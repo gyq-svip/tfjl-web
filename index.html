@@ -1740,6 +1740,34 @@
                 margin-left: 4px;
             }
         }
+        
+        @keyframes marqueeScroll {
+            0% {
+                transform: translateX(0);
+            }
+            100% {
+                transform: translateX(-100%);
+            }
+        }
+        
+        @keyframes timePulse {
+            0%, 100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 0.7;
+                transform: scale(1.1);
+            }
+        }
+        
+        #newsMarquee {
+            text-shadow: 0 0 10px #ffd700, 0 0 20px #ffd700;
+        }
+        
+        #timeText {
+            text-shadow: 0 0 10px #ffd700, 0 0 20px #ffd700;
+        }
     </style>
 </head>
 <body>
@@ -1841,8 +1869,46 @@
 
     <div class="container">
         <h1>🛡️ 塔防精灵 阵容归档</h1>
-        <p class="instructions glowing-text"> 支持导入脚本解析 | 阵容存储快速查看 | 活动遇到龙行麻烦投一下  </p>
-
+        <p id="mainTitle" class="instructions glowing-text" style="cursor:pointer;" onclick="refreshNewsAndTitle()" title="点击刷新标题"> 支持导入脚本解析 | 阵容存储快速查看 | 活动遇到龙行麻烦投一下  </p>
+        
+        <!-- 滚动公告栏 -->
+        <div id="newsMarqueeContainer" style="background:rgba(255,255,255,0.05);border:2px solid rgba(255,215,0,0.3);border-radius:10px;padding:15px;margin-bottom:20px;text-align:center;overflow:hidden;position:relative;cursor:pointer;" onclick="refreshNewsAndTitle()" title="点击刷新公告">
+            <div style="display:flex;align-items:center;gap:15px;">
+                <!-- 实时时间显示 -->
+                <div id="currentTime" style="color:#ffd700;font-weight:bold;font-size:1.1rem;white-space:nowrap;min-width:300px;text-align:left;">
+                    <span style="display:inline-block;animation:timePulse 2s ease-in-out infinite;">🕐</span>
+                    <span id="timeText">--:--:--</span>
+                </div>
+                <!-- 滚动公告 -->
+                <div style="flex:1;position:relative;overflow:hidden;">
+                    <span id="newsMarquee" style="display:inline-block;white-space:nowrap;animation:marqueeScroll 60s linear infinite;color:#ffd700;font-size:1.1rem;padding-left:100%;">暂无公告</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 版本更新说明弹窗 -->
+        <div id="versionModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:10000;align-items:center;justify-content:center;">
+            <div style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);padding:30px;border-radius:15px;max-width:500px;text-align:center;color:#fff;">
+                <h2 style="margin-top:0;">📥 离线版本说明</h2>
+                <p style="text-align:left;line-height:1.8;">
+                    <strong>使用方法：</strong><br>
+                    1. 点击右上角"菜单"按钮<br>
+                    2. 选择"下载离线版"<br>
+                    3. 保存到本地任意文件夹<br>
+                    4. 双击打开HTML文件即可使用<br><br>
+                    <strong>特点：</strong><br>
+                    ✓ 完全离线可用<br>
+                    ✓ 无需网络连接<br>
+                    ✓ 所有功能正常运行<br><br>
+                    <strong>提示：</strong><br>
+                    如果GitHub访问困难，可使用代理或等待网络恢复
+                </p>
+                <button onclick="document.getElementById('versionModal').style.display='none'" style="background:#fff;color:#667eea;padding:10px 30px;border:none;border-radius:20px;font-size:1rem;font-weight:bold;cursor:pointer;margin-top:10px;">
+                    我知道了
+                </button>
+            </div>
+        </div>
+        
         <!-- 项目管理器 -->
         <div id="scheme1">
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:rgba(255,255,255,0.05);border-radius:10px;padding:12px;margin-bottom:10px;">
@@ -1858,7 +1924,6 @@
                 <button onclick="toggleTxtFilesPanel()" title="脚本文件" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">📄</button>
                 <button onclick="toggleTextParserPanel()" title="文本解析" style="background:linear-gradient(135deg,#00bcd4,#00838f);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">🔍</button>
                 <button onclick="toggleReferencePanel()" title="参考图片" style="background:linear-gradient(135deg,#9c27b0,#7b1fa2);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">🖼️</button>
-                <button onclick="showHelpModal()" title="帮助" style="background:linear-gradient(135deg,#2196f3,#1976d2);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">❓</button>
             </div>
         </div>
 
@@ -1939,122 +2004,6 @@
             }
         }
 
-        // ==================== 配置管理 ====================
-        const CONFIG_URL = 'https://raw.githubusercontent.com/ymkfqtbl2/my-web-config/refs/heads/main/config.json';
-        const CONFIG_CACHE_KEY = 'TFJL_Config_Cache';
-        const CONFIG_CACHE_TIME_KEY = 'TFJL_Config_Cache_Time';
-        
-        // 默认配置
-        const DEFAULT_CONFIG = {
-            wechat: 'GYQSVIP',
-            game: '九区-龙行',
-            notice: '',
-            open: true
-        };
-        
-        // 当前配置
-        let currentConfig = { ...DEFAULT_CONFIG };
-        
-        // 检查是否需要刷新缓存（每天刷新一次）
-        function shouldRefreshCache() {
-            const lastUpdate = localStorage.getItem(CONFIG_CACHE_TIME_KEY);
-            if (!lastUpdate) return true;
-            
-            const lastDate = new Date(lastUpdate);
-            const today = new Date();
-            
-            return lastDate.toDateString() !== today.toDateString();
-        }
-        
-        // 保存配置到缓存
-        function saveConfigToCache(config) {
-            localStorage.setItem(CONFIG_CACHE_KEY, JSON.stringify(config));
-            localStorage.setItem(CONFIG_CACHE_TIME_KEY, new Date().toISOString());
-        }
-        
-        // 从缓存加载配置
-        function loadConfigFromCache() {
-            const cached = localStorage.getItem(CONFIG_CACHE_KEY);
-            if (cached) {
-                try {
-                    return { ...DEFAULT_CONFIG, ...JSON.parse(cached) };
-                } catch (e) {
-                    console.error('解析缓存配置失败:', e);
-                }
-            }
-            return null;
-        }
-        
-        // 修复JSON格式（容错处理）
-        function fixJsonFormat(jsonStr) {
-            return jsonStr
-                .replace(/(\w+)\s*:/g, '"$1":')  // 给键名加引号
-                .replace(/}\s*"(\w+)":/g, ',"$1":')  // 修复缺少逗号的情况
-                .replace(/,\s*}/g, '}')  // 移除最后一个逗号
-                .replace(/,\s*]/g, ']');  // 移除最后一个逗号
-        }
-        
-        // 从GitHub获取配置
-        async function fetchConfigFromGitHub() {
-            try {
-                const response = await fetch(CONFIG_URL, {
-                    method: 'GET',
-                    headers: {
-                        'Accept': 'application/json'
-                    }
-                });
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
-                }
-                
-                let text = await response.text();
-                
-                // 尝试直接解析
-                let config;
-                try {
-                    config = JSON.parse(text);
-                } catch (e) {
-                    // 如果直接解析失败，尝试修复格式
-                    console.log('尝试修复JSON格式...');
-                    text = fixJsonFormat(text);
-                    config = JSON.parse(text);
-                }
-                
-                return { ...DEFAULT_CONFIG, ...config };
-            } catch (error) {
-                console.error('从GitHub获取配置失败:', error);
-                throw error;
-            }
-        }
-        
-        // 加载配置（优先缓存，每天刷新一次）
-        async function loadConfig() {
-            // 先尝试从缓存加载
-            const cachedConfig = loadConfigFromCache();
-            if (cachedConfig) {
-                currentConfig = cachedConfig;
-            }
-            
-            // 如果需要刷新缓存或没有缓存，从GitHub获取
-            if (shouldRefreshCache() || !cachedConfig) {
-                try {
-                    const freshConfig = await fetchConfigFromGitHub();
-                    currentConfig = freshConfig;
-                    saveConfigToCache(freshConfig);
-                    console.log('配置已从GitHub更新:', freshConfig);
-                } catch (error) {
-                    console.warn('使用缓存配置:', currentConfig);
-                    // 如果没有缓存，使用默认值
-                    if (!cachedConfig) {
-                        currentConfig = { ...DEFAULT_CONFIG };
-                    }
-                }
-            }
-            
-            return currentConfig;
-        }
-
         // ==================== 密码验证 ====================
         // 在这里配置多个有效的访问密码
         const validPasswords = ['longxing', 'tfjl', 'admin', '123456'];
@@ -2079,6 +2028,9 @@
             const password = input.value.trim();
 
             if (validPasswords.includes(password)) {
+                // 记录登录
+                recordLogin();
+                
                 // 密码正确，隐藏验证层并显示主内容
                 document.getElementById('passwordOverlay').style.display = 'none';
                 document.getElementById('mainContent').classList.add('visible');
@@ -2092,18 +2044,6 @@
                 input.focus();
             }
         }
-
-        // 页面加载时检查是否已登录
-        window.onload = async function() {
-            // 加载配置
-            await loadConfig();
-            
-            if (localStorage.getItem('TFJL_LoggedIn') === 'true') {
-                // 如果已登录，直接隐藏密码层并显示内容
-                document.getElementById('passwordOverlay').style.display = 'none';
-                document.getElementById('mainContent').classList.add('visible');
-            }
-        };
 
         function updateProjectList1() {
             const cat = document.getElementById('categorySelector1').value;
@@ -2142,7 +2082,7 @@
         <div class="sticky-buttons" style="position:fixed;top:20px;right:20px;z-index:9999;display:flex;gap:10px;">
             <button onclick="saveCurrentProject()" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:10px 18px;border-radius:8px;cursor:pointer;font-size:0.9rem;box-shadow:0 2px 10px rgba(0,0,0,0.3);">💾 保存</button>
             <div style="position:relative;">
-                <button onclick="toggleBackupMenu(this)" title="备份恢复" style="background:linear-gradient(135deg,#ff5722,#e64a19);color:white;border:none;padding:10px 18px;border-radius:8px;cursor:pointer;font-size:0.9rem;box-shadow:0 2px 10px rgba(0,0,0,0.3);">💾 备份恢复</button>
+                <button onclick="toggleBackupMenu(this)" title="菜单" style="background:linear-gradient(135deg,#ff5722,#e64a19);color:white;border:none;padding:10px 18px;border-radius:8px;cursor:pointer;font-size:0.9rem;box-shadow:0 2px 10px rgba(0,0,0,0.3);">🍔 菜单</button>
                 <div id="backupMenu" style="display:none;position:absolute;top:100%;right:0;margin-top:5px;background:#2a2a4a;border:1px solid rgba(255,215,0,0.3);border-radius:8px;padding:8px 0;min-width:180px;z-index:1000;box-shadow:0 4px 15px rgba(0,0,0,0.4);">
                     <div style="padding:6px 15px;color:#ffd700;font-size:0.85rem;font-weight:bold;border-bottom:1px solid rgba(255,255,255,0.1);margin-bottom:5px;">📋 全部数据</div>
                     <div onclick="exportAllData();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📤 全部备份</div>
@@ -2151,6 +2091,16 @@
                     <div style="padding:6px 15px;color:#ffd700;font-size:0.85rem;font-weight:bold;border-bottom:1px solid rgba(255,255,255,0.1);border-top:1px solid rgba(255,255,255,0.1);margin:5px 0;">📁 单个项目</div>
                     <div onclick="exportCurrentProject();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📤 备份此项目</div>
                     <div onclick="importSingleProject();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📥 恢复项目</div>
+                    
+                    <div style="padding:6px 15px;color:#667eea;font-size:0.85rem;font-weight:bold;border-bottom:1px solid rgba(255,255,255,0.1);border-top:1px solid rgba(255,255,255,0.1);margin:5px 0;">📦 离线版本</div>
+                    <div onclick="downloadOfflineVersion();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📥 下载离线版</div>
+                    
+                    <div style="padding:6px 15px;color:#9c27b0;font-size:0.85rem;font-weight:bold;border-bottom:1px solid rgba(255,255,255,0.1);border-top:1px solid rgba(255,255,255,0.1);margin:5px 0;">📊 统计</div>
+                    <div onclick="showStatistics();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📈 查看统计</div>
+                    
+                    <div style="padding:6px 15px;color:#2196f3;font-size:0.85rem;font-weight:bold;border-bottom:1px solid rgba(255,255,255,0.1);border-top:1px solid rgba(255,255,255,0.1);margin:5px 0;">❓ 帮助</div>
+                    <div onclick="showHelpModal();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📖 使用帮助</div>
+                    <div onclick="testConnections();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">🔧 测试连接</div>
                 </div>
             </div>
             <input type="file" id="importFileInput" accept=".json" style="display:none;" onchange="handleImportFile(this)">
@@ -5869,6 +5819,967 @@
             // 初始化粒子背景
             initParticleBackground();
         });
+        
+        // ==================== 配置管理 ====================
+        const CONFIG_URL = 'https://raw.githubusercontent.com/gyq-svip/my-web-config/refs/heads/main/config.json';
+        const NEWS_URL = 'https://raw.githubusercontent.com/gyq-svip/my-web-config/refs/heads/main/news.json';
+        const CONFIG_CACHE_KEY = 'TFJL_Config_Cache';
+        const CONFIG_CACHE_TIME_KEY = 'TFJL_Config_Cache_Time';
+        const NEWS_CACHE_KEY = 'TFJL_News_Cache';
+        const NEWS_CACHE_TIME_KEY = 'TFJL_News_Cache_Time';
+        
+        // 默认配置
+        const DEFAULT_CONFIG = {
+            wechat: 'GYQSVIP',
+            game: '九区-龙行',
+            notice: '',
+            open: true,
+            title: '支持导入脚本解析 | 阵容存储快速查看 | 活动遇到龙行麻烦投一下'
+        };
+        
+        // 当前配置
+        let currentConfig = { ...DEFAULT_CONFIG };
+        
+        // 新闻/公告数据
+        let newsItems = [];
+        
+        // 统计相关常量
+        const GIST_ID = 'd302c6e90e9448885d9ccb4940abae28';
+        const GIST_URL = `https://api.github.com/gists/${GIST_ID}`;
+        const COUNTER_CACHE_KEY = 'TFJL_Counter_Cache';
+        const COUNTER_CACHE_TIME_KEY = 'TFJL_Counter_Cache_Time';
+        
+        // 当前统计数据
+        let counterData = null;
+        
+        // 检查是否需要刷新配置缓存（每天刷新一次）
+        function shouldRefreshCache() {
+            const lastUpdate = localStorage.getItem(CONFIG_CACHE_TIME_KEY);
+            if (!lastUpdate) return true;
+            
+            const lastDate = new Date(lastUpdate);
+            const today = new Date();
+            
+            return lastDate.toDateString() !== today.toDateString();
+        }
+        
+        // 保存配置到缓存
+        function saveConfigToCache(config) {
+            localStorage.setItem(CONFIG_CACHE_KEY, JSON.stringify(config));
+            localStorage.setItem(CONFIG_CACHE_TIME_KEY, new Date().toISOString());
+        }
+        
+        // 从缓存加载配置
+        function loadConfigFromCache() {
+            const cached = localStorage.getItem(CONFIG_CACHE_KEY);
+            if (cached) {
+                try {
+                    return JSON.parse(cached);
+                } catch (e) {
+                    console.error('解析配置缓存失败:', e);
+                }
+            }
+            return null;
+        }
+        
+        // 从GitHub获取配置
+        async function fetchConfigFromGitHub() {
+            try {
+                const response = await fetch(CONFIG_URL, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                let text = await response.text();
+                
+                // 尝试直接解析
+                let data;
+                try {
+                    data = JSON.parse(text);
+                } catch (e) {
+                    console.log('尝试修复JSON格式...');
+                    text = fixJsonFormat(text);
+                    data = JSON.parse(text);
+                }
+                
+                return data;
+            } catch (error) {
+                console.error('从GitHub获取配置失败:', error);
+                throw error;
+            }
+        }
+        
+        // 修复JSON格式
+        function fixJsonFormat(text) {
+            let fixed = text.replace(/\/\/.*$/gm, '');
+            fixed = fixed.replace(/,(\s*[}\]])/g, '$1');
+            return fixed;
+        }
+        
+        // 加载配置（优先缓存，每天刷新一次）
+        async function loadConfig() {
+            const cachedConfig = loadConfigFromCache();
+            if (cachedConfig) {
+                currentConfig = { ...DEFAULT_CONFIG, ...cachedConfig };
+            }
+            
+            if (shouldRefreshCache() || !cachedConfig) {
+                try {
+                    const freshConfig = await fetchConfigFromGitHub();
+                    // config.json 只处理联系方式，不处理title（title由news文件负责）
+                    currentConfig = { ...DEFAULT_CONFIG };
+                    if (freshConfig.wechat) currentConfig.wechat = freshConfig.wechat;
+                    if (freshConfig.game) currentConfig.game = freshConfig.game;
+                    if (freshConfig.notice) currentConfig.notice = freshConfig.notice;
+                    if (freshConfig.open !== undefined) currentConfig.open = freshConfig.open;
+                    saveConfigToCache(currentConfig);
+                    console.log('配置已从GitHub更新:', currentConfig);
+                } catch (error) {
+                    console.warn('使用缓存配置:', currentConfig);
+                    if (!cachedConfig) {
+                        currentConfig = { ...DEFAULT_CONFIG };
+                    }
+                }
+            }
+            
+            return currentConfig;
+        }
+        
+        // 检查是否需要刷新新闻缓存（每天刷新一次）
+        function shouldRefreshNewsCache() {
+            const lastUpdate = localStorage.getItem(NEWS_CACHE_TIME_KEY);
+            if (!lastUpdate) return true;
+            
+            const lastDate = new Date(lastUpdate);
+            const today = new Date();
+            
+            return lastDate.toDateString() !== today.toDateString();
+        }
+        
+        // 保存新闻到缓存
+        function saveNewsToCache(news) {
+            localStorage.setItem(NEWS_CACHE_KEY, JSON.stringify(news));
+            localStorage.setItem(NEWS_CACHE_TIME_KEY, new Date().toISOString());
+        }
+        
+        // 从缓存加载新闻
+        function loadNewsFromCache() {
+            const cached = localStorage.getItem(NEWS_CACHE_KEY);
+            if (cached) {
+                try {
+                    return JSON.parse(cached);
+                } catch (e) {
+                    console.error('解析新闻缓存失败:', e);
+                }
+            }
+            return null;
+        }
+        
+        // 从GitHub获取新闻和配置
+        async function fetchNewsFromGitHub() {
+            try {
+                const response = await fetch(NEWS_URL, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                let text = await response.text();
+                
+                // 尝试直接解析
+                let data;
+                try {
+                    data = JSON.parse(text);
+                } catch (e) {
+                    // 如果直接解析失败，尝试修复格式
+                    console.log('尝试修复JSON格式...');
+                    text = fixJsonFormat(text);
+                    data = JSON.parse(text);
+                }
+                
+                // 提取配置字段（如果有的话）
+                if (data && data.title) {
+                    currentConfig.title = data.title;
+                }
+                if (data && data.wechat) {
+                    currentConfig.wechat = data.wechat;
+                }
+                if (data && data.game) {
+                    currentConfig.game = data.game;
+                }
+                if (data && data.notice) {
+                    currentConfig.notice = data.notice;
+                }
+                if (data && typeof data.open !== 'undefined') {
+                    currentConfig.open = data.open;
+                }
+                
+                // 提取新闻数据
+                if (data && data.data && Array.isArray(data.data)) {
+                    return data.data;
+                }
+                
+                return [];
+            } catch (error) {
+                console.error('从GitHub获取新闻失败:', error);
+                throw error;
+            }
+        }
+        
+        // 加载新闻（优先缓存，每天刷新一次）
+        async function loadNews() {
+            // 先尝试从缓存加载
+            const cachedNews = loadNewsFromCache();
+            if (cachedNews) {
+                newsItems = cachedNews;
+            }
+            
+            // 如果需要刷新缓存或没有缓存，从GitHub获取
+            if (shouldRefreshNewsCache() || !cachedNews) {
+                try {
+                    const freshNews = await fetchNewsFromGitHub();
+                    newsItems = freshNews;
+                    saveNewsToCache(freshNews);
+                    console.log('新闻已从GitHub更新:', freshNews);
+                } catch (error) {
+                    console.warn('使用缓存新闻:', newsItems);
+                    // 如果没有缓存，使用默认新闻
+                    if (!cachedNews) {
+                        newsItems = [];
+                    }
+                }
+            }
+            
+            // 数据加载完成后，初始化公告显示
+            initMarquee();
+            
+            return newsItems;
+        }
+        
+        // 拼接新闻内容用于滚动显示
+        function getNewsMarqueeText() {
+            if (newsItems.length === 0) {
+                return '暂无公告';
+            }
+            
+            const texts = newsItems.map(item => {
+                // 拼接分类、名称、内容、作者和发布时间
+                let text = '';
+                if (item.category) text += `[${item.category}]`;
+                if (item.name) {
+                    if (text) text += ' ';
+                    text += item.name;
+                }
+                if (item.content && item.content.trim()) {
+                    if (text) text += ' - ';
+                    text += item.content.trim();
+                }
+                if (item.author && item.author !== '无名') {
+                    if (text) text += ` (${item.author})`;
+                }
+                if (item.publish_time) {
+                    if (text) text += ` [${item.publish_time.substring(0, 16)}]`;
+                }
+                return text.trim();
+            }).filter(text => text.length > 0);
+            
+            return texts.join('　　◆　　');
+        }
+        
+        // 更新实时时间
+        function updateCurrentTime() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+            const weekday = weekdays[now.getDay()];
+            const timeStr = now.toLocaleTimeString('zh-CN', { 
+                hour: '2-digit', 
+                minute: '2-digit', 
+                second: '2-digit',
+                hour12: false
+            });
+            const timeText = document.getElementById('timeText');
+            if (timeText) {
+                timeText.textContent = `${year}-${month}-${day} ${weekday} ${timeStr}`;
+            }
+        }
+        
+        // 初始化实时时间
+        function initCurrentTime() {
+            updateCurrentTime();
+            // 每秒更新一次
+            setInterval(updateCurrentTime, 1000);
+        }
+        
+        // 随机颜色数组
+        const marqueeColors = [
+            '#ffd700',  // 金色
+            '#ff6b6b',  // 红色
+            '#4ecdc4',  // 青色
+            '#45b7d1',  // 蓝色
+            '#96ceb4',  // 绿色
+            '#ffeaa7',  // 浅黄
+            '#fd79a8',  // 粉色
+            '#a29bfe',  // 紫色
+            '#74b9ff',  // 浅蓝
+            '#55efc4',  // 薄荷绿
+        ];
+        
+        // 获取随机颜色
+        function getRandomMarqueeColor() {
+            return marqueeColors[Math.floor(Math.random() * marqueeColors.length)];
+        }
+        
+        // 初始化滚动公告
+        function initMarquee() {
+            // 初始化实时时间
+            initCurrentTime();
+            
+            // 更新主标题
+            const titleEl = document.getElementById('mainTitle');
+            if (titleEl && currentConfig.title) {
+                titleEl.textContent = ' ' + currentConfig.title + ' ';
+            }
+            
+            const marqueeText = getNewsMarqueeText();
+            const marqueeEl = document.getElementById('newsMarquee');
+            if (marqueeEl) {
+                marqueeEl.textContent = marqueeText;
+                
+                // 每3秒随机改变颜色
+                setInterval(() => {
+                    const newColor = getRandomMarqueeColor();
+                    marqueeEl.style.color = newColor;
+                    marqueeEl.style.textShadow = `0 0 10px ${newColor}, 0 0 20px ${newColor}`;
+                }, 3000);
+            }
+        }
+        
+        // ==================== 测试连接功能 ====================
+        async function testConnections() {
+            const results = [];
+            const urls = [
+                { name: '配置文件', url: CONFIG_URL },
+                { name: '新闻数据', url: NEWS_URL },
+                { name: '统计Gist', url: GIST_URL }
+            ];
+            
+            // 测试每个URL
+            for (const item of urls) {
+                try {
+                    const startTime = Date.now();
+                    const response = await fetch(item.url, { timeout: 10000 });
+                    const duration = Date.now() - startTime;
+                    
+                    if (response.ok) {
+                        const text = await response.text();
+                        results.push({
+                            name: item.name,
+                            url: item.url,
+                            status: 'success',
+                            statusCode: response.status,
+                            duration: duration,
+                            size: text.length,
+                            preview: text.substring(0, 100) + (text.length > 100 ? '...' : '')
+                        });
+                    } else {
+                        results.push({
+                            name: item.name,
+                            url: item.url,
+                            status: 'error',
+                            statusCode: response.status,
+                            duration: duration,
+                            message: `HTTP ${response.status}`
+                        });
+                    }
+                } catch (error) {
+                    results.push({
+                        name: item.name,
+                        url: item.url,
+                        status: 'error',
+                        message: error.message || '未知错误'
+                    });
+                }
+            }
+            
+            // 显示测试结果
+            showTestResults(results);
+        }
+        
+        // 显示测试结果
+        function showTestResults(results) {
+            let html = `
+                <div style="text-align:left;line-height:1.8;max-height:60vh;overflow-y:auto;">
+                    <h2 style="color:#ffd700;margin-top:0;">🔧 连接测试结果</h2>
+                    <p style="color:#888;font-size:0.9rem;">测试时间：${new Date().toLocaleString('zh-CN')}</p>
+                    <hr style="border-color:rgba(255,255,255,0.2);margin:15px 0;">
+            `;
+            
+            results.forEach((result, index) => {
+                const statusIcon = result.status === 'success' ? '✅' : '❌';
+                const statusColor = result.status === 'success' ? '#4caf50' : '#ff6b6b';
+                
+                html += `
+                    <div style="margin-bottom:15px;padding:12px;border-radius:8px;background:rgba(255,255,255,0.05);">
+                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                            <span style="font-size:1.2rem;">${statusIcon}</span>
+                            <span style="color:${statusColor};font-weight:bold;">${result.name}</span>
+                        </div>
+                        <div style="padding-left:28px;">
+                            <p style="color:#888;font-size:0.85rem;margin:4px 0;">地址：${result.url}</p>
+                            ${result.statusCode ? `<p style="color:#888;font-size:0.85rem;margin:4px 0;">状态码：${result.statusCode}</p>` : ''}
+                            ${result.duration ? `<p style="color:#888;font-size:0.85rem;margin:4px 0;">耗时：${result.duration}ms</p>` : ''}
+                            ${result.size ? `<p style="color:#888;font-size:0.85rem;margin:4px 0;">数据大小：${result.size}字节</p>` : ''}
+                            ${result.message ? `<p style="color:#ff6b6b;font-size:0.85rem;margin:4px 0;">错误：${result.message}</p>` : ''}
+                            ${result.preview ? `<div style="margin-top:8px;padding:8px;background:#1a1a2e;border-radius:4px;font-size:0.8rem;color:#55efc4;word-break:break-all;">预览：${result.preview}</div>` : ''}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += `
+                    <hr style="border-color:rgba(255,255,255,0.2);margin:15px 0;">
+                    <p style="color:#888;font-size:0.85rem;">提示：如果测试失败，请检查网络连接或尝试使用代理</p>
+                </div>
+            `;
+            
+            const modal = document.createElement('div');
+            modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;';
+            modal.innerHTML = `
+                <div style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);border:2px solid rgba(255,215,0,0.5);border-radius:15px;padding:30px;max-width:600px;width:100%;color:#fff;">
+                    <button onclick="this.closest('div').parentElement.remove()" style="position:absolute;top:15px;right:20px;background:#ff6b6b;color:#fff;border:none;width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:1.2rem;line-height:30px;">×</button>
+                    ${html}
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+        
+        // ==================== 刷新公告和标题 ====================
+        async function refreshNewsAndTitle() {
+            const marqueeEl = document.getElementById('newsMarquee');
+            const titleEl = document.getElementById('mainTitle');
+            
+            // 保存当前数据（用于失败时恢复）
+            const backupNewsItems = [...newsItems];
+            const backupTitle = currentConfig.title;
+            
+            // 显示加载状态
+            marqueeEl.textContent = '正在刷新...';
+            marqueeEl.style.animation = 'none';
+            
+            try {
+                // 强制重新加载新闻（跳过缓存）
+                const response = await fetch(NEWS_URL, { cache: 'no-cache' });
+                
+                if (response.ok) {
+                    let text = await response.text();
+                    text = fixJsonFormat(text);
+                    
+                    try {
+                        const data = JSON.parse(text);
+                        
+                        // 更新新闻数据
+                        newsItems = data.data || [];
+                        
+                        // 更新配置（标题等）
+                        if (data.title) {
+                            currentConfig.title = data.title;
+                            if (titleEl) {
+                                titleEl.textContent = ' ' + data.title + ' ';
+                            }
+                        }
+                        if (data.wechat) currentConfig.wechat = data.wechat;
+                        if (data.game) currentConfig.game = data.game;
+                        if (data.notice) currentConfig.notice = data.notice;
+                        if (data.open !== undefined) currentConfig.open = data.open;
+                        
+                        // 保存到缓存
+                        saveConfigToCache(currentConfig);
+                        localStorage.setItem('TFJL_News_Cache', JSON.stringify(newsItems));
+                        
+                        // 重新初始化滚动公告
+                        initMarquee();
+                        
+                        // 记录公告获取
+                        recordNewsFetch();
+                        
+                    } catch (e) {
+                        console.error('解析新闻数据失败:', e);
+                        // 恢复备份数据
+                        newsItems = backupNewsItems;
+                        currentConfig.title = backupTitle;
+                        marqueeEl.textContent = '刷新失败，显示缓存数据';
+                        // 恢复动画
+                        setTimeout(() => {
+                            marqueeEl.textContent = getNewsMarqueeText();
+                            marqueeEl.style.animation = 'marqueeScroll 60s linear infinite';
+                        }, 1500);
+                    }
+                } else {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+            } catch (error) {
+                console.error('刷新公告失败:', error);
+                // 恢复备份数据
+                newsItems = backupNewsItems;
+                currentConfig.title = backupTitle;
+                marqueeEl.textContent = '网络异常，显示缓存数据';
+                // 恢复动画
+                setTimeout(() => {
+                    marqueeEl.textContent = getNewsMarqueeText();
+                    marqueeEl.style.animation = 'marqueeScroll 60s linear infinite';
+                }, 1500);
+            }
+        }
+        
+        // ==================== 下载离线版本 ====================
+        function downloadOfflineVersion() {
+            // 记录下载
+            recordDownload();
+            
+            // 显示使用说明
+            document.getElementById('versionModal').style.display = 'flex';
+            
+            // 获取当前页面内容
+            const htmlContent = document.documentElement.outerHTML;
+            
+            // 创建下载
+            const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `塔防精灵_离线版_${new Date().toLocaleDateString('zh-CN').replace(/\//g, '-')}.html`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+        
+        // 页面加载时初始化
+        window.onload = async function() {
+            // 记录访问
+            await recordVisit();
+            
+            // 加载配置和新闻
+            await loadConfig();
+            await loadNews();
+            
+            // 记录公告获取
+            recordNewsFetch();
+            
+            // 设置网络监听（离线同步）
+            setupNetworkListener();
+            
+            // 检查登录状态
+            if (localStorage.getItem('TFJL_LoggedIn') === 'true') {
+                document.getElementById('passwordOverlay').style.display = 'none';
+                document.getElementById('mainContent').classList.add('visible');
+            }
+        };
+        
+        // ==================== 统计功能 ====================
+        
+        // 获取今天的日期字符串
+        function getTodayString() {
+            const now = new Date();
+            return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        }
+        
+        // 获取当前时间字符串
+        function getCurrentTimeString() {
+            const now = new Date();
+            return now.toLocaleString('zh-CN');
+        }
+        
+        // 从缓存加载统计数据
+        function loadCounterFromCache() {
+            const cached = localStorage.getItem(COUNTER_CACHE_KEY);
+            if (cached) {
+                try {
+                    return JSON.parse(cached);
+                } catch (e) {
+                    console.error('解析统计缓存失败:', e);
+                }
+            }
+            return null;
+        }
+        
+        // 保存统计数据到缓存
+        function saveCounterToCache(data) {
+            localStorage.setItem(COUNTER_CACHE_KEY, JSON.stringify(data));
+            localStorage.setItem(COUNTER_CACHE_TIME_KEY, new Date().toISOString());
+        }
+        
+        // 从缓存加载待同步队列
+        function loadPendingSync() {
+            const cached = localStorage.getItem('TFJL_Pending_Sync');
+            if (cached) {
+                try {
+                    return JSON.parse(cached);
+                } catch (e) {
+                    console.error('解析待同步队列失败:', e);
+                }
+            }
+            return [];
+        }
+        
+        // 保存待同步队列到缓存
+        function savePendingSync(queue) {
+            localStorage.setItem('TFJL_Pending_Sync', JSON.stringify(queue));
+        }
+        
+        // 获取默认统计数据结构
+        function getDefaultCounter() {
+            const today = getTodayString();
+            return {
+                total_visits: 0,
+                total_logins: 0,
+                total_downloads: 0,
+                total_news_fetches: 0,
+                daily_stats: {
+                    [today]: {
+                        visits: 0,
+                        logins: 0,
+                        downloads: 0,
+                        news_fetches: 0
+                    }
+                },
+                last_updated: getCurrentTimeString()
+            };
+        }
+        
+        // 检查网络状态
+        function isOnline() {
+            return navigator.onLine;
+        }
+        
+        // 从Gist获取统计数据
+        async function fetchCounterFromGist() {
+            try {
+                const response = await fetch(GIST_URL);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const data = await response.json();
+                if (data.files && data.files['counter.json'] && data.files['counter.json'].content) {
+                    return JSON.parse(data.files['counter.json'].content);
+                }
+                
+                return getDefaultCounter();
+            } catch (error) {
+                console.error('从Gist获取统计数据失败:', error);
+                return null;
+            }
+        }
+        
+        // 更新统计数据
+        async function updateCounter(type) {
+            try {
+                // 如果没有加载过统计数据，先加载
+                if (!counterData) {
+                    const cached = loadCounterFromCache();
+                    if (cached) {
+                        counterData = cached;
+                    } else {
+                        const fresh = await fetchCounterFromGist();
+                        counterData = fresh || getDefaultCounter();
+                    }
+                }
+                
+                const today = getTodayString();
+                
+                // 确保今日数据存在
+                if (!counterData.daily_stats[today]) {
+                    counterData.daily_stats[today] = {
+                        visits: 0,
+                        logins: 0,
+                        downloads: 0,
+                        news_fetches: 0
+                    };
+                }
+                
+                // 更新对应统计
+                switch (type) {
+                    case 'visit':
+                        counterData.total_visits++;
+                        counterData.daily_stats[today].visits++;
+                        break;
+                    case 'login':
+                        counterData.total_logins++;
+                        counterData.daily_stats[today].logins++;
+                        break;
+                    case 'download':
+                        counterData.total_downloads++;
+                        counterData.daily_stats[today].downloads++;
+                        break;
+                    case 'news_fetch':
+                        counterData.total_news_fetches++;
+                        counterData.daily_stats[today].news_fetches++;
+                        break;
+                }
+                
+                counterData.last_updated = getCurrentTimeString();
+                
+                // 保存到缓存
+                saveCounterToCache(counterData);
+                
+                // 如果网络在线，直接同步到Gist
+                if (isOnline()) {
+                    await syncCounterToGist();
+                } else {
+                    // 网络离线，加入待同步队列
+                    addToPendingSync(type);
+                    console.log('网络离线，已加入待同步队列');
+                }
+                
+            } catch (error) {
+                console.error('更新统计失败:', error);
+            }
+        }
+        
+        // 添加到待同步队列
+        function addToPendingSync(type) {
+            const queue = loadPendingSync();
+            queue.push({
+                type: type,
+                timestamp: new Date().toISOString(),
+                date: getTodayString()
+            });
+            savePendingSync(queue);
+        }
+        
+        // 同步待处理数据到Gist
+        async function syncPendingQueue() {
+            try {
+                if (!isOnline()) {
+                    console.log('网络离线，暂不同步');
+                    return;
+                }
+                
+                const queue = loadPendingSync();
+                if (queue.length === 0) {
+                    return;
+                }
+                
+                // 先获取最新的Gist数据
+                const remoteData = await fetchCounterFromGist();
+                if (!remoteData) {
+                    console.log('无法获取远程数据，同步失败');
+                    return;
+                }
+                
+                // 合并待同步的数据
+                const today = getTodayString();
+                
+                queue.forEach(item => {
+                    const syncDate = item.date || today;
+                    
+                    // 确保日期数据存在
+                    if (!remoteData.daily_stats[syncDate]) {
+                        remoteData.daily_stats[syncDate] = {
+                            visits: 0,
+                            logins: 0,
+                            downloads: 0,
+                            news_fetches: 0
+                        };
+                    }
+                    
+                    // 更新统计
+                    switch (item.type) {
+                        case 'visit':
+                            remoteData.total_visits++;
+                            remoteData.daily_stats[syncDate].visits++;
+                            break;
+                        case 'login':
+                            remoteData.total_logins++;
+                            remoteData.daily_stats[syncDate].logins++;
+                            break;
+                        case 'download':
+                            remoteData.total_downloads++;
+                            remoteData.daily_stats[syncDate].downloads++;
+                            break;
+                        case 'news_fetch':
+                            remoteData.total_news_fetches++;
+                            remoteData.daily_stats[syncDate].news_fetches++;
+                            break;
+                    }
+                });
+                
+                remoteData.last_updated = getCurrentTimeString();
+                
+                // 同步到Gist
+                const success = await syncCounterDataToGist(remoteData);
+                
+                if (success) {
+                    // 清空队列
+                    savePendingSync([]);
+                    // 更新本地缓存
+                    saveCounterToCache(remoteData);
+                    counterData = remoteData;
+                    console.log(`成功同步 ${queue.length} 条待处理数据`);
+                }
+                
+            } catch (error) {
+                console.error('同步待处理队列失败:', error);
+            }
+        }
+        
+        // 同步统计数据到Gist（带成功返回）
+        async function syncCounterDataToGist(data) {
+            try {
+                const content = JSON.stringify(data, null, 2);
+                const response = await fetch(GIST_URL, {
+                    method: 'PATCH',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        files: {
+                            'counter.json': {
+                                content: content
+                            }
+                        }
+                    })
+                });
+                
+                return response.ok;
+            } catch (error) {
+                console.error('同步统计到Gist失败:', error);
+                return false;
+            }
+        }
+        
+        // 同步统计数据到Gist（异步）
+        async function syncCounterToGist() {
+            try {
+                if (!counterData) return;
+                
+                const content = JSON.stringify(counterData, null, 2);
+                const response = await fetch(GIST_URL, {
+                    method: 'PATCH',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        files: {
+                            'counter.json': {
+                                content: content
+                            }
+                        }
+                    })
+                });
+                
+                if (response.ok) {
+                    console.log('统计数据已同步到Gist');
+                } else {
+                    console.log('Gist同步失败:', response.status);
+                    // 同步失败，加入待同步队列
+                    // 这里可以根据需要添加重试逻辑
+                }
+            } catch (error) {
+                console.error('同步统计到Gist失败:', error);
+            }
+        }
+        
+        // 监听网络状态变化
+        function setupNetworkListener() {
+            // 网络恢复时自动同步
+            window.addEventListener('online', () => {
+                console.log('网络已恢复，开始同步待处理数据');
+                setTimeout(() => {
+                    syncPendingQueue();
+                }, 3000);
+            });
+            
+            // 页面加载时检查并同步
+            setTimeout(() => {
+                if (isOnline()) {
+                    syncPendingQueue();
+                }
+            }, 5000);
+        }
+        
+        // 显示统计数据
+        function showStatistics() {
+            if (!counterData) {
+                alert('暂无统计数据');
+                return;
+            }
+            
+            const today = getTodayString();
+            const todayStats = counterData.daily_stats[today] || { visits: 0, logins: 0, downloads: 0, news_fetches: 0 };
+            const pendingCount = loadPendingSync().length;
+            
+            let statsHtml = `
+                <div style="text-align:left;line-height:1.8;">
+                    <h2 style="color:#ffd700;margin-top:0;">📊 访问统计</h2>
+                    
+                    ${pendingCount > 0 ? `<p style="color:#ff9800;">⚠️ 有 ${pendingCount} 条数据等待同步</p>` : ''}
+                    
+                    <h3 style="color:#4ecdc4;">📈 总计数据</h3>
+                    <div style="padding-left:20px;">
+                        <p>• 总访问次数：${counterData.total_visits}</p>
+                        <p>• 总登录次数：${counterData.total_logins}</p>
+                        <p>• 总下载次数：${counterData.total_downloads}</p>
+                        <p>• 公告获取次数：${counterData.total_news_fetches}</p>
+                    </div>
+                    
+                    <h3 style="color:#4ecdc4;">📅 今日数据 (${today})</h3>
+                    <div style="padding-left:20px;">
+                        <p>• 今日访问：${todayStats.visits}</p>
+                        <p>• 今日登录：${todayStats.logins}</p>
+                        <p>• 今日下载：${todayStats.downloads}</p>
+                        <p>• 今日公告获取：${todayStats.news_fetches}</p>
+                    </div>
+                    
+                    <p style="color:#888;font-size:0.9rem;margin-top:20px;">最后更新：${counterData.last_updated}</p>
+                </div>
+            `;
+            
+            const modal = document.createElement('div');
+            modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;';
+            modal.innerHTML = `
+                <div style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);border:2px solid rgba(255,215,0,0.5);border-radius:15px;padding:30px;max-width:500px;color:#fff;">
+                    <button onclick="this.closest('div').parentElement.remove()" style="position:absolute;top:15px;right:20px;background:#ff6b6b;color:#fff;border:none;width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:1.2rem;line-height:30px;">×</button>
+                    ${statsHtml}
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+        
+        // 页面加载时记录访问
+        async function recordVisit() {
+            await updateCounter('visit');
+        }
+        
+        // 记录登录
+        function recordLogin() {
+            updateCounter('login');
+        }
+        
+        // 记录下载
+        function recordDownload() {
+            updateCounter('download');
+        }
+        
+        // 记录公告获取
+        function recordNewsFetch() {
+            updateCounter('news_fetch');
+        }
     </script>
 
     <!-- 模态框：创建分类 -->
