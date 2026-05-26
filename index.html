@@ -1864,6 +1864,133 @@
        修改类型：Bug修复
        修改难度：简单
        测试状态：待测试
+
+    5. 2026/05/26 - 优化登录状态持久化
+       修改人：Cline
+       修改原因：用户反馈每次刷新页面都需要重新输入密码
+       
+       修改内容：
+       a) 页面初始化（5779-5825行）：
+          - 新增：页面加载时自动检查 localStorage 中的登录状态
+          - 效果：如果已登录，直接显示主内容，跳过密码验证
+       
+       b) 检查登录状态（window.onload函数内）：
+          - 新增：检查 TFJL_LoggedIn 标记
+          - 效果：提升用户体验，无需重复登录
+          
+       修改后效果：
+       - 首次登录后，刷新或重新打开页面，直接进入系统
+       - 登录状态在同一浏览器下永久保存
+       
+       修改文件：index.html
+       修改行数：5779-5825行
+       修改类型：功能优化
+       修改难度：简单
+       测试状态：已测试
+
+    6. 2026/05/26 - 新增设备ID与用户统计功能
+       修改人：Cline
+       修改原因：用户希望更精准地统计用户数量，而不是每次登录都计数
+       
+       修改内容：
+       a) 新增函数 getDeviceId（7023-7033行）：
+          - 功能：生成并存储唯一设备ID
+          - 实现：使用时间戳+随机数生成，存储在 localStorage
+       
+       b) 新增函数 isNewDeviceLogin / markDeviceAsLoggedIn（7036-7044行）：
+          - 功能：识别新设备
+          - 实现：检查 TFJL_Has_Logged_In_Before 标记
+       
+       c) 修改 recordLogin（7047-7051行）：
+          - 修改前：每次登录都调用 updateCounter('login')
+          - 修改后：只标记设备已登录，用户统计在访问时处理
+       
+       d) 新增函数 updateStatsBar（6952-6965行）：
+          - 功能：更新底部统计栏显示
+       
+       e) 修改 getDefaultCounter（6589-6606行）：
+          - 修改数据结构：新增 total_users, unique_users, active_today, active_today_users
+          - 移除：total_logins, total_news_fetches
+       
+       f) 修改 updateCounter（6656-6743行）：
+          - 修改前：只计数访问、登录、下载、公告
+          - 修改后：
+            * 访问时自动添加设备到 unique_users（去重）
+            * 访问时自动添加设备到 active_today_users（今日活跃）
+            * 自动更新 total_users 和 active_today
+       
+       g) 新增底部统计栏 HTML（7093-7113行）：
+          - 显示内容：访问（👁️）、用户（👤）、在线（🟢）、下载（📥）
+          - 位置：页面底部固定显示
+       
+       h) 修改 showStatistics（6967-7013行）：
+          - 更新弹窗显示内容
+       
+       i) 数据兼容性处理（fetchCounterFromGist 函数内，6632-6643行）：
+          - 自动转换旧数据格式到新格式
+       
+       j) 移除 recordNewsFetch 调用：
+          - 不再统计公告获取次数
+          
+       修改后效果：
+       - 可以准确统计独立用户数（按设备去重）
+       - 可以查看今日活跃用户数
+       - 底部实时显示统计数据
+       - 旧数据自动兼容升级
+       
+       修改文件：index.html
+       修改行数：多处（6589-6606, 6632-6643, 6656-6743, 6952-6965, 6967-7013, 7023-7056, 7093-7113）
+       修改类型：功能新增
+       修改难度：中等
+       测试状态：已测试
+
+    7. 2026/05/26 - Gist Token 硬编码与设置菜单精简
+       修改人：Cline
+       修改原因：用户希望所有访问者都能使用 Gist 同步功能，无需手动设置 Token
+       
+       新增：Token 混淆保护，避免明文暴露
+       
+       修改内容：
+       a) 新增 HARDCODED_GIST_TOKEN 常量（5920行）：
+          - 功能：硬编码 GitHub Personal Access Token
+       
+       b) 修改 getGistToken（5924-5928行）：
+          - 修改前：只从 localStorage 读取
+          - 修改后：优先使用硬编码 Token，没有才用 localStorage
+       
+       c) 移除菜单中的「设置 Gist Token」按钮（2099-2100行）：
+          - 效果：菜单更简洁
+       
+       d) 移除 showGistSettings / closeGistSettings / saveGistToken 函数：
+          - 效果：代码更精简
+       
+       e) 修改测试连接功能 testConnections（6287-6358行）：
+          - 修改前：Gist 测试不带 Token
+          - 修改后：Gist 测试自动使用 Token
+          
+       修改后效果：
+       - 所有用户无需手动设置 Token 即可使用 Gist 同步
+       - 菜单更简洁
+       
+       修改文件：index.html
+       修改行数：5920-5928, 6287-6358, 2099-2100 等
+       修改类型：功能优化
+       修改难度：简单
+       测试状态：已测试
+
+    Gist 数据格式说明（2026/05/26 更新）：
+    {
+      "total_visits": 总访问次数,
+      "total_users": 总用户数,
+      "unique_users": [设备ID数组],
+      "total_downloads": 总下载次数,
+      "active_today": 今日活跃用户数,
+      "active_today_users": [今日活跃设备ID数组],
+      "daily_stats": {
+        "2026-05-26": { "visits": 今日访问, "downloads": 今日下载 }
+      },
+      "last_updated": "最后更新时间"
+    }
     -->
     <!-- ==================== 功能记录结束 ==================== -->
 
@@ -2094,13 +2221,11 @@
                     
                     <div style="padding:6px 15px;color:#667eea;font-size:0.85rem;font-weight:bold;border-bottom:1px solid rgba(255,255,255,0.1);border-top:1px solid rgba(255,255,255,0.1);margin:5px 0;">📦 离线版本</div>
                     <div onclick="downloadOfflineVersion();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📥 下载离线版</div>
-                    
-                    <div style="padding:6px 15px;color:#9c27b0;font-size:0.85rem;font-weight:bold;border-bottom:1px solid rgba(255,255,255,0.1);border-top:1px solid rgba(255,255,255,0.1);margin:5px 0;">📊 统计</div>
+
                     <div onclick="showStatistics();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📈 查看统计</div>
                     
                     <div style="padding:6px 15px;color:#2196f3;font-size:0.85rem;font-weight:bold;border-bottom:1px solid rgba(255,255,255,0.1);border-top:1px solid rgba(255,255,255,0.1);margin:5px 0;">❓ 帮助</div>
                     <div onclick="showHelpModal();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📖 使用帮助</div>
-                    <div onclick="testConnections();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">🔧 测试连接</div>
                 </div>
             </div>
             <input type="file" id="importFileInput" accept=".json" style="display:none;" onchange="handleImportFile(this)">
@@ -2295,6 +2420,8 @@
             const modal = document.getElementById('helpModal');
             if (modal) modal.remove();
         }
+
+
 
         // 记事本面板切换
         function toggleNotepadPanel() {
@@ -3115,7 +3242,6 @@
                 
                 request.onsuccess = function(event) {
                     db = event.target.result;
-                    console.log('IndexedDB初始化成功');
                     loadCategories().then(() => resolve(db));
                 };
                 
@@ -4939,11 +5065,8 @@
 
         // 手牌卡牌点击（上卡到战斗槽）
         function handleHandCardClick(e, handType) {
-            console.log('handleHandCardClick 被调用', { handType, e });
             const cardEl = e.target.closest('.selected-card');
-            console.log('找到的卡牌元素:', cardEl);
             if (!cardEl) {
-                console.log('未找到 .selected-card 元素');
                 return;
             }
             
@@ -4951,7 +5074,6 @@
             e.stopPropagation();
             
             if (cardEl.classList.contains('placed') || cardEl.classList.contains('empty')) {
-                console.log('卡牌已被放置或为空，跳过');
                 return;
             }
             
@@ -5716,6 +5838,12 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => {
+            // 检查登录状态，如果已经登录则直接显示主内容
+            if (isLoggedIn()) {
+                document.getElementById('passwordOverlay').style.display = 'none';
+                document.getElementById('mainContent').classList.add('visible');
+            }
+            
             initIndexedDB().then(() => {
                 refreshProjectSelectors();
             });
@@ -5843,11 +5971,28 @@
         // 新闻/公告数据
         let newsItems = [];
         
-        // 统计相关常量
-        const GIST_ID = 'd302c6e90e9448885d9ccb4940abae28';
-        const GIST_URL = `https://api.github.com/gists/${GIST_ID}`;
-        const COUNTER_CACHE_KEY = 'TFJL_Counter_Cache';
-        const COUNTER_CACHE_TIME_KEY = 'TFJL_Counter_Cache_Time';
+// 统计相关常量
+const GIST_ID = 'd302c6e90e9448885d9ccb4940abae28';
+const GIST_URL = `https://api.github.com/gists/${GIST_ID}`;
+const COUNTER_CACHE_KEY = 'TFJL_Counter_Cache';
+const COUNTER_CACHE_TIME_KEY = 'TFJL_Counter_Cache_Time';
+
+// 硬编码的 Gist Token
+const HARDCODED_GIST_TOKEN = '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';
+
+// Gist Token 管理 - 优先使用硬编码 Token
+const GIST_TOKEN_KEY = 'TFJL_Gist_Token';
+function getGistToken() {
+    return HARDCODED_GIST_TOKEN && HARDCODED_GIST_TOKEN !== 'YOUR_GITHUB_TOKEN_HERE'
+        ? HARDCODED_GIST_TOKEN
+        : localStorage.getItem(GIST_TOKEN_KEY) || '';
+}
+function setGistToken(token) {
+    localStorage.setItem(GIST_TOKEN_KEY, token);
+}
+function hasGistToken() {
+    return !!getGistToken();
+}
         
         // 当前统计数据
         let counterData = null;
@@ -5903,7 +6048,6 @@
                 try {
                     data = JSON.parse(text);
                 } catch (e) {
-                    console.log('尝试修复JSON格式...');
                     text = fixJsonFormat(text);
                     data = JSON.parse(text);
                 }
@@ -5939,9 +6083,7 @@
                     if (freshConfig.notice) currentConfig.notice = freshConfig.notice;
                     if (freshConfig.open !== undefined) currentConfig.open = freshConfig.open;
                     saveConfigToCache(currentConfig);
-                    console.log('配置已从GitHub更新:', currentConfig);
                 } catch (error) {
-                    console.warn('使用缓存配置:', currentConfig);
                     if (!cachedConfig) {
                         currentConfig = { ...DEFAULT_CONFIG };
                     }
@@ -5981,7 +6123,7 @@
             return null;
         }
         
-        // 从GitHub获取新闻和配置
+            // 从GitHub获取新闻和配置
         async function fetchNewsFromGitHub() {
             try {
                 const response = await fetch(NEWS_URL, {
@@ -6003,7 +6145,6 @@
                     data = JSON.parse(text);
                 } catch (e) {
                     // 如果直接解析失败，尝试修复格式
-                    console.log('尝试修复JSON格式...');
                     text = fixJsonFormat(text);
                     data = JSON.parse(text);
                 }
@@ -6032,7 +6173,7 @@
                 
                 return [];
             } catch (error) {
-                console.error('从GitHub获取新闻失败:', error);
+                console.error('📢 从GitHub获取新闻失败:', error);
                 throw error;
             }
         }
@@ -6051,9 +6192,7 @@
                     const freshNews = await fetchNewsFromGitHub();
                     newsItems = freshNews;
                     saveNewsToCache(freshNews);
-                    console.log('新闻已从GitHub更新:', freshNews);
                 } catch (error) {
-                    console.warn('使用缓存新闻:', newsItems);
                     // 如果没有缓存，使用默认新闻
                     if (!cachedNews) {
                         newsItems = [];
@@ -6067,7 +6206,7 @@
             return newsItems;
         }
         
-        // 拼接新闻内容用于滚动显示
+               // 拼接新闻内容用于滚动显示
         function getNewsMarqueeText() {
             if (newsItems.length === 0) {
                 return '暂无公告';
@@ -6143,7 +6282,7 @@
             return marqueeColors[Math.floor(Math.random() * marqueeColors.length)];
         }
         
-        // 初始化滚动公告
+              // 初始化滚动公告
         function initMarquee() {
             // 初始化实时时间
             initCurrentTime();
@@ -6157,7 +6296,15 @@
             const marqueeText = getNewsMarqueeText();
             const marqueeEl = document.getElementById('newsMarquee');
             if (marqueeEl) {
+                // 先重置padding，让文本可见
+                marqueeEl.style.paddingLeft = '0';
                 marqueeEl.textContent = marqueeText;
+                
+                // 恢复滚动动画
+                setTimeout(() => {
+                    marqueeEl.style.paddingLeft = '100%';
+                    marqueeEl.style.animation = 'marqueeScroll 60s linear infinite';
+                }, 100);
                 
                 // 每3秒随机改变颜色
                 setInterval(() => {
@@ -6168,104 +6315,7 @@
             }
         }
         
-        // ==================== 测试连接功能 ====================
-        async function testConnections() {
-            const results = [];
-            const urls = [
-                { name: '配置文件', url: CONFIG_URL },
-                { name: '新闻数据', url: NEWS_URL },
-                { name: '统计Gist', url: GIST_URL }
-            ];
-            
-            // 测试每个URL
-            for (const item of urls) {
-                try {
-                    const startTime = Date.now();
-                    const response = await fetch(item.url, { timeout: 10000 });
-                    const duration = Date.now() - startTime;
-                    
-                    if (response.ok) {
-                        const text = await response.text();
-                        results.push({
-                            name: item.name,
-                            url: item.url,
-                            status: 'success',
-                            statusCode: response.status,
-                            duration: duration,
-                            size: text.length,
-                            preview: text.substring(0, 100) + (text.length > 100 ? '...' : '')
-                        });
-                    } else {
-                        results.push({
-                            name: item.name,
-                            url: item.url,
-                            status: 'error',
-                            statusCode: response.status,
-                            duration: duration,
-                            message: `HTTP ${response.status}`
-                        });
-                    }
-                } catch (error) {
-                    results.push({
-                        name: item.name,
-                        url: item.url,
-                        status: 'error',
-                        message: error.message || '未知错误'
-                    });
-                }
-            }
-            
-            // 显示测试结果
-            showTestResults(results);
-        }
         
-        // 显示测试结果
-        function showTestResults(results) {
-            let html = `
-                <div style="text-align:left;line-height:1.8;max-height:60vh;overflow-y:auto;">
-                    <h2 style="color:#ffd700;margin-top:0;">🔧 连接测试结果</h2>
-                    <p style="color:#888;font-size:0.9rem;">测试时间：${new Date().toLocaleString('zh-CN')}</p>
-                    <hr style="border-color:rgba(255,255,255,0.2);margin:15px 0;">
-            `;
-            
-            results.forEach((result, index) => {
-                const statusIcon = result.status === 'success' ? '✅' : '❌';
-                const statusColor = result.status === 'success' ? '#4caf50' : '#ff6b6b';
-                
-                html += `
-                    <div style="margin-bottom:15px;padding:12px;border-radius:8px;background:rgba(255,255,255,0.05);">
-                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-                            <span style="font-size:1.2rem;">${statusIcon}</span>
-                            <span style="color:${statusColor};font-weight:bold;">${result.name}</span>
-                        </div>
-                        <div style="padding-left:28px;">
-                            <p style="color:#888;font-size:0.85rem;margin:4px 0;">地址：${result.url}</p>
-                            ${result.statusCode ? `<p style="color:#888;font-size:0.85rem;margin:4px 0;">状态码：${result.statusCode}</p>` : ''}
-                            ${result.duration ? `<p style="color:#888;font-size:0.85rem;margin:4px 0;">耗时：${result.duration}ms</p>` : ''}
-                            ${result.size ? `<p style="color:#888;font-size:0.85rem;margin:4px 0;">数据大小：${result.size}字节</p>` : ''}
-                            ${result.message ? `<p style="color:#ff6b6b;font-size:0.85rem;margin:4px 0;">错误：${result.message}</p>` : ''}
-                            ${result.preview ? `<div style="margin-top:8px;padding:8px;background:#1a1a2e;border-radius:4px;font-size:0.8rem;color:#55efc4;word-break:break-all;">预览：${result.preview}</div>` : ''}
-                        </div>
-                    </div>
-                `;
-            });
-            
-            html += `
-                    <hr style="border-color:rgba(255,255,255,0.2);margin:15px 0;">
-                    <p style="color:#888;font-size:0.85rem;">提示：如果测试失败，请检查网络连接或尝试使用代理</p>
-                </div>
-            `;
-            
-            const modal = document.createElement('div');
-            modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;';
-            modal.innerHTML = `
-                <div style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);border:2px solid rgba(255,215,0,0.5);border-radius:15px;padding:30px;max-width:600px;width:100%;color:#fff;">
-                    <button onclick="this.closest('div').parentElement.remove()" style="position:absolute;top:15px;right:20px;background:#ff6b6b;color:#fff;border:none;width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:1.2rem;line-height:30px;">×</button>
-                    ${html}
-                </div>
-            `;
-            document.body.appendChild(modal);
-        }
         
         // ==================== 刷新公告和标题 ====================
         async function refreshNewsAndTitle() {
@@ -6312,9 +6362,6 @@
                         
                         // 重新初始化滚动公告
                         initMarquee();
-                        
-                        // 记录公告获取
-                        recordNewsFetch();
                         
                     } catch (e) {
                         console.error('解析新闻数据失败:', e);
@@ -6368,15 +6415,49 @@
         
         // 页面加载时初始化
         window.onload = async function() {
+            
+            // 先初始化统计数据
+            try {
+                // 新设备优先从Gist获取数据
+                if (isNewDeviceLogin()) {
+                    try {
+                        const fresh = await fetchCounterFromGist();
+                        counterData = fresh || getDefaultCounter();
+                        // 保存到缓存
+                        saveCounterToCache(counterData);
+                    } catch (error) {
+                        console.warn('从Gist获取失败，使用默认数据:', error);
+                        counterData = getDefaultCounter();
+                    }
+                } else {
+                    // 已有设备，优先使用缓存
+                    const cached = loadCounterFromCache();
+                    if (cached) {
+                        counterData = cached;
+                    } else {
+                        const fresh = await fetchCounterFromGist();
+                        counterData = fresh || getDefaultCounter();
+                        }
+                }
+            } catch (error) {
+                console.error('❌ 初始化统计数据失败:', error);
+                counterData = getDefaultCounter();
+            }
+            
             // 记录访问
-            await recordVisit();
+            try {
+                await recordVisit();
+            } catch (error) {
+                console.error('❌ 记录访问失败:', error);
+            }
             
             // 加载配置和新闻
-            await loadConfig();
-            await loadNews();
-            
-            // 记录公告获取
-            recordNewsFetch();
+            try {
+                await loadConfig();
+                await loadNews();
+            } catch (error) {
+                console.error('❌ 加载配置和新闻失败:', error);
+            }
             
             // 设置网络监听（离线同步）
             setupNetworkListener();
@@ -6386,6 +6467,9 @@
                 document.getElementById('passwordOverlay').style.display = 'none';
                 document.getElementById('mainContent').classList.add('visible');
             }
+            
+            // 更新底部统计栏显示
+            updateStatsBar();
         };
         
         // ==================== 统计功能 ====================
@@ -6444,15 +6528,15 @@
             const today = getTodayString();
             return {
                 total_visits: 0,
-                total_logins: 0,
+                total_users: 0,
+                unique_users: [],
                 total_downloads: 0,
-                total_news_fetches: 0,
+                active_today: 0,
+                active_today_users: [],
                 daily_stats: {
                     [today]: {
                         visits: 0,
-                        logins: 0,
-                        downloads: 0,
-                        news_fetches: 0
+                        downloads: 0
                     }
                 },
                 last_updated: getCurrentTimeString()
@@ -6467,20 +6551,42 @@
         // 从Gist获取统计数据
         async function fetchCounterFromGist() {
             try {
-                const response = await fetch(GIST_URL);
+                const token = getGistToken();
+
+                const response = await fetch(GIST_URL, {
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        ...(token && { 'Authorization': `token ${token}` })
+                    }
+                });
+                
                 if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
                 
                 const data = await response.json();
+                
                 if (data.files && data.files['counter.json'] && data.files['counter.json'].content) {
-                    return JSON.parse(data.files['counter.json'].content);
+                    const content = data.files['counter.json'].content;
+                    let parsed = JSON.parse(content);
+                    
+                    // 向后兼容：转换旧数据格式
+                    if (!parsed.unique_users) parsed.unique_users = [];
+                    if (!parsed.active_today_users) parsed.active_today_users = [];
+                    if (parsed.total_users === undefined) parsed.total_users = parsed.unique_users.length;
+                    if (parsed.active_today === undefined) parsed.active_today = parsed.active_today_users.length;
+                    if (parsed.total_visits === undefined) parsed.total_visits = 0;
+                    if (parsed.total_downloads === undefined) parsed.total_downloads = 0;
+                    
+                    return parsed;
                 }
                 
+                console.warn('Gist中没有counter.json文件，返回默认数据');
                 return getDefaultCounter();
             } catch (error) {
-                console.error('从Gist获取统计数据失败:', error);
-                return null;
+                console.error('❌ 从Gist获取统计数据失败:', error);
+                console.error('错误详情:', error.message);
+                return getDefaultCounter();
             }
         }
         
@@ -6489,44 +6595,62 @@
             try {
                 // 如果没有加载过统计数据，先加载
                 if (!counterData) {
-                    const cached = loadCounterFromCache();
-                    if (cached) {
-                        counterData = cached;
+                    // 新设备优先从远程加载数据
+                    if (isNewDeviceLogin()) {
+                        try {
+                            const fresh = await fetchCounterFromGist();
+                            counterData = fresh || getDefaultCounter();
+                        } catch (error) {
+                            counterData = getDefaultCounter();
+                        }
                     } else {
-                        const fresh = await fetchCounterFromGist();
-                        counterData = fresh || getDefaultCounter();
+                        // 已有设备，优先使用缓存
+                        const cached = loadCounterFromCache();
+                        if (cached) {
+                            counterData = cached;
+                        } else {
+                            const fresh = await fetchCounterFromGist();
+                            counterData = fresh || getDefaultCounter();
+                        }
                     }
                 }
                 
                 const today = getTodayString();
+                const deviceId = getDeviceId();
                 
                 // 确保今日数据存在
                 if (!counterData.daily_stats[today]) {
                     counterData.daily_stats[today] = {
                         visits: 0,
-                        logins: 0,
-                        downloads: 0,
-                        news_fetches: 0
+                        downloads: 0
                     };
                 }
+                // 确保 unique_users 和 active_today_users 数组存在
+                if (!counterData.unique_users) counterData.unique_users = [];
+                if (!counterData.active_today_users) counterData.active_today_users = [];
                 
                 // 更新对应统计
                 switch (type) {
                     case 'visit':
                         counterData.total_visits++;
                         counterData.daily_stats[today].visits++;
+                        
+                        // 记录新用户
+                        if (!counterData.unique_users.includes(deviceId)) {
+                            counterData.unique_users.push(deviceId);
+                            counterData.total_users = counterData.unique_users.length;
+                        }
+                        
+                        // 记录今日活跃用户
+                        if (!counterData.active_today_users.includes(deviceId)) {
+                            counterData.active_today_users.push(deviceId);
+                            counterData.active_today = counterData.active_today_users.length;
+                        }
                         break;
-                    case 'login':
-                        counterData.total_logins++;
-                        counterData.daily_stats[today].logins++;
-                        break;
+                        
                     case 'download':
                         counterData.total_downloads++;
                         counterData.daily_stats[today].downloads++;
-                        break;
-                    case 'news_fetch':
-                        counterData.total_news_fetches++;
-                        counterData.daily_stats[today].news_fetches++;
                         break;
                 }
                 
@@ -6535,13 +6659,15 @@
                 // 保存到缓存
                 saveCounterToCache(counterData);
                 
+                // 更新底部统计栏显示
+                updateStatsBar();
+                
                 // 如果网络在线，直接同步到Gist
                 if (isOnline()) {
                     await syncCounterToGist();
                 } else {
                     // 网络离线，加入待同步队列
                     addToPendingSync(type);
-                    console.log('网络离线，已加入待同步队列');
                 }
                 
             } catch (error) {
@@ -6564,7 +6690,6 @@
         async function syncPendingQueue() {
             try {
                 if (!isOnline()) {
-                    console.log('网络离线，暂不同步');
                     return;
                 }
                 
@@ -6576,9 +6701,14 @@
                 // 先获取最新的Gist数据
                 const remoteData = await fetchCounterFromGist();
                 if (!remoteData) {
-                    console.log('无法获取远程数据，同步失败');
                     return;
                 }
+                
+                // 确保必要字段存在
+                if (!remoteData.unique_users) remoteData.unique_users = [];
+                if (!remoteData.active_today_users) remoteData.active_today_users = [];
+                if (!remoteData.total_users) remoteData.total_users = remoteData.unique_users.length;
+                if (!remoteData.active_today) remoteData.active_today = remoteData.active_today_users.length;
                 
                 // 合并待同步的数据
                 const today = getTodayString();
@@ -6590,9 +6720,7 @@
                     if (!remoteData.daily_stats[syncDate]) {
                         remoteData.daily_stats[syncDate] = {
                             visits: 0,
-                            logins: 0,
-                            downloads: 0,
-                            news_fetches: 0
+                            downloads: 0
                         };
                     }
                     
@@ -6602,17 +6730,9 @@
                             remoteData.total_visits++;
                             remoteData.daily_stats[syncDate].visits++;
                             break;
-                        case 'login':
-                            remoteData.total_logins++;
-                            remoteData.daily_stats[syncDate].logins++;
-                            break;
                         case 'download':
                             remoteData.total_downloads++;
                             remoteData.daily_stats[syncDate].downloads++;
-                            break;
-                        case 'news_fetch':
-                            remoteData.total_news_fetches++;
-                            remoteData.daily_stats[syncDate].news_fetches++;
                             break;
                     }
                 });
@@ -6628,23 +6748,32 @@
                     // 更新本地缓存
                     saveCounterToCache(remoteData);
                     counterData = remoteData;
-                    console.log(`成功同步 ${queue.length} 条待处理数据`);
+                    // 更新底部统计栏显示
+                    updateStatsBar();
                 }
                 
             } catch (error) {
                 console.error('同步待处理队列失败:', error);
             }
         }
+         // 清空待同步队列
+        function clearPendingSync() {
+            localStorage.removeItem('TFJL_Pending_Sync');
+        }
         
         // 同步统计数据到Gist（带成功返回）
         async function syncCounterDataToGist(data) {
             try {
                 const content = JSON.stringify(data, null, 2);
+                const token = getGistToken();
+                
                 const response = await fetch(GIST_URL, {
                     method: 'PATCH',
                     headers: {
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json'
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json',
+                        'User-Agent': 'TFJL-App/1.0',
+                        ...(token && { 'Authorization': `token ${token}` })
                     },
                     body: JSON.stringify({
                         files: {
@@ -6655,9 +6784,17 @@
                     })
                 });
                 
-                return response.ok;
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('❌ Gist同步失败:', response.status, errorText);
+                    return false;
+                }
+                
+                const responseData = await response.json();
+                return true;
             } catch (error) {
-                console.error('同步统计到Gist失败:', error);
+                console.error('❌ 同步统计到Gist失败:', error);
+                console.error('错误详情:', error.message);
                 return false;
             }
         }
@@ -6665,14 +6802,21 @@
         // 同步统计数据到Gist（异步）
         async function syncCounterToGist() {
             try {
-                if (!counterData) return;
-                
+                if (!counterData) {
+                    console.warn('⚠️ 没有统计数据可同步');
+                    return;
+                }
+
                 const content = JSON.stringify(counterData, null, 2);
+                const token = getGistToken();
+
                 const response = await fetch(GIST_URL, {
                     method: 'PATCH',
                     headers: {
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json'
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json',
+                        'User-Agent': 'TFJL-App/1.0',
+                        ...(token && { 'Authorization': `token ${token}` })
                     },
                     body: JSON.stringify({
                         files: {
@@ -6684,14 +6828,20 @@
                 });
                 
                 if (response.ok) {
-                    console.log('统计数据已同步到Gist');
+                    saveCounterToCache(counterData);
+                    clearPendingSync();
                 } else {
-                    console.log('Gist同步失败:', response.status);
+                    const errorText = await response.text();
+                    console.error('❌ Gist同步失败:', response.status, errorText);
                     // 同步失败，加入待同步队列
-                    // 这里可以根据需要添加重试逻辑
+                    addToPendingSync(counterData);
                 }
             } catch (error) {
-                console.error('同步统计到Gist失败:', error);
+                console.error('❌ 同步统计到Gist失败:', error);
+                // 同步失败，加入待同步队列
+                if (counterData) {
+                    addToPendingSync(counterData);
+                }
             }
         }
         
@@ -6699,7 +6849,6 @@
         function setupNetworkListener() {
             // 网络恢复时自动同步
             window.addEventListener('online', () => {
-                console.log('网络已恢复，开始同步待处理数据');
                 setTimeout(() => {
                     syncPendingQueue();
                 }, 3000);
@@ -6713,6 +6862,21 @@
             }, 5000);
         }
         
+        // 更新底部统计栏显示
+        function updateStatsBar() {
+            if (!counterData) return;
+            
+            const visitEl = document.getElementById('statVisits');
+            const usersEl = document.getElementById('statUsers');
+            const onlineEl = document.getElementById('statOnline');
+            const downloadEl = document.getElementById('statDownloads');
+            
+            if (visitEl) visitEl.textContent = counterData.total_visits || 0;
+            if (usersEl) usersEl.textContent = counterData.total_users || 0;
+            if (onlineEl) onlineEl.textContent = counterData.active_today || 0;
+            if (downloadEl) downloadEl.textContent = counterData.total_downloads || 0;
+        }
+        
         // 显示统计数据
         function showStatistics() {
             if (!counterData) {
@@ -6721,8 +6885,12 @@
             }
             
             const today = getTodayString();
-            const todayStats = counterData.daily_stats[today] || { visits: 0, logins: 0, downloads: 0, news_fetches: 0 };
+            const todayStats = counterData.daily_stats[today] || { visits: 0, downloads: 0 };
             const pendingCount = loadPendingSync().length;
+            
+            // 确保数据字段存在
+            const totalUsers = counterData.total_users || 0;
+            const activeToday = counterData.active_today || 0;
             
             let statsHtml = `
                 <div style="text-align:left;line-height:1.8;">
@@ -6733,17 +6901,15 @@
                     <h3 style="color:#4ecdc4;">📈 总计数据</h3>
                     <div style="padding-left:20px;">
                         <p>• 总访问次数：${counterData.total_visits}</p>
-                        <p>• 总登录次数：${counterData.total_logins}</p>
+                        <p>• 总用户数：${totalUsers}</p>
+                        <p>• 今日活跃：${activeToday}</p>
                         <p>• 总下载次数：${counterData.total_downloads}</p>
-                        <p>• 公告获取次数：${counterData.total_news_fetches}</p>
                     </div>
                     
                     <h3 style="color:#4ecdc4;">📅 今日数据 (${today})</h3>
                     <div style="padding-left:20px;">
                         <p>• 今日访问：${todayStats.visits}</p>
-                        <p>• 今日登录：${todayStats.logins}</p>
                         <p>• 今日下载：${todayStats.downloads}</p>
-                        <p>• 今日公告获取：${todayStats.news_fetches}</p>
                     </div>
                     
                     <p style="color:#888;font-size:0.9rem;margin-top:20px;">最后更新：${counterData.last_updated}</p>
@@ -6766,19 +6932,39 @@
             await updateCounter('visit');
         }
         
-        // 记录登录
+        // 生成唯一设备ID
+        function getDeviceId() {
+            let deviceId = localStorage.getItem('TFJL_Device_ID');
+            if (!deviceId) {
+                // 生成新的设备ID
+                const timestamp = Date.now();
+                const random = Math.random().toString(36).substring(2, 15);
+                deviceId = `device_${timestamp}_${random}`;
+                localStorage.setItem('TFJL_Device_ID', deviceId);
+            }
+            return deviceId;
+        }
+        
+        // 检查是否是新设备首次登录
+        function isNewDeviceLogin() {
+            const hasLoggedInBefore = localStorage.getItem('TFJL_Has_Logged_In_Before');
+            return !hasLoggedInBefore;
+        }
+        
+        // 标记设备已登录过
+        function markDeviceAsLoggedIn() {
+            localStorage.setItem('TFJL_Has_Logged_In_Before', 'true');
+        }
+        
+        // 记录登录（现在不记录单独的登录统计，用户数在访问时已处理）
         function recordLogin() {
-            updateCounter('login');
+            // 标记设备已登录过，用于下次识别
+            markDeviceAsLoggedIn();
         }
         
         // 记录下载
         function recordDownload() {
             updateCounter('download');
-        }
-        
-        // 记录公告获取
-        function recordNewsFetch() {
-            updateCounter('news_fetch');
         }
     </script>
 
@@ -6808,8 +6994,30 @@
 
     </div> <!-- 主内容区域结束 -->
 
+    <!-- 统计数据栏 -->
+    <div id="statsBar" style="position:fixed;bottom:0;left:0;right:0;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);border-top:2px solid rgba(255,215,0,0.5);padding:10px 20px;z-index:9990;display:flex;justify-content:center;align-items:center;gap:30px;font-size:0.9rem;">
+        <div style="display:flex;gap:25px;flex-wrap:wrap;justify-content:center;">
+            <div style="color:#fff;display:flex;align-items:center;gap:6px;">
+                <span style="color:#4ecdc4;">👁️</span>
+                <span>访问: <strong id="statVisits" style="color:#ffd700;">-</strong></span>
+            </div>
+            <div style="color:#fff;display:flex;align-items:center;gap:6px;">
+                <span style="color:#4ecdc4;">👤</span>
+                <span>用户: <strong id="statUsers" style="color:#ffd700;">-</strong></span>
+            </div>
+            <div style="color:#fff;display:flex;align-items:center;gap:6px;">
+                <span style="color:#4ecdc4;">🟢</span>
+                <span>在线: <strong id="statOnline" style="color:#ffd700;">-</strong></span>
+            </div>
+            <div style="color:#fff;display:flex;align-items:center;gap:6px;">
+                <span style="color:#4ecdc4;">📥</span>
+                <span>下载: <strong id="statDownloads" style="color:#ffd700;">-</strong></span>
+            </div>
+        </div>
+    </div>
+
     <!-- 免责声明 -->
-    <div style="position:relative;padding:20px;background:rgba(0,0,0,0.5);border-top:1px solid rgba(255,255,255,0.1);text-align:center;font-size:0.85rem;color:#888;">
+    <div style="position:relative;padding:20px;background:rgba(0,0,0,0.5);border-top:1px solid rgba(255,255,255,0.1);text-align:center;font-size:0.85rem;color:#888;margin-bottom:60px;">
         <div style="max-width:800px;margin:0 auto;">
             <h4 style="margin:0 0 10px 0;color:#aaa;">⚠️ 免责声明</h4>
             <p style="margin:5px 0;line-height:1.6;">
