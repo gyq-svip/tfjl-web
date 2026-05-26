@@ -48,7 +48,7 @@ jobs:
           echo "Checking GIST_TOKEN secret..."
           if [ -n "${{ secrets.GIST_TOKEN }}" ]; then
             echo "✅ GIST_TOKEN secret exists"
-            echo "Token length: ${#{{ secrets.GIST_TOKEN }}}"
+            echo "Token length: ${#{{ secrets.GIST_TOKEN }}}
             echo "Token prefix: ${ {{ secrets.GIST_TOKEN }}:0:10 }"
           else
             echo "❌ GIST_TOKEN secret is empty!"
@@ -62,23 +62,10 @@ jobs:
           # 读取Token
           TOKEN="${{ secrets.GIST_TOKEN }}"
           
-          # 使用Python进行替换（更可靠）
-          python3 -c "
-import sys
-
-with open('index.html', 'r', encoding='utf-8') as f:
-    content = f.read()
-
-# 替换YOUR_GITHUB_TOKEN_HERE为实际Token
-new_content = content.replace('YOUR_GITHUB_TOKEN_HERE', sys.argv[1])
-
-with open('index.html', 'w', encoding='utf-8') as f:
-    f.write(new_content)
-
-print('Token injection completed')
-" "$TOKEN"
+          # 使用sed进行替换
+          sed -i "s/YOUR_GITHUB_TOKEN_HERE/$TOKEN/g" index.html
           
-          echo "Token injection successful"
+          echo "Token injection completed"
 
       - name: Verify Injection
         run: |
