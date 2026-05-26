@@ -2218,6 +2218,8 @@
 
         <!-- 固定在右上角的按钮 -->
         <div class="sticky-buttons" style="position:fixed;top:20px;right:20px;z-index:9999;display:flex;gap:10px;">
+            <!-- 版本切换按钮（动态显示） -->
+            <button id="versionSwitchBtn" onclick="handleVersionSwitch()" style="display:none;background:linear-gradient(135deg,#00bcd4,#00838f);color:white;border:none;padding:10px 18px;border-radius:8px;cursor:pointer;font-size:0.9rem;box-shadow:0 2px 10px rgba(0,0,0,0.3);">🌐 切换在线版</button>
             <button onclick="saveCurrentProject()" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:10px 18px;border-radius:8px;cursor:pointer;font-size:0.9rem;box-shadow:0 2px 10px rgba(0,0,0,0.3);">💾 保存</button>
             <div style="position:relative;">
                 <button onclick="toggleBackupMenu(this)" title="菜单" style="background:linear-gradient(135deg,#ff5722,#e64a19);color:white;border:none;padding:10px 18px;border-radius:8px;cursor:pointer;font-size:0.9rem;box-shadow:0 2px 10px rgba(0,0,0,0.3);">🍔 菜单</button>
@@ -6009,21 +6011,6 @@ function hasGistToken() {
     return !!getGistToken();
 }
 
-// 调试函数：检查Token状态
-function debugTokenStatus() {
-    const token = getGistToken();
-    console.log('🔍 Token调试信息:');
-    console.log('Token长度:', token ? token.length : 0);
-    console.log('Token前缀:', token ? token.substring(0, 10) : '无');
-    console.log('Token是否有效:', token && token.length > 20 && token.startsWith('ghp_'));
-    
-    // 检查HARDCODED_TOKEN
-    const HARDCODED_TOKEN = 'YOUR_GITHUB_TOKEN_HERE';
-    console.log('硬编码Token:', HARDCODED_TOKEN);
-    console.log('硬编码Token长度:', HARDCODED_TOKEN.length);
-    console.log('硬编码Token是否有效:', HARDCODED_TOKEN && HARDCODED_TOKEN.length > 20 && HARDCODED_TOKEN.startsWith('ghp_'));
-}
-        
         // 当前统计数据
         let counterData = null;
         
@@ -6422,6 +6409,86 @@ function debugTokenStatus() {
             }
         }
         
+        // ==================== 智能版本切换系统 ====================
+        const ONLINE_VERSION_URL = 'https://gyq-svip.github.io/tfjl-web/';
+        let isOnlineVersionAvailable = false;
+        let isCurrentVersionOnline = false;
+        let versionCheckInterval = null;
+        
+        function initVersionSwitch() {
+            isCurrentVersionOnline = checkIfOnlineVersion();
+            checkOnlineVersionAvailability();
+            versionCheckInterval = setInterval(checkOnlineVersionAvailability, 30000);
+        }
+        
+        function checkIfOnlineVersion() {
+            const HARDCODED_TOKEN = 'YOUR_GITHUB_TOKEN_HERE';
+            return HARDCODED_TOKEN && HARDCODED_TOKEN.length > 20 && HARDCODED_TOKEN.startsWith('ghp_');
+        }
+        
+        async function checkOnlineVersionAvailability() {
+            const btn = document.getElementById('versionSwitchBtn');
+            if (!btn) return;
+            
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 3000);
+                
+                const response = await fetch(ONLINE_VERSION_URL, {
+                    method: 'HEAD',
+                    mode: 'no-cors',
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                isOnlineVersionAvailable = true;
+                updateVersionSwitchButton();
+                
+            } catch (error) {
+                isOnlineVersionAvailable = false;
+                updateVersionSwitchButton();
+            }
+        }
+        
+        function updateVersionSwitchButton() {
+            const btn = document.getElementById('versionSwitchBtn');
+            if (!btn) return;
+            
+            if (isCurrentVersionOnline) {
+                if (isOnlineVersionAvailable) {
+                    btn.style.display = 'none';
+                } else {
+                    btn.style.display = 'block';
+                    btn.innerHTML = '💾 切换离线版';
+                    btn.style.background = 'linear-gradient(135deg,#ff9800,#f57c00)';
+                    btn.title = '网络异常，点击下载离线版';
+                }
+            } else {
+                if (isOnlineVersionAvailable) {
+                    btn.style.display = 'block';
+                    btn.innerHTML = '🌐 切换在线版';
+                    btn.style.background = 'linear-gradient(135deg,#00bcd4,#00838f)';
+                    btn.title = '在线版可用，点击切换';
+                } else {
+                    btn.style.display = 'none';
+                }
+            }
+        }
+        
+        function handleVersionSwitch() {
+            if (isCurrentVersionOnline) {
+                if (!isOnlineVersionAvailable) {
+                    downloadOfflineVersion();
+                } else {
+                    checkOnlineVersionAvailability();
+                }
+            } else {
+                if (isOnlineVersionAvailable) {
+                    window.location.href = ONLINE_VERSION_URL;
+                }
+            }
+        }
+        
         // ==================== 下载离线版本 ====================
         function downloadOfflineVersion() {
             // 记录下载
@@ -6446,8 +6513,8 @@ function debugTokenStatus() {
         // 页面加载时初始化
         window.onload = async function() {
             
-            // 调试Token状态
-            debugTokenStatus();
+            // 初始化版本切换功能
+            initVersionSwitch();
             
             // 先初始化统计数据
             try {
