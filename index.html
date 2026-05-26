@@ -5993,7 +5993,9 @@ const GIST_TOKEN_KEY = 'TFJL_Gist_Token';
 function getGistToken() {
     // 优先使用硬编码Token（GitHub Actions部署时会替换为实际的Token）
     const HARDCODED_TOKEN = 'YOUR_GITHUB_TOKEN_HERE';
-    if (HARDCODED_TOKEN && HARDCODED_TOKEN !== 'YOUR_GITHUB_TOKEN_HERE') {
+    
+    // 如果Token不是占位符，就使用它
+    if (HARDCODED_TOKEN && HARDCODED_TOKEN.length > 20 && HARDCODED_TOKEN.startsWith('ghp_')) {
         return HARDCODED_TOKEN;
     }
     
@@ -6005,6 +6007,21 @@ function setGistToken(token) {
 }
 function hasGistToken() {
     return !!getGistToken();
+}
+
+// 调试函数：检查Token状态
+function debugTokenStatus() {
+    const token = getGistToken();
+    console.log('🔍 Token调试信息:');
+    console.log('Token长度:', token ? token.length : 0);
+    console.log('Token前缀:', token ? token.substring(0, 10) : '无');
+    console.log('Token是否有效:', token && token.length > 20 && token.startsWith('ghp_'));
+    
+    // 检查HARDCODED_TOKEN
+    const HARDCODED_TOKEN = 'YOUR_GITHUB_TOKEN_HERE';
+    console.log('硬编码Token:', HARDCODED_TOKEN);
+    console.log('硬编码Token长度:', HARDCODED_TOKEN.length);
+    console.log('硬编码Token是否有效:', HARDCODED_TOKEN && HARDCODED_TOKEN.length > 20 && HARDCODED_TOKEN.startsWith('ghp_'));
 }
         
         // 当前统计数据
@@ -6428,6 +6445,9 @@ function hasGistToken() {
         
         // 页面加载时初始化
         window.onload = async function() {
+            
+            // 调试Token状态
+            debugTokenStatus();
             
             // 先初始化统计数据
             try {
