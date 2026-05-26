@@ -7043,7 +7043,7 @@ function hasGistToken() {
             } else {
                 return `${hours}时${totalMinutes % 60}分`;
             }
-        }
+        } 
         
         // ==================== 消息墙功能 ====================
         let wallMessages = [];
@@ -7221,11 +7221,11 @@ function hasGistToken() {
             
             let scrollPos = 0;
             messageScrollInterval = setInterval(() => {
-                scrollPos += 1;
+                scrollPos += 0.5;
                 if (scrollPos >= scroller.scrollHeight - content.clientHeight) {
                     scrollPos = 0;
                 }
-                scroller.style.transform = `translateY(-${scrollPos}px)`;
+                content.scrollTop = scrollPos;
             }, 50);
         }
         
@@ -7336,7 +7336,8 @@ function hasGistToken() {
             }
             
             const data = await response.json();
-            return data.html_url;
+            const fileData = data.files[file.name];
+            return fileData?.raw_url || data.html_url;
         }
         
         function readFileAsText(file) {
@@ -7495,7 +7496,13 @@ function hasGistToken() {
     </div> <!-- 主内容区域结束 -->
 
     <!-- 消息墙 -->
-    <div id="messageWall" style="display:none;position:fixed;top:60px;left:20px;width:380px;max-height:450px;background:rgba(26,26,46,0.95);border:1px solid rgba(255,215,0,0.3);border-radius:12px;z-index:9980;box-shadow:0 4px 20px rgba(0,0,0,0.5);backdrop-filter:blur(10px);overflow:hidden;resize:both;min-width:300px;min-height:300px;">
+    <style>
+        #messageWallContent::-webkit-scrollbar { width: 6px; }
+        #messageWallContent::-webkit-scrollbar-track { background: rgba(255,255,255,0.1); border-radius: 3px; }
+        #messageWallContent::-webkit-scrollbar-thumb { background: rgba(255,215,0,0.5); border-radius: 3px; }
+        #messageWallContent::-webkit-scrollbar-thumb:hover { background: rgba(255,215,0,0.8); }
+    </style>
+    <div id="messageWall" style="display:none;position:fixed;top:60px;left:20px;width:380px;max-height:520px;background:rgba(26,26,46,0.95);border:1px solid rgba(255,215,0,0.3);border-radius:12px;z-index:9980;box-shadow:0 4px 20px rgba(0,0,0,0.5);backdrop-filter:blur(10px);overflow:hidden;resize:both;min-width:300px;min-height:350px;">
         <div id="messageWallHeader" style="background:linear-gradient(135deg,rgba(255,215,0,0.2),rgba(255,107,107,0.2));padding:10px 15px;display:flex;justify-content:space-between;align-items:center;cursor:move;user-select:none;">
             <span style="color:#ffd700;font-size:0.9rem;font-weight:bold;">📢 需求墙</span>
             <div style="display:flex;gap:10px;">
@@ -7503,8 +7510,8 @@ function hasGistToken() {
                 <button onclick="closeMessageWall()" title="关闭" style="background:transparent;border:none;color:#ff6b6b;font-size:1rem;cursor:pointer;padding:0;">×</button>
             </div>
         </div>
-        <div id="messageWallContent" style="padding:10px 15px;height:250px;overflow:hidden;">
-            <div id="messageScroller" style="display:flex;flex-direction:column;gap:10px;transition:transform 0.3s ease;">
+        <div id="messageWallContent" style="padding:10px 15px;height:320px;overflow-y:auto;overflow-x:hidden;">
+            <div id="messageScroller" style="display:flex;flex-direction:column;gap:10px;">
                 <div style="color:rgba(255,255,255,0.5);font-size:0.85rem;text-align:center;padding:20px;">加载中...</div>
             </div>
         </div>
