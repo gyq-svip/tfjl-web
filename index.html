@@ -7050,8 +7050,11 @@ function hasGistToken() {
         let messageWallOpen = false;
         let messageScrollInterval = null;
         let messageFetchInterval = null;
+        let pendingScriptFile = null;
         const MESSAGE_REFRESH_INTERVAL = 30000;
         const MAX_MESSAGES = 50;
+        const MAX_SCRIPT_SIZE = 1024 * 1024;
+        const SCRIPT_EXPIRE_DAYS = 10;
         
         function toggleMessageWall() {
             const wall = document.getElementById('messageWall');
@@ -7068,6 +7071,7 @@ function hasGistToken() {
                 toggle.style.display = 'none';
                 messageWallOpen = true;
                 if (wallMessages.length === 0) fetchMessages();
+                initMessageWallDrag();
             }
         }
         
@@ -7095,6 +7099,37 @@ function hasGistToken() {
             min.style.display = 'none';
             toggle.style.display = 'none';
             messageWallOpen = true;
+            initMessageWallDrag();
+        }
+        
+        function initMessageWallDrag() {
+            const header = document.getElementById('messageWallHeader');
+            const wall = document.getElementById('messageWall');
+            if (!header || !wall) return;
+            
+            let isDragging = false;
+            let startX, startY, startLeft, startTop;
+            
+            header.onmousedown = function(e) {
+                if (e.target.tagName === 'BUTTON') return;
+                isDragging = true;
+                startX = e.clientX;
+                startY = e.clientY;
+                startLeft = wall.offsetLeft;
+                startTop = wall.offsetTop;
+                document.onmousemove = function(e) {
+                    if (!isDragging) return;
+                    const newLeft = startLeft + e.clientX - startX;
+                    const newTop = startTop + e.clientY - startY;
+                    wall.style.left = Math.max(0, newLeft) + 'px';
+                    wall.style.top = Math.max(0, newTop) + 'px';
+                };
+                document.onmouseup = function() {
+                    isDragging = false;
+                    document.onmousemove = null;
+                    document.onmouseup = null;
+                };
+            };
         }
         
         async function fetchMessages() {
@@ -7121,7 +7156,7 @@ function hasGistToken() {
                 console.warn('获取消息失败:', error);
                 const scroller = document.getElementById('messageScroller');
                 if (scroller) {
-                    scroller.innerHTML = '<div style="color:rgba(255,255,255,0.5);font-size:0.8rem;text-align:center;">暂无消息</div>';
+                    scroller.innerHTML = '<div style="color:rgba(255,255,255,0.5);font-size:0.85rem;text-align:center;padding:20px;">暂无消息</div>';
                 }
             }
         }
@@ -7131,15 +7166,24 @@ function hasGistToken() {
             if (!scroller) return;
             
             if (wallMessages.length === 0) {
-                scroller.innerHTML = '<div style="color:rgba(255,255,255,0.5);font-size:0.8rem;text-align:center;">暂无消息，快来发布第一条吧！</div>';
+                scroller.innerHTML = '<div style="color:rgba(255,255,255,0.5);font-size:0.85rem;text-align:center;padding:20px;">暂无消息，快来发布第一条吧！</div>';
                 return;
             }
             
             const html = wallMessages.map(msg => {
                 const timeAgo = formatMessageTime(msg.time);
-                return `<div style="background:rgba(255,255,255,0.05);border-radius:6px;padding:6px 8px;font-size:0.8rem;">
-                    <div style="color:#fff;margin-bottom:3px;">${escapeHtml(msg.content)}</div>
-                    <div style="color:rgba(255,255,255,0.5);font-size:0.7rem;">${escapeHtml(msg.author)} · ${timeAgo}</div>
+                let contentHtml = escapeHtml(msg.content);
+                
+                if (msg.scriptUrl) {
+                    contentHtml = contentHtml.replace(
+                        msg.scriptUrl,
+                        `<a href="${msg.scriptUrl}" target="_blank" style="color:#4fc3f7;text-decoration:underline;">📥 下载脚本</a>`
+                    );
+                }
+                
+                return `<div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:10px 12px;font-size:0.85rem;">
+                    <div style="color:#fff;margin-bottom:6px;line-height:1.5;">${contentHtml}</div>
+                    <div style="color:rgba(255,255,255,0.5);font-size:0.75rem;">${escapeHtml(msg.author)} · ${timeAgo}</div>
                 </div>`;
             }).join('');
             
@@ -7185,12 +7229,29 @@ function hasGistToken() {
             }, 50);
         }
         
+        function handleScriptUpload(input) {
+            const file = input.files[0];
+            if (!file) return;
+            
+            if (file.size > MAX_SCRIPT_SIZE) {
+                alert(`文件过大！最大支持1MB\n当前文件: ${(file.size / 1024).toFixed(1)}KB`);
+                input.value = '';
+                return;
+            }
+            
+            pendingScriptFile = file;
+            document.getElementById('uploadStatus').style.display = 'inline';
+            document.getElementById('uploadStatus').textContent = `✓ ${file.name}`;
+        }
+        
         async function postMessage() {
             const input = document.getElementById('messageInput');
-            const content = input.value.trim();
+            const nicknameInput = document.getElementById('messageNickname');
+            let content = input.value.trim();
+            const nickname = nicknameInput.value.trim() || '匿名用户';
             
-            if (!content) {
-                alert('请输入内容');
+            if (!content && !pendingScriptFile) {
+                alert('请输入内容或选择脚本文件');
                 return;
             }
             
@@ -7199,12 +7260,27 @@ function hasGistToken() {
                 return;
             }
             
-            const author = localStorage.getItem('TFJL_UserName') || '匿名用户';
+            let scriptUrl = null;
+            
+            if (pendingScriptFile) {
+                try {
+                    scriptUrl = await uploadScriptToGist(pendingScriptFile);
+                    if (!content) {
+                        content = `分享脚本: ${pendingScriptFile.name}\n${scriptUrl}`;
+                    } else {
+                        content = `${content}\n${scriptUrl}`;
+                    }
+                } catch (error) {
+                    alert('脚本上传失败: ' + error.message);
+                    return;
+                }
+            }
             
             const newMsg = {
                 content: content,
-                author: author,
-                time: Date.now()
+                author: nickname,
+                time: Date.now(),
+                scriptUrl: scriptUrl
             };
             
             wallMessages.unshift(newMsg);
@@ -7213,6 +7289,12 @@ function hasGistToken() {
             }
             
             input.value = '';
+            pendingScriptFile = null;
+            document.getElementById('uploadStatus').style.display = 'none';
+            document.getElementById('scriptFileInput').value = '';
+            
+            localStorage.setItem('TFJL_UserName', nickname);
+            
             renderMessages();
             
             try {
@@ -7221,6 +7303,49 @@ function hasGistToken() {
                 console.error('保存消息失败:', error);
                 alert('发布失败，请稍后重试');
             }
+        }
+        
+        async function uploadScriptToGist(file) {
+            const token = getGistToken();
+            if (!token) throw new Error('无Token');
+            
+            const content = await readFileAsText(file);
+            const filename = `scripts/${Date.now()}_${file.name}`;
+            
+            const response = await fetch('https://api.github.com/gists', {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/vnd.github.v3+json',
+                    'Content-Type': 'application/json',
+                    'Authorization': `token ${token}`
+                },
+                body: JSON.stringify({
+                    description: `脚本分享: ${file.name}`,
+                    public: false,
+                    files: {
+                        [file.name]: {
+                            content: content
+                        }
+                    }
+                })
+            });
+            
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.message || '上传失败');
+            }
+            
+            const data = await response.json();
+            return data.html_url;
+        }
+        
+        function readFileAsText(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = e => resolve(e.target.result);
+                reader.onerror = e => reject(e);
+                reader.readAsText(file);
+            });
         }
         
         async function saveMessagesToGist() {
@@ -7247,6 +7372,12 @@ function hasGistToken() {
         }
         
         function initMessageWall() {
+            const savedNickname = localStorage.getItem('TFJL_UserName');
+            if (savedNickname) {
+                const nicknameInput = document.getElementById('messageNickname');
+                if (nicknameInput) nicknameInput.value = savedNickname;
+            }
+            
             if (messageFetchInterval) clearInterval(messageFetchInterval);
             messageFetchInterval = setInterval(() => {
                 if (messageWallOpen || document.getElementById('messageWall').style.display !== 'none') {
@@ -7364,33 +7495,41 @@ function hasGistToken() {
     </div> <!-- 主内容区域结束 -->
 
     <!-- 消息墙 -->
-    <div id="messageWall" style="display:none;position:fixed;bottom:60px;left:20px;width:320px;max-height:200px;background:rgba(26,26,46,0.92);border:1px solid rgba(255,215,0,0.3);border-radius:10px;z-index:9980;box-shadow:0 4px 15px rgba(0,0,0,0.4);backdrop-filter:blur(8px);overflow:hidden;">
-        <div id="messageWallHeader" style="background:linear-gradient(135deg,rgba(255,215,0,0.2),rgba(255,107,107,0.2));padding:8px 12px;display:flex;justify-content:space-between;align-items:center;cursor:move;">
-            <span style="color:#ffd700;font-size:0.85rem;font-weight:bold;">📢 需求墙</span>
+    <div id="messageWall" style="display:none;position:fixed;top:60px;left:20px;width:380px;max-height:450px;background:rgba(26,26,46,0.95);border:1px solid rgba(255,215,0,0.3);border-radius:12px;z-index:9980;box-shadow:0 4px 20px rgba(0,0,0,0.5);backdrop-filter:blur(10px);overflow:hidden;resize:both;min-width:300px;min-height:300px;">
+        <div id="messageWallHeader" style="background:linear-gradient(135deg,rgba(255,215,0,0.2),rgba(255,107,107,0.2));padding:10px 15px;display:flex;justify-content:space-between;align-items:center;cursor:move;user-select:none;">
+            <span style="color:#ffd700;font-size:0.9rem;font-weight:bold;">📢 需求墙</span>
+            <div style="display:flex;gap:10px;">
+                <button onclick="toggleMessageWallSize()" title="最小化" style="background:transparent;border:none;color:#ffd700;font-size:1rem;cursor:pointer;padding:0;">−</button>
+                <button onclick="closeMessageWall()" title="关闭" style="background:transparent;border:none;color:#ff6b6b;font-size:1rem;cursor:pointer;padding:0;">×</button>
+            </div>
+        </div>
+        <div id="messageWallContent" style="padding:10px 15px;height:250px;overflow:hidden;">
+            <div id="messageScroller" style="display:flex;flex-direction:column;gap:10px;transition:transform 0.3s ease;">
+                <div style="color:rgba(255,255,255,0.5);font-size:0.85rem;text-align:center;padding:20px;">加载中...</div>
+            </div>
+        </div>
+        <div id="messageWallInput" style="padding:12px 15px;border-top:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.2);">
+            <div style="display:flex;gap:8px;margin-bottom:8px;">
+                <input type="text" id="messageNickname" placeholder="昵称" maxlength="10" style="width:80px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:5px;padding:6px 8px;color:#fff;font-size:0.8rem;outline:none;" onfocus="this.style.borderColor='#ffd700'" onblur="this.style.borderColor='rgba(255,255,255,0.2)'">
+                <input type="file" id="scriptFileInput" accept=".txt,.js,.json,.lua,.py,.sh" style="display:none;" onchange="handleScriptUpload(this)">
+                <button onclick="document.getElementById('scriptFileInput').click()" title="上传脚本(最大1MB)" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:6px 12px;border-radius:5px;font-size:0.8rem;cursor:pointer;display:flex;align-items:center;gap:4px;">📎 脚本</button>
+                <span id="uploadStatus" style="color:#4caf50;font-size:0.75rem;display:none;">✓ 已选文件</span>
+            </div>
             <div style="display:flex;gap:8px;">
-                <button onclick="toggleMessageWallSize()" title="最小化" style="background:transparent;border:none;color:#ffd700;font-size:0.9rem;cursor:pointer;padding:0;">−</button>
-                <button onclick="closeMessageWall()" title="关闭" style="background:transparent;border:none;color:#ff6b6b;font-size:0.9rem;cursor:pointer;padding:0;">×</button>
+                <input type="text" id="messageInput" placeholder="发布需求或分享脚本..." maxlength="200" style="flex:1;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:5px;padding:6px 10px;color:#fff;font-size:0.85rem;outline:none;" onfocus="this.style.borderColor='#ffd700'" onblur="this.style.borderColor='rgba(255,255,255,0.2)'">
+                <button onclick="postMessage()" style="background:linear-gradient(135deg,#ffd700,#ff6b6b);color:#1a1a2e;border:none;padding:6px 16px;border-radius:5px;font-size:0.85rem;cursor:pointer;font-weight:bold;">发布</button>
             </div>
-        </div>
-        <div id="messageWallContent" style="padding:10px;height:100px;overflow:hidden;">
-            <div id="messageScroller" style="display:flex;flex-direction:column;gap:8px;">
-                <div style="color:rgba(255,255,255,0.5);font-size:0.8rem;text-align:center;">加载中...</div>
-            </div>
-        </div>
-        <div id="messageWallInput" style="padding:8px 10px;border-top:1px solid rgba(255,255,255,0.1);display:flex;gap:6px;">
-            <input type="text" id="messageInput" placeholder="发布需求..." maxlength="100" style="flex:1;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:5px;padding:5px 8px;color:#fff;font-size:0.8rem;outline:none;" onfocus="this.style.borderColor='#ffd700'" onblur="this.style.borderColor='rgba(255,255,255,0.2)'">
-            <button onclick="postMessage()" style="background:linear-gradient(135deg,#ffd700,#ff6b6b);color:#1a1a2e;border:none;padding:5px 12px;border-radius:5px;font-size:0.8rem;cursor:pointer;font-weight:bold;">发布</button>
         </div>
     </div>
 
     <!-- 消息墙最小化状态 -->
-    <div id="messageWallMin" style="display:none;position:fixed;bottom:60px;left:20px;background:rgba(26,26,46,0.9);border:1px solid rgba(255,215,0,0.3);border-radius:8px;padding:6px 12px;z-index:9980;cursor:pointer;" onclick="expandMessageWall()">
-        <span style="color:#ffd700;font-size:0.8rem;">📢 需求墙</span>
-        <span id="messageBadge" style="display:none;background:#ff6b6b;color:#fff;font-size:0.7rem;padding:1px 5px;border-radius:10px;margin-left:5px;">0</span>
+    <div id="messageWallMin" style="display:none;position:fixed;top:60px;left:20px;background:rgba(26,26,46,0.9);border:1px solid rgba(255,215,0,0.3);border-radius:8px;padding:8px 14px;z-index:9980;cursor:pointer;" onclick="expandMessageWall()">
+        <span style="color:#ffd700;font-size:0.85rem;">📢 需求墙</span>
+        <span id="messageBadge" style="display:none;background:#ff6b6b;color:#fff;font-size:0.7rem;padding:2px 6px;border-radius:10px;margin-left:6px;">0</span>
     </div>
 
     <!-- 消息墙开关按钮 -->
-    <button id="messageWallToggle" onclick="toggleMessageWall()" title="需求墙" style="position:fixed;bottom:60px;left:20px;background:rgba(255,215,0,0.8);color:#1a1a2e;border:none;width:36px;height:36px;border-radius:50%;cursor:pointer;font-size:1rem;box-shadow:0 2px 8px rgba(0,0,0,0.3);z-index:9985;display:flex;align-items:center;justify-content:center;">📢</button>
+    <button id="messageWallToggle" onclick="toggleMessageWall()" title="需求墙" style="position:fixed;top:60px;left:20px;background:rgba(255,215,0,0.85);color:#1a1a2e;border:none;width:38px;height:38px;border-radius:50%;cursor:pointer;font-size:1.1rem;box-shadow:0 2px 10px rgba(0,0,0,0.3);z-index:9985;display:flex;align-items:center;justify-content:center;">📢</button>
 
     <!-- 统计数据栏 -->
     <div id="statsBar" style="position:fixed;bottom:0;left:0;right:0;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);border-top:2px solid rgba(255,215,0,0.5);padding:10px 20px;z-index:9990;display:flex;justify-content:center;align-items:center;gap:30px;font-size:0.9rem;">
