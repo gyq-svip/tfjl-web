@@ -2217,13 +2217,13 @@
         </script>
 
         <!-- 固定在右上角的按钮 -->
-        <div class="sticky-buttons" style="position:fixed;top:20px;right:20px;z-index:9999;display:flex;gap:10px;">
+        <div class="sticky-buttons" style="position:fixed;top:12px;right:12px;z-index:9999;display:flex;gap:5px;">
             <!-- 版本切换按钮（动态显示） -->
-            <button id="versionSwitchBtn" onclick="handleVersionSwitch()" style="display:none;background:linear-gradient(135deg,#00bcd4,#00838f);color:white;border:none;padding:10px 18px;border-radius:8px;cursor:pointer;font-size:0.9rem;box-shadow:0 2px 10px rgba(0,0,0,0.3);">🌐 切换在线版</button>
-            <button onclick="saveCurrentProject()" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:10px 18px;border-radius:8px;cursor:pointer;font-size:0.9rem;box-shadow:0 2px 10px rgba(0,0,0,0.3);">💾 保存</button>
+            <button id="versionSwitchBtn" onclick="handleVersionSwitch()" style="display:none;background:rgba(0,188,212,0.8);color:white;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 1px 6px rgba(0,0,0,0.15);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;">🌐</button>
+            <button onclick="saveCurrentProject()" title="保存" style="background:rgba(76,175,80,0.8);color:white;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 1px 6px rgba(0,0,0,0.15);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;">💾</button>
             <div style="position:relative;">
-                <button onclick="toggleBackupMenu(this)" title="菜单" style="background:linear-gradient(135deg,#ff5722,#e64a19);color:white;border:none;padding:10px 18px;border-radius:8px;cursor:pointer;font-size:0.9rem;box-shadow:0 2px 10px rgba(0,0,0,0.3);">🍔 菜单</button>
-                <div id="backupMenu" style="display:none;position:absolute;top:100%;right:0;margin-top:5px;background:#2a2a4a;border:1px solid rgba(255,215,0,0.3);border-radius:8px;padding:8px 0;min-width:180px;z-index:1000;box-shadow:0 4px 15px rgba(0,0,0,0.4);">
+                <button onclick="toggleBackupMenu(this)" title="菜单" style="background:rgba(255,87,34,0.8);color:white;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 1px 6px rgba(0,0,0,0.15);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;">≡</button>
+                <div id="backupMenu" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:rgba(42,42,74,0.95);border:1px solid rgba(255,215,0,0.3);border-radius:8px;padding:8px 0;min-width:180px;z-index:1000;box-shadow:0 4px 15px rgba(0,0,0,0.4);backdrop-filter:blur(8px);">
                     <div style="padding:6px 15px;color:#ffd700;font-size:0.85rem;font-weight:bold;border-bottom:1px solid rgba(255,255,255,0.1);margin-bottom:5px;">📋 全部数据</div>
                     <div onclick="exportAllData();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📤 全部备份</div>
                     <div onclick="document.getElementById('importFileInput').click();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📥 全部恢复</div>
@@ -6459,15 +6459,15 @@ function hasGistToken() {
                     btn.style.display = 'none';
                 } else {
                     btn.style.display = 'block';
-                    btn.innerHTML = '💾 切换离线版';
-                    btn.style.background = 'linear-gradient(135deg,#ff9800,#f57c00)';
+                    btn.innerHTML = '💾';
+                    btn.style.background = 'rgba(255,152,0,0.8)';
                     btn.title = '网络异常，点击下载离线版';
                 }
             } else {
                 if (isOnlineVersionAvailable) {
                     btn.style.display = 'block';
-                    btn.innerHTML = '🌐 切换在线版';
-                    btn.style.background = 'linear-gradient(135deg,#00bcd4,#00838f)';
+                    btn.innerHTML = '🌐';
+                    btn.style.background = 'rgba(0,188,212,0.8)';
                     btn.title = '在线版可用，点击切换';
                 } else {
                     btn.style.display = 'none';
@@ -6498,7 +6498,16 @@ function hasGistToken() {
             document.getElementById('versionModal').style.display = 'flex';
             
             // 获取当前页面内容
-            const htmlContent = document.documentElement.outerHTML;
+            let htmlContent = document.documentElement.outerHTML;
+            
+            // 将已注入的Token替换回占位符，确保离线版正确识别
+            htmlContent = htmlContent.replace(/const HARDCODED_TOKEN = 'ghp_[^']+'/g, "const HARDCODED_TOKEN = 'YOUR_GITHUB_TOKEN_HERE'");
+            
+            // 关闭所有弹窗，确保离线版打开时不会弹出
+            htmlContent = htmlContent.replace(/id="versionModal" style="display:flex/g, 'id="versionModal" style="display:none');
+            htmlContent = htmlContent.replace(/id="versionModal" style="display: flex/g, 'id="versionModal" style="display:none');
+            htmlContent = htmlContent.replace(/id="backupMenu" style="display:block/g, 'id="backupMenu" style="display:none');
+            htmlContent = htmlContent.replace(/id="backupMenu" style="display: block/g, 'id="backupMenu" style="display:none');
             
             // 创建下载
             const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
@@ -6966,15 +6975,46 @@ function hasGistToken() {
         function updateStatsBar() {
             if (!counterData) return;
             
+            const runtimeEl = document.getElementById('statRuntime');
             const visitEl = document.getElementById('statVisits');
             const usersEl = document.getElementById('statUsers');
             const onlineEl = document.getElementById('statOnline');
             const downloadEl = document.getElementById('statDownloads');
             
+            if (runtimeEl) runtimeEl.textContent = calculateRuntime();
             if (visitEl) visitEl.textContent = counterData.total_visits || 0;
             if (usersEl) usersEl.textContent = counterData.total_users || 0;
             if (onlineEl) onlineEl.textContent = counterData.active_today || 0;
             if (downloadEl) downloadEl.textContent = counterData.total_downloads || 0;
+        }
+        
+        // 计算网站运行时长（从2026年5月20日开始）
+        function calculateRuntime() {
+            const startDate = new Date('2026-05-20T00:00:00');
+            const now = new Date();
+            const diff = now - startDate;
+            
+            if (diff < 0) return '未开始';
+            
+            const totalMinutes = Math.floor(diff / (1000 * 60));
+            const totalHours = Math.floor(totalMinutes / 60);
+            const totalDays = Math.floor(totalHours / 24);
+            
+            const years = Math.floor(totalDays / 365);
+            const remainingDays = totalDays % 365;
+            const months = Math.floor(remainingDays / 30);
+            const days = remainingDays % 30;
+            const hours = totalHours % 24;
+            
+            if (years > 0) {
+                return `${years}年${months}月${days}天`;
+            } else if (months > 0) {
+                return `${months}月${days}天${hours}时`;
+            } else if (days > 0) {
+                return `${days}天${hours}时`;
+            } else {
+                return `${hours}时${totalMinutes % 60}分`;
+            }
         }
         
         // 显示统计数据
@@ -7088,6 +7128,10 @@ function hasGistToken() {
     <!-- 统计数据栏 -->
     <div id="statsBar" style="position:fixed;bottom:0;left:0;right:0;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);border-top:2px solid rgba(255,215,0,0.5);padding:10px 20px;z-index:9990;display:flex;justify-content:center;align-items:center;gap:30px;font-size:0.9rem;">
         <div style="display:flex;gap:25px;flex-wrap:wrap;justify-content:center;">
+            <div style="color:#fff;display:flex;align-items:center;gap:6px;">
+                <span style="color:#4ecdc4;">⏱️</span>
+                <span>运行: <strong id="statRuntime" style="color:#ffd700;">-</strong></span>
+            </div>
             <div style="color:#fff;display:flex;align-items:center;gap:6px;">
                 <span style="color:#4ecdc4;">👁️</span>
                 <span>访问: <strong id="statVisits" style="color:#ffd700;">-</strong></span>
