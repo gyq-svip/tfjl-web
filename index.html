@@ -2203,6 +2203,17 @@
         document.addEventListener('DOMContentLoaded', () => {
             loadProjectSelectorData();
         });
+
+        // 记录登录（现在不记录单独的登录统计，用户数在访问时已处理）
+        function recordLogin() {
+            // 标记设备已登录过，用于下次识别
+            markDeviceAsLoggedIn();
+        }
+
+        // 标记设备已登录过
+        function markDeviceAsLoggedIn() {
+            localStorage.setItem('TFJL_Has_Logged_In_Before', 'true');
+        }
         </script>
 
         <!-- 固定在右上角的按钮 -->
@@ -5981,8 +5992,8 @@ const COUNTER_CACHE_TIME_KEY = 'TFJL_Counter_Cache_Time';
 const GIST_TOKEN_KEY = 'TFJL_Gist_Token';
 function getGistToken() {
     // 优先从环境变量读取（GitHub Actions部署时使用）
-    if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.GIST_TOKEN) {
-        return import.meta.env.GIST_TOKEN;
+    if (typeof process !== 'undefined' && process.env && process.env.GIST_TOKEN) {
+        return process.env.GIST_TOKEN;
     }
     // 其次从localStorage读取（本地开发时使用）
     return localStorage.getItem(GIST_TOKEN_KEY) || '';
@@ -6951,16 +6962,7 @@ function hasGistToken() {
             return !hasLoggedInBefore;
         }
         
-        // 标记设备已登录过
-        function markDeviceAsLoggedIn() {
-            localStorage.setItem('TFJL_Has_Logged_In_Before', 'true');
-        }
         
-        // 记录登录（现在不记录单独的登录统计，用户数在访问时已处理）
-        function recordLogin() {
-            // 标记设备已登录过，用于下次识别
-            markDeviceAsLoggedIn();
-        }
         
         // 记录下载
         function recordDownload() {
