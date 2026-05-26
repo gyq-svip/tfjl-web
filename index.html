@@ -2380,6 +2380,7 @@
                             <p style="margin:0 0 10px 0;"><strong style="color:#ffd700;">🔍 文本解析</strong> - 从文本快速导入阵容</p>
                             <p style="margin:0 0 10px 0;"><strong style="color:#ffd700;">🖼️ 参考图片</strong> - 上传、预览阵容参考图，可拖动调整大小</p>
                             <p style="margin:0 0 10px 0;"><strong style="color:#ffd700;">💾 备份恢复</strong> - 全部数据或单个项目备份/恢复/分享</p>
+                            <p style="margin:0 0 10px 0;"><strong style="color:#ffd700;">🌐 版本切换</strong> - 在线版/离线版智能切换，网络异常自动提示</p>
                             <p style="margin:0;"><strong style="color:#ffd700;">⭐ 收藏功能</strong> - 右键卡牌添加到常用收藏</p>
                         </div>
                     </div>
@@ -2402,9 +2403,29 @@
                             <p style="margin:0 0 8px 0;padding-left:20px;">• 点击卡牌上的等级数字可修改等级</p>
                             <p style="margin:0 0 15px 0;padding-left:20px;">• 队友卡等级独立保存，不影响我的卡等级</p>
                             <p style="margin:0 0 8px 0;"><strong style="color:#4fc3f7;">备份恢复：</strong></p>
-                           <p style="margin:0 0 5px 0;padding-left:20px;">• 点击右上角💾备份恢复按钮</p>
-                           <p style="margin:0 0 5px 0;padding-left:20px;">• 📋全部数据：备份/恢复所有项目</p>
-                           <p style="margin:0;padding-left:20px;">• 📁单个项目：备份/恢复当前项目</p>
+                            <p style="margin:0 0 5px 0;padding-left:20px;">• 点击右上角≡菜单按钮</p>
+                            <p style="margin:0 0 5px 0;padding-left:20px;">• 📋全部数据：备份/恢复所有项目</p>
+                            <p style="margin:0 0 15px 0;padding-left:20px;">• 📁单个项目：备份/恢复当前项目</p>
+                            <p style="margin:0 0 8px 0;"><strong style="color:#4fc3f7;">版本切换：</strong></p>
+                            <p style="margin:0 0 5px 0;padding-left:20px;">• 在线版：支持访问统计功能</p>
+                            <p style="margin:0 0 5px 0;padding-left:20px;">• 离线版：数据保存在本地，无需网络</p>
+                            <p style="margin:0;padding-left:20px;">• 点击🌐按钮可快速切换版本</p>
+                        </div>
+                    </div>
+
+                    <!-- 在线版与离线版 -->
+                    <div style="margin-bottom:25px;">
+                        <h3 style="color:#00bcd4;margin-bottom:10px;border-left:3px solid #00bcd4;padding-left:10px;">🌐 在线版与离线版</h3>
+                        <div style="background:rgba(0,188,212,0.1);border-radius:8px;padding:15px;font-size:0.9rem;line-height:1.8;">
+                            <p style="margin:0 0 10px 0;"><strong style="color:#4fc3f7;">在线版特点：</strong></p>
+                            <p style="margin:0 0 5px 0;padding-left:20px;">✓ 无需下载，浏览器直接访问</p>
+                            <p style="margin:0 0 5px 0;padding-left:20px;">✓ 支持访问统计显示</p>
+                            <p style="margin:0 0 15px 0;padding-left:20px;">✓ 网络异常时可切换离线版</p>
+                            <p style="margin:0 0 10px 0;"><strong style="color:#4fc3f7;">离线版特点：</strong></p>
+                            <p style="margin:0 0 5px 0;padding-left:20px;">✓ 完全离线可用</p>
+                            <p style="margin:0 0 5px 0;padding-left:20px;">✓ 无需网络连接</p>
+                            <p style="margin:0 0 15px 0;padding-left:20px;">✓ 数据保存在本地</p>
+                            <p style="margin:0;"><strong style="color:#ffd700;">提示：</strong>从菜单点击「下载离线版」可获取离线版本</p>
                         </div>
                     </div>
 
@@ -6508,6 +6529,10 @@ function hasGistToken() {
             htmlContent = htmlContent.replace(/id="versionModal" style="display: flex/g, 'id="versionModal" style="display:none');
             htmlContent = htmlContent.replace(/id="backupMenu" style="display:block/g, 'id="backupMenu" style="display:none');
             htmlContent = htmlContent.replace(/id="backupMenu" style="display: block/g, 'id="backupMenu" style="display:none');
+            htmlContent = htmlContent.replace(/id="messageWall" style="display:block/g, 'id="messageWall" style="display:none');
+            htmlContent = htmlContent.replace(/id="messageWall" style="display: block/g, 'id="messageWall" style="display:none');
+            htmlContent = htmlContent.replace(/id="messageWallMin" style="display:flex/g, 'id="messageWallMin" style="display:none');
+            htmlContent = htmlContent.replace(/id="messageWallMin" style="display: flex/g, 'id="messageWallMin" style="display:none');
             
             // 创建下载
             const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
@@ -6524,6 +6549,9 @@ function hasGistToken() {
             
             // 初始化版本切换功能
             initVersionSwitch();
+            
+            // 初始化消息墙
+            initMessageWall();
             
             // 先初始化统计数据
             try {
@@ -7017,6 +7045,216 @@ function hasGistToken() {
             }
         }
         
+        // ==================== 消息墙功能 ====================
+        let wallMessages = [];
+        let messageWallOpen = false;
+        let messageScrollInterval = null;
+        let messageFetchInterval = null;
+        const MESSAGE_REFRESH_INTERVAL = 30000;
+        const MAX_MESSAGES = 50;
+        
+        function toggleMessageWall() {
+            const wall = document.getElementById('messageWall');
+            const toggle = document.getElementById('messageWallToggle');
+            const min = document.getElementById('messageWallMin');
+            
+            if (messageWallOpen) {
+                wall.style.display = 'none';
+                min.style.display = 'flex';
+                messageWallOpen = false;
+            } else {
+                wall.style.display = 'block';
+                min.style.display = 'none';
+                toggle.style.display = 'none';
+                messageWallOpen = true;
+                if (wallMessages.length === 0) fetchMessages();
+            }
+        }
+        
+        function closeMessageWall() {
+            const wall = document.getElementById('messageWall');
+            const toggle = document.getElementById('messageWallToggle');
+            wall.style.display = 'none';
+            toggle.style.display = 'flex';
+            messageWallOpen = false;
+        }
+        
+        function toggleMessageWallSize() {
+            const wall = document.getElementById('messageWall');
+            const min = document.getElementById('messageWallToggle');
+            wall.style.display = 'none';
+            min.style.display = 'flex';
+            messageWallOpen = false;
+        }
+        
+        function expandMessageWall() {
+            const wall = document.getElementById('messageWall');
+            const min = document.getElementById('messageWallMin');
+            const toggle = document.getElementById('messageWallToggle');
+            wall.style.display = 'block';
+            min.style.display = 'none';
+            toggle.style.display = 'none';
+            messageWallOpen = true;
+        }
+        
+        async function fetchMessages() {
+            try {
+                const token = getGistToken();
+                const response = await fetch(GIST_URL, {
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        ...(token && { 'Authorization': `token ${token}` })
+                    }
+                });
+                
+                if (!response.ok) throw new Error('获取失败');
+                
+                const data = await response.json();
+                const content = data.files['messages.json']?.content;
+                
+                if (content) {
+                    const parsed = JSON.parse(content);
+                    wallMessages = parsed.messages || [];
+                    renderMessages();
+                }
+            } catch (error) {
+                console.warn('获取消息失败:', error);
+                const scroller = document.getElementById('messageScroller');
+                if (scroller) {
+                    scroller.innerHTML = '<div style="color:rgba(255,255,255,0.5);font-size:0.8rem;text-align:center;">暂无消息</div>';
+                }
+            }
+        }
+        
+        function renderMessages() {
+            const scroller = document.getElementById('messageScroller');
+            if (!scroller) return;
+            
+            if (wallMessages.length === 0) {
+                scroller.innerHTML = '<div style="color:rgba(255,255,255,0.5);font-size:0.8rem;text-align:center;">暂无消息，快来发布第一条吧！</div>';
+                return;
+            }
+            
+            const html = wallMessages.map(msg => {
+                const timeAgo = formatMessageTime(msg.time);
+                return `<div style="background:rgba(255,255,255,0.05);border-radius:6px;padding:6px 8px;font-size:0.8rem;">
+                    <div style="color:#fff;margin-bottom:3px;">${escapeHtml(msg.content)}</div>
+                    <div style="color:rgba(255,255,255,0.5);font-size:0.7rem;">${escapeHtml(msg.author)} · ${timeAgo}</div>
+                </div>`;
+            }).join('');
+            
+            scroller.innerHTML = html;
+            startMessageScroll();
+        }
+        
+        function formatMessageTime(timestamp) {
+            const now = Date.now();
+            const diff = now - timestamp;
+            const minutes = Math.floor(diff / 60000);
+            const hours = Math.floor(diff / 3600000);
+            const days = Math.floor(diff / 86400000);
+            
+            if (minutes < 1) return '刚刚';
+            if (minutes < 60) return `${minutes}分钟前`;
+            if (hours < 24) return `${hours}小时前`;
+            return `${days}天前`;
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        function startMessageScroll() {
+            if (messageScrollInterval) clearInterval(messageScrollInterval);
+            
+            const content = document.getElementById('messageWallContent');
+            const scroller = document.getElementById('messageScroller');
+            if (!content || !scroller) return;
+            
+            if (scroller.scrollHeight <= content.clientHeight) return;
+            
+            let scrollPos = 0;
+            messageScrollInterval = setInterval(() => {
+                scrollPos += 1;
+                if (scrollPos >= scroller.scrollHeight - content.clientHeight) {
+                    scrollPos = 0;
+                }
+                scroller.style.transform = `translateY(-${scrollPos}px)`;
+            }, 50);
+        }
+        
+        async function postMessage() {
+            const input = document.getElementById('messageInput');
+            const content = input.value.trim();
+            
+            if (!content) {
+                alert('请输入内容');
+                return;
+            }
+            
+            if (!getGistToken()) {
+                alert('离线版暂不支持发布消息，请切换到在线版');
+                return;
+            }
+            
+            const author = localStorage.getItem('TFJL_UserName') || '匿名用户';
+            
+            const newMsg = {
+                content: content,
+                author: author,
+                time: Date.now()
+            };
+            
+            wallMessages.unshift(newMsg);
+            if (wallMessages.length > MAX_MESSAGES) {
+                wallMessages = wallMessages.slice(0, MAX_MESSAGES);
+            }
+            
+            input.value = '';
+            renderMessages();
+            
+            try {
+                await saveMessagesToGist();
+            } catch (error) {
+                console.error('保存消息失败:', error);
+                alert('发布失败，请稍后重试');
+            }
+        }
+        
+        async function saveMessagesToGist() {
+            const token = getGistToken();
+            if (!token) throw new Error('无Token');
+            
+            const response = await fetch(GIST_URL, {
+                method: 'PATCH',
+                headers: {
+                    'Accept': 'application/vnd.github.v3+json',
+                    'Content-Type': 'application/json',
+                    'Authorization': `token ${token}`
+                },
+                body: JSON.stringify({
+                    files: {
+                        'messages.json': {
+                            content: JSON.stringify({ messages: wallMessages }, null, 2)
+                        }
+                    }
+                })
+            });
+            
+            if (!response.ok) throw new Error('保存失败');
+        }
+        
+        function initMessageWall() {
+            if (messageFetchInterval) clearInterval(messageFetchInterval);
+            messageFetchInterval = setInterval(() => {
+                if (messageWallOpen || document.getElementById('messageWall').style.display !== 'none') {
+                    fetchMessages();
+                }
+            }, MESSAGE_REFRESH_INTERVAL);
+        }
+        
         // 显示统计数据
         function showStatistics() {
             if (!counterData) {
@@ -7124,6 +7362,35 @@ function hasGistToken() {
     </div>
 
     </div> <!-- 主内容区域结束 -->
+
+    <!-- 消息墙 -->
+    <div id="messageWall" style="display:none;position:fixed;bottom:60px;left:20px;width:320px;max-height:200px;background:rgba(26,26,46,0.92);border:1px solid rgba(255,215,0,0.3);border-radius:10px;z-index:9980;box-shadow:0 4px 15px rgba(0,0,0,0.4);backdrop-filter:blur(8px);overflow:hidden;">
+        <div id="messageWallHeader" style="background:linear-gradient(135deg,rgba(255,215,0,0.2),rgba(255,107,107,0.2));padding:8px 12px;display:flex;justify-content:space-between;align-items:center;cursor:move;">
+            <span style="color:#ffd700;font-size:0.85rem;font-weight:bold;">📢 需求墙</span>
+            <div style="display:flex;gap:8px;">
+                <button onclick="toggleMessageWallSize()" title="最小化" style="background:transparent;border:none;color:#ffd700;font-size:0.9rem;cursor:pointer;padding:0;">−</button>
+                <button onclick="closeMessageWall()" title="关闭" style="background:transparent;border:none;color:#ff6b6b;font-size:0.9rem;cursor:pointer;padding:0;">×</button>
+            </div>
+        </div>
+        <div id="messageWallContent" style="padding:10px;height:100px;overflow:hidden;">
+            <div id="messageScroller" style="display:flex;flex-direction:column;gap:8px;">
+                <div style="color:rgba(255,255,255,0.5);font-size:0.8rem;text-align:center;">加载中...</div>
+            </div>
+        </div>
+        <div id="messageWallInput" style="padding:8px 10px;border-top:1px solid rgba(255,255,255,0.1);display:flex;gap:6px;">
+            <input type="text" id="messageInput" placeholder="发布需求..." maxlength="100" style="flex:1;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:5px;padding:5px 8px;color:#fff;font-size:0.8rem;outline:none;" onfocus="this.style.borderColor='#ffd700'" onblur="this.style.borderColor='rgba(255,255,255,0.2)'">
+            <button onclick="postMessage()" style="background:linear-gradient(135deg,#ffd700,#ff6b6b);color:#1a1a2e;border:none;padding:5px 12px;border-radius:5px;font-size:0.8rem;cursor:pointer;font-weight:bold;">发布</button>
+        </div>
+    </div>
+
+    <!-- 消息墙最小化状态 -->
+    <div id="messageWallMin" style="display:none;position:fixed;bottom:60px;left:20px;background:rgba(26,26,46,0.9);border:1px solid rgba(255,215,0,0.3);border-radius:8px;padding:6px 12px;z-index:9980;cursor:pointer;" onclick="expandMessageWall()">
+        <span style="color:#ffd700;font-size:0.8rem;">📢 需求墙</span>
+        <span id="messageBadge" style="display:none;background:#ff6b6b;color:#fff;font-size:0.7rem;padding:1px 5px;border-radius:10px;margin-left:5px;">0</span>
+    </div>
+
+    <!-- 消息墙开关按钮 -->
+    <button id="messageWallToggle" onclick="toggleMessageWall()" title="需求墙" style="position:fixed;bottom:60px;left:20px;background:rgba(255,215,0,0.8);color:#1a1a2e;border:none;width:36px;height:36px;border-radius:50%;cursor:pointer;font-size:1rem;box-shadow:0 2px 8px rgba(0,0,0,0.3);z-index:9985;display:flex;align-items:center;justify-content:center;">📢</button>
 
     <!-- 统计数据栏 -->
     <div id="statsBar" style="position:fixed;bottom:0;left:0;right:0;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);border-top:2px solid rgba(255,215,0,0.5);padding:10px 20px;z-index:9990;display:flex;justify-content:center;align-items:center;gap:30px;font-size:0.9rem;">
