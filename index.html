@@ -7043,7 +7043,7 @@ function hasGistToken() {
             } else {
                 return `${hours}时${totalMinutes % 60}分`;
             }
-        }
+        } 
         
         // ==================== 消息墙功能 ====================
         let wallMessages = [];
@@ -7336,7 +7336,8 @@ function hasGistToken() {
             }
             
             const data = await response.json();
-            return data.html_url;
+            const fileData = data.files[file.name];
+            return fileData?.raw_url || data.html_url;
         }
         
         function readFileAsText(file) {
