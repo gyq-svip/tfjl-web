@@ -18,8 +18,69 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Debug - Check files
+        run: |
+          echo "Current directory: $(pwd)"
+          echo "Files in directory:"
+          ls -la
+          echo "Checking index.html..."
+          if [ -f "index.html" ]; then
+            echo "✅ index.html exists"
+            echo "Checking for token placeholder..."
+            if grep -q "YOUR_GITHUB_TOKEN_HERE" index.html; then
+              echo "✅ Token placeholder found in index.html"
+            else
+              echo "❌ Token placeholder NOT found in index.html"
+            fi
+          else
+            echo "❌ index.html does not exist!"
+            exit 1
+          fi
+
+      - name: Debug - Check secret
+        run: |
+          echo "Checking GIST_TOKEN secret..."
+          if [ -n "${{ secrets.GIST_TOKEN }}" ]; then
+            echo "✅ GIST_TOKEN secret exists"
+            echo "Token length: ${#{{ secrets.GIST_TOKEN }}}"
+            echo "Token prefix: ${ {{ secrets.GIST_TOKEN }}:0:10 }"
+          else
+            echo "❌ GIST_TOKEN secret is empty!"
+            exit 1
+          fi
+
+      - name: Inject Token (Simple Method)
+        run: |
+          echo "Injecting GitHub Token..."
+          
+          # 读取Token
+          TOKEN="${{ secrets.GIST_TOKEN }}"
+          
+          # 简单的字符串替换
+          sed -i "s/YOUR_GITHUB_TOKEN_HERE/$TOKEN/g" index.html
+          
+          echo "Token injection completed"
+
+      - name: Verify Injection
+        run: |
+          echo "Verifying token injection..."
+          if grep -q "YOUR_GITHUB_TOKEN_HERE" index.html; then
+            echo "❌ ERROR: Token was NOT injected!"
+            echo "Content around placeholder:"
+            grep -B2 -A2 "YOUR_GITHUB_TOKEN_HERE" index.html
+            exit 1
+          else
+            echo "✅ SUCCESS: Token was injected"
+            echo "Checking for ghp_ prefix..."
+            if grep -q "ghp_" index.html; then
+              echo "✅ Found ghp_ prefix in index.html"
+            else
+              echo "⚠️ Warning: ghp_ prefix not found"
+            fi
+          fi
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
