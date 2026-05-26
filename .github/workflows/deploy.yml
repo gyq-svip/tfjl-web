@@ -21,11 +21,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
       - name: Debug - Check files
         run: |
           echo "Current directory: $(pwd)"
-          echo "Files in directory:"
-          ls -la
           echo "Checking index.html..."
           if [ -f "index.html" ]; then
             echo "✅ index.html exists"
@@ -52,34 +55,39 @@ jobs:
             exit 1
           fi
 
-      - name: Inject Token (Simple Method)
+      - name: Inject Token
         run: |
           echo "Injecting GitHub Token..."
           
           # 读取Token
           TOKEN="${{ secrets.GIST_TOKEN }}"
           
-          # 简单的字符串替换
-          sed -i "s/YOUR_GITHUB_TOKEN_HERE/$TOKEN/g" index.html
+          # 使用Python进行替换（更可靠）
+          python3 -c "
+import sys
+
+with open('index.html', 'r', encoding='utf-8') as f:
+    content = f.read()
+
+# 替换YOUR_GITHUB_TOKEN_HERE为实际Token
+new_content = content.replace('YOUR_GITHUB_TOKEN_HERE', sys.argv[1])
+
+with open('index.html', 'w', encoding='utf-8') as f:
+    f.write(new_content)
+
+print('Token injection completed')
+" "$TOKEN"
           
-          echo "Token injection completed"
+          echo "Token injection successful"
 
       - name: Verify Injection
         run: |
           echo "Verifying token injection..."
           if grep -q "YOUR_GITHUB_TOKEN_HERE" index.html; then
             echo "❌ ERROR: Token was NOT injected!"
-            echo "Content around placeholder:"
-            grep -B2 -A2 "YOUR_GITHUB_TOKEN_HERE" index.html
             exit 1
           else
             echo "✅ SUCCESS: Token was injected"
-            echo "Checking for ghp_ prefix..."
-            if grep -q "ghp_" index.html; then
-              echo "✅ Found ghp_ prefix in index.html"
-            else
-              echo "⚠️ Warning: ghp_ prefix not found"
-            fi
           fi
 
       - name: Setup Pages
