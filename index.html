@@ -7219,14 +7219,23 @@ function hasGistToken() {
             
             if (scroller.scrollHeight <= content.clientHeight) return;
             
-            let scrollPos = 0;
             messageScrollInterval = setInterval(() => {
-                scrollPos += 0.5;
-                if (scrollPos >= scroller.scrollHeight - content.clientHeight) {
-                    scrollPos = 0;
+                content.scrollTop += 0.5;
+                if (content.scrollTop >= scroller.scrollHeight - content.clientHeight) {
+                    content.scrollTop = 0;
                 }
-                content.scrollTop = scrollPos;
             }, 50);
+        }
+        
+        function pauseMessageScroll() {
+            if (messageScrollInterval) {
+                clearInterval(messageScrollInterval);
+                messageScrollInterval = null;
+            }
+        }
+        
+        function resumeMessageScroll() {
+            startMessageScroll();
         }
         
         function handleScriptUpload(input) {
@@ -7510,7 +7519,7 @@ function hasGistToken() {
                 <button onclick="closeMessageWall()" title="关闭" style="background:transparent;border:none;color:#ff6b6b;font-size:1rem;cursor:pointer;padding:0;">×</button>
             </div>
         </div>
-        <div id="messageWallContent" style="padding:10px 15px;height:320px;overflow-y:auto;overflow-x:hidden;">
+        <div id="messageWallContent" style="padding:10px 15px;height:320px;overflow-y:auto;overflow-x:hidden;" onmouseenter="pauseMessageScroll()" onmouseleave="resumeMessageScroll()">
             <div id="messageScroller" style="display:flex;flex-direction:column;gap:10px;">
                 <div style="color:rgba(255,255,255,0.5);font-size:0.85rem;text-align:center;padding:20px;">加载中...</div>
             </div>
