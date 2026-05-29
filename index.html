@@ -7232,6 +7232,8 @@ function hasGistToken() {
                 active_today: 0,
                 active_today_users: [],
                 active_date: today,
+                online_users: {},
+                online_timeout: 600000,
                 daily_stats: {
                     [today]: {
                         visits: 0,
@@ -7276,6 +7278,8 @@ function hasGistToken() {
                     if (parsed.active_today === undefined) parsed.active_today = parsed.active_today_users.length;
                     if (parsed.total_visits === undefined) parsed.total_visits = 0;
                     if (parsed.total_downloads === undefined) parsed.total_downloads = 0;
+                    if (!parsed.online_users) parsed.online_users = {};
+                    if (!parsed.online_timeout) parsed.online_timeout = 600000;
                     
                     // 检查日期是否变化，如果新的一天则清空今日活跃用户
                     const today = getTodayString();
@@ -7283,6 +7287,15 @@ function hasGistToken() {
                         parsed.active_today_users = [];
                         parsed.active_today = 0;
                         parsed.active_date = today;
+                    }
+                    
+                    // 清理过期的在线用户
+                    const now = Date.now();
+                    const timeout = parsed.online_timeout;
+                    for (const id in parsed.online_users) {
+                        if (now - parsed.online_users[id] > timeout) {
+                            delete parsed.online_users[id];
+                        }
                     }
                     
                     return parsed;
@@ -7336,6 +7349,22 @@ function hasGistToken() {
                     counterData.active_today_users = [];
                     counterData.active_today = 0;
                     counterData.active_date = today;
+                }
+                
+                // 确保在线用户对象存在
+                if (!counterData.online_users) counterData.online_users = {};
+                if (!counterData.online_timeout) counterData.online_timeout = 600000;
+                
+                // 记录用户最后活跃时间（用于计算在线用户）
+                counterData.online_users[deviceId] = Date.now();
+                
+                // 清理超过时间窗口的用户
+                const now = Date.now();
+                const timeout = counterData.online_timeout;
+                for (const id in counterData.online_users) {
+                    if (now - counterData.online_users[id] > timeout) {
+                        delete counterData.online_users[id];
+                    }
                 }
                 
                 // 更新对应统计
@@ -7418,6 +7447,8 @@ function hasGistToken() {
                 if (!remoteData.active_today_users) remoteData.active_today_users = [];
                 if (!remoteData.total_users) remoteData.total_users = remoteData.unique_users.length;
                 if (!remoteData.active_today) remoteData.active_today = remoteData.active_today_users.length;
+                if (!remoteData.online_users) remoteData.online_users = {};
+                if (!remoteData.online_timeout) remoteData.online_timeout = 600000;
                 
                 // 合并待同步的数据
                 const today = getTodayString();
@@ -7427,6 +7458,15 @@ function hasGistToken() {
                     remoteData.active_today_users = [];
                     remoteData.active_today = 0;
                     remoteData.active_date = today;
+                }
+                
+                // 清理过期的在线用户
+                const now = Date.now();
+                const timeout = remoteData.online_timeout;
+                for (const id in remoteData.online_users) {
+                    if (now - remoteData.online_users[id] > timeout) {
+                        delete remoteData.online_users[id];
+                    }
                 }
                 
                 queue.forEach(item => {
@@ -7613,10 +7653,22 @@ function hasGistToken() {
             const onlineEl = document.getElementById('statOnline');
             const downloadEl = document.getElementById('statDownloads');
             
+            // 计算在线用户数（清理过期用户后）
+            let onlineCount = 0;
+            if (counterData.online_users) {
+                const now = Date.now();
+                const timeout = counterData.online_timeout || 600000;
+                for (const id in counterData.online_users) {
+                    if (now - counterData.online_users[id] <= timeout) {
+                        onlineCount++;
+                    }
+                }
+            }
+            
             if (runtimeEl) runtimeEl.textContent = calculateRuntime();
             if (visitEl) visitEl.textContent = counterData.total_visits || 0;
             if (usersEl) usersEl.textContent = counterData.total_users || 0;
-            if (onlineEl) onlineEl.textContent = counterData.active_today || 0;
+            if (onlineEl) onlineEl.textContent = onlineCount;
             if (downloadEl) downloadEl.textContent = counterData.total_downloads || 0;
         }
         
@@ -7875,9 +7927,32 @@ function hasGistToken() {
         async function downloadScript(url) {
             try {
                 await recordDownload();
-                window.open(url, '_blank');
+                
+                // 从URL提取文件名
+                let fileName = url.split('/').pop() || 'download.txt';
+                if (!fileName || fileName === 'raw') {
+                    fileName = 'script.txt';
+                }
+                
+                // 获取文件内容
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error(`获取文件失败: ${response.status}`);
+                }
+                const content = await response.text();
+                
+                // 创建Blob并下载
+                const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+                const blobUrl = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = blobUrl;
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(blobUrl);
             } catch (error) {
-                console.warn('记录下载失败:', error);
+                console.warn('下载失败，尝试直接打开:', error);
                 window.open(url, '_blank');
             }
         }
@@ -9023,6 +9098,19 @@ function hasGistToken() {
             const totalUsers = counterData.total_users || 0;
             const activeToday = counterData.active_today || 0;
             
+            // 计算在线用户数
+            let onlineCount = 0;
+            if (counterData.online_users) {
+                const now = Date.now();
+                const timeout = counterData.online_timeout || 600000;
+                for (const id in counterData.online_users) {
+                    if (now - counterData.online_users[id] <= timeout) {
+                        onlineCount++;
+                    }
+                }
+            }
+            const onlineTimeoutMinutes = Math.round((counterData.online_timeout || 600000) / 60000);
+            
             let statsHtml = `
                 <div style="text-align:left;line-height:1.8;">
                     <h2 style="color:#ffd700;margin-top:0;">📊 访问统计</h2>
@@ -9033,6 +9121,7 @@ function hasGistToken() {
                     <div style="padding-left:20px;">
                         <p>• 总访问次数：${counterData.total_visits}</p>
                         <p>• 总用户数：${totalUsers}</p>
+                        <p>• 当前在线：${onlineCount} <span style="color:#888;font-size:0.8rem;">(${onlineTimeoutMinutes}分钟内活跃)</span></p>
                         <p>• 今日活跃：${activeToday}</p>
                         <p>• 总下载次数：${counterData.total_downloads}</p>
                     </div>
@@ -9176,7 +9265,7 @@ function hasGistToken() {
             </div>
             <div style="color:#fff;display:flex;align-items:center;gap:6px;">
                 <span style="color:#4ecdc4;">🟢</span>
-                <span>在线: <strong id="statOnline" style="color:#ffd700;">-</strong></span>
+                <span title="最近10分钟内活跃的用户数">在线: <strong id="statOnline" style="color:#ffd700;">-</strong></span>
             </div>
             <div style="color:#fff;display:flex;align-items:center;gap:6px;">
                 <span style="color:#4ecdc4;">📥</span>
