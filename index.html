@@ -2597,6 +2597,10 @@
             // 保存数据
             saveToLocalStorage();
             autoSaveProject();
+            
+            // 调试：检查手牌数据
+            console.log('解析后手牌数据:', targetHand);
+            console.log('手牌数量:', targetHand.length);
 
             // 显示结果
             let resultHtml = '';
@@ -4134,6 +4138,10 @@
             // 保存数据
             saveToLocalStorage();
             autoSaveProject();
+            
+            // 调试：检查手牌数据
+            console.log('窗口解析后手牌数据:', targetHand);
+            console.log('手牌数量:', targetHand.length);
 
             // 显示结果
             let resultHtml = '';
@@ -4512,6 +4520,10 @@
             
             // 更新卡牌等级徽章显示
             updateAllCardLevelBadges();
+            
+            // 保存数据
+            saveToLocalStorage();
+            autoSaveProject();
 
             // 显示结果
             let resultHtml = '';
@@ -5609,8 +5621,11 @@
 
         // 手牌卡牌点击（上卡到战斗槽）
         function handleHandCardClick(e, handType) {
+            console.log('手牌点击触发, handType:', handType);
+            
             const cardEl = e.target.closest('.selected-card');
             if (!cardEl) {
+                console.log('未找到卡牌元素');
                 return;
             }
             
@@ -5618,6 +5633,7 @@
             e.stopPropagation();
             
             if (cardEl.classList.contains('placed') || cardEl.classList.contains('empty')) {
+                console.log('卡牌已放置或为空');
                 return;
             }
             
@@ -5627,18 +5643,25 @@
             const profession = cardEl.dataset.profession;
             const cardType = cardEl.dataset.type;
             
+            console.log('卡牌信息:', { cardId, cardName, isEngineering, profession, cardType });
+            
             // 找到第一个空的战斗槽
             const handCards = handType === 'my' ? myHandCards : teammateHandCards;
             const placedCards = handType === 'my' ? myPlacedCards : teammatePlacedCards;
             
+            console.log('手牌数组:', handCards);
+            
             // 找到这个卡牌在手牌中的位置
             const cardIndex = handCards.findIndex(c => c.id === cardId);
+            console.log('卡牌索引:', cardIndex);
+            
             if (cardIndex === -1) return;
             
             const card = handCards[cardIndex];
             
             // 尝试放置到战斗槽
             const slotId = findEmptySlot(handType, card.profession, card.isEngineering);
+            console.log('找到的槽位:', slotId);
             
             if (slotId) {
                 // 不从手牌移除，只标记为已放置（变暗）
