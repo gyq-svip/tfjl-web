@@ -7119,26 +7119,23 @@ function hasGistToken() {
             
             // 先初始化统计数据
             try {
-                // 新设备优先从Gist获取数据
-                if (isNewDeviceLogin()) {
-                    try {
-                        const fresh = await fetchCounterFromGist();
-                        counterData = fresh || getDefaultCounter();
+                // 始终优先从Gist获取最新数据，确保多设备同步
+                try {
+                    const fresh = await fetchCounterFromGist();
+                    if (fresh) {
+                        counterData = fresh;
                         // 保存到缓存
                         saveCounterToCache(counterData);
-                    } catch (error) {
-                        console.warn('从Gist获取失败，使用默认数据:', error);
-                        counterData = getDefaultCounter();
-                    }
-                } else {
-                    // 已有设备，优先使用缓存
-                    const cached = loadCounterFromCache();
-                    if (cached) {
-                        counterData = cached;
                     } else {
-                        const fresh = await fetchCounterFromGist();
-                        counterData = fresh || getDefaultCounter();
-                        }
+                        // Gist获取失败，尝试使用缓存
+                        const cached = loadCounterFromCache();
+                        counterData = cached || getDefaultCounter();
+                    }
+                } catch (error) {
+                    console.warn('从Gist获取失败，尝试使用缓存:', error);
+                    // 网络失败，使用缓存
+                    const cached = loadCounterFromCache();
+                    counterData = cached || getDefaultCounter();
                 }
             } catch (error) {
                 console.error('❌ 初始化统计数据失败:', error);
@@ -7234,6 +7231,7 @@ function hasGistToken() {
                 total_downloads: 0,
                 active_today: 0,
                 active_today_users: [],
+                active_date: today,
                 daily_stats: {
                     [today]: {
                         visits: 0,
@@ -7279,6 +7277,14 @@ function hasGistToken() {
                     if (parsed.total_visits === undefined) parsed.total_visits = 0;
                     if (parsed.total_downloads === undefined) parsed.total_downloads = 0;
                     
+                    // 检查日期是否变化，如果新的一天则清空今日活跃用户
+                    const today = getTodayString();
+                    if (!parsed.active_date || parsed.active_date !== today) {
+                        parsed.active_today_users = [];
+                        parsed.active_today = 0;
+                        parsed.active_date = today;
+                    }
+                    
                     return parsed;
                 }
                 
@@ -7294,26 +7300,21 @@ function hasGistToken() {
         // 更新统计数据
         async function updateCounter(type) {
             try {
-                // 如果没有加载过统计数据，先加载
-                if (!counterData) {
-                    // 新设备优先从远程加载数据
-                    if (isNewDeviceLogin()) {
-                        try {
-                            const fresh = await fetchCounterFromGist();
-                            counterData = fresh || getDefaultCounter();
-                        } catch (error) {
-                            counterData = getDefaultCounter();
+                // 先从Gist获取最新数据，避免覆盖其他设备的更新
+                if (isOnline()) {
+                    try {
+                        const fresh = await fetchCounterFromGist();
+                        if (fresh) {
+                            counterData = fresh;
                         }
-                    } else {
-                        // 已有设备，优先使用缓存
-                        const cached = loadCounterFromCache();
-                        if (cached) {
-                            counterData = cached;
-                        } else {
-                            const fresh = await fetchCounterFromGist();
-                            counterData = fresh || getDefaultCounter();
-                        }
+                    } catch (error) {
+                        console.warn('获取最新数据失败，使用本地数据:', error);
                     }
+                }
+                
+                // 如果没有数据，使用默认值
+                if (!counterData) {
+                    counterData = getDefaultCounter();
                 }
                 
                 const today = getTodayString();
@@ -7329,6 +7330,13 @@ function hasGistToken() {
                 // 确保 unique_users 和 active_today_users 数组存在
                 if (!counterData.unique_users) counterData.unique_users = [];
                 if (!counterData.active_today_users) counterData.active_today_users = [];
+                
+                // 检查日期是否变化，如果新的一天则清空今日活跃用户
+                if (!counterData.active_date || counterData.active_date !== today) {
+                    counterData.active_today_users = [];
+                    counterData.active_today = 0;
+                    counterData.active_date = today;
+                }
                 
                 // 更新对应统计
                 switch (type) {
@@ -7413,6 +7421,13 @@ function hasGistToken() {
                 
                 // 合并待同步的数据
                 const today = getTodayString();
+                
+                // 检查日期是否变化，如果新的一天则清空今日活跃用户
+                if (!remoteData.active_date || remoteData.active_date !== today) {
+                    remoteData.active_today_users = [];
+                    remoteData.active_today = 0;
+                    remoteData.active_date = today;
+                }
                 
                 queue.forEach(item => {
                     const syncDate = item.date || today;
@@ -7531,6 +7546,8 @@ function hasGistToken() {
                 if (response.ok) {
                     saveCounterToCache(counterData);
                     clearPendingSync();
+                    // 同步成功后更新显示
+                    updateStatsBar();
                 } else {
                     const errorText = await response.text();
                     console.error('❌ Gist同步失败:', response.status, errorText);
@@ -7552,6 +7569,8 @@ function hasGistToken() {
             window.addEventListener('online', () => {
                 setTimeout(() => {
                     syncPendingQueue();
+                    // 重新获取最新数据
+                    refreshCounterData();
                 }, 3000);
             });
             
@@ -7561,6 +7580,27 @@ function hasGistToken() {
                     syncPendingQueue();
                 }
             }, 5000);
+            
+            // 定期刷新数据（每60秒），确保多设备同步
+            setInterval(() => {
+                if (isOnline()) {
+                    refreshCounterData();
+                }
+            }, 60000);
+        }
+        
+        // 刷新统计数据（从Gist获取最新）
+        async function refreshCounterData() {
+            try {
+                const fresh = await fetchCounterFromGist();
+                if (fresh) {
+                    counterData = fresh;
+                    saveCounterToCache(counterData);
+                    updateStatsBar();
+                }
+            } catch (error) {
+                console.warn('刷新统计数据失败:', error);
+            }
         }
         
         // 更新底部统计栏显示
