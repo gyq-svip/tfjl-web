@@ -7929,9 +7929,19 @@ function hasGistToken() {
                 await recordDownload();
                 
                 // 从URL提取文件名
-                let fileName = url.split('/').pop() || 'download.txt';
-                if (!fileName || fileName === 'raw') {
-                    fileName = 'script.txt';
+                let fileName = 'download.txt';
+                try {
+                    const urlObj = new URL(url);
+                    const pathParts = urlObj.pathname.split('/');
+                    const lastPart = pathParts[pathParts.length - 1];
+                    if (lastPart && lastPart !== 'raw' && lastPart.length > 0) {
+                        fileName = decodeURIComponent(lastPart);
+                    }
+                } catch (e) {
+                    const lastPart = url.split('/').pop();
+                    if (lastPart && lastPart !== 'raw' && lastPart.length > 0) {
+                        fileName = decodeURIComponent(lastPart);
+                    }
                 }
                 
                 // 获取文件内容
