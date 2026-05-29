@@ -8518,7 +8518,7 @@ function hasGistToken() {
             
             const now = Date.now();
             const currentNickname = localStorage.getItem('TFJL_UserName') || '';
-            const adminNicknames = ['管理员', 'admin', 'Admin', 'gyq', 'GYQ'];
+            const adminNicknames = ['gyq', 'GYQ'];
             const isAdmin = adminNicknames.some(nick => currentNickname.toLowerCase() === nick.toLowerCase());
             
             // 过滤消息：默认永久保存，只有设置了expireDays的消息才过期
@@ -8595,7 +8595,7 @@ function hasGistToken() {
             if (!confirm('确定要删除这条消息吗？')) return;
             
             const currentNickname = localStorage.getItem('TFJL_UserName') || '';
-            const adminNicknames = ['管理员', 'admin', 'Admin', 'gyq', 'GYQ'];
+            const adminNicknames = ['gyq', 'GYQ'];
             const isAdmin = adminNicknames.some(nick => currentNickname.toLowerCase() === nick.toLowerCase());
             const msg = wallMessages[index];
             
