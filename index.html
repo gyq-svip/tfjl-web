@@ -2593,6 +2593,10 @@
             
             // 更新卡牌等级徽章显示
             updateAllCardLevelBadges();
+            
+            // 保存数据
+            saveToLocalStorage();
+            autoSaveProject();
 
             // 显示结果
             let resultHtml = '';
@@ -4126,6 +4130,10 @@
             
             // 更新卡牌等级徽章显示
             updateAllCardLevelBadges();
+            
+            // 保存数据
+            saveToLocalStorage();
+            autoSaveProject();
 
             // 显示结果
             let resultHtml = '';
@@ -5826,6 +5834,13 @@
             if (source === 'pool') {
                 const targetHand = isUserSlot ? myHandCards : teammateHandCards;
                 if (targetHand.length >= MAX_HAND_CARDS) return;
+                
+                // 检查是否已存在相同卡牌
+                if (targetHand.some(c => c.id === cardId)) {
+                    this.classList.add('invalid-drop');
+                    setTimeout(() => this.classList.remove('invalid-drop'), 500);
+                    return;
+                }
                 
                 if (isEngineering) {
                     const engCount = targetHand.filter(c => c.isEngineering).length;
