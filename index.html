@@ -4204,10 +4204,10 @@
                 position: fixed;
                 top: ${100 + txtFileWindows.length * 30}px;
                 left: ${200 + txtFileWindows.length * 30}px;
-                width: 600px;
-                height: 450px;
-                min-width: 300px;
-                min-height: 200px;
+                width: 650px;
+                height: 500px;
+                min-width: 400px;
+                min-height: 300px;
                 background: linear-gradient(135deg, rgba(30,30,50,0.98), rgba(20,20,40,0.98));
                 border: 2px solid rgba(255,215,0,0.3);
                 border-radius: 12px;
@@ -4252,7 +4252,7 @@
             textarea.id = `${windowId}_content`;
             textarea.style.cssText = `
                 width: 100%;
-                height: 100%;
+                flex: 1;
                 background: rgba(0,0,0,0.3);
                 border: 1px solid rgba(255,215,0,0.2);
                 border-radius: 8px;
@@ -4267,20 +4267,43 @@
             textarea.value = file.content;
             textarea.spellcheck = false;
             
+            // 解析结果显示区
+            const parseResult = document.createElement('div');
+            parseResult.id = `${windowId}_parseResult`;
+            parseResult.style.cssText = `
+                margin-top: 8px;
+                font-size: 0.85rem;
+                color: rgba(255,255,255,0.7);
+                min-height: 20px;
+            `;
+            
             // 底部按钮栏
             const buttonBar = document.createElement('div');
             buttonBar.style.cssText = `
                 display: flex;
-                justify-content: flex-end;
+                justify-content: space-between;
+                align-items: center;
                 gap: 10px;
                 padding-top: 10px;
                 flex-shrink: 0;
+                flex-wrap: wrap;
             `;
             buttonBar.innerHTML = `
-                <button onclick="saveTxtWindowContent('${windowId}', ${index})" style="background:linear-gradient(135deg,#4CAF50,#45a049);border:none;color:white;padding:8px 20px;border-radius:6px;cursor:pointer;font-weight:bold;">💾 保存</button>
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <select id="${windowId}_target" style="padding:6px 10px;border-radius:6px;border:1px solid rgba(255,215,0,0.3);background:#2a2a4a;color:#fff;font-size:0.85rem;cursor:pointer;">
+                        <option value="my">我的手牌</option>
+                        <option value="teammate">队友手牌</option>
+                    </select>
+                    <button onclick="parseTxtWindowContent('${windowId}', ${index})" style="background:linear-gradient(135deg,#00bcd4,#00838f);border:none;color:white;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;">🔍 解析阵容</button>
+                </div>
+                <div style="display:flex;gap:8px;">
+                    <button onclick="downloadTxtFile(${index})" style="background:linear-gradient(135deg,#2196f3,#1565c0);border:none;color:white;padding:8px 16px;border-radius:6px;cursor:pointer;">📥 下载</button>
+                    <button onclick="saveTxtWindowContent('${windowId}', ${index})" style="background:linear-gradient(135deg,#4CAF50,#45a049);border:none;color:white;padding:8px 20px;border-radius:6px;cursor:pointer;font-weight:bold;">💾 保存</button>
+                </div>
             `;
             
             contentArea.appendChild(textarea);
+            contentArea.appendChild(parseResult);
             contentArea.appendChild(buttonBar);
             
             windowDiv.appendChild(titleBar);
@@ -4394,6 +4417,107 @@
                 win.remove();
                 txtFileWindows = txtFileWindows.filter(w => w.id !== windowId);
             }
+        }
+
+        // 解析窗口内容中的阵容
+        function parseTxtWindowContent(windowId, fileIndex) {
+            const textarea = document.getElementById(`${windowId}_content`);
+            const resultEl = document.getElementById(`${windowId}_parseResult`);
+            const targetSelect = document.getElementById(`${windowId}_target`);
+            
+            if (!textarea || !textarea.value.trim()) {
+                resultEl.innerHTML = '<span style="color:#f44336;">文件内容为空！</span>';
+                return;
+            }
+
+            const content = textarea.value.trim();
+            const target = targetSelect.value;
+
+            // 解析"上阵："后面的内容
+            let heroNames = [];
+            
+            const match = content.match(/上阵[：:]\s*(.+)/);
+            if (match && match[1]) {
+                heroNames = match[1].split(/[,，]/).map(name => name.trim()).filter(name => name);
+            } else {
+                resultEl.innerHTML = '<span style="color:#f44336;">未找到"上阵："格式的阵容信息！</span>';
+                return;
+            }
+
+            if (heroNames.length === 0) {
+                resultEl.innerHTML = '<span style="color:#f44336;">未找到英雄名称！</span>';
+                return;
+            }
+
+            // 限制最多10张
+            if (heroNames.length > 10) {
+                heroNames = heroNames.slice(0, 10);
+            }
+
+            // 获取目标手牌数组
+            const targetHand = target === 'my' ? myHandCards : teammateHandCards;
+
+            // 查找并添加卡牌
+            let addedCount = 0;
+            let notFoundCards = [];
+            let duplicateCards = [];
+
+            heroNames.forEach(heroName => {
+                // 在卡池中查找卡牌
+                const cardEl = document.querySelector(`.card-item[data-name="${heroName}"]`);
+                
+                if (!cardEl) {
+                    notFoundCards.push(heroName);
+                    return;
+                }
+
+                const cardId = cardEl.dataset.id;
+                const cardType = cardEl.dataset.type;
+                const isEngineering = cardEl.dataset.engineering === 'true';
+                const profession = cardEl.dataset.profession;
+
+                // 检查是否已在手牌中
+                if (targetHand.some(c => c.id === cardId)) {
+                    duplicateCards.push(heroName);
+                    return;
+                }
+
+                // 检查手牌是否已满
+                if (targetHand.length >= MAX_HAND_CARDS) {
+                    return;
+                }
+
+                // 添加到手牌
+                targetHand.push({
+                    id: cardId,
+                    name: heroName,
+                    placed: null,
+                    isEngineering,
+                    profession,
+                    type: cardType
+                });
+                addedCount++;
+            });
+
+            // 更新手牌显示
+            updateHandDisplay(target);
+            
+            // 更新卡牌等级徽章显示
+            updateAllCardLevelBadges();
+
+            // 显示结果
+            let resultHtml = '';
+            if (addedCount > 0) {
+                resultHtml += `<span style="color:#4caf50;">✅ 成功添加 ${addedCount} 张卡牌到${target === 'my' ? '我的手牌' : '队友手牌'}</span>`;
+            }
+            if (duplicateCards.length > 0) {
+                resultHtml += `<br><span style="color:#ff9800;">⚠️ 重复卡牌：${duplicateCards.join('、')}</span>`;
+            }
+            if (notFoundCards.length > 0) {
+                resultHtml += `<br><span style="color:#f44336;">❌ 未找到：${notFoundCards.join('、')}</span>`;
+            }
+
+            resultEl.innerHTML = resultHtml;
         }
 
         // 保存窗口内容
@@ -7557,13 +7681,25 @@ function hasGistToken() {
                 let contentHtml = escapeHtml(msg.content);
                 
                 if (msg.scriptUrl) {
-                    contentHtml = contentHtml.replace(
-                        msg.scriptUrl,
-                        `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
-                            <a href="javascript:void(0)" onclick="downloadScript('${msg.scriptUrl}')" style="color:#4fc3f7;text-decoration:underline;cursor:pointer;background:rgba(79,195,247,0.1);padding:4px 10px;border-radius:5px;font-size:0.8rem;">📥 下载</a>
-                            <a href="javascript:void(0)" onclick="importScriptToTxtFiles('${msg.scriptUrl}')" style="color:#4caf50;text-decoration:underline;cursor:pointer;background:rgba(76,175,80,0.1);padding:4px 10px;border-radius:5px;font-size:0.8rem;">📄 导入到脚本</a>
-                        </div>`
-                    );
+                    const isBackup = msg.shareType === 'backup' || msg.scriptUrl.includes('backup') || contentHtml.includes('备份') || contentHtml.includes('项目');
+                    
+                    if (isBackup) {
+                        contentHtml = contentHtml.replace(
+                            msg.scriptUrl,
+                            `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+                                <a href="javascript:void(0)" onclick="downloadScript('${msg.scriptUrl}')" style="color:#4fc3f7;text-decoration:underline;cursor:pointer;background:rgba(79,195,247,0.1);padding:4px 10px;border-radius:5px;font-size:0.8rem;">📥 下载</a>
+                                <a href="javascript:void(0)" onclick="importBackupFromWall('${msg.scriptUrl}')" style="color:#ff9800;text-decoration:underline;cursor:pointer;background:rgba(255,152,0,0.1);padding:4px 10px;border-radius:5px;font-size:0.8rem;">📦 导入备份</a>
+                            </div>`
+                        );
+                    } else {
+                        contentHtml = contentHtml.replace(
+                            msg.scriptUrl,
+                            `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+                                <a href="javascript:void(0)" onclick="downloadScript('${msg.scriptUrl}')" style="color:#4fc3f7;text-decoration:underline;cursor:pointer;background:rgba(79,195,247,0.1);padding:4px 10px;border-radius:5px;font-size:0.8rem;">📥 下载</a>
+                                <a href="javascript:void(0)" onclick="importScriptToTxtFiles('${msg.scriptUrl}')" style="color:#4caf50;text-decoration:underline;cursor:pointer;background:rgba(76,175,80,0.1);padding:4px 10px;border-radius:5px;font-size:0.8rem;">📄 导入脚本</a>
+                            </div>`
+                        );
+                    }
                 }
                 
                 return `<div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:10px 12px;font-size:0.85rem;">
@@ -7716,6 +7852,100 @@ function hasGistToken() {
                 if (loadingToast) loadingToast.remove();
                 alert('❌ 导入失败: ' + error.message);
                 console.error('导入脚本失败:', error);
+            }
+        }
+
+        // 从需求墙导入备份
+        async function importBackupFromWall(url) {
+            try {
+                // 显示加载提示
+                const toast = document.createElement('div');
+                toast.id = 'importLoadingToast';
+                toast.style.cssText = `
+                    position: fixed;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    background: rgba(40,40,70,0.95);
+                    color: #ffd700;
+                    padding: 20px 30px;
+                    border-radius: 10px;
+                    z-index: 10001;
+                    border: 2px solid rgba(255,215,0,0.3);
+                `;
+                toast.textContent = '⏳ 正在导入备份...';
+                document.body.appendChild(toast);
+
+                // 从Gist获取备份内容
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('获取备份失败');
+                
+                const data = await response.json();
+                const files = data.files;
+                const fileNames = Object.keys(files);
+                
+                if (fileNames.length === 0) throw new Error('备份文件为空');
+                
+                // 获取第一个文件的内容作为备份数据
+                const backupContent = files[fileNames[0]].content;
+                const importData = JSON.parse(backupContent);
+                
+                if (!importData.projects || !Array.isArray(importData.projects)) {
+                    throw new Error('无效的备份文件格式');
+                }
+                
+                // 移除加载提示
+                toast.remove();
+                
+                const catCount = importData.categories ? importData.categories.length : 0;
+                if (confirm(`确定要导入吗？\n\n将导入 ${importData.projects.length} 个项目${catCount > 0 ? '，' + catCount + ' 个分类' : ''}。\n同名项目将被覆盖。`)) {
+                    // 导入分类
+                    if (importData.categories && Array.isArray(importData.categories)) {
+                        importData.categories.forEach(cat => {
+                            if (!categories.includes(cat)) {
+                                categories.push(cat);
+                            }
+                        });
+                        saveCategories();
+                    }
+                    
+                    // 导入项目
+                    const transaction = db.transaction(['projects'], 'readwrite');
+                    const store = transaction.objectStore('projects');
+                    
+                    importData.projects.forEach(project => {
+                        store.put(project);
+                    });
+                    
+                    transaction.oncomplete = async function() {
+                        await recordDownload();
+                        refreshProjectSelectors();
+                        
+                        const successToast = document.createElement('div');
+                        successToast.style.cssText = `
+                            position: fixed;
+                            top: 20px;
+                            right: 20px;
+                            background: linear-gradient(135deg, #4CAF50, #45a049);
+                            color: white;
+                            padding: 12px 24px;
+                            border-radius: 8px;
+                            z-index: 10000;
+                        `;
+                        successToast.textContent = `✅ 成功导入 ${importData.projects.length} 个项目！`;
+                        document.body.appendChild(successToast);
+                        setTimeout(() => successToast.remove(), 3000);
+                    };
+                    
+                    transaction.onerror = function() {
+                        alert('❌ 导入项目失败');
+                    };
+                }
+            } catch (error) {
+                const loadingToast = document.getElementById('importLoadingToast');
+                if (loadingToast) loadingToast.remove();
+                alert('❌ 导入备份失败: ' + error.message);
+                console.error('导入备份失败:', error);
             }
         }
         
