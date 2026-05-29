@@ -314,8 +314,9 @@
             justify-content: center;
             transition: all 0.3s ease;
             white-space: nowrap;
-            overflow: hidden;
+            overflow: visible;
             text-overflow: ellipsis;
+            position: relative;
         }
 
         .battle-slot.drag-over {
@@ -520,8 +521,9 @@
             align-items: center;
             justify-content: center;
             white-space: nowrap;
-            overflow: hidden;
+            overflow: visible;
             text-overflow: ellipsis;
+            position: relative;
         }
         
         .selected-card.card-item[data-profession="warrior"] {
@@ -864,7 +866,7 @@
             max-width: 90px;
             text-align: center;
             white-space: nowrap;
-            overflow: hidden;
+            overflow: visible;
             text-overflow: ellipsis;
             display: inline-flex;
             align-items: center;
@@ -4974,9 +4976,22 @@
         
         function getMainCardName(cardName) {
             if (!cardName) return cardName;
-            const fusionCards = ['火炮射线', '射线潜艇', '火炮潜艇', '宝库射线', '宝库潜艇', '宝库火炮'];
+            const fusionCards = [
+                '火炮射线', '射线潜艇', '火炮潜艇', '宝库射线', '宝库潜艇', '宝库火炮',
+                '潜艇射线', '潜艇火炮', '射线火炮',
+                '水灵刀客', '刀客水灵', '蛇女爱神', '爱神蛇女',
+                '咕咕天使', '天使咕咕', '圣骑天使', '天使圣骑',
+                '战将鱼人', '鱼人战将', '电法冰法', '冰法电法',
+                '萌萌水灵', '水灵萌萌', '火灵风灵', '风灵火灵'
+            ];
             if (fusionCards.includes(cardName)) {
                 return cardName.substring(0, 2);
+            }
+            if (cardName.length === 4 && !DEFAULT_CARD_SKINS[cardName]) {
+                const firstTwo = cardName.substring(0, 2);
+                if (DEFAULT_CARD_SKINS[firstTwo]) {
+                    return firstTwo;
+                }
             }
             return cardName;
         }
