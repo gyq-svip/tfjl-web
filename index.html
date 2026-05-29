@@ -7785,6 +7785,8 @@ function hasGistToken() {
             return new Promise((resolve) => {
                 const catCount = importData.categories ? importData.categories.length : 0;
                 const projectCount = importData.projects.length;
+                const existingNames = importData.existingNames || [];
+                const hasExisting = existingNames.length > 0;
                 
                 const modal = document.createElement('div');
                 modal.id = 'backupImportDialog';
@@ -7801,6 +7803,31 @@ function hasGistToken() {
                     z-index: 10002;
                 `;
                 
+                let existingWarning = '';
+                if (hasExisting) {
+                    existingWarning = `
+                        <div style="background:rgba(255,152,0,0.1);border:1px solid rgba(255,152,0,0.3);border-radius:8px;padding:12px;margin-bottom:15px;">
+                            <p style="color:#ff9800;margin:0 0 8px 0;font-size:0.85rem;">
+                                ⚠️ 发现 ${existingNames.length} 个同名项目：${existingNames.slice(0, 3).join('、')}${existingNames.length > 3 ? '...' : ''}
+                            </p>
+                            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                                <label style="display:flex;align-items:center;gap:5px;padding:6px 10px;background:rgba(255,255,255,0.05);border-radius:6px;cursor:pointer;font-size:0.8rem;">
+                                    <input type="radio" name="importAction" value="rename" checked style="accent-color:#ffd700;">
+                                    <span style="color:#fff;">📝 改名</span>
+                                </label>
+                                <label style="display:flex;align-items:center;gap:5px;padding:6px 10px;background:rgba(255,255,255,0.05);border-radius:6px;cursor:pointer;font-size:0.8rem;">
+                                    <input type="radio" name="importAction" value="overwrite" style="accent-color:#ffd700;">
+                                    <span style="color:#fff;">🔄 覆盖</span>
+                                </label>
+                                <label style="display:flex;align-items:center;gap:5px;padding:6px 10px;background:rgba(255,255,255,0.05);border-radius:6px;cursor:pointer;font-size:0.8rem;">
+                                    <input type="radio" name="importAction" value="skip" style="accent-color:#ffd700;">
+                                    <span style="color:#fff;">⏭️ 跳过</span>
+                                </label>
+                            </div>
+                        </div>
+                    `;
+                }
+                
                 modal.innerHTML = `
                     <div style="background:linear-gradient(135deg,rgba(40,40,70,0.98),rgba(30,30,60,0.98));border:2px solid rgba(255,215,0,0.3);border-radius:15px;padding:25px;min-width:380px;max-width:450px;">
                         <h3 style="margin:0 0 15px 0;color:#ffd700;text-align:center;">📥 恢复项目备份</h3>
@@ -7811,11 +7838,15 @@ function hasGistToken() {
                             包含 <strong style="color:#4caf50;">${projectCount}</strong> 个项目${catCount > 0 ? `，<strong style="color:#2196f3;">${catCount}</strong> 个分类` : ''}
                         </p>
                         
-                        <div style="background:rgba(255,193,7,0.1);border:1px solid rgba(255,193,7,0.3);border-radius:8px;padding:12px;margin-bottom:20px;">
-                            <p style="color:#ffc107;margin:0;font-size:0.85rem;text-align:center;">
-                                ⚠️ 同名项目将被覆盖替换
+                        ${existingWarning}
+                        
+                        ${!hasExisting ? `
+                        <div style="background:rgba(76,175,80,0.1);border:1px solid rgba(76,175,80,0.3);border-radius:8px;padding:12px;margin-bottom:20px;">
+                            <p style="color:#4caf50;margin:0;font-size:0.85rem;text-align:center;">
+                                ✅ 无同名项目冲突
                             </p>
                         </div>
+                        ` : ''}
                         
                         <div style="display:flex;gap:10px;justify-content:center;">
                             <button id="confirmImportBtn" style="background:linear-gradient(135deg,#4CAF50,#45a049);color:white;border:none;padding:12px 30px;border-radius:8px;cursor:pointer;font-weight:bold;font-size:0.9rem;">✅ 确认恢复</button>
@@ -7827,8 +7858,10 @@ function hasGistToken() {
                 document.body.appendChild(modal);
                 
                 document.getElementById('confirmImportBtn').onclick = function() {
+                    const actionRadio = document.querySelector('input[name="importAction"]:checked');
+                    const action = actionRadio ? actionRadio.value : 'overwrite';
                     modal.remove();
-                    resolve({ action: 'overwrite' });
+                    resolve({ action });
                 };
                 
                 document.getElementById('cancelImportBtn').onclick = function() {
@@ -7972,7 +8005,22 @@ function hasGistToken() {
                                 // 这是备份文件，显示导入选项对话框
                                 toast.remove();
                                 
-                                const result = await showBackupImportDialog({ projects: projectsToImport }, fileName);
+                                // 检查同名项目
+                                const existingNames = [];
+                                for (const project of projectsToImport) {
+                                    const existing = await new Promise((resolve) => {
+                                        const tx = db.transaction(['projects'], 'readonly');
+                                        const st = tx.objectStore('projects');
+                                        const req = st.get(project.name);
+                                        req.onsuccess = () => resolve(req.result);
+                                        req.onerror = () => resolve(null);
+                                    });
+                                    if (existing) {
+                                        existingNames.push(project.name);
+                                    }
+                                }
+                                
+                                const result = await showBackupImportDialog({ projects: projectsToImport, existingNames }, fileName);
                                 
                                 if (result && result.action !== 'cancel') {
                                     // 导入分类
@@ -7985,19 +8033,61 @@ function hasGistToken() {
                                         saveCategories();
                                     }
                                     
-                                    // 直接覆盖导入项目（和恢复项目功能一致）
+                                    // 处理项目导入
                                     let imported = 0;
+                                    let renamed = 0;
+                                    let skipped = 0;
                                     const transaction = db.transaction(['projects'], 'readwrite');
                                     const store = transaction.objectStore('projects');
                                     
-                                    projectsToImport.forEach(project => {
-                                        const putRequest = store.put(project);
-                                        putRequest.onsuccess = () => imported++;
-                                    });
+                                    for (const project of projectsToImport) {
+                                        // 检查是否存在同名项目
+                                        const existing = await new Promise((resolve) => {
+                                            const req = store.get(project.name);
+                                            req.onsuccess = () => resolve(req.result);
+                                            req.onerror = () => resolve(null);
+                                        });
+                                        
+                                        if (existing) {
+                                            if (result.action === 'rename') {
+                                                // 自动改名
+                                                let newName = project.name + '_副本';
+                                                let counter = 1;
+                                                while (await new Promise((resolve) => {
+                                                    const req = store.get(newName);
+                                                    req.onsuccess = () => resolve(!!req.result);
+                                                    req.onerror = () => resolve(false);
+                                                })) {
+                                                    counter++;
+                                                    newName = `${project.name}_副本${counter}`;
+                                                }
+                                                project.name = newName;
+                                                renamed++;
+                                            } else if (result.action === 'skip') {
+                                                skipped++;
+                                                continue;
+                                            }
+                                            // overwrite 直接覆盖
+                                        }
+                                        
+                                        store.put(project);
+                                        imported++;
+                                    }
                                     
                                     transaction.oncomplete = async function() {
                                         await recordDownload();
+                                        
+                                        // 如果导入的项目有分类，切换到该分类
+                                        if (projectsToImport[0] && projectsToImport[0].category) {
+                                            currentProjectCategory = projectsToImport[0].category;
+                                        }
+                                        
                                         refreshProjectSelectors();
+                                        updateProjectSelector();
+                                        
+                                        let msg = `✅ 成功恢复 ${imported} 个项目！`;
+                                        if (renamed > 0) msg += `\n重命名 ${renamed} 个同名项目`;
+                                        if (skipped > 0) msg += `\n跳过 ${skipped} 个同名项目`;
                                         
                                         const successToast = document.createElement('div');
                                         successToast.style.cssText = `
@@ -8009,10 +8099,11 @@ function hasGistToken() {
                                             padding: 12px 24px;
                                             border-radius: 8px;
                                             z-index: 10000;
+                                            white-space: pre-line;
                                         `;
-                                        successToast.textContent = `✅ 成功恢复 ${imported} 个项目！`;
+                                        successToast.textContent = msg;
                                         document.body.appendChild(successToast);
-                                        setTimeout(() => successToast.remove(), 3000);
+                                        setTimeout(() => successToast.remove(), 4000);
                                     };
                                     
                                     transaction.onerror = function() {
@@ -8205,8 +8296,23 @@ function hasGistToken() {
                 // 移除加载提示
                 toast.remove();
                 
+                // 检查同名项目
+                const existingNames = [];
+                for (const project of projectsToImport) {
+                    const existing = await new Promise((resolve) => {
+                        const transaction = db.transaction(['projects'], 'readonly');
+                        const store = transaction.objectStore('projects');
+                        const req = store.get(project.name);
+                        req.onsuccess = () => resolve(req.result);
+                        req.onerror = () => resolve(null);
+                    });
+                    if (existing) {
+                        existingNames.push(project.name);
+                    }
+                }
+                
                 // 显示导入选项对话框
-                const result = await showBackupImportDialog({ projects: projectsToImport }, '备份文件');
+                const result = await showBackupImportDialog({ projects: projectsToImport, existingNames }, '备份文件');
                 
                 if (result && result.action !== 'cancel') {
                     // 导入分类
@@ -8219,19 +8325,61 @@ function hasGistToken() {
                         saveCategories();
                     }
                     
-                    // 直接覆盖导入项目（和恢复项目功能一致）
+                    // 处理项目导入
                     let imported = 0;
+                    let renamed = 0;
+                    let skipped = 0;
                     const transaction = db.transaction(['projects'], 'readwrite');
                     const store = transaction.objectStore('projects');
                     
-                    projectsToImport.forEach(project => {
-                        const putRequest = store.put(project);
-                        putRequest.onsuccess = () => imported++;
-                    });
+                    for (const project of projectsToImport) {
+                        // 检查是否存在同名项目
+                        const existing = await new Promise((resolve) => {
+                            const req = store.get(project.name);
+                            req.onsuccess = () => resolve(req.result);
+                            req.onerror = () => resolve(null);
+                        });
+                        
+                        if (existing) {
+                            if (result.action === 'rename') {
+                                // 自动改名
+                                let newName = project.name + '_副本';
+                                let counter = 1;
+                                while (await new Promise((resolve) => {
+                                    const req = store.get(newName);
+                                    req.onsuccess = () => resolve(!!req.result);
+                                    req.onerror = () => resolve(false);
+                                })) {
+                                    counter++;
+                                    newName = `${project.name}_副本${counter}`;
+                                }
+                                project.name = newName;
+                                renamed++;
+                            } else if (result.action === 'skip') {
+                                skipped++;
+                                continue;
+                            }
+                            // overwrite 直接覆盖
+                        }
+                        
+                        store.put(project);
+                        imported++;
+                    }
                     
                     transaction.oncomplete = async function() {
                         await recordDownload();
+                        
+                        // 如果导入的项目有分类，切换到该分类
+                        if (projectsToImport[0] && projectsToImport[0].category) {
+                            currentProjectCategory = projectsToImport[0].category;
+                        }
+                        
                         refreshProjectSelectors();
+                        updateProjectSelector();
+                        
+                        let msg = `✅ 成功恢复 ${imported} 个项目！`;
+                        if (renamed > 0) msg += `\n重命名 ${renamed} 个同名项目`;
+                        if (skipped > 0) msg += `\n跳过 ${skipped} 个同名项目`;
                         
                         const successToast = document.createElement('div');
                         successToast.style.cssText = `
@@ -8243,10 +8391,11 @@ function hasGistToken() {
                             padding: 12px 24px;
                             border-radius: 8px;
                             z-index: 10000;
+                            white-space: pre-line;
                         `;
-                        successToast.textContent = `✅ 成功恢复 ${imported} 个项目！`;
+                        successToast.textContent = msg;
                         document.body.appendChild(successToast);
-                        setTimeout(() => successToast.remove(), 3000);
+                        setTimeout(() => successToast.remove(), 4000);
                     };
                     
                     transaction.onerror = function() {
