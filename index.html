@@ -8517,7 +8517,8 @@ function hasGistToken() {
             if (!scroller) return;
             
             const now = Date.now();
-            const currentNickname = localStorage.getItem('TFJL_UserName') || '';
+            const nicknameInput = document.getElementById('messageNickname');
+            const currentNickname = nicknameInput?.value.trim() || localStorage.getItem('TFJL_UserName') || '';
             const adminNicknames = ['gyq', 'GYQ'];
             const isAdmin = adminNicknames.some(nick => currentNickname.toLowerCase() === nick.toLowerCase());
             
@@ -8594,7 +8595,8 @@ function hasGistToken() {
         async function deleteMessage(index) {
             if (!confirm('确定要删除这条消息吗？')) return;
             
-            const currentNickname = localStorage.getItem('TFJL_UserName') || '';
+            const nicknameInput = document.getElementById('messageNickname');
+            const currentNickname = nicknameInput?.value.trim() || localStorage.getItem('TFJL_UserName') || '';
             const adminNicknames = ['gyq', 'GYQ'];
             const isAdmin = adminNicknames.some(nick => currentNickname.toLowerCase() === nick.toLowerCase());
             const msg = wallMessages[index];
@@ -9828,6 +9830,13 @@ function hasGistToken() {
             if (savedNickname) {
                 const nicknameInput = document.getElementById('messageNickname');
                 if (nicknameInput) nicknameInput.value = savedNickname;
+            }
+            
+            const nicknameInput = document.getElementById('messageNickname');
+            if (nicknameInput) {
+                nicknameInput.addEventListener('input', () => {
+                    renderMessages();
+                });
             }
             
             if (messageFetchInterval) clearInterval(messageFetchInterval);
