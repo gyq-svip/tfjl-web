@@ -2594,8 +2594,7 @@
             // 更新卡牌等级徽章显示
             updateAllCardLevelBadges();
             
-            // 保存数据
-            saveToLocalStorage();
+            // 保存项目
             autoSaveProject();
             
             // 调试：检查手牌数据
@@ -3613,12 +3612,12 @@
                         clearCurrentData();
                         
                         // 恢复数据
-                        myHandCards = project.myHandCards || [];
-                        teammateHandCards = project.teammateHandCards || [];
-                        myPlacedCards = project.myPlacedCards || [];
-                        teammatePlacedCards = project.teammatePlacedCards || [];
-                        favoriteCards = project.favoriteCards || [];
-                        professionOrder = project.professionOrder || [];
+                        myHandCards = Array.isArray(project.myHandCards) ? project.myHandCards : [];
+                        teammateHandCards = Array.isArray(project.teammateHandCards) ? project.teammateHandCards : [];
+                        myPlacedCards = Array.isArray(project.myPlacedCards) ? project.myPlacedCards : [];
+                        teammatePlacedCards = Array.isArray(project.teammatePlacedCards) ? project.teammatePlacedCards : [];
+                        favoriteCards = Array.isArray(project.favoriteCards) ? project.favoriteCards : [];
+                        professionOrder = Array.isArray(project.professionOrder) ? project.professionOrder : [];
                         cardLevels = project.cardLevels || {};
                         
                         if (document.getElementById('myDeckInfo')) {
@@ -4135,8 +4134,7 @@
             // 更新卡牌等级徽章显示
             updateAllCardLevelBadges();
             
-            // 保存数据
-            saveToLocalStorage();
+            // 保存项目
             autoSaveProject();
             
             // 调试：检查手牌数据
@@ -4522,7 +4520,6 @@
             updateAllCardLevelBadges();
             
             // 保存数据
-            saveToLocalStorage();
             autoSaveProject();
 
             // 显示结果
@@ -5546,6 +5543,10 @@
                 
                 // 更新放置卡牌数组
                 const placedArray = isUserSlot ? myPlacedCards : teammatePlacedCards;
+                if (!Array.isArray(placedArray)) {
+                    if (isUserSlot) myPlacedCards = [];
+                    else teammatePlacedCards = [];
+                }
                 const existingPlacedIndex = placedArray.findIndex(c => c.id === cardId);
                 if (existingPlacedIndex > -1) {
                     placedArray[existingPlacedIndex].slot = slotId;
@@ -5647,7 +5648,12 @@
             
             // 找到第一个空的战斗槽
             const handCards = handType === 'my' ? myHandCards : teammateHandCards;
-            const placedCards = handType === 'my' ? myPlacedCards : teammatePlacedCards;
+            let placedCards = handType === 'my' ? myPlacedCards : teammatePlacedCards;
+            if (!Array.isArray(placedCards)) {
+                placedCards = [];
+                if (handType === 'my') myPlacedCards = [];
+                else teammatePlacedCards = [];
+            }
             
             console.log('手牌数组:', handCards);
             
@@ -5735,7 +5741,12 @@
             
             const cardId = cardEl.dataset.id;
             const handCards = handType === 'my' ? myHandCards : teammateHandCards;
-            const placedCards = handType === 'my' ? myPlacedCards : teammatePlacedCards;
+            let placedCards = handType === 'my' ? myPlacedCards : teammatePlacedCards;
+            if (!Array.isArray(placedCards)) {
+                placedCards = [];
+                if (handType === 'my') myPlacedCards = [];
+                else teammatePlacedCards = [];
+            }
             
             const index = handCards.findIndex(c => c.id === cardId);
             if (index > -1) {
@@ -5887,6 +5898,10 @@
                 this.dataset.profession = profession;
                 
                 const placedArray = isUserSlot ? myPlacedCards : teammatePlacedCards;
+                if (!Array.isArray(placedArray)) {
+                    if (isUserSlot) myPlacedCards = [];
+                    else teammatePlacedCards = [];
+                }
                 placedArray.push({ id: cardId, name: cardName, slot: slotId, isEngineering, profession });
                 
                 updateHandDisplay(isUserSlot ? 'my' : 'teammate');
@@ -5894,6 +5909,10 @@
                 const handType = e.dataTransfer.getData('text/hand');
                 const handCards = handType === 'my' ? myHandCards : teammateHandCards;
                 const placedArray = handType === 'my' ? myPlacedCards : teammatePlacedCards;
+                if (!Array.isArray(placedArray)) {
+                    if (handType === 'my') myPlacedCards = [];
+                    else teammatePlacedCards = [];
+                }
                 
                 const cardIndex = handCards.findIndex(c => c.id === cardId);
                 if (cardIndex > -1) {
@@ -5946,7 +5965,12 @@
             
             const isUserSlot = slotId.startsWith('u');
             const handCards = isUserSlot ? myHandCards : teammateHandCards;
-            const placedCards = isUserSlot ? myPlacedCards : teammatePlacedCards;
+            let placedCards = isUserSlot ? myPlacedCards : teammatePlacedCards;
+            if (!Array.isArray(placedCards)) {
+                placedCards = [];
+                if (isUserSlot) myPlacedCards = [];
+                else teammatePlacedCards = [];
+            }
             
             // 从手牌更新放置状态
             const handIndex = handCards.findIndex(c => c.id === cardId);
