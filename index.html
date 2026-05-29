@@ -694,7 +694,6 @@
             text-shadow: 0 0 5px rgba(255,255,255,0.8);
         }
 
-        /* 卡牌等级显示样式 */
         .card-level-badge {
             position: absolute;
             top: 2px;
@@ -716,22 +715,14 @@
             background: rgba(255, 215, 0, 0.3);
         }
         
-        /* 卡牌皮肤图标样式（左上角） */
-        .card-skin-badge {
-            position: absolute;
-            top: 2px;
-            left: 2px;
-            background: rgba(0, 0, 0, 0.7);
-            font-size: 0.6rem;
-            padding: 1px 3px;
-            border-radius: 4px;
-            z-index: 10;
-            cursor: pointer;
-            line-height: 1.2;
+        .card-level-badge.has-skin {
+            background: linear-gradient(135deg, rgba(255, 152, 0, 0.8), rgba(255, 87, 34, 0.8));
+            color: #fff;
+            border: 1px solid rgba(255, 215, 0, 0.5);
         }
-
-        .card-skin-badge:hover {
-            background: rgba(255, 152, 0, 0.3);
+        
+        .card-level-badge.has-skin:hover {
+            background: linear-gradient(135deg, rgba(255, 152, 0, 1), rgba(255, 87, 34, 1));
         }
 
         .card-item {
@@ -5302,10 +5293,10 @@
             const level = getCardLevel(cardId, cardType, handType);
             const skin = getCardSkin(cardId, cardName, handType);
             const hasCustomSkin = skin !== '默认';
-            // 等级徽章 + 皮肤图标（分开两个元素）
-            const levelBadge = `<span class="card-level-badge" data-card-id="${cardId}" data-card-type="${cardType}" data-hand-type="${handType}" data-card-name="${cardName}" onclick="showLevelDropdown(event, '${cardId}', '${cardType}', '${handType}', '${cardName}')">${level}</span>`;
-            const skinBadge = `<span class="card-skin-badge" data-card-id="${cardId}" data-card-name="${cardName}" data-hand-type="${handType}" data-skin="${skin}" onclick="showSkinOnlyDropdown(event, '${cardId}', '${cardName}', '${handType}')" onmouseenter="scheduleShowTooltip(event, '${cardId}', '${cardName}', '${handType}')" onmouseleave="hideSkinTooltip()" title="皮肤: ${skin}">${hasCustomSkin ? '🎨' : '🎭'}</span>`;
-            return levelBadge + skinBadge;
+            const displayText = hasCustomSkin ? `${level}🎨` : `${level}`;
+            const skinClass = hasCustomSkin ? 'has-skin' : '';
+            const levelBadge = `<span class="card-level-badge ${skinClass}" data-card-id="${cardId}" data-card-type="${cardType}" data-hand-type="${handType}" data-card-name="${cardName}" data-skin="${skin}" onclick="showLevelDropdown(event, '${cardId}', '${cardType}', '${handType}', '${cardName}')" onmouseenter="scheduleShowSkinTooltip(event, '${cardId}', '${cardName}', '${handType}')" onmouseleave="hideSkinTooltip()" title="等级:${level} 皮肤:${skin}">${displayText}</span>`;
+            return levelBadge;
         }
 
         // 显示等级下拉选择器
@@ -5411,77 +5402,52 @@
 
         // 更新所有卡牌等级徽章
         function updateAllCardLevelBadges() {
-            // 更新卡池中的卡牌
             document.querySelectorAll('.collapsible-section .card-item:not(.favorite-card)').forEach(card => {
                 const cardId = card.dataset.id;
                 const cardType = card.dataset.type;
                 const cardName = card.dataset.name || card.textContent.trim();
                 if (!cardId || !cardType) return;
                 
-                // 移除旧徽章
                 card.querySelector('.card-level-badge')?.remove();
-                card.querySelector('.card-skin-badge')?.remove();
-                
-                // 添加新徽章
                 card.insertAdjacentHTML('afterbegin', createLevelBadgeHTML(cardId, cardType, 'my', cardName));
             });
             
-            // 更新手牌中的卡牌
-            // 更新"我的"手牌
             document.querySelectorAll('.my-hand .selected-card.card-item').forEach(card => {
                 const cardId = card.dataset.id;
                 const cardType = card.dataset.type;
                 const cardName = card.dataset.name || '';
                 if (!cardId) return;
 
-                // 如果没有cardType，尝试从手牌数组获取
                 const actualType = cardType || findCardTypeById(cardId);
                 if (!actualType) return;
 
-                // 移除旧徽章
                 card.querySelector('.card-level-badge')?.remove();
-                card.querySelector('.card-skin-badge')?.remove();
-
-                // 添加新徽章（handType='my'）
                 card.insertAdjacentHTML('afterbegin', createLevelBadgeHTML(cardId, actualType, 'my', cardName));
             });
 
-            // 更新"队友"手牌
             document.querySelectorAll('.teammate-hand .selected-card.card-item').forEach(card => {
                 const cardId = card.dataset.id;
                 const cardType = card.dataset.type;
                 const cardName = card.dataset.name || '';
                 if (!cardId) return;
 
-                // 如果没有cardType，尝试从手牌数组获取
                 const actualType = cardType || findCardTypeById(cardId);
                 if (!actualType) return;
 
-                // 移除旧徽章
                 card.querySelector('.card-level-badge')?.remove();
-                card.querySelector('.card-skin-badge')?.remove();
-
-                // 添加新徽章（handType='teammate'）
                 card.insertAdjacentHTML('afterbegin', createLevelBadgeHTML(cardId, actualType, 'teammate', cardName));
             });
             
-            // 更新收藏中的卡牌
             document.querySelectorAll('#favoriteCardsGrid .card-item').forEach(card => {
                 const cardId = card.dataset.id;
                 const cardType = card.dataset.type;
                 const cardName = card.dataset.name || card.textContent.trim();
                 if (!cardId || !cardType) return;
                 
-                // 移除旧徽章
                 card.querySelector('.card-level-badge')?.remove();
-                card.querySelector('.card-skin-badge')?.remove();
-                
-                // 添加新徽章
                 card.insertAdjacentHTML('afterbegin', createLevelBadgeHTML(cardId, cardType, 'my', cardName));
             });
             
-            // 更新战斗槽中的卡牌
-            // 更新"我的"战斗槽
             document.querySelectorAll('.user-column .battle-slot.filled .card-item').forEach(card => {
                 const slot = card.closest('.battle-slot');
                 const cardId = slot?.dataset.cardId;
@@ -5490,19 +5456,13 @@
                 const actualType = findCardTypeById(cardId);
                 if (!actualType) return;
                 
-                // 从手牌数组获取卡牌名称
                 const handCard = myHandCards.find(c => c.id === cardId);
                 const cardName = handCard?.name || '';
                 
-                // 移除旧徽章
                 card.querySelector('.card-level-badge')?.remove();
-                card.querySelector('.card-skin-badge')?.remove();
-                
-                // 添加新徽章（handType='my'）
                 card.insertAdjacentHTML('afterbegin', createLevelBadgeHTML(cardId, actualType, 'my', cardName));
             });
 
-            // 更新"队友"战斗槽
             document.querySelectorAll('.teammate-column .battle-slot.filled .card-item').forEach(card => {
                 const slot = card.closest('.battle-slot');
                 const cardId = slot?.dataset.cardId;
@@ -5511,15 +5471,10 @@
                 const actualType = findCardTypeById(cardId);
                 if (!actualType) return;
                 
-                // 从手牌数组获取卡牌名称
                 const handCard = teammateHandCards.find(c => c.id === cardId);
                 const cardName = handCard?.name || '';
                 
-                // 移除旧徽章
                 card.querySelector('.card-level-badge')?.remove();
-                card.querySelector('.card-skin-badge')?.remove();
-                
-                // 添加新徽章（handType='teammate'）
                 card.insertAdjacentHTML('afterbegin', createLevelBadgeHTML(cardId, actualType, 'teammate', cardName));
             });
         }
@@ -5631,10 +5586,18 @@
         // 延迟显示tooltip（悬停0.8秒后显示）
         function scheduleShowTooltip(event, cardId, cardName, handType = 'my') {
             clearTimeout(tooltipTimeout);
-            hideSkinTooltip(); // 先隐藏之前的
+            hideSkinTooltip();
             tooltipTimeout = setTimeout(() => {
                 showSkinTooltip(event, cardId, cardName, handType);
             }, 800);
+        }
+        
+        function scheduleShowSkinTooltip(event, cardId, cardName, handType = 'my') {
+            clearTimeout(tooltipTimeout);
+            hideSkinTooltip();
+            tooltipTimeout = setTimeout(() => {
+                showSkinTooltip(event, cardId, cardName, handType);
+            }, 600);
         }
         
         // 显示单独的皮肤下拉选择器（点击皮肤图标）
@@ -6852,7 +6815,7 @@
                 grid.appendChild(cardEl);
                 
                 cardEl.addEventListener('click', (e) => {
-                    if (e.target.classList.contains('delete-card-btn') || e.target.classList.contains('card-level-badge') || e.target.classList.contains('card-skin-badge')) {
+                    if (e.target.classList.contains('delete-card-btn') || e.target.classList.contains('card-level-badge')) {
                         return;
                     }
                     handlePoolCardClick(cardEl);
