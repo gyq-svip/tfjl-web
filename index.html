@@ -7780,6 +7780,146 @@ function hasGistToken() {
             }
         }
 
+        // 显示TXT导入选项对话框
+        function showTxtImportDialog(fileName, content) {
+            return new Promise((resolve) => {
+                // 预览内容（前200字符）
+                const preview = content.substring(0, 200);
+                const fileSize = (content.length / 1024).toFixed(1);
+                
+                // 从文件名提取项目名（去掉扩展名）
+                const defaultProjectName = fileName.replace(/\.[^/.]+$/, '');
+                
+                const modal = document.createElement('div');
+                modal.id = 'txtImportDialog';
+                modal.style.cssText = `
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background: rgba(0,0,0,0.7);
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    z-index: 10002;
+                `;
+                
+                // 分类选项
+                let categoryOptions = categories.map(cat => 
+                    `<option value="${cat}">${cat}</option>`
+                ).join('');
+                
+                modal.innerHTML = `
+                    <div style="background:linear-gradient(135deg,rgba(40,40,70,0.98),rgba(30,30,60,0.98));border:2px solid rgba(255,215,0,0.3);border-radius:15px;padding:25px;min-width:400px;max-width:500px;">
+                        <h3 style="margin:0 0 15px 0;color:#ffd700;text-align:center;">📄 导入脚本文件</h3>
+                        
+                        <div style="background:rgba(0,0,0,0.2);border-radius:8px;padding:12px;margin-bottom:15px;">
+                            <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+                                <span style="color:#ffd700;font-weight:bold;">${escapeHtml(fileName)}</span>
+                                <span style="color:rgba(255,255,255,0.5);font-size:0.85rem;">${fileSize} KB</span>
+                            </div>
+                            <div style="color:rgba(255,255,255,0.6);font-size:0.8rem;max-height:60px;overflow:hidden;font-family:monospace;white-space:pre-wrap;word-break:break-all;">
+                                ${escapeHtml(preview)}${content.length > 200 ? '...' : ''}
+                            </div>
+                        </div>
+                        
+                        <div style="margin-bottom:20px;">
+                            <p style="color:rgba(255,255,255,0.8);margin-bottom:12px;font-size:0.9rem;">选择导入方式：</p>
+                            
+                            <label style="display:flex;align-items:center;gap:10px;padding:12px;background:rgba(76,175,80,0.1);border:1px solid rgba(76,175,80,0.3);border-radius:8px;margin-bottom:10px;cursor:pointer;">
+                                <input type="radio" name="importTarget" value="current" checked style="accent-color:#ffd700;">
+                                <div>
+                                    <div style="color:#4caf50;font-size:0.9rem;">📥 导入到当前项目</div>
+                                    <div style="color:rgba(255,255,255,0.5);font-size:0.75rem;">添加到"${escapeHtml(currentProjectName || '未选择')}"的脚本文件列表</div>
+                                </div>
+                            </label>
+                            
+                            <label style="display:flex;align-items:center;gap:10px;padding:12px;background:rgba(33,150,243,0.1);border:1px solid rgba(33,150,243,0.3);border-radius:8px;margin-bottom:10px;cursor:pointer;">
+                                <input type="radio" name="importTarget" value="new" style="accent-color:#ffd700;">
+                                <div style="flex:1;">
+                                    <div style="color:#2196f3;font-size:0.9rem;">🆕 创建新项目</div>
+                                    <div style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-top:4px;">
+                                        项目名称：<input type="text" id="newProjectName" value="${escapeHtml(defaultProjectName)}" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,215,0,0.3);border-radius:4px;padding:4px 8px;color:#fff;font-size:0.8rem;width:150px;" onclick="event.stopPropagation();">
+                                    </div>
+                                    <div style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-top:4px;">
+                                        所属分类：<select id="newProjectCategory" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,215,0,0.3);border-radius:4px;padding:4px 8px;color:#fff;font-size:0.8rem;width:160px;" onclick="event.stopPropagation();">
+                                            ${categoryOptions}
+                                            <option value="新分类">+ 新建分类</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </label>
+                        </div>
+                        
+                        <div style="display:flex;gap:10px;justify-content:center;">
+                            <button id="confirmTxtImportBtn" style="background:linear-gradient(135deg,#4CAF50,#45a049);color:white;border:none;padding:12px 30px;border-radius:8px;cursor:pointer;font-weight:bold;font-size:0.9rem;">✅ 确认导入</button>
+                            <button id="cancelTxtImportBtn" style="background:linear-gradient(135deg,#757575,#616161);color:white;border:none;padding:12px 30px;border-radius:8px;cursor:pointer;font-size:0.9rem;">取消</button>
+                        </div>
+                    </div>
+                `;
+                
+                document.body.appendChild(modal);
+                
+                // 监听新建分类选择
+                document.getElementById('newProjectCategory').onchange = function() {
+                    if (this.value === '新分类') {
+                        const newCat = prompt('请输入新分类名称：');
+                        if (newCat && newCat.trim()) {
+                            const trimmed = newCat.trim();
+                            if (!categories.includes(trimmed)) {
+                                categories.push(trimmed);
+                                saveCategories();
+                            }
+                            // 更新下拉框
+                            const select = document.getElementById('newProjectCategory');
+                            select.innerHTML = categories.map(cat => 
+                                `<option value="${cat}" ${cat === trimmed ? 'selected' : ''}>${cat}</option>`
+                            ).join('') + '<option value="新分类">+ 新建分类</option>';
+                        } else {
+                            this.value = categories[0] || '默认分类';
+                        }
+                    }
+                };
+                
+                document.getElementById('confirmTxtImportBtn').onclick = function() {
+                    const target = document.querySelector('input[name="importTarget"]:checked').value;
+                    
+                    if (target === 'current') {
+                        modal.remove();
+                        resolve({ action: 'current' });
+                    } else {
+                        const projectName = document.getElementById('newProjectName').value.trim();
+                        const category = document.getElementById('newProjectCategory').value;
+                        
+                        if (!projectName) {
+                            alert('请输入项目名称');
+                            return;
+                        }
+                        
+                        modal.remove();
+                        resolve({ 
+                            action: 'new',
+                            projectName,
+                            category: category === '新分类' ? '默认分类' : category
+                        });
+                    }
+                };
+                
+                document.getElementById('cancelTxtImportBtn').onclick = function() {
+                    modal.remove();
+                    resolve({ action: 'cancel' });
+                };
+                
+                modal.onclick = function(e) {
+                    if (e.target === modal) {
+                        modal.remove();
+                        resolve({ action: 'cancel' });
+                    }
+                };
+            });
+        }
+
         // 显示备份导入选项对话框
         function showBackupImportDialog(importData, fileName) {
             return new Promise((resolve) => {
@@ -8023,15 +8163,24 @@ function hasGistToken() {
                                 const result = await showBackupImportDialog({ projects: projectsToImport, existingNames }, fileName);
                                 
                                 if (result && result.action !== 'cancel') {
-                                    // 导入分类
+                                    // 导入分类（包括项目自带的分类）
                                     if (categoriesToImport.length > 0) {
                                         categoriesToImport.forEach(cat => {
                                             if (!categories.includes(cat)) {
                                                 categories.push(cat);
                                             }
                                         });
-                                        saveCategories();
                                     }
+                                    
+                                    // 检查并添加项目自身的分类
+                                    for (const project of projectsToImport) {
+                                        if (project.category && !categories.includes(project.category)) {
+                                            categories.push(project.category);
+                                        }
+                                    }
+                                    
+                                    // 保存分类
+                                    saveCategories();
                                     
                                     // 处理项目导入
                                     let imported = 0;
@@ -8119,41 +8268,205 @@ function hasGistToken() {
                                 }
                             } else {
                                 // JSON但不是备份格式，作为普通脚本文件导入
-                                const existsIndex = txtFiles.findIndex(f => f.name === fileName);
-                                if (existsIndex !== -1) {
-                                    if (confirm(`文件 "${fileName}" 已存在，是否覆盖？`)) {
+                                toast.remove();
+                                const result = await showTxtImportDialog(fileName, content);
+                                
+                                if (result && result.action === 'current') {
+                                    const existsIndex = txtFiles.findIndex(f => f.name === fileName);
+                                    if (existsIndex !== -1) {
                                         txtFiles[existsIndex].content = content;
-                                        importedScripts++;
+                                    } else {
+                                        txtFiles.push({ name: fileName, content: content });
                                     }
-                                } else {
-                                    txtFiles.push({ name: fileName, content: content });
+                                    updateTxtFilesList();
+                                    autoSaveProject();
+                                    await recordDownload();
                                     importedScripts++;
+                                    
+                                    const successToast = document.createElement('div');
+                                    successToast.style.cssText = `position:fixed;top:20px;right:20px;background:linear-gradient(135deg,#4CAF50,#45a049);color:white;padding:12px 24px;border-radius:8px;z-index:10000;`;
+                                    successToast.textContent = `✅ 已导入到当前项目！`;
+                                    document.body.appendChild(successToast);
+                                    setTimeout(() => successToast.remove(), 3000);
+                                } else if (result && result.action === 'new') {
+                                    const newProject = {
+                                        name: result.projectName,
+                                        category: result.category,
+                                        txtFiles: [{ name: fileName, content: content }],
+                                        myHandCards: [], teammateHandCards: [],
+                                        myPlacedCards: {}, teammatePlacedCards: {},
+                                        createdAt: Date.now()
+                                    };
+                                    if (!categories.includes(result.category)) {
+                                        categories.push(result.category);
+                                        saveCategories();
+                                    }
+                                    const transaction = db.transaction(['projects'], 'readwrite');
+                                    const store = transaction.objectStore('projects');
+                                    store.put(newProject);
+                                    transaction.oncomplete = async function() {
+                                        await recordDownload();
+                                        currentProjectCategory = result.category;
+                                        currentProjectName = result.projectName;
+                                        refreshProjectSelectors();
+                                        loadProjectFromDB(result.projectName);
+                                        const successToast = document.createElement('div');
+                                        successToast.style.cssText = `position:fixed;top:20px;right:20px;background:linear-gradient(135deg,#4CAF50,#45a049);color:white;padding:12px 24px;border-radius:8px;z-index:10000;`;
+                                        successToast.textContent = `✅ 已创建新项目"${result.projectName}"！`;
+                                        document.body.appendChild(successToast);
+                                        setTimeout(() => successToast.remove(), 3000);
+                                    };
+                                    importedScripts++;
+                                }
+                                if (fileNames.indexOf(fileName) < fileNames.length - 1) {
+                                    document.body.appendChild(toast);
                                 }
                             }
                         } catch (parseError) {
                             // JSON解析失败，作为普通文本文件导入
-                            const existsIndex = txtFiles.findIndex(f => f.name === fileName);
-                            if (existsIndex !== -1) {
-                                if (confirm(`文件 "${fileName}" 已存在，是否覆盖？`)) {
+                            toast.remove();
+                            const result = await showTxtImportDialog(fileName, content);
+                            
+                            if (result && result.action === 'current') {
+                                const existsIndex = txtFiles.findIndex(f => f.name === fileName);
+                                if (existsIndex !== -1) {
                                     txtFiles[existsIndex].content = content;
-                                    importedScripts++;
+                                } else {
+                                    txtFiles.push({ name: fileName, content: content });
                                 }
-                            } else {
-                                txtFiles.push({ name: fileName, content: content });
+                                updateTxtFilesList();
+                                autoSaveProject();
+                                await recordDownload();
                                 importedScripts++;
+                                
+                                const successToast = document.createElement('div');
+                                successToast.style.cssText = `position:fixed;top:20px;right:20px;background:linear-gradient(135deg,#4CAF50,#45a049);color:white;padding:12px 24px;border-radius:8px;z-index:10000;`;
+                                successToast.textContent = `✅ 已导入到当前项目！`;
+                                document.body.appendChild(successToast);
+                                setTimeout(() => successToast.remove(), 3000);
+                            } else if (result && result.action === 'new') {
+                                const newProject = {
+                                    name: result.projectName,
+                                    category: result.category,
+                                    txtFiles: [{ name: fileName, content: content }],
+                                    myHandCards: [], teammateHandCards: [],
+                                    myPlacedCards: {}, teammatePlacedCards: {},
+                                    createdAt: Date.now()
+                                };
+                                if (!categories.includes(result.category)) {
+                                    categories.push(result.category);
+                                    saveCategories();
+                                }
+                                const transaction = db.transaction(['projects'], 'readwrite');
+                                const store = transaction.objectStore('projects');
+                                store.put(newProject);
+                                transaction.oncomplete = async function() {
+                                    await recordDownload();
+                                    currentProjectCategory = result.category;
+                                    currentProjectName = result.projectName;
+                                    refreshProjectSelectors();
+                                    loadProjectFromDB(result.projectName);
+                                    const successToast = document.createElement('div');
+                                    successToast.style.cssText = `position:fixed;top:20px;right:20px;background:linear-gradient(135deg,#4CAF50,#45a049);color:white;padding:12px 24px;border-radius:8px;z-index:10000;`;
+                                    successToast.textContent = `✅ 已创建新项目"${result.projectName}"！`;
+                                    document.body.appendChild(successToast);
+                                    setTimeout(() => successToast.remove(), 3000);
+                                };
+                                importedScripts++;
+                            }
+                            if (fileNames.indexOf(fileName) < fileNames.length - 1) {
+                                document.body.appendChild(toast);
                             }
                         }
                     } else {
                         // 非JSON文件，作为脚本文件导入
-                        const existsIndex = txtFiles.findIndex(f => f.name === fileName);
-                        if (existsIndex !== -1) {
-                            if (confirm(`文件 "${fileName}" 已存在，是否覆盖？`)) {
+                        toast.remove();
+                        
+                        // 显示导入选项对话框
+                        const result = await showTxtImportDialog(fileName, content);
+                        
+                        if (result && result.action === 'current') {
+                            // 导入到当前项目
+                            const existsIndex = txtFiles.findIndex(f => f.name === fileName);
+                            if (existsIndex !== -1) {
                                 txtFiles[existsIndex].content = content;
-                                importedScripts++;
+                            } else {
+                                txtFiles.push({ name: fileName, content: content });
                             }
-                        } else {
-                            txtFiles.push({ name: fileName, content: content });
+                            updateTxtFilesList();
+                            autoSaveProject();
+                            await recordDownload();
                             importedScripts++;
+                            
+                            const successToast = document.createElement('div');
+                            successToast.style.cssText = `
+                                position: fixed;
+                                top: 20px;
+                                right: 20px;
+                                background: linear-gradient(135deg, #4CAF50, #45a049);
+                                color: white;
+                                padding: 12px 24px;
+                                border-radius: 8px;
+                                z-index: 10000;
+                            `;
+                            successToast.textContent = `✅ 已导入到当前项目！`;
+                            document.body.appendChild(successToast);
+                            setTimeout(() => successToast.remove(), 3000);
+                        } else if (result && result.action === 'new') {
+                            // 创建新项目
+                            const newProject = {
+                                name: result.projectName,
+                                category: result.category,
+                                txtFiles: [{ name: fileName, content: content }],
+                                myHandCards: [],
+                                teammateHandCards: [],
+                                myPlacedCards: {},
+                                teammatePlacedCards: {},
+                                createdAt: Date.now()
+                            };
+                            
+                            // 确保分类存在
+                            if (!categories.includes(result.category)) {
+                                categories.push(result.category);
+                                saveCategories();
+                            }
+                            
+                            // 保存新项目
+                            const transaction = db.transaction(['projects'], 'readwrite');
+                            const store = transaction.objectStore('projects');
+                            store.put(newProject);
+                            
+                            transaction.oncomplete = async function() {
+                                await recordDownload();
+                                currentProjectCategory = result.category;
+                                currentProjectName = result.projectName;
+                                refreshProjectSelectors();
+                                
+                                // 加载新项目
+                                loadProjectFromDB(result.projectName);
+                                
+                                const successToast = document.createElement('div');
+                                successToast.style.cssText = `
+                                    position: fixed;
+                                    top: 20px;
+                                    right: 20px;
+                                    background: linear-gradient(135deg, #4CAF50, #45a049);
+                                    color: white;
+                                    padding: 12px 24px;
+                                    border-radius: 8px;
+                                    z-index: 10000;
+                                `;
+                                successToast.textContent = `✅ 已创建新项目"${result.projectName}"！`;
+                                document.body.appendChild(successToast);
+                                setTimeout(() => successToast.remove(), 3000);
+                            };
+                            
+                            importedScripts++;
+                        }
+                        
+                        // 重新显示加载提示（如果还有其他文件）
+                        if (fileNames.indexOf(fileName) < fileNames.length - 1) {
+                            document.body.appendChild(toast);
                         }
                     }
                 }
@@ -8315,15 +8628,24 @@ function hasGistToken() {
                 const result = await showBackupImportDialog({ projects: projectsToImport, existingNames }, '备份文件');
                 
                 if (result && result.action !== 'cancel') {
-                    // 导入分类
+                    // 导入分类（包括项目自带的分类）
                     if (categoriesToImport.length > 0) {
                         categoriesToImport.forEach(cat => {
                             if (!categories.includes(cat)) {
                                 categories.push(cat);
                             }
                         });
-                        saveCategories();
                     }
+                    
+                    // 检查并添加项目自身的分类
+                    for (const project of projectsToImport) {
+                        if (project.category && !categories.includes(project.category)) {
+                            categories.push(project.category);
+                        }
+                    }
+                    
+                    // 保存分类
+                    saveCategories();
                     
                     // 处理项目导入
                     let imported = 0;
