@@ -716,13 +716,22 @@
         }
         
         .card-level-badge.has-skin {
-            background: linear-gradient(135deg, rgba(255, 152, 0, 0.8), rgba(255, 87, 34, 0.8));
+            background: linear-gradient(135deg, #ff6b6b, #feca57, #48dbfb, #ff9ff3);
+            background-size: 300% 300%;
+            animation: gradientShift 3s ease infinite;
             color: #fff;
-            border: 1px solid rgba(255, 215, 0, 0.5);
+            text-shadow: 0 0 3px rgba(0,0,0,0.5);
+            font-weight: bold;
         }
         
         .card-level-badge.has-skin:hover {
-            background: linear-gradient(135deg, rgba(255, 152, 0, 1), rgba(255, 87, 34, 1));
+            filter: brightness(1.2);
+        }
+        
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
         }
 
         .card-item {
@@ -5293,9 +5302,8 @@
             const level = getCardLevel(cardId, cardType, handType);
             const skin = getCardSkin(cardId, cardName, handType);
             const hasCustomSkin = skin !== '默认';
-            const displayText = hasCustomSkin ? `${level}🎨` : `${level}`;
             const skinClass = hasCustomSkin ? 'has-skin' : '';
-            const levelBadge = `<span class="card-level-badge ${skinClass}" data-card-id="${cardId}" data-card-type="${cardType}" data-hand-type="${handType}" data-card-name="${cardName}" data-skin="${skin}" onclick="showLevelDropdown(event, '${cardId}', '${cardType}', '${handType}', '${cardName}')" onmouseenter="scheduleShowSkinTooltip(event, '${cardId}', '${cardName}', '${handType}')" onmouseleave="hideSkinTooltip()" title="等级:${level} 皮肤:${skin}">${displayText}</span>`;
+            const levelBadge = `<span class="card-level-badge ${skinClass}" data-card-id="${cardId}" data-card-type="${cardType}" data-hand-type="${handType}" data-card-name="${cardName}" data-skin="${skin}" onclick="showLevelDropdown(event, '${cardId}', '${cardType}', '${handType}', '${cardName}')" onmouseenter="scheduleShowSkinTooltip(event, '${cardId}', '${cardName}', '${handType}')" onmouseleave="hideSkinTooltip()" title="等级:${level} 皮肤:${skin}">${level}</span>`;
             return levelBadge;
         }
 
