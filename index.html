@@ -9693,7 +9693,6 @@ function hasGistToken() {
         async function postMessage() {
             const input = document.getElementById('messageInput');
             const nicknameInput = document.getElementById('messageNickname');
-            const expireCheckbox = document.getElementById('expireCheckbox');
             const expireDaysSelect = document.getElementById('expireDays');
             let content = input.value.trim();
             const nickname = nicknameInput.value.trim() || '匿名用户';
@@ -9725,12 +9724,13 @@ function hasGistToken() {
                 }
             }
             
+            const expireDaysValue = parseInt(expireDaysSelect.value);
             const newMsg = {
                 content: content,
                 author: nickname,
                 time: Date.now(),
                 scriptUrl: scriptUrl,
-                expireDays: (expireCheckbox && expireCheckbox.checked) ? parseInt(expireDaysSelect.value) : null
+                expireDays: expireDaysValue > 0 ? expireDaysValue : null
             };
             
             wallMessages.unshift(newMsg);
@@ -9986,19 +9986,18 @@ function hasGistToken() {
                 <input type="file" id="scriptFileInput" accept=".txt,.js,.json,.lua,.py,.sh" style="display:none;" onchange="handleScriptUpload(this)">
                 <button onclick="document.getElementById('scriptFileInput').click()" title="上传脚本(最大1MB)" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:6px 12px;border-radius:5px;font-size:0.8rem;cursor:pointer;display:flex;align-items:center;gap:4px;">📎 脚本</button>
                 <span id="uploadStatus" style="color:#4caf50;font-size:0.75rem;display:none;">✓ 已选文件</span>
-                <label style="display:flex;align-items:center;gap:4px;color:#888;font-size:0.75rem;cursor:pointer;margin-left:auto;" title="勾选后消息将在指定天数后自动删除">
-                    <input type="checkbox" id="expireCheckbox" style="cursor:pointer;">
-                    限时
+                <label style="display:flex;align-items:center;gap:4px;color:#888;font-size:0.75rem;cursor:pointer;margin-left:auto;" title="选择消息保留时间">
                     <select id="expireDays" style="background:#2a2a4a;border:1px solid rgba(255,255,255,0.3);border-radius:3px;padding:2px 4px;color:#fff;font-size:0.7rem;cursor:pointer;outline:none;">
+                        <option value="0" style="background:#2a2a4a;color:#fff;">永久</option>
                         <option value="7" style="background:#2a2a4a;color:#fff;">7天</option>
-                        <option value="15" style="background:#2a2a4a;color:#fff;">15天</option>
-                        <option value="30" selected style="background:#2a2a4a;color:#fff;">30天</option>
+                        <option value="15" selected style="background:#2a2a4a;color:#fff;">15天</option>
+                        <option value="30" style="background:#2a2a4a;color:#fff;">30天</option>
                         <option value="60" style="background:#2a2a4a;color:#fff;">60天</option>
                     </select>
                 </label>
             </div>
             <div style="display:flex;gap:8px;">
-                <input type="text" id="messageInput" placeholder="发布需求或分享脚本..." maxlength="200" style="flex:1;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:5px;padding:6px 10px;color:#fff;font-size:0.85rem;outline:none;" onfocus="this.style.borderColor='#ffd700'" onblur="this.style.borderColor='rgba(255,255,255,0.2)'">
+                <input type="text" id="messageInput" placeholder="发布需求或分享脚本（保留时间可自由选择）..." maxlength="200" style="flex:1;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:5px;padding:6px 10px;color:#fff;font-size:0.85rem;outline:none;" onfocus="this.style.borderColor='#ffd700'" onblur="this.style.borderColor='rgba(255,255,255,0.2)'">
                 <button onclick="postMessage()" style="background:linear-gradient(135deg,#ffd700,#ff6b6b);color:#1a1a2e;border:none;padding:6px 16px;border-radius:5px;font-size:0.85rem;cursor:pointer;font-weight:bold;">发布</button>
             </div>
         </div>
