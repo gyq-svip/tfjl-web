@@ -4934,14 +4934,14 @@
             "圣骑": ["默认", "无头骑士·圣骑", "孙权·圣骑", "风暴·圣骑"],
             "射线": ["默认", "雷峰塔·侏儒射线", "剑冢·侏儒射线", "日晷·侏儒射线"],
             "宝库": ["默认", "暗月·地精宝库"],
-            "微型潜艇": ["默认", "鲨鱼号·微型潜艇"],
+            "潜艇": ["默认", "鲨鱼号·微型潜艇"],
             "死神": ["默认", "万圣节·死神", "粉色南瓜·死神"],
             "酋长": ["默认", "奶牛·酋长", "粉色奶牛·酋长"],
             "电法": ["默认", "水娃·电法", "戴宗·电法", "春香·电法"],
             "火灵": ["默认", "谢晓峰·火灵", "张飞·火灵", "太平乐·火灵"],
             "战将": ["默认", "虹猫·战将", "刀马·战将", "冰雪·战将", "许仕林·战将", "许仙·战将", "萧十一郎·战将", "武松·战将", "吕布·战将", "风暴·战将", "黄飞鸿·战将"],
             "咕咕": ["默认", "虚空兽·咕咕", "老爷爷·咕咕", "天机星·咕咕", "宋江·咕咕", "华佗·咕咕", "华夫人·咕咕", "深海异兽·咕咕", "太平乐·咕咕"],
-            "邪能火炮": ["默认", "龙吼·邪能火炮", "小李飞刀·邪能火炮", "尚方宝剑·邪能火炮"],
+            "火炮": ["默认", "龙吼·邪能火炮", "小李飞刀·邪能火炮", "尚方宝剑·邪能火炮"],
             "水灵": ["默认", "潮汐·水灵", "刘备·水灵", "太平乐·水灵"],
             "萌萌": ["默认", "冰雪·萌萌", "唐三藏·萌萌", "武大郎·萌萌", "诸葛亮·萌萌", "太平乐·萌萌", "烈火奶奶·萌萌"],
             "小野": ["默认", "小七·小野", "万圣甜心·小野", "紫霞仙子·小野", "沈璧君·小野", "万圣女巫·小野", "貂蝉·小野", "秋香·小野", "十三姨·小野", "太平乐·小野", "仪琳·小野"]
@@ -4972,7 +4972,27 @@
             return false;
         }
         
-        // 删除自定义皮肤
+        let customSkinAttributes = {};
+        
+        function addCustomSkinAttribute(cardName, skinName, attrDesc) {
+            if (!customSkinAttributes[cardName]) {
+                customSkinAttributes[cardName] = {};
+            }
+            customSkinAttributes[cardName][skinName] = { desc: attrDesc };
+            saveCustomSkinAttributes();
+        }
+        
+        function saveCustomSkinAttributes() {
+            localStorage.setItem('tdjl_customSkinAttributes', JSON.stringify(customSkinAttributes));
+        }
+        
+        function loadCustomSkinAttributes() {
+            const saved = localStorage.getItem('tdjl_customSkinAttributes');
+            if (saved) {
+                customSkinAttributes = JSON.parse(saved);
+            }
+        }
+        
         function removeCustomSkin(cardName, skinName) {
             if (customCardSkins[cardName]) {
                 const index = customCardSkins[cardName].indexOf(skinName);
@@ -4985,7 +5005,6 @@
             return false;
         }
         
-        // 保存自定义皮肤到localStorage
         function saveCustomSkins() {
             localStorage.setItem('tdjl_customCardSkins', JSON.stringify(customCardSkins));
         }
@@ -5032,7 +5051,7 @@
                 "默认": { desc: "技能:安装在战车前部，无法主动攻击。\n初始被动 每9秒为所在战车提供1%*银币数量的银币\n满星被动 每9秒为所在战车提供1.5%*银币数量的银币" },
                 "暗月·地精宝库": { desc: "额外被动：每100银币战车伤害减免+0.02%" }
             },
-            "微型潜艇": {
+            "潜艇": {
                 "默认": { desc: "技能:安装在战车前部，无法主动攻击。\n初始被动(光环) 百分比伤害减免+30%\n满星被动(光环) 百分比伤害减免+60%，且水下作战时氧气消耗速度-50%（唯一）" },
                 "鲨鱼号·微型潜艇": { desc: "额外被动：光环：百分比伤害减免+10%" }
             },
@@ -5082,7 +5101,7 @@
                 "深海异兽·咕咕": { desc: "额外被动：诅咒敌方战车，使敌方出售收益失效" },
                 "太平乐·咕咕": { desc: "额外被动：不触发职业被动时，全体附加伤害加成+50%" }
             },
-            "邪能火炮": {
+            "火炮": {
                 "默认": { desc: "技能:安装在战车前部，对范围目标造成150%攻击伤害。\n初始被动 每次攻击后增加自身8%攻击\n满星被动 每次攻击后增加自身15%攻击，1%攻速" },
                 "龙吼·邪能火炮": { desc: "额外被动：基础攻速+25%" },
                 "小李飞刀·邪能火炮": { desc: "额外被动：战斗中每秒自身伤害加成+0.8%，且攻击必定命中" },
@@ -5151,6 +5170,9 @@
         function getSkinAttribute(cardName, skinName) {
             if (SKIN_ATTRIBUTES[cardName] && SKIN_ATTRIBUTES[cardName][skinName]) {
                 return SKIN_ATTRIBUTES[cardName][skinName];
+            }
+            if (customSkinAttributes[cardName] && customSkinAttributes[cardName][skinName]) {
+                return customSkinAttributes[cardName][skinName];
             }
             return { desc: "无特殊属性" };
         }
@@ -5518,7 +5540,7 @@
                     ${skinAttr.desc}
                 </div>
                 <div style="color:#666;font-size:0.7rem;margin-top:8px;border-top:1px solid rgba(255,255,255,0.1);padding-top:6px;">
-                    点击等级徽章可设置皮肤
+                    点击皮肤图标可设置皮肤
                 </div>
             `;
             
@@ -5715,7 +5737,7 @@
             `;
             
             modal.innerHTML = `
-                <div style="background:linear-gradient(135deg,rgba(40,40,70,0.98),rgba(30,30,60,0.98));border:2px solid rgba(255,215,0,0.3);border-radius:15px;padding:25px;min-width:350px;max-width:400px;">
+                <div style="background:linear-gradient(135deg,rgba(40,40,70,0.98),rgba(30,30,60,0.98));border:2px solid rgba(255,215,0,0.3);border-radius:15px;padding:25px;min-width:350px;max-width:450px;">
                     <h3 style="margin:0 0 15px 0;color:#ffd700;text-align:center;">🎨 添加自定义皮肤</h3>
                     <p style="color:#888;font-size:0.85rem;margin-bottom:15px;">为 <strong style="color:#4ecdc4;">${cardName}</strong> 添加新皮肤</p>
                     
@@ -5725,9 +5747,15 @@
                             style="width:100%;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:5px;padding:8px 12px;color:#fff;font-size:0.9rem;outline:none;box-sizing:border-box;">
                     </div>
                     
+                    <div style="margin-bottom:15px;">
+                        <label style="color:#fff;font-size:0.85rem;display:block;margin-bottom:5px;">皮肤属性描述：</label>
+                        <textarea id="newSkinAttr" placeholder="输入皮肤属性描述（可选）" rows="3" maxlength="200"
+                            style="width:100%;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:5px;padding:8px 12px;color:#fff;font-size:0.85rem;outline:none;box-sizing:border-box;resize:vertical;"></textarea>
+                    </div>
+                    
                     <div style="margin-bottom:20px;">
                         <label style="color:#fff;font-size:0.85rem;display:block;margin-bottom:5px;">已有皮肤：</label>
-                        <div style="display:flex;flex-wrap:wrap;gap:5px;">
+                        <div style="display:flex;flex-wrap:wrap;gap:5px;max-height:80px;overflow-y:auto;">
                             ${existingSkins.map(s => `<span style="background:rgba(255,255,255,0.1);padding:3px 8px;border-radius:3px;font-size:0.75rem;color:#888;">${s}</span>`).join('')}
                         </div>
                     </div>
@@ -5744,12 +5772,14 @@
             document.body.appendChild(modal);
             
             const input = modal.querySelector('#newSkinName');
+            const attrInput = modal.querySelector('#newSkinAttr');
             const confirmBtn = modal.querySelector('#confirmAddSkin');
             
             input.focus();
             
             confirmBtn.onclick = () => {
                 const skinName = input.value.trim();
+                const skinAttr = attrInput.value.trim();
                 if (!skinName) {
                     alert('请输入皮肤名称');
                     return;
@@ -5759,18 +5789,18 @@
                     return;
                 }
                 
-                // 添加自定义皮肤
                 addCustomSkin(cardName, skinName);
                 
-                // 自动选择新添加的皮肤
+                if (skinAttr) {
+                    addCustomSkinAttribute(cardName, skinName, skinAttr);
+                }
+                
                 setCardSkin(cardId, skinName, handType);
                 
                 modal.remove();
                 
-                // 更新显示
                 updateAllCardLevelBadges();
                 
-                // 显示成功提示
                 const toast = document.createElement('div');
                 toast.style.cssText = `
                     position: fixed;
@@ -5789,7 +5819,6 @@
                 setTimeout(() => toast.remove(), 2000);
             };
             
-            // 回车确认
             input.onkeypress = (e) => {
                 if (e.key === 'Enter') {
                     confirmBtn.click();
@@ -5825,9 +5854,9 @@
             myPlacedCards.forEach(card => {
                 const slot = document.querySelector(`.battle-slot[data-slot="${card.slot}"]`);
                 if (slot && !slot.classList.contains('filled')) {
-                    // 获取卡牌类型并添加等级徽章
                     const cardType = card.type || findCardTypeById(card.id);
-                    const levelBadge = cardType ? createLevelBadgeHTML(card.id, cardType, 'my') : '';
+                    const cardName = card.name || '';
+                    const levelBadge = cardType ? createLevelBadgeHTML(card.id, cardType, 'my', cardName) : '';
                     slot.innerHTML = `<span class="card-item" data-profession="${card.profession}">${levelBadge}${card.name}</span>`;
                     slot.classList.add('filled');
                     slot.classList.remove('empty');
@@ -5836,13 +5865,12 @@
                 }
             });
 
-            // 恢复队友战斗槽
             teammatePlacedCards.forEach(card => {
                 const slot = document.querySelector(`.battle-slot[data-slot="${card.slot}"]`);
                 if (slot && !slot.classList.contains('filled')) {
-                    // 获取卡牌类型并添加等级徽章
                     const cardType = card.type || findCardTypeById(card.id);
-                    const levelBadge = cardType ? createLevelBadgeHTML(card.id, cardType, 'teammate') : '';
+                    const cardName = card.name || '';
+                    const levelBadge = cardType ? createLevelBadgeHTML(card.id, cardType, 'teammate', cardName) : '';
                     slot.innerHTML = `<span class="card-item" data-profession="${card.profession}">${levelBadge}${card.name}</span>`;
                     slot.classList.add('filled');
                     slot.classList.remove('empty');
@@ -7092,9 +7120,10 @@
             });
             loadFavorites();
             loadCardLevels();
-            loadIndividualCardLevels(); // 加载卡牌等级
-            loadCardSkins(); // 加载卡牌皮肤
-            loadCustomSkins(); // 加载自定义皮肤
+            loadIndividualCardLevels();
+            loadCardSkins();
+            loadCustomSkins();
+            loadCustomSkinAttributes();
             loadCustomCards();
             setupAddCardButtons();
             setupCardSortDrag();
