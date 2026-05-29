@@ -2437,7 +2437,7 @@
                             <p style="margin:0 0 10px 0;"><strong style="color:#4fc3f7;">功能说明：</strong></p>
                             <p style="margin:0 0 5px 0;padding-left:20px;">✓ 发布需求或分享脚本</p>
                             <p style="margin:0 0 5px 0;padding-left:20px;">✓ 上传脚本文件（最大1MB）</p>
-                            <p style="margin:0 0 5px 0;padding-left:20px;">✓ 消息保留10天，过期自动清理</p>
+                            <p style="margin:0 0 5px 0;padding-left:20px;">✓ 消息默认永久保存，可选限时删除</p>
                             <p style="margin:0 0 15px 0;padding-left:20px;">✓ 支持拖动窗口位置</p>
                             <p style="margin:0;"><strong style="color:#ffd700;">提示：</strong>点击左上角📢按钮打开需求墙</p>
                         </div>
@@ -3295,7 +3295,7 @@
         const DB_VERSION = 2;
         const STORE_NAME = 'projects';
         const CATEGORIES_STORE = 'categories';
-        let categories = ['默认分类']; // 默认分类
+        let categories = ['默认分类', '暗月', '寒冰', '漩涡', '深海']; // 默认分类
 
         // 初始化IndexedDB
         function initIndexedDB() {
@@ -3328,7 +3328,7 @@
         function loadCategories() {
             return new Promise((resolve, reject) => {
                 if (!db) {
-                    categories = ['默认分类'];
+                    categories = ['默认分类', '暗月', '寒冰', '漩涡', '深海'];
                     resolve();
                     return;
                 }
@@ -3338,17 +3338,24 @@
                 const request = store.getAll();
 
                 request.onsuccess = function() {
+                    const defaultCategories = ['默认分类', '暗月', '寒冰', '漩涡', '深海'];
                     if (request.result && request.result.length > 0) {
                         categories = request.result.map(c => c.name);
+                        // 确保默认分类存在
+                        defaultCategories.forEach(cat => {
+                            if (!categories.includes(cat)) {
+                                categories.push(cat);
+                            }
+                        });
                     } else {
-                        categories = ['默认分类'];
+                        categories = defaultCategories;
                         saveCategories();
                     }
                     resolve();
                 };
 
                 request.onerror = function() {
-                    categories = ['默认分类'];
+                    categories = ['默认分类', '暗月', '寒冰', '漩涡', '深海'];
                     resolve();
                 };
             });
@@ -3427,11 +3434,12 @@
                 return;
             }
 
+            const defaultCategories = ['默认分类', '暗月', '寒冰', '漩涡', '深海'];
             // 显示删除确认模态框
             const container = document.getElementById('categoryListForSave');
             container.innerHTML = categories.map((cat, i) =>
-                `<label style="display:block;padding:10px;cursor:pointer;border-bottom:1px solid #444;color:${cat === '默认分类' ? '#888' : '#fff'};">
-                    <input type="radio" name="deleteCategory" value="${cat}" ${cat === '默认分类' ? 'disabled' : ''}> ${cat} ${cat === '默认分类' ? '(不可删除)' : ''}
+                `<label style="display:block;padding:10px;cursor:pointer;border-bottom:1px solid #444;color:${defaultCategories.includes(cat) ? '#888' : '#fff'};">
+                    <input type="radio" name="deleteCategory" value="${cat}" ${defaultCategories.includes(cat) ? 'disabled' : ''}> ${cat} ${defaultCategories.includes(cat) ? '(不可删除)' : ''}
                 </label>`
             ).join('');
             document.getElementById('selectCategoryModal').style.display = 'flex';
@@ -7822,17 +7830,34 @@ function hasGistToken() {
             if (!scroller) return;
             
             const now = Date.now();
-            const expireTime = SCRIPT_EXPIRE_DAYS * 24 * 60 * 60 * 1000;
-            const validMessages = wallMessages.filter(msg => (now - msg.time) < expireTime);
+            const currentNickname = localStorage.getItem('TFJL_UserName') || '';
+            const adminNicknames = ['管理员', 'admin', 'Admin', 'gyq', 'GYQ'];
+            const isAdmin = adminNicknames.some(nick => currentNickname.toLowerCase() === nick.toLowerCase());
+            
+            // 过滤消息：默认永久保存，只有设置了expireDays的消息才过期
+            const validMessages = wallMessages.filter(msg => {
+                if (msg.expireDays && msg.expireDays > 0) {
+                    const expireTime = msg.expireDays * 24 * 60 * 60 * 1000;
+                    return (now - msg.time) < expireTime;
+                }
+                return true; // 没有设置过期时间的消息永久保存
+            });
             
             if (validMessages.length === 0) {
                 scroller.innerHTML = '<div style="color:rgba(255,255,255,0.5);font-size:0.85rem;text-align:center;padding:20px;">暂无消息，快来发布第一条吧！</div>';
                 return;
             }
             
-            const html = validMessages.map(msg => {
+            const html = validMessages.map((msg, index) => {
                 const timeAgo = formatMessageTime(msg.time);
                 let contentHtml = escapeHtml(msg.content);
+                
+                // 判断是否可以删除（发布者可删自己的，管理员可删所有）
+                const isOwner = msg.author.toLowerCase() === currentNickname.toLowerCase();
+                const canDelete = isOwner || isAdmin;
+                
+                // 过期标签
+                const expireLabel = msg.expireDays ? `<span style="color:#ff9800;font-size:0.7rem;margin-left:5px;" title="${msg.expireDays}天后过期">⏱️${msg.expireDays}天</span>` : '';
                 
                 if (msg.scriptUrl) {
                     // 检查文件名是否是JSON备份文件
@@ -7867,14 +7892,43 @@ function hasGistToken() {
                     }
                 }
                 
+                const deleteBtn = canDelete ? `<a href="javascript:void(0)" onclick="deleteMessage(${index})" style="color:#ff6b6b;cursor:pointer;margin-left:10px;font-size:0.7rem;" title="${isOwner ? '删除我的消息' : '管理员删除'}">🗑️</a>` : '';
+                
                 return `<div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:10px 12px;font-size:0.85rem;">
                     <div style="color:#fff;margin-bottom:6px;line-height:1.5;">${contentHtml}</div>
-                    <div style="color:rgba(255,255,255,0.5);font-size:0.75rem;">${escapeHtml(msg.author)} · ${timeAgo}</div>
+                    <div style="color:rgba(255,255,255,0.5);font-size:0.75rem;">${escapeHtml(msg.author)} · ${timeAgo}${expireLabel}${deleteBtn}</div>
                 </div>`;
             }).join('');
             
             scroller.innerHTML = html;
             startMessageScroll();
+        }
+        
+        async function deleteMessage(index) {
+            if (!confirm('确定要删除这条消息吗？')) return;
+            
+            const currentNickname = localStorage.getItem('TFJL_UserName') || '';
+            const adminNicknames = ['管理员', 'admin', 'Admin', 'gyq', 'GYQ'];
+            const isAdmin = adminNicknames.some(nick => currentNickname.toLowerCase() === nick.toLowerCase());
+            const msg = wallMessages[index];
+            
+            if (!msg) return;
+            
+            const isOwner = msg.author.toLowerCase() === currentNickname.toLowerCase();
+            if (!isOwner && !isAdmin) {
+                alert('你没有权限删除这条消息');
+                return;
+            }
+            
+            wallMessages.splice(index, 1);
+            renderMessages();
+            
+            try {
+                await saveMessagesToGist();
+            } catch (error) {
+                console.error('删除消息失败:', error);
+                alert('删除失败，请稍后重试');
+            }
         }
         
         function formatMessageTime(timestamp) {
@@ -8952,6 +9006,8 @@ function hasGistToken() {
         async function postMessage() {
             const input = document.getElementById('messageInput');
             const nicknameInput = document.getElementById('messageNickname');
+            const expireCheckbox = document.getElementById('expireCheckbox');
+            const expireDaysSelect = document.getElementById('expireDays');
             let content = input.value.trim();
             const nickname = nicknameInput.value.trim() || '匿名用户';
             
@@ -8986,7 +9042,8 @@ function hasGistToken() {
                 content: content,
                 author: nickname,
                 time: Date.now(),
-                scriptUrl: scriptUrl
+                scriptUrl: scriptUrl,
+                expireDays: (expireCheckbox && expireCheckbox.checked) ? parseInt(expireDaysSelect.value) : null
             };
             
             wallMessages.unshift(newMsg);
@@ -8998,6 +9055,7 @@ function hasGistToken() {
             pendingScriptFile = null;
             document.getElementById('uploadStatus').style.display = 'none';
             document.getElementById('scriptFileInput').value = '';
+            if (expireCheckbox) expireCheckbox.checked = false;
             
             localStorage.setItem('TFJL_UserName', nickname);
             
@@ -9241,6 +9299,16 @@ function hasGistToken() {
                 <input type="file" id="scriptFileInput" accept=".txt,.js,.json,.lua,.py,.sh" style="display:none;" onchange="handleScriptUpload(this)">
                 <button onclick="document.getElementById('scriptFileInput').click()" title="上传脚本(最大1MB)" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:6px 12px;border-radius:5px;font-size:0.8rem;cursor:pointer;display:flex;align-items:center;gap:4px;">📎 脚本</button>
                 <span id="uploadStatus" style="color:#4caf50;font-size:0.75rem;display:none;">✓ 已选文件</span>
+                <label style="display:flex;align-items:center;gap:4px;color:#888;font-size:0.75rem;cursor:pointer;margin-left:auto;" title="勾选后消息将在指定天数后自动删除">
+                    <input type="checkbox" id="expireCheckbox" style="cursor:pointer;">
+                    限时
+                    <select id="expireDays" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:3px;padding:2px 4px;color:#fff;font-size:0.7rem;cursor:pointer;">
+                        <option value="7">7天</option>
+                        <option value="15">15天</option>
+                        <option value="30" selected>30天</option>
+                        <option value="60">60天</option>
+                    </select>
+                </label>
             </div>
             <div style="display:flex;gap:8px;">
                 <input type="text" id="messageInput" placeholder="发布需求或分享脚本..." maxlength="200" style="flex:1;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:5px;padding:6px 10px;color:#fff;font-size:0.85rem;outline:none;" onfocus="this.style.borderColor='#ffd700'" onblur="this.style.borderColor='rgba(255,255,255,0.2)'">
