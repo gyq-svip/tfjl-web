@@ -7681,7 +7681,18 @@ function hasGistToken() {
                 let contentHtml = escapeHtml(msg.content);
                 
                 if (msg.scriptUrl) {
-                    const isBackup = msg.shareType === 'backup' || msg.scriptUrl.includes('backup') || contentHtml.includes('备份') || contentHtml.includes('项目');
+                    // 检查文件名是否是JSON备份文件
+                    const urlFileName = msg.scriptUrl.split('/').pop() || '';
+                    const isJsonFile = urlFileName.toLowerCase().endsWith('.json');
+                    const isBackup = msg.shareType === 'backup' || msg.scriptUrl.includes('backup') || contentHtml.includes('备份') || contentHtml.includes('项目') || isJsonFile;
+                    
+                    console.log('消息识别:', {
+                        url: msg.scriptUrl,
+                        urlFileName,
+                        isJsonFile,
+                        isBackup,
+                        content: msg.content.substring(0, 50)
+                    });
                     
                     if (isBackup) {
                         contentHtml = contentHtml.replace(
@@ -7934,11 +7945,14 @@ function hasGistToken() {
                     
                     // 判断文件类型
                     const isJsonFile = fileName.toLowerCase().endsWith('.json');
+                    console.log('文件名:', fileName, '是否JSON:', isJsonFile);
                     
                     if (isJsonFile) {
                         // 尝试作为备份JSON导入
                         try {
                             const importData = JSON.parse(content);
+                            console.log('解析后的数据:', importData);
+                            console.log('是否有projects:', !!importData.projects, Array.isArray(importData.projects));
                             
                             if (importData.projects && Array.isArray(importData.projects)) {
                                 // 这是备份文件，显示导入选项对话框
