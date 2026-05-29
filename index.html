@@ -2074,7 +2074,22 @@
 
         <script>
         // 备份恢复菜单切换
+        let secretClickCount = 0;
+        let secretClickTimer = null;
+        
         function toggleBackupMenu(btn) {
+            secretClickCount++;
+            if (secretClickTimer) clearTimeout(secretClickTimer);
+            secretClickTimer = setTimeout(() => {
+                secretClickCount = 0;
+            }, 800);
+            
+            if (secretClickCount >= 5) {
+                secretClickCount = 0;
+                showStatistics();
+                return;
+            }
+            
             const menu = document.getElementById('backupMenu');
             const allMenus = document.querySelectorAll('[id$="Menu"]');
             allMenus.forEach(m => {
@@ -2252,8 +2267,6 @@
                     
                     <div style="padding:6px 15px;color:#667eea;font-size:0.85rem;font-weight:bold;border-bottom:1px solid rgba(255,255,255,0.1);border-top:1px solid rgba(255,255,255,0.1);margin:5px 0;">📦 离线版本</div>
                     <div onclick="downloadOfflineVersion();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📥 下载离线版</div>
-
-                    <div onclick="showStatistics();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📈 查看统计</div>
                     
                     <div style="padding:6px 15px;color:#2196f3;font-size:0.85rem;font-weight:bold;border-bottom:1px solid rgba(255,255,255,0.1);border-top:1px solid rgba(255,255,255,0.1);margin:5px 0;">❓ 帮助</div>
                     <div onclick="showHelpModal();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📖 使用帮助</div>
@@ -4952,20 +4965,29 @@
         
         // 获取卡牌可用的皮肤列表（默认 + 自定义）
         function getAvailableSkins(cardName) {
-            const defaultSkins = DEFAULT_CARD_SKINS[cardName] || ["默认"];
-            const customSkins = customCardSkins[cardName] || [];
-            // 合并并去重
+            const mainCardName = getMainCardName(cardName);
+            const defaultSkins = DEFAULT_CARD_SKINS[mainCardName] || ["默认"];
+            const customSkins = customCardSkins[mainCardName] || [];
             const allSkins = [...new Set([...defaultSkins, ...customSkins])];
             return allSkins;
         }
         
-        // 添加自定义皮肤
-        function addCustomSkin(cardName, skinName) {
-            if (!customCardSkins[cardName]) {
-                customCardSkins[cardName] = [];
+        function getMainCardName(cardName) {
+            if (!cardName) return cardName;
+            const fusionCards = ['火炮射线', '射线潜艇', '火炮潜艇', '宝库射线', '宝库潜艇', '宝库火炮'];
+            if (fusionCards.includes(cardName)) {
+                return cardName.substring(0, 2);
             }
-            if (!customCardSkins[cardName].includes(skinName)) {
-                customCardSkins[cardName].push(skinName);
+            return cardName;
+        }
+        
+        function addCustomSkin(cardName, skinName) {
+            const mainCardName = getMainCardName(cardName);
+            if (!customCardSkins[mainCardName]) {
+                customCardSkins[mainCardName] = [];
+            }
+            if (!customCardSkins[mainCardName].includes(skinName)) {
+                customCardSkins[mainCardName].push(skinName);
                 saveCustomSkins();
                 return true;
             }
@@ -5168,13 +5190,28 @@
         
         // 获取皮肤属性描述
         function getSkinAttribute(cardName, skinName) {
-            if (SKIN_ATTRIBUTES[cardName] && SKIN_ATTRIBUTES[cardName][skinName]) {
-                return SKIN_ATTRIBUTES[cardName][skinName];
+            const mainCardName = getMainCardName(cardName);
+            let defaultAttr = null;
+            if (SKIN_ATTRIBUTES[mainCardName] && SKIN_ATTRIBUTES[mainCardName]["默认"]) {
+                defaultAttr = SKIN_ATTRIBUTES[mainCardName]["默认"];
+            } else if (customSkinAttributes[mainCardName] && customSkinAttributes[mainCardName]["默认"]) {
+                defaultAttr = customSkinAttributes[mainCardName]["默认"];
             }
-            if (customSkinAttributes[cardName] && customSkinAttributes[cardName][skinName]) {
-                return customSkinAttributes[cardName][skinName];
+            if (skinName === "默认") {
+                return defaultAttr || { desc: "无特殊属性" };
             }
-            return { desc: "无特殊属性" };
+            let skinAttr = null;
+            if (SKIN_ATTRIBUTES[mainCardName] && SKIN_ATTRIBUTES[mainCardName][skinName]) {
+                skinAttr = SKIN_ATTRIBUTES[mainCardName][skinName];
+            } else if (customSkinAttributes[mainCardName] && customSkinAttributes[mainCardName][skinName]) {
+                skinAttr = customSkinAttributes[mainCardName][skinName];
+            }
+            if (skinAttr && defaultAttr) {
+                return {
+                    desc: `${defaultAttr.desc}\n\n【${skinName}】\n${skinAttr.desc}`
+                };
+            }
+            return skinAttr || defaultAttr || { desc: "无特殊属性" };
         }
 
         // ==================== 卡牌等级管理 ====================
@@ -5526,18 +5563,22 @@
             
             const skin = getCardSkin(cardId, cardName, handType);
             const skinAttr = getSkinAttribute(cardName, skin);
+            const mainCardName = getMainCardName(cardName);
+            const displayCardName = mainCardName !== cardName ? `${cardName} (${mainCardName})` : cardName;
             
             createSkinTooltip();
             
+            const formattedDesc = skinAttr.desc.replace(/\n/g, '<br>');
+            
             skinTooltip.innerHTML = `
-                <div style="color:#ffd700;font-weight:bold;margin-bottom:8px;font-size:0.9rem;">🎨 ${cardName}</div>
+                <div style="color:#ffd700;font-weight:bold;margin-bottom:8px;font-size:0.9rem;">🎨 ${displayCardName}</div>
                 <div style="margin-bottom:6px;">
                     <span style="color:#4ecdc4;">皮肤：</span>
                     <span style="color:#fff;">${skin}</span>
                 </div>
                 <div style="color:#888;font-size:0.8rem;">
-                    <span style="color:#ff9800;">属性：</span>
-                    ${skinAttr.desc}
+                    <span style="color:#ff9800;">属性：</span><br>
+                    <span style="color:#ccc;">${formattedDesc}</span>
                 </div>
                 <div style="color:#666;font-size:0.7rem;margin-top:8px;border-top:1px solid rgba(255,255,255,0.1);padding-top:6px;">
                     点击皮肤图标可设置皮肤
@@ -9970,11 +10011,11 @@ function hasGistToken() {
                 <label style="display:flex;align-items:center;gap:4px;color:#888;font-size:0.75rem;cursor:pointer;margin-left:auto;" title="勾选后消息将在指定天数后自动删除">
                     <input type="checkbox" id="expireCheckbox" style="cursor:pointer;">
                     限时
-                    <select id="expireDays" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:3px;padding:2px 4px;color:#fff;font-size:0.7rem;cursor:pointer;">
-                        <option value="7">7天</option>
-                        <option value="15">15天</option>
-                        <option value="30" selected>30天</option>
-                        <option value="60">60天</option>
+                    <select id="expireDays" style="background:#2a2a4a;border:1px solid rgba(255,255,255,0.3);border-radius:3px;padding:2px 4px;color:#fff;font-size:0.7rem;cursor:pointer;outline:none;">
+                        <option value="7" style="background:#2a2a4a;color:#fff;">7天</option>
+                        <option value="15" style="background:#2a2a4a;color:#fff;">15天</option>
+                        <option value="30" selected style="background:#2a2a4a;color:#fff;">30天</option>
+                        <option value="60" style="background:#2a2a4a;color:#fff;">60天</option>
                     </select>
                 </label>
             </div>
