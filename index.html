@@ -7953,17 +7953,31 @@ function hasGistToken() {
                             const importData = JSON.parse(content);
                             console.log('解析后的数据:', importData);
                             console.log('是否有projects:', !!importData.projects, Array.isArray(importData.projects));
+                            console.log('是否有project:', !!importData.project, importData.type);
+                            
+                            // 支持两种备份格式
+                            let projectsToImport = [];
+                            let categoriesToImport = [];
                             
                             if (importData.projects && Array.isArray(importData.projects)) {
+                                // 全部备份格式
+                                projectsToImport = importData.projects;
+                                categoriesToImport = importData.categories || [];
+                            } else if (importData.project && importData.type === 'tower-defense-project') {
+                                // 单个项目备份格式
+                                projectsToImport = [importData.project];
+                            }
+                            
+                            if (projectsToImport.length > 0) {
                                 // 这是备份文件，显示导入选项对话框
                                 toast.remove();
                                 
-                                const result = await showBackupImportDialog(importData, fileName);
+                                const result = await showBackupImportDialog({ projects: projectsToImport }, fileName);
                                 
                                 if (result && result.action !== 'cancel') {
                                     // 导入分类
-                                    if (importData.categories && Array.isArray(importData.categories)) {
-                                        importData.categories.forEach(cat => {
+                                    if (categoriesToImport.length > 0) {
+                                        categoriesToImport.forEach(cat => {
                                             if (!categories.includes(cat)) {
                                                 categories.push(cat);
                                             }
@@ -7976,7 +7990,7 @@ function hasGistToken() {
                                     const transaction = db.transaction(['projects'], 'readwrite');
                                     const store = transaction.objectStore('projects');
                                     
-                                    importData.projects.forEach(project => {
+                                    projectsToImport.forEach(project => {
                                         const putRequest = store.put(project);
                                         putRequest.onsuccess = () => imported++;
                                     });
@@ -8005,7 +8019,7 @@ function hasGistToken() {
                                         alert('❌ 恢复项目失败');
                                     };
                                     
-                                    importedProjects += importData.projects.length;
+                                    importedProjects += projectsToImport.length;
                                 }
                                 
                                 // 重新显示加载提示（如果还有其他文件）
@@ -8167,21 +8181,37 @@ function hasGistToken() {
                 const importData = JSON.parse(backupContent);
                 console.log('解析后的数据:', importData);
                 console.log('projects字段:', importData.projects);
+                console.log('project字段:', importData.project);
                 
-                if (!importData.projects || !Array.isArray(importData.projects)) {
+                // 支持两种备份格式
+                let projectsToImport = [];
+                let categoriesToImport = [];
+                
+                if (importData.projects && Array.isArray(importData.projects)) {
+                    // 全部备份格式
+                    projectsToImport = importData.projects;
+                    categoriesToImport = importData.categories || [];
+                } else if (importData.project && importData.type === 'tower-defense-project') {
+                    // 单个项目备份格式
+                    projectsToImport = [importData.project];
+                } else {
                     throw new Error('无效的备份文件格式');
+                }
+                
+                if (projectsToImport.length === 0) {
+                    throw new Error('备份文件中没有项目');
                 }
                 
                 // 移除加载提示
                 toast.remove();
                 
                 // 显示导入选项对话框
-                const result = await showBackupImportDialog(importData, '备份文件');
+                const result = await showBackupImportDialog({ projects: projectsToImport }, '备份文件');
                 
                 if (result && result.action !== 'cancel') {
                     // 导入分类
-                    if (importData.categories && Array.isArray(importData.categories)) {
-                        importData.categories.forEach(cat => {
+                    if (categoriesToImport.length > 0) {
+                        categoriesToImport.forEach(cat => {
                             if (!categories.includes(cat)) {
                                 categories.push(cat);
                             }
@@ -8194,7 +8224,7 @@ function hasGistToken() {
                     const transaction = db.transaction(['projects'], 'readwrite');
                     const store = transaction.objectStore('projects');
                     
-                    importData.projects.forEach(project => {
+                    projectsToImport.forEach(project => {
                         const putRequest = store.put(project);
                         putRequest.onsuccess = () => imported++;
                     });
