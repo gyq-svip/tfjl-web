@@ -7696,7 +7696,7 @@ function hasGistToken() {
                             msg.scriptUrl,
                             `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
                                 <a href="javascript:void(0)" onclick="downloadScript('${msg.scriptUrl}')" style="color:#4fc3f7;text-decoration:underline;cursor:pointer;background:rgba(79,195,247,0.1);padding:4px 10px;border-radius:5px;font-size:0.8rem;">📥 下载</a>
-                                <a href="javascript:void(0)" onclick="importScriptToTxtFiles('${msg.scriptUrl}')" style="color:#4caf50;text-decoration:underline;cursor:pointer;background:rgba(76,175,80,0.1);padding:4px 10px;border-radius:5px;font-size:0.8rem;">📄 导入脚本</a>
+                                <a href="javascript:void(0)" onclick="importScriptToTxtFiles('${msg.scriptUrl}')" style="color:#4caf50;text-decoration:underline;cursor:pointer;background:rgba(76,175,80,0.1);padding:4px 10px;border-radius:5px;font-size:0.8rem;">📄 智能导入</a>
                             </div>`
                         );
                     }
@@ -7787,12 +7787,12 @@ function hasGistToken() {
                     z-index: 10001;
                     border: 2px solid rgba(255,215,0,0.3);
                 `;
-                toast.textContent = '⏳ 正在导入脚本...';
+                toast.textContent = '⏳ 正在导入...';
                 document.body.appendChild(toast);
 
                 // 从Gist获取脚本内容
                 const response = await fetch(url);
-                if (!response.ok) throw new Error('获取脚本失败');
+                if (!response.ok) throw new Error('获取内容失败');
                 
                 const data = await response.json();
                 
@@ -7800,36 +7800,132 @@ function hasGistToken() {
                 const files = data.files;
                 const fileNames = Object.keys(files);
                 
-                if (fileNames.length === 0) throw new Error('脚本文件为空');
+                if (fileNames.length === 0) throw new Error('文件为空');
                 
-                let importedCount = 0;
-                fileNames.forEach(fileName => {
+                let importedScripts = 0;
+                let importedProjects = 0;
+                
+                for (const fileName of fileNames) {
                     const content = files[fileName].content;
-                    if (content) {
-                        // 检查是否已存在同名文件
+                    if (!content) continue;
+                    
+                    // 判断文件类型
+                    const isJsonFile = fileName.toLowerCase().endsWith('.json');
+                    
+                    if (isJsonFile) {
+                        // 尝试作为备份JSON导入
+                        try {
+                            const importData = JSON.parse(content);
+                            
+                            if (importData.projects && Array.isArray(importData.projects)) {
+                                // 这是备份文件
+                                const catCount = importData.categories ? importData.categories.length : 0;
+                                
+                                toast.remove();
+                                
+                                if (confirm(`检测到备份文件"${fileName}"\n\n将导入 ${importData.projects.length} 个项目${catCount > 0 ? '，' + catCount + ' 个分类' : ''}。\n同名项目将被覆盖。`)) {
+                                    // 导入分类
+                                    if (importData.categories && Array.isArray(importData.categories)) {
+                                        importData.categories.forEach(cat => {
+                                            if (!categories.includes(cat)) {
+                                                categories.push(cat);
+                                            }
+                                        });
+                                        saveCategories();
+                                    }
+                                    
+                                    // 导入项目
+                                    const transaction = db.transaction(['projects'], 'readwrite');
+                                    const store = transaction.objectStore('projects');
+                                    
+                                    importData.projects.forEach(project => {
+                                        store.put(project);
+                                    });
+                                    
+                                    transaction.oncomplete = async function() {
+                                        await recordDownload();
+                                        refreshProjectSelectors();
+                                        
+                                        const successToast = document.createElement('div');
+                                        successToast.style.cssText = `
+                                            position: fixed;
+                                            top: 20px;
+                                            right: 20px;
+                                            background: linear-gradient(135deg, #4CAF50, #45a049);
+                                            color: white;
+                                            padding: 12px 24px;
+                                            border-radius: 8px;
+                                            z-index: 10000;
+                                        `;
+                                        successToast.textContent = `✅ 成功导入 ${importData.projects.length} 个项目！`;
+                                        document.body.appendChild(successToast);
+                                        setTimeout(() => successToast.remove(), 3000);
+                                    };
+                                    
+                                    transaction.onerror = function() {
+                                        alert('❌ 导入项目失败');
+                                    };
+                                    
+                                    importedProjects += importData.projects.length;
+                                }
+                                
+                                // 重新显示加载提示（如果还有其他文件）
+                                if (fileNames.indexOf(fileName) < fileNames.length - 1) {
+                                    document.body.appendChild(toast);
+                                }
+                            } else {
+                                // JSON但不是备份格式，作为普通脚本文件导入
+                                const existsIndex = txtFiles.findIndex(f => f.name === fileName);
+                                if (existsIndex !== -1) {
+                                    if (confirm(`文件 "${fileName}" 已存在，是否覆盖？`)) {
+                                        txtFiles[existsIndex].content = content;
+                                        importedScripts++;
+                                    }
+                                } else {
+                                    txtFiles.push({ name: fileName, content: content });
+                                    importedScripts++;
+                                }
+                            }
+                        } catch (parseError) {
+                            // JSON解析失败，作为普通文本文件导入
+                            const existsIndex = txtFiles.findIndex(f => f.name === fileName);
+                            if (existsIndex !== -1) {
+                                if (confirm(`文件 "${fileName}" 已存在，是否覆盖？`)) {
+                                    txtFiles[existsIndex].content = content;
+                                    importedScripts++;
+                                }
+                            } else {
+                                txtFiles.push({ name: fileName, content: content });
+                                importedScripts++;
+                            }
+                        }
+                    } else {
+                        // 非JSON文件，作为脚本文件导入
                         const existsIndex = txtFiles.findIndex(f => f.name === fileName);
                         if (existsIndex !== -1) {
-                            // 询问是否覆盖
                             if (confirm(`文件 "${fileName}" 已存在，是否覆盖？`)) {
                                 txtFiles[existsIndex].content = content;
-                                importedCount++;
+                                importedScripts++;
                             }
                         } else {
                             txtFiles.push({ name: fileName, content: content });
-                            importedCount++;
+                            importedScripts++;
                         }
                     }
-                });
+                }
 
                 // 移除加载提示
-                toast.remove();
+                const loadingToast = document.getElementById('importLoadingToast');
+                if (loadingToast) loadingToast.remove();
 
-                if (importedCount > 0) {
+                // 显示结果
+                if (importedScripts > 0) {
                     updateTxtFilesList();
                     autoSaveProject();
                     await recordDownload();
-                    
-                    // 显示成功提示
+                }
+                
+                if (importedScripts > 0 || importedProjects > 0) {
                     const successToast = document.createElement('div');
                     successToast.style.cssText = `
                         position: fixed;
@@ -7841,17 +7937,18 @@ function hasGistToken() {
                         border-radius: 8px;
                         z-index: 10000;
                     `;
-                    successToast.textContent = `✅ 成功导入 ${importedCount} 个脚本文件！`;
+                    let msg = '✅ 导入成功！';
+                    if (importedScripts > 0) msg += ` ${importedScripts} 个脚本文件`;
+                    if (importedProjects > 0) msg += ` ${importedProjects} 个项目`;
+                    successToast.textContent = msg;
                     document.body.appendChild(successToast);
                     setTimeout(() => successToast.remove(), 3000);
-                } else {
-                    alert('没有导入任何文件');
                 }
             } catch (error) {
                 const loadingToast = document.getElementById('importLoadingToast');
                 if (loadingToast) loadingToast.remove();
                 alert('❌ 导入失败: ' + error.message);
-                console.error('导入脚本失败:', error);
+                console.error('导入失败:', error);
             }
         }
 
