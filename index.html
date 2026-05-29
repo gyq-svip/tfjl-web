@@ -6818,15 +6818,10 @@
                 cardEl.dataset.name = name;
                 cardEl.dataset.type = cardType;
                 cardEl.dataset.profession = profession;
-                // 设置工程卡属性
-                if (profession === 'engineering') {
-                    cardEl.dataset.engineering = 'true';
-                }
+                cardEl.dataset.engineering = (profession === 'engineering') ? 'true' : 'false';
                 
-                // 创建等级徽章
-                const levelBadge = createLevelBadgeHTML(id, cardType);
+                const levelBadge = createLevelBadgeHTML(id, cardType, 'my', name);
                 
-                // 创建删除按钮（放在左下角，避免和右上角等级徽章重叠）
                 const deleteBtn = document.createElement('button');
                 deleteBtn.className = 'delete-card-btn';
                 deleteBtn.textContent = '×';
@@ -6841,10 +6836,8 @@
                 cardEl.style.position = 'relative';
                 grid.appendChild(cardEl);
                 
-                // 绑定事件 - 确保收藏功能正常工作
                 cardEl.addEventListener('click', (e) => {
-                    // 如果点击的是删除按钮或等级徽章，不触发添加到手牌
-                    if (e.target.classList.contains('delete-card-btn') || e.target.classList.contains('card-level-badge')) {
+                    if (e.target.classList.contains('delete-card-btn') || e.target.classList.contains('card-level-badge') || e.target.classList.contains('card-skin-badge')) {
                         return;
                     }
                     handlePoolCardClick(cardEl);
@@ -6853,7 +6846,6 @@
                 cardEl.addEventListener('dragstart', handlePoolDragStart);
                 cardEl.addEventListener('contextmenu', (e) => handleCardRightClick(e, cardEl));
                 
-                // 长按添加/删除收藏（手机版）
                 setupLongPress(cardEl, (e) => handleCardRightClick(e, cardEl));
                 
                 if (save) {
