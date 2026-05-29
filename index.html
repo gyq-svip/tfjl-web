@@ -8150,8 +8150,11 @@ function hasGistToken() {
                 } else {
                     // 使用API获取JSON数据
                     const data = await response.json();
+                    console.log('Gist API响应:', data);
                     const files = data.files;
                     const fileNames = Object.keys(files);
+                    
+                    console.log('文件列表:', fileNames);
                     
                     if (!fileNames || fileNames.length === 0) throw new Error('备份文件为空');
                     
@@ -8159,7 +8162,11 @@ function hasGistToken() {
                     backupContent = files[fileNames[0]].content;
                 }
                 
+                console.log('备份内容前100字符:', backupContent.substring(0, 100));
+                
                 const importData = JSON.parse(backupContent);
+                console.log('解析后的数据:', importData);
+                console.log('projects字段:', importData.projects);
                 
                 if (!importData.projects || !Array.isArray(importData.projects)) {
                     throw new Error('无效的备份文件格式');
