@@ -2654,6 +2654,7 @@
         <!-- 项目操作菜单（折叠） -->
         <div id="projectMenu" style="display:none;position:fixed;z-index:9998;background:rgba(40,40,70,0.98);border:1px solid rgba(255,215,0,0.3);border-radius:10px;padding:15px;min-width:180px;box-shadow:0 4px 15px rgba(0,0,0,0.4);">
             <button onclick="deleteCurrentProject()" style="display:block;width:100%;background:linear-gradient(135deg,#f44336,#c62828);color:white;border:none;padding:10px 15px;border-radius:8px;cursor:pointer;font-size:0.9rem;margin-bottom:8px;">🗑️ 删除项目</button>
+            <button onclick="moveProjectToCategory()" style="display:block;width:100%;background:linear-gradient(135deg,#3f51b5,#303f9f);color:white;border:none;padding:10px 15px;border-radius:8px;cursor:pointer;font-size:0.9rem;margin-bottom:8px;">📦 移动到分类</button>
             <hr style="border-color:rgba(255,255,255,0.1);margin:10px 0;">
             <button onclick="createCategory()" style="display:block;width:100%;background:linear-gradient(135deg,#9c27b0,#7b1fa2);color:white;border:none;padding:10px 15px;border-radius:8px;cursor:pointer;font-size:0.9rem;margin-bottom:8px;">➕ 创建分类</button>
             <button onclick="renameCategory()" style="display:block;width:100%;background:linear-gradient(135deg,#00bcd4,#00838f);color:white;border:none;padding:10px 15px;border-radius:8px;cursor:pointer;font-size:0.9rem;margin-bottom:8px;">✏️ 重命名分类</button>
@@ -2881,7 +2882,7 @@
             <div id="txtFilesPanelHeader" style="background:linear-gradient(135deg,#4caf50,#2e7d32);padding:10px 15px;cursor:move;display:flex;justify-content:space-between;align-items:center;">
                 <span style="color:white;font-weight:bold;">📄 脚本文件</span>
                 <div style="display:flex;align-items:center;gap:8px;">
-                    <button onclick="uploadTxtFile()" style="background:rgba(255,255,255,0.2);color:white;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:0.8rem;">📤 上传TXT</button>
+                    <button onclick="uploadTxtFile()" style="background:rgba(255,255,255,0.2);color:white;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:0.8rem;">📤 上传文件</button>
                     <button onclick="toggleTxtFilesPanel()" style="background:transparent;border:none;color:white;font-size:1.2rem;cursor:pointer;padding:0 5px;">×</button>
                 </div>
             </div>
@@ -2891,7 +2892,7 @@
             </div>
         </div>
 
-        <input type="file" id="txtFileInput" accept=".txt" style="display:none;" onchange="handleTxtFileUpload(this)">
+        <input type="file" id="txtFileInput" accept=".txt,.js,.json,.lua,.py,.sh" multiple style="display:none;" onchange="handleTxtFileUpload(this)">
 
         <!-- 文本解析悬浮面板 -->
         <div id="textParserPanel" style="display:none;position:fixed;top:80px;right:20px;width:450px;height:350px;z-index:9997;background:rgba(30,30,60,0.95);border:2px solid rgba(0,188,212,0.5);border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.5);overflow:hidden;resize:both;min-width:350px;min-height:280px;">
@@ -3932,15 +3933,18 @@
             let html = '';
             txtFiles.forEach((file, i) => {
                 html += `
-                    <div style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,215,0,0.2);border-radius:8px;padding:12px;display:flex;justify-content:space-between;align-items:center;">
-                        <div style="flex:1;overflow:hidden;">
-                            <div style="color:#ffd700;font-weight:bold;margin-bottom:4px;">📄 ${escapeHtml(file.name)}</div>
-                            <div style="color:rgba(255,255,255,0.5);font-size:0.8rem;">${(file.content.length / 1024).toFixed(1)} KB</div>
-                        </div>
-                        <div style="display:flex;gap:8px;flex-shrink:0;">
-                            <button onclick="previewTxtFile(${i})" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">✏️ 预览/编辑</button>
-                            <button onclick="downloadTxtFile(${i})" style="background:linear-gradient(135deg,#2196f3,#1565c0);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">📥 下载</button>
-                            <button onclick="deleteTxtFile(${i})" style="background:linear-gradient(135deg,#f44336,#c62828);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">🗑️</button>
+                    <div style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,215,0,0.2);border-radius:8px;padding:12px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <div style="flex:1;overflow:hidden;">
+                                <div style="color:#ffd700;font-weight:bold;margin-bottom:4px;">📄 ${escapeHtml(file.name)}</div>
+                                <div style="color:rgba(255,255,255,0.5);font-size:0.8rem;">${(file.content.length / 1024).toFixed(1)} KB</div>
+                            </div>
+                            <div style="display:flex;gap:5px;flex-shrink:0;flex-wrap:wrap;">
+                                <button onclick="openTxtFileWindow(${i})" title="打开" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">✏️</button>
+                                <button onclick="renameTxtFile(${i})" title="重命名" style="background:linear-gradient(135deg,#ff9800,#f57c00);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">✏️</button>
+                                <button onclick="downloadTxtFile(${i})" title="下载" style="background:linear-gradient(135deg,#2196f3,#1565c0);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">📥</button>
+                                <button onclick="deleteTxtFile(${i})" title="删除" style="background:linear-gradient(135deg,#f44336,#c62828);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">🗑️</button>
+                            </div>
                         </div>
                     </div>
                 `;
@@ -3954,45 +3958,39 @@
             if (input) input.click();
         }
 
-        // 处理TXT文件上传
+        // 处理TXT文件上传（支持多文件）
         function handleTxtFileUpload(input) {
-            if (!input.files || !input.files[0]) return;
-
-            const file = input.files[0];
-            if (file.size > 100 * 1024) { // 100KB限制
-                alert('文件太大，请上传小于100KB的TXT文件');
-                return;
-            }
-
-            // 检查是否已存在同名文件
-            const existsIndex = txtFiles.findIndex(f => f.name === file.name);
-            if (existsIndex !== -1) {
-                if (!confirm('已存在同名文件，是否替换？')) {
-                    input.value = '';
+            if (!input.files || input.files.length === 0) return;
+            
+            const files = Array.from(input.files);
+            let uploadedCount = 0;
+            
+            files.forEach(file => {
+                if (file.size > 1024 * 1024) {
+                    alert(`文件 ${file.name} 太大，请上传小于1MB的文件`);
                     return;
                 }
-                // 替换现有文件
+                
                 const reader = new FileReader();
                 reader.onload = function(e) {
-                    txtFiles[existsIndex].content = e.target.result;
-                    updateTxtFilesList();
-                    autoSaveProject();
-                    input.value = '';
+                    const content = e.target.result;
+                    const existsIndex = txtFiles.findIndex(f => f.name === file.name);
+                    
+                    if (existsIndex !== -1) {
+                        txtFiles[existsIndex].content = content;
+                    } else {
+                        txtFiles.push({name: file.name, content: content});
+                    }
+                    
+                    uploadedCount++;
+                    if (uploadedCount === files.length) {
+                        updateTxtFilesList();
+                        autoSaveProject();
+                        input.value = '';
+                    }
                 };
                 reader.readAsText(file);
-                return;
-            }
-
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const content = e.target.result;
-                const fileName = file.name;
-                txtFiles.push({name: fileName, content: content});
-                updateTxtFilesList();
-                autoSaveProject();
-                input.value = '';
-            };
-            reader.readAsText(file);
+            });
         }
 
         // 自动保存项目
@@ -4187,6 +4185,267 @@
             autoSaveProject();
         }
 
+        // ========== 多窗口脚本编辑系统 ==========
+        let txtFileWindows = []; // 存储所有打开的窗口信息
+        let windowZIndex = 1000; // 窗口层级管理
+
+        // 打开脚本文件窗口（支持多窗口）
+        function openTxtFileWindow(index) {
+            if (!txtFiles[index]) return;
+            
+            const file = txtFiles[index];
+            const windowId = `txtWindow_${index}_${Date.now()}`;
+            
+            // 创建窗口容器
+            const windowDiv = document.createElement('div');
+            windowDiv.id = windowId;
+            windowDiv.className = 'floating-txt-window';
+            windowDiv.style.cssText = `
+                position: fixed;
+                top: ${100 + txtFileWindows.length * 30}px;
+                left: ${200 + txtFileWindows.length * 30}px;
+                width: 600px;
+                height: 450px;
+                min-width: 300px;
+                min-height: 200px;
+                background: linear-gradient(135deg, rgba(30,30,50,0.98), rgba(20,20,40,0.98));
+                border: 2px solid rgba(255,215,0,0.3);
+                border-radius: 12px;
+                box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+                z-index: ${++windowZIndex};
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+            `;
+            
+            // 窗口标题栏
+            const titleBar = document.createElement('div');
+            titleBar.style.cssText = `
+                background: linear-gradient(90deg, rgba(255,215,0,0.2), rgba(255,215,0,0.1));
+                padding: 10px 15px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                cursor: move;
+                border-bottom: 1px solid rgba(255,215,0,0.2);
+                flex-shrink: 0;
+            `;
+            titleBar.innerHTML = `
+                <span style="color: #ffd700; font-weight: bold; font-size: 14px;">📄 ${escapeHtml(file.name)}</span>
+                <div style="display: flex; gap: 8px;">
+                    <button onclick="minimizeTxtWindow('${windowId}')" style="background:rgba(255,193,7,0.2);border:none;color:#ffc107;padding:4px 8px;border-radius:4px;cursor:pointer;">−</button>
+                    <button onclick="closeTxtWindow('${windowId}', ${index})" style="background:rgba(244,67,54,0.2);border:none;color:#f44336;padding:4px 8px;border-radius:4px;cursor:pointer;">×</button>
+                </div>
+            `;
+            
+            // 编辑区域
+            const contentArea = document.createElement('div');
+            contentArea.style.cssText = `
+                flex: 1;
+                padding: 15px;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+            `;
+            
+            const textarea = document.createElement('textarea');
+            textarea.id = `${windowId}_content`;
+            textarea.style.cssText = `
+                width: 100%;
+                height: 100%;
+                background: rgba(0,0,0,0.3);
+                border: 1px solid rgba(255,215,0,0.2);
+                border-radius: 8px;
+                color: #e0e0e0;
+                font-family: 'Consolas', 'Monaco', monospace;
+                font-size: 14px;
+                padding: 12px;
+                resize: none;
+                outline: none;
+                line-height: 1.5;
+            `;
+            textarea.value = file.content;
+            textarea.spellcheck = false;
+            
+            // 底部按钮栏
+            const buttonBar = document.createElement('div');
+            buttonBar.style.cssText = `
+                display: flex;
+                justify-content: flex-end;
+                gap: 10px;
+                padding-top: 10px;
+                flex-shrink: 0;
+            `;
+            buttonBar.innerHTML = `
+                <button onclick="saveTxtWindowContent('${windowId}', ${index})" style="background:linear-gradient(135deg,#4CAF50,#45a049);border:none;color:white;padding:8px 20px;border-radius:6px;cursor:pointer;font-weight:bold;">💾 保存</button>
+            `;
+            
+            contentArea.appendChild(textarea);
+            contentArea.appendChild(buttonBar);
+            
+            windowDiv.appendChild(titleBar);
+            windowDiv.appendChild(contentArea);
+            
+            document.body.appendChild(windowDiv);
+            
+            // 拖拽功能
+            makeWindowDraggable(windowDiv, titleBar);
+            
+            // 调整大小功能
+            makeWindowResizable(windowDiv);
+            
+            // 点击窗口时提升层级
+            windowDiv.addEventListener('mousedown', () => {
+                windowDiv.style.zIndex = ++windowZIndex;
+            });
+            
+            // 记录窗口信息
+            txtFileWindows.push({
+                id: windowId,
+                fileIndex: index,
+                element: windowDiv
+            });
+        }
+
+        // 窗口拖拽
+        function makeWindowDraggable(windowDiv, handle) {
+            let isDragging = false;
+            let startX, startY, startLeft, startTop;
+            
+            handle.addEventListener('mousedown', (e) => {
+                if (e.target.tagName === 'BUTTON') return;
+                isDragging = true;
+                startX = e.clientX;
+                startY = e.clientY;
+                startLeft = windowDiv.offsetLeft;
+                startTop = windowDiv.offsetTop;
+                windowDiv.style.transition = 'none';
+            });
+            
+            document.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+                windowDiv.style.left = (startLeft + dx) + 'px';
+                windowDiv.style.top = (startTop + dy) + 'px';
+            });
+            
+            document.addEventListener('mouseup', () => {
+                isDragging = false;
+                windowDiv.style.transition = '';
+            });
+        }
+
+        // 窗口调整大小
+        function makeWindowResizable(windowDiv) {
+            const resizer = document.createElement('div');
+            resizer.style.cssText = `
+                position: absolute;
+                right: 0;
+                bottom: 0;
+                width: 20px;
+                height: 20px;
+                cursor: se-resize;
+                background: linear-gradient(135deg, transparent 50%, rgba(255,215,0,0.3) 50%);
+                border-radius: 0 0 12px 0;
+            `;
+            windowDiv.appendChild(resizer);
+            windowDiv.style.position = 'fixed';
+            
+            let isResizing = false;
+            let startX, startY, startWidth, startHeight;
+            
+            resizer.addEventListener('mousedown', (e) => {
+                isResizing = true;
+                startX = e.clientX;
+                startY = e.clientY;
+                startWidth = windowDiv.offsetWidth;
+                startHeight = windowDiv.offsetHeight;
+                e.stopPropagation();
+            });
+            
+            document.addEventListener('mousemove', (e) => {
+                if (!isResizing) return;
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+                const newWidth = Math.max(300, startWidth + dx);
+                const newHeight = Math.max(200, startHeight + dy);
+                windowDiv.style.width = newWidth + 'px';
+                windowDiv.style.height = newHeight + 'px';
+            });
+            
+            document.addEventListener('mouseup', () => {
+                isResizing = false;
+            });
+        }
+
+        // 最小化窗口
+        function minimizeTxtWindow(windowId) {
+            const win = document.getElementById(windowId);
+            if (win) {
+                win.style.display = win.style.display === 'none' ? 'flex' : 'none';
+            }
+        }
+
+        // 关闭窗口
+        function closeTxtWindow(windowId, fileIndex) {
+            const win = document.getElementById(windowId);
+            if (win) {
+                win.remove();
+                txtFileWindows = txtFileWindows.filter(w => w.id !== windowId);
+            }
+        }
+
+        // 保存窗口内容
+        function saveTxtWindowContent(windowId, fileIndex) {
+            const textarea = document.getElementById(`${windowId}_content`);
+            if (!textarea || !txtFiles[fileIndex]) return;
+            
+            txtFiles[fileIndex].content = textarea.value;
+            updateTxtFilesList();
+            autoSaveProject();
+            
+            // 显示保存成功提示
+            const toast = document.createElement('div');
+            toast.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: linear-gradient(135deg, #4CAF50, #45a049);
+                color: white;
+                padding: 12px 24px;
+                border-radius: 8px;
+                z-index: 10000;
+                animation: fadeInOut 2s forwards;
+            `;
+            toast.textContent = '✅ 保存成功！';
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 2000);
+        }
+
+        // 重命名文件
+        function renameTxtFile(index) {
+            if (!txtFiles[index]) return;
+            
+            const oldName = txtFiles[index].name;
+            const newName = prompt('请输入新的文件名：', oldName);
+            
+            if (!newName || newName.trim() === '') return;
+            
+            const trimmedName = newName.trim();
+            
+            // 检查是否有同名文件
+            const existsIndex = txtFiles.findIndex((f, i) => i !== index && f.name === trimmedName);
+            if (existsIndex !== -1) {
+                alert('已存在同名文件，请使用其他名称');
+                return;
+            }
+            
+            txtFiles[index].name = trimmedName;
+            updateTxtFilesList();
+            autoSaveProject();
+        }
+
         // HTML转义防XSS
         function escapeHtml(text) {
             if (!text) return '';
@@ -4245,6 +4504,100 @@
                     refreshProjectSelectors();
                 }).catch(e => alert('删除失败:' + e));
             }
+        }
+
+        // 移动项目到其他分类
+        function moveProjectToCategory() {
+            const selector = document.getElementById('projectSelector1');
+            if (!selector || !selector.value) {
+                alert('请先选择一个项目');
+                return;
+            }
+
+            const projectName = selector.value;
+            const currentCategory = currentProjectCategory || '默认分类';
+
+            // 创建选择分类的模态框
+            const modal = document.createElement('div');
+            modal.id = 'moveProjectModal';
+            modal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0,0,0,0.7);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                z-index: 10000;
+            `;
+
+            let categoryOptions = categories.map(cat => 
+                `<option value="${cat}" ${cat === currentCategory ? 'selected' : ''}>${cat}</option>`
+            ).join('');
+
+            modal.innerHTML = `
+                <div style="background:linear-gradient(135deg,rgba(40,40,70,0.98),rgba(30,30,60,0.98));border:2px solid rgba(255,215,0,0.3);border-radius:15px;padding:25px;min-width:320px;max-width:400px;">
+                    <h3 style="margin:0 0 20px 0;color:#ffd700;text-align:center;">📦 移动项目到分类</h3>
+                    <p style="color:rgba(255,255,255,0.8);margin-bottom:15px;text-align:center;">项目: <strong style="color:#ffd700;">${escapeHtml(projectName)}</strong></p>
+                    <label style="color:#fff;display:block;margin-bottom:8px;">目标分类：</label>
+                    <select id="targetCategorySelect" style="width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);background:#1a1a3a;color:#fff;font-size:14px;margin-bottom:20px;">
+                        ${categoryOptions}
+                    </select>
+                    <div style="display:flex;gap:10px;justify-content:center;">
+                        <button onclick="confirmMoveProject('${projectName}')" style="background:linear-gradient(135deg,#4CAF50,#45a049);color:white;border:none;padding:10px 25px;border-radius:8px;cursor:pointer;font-weight:bold;">✅ 确认移动</button>
+                        <button onclick="closeMoveProjectModal()" style="background:linear-gradient(135deg,#757575,#616161);color:white;border:none;padding:10px 25px;border-radius:8px;cursor:pointer;">取消</button>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(modal);
+            document.getElementById('projectMenu').style.display = 'none';
+        }
+
+        // 确认移动项目
+        function confirmMoveProject(projectName) {
+            const targetCategory = document.getElementById('targetCategorySelect').value;
+            if (!targetCategory) {
+                alert('请选择目标分类');
+                return;
+            }
+
+            // 从数据库加载项目并更新分类
+            const transaction = db.transaction(['projects'], 'readwrite');
+            const store = transaction.objectStore('projects');
+            const request = store.get(projectName);
+
+            request.onsuccess = function() {
+                if (request.result) {
+                    const project = request.result;
+                    project.category = targetCategory;
+                    
+                    const updateRequest = store.put(project);
+                    updateRequest.onsuccess = function() {
+                        currentProjectCategory = targetCategory;
+                        refreshProjectSelectors();
+                        closeMoveProjectModal();
+                        alert(`✅ 项目"${projectName}"已移动到"${targetCategory}"`);
+                    };
+                    updateRequest.onerror = function() {
+                        alert('❌ 移动失败');
+                    };
+                } else {
+                    alert('项目不存在');
+                }
+            };
+
+            request.onerror = function() {
+                alert('❌ 读取项目失败');
+            };
+        }
+
+        // 关闭移动项目模态框
+        function closeMoveProjectModal() {
+            const modal = document.getElementById('moveProjectModal');
+            if (modal) modal.remove();
         }
 
         // 导出所有数据为JSON文件
@@ -7206,7 +7559,10 @@ function hasGistToken() {
                 if (msg.scriptUrl) {
                     contentHtml = contentHtml.replace(
                         msg.scriptUrl,
-                        `<a href="javascript:void(0)" onclick="downloadScript('${msg.scriptUrl}')" style="color:#4fc3f7;text-decoration:underline;cursor:pointer;">📥 下载脚本</a>`
+                        `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+                            <a href="javascript:void(0)" onclick="downloadScript('${msg.scriptUrl}')" style="color:#4fc3f7;text-decoration:underline;cursor:pointer;background:rgba(79,195,247,0.1);padding:4px 10px;border-radius:5px;font-size:0.8rem;">📥 下载</a>
+                            <a href="javascript:void(0)" onclick="importScriptToTxtFiles('${msg.scriptUrl}')" style="color:#4caf50;text-decoration:underline;cursor:pointer;background:rgba(76,175,80,0.1);padding:4px 10px;border-radius:5px;font-size:0.8rem;">📄 导入到脚本</a>
+                        </div>`
                     );
                 }
                 
@@ -7274,6 +7630,92 @@ function hasGistToken() {
             } catch (error) {
                 console.warn('记录下载失败:', error);
                 window.open(url, '_blank');
+            }
+        }
+
+        // 从需求墙导入脚本到脚本文件
+        async function importScriptToTxtFiles(url) {
+            try {
+                // 显示加载提示
+                const toast = document.createElement('div');
+                toast.id = 'importLoadingToast';
+                toast.style.cssText = `
+                    position: fixed;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    background: rgba(40,40,70,0.95);
+                    color: #ffd700;
+                    padding: 20px 30px;
+                    border-radius: 10px;
+                    z-index: 10001;
+                    border: 2px solid rgba(255,215,0,0.3);
+                `;
+                toast.textContent = '⏳ 正在导入脚本...';
+                document.body.appendChild(toast);
+
+                // 从Gist获取脚本内容
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('获取脚本失败');
+                
+                const data = await response.json();
+                
+                // 获取文件名和内容
+                const files = data.files;
+                const fileNames = Object.keys(files);
+                
+                if (fileNames.length === 0) throw new Error('脚本文件为空');
+                
+                let importedCount = 0;
+                fileNames.forEach(fileName => {
+                    const content = files[fileName].content;
+                    if (content) {
+                        // 检查是否已存在同名文件
+                        const existsIndex = txtFiles.findIndex(f => f.name === fileName);
+                        if (existsIndex !== -1) {
+                            // 询问是否覆盖
+                            if (confirm(`文件 "${fileName}" 已存在，是否覆盖？`)) {
+                                txtFiles[existsIndex].content = content;
+                                importedCount++;
+                            }
+                        } else {
+                            txtFiles.push({ name: fileName, content: content });
+                            importedCount++;
+                        }
+                    }
+                });
+
+                // 移除加载提示
+                toast.remove();
+
+                if (importedCount > 0) {
+                    updateTxtFilesList();
+                    autoSaveProject();
+                    await recordDownload();
+                    
+                    // 显示成功提示
+                    const successToast = document.createElement('div');
+                    successToast.style.cssText = `
+                        position: fixed;
+                        top: 20px;
+                        right: 20px;
+                        background: linear-gradient(135deg, #4CAF50, #45a049);
+                        color: white;
+                        padding: 12px 24px;
+                        border-radius: 8px;
+                        z-index: 10000;
+                    `;
+                    successToast.textContent = `✅ 成功导入 ${importedCount} 个脚本文件！`;
+                    document.body.appendChild(successToast);
+                    setTimeout(() => successToast.remove(), 3000);
+                } else {
+                    alert('没有导入任何文件');
+                }
+            } catch (error) {
+                const loadingToast = document.getElementById('importLoadingToast');
+                if (loadingToast) loadingToast.remove();
+                alert('❌ 导入失败: ' + error.message);
+                console.error('导入脚本失败:', error);
             }
         }
         
