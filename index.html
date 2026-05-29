@@ -7792,7 +7792,7 @@ function hasGistToken() {
                 
                 modal.innerHTML = `
                     <div style="background:linear-gradient(135deg,rgba(40,40,70,0.98),rgba(30,30,60,0.98));border:2px solid rgba(255,215,0,0.3);border-radius:15px;padding:25px;min-width:380px;max-width:450px;">
-                        <h3 style="margin:0 0 15px 0;color:#ffd700;text-align:center;">📦 导入备份</h3>
+                        <h3 style="margin:0 0 15px 0;color:#ffd700;text-align:center;">📥 恢复项目备份</h3>
                         <p style="color:rgba(255,255,255,0.8);margin-bottom:10px;text-align:center;font-size:0.9rem;">
                             文件: <strong style="color:#ffd700;">${escapeHtml(fileName)}</strong>
                         </p>
@@ -7800,36 +7800,14 @@ function hasGistToken() {
                             包含 <strong style="color:#4caf50;">${projectCount}</strong> 个项目${catCount > 0 ? `，<strong style="color:#2196f3;">${catCount}</strong> 个分类` : ''}
                         </p>
                         
-                        <div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:15px;margin-bottom:15px;">
-                            <p style="color:rgba(255,255,255,0.6);margin-bottom:12px;font-size:0.85rem;">同名项目处理方式：</p>
-                            
-                            <label style="display:flex;align-items:center;gap:10px;padding:10px;background:rgba(255,255,255,0.05);border-radius:8px;margin-bottom:8px;cursor:pointer;">
-                                <input type="radio" name="importAction" value="rename" checked style="accent-color:#ffd700;">
-                                <div>
-                                    <div style="color:#fff;font-size:0.9rem;">📝 创建副本</div>
-                                    <div style="color:rgba(255,255,255,0.5);font-size:0.75rem;">保留原项目，新项目添加"_副本"后缀</div>
-                                </div>
-                            </label>
-                            
-                            <label style="display:flex;align-items:center;gap:10px;padding:10px;background:rgba(255,255,255,0.05);border-radius:8px;margin-bottom:8px;cursor:pointer;">
-                                <input type="radio" name="importAction" value="overwrite" style="accent-color:#ffd700;">
-                                <div>
-                                    <div style="color:#fff;font-size:0.9rem;">🔄 覆盖替换</div>
-                                    <div style="color:rgba(255,255,255,0.5);font-size:0.75rem;">同名项目将被替换为新内容</div>
-                                </div>
-                            </label>
-                            
-                            <label style="display:flex;align-items:center;gap:10px;padding:10px;background:rgba(255,255,255,0.05);border-radius:8px;margin-bottom:8px;cursor:pointer;">
-                                <input type="radio" name="importAction" value="skip" style="accent-color:#ffd700;">
-                                <div>
-                                    <div style="color:#fff;font-size:0.9rem;">⏭️ 跳过</div>
-                                    <div style="color:rgba(255,255,255,0.5);font-size:0.75rem;">保留原项目，跳过所有同名项目</div>
-                                </div>
-                            </label>
+                        <div style="background:rgba(255,193,7,0.1);border:1px solid rgba(255,193,7,0.3);border-radius:8px;padding:12px;margin-bottom:20px;">
+                            <p style="color:#ffc107;margin:0;font-size:0.85rem;text-align:center;">
+                                ⚠️ 同名项目将被覆盖替换
+                            </p>
                         </div>
                         
                         <div style="display:flex;gap:10px;justify-content:center;">
-                            <button id="confirmImportBtn" style="background:linear-gradient(135deg,#4CAF50,#45a049);color:white;border:none;padding:12px 30px;border-radius:8px;cursor:pointer;font-weight:bold;font-size:0.9rem;">✅ 确认导入</button>
+                            <button id="confirmImportBtn" style="background:linear-gradient(135deg,#4CAF50,#45a049);color:white;border:none;padding:12px 30px;border-radius:8px;cursor:pointer;font-weight:bold;font-size:0.9rem;">✅ 确认恢复</button>
                             <button id="cancelImportBtn" style="background:linear-gradient(135deg,#757575,#616161);color:white;border:none;padding:12px 30px;border-radius:8px;cursor:pointer;font-size:0.9rem;">取消</button>
                         </div>
                     </div>
@@ -7838,9 +7816,8 @@ function hasGistToken() {
                 document.body.appendChild(modal);
                 
                 document.getElementById('confirmImportBtn').onclick = function() {
-                    const action = document.querySelector('input[name="importAction"]:checked').value;
                     modal.remove();
-                    resolve({ action });
+                    resolve({ action: 'overwrite' });
                 };
                 
                 document.getElementById('cancelImportBtn').onclick = function() {
@@ -7980,76 +7957,41 @@ function hasGistToken() {
                                         saveCategories();
                                     }
                                     
-                                    // 根据选择的操作处理项目
+                                    // 直接覆盖导入项目（和恢复项目功能一致）
+                                    let imported = 0;
                                     const transaction = db.transaction(['projects'], 'readwrite');
                                     const store = transaction.objectStore('projects');
                                     
-                                    let processedCount = 0;
-                                    let skippedCount = 0;
-                                    let renamedCount = 0;
-                                    
-                                    for (const project of importData.projects) {
-                                        const existingProject = await new Promise((resolve) => {
-                                            const req = store.get(project.name);
-                                            req.onsuccess = () => resolve(req.result);
-                                            req.onerror = () => resolve(null);
-                                        });
-                                        
-                                        if (existingProject) {
-                                            if (result.action === 'skip') {
-                                                skippedCount++;
-                                                continue;
-                                            } else if (result.action === 'rename') {
-                                                // 创建副本，添加后缀
-                                                let newName = project.name + '_副本';
-                                                let counter = 1;
-                                                while (await new Promise((resolve) => {
-                                                    const req = store.get(newName);
-                                                    req.onsuccess = () => resolve(!!req.result);
-                                                    req.onerror = () => resolve(false);
-                                                })) {
-                                                    counter++;
-                                                    newName = `${project.name}_副本${counter}`;
-                                                }
-                                                project.name = newName;
-                                                renamedCount++;
-                                            }
-                                            // action === 'overwrite' 时直接覆盖
-                                        }
-                                        
-                                        store.put(project);
-                                        processedCount++;
-                                    }
-                                    
-                                    await new Promise((resolve) => {
-                                        transaction.oncomplete = resolve;
-                                        transaction.onerror = resolve;
+                                    importData.projects.forEach(project => {
+                                        const putRequest = store.put(project);
+                                        putRequest.onsuccess = () => imported++;
                                     });
                                     
-                                    await recordDownload();
-                                    refreshProjectSelectors();
+                                    transaction.oncomplete = async function() {
+                                        await recordDownload();
+                                        refreshProjectSelectors();
+                                        
+                                        const successToast = document.createElement('div');
+                                        successToast.style.cssText = `
+                                            position: fixed;
+                                            top: 20px;
+                                            right: 20px;
+                                            background: linear-gradient(135deg, #4CAF50, #45a049);
+                                            color: white;
+                                            padding: 12px 24px;
+                                            border-radius: 8px;
+                                            z-index: 10000;
+                                        `;
+                                        successToast.textContent = `✅ 成功恢复 ${imported} 个项目！`;
+                                        document.body.appendChild(successToast);
+                                        setTimeout(() => successToast.remove(), 3000);
+                                    };
                                     
-                                    let msg = `✅ 成功导入 ${processedCount} 个项目！`;
-                                    if (skippedCount > 0) msg += `\n跳过 ${skippedCount} 个同名项目`;
-                                    if (renamedCount > 0) msg += `\n重命名 ${renamedCount} 个项目`;
+                                    transaction.onerror = function() {
+                                        alert('❌ 恢复项目失败');
+                                    };
                                     
-                                    const successToast = document.createElement('div');
-                                    successToast.style.cssText = `
-                                        position: fixed;
-                                        top: 20px;
-                                        right: 20px;
-                                        background: linear-gradient(135deg, #4CAF50, #45a049);
-                                        color: white;
-                                        padding: 12px 24px;
-                                        border-radius: 8px;
-                                        z-index: 10000;
-                                        white-space: pre-line;
-                                    `;
-                                    successToast.textContent = msg;
-                                    document.body.appendChild(successToast);
-                                    setTimeout(() => successToast.remove(), 4000);
-                                    
-                                    importedProjects += processedCount;
+                                    importedProjects += importData.projects.length;
                                 }
                                 
                                 // 重新显示加载提示（如果还有其他文件）
@@ -8226,72 +8168,39 @@ function hasGistToken() {
                         saveCategories();
                     }
                     
-                    // 根据选择的操作处理项目
+                    // 直接覆盖导入项目（和恢复项目功能一致）
+                    let imported = 0;
                     const transaction = db.transaction(['projects'], 'readwrite');
                     const store = transaction.objectStore('projects');
                     
-                    let processedCount = 0;
-                    let skippedCount = 0;
-                    let renamedCount = 0;
-                    
-                    for (const project of importData.projects) {
-                        const existingProject = await new Promise((resolve) => {
-                            const req = store.get(project.name);
-                            req.onsuccess = () => resolve(req.result);
-                            req.onerror = () => resolve(null);
-                        });
-                        
-                        if (existingProject) {
-                            if (result.action === 'skip') {
-                                skippedCount++;
-                                continue;
-                            } else if (result.action === 'rename') {
-                                let newName = project.name + '_副本';
-                                let counter = 1;
-                                while (await new Promise((resolve) => {
-                                    const req = store.get(newName);
-                                    req.onsuccess = () => resolve(!!req.result);
-                                    req.onerror = () => resolve(false);
-                                })) {
-                                    counter++;
-                                    newName = `${project.name}_副本${counter}`;
-                                }
-                                project.name = newName;
-                                renamedCount++;
-                            }
-                        }
-                        
-                        store.put(project);
-                        processedCount++;
-                    }
-                    
-                    await new Promise((resolve) => {
-                        transaction.oncomplete = resolve;
-                        transaction.onerror = resolve;
+                    importData.projects.forEach(project => {
+                        const putRequest = store.put(project);
+                        putRequest.onsuccess = () => imported++;
                     });
                     
-                    await recordDownload();
-                    refreshProjectSelectors();
+                    transaction.oncomplete = async function() {
+                        await recordDownload();
+                        refreshProjectSelectors();
+                        
+                        const successToast = document.createElement('div');
+                        successToast.style.cssText = `
+                            position: fixed;
+                            top: 20px;
+                            right: 20px;
+                            background: linear-gradient(135deg, #4CAF50, #45a049);
+                            color: white;
+                            padding: 12px 24px;
+                            border-radius: 8px;
+                            z-index: 10000;
+                        `;
+                        successToast.textContent = `✅ 成功恢复 ${imported} 个项目！`;
+                        document.body.appendChild(successToast);
+                        setTimeout(() => successToast.remove(), 3000);
+                    };
                     
-                    let msg = `✅ 成功导入 ${processedCount} 个项目！`;
-                    if (skippedCount > 0) msg += `\n跳过 ${skippedCount} 个同名项目`;
-                    if (renamedCount > 0) msg += `\n重命名 ${renamedCount} 个项目`;
-                    
-                    const successToast = document.createElement('div');
-                    successToast.style.cssText = `
-                        position: fixed;
-                        top: 20px;
-                        right: 20px;
-                        background: linear-gradient(135deg, #4CAF50, #45a049);
-                        color: white;
-                        padding: 12px 24px;
-                        border-radius: 8px;
-                        z-index: 10000;
-                        white-space: pre-line;
-                    `;
-                    successToast.textContent = msg;
-                    document.body.appendChild(successToast);
-                    setTimeout(() => successToast.remove(), 4000);
+                    transaction.onerror = function() {
+                        alert('❌ 恢复项目失败');
+                    };
                 }
             } catch (error) {
                 const loadingToast = document.getElementById('importLoadingToast');
