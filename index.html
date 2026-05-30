@@ -7856,11 +7856,19 @@ function hasGistToken() {
         
                // 拼接新闻内容用于滚动显示
         function getNewsMarqueeText() {
-            if (newsItems.length === 0) {
+            const now = new Date();
+            const activeItems = newsItems.filter(item => {
+                if (item.active_time) {
+                    return new Date(item.active_time) <= now;
+                }
+                return true;
+            });
+
+            if (activeItems.length === 0) {
                 return '暂无公告';
             }
             
-            const texts = newsItems.map(item => {
+            const texts = activeItems.map(item => {
                 // 拼接分类、名称、内容、作者和发布时间
                 let text = '';
                 if (item.category) text += `[${item.category}]`;
@@ -7889,12 +7897,20 @@ function hasGistToken() {
             const content = document.getElementById('newsListContent');
             modal.style.display = 'flex';
 
-            if (newsItems.length === 0) {
+            const now = new Date();
+            const activeItems = newsItems.filter(item => {
+                if (item.active_time) {
+                    return new Date(item.active_time) <= now;
+                }
+                return true;
+            });
+
+            if (activeItems.length === 0) {
                 content.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:30px;">暂无公告</div>';
                 return;
             }
 
-            content.innerHTML = newsItems.map((item, index) => {
+            content.innerHTML = activeItems.map((item, index) => {
                 const category = item.category || '';
                 const name = item.name || '无标题';
                 const contentText = item.content || '';
@@ -7986,10 +8002,8 @@ function hasGistToken() {
         
               // 初始化滚动公告
         function initMarquee() {
-            // 初始化实时时间
             initCurrentTime();
             
-            // 更新主标题
             const titleEl = document.getElementById('mainTitle');
             if (titleEl && currentConfig.title) {
                 titleEl.textContent = ' ' + currentConfig.title + ' ';
@@ -7998,23 +8012,34 @@ function hasGistToken() {
             const marqueeText = getNewsMarqueeText();
             const marqueeEl = document.getElementById('newsMarquee');
             if (marqueeEl) {
-                // 先重置padding，让文本可见
                 marqueeEl.style.paddingLeft = '0';
                 marqueeEl.textContent = marqueeText;
                 
-                // 恢复滚动动画
                 setTimeout(() => {
                     marqueeEl.style.paddingLeft = '100%';
                     marqueeEl.style.animation = 'marqueeScroll 60s linear infinite';
                 }, 100);
                 
-                // 每3秒随机改变颜色
                 setInterval(() => {
                     const newColor = getRandomMarqueeColor();
                     marqueeEl.style.color = newColor;
                     marqueeEl.style.textShadow = `0 0 10px ${newColor}, 0 0 20px ${newColor}`;
                 }, 3000);
             }
+        }
+
+        let activeTimeCheckInterval = null;
+        function startActiveTimeCheck() {
+            if (activeTimeCheckInterval) clearInterval(activeTimeCheckInterval);
+            activeTimeCheckInterval = setInterval(() => {
+                const hasPending = newsItems.some(item => item.active_time && new Date(item.active_time) > new Date());
+                if (hasPending) {
+                    const marqueeEl = document.getElementById('newsMarquee');
+                    if (marqueeEl) {
+                        marqueeEl.textContent = getNewsMarqueeText();
+                    }
+                }
+            }, 60000);
         }
         
         
@@ -10360,6 +10385,7 @@ function hasGistToken() {
             } else {
                 document.getElementById('adminVerifySection').style.display = 'block';
                 document.getElementById('adminMenuSection').style.display = 'none';
+                document.getElementById('adminPageTitle').style.display = 'none';
                 document.getElementById('adminPageNews').style.display = 'none';
                 document.getElementById('adminPageStats').style.display = 'none';
                 document.getElementById('adminPageSettings').style.display = 'none';
@@ -10370,6 +10396,7 @@ function hasGistToken() {
 
         function adminShowMenu() {
             document.getElementById('adminMenuSection').style.display = 'block';
+            document.getElementById('adminPageTitle').style.display = 'none';
             document.getElementById('adminPageNews').style.display = 'none';
             document.getElementById('adminPageStats').style.display = 'none';
             document.getElementById('adminPageSettings').style.display = 'none';
@@ -10377,11 +10404,15 @@ function hasGistToken() {
 
         function adminShowPage(page) {
             document.getElementById('adminMenuSection').style.display = 'none';
+            document.getElementById('adminPageTitle').style.display = 'none';
             document.getElementById('adminPageNews').style.display = 'none';
             document.getElementById('adminPageStats').style.display = 'none';
             document.getElementById('adminPageSettings').style.display = 'none';
 
-            if (page === 'news') {
+            if (page === 'title') {
+                document.getElementById('adminPageTitle').style.display = 'block';
+                document.getElementById('adminTitleText').value = currentConfig.title || '';
+            } else if (page === 'news') {
                 document.getElementById('adminPageNews').style.display = 'block';
                 adminRefreshNews();
             } else if (page === 'stats') {
@@ -10533,12 +10564,18 @@ function hasGistToken() {
                 const content = item.content || '';
                 const author = item.author || '';
                 const time = item.publish_time || '';
+                const activeTime = item.active_time || '';
+                const now = new Date();
+                const isActive = !activeTime || new Date(activeTime) <= now;
+                const statusTag = isActive
+                    ? '<span style="color:#4ade80;font-size:0.7rem;">✅ 已生效</span>'
+                    : `<span style="color:#f59e0b;font-size:0.7rem;">⏳ ${activeTime.substring(0, 16)} 生效</span>`;
 
                 return `
                     <div class="admin-news-item">
                         <div class="news-info">
                             <div class="news-title">[${category}] ${name}</div>
-                            <div class="news-meta">${author ? author + ' · ' : ''}${time ? time.substring(0, 16) : ''}</div>
+                            <div class="news-meta">${statusTag} ${author ? author + ' · ' : ''}${time ? time.substring(0, 16) : ''}</div>
                             <div class="news-content-preview">${content}</div>
                         </div>
                         <div class="news-actions">
@@ -10553,7 +10590,8 @@ function hasGistToken() {
             const category = document.getElementById('adminNewsCategory').value;
             const name = document.getElementById('adminNewsName').value.trim();
             const content = document.getElementById('adminNewsContent').value.trim();
-            const author = document.getElementById('adminNewsAuthor').value.trim() || 'gyq';
+            const author = document.getElementById('adminNewsAuthor').value.trim() || '龙行';
+            const activeTimeInput = document.getElementById('adminNewsActiveTime').value;
 
             if (!name) {
                 showAdminStatus('请输入公告标题', 'error');
@@ -10575,13 +10613,19 @@ function hasGistToken() {
                     String(now.getMinutes()).padStart(2, '0') + ':' +
                     String(now.getSeconds()).padStart(2, '0');
 
-                newsData.unshift({
+                const newsItem = {
                     category: category,
                     name: name,
                     content: content,
                     author: author,
                     publish_time: publishTime
-                });
+                };
+
+                if (activeTimeInput) {
+                    newsItem.active_time = activeTimeInput.replace('T', ' ') + ':00';
+                }
+
+                newsData.unshift(newsItem);
 
                 await adminSaveNewsToGist(newsData);
 
@@ -10592,6 +10636,7 @@ function hasGistToken() {
 
                 document.getElementById('adminNewsName').value = '';
                 document.getElementById('adminNewsContent').value = '';
+                document.getElementById('adminNewsActiveTime').value = '';
 
                 renderAdminNewsList(newsData);
                 showAdminStatus('公告发布成功！', 'success');
@@ -10665,6 +10710,61 @@ function hasGistToken() {
                 }
             } catch (error) {
                 showAdminStatus('连接失败: ' + error.message, 'error');
+            }
+        }
+
+        async function adminSaveTitle() {
+            const newTitle = document.getElementById('adminTitleText').value.trim();
+            if (!newTitle) {
+                showAdminStatus('标题不能为空', 'error');
+                return;
+            }
+
+            try {
+                const newsData = await adminFetchNewsFromGist();
+                currentConfig.title = newTitle;
+
+                const titleEl = document.getElementById('mainTitle');
+                if (titleEl) titleEl.textContent = ' ' + newTitle + ' ';
+
+                const fullData = {
+                    title: newTitle,
+                    wechat: currentConfig.wechat || '',
+                    game: currentConfig.game || '',
+                    notice: currentConfig.notice || '',
+                    open: currentConfig.open !== undefined ? currentConfig.open : true,
+                    data: newsData
+                };
+
+                const token = getGistToken();
+                if (!token) throw new Error('未设置GitHub Token');
+
+                const response = await fetch(GIST_URL, {
+                    method: 'PATCH',
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json',
+                        'Authorization': `token ${token}`
+                    },
+                    body: JSON.stringify({
+                        files: {
+                            'news.json': {
+                                content: JSON.stringify(fullData, null, 2)
+                            }
+                        }
+                    })
+                });
+
+                if (!response.ok) {
+                    const errData = await response.json().catch(() => ({}));
+                    throw new Error(errData.message || `保存失败 HTTP ${response.status}`);
+                }
+
+                saveConfigToCache(currentConfig);
+                showAdminStatus('标题保存成功！', 'success');
+            } catch (error) {
+                console.error('保存标题失败:', error);
+                showAdminStatus('保存失败: ' + error.message, 'error');
             }
         }
 
@@ -10769,6 +10869,13 @@ function hasGistToken() {
                             <div style="color:rgba(255,255,255,0.4);font-size:0.8rem;">发布、删除、查看公告</div>
                         </div>
                     </div>
+                    <div class="admin-menu-item" onclick="adminShowPage('title')">
+                        <span style="font-size:1.3rem;">🏷️</span>
+                        <div>
+                            <div style="color:#ffd700;font-weight:500;">标题管理</div>
+                            <div style="color:rgba(255,255,255,0.4);font-size:0.8rem;">修改网站标题文字</div>
+                        </div>
+                    </div>
                     <div class="admin-menu-item" onclick="adminShowPage('stats')">
                         <span style="font-size:1.3rem;">📊</span>
                         <div>
@@ -10782,6 +10889,20 @@ function hasGistToken() {
                             <div style="color:#ffd700;font-weight:500;">系统设置</div>
                             <div style="color:rgba(255,255,255,0.4);font-size:0.8rem;">Token配置与连接测试</div>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="adminPageTitle" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
+                    <button class="admin-btn admin-btn-secondary" onclick="adminShowMenu()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
+                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">🏷️ 标题管理</h3>
+                </div>
+                <div class="admin-section">
+                    <label>网站标题（显示在公告栏上方）</label>
+                    <input type="text" id="adminTitleText" placeholder="输入标题文字">
+                    <div style="text-align:right;">
+                        <button class="admin-btn admin-btn-primary" onclick="adminSaveTitle()">保存标题</button>
                     </div>
                 </div>
             </div>
@@ -10814,7 +10935,11 @@ function hasGistToken() {
                     <div class="admin-form-row">
                         <div>
                             <label>作者</label>
-                            <input type="text" id="adminNewsAuthor" placeholder="作者（可选）" value="gyq">
+                            <input type="text" id="adminNewsAuthor" placeholder="作者（可选）" value="龙行">
+                        </div>
+                        <div>
+                            <label>生效时间（留空则立即生效）</label>
+                            <input type="datetime-local" id="adminNewsActiveTime" style="color-scheme:dark;">
                         </div>
                     </div>
                     <div style="text-align:right;">
