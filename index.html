@@ -5290,7 +5290,7 @@
             const skin = getCardSkin(cardId, cardName, handType);
             const hasCustomSkin = skin !== '默认';
             const skinClass = hasCustomSkin ? 'has-skin' : '';
-            const levelBadge = `<span class="card-level-badge ${skinClass}" data-card-id="${cardId}" data-card-type="${cardType}" data-hand-type="${handType}" data-card-name="${cardName}" data-skin="${skin}" onclick="showLevelDropdown(event, '${cardId}', '${cardType}', '${handType}', '${cardName}')" onmouseenter="scheduleShowSkinTooltip(event, '${cardId}', '${cardName}', '${handType}')" onmouseleave="hideSkinTooltip()" title="等级:${level} 皮肤:${skin}">${level}</span>`;
+            const levelBadge = `<span class="card-level-badge ${skinClass}" data-card-id="${cardId}" data-card-type="${cardType}" data-hand-type="${handType}" data-card-name="${cardName}" data-skin="${skin}" title="等级:${level} 皮肤:${skin}">${level}</span>`;
             return levelBadge;
         }
 
@@ -6007,7 +6007,7 @@
                     html += '<div class="cards-grid">';
                     professionGroups[profession].forEach(card => {
                         // 添加等级徽章
-                        const levelBadge = createLevelBadgeHTML(card.id, card.type);
+                        const levelBadge = createLevelBadgeHTML(card.id, card.type, 'my', card.name);
                         html += '<div class="card-item favorite-card" data-id="' + card.id + '" data-name="' + card.name + '" data-type="' + card.type + '" data-engineering="' + card.isEngineering + '" data-profession="' + card.profession + '">' + levelBadge + card.name + '</div>';
                     });
                     html += '</div></div>';
@@ -6018,7 +6018,10 @@
             
             // 添加事件监听
             grid.querySelectorAll('.card-item').forEach(card => {
-                card.addEventListener('click', () => handleFavoriteCardClick(card));
+                card.addEventListener('click', (e) => {
+                    if (e.target.closest('.card-level-badge')) return;
+                    handleFavoriteCardClick(card);
+                });
                 
                 // 右键删除收藏
                 card.addEventListener('contextmenu', (e) => {
@@ -6289,21 +6292,14 @@
 
         // 手牌卡牌点击（上卡到战斗槽）
         function handleHandCardClick(e, handType) {
-            console.log('手牌点击触发, handType:', handType);
+            if (e.target.closest('.card-level-badge')) return;
             
             const cardEl = e.target.closest('.selected-card');
-            if (!cardEl) {
-                console.log('未找到卡牌元素');
-                return;
-            }
+            if (!cardEl) return;
             
-            // 阻止事件冒泡，避免触发其他点击事件
             e.stopPropagation();
             
-            if (cardEl.classList.contains('placed') || cardEl.classList.contains('empty')) {
-                console.log('卡牌已放置或为空');
-                return;
-            }
+            if (cardEl.classList.contains('placed') || cardEl.classList.contains('empty')) return;
             
             const cardId = cardEl.dataset.id;
             const cardName = cardEl.dataset.name;
@@ -6311,9 +6307,6 @@
             const profession = cardEl.dataset.profession;
             const cardType = cardEl.dataset.type;
             
-            console.log('卡牌信息:', { cardId, cardName, isEngineering, profession, cardType });
-            
-            // 找到第一个空的战斗槽
             const handCards = handType === 'my' ? myHandCards : teammateHandCards;
             let placedCards = handType === 'my' ? myPlacedCards : teammatePlacedCards;
             if (!Array.isArray(placedCards)) {
@@ -6322,19 +6315,13 @@
                 else teammatePlacedCards = [];
             }
             
-            console.log('手牌数组:', handCards);
-            
-            // 找到这个卡牌在手牌中的位置
             const cardIndex = handCards.findIndex(c => c.id === cardId);
-            console.log('卡牌索引:', cardIndex);
             
             if (cardIndex === -1) return;
             
             const card = handCards[cardIndex];
             
-            // 尝试放置到战斗槽
             const slotId = findEmptySlot(handType, card.profession, card.isEngineering);
-            console.log('找到的槽位:', slotId);
             
             if (slotId) {
                 // 不从手牌移除，只标记为已放置（变暗）
@@ -6826,16 +6813,7 @@
             cardEl.style.position = 'relative';
             grid.appendChild(cardEl);
             
-            cardEl.addEventListener('click', (e) => {
-                if (e.target.classList.contains('delete-card-btn') || e.target.classList.contains('card-level-badge')) {
-                    return;
-                }
-                handlePoolCardClick(cardEl);
-            });
             cardEl.setAttribute('draggable', 'true');
-            cardEl.addEventListener('dragstart', handlePoolDragStart);
-            cardEl.addEventListener('contextmenu', (e) => handleCardRightClick(e, cardEl));
-            
             setupLongPress(cardEl, (e) => handleCardRightClick(e, cardEl));
             
             if (save) {
@@ -7200,22 +7178,90 @@
                 }
             }
             
-            const cardItems = document.querySelectorAll('.card-item');
-
-            cardItems.forEach(card => {
-                if (card.dataset.id && card.dataset.id.startsWith('custom_')) return;
+            document.addEventListener('click', (e) => {
+                const badge = e.target.closest('.card-level-badge');
+                if (badge) {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    const cardId = badge.dataset.cardId;
+                    const cardType = badge.dataset.cardType;
+                    const handType = badge.dataset.handType || 'my';
+                    const cardName = badge.dataset.cardName || '';
+                    showLevelDropdown(e, cardId, cardType, handType, cardName);
+                    return;
+                }
                 
-                card.addEventListener('click', () => handlePoolCardClick(card));
-                card.setAttribute('draggable', 'true');
-                card.addEventListener('dragstart', (e) => {
-                    handlePoolDragStart(e);
-                    draggedCard = card;
-                    card.classList.add('dragging');
-                });
-                card.addEventListener('contextmenu', (e) => handleCardRightClick(e, card));
+                const deleteBtn = e.target.closest('.delete-card-btn');
+                if (deleteBtn) return;
                 
-                setupLongPress(card, (e) => handleCardRightClick(e, card));
+                const card = e.target.closest('.card-item');
+                if (!card) return;
+                
+                const grid = card.closest('.cards-grid');
+                if (!grid) return;
+                
+                const section = grid.closest('.collapsible-section');
+                if (!section) return;
+                
+                handlePoolCardClick(card);
             });
+            
+            document.addEventListener('contextmenu', (e) => {
+                const card = e.target.closest('.card-item');
+                if (!card) return;
+                
+                const grid = card.closest('.cards-grid');
+                if (!grid) return;
+                
+                const section = grid.closest('.collapsible-section');
+                if (!section) return;
+                
+                handleCardRightClick(e, card);
+            });
+            
+            document.addEventListener('dragstart', (e) => {
+                const card = e.target.closest('.card-item');
+                if (!card) return;
+                
+                const grid = card.closest('.cards-grid');
+                if (!grid) return;
+                
+                const section = grid.closest('.collapsible-section');
+                if (!section) return;
+                
+                handlePoolDragStart(e);
+                draggedCard = card;
+                card.classList.add('dragging');
+            });
+            
+            document.querySelectorAll('.card-item').forEach(card => {
+                const grid = card.closest('.cards-grid');
+                if (!grid) return;
+                const section = grid.closest('.collapsible-section');
+                if (!section) return;
+                
+                card.setAttribute('draggable', 'true');
+                if (!card.dataset.id || !card.dataset.id.startsWith('custom_')) {
+                    setupLongPress(card, (e) => handleCardRightClick(e, card));
+                }
+            });
+
+            document.addEventListener('mouseenter', (e) => {
+                const badge = e.target.closest('.card-level-badge');
+                if (badge) {
+                    const cardId = badge.dataset.cardId;
+                    const cardName = badge.dataset.cardName || '';
+                    const handType = badge.dataset.handType || 'my';
+                    scheduleShowSkinTooltip(e, cardId, cardName, handType);
+                }
+            }, true);
+            
+            document.addEventListener('mouseleave', (e) => {
+                const badge = e.target.closest('.card-level-badge');
+                if (badge) {
+                    hideSkinTooltip();
+                }
+            }, true);
 
             document.querySelectorAll('.battle-slot').forEach(slot => {
                 slot.addEventListener('dragover', handleSlotDragOver);
