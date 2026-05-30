@@ -1164,6 +1164,257 @@
             box-shadow: 0 4px 15px rgba(74, 222, 128, 0.4);
         }
 
+        /* ==================== 管理员面板 ==================== */
+        .admin-panel-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        }
+
+        .admin-panel {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            border: 2px solid rgba(255, 215, 0, 0.4);
+            border-radius: 16px;
+            padding: 30px;
+            width: 90%;
+            max-width: 700px;
+            max-height: 85vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 50px rgba(0, 0, 0, 0.6);
+        }
+
+        .admin-panel h2 {
+            color: #ffd700;
+            text-align: center;
+            margin: 0 0 20px 0;
+            font-size: 1.3rem;
+        }
+
+        .admin-panel .admin-section {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .admin-panel .admin-section h3 {
+            color: #ffd700;
+            margin: 0 0 12px 0;
+            font-size: 1rem;
+        }
+
+        .admin-panel label {
+            color: rgba(255, 255, 255, 0.8);
+            display: block;
+            margin-bottom: 5px;
+            font-size: 0.9rem;
+        }
+
+        .admin-panel input[type="text"],
+        .admin-panel input[type="password"],
+        .admin-panel textarea,
+        .admin-panel select {
+            width: 100%;
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(0, 0, 0, 0.4);
+            color: white;
+            font-size: 0.9rem;
+            margin-bottom: 10px;
+            outline: none;
+            box-sizing: border-box;
+        }
+
+        .admin-panel input:focus,
+        .admin-panel textarea:focus,
+        .admin-panel select:focus {
+            border-color: #ffd700;
+        }
+
+        .admin-panel textarea {
+            min-height: 80px;
+            resize: vertical;
+        }
+
+        .admin-btn {
+            padding: 8px 18px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+        }
+
+        .admin-btn-primary {
+            background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
+            color: white;
+        }
+
+        .admin-btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(74, 222, 128, 0.4);
+        }
+
+        .admin-btn-danger {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+        }
+
+        .admin-btn-danger:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+        }
+
+        .admin-btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+
+        .admin-btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .admin-news-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            margin-bottom: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .admin-news-item .news-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .admin-news-item .news-info .news-title {
+            color: #ffd700;
+            font-size: 0.9rem;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .admin-news-item .news-info .news-meta {
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 0.75rem;
+            margin-top: 3px;
+        }
+
+        .admin-news-item .news-content-preview {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.8rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 300px;
+        }
+
+        .admin-news-item .news-actions {
+            display: flex;
+            gap: 6px;
+            margin-left: 10px;
+            flex-shrink: 0;
+        }
+
+        .admin-news-item .news-actions button {
+            padding: 4px 10px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-size: 0.75rem;
+            transition: all 0.2s ease;
+        }
+
+        .admin-verify-hint {
+            color: rgba(255, 255, 255, 0.4);
+            font-size: 0.8rem;
+            text-align: center;
+            margin-top: 8px;
+        }
+
+        .admin-status {
+            text-align: center;
+            padding: 8px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            margin-bottom: 10px;
+            display: none;
+        }
+
+        .admin-status.success {
+            display: block;
+            background: rgba(74, 222, 128, 0.15);
+            color: #4ade80;
+            border: 1px solid rgba(74, 222, 128, 0.3);
+        }
+
+        .admin-status.error {
+            display: block;
+            background: rgba(239, 68, 68, 0.15);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .admin-news-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .admin-news-list::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .admin-news-list::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 3px;
+        }
+
+        .admin-news-list::-webkit-scrollbar-thumb {
+            background: rgba(255, 215, 0, 0.3);
+            border-radius: 3px;
+        }
+
+        .admin-form-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .admin-form-row > * {
+            flex: 1;
+        }
+
+        .admin-close-btn {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            background: none;
+            border: none;
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .admin-close-btn:hover {
+            color: white;
+        }
+
         /* ==================== 背景动画 ==================== */
         .background-gradient {
             background: linear-gradient(-45deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4, #ffeaa7, #dfe6e9, #fd79a8);
@@ -2015,7 +2266,7 @@
     <!-- ==================== 功能记录结束 ==================== -->
 
     <div class="container">
-        <h1>🛡️ 塔防精灵 阵容归档</h1>
+        <h1 id="mainHeader">🛡️ 塔防精灵 阵容归档</h1>
         <p id="mainTitle" class="instructions glowing-text" style="cursor:pointer;" onclick="refreshNewsAndTitle()" title="点击刷新标题"> 支持导入脚本解析 | 阵容存储快速查看 | 活动遇到龙行麻烦投一下  </p>
         
         <!-- 滚动公告栏 -->
@@ -7490,30 +7741,50 @@ function hasGistToken() {
             // 从GitHub获取新闻和配置
         async function fetchNewsFromGitHub() {
             try {
-                const response = await fetch(NEWS_URL, {
-                    method: 'GET',
-                    headers: {
-                        'Accept': 'application/json'
-                    }
-                });
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
-                }
-                
-                let text = await response.text();
-                
-                // 尝试直接解析
-                let data;
+                let data = null;
+
                 try {
-                    data = JSON.parse(text);
-                } catch (e) {
-                    // 如果直接解析失败，尝试修复格式
-                    text = fixJsonFormat(text);
-                    data = JSON.parse(text);
+                    const token = getGistToken();
+                    const gistResponse = await fetch(GIST_URL, {
+                        headers: {
+                            'Accept': 'application/vnd.github.v3+json',
+                            ...(token && { 'Authorization': `token ${token}` })
+                        }
+                    });
+
+                    if (gistResponse.ok) {
+                        const gistData = await gistResponse.json();
+                        const newsContent = gistData.files?.['news.json']?.content;
+                        if (newsContent) {
+                            data = JSON.parse(newsContent);
+                        }
+                    }
+                } catch (gistError) {
+                    console.warn('📢 从Gist获取新闻失败，尝试GitHub仓库:', gistError);
+                }
+
+                if (!data) {
+                    const response = await fetch(NEWS_URL, {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json'
+                        }
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                    
+                    let text = await response.text();
+                    
+                    try {
+                        data = JSON.parse(text);
+                    } catch (e) {
+                        text = fixJsonFormat(text);
+                        data = JSON.parse(text);
+                    }
                 }
                 
-                // 提取配置字段（如果有的话）
                 if (data && data.title) {
                     currentConfig.title = data.title;
                 }
@@ -7530,7 +7801,6 @@ function hasGistToken() {
                     currentConfig.open = data.open;
                 }
                 
-                // 提取新闻数据
                 if (data && data.data && Array.isArray(data.data)) {
                     return data.data;
                 }
@@ -7686,69 +7956,30 @@ function hasGistToken() {
             const marqueeEl = document.getElementById('newsMarquee');
             const titleEl = document.getElementById('mainTitle');
             
-            // 保存当前数据（用于失败时恢复）
             const backupNewsItems = [...newsItems];
             const backupTitle = currentConfig.title;
             
-            // 显示加载状态
             marqueeEl.textContent = '正在刷新...';
             marqueeEl.style.animation = 'none';
             
             try {
-                // 强制重新加载新闻（跳过缓存）
-                const response = await fetch(NEWS_URL, { cache: 'no-cache' });
+                const freshNews = await fetchNewsFromGitHub();
+                newsItems = freshNews;
                 
-                if (response.ok) {
-                    let text = await response.text();
-                    text = fixJsonFormat(text);
-                    
-                    try {
-                        const data = JSON.parse(text);
-                        
-                        // 更新新闻数据
-                        newsItems = data.data || [];
-                        
-                        // 更新配置（标题等）
-                        if (data.title) {
-                            currentConfig.title = data.title;
-                            if (titleEl) {
-                                titleEl.textContent = ' ' + data.title + ' ';
-                            }
-                        }
-                        if (data.wechat) currentConfig.wechat = data.wechat;
-                        if (data.game) currentConfig.game = data.game;
-                        if (data.notice) currentConfig.notice = data.notice;
-                        if (data.open !== undefined) currentConfig.open = data.open;
-                        
-                        // 保存到缓存
-                        saveConfigToCache(currentConfig);
-                        localStorage.setItem('TFJL_News_Cache', JSON.stringify(newsItems));
-                        
-                        // 重新初始化滚动公告
-                        initMarquee();
-                        
-                    } catch (e) {
-                        console.error('解析新闻数据失败:', e);
-                        // 恢复备份数据
-                        newsItems = backupNewsItems;
-                        currentConfig.title = backupTitle;
-                        marqueeEl.textContent = '刷新失败，显示缓存数据';
-                        // 恢复动画
-                        setTimeout(() => {
-                            marqueeEl.textContent = getNewsMarqueeText();
-                            marqueeEl.style.animation = 'marqueeScroll 60s linear infinite';
-                        }, 1500);
-                    }
-                } else {
-                    throw new Error(`HTTP ${response.status}`);
+                if (titleEl && currentConfig.title) {
+                    titleEl.textContent = ' ' + currentConfig.title + ' ';
                 }
+                
+                saveConfigToCache(currentConfig);
+                localStorage.setItem(NEWS_CACHE_KEY, JSON.stringify(newsItems));
+                localStorage.setItem(NEWS_CACHE_TIME_KEY, new Date().toISOString());
+                
+                initMarquee();
             } catch (error) {
                 console.error('刷新公告失败:', error);
-                // 恢复备份数据
                 newsItems = backupNewsItems;
                 currentConfig.title = backupTitle;
-                marqueeEl.textContent = '网络异常，显示缓存数据';
-                // 恢复动画
+                marqueeEl.textContent = '刷新失败，显示缓存数据';
                 setTimeout(() => {
                     marqueeEl.textContent = getNewsMarqueeText();
                     marqueeEl.style.animation = 'marqueeScroll 60s linear infinite';
@@ -10008,6 +10239,318 @@ function hasGistToken() {
         function recordDownload() {
             updateCounter('download');
         }
+
+        // ==================== 管理员面板 ====================
+        const ADMIN_VERIFY_KEY = 'TFJL_Admin_Verified';
+        const ADMIN_VERIFY_CODE = 'gyq2024';
+        let adminHeaderClickCount = 0;
+        let adminHeaderClickTimer = null;
+
+        document.getElementById('mainHeader').addEventListener('click', () => {
+            adminHeaderClickCount++;
+            clearTimeout(adminHeaderClickTimer);
+            adminHeaderClickTimer = setTimeout(() => {
+                adminHeaderClickCount = 0;
+            }, 3000);
+
+            if (adminHeaderClickCount >= 5) {
+                adminHeaderClickCount = 0;
+                clearTimeout(adminHeaderClickTimer);
+                openAdminPanel();
+            }
+        });
+
+        function openAdminPanel() {
+            const overlay = document.getElementById('adminPanelOverlay');
+            overlay.style.display = 'flex';
+
+            const isVerified = sessionStorage.getItem(ADMIN_VERIFY_KEY) === 'true';
+            if (isVerified) {
+                document.getElementById('adminVerifySection').style.display = 'none';
+                document.getElementById('adminContent').style.display = 'block';
+                const token = getGistToken();
+                if (token) {
+                    document.getElementById('adminGistToken').value = token;
+                }
+                adminRefreshNews();
+            } else {
+                document.getElementById('adminVerifySection').style.display = 'block';
+                document.getElementById('adminContent').style.display = 'none';
+                document.getElementById('adminVerifyCode').value = '';
+                document.getElementById('adminVerifyCode').focus();
+            }
+        }
+
+        function closeAdminPanel() {
+            document.getElementById('adminPanelOverlay').style.display = 'none';
+            hideAdminStatus();
+        }
+
+        function verifyAdmin() {
+            const code = document.getElementById('adminVerifyCode').value.trim();
+            if (code === ADMIN_VERIFY_CODE) {
+                sessionStorage.setItem(ADMIN_VERIFY_KEY, 'true');
+                document.getElementById('adminVerifySection').style.display = 'none';
+                document.getElementById('adminContent').style.display = 'block';
+                const token = getGistToken();
+                if (token) {
+                    document.getElementById('adminGistToken').value = token;
+                }
+                adminRefreshNews();
+                showAdminStatus('验证成功！', 'success');
+            } else {
+                showAdminStatus('验证码错误', 'error');
+            }
+        }
+
+        document.getElementById('adminVerifyCode').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') verifyAdmin();
+        });
+
+        function showAdminStatus(msg, type) {
+            const el = document.getElementById('adminStatus');
+            el.textContent = msg;
+            el.className = 'admin-status ' + type;
+            if (type === 'success') {
+                setTimeout(() => { el.style.display = 'none'; el.className = 'admin-status'; }, 3000);
+            }
+        }
+
+        function hideAdminStatus() {
+            const el = document.getElementById('adminStatus');
+            el.style.display = 'none';
+            el.className = 'admin-status';
+        }
+
+        async function adminFetchNewsFromGist() {
+            const token = getGistToken();
+            const response = await fetch(GIST_URL, {
+                headers: {
+                    'Accept': 'application/vnd.github.v3+json',
+                    ...(token && { 'Authorization': `token ${token}` })
+                }
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const data = await response.json();
+            const content = data.files['news.json']?.content;
+            if (content) {
+                const parsed = JSON.parse(content);
+                return parsed.data || [];
+            }
+            return [];
+        }
+
+        async function adminSaveNewsToGist(newsData) {
+            const token = getGistToken();
+            if (!token) throw new Error('未设置GitHub Token，请先在系统设置中配置');
+
+            const fullData = {
+                title: currentConfig.title || '',
+                wechat: currentConfig.wechat || '',
+                game: currentConfig.game || '',
+                notice: currentConfig.notice || '',
+                open: currentConfig.open !== undefined ? currentConfig.open : true,
+                data: newsData
+            };
+
+            const response = await fetch(GIST_URL, {
+                method: 'PATCH',
+                headers: {
+                    'Accept': 'application/vnd.github.v3+json',
+                    'Content-Type': 'application/json',
+                    'Authorization': `token ${token}`
+                },
+                body: JSON.stringify({
+                    files: {
+                        'news.json': {
+                            content: JSON.stringify(fullData, null, 2)
+                        }
+                    }
+                })
+            });
+
+            if (!response.ok) {
+                const errData = await response.json().catch(() => ({}));
+                throw new Error(errData.message || `保存失败 HTTP ${response.status}`);
+            }
+        }
+
+        async function adminRefreshNews() {
+            const listEl = document.getElementById('adminNewsList');
+            listEl.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;">加载中...</div>';
+
+            try {
+                const newsData = await adminFetchNewsFromGist();
+                newsItems = newsData;
+                localStorage.setItem(NEWS_CACHE_KEY, JSON.stringify(newsItems));
+                localStorage.setItem(NEWS_CACHE_TIME_KEY, new Date().toISOString());
+                initMarquee();
+                renderAdminNewsList(newsData);
+            } catch (error) {
+                console.error('管理员获取公告失败:', error);
+                listEl.innerHTML = `<div style="color:#ef4444;text-align:center;padding:20px;">加载失败: ${error.message}</div>`;
+            }
+        }
+
+        function renderAdminNewsList(newsData) {
+            const listEl = document.getElementById('adminNewsList');
+
+            if (!newsData || newsData.length === 0) {
+                listEl.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;">暂无公告</div>';
+                return;
+            }
+
+            listEl.innerHTML = newsData.map((item, index) => {
+                const category = item.category || '未分类';
+                const name = item.name || '无标题';
+                const content = item.content || '';
+                const author = item.author || '';
+                const time = item.publish_time || '';
+
+                return `
+                    <div class="admin-news-item">
+                        <div class="news-info">
+                            <div class="news-title">[${category}] ${name}</div>
+                            <div class="news-meta">${author ? author + ' · ' : ''}${time ? time.substring(0, 16) : ''}</div>
+                            <div class="news-content-preview">${content}</div>
+                        </div>
+                        <div class="news-actions">
+                            <button class="admin-btn admin-btn-danger" onclick="adminDeleteNews(${index})" style="font-size:0.75rem;">删除</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function adminPublishNews() {
+            const category = document.getElementById('adminNewsCategory').value;
+            const name = document.getElementById('adminNewsName').value.trim();
+            const content = document.getElementById('adminNewsContent').value.trim();
+            const author = document.getElementById('adminNewsAuthor').value.trim() || 'gyq';
+
+            if (!name) {
+                showAdminStatus('请输入公告标题', 'error');
+                return;
+            }
+            if (!content) {
+                showAdminStatus('请输入公告内容', 'error');
+                return;
+            }
+
+            try {
+                const newsData = await adminFetchNewsFromGist();
+
+                const now = new Date();
+                const publishTime = now.getFullYear() + '-' +
+                    String(now.getMonth() + 1).padStart(2, '0') + '-' +
+                    String(now.getDate()).padStart(2, '0') + ' ' +
+                    String(now.getHours()).padStart(2, '0') + ':' +
+                    String(now.getMinutes()).padStart(2, '0') + ':' +
+                    String(now.getSeconds()).padStart(2, '0');
+
+                newsData.unshift({
+                    category: category,
+                    name: name,
+                    content: content,
+                    author: author,
+                    publish_time: publishTime
+                });
+
+                await adminSaveNewsToGist(newsData);
+
+                newsItems = newsData;
+                localStorage.setItem(NEWS_CACHE_KEY, JSON.stringify(newsItems));
+                localStorage.setItem(NEWS_CACHE_TIME_KEY, new Date().toISOString());
+                initMarquee();
+
+                document.getElementById('adminNewsName').value = '';
+                document.getElementById('adminNewsContent').value = '';
+
+                renderAdminNewsList(newsData);
+                showAdminStatus('公告发布成功！', 'success');
+            } catch (error) {
+                console.error('发布公告失败:', error);
+                showAdminStatus('发布失败: ' + error.message, 'error');
+            }
+        }
+
+        async function adminDeleteNews(index) {
+            if (!confirm('确定要删除这条公告吗？')) return;
+
+            try {
+                const newsData = await adminFetchNewsFromGist();
+
+                if (index < 0 || index >= newsData.length) {
+                    showAdminStatus('公告不存在', 'error');
+                    return;
+                }
+
+                newsData.splice(index, 1);
+
+                await adminSaveNewsToGist(newsData);
+
+                newsItems = newsData;
+                localStorage.setItem(NEWS_CACHE_KEY, JSON.stringify(newsItems));
+                localStorage.setItem(NEWS_CACHE_TIME_KEY, new Date().toISOString());
+                initMarquee();
+
+                renderAdminNewsList(newsData);
+                showAdminStatus('公告已删除', 'success');
+            } catch (error) {
+                console.error('删除公告失败:', error);
+                showAdminStatus('删除失败: ' + error.message, 'error');
+            }
+        }
+
+        function adminSaveGistToken() {
+            const token = document.getElementById('adminGistToken').value.trim();
+            if (!token) {
+                showAdminStatus('请输入Token', 'error');
+                return;
+            }
+            setGistToken(token);
+            showAdminStatus('Token已保存', 'success');
+        }
+
+        async function adminTestGistToken() {
+            const token = getGistToken();
+            if (!token) {
+                showAdminStatus('请先设置Token', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(GIST_URL, {
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Authorization': `token ${token}`
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    const hasNewsFile = !!data.files['news.json'];
+                    const hasMessagesFile = !!data.files['messages.json'];
+                    showAdminStatus(`连接成功！${hasNewsFile ? '✅ news.json' : '⚠️ 无news.json'} ${hasMessagesFile ? '✅ messages.json' : '⚠️ 无messages.json'}`, 'success');
+                } else {
+                    const errData = await response.json().catch(() => ({}));
+                    showAdminStatus('连接失败: ' + (errData.message || `HTTP ${response.status}`), 'error');
+                }
+            } catch (error) {
+                showAdminStatus('连接失败: ' + error.message, 'error');
+            }
+        }
+
+        document.getElementById('adminPanelOverlay').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) closeAdminPanel();
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                const overlay = document.getElementById('adminPanelOverlay');
+                if (overlay.style.display === 'flex') closeAdminPanel();
+            }
+        });
     </script>
 
     <!-- 模态框：创建分类 -->
@@ -10030,6 +10573,79 @@ function hasGistToken() {
             <div style="display:flex;gap:10px;justify-content:flex-end;">
                 <button onclick="closeSelectCategoryModal()" style="padding:8px 20px;border-radius:6px;border:none;background:#666;color:#fff;cursor:pointer;">取消</button>
                 <button onclick="confirmSelectCategory()" style="padding:8px 20px;border-radius:6px;border:none;background:#4caf50;color:#fff;cursor:pointer;">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 管理员面板 -->
+    <div id="adminPanelOverlay" class="admin-panel-overlay">
+        <div class="admin-panel" style="position:relative;">
+            <button class="admin-close-btn" onclick="closeAdminPanel()">&times;</button>
+            <h2>🔐 管理员控制台</h2>
+
+            <div id="adminStatus" class="admin-status"></div>
+
+            <div id="adminVerifySection" class="admin-section">
+                <h3>🔑 身份验证</h3>
+                <label>请输入管理员验证码</label>
+                <input type="password" id="adminVerifyCode" placeholder="输入验证码" autocomplete="off">
+                <div style="text-align:center;">
+                    <button class="admin-btn admin-btn-primary" onclick="verifyAdmin()">验证</button>
+                </div>
+                <div class="admin-verify-hint">验证后可管理公告和更多功能</div>
+            </div>
+
+            <div id="adminContent" style="display:none;">
+                <div class="admin-section">
+                    <h3>📝 发布公告</h3>
+                    <div class="admin-form-row">
+                        <div>
+                            <label>分类</label>
+                            <select id="adminNewsCategory">
+                                <option value="公告">公告</option>
+                                <option value="活动">活动</option>
+                                <option value="更新">更新</option>
+                                <option value="通知">通知</option>
+                                <option value="其他">其他</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label>标题</label>
+                            <input type="text" id="adminNewsName" placeholder="公告标题">
+                        </div>
+                    </div>
+                    <label>内容</label>
+                    <textarea id="adminNewsContent" placeholder="公告内容"></textarea>
+                    <div class="admin-form-row">
+                        <div>
+                            <label>作者</label>
+                            <input type="text" id="adminNewsAuthor" placeholder="作者（可选）" value="gyq">
+                        </div>
+                    </div>
+                    <div style="text-align:right;">
+                        <button class="admin-btn admin-btn-primary" onclick="adminPublishNews()">发布公告</button>
+                    </div>
+                </div>
+
+                <div class="admin-section">
+                    <h3>📋 公告列表</h3>
+                    <div style="text-align:right;margin-bottom:10px;">
+                        <button class="admin-btn admin-btn-secondary" onclick="adminRefreshNews()" style="font-size:0.8rem;">🔄 刷新列表</button>
+                    </div>
+                    <div id="adminNewsList" class="admin-news-list">
+                        <div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;">加载中...</div>
+                    </div>
+                </div>
+
+                <div class="admin-section">
+                    <h3>⚙️ 系统设置</h3>
+                    <label>GitHub Token（用于写入Gist）</label>
+                    <input type="password" id="adminGistToken" placeholder="ghp_xxxxxxxxxxxx" autocomplete="off">
+                    <div style="display:flex;gap:8px;justify-content:flex-end;">
+                        <button class="admin-btn admin-btn-secondary" onclick="adminSaveGistToken()">保存Token</button>
+                        <button class="admin-btn admin-btn-secondary" onclick="adminTestGistToken()">测试连接</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
