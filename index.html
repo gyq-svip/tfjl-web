@@ -6205,7 +6205,10 @@
                 }
                 
                 // 更新槽位显示
-                slot.innerHTML = '<span class="card-item" data-profession="' + profession + '">' + cardName + '</span>';
+                const slotCardType = findCardTypeById(cardId) || 'gold';
+                const slotHandType = isUserSlot ? 'my' : 'teammate';
+                const slotLevelBadge = createLevelBadgeHTML(cardId, slotCardType, slotHandType, cardName);
+                slot.innerHTML = `<span class="card-item" data-profession="${profession}">${slotLevelBadge}${cardName}</span>`;
                 slot.classList.add('filled');
                 slot.classList.remove('empty');
                 slot.dataset.cardId = cardId;
@@ -6340,7 +6343,7 @@
                 if (slot) {
                     // 获取卡牌类型并添加等级徽章
                     const cardType = card.type || findCardTypeById(cardId);
-                    const levelBadge = cardType ? createLevelBadgeHTML(cardId, cardType, handType) : '';
+                    const levelBadge = cardType ? createLevelBadgeHTML(cardId, cardType, handType, cardName) : '';
                     slot.innerHTML = `<span class="card-item" data-profession="${profession}">${levelBadge}${cardName}</span>`;
                     slot.classList.add('filled');
                     slot.classList.remove('empty');
@@ -6544,7 +6547,7 @@
                 targetHand.push({ id: cardId, name: cardName, placed: slotId, isEngineering, profession, type: cardType });
                 
                 // 添加等级徽章
-                const levelBadge = cardType ? createLevelBadgeHTML(cardId, cardType, isUserSlot ? 'my' : 'teammate') : '';
+                const levelBadge = cardType ? createLevelBadgeHTML(cardId, cardType, isUserSlot ? 'my' : 'teammate', cardName) : '';
                 this.innerHTML = '<span class="card-item" data-profession="' + profession + '">' + levelBadge + cardName + '</span>';
                 this.classList.add('filled');
                 this.classList.remove('empty');
@@ -6573,7 +6576,7 @@
                     handCards[cardIndex].placed = slotId;
                     const prof = handCards[cardIndex].profession;
                     const cardType = handCards[cardIndex].type || findCardTypeById(cardId);
-                    const levelBadge = cardType ? createLevelBadgeHTML(cardId, cardType, handType) : '';
+                    const levelBadge = cardType ? createLevelBadgeHTML(cardId, cardType, handType, cardName) : '';
                     this.innerHTML = '<span class="card-item" data-profession="' + prof + '">' + levelBadge + cardName + '</span>';
                     this.classList.add('filled');
                     this.classList.remove('empty');
