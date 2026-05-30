@@ -2266,7 +2266,7 @@
     <!-- ==================== 功能记录结束 ==================== -->
 
     <div class="container">
-        <h1 id="mainHeader">🛡️ 塔防精灵 阵容归档</h1>
+        <h1><span id="mainHeader" style="cursor:default;">🛡️</span> 塔防精灵 阵容归档</h1>
         <p id="mainTitle" class="instructions glowing-text" style="cursor:pointer;" onclick="refreshNewsAndTitle()" title="点击刷新标题"> 支持导入脚本解析 | 阵容存储快速查看 | 活动遇到龙行麻烦投一下  </p>
         
         <!-- 滚动公告栏 -->
@@ -10250,17 +10250,34 @@ function hasGistToken() {
         let adminHeaderClickCount = 0;
         let adminHeaderClickTimer = null;
 
-        document.getElementById('mainHeader').addEventListener('click', () => {
-            adminHeaderClickCount++;
-            clearTimeout(adminHeaderClickTimer);
-            adminHeaderClickTimer = setTimeout(() => {
-                adminHeaderClickCount = 0;
-            }, 3000);
-
-            if (adminHeaderClickCount >= 5) {
-                adminHeaderClickCount = 0;
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('mainHeader').addEventListener('click', () => {
+                adminHeaderClickCount++;
                 clearTimeout(adminHeaderClickTimer);
-                openAdminPanel();
+                adminHeaderClickTimer = setTimeout(() => {
+                    adminHeaderClickCount = 0;
+                }, 3000);
+
+                if (adminHeaderClickCount >= 5) {
+                    adminHeaderClickCount = 0;
+                    clearTimeout(adminHeaderClickTimer);
+                    openAdminPanel();
+                }
+            });
+
+            document.getElementById('adminVerifyCode').addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') verifyAdmin();
+            });
+
+            document.getElementById('adminPanelOverlay').addEventListener('click', (e) => {
+                if (e.target === e.currentTarget) closeAdminPanel();
+            });
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                const overlay = document.getElementById('adminPanelOverlay');
+                if (overlay && overlay.style.display === 'flex') closeAdminPanel();
             }
         });
 
@@ -10315,10 +10332,6 @@ function hasGistToken() {
                 showAdminStatus('验证码错误', 'error');
             }
         }
-
-        document.getElementById('adminVerifyCode').addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') verifyAdmin();
-        });
 
         function showAdminStatus(msg, type) {
             const el = document.getElementById('adminStatus');
@@ -10562,17 +10575,6 @@ function hasGistToken() {
                 showAdminStatus('连接失败: ' + error.message, 'error');
             }
         }
-
-        document.getElementById('adminPanelOverlay').addEventListener('click', (e) => {
-            if (e.target === e.currentTarget) closeAdminPanel();
-        });
-
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                const overlay = document.getElementById('adminPanelOverlay');
-                if (overlay.style.display === 'flex') closeAdminPanel();
-            }
-        });
     </script>
 
     <!-- 模态框：创建分类 -->
