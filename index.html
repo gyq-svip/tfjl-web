@@ -10268,16 +10268,28 @@ function hasGistToken() {
             if (isVerified) {
                 document.getElementById('adminVerifySection').style.display = 'none';
                 document.getElementById('adminContent').style.display = 'block';
-                const token = getGistToken();
-                if (token) {
-                    document.getElementById('adminGistToken').value = token;
-                }
+                updateAdminTokenStatus();
                 adminRefreshNews();
             } else {
                 document.getElementById('adminVerifySection').style.display = 'block';
                 document.getElementById('adminContent').style.display = 'none';
                 document.getElementById('adminVerifyCode').value = '';
                 document.getElementById('adminVerifyCode').focus();
+            }
+        }
+
+        function updateAdminTokenStatus() {
+            const token = getGistToken();
+            const tokenSection = document.getElementById('adminTokenSection');
+            const tokenInput = document.getElementById('adminGistToken');
+            const tokenStatus = document.getElementById('adminTokenStatus');
+
+            if (token) {
+                tokenInput.value = token;
+                tokenStatus.innerHTML = '<span style="color:#4ade80;font-size:0.85rem;">✅ Token已配置（自动获取），可正常发布公告</span>';
+            } else {
+                tokenInput.value = '';
+                tokenStatus.innerHTML = '<span style="color:#ef4444;font-size:0.85rem;">⚠️ 未检测到Token，请手动配置后才能发布公告</span>';
             }
         }
 
@@ -10292,10 +10304,7 @@ function hasGistToken() {
                 sessionStorage.setItem(ADMIN_VERIFY_KEY, 'true');
                 document.getElementById('adminVerifySection').style.display = 'none';
                 document.getElementById('adminContent').style.display = 'block';
-                const token = getGistToken();
-                if (token) {
-                    document.getElementById('adminGistToken').value = token;
-                }
+                updateAdminTokenStatus();
                 adminRefreshNews();
                 showAdminStatus('验证成功！', 'success');
             } else {
@@ -10637,8 +10646,9 @@ function hasGistToken() {
                     </div>
                 </div>
 
-                <div class="admin-section">
+                <div class="admin-section" id="adminTokenSection">
                     <h3>⚙️ 系统设置</h3>
+                    <div id="adminTokenStatus" style="margin-bottom:10px;"></div>
                     <label>GitHub Token（用于写入Gist）</label>
                     <input type="password" id="adminGistToken" placeholder="ghp_xxxxxxxxxxxx" autocomplete="off">
                     <div style="display:flex;gap:8px;justify-content:flex-end;">
