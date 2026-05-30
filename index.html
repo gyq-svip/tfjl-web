@@ -6753,23 +6753,27 @@
             localStorage.setItem('tdjl_customCards', JSON.stringify(customCards));
         }
         
-        // 添加卡牌到网格
         function addCardToGrid(name, id, cardType, profession, save = true) {
-            const section = document.querySelector(`.collapsible-section.${cardType} .profession-section h4`);
+            const profMap = {'战士': 'warrior', '法师': 'mage', '射手': 'archer', '召唤': 'summoner', '牧师': 'priest', '术士': 'warlock', '熊猫': 'panda', '精灵球': 'pokeball', '工程': 'engineering'};
+            const profName = Object.keys(profMap).find(k => profMap[k] === profession);
+            
             const targetSection = Array.from(document.querySelectorAll(`.collapsible-section.${cardType} .profession-section h4`)).find(h4 => {
-                const profMap = {'战士': 'warrior', '法师': 'mage', '射手': 'archer', '召唤': 'summoner', '牧师': 'priest', '术士': 'warlock', '熊猫': 'panda', '精灵球': 'pokeball', '工程': 'engineering'};
-                return h4.textContent.includes(Object.keys(profMap).find(k => profMap[k] === profession));
+                return h4.textContent.includes(profName);
             });
             
-            if (targetSection) {
-                const grid = targetSection.nextElementSibling;
-                const cardEl = document.createElement('div');
-                cardEl.className = 'card-item';
-                cardEl.dataset.id = id;
-                cardEl.dataset.name = name;
-                cardEl.dataset.type = cardType;
-                cardEl.dataset.profession = profession;
-                cardEl.dataset.engineering = (profession === 'engineering') ? 'true' : 'false';
+            if (!targetSection) {
+                console.warn('找不到目标职业区域:', cardType, profession, profName);
+                return;
+            }
+            
+            const grid = targetSection.nextElementSibling;
+            const cardEl = document.createElement('div');
+            cardEl.className = 'card-item';
+            cardEl.dataset.id = id;
+            cardEl.dataset.name = name;
+            cardEl.dataset.type = cardType;
+            cardEl.dataset.profession = profession;
+            cardEl.dataset.engineering = (profession === 'engineering') ? 'true' : 'false';
                 
                 const levelBadge = createLevelBadgeHTML(id, cardType, 'my', name);
                 
@@ -6782,29 +6786,28 @@
                     deleteCustomCard(e, id, cardType, profession);
                 };
                 
-                cardEl.innerHTML = levelBadge + name;
-                cardEl.appendChild(deleteBtn);
-                cardEl.style.position = 'relative';
-                grid.appendChild(cardEl);
-                
-                cardEl.addEventListener('click', (e) => {
-                    if (e.target.classList.contains('delete-card-btn') || e.target.classList.contains('card-level-badge')) {
-                        return;
-                    }
-                    handlePoolCardClick(cardEl);
-                });
-                cardEl.setAttribute('draggable', 'true');
-                cardEl.addEventListener('dragstart', handlePoolDragStart);
-                cardEl.addEventListener('contextmenu', (e) => handleCardRightClick(e, cardEl));
-                
-                setupLongPress(cardEl, (e) => handleCardRightClick(e, cardEl));
-                
-                if (save) {
-                    const key = `${cardType}_${profession}`;
-                    if (!customCards[key]) customCards[key] = [];
-                    customCards[key].push({id, name, cardType, profession});
-                    saveCustomCards();
+            cardEl.innerHTML = levelBadge + name;
+            cardEl.appendChild(deleteBtn);
+            cardEl.style.position = 'relative';
+            grid.appendChild(cardEl);
+            
+            cardEl.addEventListener('click', (e) => {
+                if (e.target.classList.contains('delete-card-btn') || e.target.classList.contains('card-level-badge')) {
+                    return;
                 }
+                handlePoolCardClick(cardEl);
+            });
+            cardEl.setAttribute('draggable', 'true');
+            cardEl.addEventListener('dragstart', handlePoolDragStart);
+            cardEl.addEventListener('contextmenu', (e) => handleCardRightClick(e, cardEl));
+            
+            setupLongPress(cardEl, (e) => handleCardRightClick(e, cardEl));
+            
+            if (save) {
+                const key = `${cardType}_${profession}`;
+                if (!customCards[key]) customCards[key] = [];
+                customCards[key].push({id, name, cardType, profession});
+                saveCustomCards();
             }
         }
         
@@ -6860,7 +6863,6 @@
             localStorage.setItem('tdjl_customCards', JSON.stringify(customCards));
         }
         
-        // 加载常用卡时也加载自定义卡
         function loadFavorites() {
             const saved = localStorage.getItem('tdjl_favoriteCards');
             const savedOrder = localStorage.getItem('tdjl_professionOrder');
@@ -6871,13 +6873,14 @@
                 professionOrder = JSON.parse(savedOrder);
             }
             
-            // 更新卡池中的常用卡标记
             favoriteCards.forEach(fav => {
                 const card = document.querySelector(`.card-item[data-id="${fav.id}"]`);
                 if (card) {
                     card.classList.add('favorite-card');
                 }
             });
+            
+            updateFavoritesDisplay();
         }
         
         // 删除自定义卡牌
@@ -7102,17 +7105,17 @@
             initIndexedDB().then(() => {
                 refreshProjectSelectors();
             });
-            loadFavorites();
             loadCardLevels();
             loadIndividualCardLevels();
             loadCardSkins();
             loadCustomSkins();
             loadCustomSkinAttributes();
             loadCustomCards();
+            loadFavorites();
             setupAddCardButtons();
             setupCardSortDrag();
-            updateTxtFilesList(); // 初始化TXT文件列表
-            loadFontSizeSetting(); // 加载字体大小设置
+            updateTxtFilesList();
+            loadFontSizeSetting();
             
             // 加载卡牌顺序
             loadCardOrder();
