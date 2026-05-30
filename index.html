@@ -2907,8 +2907,8 @@
             container.innerHTML = room.auctions.slice().reverse().map(auction => {
                 const isEnded = auction.status === 'ended' || now >= auction.endTime;
                 const currentBid = auction.bids.length > 0 ? auction.bids[auction.bids.length - 1].amount : auction.startPrice;
+                const currentBidder = auction.bids.length > 0 ? auction.bids[auction.bids.length - 1].bidder : '';
                 const bidCount = auction.bids.length;
-                const nextBid = currentBid + (auction.bidIncrement || 10);
                 const qualityColor = getQualityColor(auction.quality);
                 const quality = auction.quality || '';
                 const profession = auction.profession || '';
@@ -2930,8 +2930,13 @@
                 if (ignoreIce > 0) attrsHtml += `<span style="background:rgba(96,165,250,0.15);color:#93c5fd;padding:1px 5px;border-radius:3px;font-size:0.65rem;">无视冰甲+${ignoreIce}</span>`;
 
                 const imageHtml = auction.image
-                    ? `<img src="${auction.image}" style="width:60px;height:60px;object-fit:cover;border-radius:8px;border:2px solid ${qualityColor};flex-shrink:0;" onerror="this.style.display='none'">`
+                    ? `<div style="position:relative;width:60px;height:60px;flex-shrink:0;" onmouseover="showAuctionImagePreview(this,'${auction.id}')" onmouseout="hideAuctionImagePreview()"><img src="${auction.image}" style="width:60px;height:60px;object-fit:cover;border-radius:8px;border:2px solid ${qualityColor};" onerror="this.style.display='none'"></div>`
                     : `<div style="width:60px;height:60px;background:rgba(255,255,255,0.05);border-radius:8px;border:2px solid ${qualityColor};display:flex;align-items:center;justify-content:center;flex-shrink:0;"><span style="color:${qualityColor};font-size:1.2rem;">⚔️</span></div>`;
+
+                let bidderHtml = '';
+                if (currentBidder) {
+                    bidderHtml = `<div style="color:rgba(255,255,255,0.5);font-size:0.7rem;margin-top:1px;">👤 ${currentBidder}</div>`;
+                }
 
                 return `
                     <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-left:3px solid ${qualityColor};border-radius:8px;padding:10px;margin-bottom:8px;display:flex;gap:10px;align-items:center;transition:all 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.07)'" onmouseout="this.style.background='rgba(255,255,255,0.04)'">
@@ -2942,18 +2947,47 @@
                                 ${timeHtml}
                             </div>
                             <div style="margin-bottom:3px;">${attrsHtml}</div>
-                            <div style="display:flex;align-items:center;gap:8px;">
+                            <div style="color:#ffd700;font-size:1.1rem;font-weight:700;">💰 ${currentBid}</div>
+                            ${bidderHtml}
+                            <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
                                 ${!isEnded
                                     ? `<button onclick="event.stopPropagation();quickBid('${auction.id}')" style="padding:3px 10px;border-radius:5px;border:none;background:linear-gradient(135deg,#ffd700,#ff6b6b);color:#1a1a2e;cursor:pointer;font-weight:600;font-size:0.7rem;white-space:nowrap;">加价</button>`
                                     : `<span style="padding:3px 8px;border-radius:5px;background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.3);font-size:0.7rem;">已结束</span>`
                                 }
-                                <span style="color:#ffd700;font-size:0.85rem;font-weight:600;">💰${currentBid}</span>
                                 <span style="color:rgba(255,255,255,0.3);font-size:0.65rem;">${bidCount}次出价</span>
                             </div>
                         </div>
                     </div>
                 `;
             }).join('');
+        }
+
+        function showAuctionImagePreview(el, auctionId) {
+            hideAuctionImagePreview();
+            const room = getRoomData();
+            if (!room) return;
+            const auction = room.auctions.find(a => a.id === auctionId);
+            if (!auction || !auction.image) return;
+            const preview = document.createElement('div');
+            preview.id = 'auctionImgPreviewOverlay';
+            preview.style.cssText = 'position:fixed;z-index:10001;pointer-events:none;';
+            const rect = el.getBoundingClientRect();
+            preview.style.left = (rect.right + 8) + 'px';
+            preview.style.top = rect.top + 'px';
+            preview.innerHTML = `<img src="${auction.image}" style="max-width:250px;max-height:250px;border-radius:10px;border:2px solid rgba(255,215,0,0.5);box-shadow:0 8px 30px rgba(0,0,0,0.7);">`;
+            document.body.appendChild(preview);
+            const previewRect = preview.getBoundingClientRect();
+            if (previewRect.right > window.innerWidth) {
+                preview.style.left = (rect.left - previewRect.width - 8) + 'px';
+            }
+            if (previewRect.bottom > window.innerHeight) {
+                preview.style.top = (window.innerHeight - previewRect.height - 10) + 'px';
+            }
+        }
+
+        function hideAuctionImagePreview() {
+            const el = document.getElementById('auctionImgPreviewOverlay');
+            if (el) el.remove();
         }
 
         function showAuctionDetail(auctionId) {
@@ -3055,6 +3089,11 @@
 
         async function quickBid(auctionId) {
             if (!currentChatRoom) return;
+            const bidBtn = event.target.closest('button');
+            if (bidBtn) {
+                bidBtn.disabled = true;
+                bidBtn.textContent = '...';
+            }
             try {
                 await fetchChatRoomData();
                 const room = getRoomData();
@@ -3084,9 +3123,9 @@
                     time: now
                 });
 
-                await saveChatRoomData();
                 renderAuctionsList();
                 renderChatMessages();
+                await saveChatRoomData();
             } catch (error) {
                 alert('出价失败: ' + error.message);
             }
@@ -3124,10 +3163,10 @@
                     time: now
                 });
 
-                await saveChatRoomData();
                 closeAuctionDetail();
                 renderAuctionsList();
                 renderChatMessages();
+                await saveChatRoomData();
             } catch (error) {
                 alert('出价失败: ' + error.message);
             }
@@ -3513,6 +3552,8 @@
             makePanelDraggable('notepadPanel', 'notepadPanelHeader');
             makePanelDraggable('txtFilesPanel', 'txtFilesPanelHeader');
             makePanelDraggable('textParserPanel', 'textParserPanelHeader');
+            makePanelDraggable('messageWall', 'messageWallHeader');
+            makePanelDraggable('chatRoomPanel', 'chatRoomHeader');
         });
         </script>
 
@@ -8418,9 +8459,8 @@ function hasGistToken() {
         function getNewsMarqueeText() {
             const now = new Date();
             const activeItems = newsItems.filter(item => {
-                if (item.active_time) {
-                    return new Date(item.active_time) <= now;
-                }
+                if (item.active_time && new Date(item.active_time) > now) return false;
+                if (item.expire_time && new Date(item.expire_time) <= now) return false;
                 return true;
             });
 
@@ -8459,9 +8499,8 @@ function hasGistToken() {
 
             const now = new Date();
             const activeItems = newsItems.filter(item => {
-                if (item.active_time) {
-                    return new Date(item.active_time) <= now;
-                }
+                if (item.active_time && new Date(item.active_time) > now) return false;
+                if (item.expire_time && new Date(item.expire_time) <= now) return false;
                 return true;
             });
 
@@ -8592,8 +8631,12 @@ function hasGistToken() {
         function startActiveTimeCheck() {
             if (activeTimeCheckInterval) clearInterval(activeTimeCheckInterval);
             activeTimeCheckInterval = setInterval(() => {
-                const hasPending = newsItems.some(item => item.active_time && new Date(item.active_time) > new Date());
-                if (hasPending) {
+                const hasTimeChange = newsItems.some(item => {
+                    if (item.active_time && new Date(item.active_time) > new Date()) return true;
+                    if (item.expire_time && new Date(item.expire_time) <= new Date()) return true;
+                    return false;
+                });
+                if (hasTimeChange) {
                     const marqueeEl = document.getElementById('newsMarquee');
                     if (marqueeEl) {
                         marqueeEl.textContent = getNewsMarqueeText();
@@ -10900,22 +10943,37 @@ function hasGistToken() {
         // ==================== 管理员面板 ====================
         const ADMIN_VERIFY_KEY = 'TFJL_Admin_Verified';
         const ADMIN_VERIFY_CODE = 'gyq2024';
-        let adminHeaderClickCount = 0;
-        let adminHeaderClickTimer = null;
+        let adminLongPressTimer = null;
+        let adminLongPressTriggered = false;
 
         document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('mainHeader').addEventListener('click', () => {
-                adminHeaderClickCount++;
-                clearTimeout(adminHeaderClickTimer);
-                adminHeaderClickTimer = setTimeout(() => {
-                    adminHeaderClickCount = 0;
-                }, 3000);
-
-                if (adminHeaderClickCount >= 5) {
-                    adminHeaderClickCount = 0;
-                    clearTimeout(adminHeaderClickTimer);
+            const header = document.getElementById('mainHeader');
+            header.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                adminLongPressTriggered = false;
+                adminLongPressTimer = setTimeout(() => {
+                    adminLongPressTriggered = true;
                     openAdminPanel();
-                }
+                }, 2000);
+            });
+            header.addEventListener('mouseup', () => {
+                clearTimeout(adminLongPressTimer);
+            });
+            header.addEventListener('mouseleave', () => {
+                clearTimeout(adminLongPressTimer);
+            });
+            header.addEventListener('touchstart', (e) => {
+                adminLongPressTriggered = false;
+                adminLongPressTimer = setTimeout(() => {
+                    adminLongPressTriggered = true;
+                    openAdminPanel();
+                }, 2000);
+            }, { passive: true });
+            header.addEventListener('touchend', () => {
+                clearTimeout(adminLongPressTimer);
+            });
+            header.addEventListener('touchcancel', () => {
+                clearTimeout(adminLongPressTimer);
             });
 
             document.getElementById('adminVerifyCode').addEventListener('keydown', (e) => {
@@ -10925,6 +10983,17 @@ function hasGistToken() {
             document.getElementById('adminPanelOverlay').addEventListener('click', (e) => {
                 if (e.target === e.currentTarget) closeAdminPanel();
             });
+
+            const permCheckbox = document.getElementById('adminNewsPermanent');
+            const expireInput = document.getElementById('adminNewsExpireTime');
+            if (permCheckbox && expireInput) {
+                permCheckbox.addEventListener('change', () => {
+                    if (permCheckbox.checked) expireInput.value = '';
+                });
+                expireInput.addEventListener('input', () => {
+                    if (expireInput.value) permCheckbox.checked = false;
+                });
+            }
         });
 
         document.addEventListener('keydown', (e) => {
@@ -11125,11 +11194,23 @@ function hasGistToken() {
                 const author = item.author || '';
                 const time = item.publish_time || '';
                 const activeTime = item.active_time || '';
+                const expireTime = item.expire_time || '';
+                const isPermanent = item.permanent !== false;
                 const now = new Date();
-                const isActive = !activeTime || new Date(activeTime) <= now;
-                const statusTag = isActive
-                    ? '<span style="color:#4ade80;font-size:0.7rem;">✅ 已生效</span>'
-                    : `<span style="color:#f59e0b;font-size:0.7rem;">⏳ ${activeTime.substring(0, 16)} 生效</span>`;
+                const isExpired = expireTime && new Date(expireTime) <= now;
+                const isPending = activeTime && new Date(activeTime) > now;
+                let statusTag = '';
+                if (isExpired) {
+                    statusTag = '<span style="color:#ef4444;font-size:0.7rem;">⏰ 已过期</span>';
+                } else if (isPending) {
+                    statusTag = `<span style="color:#f59e0b;font-size:0.7rem;">⏳ ${activeTime.substring(0, 16)} 生效</span>`;
+                } else if (isPermanent) {
+                    statusTag = '<span style="color:#4ade80;font-size:0.7rem;">✅ 永久</span>';
+                } else if (expireTime) {
+                    statusTag = `<span style="color:#60a5fa;font-size:0.7rem;">✅ 至 ${expireTime.substring(0, 16)}</span>`;
+                } else {
+                    statusTag = '<span style="color:#4ade80;font-size:0.7rem;">✅ 已生效</span>';
+                }
 
                 return `
                     <div class="admin-news-item">
@@ -11152,6 +11233,8 @@ function hasGistToken() {
             const content = document.getElementById('adminNewsContent').value.trim();
             const author = document.getElementById('adminNewsAuthor').value.trim() || '龙行';
             const activeTimeInput = document.getElementById('adminNewsActiveTime').value;
+            const expireTimeInput = document.getElementById('adminNewsExpireTime').value;
+            const isPermanent = document.getElementById('adminNewsPermanent').checked;
 
             if (!name) {
                 showAdminStatus('请输入公告标题', 'error');
@@ -11178,11 +11261,15 @@ function hasGistToken() {
                     name: name,
                     content: content,
                     author: author,
-                    publish_time: publishTime
+                    publish_time: publishTime,
+                    permanent: isPermanent
                 };
 
                 if (activeTimeInput) {
                     newsItem.active_time = activeTimeInput.replace('T', ' ') + ':00';
+                }
+                if (expireTimeInput) {
+                    newsItem.expire_time = expireTimeInput.replace('T', ' ') + ':00';
                 }
 
                 newsData.unshift(newsItem);
@@ -11197,6 +11284,8 @@ function hasGistToken() {
                 document.getElementById('adminNewsName').value = '';
                 document.getElementById('adminNewsContent').value = '';
                 document.getElementById('adminNewsActiveTime').value = '';
+                document.getElementById('adminNewsExpireTime').value = '';
+                document.getElementById('adminNewsPermanent').checked = true;
 
                 renderAdminNewsList(newsData);
                 showAdminStatus('公告发布成功！', 'success');
@@ -11512,6 +11601,16 @@ function hasGistToken() {
                         <div>
                             <label>生效时间（留空则立即生效）</label>
                             <input type="datetime-local" id="adminNewsActiveTime" style="color-scheme:dark;">
+                        </div>
+                    </div>
+                    <div class="admin-form-row">
+                        <div>
+                            <label>终止时间（留空则根据下方选项）</label>
+                            <input type="datetime-local" id="adminNewsExpireTime" style="color-scheme:dark;">
+                        </div>
+                        <div style="display:flex;align-items:center;gap:8px;padding-top:18px;">
+                            <input type="checkbox" id="adminNewsPermanent" checked style="width:16px;height:16px;cursor:pointer;">
+                            <label for="adminNewsPermanent" style="cursor:pointer;">永久有效</label>
                         </div>
                     </div>
                     <div style="text-align:right;">
