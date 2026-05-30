@@ -6730,19 +6730,34 @@
             }
         }
 
-        // 自定义卡牌存储
         let customCards = {};
         
-        // 加载自定义卡牌
         function loadCustomCards() {
             const saved = localStorage.getItem('tdjl_customCards');
             if (saved) {
                 customCards = JSON.parse(saved);
-                // 渲染自定义卡牌到各个职业
+                let needSave = false;
+                
                 Object.keys(customCards).forEach(key => {
                     const [cardType, profession] = key.split('_');
                     customCards[key].forEach(card => {
-                        addCardToGrid(card.name, card.id, cardType, profession, false);
+                        if (!card.cardType) { card.cardType = cardType; needSave = true; }
+                        if (!card.profession) { card.profession = profession; needSave = true; }
+                        if (!card.id || !card.id.startsWith('custom_')) { 
+                            card.id = 'custom_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                            needSave = true;
+                        }
+                    });
+                });
+                
+                if (needSave) {
+                    localStorage.setItem('tdjl_customCards', JSON.stringify(customCards));
+                }
+                
+                Object.keys(customCards).forEach(key => {
+                    const [cardType, profession] = key.split('_');
+                    customCards[key].forEach(card => {
+                        addCardToGrid(card.name, card.id, card.cardType || cardType, card.profession || profession, false);
                     });
                 });
             }
@@ -6847,27 +6862,25 @@
             });
         }
         
-        // 修复手动添加卡牌的收藏问题
-        function fixCustomCardFavoriteIssue() {
-            const customCards = JSON.parse(localStorage.getItem('tdjl_customCards') || '{}');
-            Object.keys(customCards).forEach(key => {
-                const [cardType, profession] = key.split('_');
-                customCards[key].forEach(card => {
-                    const cardEl = document.querySelector(`.card-item[data-id="${card.id}"]`);
-                    if (cardEl) {
-                        // 确保收藏功能正常工作
-                        cardEl.addEventListener('contextmenu', (e) => handleCardRightClick(e, cardEl));
-                    }
-                });
-            });
-            localStorage.setItem('tdjl_customCards', JSON.stringify(customCards));
-        }
-        
         function loadFavorites() {
             const saved = localStorage.getItem('tdjl_favoriteCards');
             const savedOrder = localStorage.getItem('tdjl_professionOrder');
             if (saved) {
                 favoriteCards = JSON.parse(saved);
+                
+                let needSave = false;
+                favoriteCards = favoriteCards.filter(fav => {
+                    if (!fav.id) return false;
+                    if (!fav.type && fav.cardType) { fav.type = fav.cardType; needSave = true; }
+                    if (!fav.type) { fav.type = 'custom'; needSave = true; }
+                    if (fav.isEngineering === undefined) { fav.isEngineering = false; needSave = true; }
+                    if (!fav.profession) { fav.profession = 'unknown'; needSave = true; }
+                    return true;
+                });
+                
+                if (needSave) {
+                    localStorage.setItem('tdjl_favoriteCards', JSON.stringify(favoriteCards));
+                }
             }
             if (savedOrder) {
                 professionOrder = JSON.parse(savedOrder);
