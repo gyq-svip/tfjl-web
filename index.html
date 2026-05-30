@@ -2803,13 +2803,36 @@
             container.scrollTop = container.scrollHeight;
         }
 
+        let auctionImageBase64 = '';
+
+        function previewAuctionImage(input) {
+            const preview = document.getElementById('auctionImagePreview');
+            if (input.files && input.files[0]) {
+                const file = input.files[0];
+                if (file.size > 2 * 1024 * 1024) {
+                    alert('图片不能超过2MB');
+                    input.value = '';
+                    return;
+                }
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    auctionImageBase64 = e.target.result;
+                    preview.innerHTML = '<img src="' + e.target.result + '" style="width:100%;height:100%;object-fit:cover;border-radius:8px;">';
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
         function openAuctionPostModal() {
             document.getElementById('auctionPostModal').style.display = 'flex';
-            document.getElementById('auctionTitle').value = '';
-            document.getElementById('auctionDesc').value = '';
-            document.getElementById('auctionImage').value = '';
+            auctionImageBase64 = '';
+            document.getElementById('auctionImageFile').value = '';
+            document.getElementById('auctionImagePreview').innerHTML = '<span style="color:rgba(255,255,255,0.3);font-size:0.7rem;">点击上传</span>';
+            document.getElementById('auctionQuality').value = '红色';
+            document.getElementById('auctionProfession').value = '工程';
+            document.getElementById('auctionBonusDmg').value = '';
+            document.getElementById('auctionIgnoreIce').value = '';
             document.getElementById('auctionStartPrice').value = '';
-            document.getElementById('auctionMinPrice').value = '';
             document.getElementById('auctionBidIncrement').value = '';
             document.getElementById('auctionDuration').value = '';
         }
@@ -2819,15 +2842,14 @@
         }
 
         async function postAuction() {
-            const title = document.getElementById('auctionTitle').value.trim();
-            const desc = document.getElementById('auctionDesc').value.trim();
-            const image = document.getElementById('auctionImage').value.trim();
+            const quality = document.getElementById('auctionQuality').value;
+            const profession = document.getElementById('auctionProfession').value;
+            const bonusDmg = parseFloat(document.getElementById('auctionBonusDmg').value) || 0;
+            const ignoreIce = parseFloat(document.getElementById('auctionIgnoreIce').value) || 0;
             const startPrice = parseFloat(document.getElementById('auctionStartPrice').value);
-            const minPrice = parseFloat(document.getElementById('auctionMinPrice').value) || 0;
             const bidIncrement = parseFloat(document.getElementById('auctionBidIncrement').value) || 10;
             const durationMin = parseInt(document.getElementById('auctionDuration').value) || 60;
 
-            if (!title) { alert('请输入物品名称'); return; }
             if (isNaN(startPrice) || startPrice < 0) { alert('请输入有效的起拍价'); return; }
 
             try {
@@ -2839,11 +2861,12 @@
                 room.auctions.push({
                     id: auctionId,
                     creator: currentChatNick,
-                    title: title,
-                    desc: desc,
-                    image: image,
+                    quality: quality,
+                    profession: profession,
+                    bonusDmg: bonusDmg,
+                    ignoreIce: ignoreIce,
+                    image: auctionImageBase64 || '',
                     startPrice: startPrice,
-                    minPrice: minPrice,
                     bidIncrement: bidIncrement,
                     startTime: Date.now(),
                     endTime: Date.now() + durationMin * 60 * 1000,
@@ -2854,7 +2877,7 @@
                 room.messages.push({
                     id: 'msg_' + Date.now(),
                     author: '系统',
-                    content: `🔨 ${currentChatNick} 发布了拍卖 #${auctionId}：${title}，起拍价 ${startPrice}`,
+                    content: `🔨 ${currentChatNick} 发布了拍卖 #${auctionId}：${quality}${profession}，起拍价 ${startPrice}`,
                     time: Date.now()
                 });
 
@@ -2865,6 +2888,11 @@
             } catch (error) {
                 alert('发布失败: ' + error.message);
             }
+        }
+
+        function getQualityColor(q) {
+            const map = { '红色': '#ef4444', '金色': '#ffd700', '紫色': '#a78bfa', '蓝色': '#60a5fa', '绿色': '#4ade80' };
+            return map[q] || 'rgba(255,255,255,0.6)';
         }
 
         function renderAuctionsList() {
@@ -2880,33 +2908,49 @@
                 const isEnded = auction.status === 'ended' || now >= auction.endTime;
                 const currentBid = auction.bids.length > 0 ? auction.bids[auction.bids.length - 1].amount : auction.startPrice;
                 const bidCount = auction.bids.length;
-                const isCreator = auction.creator === currentChatNick;
+                const nextBid = currentBid + (auction.bidIncrement || 10);
+                const qualityColor = getQualityColor(auction.quality);
+                const quality = auction.quality || '';
+                const profession = auction.profession || '';
+                const bonusDmg = auction.bonusDmg || 0;
+                const ignoreIce = auction.ignoreIce || 0;
 
-                let statusHtml = '';
+                let timeHtml = '';
                 if (isEnded) {
-                    const metMin = currentBid >= auction.minPrice;
-                    statusHtml = metMin
-                        ? '<span style="color:#4ade80;font-size:0.75rem;">✅ 已成交</span>'
-                        : '<span style="color:#ef4444;font-size:0.75rem;">❌ 流拍</span>';
+                    timeHtml = '<span style="color:#ef4444;font-size:0.7rem;">已结束</span>';
                 } else {
                     const remaining = Math.max(0, auction.endTime - now);
                     const mins = Math.floor(remaining / 60000);
                     const secs = Math.floor((remaining % 60000) / 1000);
-                    statusHtml = `<span style="color:#f59e0b;font-size:0.75rem;" data-auction-id="${auction.id}">⏳ ${mins}分${secs}秒</span>`;
+                    timeHtml = `<span style="color:#f59e0b;font-size:0.7rem;" data-auction-id="${auction.id}">⏳${mins}分${secs}秒</span>`;
                 }
 
+                let attrsHtml = '';
+                if (bonusDmg > 0) attrsHtml += `<span style="background:rgba(239,68,68,0.15);color:#f87171;padding:1px 5px;border-radius:3px;font-size:0.65rem;">附加伤害+${bonusDmg}</span> `;
+                if (ignoreIce > 0) attrsHtml += `<span style="background:rgba(96,165,250,0.15);color:#93c5fd;padding:1px 5px;border-radius:3px;font-size:0.65rem;">无视冰甲+${ignoreIce}</span>`;
+
+                const imageHtml = auction.image
+                    ? `<img src="${auction.image}" style="width:60px;height:60px;object-fit:cover;border-radius:8px;border:2px solid ${qualityColor};flex-shrink:0;" onerror="this.style.display='none'">`
+                    : `<div style="width:60px;height:60px;background:rgba(255,255,255,0.05);border-radius:8px;border:2px solid ${qualityColor};display:flex;align-items:center;justify-content:center;flex-shrink:0;"><span style="color:${qualityColor};font-size:1.2rem;">⚔️</span></div>`;
+
                 return `
-                    <div onclick="showAuctionDetail('${auction.id}')" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:12px;margin-bottom:8px;cursor:pointer;transition:all 0.2s;" onmouseover="this.style.borderColor='rgba(255,215,0,0.3)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.1)'">
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-                            <span style="color:#ffd700;font-size:0.85rem;font-weight:500;">#${auction.id} ${auction.title}</span>
-                            ${statusHtml}
+                    <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-left:3px solid ${qualityColor};border-radius:8px;padding:10px;margin-bottom:8px;display:flex;gap:10px;align-items:center;transition:all 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.07)'" onmouseout="this.style.background='rgba(255,255,255,0.04)'">
+                        ${imageHtml}
+                        <div style="flex:1;min-width:0;">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;">
+                                <span style="color:${qualityColor};font-size:0.8rem;font-weight:600;">#${auction.id} ${quality}·${profession}</span>
+                                ${timeHtml}
+                            </div>
+                            <div style="margin-bottom:3px;">${attrsHtml}</div>
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                ${!isEnded
+                                    ? `<button onclick="event.stopPropagation();quickBid('${auction.id}')" style="padding:3px 10px;border-radius:5px;border:none;background:linear-gradient(135deg,#ffd700,#ff6b6b);color:#1a1a2e;cursor:pointer;font-weight:600;font-size:0.7rem;white-space:nowrap;">加价</button>`
+                                    : `<span style="padding:3px 8px;border-radius:5px;background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.3);font-size:0.7rem;">已结束</span>`
+                                }
+                                <span style="color:#ffd700;font-size:0.85rem;font-weight:600;">💰${currentBid}</span>
+                                <span style="color:rgba(255,255,255,0.3);font-size:0.65rem;">${bidCount}次出价</span>
+                            </div>
                         </div>
-                        ${auction.image ? `<img src="${auction.image}" style="width:100%;max-height:120px;object-fit:cover;border-radius:6px;margin-bottom:6px;" onerror="this.style.display='none'">` : ''}
-                        <div style="display:flex;justify-content:space-between;font-size:0.8rem;">
-                            <span style="color:rgba(255,255,255,0.6);">💰 当前: <span style="color:#ffd700;">${currentBid}</span></span>
-                            <span style="color:rgba(255,255,255,0.4);">${bidCount}次出价</span>
-                        </div>
-                        <div style="color:rgba(255,255,255,0.3);font-size:0.7rem;margin-top:4px;">发布者: ${auction.creator}</div>
                     </div>
                 `;
             }).join('');
@@ -2922,11 +2966,15 @@
             const isEnded = auction.status === 'ended' || now >= auction.endTime;
             const currentBid = auction.bids.length > 0 ? auction.bids[auction.bids.length - 1].amount : auction.startPrice;
             const isCreator = auction.creator === currentChatNick;
-            const metMin = currentBid >= auction.minPrice;
-            const nextBid = currentBid + auction.bidIncrement;
+            const nextBid = currentBid + (auction.bidIncrement || 10);
+            const qualityColor = getQualityColor(auction.quality);
+            const quality = auction.quality || '';
+            const profession = auction.profession || '';
+            const bonusDmg = auction.bonusDmg || 0;
+            const ignoreIce = auction.ignoreIce || 0;
 
             let winnerHtml = '';
-            if (isEnded && isCreator && auction.bids.length > 0 && metMin) {
+            if (isEnded && isCreator && auction.bids.length > 0) {
                 const winner = auction.bids[auction.bids.length - 1];
                 winnerHtml = `
                     <div style="background:rgba(74,222,128,0.1);border:1px solid rgba(74,222,128,0.3);border-radius:8px;padding:12px;margin-top:10px;">
@@ -2953,12 +3001,15 @@
                 `;
             }
 
+            const imageHtml = auction.image
+                ? `<img src="${auction.image}" style="width:100%;max-height:200px;object-fit:cover;border-radius:8px;margin-bottom:10px;border:2px solid ${qualityColor};" onerror="this.style.display='none'">`
+                : '';
+
             const content = document.getElementById('auctionDetailContent');
             content.innerHTML = `
                 <button onclick="closeAuctionDetail()" style="position:absolute;top:12px;right:16px;background:none;border:none;color:rgba(255,255,255,0.5);font-size:1.5rem;cursor:pointer;">&times;</button>
-                <div style="color:#ffd700;font-size:1.1rem;font-weight:500;margin-bottom:10px;">#${auction.id} ${auction.title}</div>
-                ${auction.image ? `<img src="${auction.image}" style="width:100%;max-height:200px;object-fit:cover;border-radius:8px;margin-bottom:10px;" onerror="this.style.display='none'">` : ''}
-                ${auction.desc ? `<div style="color:rgba(255,255,255,0.7);font-size:0.9rem;margin-bottom:10px;">${auction.desc}</div>` : ''}
+                <div style="color:${qualityColor};font-size:1.1rem;font-weight:600;margin-bottom:10px;">#${auction.id} ${quality}·${profession}</div>
+                ${imageHtml}
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
                     <div style="background:rgba(255,255,255,0.05);padding:8px;border-radius:6px;text-align:center;">
                         <div style="color:rgba(255,255,255,0.4);font-size:0.75rem;">起拍价</div>
@@ -2969,17 +3020,19 @@
                         <div style="color:#ffd700;font-size:1rem;">${currentBid}</div>
                     </div>
                     <div style="background:rgba(255,255,255,0.05);padding:8px;border-radius:6px;text-align:center;">
-                        <div style="color:rgba(255,255,255,0.4);font-size:0.75rem;">最低成交价</div>
-                        <div style="color:rgba(255,255,255,0.7);">${auction.minPrice || '无'}</div>
-                    </div>
-                    <div style="background:rgba(255,255,255,0.05);padding:8px;border-radius:6px;text-align:center;">
                         <div style="color:rgba(255,255,255,0.4);font-size:0.75rem;">每次加价</div>
                         <div style="color:rgba(255,255,255,0.7);">${auction.bidIncrement}</div>
                     </div>
+                    <div style="background:rgba(255,255,255,0.05);padding:8px;border-radius:6px;text-align:center;">
+                        <div style="color:rgba(255,255,255,0.4);font-size:0.75rem;">出价次数</div>
+                        <div style="color:rgba(255,255,255,0.7);">${auction.bids.length}</div>
+                    </div>
                 </div>
+                ${bonusDmg > 0 ? `<div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);border-radius:6px;padding:6px 10px;margin-bottom:6px;font-size:0.85rem;color:#f87171;">附加伤害 +${bonusDmg}</div>` : ''}
+                ${ignoreIce > 0 ? `<div style="background:rgba(96,165,250,0.1);border:1px solid rgba(96,165,250,0.2);border-radius:6px;padding:6px 10px;margin-bottom:6px;font-size:0.85rem;color:#93c5fd;">无视冰甲 +${ignoreIce}</div>` : ''}
                 <div style="text-align:center;margin-bottom:10px;">
                     ${isEnded
-                        ? (metMin ? '<span style="color:#4ade80;font-size:0.95rem;">✅ 拍卖已结束 - 已成交</span>' : '<span style="color:#ef4444;font-size:0.95rem;">❌ 拍卖已结束 - 流拍（未达最低价）</span>')
+                        ? '<span style="color:#ef4444;font-size:0.95rem;">拍卖已结束</span>'
                         : `<span style="color:#f59e0b;font-size:0.9rem;" id="auctionDetailCountdown">⏳ 进行中</span>`
                     }
                 </div>
@@ -3000,6 +3053,45 @@
             document.getElementById('auctionDetailModal').style.display = 'none';
         }
 
+        async function quickBid(auctionId) {
+            if (!currentChatRoom) return;
+            try {
+                await fetchChatRoomData();
+                const room = getRoomData();
+                if (!room) return;
+                const auction = room.auctions.find(a => a.id === auctionId);
+                if (!auction) { alert('拍卖不存在'); return; }
+
+                const now = Date.now();
+                if (auction.status === 'ended' || now >= auction.endTime) { alert('拍卖已结束'); return; }
+                if (auction.creator === currentChatNick) { alert('不能竞拍自己发布的拍卖'); return; }
+
+                const currentBid = auction.bids.length > 0 ? auction.bids[auction.bids.length - 1].amount : auction.startPrice;
+                const nextBid = currentBid + (auction.bidIncrement || 10);
+
+                auction.bids.push({
+                    bidder: currentChatNick,
+                    amount: nextBid,
+                    time: now
+                });
+
+                const quality = auction.quality || '';
+                const profession = auction.profession || '';
+                room.messages.push({
+                    id: 'msg_' + Date.now(),
+                    author: '系统',
+                    content: `💰 ${currentChatNick} 对 #${auction.id} ${quality}·${profession} 出价 ${nextBid}`,
+                    time: now
+                });
+
+                await saveChatRoomData();
+                renderAuctionsList();
+                renderChatMessages();
+            } catch (error) {
+                alert('出价失败: ' + error.message);
+            }
+        }
+
         async function placeBid(auctionId) {
             if (!currentChatRoom) return;
 
@@ -3015,7 +3107,7 @@
                 if (auction.creator === currentChatNick) { alert('不能竞拍自己发布的拍卖'); return; }
 
                 const currentBid = auction.bids.length > 0 ? auction.bids[auction.bids.length - 1].amount : auction.startPrice;
-                const nextBid = currentBid + auction.bidIncrement;
+                const nextBid = currentBid + (auction.bidIncrement || 10);
 
                 auction.bids.push({
                     bidder: currentChatNick,
@@ -3023,10 +3115,12 @@
                     time: now
                 });
 
+                const quality = auction.quality || '';
+                const profession = auction.profession || '';
                 room.messages.push({
                     id: 'msg_' + Date.now(),
                     author: '系统',
-                    content: `💰 ${currentChatNick} 对 #${auction.id} ${auction.title} 出价 ${nextBid}`,
+                    content: `💰 ${currentChatNick} 对 #${auction.id} ${quality}·${profession} 出价 ${nextBid}`,
                     time: now
                 });
 
@@ -3048,7 +3142,7 @@
                     renderChatMessages();
                     renderAuctionsList();
                 } catch (e) {}
-            }, 10000);
+            }, 3000);
         }
 
         function startAuctionCountdown() {
@@ -11234,6 +11328,11 @@ function hasGistToken() {
             }
         }
 
+        function adminOpenChatRoom() {
+            closeAdminPanel();
+            openChatRoomEntry();
+        }
+
         function adminLoadStats() {
             const content = document.getElementById('adminStatsContent');
 
@@ -11354,6 +11453,13 @@ function hasGistToken() {
                         <div>
                             <div style="color:#ffd700;font-weight:500;">系统设置</div>
                             <div style="color:rgba(255,255,255,0.4);font-size:0.8rem;">Token配置与连接测试</div>
+                        </div>
+                    </div>
+                    <div class="admin-menu-item" onclick="adminOpenChatRoom()">
+                        <span style="font-size:1.3rem;">💬</span>
+                        <div>
+                            <div style="color:#ffd700;font-weight:500;">聊天室（测试中）</div>
+                            <div style="color:rgba(255,255,255,0.4);font-size:0.8rem;">进入聊天室与拍卖</div>
                         </div>
                     </div>
                 </div>
@@ -11502,7 +11608,7 @@ function hasGistToken() {
 
     <!-- 消息墙开关按钮 -->
     <button id="messageWallToggle" onclick="toggleMessageWall()" title="需求墙" style="position:fixed;top:60px;left:20px;background:rgba(255,215,0,0.85);color:#1a1a2e;border:none;width:38px;height:38px;border-radius:50%;cursor:pointer;font-size:1.1rem;box-shadow:0 2px 10px rgba(0,0,0,0.3);z-index:9985;display:flex;align-items:center;justify-content:center;">📢</button>
-    <button id="chatRoomToggle" onclick="openChatRoomEntry()" title="聊天室" style="position:fixed;top:105px;left:20px;background:rgba(78,205,196,0.85);color:#1a1a2e;border:none;width:38px;height:38px;border-radius:50%;cursor:pointer;font-size:1.1rem;box-shadow:0 2px 10px rgba(0,0,0,0.3);z-index:9985;display:flex;align-items:center;justify-content:center;">💬</button>
+    <button id="chatRoomToggle" onclick="openChatRoomEntry()" title="聊天室" style="position:fixed;top:105px;left:20px;background:rgba(78,205,196,0.85);color:#1a1a2e;border:none;width:38px;height:38px;border-radius:50%;cursor:pointer;font-size:1.1rem;box-shadow:0 2px 10px rgba(0,0,0,0.3);z-index:9985;display:none;align-items:center;justify-content:center;">💬</button>
 
     <!-- 聊天室入口弹窗 -->
     <div id="chatRoomEntryModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9998;align-items:center;justify-content:center;">
@@ -11547,36 +11653,66 @@ function hasGistToken() {
     <!-- 拍卖发布弹窗 -->
     <div id="auctionPostModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;align-items:center;justify-content:center;">
         <div style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);border:2px solid rgba(255,215,0,0.4);border-radius:16px;padding:25px;width:90%;max-width:450px;max-height:85vh;overflow-y:auto;box-shadow:0 10px 50px rgba(0,0,0,0.6);">
-            <h2 style="color:#ffd700;text-align:center;margin:0 0 20px 0;font-size:1.1rem;">🔨 发布拍卖</h2>
-            <label style="color:rgba(255,255,255,0.8);display:block;margin-bottom:5px;font-size:0.85rem;">物品名称</label>
-            <input type="text" id="auctionTitle" placeholder="拍卖物品名称" style="width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:white;font-size:0.9rem;margin-bottom:10px;outline:none;box-sizing:border-box;">
-            <label style="color:rgba(255,255,255,0.8);display:block;margin-bottom:5px;font-size:0.85rem;">物品描述</label>
-            <textarea id="auctionDesc" placeholder="物品描述（可选）" style="width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:white;font-size:0.9rem;margin-bottom:10px;outline:none;box-sizing:border-box;min-height:60px;resize:vertical;"></textarea>
-            <label style="color:rgba(255,255,255,0.8);display:block;margin-bottom:5px;font-size:0.85rem;">图片URL（可选）</label>
-            <input type="text" id="auctionImage" placeholder="https://example.com/image.jpg" style="width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:white;font-size:0.9rem;margin-bottom:10px;outline:none;box-sizing:border-box;">
-            <div style="display:flex;gap:10px;margin-bottom:10px;">
-                <div style="flex:1;">
-                    <label style="color:rgba(255,255,255,0.8);display:block;margin-bottom:5px;font-size:0.85rem;">起拍价</label>
-                    <input type="number" id="auctionStartPrice" placeholder="100" min="0" style="width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:white;font-size:0.9rem;outline:none;box-sizing:border-box;">
+            <h2 style="color:#ffd700;text-align:center;margin:0 0 15px 0;font-size:1.1rem;">🔨 发布拍卖</h2>
+            <label style="color:rgba(255,255,255,0.8);display:block;margin-bottom:5px;font-size:0.85rem;">物品图片</label>
+            <div style="display:flex;gap:10px;margin-bottom:10px;align-items:flex-start;">
+                <div id="auctionImagePreview" style="width:80px;height:80px;background:rgba(0,0,0,0.3);border:1px dashed rgba(255,255,255,0.2);border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;cursor:pointer;" onclick="document.getElementById('auctionImageFile').click()">
+                    <span style="color:rgba(255,255,255,0.3);font-size:0.7rem;">点击上传</span>
                 </div>
-                <div style="flex:1;">
-                    <label style="color:rgba(255,255,255,0.8);display:block;margin-bottom:5px;font-size:0.85rem;">最低成交价</label>
-                    <input type="number" id="auctionMinPrice" placeholder="50" min="0" style="width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:white;font-size:0.9rem;outline:none;box-sizing:border-box;">
+                <input type="file" id="auctionImageFile" accept="image/*" style="display:none;" onchange="previewAuctionImage(this)">
+                <div style="flex:1;display:flex;flex-direction:column;gap:8px;">
+                    <div>
+                        <label style="color:rgba(255,255,255,0.6);font-size:0.75rem;">品质</label>
+                        <select id="auctionQuality" style="width:100%;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:white;font-size:0.85rem;outline:none;box-sizing:border-box;">
+                            <option value="红色" style="color:#ef4444;">红色</option>
+                            <option value="金色" style="color:#ffd700;">金色</option>
+                            <option value="紫色" style="color:#a78bfa;">紫色</option>
+                            <option value="蓝色" style="color:#60a5fa;">蓝色</option>
+                            <option value="绿色" style="color:#4ade80;">绿色</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="color:rgba(255,255,255,0.6);font-size:0.75rem;">职业</label>
+                        <select id="auctionProfession" style="width:100%;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:white;font-size:0.85rem;outline:none;box-sizing:border-box;">
+                            <option value="工程">工程</option>
+                            <option value="熊猫">熊猫</option>
+                            <option value="法师">法师</option>
+                            <option value="召唤">召唤</option>
+                            <option value="战士">战士</option>
+                            <option value="猎人">猎人</option>
+                            <option value="牧师">牧师</option>
+                            <option value="术士">术士</option>
+                        </select>
+                    </div>
                 </div>
             </div>
-            <div style="display:flex;gap:10px;margin-bottom:15px;">
+            <div style="display:flex;gap:8px;margin-bottom:8px;">
                 <div style="flex:1;">
-                    <label style="color:rgba(255,255,255,0.8);display:block;margin-bottom:5px;font-size:0.85rem;">每次加价</label>
-                    <input type="number" id="auctionBidIncrement" placeholder="10" min="1" style="width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:white;font-size:0.9rem;outline:none;box-sizing:border-box;">
+                    <label style="color:rgba(255,255,255,0.6);font-size:0.75rem;">附加伤害</label>
+                    <input type="number" id="auctionBonusDmg" placeholder="0" min="0" style="width:100%;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:white;font-size:0.85rem;outline:none;box-sizing:border-box;">
                 </div>
                 <div style="flex:1;">
-                    <label style="color:rgba(255,255,255,0.8);display:block;margin-bottom:5px;font-size:0.85rem;">拍卖时长（分钟）</label>
-                    <input type="number" id="auctionDuration" placeholder="60" min="1" style="width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:white;font-size:0.9rem;outline:none;box-sizing:border-box;">
+                    <label style="color:rgba(255,255,255,0.6);font-size:0.75rem;">无视冰甲</label>
+                    <input type="number" id="auctionIgnoreIce" placeholder="0" min="0" style="width:100%;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:white;font-size:0.85rem;outline:none;box-sizing:border-box;">
                 </div>
             </div>
-            <div style="display:flex;gap:10px;justify-content:flex-end;">
-                <button onclick="closeAuctionPostModal()" style="padding:10px 20px;border-radius:8px;border:none;background:rgba(255,255,255,0.1);color:white;cursor:pointer;">取消</button>
-                <button onclick="postAuction()" style="padding:10px 20px;border-radius:8px;border:none;background:linear-gradient(135deg,#ffd700,#ff6b6b);color:#1a1a2e;cursor:pointer;font-weight:500;">发布拍卖</button>
+            <div style="display:flex;gap:8px;margin-bottom:8px;">
+                <div style="flex:1;">
+                    <label style="color:rgba(255,255,255,0.6);font-size:0.75rem;">起拍价</label>
+                    <input type="number" id="auctionStartPrice" placeholder="100" min="0" style="width:100%;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:white;font-size:0.85rem;outline:none;box-sizing:border-box;">
+                </div>
+                <div style="flex:1;">
+                    <label style="color:rgba(255,255,255,0.6);font-size:0.75rem;">每次加价</label>
+                    <input type="number" id="auctionBidIncrement" placeholder="10" min="1" style="width:100%;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:white;font-size:0.85rem;outline:none;box-sizing:border-box;">
+                </div>
+                <div style="flex:1;">
+                    <label style="color:rgba(255,255,255,0.6);font-size:0.75rem;">时长(分钟)</label>
+                    <input type="number" id="auctionDuration" placeholder="60" min="1" style="width:100%;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:white;font-size:0.85rem;outline:none;box-sizing:border-box;">
+                </div>
+            </div>
+            <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:10px;">
+                <button onclick="closeAuctionPostModal()" style="padding:8px 18px;border-radius:8px;border:none;background:rgba(255,255,255,0.1);color:white;cursor:pointer;font-size:0.85rem;">取消</button>
+                <button onclick="postAuction()" style="padding:8px 18px;border-radius:8px;border:none;background:linear-gradient(135deg,#ffd700,#ff6b6b);color:#1a1a2e;cursor:pointer;font-weight:500;font-size:0.85rem;">发布拍卖</button>
             </div>
         </div>
     </div>
