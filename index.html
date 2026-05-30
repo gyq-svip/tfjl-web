@@ -7575,6 +7575,10 @@
             open: true,
             title: '支持导入脚本解析 | 阵容存储快速查看 | 活动遇到龙行麻烦投一下'
         };
+
+        const DEFAULT_NEWS = [
+            { category: '公告', name: '欢迎使用塔防精灵阵容归档', content: '支持导入脚本解析、阵容存储快速查看、需求墙留言等功能', author: 'gyq', publish_time: new Date().toISOString().substring(0, 19).replace('T', ' ') }
+        ];
         
         // 当前配置
         let currentConfig = { ...DEFAULT_CONFIG };
@@ -7814,27 +7818,23 @@ function hasGistToken() {
         
         // 加载新闻（优先缓存，每天刷新一次）
         async function loadNews() {
-            // 先尝试从缓存加载
             const cachedNews = loadNewsFromCache();
             if (cachedNews) {
                 newsItems = cachedNews;
             }
             
-            // 如果需要刷新缓存或没有缓存，从GitHub获取
             if (shouldRefreshNewsCache() || !cachedNews) {
                 try {
                     const freshNews = await fetchNewsFromGitHub();
                     newsItems = freshNews;
                     saveNewsToCache(freshNews);
                 } catch (error) {
-                    // 如果没有缓存，使用默认新闻
                     if (!cachedNews) {
-                        newsItems = [];
+                        newsItems = [...DEFAULT_NEWS];
                     }
                 }
             }
             
-            // 数据加载完成后，初始化公告显示
             initMarquee();
             
             return newsItems;
@@ -7977,9 +7977,13 @@ function hasGistToken() {
                 initMarquee();
             } catch (error) {
                 console.error('刷新公告失败:', error);
-                newsItems = backupNewsItems;
-                currentConfig.title = backupTitle;
-                marqueeEl.textContent = '刷新失败，显示缓存数据';
+                if (backupNewsItems.length > 0) {
+                    newsItems = backupNewsItems;
+                } else {
+                    newsItems = [...DEFAULT_NEWS];
+                }
+                currentConfig.title = backupTitle || DEFAULT_CONFIG.title;
+                marqueeEl.textContent = '网络不可用，显示缓存数据';
                 setTimeout(() => {
                     marqueeEl.textContent = getNewsMarqueeText();
                     marqueeEl.style.animation = 'marqueeScroll 60s linear infinite';
@@ -10397,7 +10401,16 @@ function hasGistToken() {
                 renderAdminNewsList(newsData);
             } catch (error) {
                 console.error('管理员获取公告失败:', error);
-                listEl.innerHTML = `<div style="color:#ef4444;text-align:center;padding:20px;">加载失败: ${error.message}</div>`;
+                const cachedNews = loadNewsFromCache();
+                if (cachedNews && cachedNews.length > 0) {
+                    newsItems = cachedNews;
+                    renderAdminNewsList(cachedNews);
+                    listEl.insertAdjacentHTML('afterbegin', '<div style="color:#f59e0b;text-align:center;padding:8px;font-size:0.8rem;">⚠️ 网络不可用，显示缓存数据</div>');
+                } else {
+                    newsItems = [...DEFAULT_NEWS];
+                    renderAdminNewsList(newsItems);
+                    listEl.insertAdjacentHTML('afterbegin', '<div style="color:#f59e0b;text-align:center;padding:8px;font-size:0.8rem;">⚠️ 网络不可用，显示默认公告</div>');
+                }
             }
         }
 
