@@ -3576,7 +3576,6 @@
                 const transaction = db.transaction([STORE_NAME], 'readwrite');
                 const store = transaction.objectStore(STORE_NAME);
 
-                // 收集所有数据
                 const projectData = {
                     name: projectName,
                     category: category || '默认分类',
@@ -3585,8 +3584,6 @@
                     teammateHandCards: teammateHandCards,
                     myPlacedCards: myPlacedCards,
                     teammatePlacedCards: teammatePlacedCards,
-                    favoriteCards: favoriteCards,
-                    professionOrder: professionOrder,
                     cardLevels: cardLevels,
                     cardSkins: cardSkins,
                     myDeckInfo: document.getElementById('myDeckInfo')?.value || '',
@@ -3635,7 +3632,6 @@
             });
         }
 
-        // 从IndexedDB加载单个项目
         function loadProjectFromDB(projectName) {
             return new Promise((resolve, reject) => {
                 if (!db) {
@@ -3650,16 +3646,12 @@
                 request.onsuccess = function(event) {
                     const project = event.target.result;
                     if (project) {
-                        // 先清空当前数据
                         clearCurrentData();
                         
-                        // 恢复数据
                         myHandCards = Array.isArray(project.myHandCards) ? project.myHandCards : [];
                         teammateHandCards = Array.isArray(project.teammateHandCards) ? project.teammateHandCards : [];
                         myPlacedCards = Array.isArray(project.myPlacedCards) ? project.myPlacedCards : [];
                         teammatePlacedCards = Array.isArray(project.teammatePlacedCards) ? project.teammatePlacedCards : [];
-                        favoriteCards = Array.isArray(project.favoriteCards) ? project.favoriteCards : [];
-                        professionOrder = Array.isArray(project.professionOrder) ? project.professionOrder : [];
                         cardLevels = project.cardLevels || {};
                         cardSkins = project.cardSkins || {};
                         
@@ -3670,23 +3662,18 @@
                             document.getElementById('teammateDeckInfo').value = project.teammateDeckInfo || '';
                         }
                         
-                        // 加载记事本
                         const notepad = document.getElementById('notepad');
                         if (notepad) {
                             notepad.value = project.notepad || '';
                         }
                         
-                        // 加载TXT文件
                         loadTxtFilesFromProject(project);
 
-                        // 先设置项目名，再加载参考图片
                         currentProjectName = projectName;
                         currentProjectCategory = project.category || '默认分类';
 
-                        // 加载参考图片
                         loadReferenceImagesFromProject(project);
                         
-                        // 更新UI
                         updateHandDisplay('my');
                         updateHandDisplay('teammate');
                         restoreBattleSlots();
@@ -5915,33 +5902,11 @@
             }
         }
 
-        // 保存常用卡
         function saveFavorites() {
             localStorage.setItem('tdjl_favoriteCards', JSON.stringify(favoriteCards));
             localStorage.setItem('tdjl_professionOrder', JSON.stringify(professionOrder));
         }
 
-        // 加载常用卡
-        function loadFavorites() {
-            const saved = localStorage.getItem('tdjl_favoriteCards');
-            const savedOrder = localStorage.getItem('tdjl_professionOrder');
-            if (saved) {
-                favoriteCards = JSON.parse(saved);
-            }
-            if (savedOrder) {
-                professionOrder = JSON.parse(savedOrder);
-            }
-            
-            // 更新卡池中的常用卡标记
-            favoriteCards.forEach(fav => {
-                const card = document.querySelector(`.card-item[data-id="${fav.id}"]`);
-                if (card) {
-                    card.classList.add('favorite-card');
-                }
-            });
-        }
-
-        // 处理卡池卡牌右键（添加/删除常用卡）
         function handleCardRightClick(e, card) {
             e.preventDefault();
             
