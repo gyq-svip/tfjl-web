@@ -7197,6 +7197,8 @@
                 const card = e.target.closest('.card-item');
                 if (!card) return;
                 
+                if (card.closest('#favoriteCardsGrid')) return;
+                
                 const grid = card.closest('.cards-grid');
                 if (!grid) return;
                 
@@ -7210,6 +7212,8 @@
                 const card = e.target.closest('.card-item');
                 if (!card) return;
                 
+                if (card.closest('#favoriteCardsGrid')) return;
+                
                 const grid = card.closest('.cards-grid');
                 if (!grid) return;
                 
@@ -7222,6 +7226,8 @@
             document.addEventListener('dragstart', (e) => {
                 const card = e.target.closest('.card-item');
                 if (!card) return;
+                
+                if (card.closest('#favoriteCardsGrid')) return;
                 
                 const grid = card.closest('.cards-grid');
                 if (!grid) return;
@@ -7246,7 +7252,8 @@
                 }
             });
 
-            document.addEventListener('mouseenter', (e) => {
+            document.addEventListener('mouseover', (e) => {
+                if (!e.target || !e.target.closest) return;
                 const badge = e.target.closest('.card-level-badge');
                 if (badge) {
                     const cardId = badge.dataset.cardId;
@@ -7254,14 +7261,15 @@
                     const handType = badge.dataset.handType || 'my';
                     scheduleShowSkinTooltip(e, cardId, cardName, handType);
                 }
-            }, true);
+            });
             
-            document.addEventListener('mouseleave', (e) => {
+            document.addEventListener('mouseout', (e) => {
+                if (!e.target || !e.target.closest) return;
                 const badge = e.target.closest('.card-level-badge');
                 if (badge) {
                     hideSkinTooltip();
                 }
-            }, true);
+            });
 
             document.querySelectorAll('.battle-slot').forEach(slot => {
                 slot.addEventListener('dragover', handleSlotDragOver);
