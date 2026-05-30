@@ -6593,16 +6593,17 @@
         }
 
         // 战斗槽点击（移除卡牌）
-        function handleSlotClick() {
+        function handleSlotClick(e) {
+            if (e.target.closest('.card-level-badge')) return;
             if (this.classList.contains('filled')) {
                 const slotId = this.dataset.slot;
                 removeCardFromSlot(slotId);
             }
         }
 
-        // 战斗槽右键（移除卡牌）
         function handleSlotRightClick(e) {
             e.preventDefault();
+            if (e.target.closest('.card-level-badge')) return;
             if (this.classList.contains('filled')) {
                 const slotId = this.dataset.slot;
                 removeCardFromSlot(slotId);
