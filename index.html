@@ -1415,6 +1415,24 @@
             color: white;
         }
 
+        .admin-menu-item {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 15px 18px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .admin-menu-item:hover {
+            background: rgba(255, 215, 0, 0.1);
+            border-color: rgba(255, 215, 0, 0.3);
+            transform: translateX(4px);
+        }
+
         /* ==================== 背景动画 ==================== */
         .background-gradient {
             background: linear-gradient(-45deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4, #ffeaa7, #dfe6e9, #fd79a8);
@@ -2267,10 +2285,10 @@
 
     <div class="container">
         <h1><span id="mainHeader" style="cursor:default;">🛡️</span> 塔防精灵 阵容归档</h1>
-        <p id="mainTitle" class="instructions glowing-text" style="cursor:pointer;" onclick="refreshNewsAndTitle()" title="点击刷新标题"> 支持导入脚本解析 | 阵容存储快速查看 | 活动遇到龙行麻烦投一下  </p>
+        <p id="mainTitle" class="instructions glowing-text" style="cursor:pointer;" onclick="refreshNewsAndTitle()" title="点击刷新公告和标题"> 支持导入脚本解析 | 阵容存储快速查看 | 活动遇到龙行麻烦投一下  </p>
         
         <!-- 滚动公告栏 -->
-        <div id="newsMarqueeContainer" style="background:rgba(255,255,255,0.05);border:2px solid rgba(255,215,0,0.3);border-radius:10px;padding:15px;margin-bottom:20px;text-align:center;overflow:hidden;position:relative;cursor:pointer;" onclick="refreshNewsAndTitle()" title="点击刷新公告">
+        <div id="newsMarqueeContainer" style="background:rgba(255,255,255,0.05);border:2px solid rgba(255,215,0,0.3);border-radius:10px;padding:15px;margin-bottom:20px;text-align:center;overflow:hidden;position:relative;cursor:pointer;" onclick="showNewsListModal()" title="点击查看全部公告">
             <div style="display:flex;align-items:center;gap:15px;">
                 <!-- 实时时间显示 -->
                 <div id="currentTime" style="color:#ffd700;font-weight:bold;font-size:1.1rem;white-space:nowrap;min-width:300px;text-align:left;">
@@ -2282,8 +2300,18 @@
                     <span id="newsMarquee" style="display:inline-block;white-space:nowrap;animation:marqueeScroll 60s linear infinite;color:#ffd700;font-size:1.1rem;padding-left:100%;">暂无公告</span>
                 </div>
             </div>
+            <div style="position:absolute;bottom:3px;right:10px;color:rgba(255,255,255,0.25);font-size:0.65rem;pointer-events:none;">点击查看全部公告</div>
         </div>
         
+        <!-- 公告列表弹窗 -->
+        <div id="newsListModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9998;align-items:center;justify-content:center;">
+            <div style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);border:2px solid rgba(255,215,0,0.4);border-radius:16px;padding:25px;width:90%;max-width:600px;max-height:80vh;overflow-y:auto;position:relative;box-shadow:0 10px 50px rgba(0,0,0,0.6);">
+                <button onclick="closeNewsListModal()" style="position:absolute;top:12px;right:16px;background:none;border:none;color:rgba(255,255,255,0.5);font-size:1.5rem;cursor:pointer;transition:color 0.2s;" onmouseover="this.style.color='white'" onmouseout="this.style.color='rgba(255,255,255,0.5)'">&times;</button>
+                <h2 style="color:#ffd700;text-align:center;margin:0 0 20px 0;font-size:1.2rem;">📢 全部公告</h2>
+                <div id="newsListContent"></div>
+            </div>
+        </div>
+
         <!-- 版本更新说明弹窗 -->
         <div id="versionModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:10000;align-items:center;justify-content:center;">
             <div style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);padding:30px;border-radius:15px;max-width:500px;text-align:center;color:#fff;">
@@ -2327,22 +2355,8 @@
 
         <script>
         // 备份恢复菜单切换
-        let secretClickCount = 0;
-        let secretClickTimer = null;
         
         function toggleBackupMenu(btn) {
-            secretClickCount++;
-            if (secretClickTimer) clearTimeout(secretClickTimer);
-            secretClickTimer = setTimeout(() => {
-                secretClickCount = 0;
-            }, 800);
-            
-            if (secretClickCount >= 5) {
-                secretClickCount = 0;
-                showStatistics();
-                return;
-            }
-            
             const menu = document.getElementById('backupMenu');
             const allMenus = document.querySelectorAll('[id$="Menu"]');
             allMenus.forEach(m => {
@@ -7869,6 +7883,60 @@ function hasGistToken() {
             
             return texts.join('　　◆　　');
         }
+
+        function showNewsListModal() {
+            const modal = document.getElementById('newsListModal');
+            const content = document.getElementById('newsListContent');
+            modal.style.display = 'flex';
+
+            if (newsItems.length === 0) {
+                content.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:30px;">暂无公告</div>';
+                return;
+            }
+
+            content.innerHTML = newsItems.map((item, index) => {
+                const category = item.category || '';
+                const name = item.name || '无标题';
+                const contentText = item.content || '';
+                const author = item.author || '';
+                const time = item.publish_time || '';
+
+                const categoryColors = {
+                    '公告': '#ffd700',
+                    '活动': '#4ade80',
+                    '更新': '#60a5fa',
+                    '通知': '#f472b6',
+                    '其他': '#a78bfa'
+                };
+                const catColor = categoryColors[category] || '#a78bfa';
+
+                return `
+                    <div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:15px;margin-bottom:10px;${index === 0 ? 'border-left:3px solid ' + catColor + ';' : ''}">
+                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                            ${category ? `<span style="background:${catColor};color:#000;padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:bold;">${category}</span>` : ''}
+                            <span style="color:#ffd700;font-size:0.95rem;font-weight:500;">${name}</span>
+                        </div>
+                        ${contentText ? `<div style="color:rgba(255,255,255,0.8);font-size:0.9rem;line-height:1.6;margin-bottom:8px;">${contentText}</div>` : ''}
+                        <div style="color:rgba(255,255,255,0.35);font-size:0.75rem;">
+                            ${author && author !== '无名' ? author : ''}${author && time ? ' · ' : ''}${time ? time.substring(0, 16) : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function closeNewsListModal() {
+            document.getElementById('newsListModal').style.display = 'none';
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeNewsListModal();
+        });
+
+        document.addEventListener('click', (e) => {
+            const modal = document.getElementById('newsListModal');
+            if (e.target === modal) closeNewsListModal();
+        });
         
         // 更新实时时间
         function updateCurrentTime() {
@@ -10288,14 +10356,40 @@ function hasGistToken() {
             const isVerified = sessionStorage.getItem(ADMIN_VERIFY_KEY) === 'true';
             if (isVerified) {
                 document.getElementById('adminVerifySection').style.display = 'none';
-                document.getElementById('adminContent').style.display = 'block';
-                updateAdminTokenStatus();
-                adminRefreshNews();
+                adminShowMenu();
             } else {
                 document.getElementById('adminVerifySection').style.display = 'block';
-                document.getElementById('adminContent').style.display = 'none';
+                document.getElementById('adminMenuSection').style.display = 'none';
+                document.getElementById('adminPageNews').style.display = 'none';
+                document.getElementById('adminPageStats').style.display = 'none';
+                document.getElementById('adminPageSettings').style.display = 'none';
                 document.getElementById('adminVerifyCode').value = '';
                 document.getElementById('adminVerifyCode').focus();
+            }
+        }
+
+        function adminShowMenu() {
+            document.getElementById('adminMenuSection').style.display = 'block';
+            document.getElementById('adminPageNews').style.display = 'none';
+            document.getElementById('adminPageStats').style.display = 'none';
+            document.getElementById('adminPageSettings').style.display = 'none';
+        }
+
+        function adminShowPage(page) {
+            document.getElementById('adminMenuSection').style.display = 'none';
+            document.getElementById('adminPageNews').style.display = 'none';
+            document.getElementById('adminPageStats').style.display = 'none';
+            document.getElementById('adminPageSettings').style.display = 'none';
+
+            if (page === 'news') {
+                document.getElementById('adminPageNews').style.display = 'block';
+                adminRefreshNews();
+            } else if (page === 'stats') {
+                document.getElementById('adminPageStats').style.display = 'block';
+                adminLoadStats();
+            } else if (page === 'settings') {
+                document.getElementById('adminPageSettings').style.display = 'block';
+                updateAdminTokenStatus();
             }
         }
 
@@ -10324,9 +10418,7 @@ function hasGistToken() {
             if (code === ADMIN_VERIFY_CODE) {
                 sessionStorage.setItem(ADMIN_VERIFY_KEY, 'true');
                 document.getElementById('adminVerifySection').style.display = 'none';
-                document.getElementById('adminContent').style.display = 'block';
-                updateAdminTokenStatus();
-                adminRefreshNews();
+                adminShowMenu();
                 showAdminStatus('验证成功！', 'success');
             } else {
                 showAdminStatus('验证码错误', 'error');
@@ -10575,6 +10667,55 @@ function hasGistToken() {
                 showAdminStatus('连接失败: ' + error.message, 'error');
             }
         }
+
+        function adminLoadStats() {
+            const content = document.getElementById('adminStatsContent');
+
+            if (!counterData) {
+                content.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:30px;">暂无统计数据，请稍后再试</div>';
+                return;
+            }
+
+            const today = getTodayString();
+            const todayStats = counterData.daily_stats[today] || { visits: 0, downloads: 0 };
+            const pendingCount = loadPendingSync().length;
+            const totalUsers = counterData.total_users || 0;
+            const activeToday = counterData.active_today || 0;
+
+            let onlineCount = 0;
+            if (counterData.online_users) {
+                const now = Date.now();
+                const timeout = counterData.online_timeout || 7200000;
+                for (const id in counterData.online_users) {
+                    if (now - counterData.online_users[id] <= timeout) {
+                        onlineCount++;
+                    }
+                }
+            }
+            const onlineTimeoutMinutes = Math.round((counterData.online_timeout || 7200000) / 60000);
+
+            content.innerHTML = `
+                <div class="admin-section">
+                    ${pendingCount > 0 ? `<div style="color:#ff9800;margin-bottom:10px;">⚠️ 有 ${pendingCount} 条数据等待同步</div>` : ''}
+                    <h3 style="color:#4ecdc4;">📈 总计数据</h3>
+                    <div style="padding-left:20px;line-height:2;">
+                        <div>• 总访问次数：<span style="color:#ffd700;">${counterData.total_visits}</span></div>
+                        <div>• 总用户数：<span style="color:#ffd700;">${totalUsers}</span></div>
+                        <div>• 当前在线：<span style="color:#4ade80;">${onlineCount}</span> <span style="color:rgba(255,255,255,0.35);font-size:0.8rem;">(${onlineTimeoutMinutes}分钟内活跃)</span></div>
+                        <div>• 今日活跃：<span style="color:#4ade80;">${activeToday}</span></div>
+                        <div>• 总下载次数：<span style="color:#ffd700;">${counterData.total_downloads}</span></div>
+                    </div>
+                </div>
+                <div class="admin-section">
+                    <h3 style="color:#4ecdc4;">📅 今日数据 (${today})</h3>
+                    <div style="padding-left:20px;line-height:2;">
+                        <div>• 今日访问：<span style="color:#ffd700;">${todayStats.visits}</span></div>
+                        <div>• 今日下载：<span style="color:#ffd700;">${todayStats.downloads}</span></div>
+                    </div>
+                </div>
+                <div style="color:rgba(255,255,255,0.3);font-size:0.8rem;text-align:center;margin-top:10px;">最后更新：${counterData.last_updated || '未知'}</div>
+            `;
+        }
     </script>
 
     <!-- 模态框：创建分类 -->
@@ -10605,12 +10746,11 @@ function hasGistToken() {
     <div id="adminPanelOverlay" class="admin-panel-overlay">
         <div class="admin-panel" style="position:relative;">
             <button class="admin-close-btn" onclick="closeAdminPanel()">&times;</button>
-            <h2>🔐 管理员控制台</h2>
 
             <div id="adminStatus" class="admin-status"></div>
 
             <div id="adminVerifySection" class="admin-section">
-                <h3>🔑 身份验证</h3>
+                <h3 style="color:#ffd700;text-align:center;margin:0 0 15px 0;">🔐 身份验证</h3>
                 <label>请输入管理员验证码</label>
                 <input type="password" id="adminVerifyCode" placeholder="输入验证码" autocomplete="off">
                 <div style="text-align:center;">
@@ -10619,7 +10759,38 @@ function hasGistToken() {
                 <div class="admin-verify-hint">验证后可管理公告和更多功能</div>
             </div>
 
-            <div id="adminContent" style="display:none;">
+            <div id="adminMenuSection" style="display:none;">
+                <h2 style="color:#ffd700;text-align:center;margin:0 0 20px 0;font-size:1.2rem;">🛡️ 管理员菜单</h2>
+                <div style="display:flex;flex-direction:column;gap:10px;">
+                    <div class="admin-menu-item" onclick="adminShowPage('news')">
+                        <span style="font-size:1.3rem;">📢</span>
+                        <div>
+                            <div style="color:#ffd700;font-weight:500;">公告管理</div>
+                            <div style="color:rgba(255,255,255,0.4);font-size:0.8rem;">发布、删除、查看公告</div>
+                        </div>
+                    </div>
+                    <div class="admin-menu-item" onclick="adminShowPage('stats')">
+                        <span style="font-size:1.3rem;">📊</span>
+                        <div>
+                            <div style="color:#ffd700;font-weight:500;">访问统计</div>
+                            <div style="color:rgba(255,255,255,0.4);font-size:0.8rem;">查看网站访问数据</div>
+                        </div>
+                    </div>
+                    <div class="admin-menu-item" onclick="adminShowPage('settings')">
+                        <span style="font-size:1.3rem;">⚙️</span>
+                        <div>
+                            <div style="color:#ffd700;font-weight:500;">系统设置</div>
+                            <div style="color:rgba(255,255,255,0.4);font-size:0.8rem;">Token配置与连接测试</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="adminPageNews" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
+                    <button class="admin-btn admin-btn-secondary" onclick="adminShowMenu()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
+                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">📢 公告管理</h3>
+                </div>
                 <div class="admin-section">
                     <h3>📝 发布公告</h3>
                     <div class="admin-form-row">
@@ -10650,7 +10821,6 @@ function hasGistToken() {
                         <button class="admin-btn admin-btn-primary" onclick="adminPublishNews()">发布公告</button>
                     </div>
                 </div>
-
                 <div class="admin-section">
                     <h3>📋 公告列表</h3>
                     <div style="text-align:right;margin-bottom:10px;">
@@ -10660,9 +10830,22 @@ function hasGistToken() {
                         <div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;">加载中...</div>
                     </div>
                 </div>
+            </div>
 
-                <div class="admin-section" id="adminTokenSection">
-                    <h3>⚙️ 系统设置</h3>
+            <div id="adminPageStats" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
+                    <button class="admin-btn admin-btn-secondary" onclick="adminShowMenu()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
+                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">📊 访问统计</h3>
+                </div>
+                <div id="adminStatsContent"></div>
+            </div>
+
+            <div id="adminPageSettings" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
+                    <button class="admin-btn admin-btn-secondary" onclick="adminShowMenu()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
+                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">⚙️ 系统设置</h3>
+                </div>
+                <div class="admin-section">
                     <div id="adminTokenStatus" style="margin-bottom:10px;"></div>
                     <label>GitHub Token（用于写入Gist）</label>
                     <input type="password" id="adminGistToken" placeholder="ghp_xxxxxxxxxxxx" autocomplete="off">
