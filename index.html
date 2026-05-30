@@ -5585,7 +5585,7 @@
             hideSkinTooltip();
             tooltipTimeout = setTimeout(() => {
                 showSkinTooltip(event, cardId, cardName, handType);
-            }, 800);
+            }, 1500);
         }
         
         function scheduleShowSkinTooltip(event, cardId, cardName, handType = 'my') {
@@ -5593,7 +5593,7 @@
             hideSkinTooltip();
             tooltipTimeout = setTimeout(() => {
                 showSkinTooltip(event, cardId, cardName, handType);
-            }, 600);
+            }, 1500);
         }
         
         // 显示单独的皮肤下拉选择器（点击皮肤图标）
@@ -7995,7 +7995,7 @@ function hasGistToken() {
                 active_today_users: [],
                 active_date: today,
                 online_users: {},
-                online_timeout: 600000,
+                online_timeout: 7200000,
                 daily_stats: {
                     [today]: {
                         visits: 0,
@@ -8041,7 +8041,7 @@ function hasGistToken() {
                     if (parsed.total_visits === undefined) parsed.total_visits = 0;
                     if (parsed.total_downloads === undefined) parsed.total_downloads = 0;
                     if (!parsed.online_users) parsed.online_users = {};
-                    if (!parsed.online_timeout) parsed.online_timeout = 600000;
+                    if (!parsed.online_timeout) parsed.online_timeout = 7200000;
                     
                     // 检查日期是否变化，如果新的一天则清空今日活跃用户
                     const today = getTodayString();
@@ -8115,7 +8115,7 @@ function hasGistToken() {
                 
                 // 确保在线用户对象存在
                 if (!counterData.online_users) counterData.online_users = {};
-                if (!counterData.online_timeout) counterData.online_timeout = 600000;
+                if (!counterData.online_timeout) counterData.online_timeout = 7200000;
                 
                 // 记录用户最后活跃时间（用于计算在线用户）
                 counterData.online_users[deviceId] = Date.now();
@@ -8210,7 +8210,7 @@ function hasGistToken() {
                 if (!remoteData.total_users) remoteData.total_users = remoteData.unique_users.length;
                 if (!remoteData.active_today) remoteData.active_today = remoteData.active_today_users.length;
                 if (!remoteData.online_users) remoteData.online_users = {};
-                if (!remoteData.online_timeout) remoteData.online_timeout = 600000;
+                if (!remoteData.online_timeout) remoteData.online_timeout = 7200000;
                 
                 // 合并待同步的数据
                 const today = getTodayString();
@@ -8419,7 +8419,7 @@ function hasGistToken() {
             let onlineCount = 0;
             if (counterData.online_users) {
                 const now = Date.now();
-                const timeout = counterData.online_timeout || 600000;
+                const timeout = counterData.online_timeout || 7200000;
                 for (const id in counterData.online_users) {
                     if (now - counterData.online_users[id] <= timeout) {
                         onlineCount++;
@@ -9933,14 +9933,14 @@ function hasGistToken() {
             let onlineCount = 0;
             if (counterData.online_users) {
                 const now = Date.now();
-                const timeout = counterData.online_timeout || 600000;
+                const timeout = counterData.online_timeout || 7200000;
                 for (const id in counterData.online_users) {
                     if (now - counterData.online_users[id] <= timeout) {
                         onlineCount++;
                     }
                 }
             }
-            const onlineTimeoutMinutes = Math.round((counterData.online_timeout || 600000) / 60000);
+            const onlineTimeoutMinutes = Math.round((counterData.online_timeout || 7200000) / 60000);
             
             let statsHtml = `
                 <div style="text-align:left;line-height:1.8;">
