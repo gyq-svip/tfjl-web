@@ -5395,9 +5395,10 @@
             document.querySelectorAll('.level-dropdown').forEach(el => el.remove());
         }
 
-        // 更新所有卡牌等级徽章
         function updateAllCardLevelBadges() {
-            document.querySelectorAll('.collapsible-section .card-item:not(.favorite-card)').forEach(card => {
+            document.querySelectorAll('.collapsible-section .card-item').forEach(card => {
+                if (card.closest('#favoriteCardsGrid')) return;
+                
                 const cardId = card.dataset.id;
                 const cardType = card.dataset.type;
                 const cardName = card.dataset.name || card.textContent.trim();
@@ -5941,6 +5942,7 @@
             
             saveFavorites();
             updateFavoritesDisplay();
+            updateAllCardLevelBadges();
         }
 
         // 处理常用卡点击（添加到手牌）
@@ -6737,15 +6739,33 @@
             if (saved) {
                 customCards = JSON.parse(saved);
                 let needSave = false;
+                let needSaveFavorites = false;
                 
                 Object.keys(customCards).forEach(key => {
                     const [cardType, profession] = key.split('_');
                     customCards[key].forEach(card => {
                         if (!card.cardType) { card.cardType = cardType; needSave = true; }
                         if (!card.profession) { card.profession = profession; needSave = true; }
-                        if (!card.id || !card.id.startsWith('custom_')) { 
+                        if (!card.id || !card.id.startsWith('custom_')) {
+                            const oldId = card.id;
                             card.id = 'custom_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
                             needSave = true;
+                            
+                            if (oldId) {
+                                const savedFav = localStorage.getItem('tdjl_favoriteCards');
+                                if (savedFav) {
+                                    let favs = JSON.parse(savedFav);
+                                    favs.forEach(fav => {
+                                        if (fav.id === oldId) {
+                                            fav.id = card.id;
+                                            needSaveFavorites = true;
+                                        }
+                                    });
+                                    if (needSaveFavorites) {
+                                        localStorage.setItem('tdjl_favoriteCards', JSON.stringify(favs));
+                                    }
+                                }
+                            }
                         }
                     });
                 });
@@ -6887,7 +6907,14 @@
             }
             
             favoriteCards.forEach(fav => {
-                const card = document.querySelector(`.card-item[data-id="${fav.id}"]`);
+                let card = document.querySelector(`.card-item[data-id="${fav.id}"]`);
+                if (!card && fav.name) {
+                    card = document.querySelector(`.card-item[data-name="${fav.name}"][data-type="${fav.type}"]`);
+                    if (card) {
+                        fav.id = card.dataset.id;
+                        localStorage.setItem('tdjl_favoriteCards', JSON.stringify(favoriteCards));
+                    }
+                }
                 if (card) {
                     card.classList.add('favorite-card');
                 }
