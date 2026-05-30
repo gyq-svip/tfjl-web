@@ -6454,7 +6454,7 @@
                     const engineerClass = card.isEngineering ? 'engineering-card' : '';
                     // 获取卡牌类型用于显示等级
                     const cardType = card.type || findCardTypeById(card.id);
-                    const levelBadge = cardType ? createLevelBadgeHTML(card.id, cardType, handType) : '';
+                    const levelBadge = cardType ? createLevelBadgeHTML(card.id, cardType, handType, card.name) : '';
                     html += '<div class="selected-card ' + placedClass + ' ' + engineerClass + ' card-item" data-id="' + card.id + '" data-name="' + card.name + '" data-type="' + (cardType || '') + '" data-engineering="' + card.isEngineering + '" data-profession="' + card.profession + '" draggable="' + (!card.placed) + '">' + levelBadge + card.name + '</div>';
                 } else {
                     html += '<div class="selected-card empty">空</div>';
@@ -7203,6 +7203,8 @@
             const cardItems = document.querySelectorAll('.card-item');
 
             cardItems.forEach(card => {
+                if (card.dataset.id && card.dataset.id.startsWith('custom_')) return;
+                
                 card.addEventListener('click', () => handlePoolCardClick(card));
                 card.setAttribute('draggable', 'true');
                 card.addEventListener('dragstart', (e) => {
@@ -7212,7 +7214,6 @@
                 });
                 card.addEventListener('contextmenu', (e) => handleCardRightClick(e, card));
                 
-                // 长按添加/删除收藏（手机版）
                 setupLongPress(card, (e) => handleCardRightClick(e, card));
             });
 
