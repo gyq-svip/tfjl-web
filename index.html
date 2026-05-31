@@ -2666,7 +2666,7 @@
             localStorage.setItem('TFJL_ChatRoom', roomId);
 
             closeChatRoomEntry();
-            document.getElementById('chatRoomPanel').style.display = 'block';
+            document.getElementById('chatRoomPanel').style.display = 'flex';
             document.getElementById('chatRoomIdDisplay').textContent = '#' + roomId;
 
             await fetchChatRoomData();
@@ -2877,7 +2877,7 @@
                 room.messages.push({
                     id: 'msg_' + Date.now(),
                     author: '系统',
-                    content: `🔨 ${currentChatNick} 发布了拍卖 #${auctionId}：${quality}${profession}，起拍价 ${startPrice}`,
+                    content: `🔨 ${currentChatNick} 发布了拍卖 #${auctionId}：${quality}·${profession}${bonusDmg > 0 ? ' 附加伤害+' + bonusDmg : ''}${ignoreIce > 0 ? ' 无视冰甲+' + ignoreIce : ''}，起拍价 ${startPrice}`,
                     time: Date.now()
                 });
 
@@ -2917,12 +2917,12 @@
 
                 let timeHtml = '';
                 if (isEnded) {
-                    timeHtml = '<span style="color:#ef4444;font-size:0.7rem;">已结束</span>';
+                    timeHtml = '<div style="color:#ef4444;font-size:0.75rem;text-align:right;">已结束</div>';
                 } else {
                     const remaining = Math.max(0, auction.endTime - now);
                     const mins = Math.floor(remaining / 60000);
                     const secs = Math.floor((remaining % 60000) / 1000);
-                    timeHtml = `<span style="color:#f59e0b;font-size:0.7rem;" data-auction-id="${auction.id}">⏳${mins}分${secs}秒</span>`;
+                    timeHtml = `<div style="color:#f59e0b;font-size:0.75rem;text-align:right;" data-auction-id="${auction.id}">⏳${mins}分${secs}秒</div>`;
                 }
 
                 let attrsHtml = '';
@@ -2935,27 +2935,27 @@
 
                 let bidderHtml = '';
                 if (currentBidder) {
-                    bidderHtml = `<div style="color:rgba(255,255,255,0.5);font-size:0.7rem;margin-top:1px;">👤 ${currentBidder}</div>`;
+                    bidderHtml = `<div style="color:rgba(255,255,255,0.7);font-size:0.9rem;text-align:right;">👤 ${currentBidder}</div>`;
                 }
 
                 return `
                     <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-left:3px solid ${qualityColor};border-radius:8px;padding:10px;margin-bottom:8px;display:flex;gap:10px;align-items:center;transition:all 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.07)'" onmouseout="this.style.background='rgba(255,255,255,0.04)'">
                         ${imageHtml}
                         <div style="flex:1;min-width:0;">
-                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;">
-                                <span style="color:${qualityColor};font-size:0.8rem;font-weight:600;">#${auction.id} ${quality}·${profession}</span>
-                                ${timeHtml}
-                            </div>
-                            <div style="margin-bottom:3px;">${attrsHtml}</div>
-                            <div style="color:#ffd700;font-size:1.1rem;font-weight:700;">💰 ${currentBid}</div>
-                            ${bidderHtml}
-                            <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
+                            <div style="color:${qualityColor};font-size:0.8rem;font-weight:600;margin-bottom:3px;">#${auction.id} ${quality}·${profession}</div>
+                            <div style="margin-bottom:4px;">${attrsHtml}</div>
+                            <div style="display:flex;align-items:center;gap:8px;">
                                 ${!isEnded
                                     ? `<button onclick="event.stopPropagation();quickBid('${auction.id}')" style="padding:3px 10px;border-radius:5px;border:none;background:linear-gradient(135deg,#ffd700,#ff6b6b);color:#1a1a2e;cursor:pointer;font-weight:600;font-size:0.7rem;white-space:nowrap;">加价</button>`
                                     : `<span style="padding:3px 8px;border-radius:5px;background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.3);font-size:0.7rem;">已结束</span>`
                                 }
                                 <span style="color:rgba(255,255,255,0.3);font-size:0.65rem;">${bidCount}次出价</span>
                             </div>
+                        </div>
+                        <div style="flex-shrink:0;text-align:right;">
+                            ${timeHtml}
+                            <div style="color:#ffd700;font-size:1.2rem;font-weight:700;">💰${currentBid}</div>
+                            ${bidderHtml}
                         </div>
                     </div>
                 `;
@@ -3116,10 +3116,12 @@
 
                 const quality = auction.quality || '';
                 const profession = auction.profession || '';
+                const bonusDmg = auction.bonusDmg || 0;
+                const ignoreIce = auction.ignoreIce || 0;
                 room.messages.push({
                     id: 'msg_' + Date.now(),
                     author: '系统',
-                    content: `💰 ${currentChatNick} 对 #${auction.id} ${quality}·${profession} 出价 ${nextBid}`,
+                    content: `💰 ${currentChatNick} 对 #${auction.id} ${quality}·${profession}${bonusDmg > 0 ? ' 附加伤害+' + bonusDmg : ''}${ignoreIce > 0 ? ' 无视冰甲+' + ignoreIce : ''} 出价 ${nextBid}（当前最高）`,
                     time: now
                 });
 
@@ -3156,10 +3158,12 @@
 
                 const quality = auction.quality || '';
                 const profession = auction.profession || '';
+                const bonusDmg = auction.bonusDmg || 0;
+                const ignoreIce = auction.ignoreIce || 0;
                 room.messages.push({
                     id: 'msg_' + Date.now(),
                     author: '系统',
-                    content: `💰 ${currentChatNick} 对 #${auction.id} ${quality}·${profession} 出价 ${nextBid}`,
+                    content: `💰 ${currentChatNick} 对 #${auction.id} ${quality}·${profession}${bonusDmg > 0 ? ' 附加伤害+' + bonusDmg : ''}${ignoreIce > 0 ? ' 无视冰甲+' + ignoreIce : ''} 出价 ${nextBid}（当前最高）`,
                     time: now
                 });
 
@@ -3174,14 +3178,38 @@
 
         function startChatRefresh() {
             if (chatRefreshInterval) clearInterval(chatRefreshInterval);
-            chatRefreshInterval = setInterval(async () => {
+            function getRefreshInterval() {
+                const room = getRoomData();
+                if (!room || !room.auctions) return 15000;
+                const hasActive = room.auctions.some(a => a.status === 'active' && Date.now() < a.endTime);
+                return hasActive ? 5000 : 15000;
+            }
+            function doRefresh() {
                 if (!currentChatRoom) return;
-                try {
-                    await fetchChatRoomData();
+                fetchChatRoomData().then(() => {
                     renderChatMessages();
                     renderAuctionsList();
-                } catch (e) {}
-            }, 3000);
+                    const newInterval = getRefreshInterval();
+                    if (newInterval !== chatRefreshCurrentInterval) {
+                        chatRefreshCurrentInterval = newInterval;
+                        clearInterval(chatRefreshInterval);
+                        chatRefreshInterval = setInterval(doRefresh, newInterval);
+                    }
+                }).catch(() => {});
+            }
+            chatRefreshCurrentInterval = getRefreshInterval();
+            chatRefreshInterval = setInterval(doRefresh, chatRefreshCurrentInterval);
+        }
+
+        let chatRefreshCurrentInterval = 5000;
+
+        async function manualRefreshAuctions() {
+            if (!currentChatRoom) return;
+            try {
+                await fetchChatRoomData();
+                renderChatMessages();
+                renderAuctionsList();
+            } catch (e) {}
         }
 
         function startAuctionCountdown() {
@@ -3522,28 +3550,59 @@
             let isDragging = false;
             let offset = {x: 0, y: 0};
             
-            header.addEventListener('mousedown', function(e) {
-                if (e.target.tagName === 'BUTTON' || e.target.tagName === 'SELECT') return;
+            function startDrag(clientX, clientY, target) {
+                if (target.closest('button') || target.closest('select') || target.closest('input')) return;
                 isDragging = true;
                 const rect = panel.getBoundingClientRect();
-                offset.x = e.clientX - rect.left;
-                offset.y = e.clientY - rect.top;
+                offset.x = clientX - rect.left;
+                offset.y = clientY - rect.top;
                 panel.style.opacity = '0.9';
-            });
+                panel.style.transition = 'none';
+            }
             
-            document.addEventListener('mousemove', function(e) {
+            function moveDrag(clientX, clientY) {
                 if (!isDragging) return;
-                panel.style.left = (e.clientX - offset.x) + 'px';
-                panel.style.top = (e.clientY - offset.y) + 'px';
+                let newLeft = clientX - offset.x;
+                let newTop = clientY - offset.y;
+                newLeft = Math.max(0, Math.min(newLeft, window.innerWidth - 50));
+                newTop = Math.max(0, Math.min(newTop, window.innerHeight - 50));
+                panel.style.left = newLeft + 'px';
+                panel.style.top = newTop + 'px';
                 panel.style.right = 'auto';
-            });
+                panel.style.bottom = 'auto';
+            }
             
-            document.addEventListener('mouseup', function() {
+            function endDrag() {
                 if (isDragging) {
                     isDragging = false;
                     panel.style.opacity = '1';
+                    panel.style.transition = '';
                 }
+            }
+            
+            header.addEventListener('mousedown', function(e) {
+                startDrag(e.clientX, e.clientY, e.target);
+                e.preventDefault();
             });
+            document.addEventListener('mousemove', function(e) {
+                moveDrag(e.clientX, e.clientY);
+            });
+            document.addEventListener('mouseup', endDrag);
+            
+            header.addEventListener('touchstart', function(e) {
+                if (e.touches.length === 1) {
+                    const t = e.touches[0];
+                    startDrag(t.clientX, t.clientY, e.target);
+                }
+            }, {passive: true});
+            document.addEventListener('touchmove', function(e) {
+                if (isDragging && e.touches.length === 1) {
+                    const t = e.touches[0];
+                    moveDrag(t.clientX, t.clientY);
+                }
+            }, {passive: true});
+            document.addEventListener('touchend', endDrag);
+            document.addEventListener('touchcancel', endDrag);
         }
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -9415,7 +9474,7 @@ function hasGistToken() {
                 min.style.display = 'flex';
                 messageWallOpen = false;
             } else {
-                wall.style.display = 'block';
+                wall.style.display = 'flex';
                 min.style.display = 'none';
                 toggle.style.display = 'none';
                 messageWallOpen = true;
@@ -9444,7 +9503,7 @@ function hasGistToken() {
             const wall = document.getElementById('messageWall');
             const min = document.getElementById('messageWallMin');
             const toggle = document.getElementById('messageWallToggle');
-            wall.style.display = 'block';
+            wall.style.display = 'flex';
             min.style.display = 'none';
             toggle.style.display = 'none';
             messageWallOpen = true;
@@ -9452,33 +9511,6 @@ function hasGistToken() {
         }
         
         function initMessageWallDrag() {
-            const header = document.getElementById('messageWallHeader');
-            const wall = document.getElementById('messageWall');
-            if (!header || !wall) return;
-            
-            let isDragging = false;
-            let startX, startY, startLeft, startTop;
-            
-            header.onmousedown = function(e) {
-                if (e.target.tagName === 'BUTTON') return;
-                isDragging = true;
-                startX = e.clientX;
-                startY = e.clientY;
-                startLeft = wall.offsetLeft;
-                startTop = wall.offsetTop;
-                document.onmousemove = function(e) {
-                    if (!isDragging) return;
-                    const newLeft = startLeft + e.clientX - startX;
-                    const newTop = startTop + e.clientY - startY;
-                    wall.style.left = Math.max(0, newLeft) + 'px';
-                    wall.style.top = Math.max(0, newTop) + 'px';
-                };
-                document.onmouseup = function() {
-                    isDragging = false;
-                    document.onmousemove = null;
-                    document.onmouseup = null;
-                };
-            };
         }
         
         async function fetchMessages() {
@@ -11663,7 +11695,7 @@ function hasGistToken() {
         #messageWallContent::-webkit-scrollbar-thumb { background: rgba(255,215,0,0.5); border-radius: 3px; }
         #messageWallContent::-webkit-scrollbar-thumb:hover { background: rgba(255,215,0,0.8); }
     </style>
-    <div id="messageWall" style="display:none;position:fixed;top:60px;left:20px;width:380px;max-height:520px;background:rgba(26,26,46,0.95);border:1px solid rgba(255,215,0,0.3);border-radius:12px;z-index:9980;box-shadow:0 4px 20px rgba(0,0,0,0.5);backdrop-filter:blur(10px);overflow:hidden;resize:both;min-width:300px;min-height:350px;">
+    <div id="messageWall" style="display:none;position:fixed;top:60px;left:20px;width:380px;height:480px;background:rgba(26,26,46,0.95);border:1px solid rgba(255,215,0,0.3);border-radius:12px;z-index:9980;box-shadow:0 4px 20px rgba(0,0,0,0.5);backdrop-filter:blur(10px);display:flex;flex-direction:column;min-width:300px;min-height:350px;">
         <div id="messageWallHeader" style="background:linear-gradient(135deg,rgba(255,215,0,0.2),rgba(255,107,107,0.2));padding:10px 15px;display:flex;justify-content:space-between;align-items:center;cursor:move;user-select:none;">
             <span style="color:#ffd700;font-size:0.9rem;font-weight:bold;">📢 需求墙</span>
             <div style="display:flex;gap:10px;">
@@ -11725,7 +11757,7 @@ function hasGistToken() {
     </div>
 
     <!-- 聊天室主面板 -->
-    <div id="chatRoomPanel" style="display:none;position:fixed;top:50px;left:20px;width:440px;max-height:600px;background:rgba(26,26,46,0.95);border:1px solid rgba(78,205,196,0.3);border-radius:12px;z-index:9980;box-shadow:0 4px 20px rgba(0,0,0,0.5);backdrop-filter:blur(10px);overflow:hidden;resize:both;min-width:350px;min-height:400px;">
+    <div id="chatRoomPanel" style="display:none;position:fixed;top:50px;left:20px;width:440px;height:560px;background:rgba(26,26,46,0.95);border:1px solid rgba(78,205,196,0.3);border-radius:12px;z-index:9980;box-shadow:0 4px 20px rgba(0,0,0,0.5);backdrop-filter:blur(10px);display:flex;flex-direction:column;min-width:350px;min-height:400px;">
         <div id="chatRoomHeader" style="background:linear-gradient(135deg,rgba(78,205,196,0.2),rgba(44,160,141,0.2));padding:10px 15px;display:flex;justify-content:space-between;align-items:center;cursor:move;user-select:none;">
             <span style="color:#4ecdc4;font-size:0.9rem;font-weight:bold;">💬 聊天室 <span id="chatRoomIdDisplay" style="color:rgba(255,255,255,0.5);font-size:0.75rem;"></span></span>
             <div style="display:flex;gap:10px;">
@@ -11733,19 +11765,25 @@ function hasGistToken() {
                 <button onclick="closeChatRoom()" title="关闭" style="background:transparent;border:none;color:#ff6b6b;font-size:1rem;cursor:pointer;padding:0;">×</button>
             </div>
         </div>
-        <div id="chatRoomTabChat" style="height:calc(100% - 50px);display:flex;flex-direction:column;">
-            <div id="chatMessagesContainer" style="flex:1;overflow-y:auto;padding:10px;max-height:420px;"></div>
+        <div id="chatRoomTabChat" style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+            <div id="chatMessagesContainer" style="flex:1;overflow-y:auto;padding:10px;"></div>
             <div style="padding:8px 10px;border-top:1px solid rgba(255,255,255,0.1);display:flex;gap:8px;">
                 <input type="text" id="chatMessageInput" placeholder="输入消息..." style="flex:1;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:white;font-size:0.85rem;outline:none;" onkeydown="if(event.key==='Enter')sendChatMessage()">
                 <button onclick="sendChatMessage()" style="padding:8px 14px;border-radius:8px;border:none;background:linear-gradient(135deg,#4ecdc4,#44a08d);color:white;cursor:pointer;font-size:0.85rem;">发送</button>
             </div>
         </div>
-        <div id="chatRoomTabAuctions" style="height:calc(100% - 50px);display:none;flex-direction:column;">
+        <div id="chatRoomTabAuctions" style="flex:1;display:none;flex-direction:column;overflow:hidden;">
             <div style="padding:8px 10px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,0.1);">
-                <span style="color:#ffd700;font-size:0.85rem;">🔨 拍卖列表</span>
-                <button onclick="openAuctionPostModal()" style="padding:4px 10px;border-radius:6px;border:none;background:linear-gradient(135deg,#4ade80,#22c55e);color:white;cursor:pointer;font-size:0.75rem;">+ 发布拍卖</button>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <button onclick="toggleChatRoomTab('chat')" style="background:transparent;border:none;color:#4ecdc4;font-size:0.85rem;cursor:pointer;padding:0;">← 聊天</button>
+                    <span style="color:#ffd700;font-size:0.85rem;">🔨 拍卖列表</span>
+                </div>
+                <div style="display:flex;gap:6px;">
+                    <button onclick="manualRefreshAuctions()" style="padding:4px 8px;border-radius:6px;border:none;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);cursor:pointer;font-size:0.75rem;">🔄</button>
+                    <button onclick="openAuctionPostModal()" style="padding:4px 10px;border-radius:6px;border:none;background:linear-gradient(135deg,#4ade80,#22c55e);color:white;cursor:pointer;font-size:0.75rem;">+ 发布拍卖</button>
+                </div>
             </div>
-            <div id="auctionsListContainer" style="flex:1;overflow-y:auto;padding:10px;max-height:440px;"></div>
+            <div id="auctionsListContainer" style="flex:1;overflow-y:auto;padding:10px;"></div>
         </div>
     </div>
 
