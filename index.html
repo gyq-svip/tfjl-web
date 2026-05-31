@@ -9176,11 +9176,23 @@ function hasGistToken() {
         // 更新统计数据
         async function updateCounter(type) {
             try {
+                // 获取本地缓存作为备份
+                const localData = loadCounterFromCache();
+                
                 // 先从Gist获取最新数据，避免覆盖其他设备的更新
                 if (isOnline()) {
                     try {
                         const fresh = await fetchCounterFromGist();
                         if (fresh) {
+                            // 合并本地 unique_users 到 Gist 数据，防止丢失新用户
+                            if (localData && localData.unique_users && Array.isArray(localData.unique_users)) {
+                                localData.unique_users.forEach(id => {
+                                    if (!fresh.unique_users.includes(id)) {
+                                        fresh.unique_users.push(id);
+                                    }
+                                });
+                                fresh.total_users = fresh.unique_users.length;
+                            }
                             counterData = fresh;
                         }
                     } catch (error) {
@@ -9188,9 +9200,9 @@ function hasGistToken() {
                     }
                 }
                 
-                // 如果没有数据，使用默认值
+                // 如果没有数据，使用默认值或本地数据
                 if (!counterData) {
-                    counterData = getDefaultCounter();
+                    counterData = localData || getDefaultCounter();
                 }
                 
                 const today = getTodayString();
@@ -9312,16 +9324,27 @@ function hasGistToken() {
                 if (!remoteData.active_today) remoteData.active_today = remoteData.active_today_users.length;
                 if (!remoteData.online_users) remoteData.online_users = {};
                 if (!remoteData.online_timeout) remoteData.online_timeout = 7200000;
+                if (!remoteData.total_visits) remoteData.total_visits = 0;
+                if (!remoteData.total_downloads) remoteData.total_downloads = 0;
+                
+                // 获取本地缓存，合并用户信息
+                const localData = loadCounterFromCache();
+                const deviceId = getDeviceId();
+                
+                // 合并本地 unique_users 到远程
+                if (localData && localData.unique_users && Array.isArray(localData.unique_users)) {
+                    localData.unique_users.forEach(id => {
+                        if (!remoteData.unique_users.includes(id)) {
+                            remoteData.unique_users.push(id);
+                        }
+                    });
+                }
+                
+                // 更新 total_users
+                remoteData.total_users = remoteData.unique_users.length;
                 
                 // 合并待同步的数据
                 const today = getTodayString();
-                
-                // 检查日期是否变化，如果新的一天则清空今日活跃用户
-                if (!remoteData.active_date || remoteData.active_date !== today) {
-                    remoteData.active_today_users = [];
-                    remoteData.active_today = 0;
-                    remoteData.active_date = today;
-                }
                 
                 // 清理过期的在线用户
                 const now = Date.now();
@@ -9332,6 +9355,10 @@ function hasGistToken() {
                     }
                 }
                 
+                // 更新当前设备在线状态
+                remoteData.online_users[deviceId] = Date.now();
+                
+                let hasVisit = false;
                 queue.forEach(item => {
                     const syncDate = item.date || today;
                     
@@ -9348,6 +9375,7 @@ function hasGistToken() {
                         case 'visit':
                             remoteData.total_visits++;
                             remoteData.daily_stats[syncDate].visits++;
+                            hasVisit = true;
                             break;
                         case 'download':
                             remoteData.total_downloads++;
@@ -9355,6 +9383,22 @@ function hasGistToken() {
                             break;
                     }
                 });
+                
+                // 如果有访问记录，更新今日活跃用户
+                if (hasVisit) {
+                    // 检查日期是否变化，如果新的一天则清空今日活跃用户
+                    if (!remoteData.active_date || remoteData.active_date !== today) {
+                        remoteData.active_today_users = [];
+                        remoteData.active_today = 0;
+                        remoteData.active_date = today;
+                    }
+                    
+                    // 添加当前设备到今日活跃用户（如果不在）
+                    if (!remoteData.active_today_users.includes(deviceId)) {
+                        remoteData.active_today_users.push(deviceId);
+                        remoteData.active_today = remoteData.active_today_users.length;
+                    }
+                }
                 
                 remoteData.last_updated = getCurrentTimeString();
                 
