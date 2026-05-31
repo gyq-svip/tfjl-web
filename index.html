@@ -3087,6 +3087,133 @@
             document.getElementById('auctionDetailModal').style.display = 'none';
         }
 
+        function showBidToast(msg, success) {
+            const toast = document.createElement('div');
+            toast.style.cssText = `position:fixed;top:20px;left:50%;transform:translateX(-50%);padding:12px 24px;border-radius:10px;color:white;font-size:0.9rem;font-weight:600;z-index:99999;box-shadow:0 4px 20px rgba(0,0,0,0.5);animation:bidToastIn 0.3s ease;max-width:90vw;text-align:center;`;
+            toast.style.background = success ? 'linear-gradient(135deg,#4ade80,#22c55e)' : 'linear-gradient(135deg,#ef4444,#dc2626)';
+            toast.textContent = msg;
+            document.body.appendChild(toast);
+            setTimeout(() => {
+                toast.style.transition = 'opacity 0.5s';
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 500);
+            }, 3000);
+        }
+
+        async function doBid(auctionId, fromDetail) {
+            if (!currentChatRoom) return;
+
+            try {
+                await fetchChatRoomData();
+                let room = getRoomData();
+                if (!room) return;
+                let auction = room.auctions.find(a => a.id === auctionId);
+                if (!auction) { showBidToast('拍卖不存在', false); return; }
+                if (auction.status === 'ended' || Date.now() >= auction.endTime) { showBidToast('拍卖已结束', false); renderAuctionsList(); return; }
+                if (auction.creator === currentChatNick) { showBidToast('不能竞拍自己发布的拍卖', false); return; }
+
+                const currentBid = auction.bids.length > 0 ? auction.bids[auction.bids.length - 1].amount : auction.startPrice;
+                const myBid = currentBid + (auction.bidIncrement || 10);
+
+                await fetchChatRoomData();
+                room = getRoomData();
+                if (!room) return;
+                auction = room.auctions.find(a => a.id === auctionId);
+                if (!auction) { showBidToast('拍卖不存在', false); return; }
+                if (auction.status === 'ended' || Date.now() >= auction.endTime) { showBidToast('拍卖已结束', false); renderAuctionsList(); return; }
+
+                const serverCurrentBid = auction.bids.length > 0 ? auction.bids[auction.bids.length - 1].amount : auction.startPrice;
+                const serverCurrentBidder = auction.bids.length > 0 ? auction.bids[auction.bids.length - 1].bidder : '';
+
+                if (serverCurrentBid > currentBid) {
+                    const needBid = serverCurrentBid + (auction.bidIncrement || 10);
+                    showBidToast(`出价失败！${serverCurrentBidder} 已出价 ${serverCurrentBid}，需出价 ${needBid}`, false);
+                    room.messages.push({
+                        id: 'msg_' + Date.now(),
+                        author: '系统',
+                        content: `❌ ${currentChatNick} 出价 ${myBid} 失败！${serverCurrentBidder} 已出价 ${serverCurrentBid}，需出价 ${needBid}`,
+                        time: Date.now()
+                    });
+                    await saveChatRoomData();
+                    if (fromDetail) closeAuctionDetail();
+                    renderAuctionsList();
+                    renderChatMessages();
+                    return;
+                }
+
+                auction.bids.push({
+                    bidder: currentChatNick,
+                    amount: myBid,
+                    time: Date.now()
+                });
+
+                const quality = auction.quality || '';
+                const profession = auction.profession || '';
+                const bonusDmg = auction.bonusDmg || 0;
+                const ignoreIce = auction.ignoreIce || 0;
+                room.messages.push({
+                    id: 'msg_' + Date.now(),
+                    author: '系统',
+                    content: `💰 ${currentChatNick} 对 #${auction.id} ${quality}·${profession}${bonusDmg > 0 ? ' 附加伤害+' + bonusDmg : ''}${ignoreIce > 0 ? ' 无视冰甲+' + ignoreIce : ''} 出价 ${myBid}`,
+                    time: Date.now()
+                });
+
+                await saveChatRoomData();
+
+                await fetchChatRoomData();
+                room = getRoomData();
+                if (room) {
+                    auction = room.auctions.find(a => a.id === auctionId);
+                    if (auction) {
+                        const myBidInServer = auction.bids.some(b => b.bidder === currentChatNick && b.amount === myBid);
+                        const finalBid = auction.bids.length > 0 ? auction.bids[auction.bids.length - 1].amount : auction.startPrice;
+                        const finalBidder = auction.bids.length > 0 ? auction.bids[auction.bids.length - 1].bidder : '';
+
+                        if (myBidInServer) {
+                            showBidToast(`出价 ${myBid} 成功！当前最高价`, true);
+                            room.messages.push({
+                                id: 'msg_' + Date.now(),
+                                author: '系统',
+                                content: `✅ ${currentChatNick} 出价 ${myBid} 成功！当前最高价`,
+                                time: Date.now()
+                            });
+                            await saveChatRoomData();
+                        } else if (myBid > finalBid) {
+                            auction.bids.push({
+                                bidder: currentChatNick,
+                                amount: myBid,
+                                time: Date.now()
+                            });
+                            room.messages.push({
+                                id: 'msg_' + Date.now(),
+                                author: '系统',
+                                content: `✅ ${currentChatNick} 出价 ${myBid} 成功！当前最高价`,
+                                time: Date.now()
+                            });
+                            await saveChatRoomData();
+                            showBidToast(`出价 ${myBid} 成功！当前最高价`, true);
+                        } else {
+                            const needBid = finalBid + (auction.bidIncrement || 10);
+                            showBidToast(`出价失败！${finalBidder} 已出价 ${finalBid}，需出价 ${needBid}`, false);
+                            room.messages.push({
+                                id: 'msg_' + Date.now(),
+                                author: '系统',
+                                content: `❌ ${currentChatNick} 出价 ${myBid} 失败！${finalBidder} 已出价 ${finalBid}，需出价 ${needBid}`,
+                                time: Date.now()
+                            });
+                            await saveChatRoomData();
+                        }
+                    }
+                }
+
+                if (fromDetail) closeAuctionDetail();
+                renderAuctionsList();
+                renderChatMessages();
+            } catch (error) {
+                showBidToast('出价失败: ' + error.message, false);
+            }
+        }
+
         async function quickBid(auctionId) {
             if (!currentChatRoom) return;
             const bidBtn = event.target.closest('button');
@@ -3094,186 +3221,12 @@
                 bidBtn.disabled = true;
                 bidBtn.textContent = '⏳';
             }
-            try {
-                await fetchChatRoomData();
-                let room = getRoomData();
-                if (!room) return;
-                let auction = room.auctions.find(a => a.id === auctionId);
-                if (!auction) { alert('拍卖不存在'); return; }
-                if (auction.status === 'ended' || Date.now() >= auction.endTime) { alert('拍卖已结束'); renderAuctionsList(); return; }
-                if (auction.creator === currentChatNick) { alert('不能竞拍自己发布的拍卖'); return; }
-
-                const currentBid = auction.bids.length > 0 ? auction.bids[auction.bids.length - 1].amount : auction.startPrice;
-                const myBid = currentBid + (auction.bidIncrement || 10);
-
-                await fetchChatRoomData();
-                room = getRoomData();
-                if (!room) return;
-                auction = room.auctions.find(a => a.id === auctionId);
-                if (!auction) { alert('拍卖不存在'); return; }
-                if (auction.status === 'ended' || Date.now() >= auction.endTime) { alert('拍卖已结束'); renderAuctionsList(); return; }
-
-                const serverCurrentBid = auction.bids.length > 0 ? auction.bids[auction.bids.length - 1].amount : auction.startPrice;
-                const serverCurrentBidder = auction.bids.length > 0 ? auction.bids[auction.bids.length - 1].bidder : '';
-
-                if (serverCurrentBid > currentBid) {
-                    const needBid = serverCurrentBid + (auction.bidIncrement || 10);
-                    room.messages.push({
-                        id: 'msg_' + Date.now(),
-                        author: '系统',
-                        content: `❌ ${currentChatNick} 出价 ${myBid} 失败！${serverCurrentBidder} 已出价 ${serverCurrentBid}，需出价 ${needBid}`,
-                        time: Date.now()
-                    });
-                    await saveChatRoomData();
-                    renderAuctionsList();
-                    renderChatMessages();
-                    return;
-                }
-
-                auction.bids.push({
-                    bidder: currentChatNick,
-                    amount: myBid,
-                    time: Date.now()
-                });
-
-                const quality = auction.quality || '';
-                const profession = auction.profession || '';
-                const bonusDmg = auction.bonusDmg || 0;
-                const ignoreIce = auction.ignoreIce || 0;
-                room.messages.push({
-                    id: 'msg_' + Date.now(),
-                    author: '系统',
-                    content: `💰 ${currentChatNick} 对 #${auction.id} ${quality}·${profession}${bonusDmg > 0 ? ' 附加伤害+' + bonusDmg : ''}${ignoreIce > 0 ? ' 无视冰甲+' + ignoreIce : ''} 出价 ${myBid}`,
-                    time: Date.now()
-                });
-
-                await saveChatRoomData();
-
-                await fetchChatRoomData();
-                const roomCheck = getRoomData();
-                if (roomCheck) {
-                    const auctionCheck = roomCheck.auctions.find(a => a.id === auctionId);
-                    if (auctionCheck) {
-                        const finalBid = auctionCheck.bids.length > 0 ? auctionCheck.bids[auctionCheck.bids.length - 1].amount : auctionCheck.startPrice;
-                        const finalBidder = auctionCheck.bids.length > 0 ? auctionCheck.bids[auctionCheck.bids.length - 1].bidder : '';
-                        if (finalBidder === currentChatNick && finalBid === myBid) {
-                            roomCheck.messages.push({
-                                id: 'msg_' + Date.now(),
-                                author: '系统',
-                                content: `✅ ${currentChatNick} 出价 ${myBid} 成功！当前最高价`,
-                                time: Date.now()
-                            });
-                            await saveChatRoomData();
-                        } else {
-                            roomCheck.messages.push({
-                                id: 'msg_' + Date.now(),
-                                author: '系统',
-                                content: `❌ ${currentChatNick} 出价 ${myBid} 被覆盖！${finalBidder} 出价 ${finalBid}，当前最高价 ${finalBid}`,
-                                time: Date.now()
-                            });
-                            await saveChatRoomData();
-                        }
-                    }
-                }
-                renderAuctionsList();
-                renderChatMessages();
-            } catch (error) {
-                alert('出价失败: ' + error.message);
-            }
+            await doBid(auctionId, false);
         }
 
         async function placeBid(auctionId) {
             if (!currentChatRoom) return;
-
-            try {
-                await fetchChatRoomData();
-                let room = getRoomData();
-                if (!room) return;
-                let auction = room.auctions.find(a => a.id === auctionId);
-                if (!auction) { alert('拍卖不存在'); return; }
-                if (auction.status === 'ended' || Date.now() >= auction.endTime) { alert('拍卖已结束'); renderAuctionsList(); return; }
-                if (auction.creator === currentChatNick) { alert('不能竞拍自己发布的拍卖'); return; }
-
-                const currentBid = auction.bids.length > 0 ? auction.bids[auction.bids.length - 1].amount : auction.startPrice;
-                const myBid = currentBid + (auction.bidIncrement || 10);
-
-                await fetchChatRoomData();
-                room = getRoomData();
-                if (!room) return;
-                auction = room.auctions.find(a => a.id === auctionId);
-                if (!auction) { alert('拍卖不存在'); return; }
-                if (auction.status === 'ended' || Date.now() >= auction.endTime) { alert('拍卖已结束'); renderAuctionsList(); return; }
-
-                const serverCurrentBid = auction.bids.length > 0 ? auction.bids[auction.bids.length - 1].amount : auction.startPrice;
-                const serverCurrentBidder = auction.bids.length > 0 ? auction.bids[auction.bids.length - 1].bidder : '';
-
-                if (serverCurrentBid > currentBid) {
-                    const needBid = serverCurrentBid + (auction.bidIncrement || 10);
-                    room.messages.push({
-                        id: 'msg_' + Date.now(),
-                        author: '系统',
-                        content: `❌ ${currentChatNick} 出价 ${myBid} 失败！${serverCurrentBidder} 已出价 ${serverCurrentBid}，需出价 ${needBid}`,
-                        time: Date.now()
-                    });
-                    await saveChatRoomData();
-                    closeAuctionDetail();
-                    renderAuctionsList();
-                    renderChatMessages();
-                    return;
-                }
-
-                auction.bids.push({
-                    bidder: currentChatNick,
-                    amount: myBid,
-                    time: Date.now()
-                });
-
-                const quality = auction.quality || '';
-                const profession = auction.profession || '';
-                const bonusDmg = auction.bonusDmg || 0;
-                const ignoreIce = auction.ignoreIce || 0;
-                room.messages.push({
-                    id: 'msg_' + Date.now(),
-                    author: '系统',
-                    content: `💰 ${currentChatNick} 对 #${auction.id} ${quality}·${profession}${bonusDmg > 0 ? ' 附加伤害+' + bonusDmg : ''}${ignoreIce > 0 ? ' 无视冰甲+' + ignoreIce : ''} 出价 ${myBid}`,
-                    time: Date.now()
-                });
-
-                await saveChatRoomData();
-
-                await fetchChatRoomData();
-                const roomCheck = getRoomData();
-                if (roomCheck) {
-                    const auctionCheck = roomCheck.auctions.find(a => a.id === auctionId);
-                    if (auctionCheck) {
-                        const finalBid = auctionCheck.bids.length > 0 ? auctionCheck.bids[auctionCheck.bids.length - 1].amount : auctionCheck.startPrice;
-                        const finalBidder = auctionCheck.bids.length > 0 ? auctionCheck.bids[auctionCheck.bids.length - 1].bidder : '';
-                        if (finalBidder === currentChatNick && finalBid === myBid) {
-                            roomCheck.messages.push({
-                                id: 'msg_' + Date.now(),
-                                author: '系统',
-                                content: `✅ ${currentChatNick} 出价 ${myBid} 成功！当前最高价`,
-                                time: Date.now()
-                            });
-                            await saveChatRoomData();
-                        } else {
-                            roomCheck.messages.push({
-                                id: 'msg_' + Date.now(),
-                                author: '系统',
-                                content: `❌ ${currentChatNick} 出价 ${myBid} 被覆盖！${finalBidder} 出价 ${finalBid}，当前最高价 ${finalBid}`,
-                                time: Date.now()
-                            });
-                            await saveChatRoomData();
-                        }
-                    }
-                }
-
-                closeAuctionDetail();
-                renderAuctionsList();
-                renderChatMessages();
-            } catch (error) {
-                alert('出价失败: ' + error.message);
-            }
+            await doBid(auctionId, true);
         }
 
         function startChatRefresh() {
