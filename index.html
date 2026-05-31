@@ -556,11 +556,13 @@
         }
 
         .selected-cards-container {
-            display: grid;
-            grid-template-columns: repeat(5, 85px);
-            grid-template-rows: repeat(2, 40px);
+            display: grid !important;
+            grid-template-columns: repeat(5, 85px) !important;
+            grid-template-rows: repeat(2, 40px) !important;
             gap: 2px;
-            width: 441px;
+            width: 441px !important;
+            max-width: 441px !important;
+            min-width: 441px !important;
             padding: 8px;
             background: rgba(255,255,255,0.05);
             border-radius: 12px;
@@ -578,8 +580,9 @@
             .selected-cards-container {
                 width: 441px !important;
                 max-width: 441px !important;
-                grid-template-columns: repeat(5, 85px);
-                grid-template-rows: repeat(2, 40px);
+                min-width: 441px !important;
+                grid-template-columns: repeat(5, 85px) !important;
+                grid-template-rows: repeat(2, 40px) !important;
             }
         }
 
