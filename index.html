@@ -2950,6 +2950,7 @@
                                     : `<span style="padding:3px 8px;border-radius:5px;background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.3);font-size:0.7rem;">已结束</span>`
                                 }
                                 <span style="color:rgba(255,255,255,0.3);font-size:0.65rem;">${bidCount}次出价</span>
+                                <span style="color:rgba(255,255,255,0.25);font-size:0.6rem;">加价${auction.bidIncrement || 10}</span>
                             </div>
                         </div>
                         <div style="flex-shrink:0;text-align:right;">
@@ -3119,6 +3120,11 @@
             }, 1000);
         }
 
+        function updateBidCountdown(bidAmount) {
+            const toast = document.getElementById('bidCountdownToast');
+            if (toast) toast.innerHTML = `⏳ 正在出价 <b>${bidAmount}</b>... 查询中`;
+        }
+
         function removeBidCountdown() {
             if (bidCountdownTimer) { clearInterval(bidCountdownTimer); bidCountdownTimer = null; }
             const existing = document.getElementById('bidCountdownToast');
@@ -3133,29 +3139,27 @@
             try {
                 await fetchChatRoomData();
                 let room = getRoomData();
-                if (!room) { bidLock = false; return; }
+                if (!room) { bidLock = false; renderAuctionsList(); return; }
                 let auction = room.auctions.find(a => a.id === auctionId);
                 if (!auction) { showBidToast('拍卖不存在', false); renderAuctionsList(); bidLock = false; return; }
                 if (auction.status === 'ended' || Date.now() >= auction.endTime) { showBidToast('拍卖已结束', false); renderAuctionsList(); renderChatMessages(); bidLock = false; return; }
                 if (auction.creator === currentChatNick) { showBidToast('不能竞拍自己发布的拍卖', false); renderAuctionsList(); bidLock = false; return; }
 
-                const serverCurrentBid = auction.bids.length > 0 ? auction.bids[auction.bids.length - 1].amount : auction.startPrice;
-                const serverCurrentBidder = auction.bids.length > 0 ? auction.bids[auction.bids.length - 1].bidder : '';
+                const currentBid = auction.bids.length > 0 ? auction.bids[auction.bids.length - 1].amount : auction.startPrice;
+                const currentBidder = auction.bids.length > 0 ? auction.bids[auction.bids.length - 1].bidder : '';
 
-                if (serverCurrentBidder === currentChatNick) {
+                if (currentBidder === currentChatNick) {
                     showBidToast('你已经是最高出价者', false);
                     bidLock = false;
                     renderAuctionsList();
                     return;
                 }
 
-                const myBid = serverCurrentBid + (auction.bidIncrement || 10);
+                const myBid = currentBid + (auction.bidIncrement || 10);
 
-                let recentBid = false;
-                if (auction.bids.length > 0) {
-                    const lastBidTime = auction.bids[auction.bids.length - 1].time;
-                    if (Date.now() - lastBidTime < 8000) recentBid = true;
-                }
+                const lastBidTime = auction.bids.length > 0 ? auction.bids[auction.bids.length - 1].time : 0;
+                const timeSinceLastBid = Date.now() - lastBidTime;
+                const recentBid = lastBidTime > 0 && timeSinceLastBid < 8000;
 
                 const baseWait = 5000;
                 const jitter = Math.floor(Math.random() * 2000);
@@ -3217,6 +3221,8 @@
 
                 await saveChatRoomData();
 
+                showBidToast(`正在查询出价结果...`, true);
+
                 await fetchChatRoomData();
                 room = getRoomData();
                 if (room) {
@@ -3234,8 +3240,10 @@
                                 amount: actualBid,
                                 time: Date.now()
                             });
-                            showBidToast(`🎉 恭喜你出价 ${actualBid} 成功！当前最高价`, true);
                             await saveChatRoomData();
+                            showBidToast(`🎉 恭喜你出价 ${actualBid} 成功！当前最高价`, true);
+                        } else if (finalBidder === currentChatNick && finalBid >= actualBid) {
+                            showBidToast(`🎉 恭喜你出价 ${actualBid} 成功！当前最高价`, true);
                         } else {
                             const needBid = finalBid + (auction.bidIncrement || 10);
                             showBidToast(`❌ 出价失败！${finalBidder} 已出价 ${finalBid}，需出价 ${needBid}`, false);
@@ -3250,6 +3258,7 @@
             } catch (error) {
                 showBidToast('出价失败: ' + error.message, false);
                 renderAuctionsList();
+                renderChatMessages();
             } finally {
                 removeBidCountdown();
                 bidLock = false;
