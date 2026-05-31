@@ -3592,75 +3592,66 @@
             draggableInitialized[panelId] = true;
             
             let isDragging = false;
-            let offset = {x: 0, y: 0};
+            let startX = 0, startY = 0, startLeft = 0, startTop = 0;
             
-            function startDrag(clientX, clientY, target) {
-                if (target.closest('button') || target.closest('select') || target.closest('input')) return;
+            function onPointerDown(clientX, clientY) {
                 isDragging = true;
+                startX = clientX;
+                startY = clientY;
                 const rect = panel.getBoundingClientRect();
-                offset.x = clientX - rect.left;
-                offset.y = clientY - rect.top;
-                panel.style.opacity = '0.9';
-                panel.style.transition = 'none';
+                startLeft = rect.left;
+                startTop = rect.top;
             }
             
-            function moveDrag(clientX, clientY) {
+            function onPointerMove(clientX, clientY) {
                 if (!isDragging) return;
-                let newLeft = clientX - offset.x;
-                let newTop = clientY - offset.y;
+                let newLeft = startLeft + (clientX - startX);
+                let newTop = startTop + (clientY - startY);
                 newLeft = Math.max(0, Math.min(newLeft, window.innerWidth - 50));
                 newTop = Math.max(0, Math.min(newTop, window.innerHeight - 50));
                 panel.style.left = newLeft + 'px';
                 panel.style.top = newTop + 'px';
                 panel.style.right = 'auto';
-                panel.style.bottom = 'auto';
             }
             
-            function endDrag() {
-                if (isDragging) {
-                    isDragging = false;
-                    panel.style.opacity = '1';
-                    panel.style.transition = '';
-                }
+            function onPointerUp() {
+                isDragging = false;
             }
             
             header.addEventListener('mousedown', function(e) {
-                startDrag(e.clientX, e.clientY, e.target);
+                if (e.target.closest('button') || e.target.closest('select') || e.target.closest('input')) return;
                 e.preventDefault();
+                onPointerDown(e.clientX, e.clientY);
             });
             document.addEventListener('mousemove', function(e) {
-                moveDrag(e.clientX, e.clientY);
+                onPointerMove(e.clientX, e.clientY);
             });
-            document.addEventListener('mouseup', endDrag);
+            document.addEventListener('mouseup', onPointerUp);
             
             header.addEventListener('touchstart', function(e) {
+                if (e.target.closest('button') || e.target.closest('select') || e.target.closest('input')) return;
                 if (e.touches.length === 1) {
-                    const t = e.touches[0];
-                    startDrag(t.clientX, t.clientY, e.target);
+                    onPointerDown(e.touches[0].clientX, e.touches[0].clientY);
                 }
             }, {passive: true});
             document.addEventListener('touchmove', function(e) {
                 if (isDragging && e.touches.length === 1) {
-                    const t = e.touches[0];
-                    moveDrag(t.clientX, t.clientY);
+                    onPointerMove(e.touches[0].clientX, e.touches[0].clientY);
                 }
             }, {passive: true});
-            document.addEventListener('touchend', endDrag);
-            document.addEventListener('touchcancel', endDrag);
+            document.addEventListener('touchend', onPointerUp);
+            document.addEventListener('touchcancel', onPointerUp);
         }
 
         function initDraggable(panelId, headerId) {
-            requestAnimationFrame(() => makePanelDraggable(panelId, headerId));
+            makePanelDraggable(panelId, headerId);
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            // 初始化所有面板拖拽
             makePanelDraggable('referencePanel', 'referencePanelHeader');
             makePanelDraggable('notepadPanel', 'notepadPanelHeader');
             makePanelDraggable('txtFilesPanel', 'txtFilesPanelHeader');
             makePanelDraggable('textParserPanel', 'textParserPanelHeader');
-            makePanelDraggable('messageWall', 'messageWallHeader');
-            makePanelDraggable('chatRoomPanel', 'chatRoomHeader');
         });
         </script>
 
@@ -11745,7 +11736,7 @@ function hasGistToken() {
         #messageWallContent::-webkit-scrollbar-thumb { background: rgba(255,215,0,0.5); border-radius: 3px; }
         #messageWallContent::-webkit-scrollbar-thumb:hover { background: rgba(255,215,0,0.8); }
     </style>
-    <div id="messageWall" style="display:none;position:fixed;top:60px;left:20px;width:380px;height:480px;background:rgba(26,26,46,0.95);border:1px solid rgba(255,215,0,0.3);border-radius:12px;z-index:9980;box-shadow:0 4px 20px rgba(0,0,0,0.5);backdrop-filter:blur(10px);display:flex;flex-direction:column;min-width:300px;min-height:350px;">
+    <div id="messageWall" style="position:fixed;top:60px;left:20px;width:380px;height:480px;background:rgba(26,26,46,0.95);border:1px solid rgba(255,215,0,0.3);border-radius:12px;z-index:9980;box-shadow:0 4px 20px rgba(0,0,0,0.5);backdrop-filter:blur(10px);flex-direction:column;min-width:300px;min-height:350px;display:none;">
         <div id="messageWallHeader" style="background:linear-gradient(135deg,rgba(255,215,0,0.2),rgba(255,107,107,0.2));padding:10px 15px;display:flex;justify-content:space-between;align-items:center;cursor:move;user-select:none;">
             <span style="color:#ffd700;font-size:0.9rem;font-weight:bold;">📢 需求墙</span>
             <div style="display:flex;gap:10px;">
@@ -11807,7 +11798,7 @@ function hasGistToken() {
     </div>
 
     <!-- 聊天室主面板 -->
-    <div id="chatRoomPanel" style="display:none;position:fixed;top:50px;left:20px;width:440px;height:560px;background:rgba(26,26,46,0.95);border:1px solid rgba(78,205,196,0.3);border-radius:12px;z-index:9980;box-shadow:0 4px 20px rgba(0,0,0,0.5);backdrop-filter:blur(10px);display:flex;flex-direction:column;min-width:350px;min-height:400px;">
+    <div id="chatRoomPanel" style="position:fixed;top:50px;left:20px;width:440px;height:560px;background:rgba(26,26,46,0.95);border:1px solid rgba(78,205,196,0.3);border-radius:12px;z-index:9980;box-shadow:0 4px 20px rgba(0,0,0,0.5);backdrop-filter:blur(10px);flex-direction:column;min-width:350px;min-height:400px;display:none;">
         <div id="chatRoomHeader" style="background:linear-gradient(135deg,rgba(78,205,196,0.2),rgba(44,160,141,0.2));padding:10px 15px;display:flex;justify-content:space-between;align-items:center;cursor:move;user-select:none;">
             <span style="color:#4ecdc4;font-size:0.9rem;font-weight:bold;">💬 聊天室 <span id="chatRoomIdDisplay" style="color:rgba(255,255,255,0.5);font-size:0.75rem;"></span></span>
             <div style="display:flex;gap:10px;">
