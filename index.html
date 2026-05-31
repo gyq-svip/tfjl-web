@@ -2,21 +2,107 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=3.0, user-scalable=yes">
     <title>塔防阵容卡搭配专用</title>
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
             min-height: 100vh;
-            padding: 30px 20px;
+            padding: 20px 10px;
             color: #fff;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* ========== 移动端适配样式 ========== */
+        @media (max-width: 768px) {
+            body {
+                padding: 15px 8px;
+            }
+
+            button {
+                min-height: 44px;
+                touch-action: manipulation;
+            }
+        }
+
+        /* 防止双击缩放 */
+        html {
+            touch-action: manipulation;
+        }
+
+        /* ========== 更多移动端优化 ========== */
+        @media (max-width: 768px) {
+            body {
+                padding: 12px 6px;
+                overflow-x: hidden;
+            }
+            
+            /* 容器宽度优化 */
+            .container {
+                max-width: 100%;
+            }
+            
+            /* 密码框适配 */
+            .password-box {
+                padding: 25px 15px;
+                border-radius: 15px;
+            }
+            
+            .password-box h2 {
+                font-size: 1.4rem;
+            }
+            
+            /* 按钮优化 */
+            button, input[type="button"], input[type="submit"] {
+                min-height: 48px;
+                font-size: 1rem;
+            }
+            
+            /* 输入框优化 */
+            input[type="text"], input[type="password"], input[type="number"], select {
+                min-height: 44px;
+                font-size: 16px !important; /* 防止iOS自动缩放 */
+            }
+            
+            /* 卡片网格优化 */
+            .cards-grid {
+                gap: 8px;
+            }
+            
+            /* 收藏按钮在手机上更大一点 */
+            .favorite-btn {
+                width: 26px;
+                height: 26px;
+                font-size: 16px;
+                top: 3px;
+                right: 3px;
+            }
+            
+            /* 层级标题在手机上更紧凑 */
+            .collapsible-header h3 {
+                font-size: 1rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            /* 超小屏手机额外优化 */
+            body {
+                padding: 8px 4px;
+            }
+            
+            /* 更小的间距 */
+            .main-content {
+                gap: 12px;
+            }
         }
 
         /* 登录前隐藏主内容 */
@@ -808,6 +894,46 @@
             max-width: 70px;
             height: 32px;
             font-size: 0.75rem;
+        }
+
+        /* 收藏按钮样式 */
+        .favorite-btn {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            width: 22px;
+            height: 22px;
+            background: rgba(0,0,0,0.5);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            cursor: pointer;
+            z-index: 10;
+            transition: transform 0.2s, background 0.2s;
+            user-select: none;
+            touch-action: manipulation;
+        }
+
+        .favorite-btn:hover {
+            transform: scale(1.15);
+            background: rgba(0,0,0,0.7);
+        }
+
+        .favorite-btn:active {
+            transform: scale(0.9);
+        }
+
+        .favorite-btn.active {
+            color: #ffd700;
+            background: rgba(255,215,0,0.2);
+            text-shadow: 0 0 5px #ffd700;
+        }
+
+        /* 卡片需要相对定位 */
+        .card-item {
+            position: relative;
         }
 
         .toggle-icon {
@@ -4053,13 +4179,13 @@
 
         <div class="collapsible-section favorite">
             <div class="collapsible-header favorite open" onclick="toggleSection(this)">
-                <h3><span>⭐</span> 收藏 <span class="small-text">（电脑版右键/手机版长按 添加/删除）</span></h3>
+                <h3><span>⭐</span> 收藏 <span class="small-text">（点击卡片上的⭐添加/删除）</span></h3>
                 <span class="toggle-icon">▲</span>
             </div>
             <div class="collapsible-content open">
                 <div class="collapsible-inner">
                     <div id="favoriteCardsGrid">
-                        <div class="no-favorites" id="noFavorites">暂无收藏，右键点击卡牌添加到收藏</div>
+                        <div class="no-favorites" id="noFavorites">暂无收藏，点击卡片上的⭐添加到收藏</div>
                     </div>
                 </div>
             </div>
@@ -6979,6 +7105,27 @@
             saveFavorites();
             updateFavoritesDisplay();
             updateAllCardLevelBadges();
+            
+            // 更新所有卡片的收藏按钮状态
+            updateAllFavoriteButtons();
+        }
+        
+        // 更新所有卡片的收藏按钮状态
+        function updateAllFavoriteButtons() {
+            document.querySelectorAll('.card-item').forEach(card => {
+                const cardId = card.dataset.id;
+                if (!cardId) return;
+                
+                const btn = card.querySelector('.favorite-btn');
+                if (!btn) return;
+                
+                const isFav = favoriteCards.some(f => f.id === cardId);
+                if (isFav) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
         }
 
         // 处理常用卡点击（添加到手牌）
@@ -7006,7 +7153,7 @@
             const grid = document.getElementById('favoriteCardsGrid');
             
             if (favoriteCards.length === 0) {
-                grid.innerHTML = '<div class="no-favorites" id="noFavorites">暂无收藏，右键点击卡牌添加到收藏</div>';
+                grid.innerHTML = '<div class="no-favorites" id="noFavorites">暂无收藏，点击卡牌上的⭐添加到收藏</div>';
                 return;
             }
             
@@ -7052,10 +7199,14 @@
             
             grid.innerHTML = html;
             
+            // 给收藏里的卡片也添加收藏按钮
+            setupFavoriteButtons();
+            
             // 添加事件监听
             grid.querySelectorAll('.card-item').forEach(card => {
                 card.addEventListener('click', (e) => {
                     if (e.target.closest('.card-level-badge')) return;
+                    if (e.target.closest('.favorite-btn')) return;
                     handleFavoriteCardClick(card);
                 });
                 
@@ -7072,6 +7223,9 @@
                         document.querySelectorAll('.card-item[data-id="' + cardId + '"]').forEach(c => {
                             c.classList.remove('favorite-card');
                         });
+                        
+                        // 更新所有卡片的收藏按钮状态
+                        updateAllFavoriteButtons();
                     }
                 });
                 
@@ -7088,6 +7242,9 @@
                         document.querySelectorAll('.card-item[data-id="' + cardId + '"]').forEach(c => {
                             c.classList.remove('favorite-card');
                         });
+                        
+                        // 更新所有卡片的收藏按钮状态
+                        updateAllFavoriteButtons();
                     }
                 });
             });
@@ -8219,6 +8376,17 @@
             }
             
             document.addEventListener('click', (e) => {
+                const favBtn = e.target.closest('.favorite-btn');
+                if (favBtn) {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    const card = favBtn.closest('.card-item');
+                    if (card) {
+                        handleCardRightClick(e, card);
+                    }
+                    return;
+                }
+                
                 const badge = e.target.closest('.card-level-badge');
                 if (badge) {
                     e.stopPropagation();
@@ -8279,6 +8447,26 @@
                 draggedCard = card;
                 card.classList.add('dragging');
             });
+            
+            // 给所有卡片添加收藏按钮
+            function setupFavoriteButtons() {
+                document.querySelectorAll('.card-item').forEach(card => {
+                    // 如果已经有收藏按钮，跳过
+                    if (card.querySelector('.favorite-btn')) return;
+                    
+                    // 只给卡池和收藏区域的卡片添加按钮
+                    if (!card.closest('.cards-grid') && !card.closest('#favoriteCardsGrid')) return;
+                    
+                    const cardId = card.dataset.id;
+                    if (!cardId) return;
+                    
+                    const isFav = favoriteCards.some(f => f.id === cardId);
+                    const btnHTML = `<div class="favorite-btn ${isFav ? 'active' : ''}">⭐</div>`;
+                    card.insertAdjacentHTML('beforeend', btnHTML);
+                });
+            }
+            
+            setupFavoriteButtons();
             
             document.querySelectorAll('.card-item').forEach(card => {
                 const grid = card.closest('.cards-grid');
