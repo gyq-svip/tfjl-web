@@ -2668,7 +2668,6 @@
             closeChatRoomEntry();
             document.getElementById('chatRoomPanel').style.display = 'flex';
             document.getElementById('chatRoomIdDisplay').textContent = '#' + roomId;
-            initDraggable('chatRoomPanel', 'chatRoomHeader');
 
             await fetchChatRoomData();
             renderChatMessages();
@@ -3091,62 +3090,91 @@
         async function quickBid(auctionId) {
             if (!currentChatRoom) return;
             const bidBtn = event.target.closest('button');
+            if (bidBtn) {
+                bidBtn.disabled = true;
+                bidBtn.textContent = '⏳';
+            }
             try {
                 await fetchChatRoomData();
-                const room = getRoomData();
+                let room = getRoomData();
                 if (!room) return;
-                const auction = room.auctions.find(a => a.id === auctionId);
+                let auction = room.auctions.find(a => a.id === auctionId);
                 if (!auction) { alert('拍卖不存在'); return; }
-
-                const now = Date.now();
-                if (auction.status === 'ended' || now >= auction.endTime) { alert('拍卖已结束'); return; }
+                if (auction.status === 'ended' || Date.now() >= auction.endTime) { alert('拍卖已结束'); renderAuctionsList(); return; }
                 if (auction.creator === currentChatNick) { alert('不能竞拍自己发布的拍卖'); return; }
 
                 const currentBid = auction.bids.length > 0 ? auction.bids[auction.bids.length - 1].amount : auction.startPrice;
-                const nextBid = currentBid + (auction.bidIncrement || 10);
-                const currentBidder = auction.bids.length > 0 ? auction.bids[auction.bids.length - 1].bidder : '';
-
-                if (!confirm(`确认出价 ${nextBid}？\n当前价格: ${currentBid}${currentBidder ? '（' + currentBidder + '）' : ''}`)) return;
-
-                if (bidBtn) {
-                    bidBtn.disabled = true;
-                    bidBtn.textContent = '...';
-                }
+                const myBid = currentBid + (auction.bidIncrement || 10);
 
                 await fetchChatRoomData();
-                const roomLatest = getRoomData();
-                if (!roomLatest) { alert('数据获取失败，请重试'); return; }
-                const auctionLatest = roomLatest.auctions.find(a => a.id === auctionId);
-                if (!auctionLatest) { alert('拍卖不存在'); return; }
-                if (auctionLatest.status === 'ended' || Date.now() >= auctionLatest.endTime) { alert('拍卖已结束'); return; }
+                room = getRoomData();
+                if (!room) return;
+                auction = room.auctions.find(a => a.id === auctionId);
+                if (!auction) { alert('拍卖不存在'); return; }
+                if (auction.status === 'ended' || Date.now() >= auction.endTime) { alert('拍卖已结束'); renderAuctionsList(); return; }
 
-                const latestBid = auctionLatest.bids.length > 0 ? auctionLatest.bids[auctionLatest.bids.length - 1].amount : auctionLatest.startPrice;
-                const latestNextBid = latestBid + (auctionLatest.bidIncrement || 10);
+                const serverCurrentBid = auction.bids.length > 0 ? auction.bids[auction.bids.length - 1].amount : auction.startPrice;
+                const serverCurrentBidder = auction.bids.length > 0 ? auction.bids[auction.bids.length - 1].bidder : '';
 
-                if (latestBid !== currentBid) {
-                    alert(`价格已变化！当前最高价: ${latestBid}，需要出价: ${latestNextBid}，请重新出价`);
+                if (serverCurrentBid > currentBid) {
+                    const needBid = serverCurrentBid + (auction.bidIncrement || 10);
+                    room.messages.push({
+                        id: 'msg_' + Date.now(),
+                        author: '系统',
+                        content: `❌ ${currentChatNick} 出价 ${myBid} 失败！${serverCurrentBidder} 已出价 ${serverCurrentBid}，需出价 ${needBid}`,
+                        time: Date.now()
+                    });
+                    await saveChatRoomData();
                     renderAuctionsList();
+                    renderChatMessages();
                     return;
                 }
 
-                auctionLatest.bids.push({
+                auction.bids.push({
                     bidder: currentChatNick,
-                    amount: latestNextBid,
+                    amount: myBid,
                     time: Date.now()
                 });
 
-                const quality = auctionLatest.quality || '';
-                const profession = auctionLatest.profession || '';
-                const bonusDmg = auctionLatest.bonusDmg || 0;
-                const ignoreIce = auctionLatest.ignoreIce || 0;
-                roomLatest.messages.push({
+                const quality = auction.quality || '';
+                const profession = auction.profession || '';
+                const bonusDmg = auction.bonusDmg || 0;
+                const ignoreIce = auction.ignoreIce || 0;
+                room.messages.push({
                     id: 'msg_' + Date.now(),
                     author: '系统',
-                    content: `💰 ${currentChatNick} 对 #${auctionLatest.id} ${quality}·${profession}${bonusDmg > 0 ? ' 附加伤害+' + bonusDmg : ''}${ignoreIce > 0 ? ' 无视冰甲+' + ignoreIce : ''} 出价 ${latestNextBid}（当前最高）`,
+                    content: `💰 ${currentChatNick} 对 #${auction.id} ${quality}·${profession}${bonusDmg > 0 ? ' 附加伤害+' + bonusDmg : ''}${ignoreIce > 0 ? ' 无视冰甲+' + ignoreIce : ''} 出价 ${myBid}`,
                     time: Date.now()
                 });
 
                 await saveChatRoomData();
+
+                await fetchChatRoomData();
+                const roomCheck = getRoomData();
+                if (roomCheck) {
+                    const auctionCheck = roomCheck.auctions.find(a => a.id === auctionId);
+                    if (auctionCheck) {
+                        const finalBid = auctionCheck.bids.length > 0 ? auctionCheck.bids[auctionCheck.bids.length - 1].amount : auctionCheck.startPrice;
+                        const finalBidder = auctionCheck.bids.length > 0 ? auctionCheck.bids[auctionCheck.bids.length - 1].bidder : '';
+                        if (finalBidder === currentChatNick && finalBid === myBid) {
+                            roomCheck.messages.push({
+                                id: 'msg_' + Date.now(),
+                                author: '系统',
+                                content: `✅ ${currentChatNick} 出价 ${myBid} 成功！当前最高价`,
+                                time: Date.now()
+                            });
+                            await saveChatRoomData();
+                        } else {
+                            roomCheck.messages.push({
+                                id: 'msg_' + Date.now(),
+                                author: '系统',
+                                content: `❌ ${currentChatNick} 出价 ${myBid} 被覆盖！${finalBidder} 出价 ${finalBid}，当前最高价 ${finalBid}`,
+                                time: Date.now()
+                            });
+                            await saveChatRoomData();
+                        }
+                    }
+                }
                 renderAuctionsList();
                 renderChatMessages();
             } catch (error) {
@@ -3159,56 +3187,87 @@
 
             try {
                 await fetchChatRoomData();
-                const room = getRoomData();
+                let room = getRoomData();
                 if (!room) return;
-                const auction = room.auctions.find(a => a.id === auctionId);
+                let auction = room.auctions.find(a => a.id === auctionId);
                 if (!auction) { alert('拍卖不存在'); return; }
-
-                const now = Date.now();
-                if (auction.status === 'ended' || now >= auction.endTime) { alert('拍卖已结束'); return; }
+                if (auction.status === 'ended' || Date.now() >= auction.endTime) { alert('拍卖已结束'); renderAuctionsList(); return; }
                 if (auction.creator === currentChatNick) { alert('不能竞拍自己发布的拍卖'); return; }
 
                 const currentBid = auction.bids.length > 0 ? auction.bids[auction.bids.length - 1].amount : auction.startPrice;
-                const nextBid = currentBid + (auction.bidIncrement || 10);
-                const currentBidder = auction.bids.length > 0 ? auction.bids[auction.bids.length - 1].bidder : '';
-
-                if (!confirm(`确认出价 ${nextBid}？\n当前价格: ${currentBid}${currentBidder ? '（' + currentBidder + '）' : ''}`)) return;
+                const myBid = currentBid + (auction.bidIncrement || 10);
 
                 await fetchChatRoomData();
-                const roomLatest = getRoomData();
-                if (!roomLatest) { alert('数据获取失败，请重试'); return; }
-                const auctionLatest = roomLatest.auctions.find(a => a.id === auctionId);
-                if (!auctionLatest) { alert('拍卖不存在'); return; }
-                if (auctionLatest.status === 'ended' || Date.now() >= auctionLatest.endTime) { alert('拍卖已结束'); return; }
+                room = getRoomData();
+                if (!room) return;
+                auction = room.auctions.find(a => a.id === auctionId);
+                if (!auction) { alert('拍卖不存在'); return; }
+                if (auction.status === 'ended' || Date.now() >= auction.endTime) { alert('拍卖已结束'); renderAuctionsList(); return; }
 
-                const latestBid = auctionLatest.bids.length > 0 ? auctionLatest.bids[auction.bids.length - 1].amount : auctionLatest.startPrice;
-                const latestNextBid = latestBid + (auctionLatest.bidIncrement || 10);
+                const serverCurrentBid = auction.bids.length > 0 ? auction.bids[auction.bids.length - 1].amount : auction.startPrice;
+                const serverCurrentBidder = auction.bids.length > 0 ? auction.bids[auction.bids.length - 1].bidder : '';
 
-                if (latestBid !== currentBid) {
-                    alert(`价格已变化！当前最高价: ${latestBid}，需要出价: ${latestNextBid}，请重新出价`);
+                if (serverCurrentBid > currentBid) {
+                    const needBid = serverCurrentBid + (auction.bidIncrement || 10);
+                    room.messages.push({
+                        id: 'msg_' + Date.now(),
+                        author: '系统',
+                        content: `❌ ${currentChatNick} 出价 ${myBid} 失败！${serverCurrentBidder} 已出价 ${serverCurrentBid}，需出价 ${needBid}`,
+                        time: Date.now()
+                    });
+                    await saveChatRoomData();
                     closeAuctionDetail();
                     renderAuctionsList();
+                    renderChatMessages();
                     return;
                 }
 
-                auctionLatest.bids.push({
+                auction.bids.push({
                     bidder: currentChatNick,
-                    amount: latestNextBid,
+                    amount: myBid,
                     time: Date.now()
                 });
 
-                const quality = auctionLatest.quality || '';
-                const profession = auctionLatest.profession || '';
-                const bonusDmg = auctionLatest.bonusDmg || 0;
-                const ignoreIce = auctionLatest.ignoreIce || 0;
-                roomLatest.messages.push({
+                const quality = auction.quality || '';
+                const profession = auction.profession || '';
+                const bonusDmg = auction.bonusDmg || 0;
+                const ignoreIce = auction.ignoreIce || 0;
+                room.messages.push({
                     id: 'msg_' + Date.now(),
                     author: '系统',
-                    content: `💰 ${currentChatNick} 对 #${auctionLatest.id} ${quality}·${profession}${bonusDmg > 0 ? ' 附加伤害+' + bonusDmg : ''}${ignoreIce > 0 ? ' 无视冰甲+' + ignoreIce : ''} 出价 ${latestNextBid}（当前最高）`,
+                    content: `💰 ${currentChatNick} 对 #${auction.id} ${quality}·${profession}${bonusDmg > 0 ? ' 附加伤害+' + bonusDmg : ''}${ignoreIce > 0 ? ' 无视冰甲+' + ignoreIce : ''} 出价 ${myBid}`,
                     time: Date.now()
                 });
 
                 await saveChatRoomData();
+
+                await fetchChatRoomData();
+                const roomCheck = getRoomData();
+                if (roomCheck) {
+                    const auctionCheck = roomCheck.auctions.find(a => a.id === auctionId);
+                    if (auctionCheck) {
+                        const finalBid = auctionCheck.bids.length > 0 ? auctionCheck.bids[auctionCheck.bids.length - 1].amount : auctionCheck.startPrice;
+                        const finalBidder = auctionCheck.bids.length > 0 ? auctionCheck.bids[auctionCheck.bids.length - 1].bidder : '';
+                        if (finalBidder === currentChatNick && finalBid === myBid) {
+                            roomCheck.messages.push({
+                                id: 'msg_' + Date.now(),
+                                author: '系统',
+                                content: `✅ ${currentChatNick} 出价 ${myBid} 成功！当前最高价`,
+                                time: Date.now()
+                            });
+                            await saveChatRoomData();
+                        } else {
+                            roomCheck.messages.push({
+                                id: 'msg_' + Date.now(),
+                                author: '系统',
+                                content: `❌ ${currentChatNick} 出价 ${myBid} 被覆盖！${finalBidder} 出价 ${finalBid}，当前最高价 ${finalBid}`,
+                                time: Date.now()
+                            });
+                            await saveChatRoomData();
+                        }
+                    }
+                }
+
                 closeAuctionDetail();
                 renderAuctionsList();
                 renderChatMessages();
@@ -3583,68 +3642,49 @@
         }
 
         // 通用面板拖拽功能
-        const draggableInitialized = {};
-        function makePanelDraggable(panelId, headerId) {
-            if (draggableInitialized[panelId]) return;
+        function startPanelDrag(e, panelId) {
+            if (e.target.closest('button') || e.target.closest('select') || e.target.closest('input')) return;
+            e.preventDefault();
             const panel = document.getElementById(panelId);
-            const header = document.getElementById(headerId);
-            if (!panel || !header) return;
-            draggableInitialized[panelId] = true;
-            
-            let isDragging = false;
-            let startX = 0, startY = 0, startLeft = 0, startTop = 0;
-            
-            function onPointerDown(clientX, clientY) {
-                isDragging = true;
-                startX = clientX;
-                startY = clientY;
-                const rect = panel.getBoundingClientRect();
-                startLeft = rect.left;
-                startTop = rect.top;
-            }
-            
-            function onPointerMove(clientX, clientY) {
-                if (!isDragging) return;
-                let newLeft = startLeft + (clientX - startX);
-                let newTop = startTop + (clientY - startY);
-                newLeft = Math.max(0, Math.min(newLeft, window.innerWidth - 50));
-                newTop = Math.max(0, Math.min(newTop, window.innerHeight - 50));
-                panel.style.left = newLeft + 'px';
-                panel.style.top = newTop + 'px';
+            if (!panel) return;
+            const rect = panel.getBoundingClientRect();
+            const ox = e.clientX - rect.left;
+            const oy = e.clientY - rect.top;
+            function onMove(ev) {
+                panel.style.left = Math.max(0, ev.clientX - ox) + 'px';
+                panel.style.top = Math.max(0, ev.clientY - oy) + 'px';
                 panel.style.right = 'auto';
             }
-            
-            function onPointerUp() {
-                isDragging = false;
+            function onUp() {
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
             }
-            
-            header.addEventListener('mousedown', function(e) {
-                if (e.target.closest('button') || e.target.closest('select') || e.target.closest('input')) return;
-                e.preventDefault();
-                onPointerDown(e.clientX, e.clientY);
-            });
-            document.addEventListener('mousemove', function(e) {
-                onPointerMove(e.clientX, e.clientY);
-            });
-            document.addEventListener('mouseup', onPointerUp);
-            
-            header.addEventListener('touchstart', function(e) {
-                if (e.target.closest('button') || e.target.closest('select') || e.target.closest('input')) return;
-                if (e.touches.length === 1) {
-                    onPointerDown(e.touches[0].clientX, e.touches[0].clientY);
-                }
-            }, {passive: true});
-            document.addEventListener('touchmove', function(e) {
-                if (isDragging && e.touches.length === 1) {
-                    onPointerMove(e.touches[0].clientX, e.touches[0].clientY);
-                }
-            }, {passive: true});
-            document.addEventListener('touchend', onPointerUp);
-            document.addEventListener('touchcancel', onPointerUp);
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
         }
 
-        function initDraggable(panelId, headerId) {
-            makePanelDraggable(panelId, headerId);
+        function startPanelTouch(e, panelId) {
+            if (e.target.closest('button') || e.target.closest('select') || e.target.closest('input')) return;
+            if (e.touches.length !== 1) return;
+            const panel = document.getElementById(panelId);
+            if (!panel) return;
+            const rect = panel.getBoundingClientRect();
+            const ox = e.touches[0].clientX - rect.left;
+            const oy = e.touches[0].clientY - rect.top;
+            function onMove(ev) {
+                if (ev.touches.length !== 1) return;
+                panel.style.left = Math.max(0, ev.touches[0].clientX - ox) + 'px';
+                panel.style.top = Math.max(0, ev.touches[0].clientY - oy) + 'px';
+                panel.style.right = 'auto';
+            }
+            function onUp() {
+                document.removeEventListener('touchmove', onMove);
+                document.removeEventListener('touchend', onUp);
+                document.removeEventListener('touchcancel', onUp);
+            }
+            document.addEventListener('touchmove', onMove, {passive: true});
+            document.addEventListener('touchend', onUp);
+            document.addEventListener('touchcancel', onUp);
         }
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -3653,6 +3693,14 @@
             makePanelDraggable('txtFilesPanel', 'txtFilesPanelHeader');
             makePanelDraggable('textParserPanel', 'textParserPanelHeader');
         });
+
+        function makePanelDraggable(panelId, headerId) {
+            const panel = document.getElementById(panelId);
+            const header = document.getElementById(headerId);
+            if (!panel || !header) return;
+            header.addEventListener('mousedown', function(e) { startPanelDrag(e, panelId); });
+            header.addEventListener('touchstart', function(e) { startPanelTouch(e, panelId); }, {passive: true});
+        }
         </script>
 
         <!-- 项目操作菜单（折叠） -->
@@ -9519,7 +9567,6 @@ function hasGistToken() {
                 messageWallOpen = true;
                 if (wallMessages.length === 0) fetchMessages();
                 initMessageWallDrag();
-                initDraggable('messageWall', 'messageWallHeader');
             }
         }
         
@@ -9548,7 +9595,6 @@ function hasGistToken() {
             toggle.style.display = 'none';
             messageWallOpen = true;
             initMessageWallDrag();
-            initDraggable('messageWall', 'messageWallHeader');
         }
         
         function initMessageWallDrag() {
@@ -11737,7 +11783,7 @@ function hasGistToken() {
         #messageWallContent::-webkit-scrollbar-thumb:hover { background: rgba(255,215,0,0.8); }
     </style>
     <div id="messageWall" style="position:fixed;top:60px;left:20px;width:380px;height:480px;background:rgba(26,26,46,0.95);border:1px solid rgba(255,215,0,0.3);border-radius:12px;z-index:9980;box-shadow:0 4px 20px rgba(0,0,0,0.5);backdrop-filter:blur(10px);flex-direction:column;min-width:300px;min-height:350px;display:none;">
-        <div id="messageWallHeader" style="background:linear-gradient(135deg,rgba(255,215,0,0.2),rgba(255,107,107,0.2));padding:10px 15px;display:flex;justify-content:space-between;align-items:center;cursor:move;user-select:none;">
+        <div id="messageWallHeader" style="background:linear-gradient(135deg,rgba(255,215,0,0.2),rgba(255,107,107,0.2));padding:10px 15px;display:flex;justify-content:space-between;align-items:center;cursor:move;user-select:none;" onmousedown="startPanelDrag(event,'messageWall')" ontouchstart="startPanelTouch(event,'messageWall')">
             <span style="color:#ffd700;font-size:0.9rem;font-weight:bold;">📢 需求墙</span>
             <div style="display:flex;gap:10px;">
                 <button onclick="toggleMessageWallSize()" title="最小化" style="background:transparent;border:none;color:#ffd700;font-size:1rem;cursor:pointer;padding:0;">−</button>
@@ -11799,7 +11845,7 @@ function hasGistToken() {
 
     <!-- 聊天室主面板 -->
     <div id="chatRoomPanel" style="position:fixed;top:50px;left:20px;width:440px;height:560px;background:rgba(26,26,46,0.95);border:1px solid rgba(78,205,196,0.3);border-radius:12px;z-index:9980;box-shadow:0 4px 20px rgba(0,0,0,0.5);backdrop-filter:blur(10px);flex-direction:column;min-width:350px;min-height:400px;display:none;">
-        <div id="chatRoomHeader" style="background:linear-gradient(135deg,rgba(78,205,196,0.2),rgba(44,160,141,0.2));padding:10px 15px;display:flex;justify-content:space-between;align-items:center;cursor:move;user-select:none;">
+        <div id="chatRoomHeader" style="background:linear-gradient(135deg,rgba(78,205,196,0.2),rgba(44,160,141,0.2));padding:10px 15px;display:flex;justify-content:space-between;align-items:center;cursor:move;user-select:none;" onmousedown="startPanelDrag(event,'chatRoomPanel')" ontouchstart="startPanelTouch(event,'chatRoomPanel')">
             <span style="color:#4ecdc4;font-size:0.9rem;font-weight:bold;">💬 聊天室 <span id="chatRoomIdDisplay" style="color:rgba(255,255,255,0.5);font-size:0.75rem;"></span></span>
             <div style="display:flex;gap:10px;">
                 <button onclick="toggleChatRoomTab('auctions')" title="拍卖" style="background:transparent;border:none;color:#ffd700;font-size:1rem;cursor:pointer;padding:0;">🔨</button>
