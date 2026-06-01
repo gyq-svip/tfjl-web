@@ -12,6 +12,11 @@
             -webkit-tap-highlight-color: transparent;
         }
 
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
@@ -3482,11 +3487,30 @@
 
         async function manualRefreshAuctions() {
             if (!currentChatRoom) return;
+            const btn = document.getElementById('manualRefreshBtn');
+            if (!btn) return;
+            
+            // 视觉反馈：旋转图标 + 禁用
+            const origText = btn.textContent;
+            btn.textContent = '⏳';
+            btn.style.animation = 'spin 0.6s linear infinite';
+            btn.disabled = true;
+            btn.style.opacity = '0.6';
+            
             try {
                 await fetchChatRoomData();
                 renderChatMessages();
                 renderAuctionsList();
-            } catch (e) {}
+                showBidToast('刷新成功 ✓', true);
+            } catch (e) {
+                showBidToast('刷新失败，请重试', false);
+            } finally {
+                // 恢复原状
+                btn.textContent = origText;
+                btn.style.animation = '';
+                btn.disabled = false;
+                btn.style.opacity = '1';
+            }
         }
 
         function startAuctionCountdown() {
@@ -12085,7 +12109,7 @@ function hasGistToken() {
                     <span style="color:#ffd700;font-size:0.85rem;">🔨 拍卖列表</span>
                 </div>
                 <div style="display:flex;gap:6px;">
-                    <button onclick="manualRefreshAuctions()" style="padding:4px 8px;border-radius:6px;border:none;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);cursor:pointer;font-size:0.75rem;">🔄</button>
+                    <button onclick="manualRefreshAuctions()" id="manualRefreshBtn" style="padding:6px 10px;border-radius:6px;border:none;background:rgba(255,215,0,0.15);color:rgba(255,215,0,0.9);cursor:pointer;font-size:0.85rem;transition:all 0.2s;min-width:36px;" onmouseover="this.style.background='rgba(255,215,0,0.3)'" onmouseout="this.style.background='rgba(255,215,0,0.15)'">🔄</button>
                     <button onclick="openAuctionPostModal()" style="padding:4px 10px;border-radius:6px;border:none;background:linear-gradient(135deg,#4ade80,#22c55e);color:white;cursor:pointer;font-size:0.75rem;">+ 发布拍卖</button>
                 </div>
             </div>
