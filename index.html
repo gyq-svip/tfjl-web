@@ -2170,12 +2170,11 @@
     <div id="passwordOverlay" class="password-overlay">
         <div class="password-box">
             <h2>🔐 塔防阵容系统</h2>
-            <p style="color: rgba(255,255,255,0.7); margin-bottom: 20px;">请选择进入方式</p>
+            <p style="color: rgba(255,255,255,0.7); margin-bottom: 20px;">请输入访问密码</p>
             <div id="passwordError" class="password-error" style="display: none;"></div>
             <input type="password" id="passwordInput" placeholder="请输入密码..." onkeypress="if(event.key==='Enter')checkPassword()">
             <br><br>
             <button onclick="checkPassword()">进入系统</button>
-            <button onclick="directEnterAuction()" style="background:linear-gradient(135deg,#2196f3,#1565c0);margin-top:10px;">🏪 直接进入拍卖行</button>
         </div>
     </div>
 
@@ -2609,6 +2608,38 @@
                 openChatRoomEntry();
             }, 300);
         }
+
+        function toggleUserMenu() {
+            const menu = document.getElementById('userMenuDropdown');
+            if (menu.style.display === 'none' || menu.style.display === '') {
+                menu.style.display = 'block';
+                // 更新当前用户显示
+                updateCurrentUserDisplay();
+            } else {
+                menu.style.display = 'none';
+            }
+        }
+
+        function updateCurrentUserDisplay() {
+            const display = document.getElementById('currentUserDisplay');
+            if (!display) return;
+            
+            const nick = localStorage.getItem('TFJL_UserName');
+            if (nick) {
+                display.textContent = '👤 ' + nick;
+            } else {
+                display.textContent = '👤 未登录';
+            }
+        }
+
+        // 点击其他位置关闭菜单
+        document.addEventListener('click', function(e) {
+            const menu = document.getElementById('userMenuDropdown');
+            const menuBtn = e.target.closest('[onclick*="toggleUserMenu"]');
+            if (menu && menu.style.display === 'block' && !menuBtn && !menu.contains(e.target)) {
+                menu.style.display = 'none';
+            }
+        });
 
         function updateProjectList1() {
             const cat = document.getElementById('categorySelector1').value;
@@ -11662,6 +11693,10 @@ function hasGistToken() {
                 document.getElementById('adminPageNews').style.display = 'none';
                 document.getElementById('adminPageStats').style.display = 'none';
                 document.getElementById('adminPageSettings').style.display = 'none';
+                document.getElementById('adminPageAuctionStats').style.display = 'none';
+                document.getElementById('adminPageNickManage').style.display = 'none';
+                document.getElementById('adminPagePasswordManage').style.display = 'none';
+                document.getElementById('adminPageAuctionManage').style.display = 'none';
                 document.getElementById('adminVerifyCode').value = '';
                 document.getElementById('adminVerifyCode').focus();
             }
@@ -11676,6 +11711,7 @@ function hasGistToken() {
             document.getElementById('adminPageAuctionStats').style.display = 'none';
             document.getElementById('adminPageNickManage').style.display = 'none';
             document.getElementById('adminPagePasswordManage').style.display = 'none';
+            document.getElementById('adminPageAuctionManage').style.display = 'none';
         }
 
         function adminShowPage(page) {
@@ -13107,6 +13143,43 @@ function hasGistToken() {
     <!-- 消息墙开关按钮 -->
     <button id="messageWallToggle" onclick="toggleMessageWall()" title="需求墙" style="position:fixed;top:60px;left:20px;background:rgba(255,215,0,0.85);color:#1a1a2e;border:none;width:38px;height:38px;border-radius:50%;cursor:pointer;font-size:1.1rem;box-shadow:0 2px 10px rgba(0,0,0,0.3);z-index:9985;display:flex;align-items:center;justify-content:center;">📢</button>
     <button id="chatRoomToggle" onclick="openChatRoomEntry()" title="拍卖行" style="position:fixed;top:60px;left:68px;background:rgba(78,205,196,0.85);color:#1a1a2e;border:none;width:38px;height:38px;border-radius:50%;cursor:pointer;font-size:1.1rem;box-shadow:0 2px 10px rgba(0,0,0,0.3);z-index:9985;display:flex;align-items:center;justify-content:center;">🏪</button>
+
+    <!-- 顶部菜单栏 -->
+    <div id="topMenuBar" style="position:fixed;top:10px;left:140px;display:flex;gap:8px;z-index:9986;align-items:center;">
+        <button onclick="toggleUserMenu()" style="background:linear-gradient(135deg,rgba(255,255,255,0.15),rgba(255,255,255,0.05));border:1px solid rgba(255,255,255,0.2);color:white;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:0.9rem;display:flex;align-items:center;gap:6px;backdrop-filter:blur(10px);transition:all 0.2s;" onmouseover="this.style.background='linear-gradient(135deg,rgba(255,255,255,0.25),rgba(255,255,255,0.1))'" onmouseout="this.style.background='linear-gradient(135deg,rgba(255,255,255,0.15),rgba(255,255,255,0.05))'">
+            <span style="font-size:1.1rem;">☰</span>
+            <span>菜单</span>
+        </button>
+        <div id="currentUserDisplay" style="color:rgba(255,255,255,0.7);font-size:0.85rem;padding:4px 10px;background:rgba(0,0,0,0.3);border-radius:6px;border:1px solid rgba(255,255,255,0.1);"></div>
+    </div>
+
+    <!-- 用户菜单下拉面板 -->
+    <div id="userMenuDropdown" style="display:none;position:fixed;top:50px;left:140px;width:240px;background:rgba(26,26,46,0.98);border:1px solid rgba(255,255,255,0.15);border-radius:12px;z-index:9987;box-shadow:0 8px 32px rgba(0,0,0,0.5);backdrop-filter:blur(10px);overflow:hidden;">
+        <div style="padding:12px 16px;background:linear-gradient(135deg,rgba(78,205,196,0.2),rgba(44,160,141,0.2));border-bottom:1px solid rgba(255,255,255,0.1);">
+            <div style="color:#4ecdc4;font-size:0.95rem;font-weight:600;">👤 用户菜单</div>
+        </div>
+        <div onclick="openChatRoomEntry();toggleUserMenu();" style="padding:12px 16px;color:white;cursor:pointer;display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(255,255,255,0.05);transition:background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.08)'" onmouseout="this.style.background='transparent'">
+            <span style="font-size:1.2rem;">🏪</span>
+            <div>
+                <div style="font-size:0.9rem;">进入拍卖行</div>
+                <div style="color:rgba(255,255,255,0.4);font-size:0.7rem;">打开拍卖系统</div>
+            </div>
+        </div>
+        <div onclick="openAdminPanel();toggleUserMenu();" style="padding:12px 16px;color:white;cursor:pointer;display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(255,255,255,0.05);transition:background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.08)'" onmouseout="this.style.background='transparent'">
+            <span style="font-size:1.2rem;">👑</span>
+            <div>
+                <div style="font-size:0.9rem;">管理员入口</div>
+                <div style="color:rgba(255,255,255,0.4);font-size:0.7rem;">验证后管理</div>
+            </div>
+        </div>
+        <div onclick="logoutToLogin()" style="padding:12px 16px;color:#ff6b6b;cursor:pointer;display:flex;align-items:center;gap:10px;transition:background 0.2s;" onmouseover="this.style.background='rgba(255,107,107,0.1)'" onmouseout="this.style.background='transparent'">
+            <span style="font-size:1.2rem;">🔙</span>
+            <div>
+                <div style="font-size:0.9rem;">退出登录</div>
+                <div style="color:rgba(255,255,255,0.4);font-size:0.7rem;">返回登录界面</div>
+            </div>
+        </div>
+    </div>
 
     <!-- 拍卖行入口弹窗 -->
     <div id="chatRoomEntryModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9998;align-items:center;justify-content:center;">
