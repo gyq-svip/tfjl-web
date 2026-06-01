@@ -2751,17 +2751,27 @@
             const modal = document.getElementById('chatRoomEntryModal');
             modal.style.display = 'flex';
             const savedNick = localStorage.getItem('TFJL_UserName') || '';
+            const hasSetNick = localStorage.getItem('TFJL_HasSetNick') === 'true';
             const nickInput = document.getElementById('chatRoomNickInput');
             const nickEditBtn = document.getElementById('nickEditBtn');
             nickInput.value = savedNick;
-            // 如果有昵称，默认只读
-            if (savedNick) {
+            
+            if (hasSetNick && savedNick) {
+                // 已设置昵称
                 nickInput.readOnly = true;
-                nickEditBtn.textContent = '修改';
+                nickEditBtn.textContent = '已设置';
+                nickEditBtn.disabled = true;
+                nickEditBtn.style.opacity = '0.5';
+            } else if (savedNick) {
+                // 有昵称但未标记为已设置
+                nickInput.readOnly = true;
+                nickEditBtn.textContent = '设置';
             } else {
+                // 没有昵称
                 nickInput.readOnly = false;
-                nickEditBtn.textContent = '确认';
+                nickEditBtn.textContent = '保存';
             }
+            
             const savedRoom = localStorage.getItem('TFJL_ChatRoom') || '';
             document.getElementById('chatRoomIdInput').value = savedRoom;
             document.getElementById('chatRoomIdInput').focus();
@@ -2770,11 +2780,21 @@
         function toggleNickEdit() {
             const nickInput = document.getElementById('chatRoomNickInput');
             const nickEditBtn = document.getElementById('nickEditBtn');
+            const hasSetNick = localStorage.getItem('TFJL_HasSetNick') === 'true';
+            const currentNick = localStorage.getItem('TFJL_UserName');
+            
+            if (hasSetNick && currentNick) {
+                // 已经设置过昵称，不能再修改
+                alert('抱歉，昵称只能设置一次！\n如需修改请联系管理员。');
+                return;
+            }
             
             if (nickInput.readOnly) {
                 // 进入编辑模式
-                const confirm = window.confirm('确定要修改昵称吗？这会影响你在拍卖行中的身份！');
-                if (!confirm) return;
+                if (currentNick) {
+                    const confirm = window.confirm('确定要设置昵称吗？设置后无法自行修改！');
+                    if (!confirm) return;
+                }
                 nickInput.readOnly = false;
                 nickEditBtn.textContent = '保存';
                 nickInput.focus();
@@ -2786,9 +2806,12 @@
                     return;
                 }
                 localStorage.setItem('TFJL_UserName', newNick);
+                localStorage.setItem('TFJL_HasSetNick', 'true'); // 标记已设置
                 nickInput.readOnly = true;
-                nickEditBtn.textContent = '修改';
-                alert('昵称已保存！');
+                nickEditBtn.textContent = '已设置';
+                nickEditBtn.disabled = true;
+                nickEditBtn.style.opacity = '0.5';
+                alert('昵称已设置成功！以后无法自行修改。');
             }
         }
 
@@ -11485,6 +11508,8 @@ function hasGistToken() {
             document.getElementById('adminPageNews').style.display = 'none';
             document.getElementById('adminPageStats').style.display = 'none';
             document.getElementById('adminPageSettings').style.display = 'none';
+            document.getElementById('adminPageAuctionStats').style.display = 'none';
+            document.getElementById('adminPageNickManage').style.display = 'none';
         }
 
         function adminShowPage(page) {
@@ -11494,6 +11519,7 @@ function hasGistToken() {
             document.getElementById('adminPageStats').style.display = 'none';
             document.getElementById('adminPageSettings').style.display = 'none';
             document.getElementById('adminPageAuctionStats').style.display = 'none';
+            document.getElementById('adminPageNickManage').style.display = 'none';
 
             if (page === 'title') {
                 document.getElementById('adminPageTitle').style.display = 'block';
@@ -11510,6 +11536,9 @@ function hasGistToken() {
             } else if (page === 'auctionStats') {
                 document.getElementById('adminPageAuctionStats').style.display = 'block';
                 loadAuctionStats();
+            } else if (page === 'nickManage') {
+                document.getElementById('adminPageNickManage').style.display = 'block';
+                loadCurrentNick();
             }
         }
 
@@ -11754,6 +11783,21 @@ function hasGistToken() {
             const el = document.getElementById('adminStatus');
             el.style.display = 'none';
             el.className = 'admin-status';
+        }
+
+        function loadCurrentNick() {
+            const nick = localStorage.getItem('TFJL_UserName') || '未设置';
+            const hasSet = localStorage.getItem('TFJL_HasSetNick') === 'true';
+            document.getElementById('currentNickDisplay').value = nick + (hasSet ? ' (已锁定)' : '');
+        }
+
+        function resetCurrentNick() {
+            const confirm = window.confirm('确定要重置当前设备的昵称设置吗？\n用户将可以重新设置一次昵称。');
+            if (!confirm) return;
+            
+            localStorage.removeItem('TFJL_HasSetNick');
+            showAdminStatus('昵称设置已重置！用户可以重新设置昵称了。', 'success');
+            loadCurrentNick();
         }
 
         async function adminFetchNewsFromGist() {
@@ -12200,11 +12244,11 @@ function hasGistToken() {
                             <div style="color:rgba(255,255,255,0.4);font-size:0.8rem;">Token配置与连接测试</div>
                         </div>
                     </div>
-                    <div class="admin-menu-item" onclick="adminOpenChatRoom()">
-                        <span style="font-size:1.3rem;">🏪</span>
+                    <div class="admin-menu-item" onclick="adminShowPage('nickManage')">
+                        <span style="font-size:1.3rem;">👤</span>
                         <div>
-                            <div style="color:#ffd700;font-weight:500;">拍卖行</div>
-                            <div style="color:rgba(255,255,255,0.4);font-size:0.8rem;">进入拍卖行拍卖</div>
+                            <div style="color:#ffd700;font-weight:500;">昵称管理</div>
+                            <div style="color:rgba(255,255,255,0.4);font-size:0.8rem;">管理用户昵称（可重置）</div>
                         </div>
                     </div>
                     <div class="admin-menu-item" onclick="adminShowPage('auctionStats')">
@@ -12330,6 +12374,30 @@ function hasGistToken() {
                 <div id="auctionStatsSummary" style="margin-top:15px;"></div>
                 <div id="auctionStatsDetail" style="margin-top:15px;max-height:400px;overflow-y:auto;"></div>
             </div>
+
+            <div id="adminPageNickManage" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
+                    <button class="admin-btn admin-btn-secondary" onclick="adminShowMenu()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
+                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">👤 昵称管理</h3>
+                </div>
+                <div class="admin-section">
+                    <div style="background:rgba(255,165,0,0.1);border-left:3px solid #ffa500;border-radius:6px;padding:12px;margin-bottom:15px;">
+                        <div style="color:#ffa500;font-size:0.85rem;font-weight:500;">💡 说明</div>
+                        <div style="color:rgba(255,255,255,0.6);font-size:0.75rem;margin-top:5px;">
+                            用户昵称设置后无法自行修改，管理员可在此强制重置。<br>
+                            重置后用户可以重新设置一次昵称。
+                        </div>
+                    </div>
+                    <label>选择设备（用于测试：可重置当前设备）</label>
+                    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
+                        <input type="text" id="currentNickDisplay" placeholder="当前昵称" style="flex:1;" readonly>
+                    </div>
+                    <div style="display:flex;gap:8px;justify-content:flex-end;">
+                        <button class="admin-btn admin-btn-secondary" onclick="loadCurrentNick()">加载当前</button>
+                        <button class="admin-btn" style="background:linear-gradient(135deg,#f44336,#d32f2f);" onclick="resetCurrentNick()">重置当前设备</button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -12391,17 +12459,20 @@ function hasGistToken() {
     <!-- 拍卖行入口弹窗 -->
     <div id="chatRoomEntryModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9998;align-items:center;justify-content:center;">
         <div style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);border:2px solid rgba(78,205,196,0.4);border-radius:16px;padding:30px;width:90%;max-width:400px;box-shadow:0 10px 50px rgba(0,0,0,0.6);">
-            <h2 style="color:#4ecdc4;text-align:center;margin:0 0 20px 0;">🏪 进入拍卖行</h2>
-            <label style="color:rgba(255,255,255,0.8);display:block;margin-bottom:5px;font-size:0.9rem;">房间ID</label>
-            <input type="text" id="chatRoomIdInput" placeholder="输入房间ID（相同ID进入同一房间）" style="width:100%;padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:white;font-size:0.9rem;margin-bottom:15px;outline:none;box-sizing:border-box;">
+            <h2 style="color:#4ecdc4;text-align:center;margin:0 0 20px 0;">🏪 拍卖一条街</h2>
+            <label style="color:rgba(255,255,255,0.8);display:block;margin-bottom:5px;font-size:0.9rem;">拍卖会ID</label>
+            <input type="text" id="chatRoomIdInput" placeholder="输入拍卖会ID（相同ID进入同一拍卖会）" style="width:100%;padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:white;font-size:0.9rem;margin-bottom:15px;outline:none;box-sizing:border-box;">
             <label style="color:rgba(255,255,255,0.8);display:block;margin-bottom:5px;font-size:0.9rem;">昵称</label>
-            <div style="display:flex;gap:8px;margin-bottom:20px;">
+            <div style="display:flex;gap:8px;margin-bottom:8px;">
                 <input type="text" id="chatRoomNickInput" placeholder="输入你的昵称" style="flex:1;padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:white;font-size:0.9rem;outline:none;box-sizing:border-box;" readonly>
                 <button id="nickEditBtn" onclick="toggleNickEdit()" style="padding:0 12px;border-radius:8px;border:none;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);cursor:pointer;font-size:0.8rem;white-space:nowrap;">修改</button>
             </div>
+            <div id="nickEditHint" style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-bottom:20px;padding:8px;background:rgba(255,165,0,0.1);border-left:3px solid #ffa500;border-radius:4px;">
+                💡 提示：昵称只能设置一次，设置后如需修改请联系管理员
+            </div>
             <div style="display:flex;gap:10px;justify-content:flex-end;">
                 <button onclick="closeChatRoomEntry()" style="padding:10px 20px;border-radius:8px;border:none;background:rgba(255,255,255,0.1);color:white;cursor:pointer;font-size:0.9rem;">取消</button>
-                <button onclick="joinChatRoom()" style="padding:10px 20px;border-radius:8px;border:none;background:linear-gradient(135deg,#4ecdc4,#44a08d);color:white;cursor:pointer;font-weight:500;font-size:0.9rem;">进入房间</button>
+                <button onclick="joinChatRoom()" style="padding:10px 20px;border-radius:8px;border:none;background:linear-gradient(135deg,#4ecdc4,#44a08d);color:white;cursor:pointer;font-weight:500;font-size:0.9rem;">进入拍卖会</button>
             </div>
         </div>
     </div>
