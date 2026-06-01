@@ -3050,15 +3050,20 @@
                         <div style="flex:1;min-width:0;">
                             <div style="color:${qualityColor};font-size:0.8rem;font-weight:600;margin-bottom:3px;">#${auction.id} ${quality}·${profession}</div>
                             <div style="margin-bottom:4px;">${attrsHtml}</div>
-                            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                            <div style="display:flex;flex-direction:column;gap:4px;min-width:0;">
                                 ${!isEnded
-                                    ? `<div style="display:flex;align-items:center;gap:4px;">
-                                        <input type="number" id="quickBidInput_${auction.id}" placeholder="加价" min="1" style="width:50px;padding:3px 5px;border-radius:4px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.4);color:white;font-size:0.7rem;outline:none;">
-                                        <button onclick="event.stopPropagation();customQuickBid('${auction.id}')" style="padding:3px 8px;border-radius:4px;border:none;background:linear-gradient(135deg,#ffd700,#ff6b6b);color:#1a1a2e;cursor:pointer;font-weight:600;font-size:0.7rem;">出价</button>
+                                    ? `<div style="display:flex;gap:3px;margin-bottom:2px;">
+                                        <button onclick="event.stopPropagation();document.getElementById('quickBidInput_${auction.id}').value=10" style="padding:2px 6px;border-radius:4px;border:none;background:rgba(255,215,0,0.2);color:#ffd700;cursor:pointer;font-size:0.65rem;">10</button>
+                                        <button onclick="event.stopPropagation();document.getElementById('quickBidInput_${auction.id}').value=20" style="padding:2px 6px;border-radius:4px;border:none;background:rgba(255,215,0,0.2);color:#ffd700;cursor:pointer;font-size:0.65rem;">20</button>
+                                        <button onclick="event.stopPropagation();document.getElementById('quickBidInput_${auction.id}').value=50" style="padding:2px 6px;border-radius:4px;border:none;background:rgba(255,215,0,0.2);color:#ffd700;cursor:pointer;font-size:0.65rem;">50</button>
+                                    </div>
+                                    <div style="display:flex;align-items:center;gap:4px;">
+                                        <input type="number" id="quickBidInput_${auction.id}" placeholder="加价≥50" min="51" style="flex:1;padding:4px 8px;border-radius:4px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.4);color:white;font-size:0.75rem;outline:none;min-width:0;">
+                                        <button onclick="event.stopPropagation();customQuickBid('${auction.id}')" style="padding:4px 10px;border-radius:4px;border:none;background:linear-gradient(135deg,#ffd700,#ff6b6b);color:#1a1a2e;cursor:pointer;font-weight:600;font-size:0.75rem;white-space:nowrap;">出价</button>
                                     </div>`
                                     : `<span style="padding:3px 8px;border-radius:5px;background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.3);font-size:0.7rem;">已结束</span>`
                                 }
-                                <span style="color:rgba(255,255,255,0.3);font-size:0.65rem;">${bidCount}次出价</span>
+                                <span style="color:rgba(255,255,255,0.3);font-size:0.6rem;">${bidCount}次出价</span>
                             </div>
                         </div>
                         <div style="flex-shrink:0;text-align:right;">
@@ -3162,8 +3167,8 @@
                         <div style="color:#ffd700;font-size:1rem;">${currentBid}</div>
                     </div>
                     <div style="background:rgba(255,255,255,0.05);padding:8px;border-radius:6px;text-align:center;">
-                        <div style="color:rgba(255,255,255,0.4);font-size:0.75rem;">加价幅度</div>
-                        <div style="color:rgba(255,255,255,0.7);">10/20/50/100</div>
+                        <div style="color:rgba(255,255,255,0.4);font-size:0.75rem;">快捷出价</div>
+                        <div style="color:rgba(255,255,255,0.7);">10/20/50</div>
                     </div>
                     <div style="background:rgba(255,255,255,0.05);padding:8px;border-radius:6px;text-align:center;">
                         <div style="color:rgba(255,255,255,0.4);font-size:0.75rem;">出价次数</div>
@@ -3180,12 +3185,17 @@
                 </div>
                 ${!isEnded ? `
                     <div style="text-align:center;margin-bottom:10px;">
-                        <div style="color:rgba(255,255,255,0.5);font-size:0.8rem;margin-bottom:8px;">输入加价金额</div>
-                        <div style="display:flex;justify-content:center;align-items:center;gap:8px;flex-wrap:wrap;">
-                            <input type="number" id="detailBidInput" placeholder="加价金额" min="1" style="width:120px;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.4);color:white;font-size:0.9rem;outline:none;">
+                        <div style="color:rgba(255,255,255,0.5);font-size:0.8rem;margin-bottom:8px;">出价金额</div>
+                        <div style="display:flex;justify-content:center;gap:6px;margin-bottom:8px;flex-wrap:wrap;">
+                            <button onclick="document.getElementById('detailBidInput').value=10" style="padding:6px 14px;border-radius:6px;border:none;background:rgba(255,215,0,0.2);color:#ffd700;cursor:pointer;font-size:0.8rem;">+10</button>
+                            <button onclick="document.getElementById('detailBidInput').value=20" style="padding:6px 14px;border-radius:6px;border:none;background:rgba(255,215,0,0.2);color:#ffd700;cursor:pointer;font-size:0.8rem;">+20</button>
+                            <button onclick="document.getElementById('detailBidInput').value=50" style="padding:6px 14px;border-radius:6px;border:none;background:rgba(255,215,0,0.2);color:#ffd700;cursor:pointer;font-size:0.8rem;">+50</button>
+                        </div>
+                        <div style="display:flex;justify-content:center;align-items:center;gap:8px;">
+                            <input type="number" id="detailBidInput" placeholder="自定义加价≥50" min="51" style="width:180px;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.4);color:white;font-size:0.95rem;outline:none;">
                             <button onclick="customPlaceBid('${auction.id}')" style="padding:8px 22px;border-radius:8px;border:none;background:linear-gradient(135deg,#ffd700,#ff6b6b);color:#1a1a2e;cursor:pointer;font-weight:600;font-size:0.9rem;">确认出价</button>
                         </div>
-                        <div style="color:rgba(255,215,0,0.6);font-size:0.75rem;margin-top:6px;">当前最高: ${currentBid}</div>
+                        <div style="color:rgba(255,215,0,0.6);font-size:0.75rem;margin-top:6px;">当前最高: ${currentBid} | 自定义需>50</div>
                     </div>
                 ` : ''}
                 ${winnerHtml}
@@ -3400,8 +3410,8 @@
             if (!inputEl) return;
             
             const increment = parseInt(inputEl.value);
-            if (!increment || increment < 1) {
-                showBidToast('请输入有效的加价金额', false);
+            if (!increment || increment < 51) {
+                showBidToast('自定义出价需大于50', false);
                 return;
             }
             
@@ -3440,8 +3450,8 @@
             if (!inputEl) return;
             
             const increment = parseInt(inputEl.value);
-            if (!increment || increment < 1) {
-                showBidToast('请输入有效的加价金额', false);
+            if (!increment || increment < 51) {
+                showBidToast('自定义出价需大于50', false);
                 return;
             }
             
