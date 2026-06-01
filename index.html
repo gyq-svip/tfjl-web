@@ -3180,8 +3180,8 @@
             const preview = document.getElementById('auctionImagePreview');
             if (input.files && input.files[0]) {
                 const file = input.files[0];
-                if (file.size > 2 * 1024 * 1024) {
-                    alert('图片不能超过2MB');
+                if (file.size > 150 * 1024) {
+                    alert('图片不能超过150KB');
                     input.value = '';
                     return;
                 }
@@ -13384,6 +13384,7 @@ function hasGistToken() {
         <div style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);border:2px solid rgba(255,215,0,0.4);border-radius:16px;padding:25px;width:90%;max-width:450px;max-height:85vh;overflow-y:auto;box-shadow:0 10px 50px rgba(0,0,0,0.6);">
             <h2 style="color:#ffd700;text-align:center;margin:0 0 15px 0;font-size:1.1rem;">🔨 发布拍卖</h2>
             <label style="color:rgba(255,255,255,0.8);display:block;margin-bottom:5px;font-size:0.85rem;">物品图片</label>
+            <div style="color:rgba(255,152,0,0.8);font-size:0.7rem;margin-bottom:8px;">⚠️ 图片大小限制150KB，文件太多会被GitHub限制！</div>
             <div style="display:flex;gap:10px;margin-bottom:10px;align-items:flex-start;">
                 <div id="auctionImagePreview" style="width:100px;height:100px;background:rgba(0,0,0,0.3);border:1px dashed rgba(255,255,255,0.2);border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;cursor:pointer;" onclick="document.getElementById('auctionImageFile').click()">
                     <span style="color:rgba(255,255,255,0.3);font-size:0.75rem;">点击上传</span>
