@@ -3658,6 +3658,13 @@
                     amount: actualBid,
                     time: Date.now()
                 });
+                
+                // 延时拍卖：每次出价延长30秒
+                const EXTEND_TIME = 30 * 1000; // 30秒
+                const now = Date.now();
+                if (auction.endTime > now) {
+                    auction.endTime += EXTEND_TIME;
+                }
 
                 const quality = auction.quality || '';
                 const profession = auction.profession || '';
