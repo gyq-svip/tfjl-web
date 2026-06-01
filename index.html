@@ -11531,6 +11531,7 @@ function hasGistToken() {
             pendingScriptFile = null;
             document.getElementById('uploadStatus').style.display = 'none';
             document.getElementById('scriptFileInput').value = '';
+            const expireCheckbox = document.getElementById('expireCheckbox');
             if (expireCheckbox) expireCheckbox.checked = false;
             
             localStorage.setItem('TFJL_UserName', nickname);
