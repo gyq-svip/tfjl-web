@@ -2799,32 +2799,21 @@
         <div class="sticky-buttons" style="position:fixed;top:12px;right:12px;z-index:9999;display:flex;gap:5px;">
             <!-- 版本切换按钮（动态显示） -->
             <button id="versionSwitchBtn" onclick="handleVersionSwitch()" style="display:none;background:rgba(0,188,212,0.8);color:white;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 1px 6px rgba(0,0,0,0.15);backdrop-filter:blur(4px);align-items:center;justify-content:center;">🌐</button>
+            <button id="chatRoomToggle" onclick="openChatRoomEntry()" title="拍卖行" style="background:rgba(78,205,196,0.85);color:#1a1a2e;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 2px 10px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">🏪</button>
+            <button id="messageWallToggle" onclick="toggleMessageWall()" title="需求墙" style="background:rgba(255,215,0,0.85);color:#1a1a2e;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 2px 10px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">📢</button>
             <div style="position:relative;">
                 <button onclick="toggleBackupMenu(this)" title="菜单" style="background:rgba(255,87,34,0.8);color:white;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 1px 6px rgba(0,0,0,0.15);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;">☰</button>
                 <div id="backupMenu" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:rgba(42,42,74,0.95);border:1px solid rgba(255,215,0,0.3);border-radius:8px;padding:8px 0;min-width:180px;z-index:1000;box-shadow:0 4px 15px rgba(0,0,0,0.4);backdrop-filter:blur(8px);">
-                    <div style="padding:6px 15px;color:#ffd700;font-size:0.85rem;font-weight:bold;border-bottom:1px solid rgba(255,255,255,0.1);margin-bottom:5px;">📋 全部数据</div>
                     <div onclick="exportAllData();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📤 全部备份</div>
                     <div onclick="document.getElementById('importFileInput').click();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📥 全部恢复</div>
-                    
-                    <div style="padding:6px 15px;color:#ffd700;font-size:0.85rem;font-weight:bold;border-bottom:1px solid rgba(255,255,255,0.1);border-top:1px solid rgba(255,255,255,0.1);margin:5px 0;">📁 单个项目</div>
                     <div onclick="exportCurrentProject();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📤 备份此项目</div>
                     <div onclick="importSingleProject();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📥 恢复项目</div>
-                    
-                    
                     <div onclick="downloadOfflineVersion();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📥 下载离线版</div>
-                    
-                    
                     <div onclick="showHelpModal();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📖 使用帮助</div>
-                    
-                    
                     <div onclick="openChatRoomEntry();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">🏪 进入拍卖系统</div>
-                    
-                    
                     <div onclick="logoutToLogin();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#ff6b6b;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,107,107,0.1)'" onmouseout="this.style.background='transparent'">🔙 退出登录</div>
                 </div>
             </div>
-            <button id="messageWallToggle" onclick="toggleMessageWall()" title="需求墙" style="background:rgba(255,215,0,0.85);color:#1a1a2e;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 2px 10px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">📢</button>
-            <button id="chatRoomToggle" onclick="openChatRoomEntry()" title="拍卖行" style="background:rgba(78,205,196,0.85);color:#1a1a2e;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 2px 10px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">🏪</button>
             <input type="file" id="importFileInput" accept=".json" style="display:none;" onchange="handleImportFile(this)">
         </div>
 
@@ -12368,7 +12357,6 @@ function hasGistToken() {
             
             // 重置登录界面
             document.getElementById('loginActions').style.display = 'none';
-            document.querySelector('#passwordOverlay button').style.display = 'block';
             document.getElementById('passwordInput').style.display = 'block';
             document.getElementById('passwordInput').value = '';
             document.querySelector('#passwordOverlay p').textContent = '请输入访问密码';
@@ -12954,11 +12942,10 @@ function hasGistToken() {
             <div id="adminVerifySection" class="admin-section">
                 <h3 style="color:#ffd700;text-align:center;margin:0 0 15px 0;">🔐 身份验证</h3>
                 <label>请输入管理员验证码</label>
-                <input type="password" id="adminVerifyCode" placeholder="输入验证码" autocomplete="off">
+                <input type="password" id="adminVerifyCode" placeholder="输入验证码" autocomplete="off" style="padding:8px 12px;font-size:0.9rem;">
                 <div style="display:flex;gap:10px;justify-content:center;">
                     <button class="admin-btn admin-btn-secondary" onclick="closeAdminPanel()">关闭</button>
-                    <button class="admin-btn admin-btn-danger" onclick="logoutToLogin()">退出登录</button>
-                    <button class="admin-btn admin-btn-primary" onclick="verifyAdmin()">验证</button>
+                    <button class="admin-btn admin-btn-primary" onclick="verifyAdmin()">登录</button>
                 </div>
                 <div class="admin-verify-hint">验证后可管理公告和更多功能</div>
             </div>
