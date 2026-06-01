@@ -2940,7 +2940,7 @@
                 nickEditBtn.textContent = '保存';
             }
             
-            const savedRoom = localStorage.getItem('TFJL_ChatRoom') || '';
+            const savedRoom = localStorage.getItem('TFJL_ChatRoom') || 'TFJL001';
             document.getElementById('chatRoomIdInput').value = savedRoom;
             document.getElementById('chatRoomIdInput').focus();
         }
@@ -13513,12 +13513,18 @@ function hasGistToken() {
             const saved = localStorage.getItem(ADMIN_ROOMS_KEY);
             if (saved) {
                 try {
-                    return JSON.parse(saved);
+                    let rooms = JSON.parse(saved);
+                    // 确保TFJL001在列表中
+                    if (!rooms.includes('TFJL001')) {
+                        rooms.unshift('TFJL001');
+                        localStorage.setItem(ADMIN_ROOMS_KEY, JSON.stringify(rooms));
+                    }
+                    return rooms;
                 } catch (e) {
-                    return [];
+                    return ['TFJL001'];
                 }
             }
-            return [];
+            return ['TFJL001'];
         }
         
         function saveAdminRooms(rooms) {
