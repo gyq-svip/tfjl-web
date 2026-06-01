@@ -2532,11 +2532,10 @@
                 </select>
                 <button onclick="toggleProjectMenu(this)" style="background:#444;color:white;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:1rem;line-height:1;">⋮</button>
                 <button onclick="toggleNotepadPanel()" title="记事本" style="background:linear-gradient(135deg,#ffd700,#ff6b6b);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">📝</button>
-                <button onclick="saveCurrentProject()" title="保存" style="background:rgba(76,175,80,0.8);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">💾</button>
-                <button onclick="toggleReferencePanel()" title="参考图片" style="background:linear-gradient(135deg,#9c27b0,#7b1fa2);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">🖼️</button>
                 <button onclick="toggleTxtFilesPanel()" title="脚本文件" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">📄</button>
                 <button onclick="toggleTextParserPanel()" title="文本解析" style="background:linear-gradient(135deg,#00bcd4,#00838f);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">🔍</button>
                 <button onclick="toggleReferencePanel()" title="参考图片" style="background:linear-gradient(135deg,#9c27b0,#7b1fa2);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">🖼️</button>
+                <button onclick="saveCurrentProject()" title="保存" style="background:rgba(76,175,80,0.8);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">💾</button>
             </div>
         </div>
 
@@ -4610,9 +4609,9 @@
             </div>
         </div>
 
-        <div class="collapsible-section engineering-card">
-            <div class="collapsible-header engineering-card" onclick="toggleSection(this)">
-                <h3><span>🔧</span> 工程卡牌</h3>
+        <div class="collapsible-section gold">
+            <div class="collapsible-header gold" onclick="toggleSection(this)">
+                <h3><span>🥇</span> 金卡类</h3>
                 <span class="toggle-icon">▼</span>
             </div>
             <div class="collapsible-content">
@@ -4627,17 +4626,6 @@
                             <div class="card-item" data-id="53" data-name="潜艇" data-type="gold" data-engineering="true" data-profession="engineering">潜艇</div>
                         </div>
                     </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="collapsible-section gold">
-            <div class="collapsible-header gold" onclick="toggleSection(this)">
-                <h3><span>🥇</span> 金卡类</h3>
-                <span class="toggle-icon">▼</span>
-            </div>
-            <div class="collapsible-content">
-                <div class="collapsible-inner">
                     <div class="profession-section">
                         <h4>⚔️ 战士</h4>
                         <div class="cards-grid">
@@ -13517,7 +13505,7 @@ function hasGistToken() {
     </div>
 
 
-    &lt;script&gt;
+    <script>
         // ==================== 拍卖行ID管理 ====================
         const ADMIN_ROOMS_KEY = 'TFJL_AdminRooms';
         const ROOMS_LAST_SYNC_KEY = 'TFJL_RoomsLastSync';
@@ -13765,6 +13753,6 @@ function hasGistToken() {
             const rooms = getAdminRooms();
             return rooms.includes(roomId);
         }
-    &lt;/script&gt;
-    &lt;/body&gt;
+    </script>
+    </body>
 &lt;/html&gt;
