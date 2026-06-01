@@ -2170,7 +2170,7 @@
     <div id="passwordOverlay" class="password-overlay">
         <div class="password-box">
             <h2>🔐 塔防阵容系统</h2>
-            <p style="color: rgba(255,255,255,0.7); margin-bottom: 20px;">请输入访问密码</p>
+            <p id="passwordHint" style="color: rgba(255,255,255,0.7); margin-bottom: 20px;">请输入访问密码</p>
             <div id="passwordError" class="password-error" style="display: none;"></div>
             <input type="password" id="passwordInput" placeholder="请输入密码..." onkeypress="if(event.key==='Enter')checkPasswordAndEnter()">
             <br><br>
@@ -2662,9 +2662,8 @@
                 // 密码正确，显示两个选择按钮
                 errorDiv.style.display = 'none';
                 document.getElementById('loginActions').style.display = 'block';
-                document.querySelector('#passwordOverlay button').style.display = 'none';
                 document.getElementById('passwordInput').style.display = 'none';
-                document.querySelector('#passwordOverlay p').textContent = '✅ 密码验证成功';
+                document.getElementById('passwordHint').textContent = '✅ 密码验证成功';
             } else {
                 // 密码错误
                 errorDiv.textContent = '❌ 密码错误，请重试';
@@ -12346,26 +12345,32 @@ function hasGistToken() {
         function logoutToLogin() {
             if (!confirm('确定要退出登录吗？')) return;
             
-            // 清除登录状态
+            // 清除所有登录相关状态
             localStorage.removeItem('TFJL_LoggedIn');
             localStorage.removeItem('TFJL_Mode');
+            localStorage.removeItem('TFJL_AuctionOnlyMode');
             
-            // 隐藏主内容，显示登录界面
+            // 隐藏主内容
             document.getElementById('mainContent').classList.remove('visible');
+            
+            // 显示登录界面
             document.getElementById('passwordOverlay').style.display = 'flex';
             
-            // 重置登录界面
+            // 完全重置登录界面
             document.getElementById('loginActions').style.display = 'none';
             document.getElementById('passwordInput').style.display = 'block';
             document.getElementById('passwordInput').value = '';
-            document.querySelector('#passwordOverlay p').textContent = '请输入访问密码';
+            document.getElementById('passwordError').style.display = 'none';
+            document.getElementById('passwordHint').textContent = '请输入访问密码';
             
-            // 关闭管理员面板
+            // 关闭所有其他面板
             closeAdminPanel();
-            
-            // 关闭拍卖行面板
             document.getElementById('chatRoomPanel').style.display = 'none';
             document.getElementById('chatRoomEntryModal').style.display = 'none';
+            document.getElementById('referencePanel').style.display = 'none';
+            document.getElementById('textParserPanel').style.display = 'none';
+            document.getElementById('txtFilesPanel').style.display = 'none';
+            document.getElementById('notepadPanel').style.display = 'none';
         }
 
         function verifyAdmin() {
