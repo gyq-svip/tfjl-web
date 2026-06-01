@@ -13528,6 +13528,10 @@ function hasGistToken() {
         }
         
         function saveAdminRooms(rooms) {
+            // 确保TFJL001在列表中
+            if (!rooms.includes('TFJL001')) {
+                rooms.unshift('TFJL001');
+            }
             localStorage.setItem(ADMIN_ROOMS_KEY, JSON.stringify(rooms));
             localStorage.setItem(ROOMS_LAST_SYNC_KEY, Date.now().toString());
             // 同时尝试同步到Gist（如果有Gist配置）
@@ -13600,6 +13604,10 @@ function hasGistToken() {
                             
                             if (gistData.rooms &amp;&amp; gistData.rooms.length &gt; 0) {
                                 rooms = gistData.rooms;
+                                // 确保TFJL001在列表中
+                                if (!rooms.includes('TFJL001')) {
+                                    rooms.unshift('TFJL001');
+                                }
                                 // 更新到本地
                                 localStorage.setItem(ADMIN_ROOMS_KEY, JSON.stringify(rooms));
                                 localStorage.setItem(ROOMS_LAST_SYNC_KEY, Date.now().toString());
@@ -13683,6 +13691,10 @@ function hasGistToken() {
         }
         
         function adminDeleteRoom(roomId) {
+            if (roomId === 'TFJL001') {
+                alert('❌ TFJL001是默认拍卖行，无法删除！');
+                return;
+            }
             if (!confirm('确定要删除拍卖行 "' + roomId + '" 吗？\n删除后用户将无法进入该拍卖行。')) {
                 return;
             }
@@ -13741,6 +13753,10 @@ function hasGistToken() {
                             }
                             
                             if (gistData.rooms &amp;&amp; Array.isArray(gistData.rooms)) {
+                                // 确保TFJL001在列表中
+                                if (!gistData.rooms.includes('TFJL001')) {
+                                    gistData.rooms.unshift('TFJL001');
+                                }
                                 // 更新本地缓存
                                 localStorage.setItem(ADMIN_ROOMS_KEY, JSON.stringify(gistData.rooms));
                                 localStorage.setItem(ROOMS_LAST_SYNC_KEY, Date.now().toString());
