@@ -12069,7 +12069,15 @@ function hasGistToken() {
                 if (!content) throw new Error('房间数据不存在');
                 
                 const allData = JSON.parse(content);
-                const roomData = allData.rooms[roomId];
+                let roomData = null;
+                
+                if (allData.rooms) {
+                    roomData = allData.rooms[roomId];
+                } else if (Array.isArray(allData)) {
+                    roomData = allData.find(r => r.id === roomId);
+                } else {
+                    roomData = allData[roomId];
+                }
                 
                 if (!roomData) {
                     document.getElementById('auctionStatsSummary').innerHTML = '<div style="color:#f59e0b;text-align:center;padding:10px;">该房间暂无数据</div>';
