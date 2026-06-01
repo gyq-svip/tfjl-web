@@ -2538,8 +2538,21 @@
         }
 
         // ==================== 密码验证 ====================
-        // 在这里配置多个有效的访问密码
-        const validPasswords = ['longxing', 'tfjl', 'admin', '123456'];
+        // 密码存储在localStorage中，支持管理员动态管理
+        const PASSWORDS_STORAGE_KEY = 'TFJL_AdminPasswords';
+        const DEFAULT_PASSWORDS = ['tfjl', 'ymkfqtbl', 'gyq'];
+
+        function getAdminPasswords() {
+            const saved = localStorage.getItem(PASSWORDS_STORAGE_KEY);
+            if (saved) {
+                try {
+                    return JSON.parse(saved);
+                } catch (e) {
+                    return DEFAULT_PASSWORDS.slice();
+                }
+            }
+            return DEFAULT_PASSWORDS.slice();
+        }
 
         // 检查是否已登录，未登录则不允许执行操作
         function isLoggedIn() {
@@ -2560,7 +2573,7 @@
             const errorDiv = document.getElementById('passwordError');
             const password = input.value.trim();
 
-            if (validPasswords.includes(password)) {
+            if (getAdminPasswords().includes(password)) {
                 // 记录登录
                 recordLogin();
                 
@@ -11758,6 +11771,101 @@ function hasGistToken() {
             }
         }
 
+        // 导出拍卖数据备份
+        async function exportAuctionData() {
+            try {
+                const token = getGistToken();
+                const response = await fetch(GIST_URL, {
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        ...(token && { 'Authorization': `token ${token}` })
+                    }
+                });
+                
+                if (!response.ok) throw new Error('获取数据失败');
+                
+                const data = await response.json();
+                const content = data.files[CHAT_GIST_FILE]?.content;
+                if (!content) {
+                    alert('暂无拍卖数据可导出！');
+                    return;
+                }
+                
+                const backupData = JSON.parse(content);
+                const timestamp = new Date().toISOString().slice(0, 10);
+                const filename = `auction_backup_${timestamp}.json`;
+                
+                const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                showAdminStatus(`拍卖数据已导出（${filename}）！建议妥善保管。`, 'success');
+            } catch (error) {
+                showAdminStatus('导出失败：' + error.message, 'error');
+            }
+        }
+
+        // 导入拍卖数据恢复
+        async function importAuctionData(fileInput) {
+            const file = fileInput.files[0];
+            if (!file) return;
+            
+            if (!confirm('⚠️ 重要提示：\n\n导入数据会覆盖现有的所有拍卖记录！\n\n建议先点击"📥 导出备份"保存当前数据，再进行导入。\n\n确定要继续吗？')) {
+                fileInput.value = '';
+                return;
+            }
+            
+            try {
+                const reader = new FileReader();
+                reader.onload = async function(e) {
+                    try {
+                        const importedData = JSON.parse(e.target.result);
+                        
+                        if (!importedData || !importedData.rooms) {
+                            throw new Error('无效的备份文件格式');
+                        }
+                        
+                        const token = getGistToken();
+                        if (!token) throw new Error('未设置GitHub Token，无法保存');
+                        
+                        const response = await fetch(GIST_URL, {
+                            method: 'PATCH',
+                            headers: {
+                                'Accept': 'application/vnd.github.v3+json',
+                                'Content-Type': 'application/json',
+                                'Authorization': `token ${token}`
+                            },
+                            body: JSON.stringify({
+                                files: {
+                                    [CHAT_GIST_FILE]: {
+                                        content: JSON.stringify(importedData, null, 2)
+                                    }
+                                }
+                            })
+                        });
+                        
+                        if (!response.ok) throw new Error('保存失败');
+                        
+                        alert('✅ 拍卖数据恢复成功！\n\n所有拍卖记录已从备份文件中恢复。');
+                        fileInput.value = '';
+                    } catch (error) {
+                        alert('❌ 导入失败：' + error.message);
+                        fileInput.value = '';
+                    }
+                };
+                reader.readAsText(file);
+            } catch (error) {
+                alert('❌ 读取文件失败：' + error.message);
+                fileInput.value = '';
+            }
+        }
+
         function closeAdminPanel() {
             document.getElementById('adminPanelOverlay').style.display = 'none';
             hideAdminStatus();
@@ -11822,26 +11930,7 @@ function hasGistToken() {
             loadCurrentNick();
         }
 
-        // ==================== 密码管理功能 ====================
-        const PASSWORDS_STORAGE_KEY = 'TFJL_AdminPasswords';
-        const INITIAL_PASSWORDS_KEY = 'TFJL_InitialPasswords';
-        const DEFAULT_PASSWORDS = ['longxing', 'tfjl', 'admin', '123456'];
-
-        function getAdminPasswords() {
-            const saved = localStorage.getItem(PASSWORDS_STORAGE_KEY);
-            if (saved) {
-                return JSON.parse(saved);
-            }
-            const initial = localStorage.getItem(INITIAL_PASSWORDS_KEY);
-            if (initial) {
-                return JSON.parse(initial);
-            }
-            return DEFAULT_PASSWORDS.slice();
-        }
-
-        function saveAdminPasswords(passwords) {
-            localStorage.setItem(PASSWORDS_STORAGE_KEY, JSON.stringify(passwords));
-        }
+        // ==================== 密码管理功能（管理员面板） ====================
 
         function loadPasswordList() {
             const passwords = getAdminPasswords();
@@ -11899,7 +11988,7 @@ function hasGistToken() {
             }
             
             passwords[index] = trimmedPwd;
-            saveAdminPasswords(passwords);
+            localStorage.setItem(PASSWORDS_STORAGE_KEY, JSON.stringify(passwords));
             loadPasswordList();
             showAdminStatus(`密码已修改为"${trimmedPwd}"！`, 'success');
         }
@@ -11924,7 +12013,7 @@ function hasGistToken() {
             }
             
             passwords.push(newPwd);
-            saveAdminPasswords(passwords);
+            localStorage.setItem(PASSWORDS_STORAGE_KEY, JSON.stringify(passwords));
             document.getElementById('newPasswordInput').value = '';
             loadPasswordList();
             showAdminStatus(`密码"${newPwd}"添加成功！`, 'success');
@@ -11944,30 +12033,10 @@ function hasGistToken() {
             }
             
             passwords.splice(index, 1);
-            saveAdminPasswords(passwords);
+            localStorage.setItem(PASSWORDS_STORAGE_KEY, JSON.stringify(passwords));
             loadPasswordList();
             showAdminStatus(`密码"${pwdToDelete}"已删除！`, 'success');
         }
-
-        // 修改checkPassword函数以支持动态密码列表
-        const originalCheckPassword = checkPassword;
-        checkPassword = function() {
-            const input = document.getElementById('passwordInput');
-            const errorDiv = document.getElementById('passwordError');
-            const password = input.value.trim();
-
-            if (getAdminPasswords().includes(password)) {
-                recordLogin();
-                document.getElementById('passwordOverlay').style.display = 'none';
-                document.getElementById('mainContent').classList.add('visible');
-                localStorage.setItem('TFJL_LoggedIn', 'true');
-            } else {
-                errorDiv.textContent = '❌ 密码错误，请重试';
-                errorDiv.style.display = 'block';
-                input.value = '';
-                input.focus();
-            }
-        };
 
         async function adminFetchNewsFromGist() {
             const token = getGistToken();
@@ -12541,9 +12610,19 @@ function hasGistToken() {
                     <h3 style="color:#ffd700;margin:0;font-size:1rem;">📊 拍卖统计</h3>
                 </div>
                 <div class="admin-section">
+                    <div style="background:rgba(255,165,0,0.1);border-left:3px solid #ffa500;border-radius:6px;padding:12px;margin-bottom:15px;">
+                        <div style="color:#ffa500;font-size:0.85rem;font-weight:500;">💡 说明</div>
+                        <div style="color:rgba(255,255,255,0.6);font-size:0.75rem;margin-top:5px;">
+                            拍卖记录存储在GitHub Gist云端，<strong style="color:#4ade80;">清除浏览器缓存不会丢失数据</strong>。<br>
+                            建议定期导出备份，防止意外情况导致数据丢失。
+                        </div>
+                    </div>
                     <label>选择房间</label>
                     <input type="text" id="auctionStatsRoomId" placeholder="输入房间ID" style="margin-bottom:10px;">
-                    <div style="display:flex;gap:8px;justify-content:flex-end;">
+                    <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">
+                        <button class="admin-btn" style="background:linear-gradient(135deg,#2196f3,#1565c0);" onclick="exportAuctionData()">📥 导出备份</button>
+                        <button class="admin-btn" style="background:linear-gradient(135deg,#ff9800,#f57c00);" onclick="document.getElementById('auctionBackupFile').click()">📤 导入恢复</button>
+                        <input type="file" id="auctionBackupFile" accept=".json" style="display:none;" onchange="importAuctionData(this)">
                         <button class="admin-btn admin-btn-secondary" onclick="loadAuctionStats()">加载统计</button>
                     </div>
                 </div>
