@@ -11824,13 +11824,19 @@ function hasGistToken() {
 
         // ==================== 密码管理功能 ====================
         const PASSWORDS_STORAGE_KEY = 'TFJL_AdminPasswords';
+        const INITIAL_PASSWORDS_KEY = 'TFJL_InitialPasswords';
+        const DEFAULT_PASSWORDS = ['longxing', 'tfjl', 'admin', '123456'];
 
         function getAdminPasswords() {
             const saved = localStorage.getItem(PASSWORDS_STORAGE_KEY);
             if (saved) {
                 return JSON.parse(saved);
             }
-            return ['longxing', 'tfjl', 'admin', '123456'];
+            const initial = localStorage.getItem(INITIAL_PASSWORDS_KEY);
+            if (initial) {
+                return JSON.parse(initial);
+            }
+            return DEFAULT_PASSWORDS.slice();
         }
 
         function saveAdminPasswords(passwords) {
@@ -11849,17 +11855,53 @@ function hasGistToken() {
             
             let html = '';
             passwords.forEach((pwd, index) => {
+                const isDefault = DEFAULT_PASSWORDS.includes(pwd);
                 html += `
                     <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:rgba(255,255,255,0.05);border-radius:6px;margin-bottom:8px;border:1px solid rgba(255,255,255,0.1);">
                         <div style="display:flex;align-items:center;gap:10px;">
                             <span style="color:#ffd700;font-weight:bold;">${index + 1}.</span>
                             <span style="color:#fff;font-family:monospace;">${escapeHtml(pwd)}</span>
+                            ${isDefault ? '<span style="background:#4caf50;color:#fff;font-size:0.7rem;padding:2px 6px;border-radius:4px;">初始</span>' : ''}
                         </div>
-                        <button onclick="deletePassword(${index})" style="background:linear-gradient(135deg,#f44336,#d32f2f);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">删除</button>
+                        <div style="display:flex;gap:6px;">
+                            <button onclick="editPassword(${index}, '${escapeHtml(pwd)}')" style="background:linear-gradient(135deg,#ff9800,#f57c00);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">✏️</button>
+                            <button onclick="deletePassword(${index})" style="background:linear-gradient(135deg,#f44336,#d32f2f);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">🗑️</button>
+                        </div>
                     </div>
                 `;
             });
             listContainer.innerHTML = html;
+        }
+
+        function editPassword(index, currentPwd) {
+            const newPwd = prompt('请输入新密码：', currentPwd);
+            if (!newPwd || newPwd.trim() === '') {
+                showAdminStatus('密码不能为空！', 'error');
+                return;
+            }
+            
+            const trimmedPwd = newPwd.trim();
+            if (trimmedPwd.length < 4) {
+                showAdminStatus('密码长度至少4位！', 'error');
+                return;
+            }
+            
+            if (trimmedPwd === currentPwd) {
+                showAdminStatus('新密码与原密码相同，无需修改！', 'error');
+                return;
+            }
+            
+            const passwords = getAdminPasswords();
+            
+            if (passwords.includes(trimmedPwd)) {
+                showAdminStatus('该密码已存在！', 'error');
+                return;
+            }
+            
+            passwords[index] = trimmedPwd;
+            saveAdminPasswords(passwords);
+            loadPasswordList();
+            showAdminStatus(`密码已修改为"${trimmedPwd}"！`, 'success');
         }
 
         function addPassword() {
