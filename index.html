@@ -2172,13 +2172,13 @@
             <h2>🔐 塔防阵容系统</h2>
             <p style="color: rgba(255,255,255,0.7); margin-bottom: 20px;">请输入访问密码</p>
             <div id="passwordError" class="password-error" style="display: none;"></div>
-            <input type="password" id="passwordInput" placeholder="请输入密码..." onkeypress="if(event.key==='Enter')checkPassword()">
+            <input type="password" id="passwordInput" placeholder="请输入密码..." onkeypress="if(event.key==='Enter')checkPasswordAndEnter()">
             <br><br>
             <button onclick="checkPassword()" style="width:100%;padding:12px;border-radius:8px;border:none;background:linear-gradient(135deg,#4ecdc4,#44a08d);color:white;cursor:pointer;font-size:0.95rem;font-weight:600;">🔓 验证密码</button>
-            <div id="loginActions" style="display:none;margin-top:20px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.1);">
-                <p style="color:rgba(255,255,255,0.8);font-size:0.9rem;margin:0 0 12px 0;text-align:center;">✅ 密码正确，请选择进入</p>
-                <button onclick="enterArchiveFromLogin()" style="width:100%;padding:12px;margin-bottom:10px;border-radius:8px;border:none;background:linear-gradient(135deg,#4ecdc4,#44a08d);color:white;cursor:pointer;font-size:0.95rem;font-weight:600;">📋 进入归档系统</button>
-                <button onclick="enterAuctionFromLogin()" style="width:100%;padding:12px;border-radius:8px;border:none;background:linear-gradient(135deg,#f97316,#ea580c);color:white;cursor:pointer;font-size:0.95rem;font-weight:600;">🏪 进入拍卖系统</button>
+            <div id="loginActions" style="margin-top:0;">
+                <p style="color:rgba(255,255,255,0.8);font-size:0.9rem;margin:0 0 12px 0;text-align:center;">选择进入系统</p>
+                <button onclick="checkPasswordAndEnter('archive')" style="width:100%;padding:12px;margin-bottom:10px;border-radius:8px;border:none;background:linear-gradient(135deg,#4ecdc4,#44a08d);color:white;cursor:pointer;font-size:0.95rem;font-weight:600;">📋 进入归档系统</button>
+                <button onclick="checkPasswordAndEnter('auction')" style="width:100%;padding:12px;border-radius:8px;border:none;background:linear-gradient(135deg,#f97316,#ea580c);color:white;cursor:pointer;font-size:0.95rem;font-weight:600;">🏪 进入拍卖系统</button>
             </div>
         </div>
     </div>
@@ -2189,8 +2189,82 @@
     <!-- ==================== 功能记录 ==================== -->
     <!-- 
     每次新增功能都要记录在下 以便于下次查看
-    
+
+    【⭐ 重要功能索引 ⭐】常用功能快速定位（2026/06/01 更新）：
+
+    📌 登录和入口：
+       - 登录界面（密码输入框）：index.html 第 2169-2184 行
+       - 登录后两个按钮（归档/拍卖）：checkPassword() 函数，第 2572-2602 行
+       - 归档系统右上角菜单（≡ 按钮）：backupMenu，第 2666-2687 行
+         └ 新增：🏪 进入拍卖系统、🔙 退出登录
+       - 退出登录函数：logoutToLogin()，第 12184-12209 行
+
+    📌 拍卖系统：
+       - 拍卖行入口弹窗：chatRoomEntryModal，第 13125-13160 行
+       - 拍卖行主面板：chatRoomPanel，第 13162 行起
+       - 拍卖行窗口缩放函数：resizeChatRoom()，第 2893 行起
+       - 拍卖行发布商品弹窗：openAuctionPostModal()，第 2700 行附近
+       - 拍卖详情弹窗：auctionDetailModal，第 3346 行附近
+       - 拍卖商品渲染：renderAuctionsList()，第 3150 行附近
+       - 拍卖出价函数：quickBid()、customQuickBid()，第 3000 行附近
+
+    📌 管理员相关：
+       - 管理员面板打开：openAdminPanel()，第 11688 行起
+       - 管理员菜单：adminMenuSection，第 12800 行附近
+       - 管理员密码验证：verifyAdmin()，第 12211 行起
+       - 长按"龙行"触发：第 11560-11585 行
+
+    📌 数据统计和GitHub：
+       - 统计数据保存：saveCounterToGist()，第 9700 行附近
+       - 统计数据加载：fetchCounterFromGist()，第 9650 行附近
+       - 拍卖数据云存储：GIST_URL、CHAT_GIST_FILE 常量，第 2530 行附近
+       - 默认密码列表：getAdminPasswords()，第 2540 行附近
+
+    📌 拍卖统计和管理：
+       - 拍卖统计页：adminPageAuctionStats，第 12931 行
+       - 商品管理页：adminPageAuctionManage，第 12853 行
+       - 拍卖下架函数：adminRemoveAuction()，第 11810 行附近
+       - 拍卖统计加载：loadAuctionStats()，第 11910 行附近
+
+    📌 拍卖系统功能：
+       - "愿意交换"功能：openAuctionPostModal() 中，第 2700 行附近
+       - 昵称修改限制：toggleNickEdit()，第 2820 行附近
+       - 管理员昵称管理：adminPageNickManage，第 12800 行附近
+
+    📌 密码管理：
+       - 密码管理页：adminPagePasswordManage，第 12960 行附近
+       - 密码管理函数：loadPasswordList()、addPassword()、deletePassword()
+
+    📌 重要函数：
+       - 窗口拖动：startPanelDrag()、startPanelTouch()，第 4100 行附近
+       - 消息墙：initMessageWall()、toggleMessageWall()，第 6500 行附近
+       - 公告管理：adminPublishNews()、adminRefreshNews()，第 11700 行附近
+
     功能更新记录：
+
+    7. 2026/06/01 - 登录入口和系统菜单调整
+       修改人：用户需求
+       修改原因：用户希望调整登录入口，将归档系统和拍卖系统分开入口
+       
+       修改内容：
+       a) 登录界面（2169-2184行）：
+          - 输入密码后显示两个按钮：📋进入归档系统 和 🏪进入拍卖系统
+          - 新增 enterArchiveFromLogin() 和 enterAuctionFromLogin() 函数
+          
+       b) 归档系统右上角菜单（backupMenu，2666-2687行）：
+          - 新增"🏪 系统切换"分类：🏪 进入拍卖系统
+          - 新增"⚠️ 账户"分类：🔙 退出登录
+          
+       c) 退出登录函数（logoutToLogin，12184-12209行）：
+          - 重置登录界面状态
+          - 清除已验证的选择按钮
+          - 恢复密码输入框显示
+          
+       修改后效果：
+       - 用户必须输入密码才能进入
+       - 验证后选择进入归档系统或拍卖系统
+       - 在归档系统可随时通过右上角菜单切换到拍卖系统
+       - 退出登录后回到干净的密码输入界面
     
     1. 2026/05/22 - 修复手牌卡牌消失问题
        修改人：Cline
@@ -2589,6 +2663,32 @@
                 document.querySelector('#passwordOverlay button').style.display = 'none';
                 document.getElementById('passwordInput').style.display = 'none';
                 document.querySelector('#passwordOverlay p').textContent = '✅ 密码验证成功';
+            } else {
+                // 密码错误
+                errorDiv.textContent = '❌ 密码错误，请重试';
+                errorDiv.style.display = 'block';
+                input.value = '';
+                input.focus();
+            }
+        }
+
+        function checkPasswordAndEnter(targetSystem) {
+            const input = document.getElementById('passwordInput');
+            const errorDiv = document.getElementById('passwordError');
+            const password = input.value.trim();
+
+            if (getAdminPasswords().includes(password)) {
+                // 记录登录
+                recordLogin();
+                localStorage.setItem('TFJL_LoggedIn', 'true');
+                errorDiv.style.display = 'none';
+                
+                // 根据目标系统进入，默认进入归档系统
+                if (!targetSystem || targetSystem === 'archive') {
+                    enterArchiveFromLogin();
+                } else if (targetSystem === 'auction') {
+                    enterAuctionFromLogin();
+                }
             } else {
                 // 密码错误
                 errorDiv.textContent = '❌ 密码错误，请重试';
