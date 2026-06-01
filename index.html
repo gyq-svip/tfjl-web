@@ -3362,10 +3362,10 @@
                 return `
                     <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-left:4px solid ${isExchange ? '#f97316' : qualityColor};border-radius:8px;padding:10px;margin-bottom:8px;display:flex;gap:10px;align-items:flex-start;transition:all 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.07)'" onmouseout="this.style.background='rgba(255,255,255,0.04)'">
                         ${imageHtml}
-                        <div style="flex:1;min-width:0;padding-left:15px;">
-                            <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;flex-wrap:nowrap;">
-                                <span style="color:${qualityColor};font-size:0.8rem;font-weight:700;">#${auction.id}</span>
-                                <span style="color:white;font-size:0.8rem;font-weight:600;">${quality}·${profession}</span>
+                        <div style="flex:1;min-width:0;padding-left:10px;">
+                            <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px;flex-wrap:nowrap;">
+                                <span style="color:${qualityColor};font-size:0.75rem;font-weight:700;">#${auction.id}</span>
+                                <span style="color:white;font-size:0.75rem;font-weight:600;">${quality}·${profession}</span>
                                 ${exchangeBadgeHtml}
                             </div>
                             <div style="margin-bottom:4px;white-space:nowrap;">${attrsHtml}</div>
