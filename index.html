@@ -12938,11 +12938,10 @@ function hasGistToken() {
             <div id="adminVerifySection" class="admin-section">
                 <h3 style="color:#ffd700;text-align:center;margin:0 0 15px 0;">🔐 身份验证</h3>
                 <label>请输入管理员验证码</label>
-                <input type="password" id="adminVerifyCode" placeholder="输入验证码" autocomplete="off">
+                <input type="password" id="adminVerifyCode" placeholder="输入验证码" autocomplete="off" style="padding:8px 12px;font-size:0.9rem;">
                 <div style="display:flex;gap:10px;justify-content:center;">
                     <button class="admin-btn admin-btn-secondary" onclick="closeAdminPanel()">关闭</button>
-                    <button class="admin-btn admin-btn-danger" onclick="logoutToLogin()">退出登录</button>
-                    <button class="admin-btn admin-btn-primary" onclick="verifyAdmin()">验证</button>
+                    <button class="admin-btn admin-btn-primary" onclick="verifyAdmin()">登录</button>
                 </div>
                 <div class="admin-verify-hint">验证后可管理公告和更多功能</div>
             </div>
@@ -13629,8 +13628,9 @@ function hasGistToken() {
             rooms.push(roomId);
             localStorage.setItem(ADMIN_ROOMS_KEY, JSON.stringify(rooms));
             
-            // 尝试同步到Gist
+            // 尝试同步到Gist，但不强制
             let syncSuccess = false;
+            let syncError = null;
             if (HARDCODED_TOKEN &amp;&amp; HARDCODED_TOKEN.length &gt; 20) {
                 try {
                     let gistId = localStorage.getItem(GIST_ID_KEY);
@@ -13660,21 +13660,19 @@ function hasGistToken() {
                     }
                 } catch (e) {
                     console.error('同步到Gist失败:', e);
+                    syncError = e.message;
                 }
             }
             
-            if (!syncSuccess) {
-                // 如果Gist同步失败，回滚本地
-                rooms.pop();
-                localStorage.setItem(ADMIN_ROOMS_KEY, JSON.stringify(rooms));
-                alert('创建失败！无法同步到云端，请检查网络连接或配置Gist。');
-                return;
+            // 无论同步是否成功，都保留本地创建
+            localStorage.setItem(ROOMS_LAST_SYNC_KEY, Date.now().toString());
+            input.value = '';
+            loadRoomManageList();
+            
+            if (syncSuccess) {
+                alert('✅ 拍卖行创建成功！\n\nID: ' + roomId + '\n\n已同步到云端。');
             } else {
-                // 同步成功，更新同步时间
-                localStorage.setItem(ROOMS_LAST_SYNC_KEY, Date.now().toString());
-                input.value = '';
-                loadRoomManageList();
-                alert('拍卖行创建成功！ID: ' + roomId);
+                alert('⚠️ 拍卖行创建成功！\n\nID: ' + roomId + '\n\n' + (syncError ? '云端同步失败: ' + syncError : '云端未同步（未配置Gist）') + '\n\n拍卖行ID已保存到本地。');
             }
         }
         
