@@ -3149,61 +3149,61 @@
                 }
 
                 let attrsHtml = '';
-                if (bonusDmg > 0) attrsHtml += `<span style="background:rgba(239,68,68,0.15);color:#f87171;padding:2px 6px;border-radius:3px;font-size:0.7rem;">附加伤害+${bonusDmg}</span> `;
-                if (ignoreIce > 0) attrsHtml += `<span style="background:rgba(96,165,250,0.15);color:#93c5fd;padding:2px 6px;border-radius:3px;font-size:0.7rem;">无视冰甲+${ignoreIce}</span>`;
+                if (bonusDmg > 0) attrsHtml += `<span style="background:rgba(239,68,68,0.15);color:#f87171;padding:2px 6px;border-radius:3px;font-size:0.7rem;">伤害+${bonusDmg}</span> `;
+                if (ignoreIce > 0) attrsHtml += `<span style="background:rgba(96,165,250,0.15);color:#93c5fd;padding:2px 6px;border-radius:3px;font-size:0.7rem;">冰甲+${ignoreIce}</span>`;
 
                 let exchangeBadgeHtml = '';
                 if (isExchange) {
-                    exchangeBadgeHtml = `<span style="background:linear-gradient(135deg,#f97316,#ea580c);color:white;padding:4px 12px;border-radius:6px;font-size:1rem;font-weight:800;text-shadow:0 1px 3px rgba(0,0,0,0.4);box-shadow:0 3px 10px rgba(249,115,22,0.5);letter-spacing:1px;">🔄交换</span>`;
+                    exchangeBadgeHtml = `<span style="background:linear-gradient(135deg,#f97316,#ea580c);color:white;padding:3px 10px;border-radius:6px;font-size:0.9rem;font-weight:bold;text-shadow:0 1px 2px rgba(0,0,0,0.3);box-shadow:0 2px 8px rgba(249,115,22,0.4);">🔄交换</span>`;
                 }
 
-                const imageSize = 110;
+                const imageSize = 85;
                 const imageHtml = auction.image
-                    ? `<div style="position:relative;width:${imageSize}px;height:${imageSize}px;flex-shrink:0;" onmouseover="showAuctionImagePreview(this,'${auction.id}')" onmouseout="hideAuctionImagePreview()"><img src="${auction.image}" style="width:${imageSize}px;height:${imageSize}px;object-fit:cover;border-radius:10px;border:2px solid ${qualityColor};box-shadow:0 2px 8px rgba(0,0,0,0.3);" onerror="this.style.display='none'"></div>`
-                    : `<div style="width:${imageSize}px;height:${imageSize}px;background:rgba(255,255,255,0.05);border-radius:10px;border:2px solid ${qualityColor};display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,0.3);"><span style="color:${qualityColor};font-size:2rem;">⚔️</span></div>`;
+                    ? `<div style="position:relative;width:${imageSize}px;height:${imageSize}px;flex-shrink:0;" onmouseover="showAuctionImagePreview(this,'${auction.id}')" onmouseout="hideAuctionImagePreview()"><img src="${auction.image}" style="width:${imageSize}px;height:${imageSize}px;object-fit:cover;border-radius:8px;border:2px solid ${qualityColor};box-shadow:0 2px 8px rgba(0,0,0,0.3);" onerror="this.style.display='none'"></div>`
+                    : `<div style="width:${imageSize}px;height:${imageSize}px;background:rgba(255,255,255,0.05);border-radius:8px;border:2px solid ${qualityColor};display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,0.3);"><span style="color:${qualityColor};font-size:1.6rem;">⚔️</span></div>`;
 
                 let bidderHtml = '';
                 if (currentBidder) {
-                    bidderHtml = `<div style="color:rgba(255,255,255,0.7);font-size:0.9rem;text-align:right;">👤 ${currentBidder}</div>`;
+                    bidderHtml = `<div style="color:rgba(255,255,255,0.7);font-size:0.8rem;text-align:right;">👤 ${currentBidder}</div>`;
                 }
 
                 let exchangeWantHtml = '';
                 if (isExchange && exchangeWant) {
-                    exchangeWantHtml = `<div style="color:#fbbf24;font-size:0.8rem;margin-top:4px;padding:4px 8px;background:rgba(251,191,36,0.1);border-radius:4px;border-left:2px solid #fbbf24;">想要: ${exchangeWant}</div>`;
+                    exchangeWantHtml = `<div style="color:#fbbf24;font-size:0.7rem;margin-top:3px;padding:3px 6px;background:rgba(251,191,36,0.1);border-radius:3px;">想要: ${exchangeWant}</div>`;
                 }
 
                 const savedValue = savedInputs[`quickBidInput_${auction.id}`] || '';
 
                 return `
-                    <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-left:4px solid ${isExchange ? '#f97316' : qualityColor};border-radius:10px;padding:12px;margin-bottom:10px;display:flex;gap:12px;align-items:flex-start;transition:all 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.07)'" onmouseout="this.style.background='rgba(255,255,255,0.04)'">
+                    <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-left:4px solid ${isExchange ? '#f97316' : qualityColor};border-radius:8px;padding:10px;margin-bottom:8px;display:flex;gap:10px;align-items:flex-start;transition:all 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.07)'" onmouseout="this.style.background='rgba(255,255,255,0.04)'">
                         ${imageHtml}
-                        <div style="flex:1;min-width:0;padding-left:8px;">
-                            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;">
-                                <span style="color:${qualityColor};font-size:0.95rem;font-weight:700;">#${auction.id}</span>
-                                <span style="color:white;font-size:0.95rem;font-weight:600;">${quality}·${profession}</span>
+                        <div style="flex:1;min-width:0;padding-left:10px;">
+                            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap;">
+                                <span style="color:${qualityColor};font-size:0.85rem;font-weight:700;">#${auction.id}</span>
+                                <span style="color:white;font-size:0.85rem;font-weight:600;">${quality}·${profession}</span>
                                 ${exchangeBadgeHtml}
                             </div>
-                            <div style="margin-bottom:6px;">${attrsHtml}</div>
+                            <div style="margin-bottom:4px;">${attrsHtml}</div>
                             ${exchangeWantHtml}
-                            <div style="display:flex;flex-direction:column;gap:5px;min-width:0;">
+                            <div style="display:flex;flex-direction:column;gap:4px;min-width:0;">
                                 ${!isEnded
-                                    ? `<div style="display:flex;gap:4px;margin-bottom:3px;">
-                                        <button onclick="event.stopPropagation();quickBid('${auction.id}',10)" style="padding:4px 10px;border-radius:5px;border:none;background:linear-gradient(135deg,#ffd700,#ff6b6b);color:#1a1a2e;cursor:pointer;font-weight:600;font-size:0.8rem;">+10</button>
-                                        <button onclick="event.stopPropagation();quickBid('${auction.id}',20)" style="padding:4px 10px;border-radius:5px;border:none;background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#1a1a2e;cursor:pointer;font-weight:600;font-size:0.8rem;">+20</button>
-                                        <button onclick="event.stopPropagation();quickBid('${auction.id}',50)" style="padding:4px 10px;border-radius:5px;border:none;background:linear-gradient(135deg,#fb923c,#ea580c);color:#1a1a2e;cursor:pointer;font-weight:600;font-size:0.8rem;">+50</button>
+                                    ? `<div style="display:flex;gap:3px;margin-bottom:2px;">
+                                        <button onclick="event.stopPropagation();quickBid('${auction.id}',10)" style="padding:3px 8px;border-radius:4px;border:none;background:linear-gradient(135deg,#ffd700,#ff6b6b);color:#1a1a2e;cursor:pointer;font-weight:600;font-size:0.75rem;">+10</button>
+                                        <button onclick="event.stopPropagation();quickBid('${auction.id}',20)" style="padding:3px 8px;border-radius:4px;border:none;background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#1a1a2e;cursor:pointer;font-weight:600;font-size:0.75rem;">+20</button>
+                                        <button onclick="event.stopPropagation();quickBid('${auction.id}',50)" style="padding:3px 8px;border-radius:4px;border:none;background:linear-gradient(135deg,#fb923c,#ea580c);color:#1a1a2e;cursor:pointer;font-weight:600;font-size:0.75rem;">+50</button>
                                     </div>
-                                    <div style="display:flex;align-items:center;gap:5px;">
-                                        <input type="number" id="quickBidInput_${auction.id}" placeholder="加价>50" min="51" value="${savedValue}" style="flex:1;padding:5px 10px;border-radius:5px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.4);color:white;font-size:0.85rem;outline:none;min-width:0;">
-                                        <button onclick="event.stopPropagation();customQuickBid('${auction.id}')" style="padding:5px 12px;border-radius:5px;border:none;background:linear-gradient(135deg,#ffd700,#ff6b6b);color:#1a1a2e;cursor:pointer;font-weight:600;font-size:0.85rem;white-space:nowrap;">出价</button>
+                                    <div style="display:flex;align-items:center;gap:4px;">
+                                        <input type="number" id="quickBidInput_${auction.id}" placeholder="自定义数值>50" min="51" value="${savedValue}" style="flex:1;padding:4px 8px;border-radius:4px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.4);color:white;font-size:0.75rem;outline:none;min-width:0;">
+                                        <button onclick="event.stopPropagation();customQuickBid('${auction.id}')" style="padding:4px 10px;border-radius:4px;border:none;background:linear-gradient(135deg,#ffd700,#ff6b6b);color:#1a1a2e;cursor:pointer;font-weight:600;font-size:0.75rem;white-space:nowrap;">出价</button>
                                     </div>`
-                                    : `<span style="padding:4px 10px;border-radius:5px;background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.3);font-size:0.75rem;">已结束</span>`
+                                    : `<span style="padding:3px 8px;border-radius:4px;background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.3);font-size:0.7rem;">已结束</span>`
                                 }
-                                <span style="color:rgba(255,255,255,0.3);font-size:0.7rem;">${bidCount}次出价</span>
+                                <span style="color:rgba(255,255,255,0.3);font-size:0.65rem;">${bidCount}次出价</span>
                             </div>
                         </div>
-                        <div style="flex-shrink:0;text-align:right;min-width:80px;">
+                        <div style="flex-shrink:0;text-align:right;min-width:70px;">
                             ${timeHtml}
-                            <div style="color:#ffd700;font-size:1.4rem;font-weight:700;margin:4px 0;">${isExchange ? '🔄' : '💰'}${currentBid}</div>
+                            <div style="color:#ffd700;font-size:1.2rem;font-weight:700;margin:3px 0;">${isExchange ? '🔄' : '💰'}${currentBid}</div>
                             ${bidderHtml}
                         </div>
                     </div>
@@ -9533,19 +9533,58 @@ function hasGistToken() {
                     try {
                         const fresh = await fetchCounterFromGist();
                         if (fresh) {
-                            // 合并本地 unique_users 到 Gist 数据，防止丢失新用户
-                            if (localData && localData.unique_users && Array.isArray(localData.unique_users)) {
-                                localData.unique_users.forEach(id => {
-                                    if (!fresh.unique_users.includes(id)) {
-                                        fresh.unique_users.push(id);
+                            // 合并本地缓存的关键数据到 Gist 数据
+                            // 确保使用最大的访问数和用户数，防止数据丢失
+                            if (localData) {
+                                // 合并 unique_users（用户列表）
+                                if (localData.unique_users && Array.isArray(localData.unique_users)) {
+                                    localData.unique_users.forEach(id => {
+                                        if (!fresh.unique_users.includes(id)) {
+                                            fresh.unique_users.push(id);
+                                        }
+                                    });
+                                }
+                                // 合并今日活跃用户
+                                if (localData.active_today_users && Array.isArray(localData.active_today_users)) {
+                                    localData.active_today_users.forEach(id => {
+                                        if (!fresh.active_today_users.includes(id)) {
+                                            fresh.active_today_users.push(id);
+                                        }
+                                    });
+                                }
+                                // 取最大访问数和下载数（防止数据回退）
+                                fresh.total_visits = Math.max(fresh.total_visits || 0, localData.total_visits || 0);
+                                fresh.total_users = Math.max(fresh.total_users || 0, fresh.unique_users.length);
+                                fresh.total_downloads = Math.max(fresh.total_downloads || 0, localData.total_downloads || 0);
+                                fresh.active_today = fresh.active_today_users.length;
+                                
+                                // 合并每日统计数据
+                                if (localData.daily_stats) {
+                                    for (const date in localData.daily_stats) {
+                                        if (!fresh.daily_stats[date]) {
+                                            fresh.daily_stats[date] = localData.daily_stats[date];
+                                        } else {
+                                            // 取每日数据的最大值
+                                            fresh.daily_stats[date].visits = Math.max(
+                                                fresh.daily_stats[date].visits || 0,
+                                                localData.daily_stats[date].visits || 0
+                                            );
+                                            fresh.daily_stats[date].downloads = Math.max(
+                                                fresh.daily_stats[date].downloads || 0,
+                                                localData.daily_stats[date].downloads || 0
+                                            );
+                                        }
                                     }
-                                });
-                                fresh.total_users = fresh.unique_users.length;
+                                }
                             }
                             counterData = fresh;
                         }
                     } catch (error) {
                         console.warn('获取最新数据失败，使用本地数据:', error);
+                        // 如果获取失败但有本地数据，尝试使用本地数据
+                        if (localData) {
+                            counterData = localData;
+                        }
                     }
                 }
                 
@@ -11590,6 +11629,7 @@ function hasGistToken() {
             document.getElementById('adminPageAuctionStats').style.display = 'none';
             document.getElementById('adminPageNickManage').style.display = 'none';
             document.getElementById('adminPagePasswordManage').style.display = 'none';
+            document.getElementById('adminPageAuctionManage').style.display = 'none';
 
             if (page === 'title') {
                 document.getElementById('adminPageTitle').style.display = 'block';
@@ -11612,6 +11652,10 @@ function hasGistToken() {
             } else if (page === 'passwordManage') {
                 document.getElementById('adminPagePasswordManage').style.display = 'block';
                 loadPasswordList();
+            } else if (page === 'auctionManage') {
+                document.getElementById('adminPageAuctionManage').style.display = 'block';
+                document.getElementById('auctionManageRoomId').value = currentChatRoom || '';
+                loadAuctionManageList();
             }
         }
 
@@ -11627,6 +11671,158 @@ function hasGistToken() {
             } else {
                 tokenInput.value = '';
                 tokenStatus.innerHTML = '<span style="color:#ef4444;font-size:0.85rem;">⚠️ 未检测到Token，请手动配置后才能发布公告</span>';
+            }
+        }
+
+        // 管理员加载商品列表
+        async function loadAuctionManageList() {
+            const roomId = document.getElementById('auctionManageRoomId').value.trim();
+            const listContainer = document.getElementById('auctionManageList');
+            
+            if (!roomId) {
+                listContainer.innerHTML = '<div style="color:#ef4444;text-align:center;padding:10px;">请输入房间ID</div>';
+                return;
+            }
+            
+            try {
+                const token = getGistToken();
+                const response = await fetch(GIST_URL, {
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        ...(token && { 'Authorization': `token ${token}` })
+                    }
+                });
+                
+                if (!response.ok) throw new Error('获取数据失败');
+                
+                const data = await response.json();
+                const content = data.files[CHAT_GIST_FILE]?.content;
+                if (!content) {
+                    listContainer.innerHTML = '<div style="color:#ef4444;text-align:center;padding:10px;">房间数据不存在</div>';
+                    return;
+                }
+                
+                const roomData = JSON.parse(content);
+                const room = roomData.rooms?.find(r => r.id === roomId);
+                
+                if (!room || !room.auctions || room.auctions.length === 0) {
+                    listContainer.innerHTML = '<div style="color:rgba(255,255,255,0.5);text-align:center;padding:10px;">该房间暂无商品</div>';
+                    return;
+                }
+                
+                const now = Date.now();
+                let html = '';
+                
+                room.auctions.forEach((auction, index) => {
+                    const isEnded = auction.status === 'ended' || now >= auction.endTime;
+                    const qualityColor = getQualityColor(auction.quality);
+                    
+                    html += `
+                        <div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:12px;margin-bottom:10px;">
+                            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+                                <div>
+                                    <div style="color:${qualityColor};font-weight:600;margin-bottom:4px;">
+                                        #${auction.id} ${auction.quality || ''}·${auction.profession || ''}
+                                        ${auction.isExchange ? '<span style="background:#f97316;color:white;padding:2px 6px;border-radius:4px;font-size:0.7rem;margin-left:6px;">交换</span>' : ''}
+                                    </div>
+                                    <div style="color:rgba(255,255,255,0.6);font-size:0.8rem;">
+                                        发布者: ${auction.creator || '未知'}
+                                    </div>
+                                    <div style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-top:2px;">
+                                        起拍价: ${auction.startPrice} | ${auction.bids?.length || 0}次出价 | ${isEnded ? '<span style="color:#ef4444;">已结束</span>' : '<span style="color:#4ade80;">进行中</span>'}
+                                    </div>
+                                </div>
+                                <button onclick="adminRemoveAuction('${roomId}','${auction.id}','${auction.creator || ''}')" 
+                                    style="background:linear-gradient(135deg,#ef4444,#dc2626);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:500;">
+                                    下架
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                listContainer.innerHTML = html;
+                
+            } catch (error) {
+                listContainer.innerHTML = `<div style="color:#ef4444;text-align:center;padding:10px;">加载失败: ${error.message}</div>`;
+            }
+        }
+
+        // 管理员下架商品
+        async function adminRemoveAuction(roomId, auctionId, creator) {
+            const confirmMsg = creator 
+                ? `确定要下架 #${auctionId} 吗？\n发布者: ${creator}`
+                : `确定要下架 #${auctionId} 吗？`;
+            
+            if (!confirm(confirmMsg)) {
+                return;
+            }
+            
+            try {
+                const token = getGistToken();
+                if (!token) {
+                    showAdminStatus('未配置GitHub Token，无法操作', 'error');
+                    return;
+                }
+                
+                // 获取当前数据
+                const response = await fetch(GIST_URL, {
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Authorization': `token ${token}`
+                    }
+                });
+                
+                if (!response.ok) throw new Error('获取数据失败');
+                
+                const data = await response.json();
+                const content = data.files[CHAT_GIST_FILE]?.content;
+                if (!content) throw new Error('数据不存在');
+                
+                const roomData = JSON.parse(content);
+                const room = roomData.rooms?.find(r => r.id === roomId);
+                
+                if (!room) throw new Error('房间不存在');
+                
+                // 找到并移除商品
+                const auctionIndex = room.auctions.findIndex(a => a.id === auctionId);
+                if (auctionIndex === -1) throw new Error('商品不存在');
+                
+                room.auctions.splice(auctionIndex, 1);
+                
+                // 添加系统消息
+                room.messages.push({
+                    id: 'msg_' + Date.now(),
+                    author: '系统',
+                    content: `⚠️ 管理员下架了拍卖 #${auctionId}`,
+                    time: Date.now()
+                });
+                
+                // 保存
+                const saveResponse = await fetch(GIST_URL, {
+                    method: 'PATCH',
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json',
+                        'Authorization': `token ${token}`
+                    },
+                    body: JSON.stringify({
+                        files: {
+                            [CHAT_GIST_FILE]: {
+                                content: JSON.stringify(roomData, null, 2)
+                            }
+                        }
+                    })
+                });
+                
+                if (!saveResponse.ok) throw new Error('保存失败');
+                
+                showAdminStatus(`商品 #${auctionId} 已下架！`, 'success');
+                loadAuctionManageList();
+                renderAuctionsList();
+                
+            } catch (error) {
+                showAdminStatus('下架失败：' + error.message, 'error');
             }
         }
 
@@ -12558,6 +12754,34 @@ function hasGistToken() {
                             <div style="color:rgba(255,255,255,0.4);font-size:0.8rem;">查看买卖记录与统计</div>
                         </div>
                     </div>
+                    <div class="admin-menu-item" onclick="adminShowPage('auctionManage')">
+                        <span style="font-size:1.3rem;">🏪</span>
+                        <div>
+                            <div style="color:#ffd700;font-weight:500;">商品管理</div>
+                            <div style="color:rgba(255,255,255,0.4);font-size:0.8rem;">下架违规或错误商品</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="adminPageAuctionManage" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
+                    <button class="admin-btn admin-btn-secondary" onclick="adminShowMenu()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
+                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">🏪 商品管理</h3>
+                </div>
+                <div style="background:rgba(255,165,0,0.1);border-left:3px solid #ffa500;border-radius:6px;padding:12px;margin-bottom:15px;">
+                    <div style="color:#ffa500;font-size:0.85rem;font-weight:500;">⚠️ 注意</div>
+                    <div style="color:rgba(255,255,255,0.6);font-size:0.75rem;margin-top:5px;">
+                        下架操作会立即生效，商品将从列表中移除。<br>
+                        请谨慎操作，下架前请确认商品信息。
+                    </div>
+                </div>
+                <div class="admin-section">
+                    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+                        <input type="text" id="auctionManageRoomId" placeholder="房间ID" style="flex:1;min-width:100px;">
+                        <button class="admin-btn" style="background:linear-gradient(135deg,#2196f3,#1565c0);" onclick="loadAuctionManageList()">加载商品</button>
+                    </div>
+                    <div id="auctionManageList" style="max-height:400px;overflow-y:auto;"></div>
                 </div>
             </div>
 
@@ -12820,7 +13044,7 @@ function hasGistToken() {
     </div>
 
     <!-- 拍卖行主面板 -->
-    <div id="chatRoomPanel" style="position:fixed;top:50px;left:20px;width:520px;height:680px;background:rgba(26,26,46,0.95);border:1px solid rgba(78,205,196,0.3);border-radius:12px;z-index:9980;box-shadow:0 4px 20px rgba(0,0,0,0.5);backdrop-filter:blur(10px);flex-direction:column;min-width:450px;min-height:500px;display:none;">
+    <div id="chatRoomPanel" style="position:fixed;top:50px;left:20px;width:420px;height:520px;background:rgba(26,26,46,0.95);border:1px solid rgba(78,205,196,0.3);border-radius:12px;z-index:9980;box-shadow:0 4px 20px rgba(0,0,0,0.5);backdrop-filter:blur(10px);flex-direction:column;min-width:320px;min-height:400px;display:none;">
         <div id="chatRoomHeader" style="background:linear-gradient(135deg,rgba(78,205,196,0.2),rgba(44,160,141,0.2));padding:10px 15px;display:flex;justify-content:space-between;align-items:center;cursor:move;user-select:none;" onmousedown="startPanelDrag(event,'chatRoomPanel')" ontouchstart="startPanelTouch(event,'chatRoomPanel')">
             <span style="color:#4ecdc4;font-size:0.9rem;font-weight:bold;">🏪 拍卖行 <span id="chatRoomIdDisplay" style="color:rgba(255,255,255,0.5);font-size:0.75rem;"></span></span>
             <div style="display:flex;gap:8px;align-items:center;">
