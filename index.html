@@ -3149,13 +3149,18 @@
                 }
 
                 let attrsHtml = '';
-                if (bonusDmg > 0) attrsHtml += `<span style="background:rgba(239,68,68,0.15);color:#f87171;padding:1px 5px;border-radius:3px;font-size:0.65rem;">附加伤害+${bonusDmg}</span> `;
-                if (ignoreIce > 0) attrsHtml += `<span style="background:rgba(96,165,250,0.15);color:#93c5fd;padding:1px 5px;border-radius:3px;font-size:0.65rem;">无视冰甲+${ignoreIce}</span>`;
-                if (isExchange) attrsHtml += `<span style="background:rgba(255,152,0,0.15);color:#fbbf24;padding:1px 5px;border-radius:3px;font-size:0.65rem;">🔄 交换</span>`;
+                if (bonusDmg > 0) attrsHtml += `<span style="background:rgba(239,68,68,0.15);color:#f87171;padding:2px 6px;border-radius:3px;font-size:0.7rem;">附加伤害+${bonusDmg}</span> `;
+                if (ignoreIce > 0) attrsHtml += `<span style="background:rgba(96,165,250,0.15);color:#93c5fd;padding:2px 6px;border-radius:3px;font-size:0.7rem;">无视冰甲+${ignoreIce}</span>`;
 
+                let exchangeBadgeHtml = '';
+                if (isExchange) {
+                    exchangeBadgeHtml = `<span style="background:linear-gradient(135deg,#f97316,#ea580c);color:white;padding:3px 10px;border-radius:4px;font-size:0.85rem;font-weight:bold;text-shadow:0 1px 2px rgba(0,0,0,0.3);box-shadow:0 2px 6px rgba(249,115,22,0.4);">🔄 交换</span>`;
+                }
+
+                const imageSize = 110;
                 const imageHtml = auction.image
-                    ? `<div style="position:relative;width:95px;height:95px;flex-shrink:0;" onmouseover="showAuctionImagePreview(this,'${auction.id}')" onmouseout="hideAuctionImagePreview()"><img src="${auction.image}" style="width:95px;height:95px;object-fit:cover;border-radius:8px;border:2px solid ${qualityColor};" onerror="this.style.display='none'"></div>`
-                    : `<div style="width:95px;height:95px;background:rgba(255,255,255,0.05);border-radius:8px;border:2px solid ${qualityColor};display:flex;align-items:center;justify-content:center;flex-shrink:0;"><span style="color:${qualityColor};font-size:1.6rem;">⚔️</span></div>`;
+                    ? `<div style="position:relative;width:${imageSize}px;height:${imageSize}px;flex-shrink:0;" onmouseover="showAuctionImagePreview(this,'${auction.id}')" onmouseout="hideAuctionImagePreview()"><img src="${auction.image}" style="width:${imageSize}px;height:${imageSize}px;object-fit:cover;border-radius:10px;border:2px solid ${qualityColor};box-shadow:0 2px 8px rgba(0,0,0,0.3);" onerror="this.style.display='none'"></div>`
+                    : `<div style="width:${imageSize}px;height:${imageSize}px;background:rgba(255,255,255,0.05);border-radius:10px;border:2px solid ${qualityColor};display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,0.3);"><span style="color:${qualityColor};font-size:2rem;">⚔️</span></div>`;
 
                 let bidderHtml = '';
                 if (currentBidder) {
@@ -3164,37 +3169,41 @@
 
                 let exchangeWantHtml = '';
                 if (isExchange && exchangeWant) {
-                    exchangeWantHtml = `<div style="color:rgba(255,152,0,0.8);font-size:0.7rem;margin-top:2px;">想要: ${exchangeWant}</div>`;
+                    exchangeWantHtml = `<div style="color:#fbbf24;font-size:0.8rem;margin-top:4px;padding:4px 8px;background:rgba(251,191,36,0.1);border-radius:4px;border-left:2px solid #fbbf24;">想要: ${exchangeWant}</div>`;
                 }
 
                 const savedValue = savedInputs[`quickBidInput_${auction.id}`] || '';
 
                 return `
-                    <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-left:3px solid ${isExchange ? '#fbbf24' : qualityColor};border-radius:8px;padding:10px;margin-bottom:8px;display:flex;gap:10px;align-items:center;transition:all 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.07)'" onmouseout="this.style.background='rgba(255,255,255,0.04)'">
+                    <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-left:4px solid ${isExchange ? '#f97316' : qualityColor};border-radius:10px;padding:12px;margin-bottom:10px;display:flex;gap:12px;align-items:flex-start;transition:all 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.07)'" onmouseout="this.style.background='rgba(255,255,255,0.04)'">
                         ${imageHtml}
-                        <div style="flex:1;min-width:0;">
-                            <div style="color:${qualityColor};font-size:0.8rem;font-weight:600;margin-bottom:3px;">#${auction.id} ${quality}·${profession}</div>
-                            <div style="margin-bottom:4px;">${attrsHtml}</div>
+                        <div style="flex:1;min-width:0;padding-left:8px;">
+                            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;">
+                                <span style="color:${qualityColor};font-size:0.95rem;font-weight:700;">#${auction.id}</span>
+                                <span style="color:white;font-size:0.95rem;font-weight:600;">${quality}·${profession}</span>
+                                ${exchangeBadgeHtml}
+                            </div>
+                            <div style="margin-bottom:6px;">${attrsHtml}</div>
                             ${exchangeWantHtml}
-                            <div style="display:flex;flex-direction:column;gap:4px;min-width:0;">
+                            <div style="display:flex;flex-direction:column;gap:5px;min-width:0;">
                                 ${!isEnded
-                                    ? `<div style="display:flex;gap:3px;margin-bottom:2px;">
-                                        <button onclick="event.stopPropagation();quickBid('${auction.id}',10)" style="padding:2px 8px;border-radius:4px;border:none;background:linear-gradient(135deg,#ffd700,#ff6b6b);color:#1a1a2e;cursor:pointer;font-weight:600;font-size:0.7rem;">+10</button>
-                                        <button onclick="event.stopPropagation();quickBid('${auction.id}',20)" style="padding:2px 8px;border-radius:4px;border:none;background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#1a1a2e;cursor:pointer;font-weight:600;font-size:0.7rem;">+20</button>
-                                        <button onclick="event.stopPropagation();quickBid('${auction.id}',50)" style="padding:2px 8px;border-radius:4px;border:none;background:linear-gradient(135deg,#fb923c,#ea580c);color:#1a1a2e;cursor:pointer;font-weight:600;font-size:0.7rem;">+50</button>
+                                    ? `<div style="display:flex;gap:4px;margin-bottom:3px;">
+                                        <button onclick="event.stopPropagation();quickBid('${auction.id}',10)" style="padding:4px 10px;border-radius:5px;border:none;background:linear-gradient(135deg,#ffd700,#ff6b6b);color:#1a1a2e;cursor:pointer;font-weight:600;font-size:0.8rem;">+10</button>
+                                        <button onclick="event.stopPropagation();quickBid('${auction.id}',20)" style="padding:4px 10px;border-radius:5px;border:none;background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#1a1a2e;cursor:pointer;font-weight:600;font-size:0.8rem;">+20</button>
+                                        <button onclick="event.stopPropagation();quickBid('${auction.id}',50)" style="padding:4px 10px;border-radius:5px;border:none;background:linear-gradient(135deg,#fb923c,#ea580c);color:#1a1a2e;cursor:pointer;font-weight:600;font-size:0.8rem;">+50</button>
                                     </div>
-                                    <div style="display:flex;align-items:center;gap:4px;">
-                                        <input type="number" id="quickBidInput_${auction.id}" placeholder="加价>50" min="51" value="${savedValue}" style="flex:1;padding:4px 8px;border-radius:4px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.4);color:white;font-size:0.75rem;outline:none;min-width:0;">
-                                        <button onclick="event.stopPropagation();customQuickBid('${auction.id}')" style="padding:4px 10px;border-radius:4px;border:none;background:linear-gradient(135deg,#ffd700,#ff6b6b);color:#1a1a2e;cursor:pointer;font-weight:600;font-size:0.75rem;white-space:nowrap;">出价</button>
+                                    <div style="display:flex;align-items:center;gap:5px;">
+                                        <input type="number" id="quickBidInput_${auction.id}" placeholder="加价>50" min="51" value="${savedValue}" style="flex:1;padding:5px 10px;border-radius:5px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.4);color:white;font-size:0.85rem;outline:none;min-width:0;">
+                                        <button onclick="event.stopPropagation();customQuickBid('${auction.id}')" style="padding:5px 12px;border-radius:5px;border:none;background:linear-gradient(135deg,#ffd700,#ff6b6b);color:#1a1a2e;cursor:pointer;font-weight:600;font-size:0.85rem;white-space:nowrap;">出价</button>
                                     </div>`
-                                    : `<span style="padding:3px 8px;border-radius:5px;background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.3);font-size:0.7rem;">已结束</span>`
+                                    : `<span style="padding:4px 10px;border-radius:5px;background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.3);font-size:0.75rem;">已结束</span>`
                                 }
-                                <span style="color:rgba(255,255,255,0.3);font-size:0.6rem;">${bidCount}次出价</span>
+                                <span style="color:rgba(255,255,255,0.3);font-size:0.7rem;">${bidCount}次出价</span>
                             </div>
                         </div>
-                        <div style="flex-shrink:0;text-align:right;">
+                        <div style="flex-shrink:0;text-align:right;min-width:80px;">
                             ${timeHtml}
-                            <div style="color:#ffd700;font-size:1.2rem;font-weight:700;">${isExchange ? '🔄' : '💰'}${currentBid}</div>
+                            <div style="color:#ffd700;font-size:1.4rem;font-weight:700;margin:4px 0;">${isExchange ? '🔄' : '💰'}${currentBid}</div>
                             ${bidderHtml}
                         </div>
                     </div>
@@ -12811,7 +12820,7 @@ function hasGistToken() {
     </div>
 
     <!-- 拍卖行主面板 -->
-    <div id="chatRoomPanel" style="position:fixed;top:50px;left:20px;width:440px;height:560px;background:rgba(26,26,46,0.95);border:1px solid rgba(78,205,196,0.3);border-radius:12px;z-index:9980;box-shadow:0 4px 20px rgba(0,0,0,0.5);backdrop-filter:blur(10px);flex-direction:column;min-width:350px;min-height:400px;display:none;">
+    <div id="chatRoomPanel" style="position:fixed;top:50px;left:20px;width:520px;height:680px;background:rgba(26,26,46,0.95);border:1px solid rgba(78,205,196,0.3);border-radius:12px;z-index:9980;box-shadow:0 4px 20px rgba(0,0,0,0.5);backdrop-filter:blur(10px);flex-direction:column;min-width:450px;min-height:500px;display:none;">
         <div id="chatRoomHeader" style="background:linear-gradient(135deg,rgba(78,205,196,0.2),rgba(44,160,141,0.2));padding:10px 15px;display:flex;justify-content:space-between;align-items:center;cursor:move;user-select:none;" onmousedown="startPanelDrag(event,'chatRoomPanel')" ontouchstart="startPanelTouch(event,'chatRoomPanel')">
             <span style="color:#4ecdc4;font-size:0.9rem;font-weight:bold;">🏪 拍卖行 <span id="chatRoomIdDisplay" style="color:rgba(255,255,255,0.5);font-size:0.75rem;"></span></span>
             <div style="display:flex;gap:8px;align-items:center;">
