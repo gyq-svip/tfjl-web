@@ -3197,6 +3197,10 @@
         }
 
         function openAuctionPostModal() {
+            if (!currentChatRoom) {
+                alert('请先进入拍卖行房间！');
+                return;
+            }
             document.getElementById('auctionPostModal').style.display = 'flex';
             auctionImageBase64 = '';
             document.getElementById('auctionImageFile').value = '';
@@ -3233,6 +3237,10 @@
         }
 
         async function postAuction() {
+            if (!currentChatRoom) {
+                alert('请先进入拍卖行房间！');
+                return;
+            }
             const quality = document.getElementById('auctionQuality').value;
             const profession = document.getElementById('auctionProfession').value;
             const bonusDmg = parseFloat(document.getElementById('auctionBonusDmg').value) || 0;
