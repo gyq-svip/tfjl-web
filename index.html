@@ -11789,6 +11789,7 @@ function hasGistToken() {
             const nick = localStorage.getItem('TFJL_UserName') || '未设置';
             const hasSet = localStorage.getItem('TFJL_HasSetNick') === 'true';
             document.getElementById('currentNickDisplay').value = nick + (hasSet ? ' (已锁定)' : '');
+            document.getElementById('adminNewNickInput').value = nick !== '未设置' ? nick : '';
         }
 
         function resetCurrentNick() {
@@ -11797,6 +11798,22 @@ function hasGistToken() {
             
             localStorage.removeItem('TFJL_HasSetNick');
             showAdminStatus('昵称设置已重置！用户可以重新设置昵称了。', 'success');
+            loadCurrentNick();
+        }
+
+        function setNickByAdmin() {
+            const newNick = document.getElementById('adminNewNickInput').value.trim();
+            if (!newNick) {
+                showAdminStatus('请输入昵称！', 'error');
+                return;
+            }
+            
+            const confirm = window.confirm(`确定要将昵称修改为"${newNick}"吗？`);
+            if (!confirm) return;
+            
+            localStorage.setItem('TFJL_UserName', newNick);
+            localStorage.setItem('TFJL_HasSetNick', 'true');
+            showAdminStatus(`昵称已修改为"${newNick}"！`, 'success');
             loadCurrentNick();
         }
 
@@ -12384,17 +12401,23 @@ function hasGistToken() {
                     <div style="background:rgba(255,165,0,0.1);border-left:3px solid #ffa500;border-radius:6px;padding:12px;margin-bottom:15px;">
                         <div style="color:#ffa500;font-size:0.85rem;font-weight:500;">💡 说明</div>
                         <div style="color:rgba(255,255,255,0.6);font-size:0.75rem;margin-top:5px;">
-                            用户昵称设置后无法自行修改，管理员可在此强制重置。<br>
-                            重置后用户可以重新设置一次昵称。
+                            用户昵称设置后无法自行修改，管理员可在此强制重置或修改。<br>
+                            <strong>修改</strong>：直接设置用户的新昵称<br>
+                            <strong>重置</strong>：清除设置，允许用户重新设置一次昵称
                         </div>
                     </div>
-                    <label>选择设备（用于测试：可重置当前设备）</label>
+                    <label>当前昵称状态</label>
                     <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
                         <input type="text" id="currentNickDisplay" placeholder="当前昵称" style="flex:1;" readonly>
                     </div>
+                    <label>设置新昵称</label>
+                    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
+                        <input type="text" id="adminNewNickInput" placeholder="输入新昵称..." style="flex:1;">
+                    </div>
                     <div style="display:flex;gap:8px;justify-content:flex-end;">
-                        <button class="admin-btn admin-btn-secondary" onclick="loadCurrentNick()">加载当前</button>
-                        <button class="admin-btn" style="background:linear-gradient(135deg,#f44336,#d32f2f);" onclick="resetCurrentNick()">重置当前设备</button>
+                        <button class="admin-btn admin-btn-secondary" onclick="loadCurrentNick()">刷新</button>
+                        <button class="admin-btn" style="background:linear-gradient(135deg,#4caf50,#2e7d32);" onclick="setNickByAdmin()">✏️ 修改昵称</button>
+                        <button class="admin-btn" style="background:linear-gradient(135deg,#f44336,#d32f2f);" onclick="resetCurrentNick()">🔄 重置设置</button>
                     </div>
                 </div>
             </div>
