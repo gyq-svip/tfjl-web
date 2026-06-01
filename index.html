@@ -3910,17 +3910,26 @@
             return div.innerHTML;
         }
 
-        document.getElementById('chatRoomEntryModal').addEventListener('click', (e) => {
-            if (e.target === e.currentTarget) closeChatRoomEntry();
-        });
+        const chatRoomEntryModal = document.getElementById('chatRoomEntryModal');
+        if (chatRoomEntryModal) {
+            chatRoomEntryModal.addEventListener('click', (e) => {
+                if (e.target === e.currentTarget) closeChatRoomEntry();
+            });
+        }
 
-        document.getElementById('auctionPostModal').addEventListener('click', (e) => {
-            if (e.target === e.currentTarget) closeAuctionPostModal();
-        });
+        const auctionPostModal = document.getElementById('auctionPostModal');
+        if (auctionPostModal) {
+            auctionPostModal.addEventListener('click', (e) => {
+                if (e.target === e.currentTarget) closeAuctionPostModal();
+            });
+        }
 
-        document.getElementById('auctionDetailModal').addEventListener('click', (e) => {
-            if (e.target === e.currentTarget) closeAuctionDetail();
-        });
+        const auctionDetailModal = document.getElementById('auctionDetailModal');
+        if (auctionDetailModal) {
+            auctionDetailModal.addEventListener('click', (e) => {
+                if (e.target === e.currentTarget) closeAuctionDetail();
+            });
+        }
 
         function showRefImageList() {
             const content = document.getElementById('referencePanelContent');
@@ -4603,9 +4612,9 @@
             </div>
         </div>
 
-        <div class="collapsible-section engineering-card">
-            <div class="collapsible-header engineering-card" onclick="toggleSection(this)">
-                <h3><span>🔧</span> 工程卡牌</h3>
+        <div class="collapsible-section gold">
+            <div class="collapsible-header gold" onclick="toggleSection(this)">
+                <h3><span>🥇</span> 金卡类</h3>
                 <span class="toggle-icon">▼</span>
             </div>
             <div class="collapsible-content">
@@ -4620,17 +4629,6 @@
                             <div class="card-item" data-id="53" data-name="潜艇" data-type="gold" data-engineering="true" data-profession="engineering">潜艇</div>
                         </div>
                     </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="collapsible-section gold">
-            <div class="collapsible-header gold" onclick="toggleSection(this)">
-                <h3><span>🥇</span> 金卡类</h3>
-                <span class="toggle-icon">▼</span>
-            </div>
-            <div class="collapsible-content">
-                <div class="collapsible-inner">
                     <div class="profession-section">
                         <h4>⚔️ 战士</h4>
                         <div class="cards-grid">
