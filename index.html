@@ -3363,12 +3363,12 @@
                     <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-left:4px solid ${isExchange ? '#f97316' : qualityColor};border-radius:8px;padding:10px;margin-bottom:8px;display:flex;gap:10px;align-items:flex-start;transition:all 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.07)'" onmouseout="this.style.background='rgba(255,255,255,0.04)'">
                         ${imageHtml}
                         <div style="flex:1;min-width:0;padding-left:15px;">
-                            <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;flex-wrap:wrap;">
+                            <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;flex-wrap:nowrap;">
                                 <span style="color:${qualityColor};font-size:0.8rem;font-weight:700;">#${auction.id}</span>
                                 <span style="color:white;font-size:0.8rem;font-weight:600;">${quality}·${profession}</span>
                                 ${exchangeBadgeHtml}
                             </div>
-                            <div style="margin-bottom:4px;">${attrsHtml}</div>
+                            <div style="margin-bottom:4px;white-space:nowrap;">${attrsHtml}</div>
                             ${exchangeWantHtml}
                             <div style="display:flex;flex-direction:column;gap:4px;min-width:0;">
                                 ${!isEnded
@@ -3378,7 +3378,7 @@
                                         <button onclick="event.stopPropagation();quickBid('${auction.id}',50)" style="padding:3px 8px;border-radius:4px;border:none;background:linear-gradient(135deg,#fb923c,#ea580c);color:#1a1a2e;cursor:pointer;font-weight:600;font-size:0.75rem;">+50</button>
                                     </div>
                                     <div style="display:flex;align-items:center;gap:4px;">
-                                        <input type="number" id="quickBidInput_${auction.id}" placeholder="自定义数值>50" min="51" value="${savedValue}" style="flex:1;padding:4px 8px;border-radius:4px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.4);color:white;font-size:0.75rem;outline:none;min-width:0;">
+                                        <input type="number" id="quickBidInput_${auction.id}" placeholder="数值>50" min="51" value="${savedValue}" style="flex:1;padding:4px 8px;border-radius:4px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.4);color:white;font-size:0.7rem;outline:none;min-width:0;">
                                         <button onclick="event.stopPropagation();customQuickBid('${auction.id}')" style="padding:4px 10px;border-radius:4px;border:none;background:linear-gradient(135deg,#ffd700,#ff6b6b);color:#1a1a2e;cursor:pointer;font-weight:600;font-size:0.75rem;white-space:nowrap;">出价</button>
                                     </div>`
                                     : `<span style="padding:3px 8px;border-radius:4px;background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.3);font-size:0.7rem;">已结束</span>`
