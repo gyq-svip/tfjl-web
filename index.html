@@ -3115,11 +3115,13 @@
         }
 
         function getRoomData() {
+            if (!currentChatRoom) return null;
             if (!chatRoomData || !chatRoomData.rooms) return null;
             return chatRoomData.rooms[currentChatRoom] || null;
         }
 
         function ensureRoomData() {
+            if (!currentChatRoom) return null;
             if (!chatRoomData) chatRoomData = { rooms: {} };
             if (!chatRoomData.rooms[currentChatRoom]) {
                 chatRoomData.rooms[currentChatRoom] = { messages: [], auctions: [], nextAuctionId: 1 };
