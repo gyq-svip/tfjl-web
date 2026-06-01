@@ -2532,6 +2532,8 @@
                 </select>
                 <button onclick="toggleProjectMenu(this)" style="background:#444;color:white;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:1rem;line-height:1;">⋮</button>
                 <button onclick="toggleNotepadPanel()" title="记事本" style="background:linear-gradient(135deg,#ffd700,#ff6b6b);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">📝</button>
+                <button onclick="saveCurrentProject()" title="保存" style="background:rgba(76,175,80,0.8);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">💾</button>
+                <button onclick="toggleReferencePanel()" title="参考图片" style="background:linear-gradient(135deg,#9c27b0,#7b1fa2);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">🖼️</button>
                 <button onclick="toggleTxtFilesPanel()" title="脚本文件" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">📄</button>
                 <button onclick="toggleTextParserPanel()" title="文本解析" style="background:linear-gradient(135deg,#00bcd4,#00838f);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">🔍</button>
                 <button onclick="toggleReferencePanel()" title="参考图片" style="background:linear-gradient(135deg,#9c27b0,#7b1fa2);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">🖼️</button>
@@ -2797,8 +2799,6 @@
         <div class="sticky-buttons" style="position:fixed;top:12px;right:12px;z-index:9999;display:flex;gap:5px;">
             <!-- 版本切换按钮（动态显示） -->
             <button id="versionSwitchBtn" onclick="handleVersionSwitch()" style="display:none;background:rgba(0,188,212,0.8);color:white;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 1px 6px rgba(0,0,0,0.15);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;">🌐</button>
-            <button onclick="toggleReferencePanel()" title="参考图片" style="background:linear-gradient(135deg,#9c27b0,#7b1fa2);color:white;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 1px 6px rgba(0,0,0,0.15);display:flex;align-items:center;justify-content:center;">🖼️</button>
-            <button onclick="saveCurrentProject()" title="保存" style="background:rgba(76,175,80,0.8);color:white;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 1px 6px rgba(0,0,0,0.15);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;">💾</button>
             <div style="position:relative;">
                 <button onclick="toggleBackupMenu(this)" title="菜单" style="background:rgba(255,87,34,0.8);color:white;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 1px 6px rgba(0,0,0,0.15);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;">☰</button>
                 <div id="backupMenu" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:rgba(42,42,74,0.95);border:1px solid rgba(255,215,0,0.3);border-radius:8px;padding:8px 0;min-width:180px;z-index:1000;box-shadow:0 4px 15px rgba(0,0,0,0.4);backdrop-filter:blur(8px);">
@@ -2823,11 +2823,13 @@
                     <div onclick="logoutToLogin();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#ff6b6b;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,107,107,0.1)'" onmouseout="this.style.background='transparent'">🔙 退出登录</div>
                 </div>
             </div>
+            <button id="messageWallToggle" onclick="toggleMessageWall()" title="需求墙" style="background:rgba(255,215,0,0.85);color:#1a1a2e;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 2px 10px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">📢</button>
+            <button id="chatRoomToggle" onclick="openChatRoomEntry()" title="拍卖行" style="background:rgba(78,205,196,0.85);color:#1a1a2e;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 2px 10px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">🏪</button>
             <input type="file" id="importFileInput" accept=".json" style="display:none;" onchange="handleImportFile(this)">
         </div>
 
         <!-- 参考图片悬浮面板 -->
-        <div id="referencePanel" style="display:none;position:fixed;top:80px;right:20px;width:350px;height:400px;z-index:9998;background:rgba(30,30,60,0.95);border:2px solid rgba(156,39,176,0.5);border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.5);overflow:hidden;resize:both;min-width:250px;min-height:300px;">
+        <div id="referencePanel" style="display:none;position:fixed;top:80px;right:20px;width:350px;height:400px;z-index:9998;background:rgba(30,30,60,0.95);border:2px solid rgba(156,39,176,0.5);border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.5);overflow:auto;resize:both;min-width:250px;min-height:300px;">
             <div id="referencePanelHeader" style="background:linear-gradient(135deg,#9c27b0,#7b1fa2);padding:10px 15px;cursor:move;display:flex;justify-content:space-between;align-items:center;">
                 <span style="color:white;font-weight:bold;">🖼️ 参考图片</span>
                 <div>
@@ -3000,8 +3002,14 @@
         async function joinChatRoom() {
             const roomId = document.getElementById('chatRoomIdInput').value.trim();
             const nick = document.getElementById('chatRoomNickInput').value.trim();
-            if (!roomId) { alert('请输入房间ID'); return; }
+            if (!roomId) { alert('请输入拍卖会ID'); return; }
             if (!nick) { alert('请输入昵称'); return; }
+            
+            // 检查拍卖行ID是否存在（权限控制）
+            if (!isValidRoom(roomId)) {
+                alert('❌ 该拍卖会ID不存在或未开通\n请联系管理员获取有效的拍卖会ID');
+                return;
+            }
 
             currentChatRoom = roomId;
             currentChatNick = nick;
@@ -4480,7 +4488,7 @@
         </script>
 
         <!-- 记事本悬浮面板 -->
-        <div id="notepadPanel" style="display:none;position:fixed;top:80px;right:20px;width:400px;height:350px;z-index:9997;background:rgba(30,30,60,0.95);border:2px solid rgba(255,215,0,0.5);border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.5);overflow:hidden;resize:both;min-width:280px;min-height:250px;">
+        <div id="notepadPanel" style="display:none;position:fixed;top:80px;right:20px;width:400px;height:350px;z-index:9997;background:rgba(30,30,60,0.95);border:2px solid rgba(255,215,0,0.5);border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.5);overflow:auto;resize:both;min-width:280px;min-height:250px;">
             <div id="notepadPanelHeader" style="background:linear-gradient(135deg,#ffd700,#ff6b6b);padding:10px 15px;cursor:move;display:flex;justify-content:space-between;align-items:center;">
                 <span style="color:white;font-weight:bold;">📝 记事本</span>
                 <div style="display:flex;align-items:center;gap:8px;">
@@ -4501,7 +4509,7 @@
         </div>
 
         <!-- 脚本文件悬浮面板 -->
-        <div id="txtFilesPanel" style="display:none;position:fixed;top:80px;right:20px;width:400px;height:400px;z-index:9997;background:rgba(30,30,60,0.95);border:2px solid rgba(76,175,80,0.5);border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.5);overflow:hidden;resize:both;min-width:280px;min-height:300px;">
+        <div id="txtFilesPanel" style="display:none;position:fixed;top:80px;right:20px;width:400px;height:400px;z-index:9997;background:rgba(30,30,60,0.95);border:2px solid rgba(76,175,80,0.5);border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.5);overflow:auto;resize:both;min-width:280px;min-height:300px;">
             <div id="txtFilesPanelHeader" style="background:linear-gradient(135deg,#4caf50,#2e7d32);padding:10px 15px;cursor:move;display:flex;justify-content:space-between;align-items:center;">
                 <span style="color:white;font-weight:bold;">📄 脚本文件</span>
                 <div style="display:flex;align-items:center;gap:8px;">
@@ -4518,7 +4526,7 @@
         <input type="file" id="txtFileInput" accept=".txt,.js,.json,.lua,.py,.sh" multiple style="display:none;" onchange="handleTxtFileUpload(this)">
 
         <!-- 文本解析悬浮面板 -->
-        <div id="textParserPanel" style="display:none;position:fixed;top:80px;right:20px;width:450px;height:350px;z-index:9997;background:rgba(30,30,60,0.95);border:2px solid rgba(0,188,212,0.5);border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.5);overflow:hidden;resize:both;min-width:350px;min-height:280px;">
+        <div id="textParserPanel" style="display:none;position:fixed;top:80px;right:20px;width:450px;height:350px;z-index:9997;background:rgba(30,30,60,0.95);border:2px solid rgba(0,188,212,0.5);border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.5);overflow:auto;resize:both;min-width:350px;min-height:280px;">
             <div id="textParserPanelHeader" style="background:linear-gradient(135deg,#00bcd4,#00838f);padding:10px 15px;cursor:move;display:flex;justify-content:space-between;align-items:center;">
                 <span style="color:white;font-weight:bold;">🔍 文本解析手牌</span>
                 <button onclick="toggleTextParserPanel()" style="background:transparent;border:none;color:white;font-size:1.2rem;cursor:pointer;padding:0 5px;">×</button>
@@ -11835,6 +11843,7 @@ function hasGistToken() {
             document.getElementById('adminPageNickManage').style.display = 'none';
             document.getElementById('adminPagePasswordManage').style.display = 'none';
             document.getElementById('adminPageAuctionManage').style.display = 'none';
+            document.getElementById('adminPageRoomManage').style.display = 'none';
         }
 
         function adminShowPage(page) {
@@ -11871,6 +11880,9 @@ function hasGistToken() {
                 loadPasswordList();
             } else if (page === 'auctionManage') {
                 document.getElementById('adminPageAuctionManage').style.display = 'block';
+            } else if (page === 'roomManage') {
+                document.getElementById('adminPageRoomManage').style.display = 'block';
+                loadRoomManageList();
                 document.getElementById('auctionManageRoomId').value = currentChatRoom || '';
                 loadAuctionManageList();
             }
@@ -13016,6 +13028,13 @@ function hasGistToken() {
                             <div style="color:rgba(255,255,255,0.4);font-size:0.8rem;">下架违规或错误商品</div>
                         </div>
                     </div>
+                    <div class="admin-menu-item" onclick="adminShowPage('roomManage')">
+                        <span style="font-size:1.3rem;">🏠</span>
+                        <div>
+                            <div style="color:#ffd700;font-weight:500;">拍卖行管理</div>
+                            <div style="color:rgba(255,255,255,0.4);font-size:0.8rem;">创建/删除拍卖行ID</div>
+                        </div>
+                    </div>
                     <div class="admin-menu-item" onclick="logoutToLogin()">
                         <span style="font-size:1.3rem;">🔙</span>
                         <div>
@@ -13044,6 +13063,34 @@ function hasGistToken() {
                         <button class="admin-btn" style="background:linear-gradient(135deg,#2196f3,#1565c0);" onclick="loadAuctionManageList()">加载商品</button>
                     </div>
                     <div id="auctionManageList" style="max-height:400px;overflow-y:auto;"></div>
+                </div>
+            </div>
+
+            <div id="adminPageRoomManage" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
+                    <button class="admin-btn admin-btn-secondary" onclick="adminShowMenu()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
+                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">🏠 拍卖行管理</h3>
+                </div>
+                <div style="background:rgba(255,165,0,0.1);border-left:3px solid #ffa500;border-radius:6px;padding:12px;margin-bottom:15px;">
+                    <div style="color:#ffa500;font-size:0.85rem;font-weight:500;">⚠️ 权限说明</div>
+                    <div style="color:rgba(255,255,255,0.6);font-size:0.75rem;margin-top:5px;">
+                        只有管理员可以创建拍卖行ID，普通用户只能进入已创建的拍卖行。<br>
+                        请将拍卖行ID告知参与者，他们输入ID即可进入。
+                    </div>
+                </div>
+                <div class="admin-section">
+                    <h3 style="color:#ffd700;margin:0 0 10px 0;font-size:0.9rem;">创建新拍卖行</h3>
+                    <div style="display:flex;gap:8px;margin-bottom:15px;">
+                        <input type="text" id="newRoomIdInput" placeholder="拍卖行ID（如：room001）" style="flex:1;">
+                        <button class="admin-btn admin-btn-primary" onclick="adminCreateRoom()">创建</button>
+                    </div>
+                </div>
+                <div class="admin-section">
+                    <h3 style="color:#ffd700;margin:0 0 10px 0;font-size:0.9rem;">已创建的拍卖行</h3>
+                    <div id="roomManageList" style="max-height:300px;overflow-y:auto;">
+                        <div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;">点击下方按钮加载列表</div>
+                    </div>
+                    <button class="admin-btn admin-btn-secondary" onclick="loadRoomManageList()" style="width:100%;margin-top:10px;">🔄 刷新列表</button>
                 </div>
             </div>
 
@@ -13280,11 +13327,7 @@ function hasGistToken() {
         <span id="messageBadge" style="display:none;background:#ff6b6b;color:#fff;font-size:0.7rem;padding:2px 6px;border-radius:10px;margin-left:6px;">0</span>
     </div>
 
-    <!-- 消息墙和拍卖行按钮 -->
-    <div style="position:fixed;top:48px;right:12px;z-index:9985;display:flex;flex-direction:column;gap:5px;">
-        <button id="messageWallToggle" onclick="toggleMessageWall()" title="需求墙" style="background:rgba(255,215,0,0.85);color:#1a1a2e;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 2px 10px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">📢</button>
-        <button id="chatRoomToggle" onclick="openChatRoomEntry()" title="拍卖行" style="background:rgba(78,205,196,0.85);color:#1a1a2e;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 2px 10px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">🏪</button>
-    </div>
+
 
     <!-- 拍卖行主面板 -->
 
