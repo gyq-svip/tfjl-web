@@ -3334,15 +3334,15 @@
                 }
 
                 let attrsHtml = '';
-                if (bonusDmg > 0) attrsHtml += `<span style="background:rgba(239,68,68,0.15);color:#f87171;padding:2px 6px;border-radius:3px;font-size:0.7rem;">伤害+${bonusDmg}</span> `;
-                if (ignoreIce > 0) attrsHtml += `<span style="background:rgba(96,165,250,0.15);color:#93c5fd;padding:2px 6px;border-radius:3px;font-size:0.7rem;">冰甲+${ignoreIce}</span>`;
+                if (bonusDmg > 0) attrsHtml += `<span style="background:rgba(239,68,68,0.15);color:#f87171;padding:2px 6px;border-radius:3px;font-size:0.7rem;">附加伤害+${bonusDmg}%</span> `;
+                if (ignoreIce > 0) attrsHtml += `<span style="background:rgba(96,165,250,0.15);color:#93c5fd;padding:2px 6px;border-radius:3px;font-size:0.7rem;">无视冰甲+${ignoreIce}%</span>`;
 
                 let exchangeBadgeHtml = '';
                 if (isExchange) {
-                    exchangeBadgeHtml = `<span style="background:linear-gradient(135deg,#f97316,#ea580c);color:white;padding:2px 8px;border-radius:4px;font-size:0.7rem;font-weight:600;margin-left:6px;box-shadow:0 1px 3px rgba(249,115,22,0.3);">🔄支持交换</span>`;
+                    exchangeBadgeHtml = `<span style="background:linear-gradient(135deg,#f97316,#ea580c);color:white;padding:2px 8px;border-radius:4px;font-size:0.7rem;font-weight:600;margin-left:6px;box-shadow:0 1px 3px rgba(249,115,22,0.3);">支持交换</span>`;
                 }
 
-                const imageSize = 85;
+                const imageSize = 110;
                 const imageHtml = auction.image
                     ? `<div style="position:relative;width:${imageSize}px;height:${imageSize}px;flex-shrink:0;" onmouseover="showAuctionImagePreview(this,'${auction.id}')" onmouseout="hideAuctionImagePreview()"><img src="${auction.image}" style="width:${imageSize}px;height:${imageSize}px;object-fit:cover;border-radius:8px;border:2px solid ${qualityColor};box-shadow:0 2px 8px rgba(0,0,0,0.3);" onerror="this.style.display='none'"></div>`
                     : `<div style="width:${imageSize}px;height:${imageSize}px;background:rgba(255,255,255,0.05);border-radius:8px;border:2px solid ${qualityColor};display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,0.3);"><span style="color:${qualityColor};font-size:1.6rem;">⚔️</span></div>`;
@@ -3362,7 +3362,7 @@
                 return `
                     <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-left:4px solid ${isExchange ? '#f97316' : qualityColor};border-radius:8px;padding:10px;margin-bottom:8px;display:flex;gap:10px;align-items:flex-start;transition:all 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.07)'" onmouseout="this.style.background='rgba(255,255,255,0.04)'">
                         ${imageHtml}
-                        <div style="flex:1;min-width:0;padding-left:10px;">
+                        <div style="flex:1;min-width:0;padding-left:15px;">
                             <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;flex-wrap:wrap;">
                                 <span style="color:${qualityColor};font-size:0.8rem;font-weight:700;">#${auction.id}</span>
                                 <span style="color:white;font-size:0.8rem;font-weight:600;">${quality}·${profession}</span>
@@ -3388,7 +3388,7 @@
                         </div>
                         <div style="flex-shrink:0;text-align:right;min-width:70px;">
                             ${timeHtml}
-                            <div style="color:#ffd700;font-size:1.2rem;font-weight:700;margin:3px 0;">${isExchange ? '🔄' : '💰'}${currentBid}</div>
+                            <div style="color:#ffd700;font-size:1.2rem;font-weight:700;margin:8px 0 3px 0;">${isExchange ? '' : '💰'}${currentBid}</div>
                             ${bidderHtml}
                         </div>
                     </div>
@@ -3481,7 +3481,7 @@
                 ${imageHtml}
                 ${isExchange ? `
                     <div style="background:rgba(255,152,0,0.1);border:1px solid rgba(255,152,0,0.3);border-radius:6px;padding:8px;margin-bottom:10px;">
-                        <div style="color:#fbbf24;font-size:0.85rem;font-weight:500;margin-bottom:3px;">🔄 支持交换</div>
+                        <div style="color:#fbbf24;font-size:0.85rem;font-weight:500;margin-bottom:3px;">支持交换</div>
                         ${exchangeWant ? `<div style="color:rgba(255,255,255,0.7);font-size:0.8rem;">想要: ${exchangeWant}</div>` : ''}
                     </div>
                 ` : ''}
