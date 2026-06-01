@@ -3036,8 +3036,8 @@
                 if (ignoreIce > 0) attrsHtml += `<span style="background:rgba(96,165,250,0.15);color:#93c5fd;padding:1px 5px;border-radius:3px;font-size:0.65rem;">无视冰甲+${ignoreIce}</span>`;
 
                 const imageHtml = auction.image
-                    ? `<div style="position:relative;width:75px;height:75px;flex-shrink:0;" onmouseover="showAuctionImagePreview(this,'${auction.id}')" onmouseout="hideAuctionImagePreview()"><img src="${auction.image}" style="width:75px;height:75px;object-fit:cover;border-radius:8px;border:2px solid ${qualityColor};" onerror="this.style.display='none'"></div>`
-                    : `<div style="width:75px;height:75px;background:rgba(255,255,255,0.05);border-radius:8px;border:2px solid ${qualityColor};display:flex;align-items:center;justify-content:center;flex-shrink:0;"><span style="color:${qualityColor};font-size:1.4rem;">⚔️</span></div>`;
+                    ? `<div style="position:relative;width:95px;height:95px;flex-shrink:0;" onmouseover="showAuctionImagePreview(this,'${auction.id}')" onmouseout="hideAuctionImagePreview()"><img src="${auction.image}" style="width:95px;height:95px;object-fit:cover;border-radius:8px;border:2px solid ${qualityColor};" onerror="this.style.display='none'"></div>`
+                    : `<div style="width:95px;height:95px;background:rgba(255,255,255,0.05);border-radius:8px;border:2px solid ${qualityColor};display:flex;align-items:center;justify-content:center;flex-shrink:0;"><span style="color:${qualityColor};font-size:1.6rem;">⚔️</span></div>`;
 
                 let bidderHtml = '';
                 if (currentBidder) {
@@ -3053,12 +3053,12 @@
                             <div style="display:flex;flex-direction:column;gap:4px;min-width:0;">
                                 ${!isEnded
                                     ? `<div style="display:flex;gap:3px;margin-bottom:2px;">
-                                        <button onclick="event.stopPropagation();document.getElementById('quickBidInput_${auction.id}').value=10" style="padding:2px 6px;border-radius:4px;border:none;background:rgba(255,215,0,0.2);color:#ffd700;cursor:pointer;font-size:0.65rem;">10</button>
-                                        <button onclick="event.stopPropagation();document.getElementById('quickBidInput_${auction.id}').value=20" style="padding:2px 6px;border-radius:4px;border:none;background:rgba(255,215,0,0.2);color:#ffd700;cursor:pointer;font-size:0.65rem;">20</button>
-                                        <button onclick="event.stopPropagation();document.getElementById('quickBidInput_${auction.id}').value=50" style="padding:2px 6px;border-radius:4px;border:none;background:rgba(255,215,0,0.2);color:#ffd700;cursor:pointer;font-size:0.65rem;">50</button>
+                                        <button onclick="event.stopPropagation();quickBid('${auction.id}',10)" style="padding:2px 8px;border-radius:4px;border:none;background:linear-gradient(135deg,#ffd700,#ff6b6b);color:#1a1a2e;cursor:pointer;font-weight:600;font-size:0.7rem;">+10</button>
+                                        <button onclick="event.stopPropagation();quickBid('${auction.id}',20)" style="padding:2px 8px;border-radius:4px;border:none;background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#1a1a2e;cursor:pointer;font-weight:600;font-size:0.7rem;">+20</button>
+                                        <button onclick="event.stopPropagation();quickBid('${auction.id}',50)" style="padding:2px 8px;border-radius:4px;border:none;background:linear-gradient(135deg,#fb923c,#ea580c);color:#1a1a2e;cursor:pointer;font-weight:600;font-size:0.7rem;">+50</button>
                                     </div>
                                     <div style="display:flex;align-items:center;gap:4px;">
-                                        <input type="number" id="quickBidInput_${auction.id}" placeholder="加价≥50" min="51" style="flex:1;padding:4px 8px;border-radius:4px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.4);color:white;font-size:0.75rem;outline:none;min-width:0;">
+                                        <input type="number" id="quickBidInput_${auction.id}" placeholder="加价>50" min="51" style="flex:1;padding:4px 8px;border-radius:4px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.4);color:white;font-size:0.75rem;outline:none;min-width:0;">
                                         <button onclick="event.stopPropagation();customQuickBid('${auction.id}')" style="padding:4px 10px;border-radius:4px;border:none;background:linear-gradient(135deg,#ffd700,#ff6b6b);color:#1a1a2e;cursor:pointer;font-weight:600;font-size:0.75rem;white-space:nowrap;">出价</button>
                                     </div>`
                                     : `<span style="padding:3px 8px;border-radius:5px;background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.3);font-size:0.7rem;">已结束</span>`
@@ -3187,12 +3187,12 @@
                     <div style="text-align:center;margin-bottom:10px;">
                         <div style="color:rgba(255,255,255,0.5);font-size:0.8rem;margin-bottom:8px;">出价金额</div>
                         <div style="display:flex;justify-content:center;gap:6px;margin-bottom:8px;flex-wrap:wrap;">
-                            <button onclick="document.getElementById('detailBidInput').value=10" style="padding:6px 14px;border-radius:6px;border:none;background:rgba(255,215,0,0.2);color:#ffd700;cursor:pointer;font-size:0.8rem;">+10</button>
-                            <button onclick="document.getElementById('detailBidInput').value=20" style="padding:6px 14px;border-radius:6px;border:none;background:rgba(255,215,0,0.2);color:#ffd700;cursor:pointer;font-size:0.8rem;">+20</button>
-                            <button onclick="document.getElementById('detailBidInput').value=50" style="padding:6px 14px;border-radius:6px;border:none;background:rgba(255,215,0,0.2);color:#ffd700;cursor:pointer;font-size:0.8rem;">+50</button>
+                            <button onclick="placeBid('${auction.id}',10)" style="padding:8px 20px;border-radius:8px;border:none;background:linear-gradient(135deg,#ffd700,#ff6b6b);color:#1a1a2e;cursor:pointer;font-weight:600;font-size:0.9rem;">+10</button>
+                            <button onclick="placeBid('${auction.id}',20)" style="padding:8px 20px;border-radius:8px;border:none;background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#1a1a2e;cursor:pointer;font-weight:600;font-size:0.9rem;">+20</button>
+                            <button onclick="placeBid('${auction.id}',50)" style="padding:8px 20px;border-radius:8px;border:none;background:linear-gradient(135deg,#fb923c,#ea580c);color:#1a1a2e;cursor:pointer;font-weight:600;font-size:0.9rem;">+50</button>
                         </div>
                         <div style="display:flex;justify-content:center;align-items:center;gap:8px;">
-                            <input type="number" id="detailBidInput" placeholder="自定义加价≥50" min="51" style="width:180px;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.4);color:white;font-size:0.95rem;outline:none;">
+                            <input type="number" id="detailBidInput" placeholder="自定义加价>50" min="51" style="width:180px;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.4);color:white;font-size:0.95rem;outline:none;">
                             <button onclick="customPlaceBid('${auction.id}')" style="padding:8px 22px;border-radius:8px;border:none;background:linear-gradient(135deg,#ffd700,#ff6b6b);color:#1a1a2e;cursor:pointer;font-weight:600;font-size:0.9rem;">确认出价</button>
                         </div>
                         <div style="color:rgba(255,215,0,0.6);font-size:0.75rem;margin-top:6px;">当前最高: ${currentBid} | 自定义需>50</div>
@@ -11919,8 +11919,8 @@ function hasGistToken() {
                     <div class="admin-menu-item" onclick="adminOpenChatRoom()">
                         <span style="font-size:1.3rem;">💬</span>
                         <div>
-                            <div style="color:#ffd700;font-weight:500;">聊天室（测试中）</div>
-                            <div style="color:rgba(255,255,255,0.4);font-size:0.8rem;">进入聊天室与拍卖</div>
+                            <div style="color:#ffd700;font-weight:500;">拍卖行</div>
+                            <div style="color:rgba(255,255,255,0.4);font-size:0.8rem;">进入拍卖行拍卖</div>
                         </div>
                     </div>
                 </div>
@@ -12079,12 +12079,12 @@ function hasGistToken() {
 
     <!-- 消息墙开关按钮 -->
     <button id="messageWallToggle" onclick="toggleMessageWall()" title="需求墙" style="position:fixed;top:60px;left:20px;background:rgba(255,215,0,0.85);color:#1a1a2e;border:none;width:38px;height:38px;border-radius:50%;cursor:pointer;font-size:1.1rem;box-shadow:0 2px 10px rgba(0,0,0,0.3);z-index:9985;display:flex;align-items:center;justify-content:center;">📢</button>
-    <button id="chatRoomToggle" onclick="openChatRoomEntry()" title="聊天室" style="position:fixed;top:105px;left:20px;background:rgba(78,205,196,0.85);color:#1a1a2e;border:none;width:38px;height:38px;border-radius:50%;cursor:pointer;font-size:1.1rem;box-shadow:0 2px 10px rgba(0,0,0,0.3);z-index:9985;display:none;align-items:center;justify-content:center;">💬</button>
+    <button id="chatRoomToggle" onclick="openChatRoomEntry()" title="拍卖行" style="position:fixed;top:105px;left:20px;background:rgba(78,205,196,0.85);color:#1a1a2e;border:none;width:38px;height:38px;border-radius:50%;cursor:pointer;font-size:1.1rem;box-shadow:0 2px 10px rgba(0,0,0,0.3);z-index:9985;display:none;align-items:center;justify-content:center;">🏪</button>
 
-    <!-- 聊天室入口弹窗 -->
+    <!-- 拍卖行入口弹窗 -->
     <div id="chatRoomEntryModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9998;align-items:center;justify-content:center;">
         <div style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);border:2px solid rgba(78,205,196,0.4);border-radius:16px;padding:30px;width:90%;max-width:400px;box-shadow:0 10px 50px rgba(0,0,0,0.6);">
-            <h2 style="color:#4ecdc4;text-align:center;margin:0 0 20px 0;">💬 进入聊天室</h2>
+            <h2 style="color:#4ecdc4;text-align:center;margin:0 0 20px 0;">🏪 进入拍卖行</h2>
             <label style="color:rgba(255,255,255,0.8);display:block;margin-bottom:5px;font-size:0.9rem;">房间ID</label>
             <input type="text" id="chatRoomIdInput" placeholder="输入房间ID（相同ID进入同一房间）" style="width:100%;padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:white;font-size:0.9rem;margin-bottom:15px;outline:none;box-sizing:border-box;">
             <label style="color:rgba(255,255,255,0.8);display:block;margin-bottom:5px;font-size:0.9rem;">昵称</label>
@@ -12096,10 +12096,10 @@ function hasGistToken() {
         </div>
     </div>
 
-    <!-- 聊天室主面板 -->
+    <!-- 拍卖行主面板 -->
     <div id="chatRoomPanel" style="position:fixed;top:50px;left:20px;width:440px;height:560px;background:rgba(26,26,46,0.95);border:1px solid rgba(78,205,196,0.3);border-radius:12px;z-index:9980;box-shadow:0 4px 20px rgba(0,0,0,0.5);backdrop-filter:blur(10px);flex-direction:column;min-width:350px;min-height:400px;display:none;">
         <div id="chatRoomHeader" style="background:linear-gradient(135deg,rgba(78,205,196,0.2),rgba(44,160,141,0.2));padding:10px 15px;display:flex;justify-content:space-between;align-items:center;cursor:move;user-select:none;" onmousedown="startPanelDrag(event,'chatRoomPanel')" ontouchstart="startPanelTouch(event,'chatRoomPanel')">
-            <span style="color:#4ecdc4;font-size:0.9rem;font-weight:bold;">💬 聊天室 <span id="chatRoomIdDisplay" style="color:rgba(255,255,255,0.5);font-size:0.75rem;"></span></span>
+            <span style="color:#4ecdc4;font-size:0.9rem;font-weight:bold;">🏪 拍卖行 <span id="chatRoomIdDisplay" style="color:rgba(255,255,255,0.5);font-size:0.75rem;"></span></span>
             <div style="display:flex;gap:10px;">
                 <button onclick="toggleChatRoomTab('auctions')" title="拍卖" style="background:transparent;border:none;color:#ffd700;font-size:1.4rem;cursor:pointer;padding:0;text-shadow:0 0 8px rgba(255,215,0,0.6);">🔨</button>
                 <button onclick="closeChatRoom()" title="关闭" style="background:transparent;border:none;color:#ff6b6b;font-size:1rem;cursor:pointer;padding:0;">×</button>
