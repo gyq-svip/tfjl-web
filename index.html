@@ -2174,8 +2174,8 @@
             <div id="passwordError" class="password-error" style="display: none;"></div>
             <input type="password" id="passwordInput" placeholder="请输入密码..." onkeypress="if(event.key==='Enter')checkPasswordAndEnter()">
             <br><br>
-            <button onclick="checkPassword()" style="width:100%;padding:12px;border-radius:8px;border:none;background:linear-gradient(135deg,#4ecdc4,#44a08d);color:white;cursor:pointer;font-size:0.95rem;font-weight:600;">🔓 验证密码</button>
-            <div id="loginActions" style="margin-top:0;">
+            
+            <div id="loginActions">
                 <p style="color:rgba(255,255,255,0.8);font-size:0.9rem;margin:0 0 12px 0;text-align:center;">选择进入系统</p>
                 <button onclick="checkPasswordAndEnter('archive')" style="width:100%;padding:12px;margin-bottom:10px;border-radius:8px;border:none;background:linear-gradient(135deg,#4ecdc4,#44a08d);color:white;cursor:pointer;font-size:0.95rem;font-weight:600;">📋 进入归档系统</button>
                 <button onclick="checkPasswordAndEnter('auction')" style="width:100%;padding:12px;border-radius:8px;border:none;background:linear-gradient(135deg,#f97316,#ea580c);color:white;cursor:pointer;font-size:0.95rem;font-weight:600;">🏪 进入拍卖系统</button>
@@ -2676,8 +2676,35 @@
             const input = document.getElementById('passwordInput');
             const errorDiv = document.getElementById('passwordError');
             const password = input.value.trim();
+            
+            const MAX_ERRORS = 5;
+            const LOCK_DURATION = 30;
+            let errorCount = parseInt(localStorage.getItem('TFJL_PasswordErrorCount') || '0');
+            let lockStartTime = parseInt(localStorage.getItem('TFJL_PasswordLockStart') || '0');
+            let currentTime = Date.now();
+            
+            if (lockStartTime > 0) {
+                const elapsedSeconds = Math.floor((currentTime - lockStartTime) / 1000);
+                const remainingSeconds = LOCK_DURATION - elapsedSeconds;
+                
+                if (remainingSeconds > 0) {
+                    errorDiv.textContent = `⏰ 密码错误次数过多，请 ${remainingSeconds} 秒后再试`;
+                    errorDiv.style.display = 'block';
+                    input.value = '';
+                    return;
+                } else {
+                    localStorage.setItem('TFJL_PasswordErrorCount', '0');
+                    localStorage.setItem('TFJL_PasswordLockStart', '0');
+                    errorCount = 0;
+                    lockStartTime = 0;
+                }
+            }
 
             if (getAdminPasswords().includes(password)) {
+                // 密码正确，清除错误计数
+                localStorage.setItem('TFJL_PasswordErrorCount', '0');
+                localStorage.setItem('TFJL_PasswordLockStart', '0');
+                
                 // 记录登录
                 recordLogin();
                 localStorage.setItem('TFJL_LoggedIn', 'true');
@@ -2691,7 +2718,15 @@
                 }
             } else {
                 // 密码错误
-                errorDiv.textContent = '❌ 密码错误，请重试';
+                errorCount++;
+                localStorage.setItem('TFJL_PasswordErrorCount', errorCount.toString());
+                
+                if (errorCount >= MAX_ERRORS) {
+                    localStorage.setItem('TFJL_PasswordLockStart', currentTime.toString());
+                    errorDiv.textContent = `❌ 密码错误已达 ${errorCount} 次，请 ${LOCK_DURATION} 秒后再试`;
+                } else {
+                    errorDiv.textContent = `❌ 密码错误，还可以尝试 ${MAX_ERRORS - errorCount} 次`;
+                }
                 errorDiv.style.display = 'block';
                 input.value = '';
                 input.focus();
@@ -2762,9 +2797,9 @@
         <div class="sticky-buttons" style="position:fixed;top:12px;right:12px;z-index:9999;display:flex;gap:5px;">
             <!-- 版本切换按钮（动态显示） -->
             <button id="versionSwitchBtn" onclick="handleVersionSwitch()" style="display:none;background:rgba(0,188,212,0.8);color:white;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 1px 6px rgba(0,0,0,0.15);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;">🌐</button>
-            <button onclick="saveCurrentProject()" title="保存" style="background:rgba(76,175,80,0.8);color:white;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 1px 6px rgba(0,0,0,0.15);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;">💾</button>
+            <button onclick="saveCurrentProject()" title="保存" style="background:rgba(76,175,80,0.8);color:white;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 1px 6px rgba(0,0,0,0.15);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;">☰</button>
             <div style="position:relative;">
-                <button onclick="toggleBackupMenu(this)" title="菜单" style="background:rgba(255,87,34,0.8);color:white;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 1px 6px rgba(0,0,0,0.15);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;">≡</button>
+                <button onclick="toggleBackupMenu(this)" title="菜单" style="background:rgba(255,87,34,0.8);color:white;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 1px 6px rgba(0,0,0,0.15);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;">☰</button>
                 <div id="backupMenu" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:rgba(42,42,74,0.95);border:1px solid rgba(255,215,0,0.3);border-radius:8px;padding:8px 0;min-width:180px;z-index:1000;box-shadow:0 4px 15px rgba(0,0,0,0.4);backdrop-filter:blur(8px);">
                     <div style="padding:6px 15px;color:#ffd700;font-size:0.85rem;font-weight:bold;border-bottom:1px solid rgba(255,255,255,0.1);margin-bottom:5px;">📋 全部数据</div>
                     <div onclick="exportAllData();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📤 全部备份</div>
@@ -2774,16 +2809,16 @@
                     <div onclick="exportCurrentProject();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📤 备份此项目</div>
                     <div onclick="importSingleProject();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📥 恢复项目</div>
                     
-                    <div style="padding:6px 15px;color:#667eea;font-size:0.85rem;font-weight:bold;border-bottom:1px solid rgba(255,255,255,0.1);border-top:1px solid rgba(255,255,255,0.1);margin:5px 0;">📦 离线版本</div>
+                    
                     <div onclick="downloadOfflineVersion();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📥 下载离线版</div>
                     
-                    <div style="padding:6px 15px;color:#2196f3;font-size:0.85rem;font-weight:bold;border-bottom:1px solid rgba(255,255,255,0.1);border-top:1px solid rgba(255,255,255,0.1);margin:5px 0;">❓ 帮助</div>
+                    
                     <div onclick="showHelpModal();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📖 使用帮助</div>
                     
-                    <div style="padding:6px 15px;color:#f97316;font-size:0.85rem;font-weight:bold;border-bottom:1px solid rgba(255,255,255,0.1);border-top:1px solid rgba(255,255,255,0.1);margin:5px 0;">🏪 系统切换</div>
+                    
                     <div onclick="openChatRoomEntry();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">🏪 进入拍卖系统</div>
                     
-                    <div style="padding:6px 15px;color:#ff6b6b;font-size:0.85rem;font-weight:bold;border-bottom:1px solid rgba(255,255,255,0.1);border-top:1px solid rgba(255,255,255,0.1);margin:5px 0;">⚠️ 账户</div>
+                    
                     <div onclick="logoutToLogin();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#ff6b6b;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,107,107,0.1)'" onmouseout="this.style.background='transparent'">🔙 退出登录</div>
                 </div>
             </div>
@@ -3314,7 +3349,7 @@
 
                 let exchangeBadgeHtml = '';
                 if (isExchange) {
-                    exchangeBadgeHtml = `<span style="background:linear-gradient(135deg,#f97316,#ea580c);color:white;padding:3px 10px;border-radius:6px;font-size:0.9rem;font-weight:bold;text-shadow:0 1px 2px rgba(0,0,0,0.3);box-shadow:0 2px 8px rgba(249,115,22,0.4);">🔄交换</span>`;
+                    exchangeBadgeHtml = `<span style="background:linear-gradient(135deg,#f97316,#ea580c);color:white;padding:2px 8px;border-radius:4px;font-size:0.7rem;font-weight:600;margin-left:6px;box-shadow:0 1px 3px rgba(249,115,22,0.3);">🔄支持交换</span>`;
                 }
 
                 const imageSize = 85;
@@ -3338,9 +3373,9 @@
                     <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-left:4px solid ${isExchange ? '#f97316' : qualityColor};border-radius:8px;padding:10px;margin-bottom:8px;display:flex;gap:10px;align-items:flex-start;transition:all 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.07)'" onmouseout="this.style.background='rgba(255,255,255,0.04)'">
                         ${imageHtml}
                         <div style="flex:1;min-width:0;padding-left:10px;">
-                            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap;">
-                                <span style="color:${qualityColor};font-size:0.85rem;font-weight:700;">#${auction.id}</span>
-                                <span style="color:white;font-size:0.85rem;font-weight:600;">${quality}·${profession}</span>
+                            <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;flex-wrap:wrap;">
+                                <span style="color:${qualityColor};font-size:0.8rem;font-weight:700;">#${auction.id}</span>
+                                <span style="color:white;font-size:0.8rem;font-weight:600;">${quality}·${profession}</span>
                                 ${exchangeBadgeHtml}
                             </div>
                             <div style="margin-bottom:4px;">${attrsHtml}</div>
@@ -7528,6 +7563,8 @@
                 'mage': '🔮 法师',
                 'archer': '🏹 射手',
                 'summoner': '🐉 召唤',
+                'priest': '⛪ 牧师',
+                'warlock': '😈 术士',
                 'panda': '🐼 熊猫',
                 'engineering': '🔧 工程',
                 'pokeball': '🔴 精灵球'
@@ -11876,7 +11913,12 @@ function hasGistToken() {
                 }
                 
                 const roomData = JSON.parse(content);
-                const room = roomData.rooms?.find(r => r.id === roomId);
+                let room = null;
+                if (Array.isArray(roomData)) {
+                    room = roomData.find(r => r.id === roomId);
+                } else {
+                    room = roomData.rooms?.find(r => r.id === roomId);
+                }
                 
                 if (!room || !room.auctions || room.auctions.length === 0) {
                     listContainer.innerHTML = '<div style="color:rgba(255,255,255,0.5);text-align:center;padding:10px;">该房间暂无商品</div>';
@@ -11953,7 +11995,12 @@ function hasGistToken() {
                 if (!content) throw new Error('数据不存在');
                 
                 const roomData = JSON.parse(content);
-                const room = roomData.rooms?.find(r => r.id === roomId);
+                let room = null;
+                if (Array.isArray(roomData)) {
+                    room = roomData.find(r => r.id === roomId);
+                } else {
+                    room = roomData.rooms?.find(r => r.id === roomId);
+                }
                 
                 if (!room) throw new Error('房间不存在');
                 
