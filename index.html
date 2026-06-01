@@ -2170,11 +2170,12 @@
     <div id="passwordOverlay" class="password-overlay">
         <div class="password-box">
             <h2>🔐 塔防阵容系统</h2>
-            <p style="color: rgba(255,255,255,0.7); margin-bottom: 20px;">请输入访问密码</p>
+            <p style="color: rgba(255,255,255,0.7); margin-bottom: 20px;">请选择进入方式</p>
             <div id="passwordError" class="password-error" style="display: none;"></div>
             <input type="password" id="passwordInput" placeholder="请输入密码..." onkeypress="if(event.key==='Enter')checkPassword()">
             <br><br>
             <button onclick="checkPassword()">进入系统</button>
+            <button onclick="directEnterAuction()" style="background:linear-gradient(135deg,#2196f3,#1565c0);margin-top:10px;">🏪 直接进入拍卖行</button>
         </div>
     </div>
 
@@ -2591,6 +2592,24 @@
             }
         }
 
+        function directEnterAuction() {
+            // 记录登录
+            recordLogin();
+            
+            // 隐藏验证层并显示主内容
+            document.getElementById('passwordOverlay').style.display = 'none';
+            document.getElementById('mainContent').classList.add('visible');
+            localStorage.setItem('TFJL_LoggedIn', 'true');
+            
+            // 设置仅显示拍卖行模式
+            localStorage.setItem('TFJL_AuctionOnlyMode', 'true');
+            
+            // 直接打开拍卖行进入界面
+            setTimeout(() => {
+                openChatRoomEntry();
+            }, 300);
+        }
+
         function updateProjectList1() {
             const cat = document.getElementById('categorySelector1').value;
             const sel = document.getElementById('projectSelector1');
@@ -2843,6 +2862,7 @@
             localStorage.setItem('TFJL_ChatRoom', roomId);
 
             closeChatRoomEntry();
+            loadChatRoomSize(); // 加载保存的窗口尺寸
             document.getElementById('chatRoomPanel').style.display = 'flex';
             document.getElementById('chatRoomIdDisplay').textContent = '#' + roomId;
 
@@ -2858,6 +2878,44 @@
             if (chatRefreshInterval) clearInterval(chatRefreshInterval);
             if (auctionCounterInterval) clearInterval(auctionCounterInterval);
             currentChatRoom = null;
+        }
+
+        function resizeChatRoom(deltaWidth, deltaHeight) {
+            const panel = document.getElementById('chatRoomPanel');
+            const currentWidth = panel.offsetWidth;
+            const currentHeight = panel.offsetHeight;
+            
+            // 最小尺寸限制
+            const newWidth = Math.max(320, Math.min(800, currentWidth + deltaWidth));
+            const newHeight = Math.max(400, Math.min(700, currentHeight + deltaHeight));
+            
+            panel.style.width = newWidth + 'px';
+            panel.style.height = newHeight + 'px';
+            
+            // 保存到localStorage
+            localStorage.setItem('TFJL_ChatRoomWidth', newWidth);
+            localStorage.setItem('TFJL_ChatRoomHeight', newHeight);
+        }
+
+        function resetChatRoomSize() {
+            const panel = document.getElementById('chatRoomPanel');
+            panel.style.width = '420px';
+            panel.style.height = '520px';
+            
+            // 清除本地存储的尺寸
+            localStorage.removeItem('TFJL_ChatRoomWidth');
+            localStorage.removeItem('TFJL_ChatRoomHeight');
+        }
+
+        function loadChatRoomSize() {
+            const savedWidth = localStorage.getItem('TFJL_ChatRoomWidth');
+            const savedHeight = localStorage.getItem('TFJL_ChatRoomHeight');
+            
+            if (savedWidth && savedHeight) {
+                const panel = document.getElementById('chatRoomPanel');
+                panel.style.width = savedWidth + 'px';
+                panel.style.height = savedHeight + 'px';
+            }
         }
 
         function switchChatRoom() {
@@ -9376,6 +9434,14 @@ function hasGistToken() {
             if (localStorage.getItem('TFJL_LoggedIn') === 'true') {
                 document.getElementById('passwordOverlay').style.display = 'none';
                 document.getElementById('mainContent').classList.add('visible');
+                
+                // 检查是否是纯拍卖模式，如果是则自动打开拍卖行
+                if (localStorage.getItem('TFJL_AuctionOnlyMode') === 'true') {
+                    // 延迟打开，确保DOM加载完成
+                    setTimeout(() => {
+                        openChatRoomEntry();
+                    }, 300);
+                }
             }
             
             // 更新底部统计栏显示
@@ -12122,6 +12188,25 @@ function hasGistToken() {
             hideAdminStatus();
         }
 
+        function logoutToLogin() {
+            if (!confirm('确定要退出登录吗？')) return;
+            
+            // 清除登录状态
+            localStorage.removeItem('TFJL_LoggedIn');
+            localStorage.removeItem('TFJL_AuctionOnlyMode');
+            
+            // 隐藏主内容，显示登录界面
+            document.getElementById('mainContent').classList.remove('visible');
+            document.getElementById('passwordOverlay').style.display = 'flex';
+            
+            // 关闭管理员面板
+            closeAdminPanel();
+            
+            // 关闭拍卖行面板
+            document.getElementById('chatRoomPanel').style.display = 'none';
+            document.getElementById('chatRoomEntryOverlay').style.display = 'none';
+        }
+
         function verifyAdmin() {
             const code = document.getElementById('adminVerifyCode').value.trim();
             if (code === ADMIN_VERIFY_CODE) {
@@ -12761,6 +12846,13 @@ function hasGistToken() {
                             <div style="color:rgba(255,255,255,0.4);font-size:0.8rem;">下架违规或错误商品</div>
                         </div>
                     </div>
+                    <div class="admin-menu-item" onclick="logoutToLogin()">
+                        <span style="font-size:1.3rem;">🔙</span>
+                        <div>
+                            <div style="color:#ffd700;font-weight:500;">退出登录</div>
+                            <div style="color:rgba(255,255,255,0.4);font-size:0.8rem;">回到登录界面</div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -13048,6 +13140,11 @@ function hasGistToken() {
         <div id="chatRoomHeader" style="background:linear-gradient(135deg,rgba(78,205,196,0.2),rgba(44,160,141,0.2));padding:10px 15px;display:flex;justify-content:space-between;align-items:center;cursor:move;user-select:none;" onmousedown="startPanelDrag(event,'chatRoomPanel')" ontouchstart="startPanelTouch(event,'chatRoomPanel')">
             <span style="color:#4ecdc4;font-size:0.9rem;font-weight:bold;">🏪 拍卖行 <span id="chatRoomIdDisplay" style="color:rgba(255,255,255,0.5);font-size:0.75rem;"></span></span>
             <div style="display:flex;gap:8px;align-items:center;">
+                <div style="display:flex;gap:4px;align-items:center;">
+                    <button onclick="resizeChatRoom(-50,-50)" title="缩小" style="background:transparent;border:none;color:#fbbf24;font-size:1.1rem;cursor:pointer;padding:2px;line-height:1;">−</button>
+                    <button onclick="resizeChatRoom(50,50)" title="放大" style="background:transparent;border:none;color:#fbbf24;font-size:1.1rem;cursor:pointer;padding:2px;line-height:1;">+</button>
+                    <button onclick="resetChatRoomSize()" title="重置大小" style="background:transparent;border:none;color:#4ecdc4;font-size:1rem;cursor:pointer;padding:2px;line-height:1;">⟲</button>
+                </div>
                 <button onclick="switchChatRoom()" title="切换房间" style="background:transparent;border:none;color:#fbbf24;font-size:0.85rem;cursor:pointer;padding:4px 8px;border:1px solid rgba(255,215,0,0.3);border-radius:4px;transition:all 0.2s;" onmouseover="this.style.background='rgba(255,215,0,0.2)'" onmouseout="this.style.background='transparent'">切换房间</button>
                 <button onclick="toggleChatRoomTab('auctions')" title="拍卖" style="background:transparent;border:none;color:#ffd700;font-size:1.4rem;cursor:pointer;padding:0;text-shadow:0 0 8px rgba(255,215,0,0.6);">🔨</button>
                 <button onclick="closeChatRoom()" title="关闭" style="background:transparent;border:none;color:#ff6b6b;font-size:1rem;cursor:pointer;padding:0;">×</button>
