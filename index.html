@@ -3004,12 +3004,6 @@
             const nick = document.getElementById('chatRoomNickInput').value.trim();
             if (!roomId) { alert('请输入拍卖会ID'); return; }
             if (!nick) { alert('请输入昵称'); return; }
-            
-            // 检查拍卖行ID是否存在（权限控制）
-            if (!isValidRoom(roomId)) {
-                alert('❌ 该拍卖会ID不存在或未开通\n请联系管理员获取有效的拍卖会ID');
-                return;
-            }
 
             currentChatRoom = roomId;
             currentChatNick = nick;
