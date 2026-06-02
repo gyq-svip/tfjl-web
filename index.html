@@ -3374,8 +3374,10 @@
             if (!token) return;
             
             try {
-                // 动态获取索引文件 URL
-                const indexUrl = await getIndexGistUrl();
+                // 使用固定的索引文件 URL
+                const indexUrl = `https://api.github.com/gists/${GIST_ID}`;
+                
+                console.log(`📝 更新索引文件: ${roomId} = ${gistId}`);
                 
                 // 先获取现有的索引文件
                 let indexData = {};
@@ -3391,24 +3393,27 @@
                     if (data.files && data.files['room_index.json'] && data.files['room_index.json'].content) {
                         try {
                             indexData = JSON.parse(data.files['room_index.json'].content);
+                            console.log(`📖 当前索引内容:`, indexData);
                         } catch (e) {
                             indexData = {};
                         }
                     }
-                } else if (response.status === 404 || response.status === 403) {
-                    // 索引文件不存在或无权限，清除缓存，创建新的
-                    console.log(`⚠️ 索引文件 ${response.status}，创建新的`);
-                    localStorage.removeItem(INDEX_GIST_ID_KEY);
+                } else {
+                    console.error(`❌ 获取索引文件失败: ${response.status}`);
+                    return; // 不创建新索引文件，直接返回
+                }
+                
+                // 检查是否已存在相同的 Gist ID
+                if (indexData[roomId] === gistId) {
+                    console.log(`✅ 索引已存在，无需更新`);
+                    return;
                 }
                 
                 // 更新索引
                 indexData[roomId] = gistId;
                 
-                // 获取最新的索引文件 URL（可能已更新）
-                const latestIndexUrl = await getIndexGistUrl();
-                
                 // 保存索引文件
-                const patchResponse = await fetch(latestIndexUrl, {
+                const patchResponse = await fetch(indexUrl, {
                     method: 'PATCH',
                     headers: {
                         'Accept': 'application/vnd.github.v3+json',
@@ -3426,41 +3431,14 @@
                 
                 if (patchResponse.ok) {
                     console.log(`✅ 索引已更新: ${roomId} = ${gistId}`);
-                    return;
-                }
-                
-                // 如果 PATCH 失败（404 或 403），创建新的索引文件
-                if (patchResponse.status === 404 || patchResponse.status === 403) {
-                    console.log(`⚠️ PATCH 失败 (${patchResponse.status})，创建新索引文件`);
-                    localStorage.removeItem(INDEX_GIST_ID_KEY);
-                    
-                    const createResponse = await fetch('https://api.github.com/gists', {
-                        method: 'POST',
-                        headers: {
-                            'Accept': 'application/vnd.github.v3+json',
-                            'Content-Type': 'application/json',
-                            'Authorization': `token ${token}`
-                        },
-                        body: JSON.stringify({
-                            description: '房间索引文件',
-                            public: false,
-                            files: {
-                                'room_index.json': {
-                                    content: JSON.stringify(indexData, null, 2)
-                                }
-                            }
-                        })
-                    });
-                    
-                    if (createResponse.ok) {
-                        const data = await createResponse.json();
-                        // 保存新的索引文件 ID
-                        localStorage.setItem(INDEX_GIST_ID_KEY, data.id);
-                        console.log('✅ 已创建新的索引文件:', data.id);
-                    }
+                    // 更新 localStorage 缓存
+                    localStorage.setItem(INDEX_GIST_ID_KEY, GIST_ID);
+                } else {
+                    const errData = await patchResponse.json().catch(() => ({}));
+                    console.error(`❌ 更新索引失败: ${patchResponse.status}`, errData);
                 }
             } catch (error) {
-                console.warn('更新房间索引失败:', error);
+                console.error('更新房间索引失败:', error);
             }
         }
 
@@ -3470,13 +3448,17 @@
                 const roomId = currentChatRoom || 'default';
                 const filename = `chatrooms_${roomId}.json`;
                 
+                console.log(`🔄 加载房间数据: ${roomId}`);
+                
                 // 优先从 localStorage 获取该房间的 GIST_ID
                 let roomGistId = localStorage.getItem(`chatroom_gist_${roomId}`);
                 
                 // 如果 localStorage 没有，尝试从索引文件获取
                 if (!roomGistId) {
+                    console.log(`📖 本地无缓存，从索引文件获取...`);
                     try {
-                        const indexUrl = await getIndexGistUrl();
+                        // 使用固定的索引文件 URL
+                        const indexUrl = `https://api.github.com/gists/${GIST_ID}`;
                         const indexResponse = await fetch(indexUrl, {
                             headers: {
                                 'Accept': 'application/vnd.github.v3+json',
@@ -3489,19 +3471,27 @@
                             if (data.files && data.files['room_index.json'] && data.files['room_index.json'].content) {
                                 try {
                                     const indexData = JSON.parse(data.files['room_index.json'].content);
+                                    console.log(`📖 索引文件内容:`, indexData);
                                     if (indexData[roomId]) {
                                         roomGistId = indexData[roomId];
+                                        console.log(`✅ 从索引获取到房间 Gist ID: ${roomGistId}`);
                                         // 缓存到 localStorage
                                         localStorage.setItem(`chatroom_gist_${roomId}`, roomGistId);
+                                    } else {
+                                        console.log(`⚠️ 索引中未找到房间 ${roomId}`);
                                     }
                                 } catch (e) {
                                     console.warn('解析索引文件失败');
                                 }
                             }
+                        } else {
+                            console.error(`❌ 获取索引文件失败: ${indexResponse.status}`);
                         }
                     } catch (e) {
                         console.warn('获取索引文件失败:', e);
                     }
+                } else {
+                    console.log(`📖 使用本地缓存的 Gist ID: ${roomGistId}`);
                 }
                 
                 if (roomGistId) {
@@ -3536,6 +3526,7 @@
                                         chatRoomData.rooms[roomId] = { messages: [], auctions: [], nextAuctionId: 1 };
                                     }
                                     
+                                    console.log(`✅ 房间数据加载成功`);
                                     return;
                                 } catch (e) {
                                     console.warn('解析房间数据失败，使用默认值');
@@ -3551,13 +3542,14 @@
                 }
                 
                 // 如果没有找到房间数据，创建新的
+                console.log(`📝 创建新的房间配置文件...`);
                 chatRoomData = { rooms: {} };
                 if (token) {
                     try {
                         const newGistId = await saveChatRoomData();
                         // 更新索引文件
                         await updateRoomIndex(roomId, newGistId);
-                        console.log('已自动创建房间配置文件');
+                        console.log('✅ 已自动创建房间配置文件');
                     } catch (saveError) {
                         console.warn('自动创建房间配置文件失败:', saveError);
                     }
@@ -3588,7 +3580,34 @@
             }
 
             // 从 localStorage 获取该房间的 GIST_ID
-            const chatroomGistId = localStorage.getItem(`chatroom_gist_${roomId}`);
+            let chatroomGistId = localStorage.getItem(`chatroom_gist_${roomId}`);
+            
+            // 如果本地没有，先从索引文件获取（可能是其他设备创建的）
+            if (!chatroomGistId) {
+                try {
+                    const indexUrl = `https://api.github.com/gists/${GIST_ID}`;
+                    const indexResponse = await fetch(indexUrl, {
+                        headers: {
+                            'Accept': 'application/vnd.github.v3+json',
+                            'Authorization': `token ${token}`
+                        }
+                    });
+                    
+                    if (indexResponse.ok) {
+                        const data = await indexResponse.json();
+                        if (data.files && data.files['room_index.json'] && data.files['room_index.json'].content) {
+                            const indexData = JSON.parse(data.files['room_index.json'].content);
+                            if (indexData[roomId]) {
+                                chatroomGistId = indexData[roomId];
+                                console.log(`📖 从索引获取到已存在的房间 Gist ID: ${chatroomGistId}`);
+                                localStorage.setItem(`chatroom_gist_${roomId}`, chatroomGistId);
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.warn('获取索引文件失败:', e);
+                }
+            }
             
             if (chatroomGistId) {
                 try {
@@ -3617,45 +3636,51 @@
                     if (patchResponse.status === 404 || patchResponse.status === 403) {
                         console.log(`⚠️ PATCH 失败 (${patchResponse.status})，清除缓存重新创建`);
                         localStorage.removeItem(`chatroom_gist_${roomId}`);
+                        chatroomGistId = null;
                     }
                 } catch (e) {
                     console.warn('PATCH 失败，清除缓存重新创建');
                     localStorage.removeItem(`chatroom_gist_${roomId}`);
+                    chatroomGistId = null;
                 }
             }
             
-            // 如果不存在或 PATCH 失败，使用 POST 创建新的 Gist
-            const response = await fetch('https://api.github.com/gists', {
-                method: 'POST',
-                headers: {
-                    'Accept': 'application/vnd.github.v3+json',
-                    'Content-Type': 'application/json',
-                    'Authorization': `token ${token}`
-                },
-                body: JSON.stringify({
-                    description: `聊天室配置: ${roomId}`,
-                    public: false,
-                    files: {
-                        [filename]: {
-                            content: JSON.stringify(chatRoomData, null, 2)
+            // 只有确实没有已存在的 Gist 时，才创建新的
+            if (!chatroomGistId) {
+                const response = await fetch('https://api.github.com/gists', {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json',
+                        'Authorization': `token ${token}`
+                    },
+                    body: JSON.stringify({
+                        description: `聊天室配置: ${roomId}`,
+                        public: false,
+                        files: {
+                            [filename]: {
+                                content: JSON.stringify(chatRoomData, null, 2)
+                            }
                         }
-                    }
-                })
-            });
-            
-            if (!response.ok) {
-                const errData = await response.json().catch(() => ({}));
-                throw new Error(errData.message || '保存失败');
+                    })
+                });
+                
+                if (!response.ok) {
+                    const errData = await response.json().catch(() => ({}));
+                    throw new Error(errData.message || '保存失败');
+                }
+                
+                const data = await response.json();
+                // 保存 GIST_ID 到 localStorage
+                localStorage.setItem(`chatroom_gist_${roomId}`, data.id);
+                // 更新索引文件，让其他人也能找到这个房间
+                await updateRoomIndex(roomId, data.id);
+                console.log(`✅ 已创建房间 ${roomId} 的配置文件，GIST_ID: ${data.id}`);
+                
+                return data.id;
             }
             
-            const data = await response.json();
-            // 保存 GIST_ID 到 localStorage
-            localStorage.setItem(`chatroom_gist_${roomId}`, data.id);
-            // 更新索引文件，让其他人也能找到这个房间
-            await updateRoomIndex(roomId, data.id);
-            console.log(`✅ 已创建房间 ${roomId} 的配置文件，GIST_ID: ${data.id}`);
-            
-            return data.id;
+            throw new Error('保存失败');
         }
 
         function getRoomData() {
@@ -3957,7 +3982,7 @@
                 // 优先使用 imageGistId，兼容旧的 image 字段
                 const hasImage = auction.imageGistId || auction.image;
                 const imageHtml = hasImage
-                    ? `<div style="position:relative;width:${imageSize}px;height:${imageSize}px;flex-shrink:0;" onmouseover="showAuctionImagePreview(this,'${auctionId}')" onmouseout="hideAuctionImagePreview()"><img data-auction-id="${auctionId}" data-image-gist-id="${auction.imageGistId || ''}" src="" style="width:${imageSize}px;height:${imageSize}px;object-fit:cover;border-radius:8px;border:2px solid ${qualityColor};box-shadow:0 2px 8px rgba(0,0,0,0.3);" onerror="this.style.display='none'"></div>`
+                    ? `<div style="position:relative;width:${imageSize}px;height:${imageSize}px;flex-shrink:0;background:rgba(255,255,255,0.05);border-radius:8px;" onmouseover="showAuctionImagePreview(this,'${auctionId}')" onmouseout="hideAuctionImagePreview()"><img data-auction-id="${auctionId}" data-image-gist-id="${auction.imageGistId || ''}" src="" style="width:${imageSize}px;height:${imageSize}px;object-fit:cover;border-radius:8px;border:2px solid ${qualityColor};box-shadow:0 2px 8px rgba(0,0,0,0.3);display:none;" onload="this.style.display='block';this.parentElement.style.background='transparent';" onerror="console.warn('图片加载失败:', this.dataset.auctionId);this.style.display='none';"></div>`
                     : `<div style="width:${imageSize}px;height:${imageSize}px;background:rgba(255,255,255,0.05);border-radius:8px;border:2px solid ${qualityColor};display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,0.3);"><span style="color:${qualityColor};font-size:1.6rem;">⚔️</span></div>`;
 
                 let bidderHtml = '';
