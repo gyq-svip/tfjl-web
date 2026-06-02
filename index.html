@@ -9544,16 +9544,13 @@
         let newsItems = [];
         
 // 统计相关常量
+// ⚠️ 重要：这个 GIST_ID 是索引文件的固定 ID，所有设备必须使用同一个！
 const GIST_ID = '9efbcbe9a0cd65e36a7e4ff796992e56';
 const INDEX_GIST_ID_KEY = 'TFJL_Index_Gist_ID';
 const COUNTER_CACHE_KEY = 'TFJL_Counter_Cache';
 const COUNTER_CACHE_TIME_KEY = 'TFJL_Counter_Cache_Time';
 
-// 索引文件创建锁（防止并发创建）
-let indexGistCreating = false;
-let indexGistCreatePromise = null;
-
-// 获取索引文件的 Gist URL（动态获取，支持自动创建）
+// 获取索引文件的 Gist URL（使用固定 ID，不自动创建）
 async function getIndexGistUrl() {
     const token = getGistToken();
     
@@ -9564,12 +9561,7 @@ async function getIndexGistUrl() {
         return `https://api.github.com/gists/${indexGistId}`;
     }
     
-    // 如果正在创建，等待创建完成
-    if (indexGistCreating && indexGistCreatePromise) {
-        return await indexGistCreatePromise;
-    }
-    
-    // 尝试使用硬编码的 GIST_ID
+    // 使用硬编码的 GIST_ID（必须所有设备使用同一个！）
     if (GIST_ID && GIST_ID !== 'YOUR_GIST_ID_HERE') {
         const testUrl = `https://api.github.com/gists/${GIST_ID}`;
         const response = await fetch(testUrl, {
@@ -9584,23 +9576,19 @@ async function getIndexGistUrl() {
             localStorage.setItem(INDEX_GIST_ID_KEY, GIST_ID);
             return testUrl;
         }
-    }
-    
-    // 需要创建新的索引文件（加锁）
-    if (token) {
-        indexGistCreating = true;
-        indexGistCreatePromise = createIndexGist(token);
         
-        try {
-            const result = await indexGistCreatePromise;
-            return result;
-        } finally {
-            indexGistCreating = false;
-            indexGistCreatePromise = null;
+        // 如果硬编码的 ID 无效，尝试创建
+        if (token && response.status === 404) {
+            console.log('⚠️ 索引文件不存在，正在创建...');
+            const createdUrl = await createIndexGist(token);
+            const createdId = createdUrl.split('/').pop();
+            console.log('✅ 索引文件已创建，ID:', createdId);
+            console.log('⚠️ 请将代码中的 GIST_ID 常量更新为这个新 ID，以便所有设备使用同一个索引文件！');
+            return createdUrl;
         }
     }
     
-    // 最后回退到硬编码 URL（可能会 404）
+    // 最后回退到硬编码 URL
     return `https://api.github.com/gists/${GIST_ID}`;
 }
 
@@ -12844,6 +12832,11 @@ function hasGistToken() {
                 adminLoadStats();
             } else if (page === 'settings') {
                 document.getElementById('adminPageSettings').style.display = 'block';
+                // 填充当前的索引ID
+                const indexInput = document.getElementById('adminIndexGistId');
+                if (indexInput) {
+                    indexInput.value = localStorage.getItem(INDEX_GIST_ID_KEY) || GIST_ID || '';
+                }
                 updateAdminTokenStatus();
             } else if (page === 'auctionStats') {
                 document.getElementById('adminPageAuctionStats').style.display = 'block';
@@ -13071,6 +13064,73 @@ function hasGistToken() {
             } catch (error) {
                 showGistDeleteStatus(`❌ 删除失败: ${error.message}`, '#ff6b6b');
             }
+        }
+
+        // 全选Gist
+        function selectAllGists() {
+            const checkboxes = document.querySelectorAll('.gist-checkbox');
+            checkboxes.forEach(cb => cb.checked = true);
+        }
+
+        // 反选Gist
+        function toggleGistsSelection() {
+            const checkboxes = document.querySelectorAll('.gist-checkbox');
+            checkboxes.forEach(cb => cb.checked = !cb.checked);
+        }
+
+        // 删除选中的Gist
+        async function deleteSelectedGists() {
+            const checkboxes = document.querySelectorAll('.gist-checkbox:checked');
+            if (checkboxes.length === 0) {
+                alert('请先选择要删除的配置文件！');
+                return;
+            }
+
+            if (!confirm(`确定要删除选中的 ${checkboxes.length} 个配置文件吗？\n\n此操作不可恢复！`)) return;
+
+            const token = getGistToken();
+            if (!token) {
+                alert('请先设置Token！');
+                return;
+            }
+
+            const gistIds = Array.from(checkboxes).map(cb => cb.dataset.gistId);
+            
+            showGistDeleteStatus(`⏳ 正在删除 ${gistIds.length} 个配置文件...`, '#ffa500');
+
+            let successCount = 0;
+            let failCount = 0;
+
+            for (let i = 0; i < gistIds.length; i++) {
+                try {
+                    const response = await fetch(`https://api.github.com/gists/${gistIds[i]}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Accept': 'application/vnd.github.v3+json',
+                            'Authorization': `token ${token}`
+                        }
+                    });
+
+                    if (response.ok) {
+                        successCount++;
+                    } else {
+                        failCount++;
+                    }
+                } catch (e) {
+                    failCount++;
+                }
+
+                // 更新进度
+                showGistDeleteStatus(`⏳ 正在删除... ${i + 1}/${gistIds.length} (成功: ${successCount}, 失败: ${failCount})`, '#ffa500');
+
+                // 避免API限制
+                if (i < gistIds.length - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 200));
+                }
+            }
+
+            showGistDeleteStatus(`✅ 删除完成！成功: ${successCount}, 失败: ${failCount}`, successCount > 0 ? '#4caf50' : '#ff6b6b');
+            loadGistList();
         }
 
         // 删除所有空的Gist
@@ -14147,6 +14207,96 @@ function hasGistToken() {
             }
         }
 
+        // 查看索引文件状态
+        function adminGetIndexStatus() {
+            const cachedId = localStorage.getItem(INDEX_GIST_ID_KEY);
+            const hardcodedId = GIST_ID;
+            const input = document.getElementById('adminIndexGistId');
+            if (input) input.value = cachedId || '';
+            
+            let status = '';
+            if (cachedId) {
+                status += `✅ 缓存的索引ID: ${cachedId}\n`;
+            } else {
+                status += `⚠️ 无缓存的索引ID\n`;
+            }
+            status += `📄 代码中的索引ID: ${hardcodedId}\n`;
+            
+            if (cachedId && hardcodedId && cachedId !== hardcodedId) {
+                status += `⚠️ 警告：缓存ID和代码ID不一致！`;
+            }
+            
+            alert(status);
+        }
+
+        // 创建索引文件
+        async function adminCreateIndexGist() {
+            const token = getGistToken();
+            if (!token) {
+                showAdminStatus('请先设置Token', 'error');
+                return;
+            }
+
+            if (!confirm('确定要创建新的索引文件吗？\n\n创建后需要将新ID更新到代码中，所有设备才能互通！')) {
+                return;
+            }
+
+            try {
+                showAdminStatus('正在创建索引文件...', 'info');
+                
+                const createResponse = await fetch('https://api.github.com/gists', {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json',
+                        'Authorization': `token ${token}`
+                    },
+                    body: JSON.stringify({
+                        description: '房间索引文件（所有设备必须使用同一个！）',
+                        public: false,
+                        files: {
+                            'room_index.json': {
+                                content: JSON.stringify({}, null, 2)
+                            }
+                        }
+                    })
+                });
+
+                if (createResponse.ok) {
+                    const data = await createResponse.json();
+                    const newId = data.id;
+                    localStorage.setItem(INDEX_GIST_ID_KEY, newId);
+                    
+                    const input = document.getElementById('adminIndexGistId');
+                    if (input) input.value = newId;
+                    
+                    showAdminStatus(`✅ 索引文件已创建！ID: ${newId}`, 'success');
+                    alert(`✅ 索引文件创建成功！\n\n新索引ID: ${newId}\n\n⚠️ 重要：请将代码中的 GIST_ID 常量更新为这个新ID，\n确保所有设备使用同一个索引文件！`);
+                } else {
+                    const errData = await createResponse.json().catch(() => ({}));
+                    throw new Error(errData.message || `HTTP ${createResponse.status}`);
+                }
+            } catch (error) {
+                showAdminStatus('创建失败: ' + error.message, 'error');
+            }
+        }
+
+        // 保存索引文件ID
+        function adminSaveIndexGistId() {
+            const input = document.getElementById('adminIndexGistId');
+            if (!input) return;
+            
+            const newId = input.value.trim();
+            if (!newId) {
+                showAdminStatus('请输入索引文件ID', 'error');
+                return;
+            }
+            
+            localStorage.setItem(INDEX_GIST_ID_KEY, newId);
+            showAdminStatus('✅ 索引ID已保存', 'success');
+            alert(`✅ 索引ID已保存！\n\n请确保其他设备也使用这个ID: ${newId}`);
+        }
+
         async function adminSaveTitle() {
             const newTitle = document.getElementById('adminTitleText').value.trim();
             if (!newTitle) {
@@ -14455,7 +14605,10 @@ function hasGistToken() {
                     <h3 style="color:#ffd700;margin:0 0 10px 0;font-size:0.9rem;">操作选项</h3>
                     <div style="display:flex;gap:8px;margin-bottom:15px;flex-wrap:wrap;">
                         <button class="admin-btn admin-btn-secondary" onclick="loadGistList()" style="flex:1;min-width:120px;">🔄 刷新列表</button>
-                        <button class="admin-btn admin-btn-primary" onclick="deleteAllEmptyGists()" style="flex:1;min-width:120px;background:#ff6b6b;">🗑️ 删除空配置</button>
+                        <button class="admin-btn admin-btn-primary" onclick="selectAllGists()" style="flex:1;min-width:120px;background:#2196f3;">✓ 全选</button>
+                        <button class="admin-btn admin-btn-primary" onclick="toggleGistsSelection()" style="flex:1;min-width:120px;background:#9c27b0;">↔️ 反选</button>
+                        <button class="admin-btn admin-btn-primary" onclick="deleteSelectedGists()" style="flex:1;min-width:120px;background:#ff6b6b;">🗑️ 删除选中</button>
+                        <button class="admin-btn admin-btn-primary" onclick="deleteAllEmptyGists()" style="flex:1;min-width:120px;background:#ff9800;">🗑️ 删除空配置</button>
                         <button class="admin-btn admin-btn-primary" onclick="deleteAllGists()" style="flex:1;min-width:120px;background:#ff0000;">⚠️ 删除全部</button>
                     </div>
                 </div>
@@ -14586,6 +14739,22 @@ function hasGistToken() {
                 <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
                     <button class="admin-btn admin-btn-secondary" onclick="adminShowMenu()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
                     <h3 style="color:#ffd700;margin:0;font-size:1rem;">⚙️ 系统设置</h3>
+                </div>
+                <div class="admin-section">
+                    <div style="background:rgba(76,175,80,0.1);border-left:3px solid #4caf50;border-radius:6px;padding:12px;margin-bottom:15px;">
+                        <div style="color:#4caf50;font-size:0.85rem;font-weight:500;">⚠️ 重要说明</div>
+                        <div style="color:rgba(255,255,255,0.6);font-size:0.75rem;margin-top:5px;">
+                            索引文件是所有设备共享数据的关键！<br>
+                            <strong style="color:#ffd700;">所有设备必须使用同一个索引文件ID才能实现数据互通！</strong>
+                        </div>
+                    </div>
+                    <label>索引文件ID（所有设备必须相同）</label>
+                    <input type="text" id="adminIndexGistId" placeholder="输入索引文件ID" autocomplete="off">
+                    <div style="display:flex;gap:8px;justify-content:flex-end;margin-bottom:15px;">
+                        <button class="admin-btn admin-btn-secondary" onclick="adminGetIndexStatus()">查看当前状态</button>
+                        <button class="admin-btn admin-btn-secondary" onclick="adminCreateIndexGist()">创建索引文件</button>
+                        <button class="admin-btn admin-btn-primary" onclick="adminSaveIndexGistId()">保存索引ID</button>
+                    </div>
                 </div>
                 <div class="admin-section">
                     <div id="adminTokenStatus" style="margin-bottom:10px;"></div>
