@@ -14396,6 +14396,10 @@ function hasGistToken() {
                 
                 const history = roomDataObj.auctionHistory || [];
                 const allAuctions = roomDataObj.auctions || [];
+                const now = Date.now();
+                
+                // 统计正在拍卖的拍品
+                const activeAuctions = allAuctions.filter(a => a.status === 'active' && now < a.endTime);
                 
                 if (history.length === 0 && allAuctions.length === 0) {
                     document.getElementById('auctionStatsSummary').innerHTML = '<div style="color:#f59e0b;text-align:center;padding:10px;">该房间暂无拍卖记录</div>';
@@ -14427,6 +14431,7 @@ function hasGistToken() {
                         <div style="color:#ffd700;font-size:0.95rem;font-weight:bold;margin-bottom:10px;">📊 统计概览</div>
                         <div style="color:rgba(255,255,255,0.7);font-size:0.85rem;margin-bottom:5px;">总拍卖次数: <span style="color:#4ade80;">${history.length}</span></div>
                         <div style="color:rgba(255,255,255,0.7);font-size:0.85rem;margin-bottom:5px;">总交易金额: <span style="color:#ffd700;">${history.reduce((sum, r) => sum + r.finalPrice, 0)}</span></div>
+                        <div style="color:rgba(255,255,255,0.7);font-size:0.85rem;margin-bottom:5px;">正在拍卖: <span style="color:#fbbf24;">${activeAuctions.length}</span></div>
                         <div style="color:rgba(255,255,255,0.7);font-size:0.85rem;">卖家数量: <span style="color:#4ade80;">${Object.keys(sellerStats).length}</span> · 买家数量: <span style="color:#4ade80;">${Object.keys(buyerStats).length}</span></div>
                     </div>
                 `;
@@ -14472,6 +14477,49 @@ function hasGistToken() {
                     });
                 }
                 detailHtml += '</div>';
+                
+                // 添加正在拍卖的拍品列表
+                if (activeAuctions.length > 0) {
+                    detailHtml += '<div style="background:rgba(255,215,0,0.05);border-radius:8px;padding:15px;margin-bottom:15px;border:1px solid rgba(255,215,0,0.2);">';
+                    detailHtml += '<div style="color:#fbbf24;font-size:0.95rem;font-weight:bold;margin-bottom:10px;">🔨 正在拍卖的拍品 (' + activeAuctions.length + ')</div>';
+                    
+                    activeAuctions.forEach((auction) => {
+                        const qualityColor = getQualityColor(auction.quality);
+                        const currentBid = auction.bids && auction.bids.length > 0 ? auction.bids[auction.bids.length - 1].amount : auction.startPrice;
+                        const currentBidder = auction.bids && auction.bids.length > 0 ? auction.bids[auction.bids.length - 1].bidder : '无';
+                        const remainingTime = Math.max(0, auction.endTime - now);
+                        const remainingMin = Math.floor(remainingTime / 60000);
+                        const remainingSec = Math.floor((remainingTime % 60000) / 1000);
+                        
+                        let attrsText = '';
+                        if (auction.bonusDmg > 0) attrsText += ` 附加伤害+${auction.bonusDmg}`;
+                        if (auction.ignoreIce > 0) attrsText += ` 无视冰甲+${auction.ignoreIce}`;
+                        
+                        detailHtml += `
+                            <div style="border-bottom:1px solid rgba(255,255,255,0.1);padding:10px 0;">
+                                <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:5px;">
+                                    <div>
+                                        <span style="color:${qualityColor};font-size:0.85rem;font-weight:600;">#${auction.id} ${auction.quality || ''}·${auction.profession || ''}</span>
+                                        ${auction.isExchange ? '<span style="background:#f97316;color:white;padding:1px 4px;border-radius:3px;font-size:0.65rem;margin-left:5px;">交换</span>' : ''}
+                                    </div>
+                                    <div style="color:#ffd700;font-size:0.9rem;font-weight:600;">💰 ${currentBid}</div>
+                                </div>
+                                <div style="color:rgba(255,255,255,0.6);font-size:0.75rem;margin-bottom:3px;">
+                                    ${attrsText ? `<span style="color:#f87171;">${attrsText}</span>` : ''}
+                                </div>
+                                <div style="color:rgba(255,255,255,0.5);font-size:0.7rem;">
+                                    卖家: <span style="color:#ffd700;">${auction.creator || '未知'}</span> · 
+                                    当前买家: <span style="color:#4ade80;">${currentBidder}</span>
+                                </div>
+                                <div style="color:rgba(255,255,255,0.4);font-size:0.65rem;margin-top:2px;">
+                                    起拍价: ${auction.startPrice} · 出价次数: ${auction.bids ? auction.bids.length : 0} · 剩余: <span style="color:#fbbf24;">${remainingMin}分${remainingSec}秒</span>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    
+                    detailHtml += '</div>';
+                }
                 
                 detailHtml += '<div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:15px;margin-bottom:15px;">';
                 detailHtml += '<div style="color:#ffd700;font-size:0.95rem;font-weight:bold;margin-bottom:10px;">📜 拍卖记录详情</div>';
