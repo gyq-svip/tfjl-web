@@ -3269,7 +3269,17 @@
                 if (content) {
                     chatRoomData = JSON.parse(content);
                 } else {
+                    // chatrooms.json 不存在，自动创建
                     chatRoomData = { rooms: {} };
+                    // 尝试自动保存
+                    if (token) {
+                        try {
+                            await saveChatRoomData();
+                            console.log('已自动创建 chatrooms.json 文件');
+                        } catch (saveError) {
+                            console.warn('自动创建 chatrooms.json 失败:', saveError);
+                        }
+                    }
                 }
             } catch (error) {
                 console.warn('获取聊天室数据失败:', error);
