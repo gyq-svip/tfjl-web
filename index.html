@@ -2941,7 +2941,7 @@
                 nickEditBtn.textContent = '保存';
             }
             
-            const savedRoom = localStorage.getItem('TFJL_ChatRoom') || '';
+            const savedRoom = localStorage.getItem('TFJL_ChatRoom') || 'TF001';
             document.getElementById('chatRoomIdInput').value = savedRoom;
             document.getElementById('chatRoomIdInput').focus();
         }
@@ -2993,6 +2993,34 @@
             const nick = document.getElementById('chatRoomNickInput').value.trim();
             if (!roomId) { alert('请输入拍卖会ID'); return; }
             if (!nick) { alert('请输入昵称'); return; }
+
+            // 检查房间白名单
+            try {
+                const token = getGistToken();
+                const indexUrl = `https://api.github.com/gists/${GIST_ID}`;
+                const indexResponse = await fetch(indexUrl, {
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        ...(token && { 'Authorization': `token ${token}` })
+                    }
+                });
+                
+                if (indexResponse.ok) {
+                    const indexData = await indexResponse.json();
+                    if (indexData.files && indexData.files['room_index.json'] && indexData.files['room_index.json'].content) {
+                        const index = JSON.parse(indexData.files['room_index.json'].content);
+                        const allowedRooms = index.allowedRooms || [];
+                        
+                        // 如果白名单不为空，且房间不在白名单中，则拒绝进入
+                        if (allowedRooms.length > 0 && !allowedRooms.includes(roomId)) {
+                            alert(`房间 "${roomId}" 未开放，请联系管理员开通`);
+                            return;
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn('检查房间白名单失败:', e);
+            }
 
             currentChatRoom = roomId;
             currentChatNick = nick;
@@ -12922,6 +12950,8 @@ function hasGistToken() {
             document.getElementById('adminPagePasswordManage').style.display = 'none';
             document.getElementById('adminPageAuctionManage').style.display = 'none';
             document.getElementById('adminPageRoomManage').style.display = 'none';
+            const helpPage = document.getElementById('adminPageHelp');
+            if (helpPage) helpPage.style.display = 'none';
             const gistPage = document.getElementById('adminPageGistManage');
             if (gistPage) gistPage.style.display = 'none';
             const cachePage = document.getElementById('adminPageCacheManage');
@@ -12938,12 +12968,16 @@ function hasGistToken() {
             document.getElementById('adminPageNickManage').style.display = 'none';
             document.getElementById('adminPagePasswordManage').style.display = 'none';
             document.getElementById('adminPageAuctionManage').style.display = 'none';
+            const helpPage = document.getElementById('adminPageHelp');
+            if (helpPage) helpPage.style.display = 'none';
             const gistPage = document.getElementById('adminPageGistManage');
             if (gistPage) gistPage.style.display = 'none';
             const cachePage = document.getElementById('adminPageCacheManage');
             if (cachePage) cachePage.style.display = 'none';
 
-            if (page === 'title') {
+            if (page === 'help') {
+                if (helpPage) helpPage.style.display = 'block';
+            } else if (page === 'title') {
                 document.getElementById('adminPageTitle').style.display = 'block';
                 document.getElementById('adminTitleText').value = currentConfig.title || '';
             } else if (page === 'news') {
@@ -12973,9 +13007,7 @@ function hasGistToken() {
                 document.getElementById('adminPageAuctionManage').style.display = 'block';
             } else if (page === 'roomManage') {
                 document.getElementById('adminPageRoomManage').style.display = 'block';
-                loadRoomManageList();
-                document.getElementById('auctionManageRoomId').value = currentChatRoom || '';
-                loadAuctionManageList();
+                loadAllowedRoomsList();
             } else if (page === 'gistManage') {
                 if (gistPage) {
                     gistPage.style.display = 'block';
@@ -12985,6 +13017,360 @@ function hasGistToken() {
                 if (cachePage) {
                     cachePage.style.display = 'block';
                 }
+            }
+        }
+
+        // ==================== 房间白名单管理 ====================
+        async function loadAllowedRoomsList() {
+            const container = document.getElementById('allowedRoomsList');
+            container.innerHTML = '<div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;">加载中...</div>';
+            
+            try {
+                const token = getGistToken();
+                const indexUrl = `https://api.github.com/gists/${GIST_ID}`;
+                const response = await fetch(indexUrl, {
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        ...(token && { 'Authorization': `token ${token}` })
+                    }
+                });
+                
+                if (!response.ok) throw new Error('获取索引文件失败');
+                
+                const data = await response.json();
+                const content = data.files['room_index.json']?.content;
+                if (!content) throw new Error('索引文件内容为空');
+                
+                const index = JSON.parse(content);
+                const allowedRooms = index.allowedRooms || [];
+                
+                if (allowedRooms.length === 0) {
+                    container.innerHTML = `
+                        <div style="color:#4ade80;text-align:center;padding:20px;">
+                            🌐 <strong>开放模式</strong><br>
+                            <span style="font-size:0.8rem;color:rgba(255,255,255,0.6);">所有房间都可以进入</span>
+                        </div>
+                    `;
+                } else {
+                    container.innerHTML = `
+                        <div style="color:#f59e0b;margin-bottom:10px;font-size:0.85rem;">
+                            🔒 限制模式：${allowedRooms.length} 个房间已开放
+                        </div>
+                        ${allowedRooms.map(room => {
+                            const roomId = typeof room === 'string' ? room : room.id;
+                            const owner = typeof room === 'object' ? (room.owner || '') : '';
+                            return `
+                                <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:rgba(255,255,255,0.05);border-radius:6px;margin-bottom:6px;">
+                                    <div>
+                                        <span style="color:#ffd700;font-weight:500;">#${roomId}</span>
+                                        ${owner ? `<span style="color:#4ade80;font-size:0.75rem;margin-left:8px;">👤 ${owner}</span>` : ''}
+                                    </div>
+                                    <div style="display:flex;gap:4px;">
+                                        <button onclick="adminEditRoomOwner('${roomId}','${owner}')" style="padding:4px 8px;border-radius:4px;border:none;background:#3b82f6;color:white;cursor:pointer;font-size:0.7rem;">设置房主</button>
+                                        <button onclick="adminRemoveAllowedRoom('${roomId}')" style="padding:4px 8px;border-radius:4px;border:none;background:#ff6b6b;color:white;cursor:pointer;font-size:0.7rem;">删除</button>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    `;
+                }
+            } catch (e) {
+                container.innerHTML = `<div style="color:#ef4444;text-align:center;padding:20px;">加载失败: ${e.message}</div>`;
+            }
+        }
+
+        async function adminAddAllowedRoom() {
+            const roomId = document.getElementById('newAllowedRoomIdInput').value.trim();
+            const owner = document.getElementById('newRoomOwnerInput').value.trim();
+            if (!roomId) {
+                alert('请输入房间ID');
+                return;
+            }
+            
+            try {
+                const token = getGistToken();
+                if (!token) throw new Error('未设置Token');
+                
+                const indexUrl = `https://api.github.com/gists/${GIST_ID}`;
+                const response = await fetch(indexUrl, {
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Authorization': `token ${token}`
+                    }
+                });
+                
+                if (!response.ok) throw new Error('获取索引文件失败');
+                
+                const data = await response.json();
+                const content = data.files['room_index.json']?.content || '{}';
+                const index = JSON.parse(content);
+                
+                if (!index.allowedRooms) index.allowedRooms = [];
+                
+                // 检查是否已存在
+                const exists = index.allowedRooms.some(r => {
+                    const existingId = typeof r === 'string' ? r : r.id;
+                    return existingId === roomId;
+                });
+                if (exists) {
+                    alert('该房间已在列表中');
+                    return;
+                }
+                
+                // 添加房间（新格式：对象）
+                index.allowedRooms.push({
+                    id: roomId,
+                    owner: owner || ''
+                });
+                
+                const patchResponse = await fetch(indexUrl, {
+                    method: 'PATCH',
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json',
+                        'Authorization': `token ${token}`
+                    },
+                    body: JSON.stringify({
+                        files: {
+                            'room_index.json': {
+                                content: JSON.stringify(index, null, 2)
+                            }
+                        }
+                    })
+                });
+                
+                if (!patchResponse.ok) throw new Error('保存失败');
+                
+                document.getElementById('newAllowedRoomIdInput').value = '';
+                document.getElementById('newRoomOwnerInput').value = '';
+                loadAllowedRoomsList();
+                alert(`✅ 房间 "${roomId}" 已添加${owner ? `，房主：${owner}` : ''}`);
+            } catch (e) {
+                alert('添加失败: ' + e.message);
+            }
+        }
+
+        async function adminEditRoomOwner(roomId, currentOwner) {
+            const owner = prompt(`设置房间 "${roomId}" 的房主昵称：`, currentOwner);
+            if (owner === null) return; // 取消
+            
+            try {
+                const token = getGistToken();
+                if (!token) throw new Error('未设置Token');
+                
+                const indexUrl = `https://api.github.com/gists/${GIST_ID}`;
+                const response = await fetch(indexUrl, {
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Authorization': `token ${token}`
+                    }
+                });
+                
+                if (!response.ok) throw new Error('获取索引文件失败');
+                
+                const data = await response.json();
+                const content = data.files['room_index.json']?.content || '{}';
+                const index = JSON.parse(content);
+                
+                // 更新房主
+                if (index.allowedRooms) {
+                    index.allowedRooms = index.allowedRooms.map(r => {
+                        const existingId = typeof r === 'string' ? r : r.id;
+                        if (existingId === roomId) {
+                            return { id: roomId, owner: owner.trim() };
+                        }
+                        return r;
+                    });
+                }
+                
+                const patchResponse = await fetch(indexUrl, {
+                    method: 'PATCH',
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json',
+                        'Authorization': `token ${token}`
+                    },
+                    body: JSON.stringify({
+                        files: {
+                            'room_index.json': {
+                                content: JSON.stringify(index, null, 2)
+                            }
+                        }
+                    })
+                });
+                
+                if (!patchResponse.ok) throw new Error('保存失败');
+                
+                loadAllowedRoomsList();
+                alert(`✅ 房主已设置为：${owner.trim() || '无'}`);
+            } catch (e) {
+                alert('设置失败: ' + e.message);
+            }
+        }
+
+        async function adminRemoveAllowedRoom(roomId) {
+            if (!confirm(`确定要从白名单移除房间 "${roomId}" 吗？\n\n⚠️ 这将同时删除该房间的所有数据（包括拍品、消息、图片），此操作不可恢复！`)) return;
+            
+            try {
+                const token = getGistToken();
+                if (!token) throw new Error('未设置Token');
+                
+                const indexUrl = `https://api.github.com/gists/${GIST_ID}`;
+                const response = await fetch(indexUrl, {
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Authorization': `token ${token}`
+                    }
+                });
+                
+                if (!response.ok) throw new Error('获取索引文件失败');
+                
+                const data = await response.json();
+                const content = data.files['room_index.json']?.content || '{}';
+                const index = JSON.parse(content);
+                
+                // 获取房间的 Gist ID
+                const roomGistId = index[roomId];
+                
+                if (roomGistId) {
+                    // 获取房间数据，找出所有图片
+                    const roomResponse = await fetch(`https://api.github.com/gists/${roomGistId}`, {
+                        headers: {
+                            'Accept': 'application/vnd.github.v3+json',
+                            'Authorization': `token ${token}`
+                        }
+                    });
+                    
+                    if (roomResponse.ok) {
+                        const roomData = await roomResponse.json();
+                        const filename = `chatrooms_${roomId}.json`;
+                        const roomContent = roomData.files[filename]?.content;
+                        
+                        if (roomContent) {
+                            const roomObj = JSON.parse(roomContent);
+                            let roomInfo = null;
+                            
+                            if (roomObj.rooms && roomObj.rooms[roomId]) {
+                                roomInfo = roomObj.rooms[roomId];
+                            } else if (roomObj.auctions) {
+                                roomInfo = roomObj;
+                            }
+                            
+                            // 删除所有图片
+                            if (roomInfo && roomInfo.auctions) {
+                                for (const auction of roomInfo.auctions) {
+                                    if (auction.imageGistId) {
+                                        try {
+                                            await fetch(`https://api.github.com/gists/${auction.imageGistId}`, {
+                                                method: 'DELETE',
+                                                headers: { 'Authorization': `token ${token}` }
+                                            });
+                                            console.log(`🗑️ 已删除图片: ${auction.imageGistId}`);
+                                        } catch (e) {
+                                            console.warn(`删除图片失败: ${auction.imageGistId}`, e);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    // 删除房间配置文件
+                    try {
+                        await fetch(`https://api.github.com/gists/${roomGistId}`, {
+                            method: 'DELETE',
+                            headers: { 'Authorization': `token ${token}` }
+                        });
+                        console.log(`🗑️ 已删除房间配置: ${roomGistId}`);
+                    } catch (e) {
+                        console.warn(`删除房间配置失败: ${roomGistId}`, e);
+                    }
+                    
+                    // 从索引中移除房间记录
+                    delete index[roomId];
+                }
+                
+                // 从白名单移除
+                if (index.allowedRooms) {
+                    index.allowedRooms = index.allowedRooms.filter(r => r !== roomId);
+                }
+                
+                // 保存索引文件
+                const patchResponse = await fetch(indexUrl, {
+                    method: 'PATCH',
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json',
+                        'Authorization': `token ${token}`
+                    },
+                    body: JSON.stringify({
+                        files: {
+                            'room_index.json': {
+                                content: JSON.stringify(index, null, 2)
+                            }
+                        }
+                    })
+                });
+                
+                if (!patchResponse.ok) throw new Error('保存索引文件失败');
+                
+                // 清除本地缓存
+                localStorage.removeItem(`chatroom_gist_${roomId}`);
+                
+                loadAllowedRoomsList();
+                alert(`✅ 房间 "${roomId}" 已完全删除（包括所有数据）`);
+            } catch (e) {
+                alert('删除失败: ' + e.message);
+            }
+        }
+
+        async function adminClearAllowedRooms() {
+            if (!confirm('确定要清空白名单吗？清空后所有房间都可以进入。')) return;
+            
+            try {
+                const token = getGistToken();
+                if (!token) throw new Error('未设置Token');
+                
+                const indexUrl = `https://api.github.com/gists/${GIST_ID}`;
+                const response = await fetch(indexUrl, {
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Authorization': `token ${token}`
+                    }
+                });
+                
+                if (!response.ok) throw new Error('获取索引文件失败');
+                
+                const data = await response.json();
+                const content = data.files['room_index.json']?.content || '{}';
+                const index = JSON.parse(content);
+                
+                // 清空白名单
+                index.allowedRooms = [];
+                
+                // 保存
+                const patchResponse = await fetch(indexUrl, {
+                    method: 'PATCH',
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json',
+                        'Authorization': `token ${token}`
+                    },
+                    body: JSON.stringify({
+                        files: {
+                            'room_index.json': {
+                                content: JSON.stringify(index, null, 2)
+                            }
+                        }
+                    })
+                });
+                
+                if (!patchResponse.ok) throw new Error('保存失败');
+                
+                loadAllowedRoomsList();
+                alert('✅ 白名单已清空，现在所有房间都可以进入');
+            } catch (e) {
+                alert('清空失败: ' + e.message);
             }
         }
 
@@ -14594,6 +14980,13 @@ function hasGistToken() {
             <div id="adminMenuSection" style="display:none;">
                 <h2 style="color:#ffd700;text-align:center;margin:0 0 20px 0;font-size:1.2rem;">🛡️ 管理员菜单</h2>
                 <div style="display:flex;flex-direction:column;gap:10px;">
+                    <div class="admin-menu-item" onclick="adminShowPage('help')">
+                        <span style="font-size:1.3rem;">📖</span>
+                        <div>
+                            <div style="color:#ffd700;font-weight:500;">功能使用说明</div>
+                            <div style="color:rgba(255,255,255,0.4);font-size:0.8rem;">查看各功能详细使用方法</div>
+                        </div>
+                    </div>
                     <div class="admin-menu-item" onclick="adminShowPage('news')">
                         <span style="font-size:1.3rem;">📢</span>
                         <div>
@@ -14653,8 +15046,8 @@ function hasGistToken() {
                     <div class="admin-menu-item" onclick="adminShowPage('roomManage')">
                         <span style="font-size:1.3rem;">🏠</span>
                         <div>
-                            <div style="color:#ffd700;font-weight:500;">拍卖行管理</div>
-                            <div style="color:rgba(255,255,255,0.4);font-size:0.8rem;">创建/删除拍卖行ID</div>
+                            <div style="color:#ffd700;font-weight:500;">房间白名单</div>
+                            <div style="color:rgba(255,255,255,0.4);font-size:0.8rem;">管理开放的房间ID</div>
                         </div>
                     </div>
                     <div class="admin-menu-item" onclick="adminShowPage('gistManage')">
@@ -14676,6 +15069,121 @@ function hasGistToken() {
                         <div>
                             <div style="color:#ffd700;font-weight:500;">退出登录</div>
                             <div style="color:rgba(255,255,255,0.4);font-size:0.8rem;">回到登录界面</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="adminPageHelp" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
+                    <button class="admin-btn admin-btn-secondary" onclick="adminShowMenu()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
+                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">📖 功能使用说明</h3>
+                </div>
+                <div style="max-height:70vh;overflow-y:auto;">
+                    <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:15px;margin-bottom:15px;">
+                        <h4 style="color:#ffd700;margin:0 0 10px 0;">🏠 房间管理</h4>
+                        <div style="color:rgba(255,255,255,0.8);font-size:0.85rem;line-height:1.6;">
+                            <p><strong>白名单模式：</strong></p>
+                            <ul style="margin:5px 0;padding-left:20px;">
+                                <li>白名单为空时，所有房间都可以进入（开放模式）</li>
+                                <li>白名单不为空时，只有列表中的房间可以进入（限制模式）</li>
+                            </ul>
+                            <p><strong>添加房间：</strong></p>
+                            <ul style="margin:5px 0;padding-left:20px;">
+                                <li>输入房间ID（如：TF001）</li>
+                                <li>可选填房主昵称，房主可管理该房间</li>
+                            </ul>
+                            <p><strong>删除房间：</strong></p>
+                            <ul style="margin:5px 0;padding-left:20px;">
+                                <li>删除时会同时删除房间所有数据（拍品、消息、图片）</li>
+                                <li>此操作不可恢复，请谨慎</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:15px;margin-bottom:15px;">
+                        <h4 style="color:#ffd700;margin:0 0 10px 0;">🏪 商品管理</h4>
+                        <div style="color:rgba(255,255,255,0.8);font-size:0.85rem;line-height:1.6;">
+                            <p><strong>管理员：</strong>可查看所有房间商品，可下架任意商品</p>
+                            <p><strong>房主：</strong>只能查看和管理自己房间的商品</p>
+                            <p><strong>下架操作：</strong>输入房间ID后点击"加载商品"，选择要下架的商品</p>
+                        </div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:15px;margin-bottom:15px;">
+                        <h4 style="color:#ffd700;margin:0 0 10px 0;">📊 拍卖统计</h4>
+                        <div style="color:rgba(255,255,255,0.8);font-size:0.85rem;line-height:1.6;">
+                            <p><strong>查看统计：</strong>输入房间ID后点击"加载统计"</p>
+                            <p><strong>统计内容：</strong></p>
+                            <ul style="margin:5px 0;padding-left:20px;">
+                                <li>卖家排行榜（按成交金额排序）</li>
+                                <li>买家排行榜（按成交金额排序）</li>
+                                <li>拍卖记录详情</li>
+                            </ul>
+                            <p><strong>数据备份：</strong>可导出JSON格式备份文件</p>
+                        </div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:15px;margin-bottom:15px;">
+                        <h4 style="color:#ffd700;margin:0 0 10px 0;">⚙️ 系统设置</h4>
+                        <div style="color:rgba(255,255,255,0.8);font-size:0.85rem;line-height:1.6;">
+                            <p><strong>索引文件ID：</strong></p>
+                            <ul style="margin:5px 0;padding-left:20px;">
+                                <li>固定值：dfd1519cd14c27d3df1eeea19918fc43</li>
+                                <li>所有设备必须使用同一个索引文件ID</li>
+                                <li>如果误删，需要修改代码中的 GIST_ID 常量</li>
+                            </ul>
+                            <p><strong>GitHub Token：</strong></p>
+                            <ul style="margin:5px 0;padding-left:20px;">
+                                <li>需要创建 GitHub Personal Access Token</li>
+                                <li>权限需要勾选 gist</li>
+                                <li>Token 格式：ghp_xxxxxxxxxxxx</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:15px;margin-bottom:15px;">
+                        <h4 style="color:#ffd700;margin:0 0 10px 0;">🧹 清除缓存</h4>
+                        <div style="color:rgba(255,255,255,0.8);font-size:0.85rem;line-height:1.6;">
+                            <p><strong>何时需要清除：</strong></p>
+                            <ul style="margin:5px 0;padding-left:20px;">
+                                <li>出现 403 Forbidden 错误</li>
+                                <li>每次刷新重复创建配置文件</li>
+                                <li>旧的 Gist ID 缓存导致 404 错误</li>
+                            </ul>
+                            <p><strong>清除后：</strong>刷新页面，系统会自动重新获取数据</p>
+                        </div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:15px;margin-bottom:15px;">
+                        <h4 style="color:#ffd700;margin:0 0 10px 0;">🗑️ 配置文件管理</h4>
+                        <div style="color:rgba(255,255,255,0.8);font-size:0.85rem;line-height:1.6;">
+                            <p><strong>功能：</strong>批量删除多余的 Gist 配置文件</p>
+                            <p><strong>操作：</strong></p>
+                            <ul style="margin:5px 0;padding-left:20px;">
+                                <li>全选/反选：快速选择文件</li>
+                                <li>删除选中：删除勾选的文件</li>
+                                <li>删除空配置：删除没有内容的文件</li>
+                            </ul>
+                            <p style="color:#ff6b6b;"><strong>⚠️ 注意：索引文件不要删除！</strong></p>
+                        </div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:15px;margin-bottom:15px;">
+                        <h4 style="color:#ffd700;margin:0 0 10px 0;">🔨 拍卖行使用</h4>
+                        <div style="color:rgba(255,255,255,0.8);font-size:0.85rem;line-height:1.6;">
+                            <p><strong>进入房间：</strong></p>
+                            <ul style="margin:5px 0;padding-left:20px;">
+                                <li>输入房间ID（默认 TF001）</li>
+                                <li>输入昵称（只能设置一次）</li>
+                            </ul>
+                            <p><strong>发布拍品：</strong></p>
+                            <ul style="margin:5px 0;padding-left:20px;">
+                                <li>选择品质、职业、起拍价等</li>
+                                <li>可上传图片（限制150KB）</li>
+                                <li>拍品ID自动生成（时间戳+随机数）</li>
+                            </ul>
+                            <p><strong>出价：</strong></p>
+                            <ul style="margin:5px 0;padding-left:20px;">
+                                <li>点击 +10/+20/+50 快速出价</li>
+                                <li>或输入自定义出价（需大于50）</li>
+                                <li>出价有10秒冷却期，防止并发冲突</li>
+                            </ul>
+                            <p><strong>刷新：</strong>点击刷新按钮获取最新数据</p>
                         </div>
                     </div>
                 </div>
@@ -14705,28 +15213,33 @@ function hasGistToken() {
             <div id="adminPageRoomManage" style="display:none;">
                 <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
                     <button class="admin-btn admin-btn-secondary" onclick="adminShowMenu()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
-                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">🏠 拍卖行管理</h3>
+                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">🏠 房间管理</h3>
                 </div>
                 <div style="background:rgba(255,165,0,0.1);border-left:3px solid #ffa500;border-radius:6px;padding:12px;margin-bottom:15px;">
                     <div style="color:#ffa500;font-size:0.85rem;font-weight:500;">⚠️ 权限说明</div>
                     <div style="color:rgba(255,255,255,0.6);font-size:0.75rem;margin-top:5px;">
-                        只有管理员可以创建拍卖行ID，普通用户只能进入已创建的拍卖行。<br>
-                        请将拍卖行ID告知参与者，他们输入ID即可进入。
+                        白名单为空时，所有房间都可以进入（开放模式）。<br>
+                        白名单不为空时，只有列表中的房间可以进入（限制模式）。<br>
+                        <span style="color:#4ade80;">房主可以管理自己房间的商品和查看统计。</span>
                     </div>
                 </div>
                 <div class="admin-section">
-                    <h3 style="color:#ffd700;margin:0 0 10px 0;font-size:0.9rem;">创建新拍卖行</h3>
-                    <div style="display:flex;gap:8px;margin-bottom:15px;">
-                        <input type="text" id="newRoomIdInput" placeholder="拍卖行ID（如：room001）" style="flex:1;">
-                        <button class="admin-btn admin-btn-primary" onclick="adminCreateRoom()">创建</button>
+                    <h3 style="color:#ffd700;margin:0 0 10px 0;font-size:0.9rem;">添加房间</h3>
+                    <div style="display:flex;gap:8px;margin-bottom:8px;">
+                        <input type="text" id="newAllowedRoomIdInput" placeholder="房间ID（如：007）" style="flex:1;">
+                        <input type="text" id="newRoomOwnerInput" placeholder="房主昵称（可选）" style="flex:1;">
                     </div>
+                    <button class="admin-btn admin-btn-primary" onclick="adminAddAllowedRoom()" style="width:100%;">添加房间</button>
                 </div>
                 <div class="admin-section">
-                    <h3 style="color:#ffd700;margin:0 0 10px 0;font-size:0.9rem;">已创建的拍卖行</h3>
-                    <div id="roomManageList" style="max-height:300px;overflow-y:auto;">
+                    <h3 style="color:#ffd700;margin:0 0 10px 0;font-size:0.9rem;">房间列表</h3>
+                    <div id="allowedRoomsList" style="max-height:300px;overflow-y:auto;background:rgba(0,0,0,0.3);border-radius:6px;padding:12px;">
                         <div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;">点击下方按钮加载列表</div>
                     </div>
-                    <button class="admin-btn admin-btn-secondary" onclick="loadRoomManageList()" style="width:100%;margin-top:10px;">🔄 刷新列表</button>
+                    <div style="display:flex;gap:8px;margin-top:10px;">
+                        <button class="admin-btn admin-btn-secondary" onclick="loadAllowedRoomsList()" style="flex:1;">🔄 刷新列表</button>
+                        <button class="admin-btn" style="flex:1;background:#ff6b6b;" onclick="adminClearAllowedRooms()">🗑️ 清空</button>
+                    </div>
                 </div>
             </div>
 
