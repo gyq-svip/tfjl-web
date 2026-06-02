@@ -3416,7 +3416,7 @@
             });
             
             if (patchResponse.ok) {
-                return;
+                return GIST_ID;
             }
             
             // 如果 PATCH 失败（404），使用 POST 创建新的 Gist
@@ -3447,7 +3447,7 @@
                 
                 const data = await createResponse.json();
                 console.log('已创建新的 Gist，请更新 GIST_ID:', data.id);
-                return;
+                return data.id;
             }
             
             // 其他错误
@@ -10084,6 +10084,11 @@ function hasGistToken() {
                     }
                 });
 
+                if (response.status === 404) {
+                    console.warn('Gist不存在，返回默认数据');
+                    return getDefaultCounter();
+                }
+
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
@@ -10472,7 +10477,8 @@ function hasGistToken() {
                 const content = JSON.stringify(counterData, null, 2);
                 const token = getGistToken();
 
-                const response = await fetch(GIST_URL, {
+                // 先尝试使用 PATCH 更新现有的 Gist
+                const patchResponse = await fetch(GIST_URL, {
                     method: 'PATCH',
                     headers: {
                         'Accept': 'application/vnd.github.v3+json',
@@ -10489,17 +10495,50 @@ function hasGistToken() {
                     })
                 });
                 
-                if (response.ok) {
+                if (patchResponse.ok) {
                     saveCounterToCache(counterData);
                     clearPendingSync();
                     // 同步成功后更新显示
                     updateStatsBar();
-                } else {
-                    const errorText = await response.text();
-                    console.error('❌ Gist同步失败:', response.status, errorText);
-                    // 同步失败，加入待同步队列
-                    addToPendingSync(counterData);
+                    return;
                 }
+                
+                // 如果 PATCH 失败（404），使用 POST 创建新的 Gist
+                if (patchResponse.status === 404) {
+                    console.log('Gist不存在，创建新的 Gist');
+                    const createResponse = await fetch('https://api.github.com/gists', {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/vnd.github.v3+json',
+                            'Content-Type': 'application/json',
+                            'User-Agent': 'TFJL-App/1.0',
+                            ...(token && { 'Authorization': `token ${token}` })
+                        },
+                        body: JSON.stringify({
+                            description: '统计数据',
+                            public: false,
+                            files: {
+                                'counter.json': {
+                                    content: content
+                                }
+                            }
+                        })
+                    });
+                    
+                    if (createResponse.ok) {
+                        saveCounterToCache(counterData);
+                        clearPendingSync();
+                        updateStatsBar();
+                        console.log('已创建新的 Gist');
+                        return;
+                    }
+                }
+                
+                // 其他错误
+                const errorText = await response.text();
+                console.error('❌ Gist同步失败:', response.status, errorText);
+                // 同步失败，加入待同步队列
+                addToPendingSync(counterData);
             } catch (error) {
                 console.error('❌ 同步统计到Gist失败:', error);
                 // 同步失败，加入待同步队列
