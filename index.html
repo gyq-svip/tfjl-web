@@ -3595,6 +3595,23 @@
                                     }
                                     
                                     console.log(`✅ 房间数据加载成功`);
+                                    
+                                    // 自动清理过期消息（7天）
+                                    const MESSAGE_EXPIRE = 7 * 24 * 60 * 60 * 1000; // 7天
+                                    const now = Date.now();
+                                    const currentRoom = chatRoomData.rooms[roomId];
+                                    if (currentRoom && currentRoom.messages && currentRoom.messages.length > 0) {
+                                        const originalLength = currentRoom.messages.length;
+                                        currentRoom.messages = currentRoom.messages.filter(msg => {
+                                            return msg.author === '系统' || (now - msg.time) < MESSAGE_EXPIRE;
+                                        });
+                                        if (currentRoom.messages.length < originalLength) {
+                                            console.log(`🧹 自动清理了 ${originalLength - currentRoom.messages.length} 条过期消息`);
+                                            // 异步保存，不阻塞加载
+                                            saveChatRoomData().catch(e => console.warn('清理后保存失败:', e));
+                                        }
+                                    }
+                                    
                                     return;
                                 } catch (e) {
                                     console.warn('解析房间数据失败，使用默认值');
@@ -3790,6 +3807,18 @@
             }
         }
 
+        let messageManageMode = false; // 消息管理模式
+
+        function toggleMessageManageMode() {
+            messageManageMode = !messageManageMode;
+            const btn = document.getElementById('msgManageBtn');
+            if (btn) {
+                btn.style.background = messageManageMode ? 'rgba(239,68,68,0.3)' : 'transparent';
+                btn.textContent = messageManageMode ? '✓ 管理中' : '🛡️ 管理';
+            }
+            renderChatMessages();
+        }
+
         function renderChatMessages() {
             const container = document.getElementById('chatMessagesContainer');
             const room = getRoomData();
@@ -3798,20 +3827,202 @@
                 return;
             }
 
+            const now = Date.now();
+            const RECALL_LIMIT = 2 * 60 * 1000; // 2分钟内可撤回
+
             container.innerHTML = room.messages.map(msg => {
+                if (!msg.id) return '';
                 const time = new Date(msg.time);
                 const timeStr = String(time.getHours()).padStart(2, '0') + ':' + String(time.getMinutes()).padStart(2, '0');
                 const isMe = msg.author === currentChatNick;
+                const isSystem = msg.author === '系统';
+                const isRecallable = isMe && !isSystem && (now - msg.time) < RECALL_LIMIT;
+                const isDeletable = isMe && !isSystem;
+
+                let actionBtn = '';
+                if (messageManageMode && !isSystem) {
+                    // 管理模式：所有消息都可以删除
+                    actionBtn = `<span onclick="adminDeleteMessage('${msg.id}')" title="管理员删除" style="color:#ef4444;font-size:0.7rem;cursor:pointer;margin-left:6px;padding:2px 4px;border-radius:3px;background:rgba(239,68,68,0.25);">🗑️</span>`;
+                } else if (isRecallable) {
+                    actionBtn = `<span onclick="recallMessage('${msg.id}')" title="撤回" style="color:#fbbf24;font-size:0.7rem;cursor:pointer;margin-left:6px;padding:2px 4px;border-radius:3px;background:rgba(251,191,36,0.15);">撤回</span>`;
+                } else if (isDeletable) {
+                    actionBtn = `<span onclick="deleteMessage('${msg.id}')" title="删除" style="color:#ef4444;font-size:0.7rem;cursor:pointer;margin-left:6px;padding:2px 4px;border-radius:3px;background:rgba(239,68,68,0.15);">删除</span>`;
+                }
+
                 return `
                     <div style="margin-bottom:8px;${isMe ? 'text-align:right;' : ''}">
                         <span style="color:${isMe ? '#4ecdc4' : '#ffd700'};font-size:0.8rem;font-weight:500;">${msg.author}</span>
                         <span style="color:rgba(255,255,255,0.25);font-size:0.7rem;margin-left:5px;">${timeStr}</span>
+                        ${actionBtn}
                         <div style="display:inline-block;background:${isMe ? 'rgba(78,205,196,0.15)' : 'rgba(255,255,255,0.08)'};padding:6px 12px;border-radius:10px;font-size:0.85rem;color:rgba(255,255,255,0.9);max-width:80%;word-break:break-all;margin-top:2px;">${escapeHtml(msg.content)}</div>
                     </div>
                 `;
             }).join('');
 
             container.scrollTop = container.scrollHeight;
+        }
+
+        // 撤回消息（2分钟内）
+        async function recallMessage(msgId) {
+            if (!confirm('确定要撤回这条消息吗？')) return;
+            
+            try {
+                const roomId = currentChatRoom || 'default';
+                localStorage.removeItem(`chatroom_gist_${roomId}`);
+                await fetchChatRoomData();
+                const room = getRoomData();
+                if (!room || !room.messages) return;
+                
+                const msgIndex = room.messages.findIndex(m => m.id === msgId);
+                if (msgIndex === -1) {
+                    alert('消息不存在');
+                    return;
+                }
+                
+                const msg = room.messages[msgIndex];
+                if (msg.author !== currentChatNick) {
+                    alert('只能撤回自己的消息');
+                    return;
+                }
+                
+                const RECALL_LIMIT = 2 * 60 * 1000;
+                if (Date.now() - msg.time > RECALL_LIMIT) {
+                    alert('超过2分钟，无法撤回，请使用删除功能');
+                    return;
+                }
+                
+                // 撤回：替换为"已撤回"提示
+                room.messages[msgIndex] = {
+                    id: msg.id,
+                    author: '系统',
+                    content: `${currentChatNick} 撤回了一条消息`,
+                    time: msg.time,
+                    recalled: true
+                };
+                
+                await saveChatRoomData();
+                renderChatMessages();
+                showBidToast('✅ 已撤回', true);
+            } catch (e) {
+                alert('撤回失败: ' + e.message);
+            }
+        }
+
+        // 删除消息（自己）
+        async function deleteMessage(msgId) {
+            if (!confirm('确定要删除这条消息吗？')) return;
+            
+            try {
+                const roomId = currentChatRoom || 'default';
+                localStorage.removeItem(`chatroom_gist_${roomId}`);
+                await fetchChatRoomData();
+                const room = getRoomData();
+                if (!room || !room.messages) return;
+                
+                const msgIndex = room.messages.findIndex(m => m.id === msgId);
+                if (msgIndex === -1) {
+                    alert('消息不存在');
+                    return;
+                }
+                
+                const msg = room.messages[msgIndex];
+                if (msg.author !== currentChatNick) {
+                    alert('只能删除自己的消息');
+                    return;
+                }
+                
+                room.messages.splice(msgIndex, 1);
+                await saveChatRoomData();
+                renderChatMessages();
+                showBidToast('✅ 已删除', true);
+            } catch (e) {
+                alert('删除失败: ' + e.message);
+            }
+        }
+
+        // 删除消息（管理员/房主）
+        async function adminDeleteMessage(msgId) {
+            if (!confirm('确定要删除这条消息吗？')) return;
+            
+            try {
+                const token = getGistToken();
+                if (!token) throw new Error('未配置Token');
+                
+                // 从索引文件获取房间的 Gist ID
+                const indexUrl = `https://api.github.com/gists/${GIST_ID}`;
+                const indexResponse = await fetch(indexUrl, {
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Authorization': `token ${token}`
+                    }
+                });
+                
+                if (!indexResponse.ok) throw new Error('获取索引文件失败');
+                
+                const indexData = await indexResponse.json();
+                const indexContent = indexData.files['room_index.json']?.content;
+                if (!indexContent) throw new Error('索引文件内容为空');
+                
+                const index = JSON.parse(indexContent);
+                const roomGistId = index[currentChatRoom];
+                if (!roomGistId) throw new Error('房间不存在');
+                
+                // 获取房间数据
+                const roomResponse = await fetch(`https://api.github.com/gists/${roomGistId}`, {
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Authorization': `token ${token}`
+                    }
+                });
+                
+                if (!roomResponse.ok) throw new Error('获取房间数据失败');
+                
+                const roomData = await roomResponse.json();
+                const filename = `chatrooms_${currentChatRoom}.json`;
+                const content = roomData.files[filename]?.content;
+                if (!content) throw new Error('房间数据为空');
+                
+                const allData = JSON.parse(content);
+                let roomInfo = null;
+                
+                if (allData.rooms && allData.rooms[currentChatRoom]) {
+                    roomInfo = allData.rooms[currentChatRoom];
+                } else if (allData.messages) {
+                    roomInfo = allData;
+                }
+                
+                if (!roomInfo || !roomInfo.messages) throw new Error('房间数据格式错误');
+                
+                const msgIndex = roomInfo.messages.findIndex(m => m.id === msgId);
+                if (msgIndex === -1) throw new Error('消息不存在');
+                
+                roomInfo.messages.splice(msgIndex, 1);
+                
+                // 保存
+                const saveResponse = await fetch(`https://api.github.com/gists/${roomGistId}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json',
+                        'Authorization': `token ${token}`
+                    },
+                    body: JSON.stringify({
+                        files: {
+                            [filename]: {
+                                content: JSON.stringify(allData, null, 2)
+                            }
+                        }
+                    })
+                });
+                
+                if (!saveResponse.ok) throw new Error('保存失败');
+                
+                alert('✅ 消息已删除');
+                renderChatMessages();
+                
+            } catch (e) {
+                alert('删除失败: ' + e.message);
+            }
         }
 
         let auctionImageBase64 = '';
@@ -16071,7 +16282,8 @@ function hasGistToken() {
         </div>
         <div id="chatRoomTabChat" style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
             <div id="chatMessagesContainer" style="flex:1;overflow-y:auto;padding:10px;"></div>
-            <div style="padding:8px 10px;border-top:1px solid rgba(255,255,255,0.1);display:flex;gap:8px;">
+            <div style="padding:8px 10px;border-top:1px solid rgba(255,255,255,0.1);display:flex;gap:8px;align-items:center;">
+                <button onclick="toggleMessageManageMode()" id="msgManageBtn" style="padding:6px 10px;border-radius:6px;border:none;background:transparent;color:#ef4444;cursor:pointer;font-size:0.75rem;transition:all 0.2s;" onmouseover="this.style.background='rgba(239,68,68,0.15)'" onmouseout="this.style.background='transparent'">🛡️ 管理</button>
                 <input type="text" id="chatMessageInput" placeholder="输入消息..." style="flex:1;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:white;font-size:0.85rem;outline:none;" onkeydown="if(event.key==='Enter')sendChatMessage()">
                 <button onclick="sendChatMessage()" style="padding:8px 14px;border-radius:8px;border:none;background:linear-gradient(135deg,#4ecdc4,#44a08d);color:white;cursor:pointer;font-size:0.85rem;">发送</button>
             </div>
