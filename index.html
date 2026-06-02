@@ -3282,28 +3282,54 @@
         async function fetchChatRoomData() {
             try {
                 const token = getGistToken();
+                
+                // 从 localStorage 获取聊天室的 GIST_ID
+                const chatroomGistId = localStorage.getItem(`chatroom_gist_${currentChatRoom}`);
+                
+                if (chatroomGistId) {
+                    // 从独立 Gist 加载
+                    const response = await fetch(`https://api.github.com/gists/${chatroomGistId}`, {
+                        headers: {
+                            'Accept': 'application/vnd.github.v3+json',
+                            ...(token && { 'Authorization': `token ${token}` })
+                        }
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        const content = data.files[CHAT_GIST_FILE]?.content;
+                        if (content) {
+                            chatRoomData = JSON.parse(content);
+                            return;
+                        }
+                    }
+                }
+                
+                // 如果没有找到独立 Gist，尝试从旧 GIST_URL 加载
                 const response = await fetch(GIST_URL, {
                     headers: {
                         'Accept': 'application/vnd.github.v3+json',
                         ...(token && { 'Authorization': `token ${token}` })
                     }
                 });
-                if (!response.ok) throw new Error('获取失败');
-                const data = await response.json();
-                const content = data.files[CHAT_GIST_FILE]?.content;
-                if (content) {
-                    chatRoomData = JSON.parse(content);
-                } else {
-                    // chatrooms.json 不存在，自动创建
-                    chatRoomData = { rooms: {} };
-                    // 尝试自动保存
-                    if (token) {
-                        try {
-                            await saveChatRoomData();
-                            console.log('已自动创建 chatrooms.json 文件');
-                        } catch (saveError) {
-                            console.warn('自动创建 chatrooms.json 失败:', saveError);
-                        }
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    const content = data.files[CHAT_GIST_FILE]?.content;
+                    if (content) {
+                        chatRoomData = JSON.parse(content);
+                        return;
+                    }
+                }
+                
+                // 如果都不存在，创建新的
+                chatRoomData = { rooms: {} };
+                if (token) {
+                    try {
+                        await saveChatRoomData();
+                        console.log('已自动创建 chatrooms.json 文件');
+                    } catch (saveError) {
+                        console.warn('自动创建 chatrooms.json 失败:', saveError);
                     }
                 }
             } catch (error) {
@@ -3316,14 +3342,16 @@
             const token = getGistToken();
             if (!token) throw new Error('未设置Token');
 
-            const response = await fetch(GIST_URL, {
-                method: 'PATCH',
+            const response = await fetch('https://api.github.com/gists', {
+                method: 'POST',
                 headers: {
                     'Accept': 'application/vnd.github.v3+json',
                     'Content-Type': 'application/json',
                     'Authorization': `token ${token}`
                 },
                 body: JSON.stringify({
+                    description: `聊天室配置: ${currentChatRoom}`,
+                    public: false,
                     files: {
                         [CHAT_GIST_FILE]: {
                             content: JSON.stringify(chatRoomData, null, 2)
@@ -3335,6 +3363,10 @@
                 const errData = await response.json().catch(() => ({}));
                 throw new Error(errData.message || '保存失败');
             }
+
+            const data = await response.json();
+            // 保存 GIST_ID 到 localStorage
+            localStorage.setItem(`chatroom_gist_${currentChatRoom}`, data.id);
         }
 
         function getRoomData() {
