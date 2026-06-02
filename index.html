@@ -3054,7 +3054,7 @@
                 },
                 body: JSON.stringify({
                     files: {
-                        [`img_${auctionId}.jpg`]: {
+                        [`auction_${auctionId}.jpg`]: {
                             content: imageData
                         }
                     }
@@ -3078,7 +3078,7 @@
                 if (!response.ok) throw new Error('获取图片失败');
                 
                 const data = await response.json();
-                const filename = `img_${auctionId}.jpg`;
+                const filename = `auction_${auctionId}.jpg`;
                 const content = data.files[filename]?.content;
                 
                 return content || null;
@@ -3119,11 +3119,11 @@
                 const sevenDaysAgo = now - (7 * 24 * 60 * 60 * 1000);
                 let deletedCount = 0;
                 
-                // 遍历所有文件，删除以 img_ 开头且超过7天的文件
+                // 遍历所有文件，删除以 auction_ 开头且超过7天的文件
                 for (const filename in files) {
-                    if (filename.startsWith('img_') && filename.endsWith('.jpg')) {
+                    if (filename.startsWith('auction_') && filename.endsWith('.jpg')) {
                         // 从文件名提取时间戳
-                        const timestampStr = filename.replace('img_', '').replace('.jpg', '');
+                        const timestampStr = filename.replace('auction_', '').replace('.jpg', '');
                         const timestamp = parseInt(timestampStr);
                         
                         if (timestamp && timestamp < sevenDaysAgo) {
@@ -3491,7 +3491,7 @@
 
                 const imageSize = 110;
                 // 使用 Gist raw URL 显示图片
-                const imageUrl = auction.image ? `https://gist.githubusercontent.com/gyq-svip/${GIST_ID}/raw/img_${auction.id}.jpg` : '';
+                const imageUrl = auction.image ? `https://gist.githubusercontent.com/gyq-svip/${GIST_ID}/raw/auction_${auction.id}.jpg` : '';
                 const imageHtml = imageUrl
                     ? `<div style="position:relative;width:${imageSize}px;height:${imageSize}px;flex-shrink:0;" onmouseover="showAuctionImagePreview(this,'${auction.id}')" onmouseout="hideAuctionImagePreview()"><img src="${imageUrl}" style="width:${imageSize}px;height:${imageSize}px;object-fit:cover;border-radius:8px;border:2px solid ${qualityColor};box-shadow:0 2px 8px rgba(0,0,0,0.3);" onerror="this.style.display='none'"></div>`
                     : `<div style="width:${imageSize}px;height:${imageSize}px;background:rgba(255,255,255,0.05);border-radius:8px;border:2px solid ${qualityColor};display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,0.3);"><span style="color:${qualityColor};font-size:1.6rem;">⚔️</span></div>`;
@@ -3558,7 +3558,7 @@
             preview.style.left = (rect.right + 8) + 'px';
             preview.style.top = rect.top + 'px';
             // 使用 Gist raw URL
-            const imageUrl = `https://gist.githubusercontent.com/gyq-svip/${GIST_ID}/raw/img_${auctionId}.jpg`;
+            const imageUrl = `https://gist.githubusercontent.com/gyq-svip/${GIST_ID}/raw/auction_${auctionId}.jpg`;
             preview.innerHTML = `<img src="${imageUrl}" style="max-width:250px;max-height:250px;border-radius:10px;border:2px solid rgba(255,215,0,0.5);box-shadow:0 8px 30px rgba(0,0,0,0.7);">`;
             document.body.appendChild(preview);
             const previewRect = preview.getBoundingClientRect();
@@ -3621,7 +3621,7 @@
                 `;
             }
 
-            const imageUrl = auction.image ? `https://gist.githubusercontent.com/gyq-svip/${GIST_ID}/raw/img_${auction.id}.jpg` : '';
+            const imageUrl = auction.image ? `https://gist.githubusercontent.com/gyq-svip/${GIST_ID}/raw/auction_${auction.id}.jpg` : '';
             const imageHtml = imageUrl
                 ? `<img src="${imageUrl}" style="width:100%;max-height:200px;object-fit:cover;border-radius:8px;margin-bottom:10px;border:2px solid ${qualityColor};" onerror="this.style.display='none'">`
                 : '';
