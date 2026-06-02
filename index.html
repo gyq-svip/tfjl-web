@@ -3047,6 +3047,10 @@
             
             // 去掉 base64 前缀，只保存纯 base64 数据
             const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
+            
+            // 文件名加入房间号，避免冲突
+            const roomId = currentChatRoom || 'default';
+            const filename = `auction_${auctionId}_${roomId}.txt`;
 
             const response = await fetch('https://api.github.com/gists', {
                 method: 'POST',
@@ -3056,10 +3060,10 @@
                     'Authorization': `token ${token}`
                 },
                 body: JSON.stringify({
-                    description: `拍卖图片: ${auctionId}`,
+                    description: `拍卖图片: ${auctionId} (房间: ${roomId})`,
                     public: false,
                     files: {
-                        [`auction_${auctionId}.txt`]: {
+                        [filename]: {
                             content: base64Data
                         }
                     }
@@ -3069,20 +3073,22 @@
             if (!response.ok) throw new Error('保存图片失败');
             
             const data = await response.json();
-            const fileData = data.files[`auction_${auctionId}.txt`];
+            const fileData = data.files[filename];
             const gistUrl = fileData?.raw_url || data.html_url;
             
-            // 保存 GIST_ID 到 localStorage
-            localStorage.setItem(`auction_img_gist_${auctionId}`, data.id);
+            // 保存 GIST_ID 到 localStorage（key 包含房间号）
+            const storageKey = `auction_img_gist_${roomId}_${auctionId}`;
+            localStorage.setItem(storageKey, data.id);
             
             // 同时保存到 localStorage（缓存7天）
             const now = Date.now();
             const cacheData = {
                 data: imageData,
                 timestamp: now,
-                gistId: data.id
+                gistId: data.id,
+                roomId: roomId
             };
-            localStorage.setItem(`auction_img_${auctionId}`, JSON.stringify(cacheData));
+            localStorage.setItem(`auction_img_${roomId}_${auctionId}`, JSON.stringify(cacheData));
             
             // 清理7天前的缓存
             const allKeys = Object.keys(localStorage);
@@ -3104,8 +3110,11 @@
 
         // 从Gist加载图片（返回base64格式）
         async function loadImage(auctionId) {
+            // 获取当前房间号
+            const roomId = currentChatRoom || 'default';
+            
             // 优先从 localStorage 读取缓存
-            const cached = localStorage.getItem(`auction_img_${auctionId}`);
+            const cached = localStorage.getItem(`auction_img_${roomId}_${auctionId}`);
             if (cached) {
                 try {
                     const cacheData = JSON.parse(cached);
@@ -3116,8 +3125,8 @@
             }
             
             try {
-                // 从 localStorage 获取图片的 GIST_ID
-                const imgGistId = localStorage.getItem(`auction_img_gist_${auctionId}`);
+                // 从 localStorage 获取图片的 GIST_ID（key 包含房间号）
+                const imgGistId = localStorage.getItem(`auction_img_gist_${roomId}_${auctionId}`);
                 if (!imgGistId) return null;
                 
                 const response = await fetch(`https://api.github.com/gists/${imgGistId}`, {
@@ -3128,7 +3137,7 @@
                 if (!response.ok) return null;
                 
                 const data = await response.json();
-                const filename = `auction_${auctionId}.txt`;
+                const filename = `auction_${auctionId}_${roomId}.txt`;
                 const content = data.files[filename]?.content;
                 
                 if (!content) return null;
@@ -3139,9 +3148,10 @@
                 const cacheData = {
                     data: base64Url,
                     timestamp: now,
-                    gistId: imgGistId
+                    gistId: imgGistId,
+                    roomId: roomId
                 };
-                localStorage.setItem(`auction_img_${auctionId}`, JSON.stringify(cacheData));
+                localStorage.setItem(`auction_img_${roomId}_${auctionId}`, JSON.stringify(cacheData));
                 
                 // 清理7天前的缓存
                 const allKeys = Object.keys(localStorage);
@@ -3193,11 +3203,13 @@
                 const allKeys = Object.keys(localStorage);
                 for (const key of allKeys) {
                     if (key.startsWith('auction_img_gist_')) {
-                        const auctionId = key.replace('auction_img_gist_', '');
+                        // 从 key 提取 roomId 和 auctionId
+                        // key 格式: auction_img_gist_${roomId}_${auctionId}
+                        const suffix = key.replace('auction_img_gist_', '');
                         const imgGistId = localStorage.getItem(key);
                         
-                        // 检查缓存时间
-                        const cacheKey = `auction_img_${auctionId}`;
+                        // 对应的缓存 key: auction_img_${roomId}_${auctionId}
+                        const cacheKey = `auction_img_${suffix}`;
                         const cacheData = localStorage.getItem(cacheKey);
                         let timestamp = 0;
                         try {
@@ -3224,7 +3236,7 @@
                                     localStorage.removeItem(cacheKey);
                                 }
                             } catch (e) {
-                                console.warn(`删除图片Gist失败: ${auctionId}`, e);
+                                console.warn(`删除图片Gist失败: ${suffix}`, e);
                             }
                         }
                     }
@@ -3283,29 +3295,7 @@
             try {
                 const token = getGistToken();
                 
-                // 从 localStorage 获取聊天室的 GIST_ID
-                const chatroomGistId = localStorage.getItem(`chatroom_gist_${currentChatRoom}`);
-                
-                if (chatroomGistId) {
-                    // 从独立 Gist 加载
-                    const response = await fetch(`https://api.github.com/gists/${chatroomGistId}`, {
-                        headers: {
-                            'Accept': 'application/vnd.github.v3+json',
-                            ...(token && { 'Authorization': `token ${token}` })
-                        }
-                    });
-                    
-                    if (response.ok) {
-                        const data = await response.json();
-                        const content = data.files[CHAT_GIST_FILE]?.content;
-                        if (content) {
-                            chatRoomData = JSON.parse(content);
-                            return;
-                        }
-                    }
-                }
-                
-                // 如果没有找到独立 Gist，尝试从旧 GIST_URL 加载
+                // 使用原来的 GIST_URL 加载 chatrooms.json（所有房间共享）
                 const response = await fetch(GIST_URL, {
                     headers: {
                         'Accept': 'application/vnd.github.v3+json',
@@ -3322,7 +3312,7 @@
                     }
                 }
                 
-                // 如果都不存在，创建新的
+                // 如果不存在，创建新的
                 chatRoomData = { rooms: {} };
                 if (token) {
                     try {
@@ -3342,16 +3332,15 @@
             const token = getGistToken();
             if (!token) throw new Error('未设置Token');
 
-            const response = await fetch('https://api.github.com/gists', {
-                method: 'POST',
+            // 使用原来的 GIST_URL 更新 chatrooms.json（所有房间共享）
+            const response = await fetch(GIST_URL, {
+                method: 'PATCH',
                 headers: {
                     'Accept': 'application/vnd.github.v3+json',
                     'Content-Type': 'application/json',
                     'Authorization': `token ${token}`
                 },
                 body: JSON.stringify({
-                    description: `聊天室配置: ${currentChatRoom}`,
-                    public: false,
                     files: {
                         [CHAT_GIST_FILE]: {
                             content: JSON.stringify(chatRoomData, null, 2)
@@ -3359,14 +3348,11 @@
                     }
                 })
             });
+            
             if (!response.ok) {
                 const errData = await response.json().catch(() => ({}));
                 throw new Error(errData.message || '保存失败');
             }
-
-            const data = await response.json();
-            // 保存 GIST_ID 到 localStorage
-            localStorage.setItem(`chatroom_gist_${currentChatRoom}`, data.id);
         }
 
         function getRoomData() {
