@@ -2994,7 +2994,7 @@
             if (!roomId) { alert('请输入拍卖会ID'); return; }
             if (!nick) { alert('请输入昵称'); return; }
 
-            // 检查房间白名单
+            // 检查房间白名单和昵称唯一性
             try {
                 const token = getGistToken();
                 const indexUrl = `https://api.github.com/gists/${GIST_ID}`;
@@ -3010,6 +3010,7 @@
                     if (indexData.files && indexData.files['room_index.json'] && indexData.files['room_index.json'].content) {
                         const index = JSON.parse(indexData.files['room_index.json'].content);
                         const allowedRooms = index.allowedRooms || [];
+                        const usedNicks = index.usedNicks || [];
                         
                         // 如果白名单不为空，检查房间是否在白名单中
                         if (allowedRooms.length > 0) {
@@ -3022,15 +3023,46 @@
                                 return;
                             }
                         }
+                        
+                        // 检查昵称是否已被使用（不检查当前已保存的昵称）
+                        const savedNick = localStorage.getItem('TFJL_ChatNick');
+                        if (nick !== savedNick && usedNicks.includes(nick)) {
+                            alert(`昵称 "${nick}" 已被使用，请换一个昵称`);
+                            return;
+                        }
+                        
+                        // 如果是新昵称，注册到全局列表
+                        if (nick !== savedNick && !usedNicks.includes(nick)) {
+                            usedNicks.push(nick);
+                            index.usedNicks = usedNicks;
+                            
+                            // 保存更新后的索引
+                            await fetch(indexUrl, {
+                                method: 'PATCH',
+                                headers: {
+                                    'Accept': 'application/vnd.github.v3+json',
+                                    'Content-Type': 'application/json',
+                                    'Authorization': `token ${token}`
+                                },
+                                body: JSON.stringify({
+                                    files: {
+                                        'room_index.json': {
+                                            content: JSON.stringify(index, null, 2)
+                                        }
+                                    }
+                                })
+                            });
+                        }
                     }
                 }
             } catch (e) {
-                console.warn('检查房间白名单失败:', e);
+                console.warn('检查失败:', e);
             }
 
             currentChatRoom = roomId;
             currentChatNick = nick;
             localStorage.setItem('TFJL_ChatRoom', roomId);
+            localStorage.setItem('TFJL_ChatNick', nick);
 
             closeChatRoomEntry();
             loadChatRoomSize(); // 加载保存的窗口尺寸
@@ -13807,31 +13839,51 @@ function hasGistToken() {
             
             try {
                 const token = getGistToken();
-                const response = await fetch(GIST_URL, {
+                
+                // 从索引文件获取房间的 Gist ID
+                const indexUrl = `https://api.github.com/gists/${GIST_ID}`;
+                const indexResponse = await fetch(indexUrl, {
                     headers: {
                         'Accept': 'application/vnd.github.v3+json',
                         ...(token && { 'Authorization': `token ${token}` })
                     }
                 });
                 
-                if (!response.ok) throw new Error('获取数据失败');
+                if (!indexResponse.ok) throw new Error('获取索引文件失败');
                 
-                const data = await response.json();
-                const content = data.files[CHAT_GIST_FILE]?.content;
-                if (!content) {
-                    listContainer.innerHTML = '<div style="color:#ef4444;text-align:center;padding:10px;">房间数据不存在</div>';
-                    return;
+                const indexData = await indexResponse.json();
+                const indexContent = indexData.files['room_index.json']?.content;
+                if (!indexContent) throw new Error('索引文件内容为空');
+                
+                const index = JSON.parse(indexContent);
+                const roomGistId = index[roomId];
+                if (!roomGistId) throw new Error('该房间不存在');
+                
+                // 从房间 Gist 获取数据
+                const roomResponse = await fetch(`https://api.github.com/gists/${roomGistId}`, {
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        ...(token && { 'Authorization': `token ${token}` })
+                    }
+                });
+                
+                if (!roomResponse.ok) throw new Error('获取房间数据失败');
+                
+                const roomData = await roomResponse.json();
+                const filename = `chatrooms_${roomId}.json`;
+                const content = roomData.files[filename]?.content;
+                if (!content) throw new Error('房间数据为空');
+                
+                const allData = JSON.parse(content);
+                let roomInfo = null;
+                
+                if (allData.rooms && allData.rooms[roomId]) {
+                    roomInfo = allData.rooms[roomId];
+                } else if (allData.auctions) {
+                    roomInfo = allData;
                 }
                 
-                const roomData = JSON.parse(content);
-                let room = null;
-                if (Array.isArray(roomData)) {
-                    room = roomData.find(r => r.id === roomId);
-                } else {
-                    room = roomData.rooms?.find(r => r.id === roomId);
-                }
-                
-                if (!room || !room.auctions || room.auctions.length === 0) {
+                if (!roomInfo || !roomInfo.auctions || roomInfo.auctions.length === 0) {
                     listContainer.innerHTML = '<div style="color:rgba(255,255,255,0.5);text-align:center;padding:10px;">该房间暂无商品</div>';
                     return;
                 }
@@ -13839,7 +13891,7 @@ function hasGistToken() {
                 const now = Date.now();
                 let html = '';
                 
-                room.auctions.forEach((auction, index) => {
+                roomInfo.auctions.forEach((auction) => {
                     const isEnded = auction.status === 'ended' || now >= auction.endTime;
                     const qualityColor = getQualityColor(auction.quality);
                     
@@ -13880,49 +13932,80 @@ function hasGistToken() {
                 ? `确定要下架 #${auctionId} 吗？\n发布者: ${creator}`
                 : `确定要下架 #${auctionId} 吗？`;
             
-            if (!confirm(confirmMsg)) {
-                return;
-            }
+            if (!confirm(confirmMsg)) return;
             
             try {
                 const token = getGistToken();
-                if (!token) {
-                    showAdminStatus('未配置GitHub Token，无法操作', 'error');
-                    return;
-                }
+                if (!token) throw new Error('未配置Token');
                 
-                // 获取当前数据
-                const response = await fetch(GIST_URL, {
+                // 从索引文件获取房间的 Gist ID
+                const indexUrl = `https://api.github.com/gists/${GIST_ID}`;
+                const indexResponse = await fetch(indexUrl, {
                     headers: {
                         'Accept': 'application/vnd.github.v3+json',
                         'Authorization': `token ${token}`
                     }
                 });
                 
-                if (!response.ok) throw new Error('获取数据失败');
+                if (!indexResponse.ok) throw new Error('获取索引文件失败');
                 
-                const data = await response.json();
-                const content = data.files[CHAT_GIST_FILE]?.content;
-                if (!content) throw new Error('数据不存在');
+                const indexData = await indexResponse.json();
+                const indexContent = indexData.files['room_index.json']?.content;
+                if (!indexContent) throw new Error('索引文件内容为空');
                 
-                const roomData = JSON.parse(content);
-                let room = null;
-                if (Array.isArray(roomData)) {
-                    room = roomData.find(r => r.id === roomId);
-                } else {
-                    room = roomData.rooms?.find(r => r.id === roomId);
+                const index = JSON.parse(indexContent);
+                const roomGistId = index[roomId];
+                if (!roomGistId) throw new Error('房间不存在');
+                
+                // 获取房间数据
+                const roomResponse = await fetch(`https://api.github.com/gists/${roomGistId}`, {
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Authorization': `token ${token}`
+                    }
+                });
+                
+                if (!roomResponse.ok) throw new Error('获取房间数据失败');
+                
+                const roomData = await roomResponse.json();
+                const filename = `chatrooms_${roomId}.json`;
+                const content = roomData.files[filename]?.content;
+                if (!content) throw new Error('房间数据为空');
+                
+                const allData = JSON.parse(content);
+                let roomInfo = null;
+                
+                if (allData.rooms && allData.rooms[roomId]) {
+                    roomInfo = allData.rooms[roomId];
+                } else if (allData.auctions) {
+                    roomInfo = allData;
                 }
                 
-                if (!room) throw new Error('房间不存在');
+                if (!roomInfo) throw new Error('房间数据格式错误');
                 
                 // 找到并移除商品
-                const auctionIndex = room.auctions.findIndex(a => a.id === auctionId);
+                const auctionIndex = roomInfo.auctions.findIndex(a => a.id === auctionId);
                 if (auctionIndex === -1) throw new Error('商品不存在');
                 
-                room.auctions.splice(auctionIndex, 1);
+                // 删除商品图片
+                const auction = roomInfo.auctions[auctionIndex];
+                if (auction.imageGistId) {
+                    try {
+                        await fetch(`https://api.github.com/gists/${auction.imageGistId}`, {
+                            method: 'DELETE',
+                            headers: { 'Authorization': `token ${token}` }
+                        });
+                        console.log(`🗑️ 已删除商品图片: ${auction.imageGistId}`);
+                    } catch (e) {
+                        console.warn('删除图片失败:', e);
+                    }
+                }
+                
+                roomInfo.auctions.splice(auctionIndex, 1);
                 
                 // 添加系统消息
-                room.messages.push({
+                if (!roomInfo.messages) roomInfo.messages = [];
+                roomInfo.messages.push({
                     id: 'msg_' + Date.now(),
                     author: '系统',
                     content: `⚠️ 管理员下架了拍卖 #${auctionId}`,
@@ -13930,7 +14013,7 @@ function hasGistToken() {
                 });
                 
                 // 保存
-                const saveResponse = await fetch(GIST_URL, {
+                const saveResponse = await fetch(`https://api.github.com/gists/${roomGistId}`, {
                     method: 'PATCH',
                     headers: {
                         'Accept': 'application/vnd.github.v3+json',
@@ -13939,8 +14022,8 @@ function hasGistToken() {
                     },
                     body: JSON.stringify({
                         files: {
-                            [CHAT_GIST_FILE]: {
-                                content: JSON.stringify(roomData, null, 2)
+                            [filename]: {
+                                content: JSON.stringify(allData, null, 2)
                             }
                         }
                     })
@@ -13948,13 +14031,307 @@ function hasGistToken() {
                 
                 if (!saveResponse.ok) throw new Error('保存失败');
                 
-                showAdminStatus(`商品 #${auctionId} 已下架！`, 'success');
+                alert(`✅ 商品 #${auctionId} 已下架！`);
                 loadAuctionManageList();
-                renderAuctionsList();
                 
             } catch (error) {
-                showAdminStatus('下架失败：' + error.message, 'error');
+                alert('下架失败：' + error.message);
             }
+        }
+
+        // ==================== 房主管理功能 ====================
+        async function openOwnerPanel() {
+            const panel = document.getElementById('ownerPanel');
+            const content = document.getElementById('ownerPanelContent');
+            panel.style.display = 'flex';
+            
+            if (!currentChatRoom) {
+                content.innerHTML = '<div style="text-align:center;padding:20px;color:#ef4444;">请先进入房间</div>';
+                return;
+            }
+            
+            content.innerHTML = '<div style="text-align:center;padding:20px;color:rgba(255,255,255,0.5);">验证权限中...</div>';
+            
+            try {
+                const token = getGistToken();
+                
+                // 从索引文件获取房间信息
+                const indexUrl = `https://api.github.com/gists/${GIST_ID}`;
+                const indexResponse = await fetch(indexUrl, {
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        ...(token && { 'Authorization': `token ${token}` })
+                    }
+                });
+                
+                if (!indexResponse.ok) throw new Error('获取索引文件失败');
+                
+                const indexData = await indexResponse.json();
+                const indexContent = indexData.files['room_index.json']?.content;
+                if (!indexContent) throw new Error('索引文件内容为空');
+                
+                const index = JSON.parse(indexContent);
+                const allowedRooms = index.allowedRooms || [];
+                
+                // 查找当前房间的房主
+                const roomInfo = allowedRooms.find(r => {
+                    const existingId = typeof r === 'string' ? r : r.id;
+                    return existingId === currentChatRoom;
+                });
+                
+                const owner = typeof roomInfo === 'object' ? (roomInfo.owner || '') : '';
+                
+                // 检查是否是房主
+                if (!owner || currentChatNick !== owner) {
+                    content.innerHTML = `
+                        <div style="text-align:center;padding:20px;">
+                            <div style="color:#ef4444;font-size:1.2rem;margin-bottom:10px;">❌ 权限不足</div>
+                            <div style="color:rgba(255,255,255,0.6);font-size:0.85rem;">
+                                当前房间: <strong style="color:#ffd700;">#${currentChatRoom}</strong><br>
+                                房主: <strong style="color:#a78bfa;">${owner || '未设置'}</strong><br>
+                                你的昵称: <strong style="color:#4ecdc4;">${currentChatNick}</strong>
+                            </div>
+                            <div style="color:rgba(255,255,255,0.4);font-size:0.75rem;margin-top:15px;">
+                                只有房主才能管理房间
+                            </div>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                // 显示房主管理界面
+                content.innerHTML = `
+                    <div style="background:rgba(167,139,250,0.1);border-radius:8px;padding:12px;margin-bottom:15px;">
+                        <div style="color:#a78bfa;font-size:0.85rem;">
+                            🏠 房间: <strong style="color:#ffd700;">#${currentChatRoom}</strong>
+                            &nbsp;|&nbsp;
+                            👤 房主: <strong style="color:#4ecdc4;">${currentChatNick}</strong>
+                        </div>
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:10px;">
+                        <button onclick="ownerLoadProducts()" style="padding:12px;border-radius:8px;border:none;background:linear-gradient(135deg,#4ecdc4,#44a08d);color:white;cursor:pointer;font-size:0.9rem;font-weight:500;">
+                            🏪 商品管理（下架商品）
+                        </button>
+                        <button onclick="ownerLoadStats()" style="padding:12px;border-radius:8px;border:none;background:linear-gradient(135deg,#a78bfa,#7c3aed);color:white;cursor:pointer;font-size:0.9rem;font-weight:500;">
+                            📊 查看统计
+                        </button>
+                    </div>
+                    <div id="ownerPanelSubContent" style="margin-top:15px;"></div>
+                `;
+                
+            } catch (e) {
+                content.innerHTML = `<div style="text-align:center;padding:20px;color:#ef4444;">验证失败: ${e.message}</div>`;
+            }
+        }
+
+        function closeOwnerPanel() {
+            document.getElementById('ownerPanel').style.display = 'none';
+        }
+
+        async function ownerLoadProducts() {
+            const container = document.getElementById('ownerPanelSubContent');
+            container.innerHTML = '<div style="text-align:center;padding:15px;color:rgba(255,255,255,0.5);">加载商品中...</div>';
+            
+            try {
+                const token = getGistToken();
+                
+                // 从索引文件获取房间的 Gist ID
+                const indexUrl = `https://api.github.com/gists/${GIST_ID}`;
+                const indexResponse = await fetch(indexUrl, {
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        ...(token && { 'Authorization': `token ${token}` })
+                    }
+                });
+                
+                if (!indexResponse.ok) throw new Error('获取索引文件失败');
+                
+                const indexData = await indexResponse.json();
+                const indexContent = indexData.files['room_index.json']?.content;
+                if (!indexContent) throw new Error('索引文件内容为空');
+                
+                const index = JSON.parse(indexContent);
+                const roomGistId = index[currentChatRoom];
+                if (!roomGistId) throw new Error('房间不存在');
+                
+                // 获取房间数据
+                const roomResponse = await fetch(`https://api.github.com/gists/${roomGistId}`, {
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        ...(token && { 'Authorization': `token ${token}` })
+                    }
+                });
+                
+                if (!roomResponse.ok) throw new Error('获取房间数据失败');
+                
+                const roomData = await roomResponse.json();
+                const filename = `chatrooms_${currentChatRoom}.json`;
+                const content = roomData.files[filename]?.content;
+                if (!content) throw new Error('房间数据为空');
+                
+                const allData = JSON.parse(content);
+                let roomInfo = null;
+                
+                if (allData.rooms && allData.rooms[currentChatRoom]) {
+                    roomInfo = allData.rooms[currentChatRoom];
+                } else if (allData.auctions) {
+                    roomInfo = allData;
+                }
+                
+                if (!roomInfo || !roomInfo.auctions || roomInfo.auctions.length === 0) {
+                    container.innerHTML = '<div style="text-align:center;padding:15px;color:rgba(255,255,255,0.5);">暂无商品</div>';
+                    return;
+                }
+                
+                const now = Date.now();
+                let html = '<div style="font-size:0.85rem;color:#ffd700;margin-bottom:10px;">商品列表：</div>';
+                
+                roomInfo.auctions.forEach((auction) => {
+                    const isEnded = auction.status === 'ended' || now >= auction.endTime;
+                    const qualityColor = getQualityColor(auction.quality);
+                    
+                    html += `
+                        <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:10px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+                            <div>
+                                <div style="color:${qualityColor};font-weight:500;font-size:0.85rem;">#${auction.id} ${auction.quality || ''}·${auction.profession || ''}</div>
+                                <div style="color:rgba(255,255,255,0.5);font-size:0.75rem;">${auction.creator || '未知'} | ${isEnded ? '已结束' : '进行中'}</div>
+                            </div>
+                            <button onclick="ownerRemoveProduct('${auction.id}')" style="padding:6px 10px;border-radius:6px;border:none;background:#ef4444;color:white;cursor:pointer;font-size:0.75rem;">下架</button>
+                        </div>
+                    `;
+                });
+                
+                container.innerHTML = html;
+                
+            } catch (e) {
+                container.innerHTML = `<div style="text-align:center;padding:15px;color:#ef4444;">加载失败: ${e.message}</div>`;
+            }
+        }
+
+        async function ownerRemoveProduct(auctionId) {
+            if (!confirm(`确定要下架 #${auctionId} 吗？`)) return;
+            
+            try {
+                const token = getGistToken();
+                if (!token) throw new Error('未配置Token');
+                
+                // 从索引文件获取房间的 Gist ID
+                const indexUrl = `https://api.github.com/gists/${GIST_ID}`;
+                const indexResponse = await fetch(indexUrl, {
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Authorization': `token ${token}`
+                    }
+                });
+                
+                if (!indexResponse.ok) throw new Error('获取索引文件失败');
+                
+                const indexData = await indexResponse.json();
+                const indexContent = indexData.files['room_index.json']?.content;
+                if (!indexContent) throw new Error('索引文件内容为空');
+                
+                const index = JSON.parse(indexContent);
+                const roomGistId = index[currentChatRoom];
+                if (!roomGistId) throw new Error('房间不存在');
+                
+                // 获取房间数据
+                const roomResponse = await fetch(`https://api.github.com/gists/${roomGistId}`, {
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Authorization': `token ${token}`
+                    }
+                });
+                
+                if (!roomResponse.ok) throw new Error('获取房间数据失败');
+                
+                const roomData = await roomResponse.json();
+                const filename = `chatrooms_${currentChatRoom}.json`;
+                const content = roomData.files[filename]?.content;
+                if (!content) throw new Error('房间数据为空');
+                
+                const allData = JSON.parse(content);
+                let roomInfo = null;
+                
+                if (allData.rooms && allData.rooms[currentChatRoom]) {
+                    roomInfo = allData.rooms[currentChatRoom];
+                } else if (allData.auctions) {
+                    roomInfo = allData;
+                }
+                
+                if (!roomInfo) throw new Error('房间数据格式错误');
+                
+                // 找到并移除商品
+                const auctionIndex = roomInfo.auctions.findIndex(a => a.id === auctionId);
+                if (auctionIndex === -1) throw new Error('商品不存在');
+                
+                // 删除商品图片
+                const auction = roomInfo.auctions[auctionIndex];
+                if (auction.imageGistId) {
+                    try {
+                        await fetch(`https://api.github.com/gists/${auction.imageGistId}`, {
+                            method: 'DELETE',
+                            headers: { 'Authorization': `token ${token}` }
+                        });
+                    } catch (e) {}
+                }
+                
+                roomInfo.auctions.splice(auctionIndex, 1);
+                
+                // 添加系统消息
+                if (!roomInfo.messages) roomInfo.messages = [];
+                roomInfo.messages.push({
+                    id: 'msg_' + Date.now(),
+                    author: '系统',
+                    content: `⚠️ 房主下架了拍卖 #${auctionId}`,
+                    time: Date.now()
+                });
+                
+                // 保存
+                const saveResponse = await fetch(`https://api.github.com/gists/${roomGistId}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json',
+                        'Authorization': `token ${token}`
+                    },
+                    body: JSON.stringify({
+                        files: {
+                            [filename]: {
+                                content: JSON.stringify(allData, null, 2)
+                            }
+                        }
+                    })
+                });
+                
+                if (!saveResponse.ok) throw new Error('保存失败');
+                
+                alert(`✅ 商品 #${auctionId} 已下架！`);
+                ownerLoadProducts();
+                
+            } catch (e) {
+                alert('下架失败：' + e.message);
+            }
+        }
+
+        async function ownerLoadStats() {
+            const container = document.getElementById('ownerPanelSubContent');
+            container.innerHTML = '<div style="text-align:center;padding:15px;color:rgba(255,255,255,0.5);">加载统计中...</div>';
+            
+            // 复用拍卖统计逻辑，但只显示当前房间
+            document.getElementById('auctionStatsRoomId').value = currentChatRoom;
+            await loadAuctionStats();
+            
+            // 将统计结果复制到房主面板
+            const summary = document.getElementById('auctionStatsSummary').innerHTML;
+            const detail = document.getElementById('auctionStatsDetail').innerHTML;
+            
+            container.innerHTML = `
+                <div style="font-size:0.85rem;color:#ffd700;margin-bottom:10px;">统计信息：</div>
+                <div style="background:rgba(0,0,0,0.2);border-radius:8px;padding:10px;max-height:300px;overflow-y:auto;">
+                    ${summary}
+                    ${detail}
+                </div>
+            `;
         }
 
         async function loadAuctionStats() {
@@ -15589,6 +15966,7 @@ function hasGistToken() {
         <div id="chatRoomHeader" style="background:linear-gradient(135deg,rgba(78,205,196,0.2),rgba(44,160,141,0.2));padding:10px 15px;display:flex;justify-content:space-between;align-items:center;cursor:move;user-select:none;" onmousedown="startPanelDrag(event,'chatRoomPanel')" ontouchstart="startPanelTouch(event,'chatRoomPanel')">
             <span style="color:#4ecdc4;font-size:0.9rem;font-weight:bold;">🏪 拍卖行 <span id="chatRoomIdDisplay" style="color:rgba(255,255,255,0.5);font-size:0.75rem;"></span></span>
             <div style="display:flex;gap:8px;align-items:center;">
+                <button onclick="openOwnerPanel()" title="房主管理" style="background:transparent;border:none;color:#a78bfa;font-size:0.85rem;cursor:pointer;padding:4px 8px;border:1px solid rgba(167,139,250,0.3);border-radius:4px;transition:all 0.2s;" onmouseover="this.style.background='rgba(167,139,250,0.2)'" onmouseout="this.style.background='transparent'">👑 房主</button>
                 <button onclick="switchChatRoom()" title="切换房间" style="background:transparent;border:none;color:#fbbf24;font-size:0.85rem;cursor:pointer;padding:4px 8px;border:1px solid rgba(255,215,0,0.3);border-radius:4px;transition:all 0.2s;" onmouseover="this.style.background='rgba(255,215,0,0.2)'" onmouseout="this.style.background='transparent'">切换房间</button>
                 <button onclick="toggleChatRoomTab('auctions')" title="拍卖" style="background:transparent;border:none;color:#ffd700;font-size:1.4rem;cursor:pointer;padding:0;text-shadow:0 0 8px rgba(255,215,0,0.6);">🔨</button>
                 <button onclick="closeChatRoom()" title="关闭" style="background:transparent;border:none;color:#ff6b6b;font-size:1rem;cursor:pointer;padding:0;">×</button>
@@ -15619,6 +15997,19 @@ function hasGistToken() {
                 📢 <b>提示：</b>多人同时拍卖可能提交失败，请查看拍主是否为自己再确认出价成功！
             </div>
             <div id="auctionsListContainer" style="flex:1;overflow-y:auto;padding:10px;"></div>
+        </div>
+    </div>
+
+    <!-- 房主管理面板 -->
+    <div id="ownerPanel" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:9999;align-items:center;justify-content:center;">
+        <div style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);border:2px solid rgba(167,139,250,0.4);border-radius:16px;padding:20px;width:90%;max-width:500px;max-height:80vh;overflow-y:auto;box-shadow:0 10px 50px rgba(0,0,0,0.6);">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+                <h2 style="color:#a78bfa;margin:0;font-size:1.1rem;">👑 房主管理</h2>
+                <button onclick="closeOwnerPanel()" style="background:transparent;border:none;color:#ff6b6b;font-size:1.2rem;cursor:pointer;">×</button>
+            </div>
+            <div id="ownerPanelContent" style="color:rgba(255,255,255,0.8);">
+                <div style="text-align:center;padding:20px;color:rgba(255,255,255,0.5);">加载中...</div>
+            </div>
         </div>
     </div>
 
