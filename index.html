@@ -3011,28 +3011,18 @@
                         const index = JSON.parse(indexData.files['room_index.json'].content);
                         const allowedRooms = index.allowedRooms || [];
                         
-                        console.log('🔍 白名单检查:', {
-                            roomId: roomId,
-                            allowedRooms: allowedRooms,
-                            length: allowedRooms.length
-                        });
-                        
                         // 如果白名单不为空，检查房间是否在白名单中
                         if (allowedRooms.length > 0) {
                             const isAllowed = allowedRooms.some(r => {
                                 const existingId = typeof r === 'string' ? r : r.id;
-                                console.log(`  检查: ${existingId} === ${roomId} ?`, existingId === roomId);
                                 return existingId === roomId;
                             });
-                            console.log('  结果: isAllowed =', isAllowed);
                             if (!isAllowed) {
                                 alert(`房间 "${roomId}" 未开放，请联系管理员开通`);
                                 return;
                             }
                         }
                     }
-                } else {
-                    console.error('❌ 获取索引文件失败:', indexResponse.status);
                 }
             } catch (e) {
                 console.warn('检查房间白名单失败:', e);
@@ -14994,100 +14984,82 @@ function hasGistToken() {
             </div>
 
             <div id="adminMenuSection" style="display:none;">
-                <h2 style="color:#ffd700;text-align:center;margin:0 0 20px 0;font-size:1.2rem;">🛡️ 管理员菜单</h2>
-                <div style="display:flex;flex-direction:column;gap:10px;">
-                    <div class="admin-menu-item" onclick="adminShowPage('help')">
-                        <span style="font-size:1.3rem;">📖</span>
-                        <div>
-                            <div style="color:#ffd700;font-weight:500;">功能使用说明</div>
-                            <div style="color:rgba(255,255,255,0.4);font-size:0.8rem;">查看各功能详细使用方法</div>
+                <h2 style="color:#ffd700;text-align:center;margin:0 0 15px 0;font-size:1.1rem;">🛡️ 管理员菜单</h2>
+                <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;">
+                    <div class="admin-menu-item" onclick="adminShowPage('help')" style="padding:10px;">
+                        <span style="font-size:1.1rem;">📖</span>
+                        <div style="margin-left:8px;">
+                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">使用说明</div>
                         </div>
                     </div>
-                    <div class="admin-menu-item" onclick="adminShowPage('news')">
-                        <span style="font-size:1.3rem;">📢</span>
-                        <div>
-                            <div style="color:#ffd700;font-weight:500;">公告管理</div>
-                            <div style="color:rgba(255,255,255,0.4);font-size:0.8rem;">发布、删除、查看公告</div>
+                    <div class="admin-menu-item" onclick="adminShowPage('news')" style="padding:10px;">
+                        <span style="font-size:1.1rem;">📢</span>
+                        <div style="margin-left:8px;">
+                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">公告管理</div>
                         </div>
                     </div>
-                    <div class="admin-menu-item" onclick="adminShowPage('title')">
-                        <span style="font-size:1.3rem;">🏷️</span>
-                        <div>
-                            <div style="color:#ffd700;font-weight:500;">标题管理</div>
-                            <div style="color:rgba(255,255,255,0.4);font-size:0.8rem;">修改网站标题文字</div>
+                    <div class="admin-menu-item" onclick="adminShowPage('title')" style="padding:10px;">
+                        <span style="font-size:1.1rem;">🏷️</span>
+                        <div style="margin-left:8px;">
+                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">标题管理</div>
                         </div>
                     </div>
-                    <div class="admin-menu-item" onclick="adminShowPage('stats')">
-                        <span style="font-size:1.3rem;">📊</span>
-                        <div>
-                            <div style="color:#ffd700;font-weight:500;">访问统计</div>
-                            <div style="color:rgba(255,255,255,0.4);font-size:0.8rem;">查看网站访问数据</div>
+                    <div class="admin-menu-item" onclick="adminShowPage('stats')" style="padding:10px;">
+                        <span style="font-size:1.1rem;">📊</span>
+                        <div style="margin-left:8px;">
+                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">访问统计</div>
                         </div>
                     </div>
-                    <div class="admin-menu-item" onclick="adminShowPage('settings')">
-                        <span style="font-size:1.3rem;">⚙️</span>
-                        <div>
-                            <div style="color:#ffd700;font-weight:500;">系统设置</div>
-                            <div style="color:rgba(255,255,255,0.4);font-size:0.8rem;">Token配置与连接测试</div>
+                    <div class="admin-menu-item" onclick="adminShowPage('settings')" style="padding:10px;">
+                        <span style="font-size:1.1rem;">⚙️</span>
+                        <div style="margin-left:8px;">
+                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">系统设置</div>
                         </div>
                     </div>
-                    <div class="admin-menu-item" onclick="adminShowPage('nickManage')">
-                        <span style="font-size:1.3rem;">👤</span>
-                        <div>
-                            <div style="color:#ffd700;font-weight:500;">昵称管理</div>
-                            <div style="color:rgba(255,255,255,0.4);font-size:0.8rem;">管理用户昵称（可重置）</div>
+                    <div class="admin-menu-item" onclick="adminShowPage('nickManage')" style="padding:10px;">
+                        <span style="font-size:1.1rem;">👤</span>
+                        <div style="margin-left:8px;">
+                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">昵称管理</div>
                         </div>
                     </div>
-                    <div class="admin-menu-item" onclick="adminShowPage('passwordManage')">
-                        <span style="font-size:1.3rem;">🔑</span>
-                        <div>
-                            <div style="color:#ffd700;font-weight:500;">密码管理</div>
-                            <div style="color:rgba(255,255,255,0.4);font-size:0.8rem;">管理网站访问密码</div>
+                    <div class="admin-menu-item" onclick="adminShowPage('passwordManage')" style="padding:10px;">
+                        <span style="font-size:1.1rem;">🔑</span>
+                        <div style="margin-left:8px;">
+                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">密码管理</div>
                         </div>
                     </div>
-                    <div class="admin-menu-item" onclick="adminShowPage('auctionStats')">
-                        <span style="font-size:1.3rem;">📊</span>
-                        <div>
-                            <div style="color:#ffd700;font-weight:500;">拍卖统计</div>
-                            <div style="color:rgba(255,255,255,0.4);font-size:0.8rem;">查看买卖记录与统计</div>
+                    <div class="admin-menu-item" onclick="adminShowPage('auctionStats')" style="padding:10px;">
+                        <span style="font-size:1.1rem;">📈</span>
+                        <div style="margin-left:8px;">
+                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">拍卖统计</div>
                         </div>
                     </div>
-                    <div class="admin-menu-item" onclick="adminShowPage('auctionManage')">
-                        <span style="font-size:1.3rem;">🏪</span>
-                        <div>
-                            <div style="color:#ffd700;font-weight:500;">商品管理</div>
-                            <div style="color:rgba(255,255,255,0.4);font-size:0.8rem;">下架违规或错误商品</div>
+                    <div class="admin-menu-item" onclick="adminShowPage('auctionManage')" style="padding:10px;">
+                        <span style="font-size:1.1rem;">🏪</span>
+                        <div style="margin-left:8px;">
+                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">商品管理</div>
                         </div>
                     </div>
-                    <div class="admin-menu-item" onclick="adminShowPage('roomManage')">
-                        <span style="font-size:1.3rem;">🏠</span>
-                        <div>
-                            <div style="color:#ffd700;font-weight:500;">房间白名单</div>
-                            <div style="color:rgba(255,255,255,0.4);font-size:0.8rem;">管理开放的房间ID</div>
+                    <div class="admin-menu-item" onclick="adminShowPage('roomManage')" style="padding:10px;">
+                        <span style="font-size:1.1rem;">🏠</span>
+                        <div style="margin-left:8px;">
+                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">房间管理</div>
                         </div>
                     </div>
-                    <div class="admin-menu-item" onclick="adminShowPage('gistManage')">
-                        <span style="font-size:1.3rem;">🗑️</span>
-                        <div>
-                            <div style="color:#ffd700;font-weight:500;">配置文件管理</div>
-                            <div style="color:rgba(255,255,255,0.4);font-size:0.8rem;">批量删除多余的Gist配置文件</div>
+                    <div class="admin-menu-item" onclick="adminShowPage('gistManage')" style="padding:10px;">
+                        <span style="font-size:1.1rem;">🗑️</span>
+                        <div style="margin-left:8px;">
+                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">文件管理</div>
                         </div>
                     </div>
-                    <div class="admin-menu-item" onclick="adminShowPage('cacheManage')">
-                        <span style="font-size:1.3rem;">🧹</span>
-                        <div>
-                            <div style="color:#ffd700;font-weight:500;">清除缓存</div>
-                            <div style="color:rgba(255,255,255,0.4);font-size:0.8rem;">清除本地缓存，解决配置冲突</div>
-                        </div>
-                    </div>
-                    <div class="admin-menu-item" onclick="logoutToLogin()">
-                        <span style="font-size:1.3rem;">🔙</span>
-                        <div>
-                            <div style="color:#ffd700;font-weight:500;">退出登录</div>
-                            <div style="color:rgba(255,255,255,0.4);font-size:0.8rem;">回到登录界面</div>
+                    <div class="admin-menu-item" onclick="adminShowPage('cacheManage')" style="padding:10px;">
+                        <span style="font-size:1.1rem;">🧹</span>
+                        <div style="margin-left:8px;">
+                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">清除缓存</div>
                         </div>
                     </div>
                 </div>
+                <button class="admin-btn" onclick="logoutToLogin()" style="width:100%;margin-top:12px;background:linear-gradient(135deg,#ef4444,#dc2626);color:white;">🔙 退出登录</button>
             </div>
 
             <div id="adminPageHelp" style="display:none;">
