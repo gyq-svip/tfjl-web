@@ -9507,6 +9507,10 @@ const INDEX_GIST_ID_KEY = 'TFJL_Index_Gist_ID';
 const COUNTER_CACHE_KEY = 'TFJL_Counter_Cache';
 const COUNTER_CACHE_TIME_KEY = 'TFJL_Counter_Cache_Time';
 
+// 索引文件创建锁（防止并发创建）
+let indexGistCreating = false;
+let indexGistCreatePromise = null;
+
 // 获取索引文件的 Gist URL（动态获取，支持自动创建）
 async function getIndexGistUrl() {
     const token = getGistToken();
@@ -9516,6 +9520,11 @@ async function getIndexGistUrl() {
     
     if (indexGistId) {
         return `https://api.github.com/gists/${indexGistId}`;
+    }
+    
+    // 如果正在创建，等待创建完成
+    if (indexGistCreating && indexGistCreatePromise) {
+        return await indexGistCreatePromise;
     }
     
     // 尝试使用硬编码的 GIST_ID
@@ -9535,36 +9544,52 @@ async function getIndexGistUrl() {
         }
     }
     
-    // 需要创建新的索引文件
+    // 需要创建新的索引文件（加锁）
     if (token) {
-        const createResponse = await fetch('https://api.github.com/gists', {
-            method: 'POST',
-            headers: {
-                'Accept': 'application/vnd.github.v3+json',
-                'Content-Type': 'application/json',
-                'Authorization': `token ${token}`
-            },
-            body: JSON.stringify({
-                description: '房间索引文件',
-                public: false,
-                files: {
-                    'room_index.json': {
-                        content: JSON.stringify({}, null, 2)
-                    }
-                }
-            })
-        });
+        indexGistCreating = true;
+        indexGistCreatePromise = createIndexGist(token);
         
-        if (createResponse.ok) {
-            const data = await createResponse.json();
-            localStorage.setItem(INDEX_GIST_ID_KEY, data.id);
-            console.log('已创建新的索引文件:', data.id);
-            return `https://api.github.com/gists/${data.id}`;
+        try {
+            const result = await indexGistCreatePromise;
+            return result;
+        } finally {
+            indexGistCreating = false;
+            indexGistCreatePromise = null;
         }
     }
     
     // 最后回退到硬编码 URL（可能会 404）
     return `https://api.github.com/gists/${GIST_ID}`;
+}
+
+// 创建索引文件
+async function createIndexGist(token) {
+    const createResponse = await fetch('https://api.github.com/gists', {
+        method: 'POST',
+        headers: {
+            'Accept': 'application/vnd.github.v3+json',
+            'Content-Type': 'application/json',
+            'Authorization': `token ${token}`
+        },
+        body: JSON.stringify({
+            description: '房间索引文件',
+            public: false,
+            files: {
+                'room_index.json': {
+                    content: JSON.stringify({}, null, 2)
+                }
+            }
+        })
+    });
+    
+    if (createResponse.ok) {
+        const data = await createResponse.json();
+        localStorage.setItem(INDEX_GIST_ID_KEY, data.id);
+        console.log('✅ 已创建新的索引文件:', data.id);
+        return `https://api.github.com/gists/${data.id}`;
+    }
+    
+    throw new Error('创建索引文件失败');
 }
 
 // 兼容旧的 GIST_URL（但推荐使用 getIndexGistUrl()）
