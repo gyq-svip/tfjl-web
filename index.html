@@ -3048,9 +3048,11 @@
             // 去掉 base64 前缀，只保存纯 base64 数据
             const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
             
-            // 文件名加入房间号，避免冲突
+            // 文件名加入房间号、时间戳和随机数，确保唯一
             const roomId = currentChatRoom || 'default';
-            const filename = `auction_${auctionId}_${roomId}.txt`;
+            const timestamp = Date.now();
+            const random = Math.random().toString(36).substr(2, 6);
+            const filename = `auction_${auctionId}_${roomId}_${timestamp}_${random}.txt`;
             
             // 检查是否已经存在该图片的 GIST_ID
             const storageKey = `auction_img_gist_${roomId}_${auctionId}`;
@@ -3835,13 +3837,32 @@
                 return; 
             }
 
+            // 使用短ID：时间戳后6位 + 随机3位字符，如 "123456_a1b"
+            const shortTimestamp = (Date.now() % 1000000).toString().padStart(6, '0');
+            const random = Math.random().toString(36).substr(2, 3);
+            const auctionId = `${shortTimestamp}_${random}`;
+            
+            let imageGistId = null;
+
             try {
+                // 先上传图片（如果有）
+                if (auctionImageBase64) {
+                    console.log('📸 开始保存图片...');
+                    imageGistId = await saveImage(auctionId, auctionImageBase64);
+                    console.log('📸 图片保存成功，Gist ID:', imageGistId);
+                }
+                
+                // 获取最新数据
+                const roomId = currentChatRoom || 'default';
+                localStorage.removeItem(`chatroom_gist_${roomId}`);
                 await fetchChatRoomData();
                 const room = ensureRoomData();
-                const auctionId = String(room.nextAuctionId || 1).padStart(4, '0');
-                room.nextAuctionId = (room.nextAuctionId || 1) + 1;
+                
+                // 检查ID是否已存在（极小概率，但以防万一）
+                if (room.auctions.some(a => a.id === auctionId)) {
+                    throw new Error('ID冲突，请重试');
+                }
 
-                // 先保存拍品基本信息（不含图片）
                 const auctionData = {
                     id: auctionId,
                     creator: currentChatNick,
@@ -3849,7 +3870,8 @@
                     profession: profession,
                     bonusDmg: bonusDmg,
                     ignoreIce: ignoreIce,
-                    image: '', // 先留空，后面更新
+                    image: '',
+                    imageGistId: imageGistId || '',
                     startPrice: startPrice,
                     bidIncrement: bidIncrement,
                     startTime: Date.now(),
@@ -3859,15 +3881,6 @@
                     isExchange: isExchange,
                     exchangeWant: exchangeWant
                 };
-
-                // 如果有图片，保存到独立的 Gist 文件
-                if (auctionImageBase64) {
-                    console.log('📸 开始保存图片...');
-                    const imageGistId = await saveImage(auctionId, auctionImageBase64);
-                    console.log('📸 图片保存成功，Gist ID:', imageGistId);
-                    // 只保存 Gist ID，不保存完整的 base64 数据
-                    auctionData.imageGistId = imageGistId;
-                }
 
                 room.auctions.push(auctionData);
 
@@ -3896,6 +3909,23 @@
                 showAuctionToast('✅ 发布成功！', 'success');
             } catch (error) {
                 console.error('发布失败:', error);
+                
+                // 发布失败时删除已上传的图片
+                if (imageGistId) {
+                    try {
+                        const token = getGistToken();
+                        await fetch(`https://api.github.com/gists/${imageGistId}`, {
+                            method: 'DELETE',
+                            headers: {
+                                'Authorization': `token ${token}`
+                            }
+                        });
+                        console.log('🗑️ 已删除上传的图片');
+                    } catch (e) {
+                        console.warn('删除图片失败:', e);
+                    }
+                }
+                
                 alert('发布失败: ' + error.message);
             } finally {
                 btn.disabled = false;
@@ -4298,23 +4328,38 @@
                 if (auction.status === 'ended' || Date.now() >= auction.endTime) { showBidToast('拍卖已结束', false); renderAuctionsList(); renderChatMessages(); bidLock = false; return; }
                 if (auction.creator === currentChatNick) { showBidToast('不能竞拍自己发布的拍卖', false); renderAuctionsList(); bidLock = false; return; }
 
+                // 检查是否有人在出价（冷却期检查）
+                const BID_COOLDOWN = 10000; // 10秒冷却期
+                const lastBidLockTime = auction.bidLockTime || 0;
+                const lastBidLockUser = auction.bidLockUser || '';
+                
+                if (lastBidLockTime > 0 && lastBidLockUser !== currentChatNick) {
+                    const timeSinceLock = Date.now() - lastBidLockTime;
+                    if (timeSinceLock < BID_COOLDOWN) {
+                        const waitSec = Math.ceil((BID_COOLDOWN - timeSinceLock) / 1000);
+                        showBidToast(`⏳ ${lastBidLockUser} 正在出价，请等待 ${waitSec} 秒`, false);
+                        bidLock = false;
+                        renderAuctionsList();
+                        return;
+                    }
+                }
+
+                // 设置出价锁
+                auction.bidLockTime = Date.now();
+                auction.bidLockUser = currentChatNick;
+                await saveChatRoomData();
+                console.log(`🔒 出价锁已设置: ${currentChatNick}`);
+
                 const currentBid = auction.bids.length > 0 ? auction.bids[auction.bids.length - 1].amount : auction.startPrice;
                 const currentBidder = auction.bids.length > 0 ? auction.bids[auction.bids.length - 1].bidder : '';
-
-                // 注意：这里不检查是否是最高出价者，因为可能别人已经超过他了
-                // 在等待后再次检查，确保是最新的
 
                 const increment = customIncrement || auction.bidIncrement || 10;
                 const myBid = currentBid + increment;
 
-                const lastBidTime = auction.bids.length > 0 ? auction.bids[auction.bids.length - 1].time : 0;
-                const timeSinceLastBid = Date.now() - lastBidTime;
-                const recentBid = lastBidTime > 0 && timeSinceLastBid < 8000;
-
-                const baseWait = 5000;
-                const jitter = Math.floor(Math.random() * 2000);
-                const extraWait = recentBid ? 3000 : 0;
-                const totalWait = baseWait + jitter + extraWait;
+                // 等待时间（防止并发）
+                const baseWait = 3000;
+                const jitter = Math.floor(Math.random() * 1000);
+                const totalWait = baseWait + jitter;
                 const totalWaitSec = Math.ceil(totalWait / 1000);
 
                 showBidCountdown(myBid, totalWaitSec);
@@ -4323,6 +4368,8 @@
 
                 removeBidCountdown();
 
+                // 再次获取最新数据
+                localStorage.removeItem(`chatroom_gist_${roomId}`);
                 await fetchChatRoomData();
                 room = getRoomData();
                 if (!room) { bidLock = false; renderAuctionsList(); return; }
@@ -4335,6 +4382,10 @@
 
                 if (latestBidder === currentChatNick) {
                     showBidToast('你已经是最高出价者', false);
+                    // 释放锁
+                    auction.bidLockTime = 0;
+                    auction.bidLockUser = '';
+                    await saveChatRoomData();
                     bidLock = false;
                     renderAuctionsList();
                     return;
@@ -4344,6 +4395,10 @@
 
                 if (actualBid !== myBid) {
                     showBidToast(`价格已变化！当前 ${latestBid}(${latestBidder})，需出价 ${latestBid + increment}，请重新出价`, false);
+                    // 释放锁
+                    auction.bidLockTime = 0;
+                    auction.bidLockUser = '';
+                    await saveChatRoomData();
                     renderAuctionsList();
                     renderChatMessages();
                     bidLock = false;
@@ -4364,6 +4419,10 @@
                 if (auction.endTime > now) {
                     auction.endTime += EXTEND_TIME;
                 }
+                
+                // 释放出价锁
+                auction.bidLockTime = 0;
+                auction.bidLockUser = '';
 
                 const quality = auction.quality || '';
                 const profession = auction.profession || '';
@@ -4377,36 +4436,9 @@
                 });
 
                 await saveChatRoomData();
+                console.log(`🔓 出价锁已释放: ${currentChatNick}`);
 
-                showBidToast(`正在查询出价结果...`, true);
-
-                await fetchChatRoomData();
-                room = getRoomData();
-                if (room) {
-                    auction = room.auctions.find(a => a.id === auctionId);
-                    if (auction) {
-                        const finalBid = auction.bids.length > 0 ? auction.bids[auction.bids.length - 1].amount : auction.startPrice;
-                        const finalBidder = auction.bids.length > 0 ? auction.bids[auction.bids.length - 1].bidder : '';
-                        const myBidExists = auction.bids.some(b => b.bidder === currentChatNick && b.amount === actualBid);
-
-                        if (myBidExists && finalBidder === currentChatNick) {
-                            showBidToast(`🎉 恭喜你出价 ${actualBid} 成功！当前最高价`, true);
-                        } else if (actualBid > finalBid) {
-                            auction.bids.push({
-                                bidder: currentChatNick,
-                                amount: actualBid,
-                                time: Date.now()
-                            });
-                            await saveChatRoomData();
-                            showBidToast(`🎉 恭喜你出价 ${actualBid} 成功！当前最高价`, true);
-                        } else if (finalBidder === currentChatNick && finalBid >= actualBid) {
-                            showBidToast(`🎉 恭喜你出价 ${actualBid} 成功！当前最高价`, true);
-                        } else {
-                            const needBid = finalBid + increment;
-                            showBidToast(`❌ 出价失败！${finalBidder} 已出价 ${finalBid}，需出价 ${needBid}`, false);
-                        }
-                    }
-                }
+                showBidToast(`🎉 出价 ${actualBid} 成功！`, true);
 
                 await fetchChatRoomData();
                 if (fromDetail) closeAuctionDetail();
