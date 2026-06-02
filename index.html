@@ -3360,13 +3360,20 @@
                             indexData = {};
                         }
                     }
+                } else if (response.status === 404 || response.status === 403) {
+                    // 索引文件不存在或无权限，清除缓存，创建新的
+                    console.log(`⚠️ 索引文件 ${response.status}，创建新的`);
+                    localStorage.removeItem(INDEX_GIST_ID_KEY);
                 }
                 
                 // 更新索引
                 indexData[roomId] = gistId;
                 
+                // 获取最新的索引文件 URL（可能已更新）
+                const latestIndexUrl = await getIndexGistUrl();
+                
                 // 保存索引文件
-                const patchResponse = await fetch(indexUrl, {
+                const patchResponse = await fetch(latestIndexUrl, {
                     method: 'PATCH',
                     headers: {
                         'Accept': 'application/vnd.github.v3+json',
@@ -3382,8 +3389,16 @@
                     })
                 });
                 
-                if (!patchResponse.ok && patchResponse.status === 404) {
-                    // 如果索引文件不存在，创建新的
+                if (patchResponse.ok) {
+                    console.log(`✅ 索引已更新: ${roomId} = ${gistId}`);
+                    return;
+                }
+                
+                // 如果 PATCH 失败（404 或 403），创建新的索引文件
+                if (patchResponse.status === 404 || patchResponse.status === 403) {
+                    console.log(`⚠️ PATCH 失败 (${patchResponse.status})，创建新索引文件`);
+                    localStorage.removeItem(INDEX_GIST_ID_KEY);
+                    
                     const createResponse = await fetch('https://api.github.com/gists', {
                         method: 'POST',
                         headers: {
@@ -3406,7 +3421,7 @@
                         const data = await createResponse.json();
                         // 保存新的索引文件 ID
                         localStorage.setItem(INDEX_GIST_ID_KEY, data.id);
-                        console.log('已创建房间索引文件:', data.id);
+                        console.log('✅ 已创建新的索引文件:', data.id);
                     }
                 }
             } catch (error) {
@@ -3572,6 +3587,8 @@
             const data = await response.json();
             // 保存 GIST_ID 到 localStorage
             localStorage.setItem(`chatroom_gist_${roomId}`, data.id);
+            // 更新索引文件，让其他人也能找到这个房间
+            await updateRoomIndex(roomId, data.id);
             console.log(`已创建房间 ${roomId} 的配置文件，GIST_ID: ${data.id}`);
             
             return data.id;
@@ -3704,6 +3721,13 @@
                 alert('请先进入拍卖行房间！');
                 return;
             }
+            
+            // 显示加载状态
+            const btn = document.getElementById('postAuctionBtn');
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = '⏳ 发布中...';
+            
             const quality = document.getElementById('auctionQuality').value;
             const profession = document.getElementById('auctionProfession').value;
             const bonusDmg = parseFloat(document.getElementById('auctionBonusDmg').value) || 0;
@@ -3714,7 +3738,12 @@
             const isExchange = document.getElementById('auctionIsExchange').checked;
             const exchangeWant = document.getElementById('auctionExchangeWant').value || '';
 
-            if (isNaN(startPrice) || startPrice < 0) { alert('请输入有效的起拍价'); return; }
+            if (isNaN(startPrice) || startPrice < 0) { 
+                alert('请输入有效的起拍价');
+                btn.disabled = false;
+                btn.textContent = originalText;
+                return; 
+            }
 
             try {
                 await fetchChatRoomData();
@@ -3759,13 +3788,43 @@
                     time: Date.now()
                 });
 
-                await saveChatRoomData();
+                const savedGistId = await saveChatRoomData();
+                console.log('✅ 拍品发布成功，Gist ID:', savedGistId);
+                
                 closeAuctionPostModal();
                 renderAuctionsList();
                 renderChatMessages();
+                
+                // 显示成功提示
+                showAuctionToast('✅ 发布成功！', 'success');
             } catch (error) {
+                console.error('发布失败:', error);
                 alert('发布失败: ' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = originalText;
             }
+        }
+        
+        // 显示拍卖操作提示
+        function showAuctionToast(message, type) {
+            const toast = document.createElement('div');
+            toast.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                padding: 15px 30px;
+                border-radius: 10px;
+                font-size: 1rem;
+                font-weight: 500;
+                z-index: 99999;
+                animation: fadeInOut 2s ease-in-out;
+                ${type === 'success' ? 'background: rgba(74,222,128,0.9); color: #1a1a2e;' : 'background: rgba(239,68,68,0.9); color: white;'}
+            `;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 2000);
         }
 
         function getQualityColor(q) {
@@ -10295,8 +10354,39 @@ function hasGistToken() {
             try {
                 const token = getGistToken();
                 
-                // 从索引文件获取 counter 的 GIST_ID
+                // 从 localStorage 获取 counter 的 GIST_ID
                 let counterGistId = localStorage.getItem('counter_gist_id');
+                
+                // 如果 localStorage 没有，尝试从索引文件获取
+                if (!counterGistId) {
+                    try {
+                        const indexUrl = await getIndexGistUrl();
+                        const indexResponse = await fetch(indexUrl, {
+                            headers: {
+                                'Accept': 'application/vnd.github.v3+json',
+                                ...(token && { 'Authorization': `token ${token}` })
+                            }
+                        });
+                        
+                        if (indexResponse.ok) {
+                            const data = await indexResponse.json();
+                            if (data.files && data.files['room_index.json'] && data.files['room_index.json'].content) {
+                                try {
+                                    const indexData = JSON.parse(data.files['room_index.json'].content);
+                                    if (indexData['counter']) {
+                                        counterGistId = indexData['counter'];
+                                        // 缓存到 localStorage
+                                        localStorage.setItem('counter_gist_id', counterGistId);
+                                    }
+                                } catch (e) {
+                                    console.warn('解析索引文件失败');
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('获取索引文件失败:', e);
+                    }
+                }
                 
                 if (counterGistId) {
                     // 从独立 Gist 加载
@@ -10342,6 +10432,10 @@ function hasGistToken() {
                             
                             return parsed;
                         }
+                    } else if (response.status === 404 || response.status === 403) {
+                        // Gist 不存在或无权限，清除缓存
+                        console.log(`⚠️ Counter Gist ${response.status}，清除缓存`);
+                        localStorage.removeItem('counter_gist_id');
                     }
                 }
                 
@@ -10999,28 +11093,32 @@ function hasGistToken() {
                 
                 // 如果 localStorage 没有，从索引文件获取
                 if (!messagesGistId) {
-                    const indexUrl = await getIndexGistUrl();
-                    const indexResponse = await fetch(indexUrl, {
-                        headers: {
-                            'Accept': 'application/vnd.github.v3+json',
-                            ...(token && { 'Authorization': `token ${token}` })
-                        }
-                    });
-                    
-                    if (indexResponse.ok) {
-                        const data = await indexResponse.json();
-                        if (data.files && data.files['room_index.json'] && data.files['room_index.json'].content) {
-                            try {
-                                const indexData = JSON.parse(data.files['room_index.json'].content);
-                                if (indexData['messages']) {
-                                    messagesGistId = indexData['messages'];
-                                    // 保存到 localStorage
-                                    localStorage.setItem('messages_gist_id', messagesGistId);
+                    try {
+                        const indexUrl = await getIndexGistUrl();
+                        const indexResponse = await fetch(indexUrl, {
+                            headers: {
+                                'Accept': 'application/vnd.github.v3+json',
+                                ...(token && { 'Authorization': `token ${token}` })
+                            }
+                        });
+                        
+                        if (indexResponse.ok) {
+                            const data = await indexResponse.json();
+                            if (data.files && data.files['room_index.json'] && data.files['room_index.json'].content) {
+                                try {
+                                    const indexData = JSON.parse(data.files['room_index.json'].content);
+                                    if (indexData['messages']) {
+                                        messagesGistId = indexData['messages'];
+                                        // 保存到 localStorage
+                                        localStorage.setItem('messages_gist_id', messagesGistId);
+                                    }
+                                } catch (e) {
+                                    console.warn('解析索引文件失败');
                                 }
-                            } catch (e) {
-                                console.warn('解析索引文件失败');
                             }
                         }
+                    } catch (e) {
+                        console.warn('获取索引文件失败:', e);
                     }
                 }
                 
@@ -11044,6 +11142,10 @@ function hasGistToken() {
                                 return;
                             }
                         }
+                    } else if (response.status === 404 || response.status === 403) {
+                        // Gist 不存在或无权限，清除缓存
+                        console.log(`⚠️ Messages Gist ${response.status}，清除缓存`);
+                        localStorage.removeItem('messages_gist_id');
                     }
                 }
                 
