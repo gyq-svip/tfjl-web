@@ -14915,6 +14915,20 @@ function hasGistToken() {
         #messageWallContent::-webkit-scrollbar-track { background: rgba(255,255,255,0.1); border-radius: 3px; }
         #messageWallContent::-webkit-scrollbar-thumb { background: rgba(255,215,0,0.5); border-radius: 3px; }
         #messageWallContent::-webkit-scrollbar-thumb:hover { background: rgba(255,215,0,0.8); }
+        
+        /* 拍卖行面板拖拽调整大小样式 */
+        #chatRoomPanel {
+            resize: both;
+            overflow: hidden;
+        }
+        #chatRoomPanel::-webkit-scrollbar { width: 6px; height: 6px; }
+        #chatRoomPanel::-webkit-scrollbar-track { background: rgba(255,255,255,0.1); border-radius: 3px; }
+        #chatRoomPanel::-webkit-scrollbar-thumb { background: rgba(78,205,196,0.5); border-radius: 3px; }
+        #chatRoomPanel::-webkit-scrollbar-thumb:hover { background: rgba(78,205,196,0.8); }
+        #chatRoomPanel::-webkit-resizer { 
+            background: linear-gradient(135deg, transparent 50%, rgba(78,205,196,0.5) 50%);
+            border-radius: 0 0 12px 0;
+        }
     </style>
     <div id="messageWall" style="position:fixed;top:60px;left:20px;width:380px;height:480px;background:rgba(26,26,46,0.95);border:1px solid rgba(255,215,0,0.3);border-radius:12px;z-index:9980;box-shadow:0 4px 20px rgba(0,0,0,0.5);backdrop-filter:blur(10px);flex-direction:column;min-width:300px;min-height:350px;display:none;">
         <div id="messageWallHeader" style="background:linear-gradient(135deg,rgba(255,215,0,0.2),rgba(255,107,107,0.2));padding:10px 15px;display:flex;justify-content:space-between;align-items:center;cursor:move;user-select:none;" onmousedown="startPanelDrag(event,'messageWall')" ontouchstart="startPanelTouch(event,'messageWall')">
@@ -14984,15 +14998,10 @@ function hasGistToken() {
     </div>
 
     <!-- 拍卖行主面板 -->
-    <div id="chatRoomPanel" style="position:fixed;top:50px;left:20px;width:420px;height:700px;background:rgba(26,26,46,0.95);border:1px solid rgba(78,205,196,0.3);border-radius:12px;z-index:9980;box-shadow:0 4px 20px rgba(0,0,0,0.5);backdrop-filter:blur(10px);flex-direction:column;min-width:320px;min-height:400px;display:none;">
+    <div id="chatRoomPanel" style="position:fixed;top:50px;left:20px;width:420px;height:700px;background:rgba(26,26,46,0.95);border:1px solid rgba(78,205,196,0.3);border-radius:12px;z-index:9980;box-shadow:0 4px 20px rgba(0,0,0,0.5);backdrop-filter:blur(10px);flex-direction:column;min-width:320px;min-height:400px;display:none;resize:both;overflow:hidden;">
         <div id="chatRoomHeader" style="background:linear-gradient(135deg,rgba(78,205,196,0.2),rgba(44,160,141,0.2));padding:10px 15px;display:flex;justify-content:space-between;align-items:center;cursor:move;user-select:none;" onmousedown="startPanelDrag(event,'chatRoomPanel')" ontouchstart="startPanelTouch(event,'chatRoomPanel')">
             <span style="color:#4ecdc4;font-size:0.9rem;font-weight:bold;">🏪 拍卖行 <span id="chatRoomIdDisplay" style="color:rgba(255,255,255,0.5);font-size:0.75rem;"></span></span>
             <div style="display:flex;gap:8px;align-items:center;">
-                <div style="display:flex;gap:6px;align-items:center;">
-                    <button onclick="resizeChatRoom(0,-80)" title="缩小高度" style="background:transparent;border:none;color:#fbbf24;font-size:1.6rem;cursor:pointer;padding:4px 8px;line-height:1;border-radius:4px;transition:all 0.2s;" onmouseover="this.style.background='rgba(251,191,36,0.2)'" onmouseout="this.style.background='transparent'">−</button>
-                    <button onclick="resizeChatRoom(0,80)" title="放大高度" style="background:transparent;border:none;color:#fbbf24;font-size:1.6rem;cursor:pointer;padding:4px 8px;line-height:1;border-radius:4px;transition:all 0.2s;" onmouseover="this.style.background='rgba(251,191,36,0.2)'" onmouseout="this.style.background='transparent'">+</button>
-                    <button onclick="resetChatRoomSize()" title="重置大小" style="background:transparent;border:none;color:#4ecdc4;font-size:1.3rem;cursor:pointer;padding:4px 8px;line-height:1;border-radius:4px;transition:all 0.2s;" onmouseover="this.style.background='rgba(78,205,196,0.2)'" onmouseout="this.style.background='transparent'">⟲</button>
-                </div>
                 <button onclick="switchChatRoom()" title="切换房间" style="background:transparent;border:none;color:#fbbf24;font-size:0.85rem;cursor:pointer;padding:4px 8px;border:1px solid rgba(255,215,0,0.3);border-radius:4px;transition:all 0.2s;" onmouseover="this.style.background='rgba(255,215,0,0.2)'" onmouseout="this.style.background='transparent'">切换房间</button>
                 <button onclick="toggleChatRoomTab('auctions')" title="拍卖" style="background:transparent;border:none;color:#ffd700;font-size:1.4rem;cursor:pointer;padding:0;text-shadow:0 0 8px rgba(255,215,0,0.6);">🔨</button>
                 <button onclick="closeChatRoom()" title="关闭" style="background:transparent;border:none;color:#ff6b6b;font-size:1rem;cursor:pointer;padding:0;">×</button>
