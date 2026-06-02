@@ -3305,14 +3305,25 @@
                 
                 if (response.ok) {
                     const data = await response.json();
-                    const content = data.files[CHAT_GIST_FILE]?.content;
-                    if (content) {
-                        chatRoomData = JSON.parse(content);
+                    // 检查文件是否存在
+                    if (data.files && data.files[CHAT_GIST_FILE]) {
+                        const content = data.files[CHAT_GIST_FILE].content;
+                        if (content) {
+                            try {
+                                chatRoomData = JSON.parse(content);
+                            } catch (e) {
+                                console.warn('解析 chatrooms.json 失败，使用默认值');
+                                chatRoomData = { rooms: {} };
+                            }
+                        } else {
+                            // 文件存在但内容为空
+                            chatRoomData = { rooms: {} };
+                        }
                         return;
                     }
                 }
                 
-                // 如果不存在，创建新的
+                // 如果文件不存在，创建新的
                 chatRoomData = { rooms: {} };
                 if (token) {
                     try {
@@ -10581,6 +10592,34 @@ function hasGistToken() {
         async function fetchMessages() {
             try {
                 const token = getGistToken();
+                
+                // 从 localStorage 获取 messages.json 的 GIST_ID
+                const messagesGistId = localStorage.getItem('messages_gist_id');
+                
+                if (messagesGistId) {
+                    // 从独立 Gist 加载
+                    const response = await fetch(`https://api.github.com/gists/${messagesGistId}`, {
+                        headers: {
+                            'Accept': 'application/vnd.github.v3+json',
+                            ...(token && { 'Authorization': `token ${token}` })
+                        }
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.files && data.files['messages.json']) {
+                            const content = data.files['messages.json'].content;
+                            if (content) {
+                                const parsed = JSON.parse(content);
+                                wallMessages = parsed.messages || [];
+                                renderMessages();
+                                return;
+                            }
+                        }
+                    }
+                }
+                
+                // 如果没有独立 Gist，尝试从旧 GIST_URL 加载
                 const response = await fetch(GIST_URL, {
                     headers: {
                         'Accept': 'application/vnd.github.v3+json',
@@ -10588,21 +10627,27 @@ function hasGistToken() {
                     }
                 });
                 
-                if (!response.ok) throw new Error('获取失败');
-                
-                const data = await response.json();
-                const content = data.files['messages.json']?.content;
-                
-                if (content) {
-                    const parsed = JSON.parse(content);
-                    wallMessages = parsed.messages || [];
-                    renderMessages();
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.files && data.files['messages.json']) {
+                        const content = data.files['messages.json'].content;
+                        if (content) {
+                            const parsed = JSON.parse(content);
+                            wallMessages = parsed.messages || [];
+                            renderMessages();
+                            return;
+                        }
+                    }
                 }
+                
+                // 如果都不存在，使用空数组
+                wallMessages = [];
+                renderMessages();
             } catch (error) {
                 console.warn('获取消息失败:', error);
                 const scroller = document.getElementById('messageScroller');
                 if (scroller) {
-                    scroller.innerHTML = '<div style="color:rgba(255,255,255,0.5);font-size:0.85rem;text-align:center;padding:20px;">暂无消息</div>';
+                    scroller.innerHTML = '<div style="color:rgba(255,255,255,0.5);font-size:0.85rem;text-align:center;padding:20px;">暂无消息，快来发布第一条吧！</div>';
                 }
             }
         }
@@ -11901,24 +11946,62 @@ function hasGistToken() {
         async function saveMessagesToGist() {
             const token = getGistToken();
             if (!token) throw new Error('无Token');
+
+            // 从 localStorage 获取 messages.json 的 GIST_ID
+            const messagesGistId = localStorage.getItem('messages_gist_id');
             
-            const response = await fetch(GIST_URL, {
-                method: 'PATCH',
-                headers: {
-                    'Accept': 'application/vnd.github.v3+json',
-                    'Content-Type': 'application/json',
-                    'Authorization': `token ${token}`
-                },
-                body: JSON.stringify({
-                    files: {
-                        'messages.json': {
-                            content: JSON.stringify({ messages: wallMessages }, null, 2)
+            if (messagesGistId) {
+                // 如果存在，使用 PATCH 更新现有 Gist
+                const response = await fetch(`https://api.github.com/gists/${messagesGistId}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json',
+                        'Authorization': `token ${token}`
+                    },
+                    body: JSON.stringify({
+                        files: {
+                            'messages.json': {
+                                content: JSON.stringify({ messages: wallMessages }, null, 2)
+                            }
                         }
-                    }
-                })
-            });
-            
-            if (!response.ok) throw new Error('保存失败');
+                    })
+                });
+                
+                if (!response.ok) {
+                    const errData = await response.json().catch(() => ({}));
+                    throw new Error(errData.message || '保存失败');
+                }
+            } else {
+                // 如果不存在，使用 POST 创建新的 Gist
+                const response = await fetch('https://api.github.com/gists', {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json',
+                        'Authorization': `token ${token}`
+                    },
+                    body: JSON.stringify({
+                        description: '需求墙消息',
+                        public: false,
+                        files: {
+                            'messages.json': {
+                                content: JSON.stringify({ messages: wallMessages }, null, 2)
+                            }
+                        }
+                    })
+                });
+                
+                if (!response.ok) {
+                    const errData = await response.json().catch(() => ({}));
+                    throw new Error(errData.message || '保存失败');
+                }
+                
+                const data = await response.json();
+                // 保存 GIST_ID 到 localStorage
+                localStorage.setItem('messages_gist_id', data.id);
+                console.log(`已创建需求墙配置文件，GIST_ID: ${data.id}`);
+            }
         }
         
         function initMessageWall() {
