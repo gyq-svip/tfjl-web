@@ -3484,7 +3484,26 @@
                             const content = data.files[filename].content;
                             if (content) {
                                 try {
-                                    chatRoomData = JSON.parse(content);
+                                    const parsed = JSON.parse(content);
+                                    console.log('📦 从 Gist 加载的数据:', parsed);
+                                    
+                                    // 检查数据结构，兼容两种格式
+                                    if (parsed.rooms && parsed.rooms[roomId]) {
+                                        // 新格式: { rooms: { "789": { messages, auctions } } }
+                                        chatRoomData = parsed;
+                                    } else if (parsed.messages || parsed.auctions) {
+                                        // 旧格式: { messages: [], auctions: [] }
+                                        // 转换为新格式
+                                        chatRoomData = { rooms: {} };
+                                        chatRoomData.rooms[roomId] = parsed;
+                                        console.log('📦 转换旧格式为新格式:', chatRoomData);
+                                    } else {
+                                        // 无效格式，使用默认
+                                        chatRoomData = { rooms: {} };
+                                        chatRoomData.rooms[roomId] = { messages: [], auctions: [], nextAuctionId: 1 };
+                                    }
+                                    
+                                    console.log('📦 最终 chatRoomData:', chatRoomData);
                                     return;
                                 } catch (e) {
                                     console.warn('解析房间数据失败，使用默认值');
@@ -3525,6 +3544,19 @@
             const roomId = currentChatRoom || 'default';
             const filename = `chatrooms_${roomId}.json`;
 
+            // 确保数据格式正确
+            if (!chatRoomData) {
+                chatRoomData = { rooms: {} };
+            }
+            if (!chatRoomData.rooms) {
+                chatRoomData.rooms = {};
+            }
+            if (!chatRoomData.rooms[roomId]) {
+                chatRoomData.rooms[roomId] = { messages: [], auctions: [], nextAuctionId: 1 };
+            }
+            
+            console.log(`💾 保存房间 ${roomId} 数据:`, chatRoomData);
+
             // 从 localStorage 获取该房间的 GIST_ID
             const chatroomGistId = localStorage.getItem(`chatroom_gist_${roomId}`);
             
@@ -3548,10 +3580,12 @@
                     });
                     
                     if (patchResponse.ok) {
+                        console.log(`✅ 房间 ${roomId} 数据已更新`);
                         return chatroomGistId;
                     }
-                    // 如果 PATCH 失败（404），清除 localStorage，重新创建
-                    if (patchResponse.status === 404) {
+                    // 如果 PATCH 失败（404 或 403），清除 localStorage，重新创建
+                    if (patchResponse.status === 404 || patchResponse.status === 403) {
+                        console.log(`⚠️ PATCH 失败 (${patchResponse.status})，清除缓存重新创建`);
                         localStorage.removeItem(`chatroom_gist_${roomId}`);
                     }
                 } catch (e) {
@@ -3589,7 +3623,7 @@
             localStorage.setItem(`chatroom_gist_${roomId}`, data.id);
             // 更新索引文件，让其他人也能找到这个房间
             await updateRoomIndex(roomId, data.id);
-            console.log(`已创建房间 ${roomId} 的配置文件，GIST_ID: ${data.id}`);
+            console.log(`✅ 已创建房间 ${roomId} 的配置文件，GIST_ID: ${data.id}`);
             
             return data.id;
         }
@@ -3597,7 +3631,9 @@
         function getRoomData() {
             if (!currentChatRoom) return null;
             if (!chatRoomData || !chatRoomData.rooms) return null;
-            return chatRoomData.rooms[currentChatRoom] || null;
+            const room = chatRoomData.rooms[currentChatRoom];
+            console.log('getRoomData - roomId:', currentChatRoom, 'room:', room);
+            return room || null;
         }
 
         function ensureRoomData() {
@@ -3606,6 +3642,7 @@
             if (!chatRoomData.rooms[currentChatRoom]) {
                 chatRoomData.rooms[currentChatRoom] = { messages: [], auctions: [], nextAuctionId: 1 };
             }
+            console.log('ensureRoomData - chatRoomData:', chatRoomData);
             return chatRoomData.rooms[currentChatRoom];
         }
 
@@ -3835,6 +3872,11 @@
         function renderAuctionsList() {
             const container = document.getElementById('auctionsListContainer');
             const room = getRoomData();
+            
+            console.log('renderAuctionsList - currentChatRoom:', currentChatRoom);
+            console.log('renderAuctionsList - chatRoomData:', chatRoomData);
+            console.log('renderAuctionsList - room:', room);
+            
             if (!room || !room.auctions || room.auctions.length === 0) {
                 container.innerHTML = '<div style="color:rgba(255,255,255,0.3);text-align:center;padding:30px;">暂无拍卖</div>';
                 return;
