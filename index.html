@@ -10813,8 +10813,34 @@ function hasGistToken() {
             try {
                 const token = getGistToken();
                 
-                // 从 localStorage 获取 messages.json 的 GIST_ID
-                const messagesGistId = localStorage.getItem('messages_gist_id');
+                // 从索引文件获取需求墙的 GIST_ID
+                let messagesGistId = localStorage.getItem('messages_gist_id');
+                
+                // 如果 localStorage 没有，从索引文件获取
+                if (!messagesGistId) {
+                    const indexResponse = await fetch(GIST_URL, {
+                        headers: {
+                            'Accept': 'application/vnd.github.v3+json',
+                            ...(token && { 'Authorization': `token ${token}` })
+                        }
+                    });
+                    
+                    if (indexResponse.ok) {
+                        const data = await indexResponse.json();
+                        if (data.files && data.files['room_index.json'] && data.files['room_index.json'].content) {
+                            try {
+                                const indexData = JSON.parse(data.files['room_index.json'].content);
+                                if (indexData['messages']) {
+                                    messagesGistId = indexData['messages'];
+                                    // 保存到 localStorage
+                                    localStorage.setItem('messages_gist_id', messagesGistId);
+                                }
+                            } catch (e) {
+                                console.warn('解析索引文件失败');
+                            }
+                        }
+                    }
+                }
                 
                 if (messagesGistId) {
                     // 从独立 Gist 加载
@@ -10839,28 +10865,7 @@ function hasGistToken() {
                     }
                 }
                 
-                // 如果没有独立 Gist，尝试从旧 GIST_URL 加载
-                const response = await fetch(GIST_URL, {
-                    headers: {
-                        'Accept': 'application/vnd.github.v3+json',
-                        ...(token && { 'Authorization': `token ${token}` })
-                    }
-                });
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data.files && data.files['messages.json']) {
-                        const content = data.files['messages.json'].content;
-                        if (content) {
-                            const parsed = JSON.parse(content);
-                            wallMessages = parsed.messages || [];
-                            renderMessages();
-                            return;
-                        }
-                    }
-                }
-                
-                // 如果都不存在，使用空数组
+                // 如果没有找到，使用空数组
                 wallMessages = [];
                 renderMessages();
             } catch (error) {
@@ -12221,6 +12226,9 @@ function hasGistToken() {
                 // 保存 GIST_ID 到 localStorage
                 localStorage.setItem('messages_gist_id', data.id);
                 console.log(`已创建需求墙配置文件，GIST_ID: ${data.id}`);
+                
+                // 更新索引文件
+                await updateRoomIndex('messages', data.id);
             }
         }
         
