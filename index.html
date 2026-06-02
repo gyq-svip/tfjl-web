@@ -3048,14 +3048,16 @@
             // 去掉 base64 前缀，只保存纯 base64 数据
             const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
 
-            const response = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
-                method: 'PATCH',
+            const response = await fetch('https://api.github.com/gists', {
+                method: 'POST',
                 headers: {
                     'Accept': 'application/vnd.github.v3+json',
                     'Content-Type': 'application/json',
                     'Authorization': `token ${token}`
                 },
                 body: JSON.stringify({
+                    description: `拍卖图片: ${auctionId}`,
+                    public: false,
                     files: {
                         [`auction_${auctionId}.txt`]: {
                             content: base64Data
@@ -3066,11 +3068,19 @@
             
             if (!response.ok) throw new Error('保存图片失败');
             
+            const data = await response.json();
+            const fileData = data.files[`auction_${auctionId}.txt`];
+            const gistUrl = fileData?.raw_url || data.html_url;
+            
+            // 保存 GIST_ID 到 localStorage
+            localStorage.setItem(`auction_img_gist_${auctionId}`, data.id);
+            
             // 同时保存到 localStorage（缓存7天）
             const now = Date.now();
             const cacheData = {
                 data: imageData,
-                timestamp: now
+                timestamp: now,
+                gistId: data.id
             };
             localStorage.setItem(`auction_img_${auctionId}`, JSON.stringify(cacheData));
             
@@ -3088,11 +3098,8 @@
                     }
                 }
             });
-        }
-
-        // 获取图片URL
-        function getImageUrl(auctionId) {
-            return `https://gist.githubusercontent.com/gyq-svip/${GIST_ID}/raw/auction_${auctionId}.txt`;
+            
+            return gistUrl;
         }
 
         // 从Gist加载图片（返回base64格式）
@@ -3100,20 +3107,39 @@
             // 优先从 localStorage 读取缓存
             const cached = localStorage.getItem(`auction_img_${auctionId}`);
             if (cached) {
-                return cached;
+                try {
+                    const cacheData = JSON.parse(cached);
+                    return cacheData.data || cacheData;
+                } catch (e) {
+                    return cached;
+                }
             }
             
             try {
-                const response = await fetch(getImageUrl(auctionId));
+                // 从 localStorage 获取图片的 GIST_ID
+                const imgGistId = localStorage.getItem(`auction_img_gist_${auctionId}`);
+                if (!imgGistId) return null;
+                
+                const response = await fetch(`https://api.github.com/gists/${imgGistId}`, {
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json'
+                    }
+                });
                 if (!response.ok) return null;
-                const base64Data = await response.text();
-                const base64Url = `data:image/jpeg;base64,${base64Data}`;
+                
+                const data = await response.json();
+                const filename = `auction_${auctionId}.txt`;
+                const content = data.files[filename]?.content;
+                
+                if (!content) return null;
+                const base64Url = `data:image/jpeg;base64,${content}`;
                 
                 // 保存到 localStorage（缓存7天）
                 const now = Date.now();
                 const cacheData = {
                     data: base64Url,
-                    timestamp: now
+                    timestamp: now,
+                    gistId: imgGistId
                 };
                 localStorage.setItem(`auction_img_${auctionId}`, JSON.stringify(cacheData));
                 
@@ -3150,7 +3176,7 @@
             // 可以在拍卖结束的回调中调用
         }
 
-        // 删除过期图片文件（7天前）
+        // 删除过期图片Gist（7天前）
         async function deleteExpiredImages() {
             const token = getGistToken();
             if (!token) {
@@ -3159,54 +3185,53 @@
             }
 
             try {
-                const response = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
-                    headers: {
-                        'Accept': 'application/vnd.github.v3+json',
-                        'Authorization': `token ${token}`
-                    }
-                });
-                
-                if (!response.ok) throw new Error('获取图片列表失败');
-                
-                const data = await response.json();
-                const files = data.files || {};
-                
                 const now = Date.now();
                 const sevenDaysAgo = now - (7 * 24 * 60 * 60 * 1000);
                 let deletedCount = 0;
                 
-                // 遍历所有文件，删除以 auction_ 开头且超过7天的文件
-                for (const filename in files) {
-                    if (filename.startsWith('auction_') && filename.endsWith('.txt')) {
-    // 从文件名提取时间戳
-    const timestampStr = filename.replace('auction_', '').replace('.txt', '');
-                        const timestamp = parseInt(timestampStr);
+                // 遍历 localStorage 中所有图片 GIST_ID
+                const allKeys = Object.keys(localStorage);
+                for (const key of allKeys) {
+                    if (key.startsWith('auction_img_gist_')) {
+                        const auctionId = key.replace('auction_img_gist_', '');
+                        const imgGistId = localStorage.getItem(key);
                         
+                        // 检查缓存时间
+                        const cacheKey = `auction_img_${auctionId}`;
+                        const cacheData = localStorage.getItem(cacheKey);
+                        let timestamp = 0;
+                        try {
+                            const cache = JSON.parse(cacheData);
+                            timestamp = cache.timestamp || 0;
+                        } catch (e) {
+                            continue;
+                        }
+                        
+                        // 如果超过7天，删除Gist
                         if (timestamp && timestamp < sevenDaysAgo) {
-                            // 删除文件
-                            const deleteResponse = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
-                                method: 'PATCH',
-                                headers: {
-                                    'Accept': 'application/vnd.github.v3+json',
-                                    'Content-Type': 'application/json',
-                                    'Authorization': `token ${token}`
-                                },
-                                body: JSON.stringify({
-                                    files: {
-                                        [filename]: null // 设置为 null 表示删除
+                            try {
+                                const deleteResponse = await fetch(`https://api.github.com/gists/${imgGistId}`, {
+                                    method: 'DELETE',
+                                    headers: {
+                                        'Accept': 'application/vnd.github.v3+json',
+                                        'Authorization': `token ${token}`
                                     }
-                                })
-                            });
-                            
-                            if (deleteResponse.ok) {
-                                deletedCount++;
+                                });
+                                
+                                if (deleteResponse.ok) {
+                                    deletedCount++;
+                                    localStorage.removeItem(key);
+                                    localStorage.removeItem(cacheKey);
+                                }
+                            } catch (e) {
+                                console.warn(`删除图片Gist失败: ${auctionId}`, e);
                             }
                         }
                     }
                 }
                 
                 if (deletedCount > 0) {
-                    console.log(`已删除 ${deletedCount} 张过期图片文件`);
+                    console.log(`已删除 ${deletedCount} 张过期图片Gist`);
                 }
             } catch (error) {
                 console.error('清理过期图片失败:', error);
