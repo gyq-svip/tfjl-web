@@ -9725,7 +9725,7 @@
         
 // 统计相关常量
 // ⚠️ 重要：这个 GIST_ID 是索引文件的固定 ID，所有设备必须使用同一个！
-const GIST_ID = 'dfd1519cd14c27d3df1eeea19918fc43';
+const GIST_ID = 'a32a0628bd9275f3a4922cd12cf298c9';
 const INDEX_GIST_ID_KEY = 'TFJL_Index_Gist_ID';
 const COUNTER_CACHE_KEY = 'TFJL_Counter_Cache';
 const COUNTER_CACHE_TIME_KEY = 'TFJL_Counter_Cache_Time';
@@ -15511,6 +15511,12 @@ function hasGistToken() {
                                 <li>删除时会同时删除房间所有数据（拍品、消息、图片）</li>
                                 <li>此操作不可恢复，请谨慎</li>
                             </ul>
+                            <p><strong>房主功能：</strong></p>
+                            <ul style="margin:5px 0;padding-left:20px;">
+                                <li>房主由管理员指定，只能管理自己房间的商品</li>
+                                <li>房主可以查看房间统计、下架商品</li>
+                                <li>房主入口：拍卖行面板右上角"👑 房主"按钮</li>
+                            </ul>
                         </div>
                     </div>
                     <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:15px;margin-bottom:15px;">
@@ -15519,6 +15525,7 @@ function hasGistToken() {
                             <p><strong>管理员：</strong>可查看所有房间商品，可下架任意商品</p>
                             <p><strong>房主：</strong>只能查看和管理自己房间的商品</p>
                             <p><strong>下架操作：</strong>输入房间ID后点击"加载商品"，选择要下架的商品</p>
+                            <p><strong>商品ID格式：</strong>时间戳后6位+随机3位（如：123456_a1b）</p>
                         </div>
                     </div>
                     <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:15px;margin-bottom:15px;">
@@ -15530,8 +15537,26 @@ function hasGistToken() {
                                 <li>卖家排行榜（按成交金额排序）</li>
                                 <li>买家排行榜（按成交金额排序）</li>
                                 <li>拍卖记录详情</li>
+                                <li><strong>正在拍卖的拍品</strong>（显示卖家、当前买家、剩余时间）</li>
                             </ul>
                             <p><strong>数据备份：</strong>可导出JSON格式备份文件</p>
+                        </div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:15px;margin-bottom:15px;">
+                        <h4 style="color:#ffd700;margin:0 0 10px 0;">👤 昵称管理</h4>
+                        <div style="color:rgba(255,255,255,0.8);font-size:0.85rem;line-height:1.6;">
+                            <p><strong>昵称唯一性：</strong></p>
+                            <ul style="margin:5px 0;padding-left:20px;">
+                                <li>昵称全局唯一，不能重复使用</li>
+                                <li>昵称存储在索引文件的 usedNicks 列表中</li>
+                                <li>清除缓存后，之前的昵称无法使用</li>
+                            </ul>
+                            <p><strong>重置昵称：</strong></p>
+                            <ul style="margin:5px 0;padding-left:20px;">
+                                <li>管理员可在"昵称管理"中重置用户昵称</li>
+                                <li>重置后该昵称从 usedNicks 列表中移除</li>
+                                <li>用户可以重新使用该昵称</li>
+                            </ul>
                         </div>
                     </div>
                     <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:15px;margin-bottom:15px;">
@@ -15539,7 +15564,7 @@ function hasGistToken() {
                         <div style="color:rgba(255,255,255,0.8);font-size:0.85rem;line-height:1.6;">
                             <p><strong>索引文件ID：</strong></p>
                             <ul style="margin:5px 0;padding-left:20px;">
-                                <li>固定值：dfd1519cd14c27d3df1eeea19918fc43</li>
+                                <li>固定值：a32a0628bd9275f3a4922cd12cf298c9</li>
                                 <li>所有设备必须使用同一个索引文件ID</li>
                                 <li>如果误删，需要修改代码中的 GIST_ID 常量</li>
                             </ul>
@@ -15561,6 +15586,7 @@ function hasGistToken() {
                                 <li>旧的 Gist ID 缓存导致 404 错误</li>
                             </ul>
                             <p><strong>清除后：</strong>刷新页面，系统会自动重新获取数据</p>
+                            <p style="color:#f59e0b;"><strong>⚠️ 注意：</strong>清除缓存后，之前的昵称无法使用，需要管理员重置</p>
                         </div>
                     </div>
                     <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:15px;margin-bottom:15px;">
@@ -15588,15 +15614,38 @@ function hasGistToken() {
                             <ul style="margin:5px 0;padding-left:20px;">
                                 <li>选择品质、职业、起拍价等</li>
                                 <li>可上传图片（限制150KB）</li>
-                                <li>拍品ID自动生成（时间戳+随机数）</li>
+                                <li>拍品ID自动生成（时间戳后6位+随机3位）</li>
+                                <li>图片存储在独立Gist，文件名包含时间戳和随机数</li>
                             </ul>
                             <p><strong>出价：</strong></p>
                             <ul style="margin:5px 0;padding-left:20px;">
                                 <li>点击 +10/+20/+50 快速出价</li>
                                 <li>或输入自定义出价（需大于50）</li>
                                 <li>出价有10秒冷却期，防止并发冲突</li>
+                                <li>出价成功后显示当前最高价</li>
                             </ul>
                             <p><strong>刷新：</strong>点击刷新按钮获取最新数据</p>
+                            <p><strong>房主管理：</strong>点击"👑 房主"按钮管理房间</p>
+                        </div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:15px;margin-bottom:15px;">
+                        <h4 style="color:#ffd700;margin:0 0 10px 0;">🔒 安全机制</h4>
+                        <div style="color:rgba(255,255,255,0.8);font-size:0.85rem;line-height:1.6;">
+                            <p><strong>出价锁机制：</strong></p>
+                            <ul style="margin:5px 0;padding-left:20px;">
+                                <li>出价时设置10秒锁，其他人无法同时出价</li>
+                                <li>出价完成后自动释放锁</li>
+                            </ul>
+                            <p><strong>昵称唯一性：</strong></p>
+                            <ul style="margin:5px 0;padding-left:20px;">
+                                <li>昵称全局唯一，防止重复</li>
+                                <li>清除缓存后需要管理员重置</li>
+                            </ul>
+                            <p><strong>图片唯一性：</strong></p>
+                            <ul style="margin:5px 0;padding-left:20px;">
+                                <li>图片文件名包含时间戳和随机数</li>
+                                <li>避免多人同时发布时文件名冲突</li>
+                            </ul>
                         </div>
                     </div>
                 </div>
