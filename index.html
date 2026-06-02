@@ -3051,7 +3051,50 @@
             // 文件名加入房间号，避免冲突
             const roomId = currentChatRoom || 'default';
             const filename = `auction_${auctionId}_${roomId}.txt`;
-
+            
+            // 检查是否已经存在该图片的 GIST_ID
+            const storageKey = `auction_img_gist_${roomId}_${auctionId}`;
+            const existingGistId = localStorage.getItem(storageKey);
+            
+            if (existingGistId) {
+                // 如果存在，使用 PATCH 更新现有 Gist
+                const patchResponse = await fetch(`https://api.github.com/gists/${existingGistId}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json',
+                        'Authorization': `token ${token}`
+                    },
+                    body: JSON.stringify({
+                        files: {
+                            [filename]: {
+                                content: base64Data
+                            }
+                        }
+                    })
+                });
+                
+                if (patchResponse.ok) {
+                    const data = await patchResponse.json();
+                    const fileData = data.files[filename];
+                    const gistUrl = fileData?.raw_url || data.html_url;
+                    
+                    // 更新 localStorage 缓存
+                    const now = Date.now();
+                    const cacheData = {
+                        data: imageData,
+                        timestamp: now,
+                        gistId: existingGistId,
+                        roomId: roomId
+                    };
+                    localStorage.setItem(`auction_img_${roomId}_${auctionId}`, JSON.stringify(cacheData));
+                    
+                    return gistUrl;
+                }
+                // 如果 PATCH 失败，继续创建新的
+            }
+            
+            // 如果不存在或 PATCH 失败，创建新的 Gist
             const response = await fetch('https://api.github.com/gists', {
                 method: 'POST',
                 headers: {
@@ -3077,7 +3120,6 @@
             const gistUrl = fileData?.raw_url || data.html_url;
             
             // 保存 GIST_ID 到 localStorage（key 包含房间号）
-            const storageKey = `auction_img_gist_${roomId}_${auctionId}`;
             localStorage.setItem(storageKey, data.id);
             
             // 同时保存到 localStorage（缓存7天）
@@ -3321,6 +3363,19 @@
                         }
                         return;
                     }
+                } else if (response.status === 404) {
+                    // GIST_URL 不存在，创建新的 Gist
+                    console.log('GIST_URL 不存在，创建新的 Gist');
+                    chatRoomData = { rooms: {} };
+                    if (token) {
+                        try {
+                            await saveChatRoomData();
+                            console.log('已自动创建 chatrooms.json 文件');
+                        } catch (saveError) {
+                            console.warn('自动创建 chatrooms.json 失败:', saveError);
+                        }
+                    }
+                    return;
                 }
                 
                 // 如果文件不存在，创建新的
@@ -3343,8 +3398,8 @@
             const token = getGistToken();
             if (!token) throw new Error('未设置Token');
 
-            // 使用原来的 GIST_URL 更新 chatrooms.json（所有房间共享）
-            const response = await fetch(GIST_URL, {
+            // 先尝试使用 PATCH 更新现有的 Gist
+            const patchResponse = await fetch(GIST_URL, {
                 method: 'PATCH',
                 headers: {
                     'Accept': 'application/vnd.github.v3+json',
@@ -3360,10 +3415,44 @@
                 })
             });
             
-            if (!response.ok) {
-                const errData = await response.json().catch(() => ({}));
-                throw new Error(errData.message || '保存失败');
+            if (patchResponse.ok) {
+                return;
             }
+            
+            // 如果 PATCH 失败（404），使用 POST 创建新的 Gist
+            if (patchResponse.status === 404) {
+                console.log('GIST_URL 不存在，创建新的 Gist');
+                const createResponse = await fetch('https://api.github.com/gists', {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json',
+                        'Authorization': `token ${token}`
+                    },
+                    body: JSON.stringify({
+                        description: '聊天室配置文件',
+                        public: false,
+                        files: {
+                            [CHAT_GIST_FILE]: {
+                                content: JSON.stringify(chatRoomData, null, 2)
+                            }
+                        }
+                    })
+                });
+                
+                if (!createResponse.ok) {
+                    const errData = await createResponse.json().catch(() => ({}));
+                    throw new Error(errData.message || '创建失败');
+                }
+                
+                const data = await createResponse.json();
+                console.log('已创建新的 Gist，请更新 GIST_ID:', data.id);
+                return;
+            }
+            
+            // 其他错误
+            const errData = await patchResponse.json().catch(() => ({}));
+            throw new Error(errData.message || '保存失败');
         }
 
         function getRoomData() {
