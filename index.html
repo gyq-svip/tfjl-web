@@ -4286,6 +4286,10 @@
             bidLock = true;
 
             try {
+                // 先清除本地缓存，确保获取最新数据
+                const roomId = currentChatRoom || 'default';
+                localStorage.removeItem(`chatroom_gist_${roomId}`);
+                
                 await fetchChatRoomData();
                 let room = getRoomData();
                 if (!room) { bidLock = false; renderAuctionsList(); return; }
@@ -4297,12 +4301,8 @@
                 const currentBid = auction.bids.length > 0 ? auction.bids[auction.bids.length - 1].amount : auction.startPrice;
                 const currentBidder = auction.bids.length > 0 ? auction.bids[auction.bids.length - 1].bidder : '';
 
-                if (currentBidder === currentChatNick) {
-                    showBidToast('你已经是最高出价者', false);
-                    bidLock = false;
-                    renderAuctionsList();
-                    return;
-                }
+                // 注意：这里不检查是否是最高出价者，因为可能别人已经超过他了
+                // 在等待后再次检查，确保是最新的
 
                 const increment = customIncrement || auction.bidIncrement || 10;
                 const myBid = currentBid + increment;
@@ -4534,24 +4534,27 @@
             const btn = document.getElementById('manualRefreshBtn');
             if (!btn) return;
             
-            // 视觉反馈：旋转图标 + 禁用
-            const origText = btn.textContent;
-            btn.textContent = '⏳';
-            btn.style.animation = 'spin 0.6s linear infinite';
+            // 视觉反馈：漏斗动画 + 禁用
+            btn.innerHTML = '<span style="display:inline-block;animation:spin 0.8s linear infinite;">⏳</span>';
             btn.disabled = true;
-            btn.style.opacity = '0.6';
+            btn.style.opacity = '0.7';
             
             try {
+                // 清除本地缓存，强制从服务器获取最新数据
+                const roomId = currentChatRoom || 'default';
+                localStorage.removeItem(`chatroom_gist_${roomId}`);
+                console.log('🔄 手动刷新：已清除缓存，重新获取数据...');
+                
                 await fetchChatRoomData();
                 renderChatMessages();
                 renderAuctionsList();
-                showBidToast('刷新成功 ✓', true);
+                showBidToast('✅ 刷新成功', true);
             } catch (e) {
-                showBidToast('刷新失败，请重试', false);
+                console.error('刷新失败:', e);
+                showBidToast('❌ 刷新失败，请重试', false);
             } finally {
                 // 恢复原状
-                btn.textContent = origText;
-                btn.style.animation = '';
+                btn.innerHTML = '↻';
                 btn.disabled = false;
                 btn.style.opacity = '1';
             }
@@ -12887,6 +12890,10 @@ function hasGistToken() {
             document.getElementById('adminPagePasswordManage').style.display = 'none';
             document.getElementById('adminPageAuctionManage').style.display = 'none';
             document.getElementById('adminPageRoomManage').style.display = 'none';
+            const gistPage = document.getElementById('adminPageGistManage');
+            if (gistPage) gistPage.style.display = 'none';
+            const cachePage = document.getElementById('adminPageCacheManage');
+            if (cachePage) cachePage.style.display = 'none';
         }
 
         function adminShowPage(page) {
@@ -13536,38 +13543,58 @@ function hasGistToken() {
             
             try {
                 const token = getGistToken();
-                const response = await fetch(GIST_URL, {
+                
+                // 从索引文件获取房间的 Gist ID
+                const indexUrl = `https://api.github.com/gists/${GIST_ID}`;
+                const indexResponse = await fetch(indexUrl, {
                     headers: {
                         'Accept': 'application/vnd.github.v3+json',
                         ...(token && { 'Authorization': `token ${token}` })
                     }
                 });
                 
-                if (!response.ok) throw new Error('获取数据失败');
+                if (!indexResponse.ok) throw new Error('获取索引文件失败');
                 
-                const data = await response.json();
-                const content = data.files[CHAT_GIST_FILE]?.content;
-                if (!content) throw new Error('房间数据不存在');
+                const indexData = await indexResponse.json();
+                const indexContent = indexData.files['room_index.json']?.content;
+                if (!indexContent) throw new Error('索引文件内容为空');
+                
+                const index = JSON.parse(indexContent);
+                const roomGistId = index[roomId];
+                if (!roomGistId) throw new Error('该房间不存在');
+                
+                // 从房间 Gist 获取数据
+                const roomResponse = await fetch(`https://api.github.com/gists/${roomGistId}`, {
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        ...(token && { 'Authorization': `token ${token}` })
+                    }
+                });
+                
+                if (!roomResponse.ok) throw new Error('获取房间数据失败');
+                
+                const roomData = await roomResponse.json();
+                const filename = `chatrooms_${roomId}.json`;
+                const content = roomData.files[filename]?.content;
+                if (!content) throw new Error('房间数据为空');
                 
                 const allData = JSON.parse(content);
-                let roomData = null;
+                let roomDataObj = null;
                 
                 if (allData.rooms) {
-                    roomData = allData.rooms[roomId];
-                } else if (Array.isArray(allData)) {
-                    roomData = allData.find(r => r.id === roomId);
-                } else {
-                    roomData = allData[roomId];
+                    roomDataObj = allData.rooms[roomId];
+                } else if (allData.messages || allData.auctions) {
+                    roomDataObj = allData;
                 }
                 
-                if (!roomData) {
+                if (!roomDataObj) {
                     document.getElementById('auctionStatsSummary').innerHTML = '<div style="color:#f59e0b;text-align:center;padding:10px;">该房间暂无数据</div>';
                     document.getElementById('auctionStatsDetail').innerHTML = '';
                     return;
                 }
                 
-                const history = roomData.auctionHistory || [];
-                const allAuctions = roomData.auctions || [];
+                const history = roomDataObj.auctionHistory || [];
+                const allAuctions = roomDataObj.auctions || [];
                 
                 if (history.length === 0 && allAuctions.length === 0) {
                     document.getElementById('auctionStatsSummary').innerHTML = '<div style="color:#f59e0b;text-align:center;padding:10px;">该房间暂无拍卖记录</div>';
@@ -15048,7 +15075,7 @@ function hasGistToken() {
                     <span style="color:#ffd700;font-size:0.85rem;">🔨 拍卖列表</span>
                 </div>
                 <div style="display:flex;gap:6px;">
-                    <button onclick="manualRefreshAuctions()" id="manualRefreshBtn" style="padding:6px 10px;border-radius:6px;border:none;background:rgba(255,215,0,0.15);color:rgba(255,215,0,0.9);cursor:pointer;font-size:0.85rem;transition:all 0.2s;min-width:36px;" onmouseover="this.style.background='rgba(255,215,0,0.3)'" onmouseout="this.style.background='rgba(255,215,0,0.15)'">🔄</button>
+                    <button onclick="manualRefreshAuctions()" id="manualRefreshBtn" style="padding:6px 10px;border-radius:6px;border:none;background:rgba(255,215,0,0.15);color:rgba(255,215,0,0.9);cursor:pointer;font-size:1rem;transition:all 0.2s;min-width:36px;font-weight:bold;" onmouseover="this.style.background='rgba(255,215,0,0.3)'" onmouseout="this.style.background='rgba(255,215,0,0.15)'">↻</button>
                     <button onclick="openAuctionPostModal()" style="padding:4px 10px;border-radius:6px;border:none;background:linear-gradient(135deg,#4ade80,#22c55e);color:white;cursor:pointer;font-size:0.75rem;">+ 发布拍卖</button>
                 </div>
             </div>
