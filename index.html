@@ -10085,12 +10085,13 @@ function hasGistToken() {
                 });
 
                 if (response.status === 404) {
-                    console.warn('Gist不存在，返回默认数据');
+                    console.warn('⚠️ 统计数据 Gist 不存在（404），使用默认数据。首次访问时会自动创建。');
                     return getDefaultCounter();
                 }
 
                 if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    console.warn('⚠️ 获取统计数据失败:', response.status);
+                    return getDefaultCounter();
                 }
                 
                 const data = await response.json();
@@ -10132,8 +10133,7 @@ function hasGistToken() {
                 console.warn('Gist中没有counter.json文件，返回默认数据');
                 return getDefaultCounter();
             } catch (error) {
-                console.error('❌ 从Gist获取统计数据失败:', error);
-                console.error('错误详情:', error.message);
+                console.warn('⚠️ 获取统计数据异常，使用默认数据:', error.message);
                 return getDefaultCounter();
             }
         }
@@ -10505,7 +10505,7 @@ function hasGistToken() {
                 
                 // 如果 PATCH 失败（404），使用 POST 创建新的 Gist
                 if (patchResponse.status === 404) {
-                    console.log('Gist不存在，创建新的 Gist');
+                    console.log('⚠️ 统计数据 Gist 不存在（404），创建新的 Gist');
                     const createResponse = await fetch('https://api.github.com/gists', {
                         method: 'POST',
                         headers: {
@@ -10529,18 +10529,18 @@ function hasGistToken() {
                         saveCounterToCache(counterData);
                         clearPendingSync();
                         updateStatsBar();
-                        console.log('已创建新的 Gist');
+                        console.log('✅ 已创建新的统计数据 Gist');
                         return;
                     }
                 }
                 
                 // 其他错误
                 const errorText = await response.text();
-                console.error('❌ Gist同步失败:', response.status, errorText);
+                console.warn('⚠️ 同步统计数据失败:', patchResponse.status);
                 // 同步失败，加入待同步队列
                 addToPendingSync(counterData);
             } catch (error) {
-                console.error('❌ 同步统计到Gist失败:', error);
+                console.warn('⚠️ 同步统计数据异常:', error.message);
                 // 同步失败，加入待同步队列
                 if (counterData) {
                     addToPendingSync(counterData);
