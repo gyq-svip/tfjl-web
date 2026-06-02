@@ -3011,12 +3011,28 @@
                         const index = JSON.parse(indexData.files['room_index.json'].content);
                         const allowedRooms = index.allowedRooms || [];
                         
-                        // 如果白名单不为空，且房间不在白名单中，则拒绝进入
-                        if (allowedRooms.length > 0 && !allowedRooms.includes(roomId)) {
-                            alert(`房间 "${roomId}" 未开放，请联系管理员开通`);
-                            return;
+                        console.log('🔍 白名单检查:', {
+                            roomId: roomId,
+                            allowedRooms: allowedRooms,
+                            length: allowedRooms.length
+                        });
+                        
+                        // 如果白名单不为空，检查房间是否在白名单中
+                        if (allowedRooms.length > 0) {
+                            const isAllowed = allowedRooms.some(r => {
+                                const existingId = typeof r === 'string' ? r : r.id;
+                                console.log(`  检查: ${existingId} === ${roomId} ?`, existingId === roomId);
+                                return existingId === roomId;
+                            });
+                            console.log('  结果: isAllowed =', isAllowed);
+                            if (!isAllowed) {
+                                alert(`房间 "${roomId}" 未开放，请联系管理员开通`);
+                                return;
+                            }
                         }
                     }
+                } else {
+                    console.error('❌ 获取索引文件失败:', indexResponse.status);
                 }
             } catch (e) {
                 console.warn('检查房间白名单失败:', e);
