@@ -3981,8 +3981,10 @@
                 const auctionId = auction.id;
                 // 优先使用 imageGistId，兼容旧的 image 字段
                 const hasImage = auction.imageGistId || auction.image;
+                // 透明占位图，避免初始 src="" 触发 onerror
+                const placeholder = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
                 const imageHtml = hasImage
-                    ? `<div style="position:relative;width:${imageSize}px;height:${imageSize}px;flex-shrink:0;background:rgba(255,255,255,0.05);border-radius:8px;" onmouseover="showAuctionImagePreview(this,'${auctionId}')" onmouseout="hideAuctionImagePreview()"><img data-auction-id="${auctionId}" data-image-gist-id="${auction.imageGistId || ''}" src="" style="width:${imageSize}px;height:${imageSize}px;object-fit:cover;border-radius:8px;border:2px solid ${qualityColor};box-shadow:0 2px 8px rgba(0,0,0,0.3);display:none;" onload="this.style.display='block';this.parentElement.style.background='transparent';" onerror="console.warn('图片加载失败:', this.dataset.auctionId);this.style.display='none';"></div>`
+                    ? `<div style="position:relative;width:${imageSize}px;height:${imageSize}px;flex-shrink:0;background:rgba(255,255,255,0.05);border-radius:8px;" onmouseover="showAuctionImagePreview(this,'${auctionId}')" onmouseout="hideAuctionImagePreview()"><img data-auction-id="${auctionId}" data-image-gist-id="${auction.imageGistId || ''}" src="${placeholder}" style="width:${imageSize}px;height:${imageSize}px;object-fit:cover;border-radius:8px;border:2px solid ${qualityColor};box-shadow:0 2px 8px rgba(0,0,0,0.3);display:none;" onload="if(this.src.startsWith('data:image/jpeg')){this.style.display='block';this.parentElement.style.background='transparent';}" onerror="if(this.src.startsWith('data:image/jpeg')){console.warn('图片加载失败:', this.dataset.auctionId);this.style.display='none';}"></div>`
                     : `<div style="width:${imageSize}px;height:${imageSize}px;background:rgba(255,255,255,0.05);border-radius:8px;border:2px solid ${qualityColor};display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,0.3);"><span style="color:${qualityColor};font-size:1.6rem;">⚔️</span></div>`;
 
                 let bidderHtml = '';
