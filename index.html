@@ -3710,9 +3710,9 @@
                 `;
             }
 
-            const auctionId = auction.id;
+            const imgAuctionId = auction.id;
             const imageHtml = auction.image
-                ? `<img data-auction-id="${auctionId}" src="" style="width:100%;max-height:200px;object-fit:cover;border-radius:8px;margin-bottom:10px;border:2px solid ${qualityColor};" onerror="this.style.display='none'">`
+                ? `<img data-auction-id="${imgAuctionId}" src="" style="width:100%;max-height:200px;object-fit:cover;border-radius:8px;margin-bottom:10px;border:2px solid ${qualityColor};" onerror="this.style.display='none'">`
                 : '';
 
             const content = document.getElementById('auctionDetailContent');
