@@ -3076,8 +3076,6 @@
                 
                 if (patchResponse.ok) {
                     const data = await patchResponse.json();
-                    const fileData = data.files[filename];
-                    const gistUrl = fileData?.raw_url || data.html_url;
                     
                     // 更新 localStorage 缓存
                     const now = Date.now();
@@ -3089,7 +3087,8 @@
                     };
                     localStorage.setItem(`auction_img_${roomId}_${auctionId}`, JSON.stringify(cacheData));
                     
-                    return gistUrl;
+                    // 返回 Gist ID（用于保存到房间配置文件）
+                    return existingGistId;
                 }
                 // 如果 PATCH 失败，继续创建新的
             }
@@ -3154,6 +3153,8 @@
         // 从Gist加载图片（返回base64格式）
         // 参数可以是 auctionId 或 imageGistId
         async function loadImage(auctionIdOrGistId) {
+            console.log('📷 loadImage 调用，参数:', auctionIdOrGistId);
+            
             // 获取当前房间号
             const roomId = currentChatRoom || 'default';
             
@@ -3167,6 +3168,7 @@
             if (isGistId) {
                 // 直接传入的是 Gist ID
                 imgGistId = auctionIdOrGistId;
+                console.log('📷 使用 Gist ID:', imgGistId);
             } else {
                 // 传入的是 auctionId，需要查找对应的 Gist ID
                 auctionId = auctionIdOrGistId;
@@ -3515,7 +3517,6 @@
                             if (content) {
                                 try {
                                     const parsed = JSON.parse(content);
-                                    console.log('📦 从 Gist 加载的数据:', parsed);
                                     
                                     // 检查数据结构，兼容两种格式
                                     if (parsed.rooms && parsed.rooms[roomId]) {
@@ -3526,14 +3527,12 @@
                                         // 转换为新格式
                                         chatRoomData = { rooms: {} };
                                         chatRoomData.rooms[roomId] = parsed;
-                                        console.log('📦 转换旧格式为新格式:', chatRoomData);
                                     } else {
                                         // 无效格式，使用默认
                                         chatRoomData = { rooms: {} };
                                         chatRoomData.rooms[roomId] = { messages: [], auctions: [], nextAuctionId: 1 };
                                     }
                                     
-                                    console.log('📦 最终 chatRoomData:', chatRoomData);
                                     return;
                                 } catch (e) {
                                     console.warn('解析房间数据失败，使用默认值');
@@ -3584,8 +3583,6 @@
             if (!chatRoomData.rooms[roomId]) {
                 chatRoomData.rooms[roomId] = { messages: [], auctions: [], nextAuctionId: 1 };
             }
-            
-            console.log(`💾 保存房间 ${roomId} 数据:`, chatRoomData);
 
             // 从 localStorage 获取该房间的 GIST_ID
             const chatroomGistId = localStorage.getItem(`chatroom_gist_${roomId}`);
@@ -3662,7 +3659,6 @@
             if (!currentChatRoom) return null;
             if (!chatRoomData || !chatRoomData.rooms) return null;
             const room = chatRoomData.rooms[currentChatRoom];
-            console.log('getRoomData - roomId:', currentChatRoom, 'room:', room);
             return room || null;
         }
 
@@ -3672,7 +3668,6 @@
             if (!chatRoomData.rooms[currentChatRoom]) {
                 chatRoomData.rooms[currentChatRoom] = { messages: [], auctions: [], nextAuctionId: 1 };
             }
-            console.log('ensureRoomData - chatRoomData:', chatRoomData);
             return chatRoomData.rooms[currentChatRoom];
         }
 
@@ -3839,7 +3834,9 @@
 
                 // 如果有图片，保存到独立的 Gist 文件
                 if (auctionImageBase64) {
+                    console.log('📸 开始保存图片...');
                     const imageGistId = await saveImage(auctionId, auctionImageBase64);
+                    console.log('📸 图片保存成功，Gist ID:', imageGistId);
                     // 只保存 Gist ID，不保存完整的 base64 数据
                     auctionData.imageGistId = imageGistId;
                 }
@@ -3907,10 +3904,6 @@
         function renderAuctionsList() {
             const container = document.getElementById('auctionsListContainer');
             const room = getRoomData();
-            
-            console.log('renderAuctionsList - currentChatRoom:', currentChatRoom);
-            console.log('renderAuctionsList - chatRoomData:', chatRoomData);
-            console.log('renderAuctionsList - room:', room);
             
             if (!room || !room.auctions || room.auctions.length === 0) {
                 container.innerHTML = '<div style="color:rgba(255,255,255,0.3);text-align:center;padding:30px;">暂无拍卖</div>';
@@ -4017,9 +4010,12 @@
                 const auctionId = img.dataset.auctionId;
                 const imageGistId = img.dataset.imageGistId;
                 
+                console.log(`🖼️ 加载图片 - auctionId: ${auctionId}, imageGistId: ${imageGistId}`);
+                
                 // 优先使用 imageGistId 加载图片
                 if (imageGistId) {
                     loadImage(imageGistId).then(base64Url => {
+                        console.log(`🖼️ 图片加载结果 (from Gist ID):`, base64Url ? '成功' : '失败');
                         if (base64Url) {
                             img.src = base64Url;
                         } else {
@@ -4029,6 +4025,7 @@
                 } else {
                     // 兼容旧数据，使用 auctionId 加载
                     loadImage(auctionId).then(base64Url => {
+                        console.log(`🖼️ 图片加载结果 (from auction ID):`, base64Url ? '成功' : '失败');
                         if (base64Url) {
                             img.src = base64Url;
                         } else {
@@ -9631,11 +9628,8 @@ async function getIndexGistUrl() {
         
         // 如果硬编码的 ID 无效，尝试创建
         if (token && response.status === 404) {
-            console.log('⚠️ 索引文件不存在，正在创建...');
             const createdUrl = await createIndexGist(token);
             const createdId = createdUrl.split('/').pop();
-            console.log('✅ 索引文件已创建，ID:', createdId);
-            console.log('⚠️ 请将代码中的 GIST_ID 常量更新为这个新 ID，以便所有设备使用同一个索引文件！');
             return createdUrl;
         }
     }
