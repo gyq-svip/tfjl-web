@@ -4347,14 +4347,18 @@
             btn.textContent = '⏳ 发布中...';
 
             try {
-                const quality = document.getElementById('buyRequestQuality').value;
-                const profession = document.getElementById('buyRequestProfession').value;
+                // 获取多选品质
+                const qualityCheckboxes = document.querySelectorAll('#buyRequestQualityGroup input[type="checkbox"]:checked');
+                const quality = Array.from(qualityCheckboxes).map(cb => cb.value);
+                // 获取多选职业
+                const professionCheckboxes = document.querySelectorAll('#buyRequestProfessionGroup input[type="checkbox"]:checked');
+                const profession = Array.from(professionCheckboxes).map(cb => cb.value);
                 const minBonusDmg = parseFloat(document.getElementById('buyRequestMinBonusDmg').value) || 0;
                 const minIgnoreIce = parseFloat(document.getElementById('buyRequestMinIgnoreIce').value) || 0;
                 const budget = document.getElementById('buyRequestBudget').value.trim();
                 const note = document.getElementById('buyRequestNote').value.trim();
 
-                if (quality === '不限' && profession === '不限' && minBonusDmg === 0 && minIgnoreIce === 0 && !budget && !note) {
+                if (quality.length === 0 && profession.length === 0 && minBonusDmg === 0 && minIgnoreIce === 0 && !budget && !note) {
                     alert('请至少填写一项求购需求');
                     btn.disabled = false;
                     btn.textContent = originalText;
@@ -4390,8 +4394,8 @@
 
                 // 系统消息
                 let desc = [];
-                if (quality !== '不限') desc.push(quality);
-                if (profession !== '不限') desc.push(profession);
+                if (quality.length > 0) desc.push(quality.join('/'));
+                if (profession.length > 0) desc.push(profession.join('/'));
                 if (minBonusDmg > 0) desc.push('附加>=' + minBonusDmg);
                 if (minIgnoreIce > 0) desc.push('无视>=' + minIgnoreIce);
                 const descStr = desc.length > 0 ? desc.join('·') : '不限';
@@ -4408,7 +4412,7 @@
                 renderChatMessages();
 
                 // 公告播报求购信息
-                addAuctionBroadcast(`[${roomId}] ${currentChatNick} 求购：${descStr}${budget ? ' 预算' + budget : ''}`);
+                addAuctionBroadcast(`[拍卖行${roomId}] ${currentChatNick} 求购：${descStr}${budget ? ' 预算' + budget : ''}`);
 
                 showAuctionToast('✅ 求购发布成功！', 'success');
             } catch (error) {
@@ -4519,9 +4523,9 @@
                 
                 // 公告播报拍卖信息
                 if (isExchange) {
-                    addAuctionBroadcast(`[${roomId}] ${currentChatNick} 上架交换：${quality}·${profession}${bonusDmg > 0 ? ' 附加+' + bonusDmg : ''}${ignoreIce > 0 ? ' 无视+' + ignoreIce : ''}${exchangeWant ? ' 想要:' + exchangeWant : ''}`);
+                    addAuctionBroadcast(`[拍卖行${roomId}] ${currentChatNick} 上架交换：${quality}·${profession}${bonusDmg > 0 ? ' 附加+' + bonusDmg : ''}${ignoreIce > 0 ? ' 无视+' + ignoreIce : ''}${exchangeWant ? ' 想要:' + exchangeWant : ''}`);
                 } else {
-                    addAuctionBroadcast(`[${roomId}] ${currentChatNick} 上架拍卖：${quality}·${profession}${bonusDmg > 0 ? ' 附加+' + bonusDmg : ''}${ignoreIce > 0 ? ' 无视+' + ignoreIce : ''} 起拍${startPrice}`);
+                    addAuctionBroadcast(`[拍卖行${roomId}] ${currentChatNick} 上架拍卖：${quality}·${profession}${bonusDmg > 0 ? ' 附加+' + bonusDmg : ''}${ignoreIce > 0 ? ' 无视+' + ignoreIce : ''} 起拍${startPrice}`);
                 }
                 
                 // 显示成功提示
@@ -4602,12 +4606,14 @@
                 room.buyRequests = room.buyRequests.filter(br => now < br.expireTime && br.status === 'active');
                 
                 html += room.buyRequests.slice().reverse().map(br => {
-                    const qualityColor = getQualityColor(br.quality);
-                    const isExpired = now >= br.expireTime;
+                    // quality和profession可能是数组（新格式）或字符串（旧格式）
+                    const qArr = Array.isArray(br.quality) ? br.quality : (br.quality && br.quality !== '不限' ? [br.quality] : []);
+                    const pArr = Array.isArray(br.profession) ? br.profession : (br.profession && br.profession !== '不限' ? [br.profession] : []);
+                    const qualityColor = qArr.length > 0 ? getQualityColor(qArr[0]) : 'rgba(255,255,255,0.6)';
                     
                     let desc = [];
-                    if (br.quality && br.quality !== '不限') desc.push(br.quality);
-                    if (br.profession && br.profession !== '不限') desc.push(br.profession);
+                    if (qArr.length > 0) desc.push(qArr.join('/'));
+                    if (pArr.length > 0) desc.push(pArr.join('/'));
                     if (br.minBonusDmg > 0) desc.push('附加>=' + br.minBonusDmg);
                     if (br.minIgnoreIce > 0) desc.push('无视>=' + br.minIgnoreIce);
                     const descStr = desc.length > 0 ? desc.join(' · ') : '不限';
@@ -5104,7 +5110,7 @@
 
                 // 公告播报出价信息
                 const bidRoomId = currentChatRoom || 'default';
-                addAuctionBroadcast(`[${bidRoomId}] ${currentChatNick} 出价${actualBid} → ${quality}·${profession}${bonusDmg > 0 ? ' 附加+' + bonusDmg : ''}${ignoreIce > 0 ? ' 无视+' + ignoreIce : ''}`);
+                addAuctionBroadcast(`[拍卖行${bidRoomId}] ${currentChatNick} 出价${actualBid} → ${quality}·${profession}${bonusDmg > 0 ? ' 附加+' + bonusDmg : ''}${ignoreIce > 0 ? ' 无视+' + ignoreIce : ''}`);
 
                 await fetchChatRoomData();
                 if (fromDetail) closeAuctionDetail();
@@ -5239,7 +5245,7 @@
                                             const p = auction.profession || '';
                                             const bd = auction.bonusDmg || 0;
                                             const ii = auction.ignoreIce || 0;
-                                            addAuctionBroadcast(`[${roomId}] ${latestBid.bidder} 出价${latestBid.amount} → ${q}·${p}${bd > 0 ? ' 附加+' + bd : ''}${ii > 0 ? ' 无视+' + ii : ''}`);
+                                            addAuctionBroadcast(`[拍卖行${roomId}] ${latestBid.bidder} 出价${latestBid.amount} → ${q}·${p}${bd > 0 ? ' 附加+' + bd : ''}${ii > 0 ? ' 无视+' + ii : ''}`);
                                         }
                                     }
                                     lastAuctionSnapshot[key] = {
@@ -10774,40 +10780,77 @@ function hasGistToken() {
                 return true;
             });
 
+            // 普通公告HTML
+            let normalHtml = '';
             if (activeItems.length === 0) {
-                content.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:30px;">暂无公告</div>';
-                return;
+                normalHtml = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;">暂无公告</div>';
+            } else {
+                normalHtml = activeItems.map((item, index) => {
+                    const category = item.category || '';
+                    const name = item.name || '无标题';
+                    const contentText = item.content || '';
+                    const author = item.author || '';
+                    const time = item.publish_time || '';
+
+                    const categoryColors = {
+                        '公告': '#ffd700',
+                        '活动': '#4ade80',
+                        '更新': '#60a5fa',
+                        '通知': '#f472b6',
+                        '其他': '#a78bfa'
+                    };
+                    const catColor = categoryColors[category] || '#a78bfa';
+
+                    return `
+                        <div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:15px;margin-bottom:10px;${index === 0 ? 'border-left:3px solid ' + catColor + ';' : ''}">
+                            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                                ${category ? `<span style="background:${catColor};color:#000;padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:bold;">${category}</span>` : ''}
+                                <span style="color:#ffd700;font-size:0.95rem;font-weight:500;">${name}</span>
+                            </div>
+                            ${contentText ? `<div style="color:rgba(255,255,255,0.8);font-size:0.9rem;line-height:1.6;margin-bottom:8px;">${contentText}</div>` : ''}
+                            <div style="color:rgba(255,255,255,0.35);font-size:0.75rem;">
+                                ${author && author !== '无名' ? author : ''}${author && time ? ' · ' : ''}${time ? time.substring(0, 16) : ''}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
             }
 
-            content.innerHTML = activeItems.map((item, index) => {
-                const category = item.category || '';
-                const name = item.name || '无标题';
-                const contentText = item.content || '';
-                const author = item.author || '';
-                const time = item.publish_time || '';
-
-                const categoryColors = {
-                    '公告': '#ffd700',
-                    '活动': '#4ade80',
-                    '更新': '#60a5fa',
-                    '通知': '#f472b6',
-                    '其他': '#a78bfa'
-                };
-                const catColor = categoryColors[category] || '#a78bfa';
-
-                return `
-                    <div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:15px;margin-bottom:10px;${index === 0 ? 'border-left:3px solid ' + catColor + ';' : ''}">
-                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-                            ${category ? `<span style="background:${catColor};color:#000;padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:bold;">${category}</span>` : ''}
-                            <span style="color:#ffd700;font-size:0.95rem;font-weight:500;">${name}</span>
+            // 拍卖快讯HTML
+            let auctionHtml = '';
+            if (auctionBroadcastQueue.length === 0) {
+                auctionHtml = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;">暂无拍卖快讯</div>';
+            } else {
+                auctionHtml = auctionBroadcastQueue.map(item => {
+                    const timeAgo = Math.floor((Date.now() - item.addedAt) / 60000);
+                    const timeStr = timeAgo < 1 ? '刚刚' : timeAgo < 60 ? `${timeAgo}分钟前` : `${Math.floor(timeAgo / 60)}小时前`;
+                    return `
+                        <div style="background:rgba(255,107,107,0.06);border:1px solid rgba(255,107,107,0.15);border-radius:8px;padding:10px 14px;margin-bottom:8px;">
+                            <div style="color:rgba(255,255,255,0.85);font-size:0.85rem;line-height:1.5;">${item.text}</div>
+                            <div style="color:rgba(255,255,255,0.3);font-size:0.7rem;margin-top:4px;">${timeStr}</div>
                         </div>
-                        ${contentText ? `<div style="color:rgba(255,255,255,0.8);font-size:0.9rem;line-height:1.6;margin-bottom:8px;">${contentText}</div>` : ''}
-                        <div style="color:rgba(255,255,255,0.35);font-size:0.75rem;">
-                            ${author && author !== '无名' ? author : ''}${author && time ? ' · ' : ''}${time ? time.substring(0, 16) : ''}
+                    `;
+                }).join('');
+            }
+
+            content.innerHTML = `
+                <div style="display:flex;gap:12px;min-height:300px;">
+                    <div style="flex:1;overflow-y:auto;max-height:65vh;padding-right:6px;border-right:1px solid rgba(255,215,0,0.15);">
+                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid rgba(255,215,0,0.2);">
+                            <span style="color:#ffd700;font-size:0.95rem;font-weight:600;">📢 普通公告</span>
+                            <span style="color:rgba(255,255,255,0.4);font-size:0.75rem;margin-left:auto;">${activeItems.length}条</span>
                         </div>
+                        ${normalHtml}
                     </div>
-                `;
-            }).join('');
+                    <div style="flex:1;overflow-y:auto;max-height:65vh;padding-left:6px;">
+                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid rgba(255,107,107,0.2);">
+                            <span style="color:#ff6b6b;font-size:0.95rem;font-weight:600;">🔨 拍卖快讯</span>
+                            <span style="color:rgba(255,255,255,0.4);font-size:0.75rem;margin-left:auto;">${auctionBroadcastQueue.length}条</span>
+                        </div>
+                        ${auctionHtml}
+                    </div>
+                </div>
+            `;
         }
 
         function closeNewsListModal() {
@@ -12403,21 +12446,29 @@ function hasGistToken() {
                 try {
                     const token = getGistToken();
                     if (token) {
-                        // 从scriptUrl中提取Gist ID（支持多种URL格式）
                         let gistId = null;
-                        // 格式1: https://gist.githubusercontent.com/user/GIST_ID/raw/...
-                        const match1 = msg.scriptUrl.match(/gist\.githubusercontent\.com\/[^/]+\/([a-f0-9]{20,40})/i);
-                        // 格式2: https://gist.github.com/user/GIST_ID
-                        const match2 = msg.scriptUrl.match(/gist\.github\.com\/[^/]+\/([a-f0-9]{20,40})/i);
-                        // 格式3: /gists/GIST_ID
-                        const match3 = msg.scriptUrl.match(/\/gists\/([a-f0-9]{20,40})/i);
-                        gistId = (match1 && match1[1]) || (match2 && match2[1]) || (match3 && match3[1]);
+                        if (msg.scriptUrl.includes('gist.githubusercontent.com')) {
+                            const match = msg.scriptUrl.match(/gist\.githubusercontent\.com\/[^\/]+\/([a-zA-Z0-9]+)/i);
+                            if (match) gistId = match[1];
+                        } else if (msg.scriptUrl.includes('gist.github.com') && !msg.scriptUrl.includes('api.github.com')) {
+                            const match = msg.scriptUrl.match(/gist\.github\.com\/[^\/]+\/([a-zA-Z0-9]+)/i);
+                            if (match) gistId = match[1];
+                        } else if (msg.scriptUrl.includes('/gists/')) {
+                            const match = msg.scriptUrl.match(/\/gists\/([a-zA-Z0-9]+)/i);
+                            if (match) gistId = match[1];
+                        }
                         if (gistId) {
-                            await fetch(`https://api.github.com/gists/${gistId}`, {
+                            const delResp = await fetch(`https://api.github.com/gists/${gistId}`, {
                                 method: 'DELETE',
                                 headers: { 'Authorization': `token ${token}` }
                             });
-                            console.log(`🗑️ 已删除关联脚本: ${gistId}`);
+                            if (delResp.ok) {
+                                console.log(`🗑️ 已删除关联脚本Gist: ${gistId}`);
+                            } else {
+                                console.warn(`删除脚本Gist失败 (${delResp.status}): ${gistId}`);
+                            }
+                        } else {
+                            console.warn(`无法从URL提取Gist ID: ${msg.scriptUrl}`);
                         }
                     }
                 } catch (e) {
@@ -17215,31 +17266,27 @@ function hasGistToken() {
                     <div style="color:#60a5fa;font-size:0.75rem;font-weight:500;">🛒 求购说明</div>
                     <div style="color:rgba(255,255,255,0.6);font-size:0.7rem;margin-top:4px;">发布您想购买的物品需求，其他玩家看到后可以联系您交易。</div>
                 </div>
-                <div style="display:flex;gap:8px;margin-bottom:8px;">
-                    <div style="flex:1;">
-                        <label style="color:rgba(255,255,255,0.6);font-size:0.75rem;">想要品质</label>
-                        <select id="buyRequestQuality" style="width:100%;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:white;font-size:0.85rem;outline:none;box-sizing:border-box;">
-                            <option value="不限">不限</option>
-                            <option value="红色" style="color:#ef4444;">红色</option>
-                            <option value="金色" style="color:#ffd700;">金色</option>
-                            <option value="紫色" style="color:#a78bfa;">紫色</option>
-                            <option value="蓝色" style="color:#60a5fa;">蓝色</option>
-                            <option value="绿色" style="color:#4ade80;">绿色</option>
-                        </select>
+                <div style="margin-bottom:8px;">
+                    <label style="color:rgba(255,255,255,0.6);font-size:0.75rem;display:block;margin-bottom:4px;">想要品质（可多选）</label>
+                    <div style="display:flex;flex-wrap:wrap;gap:6px;" id="buyRequestQualityGroup">
+                        <label style="display:flex;align-items:center;gap:3px;cursor:pointer;padding:3px 8px;border-radius:4px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);font-size:0.8rem;"><input type="checkbox" value="红色" style="width:14px;height:14px;cursor:pointer;"><span style="color:#ef4444;">红色</span></label>
+                        <label style="display:flex;align-items:center;gap:3px;cursor:pointer;padding:3px 8px;border-radius:4px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);font-size:0.8rem;"><input type="checkbox" value="金色" style="width:14px;height:14px;cursor:pointer;"><span style="color:#ffd700;">金色</span></label>
+                        <label style="display:flex;align-items:center;gap:3px;cursor:pointer;padding:3px 8px;border-radius:4px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);font-size:0.8rem;"><input type="checkbox" value="紫色" style="width:14px;height:14px;cursor:pointer;"><span style="color:#a78bfa;">紫色</span></label>
+                        <label style="display:flex;align-items:center;gap:3px;cursor:pointer;padding:3px 8px;border-radius:4px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);font-size:0.8rem;"><input type="checkbox" value="蓝色" style="width:14px;height:14px;cursor:pointer;"><span style="color:#60a5fa;">蓝色</span></label>
+                        <label style="display:flex;align-items:center;gap:3px;cursor:pointer;padding:3px 8px;border-radius:4px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);font-size:0.8rem;"><input type="checkbox" value="绿色" style="width:14px;height:14px;cursor:pointer;"><span style="color:#4ade80;">绿色</span></label>
                     </div>
-                    <div style="flex:1;">
-                        <label style="color:rgba(255,255,255,0.6);font-size:0.75rem;">想要职业</label>
-                        <select id="buyRequestProfession" style="width:100%;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:white;font-size:0.85rem;outline:none;box-sizing:border-box;">
-                            <option value="不限">不限</option>
-                            <option value="工程">工程</option>
-                            <option value="熊猫">熊猫</option>
-                            <option value="法师">法师</option>
-                            <option value="召唤">召唤</option>
-                            <option value="战士">战士</option>
-                            <option value="猎人">猎人</option>
-                            <option value="牧师">牧师</option>
-                            <option value="术士">术士</option>
-                        </select>
+                </div>
+                <div style="margin-bottom:8px;">
+                    <label style="color:rgba(255,255,255,0.6);font-size:0.75rem;display:block;margin-bottom:4px;">想要职业（可多选）</label>
+                    <div style="display:flex;flex-wrap:wrap;gap:6px;" id="buyRequestProfessionGroup">
+                        <label style="display:flex;align-items:center;gap:3px;cursor:pointer;padding:3px 8px;border-radius:4px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);font-size:0.8rem;"><input type="checkbox" value="工程" style="width:14px;height:14px;cursor:pointer;"><span>工程</span></label>
+                        <label style="display:flex;align-items:center;gap:3px;cursor:pointer;padding:3px 8px;border-radius:4px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);font-size:0.8rem;"><input type="checkbox" value="熊猫" style="width:14px;height:14px;cursor:pointer;"><span>熊猫</span></label>
+                        <label style="display:flex;align-items:center;gap:3px;cursor:pointer;padding:3px 8px;border-radius:4px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);font-size:0.8rem;"><input type="checkbox" value="法师" style="width:14px;height:14px;cursor:pointer;"><span>法师</span></label>
+                        <label style="display:flex;align-items:center;gap:3px;cursor:pointer;padding:3px 8px;border-radius:4px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);font-size:0.8rem;"><input type="checkbox" value="召唤" style="width:14px;height:14px;cursor:pointer;"><span>召唤</span></label>
+                        <label style="display:flex;align-items:center;gap:3px;cursor:pointer;padding:3px 8px;border-radius:4px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);font-size:0.8rem;"><input type="checkbox" value="战士" style="width:14px;height:14px;cursor:pointer;"><span>战士</span></label>
+                        <label style="display:flex;align-items:center;gap:3px;cursor:pointer;padding:3px 8px;border-radius:4px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);font-size:0.8rem;"><input type="checkbox" value="猎人" style="width:14px;height:14px;cursor:pointer;"><span>猎人</span></label>
+                        <label style="display:flex;align-items:center;gap:3px;cursor:pointer;padding:3px 8px;border-radius:4px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);font-size:0.8rem;"><input type="checkbox" value="牧师" style="width:14px;height:14px;cursor:pointer;"><span>牧师</span></label>
+                        <label style="display:flex;align-items:center;gap:3px;cursor:pointer;padding:3px 8px;border-radius:4px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);font-size:0.8rem;"><input type="checkbox" value="术士" style="width:14px;height:14px;cursor:pointer;"><span>术士</span></label>
                     </div>
                 </div>
                 <div style="display:flex;gap:8px;margin-bottom:8px;">
