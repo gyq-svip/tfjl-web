@@ -3811,7 +3811,7 @@
 
         // 检查是否是管理员
         function checkIsAdmin() {
-            const adminNicknames = ['gyq', 'GYQ'];
+            const adminNicknames = ['gyq', 'GYQ', '龙行'];
             return adminNicknames.some(nick => currentChatNick.toLowerCase() === nick.toLowerCase());
         }
 
@@ -11667,7 +11667,7 @@ function hasGistToken() {
             const now = Date.now();
             const nicknameInput = document.getElementById('messageNickname');
             const currentNickname = nicknameInput?.value.trim() || localStorage.getItem('TFJL_UserName') || '';
-            const adminNicknames = ['gyq', 'GYQ'];
+            const adminNicknames = ['gyq', 'GYQ', '龙行'];
             const isAdmin = adminNicknames.some(nick => currentNickname.toLowerCase() === nick.toLowerCase());
             
             // 过滤消息：默认永久保存，只有设置了expireDays的消息才过期
@@ -11745,7 +11745,7 @@ function hasGistToken() {
             
             const nicknameInput = document.getElementById('messageNickname');
             const currentNickname = nicknameInput?.value.trim() || localStorage.getItem('TFJL_UserName') || '';
-            const adminNicknames = ['gyq', 'GYQ'];
+            const adminNicknames = ['gyq', 'GYQ', '龙行'];
             const isAdmin = adminNicknames.some(nick => currentNickname.toLowerCase() === nick.toLowerCase());
             const msg = wallMessages[index];
             
