@@ -10938,6 +10938,8 @@ function hasGistToken() {
                 }, 100);
                 
                 setInterval(() => {
+                    // 有拍卖播报时不改变颜色，保持红色
+                    if (auctionBroadcastQueue.length > 0) return;
                     const newColor = getRandomMarqueeColor();
                     marqueeEl.style.color = newColor;
                     marqueeEl.style.textShadow = `0 0 10px ${newColor}, 0 0 20px ${newColor}`;
@@ -10955,6 +10957,8 @@ function hasGistToken() {
                     return false;
                 });
                 if (hasTimeChange) {
+                    // 有拍卖播报时不覆盖，由播报系统管理
+                    if (auctionBroadcastQueue.length > 0) return;
                     const marqueeEl = document.getElementById('newsMarquee');
                     if (marqueeEl) {
                         marqueeEl.textContent = getNewsMarqueeText();
@@ -10973,8 +10977,12 @@ function hasGistToken() {
             const backupNewsItems = [...newsItems];
             const backupTitle = currentConfig.title;
             
-            marqueeEl.textContent = '正在刷新...';
-            marqueeEl.style.animation = 'none';
+            // 有拍卖播报时只刷新数据，不覆盖公告显示
+            const hasBroadcast = auctionBroadcastQueue.length > 0;
+            if (!hasBroadcast) {
+                marqueeEl.textContent = '正在刷新...';
+                marqueeEl.style.animation = 'none';
+            }
             
             try {
                 const freshNews = await fetchNewsFromGitHub();
@@ -10988,7 +10996,12 @@ function hasGistToken() {
                 localStorage.setItem(NEWS_CACHE_KEY, JSON.stringify(newsItems));
                 localStorage.setItem(NEWS_CACHE_TIME_KEY, new Date().toISOString());
                 
-                initMarquee();
+                if (hasBroadcast) {
+                    // 有拍卖播报时，更新播报显示即可
+                    updateMarqueeWithBroadcast();
+                } else {
+                    initMarquee();
+                }
             } catch (error) {
                 console.error('刷新公告失败:', error);
                 if (backupNewsItems.length > 0) {
@@ -10997,11 +11010,13 @@ function hasGistToken() {
                     newsItems = [...DEFAULT_NEWS];
                 }
                 currentConfig.title = backupTitle || DEFAULT_CONFIG.title;
-                marqueeEl.textContent = '网络不可用，显示缓存数据';
-                setTimeout(() => {
-                    marqueeEl.textContent = getNewsMarqueeText();
-                    marqueeEl.style.animation = 'marqueeScroll 60s linear infinite';
-                }, 1500);
+                if (!hasBroadcast) {
+                    marqueeEl.textContent = '网络不可用，显示缓存数据';
+                    setTimeout(() => {
+                        marqueeEl.textContent = getNewsMarqueeText();
+                        marqueeEl.style.animation = 'marqueeScroll 60s linear infinite';
+                    }, 1500);
+                }
             }
         }
         
