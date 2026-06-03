@@ -15246,6 +15246,126 @@ function hasGistToken() {
             }
         }
 
+        // 加载所有房间的商品
+        async function loadAllRoomsGoods() {
+            const listContainer = document.getElementById('auctionManageList');
+            listContainer.innerHTML = '<div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;">加载中...</div>';
+            
+            try {
+                const token = getGistToken();
+                const indexUrl = `https://api.github.com/gists/${GIST_ID}`;
+                const indexResponse = await fetch(indexUrl, {
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        ...(token && { 'Authorization': `token ${token}` })
+                    }
+                });
+                if (!indexResponse.ok) throw new Error('获取索引文件失败');
+                
+                const indexData = await indexResponse.json();
+                const indexContent = indexData.files['room_index.json']?.content;
+                if (!indexContent) throw new Error('索引文件内容为空');
+                
+                const index = JSON.parse(indexContent);
+                const allowedRooms = index.allowedRooms || [];
+                const allRoomIds = allowedRooms.map(r => typeof r === 'string' ? r : r.id).filter(id => id && id !== 'news');
+                Object.keys(index).forEach(key => {
+                    if (key !== 'allowedRooms' && key !== 'usedNicks' && key !== 'news' && !allRoomIds.includes(key)) {
+                        allRoomIds.push(key);
+                    }
+                });
+                
+                // 获取快讯数据
+                let broadcasts = [];
+                try { broadcasts = await fetchAuctionBroadcastsFromGist(); } catch(e) {}
+                const broadcastsByRoom = {};
+                broadcasts.forEach(b => {
+                    const rId = b.roomId || '未知';
+                    if (!broadcastsByRoom[rId]) broadcastsByRoom[rId] = [];
+                    broadcastsByRoom[rId].push(b);
+                });
+                
+                let html = '';
+                let totalGoods = 0;
+                const now = Date.now();
+                
+                for (const rId of allRoomIds) {
+                    const roomGistId = index[rId];
+                    if (!roomGistId) continue;
+                    
+                    try {
+                        const roomResponse = await fetch(`https://api.github.com/gists/${roomGistId}`, {
+                            headers: {
+                                'Accept': 'application/vnd.github.v3+json',
+                                ...(token && { 'Authorization': `token ${token}` })
+                            }
+                        });
+                        if (!roomResponse.ok) continue;
+                        
+                        const roomData = await roomResponse.json();
+                        const filename = `chatrooms_${rId}.json`;
+                        const content = roomData.files[filename]?.content;
+                        if (!content) continue;
+                        
+                        const allData = JSON.parse(content);
+                        let roomInfo = allData.rooms ? allData.rooms[rId] : (allData.auctions ? allData : null);
+                        if (!roomInfo) continue;
+                        
+                        const auctions = roomInfo.auctions || [];
+                        const buyRequests = (roomInfo.buyRequests || []).filter(b => b.status === 'active');
+                        const roomBroadcasts = broadcastsByRoom[rId] || [];
+                        const activeCount = auctions.filter(a => a.status === 'active' && now < a.endTime).length;
+                        
+                        if (auctions.length === 0 && buyRequests.length === 0) continue;
+                        
+                        totalGoods += auctions.length;
+                        
+                        html += `
+                            <div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,215,0,0.15);border-radius:8px;padding:12px;margin-bottom:12px;">
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                                    <div style="color:#ffd700;font-weight:600;font-size:0.95rem;">【拍卖行◆${rId}】</div>
+                                    <div style="color:rgba(255,255,255,0.5);font-size:0.75rem;">
+                                        拍品${auctions.length} · 进行中${activeCount} · 求购${buyRequests.length} · 快讯${roomBroadcasts.length}条
+                                    </div>
+                                </div>
+                        `;
+                        
+                        auctions.forEach((auction) => {
+                            const isEnded = auction.status === 'ended' || now >= auction.endTime;
+                            const qualityColor = getQualityColor(auction.quality);
+                            const currentBid = auction.bids && auction.bids.length > 0 ? auction.bids[auction.bids.length - 1].amount : auction.startPrice;
+                            
+                            html += `
+                                <div style="background:rgba(255,255,255,0.03);border-radius:6px;padding:8px 10px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;">
+                                    <div style="flex:1;">
+                                        <span style="color:${qualityColor};font-size:0.8rem;font-weight:500;">#${auction.id} ${auction.quality || ''}·${auction.profession || ''}</span>
+                                        ${auction.isExchange ? '<span style="background:#f97316;color:white;padding:1px 4px;border-radius:3px;font-size:0.6rem;margin-left:4px;">交换</span>' : ''}
+                                        <span style="color:#ffd700;font-size:0.8rem;margin-left:6px;">💰${currentBid}</span>
+                                        <span style="color:rgba(255,255,255,0.4);font-size:0.7rem;margin-left:4px;">${auction.creator || ''} ${isEnded ? '· 已结束' : '· 进行中'}</span>
+                                    </div>
+                                    <button onclick="adminRemoveAuction('${rId}','${auction.id}','${auction.creator || ''}')" 
+                                        style="background:#ef4444;color:white;border:none;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;">下架</button>
+                                </div>
+                            `;
+                        });
+                        
+                        html += '</div>';
+                    } catch (e) {
+                        console.warn(`加载房间${rId}商品失败:`, e);
+                    }
+                }
+                
+                if (!html) {
+                    listContainer.innerHTML = '<div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;">所有房间暂无商品</div>';
+                } else {
+                    listContainer.innerHTML = `<div style="color:#ffd700;font-size:0.85rem;margin-bottom:10px;">共 ${allRoomIds.length} 个房间，${totalGoods} 件商品</div>` + html;
+                }
+                
+            } catch (error) {
+                listContainer.innerHTML = `<div style="color:#ef4444;text-align:center;padding:10px;">加载失败: ${error.message}</div>`;
+            }
+        }
+
         // ==================== 房主管理功能 ====================
         async function openOwnerPanel() {
             const panel = document.getElementById('ownerPanel');
@@ -15543,16 +15663,11 @@ function hasGistToken() {
 
         async function loadAuctionStats() {
             const roomId = document.getElementById('auctionStatsRoomId').value.trim();
-            if (!roomId) {
-                document.getElementById('auctionStatsSummary').innerHTML = '<div style="color:#ef4444;text-align:center;padding:10px;">请输入房间ID</div>';
-                document.getElementById('auctionStatsDetail').innerHTML = '';
-                return;
-            }
             
             try {
                 const token = getGistToken();
                 
-                // 从索引文件获取房间的 Gist ID
+                // 从索引文件获取房间列表
                 const indexUrl = `https://api.github.com/gists/${GIST_ID}`;
                 const indexResponse = await fetch(indexUrl, {
                     headers: {
@@ -15568,6 +15683,40 @@ function hasGistToken() {
                 if (!indexContent) throw new Error('索引文件内容为空');
                 
                 const index = JSON.parse(indexContent);
+                
+                // 获取拍卖快讯数据
+                let broadcasts = [];
+                try {
+                    broadcasts = await fetchAuctionBroadcastsFromGist();
+                } catch (e) {
+                    console.warn('获取拍卖快讯失败:', e);
+                }
+                
+                // 确定要统计的房间列表
+                const allowedRooms = index.allowedRooms || [];
+                const allRoomIds = allowedRooms.map(r => typeof r === 'string' ? r : r.id).filter(id => id && id !== 'news');
+                // 也包含索引中有gist但不在白名单的房间
+                Object.keys(index).forEach(key => {
+                    if (key !== 'allowedRooms' && key !== 'usedNicks' && key !== 'news' && !allRoomIds.includes(key)) {
+                        allRoomIds.push(key);
+                    }
+                });
+                
+                // 按房间分组统计快讯
+                const broadcastsByRoom = {};
+                broadcasts.forEach(b => {
+                    const rId = b.roomId || '未知';
+                    if (!broadcastsByRoom[rId]) broadcastsByRoom[rId] = [];
+                    broadcastsByRoom[rId].push(b);
+                });
+                
+                if (!roomId) {
+                    // 无房间ID时显示所有房间的汇总
+                    await loadAllRoomsStats(index, allRoomIds, broadcasts, broadcastsByRoom, token);
+                    return;
+                }
+                
+                // 单个房间统计
                 const roomGistId = index[roomId];
                 if (!roomGistId) throw new Error('该房间不存在');
                 
@@ -15603,12 +15752,17 @@ function hasGistToken() {
                 
                 const history = roomDataObj.auctionHistory || [];
                 const allAuctions = roomDataObj.auctions || [];
+                const buyRequests = roomDataObj.buyRequests || [];
                 const now = Date.now();
                 
                 // 统计正在拍卖的拍品
                 const activeAuctions = allAuctions.filter(a => a.status === 'active' && now < a.endTime);
+                const endedAuctions = allAuctions.filter(a => a.status === 'ended');
                 
-                if (history.length === 0 && allAuctions.length === 0) {
+                // 该房间的快讯
+                const roomBroadcasts = broadcastsByRoom[roomId] || [];
+                
+                if (history.length === 0 && allAuctions.length === 0 && buyRequests.length === 0) {
                     document.getElementById('auctionStatsSummary').innerHTML = '<div style="color:#f59e0b;text-align:center;padding:10px;">该房间暂无拍卖记录</div>';
                     document.getElementById('auctionStatsDetail').innerHTML = '';
                     return;
@@ -15635,15 +15789,40 @@ function hasGistToken() {
                 
                 let summaryHtml = `
                     <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:15px;margin-bottom:15px;">
-                        <div style="color:#ffd700;font-size:0.95rem;font-weight:bold;margin-bottom:10px;">📊 统计概览</div>
-                        <div style="color:rgba(255,255,255,0.7);font-size:0.85rem;margin-bottom:5px;">总拍卖次数: <span style="color:#4ade80;">${history.length}</span></div>
-                        <div style="color:rgba(255,255,255,0.7);font-size:0.85rem;margin-bottom:5px;">总交易金额: <span style="color:#ffd700;">${history.reduce((sum, r) => sum + r.finalPrice, 0)}</span></div>
-                        <div style="color:rgba(255,255,255,0.7);font-size:0.85rem;margin-bottom:5px;">正在拍卖: <span style="color:#fbbf24;">${activeAuctions.length}</span></div>
-                        <div style="color:rgba(255,255,255,0.7);font-size:0.85rem;">卖家数量: <span style="color:#4ade80;">${Object.keys(sellerStats).length}</span> · 买家数量: <span style="color:#4ade80;">${Object.keys(buyerStats).length}</span></div>
+                        <div style="color:#ffd700;font-size:0.95rem;font-weight:bold;margin-bottom:10px;">📊 【拍卖行◆${roomId}】统计概览</div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                            <div style="color:rgba(255,255,255,0.7);font-size:0.85rem;">总拍卖次数: <span style="color:#4ade80;">${history.length}</span></div>
+                            <div style="color:rgba(255,255,255,0.7);font-size:0.85rem;">总交易金额: <span style="color:#ffd700;">${history.reduce((sum, r) => sum + r.finalPrice, 0)}</span></div>
+                            <div style="color:rgba(255,255,255,0.7);font-size:0.85rem;">正在拍卖: <span style="color:#fbbf24;">${activeAuctions.length}</span></div>
+                            <div style="color:rgba(255,255,255,0.7);font-size:0.85rem;">已结束: <span style="color:#60a5fa;">${endedAuctions.length}</span></div>
+                            <div style="color:rgba(255,255,255,0.7);font-size:0.85rem;">求购中: <span style="color:#f472b6;">${buyRequests.filter(b => b.status === 'active').length}</span></div>
+                            <div style="color:rgba(255,255,255,0.7);font-size:0.85rem;">卖家: <span style="color:#4ade80;">${Object.keys(sellerStats).length}</span> · 买家: <span style="color:#4ade80;">${Object.keys(buyerStats).length}</span></div>
+                        </div>
+                        <div style="border-top:1px solid rgba(255,107,107,0.2);margin-top:10px;padding-top:10px;">
+                            <div style="color:#ff6b6b;font-size:0.85rem;font-weight:500;">📢 拍卖快讯: <span style="color:#4ade80;">${roomBroadcasts.length}条</span></div>
+                        </div>
                     </div>
                 `;
                 
                 let detailHtml = '';
+                
+                // 快讯列表
+                if (roomBroadcasts.length > 0) {
+                    detailHtml += '<div style="background:rgba(255,107,107,0.05);border-radius:8px;padding:15px;margin-bottom:15px;border:1px solid rgba(255,107,107,0.15);">';
+                    detailHtml += '<div style="color:#ff6b6b;font-size:0.95rem;font-weight:bold;margin-bottom:10px;">📢 拍卖快讯 (' + roomBroadcasts.length + ')</div>';
+                    roomBroadcasts.slice().reverse().forEach(item => {
+                        const dateStr = new Date(item.addedAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+                        const timeAgo = Math.floor((Date.now() - item.addedAt) / 60000);
+                        const timeStr = timeAgo < 1 ? '刚刚' : timeAgo < 60 ? `${timeAgo}分钟前` : timeAgo < 1440 ? `${Math.floor(timeAgo / 60)}小时前` : `${Math.floor(timeAgo / 1440)}天前`;
+                        detailHtml += `
+                            <div style="border-bottom:1px solid rgba(255,255,255,0.06);padding:8px 0;">
+                                <div style="color:rgba(255,255,255,0.85);font-size:0.85rem;line-height:1.5;">${item.text}</div>
+                                <div style="color:rgba(255,255,255,0.3);font-size:0.7rem;margin-top:3px;">${timeStr} · ${dateStr}</div>
+                            </div>
+                        `;
+                    });
+                    detailHtml += '</div>';
+                }
                 
                 const sortedSellers = Object.entries(sellerStats).sort((a, b) => b[1].totalAmount - a[1].totalAmount);
                 detailHtml += '<div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:15px;margin-bottom:15px;">';
@@ -15771,12 +15950,12 @@ function hasGistToken() {
                 }
                 detailHtml += '</div>';
                 
-                const endedAuctions = allAuctions.filter(a => a.bids && a.bids.length > 0 && a.status === 'ended');
-                if (endedAuctions.length > 0) {
+                const endedAuctionsWithBids = allAuctions.filter(a => a.bids && a.bids.length > 0 && a.status === 'ended');
+                if (endedAuctionsWithBids.length > 0) {
                     detailHtml += '<div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:15px;">';
                     detailHtml += '<div style="color:#ffd700;font-size:0.95rem;font-weight:bold;margin-bottom:10px;">📋 完整出价记录</div>';
                     
-                    endedAuctions.slice().reverse().forEach((auction, idx) => {
+                    endedAuctionsWithBids.slice().reverse().forEach((auction, idx) => {
                         const qualityColor = auction.quality === '传说' ? '#ff6b6b' : 
                                            auction.quality === '史诗' ? '#a855f7' : 
                                            auction.quality === '稀有' ? '#3b82f6' : 'rgba(255,255,255,0.6)';
@@ -15811,6 +15990,134 @@ function hasGistToken() {
                 document.getElementById('auctionStatsSummary').innerHTML = `<div style="color:#ef4444;text-align:center;padding:10px;">加载失败: ${error.message}</div>`;
                 document.getElementById('auctionStatsDetail').innerHTML = '';
             }
+        }
+
+        // 加载所有房间的汇总统计
+        async function loadAllRoomsStats(index, allRoomIds, broadcasts, broadcastsByRoom, token) {
+            let totalHistory = 0;
+            let totalAmount = 0;
+            let totalActive = 0;
+            let totalEnded = 0;
+            let totalBuyRequests = 0;
+            const roomStats = [];
+            
+            for (const rId of allRoomIds) {
+                const roomGistId = index[rId];
+                if (!roomGistId) continue;
+                
+                try {
+                    const roomResponse = await fetch(`https://api.github.com/gists/${roomGistId}`, {
+                        headers: {
+                            'Accept': 'application/vnd.github.v3+json',
+                            ...(token && { 'Authorization': `token ${token}` })
+                        }
+                    });
+                    if (!roomResponse.ok) continue;
+                    
+                    const roomData = await roomResponse.json();
+                    const filename = `chatrooms_${rId}.json`;
+                    const content = roomData.files[filename]?.content;
+                    if (!content) continue;
+                    
+                    const allData = JSON.parse(content);
+                    let roomDataObj = allData.rooms ? allData.rooms[rId] : (allData.auctions ? allData : null);
+                    if (!roomDataObj) continue;
+                    
+                    const history = roomDataObj.auctionHistory || [];
+                    const auctions = roomDataObj.auctions || [];
+                    const buyReqs = roomDataObj.buyRequests || [];
+                    const now = Date.now();
+                    const active = auctions.filter(a => a.status === 'active' && now < a.endTime).length;
+                    const ended = auctions.filter(a => a.status === 'ended').length;
+                    const roomTotal = history.reduce((sum, r) => sum + r.finalPrice, 0);
+                    const roomBroadcasts = broadcastsByRoom[rId] || [];
+                    
+                    totalHistory += history.length;
+                    totalAmount += roomTotal;
+                    totalActive += active;
+                    totalEnded += ended;
+                    totalBuyRequests += buyReqs.filter(b => b.status === 'active').length;
+                    
+                    roomStats.push({
+                        roomId: rId,
+                        historyCount: history.length,
+                        totalAmount: roomTotal,
+                        activeCount: active,
+                        endedCount: ended,
+                        buyRequestCount: buyReqs.filter(b => b.status === 'active').length,
+                        broadcastCount: roomBroadcasts.length
+                    });
+                } catch (e) {
+                    console.warn(`加载房间${rId}统计失败:`, e);
+                }
+            }
+            
+            // 汇总概览
+            let summaryHtml = `
+                <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:15px;margin-bottom:15px;">
+                    <div style="color:#ffd700;font-size:0.95rem;font-weight:bold;margin-bottom:10px;">📊 所有房间汇总统计</div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                        <div style="color:rgba(255,255,255,0.7);font-size:0.85rem;">房间数量: <span style="color:#4ade80;">${allRoomIds.length}</span></div>
+                        <div style="color:rgba(255,255,255,0.7);font-size:0.85rem;">总拍卖次数: <span style="color:#4ade80;">${totalHistory}</span></div>
+                        <div style="color:rgba(255,255,255,0.7);font-size:0.85rem;">总交易金额: <span style="color:#ffd700;">${totalAmount}</span></div>
+                        <div style="color:rgba(255,255,255,0.7);font-size:0.85rem;">正在拍卖: <span style="color:#fbbf24;">${totalActive}</span></div>
+                        <div style="color:rgba(255,255,255,0.7);font-size:0.85rem;">已结束: <span style="color:#60a5fa;">${totalEnded}</span></div>
+                        <div style="color:rgba(255,255,255,0.7);font-size:0.85rem;">求购中: <span style="color:#f472b6;">${totalBuyRequests}</span></div>
+                    </div>
+                    <div style="border-top:1px solid rgba(255,107,107,0.2);margin-top:10px;padding-top:10px;">
+                        <div style="color:#ff6b6b;font-size:0.85rem;font-weight:500;">📢 拍卖快讯总计: <span style="color:#4ade80;">${broadcasts.length}条</span> · 涉及房间: <span style="color:#4ade80;">${Object.keys(broadcastsByRoom).length}个</span></div>
+                    </div>
+                </div>
+            `;
+            
+            // 各房间统计卡片
+            let detailHtml = '<div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:15px;margin-bottom:15px;">';
+            detailHtml += '<div style="color:#ffd700;font-size:0.95rem;font-weight:bold;margin-bottom:10px;">🏠 各房间统计</div>';
+            
+            if (roomStats.length === 0) {
+                detailHtml += '<div style="color:rgba(255,255,255,0.5);font-size:0.85rem;text-align:center;padding:10px;">暂无房间数据</div>';
+            } else {
+                roomStats.sort((a, b) => b.totalAmount - a.totalAmount);
+                roomStats.forEach((rs, idx) => {
+                    detailHtml += `
+                        <div style="border-bottom:1px solid rgba(255,255,255,0.1);padding:10px 0;cursor:pointer;" onclick="document.getElementById('auctionStatsRoomId').value='${rs.roomId}';loadAuctionStats();">
+                            <div style="display:flex;justify-content:space-between;align-items:center;">
+                                <div>
+                                    <span style="color:#ffd700;font-size:0.9rem;font-weight:600;">${idx + 1}. 【拍卖行◆${rs.roomId}】</span>
+                                </div>
+                                <div style="color:#4ade80;font-size:0.9rem;">💰 ${rs.totalAmount}</div>
+                            </div>
+                            <div style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-top:4px;">
+                                成交${rs.historyCount}笔 · 进行中${rs.activeCount} · 已结束${rs.endedCount} · 求购${rs.buyRequestCount} · 快讯${rs.broadcastCount}条
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+            detailHtml += '</div>';
+            
+            // 快讯按房间分组
+            if (broadcasts.length > 0) {
+                detailHtml += '<div style="background:rgba(255,107,107,0.05);border-radius:8px;padding:15px;margin-bottom:15px;border:1px solid rgba(255,107,107,0.15);">';
+                detailHtml += '<div style="color:#ff6b6b;font-size:0.95rem;font-weight:bold;margin-bottom:10px;">📢 拍卖快讯汇总 (' + broadcasts.length + ')</div>';
+                
+                Object.entries(broadcastsByRoom).sort((a, b) => b[1].length - a[1].length).forEach(([rId, items]) => {
+                    detailHtml += `<div style="margin-bottom:10px;">
+                        <div style="color:#ffd700;font-size:0.85rem;font-weight:500;margin-bottom:6px;">【拍卖行◆${rId}】<span style="color:rgba(255,255,255,0.4);font-size:0.75rem;">${items.length}条</span></div>`;
+                    items.slice().reverse().slice(0, 5).forEach(item => {
+                        const dateStr = new Date(item.addedAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+                        detailHtml += `<div style="color:rgba(255,255,255,0.7);font-size:0.8rem;padding:3px 0;padding-left:10px;border-left:2px solid rgba(255,107,107,0.3);">${item.text} <span style="color:rgba(255,255,255,0.3);font-size:0.7rem;">${dateStr}</span></div>`;
+                    });
+                    if (items.length > 5) {
+                        detailHtml += `<div style="color:rgba(255,255,255,0.3);font-size:0.75rem;padding-left:10px;">...还有${items.length - 5}条</div>`;
+                    }
+                    detailHtml += '</div>';
+                });
+                detailHtml += '</div>';
+            }
+            
+            document.getElementById('auctionStatsSummary').innerHTML = summaryHtml;
+            document.getElementById('auctionStatsDetail').innerHTML = detailHtml;
         }
 
         // 导出拍卖数据备份
@@ -16978,6 +17285,7 @@ function hasGistToken() {
                     <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
                         <input type="text" id="auctionManageRoomId" placeholder="房间ID" style="flex:1;min-width:100px;">
                         <button class="admin-btn" style="background:linear-gradient(135deg,#2196f3,#1565c0);" onclick="loadAuctionManageList()">加载商品</button>
+                        <button class="admin-btn admin-btn-secondary" onclick="loadAllRoomsGoods()">加载全部房间</button>
                     </div>
                     <div id="auctionManageList" style="max-height:400px;overflow-y:auto;"></div>
                 </div>
@@ -17221,11 +17529,12 @@ function hasGistToken() {
                         <div style="color:#ffa500;font-size:0.85rem;font-weight:500;">💡 说明</div>
                         <div style="color:rgba(255,255,255,0.6);font-size:0.75rem;margin-top:5px;">
                             拍卖记录存储在GitHub Gist云端，<strong style="color:#4ade80;">清除浏览器缓存不会丢失数据</strong>。<br>
+                            留空房间ID点击加载可查看<strong style="color:#ffd700;">所有房间汇总</strong>，输入房间ID查看单房间详情。<br>
                             建议定期导出备份，防止意外情况导致数据丢失。
                         </div>
                     </div>
-                    <label>选择房间</label>
-                    <input type="text" id="auctionStatsRoomId" placeholder="输入房间ID" style="margin-bottom:10px;">
+                    <label>选择房间（留空查看全部）</label>
+                    <input type="text" id="auctionStatsRoomId" placeholder="输入房间ID（留空查看全部）" style="margin-bottom:10px;">
                     <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">
                         <button class="admin-btn" style="background:linear-gradient(135deg,#2196f3,#1565c0);" onclick="exportAuctionData()">📥 导出备份</button>
                         <button class="admin-btn" style="background:linear-gradient(135deg,#ff9800,#f57c00);" onclick="document.getElementById('auctionBackupFile').click()">📤 导入恢复</button>
