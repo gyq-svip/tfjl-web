@@ -2921,34 +2921,130 @@
         let auctionCounterInterval = null;
         let imagesData = null;
 
-        // 拍卖播报队列
-        let auctionBroadcastQueue = []; // { text, addedAt, scrollCount }
-        let auctionBroadcastTimer = null;
-        const BROADCAST_MAX_SCROLLS = 3; // 滚动3次后消失
-        const BROADCAST_SCROLL_DURATION = 20000; // 每次滚动约20秒
+        // 拍卖播报队列（持久化到Gist，所有设备共享）
+        let auctionBroadcastQueue = []; // { id, text, roomId, addedAt }
 
-        // 添加拍卖播报消息
-        function addAuctionBroadcast(text) {
-            auctionBroadcastQueue.push({
+        // 添加拍卖播报消息（同时保存到Gist持久化）
+        async function addAuctionBroadcast(text, roomId) {
+            const broadcast = {
+                id: 'ab_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
                 text: text,
-                addedAt: Date.now(),
-                scrollCount: 0
-            });
+                roomId: roomId || '',
+                addedAt: Date.now()
+            };
+            auctionBroadcastQueue.push(broadcast);
             updateMarqueeWithBroadcast();
+            // 异步保存到Gist（不阻塞UI）
+            saveAuctionBroadcastsToGist().catch(err => {
+                console.warn('拍卖快讯保存到Gist失败:', err);
+            });
+        }
+
+        // 从Gist加载拍卖快讯
+        async function fetchAuctionBroadcastsFromGist() {
+            try {
+                const token = getGistToken();
+                const response = await fetch(GIST_URL, {
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        ...(token && { 'Authorization': `token ${token}` })
+                    }
+                });
+                if (!response.ok) return [];
+                const data = await response.json();
+                const content = data.files && data.files['auction_broadcasts.json'] && data.files['auction_broadcasts.json'].content;
+                if (!content || content.trim() === '') return [];
+                const broadcasts = JSON.parse(content);
+                if (!Array.isArray(broadcasts)) return [];
+                return broadcasts;
+            } catch (e) {
+                console.warn('从Gist加载拍卖快讯失败:', e);
+                return [];
+            }
+        }
+
+        // 保存拍卖快讯到Gist
+        async function saveAuctionBroadcastsToGist() {
+            const token = getGistToken();
+            if (!token) {
+                console.warn('未设置Gist Token，拍卖快讯仅保存在本地');
+                return;
+            }
+            const content = JSON.stringify(auctionBroadcastQueue, null, 2);
+            const response = await fetch(GIST_URL, {
+                method: 'PATCH',
+                headers: {
+                    'Accept': 'application/vnd.github.v3+json',
+                    'Content-Type': 'application/json',
+                    'Authorization': `token ${token}`
+                },
+                body: JSON.stringify({
+                    files: {
+                        'auction_broadcasts.json': {
+                            content: content
+                        }
+                    }
+                })
+            });
+            if (!response.ok) {
+                const errData = await response.json().catch(() => ({}));
+                throw new Error(errData.message || `保存拍卖快讯失败 HTTP ${response.status}`);
+            }
+        }
+
+        // 管理员删除拍卖快讯
+        async function adminDeleteAuctionBroadcast(broadcastId) {
+            if (!confirm('确定要删除这条拍卖快讯吗？（不会影响拍卖行房间数据）')) return;
+            try {
+                // 从Gist重新读取最新数据
+                const latestBroadcasts = await fetchAuctionBroadcastsFromGist();
+                const index = latestBroadcasts.findIndex(b => b.id === broadcastId);
+                if (index === -1) {
+                    // 也尝试从内存队列删除
+                    auctionBroadcastQueue = auctionBroadcastQueue.filter(b => b.id !== broadcastId);
+                    updateMarqueeWithBroadcast();
+                    renderAdminAuctionBroadcastList(auctionBroadcastQueue);
+                    showAdminStatus('快讯已从本地删除', 'success');
+                    return;
+                }
+                latestBroadcasts.splice(index, 1);
+                // 更新内存队列
+                auctionBroadcastQueue = latestBroadcasts;
+                updateMarqueeWithBroadcast();
+                // 保存到Gist
+                const token = getGistToken();
+                if (!token) throw new Error('未设置GitHub Token');
+                const content = JSON.stringify(latestBroadcasts, null, 2);
+                const response = await fetch(GIST_URL, {
+                    method: 'PATCH',
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json',
+                        'Authorization': `token ${token}`
+                    },
+                    body: JSON.stringify({
+                        files: {
+                            'auction_broadcasts.json': {
+                                content: content
+                            }
+                        }
+                    })
+                });
+                if (!response.ok) throw new Error('保存失败');
+                showAdminStatus('拍卖快讯已删除', 'success');
+                // 刷新管理列表和公告弹窗
+                adminRefreshNews();
+                renderAdminAuctionBroadcastList(latestBroadcasts);
+            } catch (error) {
+                console.error('删除拍卖快讯失败:', error);
+                showAdminStatus('删除失败: ' + error.message, 'error');
+            }
         }
 
         // 更新公告栏显示（拍卖播报优先）
         function updateMarqueeWithBroadcast() {
             const marqueeEl = document.getElementById('newsMarquee');
             if (!marqueeEl) return;
-
-            // 清理已过期的播报（滚动次数达到上限）
-            const now = Date.now();
-            auctionBroadcastQueue = auctionBroadcastQueue.filter(item => {
-                const elapsed = now - item.addedAt;
-                item.scrollCount = Math.floor(elapsed / BROADCAST_SCROLL_DURATION);
-                return item.scrollCount < BROADCAST_MAX_SCROLLS;
-            });
 
             if (auctionBroadcastQueue.length > 0) {
                 // 有拍卖播报，显示播报内容
@@ -2971,17 +3067,6 @@
                 marqueeEl.style.paddingLeft = '100%';
                 void marqueeEl.offsetWidth;
                 marqueeEl.style.animation = 'marqueeScroll 60s linear infinite';
-            }
-
-            // 设置定时器检查播报是否过期
-            if (auctionBroadcastQueue.length > 0 && !auctionBroadcastTimer) {
-                auctionBroadcastTimer = setInterval(() => {
-                    updateMarqueeWithBroadcast();
-                    if (auctionBroadcastQueue.length === 0) {
-                        clearInterval(auctionBroadcastTimer);
-                        auctionBroadcastTimer = null;
-                    }
-                }, BROADCAST_SCROLL_DURATION);
             }
         }
 
@@ -4421,7 +4506,7 @@
                 renderChatMessages();
 
                 // 公告播报求购信息
-                addAuctionBroadcast(`[拍卖行${roomId}] ${currentChatNick} 求购：${descStr}${budget ? ' 预算' + budget : ''}`);
+                addAuctionBroadcast(`【拍卖行◆${roomId}】${currentChatNick} 求购：${descStr}${budget ? ' 预算' + budget : ''}`, roomId);
 
                 showAuctionToast('✅ 求购发布成功！', 'success');
             } catch (error) {
@@ -4532,9 +4617,9 @@
                 
                 // 公告播报拍卖信息
                 if (isExchange) {
-                    addAuctionBroadcast(`[拍卖行${roomId}] ${currentChatNick} 上架交换：${quality}·${profession}${bonusDmg > 0 ? ' 附加+' + bonusDmg : ''}${ignoreIce > 0 ? ' 无视+' + ignoreIce : ''}${exchangeWant ? ' 想要:' + exchangeWant : ''}`);
+                    addAuctionBroadcast(`【拍卖行◆${roomId}】${currentChatNick} 上架交换：${quality}·${profession}${bonusDmg > 0 ? ' 附加+' + bonusDmg : ''}${ignoreIce > 0 ? ' 无视+' + ignoreIce : ''}${exchangeWant ? ' 想要:' + exchangeWant : ''}`, roomId);
                 } else {
-                    addAuctionBroadcast(`[拍卖行${roomId}] ${currentChatNick} 上架拍卖：${quality}·${profession}${bonusDmg > 0 ? ' 附加+' + bonusDmg : ''}${ignoreIce > 0 ? ' 无视+' + ignoreIce : ''} 起拍${startPrice}`);
+                    addAuctionBroadcast(`【拍卖行◆${roomId}】${currentChatNick} 上架拍卖：${quality}·${profession}${bonusDmg > 0 ? ' 附加+' + bonusDmg : ''}${ignoreIce > 0 ? ' 无视+' + ignoreIce : ''} 起拍${startPrice}`, roomId);
                 }
                 
                 // 显示成功提示
@@ -5119,7 +5204,7 @@
 
                 // 公告播报出价信息
                 const bidRoomId = currentChatRoom || 'default';
-                addAuctionBroadcast(`[拍卖行${bidRoomId}] ${currentChatNick} 出价${actualBid} → ${quality}·${profession}${bonusDmg > 0 ? ' 附加+' + bonusDmg : ''}${ignoreIce > 0 ? ' 无视+' + ignoreIce : ''}`);
+                addAuctionBroadcast(`【拍卖行◆${bidRoomId}】${currentChatNick} 出价${actualBid} → ${quality}·${profession}${bonusDmg > 0 ? ' 附加+' + bonusDmg : ''}${ignoreIce > 0 ? ' 无视+' + ignoreIce : ''}`, bidRoomId);
 
                 await fetchChatRoomData();
                 if (fromDetail) closeAuctionDetail();
@@ -5254,7 +5339,7 @@
                                             const p = auction.profession || '';
                                             const bd = auction.bonusDmg || 0;
                                             const ii = auction.ignoreIce || 0;
-                                            addAuctionBroadcast(`[拍卖行${roomId}] ${latestBid.bidder} 出价${latestBid.amount} → ${q}·${p}${bd > 0 ? ' 附加+' + bd : ''}${ii > 0 ? ' 无视+' + ii : ''}`);
+                                            addAuctionBroadcast(`【拍卖行◆${roomId}】${latestBid.bidder} 出价${latestBid.amount} → ${q}·${p}${bd > 0 ? ' 附加+' + bd : ''}${ii > 0 ? ' 无视+' + ii : ''}`, roomId);
                                         }
                                     }
                                     lastAuctionSnapshot[key] = {
@@ -10827,16 +10912,22 @@ function hasGistToken() {
 
             // 拍卖快讯HTML
             let auctionHtml = '';
+            const isAdminUser = checkIsAdmin();
             if (auctionBroadcastQueue.length === 0) {
                 auctionHtml = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;">暂无拍卖快讯</div>';
             } else {
                 auctionHtml = auctionBroadcastQueue.map(item => {
                     const timeAgo = Math.floor((Date.now() - item.addedAt) / 60000);
-                    const timeStr = timeAgo < 1 ? '刚刚' : timeAgo < 60 ? `${timeAgo}分钟前` : `${Math.floor(timeAgo / 60)}小时前`;
+                    const timeStr = timeAgo < 1 ? '刚刚' : timeAgo < 60 ? `${timeAgo}分钟前` : timeAgo < 1440 ? `${Math.floor(timeAgo / 60)}小时前` : `${Math.floor(timeAgo / 1440)}天前`;
+                    const dateStr = new Date(item.addedAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+                    const deleteBtn = isAdminUser ? `<button onclick="adminDeleteAuctionBroadcast('${item.id}')" style="background:rgba(239,68,68,0.2);border:1px solid rgba(239,68,68,0.3);color:#ef4444;font-size:0.7rem;padding:2px 8px;border-radius:4px;cursor:pointer;margin-left:auto;white-space:nowrap;">删除</button>` : '';
                     return `
                         <div style="background:rgba(255,107,107,0.06);border:1px solid rgba(255,107,107,0.15);border-radius:8px;padding:10px 14px;margin-bottom:8px;">
-                            <div style="color:rgba(255,255,255,0.85);font-size:0.85rem;line-height:1.5;">${item.text}</div>
-                            <div style="color:rgba(255,255,255,0.3);font-size:0.7rem;margin-top:4px;">${timeStr}</div>
+                            <div style="display:flex;align-items:flex-start;gap:6px;">
+                                <div style="color:rgba(255,255,255,0.85);font-size:0.85rem;line-height:1.5;flex:1;">${item.text}</div>
+                                ${deleteBtn}
+                            </div>
+                            <div style="color:rgba(255,255,255,0.3);font-size:0.7rem;margin-top:4px;">${timeStr} · ${dateStr}</div>
                         </div>
                     `;
                 }).join('');
@@ -10991,6 +11082,14 @@ function hasGistToken() {
             try {
                 const freshNews = await fetchNewsFromGitHub();
                 newsItems = freshNews;
+                
+                // 同时刷新拍卖快讯
+                try {
+                    const broadcasts = await fetchAuctionBroadcastsFromGist();
+                    auctionBroadcastQueue = broadcasts;
+                } catch (e) {
+                    console.warn('刷新拍卖快讯失败:', e);
+                }
                 
                 if (titleEl && currentConfig.title) {
                     titleEl.textContent = ' ' + currentConfig.title + ' ';
@@ -11188,6 +11287,17 @@ function hasGistToken() {
                 await loadNews();
             } catch (error) {
                 console.error('❌ 加载配置和新闻失败:', error);
+            }
+
+            // 从Gist加载拍卖快讯（持久化，所有设备共享）
+            try {
+                const broadcasts = await fetchAuctionBroadcastsFromGist();
+                if (broadcasts && broadcasts.length > 0) {
+                    auctionBroadcastQueue = broadcasts;
+                    updateMarqueeWithBroadcast();
+                }
+            } catch (error) {
+                console.warn('加载拍卖快讯失败:', error);
             }
             
             // 设置网络监听（离线同步）
@@ -16063,6 +16173,15 @@ function hasGistToken() {
                 newsItems = newsData;
                 localStorage.setItem(NEWS_CACHE_KEY, JSON.stringify(newsItems));
                 localStorage.setItem(NEWS_CACHE_TIME_KEY, new Date().toISOString());
+                // 同时刷新拍卖快讯
+                try {
+                    const broadcasts = await fetchAuctionBroadcastsFromGist();
+                    auctionBroadcastQueue = broadcasts;
+                    updateMarqueeWithBroadcast();
+                    renderAdminAuctionBroadcastList(broadcasts);
+                } catch (e) {
+                    console.warn('刷新拍卖快讯失败:', e);
+                }
                 initMarquee();
                 renderAdminNewsList(newsData);
             } catch (error) {
@@ -16221,6 +16340,78 @@ function hasGistToken() {
             } catch (error) {
                 console.error('删除公告失败:', error);
                 showAdminStatus('删除失败: ' + error.message, 'error');
+            }
+        }
+
+        // 管理员刷新拍卖快讯列表
+        async function adminRefreshAuctionBroadcasts() {
+            const listEl = document.getElementById('adminAuctionBroadcastList');
+            listEl.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;">加载中...</div>';
+            try {
+                const broadcasts = await fetchAuctionBroadcastsFromGist();
+                auctionBroadcastQueue = broadcasts;
+                updateMarqueeWithBroadcast();
+                renderAdminAuctionBroadcastList(broadcasts);
+            } catch (error) {
+                console.error('加载拍卖快讯失败:', error);
+                listEl.innerHTML = '<div style="color:#ef4444;text-align:center;padding:20px;">加载失败: ' + error.message + '</div>';
+            }
+        }
+
+        // 渲染管理员拍卖快讯列表
+        function renderAdminAuctionBroadcastList(broadcasts) {
+            const listEl = document.getElementById('adminAuctionBroadcastList');
+            if (!broadcasts || broadcasts.length === 0) {
+                listEl.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;">暂无拍卖快讯</div>';
+                return;
+            }
+            listEl.innerHTML = broadcasts.map(item => {
+                const dateStr = new Date(item.addedAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+                const timeAgo = Math.floor((Date.now() - item.addedAt) / 60000);
+                const timeStr = timeAgo < 1 ? '刚刚' : timeAgo < 60 ? `${timeAgo}分钟前` : timeAgo < 1440 ? `${Math.floor(timeAgo / 60)}小时前` : `${Math.floor(timeAgo / 1440)}天前`;
+                return `
+                    <div class="admin-news-item" style="border-left:3px solid #ff6b6b;">
+                        <div class="news-info">
+                            <div class="news-title" style="color:#ff6b6b;">${item.text}</div>
+                            <div class="news-meta">${timeStr} · ${dateStr}${item.roomId ? ' · 房间: ' + item.roomId : ''}</div>
+                        </div>
+                        <div class="news-actions">
+                            <button class="admin-btn admin-btn-danger" onclick="adminDeleteAuctionBroadcast('${item.id}')" style="font-size:0.75rem;">删除</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // 管理员清空所有拍卖快讯
+        async function adminClearAllAuctionBroadcasts() {
+            if (!confirm('确定要清空所有拍卖快讯吗？（不会影响拍卖行房间数据）')) return;
+            try {
+                auctionBroadcastQueue = [];
+                updateMarqueeWithBroadcast();
+                const token = getGistToken();
+                if (!token) throw new Error('未设置GitHub Token');
+                const response = await fetch(GIST_URL, {
+                    method: 'PATCH',
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json',
+                        'Authorization': `token ${token}`
+                    },
+                    body: JSON.stringify({
+                        files: {
+                            'auction_broadcasts.json': {
+                                content: '[]'
+                            }
+                        }
+                    })
+                });
+                if (!response.ok) throw new Error('保存失败');
+                showAdminStatus('所有拍卖快讯已清空', 'success');
+                adminRefreshAuctionBroadcasts();
+            } catch (error) {
+                console.error('清空拍卖快讯失败:', error);
+                showAdminStatus('清空失败: ' + error.message, 'error');
             }
         }
 
@@ -16960,6 +17151,22 @@ function hasGistToken() {
                     </div>
                     <div id="adminNewsList" class="admin-news-list">
                         <div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;">加载中...</div>
+                    </div>
+                </div>
+                <div class="admin-section">
+                    <h3 style="color:#ff6b6b;">🔨 拍卖快讯管理</h3>
+                    <div style="background:rgba(255,107,107,0.1);border-left:3px solid #ff6b6b;border-radius:6px;padding:10px;margin-bottom:10px;">
+                        <div style="color:rgba(255,255,255,0.6);font-size:0.75rem;">
+                            拍卖快讯由拍卖行自动生成，存储在云端所有设备共享。<br>
+                            删除快讯<strong style="color:#4ade80;">不会影响</strong>拍卖行房间的拍品和数据。
+                        </div>
+                    </div>
+                    <div style="text-align:right;margin-bottom:10px;">
+                        <button class="admin-btn admin-btn-secondary" onclick="adminRefreshAuctionBroadcasts()" style="font-size:0.8rem;">🔄 刷新快讯</button>
+                        <button class="admin-btn" style="font-size:0.8rem;background:#ff6b6b;" onclick="adminClearAllAuctionBroadcasts()">🗑️ 清空全部</button>
+                    </div>
+                    <div id="adminAuctionBroadcastList" class="admin-news-list">
+                        <div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;">点击刷新加载</div>
                     </div>
                 </div>
             </div>
