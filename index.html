@@ -3532,8 +3532,12 @@
                             indexData = JSON.parse(data.files['room_index.json'].content);
                             console.log(`📖 当前索引内容:`, indexData);
                         } catch (e) {
-                            indexData = {};
+                            console.error('❌ 解析索引文件失败，中止更新以防数据丢失');
+                            return null;
                         }
+                    } else {
+                        console.error('❌ 索引文件内容为空，中止更新以防数据丢失');
+                        return null;
                     }
                 } else {
                     console.error(`❌ 获取索引文件失败: ${response.status}`);
@@ -14202,7 +14206,10 @@ function hasGistToken() {
                 if (!response.ok) throw new Error('获取索引文件失败');
                 
                 const data = await response.json();
-                const content = data.files['room_index.json']?.content || '{}';
+                const content = data.files['room_index.json']?.content;
+                if (!content || content.trim() === '' || content.trim() === '{}') {
+                    throw new Error('索引文件内容为空或不存在，为安全起见已中止操作。');
+                }
                 const index = JSON.parse(content);
                 
                 if (!index.allowedRooms) index.allowedRooms = [];
@@ -14269,7 +14276,10 @@ function hasGistToken() {
                 if (!response.ok) throw new Error('获取索引文件失败');
                 
                 const data = await response.json();
-                const content = data.files['room_index.json']?.content || '{}';
+                const content = data.files['room_index.json']?.content;
+                if (!content || content.trim() === '' || content.trim() === '{}') {
+                    throw new Error('索引文件内容为空或不存在，为安全起见已中止操作。');
+                }
                 const index = JSON.parse(content);
                 
                 // 更新房主
@@ -14326,8 +14336,18 @@ function hasGistToken() {
                 if (!response.ok) throw new Error('获取索引文件失败');
                 
                 const data = await response.json();
-                const content = data.files['room_index.json']?.content || '{}';
+                const content = data.files['room_index.json']?.content;
+                // 安全检查：如果索引文件不存在或内容为空，绝不能覆盖
+                if (!content || content.trim() === '' || content.trim() === '{}') {
+                    throw new Error('索引文件内容为空或不存在，为安全起见已中止操作。请检查 room_index.json 是否正常。');
+                }
+                
                 const index = JSON.parse(content);
+                // 二次安全检查：解析后的索引必须包含有效数据
+                const indexKeys = Object.keys(index).filter(k => k !== 'allowedRooms');
+                if (indexKeys.length === 0 && (!index.allowedRooms || index.allowedRooms.length === 0)) {
+                    throw new Error('索引文件数据异常（无任何房间记录），为安全起见已中止操作。');
+                }
                 
                 // 获取房间的 Gist ID
                 const roomGistId = index[roomId];
@@ -14390,12 +14410,24 @@ function hasGistToken() {
                     delete index[roomId];
                 }
                 
-                // 从白名单移除
+                // 从白名单移除（兼容字符串和对象格式）
                 if (index.allowedRooms) {
-                    index.allowedRooms = index.allowedRooms.filter(r => r !== roomId);
+                    index.allowedRooms = index.allowedRooms.filter(r => {
+                        const existingId = typeof r === 'string' ? r : r.id;
+                        return existingId !== roomId;
+                    });
                 }
                 
-                // 保存索引文件
+                // 保存索引文件（再次安全检查）
+                const newIndexStr = JSON.stringify(index, null, 2);
+                const newIndexObj = JSON.parse(newIndexStr);
+                const newIndexKeys = Object.keys(newIndexObj).filter(k => k !== 'allowedRooms');
+                // 删除一个房间后，索引中应该还有其他房间或至少有allowedRooms
+                // 如果删除后索引完全为空，说明可能有问题
+                if (newIndexKeys.length === 0 && (!newIndexObj.allowedRooms || newIndexObj.allowedRooms.length === 0)) {
+                    console.warn('⚠️ 删除后索引将为空，仍然保存（可能是最后一个房间）');
+                }
+                
                 const patchResponse = await fetch(indexUrl, {
                     method: 'PATCH',
                     headers: {
@@ -14406,7 +14438,7 @@ function hasGistToken() {
                     body: JSON.stringify({
                         files: {
                             'room_index.json': {
-                                content: JSON.stringify(index, null, 2)
+                                content: newIndexStr
                             }
                         }
                     })
@@ -14442,7 +14474,10 @@ function hasGistToken() {
                 if (!response.ok) throw new Error('获取索引文件失败');
                 
                 const data = await response.json();
-                const content = data.files['room_index.json']?.content || '{}';
+                const content = data.files['room_index.json']?.content;
+                if (!content || content.trim() === '' || content.trim() === '{}') {
+                    throw new Error('索引文件内容为空或不存在，为安全起见已中止操作。');
+                }
                 const index = JSON.parse(content);
                 
                 // 清空白名单
