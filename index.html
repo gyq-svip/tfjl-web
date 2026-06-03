@@ -2469,11 +2469,13 @@
     <!-- ==================== 功能记录结束 ==================== -->
 
     <div class="container">
+        <!-- 固定头部：标题 + 公告栏 -->
+        <div id="fixedHeader" style="position:sticky;top:0;z-index:100;background:linear-gradient(135deg,#0f0f23 0%,#1a1a2e 50%,#16213e 100%);padding-bottom:5px;">
         <h1><span id="mainHeader" style="cursor:default;">🛡️</span> 塔防精灵 阵容归档</h1>
         <p id="mainTitle" class="instructions glowing-text" style="cursor:pointer;" onclick="refreshNewsAndTitle()" title="点击刷新公告和标题"> 支持导入脚本解析 | 阵容存储快速查看 | 活动遇到龙行麻烦投一下  </p>
         
         <!-- 滚动公告栏 -->
-        <div id="newsMarqueeContainer" style="background:rgba(255,255,255,0.05);border:2px solid rgba(255,215,0,0.3);border-radius:10px;padding:15px;margin-bottom:20px;text-align:center;overflow:hidden;position:relative;cursor:pointer;" onclick="showNewsListModal()" title="点击查看全部公告">
+        <div id="newsMarqueeContainer" style="background:rgba(255,255,255,0.05);border:2px solid rgba(255,215,0,0.3);border-radius:10px;padding:15px;margin-bottom:5px;text-align:center;overflow:hidden;position:relative;cursor:pointer;" onclick="showNewsListModal()" title="点击查看全部公告">
             <div style="display:flex;align-items:center;gap:15px;">
                 <!-- 实时时间显示 -->
                 <div id="currentTime" style="color:#ffd700;font-weight:bold;font-size:1.1rem;white-space:nowrap;min-width:300px;text-align:left;">
@@ -2487,6 +2489,9 @@
             </div>
             <div style="position:absolute;bottom:3px;right:10px;color:rgba(255,255,255,0.25);font-size:0.65rem;pointer-events:none;">点击查看全部公告</div>
         </div>
+        </div>
+        <!-- 可滚动内容区域 -->
+        <div id="scrollableContent">
         
         <!-- 公告列表弹窗 -->
         <div id="newsListModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9998;align-items:center;justify-content:center;">
@@ -17362,6 +17367,8 @@ function hasGistToken() {
             </p>
         </div>
     </div>
+    </div><!-- end scrollableContent -->
+    </div><!-- end container -->
 
 </body>
 </html>
