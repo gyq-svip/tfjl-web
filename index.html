@@ -5799,13 +5799,19 @@
                 return;
             }
 
-            // 提示用户把要上的卡放在前6个位置
-            if (heroNames.length > 6) {
-                resultEl.innerHTML = `<span style="color:#ff9800;">⚠️ 请把要上的卡放在前6个位置！当前共${heroNames.length}张卡。</span><br>`;
-            }
-
-            // 取前6张卡
-            const first6 = heroNames.slice(0, 6);
+            // 精灵类卡名列表（精灵不占位置，跳过）
+            const jingLingNames = ['冰精灵', '光精灵', '魔精灵', '木精灵', '土精灵', '雷精灵', '暗精灵', '幻精灵', '魂精灵', '彩精灵'];
+            // 工程类卡名列表
+            const gongChengNames = ['火炮', '宝库', '射线', '咬人娃娃', '潜艇'];
+            
+            // 过滤掉精灵类，取前6张非精灵卡
+            const nonJingLingCards = heroNames.filter(name => !jingLingNames.some(jl => name.includes(jl)));
+            // 检查是否有工程卡
+            const hasGongCheng = heroNames.some(name => gongChengNames.some(gc => name.includes(gc)));
+            // 有工程卡就上7张，没有就上6张
+            const cardCount = hasGongCheng ? 7 : 6;
+            const first6 = nonJingLingCards.slice(0, cardCount);
+            
             // 检查是否有射线或宝库
             const hasSheXian = heroNames.some(name => name.includes('射线'));
             const hasBaoKu = heroNames.some(name => name.includes('宝库'));
