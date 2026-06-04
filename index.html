@@ -5856,11 +5856,12 @@
             let shangKaStr = '';
             const levelStr = hasGuangJingLing ? '3级' : '满';
             
-            // 如果有蛇女，蛇女固定在第6位，需要加"强制顺序上卡,"
+            // 如果有蛇女，蛇女固定在第6位
             if (hasSheNv) {
                 // 过滤掉蛇女，取前5张
-                const cardsWithoutSheNv = first6.filter(name => !name.includes('蛇女'));
-                cardsWithoutSheNv.forEach(name => {
+                const cardsWithoutSheNv = filteredCards.filter(name => !name.includes('蛇女'));
+                const first5 = cardsWithoutSheNv.slice(0, 5);
+                first5.forEach(name => {
                     shangKaStr += `上${name}${levelStr},`;
                 });
                 // 蛇女放在第6位
@@ -5872,7 +5873,7 @@
                 });
             }
             
-            // 如果有射线或宝库，添加到上卡字符串
+            // 如果有射线或宝库，添加到上卡字符串（第7位）
             if (hasBaoKu) {
                 shangKaStr += `上宝库${levelStr},`;
             } else if (hasSheXian) {
