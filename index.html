@@ -5764,6 +5764,86 @@
             resultEl.innerHTML = resultHtml;
         }
 
+        // 活动脚本解析功能
+        function parseActivityScript() {
+            const input = document.getElementById('parserInput').value.trim();
+            const resultEl = document.getElementById('parserResult');
+
+            if (!input) {
+                resultEl.innerHTML = '<span style="color:#f44336;">请输入文本！</span>';
+                return;
+            }
+
+            // 解析"上阵："后面的内容
+            let heroNames = [];
+            const match = input.match(/上阵[：:]\s*(.+)/);
+            if (match && match[1]) {
+                heroNames = match[1].split(/[,，]/).map(name => name.trim()).filter(name => name);
+            } else {
+                heroNames = input.split(/[,，]/).map(name => name.trim()).filter(name => name);
+            }
+
+            if (heroNames.length === 0) {
+                resultEl.innerHTML = '<span style="color:#f44336;">未找到英雄名称！</span>';
+                return;
+            }
+
+            // 提示用户把要上的卡放在前6个位置
+            if (heroNames.length > 6) {
+                resultEl.innerHTML = `<span style="color:#ff9800;">⚠️ 请把要上的卡放在前6个位置！当前共${heroNames.length}张卡。</span><br>`;
+            }
+
+            // 取前6张卡
+            const first6 = heroNames.slice(0, 6);
+            // 检查是否有射线或宝库
+            const hasSheXian = heroNames.some(name => name.includes('射线'));
+            const hasBaoKu = heroNames.some(name => name.includes('宝库'));
+            // 检查是否有冰精灵
+            const hasBingJingLing = heroNames.some(name => name.includes('冰精灵'));
+
+            // 构建输出
+            let output = '00:01,';
+            first6.forEach(name => {
+                output += `上${name}满,`;
+            });
+
+            // 如果有射线或宝库，添加到输出
+            if (hasBaoKu) {
+                output += '上宝库满,';
+            } else if (hasSheXian) {
+                output += '上射线满,';
+            }
+
+            // 如果有冰精灵，添加额外输出
+            let extraOutput = '';
+            if (hasBingJingLing) {
+                extraOutput = '\n田伯光扔壶前，每1秒共1次冰精灵\n田伯光酒壶，每2秒共3次冰精灵\n田伯光药壶，停球';
+            }
+
+            // 显示结果
+            resultEl.innerHTML = `
+                <div style="background:rgba(0,0,0,0.3);padding:10px;border-radius:8px;margin-top:5px;">
+                    <div style="color:#4caf50;font-weight:bold;margin-bottom:8px;">✅ 活动脚本输出：</div>
+                    <div style="color:#fff;font-family:monospace;white-space:pre-wrap;word-break:break-all;">${output}${extraOutput}</div>
+                    <button onclick="copyActivityScriptOutput()" style="margin-top:10px;background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.85rem;">📋 复制脚本</button>
+                </div>
+            `;
+
+            // 保存输出到全局变量供复制使用
+            window._activityScriptOutput = output + extraOutput;
+        }
+
+        // 复制活动脚本输出
+        function copyActivityScriptOutput() {
+            if (!window._activityScriptOutput) return;
+            navigator.clipboard.writeText(window._activityScriptOutput).then(() => {
+                const resultEl = document.getElementById('parserResult');
+                resultEl.innerHTML += '<br><span style="color:#4caf50;">✅ 已复制到剪贴板！</span>';
+            }).catch(err => {
+                console.error('复制失败:', err);
+            });
+        }
+
         // 通用面板拖拽功能
         function startPanelDrag(e, panelId) {
             if (e.target.closest('button') || e.target.closest('select') || e.target.closest('input')) return;
@@ -6087,8 +6167,9 @@
                     <label style="color:rgba(255,255,255,0.8);font-size:0.85rem;margin-bottom:5px;display:block;">输入文本（格式：上阵：英雄1,英雄2,...）：</label>
                     <textarea id="parserInput" placeholder="示例：上阵：水灵,死神,幻精灵,小野,龙王,风灵,木精灵,咕咕,火炮,光精灵" style="width:100%;height:100%;min-height:100px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,215,0,0.2);border-radius:8px;padding:10px;color:#fff;font-size:0.9rem;resize:none;font-family:inherit;box-sizing:border-box;"></textarea>
                 </div>
-                <div style="display:flex;gap:10px;">
+                <div style="display:flex;gap:10px;flex-wrap:wrap;">
                     <button onclick="parseTextAndAddCards()" style="flex:1;background:linear-gradient(135deg,#00bcd4,#00838f);color:white;border:none;padding:10px 16px;border-radius:8px;cursor:pointer;font-size:0.9rem;font-weight:500;">🔍 解析并添加</button>
+                    <button onclick="parseActivityScript()" style="flex:1;background:linear-gradient(135deg,#ff5722,#e64a19);color:white;border:none;padding:10px 16px;border-radius:8px;cursor:pointer;font-size:0.9rem;font-weight:500;">📜 活动脚本解析</button>
                     <button onclick="clearParserInput()" style="background:rgba(255,255,255,0.1);color:white;border:none;padding:10px 16px;border-radius:8px;cursor:pointer;font-size:0.9rem;">清空</button>
                 </div>
                 <div id="parserResult" style="margin-top:10px;font-size:0.85rem;color:rgba(255,255,255,0.7);"></div>
