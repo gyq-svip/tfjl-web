@@ -5774,14 +5774,25 @@
                 return;
             }
 
+            // 按行分割输入
+            const lines = input.split('\n').map(line => line.trim()).filter(line => line);
+            
             // 解析"上阵："后面的内容
             let heroNames = [];
-            const match = input.match(/上阵[：:]\s*(.+)/);
-            if (match && match[1]) {
-                heroNames = match[1].split(/[,，]/).map(name => name.trim()).filter(name => name);
-            } else {
-                heroNames = input.split(/[,，]/).map(name => name.trim()).filter(name => name);
-            }
+            let zhenZhanLine = '';
+            let otherLines = []; // 魔化、皮肤、主战车、副战车等行
+            
+            lines.forEach((line, index) => {
+                if (line.match(/^上阵[：:]/)) {
+                    zhenZhanLine = line;
+                    const match = line.match(/上阵[：:]\s*(.+)/);
+                    if (match && match[1]) {
+                        heroNames = match[1].split(/[,，]/).map(name => name.trim()).filter(name => name);
+                    }
+                } else if (line.match(/^(魔化|皮肤|主战车|副战车)[：:]/)) {
+                    otherLines.push(line);
+                }
+            });
 
             if (heroNames.length === 0) {
                 resultEl.innerHTML = '<span style="color:#f44336;">未找到英雄名称！</span>';
@@ -5800,37 +5811,64 @@
             const hasBaoKu = heroNames.some(name => name.includes('宝库'));
             // 检查是否有冰精灵
             const hasBingJingLing = heroNames.some(name => name.includes('冰精灵'));
+            // 检查是否有魔精灵、光精灵
+            const hasMoJingLing = heroNames.some(name => name.includes('魔精灵'));
+            const hasGuangJingLing = heroNames.some(name => name.includes('光精灵'));
 
             // 构建输出
-            let output = '00:01,';
-            first6.forEach(name => {
-                output += `上${name}满,`;
+            // 第一部分：原样输出输入的行
+            let output = '';
+            if (zhenZhanLine) {
+                output += zhenZhanLine + '\n';
+            }
+            otherLines.forEach(line => {
+                output += line + '\n';
             });
-
-            // 如果有射线或宝库，添加到输出
+            
+            // 空一行
+            output += '\n';
+            
+            // 构建上卡字符串（格式：上卡名3级,）
+            let shangKaStr = '';
+            first6.forEach(name => {
+                shangKaStr += `上${name}3级,`;
+            });
+            // 如果有射线或宝库，添加到上卡字符串
             if (hasBaoKu) {
-                output += '上宝库满,';
+                shangKaStr += '上宝库3级,';
             } else if (hasSheXian) {
-                output += '上射线满,';
+                shangKaStr += '上射线3级,';
             }
 
-            // 如果有冰精灵，添加额外输出
-            let extraOutput = '';
+            // 第一行脚本
+            output += `00:01,${shangKaStr}\n`;
+            
+            // 如果有光精灵，添加光精灵输出
+            if (hasGuangJingLing) {
+                output += '00:40,每1秒共15次光精灵\n';
+            }
+
+            // 如果有魔精灵，添加魔精灵输出
+            if (hasMoJingLing) {
+                output += '01:25,每3秒共5000次魔精灵,\n';
+            }
+
+            // 如果有冰精灵，添加额外输出（空一行）
             if (hasBingJingLing) {
-                extraOutput = '\n田伯光扔壶前，每1秒共1次冰精灵\n田伯光酒壶，每2秒共3次冰精灵\n田伯光药壶，停球';
+                output += '\n田伯光扔壶前，每1秒共1次冰精灵\n田伯光酒壶，每2秒共3次冰精灵\n田伯光药壶，停球';
             }
 
             // 显示结果
             resultEl.innerHTML = `
                 <div style="background:rgba(0,0,0,0.3);padding:10px;border-radius:8px;margin-top:5px;">
                     <div style="color:#4caf50;font-weight:bold;margin-bottom:8px;">✅ 活动脚本输出：</div>
-                    <div style="color:#fff;font-family:monospace;white-space:pre-wrap;word-break:break-all;">${output}${extraOutput}</div>
+                    <div style="color:#fff;font-family:monospace;white-space:pre-wrap;word-break:break-all;">${output}</div>
                     <button onclick="copyActivityScriptOutput()" style="margin-top:10px;background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.85rem;">📋 复制脚本</button>
                 </div>
             `;
 
             // 保存输出到全局变量供复制使用
-            window._activityScriptOutput = output + extraOutput;
+            window._activityScriptOutput = output;
         }
 
         // 复制活动脚本输出
