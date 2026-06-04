@@ -6205,7 +6205,14 @@
                 </div>
                 <div style="margin-bottom:10px;flex:1;">
                     <label style="color:rgba(255,255,255,0.8);font-size:0.85rem;margin-bottom:5px;display:block;">输入文本（格式：上阵：英雄1,英雄2,...）：</label>
-                    <textarea id="parserInput" placeholder="示例：上阵：水灵,死神,幻精灵,小野,龙王,风灵,木精灵,咕咕,火炮,光精灵" style="width:100%;height:100%;min-height:100px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,215,0,0.2);border-radius:8px;padding:10px;color:#fff;font-size:0.9rem;resize:none;font-family:inherit;box-sizing:border-box;"></textarea>
+                    <textarea id="parserInput" placeholder="示例：
+上阵：水灵,死神,幻精灵,小野,龙王,风灵,木精灵,咕咕,火炮,光精灵
+魔化：
+皮肤：
+主战车：
+副战车：
+
+💡 只上前6张卡，要上的卡放在前6个位置，工程卡不算" style="width:100%;height:100%;min-height:100px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,215,0,0.2);border-radius:8px;padding:10px;color:#fff;font-size:0.9rem;resize:none;font-family:inherit;box-sizing:border-box;"></textarea>
                 </div>
                 <div style="display:flex;gap:10px;flex-wrap:wrap;">
                     <button onclick="parseTextAndAddCards()" style="flex:1;background:linear-gradient(135deg,#00bcd4,#00838f);color:white;border:none;padding:10px 16px;border-radius:8px;cursor:pointer;font-size:0.9rem;font-weight:500;">🔍 解析并添加</button>
