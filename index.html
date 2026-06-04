@@ -5828,16 +5828,18 @@
             // 空一行
             output += '\n';
             
-            // 构建上卡字符串（格式：上卡名3级,）
+            // 构建上卡字符串
+            // 如果有光精灵就上3级，否则上满
             let shangKaStr = '';
+            const levelStr = hasGuangJingLing ? '3级' : '满';
             first6.forEach(name => {
-                shangKaStr += `上${name}3级,`;
+                shangKaStr += `上${name}${levelStr},`;
             });
             // 如果有射线或宝库，添加到上卡字符串
             if (hasBaoKu) {
-                shangKaStr += '上宝库3级,';
+                shangKaStr += `上宝库${levelStr},`;
             } else if (hasSheXian) {
-                shangKaStr += '上射线3级,';
+                shangKaStr += `上射线${levelStr},`;
             }
 
             // 第一行脚本
