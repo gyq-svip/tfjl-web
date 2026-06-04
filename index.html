@@ -5801,20 +5801,25 @@
 
             // 精灵类卡名列表（精灵不占位置，跳过）
             const jingLingNames = ['冰精灵', '光精灵', '魔精灵', '木精灵', '土精灵', '雷精灵', '暗精灵', '幻精灵', '魂精灵', '彩精灵'];
-            // 工程类卡名列表
-            const gongChengNames = ['火炮', '宝库', '射线', '咬人娃娃', '潜艇'];
-            
-            // 过滤掉精灵类，取前6张非精灵卡
-            const nonJingLingCards = heroNames.filter(name => !jingLingNames.some(jl => name.includes(jl)));
-            // 检查是否有工程卡
-            const hasGongCheng = heroNames.some(name => gongChengNames.some(gc => name.includes(gc)));
-            // 有工程卡就上7张，没有就上6张
-            const cardCount = hasGongCheng ? 7 : 6;
-            const first6 = nonJingLingCards.slice(0, cardCount);
+            // 工程类卡名列表（射线和宝库单独处理）
+            const gongChengNames = ['火炮', '咬人娃娃', '潜艇'];
             
             // 检查是否有射线或宝库
             const hasSheXian = heroNames.some(name => name.includes('射线'));
             const hasBaoKu = heroNames.some(name => name.includes('宝库'));
+            // 检查是否有工程卡
+            const hasGongCheng = heroNames.some(name => gongChengNames.some(gc => name.includes(gc))) || hasSheXian || hasBaoKu;
+            
+            // 过滤掉精灵类和射线/宝库，取前6张或7张非精灵非工程卡
+            const filteredCards = heroNames.filter(name => {
+                if (jingLingNames.some(jl => name.includes(jl))) return false;
+                if (name.includes('射线') || name.includes('宝库')) return false;
+                return true;
+            });
+            // 有工程卡就上7张，没有就上6张
+            const cardCount = hasGongCheng ? 7 : 6;
+            const first6 = filteredCards.slice(0, cardCount);
+            
             // 检查是否有冰精灵
             const hasBingJingLing = heroNames.some(name => name.includes('冰精灵'));
             // 检查是否有魔精灵、光精灵
@@ -5861,7 +5866,7 @@
             
             // 如果有光精灵，添加光精灵输出
             if (hasGuangJingLing) {
-                output += '00:40,每1秒共15次光精灵\n';
+                output += '00:50,每0.1秒共15次光精灵\n';
             }
 
             // 如果有魔精灵，添加魔精灵输出
