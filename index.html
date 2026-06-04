@@ -5764,7 +5764,7 @@
             resultEl.innerHTML = resultHtml;
         }
 
-        // 活动脚本解析功能
+        // 活动脚本生成功能
         function parseActivityScript() {
             const input = document.getElementById('parserInput').value.trim();
             const resultEl = document.getElementById('parserResult');
@@ -5822,9 +5822,13 @@
             
             // 检查是否有冰精灵
             const hasBingJingLing = heroNames.some(name => name.includes('冰精灵'));
-            // 检查是否有魔精灵、光精灵
+            // 检查是否有魔精灵、光精灵、木精灵、魂精灵
             const hasMoJingLing = heroNames.some(name => name.includes('魔精灵'));
             const hasGuangJingLing = heroNames.some(name => name.includes('光精灵'));
+            const hasMuJingLing = heroNames.some(name => name.includes('木精灵'));
+            const hasHunJingLing = heroNames.some(name => name.includes('魂精灵'));
+            // 检查是否有蛇女
+            const hasSheNv = heroNames.some(name => name.includes('蛇女'));
 
             // 构建输出
             // 第一部分：原样输出输入的行
@@ -5851,9 +5855,23 @@
             // 如果有光精灵就上3级，否则上满
             let shangKaStr = '';
             const levelStr = hasGuangJingLing ? '3级' : '满';
-            first6.forEach(name => {
-                shangKaStr += `上${name}${levelStr},`;
-            });
+            
+            // 如果有蛇女，蛇女固定在第6位，需要加"强制顺序上卡,"
+            if (hasSheNv) {
+                // 过滤掉蛇女，取前5张
+                const cardsWithoutSheNv = first6.filter(name => !name.includes('蛇女'));
+                cardsWithoutSheNv.forEach(name => {
+                    shangKaStr += `上${name}${levelStr},`;
+                });
+                // 蛇女放在第6位
+                shangKaStr += `上蛇女${levelStr},`;
+            } else {
+                // 没有蛇女，正常上卡
+                first6.forEach(name => {
+                    shangKaStr += `上${name}${levelStr},`;
+                });
+            }
+            
             // 如果有射线或宝库，添加到上卡字符串
             if (hasBaoKu) {
                 shangKaStr += `上宝库${levelStr},`;
@@ -5862,16 +5880,22 @@
             }
 
             // 第一行脚本
-            output += `00:01,${shangKaStr}\n`;
+            // 如果有蛇女，加"强制顺序上卡,"
+            const qiangZhiStr = hasSheNv ? '强制顺序上卡,' : '';
+            output += `00:01,${qiangZhiStr}${shangKaStr}\n`;
             
             // 如果有光精灵，添加光精灵输出
             if (hasGuangJingLing) {
-                output += '00:50,每0.1秒共15次光精灵\n';
+                output += '00:50,每0.1秒共15次光精灵,关闭验光\n';
             }
 
-            // 如果有魔精灵，添加魔精灵输出
-            if (hasMoJingLing) {
-                output += '01:25,每3秒共5000次魔精灵,\n';
+            // 如果有魔精灵、木精灵、魂精灵，添加到同一行
+            const jingLing01_25 = [];
+            if (hasMoJingLing) jingLing01_25.push('每3秒共5000次魔精灵');
+            if (hasMuJingLing) jingLing01_25.push('每3秒共5000次木精灵');
+            if (hasHunJingLing) jingLing01_25.push('每3秒共5000次魂精灵');
+            if (jingLing01_25.length > 0) {
+                output += '01:25,' + jingLing01_25.join(',') + ',\n';
             }
 
             // 如果有冰精灵，添加额外输出（空一行）
@@ -6227,11 +6251,12 @@
                     <textarea id="parserInput" placeholder="示例：
 上阵：水灵,死神,幻精灵,小野,龙王,风灵,木精灵,咕咕,火炮,光精灵
 
-⚠️ 只上前6张卡！要上的卡放在前6个位置，工程卡不算" style="width:100%;height:100%;min-height:100px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,215,0,0.2);border-radius:8px;padding:10px;color:#fff;font-size:0.9rem;resize:none;font-family:inherit;box-sizing:border-box;"></textarea>
+⚠️ 只上前6张卡！要上的卡放在前6个位置，工程卡不算
+🐍 有蛇女时：蛇女会加速第4和第5张卡，请把需要加速的卡放在第4和第5位，蛇女会自动放在第6位" style="width:100%;height:100%;min-height:100px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,215,0,0.2);border-radius:8px;padding:10px;color:#fff;font-size:0.9rem;resize:none;font-family:inherit;box-sizing:border-box;"></textarea>
                 </div>
                 <div style="display:flex;gap:10px;flex-wrap:wrap;">
                     <button onclick="parseTextAndAddCards()" style="flex:1;background:linear-gradient(135deg,#00bcd4,#00838f);color:white;border:none;padding:10px 16px;border-radius:8px;cursor:pointer;font-size:0.9rem;font-weight:500;">🔍 解析并添加</button>
-                    <button onclick="parseActivityScript()" style="flex:1;background:linear-gradient(135deg,#ff5722,#e64a19);color:white;border:none;padding:10px 16px;border-radius:8px;cursor:pointer;font-size:0.9rem;font-weight:500;">📜 活动脚本解析</button>
+                    <button onclick="parseActivityScript()" style="flex:1;background:linear-gradient(135deg,#ff5722,#e64a19);color:white;border:none;padding:10px 16px;border-radius:8px;cursor:pointer;font-size:0.9rem;font-weight:500;">📜 活动脚本生成</button>
                     <button onclick="clearParserInput()" style="background:rgba(255,255,255,0.1);color:white;border:none;padding:10px 16px;border-radius:8px;cursor:pointer;font-size:0.9rem;">清空</button>
                 </div>
                 <div id="parserResult" style="margin-top:10px;font-size:0.85rem;color:rgba(255,255,255,0.7);"></div>
