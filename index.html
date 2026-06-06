@@ -11352,6 +11352,7 @@
 // 统计相关常量
 // ⚠️ 重要：这个 GIST_ID 是索引文件的固定 ID，所有设备必须使用同一个！
 const GIST_ID = 'a32a0628bd9275f3a4922cd12cf298c9';
+const COUNTER_GIST_ID = 'e1bd9a5139e1c4e011bfea707e917d61';
 const INDEX_GIST_ID_KEY = 'TFJL_Index_Gist_ID';
 const COUNTER_CACHE_KEY = 'TFJL_Counter_Cache';
 const COUNTER_CACHE_TIME_KEY = 'TFJL_Counter_Cache_Time';
@@ -12289,10 +12290,10 @@ function hasGistToken() {
             try {
                 const token = getGistToken();
                 
-                // 从 localStorage 获取 counter 的 GIST_ID
-                let counterGistId = localStorage.getItem('counter_gist_id');
+                // 优先使用硬编码的 COUNTER_GIST_ID
+                let counterGistId = COUNTER_GIST_ID || localStorage.getItem('counter_gist_id');
                 
-                // 如果 localStorage 没有，尝试从索引文件获取
+                // 如果都没有，尝试从索引文件获取
                 if (!counterGistId) {
                     try {
                         const indexUrl = await getIndexGistUrl();
@@ -12710,14 +12711,64 @@ function hasGistToken() {
         // 同步统计数据到Gist（带成功返回）
         async function syncCounterDataToGist(data) {
             try {
-                let content = JSON.stringify(data, null, 2);
                 const token = getGistToken();
                 
-                // 从 localStorage 获取 counter 的 GIST_ID
-                let counterGistId = localStorage.getItem('counter_gist_id');
+                // 优先使用硬编码的 COUNTER_GIST_ID
+                let counterGistId = COUNTER_GIST_ID || localStorage.getItem('counter_gist_id');
                 
                 if (counterGistId) {
-                    // 如果存在，使用 PATCH 更新现有 Gist
+                    // PATCH之前先读取远程数据，合并后再写入，防止本地小数据覆盖远程大数据
+                    try {
+                        const remoteResp = await fetch(`https://api.github.com/gists/${counterGistId}`, {
+                            headers: {
+                                'Accept': 'application/vnd.github.v3+json',
+                                ...(token && { 'Authorization': `token ${token}` })
+                            }
+                        });
+                        if (remoteResp.ok) {
+                            const remoteJson = await remoteResp.json();
+                            if (remoteJson.files && remoteJson.files['counter.json'] && remoteJson.files['counter.json'].content) {
+                                try {
+                                    const remoteData = JSON.parse(remoteJson.files['counter.json'].content);
+                                    if (remoteData) {
+                                        data.total_visits = Math.max(data.total_visits || 0, remoteData.total_visits || 0);
+                                        data.total_downloads = Math.max(data.total_downloads || 0, remoteData.total_downloads || 0);
+                                        if (remoteData.unique_users && Array.isArray(remoteData.unique_users)) {
+                                            remoteData.unique_users.forEach(id => {
+                                                if (!data.unique_users.includes(id)) {
+                                                    data.unique_users.push(id);
+                                                }
+                                            });
+                                        }
+                                        data.total_users = data.unique_users.length;
+                                        if (remoteData.daily_stats) {
+                                            for (const date in remoteData.daily_stats) {
+                                                if (!data.daily_stats[date]) {
+                                                    data.daily_stats[date] = remoteData.daily_stats[date];
+                                                } else {
+                                                    data.daily_stats[date].visits = Math.max(
+                                                        data.daily_stats[date].visits || 0,
+                                                        remoteData.daily_stats[date].visits || 0
+                                                    );
+                                                    data.daily_stats[date].downloads = Math.max(
+                                                        data.daily_stats[date].downloads || 0,
+                                                        remoteData.daily_stats[date].downloads || 0
+                                                    );
+                                                }
+                                            }
+                                        }
+                                    }
+                                } catch (parseErr) {
+                                    console.warn('syncCounterDataToGist 合并远程数据失败:', parseErr);
+                                }
+                            }
+                        }
+                    } catch (fetchErr) {
+                        console.warn('syncCounterDataToGist 读取远程数据失败:', fetchErr);
+                    }
+
+                    let content = JSON.stringify(data, null, 2);
+                    // 使用 PATCH 更新现有 Gist
                     const response = await fetch(`https://api.github.com/gists/${counterGistId}`, {
                         method: 'PATCH',
                         headers: {
@@ -12906,15 +12957,66 @@ function hasGistToken() {
                     return;
                 }
 
-                let content = JSON.stringify(counterData, null, 2);
                 const token = getGistToken();
 
-                // 从 localStorage 获取 counter 的 GIST_ID
-                let counterGistId = localStorage.getItem('counter_gist_id');
+                // 优先使用硬编码的 COUNTER_GIST_ID
+                let counterGistId = COUNTER_GIST_ID || localStorage.getItem('counter_gist_id');
                 
                 if (counterGistId) {
+                    // PATCH之前先读取远程数据，合并后再写入，防止本地小数据覆盖远程大数据
                     try {
-                        // 如果存在，使用 PATCH 更新现有 Gist
+                        const remoteResp = await fetch(`https://api.github.com/gists/${counterGistId}`, {
+                            headers: {
+                                'Accept': 'application/vnd.github.v3+json',
+                                ...(token && { 'Authorization': `token ${token}` })
+                            }
+                        });
+                        if (remoteResp.ok) {
+                            const remoteJson = await remoteResp.json();
+                            if (remoteJson.files && remoteJson.files['counter.json'] && remoteJson.files['counter.json'].content) {
+                                try {
+                                    const remoteData = JSON.parse(remoteJson.files['counter.json'].content);
+                                    if (remoteData) {
+                                        // 合并远程数据到本地（取最大值，防止数据回退）
+                                        counterData.total_visits = Math.max(counterData.total_visits || 0, remoteData.total_visits || 0);
+                                        counterData.total_downloads = Math.max(counterData.total_downloads || 0, remoteData.total_downloads || 0);
+                                        if (remoteData.unique_users && Array.isArray(remoteData.unique_users)) {
+                                            remoteData.unique_users.forEach(id => {
+                                                if (!counterData.unique_users.includes(id)) {
+                                                    counterData.unique_users.push(id);
+                                                }
+                                            });
+                                        }
+                                        counterData.total_users = counterData.unique_users.length;
+                                        if (remoteData.daily_stats) {
+                                            for (const date in remoteData.daily_stats) {
+                                                if (!counterData.daily_stats[date]) {
+                                                    counterData.daily_stats[date] = remoteData.daily_stats[date];
+                                                } else {
+                                                    counterData.daily_stats[date].visits = Math.max(
+                                                        counterData.daily_stats[date].visits || 0,
+                                                        remoteData.daily_stats[date].visits || 0
+                                                    );
+                                                    counterData.daily_stats[date].downloads = Math.max(
+                                                        counterData.daily_stats[date].downloads || 0,
+                                                        remoteData.daily_stats[date].downloads || 0
+                                                    );
+                                                }
+                                            }
+                                        }
+                                    }
+                                } catch (parseErr) {
+                                    console.warn('合并远程数据失败，使用本地数据:', parseErr);
+                                }
+                            }
+                        }
+                    } catch (fetchErr) {
+                        console.warn('读取远程数据失败，直接使用本地数据:', fetchErr);
+                    }
+
+                    let content = JSON.stringify(counterData, null, 2);
+                    try {
+                        // 使用 PATCH 更新现有 Gist
                         const patchResponse = await fetch(`https://api.github.com/gists/${counterGistId}`, {
                             method: 'PATCH',
                             headers: {
