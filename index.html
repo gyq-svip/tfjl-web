@@ -6364,8 +6364,11 @@
                 return;
             }
 
-            const fileName = `${scriptType}_${new Date().toLocaleDateString('zh-CN').replace(/\//g, '')}.txt`;
-            if (!confirm(`确定要将${scriptType}分享到需求墙？\n文件名：${fileName}`)) return;
+            const now = new Date();
+            const defaultName = `${scriptType}_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
+            const inputName = prompt(`请输入分享文件名（不含扩展名）：`, defaultName);
+            if (!inputName) return;
+            const fileName = inputName.endsWith('.txt') ? inputName : inputName + '.txt';
 
             try {
                 // 上传到Gist
@@ -6388,7 +6391,7 @@
 
                 if (!response.ok) throw new Error('上传失败');
                 const data = await response.json();
-                const scriptUrl = data.files[fileName]?.raw_url || `https://gist.githubusercontent.com/${data.id}/raw/${fileName}`;
+                const scriptUrl = data.files[fileName]?.raw_url || `https://gist.githubusercontent.com/${data.id}/raw/${encodeURIComponent(fileName)}`;
 
                 // 发布到需求墙
                 const nickname = localStorage.getItem('TFJL_UserName') || '匿名用户';
@@ -6425,7 +6428,11 @@
                 return;
             }
 
-            if (!confirm(`确定要将"${file.name}"分享到需求墙？`)) return;
+            const now = new Date();
+            const defaultName = `${file.name.replace(/\.txt$/,'')}_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
+            const inputName = prompt(`请输入分享文件名（不含扩展名）：`, defaultName);
+            if (!inputName) return;
+            const shareFileName = inputName.endsWith('.txt') ? inputName : inputName + '.txt';
 
             try {
                 const token = getGistToken();
@@ -6437,20 +6444,20 @@
                         'Authorization': `token ${token}`
                     },
                     body: JSON.stringify({
-                        description: `脚本分享: ${file.name}`,
+                        description: `脚本分享: ${shareFileName}`,
                         public: true,
                         files: {
-                            [file.name]: { content: file.content }
+                            [shareFileName]: { content: file.content }
                         }
                     })
                 });
 
                 if (!response.ok) throw new Error('上传失败');
                 const data = await response.json();
-                const scriptUrl = data.files[file.name]?.raw_url || `https://gist.githubusercontent.com/${data.id}/raw/${file.name}`;
+                const scriptUrl = data.files[shareFileName]?.raw_url || `https://gist.githubusercontent.com/${data.id}/raw/${encodeURIComponent(shareFileName)}`;
 
                 const nickname = localStorage.getItem('TFJL_UserName') || '匿名用户';
-                const content = `分享脚本: ${file.name}\n${scriptUrl}`;
+                const content = `分享脚本: ${shareFileName}\n${scriptUrl}`;
                 const newMsg = {
                     content: content,
                     author: nickname,
@@ -13456,15 +13463,49 @@ function hasGistToken() {
                     }
                 }
 
-                // 获取文件内容（带认证header以支持私有Gist）
-                const token = getGistToken();
-                const fetchHeaders = {};
-                if (token) fetchHeaders['Authorization'] = `token ${token}`;
-                const response = await fetch(url, { headers: fetchHeaders });
-                if (!response.ok) {
-                    throw new Error(`获取文件失败: ${response.status}`);
+                // 获取文件内容
+                let content = null;
+                // 先尝试直接fetch（公开Gist的raw_url可直接访问）
+                try {
+                    const resp = await fetch(url);
+                    if (resp.ok) {
+                        content = await resp.text();
+                    }
+                } catch (e) {
+                    // CORS或网络错误，尝试API方式
                 }
-                const content = await response.text();
+                // 如果直接fetch失败，尝试通过Gist API获取（支持私有Gist）
+                if (content === null) {
+                    const token = getGistToken();
+                    const gistMatch = url.match(/gist\.githubusercontent\.com\/[^/]+\/([a-f0-9]+)/i) || url.match(/gist\.github\.com\/[^/]+\/([a-f0-9]+)/i);
+                    if (gistMatch && token) {
+                        try {
+                            const apiResp = await fetch(`https://api.github.com/gists/${gistMatch[1]}`, {
+                                headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` }
+                            });
+                            if (apiResp.ok) {
+                                const gistData = await apiResp.json();
+                                // 找到匹配的文件
+                                for (const f of Object.values(gistData.files)) {
+                                    if (f.filename === fileName || url.includes(f.filename)) {
+                                        content = f.content;
+                                        break;
+                                    }
+                                }
+                                // 如果没匹配到文件名，取第一个文件
+                                if (content === null && gistData.files) {
+                                    const firstFile = Object.values(gistData.files)[0];
+                                    if (firstFile) content = firstFile.content;
+                                }
+                            }
+                        } catch (e) {
+                            console.warn('API方式获取Gist失败:', e);
+                        }
+                    }
+                }
+                if (content === null) {
+                    throw new Error('获取文件失败，可能需要登录或文件不存在');
+                }
 
                 // 判断是否是JSON
                 const isJson = fileName.toLowerCase().endsWith('.json');
