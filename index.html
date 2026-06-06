@@ -6395,7 +6395,7 @@
 
                 // 发布到需求墙
                 const nickname = localStorage.getItem('TFJL_UserName') || '匿名用户';
-                const content = `分享${scriptType}\n${scriptUrl}`;
+                const content = `分享${scriptType}: ${fileName}\n${scriptUrl}`;
                 const newMsg = {
                     content: content,
                     author: nickname,
