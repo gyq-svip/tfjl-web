@@ -5980,24 +5980,21 @@
 
             // 精灵类卡名列表（精灵不占位置，跳过）
             const jingLingNames = ['冰精灵', '光精灵', '魔精灵', '木精灵', '土精灵', '雷精灵', '暗精灵', '幻精灵', '魂精灵', '彩精灵'];
-            // 工程类卡名列表（射线和宝库单独处理）
-            const gongChengNames = ['火炮', '咬人娃娃', '潜艇'];
+            // 工程类卡名列表（工程卡不占6位置，单独满）
+            const gongChengNames = ['火炮', '咬人娃娃', '潜艇', '宝库', '射线'];
             
-            // 检查是否有射线或宝库
-            const hasSheXian = heroNames.some(name => name.includes('射线'));
-            const hasBaoKu = heroNames.some(name => name.includes('宝库'));
             // 检查是否有工程卡
-            const hasGongCheng = heroNames.some(name => gongChengNames.some(gc => name.includes(gc))) || hasSheXian || hasBaoKu;
+            const hasGongCheng = heroNames.some(name => gongChengNames.some(gc => name.includes(gc)));
             
-            // 过滤掉精灵类和射线/宝库，取前6张或7张非精灵非工程卡
+            // 分离工程卡和非工程卡
+            const gongChengCards = heroNames.filter(name => gongChengNames.some(gc => name.includes(gc)));
+            // 过滤掉精灵类和工程卡，取前6张
             const filteredCards = heroNames.filter(name => {
                 if (jingLingNames.some(jl => name.includes(jl))) return false;
-                if (name.includes('射线') || name.includes('宝库')) return false;
+                if (gongChengNames.some(gc => name.includes(gc))) return false;
                 return true;
             });
-            // 有工程卡就上7张，没有就上6张
-            const cardCount = hasGongCheng ? 7 : 6;
-            const first6 = filteredCards.slice(0, cardCount);
+            const first6 = filteredCards.slice(0, 6);
             
             // 检查是否有冰精灵
             const hasBingJingLing = heroNames.some(name => name.includes('冰精灵'));
@@ -6053,11 +6050,11 @@
                 });
             }
             
-            // 如果有射线或宝库，添加到上卡字符串（第7位）
-            if (hasBaoKu) {
-                shangKaStr += `上宝库${levelStr},`;
-            } else if (hasSheXian) {
-                shangKaStr += `上射线${levelStr},`;
+            // 工程卡加在最后（第7位）
+            if (hasGongCheng) {
+                gongChengCards.forEach(name => {
+                    shangKaStr += `上${name}${levelStr},`;
+                });
             }
 
             // 第一行脚本
