@@ -11376,6 +11376,7 @@
 // ⚠️ 重要：这个 GIST_ID 是索引文件的固定 ID，所有设备必须使用同一个！
 const GIST_ID = 'a32a0628bd9275f3a4922cd12cf298c9';
 const COUNTER_GIST_ID = 'e1bd9a5139e1c4e011bfea707e917d61';
+const MESSAGES_GIST_ID = 'a4591ac2200b7638d51ae4c0155d7851';
 const INDEX_GIST_ID_KEY = 'TFJL_Index_Gist_ID';
 const COUNTER_CACHE_KEY = 'TFJL_Counter_Cache';
 const COUNTER_CACHE_TIME_KEY = 'TFJL_Counter_Cache_Time';
@@ -13344,9 +13345,33 @@ function hasGistToken() {
         let messageWallOpen = false;
         let messageScrollInterval = null;
         let messageFetchInterval = null;
+        let msgRefreshCountdown = 30;
+        let msgCountdownInterval = null;
         let pendingScriptFile = null;
         const MESSAGE_REFRESH_INTERVAL = 30000;
         const MAX_MESSAGES = 50;
+
+        function updateMsgRefreshBtn() {
+            const btn = document.getElementById('msgRefreshBtn');
+            if (btn) btn.textContent = '⏳' + msgRefreshCountdown;
+        }
+
+        function startMsgCountdown() {
+            if (msgCountdownInterval) clearInterval(msgCountdownInterval);
+            msgRefreshCountdown = 30;
+            updateMsgRefreshBtn();
+            msgCountdownInterval = setInterval(() => {
+                const wallEl = document.getElementById('messageWall');
+                const isOpen = messageWallOpen || (wallEl && wallEl.style.display !== 'none');
+                if (!isOpen) return;
+                msgRefreshCountdown--;
+                updateMsgRefreshBtn();
+                if (msgRefreshCountdown <= 0) {
+                    msgRefreshCountdown = 30;
+                    fetchMessages();
+                }
+            }, 1000);
+        }
         const MAX_SCRIPT_SIZE = 10 * 1024 * 1024;
         const SCRIPT_EXPIRE_DAYS = 10;
         
@@ -13414,10 +13439,10 @@ function hasGistToken() {
             try {
                 const token = getGistToken();
                 
-                // 从索引文件获取需求墙的 GIST_ID
-                let messagesGistId = localStorage.getItem('messages_gist_id');
+                // 优先使用硬编码的 MESSAGES_GIST_ID
+                let messagesGistId = MESSAGES_GIST_ID || localStorage.getItem('messages_gist_id');
                 
-                // 如果 localStorage 没有，从索引文件获取
+                // 如果都没有，从索引文件获取
                 if (!messagesGistId) {
                     try {
                         const indexUrl = await getIndexGistUrl();
@@ -14933,8 +14958,8 @@ function hasGistToken() {
             const token = getGistToken();
             if (!token) throw new Error('无Token');
 
-            // 从 localStorage 获取 messages.json 的 GIST_ID
-            let messagesGistId = localStorage.getItem('messages_gist_id');
+            // 优先使用硬编码的 MESSAGES_GIST_ID
+            let messagesGistId = MESSAGES_GIST_ID || localStorage.getItem('messages_gist_id');
             
             if (messagesGistId) {
                 try {
@@ -15078,11 +15103,8 @@ function hasGistToken() {
             }
             
             if (messageFetchInterval) clearInterval(messageFetchInterval);
-            messageFetchInterval = setInterval(() => {
-                if (messageWallOpen || document.getElementById('messageWall').style.display !== 'none') {
-                    fetchMessages();
-                }
-            }, MESSAGE_REFRESH_INTERVAL);
+            // 使用1秒倒计时刷新（替代原来的30秒定时器）
+            startMsgCountdown();
         }
         
         // 显示统计数据
@@ -18744,6 +18766,7 @@ function hasGistToken() {
         <div id="messageWallHeader" style="background:linear-gradient(135deg,rgba(255,215,0,0.2),rgba(255,107,107,0.2));padding:10px 15px;display:flex;justify-content:space-between;align-items:center;cursor:move;user-select:none;" onmousedown="startPanelDrag(event,'messageWall')" ontouchstart="startPanelTouch(event,'messageWall')">
             <span style="color:#ffd700;font-size:0.9rem;font-weight:bold;">📢 需求墙</span>
             <div style="display:flex;gap:10px;">
+                <button id="msgRefreshBtn" onclick="fetchMessages();msgRefreshCountdown=30;updateMsgRefreshBtn();" title="刷新消息" style="background:transparent;border:none;color:#4fc3f7;font-size:0.8rem;cursor:pointer;padding:0;font-family:monospace;min-width:32px;text-align:center;">⏳30</button>
                 <button onclick="toggleMessageWallSize()" title="最小化" style="background:transparent;border:none;color:#ffd700;font-size:1rem;cursor:pointer;padding:0;">−</button>
                 <button onclick="closeMessageWall()" title="关闭" style="background:transparent;border:none;color:#ff6b6b;font-size:1rem;cursor:pointer;padding:0;">×</button>
             </div>
