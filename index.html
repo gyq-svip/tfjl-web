@@ -6033,16 +6033,21 @@
             let line1Parts = [];
             if (hasSheNv) line1Parts.push('强制顺序上卡');
 
-            // 光葫芦（第1行目标优先级：火炮 > 火灵 > 天使 > 风灵）
+            // 光葫芦（第1行：火炮和风灵都加光葫芦）
             if (hasGuangJingLing) {
                 if (gongChengCards.some(name => name.includes('火炮'))) {
                     line1Parts.push('光葫芦火炮');
-                } else if (hasHuoLing) {
-                    line1Parts.push('光葫芦火灵');
-                } else if (hasTianShi) {
-                    line1Parts.push('光葫芦天使');
-                } else if (hasFengLing) {
+                }
+                if (hasFengLing) {
                     line1Parts.push('光葫芦风灵');
+                }
+                // 没有火炮和风灵时，按优先级加
+                if (!gongChengCards.some(name => name.includes('火炮')) && !hasFengLing) {
+                    if (hasHuoLing) {
+                        line1Parts.push('光葫芦火灵');
+                    } else if (hasTianShi) {
+                        line1Parts.push('光葫芦天使');
+                    }
                 }
             }
 
