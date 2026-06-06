@@ -6180,24 +6180,24 @@
 
             // 构建上卡顺序
             // 工程卡不占6个位置，放在最上面，不参与强制顺序
-            // 剩余6卡：有蛇女时，前3位放非优先级卡，第4-5位放优先级最高的2张，第6位蛇女
+            // 剩余6卡：有蛇女时，第4-5位放优先级最高的2张，第6位蛇女，前3位放其余卡
             let arrangedCards = [];
             let gongChengOrder = []; // 工程卡单独排
             
-            if (hasSheNv && priorityCards.length > 0) {
-                // 非优先级、非蛇女、非工程的卡
-                const nonPriorityCards = filteredCards.filter(name =>
+            if (hasSheNv) {
+                // 有蛇女：第4-5位放优先级最高的2张，第6位蛇女，前3位放剩余卡
+                const top2 = priorityCards.slice(0, 2); // 优先级最高的2张放第4-5位
+                const restPriority = priorityCards.slice(2); // 剩余优先级卡
+                // 前三位：剩余优先级卡 + 非优先级非工程非蛇女的卡
+                const nonPriorityNonGongCheng = filteredCards.filter(name =>
                     !priorityCards.some(p => p === name) && !name.includes('蛇女') &&
                     !gongChengNames.some(gc => name.includes(gc)) && !name.includes('射线') && !name.includes('宝库')
                 );
-                // 前3位：非优先级卡
-                arrangedCards.push(...nonPriorityCards.slice(0, 3));
-                // 第4-5位：优先级最高的2张
-                arrangedCards.push(...priorityCards.slice(0, 2));
-                // 剩余优先级卡
-                arrangedCards.push(...priorityCards.slice(2));
-                // 第6位：蛇女
-                arrangedCards.push(...sheNvCards);
+                const first3 = [...restPriority, ...nonPriorityNonGongCheng].slice(0, 3);
+                
+                arrangedCards.push(...first3);    // 前3位
+                arrangedCards.push(...top2);       // 第4-5位：优先级最高2张
+                arrangedCards.push(...sheNvCards); // 第6位：蛇女
             } else {
                 // 无蛇女：工程卡也排在前面
                 arrangedCards.push(...gongChengCards);
