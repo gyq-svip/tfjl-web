@@ -13857,6 +13857,28 @@ function hasGistToken() {
                 
                 // 创建Blob并下载
                 const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+                
+                // 优先使用文件选择器API（支持选择保存目录）
+                if (window.showSaveFilePicker) {
+                    try {
+                        const handle = await window.showSaveFilePicker({
+                            suggestedName: fileName,
+                            types: [{
+                                description: '文本文件',
+                                accept: { 'text/plain': ['.txt', '.json', '.js', '.lua', '.py', '.sh'] }
+                            }]
+                        });
+                        const writable = await handle.createWritable();
+                        await writable.write(blob);
+                        await writable.close();
+                        return;
+                    } catch (e) {
+                        if (e.name === 'AbortError') return; // 用户取消
+                        // 其他错误，回退到传统下载
+                    }
+                }
+                
+                // 回退：传统下载方式
                 const blobUrl = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = blobUrl;
