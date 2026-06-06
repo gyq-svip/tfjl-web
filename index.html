@@ -6142,6 +6142,7 @@
             const hasHuoLing = heroNames.some(name => name.includes('火灵'));
             const hasTianShi = heroNames.some(name => name.includes('天使'));
             const hasFengLing = heroNames.some(name => name.includes('风灵'));
+            const hasHuGong = heroNames.some(name => name.includes('虎弓'));
             const hasGuangJingLing = heroNames.some(name => name.includes('光精灵'));
             const hasMoJingLing = heroNames.some(name => name.includes('魔精灵'));
             const hasLeiJingLing = heroNames.some(name => name.includes('雷精灵'));
@@ -6158,59 +6159,77 @@
                 return true;
             });
 
-            const cardCount = hasGongCheng ? 7 : 6;
-
             // 分离卡牌类型
             const gongChengCards = filteredCards.filter(name =>
                 gongChengNames.some(gc => name.includes(gc)) || name.includes('射线') || name.includes('宝库')
             );
             const sheNvCards = filteredCards.filter(name => name.includes('蛇女'));
-            const huoLingCards = filteredCards.filter(name => name.includes('火灵'));
-            const fengLingCards = filteredCards.filter(name => name.includes('风灵'));
-            const tianShiCards = filteredCards.filter(name => name.includes('天使'));
-            const otherCards = filteredCards.filter(name =>
-                !gongChengNames.some(gc => name.includes(gc)) &&
-                !name.includes('射线') && !name.includes('宝库') &&
-                !name.includes('蛇女') && !name.includes('火灵') &&
-                !name.includes('天使') && !name.includes('风灵')
-            );
 
-            // 蛇女加速优先级（第4、第5位）：优先级高的放前面让蛇女加速
+            // 循环卡：火灵、虎弓、天使（19下49上，逢9上逢0下）
+            const cycleCardNames = [];
+            if (hasHuoLing) cycleCardNames.push('火灵');
+            if (hasHuGong) cycleCardNames.push('虎弓');
+            if (hasTianShi) cycleCardNames.push('天使');
+            const hasCycle = cycleCardNames.length > 0;
+
+            // 蛇女加速优先级（第4、第5位）
             const sheNvPriority = ['火灵', '虎弓', '风灵', '后羿', '小野', '天使', '水灵'];
-            // 按优先级找出当前卡组中需要加速的卡（排除蛇女自己）
             const priorityCards = sheNvPriority.filter(p =>
                 filteredCards.some(name => name.includes(p))
             ).map(p => filteredCards.find(name => name.includes(p)));
 
             // 构建上卡顺序
+            // 工程卡不占6个位置，放在最上面，不参与强制顺序
+            // 剩余6卡：有蛇女时，前3位放非优先级卡，第4-5位放优先级最高的2张，第6位蛇女
             let arrangedCards = [];
+            let gongChengOrder = []; // 工程卡单独排
             
             if (hasSheNv && priorityCards.length > 0) {
-                // 有蛇女：前3个位置放工程+其他非优先级卡，第4第5位放优先级最高的2张卡，第6位蛇女
+                // 非优先级、非蛇女、非工程的卡
                 const nonPriorityCards = filteredCards.filter(name =>
-                    !priorityCards.some(p => p === name) && !name.includes('蛇女')
+                    !priorityCards.some(p => p === name) && !name.includes('蛇女') &&
+                    !gongChengNames.some(gc => name.includes(gc)) && !name.includes('射线') && !name.includes('宝库')
                 );
+                // 前3位：非优先级卡
                 arrangedCards.push(...nonPriorityCards.slice(0, 3));
-                // 取优先级前2张放第4、5位
+                // 第4-5位：优先级最高的2张
                 arrangedCards.push(...priorityCards.slice(0, 2));
-                // 剩余优先级卡放后面
+                // 剩余优先级卡
                 arrangedCards.push(...priorityCards.slice(2));
-                // 蛇女放最后
+                // 第6位：蛇女
                 arrangedCards.push(...sheNvCards);
             } else {
+                // 无蛇女：工程卡也排在前面
                 arrangedCards.push(...gongChengCards);
+                const otherCards = filteredCards.filter(name =>
+                    !gongChengNames.some(gc => name.includes(gc)) &&
+                    !name.includes('射线') && !name.includes('宝库') &&
+                    !name.includes('蛇女')
+                );
                 arrangedCards.push(...otherCards);
-                if (hasFengLing) arrangedCards.push(...fengLingCards);
-                if (hasHuoLing) arrangedCards.push(...huoLingCards);
-                if (hasTianShi) arrangedCards.push(...tianShiCards);
+                if (hasFengLing) arrangedCards.push(...filteredCards.filter(name => name.includes('风灵')));
+                if (hasHuoLing) arrangedCards.push(...filteredCards.filter(name => name.includes('火灵')));
+                if (hasHuGong) arrangedCards.push(...filteredCards.filter(name => name.includes('虎弓')));
+                if (hasTianShi) arrangedCards.push(...filteredCards.filter(name => name.includes('天使')));
                 if (hasSheNv) arrangedCards.push(...sheNvCards);
             }
-            arrangedCards = arrangedCards.slice(0, cardCount);
+
+            // 有蛇女时，工程卡单独放最前面，不参与强制顺序
+            if (hasSheNv) {
+                gongChengOrder = [...gongChengCards];
+                // arrangedCards 只保留非工程卡（6张）
+                arrangedCards = arrangedCards.filter(name =>
+                    !gongChengNames.some(gc => name.includes(gc)) && !name.includes('射线') && !name.includes('宝库')
+                );
+                arrangedCards = arrangedCards.slice(0, 6);
+            } else {
+                arrangedCards = arrangedCards.slice(0, hasGongCheng ? 7 : 6);
+            }
 
             // 构建输出
             let output = '';
 
-            // 头部信息（皮肤/魔化/战车留空）
+            // 头部信息
             if (zhenZhanLine) output += zhenZhanLine + '\n';
             output += '皮肤：\n';
             output += '魔化：\n';
@@ -6222,33 +6241,31 @@
             let line1Parts = [];
             if (hasSheNv) line1Parts.push('强制顺序上卡');
 
-            // 光葫芦（第1行：火炮和风灵都加光葫芦）
+            // 光葫芦（第1行）
             if (hasGuangJingLing) {
+                // 火炮光葫芦
                 if (gongChengCards.some(name => name.includes('火炮'))) {
                     line1Parts.push('光葫芦火炮');
                 }
+                // 风灵光葫芦（第一波特殊）
                 if (hasFengLing) {
                     line1Parts.push('光葫芦风灵');
                 }
-                // 没有火炮和风灵时，按优先级加
-                if (!gongChengCards.some(name => name.includes('火炮')) && !hasFengLing) {
-                    if (hasHuoLing) {
-                        line1Parts.push('光葫芦火灵');
-                    } else if (hasTianShi) {
-                        line1Parts.push('光葫芦天使');
-                    }
-                }
+                // 循环卡光葫芦（火灵、虎弓、天使）
+                cycleCardNames.forEach(card => {
+                    line1Parts.push('光葫芦' + card);
+                });
             }
 
-            // 上卡列表
+            // 上卡列表：工程卡先上（满），然后非工程卡按顺序
             if (hasSheNv) {
-                // 有蛇女：工程卡满，其他不满
+                // 工程卡先上，满，不参与强制顺序
+                gongChengOrder.forEach(name => {
+                    line1Parts.push('上' + name + '满');
+                });
+                // 非工程卡按强制顺序上，不满
                 arrangedCards.forEach(name => {
-                    if (gongChengCards.includes(name)) {
-                        line1Parts.push('上' + name + '满');
-                    } else {
-                        line1Parts.push('上' + name);
-                    }
+                    line1Parts.push('上' + name);
                 });
             } else {
                 // 没有蛇女：全部满
@@ -6258,47 +6275,48 @@
             }
             output += '1,' + line1Parts.join(',') + ',\n';
 
-            // 第2行 (时间11) - 有蛇女时需要第二行全满
+            // 第2行 (时间11) - 有蛇女时全满
             if (hasSheNv) {
-                let line2Parts = arrangedCards.map(name => '上' + name + '满');
+                let line2Parts = [];
+                gongChengOrder.forEach(name => {
+                    line2Parts.push('上' + name + '满');
+                });
+                arrangedCards.forEach(name => {
+                    line2Parts.push('上' + name + '满');
+                });
                 output += '11,' + line2Parts.join(',') + ',\n';
             }
 
-            // 第3行 (时间19) - 下火灵/天使
+            // 第3行 (时间19) - 下循环卡（火灵、虎弓、天使）
             let line19Parts = [];
-            if (hasHuoLing) line19Parts.push('下火灵');
-            if (hasTianShi) line19Parts.push('下天使');
+            cycleCardNames.forEach(card => {
+                line19Parts.push('下' + card);
+            });
             if (line19Parts.length > 0) {
                 output += '19,' + line19Parts.join(',') + ',\n';
             }
 
             // 49波之后的循环
-            // 光葫芦目标：循环卡下了再上都要光一下（风灵不下，不参与循环）
             const guangHuLuTargets = [];
             if (hasGuangJingLing) {
-                if (hasHuoLing) guangHuLuTargets.push('火灵');
-                if (hasTianShi) guangHuLuTargets.push('天使');
+                cycleCardNames.forEach(card => {
+                    guangHuLuTargets.push(card);
+                });
             }
 
-            // 需要上下循环的卡（火灵、天使）
-            const cycleCards = [];
-            if (hasHuoLing) cycleCards.push('火灵');
-            if (hasTianShi) cycleCards.push('天使');
-
-            const hasCycle = cycleCards.length > 0;
             const hasJingLingOps = hasLeiJingLing || hasMoJingLing || hasMuJingLing;
 
             if (hasCycle || hasJingLingOps) {
                 for (let wave = 49; wave <= 129; wave += 10) {
                     let upParts = [];
 
-                    // 光葫芦 + 上卡（每个循环卡下了再上都要光一下）
+                    // 光葫芦 + 上循环卡
                     if (hasCycle) {
                         guangHuLuTargets.forEach(target => {
                             upParts.push('光葫芦' + target);
                         });
                     }
-                    cycleCards.forEach(card => {
+                    cycleCardNames.forEach(card => {
                         upParts.push('上' + card + '满');
                     });
 
@@ -6311,11 +6329,11 @@
                         output += wave + ',' + upParts.join(',') + ',\n';
                     }
 
-                    // 逢0停球 + 下卡（合并为一行）
+                    // 逢0停球 + 下循环卡
                     if (wave < 129) {
                         let stopParts = ['停球'];
                         if (hasCycle) {
-                            cycleCards.forEach(card => {
+                            cycleCardNames.forEach(card => {
                                 stopParts.push('下' + card);
                             });
                         }
