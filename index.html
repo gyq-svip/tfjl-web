@@ -4640,6 +4640,15 @@
             }
         }
         
+        // 通用提示
+        function showToast(message) {
+            const toast = document.createElement('div');
+            toast.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);padding:15px 30px;border-radius:10px;font-size:1rem;font-weight:500;z-index:99999;background:rgba(74,222,128,0.9);color:#1a1a2e;animation:fadeInOut 2s ease-in-out;';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 2000);
+        }
+
         // 显示拍卖操作提示
         function showAuctionToast(message, type) {
             const toast = document.createElement('div');
@@ -5751,7 +5760,7 @@
                         const myPlaced = Array.isArray(p.myPlacedCards) ? p.myPlacedCards : [];
                         const teammatePlaced = Array.isArray(p.teammatePlacedCards) ? p.teammatePlacedCards : [];
                         const allCards = [...myCards, ...teammateCards, ...myPlaced, ...teammatePlaced];
-                        const cardMatch = allCards.some(c => (c || '').toLowerCase().includes(keyword));
+                        const cardMatch = allCards.some(c => String(c || '').toLowerCase().includes(keyword));
 
                         // 搜索卡皮
                         const skins = p.cardSkins ? Object.values(p.cardSkins) : [];
