@@ -5962,11 +5962,16 @@
                     }
                 } else if (line.match(/^(魔化|皮肤|主战车|副战车)[：:]/)) {
                     otherLines.push(line);
-                } else if (!line.match(/^(魔化|皮肤|主战车|副战车)[：:]/) && index === 0 && !line.match(/^上阵[：:]/)) {
+                } else if (index === 0 && !line.match(/^(魔化|皮肤|主战车|副战车)[：:]/)) {
                     // 没有"上阵："前缀时，直接解析第一行作为卡牌列表
                     heroNames = line.split(/[,，]/).map(name => name.trim()).filter(name => name);
                 }
             });
+
+            // 没有"上阵："时，自动补上
+            if (heroNames.length > 0 && !zhenZhanLine) {
+                zhenZhanLine = '上阵：' + heroNames.join(',');
+            }
 
             if (heroNames.length === 0) {
                 resultEl.innerHTML = '<span style="color:#f44336;">未找到英雄名称！</span>';
@@ -6138,6 +6143,11 @@
                 if (!firstLine.match(/^(魔化|皮肤|主战车|副战车)[：:]/)) {
                     heroNames = firstLine.split(/[,，]/).map(name => name.trim()).filter(name => name);
                 }
+            }
+
+            // 没有"上阵："时，自动补上
+            if (heroNames.length > 0 && !zhenZhanLine) {
+                zhenZhanLine = '上阵：' + heroNames.join(',');
             }
 
             if (heroNames.length === 0) {
