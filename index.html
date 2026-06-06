@@ -5989,6 +5989,7 @@
             );
             const sheNvCards = filteredCards.filter(name => name.includes('蛇女'));
             const huoLingCards = filteredCards.filter(name => name.includes('火灵'));
+            const fengLingCards = filteredCards.filter(name => name.includes('风灵'));
             const tianShiCards = filteredCards.filter(name => name.includes('天使'));
             const otherCards = filteredCards.filter(name =>
                 !gongChengNames.some(gc => name.includes(gc)) &&
@@ -5997,13 +5998,24 @@
                 !name.includes('天使') && !name.includes('风灵')
             );
 
-            // 构建上卡顺序：工程卡 → 其他卡 → 火灵 → 天使 → 蛇女
+            // 构建上卡顺序：工程卡 → 其他卡 → 风灵(第4位) → 火灵(第5位) → 天使 → 蛇女
             let arrangedCards = [];
             arrangedCards.push(...gongChengCards);
             arrangedCards.push(...otherCards);
-            if (hasHuoLing) arrangedCards.push(...huoLingCards);
-            if (hasTianShi) arrangedCards.push(...tianShiCards);
-            if (hasSheNv) arrangedCards.push(...sheNvCards);
+            // 有蛇女+风灵时，风灵放第4位、火灵放第5位，让蛇女加速风灵和火灵
+            if (hasSheNv && hasFengLing) {
+                // 先填到3个位置，第4位放风灵，第5位放火灵，第6位放蛇女
+                arrangedCards = arrangedCards.slice(0, 3);
+                arrangedCards.push(...fengLingCards);
+                if (hasHuoLing) arrangedCards.push(...huoLingCards);
+                if (hasTianShi) arrangedCards.push(...tianShiCards);
+                arrangedCards.push(...sheNvCards);
+            } else {
+                if (hasFengLing) arrangedCards.push(...fengLingCards);
+                if (hasHuoLing) arrangedCards.push(...huoLingCards);
+                if (hasTianShi) arrangedCards.push(...tianShiCards);
+                if (hasSheNv) arrangedCards.push(...sheNvCards);
+            }
             arrangedCards = arrangedCards.slice(0, cardCount);
 
             // 构建输出
