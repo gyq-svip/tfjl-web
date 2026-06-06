@@ -5928,6 +5928,215 @@
             });
         }
 
+        // 副本脚本生成功能
+        function parseDungeonScript() {
+            const input = document.getElementById('parserInput').value.trim();
+            const resultEl = document.getElementById('parserResult');
+
+            if (!input) {
+                resultEl.innerHTML = '<span style="color:#f44336;">请输入文本！</span>';
+                return;
+            }
+
+            const lines = input.split('\n').map(line => line.trim()).filter(line => line);
+            let heroNames = [];
+            let zhenZhanLine = '';
+
+            lines.forEach(line => {
+                if (line.match(/^上阵[：:]/)) {
+                    zhenZhanLine = line;
+                    const match = line.match(/上阵[：:]\s*(.+)/);
+                    if (match && match[1]) {
+                        heroNames = match[1].split(/[,，]/).map(name => name.trim()).filter(name => name);
+                    }
+                }
+            });
+
+            if (heroNames.length === 0) {
+                resultEl.innerHTML = '<span style="color:#f44336;">未找到英雄名称！</span>';
+                return;
+            }
+
+            // 卡牌分类
+            const jingLingNames = ['冰精灵', '光精灵', '魔精灵', '木精灵', '土精灵', '雷精灵', '暗精灵', '幻精灵', '魂精灵', '彩精灵'];
+            const gongChengNames = ['火炮', '咬人娃娃', '潜艇'];
+
+            const hasSheNv = heroNames.some(name => name.includes('蛇女'));
+            const hasHuoLing = heroNames.some(name => name.includes('火灵'));
+            const hasTianShi = heroNames.some(name => name.includes('天使'));
+            const hasFengLing = heroNames.some(name => name.includes('风灵'));
+            const hasGuangJingLing = heroNames.some(name => name.includes('光精灵'));
+            const hasMoJingLing = heroNames.some(name => name.includes('魔精灵'));
+            const hasLeiJingLing = heroNames.some(name => name.includes('雷精灵'));
+            const hasMuJingLing = heroNames.some(name => name.includes('木精灵'));
+
+            const hasSheXian = heroNames.some(name => name.includes('射线'));
+            const hasBaoKu = heroNames.some(name => name.includes('宝库'));
+            const hasGongCheng = heroNames.some(name => gongChengNames.some(gc => name.includes(gc))) || hasSheXian || hasBaoKu;
+
+            // 过滤精灵和射线/宝库
+            const filteredCards = heroNames.filter(name => {
+                if (jingLingNames.some(jl => name.includes(jl))) return false;
+                if (name.includes('射线') || name.includes('宝库')) return false;
+                return true;
+            });
+
+            const cardCount = hasGongCheng ? 7 : 6;
+
+            // 分离卡牌类型
+            const gongChengCards = filteredCards.filter(name =>
+                gongChengNames.some(gc => name.includes(gc)) || name.includes('射线') || name.includes('宝库')
+            );
+            const sheNvCards = filteredCards.filter(name => name.includes('蛇女'));
+            const huoLingCards = filteredCards.filter(name => name.includes('火灵'));
+            const tianShiCards = filteredCards.filter(name => name.includes('天使'));
+            const otherCards = filteredCards.filter(name =>
+                !gongChengNames.some(gc => name.includes(gc)) &&
+                !name.includes('射线') && !name.includes('宝库') &&
+                !name.includes('蛇女') && !name.includes('火灵') &&
+                !name.includes('天使') && !name.includes('风灵')
+            );
+
+            // 构建上卡顺序：工程卡 → 其他卡 → 火灵 → 天使 → 蛇女
+            let arrangedCards = [];
+            arrangedCards.push(...gongChengCards);
+            arrangedCards.push(...otherCards);
+            if (hasHuoLing) arrangedCards.push(...huoLingCards);
+            if (hasTianShi) arrangedCards.push(...tianShiCards);
+            if (hasSheNv) arrangedCards.push(...sheNvCards);
+            arrangedCards = arrangedCards.slice(0, cardCount);
+
+            // 构建输出
+            let output = '';
+
+            // 头部信息（皮肤/魔化/战车留空）
+            if (zhenZhanLine) output += zhenZhanLine + '\n';
+            output += '皮肤：\n';
+            output += '魔化：\n';
+            output += '主战车：\n';
+            output += '副战车：\n';
+            output += '\n';
+
+            // 第1行 (时间1)
+            let line1Parts = [];
+            if (hasSheNv) line1Parts.push('强制顺序上卡');
+
+            // 光葫芦（第1行目标优先级：火炮 > 火灵 > 天使 > 风灵）
+            if (hasGuangJingLing) {
+                if (gongChengCards.some(name => name.includes('火炮'))) {
+                    line1Parts.push('光葫芦火炮');
+                } else if (hasHuoLing) {
+                    line1Parts.push('光葫芦火灵');
+                } else if (hasTianShi) {
+                    line1Parts.push('光葫芦天使');
+                } else if (hasFengLing) {
+                    line1Parts.push('光葫芦风灵');
+                }
+            }
+
+            // 上卡列表
+            if (hasSheNv) {
+                // 有蛇女：工程卡满，其他不满
+                arrangedCards.forEach(name => {
+                    if (gongChengCards.includes(name)) {
+                        line1Parts.push('上' + name + '满');
+                    } else {
+                        line1Parts.push('上' + name);
+                    }
+                });
+            } else {
+                // 没有蛇女：全部满
+                arrangedCards.forEach(name => {
+                    line1Parts.push('上' + name + '满');
+                });
+            }
+            output += '1,' + line1Parts.join(',') + ',\n';
+
+            // 第2行 (时间11) - 有蛇女时需要第二行全满
+            if (hasSheNv) {
+                let line2Parts = arrangedCards.map(name => '上' + name + '满');
+                output += '11,' + line2Parts.join(',') + ',\n';
+            }
+
+            // 第3行 (时间19) - 下火灵/天使
+            let line19Parts = [];
+            if (hasHuoLing) line19Parts.push('下火灵');
+            if (hasTianShi) line19Parts.push('下天使');
+            if (line19Parts.length > 0) {
+                output += '19,' + line19Parts.join(',') + ',\n';
+            }
+
+            // 49波之后的循环
+            // 光葫芦目标（49+优先级：火灵 > 天使 > 风灵）
+            let guangHuLuTarget = '';
+            if (hasGuangJingLing) {
+                if (hasHuoLing) guangHuLuTarget = '火灵';
+                else if (hasTianShi) guangHuLuTarget = '天使';
+                else if (hasFengLing) guangHuLuTarget = '风灵';
+            }
+
+            // 需要上下循环的卡（火灵、天使）
+            const cycleCards = [];
+            if (hasHuoLing) cycleCards.push('火灵');
+            if (hasTianShi) cycleCards.push('天使');
+
+            const hasCycle = cycleCards.length > 0;
+            const hasJingLingOps = hasLeiJingLing || hasMoJingLing || hasMuJingLing;
+
+            if (hasCycle || hasJingLingOps) {
+                for (let wave = 49; wave <= 129; wave += 10) {
+                    let upParts = [];
+
+                    // 光葫芦 + 上卡（输出卡下了再上就要光一下）
+                    if (hasCycle && guangHuLuTarget) {
+                        upParts.push('光葫芦' + guangHuLuTarget);
+                    }
+                    cycleCards.forEach(card => {
+                        upParts.push('上' + card + '满');
+                    });
+
+                    // 精灵操作：逢9就打（>=49波）
+                    if (hasLeiJingLing) upParts.push('每4秒共100次雷精灵');
+                    if (hasMoJingLing) upParts.push('每4秒共100次魔精灵');
+                    if (hasMuJingLing) upParts.push('每4秒共100次木精灵');
+
+                    if (upParts.length > 0) {
+                        output += wave + ',' + upParts.join(',') + ',\n';
+                    }
+
+                    // 停球 + 下卡（129之后不需要下了）
+                    if (hasCycle && wave < 129) {
+                        let downTime = wave + 2;
+                        let downParts = ['停球'];
+                        cycleCards.forEach(card => {
+                            downParts.push('下' + card);
+                        });
+                        output += downTime + ',' + downParts.join(',') + ',\n';
+                    }
+                }
+            }
+
+            // 显示结果
+            resultEl.innerHTML = '<div style="background:rgba(0,0,0,0.3);padding:10px;border-radius:8px;margin-top:5px;">' +
+                '<div style="color:#ff9800;font-weight:bold;margin-bottom:8px;">✅ 副本脚本输出：</div>' +
+                '<div style="color:#fff;font-family:monospace;white-space:pre-wrap;word-break:break-all;">' + output + '</div>' +
+                '<button onclick="copyDungeonScriptOutput()" style="margin-top:10px;background:linear-gradient(135deg,#ff9800,#e65100);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.85rem;">📋 复制脚本</button>' +
+                '</div>';
+
+            window._dungeonScriptOutput = output;
+        }
+
+        // 复制副本脚本输出
+        function copyDungeonScriptOutput() {
+            if (!window._dungeonScriptOutput) return;
+            navigator.clipboard.writeText(window._dungeonScriptOutput).then(() => {
+                const resultEl = document.getElementById('parserResult');
+                resultEl.innerHTML += '<br><span style="color:#ff9800;">✅ 已复制到剪贴板！</span>';
+            }).catch(err => {
+                console.error('复制失败:', err);
+            });
+        }
+
         // 通用面板拖拽功能
         function startPanelDrag(e, panelId) {
             if (e.target.closest('button') || e.target.closest('select') || e.target.closest('input')) return;
@@ -6258,6 +6467,7 @@
                 <div style="display:flex;gap:10px;flex-wrap:wrap;">
                     <button onclick="parseTextAndAddCards()" style="flex:1;background:linear-gradient(135deg,#00bcd4,#00838f);color:white;border:none;padding:10px 16px;border-radius:8px;cursor:pointer;font-size:0.9rem;font-weight:500;">🔍 解析并添加</button>
                     <button onclick="parseActivityScript()" style="flex:1;background:linear-gradient(135deg,#ff5722,#e64a19);color:white;border:none;padding:10px 16px;border-radius:8px;cursor:pointer;font-size:0.9rem;font-weight:500;">📜 活动脚本生成</button>
+                    <button onclick="parseDungeonScript()" style="flex:1;background:linear-gradient(135deg,#ff9800,#e65100);color:white;border:none;padding:10px 16px;border-radius:8px;cursor:pointer;font-size:0.9rem;font-weight:500;">🏰 副本脚本生成</button>
                     <button onclick="clearParserInput()" style="background:rgba(255,255,255,0.1);color:white;border:none;padding:10px 16px;border-radius:8px;cursor:pointer;font-size:0.9rem;">清空</button>
                 </div>
                 <div id="parserResult" style="margin-top:10px;font-size:0.85rem;color:rgba(255,255,255,0.7);"></div>
