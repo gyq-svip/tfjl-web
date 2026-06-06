@@ -5741,14 +5741,25 @@
 
                     let html = '';
                     projects.forEach(p => {
-                        // 搜索项目名、分类、手牌卡名、脚本文件名和内容
+                        // 搜索项目名、分类
                         const nameMatch = p.name.toLowerCase().includes(keyword);
                         const catMatch = (p.category || '').toLowerCase().includes(keyword);
 
-                        // 搜索手牌
+                        // 搜索所有卡牌（手牌+已放置）
                         const myCards = Array.isArray(p.myHandCards) ? p.myHandCards : [];
                         const teammateCards = Array.isArray(p.teammateHandCards) ? p.teammateHandCards : [];
-                        const cardMatch = [...myCards, ...teammateCards].some(c => (c || '').toLowerCase().includes(keyword));
+                        const myPlaced = Array.isArray(p.myPlacedCards) ? p.myPlacedCards : [];
+                        const teammatePlaced = Array.isArray(p.teammatePlacedCards) ? p.teammatePlacedCards : [];
+                        const allCards = [...myCards, ...teammateCards, ...myPlaced, ...teammatePlaced];
+                        const cardMatch = allCards.some(c => (c || '').toLowerCase().includes(keyword));
+
+                        // 搜索卡皮
+                        const skins = p.cardSkins ? Object.values(p.cardSkins) : [];
+                        const skinMatch = skins.some(s => (s || '').toLowerCase().includes(keyword));
+
+                        // 搜索牌组信息
+                        const deckInfo = [p.myDeckInfo || '', p.teammateDeckInfo || ''];
+                        const deckMatch = deckInfo.some(d => d.toLowerCase().includes(keyword));
 
                         // 搜索脚本文件
                         const txtFiles = Array.isArray(p.txtFiles) ? p.txtFiles : [];
@@ -5758,7 +5769,10 @@
                         );
                         const fileMatch = matchedFiles.length > 0;
 
-                        if (!nameMatch && !catMatch && !cardMatch && !fileMatch) return;
+                        // 搜索记事本
+                        const notepadMatch = (p.notepad || '').toLowerCase().includes(keyword);
+
+                        if (!nameMatch && !catMatch && !cardMatch && !skinMatch && !deckMatch && !fileMatch && !notepadMatch) return;
 
                         // 高亮关键字
                         const highlight = (text) => {
@@ -5771,8 +5785,11 @@
                         let matchInfo = [];
                         if (nameMatch) matchInfo.push('项目名');
                         if (catMatch) matchInfo.push('分类');
-                        if (cardMatch) matchInfo.push('手牌');
+                        if (cardMatch) matchInfo.push('卡牌');
+                        if (skinMatch) matchInfo.push('卡皮');
+                        if (deckMatch) matchInfo.push('牌组');
                         if (fileMatch) matchInfo.push(`脚本(${matchedFiles.length}个)`);
+                        if (notepadMatch) matchInfo.push('记事本');
 
                         html += `
                             <div style="background:rgba(0,0,0,0.3);border:1px solid rgba(0,188,212,0.2);border-radius:8px;padding:10px;cursor:pointer;" onclick="loadProjectByName('${p.name.replace(/'/g, "\\'")}')">
