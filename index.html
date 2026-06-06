@@ -6104,19 +6104,17 @@
                         output += wave + ',' + upParts.join(',') + ',\n';
                     }
 
-                    // 有打精灵球就逢0停球（50,60,70,...130）
-                    if (hasJingLingOps && wave < 129) {
-                        output += (wave + 1) + ',停球,\n';
-                    }
-
-                    // 停球 + 下卡（129之后不需要下了）
-                    if (hasCycle && wave < 129) {
-                        let downTime = wave + 2;
-                        let downParts = ['停球'];
-                        cycleCards.forEach(card => {
-                            downParts.push('下' + card);
-                        });
-                        output += downTime + ',' + downParts.join(',') + ',\n';
+                    // 逢0停球 + 下卡（合并为一行）
+                    if (wave < 129) {
+                        let stopParts = ['停球'];
+                        if (hasCycle) {
+                            cycleCards.forEach(card => {
+                                stopParts.push('下' + card);
+                            });
+                        }
+                        if (hasJingLingOps || hasCycle) {
+                            output += (wave + 1) + ',' + stopParts.join(',') + ',\n';
+                        }
                     }
                 }
                 // 130波停球
