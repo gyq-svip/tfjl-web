@@ -6147,6 +6147,7 @@
             const hasMoJingLing = heroNames.some(name => name.includes('魔精灵'));
             const hasLeiJingLing = heroNames.some(name => name.includes('雷精灵'));
             const hasMuJingLing = heroNames.some(name => name.includes('木精灵'));
+            const hasHunJingLing = heroNames.some(name => name.includes('魂精灵'));
 
             const hasSheXian = heroNames.some(name => name.includes('射线'));
             const hasBaoKu = heroNames.some(name => name.includes('宝库'));
@@ -6304,7 +6305,7 @@
                 });
             }
 
-            const hasJingLingOps = hasLeiJingLing || hasMoJingLing || hasMuJingLing;
+            const hasJingLingOps = hasLeiJingLing || hasMoJingLing || hasMuJingLing || hasHunJingLing;
 
             if (hasCycle || hasJingLingOps) {
                 for (let wave = 49; wave <= 129; wave += 10) {
@@ -6324,6 +6325,7 @@
                     if (hasLeiJingLing) upParts.push('每4秒共100次雷精灵');
                     if (hasMoJingLing) upParts.push('每4秒共100次魔精灵');
                     if (hasMuJingLing) upParts.push('每4秒共100次木精灵');
+                    if (hasHunJingLing) upParts.push('每2秒共100次魂精灵');
 
                     if (upParts.length > 0) {
                         output += wave + ',' + upParts.join(',') + ',\n';
