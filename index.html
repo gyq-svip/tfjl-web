@@ -6379,7 +6379,7 @@
                     },
                     body: JSON.stringify({
                         description: `脚本分享: ${fileName}`,
-                        public: false,
+                        public: true,
                         files: {
                             [fileName]: { content: scriptContent }
                         }
@@ -6438,7 +6438,7 @@
                     },
                     body: JSON.stringify({
                         description: `脚本分享: ${file.name}`,
-                        public: false,
+                        public: true,
                         files: {
                             [file.name]: { content: file.content }
                         }
@@ -13456,8 +13456,11 @@ function hasGistToken() {
                     }
                 }
 
-                // 获取文件内容
-                const response = await fetch(url);
+                // 获取文件内容（带认证header以支持私有Gist）
+                const token = getGistToken();
+                const fetchHeaders = {};
+                if (token) fetchHeaders['Authorization'] = `token ${token}`;
+                const response = await fetch(url, { headers: fetchHeaders });
                 if (!response.ok) {
                     throw new Error(`获取文件失败: ${response.status}`);
                 }
@@ -14732,7 +14735,7 @@ function hasGistToken() {
                 },
                 body: JSON.stringify({
                     description: `脚本分享: ${file.name}`,
-                    public: false,
+                    public: true,
                     files: {
                         [file.name]: {
                             content: content
