@@ -5998,6 +5998,7 @@
             const hasGuangJingLing = heroNames.some(name => name.includes('光精灵'));
             const hasMuJingLing = heroNames.some(name => name.includes('木精灵'));
             const hasHunJingLing = heroNames.some(name => name.includes('魂精灵'));
+            const hasLeiJingLing = heroNames.some(name => name.includes('雷精灵'));
             // 检查是否有蛇女
             const hasSheNv = heroNames.some(name => name.includes('蛇女'));
 
@@ -6176,27 +6177,29 @@
 
             // 蛇女加速优先级（第4、第5位）：优先级高的放前面让蛇女加速
             const sheNvPriority = ['火灵', '虎弓', '风灵', '后羿', '小野', '天使', '水灵'];
-            // 按优先级找出当前卡组中需要加速的卡
+            // 按优先级找出当前卡组中需要加速的卡（排除蛇女自己）
             const priorityCards = sheNvPriority.filter(p =>
                 filteredCards.some(name => name.includes(p))
             ).map(p => filteredCards.find(name => name.includes(p)));
 
             // 构建上卡顺序
             let arrangedCards = [];
-            arrangedCards.push(...gongChengCards);
-            arrangedCards.push(...otherCards);
-
+            
             if (hasSheNv && priorityCards.length > 0) {
-                // 有蛇女：前3个位置放工程+其他卡，第4第5位放优先级最高的2张卡，第6位蛇女
-                arrangedCards = arrangedCards.slice(0, 3);
+                // 有蛇女：前3个位置放工程+其他非优先级卡，第4第5位放优先级最高的2张卡，第6位蛇女
+                const nonPriorityCards = filteredCards.filter(name =>
+                    !priorityCards.some(p => p === name) && !name.includes('蛇女')
+                );
+                arrangedCards.push(...nonPriorityCards.slice(0, 3));
                 // 取优先级前2张放第4、5位
                 arrangedCards.push(...priorityCards.slice(0, 2));
-                // 剩余优先级卡和天使等放后面
-                const remainingPriority = priorityCards.slice(2);
-                arrangedCards.push(...remainingPriority);
-                if (hasTianShi && !priorityCards.some(c => c.includes('天使'))) arrangedCards.push(...tianShiCards);
+                // 剩余优先级卡放后面
+                arrangedCards.push(...priorityCards.slice(2));
+                // 蛇女放最后
                 arrangedCards.push(...sheNvCards);
             } else {
+                arrangedCards.push(...gongChengCards);
+                arrangedCards.push(...otherCards);
                 if (hasFengLing) arrangedCards.push(...fengLingCards);
                 if (hasHuoLing) arrangedCards.push(...huoLingCards);
                 if (hasTianShi) arrangedCards.push(...tianShiCards);
