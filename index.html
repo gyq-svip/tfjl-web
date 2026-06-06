@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -1839,17 +1839,7 @@
             }
             
             /* 文件面板移动端适配 */
-            #txtFilesPanelHeader,
-            #textParserPanelHeader {
-                padding: 8px 12px;
-            }
-            
-            #textParserPanelContent textarea {
-                font-size: 0.8rem;
-            }
-            
-            #textParserPanelContent button {
-                font-size: 0.8rem;
+            #txtFilesPanelHeader {
                 padding: 8px 12px;
             }
             
@@ -2528,6 +2518,7 @@
         <!-- 项目管理器 -->
         <div id="scheme1">
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:rgba(255,255,255,0.05);border-radius:10px;padding:12px;margin-bottom:10px;">
+                <button onclick="focusScriptSearch()" title="搜索脚本" style="background:linear-gradient(135deg,#00bcd4,#00838f);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">🔍</button>
                 <span style="color:#ffd700;font-weight:bold;">📁</span>
                 <select id="categorySelector1" onchange="updateProjectList1()" style="background:#2a2a4a;color:#fff;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);font-size:0.9rem;min-width:120px;cursor:pointer;">
                     <option value="">-- 选择分类 --</option>
@@ -2538,7 +2529,6 @@
                 <button onclick="toggleProjectMenu(this)" style="background:#444;color:white;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:1rem;line-height:1;">⋮</button>
                 <button onclick="toggleNotepadPanel()" title="记事本" style="background:linear-gradient(135deg,#ffd700,#ff6b6b);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">📝</button>
                 <button onclick="toggleTxtFilesPanel()" title="脚本文件" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">📄</button>
-                <button onclick="toggleTextParserPanel()" title="文本解析" style="background:linear-gradient(135deg,#00bcd4,#00838f);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">🔍</button>
                 <button onclick="toggleReferencePanel()" title="参考图片" style="background:linear-gradient(135deg,#9c27b0,#7b1fa2);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">🖼️</button>
                 <button onclick="saveCurrentProject()" title="保存" style="background:rgba(76,175,80,0.8);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">💾</button>
             </div>
@@ -5645,10 +5635,57 @@
             }
         }
 
-        // 文本解析面板切换
+        // 文本解析面板切换（已集成到脚本文件面板的tab中）
         function toggleTextParserPanel() {
-            const panel = document.getElementById('textParserPanel');
-            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+            const panel = document.getElementById('txtFilesPanel');
+            panel.style.display = 'block';
+            switchTxtPanelTab('parser');
+        }
+
+        // 脚本文件面板Tab切换
+        function switchTxtPanelTab(tab) {
+            const filesTab = document.getElementById('txtTabFiles');
+            const parserTab = document.getElementById('txtTabParser');
+            const filesBtn = document.getElementById('txtTabBtn');
+            const parserBtn = document.getElementById('parserTabBtn');
+
+            if (tab === 'files') {
+                filesTab.style.display = 'block';
+                parserTab.style.display = 'none';
+                filesBtn.style.background = 'rgba(76,175,80,0.3)';
+                filesBtn.style.color = '#fff';
+                filesBtn.style.fontWeight = 'bold';
+                filesBtn.style.borderBottom = '2px solid #4caf50';
+                parserBtn.style.background = 'transparent';
+                parserBtn.style.color = 'rgba(255,255,255,0.5)';
+                parserBtn.style.fontWeight = 'normal';
+                parserBtn.style.borderBottom = 'none';
+            } else {
+                filesTab.style.display = 'none';
+                parserTab.style.display = 'flex';
+                parserBtn.style.background = 'rgba(0,188,212,0.3)';
+                parserBtn.style.color = '#fff';
+                parserBtn.style.fontWeight = 'bold';
+                parserBtn.style.borderBottom = '2px solid #00bcd4';
+                filesBtn.style.background = 'transparent';
+                filesBtn.style.color = 'rgba(255,255,255,0.5)';
+                filesBtn.style.fontWeight = 'normal';
+                filesBtn.style.borderBottom = 'none';
+            }
+        }
+
+        // 搜索脚本按钮 - 打开脚本面板并聚焦搜索框
+        function focusScriptSearch() {
+            const panel = document.getElementById('txtFilesPanel');
+            panel.style.display = 'block';
+            switchTxtPanelTab('files');
+            setTimeout(() => {
+                const searchInput = document.getElementById('txtFileSearchInput');
+                if (searchInput) {
+                    searchInput.focus();
+                    searchInput.select();
+                }
+            }, 100);
         }
 
         // 清空解析输入
@@ -6223,7 +6260,6 @@
             makePanelDraggable('referencePanel', 'referencePanelHeader');
             makePanelDraggable('notepadPanel', 'notepadPanelHeader');
             makePanelDraggable('txtFilesPanel', 'txtFilesPanelHeader');
-            makePanelDraggable('textParserPanel', 'textParserPanelHeader');
         });
 
         function makePanelDraggable(panelId, headerId) {
@@ -6462,7 +6498,7 @@
         </div>
 
         <!-- 脚本文件悬浮面板 -->
-        <div id="txtFilesPanel" style="display:none;position:fixed;top:80px;right:20px;width:400px;height:400px;z-index:9997;background:rgba(30,30,60,0.95);border:2px solid rgba(76,175,80,0.5);border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.5);overflow:auto;resize:both;min-width:280px;min-height:300px;">
+        <div id="txtFilesPanel" style="display:none;position:fixed;top:80px;right:20px;width:450px;height:500px;z-index:9997;background:rgba(30,30,60,0.95);border:2px solid rgba(76,175,80,0.5);border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.5);overflow:auto;resize:both;min-width:350px;min-height:400px;">
             <div id="txtFilesPanelHeader" style="background:linear-gradient(135deg,#4caf50,#2e7d32);padding:10px 15px;cursor:move;display:flex;justify-content:space-between;align-items:center;">
                 <span style="color:white;font-weight:bold;">📄 脚本文件</span>
                 <div style="display:flex;align-items:center;gap:8px;">
@@ -6470,24 +6506,21 @@
                     <button onclick="toggleTxtFilesPanel()" style="background:transparent;border:none;color:white;font-size:1.2rem;cursor:pointer;padding:0 5px;">×</button>
                 </div>
             </div>
-            <div style="padding:10px;height:calc(100% - 50px);overflow:auto;">
+            <!-- Tab切换 -->
+            <div style="display:flex;border-bottom:1px solid rgba(255,255,255,0.1);">
+                <button id="txtTabBtn" onclick="switchTxtPanelTab('files')" style="flex:1;padding:8px;border:none;background:rgba(76,175,80,0.3);color:#fff;cursor:pointer;font-size:0.85rem;font-weight:bold;border-bottom:2px solid #4caf50;">📄 脚本文件</button>
+                <button id="parserTabBtn" onclick="switchTxtPanelTab('parser')" style="flex:1;padding:8px;border:none;background:transparent;color:rgba(255,255,255,0.5);cursor:pointer;font-size:0.85rem;">🔍 文本解析</button>
+            </div>
+            <!-- 脚本文件Tab内容 -->
+            <div id="txtTabFiles" style="padding:10px;height:calc(100% - 90px);overflow:auto;">
                 <div style="margin-bottom:10px;">
                     <input id="txtFileSearchInput" type="text" placeholder="🔍 搜索脚本..." oninput="filterTxtFilesList()" style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid rgba(76,175,80,0.3);background:rgba(0,0,0,0.3);color:#fff;font-size:0.85rem;box-sizing:border-box;">
                 </div>
                 <div id="txtFilesList" style="display:flex;flex-direction:column;gap:10px;"></div>
                 <div style="margin-top:10px;color:rgba(255,255,255,0.5);font-size:0.75rem;">💡 支持上传多个TXT文件，预览时可编辑保存</div>
             </div>
-        </div>
-
-        <input type="file" id="txtFileInput" accept=".txt,.js,.json,.lua,.py,.sh" multiple style="display:none;" onchange="handleTxtFileUpload(this)">
-
-        <!-- 文本解析悬浮面板 -->
-        <div id="textParserPanel" style="display:none;position:fixed;top:80px;right:20px;width:450px;height:350px;z-index:9997;background:rgba(30,30,60,0.95);border:2px solid rgba(0,188,212,0.5);border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.5);overflow:auto;resize:both;min-width:350px;min-height:280px;">
-            <div id="textParserPanelHeader" style="background:linear-gradient(135deg,#00bcd4,#00838f);padding:10px 15px;cursor:move;display:flex;justify-content:space-between;align-items:center;">
-                <span style="color:white;font-weight:bold;">🔍 文本解析手牌</span>
-                <button onclick="toggleTextParserPanel()" style="background:transparent;border:none;color:white;font-size:1.2rem;cursor:pointer;padding:0 5px;">×</button>
-            </div>
-            <div style="padding:15px;height:calc(100% - 50px);display:flex;flex-direction:column;">
+            <!-- 文本解析Tab内容 -->
+            <div id="txtTabParser" style="padding:15px;height:calc(100% - 90px);display:none;flex-direction:column;overflow:auto;">
                 <div style="margin-bottom:10px;">
                     <label style="color:rgba(255,255,255,0.8);font-size:0.85rem;margin-bottom:5px;display:block;">分配到手牌：</label>
                     <select id="parserHandTarget" style="width:100%;padding:8px;border-radius:6px;border:1px solid rgba(255,215,0,0.3);background:#2a2a4a;color:#fff;font-size:0.9rem;cursor:pointer;">
@@ -6512,6 +6545,8 @@
                 <div id="parserResult" style="margin-top:10px;font-size:0.85rem;color:rgba(255,255,255,0.7);"></div>
             </div>
         </div>
+
+        <input type="file" id="txtFileInput" accept=".txt,.js,.json,.lua,.py,.sh" multiple style="display:none;" onchange="handleTxtFileUpload(this)">
 
         <div class="selection-area">
             <div style="text-align: center;">
@@ -16713,7 +16748,6 @@ function hasGistToken() {
             document.getElementById('chatRoomPanel').style.display = 'none';
             document.getElementById('chatRoomEntryModal').style.display = 'none';
             document.getElementById('referencePanel').style.display = 'none';
-            document.getElementById('textParserPanel').style.display = 'none';
             document.getElementById('txtFilesPanel').style.display = 'none';
             document.getElementById('notepadPanel').style.display = 'none';
         }
