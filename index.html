@@ -6104,6 +6104,11 @@
                         output += wave + ',' + upParts.join(',') + ',\n';
                     }
 
+                    // 有打精灵球就逢0停球（50,60,70,...130）
+                    if (hasJingLingOps && wave < 129) {
+                        output += (wave + 1) + ',停球,\n';
+                    }
+
                     // 停球 + 下卡（129之后不需要下了）
                     if (hasCycle && wave < 129) {
                         let downTime = wave + 2;
@@ -6113,6 +6118,10 @@
                         });
                         output += downTime + ',' + downParts.join(',') + ',\n';
                     }
+                }
+                // 130波停球
+                if (hasJingLingOps) {
+                    output += '130,停球,\n';
                 }
             }
 
