@@ -6084,12 +6084,12 @@
             }
 
             // 49波之后的循环
-            // 光葫芦目标（49+优先级：火灵 > 天使 > 风灵）
-            let guangHuLuTarget = '';
+            // 光葫芦目标：每个循环卡都加光葫芦（火灵、天使各自加）
+            const guangHuLuTargets = [];
             if (hasGuangJingLing) {
-                if (hasHuoLing) guangHuLuTarget = '火灵';
-                else if (hasTianShi) guangHuLuTarget = '天使';
-                else if (hasFengLing) guangHuLuTarget = '风灵';
+                if (hasHuoLing) guangHuLuTargets.push('火灵');
+                if (hasTianShi) guangHuLuTargets.push('天使');
+                if (hasFengLing) guangHuLuTargets.push('风灵');
             }
 
             // 需要上下循环的卡（火灵、天使）
@@ -6104,9 +6104,11 @@
                 for (let wave = 49; wave <= 129; wave += 10) {
                     let upParts = [];
 
-                    // 光葫芦 + 上卡（输出卡下了再上就要光一下）
-                    if (hasCycle && guangHuLuTarget) {
-                        upParts.push('光葫芦' + guangHuLuTarget);
+                    // 光葫芦 + 上卡（每个循环卡下了再上都要光一下）
+                    if (hasCycle) {
+                        guangHuLuTargets.forEach(target => {
+                            upParts.push('光葫芦' + target);
+                        });
                     }
                     cycleCards.forEach(card => {
                         upParts.push('上' + card + '满');
