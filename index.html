@@ -6380,7 +6380,7 @@
                     wallMessages = wallMessages.slice(0, MAX_MESSAGES);
                 }
 
-                await saveWallMessages();
+                await saveMessagesToGist();
                 renderMessages();
                 showToast('✅ 脚本已分享到需求墙！');
             } catch (err) {
@@ -6438,7 +6438,7 @@
                     wallMessages = wallMessages.slice(0, MAX_MESSAGES);
                 }
 
-                await saveWallMessages();
+                await saveMessagesToGist();
                 renderMessages();
                 showToast('✅ 脚本已分享到需求墙！');
             } catch (err) {
