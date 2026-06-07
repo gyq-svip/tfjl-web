@@ -14706,9 +14706,43 @@ function hasGistToken() {
                     if (firstFile.truncated) {
                         // 大文件被截断，需要通过raw_url获取完整内容
                         console.log('文件被截断，通过raw_url获取完整内容');
-                        const rawResp = await fetch(firstFile.raw_url, { headers });
-                        if (rawResp.ok) {
-                            backupContent = await rawResp.text();
+                        let rawContent = null;
+                        // 先不带认证请求（公开Gist可直接访问，避免CORS预检）
+                        try {
+                            const rawResp = await fetch(firstFile.raw_url);
+                            if (rawResp.ok) {
+                                rawContent = await rawResp.text();
+                            }
+                        } catch (e) {
+                            // CORS或网络错误
+                        }
+                        // 如果直接fetch失败，通过API获取（私有Gist需要认证）
+                        if (rawContent === null && token) {
+                            try {
+                                // 用Gist API获取完整内容（API支持CORS+认证）
+                                const gistId = apiUrl.match(/gists\/([a-f0-9]+)/i)?.[1];
+                                if (gistId) {
+                                    const apiResp = await fetch(`https://api.github.com/gists/${gistId}`, {
+                                        headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` }
+                                    });
+                                    if (apiResp.ok) {
+                                        const fullData = await apiResp.json();
+                                        const fullFile = fullData.files?.[fileNames[0]];
+                                        if (fullFile && !fullFile.truncated) {
+                                            rawContent = fullFile.content;
+                                        } else if (fullFile?.raw_url) {
+                                            // 仍然截断，尝试通过raw_url获取（带token参数）
+                                            const rawResp2 = await fetch(fullFile.raw_url);
+                                            if (rawResp2.ok) rawContent = await rawResp2.text();
+                                        }
+                                    }
+                                }
+                            } catch (e) {
+                                console.warn('API方式获取截断文件失败:', e);
+                            }
+                        }
+                        if (rawContent !== null) {
+                            backupContent = rawContent;
                         } else {
                             throw new Error('获取完整备份文件失败');
                         }
