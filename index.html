@@ -3213,11 +3213,61 @@
             document.getElementById('chatRoomPanel').style.display = 'flex';
             document.getElementById('chatRoomIdDisplay').textContent = '#' + roomId;
 
+            // 首次进入拍卖行显示规则说明
+            if (!localStorage.getItem('TFJL_AuctionRulesRead')) {
+                showAuctionRules();
+            }
+
             await fetchChatRoomData();
             renderChatMessages();
             renderAuctionsList();
             startChatRefresh();
             startAuctionCountdown();
+        }
+
+        // 拍卖行规则弹窗
+        function showAuctionRules() {
+            const rulesHtml = `
+                <div id="auctionRulesModal" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:99999;display:flex;align-items:center;justify-content:center;">
+                    <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(78,205,196,0.6);border-radius:16px;padding:24px;max-width:420px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
+                        <div style="text-align:center;margin-bottom:12px;">
+                            <span style="font-size:1.5rem;">🏪</span>
+                            <span style="color:#4ecdc4;font-size:1.1rem;font-weight:bold;margin-left:8px;">拍卖行规则</span>
+                        </div>
+                        <div style="background:rgba(251,191,36,0.15);border:1px solid rgba(251,191,36,0.4);border-radius:8px;padding:8px 12px;margin-bottom:14px;text-align:center;">
+                            <span style="color:#fbbf24;font-size:0.85rem;font-weight:bold;">⚠️ 首次进入，请仔细阅读！关闭后可在拍卖行内重新查看</span>
+                        </div>
+                        <div style="color:rgba(255,255,255,0.85);font-size:0.85rem;line-height:1.8;">
+                            <div style="margin-bottom:10px;">
+                                <span style="color:#4ade80;">🔨 浏览商品</span><br>
+                                点击小锤子图标进入商品浏览页面
+                            </div>
+                            <div style="margin-bottom:10px;">
+                                <span style="color:#fbbf24;">📢 上架商品</span><br>
+                                点击「发布拍卖」即可上架商品
+                            </div>
+                            <div style="margin-bottom:10px;">
+                                <span style="color:#60a5fa;">🔄 交换</span><br>
+                                交换商品的价格统一填 <b style="color:#fbbf24;">8888</b>，想要物品填自己要的，时间填长一点，可自行找大佬担保，本平台不收费
+                            </div>
+                            <div style="margin-bottom:10px;">
+                                <span style="color:#f472b6;">🛒 求购</span><br>
+                                选中自己想要的，尽可能填入最高价钱，停止收购需联系管理员下架
+                            </div>
+                        </div>
+                        <div style="text-align:center;margin-top:16px;">
+                            <button onclick="closeAuctionRules()" style="padding:10px 40px;border-radius:8px;border:none;background:linear-gradient(135deg,#4ecdc4,#44a08d);color:white;cursor:pointer;font-size:0.9rem;font-weight:600;">我已阅读并了解规则</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.insertAdjacentHTML('beforeend', rulesHtml);
+        }
+
+        function closeAuctionRules() {
+            localStorage.setItem('TFJL_AuctionRulesRead', 'true');
+            const modal = document.getElementById('auctionRulesModal');
+            if (modal) modal.remove();
         }
 
         function closeChatRoom() {
@@ -18835,6 +18885,7 @@ function hasGistToken() {
             <div style="display:flex;gap:8px;align-items:center;">
                 <button onclick="openOwnerPanel()" title="房主管理" style="background:transparent;border:none;color:#a78bfa;font-size:0.85rem;cursor:pointer;padding:4px 8px;border:1px solid rgba(167,139,250,0.3);border-radius:4px;transition:all 0.2s;" onmouseover="this.style.background='rgba(167,139,250,0.2)'" onmouseout="this.style.background='transparent'">👑 房主</button>
                 <button onclick="switchChatRoom()" title="切换房间" style="background:transparent;border:none;color:#fbbf24;font-size:0.85rem;cursor:pointer;padding:4px 8px;border:1px solid rgba(255,215,0,0.3);border-radius:4px;transition:all 0.2s;" onmouseover="this.style.background='rgba(255,215,0,0.2)'" onmouseout="this.style.background='transparent'">切换房间</button>
+                <button onclick="showAuctionRules()" title="查看规则" style="background:transparent;border:none;color:#4ecdc4;font-size:0.85rem;cursor:pointer;padding:4px 8px;border:1px solid rgba(78,205,196,0.3);border-radius:4px;transition:all 0.2s;" onmouseover="this.style.background='rgba(78,205,196,0.2)'" onmouseout="this.style.background='transparent'">📜 规则</button>
                 <button onclick="toggleChatRoomTab('auctions')" title="拍卖" style="background:transparent;border:none;color:#ffd700;font-size:1.4rem;cursor:pointer;padding:0;text-shadow:0 0 8px rgba(255,215,0,0.6);">🔨</button>
                 <button onclick="closeChatRoom()" title="关闭" style="background:transparent;border:none;color:#ff6b6b;font-size:1rem;cursor:pointer;padding:0;">×</button>
             </div>
