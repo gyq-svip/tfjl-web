@@ -2732,6 +2732,10 @@
             // 进入归档系统（完整功能）
             document.getElementById('passwordOverlay').style.display = 'none';
             document.getElementById('mainContent').classList.add('visible');
+            // 首次进入显示功能说明
+            if (!localStorage.getItem('TFJL_WelcomeRead')) {
+                setTimeout(() => showWelcomeGuide(), 500);
+            }
         }
 
         function enterAuctionFromLogin() {
@@ -2803,6 +2807,7 @@
                     <div onclick="importSingleProject();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📥 恢复项目</div>
                     <div onclick="downloadOfflineVersion();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📥 下载离线版</div>
                     <div onclick="showHelpModal();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📖 使用帮助</div>
+                    <div onclick="showWelcomeGuide();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#ffd700;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,215,0,0.1)'" onmouseout="this.style.background='transparent'">🎮 功能指南</div>
                     <div onclick="openChatRoomEntry();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">🏪 进入拍卖系统</div>
                     <div onclick="logoutToLogin();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#ff6b6b;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,107,107,0.1)'" onmouseout="this.style.background='transparent'">🔙 退出登录</div>
                 </div>
@@ -3256,7 +3261,7 @@
                             </div>
                             <div style="margin-bottom:10px;">
                                 <span style="color:#a78bfa;">👑 入驻</span><br>
-                                欢迎大佬入驻，非欺诈量不大者可私聊给房主（查看该房间统计功能
+                                欢迎大佬入驻，非欺诈量且不大者可私聊给房主，量太大网站承受不了，哈哈（查看该房间统计功能
                             </div>
                         </div>
                         <div style="text-align:center;margin-top:16px;">
@@ -3271,6 +3276,48 @@
         function closeAuctionRules() {
             localStorage.setItem('TFJL_AuctionRulesRead', 'true');
             const modal = document.getElementById('auctionRulesModal');
+            if (modal) modal.remove();
+        }
+
+        // 网站功能说明弹窗
+        function showWelcomeGuide() {
+            const guideHtml = `
+                <div id="welcomeGuideModal" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:99999;display:flex;align-items:center;justify-content:center;">
+                    <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(255,215,0,0.5);border-radius:16px;padding:24px;max-width:460px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.5);max-height:85vh;overflow-y:auto;">
+                        <div style="text-align:center;margin-bottom:12px;">
+                            <span style="font-size:1.5rem;">🎮</span>
+                            <span style="color:#ffd700;font-size:1.1rem;font-weight:bold;margin-left:8px;">塔防精灵助手 · 功能指南</span>
+                        </div>
+                        <div style="background:rgba(251,191,36,0.15);border:1px solid rgba(251,191,36,0.4);border-radius:8px;padding:8px 12px;margin-bottom:14px;text-align:center;">
+                            <span style="color:#fbbf24;font-size:0.85rem;font-weight:bold;">⚠️ 首次使用，请仔细阅读！关闭后可在菜单中重新查看</span>
+                        </div>
+                        <div style="color:rgba(255,255,255,0.85);font-size:0.82rem;line-height:1.8;">
+                            <div style="margin-bottom:12px;">
+                                <span style="color:#4ade80;font-weight:bold;">📂 项目管理</span><br>
+                                脚本分类存储，便于日后查找。数据存储在本地浏览器缓存中，支持项目中存放脚本文件、图片、阵容占位、皮肤融合，还有记事本可备注战车及注意事项，保存后均跟随单个项目。
+                            </div>
+                            <div style="margin-bottom:12px;">
+                                <span style="color:#60a5fa;font-weight:bold;">📜 脚本文件</span><br>
+                                支持脚本解析到手牌，方便调整占位一目了然；支持拖拽排序；支持分享到需求墙，所有人均可查看、下载和使用。
+                            </div>
+                            <div style="margin-bottom:12px;">
+                                <span style="color:#f472b6;font-weight:bold;">🔍 文本解析</span><br>
+                                支持解析文本到手牌，自动生成活动和隐藏脚本（带时间轴），建议生成后手动微调效果更佳。<br>
+                                <b style="color:#ff9800;">副本脚本</b>：目前已支持蛇女、雷精灵、天使、火炮、虎弓、后羿等阵容的自动生成，后续遇到新阵容会持续完善。
+                            </div>
+                        </div>
+                        <div style="text-align:center;margin-top:16px;">
+                            <button onclick="closeWelcomeGuide()" style="padding:10px 40px;border-radius:8px;border:none;background:linear-gradient(135deg,#ffd700,#f59e0b);color:#1a1a2e;cursor:pointer;font-size:0.9rem;font-weight:600;">我已了解，开始使用</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.insertAdjacentHTML('beforeend', guideHtml);
+        }
+
+        function closeWelcomeGuide() {
+            localStorage.setItem('TFJL_WelcomeRead', 'true');
+            const modal = document.getElementById('welcomeGuideModal');
             if (modal) modal.remove();
         }
 
@@ -6099,7 +6146,7 @@
 
             // 如果有冰精灵，添加额外输出（空一行）
             if (hasBingJingLing) {
-                output += '\n田伯光扔壶前，每1秒共1次冰精灵\n田伯光酒壶，每2秒共3次冰精灵\n田伯光药壶，停球';
+                output += '\n田伯光最大吃酒数，1\n田伯光扔壶前，每1秒共1次冰精灵\n田伯光酒壶，每2秒共3次冰精灵\n田伯光药壶，停球';
             }
 
             // 显示结果
