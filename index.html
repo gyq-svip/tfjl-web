@@ -6157,8 +6157,12 @@
             }
 
             // 龙王+幻精灵同时存在时，01:40重复01:25的精灵操作并加换强袭
-            if (hasLongWang && hasHuanJingLing && jingLing01_25.length > 0) {
-                output += '01:40,' + jingLing01_25.join(',') + ',换强袭,\n';
+            if (hasLongWang && hasHuanJingLing) {
+                if (jingLing01_25.length > 0) {
+                    output += '01:40,' + jingLing01_25.join(',') + ',换强袭,\n';
+                } else {
+                    output += '01:40,换强袭,\n';
+                }
             }
 
             // 如果有冰精灵，添加额外输出（空一行）
