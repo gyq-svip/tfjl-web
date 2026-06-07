@@ -6006,6 +6006,10 @@
             const hasLeiJingLing = heroNames.some(name => name.includes('雷精灵'));
             // 检查是否有蛇女
             const hasSheNv = heroNames.some(name => name.includes('蛇女'));
+            // 检查是否有飞机和大圣（同排机制）
+            const hasFeiJi = heroNames.some(name => name.includes('飞机'));
+            const hasDaSheng = heroNames.some(name => name.includes('大圣'));
+            const hasTongPai = hasFeiJi && hasDaSheng;
 
             // 构建输出
             // 第一部分：原样输出输入的行
@@ -6060,11 +6064,22 @@
             // 第一行脚本
             // 如果有蛇女，加"强制顺序上卡,"
             const qiangZhiStr = hasSheNv ? '强制顺序上卡,' : '';
-            output += `00:01,${qiangZhiStr}${shangKaStr}\n`;
+            // 如果有飞机和大圣同排，加"飞机大圣同排,"
+            const tongPaiStr = hasTongPai ? '飞机大圣同排,' : '';
+            output += `00:01,${qiangZhiStr}${tongPaiStr}${shangKaStr}\n`;
             
             // 如果有光精灵，添加光精灵输出
             if (hasGuangJingLing) {
                 output += '00:30,每0.1秒共20次光精灵,关闭验光\n';
+            }
+
+            // 同排机制：飞机+大圣
+            if (hasTongPai) {
+                if (hasGuangJingLing) {
+                    output += '01:20,下大圣,上大圣4级,光葫芦大圣,关闭验光,\n';
+                } else {
+                    output += '01:20,下大圣,上大圣满,\n';
+                }
             }
 
             // 如果有魔精灵、木精灵、魂精灵，添加到同一行
