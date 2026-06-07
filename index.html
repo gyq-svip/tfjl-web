@@ -3365,8 +3365,6 @@
         // 从Gist加载图片（返回base64格式）
         // 参数可以是 auctionId 或 imageGistId
         async function loadImage(auctionIdOrGistId) {
-            console.log('📷 loadImage 调用，参数:', auctionIdOrGistId);
-            
             // 获取当前房间号
             const roomId = currentChatRoom || 'default';
             
@@ -3380,7 +3378,6 @@
             if (isGistId) {
                 // 直接传入的是 Gist ID
                 imgGistId = auctionIdOrGistId;
-                console.log('📷 使用 Gist ID:', imgGistId);
             } else {
                 // 传入的是 auctionId，需要查找对应的 Gist ID
                 auctionId = auctionIdOrGistId;
@@ -3531,9 +3528,6 @@
                     }
                 }
                 
-                if (deletedCount > 0) {
-                    console.log(`已删除 ${deletedCount} 张过期图片Gist`);
-                }
             } catch (error) {
                 console.error('清理过期图片失败:', error);
             }
@@ -3589,8 +3583,6 @@
                 // 使用固定的索引文件 URL
                 const indexUrl = `https://api.github.com/gists/${GIST_ID}`;
                 
-                console.log(`📝 更新索引文件: ${roomId} = ${gistId}`);
-                
                 // 先获取现有的索引文件
                 let indexData = {};
                 const response = await fetch(indexUrl, {
@@ -3605,7 +3597,6 @@
                     if (data.files && data.files['room_index.json'] && data.files['room_index.json'].content) {
                         try {
                             indexData = JSON.parse(data.files['room_index.json'].content);
-                            console.log(`📖 当前索引内容:`, indexData);
                         } catch (e) {
                             console.error('❌ 解析索引文件失败，中止更新以防数据丢失');
                             return null;
@@ -3621,13 +3612,11 @@
                 
                 // 检查是否已存在相同的 Gist ID
                 if (indexData[roomId] === gistId) {
-                    console.log(`✅ 索引已存在，无需更新`);
                     return null;
                 }
                 
                 // 【冲突检测】如果索引中已有不同的Gist ID，说明其他设备已抢先创建
                 if (indexData[roomId] && indexData[roomId] !== gistId) {
-                    console.log(`⚠️ 索引冲突！已有 ${indexData[roomId]}，新的是 ${gistId}`);
                     return { conflict: true, existingGistId: indexData[roomId] };
                 }
                 
@@ -3652,7 +3641,6 @@
                 });
                 
                 if (patchResponse.ok) {
-                    console.log(`✅ 索引已更新: ${roomId} = ${gistId}`);
                     // 更新 localStorage 缓存
                     localStorage.setItem(INDEX_GIST_ID_KEY, GIST_ID);
                 } else {
@@ -3670,14 +3658,11 @@
                 const roomId = currentChatRoom || 'default';
                 const filename = `chatrooms_${roomId}.json`;
                 
-                console.log(`🔄 加载房间数据: ${roomId}`);
-                
                 // 优先从 localStorage 获取该房间的 GIST_ID
                 let roomGistId = localStorage.getItem(`chatroom_gist_${roomId}`);
                 
                 // 如果 localStorage 没有，尝试从索引文件获取
                 if (!roomGistId) {
-                    console.log(`📖 本地无缓存，从索引文件获取...`);
                     try {
                         // 使用固定的索引文件 URL
                         const indexUrl = `https://api.github.com/gists/${GIST_ID}`;
@@ -3693,14 +3678,10 @@
                             if (data.files && data.files['room_index.json'] && data.files['room_index.json'].content) {
                                 try {
                                     const indexData = JSON.parse(data.files['room_index.json'].content);
-                                    console.log(`📖 索引文件内容:`, indexData);
                                     if (indexData[roomId]) {
                                         roomGistId = indexData[roomId];
-                                        console.log(`✅ 从索引获取到房间 Gist ID: ${roomGistId}`);
                                         // 缓存到 localStorage
                                         localStorage.setItem(`chatroom_gist_${roomId}`, roomGistId);
-                                    } else {
-                                        console.log(`⚠️ 索引中未找到房间 ${roomId}`);
                                     }
                                 } catch (e) {
                                     console.warn('解析索引文件失败');
@@ -3713,7 +3694,6 @@
                         console.warn('获取索引文件失败:', e);
                     }
                 } else {
-                    console.log(`📖 使用本地缓存的 Gist ID: ${roomGistId}`);
                 }
                 
                 if (roomGistId) {
@@ -3748,8 +3728,6 @@
                                         chatRoomData.rooms[roomId] = { messages: [], auctions: [], nextAuctionId: 1 };
                                     }
                                     
-                                    console.log(`✅ 房间数据加载成功`);
-                                    
                                     // 自动清理过期消息（7天）
                                     const MESSAGE_EXPIRE = 7 * 24 * 60 * 60 * 1000; // 7天
                                     const now = Date.now();
@@ -3760,7 +3738,6 @@
                                             return msg.author === '系统' || (now - msg.time) < MESSAGE_EXPIRE;
                                         });
                                         if (currentRoom.messages.length < originalLength) {
-                                            console.log(`🧹 自动清理了 ${originalLength - currentRoom.messages.length} 条过期消息`);
                                             // 异步保存，不阻塞加载
                                             saveChatRoomData().catch(e => console.warn('清理后保存失败:', e));
                                         }
@@ -3774,20 +3751,17 @@
                         }
                     } else if (response.status === 404 || response.status === 403) {
                         // Gist 不存在或无权限，清除缓存
-                        console.log(`⚠️ 房间 Gist ${response.status}，清除缓存`);
                         localStorage.removeItem(`chatroom_gist_${roomId}`);
                         roomGistId = null;
                     }
                 }
                 
                 // 如果没有找到房间数据，创建新的
-                console.log(`📝 创建新的房间配置文件...`);
                 chatRoomData = { rooms: {} };
                 if (token) {
                     try {
                         // saveChatRoomData 内部已包含双重检查、冲突检测和索引更新
                         const newGistId = await saveChatRoomData();
-                        console.log('✅ 已自动创建房间配置文件');
                     } catch (saveError) {
                         console.warn('自动创建房间配置文件失败:', saveError);
                     }
@@ -3837,7 +3811,6 @@
                             const indexData = JSON.parse(data.files['room_index.json'].content);
                             if (indexData[roomId]) {
                                 chatroomGistId = indexData[roomId];
-                                console.log(`📖 从索引获取到已存在的房间 Gist ID: ${chatroomGistId}`);
                                 localStorage.setItem(`chatroom_gist_${roomId}`, chatroomGistId);
                             }
                         }
@@ -3867,12 +3840,10 @@
                     });
                     
                     if (patchResponse.ok) {
-                        console.log(`✅ 房间 ${roomId} 数据已更新`);
                         return chatroomGistId;
                     }
                     // 如果 PATCH 失败（404 或 403），清除 localStorage，重新创建
                     if (patchResponse.status === 404 || patchResponse.status === 403) {
-                        console.log(`⚠️ PATCH 失败 (${patchResponse.status})，清除缓存重新创建`);
                         localStorage.removeItem(`chatroom_gist_${roomId}`);
                         chatroomGistId = null;
                     }
@@ -3901,7 +3872,6 @@
                             if (checkIndex[roomId]) {
                                 // 索引中已有其他设备创建的房间，使用已有的
                                 chatroomGistId = checkIndex[roomId];
-                                console.log(`🔒 双重检查发现已有房间 Gist: ${chatroomGistId}，跳过创建`);
                                 localStorage.setItem(`chatroom_gist_${roomId}`, chatroomGistId);
                                 // 用已有的Gist ID去PATCH更新数据
                                 const patchResp = await fetch(`https://api.github.com/gists/${chatroomGistId}`, {
@@ -3920,7 +3890,6 @@
                                     })
                                 });
                                 if (patchResp.ok) {
-                                    console.log(`✅ 房间 ${roomId} 数据已更新到已有Gist`);
                                     return chatroomGistId;
                                 }
                             }
@@ -3960,7 +3929,6 @@
                 // 【冲突检测】更新索引时检查是否有其他设备已抢先创建
                 const conflictResult = await updateRoomIndex(roomId, data.id);
                 if (conflictResult && conflictResult.conflict && conflictResult.existingGistId) {
-                    console.log(`⚠️ 发现冲突！其他设备已创建房间 Gist: ${conflictResult.existingGistId}，删除重复的 ${data.id}`);
                     // 删除刚创建的重复Gist
                     try {
                         await fetch(`https://api.github.com/gists/${data.id}`, {
@@ -3989,13 +3957,9 @@
                             }
                         })
                     });
-                    if (patchResp.ok) {
-                        console.log(`✅ 数据已合并到已有Gist: ${chatroomGistId}`);
-                    }
                     return chatroomGistId;
                 }
                 
-                console.log(`✅ 已创建房间 ${roomId} 的配置文件，GIST_ID: ${data.id}`);
                 return data.id;
             }
             
@@ -4547,9 +4511,7 @@
             try {
                 // 先上传图片（如果有）
                 if (auctionImageBase64) {
-                    console.log('📸 开始保存图片...');
                     imageGistId = await saveImage(auctionId, auctionImageBase64);
-                    console.log('📸 图片保存成功，Gist ID:', imageGistId);
                 }
                 
                 // 获取最新数据
@@ -4599,7 +4561,6 @@
                 });
 
                 const savedGistId = await saveChatRoomData();
-                console.log('✅ 拍品发布成功，Gist ID:', savedGistId);
                 
                 closeAuctionPostModal();
                 renderAuctionsList();
@@ -4627,7 +4588,6 @@
                                 'Authorization': `token ${token}`
                             }
                         });
-                        console.log('🗑️ 已删除上传的图片');
                     } catch (e) {
                         console.warn('删除图片失败:', e);
                     }
@@ -4831,12 +4791,9 @@
                 const auctionId = img.dataset.auctionId;
                 const imageGistId = img.dataset.imageGistId;
                 
-                console.log(`🖼️ 加载图片 - auctionId: ${auctionId}, imageGistId: ${imageGistId}`);
-                
                 // 优先使用 imageGistId 加载图片
                 if (imageGistId) {
                     loadImage(imageGistId).then(base64Url => {
-                        console.log(`🖼️ 图片加载结果 (from Gist ID):`, base64Url ? '成功' : '失败');
                         if (base64Url) {
                             img.src = base64Url;
                         } else {
@@ -4846,7 +4803,6 @@
                 } else {
                     // 兼容旧数据，使用 auctionId 加载
                     loadImage(auctionId).then(base64Url => {
-                        console.log(`🖼️ 图片加载结果 (from auction ID):`, base64Url ? '成功' : '失败');
                         if (base64Url) {
                             img.src = base64Url;
                         } else {
@@ -5109,7 +5065,6 @@
                 auction.bidLockTime = Date.now();
                 auction.bidLockUser = currentChatNick;
                 await saveChatRoomData();
-                console.log(`🔒 出价锁已设置: ${currentChatNick}`);
 
                 const currentBid = auction.bids.length > 0 ? auction.bids[auction.bids.length - 1].amount : auction.startPrice;
                 const currentBidder = auction.bids.length > 0 ? auction.bids[auction.bids.length - 1].bidder : '';
@@ -5197,7 +5152,6 @@
                 });
 
                 await saveChatRoomData();
-                console.log(`🔓 出价锁已释放: ${currentChatNick}`);
 
                 showBidToast(`🎉 出价 ${actualBid} 成功！`, true);
 
@@ -5382,7 +5336,6 @@
                 // 清除本地缓存，强制从服务器获取最新数据
                 const roomId = currentChatRoom || 'default';
                 localStorage.removeItem(`chatroom_gist_${roomId}`);
-                console.log('🔄 手动刷新：已清除缓存，重新获取数据...');
                 
                 await fetchChatRoomData();
                 renderChatMessages();
@@ -5917,8 +5870,6 @@
             autoSaveProject();
             
             // 调试：检查手牌数据
-            console.log('解析后手牌数据:', targetHand);
-            console.log('手牌数量:', targetHand.length);
 
             // 显示结果
             let resultHtml = '';
@@ -6101,7 +6052,7 @@
             resultEl.innerHTML = `
                 <div style="background:rgba(0,0,0,0.3);padding:10px;border-radius:8px;margin-top:5px;">
                     <div style="color:#4caf50;font-weight:bold;margin-bottom:8px;">✅ 活动脚本输出：</div>
-                    <div style="color:#fff;font-family:monospace;white-space:pre-wrap;word-break:break-all;">${output}</div>
+                    <textarea id="activityScriptTextarea" oninput="window._activityScriptOutput=this.value" style="width:100%;min-height:350px;color:#fff;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.2);border-radius:6px;padding:8px;font-family:monospace;font-size:0.85rem;white-space:pre-wrap;word-break:break-all;resize:vertical;">${output.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</textarea>
                     <div style="display:flex;gap:8px;margin-top:10px;">
                         <button onclick="copyActivityScriptOutput()" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.85rem;">📋 复制脚本</button>
                         <button onclick="showSaveScriptDialog('activity')" style="background:linear-gradient(135deg,#2196f3,#1565c0);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.85rem;">💾 保存到项目</button>
@@ -6386,11 +6337,12 @@
             // 显示结果
             resultEl.innerHTML = '<div style="background:rgba(0,0,0,0.3);padding:10px;border-radius:8px;margin-top:5px;">' +
                 '<div style="color:#ff9800;font-weight:bold;margin-bottom:8px;">✅ 副本脚本输出：</div>' +
-                '<div style="color:#fff;font-family:monospace;white-space:pre-wrap;word-break:break-all;">' + output + '</div>' +
+                '<textarea id="dungeonScriptTextarea" oninput="window._dungeonScriptOutput=this.value" style="width:100%;min-height:350px;color:#fff;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.2);border-radius:6px;padding:8px;font-family:monospace;font-size:0.85rem;white-space:pre-wrap;word-break:break-all;resize:vertical;">' + output.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</textarea>' +
+                '<div style="display:flex;gap:8px;margin-top:10px;">' +
                 '<button onclick="copyDungeonScriptOutput()" style="background:linear-gradient(135deg,#ff9800,#e65100);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.85rem;">📋 复制脚本</button>' +
                 '<button onclick="showSaveScriptDialog(\'dungeon\')" style="background:linear-gradient(135deg,#2196f3,#1565c0);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.85rem;">💾 保存到项目</button>' +
                 '<button onclick="shareScriptToWall(\'dungeon\')" style="background:linear-gradient(135deg,#9c27b0,#7b1fa2);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.85rem;">📢 分享到需求墙</button>' +
-                '</div>';
+                '</div></div>';
 
             window._dungeonScriptOutput = output;
         }
@@ -6971,7 +6923,7 @@
 上阵：水灵,死神,幻精灵,小野,龙王,风灵,木精灵,咕咕,火炮,光精灵
 
 ⚠️ 只上前6张卡！要上的卡放在前6个位置，工程卡不算
-🐍 有蛇女时：蛇女会加速第4和第5张卡，请把需要加速的卡放在第4和第5位，蛇女会自动放在第6位" style="width:100%;height:100%;min-height:100px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,215,0,0.2);border-radius:8px;padding:10px;color:#fff;font-size:0.9rem;resize:none;font-family:inherit;box-sizing:border-box;"></textarea>
+🐍 有蛇女时：蛇女会加速第4和第5张卡，请把需要加速的卡放在第4和第5位，蛇女会自动放在第6位" style="width:100%;height:60px;min-height:40px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,215,0,0.2);border-radius:8px;padding:10px;color:#fff;font-size:0.9rem;resize:none;font-family:inherit;box-sizing:border-box;"></textarea>
                 </div>
                 <div style="display:flex;gap:10px;flex-wrap:wrap;">
                     <button onclick="parseTextAndAddCards()" style="flex:1;background:linear-gradient(135deg,#00bcd4,#00838f);color:white;border:none;padding:10px 16px;border-radius:8px;cursor:pointer;font-size:0.9rem;font-weight:500;">🔍 解析并添加</button>
@@ -8232,8 +8184,6 @@
             autoSaveProject();
             
             // 调试：检查手牌数据
-            console.log('窗口解析后手牌数据:', targetHand);
-            console.log('手牌数量:', targetHand.length);
 
             // 显示结果
             let resultHtml = '';
@@ -11476,7 +11426,6 @@ async function createIndexGist(token) {
     if (createResponse.ok) {
         const data = await createResponse.json();
         localStorage.setItem(INDEX_GIST_ID_KEY, data.id);
-        console.log('✅ 已创建新的索引文件:', data.id);
         return `https://api.github.com/gists/${data.id}`;
     }
     
@@ -12433,7 +12382,6 @@ function hasGistToken() {
                         }
                     } else if (response.status === 404 || response.status === 403) {
                         // Gist 不存在或无权限，清除缓存
-                        console.log(`⚠️ Counter Gist ${response.status}，清除缓存`);
                         localStorage.removeItem('counter_gist_id');
                     }
                 }
@@ -12527,7 +12475,6 @@ function hasGistToken() {
                             if (allDates.length > 365) {
                                 const datesToRemove = allDates.slice(0, allDates.length - 365);
                                 datesToRemove.forEach(d => delete fresh.daily_stats[d]);
-                                console.log(`🧹 清理了 ${datesToRemove.length} 天的旧统计数据`);
                             }
                             
                             counterData = fresh;
@@ -12848,7 +12795,6 @@ function hasGistToken() {
                     }
                     // 如果 PATCH 失败（404 或 403），清除 localStorage，尝试从索引获取
                     if (response.status === 404 || response.status === 403) {
-                        console.log(`⚠️ syncCounterDataToGist PATCH 失败 (${response.status})，清除缓存`);
                         localStorage.removeItem('counter_gist_id');
                         counterGistId = null;
                     }
@@ -12874,7 +12820,6 @@ function hasGistToken() {
                                 }
                                 if (checkIndex && checkIndex['counter']) {
                                     counterGistId = checkIndex['counter'];
-                                    console.log(`🔒 syncCounterDataToGist 双重检查发现已有counter Gist: ${counterGistId}`);
                                     localStorage.setItem('counter_gist_id', counterGistId);
                                     // 先尝试从已有Gist获取数据合并，防止数据丢失
                                     try {
@@ -12973,7 +12918,6 @@ function hasGistToken() {
                     // 更新索引文件（含冲突检测）
                     const conflictResult = await updateRoomIndex('counter', responseData.id);
                     if (conflictResult && conflictResult.conflict && conflictResult.existingGistId) {
-                        console.log(`⚠️ counter冲突！删除重复的 ${responseData.id}，使用已有的 ${conflictResult.existingGistId}`);
                         try {
                             await fetch(`https://api.github.com/gists/${responseData.id}`, {
                                 method: 'DELETE',
@@ -13100,7 +13044,6 @@ function hasGistToken() {
                         
                         // 如果 PATCH 失败（404 或 403），清除缓存重新创建
                         if (patchResponse.status === 404 || patchResponse.status === 403) {
-                            console.log(`⚠️ PATCH 失败 (${patchResponse.status})，清除缓存重新创建`);
                             localStorage.removeItem('counter_gist_id');
                             counterGistId = null;
                         }
@@ -13131,7 +13074,6 @@ function hasGistToken() {
                                 }
                                 if (checkIndex && checkIndex['counter']) {
                                     counterGistId = checkIndex['counter'];
-                                    console.log(`🔒 双重检查发现已有counter Gist: ${counterGistId}`);
                                     localStorage.setItem('counter_gist_id', counterGistId);
                                     // 先尝试从已有Gist获取数据合并，防止数据丢失
                                     try {
@@ -13210,7 +13152,6 @@ function hasGistToken() {
                     }
                 }
                 
-                console.log('⚠️ 创建新的统计数据 Gist');
                 const createResponse = await fetch('https://api.github.com/gists', {
                     method: 'POST',
                     headers: {
@@ -13240,7 +13181,6 @@ function hasGistToken() {
                     // 更新索引文件（含冲突检测）
                     const conflictResult = await updateRoomIndex('counter', data.id);
                     if (conflictResult && conflictResult.conflict && conflictResult.existingGistId) {
-                        console.log(`⚠️ counter冲突！删除重复的 ${data.id}，使用已有的 ${conflictResult.existingGistId}`);
                         try {
                             await fetch(`https://api.github.com/gists/${data.id}`, {
                                 method: 'DELETE',
@@ -13259,7 +13199,6 @@ function hasGistToken() {
                             body: JSON.stringify({ files: { 'counter.json': { content: content } } })
                         });
                     }
-                    console.log('✅ 已创建新的统计数据 Gist，GIST_ID:', data.id);
                     return;
                 }
                 
@@ -13528,7 +13467,6 @@ function hasGistToken() {
                         }
                     } else if (response.status === 404 || response.status === 403) {
                         // Gist 不存在或无权限，清除缓存
-                        console.log(`⚠️ Messages Gist ${response.status}，清除缓存`);
                         localStorage.removeItem('messages_gist_id');
                     }
                 }
@@ -13585,14 +13523,6 @@ function hasGistToken() {
                     const urlFileName = msg.scriptUrl.split('/').pop() || '';
                     const isJsonFile = urlFileName.toLowerCase().endsWith('.json');
                     const isBackup = msg.shareType === 'backup' || msg.scriptUrl.includes('backup') || contentHtml.includes('备份') || contentHtml.includes('项目') || isJsonFile;
-                    
-                    console.log('消息识别:', {
-                        url: msg.scriptUrl,
-                        urlFileName,
-                        isJsonFile,
-                        isBackup,
-                        content: msg.content.substring(0, 50)
-                    });
                     
                     if (isBackup) {
                         contentHtml = contentHtml.replace(
@@ -13768,9 +13698,7 @@ function hasGistToken() {
                                 method: 'DELETE',
                                 headers: { 'Authorization': `token ${token}` }
                             });
-                            if (delResp.ok) {
-                                console.log(`🗑️ 已删除关联脚本Gist: ${gistId}`);
-                            } else {
+                            if (!delResp.ok) {
                                 console.warn(`删除脚本Gist失败 (${delResp.status}): ${gistId}`);
                             }
                         } else {
@@ -14169,23 +14097,18 @@ function hasGistToken() {
                 let apiUrl = url;
                 let isRawUrl = url.includes('gist.githubusercontent.com');
                 
-                console.log('原始URL:', url);
-                console.log('是否raw_url:', isRawUrl);
-                
                 if (isRawUrl) {
                     // raw_url 格式: https://gist.githubusercontent.com/user/gist_id/raw/.../filename
                     // 提取 gist_id
                     const match = url.match(/gist\.githubusercontent\.com\/[^\/]+\/([a-zA-Z0-9]+)/i);
                     if (match && match[1]) {
                         apiUrl = `https://api.github.com/gists/${match[1]}`;
-                        console.log('转换后的API URL:', apiUrl);
                     }
                 } else if (url.includes('gist.github.com') && !url.includes('api.github.com')) {
                     // html_url 格式: https://gist.github.com/user/gist_id
                     const match = url.match(/gist\.github\.com\/[^\/]+\/([a-zA-Z0-9]+)/i);
                     if (match && match[1]) {
                         apiUrl = `https://api.github.com/gists/${match[1]}`;
-                        console.log('转换后的API URL:', apiUrl);
                     }
                 }
                 
@@ -14207,8 +14130,6 @@ function hasGistToken() {
                     throw new Error('网络请求失败，请检查网络连接');
                 }
                 
-                console.log('响应状态:', response.status);
-                
                 if (!response.ok) {
                     const errorText = await response.text();
                     console.error('响应错误:', errorText);
@@ -14227,7 +14148,6 @@ function hasGistToken() {
                 } else {
                     // 使用API获取JSON数据
                     const data = await response.json();
-                    console.log('Gist数据:', data);
                     files = data.files;
                 }
                 
@@ -14243,15 +14163,11 @@ function hasGistToken() {
                     
                     // 判断文件类型
                     const isJsonFile = fileName.toLowerCase().endsWith('.json');
-                    console.log('文件名:', fileName, '是否JSON:', isJsonFile);
                     
                     if (isJsonFile) {
                         // 尝试作为备份JSON导入
                         try {
                             const importData = JSON.parse(content);
-                            console.log('解析后的数据:', importData);
-                            console.log('是否有projects:', !!importData.projects, Array.isArray(importData.projects));
-                            console.log('是否有project:', !!importData.project, importData.type);
                             
                             // 支持两种备份格式
                             let projectsToImport = [];
@@ -14693,11 +14609,8 @@ function hasGistToken() {
                 } else {
                     // 使用API获取JSON数据
                     const data = await response.json();
-                    console.log('Gist API响应:', data);
                     const files = data.files;
                     const fileNames = Object.keys(files);
-                    
-                    console.log('文件列表:', fileNames);
                     
                     if (!fileNames || fileNames.length === 0) throw new Error('备份文件为空');
                     
@@ -14705,7 +14618,6 @@ function hasGistToken() {
                     const firstFile = files[fileNames[0]];
                     if (firstFile.truncated) {
                         // 大文件被截断，需要通过raw_url获取完整内容
-                        console.log('文件被截断，通过raw_url获取完整内容');
                         let rawContent = null;
                         // 先不带认证请求（公开Gist可直接访问，避免CORS预检）
                         try {
@@ -14751,12 +14663,7 @@ function hasGistToken() {
                     }
                 }
                 
-                console.log('备份内容前100字符:', backupContent.substring(0, 100));
-                
                 const importData = JSON.parse(backupContent);
-                console.log('解析后的数据:', importData);
-                console.log('projects字段:', importData.projects);
-                console.log('project字段:', importData.project);
                 
                 // 支持两种备份格式
                 let projectsToImport = [];
@@ -15087,7 +14994,6 @@ function hasGistToken() {
                     
                     // 如果 PATCH 失败（404 或 403），清除缓存重新创建
                     if (response.status === 404 || response.status === 403) {
-                        console.log(`⚠️ PATCH 失败 (${response.status})，清除缓存重新创建`);
                         localStorage.removeItem('messages_gist_id');
                         messagesGistId = null;
                     } else {
@@ -15118,7 +15024,6 @@ function hasGistToken() {
                             const checkIndex = JSON.parse(checkData.files['room_index.json'].content);
                             if (checkIndex['messages']) {
                                 messagesGistId = checkIndex['messages'];
-                                console.log(`🔒 双重检查发现已有messages Gist: ${messagesGistId}`);
                                 localStorage.setItem('messages_gist_id', messagesGistId);
                                 const existResp = await fetch(`https://api.github.com/gists/${messagesGistId}`, {
                                     method: 'PATCH',
@@ -15164,12 +15069,10 @@ function hasGistToken() {
             const data = await response.json();
             // 保存 GIST_ID 到 localStorage
             localStorage.setItem('messages_gist_id', data.id);
-            console.log(`已创建需求墙配置文件，GIST_ID: ${data.id}`);
             
             // 更新索引文件（含冲突检测）
             const conflictResult = await updateRoomIndex('messages', data.id);
             if (conflictResult && conflictResult.conflict && conflictResult.existingGistId) {
-                console.log(`⚠️ messages冲突！删除重复的 ${data.id}，使用已有的 ${conflictResult.existingGistId}`);
                 try {
                     await fetch(`https://api.github.com/gists/${data.id}`, {
                         method: 'DELETE',
@@ -15732,7 +15635,6 @@ function hasGistToken() {
                                                 method: 'DELETE',
                                                 headers: { 'Authorization': `token ${token}` }
                                             });
-                                            console.log(`🗑️ 已删除图片: ${auction.imageGistId}`);
                                         } catch (e) {
                                             console.warn(`删除图片失败: ${auction.imageGistId}`, e);
                                         }
@@ -15748,7 +15650,6 @@ function hasGistToken() {
                             method: 'DELETE',
                             headers: { 'Authorization': `token ${token}` }
                         });
-                        console.log(`🗑️ 已删除房间配置: ${roomGistId}`);
                     } catch (e) {
                         console.warn(`删除房间配置失败: ${roomGistId}`, e);
                     }
@@ -16439,7 +16340,6 @@ function hasGistToken() {
                             method: 'DELETE',
                             headers: { 'Authorization': `token ${token}` }
                         });
-                        console.log(`🗑️ 已删除商品图片: ${auction.imageGistId}`);
                     } catch (e) {
                         console.warn('删除图片失败:', e);
                     }
