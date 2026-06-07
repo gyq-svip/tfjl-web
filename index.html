@@ -6057,10 +6057,12 @@
             const hasBingJingLing = heroNames.some(name => name.includes('冰精灵'));
             // 检查是否有魔精灵、光精灵、木精灵、魂精灵
             const hasMoJingLing = heroNames.some(name => name.includes('魔精灵'));
+            const hasLongWang = heroNames.some(name => name.includes('龙王'));
             const hasGuangJingLing = heroNames.some(name => name.includes('光精灵'));
             const hasMuJingLing = heroNames.some(name => name.includes('木精灵'));
             const hasHunJingLing = heroNames.some(name => name.includes('魂精灵'));
             const hasLeiJingLing = heroNames.some(name => name.includes('雷精灵'));
+            const hasHuanJingLing = heroNames.some(name => name.includes('幻精灵'));
             // 检查是否有蛇女
             const hasSheNv = heroNames.some(name => name.includes('蛇女'));
             // 检查是否有飞机和大圣（同排机制）
@@ -6130,6 +6132,11 @@
                 output += '00:25,每0.1秒共20次光精灵,关闭验光\n';
             }
 
+            // 龙王：没有魔精灵时，00:20下龙王上龙王不满
+            if (hasLongWang && !hasMoJingLing) {
+                output += '00:20,下龙王,上龙王不满,\n';
+            }
+
             // 同排机制：飞机+大圣
             if (hasTongPai) {
                 if (hasGuangJingLing) {
@@ -6147,6 +6154,11 @@
             if (hasHunJingLing) jingLing01_25.push('每3秒共5000次魂精灵');
             if (jingLing01_25.length > 0) {
                 output += '01:25,' + jingLing01_25.join(',') + ',\n';
+            }
+
+            // 龙王+幻精灵同时存在时，01:40重复01:25的精灵操作并加换强袭
+            if (hasLongWang && hasHuanJingLing && jingLing01_25.length > 0) {
+                output += '01:40,' + jingLing01_25.join(',') + ',换强袭,\n';
             }
 
             // 如果有冰精灵，添加额外输出（空一行）
