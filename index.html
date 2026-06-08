@@ -19207,7 +19207,7 @@ function hasGistToken() {
     </div>
 
     <!-- 统计数据栏 -->
-    <div id="statsBar" style="position:fixed;bottom:0;left:0;right:0;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);border-top:2px solid rgba(255,215,0,0.5);padding:8px 20px;z-index:9990;display:none;justify-content:center;align-items:center;gap:20px;font-size:0.82rem;">
+    <div id="statsBar" style="position:fixed;bottom:0;left:0;right:0;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);border-top:2px solid rgba(255,215,0,0.5);padding:8px 20px;z-index:9990;display:flex;justify-content:center;align-items:center;gap:20px;font-size:0.82rem;">
         <div style="display:flex;gap:18px;flex-wrap:wrap;justify-content:center;">
             <div style="color:#fff;display:flex;align-items:center;gap:4px;">
                 <span style="color:#4ecdc4;">⏱️</span>
@@ -19220,18 +19220,6 @@ function hasGistToken() {
             <div style="color:#fff;display:flex;align-items:center;gap:4px;">
                 <span style="color:#4ecdc4;">👤</span>
                 <span>用户: <strong id="statUsers" style="color:#ffd700;">-</strong></span>
-            </div>
-            <div style="color:#fff;display:flex;align-items:center;gap:4px;">
-                <span style="color:#4ade80;">🆕</span>
-                <span>今日: <strong id="statTodayNew" style="color:#4ade80;">0</strong></span>
-            </div>
-            <div style="color:#fff;display:flex;align-items:center;gap:4px;">
-                <span style="color:#60a5fa;">📅</span>
-                <span>本周: <strong id="statWeekNew" style="color:#60a5fa;">0</strong></span>
-            </div>
-            <div style="color:#fff;display:flex;align-items:center;gap:4px;">
-                <span style="color:#a78bfa;">🗓️</span>
-                <span>本月: <strong id="statMonthNew" style="color:#a78bfa;">0</strong></span>
             </div>
             <div style="color:#fff;display:flex;align-items:center;gap:4px;">
                 <span style="color:#4ecdc4;">🟢</span>
