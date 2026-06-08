@@ -323,8 +323,8 @@
             display: flex;
             justify-content: center;
             align-items: flex-start;
-            gap: 100px;
-            margin: 8px 0;
+            gap: 30px;
+            margin: 4px 0;
             width: 100%;
             max-width: 950px;
             margin-left: auto;
@@ -335,8 +335,8 @@
             display: flex;
             justify-content: center;
             align-items: flex-start;
-            gap: 60px;
-            margin: 8px 0;
+            gap: 30px;
+            margin: 4px 0;
             width: 100%;
             max-width: 950px;
             margin-left: auto;
@@ -344,7 +344,7 @@
         }
 
         .battle-column {
-            flex: 0 0 441px;
+            flex: 0 0 auto;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -352,8 +352,8 @@
 
         .battle-column h4 {
             text-align: center;
-            margin-bottom: 12px;
-            font-size: 1rem;
+            margin-bottom: 6px;
+            font-size: 0.9rem;
         }
 
         .user-column h4 { color: #4fc3f7; }
@@ -379,6 +379,7 @@
             width: 85px;
             box-sizing: border-box;
             margin-left: 0;
+            margin-bottom: 2px;
         }
 
         .battle-slots {
@@ -392,11 +393,11 @@
             background: rgba(255,255,255,0.05);
             border: 2px dashed rgba(255,255,255,0.2);
             border-radius: 8px;
-            padding: 8px 6px;
+            padding: 5px 4px;
             text-align: center;
             font-size: 0.8rem;
             color: rgba(255,255,255,0.4);
-            min-height: 40px;
+            min-height: 32px;
             min-width: 85px;
             max-width: 85px;
             width: 85px;
@@ -18205,7 +18206,7 @@ function hasGistToken() {
             }
 
             const today = getTodayString();
-            const todayStats = counterData.daily_stats[today] || { visits: 0, downloads: 0 };
+            const todayStats = counterData.daily_stats[today] || { visits: 0, downloads: 0, new_users: 0 };
             const pendingCount = loadPendingSync().length;
             const totalUsers = counterData.total_users || 0;
             const activeToday = counterData.active_today || 0;
@@ -18222,6 +18223,24 @@ function hasGistToken() {
             }
             const onlineTimeoutMinutes = Math.round((counterData.online_timeout || 3600000) / 60000);
 
+            // 计算本周/本月新增用户
+            const now = new Date();
+            const todayNew = todayStats.new_users || 0;
+            let weekNew = 0;
+            let monthNew = 0;
+            const weekAgo = new Date(now);
+            weekAgo.setDate(weekAgo.getDate() - 7);
+            const monthAgo = new Date(now);
+            monthAgo.setDate(monthAgo.getDate() - 30);
+            if (counterData.daily_stats) {
+                for (const date in counterData.daily_stats) {
+                    const d = new Date(date);
+                    const nu = counterData.daily_stats[date].new_users || 0;
+                    if (d >= weekAgo) weekNew += nu;
+                    if (d >= monthAgo) monthNew += nu;
+                }
+            }
+
             content.innerHTML = `
                 <div class="admin-section">
                     ${pendingCount > 0 ? `<div style="color:#ff9800;margin-bottom:10px;">⚠️ 有 ${pendingCount} 条数据等待同步</div>` : ''}
@@ -18232,6 +18251,14 @@ function hasGistToken() {
                         <div>• 当前在线：<span style="color:#4ade80;">${onlineCount}</span> <span style="color:rgba(255,255,255,0.35);font-size:0.8rem;">(${onlineTimeoutMinutes}分钟内活跃)</span></div>
                         <div>• 今日活跃：<span style="color:#4ade80;">${activeToday}</span></div>
                         <div>• 总下载次数：<span style="color:#ffd700;">${counterData.total_downloads}</span></div>
+                    </div>
+                </div>
+                <div class="admin-section">
+                    <h3 style="color:#4ade80;">🆕 新增用户</h3>
+                    <div style="padding-left:20px;line-height:2;">
+                        <div>• 今日新增：<span style="color:#4ade80;">${todayNew}</span></div>
+                        <div>• 本周新增：<span style="color:#60a5fa;">${weekNew}</span></div>
+                        <div>• 本月新增：<span style="color:#a78bfa;">${monthNew}</span></div>
                     </div>
                 </div>
                 <div class="admin-section">
@@ -19180,7 +19207,7 @@ function hasGistToken() {
     </div>
 
     <!-- 统计数据栏 -->
-    <div id="statsBar" style="position:fixed;bottom:0;left:0;right:0;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);border-top:2px solid rgba(255,215,0,0.5);padding:8px 20px;z-index:9990;display:flex;justify-content:center;align-items:center;gap:20px;font-size:0.82rem;">
+    <div id="statsBar" style="position:fixed;bottom:0;left:0;right:0;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);border-top:2px solid rgba(255,215,0,0.5);padding:8px 20px;z-index:9990;display:none;justify-content:center;align-items:center;gap:20px;font-size:0.82rem;">
         <div style="display:flex;gap:18px;flex-wrap:wrap;justify-content:center;">
             <div style="color:#fff;display:flex;align-items:center;gap:4px;">
                 <span style="color:#4ecdc4;">⏱️</span>
