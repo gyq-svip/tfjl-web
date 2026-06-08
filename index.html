@@ -6161,8 +6161,10 @@
             output += `00:01,${qiangZhiStr}${tongPaiStr}${shangKaStr}\n`;
             
             // 如果有光精灵，添加光精灵输出
+            // 光精灵次数 = 20 - 魔化卡数量（最少1次）
             if (hasGuangJingLing) {
-                output += '00:25,每0.1秒共20次光精灵,关闭验光\n';
+                const guangJingLingCount = Math.max(1, 20 - moHuaCards.length);
+                output += `00:25,每0.1秒共${guangJingLingCount}次光精灵,关闭验光\n`;
             }
 
             // 龙王：没有魔精灵时，01:20下龙王上龙王不满
