@@ -12638,7 +12638,8 @@ function hasGistToken() {
                 
                 // 确保在线用户对象存在
                 if (!counterData.online_users) counterData.online_users = {};
-                if (!counterData.online_timeout) counterData.online_timeout = 3600000;
+                // 强制更新在线时间为60分钟（兼容旧数据）
+                if (!counterData.online_timeout || counterData.online_timeout === 7200000) counterData.online_timeout = 3600000;
                 
                 // 记录用户最后活跃时间（用于计算在线用户）
                 counterData.online_users[deviceId] = Date.now();
