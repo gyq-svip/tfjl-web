@@ -240,15 +240,15 @@
             background: rgba(255,255,255,0.1);
             backdrop-filter: blur(10px);
             border-radius: 20px;
-            padding: 25px;
-            margin-bottom: 30px;
+            padding: 15px 20px;
+            margin-bottom: 15px;
             border: 2px solid rgba(255,215,0,0.3);
         }
 
         .selection-area h2 {
             color: #ffd700;
-            margin-bottom: 20px;
-            font-size: 1.5rem;
+            margin-bottom: 10px;
+            font-size: 1.3rem;
             display: flex;
             align-items: center;
             gap: 10px;
@@ -7058,10 +7058,10 @@
         <input type="file" id="txtFileInput" accept=".txt,.js,.json,.lua,.py,.sh" multiple style="display:none;" onchange="handleTxtFileUpload(this)">
 
         <div class="selection-area">
-            <div style="text-align: center;">
-                <button class="reset-btn" onclick="resetAll()">🔄 重置选择</button>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                <h2 style="margin:0;">⚔️ 出战选择</h2>
+                <button onclick="resetAll()" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:0.75rem;">🔄 重置</button>
             </div>
-            <h2>⚔️ 出战选择</h2>
             
             <div class="battle-field">
                 <div class="battle-column user-column">
