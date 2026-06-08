@@ -12394,7 +12394,7 @@ function hasGistToken() {
                 active_today_users: [],
                 active_date: today,
                 online_users: {},
-                online_timeout: 7200000,
+                online_timeout: 3600000,
                 daily_stats: {
                     [today]: {
                         visits: 0,
@@ -12478,7 +12478,7 @@ function hasGistToken() {
                             if (parsed.total_visits === undefined) parsed.total_visits = 0;
                             if (parsed.total_downloads === undefined) parsed.total_downloads = 0;
                             if (!parsed.online_users) parsed.online_users = {};
-                            if (!parsed.online_timeout) parsed.online_timeout = 7200000;
+                            if (!parsed.online_timeout) parsed.online_timeout = 3600000;
                             
                             // 检查日期是否变化，如果新的一天则清空今日活跃用户
                             const today = getTodayString();
@@ -12581,7 +12581,7 @@ function hasGistToken() {
                             if (fresh.total_users === undefined || fresh.total_users === null) fresh.total_users = fresh.unique_users ? fresh.unique_users.length : 0;
                             if (fresh.total_downloads === undefined || fresh.total_downloads === null) fresh.total_downloads = 0;
                             if (fresh.active_today === undefined || fresh.active_today === null) fresh.active_today = fresh.active_today_users ? fresh.active_today_users.length : 0;
-                            if (!fresh.online_timeout) fresh.online_timeout = 7200000;
+                            if (!fresh.online_timeout) fresh.online_timeout = 3600000;
                             if (!fresh.active_date) fresh.active_date = getTodayString();
                             // 确保 unique_users 和 active_today_users 是数组
                             if (!Array.isArray(fresh.unique_users)) fresh.unique_users = [];
@@ -12619,9 +12619,11 @@ function hasGistToken() {
                 if (!counterData.daily_stats[today]) {
                     counterData.daily_stats[today] = {
                         visits: 0,
-                        downloads: 0
+                        downloads: 0,
+                        new_users: 0
                     };
                 }
+                if (!counterData.daily_stats[today].new_users) counterData.daily_stats[today].new_users = 0;
                 // 确保 unique_users 和 active_today_users 数组存在
                 if (!counterData.unique_users) counterData.unique_users = [];
                 if (!counterData.active_today_users) counterData.active_today_users = [];
@@ -12635,7 +12637,7 @@ function hasGistToken() {
                 
                 // 确保在线用户对象存在
                 if (!counterData.online_users) counterData.online_users = {};
-                if (!counterData.online_timeout) counterData.online_timeout = 7200000;
+                if (!counterData.online_timeout) counterData.online_timeout = 3600000;
                 
                 // 记录用户最后活跃时间（用于计算在线用户）
                 counterData.online_users[deviceId] = Date.now();
@@ -12659,6 +12661,7 @@ function hasGistToken() {
                         if (!counterData.unique_users.includes(deviceId)) {
                             counterData.unique_users.push(deviceId);
                             counterData.total_users = counterData.unique_users.length;
+                            counterData.daily_stats[today].new_users++;
                         }
                         
                         // 记录今日活跃用户
@@ -12730,7 +12733,7 @@ function hasGistToken() {
                 if (!remoteData.total_users) remoteData.total_users = remoteData.unique_users.length;
                 if (!remoteData.active_today) remoteData.active_today = remoteData.active_today_users.length;
                 if (!remoteData.online_users) remoteData.online_users = {};
-                if (!remoteData.online_timeout) remoteData.online_timeout = 7200000;
+                if (!remoteData.online_timeout) remoteData.online_timeout = 3600000;
                 if (!remoteData.total_visits) remoteData.total_visits = 0;
                 if (!remoteData.total_downloads) remoteData.total_downloads = 0;
                 
@@ -13382,16 +13385,40 @@ function hasGistToken() {
             const usersEl = document.getElementById('statUsers');
             const onlineEl = document.getElementById('statOnline');
             const downloadEl = document.getElementById('statDownloads');
+            const todayNewEl = document.getElementById('statTodayNew');
+            const weekNewEl = document.getElementById('statWeekNew');
+            const monthNewEl = document.getElementById('statMonthNew');
             
             // 计算在线用户数（清理过期用户后）
             let onlineCount = 0;
             if (counterData.online_users) {
                 const now = Date.now();
-                const timeout = counterData.online_timeout || 7200000;
+                const timeout = counterData.online_timeout || 3600000;
                 for (const id in counterData.online_users) {
                     if (now - counterData.online_users[id] <= timeout) {
                         onlineCount++;
                     }
+                }
+            }
+            
+            // 计算今日/本周/本月新增用户
+            const today = getTodayString();
+            const now = new Date();
+            const todayNew = (counterData.daily_stats[today] && counterData.daily_stats[today].new_users) || 0;
+            
+            let weekNew = 0;
+            let monthNew = 0;
+            const weekAgo = new Date(now);
+            weekAgo.setDate(weekAgo.getDate() - 7);
+            const monthAgo = new Date(now);
+            monthAgo.setDate(monthAgo.getDate() - 30);
+            
+            if (counterData.daily_stats) {
+                for (const date in counterData.daily_stats) {
+                    const d = new Date(date);
+                    const nu = counterData.daily_stats[date].new_users || 0;
+                    if (d >= weekAgo) weekNew += nu;
+                    if (d >= monthAgo) monthNew += nu;
                 }
             }
             
@@ -13400,6 +13427,9 @@ function hasGistToken() {
             if (usersEl) usersEl.textContent = counterData.total_users || 0;
             if (onlineEl) onlineEl.textContent = onlineCount;
             if (downloadEl) downloadEl.textContent = counterData.total_downloads || 0;
+            if (todayNewEl) todayNewEl.textContent = todayNew;
+            if (weekNewEl) weekNewEl.textContent = weekNew;
+            if (monthNewEl) monthNewEl.textContent = monthNew;
         }
         
         // 计算网站运行时长（从2026年5月20日开始）
@@ -15249,14 +15279,14 @@ function hasGistToken() {
             let onlineCount = 0;
             if (counterData.online_users) {
                 const now = Date.now();
-                const timeout = counterData.online_timeout || 7200000;
+                const timeout = counterData.online_timeout || 3600000;
                 for (const id in counterData.online_users) {
                     if (now - counterData.online_users[id] <= timeout) {
                         onlineCount++;
                     }
                 }
             }
-            const onlineTimeoutMinutes = Math.round((counterData.online_timeout || 7200000) / 60000);
+            const onlineTimeoutMinutes = Math.round((counterData.online_timeout || 3600000) / 60000);
             
             let statsHtml = `
                 <div style="text-align:left;line-height:1.8;">
@@ -18183,14 +18213,14 @@ function hasGistToken() {
             let onlineCount = 0;
             if (counterData.online_users) {
                 const now = Date.now();
-                const timeout = counterData.online_timeout || 7200000;
+                const timeout = counterData.online_timeout || 3600000;
                 for (const id in counterData.online_users) {
                     if (now - counterData.online_users[id] <= timeout) {
                         onlineCount++;
                     }
                 }
             }
-            const onlineTimeoutMinutes = Math.round((counterData.online_timeout || 7200000) / 60000);
+            const onlineTimeoutMinutes = Math.round((counterData.online_timeout || 3600000) / 60000);
 
             content.innerHTML = `
                 <div class="admin-section">
@@ -19150,25 +19180,37 @@ function hasGistToken() {
     </div>
 
     <!-- 统计数据栏 -->
-    <div id="statsBar" style="position:fixed;bottom:0;left:0;right:0;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);border-top:2px solid rgba(255,215,0,0.5);padding:10px 20px;z-index:9990;display:flex;justify-content:center;align-items:center;gap:30px;font-size:0.9rem;">
-        <div style="display:flex;gap:25px;flex-wrap:wrap;justify-content:center;">
-            <div style="color:#fff;display:flex;align-items:center;gap:6px;">
+    <div id="statsBar" style="position:fixed;bottom:0;left:0;right:0;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);border-top:2px solid rgba(255,215,0,0.5);padding:8px 20px;z-index:9990;display:flex;justify-content:center;align-items:center;gap:20px;font-size:0.82rem;">
+        <div style="display:flex;gap:18px;flex-wrap:wrap;justify-content:center;">
+            <div style="color:#fff;display:flex;align-items:center;gap:4px;">
                 <span style="color:#4ecdc4;">⏱️</span>
                 <span>运行: <strong id="statRuntime" style="color:#ffd700;">-</strong></span>
             </div>
-            <div style="color:#fff;display:flex;align-items:center;gap:6px;">
+            <div style="color:#fff;display:flex;align-items:center;gap:4px;">
                 <span style="color:#4ecdc4;">👁️</span>
                 <span>访问: <strong id="statVisits" style="color:#ffd700;">-</strong></span>
             </div>
-            <div style="color:#fff;display:flex;align-items:center;gap:6px;">
+            <div style="color:#fff;display:flex;align-items:center;gap:4px;">
                 <span style="color:#4ecdc4;">👤</span>
                 <span>用户: <strong id="statUsers" style="color:#ffd700;">-</strong></span>
             </div>
-            <div style="color:#fff;display:flex;align-items:center;gap:6px;">
-                <span style="color:#4ecdc4;">🟢</span>
-                <span title="最近10分钟内活跃的用户数">在线: <strong id="statOnline" style="color:#ffd700;">-</strong></span>
+            <div style="color:#fff;display:flex;align-items:center;gap:4px;">
+                <span style="color:#4ade80;">🆕</span>
+                <span>今日: <strong id="statTodayNew" style="color:#4ade80;">0</strong></span>
             </div>
-            <div style="color:#fff;display:flex;align-items:center;gap:6px;">
+            <div style="color:#fff;display:flex;align-items:center;gap:4px;">
+                <span style="color:#60a5fa;">📅</span>
+                <span>本周: <strong id="statWeekNew" style="color:#60a5fa;">0</strong></span>
+            </div>
+            <div style="color:#fff;display:flex;align-items:center;gap:4px;">
+                <span style="color:#a78bfa;">🗓️</span>
+                <span>本月: <strong id="statMonthNew" style="color:#a78bfa;">0</strong></span>
+            </div>
+            <div style="color:#fff;display:flex;align-items:center;gap:4px;">
+                <span style="color:#4ecdc4;">🟢</span>
+                <span title="60分钟内活跃的用户数">在线: <strong id="statOnline" style="color:#ffd700;">-</strong></span>
+            </div>
+            <div style="color:#fff;display:flex;align-items:center;gap:4px;">
                 <span style="color:#4ecdc4;">📥</span>
                 <span>下载: <strong id="statDownloads" style="color:#ffd700;">-</strong></span>
             </div>
