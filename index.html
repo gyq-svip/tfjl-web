@@ -6010,6 +6010,7 @@
             let heroNames = [];
             let zhenZhanLine = '';
             let otherLines = []; // 魔化、皮肤、主战车、副战车等行
+            let moHuaCards = []; // 魔化的卡牌列表
             
             lines.forEach((line, index) => {
                 if (line.match(/^上阵[：:]/)) {
@@ -6018,7 +6019,14 @@
                     if (match && match[1]) {
                         heroNames = match[1].split(/[,，]/).map(name => name.trim()).filter(name => name);
                     }
-                } else if (line.match(/^(魔化|皮肤|主战车|副战车)[：:]/)) {
+                } else if (line.match(/^魔化[：:]/)) {
+                    otherLines.push(line);
+                    // 提取魔化的卡牌名称
+                    const match = line.match(/魔化[：:]\s*(.+)/);
+                    if (match && match[1]) {
+                        moHuaCards = match[1].split(/[,，]/).map(name => name.trim()).filter(name => name);
+                    }
+                } else if (line.match(/^(皮肤|主战车|副战车)[：:]/)) {
                     otherLines.push(line);
                 } else if (index === 0 && !line.match(/^(魔化|皮肤|主战车|副战车)[：:]/)) {
                     // 没有"上阵："前缀时，直接解析第一行作为卡牌列表
@@ -6093,9 +6101,11 @@
             output += '\n';
             
             // 构建上卡字符串
-            // 如果有光精灵就上3级，否则上满
+            // 如果有光精灵就上3级（魔化的卡上4级），否则上满
             let shangKaStr = '';
-            const levelStr = hasGuangJingLing ? '3级' : '满';
+            
+            // 辅助函数：判断卡牌是否在魔化列表中
+            const isMoHua = (name) => moHuaCards.some(mh => name.includes(mh) || mh.includes(name));
             
             // 如果有蛇女，蛇女固定在第6位
             if (hasSheNv) {
@@ -6103,21 +6113,43 @@
                 const cardsWithoutSheNv = filteredCards.filter(name => !name.includes('蛇女'));
                 const first5 = cardsWithoutSheNv.slice(0, 5);
                 first5.forEach(name => {
-                    shangKaStr += `上${name}${levelStr},`;
+                    if (hasGuangJingLing) {
+                        // 有光精灵：魔化的卡上4级，其他上3级
+                        const level = isMoHua(name) ? '4级' : '3级';
+                        shangKaStr += `上${name}${level},`;
+                    } else {
+                        shangKaStr += `上${name}满,`;
+                    }
                 });
                 // 蛇女放在第6位
-                shangKaStr += `上蛇女${levelStr},`;
+                if (hasGuangJingLing) {
+                    const sheNvLevel = isMoHua('蛇女') ? '4级' : '3级';
+                    shangKaStr += `上蛇女${sheNvLevel},`;
+                } else {
+                    shangKaStr += `上蛇女满,`;
+                }
             } else {
                 // 没有蛇女，正常上卡
                 first6.forEach(name => {
-                    shangKaStr += `上${name}${levelStr},`;
+                    if (hasGuangJingLing) {
+                        // 有光精灵：魔化的卡上4级，其他上3级
+                        const level = isMoHua(name) ? '4级' : '3级';
+                        shangKaStr += `上${name}${level},`;
+                    } else {
+                        shangKaStr += `上${name}满,`;
+                    }
                 });
             }
             
             // 工程卡加在最后（第7位）
             if (hasGongCheng) {
                 gongChengCards.forEach(name => {
-                    shangKaStr += `上${name}${levelStr},`;
+                    if (hasGuangJingLing) {
+                        const level = isMoHua(name) ? '4级' : '3级';
+                        shangKaStr += `上${name}${level},`;
+                    } else {
+                        shangKaStr += `上${name}满,`;
+                    }
                 });
             }
 
