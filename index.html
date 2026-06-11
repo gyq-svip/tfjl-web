@@ -15218,13 +15218,12 @@ function hasGistToken() {
                 }
             }
             
-            // 【空数据保护】如果远程有数据但本地为空，阻止保存
-            if (existingMessages.length > 0 && wallMessages.length === 0) {
+            // 【空数据保护】如果远程有数据但本地为空，阻止保存（但删除操作除外）
+            const isDeleteOperation = wallMessages.length < existingMessages.length;
+            
+            if (existingMessages.length > 0 && wallMessages.length === 0 && !isDeleteOperation) {
                 throw new Error('⚠️ 数据保护：检测到远程有 ' + existingMessages.length + ' 条消息，但本地数据为空。\n\n可能原因：网络问题导致数据加载失败。\n\n请刷新页面重新加载，或联系管理员从备份还原数据。');
             }
-            
-            // 【删除操作检测】如果本地消息数量比远程少，说明是删除操作，不合并远程数据
-            const isDeleteOperation = wallMessages.length < existingMessages.length;
             
             let finalMessages;
             if (isDeleteOperation) {
