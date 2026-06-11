@@ -13924,7 +13924,7 @@ function hasGistToken() {
             renderMessages();
             
             try {
-                await saveMessagesToGist();
+                await saveMessagesToGist(true); // 强制保存，跳过合并逻辑
             } catch (error) {
                 console.error('删除消息失败:', error);
                 alert('删除失败，请稍后重试');
@@ -15172,7 +15172,7 @@ function hasGistToken() {
             });
         }
         
-        async function saveMessagesToGist() {
+        async function saveMessagesToGist(forceSave = false) {
             const token = getGistToken();
             if (!token) throw new Error('无Token');
 
@@ -15180,8 +15180,9 @@ function hasGistToken() {
             let messagesGistId = MESSAGES_GIST_ID || localStorage.getItem('messages_gist_id');
             
             // 【安全检查】保存前先从 Gist 获取现有消息，防止覆盖丢失
+            // 但如果是强制保存（删除操作），跳过合并逻辑
             let existingMessages = [];
-            if (messagesGistId) {
+            if (!forceSave && messagesGistId) {
                 try {
                     const existResp = await fetch(`https://api.github.com/gists/${messagesGistId}`, {
                         headers: {
@@ -15218,15 +15219,18 @@ function hasGistToken() {
                 }
             }
             
-            // 【空数据保护】如果远程有数据但本地为空，阻止保存（但删除操作除外）
-            const isDeleteOperation = wallMessages.length < existingMessages.length;
-            
-            if (existingMessages.length > 0 && wallMessages.length === 0 && !isDeleteOperation) {
+            // 【空数据保护】如果远程有数据但本地为空，阻止保存
+            // 但强制保存（删除操作）除外
+            if (!forceSave && existingMessages.length > 0 && wallMessages.length === 0) {
                 throw new Error('⚠️ 数据保护：检测到远程有 ' + existingMessages.length + ' 条消息，但本地数据为空。\n\n可能原因：网络问题导致数据加载失败。\n\n请刷新页面重新加载，或联系管理员从备份还原数据。');
             }
             
             let finalMessages;
-            if (isDeleteOperation) {
+            if (forceSave) {
+                // 强制保存（删除操作）：直接使用本地数据，不合并
+                finalMessages = wallMessages.slice(0, MAX_MESSAGES);
+                console.log('强制保存：本地', wallMessages.length, '条');
+            } else if (wallMessages.length < existingMessages.length) {
                 // 删除操作：直接使用本地数据，不合并远程
                 finalMessages = wallMessages.slice(0, MAX_MESSAGES);
                 console.log('删除操作：本地', wallMessages.length, '条，远程', existingMessages.length, '条，直接使用本地数据');
