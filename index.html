@@ -11014,6 +11014,12 @@
         
         // ==================== 减伤记录功能 ====================
         let damageReductionData = {}; // 存储减伤数据 { 卡牌名: 减伤数值 }
+        let specialDamageReduction = { // 特殊减伤参数（技能减伤，与洗炼不冲突）
+            "战车": 0,
+            "小野": 0,
+            "酋长": 0,
+            "宝库": 0
+        };
         
         // 加载减伤数据
         function loadDamageReductionData() {
@@ -11025,11 +11031,21 @@
                     damageReductionData = {};
                 }
             }
+            
+            const savedSpecial = localStorage.getItem('tdjl_specialDamageReduction');
+            if (savedSpecial) {
+                try {
+                    specialDamageReduction = JSON.parse(savedSpecial);
+                } catch (e) {
+                    specialDamageReduction = { "战车": 0, "小野": 0, "酋长": 0, "宝库": 0 };
+                }
+            }
         }
         
         // 保存减伤数据
         function saveDamageReductionData() {
             localStorage.setItem('tdjl_damageReduction', JSON.stringify(damageReductionData));
+            localStorage.setItem('tdjl_specialDamageReduction', JSON.stringify(specialDamageReduction));
         }
         
         // 显示减伤记录弹窗
@@ -11037,7 +11053,7 @@
             loadDamageReductionData();
             
             // 获取所有职业分类（排除精灵类 pokeball）
-            const professions = ['战士', '法师', '弓箭手', '召唤师', '熊猫', '牧师', '工程'];
+            const professions = ['战士', '法师', '弓箭手', '召唤师', '熊猫', '牧师', '术士', '工程'];
             const professionNames = {
                 '战士': 'warrior',
                 '法师': 'mage',
@@ -11045,6 +11061,7 @@
                 '召唤师': 'summoner',
                 '熊猫': 'panda',
                 '牧师': 'priest',
+                '术士': 'warlock',
                 '工程': 'engineering'
             };
             
@@ -11054,56 +11071,133 @@
                 cardsByProfession[prof] = [];
             });
             
-            // 从卡牌数据中获取（需要找到卡牌定义）
-            // 这里先使用常见的卡牌列表
+            // 完整的99张英雄卡列表（排除精灵卡）
             const allCards = [
-                { name: '小野酋长', profession: 'priest' },
+                // 金卡 - 战士
+                { name: '战将', profession: 'warrior' },
+                { name: '刀客', profession: 'warrior' },
+                { name: '霸王', profession: 'warrior' },
+                { name: '狂龙', profession: 'warrior' },
+                { name: '亡将', profession: 'warrior' },
+                { name: '领主', profession: 'warrior' },
+                { name: '孤星', profession: 'warrior' },
+                { name: '狂将', profession: 'warrior' },
+                { name: '龙拳', profession: 'warrior' },
+                { name: '鱼人', profession: 'warrior' },
+                // 金卡 - 法师
+                { name: '小丑', profession: 'mage' },
+                { name: '女妖', profession: 'mage' },
+                { name: '雷神', profession: 'mage' },
+                { name: '谜云', profession: 'mage' },
+                { name: '女王', profession: 'mage' },
+                { name: '沙皇', profession: 'mage' },
+                { name: '龟相', profession: 'mage' },
+                { name: '阿翼', profession: 'mage' },
+                { name: '火神', profession: 'mage' },
+                { name: '凤凰', profession: 'mage' },
+                // 金卡 - 弓箭手
+                { name: '蛇女', profession: 'archer' },
+                { name: '炸弹', profession: 'archer' },
+                { name: '虎弓', profession: 'archer' },
+                { name: '毒王', profession: 'archer' },
+                { name: '后羿', profession: 'archer' },
+                { name: '船长', profession: 'archer' },
+                { name: '爱神', profession: 'archer' },
+                { name: '小炮', profession: 'archer' },
+                // 金卡 - 召唤师
+                { name: '恶魔', profession: 'summoner' },
+                { name: '幽灵', profession: 'summoner' },
+                { name: '神龙', profession: 'summoner' },
+                { name: '龙王', profession: 'summoner' },
+                { name: '钟馗', profession: 'summoner' },
+                // 金卡 - 牧师
                 { name: '咕咕', profession: 'priest' },
-                { name: '死神', profession: 'priest' },
+                { name: '小野', profession: 'priest' },
+                { name: '圣骑', profession: 'priest' },
+                { name: '鮫女', profession: 'priest' },
+                { name: '天使', profession: 'priest' },
+                // 金卡 - 术士
+                { name: '影', profession: 'warlock' },
+                { name: '魇', profession: 'warlock' },
+                { name: '葵', profession: 'warlock' },
+                { name: '愧', profession: 'warlock' },
+                { name: '邪', profession: 'warlock' },
+                { name: '大圣', profession: 'warlock' },
+                // 金卡 - 熊猫
                 { name: '萌萌', profession: 'panda' },
                 { name: '水灵', profession: 'panda' },
                 { name: '火灵', profession: 'panda' },
-                { name: '鱼人', profession: 'panda' },
-                { name: '女妖', profession: 'mage' },
-                { name: '电法', profession: 'mage' },
-                { name: '骨弓', profession: 'archer' },
-                { name: '蛇女', profession: 'archer' },
-                { name: '悟空', profession: 'summoner' },
-                { name: '大圣', profession: 'summoner' },
-                { name: '后羿', profession: 'archer' },
-                { name: '天使', profession: 'priest' },
-                { name: '虎弓', profession: 'archer' },
                 { name: '风灵', profession: 'panda' },
-                { name: '龙王', profession: 'summoner' },
-                { name: '飞机', profession: 'summoner' },
+                // 金卡 - 工程
                 { name: '火炮', profession: 'engineering' },
                 { name: '宝库', profession: 'engineering' },
                 { name: '射线', profession: 'engineering' },
                 { name: '咬人娃娃', profession: 'engineering' },
-                { name: '潜艇', profession: 'engineering' }
+                { name: '潜艇', profession: 'engineering' },
+                // 紫卡 - 战士
+                { name: '铁骑', profession: 'warrior' },
+                { name: '剑客', profession: 'warrior' },
+                { name: '斧客', profession: 'warrior' },
+                { name: '恶匪', profession: 'warrior' },
+                { name: '钢鬃', profession: 'warrior' },
+                // 紫卡 - 法师
+                { name: '电法', profession: 'mage' },
+                { name: '冰法', profession: 'mage' },
+                { name: '飞机', profession: 'mage' },
+                { name: '炎魔', profession: 'mage' },
+                // 紫卡 - 弓箭手
+                { name: '海妖', profession: 'archer' },
+                { name: '骨弓', profession: 'archer' },
+                { name: '火枪', profession: 'archer' },
+                { name: '松鼠', profession: 'archer' },
+                // 紫卡 - 召唤师
+                { name: '悟空', profession: 'summoner' },
+                { name: '冰骑', profession: 'summoner' },
+                // 紫卡 - 牧师
+                { name: '巫医', profession: 'priest' },
+                { name: '死神', profession: 'priest' },
+                { name: '工匠', profession: 'priest' },
+                { name: '地精', profession: 'priest' },
+                { name: '萨满', profession: 'priest' },
+                { name: '酋长', profession: 'priest' },
+                { name: '猫咪', profession: 'priest' },
+                // 紫卡 - 术士
+                { name: '闪', profession: 'warlock' },
+                // 紫卡 - 熊猫
+                { name: '土灵', profession: 'panda' },
+                // 蓝卡 - 战士
+                { name: '刺客', profession: 'warrior' },
+                // 蓝卡 - 法师
+                { name: '暗法', profession: 'mage' },
+                // 蓝卡 - 弓箭手
+                { name: '绿弓', profession: 'archer' },
+                { name: '蜘蛛', profession: 'archer' },
+                // 蓝卡 - 召唤师
+                { name: '骨龙', profession: 'summoner' },
+                // 蓝卡 - 牧师
+                { name: '大树', profession: 'priest' },
+                // 绿卡 - 战士
+                { name: '神龛', profession: 'warrior' },
+                { name: '石头', profession: 'warrior' },
+                // 绿卡 - 法师
+                { name: '火法', profession: 'mage' },
+                // 绿卡 - 弓箭手
+                { name: '冰弓', profession: 'archer' }
             ];
             
-            // 添加自定义卡牌
-            if (typeof customCards !== 'undefined' && customCards) {
-                // customCards 是对象格式 { key: [card1, card2, ...] }
-                Object.keys(customCards).forEach(key => {
-                    const cards = customCards[key];
-                    if (Array.isArray(cards)) {
-                        cards.forEach(card => {
-                            if (card.profession !== 'pokeball') {
-                                allCards.push({ name: card.name, profession: card.profession });
-                            }
-                        });
-                    }
-                });
-            }
-            
-            // 按职业分组
+            // 按职业分组并去重排序
+            const cardSet = new Set();
             allCards.forEach(card => {
                 const profKey = Object.keys(professionNames).find(key => professionNames[key] === card.profession);
-                if (profKey && cardsByProfession[profKey]) {
+                if (profKey && cardsByProfession[profKey] && !cardSet.has(card.name)) {
                     cardsByProfession[profKey].push(card.name);
+                    cardSet.add(card.name);
                 }
+            });
+            
+            // 对每个职业的卡牌排序
+            Object.keys(cardsByProfession).forEach(prof => {
+                cardsByProfession[prof].sort();
             });
             
             // 构建弹窗HTML
@@ -11125,6 +11219,28 @@
                             <button onclick="exportDamageReductionToTxt()" style="background:rgba(74,222,128,0.2);border:1px solid rgba(74,222,128,0.4);color:#4ade80;padding:8px 12px;border-radius:6px;">导出TXT</button>
                             <button onclick="importDamageReductionFromTxt();setTimeout(()=>{filterDamageReductionCards();},500);" style="background:rgba(96,165,250,0.2);border:1px solid rgba(96,165,250,0.4);color:#60a5fa;padding:8px 12px;border-radius:6px;">导入TXT</button>
                             <button onclick="clearAllDamageReduction()" style="background:rgba(239,68,68,0.2);border:1px solid rgba(239,68,68,0.4);color:#ef4444;padding:8px 12px;border-radius:6px;">清空</button>
+                        </div>
+                        <div style="background:rgba(255,152,0,0.1);border-radius:8px;padding:12px;margin-bottom:15px;">
+                            <div style="color:#ff9800;font-size:0.85rem;margin-bottom:8px;padding:5px;background:rgba(255,152,0,0.1);border-radius:4px;">⚡ 特殊技能减伤</div>
+                            <div style="display:flex;flex-wrap:wrap;gap:12px;">
+                                <div style="display:flex;align-items:center;gap:6px;">
+                                    <span style="color:#fff;font-size:0.85rem;">战车:</span>
+                                    <input type="number" data-special="战车" value="${specialDamageReduction['战车'] || 0}" min="0" max="100" step="0.1" style="width:50px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,152,0,0.4);color:#ff9800;padding:4px 6px;border-radius:4px;text-align:center;font-size:0.8rem;">
+                                </div>
+                                <div style="display:flex;align-items:center;gap:6px;">
+                                    <span style="color:#fff;font-size:0.85rem;">小野:</span>
+                                    <input type="number" data-special="小野" value="${specialDamageReduction['小野'] || 0}" min="0" max="100" step="0.1" style="width:50px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,152,0,0.4);color:#ff9800;padding:4px 6px;border-radius:4px;text-align:center;font-size:0.8rem;">
+                                </div>
+                                <div style="display:flex;align-items:center;gap:6px;">
+                                    <span style="color:#fff;font-size:0.85rem;">酋长:</span>
+                                    <input type="number" data-special="酋长" value="${specialDamageReduction['酋长'] || 0}" min="0" max="100" step="0.1" style="width:50px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,152,0,0.4);color:#ff9800;padding:4px 6px;border-radius:4px;text-align:center;font-size:0.8rem;">
+                                </div>
+                                <div style="display:flex;align-items:center;gap:6px;">
+                                    <span style="color:#fff;font-size:0.85rem;">宝库:</span>
+                                    <input type="number" data-special="宝库" value="${specialDamageReduction['宝库'] || 0}" min="0" max="100" step="0.1" style="width:50px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,152,0,0.4);color:#ff9800;padding:4px 6px;border-radius:4px;text-align:center;font-size:0.8rem;">
+                                </div>
+                            </div>
+                            <div style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-top:8px;">💡 技能减伤与洗炼减伤分开计算，不冲突</div>
                         </div>
                         <div id="damageReductionCardsList" style="display:flex;flex-direction:column;gap:8px;">
                             ${buildDamageReductionCardsList('all', cardsByProfession, damageReductionData)}
@@ -11167,6 +11283,7 @@
                                    value="${value}" 
                                    min="0" 
                                    max="100"
+                                   step="0.1"
                                    style="width:60px;background:rgba(255,255,255,0.1);border:1px solid rgba(78,205,196,0.3);color:#4ecdc4;padding:4px 8px;border-radius:4px;text-align:center;font-size:0.85rem;"
                                    onchange="this.style.color='#4ecdc4'">
                         </div>
@@ -11191,13 +11308,21 @@
             const inputs = document.querySelectorAll('#damageReductionCardsList input[data-card]');
             inputs.forEach(input => {
                 const cardName = input.dataset.card;
-                const value = parseInt(input.value) || 0;
+                const value = parseFloat(input.value) || 0;
                 if (value > 0) {
                     damageReductionData[cardName] = value;
                 } else {
                     delete damageReductionData[cardName];
                 }
             });
+            
+            const specialInputs = document.querySelectorAll('#damageReductionModal input[data-special]');
+            specialInputs.forEach(input => {
+                const key = input.dataset.special;
+                const value = parseFloat(input.value) || 0;
+                specialDamageReduction[key] = value;
+            });
+            
             saveDamageReductionData();
         }
         
@@ -11212,16 +11337,38 @@
         // 计算卡组的总减伤
         function calculateTotalDamageReduction(cardList) {
             let total = 0;
+            const seenCards = new Set(); // 用于去重
+            
             cardList.forEach(card => {
                 // 精灵卡不参与减伤计算
                 if (card.profession === 'pokeball') return;
                 
-                const cardName = card.name;
+                let cardName = card.name;
+                
+                // 处理组合卡，只取第一个卡（如火炮射线只算火炮）
+                if (cardName.includes('、') || cardName.includes('+') || cardName.includes(' ')) {
+                    // 按分隔符分割，取第一个卡名
+                    const separators = ['、', '+', ' '];
+                    let firstPart = cardName;
+                    for (const sep of separators) {
+                        if (firstPart.includes(sep)) {
+                            firstPart = firstPart.split(sep)[0].trim();
+                            break;
+                        }
+                    }
+                    cardName = firstPart;
+                }
+                
+                // 防止重复计算（同名卡只算一次洗炼）
+                if (seenCards.has(cardName)) return;
+                seenCards.add(cardName);
+                
                 if (damageReductionData[cardName]) {
                     total += damageReductionData[cardName];
                 }
             });
-            return total;
+            
+            return parseFloat(total.toFixed(1));
         }
         
         // 更减伤显示
@@ -11256,15 +11403,37 @@
         // 计算指定卡牌列表的总减伤（用于脚本解析）
         function calculateDamageReductionForCards(cardNames) {
             let total = 0;
+            const seenCards = new Set(); // 用于去重
+            
             cardNames.forEach(name => {
                 // 精灵卡不参与
                 if (name.includes('精灵')) return;
                 
-                if (damageReductionData[name]) {
-                    total += damageReductionData[name];
+                let cardName = name;
+                
+                // 处理组合卡，只取第一个卡（如火炮射线只算火炮）
+                if (cardName.includes('、') || cardName.includes('+') || cardName.includes(' ')) {
+                    const separators = ['、', '+', ' '];
+                    let firstPart = cardName;
+                    for (const sep of separators) {
+                        if (firstPart.includes(sep)) {
+                            firstPart = firstPart.split(sep)[0].trim();
+                            break;
+                        }
+                    }
+                    cardName = firstPart;
+                }
+                
+                // 防止重复计算（同名卡只算一次洗炼）
+                if (seenCards.has(cardName)) return;
+                seenCards.add(cardName);
+                
+                if (damageReductionData[cardName]) {
+                    total += damageReductionData[cardName];
                 }
             });
-            return total;
+            
+            return parseFloat(total.toFixed(1));
         }
         
         // 导出减伤记录为TXT文件
@@ -11272,12 +11441,23 @@
             loadDamageReductionData();
             
             let content = '# 减伤记录配置文件\n';
-            content += '# 格式：卡牌名=减伤数值\n';
-            content += '# 示例：水灵=10\n';
+            content += '# 格式：卡牌名=减伤数值（支持小数，如 10.5）\n';
+            content += '# 特殊减伤参数：战车、小野、酋长、宝库（技能减伤，与洗炼不冲突）\n';
+            content += '# 示例：水灵=10.5\n';
             content += '# 精灵卡不参与减伤计算\n';
             content += '# 导出时间：' + new Date().toLocaleString('zh-CN') + '\n\n';
             
-            // 按卡牌名排序
+            // 导出特殊减伤参数
+            content += '===== 特殊技能减伤 =====\n';
+            const specialKeys = ['战车', '小野', '酋长', '宝库'];
+            specialKeys.forEach(key => {
+                if (specialDamageReduction[key] > 0) {
+                    content += `${key}=${specialDamageReduction[key]}\n`;
+                }
+            });
+            
+            // 导出洗炼减伤数据
+            content += '\n===== 洗炼减伤 =====\n';
             const sortedCards = Object.keys(damageReductionData).sort();
             sortedCards.forEach(cardName => {
                 content += `${cardName}=${damageReductionData[cardName]}\n`;
@@ -11316,26 +11496,50 @@
         function parseDamageReductionTxt(content) {
             const lines = content.split('\n');
             const newData = {};
+            const specialKeys = ['战车', '小野', '酋长', '宝库'];
+            let inSpecialSection = false;
             
             lines.forEach(line => {
                 // 跳过注释和空行
                 if (line.startsWith('#') || line.trim() === '') return;
                 
-                // 解析格式：卡牌名=数值
-                const match = line.match(/^([^=]+)=(\d+)$/);
+                // 检测段落分隔
+                if (line.includes('=====')) {
+                    inSpecialSection = line.includes('特殊技能减伤');
+                    return;
+                }
+                
+                // 解析格式：卡牌名=数值（支持小数）
+                const match = line.match(/^([^=]+)=(\d+(?:\.\d+)?)$/);
                 if (match) {
                     const cardName = match[1].trim();
-                    const value = parseInt(match[2]);
+                    const value = parseFloat(match[2]);
                     if (cardName && value > 0) {
-                        newData[cardName] = value;
+                        // 判断是特殊减伤还是洗炼减伤
+                        if (specialKeys.includes(cardName)) {
+                            specialDamageReduction[cardName] = value;
+                        } else {
+                            newData[cardName] = value;
+                        }
                     }
                 }
             });
             
+            let message = '';
             if (Object.keys(newData).length > 0) {
                 damageReductionData = newData;
+                message += `洗炼减伤：${Object.keys(newData).length} 条`;
+            }
+            
+            const specialCount = specialKeys.filter(k => specialDamageReduction[k] > 0).length;
+            if (specialCount > 0) {
+                if (message) message += '，';
+                message += `特殊技能减伤：${specialCount} 条`;
+            }
+            
+            if (message) {
                 saveDamageReductionData();
-                alert(`导入成功！共 ${Object.keys(newData).length} 条减伤记录`);
+                alert(`导入成功！${message}`);
                 updateDamageReductionDisplay();
             } else {
                 alert('未找到有效的减伤记录');
