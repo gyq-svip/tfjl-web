@@ -16737,13 +16737,25 @@ function hasGistToken() {
                     const type = typeMatch ? typeMatch[1] : 'all';
                     const typeLabel = type === 'messages_scripts' ? '📝+📄 消息+脚本' : type === 'messages' ? '📝 消息' : type === 'counter' ? '📊 统计' : type === 'auction' ? '🏪 拍卖行' : '📦 全部';
                     
+                    // 从文件名提取时间戳并转换成可读格式
+                    const timeMatch = fileName.match(/_(\d{13})\.json$/);
+                    let timeDisplay = fileName.replace('backup_', '').replace('.json', '');
+                    if (timeMatch) {
+                        const timestamp = parseInt(timeMatch[1]);
+                        const date = new Date(timestamp);
+                        timeDisplay = date.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+                    }
+                    
                     html += `
                         <div style="background:rgba(255,255,255,0.05);border-radius:6px;padding:8px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
                             <div>
                                 <span style="color:#ffd700;">${typeLabel}</span>
-                                <span style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-left:8px;">${fileName.replace('backup_', '').replace('.json', '')}</span>
+                                <span style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-left:8px;">${timeDisplay}</span>
                             </div>
-                            <button onclick="viewBackupDetail('${fileName}')" style="background:rgba(255,255,255,0.1);border:none;color:#4ade80;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:0.75rem;">查看</button>
+                            <div style="display:flex;gap:4px;">
+                                <button onclick="viewBackupDetail('${fileName}')" style="background:rgba(255,255,255,0.1);border:none;color:#4ade80;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:0.75rem;">查看</button>
+                                <button onclick="deleteBackupFile('${fileName}')" style="background:rgba(239,68,68,0.2);border:none;color:#ef4444;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:0.75rem;">删除</button>
+                            </div>
                         </div>
                     `;
                 });
@@ -16751,6 +16763,76 @@ function hasGistToken() {
                 container.innerHTML = html;
             } catch (e) {
                 container.innerHTML = `<div style="color:#ef4444;text-align:center;">加载失败：${e.message}</div>`;
+            }
+        }
+        
+        // 删除备份文件
+        async function deleteBackupFile(fileName) {
+            if (!confirm(`⚠️ 确定要删除备份 ${fileName} 吗？\n\n此操作不可恢复！`)) return;
+            
+            showBackupStatus('⏳ 正在删除备份...', 'loading');
+            try {
+                const token = getGistToken();
+                if (!token) throw new Error('无Token');
+                
+                const backupGistId = localStorage.getItem(BACKUP_GIST_ID_KEY);
+                
+                // 获取备份内容，找出关联的脚本文件
+                const resp = await fetch(`https://api.github.com/gists/${backupGistId}`, {
+                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` }
+                });
+                
+                const data = await resp.json();
+                const allFiles = data.files || {};
+                const file = allFiles[fileName];
+                
+                // 如果是消息备份，需要删除关联的脚本文件
+                let scriptBackupKeys = [];
+                if (file) {
+                    let content = file.content;
+                    if (file.truncated) {
+                        const rawResp = await fetch(file.raw_url);
+                        if (rawResp.ok) content = await rawResp.text();
+                    }
+                    try {
+                        const backupData = JSON.parse(content);
+                        if (backupData.data) {
+                            scriptBackupKeys = backupData.data.filter(msg => msg.scriptBackupKey).map(msg => msg.scriptBackupKey);
+                        }
+                    } catch (e) {
+                        console.warn('解析备份内容失败:', e);
+                    }
+                }
+                
+                // 构建删除文件列表
+                const filesToDelete = {};
+                filesToDelete[fileName] = null; // 删除备份文件
+                scriptBackupKeys.forEach(key => {
+                    if (allFiles[key]) {
+                        filesToDelete[key] = null; // 删除关联的脚本文件
+                    }
+                });
+                
+                // 执行删除
+                const deleteResp = await fetch(`https://api.github.com/gists/${backupGistId}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json',
+                        'Authorization': `token ${token}`
+                    },
+                    body: JSON.stringify({ files: filesToDelete })
+                });
+                
+                if (!deleteResp.ok) {
+                    const errData = await deleteResp.json().catch(() => ({}));
+                    throw new Error(errData.message || '删除失败');
+                }
+                
+                showBackupStatus(`✅ 已删除备份 ${fileName}（含 ${scriptBackupKeys.length} 个脚本文件）`, 'success');
+                loadBackupList();
+            } catch (e) {
+                showBackupStatus(`❌ 删除失败：${e.message}`, 'error');
             }
         }
         
