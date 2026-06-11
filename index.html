@@ -2769,7 +2769,9 @@
         function loadProjectSelectorData() {
             const catSel = document.getElementById('categorySelector1');
             if (!catSel) return;
-            categories.forEach(cat => {
+            // 使用默认分类（categories 变量可能在后面定义）
+            const defaultCategories = ['默认分类', '暗月', '寒冰', '漩涡', '深海'];
+            defaultCategories.forEach(cat => {
                 const opt = document.createElement('option');
                 opt.value = cat;
                 opt.textContent = cat;
@@ -16645,7 +16647,6 @@ function hasGistToken() {
                         console.log('备份总大小:', Math.round(totalBackupSize / 1024), 'KB');
                         return messagesWithScriptContent;
                     }
-                }
                 }
             } catch (e) {
                 console.warn('获取消息数据失败:', e);
