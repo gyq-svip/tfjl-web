@@ -16247,7 +16247,7 @@ function hasGistToken() {
             }
         }
         
-        // 仅备份消息
+        // 仅备份消息（自动备份脚本文件到私有 Gist）
         async function backupMessagesOnly() {
             showBackupStatus('⏳ 正在备份消息数据...', 'loading');
             try {
@@ -16255,15 +16255,57 @@ function hasGistToken() {
                 if (!token) throw new Error('无Token');
                 
                 const backupGistId = await getOrCreateBackupGist();
-                const messagesData = await fetchMessagesDataForBackup(false); // 不包含脚本内容
                 
-                const backupData = {
-                    timestamp: Date.now(),
-                    date: new Date().toLocaleString('zh-CN'),
-                    type: 'messages',
-                    data: messagesData
+                // 获取消息数据
+                const messagesData = await fetchMessagesDataForBackupLight();
+                
+                // 【重要】把脚本文件单独备份到私有 Gist
+                const scriptBackupFiles = {};
+                const messagesWithBackupKey = [];
+                
+                for (const msg of messagesData) {
+                    if (msg.scriptUrl) {
+                        try {
+                            // 获取脚本内容
+                            const scriptContent = await fetchScriptContent(msg.scriptUrl, token);
+                            if (scriptContent) {
+                                // 生成备份文件名（用时间戳+作者作为key）
+                                const backupKey = `script_${msg.time}_${msg.author.replace(/[^a-zA-Z0-9]/g, '_')}`;
+                                scriptBackupFiles[backupKey] = {
+                                    content: scriptContent.content
+                                };
+                                // 消息记录中保存备份key，而不是脚本内容
+                                messagesWithBackupKey.push({
+                                    ...msg,
+                                    scriptBackupKey: backupKey, // 用于还原时查找脚本
+                                    scriptFileName: scriptContent.fileName
+                                });
+                            } else {
+                                messagesWithBackupKey.push(msg);
+                            }
+                        } catch (e) {
+                            console.warn('备份脚本失败:', e, msg.scriptUrl);
+                            messagesWithBackupKey.push(msg);
+                        }
+                    } else {
+                        messagesWithBackupKey.push(msg);
+                    }
+                }
+                
+                // 构建备份文件
+                const backupFiles = {
+                    [`backup_messages_${Date.now()}.json`]: {
+                        content: JSON.stringify({
+                            timestamp: Date.now(),
+                            date: new Date().toLocaleString('zh-CN'),
+                            type: 'messages_with_script_backup',
+                            data: messagesWithBackupKey
+                        }, null, 2)
+                    },
+                    ...scriptBackupFiles // 脚本文件单独存储
                 };
                 
+                // 保存到备份 Gist
                 const resp = await fetch(`https://api.github.com/gists/${backupGistId}`, {
                     method: 'PATCH',
                     headers: {
@@ -16271,22 +16313,103 @@ function hasGistToken() {
                         'Content-Type': 'application/json',
                         'Authorization': `token ${token}`
                     },
-                    body: JSON.stringify({
-                        files: {
-                            [`backup_messages_${Date.now()}.json`]: {
-                                content: JSON.stringify(backupData, null, 2)
-                            }
-                        }
-                    })
+                    body: JSON.stringify({ files: backupFiles })
                 });
                 
-                if (!resp.ok) throw new Error('保存备份失败');
+                if (!resp.ok) {
+                    const errData = await resp.json().catch(() => ({}));
+                    throw new Error(errData.message || '保存备份失败');
+                }
                 
-                showBackupStatus(`✅ 消息备份成功！共 ${messagesData.length} 条消息`, 'success');
+                const scriptCount = Object.keys(scriptBackupFiles).length;
+                showBackupStatus(`✅ 消息备份成功！共 ${messagesData.length} 条消息，${scriptCount} 个脚本文件`, 'success');
                 loadBackupList();
             } catch (e) {
                 showBackupStatus(`❌ 备份失败：${e.message}`, 'error');
             }
+        }
+        
+        // 获取脚本内容（用于备份）
+        async function fetchScriptContent(scriptUrl, token) {
+            try {
+                // 从 scriptUrl 提取 Gist ID
+                let scriptGistId = null;
+                let fileName = 'script.txt';
+                
+                if (scriptUrl.includes('gist.githubusercontent.com')) {
+                    const match = scriptUrl.match(/gist\.githubusercontent\.com\/([^\/]+)\/raw\/([^?]+)/i);
+                    if (match) {
+                        scriptGistId = match[1];
+                        fileName = match[2] || 'script.txt';
+                    }
+                } else if (scriptUrl.includes('gist.github.com')) {
+                    const match = scriptUrl.match(/gist\.github\.com\/[^\/]+\/([a-zA-Z0-9]+)/i);
+                    if (match) scriptGistId = match[1];
+                } else if (scriptUrl.includes('/gists/')) {
+                    const match = scriptUrl.match(/\/gists\/([a-zA-Z0-9]+)/i);
+                    if (match) scriptGistId = match[1];
+                }
+                
+                if (scriptGistId) {
+                    const resp = await fetch(`https://api.github.com/gists/${scriptGistId}`, {
+                        headers: {
+                            'Accept': 'application/vnd.github.v3+json',
+                            ...(token && { 'Authorization': `token ${token}` })
+                        }
+                    });
+                    
+                    if (resp.ok) {
+                        const data = await resp.json();
+                        const files = data.files || {};
+                        const fileNames = Object.keys(files);
+                        if (fileNames.length > 0) {
+                            fileName = fileNames[0];
+                            let content = files[fileNames[0]].content;
+                            if (files[fileNames[0]].truncated) {
+                                const rawResp = await fetch(files[fileNames[0]].raw_url);
+                                if (rawResp.ok) content = await rawResp.text();
+                            }
+                            return { content, fileName };
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn('获取脚本内容失败:', e);
+            }
+            return null;
+        }
+        
+        // 获取消息数据（轻量版，不含脚本内容）
+        async function fetchMessagesDataForBackupLight() {
+            const token = getGistToken();
+            const messagesGistId = MESSAGES_GIST_ID || localStorage.getItem('messages_gist_id');
+            if (!messagesGistId) return [];
+            
+            try {
+                const resp = await fetch(`https://api.github.com/gists/${messagesGistId}`, {
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        ...(token && { 'Authorization': `token ${token}` })
+                    }
+                });
+                if (!resp.ok) return [];
+                
+                const data = await resp.json();
+                if (data.files && data.files['messages.json']) {
+                    let content = data.files['messages.json'].content;
+                    if (data.files['messages.json'].truncated) {
+                        const rawResp = await fetch(data.files['messages.json'].raw_url);
+                        if (rawResp.ok) content = await rawResp.text();
+                    }
+                    if (content) {
+                        const parsed = JSON.parse(content);
+                        return parsed.messages || [];
+                    }
+                }
+            } catch (e) {
+                console.warn('获取消息数据失败:', e);
+            }
+            return [];
         }
         
         // 仅备份消息（含脚本内容，有大小限制）
@@ -16597,15 +16720,16 @@ function hasGistToken() {
                 const data = await resp.json();
                 const files = data.files || {};
                 
-                // 过滤出备份文件（排除 backup_info.json）
+                // 过滤出备份文件（排除 backup_info.json 和 script_ 文件）
                 const backupFiles = Object.keys(files).filter(name => name.startsWith('backup_') && name !== 'backup_info.json').sort().reverse();
+                const scriptFiles = Object.keys(files).filter(name => name.startsWith('script_'));
                 
                 if (backupFiles.length === 0) {
                     container.innerHTML = '<div style="color:rgba(255,255,255,0.5);text-align:center;">暂无备份记录</div>';
                     return;
                 }
                 
-                let html = '';
+                let html = `<div style="color:rgba(255,255,255,0.6);font-size:0.75rem;margin-bottom:10px;">📁 备份文件: ${backupFiles.length} 个 | 📄 脚本文件: ${scriptFiles.length} 个</div>`;
                 backupFiles.forEach(fileName => {
                     const file = files[fileName];
                     const typeMatch = fileName.match(/backup_(messages_scripts|messages|counter|auction|all)_/);
@@ -16691,7 +16815,8 @@ function hasGistToken() {
                 });
                 
                 const data = await resp.json();
-                const file = data.files[fileName];
+                const allFiles = data.files || {};
+                const file = allFiles[fileName];
                 
                 let content = file.content;
                 if (file.truncated) {
@@ -16702,9 +16827,10 @@ function hasGistToken() {
                 const backupData = JSON.parse(content);
                 
                 // 根据备份类型还原
-                if (backupData.type === 'messages' || backupData.data?.messages) {
-                    const messages = backupData.type === 'messages' ? backupData.data : backupData.messages;
-                    await restoreMessagesData(messages);
+                if (backupData.type === 'messages' || backupData.type === 'messages_with_script_backup' || backupData.data?.messages) {
+                    const messages = backupData.type === 'messages' || backupData.type === 'messages_with_script_backup' ? backupData.data : backupData.messages;
+                    // 传递整个备份 Gist 的 files，用于查找脚本文件
+                    await restoreMessagesData(messages, allFiles);
                 }
                 
                 if (backupData.type === 'counter' || backupData.data?.counter) {
@@ -16736,7 +16862,7 @@ function hasGistToken() {
                 const token = getGistToken();
                 const backupGistId = localStorage.getItem(BACKUP_GIST_ID_KEY);
                 
-                // 获取最新的消息备份
+                // 获取备份 Gist（包含所有文件）
                 const resp = await fetch(`https://api.github.com/gists/${backupGistId}`, {
                     headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` }
                 });
@@ -16759,7 +16885,8 @@ function hasGistToken() {
                 }
                 
                 const backupData = JSON.parse(content);
-                await restoreMessagesData(backupData.data);
+                // 传递整个备份 Gist 的 files，用于查找脚本文件
+                await restoreMessagesData(backupData.data, files);
                 
                 showBackupStatus('✅ 消息还原成功！', 'success');
             } catch (e) {
@@ -16844,17 +16971,61 @@ function hasGistToken() {
         }
         
         // 实际还原消息到 Gist（包含脚本文件还原）
-        async function restoreMessagesData(messages) {
+        async function restoreMessagesData(messages, backupGistFiles = null) {
             const token = getGistToken();
             const messagesGistId = MESSAGES_GIST_ID || localStorage.getItem('messages_gist_id');
             
             if (!messagesGistId) throw new Error('消息Gist不存在');
             
-            // 【重要】还原脚本文件：如果备份中有 scriptContent，重新创建脚本 Gist
+            // 【重要】还原脚本文件
             const restoredMessages = await Promise.all(messages.map(async (msg) => {
+                // 方式1：从 scriptBackupKey 查找（脚本单独存储在备份 Gist）
+                if (msg.scriptBackupKey && backupGistFiles) {
+                    try {
+                        const scriptFile = backupGistFiles[msg.scriptBackupKey];
+                        if (scriptFile) {
+                            let scriptContent = scriptFile.content;
+                            if (scriptFile.truncated) {
+                                const rawResp = await fetch(scriptFile.raw_url);
+                                if (rawResp.ok) scriptContent = await rawResp.text();
+                            }
+                            
+                            // 创建新的脚本 Gist
+                            const scriptResp = await fetch('https://api.github.com/gists', {
+                                method: 'POST',
+                                headers: {
+                                    'Accept': 'application/vnd.github.v3+json',
+                                    'Content-Type': 'application/json',
+                                    'Authorization': `token ${token}`
+                                },
+                                body: JSON.stringify({
+                                    description: `脚本还原: ${msg.scriptFileName || 'script.txt'}`,
+                                    public: true,
+                                    files: {
+                                        [msg.scriptFileName || 'script.txt']: {
+                                            content: scriptContent
+                                        }
+                                    }
+                                })
+                            });
+                            
+                            if (scriptResp.ok) {
+                                const scriptData = await scriptResp.json();
+                                const newScriptUrl = scriptData.files[msg.scriptFileName || 'script.txt']?.raw_url || `https://gist.githubusercontent.com/${scriptData.id}/raw`;
+                                return {
+                                    ...msg,
+                                    scriptUrl: newScriptUrl
+                                };
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('从备份还原脚本失败:', e, msg.scriptBackupKey);
+                    }
+                }
+                
+                // 方式2：从 scriptContent 直接还原（旧方式）
                 if (msg.scriptContent && msg.scriptFileName) {
                     try {
-                        // 创建新的脚本 Gist
                         const scriptResp = await fetch('https://api.github.com/gists', {
                             method: 'POST',
                             headers: {
@@ -16878,7 +17049,7 @@ function hasGistToken() {
                             const newScriptUrl = scriptData.files[msg.scriptFileName]?.raw_url || `https://gist.githubusercontent.com/${scriptData.id}/raw/${encodeURIComponent(msg.scriptFileName)}`;
                             return {
                                 ...msg,
-                                scriptUrl: newScriptUrl // 更新为新的脚本链接
+                                scriptUrl: newScriptUrl
                             };
                         }
                     } catch (e) {
@@ -16888,7 +17059,7 @@ function hasGistToken() {
                 return msg;
             }));
             
-            // 保存还原后的消息（去掉 scriptContent 和 scriptFileName，只保留 scriptUrl）
+            // 保存还原后的消息（去掉备份相关字段）
             const finalMessages = restoredMessages.map(msg => ({
                 content: msg.content,
                 author: msg.author,
@@ -19683,7 +19854,7 @@ function hasGistToken() {
                         <button class="admin-btn admin-btn-secondary" onclick="backupAuctionOnly()" style="flex:1;min-width:150px;">🏪 仅备份拍卖行</button>
                     </div>
                     <div style="background:rgba(255,255,255,0.05);border-radius:6px;padding:8px 12px;font-size:0.75rem;color:rgba(255,255,255,0.6);">
-                        💡 提示：脚本文件较多时建议使用"仅备份消息"，脚本内容备份有大小限制（8MB）
+                        💡 提示："仅备份消息"会自动把脚本文件单独备份到私有Gist，用户删除消息后脚本仍可还原
                     </div>
                 </div>
                 <div class="admin-section">
