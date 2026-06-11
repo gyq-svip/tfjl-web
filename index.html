@@ -11404,8 +11404,14 @@
             if (!side) side = 'my';
             let total = 0;
             const seenCards = new Set(); // 用于洗炼去重
-            const seenSpecial = new Set(); // 用于特殊技能去重
             
+            // ========== 第一步：战车特殊减伤（始终计算，与卡组中是否有"战车"卡无关）==========
+            const chariotKey = (side === 'teammate') ? '队友战车' : '我的战车';
+            if (specialDamageReduction[chariotKey] > 0) {
+                total += specialDamageReduction[chariotKey];
+            }
+            
+            // ========== 第二步：洗炼减伤 + 小野/酋长/宝库的特殊技能减伤（仅上阵时计算）==========
             cardList.forEach(card => {
                 // 精灵卡不参与减伤计算
                 if (card.profession === 'pokeball') return;
@@ -11417,10 +11423,9 @@
                 // 处理融合卡，拆分各部分
                 if (cardName.includes('、') || cardName.includes('+') || cardName.includes(' ')) {
                     const separators = ['、', '+', ' '];
-                    let remaining = cardName;
                     for (const sep of separators) {
-                        if (remaining.includes(sep)) {
-                            const splitParts = remaining.split(sep).map(p => p.trim()).filter(p => p);
+                        if (cardName.includes(sep)) {
+                            const splitParts = cardName.split(sep).map(p => p.trim()).filter(p => p);
                             parts.push(...splitParts);
                             break;
                         }
@@ -11431,15 +11436,12 @@
                     parts.push(cardName);
                 }
                 
-                // 处理洗炼减伤
-                // 融合卡逻辑：优先读取融合卡自身的设置，如为0则回退到第一张卡
+                // 洗炼减伤
                 let usedKey = cardName;
                 if (isFusion) {
-                    // 先尝试读取融合卡本身（如"小野酋长"）
                     if (damageReductionData[cardName] !== undefined && damageReductionData[cardName] > 0) {
                         usedKey = cardName;
                     } else {
-                        // 回退到第一张卡（如"小野"）
                         usedKey = parts[0];
                     }
                 } else {
@@ -11453,29 +11455,18 @@
                     }
                 }
                 
-                // 处理特殊技能减伤
-                // 战车：分我的战车和队友战车，根据side参数选择
-                // 其他（小野、酋长、宝库）：双方共享
-                parts.forEach(part => {
-                    if (part.includes('战车')) {
-                        const chariotKey = (side === 'teammate') ? '队友战车' : '我的战车';
-                        if (!seenSpecial.has(chariotKey)) {
-                            seenSpecial.add(chariotKey);
-                            if (specialDamageReduction[chariotKey] > 0) {
-                                total += specialDamageReduction[chariotKey];
+                // 特殊技能减伤（小野、酋长、宝库 — 仅上阵时计算）
+                ['小野', '酋长', '宝库'].forEach(special => {
+                    const isMatch = parts.some(part => part.includes(special));
+                    if (isMatch) {
+                        const seenKey = '_special_' + special;
+                        if (!seenCards.has(seenKey)) {
+                            seenCards.add(seenKey);
+                            if (specialDamageReduction[special] > 0) {
+                                total += specialDamageReduction[special];
                             }
                         }
                     }
-                    ['小野', '酋长', '宝库'].forEach(special => {
-                        if (part.includes(special)) {
-                            if (!seenSpecial.has(special)) {
-                                seenSpecial.add(special);
-                                if (specialDamageReduction[special] > 0) {
-                                    total += specialDamageReduction[special];
-                                }
-                            }
-                        }
-                    });
                 });
             });
             
@@ -11516,8 +11507,13 @@
         function calculateDamageReductionForCards(cardNames, side) {
             if (!side) side = 'my';
             let total = 0;
-            const seenCards = new Set(); // 用于洗炼去重
-            const seenSpecial = new Set(); // 用于特殊技能去重
+            const seenCards = new Set(); // 用于去重
+            
+            // 战车特殊减伤（始终计算，与卡组中是否有"战车"卡无关）
+            const chariotKey = (side === 'teammate') ? '队友战车' : '我的战车';
+            if (specialDamageReduction[chariotKey] > 0) {
+                total += specialDamageReduction[chariotKey];
+            }
             
             cardNames.forEach(name => {
                 // 精灵卡不参与
@@ -11542,7 +11538,7 @@
                     parts.push(name);
                 }
                 
-                // 处理洗炼减伤
+                // 洗炼减伤
                 let usedKey = name;
                 if (isFusion) {
                     if (damageReductionData[name] !== undefined && damageReductionData[name] > 0) {
@@ -11561,27 +11557,18 @@
                     }
                 }
                 
-                // 处理特殊技能减伤
-                parts.forEach(part => {
-                    if (part.includes('战车')) {
-                        const chariotKey = (side === 'teammate') ? '队友战车' : '我的战车';
-                        if (!seenSpecial.has(chariotKey)) {
-                            seenSpecial.add(chariotKey);
-                            if (specialDamageReduction[chariotKey] > 0) {
-                                total += specialDamageReduction[chariotKey];
+                // 特殊技能减伤（小野、酋长、宝库 — 仅上阵时计算）
+                ['小野', '酋长', '宝库'].forEach(special => {
+                    const isMatch = parts.some(part => part.includes(special));
+                    if (isMatch) {
+                        const seenKey = '_special_' + special;
+                        if (!seenCards.has(seenKey)) {
+                            seenCards.add(seenKey);
+                            if (specialDamageReduction[special] > 0) {
+                                total += specialDamageReduction[special];
                             }
                         }
                     }
-                    ['小野', '酋长', '宝库'].forEach(special => {
-                        if (part.includes(special)) {
-                            if (!seenSpecial.has(special)) {
-                                seenSpecial.add(special);
-                                if (specialDamageReduction[special] > 0) {
-                                    total += specialDamageReduction[special];
-                                }
-                            }
-                        }
-                    });
                 });
             });
             
