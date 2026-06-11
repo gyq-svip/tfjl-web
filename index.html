@@ -15177,6 +15177,64 @@ function hasGistToken() {
             // 优先使用硬编码的 MESSAGES_GIST_ID
             let messagesGistId = MESSAGES_GIST_ID || localStorage.getItem('messages_gist_id');
             
+            // 【安全检查】保存前先从 Gist 获取现有消息，防止覆盖丢失
+            let existingMessages = [];
+            if (messagesGistId) {
+                try {
+                    const existResp = await fetch(`https://api.github.com/gists/${messagesGistId}`, {
+                        headers: {
+                            'Accept': 'application/vnd.github.v3+json',
+                            ...(token && { 'Authorization': `token ${token}` })
+                        }
+                    });
+                    if (existResp.ok) {
+                        const existData = await existResp.json();
+                        if (existData.files && existData.files['messages.json']) {
+                            const fileData = existData.files['messages.json'];
+                            let content = fileData.content;
+                            
+                            // 处理 truncated
+                            if (fileData.truncated || !content) {
+                                const rawResp = await fetch(fileData.raw_url, {
+                                    headers: { ...(token && { 'Authorization': `token ${token}` }) }
+                                });
+                                if (rawResp.ok) content = await rawResp.text();
+                            }
+                            
+                            if (content) {
+                                try {
+                                    const parsed = JSON.parse(content);
+                                    existingMessages = parsed.messages || [];
+                                } catch (e) {
+                                    console.warn('解析现有消息失败:', e);
+                                }
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.warn('获取现有消息失败:', e);
+                }
+            }
+            
+            // 【空数据保护】如果远程有数据但本地为空，阻止保存
+            if (existingMessages.length > 0 && wallMessages.length === 0) {
+                throw new Error('安全保护：远程有数据但本地为空，阻止保存以防止覆盖');
+            }
+            
+            // 合并消息：本地新消息 + 远程现有消息（去重）
+            const localNewMsgIds = wallMessages.map(m => m.time + '_' + m.author);
+            const mergedMessages = [...wallMessages];
+            for (const msg of existingMessages) {
+                const msgId = msg.time + '_' + msg.author;
+                if (!localNewMsgIds.includes(msgId)) {
+                    mergedMessages.push(msg);
+                }
+            }
+            // 按时间排序（新的在前）
+            mergedMessages.sort((a, b) => b.time - a.time);
+            // 限制最大数量
+            const finalMessages = mergedMessages.slice(0, MAX_MESSAGES);
+            
             if (messagesGistId) {
                 try {
                     // 如果存在，使用 PATCH 更新现有 Gist
@@ -15190,13 +15248,15 @@ function hasGistToken() {
                         body: JSON.stringify({
                             files: {
                                 'messages.json': {
-                                    content: JSON.stringify({ messages: wallMessages }, null, 2)
+                                    content: JSON.stringify({ messages: finalMessages }, null, 2)
                                 }
                             }
                         })
                     });
                     
                     if (response.ok) {
+                        // 更新本地 wallMessages
+                        wallMessages = finalMessages;
                         return;
                     }
                     
@@ -15240,9 +15300,12 @@ function hasGistToken() {
                                         'Content-Type': 'application/json',
                                         'Authorization': `token ${token}`
                                     },
-                                    body: JSON.stringify({ files: { 'messages.json': { content: JSON.stringify({ messages: wallMessages }, null, 2) } } })
+                                    body: JSON.stringify({ files: { 'messages.json': { content: JSON.stringify({ messages: finalMessages }, null, 2) } } })
                                 });
-                                if (existResp.ok) return;
+                                if (existResp.ok) {
+                                    wallMessages = finalMessages;
+                                    return;
+                                }
                             }
                         }
                     }
@@ -15263,7 +15326,7 @@ function hasGistToken() {
                     public: true,
                     files: {
                         'messages.json': {
-                            content: JSON.stringify({ messages: wallMessages }, null, 2)
+                            content: JSON.stringify({ messages: finalMessages }, null, 2)
                         }
                     }
                 })
@@ -16070,6 +16133,654 @@ function hasGistToken() {
             setTimeout(() => {
                 statusDiv.innerHTML = '';
             }, 5000);
+        }
+
+        // ==================== 数据备份与还原 ====================
+        
+        // 备份 Gist ID（私有）
+        const BACKUP_GIST_ID_KEY = 'tfjl_backup_gist_id';
+        
+        // 获取或创建备份 Gist
+        async function getOrCreateBackupGist() {
+            const token = getGistToken();
+            if (!token) throw new Error('无Token');
+            
+            let backupGistId = localStorage.getItem(BACKUP_GIST_ID_KEY);
+            
+            // 如果已有备份 Gist，验证是否存在
+            if (backupGistId) {
+                const checkResp = await fetch(`https://api.github.com/gists/${backupGistId}`, {
+                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` }
+                });
+                if (checkResp.ok) return backupGistId;
+                // 不存在，清除缓存
+                localStorage.removeItem(BACKUP_GIST_ID_KEY);
+                backupGistId = null;
+            }
+            
+            // 创建新的私有备份 Gist
+            const createResp = await fetch('https://api.github.com/gists', {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/vnd.github.v3+json',
+                    'Content-Type': 'application/json',
+                    'Authorization': `token ${token}`
+                },
+                body: JSON.stringify({
+                    description: 'TFJL 数据备份（私有）',
+                    public: false, // 私有 Gist，只有自己能访问
+                    files: {
+                        'backup_info.json': {
+                            content: JSON.stringify({ created: Date.now(), type: 'backup' }, null, 2)
+                        }
+                    }
+                })
+            });
+            
+            if (!createResp.ok) {
+                const err = await createResp.json().catch(() => ({}));
+                throw new Error(err.message || '创建备份Gist失败');
+            }
+            
+            const data = await createResp.json();
+            localStorage.setItem(BACKUP_GIST_ID_KEY, data.id);
+            return data.id;
+        }
+        
+        // 备份全部数据
+        async function backupAllData() {
+            showBackupStatus('⏳ 正在备份全部数据...', 'loading');
+            try {
+                const token = getGistToken();
+                if (!token) throw new Error('无Token');
+                
+                const backupGistId = await getOrCreateBackupGist();
+                
+                // 收集所有数据
+                const backupData = {
+                    timestamp: Date.now(),
+                    date: new Date().toLocaleString('zh-CN'),
+                    messages: await fetchMessagesDataForBackup(),
+                    counter: await fetchCounterDataForBackup(),
+                    auction: await fetchAuctionDataForBackup()
+                };
+                
+                // 保存到备份 Gist
+                const resp = await fetch(`https://api.github.com/gists/${backupGistId}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json',
+                        'Authorization': `token ${token}`
+                    },
+                    body: JSON.stringify({
+                        files: {
+                            'backup_all.json': {
+                                content: JSON.stringify(backupData, null, 2)
+                            },
+                            [`backup_${Date.now()}.json`]: {
+                                content: JSON.stringify(backupData, null, 2)
+                            }
+                        }
+                    })
+                });
+                
+                if (!resp.ok) throw new Error('保存备份失败');
+                
+                showBackupStatus(`✅ 备份成功！时间：${backupData.date}`, 'success');
+                loadBackupList();
+            } catch (e) {
+                showBackupStatus(`❌ 备份失败：${e.message}`, 'error');
+            }
+        }
+        
+        // 仅备份消息
+        async function backupMessagesOnly() {
+            showBackupStatus('⏳ 正在备份消息数据...', 'loading');
+            try {
+                const token = getGistToken();
+                if (!token) throw new Error('无Token');
+                
+                const backupGistId = await getOrCreateBackupGist();
+                const messagesData = await fetchMessagesDataForBackup();
+                
+                const backupData = {
+                    timestamp: Date.now(),
+                    date: new Date().toLocaleString('zh-CN'),
+                    type: 'messages',
+                    data: messagesData
+                };
+                
+                const resp = await fetch(`https://api.github.com/gists/${backupGistId}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json',
+                        'Authorization': `token ${token}`
+                    },
+                    body: JSON.stringify({
+                        files: {
+                            [`backup_messages_${Date.now()}.json`]: {
+                                content: JSON.stringify(backupData, null, 2)
+                            }
+                        }
+                    })
+                });
+                
+                if (!resp.ok) throw new Error('保存备份失败');
+                
+                showBackupStatus(`✅ 消息备份成功！共 ${messagesData.length} 条消息`, 'success');
+                loadBackupList();
+            } catch (e) {
+                showBackupStatus(`❌ 备份失败：${e.message}`, 'error');
+            }
+        }
+        
+        // 仅备份统计
+        async function backupCounterOnly() {
+            showBackupStatus('⏳ 正在备份统计数据...', 'loading');
+            try {
+                const token = getGistToken();
+                if (!token) throw new Error('无Token');
+                
+                const backupGistId = await getOrCreateBackupGist();
+                const counterData = await fetchCounterDataForBackup();
+                
+                const backupData = {
+                    timestamp: Date.now(),
+                    date: new Date().toLocaleString('zh-CN'),
+                    type: 'counter',
+                    data: counterData
+                };
+                
+                const resp = await fetch(`https://api.github.com/gists/${backupGistId}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json',
+                        'Authorization': `token ${token}`
+                    },
+                    body: JSON.stringify({
+                        files: {
+                            [`backup_counter_${Date.now()}.json`]: {
+                                content: JSON.stringify(backupData, null, 2)
+                            }
+                        }
+                    })
+                });
+                
+                if (!resp.ok) throw new Error('保存备份失败');
+                
+                showBackupStatus(`✅ 统计备份成功！访问：${counterData.total_visits}，用户：${counterData.total_users}`, 'success');
+                loadBackupList();
+            } catch (e) {
+                showBackupStatus(`❌ 备份失败：${e.message}`, 'error');
+            }
+        }
+        
+        // 仅备份拍卖行
+        async function backupAuctionOnly() {
+            showBackupStatus('⏳ 正在备份拍卖行数据...', 'loading');
+            try {
+                const token = getGistToken();
+                if (!token) throw new Error('无Token');
+                
+                const backupGistId = await getOrCreateBackupGist();
+                const auctionData = await fetchAuctionDataForBackup();
+                
+                const backupData = {
+                    timestamp: Date.now(),
+                    date: new Date().toLocaleString('zh-CN'),
+                    type: 'auction',
+                    data: auctionData
+                };
+                
+                const resp = await fetch(`https://api.github.com/gists/${backupGistId}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json',
+                        'Authorization': `token ${token}`
+                    },
+                    body: JSON.stringify({
+                        files: {
+                            [`backup_auction_${Date.now()}.json`]: {
+                                content: JSON.stringify(backupData, null, 2)
+                            }
+                        }
+                    })
+                });
+                
+                if (!resp.ok) throw new Error('保存备份失败');
+                
+                showBackupStatus(`✅ 拍卖行备份成功！`, 'success');
+                loadBackupList();
+            } catch (e) {
+                showBackupStatus(`❌ 备份失败：${e.message}`, 'error');
+            }
+        }
+        
+        // 获取消息数据用于备份
+        async function fetchMessagesDataForBackup() {
+            const token = getGistToken();
+            const messagesGistId = MESSAGES_GIST_ID || localStorage.getItem('messages_gist_id');
+            if (!messagesGistId) return [];
+            
+            try {
+                const resp = await fetch(`https://api.github.com/gists/${messagesGistId}`, {
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        ...(token && { 'Authorization': `token ${token}` })
+                    }
+                });
+                if (!resp.ok) return [];
+                
+                const data = await resp.json();
+                if (data.files && data.files['messages.json']) {
+                    let content = data.files['messages.json'].content;
+                    if (data.files['messages.json'].truncated) {
+                        const rawResp = await fetch(data.files['messages.json'].raw_url);
+                        if (rawResp.ok) content = await rawResp.text();
+                    }
+                    if (content) {
+                        const parsed = JSON.parse(content);
+                        return parsed.messages || [];
+                    }
+                }
+            } catch (e) {
+                console.warn('获取消息数据失败:', e);
+            }
+            return [];
+        }
+        
+        // 获取统计数据用于备份
+        async function fetchCounterDataForBackup() {
+            const token = getGistToken();
+            const counterGistId = COUNTER_GIST_ID || localStorage.getItem('counter_gist_id');
+            if (!counterGistId) return {};
+            
+            try {
+                const resp = await fetch(`https://api.github.com/gists/${counterGistId}`, {
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        ...(token && { 'Authorization': `token ${token}` })
+                    }
+                });
+                if (!resp.ok) return {};
+                
+                const data = await resp.json();
+                if (data.files && data.files['counter.json']) {
+                    let content = data.files['counter.json'].content;
+                    if (data.files['counter.json'].truncated) {
+                        const rawResp = await fetch(data.files['counter.json'].raw_url);
+                        if (rawResp.ok) content = await rawResp.text();
+                    }
+                    if (content) {
+                        return JSON.parse(content);
+                    }
+                }
+            } catch (e) {
+                console.warn('获取统计数据失败:', e);
+            }
+            return {};
+        }
+        
+        // 获取拍卖行数据用于备份
+        async function fetchAuctionDataForBackup() {
+            // 拍卖行数据存储在 localStorage
+            const auctionItems = JSON.parse(localStorage.getItem('auctionItems') || '[]');
+            const auctionMessages = JSON.parse(localStorage.getItem('auctionMessages') || '[]');
+            return { items: auctionItems, messages: auctionMessages };
+        }
+        
+        // 加载备份列表
+        async function loadBackupList() {
+            const container = document.getElementById('backupListContainer');
+            container.innerHTML = '<div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;">⏳ 加载中...</div>';
+            
+            try {
+                const token = getGistToken();
+                if (!token) throw new Error('无Token');
+                
+                const backupGistId = localStorage.getItem(BACKUP_GIST_ID_KEY);
+                if (!backupGistId) {
+                    container.innerHTML = '<div style="color:rgba(255,255,255,0.5);text-align:center;">暂无备份记录</div>';
+                    return;
+                }
+                
+                const resp = await fetch(`https://api.github.com/gists/${backupGistId}`, {
+                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` }
+                });
+                
+                if (!resp.ok) {
+                    container.innerHTML = '<div style="color:#ef4444;text-align:center;">获取备份列表失败</div>';
+                    return;
+                }
+                
+                const data = await resp.json();
+                const files = data.files || {};
+                
+                // 过滤出备份文件（排除 backup_info.json）
+                const backupFiles = Object.keys(files).filter(name => name.startsWith('backup_') && name !== 'backup_info.json').sort().reverse();
+                
+                if (backupFiles.length === 0) {
+                    container.innerHTML = '<div style="color:rgba(255,255,255,0.5);text-align:center;">暂无备份记录</div>';
+                    return;
+                }
+                
+                let html = '';
+                backupFiles.forEach(fileName => {
+                    const file = files[fileName];
+                    const typeMatch = fileName.match(/backup_(messages|counter|auction|all)_/);
+                    const type = typeMatch ? typeMatch[1] : 'all';
+                    const typeLabel = type === 'messages' ? '📝 消息' : type === 'counter' ? '📊 统计' : type === 'auction' ? '🏪 拍卖行' : '📦 全部';
+                    
+                    html += `
+                        <div style="background:rgba(255,255,255,0.05);border-radius:6px;padding:8px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+                            <div>
+                                <span style="color:#ffd700;">${typeLabel}</span>
+                                <span style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-left:8px;">${fileName.replace('backup_', '').replace('.json', '')}</span>
+                            </div>
+                            <button onclick="viewBackupDetail('${fileName}')" style="background:rgba(255,255,255,0.1);border:none;color:#4ade80;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:0.75rem;">查看</button>
+                        </div>
+                    `;
+                });
+                
+                container.innerHTML = html;
+            } catch (e) {
+                container.innerHTML = `<div style="color:#ef4444;text-align:center;">加载失败：${e.message}</div>`;
+            }
+        }
+        
+        // 查看备份详情
+        async function viewBackupDetail(fileName) {
+            try {
+                const token = getGistToken();
+                const backupGistId = localStorage.getItem(BACKUP_GIST_ID_KEY);
+                
+                const resp = await fetch(`https://api.github.com/gists/${backupGistId}`, {
+                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` }
+                });
+                
+                const data = await resp.json();
+                const file = data.files[fileName];
+                
+                let content = file.content;
+                if (file.truncated) {
+                    const rawResp = await fetch(file.raw_url);
+                    if (rawResp.ok) content = await rawResp.text();
+                }
+                
+                const backupData = JSON.parse(content);
+                
+                // 显示详情弹窗
+                const detailHtml = `
+                    <div id="backupDetailModal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:99999;display:flex;justify-content:center;align-items:center;">
+                        <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:12px;padding:20px;max-width:600px;width:90%;max-height:80vh;overflow-y:auto;">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+                                <h3 style="color:#ffd700;margin:0;">📋 备份详情：${fileName}</h3>
+                                <button onclick="document.getElementById('backupDetailModal').remove()" style="background:none;border:none;color:#fff;font-size:1.5rem;cursor:pointer;">✕</button>
+                            </div>
+                            <div style="background:rgba(0,0,0,0.3);border-radius:8px;padding:12px;font-size:0.85rem;">
+                                <div style="color:#4ade80;margin-bottom:10px;">备份时间：${backupData.date || new Date(backupData.timestamp).toLocaleString('zh-CN')}</div>
+                                <div style="color:rgba(255,255,255,0.8);white-space:pre-wrap;word-break:break-all;font-family:monospace;">${JSON.stringify(backupData, null, 2).substring(0, 2000)}${JSON.stringify(backupData, null, 2).length > 2000 ? '\n...(内容过长，已截断)' : ''}</div>
+                            </div>
+                            <div style="display:flex;gap:10px;margin-top:15px;">
+                                <button onclick="restoreFromBackupFile('${fileName}')" style="background:linear-gradient(135deg,#f97316,#ea580c);color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;">🔄 还原此备份</button>
+                                <button onclick="document.getElementById('backupDetailModal').remove()" style="background:rgba(255,255,255,0.1);color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;">关闭</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                document.body.insertAdjacentHTML('beforeend', detailHtml);
+            } catch (e) {
+                alert('查看备份详情失败：' + e.message);
+            }
+        }
+        
+        // 从指定备份文件还原
+        async function restoreFromBackupFile(fileName) {
+            if (!confirm(`⚠️ 确定要从 ${fileName} 还原数据吗？\n\n这将覆盖当前数据！`)) return;
+            
+            showBackupStatus('⏳ 正在还原数据...', 'loading');
+            
+            try {
+                const token = getGistToken();
+                if (!token) throw new Error('无Token');
+                
+                const backupGistId = localStorage.getItem(BACKUP_GIST_ID_KEY);
+                const resp = await fetch(`https://api.github.com/gists/${backupGistId}`, {
+                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` }
+                });
+                
+                const data = await resp.json();
+                const file = data.files[fileName];
+                
+                let content = file.content;
+                if (file.truncated) {
+                    const rawResp = await fetch(file.raw_url);
+                    if (rawResp.ok) content = await rawResp.text();
+                }
+                
+                const backupData = JSON.parse(content);
+                
+                // 根据备份类型还原
+                if (backupData.type === 'messages' || backupData.data?.messages) {
+                    const messages = backupData.type === 'messages' ? backupData.data : backupData.messages;
+                    await restoreMessagesData(messages);
+                }
+                
+                if (backupData.type === 'counter' || backupData.data?.counter) {
+                    const counter = backupData.type === 'counter' ? backupData.data : backupData.counter;
+                    await restoreCounterData(counter);
+                }
+                
+                if (backupData.type === 'auction' || backupData.data?.auction) {
+                    const auction = backupData.type === 'auction' ? backupData.data : backupData.auction;
+                    await restoreAuctionData(auction);
+                }
+                
+                showBackupStatus('✅ 还原成功！建议刷新页面查看最新数据', 'success');
+                
+                // 关闭详情弹窗
+                const modal = document.getElementById('backupDetailModal');
+                if (modal) modal.remove();
+            } catch (e) {
+                showBackupStatus(`❌ 还原失败：${e.message}`, 'error');
+            }
+        }
+        
+        // 还原消息数据
+        async function restoreMessagesBackup() {
+            if (!confirm('⚠️ 确定要还原消息数据吗？\n\n这将覆盖当前消息！建议先备份当前数据。')) return;
+            
+            showBackupStatus('⏳ 正在还原消息数据...', 'loading');
+            try {
+                const token = getGistToken();
+                const backupGistId = localStorage.getItem(BACKUP_GIST_ID_KEY);
+                
+                // 获取最新的消息备份
+                const resp = await fetch(`https://api.github.com/gists/${backupGistId}`, {
+                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` }
+                });
+                
+                const data = await resp.json();
+                const files = data.files || {};
+                
+                // 找最新的消息备份
+                const msgBackups = Object.keys(files).filter(name => name.includes('messages')).sort().reverse();
+                if (msgBackups.length === 0) {
+                    showBackupStatus('❌ 未找到消息备份', 'error');
+                    return;
+                }
+                
+                const file = files[msgBackups[0]];
+                let content = file.content;
+                if (file.truncated) {
+                    const rawResp = await fetch(file.raw_url);
+                    if (rawResp.ok) content = await rawResp.text();
+                }
+                
+                const backupData = JSON.parse(content);
+                await restoreMessagesData(backupData.data);
+                
+                showBackupStatus('✅ 消息还原成功！', 'success');
+            } catch (e) {
+                showBackupStatus(`❌ 还原失败：${e.message}`, 'error');
+            }
+        }
+        
+        // 还原统计数据
+        async function restoreCounterBackup() {
+            if (!confirm('⚠️ 确定要还原统计数据吗？\n\n这将覆盖当前统计数据！建议先备份当前数据。')) return;
+            
+            showBackupStatus('⏳ 正在还原统计数据...', 'loading');
+            try {
+                const token = getGistToken();
+                const backupGistId = localStorage.getItem(BACKUP_GIST_ID_KEY);
+                
+                const resp = await fetch(`https://api.github.com/gists/${backupGistId}`, {
+                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` }
+                });
+                
+                const data = await resp.json();
+                const files = data.files || {};
+                
+                const counterBackups = Object.keys(files).filter(name => name.includes('counter')).sort().reverse();
+                if (counterBackups.length === 0) {
+                    showBackupStatus('❌ 未找到统计备份', 'error');
+                    return;
+                }
+                
+                const file = files[counterBackups[0]];
+                let content = file.content;
+                if (file.truncated) {
+                    const rawResp = await fetch(file.raw_url);
+                    if (rawResp.ok) content = await rawResp.text();
+                }
+                
+                const backupData = JSON.parse(content);
+                await restoreCounterData(backupData.data);
+                
+                showBackupStatus('✅ 统计还原成功！', 'success');
+            } catch (e) {
+                showBackupStatus(`❌ 还原失败：${e.message}`, 'error');
+            }
+        }
+        
+        // 还原拍卖行数据
+        async function restoreAuctionBackup() {
+            if (!confirm('⚠️ 确定要还原拍卖行数据吗？\n\n这将覆盖当前拍卖行数据！建议先备份当前数据。')) return;
+            
+            showBackupStatus('⏳ 正在还原拍卖行数据...', 'loading');
+            try {
+                const token = getGistToken();
+                const backupGistId = localStorage.getItem(BACKUP_GIST_ID_KEY);
+                
+                const resp = await fetch(`https://api.github.com/gists/${backupGistId}`, {
+                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` }
+                });
+                
+                const data = await resp.json();
+                const files = data.files || {};
+                
+                const auctionBackups = Object.keys(files).filter(name => name.includes('auction')).sort().reverse();
+                if (auctionBackups.length === 0) {
+                    showBackupStatus('❌ 未找到拍卖行备份', 'error');
+                    return;
+                }
+                
+                const file = files[auctionBackups[0]];
+                let content = file.content;
+                if (file.truncated) {
+                    const rawResp = await fetch(file.raw_url);
+                    if (rawResp.ok) content = await rawResp.text();
+                }
+                
+                const backupData = JSON.parse(content);
+                await restoreAuctionData(backupData.data);
+                
+                showBackupStatus('✅ 拍卖行还原成功！', 'success');
+            } catch (e) {
+                showBackupStatus(`❌ 还原失败：${e.message}`, 'error');
+            }
+        }
+        
+        // 实际还原消息到 Gist
+        async function restoreMessagesData(messages) {
+            const token = getGistToken();
+            const messagesGistId = MESSAGES_GIST_ID || localStorage.getItem('messages_gist_id');
+            
+            if (!messagesGistId) throw new Error('消息Gist不存在');
+            
+            const resp = await fetch(`https://api.github.com/gists/${messagesGistId}`, {
+                method: 'PATCH',
+                headers: {
+                    'Accept': 'application/vnd.github.v3+json',
+                    'Content-Type': 'application/json',
+                    'Authorization': `token ${token}`
+                },
+                body: JSON.stringify({
+                    files: {
+                        'messages.json': {
+                            content: JSON.stringify({ messages: messages }, null, 2)
+                        }
+                    }
+                })
+            });
+            
+            if (!resp.ok) throw new Error('还原消息失败');
+            
+            // 更新本地数据
+            wallMessages = messages;
+            renderMessages();
+        }
+        
+        // 实际还原统计到 Gist
+        async function restoreCounterData(counter) {
+            const token = getGistToken();
+            const counterGistId = COUNTER_GIST_ID || localStorage.getItem('counter_gist_id');
+            
+            if (!counterGistId) throw new Error('统计Gist不存在');
+            
+            const resp = await fetch(`https://api.github.com/gists/${counterGistId}`, {
+                method: 'PATCH',
+                headers: {
+                    'Accept': 'application/vnd.github.v3+json',
+                    'Content-Type': 'application/json',
+                    'Authorization': `token ${token}`
+                },
+                body: JSON.stringify({
+                    files: {
+                        'counter.json': {
+                            content: JSON.stringify(counter, null, 2)
+                        }
+                    }
+                })
+            });
+            
+            if (!resp.ok) throw new Error('还原统计失败');
+            
+            // 更新本地数据
+            counterData = counter;
+            updateStatsBar();
+        }
+        
+        // 实际还原拍卖行到 localStorage
+        async function restoreAuctionData(auction) {
+            if (auction.items) localStorage.setItem('auctionItems', JSON.stringify(auction.items));
+            if (auction.messages) localStorage.setItem('auctionMessages', JSON.stringify(auction.messages));
+        }
+        
+        // 显示备份状态
+        function showBackupStatus(message, type) {
+            const statusDiv = document.getElementById('backupManageStatus');
+            const bgColor = type === 'success' ? 'rgba(74,222,128,0.2)' : type === 'error' ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.1)';
+            const textColor = type === 'success' ? '#4ade80' : type === 'error' ? '#ef4444' : '#fff';
+            statusDiv.innerHTML = `<div style="background:${bgColor};color:${textColor};padding:10px;border-radius:6px;text-align:center;">${message}</div>`;
+            if (type !== 'loading') {
+                setTimeout(() => { statusDiv.innerHTML = ''; }, 5000);
+            }
         }
 
         // ==================== 配置文件管理 ====================
@@ -18448,6 +19159,12 @@ function hasGistToken() {
                             <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">清除缓存</div>
                         </div>
                     </div>
+                    <div class="admin-menu-item" onclick="adminShowPage('backupManage')" style="padding:10px;">
+                        <span style="font-size:1.1rem;">💾</span>
+                        <div style="margin-left:8px;">
+                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">数据备份</div>
+                        </div>
+                    </div>
                 </div>
                 <button class="admin-btn" onclick="logoutToLogin()" style="width:100%;margin-top:12px;background:linear-gradient(135deg,#ef4444,#dc2626);color:white;">🔙 退出登录</button>
             </div>
@@ -18757,6 +19474,49 @@ function hasGistToken() {
                     </div>
                 </div>
                 <div id="cacheManageStatus" style="margin-top:10px;"></div>
+            </div>
+
+            <div id="adminPageBackupManage" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
+                    <button class="admin-btn admin-btn-secondary" onclick="adminShowMenu()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
+                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">💾 数据备份与还原</h3>
+                </div>
+                <div style="background:rgba(74,222,128,0.1);border-left:3px solid #4ade80;border-radius:6px;padding:12px;margin-bottom:15px;">
+                    <div style="color:#4ade80;font-size:0.85rem;font-weight:500;">✅ 安全备份</div>
+                    <div style="color:rgba(255,255,255,0.6);font-size:0.75rem;margin-top:5px;">
+                        • 备份数据存储在云端私有 Gist，只有您能访问<br>
+                        • 备份不会覆盖现有数据，可随时还原<br>
+                        • 建议定期备份，防止数据丢失
+                    </div>
+                </div>
+                <div class="admin-section">
+                    <h3 style="color:#ffd700;margin:0 0 10px 0;font-size:0.9rem;">📦 创建备份</h3>
+                    <div style="display:flex;gap:8px;margin-bottom:15px;flex-wrap:wrap;">
+                        <button class="admin-btn admin-btn-primary" onclick="backupAllData()" style="flex:1;min-width:150px;background:linear-gradient(135deg,#4ade80,#22c55e);">💾 备份全部数据</button>
+                        <button class="admin-btn admin-btn-secondary" onclick="backupMessagesOnly()" style="flex:1;min-width:150px;">📝 仅备份消息</button>
+                        <button class="admin-btn admin-btn-secondary" onclick="backupCounterOnly()" style="flex:1;min-width:150px;">📊 仅备份统计</button>
+                        <button class="admin-btn admin-btn-secondary" onclick="backupAuctionOnly()" style="flex:1;min-width:150px;">🏪 仅备份拍卖行</button>
+                    </div>
+                </div>
+                <div class="admin-section">
+                    <h3 style="color:#ffd700;margin:0 0 10px 0;font-size:0.9rem;">📋 备份列表</h3>
+                    <div id="backupListContainer" style="background:rgba(0,0,0,0.3);border-radius:6px;padding:12px;margin-bottom:15px;font-size:0.85rem;max-height:200px;overflow-y:auto;">
+                        <div style="color:rgba(255,255,255,0.5);text-align:center;">点击"查看备份"加载列表</div>
+                    </div>
+                    <button class="admin-btn admin-btn-secondary" onclick="loadBackupList()" style="width:100%;">🔍 查看备份列表</button>
+                </div>
+                <div class="admin-section">
+                    <h3 style="color:#ffd700;margin:0 0 10px 0;font-size:0.9rem;">🔄 还原数据</h3>
+                    <div style="background:rgba(255,165,0,0.1);border-left:3px solid #ffa500;border-radius:6px;padding:8px 12px;margin-bottom:10px;">
+                        <div style="color:#ffa500;font-size:0.75rem;">⚠️ 还原会覆盖当前数据，请谨慎操作！建议先备份当前数据再还原。</div>
+                    </div>
+                    <div style="display:flex;gap:8px;margin-bottom:15px;flex-wrap:wrap;">
+                        <button class="admin-btn admin-btn-primary" onclick="restoreMessagesBackup()" style="flex:1;min-width:150px;background:linear-gradient(135deg,#f97316,#ea580c);">🔄 还原消息</button>
+                        <button class="admin-btn admin-btn-primary" onclick="restoreCounterBackup()" style="flex:1;min-width:150px;background:linear-gradient(135deg,#f97316,#ea580c);">🔄 还原统计</button>
+                        <button class="admin-btn admin-btn-primary" onclick="restoreAuctionBackup()" style="flex:1;min-width:150px;background:linear-gradient(135deg,#f97316,#ea580c);">🔄 还原拍卖行</button>
+                    </div>
+                </div>
+                <div id="backupManageStatus" style="margin-top:10px;"></div>
             </div>
 
             <div id="adminPageTitle" style="display:none;">
