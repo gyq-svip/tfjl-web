@@ -10545,6 +10545,7 @@
                 }
                 
                 updateHandDisplay(isUserSlot ? 'my' : 'teammate');
+                updateDamageReductionDisplay(); // 拖放上卡后立即更新减伤显示
             });
         }
 
@@ -10672,6 +10673,7 @@
                 cardEl.classList.add('placed');
                 
                 updateHandDisplay(handType);
+                updateDamageReductionDisplay(); // 上卡后立即更新减伤显示
             }
         }
         
@@ -11200,6 +11202,51 @@
                 cardsByProfession[prof].sort();
             });
             
+            // 动态添加所有自定义卡牌到减伤列表
+            if (typeof customCards !== 'undefined' && customCards) {
+                Object.keys(customCards).forEach(key => {
+                    const [cardType, profession] = key.split('_');
+                    const cards = customCards[key];
+                    if (Array.isArray(cards) && profession) {
+                        const profKey = Object.keys(professionNames).find(k => professionNames[k] === profession);
+                        if (profKey && cardsByProfession[profKey]) {
+                            cards.forEach(card => {
+                                if (card.name && !cardSet.has(card.name)) {
+                                    cardsByProfession[profKey].push(card.name);
+                                    cardSet.add(card.name);
+                                }
+                            });
+                        }
+                    }
+                });
+                // 重新排序
+                Object.keys(cardsByProfession).forEach(prof => {
+                    cardsByProfession[prof].sort();
+                });
+            }
+            
+            // 同时从DOM中获取所有已添加的卡牌（确保不遗漏）
+            try {
+                const allCardElements = document.querySelectorAll('.card-item[data-name][data-profession]');
+                allCardElements.forEach(el => {
+                    const name = el.dataset.name;
+                    const profession = el.dataset.profession;
+                    if (!name || !profession || profession === 'pokeball') return;
+                    if (cardSet.has(name)) return;
+                    const profKey = Object.keys(professionNames).find(k => professionNames[k] === profession);
+                    if (profKey && cardsByProfession[profKey]) {
+                        cardsByProfession[profKey].push(name);
+                        cardSet.add(name);
+                    }
+                });
+                // 重新排序
+                Object.keys(cardsByProfession).forEach(prof => {
+                    cardsByProfession[prof].sort();
+                });
+            } catch (err) {
+                console.warn('从DOM加载卡牌失败:', err);
+            }
+            
             // 构建弹窗HTML
             let html = `
                 <div id="damageReductionModal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:9999;display:flex;justify-content:center;align-items:center;">
@@ -11680,6 +11727,13 @@
                 if (!customCards[key]) customCards[key] = [];
                 customCards[key].push({id, name, cardType, profession});
                 saveCustomCards();
+                
+                // 自动初始化自定义卡牌的减伤记录（默认为0）
+                loadDamageReductionData();
+                if (damageReductionData[name] === undefined) {
+                    damageReductionData[name] = 0;
+                    saveDamageReductionData();
+                }
             }
         }
         
@@ -11766,12 +11820,29 @@
             if (!confirm('确定删除这张卡牌吗？')) return;
             
             const cardEl = document.querySelector(`.card-item[data-id="${id}"]`);
-            if (cardEl) cardEl.remove();
+            let cardName = null;
+            if (cardEl) {
+                cardName = cardEl.dataset.name;
+                cardEl.remove();
+            }
             
             const key = `${cardType}_${profession}`;
             if (customCards[key]) {
+                // 找到要删除的卡牌名
+                const removedCard = customCards[key].find(c => c.id === id);
+                if (removedCard && !cardName) cardName = removedCard.name;
+                
                 customCards[key] = customCards[key].filter(c => c.id !== id);
                 saveCustomCards();
+                
+                // 清理该自定义卡牌的减伤记录（如果减伤值为0则删除，否则保留设置）
+                if (cardName) {
+                    loadDamageReductionData();
+                    if (damageReductionData[cardName] !== undefined && damageReductionData[cardName] === 0) {
+                        delete damageReductionData[cardName];
+                        saveDamageReductionData();
+                    }
+                }
             }
         }
         
