@@ -7451,6 +7451,64 @@
         const STORE_NAME = 'projects';
         const CATEGORIES_STORE = 'categories';
         let categories = ['默认分类', '暗月', '寒冰', '漩涡', '深海']; // 默认分类
+        
+        // 默认配置项目（南门公主）
+        const DEFAULT_PROJECT = {
+            name: '南门公主',
+            category: '深海',
+            timestamp: '2026-06-06T05:20:57.138Z',
+            myHandCards: [
+                { id: "46", name: "水灵", placed: "u2", isEngineering: false, profession: "panda", type: "gold" },
+                { id: "77", name: "死神", placed: "u1", isEngineering: false, profession: "priest", type: "purple" },
+                { id: "34", name: "咕咕", placed: "u6", isEngineering: false, profession: "priest", type: "gold" },
+                { id: "21", name: "蛇女", placed: "u3", isEngineering: false, profession: "archer", type: "gold" },
+                { id: "47", name: "火灵", placed: "u4", isEngineering: false, profession: "panda", type: "gold" },
+                { id: "55", name: "光精灵", placed: null, isEngineering: false, profession: "pokeball", type: "gold" },
+                { id: "85", name: "雷精灵", placed: null, isEngineering: false, profession: "pokeball", type: "purple" },
+                { id: "57", name: "木精灵", placed: null, isEngineering: false, profession: "pokeball", type: "gold" },
+                { id: "custom_1780506538530", name: "火炮射线", placed: "u0", isEngineering: true, profession: "engineering", type: "gold" },
+                { id: "custom_1780506403323", name: "小野酋长", placed: "u5", isEngineering: false, profession: "priest", type: "gold" }
+            ],
+            teammateHandCards: [
+                { id: "47", name: "火灵", placed: "t6", isEngineering: false, profession: "panda", type: "gold" },
+                { id: "45", name: "萌萌", placed: "t5", isEngineering: false, profession: "panda", type: "gold" },
+                { id: "12", name: "女妖", placed: "t4", isEngineering: false, profession: "mage", type: "gold" },
+                { id: "71", name: "骨弓", placed: "t3", isEngineering: false, profession: "archer", type: "purple" },
+                { id: "66", name: "电法", placed: "t2", isEngineering: false, profession: "mage", type: "purple" },
+                { id: "74", name: "悟空", placed: "t1", isEngineering: false, profession: "summoner", type: "purple" },
+                { id: "56", name: "幻精灵", placed: null, isEngineering: false, profession: "pokeball", type: "gold" },
+                { id: "58", name: "魔精灵", placed: null, isEngineering: false, profession: "pokeball", type: "gold" },
+                { id: "55", name: "光精灵", placed: null, isEngineering: false, profession: "pokeball", type: "gold" },
+                { id: "custom_1780506528280", name: "火炮宝库", placed: "t0", isEngineering: true, profession: "engineering", type: "gold" }
+            ],
+            myPlacedCards: [
+                { id: "34", name: "咕咕", slot: "u6", isEngineering: false, profession: "priest" },
+                { id: "47", name: "火灵", slot: "u4", isEngineering: false, profession: "panda" },
+                { id: "21", name: "蛇女", slot: "u3", isEngineering: false, profession: "archer" },
+                { id: "46", name: "水灵", slot: "u2", isEngineering: false, profession: "panda" },
+                { id: "77", name: "死神", slot: "u1", isEngineering: false, profession: "priest" },
+                { id: "custom_1780506538530", name: "火炮射线", slot: "u0", isEngineering: true, profession: "engineering" },
+                { id: "custom_1780506403323", name: "小野酋长", slot: "u5", isEngineering: false, profession: "priest" }
+            ],
+            teammatePlacedCards: [
+                { id: "47", name: "火灵", slot: "t6", isEngineering: false, profession: "panda" },
+                { id: "45", name: "萌萌", slot: "t5", isEngineering: false, profession: "panda" },
+                { id: "12", name: "女妖", slot: "t4", isEngineering: false, profession: "mage" },
+                { id: "71", name: "骨弓", slot: "t3", isEngineering: false, profession: "archer" },
+                { id: "66", name: "电法", slot: "t2", isEngineering: false, profession: "mage" },
+                { id: "74", name: "悟空", slot: "t1", isEngineering: false, profession: "summoner" },
+                { id: "custom_1780506528280", name: "火炮宝库", slot: "t0", isEngineering: true, profession: "engineering" }
+            ],
+            cardLevels: {},
+            cardSkins: { "my_custom_1779492294329": "张顺·鱼人", "my_47": "太平乐·火灵", "my_34": "老爷爷·咕咕" },
+            myDeckInfo: "",
+            teammateDeckInfo: "",
+            notepad: "马寒\n寒马\n死神海妖\n小野牛\n女妖可以换法师鱼人等\n主卡禁疗雷\n马寒容3级 副车血马",
+            txtFiles: [
+                { name: "【深海】南门死神容海妖组带人主.txt", content: "上阵：水灵,死神,小野,咕咕,蛇女,火灵,光精灵,火炮,雷精灵,木精灵,\n皮肤：咕咕3\n魔化：水灵,死神,小野,咕咕,蛇女,火灵,悟空,火炮,\n主战车：未设置\n副战车：未设置\n\n1,强制顺序上卡,光葫芦火炮,上火炮满,上咕咕,上小野,上火灵,上蛇女,上死神,上水灵,\n11,上火炮满,上咕咕满,上小野满,上火灵满,上蛇女满,上死神满,上水灵满,\n19,下火灵,\n49,光葫芦火灵,上火灵满,每4秒共100次雷精灵, \n51,停球,下火灵,\n59,光葫芦火灵,上火灵满,每4秒共100次雷精灵, \n61,停球,下火灵,\n69,光葫芦火灵,上火灵满,每4秒共100次雷精灵, \n71,停球,下火灵,\n79,光葫芦火灵,上火灵满,每4秒共100次雷精灵, \n80,停球,\n89,每4秒共100次雷精灵, \n90,停球,\n99,每4秒共100次雷精灵, 每4秒共100次木精灵, \n100,停球,\n109,每4秒共100次雷精灵, 每4秒共100次木精灵, \n\n\n\n" }
+            ],
+            referenceImages: []
+        };
 
         // 初始化IndexedDB
         function initIndexedDB() {
@@ -7464,7 +7522,10 @@
                 
                 request.onsuccess = function(event) {
                     db = event.target.result;
-                    loadCategories().then(() => resolve(db));
+                    loadCategories().then(() => {
+                        // 检查是否有项目，如果没有则保存默认配置
+                        checkAndSaveDefaultProject().then(() => resolve(db));
+                    });
                 };
                 
                 request.onupgradeneeded = function(event) {
@@ -7476,6 +7537,68 @@
                         database.createObjectStore(CATEGORIES_STORE, { keyPath: 'name' });
                     }
                 }
+            });
+        }
+        
+        // 检查并保存默认项目（只在第一次打开时）
+        function checkAndSaveDefaultProject() {
+            return new Promise((resolve, reject) => {
+                if (!db) {
+                    resolve();
+                    return;
+                }
+                
+                // 检查是否已有项目
+                const transaction = db.transaction([STORE_NAME], 'readonly');
+                const store = transaction.objectStore(STORE_NAME);
+                const request = store.getAll();
+                
+                request.onsuccess = function() {
+                    const projects = request.result || [];
+                    
+                    // 如果没有项目，保存默认配置
+                    if (projects.length === 0) {
+                        console.log('首次打开，保存默认配置...');
+                        saveDefaultProject().then(() => resolve());
+                    } else {
+                        // 检查是否已有"南门公主"项目
+                        const hasDefault = projects.some(p => p.name === DEFAULT_PROJECT.name);
+                        if (!hasDefault) {
+                            console.log('添加默认配置到项目列表...');
+                            saveDefaultProject().then(() => resolve());
+                        } else {
+                            resolve();
+                        }
+                    }
+                };
+                
+                request.onerror = function() {
+                    resolve();
+                };
+            });
+        }
+        
+        // 保存默认项目到 IndexedDB
+        function saveDefaultProject() {
+            return new Promise((resolve, reject) => {
+                if (!db) {
+                    reject('DB not initialized');
+                    return;
+                }
+                
+                const transaction = db.transaction([STORE_NAME], 'readwrite');
+                const store = transaction.objectStore(STORE_NAME);
+                const request = store.put(DEFAULT_PROJECT);
+                
+                request.onsuccess = function() {
+                    console.log('默认配置已保存:', DEFAULT_PROJECT.name);
+                    resolve();
+                };
+                
+                request.onerror = function(event) {
+                    console.error('保存默认配置失败:', event.target.error);
+                    reject(event.target.error);
+                };
             });
         }
 
@@ -11302,6 +11425,12 @@
             
             initIndexedDB().then(() => {
                 refreshProjectSelectors();
+                // 自动加载默认项目（南门公主）
+                loadProjectFromDB(DEFAULT_PROJECT.name).then(() => {
+                    console.log('默认项目已加载:', DEFAULT_PROJECT.name);
+                }).catch(e => {
+                    console.warn('加载默认项目失败:', e);
+                });
             });
             loadCardLevels();
             loadIndividualCardLevels();
