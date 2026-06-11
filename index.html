@@ -15223,24 +15223,27 @@ function hasGistToken() {
                 throw new Error('⚠️ 数据保护：检测到远程有 ' + existingMessages.length + ' 条消息，但本地数据为空。\n\n可能原因：网络问题导致数据加载失败。\n\n请刷新页面重新加载，或联系管理员从备份还原数据。');
             }
             
-            // 【数据量异常保护】如果远程数据量远大于本地（超过10条差异），强制合并而不是覆盖
-            if (existingMessages.length > wallMessages.length + 10) {
-                console.warn('数据量异常：远程 ' + existingMessages.length + ' 条，本地 ' + wallMessages.length + ' 条，将自动合并');
-            }
+            // 【删除操作检测】如果本地消息数量比远程少，说明是删除操作，不合并远程数据
+            const isDeleteOperation = wallMessages.length < existingMessages.length;
             
-            // 合并消息：本地新消息 + 远程现有消息（去重）
-            const localNewMsgIds = wallMessages.map(m => m.time + '_' + m.author);
-            const mergedMessages = [...wallMessages];
-            for (const msg of existingMessages) {
-                const msgId = msg.time + '_' + msg.author;
-                if (!localNewMsgIds.includes(msgId)) {
-                    mergedMessages.push(msg);
+            let finalMessages;
+            if (isDeleteOperation) {
+                // 删除操作：直接使用本地数据，不合并远程
+                finalMessages = wallMessages.slice(0, MAX_MESSAGES);
+                console.log('删除操作：本地', wallMessages.length, '条，远程', existingMessages.length, '条，直接使用本地数据');
+            } else {
+                // 添加操作：合并远程数据（防止丢失）
+                const localNewMsgIds = wallMessages.map(m => m.time + '_' + m.author);
+                const mergedMessages = [...wallMessages];
+                for (const msg of existingMessages) {
+                    const msgId = msg.time + '_' + msg.author;
+                    if (!localNewMsgIds.includes(msgId)) {
+                        mergedMessages.push(msg);
+                    }
                 }
+                mergedMessages.sort((a, b) => b.time - a.time);
+                finalMessages = mergedMessages.slice(0, MAX_MESSAGES);
             }
-            // 按时间排序（新的在前）
-            mergedMessages.sort((a, b) => b.time - a.time);
-            // 限制最大数量
-            const finalMessages = mergedMessages.slice(0, MAX_MESSAGES);
             
             if (messagesGistId) {
                 try {
