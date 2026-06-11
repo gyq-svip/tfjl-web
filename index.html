@@ -6207,10 +6207,18 @@
                 output += '\n田伯光最大吃酒数，1\n田伯光扔壶前，每1秒共1次冰精灵\n田伯光酒壶，每2秒共3次冰精灵\n田伯光药壶，停球';
             }
 
+            // 计算总减伤
+            loadDamageReductionData();
+            const totalDamageReduction = calculateDamageReductionForCards(heroNames);
+
             // 显示结果
             resultEl.innerHTML = `
                 <div style="background:rgba(0,0,0,0.3);padding:10px;border-radius:8px;margin-top:5px;">
                     <div style="color:#4caf50;font-weight:bold;margin-bottom:8px;">✅ 活动脚本输出：</div>
+                    <div style="background:rgba(78,205,196,0.1);border:1px solid rgba(78,205,196,0.3);border-radius:6px;padding:8px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
+                        <span style="color:#4ecdc4;font-size:0.85rem;">🛡️ 总减伤：<strong style="color:#fff;font-size:1rem;">${totalDamageReduction}</strong></span>
+                        <span style="color:rgba(255,255,255,0.5);font-size:0.75rem;">（已上阵${heroNames.length}张卡，精灵卡不计入）</span>
+                    </div>
                     <textarea id="activityScriptTextarea" oninput="window._activityScriptOutput=this.value" style="width:100%;min-height:350px;color:#fff;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.2);border-radius:6px;padding:8px;font-family:monospace;font-size:0.85rem;white-space:pre-wrap;word-break:break-all;resize:vertical;">${output.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</textarea>
                     <div style="display:flex;gap:8px;margin-top:10px;">
                         <button onclick="copyActivityScriptOutput()" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.85rem;">📋 复制脚本</button>
@@ -7096,12 +7104,15 @@
         <div class="selection-area">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
                 <h2 style="margin:0;">⚔️ 出战选择</h2>
-                <button onclick="resetAll()" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:0.75rem;">🔄 重置</button>
+                <div style="display:flex;gap:8px;">
+                    <button onclick="showDamageReductionDialog()" style="background:rgba(78,205,196,0.2);border:1px solid rgba(78,205,196,0.4);color:#4ecdc4;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:0.75rem;">🛡️ 减伤</button>
+                    <button onclick="resetAll()" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:0.75rem;">🔄 重置</button>
+                </div>
             </div>
             
             <div class="battle-field">
                 <div class="battle-column user-column">
-                    <h4>👤 我卡组（7格）</h4>
+                    <h4>👤 我卡组（7格）<span id="myDamageReduction" style="color:#4ecdc4;font-size:0.85rem;margin-left:8px;">总减伤:0</span></h4>
                     <div class="battle-slots-container">
                         <div class="battle-slot engineering-slot empty" data-slot="u0" data-type="engineering">
                             <span class="slot-label">🔧</span>
@@ -7118,7 +7129,7 @@
                     </div>
                 </div>
                 <div class="battle-column teammate-column">
-                    <h4>👥 队友卡组（7格）</h4>
+                    <h4>👥 队友卡组（7格）<span id="teammateDamageReduction" style="color:#4ecdc4;font-size:0.85rem;margin-left:8px;">总减伤:0</span></h4>
                     <div class="battle-slots-container">
                         <div class="battle-slot engineering-slot empty" data-slot="t0" data-type="engineering">
                             <span class="slot-label">🔧</span>
@@ -10861,6 +10872,7 @@
                 placedArray.push({ id: cardId, name: cardName, slot: slotId, isEngineering, profession });
                 
                 updateHandDisplay(isUserSlot ? 'my' : 'teammate');
+                updateDamageReductionDisplay(); // 更新减伤显示
             } else if (source === 'hand') {
                 const handType = e.dataTransfer.getData('text/hand');
                 const handCards = handType === 'my' ? myHandCards : teammateHandCards;
@@ -10890,6 +10902,7 @@
                     }
                     
                     updateHandDisplay(handType);
+                    updateDamageReductionDisplay(); // 更新减伤显示
                 }
             }
         }
@@ -10956,6 +10969,7 @@
             }
             
             updateHandDisplay(isUserSlot ? 'my' : 'teammate');
+            updateDamageReductionDisplay(); // 更新减伤显示
         }
 
         // 重置所有选择
@@ -10988,6 +11002,321 @@
             
             updateHandDisplay('my');
             updateHandDisplay('teammate');
+            updateDamageReductionDisplay();
+        }
+        
+        // ==================== 减伤记录功能 ====================
+        let damageReductionData = {}; // 存储减伤数据 { 卡牌名: 减伤数值 }
+        
+        // 加载减伤数据
+        function loadDamageReductionData() {
+            const saved = localStorage.getItem('tdjl_damageReduction');
+            if (saved) {
+                try {
+                    damageReductionData = JSON.parse(saved);
+                } catch (e) {
+                    damageReductionData = {};
+                }
+            }
+        }
+        
+        // 保存减伤数据
+        function saveDamageReductionData() {
+            localStorage.setItem('tdjl_damageReduction', JSON.stringify(damageReductionData));
+        }
+        
+        // 显示减伤记录弹窗
+        function showDamageReductionDialog() {
+            loadDamageReductionData();
+            
+            // 获取所有职业分类（排除精灵类 pokeball）
+            const professions = ['战士', '法师', '弓箭手', '召唤师', '熊猫', '牧师', '工程'];
+            const professionNames = {
+                '战士': 'warrior',
+                '法师': 'mage',
+                '弓箭手': 'archer',
+                '召唤师': 'summoner',
+                '熊猫': 'panda',
+                '牧师': 'priest',
+                '工程': 'engineering'
+            };
+            
+            // 获取每个职业下的卡牌列表
+            const cardsByProfession = {};
+            professions.forEach(prof => {
+                cardsByProfession[prof] = [];
+            });
+            
+            // 从卡牌数据中获取（需要找到卡牌定义）
+            // 这里先使用常见的卡牌列表
+            const allCards = [
+                { name: '小野酋长', profession: 'priest' },
+                { name: '咕咕', profession: 'priest' },
+                { name: '死神', profession: 'priest' },
+                { name: '萌萌', profession: 'panda' },
+                { name: '水灵', profession: 'panda' },
+                { name: '火灵', profession: 'panda' },
+                { name: '鱼人', profession: 'panda' },
+                { name: '女妖', profession: 'mage' },
+                { name: '电法', profession: 'mage' },
+                { name: '骨弓', profession: 'archer' },
+                { name: '蛇女', profession: 'archer' },
+                { name: '悟空', profession: 'summoner' },
+                { name: '大圣', profession: 'summoner' },
+                { name: '后羿', profession: 'archer' },
+                { name: '天使', profession: 'priest' },
+                { name: '虎弓', profession: 'archer' },
+                { name: '风灵', profession: 'panda' },
+                { name: '龙王', profession: 'summoner' },
+                { name: '飞机', profession: 'summoner' },
+                { name: '火炮', profession: 'engineering' },
+                { name: '宝库', profession: 'engineering' },
+                { name: '射线', profession: 'engineering' },
+                { name: '咬人娃娃', profession: 'engineering' },
+                { name: '潜艇', profession: 'engineering' }
+            ];
+            
+            // 添加自定义卡牌
+            if (typeof customCards !== 'undefined') {
+                customCards.forEach(card => {
+                    if (card.profession !== 'pokeball') {
+                        allCards.push({ name: card.name, profession: card.profession });
+                    }
+                });
+            }
+            
+            // 按职业分组
+            allCards.forEach(card => {
+                const profKey = Object.keys(professionNames).find(key => professionNames[key] === card.profession);
+                if (profKey && cardsByProfession[profKey]) {
+                    cardsByProfession[profKey].push(card.name);
+                }
+            });
+            
+            // 构建弹窗HTML
+            let html = `
+                <div id="damageReductionModal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:9999;display:flex;justify-content:center;align-items:center;">
+                    <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:16px;padding:20px;max-width:600px;width:90%;max-height:80vh;overflow-y:auto;border:2px solid rgba(78,205,196,0.3);">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+                            <h3 style="color:#4ecdc4;margin:0;">🛡️ 减伤记录</h3>
+                            <button onclick="document.getElementById('damageReductionModal').remove()" style="background:none;border:none;color:#fff;font-size:1.5rem;cursor:pointer;">✕</button>
+                        </div>
+                        <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:12px;margin-bottom:15px;font-size:0.85rem;color:rgba(255,255,255,0.6);">
+                            💡 提示：设置每张卡的减伤数值，系统会自动计算卡组总减伤。精灵卡不参与减伤计算。
+                        </div>
+                        <div style="display:flex;gap:8px;margin-bottom:15px;">
+                            <select id="professionFilter" onchange="filterDamageReductionCards()" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;padding:8px 12px;border-radius:6px;flex:1;">
+                                <option value="all">全部职业</option>
+                                ${professions.map(prof => `<option value="${prof}">${prof}</option>`).join('')}
+                            </select>
+                            <button onclick="exportDamageReductionToTxt()" style="background:rgba(74,222,128,0.2);border:1px solid rgba(74,222,128,0.4);color:#4ade80;padding:8px 12px;border-radius:6px;">导出TXT</button>
+                            <button onclick="importDamageReductionFromTxt();setTimeout(()=>{filterDamageReductionCards();},500);" style="background:rgba(96,165,250,0.2);border:1px solid rgba(96,165,250,0.4);color:#60a5fa;padding:8px 12px;border-radius:6px;">导入TXT</button>
+                            <button onclick="clearAllDamageReduction()" style="background:rgba(239,68,68,0.2);border:1px solid rgba(239,68,68,0.4);color:#ef4444;padding:8px 12px;border-radius:6px;">清空</button>
+                        </div>
+                        <div id="damageReductionCardsList" style="display:flex;flex-direction:column;gap:8px;">
+                            ${buildDamageReductionCardsList('all', cardsByProfession, damageReductionData)}
+                        </div>
+                        <div style="display:flex;justify-content:center;margin-top:15px;">
+                            <button onclick="saveDamageReductionFromDialog();document.getElementById('damageReductionModal').remove();updateDamageReductionDisplay();" style="background:linear-gradient(135deg,#4ecdc4,#44a08d);color:#1a1a2e;border:none;padding:12px 24px;border-radius:8px;cursor:pointer;font-weight:bold;">保存</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.insertAdjacentHTML('beforeend', html);
+            
+            // 存储卡牌列表供后续筛选使用
+            window._damageReductionCardsByProfession = cardsByProfession;
+        }
+        
+        // 构建减伤卡牌列表
+        function buildDamageReductionCardsList(filter, cardsByProfession, currentData) {
+            let html = '';
+            const professions = Object.keys(cardsByProfession);
+            
+            professions.forEach(prof => {
+                if (filter !== 'all' && filter !== prof) return;
+                
+                const cards = cardsByProfession[prof];
+                if (cards.length === 0) return;
+                
+                html += `<div style="margin-bottom:10px;">
+                    <div style="color:#ffd700;font-size:0.85rem;margin-bottom:5px;padding:5px;background:rgba(255,215,0,0.1);border-radius:4px;">${prof}类 (${cards.length}张)</div>
+                    <div style="display:flex;flex-direction:column;gap:4px;">`;
+                
+                cards.forEach(cardName => {
+                    const value = currentData[cardName] || 0;
+                    html += `
+                        <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:rgba(255,255,255,0.05);border-radius:6px;">
+                            <span style="color:#fff;font-size:0.85rem;">${cardName}</span>
+                            <input type="number" 
+                                   data-card="${cardName}" 
+                                   value="${value}" 
+                                   min="0" 
+                                   max="100"
+                                   style="width:60px;background:rgba(255,255,255,0.1);border:1px solid rgba(78,205,196,0.3);color:#4ecdc4;padding:4px 8px;border-radius:4px;text-align:center;font-size:0.85rem;"
+                                   onchange="this.style.color='#4ecdc4'">
+                        </div>
+                    `;
+                });
+                
+                html += `</div></div>`;
+            });
+            
+            return html;
+        }
+        
+        // 筛选减伤卡牌
+        function filterDamageReductionCards() {
+            const filter = document.getElementById('professionFilter').value;
+            const listContainer = document.getElementById('damageReductionCardsList');
+            listContainer.innerHTML = buildDamageReductionCardsList(filter, window._damageReductionCardsByProfession, damageReductionData);
+        }
+        
+        // 从弹窗保存减伤数据
+        function saveDamageReductionFromDialog() {
+            const inputs = document.querySelectorAll('#damageReductionCardsList input[data-card]');
+            inputs.forEach(input => {
+                const cardName = input.dataset.card;
+                const value = parseInt(input.value) || 0;
+                if (value > 0) {
+                    damageReductionData[cardName] = value;
+                } else {
+                    delete damageReductionData[cardName];
+                }
+            });
+            saveDamageReductionData();
+        }
+        
+        // 清空全部减伤数据
+        function clearAllDamageReduction() {
+            if (!confirm('确定要清空所有减伤记录吗？')) return;
+            damageReductionData = {};
+            saveDamageReductionData();
+            filterDamageReductionCards();
+        }
+        
+        // 计算卡组的总减伤
+        function calculateTotalDamageReduction(cardList) {
+            let total = 0;
+            cardList.forEach(card => {
+                // 精灵卡不参与减伤计算
+                if (card.profession === 'pokeball') return;
+                
+                const cardName = card.name;
+                if (damageReductionData[cardName]) {
+                    total += damageReductionData[cardName];
+                }
+            });
+            return total;
+        }
+        
+        // 更减伤显示
+        function updateDamageReductionDisplay() {
+            loadDamageReductionData();
+            
+            // 计算我的卡组减伤（已出战的卡）
+            const myTotal = calculateTotalDamageReduction(myPlacedCards);
+            const myEl = document.getElementById('myDamageReduction');
+            if (myEl) {
+                myEl.textContent = `总减伤:${myTotal}`;
+            }
+            
+            // 计算队友卡组减伤（已出战的卡）
+            const teammateTotal = calculateTotalDamageReduction(teammatePlacedCards);
+            const teammateEl = document.getElementById('teammateDamageReduction');
+            if (teammateEl) {
+                teammateEl.textContent = `总减伤:${teammateTotal}`;
+            }
+        }
+        
+        // 计算指定卡牌列表的总减伤（用于脚本解析）
+        function calculateDamageReductionForCards(cardNames) {
+            let total = 0;
+            cardNames.forEach(name => {
+                // 精灵卡不参与
+                if (name.includes('精灵')) return;
+                
+                if (damageReductionData[name]) {
+                    total += damageReductionData[name];
+                }
+            });
+            return total;
+        }
+        
+        // 导出减伤记录为TXT文件
+        function exportDamageReductionToTxt() {
+            loadDamageReductionData();
+            
+            let content = '# 减伤记录配置文件\n';
+            content += '# 格式：卡牌名=减伤数值\n';
+            content += '# 示例：水灵=10\n';
+            content += '# 精灵卡不参与减伤计算\n';
+            content += '# 导出时间：' + new Date().toLocaleString('zh-CN') + '\n\n';
+            
+            // 按卡牌名排序
+            const sortedCards = Object.keys(damageReductionData).sort();
+            sortedCards.forEach(cardName => {
+                content += `${cardName}=${damageReductionData[cardName]}\n`;
+            });
+            
+            // 创建下载
+            const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `减伤记录_${new Date().toLocaleDateString('zh-CN').replace(/\//g, '-')}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+        
+        // 导入减伤记录从TXT文件
+        function importDamageReductionFromTxt() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.txt';
+            input.onchange = function(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const content = event.target.result;
+                    parseDamageReductionTxt(content);
+                };
+                reader.readAsText(file);
+            };
+            input.click();
+        }
+        
+        // 解析减伤TXT文件
+        function parseDamageReductionTxt(content) {
+            const lines = content.split('\n');
+            const newData = {};
+            
+            lines.forEach(line => {
+                // 跳过注释和空行
+                if (line.startsWith('#') || line.trim() === '') return;
+                
+                // 解析格式：卡牌名=数值
+                const match = line.match(/^([^=]+)=(\d+)$/);
+                if (match) {
+                    const cardName = match[1].trim();
+                    const value = parseInt(match[2]);
+                    if (cardName && value > 0) {
+                        newData[cardName] = value;
+                    }
+                }
+            });
+            
+            if (Object.keys(newData).length > 0) {
+                damageReductionData = newData;
+                saveDamageReductionData();
+                alert(`导入成功！共 ${Object.keys(newData).length} 条减伤记录`);
+                updateDamageReductionDisplay();
+            } else {
+                alert('未找到有效的减伤记录');
+            }
         }
 
         function toggleSection(header) {
@@ -11439,6 +11768,7 @@
             loadCustomSkinAttributes();
             loadCustomCards();
             loadFavorites();
+            loadDamageReductionData(); // 加载减伤数据
             setupAddCardButtons();
             setupCardSortDrag();
             updateTxtFilesList();
@@ -11450,6 +11780,8 @@
             applyCardOrder();
             // 初始化所有卡牌的等级徽章显示
             updateAllCardLevelBadges();
+            // 更新减伤显示
+            updateDamageReductionDisplay();
 
             // 恢复收藏折叠状态
             const favoriteOpen = localStorage.getItem('tdjl_favorite_open');
