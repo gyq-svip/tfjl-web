@@ -6216,7 +6216,7 @@
                 <div style="background:rgba(0,0,0,0.3);padding:10px;border-radius:8px;margin-top:5px;">
                     <div style="color:#4caf50;font-weight:bold;margin-bottom:8px;">✅ 活动脚本输出：</div>
                     <div style="background:rgba(78,205,196,0.1);border:1px solid rgba(78,205,196,0.3);border-radius:6px;padding:8px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
-                        <span style="color:#4ecdc4;font-size:0.85rem;">🛡️ 总减伤：<strong style="color:#fff;font-size:1rem;">${totalDamageReduction}</strong></span>
+                        <span style="color:#4ecdc4;font-size:0.85rem;">🛡️ 洗炼总减伤：<strong style="color:#fff;font-size:1rem;">${totalDamageReduction}</strong></span>
                         <span style="color:rgba(255,255,255,0.5);font-size:0.75rem;">（已上阵${heroNames.length}张卡，精灵卡不计入）</span>
                     </div>
                     <textarea id="activityScriptTextarea" oninput="window._activityScriptOutput=this.value" style="width:100%;min-height:350px;color:#fff;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.2);border-radius:6px;padding:8px;font-family:monospace;font-size:0.85rem;white-space:pre-wrap;word-break:break-all;resize:vertical;">${output.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</textarea>
@@ -7105,14 +7105,21 @@
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
                 <h2 style="margin:0;">⚔️ 出战选择</h2>
                 <div style="display:flex;gap:8px;">
-                    <button onclick="showDamageReductionDialog()" style="background:rgba(78,205,196,0.2);border:1px solid rgba(78,205,196,0.4);color:#4ecdc4;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:0.75rem;">🛡️ 减伤</button>
+                    <div style="position:relative;">
+                        <button onclick="toggleDamageReductionMenu(this)" style="background:rgba(78,205,196,0.2);border:1px solid rgba(78,205,196,0.4);color:#4ecdc4;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:0.75rem;">🛡️ 减伤</button>
+                        <div id="damageReductionMenu" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:rgba(42,42,74,0.95);border:1px solid rgba(78,205,196,0.3);border-radius:8px;padding:8px 0;min-width:140px;z-index:1000;box-shadow:0 4px 15px rgba(0,0,0,0.4);">
+                            <div onclick="showDamageReductionDialog();document.getElementById('damageReductionMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📝 设置减伤</div>
+                            <div onclick="exportDamageReductionToTxt();document.getElementById('damageReductionMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#4ade80;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(74,222,128,0.1)'" onmouseout="this.style.background='transparent'">📤 导出TXT</div>
+                            <div onclick="importDamageReductionFromTxt();document.getElementById('damageReductionMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#60a5fa;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(96,165,250,0.1)'" onmouseout="this.style.background='transparent'">📥 导入TXT</div>
+                        </div>
+                    </div>
                     <button onclick="resetAll()" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:0.75rem;">🔄 重置</button>
                 </div>
             </div>
             
             <div class="battle-field">
                 <div class="battle-column user-column">
-                    <h4>👤 我卡组（7格）<span id="myDamageReduction" style="color:#4ecdc4;font-size:0.85rem;margin-left:8px;">总减伤:0</span></h4>
+                    <h4>👤 我卡组（7格）<span id="myDamageReduction" style="color:#4ecdc4;font-size:0.85rem;margin-left:8px;">洗炼总减伤:0</span></h4>
                     <div class="battle-slots-container">
                         <div class="battle-slot engineering-slot empty" data-slot="u0" data-type="engineering">
                             <span class="slot-label">🔧</span>
@@ -7129,7 +7136,7 @@
                     </div>
                 </div>
                 <div class="battle-column teammate-column">
-                    <h4>👥 队友卡组（7格）<span id="teammateDamageReduction" style="color:#4ecdc4;font-size:0.85rem;margin-left:8px;">总减伤:0</span></h4>
+                    <h4>👥 队友卡组（7格）<span id="teammateDamageReduction" style="color:#4ecdc4;font-size:0.85rem;margin-left:8px;">洗炼总减伤:0</span></h4>
                     <div class="battle-slots-container">
                         <div class="battle-slot engineering-slot empty" data-slot="t0" data-type="engineering">
                             <span class="slot-label">🔧</span>
@@ -11077,10 +11084,16 @@
             ];
             
             // 添加自定义卡牌
-            if (typeof customCards !== 'undefined') {
-                customCards.forEach(card => {
-                    if (card.profession !== 'pokeball') {
-                        allCards.push({ name: card.name, profession: card.profession });
+            if (typeof customCards !== 'undefined' && customCards) {
+                // customCards 是对象格式 { key: [card1, card2, ...] }
+                Object.keys(customCards).forEach(key => {
+                    const cards = customCards[key];
+                    if (Array.isArray(cards)) {
+                        cards.forEach(card => {
+                            if (card.profession !== 'pokeball') {
+                                allCards.push({ name: card.name, profession: card.profession });
+                            }
+                        });
                     }
                 });
             }
@@ -11219,14 +11232,24 @@
             const myTotal = calculateTotalDamageReduction(myPlacedCards);
             const myEl = document.getElementById('myDamageReduction');
             if (myEl) {
-                myEl.textContent = `总减伤:${myTotal}`;
+                myEl.textContent = `洗炼总减伤:${myTotal}`;
             }
             
             // 计算队友卡组减伤（已出战的卡）
             const teammateTotal = calculateTotalDamageReduction(teammatePlacedCards);
             const teammateEl = document.getElementById('teammateDamageReduction');
             if (teammateEl) {
-                teammateEl.textContent = `总减伤:${teammateTotal}`;
+                teammateEl.textContent = `洗炼总减伤:${teammateTotal}`;
+            }
+        }
+        
+        // 切换减伤菜单
+        function toggleDamageReductionMenu(btn) {
+            const menu = document.getElementById('damageReductionMenu');
+            if (menu.style.display === 'none') {
+                menu.style.display = 'block';
+            } else {
+                menu.style.display = 'none';
             }
         }
         
