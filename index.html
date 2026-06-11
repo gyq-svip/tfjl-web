@@ -15218,7 +15218,12 @@ function hasGistToken() {
             
             // 【空数据保护】如果远程有数据但本地为空，阻止保存
             if (existingMessages.length > 0 && wallMessages.length === 0) {
-                throw new Error('安全保护：远程有数据但本地为空，阻止保存以防止覆盖');
+                throw new Error('⚠️ 数据保护：检测到远程有 ' + existingMessages.length + ' 条消息，但本地数据为空。\n\n可能原因：网络问题导致数据加载失败。\n\n请刷新页面重新加载，或联系管理员从备份还原数据。');
+            }
+            
+            // 【数据量异常保护】如果远程数据量远大于本地（超过10条差异），强制合并而不是覆盖
+            if (existingMessages.length > wallMessages.length + 10) {
+                console.warn('数据量异常：远程 ' + existingMessages.length + ' 条，本地 ' + wallMessages.length + ' 条，将自动合并');
             }
             
             // 合并消息：本地新消息 + 远程现有消息（去重）
@@ -15599,6 +15604,8 @@ function hasGistToken() {
             if (gistPage) gistPage.style.display = 'none';
             const cachePage = document.getElementById('adminPageCacheManage');
             if (cachePage) cachePage.style.display = 'none';
+            const backupPage = document.getElementById('adminPageBackupManage');
+            if (backupPage) backupPage.style.display = 'none';
 
             if (page === 'help') {
                 if (helpPage) helpPage.style.display = 'block';
@@ -15641,6 +15648,10 @@ function hasGistToken() {
             } else if (page === 'cacheManage') {
                 if (cachePage) {
                     cachePage.style.display = 'block';
+                }
+            } else if (page === 'backupManage') {
+                if (backupPage) {
+                    backupPage.style.display = 'block';
                 }
             }
         }
