@@ -7942,6 +7942,7 @@
                         restoreBattleSlots();
                         updateFavoritesDisplay();
                         updateAllCardLevelDisplays();
+                        updateDamageReductionDisplay(); // 切换项目后更新减伤显示
                         
                         // 更新卡池中的常用卡标记
                         document.querySelectorAll('.card-item').forEach(card => {
@@ -11259,9 +11260,9 @@
                             💡 提示：设置每张卡的减伤数值，系统会自动计算卡组总减伤。精灵卡不参与减伤计算。
                         </div>
                         <div style="display:flex;gap:8px;margin-bottom:15px;">
-                            <select id="professionFilter" onchange="filterDamageReductionCards()" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;padding:8px 12px;border-radius:6px;flex:1;">
-                                <option value="all">全部职业</option>
-                                ${professions.map(prof => `<option value="${prof}">${prof}</option>`).join('')}
+                            <select id="professionFilter" onchange="filterDamageReductionCards()" style="background:rgba(30,30,60,0.95);border:1px solid rgba(78,205,196,0.4);color:#fff;padding:8px 12px;border-radius:6px;flex:1;">
+                                <option value="all" style="background:rgba(30,30,60,0.95);">全部职业</option>
+                                ${professions.map(prof => `<option value="${prof}" style="background:rgba(30,30,60,0.95);">${prof}</option>`).join('')}
                             </select>
                             <button onclick="exportDamageReductionToTxt()" style="background:rgba(74,222,128,0.2);border:1px solid rgba(74,222,128,0.4);color:#4ade80;padding:8px 12px;border-radius:6px;">导出TXT</button>
                             <button onclick="importDamageReductionFromTxt();setTimeout(()=>{filterDamageReductionCards();},500);" style="background:rgba(96,165,250,0.2);border:1px solid rgba(96,165,250,0.4);color:#60a5fa;padding:8px 12px;border-radius:6px;">导入TXT</button>
@@ -11381,38 +11382,61 @@
             filterDamageReductionCards();
         }
         
-        // 计算卡组的总减伤
+        // 计算卡组的总减伤（洗炼减伤 + 特殊技能减伤）
         function calculateTotalDamageReduction(cardList) {
             let total = 0;
-            const seenCards = new Set(); // 用于去重
+            const seenCards = new Set(); // 用于洗炼去重
+            const seenSpecial = new Set(); // 用于特殊技能去重
             
             cardList.forEach(card => {
                 // 精灵卡不参与减伤计算
                 if (card.profession === 'pokeball') return;
                 
-                let cardName = card.name;
+                const cardName = card.name;
+                const parts = [];
                 
-                // 处理组合卡，只取第一个卡（如火炮射线只算火炮）
+                // 处理融合卡，拆分各部分
                 if (cardName.includes('、') || cardName.includes('+') || cardName.includes(' ')) {
-                    // 按分隔符分割，取第一个卡名
                     const separators = ['、', '+', ' '];
-                    let firstPart = cardName;
+                    let remaining = cardName;
                     for (const sep of separators) {
-                        if (firstPart.includes(sep)) {
-                            firstPart = firstPart.split(sep)[0].trim();
+                        if (remaining.includes(sep)) {
+                            const splitParts = remaining.split(sep).map(p => p.trim()).filter(p => p);
+                            parts.push(...splitParts);
                             break;
                         }
                     }
-                    cardName = firstPart;
+                    if (parts.length === 0) parts.push(cardName);
+                } else {
+                    parts.push(cardName);
                 }
                 
-                // 防止重复计算（同名卡只算一次洗炼）
-                if (seenCards.has(cardName)) return;
-                seenCards.add(cardName);
-                
-                if (damageReductionData[cardName]) {
-                    total += damageReductionData[cardName];
+                // 处理洗炼减伤（取第一张卡的洗炼）
+                if (parts.length > 0) {
+                    const firstPart = parts[0];
+                    if (!seenCards.has(firstPart)) {
+                        seenCards.add(firstPart);
+                        if (damageReductionData[firstPart]) {
+                            total += damageReductionData[firstPart];
+                        }
+                    }
                 }
+                
+                // 处理特殊技能减伤（战车、小野、酋长、宝库）
+                const specialKeys = ['战车', '小野', '酋长', '宝库'];
+                parts.forEach(part => {
+                    specialKeys.forEach(special => {
+                        if (part.includes(special)) {
+                            const key = special;
+                            if (!seenSpecial.has(key)) {
+                                seenSpecial.add(key);
+                                if (specialDamageReduction[key] > 0) {
+                                    total += specialDamageReduction[key];
+                                }
+                            }
+                        }
+                    });
+                });
             });
             
             return parseFloat(total.toFixed(1));
@@ -11426,14 +11450,14 @@
             const myTotal = calculateTotalDamageReduction(myPlacedCards);
             const myEl = document.getElementById('myDamageReduction');
             if (myEl) {
-                myEl.textContent = `洗炼总减伤:${myTotal}`;
+                myEl.textContent = `总减伤:${myTotal}`;
             }
             
             // 计算队友卡组减伤（已出战的卡）
             const teammateTotal = calculateTotalDamageReduction(teammatePlacedCards);
             const teammateEl = document.getElementById('teammateDamageReduction');
             if (teammateEl) {
-                teammateEl.textContent = `洗炼总减伤:${teammateTotal}`;
+                teammateEl.textContent = `总减伤:${teammateTotal}`;
             }
         }
         
@@ -11498,7 +11522,7 @@
             content += '===== 特殊技能减伤 =====\n';
             const specialKeys = ['战车', '小野', '酋长', '宝库'];
             specialKeys.forEach(key => {
-                if (specialDamageReduction[key] > 0) {
+                if (specialDamageReduction[key] !== undefined) {
                     content += `${key}=${specialDamageReduction[key]}\n`;
                 }
             });
@@ -11543,6 +11567,7 @@
         function parseDamageReductionTxt(content) {
             const lines = content.split('\n');
             const newData = {};
+            const newSpecial = { "战车": 0, "小野": 0, "酋长": 0, "宝库": 0 };
             const specialKeys = ['战车', '小野', '酋长', '宝库'];
             let inSpecialSection = false;
             
@@ -11556,15 +11581,15 @@
                     return;
                 }
                 
-                // 解析格式：卡牌名=数值（支持小数）
+                // 解析格式：卡牌名=数值（支持小数，可为0）
                 const match = line.match(/^([^=]+)=(\d+(?:\.\d+)?)$/);
                 if (match) {
                     const cardName = match[1].trim();
                     const value = parseFloat(match[2]);
-                    if (cardName && value > 0) {
+                    if (cardName && !isNaN(value)) {
                         // 判断是特殊减伤还是洗炼减伤
                         if (specialKeys.includes(cardName)) {
-                            specialDamageReduction[cardName] = value;
+                            newSpecial[cardName] = value;
                         } else {
                             newData[cardName] = value;
                         }
@@ -11572,22 +11597,30 @@
                 }
             });
             
+            // 保存数据
+            damageReductionData = newData;
+            specialDamageReduction = newSpecial;
+            saveDamageReductionData();
+            
             let message = '';
             if (Object.keys(newData).length > 0) {
-                damageReductionData = newData;
                 message += `洗炼减伤：${Object.keys(newData).length} 条`;
             }
             
-            const specialCount = specialKeys.filter(k => specialDamageReduction[k] > 0).length;
+            const specialCount = specialKeys.filter(k => newSpecial[k] > 0).length;
             if (specialCount > 0) {
                 if (message) message += '，';
                 message += `特殊技能减伤：${specialCount} 条`;
             }
             
             if (message) {
-                saveDamageReductionData();
                 alert(`导入成功！${message}`);
                 updateDamageReductionDisplay();
+                // 刷新当前弹窗的显示
+                const filterEl = document.getElementById('professionFilter');
+                if (filterEl) {
+                    filterDamageReductionCards();
+                }
             } else {
                 alert('未找到有效的减伤记录');
             }
