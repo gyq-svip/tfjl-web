@@ -11394,6 +11394,7 @@
                 
                 const cardName = card.name;
                 const parts = [];
+                let isFusion = false;
                 
                 // 处理融合卡，拆分各部分
                 if (cardName.includes('、') || cardName.includes('+') || cardName.includes(' ')) {
@@ -11407,18 +11408,30 @@
                         }
                     }
                     if (parts.length === 0) parts.push(cardName);
+                    isFusion = (parts.length >= 2);
                 } else {
                     parts.push(cardName);
                 }
                 
-                // 处理洗炼减伤（取第一张卡的洗炼）
-                if (parts.length > 0) {
-                    const firstPart = parts[0];
-                    if (!seenCards.has(firstPart)) {
-                        seenCards.add(firstPart);
-                        if (damageReductionData[firstPart]) {
-                            total += damageReductionData[firstPart];
-                        }
+                // 处理洗炼减伤
+                // 融合卡逻辑：优先读取融合卡自身的设置，如为0则回退到第一张卡
+                let usedKey = cardName;
+                if (isFusion) {
+                    // 先尝试读取融合卡本身（如"小野酋长"）
+                    if (damageReductionData[cardName] !== undefined && damageReductionData[cardName] > 0) {
+                        usedKey = cardName;
+                    } else {
+                        // 回退到第一张卡（如"小野"）
+                        usedKey = parts[0];
+                    }
+                } else {
+                    usedKey = parts[0];
+                }
+                
+                if (!seenCards.has(usedKey)) {
+                    seenCards.add(usedKey);
+                    if (damageReductionData[usedKey] && damageReductionData[usedKey] > 0) {
+                        total += damageReductionData[usedKey];
                     }
                 }
                 
