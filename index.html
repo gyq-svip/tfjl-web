@@ -6539,6 +6539,12 @@
                 return;
             }
 
+            // 【关键安全】分享前先从Gist加载历史消息，确保本地wallMessages完整
+            // 否则可能只有新消息，保存后覆盖历史消息
+            if (wallMessages.length === 0) {
+                try { await fetchMessages(); } catch (e) { console.warn('预加载消息失败:', e); }
+            }
+
             const now = new Date();
             const defaultName = `${scriptType}_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
             const inputName = prompt(`请输入分享文件名（不含扩展名）：`, defaultName);
@@ -6601,6 +6607,11 @@
             if (!getGistToken()) {
                 alert('离线版暂不支持分享，请切换到在线版');
                 return;
+            }
+
+            // 【关键安全】分享前先从Gist加载历史消息，确保本地wallMessages完整
+            if (wallMessages.length === 0) {
+                try { await fetchMessages(); } catch (e) { console.warn('预加载消息失败:', e); }
             }
 
             const now = new Date();
@@ -14400,7 +14411,7 @@ function hasGistToken() {
         let msgCountdownInterval = null;
         let pendingScriptFile = null;
         const MESSAGE_REFRESH_INTERVAL = 30000;
-        const MAX_MESSAGES = 50;
+        const MAX_MESSAGES = 5000;
 
         function updateMsgRefreshBtn() {
             const btn = document.getElementById('msgRefreshBtn');
@@ -14490,13 +14501,13 @@ function hasGistToken() {
             try {
                 const token = getGistToken();
                 
-                // 优先使用硬编码的 MESSAGES_GIST_ID
+                // ★ 永远优先使用硬编码的 MESSAGES_GIST_ID（这是所有用户共同的消息存储）
                 let messagesGistId = MESSAGES_GIST_ID || localStorage.getItem('messages_gist_id');
                 
                 // 如果都没有，从索引文件获取
                 if (!messagesGistId) {
                     try {
-                        const indexUrl = await getIndexGistUrl();
+                        const indexUrl = `https://api.github.com/gists/${GIST_ID}`;
                         const indexResponse = await fetch(indexUrl, {
                             headers: {
                                 'Accept': 'application/vnd.github.v3+json',
@@ -14511,17 +14522,12 @@ function hasGistToken() {
                                     const indexData = JSON.parse(data.files['room_index.json'].content);
                                     if (indexData['messages']) {
                                         messagesGistId = indexData['messages'];
-                                        // 保存到 localStorage
                                         localStorage.setItem('messages_gist_id', messagesGistId);
                                     }
-                                } catch (e) {
-                                    console.warn('解析索引文件失败');
-                                }
+                                } catch (e) { console.warn('解析索引文件失败:', e); }
                             }
                         }
-                    } catch (e) {
-                        console.warn('获取索引文件失败:', e);
-                    }
+                    } catch (e) { console.warn('获取索引文件失败:', e); }
                 }
                 
                 if (messagesGistId) {
@@ -14539,7 +14545,8 @@ function hasGistToken() {
                             const fileData = data.files['messages.json'];
                             let content = fileData.content;
                             
-                            // 处理 truncated：如果内容被截断，使用 raw_url 获取完整内容
+                            // ★ 处理 truncated：如果内容被截断，使用 raw_url 获取完整内容
+                            // 这是消息丢失的常见原因！GitHub API 会截断大文件
                             if (fileData.truncated || !content) {
                                 try {
                                     const rawResponse = await fetch(fileData.raw_url, {
@@ -14549,33 +14556,52 @@ function hasGistToken() {
                                     });
                                     if (rawResponse.ok) {
                                         content = await rawResponse.text();
+                                    } else {
+                                        console.warn('raw_url 获取失败，状态码:', rawResponse.status);
                                     }
-                                } catch (e) {
-                                    // raw_url 直接获取失败，尝试带认证的 API
-                                    console.warn('raw_url 获取失败，尝试 API 方式');
-                                }
+                                } catch (e) { console.warn('raw_url 获取失败:', e); }
                             }
                             
                             if (content) {
                                 try {
                                     const parsed = JSON.parse(content);
-                                    wallMessages = parsed.messages || [];
+                                    const fetchedMessages = parsed.messages || [];
+                                    
+                                    // ★ 关键修复：不要清空已有本地消息，而是合并
+                                    // 防止用户刚发的消息因为网络延迟被覆盖
+                                    if (wallMessages.length > 0) {
+                                        // 使用和 saveMessagesToGist 相同的唯一ID逻辑合并
+                                        function getMsgId(m) {
+                                            const cs = (m.content || '').substring(0, 30);
+                                            return m.time + '_' + m.author + '_' + cs;
+                                        }
+                                        const fetchedIds = new Set(fetchedMessages.map(getMsgId));
+                                        const merged = [...fetchedMessages];
+                                        wallMessages.forEach(m => {
+                                            if (!fetchedIds.has(getMsgId(m))) merged.push(m);
+                                        });
+                                        merged.sort((a, b) => b.time - a.time);
+                                        wallMessages = merged;
+                                    } else {
+                                        wallMessages = fetchedMessages;
+                                    }
+                                    
                                     renderMessages();
+                                    console.log('[消息加载] 成功加载', wallMessages.length, '条消息');
                                     return;
-                                } catch (e) {
-                                    console.warn('解析消息 JSON 失败:', e);
-                                }
+                                } catch (e) { console.warn('解析消息 JSON 失败:', e); }
                             }
                         }
                     } else if (response.status === 404 || response.status === 403) {
-                        // Gist 不存在或无权限，清除缓存
                         localStorage.removeItem('messages_gist_id');
                     }
                 }
                 
-                // 如果没有找到，使用空数组
-                wallMessages = [];
-                renderMessages();
+                // 如果加载失败，不要清空已有消息，保持原来的消息
+                if (wallMessages.length === 0) {
+                    wallMessages = [];
+                    renderMessages();
+                }
             } catch (error) {
                 console.warn('获取消息失败:', error);
                 const scroller = document.getElementById('messageScroller');
@@ -14764,21 +14790,27 @@ function hasGistToken() {
         }
         async function deleteMessage(index) {
             if (!confirm('确定要删除这条消息吗？')) return;
-            
+
             const nicknameInput = document.getElementById('messageNickname');
             const currentNickname = nicknameInput?.value.trim() || localStorage.getItem('TFJL_UserName') || '';
             const adminNicknames = ['gyq', 'GYQ', '龙行'];
             const isAdmin = adminNicknames.some(nick => currentNickname.toLowerCase() === nick.toLowerCase());
             const msg = wallMessages[index];
-            
+
             if (!msg) return;
-            
+
             const isOwner = msg.author.toLowerCase() === currentNickname.toLowerCase();
             if (!isOwner && !isAdmin) {
                 alert('你没有权限删除这条消息');
                 return;
             }
-            
+
+            // 【关键安全】删除是强制保存（forceSave=true），会直接用本地数据覆盖远程
+            // 所以删除前必须先从Gist加载完整消息，否则可能因本地消息不完整导致其他消息丢失
+            if (wallMessages.length < 5) {
+                try { await fetchMessages(); } catch (e) { console.warn('预加载消息失败:', e); }
+            }
+
             // 删除关联的脚本Gist文件
             if (msg.scriptUrl) {
                 try {
@@ -14811,10 +14843,10 @@ function hasGistToken() {
                     console.warn('删除关联脚本失败:', e);
                 }
             }
-            
+
             wallMessages.splice(index, 1);
             renderMessages();
-            
+
             try {
                 await saveMessagesToGist(true); // 强制保存，跳过合并逻辑
             } catch (error) {
@@ -15948,25 +15980,30 @@ function hasGistToken() {
             const expireDaysSelect = document.getElementById('expireDays');
             let content = input.value.trim();
             const nickname = nicknameInput.value.trim() || '匿名用户';
-            
+
             if (!content && !pendingScriptFile) {
                 alert('请输入内容或选择脚本文件');
                 return;
             }
-            
+
             if (!getGistToken()) {
                 alert('离线版暂不支持发布消息，请切换到在线版');
                 return;
             }
-            
+
+            // 【关键安全】发布前先从Gist加载历史消息，确保本地wallMessages完整
+            if (wallMessages.length === 0) {
+                try { await fetchMessages(); } catch (e) { console.warn('预加载消息失败:', e); }
+            }
+
             // 显示加载状态
             const btn = event.target;
             const originalText = btn.textContent;
             btn.disabled = true;
             btn.textContent = '⏳ 发布中...';
-            
+
             let scriptUrl = null;
-            
+
             try {
                 if (pendingScriptFile) {
                     scriptUrl = await uploadScriptToGist(pendingScriptFile);
@@ -15977,7 +16014,7 @@ function hasGistToken() {
                         content = `${content}\n${scriptUrl}`;
                     }
                 }
-                
+
                 const expireDaysValue = parseInt(expireDaysSelect.value);
                 const newMsg = {
                     content: content,
@@ -15986,25 +16023,25 @@ function hasGistToken() {
                     scriptUrl: scriptUrl,
                     expireDays: expireDaysValue > 0 ? expireDaysValue : null
                 };
-                
+
                 wallMessages.unshift(newMsg);
                 if (wallMessages.length > MAX_MESSAGES) {
                     wallMessages = wallMessages.slice(0, MAX_MESSAGES);
                 }
-                
+
                 input.value = '';
                 pendingScriptFile = null;
                 document.getElementById('uploadStatus').style.display = 'none';
                 document.getElementById('scriptFileInput').value = '';
                 const expireCheckbox = document.getElementById('expireCheckbox');
                 if (expireCheckbox) expireCheckbox.checked = false;
-                
+
                 localStorage.setItem('TFJL_UserName', nickname);
-                
+
                 renderMessages();
-                
+
                 await saveMessagesToGist();
-                
+
                 // 显示成功提示
                 const _toast = document.createElement('div');
                 _toast.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);padding:10px 24px;border-radius:8px;z-index:99999;font-size:0.9rem;animation:fadeInOut 2s ease-in-out;background:rgba(74,222,128,0.9);color:#1a1a2e;';
@@ -16070,11 +16107,15 @@ function hasGistToken() {
 
             // 优先使用硬编码的 MESSAGES_GIST_ID
             let messagesGistId = MESSAGES_GIST_ID || localStorage.getItem('messages_gist_id');
-            
-            // 【安全检查】保存前先从 Gist 获取现有消息，防止覆盖丢失
-            // 但如果是强制保存（删除操作），跳过合并逻辑
+
+            // 【关键安全标记】保存前先尝试获取远程消息
+            // 注意：如果 messagesGistId 存在，就必须成功获取到远程消息
+            // 否则视为"获取失败"，此时用本地数据覆盖会导致历史消息丢失
             let existingMessages = [];
+            let remoteFetchAttempted = false;  // 是否尝试过获取远程
+            let remoteFetchSucceeded = false;  // 获取是否成功
             if (!forceSave && messagesGistId) {
+                remoteFetchAttempted = true;
                 try {
                     const existResp = await fetch(`https://api.github.com/gists/${messagesGistId}`, {
                         headers: {
@@ -16087,7 +16128,7 @@ function hasGistToken() {
                         if (existData.files && existData.files['messages.json']) {
                             const fileData = existData.files['messages.json'];
                             let content = fileData.content;
-                            
+
                             // 处理 truncated
                             if (fileData.truncated || !content) {
                                 const rawResp = await fetch(fileData.raw_url, {
@@ -16095,11 +16136,12 @@ function hasGistToken() {
                                 });
                                 if (rawResp.ok) content = await rawResp.text();
                             }
-                            
+
                             if (content) {
                                 try {
                                     const parsed = JSON.parse(content);
                                     existingMessages = parsed.messages || [];
+                                    remoteFetchSucceeded = true;
                                 } catch (e) {
                                     console.warn('解析现有消息失败:', e);
                                 }
@@ -16110,34 +16152,53 @@ function hasGistToken() {
                     console.warn('获取现有消息失败:', e);
                 }
             }
-            
-            // 【空数据保护】如果远程有数据但本地为空，阻止保存
-            // 但强制保存（删除操作）除外
+
+            // 【第一层空数据保护】远程有数据但本地为空，阻止保存（如删除操作除外）
             if (!forceSave && existingMessages.length > 0 && wallMessages.length === 0) {
                 throw new Error('⚠️ 数据保护：检测到远程有 ' + existingMessages.length + ' 条消息，但本地数据为空。\n\n可能原因：网络问题导致数据加载失败。\n\n请刷新页面重新加载，或联系管理员从备份还原数据。');
+            }
+
+            // 【第二层关键保护】如果 messagesGistId 存在且尝试过获取远程消息，但获取失败（existingMessages为空）
+            // 此时绝对不能用本地数据覆盖保存——否则将导致所有历史消息永久丢失！
+            if (!forceSave && remoteFetchAttempted && !remoteFetchSucceeded && messagesGistId) {
+                throw new Error('⚠️ 数据保护：无法从远程获取历史消息（可能网络不稳定或GitHub限流）。\n\n为保护历史消息，已阻止本次保存。\n\n请刷新页面后重试发布，或稍后再试。');
+            }
+
+            // 【第三层保护】即使获取成功了，如果远程消息数明显多于本地，也要警告
+            // （防止本地消息列表只加载了新消息，没有加载历史）
+            if (!forceSave && remoteFetchSucceeded && existingMessages.length > wallMessages.length + 5) {
+                console.warn('[消息保护] 远程 ' + existingMessages.length + ' 条，本地仅 ' + wallMessages.length + ' 条，已自动合并。');
+            }
+            
+            // 生成消息唯一ID（防止重复合并）
+            function getMessageId(msg) {
+                const contentShort = (msg.content || '').substring(0, 30);
+                return msg.time + '_' + msg.author + '_' + contentShort;
             }
             
             let finalMessages;
             if (forceSave) {
-                // 强制保存（删除操作）：直接使用本地数据，不合并
+                // 强制保存（删除操作）：直接使用本地数据
                 finalMessages = wallMessages.slice(0, MAX_MESSAGES);
-                console.log('强制保存：本地', wallMessages.length, '条');
-            } else if (wallMessages.length < existingMessages.length) {
-                // 删除操作：直接使用本地数据，不合并远程
-                finalMessages = wallMessages.slice(0, MAX_MESSAGES);
-                console.log('删除操作：本地', wallMessages.length, '条，远程', existingMessages.length, '条，直接使用本地数据');
+                console.log('[消息保存] 删除操作：保存', finalMessages.length, '条');
             } else {
-                // 添加操作：合并远程数据（防止丢失）
-                const localNewMsgIds = wallMessages.map(m => m.time + '_' + m.author);
-                const mergedMessages = [...wallMessages];
-                for (const msg of existingMessages) {
-                    const msgId = msg.time + '_' + msg.author;
-                    if (!localNewMsgIds.includes(msgId)) {
-                        mergedMessages.push(msg);
-                    }
-                }
-                mergedMessages.sort((a, b) => b.time - a.time);
-                finalMessages = mergedMessages.slice(0, MAX_MESSAGES);
+                // ★ 核心修复：添加消息时永远合并所有远程数据，防止数据丢失
+                // 无论本地数据多少，都必须先获取远程数据，然后合并
+                const localIds = new Set(wallMessages.map(m => getMessageId(m)));
+                const mergedMap = new Map();
+                
+                // 先添加所有本地消息
+                wallMessages.forEach(m => mergedMap.set(getMessageId(m), m));
+                // 再添加所有远程消息（本地没有的才添加）
+                existingMessages.forEach(m => {
+                    const id = getMessageId(m);
+                    if (!localIds.has(id)) mergedMap.set(id, m);
+                });
+                
+                const merged = Array.from(mergedMap.values());
+                merged.sort((a, b) => b.time - a.time);
+                finalMessages = merged.slice(0, MAX_MESSAGES);
+                console.log('[消息保存] 添加操作：本地', wallMessages.length, '条，远程', existingMessages.length, '条，合并后', finalMessages.length, '条');
             }
             
             if (messagesGistId) {
