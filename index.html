@@ -13341,6 +13341,7 @@ function hasGistToken() {
                         downloads: 0
                     }
                 },
+                script_downloads: {},  // { "脚本名": 次数, ... }
                 last_updated: getCurrentTimeString()
             };
         }
@@ -13455,7 +13456,7 @@ function hasGistToken() {
         }
         
         // 更新统计数据
-        async function updateCounter(type) {
+        async function updateCounter(type, scriptName = null) {
             try {
                 // 获取本地缓存作为备份
                 const localData = loadCounterFromCache();
@@ -13528,6 +13529,7 @@ function hasGistToken() {
                             if (!Array.isArray(fresh.active_today_users)) fresh.active_today_users = [];
                             if (typeof fresh.daily_stats !== 'object' || fresh.daily_stats === null) fresh.daily_stats = {};
                             if (typeof fresh.online_users !== 'object' || fresh.online_users === null) fresh.online_users = {};
+                            if (typeof fresh.script_downloads !== 'object' || fresh.script_downloads === null) fresh.script_downloads = {};
                             
                             // 清理 daily_stats 中超过365天的旧数据
                             const allDates = Object.keys(fresh.daily_stats).sort();
@@ -13615,6 +13617,11 @@ function hasGistToken() {
                     case 'download':
                         counterData.total_downloads++;
                         counterData.daily_stats[today].downloads++;
+                        // 记录单个脚本的下载次数
+                        if (scriptName) {
+                            if (!counterData.script_downloads) counterData.script_downloads = {};
+                            counterData.script_downloads[scriptName] = (counterData.script_downloads[scriptName] || 0) + 1;
+                        }
                         break;
                 }
                 
@@ -14904,9 +14911,7 @@ function hasGistToken() {
         
         async function downloadScript(url) {
             try {
-                await recordDownload();
-                
-                // 从URL提取文件名
+                // 从URL提取文件名（先提取，后面用于统计）
                 let fileName = 'download.txt';
                 try {
                     const urlObj = new URL(url);
@@ -14921,17 +14926,20 @@ function hasGistToken() {
                         fileName = decodeURIComponent(lastPart);
                     }
                 }
-                
+
+                // 记录下载（包含脚本名统计）
+                await recordDownload(fileName);
+
                 // 获取文件内容
                 const response = await fetch(url);
                 if (!response.ok) {
                     throw new Error(`获取文件失败: ${response.status}`);
                 }
                 const content = await response.text();
-                
+
                 // 创建Blob并下载
                 const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-                
+
                 // 优先使用文件选择器API（支持选择保存目录）
                 if (window.showSaveFilePicker) {
                     try {
@@ -14951,7 +14959,7 @@ function hasGistToken() {
                         // 其他错误，回退到传统下载
                     }
                 }
-                
+
                 // 回退：传统下载方式
                 const blobUrl = URL.createObjectURL(blob);
                 const a = document.createElement('a');
@@ -16435,12 +16443,12 @@ function hasGistToken() {
             const hasLoggedInBefore = localStorage.getItem('TFJL_Has_Logged_In_Before');
             return !hasLoggedInBefore;
         }
-        
-        
-        
-        // 记录下载
-        function recordDownload() {
-            updateCounter('download');
+
+
+
+        // 记录下载（可选脚本名参数，用于单独统计每个脚本的下载次数）
+        function recordDownload(scriptName = null) {
+            updateCounter('download', scriptName);
         }
 
         // ==================== 管理员面板 ====================
@@ -16525,6 +16533,9 @@ function hasGistToken() {
                 document.getElementById('adminPageNickManage').style.display = 'none';
                 document.getElementById('adminPagePasswordManage').style.display = 'none';
                 document.getElementById('adminPageAuctionManage').style.display = 'none';
+                document.getElementById('adminPageRoomManage').style.display = 'none';
+                const scriptStatsPage = document.getElementById('adminPageScriptStats');
+                if (scriptStatsPage) scriptStatsPage.style.display = 'none';
                 document.getElementById('adminVerifyCode').value = '';
                 document.getElementById('adminVerifyCode').focus();
             }
@@ -16549,6 +16560,8 @@ function hasGistToken() {
             if (cachePage) cachePage.style.display = 'none';
             const backupPage = document.getElementById('adminPageBackupManage');
             if (backupPage) backupPage.style.display = 'none';
+            const scriptStatsPage = document.getElementById('adminPageScriptStats');
+            if (scriptStatsPage) scriptStatsPage.style.display = 'none';
         }
 
         function adminShowPage(page) {
@@ -16569,6 +16582,8 @@ function hasGistToken() {
             if (cachePage) cachePage.style.display = 'none';
             const backupPage = document.getElementById('adminPageBackupManage');
             if (backupPage) backupPage.style.display = 'none';
+            const scriptStatsPage = document.getElementById('adminPageScriptStats');
+            if (scriptStatsPage) scriptStatsPage.style.display = 'none';
 
             if (page === 'help') {
                 if (helpPage) helpPage.style.display = 'block';
@@ -16581,6 +16596,11 @@ function hasGistToken() {
             } else if (page === 'stats') {
                 document.getElementById('adminPageStats').style.display = 'block';
                 adminLoadStats();
+            } else if (page === 'scriptStats') {
+                if (scriptStatsPage) {
+                    scriptStatsPage.style.display = 'block';
+                    adminLoadScriptStats();
+                }
             } else if (page === 'settings') {
                 document.getElementById('adminPageSettings').style.display = 'block';
                 // 填充当前的索引ID
@@ -20437,6 +20457,97 @@ function hasGistToken() {
                 <div style="color:rgba(255,255,255,0.3);font-size:0.8rem;text-align:center;margin-top:10px;">最后更新：${counterData.last_updated || '未知'}</div>
             `;
         }
+
+        // 加载脚本下载统计
+        async function adminLoadScriptStats() {
+            const content = document.getElementById('adminScriptStatsContent');
+            content.innerHTML = '<div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;">加载中...</div>';
+
+            // 先从Gist获取最新统计数据
+            try {
+                const fresh = await fetchCounterFromGist();
+                if (fresh) {
+                    counterData = fresh;
+                    saveCounterToCache(counterData);
+                }
+            } catch (e) {
+                console.warn('获取最新统计失败，使用本地缓存:', e);
+            }
+
+            if (!counterData) {
+                content.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:30px;">暂无统计数据</div>';
+                return;
+            }
+
+            const scriptDownloads = counterData.script_downloads || {};
+            const scriptNames = Object.keys(scriptDownloads);
+
+            if (scriptNames.length === 0) {
+                content.innerHTML = `
+                    <div style="color:rgba(255,255,255,0.4);text-align:center;padding:30px;">
+                        暂无脚本下载记录<br>
+                        <span style="font-size:0.8rem;">（用户下载脚本后会自动统计）</span>
+                    </div>
+                `;
+                return;
+            }
+
+            // 按下载次数排序
+            const sortedScripts = scriptNames.sort((a, b) => scriptDownloads[b] - scriptDownloads[a]);
+
+            // 计算总下载次数（用于验证）
+            const totalFromScripts = sortedScripts.reduce((sum, name) => sum + scriptDownloads[name], 0);
+
+            let html = `
+                <div style="background:rgba(255,215,0,0.1);border-radius:8px;padding:12px;margin-bottom:15px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <span style="color:#ffd700;font-weight:500;">📊 统计概览</span>
+                        <span style="color:#4ade80;">共 ${sortedScripts.length} 个脚本 | 总下载 ${totalFromScripts} 次</span>
+                    </div>
+                </div>
+                <table style="width:100%;border-collapse:collapse;font-size:0.85rem;">
+                    <thead>
+                        <tr style="background:rgba(79,195,247,0.15);">
+                            <th style="padding:8px;text-align:left;color:#4fc3f7;border-bottom:1px solid rgba(79,195,247,0.3);">排名</th>
+                            <th style="padding:8px;text-align:left;color:#4fc3f7;border-bottom:1px solid rgba(79,195,247,0.3);">脚本名称</th>
+                            <th style="padding:8px;text-align:right;color:#4fc3f7;border-bottom:1px solid rgba(79,195,247,0.3);">下载次数</th>
+                            <th style="padding:8px;text-align:right;color:#4fc3f7;border-bottom:1px solid rgba(79,195,247,0.3);">占比</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            sortedScripts.forEach((name, index) => {
+                const count = scriptDownloads[name];
+                const percent = totalFromScripts > 0 ? ((count / totalFromScripts) * 100).toFixed(1) : 0;
+                const rankColor = index === 0 ? '#ffd700' : (index < 3 ? '#4ade80' : 'rgba(255,255,255,0.7)');
+                const barWidth = Math.min(100, (count / (sortedScripts[0] ? scriptDownloads[sortedScripts[0]] : 1)) * 100);
+
+                html += `
+                    <tr style="border-bottom:1px solid rgba(255,255,255,0.1);">
+                        <td style="padding:8px;color:${rankColor};font-weight:${index < 3 ? 'bold' : 'normal'};">${index + 1}</td>
+                        <td style="padding:8px;color:rgba(255,255,255,0.85);max-width:200px;overflow:hidden;text-overflow:ellipsis;">
+                            ${name}
+                            <div style="height:4px;background:rgba(79,195,247,0.2);border-radius:2px;margin-top:4px;overflow:hidden;">
+                                <div style="height:100%;width:${barWidth}%;background:linear-gradient(90deg,#4fc3f7,#4ade80);border-radius:2px;"></div>
+                            </div>
+                        </td>
+                        <td style="padding:8px;text-align:right;color:#ffd700;font-weight:500;">${count}</td>
+                        <td style="padding:8px;text-align:right;color:rgba(255,255,255,0.5);">${percent}%</td>
+                    </tr>
+                `;
+            });
+
+            html += `
+                    </tbody>
+                </table>
+                <div style="color:rgba(255,255,255,0.3);font-size:0.75rem;text-align:center;margin-top:15px;">
+                    最后更新：${counterData.last_updated || '未知'}
+                </div>
+            `;
+
+            content.innerHTML = html;
+        }
     </script>
 
     <!-- 模态框：创建分类 -->
@@ -20506,6 +20617,12 @@ function hasGistToken() {
                         <span style="font-size:1.1rem;">📊</span>
                         <div style="margin-left:8px;">
                             <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">访问统计</div>
+                        </div>
+                    </div>
+                    <div class="admin-menu-item" onclick="adminShowPage('scriptStats')" style="padding:10px;">
+                        <span style="font-size:1.1rem;">📥</span>
+                        <div style="margin-left:8px;">
+                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">脚本下载</div>
                         </div>
                     </div>
                     <div class="admin-menu-item" onclick="adminShowPage('settings')" style="padding:10px;">
@@ -21016,6 +21133,28 @@ function hasGistToken() {
                     <h3 style="color:#ffd700;margin:0;font-size:1rem;">📊 访问统计</h3>
                 </div>
                 <div id="adminStatsContent"></div>
+            </div>
+
+            <div id="adminPageScriptStats" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
+                    <button class="admin-btn admin-btn-secondary" onclick="adminShowMenu()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
+                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">📥 脚本下载统计</h3>
+                </div>
+                <div class="admin-section">
+                    <div style="background:rgba(79,195,247,0.1);border-left:3px solid #4fc3f7;border-radius:6px;padding:12px;margin-bottom:15px;">
+                        <div style="color:#4fc3f7;font-size:0.85rem;font-weight:500;">💡 说明</div>
+                        <div style="color:rgba(255,255,255,0.6);font-size:0.75rem;margin-top:5px;">
+                            此页面统计需求墙中每个脚本文件的下载次数。<br>
+                            点击"刷新统计"可重新加载最新数据。
+                        </div>
+                    </div>
+                    <div style="text-align:right;margin-bottom:10px;">
+                        <button class="admin-btn admin-btn-secondary" onclick="adminLoadScriptStats()" style="font-size:0.8rem;">🔄 刷新统计</button>
+                    </div>
+                    <div id="adminScriptStatsContent" style="max-height:500px;overflow-y:auto;">
+                        <div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;">点击刷新加载</div>
+                    </div>
+                </div>
             </div>
 
             <div id="adminPageSettings" style="display:none;">
