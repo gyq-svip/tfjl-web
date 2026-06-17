@@ -1738,12 +1738,16 @@
                         }
                         
                         const savedNick = localStorage.getItem('TFJL_ChatNick');
-                        if (nick !== savedNick && usedNicks.includes(nick)) {
-                            alert(`昵称 "${nick}" 已被使用，请换一个昵称`);
-                            return;
-                        }
+                        const userSetName = localStorage.getItem('TFJL_UserName');
                         
-                        if (nick !== savedNick && !usedNicks.includes(nick)) {
+                        // 检查昵称是否被占用，但允许用户使用自己设置过的昵称
+                        if (usedNicks.includes(nick)) {
+                            // 如果用户之前已经设置过这个昵称，允许继续使用
+                            if (!userSetName || nick !== userSetName) {
+                                alert(`昵称 "${nick}" 已被使用，请换一个昵称`);
+                                return;
+                            }
+                        } else if (nick !== savedNick) {
                             usedNicks.push(nick);
                             index.usedNicks = usedNicks;
                             
