@@ -585,7 +585,7 @@
                 <button onclick="openOwnerPanel()" title="房主管理" style="background:transparent;border:none;color:#a78bfa;font-size:0.85rem;cursor:pointer;padding:4px 8px;border:1px solid rgba(167,139,250,0.3);border-radius:4px;transition:all 0.2s;" onmouseover="this.style.background='rgba(167,139,250,0.2)'" onmouseout="this.style.background='transparent'">👑 房主</button>
                 <button onclick="switchChatRoom()" title="切换房间" style="background:transparent;border:none;color:#fbbf24;font-size:0.85rem;cursor:pointer;padding:4px 8px;border:1px solid rgba(255,215,0,0.3);border-radius:4px;transition:all 0.2s;" onmouseover="this.style.background='rgba(255,215,0,0.2)'" onmouseout="this.style.background='transparent'">切换房间</button>
                 <button onclick="showAuctionRules()" title="查看规则" style="background:transparent;border:none;color:#4ecdc4;font-size:0.85rem;cursor:pointer;padding:4px 8px;border:1px solid rgba(78,205,196,0.3);border-radius:4px;transition:all 0.2s;" onmouseover="this.style.background='rgba(78,205,196,0.2)'" onmouseout="this.style.background='transparent'">📜 规则</button>
-                <button onclick="openAuctionPostModal()" title="发布拍卖" class="hammer-btn">🔨</button>
+                <button onclick="smartHammerClick()" title="浏览拍卖 / 发布拍卖" class="hammer-btn">🔨</button>
                 <button onclick="closeChatRoom()" title="关闭" style="background:transparent;border:none;color:#ff6b6b;font-size:1rem;cursor:pointer;padding:0;">×</button>
             </div>
         </div>
@@ -1711,13 +1711,25 @@
         function toggleChatRoomTab(tab) {
             const chatTab = document.getElementById('chatRoomTabChat');
             const auctionsTab = document.getElementById('chatRoomTabAuctions');
-            
+
             if (tab === 'chat') {
                 chatTab.style.display = 'flex';
                 auctionsTab.style.display = 'none';
             } else {
                 chatTab.style.display = 'none';
                 auctionsTab.style.display = 'flex';
+            }
+        }
+
+        // 智能锤子按钮：聊天界面→切换到商品列表；商品列表→弹出上架弹窗
+        function smartHammerClick() {
+            const auctionsTab = document.getElementById('chatRoomTabAuctions');
+            if (auctionsTab.style.display === 'none' || auctionsTab.style.display === '') {
+                // 当前在聊天界面，切换到商品列表
+                toggleChatRoomTab('auctions');
+            } else {
+                // 当前在商品列表，弹出上架弹窗
+                openAuctionPostModal();
             }
         }
 
