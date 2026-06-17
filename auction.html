@@ -1882,6 +1882,21 @@
         }
 
         // ==================== 数据管理 ====================
+        // 带重试机制的 fetch
+        async function fetchWithRetry(url, options, maxRetries = 3) {
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    const response = await fetch(url, options);
+                    return response;
+                } catch (e) {
+                    if (i === maxRetries - 1) throw e;
+                    // 递增等待时间
+                    await new Promise(r => setTimeout(r, 1000 * (i + 1)));
+                    console.warn(`fetch 重试 ${i + 1}/${maxRetries}:`, e.message);
+                }
+            }
+        }
+
         async function fetchChatRoomData() {
             try {
                 const token = getGistToken();
@@ -1893,12 +1908,12 @@
                 if (!roomGistId) {
                     try {
                         const indexUrl = `https://api.github.com/gists/${GIST_ID}`;
-                        const indexResponse = await fetch(indexUrl, {
+                        const indexResponse = await fetchWithRetry(indexUrl, {
                             headers: {
                                 'Accept': 'application/vnd.github.v3+json',
                                 ...(token && { 'Authorization': `token ${token}` })
                             }
-                        });
+                        }, 2);
 
                         if (indexResponse.ok) {
                             const data = await indexResponse.json();
@@ -1920,12 +1935,12 @@
                 }
 
                 if (roomGistId) {
-                    const response = await fetch(`https://api.github.com/gists/${roomGistId}`, {
+                    const response = await fetchWithRetry(`https://api.github.com/gists/${roomGistId}`, {
                         headers: {
                             'Accept': 'application/vnd.github.v3+json',
                             ...(token && { 'Authorization': `token ${token}` })
                         }
-                    });
+                    }, 2);
 
                     if (response.ok) {
                         const data = await response.json();
@@ -2113,7 +2128,7 @@
             
             if (chatroomGistId) {
                 try {
-                    const patchResponse = await fetch(`https://api.github.com/gists/${chatroomGistId}`, {
+                    const patchResponse = await fetchWithRetry(`https://api.github.com/gists/${chatroomGistId}`, {
                         method: 'PATCH',
                         headers: {
                             'Accept': 'application/vnd.github.v3+json',
@@ -2127,8 +2142,8 @@
                                 }
                             }
                         })
-                    });
-                    
+                    }, 3);
+
                     if (patchResponse.ok) {
                         return chatroomGistId;
                     }
@@ -2137,14 +2152,14 @@
                         chatroomGistId = null;
                     }
                 } catch (e) {
-                    console.warn('PATCH 失败，清除缓存重新创建');
+                    console.warn('PATCH 失败，清除缓存重新创建:', e.message);
                     localStorage.removeItem(`chatroom_gist_${roomId}`);
                     chatroomGistId = null;
                 }
             }
-            
+
             if (!chatroomGistId) {
-                const response = await fetch('https://api.github.com/gists', {
+                const response = await fetchWithRetry('https://api.github.com/gists', {
                     method: 'POST',
                     headers: {
                         'Accept': 'application/vnd.github.v3+json',
@@ -2160,7 +2175,7 @@
                             }
                         }
                     })
-                });
+                }, 3);
                 
                 if (!response.ok) {
                     const errData = await response.json().catch(() => ({}));
