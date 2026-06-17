@@ -6677,21 +6677,18 @@
 
             // 获取所有项目列表
             loadProjectListFromDB().then(projects => {
-                if (!projects || projects.length === 0) {
-                    alert('暂无项目，请先创建项目！');
-                    return;
-                }
-
                 // 按分类分组
                 const grouped = {};
-                projects.forEach(p => {
-                    const cat = p.category || '默认分类';
-                    if (!grouped[cat]) grouped[cat] = [];
-                    grouped[cat].push(p);
-                });
+                if (projects && projects.length > 0) {
+                    projects.forEach(p => {
+                        const cat = p.category || '默认分类';
+                        if (!grouped[cat]) grouped[cat] = [];
+                        grouped[cat].push(p);
+                    });
+                }
 
-                // 构建选项HTML
-                let optionsHtml = '';
+                // 构建选项HTML（添加"新建项目"选项）
+                let optionsHtml = '<option value="__NEW__" style="color:#4ade80;font-weight:bold;">➕ 新建项目</option>';
                 Object.keys(grouped).sort().forEach(cat => {
                     optionsHtml += `<optgroup label="${cat}">`;
                     grouped[cat].forEach(p => {
@@ -6710,7 +6707,11 @@
                         <div style="color:#fff;font-weight:bold;font-size:1.1rem;margin-bottom:15px;">💾 保存${scriptType}到项目</div>
                         <div style="margin-bottom:10px;">
                             <label style="color:rgba(255,255,255,0.7);font-size:0.85rem;display:block;margin-bottom:5px;">选择项目：</label>
-                            <select id="saveScriptProjectSelect" style="width:100%;padding:8px;border-radius:6px;border:1px solid rgba(33,150,243,0.3);background:#2a2a4a;color:#fff;font-size:0.9rem;">${optionsHtml}</select>
+                            <select id="saveScriptProjectSelect" onchange="toggleNewProjectInput()" style="width:100%;padding:8px;border-radius:6px;border:1px solid rgba(33,150,243,0.3);background:#2a2a4a;color:#fff;font-size:0.9rem;">${optionsHtml}</select>
+                        </div>
+                        <div id="newProjectInputRow" style="display:none;margin-bottom:10px;">
+                            <label style="color:rgba(255,255,255,0.7);font-size:0.85rem;display:block;margin-bottom:5px;">新项目名称：</label>
+                            <input id="newProjectNameInput" type="text" placeholder="输入新项目名称" style="width:100%;padding:8px;border-radius:6px;border:1px solid rgba(33,150,243,0.3);background:#2a2a4a;color:#fff;font-size:0.9rem;box-sizing:border-box;">
                         </div>
                         <div style="margin-bottom:15px;">
                             <label style="color:rgba(255,255,255,0.7);font-size:0.85rem;display:block;margin-bottom:5px;">脚本文件名：</label>
@@ -6729,60 +6730,118 @@
             });
         }
 
+        // 切换新项目输入框显示
+        function toggleNewProjectInput() {
+            const select = document.getElementById('saveScriptProjectSelect');
+            const inputRow = document.getElementById('newProjectInputRow');
+            if (!select || !inputRow) return;
+
+            if (select.value === '__NEW__') {
+                inputRow.style.display = 'block';
+                document.getElementById('newProjectNameInput')?.focus();
+            } else {
+                inputRow.style.display = 'none';
+            }
+        }
+
         // 执行保存脚本到项目
         function doSaveScriptToProject(type) {
             const scriptContent = type === 'activity' ? window._activityScriptOutput : window._dungeonScriptOutput;
-            const projectName = document.getElementById('saveScriptProjectSelect')?.value;
+            const selectValue = document.getElementById('saveScriptProjectSelect')?.value;
             const fileName = document.getElementById('saveScriptFileName')?.value?.trim();
 
-            if (!projectName || !fileName || !scriptContent) {
+            if (!fileName || !scriptContent) {
                 alert('请填写完整信息！');
                 return;
             }
 
-            // 从数据库获取目标项目数据（不影响当前项目状态）
-            getProjectFromDB(projectName).then(project => {
-                if (!project) {
-                    throw new Error('项目不存在');
+            // 判断是新建项目还是保存到现有项目
+            if (selectValue === '__NEW__') {
+                // 新建项目
+                const newProjectName = document.getElementById('newProjectNameInput')?.value?.trim();
+                if (!newProjectName) {
+                    alert('请输入新项目名称！');
+                    return;
                 }
 
-                // 获取项目的txtFiles
-                const projectTxtFiles = Array.isArray(project.txtFiles) ? project.txtFiles : [];
+                // 创建新项目数据
+                const newProjectData = {
+                    name: newProjectName,
+                    category: '默认分类',
+                    timestamp: new Date().toISOString(),
+                    myHandCards: [],
+                    teammateHandCards: [],
+                    myPlacedCards: [],
+                    teammatePlacedCards: [],
+                    cardLevels: {},
+                    cardSkins: {},
+                    myDeckInfo: '',
+                    teammateDeckInfo: '',
+                    notepad: '',
+                    txtFiles: [{ name: fileName, content: scriptContent }],
+                    referenceImages: []
+                };
 
-                // 检查是否已存在同名文件
-                const existIdx = projectTxtFiles.findIndex(f => f.name === fileName);
-                if (existIdx !== -1) {
-                    if (!confirm(`项目"${projectName}"中已存在"${fileName}"，是否覆盖？`)) return;
-                    projectTxtFiles[existIdx].content = scriptContent;
-                } else {
-                    projectTxtFiles.push({ name: fileName, content: scriptContent });
+                // 直接保存新项目
+                saveProjectToDBDirect(newProjectData).then(() => {
+                    document.getElementById('saveScriptModal')?.remove();
+                    showToast(`✅ 新项目"${newProjectName}"已创建，脚本已保存！`);
+                    refreshProjectSelectors();
+                }).catch(err => {
+                    console.error('创建项目失败:', err);
+                    alert('创建项目失败: ' + err);
+                });
+            } else {
+                // 保存到现有项目
+                const projectName = selectValue;
+                if (!projectName) {
+                    alert('请选择项目！');
+                    return;
                 }
 
-                // 更新项目数据中的txtFiles
-                project.txtFiles = projectTxtFiles;
-                project.timestamp = new Date().toISOString();
-
-                // 使用 saveProjectToDBDirect 直接保存修改后的项目数据
-                return saveProjectToDBDirect(project);
-            }).then(() => {
-                document.getElementById('saveScriptModal')?.remove();
-                showToast(`✅ 脚本已保存到项目"${projectName}"`);
-
-                // 如果保存到当前项目，刷新脚本文件列表
-                if (projectName === currentProjectName) {
-                    // 重新加载当前项目的txtFiles
-                    const existIdx = txtFiles.findIndex(f => f.name === fileName);
-                    if (existIdx !== -1) {
-                        txtFiles[existIdx].content = scriptContent;
-                    } else {
-                        txtFiles.push({ name: fileName, content: scriptContent });
+                // 从数据库获取目标项目数据（不影响当前项目状态）
+                getProjectFromDB(projectName).then(project => {
+                    if (!project) {
+                        throw new Error('项目不存在');
                     }
-                    updateTxtFilesList();
-                }
-            }).catch(err => {
-                console.error('保存脚本失败:', err);
-                alert('保存失败: ' + err);
-            });
+
+                    // 获取项目的txtFiles
+                    const projectTxtFiles = Array.isArray(project.txtFiles) ? project.txtFiles : [];
+
+                    // 检查是否已存在同名文件
+                    const existIdx = projectTxtFiles.findIndex(f => f.name === fileName);
+                    if (existIdx !== -1) {
+                        if (!confirm(`项目"${projectName}"中已存在"${fileName}"，是否覆盖？`)) return;
+                        projectTxtFiles[existIdx].content = scriptContent;
+                    } else {
+                        projectTxtFiles.push({ name: fileName, content: scriptContent });
+                    }
+
+                    // 更新项目数据中的txtFiles
+                    project.txtFiles = projectTxtFiles;
+                    project.timestamp = new Date().toISOString();
+
+                    // 使用 saveProjectToDBDirect 直接保存修改后的项目数据
+                    return saveProjectToDBDirect(project);
+                }).then(() => {
+                    document.getElementById('saveScriptModal')?.remove();
+                    showToast(`✅ 脚本已保存到项目"${projectName}"`);
+
+                    // 如果保存到当前项目，刷新脚本文件列表
+                    if (projectName === currentProjectName) {
+                        const existIdx = txtFiles.findIndex(f => f.name === fileName);
+                        if (existIdx !== -1) {
+                            txtFiles[existIdx].content = scriptContent;
+                        } else {
+                            txtFiles.push({ name: fileName, content: scriptContent });
+                        }
+                        updateTxtFilesList();
+                    }
+                }).catch(err => {
+                    console.error('保存脚本失败:', err);
+                    alert('保存失败: ' + err);
+                });
+            }
         }
 
         // 通用面板拖拽功能
