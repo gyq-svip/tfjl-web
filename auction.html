@@ -98,20 +98,20 @@
         /* 拍卖者信息流动显示 */
         @keyframes bidderScroll {
             0%, 45% { transform: translateY(0); }
-            50%, 95% { transform: translateY(-100%); }
+            50%, 95% { transform: translateY(-50%); }
             100% { transform: translateY(0); }
         }
         .bidder-scroll-wrap {
             overflow: hidden;
-            height: 1.1em;
-            line-height: 1.1em;
+            height: 1.2em;
+            line-height: 1.2em;
         }
         .bidder-scroll-inner {
             animation: bidderScroll 10s infinite;
         }
         .bidder-scroll-inner > div {
-            height: 1.1em;
-            line-height: 1.1em;
+            height: 1.2em;
+            line-height: 1.2em;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
