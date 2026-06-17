@@ -2755,6 +2755,13 @@
             newOpt.style.color = '#4ade80';
             newOpt.style.fontWeight = 'bold';
             sel.appendChild(newOpt);
+            // 添加"创建分类"选项
+            const newCatOpt = document.createElement('option');
+            newCatOpt.value = '__NEW_CAT__';
+            newCatOpt.textContent = '📁 创建分类';
+            newCatOpt.style.color = '#3b82f6';
+            newCatOpt.style.fontWeight = 'bold';
+            sel.appendChild(newCatOpt);
             if (!cat) return;
 
             loadProjectListFromDB().then(allProjects => {
@@ -6922,6 +6929,7 @@
 
         <!-- 项目操作菜单（折叠） -->
         <div id="projectMenu" style="display:none;position:fixed;z-index:9998;background:rgba(40,40,70,0.98);border:1px solid rgba(255,215,0,0.3);border-radius:10px;padding:15px;min-width:180px;box-shadow:0 4px 15px rgba(0,0,0,0.4);">
+            <button onclick="renameProject()" style="display:block;width:100%;background:linear-gradient(135deg,#ff9800,#f57c00);color:white;border:none;padding:10px 15px;border-radius:8px;cursor:pointer;font-size:0.9rem;margin-bottom:8px;">✏️ 重命名项目</button>
             <button onclick="deleteCurrentProject()" style="display:block;width:100%;background:linear-gradient(135deg,#f44336,#c62828);color:white;border:none;padding:10px 15px;border-radius:8px;cursor:pointer;font-size:0.9rem;margin-bottom:8px;">🗑️ 删除项目</button>
             <button onclick="moveProjectToCategory()" style="display:block;width:100%;background:linear-gradient(135deg,#3f51b5,#303f9f);color:white;border:none;padding:10px 15px;border-radius:8px;cursor:pointer;font-size:0.9rem;margin-bottom:8px;">📦 移动到分类</button>
             <hr style="border-color:rgba(255,255,255,0.1);margin:10px 0;">
@@ -7954,21 +7962,22 @@
                 const transaction = db.transaction([STORE_NAME], 'readwrite');
                 const store = transaction.objectStore(STORE_NAME);
 
+                // 新建项目时使用空数据，而不是复制当前页面的数据
                 const projectData = {
                     name: projectName,
                     category: category || '默认分类',
                     timestamp: new Date().toISOString(),
-                    myHandCards: myHandCards,
-                    teammateHandCards: teammateHandCards,
-                    myPlacedCards: myPlacedCards,
-                    teammatePlacedCards: teammatePlacedCards,
-                    cardLevels: cardLevels,
-                    cardSkins: cardSkins,
-                    myDeckInfo: document.getElementById('myDeckInfo')?.value || '',
-                    teammateDeckInfo: document.getElementById('teammateDeckInfo')?.value || '',
-                    notepad: document.getElementById('notepad')?.value || '',
-                    txtFiles: getTxtFilesData(),
-                    referenceImages: getReferenceImagesData()
+                    myHandCards: [],
+                    teammateHandCards: [],
+                    myPlacedCards: [],
+                    teammatePlacedCards: [],
+                    cardLevels: {},
+                    cardSkins: {},
+                    myDeckInfo: '',
+                    teammateDeckInfo: '',
+                    notepad: '',
+                    txtFiles: [],
+                    referenceImages: []
                 };
                 
                 const request = store.put(projectData);
@@ -8280,6 +8289,40 @@
                 return;
             }
 
+            // 处理"创建分类"选项
+            if (name === '__NEW_CAT__') {
+                const newCategoryName = prompt('请输入新分类名称：', '');
+                if (!newCategoryName || !newCategoryName.trim()) {
+                    // 用户取消，恢复下拉框选中状态
+                    const sel = document.getElementById('projectSelector1');
+                    if (currentProjectName) {
+                        sel.value = currentProjectName;
+                    } else {
+                        sel.value = '';
+                    }
+                    return;
+                }
+                const catName = newCategoryName.trim();
+                if (categories.includes(catName)) {
+                    alert('❌ 该分类已存在！');
+                    const sel = document.getElementById('projectSelector1');
+                    if (currentProjectName) {
+                        sel.value = currentProjectName;
+                    } else {
+                        sel.value = '';
+                    }
+                    return;
+                }
+                categories.push(catName);
+                localStorage.setItem('tfjl_categories', JSON.stringify(categories));
+                refreshProjectSelectors();
+                // 自动选中新创建的分类
+                const catSel = document.getElementById('categorySelector1');
+                if (catSel) catSel.value = catName;
+                alert(`✅ 新分类"${catName}"创建成功！`);
+                return;
+            }
+
             loadProjectFromDB(name).then(() => {
                 refreshProjectSelectors();
                 // 如果搜索面板打开，自动关闭
@@ -8322,6 +8365,13 @@
                     newOpt.style.color = '#4ade80';
                     newOpt.style.fontWeight = 'bold';
                     projSel.appendChild(newOpt);
+                    // 添加"创建分类"选项
+                    const newCatOpt = document.createElement('option');
+                    newCatOpt.value = '__NEW_CAT__';
+                    newCatOpt.textContent = '📁 创建分类';
+                    newCatOpt.style.color = '#3b82f6';
+                    newCatOpt.style.fontWeight = 'bold';
+                    projSel.appendChild(newCatOpt);
                     const cat = currentProjectCategory || '默认分类';
                     allProjects.filter(p => p.category === cat).forEach(p => {
                         const opt = document.createElement('option');
@@ -9136,6 +9186,55 @@
         }
 
         // 删除当前选中的项目
+        // 重命名项目
+        function renameProject() {
+            const selector = document.getElementById('projectSelector1');
+            if (!selector || !selector.value) {
+                alert('请先选择一个项目');
+                return;
+            }
+
+            const oldName = selector.value;
+            const newName = prompt(`请输入新项目名称（当前：${oldName}）：`, oldName);
+            
+            if (!newName || !newName.trim()) {
+                return;
+            }
+            
+            const trimmedName = newName.trim();
+            
+            if (trimmedName === oldName) {
+                alert('新项目名称与原名称相同！');
+                return;
+            }
+
+            loadProjectListFromDB().then(allProjects => {
+                const sameNameProject = allProjects.find(p => p.name === trimmedName && p.category === currentProjectCategory);
+                if (sameNameProject) {
+                    alert(`❌ 同一分类下已存在名为"${trimmedName}"的项目！`);
+                    return;
+                }
+
+                getProjectFromDB(oldName).then(projectData => {
+                    if (!projectData) {
+                        alert('未找到该项目！');
+                        return;
+                    }
+
+                    projectData.name = trimmedName;
+                    saveProjectToDBDirect(projectData).then(() => {
+                        deleteProjectFromDB(oldName).then(() => {
+                            if (currentProjectName === oldName) {
+                                currentProjectName = trimmedName;
+                            }
+                            refreshProjectSelectors();
+                            alert(`✅ 项目已重命名为"${trimmedName}"！`);
+                        }).catch(e => alert('删除原项目失败:' + e));
+                    }).catch(e => alert('保存新项目失败:' + e));
+                }).catch(e => alert('获取项目数据失败:' + e));
+            }).catch(e => alert('加载项目列表失败:' + e));
+        }
+
         function deleteCurrentProject() {
             const selector = document.getElementById('projectSelector1');
             if (!selector || !selector.value) {
