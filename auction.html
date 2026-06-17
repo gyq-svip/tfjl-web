@@ -897,27 +897,31 @@
                 if (!content) return;
                 
                 const counterData = JSON.parse(content);
-                
-                // 运行天数
-                if (counterData.startDate) {
-                    const startDate = new Date(counterData.startDate);
-                    const now = new Date();
-                    const days = Math.floor((now - startDate) / (1000 * 60 * 60 * 24));
-                    document.getElementById('statRuntime').textContent = days + '天';
-                }
-                
+
+                // 运行天数（与主站一致，从2026年5月20日开始计算）
+                const startDate = new Date('2026-05-20T00:00:00');
+                const now = new Date();
+                const days = Math.floor((now - startDate) / (1000 * 60 * 60 * 24));
+                document.getElementById('statRuntime').textContent = days + '天';
+
                 // 访问次数
-                document.getElementById('statVisits').textContent = counterData.visits || 0;
-                
+                document.getElementById('statVisits').textContent = counterData.total_visits || 0;
+
                 // 用户数
-                document.getElementById('statUsers').textContent = counterData.users || 0;
-                
+                document.getElementById('statUsers').textContent = counterData.total_users || 0;
+
                 // 在线用户（60分钟内活跃）
-                if (counterData.activeUsers) {
-                    const now = Date.now();
-                    const onlineCount = counterData.activeUsers.filter(u => now - u.time < 60 * 60 * 1000).length;
-                    document.getElementById('statOnline').textContent = onlineCount;
+                let onlineCount = 0;
+                if (counterData.online_users) {
+                    const nowMs = Date.now();
+                    const timeout = counterData.online_timeout || 3600000;
+                    for (const id in counterData.online_users) {
+                        if (nowMs - counterData.online_users[id] <= timeout) {
+                            onlineCount++;
+                        }
+                    }
                 }
+                document.getElementById('statOnline').textContent = onlineCount;
                 
             } catch (e) {
                 console.warn('加载统计失败:', e);
