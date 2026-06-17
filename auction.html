@@ -4000,23 +4000,26 @@
             checkAdminTokenStatus();
         }
 
-        // ==================== 房间管理 ====================
+        // ==================== 房间管理（含自检） ====================
+        let roomSelfCheckResult = null;
+
         async function loadAllowedRoomsList() {
             const container = document.getElementById('allowedRoomsList');
-            container.innerHTML = '<div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;">加载中...</div>';
+            container.innerHTML = '<div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;">正在自检所有房间...（可能需要几秒钟）</div>';
 
             try {
                 const token = getGistToken();
+                if (!token) throw new Error('未设置Token');
+
                 const indexUrl = `https://api.github.com/gists/${GIST_ID}`;
                 const response = await fetch(indexUrl, {
                     headers: {
                         'Accept': 'application/vnd.github.v3+json',
-                        ...(token && { 'Authorization': `token ${token}` })
+                        'Authorization': `token ${token}`
                     }
                 });
 
                 if (!response.ok) throw new Error('获取索引文件失败');
-
                 const data = await response.json();
                 const content = data.files['room_index.json']?.content;
                 if (!content) throw new Error('索引文件内容为空');
@@ -4024,34 +4027,195 @@
                 const index = JSON.parse(content);
                 const allowedRooms = index.allowedRooms || [];
 
-                if (allowedRooms.length === 0) {
-                    container.innerHTML = `
+                // 收集所有在索引中出现的房间ID（包括白名单和映射）
+                const allRoomIds = new Set();
+                allowedRooms.forEach(r => {
+                    const id = typeof r === 'string' ? r : r.id;
+                    allRoomIds.add(id);
+                });
+                Object.keys(index).forEach(key => {
+                    if (key !== 'allowedRooms' && key !== 'usedNicks') {
+                        allRoomIds.add(key);
+                    }
+                });
+
+                // 扫描本地 localStorage，查找 chatroom_gist_*
+                const localStorageRooms = [];
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && key.startsWith('chatroom_gist_')) {
+                        const roomId = key.substring('chatroom_gist_'.length);
+                        localStorageRooms.push({
+                            roomId: roomId,
+                            gistId: localStorage.getItem(key)
+                        });
+                    }
+                }
+
+                // 检查每一个房间 ID 对应的 Gist 是否存在
+                const roomCheckList = [];
+                const gistIdCount = {};
+
+                for (const roomId of allRoomIds) {
+                    const inWhitelist = allowedRooms.some(r =>
+                        (typeof r === 'string' ? r : r.id) === roomId
+                    );
+                    const mappedGistId = index[roomId];
+                    const localGistId = localStorage.getItem(`chatroom_gist_${roomId}`);
+                    let gistStatus = 'not_found';
+                    let gistFileExists = false;
+                    let gistFileCorrect = false;
+
+                    // 如果映射存在，验证 Gist
+                    if (mappedGistId) {
+                        try {
+                            const gistResp = await fetch(`https://api.github.com/gists/${mappedGistId}`, {
+                                headers: {
+                                    'Accept': 'application/vnd.github.v3+json',
+                                    'Authorization': `token ${token}`
+                                }
+                            });
+                            if (gistResp.ok) {
+                                gistStatus = 'exists';
+                                const gistData = await gistResp.json();
+                                const expectedFile = `chatrooms_${roomId}.json`;
+                                gistFileExists = !!(gistData.files && gistData.files[expectedFile]);
+                                gistFileCorrect = gistFileExists;
+                            } else if (gistResp.status === 404) {
+                                gistStatus = 'not_found';
+                            } else {
+                                gistStatus = 'error';
+                            }
+                        } catch (e) {
+                            gistStatus = 'error';
+                        }
+                    }
+
+                    // 统计 gistId 重复
+                    if (mappedGistId) {
+                        gistIdCount[mappedGistId] = (gistIdCount[mappedGistId] || 0) + 1;
+                    }
+                    if (localGistId && localGistId !== mappedGistId) {
+                        gistIdCount[localGistId] = (gistIdCount[localGistId] || 0) + 1;
+                    }
+
+                    // 判断问题类型
+                    const problems = [];
+                    if (!mappedGistId) problems.push('无索引映射');
+                    if (mappedGistId && gistStatus === 'not_found') problems.push('Gist已删除（404）');
+                    if (mappedGistId && gistStatus === 'error') problems.push('检查Gist失败');
+                    if (mappedGistId && !gistFileCorrect) problems.push('Gist中缺少正确文件');
+                    if (mappedGistId && localGistId && mappedGistId !== localGistId) problems.push('本地与索引不一致');
+                    if (!mappedGistId && localGistId) problems.push('本地有缓存但无索引');
+                    if (!inWhitelist && mappedGistId) problems.push('不在白名单但有映射');
+
+                    roomCheckList.push({
+                        roomId,
+                        inWhitelist,
+                        mappedGistId,
+                        localGistId,
+                        gistStatus,
+                        gistFileExists,
+                        problems
+                    });
+                }
+
+                // 本地有但是 index 中完全没有的房间
+                for (const { roomId, gistId } of localStorageRooms) {
+                    if (!allRoomIds.has(roomId)) {
+                        roomCheckList.push({
+                            roomId,
+                            inWhitelist: false,
+                            mappedGistId: null,
+                            localGistId: gistId,
+                            gistStatus: 'local_only',
+                            gistFileExists: false,
+                            problems: ['仅本地缓存（无索引）']
+                        });
+                    }
+                }
+
+                // 检查 gistId 是否重复
+                const duplicateGistIds = Object.keys(gistIdCount).filter(id => gistIdCount[id] > 1);
+                for (const room of roomCheckList) {
+                    if (room.mappedGistId && duplicateGistIds.includes(room.mappedGistId)) {
+                        room.problems.push(`GistID被${gistIdCount[room.mappedGistId]}个房间共享`);
+                    }
+                }
+
+                // 统计
+                const totalRooms = roomCheckList.length;
+                const roomsWithProblems = roomCheckList.filter(r => r.problems.length > 0).length;
+                const roomsOK = totalRooms - roomsWithProblems;
+                const duplicateRooms = roomCheckList.filter(r =>
+                    r.problems.some(p => p.includes('共享'))
+                ).length;
+                const missingRooms = roomCheckList.filter(r =>
+                    r.problems.some(p => p.includes('404'))
+                ).length;
+
+                // 保存结果供批量操作使用
+                roomSelfCheckResult = roomCheckList;
+
+                // 渲染
+                container.innerHTML = `
+                    <div style="background:rgba(0,0,0,0.2);padding:12px;border-radius:8px;margin-bottom:15px;">
+                        <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;font-size:0.85rem;margin-bottom:10px;">
+                            <span style="color:#4ade80;">✅ 正常: ${roomsOK}</span>
+                            <span style="color:#ef4444;">❌ 有问题: ${roomsWithProblems}</span>
+                            <span style="color:#f59e0b;">⚠️ Gist已删除: ${missingRooms}</span>
+                            <span style="color:#a78bfa;">🔗 Gist重复: ${duplicateRooms}</span>
+                            <span style="color:rgba(255,255,255,0.7);">📊 总计: ${totalRooms}</span>
+                        </div>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                            <button onclick="adminBatchDeleteProblemRooms()" style="padding:6px 12px;border-radius:6px;border:none;background:#ef4444;color:white;cursor:pointer;font-size:0.75rem;">一键清理问题房间</button>
+                            <button onclick="adminClearAllLocalRoomCache()" style="padding:6px 12px;border-radius:6px;border:none;background:rgba(239,68,68,0.3);color:#ff6b6b;cursor:pointer;font-size:0.75rem;border:1px solid rgba(239,68,68,0.4);">清除本地所有房间缓存</button>
+                        </div>
+                    </div>
+
+                    ${roomCheckList.length === 0 ? `
                         <div style="color:#4ade80;text-align:center;padding:20px;">
                             🌐 <strong>开放模式</strong><br>
                             <span style="font-size:0.8rem;color:rgba(255,255,255,0.6);">所有房间都可以进入</span>
                         </div>
-                    `;
-                } else {
-                    container.innerHTML = `
-                        <div style="color:#f59e0b;margin-bottom:10px;font-size:0.85rem;">
-                            🔒 限制模式：${allowedRooms.length} 个房间已开放
+                    ` : `
+                        <div style="margin-bottom:8px;font-size:0.75rem;color:rgba(255,255,255,0.5);">
+                            <span style="color:#4ade80;">●</span>正常
+                            <span style="color:#ef4444;margin-left:8px;">●</span>有问题
+                            <span style="color:#f59e0b;margin-left:8px;">●</span>Gist不存在
+                            <span style="color:#a78bfa;margin-left:8px;">●</span>Gist被共享
                         </div>
-                        ${allowedRooms.map(room => {
-                            const roomId = typeof room === 'string' ? room : room.id;
-                            const owner = typeof room === 'object' ? (room.owner || '') : '';
+                        ${roomCheckList.map(room => {
+                            const isOK = room.problems.length === 0;
+                            const bgColor = isOK ? 'rgba(74,222,128,0.08)' : 'rgba(239,68,68,0.08)';
+                            const borderColor = isOK ? 'rgba(74,222,128,0.2)' : 'rgba(239,68,68,0.3)';
+                            const indicatorColor = room.problems.some(p => p.includes('404')) ? '#f59e0b' :
+                                                    room.problems.some(p => p.includes('共享')) ? '#a78bfa' :
+                                                    isOK ? '#4ade80' : '#ef4444';
+
                             return `
-                                <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:rgba(255,255,255,0.05);border-radius:6px;margin-bottom:6px;">
-                                    <div>
-                                        <span style="color:#ffd700;font-weight:500;">#${roomId}</span>
-                                        ${owner ? `<span style="color:#4ade80;font-size:0.75rem;margin-left:8px;">👤 ${owner}</span>` : ''}
+                                <div style="background:${bgColor};border:1px solid ${borderColor};padding:10px 12px;border-radius:6px;margin-bottom:6px;">
+                                    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+                                        <div style="flex:1;min-width:0;">
+                                            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                                                <span style="color:${indicatorColor};">●</span>
+                                                <span style="color:#ffd700;font-weight:500;">#${room.roomId}</span>
+                                                ${room.inWhitelist ? '<span style="font-size:0.7rem;color:#4ade80;padding:1px 6px;background:rgba(74,222,128,0.15);border-radius:4px;">白名单</span>' : ''}
+                                                ${room.mappedGistId ? `<span style="font-size:0.7rem;color:#a78bfa;padding:1px 6px;background:rgba(167,139,250,0.15);border-radius:4px;">有映射</span>` : ''}
+                                                ${room.localGistId ? `<span style="font-size:0.7rem;color:#4ecdc4;padding:1px 6px;background:rgba(78,205,196,0.15);border-radius:4px;">本地缓存</span>` : ''}
+                                            </div>
+                                            ${room.mappedGistId ? `<div style="font-size:0.7rem;color:rgba(255,255,255,0.4);margin-top:4px;word-break:break-all;">GistID: ${room.mappedGistId.substring(0, 12)}...</div>` : ''}
+                                            ${room.problems.length > 0 ? `<div style="font-size:0.7rem;color:#ef4444;margin-top:4px;">⚠️ ${room.problems.join('；')}</div>` : ''}
+                                        </div>
+                                        <button onclick="adminRemoveAllowedRoom('${room.roomId}')" style="padding:4px 10px;border-radius:4px;border:none;background:#ff6b6b;color:white;cursor:pointer;font-size:0.7rem;white-space:nowrap;flex-shrink:0;">删除</button>
                                     </div>
-                                    <button onclick="adminRemoveAllowedRoom('${roomId}')" style="padding:4px 8px;border-radius:4px;border:none;background:#ff6b6b;color:white;cursor:pointer;font-size:0.7rem;">删除</button>
                                 </div>
                             `;
                         }).join('')}
-                    `;
-                }
+                    `}
+                `;
             } catch (e) {
+                console.error('自检失败:', e);
                 container.innerHTML = `<div style="color:#ef4444;text-align:center;padding:20px;">加载失败: ${e.message}</div>`;
             }
         }
@@ -4114,8 +4278,135 @@
             }
         }
 
+        async function adminBatchDeleteProblemRooms() {
+            if (!roomSelfCheckResult || roomSelfCheckResult.length === 0) {
+                alert('没有可用的自检数据，请先加载');
+                return;
+            }
+
+            const problemRooms = roomSelfCheckResult.filter(r => r.problems.length > 0);
+            if (problemRooms.length === 0) {
+                alert('✅ 没有检测到问题房间');
+                return;
+            }
+
+            const problemIds = problemRooms.map(r => `#${r.roomId}`).join(', ');
+            if (!confirm(`检测到 ${problemRooms.length} 个有问题的房间：\n${problemIds}\n\n⚠️ 确定要批量删除吗？\n这将同时清除白名单、索引映射、Gist文件和本地缓存。`)) return;
+
+            let successCount = 0;
+            let failCount = 0;
+
+            for (const room of problemRooms) {
+                try {
+                    // 模拟逐个调用 adminRemoveAllowedRoom 的核心逻辑
+                    const token = getGistToken();
+                    if (!token) throw new Error('未设置Token');
+
+                    const indexUrl = `https://api.github.com/gists/${GIST_ID}`;
+                    const response = await fetch(indexUrl, {
+                        headers: {
+                            'Accept': 'application/vnd.github.v3+json',
+                            'Authorization': `token ${token}`
+                        }
+                    });
+
+                    if (!response.ok) throw new Error('获取索引失败');
+                    const data = await response.json();
+                    const index = JSON.parse(data.files['room_index.json'].content);
+
+                    // 1. 从白名单中移除
+                    if (!index.allowedRooms) index.allowedRooms = [];
+                    index.allowedRooms = index.allowedRooms.filter(r =>
+                        (typeof r === 'string' ? r : r.id) !== room.roomId
+                    );
+
+                    // 2. 从索引中删除
+                    const gistIdToDelete = index[room.roomId];
+                    if (gistIdToDelete) {
+                        delete index[room.roomId];
+                    }
+
+                    // 3. 更新索引
+                    const patchResponse = await fetch(indexUrl, {
+                        method: 'PATCH',
+                        headers: {
+                            'Accept': 'application/vnd.github.v3+json',
+                            'Content-Type': 'application/json',
+                            'Authorization': `token ${token}`
+                        },
+                        body: JSON.stringify({
+                            files: {
+                                'room_index.json': {
+                                    content: JSON.stringify(index, null, 2)
+                                }
+                            }
+                        })
+                    });
+
+                    if (!patchResponse.ok) throw new Error('更新索引失败');
+
+                    // 4. 删除对应的 Gist
+                    if (gistIdToDelete) {
+                        try {
+                            await fetch(`https://api.github.com/gists/${gistIdToDelete}`, {
+                                method: 'DELETE',
+                                headers: {
+                                    'Accept': 'application/vnd.github.v3+json',
+                                    'Authorization': `token ${token}`
+                                }
+                            });
+                        } catch (e) {
+                            console.warn(`删除 Gist 失败:`, e);
+                        }
+                    }
+
+                    // 5. 清除本地缓存
+                    localStorage.removeItem(`chatroom_gist_${room.roomId}`);
+                    const currentRoom = localStorage.getItem('TFJL_ChatRoom');
+                    if (currentRoom === room.roomId) {
+                        localStorage.removeItem('TFJL_ChatRoom');
+                        localStorage.removeItem('TFJL_ChatNick');
+                    }
+
+                    successCount++;
+                } catch (err) {
+                    console.error(`删除房间 #${room.roomId} 失败:`, err);
+                    failCount++;
+                }
+            }
+
+            alert(`✅ 批量删除完成\n成功: ${successCount}\n失败: ${failCount}`);
+            loadAllowedRoomsList();
+        }
+
+        function adminClearAllLocalRoomCache() {
+            if (!confirm('确定要清除本地所有房间Gist缓存吗？\n\n⚠️ 这只会清除 localStorage 中的 chatroom_gist_* 条目，\n不会删除远程的 Gist 或修改索引文件。\n下次进入房间时会重新从索引获取。')) return;
+
+            const keysToRemove = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith('chatroom_gist_')) {
+                    keysToRemove.push(key);
+                }
+            }
+
+            if (keysToRemove.length === 0) {
+                alert('本地没有房间缓存');
+                return;
+            }
+
+            keysToRemove.forEach(key => localStorage.removeItem(key));
+
+            // 同时清除当前房间信息
+            localStorage.removeItem('TFJL_ChatRoom');
+            localStorage.removeItem('TFJL_ChatNick');
+
+            alert(`✅ 已清除 ${keysToRemove.length} 个本地房间缓存`);
+            loadAllowedRoomsList();
+        }
+
         async function adminRemoveAllowedRoom(roomId) {
-            if (!confirm(`确定要从白名单中删除房间 #${roomId} 吗？`)) return;
+            if (!confirm(`确定要完全删除房间 #${roomId} 吗？\n\n⚠️ 操作内容包括：\n1. 从白名单中移除\n2. 从房间索引中删除\n3. 删除该房间对应的Gist文件（如果存在）\n4. 清除本地缓存的token映射`)) return;
 
             try {
                 const token = getGistToken();
@@ -4133,9 +4424,17 @@
                 const data = await response.json();
                 const index = JSON.parse(data.files['room_index.json'].content);
 
+                // 1. 从白名单中移除
                 if (!index.allowedRooms) index.allowedRooms = [];
                 index.allowedRooms = index.allowedRooms.filter(r => (typeof r === 'string' ? r : r.id) !== roomId);
 
+                // 2. 从房间索引中删除并记录 gistId 以便删除
+                const gistIdToDelete = index[roomId];
+                if (gistIdToDelete) {
+                    delete index[roomId];
+                }
+
+                // 3. 更新 room_index.json
                 const patchResponse = await fetch(indexUrl, {
                     method: 'PATCH',
                     headers: {
@@ -4152,8 +4451,37 @@
                     })
                 });
 
-                if (!patchResponse.ok) throw new Error('更新失败');
-                alert('✅ 房间已从白名单中移除');
+                if (!patchResponse.ok) throw new Error('更新索引失败');
+
+                // 4. 删除对应的 Gist 文件
+                if (gistIdToDelete) {
+                    try {
+                        const deleteResponse = await fetch(`https://api.github.com/gists/${gistIdToDelete}`, {
+                            method: 'DELETE',
+                            headers: {
+                                'Accept': 'application/vnd.github.v3+json',
+                                'Authorization': `token ${token}`
+                            }
+                        });
+                        if (!deleteResponse.ok && deleteResponse.status !== 404) {
+                            console.warn(`删除 Gist ${gistIdToDelete} 失败: ${deleteResponse.status}`);
+                        }
+                    } catch (delErr) {
+                        console.warn('删除Gist异常:', delErr);
+                    }
+                }
+
+                // 5. 清除本地缓存的 token 映射
+                localStorage.removeItem(`chatroom_gist_${roomId}`);
+
+                // 6. 如果当前正在使用这个房间，也清理掉
+                const currentRoom = localStorage.getItem('TFJL_ChatRoom');
+                if (currentRoom === roomId) {
+                    localStorage.removeItem('TFJL_ChatRoom');
+                    localStorage.removeItem('TFJL_ChatNick');
+                }
+
+                alert(`✅ 房间 #${roomId} 已完全删除\n- 白名单已更新\n- 索引已清理\n- Gist${gistIdToDelete ? `已删除(${gistIdToDelete.substring(0, 8)}...)` : '无对应文件'}\n- 本地缓存已清除`);
                 loadAllowedRoomsList();
             } catch (e) {
                 alert('❌ 删除失败: ' + e.message);
