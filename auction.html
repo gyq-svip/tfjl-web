@@ -24,6 +24,11 @@
             100% { opacity: 0; }
         }
 
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
@@ -391,6 +396,50 @@
                     <span style="padding:6px 14px;border-radius:8px;background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.7);font-size:0.85rem;">猎人</span>
                     <span style="padding:6px 14px;border-radius:8px;background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.7);font-size:0.85rem;">牧师</span>
                     <span style="padding:6px 14px;border-radius:8px;background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.7);font-size:0.85rem;">术士</span>
+                </div>
+            </div>
+
+            <!-- 热门拍卖展示 -->
+            <div style="background:rgba(255,255,255,0.1);backdrop-filter:blur(10px);border-radius:20px;padding:20px;margin-bottom:20px;border:2px solid rgba(255,107,107,0.3);">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+                    <span style="color:#ff6b6b;font-size:1.1rem;font-weight:bold;">🔥 热门拍卖</span>
+                    <button onclick="loadHotAuctions()" style="padding:6px 12px;border-radius:6px;border:none;background:rgba(255,107,107,0.2);color:#ff6b6b;cursor:pointer;font-size:0.85rem;">刷新</button>
+                </div>
+                <div id="hotAuctionsContainer" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;">
+                    <div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;grid-column:1/-1;">点击刷新加载</div>
+                </div>
+            </div>
+
+            <!-- 最新成交记录 -->
+            <div style="background:rgba(255,255,255,0.1);backdrop-filter:blur(10px);border-radius:20px;padding:20px;margin-bottom:20px;border:2px solid rgba(74,222,128,0.3);">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+                    <span style="color:#4ade80;font-size:1.1rem;font-weight:bold;">📋 最新成交</span>
+                    <button onclick="loadRecentTransactions()" style="padding:6px 12px;border-radius:6px;border:none;background:rgba(74,222,128,0.2);color:#4ade80;cursor:pointer;font-size:0.85rem;">刷新</button>
+                </div>
+                <div id="recentTransactionsContainer" style="max-height:400px;overflow-y:auto;">
+                    <div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;">点击刷新加载</div>
+                </div>
+            </div>
+
+            <!-- 排行榜 -->
+            <div style="background:rgba(255,255,255,0.1);backdrop-filter:blur(10px);border-radius:20px;padding:20px;margin-bottom:20px;border:2px solid rgba(255,215,0,0.3);">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+                    <span style="color:#ffd700;font-size:1.1rem;font-weight:bold;">🏆 排行榜</span>
+                    <button onclick="loadLeaderboard()" style="padding:6px 12px;border-radius:6px;border:none;background:rgba(255,215,0,0.2);color:#ffd700;cursor:pointer;font-size:0.85rem;">刷新</button>
+                </div>
+                <div id="leaderboardContainer" style="max-height:400px;overflow-y:auto;">
+                    <div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;">点击刷新加载</div>
+                </div>
+            </div>
+
+            <!-- 拍卖日历 -->
+            <div style="background:rgba(255,255,255,0.1);backdrop-filter:blur(10px);border-radius:20px;padding:20px;margin-bottom:20px;border:2px solid rgba(96,165,250,0.3);">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+                    <span style="color:#60a5fa;font-size:1.1rem;font-weight:bold;">📅 拍卖日历</span>
+                    <button onclick="loadAuctionCalendar()" style="padding:6px 12px;border-radius:6px;border:none;background:rgba(96,165,250,0.2);color:#60a5fa;cursor:pointer;font-size:0.85rem;">刷新</button>
+                </div>
+                <div id="auctionCalendarContainer" style="max-height:400px;overflow-y:auto;">
+                    <div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;">点击刷新加载</div>
                 </div>
             </div>
 
@@ -790,6 +839,14 @@
             refreshAuctionBroadcasts();
             // 加载概览统计
             loadOverviewStats();
+            // 加载热门拍卖
+            loadHotAuctions();
+            // 加载最新成交
+            loadRecentTransactions();
+            // 加载排行榜
+            loadLeaderboard();
+            // 加载拍卖日历
+            loadAuctionCalendar();
             // 检查Token状态
             checkAdminTokenStatus();
             
@@ -942,6 +999,374 @@
                 
             } catch (e) {
                 console.warn('加载概览统计失败:', e);
+            }
+        }
+
+        // ==================== 通用：获取所有房间数据 ====================
+        async function fetchAllRoomsData() {
+            const token = getGistToken();
+            const indexUrl = `https://api.github.com/gists/${GIST_ID}`;
+            const indexResponse = await fetch(indexUrl, {
+                headers: {
+                    'Accept': 'application/vnd.github.v3+json',
+                    ...(token && { 'Authorization': `token ${token}` })
+                }
+            });
+            if (!indexResponse.ok) return [];
+
+            const indexData = await indexResponse.json();
+            const indexContent = indexData.files['room_index.json']?.content;
+            if (!indexContent) return [];
+
+            const index = JSON.parse(indexContent);
+            const allowedRooms = index.allowedRooms || [];
+            const allRoomIds = allowedRooms.map(r => typeof r === 'string' ? r : r.id).filter(id => id && id !== 'news');
+            Object.keys(index).forEach(key => {
+                if (key !== 'allowedRooms' && key !== 'usedNicks' && key !== 'news' && !allRoomIds.includes(key)) {
+                    allRoomIds.push(key);
+                }
+            });
+
+            const results = [];
+            for (const rId of allRoomIds) {
+                const roomGistId = index[rId];
+                if (!roomGistId) continue;
+                try {
+                    const roomResponse = await fetch(`https://api.github.com/gists/${roomGistId}`, {
+                        headers: {
+                            'Accept': 'application/vnd.github.v3+json',
+                            ...(token && { 'Authorization': `token ${token}` })
+                        }
+                    });
+                    if (!roomResponse.ok) continue;
+                    const roomData = await roomResponse.json();
+                    const filename = `chatrooms_${rId}.json`;
+                    const content = roomData.files[filename]?.content;
+                    if (!content) continue;
+                    const allData = JSON.parse(content);
+                    const roomInfo = allData.rooms ? allData.rooms[rId] : (allData.auctions ? allData : null);
+                    if (!roomInfo) continue;
+                    results.push({ roomId: rId, roomInfo: roomInfo });
+                } catch (e) {
+                    // 跳过失败的房间
+                }
+            }
+            return results;
+        }
+
+        // ==================== 热门拍卖 ====================
+        async function loadHotAuctions() {
+            const container = document.getElementById('hotAuctionsContainer');
+            container.innerHTML = '<div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;grid-column:1/-1;">加载中...</div>';
+
+            try {
+                const allRooms = await fetchAllRoomsData();
+                const now = Date.now();
+                const hotAuctions = [];
+
+                allRooms.forEach(({ roomId, roomInfo }) => {
+                    const auctions = roomInfo.auctions || [];
+                    auctions.forEach(a => {
+                        if (a.status === 'active' && now < a.endTime) {
+                            const currentBid = a.bids && a.bids.length > 0 ? a.bids[a.bids.length - 1].amount : a.startPrice;
+                            hotAuctions.push({
+                                id: a.id,
+                                quality: a.quality,
+                                profession: a.profession,
+                                bonusDmg: a.bonusDmg || 0,
+                                ignoreIce: a.ignoreIce || 0,
+                                currentBid: currentBid,
+                                bidCount: a.bids ? a.bids.length : 0,
+                                creator: a.creator,
+                                roomId: roomId,
+                                endTime: a.endTime,
+                                isExchange: a.isExchange
+                            });
+                        }
+                    });
+                });
+
+                // 按出价次数排序，其次按当前价格
+                hotAuctions.sort((a, b) => b.bidCount - a.bidCount || b.currentBid - a.currentBid);
+                const topAuctions = hotAuctions.slice(0, 12);
+
+                if (topAuctions.length === 0) {
+                    container.innerHTML = '<div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;grid-column:1/-1;">暂无进行中的拍卖</div>';
+                    return;
+                }
+
+                container.innerHTML = topAuctions.map(a => {
+                    const qualityColor = getQualityColor(a.quality);
+                    const remaining = Math.max(0, a.endTime - now);
+                    const mins = Math.floor(remaining / 60000);
+                    const hours = Math.floor(mins / 60);
+                    const timeStr = hours > 0 ? `${hours}时${mins % 60}分` : `${mins}分`;
+                    return `
+                        <div style="background:rgba(0,0,0,0.3);border-radius:10px;padding:12px;border:1px solid ${qualityColor}40;transition:all 0.2s;" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 12px rgba(0,0,0,0.3)'" onmouseout="this.style.transform='none';this.style.boxShadow='none'">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                                <span style="color:${qualityColor};font-size:0.8rem;font-weight:600;">${a.quality || '?'}·${a.profession || '?'}</span>
+                                <span style="color:#fbbf24;font-size:0.7rem;">${a.isExchange ? '🔄' : ''}#${a.id}</span>
+                            </div>
+                            <div style="color:rgba(255,255,255,0.6);font-size:0.7rem;margin-bottom:4px;">
+                                ${a.bonusDmg > 0 ? '附加+' + a.bonusDmg + ' ' : ''}${a.ignoreIce > 0 ? '冰甲+' + a.ignoreIce : ''}
+                            </div>
+                            <div style="display:flex;justify-content:space-between;align-items:center;">
+                                <div>
+                                    <div style="color:#ffd700;font-size:0.95rem;font-weight:bold;">💰 ${a.currentBid}</div>
+                                    <div style="color:rgba(255,255,255,0.4);font-size:0.65rem;">${a.bidCount}次出价</div>
+                                </div>
+                                <div style="text-align:right;">
+                                    <div style="color:#f59e0b;font-size:0.7rem;">⏳ ${timeStr}</div>
+                                    <div style="color:rgba(255,255,255,0.4);font-size:0.65rem;">房间:${a.roomId}</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } catch (e) {
+                container.innerHTML = '<div style="color:#ef4444;text-align:center;padding:20px;grid-column:1/-1;">加载失败</div>';
+            }
+        }
+
+        // ==================== 最新成交记录 ====================
+        async function loadRecentTransactions() {
+            const container = document.getElementById('recentTransactionsContainer');
+            container.innerHTML = '<div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;">加载中...</div>';
+
+            try {
+                const allRooms = await fetchAllRoomsData();
+                const allHistory = [];
+
+                allRooms.forEach(({ roomId, roomInfo }) => {
+                    const history = roomInfo.auctionHistory || [];
+                    history.forEach(h => {
+                        allHistory.push({ ...h, roomId: roomId });
+                    });
+                });
+
+                // 按成交时间倒序
+                allHistory.sort((a, b) => (b.recordTime || b.endTime || 0) - (a.recordTime || a.endTime || 0));
+                const recent = allHistory.slice(0, 20);
+
+                if (recent.length === 0) {
+                    container.innerHTML = '<div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;">暂无成交记录</div>';
+                    return;
+                }
+
+                container.innerHTML = recent.map((h, i) => {
+                    const qualityColor = getQualityColor(h.quality);
+                    const date = new Date(h.recordTime || h.endTime || 0);
+                    const dateStr = `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+                    return `
+                        <div style="display:flex;align-items:center;gap:10px;padding:10px;background:rgba(0,0,0,0.2);border-radius:8px;margin-bottom:8px;border-left:3px solid ${qualityColor};">
+                            <div style="color:rgba(255,255,255,0.3);font-size:0.8rem;width:24px;text-align:center;">${i + 1}</div>
+                            <div style="flex:1;">
+                                <div style="color:${qualityColor};font-size:0.85rem;font-weight:500;">${h.quality || '?'}·${h.profession || '?'}</div>
+                                <div style="color:rgba(255,255,255,0.4);font-size:0.7rem;">
+                                    ${h.bonusDmg > 0 ? '附加+' + h.bonusDmg + ' ' : ''}${h.ignoreIce > 0 ? '冰甲+' + h.ignoreIce : ''}
+                                    ${h.bonusDmg > 0 || h.ignoreIce > 0 ? '' : '无附加属性'}
+                                </div>
+                            </div>
+                            <div style="text-align:right;">
+                                <div style="color:#ffd700;font-size:0.9rem;font-weight:bold;">💰 ${h.finalPrice}</div>
+                                <div style="color:rgba(255,255,255,0.4);font-size:0.65rem;">${dateStr}</div>
+                            </div>
+                            <div style="text-align:right;min-width:80px;">
+                                <div style="color:#4ade80;font-size:0.75rem;">🏆 ${h.winner || '无'}</div>
+                                <div style="color:rgba(255,255,255,0.3);font-size:0.65rem;">房间:${h.roomId}</div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } catch (e) {
+                container.innerHTML = '<div style="color:#ef4444;text-align:center;padding:20px;">加载失败</div>';
+            }
+        }
+
+        // ==================== 排行榜 ====================
+        async function loadLeaderboard() {
+            const container = document.getElementById('leaderboardContainer');
+            container.innerHTML = '<div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;">加载中...</div>';
+
+            try {
+                const allRooms = await fetchAllRoomsData();
+                const sellerStats = {};  // 按发布者统计
+                const buyerStats = {};   // 按买家统计
+
+                allRooms.forEach(({ roomId, roomInfo }) => {
+                    const history = roomInfo.auctionHistory || [];
+                    history.forEach(h => {
+                        // 卖家统计
+                        if (h.creator) {
+                            if (!sellerStats[h.creator]) sellerStats[h.creator] = { count: 0, totalAmount: 0 };
+                            sellerStats[h.creator].count++;
+                            sellerStats[h.creator].totalAmount += h.finalPrice || 0;
+                        }
+                        // 买家统计
+                        if (h.winner && h.winner !== '无') {
+                            if (!buyerStats[h.winner]) buyerStats[h.winner] = { count: 0, totalAmount: 0 };
+                            buyerStats[h.winner].count++;
+                            buyerStats[h.winner].totalAmount += h.finalPrice || 0;
+                        }
+                    });
+                });
+
+                const topSellers = Object.entries(sellerStats).sort((a, b) => b[1].totalAmount - a[1].totalAmount).slice(0, 5);
+                const topBuyers = Object.entries(buyerStats).sort((a, b) => b[1].totalAmount - a[1].totalAmount).slice(0, 5);
+
+                if (topSellers.length === 0 && topBuyers.length === 0) {
+                    container.innerHTML = '<div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;">暂无排行数据</div>';
+                    return;
+                }
+
+                const rankColors = ['#ffd700', '#c0c0c0', '#cd7f32', 'rgba(255,255,255,0.5)', 'rgba(255,255,255,0.5)'];
+                let html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:15px;">';
+
+                // 卖家排行
+                html += '<div><div style="color:#ff6b6b;font-size:0.9rem;font-weight:bold;margin-bottom:10px;">🏷️ 卖家排行（交易额）</div>';
+                if (topSellers.length === 0) {
+                    html += '<div style="color:rgba(255,255,255,0.3);font-size:0.8rem;text-align:center;padding:10px;">暂无数据</div>';
+                } else {
+                    html += topSellers.map(([name, stats], i) => {
+                        const color = rankColors[i] || 'rgba(255,255,255,0.5)';
+                        const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}`;
+                        return `
+                            <div style="display:flex;align-items:center;gap:8px;padding:8px;background:rgba(0,0,0,0.2);border-radius:6px;margin-bottom:6px;">
+                                <span style="color:${color};font-size:0.9rem;width:28px;text-align:center;">${medal}</span>
+                                <div style="flex:1;">
+                                    <div style="color:rgba(255,255,255,0.85);font-size:0.8rem;">${name}</div>
+                                    <div style="color:rgba(255,255,255,0.4);font-size:0.65rem;">${stats.count}笔交易</div>
+                                </div>
+                                <div style="color:#ffd700;font-size:0.85rem;font-weight:bold;">💰${stats.totalAmount}</div>
+                            </div>
+                        `;
+                    }).join('');
+                }
+                html += '</div>';
+
+                // 买家排行
+                html += '<div><div style="color:#4ade80;font-size:0.9rem;font-weight:bold;margin-bottom:10px;">💰 买家排行（交易额）</div>';
+                if (topBuyers.length === 0) {
+                    html += '<div style="color:rgba(255,255,255,0.3);font-size:0.8rem;text-align:center;padding:10px;">暂无数据</div>';
+                } else {
+                    html += topBuyers.map(([name, stats], i) => {
+                        const color = rankColors[i] || 'rgba(255,255,255,0.5)';
+                        const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}`;
+                        return `
+                            <div style="display:flex;align-items:center;gap:8px;padding:8px;background:rgba(0,0,0,0.2);border-radius:6px;margin-bottom:6px;">
+                                <span style="color:${color};font-size:0.9rem;width:28px;text-align:center;">${medal}</span>
+                                <div style="flex:1;">
+                                    <div style="color:rgba(255,255,255,0.85);font-size:0.8rem;">${name}</div>
+                                    <div style="color:rgba(255,255,255,0.4);font-size:0.65rem;">${stats.count}笔购买</div>
+                                </div>
+                                <div style="color:#ffd700;font-size:0.85rem;font-weight:bold;">💰${stats.totalAmount}</div>
+                            </div>
+                        `;
+                    }).join('');
+                }
+                html += '</div>';
+
+                html += '</div>';
+                container.innerHTML = html;
+            } catch (e) {
+                container.innerHTML = '<div style="color:#ef4444;text-align:center;padding:20px;">加载失败</div>';
+            }
+        }
+
+        // ==================== 拍卖日历 ====================
+        async function loadAuctionCalendar() {
+            const container = document.getElementById('auctionCalendarContainer');
+            container.innerHTML = '<div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;">加载中...</div>';
+
+            try {
+                const allRooms = await fetchAllRoomsData();
+                const now = Date.now();
+                const upcoming = [];
+                const endingSoon = [];
+
+                allRooms.forEach(({ roomId, roomInfo }) => {
+                    const auctions = roomInfo.auctions || [];
+                    auctions.forEach(a => {
+                        if (a.status === 'active' && now < a.endTime) {
+                            const remaining = a.endTime - now;
+                            const currentBid = a.bids && a.bids.length > 0 ? a.bids[a.bids.length - 1].amount : a.startPrice;
+                            const item = {
+                                id: a.id,
+                                quality: a.quality,
+                                profession: a.profession,
+                                currentBid: currentBid,
+                                bidCount: a.bids ? a.bids.length : 0,
+                                roomId: roomId,
+                                endTime: a.endTime,
+                                remaining: remaining
+                            };
+                            if (remaining < 10 * 60 * 1000) {
+                                // 10分钟内结束
+                                endingSoon.push(item);
+                            }
+                            upcoming.push(item);
+                        }
+                    });
+                });
+
+                if (upcoming.length === 0) {
+                    container.innerHTML = '<div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;">暂无进行中的拍卖</div>';
+                    return;
+                }
+
+                // 即将结束的排前面
+                upcoming.sort((a, b) => a.remaining - b.remaining);
+                endingSoon.sort((a, b) => a.remaining - b.remaining);
+
+                let html = '';
+
+                // 即将结束（紧急）
+                if (endingSoon.length > 0) {
+                    html += '<div style="margin-bottom:15px;">';
+                    html += '<div style="color:#ef4444;font-size:0.9rem;font-weight:bold;margin-bottom:10px;">🚨 即将结束（10分钟内）</div>';
+                    html += endingSoon.slice(0, 5).map(a => {
+                        const qualityColor = getQualityColor(a.quality);
+                        const mins = Math.floor(a.remaining / 60000);
+                        const secs = Math.floor((a.remaining % 60000) / 1000);
+                        return `
+                            <div style="display:flex;align-items:center;gap:10px;padding:10px;background:rgba(239,68,68,0.1);border-radius:8px;margin-bottom:6px;border:1px solid rgba(239,68,68,0.3);animation:pulse 2s infinite;">
+                                <div style="flex:1;">
+                                    <span style="color:${qualityColor};font-size:0.85rem;font-weight:500;">${a.quality || '?'}·${a.profession || '?'}</span>
+                                    <span style="color:rgba(255,255,255,0.4);font-size:0.7rem;margin-left:6px;">#${a.id} 房间:${a.roomId}</span>
+                                </div>
+                                <div style="color:#ef4444;font-size:0.9rem;font-weight:bold;">⏰ ${mins}:${String(secs).padStart(2, '0')}</div>
+                                <div style="color:#ffd700;font-size:0.85rem;">💰${a.currentBid}</div>
+                            </div>
+                        `;
+                    }).join('');
+                    html += '</div>';
+                }
+
+                // 全部进行中
+                html += '<div style="color:#60a5fa;font-size:0.9rem;font-weight:bold;margin-bottom:10px;">📅 全部进行中</div>';
+                html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px;">';
+                html += upcoming.slice(0, 20).map(a => {
+                    const qualityColor = getQualityColor(a.quality);
+                    const mins = Math.floor(a.remaining / 60000);
+                    const hours = Math.floor(mins / 60);
+                    const timeStr = hours > 0 ? `${hours}时${mins % 60}分` : `${mins}分`;
+                    const isUrgent = a.remaining < 30 * 60 * 1000;
+                    return `
+                        <div style="display:flex;align-items:center;gap:8px;padding:8px;background:rgba(0,0,0,0.2);border-radius:6px;border-left:3px solid ${isUrgent ? '#ef4444' : qualityColor};">
+                            <div style="flex:1;">
+                                <span style="color:${qualityColor};font-size:0.8rem;">${a.quality || '?'}·${a.profession || '?'}</span>
+                                <span style="color:rgba(255,255,255,0.3);font-size:0.65rem;margin-left:4px;">#${a.id}</span>
+                            </div>
+                            <div style="color:${isUrgent ? '#ef4444' : '#f59e0b'};font-size:0.75rem;">⏳${timeStr}</div>
+                            <div style="color:#ffd700;font-size:0.8rem;">💰${a.currentBid}</div>
+                        </div>
+                    `;
+                }).join('');
+                html += '</div>';
+
+                container.innerHTML = html;
+            } catch (e) {
+                container.innerHTML = '<div style="color:#ef4444;text-align:center;padding:20px;">加载失败</div>';
             }
         }
 
