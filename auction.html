@@ -3231,6 +3231,12 @@
             }
             function doRefresh() {
                 if (!currentChatRoom) return;
+                // 发布弹窗打开时暂停刷新，避免输入中断
+                const postModal = document.getElementById('auctionPostModal');
+                if (postModal && postModal.style.display === 'flex') return;
+                // 详情弹窗打开时也暂停
+                const detailModal = document.getElementById('auctionDetailModal');
+                if (detailModal && detailModal.style.display === 'flex') return;
                 fetchChatRoomData().then(() => {
                     renderChatMessages();
                     renderAuctionsList();
