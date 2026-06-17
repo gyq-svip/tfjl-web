@@ -29,19 +29,17 @@ jobs:
       - name: Debug - Check files
         run: |
           echo "Current directory: $(pwd)"
-          echo "Checking index.html..."
-          if [ -f "index.html" ]; then
-            echo "✅ index.html exists"
-            echo "Checking for token placeholder..."
-            if grep -q "YOUR_GITHUB_TOKEN_HERE" index.html; then
-              echo "✅ Token placeholder found in index.html"
-            else
-              echo "❌ Token placeholder NOT found in index.html"
+          echo "Checking HTML files..."
+          for file in *.html; do
+            if [ -f "$file" ]; then
+              echo "✅ $file exists"
+              if grep -q "YOUR_GITHUB_TOKEN_HERE" "$file"; then
+                echo "  ✅ Token placeholder found in $file"
+              else
+                echo "  ℹ️ No token placeholder in $file (may not need it)"
+              fi
             fi
-          else
-            echo "❌ index.html does not exist!"
-            exit 1
-          fi
+          done
 
       - name: Debug - Check secret
         run: |
@@ -62,19 +60,30 @@ jobs:
           # 读取Token
           TOKEN="${{ secrets.GIST_TOKEN }}"
           
-          # 使用sed进行替换
-          sed -i "s/YOUR_GITHUB_TOKEN_HERE/$TOKEN/g" index.html
+          # 对所有HTML文件进行Token替换
+          for file in *.html; do
+            if grep -q "YOUR_GITHUB_TOKEN_HERE" "$file"; then
+              sed -i "s/YOUR_GITHUB_TOKEN_HERE/$TOKEN/g" "$file"
+              echo "✅ Token injected into $file"
+            fi
+          done
           
           echo "Token injection completed"
 
       - name: Verify Injection
         run: |
           echo "Verifying token injection..."
-          if grep -q "YOUR_GITHUB_TOKEN_HERE" index.html; then
-            echo "❌ ERROR: Token was NOT injected!"
+          ALL_OK=true
+          for file in *.html; do
+            if grep -q "YOUR_GITHUB_TOKEN_HERE" "$file"; then
+              echo "❌ ERROR: Token was NOT injected in $file!"
+              ALL_OK=false
+            else
+              echo "✅ SUCCESS: Token verified in $file"
+            fi
+          done
+          if [ "$ALL_OK" = false ]; then
             exit 1
-          else
-            echo "✅ SUCCESS: Token was injected"
           fi
 
       - name: Setup Pages
