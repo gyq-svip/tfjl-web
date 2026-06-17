@@ -2943,7 +2943,7 @@
         async function fetchAuctionBroadcastsFromGist() {
             try {
                 const token = getGistToken();
-                const response = await fetch(GIST_URL, {
+                const response = await fetch(BROADCASTS_GIST_URL, {
                     headers: {
                         'Accept': 'application/vnd.github.v3+json',
                         ...(token && { 'Authorization': `token ${token}` })
@@ -2970,7 +2970,7 @@
                 return;
             }
             const content = JSON.stringify(auctionBroadcastQueue, null, 2);
-            const response = await fetch(GIST_URL, {
+            const response = await fetch(BROADCASTS_GIST_URL, {
                 method: 'PATCH',
                 headers: {
                     'Accept': 'application/vnd.github.v3+json',
@@ -3014,7 +3014,7 @@
                 const token = getGistToken();
                 if (!token) throw new Error('未设置GitHub Token');
                 const content = JSON.stringify(latestBroadcasts, null, 2);
-                const response = await fetch(GIST_URL, {
+                const response = await fetch(BROADCASTS_GIST_URL, {
                     method: 'PATCH',
                     headers: {
                         'Accept': 'application/vnd.github.v3+json',
@@ -12642,6 +12642,7 @@ async function createIndexGist(token) {
 
 // 兼容旧的 GIST_URL（但推荐使用 getIndexGistUrl()）
 const GIST_URL = `https://api.github.com/gists/${GIST_ID}`;
+const BROADCASTS_GIST_URL = `https://api.github.com/gists/${MESSAGES_GIST_ID}`;
 
 // Gist Token 管理 - 优先从环境变量读取（GitHub Actions），其次从localStorage读取
 const GIST_TOKEN_KEY = 'TFJL_Gist_Token';
@@ -20319,7 +20320,7 @@ function hasGistToken() {
                 updateMarqueeWithBroadcast();
                 const token = getGistToken();
                 if (!token) throw new Error('未设置GitHub Token');
-                const response = await fetch(GIST_URL, {
+                const response = await fetch(BROADCASTS_GIST_URL, {
                     method: 'PATCH',
                     headers: {
                         'Accept': 'application/vnd.github.v3+json',
