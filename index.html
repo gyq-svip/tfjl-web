@@ -2523,6 +2523,7 @@
                 <select id="categorySelector1" onchange="updateProjectList1()" style="background:#2a2a4a;color:#fff;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);font-size:0.9rem;min-width:120px;cursor:pointer;">
                     <option value="">-- 选择分类 --</option>
                 </select>
+                <button onclick="createCategory()" title="创建分类" style="background:linear-gradient(135deg,#9c27b0,#7b1fa2);color:white;border:none;padding:8px 10px;border-radius:8px;cursor:pointer;font-size:0.9rem;line-height:1;">➕</button>
                 <select id="projectSelector1" onchange="loadProjectByName(this.value)" style="background:#2a2a4a;color:#fff;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);font-size:0.9rem;min-width:150px;cursor:pointer;">
                     <option value="">-- 选择项目 --</option>
                 </select>
@@ -2755,13 +2756,6 @@
             newOpt.style.color = '#4ade80';
             newOpt.style.fontWeight = 'bold';
             sel.appendChild(newOpt);
-            // 添加"创建分类"选项
-            const newCatOpt = document.createElement('option');
-            newCatOpt.value = '__NEW_CAT__';
-            newCatOpt.textContent = '📁 创建分类';
-            newCatOpt.style.color = '#3b82f6';
-            newCatOpt.style.fontWeight = 'bold';
-            sel.appendChild(newCatOpt);
             if (!cat) return;
 
             loadProjectListFromDB().then(allProjects => {
@@ -6933,7 +6927,6 @@
             <button onclick="deleteCurrentProject()" style="display:block;width:100%;background:linear-gradient(135deg,#f44336,#c62828);color:white;border:none;padding:10px 15px;border-radius:8px;cursor:pointer;font-size:0.9rem;margin-bottom:8px;">🗑️ 删除项目</button>
             <button onclick="moveProjectToCategory()" style="display:block;width:100%;background:linear-gradient(135deg,#3f51b5,#303f9f);color:white;border:none;padding:10px 15px;border-radius:8px;cursor:pointer;font-size:0.9rem;margin-bottom:8px;">📦 移动到分类</button>
             <hr style="border-color:rgba(255,255,255,0.1);margin:10px 0;">
-            <button onclick="createCategory()" style="display:block;width:100%;background:linear-gradient(135deg,#9c27b0,#7b1fa2);color:white;border:none;padding:10px 15px;border-radius:8px;cursor:pointer;font-size:0.9rem;margin-bottom:8px;">➕ 创建分类</button>
             <button onclick="renameCategory()" style="display:block;width:100%;background:linear-gradient(135deg,#00bcd4,#00838f);color:white;border:none;padding:10px 15px;border-radius:8px;cursor:pointer;font-size:0.9rem;margin-bottom:8px;">✏️ 重命名分类</button>
             <button onclick="deleteCategory()" style="display:block;width:100%;background:linear-gradient(135deg,#795548,#5d4037);color:white;border:none;padding:10px 15px;border-radius:8px;cursor:pointer;font-size:0.9rem;">🗂️ 删除分类</button>
         </div>
@@ -8289,40 +8282,6 @@
                 return;
             }
 
-            // 处理"创建分类"选项
-            if (name === '__NEW_CAT__') {
-                const newCategoryName = prompt('请输入新分类名称：', '');
-                if (!newCategoryName || !newCategoryName.trim()) {
-                    // 用户取消，恢复下拉框选中状态
-                    const sel = document.getElementById('projectSelector1');
-                    if (currentProjectName) {
-                        sel.value = currentProjectName;
-                    } else {
-                        sel.value = '';
-                    }
-                    return;
-                }
-                const catName = newCategoryName.trim();
-                if (categories.includes(catName)) {
-                    alert('❌ 该分类已存在！');
-                    const sel = document.getElementById('projectSelector1');
-                    if (currentProjectName) {
-                        sel.value = currentProjectName;
-                    } else {
-                        sel.value = '';
-                    }
-                    return;
-                }
-                categories.push(catName);
-                localStorage.setItem('tfjl_categories', JSON.stringify(categories));
-                refreshProjectSelectors();
-                // 自动选中新创建的分类
-                const catSel = document.getElementById('categorySelector1');
-                if (catSel) catSel.value = catName;
-                alert(`✅ 新分类"${catName}"创建成功！`);
-                return;
-            }
-
             loadProjectFromDB(name).then(() => {
                 refreshProjectSelectors();
                 // 如果搜索面板打开，自动关闭
@@ -8365,13 +8324,6 @@
                     newOpt.style.color = '#4ade80';
                     newOpt.style.fontWeight = 'bold';
                     projSel.appendChild(newOpt);
-                    // 添加"创建分类"选项
-                    const newCatOpt = document.createElement('option');
-                    newCatOpt.value = '__NEW_CAT__';
-                    newCatOpt.textContent = '📁 创建分类';
-                    newCatOpt.style.color = '#3b82f6';
-                    newCatOpt.style.fontWeight = 'bold';
-                    projSel.appendChild(newCatOpt);
                     const cat = currentProjectCategory || '默认分类';
                     allProjects.filter(p => p.category === cat).forEach(p => {
                         const opt = document.createElement('option');
