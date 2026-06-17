@@ -2520,10 +2520,9 @@
         <div id="scheme1">
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:rgba(255,255,255,0.05);border-radius:10px;padding:12px;margin-bottom:10px;">
                 <span style="color:#ffd700;font-weight:bold;">📁</span>
-                <select id="categorySelector1" onchange="updateProjectList1()" style="background:#2a2a4a;color:#fff;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);font-size:0.9rem;min-width:120px;cursor:pointer;">
+                <select id="categorySelector1" onchange="handleCategoryChange()" style="background:#2a2a4a;color:#fff;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);font-size:0.9rem;min-width:120px;cursor:pointer;">
                     <option value="">-- 选择分类 --</option>
                 </select>
-                <button onclick="createCategory()" title="创建分类" style="background:linear-gradient(135deg,#9c27b0,#7b1fa2);color:white;border:none;padding:8px 10px;border-radius:8px;cursor:pointer;font-size:0.9rem;line-height:1;">➕</button>
                 <select id="projectSelector1" onchange="loadProjectByName(this.value)" style="background:#2a2a4a;color:#fff;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);font-size:0.9rem;min-width:150px;cursor:pointer;">
                     <option value="">-- 选择项目 --</option>
                 </select>
@@ -2780,6 +2779,49 @@
                 opt.textContent = cat;
                 catSel.appendChild(opt);
             });
+            // 添加创建分类选项
+            const newCatOpt = document.createElement('option');
+            newCatOpt.value = '__NEW_CAT__';
+            newCatOpt.textContent = '➕ 创建分类';
+            newCatOpt.style.color = '#9c27b0';
+            newCatOpt.style.fontWeight = 'bold';
+            catSel.appendChild(newCatOpt);
+        }
+
+        function handleCategoryChange() {
+            const catSel = document.getElementById('categorySelector1');
+            const selectedValue = catSel.value;
+            
+            if (selectedValue === '__NEW_CAT__') {
+                const newCategoryName = prompt('请输入新分类名称：', '');
+                if (!newCategoryName || !newCategoryName.trim()) {
+                    // 用户取消，恢复之前的选中状态
+                    if (currentProjectCategory) {
+                        catSel.value = currentProjectCategory;
+                    } else {
+                        catSel.value = '';
+                    }
+                    return;
+                }
+                const catName = newCategoryName.trim();
+                if (categories.includes(catName)) {
+                    alert('❌ 该分类已存在！');
+                    if (currentProjectCategory) {
+                        catSel.value = currentProjectCategory;
+                    } else {
+                        catSel.value = '';
+                    }
+                    return;
+                }
+                categories.push(catName);
+                localStorage.setItem('tfjl_categories', JSON.stringify(categories));
+                refreshProjectSelectors();
+                const sel = document.getElementById('categorySelector1');
+                if (sel) sel.value = catName;
+                alert(`✅ 新分类"${catName}"创建成功！`);
+            } else {
+                updateProjectList1();
+            }
         }
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -8311,6 +8353,13 @@
                         if (cat === currentProjectCategory) opt.selected = true;
                         catSel.appendChild(opt);
                     });
+                    // 添加创建分类选项
+                    const newCatOpt = document.createElement('option');
+                    newCatOpt.value = '__NEW_CAT__';
+                    newCatOpt.textContent = '➕ 创建分类';
+                    newCatOpt.style.color = '#9c27b0';
+                    newCatOpt.style.fontWeight = 'bold';
+                    catSel.appendChild(newCatOpt);
                 }
 
                 // 刷新项目下拉框（只显示选中分类的项目）
