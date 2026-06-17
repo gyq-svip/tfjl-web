@@ -6687,6 +6687,11 @@
                     });
                 }
 
+                // 构建分类选项HTML
+                const categoryOptionsHtml = categories.map((cat, i) =>
+                    `<option value="${cat}" ${i === 0 ? 'selected' : ''}>${cat}</option>`
+                ).join('');
+
                 // 构建选项HTML（添加"新建项目"选项）
                 let optionsHtml = '<option value="__NEW__" style="color:#4ade80;font-weight:bold;">➕ 新建项目</option>';
                 Object.keys(grouped).sort().forEach(cat => {
@@ -6713,6 +6718,10 @@
                             <label style="color:rgba(255,255,255,0.7);font-size:0.85rem;display:block;margin-bottom:5px;">新项目名称：</label>
                             <input id="newProjectNameInput" type="text" placeholder="输入新项目名称" style="width:100%;padding:8px;border-radius:6px;border:1px solid rgba(33,150,243,0.3);background:#2a2a4a;color:#fff;font-size:0.9rem;box-sizing:border-box;">
                         </div>
+                        <div id="newProjectCategoryRow" style="display:none;margin-bottom:10px;">
+                            <label style="color:rgba(255,255,255,0.7);font-size:0.85rem;display:block;margin-bottom:5px;">选择分类：</label>
+                            <select id="newProjectCategorySelect" style="width:100%;padding:8px;border-radius:6px;border:1px solid rgba(33,150,243,0.3);background:#2a2a4a;color:#fff;font-size:0.9rem;">${categoryOptionsHtml}</select>
+                        </div>
                         <div style="margin-bottom:15px;">
                             <label style="color:rgba(255,255,255,0.7);font-size:0.85rem;display:block;margin-bottom:5px;">脚本文件名：</label>
                             <input id="saveScriptFileName" type="text" value="${scriptType}_${new Date().toLocaleDateString('zh-CN').replace(/\//g, '')}.txt" style="width:100%;padding:8px;border-radius:6px;border:1px solid rgba(33,150,243,0.3);background:#2a2a4a;color:#fff;font-size:0.9rem;box-sizing:border-box;">
@@ -6733,14 +6742,17 @@
         // 切换新项目输入框显示
         function toggleNewProjectInput() {
             const select = document.getElementById('saveScriptProjectSelect');
-            const inputRow = document.getElementById('newProjectInputRow');
-            if (!select || !inputRow) return;
+            const nameRow = document.getElementById('newProjectInputRow');
+            const categoryRow = document.getElementById('newProjectCategoryRow');
+            if (!select || !nameRow || !categoryRow) return;
 
             if (select.value === '__NEW__') {
-                inputRow.style.display = 'block';
+                nameRow.style.display = 'block';
+                categoryRow.style.display = 'block';
                 document.getElementById('newProjectNameInput')?.focus();
             } else {
-                inputRow.style.display = 'none';
+                nameRow.style.display = 'none';
+                categoryRow.style.display = 'none';
             }
         }
 
@@ -6759,6 +6771,7 @@
             if (selectValue === '__NEW__') {
                 // 新建项目
                 const newProjectName = document.getElementById('newProjectNameInput')?.value?.trim();
+                const newCategory = document.getElementById('newProjectCategorySelect')?.value || '默认分类';
                 if (!newProjectName) {
                     alert('请输入新项目名称！');
                     return;
@@ -6767,7 +6780,7 @@
                 // 创建新项目数据
                 const newProjectData = {
                     name: newProjectName,
-                    category: '默认分类',
+                    category: newCategory,
                     timestamp: new Date().toISOString(),
                     myHandCards: [],
                     teammateHandCards: [],
@@ -6785,7 +6798,7 @@
                 // 直接保存新项目
                 saveProjectToDBDirect(newProjectData).then(() => {
                     document.getElementById('saveScriptModal')?.remove();
-                    showToast(`✅ 新项目"${newProjectName}"已创建，脚本已保存！`);
+                    showToast(`✅ 新项目"${newProjectName}"已创建（分类：${newCategory}），脚本已保存！`);
                     refreshProjectSelectors();
                 }).catch(err => {
                     console.error('创建项目失败:', err);
