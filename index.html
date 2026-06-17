@@ -3721,7 +3721,10 @@
         // 更新房间索引文件（返回冲突信息供调用方处理）
         async function updateRoomIndex(roomId, gistId) {
             const token = getGistToken();
-            if (!token) return null;
+            if (!token) {
+                console.warn('未设置Token，无法更新索引');
+                return { warning: '未设置Token' };
+            }
             
             try {
                 // 使用固定的索引文件 URL
@@ -3743,15 +3746,15 @@
                             indexData = JSON.parse(data.files['room_index.json'].content);
                         } catch (e) {
                             console.error('❌ 解析索引文件失败，中止更新以防数据丢失');
-                            return null;
+                            return { error: '解析索引文件失败' };
                         }
                     } else {
                         console.error('❌ 索引文件内容为空，中止更新以防数据丢失');
-                        return null;
+                        return { error: '索引文件内容为空' };
                     }
                 } else {
                     console.error(`❌ 获取索引文件失败: ${response.status}`);
-                    return null;
+                    return { error: `获取索引失败: ${response.status}` };
                 }
                 
                 // 检查是否已存在相同的 Gist ID
@@ -3767,32 +3770,47 @@
                 // 更新索引
                 indexData[roomId] = gistId;
                 
-                // 保存索引文件
-                const patchResponse = await fetch(indexUrl, {
-                    method: 'PATCH',
-                    headers: {
-                        'Accept': 'application/vnd.github.v3+json',
-                        'Content-Type': 'application/json',
-                        'Authorization': `token ${token}`
-                    },
-                    body: JSON.stringify({
-                        files: {
-                            'room_index.json': {
-                                content: JSON.stringify(indexData, null, 2)
-                            }
-                        }
-                    })
-                });
+                // 保存索引文件（带重试机制）
+                let patchSuccess = false;
+                let retryCount = 0;
+                const maxRetries = 3;
                 
-                if (patchResponse.ok) {
-                    // 更新 localStorage 缓存
-                    localStorage.setItem(INDEX_GIST_ID_KEY, GIST_ID);
-                } else {
-                    const errData = await patchResponse.json().catch(() => ({}));
-                    console.error(`❌ 更新索引失败: ${patchResponse.status}`, errData);
+                while (!patchSuccess && retryCount < maxRetries) {
+                    const patchResponse = await fetch(indexUrl, {
+                        method: 'PATCH',
+                        headers: {
+                            'Accept': 'application/vnd.github.v3+json',
+                            'Content-Type': 'application/json',
+                            'Authorization': `token ${token}`
+                        },
+                        body: JSON.stringify({
+                            files: {
+                                'room_index.json': {
+                                    content: JSON.stringify(indexData, null, 2)
+                                }
+                            }
+                        })
+                    });
+                    
+                    if (patchResponse.ok) {
+                        patchSuccess = true;
+                        // 更新 localStorage 缓存
+                        localStorage.setItem(INDEX_GIST_ID_KEY, GIST_ID);
+                    } else {
+                        retryCount++;
+                        if (retryCount < maxRetries) {
+                            await new Promise(r => setTimeout(r, 500 * retryCount)); // 递增等待
+                        }
+                    }
+                }
+                
+                if (!patchSuccess) {
+                    console.error(`❌ 更新索引失败，已重试${maxRetries}次`);
+                    return { error: '更新索引失败' };
                 }
             } catch (error) {
                 console.error('更新房间索引失败:', error);
+                return { error: error.message };
             }
         }
 
@@ -4102,6 +4120,13 @@
                         })
                     });
                     return chatroomGistId;
+                }
+                
+                // 检查索引更新是否失败
+                if (conflictResult && conflictResult.error) {
+                    console.warn(`⚠️ 索引更新失败: ${conflictResult.error}，但房间数据已保存`);
+                    // 仍然返回成功，因为房间数据已保存，只是索引没更新
+                    // 其他用户需要通过分享的房间ID来访问
                 }
                 
                 return data.id;

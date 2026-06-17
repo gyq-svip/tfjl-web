@@ -2067,8 +2067,48 @@
                 const data = await response.json();
                 localStorage.setItem(`chatroom_gist_${roomId}`, data.id);
                 
-                // 更新索引
-                await updateRoomIndex(roomId, data.id);
+                // 更新索引（带冲突检测）
+                const conflictResult = await updateRoomIndex(roomId, data.id);
+                
+                // 处理冲突情况
+                if (conflictResult && conflictResult.conflict && conflictResult.existingGistId) {
+                    // 删除刚创建的重复Gist
+                    try {
+                        await fetch(`https://api.github.com/gists/${data.id}`, {
+                            method: 'DELETE',
+                            headers: { 'Authorization': `token ${token}` }
+                        });
+                    } catch (delErr) {
+                        console.warn('删除重复Gist失败:', delErr);
+                    }
+                    // 使用已有的Gist ID
+                    chatroomGistId = conflictResult.existingGistId;
+                    localStorage.setItem(`chatroom_gist_${roomId}`, chatroomGistId);
+                    // 将数据PATCH到已有的Gist
+                    const patchResp = await fetch(`https://api.github.com/gists/${chatroomGistId}`, {
+                        method: 'PATCH',
+                        headers: {
+                            'Accept': 'application/vnd.github.v3+json',
+                            'Content-Type': 'application/json',
+                            'Authorization': `token ${token}`
+                        },
+                        body: JSON.stringify({
+                            files: {
+                                [filename]: {
+                                    content: JSON.stringify(chatRoomData, null, 2)
+                                }
+                            }
+                        })
+                    });
+                    if (patchResp.ok) {
+                        return chatroomGistId;
+                    }
+                }
+                
+                // 检查索引更新是否失败
+                if (conflictResult && conflictResult.error) {
+                    console.warn(`⚠️ 索引更新失败: ${conflictResult.error}，但房间数据已保存`);
+                }
                 
                 return data.id;
             }
@@ -2078,7 +2118,10 @@
 
         async function updateRoomIndex(roomId, gistId) {
             const token = getGistToken();
-            if (!token) return;
+            if (!token) {
+                console.warn('未设置Token，无法更新索引');
+                return { warning: '未设置Token' };
+            }
             
             try {
                 const indexUrl = `https://api.github.com/gists/${GIST_ID}`;
@@ -2089,10 +2132,14 @@
                     }
                 });
                 
-                if (!response.ok) return;
+                if (!response.ok) {
+                    return { error: `获取索引失败: ${response.status}` };
+                }
                 
                 const data = await response.json();
-                if (!data.files || !data.files['room_index.json'] || !data.files['room_index.json'].content) return;
+                if (!data.files || !data.files['room_index.json'] || !data.files['room_index.json'].content) {
+                    return { error: '索引文件内容为空' };
+                }
                 
                 const index = JSON.parse(data.files['room_index.json'].content);
                 
@@ -2101,25 +2148,52 @@
                     return { conflict: true, existingGistId: index[roomId] };
                 }
                 
+                // 如果相同，跳过更新
+                if (index[roomId] === gistId) {
+                    return null;
+                }
+                
                 index[roomId] = gistId;
                 
-                await fetch(indexUrl, {
-                    method: 'PATCH',
-                    headers: {
-                        'Accept': 'application/vnd.github.v3+json',
-                        'Content-Type': 'application/json',
-                        'Authorization': `token ${token}`
-                    },
-                    body: JSON.stringify({
-                        files: {
-                            'room_index.json': {
-                                content: JSON.stringify(index, null, 2)
+                // 保存索引文件（带重试机制）
+                let patchSuccess = false;
+                let retryCount = 0;
+                const maxRetries = 3;
+                
+                while (!patchSuccess && retryCount < maxRetries) {
+                    const patchResponse = await fetch(indexUrl, {
+                        method: 'PATCH',
+                        headers: {
+                            'Accept': 'application/vnd.github.v3+json',
+                            'Content-Type': 'application/json',
+                            'Authorization': `token ${token}`
+                        },
+                        body: JSON.stringify({
+                            files: {
+                                'room_index.json': {
+                                    content: JSON.stringify(index, null, 2)
+                                }
                             }
+                        })
+                    });
+                    
+                    if (patchResponse.ok) {
+                        patchSuccess = true;
+                    } else {
+                        retryCount++;
+                        if (retryCount < maxRetries) {
+                            await new Promise(r => setTimeout(r, 500 * retryCount));
                         }
-                    })
-                });
+                    }
+                }
+                
+                if (!patchSuccess) {
+                    console.error(`❌ 更新索引失败，已重试${maxRetries}次`);
+                    return { error: '更新索引失败' };
+                }
             } catch (error) {
                 console.error('更新房间索引失败:', error);
+                return { error: error.message };
             }
         }
 
