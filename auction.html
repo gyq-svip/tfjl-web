@@ -29,6 +29,72 @@
             50% { opacity: 0.6; }
         }
 
+        /* 锤子按钮脉冲发光动画 */
+        @keyframes hammerPulse {
+            0%, 100% {
+                box-shadow: 0 0 8px rgba(255,215,0,0.6), 0 0 16px rgba(255,215,0,0.4);
+                transform: scale(1);
+            }
+            50% {
+                box-shadow: 0 0 16px rgba(255,215,0,0.9), 0 0 32px rgba(255,215,0,0.6), 0 0 48px rgba(255,107,107,0.4);
+                transform: scale(1.08);
+            }
+        }
+
+        /* 横幅按钮渐变流动 */
+        @keyframes bannerShine {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .hammer-btn {
+            background: linear-gradient(135deg, #ffd700, #ff6b6b) !important;
+            border: 2px solid rgba(255,255,255,0.4) !important;
+            color: #1a1a2e !important;
+            font-size: 1.3rem !important;
+            padding: 4px 10px !important;
+            border-radius: 8px !important;
+            cursor: pointer;
+            animation: hammerPulse 1.8s ease-in-out infinite;
+            text-shadow: none !important;
+            font-weight: bold;
+            transition: transform 0.15s;
+        }
+        .hammer-btn:hover {
+            transform: scale(1.15) !important;
+            animation: none;
+            box-shadow: 0 0 20px rgba(255,215,0,1), 0 0 40px rgba(255,107,107,0.8) !important;
+        }
+        .hammer-btn:active {
+            transform: scale(0.95) !important;
+        }
+
+        .post-banner-btn {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 10px;
+            background: linear-gradient(90deg, #ffd700, #ff6b6b, #ffd700, #ff6b6b);
+            background-size: 300% 100%;
+            color: #1a1a2e;
+            font-size: 0.95rem;
+            font-weight: bold;
+            cursor: pointer;
+            animation: bannerShine 3s ease infinite;
+            box-shadow: 0 4px 15px rgba(255,215,0,0.4);
+            transition: transform 0.15s, box-shadow 0.15s;
+            text-align: center;
+            letter-spacing: 1px;
+        }
+        .post-banner-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 25px rgba(255,215,0,0.6);
+        }
+        .post-banner-btn:active {
+            transform: translateY(0);
+        }
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
@@ -519,7 +585,7 @@
                 <button onclick="openOwnerPanel()" title="房主管理" style="background:transparent;border:none;color:#a78bfa;font-size:0.85rem;cursor:pointer;padding:4px 8px;border:1px solid rgba(167,139,250,0.3);border-radius:4px;transition:all 0.2s;" onmouseover="this.style.background='rgba(167,139,250,0.2)'" onmouseout="this.style.background='transparent'">👑 房主</button>
                 <button onclick="switchChatRoom()" title="切换房间" style="background:transparent;border:none;color:#fbbf24;font-size:0.85rem;cursor:pointer;padding:4px 8px;border:1px solid rgba(255,215,0,0.3);border-radius:4px;transition:all 0.2s;" onmouseover="this.style.background='rgba(255,215,0,0.2)'" onmouseout="this.style.background='transparent'">切换房间</button>
                 <button onclick="showAuctionRules()" title="查看规则" style="background:transparent;border:none;color:#4ecdc4;font-size:0.85rem;cursor:pointer;padding:4px 8px;border:1px solid rgba(78,205,196,0.3);border-radius:4px;transition:all 0.2s;" onmouseover="this.style.background='rgba(78,205,196,0.2)'" onmouseout="this.style.background='transparent'">📜 规则</button>
-                <button onclick="toggleChatRoomTab('auctions')" title="拍卖" style="background:transparent;border:none;color:#ffd700;font-size:1.4rem;cursor:pointer;padding:0;text-shadow:0 0 8px rgba(255,215,0,0.6);">🔨</button>
+                <button onclick="openAuctionPostModal()" title="发布拍卖" class="hammer-btn">🔨</button>
                 <button onclick="closeChatRoom()" title="关闭" style="background:transparent;border:none;color:#ff6b6b;font-size:1rem;cursor:pointer;padding:0;">×</button>
             </div>
         </div>
@@ -539,8 +605,10 @@
                 </div>
                 <div style="display:flex;gap:6px;">
                     <button onclick="manualRefreshAuctions()" id="manualRefreshBtn" style="padding:6px 10px;border-radius:6px;border:none;background:rgba(255,215,0,0.15);color:rgba(255,215,0,0.9);cursor:pointer;font-size:1rem;transition:all 0.2s;min-width:36px;font-weight:bold;" onmouseover="this.style.background='rgba(255,215,0,0.3)'" onmouseout="this.style.background='rgba(255,215,0,0.15)'">↻</button>
-                    <button onclick="openAuctionPostModal()" style="padding:4px 10px;border-radius:6px;border:none;background:linear-gradient(135deg,#4ade80,#22c55e);color:white;cursor:pointer;font-size:0.75rem;">+ 发布拍卖</button>
                 </div>
+            </div>
+            <div style="padding:8px 10px;border-bottom:1px solid rgba(255,215,0,0.2);">
+                <button onclick="openAuctionPostModal()" class="post-banner-btn">🔨 立即上架商品</button>
             </div>
             <div style="padding:6px 10px;background:rgba(255,80,80,0.12);border-bottom:1px solid rgba(255,80,80,0.2);font-size:0.7rem;color:rgba(255,180,180,0.95);text-align:center;line-height:1.4;">
                 ⚠️ <b>防骗提示：</b>交易前务必核实对方信息，建议走官方平台，谨防被骗！
@@ -1622,6 +1690,8 @@
             await fetchChatRoomData();
             renderChatMessages();
             renderAuctionsList();
+            // 默认显示拍卖列表（商品界面）
+            toggleChatRoomTab('auctions');
             startChatRefresh();
             startAuctionCountdown();
         }
