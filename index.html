@@ -2748,6 +2748,13 @@
             const cat = document.getElementById('categorySelector1').value;
             const sel = document.getElementById('projectSelector1');
             sel.innerHTML = '<option value="">-- 选择项目 --</option>';
+            // 添加"新增项目"选项
+            const newOpt = document.createElement('option');
+            newOpt.value = '__NEW__';
+            newOpt.textContent = '➕ 新建项目';
+            newOpt.style.color = '#4ade80';
+            newOpt.style.fontWeight = 'bold';
+            sel.appendChild(newOpt);
             if (!cat) return;
 
             loadProjectListFromDB().then(allProjects => {
@@ -8235,6 +8242,44 @@
             if (!name) return;
             if (name === '-- 选择项目 --' || name === '') return;
 
+            // 处理"新建项目"选项
+            if (name === '__NEW__') {
+                // 获取当前选中的分类
+                const currentCat = document.getElementById('categorySelector1').value || '默认分类';
+                const newProjectName = prompt('请输入新项目名称：', '');
+                if (!newProjectName || !newProjectName.trim()) {
+                    // 用户取消，恢复下拉框选中状态
+                    const sel = document.getElementById('projectSelector1');
+                    if (currentProjectName) {
+                        sel.value = currentProjectName;
+                    } else {
+                        sel.value = '';
+                    }
+                    return;
+                }
+                pendingSaveProjectName = newProjectName.trim();
+                // 直接使用当前分类创建新项目
+                saveProjectToDB(pendingSaveProjectName, currentCat).then(() => {
+                    currentProjectName = pendingSaveProjectName;
+                    currentProjectCategory = currentCat;
+                    refreshProjectSelectors();
+                    // 选中刚创建的项目
+                    const sel = document.getElementById('projectSelector1');
+                    if (sel) sel.value = pendingSaveProjectName;
+                    alert(`✅ 新项目"${pendingSaveProjectName}"创建成功！\n分类：${currentCat}`);
+                }).catch(e => {
+                    alert('❌ 创建失败：' + e);
+                    // 恢复下拉框选中状态
+                    const sel = document.getElementById('projectSelector1');
+                    if (currentProjectName) {
+                        sel.value = currentProjectName;
+                    } else {
+                        sel.value = '';
+                    }
+                });
+                return;
+            }
+
             loadProjectFromDB(name).then(() => {
                 refreshProjectSelectors();
                 // 如果搜索面板打开，自动关闭
@@ -8270,6 +8315,13 @@
                 const projSel = document.getElementById('projectSelector1');
                 if (projSel) {
                     projSel.innerHTML = '<option value="">-- 选择项目 --</option>';
+                    // 添加"新增项目"选项
+                    const newOpt = document.createElement('option');
+                    newOpt.value = '__NEW__';
+                    newOpt.textContent = '➕ 新建项目';
+                    newOpt.style.color = '#4ade80';
+                    newOpt.style.fontWeight = 'bold';
+                    projSel.appendChild(newOpt);
                     const cat = currentProjectCategory || '默认分类';
                     allProjects.filter(p => p.category === cat).forEach(p => {
                         const opt = document.createElement('option');
