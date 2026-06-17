@@ -1952,7 +1952,8 @@
                                     if (currentRoom && currentRoom.messages && currentRoom.messages.length > 0) {
                                         const originalLength = currentRoom.messages.length;
                                         currentRoom.messages = currentRoom.messages.filter(msg => {
-                                            return msg.author === '系统' || (now - msg.time) < MESSAGE_EXPIRE;
+                                            // 系统消息永久保留
+                                            return msg.author === '系统' || msg.isSystem || (now - msg.time) < MESSAGE_EXPIRE;
                                         });
                                         if (currentRoom.messages.length < originalLength) {
                                             saveChatRoomData().catch(e => console.warn('清理后保存失败:', e));
@@ -2026,20 +2027,60 @@
                 chatRoomData.rooms = {};
             }
             if (!chatRoomData.rooms[roomId]) {
-                chatRoomData.rooms[roomId] = { messages: [], auctions: [], nextAuctionId: 1 };
+                // 新房间创建时添加一条系统消息作为标记
+                chatRoomData.rooms[roomId] = {
+                    messages: [{
+                        id: 'sys_create_' + Date.now(),
+                        author: '系统',
+                        content: '🎉 房间已创建，欢迎来到拍卖一条街！',
+                        time: Date.now(),
+                        isSystem: true
+                    }],
+                    auctions: [],
+                    nextAuctionId: 1,
+                    createdAt: new Date().toISOString()
+                };
             }
 
-            // 防御性检查：如果远程已有数据但本地auctions为空数组，不覆盖
-            // 避免fetch失败后用空数据覆盖远程数据
+            // 防御性检查：如果远程已有拍卖数据但本地auctions为空数组，不覆盖拍卖部分
+            // 但允许保存消息（新用户发消息时 auctions 可能确实是空的）
             const currentRoom = chatRoomData.rooms[roomId];
-            if (currentRoom && (!currentRoom.auctions || currentRoom.auctions.length === 0)) {
-                // 检查是否是首次创建（没有gistId缓存）
-                const existingGistId = localStorage.getItem(`chatroom_gist_${roomId}`);
-                if (existingGistId) {
-                    console.warn('⚠️ 检测到本地auctions为空但远程Gist已存在，跳过保存以防止覆盖');
-                    // 只保存消息部分，不覆盖auctions
-                    // 实际上直接跳过，等下次fetch成功后再保存
-                    return existingGistId;
+            const existingGistId = localStorage.getItem(`chatroom_gist_${roomId}`);
+
+            // 只有当远程 Gist 存在且有拍卖数据，但本地 auctions 为空时才跳过
+            // 新房间（有系统消息但 auctions 为空）应该允许保存
+            if (existingGistId && currentRoom) {
+                // 检查是否是新创建的房间（有系统消息且没有其他消息）
+                const hasOnlySystemMsg = currentRoom.messages &&
+                    currentRoom.messages.length === 1 &&
+                    currentRoom.messages[0].isSystem;
+
+                // 如果不是新房间，且 auctions 为空，需要谨慎
+                if (!hasOnlySystemMsg && (!currentRoom.auctions || currentRoom.auctions.length === 0)) {
+                    // 尝试获取远程数据确认是否真的有拍卖
+                    try {
+                        const remoteResp = await fetch(`https://api.github.com/gists/${existingGistId}`, {
+                            headers: {
+                                'Accept': 'application/vnd.github.v3+json',
+                                'Authorization': `token ${token}`
+                            }
+                        });
+                        if (remoteResp.ok) {
+                            const remoteData = await remoteResp.json();
+                            const remoteContent = remoteData.files?.[filename]?.content;
+                            if (remoteContent) {
+                                const remoteRoomData = JSON.parse(remoteContent);
+                                const remoteRoom = remoteRoomData.rooms?.[roomId];
+                                // 如果远程有拍卖数据但本地没有，跳过保存
+                                if (remoteRoom?.auctions?.length > 0 && !currentRoom.auctions?.length) {
+                                    console.warn('⚠️ 远程有拍卖数据但本地为空，跳过保存以防止覆盖');
+                                    return existingGistId;
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('检查远程数据失败，继续保存:', e);
+                    }
                 }
             }
 
@@ -2317,7 +2358,7 @@
                 const time = new Date(msg.time);
                 const timeStr = String(time.getHours()).padStart(2, '0') + ':' + String(time.getMinutes()).padStart(2, '0');
                 const isMe = msg.author === currentChatNick;
-                const isSystem = msg.author === '系统';
+                const isSystem = msg.author === '系统' || msg.isSystem;
                 const isRecallable = isMe && !isSystem && (now - msg.time) < RECALL_LIMIT;
                 const isDeletable = isMe && !isSystem;
 
@@ -2328,6 +2369,17 @@
                     actionBtn = `<span onclick="recallMessage('${msg.id}')" title="撤回" style="color:#fbbf24;font-size:0.7rem;cursor:pointer;margin-left:6px;padding:2px 4px;border-radius:3px;background:rgba(251,191,36,0.15);">撤回</span>`;
                 } else if (isDeletable) {
                     actionBtn = `<span onclick="deleteMessage('${msg.id}')" title="删除" style="color:#ef4444;font-size:0.7rem;cursor:pointer;margin-left:6px;padding:2px 4px;border-radius:3px;background:rgba(239,68,68,0.15);">删除</span>`;
+                }
+
+                // 系统消息特殊样式（居中、紫色背景）
+                if (isSystem) {
+                    return `
+                        <div style="margin-bottom:8px;text-align:center;">
+                            <div style="display:inline-block;background:linear-gradient(135deg,rgba(167,139,250,0.2),rgba(124,58,237,0.15));padding:8px 16px;border-radius:12px;font-size:0.85rem;color:#a78bfa;max-width:90%;word-break:break-all;border:1px solid rgba(167,139,250,0.3);">
+                                ${escapeHtml(msg.content)}
+                            </div>
+                        </div>
+                    `;
                 }
 
                 return `
@@ -5356,12 +5408,12 @@
             loadInitialData();
         }
 
-        // 初始化长按标题弹出管理员验证
-        initTitleLongPress();
+        // 设置管理员面板触发（长按标题）
+        setupAdminTrigger();
 
-        // 管理员验证弹窗点击外部关闭
-        document.getElementById('adminVerifyModal').addEventListener('click', function(e) {
-            if (e.target === this) closeAdminVerify();
+        // 管理员面板点击外部关闭
+        document.getElementById('adminPanel').addEventListener('click', function(e) {
+            if (e.target === this) closeAdminPanel();
         });
 
         // 密码输入框回车事件
