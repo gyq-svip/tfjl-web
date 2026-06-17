@@ -800,43 +800,78 @@
         <div id="auctionDetailContent" style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);border:2px solid rgba(255,215,0,0.4);border-radius:16px;padding:25px;width:90%;max-width:500px;max-height:85vh;overflow-y:auto;box-shadow:0 10px 50px rgba(0,0,0,0.6);position:relative;"></div>
     </div>
 
-    <!-- 管理员密码验证弹窗 -->
-    <div id="adminVerifyModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:10001;align-items:center;justify-content:center;">
-        <div style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);border:2px solid rgba(167,139,250,0.4);border-radius:16px;padding:30px;width:90%;max-width:350px;text-align:center;box-shadow:0 10px 50px rgba(0,0,0,0.6);">
-            <div style="color:#a78bfa;font-size:2rem;margin-bottom:10px;">⚙️</div>
-            <h2 style="color:#a78bfa;margin-bottom:15px;font-size:1.2rem;">管理员验证</h2>
-            <input type="password" id="adminPasswordInput" placeholder="请输入管理员密码" style="width:100%;padding:12px;border-radius:8px;border:1px solid rgba(167,139,250,0.3);background:rgba(0,0,0,0.4);color:white;font-size:0.9rem;margin-bottom:15px;outline:none;box-sizing:border-box;" onkeydown="if(event.key==='Enter')verifyAdminPassword()">
-            <div id="adminPasswordError" style="color:#ef4444;font-size:0.8rem;margin-bottom:10px;display:none;">密码错误！</div>
-            <div style="display:flex;gap:10px;justify-content:center;">
-                <button onclick="closeAdminVerify()" style="padding:8px 20px;border-radius:8px;border:none;background:rgba(255,255,255,0.1);color:white;cursor:pointer;font-size:0.9rem;">取消</button>
-                <button onclick="verifyAdminPassword()" style="padding:8px 20px;border-radius:8px;border:none;background:linear-gradient(135deg,#a78bfa,#7c3aed);color:white;cursor:pointer;font-weight:500;font-size:0.9rem;">验证</button>
-            </div>
-        </div>
-    </div>
-
     <!-- 管理员面板 -->
-    <div id="adminPanel">
-        <div style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);border:2px solid rgba(167,139,250,0.4);border-radius:16px;padding:20px;width:90%;max-width:900px;max-height:90vh;overflow-y:auto;box-shadow:0 10px 50px rgba(0,0,0,0.6);">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
-                <h2 style="color:#a78bfa;margin:0;font-size:1.2rem;">⚙️ 管理员面板</h2>
-                <button onclick="closeAdminPanel()" style="background:transparent;border:none;color:#ff6b6b;font-size:1.2rem;cursor:pointer;">×</button>
-            </div>
-            
-            <!-- Token状态 -->
-            <div id="adminTokenSection" style="background:rgba(0,0,0,0.2);border-radius:8px;padding:15px;margin-bottom:15px;">
-                <div style="color:rgba(255,255,255,0.6);font-size:0.85rem;margin-bottom:8px;">GitHub Token状态</div>
-                <div id="adminTokenStatus" style="color:#4ade80;font-size:0.85rem;">检测中...</div>
-                <div style="margin-top:10px;display:flex;gap:8px;align-items:center;">
-                    <input type="password" id="adminTokenInput" placeholder="输入GitHub Token (ghp_开头)" style="flex:1;padding:8px 12px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:white;font-size:0.8rem;outline:none;">
-                    <button onclick="saveAdminToken()" style="padding:8px 14px;border-radius:6px;border:none;background:linear-gradient(135deg,#4ade80,#22c55e);color:white;cursor:pointer;font-size:0.8rem;white-space:nowrap;">保存</button>
-                    <button onclick="clearAdminToken()" style="padding:8px 14px;border-radius:6px;border:none;background:rgba(239,68,68,0.2);color:#ef4444;cursor:pointer;font-size:0.8rem;white-space:nowrap;border:1px solid rgba(239,68,68,0.3);">清除</button>
+    <div id="adminPanel" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:10001;align-items:center;justify-content:center;">
+        <div style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);border:2px solid rgba(167,139,250,0.4);border-radius:16px;padding:25px;width:90%;max-width:600px;max-height:90vh;overflow-y:auto;box-shadow:0 10px 50px rgba(0,0,0,0.6);position:relative;">
+            <button onclick="closeAdminPanel()" style="position:absolute;top:15px;right:15px;background:transparent;border:none;color:#ff6b6b;font-size:1.5rem;cursor:pointer;line-height:1;">×</button>
+
+            <!-- 验证区域 -->
+            <div id="adminVerifySection" style="text-align:center;">
+                <div style="color:#a78bfa;font-size:2rem;margin-bottom:10px;">🔐</div>
+                <h3 style="color:#a78bfa;margin:0 0 15px 0;font-size:1.2rem;">管理员验证</h3>
+                <input type="password" id="adminPasswordInput" placeholder="请输入管理员密码" style="width:100%;padding:12px;border-radius:8px;border:1px solid rgba(167,139,250,0.3);background:rgba(0,0,0,0.4);color:white;font-size:0.9rem;margin-bottom:15px;outline:none;box-sizing:border-box;" onkeydown="if(event.key==='Enter')verifyAdminPassword()">
+                <div id="adminPasswordError" style="color:#ef4444;font-size:0.8rem;margin-bottom:10px;display:none;">密码错误！</div>
+                <div style="display:flex;gap:10px;justify-content:center;">
+                    <button onclick="closeAdminPanel()" style="padding:10px 20px;border-radius:8px;border:none;background:rgba(255,255,255,0.1);color:white;cursor:pointer;font-size:0.9rem;">取消</button>
+                    <button onclick="verifyAdminPassword()" style="padding:10px 20px;border-radius:8px;border:none;background:linear-gradient(135deg,#a78bfa,#7c3aed);color:white;cursor:pointer;font-weight:500;font-size:0.9rem;">验证</button>
                 </div>
-                <div style="color:rgba(255,255,255,0.4);font-size:0.7rem;margin-top:6px;">提示：Token需有gist权限，保存后刷新页面生效</div>
             </div>
-            
-            <!-- 商品管理 -->
-            <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:15px;margin-bottom:15px;">
-                <div style="color:#ffd700;font-size:0.95rem;font-weight:bold;margin-bottom:10px;">🏪 商品管理</div>
+
+            <!-- 菜单区域 -->
+            <div id="adminMenuSection" style="display:none;">
+                <h2 style="color:#a78bfa;text-align:center;margin:0 0 20px 0;font-size:1.1rem;">🛡️ 管理员菜单</h2>
+                <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;">
+                    <div onclick="adminShowPage('settings')" style="background:rgba(255,255,255,0.05);border-radius:10px;padding:15px;cursor:pointer;display:flex;align-items:center;gap:10px;transition:background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.05)'">
+                        <span style="font-size:1.2rem;">⚙️</span>
+                        <div style="color:#ffd700;font-weight:500;font-size:0.9rem;">系统设置</div>
+                    </div>
+                    <div onclick="adminShowPage('auctionManage')" style="background:rgba(255,255,255,0.05);border-radius:10px;padding:15px;cursor:pointer;display:flex;align-items:center;gap:10px;transition:background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.05)'">
+                        <span style="font-size:1.2rem;">🏪</span>
+                        <div style="color:#ffd700;font-weight:500;font-size:0.9rem;">商品管理</div>
+                    </div>
+                    <div onclick="adminShowPage('auctionStats')" style="background:rgba(255,255,255,0.05);border-radius:10px;padding:15px;cursor:pointer;display:flex;align-items:center;gap:10px;transition:background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.05)'">
+                        <span style="font-size:1.2rem;">📊</span>
+                        <div style="color:#ffd700;font-weight:500;font-size:0.9rem;">拍卖统计</div>
+                    </div>
+                    <div onclick="adminShowPage('gistManage')" style="background:rgba(255,255,255,0.05);border-radius:10px;padding:15px;cursor:pointer;display:flex;align-items:center;gap:10px;transition:background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.05)'">
+                        <span style="font-size:1.2rem;">📁</span>
+                        <div style="color:#ffd700;font-weight:500;font-size:0.9rem;">文件管理</div>
+                    </div>
+                    <div onclick="adminShowPage('broadcastManage')" style="background:rgba(255,255,255,0.05);border-radius:10px;padding:15px;cursor:pointer;display:flex;align-items:center;gap:10px;transition:background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.05)'">
+                        <span style="font-size:1.2rem;">📢</span>
+                        <div style="color:#ffd700;font-weight:500;font-size:0.9rem;">快讯管理</div>
+                    </div>
+                    <div onclick="adminShowPage('roomManage')" style="background:rgba(255,255,255,0.05);border-radius:10px;padding:15px;cursor:pointer;display:flex;align-items:center;gap:10px;transition:background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.05)'">
+                        <span style="font-size:1.2rem;">🏠</span>
+                        <div style="color:#ffd700;font-weight:500;font-size:0.9rem;">房间管理</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 系统设置页面 -->
+            <div id="adminPageSettings" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">
+                    <button onclick="adminShowMenu()" style="background:transparent;border:none;color:#a78bfa;font-size:1rem;cursor:pointer;">← 返回</button>
+                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">⚙️ 系统设置</h3>
+                </div>
+                <div style="background:rgba(0,0,0,0.2);border-radius:8px;padding:15px;">
+                    <div style="color:rgba(255,255,255,0.6);font-size:0.85rem;margin-bottom:8px;">GitHub Token状态</div>
+                    <div id="adminTokenStatus" style="color:#4ade80;font-size:0.85rem;">检测中...</div>
+                    <div style="margin-top:10px;display:flex;gap:8px;align-items:center;">
+                        <input type="password" id="adminTokenInput" placeholder="输入GitHub Token (ghp_开头)" style="flex:1;padding:8px 12px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:white;font-size:0.8rem;outline:none;">
+                        <button onclick="saveAdminToken()" style="padding:8px 14px;border-radius:6px;border:none;background:linear-gradient(135deg,#4ade80,#22c55e);color:white;cursor:pointer;font-size:0.8rem;white-space:nowrap;">保存</button>
+                        <button onclick="clearAdminToken()" style="padding:8px 14px;border-radius:6px;border:none;background:rgba(239,68,68,0.2);color:#ef4444;cursor:pointer;font-size:0.8rem;white-space:nowrap;border:1px solid rgba(239,68,68,0.3);">清除</button>
+                    </div>
+                    <div style="color:rgba(255,255,255,0.4);font-size:0.7rem;margin-top:6px;">提示：Token需有gist权限，保存后刷新页面生效</div>
+                </div>
+            </div>
+
+            <!-- 商品管理页面 -->
+            <div id="adminPageAuctionManage" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">
+                    <button onclick="adminShowMenu()" style="background:transparent;border:none;color:#a78bfa;font-size:1rem;cursor:pointer;">← 返回</button>
+                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">🏪 商品管理</h3>
+                </div>
                 <div style="display:flex;gap:10px;margin-bottom:10px;">
                     <input type="text" id="auctionManageRoomId" placeholder="输入房间ID" style="flex:1;padding:8px 12px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:white;font-size:0.85rem;outline:none;">
                     <button onclick="loadAuctionManageList()" style="padding:8px 16px;border-radius:6px;border:none;background:linear-gradient(135deg,#4ecdc4,#44a08d);color:white;cursor:pointer;font-size:0.85rem;">查询</button>
@@ -844,10 +879,13 @@
                 </div>
                 <div id="auctionManageList" style="max-height:300px;overflow-y:auto;"></div>
             </div>
-            
-            <!-- 拍卖统计 -->
-            <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:15px;margin-bottom:15px;">
-                <div style="color:#ffd700;font-size:0.95rem;font-weight:bold;margin-bottom:10px;">📊 拍卖统计</div>
+
+            <!-- 拍卖统计页面 -->
+            <div id="adminPageAuctionStats" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">
+                    <button onclick="adminShowMenu()" style="background:transparent;border:none;color:#a78bfa;font-size:1rem;cursor:pointer;">← 返回</button>
+                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">📊 拍卖统计</h3>
+                </div>
                 <div style="display:flex;gap:10px;margin-bottom:10px;">
                     <input type="text" id="auctionStatsRoomId" placeholder="输入房间ID（空=全部）" style="flex:1;padding:8px 12px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:white;font-size:0.85rem;outline:none;">
                     <button onclick="loadAuctionStats()" style="padding:8px 16px;border-radius:6px;border:none;background:linear-gradient(135deg,#a78bfa,#7c3aed);color:white;cursor:pointer;font-size:0.85rem;">查询统计</button>
@@ -855,25 +893,45 @@
                 <div id="auctionStatsSummary" style="margin-bottom:10px;"></div>
                 <div id="auctionStatsDetail" style="max-height:400px;overflow-y:auto;"></div>
             </div>
-            
-            <!-- Gist文件管理 -->
-            <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:15px;margin-bottom:15px;">
-                <div style="color:#10b981;font-size:0.95rem;font-weight:bold;margin-bottom:10px;">📁 Gist文件管理</div>
+
+            <!-- 文件管理页面 -->
+            <div id="adminPageGistManage" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">
+                    <button onclick="adminShowMenu()" style="background:transparent;border:none;color:#a78bfa;font-size:1rem;cursor:pointer;">← 返回</button>
+                    <h3 style="color:#10b981;margin:0;font-size:1rem;">📁 Gist文件管理</h3>
+                </div>
                 <div style="display:flex;gap:10px;margin-bottom:10px;">
                     <button onclick="loadGistFileStatus()" style="padding:8px 16px;border-radius:6px;border:none;background:linear-gradient(135deg,#10b981,#059669);color:white;cursor:pointer;font-size:0.85rem;">刷新状态</button>
                     <button onclick="cleanupObsoleteFiles()" style="padding:8px 16px;border-radius:6px;border:none;background:rgba(239,68,68,0.2);color:#ef4444;cursor:pointer;font-size:0.85rem;border:1px solid rgba(239,68,68,0.3);">清理可删除文件</button>
                 </div>
                 <div id="gistFileStatus" style="max-height:300px;overflow-y:auto;"></div>
             </div>
-            
-            <!-- 拍卖快讯管理 -->
-            <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:15px;margin-bottom:15px;">
-                <div style="color:#ff6b6b;font-size:0.95rem;font-weight:bold;margin-bottom:10px;">📢 拍卖快讯管理</div>
+
+            <!-- 快讯管理页面 -->
+            <div id="adminPageBroadcastManage" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">
+                    <button onclick="adminShowMenu()" style="background:transparent;border:none;color:#a78bfa;font-size:1rem;cursor:pointer;">← 返回</button>
+                    <h3 style="color:#ff6b6b;margin:0;font-size:1rem;">📢 拍卖快讯管理</h3>
+                </div>
                 <div style="display:flex;gap:10px;margin-bottom:10px;">
                     <button onclick="adminRefreshAuctionBroadcasts()" style="padding:8px 16px;border-radius:6px;border:none;background:linear-gradient(135deg,#ff6b6b,#ef4444);color:white;cursor:pointer;font-size:0.85rem;">刷新快讯</button>
                     <button onclick="adminClearAllAuctionBroadcasts()" style="padding:8px 16px;border-radius:6px;border:none;background:rgba(239,68,68,0.2);color:#ef4444;cursor:pointer;font-size:0.85rem;border:1px solid rgba(239,68,68,0.3);">清空全部</button>
                 </div>
                 <div id="adminAuctionBroadcastList" style="max-height:200px;overflow-y:auto;"></div>
+            </div>
+
+            <!-- 房间管理页面 -->
+            <div id="adminPageRoomManage" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">
+                    <button onclick="adminShowMenu()" style="background:transparent;border:none;color:#a78bfa;font-size:1rem;cursor:pointer;">← 返回</button>
+                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">🏠 房间管理</h3>
+                </div>
+                <div id="allowedRoomsList" style="max-height:300px;overflow-y:auto;"></div>
+                <div style="margin-top:15px;display:flex;gap:10px;">
+                    <input type="text" id="newAllowedRoomIdInput" placeholder="新房间ID" style="flex:1;padding:8px 12px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:white;font-size:0.85rem;outline:none;">
+                    <input type="text" id="newRoomOwnerInput" placeholder="房主昵称" style="flex:1;padding:8px 12px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:white;font-size:0.85rem;outline:none;">
+                    <button onclick="adminAddAllowedRoom()" style="padding:8px 16px;border-radius:6px;border:none;background:linear-gradient(135deg,#4ade80,#22c55e);color:white;cursor:pointer;font-size:0.85rem;">添加</button>
+                </div>
             </div>
         </div>
     </div>
@@ -940,6 +998,8 @@
         async function loadInitialData() {
             // 加载统计数据
             loadStats();
+            // 设置管理员面板触发
+            setupAdminTrigger();
             // 加载拍卖快讯
             refreshAuctionBroadcasts();
             // 加载概览统计
@@ -952,8 +1012,6 @@
             loadLeaderboard();
             // 加载拍卖日历
             loadAuctionCalendar();
-            // 检查Token状态
-            checkAdminTokenStatus();
             
             // 恢复上次房间
             const savedRoom = localStorage.getItem('TFJL_ChatRoom');
@@ -3793,13 +3851,116 @@
             }
         }
 
+        // ==================== 管理员面板 ====================
+        let adminLongPressTimer = null;
+        let adminTouchMoved = false;
+        const ADMIN_VERIFY_KEY = 'auction_admin_verified';
+
+        // 长按标题触发管理员面板
+        function setupAdminTrigger() {
+            const title = document.getElementById('auctionTitle');
+            if (!title) return;
+
+            // 鼠标长按
+            title.addEventListener('mousedown', (e) => {
+                adminLongPressTimer = setTimeout(() => {
+                    openAdminPanel();
+                }, 1500);
+            });
+            title.addEventListener('mouseup', () => {
+                clearTimeout(adminLongPressTimer);
+            });
+            title.addEventListener('mouseleave', () => {
+                clearTimeout(adminLongPressTimer);
+            });
+
+            // 触摸长按
+            title.addEventListener('touchstart', (e) => {
+                adminTouchMoved = false;
+                adminLongPressTimer = setTimeout(() => {
+                    if (!adminTouchMoved) {
+                        openAdminPanel();
+                    }
+                }, 1500);
+            });
+            title.addEventListener('touchend', () => {
+                clearTimeout(adminLongPressTimer);
+            });
+            title.addEventListener('touchmove', () => {
+                adminTouchMoved = true;
+                clearTimeout(adminLongPressTimer);
+            });
+        }
+
         function openAdminPanel() {
-            document.getElementById('adminPanel').style.display = 'flex';
-            checkAdminTokenStatus();
+            const panel = document.getElementById('adminPanel');
+            panel.style.display = 'flex';
+
+            const isVerified = sessionStorage.getItem(ADMIN_VERIFY_KEY) === 'true';
+            if (isVerified) {
+                document.getElementById('adminVerifySection').style.display = 'none';
+                adminShowMenu();
+            } else {
+                document.getElementById('adminVerifySection').style.display = 'block';
+                document.getElementById('adminMenuSection').style.display = 'none';
+                hideAllAdminPages();
+                document.getElementById('adminPasswordInput').value = '';
+                document.getElementById('adminPasswordInput').focus();
+            }
         }
 
         function closeAdminPanel() {
             document.getElementById('adminPanel').style.display = 'none';
+        }
+
+        function verifyAdminPassword() {
+            const input = document.getElementById('adminPasswordInput');
+            const error = document.getElementById('adminPasswordError');
+            if (input.value === ADMIN_PASSWORD) {
+                sessionStorage.setItem(ADMIN_VERIFY_KEY, 'true');
+                document.getElementById('adminVerifySection').style.display = 'none';
+                adminShowMenu();
+                error.style.display = 'none';
+            } else {
+                error.style.display = 'block';
+                input.value = '';
+                input.focus();
+            }
+        }
+
+        function adminShowMenu() {
+            document.getElementById('adminMenuSection').style.display = 'block';
+            hideAllAdminPages();
+        }
+
+        function hideAllAdminPages() {
+            document.getElementById('adminPageSettings').style.display = 'none';
+            document.getElementById('adminPageAuctionManage').style.display = 'none';
+            document.getElementById('adminPageAuctionStats').style.display = 'none';
+            document.getElementById('adminPageGistManage').style.display = 'none';
+            document.getElementById('adminPageBroadcastManage').style.display = 'none';
+            document.getElementById('adminPageRoomManage').style.display = 'none';
+        }
+
+        function adminShowPage(page) {
+            document.getElementById('adminMenuSection').style.display = 'none';
+            hideAllAdminPages();
+
+            if (page === 'settings') {
+                document.getElementById('adminPageSettings').style.display = 'block';
+                checkAdminTokenStatus();
+            } else if (page === 'auctionManage') {
+                document.getElementById('adminPageAuctionManage').style.display = 'block';
+            } else if (page === 'auctionStats') {
+                document.getElementById('adminPageAuctionStats').style.display = 'block';
+            } else if (page === 'gistManage') {
+                document.getElementById('adminPageGistManage').style.display = 'block';
+            } else if (page === 'broadcastManage') {
+                document.getElementById('adminPageBroadcastManage').style.display = 'block';
+            } else if (page === 'roomManage') {
+                document.getElementById('adminPageRoomManage').style.display = 'block';
+                loadAllowedRoomsList();
+            }
         }
 
         function checkAdminTokenStatus() {
@@ -3808,13 +3969,12 @@
             const tokenInput = document.getElementById('adminTokenInput');
 
             if (token) {
-                // 显示token前缀和长度，方便确认
                 const prefix = token.substring(0, 10);
                 const len = token.length;
-                tokenStatus.innerHTML = `<span style="color:#4ade80;font-size:0.85rem;">✅ Token已配置 (${prefix}...共${len}字符)</span>`;
+                tokenStatus.innerHTML = `<span style="color:#4ade80;">✅ Token已配置 (${prefix}...共${len}字符)</span>`;
                 if (tokenInput) tokenInput.value = '';
             } else {
-                tokenStatus.innerHTML = '<span style="color:#ef4444;font-size:0.85rem;">⚠️ 未检测到Token，请配置后才能操作</span>';
+                tokenStatus.innerHTML = '<span style="color:#ef4444;">⚠️ 未检测到Token，请配置后才能操作</span>';
             }
         }
 
@@ -3829,16 +3989,175 @@
                 if (!confirm('Token格式可能不正确（通常以ghp_开头），确定要保存吗？')) return;
             }
             setGistToken(token);
-            input.value = '';
+            alert('✅ Token已保存！刷新页面后生效');
             checkAdminTokenStatus();
-            alert('✅ Token已保存！\n请刷新页面使Token生效。');
         }
 
         function clearAdminToken() {
-            if (!confirm('确定要清除Token吗？清除后将无法操作拍卖功能。')) return;
+            if (!confirm('确定要清除Token吗？')) return;
             localStorage.removeItem(GIST_TOKEN_KEY);
+            alert('✅ Token已清除');
             checkAdminTokenStatus();
-            alert('Token已清除');
+        }
+
+        // ==================== 房间管理 ====================
+        async function loadAllowedRoomsList() {
+            const container = document.getElementById('allowedRoomsList');
+            container.innerHTML = '<div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;">加载中...</div>';
+
+            try {
+                const token = getGistToken();
+                const indexUrl = `https://api.github.com/gists/${GIST_ID}`;
+                const response = await fetch(indexUrl, {
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        ...(token && { 'Authorization': `token ${token}` })
+                    }
+                });
+
+                if (!response.ok) throw new Error('获取索引文件失败');
+
+                const data = await response.json();
+                const content = data.files['room_index.json']?.content;
+                if (!content) throw new Error('索引文件内容为空');
+
+                const index = JSON.parse(content);
+                const allowedRooms = index.allowedRooms || [];
+
+                if (allowedRooms.length === 0) {
+                    container.innerHTML = `
+                        <div style="color:#4ade80;text-align:center;padding:20px;">
+                            🌐 <strong>开放模式</strong><br>
+                            <span style="font-size:0.8rem;color:rgba(255,255,255,0.6);">所有房间都可以进入</span>
+                        </div>
+                    `;
+                } else {
+                    container.innerHTML = `
+                        <div style="color:#f59e0b;margin-bottom:10px;font-size:0.85rem;">
+                            🔒 限制模式：${allowedRooms.length} 个房间已开放
+                        </div>
+                        ${allowedRooms.map(room => {
+                            const roomId = typeof room === 'string' ? room : room.id;
+                            const owner = typeof room === 'object' ? (room.owner || '') : '';
+                            return `
+                                <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:rgba(255,255,255,0.05);border-radius:6px;margin-bottom:6px;">
+                                    <div>
+                                        <span style="color:#ffd700;font-weight:500;">#${roomId}</span>
+                                        ${owner ? `<span style="color:#4ade80;font-size:0.75rem;margin-left:8px;">👤 ${owner}</span>` : ''}
+                                    </div>
+                                    <button onclick="adminRemoveAllowedRoom('${roomId}')" style="padding:4px 8px;border-radius:4px;border:none;background:#ff6b6b;color:white;cursor:pointer;font-size:0.7rem;">删除</button>
+                                </div>
+                            `;
+                        }).join('')}
+                    `;
+                }
+            } catch (e) {
+                container.innerHTML = `<div style="color:#ef4444;text-align:center;padding:20px;">加载失败: ${e.message}</div>`;
+            }
+        }
+
+        async function adminAddAllowedRoom() {
+            const roomId = document.getElementById('newAllowedRoomIdInput').value.trim();
+            const owner = document.getElementById('newRoomOwnerInput').value.trim();
+            if (!roomId) {
+                alert('请输入房间ID');
+                return;
+            }
+
+            try {
+                const token = getGistToken();
+                if (!token) throw new Error('未设置Token');
+
+                const indexUrl = `https://api.github.com/gists/${GIST_ID}`;
+                const response = await fetch(indexUrl, {
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Authorization': `token ${token}`
+                    }
+                });
+
+                if (!response.ok) throw new Error('获取索引失败');
+                const data = await response.json();
+                const index = JSON.parse(data.files['room_index.json'].content);
+
+                if (!index.allowedRooms) index.allowedRooms = [];
+                if (index.allowedRooms.some(r => (typeof r === 'string' ? r : r.id) === roomId)) {
+                    alert('该房间已在白名单中');
+                    return;
+                }
+
+                index.allowedRooms.push(owner ? { id: roomId, owner: owner } : roomId);
+
+                const patchResponse = await fetch(indexUrl, {
+                    method: 'PATCH',
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json',
+                        'Authorization': `token ${token}`
+                    },
+                    body: JSON.stringify({
+                        files: {
+                            'room_index.json': {
+                                content: JSON.stringify(index, null, 2)
+                            }
+                        }
+                    })
+                });
+
+                if (!patchResponse.ok) throw new Error('更新失败');
+                alert('✅ 房间已添加到白名单');
+                document.getElementById('newAllowedRoomIdInput').value = '';
+                document.getElementById('newRoomOwnerInput').value = '';
+                loadAllowedRoomsList();
+            } catch (e) {
+                alert('❌ 添加失败: ' + e.message);
+            }
+        }
+
+        async function adminRemoveAllowedRoom(roomId) {
+            if (!confirm(`确定要从白名单中删除房间 #${roomId} 吗？`)) return;
+
+            try {
+                const token = getGistToken();
+                if (!token) throw new Error('未设置Token');
+
+                const indexUrl = `https://api.github.com/gists/${GIST_ID}`;
+                const response = await fetch(indexUrl, {
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Authorization': `token ${token}`
+                    }
+                });
+
+                if (!response.ok) throw new Error('获取索引失败');
+                const data = await response.json();
+                const index = JSON.parse(data.files['room_index.json'].content);
+
+                if (!index.allowedRooms) index.allowedRooms = [];
+                index.allowedRooms = index.allowedRooms.filter(r => (typeof r === 'string' ? r : r.id) !== roomId);
+
+                const patchResponse = await fetch(indexUrl, {
+                    method: 'PATCH',
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json',
+                        'Authorization': `token ${token}`
+                    },
+                    body: JSON.stringify({
+                        files: {
+                            'room_index.json': {
+                                content: JSON.stringify(index, null, 2)
+                            }
+                        }
+                    })
+                });
+
+                if (!patchResponse.ok) throw new Error('更新失败');
+                alert('✅ 房间已从白名单中移除');
+                loadAllowedRoomsList();
+            } catch (e) {
+                alert('❌ 删除失败: ' + e.message);
+            }
         }
 
         async function loadAuctionManageList() {
