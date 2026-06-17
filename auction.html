@@ -98,20 +98,21 @@
         /* 拍卖者信息流动显示 */
         @keyframes bidderScroll {
             0%, 45% { transform: translateY(0); }
-            50%, 95% { transform: translateY(-50%); }
+            50%, 95% { transform: translateY(-100%); }
             100% { transform: translateY(0); }
         }
         .bidder-scroll-wrap {
             overflow: hidden;
-            height: 1.2em;
-            line-height: 1.2em;
+            height: 20px;
+            line-height: 20px;
+            min-height: 20px;
         }
         .bidder-scroll-inner {
             animation: bidderScroll 10s infinite;
         }
         .bidder-scroll-inner > div {
-            height: 1.2em;
-            line-height: 1.2em;
+            height: 20px;
+            line-height: 20px;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -3096,22 +3097,20 @@
 
                 let bidderHtml = '';
                 if (currentBidder) {
-                    // 格式化出价时间
+                    // 格式化出价时间（简化格式，避免太长）
                     const bidTime = highestBid.time;
                     let timeStr = '';
                     if (bidTime) {
                         const d = new Date(bidTime);
-                        const mm = String(d.getMonth() + 1).padStart(2, '0');
-                        const dd = String(d.getDate()).padStart(2, '0');
                         const hh = String(d.getHours()).padStart(2, '0');
                         const mi = String(d.getMinutes()).padStart(2, '0');
                         const ss = String(d.getSeconds()).padStart(2, '0');
-                        timeStr = `${mm}-${dd} ${hh}:${mi}:${ss}`;
+                        timeStr = `${hh}:${mi}:${ss}`;
                     }
-                    bidderHtml = `<div class="bidder-scroll-wrap" style="text-align:right;">
+                    bidderHtml = `<div class="bidder-scroll-wrap" style="text-align:right;width:100%;">
                         <div class="bidder-scroll-inner">
-                            <div style="color:rgba(255,255,255,0.75);font-size:0.75rem;">👤 ${currentBidder}</div>
-                            <div style="color:rgba(78,205,196,0.85);font-size:0.7rem;">⏰ ${timeStr}</div>
+                            <div style="color:rgba(255,255,255,0.85);font-size:0.75rem;text-align:right;">👤 ${currentBidder}</div>
+                            <div style="color:rgba(78,205,196,0.95);font-size:0.7rem;text-align:right;">⏰ ${timeStr}</div>
                         </div>
                     </div>`;
                 }
