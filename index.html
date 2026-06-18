@@ -8011,7 +8011,7 @@
         let currentCategoryFilter = '全部';
 
         // 保存项目到IndexedDB
-        function saveProjectToDB(projectName, category) {
+        function saveProjectToDB(projectName, category, currentData) {
             return new Promise((resolve, reject) => {
                 if (!db) {
                     alert('数据库未初始化');
@@ -8022,34 +8022,35 @@
                 const transaction = db.transaction([STORE_NAME], 'readwrite');
                 const store = transaction.objectStore(STORE_NAME);
 
-                // 新建项目时使用空数据，而不是复制当前页面的数据
+                // 构建项目数据（保存当前页面的数据）
                 const projectData = {
                     name: projectName,
                     category: category || '默认分类',
                     timestamp: new Date().toISOString(),
-                    myHandCards: [],
-                    teammateHandCards: [],
-                    myPlacedCards: [],
-                    teammatePlacedCards: [],
-                    cardLevels: {},
-                    cardSkins: {},
-                    myDeckInfo: '',
-                    teammateDeckInfo: '',
-                    notepad: '',
-                    txtFiles: [],
-                    referenceImages: []
+                    myHandCards: currentData?.myHandCards || myHandCards || [],
+                    teammateHandCards: currentData?.teammateHandCards || teammateHandCards || [],
+                    myPlacedCards: currentData?.myPlacedCards || myPlacedCards || [],
+                    teammatePlacedCards: currentData?.teammatePlacedCards || teammatePlacedCards || [],
+                    cardLevels: currentData?.cardLevels || cardLevels || {},
+                    cardSkins: currentData?.cardSkins || cardSkins || {},
+                    myDeckInfo: currentData?.myDeckInfo || myDeckInfo || '',
+                    teammateDeckInfo: currentData?.teammateDeckInfo || teammateDeckInfo || '',
+                    notepad: currentData?.notepad || notepad || '',
+                    txtFiles: currentData?.txtFiles || txtFiles || [],
+                    referenceImages: currentData?.referenceImages || referenceImages || []
                 };
+
+                // 保存项目数据
+                const putRequest = store.put(projectData);
                 
-                const request = store.put(projectData);
-                
-                request.onsuccess = function() {
+                putRequest.onsuccess = function() {
                     currentProjectName = projectName;
                     currentProjectCategory = category || '默认分类';
                     refreshProjectSelectors();
                     resolve();
                 };
                 
-                request.onerror = function(event) {
+                putRequest.onerror = function(event) {
                     console.error('保存项目失败:', event.target.error);
                     reject(event.target.error);
                 };
@@ -9508,7 +9509,22 @@
 
             closeSelectCategoryModal();
 
-            saveProjectToDB(projectName, category).then(() => {
+            // 收集当前页面数据
+            const currentData = {
+                myHandCards: myHandCards,
+                teammateHandCards: teammateHandCards,
+                myPlacedCards: myPlacedCards,
+                teammatePlacedCards: teammatePlacedCards,
+                cardLevels: cardLevels,
+                cardSkins: cardSkins,
+                myDeckInfo: myDeckInfo,
+                teammateDeckInfo: teammateDeckInfo,
+                notepad: notepad,
+                txtFiles: txtFiles,
+                referenceImages: referenceImages
+            };
+
+            saveProjectToDB(projectName, category, currentData).then(() => {
                 refreshProjectSelectors();
                 alert(`✅ 项目"${projectName}"保存成功！`);
             }).catch(e => {
