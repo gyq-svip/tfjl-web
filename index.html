@@ -8022,22 +8022,27 @@
                 const transaction = db.transaction([STORE_NAME], 'readwrite');
                 const store = transaction.objectStore(STORE_NAME);
 
+                // 从DOM元素读取当前数据（确保即使变量未定义也能正常工作）
+                const safeMyDeckInfo = document.getElementById('myDeckInfo')?.value || '';
+                const safeTeammateDeckInfo = document.getElementById('teammateDeckInfo')?.value || '';
+                const safeNotepad = document.getElementById('notepad')?.value || '';
+
                 // 构建项目数据（保存当前页面的数据）
                 const projectData = {
                     name: projectName,
                     category: category || '默认分类',
                     timestamp: new Date().toISOString(),
-                    myHandCards: currentData?.myHandCards || myHandCards || [],
-                    teammateHandCards: currentData?.teammateHandCards || teammateHandCards || [],
-                    myPlacedCards: currentData?.myPlacedCards || myPlacedCards || [],
-                    teammatePlacedCards: currentData?.teammatePlacedCards || teammatePlacedCards || [],
-                    cardLevels: currentData?.cardLevels || cardLevels || {},
-                    cardSkins: currentData?.cardSkins || cardSkins || {},
-                    myDeckInfo: currentData?.myDeckInfo || myDeckInfo || '',
-                    teammateDeckInfo: currentData?.teammateDeckInfo || teammateDeckInfo || '',
-                    notepad: currentData?.notepad || notepad || '',
-                    txtFiles: currentData?.txtFiles || txtFiles || [],
-                    referenceImages: currentData?.referenceImages || referenceImages || []
+                    myHandCards: currentData?.myHandCards || (typeof myHandCards !== 'undefined' ? myHandCards : []),
+                    teammateHandCards: currentData?.teammateHandCards || (typeof teammateHandCards !== 'undefined' ? teammateHandCards : []),
+                    myPlacedCards: currentData?.myPlacedCards || (typeof myPlacedCards !== 'undefined' ? myPlacedCards : []),
+                    teammatePlacedCards: currentData?.teammatePlacedCards || (typeof teammatePlacedCards !== 'undefined' ? teammatePlacedCards : []),
+                    cardLevels: currentData?.cardLevels || (typeof cardLevels !== 'undefined' ? cardLevels : {}),
+                    cardSkins: currentData?.cardSkins || (typeof cardSkins !== 'undefined' ? cardSkins : {}),
+                    myDeckInfo: currentData?.myDeckInfo || safeMyDeckInfo,
+                    teammateDeckInfo: currentData?.teammateDeckInfo || safeTeammateDeckInfo,
+                    notepad: currentData?.notepad || safeNotepad,
+                    txtFiles: currentData?.txtFiles || (typeof txtFiles !== 'undefined' ? txtFiles : []),
+                    referenceImages: currentData?.referenceImages || (typeof referenceImages !== 'undefined' ? referenceImages : [])
                 };
 
                 // 保存项目数据
@@ -8328,8 +8333,21 @@
                     return;
                 }
                 pendingSaveProjectName = newProjectName.trim();
-                // 直接使用当前分类创建新项目
-                saveProjectToDB(pendingSaveProjectName, currentCat).then(() => {
+                // 直接使用当前分类创建新项目（空数据）
+                const emptyData = {
+                    myHandCards: [],
+                    teammateHandCards: [],
+                    myPlacedCards: [],
+                    teammatePlacedCards: [],
+                    cardLevels: {},
+                    cardSkins: {},
+                    myDeckInfo: '',
+                    teammateDeckInfo: '',
+                    notepad: '',
+                    txtFiles: [],
+                    referenceImages: []
+                };
+                saveProjectToDB(pendingSaveProjectName, currentCat, emptyData).then(() => {
                     currentProjectName = pendingSaveProjectName;
                     currentProjectCategory = currentCat;
                     refreshProjectSelectors();
@@ -8421,9 +8439,22 @@
                     localStorage.setItem('tdjl_notepad_temp', document.getElementById('notepad')?.value || '');
                     return;
                 }
-                // 保存到当前项目（使用当前分类）
+                // 保存到当前项目（使用当前分类），传递完整数据
+                const currentData = {
+                    myHandCards: typeof myHandCards !== 'undefined' ? myHandCards : [],
+                    teammateHandCards: typeof teammateHandCards !== 'undefined' ? teammateHandCards : [],
+                    myPlacedCards: typeof myPlacedCards !== 'undefined' ? myPlacedCards : [],
+                    teammatePlacedCards: typeof teammatePlacedCards !== 'undefined' ? teammatePlacedCards : [],
+                    cardLevels: typeof cardLevels !== 'undefined' ? cardLevels : {},
+                    cardSkins: typeof cardSkins !== 'undefined' ? cardSkins : {},
+                    myDeckInfo: document.getElementById('myDeckInfo')?.value || '',
+                    teammateDeckInfo: document.getElementById('teammateDeckInfo')?.value || '',
+                    notepad: document.getElementById('notepad')?.value || '',
+                    txtFiles: typeof txtFiles !== 'undefined' ? txtFiles : [],
+                    referenceImages: typeof referenceImages !== 'undefined' ? referenceImages : []
+                };
                 const currentCat = currentProjectCategory || '默认分类';
-                saveProjectToDB(currentProjectName, currentCat).catch(e => console.error('记事本自动保存失败:', e));
+                saveProjectToDB(currentProjectName, currentCat, currentData).catch(e => console.error('记事本自动保存失败:', e));
             }, 1000);
         }
 
@@ -8589,7 +8620,20 @@
         // 自动保存项目
         function autoSaveProject() {
             if (currentProjectName && currentProjectName !== '默认项目') {
-                saveProjectToDB(currentProjectName).catch(e => console.error('TXT文件保存失败:', e));
+                const currentData = {
+                    myHandCards: typeof myHandCards !== 'undefined' ? myHandCards : [],
+                    teammateHandCards: typeof teammateHandCards !== 'undefined' ? teammateHandCards : [],
+                    myPlacedCards: typeof myPlacedCards !== 'undefined' ? myPlacedCards : [],
+                    teammatePlacedCards: typeof teammatePlacedCards !== 'undefined' ? teammatePlacedCards : [],
+                    cardLevels: typeof cardLevels !== 'undefined' ? cardLevels : {},
+                    cardSkins: typeof cardSkins !== 'undefined' ? cardSkins : {},
+                    myDeckInfo: document.getElementById('myDeckInfo')?.value || '',
+                    teammateDeckInfo: document.getElementById('teammateDeckInfo')?.value || '',
+                    notepad: document.getElementById('notepad')?.value || '',
+                    txtFiles: typeof txtFiles !== 'undefined' ? txtFiles : [],
+                    referenceImages: typeof referenceImages !== 'undefined' ? referenceImages : []
+                };
+                saveProjectToDB(currentProjectName, currentProjectCategory || '默认分类', currentData).catch(e => console.error('项目自动保存失败:', e));
             }
         }
 
@@ -9473,20 +9517,51 @@
 
         function saveCurrentProject() {
             const current = currentProjectName === '默认项目' ? '' : currentProjectName;
+            const isNewProject = currentProjectName === '默认项目' || !current;
             pendingSaveProjectName = prompt('请输入项目名称：', current);
 
             if (!pendingSaveProjectName || !pendingSaveProjectName.trim()) return;
             pendingSaveProjectName = pendingSaveProjectName.trim();
 
-            // 显示分类选择模态框
-            showCategorySelectModal();
+            // 检查是否是现有项目
+            loadProjectListFromDB().then(projects => {
+                const existingProject = projects.find(p => p.name === pendingSaveProjectName);
+
+                if (existingProject) {
+                    // 现有项目：直接保存到当前分类，跳过分类选择
+                    const currentData = {
+                        myHandCards: myHandCards,
+                        teammateHandCards: teammateHandCards,
+                        myPlacedCards: myPlacedCards,
+                        teammatePlacedCards: teammatePlacedCards,
+                        cardLevels: cardLevels,
+                        cardSkins: cardSkins,
+                        myDeckInfo: myDeckInfo,
+                        teammateDeckInfo: teammateDeckInfo,
+                        notepad: notepad,
+                        txtFiles: txtFiles,
+                        referenceImages: referenceImages
+                    };
+                    const cat = existingProject.category || currentProjectCategory || '默认分类';
+                    saveProjectToDB(pendingSaveProjectName, cat, currentData).then(() => {
+                        alert(`✅ 项目"${pendingSaveProjectName}"保存成功！\n分类：${cat}`);
+                    }).catch(e => {
+                        alert('❌ 保存失败：' + e);
+                    });
+                } else {
+                    // 新项目：显示分类选择
+                    showCategorySelectModal();
+                }
+            });
         }
 
         function showCategorySelectModal() {
             const container = document.getElementById('categoryListForSave');
-            container.innerHTML = categories.map((cat, i) =>
+            // 默认选中当前项目的分类
+            const defaultCat = currentProjectCategory || categories[0] || '默认分类';
+            container.innerHTML = categories.map((cat) =>
                 `<label style="display:block;padding:10px;cursor:pointer;border-bottom:1px solid #444;">
-                    <input type="radio" name="selectedCategory" value="${cat}" ${i === 0 ? 'checked' : ''}> ${cat}
+                    <input type="radio" name="selectedCategory" value="${cat}" ${cat === defaultCat ? 'checked' : ''}> ${cat}
                 </label>`
             ).join('');
             document.getElementById('selectCategoryModal').style.display = 'flex';
