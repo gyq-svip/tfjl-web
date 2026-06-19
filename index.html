@@ -2993,7 +2993,7 @@
         async function fetchAuctionBroadcastsFromGist() {
             try {
                 const token = getGistToken();
-                const response = await fetch(BROADCASTS_GIST_URL, {
+                const response = await fetch(getMessagesGistUrl(), {
                     headers: {
                         'Accept': 'application/vnd.github.v3+json',
                         ...(token && { 'Authorization': `token ${token}` })
@@ -3020,7 +3020,7 @@
                 return;
             }
             const content = JSON.stringify(auctionBroadcastQueue, null, 2);
-            const response = await fetch(BROADCASTS_GIST_URL, {
+            const response = await fetch(getMessagesGistUrl(), {
                 method: 'PATCH',
                 headers: {
                     'Accept': 'application/vnd.github.v3+json',
@@ -3064,7 +3064,7 @@
                 const token = getGistToken();
                 if (!token) throw new Error('未设置GitHub Token');
                 const content = JSON.stringify(latestBroadcasts, null, 2);
-                const response = await fetch(BROADCASTS_GIST_URL, {
+                const response = await fetch(getMessagesGistUrl(), {
                     method: 'PATCH',
                     headers: {
                         'Accept': 'application/vnd.github.v3+json',
@@ -12864,6 +12864,13 @@ async function createIndexGist(token) {
 const GIST_URL = `https://api.github.com/gists/${GIST_ID}`;
 const BROADCASTS_GIST_URL = `https://api.github.com/gists/${MESSAGES_GIST_ID}`;
 
+// 动态获取消息Gist URL（考虑Gist可能被删除重建的情况）
+function getMessagesGistUrl() {
+    const gistDeleted = localStorage.getItem('messages_gist_deleted') === 'true';
+    const gistId = (!gistDeleted && MESSAGES_GIST_ID) ? MESSAGES_GIST_ID : (localStorage.getItem('messages_gist_id') || MESSAGES_GIST_ID);
+    return `https://api.github.com/gists/${gistId}`;
+}
+
 // Gist Token 管理 - 优先从环境变量读取（GitHub Actions），其次从localStorage读取
 const GIST_TOKEN_KEY = 'TFJL_Gist_Token';
 function getGistToken() {
@@ -14879,7 +14886,9 @@ function hasGistToken() {
                 const token = getGistToken();
                 
                 // ★ 永远优先使用硬编码的 MESSAGES_GIST_ID（这是所有用户共同的消息存储）
-                let messagesGistId = MESSAGES_GIST_ID || localStorage.getItem('messages_gist_id');
+                // 但如果已确认该Gist被删除(404)，则跳过，从索引文件获取新ID
+                const gistDeleted = localStorage.getItem('messages_gist_deleted') === 'true';
+                let messagesGistId = (!gistDeleted && MESSAGES_GIST_ID) ? MESSAGES_GIST_ID : (localStorage.getItem('messages_gist_id') || '');
                 
                 // 如果都没有，从索引文件获取
                 if (!messagesGistId) {
@@ -14969,8 +14978,14 @@ function hasGistToken() {
                                 } catch (e) { console.warn('解析消息 JSON 失败:', e); }
                             }
                         }
-                    } else if (response.status === 404 || response.status === 403) {
+                    } else if (response.status === 404) {
+                        // Gist已被删除，标记为失效，允许后续重建
+                        console.warn('[消息加载] 消息Gist已删除(404)，标记为失效');
+                        localStorage.setItem('messages_gist_deleted', 'true');
                         localStorage.removeItem('messages_gist_id');
+                    } else if (response.status === 403) {
+                        // 403可能是限流或权限问题，不标记删除
+                        console.warn('[消息加载] 消息Gist访问被拒(403)');
                     }
                 }
                 
@@ -16481,15 +16496,18 @@ function hasGistToken() {
             const token = getGistToken();
             if (!token) throw new Error('无Token');
 
-            // 优先使用硬编码的 MESSAGES_GIST_ID
-            let messagesGistId = MESSAGES_GIST_ID || localStorage.getItem('messages_gist_id');
+            // 优先使用硬编码的 MESSAGES_GIST_ID，但如果已确认删除则跳过
+            const gistDeleted = localStorage.getItem('messages_gist_deleted') === 'true';
+            let messagesGistId = (!gistDeleted && MESSAGES_GIST_ID) ? MESSAGES_GIST_ID : (localStorage.getItem('messages_gist_id') || '');
 
             // 【关键安全标记】保存前先尝试获取远程消息
             // 注意：如果 messagesGistId 存在，就必须成功获取到远程消息
             // 否则视为"获取失败"，此时用本地数据覆盖会导致历史消息丢失
+            // ★ 重要：Gist存在但为空（新创建的）不算"获取失败"，应允许写入
             let existingMessages = [];
             let remoteFetchAttempted = false;  // 是否尝试过获取远程
-            let remoteFetchSucceeded = false;  // 获取是否成功
+            let remoteFetchSucceeded = false;  // 获取是否成功（Gist存在且可访问，即使为空也算成功）
+            let remoteGistDeleted = false;     // 远程Gist是否已删除(404)
             if (!forceSave && messagesGistId) {
                 remoteFetchAttempted = true;
                 try {
@@ -16500,6 +16518,8 @@ function hasGistToken() {
                         }
                     });
                     if (existResp.ok) {
+                        // Gist存在且可访问，标记为成功（即使内容为空）
+                        remoteFetchSucceeded = true;
                         const existData = await existResp.json();
                         if (existData.files && existData.files['messages.json']) {
                             const fileData = existData.files['messages.json'];
@@ -16517,12 +16537,19 @@ function hasGistToken() {
                                 try {
                                     const parsed = JSON.parse(content);
                                     existingMessages = parsed.messages || [];
-                                    remoteFetchSucceeded = true;
                                 } catch (e) {
                                     console.warn('解析现有消息失败:', e);
                                 }
                             }
                         }
+                        // ★ 即使没有messages.json文件，Gist存在就算成功，允许写入
+                    } else if (existResp.status === 404) {
+                        // Gist已被删除，标记为已删除，允许后续重建
+                        console.warn('[消息保存] 消息Gist已删除(404)，将重建');
+                        remoteGistDeleted = true;
+                        localStorage.setItem('messages_gist_deleted', 'true');
+                        localStorage.removeItem('messages_gist_id');
+                        messagesGistId = '';
                     }
                 } catch (e) {
                     console.warn('获取现有消息失败:', e);
@@ -16534,9 +16561,9 @@ function hasGistToken() {
                 throw new Error('⚠️ 数据保护：检测到远程有 ' + existingMessages.length + ' 条消息，但本地数据为空。\n\n可能原因：网络问题导致数据加载失败。\n\n请刷新页面重新加载，或联系管理员从备份还原数据。');
             }
 
-            // 【第二层关键保护】如果 messagesGistId 存在且尝试过获取远程消息，但获取失败（existingMessages为空）
-            // 此时绝对不能用本地数据覆盖保存——否则将导致所有历史消息永久丢失！
-            if (!forceSave && remoteFetchAttempted && !remoteFetchSucceeded && messagesGistId) {
+            // 【第二层关键保护】如果 messagesGistId 存在且尝试过获取远程消息，但获取失败
+            // 区分情况：404（Gist已删除）→ 允许重建；403/网络错误 → 阻止保存防止数据丢失
+            if (!forceSave && remoteFetchAttempted && !remoteFetchSucceeded && messagesGistId && !remoteGistDeleted) {
                 throw new Error('⚠️ 数据保护：无法从远程获取历史消息（可能网络不稳定或GitHub限流）。\n\n为保护历史消息，已阻止本次保存。\n\n请刷新页面后重试发布，或稍后再试。');
             }
 
@@ -16599,11 +16626,17 @@ function hasGistToken() {
                     if (response.ok) {
                         // 更新本地 wallMessages
                         wallMessages = finalMessages;
+                        // PATCH成功，清除删除标记
+                        localStorage.removeItem('messages_gist_deleted');
                         return;
                     }
-                    
+
                     // 如果 PATCH 失败（404 或 403），清除缓存重新创建
-                    if (response.status === 404 || response.status === 403) {
+                    if (response.status === 404) {
+                        localStorage.setItem('messages_gist_deleted', 'true');
+                        localStorage.removeItem('messages_gist_id');
+                        messagesGistId = null;
+                    } else if (response.status === 403) {
                         localStorage.removeItem('messages_gist_id');
                         messagesGistId = null;
                     } else {
@@ -16611,7 +16644,11 @@ function hasGistToken() {
                         throw new Error(errData.message || '保存失败');
                     }
                 } catch (e) {
-                    if (e.message.includes('404') || e.message.includes('403')) {
+                    if (e.message.includes('404')) {
+                        localStorage.setItem('messages_gist_deleted', 'true');
+                        localStorage.removeItem('messages_gist_id');
+                        messagesGistId = null;
+                    } else if (e.message.includes('403')) {
                         localStorage.removeItem('messages_gist_id');
                         messagesGistId = null;
                     } else {
@@ -16646,6 +16683,7 @@ function hasGistToken() {
                                 });
                                 if (existResp.ok) {
                                     wallMessages = finalMessages;
+                                    localStorage.removeItem('messages_gist_deleted');
                                     return;
                                 }
                             }
@@ -16682,6 +16720,9 @@ function hasGistToken() {
             const data = await response.json();
             // 保存 GIST_ID 到 localStorage
             localStorage.setItem('messages_gist_id', data.id);
+            // 重建成功，清除删除标记
+            localStorage.removeItem('messages_gist_deleted');
+            console.log('[消息保存] 消息Gist重建成功，新ID:', data.id);
             
             // 更新索引文件（含冲突检测）
             const conflictResult = await updateRoomIndex('messages', data.id);
@@ -17731,7 +17772,8 @@ function hasGistToken() {
         // 获取消息数据（轻量版，不含脚本内容）
         async function fetchMessagesDataForBackupLight() {
             const token = getGistToken();
-            const messagesGistId = MESSAGES_GIST_ID || localStorage.getItem('messages_gist_id');
+            const gistDeleted = localStorage.getItem('messages_gist_deleted') === 'true';
+            const messagesGistId = (!gistDeleted && MESSAGES_GIST_ID) ? MESSAGES_GIST_ID : (localStorage.getItem('messages_gist_id') || '');
             if (!messagesGistId) return [];
             
             try {
@@ -17899,7 +17941,8 @@ function hasGistToken() {
         // 获取消息数据用于备份（可选是否包含脚本文件内容）
         async function fetchMessagesDataForBackup(includeScriptContent = false) {
             const token = getGistToken();
-            const messagesGistId = MESSAGES_GIST_ID || localStorage.getItem('messages_gist_id');
+            const gistDeleted = localStorage.getItem('messages_gist_deleted') === 'true';
+            const messagesGistId = (!gistDeleted && MESSAGES_GIST_ID) ? MESSAGES_GIST_ID : (localStorage.getItem('messages_gist_id') || '');
             if (!messagesGistId) return [];
             
             // Gist 文件大小限制（约 10MB，保守设置为 8MB）
@@ -18403,7 +18446,8 @@ function hasGistToken() {
         // 实际还原消息到 Gist（包含脚本文件还原）
         async function restoreMessagesData(messages, backupGistFiles = null) {
             const token = getGistToken();
-            const messagesGistId = MESSAGES_GIST_ID || localStorage.getItem('messages_gist_id');
+            const gistDeleted = localStorage.getItem('messages_gist_deleted') === 'true';
+            const messagesGistId = (!gistDeleted && MESSAGES_GIST_ID) ? MESSAGES_GIST_ID : (localStorage.getItem('messages_gist_id') || '');
             
             if (!messagesGistId) throw new Error('消息Gist不存在');
             
@@ -19145,8 +19189,9 @@ function hasGistToken() {
                 const index = JSON.parse(indexContent);
                 const allowedRooms = index.allowedRooms || [];
                 const allRoomIds = allowedRooms.map(r => typeof r === 'string' ? r : r.id).filter(id => id && id !== 'news');
+                const NON_ROOM_KEYS = new Set(['allowedRooms', 'usedNicks', 'news', 'messages', 'counter', 'auction_broadcasts']);
                 Object.keys(index).forEach(key => {
-                    if (key !== 'allowedRooms' && key !== 'usedNicks' && key !== 'news' && !allRoomIds.includes(key)) {
+                    if (!NON_ROOM_KEYS.has(key) && !allRoomIds.includes(key)) {
                         allRoomIds.push(key);
                     }
                 });
@@ -19572,8 +19617,9 @@ function hasGistToken() {
                 const allowedRooms = index.allowedRooms || [];
                 const allRoomIds = allowedRooms.map(r => typeof r === 'string' ? r : r.id).filter(id => id && id !== 'news');
                 // 也包含索引中有gist但不在白名单的房间
+                const NON_ROOM_KEYS2 = new Set(['allowedRooms', 'usedNicks', 'news', 'messages', 'counter', 'auction_broadcasts']);
                 Object.keys(index).forEach(key => {
-                    if (key !== 'allowedRooms' && key !== 'usedNicks' && key !== 'news' && !allRoomIds.includes(key)) {
+                    if (!NON_ROOM_KEYS2.has(key) && !allRoomIds.includes(key)) {
                         allRoomIds.push(key);
                     }
                 });
@@ -20573,7 +20619,7 @@ function hasGistToken() {
                 updateMarqueeWithBroadcast();
                 const token = getGistToken();
                 if (!token) throw new Error('未设置GitHub Token');
-                const response = await fetch(BROADCASTS_GIST_URL, {
+                const response = await fetch(getMessagesGistUrl(), {
                     method: 'PATCH',
                     headers: {
                         'Accept': 'application/vnd.github.v3+json',
