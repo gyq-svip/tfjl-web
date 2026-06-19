@@ -2059,13 +2059,13 @@
                         localStorage.removeItem(`chatroom_gist_${roomId}`);
                         roomGistId = null;
                     } else if (response.status === 403) {
-                        // 速率限制或权限问题，不清除缓存，保留本地数据
-                        console.warn('GitHub API限制，暂不更新数据');
+                        // 403权限问题：旧Gist可能是其他token创建的，清除缓存以便下次保存时重新创建
+                        console.warn('GitHub API 403: 当前Token无权访问此Gist，清除缓存');
+                        localStorage.removeItem(`chatroom_gist_${roomId}`);
                         if (!chatRoomData || !chatRoomData.rooms || !chatRoomData.rooms[roomId]) {
                             chatRoomData = { rooms: {} };
                             chatRoomData.rooms[roomId] = { messages: [], auctions: [], nextAuctionId: 1 };
                         }
-                        // 403时不覆盖本地已有的拍卖数据
                         return;
                     } else {
                         // 其他错误，保留现有数据，不覆盖
@@ -2217,7 +2217,22 @@
                     if (patchResponse.ok) {
                         return chatroomGistId;
                     }
-                    if (patchResponse.status === 404 || patchResponse.status === 403) {
+                    if (patchResponse.status === 403) {
+                        // 403权限问题：读取详细错误信息
+                        const errBody = await patchResponse.json().catch(() => ({}));
+                        console.error('PATCH 403 详情:', JSON.stringify(errBody));
+                        const errMsg = errBody.message || errBody.block?.reason || '未知原因';
+                        // 如果是abuse rate limit（临时封禁），不重建Gist
+                        if (errMsg.includes('abuse') || errMsg.includes('rate limit') || errMsg.includes('temporarily')) {
+                            throw new Error(`API临时限制（403）：${errMsg}，请稍后重试`);
+                        }
+                        // 其他403：旧Gist可能无法修改，用当前token重新创建
+                        console.warn(`PATCH 403 (${errMsg}): 将用当前Token重新创建Gist`);
+                        localStorage.removeItem(`chatroom_gist_${roomId}`);
+                        chatroomGistId = null;
+                    }
+                    if (patchResponse.status === 404) {
+                        // Gist被删除，清除缓存重新创建
                         localStorage.removeItem(`chatroom_gist_${roomId}`);
                         chatroomGistId = null;
                     }
@@ -4326,6 +4341,7 @@
                 // 检测token权限（通过响应头或尝试创建测试Gist）
                 let tokenScope = '未知';
                 let gistScope = false;
+                let writeTestResult = '';
                 if (token) {
                     // 通过 rate_limit 响应头检测 token 类型
                     const scopeHeader = response.headers.get('X-OAuth-Scopes') || '';
@@ -4334,20 +4350,69 @@
                         tokenScope = scopeHeader;
                         gistScope = scopeHeader.includes('gist');
                     } else {
-                        // Fine-grained token 没有 X-OAuth-Scopes 头，尝试检测
+                        // Fine-grained token 没有 X-OAuth-Scopes 头
                         tokenScope = 'Fine-grained PAT';
-                        // 尝试读取一个已知Gist来验证写权限
-                        try {
-                            const testResp = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
-                                headers: {
-                                    'Accept': 'application/vnd.github.v3+json',
-                                    'Authorization': `token ${token}`
-                                }
+                    }
+
+                    // 实际写入测试：创建临时Gist再删除
+                    try {
+                        const testResp = await fetch('https://api.github.com/gists', {
+                            method: 'POST',
+                            headers: {
+                                'Accept': 'application/vnd.github.v3+json',
+                                'Content-Type': 'application/json',
+                                'Authorization': `token ${token}`
+                            },
+                            body: JSON.stringify({
+                                description: 'API write test - will be deleted',
+                                public: false,
+                                files: { '_test_.txt': { content: 'test_' + Date.now() } }
+                            })
+                        });
+                        if (testResp.ok) {
+                            const testData = await testResp.json();
+                            gistScope = true;
+                            // 立即删除测试Gist
+                            await fetch(`https://api.github.com/gists/${testData.id}`, {
+                                method: 'DELETE',
+                                headers: { 'Authorization': `token ${token}` }
                             });
-                            if (testResp.ok) {
-                                gistScope = true; // 能读取至少说明token有效
+                            writeTestResult = '✅ 创建+删除成功';
+                        } else {
+                            const errBody = await testResp.json().catch(() => ({}));
+                            gistScope = false;
+                            writeTestResult = `❌ 创建失败(${testResp.status}): ${errBody.message || '未知'}`;
+                        }
+                    } catch (e) {
+                        writeTestResult = `❌ 请求失败: ${e.message}`;
+                    }
+
+                    // 测试PATCH房间Gist
+                    if (currentChatRoom) {
+                        const roomGistId = localStorage.getItem(`chatroom_gist_${currentChatRoom}`);
+                        if (roomGistId) {
+                            try {
+                                const patchTestResp = await fetch(`https://api.github.com/gists/${roomGistId}`, {
+                                    method: 'PATCH',
+                                    headers: {
+                                        'Accept': 'application/vnd.github.v3+json',
+                                        'Content-Type': 'application/json',
+                                        'Authorization': `token ${token}`
+                                    },
+                                    body: JSON.stringify({
+                                        description: `聊天室配置: ${currentChatRoom}`
+                                    })
+                                });
+                                if (patchTestResp.ok) {
+                                    writeTestResult += ' | ✅ PATCH房间Gist成功';
+                                } else {
+                                    const errBody = await patchTestResp.json().catch(() => ({}));
+                                    writeTestResult += ` | ❌ PATCH失败(${patchTestResp.status}): ${errBody.message || '未知'}`;
+                                }
+                            } catch (e) {
+                                writeTestResult += ` | ❌ PATCH请求失败: ${e.message}`;
                             }
-                        } catch (e) {}
+                        }
                     }
                 }
 
@@ -4385,9 +4450,33 @@
                                     ...(token && { 'Authorization': `token ${token}` })
                                 }
                             });
-                            const statusIcon = gr.ok ? '✅' : gr.status === 404 ? '❌ 已删除' : gr.status === 403 ? '🔒 无权限' : `⚠️ ${gr.status}`;
-                            const statusColor = gr.ok ? '#4ade80' : '#ef4444';
-                            gistStatusHtml += `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:0.75rem;"><span style="color:rgba(255,255,255,0.6);">当前房间</span><span style="color:${statusColor};">${statusIcon} ${roomGistId.substring(0,8)}...</span></div>`;
+                            let ownerInfo = '';
+                            if (gr.ok) {
+                                const gistData = await gr.json();
+                                const owner = gistData.owner ? gistData.owner.login : '未知';
+                                // 检测token对应的用户
+                                let tokenUser = '';
+                                try {
+                                    const userResp = await fetch('https://api.github.com/user', {
+                                        headers: { 'Authorization': `token ${token}` }
+                                    });
+                                    if (userResp.ok) {
+                                        const userData = await userResp.json();
+                                        tokenUser = userData.login || '';
+                                    }
+                                } catch (e) {}
+                                const ownerMatch = !tokenUser || tokenUser === owner;
+                                ownerInfo = ownerMatch ? '' : ` ⚠️所有者:${owner}(当前:${tokenUser})`;
+                                if (!ownerMatch) {
+                                    gistStatusHtml += `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:0.75rem;"><span style="color:rgba(255,255,255,0.6);">当前房间</span><span style="color:#ef4444;">🔒 权限不匹配 ${roomGistId.substring(0,8)}...${ownerInfo}</span></div>`;
+                                    gistStatusHtml += `<div style="color:#ef4444;font-size:0.7rem;padding:2px 0 4px 0;">⚠️ Gist由"${owner}"创建，但当前Token属于"${tokenUser}"，无法修改。请在管理员→系统设置中更换Token，或删除此房间重建。</div>`;
+                                } else {
+                                    gistStatusHtml += `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:0.75rem;"><span style="color:rgba(255,255,255,0.6);">当前房间</span><span style="color:#4ade80;">✅ ${roomGistId.substring(0,8)}... (${owner})</span></div>`;
+                                }
+                            } else {
+                                const statusIcon = gr.status === 404 ? '❌ 已删除' : gr.status === 403 ? '🔒 无权限' : `⚠️ ${gr.status}`;
+                                gistStatusHtml += `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:0.75rem;"><span style="color:rgba(255,255,255,0.6);">当前房间</span><span style="color:#ef4444;">${statusIcon} ${roomGistId.substring(0,8)}...</span></div>`;
+                            }
                         } catch (e) {
                             gistStatusHtml += `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:0.75rem;"><span style="color:rgba(255,255,255,0.6);">当前房间</span><span style="color:#ef4444;">❌ 请求失败</span></div>`;
                         }
@@ -4455,6 +4544,7 @@
                             </div>
                         </div>
                         ${!gistScope && token ? '<div style="color:#ef4444;font-size:0.7rem;margin-top:6px;">⚠️ Token缺少gist权限，无法创建/修改Gist，请在GitHub重新生成带gist权限的Token</div>' : ''}
+                        ${writeTestResult ? `<div style="color:${writeTestResult.includes('❌') ? '#ef4444' : '#4ade80'};font-size:0.75rem;margin-top:6px;word-break:break-all;">写入测试: ${writeTestResult}</div>` : ''}
                     </div>
                     <div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:12px;margin-bottom:16px;">
                         <div style="color:rgba(255,255,255,0.6);font-size:0.8rem;margin-bottom:8px;">Gist状态</div>
