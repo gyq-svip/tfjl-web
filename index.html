@@ -2191,17 +2191,12 @@
     <!-- 密码验证层 -->
     <div id="passwordOverlay" class="password-overlay">
         <div class="password-box">
-            <h2>🔐 塔防阵容系统</h2>
+            <h2>🔐 塔防小助手</h2>
             <p id="passwordHint" style="color: rgba(255,255,255,0.7); margin-bottom: 20px;">请输入访问密码</p>
             <div id="passwordError" class="password-error" style="display: none;"></div>
             <input type="password" id="passwordInput" placeholder="请输入密码..." onkeypress="if(event.key==='Enter')checkPasswordAndEnter()">
             <br><br>
-            
-            <div id="loginActions">
-                <p style="color:rgba(255,255,255,0.8);font-size:0.9rem;margin:0 0 12px 0;text-align:center;">选择进入系统</p>
-                <button onclick="checkPasswordAndEnter('archive')" style="width:100%;padding:12px;margin-bottom:10px;border-radius:8px;border:none;background:linear-gradient(135deg,#4ecdc4,#44a08d);color:white;cursor:pointer;font-size:0.95rem;font-weight:600;">📋 进入归档系统</button>
-                <button onclick="checkPasswordAndEnter('auction')" style="width:100%;padding:12px;border-radius:8px;border:none;background:linear-gradient(135deg,#f97316,#ea580c);color:white;cursor:pointer;font-size:0.95rem;font-weight:600;">🏪 进入拍卖系统</button>
-            </div>
+            <button onclick="checkPasswordAndEnter()" style="width:100%;padding:12px;border-radius:8px;border:none;background:linear-gradient(135deg,#4ecdc4,#44a08d);color:white;cursor:pointer;font-size:0.95rem;font-weight:600;">进入塔防助手</button>
         </div>
     </div>
 
