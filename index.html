@@ -1870,79 +1870,35 @@
                 font-size: 0.7rem;
             }
 
-            /* 灯箱样式 */
-            #lightbox {
+            /* 悬停预览样式 */
+            #refImagePreview {
                 display: none;
                 position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: rgba(0, 0, 0, 0.95);
                 z-index: 99999;
+                max-width: 65vw;
+                max-height: 80vh;
+                background: rgba(0, 0, 0, 0.95);
+                border-radius: 12px;
+                padding: 10px;
+                box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
+            }
+            #refImagePreview.active {
+                display: flex;
+                flex-direction: column;
                 align-items: center;
                 justify-content: center;
-                flex-direction: column;
             }
-            #lightbox.active {
-                display: flex;
-            }
-            #lightboxImage {
-                max-width: 90vw;
-                max-height: 80vh;
-                box-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
+            #refImagePreview img {
+                max-width: 65vw;
+                max-height: 70vh;
                 border-radius: 8px;
-                cursor: pointer;
+                display: block;
             }
-            #lightboxClose {
-                position: absolute;
-                top: 20px;
-                right: 20px;
-                background: rgba(244, 67, 54, 0.8);
-                color: white;
-                border: none;
-                width: 40px;
-                height: 40px;
-                border-radius: 50%;
-                cursor: pointer;
-                font-size: 1.5rem;
-                z-index: 10;
-            }
-            #lightboxClose:hover {
-                background: rgba(244, 67, 54, 1);
-            }
-            #lightboxNav {
-                position: absolute;
-                top: 50%;
-                transform: translateY(-50%);
-                width: 100%;
-                display: flex;
-                justify-content: space-between;
-                padding: 0 30px;
-                box-sizing: border-box;
-                z-index: 5;
-            }
-            .lightbox-nav-btn {
-                background: rgba(156, 39, 176, 0.7);
-                color: white;
-                border: none;
-                width: 50px;
-                height: 50px;
-                border-radius: 50%;
-                cursor: pointer;
-                font-size: 1.5rem;
-                transition: background 0.2s;
-            }
-            .lightbox-nav-btn:hover {
-                background: rgba(156, 39, 176, 1);
-            }
-            #lightboxInfo {
-                position: absolute;
-                bottom: 30px;
-                color: white;
+            #refImagePreview .preview-caption {
+                margin-top: 8px;
+                color: rgba(255, 255, 255, 0.8);
                 font-size: 0.9rem;
                 text-align: center;
-                z-index: 10;
             }
 
             /* 导入模态框移动端适配 */
@@ -2954,15 +2910,10 @@
             </div>
         </div>
 
-        <!-- 灯箱大图查看器 -->
-        <div id="lightbox">
-            <button id="lightboxClose" onclick="closeLightbox()">×</button>
-            <div id="lightboxNav">
-                <button class="lightbox-nav-btn" onclick="prevLightboxImage()">←</button>
-                <button class="lightbox-nav-btn" onclick="nextLightboxImage()">→</button>
-            </div>
-            <img id="lightboxImage" onclick="closeLightbox()">
-            <div id="lightboxInfo"></div>
+        <!-- 参考图片悬停预览 -->
+        <div id="refImagePreview">
+            <img id="refImagePreviewImg">
+            <div class="preview-caption" id="refImagePreviewCaption"></div>
         </div>
 
         <script>
@@ -2992,8 +2943,11 @@
             }
             grid.innerHTML = referenceImages.map((img, i) => `
                 <div style="position:relative;background:rgba(0,0,0,0.3);border-radius:8px;overflow:hidden;">
-                    <img src="${img.data}" style="width:100%;height:180px;object-fit:cover;cursor:pointer;" onclick="openLightbox(${i})" title="点击查看大图">
-                    <button onclick="deleteRefImage(${i})" style="position:absolute;top:5px;right:5px;background:rgba(244,67,54,0.9);border:none;color:white;border-radius:50%;width:24px;height:24px;cursor:pointer;font-size:0.8rem;">×</button>
+                    <img src="${img.data}" style="width:100%;height:180px;object-fit:cover;display:block;"
+                         onmouseenter="showRefPreview(${i}, event)"
+                         onmouseleave="hideRefPreview()"
+                         title="${img.name || ''}">
+                    <button onclick="deleteRefImage(${i});event.stopPropagation();" style="position:absolute;top:5px;right:5px;background:rgba(244,67,54,0.9);border:none;color:white;border-radius:50%;width:24px;height:24px;cursor:pointer;font-size:0.8rem;">×</button>
                 </div>
             `).join('');
         }
@@ -3026,61 +2980,48 @@
             }
         }
 
-        // 灯箱大图查看（简洁版：只有图片+关闭+翻页）
-        let currentLightboxIndex = 0;
+        // 参考图片悬停预览（鼠标放到缩略图上显示大图，移开消失）
+        function showRefPreview(index, event) {
+            if (!referenceImages[index]) return;
+            const img = referenceImages[index];
+            const preview = document.getElementById('refImagePreview');
+            const previewImg = document.getElementById('refImagePreviewImg');
+            const caption = document.getElementById('refImagePreviewCaption');
 
-        function openLightbox(index) {
-            if (referenceImages.length === 0) return;
-            currentLightboxIndex = index;
-            updateLightboxImage();
-            document.getElementById('lightbox').classList.add('active');
-        }
+            previewImg.src = img.data;
+            caption.textContent = img.name || '';
+            preview.classList.add('active');
 
-        function closeLightbox() {
-            document.getElementById('lightbox').classList.remove('active');
-        }
-
-        function updateLightboxImage() {
-            const img = referenceImages[currentLightboxIndex];
-            if (!img) return;
-            document.getElementById('lightboxImage').src = img.data;
-            document.getElementById('lightboxInfo').textContent = `${img.name}  (${currentLightboxIndex + 1}/${referenceImages.length})`;
-        }
-
-        function nextLightboxImage() {
-            currentLightboxIndex = (currentLightboxIndex + 1) % referenceImages.length;
-            updateLightboxImage();
-        }
-
-        function prevLightboxImage() {
-            currentLightboxIndex = (currentLightboxIndex - 1 + referenceImages.length) % referenceImages.length;
-            updateLightboxImage();
-        }
-
-        function downloadLightboxImage() {
-            const img = referenceImages[currentLightboxIndex];
-            if (!img) return;
-            const link = document.createElement('a');
-            link.href = img.data;
-            link.download = img.name || 'reference-image.png';
-            link.click();
-        }
-
-        // 键盘控制：Esc关闭，左右箭头翻页
-        document.addEventListener('keydown', function(e) {
-            const lightbox = document.getElementById('lightbox');
-            if (!lightbox.classList.contains('active')) return;
-            if (e.key === 'Escape') closeLightbox();
-            if (e.key === 'ArrowLeft') prevLightboxImage();
-            if (e.key === 'ArrowRight') nextLightboxImage();
-        });
-
-        // 点击背景关闭灯箱
-        document.getElementById('lightbox').addEventListener('click', function(e) {
-            if (e.target === this) {
-                closeLightbox();
+            function positionPreview(e) {
+                const padding = 20;
+                const previewW = Math.min(window.innerWidth * 0.65, 900);
+                const previewH = Math.min(window.innerHeight * 0.8, 800);
+                let x = e.clientX + 20;
+                let y = e.clientY + 20;
+                if (x + previewW > window.innerWidth - padding) {
+                    x = e.clientX - previewW - 20;
+                }
+                if (y + previewH > window.innerHeight - padding) {
+                    y = window.innerHeight - previewH - padding;
+                }
+                if (x < padding) x = padding;
+                if (y < padding) y = padding;
+                preview.style.left = x + 'px';
+                preview.style.top = y + 'px';
             }
-        });
+            positionPreview(event);
+            preview._moveHandler = positionPreview;
+            document.addEventListener('mousemove', preview._moveHandler);
+        }
+
+        function hideRefPreview() {
+            const preview = document.getElementById('refImagePreview');
+            preview.classList.remove('active');
+            if (preview._moveHandler) {
+                document.removeEventListener('mousemove', preview._moveHandler);
+                preview._moveHandler = null;
+            }
+        }
 
         // ==================== 聊天室+拍卖系统 ====================
         const CHAT_GIST_FILE = 'chatrooms.json';
