@@ -2973,7 +2973,7 @@
             grid.innerHTML = referenceImages.map((img, i) => `
                 <div style="position:relative;background:rgba(0,0,0,0.3);border-radius:8px;overflow:hidden;">
                     <img src="${img.data}" style="width:100%;height:180px;object-fit:cover;display:block;cursor:pointer;"
-                         onclick="showRefPreview(${i})"
+                         onclick="window.showRefPreview(${i})"
                          title="${img.name || ''}">
                     <button onclick="deleteRefImage(${i});event.stopPropagation();" style="position:absolute;top:5px;right:5px;background:rgba(244,67,54,0.9);border:none;color:white;border-radius:50%;width:24px;height:24px;cursor:pointer;font-size:0.8rem;">×</button>
                 </div>
@@ -3068,7 +3068,7 @@
             });
         }
 
-        function showRefPreview(index) {
+        window.showRefPreview = function(index) {
             if (!referenceImages[index]) return;
 
             // 初始化拖拽（首次调用时）
@@ -3078,6 +3078,11 @@
             const preview = document.getElementById('refImagePreview');
             const previewImg = document.getElementById('refImagePreviewImg');
             const title = document.getElementById('refImagePreviewTitle');
+
+            if (!preview) {
+                console.error('预览窗元素不存在');
+                return;
+            }
 
             previewImg.src = img.data;
             title.textContent = img.name || '';
@@ -3092,15 +3097,16 @@
             const winH = window.innerHeight;
             preview.style.left = Math.max(20, (winW - 600) / 2) + 'px';
             preview.style.top = Math.max(20, winH * 0.15) + 'px';
-        }
+        };
 
-        function hideRefPreview() {
-            document.getElementById('refImagePreview').classList.remove('active');
-        }
+        window.hideRefPreview = function() {
+            const preview = document.getElementById('refImagePreview');
+            if (preview) preview.classList.remove('active');
+        };
 
         // ESC 关闭
         document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') hideRefPreview();
+            if (e.key === 'Escape') window.hideRefPreview();
         });
 
         // ==================== 聊天室+拍卖系统 ====================
@@ -22128,7 +22134,7 @@ function hasGistToken() {
         <div id="refImagePreview">
             <div class="preview-header">
                 <span class="preview-title" id="refImagePreviewTitle"></span>
-                <button class="preview-close" onclick="hideRefPreview()">×</button>
+                <button class="preview-close" onclick="window.hideRefPreview()">×</button>
             </div>
             <div class="preview-body">
                 <img class="preview-img" id="refImagePreviewImg">
