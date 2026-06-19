@@ -1870,7 +1870,7 @@
                 font-size: 0.7rem;
             }
 
-            /* 灯箱样式 */
+            /* 灯箱样式（简洁版） */
             #lightbox {
                 display: none;
                 position: fixed;
@@ -1878,20 +1878,18 @@
                 left: 0;
                 width: 100%;
                 height: 100%;
-                background: rgba(0, 0, 0, 0.95);
+                background: rgba(0, 0, 0, 0.92);
                 z-index: 99999;
                 align-items: center;
                 justify-content: center;
                 flex-direction: column;
-                user-select: none;
-                overflow: hidden;
             }
             #lightbox.active {
                 display: flex;
             }
             #lightboxImageContainer {
-                max-width: 95vw;
-                max-height: 80vh;
+                max-width: 92vw;
+                max-height: 82vh;
                 display: flex;
                 align-items: center;
                 justify-content: center;
@@ -1900,113 +1898,72 @@
                 pointer-events: none;
             }
             #lightboxImage {
-                max-width: 95vw;
-                max-height: 80vh;
-                transition: transform 0.25s ease;
+                max-width: 92vw;
+                max-height: 82vh;
                 box-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
-                border-radius: 8px;
-                cursor: grab;
+                border-radius: 10px;
+                cursor: zoom-in;
                 pointer-events: auto;
             }
-            #lightboxImage.dragging {
-                cursor: grabbing;
-                transition: none;
-            }
-            #lightboxControls {
+            #lightboxTopBar {
                 position: absolute;
-                top: 25px;
+                top: 0;
                 left: 0;
                 right: 0;
                 display: flex;
-                justify-content: center;
-                gap: 12px;
+                justify-content: space-between;
+                align-items: center;
+                padding: 15px 25px;
                 z-index: 10;
-                flex-wrap: wrap;
+                background: linear-gradient(180deg, rgba(0,0,0,0.5), transparent);
             }
-            .lightbox-btn {
+            #lightboxTitle {
+                color: white;
+                font-size: 1rem;
+                font-weight: 500;
+                max-width: 50%;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            #lightboxActions {
+                display: flex;
+                gap: 10px;
+            }
+            .lightbox-action-btn {
                 background: rgba(156, 39, 176, 0.9);
                 color: white;
                 border: none;
-                padding: 12px 22px;
-                border-radius: 10px;
+                padding: 10px 18px;
+                border-radius: 8px;
                 cursor: pointer;
-                font-size: 1.1rem;
+                font-size: 1rem;
                 transition: background 0.2s, transform 0.15s;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.3);
             }
-            .lightbox-btn:hover {
+            .lightbox-action-btn:hover {
                 background: rgba(156, 39, 176, 1);
                 transform: translateY(-1px);
             }
             #lightboxClose {
-                position: absolute;
-                top: 20px;
-                right: 20px;
                 background: rgba(244, 67, 54, 0.9);
-                color: white;
-                border: none;
-                width: 50px;
-                height: 50px;
-                border-radius: 50%;
-                cursor: pointer;
-                font-size: 2rem;
-                z-index: 11;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-                transition: background 0.2s, transform 0.15s;
+                width: 44px;
+                height: 44px;
+                font-size: 1.6rem;
                 line-height: 1;
+                padding: 0;
+                border-radius: 50%;
             }
             #lightboxClose:hover {
                 background: rgba(244, 67, 54, 1);
                 transform: scale(1.05);
             }
-            #lightboxNav {
+            #lightboxHint {
                 position: absolute;
-                top: 50%;
-                transform: translateY(-50%);
-                width: 100%;
-                display: flex;
-                justify-content: space-between;
-                padding: 0 40px;
-                box-sizing: border-box;
-                z-index: 5;
-            }
-            .lightbox-nav-btn {
-                background: rgba(156, 39, 176, 0.8);
-                color: white;
-                border: none;
-                width: 60px;
-                height: 60px;
-                border-radius: 50%;
-                cursor: pointer;
-                font-size: 1.8rem;
-                transition: background 0.2s, transform 0.15s;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-                line-height: 1;
-            }
-            .lightbox-nav-btn:hover {
-                background: rgba(156, 39, 176, 1);
-                transform: scale(1.05);
-            }
-            #lightboxInfo {
-                position: absolute;
-                bottom: 30px;
-                color: white;
-                font-size: 1rem;
+                bottom: 20px;
+                color: rgba(255,255,255,0.5);
+                font-size: 0.9rem;
                 text-align: center;
                 z-index: 10;
-                background: rgba(0,0,0,0.4);
-                padding: 6px 16px;
-                border-radius: 6px;
-            }
-            #lightboxDragHint {
-                position: absolute;
-                top: 85px;
-                left: 50%;
-                transform: translateX(-50%);
-                color: rgba(255,255,255,0.5);
-                font-size: 0.85rem;
-                z-index: 10;
-                pointer-events: none;
             }
 
             /* 导入模态框移动端适配 */
@@ -3018,25 +2975,20 @@
             </div>
         </div>
 
-        <!-- 灯箱大图查看器 -->
+        <!-- 灯箱大图查看器（简洁版） -->
         <div id="lightbox">
-            <button id="lightboxClose" onclick="closeLightbox()">×</button>
-            <div id="lightboxControls">
-                <button class="lightbox-btn" onclick="zoomInLightbox()">🔍+ 放大</button>
-                <button class="lightbox-btn" onclick="zoomOutLightbox()">🔍- 缩小</button>
-                <button class="lightbox-btn" onclick="rotateLightbox()">🔄 旋转</button>
-                <button class="lightbox-btn" onclick="resetLightbox()">↺ 重置</button>
-                <button class="lightbox-btn" onclick="downloadLightboxImage()">⬇ 下载</button>
-            </div>
-            <div id="lightboxDragHint">🖱️ 点击图片可拖拽移动 · 点击空白背景关闭</div>
-            <div id="lightboxNav">
-                <button class="lightbox-nav-btn" onclick="prevLightboxImage()">←</button>
-                <button class="lightbox-nav-btn" onclick="nextLightboxImage()">→</button>
+            <div id="lightboxTopBar">
+                <div id="lightboxTitle"></div>
+                <div id="lightboxActions">
+                    <button class="lightbox-action-btn" onclick="openLightboxInNewTab()">🔗 新标签页</button>
+                    <button class="lightbox-action-btn" onclick="downloadLightboxImage()">⬇ 下载</button>
+                    <button class="lightbox-action-btn" id="lightboxClose" onclick="closeLightbox()">×</button>
+                </div>
             </div>
             <div id="lightboxImageContainer">
                 <img id="lightboxImage" draggable="false">
             </div>
-            <div id="lightboxInfo"></div>
+            <div id="lightboxHint">点击空白处关闭</div>
         </div>
 
         <script>
@@ -3100,29 +3052,18 @@
             }
         }
 
-        // 灯箱大图查看功能
+        // 灯箱大图查看（简洁版）
         let currentLightboxIndex = 0;
-        let lightboxScale = 1;
-        let lightboxRotate = 0;
-        let lightboxTranslateX = 0;
-        let lightboxTranslateY = 0;
-        let isLightboxDragging = false;
-        let lightboxDragStart = { x: 0, y: 0 };
-        let hasLightboxMoved = false;
-
-        function applyLightboxTransform() {
-            const img = document.getElementById('lightboxImage');
-            img.style.transform = `translate(${lightboxTranslateX}px, ${lightboxTranslateY}px) scale(${lightboxScale}) rotate(${lightboxRotate}deg)`;
-        }
+        let currentLightboxData = null;
 
         function openLightbox(index) {
             if (referenceImages.length === 0) return;
             currentLightboxIndex = index;
-            lightboxScale = 1;
-            lightboxRotate = 0;
-            lightboxTranslateX = 0;
-            lightboxTranslateY = 0;
-            updateLightboxImage();
+            const img = referenceImages[index];
+            currentLightboxData = img;
+            const lightboxImg = document.getElementById('lightboxImage');
+            lightboxImg.src = img.data;
+            document.getElementById('lightboxTitle').textContent = img.name || '参考图片';
             document.getElementById('lightbox').classList.add('active');
         }
 
@@ -3130,184 +3071,52 @@
             document.getElementById('lightbox').classList.remove('active');
         }
 
-        function updateLightboxImage() {
-            const img = referenceImages[currentLightboxIndex];
-            if (!img) return;
-            const lightboxImg = document.getElementById('lightboxImage');
-            lightboxImg.src = img.data;
-            applyLightboxTransform();
-            document.getElementById('lightboxInfo').textContent = `${img.name}  (${currentLightboxIndex + 1}/${referenceImages.length})`;
-        }
-
-        function zoomInLightbox() {
-            lightboxScale = Math.min(lightboxScale + 0.2, 3);
-            applyLightboxTransform();
-        }
-
-        function zoomOutLightbox() {
-            lightboxScale = Math.max(lightboxScale - 0.2, 0.5);
-            applyLightboxTransform();
-        }
-
-        function rotateLightbox() {
-            lightboxRotate = (lightboxRotate + 90) % 360;
-            applyLightboxTransform();
-        }
-
-        function resetLightbox() {
-            lightboxScale = 1;
-            lightboxRotate = 0;
-            lightboxTranslateX = 0;
-            lightboxTranslateY = 0;
-            applyLightboxTransform();
-        }
-
-        function nextLightboxImage() {
-            currentLightboxIndex = (currentLightboxIndex + 1) % referenceImages.length;
-            lightboxScale = 1;
-            lightboxRotate = 0;
-            lightboxTranslateX = 0;
-            lightboxTranslateY = 0;
-            updateLightboxImage();
-        }
-
-        function prevLightboxImage() {
-            currentLightboxIndex = (currentLightboxIndex - 1 + referenceImages.length) % referenceImages.length;
-            lightboxScale = 1;
-            lightboxRotate = 0;
-            lightboxTranslateX = 0;
-            lightboxTranslateY = 0;
-            updateLightboxImage();
+        function openLightboxInNewTab() {
+            if (!currentLightboxData) return;
+            const win = window.open();
+            if (!win) {
+                alert('浏览器阻止了弹出，请允许弹窗后重试');
+                return;
+            }
+            win.document.write(`
+                <!DOCTYPE html>
+                <html><head><title>${currentLightboxData.name || '参考图片'}</title>
+                <style>
+                    body { margin:0; background:#1a1a1a; display:flex; align-items:center; justify-content:center; min-height:100vh; }
+                    img { max-width:100%; max-height:100vh; object-fit:contain; }
+                </style></head><body>
+                <img src="${currentLightboxData.data}" alt="${currentLightboxData.name || ''}">
+                </body></html>
+            `);
         }
 
         function downloadLightboxImage() {
-            const img = referenceImages[currentLightboxIndex];
-            if (!img) return;
+            if (!currentLightboxData) return;
             const link = document.createElement('a');
-            link.href = img.data;
-            link.download = img.name || 'reference-image.png';
+            link.href = currentLightboxData.data;
+            link.download = currentLightboxData.name || 'reference-image.png';
             link.click();
         }
 
-        // 拖拽移动图片
-        function setupLightboxDrag() {
-            const img = document.getElementById('lightboxImage');
-            img.addEventListener('mousedown', function(e) {
-                isLightboxDragging = true;
-                hasLightboxMoved = false;
-                lightboxDragStart.x = e.clientX - lightboxTranslateX;
-                lightboxDragStart.y = e.clientY - lightboxTranslateY;
-                img.classList.add('dragging');
-                e.preventDefault();
-            });
-            document.addEventListener('mousemove', function(e) {
-                if (!isLightboxDragging) return;
-                const newX = e.clientX - lightboxDragStart.x;
-                const newY = e.clientY - lightboxDragStart.y;
-                if (Math.abs(newX - lightboxTranslateX) > 3 || Math.abs(newY - lightboxTranslateY) > 3) {
-                    hasLightboxMoved = true;
-                }
-                lightboxTranslateX = newX;
-                lightboxTranslateY = newY;
-                applyLightboxTransform();
-            });
-            document.addEventListener('mouseup', function() {
-                if (isLightboxDragging) {
-                    isLightboxDragging = false;
-                    const img = document.getElementById('lightboxImage');
-                    if (img) img.classList.remove('dragging');
-                }
-            });
-            // 触摸设备支持
-            img.addEventListener('touchstart', function(e) {
-                if (e.touches.length !== 1) return;
-                isLightboxDragging = true;
-                hasLightboxMoved = false;
-                lightboxDragStart.x = e.touches[0].clientX - lightboxTranslateX;
-                lightboxDragStart.y = e.touches[0].clientY - lightboxTranslateY;
-                img.classList.add('dragging');
-            }, { passive: true });
-            document.addEventListener('touchmove', function(e) {
-                if (!isLightboxDragging || e.touches.length !== 1) return;
-                const newX = e.touches[0].clientX - lightboxDragStart.x;
-                const newY = e.touches[0].clientY - lightboxDragStart.y;
-                if (Math.abs(newX - lightboxTranslateX) > 3 || Math.abs(newY - lightboxTranslateY) > 3) {
-                    hasLightboxMoved = true;
-                }
-                lightboxTranslateX = newX;
-                lightboxTranslateY = newY;
-                applyLightboxTransform();
-            }, { passive: true });
-            document.addEventListener('touchend', function() {
-                if (isLightboxDragging) {
-                    isLightboxDragging = false;
-                    const img = document.getElementById('lightboxImage');
-                    if (img) img.classList.remove('dragging');
-                }
-            });
-        }
-
-        // 键盘控制
+        // 键盘控制（Esc 关闭）
         document.addEventListener('keydown', function(e) {
             const lightbox = document.getElementById('lightbox');
             if (!lightbox.classList.contains('active')) return;
-
-            switch(e.key) {
-                case 'Escape':
-                    closeLightbox();
-                    break;
-                case 'ArrowLeft':
-                    prevLightboxImage();
-                    break;
-                case 'ArrowRight':
-                    nextLightboxImage();
-                    break;
-                case '+':
-                case '=':
-                    zoomInLightbox();
-                    break;
-                case '-':
-                    zoomOutLightbox();
-                    break;
-                case 'r':
-                case 'R':
-                    rotateLightbox();
-                    break;
-                case '0':
-                    resetLightbox();
-                    break;
-            }
+            if (e.key === 'Escape') closeLightbox();
         });
 
-        // 鼠标滚轮缩放
-        document.getElementById('lightbox').addEventListener('wheel', function(e) {
-            if (!this.classList.contains('active')) return;
-            // 滚轮操作在图片上时进行缩放，背景上也缩放
-            e.preventDefault();
-            if (e.deltaY < 0) {
-                zoomInLightbox();
-            } else {
-                zoomOutLightbox();
-            }
-        }, { passive: false });
-
-        // 点击灯箱关闭（点击按钮或图片时不关闭，图片用于拖拽）
+        // 点击空白处关闭（点击按钮或图片时不关闭）
         document.getElementById('lightbox').addEventListener('click', function(e) {
-            // 拖拽移动后不关闭
-            if (hasLightboxMoved) {
-                hasLightboxMoved = false;
-                return;
-            }
-            // 如果点击的是按钮或图片，则不关闭（按钮有自己的 onclick，图片用于拖拽）
             const isBtn = e.target.closest('button');
             const isImg = e.target.tagName === 'IMG';
             if (isBtn || isImg) return;
-            // 其他情况（点击空白背景）一律关闭
             closeLightbox();
         });
 
-        // 初始化拖拽
-        setupLightboxDrag();
+        // 点击图片时在新标签页打开（浏览器原生支持缩放/保存）
+        document.getElementById('lightboxImage').addEventListener('click', function() {
+            openLightboxInNewTab();
+        });
 
         // ==================== 聊天室+拍卖系统 ====================
         const CHAT_GIST_FILE = 'chatrooms.json';
