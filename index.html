@@ -2871,6 +2871,13 @@
                     <input type="file" id="refImageInput" accept="image/*" style="display:none;" onchange="handleRefImageUpload(this)">
                     <button onclick="document.getElementById('refImageInput').click()" style="background:linear-gradient(135deg,#9c27b0,#7b1fa2);color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;width:100%;">📤 上传参考图片</button>
                 </div>
+                <div id="refImageViewer" style="display:none;margin-top:10px;background:rgba(0,0,0,0.4);border-radius:8px;padding:8px;position:relative;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                        <span id="refViewerTitle" style="color:rgba(255,255,255,0.8);font-size:0.8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;margin-right:8px;"></span>
+                        <button onclick="closeRefViewer()" style="background:rgba(244,67,54,0.9);border:none;color:white;border-radius:50%;width:24px;height:24px;cursor:pointer;font-size:0.9rem;flex-shrink:0;">×</button>
+                    </div>
+                    <img id="refViewerImg" style="width:100%;max-height:50vh;object-fit:contain;display:block;border-radius:6px;">
+                </div>
             </div>
         </div>
 
@@ -2901,23 +2908,28 @@
             }
             grid.innerHTML = referenceImages.map((img, i) => `
                 <div style="position:relative;background:rgba(0,0,0,0.3);border-radius:8px;overflow:hidden;cursor:pointer;"
-                     onclick="toggleRefImageFull(${i})">
+                     onclick="openRefViewer(${i})">
                     <img src="${img.data}" style="width:100%;height:180px;object-fit:cover;display:block;"
                          title="点击查看大图">
                     <button onclick="deleteRefImage(${i});event.stopPropagation();" style="position:absolute;top:5px;right:5px;background:rgba(244,67,54,0.9);border:none;color:white;border-radius:50%;width:24px;height:24px;cursor:pointer;font-size:0.8rem;">×</button>
                 </div>
-                <div id="refFull_${i}" style="display:none;margin-top:8px;background:rgba(0,0,0,0.4);border-radius:8px;padding:10px;position:relative;">
-                    <img src="${img.data}" style="width:100%;max-height:60vh;object-fit:contain;display:block;border-radius:6px;">
-                    <button onclick="toggleRefImageFull(${i});event.stopPropagation();" style="position:absolute;top:15px;right:15px;background:rgba(244,67,54,0.9);border:none;color:white;border-radius:50%;width:30px;height:30px;cursor:pointer;font-size:1.2rem;">×</button>
-                </div>
             `).join('');
         }
 
-        function toggleRefImageFull(index) {
-            var el = document.getElementById('refFull_' + index);
-            if (el) {
-                el.style.display = el.style.display === 'none' ? 'block' : 'none';
-            }
+        function openRefViewer(index) {
+            if (!referenceImages[index]) return;
+            var viewer = document.getElementById('refImageViewer');
+            var img = document.getElementById('refViewerImg');
+            var title = document.getElementById('refViewerTitle');
+            img.src = referenceImages[index].data;
+            title.textContent = referenceImages[index].name || '';
+            viewer.style.display = 'block';
+            // 滚动到查看器位置
+            viewer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        function closeRefViewer() {
+            document.getElementById('refImageViewer').style.display = 'none';
         }
 
         function handleRefImageUpload(input) {
