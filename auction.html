@@ -874,6 +874,11 @@
                         <span style="font-size:1.2rem;">📡</span>
                         <div style="color:#ffd700;font-weight:500;font-size:0.9rem;">API监控</div>
                     </div>
+                    <div onclick="adminShowPage('notifications')" style="background:rgba(255,255,255,0.05);border-radius:10px;padding:15px;cursor:pointer;display:flex;align-items:center;gap:10px;transition:background 0.2s;position:relative;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.05)'">
+                        <span style="font-size:1.2rem;">🔔</span>
+                        <div style="color:#ffd700;font-weight:500;font-size:0.9rem;">系统通知</div>
+                        <span id="adminNotifyBadge" style="display:none;position:absolute;top:8px;right:8px;background:#ef4444;color:white;border-radius:50%;width:18px;height:18px;font-size:0.65rem;line-height:18px;text-align:center;font-weight:700;"></span>
+                    </div>
                 </div>
             </div>
 
@@ -973,6 +978,16 @@
                 <div id="apiMonitorContent" style="background:rgba(0,0,0,0.2);border-radius:8px;padding:15px;">
                     <div style="text-align:center;color:rgba(255,255,255,0.4);padding:10px;">加载中...</div>
                 </div>
+            </div>
+        </div>
+            <!-- 系统通知页面 -->
+            <div id="adminPageNotifications" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">
+                    <button onclick="adminShowMenu()" style="background:transparent;border:none;color:#a78bfa;font-size:1rem;cursor:pointer;">← 返回</button>
+                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">🔔 系统通知</h3>
+                    <button onclick="clearAdminNotifications()" style="margin-left:auto;padding:4px 10px;border-radius:6px;border:1px solid rgba(239,68,68,0.3);background:rgba(239,68,68,0.1);color:#ef4444;cursor:pointer;font-size:0.75rem;">清空</button>
+                </div>
+                <div id="adminNotificationsList" style="max-height:400px;overflow-y:auto;"></div>
             </div>
         </div>
     </div>
@@ -1585,34 +1600,171 @@
         // ==================== 拍卖快讯 ====================
         async function fetchAuctionBroadcastsFromGist() {
             const token = getGistToken();
-            const messagesGistId = MESSAGES_GIST_ID || localStorage.getItem('messages_gist_id');
-            
+            let messagesGistId = MESSAGES_GIST_ID || localStorage.getItem('messages_gist_id');
+
+            if (!messagesGistId) {
+                // 尝试从索引文件中查找
+                messagesGistId = await findMessagesGistFromIndex();
+            }
+
             if (!messagesGistId) return [];
-            
+
             const response = await fetch(`https://api.github.com/gists/${messagesGistId}`, {
                 headers: {
                     'Accept': 'application/vnd.github.v3+json',
                     ...(token && { 'Authorization': `token ${token}` })
                 }
             });
-            
-            if (!response.ok) return [];
-            
+
+            if (!response.ok) {
+                // 硬编码的ID可能已失效，尝试从索引查找新的
+                if (messagesGistId === MESSAGES_GIST_ID) {
+                    const newId = await findMessagesGistFromIndex();
+                    if (newId && newId !== MESSAGES_GIST_ID) {
+                        const resp2 = await fetch(`https://api.github.com/gists/${newId}`, {
+                            headers: {
+                                'Accept': 'application/vnd.github.v3+json',
+                                ...(token && { 'Authorization': `token ${token}` })
+                            }
+                        });
+                        if (resp2.ok) {
+                            const data2 = await resp2.json();
+                            const content2 = data2.files?.['auction_broadcasts.json']?.content;
+                            if (content2) return JSON.parse(content2);
+                        }
+                    }
+                }
+                return [];
+            }
+
             const data = await response.json();
             const content = data.files?.['auction_broadcasts.json']?.content;
             if (!content) return [];
-            
+
             return JSON.parse(content);
+        }
+
+        async function findMessagesGistFromIndex() {
+            const token = getGistToken();
+            try {
+                const resp = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        ...(token && { 'Authorization': `token ${token}` })
+                    }
+                });
+                if (!resp.ok) return null;
+                const data = await resp.json();
+                const content = data.files?.['room_index.json']?.content;
+                if (!content) return null;
+                const index = JSON.parse(content);
+                if (index['messages']) {
+                    localStorage.setItem('messages_gist_id', index['messages']);
+                    return index['messages'];
+                }
+            } catch (e) {}
+            return null;
         }
 
         async function saveAuctionBroadcastsToGist() {
             const token = getGistToken();
-            if (!token) throw new Error('未设置Token');
-            
-            const messagesGistId = MESSAGES_GIST_ID || localStorage.getItem('messages_gist_id');
-            
+            if (!token) return;
+
+            let messagesGistId = MESSAGES_GIST_ID || localStorage.getItem('messages_gist_id');
+
             if (messagesGistId) {
-                await fetch(`https://api.github.com/gists/${messagesGistId}`, {
+                try {
+                    const patchResp = await fetch(`https://api.github.com/gists/${messagesGistId}`, {
+                        method: 'PATCH',
+                        headers: {
+                            'Accept': 'application/vnd.github.v3+json',
+                            'Content-Type': 'application/json',
+                            'Authorization': `token ${token}`
+                        },
+                        body: JSON.stringify({
+                            files: {
+                                'auction_broadcasts.json': {
+                                    content: JSON.stringify(auctionBroadcastQueue, null, 2)
+                                }
+                            }
+                        })
+                    });
+                    if (patchResp.ok) return;
+                    // 只有404（Gist确实被删除）才重建，403/网络错误不重建避免数据分裂
+                    if (patchResp.status === 404) {
+                        console.warn('消息Gist已删除(404)，将重建');
+                        addAdminNotification('warning', '消息Gist已删除', `Gist ${messagesGistId.substring(0,8)}... 返回404，确认已删除，将自动重建。`);
+                        messagesGistId = null;
+                    } else {
+                        // 403或其他错误，不重建，只记录
+                        console.warn(`消息Gist PATCH失败(${patchResp.status})，跳过保存`);
+                        addAdminNotification('warning', '快讯保存失败', `PATCH返回${patchResp.status}，可能是临时问题，不重建Gist避免数据丢失。`);
+                        return;
+                    }
+                } catch (e) {
+                    console.warn('保存快讯失败:', e.message);
+                    return; // 网络错误不重建
+                }
+            }
+
+            // 只有确认Gist被删除(404)才创建新的
+            if (!messagesGistId) {
+                try {
+                    const createResp = await fetch('https://api.github.com/gists', {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/vnd.github.v3+json',
+                            'Content-Type': 'application/json',
+                            'Authorization': `token ${token}`
+                        },
+                        body: JSON.stringify({
+                            description: '需求墙消息',
+                            public: true,
+                            files: {
+                                'messages.json': {
+                                    content: '[]'
+                                },
+                                'auction_broadcasts.json': {
+                                    content: JSON.stringify(auctionBroadcastQueue, null, 2)
+                                }
+                            }
+                        })
+                    });
+                    if (createResp.ok) {
+                        const newData = await createResp.json();
+                        localStorage.setItem('messages_gist_id', newData.id);
+                        addAdminNotification('info', '消息Gist已重建', `新Gist: ${newData.id}，已同步到索引文件。`);
+                        console.warn(`消息Gist已重建: ${newData.id}`);
+                        // 同步到索引文件
+                        try {
+                            await updateMessagesGistIndex(newData.id);
+                        } catch (e) {
+                            console.warn('更新索引失败:', e.message);
+                        }
+                    }
+                } catch (e) {
+                    console.warn('重建消息Gist失败:', e.message);
+                }
+            }
+        }
+
+        async function updateMessagesGistIndex(newGistId) {
+            const token = getGistToken();
+            if (!token) return;
+            try {
+                const indexResp = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Authorization': `token ${token}`
+                    }
+                });
+                if (!indexResp.ok) return;
+                const indexData = await indexResp.json();
+                const content = indexData.files?.['room_index.json']?.content;
+                if (!content) return;
+                const index = JSON.parse(content);
+                index['messages'] = newGistId;
+                await fetch(`https://api.github.com/gists/${GIST_ID}`, {
                     method: 'PATCH',
                     headers: {
                         'Accept': 'application/vnd.github.v3+json',
@@ -1621,12 +1773,14 @@
                     },
                     body: JSON.stringify({
                         files: {
-                            'auction_broadcasts.json': {
-                                content: JSON.stringify(auctionBroadcastQueue, null, 2)
+                            'room_index.json': {
+                                content: JSON.stringify(index, null, 2)
                             }
                         }
                     })
                 });
+            } catch (e) {
+                console.warn('更新消息Gist索引失败:', e);
             }
         }
 
@@ -1835,6 +1989,9 @@
             toggleChatRoomTab('auctions');
             startChatRefresh();
             startAuctionCountdown();
+            // 启动健康检查和通知
+            updateNotifyBadge();
+            setTimeout(() => checkSystemHealth(), 3000); // 延迟3秒避免影响加载速度
         }
 
         function closeChatRoom() {
@@ -2059,9 +2216,8 @@
                         localStorage.removeItem(`chatroom_gist_${roomId}`);
                         roomGistId = null;
                     } else if (response.status === 403) {
-                        // 403权限问题：旧Gist可能是其他token创建的，清除缓存以便下次保存时重新创建
-                        console.warn('GitHub API 403: 当前Token无权访问此Gist，清除缓存');
-                        localStorage.removeItem(`chatroom_gist_${roomId}`);
+                        // 403权限/临时问题：不清除缓存，不重建，保留本地数据
+                        console.warn('GitHub API 403: 暂时无法访问，保留本地数据');
                         if (!chatRoomData || !chatRoomData.rooms || !chatRoomData.rooms[roomId]) {
                             chatRoomData = { rooms: {} };
                             chatRoomData.rooms[roomId] = { messages: [], auctions: [], nextAuctionId: 1 };
@@ -2218,28 +2374,25 @@
                         return chatroomGistId;
                     }
                     if (patchResponse.status === 403) {
-                        // 403权限问题：读取详细错误信息
+                        // 403权限/临时问题：不重建Gist，记录通知后抛错
                         const errBody = await patchResponse.json().catch(() => ({}));
                         console.error('PATCH 403 详情:', JSON.stringify(errBody));
                         const errMsg = errBody.message || errBody.block?.reason || '未知原因';
-                        // 如果是abuse rate limit（临时封禁），不重建Gist
-                        if (errMsg.includes('abuse') || errMsg.includes('rate limit') || errMsg.includes('temporarily')) {
-                            throw new Error(`API临时限制（403）：${errMsg}，请稍后重试`);
-                        }
-                        // 其他403：旧Gist可能无法修改，用当前token重新创建
-                        console.warn(`PATCH 403 (${errMsg}): 将用当前Token重新创建Gist`);
-                        localStorage.removeItem(`chatroom_gist_${roomId}`);
-                        chatroomGistId = null;
+                        addAdminNotification('warning', '房间数据保存失败', `PATCH返回403: ${errMsg}，可能是临时限制，不重建Gist避免数据丢失。`);
+                        throw new Error(`保存失败(403): ${errMsg}`);
                     }
                     if (patchResponse.status === 404) {
-                        // Gist被删除，清除缓存重新创建
+                        // Gist确实被删除，安全重建
+                        addAdminNotification('warning', '房间Gist已删除', `Gist ${chatroomGistId.substring(0,8)}... 返回404，将自动重建。`);
                         localStorage.removeItem(`chatroom_gist_${roomId}`);
                         chatroomGistId = null;
                     }
                 } catch (e) {
-                    console.warn('PATCH 失败，清除缓存重新创建:', e.message);
-                    localStorage.removeItem(`chatroom_gist_${roomId}`);
-                    chatroomGistId = null;
+                    if (e.message.includes('403')) throw e; // 403直接抛出
+                    // 网络错误等，不重建Gist
+                    console.warn('PATCH 网络错误:', e.message);
+                    addAdminNotification('warning', '房间数据保存失败', `网络错误: ${e.message}，不重建Gist避免数据丢失。`);
+                    throw e;
                 }
             }
 
@@ -4287,6 +4440,139 @@
             hideAllAdminPages();
         }
 
+        // ==================== 系统通知 ====================
+        const NOTIFY_KEY = 'auction_admin_notifications';
+        const MAX_NOTIFICATIONS = 50;
+
+        function getAdminNotifications() {
+            try {
+                return JSON.parse(localStorage.getItem(NOTIFY_KEY) || '[]');
+            } catch (e) { return []; }
+        }
+
+        function addAdminNotification(type, title, message) {
+            const notifications = getAdminNotifications();
+            notifications.unshift({
+                id: 'n_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+                type: type, // 'error', 'warning', 'info'
+                title: title,
+                message: message,
+                time: Date.now(),
+                read: false
+            });
+            // 保留最近50条
+            if (notifications.length > MAX_NOTIFICATIONS) {
+                notifications.length = MAX_NOTIFICATIONS;
+            }
+            localStorage.setItem(NOTIFY_KEY, JSON.stringify(notifications));
+            updateNotifyBadge();
+        }
+
+        function updateNotifyBadge() {
+            const badge = document.getElementById('adminNotifyBadge');
+            if (!badge) return;
+            const unread = getAdminNotifications().filter(n => !n.read).length;
+            if (unread > 0) {
+                badge.style.display = 'block';
+                badge.textContent = unread > 9 ? '9+' : unread;
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+
+        function renderAdminNotifications() {
+            const list = document.getElementById('adminNotificationsList');
+            const notifications = getAdminNotifications();
+
+            // 标记全部已读
+            notifications.forEach(n => n.read = true);
+            localStorage.setItem(NOTIFY_KEY, JSON.stringify(notifications));
+            updateNotifyBadge();
+
+            if (notifications.length === 0) {
+                list.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,0.3);padding:30px;font-size:0.85rem;">暂无通知</div>';
+                return;
+            }
+
+            const typeConfig = {
+                error: { icon: '❌', color: '#ef4444', bg: 'rgba(239,68,68,0.08)' },
+                warning: { icon: '⚠️', color: '#fbbf24', bg: 'rgba(251,191,36,0.08)' },
+                info: { icon: 'ℹ️', color: '#60a5fa', bg: 'rgba(96,165,250,0.08)' }
+            };
+
+            list.innerHTML = notifications.map(n => {
+                const cfg = typeConfig[n.type] || typeConfig.info;
+                const d = new Date(n.time);
+                const timeStr = `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`;
+                return `<div style="background:${cfg.bg};border:1px solid ${cfg.color}22;border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                        <span style="color:${cfg.color};font-size:0.8rem;font-weight:600;">${cfg.icon} ${n.title}</span>
+                        <span style="color:rgba(255,255,255,0.3);font-size:0.65rem;">${timeStr}</span>
+                    </div>
+                    <div style="color:rgba(255,255,255,0.6);font-size:0.75rem;line-height:1.4;">${n.message}</div>
+                </div>`;
+            }).join('');
+        }
+
+        function clearAdminNotifications() {
+            if (!confirm('确定清空所有通知？')) return;
+            localStorage.setItem(NOTIFY_KEY, '[]');
+            renderAdminNotifications();
+            updateNotifyBadge();
+        }
+
+        // 启动时检查系统健康状态
+        async function checkSystemHealth() {
+            const token = getGistToken();
+            if (!token) {
+                addAdminNotification('error', 'Token未配置', '未检测到GitHub Token，拍卖行无法正常保存数据。请在管理员→系统设置中配置Token。');
+                return;
+            }
+
+            // 检查关键Gist
+            const gistChecks = [
+                { name: '索引Gist', id: GIST_ID },
+                { name: '消息Gist', id: MESSAGES_GIST_ID },
+                { name: '计数器Gist', id: COUNTER_GIST_ID }
+            ];
+
+            for (const gc of gistChecks) {
+                try {
+                    const resp = await fetch(`https://api.github.com/gists/${gc.id}`, {
+                        headers: {
+                            'Accept': 'application/vnd.github.v3+json',
+                            'Authorization': `token ${token}`
+                        }
+                    });
+                    if (resp.status === 404) {
+                        addAdminNotification('error', `${gc.name}已删除`, `Gist ${gc.id.substring(0,8)}... 返回404，数据可能已丢失。${gc.name === '消息Gist' ? '发布拍卖时会自动重建。' : '请手动恢复。'}`);
+                    } else if (resp.status === 403) {
+                        addAdminNotification('warning', `${gc.name}访问被拒`, `Gist ${gc.id.substring(0,8)}... 返回403，当前Token可能无权访问。`);
+                    }
+                } catch (e) {
+                    addAdminNotification('warning', `${gc.name}检查失败`, `请求异常: ${e.message}`);
+                }
+            }
+
+            // 检查当前房间Gist
+            if (currentChatRoom) {
+                const roomGistId = localStorage.getItem(`chatroom_gist_${currentChatRoom}`);
+                if (roomGistId) {
+                    try {
+                        const resp = await fetch(`https://api.github.com/gists/${roomGistId}`, {
+                            headers: {
+                                'Accept': 'application/vnd.github.v3+json',
+                                'Authorization': `token ${token}`
+                            }
+                        });
+                        if (resp.status === 404) {
+                            addAdminNotification('error', '当前房间Gist已删除', `房间 ${currentChatRoom} 的Gist ${roomGistId.substring(0,8)}... 已被删除，下次保存时会自动重建。`);
+                        }
+                    } catch (e) {}
+                }
+            }
+        }
+
         function hideAllAdminPages() {
             document.getElementById('adminPageSettings').style.display = 'none';
             document.getElementById('adminPageAuctionManage').style.display = 'none';
@@ -4295,6 +4581,7 @@
             document.getElementById('adminPageBroadcastManage').style.display = 'none';
             document.getElementById('adminPageRoomManage').style.display = 'none';
             document.getElementById('adminPageApiMonitor').style.display = 'none';
+            document.getElementById('adminPageNotifications').style.display = 'none';
         }
 
         function adminShowPage(page) {
@@ -4318,6 +4605,9 @@
             } else if (page === 'apiMonitor') {
                 document.getElementById('adminPageApiMonitor').style.display = 'block';
                 refreshApiMonitor();
+            } else if (page === 'notifications') {
+                document.getElementById('adminPageNotifications').style.display = 'block';
+                renderAdminNotifications();
             }
         }
 
