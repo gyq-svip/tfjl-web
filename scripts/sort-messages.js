@@ -1,6 +1,9 @@
 /**
- * 聊天消息整理脚本
- * 功能：遍历所有房间，对消息进行去重、按时间排序，防止并发写入导致的数据混乱
+ * 聊天消息 & 需求墙整理脚本
+ * 功能：
+ *   1. 遍历所有房间，对消息(messages)和求购需求(buyRequests)进行去重、按时间排序
+ *   2. 整理独立的 messages Gist（需求墙消息 + 拍卖快讯）
+ *   3. 清理过期的求购需求（超过7天）
  *
  * 运行环境：GitHub Actions (Node.js 18)
  * 触发方式：每20分钟定时触发，或手动触发
@@ -22,6 +25,12 @@ const CONCURRENCY = 5;
 const ROOM_TIMEOUT = 10000;
 // 消息保留上限
 const MAX_MESSAGES = 200;
+// 求购需求保留上限
+const MAX_BUY_REQUESTS = 100;
+// 求购需求过期时间（7天，毫秒）
+const BUY_REQUEST_EXPIRE = 7 * 24 * 60 * 60 * 1000;
+// 拍卖快讯保留上限
+const MAX_BROADCASTS = 200;
 
 if (!TOKEN) {
     console.error('❌ GIST_TOKEN 未配置');
@@ -85,10 +94,10 @@ async function patchGist(gistId, files) {
 // ============ 核心整理逻辑 ============
 
 /**
- * 从索引文件获取所有房间
- * 索引结构: { allowedRooms: [...], usedNicks: [...], [roomId]: gistId, ... }
+ * 从索引文件获取所有房间和消息Gist
+ * 索引结构: { allowedRooms: [...], usedNicks: [...], [roomId]: gistId, messages: gistId }
  */
-async function getAllRooms() {
+async function getIndexData() {
     console.log('📋 读取房间索引...');
     const resp = await getGist(INDEX_GIST_ID);
 
@@ -124,16 +133,71 @@ async function getAllRooms() {
         }
     });
 
-    console.log(`✅ 发现 ${rooms.length} 个房间`);
-    return rooms;
+    // 消息Gist（需求墙消息 + 拍卖快讯）
+    const messagesGistId = index['messages'] || null;
+
+    console.log(`✅ 发现 ${rooms.length} 个房间${messagesGistId ? '，消息Gist: ' + messagesGistId.substring(0, 8) + '...' : ''}`);
+    return { rooms, messagesGistId };
 }
 
 /**
- * 整理单个房间的消息
- * 1. 去重（按消息id）
- * 2. 按时间排序
- * 3. 限制数量
- * 4. 有变化才写回
+ * 整理数组：去重 + 按时间排序 + 限制数量
+ * @param {Array} arr - 原始数组
+ * @param {string} idField - 去重用的字段（默认 'id'）
+ * @param {string} timeField - 排序用的时间字段（默认 'time'）
+ * @param {number} maxLimit - 最大保留数量
+ * @returns {Object} { data: 整理后的数组, changed: 是否有变化, removed: 移除数量 }
+ */
+function sortAndDedup(arr, idField = 'id', timeField = 'time', maxLimit = MAX_MESSAGES) {
+    if (!arr || arr.length === 0) {
+        return { data: [], changed: false, removed: 0 };
+    }
+
+    const beforeCount = arr.length;
+
+    // 1. 去重（按id）
+    const seen = new Set();
+    const deduped = [];
+    for (const item of arr) {
+        const id = item[idField] || `${item[timeField] || 0}_${Math.random()}`;
+        if (!seen.has(id)) {
+            seen.add(id);
+            deduped.push(item);
+        }
+    }
+
+    // 2. 按时间排序（升序，旧的在前）
+    deduped.sort((a, b) => (a[timeField] || 0) - (b[timeField] || 0));
+
+    // 3. 限制数量（保留最新的N条）
+    const trimmed = deduped.length > maxLimit
+        ? deduped.slice(-maxLimit)
+        : deduped;
+
+    // 4. 检查是否有变化
+    let changed = false;
+    if (trimmed.length !== beforeCount) {
+        changed = true;
+    } else {
+        for (let i = 0; i < trimmed.length; i++) {
+            if (trimmed[i][idField] !== arr[i][idField]) {
+                changed = true;
+                break;
+            }
+        }
+    }
+
+    return {
+        data: trimmed,
+        changed,
+        removed: beforeCount - trimmed.length
+    };
+}
+
+/**
+ * 整理单个房间
+ * 1. 消息去重排序
+ * 2. 求购需求去重排序 + 清理过期
  */
 async function sortRoomMessages(room) {
     const { roomId, gistId } = room;
@@ -160,56 +224,49 @@ async function sortRoomMessages(room) {
             return { roomId, status: 'skip', reason: '结构异常' };
         }
 
-        const messages = roomObj.messages || [];
-        if (messages.length === 0) {
-            console.log(`  ℹ️ [${roomId}] 无消息，跳过`);
-            return { roomId, status: 'skip', reason: '无消息' };
-        }
-
-        // 记录整理前状态
-        const beforeCount = messages.length;
-
-        // 1. 去重（按id）
-        const seen = new Set();
-        const deduped = [];
-        for (const msg of messages) {
-            const id = msg.id || `msg_${msg.time}_${msg.author}_${Math.random()}`;
-            if (!seen.has(id)) {
-                seen.add(id);
-                deduped.push(msg);
-            }
-        }
-
-        // 2. 按时间排序（升序，旧的在前）
-        deduped.sort((a, b) => (a.time || 0) - (b.time || 0));
-
-        // 3. 限制数量（保留最新的200条）
-        const trimmed = deduped.length > MAX_MESSAGES
-            ? deduped.slice(-MAX_MESSAGES)
-            : deduped;
-
-        // 4. 检查是否有变化
         let changed = false;
-        if (trimmed.length !== beforeCount) {
-            changed = true;
-        } else {
-            // 对比顺序和内容
-            for (let i = 0; i < trimmed.length; i++) {
-                if (trimmed[i].id !== messages[i].id) {
-                    changed = true;
-                    break;
-                }
+        let totalRemoved = 0;
+        const stats = { messages: 0, buyRequests: 0 };
+
+        // 1. 整理消息
+        if (roomObj.messages && roomObj.messages.length > 0) {
+            const result = sortAndDedup(roomObj.messages, 'id', 'time', MAX_MESSAGES);
+            if (result.changed) {
+                roomObj.messages = result.data;
+                changed = true;
+                totalRemoved += result.removed;
             }
+            stats.messages = result.data.length;
+        }
+
+        // 2. 整理求购需求（去重 + 排序 + 清理过期）
+        if (roomObj.buyRequests && roomObj.buyRequests.length > 0) {
+            const beforeCount = roomObj.buyRequests.length;
+            const now = Date.now();
+
+            // 先清理过期的求购需求（超过7天且状态不是active）
+            let filtered = roomObj.buyRequests.filter(r => {
+                const expireTime = r.expireTime || (r.createTime + BUY_REQUEST_EXPIRE);
+                return expireTime > now || r.status === 'active';
+            });
+
+            // 去重 + 排序
+            const result = sortAndDedup(filtered, 'id', 'createTime', MAX_BUY_REQUESTS);
+            if (result.changed || filtered.length !== beforeCount) {
+                roomObj.buyRequests = result.data;
+                changed = true;
+                totalRemoved += (beforeCount - result.data.length);
+            }
+            stats.buyRequests = result.data.length;
         }
 
         if (!changed) {
             const elapsed = Date.now() - startTime;
-            console.log(`  ✅ [${roomId}] 无需整理 (${beforeCount}条, ${elapsed}ms)`);
-            return { roomId, status: 'ok', reason: '无需整理', count: beforeCount };
+            console.log(`  ✅ [${roomId}] 无需整理 (消息${stats.messages}条/求购${stats.buyRequests}条, ${elapsed}ms)`);
+            return { roomId, status: 'ok', reason: '无需整理', stats };
         }
 
-        // 5. 写回
-        roomObj.messages = trimmed;
+        // 3. 写回
         const patchResp = await patchGist(gistId, {
             [filename]: {
                 content: JSON.stringify(roomData, null, 2)
@@ -222,13 +279,107 @@ async function sortRoomMessages(room) {
         }
 
         const elapsed = Date.now() - startTime;
-        const removed = beforeCount - trimmed.length;
-        console.log(`  ✅ [${roomId}] 整理完成: ${beforeCount} → ${trimmed.length}条 (去重/裁剪${removed}条, ${elapsed}ms)`);
-        return { roomId, status: 'ok', count: trimmed.length, removed };
+        console.log(`  ✅ [${roomId}] 整理完成: 消息${stats.messages}条/求购${stats.buyRequests}条 (清理${totalRemoved}条, ${elapsed}ms)`);
+        return { roomId, status: 'ok', stats, removed: totalRemoved };
 
     } catch (e) {
         console.log(`  ❌ [${roomId}] 异常: ${e.message}`);
         return { roomId, status: 'fail', reason: e.message };
+    }
+}
+
+/**
+ * 整理独立的 messages Gist
+ * 1. messages.json（需求墙消息）
+ * 2. auction_broadcasts.json（拍卖快讯）
+ */
+async function sortMessagesGist(messagesGistId) {
+    if (!messagesGistId) {
+        console.log('  ℹ️ 无消息Gist，跳过');
+        return { status: 'skip', reason: '无消息Gist' };
+    }
+
+    const startTime = Date.now();
+
+    try {
+        const resp = await getGist(messagesGistId);
+        if (resp.status !== 200) {
+            console.log(`  ⚠️ 消息Gist获取失败: ${resp.status}`);
+            return { status: 'skip', reason: `获取失败${resp.status}` };
+        }
+
+        const files = resp.data?.files;
+        if (!files) {
+            console.log(`  ⚠️ 消息Gist无文件`);
+            return { status: 'skip', reason: '无文件' };
+        }
+
+        const patchFiles = {};
+        let changed = false;
+        let totalRemoved = 0;
+        const stats = {};
+
+        // 1. 整理 messages.json（需求墙消息）
+        if (files['messages.json']?.content) {
+            try {
+                const msgData = JSON.parse(files['messages.json'].content);
+                if (msgData.messages && Array.isArray(msgData.messages)) {
+                    const result = sortAndDedup(msgData.messages, 'id', 'time', MAX_MESSAGES);
+                    if (result.changed) {
+                        msgData.messages = result.data;
+                        patchFiles['messages.json'] = {
+                            content: JSON.stringify(msgData, null, 2)
+                        };
+                        changed = true;
+                        totalRemoved += result.removed;
+                    }
+                    stats.messages = result.data.length;
+                }
+            } catch (e) {
+                console.log(`  ⚠️ messages.json 解析失败: ${e.message}`);
+            }
+        }
+
+        // 2. 整理 auction_broadcasts.json（拍卖快讯）
+        if (files['auction_broadcasts.json']?.content) {
+            try {
+                const broadcasts = JSON.parse(files['auction_broadcasts.json'].content);
+                if (Array.isArray(broadcasts)) {
+                    const result = sortAndDedup(broadcasts, 'id', 'addedAt', MAX_BROADCASTS);
+                    if (result.changed) {
+                        patchFiles['auction_broadcasts.json'] = {
+                            content: JSON.stringify(result.data, null, 2)
+                        };
+                        changed = true;
+                        totalRemoved += result.removed;
+                    }
+                    stats.broadcasts = result.data.length;
+                }
+            } catch (e) {
+                console.log(`  ⚠️ auction_broadcasts.json 解析失败: ${e.message}`);
+            }
+        }
+
+        if (!changed) {
+            const elapsed = Date.now() - startTime;
+            console.log(`  ✅ [消息Gist] 无需整理 (消息${stats.messages || 0}条/快讯${stats.broadcasts || 0}条, ${elapsed}ms)`);
+            return { status: 'ok', reason: '无需整理', stats };
+        }
+
+        // 写回
+        const patchResp = await patchGist(messagesGistId, patchFiles);
+        if (patchResp.status !== 200) {
+            console.log(`  ❌ [消息Gist] 写回失败: ${patchResp.status}`);
+            return { status: 'fail', reason: `写回失败${patchResp.status}` };
+        }
+
+        const elapsed = Date.now() - startTime;
+        console.log(`  ✅ [消息Gist] 整理完成: 消息${stats.messages || 0}条/快讯${stats.broadcasts || 0}条 (清理${totalRemoved}条, ${elapsed}ms)`);
+        return { status: 'ok', stats, removed: totalRemoved };
+
+    } catch (e) {
+        console.log(`  ❌ [消息Gist] 异常: ${e.message}`);
+        return { status: 'fail', reason: e.message };
     }
 }
 
@@ -260,39 +411,49 @@ async function processRoomsWithConcurrency(rooms) {
 // ============ 主流程 ============
 
 async function main() {
-    console.log('🚀 开始整理聊天消息');
+    console.log('🚀 开始整理聊天消息 & 需求墙');
     console.log(`⏰ 时间: ${new Date().toISOString()}`);
     console.log(`📋 索引Gist: ${INDEX_GIST_ID}`);
     console.log('');
 
     try {
-        // 1. 获取所有房间
-        const rooms = await getAllRooms();
-        if (rooms.length === 0) {
-            console.log('ℹ️ 没有房间需要整理');
+        // 1. 获取所有房间和消息Gist
+        const { rooms, messagesGistId } = await getIndexData();
+        if (rooms.length === 0 && !messagesGistId) {
+            console.log('ℹ️ 没有数据需要整理');
             return;
         }
 
         console.log('');
-        console.log('📝 开始整理各房间消息...');
+        console.log('📝 开始整理各房间数据...');
         console.log(`   并发数: ${CONCURRENCY}`);
         console.log('');
 
         // 2. 并行整理所有房间
-        const results = await processRoomsWithConcurrency(rooms);
+        const roomResults = rooms.length > 0
+            ? await processRoomsWithConcurrency(rooms)
+            : [];
 
-        // 3. 输出统计
+        // 3. 整理消息Gist（需求墙消息 + 拍卖快讯）
+        console.log('');
+        console.log('📝 整理消息Gist（需求墙消息 + 拍卖快讯）...');
+        const msgResult = messagesGistId
+            ? await sortMessagesGist(messagesGistId)
+            : { status: 'skip', reason: '无消息Gist' };
+
+        // 4. 输出统计
         console.log('');
         console.log('📊 执行统计:');
         console.log('=========================================');
 
-        const success = results.filter(r => r.status === 'ok');
-        const skipped = results.filter(r => r.status === 'skip');
-        const failed = results.filter(r => r.status === 'fail');
+        const success = roomResults.filter(r => r.status === 'ok');
+        const skipped = roomResults.filter(r => r.status === 'skip');
+        const failed = roomResults.filter(r => r.status === 'fail');
 
-        console.log(`✅ 成功: ${success.length} 个房间`);
-        console.log(`ℹ️ 跳过: ${skipped.length} 个房间`);
-        console.log(`❌ 失败: ${failed.length} 个房间`);
+        console.log(`✅ 房间成功: ${success.length} 个`);
+        console.log(`ℹ️ 房间跳过: ${skipped.length} 个`);
+        console.log(`❌ 房间失败: ${failed.length} 个`);
+        console.log(`📦 消息Gist: ${msgResult.status}`);
 
         if (failed.length > 0) {
             console.log('');
@@ -302,10 +463,11 @@ async function main() {
             });
         }
 
-        const totalRemoved = success.reduce((sum, r) => sum + (r.removed || 0), 0);
+        const totalRemoved = success.reduce((sum, r) => sum + (r.removed || 0), 0)
+                          + (msgResult.removed || 0);
         if (totalRemoved > 0) {
             console.log('');
-            console.log(`🗑️  共清理重复/过期消息: ${totalRemoved} 条`);
+            console.log(`🗑️  共清理重复/过期数据: ${totalRemoved} 条`);
         }
 
         console.log('=========================================');
