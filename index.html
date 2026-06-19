@@ -1890,33 +1890,9 @@
             #lightboxImage {
                 max-width: 90vw;
                 max-height: 80vh;
-                transition: transform 0.3s ease;
                 box-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
                 border-radius: 8px;
                 cursor: pointer;
-            }
-            #lightboxControls {
-                position: absolute;
-                top: 20px;
-                left: 0;
-                right: 0;
-                display: flex;
-                justify-content: center;
-                gap: 10px;
-                z-index: 10;
-            }
-            .lightbox-btn {
-                background: rgba(156, 39, 176, 0.8);
-                color: white;
-                border: none;
-                padding: 8px 14px;
-                border-radius: 8px;
-                cursor: pointer;
-                font-size: 0.95rem;
-                transition: background 0.2s;
-            }
-            .lightbox-btn:hover {
-                background: rgba(156, 39, 176, 1);
             }
             #lightboxClose {
                 position: absolute;
@@ -2981,13 +2957,6 @@
         <!-- 灯箱大图查看器 -->
         <div id="lightbox">
             <button id="lightboxClose" onclick="closeLightbox()">×</button>
-            <div id="lightboxControls">
-                <button class="lightbox-btn" onclick="zoomInLightbox()">🔍+ 放大</button>
-                <button class="lightbox-btn" onclick="zoomOutLightbox()">🔍- 缩小</button>
-                <button class="lightbox-btn" onclick="rotateLightbox()">🔄 旋转</button>
-                <button class="lightbox-btn" onclick="resetLightbox()">↺ 重置</button>
-                <button class="lightbox-btn" onclick="downloadLightboxImage()">⬇ 下载</button>
-            </div>
             <div id="lightboxNav">
                 <button class="lightbox-nav-btn" onclick="prevLightboxImage()">←</button>
                 <button class="lightbox-nav-btn" onclick="nextLightboxImage()">→</button>
@@ -3057,16 +3026,12 @@
             }
         }
 
-        // 灯箱大图查看（原始版本）
+        // 灯箱大图查看（简洁版：只有图片+关闭+翻页）
         let currentLightboxIndex = 0;
-        let lightboxScale = 1;
-        let lightboxRotate = 0;
 
         function openLightbox(index) {
             if (referenceImages.length === 0) return;
             currentLightboxIndex = index;
-            lightboxScale = 1;
-            lightboxRotate = 0;
             updateLightboxImage();
             document.getElementById('lightbox').classList.add('active');
         }
@@ -3078,48 +3043,17 @@
         function updateLightboxImage() {
             const img = referenceImages[currentLightboxIndex];
             if (!img) return;
-            const lightboxImg = document.getElementById('lightboxImage');
-            lightboxImg.src = img.data;
-            lightboxImg.style.transform = `scale(${lightboxScale}) rotate(${lightboxRotate}deg)`;
+            document.getElementById('lightboxImage').src = img.data;
             document.getElementById('lightboxInfo').textContent = `${img.name}  (${currentLightboxIndex + 1}/${referenceImages.length})`;
-        }
-
-        function zoomInLightbox() {
-            lightboxScale = Math.min(lightboxScale + 0.2, 3);
-            const img = document.getElementById('lightboxImage');
-            img.style.transform = `scale(${lightboxScale}) rotate(${lightboxRotate}deg)`;
-        }
-
-        function zoomOutLightbox() {
-            lightboxScale = Math.max(lightboxScale - 0.2, 0.5);
-            const img = document.getElementById('lightboxImage');
-            img.style.transform = `scale(${lightboxScale}) rotate(${lightboxRotate}deg)`;
-        }
-
-        function rotateLightbox() {
-            lightboxRotate = (lightboxRotate + 90) % 360;
-            const img = document.getElementById('lightboxImage');
-            img.style.transform = `scale(${lightboxScale}) rotate(${lightboxRotate}deg)`;
-        }
-
-        function resetLightbox() {
-            lightboxScale = 1;
-            lightboxRotate = 0;
-            const img = document.getElementById('lightboxImage');
-            img.style.transform = `scale(${lightboxScale}) rotate(${lightboxRotate}deg)`;
         }
 
         function nextLightboxImage() {
             currentLightboxIndex = (currentLightboxIndex + 1) % referenceImages.length;
-            lightboxScale = 1;
-            lightboxRotate = 0;
             updateLightboxImage();
         }
 
         function prevLightboxImage() {
             currentLightboxIndex = (currentLightboxIndex - 1 + referenceImages.length) % referenceImages.length;
-            lightboxScale = 1;
-            lightboxRotate = 0;
             updateLightboxImage();
         }
 
@@ -3132,46 +3066,13 @@
             link.click();
         }
 
-        // 键盘控制
+        // 键盘控制：Esc关闭，左右箭头翻页
         document.addEventListener('keydown', function(e) {
             const lightbox = document.getElementById('lightbox');
             if (!lightbox.classList.contains('active')) return;
-            switch(e.key) {
-                case 'Escape':
-                    closeLightbox();
-                    break;
-                case 'ArrowLeft':
-                    prevLightboxImage();
-                    break;
-                case 'ArrowRight':
-                    nextLightboxImage();
-                    break;
-                case '+':
-                case '=':
-                    zoomInLightbox();
-                    break;
-                case '-':
-                    zoomOutLightbox();
-                    break;
-                case 'r':
-                case 'R':
-                    rotateLightbox();
-                    break;
-                case '0':
-                    resetLightbox();
-                    break;
-            }
-        });
-
-        // 鼠标滚轮缩放
-        document.getElementById('lightbox').addEventListener('wheel', function(e) {
-            if (!this.classList.contains('active')) return;
-            e.preventDefault();
-            if (e.deltaY < 0) {
-                zoomInLightbox();
-            } else {
-                zoomOutLightbox();
-            }
+            if (e.key === 'Escape') closeLightbox();
+            if (e.key === 'ArrowLeft') prevLightboxImage();
+            if (e.key === 'ArrowRight') nextLightboxImage();
         });
 
         // 点击背景关闭灯箱
