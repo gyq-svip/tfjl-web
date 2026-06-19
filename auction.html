@@ -870,6 +870,10 @@
                         <span style="font-size:1.2rem;">🏠</span>
                         <div style="color:#ffd700;font-weight:500;font-size:0.9rem;">房间管理</div>
                     </div>
+                    <div onclick="adminShowPage('apiMonitor')" style="background:rgba(255,255,255,0.05);border-radius:10px;padding:15px;cursor:pointer;display:flex;align-items:center;gap:10px;transition:background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.05)'">
+                        <span style="font-size:1.2rem;">📡</span>
+                        <div style="color:#ffd700;font-weight:500;font-size:0.9rem;">API监控</div>
+                    </div>
                 </div>
             </div>
 
@@ -956,6 +960,18 @@
                     <input type="text" id="newAllowedRoomIdInput" placeholder="新房间ID" style="flex:1;padding:8px 12px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:white;font-size:0.85rem;outline:none;">
                     <input type="text" id="newRoomOwnerInput" placeholder="房主昵称" style="flex:1;padding:8px 12px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:white;font-size:0.85rem;outline:none;">
                     <button onclick="adminAddAllowedRoom()" style="padding:8px 16px;border-radius:6px;border:none;background:linear-gradient(135deg,#4ade80,#22c55e);color:white;cursor:pointer;font-size:0.85rem;">添加</button>
+                </div>
+            </div>
+
+            <!-- API监控页面 -->
+            <div id="adminPageApiMonitor" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">
+                    <button onclick="adminShowMenu()" style="background:transparent;border:none;color:#a78bfa;font-size:1rem;cursor:pointer;">← 返回</button>
+                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">📡 API监控</h3>
+                    <button onclick="refreshApiMonitor()" style="margin-left:auto;padding:6px 12px;border-radius:6px;border:none;background:linear-gradient(135deg,#4ecdc4,#44a08d);color:white;cursor:pointer;font-size:0.8rem;">刷新</button>
+                </div>
+                <div id="apiMonitorContent" style="background:rgba(0,0,0,0.2);border-radius:8px;padding:15px;">
+                    <div style="text-align:center;color:rgba(255,255,255,0.4);padding:10px;">加载中...</div>
                 </div>
             </div>
         </div>
@@ -1908,10 +1924,25 @@
 
         // ==================== 数据管理 ====================
         // 带重试机制的 fetch
+        // API限额监控（仅管理员可见）
+        let apiRateLimitInfo = { limit: 0, remaining: 0, reset: 0, used: 0, lastUpdate: 0 };
+
+        function updateRateLimitFromResponse(response) {
+            if (!response || !response.headers) return;
+            const limit = parseInt(response.headers.get('X-RateLimit-Limit')) || 0;
+            const remaining = parseInt(response.headers.get('X-RateLimit-Remaining')) || 0;
+            const reset = parseInt(response.headers.get('X-RateLimit-Reset')) || 0;
+            const used = parseInt(response.headers.get('X-RateLimit-Used')) || 0;
+            if (limit > 0) {
+                apiRateLimitInfo = { limit, remaining, reset, used, lastUpdate: Date.now() };
+            }
+        }
+
         async function fetchWithRetry(url, options, maxRetries = 3) {
             for (let i = 0; i < maxRetries; i++) {
                 try {
                     const response = await fetch(url, options);
+                    updateRateLimitFromResponse(response);
                     return response;
                 } catch (e) {
                     if (i === maxRetries - 1) throw e;
@@ -3570,9 +3601,13 @@
             if (chatRefreshInterval) clearInterval(chatRefreshInterval);
             function getRefreshInterval() {
                 const room = getRoomData();
-                if (!room || !room.auctions) return 15000;
-                const hasActive = room.auctions.some(a => a.status === 'active' && Date.now() < a.endTime);
-                return hasActive ? 5000 : 15000;
+                if (!room || !room.auctions) return 30000;
+                const now = Date.now();
+                const hasActive = room.auctions.some(a => a.status === 'active' && now < a.endTime);
+                const hasPresale = room.auctions.some(a => a.status === 'presale' && a.scheduledStartTime && now < a.scheduledStartTime);
+                if (hasActive) return 5000;
+                if (hasPresale) return 10000;
+                return 30000;
             }
             function doRefresh() {
                 if (!currentChatRoom) return;
@@ -3595,6 +3630,21 @@
             }
             chatRefreshCurrentInterval = getRefreshInterval();
             chatRefreshInterval = setInterval(doRefresh, chatRefreshCurrentInterval);
+            // 页面不可见时暂停刷新，可见时恢复
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            document.addEventListener('visibilitychange', handleVisibilityChange);
+        }
+
+        function handleVisibilityChange() {
+            if (document.hidden) {
+                // 页面不可见，暂停刷新
+                if (chatRefreshInterval) { clearInterval(chatRefreshInterval); chatRefreshInterval = null; }
+                if (auctionCounterInterval) { clearInterval(auctionCounterInterval); auctionCounterInterval = null; }
+            } else {
+                // 页面可见，立即刷新一次并恢复定时器
+                startChatRefresh();
+                startAuctionCountdown();
+            }
         }
 
         async function manualRefreshAuctions() {
@@ -4205,6 +4255,7 @@
             document.getElementById('adminPageGistManage').style.display = 'none';
             document.getElementById('adminPageBroadcastManage').style.display = 'none';
             document.getElementById('adminPageRoomManage').style.display = 'none';
+            document.getElementById('adminPageApiMonitor').style.display = 'none';
         }
 
         function adminShowPage(page) {
@@ -4225,6 +4276,104 @@
             } else if (page === 'roomManage') {
                 document.getElementById('adminPageRoomManage').style.display = 'block';
                 loadAllowedRoomsList();
+            } else if (page === 'apiMonitor') {
+                document.getElementById('adminPageApiMonitor').style.display = 'block';
+                refreshApiMonitor();
+            }
+        }
+
+        async function refreshApiMonitor() {
+            const content = document.getElementById('apiMonitorContent');
+            content.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,0.4);padding:10px;">查询中...</div>';
+
+            try {
+                const token = getGistToken();
+                // 直接查询GitHub API限额
+                const response = await fetch('https://api.github.com/rate_limit', {
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        ...(token && { 'Authorization': `token ${token}` })
+                    }
+                });
+                const data = await response.json();
+                const core = data.resources.core;
+                const search = data.resources.search;
+
+                const now = Math.floor(Date.now() / 1000);
+                const coreResetIn = Math.max(0, core.reset - now);
+                const searchResetIn = Math.max(0, search.reset - now);
+                const coreResetMin = Math.ceil(coreResetIn / 60);
+                const searchResetMin = Math.ceil(searchResetIn / 60);
+                const corePercent = core.limit > 0 ? (core.remaining / core.limit * 100) : 0;
+                const searchPercent = search.limit > 0 ? (search.remaining / search.limit * 100) : 0;
+
+                function barColor(percent) {
+                    if (percent > 50) return '#4ade80';
+                    if (percent > 20) return '#fbbf24';
+                    return '#ef4444';
+                }
+                function barHtml(percent, color) {
+                    return `<div style="background:rgba(255,255,255,0.1);border-radius:4px;height:8px;overflow:hidden;margin-top:4px;"><div style="width:${percent}%;background:${color};height:100%;border-radius:4px;transition:width 0.3s;"></div></div>`;
+                }
+
+                // 计算预估消耗
+                const room = getRoomData();
+                const hasActive = room && room.auctions && room.auctions.some(a => a.status === 'active' && Date.now() < a.endTime);
+                const hasPresale = room && room.auctions && room.auctions.some(a => a.status === 'presale');
+                const currentInterval = hasActive ? 5 : hasPresale ? 10 : 30;
+                const requestsPerHour = Math.floor(3600 / currentInterval);
+                const hoursLeft = requestsPerHour > 0 ? (core.remaining / requestsPerHour).toFixed(1) : '∞';
+
+                content.innerHTML = `
+                    <div style="margin-bottom:16px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                            <span style="color:#a78bfa;font-weight:600;font-size:0.9rem;">Core API</span>
+                            <span style="color:${barColor(corePercent)};font-size:0.85rem;font-weight:600;">${core.remaining} / ${core.limit}</span>
+                        </div>
+                        ${barHtml(corePercent, barColor(corePercent))}
+                        <div style="display:flex;justify-content:space-between;margin-top:4px;font-size:0.7rem;color:rgba(255,255,255,0.4);">
+                            <span>已用 ${core.used} 次</span>
+                            <span>重置: ${coreResetMin}分钟后</span>
+                        </div>
+                    </div>
+                    <div style="margin-bottom:16px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                            <span style="color:#a78bfa;font-weight:600;font-size:0.9rem;">Search API</span>
+                            <span style="color:${barColor(searchPercent)};font-size:0.85rem;font-weight:600;">${search.remaining} / ${search.limit}</span>
+                        </div>
+                        ${barHtml(searchPercent, barColor(searchPercent))}
+                        <div style="display:flex;justify-content:space-between;margin-top:4px;font-size:0.7rem;color:rgba(255,255,255,0.4);">
+                            <span>已用 ${search.used} 次</span>
+                            <span>重置: ${searchResetMin}分钟后</span>
+                        </div>
+                    </div>
+                    <div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:12px;">
+                        <div style="color:rgba(255,255,255,0.6);font-size:0.8rem;margin-bottom:8px;">预估消耗</div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                            <div style="background:rgba(0,0,0,0.2);border-radius:6px;padding:8px;text-align:center;">
+                                <div style="color:rgba(255,255,255,0.4);font-size:0.7rem;">当前刷新间隔</div>
+                                <div style="color:#4ecdc4;font-size:1rem;font-weight:600;">${currentInterval}秒</div>
+                            </div>
+                            <div style="background:rgba(0,0,0,0.2);border-radius:6px;padding:8px;text-align:center;">
+                                <div style="color:rgba(255,255,255,0.4);font-size:0.7rem;">每小时消耗</div>
+                                <div style="color:#fbbf24;font-size:1rem;font-weight:600;">${requestsPerHour}次</div>
+                            </div>
+                            <div style="background:rgba(0,0,0,0.2);border-radius:6px;padding:8px;text-align:center;">
+                                <div style="color:rgba(255,255,255,0.4);font-size:0.7rem;">1人可用时长</div>
+                                <div style="color:${parseFloat(hoursLeft) < 2 ? '#ef4444' : '#4ade80'};font-size:1rem;font-weight:600;">${hoursLeft}小时</div>
+                            </div>
+                            <div style="background:rgba(0,0,0,0.2);border-radius:6px;padding:8px;text-align:center;">
+                                <div style="color:rgba(255,255,255,0.4);font-size:0.7rem;">认证状态</div>
+                                <div style="color:${token ? '#4ade80' : '#ef4444'};font-size:0.85rem;font-weight:600;">${token ? '已认证' : '未认证'}</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="margin-top:12px;font-size:0.7rem;color:rgba(255,255,255,0.3);text-align:center;">
+                        上次更新: ${new Date().toLocaleTimeString()}
+                    </div>
+                `;
+            } catch (e) {
+                content.innerHTML = `<div style="text-align:center;color:#ef4444;padding:10px;">查询失败: ${e.message}</div>`;
             }
         }
 
