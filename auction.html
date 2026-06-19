@@ -643,6 +643,9 @@
             <div style="padding:4px 10px;background:rgba(255,215,0,0.08);border-bottom:1px solid rgba(255,215,0,0.15);font-size:0.65rem;color:rgba(255,215,0,0.9);text-align:center;line-height:1.3;">
                 📢 <b>提示：</b>多人同时拍卖可能提交失败，请查看拍主是否为自己再确认出价成功！
             </div>
+            <div style="padding:6px 10px;border-bottom:1px solid rgba(255,255,255,0.1);">
+                <input type="text" id="auctionSearchInput" placeholder="🔍 搜索品质/职业/属性/出价者..." oninput="renderAuctionsList()" style="width:100%;padding:6px 10px;border-radius:6px;border:1px solid rgba(255,215,0,0.2);background:rgba(0,0,0,0.3);color:white;font-size:0.8rem;outline:none;box-sizing:border-box;" onfocus="this.style.borderColor='rgba(255,215,0,0.5)'" onblur="this.style.borderColor='rgba(255,215,0,0.2)'">
+            </div>
             <div id="auctionsListContainer" style="flex:1;overflow-y:auto;padding:10px;"></div>
         </div>
     </div>
@@ -3082,7 +3085,32 @@
 
             // 渲染拍卖列表
             if (room.auctions && room.auctions.length > 0) {
-                html += room.auctions.slice().reverse().map(auction => {
+                // 模糊搜索过滤
+                const searchInput = document.getElementById('auctionSearchInput');
+                const keyword = searchInput ? searchInput.value.trim().toLowerCase() : '';
+                let filteredAuctions = room.auctions;
+                if (keyword) {
+                    filteredAuctions = room.auctions.filter(auction => {
+                        const highestBid = getHighestBid(auction);
+                        const searchStr = [
+                            auction.quality, auction.profession,
+                            auction.bonusDmg ? '附加' + auction.bonusDmg : '',
+                            auction.ignoreIce ? '无视' + auction.ignoreIce : '',
+                            highestBid.bidder,
+                            auction.isExchange ? '交换' : '拍卖',
+                            auction.exchangeWant || '',
+                            auction.id ? '#' + auction.id : ''
+                        ].join(' ').toLowerCase();
+                        // 模糊匹配：关键词的每个字/词都出现在搜索字符串中即可
+                        return keyword.split(/\s+/).every(kw => searchStr.includes(kw));
+                    });
+                }
+
+                if (keyword && filteredAuctions.length === 0) {
+                    html += '<div style="color:rgba(255,255,255,0.3);text-align:center;padding:15px;font-size:0.85rem;">未找到匹配的商品</div>';
+                }
+
+                html += filteredAuctions.slice().reverse().map(auction => {
                 const isEnded = auction.status === 'ended' || now >= auction.endTime;
                 const highestBid = getHighestBid(auction);
                 const currentBid = highestBid.amount;
