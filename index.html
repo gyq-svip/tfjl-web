@@ -2488,7 +2488,7 @@
     <div class="container">
         <!-- 固定头部：标题 + 公告栏 -->
         <div id="fixedHeader" style="position:sticky;top:0;z-index:100;background:linear-gradient(135deg,#0f0f23 0%,#1a1a2e 50%,#16213e 100%);padding-bottom:5px;">
-        <h1><span id="mainHeader" style="cursor:default;">🛡️</span> 塔防精灵 阵容归档</h1>
+        <h1><span id="mainHeader" style="cursor:default;">🛡️</span> 塔防助手</h1>
         <p id="mainTitle" class="instructions glowing-text" style="cursor:pointer;" onclick="refreshNewsAndTitle()" title="点击刷新公告和标题"> 支持导入脚本解析 | 阵容存储快速查看 | 活动遇到龙行麻烦投一下  </p>
         
         <!-- 滚动公告栏 -->
@@ -2976,6 +2976,8 @@
         }
 
         // 参考图片悬停预览（鼠标放到缩略图上显示大图，移开消失）
+        let refPreviewTimeout = null;
+
         function showRefPreview(index, event) {
             if (!referenceImages[index]) return;
             const img = referenceImages[index];
@@ -2987,35 +2989,15 @@
             caption.textContent = img.name || '';
             preview.classList.add('active');
 
-            function positionPreview(e) {
-                const padding = 20;
-                const previewW = Math.min(window.innerWidth * 0.65, 900);
-                const previewH = Math.min(window.innerHeight * 0.8, 800);
-                let x = e.clientX + 20;
-                let y = e.clientY + 20;
-                if (x + previewW > window.innerWidth - padding) {
-                    x = e.clientX - previewW - 20;
-                }
-                if (y + previewH > window.innerHeight - padding) {
-                    y = window.innerHeight - previewH - padding;
-                }
-                if (x < padding) x = padding;
-                if (y < padding) y = padding;
-                preview.style.left = x + 'px';
-                preview.style.top = y + 'px';
-            }
-            positionPreview(event);
-            preview._moveHandler = positionPreview;
-            document.addEventListener('mousemove', preview._moveHandler);
+            // 固定在屏幕中央显示
+            preview.style.left = '50%';
+            preview.style.top = '50%';
+            preview.style.transform = 'translate(-50%, -50%)';
         }
 
         function hideRefPreview() {
             const preview = document.getElementById('refImagePreview');
             preview.classList.remove('active');
-            if (preview._moveHandler) {
-                document.removeEventListener('mousemove', preview._moveHandler);
-                preview._moveHandler = null;
-            }
         }
 
         // ==================== 聊天室+拍卖系统 ====================
