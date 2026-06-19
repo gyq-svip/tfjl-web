@@ -95,24 +95,23 @@
             transform: translateY(0);
         }
 
-        /* 拍卖者信息切换显示 - 昵称3秒，时间2秒 */
-        @keyframes bidderFadeSwitch {
-            0%, 60% { opacity: 1; visibility: visible; }
-            61%, 100% { opacity: 0; visibility: hidden; }
-        }
-        .bidder-switch-wrap {
+        /* 拍卖者信息同时显示 */
+        .bidder-display {
             display: flex;
             flex-direction: column;
             gap: 2px;
+            text-align: right;
+            width: 100%;
         }
-        .bidder-switch-wrap > div {
-            animation: bidderFadeSwitch 5s infinite;
+        .bidder-display .bidder-name {
+            color: #ffd700;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-shadow: 0 0 6px rgba(255,215,0,0.6), 0 0 12px rgba(255,215,0,0.3);
         }
-        .bidder-switch-wrap > div:first-child {
-            animation-delay: 0s;
-        }
-        .bidder-switch-wrap > div:last-child {
-            animation-delay: -3s;
+        .bidder-display .bidder-time {
+            color: rgba(78,205,196,0.9);
+            font-size: 0.7rem;
         }
 
         body {
@@ -3128,9 +3127,9 @@
                         const ss = String(d.getSeconds()).padStart(2, '0');
                         timeStr = `${hh}:${mi}:${ss}`;
                     }
-                    bidderHtml = `<div class="bidder-switch-wrap" style="text-align:right;width:100%;">
-                        <div style="color:rgba(255,255,255,0.85);font-size:0.75rem;">👤 ${currentBidder}</div>
-                        <div style="color:rgba(78,205,196,0.95);font-size:0.7rem;">⏰ ${timeStr}</div>
+                    bidderHtml = `<div class="bidder-display">
+                        <div class="bidder-name">👤 ${currentBidder}</div>
+                        <div class="bidder-time">⏰ ${timeStr}</div>
                     </div>`;
                 }
 
