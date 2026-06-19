@@ -746,6 +746,23 @@
                         <input type="text" id="auctionExchangeWant" placeholder="例如：红色工程卡 或 金色熊猫" style="width:100%;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:white;font-size:0.8rem;outline:none;box-sizing:border-box;">
                     </div>
                 </div>
+                <div style="margin-bottom:10px;">
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                        <input type="checkbox" id="auctionIsScheduled" style="width:16px;height:16px;cursor:pointer;" onchange="toggleScheduledMode()">
+                        <span style="color:rgba(255,255,255,0.85);font-size:0.85rem;">⏰ 定时预售</span>
+                    </label>
+                    <div id="scheduledModeHint" style="display:none;margin-top:8px;padding:10px;background:rgba(168,85,247,0.1);border-left:3px solid #a855f7;border-radius:6px;">
+                        <div style="color:#a855f7;font-size:0.75rem;font-weight:500;">💡 定时预售说明</div>
+                        <div style="color:rgba(255,255,255,0.6);font-size:0.7rem;margin-top:4px;">
+                            设置开拍时间后，商品将以"预售"状态展示，大家可以看到商品信息。<br>
+                            到达设定时间后自动转为正式拍卖，届时方可出价。
+                        </div>
+                        <div style="margin-top:8px;">
+                            <label style="color:rgba(255,255,255,0.6);font-size:0.75rem;display:block;margin-bottom:4px;">开拍时间</label>
+                            <input type="datetime-local" id="auctionScheduledTime" style="width:100%;padding:6px 8px;border-radius:6px;border:1px solid rgba(168,85,247,0.3);background:rgba(0,0,0,0.4);color:white;font-size:0.85rem;outline:none;box-sizing:border-box;">
+                        </div>
+                    </div>
+                </div>
             </div>
             <!-- 求购模式表单 -->
             <div id="buyRequestModeForm" style="display:none;">
@@ -2628,6 +2645,23 @@
             document.getElementById('exchangeWantInput').style.display = isExchange ? 'block' : 'none';
         }
 
+        function toggleScheduledMode() {
+            const isScheduled = document.getElementById('auctionIsScheduled').checked;
+            const hint = document.getElementById('scheduledModeHint');
+            const timeInput = document.getElementById('auctionScheduledTime');
+            hint.style.display = isScheduled ? 'block' : 'none';
+            if (isScheduled && !timeInput.value) {
+                // 默认30分钟后
+                const defaultTime = new Date(Date.now() + 30 * 60 * 1000);
+                const yyyy = defaultTime.getFullYear();
+                const mm = String(defaultTime.getMonth() + 1).padStart(2, '0');
+                const dd = String(defaultTime.getDate()).padStart(2, '0');
+                const hh = String(defaultTime.getHours()).padStart(2, '0');
+                const mi = String(defaultTime.getMinutes()).padStart(2, '0');
+                timeInput.value = `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+            }
+        }
+
         function previewAuctionImage(input) {
             const file = input.files[0];
             if (!file) return;
@@ -2691,6 +2725,18 @@
             const durationMin = parseInt(document.getElementById('auctionDuration').value) || 60;
             const isExchange = document.getElementById('auctionIsExchange').checked;
             const exchangeWant = document.getElementById('auctionExchangeWant').value || '';
+            const isScheduled = document.getElementById('auctionIsScheduled').checked;
+            const scheduledTimeStr = document.getElementById('auctionScheduledTime').value;
+            let scheduledStartTime = null;
+            if (isScheduled && scheduledTimeStr) {
+                scheduledStartTime = new Date(scheduledTimeStr).getTime();
+                if (isNaN(scheduledStartTime) || scheduledStartTime <= Date.now()) {
+                    alert('开拍时间必须晚于当前时间');
+                    btn.disabled = false;
+                    btn.textContent = originalText;
+                    return;
+                }
+            }
 
             if (isNaN(startPrice) || startPrice < 0) { 
                 alert('请输入有效的起拍价');
@@ -2731,17 +2777,22 @@
                     startPrice: startPrice,
                     bidIncrement: bidIncrement,
                     startTime: Date.now(),
-                    endTime: Date.now() + durationMin * 60 * 1000,
+                    endTime: scheduledStartTime ? scheduledStartTime + durationMin * 60 * 1000 : Date.now() + durationMin * 60 * 1000,
                     bids: [],
-                    status: 'active',
+                    status: scheduledStartTime ? 'presale' : 'active',
                     isExchange: isExchange,
-                    exchangeWant: exchangeWant
+                    exchangeWant: exchangeWant,
+                    scheduledStartTime: scheduledStartTime
                 };
 
                 room.auctions.push(auctionData);
 
                 let msgContent = '';
-                if (isExchange) {
+                if (scheduledStartTime) {
+                    const scheduleDate = new Date(scheduledStartTime);
+                    const timeStr = `${scheduleDate.getMonth()+1}月${scheduleDate.getDate()}日 ${String(scheduleDate.getHours()).padStart(2,'0')}:${String(scheduleDate.getMinutes()).padStart(2,'0')}`;
+                    msgContent = `⏰ ${currentChatNick} 发布了预售 #${auctionId}：${quality}·${profession}${bonusDmg > 0 ? ' 附加伤害+' + bonusDmg : ''}${ignoreIce > 0 ? ' 无视冰甲+' + ignoreIce : ''}，起拍价 ${startPrice}，${timeStr}开拍`;
+                } else if (isExchange) {
                     msgContent = `🔄 ${currentChatNick} 发布了交换 #${auctionId}：${quality}·${profession}${bonusDmg > 0 ? ' 附加伤害+' + bonusDmg : ''}${ignoreIce > 0 ? ' 无视冰甲+' + ignoreIce : ''}${exchangeWant ? ' 想要：' + exchangeWant : ''}`;
                 } else {
                     msgContent = `🔨 ${currentChatNick} 发布了拍卖 #${auctionId}：${quality}·${profession}${bonusDmg > 0 ? ' 附加伤害+' + bonusDmg : ''}${ignoreIce > 0 ? ' 无视冰甲+' + ignoreIce : ''}，起拍价 ${startPrice}`;
@@ -3111,7 +3162,8 @@
                 }
 
                 html += filteredAuctions.slice().reverse().map(auction => {
-                const isEnded = auction.status === 'ended' || now >= auction.endTime;
+                const isPresale = auction.status === 'presale' || (auction.scheduledStartTime && auction.scheduledStartTime > now && auction.status !== 'ended');
+                const isEnded = auction.status === 'ended' || (!isPresale && now >= auction.endTime);
                 const highestBid = getHighestBid(auction);
                 const currentBid = highestBid.amount;
                 const currentBidder = highestBid.bidder;
@@ -3125,7 +3177,18 @@
                 const exchangeWant = auction.exchangeWant || '';
 
                 let timeHtml = '';
-                if (isEnded) {
+                if (isPresale) {
+                    const remaining = Math.max(0, auction.scheduledStartTime - now);
+                    const days = Math.floor(remaining / 86400000);
+                    const hours = Math.floor((remaining % 86400000) / 3600000);
+                    const mins = Math.floor((remaining % 3600000) / 60000);
+                    const secs = Math.floor((remaining % 60000) / 1000);
+                    let countdownStr = '';
+                    if (days > 0) countdownStr += `${days}天`;
+                    if (hours > 0 || days > 0) countdownStr += `${hours}时`;
+                    countdownStr += `${mins}分${secs}秒`;
+                    timeHtml = `<div style="color:#a855f7;font-size:0.75rem;text-align:right;" data-presale-id="${auction.id}">⏰ ${countdownStr}后开拍</div>`;
+                } else if (isEnded) {
                     timeHtml = '<div style="color:#ef4444;font-size:0.75rem;text-align:right;">已结束</div>';
                 } else {
                     const remaining = Math.max(0, auction.endTime - now);
@@ -3141,6 +3204,13 @@
                 let exchangeBadgeHtml = '';
                 if (isExchange) {
                     exchangeBadgeHtml = `<span style="background:linear-gradient(135deg,#f97316,#ea580c);color:white;padding:2px 8px;border-radius:4px;font-size:0.7rem;font-weight:600;margin-left:6px;box-shadow:0 1px 3px rgba(249,115,22,0.3);">支持交换</span>`;
+                }
+
+                let presaleBadgeHtml = '';
+                if (isPresale) {
+                    const scheduleDate = new Date(auction.scheduledStartTime);
+                    const scheduleStr = `${scheduleDate.getMonth()+1}/${scheduleDate.getDate()} ${String(scheduleDate.getHours()).padStart(2,'0')}:${String(scheduleDate.getMinutes()).padStart(2,'0')}`;
+                    presaleBadgeHtml = `<span style="background:linear-gradient(135deg,#a855f7,#7c3aed);color:white;padding:2px 8px;border-radius:4px;font-size:0.7rem;font-weight:600;margin-left:6px;box-shadow:0 1px 3px rgba(168,85,247,0.3);">⏰ 预售 ${scheduleStr}</span>`;
                 }
 
                 const imageSize = 110;
@@ -3177,18 +3247,21 @@
                 const savedValue = savedInputs[`quickBidInput_${auction.id}`] || '';
 
                 return `
-                    <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-left:4px solid ${isExchange ? '#f97316' : qualityColor};border-radius:8px;padding:10px;margin-bottom:8px;display:flex;gap:10px;align-items:flex-start;transition:all 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.07)'" onmouseout="this.style.background='rgba(255,255,255,0.04)'">
+                    <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-left:4px solid ${isPresale ? '#a855f7' : isExchange ? '#f97316' : qualityColor};border-radius:8px;padding:10px;margin-bottom:8px;display:flex;gap:10px;align-items:flex-start;transition:all 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.07)'" onmouseout="this.style.background='rgba(255,255,255,0.04)'">
                         ${imageHtml}
                         <div style="flex:1;min-width:0;padding-left:5px;">
                             <div style="display:flex;align-items:center;gap:4px;margin-bottom:3px;flex-wrap:nowrap;">
                                 <span style="color:${qualityColor};font-size:0.65rem;font-weight:700;">#${auction.id}</span>
                                 <span style="color:${qualityColor};font-size:0.65rem;font-weight:600;">${quality}·${profession}</span>
                                 ${exchangeBadgeHtml}
+                                ${presaleBadgeHtml}
                             </div>
                             <div style="margin-bottom:4px;white-space:nowrap;">${attrsHtml}</div>
                             ${exchangeWantHtml}
                             <div style="display:flex;flex-direction:column;gap:4px;min-width:0;">
-                                ${!isEnded
+                                ${isPresale
+                                    ? `<span style="padding:3px 8px;border-radius:4px;background:rgba(168,85,247,0.15);color:#a855f7;font-size:0.75rem;text-align:center;">⏰ 预售中，开拍后可出价</span>`
+                                    : !isEnded
                                     ? `<div style="display:flex;gap:3px;margin-bottom:2px;">
                                         <button onclick="event.stopPropagation();quickBid('${auction.id}',10)" style="padding:3px 8px;border-radius:4px;border:none;background:linear-gradient(135deg,#ffd700,#ff6b6b);color:#1a1a2e;cursor:pointer;font-weight:600;font-size:0.75rem;">+10</button>
                                         <button onclick="event.stopPropagation();quickBid('${auction.id}',20)" style="padding:3px 8px;border-radius:4px;border:none;background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#1a1a2e;cursor:pointer;font-weight:600;font-size:0.75rem;">+20</button>
@@ -3343,6 +3416,7 @@
                 let auction = room.auctions.find(a => a.id === auctionId);
                 if (!auction) { showBidToast('拍卖不存在', false); renderAuctionsList(); bidLock = false; return; }
                 if (auction.status === 'ended' || Date.now() >= auction.endTime) { showBidToast('拍卖已结束', false); renderAuctionsList(); renderChatMessages(); bidLock = false; return; }
+                if (auction.status === 'presale') { showBidToast('预售中，开拍后才能出价', false); renderAuctionsList(); renderChatMessages(); bidLock = false; return; }
                 if (auction.creator === currentChatNick) { showBidToast('不能竞拍自己发布的拍卖', false); renderAuctionsList(); bidLock = false; return; }
 
                 // 计算出价金额
@@ -3375,6 +3449,10 @@
                         if (!auction) break;
                         if (auction.status === 'ended' || Date.now() >= auction.endTime) {
                             showBidToast('拍卖已结束', false);
+                            break;
+                        }
+                        if (auction.status === 'presale') {
+                            showBidToast('预售中，开拍后才能出价', false);
                             break;
                         }
                     }
@@ -3590,10 +3668,20 @@
                 const now = Date.now();
                 let needRender = false;
                 room.auctions.forEach(auction => {
+                    // 预售自动转正式拍卖
+                    if (auction.status === 'presale' && auction.scheduledStartTime && now >= auction.scheduledStartTime) {
+                        auction.status = 'active';
+                        auction.startTime = now;
+                        // 如果没有设置endTime或endTime已过，设置默认拍卖时长
+                        if (!auction.endTime || auction.endTime <= now) {
+                            auction.endTime = now + 3600000; // 默认1小时
+                        }
+                        needRender = true;
+                    }
                     if (auction.status === 'active' && now >= auction.endTime) {
                         auction.status = 'ended';
                         needRender = true;
-                        
+
                         if (!room.auctionHistory) room.auctionHistory = [];
                         const highestBid = getHighestBid(auction);
                         const currentBid = highestBid.amount;
@@ -3619,6 +3707,7 @@
                     saveChatRoomData().catch(() => {});
                     renderAuctionsList();
                 }
+                // 更新拍卖倒计时
                 document.querySelectorAll('[data-auction-id]').forEach(el => {
                     const auction = room.auctions.find(a => a.id === el.dataset.auctionId);
                     if (auction && auction.status === 'active') {
@@ -3626,6 +3715,22 @@
                         const mins = Math.floor(remaining / 60000);
                         const secs = Math.floor((remaining % 60000) / 1000);
                         el.textContent = `⏳${mins}分${secs}秒`;
+                    }
+                });
+                // 更新预售倒计时
+                document.querySelectorAll('[data-presale-id]').forEach(el => {
+                    const auction = room.auctions.find(a => a.id === el.dataset.presaleId);
+                    if (auction && auction.scheduledStartTime) {
+                        const remaining = Math.max(0, auction.scheduledStartTime - now);
+                        const days = Math.floor(remaining / 86400000);
+                        const hours = Math.floor((remaining % 86400000) / 3600000);
+                        const mins = Math.floor((remaining % 3600000) / 60000);
+                        const secs = Math.floor((remaining % 60000) / 1000);
+                        let countdownStr = '';
+                        if (days > 0) countdownStr += `${days}天`;
+                        if (hours > 0 || days > 0) countdownStr += `${hours}时`;
+                        countdownStr += `${mins}分${secs}秒`;
+                        el.textContent = `⏰ ${countdownStr}后开拍`;
                     }
                 });
             }, 1000);
