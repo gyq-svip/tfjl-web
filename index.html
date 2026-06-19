@@ -19008,6 +19008,382 @@ function hasGistToken() {
             }
         }
 
+        // ==================== 图片Gist精细管理 ====================
+
+        // 全局变量：图片Gist列表
+        let _imageGistList = [];
+        let _allAuctionsMap = new Map(); // auctionId -> auction对象
+
+        // 显示图片Gist管理面板
+        function showImageGistManager() {
+            document.getElementById('adminPageGistManage').style.display = 'none';
+            document.getElementById('adminPageImageGistManage').style.display = 'block';
+        }
+
+        // 返回配置文件管理
+        function adminShowGistManage() {
+            document.getElementById('adminPageImageGistManage').style.display = 'none';
+            document.getElementById('adminPageGistManage').style.display = 'block';
+        }
+
+        // 加载所有图片Gist并分类
+        async function loadImageGists() {
+            const container = document.getElementById('imageGistListContainer');
+            const countEl = document.getElementById('imageGistCount');
+            const token = getGistToken();
+
+            if (!token) {
+                container.innerHTML = '<div style="color:#ff6b6b;text-align:center;padding:20px;">请先设置Token！</div>';
+                return;
+            }
+
+            container.innerHTML = '<div style="color:#4ade80;text-align:center;padding:20px;">⏳ 正在扫描所有Gist...</div>';
+            countEl.textContent = '';
+
+            try {
+                // 第1步：获取所有Gist（分页获取）
+                _imageGistList = [];
+                let page = 1;
+                let hasMore = true;
+                while (hasMore) {
+                    const response = await fetch(`https://api.github.com/gists?per_page=100&page=${page}`, {
+                        headers: {
+                            'Accept': 'application/vnd.github.v3+json',
+                            'Authorization': `token ${token}`
+                        }
+                    });
+                    if (!response.ok) {
+                        throw new Error(`获取Gist列表失败: ${response.status}`);
+                    }
+                    const gists = await response.json();
+                    if (gists.length === 0) {
+                        hasMore = false;
+                    } else {
+                        // 筛选图片Gist（description包含"拍卖图片"）
+                        const imageGists = gists.filter(g =>
+                            g.description && g.description.includes('拍卖图片')
+                        );
+                        _imageGistList = _imageGistList.concat(imageGists);
+                        if (gists.length < 100) hasMore = false;
+                        page++;
+                    }
+                    // 限制最多扫描5页（500个Gist）
+                    if (page > 5) hasMore = false;
+                }
+
+                // 第2步：读取所有房间的拍卖数据，建立 auctionId -> auction 的映射
+                _allAuctionsMap = new Map();
+                await buildAuctionsMap();
+
+                // 第3步：解析每个图片Gist的信息并分类
+                _imageGistList = _imageGistList.map(gist => {
+                    const info = parseImageGistInfo(gist);
+                    return { ...gist, _parsedInfo: info };
+                });
+
+                // 第4步：渲染列表
+                renderImageGistList();
+
+            } catch (error) {
+                container.innerHTML = `<div style="color:#ff6b6b;text-align:center;padding:20px;">❌ 加载失败: ${error.message}</div>`;
+            }
+        }
+
+        // 从索引文件读取所有房间的拍卖数据，建立映射
+        async function buildAuctionsMap() {
+            const token = getGistToken();
+            try {
+                // 读取索引文件
+                const indexResponse = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Authorization': `token ${token}`
+                    }
+                });
+
+                if (!indexResponse.ok) return;
+
+                const indexData = await indexResponse.json();
+                if (!indexData.files || !indexData.files['room_index.json']) return;
+
+                const index = JSON.parse(indexData.files['room_index.json'].content);
+
+                // 遍历所有房间，读取拍卖数据
+                const roomIds = Object.keys(index).filter(k =>
+                    typeof index[k] === 'string' && index[k].length > 10 && k !== 'messagesGistId'
+                );
+
+                for (const roomId of roomIds) {
+                    const roomGistId = index[roomId];
+                    try {
+                        const roomResponse = await fetch(`https://api.github.com/gists/${roomGistId}`, {
+                            headers: {
+                                'Accept': 'application/vnd.github.v3+json',
+                                'Authorization': `token ${token}`
+                            }
+                        });
+
+                        if (!roomResponse.ok) continue;
+
+                        const roomData = await roomResponse.json();
+                        const filename = `chatrooms_${roomId}.json`;
+                        const content = roomData.files[filename]?.content;
+
+                        if (!content) continue;
+
+                        const parsed = JSON.parse(content);
+                        let auctions = [];
+
+                        if (parsed.rooms && parsed.rooms[roomId]) {
+                            auctions = parsed.rooms[roomId].auctions || [];
+                        } else if (parsed.auctions) {
+                            auctions = parsed.auctions || [];
+                        }
+
+                        // 添加到映射表
+                        for (const auction of auctions) {
+                            _allAuctionsMap.set(String(auction.id), { ...auction, _roomId: roomId });
+                        }
+                    } catch (e) {
+                        console.warn(`读取房间 ${roomId} 数据失败:`, e);
+                    }
+                }
+            } catch (e) {
+                console.warn('建立拍卖映射失败:', e);
+            }
+        }
+
+        // 解析图片Gist的信息（从description和文件名提取）
+        function parseImageGistInfo(gist) {
+            const info = {
+                auctionId: null,
+                roomId: null,
+                timestamp: null,
+                status: 'unknown', // orphan / ended / active / unknown
+                statusLabel: '⚪ 未知',
+                statusColor: '#999',
+                fileSize: 0,
+                created: gist.created_at,
+                description: gist.description || ''
+            };
+
+            // 从description提取: "拍卖图片: {auctionId} (房间: {roomId})"
+            const descMatch = info.description.match(/拍卖图片:\s*(\S+)\s*\(房间:\s*(\S+)\)/);
+            if (descMatch) {
+                info.auctionId = descMatch[1];
+                info.roomId = descMatch[2];
+            }
+
+            // 从文件名提取时间戳: auction_{auctionId}_{roomId}_{timestamp}_{random}.txt
+            const files = Object.keys(gist.files || {});
+            if (files.length > 0) {
+                const filename = files[0];
+                const fileMatch = filename.match(/auction_\S+_\S+_(\d+)_\w+\.txt/);
+                if (fileMatch) {
+                    info.timestamp = parseInt(fileMatch[1]);
+                }
+                info.fileSize = gist.files[filename].size || 0;
+            }
+
+            // 判断状态：关联拍卖数据
+            if (info.auctionId) {
+                const auction = _allAuctionsMap.get(String(info.auctionId));
+                if (auction) {
+                    const now = Date.now();
+                    if (auction.status === 'ended' || (auction.endTime && now >= auction.endTime)) {
+                        info.status = 'ended';
+                        info.statusLabel = '🟡 已结束';
+                        info.statusColor = '#ffa500';
+                    } else {
+                        info.status = 'active';
+                        info.statusLabel = '🟢 在售中';
+                        info.statusColor = '#4caf50';
+                    }
+                } else {
+                    // 拍卖不存在 → 孤儿
+                    info.status = 'orphan';
+                    info.statusLabel = '🔴 孤儿';
+                    info.statusColor = '#ff6b6b';
+                }
+            }
+
+            return info;
+        }
+
+        // 渲染图片Gist列表
+        function renderImageGistList() {
+            const container = document.getElementById('imageGistListContainer');
+            const countEl = document.getElementById('imageGistCount');
+
+            const statusFilter = document.getElementById('imageGistFilter').value;
+            const timeFilter = parseInt(document.getElementById('imageGistTimeFilter').value);
+
+            // 筛选
+            let filtered = _imageGistList;
+            if (statusFilter !== 'all') {
+                filtered = filtered.filter(g => g._parsedInfo.status === statusFilter);
+            }
+            if (timeFilter > 0) {
+                const cutoff = Date.now() - timeFilter * 24 * 60 * 60 * 1000;
+                filtered = filtered.filter(g => {
+                    const t = g._parsedInfo.timestamp || new Date(g.created).getTime();
+                    return t < cutoff;
+                });
+            }
+
+            // 统计
+            const stats = {
+                orphan: _imageGistList.filter(g => g._parsedInfo.status === 'orphan').length,
+                ended: _imageGistList.filter(g => g._parsedInfo.status === 'ended').length,
+                active: _imageGistList.filter(g => g._parsedInfo.status === 'active').length,
+                unknown: _imageGistList.filter(g => g._parsedInfo.status === 'unknown').length
+            };
+            countEl.textContent = `(共${_imageGistList.length}个 | 孤儿${stats.orphan} 已结束${stats.ended} 在售${stats.active} 未知${stats.unknown} | 当前显示${filtered.length}个)`;
+
+            if (filtered.length === 0) {
+                container.innerHTML = '<div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;">没有符合条件的图片Gist</div>';
+                return;
+            }
+
+            // 按状态排序：孤儿 > 已结束 > 未知 > 在售
+            const statusOrder = { orphan: 0, ended: 1, unknown: 2, active: 3 };
+            filtered.sort((a, b) => statusOrder[a._parsedInfo.status] - statusOrder[b._parsedInfo.status]);
+
+            let html = '';
+            for (const gist of filtered) {
+                const info = gist._parsedInfo;
+                const sizeKB = (info.fileSize / 1024).toFixed(1);
+                const dateStr = info.timestamp
+                    ? new Date(info.timestamp).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+                    : new Date(gist.created).toLocaleDateString('zh-CN');
+
+                html += `<div style="background:rgba(0,0,0,0.2);border-radius:8px;padding:10px;margin-bottom:8px;border-left:3px solid ${info.statusColor};">
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <input type="checkbox" class="image-gist-checkbox" data-gist-id="${gist.id}" style="flex-shrink:0;">
+                        <div style="flex:1;min-width:0;">
+                            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
+                                <span style="color:${info.statusColor};font-weight:bold;font-size:0.85rem;">${info.statusLabel}</span>
+                                <span style="color:white;font-size:0.85rem;">拍卖#${info.auctionId || '?'}</span>
+                                <span style="color:rgba(255,255,255,0.5);font-size:0.75rem;">房间:${info.roomId || '?'}</span>
+                                <span style="color:rgba(255,255,255,0.4);font-size:0.7rem;">${dateStr}</span>
+                                <span style="color:rgba(255,255,255,0.4);font-size:0.7rem;">${sizeKB}KB</span>
+                            </div>
+                            <div style="color:rgba(255,255,255,0.3);font-size:0.7rem;font-family:monospace;">ID: ${gist.id.substring(0, 12)}...</div>
+                        </div>
+                        <a href="https://gist.github.com/${gist.id}" target="_blank" style="color:#4ade80;font-size:0.75rem;flex-shrink:0;">查看</a>
+                    </div>
+                </div>`;
+            }
+
+            container.innerHTML = html;
+        }
+
+        // 筛选图片Gist
+        function filterImageGists() {
+            renderImageGistList();
+        }
+
+        // 选中所有孤儿图片
+        function selectAllOrphanImages() {
+            const checkboxes = document.querySelectorAll('.image-gist-checkbox');
+            let orphanCount = 0;
+            checkboxes.forEach(cb => {
+                const gistId = cb.dataset.gistId;
+                const gist = _imageGistList.find(g => g.id === gistId);
+                if (gist && gist._parsedInfo.status === 'orphan') {
+                    cb.checked = true;
+                    orphanCount++;
+                } else {
+                    cb.checked = false;
+                }
+            });
+            if (orphanCount === 0) {
+                alert('当前列表中没有孤儿图片！');
+            }
+        }
+
+        // 删除选中的图片Gist
+        async function deleteSelectedImageGists() {
+            const checkboxes = document.querySelectorAll('.image-gist-checkbox:checked');
+            if (checkboxes.length === 0) {
+                alert('请先选择要删除的图片Gist！');
+                return;
+            }
+
+            const gistIds = Array.from(checkboxes).map(cb => cb.dataset.gistId);
+
+            // 预览：显示将要删除的图片信息
+            let previewHtml = '将删除以下图片Gist：\n\n';
+            let hasActive = false;
+            for (const id of gistIds) {
+                const gist = _imageGistList.find(g => g.id === id);
+                if (gist) {
+                    const info = gist._parsedInfo;
+                    previewHtml += `${info.statusLabel} 拍卖#${info.auctionId} 房间:${info.roomId}\n`;
+                    if (info.status === 'active') hasActive = true;
+                }
+            }
+            previewHtml += `\n共 ${gistIds.length} 个，删除后无法恢复！`;
+
+            // 如果有在售图片，额外警告
+            if (hasActive) {
+                if (!confirm('⚠️ 警告！\n\n选中的图片中包含"在售中"的拍卖图片！\n删除后对应的拍卖将无法显示图片！\n\n' + previewHtml)) return;
+            } else {
+                if (!confirm(previewHtml)) return;
+            }
+
+            const token = getGistToken();
+            if (!token) {
+                alert('请先设置Token！');
+                return;
+            }
+
+            const statusEl = document.getElementById('imageGistDeleteStatus');
+            statusEl.innerHTML = `<div style="color:#ffa500;font-size:0.85rem;text-align:center;padding:10px;">⏳ 正在删除 ${gistIds.length} 个图片Gist...</div>`;
+
+            let successCount = 0;
+            let failCount = 0;
+
+            for (let i = 0; i < gistIds.length; i++) {
+                try {
+                    const response = await fetch(`https://api.github.com/gists/${gistIds[i]}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Accept': 'application/vnd.github.v3+json',
+                            'Authorization': `token ${token}`
+                        }
+                    });
+
+                    if (response.ok) {
+                        successCount++;
+                        // 同时清理localStorage中的记录
+                        for (let j = localStorage.length - 1; j >= 0; j--) {
+                            const key = localStorage.key(j);
+                            if (key && localStorage.getItem(key) === gistIds[i] && key.startsWith('auction_img_gist_')) {
+                                localStorage.removeItem(key);
+                            }
+                        }
+                    } else {
+                        failCount++;
+                    }
+                } catch (e) {
+                    failCount++;
+                }
+
+                statusEl.innerHTML = `<div style="color:#ffa500;font-size:0.85rem;text-align:center;padding:10px;">⏳ 正在删除... ${i + 1}/${gistIds.length} (成功: ${successCount}, 失败: ${failCount})</div>`;
+
+                // 避免API限制
+                if (i < gistIds.length - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 300));
+                }
+            }
+
+            statusEl.innerHTML = `<div style="color:${successCount > 0 ? '#4caf50' : '#ff6b6b'};font-size:0.85rem;text-align:center;padding:10px;">✅ 删除完成！成功: ${successCount}, 失败: ${failCount}</div>`;
+
+            // 重新加载列表
+            await loadImageGists();
+        }
+
         function updateAdminTokenStatus() {
             const token = getGistToken();
             const tokenSection = document.getElementById('adminTokenSection');
@@ -21464,6 +21840,7 @@ function hasGistToken() {
                         <button class="admin-btn admin-btn-primary" onclick="deleteSelectedGists()" style="flex:1;min-width:120px;background:#ff6b6b;">🗑️ 删除选中</button>
                         <button class="admin-btn admin-btn-primary" onclick="deleteAllEmptyGists()" style="flex:1;min-width:120px;background:#ff9800;">🗑️ 删除空配置</button>
                         <button class="admin-btn admin-btn-primary" onclick="deleteAllGists()" style="flex:1;min-width:120px;background:#ff0000;">⚠️ 删除全部</button>
+                        <button class="admin-btn admin-btn-primary" onclick="showImageGistManager()" style="flex:1;min-width:120px;background:#9c27b0;">🖼️ 图片精细管理</button>
                     </div>
                 </div>
                 <div class="admin-section">
@@ -21473,6 +21850,56 @@ function hasGistToken() {
                     </div>
                 </div>
                 <div id="gistDeleteStatus" style="margin-top:10px;"></div>
+            </div>
+
+            <!-- 图片Gist精细管理面板 -->
+            <div id="adminPageImageGistManage" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
+                    <button class="admin-btn admin-btn-secondary" onclick="adminShowGistManage()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
+                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">🖼️ 图片Gist精细管理</h3>
+                </div>
+                <div style="background:rgba(156,39,176,0.1);border-left:3px solid #9c27b0;border-radius:6px;padding:12px;margin-bottom:15px;">
+                    <div style="color:#ce93d8;font-size:0.85rem;font-weight:500;">📌 图片分类说明</div>
+                    <div style="color:rgba(255,255,255,0.6);font-size:0.75rem;margin-top:5px;line-height:1.6;">
+                        🔴 <b>孤儿图片</b>：对应的拍卖已不存在（被下架/覆盖），建议删除<br>
+                        🟡 <b>已结束</b>：拍卖已到期结束，可选删除<br>
+                        🟢 <b>在售中</b>：拍卖进行中，不建议删除<br>
+                        ⚪ <b>未知</b>：无法关联到拍卖数据，谨慎处理
+                    </div>
+                </div>
+                <div class="admin-section">
+                    <h3 style="color:#ffd700;margin:0 0 10px 0;font-size:0.9rem;">筛选与操作</h3>
+                    <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center;">
+                        <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;">状态筛选:</label>
+                        <select id="imageGistFilter" onchange="filterImageGists()" style="background:rgba(0,0,0,0.3);color:white;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:4px 8px;font-size:0.8rem;">
+                            <option value="all">全部</option>
+                            <option value="orphan" style="color:#ff6b6b;">🔴 孤儿图片</option>
+                            <option value="ended" style="color:#ffa500;">🟡 已结束</option>
+                            <option value="active" style="color:#4caf50;">🟢 在售中</option>
+                            <option value="unknown" style="color:#999;">⚪ 未知</option>
+                        </select>
+                        <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;margin-left:10px;">时间筛选:</label>
+                        <select id="imageGistTimeFilter" onchange="filterImageGists()" style="background:rgba(0,0,0,0.3);color:white;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:4px 8px;font-size:0.8rem;">
+                            <option value="0">全部时间</option>
+                            <option value="1">1天前</option>
+                            <option value="3">3天前</option>
+                            <option value="7">7天前</option>
+                            <option value="30">30天前</option>
+                        </select>
+                    </div>
+                    <div style="display:flex;gap:8px;margin-bottom:15px;flex-wrap:wrap;">
+                        <button class="admin-btn admin-btn-secondary" onclick="loadImageGists()" style="flex:1;min-width:120px;">🔄 加载图片Gist</button>
+                        <button class="admin-btn admin-btn-primary" onclick="selectAllOrphanImages()" style="flex:1;min-width:120px;background:#ff6b6b;">✓ 选中所有孤儿</button>
+                        <button class="admin-btn admin-btn-primary" onclick="deleteSelectedImageGists()" style="flex:1;min-width:120px;background:#ff0000;">🗑️ 删除选中</button>
+                    </div>
+                </div>
+                <div class="admin-section">
+                    <h3 style="color:#ffd700;margin:0 0 10px 0;font-size:0.9rem;">图片列表 <span id="imageGistCount" style="color:rgba(255,255,255,0.5);font-size:0.8rem;font-weight:normal;"></span></h3>
+                    <div id="imageGistListContainer" style="max-height:500px;overflow-y:auto;">
+                        <div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;">点击"加载图片Gist"开始扫描</div>
+                    </div>
+                </div>
+                <div id="imageGistDeleteStatus" style="margin-top:10px;"></div>
             </div>
 
             <div id="adminPageCacheManage" style="display:none;">
