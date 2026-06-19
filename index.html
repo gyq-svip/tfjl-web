@@ -2945,18 +2945,6 @@
             </div>
         </div>
 
-        <!-- 参考图片预览窗（可拖拽+可调整大小） -->
-        <div id="refImagePreview">
-            <div class="preview-header">
-                <span class="preview-title" id="refImagePreviewTitle"></span>
-                <button class="preview-close" onclick="hideRefPreview()">×</button>
-            </div>
-            <div class="preview-body">
-                <img class="preview-img" id="refImagePreviewImg">
-                <div class="resize-handle"></div>
-            </div>
-        </div>
-
         <script>
         let referenceImages = [];
         let isDraggingRef = false;
@@ -3025,42 +3013,17 @@
         let previewDragOffset = { x: 0, y: 0 };
         let previewIsResizing = false;
         let previewResizeStart = { x: 0, y: 0, w: 0 };
+        let previewDragInitialized = false;
 
-        function showRefPreview(index) {
-            if (!referenceImages[index]) return;
-            const img = referenceImages[index];
+        function initPreviewDrag() {
+            if (previewDragInitialized) return;
+            previewDragInitialized = true;
+
             const preview = document.getElementById('refImagePreview');
-            const previewImg = document.getElementById('refImagePreviewImg');
-            const title = document.getElementById('refImagePreviewTitle');
+            if (!preview) return;
 
-            previewImg.src = img.data;
-            title.textContent = img.name || '';
-            preview.classList.add('active');
-
-            // 初始尺寸
-            preview.style.width = '600px';
-            previewImg.style.maxHeight = '70vh';
-
-            // 居中显示
-            const winW = window.innerWidth;
-            const winH = window.innerHeight;
-            preview.style.left = Math.max(20, (winW - 600) / 2) + 'px';
-            preview.style.top = Math.max(20, winH * 0.15) + 'px';
-        }
-
-        function hideRefPreview() {
-            document.getElementById('refImagePreview').classList.remove('active');
-        }
-
-        // ESC 关闭
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') hideRefPreview();
-        });
-
-        // 拖拽标题栏移动 + 调整大小
-        (function() {
-            const preview = document.getElementById('refImagePreview');
             const header = preview.querySelector('.preview-header');
+            const resizeHandle = preview.querySelector('.resize-handle');
 
             header.addEventListener('mousedown', function(e) {
                 if (e.target.classList.contains('preview-close')) return;
@@ -3096,8 +3059,6 @@
                 }
             });
 
-            // 调整大小
-            const resizeHandle = preview.querySelector('.resize-handle');
             resizeHandle.addEventListener('mousedown', function(e) {
                 previewIsResizing = true;
                 previewResizeStart.x = e.clientX;
@@ -3105,7 +3066,42 @@
                 e.preventDefault();
                 e.stopPropagation();
             });
-        })();
+        }
+
+        function showRefPreview(index) {
+            if (!referenceImages[index]) return;
+
+            // 初始化拖拽（首次调用时）
+            initPreviewDrag();
+
+            const img = referenceImages[index];
+            const preview = document.getElementById('refImagePreview');
+            const previewImg = document.getElementById('refImagePreviewImg');
+            const title = document.getElementById('refImagePreviewTitle');
+
+            previewImg.src = img.data;
+            title.textContent = img.name || '';
+            preview.classList.add('active');
+
+            // 初始尺寸
+            preview.style.width = '600px';
+            previewImg.style.maxHeight = '70vh';
+
+            // 居中显示
+            const winW = window.innerWidth;
+            const winH = window.innerHeight;
+            preview.style.left = Math.max(20, (winW - 600) / 2) + 'px';
+            preview.style.top = Math.max(20, winH * 0.15) + 'px';
+        }
+
+        function hideRefPreview() {
+            document.getElementById('refImagePreview').classList.remove('active');
+        }
+
+        // ESC 关闭
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') hideRefPreview();
+        });
 
         // ==================== 聊天室+拍卖系统 ====================
         const CHAT_GIST_FILE = 'chatrooms.json';
@@ -22128,5 +22124,16 @@ function hasGistToken() {
     </div><!-- end scrollableContent -->
     </div><!-- end container -->
 
+        <!-- 参考图片预览窗（悬浮在最顶层） -->
+        <div id="refImagePreview">
+            <div class="preview-header">
+                <span class="preview-title" id="refImagePreviewTitle"></span>
+                <button class="preview-close" onclick="hideRefPreview()">×</button>
+            </div>
+            <div class="preview-body">
+                <img class="preview-img" id="refImagePreviewImg">
+                <div class="resize-handle"></div>
+            </div>
+        </div>
 </body>
 </html>
