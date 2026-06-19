@@ -1870,77 +1870,6 @@
                 font-size: 0.7rem;
             }
 
-            /* 预览窗样式（可拖拽+可调整大小） */
-            #refImagePreview {
-                display: none;
-                position: fixed;
-                z-index: 99999;
-                background: rgba(0, 0, 0, 0.95);
-                border-radius: 12px;
-                box-shadow: 0 10px 50px rgba(0, 0, 0, 0.9);
-                border: 1px solid rgba(255,255,255,0.1);
-                overflow: hidden;
-                min-width: 300px;
-                min-height: 200px;
-            }
-            #refImagePreview.active {
-                display: block;
-            }
-            #refImagePreview .preview-header {
-                background: rgba(156, 39, 176, 0.8);
-                padding: 8px 12px;
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                cursor: move;
-                user-select: none;
-            }
-            #refImagePreview .preview-title {
-                color: white;
-                font-size: 0.9rem;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                white-space: nowrap;
-                flex: 1;
-                margin-right: 10px;
-            }
-            #refImagePreview .preview-close {
-                background: rgba(244, 67, 54, 0.9);
-                color: white;
-                border: none;
-                width: 28px;
-                height: 28px;
-                border-radius: 50%;
-                cursor: pointer;
-                font-size: 1.2rem;
-                line-height: 1;
-                flex-shrink: 0;
-            }
-            #refImagePreview .preview-close:hover {
-                background: rgba(244, 67, 54, 1);
-            }
-            #refImagePreview .preview-body {
-                position: relative;
-                padding: 10px;
-            }
-            #refImagePreview .preview-img {
-                max-width: 100%;
-                max-height: 70vh;
-                display: block;
-                border-radius: 6px;
-            }
-            /* 调整大小的手柄 */
-            #refImagePreview .resize-handle {
-                position: absolute;
-                right: 0;
-                bottom: 0;
-                width: 20px;
-                height: 20px;
-                cursor: se-resize;
-                background: linear-gradient(135deg, transparent 50%, rgba(156,39,176,0.8) 50%);
-                border-bottom-right-radius: 12px;
-            }
-
             /* 导入模态框移动端适配 */
             #importModal .modal-content {
                 max-width: 95%;
@@ -2971,13 +2900,24 @@
                 return;
             }
             grid.innerHTML = referenceImages.map((img, i) => `
-                <div style="position:relative;background:rgba(0,0,0,0.3);border-radius:8px;overflow:hidden;">
-                    <img src="${img.data}" style="width:100%;height:180px;object-fit:cover;display:block;cursor:pointer;"
-                         onclick="window.showRefPreview(${i})"
-                         title="${img.name || ''}">
+                <div style="position:relative;background:rgba(0,0,0,0.3);border-radius:8px;overflow:hidden;cursor:pointer;"
+                     onclick="toggleRefImageFull(${i})">
+                    <img src="${img.data}" style="width:100%;height:180px;object-fit:cover;display:block;"
+                         title="点击查看大图">
                     <button onclick="deleteRefImage(${i});event.stopPropagation();" style="position:absolute;top:5px;right:5px;background:rgba(244,67,54,0.9);border:none;color:white;border-radius:50%;width:24px;height:24px;cursor:pointer;font-size:0.8rem;">×</button>
                 </div>
+                <div id="refFull_${i}" style="display:none;margin-top:8px;background:rgba(0,0,0,0.4);border-radius:8px;padding:10px;position:relative;">
+                    <img src="${img.data}" style="width:100%;max-height:60vh;object-fit:contain;display:block;border-radius:6px;">
+                    <button onclick="toggleRefImageFull(${i});event.stopPropagation();" style="position:absolute;top:15px;right:15px;background:rgba(244,67,54,0.9);border:none;color:white;border-radius:50%;width:30px;height:30px;cursor:pointer;font-size:1.2rem;">×</button>
+                </div>
             `).join('');
+        }
+
+        function toggleRefImageFull(index) {
+            var el = document.getElementById('refFull_' + index);
+            if (el) {
+                el.style.display = el.style.display === 'none' ? 'block' : 'none';
+            }
         }
 
         function handleRefImageUpload(input) {
@@ -3007,107 +2947,6 @@
                 autoSaveProject();
             }
         }
-
-        // 参考图片预览窗（悬浮窗显示+可拖拽+可调整大小）
-        let previewIsDragging = false;
-        let previewDragOffset = { x: 0, y: 0 };
-        let previewIsResizing = false;
-        let previewResizeStart = { x: 0, y: 0, w: 0 };
-        let previewDragInitialized = false;
-
-        function initPreviewDrag() {
-            if (previewDragInitialized) return;
-            previewDragInitialized = true;
-
-            const preview = document.getElementById('refImagePreview');
-            if (!preview) return;
-
-            const header = preview.querySelector('.preview-header');
-            const resizeHandle = preview.querySelector('.resize-handle');
-
-            header.addEventListener('mousedown', function(e) {
-                if (e.target.classList.contains('preview-close')) return;
-                previewIsDragging = true;
-                previewDragOffset.x = e.clientX - preview.offsetLeft;
-                previewDragOffset.y = e.clientY - preview.offsetTop;
-                header.style.cursor = 'grabbing';
-                e.preventDefault();
-            });
-
-            document.addEventListener('mousemove', function(e) {
-                if (previewIsDragging) {
-                    let x = e.clientX - previewDragOffset.x;
-                    let y = e.clientY - previewDragOffset.y;
-                    x = Math.max(0, Math.min(x, window.innerWidth - 100));
-                    y = Math.max(0, Math.min(y, window.innerHeight - 50));
-                    preview.style.left = x + 'px';
-                    preview.style.top = y + 'px';
-                }
-                if (previewIsResizing) {
-                    const w = Math.max(300, previewResizeStart.w + (e.clientX - previewResizeStart.x));
-                    preview.style.width = w + 'px';
-                }
-            });
-
-            document.addEventListener('mouseup', function() {
-                if (previewIsDragging) {
-                    previewIsDragging = false;
-                    header.style.cursor = 'move';
-                }
-                if (previewIsResizing) {
-                    previewIsResizing = false;
-                }
-            });
-
-            resizeHandle.addEventListener('mousedown', function(e) {
-                previewIsResizing = true;
-                previewResizeStart.x = e.clientX;
-                previewResizeStart.w = preview.offsetWidth;
-                e.preventDefault();
-                e.stopPropagation();
-            });
-        }
-
-        window.showRefPreview = function(index) {
-            if (!referenceImages[index]) return;
-
-            // 初始化拖拽（首次调用时）
-            initPreviewDrag();
-
-            const img = referenceImages[index];
-            const preview = document.getElementById('refImagePreview');
-            const previewImg = document.getElementById('refImagePreviewImg');
-            const title = document.getElementById('refImagePreviewTitle');
-
-            if (!preview) {
-                console.error('预览窗元素不存在');
-                return;
-            }
-
-            previewImg.src = img.data;
-            title.textContent = img.name || '';
-            preview.classList.add('active');
-
-            // 初始尺寸
-            preview.style.width = '600px';
-            previewImg.style.maxHeight = '70vh';
-
-            // 居中显示
-            const winW = window.innerWidth;
-            const winH = window.innerHeight;
-            preview.style.left = Math.max(20, (winW - 600) / 2) + 'px';
-            preview.style.top = Math.max(20, winH * 0.15) + 'px';
-        };
-
-        window.hideRefPreview = function() {
-            const preview = document.getElementById('refImagePreview');
-            if (preview) preview.classList.remove('active');
-        };
-
-        // ESC 关闭
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') window.hideRefPreview();
-        });
 
         // ==================== 聊天室+拍卖系统 ====================
         const CHAT_GIST_FILE = 'chatrooms.json';
