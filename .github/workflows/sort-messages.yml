@@ -1,0 +1,49 @@
+name: 整理聊天消息队列
+
+# 每20分钟自动运行一次，整理所有房间的消息（去重、按时间排序）
+# 配合浏览器端的实时整理，作为后台兜底机制
+on:
+  schedule:
+    - cron: '*/20 * * * *'  # 每20分钟
+  workflow_dispatch: {}      # 支持手动触发
+
+permissions:
+  contents: read
+
+jobs:
+  sort-messages:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5  # 单次最多5分钟，防止卡死
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: 检查 Token 配置
+        run: |
+          echo "检查 GIST_TOKEN 配置..."
+          if [ -z "${{ secrets.GIST_TOKEN }}" ]; then
+            echo "❌ GIST_TOKEN 未配置，跳过执行"
+            exit 0
+          else
+            echo "✅ GIST_TOKEN 已配置"
+          fi
+
+      - name: 运行消息整理脚本
+        env:
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+          GIST_INDEX_ID: 'a32a0628bd9275f3a4922cd12cf298c9'
+        run: node scripts/sort-messages.js
+
+      - name: 输出执行摘要
+        if: always()
+        run: |
+          echo "========================================="
+          echo "消息整理任务执行完毕"
+          echo "时间: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "========================================="

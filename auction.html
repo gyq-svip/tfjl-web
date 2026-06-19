@@ -1078,6 +1078,8 @@
             // 串行加载，避免并发请求耗尽API配额
             // 优先加载用户当前房间的数据
             if (currentChatRoom) {
+                // 启动时先同步上次遗留的待发送消息（防止关页面时没同步完）
+                await syncPendingMessages(currentChatRoom).catch(() => {});
                 await fetchChatRoomData().catch(() => {});
                 renderChatMessages();
                 renderAuctionsList();
@@ -2713,27 +2715,134 @@
         }
 
         // ==================== 聊天消息 ====================
+        let messageSendLock = false; // 发送锁，防止快速连点
+
+        // 本地待发送消息队列（持久化到localStorage，防止关页面丢失）
+        // 结构: { [roomId]: [{id, author, content, time}, ...] }
+        function getPendingMessages(roomId) {
+            try {
+                return JSON.parse(localStorage.getItem(`pending_msgs_${roomId}`) || '[]');
+            } catch (e) { return []; }
+        }
+        function savePendingMessages(roomId, msgs) {
+            localStorage.setItem(`pending_msgs_${roomId}`, JSON.stringify(msgs));
+        }
+        function addPendingMessage(roomId, msg) {
+            const msgs = getPendingMessages(roomId);
+            if (!msgs.find(m => m.id === msg.id)) {
+                msgs.push(msg);
+                savePendingMessages(roomId, msgs);
+            }
+        }
+        function removePendingMessage(roomId, msgId) {
+            const msgs = getPendingMessages(roomId);
+            savePendingMessages(roomId, msgs.filter(m => m.id !== msgId));
+        }
+
         async function sendChatMessage() {
             const input = document.getElementById('chatMessageInput');
             const content = input.value.trim();
             if (!content || !currentChatRoom) return;
+            if (messageSendLock) {
+                showBidToast('正在发送中，请稍候', false);
+                return;
+            }
+            messageSendLock = true;
+
+            const btn = event?.target?.closest('button') || null;
+            const originalBtnText = btn ? btn.textContent : '';
+            if (btn) { btn.disabled = true; btn.textContent = '发送中...'; }
 
             try {
-                await fetchChatRoomData();
-                const room = ensureRoomData();
-                room.messages.push({
-                    id: 'msg_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+                const roomId = currentChatRoom || 'default';
+                const sendTime = Date.now();
+                const msgId = 'msg_' + sendTime + '_' + Math.random().toString(36).substr(2, 6);
+
+                const myMsg = {
+                    id: msgId,
                     author: currentChatNick,
                     content: content,
-                    time: Date.now()
-                });
-                if (room.messages.length > 200) room.messages = room.messages.slice(-200);
-                await saveChatRoomData();
-                input.value = '';
-                renderChatMessages();
+                    time: sendTime
+                };
+
+                // 立即放入待发送队列（持久化，防止丢失）
+                addPendingMessage(roomId, myMsg);
+
+                // 立即尝试同步一次
+                const synced = await syncPendingMessages(roomId);
+
+                if (synced) {
+                    input.value = '';
+                    renderChatMessages();
+                } else {
+                    // 同步失败也没关系，定时器会继续重试，消息已在队列里不会丢
+                    input.value = '';
+                    renderChatMessages();
+                    showBidToast('消息已暂存，正在后台同步...', true);
+                }
             } catch (error) {
-                alert('发送失败: ' + error.message);
+                showBidToast('发送失败: ' + error.message, false);
+            } finally {
+                if (btn) { btn.disabled = false; btn.textContent = originalBtnText; }
+                messageSendLock = false;
             }
+        }
+
+        // 同步待发送队列：把本地未同步的消息合并写入远程
+        // 返回 true 表示全部同步成功，false 表示部分或全部失败（留在队列里下次重试）
+        async function syncPendingMessages(roomId) {
+            const pending = getPendingMessages(roomId);
+            if (!pending || pending.length === 0) return true;
+
+            const MAX_RETRIES = 3;
+            for (let retry = 0; retry < MAX_RETRIES; retry++) {
+                try {
+                    // 重新拉取最新远程数据
+                    if (retry > 0) {
+                        localStorage.removeItem(`chatroom_gist_${roomId}`);
+                    }
+                    await fetchChatRoomData();
+                    const room = ensureRoomData();
+                    if (!room) break;
+
+                    if (!room.messages) room.messages = [];
+
+                    // 合并待发送消息（按id去重）
+                    const existingIds = new Set(room.messages.map(m => m.id));
+                    let addedCount = 0;
+                    for (const msg of pending) {
+                        if (!existingIds.has(msg.id)) {
+                            room.messages.push(msg);
+                            addedCount++;
+                        }
+                    }
+
+                    // 如果没有新消息要加（说明都已同步过），直接清空队列
+                    if (addedCount === 0) {
+                        savePendingMessages(roomId, []);
+                        return true;
+                    }
+
+                    // 按时间排序
+                    room.messages.sort((a, b) => (a.time || 0) - (b.time || 0));
+                    if (room.messages.length > 200) {
+                        room.messages = room.messages.slice(-200);
+                    }
+
+                    // 写入
+                    await saveChatRoomData();
+
+                    // 写入成功，清空队列
+                    savePendingMessages(roomId, []);
+                    return true;
+                } catch (e) {
+                    console.warn(`待发送消息同步失败(第${retry + 1}次):`, e);
+                    if (retry < MAX_RETRIES - 1) {
+                        await new Promise(r => setTimeout(r, 500 + retry * 500));
+                    }
+                }
+            }
+            return false;
         }
 
         function renderChatMessages() {
@@ -3987,7 +4096,14 @@
                 // 详情弹窗打开时也暂停
                 const detailModal = document.getElementById('auctionDetailModal');
                 if (detailModal && detailModal.style.display === 'flex') return;
-                fetchChatRoomData().then(() => {
+
+                const roomId = currentChatRoom || 'default';
+                // 先同步待发送队列（如果有未发送的消息，优先处理）
+                const hasPending = getPendingMessages(roomId).length > 0;
+
+                (hasPending ? syncPendingMessages(roomId) : Promise.resolve(true)).then(() => {
+                    return fetchChatRoomData();
+                }).then(() => {
                     renderChatMessages();
                     renderAuctionsList();
                     const newInterval = getRefreshInterval();
