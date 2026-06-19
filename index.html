@@ -19013,6 +19013,7 @@ function hasGistToken() {
         // 全局变量：图片Gist列表
         let _imageGistList = [];
         let _allAuctionsMap = new Map(); // auctionId -> auction对象
+        let _currentMessagesGistId = ''; // 当前使用的需求墙消息Gist ID
 
         // 显示图片Gist管理面板
         function showImageGistManager() {
@@ -19059,11 +19060,12 @@ function hasGistToken() {
                     if (gists.length === 0) {
                         hasMore = false;
                     } else {
-                        // 筛选图片Gist（description包含"拍卖图片"）
-                        const imageGists = gists.filter(g =>
-                            g.description && g.description.includes('拍卖图片')
+                        // 筛选图片Gist（description包含"拍卖图片"）和需求墙消息Gist（description包含"需求墙消息"）
+                        const targetGists = gists.filter(g =>
+                            (g.description && g.description.includes('拍卖图片')) ||
+                            (g.description && g.description.includes('需求墙消息'))
                         );
-                        _imageGistList = _imageGistList.concat(imageGists);
+                        _imageGistList = _imageGistList.concat(targetGists);
                         if (gists.length < 100) hasMore = false;
                         page++;
                     }
@@ -19071,11 +19073,12 @@ function hasGistToken() {
                     if (page > 5) hasMore = false;
                 }
 
-                // 第2步：读取所有房间的拍卖数据，建立 auctionId -> auction 的映射
+                // 第2步：读取所有房间的拍卖数据 + 获取当前消息Gist ID
                 _allAuctionsMap = new Map();
+                _currentMessagesGistId = '';
                 await buildAuctionsMap();
 
-                // 第3步：解析每个图片Gist的信息并分类
+                // 第3步：解析每个Gist的信息并分类
                 _imageGistList = _imageGistList.map(gist => {
                     const info = parseImageGistInfo(gist);
                     return { ...gist, _parsedInfo: info };
@@ -19108,9 +19111,12 @@ function hasGistToken() {
 
                 const index = JSON.parse(indexData.files['room_index.json'].content);
 
+                // 获取当前需求墙消息Gist ID
+                _currentMessagesGistId = index['messages'] || localStorage.getItem('messages_gist_id') || '';
+
                 // 遍历所有房间，读取拍卖数据
                 const roomIds = Object.keys(index).filter(k =>
-                    typeof index[k] === 'string' && index[k].length > 10 && k !== 'messagesGistId'
+                    typeof index[k] === 'string' && index[k].length > 10 && k !== 'messagesGistId' && k !== 'messages'
                 );
 
                 for (const roomId of roomIds) {
@@ -19148,59 +19154,168 @@ function hasGistToken() {
                         console.warn(`读取房间 ${roomId} 数据失败:`, e);
                     }
                 }
+
+                // 读取当前需求墙消息，建立 scriptUrl 集合（用于判断脚本分享Gist是否为孤儿）
+                _currentScriptUrls = new Set();
+                if (_currentMessagesGistId) {
+                    try {
+                        const msgResponse = await fetch(`https://api.github.com/gists/${_currentMessagesGistId}`, {
+                            headers: {
+                                'Accept': 'application/vnd.github.v3+json',
+                                'Authorization': `token ${token}`
+                            }
+                        });
+
+                        if (msgResponse.ok) {
+                            const msgData = await msgResponse.json();
+                            if (msgData.files && msgData.files['messages.json']) {
+                                let content = msgData.files['messages.json'].content;
+                                // 处理 truncated
+                                if (msgData.files['messages.json'].truncated || !content) {
+                                    const rawResp = await fetch(msgData.files['messages.json'].raw_url, {
+                                        headers: { ...(token && { 'Authorization': `token ${token}` }) }
+                                    });
+                                    if (rawResp.ok) content = await rawResp.text();
+                                }
+                                if (content) {
+                                    const parsed = JSON.parse(content);
+                                    const messages = parsed.messages || [];
+                                    for (const msg of messages) {
+                                        if (msg.scriptUrl) {
+                                            _currentScriptUrls.add(msg.scriptUrl);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('读取需求墙消息失败:', e);
+                    }
+                }
             } catch (e) {
                 console.warn('建立拍卖映射失败:', e);
             }
         }
 
-        // 解析图片Gist的信息（从description和文件名提取）
+        // 全局变量：当前需求墙消息中引用的scriptUrl集合
+        let _currentScriptUrls = new Set();
+
+        // 解析Gist的信息（从description和文件名提取）
         function parseImageGistInfo(gist) {
             const info = {
+                type: 'unknown', // image / message / script / unknown
+                typeLabel: '⚪ 未知',
+                typeColor: '#999',
                 auctionId: null,
                 roomId: null,
                 timestamp: null,
-                status: 'unknown', // orphan / ended / active / unknown
+                status: 'unknown', // orphan / ended / active / current / unknown
                 statusLabel: '⚪ 未知',
                 statusColor: '#999',
                 fileSize: 0,
                 created: gist.created_at,
-                description: gist.description || ''
+                description: gist.description || '',
+                fileName: ''
             };
 
-            // 从description提取: "拍卖图片: {auctionId} (房间: {roomId})"
-            const descMatch = info.description.match(/拍卖图片:\s*(\S+)\s*\(房间:\s*(\S+)\)/);
-            if (descMatch) {
-                info.auctionId = descMatch[1];
-                info.roomId = descMatch[2];
-            }
-
-            // 从文件名提取时间戳: auction_{auctionId}_{roomId}_{timestamp}_{random}.txt
             const files = Object.keys(gist.files || {});
             if (files.length > 0) {
-                const filename = files[0];
-                const fileMatch = filename.match(/auction_\S+_\S+_(\d+)_\w+\.txt/);
+                info.fileName = files[0];
+                info.fileSize = gist.files[files[0]].size || 0;
+            }
+
+            // 判断类型1：拍卖图片（description含"拍卖图片"）
+            if (info.description.includes('拍卖图片')) {
+                info.type = 'image';
+                info.typeLabel = '🖼️ 图片';
+                info.typeColor = '#9c27b0';
+
+                // 从description提取: "拍卖图片: {auctionId} (房间: {roomId})"
+                const descMatch = info.description.match(/拍卖图片:\s*(\S+)\s*\(房间:\s*(\S+)\)/);
+                if (descMatch) {
+                    info.auctionId = descMatch[1];
+                    info.roomId = descMatch[2];
+                }
+
+                // 从文件名提取时间戳: auction_{auctionId}_{roomId}_{timestamp}_{random}.txt
+                const fileMatch = info.fileName.match(/auction_\S+_\S+_(\d+)_\w+\.txt/);
                 if (fileMatch) {
                     info.timestamp = parseInt(fileMatch[1]);
                 }
-                info.fileSize = gist.files[filename].size || 0;
-            }
 
-            // 判断状态：关联拍卖数据
-            if (info.auctionId) {
-                const auction = _allAuctionsMap.get(String(info.auctionId));
-                if (auction) {
-                    const now = Date.now();
-                    if (auction.status === 'ended' || (auction.endTime && now >= auction.endTime)) {
-                        info.status = 'ended';
-                        info.statusLabel = '🟡 已结束';
-                        info.statusColor = '#ffa500';
+                // 判断状态：关联拍卖数据
+                if (info.auctionId) {
+                    const auction = _allAuctionsMap.get(String(info.auctionId));
+                    if (auction) {
+                        const now = Date.now();
+                        if (auction.status === 'ended' || (auction.endTime && now >= auction.endTime)) {
+                            info.status = 'ended';
+                            info.statusLabel = '🟡 已结束';
+                            info.statusColor = '#ffa500';
+                        } else {
+                            info.status = 'active';
+                            info.statusLabel = '🟢 在售中';
+                            info.statusColor = '#4caf50';
+                        }
                     } else {
-                        info.status = 'active';
-                        info.statusLabel = '🟢 在售中';
-                        info.statusColor = '#4caf50';
+                        // 拍卖不存在 → 孤儿
+                        info.status = 'orphan';
+                        info.statusLabel = '🔴 孤儿';
+                        info.statusColor = '#ff6b6b';
                     }
+                }
+            }
+            // 判断类型2：需求墙消息（description含"需求墙消息"）
+            else if (info.description.includes('需求墙消息')) {
+                info.type = 'message';
+                info.typeLabel = '📢 消息';
+                info.typeColor = '#2196f3';
+
+                // 判断状态：是否为当前使用的消息Gist
+                if (_currentMessagesGistId && gist.id === _currentMessagesGistId) {
+                    info.status = 'current';
+                    info.statusLabel = '🟢 当前使用';
+                    info.statusColor = '#4caf50';
                 } else {
-                    // 拍卖不存在 → 孤儿
+                    // 不是当前使用的 → 孤儿（旧的、被覆盖的）
+                    info.status = 'orphan';
+                    info.statusLabel = '🔴 孤儿';
+                    info.statusColor = '#ff6b6b';
+                }
+            }
+            // 判断类型3：脚本分享（description含"脚本分享"）
+            else if (info.description.includes('脚本分享')) {
+                info.type = 'script';
+                info.typeLabel = '📜 脚本';
+                info.typeColor = '#ff9800';
+
+                // 从description提取文件名: "脚本分享: {fileName}"
+                const scriptMatch = info.description.match(/脚本分享:\s*(.+)/);
+                if (scriptMatch) {
+                    info.fileName = scriptMatch[1].trim();
+                }
+
+                // 构建这个Gist的raw_url
+                const rawUrl = gist.files && gist.files[Object.keys(gist.files)[0]]
+                    ? gist.files[Object.keys(gist.files)[0]].raw_url
+                    : `https://gist.githubusercontent.com/${gist.id}/raw/${encodeURIComponent(info.fileName)}`;
+
+                // 判断状态：是否被当前需求墙消息引用
+                let isReferenced = false;
+                for (const url of _currentScriptUrls) {
+                    // 比较Gist ID是否匹配（scriptUrl包含Gist ID）
+                    if (url.includes(gist.id) || url.includes(encodeURIComponent(info.fileName))) {
+                        isReferenced = true;
+                        break;
+                    }
+                }
+
+                if (isReferenced) {
+                    info.status = 'active';
+                    info.statusLabel = '🟢 被引用';
+                    info.statusColor = '#4caf50';
+                } else {
+                    // 没有被引用 → 孤儿
                     info.status = 'orphan';
                     info.statusLabel = '🔴 孤儿';
                     info.statusColor = '#ff6b6b';
@@ -19215,11 +19330,15 @@ function hasGistToken() {
             const container = document.getElementById('imageGistListContainer');
             const countEl = document.getElementById('imageGistCount');
 
+            const typeFilter = document.getElementById('imageGistTypeFilter').value;
             const statusFilter = document.getElementById('imageGistFilter').value;
             const timeFilter = parseInt(document.getElementById('imageGistTimeFilter').value);
 
             // 筛选
             let filtered = _imageGistList;
+            if (typeFilter !== 'all') {
+                filtered = filtered.filter(g => g._parsedInfo.type === typeFilter);
+            }
             if (statusFilter !== 'all') {
                 filtered = filtered.filter(g => g._parsedInfo.status === statusFilter);
             }
@@ -19233,20 +19352,22 @@ function hasGistToken() {
 
             // 统计
             const stats = {
+                image: _imageGistList.filter(g => g._parsedInfo.type === 'image').length,
+                message: _imageGistList.filter(g => g._parsedInfo.type === 'message').length,
+                script: _imageGistList.filter(g => g._parsedInfo.type === 'script').length,
                 orphan: _imageGistList.filter(g => g._parsedInfo.status === 'orphan').length,
                 ended: _imageGistList.filter(g => g._parsedInfo.status === 'ended').length,
-                active: _imageGistList.filter(g => g._parsedInfo.status === 'active').length,
-                unknown: _imageGistList.filter(g => g._parsedInfo.status === 'unknown').length
+                active: _imageGistList.filter(g => g._parsedInfo.status === 'active' || g._parsedInfo.status === 'current').length,
             };
-            countEl.textContent = `(共${_imageGistList.length}个 | 孤儿${stats.orphan} 已结束${stats.ended} 在售${stats.active} 未知${stats.unknown} | 当前显示${filtered.length}个)`;
+            countEl.textContent = `(图片${stats.image} 消息${stats.message} 脚本${stats.script} | 孤儿${stats.orphan} 已结束${stats.ended} 在用${stats.active} | 显示${filtered.length}个)`;
 
             if (filtered.length === 0) {
-                container.innerHTML = '<div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;">没有符合条件的图片Gist</div>';
+                container.innerHTML = '<div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;">没有符合条件的Gist</div>';
                 return;
             }
 
-            // 按状态排序：孤儿 > 已结束 > 未知 > 在售
-            const statusOrder = { orphan: 0, ended: 1, unknown: 2, active: 3 };
+            // 按状态排序：孤儿 > 已结束 > 未知 > 在用
+            const statusOrder = { orphan: 0, ended: 1, unknown: 2, active: 3, current: 4 };
             filtered.sort((a, b) => statusOrder[a._parsedInfo.status] - statusOrder[b._parsedInfo.status]);
 
             let html = '';
@@ -19257,18 +19378,29 @@ function hasGistToken() {
                     ? new Date(info.timestamp).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
                     : new Date(gist.created).toLocaleDateString('zh-CN');
 
+                // 根据类型显示不同的信息
+                let detailHtml = '';
+                if (info.type === 'image') {
+                    detailHtml = `<span style="color:white;font-size:0.85rem;">拍卖#${info.auctionId || '?'}</span>
+                        <span style="color:rgba(255,255,255,0.5);font-size:0.75rem;">房间:${info.roomId || '?'}</span>`;
+                } else if (info.type === 'message') {
+                    detailHtml = `<span style="color:white;font-size:0.85rem;">需求墙消息Gist</span>`;
+                } else if (info.type === 'script') {
+                    detailHtml = `<span style="color:white;font-size:0.85rem;">${info.fileName || '脚本文件'}</span>`;
+                }
+
                 html += `<div style="background:rgba(0,0,0,0.2);border-radius:8px;padding:10px;margin-bottom:8px;border-left:3px solid ${info.statusColor};">
                     <div style="display:flex;align-items:center;gap:10px;">
                         <input type="checkbox" class="image-gist-checkbox" data-gist-id="${gist.id}" style="flex-shrink:0;">
                         <div style="flex:1;min-width:0;">
                             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
+                                <span style="color:${info.typeColor};font-weight:bold;font-size:0.8rem;">${info.typeLabel}</span>
                                 <span style="color:${info.statusColor};font-weight:bold;font-size:0.85rem;">${info.statusLabel}</span>
-                                <span style="color:white;font-size:0.85rem;">拍卖#${info.auctionId || '?'}</span>
-                                <span style="color:rgba(255,255,255,0.5);font-size:0.75rem;">房间:${info.roomId || '?'}</span>
+                                ${detailHtml}
                                 <span style="color:rgba(255,255,255,0.4);font-size:0.7rem;">${dateStr}</span>
                                 <span style="color:rgba(255,255,255,0.4);font-size:0.7rem;">${sizeKB}KB</span>
                             </div>
-                            <div style="color:rgba(255,255,255,0.3);font-size:0.7rem;font-family:monospace;">ID: ${gist.id.substring(0, 12)}...</div>
+                            <div style="color:rgba(255,255,255,0.3);font-size:0.7rem;font-family:monospace;">ID: ${gist.id.substring(0, 12)}... | ${info.description.substring(0, 40)}</div>
                         </div>
                         <a href="https://gist.github.com/${gist.id}" target="_blank" style="color:#4ade80;font-size:0.75rem;flex-shrink:0;">查看</a>
                     </div>
@@ -21840,7 +21972,7 @@ function hasGistToken() {
                         <button class="admin-btn admin-btn-primary" onclick="deleteSelectedGists()" style="flex:1;min-width:120px;background:#ff6b6b;">🗑️ 删除选中</button>
                         <button class="admin-btn admin-btn-primary" onclick="deleteAllEmptyGists()" style="flex:1;min-width:120px;background:#ff9800;">🗑️ 删除空配置</button>
                         <button class="admin-btn admin-btn-primary" onclick="deleteAllGists()" style="flex:1;min-width:120px;background:#ff0000;">⚠️ 删除全部</button>
-                        <button class="admin-btn admin-btn-primary" onclick="showImageGistManager()" style="flex:1;min-width:120px;background:#9c27b0;">🖼️ 图片精细管理</button>
+                        <button class="admin-btn admin-btn-primary" onclick="showImageGistManager()" style="flex:1;min-width:120px;background:#9c27b0;">🗂️ Gist精细管理</button>
                     </div>
                 </div>
                 <div class="admin-section">
@@ -21856,29 +21988,36 @@ function hasGistToken() {
             <div id="adminPageImageGistManage" style="display:none;">
                 <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
                     <button class="admin-btn admin-btn-secondary" onclick="adminShowGistManage()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
-                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">🖼️ 图片Gist精细管理</h3>
+                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">🗂️ Gist精细管理</h3>
                 </div>
                 <div style="background:rgba(156,39,176,0.1);border-left:3px solid #9c27b0;border-radius:6px;padding:12px;margin-bottom:15px;">
-                    <div style="color:#ce93d8;font-size:0.85rem;font-weight:500;">📌 图片分类说明</div>
+                    <div style="color:#ce93d8;font-size:0.85rem;font-weight:500;">📌 Gist分类说明</div>
                     <div style="color:rgba(255,255,255,0.6);font-size:0.75rem;margin-top:5px;line-height:1.6;">
-                        🔴 <b>孤儿图片</b>：对应的拍卖已不存在（被下架/覆盖），建议删除<br>
-                        🟡 <b>已结束</b>：拍卖已到期结束，可选删除<br>
-                        🟢 <b>在售中</b>：拍卖进行中，不建议删除<br>
-                        ⚪ <b>未知</b>：无法关联到拍卖数据，谨慎处理
+                        <b>类型：</b>🖼️ 拍卖图片 | 📢 需求墙消息 | 📜 脚本分享<br>
+                        <b>状态：</b>🔴 孤儿（建议删除）| 🟡 已结束（可选删除）| 🟢 在用（不建议删除）| ⚪ 未知（谨慎处理）<br>
+                        <span style="color:#ff6b6b;">孤儿 = 对应的拍卖/消息已不存在，但文件还在占用空间</span>
                     </div>
                 </div>
                 <div class="admin-section">
                     <h3 style="color:#ffd700;margin:0 0 10px 0;font-size:0.9rem;">筛选与操作</h3>
                     <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center;">
-                        <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;">状态筛选:</label>
+                        <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;">类型:</label>
+                        <select id="imageGistTypeFilter" onchange="filterImageGists()" style="background:rgba(0,0,0,0.3);color:white;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:4px 8px;font-size:0.8rem;">
+                            <option value="all">全部类型</option>
+                            <option value="image" style="color:#9c27b0;">🖼️ 拍卖图片</option>
+                            <option value="message" style="color:#2196f3;">📢 需求墙消息</option>
+                            <option value="script" style="color:#ff9800;">📜 脚本分享</option>
+                        </select>
+                        <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;margin-left:10px;">状态:</label>
                         <select id="imageGistFilter" onchange="filterImageGists()" style="background:rgba(0,0,0,0.3);color:white;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:4px 8px;font-size:0.8rem;">
-                            <option value="all">全部</option>
-                            <option value="orphan" style="color:#ff6b6b;">🔴 孤儿图片</option>
+                            <option value="all">全部状态</option>
+                            <option value="orphan" style="color:#ff6b6b;">🔴 孤儿（建议删除）</option>
                             <option value="ended" style="color:#ffa500;">🟡 已结束</option>
-                            <option value="active" style="color:#4caf50;">🟢 在售中</option>
+                            <option value="active" style="color:#4caf50;">🟢 在售/被引用</option>
+                            <option value="current" style="color:#4caf50;">🟢 当前使用</option>
                             <option value="unknown" style="color:#999;">⚪ 未知</option>
                         </select>
-                        <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;margin-left:10px;">时间筛选:</label>
+                        <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;margin-left:10px;">时间:</label>
                         <select id="imageGistTimeFilter" onchange="filterImageGists()" style="background:rgba(0,0,0,0.3);color:white;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:4px 8px;font-size:0.8rem;">
                             <option value="0">全部时间</option>
                             <option value="1">1天前</option>
@@ -21888,15 +22027,15 @@ function hasGistToken() {
                         </select>
                     </div>
                     <div style="display:flex;gap:8px;margin-bottom:15px;flex-wrap:wrap;">
-                        <button class="admin-btn admin-btn-secondary" onclick="loadImageGists()" style="flex:1;min-width:120px;">🔄 加载图片Gist</button>
+                        <button class="admin-btn admin-btn-secondary" onclick="loadImageGists()" style="flex:1;min-width:120px;">🔄 加载Gist</button>
                         <button class="admin-btn admin-btn-primary" onclick="selectAllOrphanImages()" style="flex:1;min-width:120px;background:#ff6b6b;">✓ 选中所有孤儿</button>
                         <button class="admin-btn admin-btn-primary" onclick="deleteSelectedImageGists()" style="flex:1;min-width:120px;background:#ff0000;">🗑️ 删除选中</button>
                     </div>
                 </div>
                 <div class="admin-section">
-                    <h3 style="color:#ffd700;margin:0 0 10px 0;font-size:0.9rem;">图片列表 <span id="imageGistCount" style="color:rgba(255,255,255,0.5);font-size:0.8rem;font-weight:normal;"></span></h3>
+                    <h3 style="color:#ffd700;margin:0 0 10px 0;font-size:0.9rem;">Gist列表 <span id="imageGistCount" style="color:rgba(255,255,255,0.5);font-size:0.8rem;font-weight:normal;"></span></h3>
                     <div id="imageGistListContainer" style="max-height:500px;overflow-y:auto;">
-                        <div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;">点击"加载图片Gist"开始扫描</div>
+                        <div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;">点击"加载Gist"开始扫描所有Gist文件</div>
                     </div>
                 </div>
                 <div id="imageGistDeleteStatus" style="margin-top:10px;"></div>
