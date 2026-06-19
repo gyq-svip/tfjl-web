@@ -3355,11 +3355,12 @@
                     if (!auction.bids) auction.bids = [];
                     auction.bids.push(newBid);
 
-                    // 延时加价（最后30秒出价延长结束时间）
-                    const EXTEND_TIME = 30 * 1000;
+                    // 延时加价（最后60秒内出价延长结束时间60秒）
+                    const EXTEND_TIME = 60 * 1000;
+                    const EXTEND_THRESHOLD = 60 * 1000;
                     const now = Date.now();
-                    if (auction.endTime > now) {
-                        auction.endTime += EXTEND_TIME;
+                    if (auction.endTime - now < EXTEND_THRESHOLD && auction.endTime > now - 10000) {
+                        auction.endTime = Math.max(auction.endTime, now) + EXTEND_TIME;
                     }
 
                     // 添加系统消息
