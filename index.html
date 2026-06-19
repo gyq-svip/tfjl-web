@@ -1869,7 +1869,105 @@
             .ref-image-item .ref-image-name {
                 font-size: 0.7rem;
             }
-            
+
+            /* 灯箱样式 */
+            #lightbox {
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.95);
+                z-index: 99999;
+                align-items: center;
+                justify-content: center;
+                flex-direction: column;
+            }
+            #lightbox.active {
+                display: flex;
+            }
+            #lightboxImage {
+                max-width: 90vw;
+                max-height: 80vh;
+                transition: transform 0.3s ease;
+                box-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
+                border-radius: 8px;
+            }
+            #lightboxControls {
+                position: absolute;
+                top: 20px;
+                left: 0;
+                right: 0;
+                display: flex;
+                justify-content: center;
+                gap: 10px;
+                z-index: 10;
+            }
+            .lightbox-btn {
+                background: rgba(156, 39, 176, 0.8);
+                color: white;
+                border: none;
+                padding: 8px 14px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-size: 0.95rem;
+                transition: background 0.2s;
+            }
+            .lightbox-btn:hover {
+                background: rgba(156, 39, 176, 1);
+            }
+            #lightboxClose {
+                position: absolute;
+                top: 20px;
+                right: 20px;
+                background: rgba(244, 67, 54, 0.8);
+                color: white;
+                border: none;
+                width: 40px;
+                height: 40px;
+                border-radius: 50%;
+                cursor: pointer;
+                font-size: 1.5rem;
+                z-index: 10;
+            }
+            #lightboxClose:hover {
+                background: rgba(244, 67, 54, 1);
+            }
+            #lightboxNav {
+                position: absolute;
+                top: 50%;
+                transform: translateY(-50%);
+                width: 100%;
+                display: flex;
+                justify-content: space-between;
+                padding: 0 30px;
+                box-sizing: border-box;
+                z-index: 5;
+            }
+            .lightbox-nav-btn {
+                background: rgba(156, 39, 176, 0.7);
+                color: white;
+                border: none;
+                width: 50px;
+                height: 50px;
+                border-radius: 50%;
+                cursor: pointer;
+                font-size: 1.5rem;
+                transition: background 0.2s;
+            }
+            .lightbox-nav-btn:hover {
+                background: rgba(156, 39, 176, 1);
+            }
+            #lightboxInfo {
+                position: absolute;
+                bottom: 30px;
+                color: white;
+                font-size: 0.9rem;
+                text-align: center;
+                z-index: 10;
+            }
+
             /* 导入模态框移动端适配 */
             #importModal .modal-content {
                 max-width: 95%;
@@ -2879,6 +2977,24 @@
             </div>
         </div>
 
+        <!-- 灯箱大图查看器 -->
+        <div id="lightbox">
+            <button id="lightboxClose" onclick="closeLightbox()">×</button>
+            <div id="lightboxControls">
+                <button class="lightbox-btn" onclick="zoomInLightbox()">🔍+ 放大</button>
+                <button class="lightbox-btn" onclick="zoomOutLightbox()">🔍- 缩小</button>
+                <button class="lightbox-btn" onclick="rotateLightbox()">🔄 旋转</button>
+                <button class="lightbox-btn" onclick="resetLightbox()">↺ 重置</button>
+                <button class="lightbox-btn" onclick="downloadLightboxImage()">⬇ 下载</button>
+            </div>
+            <div id="lightboxNav">
+                <button class="lightbox-nav-btn" onclick="prevLightboxImage()">←</button>
+                <button class="lightbox-nav-btn" onclick="nextLightboxImage()">→</button>
+            </div>
+            <img id="lightboxImage" onclick="closeLightbox()">
+            <div id="lightboxInfo"></div>
+        </div>
+
         <script>
         let referenceImages = [];
         let isDraggingRef = false;
@@ -2906,7 +3022,7 @@
             }
             grid.innerHTML = referenceImages.map((img, i) => `
                 <div style="position:relative;background:rgba(0,0,0,0.3);border-radius:8px;overflow:hidden;">
-                    <img src="${img.data}" style="width:100%;height:180px;object-fit:cover;cursor:pointer;" onclick="previewRefImage(${i})">
+                    <img src="${img.data}" style="width:100%;height:180px;object-fit:cover;cursor:pointer;" onclick="openLightbox(${i})" title="点击查看大图">
                     <button onclick="deleteRefImage(${i})" style="position:absolute;top:5px;right:5px;background:rgba(244,67,54,0.9);border:none;color:white;border-radius:50%;width:24px;height:24px;cursor:pointer;font-size:0.8rem;">×</button>
                 </div>
             `).join('');
@@ -2940,18 +3056,130 @@
             }
         }
 
-        function previewRefImage(index) {
-            const img = referenceImages[index];
-            if (!img) return;
-            const content = document.getElementById('referencePanelContent');
-            content.innerHTML = `
-                <div style="text-align:center;margin-bottom:10px;">
-                    <button onclick="showRefImageList()" style="background:#666;color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;">← 返回列表</button>
-                </div>
-                <img src="${img.data}" style="max-width:100%;max-height:calc(100% - 50px);object-fit:contain;border-radius:8px;cursor:pointer;" onclick="showRefImageList()">
-                <div style="margin-top:10px;color:rgba(255,255,255,0.7);font-size:0.85rem;text-align:center;">${img.name}</div>
-            `;
+        // 灯箱大图查看功能
+        let currentLightboxIndex = 0;
+        let lightboxScale = 1;
+        let lightboxRotate = 0;
+
+        function openLightbox(index) {
+            if (referenceImages.length === 0) return;
+            currentLightboxIndex = index;
+            lightboxScale = 1;
+            lightboxRotate = 0;
+            updateLightboxImage();
+            document.getElementById('lightbox').classList.add('active');
         }
+
+        function closeLightbox() {
+            document.getElementById('lightbox').classList.remove('active');
+        }
+
+        function updateLightboxImage() {
+            const img = referenceImages[currentLightboxIndex];
+            if (!img) return;
+            const lightboxImg = document.getElementById('lightboxImage');
+            lightboxImg.src = img.data;
+            lightboxImg.style.transform = `scale(${lightboxScale}) rotate(${lightboxRotate}deg)`;
+            document.getElementById('lightboxInfo').textContent = `${img.name}  (${currentLightboxIndex + 1}/${referenceImages.length})`;
+        }
+
+        function zoomInLightbox() {
+            lightboxScale = Math.min(lightboxScale + 0.2, 3);
+            const img = document.getElementById('lightboxImage');
+            img.style.transform = `scale(${lightboxScale}) rotate(${lightboxRotate}deg)`;
+        }
+
+        function zoomOutLightbox() {
+            lightboxScale = Math.max(lightboxScale - 0.2, 0.5);
+            const img = document.getElementById('lightboxImage');
+            img.style.transform = `scale(${lightboxScale}) rotate(${lightboxRotate}deg)`;
+        }
+
+        function rotateLightbox() {
+            lightboxRotate = (lightboxRotate + 90) % 360;
+            const img = document.getElementById('lightboxImage');
+            img.style.transform = `scale(${lightboxScale}) rotate(${lightboxRotate}deg)`;
+        }
+
+        function resetLightbox() {
+            lightboxScale = 1;
+            lightboxRotate = 0;
+            const img = document.getElementById('lightboxImage');
+            img.style.transform = `scale(${lightboxScale}) rotate(${lightboxRotate}deg)`;
+        }
+
+        function nextLightboxImage() {
+            currentLightboxIndex = (currentLightboxIndex + 1) % referenceImages.length;
+            lightboxScale = 1;
+            lightboxRotate = 0;
+            updateLightboxImage();
+        }
+
+        function prevLightboxImage() {
+            currentLightboxIndex = (currentLightboxIndex - 1 + referenceImages.length) % referenceImages.length;
+            lightboxScale = 1;
+            lightboxRotate = 0;
+            updateLightboxImage();
+        }
+
+        function downloadLightboxImage() {
+            const img = referenceImages[currentLightboxIndex];
+            if (!img) return;
+            const link = document.createElement('a');
+            link.href = img.data;
+            link.download = img.name || 'reference-image.png';
+            link.click();
+        }
+
+        // 键盘控制
+        document.addEventListener('keydown', function(e) {
+            const lightbox = document.getElementById('lightbox');
+            if (!lightbox.classList.contains('active')) return;
+
+            switch(e.key) {
+                case 'Escape':
+                    closeLightbox();
+                    break;
+                case 'ArrowLeft':
+                    prevLightboxImage();
+                    break;
+                case 'ArrowRight':
+                    nextLightboxImage();
+                    break;
+                case '+':
+                case '=':
+                    zoomInLightbox();
+                    break;
+                case '-':
+                    zoomOutLightbox();
+                    break;
+                case 'r':
+                case 'R':
+                    rotateLightbox();
+                    break;
+                case '0':
+                    resetLightbox();
+                    break;
+            }
+        });
+
+        // 鼠标滚轮缩放
+        document.getElementById('lightbox').addEventListener('wheel', function(e) {
+            if (!this.classList.contains('active')) return;
+            e.preventDefault();
+            if (e.deltaY < 0) {
+                zoomInLightbox();
+            } else {
+                zoomOutLightbox();
+            }
+        });
+
+        // 点击背景关闭灯箱
+        document.getElementById('lightbox').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeLightbox();
+            }
+        });
 
         // ==================== 聊天室+拍卖系统 ====================
         const CHAT_GIST_FILE = 'chatrooms.json';
