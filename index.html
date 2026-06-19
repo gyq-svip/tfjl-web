@@ -18677,8 +18677,9 @@ function hasGistToken() {
 
         // 删除单个Gist
         async function deleteSingleGist(gistId) {
-            if (PROTECTED_GIST_IDS.has(gistId)) {
-                alert('⚠️ 核心Gist禁止删除！（索引/消息/计数器）');
+            const protectedIds = await getProtectedGistIds();
+            if (protectedIds.has(gistId)) {
+                alert('⚠️ 核心Gist禁止删除！（索引/消息/计数器/聊天室）');
                 return;
             }
             if (!confirm('确定要删除这个配置文件吗？')) return;
@@ -18723,11 +18724,71 @@ function hasGistToken() {
 
         // 删除选中的Gist
         // 核心Gist白名单，禁止删除
-        const PROTECTED_GIST_IDS = new Set([
+        const STATIC_PROTECTED_GIST_IDS = new Set([
             'a32a0628bd9275f3a4922cd12cf298c9', // 索引Gist
-            'a4591ac2200b7638d51ae4c0155d7851', // 消息Gist
             'e1bd9a5139e1c4e011bfea707e917d61'  // 计数器Gist
         ]);
+
+        // 动态获取所有受保护的Gist ID（索引Gist + 计数器Gist + 消息Gist + 所有聊天室Gist）
+        async function getProtectedGistIds() {
+            const protectedIds = new Set(STATIC_PROTECTED_GIST_IDS);
+            const token = getGistToken();
+            if (!token) return protectedIds;
+
+            try {
+                // 1. 读取索引文件，获取所有聊天室Gist ID
+                const indexResponse = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Authorization': `token ${token}`
+                    }
+                });
+
+                if (indexResponse.ok) {
+                    const indexData = await indexResponse.json();
+                    if (indexData.files && indexData.files['room_index.json'] && indexData.files['room_index.json'].content) {
+                        try {
+                            const index = JSON.parse(indexData.files['room_index.json'].content);
+
+                            // 2. 添加所有聊天室Gist ID（索引中所有值为字符串的key）
+                            for (const key in index) {
+                                if (typeof index[key] === 'string' && index[key].length > 10) {
+                                    protectedIds.add(index[key]);
+                                }
+                            }
+
+                            // 3. 添加消息Gist ID（如果索引里记录了）
+                            if (index.messagesGistId && typeof index.messagesGistId === 'string') {
+                                protectedIds.add(index.messagesGistId);
+                            }
+                        } catch (e) {
+                            console.warn('解析索引文件失败，仅使用静态保护列表:', e);
+                        }
+                    }
+                }
+
+                // 4. 添加localStorage中记录的消息Gist ID
+                const localMsgGistId = localStorage.getItem('messages_gist_id');
+                if (localMsgGistId && localMsgGistId.length > 10) {
+                    protectedIds.add(localMsgGistId);
+                }
+
+                // 5. 添加localStorage中记录的所有聊天室Gist ID
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && key.startsWith('chatroom_gist_')) {
+                        const roomGistId = localStorage.getItem(key);
+                        if (roomGistId && roomGistId.length > 10) {
+                            protectedIds.add(roomGistId);
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn('获取受保护Gist列表失败，仅使用静态保护列表:', e);
+            }
+
+            return protectedIds;
+        }
 
         async function deleteSelectedGists() {
             const checkboxes = document.querySelectorAll('.gist-checkbox:checked');
@@ -18744,15 +18805,18 @@ function hasGistToken() {
                 return;
             }
 
-            const gistIds = Array.from(checkboxes).map(cb => cb.dataset.gistId).filter(id => !PROTECTED_GIST_IDS.has(id));
-            const protectedCount = Array.from(checkboxes).map(cb => cb.dataset.gistId).filter(id => PROTECTED_GIST_IDS.has(id)).length;
-            
+            // 动态获取受保护的Gist ID
+            const protectedIds = await getProtectedGistIds();
+            const allSelectedIds = Array.from(checkboxes).map(cb => cb.dataset.gistId);
+            const gistIds = allSelectedIds.filter(id => !protectedIds.has(id));
+            const protectedCount = allSelectedIds.length - gistIds.length;
+
             if (gistIds.length === 0) {
-                alert('选中的都是核心Gist，禁止删除！');
+                alert('选中的都是核心Gist（索引/消息/计数器/聊天室），禁止删除！');
                 return;
             }
             if (protectedCount > 0) {
-                if (!confirm(`选中的 ${protectedCount} 个核心Gist已自动跳过（索引/消息/计数器），将删除其余 ${gistIds.length} 个文件。确定吗？`)) return;
+                if (!confirm(`选中的 ${protectedCount} 个核心Gist已自动跳过（索引/消息/计数器/聊天室），将删除其余 ${gistIds.length} 个文件。确定吗？`)) return;
             }
             
             showGistDeleteStatus(`⏳ 正在删除 ${gistIds.length} 个配置文件...`, '#ffa500');
@@ -18814,7 +18878,8 @@ function hasGistToken() {
                 emptyCheckboxes.forEach(cb => cb.checked = true);
             }
 
-            const gistIds = Array.from(document.querySelectorAll('.gist-checkbox[data-empty="true"]:checked')).map(cb => cb.dataset.gistId).filter(id => !PROTECTED_GIST_IDS.has(id));
+            const protectedIds = await getProtectedGistIds();
+            const gistIds = Array.from(document.querySelectorAll('.gist-checkbox[data-empty="true"]:checked')).map(cb => cb.dataset.gistId).filter(id => !protectedIds.has(id));
             
             if (gistIds.length === 0) {
                 alert('没有可删除的空配置文件（核心Gist受保护）！');
@@ -18872,20 +18937,23 @@ function hasGistToken() {
             const checkboxes = document.querySelectorAll('.gist-checkbox:checked');
             let gistIds;
 
+            // 动态获取受保护的Gist ID
+            const protectedIds = await getProtectedGistIds();
+
             if (checkboxes.length === 0) {
                 // 如果没有选中，删除所有（跳过核心Gist）
                 const allIds = (window.currentGistList || []).map(g => g.id);
-                gistIds = allIds.filter(id => !PROTECTED_GIST_IDS.has(id));
+                gistIds = allIds.filter(id => !protectedIds.has(id));
                 const skipped = allIds.length - gistIds.length;
                 if (gistIds.length === 0) {
                     alert('没有可删除的配置文件（核心Gist受保护）！');
                     return;
                 }
-                if (!confirm(`没有选中任何文件，将删除 ${gistIds.length} 个非核心配置文件（已跳过 ${skipped} 个核心Gist）。确定吗？`)) return;
+                if (!confirm(`没有选中任何文件，将删除 ${gistIds.length} 个非核心配置文件（已跳过 ${skipped} 个核心Gist：索引/消息/计数器/聊天室）。确定吗？`)) return;
             } else {
-                gistIds = Array.from(checkboxes).map(cb => cb.dataset.gistId).filter(id => !PROTECTED_GIST_IDS.has(id));
+                gistIds = Array.from(checkboxes).map(cb => cb.dataset.gistId).filter(id => !protectedIds.has(id));
                 if (gistIds.length === 0) {
-                    alert('选中的都是核心Gist，禁止删除！');
+                    alert('选中的都是核心Gist（索引/消息/计数器/聊天室），禁止删除！');
                     return;
                 }
             }
