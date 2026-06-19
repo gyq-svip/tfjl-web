@@ -3020,11 +3020,11 @@
             }
         }
 
-        // 参考图片预览窗（可拖拽+可调整大小）
+        // 参考图片预览窗（悬浮窗显示+可拖拽+可调整大小）
         let previewIsDragging = false;
         let previewDragOffset = { x: 0, y: 0 };
         let previewIsResizing = false;
-        let previewResizeStart = { x: 0, y: 0, w: 0, h: 0 };
+        let previewResizeStart = { x: 0, y: 0, w: 0 };
 
         function showRefPreview(index) {
             if (!referenceImages[index]) return;
@@ -3044,29 +3044,20 @@
             // 居中显示
             const winW = window.innerWidth;
             const winH = window.innerHeight;
-            preview.style.left = Math.max(0, (winW - 600) / 2) + 'px';
-            preview.style.top = Math.max(0, (winH * 0.15)) + 'px';
+            preview.style.left = Math.max(20, (winW - 600) / 2) + 'px';
+            preview.style.top = Math.max(20, winH * 0.15) + 'px';
         }
 
         function hideRefPreview() {
             document.getElementById('refImagePreview').classList.remove('active');
         }
 
-        // 点击空白处关闭
-        document.addEventListener('click', function(e) {
-            const preview = document.getElementById('refImagePreview');
-            if (!preview.classList.contains('active')) return;
-            if (!preview.contains(e.target)) {
-                hideRefPreview();
-            }
-        });
-
         // ESC 关闭
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') hideRefPreview();
         });
 
-        // 拖拽标题栏移动
+        // 拖拽标题栏移动 + 调整大小
         (function() {
             const preview = document.getElementById('refImagePreview');
             const header = preview.querySelector('.preview-header');
@@ -3081,19 +3072,27 @@
             });
 
             document.addEventListener('mousemove', function(e) {
-                if (!previewIsDragging) return;
-                let x = e.clientX - previewDragOffset.x;
-                let y = e.clientY - previewDragOffset.y;
-                x = Math.max(0, Math.min(x, window.innerWidth - 100));
-                y = Math.max(0, Math.min(y, window.innerHeight - 50));
-                preview.style.left = x + 'px';
-                preview.style.top = y + 'px';
+                if (previewIsDragging) {
+                    let x = e.clientX - previewDragOffset.x;
+                    let y = e.clientY - previewDragOffset.y;
+                    x = Math.max(0, Math.min(x, window.innerWidth - 100));
+                    y = Math.max(0, Math.min(y, window.innerHeight - 50));
+                    preview.style.left = x + 'px';
+                    preview.style.top = y + 'px';
+                }
+                if (previewIsResizing) {
+                    const w = Math.max(300, previewResizeStart.w + (e.clientX - previewResizeStart.x));
+                    preview.style.width = w + 'px';
+                }
             });
 
             document.addEventListener('mouseup', function() {
                 if (previewIsDragging) {
                     previewIsDragging = false;
                     header.style.cursor = 'move';
+                }
+                if (previewIsResizing) {
+                    previewIsResizing = false;
                 }
             });
 
@@ -3102,22 +3101,9 @@
             resizeHandle.addEventListener('mousedown', function(e) {
                 previewIsResizing = true;
                 previewResizeStart.x = e.clientX;
-                previewResizeStart.y = e.clientY;
                 previewResizeStart.w = preview.offsetWidth;
-                previewResizeStart.h = preview.offsetHeight;
                 e.preventDefault();
                 e.stopPropagation();
-            });
-
-            document.addEventListener('mousemove', function(e) {
-                if (!previewIsResizing) return;
-                const w = Math.max(300, previewResizeStart.w + (e.clientX - previewResizeStart.x));
-                const h = Math.max(200, previewResizeStart.h + (e.clientY - previewResizeStart.y));
-                preview.style.width = w + 'px';
-            });
-
-            document.addEventListener('mouseup', function() {
-                previewIsResizing = false;
             });
         })();
 
