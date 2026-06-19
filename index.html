@@ -1870,35 +1870,75 @@
                 font-size: 0.7rem;
             }
 
-            /* 悬停预览样式 */
+            /* 预览窗样式（可拖拽+可调整大小） */
             #refImagePreview {
                 display: none;
                 position: fixed;
                 z-index: 99999;
-                max-width: 65vw;
-                max-height: 80vh;
                 background: rgba(0, 0, 0, 0.95);
                 border-radius: 12px;
-                padding: 10px;
-                box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
+                box-shadow: 0 10px 50px rgba(0, 0, 0, 0.9);
+                border: 1px solid rgba(255,255,255,0.1);
+                overflow: hidden;
+                min-width: 300px;
+                min-height: 200px;
             }
             #refImagePreview.active {
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-            }
-            #refImagePreview img {
-                max-width: 65vw;
-                max-height: 70vh;
-                border-radius: 8px;
                 display: block;
             }
-            #refImagePreview .preview-caption {
-                margin-top: 8px;
-                color: rgba(255, 255, 255, 0.8);
+            #refImagePreview .preview-header {
+                background: rgba(156, 39, 176, 0.8);
+                padding: 8px 12px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                cursor: move;
+                user-select: none;
+            }
+            #refImagePreview .preview-title {
+                color: white;
                 font-size: 0.9rem;
-                text-align: center;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                flex: 1;
+                margin-right: 10px;
+            }
+            #refImagePreview .preview-close {
+                background: rgba(244, 67, 54, 0.9);
+                color: white;
+                border: none;
+                width: 28px;
+                height: 28px;
+                border-radius: 50%;
+                cursor: pointer;
+                font-size: 1.2rem;
+                line-height: 1;
+                flex-shrink: 0;
+            }
+            #refImagePreview .preview-close:hover {
+                background: rgba(244, 67, 54, 1);
+            }
+            #refImagePreview .preview-body {
+                position: relative;
+                padding: 10px;
+            }
+            #refImagePreview .preview-img {
+                max-width: 100%;
+                max-height: 70vh;
+                display: block;
+                border-radius: 6px;
+            }
+            /* 调整大小的手柄 */
+            #refImagePreview .resize-handle {
+                position: absolute;
+                right: 0;
+                bottom: 0;
+                width: 20px;
+                height: 20px;
+                cursor: se-resize;
+                background: linear-gradient(135deg, transparent 50%, rgba(156,39,176,0.8) 50%);
+                border-bottom-right-radius: 12px;
             }
 
             /* 导入模态框移动端适配 */
@@ -2905,10 +2945,16 @@
             </div>
         </div>
 
-        <!-- 参考图片悬停预览 -->
+        <!-- 参考图片预览窗（可拖拽+可调整大小） -->
         <div id="refImagePreview">
-            <img id="refImagePreviewImg">
-            <div class="preview-caption" id="refImagePreviewCaption"></div>
+            <div class="preview-header">
+                <span class="preview-title" id="refImagePreviewTitle"></span>
+                <button class="preview-close" onclick="hideRefPreview()">×</button>
+            </div>
+            <div class="preview-body">
+                <img class="preview-img" id="refImagePreviewImg">
+                <div class="resize-handle"></div>
+            </div>
         </div>
 
         <script>
@@ -2938,9 +2984,8 @@
             }
             grid.innerHTML = referenceImages.map((img, i) => `
                 <div style="position:relative;background:rgba(0,0,0,0.3);border-radius:8px;overflow:hidden;">
-                    <img src="${img.data}" style="width:100%;height:180px;object-fit:cover;display:block;"
-                         onmouseenter="showRefPreview(${i}, event)"
-                         onmouseleave="hideRefPreview()"
+                    <img src="${img.data}" style="width:100%;height:180px;object-fit:cover;display:block;cursor:pointer;"
+                         onclick="showRefPreview(${i})"
                          title="${img.name || ''}">
                     <button onclick="deleteRefImage(${i});event.stopPropagation();" style="position:absolute;top:5px;right:5px;background:rgba(244,67,54,0.9);border:none;color:white;border-radius:50%;width:24px;height:24px;cursor:pointer;font-size:0.8rem;">×</button>
                 </div>
@@ -2975,30 +3020,106 @@
             }
         }
 
-        // 参考图片悬停预览（鼠标放到缩略图上显示大图，移开消失）
-        let refPreviewTimeout = null;
+        // 参考图片预览窗（可拖拽+可调整大小）
+        let previewIsDragging = false;
+        let previewDragOffset = { x: 0, y: 0 };
+        let previewIsResizing = false;
+        let previewResizeStart = { x: 0, y: 0, w: 0, h: 0 };
 
-        function showRefPreview(index, event) {
+        function showRefPreview(index) {
             if (!referenceImages[index]) return;
             const img = referenceImages[index];
             const preview = document.getElementById('refImagePreview');
             const previewImg = document.getElementById('refImagePreviewImg');
-            const caption = document.getElementById('refImagePreviewCaption');
+            const title = document.getElementById('refImagePreviewTitle');
 
             previewImg.src = img.data;
-            caption.textContent = img.name || '';
+            title.textContent = img.name || '';
             preview.classList.add('active');
 
-            // 固定在屏幕中央显示
-            preview.style.left = '50%';
-            preview.style.top = '50%';
-            preview.style.transform = 'translate(-50%, -50%)';
+            // 初始尺寸
+            preview.style.width = '600px';
+            previewImg.style.maxHeight = '70vh';
+
+            // 居中显示
+            const winW = window.innerWidth;
+            const winH = window.innerHeight;
+            preview.style.left = Math.max(0, (winW - 600) / 2) + 'px';
+            preview.style.top = Math.max(0, (winH * 0.15)) + 'px';
         }
 
         function hideRefPreview() {
-            const preview = document.getElementById('refImagePreview');
-            preview.classList.remove('active');
+            document.getElementById('refImagePreview').classList.remove('active');
         }
+
+        // 点击空白处关闭
+        document.addEventListener('click', function(e) {
+            const preview = document.getElementById('refImagePreview');
+            if (!preview.classList.contains('active')) return;
+            if (!preview.contains(e.target)) {
+                hideRefPreview();
+            }
+        });
+
+        // ESC 关闭
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') hideRefPreview();
+        });
+
+        // 拖拽标题栏移动
+        (function() {
+            const preview = document.getElementById('refImagePreview');
+            const header = preview.querySelector('.preview-header');
+
+            header.addEventListener('mousedown', function(e) {
+                if (e.target.classList.contains('preview-close')) return;
+                previewIsDragging = true;
+                previewDragOffset.x = e.clientX - preview.offsetLeft;
+                previewDragOffset.y = e.clientY - preview.offsetTop;
+                header.style.cursor = 'grabbing';
+                e.preventDefault();
+            });
+
+            document.addEventListener('mousemove', function(e) {
+                if (!previewIsDragging) return;
+                let x = e.clientX - previewDragOffset.x;
+                let y = e.clientY - previewDragOffset.y;
+                x = Math.max(0, Math.min(x, window.innerWidth - 100));
+                y = Math.max(0, Math.min(y, window.innerHeight - 50));
+                preview.style.left = x + 'px';
+                preview.style.top = y + 'px';
+            });
+
+            document.addEventListener('mouseup', function() {
+                if (previewIsDragging) {
+                    previewIsDragging = false;
+                    header.style.cursor = 'move';
+                }
+            });
+
+            // 调整大小
+            const resizeHandle = preview.querySelector('.resize-handle');
+            resizeHandle.addEventListener('mousedown', function(e) {
+                previewIsResizing = true;
+                previewResizeStart.x = e.clientX;
+                previewResizeStart.y = e.clientY;
+                previewResizeStart.w = preview.offsetWidth;
+                previewResizeStart.h = preview.offsetHeight;
+                e.preventDefault();
+                e.stopPropagation();
+            });
+
+            document.addEventListener('mousemove', function(e) {
+                if (!previewIsResizing) return;
+                const w = Math.max(300, previewResizeStart.w + (e.clientX - previewResizeStart.x));
+                const h = Math.max(200, previewResizeStart.h + (e.clientY - previewResizeStart.y));
+                preview.style.width = w + 'px';
+            });
+
+            document.addEventListener('mouseup', function() {
+                previewIsResizing = false;
+            });
+        })();
 
         // ==================== 聊天室+拍卖系统 ====================
         const CHAT_GIST_FILE = 'chatrooms.json';
