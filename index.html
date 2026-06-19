@@ -1897,6 +1897,7 @@
                 justify-content: center;
                 position: relative;
                 z-index: 3;
+                pointer-events: none;
             }
             #lightboxImage {
                 max-width: 95vw;
@@ -3290,17 +3291,19 @@
             }
         }, { passive: false });
 
-        // 点击背景关闭灯箱（只在点击lightbox本身而非子元素时生效）
+        // 点击灯箱关闭（点击按钮或图片时不关闭，图片用于拖拽）
         document.getElementById('lightbox').addEventListener('click', function(e) {
             // 拖拽移动后不关闭
             if (hasLightboxMoved) {
                 hasLightboxMoved = false;
                 return;
             }
-            // 仅当点击的就是灯箱容器本身才关闭（点击图片/按钮等子元素不会关闭）
-            if (e.target === this) {
-                closeLightbox();
-            }
+            // 如果点击的是按钮或图片，则不关闭（按钮有自己的 onclick，图片用于拖拽）
+            const isBtn = e.target.closest('button');
+            const isImg = e.target.tagName === 'IMG';
+            if (isBtn || isImg) return;
+            // 其他情况（点击空白背景）一律关闭
+            closeLightbox();
         });
 
         // 初始化拖拽
