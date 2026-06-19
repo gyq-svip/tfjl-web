@@ -18638,6 +18638,10 @@ function hasGistToken() {
 
         // 删除单个Gist
         async function deleteSingleGist(gistId) {
+            if (PROTECTED_GIST_IDS.has(gistId)) {
+                alert('⚠️ 核心Gist禁止删除！（索引/消息/计数器）');
+                return;
+            }
             if (!confirm('确定要删除这个配置文件吗？')) return;
 
             const token = getGistToken();
@@ -18679,6 +18683,13 @@ function hasGistToken() {
         }
 
         // 删除选中的Gist
+        // 核心Gist白名单，禁止删除
+        const PROTECTED_GIST_IDS = new Set([
+            'a32a0628bd9275f3a4922cd12cf298c9', // 索引Gist
+            'a4591ac2200b7638d51ae4c0155d7851', // 消息Gist
+            'e1bd9a5139e1c4e011bfea707e917d61'  // 计数器Gist
+        ]);
+
         async function deleteSelectedGists() {
             const checkboxes = document.querySelectorAll('.gist-checkbox:checked');
             if (checkboxes.length === 0) {
@@ -18694,7 +18705,16 @@ function hasGistToken() {
                 return;
             }
 
-            const gistIds = Array.from(checkboxes).map(cb => cb.dataset.gistId);
+            const gistIds = Array.from(checkboxes).map(cb => cb.dataset.gistId).filter(id => !PROTECTED_GIST_IDS.has(id));
+            const protectedCount = Array.from(checkboxes).map(cb => cb.dataset.gistId).filter(id => PROTECTED_GIST_IDS.has(id)).length;
+            
+            if (gistIds.length === 0) {
+                alert('选中的都是核心Gist，禁止删除！');
+                return;
+            }
+            if (protectedCount > 0) {
+                if (!confirm(`选中的 ${protectedCount} 个核心Gist已自动跳过（索引/消息/计数器），将删除其余 ${gistIds.length} 个文件。确定吗？`)) return;
+            }
             
             showGistDeleteStatus(`⏳ 正在删除 ${gistIds.length} 个配置文件...`, '#ffa500');
 
@@ -18755,7 +18775,12 @@ function hasGistToken() {
                 emptyCheckboxes.forEach(cb => cb.checked = true);
             }
 
-            const gistIds = Array.from(document.querySelectorAll('.gist-checkbox[data-empty="true"]:checked')).map(cb => cb.dataset.gistId);
+            const gistIds = Array.from(document.querySelectorAll('.gist-checkbox[data-empty="true"]:checked')).map(cb => cb.dataset.gistId).filter(id => !PROTECTED_GIST_IDS.has(id));
+            
+            if (gistIds.length === 0) {
+                alert('没有可删除的空配置文件（核心Gist受保护）！');
+                return;
+            }
             
             showGistDeleteStatus(`⏳ 正在删除 ${gistIds.length} 个空配置文件...`, '#ffa500');
 
@@ -18809,11 +18834,21 @@ function hasGistToken() {
             let gistIds;
 
             if (checkboxes.length === 0) {
-                // 如果没有选中，删除所有
-                if (!confirm(`没有选中任何文件，是否删除所有 ${window.currentGistList?.length || 0} 个配置文件？`)) return;
-                gistIds = (window.currentGistList || []).map(g => g.id);
+                // 如果没有选中，删除所有（跳过核心Gist）
+                const allIds = (window.currentGistList || []).map(g => g.id);
+                gistIds = allIds.filter(id => !PROTECTED_GIST_IDS.has(id));
+                const skipped = allIds.length - gistIds.length;
+                if (gistIds.length === 0) {
+                    alert('没有可删除的配置文件（核心Gist受保护）！');
+                    return;
+                }
+                if (!confirm(`没有选中任何文件，将删除 ${gistIds.length} 个非核心配置文件（已跳过 ${skipped} 个核心Gist）。确定吗？`)) return;
             } else {
-                gistIds = Array.from(checkboxes).map(cb => cb.dataset.gistId);
+                gistIds = Array.from(checkboxes).map(cb => cb.dataset.gistId).filter(id => !PROTECTED_GIST_IDS.has(id));
+                if (gistIds.length === 0) {
+                    alert('选中的都是核心Gist，禁止删除！');
+                    return;
+                }
             }
 
             if (gistIds.length === 0) {
