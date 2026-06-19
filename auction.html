@@ -3494,19 +3494,54 @@
             if (!currentChatRoom) return;
             const btn = document.getElementById('manualRefreshBtn');
             if (!btn) return;
-            
+
             btn.innerHTML = '<span style="display:inline-block;animation:spin 0.8s linear infinite;">⏳</span>';
             btn.disabled = true;
             btn.style.opacity = '0.7';
-            
+
             try {
                 const roomId = currentChatRoom || 'default';
                 localStorage.removeItem(`chatroom_gist_${roomId}`);
-                
+
+                // 记录刷新前的拍卖数据用于对比
+                const oldRoom = chatRoomData?.rooms?.[roomId];
+                const oldAuctionCount = oldRoom?.auctions?.length || 0;
+                const oldBidInfo = {};
+                if (oldRoom?.auctions) {
+                    oldRoom.auctions.forEach(a => {
+                        const topBid = a.bids && a.bids.length > 0 ? a.bids[a.bids.length - 1] : null;
+                        oldBidInfo[a.id] = topBid ? topBid.amount : 0;
+                    });
+                }
+
                 await fetchChatRoomData();
                 renderChatMessages();
                 renderAuctionsList();
-                showBidToast('✅ 刷新成功', true);
+
+                // 对比刷新后的数据
+                const newRoom = chatRoomData?.rooms?.[roomId];
+                const newAuctionCount = newRoom?.auctions?.length || 0;
+                let bidChanged = false;
+                if (newRoom?.auctions) {
+                    for (const a of newRoom.auctions) {
+                        const topBid = a.bids && a.bids.length > 0 ? a.bids[a.bids.length - 1] : null;
+                        const newAmount = topBid ? topBid.amount : 0;
+                        if (oldBidInfo[a.id] !== undefined && newAmount !== oldBidInfo[a.id]) {
+                            bidChanged = true;
+                            break;
+                        }
+                    }
+                }
+
+                let msg = '✅ 刷新成功';
+                if (newAuctionCount > oldAuctionCount) {
+                    msg += ` · 新增${newAuctionCount - oldAuctionCount}件商品`;
+                } else if (bidChanged) {
+                    msg += ' · 价格已更新';
+                } else {
+                    msg += ' · 暂无新变动';
+                }
+                showBidToast(msg, true);
             } catch (e) {
                 console.error('刷新失败:', e);
                 showBidToast('❌ 刷新失败，请重试', false);
