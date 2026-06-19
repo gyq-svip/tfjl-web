@@ -4643,8 +4643,7 @@
                 console.error('求购发布失败:', error);
                 alert('发布失败: ' + error.message);
             } finally {
-                btn.disabled = false;
-                btn.textContent = originalText;
+                if (btn) { btn.disabled = false; btn.textContent = originalText; }
             }
         }
 
@@ -4672,8 +4671,7 @@
 
             if (isNaN(startPrice) || startPrice < 0) { 
                 alert('请输入有效的起拍价');
-                btn.disabled = false;
-                btn.textContent = originalText;
+                if (btn) { btn.disabled = false; btn.textContent = originalText; }
                 return; 
             }
 
@@ -4771,8 +4769,7 @@
                 
                 alert('发布失败: ' + error.message);
             } finally {
-                btn.disabled = false;
-                btn.textContent = originalText;
+                if (btn) { btn.disabled = false; btn.textContent = originalText; }
             }
         }
         
@@ -16378,10 +16375,9 @@ function hasGistToken() {
             }
 
             // 显示加载状态
-            const btn = event.target;
-            const originalText = btn.textContent;
-            btn.disabled = true;
-            btn.textContent = '⏳ 发布中...';
+            const btn = document.querySelector('[onclick="postMessage()"]');
+            const originalText = btn ? btn.textContent : '发布';
+            if (btn) { btn.disabled = true; btn.textContent = '⏳ 发布中...'; }
 
             let scriptUrl = null;
 
@@ -16433,8 +16429,7 @@ function hasGistToken() {
                 console.error('发布失败:', error);
                 alert('发布失败: ' + error.message);
             } finally {
-                btn.disabled = false;
-                btn.textContent = originalText;
+                if (btn) { btn.disabled = false; btn.textContent = originalText; }
             }
         }
         
