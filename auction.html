@@ -2142,28 +2142,35 @@
         // API限额监控（仅管理员可见）
         let apiRateLimitInfo = { limit: 0, remaining: 0, reset: 0, used: 0, lastUpdate: 0 };
 
-        // 全局请求节流：防止触发GitHub二级速率限制（认证用户约30次/分钟）
-        let _lastRequestTime = 0;
-        const MIN_REQUEST_INTERVAL = 2500; // 请求间至少间隔2.5秒
-        let _requestQueue = Promise.resolve();
+        // 全局请求并发限制：防止触发GitHub二级速率限制
+        // GitHub主限制：认证用户5000次/小时；次级限制针对瞬时并发，限制并发数即可
+        const MAX_CONCURRENT_REQUESTS = 6; // 最大并发请求数
+        let _activeRequests = 0;
+        let _waitQueue = [];
+
+        function _releaseSlot() {
+            _activeRequests--;
+            if (_waitQueue.length > 0 && _activeRequests < MAX_CONCURRENT_REQUESTS) {
+                _activeRequests++;
+                const { resolve } = _waitQueue.shift();
+                resolve();
+            }
+        }
 
         async function throttledFetch(url, options = {}) {
-            // 串行化所有API请求，确保间隔
-            return _requestQueue = _requestQueue.then(async () => {
-                const now = Date.now();
-                const elapsed = now - _lastRequestTime;
-                if (elapsed < MIN_REQUEST_INTERVAL) {
-                    await new Promise(r => setTimeout(r, MIN_REQUEST_INTERVAL - elapsed));
-                }
-                _lastRequestTime = Date.now();
+            // 达到并发上限时排队等待，不人为延迟
+            if (_activeRequests >= MAX_CONCURRENT_REQUESTS) {
+                await new Promise(resolve => _waitQueue.push({ resolve }));
+            } else {
+                _activeRequests++;
+            }
+            try {
                 const response = await fetch(url, options);
                 updateRateLimitFromResponse(response);
                 return response;
-            }).catch(e => {
-                // 重置队列，避免一个失败阻塞后续所有请求
-                _requestQueue = Promise.resolve();
-                throw e;
-            });
+            } finally {
+                _releaseSlot();
+            }
         }
 
         function updateRateLimitFromResponse(response) {
@@ -3362,35 +3369,47 @@
             return data.id;
         }
 
+        // 图片内存缓存：避免重复请求API（悬停预览时直接命中）
+        const _imageMemCache = new Map();
+
         async function loadImage(auctionIdOrGistId) {
             const roomId = currentChatRoom || 'default';
             const isGistId = auctionIdOrGistId && auctionIdOrGistId.length > 10;
-            
+
+            // 内存缓存命中（按gistId或auctionId+roomId作为key）
+            const memKey = isGistId ? auctionIdOrGistId : `${roomId}_${auctionIdOrGistId}`;
+            if (_imageMemCache.has(memKey)) {
+                return _imageMemCache.get(memKey);
+            }
+
             let imgGistId = null;
             let auctionId = null;
-            
+
             if (isGistId) {
                 imgGistId = auctionIdOrGistId;
             } else {
                 auctionId = auctionIdOrGistId;
-                
+
                 const cached = localStorage.getItem(`auction_img_${roomId}_${auctionId}`);
                 if (cached) {
                     try {
                         const cacheData = JSON.parse(cached);
-                        return cacheData.data || cacheData;
+                        const data = cacheData.data || cacheData;
+                        _imageMemCache.set(memKey, data);
+                        return data;
                     } catch (e) {
+                        _imageMemCache.set(memKey, cached);
                         return cached;
                     }
                 }
-                
+
                 imgGistId = localStorage.getItem(`auction_img_gist_${roomId}_${auctionId}`);
             }
-            
+
             if (!imgGistId) return null;
-            
+
             const token = getGistToken();
-            
+
             try {
                 const response = await throttledFetch(`https://api.github.com/gists/${imgGistId}`, {
                     headers: {
@@ -3399,9 +3418,9 @@
                     }
                 });
                 if (!response.ok) return null;
-                
+
                 const data = await response.json();
-                
+
                 let content = null;
                 for (const filename in data.files) {
                     if (filename.startsWith('auction_')) {
@@ -3411,10 +3430,17 @@
                         break;
                     }
                 }
-                
+
                 if (!content) return null;
                 const base64Url = `data:image/jpeg;base64,${content}`;
-                
+
+                // 写入内存缓存
+                _imageMemCache.set(memKey, base64Url);
+                // 同时按gistId缓存一份，方便悬停时直接命中
+                if (imgGistId !== memKey) {
+                    _imageMemCache.set(imgGistId, base64Url);
+                }
+
                 if (auctionId) {
                     const now = Date.now();
                     const cacheData = {
@@ -3425,7 +3451,7 @@
                     };
                     localStorage.setItem(`auction_img_${roomId}_${auctionId}`, JSON.stringify(cacheData));
                 }
-                
+
                 return base64Url;
             } catch (error) {
                 console.warn('加载图片失败:', error);
