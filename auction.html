@@ -498,7 +498,7 @@
             <div style="background:rgba(255,255,255,0.1);backdrop-filter:blur(10px);border-radius:20px;padding:20px;margin-bottom:20px;border:2px solid rgba(255,107,107,0.3);">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
                     <span style="color:#ff6b6b;font-size:1.1rem;font-weight:bold;">🔥 热门拍卖</span>
-                    <button onclick="loadHotAuctions()" style="padding:6px 12px;border-radius:6px;border:none;background:rgba(255,107,107,0.2);color:#ff6b6b;cursor:pointer;font-size:0.85rem;">刷新</button>
+                    <button onclick="loadHotAuctions(true)" style="padding:6px 12px;border-radius:6px;border:none;background:rgba(255,107,107,0.2);color:#ff6b6b;cursor:pointer;font-size:0.85rem;">刷新</button>
                 </div>
                 <div id="hotAuctionsContainer" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;">
                     <div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;grid-column:1/-1;">点击刷新加载</div>
@@ -509,7 +509,7 @@
             <div style="background:rgba(255,255,255,0.1);backdrop-filter:blur(10px);border-radius:20px;padding:20px;margin-bottom:20px;border:2px solid rgba(74,222,128,0.3);">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
                     <span style="color:#4ade80;font-size:1.1rem;font-weight:bold;">📋 最新成交</span>
-                    <button onclick="loadRecentTransactions()" style="padding:6px 12px;border-radius:6px;border:none;background:rgba(74,222,128,0.2);color:#4ade80;cursor:pointer;font-size:0.85rem;">刷新</button>
+                    <button onclick="loadRecentTransactions(true)" style="padding:6px 12px;border-radius:6px;border:none;background:rgba(74,222,128,0.2);color:#4ade80;cursor:pointer;font-size:0.85rem;">刷新</button>
                 </div>
                 <div id="recentTransactionsContainer" style="max-height:400px;overflow-y:auto;">
                     <div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;">点击刷新加载</div>
@@ -1004,7 +1004,7 @@
         // GitHub Gist ID（与主网站共享）
         const GIST_ID = 'a32a0628bd9275f3a4922cd12cf298c9';
         const COUNTER_GIST_ID = 'e1bd9a5139e1c4e011bfea707e917d61';
-        const MESSAGES_GIST_ID = 'a4591ac2200b7638d51ae4c0155d7851';
+        const MESSAGES_GIST_ID = ''; // 原a4591ac2已删除，从索引自动查找
         
         // Token管理
         const GIST_TOKEN_KEY = 'TFJL_Gist_Token';
@@ -1152,71 +1152,23 @@
         // ==================== 概览统计 ====================
         async function loadOverviewStats() {
             try {
-                const token = getGistToken();
-                const indexUrl = `https://api.github.com/gists/${GIST_ID}`;
-                const indexResponse = await fetch(indexUrl, {
-                    headers: {
-                        'Accept': 'application/vnd.github.v3+json',
-                        ...(token && { 'Authorization': `token ${token}` })
-                    }
-                });
-                
-                if (!indexResponse.ok) return;
-                
-                const indexData = await indexResponse.json();
-                const indexContent = indexData.files['room_index.json']?.content;
-                if (!indexContent) return;
-                
-                const index = JSON.parse(indexContent);
-                const allowedRooms = index.allowedRooms || [];
-                const allRoomIds = allowedRooms.map(r => typeof r === 'string' ? r : r.id).filter(id => id && id !== 'news');
-                Object.keys(index).forEach(key => {
-                    if (key !== 'allowedRooms' && key !== 'usedNicks' && key !== 'news' && !allRoomIds.includes(key)) {
-                        allRoomIds.push(key);
-                    }
-                });
-                
-                document.getElementById('overviewRoomCount').textContent = allRoomIds.length;
+                const allRooms = await fetchAllRoomsData();
                 
                 let totalHistory = 0;
                 let totalAmount = 0;
                 let totalActive = 0;
+                const now = Date.now();
                 
-                for (const rId of allRoomIds) {
-                    const roomGistId = index[rId];
-                    if (!roomGistId) continue;
+                allRooms.forEach(({ roomId, roomInfo }) => {
+                    const history = roomInfo.auctionHistory || [];
+                    const auctions = roomInfo.auctions || [];
                     
-                    try {
-                        const roomResponse = await fetch(`https://api.github.com/gists/${roomGistId}`, {
-                            headers: {
-                                'Accept': 'application/vnd.github.v3+json',
-                                ...(token && { 'Authorization': `token ${token}` })
-                            }
-                        });
-                        if (!roomResponse.ok) continue;
-                        
-                        const roomData = await roomResponse.json();
-                        const filename = `chatrooms_${rId}.json`;
-                        const content = roomData.files[filename]?.content;
-                        if (!content) continue;
-                        
-                        const allData = JSON.parse(content);
-                        const roomInfo = allData.rooms ? allData.rooms[rId] : (allData.auctions ? allData : null);
-                        if (!roomInfo) continue;
-                        
-                        const history = roomInfo.auctionHistory || [];
-                        const auctions = roomInfo.auctions || [];
-                        const now = Date.now();
-                        
-                        totalHistory += history.length;
-                        totalAmount += history.reduce((sum, r) => sum + r.finalPrice, 0);
-                        totalActive += auctions.filter(a => a.status === 'active' && now < a.endTime).length;
-                        
-                    } catch (e) {
-                        console.warn(`加载房间${rId}失败:`, e);
-                    }
-                }
+                    totalHistory += history.length;
+                    totalAmount += history.reduce((sum, r) => sum + r.finalPrice, 0);
+                    totalActive += auctions.filter(a => a.status === 'active' && now < a.endTime).length;
+                });
                 
+                document.getElementById('overviewRoomCount').textContent = allRooms.length;
                 document.getElementById('overviewTotalAuctions').textContent = totalHistory;
                 document.getElementById('overviewTotalAmount').textContent = totalAmount;
                 document.getElementById('overviewActiveAuctions').textContent = totalActive;
@@ -1226,8 +1178,22 @@
             }
         }
 
-        // ==================== 通用：获取所有房间数据 ====================
-        async function fetchAllRoomsData() {
+        // ==================== 通用：获取所有房间数据（带缓存） ====================
+        let _allRoomsCache = null;
+        let _allRoomsCacheTime = 0;
+        const ALL_ROOMS_CACHE_TTL = 60000; // 缓存60秒
+
+        async function fetchAllRoomsData(forceRefresh = false) {
+            // 缓存有效且非强制刷新时直接返回缓存
+            if (!forceRefresh && _allRoomsCache && (Date.now() - _allRoomsCacheTime) < ALL_ROOMS_CACHE_TTL) {
+                return _allRoomsCache;
+            }
+            // 速率限制保护：配额不足时跳过
+            const rl = apiRateLimitInfo;
+            if (rl.remaining > 0 && rl.remaining < 100) {
+                console.warn('API配额不足，跳过fetchAllRoomsData，使用缓存');
+                return _allRoomsCache || [];
+            }
             const token = getGistToken();
             const indexUrl = `https://api.github.com/gists/${GIST_ID}`;
             const indexResponse = await fetch(indexUrl, {
@@ -1275,16 +1241,19 @@
                     // 跳过失败的房间
                 }
             }
+            // 保存缓存
+            _allRoomsCache = results;
+            _allRoomsCacheTime = Date.now();
             return results;
         }
 
         // ==================== 热门拍卖 ====================
-        async function loadHotAuctions() {
+        async function loadHotAuctions(forceRefresh = false) {
             const container = document.getElementById('hotAuctionsContainer');
             container.innerHTML = '<div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;grid-column:1/-1;">加载中...</div>';
 
             try {
-                const allRooms = await fetchAllRoomsData();
+                const allRooms = await fetchAllRoomsData(forceRefresh);
                 const now = Date.now();
                 const hotAuctions = [];
 
@@ -1355,12 +1324,12 @@
         }
 
         // ==================== 最新成交记录 ====================
-        async function loadRecentTransactions() {
+        async function loadRecentTransactions(forceRefresh = false) {
             const container = document.getElementById('recentTransactionsContainer');
             container.innerHTML = '<div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;">加载中...</div>';
 
             try {
-                const allRooms = await fetchAllRoomsData();
+                const allRooms = await fetchAllRoomsData(forceRefresh);
                 const allHistory = [];
 
                 allRooms.forEach(({ roomId, roomInfo }) => {
@@ -1624,6 +1593,11 @@
                     localStorage.setItem('messages_gist_deleted', 'true');
                     localStorage.removeItem('messages_gist_id');
                 }
+                if (response.status === 403) {
+                    // 速率限制，不重试
+                    console.warn('消息Gist访问被403限制');
+                    return [];
+                }
                 // 硬编码的ID可能已失效，尝试从索引查找新的
                 const currentGistId = messagesGistId;
                 messagesGistId = ''; // 重置以便从索引查找
@@ -1678,6 +1652,12 @@
         async function saveAuctionBroadcastsToGist() {
             const token = getGistToken();
             if (!token) return;
+
+            // 防止空队列覆盖远程已有数据（网络延迟/初始化时可能为空）
+            if (!auctionBroadcastQueue || auctionBroadcastQueue.length === 0) {
+                console.warn('⚠️ 快讯队列为空，跳过保存以防止覆盖远程数据');
+                return;
+            }
 
             const gistDeleted = localStorage.getItem('messages_gist_deleted') === 'true';
             let messagesGistId = (!gistDeleted && MESSAGES_GIST_ID) ? MESSAGES_GIST_ID : (localStorage.getItem('messages_gist_id') || '');
@@ -1854,7 +1834,15 @@
 
         async function refreshAuctionBroadcasts() {
             try {
-                auctionBroadcastQueue = await fetchAuctionBroadcastsFromGist();
+                const remoteBroadcasts = await fetchAuctionBroadcastsFromGist();
+                // 防止网络延迟/错误返回空数据覆盖本地
+                if (remoteBroadcasts && remoteBroadcasts.length > 0) {
+                    auctionBroadcastQueue = remoteBroadcasts;
+                } else if (auctionBroadcastQueue.length === 0) {
+                    // 本地也为空才使用远程空结果
+                    auctionBroadcastQueue = remoteBroadcasts || [];
+                }
+                // 本地有数据且远程为空时，保留本地数据不覆盖
                 renderAuctionBroadcasts();
             } catch (e) {
                 console.warn('加载拍卖快讯失败:', e);
@@ -2208,26 +2196,54 @@
                                     const parsed = JSON.parse(content);
 
                                     if (parsed.rooms && parsed.rooms[roomId]) {
-                                        // 合并：保留本地有但远程没有的拍卖（防止保存失败时数据丢失）
+                                        // 合并：保留本地有但远程没有的拍卖和消息（防止保存失败时数据丢失）
                                         const oldRoom = chatRoomData && chatRoomData.rooms && chatRoomData.rooms[roomId];
                                         chatRoomData = parsed;
-                                        if (oldRoom && oldRoom.auctions && oldRoom.auctions.length > 0) {
+                                        if (oldRoom) {
                                             const newRoom = chatRoomData.rooms[roomId];
-                                            if (newRoom && newRoom.auctions) {
-                                                const remoteIds = new Set(newRoom.auctions.map(a => a.id));
-                                                const localOnly = oldRoom.auctions.filter(a => !remoteIds.has(a.id));
-                                                if (localOnly.length > 0) {
-                                                    newRoom.auctions = newRoom.auctions.concat(localOnly);
-                                                    console.warn(`⚠️ 合并了${localOnly.length}条本地未同步的拍卖数据`);
+                                            if (newRoom) {
+                                                // 合并本地未同步的拍卖
+                                                if (oldRoom.auctions && oldRoom.auctions.length > 0) {
+                                                    const remoteIds = new Set(newRoom.auctions.map(a => a.id));
+                                                    const localOnlyAuctions = oldRoom.auctions.filter(a => !remoteIds.has(a.id));
+                                                    if (localOnlyAuctions.length > 0) {
+                                                        newRoom.auctions = newRoom.auctions.concat(localOnlyAuctions);
+                                                        console.warn(`⚠️ 合并了${localOnlyAuctions.length}条本地未同步的拍卖数据`);
+                                                    }
+                                                }
+                                                // 合并本地未同步的消息（按id去重）
+                                                if (oldRoom.messages && oldRoom.messages.length > 0) {
+                                                    const remoteMsgIds = new Set(newRoom.messages.map(m => m.id));
+                                                    const localOnlyMsgs = oldRoom.messages.filter(m => !remoteMsgIds.has(m.id));
+                                                    if (localOnlyMsgs.length > 0) {
+                                                        newRoom.messages = newRoom.messages.concat(localOnlyMsgs);
+                                                        console.warn(`⚠️ 合并了${localOnlyMsgs.length}条本地未同步的消息`);
+                                                    }
                                                 }
                                             }
                                         }
                                     } else if (parsed.messages || parsed.auctions) {
+                                        // 旧格式数据，保留本地已有数据做合并
+                                        const oldRoom = chatRoomData && chatRoomData.rooms && chatRoomData.rooms[roomId];
                                         chatRoomData = { rooms: {} };
                                         chatRoomData.rooms[roomId] = parsed;
+                                        if (oldRoom) {
+                                            // 合并本地拍卖
+                                            if (oldRoom.auctions && oldRoom.auctions.length > 0) {
+                                                const remoteIds = new Set((parsed.auctions || []).map(a => a.id));
+                                                const localOnly = oldRoom.auctions.filter(a => !remoteIds.has(a.id));
+                                                if (localOnly.length > 0) {
+                                                    chatRoomData.rooms[roomId].auctions = (parsed.auctions || []).concat(localOnly);
+                                                }
+                                            }
+                                        }
                                     } else {
-                                        chatRoomData = { rooms: {} };
-                                        chatRoomData.rooms[roomId] = { messages: [], auctions: [], nextAuctionId: 1 };
+                                        // 解析成功但数据结构异常，保留本地数据
+                                        if (!chatRoomData || !chatRoomData.rooms || !chatRoomData.rooms[roomId]) {
+                                            chatRoomData = { rooms: {} };
+                                            chatRoomData.rooms[roomId] = { messages: [], auctions: [], nextAuctionId: 1 };
+                                        }
+                                        console.warn('远程数据结构异常，保留本地数据');
                                     }
 
                                     // 自动清理过期消息（7天）
@@ -2247,13 +2263,22 @@
 
                                     return;
                                 } catch (e) {
-                                    console.warn('解析房间数据失败，使用默认值');
+                                    console.warn('解析房间数据失败，保留本地数据');
+                                    // 解析失败时不覆盖本地已有数据
+                                    if (!chatRoomData || !chatRoomData.rooms || !chatRoomData.rooms[roomId]) {
+                                        chatRoomData = { rooms: {} };
+                                        chatRoomData.rooms[roomId] = { messages: [], auctions: [], nextAuctionId: 1 };
+                                    }
+                                    return;
                                 }
                             }
                         }
-                        // 文件不存在或内容为空：只设置本地默认值，不覆盖远程数据
-                        chatRoomData = { rooms: {} };
-                        chatRoomData.rooms[roomId] = { messages: [], auctions: [], nextAuctionId: 1 };
+                        // 文件不存在或内容为空：保留本地已有数据，不覆盖
+                        if (!chatRoomData || !chatRoomData.rooms || !chatRoomData.rooms[roomId]) {
+                            chatRoomData = { rooms: {} };
+                            chatRoomData.rooms[roomId] = { messages: [], auctions: [], nextAuctionId: 1 };
+                        }
+                        console.warn('远程文件内容为空，保留本地数据');
                         return;
                     } else if (response.status === 404) {
                         // Gist被删除，清除缓存，可以重新创建
@@ -2327,22 +2352,22 @@
                 };
             }
 
-            // 防御性检查：如果远程已有拍卖数据但本地auctions为空数组，不覆盖拍卖部分
-            // 但允许保存消息（新用户发消息时 auctions 可能确实是空的）
+            // 防御性检查：如果远程已有数据但本地为空（网络延迟/读取失败），不覆盖
             const currentRoom = chatRoomData.rooms[roomId];
             const existingGistId = localStorage.getItem(`chatroom_gist_${roomId}`);
 
-            // 只有当远程 Gist 存在且有拍卖数据，但本地 auctions 为空时才跳过
-            // 新房间（有系统消息但 auctions 为空）应该允许保存
             if (existingGistId && currentRoom) {
                 // 检查是否是新创建的房间（有系统消息且没有其他消息）
                 const hasOnlySystemMsg = currentRoom.messages &&
                     currentRoom.messages.length === 1 &&
                     currentRoom.messages[0].isSystem;
 
-                // 如果不是新房间，且 auctions 为空，需要谨慎
-                if (!hasOnlySystemMsg && (!currentRoom.auctions || currentRoom.auctions.length === 0)) {
-                    // 尝试获取远程数据确认是否真的有拍卖
+                // 本地数据明显不完整时（messages和auctions都为空，且非新建房间），先合并远程数据
+                const localMessagesEmpty = !currentRoom.messages || currentRoom.messages.length === 0;
+                const localAuctionsEmpty = !currentRoom.auctions || currentRoom.auctions.length === 0;
+
+                if (!hasOnlySystemMsg && (localAuctionsEmpty || localMessagesEmpty)) {
+                    // 尝试获取远程数据确认
                     try {
                         const remoteResp = await fetch(`https://api.github.com/gists/${existingGistId}`, {
                             headers: {
@@ -2356,10 +2381,26 @@
                             if (remoteContent) {
                                 const remoteRoomData = JSON.parse(remoteContent);
                                 const remoteRoom = remoteRoomData.rooms?.[roomId];
-                                // 如果远程有拍卖数据但本地没有，跳过保存
-                                if (remoteRoom?.auctions?.length > 0 && !currentRoom.auctions?.length) {
-                                    console.warn('⚠️ 远程有拍卖数据但本地为空，跳过保存以防止覆盖');
-                                    return existingGistId;
+                                if (remoteRoom) {
+                                    const remoteHasAuctions = remoteRoom.auctions && remoteRoom.auctions.length > 0;
+                                    const remoteHasMessages = remoteRoom.messages && remoteRoom.messages.length > 0;
+
+                                    // 远程有拍卖数据但本地为空：合并而非覆盖
+                                    if (remoteHasAuctions && localAuctionsEmpty) {
+                                        console.warn('⚠️ 远程有拍卖数据但本地为空，合并远程拍卖数据');
+                                        currentRoom.auctions = remoteRoom.auctions;
+                                        if (remoteRoom.nextAuctionId) {
+                                            currentRoom.nextAuctionId = remoteRoom.nextAuctionId;
+                                        }
+                                    }
+
+                                    // 远程有消息但本地为空：合并远程消息
+                                    if (remoteHasMessages && localMessagesEmpty) {
+                                        console.warn('⚠️ 远程有消息数据但本地为空，合并远程消息');
+                                        currentRoom.messages = remoteRoom.messages;
+                                    }
+
+                                    // 如果合并后本地仍然全空（远程也空），说明是正常空房间，允许保存
                                 }
                             }
                         }
@@ -3838,13 +3879,18 @@
         function startChatRefresh() {
             if (chatRefreshInterval) clearInterval(chatRefreshInterval);
             function getRefreshInterval() {
+                // 速率限制保护：剩余配额低时自动降低刷新频率
+                const rl = apiRateLimitInfo;
+                if (rl.remaining > 0 && rl.remaining < 200) {
+                    return 60000; // 配额紧张时降到1分钟
+                }
                 const room = getRoomData();
                 if (!room || !room.auctions) return 30000;
                 const now = Date.now();
                 const hasActive = room.auctions.some(a => a.status === 'active' && now < a.endTime);
                 const hasPresale = room.auctions.some(a => a.status === 'presale' && a.scheduledStartTime && now < a.scheduledStartTime);
-                if (hasActive) return 5000;
-                if (hasPresale) return 10000;
+                if (hasActive) return 8000;
+                if (hasPresale) return 15000;
                 return 30000;
             }
             function doRefresh() {
