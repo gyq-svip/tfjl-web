@@ -2007,7 +2007,20 @@
                                     const parsed = JSON.parse(content);
 
                                     if (parsed.rooms && parsed.rooms[roomId]) {
+                                        // 合并：保留本地有但远程没有的拍卖（防止保存失败时数据丢失）
+                                        const oldRoom = chatRoomData && chatRoomData.rooms && chatRoomData.rooms[roomId];
                                         chatRoomData = parsed;
+                                        if (oldRoom && oldRoom.auctions && oldRoom.auctions.length > 0) {
+                                            const newRoom = chatRoomData.rooms[roomId];
+                                            if (newRoom && newRoom.auctions) {
+                                                const remoteIds = new Set(newRoom.auctions.map(a => a.id));
+                                                const localOnly = oldRoom.auctions.filter(a => !remoteIds.has(a.id));
+                                                if (localOnly.length > 0) {
+                                                    newRoom.auctions = newRoom.auctions.concat(localOnly);
+                                                    console.warn(`⚠️ 合并了${localOnly.length}条本地未同步的拍卖数据`);
+                                                }
+                                            }
+                                        }
                                     } else if (parsed.messages || parsed.auctions) {
                                         chatRoomData = { rooms: {} };
                                         chatRoomData.rooms[roomId] = parsed;
@@ -4310,6 +4323,77 @@
                 const core = data.resources.core;
                 const search = data.resources.search;
 
+                // 检测token权限（通过响应头或尝试创建测试Gist）
+                let tokenScope = '未知';
+                let gistScope = false;
+                if (token) {
+                    // 通过 rate_limit 响应头检测 token 类型
+                    const scopeHeader = response.headers.get('X-OAuth-Scopes') || '';
+                    const acceptedHeader = response.headers.get('X-Accepted-OAuth-Scopes') || '';
+                    if (scopeHeader) {
+                        tokenScope = scopeHeader;
+                        gistScope = scopeHeader.includes('gist');
+                    } else {
+                        // Fine-grained token 没有 X-OAuth-Scopes 头，尝试检测
+                        tokenScope = 'Fine-grained PAT';
+                        // 尝试读取一个已知Gist来验证写权限
+                        try {
+                            const testResp = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+                                headers: {
+                                    'Accept': 'application/vnd.github.v3+json',
+                                    'Authorization': `token ${token}`
+                                }
+                            });
+                            if (testResp.ok) {
+                                gistScope = true; // 能读取至少说明token有效
+                            }
+                        } catch (e) {}
+                    }
+                }
+
+                // 检测关键Gist可访问性
+                let gistStatusHtml = '';
+                const gistChecks = [
+                    { name: '索引Gist', id: GIST_ID },
+                    { name: '消息Gist', id: MESSAGES_GIST_ID },
+                    { name: '计数器Gist', id: COUNTER_GIST_ID }
+                ];
+                for (const gc of gistChecks) {
+                    try {
+                        const gr = await fetch(`https://api.github.com/gists/${gc.id}`, {
+                            headers: {
+                                'Accept': 'application/vnd.github.v3+json',
+                                ...(token && { 'Authorization': `token ${token}` })
+                            }
+                        });
+                        const statusIcon = gr.ok ? '✅' : gr.status === 404 ? '❌ 404' : gr.status === 403 ? '🔒 403' : `⚠️ ${gr.status}`;
+                        const statusColor = gr.ok ? '#4ade80' : '#ef4444';
+                        gistStatusHtml += `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:0.75rem;"><span style="color:rgba(255,255,255,0.6);">${gc.name}</span><span style="color:${statusColor};">${statusIcon} ${gc.id.substring(0,8)}...</span></div>`;
+                    } catch (e) {
+                        gistStatusHtml += `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:0.75rem;"><span style="color:rgba(255,255,255,0.6);">${gc.name}</span><span style="color:#ef4444;">❌ 请求失败</span></div>`;
+                    }
+                }
+
+                // 检测当前房间Gist
+                if (currentChatRoom) {
+                    const roomGistId = localStorage.getItem(`chatroom_gist_${currentChatRoom}`);
+                    if (roomGistId) {
+                        try {
+                            const gr = await fetch(`https://api.github.com/gists/${roomGistId}`, {
+                                headers: {
+                                    'Accept': 'application/vnd.github.v3+json',
+                                    ...(token && { 'Authorization': `token ${token}` })
+                                }
+                            });
+                            const statusIcon = gr.ok ? '✅' : gr.status === 404 ? '❌ 已删除' : gr.status === 403 ? '🔒 无权限' : `⚠️ ${gr.status}`;
+                            const statusColor = gr.ok ? '#4ade80' : '#ef4444';
+                            gistStatusHtml += `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:0.75rem;"><span style="color:rgba(255,255,255,0.6);">当前房间</span><span style="color:${statusColor};">${statusIcon} ${roomGistId.substring(0,8)}...</span></div>`;
+                        } catch (e) {
+                            gistStatusHtml += `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:0.75rem;"><span style="color:rgba(255,255,255,0.6);">当前房间</span><span style="color:#ef4444;">❌ 请求失败</span></div>`;
+                        }
+                    }
+                }
+
                 const now = Math.floor(Date.now() / 1000);
                 const coreResetIn = Math.max(0, core.reset - now);
                 const searchResetIn = Math.max(0, search.reset - now);
@@ -4357,6 +4441,24 @@
                             <span>已用 ${search.used} 次</span>
                             <span>重置: ${searchResetMin}分钟后</span>
                         </div>
+                    </div>
+                    <div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:12px;margin-bottom:16px;">
+                        <div style="color:rgba(255,255,255,0.6);font-size:0.8rem;margin-bottom:8px;">Token权限</div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                            <div style="background:rgba(0,0,0,0.2);border-radius:6px;padding:8px;text-align:center;">
+                                <div style="color:rgba(255,255,255,0.4);font-size:0.7rem;">Token类型</div>
+                                <div style="color:#a78bfa;font-size:0.8rem;font-weight:600;word-break:break-all;">${tokenScope}</div>
+                            </div>
+                            <div style="background:rgba(0,0,0,0.2);border-radius:6px;padding:8px;text-align:center;">
+                                <div style="color:rgba(255,255,255,0.4);font-size:0.7rem;">Gist写权限</div>
+                                <div style="color:${gistScope ? '#4ade80' : '#ef4444'};font-size:0.85rem;font-weight:600;">${gistScope ? '✅ 有' : '❌ 无'}</div>
+                            </div>
+                        </div>
+                        ${!gistScope && token ? '<div style="color:#ef4444;font-size:0.7rem;margin-top:6px;">⚠️ Token缺少gist权限，无法创建/修改Gist，请在GitHub重新生成带gist权限的Token</div>' : ''}
+                    </div>
+                    <div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:12px;margin-bottom:16px;">
+                        <div style="color:rgba(255,255,255,0.6);font-size:0.8rem;margin-bottom:8px;">Gist状态</div>
+                        ${gistStatusHtml}
                     </div>
                     <div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:12px;">
                         <div style="color:rgba(255,255,255,0.6);font-size:0.8rem;margin-bottom:8px;">预估消耗</div>
