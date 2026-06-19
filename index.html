@@ -1883,56 +1883,80 @@
                 align-items: center;
                 justify-content: center;
                 flex-direction: column;
+                user-select: none;
+                overflow: hidden;
             }
             #lightbox.active {
                 display: flex;
             }
-            #lightboxImage {
-                max-width: 90vw;
+            #lightboxImageContainer {
+                max-width: 95vw;
                 max-height: 80vh;
-                transition: transform 0.3s ease;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                position: relative;
+                z-index: 3;
+            }
+            #lightboxImage {
+                max-width: 95vw;
+                max-height: 80vh;
+                transition: transform 0.25s ease;
                 box-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
                 border-radius: 8px;
+                cursor: grab;
+                pointer-events: auto;
+            }
+            #lightboxImage.dragging {
+                cursor: grabbing;
+                transition: none;
             }
             #lightboxControls {
                 position: absolute;
-                top: 20px;
+                top: 25px;
                 left: 0;
                 right: 0;
                 display: flex;
                 justify-content: center;
-                gap: 10px;
+                gap: 12px;
                 z-index: 10;
+                flex-wrap: wrap;
             }
             .lightbox-btn {
-                background: rgba(156, 39, 176, 0.8);
+                background: rgba(156, 39, 176, 0.9);
                 color: white;
                 border: none;
-                padding: 8px 14px;
-                border-radius: 8px;
+                padding: 12px 22px;
+                border-radius: 10px;
                 cursor: pointer;
-                font-size: 0.95rem;
-                transition: background 0.2s;
+                font-size: 1.1rem;
+                transition: background 0.2s, transform 0.15s;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.3);
             }
             .lightbox-btn:hover {
                 background: rgba(156, 39, 176, 1);
+                transform: translateY(-1px);
             }
             #lightboxClose {
                 position: absolute;
                 top: 20px;
                 right: 20px;
-                background: rgba(244, 67, 54, 0.8);
+                background: rgba(244, 67, 54, 0.9);
                 color: white;
                 border: none;
-                width: 40px;
-                height: 40px;
+                width: 50px;
+                height: 50px;
                 border-radius: 50%;
                 cursor: pointer;
-                font-size: 1.5rem;
-                z-index: 10;
+                font-size: 2rem;
+                z-index: 11;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                transition: background 0.2s, transform 0.15s;
+                line-height: 1;
             }
             #lightboxClose:hover {
                 background: rgba(244, 67, 54, 1);
+                transform: scale(1.05);
             }
             #lightboxNav {
                 position: absolute;
@@ -1941,31 +1965,47 @@
                 width: 100%;
                 display: flex;
                 justify-content: space-between;
-                padding: 0 30px;
+                padding: 0 40px;
                 box-sizing: border-box;
                 z-index: 5;
             }
             .lightbox-nav-btn {
-                background: rgba(156, 39, 176, 0.7);
+                background: rgba(156, 39, 176, 0.8);
                 color: white;
                 border: none;
-                width: 50px;
-                height: 50px;
+                width: 60px;
+                height: 60px;
                 border-radius: 50%;
                 cursor: pointer;
-                font-size: 1.5rem;
-                transition: background 0.2s;
+                font-size: 1.8rem;
+                transition: background 0.2s, transform 0.15s;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                line-height: 1;
             }
             .lightbox-nav-btn:hover {
                 background: rgba(156, 39, 176, 1);
+                transform: scale(1.05);
             }
             #lightboxInfo {
                 position: absolute;
                 bottom: 30px;
                 color: white;
-                font-size: 0.9rem;
+                font-size: 1rem;
                 text-align: center;
                 z-index: 10;
+                background: rgba(0,0,0,0.4);
+                padding: 6px 16px;
+                border-radius: 6px;
+            }
+            #lightboxDragHint {
+                position: absolute;
+                top: 85px;
+                left: 50%;
+                transform: translateX(-50%);
+                color: rgba(255,255,255,0.5);
+                font-size: 0.85rem;
+                z-index: 10;
+                pointer-events: none;
             }
 
             /* 导入模态框移动端适配 */
@@ -2987,11 +3027,14 @@
                 <button class="lightbox-btn" onclick="resetLightbox()">↺ 重置</button>
                 <button class="lightbox-btn" onclick="downloadLightboxImage()">⬇ 下载</button>
             </div>
+            <div id="lightboxDragHint">🖱️ 点击图片可拖拽移动 · 点击空白背景关闭</div>
             <div id="lightboxNav">
                 <button class="lightbox-nav-btn" onclick="prevLightboxImage()">←</button>
                 <button class="lightbox-nav-btn" onclick="nextLightboxImage()">→</button>
             </div>
-            <img id="lightboxImage" onclick="closeLightbox()">
+            <div id="lightboxImageContainer">
+                <img id="lightboxImage" draggable="false">
+            </div>
             <div id="lightboxInfo"></div>
         </div>
 
@@ -3060,12 +3103,24 @@
         let currentLightboxIndex = 0;
         let lightboxScale = 1;
         let lightboxRotate = 0;
+        let lightboxTranslateX = 0;
+        let lightboxTranslateY = 0;
+        let isLightboxDragging = false;
+        let lightboxDragStart = { x: 0, y: 0 };
+        let hasLightboxMoved = false;
+
+        function applyLightboxTransform() {
+            const img = document.getElementById('lightboxImage');
+            img.style.transform = `translate(${lightboxTranslateX}px, ${lightboxTranslateY}px) scale(${lightboxScale}) rotate(${lightboxRotate}deg)`;
+        }
 
         function openLightbox(index) {
             if (referenceImages.length === 0) return;
             currentLightboxIndex = index;
             lightboxScale = 1;
             lightboxRotate = 0;
+            lightboxTranslateX = 0;
+            lightboxTranslateY = 0;
             updateLightboxImage();
             document.getElementById('lightbox').classList.add('active');
         }
@@ -3079,39 +3134,39 @@
             if (!img) return;
             const lightboxImg = document.getElementById('lightboxImage');
             lightboxImg.src = img.data;
-            lightboxImg.style.transform = `scale(${lightboxScale}) rotate(${lightboxRotate}deg)`;
+            applyLightboxTransform();
             document.getElementById('lightboxInfo').textContent = `${img.name}  (${currentLightboxIndex + 1}/${referenceImages.length})`;
         }
 
         function zoomInLightbox() {
             lightboxScale = Math.min(lightboxScale + 0.2, 3);
-            const img = document.getElementById('lightboxImage');
-            img.style.transform = `scale(${lightboxScale}) rotate(${lightboxRotate}deg)`;
+            applyLightboxTransform();
         }
 
         function zoomOutLightbox() {
             lightboxScale = Math.max(lightboxScale - 0.2, 0.5);
-            const img = document.getElementById('lightboxImage');
-            img.style.transform = `scale(${lightboxScale}) rotate(${lightboxRotate}deg)`;
+            applyLightboxTransform();
         }
 
         function rotateLightbox() {
             lightboxRotate = (lightboxRotate + 90) % 360;
-            const img = document.getElementById('lightboxImage');
-            img.style.transform = `scale(${lightboxScale}) rotate(${lightboxRotate}deg)`;
+            applyLightboxTransform();
         }
 
         function resetLightbox() {
             lightboxScale = 1;
             lightboxRotate = 0;
-            const img = document.getElementById('lightboxImage');
-            img.style.transform = `scale(${lightboxScale}) rotate(${lightboxRotate}deg)`;
+            lightboxTranslateX = 0;
+            lightboxTranslateY = 0;
+            applyLightboxTransform();
         }
 
         function nextLightboxImage() {
             currentLightboxIndex = (currentLightboxIndex + 1) % referenceImages.length;
             lightboxScale = 1;
             lightboxRotate = 0;
+            lightboxTranslateX = 0;
+            lightboxTranslateY = 0;
             updateLightboxImage();
         }
 
@@ -3119,6 +3174,8 @@
             currentLightboxIndex = (currentLightboxIndex - 1 + referenceImages.length) % referenceImages.length;
             lightboxScale = 1;
             lightboxRotate = 0;
+            lightboxTranslateX = 0;
+            lightboxTranslateY = 0;
             updateLightboxImage();
         }
 
@@ -3129,6 +3186,64 @@
             link.href = img.data;
             link.download = img.name || 'reference-image.png';
             link.click();
+        }
+
+        // 拖拽移动图片
+        function setupLightboxDrag() {
+            const img = document.getElementById('lightboxImage');
+            img.addEventListener('mousedown', function(e) {
+                isLightboxDragging = true;
+                hasLightboxMoved = false;
+                lightboxDragStart.x = e.clientX - lightboxTranslateX;
+                lightboxDragStart.y = e.clientY - lightboxTranslateY;
+                img.classList.add('dragging');
+                e.preventDefault();
+            });
+            document.addEventListener('mousemove', function(e) {
+                if (!isLightboxDragging) return;
+                const newX = e.clientX - lightboxDragStart.x;
+                const newY = e.clientY - lightboxDragStart.y;
+                if (Math.abs(newX - lightboxTranslateX) > 3 || Math.abs(newY - lightboxTranslateY) > 3) {
+                    hasLightboxMoved = true;
+                }
+                lightboxTranslateX = newX;
+                lightboxTranslateY = newY;
+                applyLightboxTransform();
+            });
+            document.addEventListener('mouseup', function() {
+                if (isLightboxDragging) {
+                    isLightboxDragging = false;
+                    const img = document.getElementById('lightboxImage');
+                    if (img) img.classList.remove('dragging');
+                }
+            });
+            // 触摸设备支持
+            img.addEventListener('touchstart', function(e) {
+                if (e.touches.length !== 1) return;
+                isLightboxDragging = true;
+                hasLightboxMoved = false;
+                lightboxDragStart.x = e.touches[0].clientX - lightboxTranslateX;
+                lightboxDragStart.y = e.touches[0].clientY - lightboxTranslateY;
+                img.classList.add('dragging');
+            }, { passive: true });
+            document.addEventListener('touchmove', function(e) {
+                if (!isLightboxDragging || e.touches.length !== 1) return;
+                const newX = e.touches[0].clientX - lightboxDragStart.x;
+                const newY = e.touches[0].clientY - lightboxDragStart.y;
+                if (Math.abs(newX - lightboxTranslateX) > 3 || Math.abs(newY - lightboxTranslateY) > 3) {
+                    hasLightboxMoved = true;
+                }
+                lightboxTranslateX = newX;
+                lightboxTranslateY = newY;
+                applyLightboxTransform();
+            }, { passive: true });
+            document.addEventListener('touchend', function() {
+                if (isLightboxDragging) {
+                    isLightboxDragging = false;
+                    const img = document.getElementById('lightboxImage');
+                    if (img) img.classList.remove('dragging');
+                }
+            });
         }
 
         // 键盘控制
@@ -3166,20 +3281,30 @@
         // 鼠标滚轮缩放
         document.getElementById('lightbox').addEventListener('wheel', function(e) {
             if (!this.classList.contains('active')) return;
+            // 滚轮操作在图片上时进行缩放，背景上也缩放
             e.preventDefault();
             if (e.deltaY < 0) {
                 zoomInLightbox();
             } else {
                 zoomOutLightbox();
             }
-        });
+        }, { passive: false });
 
-        // 点击背景关闭灯箱
+        // 点击背景关闭灯箱（只在点击lightbox本身而非子元素时生效）
         document.getElementById('lightbox').addEventListener('click', function(e) {
+            // 拖拽移动后不关闭
+            if (hasLightboxMoved) {
+                hasLightboxMoved = false;
+                return;
+            }
+            // 仅当点击的就是灯箱容器本身才关闭（点击图片/按钮等子元素不会关闭）
             if (e.target === this) {
                 closeLightbox();
             }
         });
+
+        // 初始化拖拽
+        setupLightboxDrag();
 
         // ==================== 聊天室+拍卖系统 ====================
         const CHAT_GIST_FILE = 'chatrooms.json';
