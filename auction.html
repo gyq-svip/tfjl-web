@@ -979,7 +979,7 @@
                     <div style="text-align:center;color:rgba(255,255,255,0.4);padding:10px;">加载中...</div>
                 </div>
             </div>
-        </div>
+
             <!-- 系统通知页面 -->
             <div id="adminPageNotifications" style="display:none;">
                 <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">
@@ -1600,7 +1600,8 @@
         // ==================== 拍卖快讯 ====================
         async function fetchAuctionBroadcastsFromGist() {
             const token = getGistToken();
-            let messagesGistId = MESSAGES_GIST_ID || localStorage.getItem('messages_gist_id');
+            const gistDeleted = localStorage.getItem('messages_gist_deleted') === 'true';
+            let messagesGistId = (!gistDeleted && MESSAGES_GIST_ID) ? MESSAGES_GIST_ID : (localStorage.getItem('messages_gist_id') || '');
 
             if (!messagesGistId) {
                 // 尝试从索引文件中查找
@@ -1617,21 +1618,28 @@
             });
 
             if (!response.ok) {
+                if (response.status === 404) {
+                    // Gist已被删除，标记为失效
+                    localStorage.setItem('messages_gist_deleted', 'true');
+                    localStorage.removeItem('messages_gist_id');
+                }
                 // 硬编码的ID可能已失效，尝试从索引查找新的
-                if (messagesGistId === MESSAGES_GIST_ID) {
-                    const newId = await findMessagesGistFromIndex();
-                    if (newId && newId !== MESSAGES_GIST_ID) {
-                        const resp2 = await fetch(`https://api.github.com/gists/${newId}`, {
-                            headers: {
-                                'Accept': 'application/vnd.github.v3+json',
-                                ...(token && { 'Authorization': `token ${token}` })
-                            }
-                        });
-                        if (resp2.ok) {
-                            const data2 = await resp2.json();
-                            const content2 = data2.files?.['auction_broadcasts.json']?.content;
-                            if (content2) return JSON.parse(content2);
+                const currentGistId = messagesGistId;
+                messagesGistId = ''; // 重置以便从索引查找
+                const newId = await findMessagesGistFromIndex();
+                if (newId && newId !== currentGistId) {
+                    const resp2 = await fetch(`https://api.github.com/gists/${newId}`, {
+                        headers: {
+                            'Accept': 'application/vnd.github.v3+json',
+                            ...(token && { 'Authorization': `token ${token}` })
                         }
+                    });
+                    if (resp2.ok) {
+                        // 找到新Gist，清除删除标记
+                        localStorage.removeItem('messages_gist_deleted');
+                        const data2 = await resp2.json();
+                        const content2 = data2.files?.['auction_broadcasts.json']?.content;
+                        if (content2) return JSON.parse(content2);
                     }
                 }
                 return [];
@@ -1670,7 +1678,8 @@
             const token = getGistToken();
             if (!token) return;
 
-            let messagesGistId = MESSAGES_GIST_ID || localStorage.getItem('messages_gist_id');
+            const gistDeleted = localStorage.getItem('messages_gist_deleted') === 'true';
+            let messagesGistId = (!gistDeleted && MESSAGES_GIST_ID) ? MESSAGES_GIST_ID : (localStorage.getItem('messages_gist_id') || '');
 
             if (messagesGistId) {
                 try {
@@ -1694,6 +1703,8 @@
                     if (patchResp.status === 404) {
                         console.warn('消息Gist已删除(404)，将重建');
                         addAdminNotification('warning', '消息Gist已删除', `Gist ${messagesGistId.substring(0,8)}... 返回404，确认已删除，将自动重建。`);
+                        localStorage.setItem('messages_gist_deleted', 'true');
+                        localStorage.removeItem('messages_gist_id');
                         messagesGistId = null;
                     } else {
                         // 403或其他错误，不重建，只记录
@@ -1708,7 +1719,38 @@
             }
 
             // 只有确认Gist被删除(404)才创建新的
+            // ★ 防重复：先从索引文件检查是否已有新的messages Gist
             if (!messagesGistId) {
+                try {
+                    const indexId = await findMessagesGistFromIndex();
+                    if (indexId) {
+                        // 索引文件中已有新的messages Gist，直接使用
+                        messagesGistId = indexId;
+                        localStorage.removeItem('messages_gist_deleted');
+                        console.log('[快讯保存] 从索引找到新消息Gist:', indexId);
+                        // 用找到的Gist PATCH保存
+                        const patchResp2 = await fetch(`https://api.github.com/gists/${messagesGistId}`, {
+                            method: 'PATCH',
+                            headers: {
+                                'Accept': 'application/vnd.github.v3+json',
+                                'Content-Type': 'application/json',
+                                'Authorization': `token ${token}`
+                            },
+                            body: JSON.stringify({
+                                files: {
+                                    'auction_broadcasts.json': {
+                                        content: JSON.stringify(auctionBroadcastQueue, null, 2)
+                                    }
+                                }
+                            })
+                        });
+                        if (patchResp2.ok) return;
+                        // PATCH也失败才继续创建
+                    }
+                } catch (e) {
+                    console.warn('检查索引失败，继续创建:', e.message);
+                }
+
                 try {
                     const createResp = await fetch('https://api.github.com/gists', {
                         method: 'POST',
@@ -1722,7 +1764,7 @@
                             public: true,
                             files: {
                                 'messages.json': {
-                                    content: '[]'
+                                    content: JSON.stringify({ messages: [] }, null, 2)
                                 },
                                 'auction_broadcasts.json': {
                                     content: JSON.stringify(auctionBroadcastQueue, null, 2)
@@ -1733,6 +1775,7 @@
                     if (createResp.ok) {
                         const newData = await createResp.json();
                         localStorage.setItem('messages_gist_id', newData.id);
+                        localStorage.removeItem('messages_gist_deleted');
                         addAdminNotification('info', '消息Gist已重建', `新Gist: ${newData.id}，已同步到索引文件。`);
                         console.warn(`消息Gist已重建: ${newData.id}`);
                         // 同步到索引文件
@@ -4940,8 +4983,10 @@
                     const id = typeof r === 'string' ? r : r.id;
                     allRoomIds.add(id);
                 });
+                // 索引文件中的非房间键（messages、counter等是共享Gist，不是聊天房间）
+                const NON_ROOM_KEYS = new Set(['allowedRooms', 'usedNicks', 'messages', 'counter', 'news', 'auction_broadcasts']);
                 Object.keys(index).forEach(key => {
-                    if (key !== 'allowedRooms' && key !== 'usedNicks') {
+                    if (!NON_ROOM_KEYS.has(key)) {
                         allRoomIds.add(key);
                     }
                 });
