@@ -2046,12 +2046,13 @@
                         localStorage.removeItem(`chatroom_gist_${roomId}`);
                         roomGistId = null;
                     } else if (response.status === 403) {
-                        // 速率限制或权限问题，不清除缓存，用本地默认值
+                        // 速率限制或权限问题，不清除缓存，保留本地数据
                         console.warn('GitHub API限制，暂不更新数据');
                         if (!chatRoomData || !chatRoomData.rooms || !chatRoomData.rooms[roomId]) {
                             chatRoomData = { rooms: {} };
                             chatRoomData.rooms[roomId] = { messages: [], auctions: [], nextAuctionId: 1 };
                         }
+                        // 403时不覆盖本地已有的拍卖数据
                         return;
                     } else {
                         // 其他错误，保留现有数据，不覆盖
@@ -2836,19 +2837,28 @@
                     time: Date.now()
                 });
 
-                await saveChatRoomData();
-                
+                let saveOk = true;
+                try {
+                    await saveChatRoomData();
+                } catch (saveErr) {
+                    saveOk = false;
+                    console.warn('保存到远程失败:', saveErr.message);
+                }
+
                 closeAuctionPostModal();
                 renderAuctionsList();
                 renderChatMessages();
-                
-                if (isExchange) {
-                    addAuctionBroadcast(`【拍卖行◆${roomId}】${currentChatNick} 上架交换：${quality}·${profession}${bonusDmg > 0 ? ' 附加+' + bonusDmg : ''}${ignoreIce > 0 ? ' 无视+' + ignoreIce : ''}${exchangeWant ? ' 想要:' + exchangeWant : ''}`, roomId);
+
+                if (saveOk) {
+                    if (isExchange) {
+                        addAuctionBroadcast(`【拍卖行◆${roomId}】${currentChatNick} 上架交换：${quality}·${profession}${bonusDmg > 0 ? ' 附加+' + bonusDmg : ''}${ignoreIce > 0 ? ' 无视+' + ignoreIce : ''}${exchangeWant ? ' 想要:' + exchangeWant : ''}`, roomId);
+                    } else {
+                        addAuctionBroadcast(`【拍卖行◆${roomId}】${currentChatNick} 上架拍卖：${quality}·${profession}${bonusDmg > 0 ? ' 附加+' + bonusDmg : ''}${ignoreIce > 0 ? ' 无视+' + ignoreIce : ''} 起拍${startPrice}`, roomId);
+                    }
+                    showAuctionToast('✅ 发布成功！', 'success');
                 } else {
-                    addAuctionBroadcast(`【拍卖行◆${roomId}】${currentChatNick} 上架拍卖：${quality}·${profession}${bonusDmg > 0 ? ' 附加+' + bonusDmg : ''}${ignoreIce > 0 ? ' 无视+' + ignoreIce : ''} 起拍${startPrice}`, roomId);
+                    showAuctionToast('⚠️ 本地已显示，但远程保存失败（API限额可能已用完），请稍后手动刷新重试', 'warning');
                 }
-                
-                showAuctionToast('✅ 发布成功！', 'success');
             } catch (error) {
                 console.error('发布失败:', error);
                 
@@ -3383,15 +3393,16 @@
                 transform: translate(-50%, -50%);
                 padding: 15px 30px;
                 border-radius: 10px;
-                font-size: 1rem;
+                font-size: ${type === 'warning' ? '0.85rem' : '1rem'};
                 font-weight: 500;
                 z-index: 99999;
                 animation: fadeInOut 2s ease-in-out;
-                ${type === 'success' ? 'background: rgba(74,222,128,0.9); color: #1a1a2e;' : 'background: rgba(239,68,68,0.9); color: white;'}
+                ${type === 'success' ? 'background: rgba(74,222,128,0.9); color: #1a1a2e;' : type === 'warning' ? 'background: rgba(251,191,36,0.9); color: #1a1a2e;' : 'background: rgba(239,68,68,0.9); color: white;'}
             `;
             toast.textContent = message;
             document.body.appendChild(toast);
-            setTimeout(() => toast.remove(), 2000);
+            const duration = type === 'warning' ? 4000 : 2000;
+            setTimeout(() => toast.remove(), duration);
         }
 
         // ==================== 出价辅助函数 ====================
