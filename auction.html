@@ -1129,9 +1129,11 @@
                         <div style="color:#ffa500;font-size:0.75rem;">⚠️ 还原会覆盖当前数据，请谨慎操作！建议先备份当前数据再还原。</div>
                     </div>
                     <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                        <button onclick="auctionRestoreBackup('all')" style="flex:1;min-width:150px;padding:10px;border-radius:6px;border:none;background:linear-gradient(135deg,#f97316,#ea580c);color:white;cursor:pointer;font-size:0.85rem;">🔄 还原全部</button>
-                        <button onclick="auctionRestoreBackup('rooms')" style="flex:1;min-width:150px;padding:10px;border-radius:6px;border:none;background:linear-gradient(135deg,#f97316,#ea580c);color:white;cursor:pointer;font-size:0.85rem;">🔄 还原房间</button>
-                        <button onclick="auctionRestoreBackup('stats')" style="flex:1;min-width:150px;padding:10px;border-radius:6px;border:none;background:linear-gradient(135deg,#f97316,#ea580c);color:white;cursor:pointer;font-size:0.85rem;">🔄 还原统计</button>
+                        <button onclick="auctionRestoreBackup('all')" style="flex:1;min-width:120px;padding:10px;border-radius:6px;border:none;background:linear-gradient(135deg,#f97316,#ea580c);color:white;cursor:pointer;font-size:0.85rem;">🔄 还原全部</button>
+                        <button onclick="auctionRestoreBackup('index')" style="flex:1;min-width:120px;padding:10px;border-radius:6px;border:none;background:linear-gradient(135deg,#f97316,#ea580c);color:white;cursor:pointer;font-size:0.85rem;">📋 还原索引</button>
+                        <button onclick="auctionRestoreBackup('messages')" style="flex:1;min-width:120px;padding:10px;border-radius:6px;border:none;background:linear-gradient(135deg,#f97316,#ea580c);color:white;cursor:pointer;font-size:0.85rem;">📢 还原消息</button>
+                        <button onclick="auctionRestoreBackup('scripts')" style="flex:1;min-width:120px;padding:10px;border-radius:6px;border:none;background:linear-gradient(135deg,#f97316,#ea580c);color:white;cursor:pointer;font-size:0.85rem;">📜 还原脚本</button>
+                        <button onclick="auctionRestoreBackup('stats')" style="flex:1;min-width:120px;padding:10px;border-radius:6px;border:none;background:linear-gradient(135deg,#f97316,#ea580c);color:white;cursor:pointer;font-size:0.85rem;">📊 还原统计</button>
                     </div>
                 </div>
                 <div id="auctionBackupStatus" style="margin-top:10px;"></div>
@@ -5126,7 +5128,178 @@
             return data.id;
         }
 
-        // 获取所有房间数据用于备份
+        // 获取所有房间数据用于备份（只存Gist引用，不存完整内容）
+        async function auctionFetchRoomsRefForBackup() {
+            const token = getGistToken();
+            const roomsRef = {};
+
+            try {
+                const indexResp = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` }
+                });
+                if (!indexResp.ok) return roomsRef;
+
+                const indexData = await indexResp.json();
+                if (!indexData.files || !indexData.files['room_index.json']) return roomsRef;
+
+                const index = JSON.parse(indexData.files['room_index.json'].content);
+                const roomIds = Object.keys(index).filter(k =>
+                    typeof index[k] === 'string' && index[k].length > 10 && k !== 'messagesGistId' && k !== 'messages'
+                );
+
+                for (const roomId of roomIds) {
+                    roomsRef[roomId] = { gistId: index[roomId] };
+                }
+            } catch (e) {
+                console.warn('获取房间引用失败:', e);
+            }
+
+            return roomsRef;
+        }
+
+        // 获取所有脚本文件内容用于备份（脚本容易丢失，需要备份内容）
+        async function auctionFetchScriptsForBackup() {
+            const token = getGistToken();
+            const scripts = [];
+
+            try {
+                const resp = await fetch('https://api.github.com/gists?per_page=100', {
+                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` }
+                });
+                if (!resp.ok) return scripts;
+
+                const gists = await resp.json();
+                const scriptGists = gists.filter(g => g.description && g.description.includes('脚本分享'));
+
+                for (const gist of scriptGists) {
+                    try {
+                        const detailResp = await fetch(`https://api.github.com/gists/${gist.id}`, {
+                            headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` }
+                        });
+                        if (!detailResp.ok) continue;
+
+                        const detail = await detailResp.json();
+                        const fileNames = Object.keys(detail.files || {});
+                        if (fileNames.length === 0) continue;
+
+                        const fileName = fileNames[0];
+                        const file = detail.files[fileName];
+                        let content = file.content || '';
+                        if (file.truncated) {
+                            const rawResp = await fetch(file.raw_url, {
+                                headers: { ...(token && { 'Authorization': `token ${token}` }) }
+                            });
+                            if (rawResp.ok) content = await rawResp.text();
+                        }
+
+                        scripts.push({
+                            gistId: gist.id,
+                            description: gist.description,
+                            fileName: fileName,
+                            content: content
+                        });
+                    } catch (e) {
+                        console.warn(`备份脚本 ${gist.id} 失败:`, e);
+                    }
+                }
+            } catch (e) {
+                console.warn('获取脚本列表失败:', e);
+            }
+
+            return scripts;
+        }
+
+        // 获取消息数据用于备份
+        async function auctionFetchMessagesForBackup() {
+            const token = getGistToken();
+            try {
+                const indexResp = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` }
+                });
+                if (!indexResp.ok) return null;
+
+                const indexData = await indexResp.json();
+                if (!indexData.files || !indexData.files['room_index.json']) return null;
+
+                const index = JSON.parse(indexData.files['room_index.json'].content);
+                const messagesGistId = index.messages || localStorage.getItem('messages_gist_id');
+                if (!messagesGistId) return null;
+
+                const msgResp = await fetch(`https://api.github.com/gists/${messagesGistId}`, {
+                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` }
+                });
+                if (!msgResp.ok) return null;
+
+                const msgData = await msgResp.json();
+                if (!msgData.files || !msgData.files['messages.json']) return null;
+
+                let content = msgData.files['messages.json'].content || '';
+                if (msgData.files['messages.json'].truncated) {
+                    const rawResp = await fetch(msgData.files['messages.json'].raw_url, {
+                        headers: { ...(token && { 'Authorization': `token ${token}` }) }
+                    });
+                    if (rawResp.ok) content = await rawResp.text();
+                }
+
+                return { gistId: messagesGistId, content: content };
+            } catch (e) {
+                console.warn('获取消息数据失败:', e);
+                return null;
+            }
+        }
+
+        // 获取索引文件内容用于备份
+        async function auctionFetchIndexForBackup() {
+            const token = getGistToken();
+            try {
+                const resp = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` }
+                });
+                if (!resp.ok) return null;
+
+                const data = await resp.json();
+                if (!data.files || !data.files['room_index.json']) return null;
+
+                let content = data.files['room_index.json'].content || '';
+                if (data.files['room_index.json'].truncated) {
+                    const rawResp = await fetch(data.files['room_index.json'].raw_url, {
+                        headers: { ...(token && { 'Authorization': `token ${token}` }) }
+                    });
+                    if (rawResp.ok) content = await rawResp.text();
+                }
+
+                return content;
+            } catch (e) {
+                console.warn('获取索引文件失败:', e);
+                return null;
+            }
+        }
+
+        // 获取统计数据用于备份
+        async function auctionFetchStatsDataForBackup() {
+            const token = getGistToken();
+            try {
+                const resp = await fetch(`https://api.github.com/gists/${COUNTER_GIST_ID}`, {
+                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` }
+                });
+                if (!resp.ok) return {};
+
+                const data = await resp.json();
+                if (data.files && data.files['counter.json']) {
+                    let content = data.files['counter.json'].content;
+                    if (data.files['counter.json'].truncated) {
+                        const rawResp = await fetch(data.files['counter.json'].raw_url);
+                        if (rawResp.ok) content = await rawResp.text();
+                    }
+                    if (content) return JSON.parse(content);
+                }
+            } catch (e) {
+                console.warn('获取统计数据失败:', e);
+            }
+            return {};
+        }
+
+        // 保留旧函数兼容性（导出功能用）
         async function auctionFetchRoomsDataForBackup() {
             const token = getGistToken();
             const roomsData = {};
@@ -5172,51 +5345,74 @@
             return roomsData;
         }
 
-        // 获取统计数据用于备份
-        async function auctionFetchStatsDataForBackup() {
-            const token = getGistToken();
-            try {
-                const resp = await fetch(`https://api.github.com/gists/${COUNTER_GIST_ID}`, {
-                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` }
-                });
-                if (!resp.ok) return {};
-
-                const data = await resp.json();
-                if (data.files && data.files['counter.json']) {
-                    let content = data.files['counter.json'].content;
-                    if (data.files['counter.json'].truncated) {
-                        const rawResp = await fetch(data.files['counter.json'].raw_url);
-                        if (rawResp.ok) content = await rawResp.text();
-                    }
-                    if (content) return JSON.parse(content);
-                }
-            } catch (e) {
-                console.warn('获取统计数据失败:', e);
-            }
-            return {};
-        }
-
-        // 备份全部拍卖数据
+        // 备份全部数据（增强版：索引+房间引用+消息+脚本+统计，内容分文件存储）
         async function auctionBackupAll() {
-            auctionShowBackupStatus('⏳ 正在备份全部拍卖数据...', 'loading');
+            auctionShowBackupStatus('⏳ 正在备份全部数据...', 'loading');
             try {
                 const token = getGistToken();
                 if (!token) throw new Error('无Token');
 
                 const backupGistId = await auctionGetOrCreateBackupGist();
-                auctionShowBackupStatus('⏳ 正在读取房间数据...', 'loading');
+                const ts = Date.now();
+                const backupFiles = {};
 
-                const roomsData = await auctionFetchRoomsDataForBackup();
-                auctionShowBackupStatus('⏳ 正在读取统计数据...', 'loading');
+                // 1. 索引文件（单独文件）
+                auctionShowBackupStatus('⏳ 正在备份索引文件...', 'loading');
+                const indexContent = await auctionFetchIndexForBackup();
+                if (indexContent) {
+                    backupFiles[`content_index_${ts}.json`] = { content: indexContent };
+                }
+
+                // 2. 房间引用（只存Gist ID，不存内容）
+                auctionShowBackupStatus('⏳ 正在扫描房间...', 'loading');
+                const roomsRef = await auctionFetchRoomsRefForBackup();
+
+                // 3. 消息数据（单独文件）
+                auctionShowBackupStatus('⏳ 正在备份消息数据...', 'loading');
+                const messagesData = await auctionFetchMessagesForBackup();
+                if (messagesData) {
+                    backupFiles[`content_messages_${ts}.json`] = { content: messagesData.content };
+                }
+
+                // 4. 统计数据（单独文件）
+                auctionShowBackupStatus('⏳ 正在备份统计数据...', 'loading');
                 const statsData = await auctionFetchStatsDataForBackup();
+                if (Object.keys(statsData).length > 0) {
+                    backupFiles[`content_stats_${ts}.json`] = { content: JSON.stringify(statsData, null, 2) };
+                }
 
-                const backupData = {
-                    timestamp: Date.now(),
+                // 5. 脚本文件（每个脚本单独一个文件）
+                auctionShowBackupStatus('⏳ 正在备份脚本文件...', 'loading');
+                const scripts = await auctionFetchScriptsForBackup();
+                const scriptsRef = [];
+                for (const script of scripts) {
+                    const safeName = script.fileName.replace(/[^a-zA-Z0-9_\-.]/g, '_');
+                    backupFiles[`content_script_${safeName}_${ts}.js`] = { content: script.content };
+                    scriptsRef.push({
+                        gistId: script.gistId,
+                        description: script.description,
+                        fileName: script.fileName,
+                        backupFile: `content_script_${safeName}_${ts}.js`
+                    });
+                }
+
+                // 6. 主索引文件（轻量，只存引用）
+                const mainBackup = {
+                    timestamp: ts,
                     date: new Date().toLocaleString('zh-CN'),
-                    type: 'auction_all',
-                    rooms: roomsData,
-                    stats: statsData
+                    type: 'auction_full_v2',
+                    indexGistId: GIST_ID,
+                    counterGistId: COUNTER_GIST_ID,
+                    rooms: roomsRef,
+                    messagesGistId: messagesData ? messagesData.gistId : null,
+                    scripts: scriptsRef,
+                    contentFiles: {
+                        index: indexContent ? `content_index_${ts}.json` : null,
+                        messages: messagesData ? `content_messages_${ts}.json` : null,
+                        stats: statsData ? `content_stats_${ts}.json` : null
+                    }
                 };
+                backupFiles[`backup_auction_all_${ts}.json`] = { content: JSON.stringify(mainBackup, null, 2) };
 
                 const resp = await fetch(`https://api.github.com/gists/${backupGistId}`, {
                     method: 'PATCH',
@@ -5225,18 +5421,13 @@
                         'Content-Type': 'application/json',
                         'Authorization': `token ${token}`
                     },
-                    body: JSON.stringify({
-                        files: {
-                            [`backup_auction_all_${Date.now()}.json`]: {
-                                content: JSON.stringify(backupData, null, 2)
-                            }
-                        }
-                    })
+                    body: JSON.stringify({ files: backupFiles })
                 });
 
                 if (!resp.ok) throw new Error('保存备份失败');
 
-                auctionShowBackupStatus(`✅ 全部拍卖数据备份成功！房间:${Object.keys(roomsData).length}个`, 'success');
+                const summary = `房间:${Object.keys(roomsRef).length} 脚本:${scripts.length} ${messagesData ? '消息:✓' : '消息:✗'}`;
+                auctionShowBackupStatus(`✅ 全部数据备份成功！${summary}`, 'success');
                 auctionLoadBackupList();
             } catch (e) {
                 auctionShowBackupStatus(`❌ 备份失败：${e.message}`, 'error');
@@ -5320,7 +5511,7 @@
 
                 if (!resp.ok) throw new Error('保存备份失败');
 
-                auctionShowBackupStatus(`✅ 统计数据备份成功！`, 'success');
+                auctionShowBackupStatus('✅ 统计数据备份成功！', 'success');
                 auctionLoadBackupList();
             } catch (e) {
                 auctionShowBackupStatus(`❌ 备份失败：${e.message}`, 'error');
@@ -5439,6 +5630,25 @@
         }
 
         // 从指定文件还原
+        // 辅助：从备份Gist读取文件内容
+        async function auctionReadBackupFile(backupGistId, fileName, token) {
+            const resp = await fetch(`https://api.github.com/gists/${backupGistId}`, {
+                headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` }
+            });
+            const data = await resp.json();
+            const file = data.files[fileName];
+            if (!file) return null;
+
+            let content = file.content || '';
+            if (file.truncated) {
+                const rawResp = await fetch(file.raw_url, {
+                    headers: { ...(token && { 'Authorization': `token ${token}` }) }
+                });
+                if (rawResp.ok) content = await rawResp.text();
+            }
+            return content;
+        }
+
         async function auctionRestoreFromFile(fileName) {
             if (!confirm(`⚠️ 确定要从 ${fileName} 还原数据吗？\n\n这将覆盖当前数据！`)) return;
 
@@ -5449,68 +5659,119 @@
                 if (!token) throw new Error('无Token');
 
                 const backupGistId = localStorage.getItem(AUCTION_BACKUP_GIST_KEY);
-                const resp = await fetch(`https://api.github.com/gists/${backupGistId}`, {
-                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` }
-                });
-
-                const data = await resp.json();
-                const file = data.files[fileName];
-
-                let content = file.content;
-                if (file.truncated) {
-                    const rawResp = await fetch(file.raw_url);
-                    if (rawResp.ok) content = await rawResp.text();
-                }
+                const content = await auctionReadBackupFile(backupGistId, fileName, token);
+                if (!content) throw new Error('备份文件不存在');
 
                 const backupData = JSON.parse(content);
 
-                // 还原房间数据
-                if (backupData.rooms) {
-                    auctionShowBackupStatus('⏳ 正在还原房间数据...', 'loading');
-                    for (const roomId in backupData.rooms) {
-                        const roomInfo = backupData.rooms[roomId];
-                        if (roomInfo.gistId && roomInfo.data) {
-                            const filename = `chatrooms_${roomId}.json`;
-                            await fetch(`https://api.github.com/gists/${roomInfo.gistId}`, {
+                // V2格式：分文件存储
+                if (backupData.type === 'auction_full_v2' && backupData.contentFiles) {
+                    const cf = backupData.contentFiles;
+                    let restored = [];
+
+                    // 还原索引文件
+                    if (cf.index) {
+                        auctionShowBackupStatus('⏳ 正在还原索引文件...', 'loading');
+                        const indexContent = await auctionReadBackupFile(backupGistId, cf.index, token);
+                        if (indexContent) {
+                            await fetch(`https://api.github.com/gists/${GIST_ID}`, {
                                 method: 'PATCH',
-                                headers: {
-                                    'Accept': 'application/vnd.github.v3+json',
-                                    'Content-Type': 'application/json',
-                                    'Authorization': `token ${token}`
-                                },
-                                body: JSON.stringify({
-                                    files: {
-                                        [filename]: {
-                                            content: JSON.stringify(roomInfo.data, null, 2)
-                                        }
-                                    }
-                                })
+                                headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` },
+                                body: JSON.stringify({ files: { 'room_index.json': { content: indexContent } } })
                             });
+                            restored.push('索引');
                         }
                     }
-                }
 
-                // 还原统计数据
-                if (backupData.stats) {
-                    auctionShowBackupStatus('⏳ 正在还原统计数据...', 'loading');
-                    await fetch(`https://api.github.com/gists/${COUNTER_GIST_ID}`, {
-                        method: 'PATCH',
-                        headers: {
-                            'Accept': 'application/vnd.github.v3+json',
-                            'Content-Type': 'application/json',
-                            'Authorization': `token ${token}`
-                        },
-                        body: JSON.stringify({
-                            files: {
-                                'counter.json': {
-                                    content: JSON.stringify(backupData.stats, null, 2)
+                    // 还原消息数据
+                    if (cf.messages && backupData.messagesGistId) {
+                        auctionShowBackupStatus('⏳ 正在还原消息数据...', 'loading');
+                        const msgContent = await auctionReadBackupFile(backupGistId, cf.messages, token);
+                        if (msgContent) {
+                            await fetch(`https://api.github.com/gists/${backupData.messagesGistId}`, {
+                                method: 'PATCH',
+                                headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` },
+                                body: JSON.stringify({ files: { 'messages.json': { content: msgContent } } })
+                            });
+                            restored.push('消息');
+                        }
+                    }
+
+                    // 还原统计数据
+                    if (cf.stats) {
+                        auctionShowBackupStatus('⏳ 正在还原统计数据...', 'loading');
+                        const statsContent = await auctionReadBackupFile(backupGistId, cf.stats, token);
+                        if (statsContent) {
+                            await fetch(`https://api.github.com/gists/${COUNTER_GIST_ID}`, {
+                                method: 'PATCH',
+                                headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` },
+                                body: JSON.stringify({ files: { 'counter.json': { content: statsContent } } })
+                            });
+                            restored.push('统计');
+                        }
+                    }
+
+                    // 还原脚本文件
+                    if (backupData.scripts && backupData.scripts.length > 0) {
+                        auctionShowBackupStatus('⏳ 正在还原脚本文件...', 'loading');
+                        let scriptCount = 0;
+                        for (const scriptRef of backupData.scripts) {
+                            const scriptContent = await auctionReadBackupFile(backupGistId, scriptRef.backupFile, token);
+                            if (scriptContent) {
+                                // 检查原Gist是否还存在
+                                const checkResp = await fetch(`https://api.github.com/gists/${scriptRef.gistId}`, {
+                                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` }
+                                });
+                                if (checkResp.ok) {
+                                    // 原Gist存在，更新内容
+                                    await fetch(`https://api.github.com/gists/${scriptRef.gistId}`, {
+                                        method: 'PATCH',
+                                        headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` },
+                                        body: JSON.stringify({ files: { [scriptRef.fileName]: { content: scriptContent } } })
+                                    });
+                                } else {
+                                    // 原Gist已删除，创建新的
+                                    await fetch('https://api.github.com/gists', {
+                                        method: 'POST',
+                                        headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` },
+                                        body: JSON.stringify({ description: scriptRef.description, public: false, files: { [scriptRef.fileName]: { content: scriptContent } } })
+                                    });
                                 }
+                                scriptCount++;
                             }
-                        })
-                    });
-                }
+                        }
+                        restored.push(`脚本${scriptCount}个`);
+                    }
 
-                auctionShowBackupStatus('✅ 还原成功！建议刷新页面查看最新数据', 'success');
+                    auctionShowBackupStatus(`✅ 还原成功！已还原：${restored.join('、')}`, 'success');
+                } else {
+                    // V1格式：房间数据内嵌
+                    if (backupData.rooms) {
+                        auctionShowBackupStatus('⏳ 正在还原房间数据...', 'loading');
+                        for (const roomId in backupData.rooms) {
+                            const roomInfo = backupData.rooms[roomId];
+                            if (roomInfo.gistId && roomInfo.data) {
+                                const filename = `chatrooms_${roomId}.json`;
+                                await fetch(`https://api.github.com/gists/${roomInfo.gistId}`, {
+                                    method: 'PATCH',
+                                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` },
+                                    body: JSON.stringify({ files: { [filename]: { content: JSON.stringify(roomInfo.data, null, 2) } } })
+                                });
+                            }
+                        }
+                    }
+
+                    if (backupData.stats) {
+                        auctionShowBackupStatus('⏳ 正在还原统计数据...', 'loading');
+                        await fetch(`https://api.github.com/gists/${COUNTER_GIST_ID}`, {
+                            method: 'PATCH',
+                            headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` },
+                            body: JSON.stringify({ files: { 'counter.json': { content: JSON.stringify(backupData.stats, null, 2) } } })
+                        });
+                    }
+
+                    auctionShowBackupStatus('✅ 还原成功！建议刷新页面查看最新数据', 'success');
+                }
 
                 const modal = document.getElementById('auctionBackupDetailModal');
                 if (modal) modal.remove();
@@ -5521,7 +5782,7 @@
 
         // 还原备份（按类型）
         async function auctionRestoreBackup(type) {
-            if (!confirm(`⚠️ 确定要还原${type === 'all' ? '全部' : type === 'rooms' ? '房间' : '统计'}数据吗？\n\n这将覆盖当前数据！`)) return;
+            if (!confirm(`⚠️ 确定要还原${type === 'all' ? '全部' : type === 'rooms' ? '房间' : type === 'stats' ? '统计' : type === 'index' ? '索引' : type === 'messages' ? '消息' : '脚本'}数据吗？\n\n这将覆盖当前数据！`)) return;
 
             auctionShowBackupStatus('⏳ 正在查找备份...', 'loading');
             try {
@@ -5533,121 +5794,121 @@
                     return;
                 }
 
-                const resp = await fetch(`https://api.github.com/gists/${backupGistId}`, {
+                // 找最新的全部备份（V2优先）
+                const allBackups = Object.keys((await (await fetch(`https://api.github.com/gists/${backupGistId}`, {
                     headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` }
-                });
+                })).json()).files || {}).filter(name => name.startsWith('backup_auction_all_')).sort().reverse();
 
-                const data = await resp.json();
-                const files = data.files || {};
-
-                // 找最新的指定类型备份
-                const typePrefix = `backup_auction_${type}_`;
-                const backups = Object.keys(files).filter(name => name.startsWith(typePrefix)).sort().reverse();
-
-                if (backups.length === 0) {
-                    // 如果指定类型没找到，尝试找全部备份
-                    if (type !== 'all') {
-                        const allBackups = Object.keys(files).filter(name => name.startsWith('backup_auction_all_')).sort().reverse();
-                        if (allBackups.length === 0) {
-                            auctionShowBackupStatus('❌ 未找到相关备份', 'error');
-                            return;
-                        }
-                        // 从全部备份中还原指定类型
-                        const file = files[allBackups[0]];
-                        let content = file.content;
-                        if (file.truncated) {
-                            const rawResp = await fetch(file.raw_url);
-                            if (rawResp.ok) content = await rawResp.text();
-                        }
-                        const backupData = JSON.parse(content);
-
-                        if (type === 'rooms' && backupData.rooms) {
-                            auctionShowBackupStatus('⏳ 正在还原房间数据...', 'loading');
-                            for (const roomId in backupData.rooms) {
-                                const roomInfo = backupData.rooms[roomId];
-                                if (roomInfo.gistId && roomInfo.data) {
-                                    const filename = `chatrooms_${roomId}.json`;
-                                    await fetch(`https://api.github.com/gists/${roomInfo.gistId}`, {
-                                        method: 'PATCH',
-                                        headers: {
-                                            'Accept': 'application/vnd.github.v3+json',
-                                            'Content-Type': 'application/json',
-                                            'Authorization': `token ${token}`
-                                        },
-                                        body: JSON.stringify({
-                                            files: { [filename]: { content: JSON.stringify(roomInfo.data, null, 2) } }
-                                        })
-                                    });
-                                }
-                            }
-                        } else if (type === 'stats' && backupData.stats) {
-                            auctionShowBackupStatus('⏳ 正在还原统计数据...', 'loading');
-                            await fetch(`https://api.github.com/gists/${COUNTER_GIST_ID}`, {
-                                method: 'PATCH',
-                                headers: {
-                                    'Accept': 'application/vnd.github.v3+json',
-                                    'Content-Type': 'application/json',
-                                    'Authorization': `token ${token}`
-                                },
-                                body: JSON.stringify({
-                                    files: { 'counter.json': { content: JSON.stringify(backupData.stats, null, 2) } }
-                                })
-                            });
-                        }
-
-                        auctionShowBackupStatus('✅ 还原成功！建议刷新页面', 'success');
-                        return;
-                    }
+                if (allBackups.length === 0) {
                     auctionShowBackupStatus('❌ 未找到备份', 'error');
                     return;
                 }
 
-                // 直接还原指定类型备份
-                const file = files[backups[0]];
-                let content = file.content;
-                if (file.truncated) {
-                    const rawResp = await fetch(file.raw_url);
-                    if (rawResp.ok) content = await rawResp.text();
-                }
+                const content = await auctionReadBackupFile(backupGistId, allBackups[0], token);
                 const backupData = JSON.parse(content);
 
-                if (backupData.rooms) {
-                    auctionShowBackupStatus('⏳ 正在还原房间数据...', 'loading');
-                    for (const roomId in backupData.rooms) {
-                        const roomInfo = backupData.rooms[roomId];
-                        if (roomInfo.gistId && roomInfo.data) {
-                            const filename = `chatrooms_${roomId}.json`;
-                            await fetch(`https://api.github.com/gists/${roomInfo.gistId}`, {
-                                method: 'PATCH',
-                                headers: {
-                                    'Accept': 'application/vnd.github.v3+json',
-                                    'Content-Type': 'application/json',
-                                    'Authorization': `token ${token}`
-                                },
-                                body: JSON.stringify({
-                                    files: { [filename]: { content: JSON.stringify(roomInfo.data, null, 2) } }
-                                })
-                            });
+                // V2格式
+                if (backupData.type === 'auction_full_v2' && backupData.contentFiles) {
+                    const cf = backupData.contentFiles;
+
+                    if (type === 'all' || type === 'index') {
+                        if (cf.index) {
+                            auctionShowBackupStatus('⏳ 正在还原索引文件...', 'loading');
+                            const indexContent = await auctionReadBackupFile(backupGistId, cf.index, token);
+                            if (indexContent) {
+                                await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+                                    method: 'PATCH',
+                                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` },
+                                    body: JSON.stringify({ files: { 'room_index.json': { content: indexContent } } })
+                                });
+                            }
                         }
                     }
-                }
 
-                if (backupData.stats) {
-                    auctionShowBackupStatus('⏳ 正在还原统计数据...', 'loading');
-                    await fetch(`https://api.github.com/gists/${COUNTER_GIST_ID}`, {
-                        method: 'PATCH',
-                        headers: {
-                            'Accept': 'application/vnd.github.v3+json',
-                            'Content-Type': 'application/json',
-                            'Authorization': `token ${token}`
-                        },
-                        body: JSON.stringify({
-                            files: { 'counter.json': { content: JSON.stringify(backupData.stats, null, 2) } }
-                        })
-                    });
-                }
+                    if (type === 'all' || type === 'messages') {
+                        if (cf.messages && backupData.messagesGistId) {
+                            auctionShowBackupStatus('⏳ 正在还原消息数据...', 'loading');
+                            const msgContent = await auctionReadBackupFile(backupGistId, cf.messages, token);
+                            if (msgContent) {
+                                await fetch(`https://api.github.com/gists/${backupData.messagesGistId}`, {
+                                    method: 'PATCH',
+                                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` },
+                                    body: JSON.stringify({ files: { 'messages.json': { content: msgContent } } })
+                                });
+                            }
+                        }
+                    }
 
-                auctionShowBackupStatus('✅ 还原成功！建议刷新页面', 'success');
+                    if (type === 'all' || type === 'stats') {
+                        if (cf.stats) {
+                            auctionShowBackupStatus('⏳ 正在还原统计数据...', 'loading');
+                            const statsContent = await auctionReadBackupFile(backupGistId, cf.stats, token);
+                            if (statsContent) {
+                                await fetch(`https://api.github.com/gists/${COUNTER_GIST_ID}`, {
+                                    method: 'PATCH',
+                                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` },
+                                    body: JSON.stringify({ files: { 'counter.json': { content: statsContent } } })
+                                });
+                            }
+                        }
+                    }
+
+                    if (type === 'all' || type === 'scripts') {
+                        if (backupData.scripts && backupData.scripts.length > 0) {
+                            auctionShowBackupStatus('⏳ 正在还原脚本文件...', 'loading');
+                            for (const scriptRef of backupData.scripts) {
+                                const scriptContent = await auctionReadBackupFile(backupGistId, scriptRef.backupFile, token);
+                                if (scriptContent) {
+                                    const checkResp = await fetch(`https://api.github.com/gists/${scriptRef.gistId}`, {
+                                        headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` }
+                                    });
+                                    if (checkResp.ok) {
+                                        await fetch(`https://api.github.com/gists/${scriptRef.gistId}`, {
+                                            method: 'PATCH',
+                                            headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` },
+                                            body: JSON.stringify({ files: { [scriptRef.fileName]: { content: scriptContent } } })
+                                        });
+                                    } else {
+                                        await fetch('https://api.github.com/gists', {
+                                            method: 'POST',
+                                            headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` },
+                                            body: JSON.stringify({ description: scriptRef.description, public: false, files: { [scriptRef.fileName]: { content: scriptContent } } })
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    auctionShowBackupStatus('✅ 还原成功！建议刷新页面', 'success');
+                } else {
+                    // V1格式兼容
+                    if ((type === 'all' || type === 'rooms') && backupData.rooms) {
+                        auctionShowBackupStatus('⏳ 正在还原房间数据...', 'loading');
+                        for (const roomId in backupData.rooms) {
+                            const roomInfo = backupData.rooms[roomId];
+                            if (roomInfo.gistId && roomInfo.data) {
+                                const filename = `chatrooms_${roomId}.json`;
+                                await fetch(`https://api.github.com/gists/${roomInfo.gistId}`, {
+                                    method: 'PATCH',
+                                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` },
+                                    body: JSON.stringify({ files: { [filename]: { content: JSON.stringify(roomInfo.data, null, 2) } } })
+                                });
+                            }
+                        }
+                    }
+
+                    if ((type === 'all' || type === 'stats') && backupData.stats) {
+                        auctionShowBackupStatus('⏳ 正在还原统计数据...', 'loading');
+                        await fetch(`https://api.github.com/gists/${COUNTER_GIST_ID}`, {
+                            method: 'PATCH',
+                            headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` },
+                            body: JSON.stringify({ files: { 'counter.json': { content: JSON.stringify(backupData.stats, null, 2) } } })
+                        });
+                    }
+
+                    auctionShowBackupStatus('✅ 还原成功！建议刷新页面', 'success');
+                }
             } catch (e) {
                 auctionShowBackupStatus(`❌ 还原失败：${e.message}`, 'error');
             }
