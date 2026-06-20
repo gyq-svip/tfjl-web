@@ -3213,8 +3213,21 @@
                     if (indexData.files && indexData.files['room_index.json'] && indexData.files['room_index.json'].content) {
                         const index = JSON.parse(indexData.files['room_index.json'].content);
                         const allowedRooms = index.allowedRooms || [];
+                        const blockedRooms = index.blockedRooms || [];
                         const usedNicks = index.usedNicks || [];
-                        
+
+                        // 黑名单检查（优先级最高，无论白名单模式）
+                        const isBlocked = blockedRooms.some(r => {
+                            const existingId = typeof r === 'string' ? r : r.id;
+                            return existingId === roomId;
+                        });
+                        if (isBlocked) {
+                            const blockInfo = blockedRooms.find(r => (typeof r === 'string' ? r : r.id) === roomId);
+                            const reason = typeof blockInfo === 'object' ? blockInfo.reason : '';
+                            alert(`房间 "${roomId}" 已被封禁${reason ? '，原因：' + reason : ''}，无法进入`);
+                            return;
+                        }
+
                         // 如果白名单不为空，检查房间是否在白名单中
                         if (allowedRooms.length > 0) {
                             const isAllowed = allowedRooms.some(r => {

@@ -1043,11 +1043,32 @@
                     <button onclick="adminShowMenu()" style="background:transparent;border:none;color:#a78bfa;font-size:1rem;cursor:pointer;">← 返回</button>
                     <h3 style="color:#ffd700;margin:0;font-size:1rem;">🏠 房间管理</h3>
                 </div>
+                <div style="background:rgba(59,130,246,0.1);border-left:3px solid #3b82f6;border-radius:6px;padding:12px;margin-bottom:15px;">
+                    <div style="color:#3b82f6;font-size:0.85rem;font-weight:500;">💡 管理模式说明</div>
+                    <div style="color:rgba(255,255,255,0.6);font-size:0.75rem;margin-top:5px;">
+                        <strong style="color:#4ade80;">开放模式</strong>（白名单为空）：所有人可自由开房，黑名单中的房间禁止进入<br>
+                        <strong style="color:#f59e0b;">限制模式</strong>（白名单不为空）：只有白名单中的房间可以进入<br>
+                        黑名单在两种模式下都生效，优先级最高
+                    </div>
+                </div>
                 <div id="allowedRoomsList" style="max-height:300px;overflow-y:auto;"></div>
                 <div style="margin-top:15px;display:flex;gap:10px;">
                     <input type="text" id="newAllowedRoomIdInput" placeholder="新房间ID" style="flex:1;padding:8px 12px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:white;font-size:0.85rem;outline:none;">
                     <input type="text" id="newRoomOwnerInput" placeholder="房主昵称" style="flex:1;padding:8px 12px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:white;font-size:0.85rem;outline:none;">
-                    <button onclick="adminAddAllowedRoom()" style="padding:8px 16px;border-radius:6px;border:none;background:linear-gradient(135deg,#4ade80,#22c55e);color:white;cursor:pointer;font-size:0.85rem;">添加</button>
+                    <button onclick="adminAddAllowedRoom()" style="padding:8px 16px;border-radius:6px;border:none;background:linear-gradient(135deg,#4ade80,#22c55e);color:white;cursor:pointer;font-size:0.85rem;">添加白名单</button>
+                </div>
+                <!-- 黑名单区域 -->
+                <div style="margin-top:20px;border-top:1px solid rgba(255,255,255,0.1);padding-top:15px;">
+                    <h4 style="color:#ef4444;margin:0 0 10px 0;font-size:0.9rem;">🚫 黑名单</h4>
+                    <div style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-bottom:10px;">黑名单中的房间将被禁止进入，无论是否在白名单中</div>
+                    <div id="blockedRoomsList" style="max-height:200px;overflow-y:auto;margin-bottom:10px;">
+                        <div style="color:rgba(255,255,255,0.4);text-align:center;padding:15px;font-size:0.8rem;">点击下方按钮加载黑名单</div>
+                    </div>
+                    <div style="display:flex;gap:10px;">
+                        <input type="text" id="newBlockedRoomIdInput" placeholder="要封禁的房间ID" style="flex:1;padding:8px 12px;border-radius:6px;border:1px solid rgba(239,68,68,0.3);background:rgba(0,0,0,0.3);color:white;font-size:0.85rem;outline:none;">
+                        <input type="text" id="newBlockedReasonInput" placeholder="封禁原因（可选）" style="flex:1;padding:8px 12px;border-radius:6px;border:1px solid rgba(239,68,68,0.3);background:rgba(0,0,0,0.3);color:white;font-size:0.85rem;outline:none;">
+                        <button onclick="adminAddBlockedRoom()" style="padding:8px 16px;border-radius:6px;border:none;background:linear-gradient(135deg,#ef4444,#dc2626);color:white;cursor:pointer;font-size:0.85rem;">添加黑名单</button>
+                    </div>
                 </div>
             </div>
 
@@ -2104,8 +2125,21 @@
                     if (indexData.files && indexData.files['room_index.json'] && indexData.files['room_index.json'].content) {
                         const index = JSON.parse(indexData.files['room_index.json'].content);
                         const allowedRooms = index.allowedRooms || [];
+                        const blockedRooms = index.blockedRooms || [];
                         const usedNicks = index.usedNicks || [];
-                        
+
+                        // 黑名单检查（优先级最高，无论白名单模式）
+                        const isBlocked = blockedRooms.some(r => {
+                            const existingId = typeof r === 'string' ? r : r.id;
+                            return existingId === roomId;
+                        });
+                        if (isBlocked) {
+                            const blockInfo = blockedRooms.find(r => (typeof r === 'string' ? r : r.id) === roomId);
+                            const reason = typeof blockInfo === 'object' ? blockInfo.reason : '';
+                            alert(`房间 "${roomId}" 已被封禁${reason ? '，原因：' + reason : ''}，无法进入`);
+                            return;
+                        }
+
                         if (allowedRooms.length > 0) {
                             const isAllowed = allowedRooms.some(r => {
                                 const existingId = typeof r === 'string' ? r : r.id;
@@ -5025,6 +5059,7 @@
             } else if (page === 'roomManage') {
                 document.getElementById('adminPageRoomManage').style.display = 'block';
                 loadAllowedRoomsList();
+                loadBlockedRoomsList();
             } else if (page === 'apiMonitor') {
                 document.getElementById('adminPageApiMonitor').style.display = 'block';
                 refreshApiMonitor();
@@ -6540,15 +6575,20 @@
 
                 const index = JSON.parse(content);
                 const allowedRooms = index.allowedRooms || [];
+                const blockedRooms = index.blockedRooms || [];
 
-                // 收集所有在索引中出现的房间ID（包括白名单和映射）
+                // 收集所有在索引中出现的房间ID（包括白名单、黑名单和映射）
                 const allRoomIds = new Set();
                 allowedRooms.forEach(r => {
                     const id = typeof r === 'string' ? r : r.id;
                     allRoomIds.add(id);
                 });
+                blockedRooms.forEach(r => {
+                    const id = typeof r === 'string' ? r : r.id;
+                    allRoomIds.add(id);
+                });
                 // 索引文件中的非房间键（messages、counter等是共享Gist，不是聊天房间）
-                const NON_ROOM_KEYS = new Set(['allowedRooms', 'usedNicks', 'messages', 'counter', 'news', 'auction_broadcasts']);
+                const NON_ROOM_KEYS = new Set(['allowedRooms', 'blockedRooms', 'usedNicks', 'messages', 'counter', 'news', 'auction_broadcasts']);
                 Object.keys(index).forEach(key => {
                     if (!NON_ROOM_KEYS.has(key)) {
                         allRoomIds.add(key);
@@ -6576,6 +6616,13 @@
                     const inWhitelist = allowedRooms.some(r =>
                         (typeof r === 'string' ? r : r.id) === roomId
                     );
+                    const inBlacklist = blockedRooms.some(r =>
+                        (typeof r === 'string' ? r : r.id) === roomId
+                    );
+                    const blockReason = inBlacklist ? (() => {
+                        const item = blockedRooms.find(r => (typeof r === 'string' ? r : r.id) === roomId);
+                        return typeof item === 'object' ? (item.reason || '') : '';
+                    })() : '';
                     const mappedGistId = index[roomId];
                     const localGistId = localStorage.getItem(`chatroom_gist_${roomId}`);
                     let gistStatus = 'not_found';
@@ -6617,17 +6664,20 @@
 
                     // 判断问题类型
                     const problems = [];
+                    if (inBlacklist) problems.push('🚫 已封禁' + (blockReason ? `（${blockReason}）` : ''));
                     if (!mappedGistId) problems.push('无索引映射');
                     if (mappedGistId && gistStatus === 'not_found') problems.push('Gist已删除（404）');
                     if (mappedGistId && gistStatus === 'error') problems.push('检查Gist失败');
                     if (mappedGistId && !gistFileCorrect) problems.push('Gist中缺少正确文件');
                     if (mappedGistId && localGistId && mappedGistId !== localGistId) problems.push('本地与索引不一致');
                     if (!mappedGistId && localGistId) problems.push('本地有缓存但无索引');
-                    if (!inWhitelist && mappedGistId) problems.push('不在白名单但有映射');
+                    if (!inWhitelist && !inBlacklist && mappedGistId) problems.push('不在白名单但有映射');
 
                     roomCheckList.push({
                         roomId,
                         inWhitelist,
+                        inBlacklist,
+                        blockReason,
                         mappedGistId,
                         localGistId,
                         gistStatus,
@@ -6661,8 +6711,9 @@
 
                 // 统计
                 const totalRooms = roomCheckList.length;
-                const roomsWithProblems = roomCheckList.filter(r => r.problems.length > 0).length;
-                const roomsOK = totalRooms - roomsWithProblems;
+                const blockedCount = roomCheckList.filter(r => r.inBlacklist).length;
+                const roomsWithProblems = roomCheckList.filter(r => r.problems.length > 0 && !r.inBlacklist).length;
+                const roomsOK = totalRooms - roomCheckList.filter(r => r.problems.length > 0).length;
                 const duplicateRooms = roomCheckList.filter(r =>
                     r.problems.some(p => p.includes('共享'))
                 ).length;
@@ -6674,11 +6725,17 @@
                 roomSelfCheckResult = roomCheckList;
 
                 // 渲染
+                const modeLabel = allowedRooms.length > 0
+                    ? '<span style="color:#f59e0b;">🔒 限制模式</span>'
+                    : '<span style="color:#4ade80;">🌐 开放模式</span>';
+
                 container.innerHTML = `
                     <div style="background:rgba(0,0,0,0.2);padding:12px;border-radius:8px;margin-bottom:15px;">
+                        <div style="margin-bottom:8px;font-size:0.85rem;">${modeLabel}</div>
                         <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;font-size:0.85rem;margin-bottom:10px;">
                             <span style="color:#4ade80;">✅ 正常: ${roomsOK}</span>
                             <span style="color:#ef4444;">❌ 有问题: ${roomsWithProblems}</span>
+                            <span style="color:#ef4444;">🚫 已封禁: ${blockedCount}</span>
                             <span style="color:#f59e0b;">⚠️ Gist已删除: ${missingRooms}</span>
                             <span style="color:#a78bfa;">🔗 Gist重复: ${duplicateRooms}</span>
                             <span style="color:rgba(255,255,255,0.7);">📊 总计: ${totalRooms}</span>
@@ -6700,30 +6757,37 @@
                             <span style="color:#ef4444;margin-left:8px;">●</span>有问题
                             <span style="color:#f59e0b;margin-left:8px;">●</span>Gist不存在
                             <span style="color:#a78bfa;margin-left:8px;">●</span>Gist被共享
+                            <span style="color:#ef4444;margin-left:8px;">🚫</span>已封禁
                         </div>
                         ${roomCheckList.map(room => {
                             const isOK = room.problems.length === 0;
-                            const bgColor = isOK ? 'rgba(74,222,128,0.08)' : 'rgba(239,68,68,0.08)';
-                            const borderColor = isOK ? 'rgba(74,222,128,0.2)' : 'rgba(239,68,68,0.3)';
-                            const indicatorColor = room.problems.some(p => p.includes('404')) ? '#f59e0b' :
+                            const isBlocked = room.inBlacklist;
+                            const bgColor = isBlocked ? 'rgba(239,68,68,0.12)' : isOK ? 'rgba(74,222,128,0.08)' : 'rgba(239,68,68,0.08)';
+                            const borderColor = isBlocked ? 'rgba(239,68,68,0.4)' : isOK ? 'rgba(74,222,128,0.2)' : 'rgba(239,68,68,0.3)';
+                            const indicatorColor = isBlocked ? '#ef4444' :
+                                                    room.problems.some(p => p.includes('404')) ? '#f59e0b' :
                                                     room.problems.some(p => p.includes('共享')) ? '#a78bfa' :
                                                     isOK ? '#4ade80' : '#ef4444';
 
                             return `
-                                <div style="background:${bgColor};border:1px solid ${borderColor};padding:10px 12px;border-radius:6px;margin-bottom:6px;">
+                                <div style="background:${bgColor};border:1px solid ${borderColor};padding:10px 12px;border-radius:6px;margin-bottom:6px;${isBlocked ? 'opacity:0.7;' : ''}">
                                     <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
                                         <div style="flex:1;min-width:0;">
                                             <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-                                                <span style="color:${indicatorColor};">●</span>
+                                                <span style="color:${indicatorColor};">${isBlocked ? '🚫' : '●'}</span>
                                                 <span style="color:#ffd700;font-weight:500;">#${room.roomId}</span>
                                                 ${room.inWhitelist ? '<span style="font-size:0.7rem;color:#4ade80;padding:1px 6px;background:rgba(74,222,128,0.15);border-radius:4px;">白名单</span>' : ''}
+                                                ${isBlocked ? '<span style="font-size:0.7rem;color:#ef4444;padding:1px 6px;background:rgba(239,68,68,0.15);border-radius:4px;">已封禁</span>' : ''}
                                                 ${room.mappedGistId ? `<span style="font-size:0.7rem;color:#a78bfa;padding:1px 6px;background:rgba(167,139,250,0.15);border-radius:4px;">有映射</span>` : ''}
                                                 ${room.localGistId ? `<span style="font-size:0.7rem;color:#4ecdc4;padding:1px 6px;background:rgba(78,205,196,0.15);border-radius:4px;">本地缓存</span>` : ''}
                                             </div>
                                             ${room.mappedGistId ? `<div style="font-size:0.7rem;color:rgba(255,255,255,0.4);margin-top:4px;word-break:break-all;">GistID: ${room.mappedGistId.substring(0, 12)}...</div>` : ''}
                                             ${room.problems.length > 0 ? `<div style="font-size:0.7rem;color:#ef4444;margin-top:4px;">⚠️ ${room.problems.join('；')}</div>` : ''}
                                         </div>
-                                        <button onclick="adminRemoveAllowedRoom('${room.roomId}')" style="padding:4px 10px;border-radius:4px;border:none;background:#ff6b6b;color:white;cursor:pointer;font-size:0.7rem;white-space:nowrap;flex-shrink:0;">删除</button>
+                                        <div style="display:flex;gap:4px;flex-shrink:0;">
+                                            ${isBlocked ? `<button onclick="adminRemoveBlockedRoom('${room.roomId}')" style="padding:4px 10px;border-radius:4px;border:none;background:rgba(74,222,128,0.3);color:#4ade80;cursor:pointer;font-size:0.7rem;white-space:nowrap;">解封</button>` : `<button onclick="adminAddBlockedRoomQuick('${room.roomId}')" style="padding:4px 10px;border-radius:4px;border:none;background:rgba(239,68,68,0.3);color:#ef4444;cursor:pointer;font-size:0.7rem;white-space:nowrap;">封禁</button>`}
+                                            <button onclick="adminRemoveAllowedRoom('${room.roomId}')" style="padding:4px 10px;border-radius:4px;border:none;background:#ff6b6b;color:white;cursor:pointer;font-size:0.7rem;white-space:nowrap;">删除</button>
+                                        </div>
                                     </div>
                                 </div>
                             `;
@@ -6791,6 +6855,230 @@
                 loadAllowedRoomsList();
             } catch (e) {
                 alert('❌ 添加失败: ' + e.message);
+            }
+        }
+
+        // ==================== 黑名单管理 ====================
+
+        // 加载黑名单列表
+        async function loadBlockedRoomsList() {
+            const container = document.getElementById('blockedRoomsList');
+            container.innerHTML = '<div style="color:rgba(255,255,255,0.5);text-align:center;padding:15px;">加载中...</div>';
+
+            try {
+                const token = getGistToken();
+                if (!token) throw new Error('未设置Token');
+
+                const indexUrl = `https://api.github.com/gists/${GIST_ID}`;
+                const response = await fetch(indexUrl, {
+                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` }
+                });
+
+                if (!response.ok) throw new Error('获取索引失败');
+                const data = await response.json();
+                const index = JSON.parse(data.files['room_index.json'].content);
+                const blockedRooms = index.blockedRooms || [];
+
+                if (blockedRooms.length === 0) {
+                    container.innerHTML = '<div style="color:#4ade80;text-align:center;padding:15px;font-size:0.8rem;">🟢 黑名单为空，所有房间均可自由进入</div>';
+                    return;
+                }
+
+                container.innerHTML = blockedRooms.map(item => {
+                    const roomId = typeof item === 'string' ? item : item.id;
+                    const reason = typeof item === 'object' ? (item.reason || '') : '';
+                    const blockedAt = typeof item === 'object' ? (item.blockedAt || '') : '';
+                    return `
+                        <div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);padding:8px 12px;border-radius:6px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;gap:8px;">
+                            <div style="flex:1;min-width:0;">
+                                <div style="display:flex;align-items:center;gap:6px;">
+                                    <span style="color:#ef4444;">🚫</span>
+                                    <span style="color:#ffd700;font-weight:500;">#${roomId}</span>
+                                </div>
+                                ${reason ? `<div style="font-size:0.7rem;color:rgba(255,255,255,0.5);margin-top:3px;">原因：${reason}</div>` : ''}
+                                ${blockedAt ? `<div style="font-size:0.65rem;color:rgba(255,255,255,0.3);margin-top:2px;">封禁时间：${blockedAt}</div>` : ''}
+                            </div>
+                            <button onclick="adminRemoveBlockedRoom('${roomId}')" style="padding:4px 10px;border-radius:4px;border:none;background:rgba(239,68,68,0.3);color:#ef4444;cursor:pointer;font-size:0.7rem;white-space:nowrap;flex-shrink:0;">解封</button>
+                        </div>
+                    `;
+                }).join('');
+            } catch (e) {
+                container.innerHTML = `<div style="color:#ef4444;text-align:center;padding:15px;">加载失败: ${e.message}</div>`;
+            }
+        }
+
+        // 添加房间到黑名单
+        async function adminAddBlockedRoom() {
+            const roomId = document.getElementById('newBlockedRoomIdInput').value.trim();
+            const reason = document.getElementById('newBlockedReasonInput').value.trim();
+            if (!roomId) {
+                alert('请输入要封禁的房间ID');
+                return;
+            }
+
+            try {
+                const token = getGistToken();
+                if (!token) throw new Error('未设置Token');
+
+                const indexUrl = `https://api.github.com/gists/${GIST_ID}`;
+                const response = await fetch(indexUrl, {
+                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` }
+                });
+
+                if (!response.ok) throw new Error('获取索引失败');
+                const data = await response.json();
+                const index = JSON.parse(data.files['room_index.json'].content);
+
+                if (!index.blockedRooms) index.blockedRooms = [];
+
+                // 检查是否已在黑名单
+                if (index.blockedRooms.some(r => (typeof r === 'string' ? r : r.id) === roomId)) {
+                    alert('该房间已在黑名单中');
+                    return;
+                }
+
+                // 添加到黑名单
+                const blockItem = reason
+                    ? { id: roomId, reason: reason, blockedAt: new Date().toLocaleString('zh-CN') }
+                    : { id: roomId, blockedAt: new Date().toLocaleString('zh-CN') };
+                index.blockedRooms.push(blockItem);
+
+                // 同时从白名单中移除（如果存在）
+                if (index.allowedRooms) {
+                    index.allowedRooms = index.allowedRooms.filter(r =>
+                        (typeof r === 'string' ? r : r.id) !== roomId
+                    );
+                }
+
+                const patchResponse = await fetch(indexUrl, {
+                    method: 'PATCH',
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json',
+                        'Authorization': `token ${token}`
+                    },
+                    body: JSON.stringify({
+                        files: {
+                            'room_index.json': {
+                                content: JSON.stringify(index, null, 2)
+                            }
+                        }
+                    })
+                });
+
+                if (!patchResponse.ok) throw new Error('更新失败');
+                alert(`✅ 房间 #${roomId} 已加入黑名单`);
+                document.getElementById('newBlockedRoomIdInput').value = '';
+                document.getElementById('newBlockedReasonInput').value = '';
+                loadBlockedRoomsList();
+                loadAllowedRoomsList();
+            } catch (e) {
+                alert('❌ 添加黑名单失败: ' + e.message);
+            }
+        }
+
+        // 从黑名单中移除（解封）
+        async function adminRemoveBlockedRoom(roomId) {
+            if (!confirm(`确定要解封房间 #${roomId} 吗？`)) return;
+
+            try {
+                const token = getGistToken();
+                if (!token) throw new Error('未设置Token');
+
+                const indexUrl = `https://api.github.com/gists/${GIST_ID}`;
+                const response = await fetch(indexUrl, {
+                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` }
+                });
+
+                if (!response.ok) throw new Error('获取索引失败');
+                const data = await response.json();
+                const index = JSON.parse(data.files['room_index.json'].content);
+
+                if (!index.blockedRooms) index.blockedRooms = [];
+                index.blockedRooms = index.blockedRooms.filter(r =>
+                    (typeof r === 'string' ? r : r.id) !== roomId
+                );
+
+                const patchResponse = await fetch(indexUrl, {
+                    method: 'PATCH',
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json',
+                        'Authorization': `token ${token}`
+                    },
+                    body: JSON.stringify({
+                        files: {
+                            'room_index.json': {
+                                content: JSON.stringify(index, null, 2)
+                            }
+                        }
+                    })
+                });
+
+                if (!patchResponse.ok) throw new Error('更新失败');
+                alert(`✅ 房间 #${roomId} 已解封`);
+                loadBlockedRoomsList();
+                loadAllowedRoomsList();
+            } catch (e) {
+                alert('❌ 解封失败: ' + e.message);
+            }
+        }
+
+        // 快速封禁房间（从房间列表中一键封禁，无需输入原因）
+        async function adminAddBlockedRoomQuick(roomId) {
+            if (!confirm(`确定要封禁房间 #${roomId} 吗？\n\n封禁后该房间将无法进入。`)) return;
+
+            try {
+                const token = getGistToken();
+                if (!token) throw new Error('未设置Token');
+
+                const indexUrl = `https://api.github.com/gists/${GIST_ID}`;
+                const response = await fetch(indexUrl, {
+                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` }
+                });
+
+                if (!response.ok) throw new Error('获取索引失败');
+                const data = await response.json();
+                const index = JSON.parse(data.files['room_index.json'].content);
+
+                if (!index.blockedRooms) index.blockedRooms = [];
+
+                if (index.blockedRooms.some(r => (typeof r === 'string' ? r : r.id) === roomId)) {
+                    alert('该房间已在黑名单中');
+                    return;
+                }
+
+                index.blockedRooms.push({ id: roomId, blockedAt: new Date().toLocaleString('zh-CN') });
+
+                // 同时从白名单中移除
+                if (index.allowedRooms) {
+                    index.allowedRooms = index.allowedRooms.filter(r =>
+                        (typeof r === 'string' ? r : r.id) !== roomId
+                    );
+                }
+
+                const patchResponse = await fetch(indexUrl, {
+                    method: 'PATCH',
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json',
+                        'Authorization': `token ${token}`
+                    },
+                    body: JSON.stringify({
+                        files: {
+                            'room_index.json': {
+                                content: JSON.stringify(index, null, 2)
+                            }
+                        }
+                    })
+                });
+
+                if (!patchResponse.ok) throw new Error('更新失败');
+                alert(`✅ 房间 #${roomId} 已封禁`);
+                loadBlockedRoomsList();
+                loadAllowedRoomsList();
+            } catch (e) {
+                alert('❌ 封禁失败: ' + e.message);
             }
         }
 
