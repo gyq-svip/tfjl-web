@@ -21668,6 +21668,7 @@ function hasGistToken() {
                             <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">密码管理</div>
                         </div>
                     </div>
+                    <!-- MIGRATED_TO_AUCTION 开始：以下菜单已迁移到拍卖行 -->
                     <div class="admin-menu-item" onclick="adminShowPage('auctionStats')" style="padding:10px;">
                         <span style="font-size:1.1rem;">📈</span>
                         <div style="margin-left:8px;">
@@ -21692,18 +21693,21 @@ function hasGistToken() {
                             <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">文件管理</div>
                         </div>
                     </div>
+                    <!-- MIGRATED_TO_AUCTION 结束：以上菜单已迁移到拍卖行 -->
                     <div class="admin-menu-item" onclick="adminShowPage('cacheManage')" style="padding:10px;">
                         <span style="font-size:1.1rem;">🧹</span>
                         <div style="margin-left:8px;">
                             <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">清除缓存</div>
                         </div>
                     </div>
+                    <!-- MIGRATED_TO_AUCTION 开始：数据备份菜单已迁移到拍卖行 -->
                     <div class="admin-menu-item" onclick="adminShowPage('backupManage')" style="padding:10px;">
                         <span style="font-size:1.1rem;">💾</span>
                         <div style="margin-left:8px;">
                             <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">数据备份</div>
                         </div>
                     </div>
+                    <!-- MIGRATED_TO_AUCTION 结束：数据备份菜单已迁移到拍卖行 -->
                 </div>
                 <button class="admin-btn" onclick="logoutToLogin()" style="width:100%;margin-top:12px;background:linear-gradient(135deg,#ef4444,#dc2626);color:white;">🔙 退出登录</button>
             </div>
@@ -21895,6 +21899,7 @@ function hasGistToken() {
                 </div>
             </div>
 
+            <!-- MIGRATED_TO_AUCTION 开始：商品管理已迁移到拍卖行 -->
             <div id="adminPageAuctionManage" style="display:none;">
                 <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
                     <button class="admin-btn admin-btn-secondary" onclick="adminShowMenu()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
@@ -21916,7 +21921,9 @@ function hasGistToken() {
                     <div id="auctionManageList" style="max-height:400px;overflow-y:auto;"></div>
                 </div>
             </div>
+            <!-- MIGRATED_TO_AUCTION 结束：商品管理已迁移到拍卖行 -->
 
+            <!-- MIGRATED_TO_AUCTION 开始：房间管理已迁移到拍卖行 -->
             <div id="adminPageRoomManage" style="display:none;">
                 <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
                     <button class="admin-btn admin-btn-secondary" onclick="adminShowMenu()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
@@ -21949,7 +21956,9 @@ function hasGistToken() {
                     </div>
                 </div>
             </div>
+            <!-- MIGRATED_TO_AUCTION 结束：房间管理已迁移到拍卖行 -->
 
+            <!-- MIGRATED_TO_AUCTION 开始：文件管理已迁移到拍卖行 -->
             <div id="adminPageGistManage" style="display:none;">
                 <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
                     <button class="admin-btn admin-btn-secondary" onclick="adminShowMenu()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
@@ -21983,8 +21992,10 @@ function hasGistToken() {
                 </div>
                 <div id="gistDeleteStatus" style="margin-top:10px;"></div>
             </div>
+            <!-- MIGRATED_TO_AUCTION 结束：文件管理已迁移到拍卖行 -->
 
             <!-- 图片Gist精细管理面板 -->
+            <!-- MIGRATED_TO_AUCTION 开始：Gist精细管理已迁移到拍卖行 -->
             <div id="adminPageImageGistManage" style="display:none;">
                 <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
                     <button class="admin-btn admin-btn-secondary" onclick="adminShowGistManage()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
@@ -22040,6 +22051,7 @@ function hasGistToken() {
                 </div>
                 <div id="imageGistDeleteStatus" style="margin-top:10px;"></div>
             </div>
+            <!-- MIGRATED_TO_AUCTION 结束：Gist精细管理已迁移到拍卖行 -->
 
             <div id="adminPageCacheManage" style="display:none;">
                 <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
@@ -22073,6 +22085,7 @@ function hasGistToken() {
                 <div id="cacheManageStatus" style="margin-top:10px;"></div>
             </div>
 
+            <!-- MIGRATED_TO_AUCTION 开始：数据备份已迁移到拍卖行 -->
             <div id="adminPageBackupManage" style="display:none;">
                 <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
                     <button class="admin-btn admin-btn-secondary" onclick="adminShowMenu()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
@@ -22119,6 +22132,7 @@ function hasGistToken() {
                 </div>
                 <div id="backupManageStatus" style="margin-top:10px;"></div>
             </div>
+            <!-- MIGRATED_TO_AUCTION 结束：数据备份已迁移到拍卖行 -->
 
             <div id="adminPageTitle" style="display:none;">
                 <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
@@ -22272,6 +22286,7 @@ function hasGistToken() {
                 </div>
             </div>
 
+            <!-- MIGRATED_TO_AUCTION 开始：拍卖统计已迁移到拍卖行 -->
             <div id="adminPageAuctionStats" style="display:none;">
                 <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
                     <button class="admin-btn admin-btn-secondary" onclick="adminShowMenu()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
@@ -22298,6 +22313,7 @@ function hasGistToken() {
                 <div id="auctionStatsSummary" style="margin-top:15px;"></div>
                 <div id="auctionStatsDetail" style="margin-top:15px;max-height:400px;overflow-y:auto;"></div>
             </div>
+            <!-- MIGRATED_TO_AUCTION 结束：拍卖统计已迁移到拍卖行 -->
 
             <div id="adminPagePasswordManage" style="display:none;">
                 <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
