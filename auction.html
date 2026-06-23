@@ -1029,6 +1029,10 @@
                 <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">
                     <button onclick="adminShowMenu()" style="background:transparent;border:none;color:#a78bfa;font-size:1rem;cursor:pointer;">← 返回</button>
                     <h3 style="color:#ff6b6b;margin:0;font-size:1rem;">📢 拍卖快讯管理</h3>
+                    <div style="margin-left:auto;display:flex;align-items:center;gap:6px;">
+                        <span style="color:rgba(255,255,255,0.5);font-size:0.75rem;">公告栏显示</span>
+                        <button id="broadcastToggleBtn" onclick="toggleAuctionBroadcastInMarquee()" style="padding:4px 12px;border-radius:12px;border:none;cursor:pointer;font-size:0.75rem;font-weight:500;transition:all 0.2s;">已开启</button>
+                    </div>
                 </div>
                 <div style="display:flex;gap:10px;margin-bottom:10px;">
                     <button onclick="adminRefreshAuctionBroadcasts()" style="padding:8px 16px;border-radius:6px;border:none;background:linear-gradient(135deg,#ff6b6b,#ef4444);color:white;cursor:pointer;font-size:0.85rem;">刷新快讯</button>
@@ -1744,6 +1748,72 @@
         }
 
         // ==================== 拍卖快讯 ====================
+        let _globalBroadcastEnabled = true; // 默认开启
+
+        // 全局拍卖快讯公告开关（存索引文件）
+        async function toggleAuctionBroadcastInMarquee() {
+            const newVal = !_globalBroadcastEnabled;
+            try {
+                const token = getGistToken();
+                if (!token) { alert('❌ 需要管理员Token才能修改全局设置'); return; }
+
+                const indexUrl = `https://api.github.com/gists/${GIST_ID}`;
+                const response = await fetch(indexUrl, {
+                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` }
+                });
+                if (!response.ok) throw new Error('获取索引失败');
+
+                const data = await response.json();
+                const index = JSON.parse(data.files['room_index.json'].content);
+                index.broadcastEnabled = newVal;
+
+                const patchResp = await fetch(indexUrl, {
+                    method: 'PATCH',
+                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` },
+                    body: JSON.stringify({ files: { 'room_index.json': { content: JSON.stringify(index, null, 2) } } })
+                });
+                if (!patchResp.ok) throw new Error('更新失败');
+
+                _globalBroadcastEnabled = newVal;
+                updateBroadcastToggleBtn();
+                alert(newVal ? '✅ 拍卖快讯公告已全局开启\n所有用户公告栏将显示拍卖快讯' : '❌ 拍卖快讯公告已全局关闭\n所有用户公告栏只显示普通公告');
+            } catch (e) {
+                alert('❌ 操作失败: ' + e.message);
+            }
+        }
+
+        function updateBroadcastToggleBtn() {
+            const btn = document.getElementById('broadcastToggleBtn');
+            if (!btn) return;
+            if (_globalBroadcastEnabled) {
+                btn.textContent = '已开启';
+                btn.style.background = 'rgba(74,222,128,0.2)';
+                btn.style.color = '#4ade80';
+            } else {
+                btn.textContent = '已关闭';
+                btn.style.background = 'rgba(239,68,68,0.2)';
+                btn.style.color = '#ef4444';
+            }
+        }
+
+        async function loadGlobalBroadcastStatus() {
+            try {
+                const token = getGistToken();
+                const indexUrl = `https://api.github.com/gists/${GIST_ID}`;
+                const response = await fetch(indexUrl, {
+                    headers: { 'Accept': 'application/vnd.github.v3+json', ...(token && { 'Authorization': `token ${token}` }) }
+                });
+                if (!response.ok) return;
+                const data = await response.json();
+                if (data.files && data.files['room_index.json'] && data.files['room_index.json'].content) {
+                    const index = JSON.parse(data.files['room_index.json'].content);
+                    _globalBroadcastEnabled = index.broadcastEnabled !== false;
+                }
+            } catch (e) {
+                console.warn('读取全局开关状态失败:', e);
+            }
+        }
+
         async function fetchAuctionBroadcastsFromGist() {
             const token = getGistToken();
             const gistDeleted = localStorage.getItem('messages_gist_deleted') === 'true';
@@ -5058,6 +5128,7 @@
                 document.getElementById('adminPageGistManage').style.display = 'block';
             } else if (page === 'broadcastManage') {
                 document.getElementById('adminPageBroadcastManage').style.display = 'block';
+                loadGlobalBroadcastStatus().then(() => updateBroadcastToggleBtn());
             } else if (page === 'roomManage') {
                 document.getElementById('adminPageRoomManage').style.display = 'block';
                 loadAllowedRoomsList();
