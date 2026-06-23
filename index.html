@@ -3126,10 +3126,12 @@
         }
 
         function updateBroadcastToggleStatus() {
-            const el = document.getElementById('broadcastToggleStatus');
-            if (!el) return;
-            el.textContent = _globalBroadcastEnabled ? '已开启（全局）' : '已关闭（全局）';
-            el.style.color = _globalBroadcastEnabled ? '#4ade80' : '#ef4444';
+            const btn = document.getElementById('broadcastToggleBtn');
+            if (btn) {
+                btn.textContent = _globalBroadcastEnabled ? '已开启' : '已关闭';
+                btn.style.background = _globalBroadcastEnabled ? 'rgba(74,222,128,0.2)' : 'rgba(239,68,68,0.2)';
+                btn.style.color = _globalBroadcastEnabled ? '#4ade80' : '#ef4444';
+            }
         }
 
         // 从索引文件读取全局开关状态
@@ -21736,13 +21738,6 @@ function hasGistToken() {
                             <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">系统设置</div>
                         </div>
                     </div>
-                    <div class="admin-menu-item" onclick="toggleAuctionBroadcastInMarquee()" style="padding:10px;">
-                        <span style="font-size:1.1rem;">📢</span>
-                        <div style="margin-left:8px;">
-                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">拍卖快讯公告</div>
-                            <div id="broadcastToggleStatus" style="font-size:0.7rem;color:#4ade80;">已开启</div>
-                        </div>
-                    </div>
                     <div class="admin-menu-item" onclick="adminShowPage('nickManage')" style="padding:10px;">
                         <span style="font-size:1.1rem;">👤</span>
                         <div style="margin-left:8px;">
@@ -22294,7 +22289,13 @@ function hasGistToken() {
                     </div>
                 </div>
                 <div class="admin-section">
-                    <h3 style="color:#ff6b6b;">🔨 拍卖快讯管理</h3>
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+                        <h3 style="color:#ff6b6b;margin:0;">🔨 拍卖快讯管理</h3>
+                        <div style="margin-left:auto;display:flex;align-items:center;gap:6px;">
+                            <span style="color:rgba(255,255,255,0.5);font-size:0.75rem;">公告栏显示</span>
+                            <button id="broadcastToggleBtn" onclick="toggleAuctionBroadcastInMarquee()" style="padding:4px 12px;border-radius:12px;border:none;cursor:pointer;font-size:0.75rem;font-weight:500;transition:all 0.2s;">已开启</button>
+                        </div>
+                    </div>
                     <div style="background:rgba(255,107,107,0.1);border-left:3px solid #ff6b6b;border-radius:6px;padding:10px;margin-bottom:10px;">
                         <div style="color:rgba(255,255,255,0.6);font-size:0.75rem;">
                             拍卖快讯由拍卖行自动生成，存储在云端所有设备共享。<br>
