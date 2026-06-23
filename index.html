@@ -3090,12 +3090,75 @@
             }
         }
 
+        // 拍卖快讯公告开关（全局，存索引文件）
+        let _globalBroadcastEnabled = true; // 默认开启
+
+        async function toggleAuctionBroadcastInMarquee() {
+            const newVal = !_globalBroadcastEnabled;
+            try {
+                const token = getGistToken();
+                if (!token) { alert('❌ 需要管理员Token才能修改全局设置'); return; }
+
+                const indexUrl = `https://api.github.com/gists/${GIST_ID}`;
+                const response = await fetch(indexUrl, {
+                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` }
+                });
+                if (!response.ok) throw new Error('获取索引失败');
+
+                const data = await response.json();
+                const index = JSON.parse(data.files['room_index.json'].content);
+                index.broadcastEnabled = newVal;
+
+                const patchResp = await fetch(indexUrl, {
+                    method: 'PATCH',
+                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` },
+                    body: JSON.stringify({ files: { 'room_index.json': { content: JSON.stringify(index, null, 2) } } })
+                });
+                if (!patchResp.ok) throw new Error('更新失败');
+
+                _globalBroadcastEnabled = newVal;
+                updateBroadcastToggleStatus();
+                updateMarqueeWithBroadcast();
+                alert(newVal ? '✅ 拍卖快讯公告已全局开启\n所有用户公告栏将显示拍卖快讯' : '❌ 拍卖快讯公告已全局关闭\n所有用户公告栏只显示普通公告');
+            } catch (e) {
+                alert('❌ 操作失败: ' + e.message);
+            }
+        }
+
+        function updateBroadcastToggleStatus() {
+            const el = document.getElementById('broadcastToggleStatus');
+            if (!el) return;
+            el.textContent = _globalBroadcastEnabled ? '已开启（全局）' : '已关闭（全局）';
+            el.style.color = _globalBroadcastEnabled ? '#4ade80' : '#ef4444';
+        }
+
+        // 从索引文件读取全局开关状态
+        async function loadGlobalBroadcastStatus() {
+            try {
+                const token = getGistToken();
+                const indexUrl = `https://api.github.com/gists/${GIST_ID}`;
+                const response = await fetch(indexUrl, {
+                    headers: { 'Accept': 'application/vnd.github.v3+json', ...(token && { 'Authorization': `token ${token}` }) }
+                });
+                if (!response.ok) return;
+
+                const data = await response.json();
+                if (data.files && data.files['room_index.json'] && data.files['room_index.json'].content) {
+                    const index = JSON.parse(data.files['room_index.json'].content);
+                    _globalBroadcastEnabled = index.broadcastEnabled !== false;
+                }
+            } catch (e) {
+                console.warn('读取全局开关状态失败:', e);
+            }
+        }
+
         // 更新公告栏显示（拍卖播报优先）
         function updateMarqueeWithBroadcast() {
             const marqueeEl = document.getElementById('newsMarquee');
             if (!marqueeEl) return;
 
-            if (auctionBroadcastQueue.length > 0) {
+            // 检查全局拍卖快讯公告开关
+            if (_globalBroadcastEnabled && auctionBroadcastQueue.length > 0) {
                 // 有拍卖播报，显示播报内容
                 const broadcastTexts = auctionBroadcastQueue.map(item => item.text).join('　　◆　　');
                 marqueeEl.textContent = '📢 拍卖快讯：' + broadcastTexts;
@@ -13583,6 +13646,9 @@ function hasGistToken() {
             // 初始化版本切换功能
             initVersionSwitch();
             
+            // 加载全局拍卖快讯开关状态
+            await loadGlobalBroadcastStatus();
+            
             // 初始化消息墙
             initMessageWall();
             
@@ -16984,6 +17050,7 @@ function hasGistToken() {
             if (backupPage) backupPage.style.display = 'none';
             const scriptStatsPage = document.getElementById('adminPageScriptStats');
             if (scriptStatsPage) scriptStatsPage.style.display = 'none';
+            updateBroadcastToggleStatus();
         }
 
         function adminShowPage(page) {
@@ -21667,6 +21734,13 @@ function hasGistToken() {
                         <span style="font-size:1.1rem;">⚙️</span>
                         <div style="margin-left:8px;">
                             <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">系统设置</div>
+                        </div>
+                    </div>
+                    <div class="admin-menu-item" onclick="toggleAuctionBroadcastInMarquee()" style="padding:10px;">
+                        <span style="font-size:1.1rem;">📢</span>
+                        <div style="margin-left:8px;">
+                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">拍卖快讯公告</div>
+                            <div id="broadcastToggleStatus" style="font-size:0.7rem;color:#4ade80;">已开启</div>
                         </div>
                     </div>
                     <div class="admin-menu-item" onclick="adminShowPage('nickManage')" style="padding:10px;">
