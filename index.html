@@ -19847,7 +19847,7 @@ function hasGistToken() {
                 const index = JSON.parse(indexContent);
                 const allowedRooms = index.allowedRooms || [];
                 const allRoomIds = allowedRooms.map(r => typeof r === 'string' ? r : r.id).filter(id => id && id !== 'news');
-                const NON_ROOM_KEYS = new Set(['allowedRooms', 'usedNicks', 'news', 'messages', 'counter', 'auction_broadcasts']);
+                const NON_ROOM_KEYS = new Set(['allowedRooms', 'usedNicks', 'news', 'messages', 'counter', 'auction_broadcasts', 'broadcastEnabled']);
                 Object.keys(index).forEach(key => {
                     if (!NON_ROOM_KEYS.has(key) && !allRoomIds.includes(key)) {
                         allRoomIds.push(key);
@@ -20275,7 +20275,7 @@ function hasGistToken() {
                 const allowedRooms = index.allowedRooms || [];
                 const allRoomIds = allowedRooms.map(r => typeof r === 'string' ? r : r.id).filter(id => id && id !== 'news');
                 // 也包含索引中有gist但不在白名单的房间
-                const NON_ROOM_KEYS2 = new Set(['allowedRooms', 'usedNicks', 'news', 'messages', 'counter', 'auction_broadcasts']);
+                const NON_ROOM_KEYS2 = new Set(['allowedRooms', 'usedNicks', 'news', 'messages', 'counter', 'auction_broadcasts', 'broadcastEnabled']);
                 Object.keys(index).forEach(key => {
                     if (!NON_ROOM_KEYS2.has(key) && !allRoomIds.includes(key)) {
                         allRoomIds.push(key);
