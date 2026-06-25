@@ -6920,7 +6920,7 @@
                     allRoomIds.add(id);
                 });
                 // 索引文件中的非房间键（messages、counter等是共享Gist，不是聊天房间）
-                const NON_ROOM_KEYS = new Set(['allowedRooms', 'blockedRooms', 'usedNicks', 'messages', 'counter', 'news', 'auction_broadcasts']);
+                const NON_ROOM_KEYS = new Set(['allowedRooms', 'blockedRooms', 'usedNicks', 'messages', 'counter', 'news', 'auction_broadcasts', 'broadcastEnabled']);
                 Object.keys(index).forEach(key => {
                     if (!NON_ROOM_KEYS.has(key)) {
                         allRoomIds.add(key);
