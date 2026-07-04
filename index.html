@@ -6403,24 +6403,30 @@
             const lines = input.split('\n').map(line => line.trim()).filter(line => line);
             let heroNames = [];
             let zhenZhanLine = '';
+            let otherLines = []; // 魔化、皮肤、主战车、副战车等行
+            let moHuaCards = []; // 魔化的卡牌列表
 
-            lines.forEach(line => {
+            lines.forEach((line, index) => {
                 if (line.match(/^上阵[：:]/)) {
                     zhenZhanLine = line;
                     const match = line.match(/上阵[：:]\s*(.+)/);
                     if (match && match[1]) {
                         heroNames = match[1].split(/[,，]/).map(name => name.trim()).filter(name => name);
                     }
+                } else if (line.match(/^魔化[：:]/)) {
+                    otherLines.push(line);
+                    // 提取魔化的卡牌名称
+                    const match = line.match(/魔化[：:]\s*(.+)/);
+                    if (match && match[1]) {
+                        moHuaCards = match[1].split(/[,，]/).map(name => name.trim()).filter(name => name);
+                    }
+                } else if (line.match(/^(皮肤|主战车|副战车)[：:]/)) {
+                    otherLines.push(line);
+                } else if (index === 0 && !line.match(/^(魔化|皮肤|主战车|副战车)[：:]/)) {
+                    // 没有"上阵："前缀时，直接解析第一行作为卡牌列表
+                    heroNames = line.split(/[,，]/).map(name => name.trim()).filter(name => name);
                 }
             });
-
-            // 没有"上阵："前缀时，直接解析第一行作为卡牌列表
-            if (heroNames.length === 0 && lines.length > 0) {
-                const firstLine = lines[0];
-                if (!firstLine.match(/^(魔化|皮肤|主战车|副战车)[：:]/)) {
-                    heroNames = firstLine.split(/[,，]/).map(name => name.trim()).filter(name => name);
-                }
-            }
 
             // 没有"上阵："时，自动补上
             if (heroNames.length > 0 && !zhenZhanLine) {
@@ -6446,6 +6452,7 @@
             const hasLeiJingLing = heroNames.some(name => name.includes('雷精灵'));
             const hasMuJingLing = heroNames.some(name => name.includes('木精灵'));
             const hasHunJingLing = heroNames.some(name => name.includes('魂精灵'));
+            const hasHuanJingLing = heroNames.some(name => name.includes('幻精灵'));
 
             const hasSheXian = heroNames.some(name => name.includes('射线'));
             const hasBaoKu = heroNames.some(name => name.includes('宝库'));
@@ -6530,10 +6537,16 @@
 
             // 头部信息
             if (zhenZhanLine) output += zhenZhanLine + '\n';
-            output += '皮肤：\n';
-            output += '魔化：\n';
-            output += '主战车：\n';
-            output += '副战车：\n';
+            // 保留用户输入的皮肤、魔化、主战车、副战车行，没有则输出默认空行
+            const defaultLines = ['皮肤：', '魔化：', '主战车：', '副战车：'];
+            defaultLines.forEach(defaultLine => {
+                const foundLine = otherLines.find(line => line.startsWith(defaultLine.replace('：', '')));
+                if (foundLine) {
+                    output += foundLine + '\n';
+                } else {
+                    output += defaultLine + '\n';
+                }
+            });
             output += '\n';
 
             // 第1行 (时间1)
@@ -6584,6 +6597,11 @@
                     line2Parts.push('上' + name + '满');
                 });
                 output += '11,' + line2Parts.join(',') + ',\n';
+            }
+
+            // 有幻精灵时，16波换龙心
+            if (hasHuanJingLing) {
+                output += '16,换龙心,\n';
             }
 
             // 第3行 (时间19) - 下循环卡（火灵、虎弓、天使）
