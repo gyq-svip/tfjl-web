@@ -1,0 +1,2217 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=3.0, user-scalable=yes">
+    <title>🎮 副本统计</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html {
+            touch-action: manipulation;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            padding: 20px 10px;
+            color: #fff;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
+            15% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            85% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        /* ========== Header ========== */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+            background: rgba(255,255,255,0.05);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(0,188,212,0.2);
+            border-radius: 12px;
+            padding: 14px 18px;
+            margin-bottom: 16px;
+        }
+
+        .header-title {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #00bcd4;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .season-select {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(0,188,212,0.4);
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            min-height: 40px;
+            cursor: pointer;
+        }
+
+        .season-select option {
+            background: #16213e;
+            color: #fff;
+        }
+
+        .token-status {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.85rem;
+            color: rgba(255,255,255,0.7);
+            padding: 6px 10px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 20px;
+        }
+
+        .token-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ef4444;
+        }
+
+        .token-dot.active {
+            background: #4ade80;
+            box-shadow: 0 0 6px #4ade80;
+        }
+
+        .icon-btn {
+            background: rgba(0,188,212,0.15);
+            border: 1px solid rgba(0,188,212,0.4);
+            color: #00bcd4;
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .icon-btn:hover {
+            background: rgba(0,188,212,0.3);
+        }
+
+        /* ========== Tab 导航 ========== */
+        .tab-nav {
+            display: flex;
+            gap: 4px;
+            background: rgba(255,255,255,0.05);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 6px;
+            margin-bottom: 16px;
+            overflow-x: auto;
+        }
+
+        .tab-btn {
+            flex: 1;
+            min-width: 70px;
+            background: transparent;
+            border: none;
+            color: rgba(255,255,255,0.6);
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .tab-btn.active {
+            background: linear-gradient(135deg, #00bcd4, #00838f);
+            color: #fff;
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(0,188,212,0.3);
+        }
+
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* ========== 卡片 ========== */
+        .card {
+            background: rgba(255,255,255,0.05);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            padding: 18px;
+            margin-bottom: 14px;
+        }
+
+        .card-title {
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: #ffd700;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* ========== 进度条 ========== */
+        .progress-wrap {
+            margin-bottom: 8px;
+        }
+
+        .progress-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9rem;
+            color: rgba(255,255,255,0.8);
+            margin-bottom: 6px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 14px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00bcd4, #00838f);
+            border-radius: 10px;
+            transition: width 0.5s ease;
+        }
+
+        /* ========== 数字展示 ========== */
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+        }
+
+        .stat-item {
+            background: rgba(0,0,0,0.2);
+            border-radius: 10px;
+            padding: 14px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #00bcd4;
+        }
+
+        .stat-value.gold {
+            color: #ffd700;
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: rgba(255,255,255,0.6);
+            margin-top: 4px;
+        }
+
+        /* ========== 奖牌 ========== */
+        .podium {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .podium-item {
+            flex: 1;
+            min-width: 100px;
+            background: rgba(0,0,0,0.25);
+            border-radius: 10px;
+            padding: 14px 10px;
+            text-align: center;
+            border: 2px solid transparent;
+        }
+
+        .podium-item.rank-1 {
+            border-color: #ffd700;
+            background: rgba(255,215,0,0.1);
+        }
+
+        .podium-item.rank-2 {
+            border-color: #c0c0c0;
+            background: rgba(192,192,192,0.1);
+        }
+
+        .podium-item.rank-3 {
+            border-color: #cd7f32;
+            background: rgba(205,127,50,0.1);
+        }
+
+        .podium-medal {
+            font-size: 2rem;
+        }
+
+        .podium-name {
+            font-size: 0.95rem;
+            font-weight: 600;
+            margin: 6px 0 2px;
+            word-break: break-all;
+        }
+
+        .podium-cups {
+            font-size: 0.85rem;
+            color: rgba(255,255,255,0.7);
+        }
+
+        /* ========== 表单 ========== */
+        .form-group {
+            margin-bottom: 12px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.85rem;
+            color: rgba(255,255,255,0.7);
+            margin-bottom: 6px;
+        }
+
+        .form-input,
+        .form-select,
+        .form-textarea {
+            width: 100%;
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(0,188,212,0.3);
+            color: #fff;
+            padding: 10px 12px;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            min-height: 42px;
+            font-family: inherit;
+        }
+
+        .form-input:focus,
+        .form-select:focus,
+        .form-textarea:focus {
+            outline: none;
+            border-color: #00bcd4;
+            box-shadow: 0 0 0 2px rgba(0,188,212,0.2);
+        }
+
+        .form-textarea {
+            min-height: 70px;
+            resize: vertical;
+        }
+
+        .form-select option {
+            background: #16213e;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .form-row > * {
+            flex: 1;
+            min-width: 120px;
+        }
+
+        .calc-box {
+            background: rgba(0,188,212,0.08);
+            border: 1px dashed rgba(0,188,212,0.3);
+            border-radius: 8px;
+            padding: 10px 12px;
+            margin-bottom: 12px;
+            font-size: 0.9rem;
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .calc-box .calc-item {
+            color: rgba(255,255,255,0.8);
+        }
+
+        .calc-box .calc-item span {
+            color: #ffd700;
+            font-weight: 600;
+        }
+
+        /* ========== 按钮 ========== */
+        .btn {
+            background: linear-gradient(135deg, #00bcd4, #00838f);
+            color: #fff;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            min-height: 42px;
+            font-family: inherit;
+        }
+
+        .btn:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-gold {
+            background: linear-gradient(135deg, #ffd700, #b8860b);
+            color: #1a1a2e;
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ef4444, #b91c1c);
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid rgba(0,188,212,0.5);
+            color: #00bcd4;
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            min-height: 34px;
+            font-size: 0.85rem;
+        }
+
+        .btn-block {
+            width: 100%;
+        }
+
+        /* ========== 成员列表 ========== */
+        .member-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .member-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 10px;
+            padding: 10px 12px;
+            flex-wrap: wrap;
+        }
+
+        .member-row .m-index {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: rgba(0,188,212,0.2);
+            color: #00bcd4;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.85rem;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+
+        .member-row .m-name {
+            flex: 1;
+            min-width: 80px;
+            font-weight: 500;
+            word-break: break-all;
+        }
+
+        .member-row .m-info {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            font-size: 0.85rem;
+            color: rgba(255,255,255,0.7);
+        }
+
+        .member-row .m-info span {
+            white-space: nowrap;
+        }
+
+        .pass-badge {
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .pass-badge.bought {
+            background: rgba(74,222,128,0.2);
+            color: #4ade80;
+            border: 1px solid rgba(74,222,128,0.4);
+        }
+
+        .pass-badge.not-bought {
+            background: rgba(239,68,68,0.15);
+            color: #f87171;
+            border: 1px solid rgba(239,68,68,0.3);
+        }
+
+        /* ========== 排名列表 ========== */
+        .rank-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .rank-row {
+            background: rgba(0,0,0,0.2);
+            border-radius: 10px;
+            padding: 12px;
+            border-left: 4px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .rank-row:hover {
+            background: rgba(0,188,212,0.08);
+        }
+
+        .rank-row.rank-1 {
+            border-left-color: #ffd700;
+            background: rgba(255,215,0,0.06);
+        }
+
+        .rank-row.rank-2 {
+            border-left-color: #c0c0c0;
+            background: rgba(192,192,192,0.06);
+        }
+
+        .rank-row.rank-3 {
+            border-left-color: #cd7f32;
+            background: rgba(205,127,50,0.06);
+        }
+
+        .rank-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .rank-num {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        .rank-row.rank-1 .rank-num { background: #ffd700; color: #1a1a2e; }
+        .rank-row.rank-2 .rank-num { background: #c0c0c0; color: #1a1a2e; }
+        .rank-row.rank-3 .rank-num { background: #cd7f32; color: #1a1a2e; }
+
+        .rank-name {
+            flex: 1;
+            font-weight: 600;
+            min-width: 70px;
+            word-break: break-all;
+        }
+
+        .rank-cups {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #ffd700;
+        }
+
+        .rank-meta {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            font-size: 0.8rem;
+            color: rgba(255,255,255,0.6);
+            margin-top: 8px;
+        }
+
+        .rank-detail {
+            display: none;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .rank-detail.show {
+            display: block;
+        }
+
+        .detail-day {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            font-size: 0.82rem;
+            border-bottom: 1px dashed rgba(255,255,255,0.06);
+        }
+
+        .detail-day:last-child {
+            border-bottom: none;
+        }
+
+        .detail-day .d-label {
+            color: rgba(255,255,255,0.6);
+        }
+
+        .detail-day .d-value {
+            color: #00bcd4;
+        }
+
+        /* ========== 模态框 ========== */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            padding: 16px;
+        }
+
+        .modal-overlay.show {
+            display: flex;
+        }
+
+        .modal {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            border: 1px solid rgba(0,188,212,0.3);
+            border-radius: 14px;
+            padding: 22px;
+            width: 100%;
+            max-width: 460px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #00bcd4;
+            margin-bottom: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: rgba(255,255,255,0.6);
+            font-size: 1.4rem;
+            cursor: pointer;
+            line-height: 1;
+        }
+
+        .modal-tip {
+            background: rgba(255,215,0,0.1);
+            border: 1px solid rgba(255,215,0,0.3);
+            color: #ffd700;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            margin-bottom: 14px;
+        }
+
+        /* ========== 图片预览 ========== */
+        .img-preview {
+            margin-top: 8px;
+            position: relative;
+            display: none;
+        }
+
+        .img-preview.show {
+            display: block;
+        }
+
+        .img-preview img {
+            max-width: 100%;
+            max-height: 200px;
+            border-radius: 8px;
+            border: 1px solid rgba(0,188,212,0.3);
+            cursor: pointer;
+            display: block;
+        }
+
+        .img-thumb {
+            width: 50px;
+            height: 50px;
+            object-fit: cover;
+            border-radius: 6px;
+            border: 1px solid rgba(0,188,212,0.3);
+            cursor: pointer;
+            vertical-align: middle;
+        }
+
+        .img-large-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            cursor: zoom-out;
+            padding: 20px;
+        }
+
+        .img-large-overlay.show {
+            display: flex;
+        }
+
+        .img-large-overlay img {
+            max-width: 95%;
+            max-height: 95%;
+            border-radius: 8px;
+        }
+
+        /* ========== 加载状态 ========== */
+        .loading-mask {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1500;
+        }
+
+        .loading-mask.show {
+            display: flex;
+        }
+
+        .spinner {
+            width: 44px;
+            height: 44px;
+            border: 4px solid rgba(0,188,212,0.2);
+            border-top-color: #00bcd4;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        .loading-text {
+            color: #fff;
+            margin-left: 12px;
+            font-size: 0.95rem;
+        }
+
+        /* ========== 空状态 ========== */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: rgba(255,255,255,0.5);
+        }
+
+        .empty-state .emoji {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        /* ========== 工具栏 ========== */
+        .toolbar {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+            align-items: center;
+        }
+
+        .toolbar .spacer {
+            flex: 1;
+        }
+
+        /* ========== Toast ========== */
+        .toast {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 14px 26px;
+            border-radius: 10px;
+            font-size: 0.95rem;
+            font-weight: 500;
+            z-index: 9999;
+            animation: fadeInOut 2s ease-in-out;
+            max-width: 80%;
+            text-align: center;
+        }
+
+        .toast.success { background: rgba(74,222,128,0.95); color: #1a1a2e; }
+        .toast.error { background: rgba(239,68,68,0.95); color: #fff; }
+        .toast.info { background: rgba(0,188,212,0.95); color: #fff; }
+
+        /* ========== 移动端 ========== */
+        @media (max-width: 768px) {
+            body {
+                padding: 12px 6px;
+            }
+
+            .header {
+                padding: 12px;
+            }
+
+            .header-title {
+                font-size: 1.2rem;
+                width: 100%;
+            }
+
+            .header-controls {
+                width: 100%;
+                justify-content: space-between;
+            }
+
+            .tab-btn {
+                padding: 10px 8px;
+                font-size: 0.88rem;
+            }
+
+            .card {
+                padding: 14px;
+            }
+
+            .stat-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .stat-value {
+                font-size: 1.5rem;
+            }
+
+            .podium {
+                flex-direction: column;
+            }
+
+            .form-row > * {
+                min-width: 100%;
+            }
+
+            .member-row {
+                font-size: 0.85rem;
+            }
+
+            input[type="text"],
+            input[type="password"],
+            input[type="number"],
+            input[type="textarea"],
+            select,
+            textarea {
+                font-size: 16px !important;
+            }
+
+            .modal {
+                padding: 16px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .stat-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .rank-meta {
+                font-size: 0.75rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-title">🎮 副本统计</div>
+            <div class="header-controls">
+                <select class="season-select" id="seasonSelect" onchange="switchSeasonFromSelect()"></select>
+                <button class="icon-btn" onclick="addNewSeason()" title="新建赛季">➕</button>
+                <div class="token-status">
+                    <span class="token-dot" id="tokenDot"></span>
+                    <span id="tokenStatusText">未设置</span>
+                </div>
+                <button class="icon-btn" onclick="showSettings()" title="设置">⚙️</button>
+            </div>
+        </div>
+
+        <!-- Tab 导航 -->
+        <div class="tab-nav">
+            <button class="tab-btn active" data-tab="overview" onclick="switchTab('overview')">概览</button>
+            <button class="tab-btn" data-tab="members" onclick="switchTab('members')">成员</button>
+            <button class="tab-btn" data-tab="records" onclick="switchTab('records')">记录</button>
+            <button class="tab-btn" data-tab="rankings" onclick="switchTab('rankings')">排名</button>
+        </div>
+
+        <!-- Tab 1: 概览 -->
+        <div class="tab-content active" id="tab-overview">
+            <div class="card">
+                <div class="card-title">📅 赛季进度</div>
+                <div class="progress-wrap">
+                    <div class="progress-label">
+                        <span id="progressDayText">第 1 天 / 14 天</span>
+                        <span id="progressPercent">7%</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill" style="width:7%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">📊 联盟数据</div>
+                <div class="stat-grid">
+                    <div class="stat-item">
+                        <div class="stat-value gold" id="totalCups">0</div>
+                        <div class="stat-label">联盟总杯数</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="todayRecorded">0 / 0</div>
+                        <div class="stat-label">今日已记录</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="totalMembers">0</div>
+                        <div class="stat-label">联盟人数</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value gold" id="totalSpent">¥0</div>
+                        <div class="stat-label">总消费估算</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">🏆 前3名</div>
+                <div class="podium" id="podiumList">
+                    <div class="empty-state" style="padding:20px;">
+                        <div class="emoji">🎯</div>
+                        <div>暂无数据，请先添加成员并记录</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">💳 购买统计</div>
+                <div class="stat-grid">
+                    <div class="stat-item">
+                        <div class="stat-value" id="passRate">0%</div>
+                        <div class="stat-label">通行证购买率</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value gold" id="passCount">0 / 0</div>
+                        <div class="stat-label">通行证 / 总人数</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 2: 成员管理 -->
+        <div class="tab-content" id="tab-members">
+            <div class="card">
+                <div class="card-title">➕ 添加成员</div>
+                <div class="form-row">
+                    <input type="text" class="form-input" id="memberNameInput" placeholder="输入成员名称" onkeydown="if(event.key==='Enter')addMember()">
+                    <button class="btn" onclick="addMember()">添加</button>
+                </div>
+                <div style="font-size:0.8rem;color:rgba(255,255,255,0.5);margin-top:6px;">最多 81 人，当前：<span id="memberCountText">0</span> / 81</div>
+            </div>
+
+            <div class="card">
+                <div class="toolbar">
+                    <div class="card-title" style="margin-bottom:0;">👥 成员列表</div>
+                    <div class="spacer"></div>
+                    <button class="btn btn-danger btn-sm" onclick="clearAllMembers()">清空所有</button>
+                </div>
+                <div class="member-list" id="memberList" style="margin-top:12px;"></div>
+            </div>
+        </div>
+
+        <!-- Tab 3: 每日记录 -->
+        <div class="tab-content" id="tab-records">
+            <div class="card">
+                <div class="card-title">📝 每日记录</div>
+                <div class="form-row">
+                    <div class="form-group" style="min-width:140px;">
+                        <label class="form-label">天数</label>
+                        <select class="form-select" id="daySelect" onchange="loadDailyRecord()"></select>
+                    </div>
+                    <div class="form-group" style="min-width:160px;">
+                        <label class="form-label">成员</label>
+                        <select class="form-select" id="memberSelect" onchange="loadDailyRecord()"></select>
+                    </div>
+                </div>
+                <div id="dayDateText" style="font-size:0.85rem;color:rgba(255,255,255,0.6);margin-bottom:12px;"></div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">⚔️ 体力与杯数</div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">免费体力（默认2）</label>
+                        <input type="number" class="form-input" id="freeStamina" value="2" min="0" oninput="recalcDaily()">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">30元次数（限1）</label>
+                        <input type="number" class="form-input" id="p30" value="0" min="0" max="1" oninput="recalcDaily()">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">128元次数（限3）</label>
+                        <input type="number" class="form-input" id="p128" value="0" min="0" max="3" oninput="recalcDaily()">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">328元次数（限3）</label>
+                        <input type="number" class="form-input" id="p328" value="0" min="0" max="3" oninput="recalcDaily()">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">648元次数（不限）</label>
+                        <input type="number" class="form-input" id="p648" value="0" min="0" oninput="recalcDaily()">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">实际杯数</label>
+                        <input type="number" class="form-input" id="actualCups" value="0" min="0" oninput="onActualCupsInput()">
+                    </div>
+                </div>
+
+                <div class="calc-box">
+                    <div class="calc-item">今日体力总计：<span id="totalStamina">0</span></div>
+                    <div class="calc-item">预期杯数：<span id="expectedCups">0</span></div>
+                    <div class="calc-item">今日消费：<span id="dailySpent">¥0</span></div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">截图上传</label>
+                    <div class="form-row">
+                        <input type="file" class="form-input" id="imageFile" accept="image/*" style="flex:2;min-width:0;" onchange="previewImage(this)">
+                        <button class="btn btn-outline" id="uploadImgBtn" onclick="uploadImageToGist()" style="flex:1;min-width:90px;">上传</button>
+                    </div>
+                    <div class="img-preview" id="imgPreview">
+                        <img id="imgPreviewEl" src="" alt="预览" onclick="showLargeImage(this.src)">
+                    </div>
+                    <div id="imgUploadedTip" style="font-size:0.8rem;color:#4ade80;margin-top:6px;display:none;">✅ 已上传截图</div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">备注</label>
+                    <textarea class="form-textarea" id="noteInput" placeholder="可填写备注信息"></textarea>
+                </div>
+
+                <button class="btn btn-block btn-gold" id="saveRecordBtn" onclick="saveDailyRecord()">保存记录</button>
+            </div>
+        </div>
+
+        <!-- Tab 4: 排名统计 -->
+        <div class="tab-content" id="tab-rankings">
+            <div class="card">
+                <div class="card-title">📈 联盟汇总</div>
+                <div class="stat-grid">
+                    <div class="stat-item">
+                        <div class="stat-value gold" id="rankTotalCups">0</div>
+                        <div class="stat-label">总杯数</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="rankTotalStamina">0</div>
+                        <div class="stat-label">总体力</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value gold" id="rankTotalSpent">¥0</div>
+                        <div class="stat-label">总消费</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="rankAvgCups">0</div>
+                        <div class="stat-label">平均杯数</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="rankPassRate">0%</div>
+                        <div class="stat-label">通行证率</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="toolbar">
+                    <div class="card-title" style="margin-bottom:0;">🏆 排名列表</div>
+                    <div class="spacer"></div>
+                    <button class="btn btn-outline btn-sm" onclick="exportData()">导出JSON</button>
+                </div>
+                <div class="rank-list" id="rankList" style="margin-top:12px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 设置模态框 -->
+    <div class="modal-overlay" id="settingsModal">
+        <div class="modal">
+            <div class="modal-title">
+                <span>⚙️ 设置</span>
+                <button class="modal-close" onclick="closeSettings()">×</button>
+            </div>
+
+            <div class="modal-tip" id="tokenTip">
+                请先在主站设置 Token，或在此处输入
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">主数据 Gist ID</label>
+                <input type="text" class="form-input" id="gistIdInput" placeholder="输入已有 Gist ID 或点击创建">
+            </div>
+            <div class="form-row" style="margin-bottom:14px;">
+                <button class="btn btn-outline btn-sm" onclick="createGameGist()" style="flex:1;">创建新 Gist</button>
+                <button class="btn btn-sm" onclick="saveGistId()" style="flex:1;">保存 ID</button>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">GitHub Token</label>
+                <input type="password" class="form-input" id="tokenInput" placeholder="输入 ghp_ 开头的 Token">
+            </div>
+            <button class="btn btn-block" onclick="saveTokenFromSettings()">保存 Token</button>
+        </div>
+    </div>
+
+    <!-- 图片大图查看 -->
+    <div class="img-large-overlay" id="imgLargeOverlay" onclick="closeLargeImage()">
+        <img id="imgLargeEl" src="" alt="大图">
+    </div>
+
+    <!-- 加载状态 -->
+    <div class="loading-mask" id="loadingMask">
+        <div style="display:flex;align-items:center;">
+            <div class="spinner"></div>
+            <span class="loading-text" id="loadingText">加载中...</span>
+        </div>
+    </div>
+
+    <script>
+        // ==================== 常量 ====================
+        const GIST_TOKEN_KEY = 'TFJL_Gist_Token';
+        const GIST_ID_KEY = 'GAME_STATS_GIST_ID';
+        const GIST_FILENAME = 'game_stats.json';
+        const MAX_MEMBERS = 81;
+        const SEASON_DAYS = 14;
+        // 购买规则：[金额, 单次体力, 限购次数（-1为不限）]
+        const PURCHASE_RULES = {
+            p30:  { price: 30,  stamina: 1,  limit: 1 },
+            p128: { price: 128, stamina: 3,  limit: 3 },
+            p328: { price: 328, stamina: 6,  limit: 3 },
+            p648: { price: 648, stamina: 10, limit: -1 }
+        };
+        const PASS_PRICE = 50;
+        const CUPS_PER_STAMINA = 100;
+
+        // ==================== Token 管理 ====================
+        function getGistToken() {
+            const HARDCODED_TOKEN = 'YOUR_GITHUB_TOKEN_HERE';
+            if (HARDCODED_TOKEN && HARDCODED_TOKEN.length > 20 && HARDCODED_TOKEN.startsWith('ghp_')) {
+                return HARDCODED_TOKEN;
+            }
+            return localStorage.getItem(GIST_TOKEN_KEY) || '';
+        }
+
+        function setGistToken(token) {
+            localStorage.setItem(GIST_TOKEN_KEY, token);
+        }
+
+        function hasGistToken() {
+            return !!getGistToken();
+        }
+
+        function getGistId() {
+            return localStorage.getItem(GIST_ID_KEY) || '';
+        }
+
+        function setGistId(id) {
+            localStorage.setItem(GIST_ID_KEY, id);
+        }
+
+        // ==================== 全局状态 ====================
+        let gameData = { seasons: [], currentSeasonId: '' };
+        let currentTab = 'overview';
+        let saveTimer = null;
+        let currentImageGistId = '';
+
+        // ==================== 加载状态 ====================
+        function showLoading(text) {
+            document.getElementById('loadingText').textContent = text || '加载中...';
+            document.getElementById('loadingMask').classList.add('show');
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingMask').classList.remove('show');
+        }
+
+        // ==================== Toast ====================
+        function showToast(msg, type) {
+            const toast = document.createElement('div');
+            toast.className = 'toast ' + (type || 'info');
+            toast.textContent = msg;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 2000);
+        }
+
+        // ==================== Gist 操作 ====================
+        async function createGameGist() {
+            const token = getGistToken();
+            if (!token) {
+                showToast('请先设置 Token', 'error');
+                return;
+            }
+            showLoading('创建 Gist 中...');
+            try {
+                const initData = { seasons: [], currentSeasonId: '' };
+                const response = await fetch('https://api.github.com/gists', {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json',
+                        'Authorization': `token ${token}`
+                    },
+                    body: JSON.stringify({
+                        description: '副本统计数据',
+                        public: false,
+                        files: {
+                            [GIST_FILENAME]: { content: JSON.stringify(initData, null, 2) }
+                        }
+                    })
+                });
+                if (!response.ok) {
+                    const err = await response.json().catch(() => ({}));
+                    throw new Error('创建失败: ' + (err.message || response.status));
+                }
+                const data = await response.json();
+                setGistId(data.id);
+                document.getElementById('gistIdInput').value = data.id;
+                gameData = initData;
+                showToast('✅ Gist 创建成功', 'success');
+                await refreshAll();
+            } catch (e) {
+                showToast('创建 Gist 失败: ' + e.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function getGameGistData() {
+            const token = getGistToken();
+            const gistId = getGistId();
+            if (!gistId) {
+                return null;
+            }
+            const response = await fetch(`https://api.github.com/gists/${gistId}`, {
+                headers: {
+                    'Accept': 'application/vnd.github.v3+json',
+                    ...(token && { 'Authorization': `token ${token}` })
+                }
+            });
+            if (response.status === 404) {
+                throw new Error('Gist 不存在，请重新创建');
+            }
+            if (!response.ok) {
+                const err = await response.json().catch(() => ({}));
+                throw new Error('读取失败: ' + (err.message || response.status));
+            }
+            const data = await response.json();
+            if (data.files && data.files[GIST_FILENAME] && data.files[GIST_FILENAME].content) {
+                const content = data.files[GIST_FILENAME].content;
+                return JSON.parse(content);
+            }
+            throw new Error('Gist 中未找到数据文件');
+        }
+
+        async function saveGameGistData(data) {
+            const token = getGistToken();
+            const gistId = getGistId();
+            if (!gistId) {
+                throw new Error('未设置 Gist ID');
+            }
+            if (!token) {
+                throw new Error('未设置 Token');
+            }
+            const response = await fetch(`https://api.github.com/gists/${gistId}`, {
+                method: 'PATCH',
+                headers: {
+                    'Accept': 'application/vnd.github.v3+json',
+                    'Content-Type': 'application/json',
+                    'Authorization': `token ${token}`
+                },
+                body: JSON.stringify({
+                    files: {
+                        [GIST_FILENAME]: { content: JSON.stringify(data, null, 2) }
+                        }
+                })
+            });
+            if (!response.ok) {
+                const err = await response.json().catch(() => ({}));
+                throw new Error('保存失败: ' + (err.message || response.status));
+            }
+        }
+
+        // 防抖保存
+        function debounceSave() {
+            if (saveTimer) clearTimeout(saveTimer);
+            saveTimer = setTimeout(async () => {
+                try {
+                    await saveGameGistData(gameData);
+                } catch (e) {
+                    showToast('自动保存失败: ' + e.message, 'error');
+                }
+            }, 1500);
+        }
+
+        // 立即保存（带加载状态）
+        async function saveNow() {
+            if (saveTimer) {
+                clearTimeout(saveTimer);
+                saveTimer = null;
+            }
+            showLoading('保存中...');
+            try {
+                await saveGameGistData(gameData);
+                showToast('✅ 保存成功', 'success');
+            } catch (e) {
+                showToast('保存失败: ' + e.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // ==================== 图片操作 ====================
+        async function uploadImageToGist() {
+            const fileInput = document.getElementById('imageFile');
+            const file = fileInput.files[0];
+            if (!file) {
+                showToast('请先选择图片', 'error');
+                return;
+            }
+            const token = getGistToken();
+            if (!token) {
+                showToast('未设置 Token，无法上传', 'error');
+                return;
+            }
+            showLoading('上传图片中...');
+            try {
+                const base64 = await fileToBase64(file);
+                const base64Data = base64.replace(/^data:image\/\w+;base64,/, '');
+                const ext = (file.name.split('.').pop() || 'png').toLowerCase();
+                const timestamp = Date.now();
+                const random = Math.random().toString(36).substr(2, 6);
+                const filename = `dungeon_img_${timestamp}_${random}.${ext}`;
+
+                const response = await fetch('https://api.github.com/gists', {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json',
+                        'Authorization': `token ${token}`
+                    },
+                    body: JSON.stringify({
+                        description: '副本截图',
+                        public: false,
+                        files: {
+                            [filename]: { content: base64Data }
+                        }
+                    })
+                });
+                if (!response.ok) {
+                    const err = await response.json().catch(() => ({}));
+                    throw new Error(err.message || response.status);
+                }
+                const data = await response.json();
+                currentImageGistId = data.id;
+                document.getElementById('imgUploadedTip').style.display = 'block';
+                document.getElementById('uploadImgBtn').disabled = true;
+                showToast('✅ 图片上传成功', 'success');
+            } catch (e) {
+                showToast('图片上传失败: ' + e.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        async function getImageUrl(gistId) {
+            if (!gistId) return '';
+            const token = getGistToken();
+            try {
+                const response = await fetch(`https://api.github.com/gists/${gistId}`, {
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        ...(token && { 'Authorization': `token ${token}` })
+                    }
+                });
+                if (!response.ok) return '';
+                const data = await response.json();
+                if (data.files) {
+                    const firstKey = Object.keys(data.files)[0];
+                    if (firstKey) {
+                        const fileObj = data.files[firstKey];
+                        const content = fileObj.content || '';
+                        if (content) {
+                            // 根据文件扩展名判断 MIME 类型
+                            const ext = (firstKey.split('.').pop() || 'png').toLowerCase();
+                            const mimeMap = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp', bmp: 'image/bmp' };
+                            const mime = mimeMap[ext] || 'image/png';
+                            return 'data:' + mime + ';base64,' + content;
+                        }
+                    }
+                }
+                return '';
+            } catch (e) {
+                return '';
+            }
+        }
+
+        function previewImage(input) {
+            const file = input.files[0];
+            if (!file) {
+                document.getElementById('imgPreview').classList.remove('show');
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                document.getElementById('imgPreviewEl').src = e.target.result;
+                document.getElementById('imgPreview').classList.add('show');
+            };
+            reader.readAsDataURL(file);
+            document.getElementById('imgUploadedTip').style.display = 'none';
+            document.getElementById('uploadImgBtn').disabled = false;
+            currentImageGistId = '';
+        }
+
+        function showLargeImage(src) {
+            if (!src) return;
+            document.getElementById('imgLargeEl').src = src;
+            document.getElementById('imgLargeOverlay').classList.add('show');
+        }
+
+        function closeLargeImage() {
+            document.getElementById('imgLargeOverlay').classList.remove('show');
+        }
+
+        // ==================== 赛季管理 ====================
+        function createSeason() {
+            const num = gameData.seasons.length + 1;
+            const season = {
+                id: 's' + Date.now(),
+                name: '第' + num + '赛季',
+                startDate: new Date().toISOString().slice(0, 10),
+                days: SEASON_DAYS,
+                members: []
+            };
+            gameData.seasons.push(season);
+            gameData.currentSeasonId = season.id;
+            return season;
+        }
+
+        function switchSeason(id) {
+            gameData.currentSeasonId = id;
+        }
+
+        function getCurrentSeason() {
+            if (!gameData.seasons || gameData.seasons.length === 0) return null;
+            return gameData.seasons.find(s => s.id === gameData.currentSeasonId) || gameData.seasons[0];
+        }
+
+        function getSeasonDay(season) {
+            if (!season || !season.startDate) return 1;
+            const start = new Date(season.startDate);
+            const now = new Date();
+            const diff = Math.floor((now - start) / (1000 * 60 * 60 * 24)) + 1;
+            if (diff < 1) return 1;
+            if (diff > season.days) return season.days;
+            return diff;
+        }
+
+        function getDateOfDay(season, dayIdx) {
+            if (!season || !season.startDate) return '';
+            const start = new Date(season.startDate);
+            start.setDate(start.getDate() + dayIdx - 1);
+            return start.toISOString().slice(0, 10);
+        }
+
+        function switchSeasonFromSelect() {
+            const sel = document.getElementById('seasonSelect');
+            const id = sel.value;
+            if (!id) return;
+            switchSeason(id);
+            renderAll();
+        }
+
+        function addNewSeason() {
+            if (!hasGistToken() || !getGistId()) {
+                showToast('请先在设置中配置 Token 和 Gist', 'error');
+                showSettings();
+                return;
+            }
+            const name = prompt('请输入赛季名称：', '第' + (gameData.seasons.length + 1) + '赛季');
+            if (!name) return;
+            const startDate = prompt('请输入赛季开始日期（YYYY-MM-DD，留空使用今天）：', new Date().toISOString().slice(0, 10));
+            const season = {
+                id: 's' + Date.now(),
+                name: name,
+                startDate: (startDate && startDate.trim()) || new Date().toISOString().slice(0, 10),
+                days: SEASON_DAYS,
+                members: []
+            };
+            gameData.seasons.push(season);
+            gameData.currentSeasonId = season.id;
+            saveNow().then(() => {
+                renderAll();
+            });
+            showToast('✅ 已创建新赛季', 'success');
+        }
+
+        function renderSeasonSelect() {
+            const sel = document.getElementById('seasonSelect');
+            const cur = getCurrentSeason();
+            sel.innerHTML = gameData.seasons.map(s =>
+                `<option value="${s.id}" ${cur && s.id === cur.id ? 'selected' : ''}>${escapeHtml(s.name)}</option>`
+            ).join('');
+            // 新建赛季按钮选项
+            if (gameData.seasons.length === 0) {
+                sel.innerHTML = '<option value="">暂无赛季</option>';
+            }
+        }
+
+        // ==================== 成员管理 ====================
+        function addMember() {
+            const season = getCurrentSeason();
+            if (!season) {
+                showToast('请先创建赛季', 'error');
+                return;
+            }
+            if (season.members.length >= MAX_MEMBERS) {
+                showToast('已达上限 ' + MAX_MEMBERS + ' 人', 'error');
+                return;
+            }
+            const input = document.getElementById('memberNameInput');
+            const name = input.value.trim();
+            if (!name) {
+                showToast('请输入成员名称', 'error');
+                return;
+            }
+            if (season.members.some(m => m.name === name)) {
+                showToast('成员名称已存在', 'error');
+                return;
+            }
+            const member = {
+                id: 'm' + Date.now() + Math.random().toString(36).substr(2, 4),
+                name: name,
+                passBought: false,
+                dailyRecords: {}
+            };
+            season.members.push(member);
+            input.value = '';
+            renderMembers();
+            renderOverview();
+            debounceSave();
+            showToast('✅ 已添加成员', 'success');
+        }
+
+        function removeMember(id) {
+            const season = getCurrentSeason();
+            if (!season) return;
+            if (!confirm('确定删除该成员？相关记录也会删除。')) return;
+            season.members = season.members.filter(m => m.id !== id);
+            renderMembers();
+            renderOverview();
+            renderRankings();
+            renderMemberSelect();
+            debounceSave();
+            showToast('已删除', 'success');
+        }
+
+        function togglePass(id) {
+            const season = getCurrentSeason();
+            if (!season) return;
+            const member = season.members.find(m => m.id === id);
+            if (!member) return;
+            member.passBought = !member.passBought;
+            renderMembers();
+            renderOverview();
+            renderRankings();
+            debounceSave();
+        }
+
+        function clearAllMembers() {
+            const season = getCurrentSeason();
+            if (!season) return;
+            if (season.members.length === 0) {
+                showToast('暂无成员', 'info');
+                return;
+            }
+            if (!confirm('确定清空所有成员？此操作不可恢复！')) return;
+            season.members = [];
+            renderMembers();
+            renderOverview();
+            renderRankings();
+            renderMemberSelect();
+            debounceSave();
+            showToast('已清空所有成员', 'success');
+        }
+
+        // ==================== 杯数/消费计算 ====================
+        function calcDailyStamina(record) {
+            if (!record) return 0;
+            return (record.freeStamina || 0)
+                + (record.p30 || 0) * PURCHASE_RULES.p30.stamina
+                + (record.p128 || 0) * PURCHASE_RULES.p128.stamina
+                + (record.p328 || 0) * PURCHASE_RULES.p328.stamina
+                + (record.p648 || 0) * PURCHASE_RULES.p648.stamina;
+        }
+
+        function calcExpectedCups(record) {
+            return calcDailyStamina(record) * CUPS_PER_STAMINA;
+        }
+
+        function calcDailySpent(record) {
+            if (!record) return 0;
+            return (record.p30 || 0) * PURCHASE_RULES.p30.price
+                + (record.p128 || 0) * PURCHASE_RULES.p128.price
+                + (record.p328 || 0) * PURCHASE_RULES.p328.price
+                + (record.p648 || 0) * PURCHASE_RULES.p648.price;
+        }
+
+        function getMemberTotalCups(member) {
+            if (!member || !member.dailyRecords) return 0;
+            let total = 0;
+            for (const key in member.dailyRecords) {
+                const r = member.dailyRecords[key];
+                total += (r.actualCups || 0);
+            }
+            return total;
+        }
+
+        function getMemberTotalStamina(member) {
+            if (!member || !member.dailyRecords) return 0;
+            let total = 0;
+            for (const key in member.dailyRecords) {
+                total += calcDailyStamina(member.dailyRecords[key]);
+            }
+            return total;
+        }
+
+        function getMemberTotalSpent(member) {
+            if (!member) return 0;
+            let total = member.passBought ? PASS_PRICE : 0;
+            if (member.dailyRecords) {
+                for (const key in member.dailyRecords) {
+                    total += calcDailySpent(member.dailyRecords[key]);
+                }
+            }
+            return total;
+        }
+
+        function calcAllianceTotalCups() {
+            const season = getCurrentSeason();
+            if (!season) return 0;
+            return season.members.reduce((sum, m) => sum + getMemberTotalCups(m), 0);
+        }
+
+        function calcAllianceTotalSpent() {
+            const season = getCurrentSeason();
+            if (!season) return 0;
+            return season.members.reduce((sum, m) => sum + getMemberTotalSpent(m), 0);
+        }
+
+        function calcAllianceTotalStamina() {
+            const season = getCurrentSeason();
+            if (!season) return 0;
+            return season.members.reduce((sum, m) => sum + getMemberTotalStamina(m), 0);
+        }
+
+        function getRankings() {
+            const season = getCurrentSeason();
+            if (!season) return [];
+            return season.members.map(m => ({
+                member: m,
+                cups: getMemberTotalCups(m),
+                stamina: getMemberTotalStamina(m),
+                spent: getMemberTotalSpent(m),
+                passBought: m.passBought
+            })).sort((a, b) => b.cups - a.cups);
+        }
+
+        // ==================== 每日记录 ====================
+        function recalcDaily() {
+            const record = collectDailyForm();
+            const total = calcDailyStamina(record);
+            const expected = calcExpectedCups(record);
+            const spent = calcDailySpent(record);
+            document.getElementById('totalStamina').textContent = total;
+            document.getElementById('expectedCups').textContent = expected;
+            document.getElementById('dailySpent').textContent = '¥' + spent;
+
+            // 限购提示
+            checkPurchaseLimit('p30', 1);
+            checkPurchaseLimit('p128', 3);
+            checkPurchaseLimit('p328', 3);
+
+            // 如果实际杯数未手动修改过，自动同步为预期杯数
+            const actualInput = document.getElementById('actualCups');
+            if (actualInput.dataset.autoSync !== 'no') {
+                actualInput.value = expected;
+            }
+        }
+
+        // 用户手动修改实际杯数时，停止自动同步
+        function onActualCupsInput() {
+            const actualInput = document.getElementById('actualCups');
+            const record = collectDailyForm();
+            const expected = calcExpectedCups(record);
+            if (parseInt(actualInput.value) !== expected) {
+                actualInput.dataset.autoSync = 'no';
+            } else {
+                actualInput.dataset.autoSync = 'yes';
+            }
+        }
+
+        function checkPurchaseLimit(field, limit) {
+            const input = document.getElementById(field);
+            const val = parseInt(input.value) || 0;
+            if (val > limit) {
+                input.value = limit;
+                showToast(PURCHASE_RULES[field].price + '元限购 ' + limit + ' 次', 'error');
+            }
+        }
+
+        function collectDailyForm() {
+            return {
+                freeStamina: parseInt(document.getElementById('freeStamina').value) || 0,
+                p30: parseInt(document.getElementById('p30').value) || 0,
+                p128: parseInt(document.getElementById('p128').value) || 0,
+                p328: parseInt(document.getElementById('p328').value) || 0,
+                p648: parseInt(document.getElementById('p648').value) || 0,
+                actualCups: parseInt(document.getElementById('actualCups').value) || 0,
+                imageGistId: currentImageGistId,
+                note: document.getElementById('noteInput').value
+            };
+        }
+
+        function loadDailyRecord() {
+            const season = getCurrentSeason();
+            if (!season) return;
+            const memberId = document.getElementById('memberSelect').value;
+            const day = document.getElementById('daySelect').value;
+            if (!memberId || !day) return;
+
+            // 显示日期
+            const dayNum = parseInt(day.replace('d', ''));
+            document.getElementById('dayDateText').textContent = '第 ' + dayNum + ' 天 · ' + getDateOfDay(season, dayNum);
+
+            const member = season.members.find(m => m.id === memberId);
+            if (!member) return;
+            const record = member.dailyRecords[day];
+
+            // 重置状态
+            currentImageGistId = '';
+            document.getElementById('imgPreview').classList.remove('show');
+            document.getElementById('imgUploadedTip').style.display = 'none';
+            document.getElementById('uploadImgBtn').disabled = false;
+            document.getElementById('imageFile').value = '';
+            document.getElementById('actualCups').dataset.autoSync = 'yes';
+
+            if (record) {
+                document.getElementById('freeStamina').value = record.freeStamina ?? 2;
+                document.getElementById('p30').value = record.p30 ?? 0;
+                document.getElementById('p128').value = record.p128 ?? 0;
+                document.getElementById('p328').value = record.p328 ?? 0;
+                document.getElementById('p648').value = record.p648 ?? 0;
+                document.getElementById('actualCups').value = record.actualCups ?? 0;
+                document.getElementById('noteInput').value = record.note || '';
+                currentImageGistId = record.imageGistId || '';
+                if (currentImageGistId) {
+                    document.getElementById('imgUploadedTip').style.display = 'block';
+                    document.getElementById('uploadImgBtn').disabled = true;
+                    // 异步加载图片预览
+                    loadRecordImage(currentImageGistId);
+                }
+                if (record.actualCups && record.actualCups !== calcExpectedCups(record)) {
+                    document.getElementById('actualCups').dataset.autoSync = 'no';
+                }
+            } else {
+                document.getElementById('freeStamina').value = 2;
+                document.getElementById('p30').value = 0;
+                document.getElementById('p128').value = 0;
+                document.getElementById('p328').value = 0;
+                document.getElementById('p648').value = 0;
+                document.getElementById('actualCups').value = 200;
+                document.getElementById('noteInput').value = '';
+            }
+            recalcDaily();
+        }
+
+        async function loadRecordImage(gistId) {
+            const url = await getImageUrl(gistId);
+            if (url) {
+                document.getElementById('imgPreviewEl').src = url;
+                document.getElementById('imgPreview').classList.add('show');
+            }
+        }
+
+        async function saveDailyRecord() {
+            const season = getCurrentSeason();
+            if (!season) {
+                showToast('请先创建赛季', 'error');
+                return;
+            }
+            const memberId = document.getElementById('memberSelect').value;
+            const day = document.getElementById('daySelect').value;
+            if (!memberId || !day) {
+                showToast('请选择成员和天数', 'error');
+                return;
+            }
+            const member = season.members.find(m => m.id === memberId);
+            if (!member) {
+                showToast('成员不存在', 'error');
+                return;
+            }
+            if (!member.dailyRecords) member.dailyRecords = {};
+
+            const record = collectDailyForm();
+            member.dailyRecords[day] = record;
+
+            const btn = document.getElementById('saveRecordBtn');
+            btn.disabled = true;
+            btn.textContent = '保存中...';
+            try {
+                await saveGameGistData(gameData);
+                showToast('✅ 记录保存成功', 'success');
+                renderOverview();
+                renderRankings();
+            } catch (e) {
+                showToast('保存失败: ' + e.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '保存记录';
+            }
+        }
+
+        function renderMemberSelect() {
+            const season = getCurrentSeason();
+            const sel = document.getElementById('memberSelect');
+            if (!season || season.members.length === 0) {
+                sel.innerHTML = '<option value="">请先添加成员</option>';
+                return;
+            }
+            const cur = sel.value;
+            sel.innerHTML = season.members.map(m =>
+                `<option value="${m.id}">${escapeHtml(m.name)}</option>`
+            ).join('');
+            if (cur && season.members.some(m => m.id === cur)) {
+                sel.value = cur;
+            }
+        }
+
+        function renderDaySelect() {
+            const season = getCurrentSeason();
+            const sel = document.getElementById('daySelect');
+            let html = '';
+            for (let i = 1; i <= SEASON_DAYS; i++) {
+                const dateStr = season ? getDateOfDay(season, i) : '';
+                html += `<option value="d${i}">第 ${i} 天${dateStr ? ' (' + dateStr + ')' : ''}</option>`;
+            }
+            sel.innerHTML = html;
+            // 默认选择当前天数
+            const curDay = season ? getSeasonDay(season) : 1;
+            sel.value = 'd' + curDay;
+        }
+
+        // ==================== Tab 切换 ====================
+        function switchTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.tab === tab);
+            });
+            document.querySelectorAll('.tab-content').forEach(c => {
+                c.classList.remove('active');
+            });
+            document.getElementById('tab-' + tab).classList.add('active');
+            if (tab === 'overview') renderOverview();
+            else if (tab === 'members') renderMembers();
+            else if (tab === 'records') { renderMemberSelect(); renderDaySelect(); loadDailyRecord(); }
+            else if (tab === 'rankings') renderRankings();
+        }
+
+        // ==================== 渲染：概览 ====================
+        function renderOverview() {
+            const season = getCurrentSeason();
+            if (!season) {
+                document.getElementById('progressDayText').textContent = '暂无赛季';
+                document.getElementById('progressPercent').textContent = '0%';
+                document.getElementById('progressFill').style.width = '0%';
+                document.getElementById('totalCups').textContent = '0';
+                document.getElementById('todayRecorded').textContent = '0 / 0';
+                document.getElementById('totalMembers').textContent = '0';
+                document.getElementById('totalSpent').textContent = '¥0';
+                document.getElementById('passRate').textContent = '0%';
+                document.getElementById('passCount').textContent = '0 / 0';
+                document.getElementById('podiumList').innerHTML = '<div class="empty-state" style="padding:20px;"><div class="emoji">🎯</div><div>暂无赛季，请先在设置中创建</div></div>';
+                return;
+            }
+            const curDay = getSeasonDay(season);
+            const pct = Math.round((curDay / season.days) * 100);
+            document.getElementById('progressDayText').textContent = '第 ' + curDay + ' 天 / ' + season.days + ' 天';
+            document.getElementById('progressPercent').textContent = pct + '%';
+            document.getElementById('progressFill').style.width = pct + '%';
+
+            const totalCups = calcAllianceTotalCups();
+            document.getElementById('totalCups').textContent = totalCups.toLocaleString();
+
+            const todayKey = 'd' + curDay;
+            const todayRecorded = season.members.filter(m => m.dailyRecords && m.dailyRecords[todayKey]).length;
+            document.getElementById('todayRecorded').textContent = todayRecorded + ' / ' + season.members.length;
+            document.getElementById('totalMembers').textContent = season.members.length;
+
+            const totalSpent = calcAllianceTotalSpent();
+            document.getElementById('totalSpent').textContent = '¥' + totalSpent.toLocaleString();
+
+            const passCount = season.members.filter(m => m.passBought).length;
+            const passRate = season.members.length > 0 ? Math.round((passCount / season.members.length) * 100) : 0;
+            document.getElementById('passRate').textContent = passRate + '%';
+            document.getElementById('passCount').textContent = passCount + ' / ' + season.members.length;
+
+            // 前3名
+            const rankings = getRankings();
+            const podium = document.getElementById('podiumList');
+            if (rankings.length === 0) {
+                podium.innerHTML = '<div class="empty-state" style="padding:20px;"><div class="emoji">🎯</div><div>暂无数据，请先添加成员并记录</div></div>';
+            } else {
+                const medals = ['🥇', '🥈', '🥉'];
+                podium.innerHTML = rankings.slice(0, 3).map((r, i) =>
+                    `<div class="podium-item rank-${i+1}">
+                        <div class="podium-medal">${medals[i]}</div>
+                        <div class="podium-name">${escapeHtml(r.member.name)}</div>
+                        <div class="podium-cups">${r.cups.toLocaleString()} 杯</div>
+                    </div>`
+                ).join('');
+            }
+        }
+
+        // ==================== 渲染：成员 ====================
+        function renderMembers() {
+            const season = getCurrentSeason();
+            const list = document.getElementById('memberList');
+            const countText = document.getElementById('memberCountText');
+            if (!season) {
+                list.innerHTML = '<div class="empty-state"><div class="emoji">👥</div><div>暂无赛季</div></div>';
+                countText.textContent = '0';
+                return;
+            }
+            countText.textContent = season.members.length;
+            if (season.members.length === 0) {
+                list.innerHTML = '<div class="empty-state"><div class="emoji">👥</div><div>暂无成员，请添加</div></div>';
+                return;
+            }
+            list.innerHTML = season.members.map((m, i) => {
+                const cups = getMemberTotalCups(m);
+                const spent = getMemberTotalSpent(m);
+                return `<div class="member-row">
+                    <div class="m-index">${i+1}</div>
+                    <div class="m-name">${escapeHtml(m.name)}</div>
+                    <div class="m-info">
+                        <span class="pass-badge ${m.passBought ? 'bought' : 'not-bought'}" onclick="togglePass('${m.id}')">
+                            通行证：${m.passBought ? '已买' : '未买'}
+                        </span>
+                        <span>🏆 ${cups.toLocaleString()}杯</span>
+                        <span>💰 ¥${spent.toLocaleString()}</span>
+                    </div>
+                    <button class="btn btn-danger btn-sm" onclick="removeMember('${m.id}')">删除</button>
+                </div>`;
+            }).join('');
+        }
+
+        // ==================== 渲染：排名 ====================
+        function renderRankings() {
+            const season = getCurrentSeason();
+            const list = document.getElementById('rankList');
+            if (!season || season.members.length === 0) {
+                list.innerHTML = '<div class="empty-state"><div class="emoji">🏆</div><div>暂无数据</div></div>';
+            } else {
+                const rankings = getRankings();
+                list.innerHTML = rankings.map((r, i) => {
+                    const rank = i + 1;
+                    const rankClass = rank <= 3 ? 'rank-' + rank : '';
+                    const curDay = getSeasonDay(season);
+                    const avgCups = curDay > 0 ? Math.round(r.cups / curDay) : 0;
+                    let detailHtml = '';
+                    for (let d = 1; d <= SEASON_DAYS; d++) {
+                        const rec = r.member.dailyRecords['d' + d];
+                        if (rec) {
+                            const stamina = calcDailyStamina(rec);
+                            detailHtml += `<div class="detail-day">
+                                <span class="d-label">第${d}天 (${getDateOfDay(season, d)})</span>
+                                <span class="d-value">体力${stamina} · ${rec.actualCups || 0}杯 · ¥${calcDailySpent(rec)}${rec.note ? ' · ' + escapeHtml(rec.note) : ''}</span>
+                            </div>`;
+                        }
+                    }
+                    if (!detailHtml) {
+                        detailHtml = '<div class="detail-day"><span class="d-label">暂无每日记录</span></div>';
+                    }
+                    return `<div class="rank-row ${rankClass}" onclick="toggleRankDetail(this)">
+                        <div class="rank-head">
+                            <div class="rank-num">${rank}</div>
+                            <div class="rank-name">${escapeHtml(r.member.name)}</div>
+                            <div class="rank-cups">${r.cups.toLocaleString()}</div>
+                        </div>
+                        <div class="rank-meta">
+                            <span>体力: ${r.stamina}</span>
+                            <span>消费: ¥${r.spent.toLocaleString()}</span>
+                            <span>日均: ${avgCups}杯</span>
+                            <span>通行证: ${r.passBought ? '✅' : '❌'}</span>
+                            <span style="color:#00bcd4;">点击查看明细 ▼</span>
+                        </div>
+                        <div class="rank-detail">${detailHtml}</div>
+                    </div>`;
+                }).join('');
+            }
+
+            // 联盟汇总
+            const totalCups = calcAllianceTotalCups();
+            const totalStamina = calcAllianceTotalStamina();
+            const totalSpent = calcAllianceTotalSpent();
+            const memberCount = season ? season.members.length : 0;
+            const avgCups = memberCount > 0 ? Math.round(totalCups / memberCount) : 0;
+            const passCount = season ? season.members.filter(m => m.passBought).length : 0;
+            const passRate = memberCount > 0 ? Math.round((passCount / memberCount) * 100) : 0;
+
+            document.getElementById('rankTotalCups').textContent = totalCups.toLocaleString();
+            document.getElementById('rankTotalStamina').textContent = totalStamina.toLocaleString();
+            document.getElementById('rankTotalSpent').textContent = '¥' + totalSpent.toLocaleString();
+            document.getElementById('rankAvgCups').textContent = avgCups.toLocaleString();
+            document.getElementById('rankPassRate').textContent = passRate + '%';
+        }
+
+        function toggleRankDetail(el) {
+            const detail = el.querySelector('.rank-detail');
+            if (detail) detail.classList.toggle('show');
+        }
+
+        // ==================== 导出数据 ====================
+        function exportData() {
+            const season = getCurrentSeason();
+            if (!season) {
+                showToast('暂无数据可导出', 'error');
+                return;
+            }
+            const dataStr = JSON.stringify(gameData, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = '副本统计_' + (season.name) + '_' + new Date().toISOString().slice(0, 10) + '.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast('✅ 已导出', 'success');
+        }
+
+        // ==================== 设置面板 ====================
+        function showSettings() {
+            document.getElementById('gistIdInput').value = getGistId();
+            updateTokenUI();
+            document.getElementById('settingsModal').classList.add('show');
+        }
+
+        function closeSettings() {
+            document.getElementById('settingsModal').classList.remove('show');
+        }
+
+        function saveGistId() {
+            const id = document.getElementById('gistIdInput').value.trim();
+            setGistId(id);
+            showToast('✅ Gist ID 已保存', 'success');
+            closeSettings();
+            refreshAll();
+        }
+
+        function saveTokenFromSettings() {
+            const token = document.getElementById('tokenInput').value.trim();
+            if (!token) {
+                showToast('请输入 Token', 'error');
+                return;
+            }
+            if (!token.startsWith('ghp_')) {
+                showToast('Token 应以 ghp_ 开头', 'error');
+                return;
+            }
+            setGistToken(token);
+            document.getElementById('tokenInput').value = '';
+            updateTokenUI();
+            showToast('✅ Token 已保存', 'success');
+            refreshAll();
+        }
+
+        function updateTokenUI() {
+            const has = hasGistToken();
+            const dot = document.getElementById('tokenDot');
+            const text = document.getElementById('tokenStatusText');
+            const tip = document.getElementById('tokenTip');
+            if (has) {
+                dot.classList.add('active');
+                text.textContent = '已设置';
+                tip.style.display = 'none';
+            } else {
+                dot.classList.remove('active');
+                text.textContent = '未设置';
+                tip.style.display = 'block';
+            }
+        }
+
+        // ==================== 工具函数 ====================
+        function escapeHtml(str) {
+            if (str == null) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function renderAll() {
+            renderSeasonSelect();
+            renderOverview();
+            renderMembers();
+            renderMemberSelect();
+            renderDaySelect();
+            renderRankings();
+            updateTokenUI();
+        }
+
+        async function refreshAll() {
+            updateTokenUI();
+            if (!hasGistToken()) {
+                gameData = { seasons: [], currentSeasonId: '' };
+                renderAll();
+                return;
+            }
+            if (!getGistId()) {
+                gameData = { seasons: [], currentSeasonId: '' };
+                // 自动创建第一个赛季便于使用
+                if (gameData.seasons.length === 0) {
+                    // 不自动创建，等待用户在设置中创建 Gist
+                }
+                renderAll();
+                return;
+            }
+            showLoading('加载数据中...');
+            try {
+                const data = await getGameGistData();
+                if (data && data.seasons) {
+                    gameData = data;
+                } else {
+                    gameData = { seasons: [], currentSeasonId: '' };
+                }
+                // 如果没有赛季，自动创建一个
+                if (gameData.seasons.length === 0) {
+                    createSeason();
+                }
+                renderAll();
+            } catch (e) {
+                showToast('加载数据失败: ' + e.message, 'error');
+                gameData = { seasons: [], currentSeasonId: '' };
+                renderAll();
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // ==================== 初始化 ====================
+        async function init() {
+            updateTokenUI();
+            await refreshAll();
+            // 默认加载记录Tab的表单
+            renderDaySelect();
+            renderMemberSelect();
+            loadDailyRecord();
+        }
+
+        // 点击模态框外部关闭
+        document.getElementById('settingsModal').addEventListener('click', function(e) {
+            if (e.target === this) closeSettings();
+        });
+
+        // 页面加载完成初始化
+        window.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
