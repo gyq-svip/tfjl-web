@@ -1132,6 +1132,102 @@
                 opacity: 0;
             }
         }
+
+        /* ========== 对手联盟表格 ========== */
+        .rival-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.88rem;
+        }
+
+        .rival-table th,
+        .rival-table td {
+            padding: 8px 6px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            white-space: nowrap;
+        }
+
+        .rival-table th {
+            color: rgba(255,255,255,0.7);
+            font-weight: 600;
+            background: rgba(0,0,0,0.25);
+        }
+
+        .rival-table td {
+            color: rgba(255,255,255,0.85);
+        }
+
+        .rival-table tr.rival-self {
+            background: rgba(0,188,212,0.12);
+        }
+
+        .rival-table tr.rival-self td {
+            color: #00bcd4;
+            font-weight: 600;
+        }
+
+        .rival-action {
+            background: rgba(239,68,68,0.15);
+            border: 1px solid rgba(239,68,68,0.4);
+            color: #f87171;
+            padding: 3px 10px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        .rival-action:hover {
+            background: rgba(239,68,68,0.3);
+        }
+
+        /* ========== 分析提示框 ========== */
+        .analysis-box {
+            border-radius: 10px;
+            padding: 12px 14px;
+            margin: 10px 0;
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+
+        .analysis-box.success {
+            background: rgba(74,222,128,0.12);
+            border: 1px solid rgba(74,222,128,0.4);
+            color: #4ade80;
+        }
+
+        .analysis-box.warning {
+            background: rgba(245,158,11,0.12);
+            border: 1px solid rgba(245,158,11,0.4);
+            color: #f59e0b;
+        }
+
+        .analysis-box.danger {
+            background: rgba(239,68,68,0.12);
+            border: 1px solid rgba(239,68,68,0.4);
+            color: #f87171;
+        }
+
+        .analysis-box.info {
+            background: rgba(0,188,212,0.1);
+            border: 1px solid rgba(0,188,212,0.3);
+            color: #00bcd4;
+        }
+
+        .analysis-sub {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px dashed rgba(255,255,255,0.1);
+            font-size: 0.85rem;
+            color: rgba(255,255,255,0.8);
+            line-height: 1.6;
+        }
+
+        .analysis-sub .k {
+            color: #ffd700;
+            font-weight: 600;
+        }
     </style>
 </head>
 <body>
@@ -1311,6 +1407,10 @@
                             <div class="stat-value gold" id="totalSpent">¥0</div>
                             <div class="stat-label">总消费估算</div>
                         </div>
+                        <div class="stat-item">
+                            <div class="stat-value gold" id="overviewRemainingStamina">0</div>
+                            <div class="stat-label">剩余体力（可攒末日用）</div>
+                        </div>
                     </div>
                 </div>
 
@@ -1341,6 +1441,20 @@
                 <div class="card">
                     <div class="card-title">⚠️ 今日体力汇总</div>
                     <div id="staminaSummary" style="margin-top:12px;">
+                        <div class="empty-state" style="padding:20px;"><div class="emoji">📊</div><div>暂无数据</div></div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-title">⚔️ 对手联盟</div>
+                    <div id="rivalListContainer" style="margin-top:12px;">
+                        <div class="empty-state" style="padding:20px;"><div class="emoji">⚔️</div><div>暂无数据</div></div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-title">📊 数据分析</div>
+                    <div id="analysisContainer" style="margin-top:12px;">
                         <div class="empty-state" style="padding:20px;"><div class="emoji">📊</div><div>暂无数据</div></div>
                     </div>
                 </div>
@@ -1458,7 +1572,15 @@
                         </div>
                         <div class="stat-item">
                             <div class="stat-value" id="rankTotalStamina">0</div>
-                            <div class="stat-label">总体力</div>
+                            <div class="stat-label">总获得体力</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="rankTotalUsedStamina">0</div>
+                            <div class="stat-label">已用体力</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value gold" id="rankTotalRemainingStamina">0</div>
+                            <div class="stat-label">剩余体力</div>
                         </div>
                         <div class="stat-item">
                             <div class="stat-value gold" id="rankTotalSpent">¥0</div>
@@ -2676,6 +2798,335 @@
             return season.members.reduce((sum, m) => sum + getMemberTotalStamina(m), 0);
         }
 
+        // ==================== 体力累计机制 ====================
+        function getMemberUsedStamina(member) {
+            return getMemberTotalCups(member) / CUPS_PER_STAMINA;
+        }
+
+        function getMemberRemainingStamina(member) {
+            return getMemberTotalStamina(member) - getMemberUsedStamina(member);
+        }
+
+        function calcAllianceUsedStamina() {
+            const season = getCurrentSeason();
+            if (!season) return 0;
+            return season.members.reduce((sum, m) => sum + getMemberUsedStamina(m), 0);
+        }
+
+        function calcAllianceRemainingStamina() {
+            const season = getCurrentSeason();
+            if (!season) return 0;
+            return season.members.reduce((sum, m) => sum + getMemberRemainingStamina(m), 0);
+        }
+
+        // ==================== 对手联盟管理 ====================
+        function getRivalAlliances() {
+            const season = getCurrentSeason();
+            if (!season) return [];
+            if (!Array.isArray(season.rivalAlliances)) season.rivalAlliances = [];
+            return season.rivalAlliances;
+        }
+
+        function addRivalAlliance() {
+            if (!isOwner()) {
+                showToast('只有盟主可以添加对手联盟', 'error');
+                return;
+            }
+            const nameInput = document.getElementById('rivalNameInput');
+            const cupsInput = document.getElementById('rivalCupsInput');
+            const countInput = document.getElementById('rivalCountInput');
+            if (!nameInput || !cupsInput || !countInput) return;
+            const name = nameInput.value.trim();
+            const cups = parseInt(cupsInput.value) || 0;
+            const count = parseInt(countInput.value) || 0;
+            if (!name) { showToast('请输入联盟名称', 'error'); return; }
+            if (cups < 0 || count < 0) { showToast('杯数和人数不能为负', 'error'); return; }
+            const rivals = getRivalAlliances();
+            rivals.push({
+                id: 'r' + Date.now() + Math.random().toString(36).substr(2, 4),
+                name: name,
+                totalCups: cups,
+                memberCount: count
+            });
+            nameInput.value = '';
+            cupsInput.value = '';
+            countInput.value = '';
+            renderRivalList();
+            renderAnalysis();
+            debounceSave();
+            showToast('✅ 已添加对手联盟', 'success');
+        }
+
+        function removeRivalAlliance(id) {
+            if (!isOwner()) {
+                showToast('只有盟主可以删除对手联盟', 'error');
+                return;
+            }
+            if (!confirm('确定删除该对手联盟？')) return;
+            const rivals = getRivalAlliances();
+            const idx = rivals.findIndex(r => r.id === id);
+            if (idx >= 0) {
+                rivals.splice(idx, 1);
+                renderRivalList();
+                renderAnalysis();
+                debounceSave();
+                showToast('已删除', 'success');
+            }
+        }
+
+        function renderRivalList() {
+            const container = document.getElementById('rivalListContainer');
+            if (!container) return;
+            const season = getCurrentSeason();
+            if (!season) {
+                container.innerHTML = '<div class="empty-state"><div class="emoji">⚔️</div><div>暂无赛季</div></div>';
+                return;
+            }
+            const rivals = getRivalAlliances();
+            const owner = isOwner();
+            const ourCups = calcAllianceTotalCups();
+            const ourMembers = season.members.length;
+
+            // 我方联盟自动加入列表（当前总杯数）
+            const combined = rivals.map(r => ({
+                id: r.id, name: r.name, totalCups: r.totalCups || 0, memberCount: r.memberCount || 0, isSelf: false
+            }));
+            combined.push({
+                id: 'self', name: (gameData.allianceName || '我方') + '（我方）',
+                totalCups: ourCups, memberCount: ourMembers, isSelf: true
+            });
+            combined.sort((a, b) => b.totalCups - a.totalCups);
+
+            let html = '';
+            // 盟主可添加对手
+            if (owner) {
+                html += '<div class="form-row" style="margin-bottom:12px;">';
+                html += '<input type="text" class="form-input" id="rivalNameInput" placeholder="对手联盟名称" style="flex:2;min-width:120px;">';
+                html += '<input type="number" class="form-input" id="rivalCupsInput" placeholder="总杯数" min="0" style="flex:1;min-width:90px;">';
+                html += '<input type="number" class="form-input" id="rivalCountInput" placeholder="人数" min="0" style="flex:1;min-width:90px;">';
+                html += '<button class="btn" onclick="addRivalAlliance()" style="flex:0 0 auto;">添加</button>';
+                html += '</div>';
+            }
+
+            html += '<div style="overflow-x:auto;"><table class="rival-table"><thead><tr>';
+            html += '<th>排名</th><th>联盟</th><th>总杯数</th><th>人数</th><th>人均杯数</th>';
+            if (owner) html += '<th>操作</th>';
+            html += '</tr></thead><tbody>';
+            combined.forEach((r, i) => {
+                const perCap = r.memberCount > 0 ? Math.round(r.totalCups / r.memberCount) : 0;
+                const selfClass = r.isSelf ? ' class="rival-self"' : '';
+                let actionCell = '';
+                if (owner) {
+                    actionCell = r.isSelf ? '<td>-</td>' : '<td><button class="rival-action" onclick="removeRivalAlliance(\'' + r.id + '\')">删除</button></td>';
+                }
+                html += '<tr' + selfClass + '>';
+                html += '<td>' + (i + 1) + '</td>';
+                html += '<td>' + escapeHtml(r.name) + '</td>';
+                html += '<td>' + r.totalCups.toLocaleString() + '</td>';
+                html += '<td>' + r.memberCount + '</td>';
+                html += '<td>' + perCap.toLocaleString() + '</td>';
+                html += actionCell;
+                html += '</tr>';
+            });
+            html += '</tbody></table></div>';
+
+            if (rivals.length === 0) {
+                html += '<div style="text-align:center;padding:8px;color:rgba(255,255,255,0.5);font-size:0.82rem;">暂无对手联盟数据，请添加</div>';
+            }
+
+            container.innerHTML = html;
+        }
+
+        // ==================== 数据分析与趋势预测 ====================
+        function analyzeData() {
+            const season = getCurrentSeason();
+            if (!season || season.members.length === 0) return { noData: true };
+            const hasRecords = season.members.some(m => m.dailyRecords && Object.keys(m.dailyRecords).length > 0);
+            if (!hasRecords) return { noData: true };
+
+            const rivals = getRivalAlliances();
+            const curDay = getSeasonDay(season);
+            const totalDays = season.days || SEASON_DAYS;
+            const remainingDays = Math.max(0, totalDays - curDay);
+            const currentCups = calcAllianceTotalCups();
+            const dailyAvg = curDay > 0 ? currentCups / curDay : 0;
+            const predictedEndCups = Math.round(currentCups + dailyAvg * remainingDays);
+            const remainingStamina = Math.round(calcAllianceRemainingStamina());
+            const predictedFinalCups = predictedEndCups + remainingStamina * CUPS_PER_STAMINA;
+            const memberCount = season.members.length;
+
+            const result = {
+                curDay: curDay,
+                totalDays: totalDays,
+                remainingDays: remainingDays,
+                currentCups: currentCups,
+                dailyAvg: Math.round(dailyAvg),
+                predictedEndCups: predictedEndCups,
+                remainingStamina: remainingStamina,
+                predictedFinalCups: predictedFinalCups,
+                memberCount: memberCount
+            };
+
+            if (rivals.length === 0) {
+                result.noRivals = true;
+                return result;
+            }
+
+            // 合并对手与我方（我方用预测最终总杯数参与排名）
+            const combined = rivals.map(r => ({
+                name: r.name, totalCups: r.totalCups || 0, memberCount: r.memberCount || 0, isSelf: false
+            }));
+            combined.push({
+                name: (gameData.allianceName || '我方') + '（我方预测）',
+                totalCups: predictedFinalCups,
+                memberCount: memberCount,
+                isSelf: true
+            });
+            combined.sort((a, b) => b.totalCups - a.totalCups);
+
+            const ourRank = combined.findIndex(c => c.isSelf) + 1;
+            result.combined = combined;
+            result.totalAlliances = combined.length;
+            result.ourRank = ourRank;
+
+            // 已进入前3
+            if (ourRank <= 3) {
+                result.inTop3 = true;
+                result.gap = 0;
+                result.perPersonExtra = 0;
+                return result;
+            }
+
+            // 需超越第3名
+            const rank3 = combined[2];
+            result.rank3 = rank3;
+            result.gap = rank3.totalCups - predictedFinalCups;
+            const needExtraCups = Math.max(0, rank3.totalCups - predictedEndCups);
+            const needExtraStamina = Math.ceil(needExtraCups / CUPS_PER_STAMINA);
+            const actualExtraStamina = Math.max(0, needExtraStamina - remainingStamina);
+            const perPersonExtra = memberCount > 0 ? Math.ceil(actualExtraStamina / memberCount) : actualExtraStamina;
+            result.needExtraCups = needExtraCups;
+            result.needExtraStamina = needExtraStamina;
+            result.actualExtraStamina = actualExtraStamina;
+            result.perPersonExtra = perPersonExtra;
+            return result;
+        }
+
+        function calcPurchasePlan(staminaNeeded, remainingDays) {
+            if (staminaNeeded <= 0) return { totalCost: 0, details: [], totalStamina: 0 };
+            const days = (remainingDays != null && remainingDays > 0) ? remainingDays : SEASON_DAYS;
+            let remaining = staminaNeeded;
+            const plan = [];
+            // 按性价比从高到低：30元 < 128元 < 328元 < 648元
+            const tiers = [
+                { name: '30元', price: 30, stamina: 1, maxTimes: days },        // 每天1次
+                { name: '128元', price: 128, stamina: 3, maxTimes: 3 * days },  // 每天3次
+                { name: '328元', price: 328, stamina: 6, maxTimes: 3 * days },  // 每天3次
+                { name: '648元', price: 648, stamina: 10, maxTimes: 999 }       // 不限
+            ];
+            let totalCost = 0;
+            for (const tier of tiers) {
+                if (remaining <= 0) break;
+                const maxStaminaFromThisTier = tier.stamina * tier.maxTimes;
+                if (maxStaminaFromThisTier <= 0) continue;
+                const staminaFromThisTier = Math.min(remaining, maxStaminaFromThisTier);
+                const times = Math.ceil(staminaFromThisTier / tier.stamina);
+                const actualStamina = times * tier.stamina;
+                const cost = times * tier.price;
+                plan.push({
+                    name: tier.name,
+                    unitPrice: (tier.price / tier.stamina).toFixed(1),
+                    times: times,
+                    stamina: actualStamina,
+                    cost: cost
+                });
+                totalCost += cost;
+                remaining -= actualStamina;
+            }
+            return { totalCost: totalCost, details: plan, totalStamina: staminaNeeded };
+        }
+
+        function renderPurchaseTable(staminaNeeded, remainingDays) {
+            const plan = calcPurchasePlan(staminaNeeded, remainingDays);
+            const allTiers = [
+                { name: '30元', price: 30, stamina: 1 },
+                { name: '128元', price: 128, stamina: 3 },
+                { name: '328元', price: 328, stamina: 6 },
+                { name: '648元', price: 648, stamina: 10 }
+            ];
+            let html = '<div style="margin-top:12px;font-size:0.85rem;color:#ffd700;font-weight:600;">💳 每人购买建议明细</div>';
+            html += '<div style="overflow-x:auto;margin-top:6px;"><table class="rival-table"><thead><tr>';
+            html += '<th>购买方式</th><th>单价(元/体力)</th><th>建议次数</th><th>获得体力</th><th>总价(元)</th>';
+            html += '</tr></thead><tbody>';
+            allTiers.forEach(t => {
+                const detail = plan.details.find(d => d.name === t.name);
+                const times = detail ? detail.times : 0;
+                const stamina = detail ? detail.stamina : 0;
+                const cost = detail ? detail.cost : 0;
+                const unit = (t.price / t.stamina).toFixed(1);
+                html += '<tr><td>' + t.name + '</td><td>' + unit + '</td><td>' + times + '</td><td>' + stamina + '</td><td>' + cost.toLocaleString() + '</td></tr>';
+            });
+            html += '<tr style="background:rgba(255,215,0,0.12);"><td colspan="4" style="text-align:right;color:#ffd700;font-weight:600;">每人合计</td><td style="color:#ffd700;font-weight:700;">¥' + plan.totalCost.toLocaleString() + '</td></tr>';
+            html += '</tbody></table></div>';
+            return html;
+        }
+
+        function renderAnalysis() {
+            const container = document.getElementById('analysisContainer');
+            if (!container) return;
+            const data = analyzeData();
+            if (data.noData) {
+                container.innerHTML = '<div class="empty-state"><div class="emoji">📊</div><div>暂无数据</div></div>';
+                return;
+            }
+            let html = '';
+            // 1. 我方趋势预测
+            html += '<div class="analysis-sub" style="border-top:none;padding-top:0;margin-top:0;">';
+            html += '<div style="font-weight:600;color:#ffd700;margin-bottom:8px;">📈 我方趋势预测</div>';
+            html += '<div style="margin-bottom:4px;">📅 已过 <span class="k">' + data.curDay + '</span> / ' + data.totalDays + ' 天，剩余 <span class="k">' + data.remainingDays + '</span> 天</div>';
+            html += '<div style="margin-bottom:4px;">🏆 当前总杯数：<span class="k">' + data.currentCups.toLocaleString() + '</span>　日均：<span class="k">' + data.dailyAvg.toLocaleString() + '</span> 杯</div>';
+            html += '<div style="margin-bottom:4px;">📊 预测赛季结束总杯数：<span class="k">' + data.predictedEndCups.toLocaleString() + '</span></div>';
+            html += '<div>⚡ 剩余体力：<span class="k">' + data.remainingStamina + '</span>　预测最终总杯数（含剩余体力）：<span class="k">' + data.predictedFinalCups.toLocaleString() + '</span></div>';
+            html += '</div>';
+
+            if (data.noRivals) {
+                html += '<div class="analysis-box info">请添加对手联盟数据以进行分析</div>';
+                container.innerHTML = html;
+                return;
+            }
+
+            // 2. 与对手对比
+            html += '<div class="analysis-sub">';
+            html += '<div style="font-weight:600;color:#ffd700;margin-bottom:8px;">⚔️ 与对手对比</div>';
+            html += '<div style="margin-bottom:8px;">🏅 我方预测排名：<span class="k">第 ' + data.ourRank + ' 名</span> / 共 ' + data.totalAlliances + ' 个联盟</div>';
+
+            if (data.inTop3) {
+                html += '<div class="analysis-box success">✅ 按当前趋势，预计可以进入前3名！</div>';
+            } else {
+                const perPerson = data.perPersonExtra;
+                const perDay = data.remainingDays > 0 ? Math.ceil(perPerson / data.remainingDays) : perPerson;
+                const plan = calcPurchasePlan(perPerson, data.remainingDays);
+                const isSmall = perPerson <= 2 * Math.max(1, data.remainingDays);
+                if (isSmall) {
+                    html += '<div class="analysis-box warning">⚠️ 距离第3名差距不大，每人每天多打 ' + perDay + ' 体力即可（差距 ' + data.gap.toLocaleString() + ' 杯）</div>';
+                } else {
+                    html += '<div class="analysis-box danger">❌ 距离第3名差距较大，需要每人额外购买 ' + perPerson + ' 体力（约 ¥' + plan.totalCost.toLocaleString() + '，差距 ' + data.gap.toLocaleString() + ' 杯）</div>';
+                }
+                // 3. 超越建议
+                html += '<div style="margin-top:10px;font-size:0.85rem;color:rgba(255,255,255,0.75);line-height:1.8;">';
+                html += '<div>🎯 第3名：<span class="k">' + data.rank3.totalCups.toLocaleString() + '</span> 杯（' + escapeHtml(data.rank3.name) + '）</div>';
+                html += '<div>📦 需要额外杯数：<span class="k">' + data.needExtraCups.toLocaleString() + '</span>　对应体力：<span class="k">' + data.needExtraStamina + '</span></div>';
+                html += '<div>⚡ 扣除已攒剩余体力 ' + data.remainingStamina + ' 后，实际还需体力：<span class="k">' + data.actualExtraStamina + '</span></div>';
+                html += '<div>👥 分摊到 ' + data.memberCount + ' 人，每人需额外贡献：<span class="k">' + data.perPersonExtra + '</span> 体力</div>';
+                html += '</div>';
+                // 4. 购买建议明细
+                html += renderPurchaseTable(perPerson, data.remainingDays);
+            }
+            html += '</div>';
+
+            container.innerHTML = html;
+        }
+
         function getRankings() {
             const season = getCurrentSeason();
             if (!season) return [];
@@ -2920,9 +3371,12 @@
                 document.getElementById('todayRecorded').textContent = '0 / 0';
                 document.getElementById('totalMembers').textContent = '0';
                 document.getElementById('totalSpent').textContent = '¥0';
+                document.getElementById('overviewRemainingStamina').textContent = '0';
                 document.getElementById('passRate').textContent = '0%';
                 document.getElementById('passCount').textContent = '0 / 0';
                 document.getElementById('podiumList').innerHTML = '<div class="empty-state" style="padding:20px;"><div class="emoji">🎯</div><div>暂无赛季</div></div>';
+                renderRivalList();
+                renderAnalysis();
                 return;
             }
             const curDay = getSeasonDay(season);
@@ -2941,6 +3395,9 @@
 
             const totalSpent = calcAllianceTotalSpent();
             document.getElementById('totalSpent').textContent = '¥' + totalSpent.toLocaleString();
+
+            const remainingStamina = calcAllianceRemainingStamina();
+            document.getElementById('overviewRemainingStamina').textContent = Math.round(remainingStamina);
 
             const passCount = season.members.filter(m => m.passBought).length;
             const passRate = season.members.length > 0 ? Math.round((passCount / season.members.length) * 100) : 0;
@@ -2965,6 +3422,10 @@
 
             // 今日体力汇总
             renderStaminaSummary(season, curDay);
+            // 对手联盟
+            renderRivalList();
+            // 数据分析
+            renderAnalysis();
         }
 
         function renderStaminaSummary(season, curDay) {
@@ -3079,6 +3540,8 @@
                     const rankClass = rank <= 3 ? 'rank-' + rank : '';
                     const curDay = getSeasonDay(season);
                     const avgCups = curDay > 0 ? Math.round(r.cups / curDay) : 0;
+                    const usedStamina = Math.round(getMemberUsedStamina(r.member));
+                    const remainingStamina = Math.round(getMemberRemainingStamina(r.member));
                     let detailHtml = '';
                     for (let d = 1; d <= SEASON_DAYS; d++) {
                         const rec = r.member.dailyRecords['d' + d];
@@ -3100,7 +3563,9 @@
                             <div class="rank-cups">${r.cups.toLocaleString()}</div>
                         </div>
                         <div class="rank-meta">
-                            <span>体力: ${r.stamina}</span>
+                            <span>获得体力: ${r.stamina}</span>
+                            <span>已用体力: ${usedStamina}</span>
+                            <span>剩余体力: ${remainingStamina}</span>
                             <span>消费: ¥${r.spent.toLocaleString()}</span>
                             <span>日均: ${avgCups}杯</span>
                             <span>通行证: ${r.passBought ? '✅' : '❌'}</span>
@@ -3114,6 +3579,8 @@
             // 联盟汇总
             const totalCups = calcAllianceTotalCups();
             const totalStamina = calcAllianceTotalStamina();
+            const totalUsedStamina = calcAllianceUsedStamina();
+            const totalRemainingStamina = calcAllianceRemainingStamina();
             const totalSpent = calcAllianceTotalSpent();
             const memberCount = season ? season.members.length : 0;
             const avgCups = memberCount > 0 ? Math.round(totalCups / memberCount) : 0;
@@ -3122,6 +3589,8 @@
 
             document.getElementById('rankTotalCups').textContent = totalCups.toLocaleString();
             document.getElementById('rankTotalStamina').textContent = totalStamina.toLocaleString();
+            document.getElementById('rankTotalUsedStamina').textContent = Math.round(totalUsedStamina).toLocaleString();
+            document.getElementById('rankTotalRemainingStamina').textContent = Math.round(totalRemainingStamina).toLocaleString();
             document.getElementById('rankTotalSpent').textContent = '¥' + totalSpent.toLocaleString();
             document.getElementById('rankAvgCups').textContent = avgCups.toLocaleString();
             document.getElementById('rankPassRate').textContent = passRate + '%';
