@@ -48,6 +48,103 @@
             margin: 0 auto;
         }
 
+        /* ========== Login View ========== */
+        .login-view {
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .login-card {
+            background: rgba(255,255,255,0.05);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(0,188,212,0.3);
+            border-radius: 16px;
+            padding: 28px;
+            width: 100%;
+            max-width: 420px;
+            position: relative;
+            z-index: 10;
+        }
+
+        .login-title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #00bcd4;
+            text-align: center;
+            margin-bottom: 6px;
+        }
+
+        .login-subtitle {
+            font-size: 0.85rem;
+            color: rgba(255,255,255,0.5);
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .login-tabs {
+            display: flex;
+            gap: 4px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 10px;
+            padding: 4px;
+            margin-bottom: 20px;
+        }
+
+        .login-tab {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: rgba(255,255,255,0.6);
+            padding: 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.95rem;
+            font-family: inherit;
+        }
+
+        .login-tab.active {
+            background: linear-gradient(135deg, #00bcd4, #00838f);
+            color: #fff;
+            font-weight: 600;
+        }
+
+        .login-form {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .login-form.active {
+            display: block;
+        }
+
+        .login-tip {
+            text-align: center;
+            font-size: 0.8rem;
+            color: rgba(255,255,255,0.4);
+            margin-top: 16px;
+        }
+
+        .login-token-warn {
+            text-align: center;
+            font-size: 0.85rem;
+            color: #ffd700;
+            margin-top: 8px;
+            background: rgba(255,215,0,0.1);
+            border: 1px solid rgba(255,215,0,0.3);
+            border-radius: 8px;
+            padding: 8px;
+        }
+
+        .login-token-warn a {
+            color: #00bcd4;
+            text-decoration: underline;
+        }
+
         /* ========== Header ========== */
         .header {
             display: flex;
@@ -73,6 +170,45 @@
             gap: 8px;
         }
 
+        .header-alliance {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 0.9rem;
+            flex-wrap: wrap;
+        }
+
+        .header-alliance #allianceInfo {
+            color: #ffd700;
+            font-weight: 600;
+        }
+
+        .header-alliance #userInfo {
+            color: rgba(255,255,255,0.8);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .role-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.75rem;
+        }
+
+        .role-badge.owner {
+            background: rgba(255,215,0,0.2);
+            color: #ffd700;
+            border: 1px solid rgba(255,215,0,0.4);
+        }
+
+        .role-badge.member {
+            background: rgba(0,188,212,0.2);
+            color: #00bcd4;
+            border: 1px solid rgba(0,188,212,0.4);
+        }
+
         .header-controls {
             display: flex;
             align-items: center;
@@ -89,6 +225,11 @@
             font-size: 0.95rem;
             min-height: 40px;
             cursor: pointer;
+        }
+
+        .season-select:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
         }
 
         .season-select option {
@@ -136,6 +277,16 @@
 
         .icon-btn:hover {
             background: rgba(0,188,212,0.3);
+        }
+
+        .icon-btn.logout-btn {
+            background: rgba(239,68,68,0.15);
+            border-color: rgba(239,68,68,0.4);
+            color: #f87171;
+        }
+
+        .icon-btn.logout-btn:hover {
+            background: rgba(239,68,68,0.3);
         }
 
         /* ========== Tab 导航 ========== */
@@ -679,6 +830,18 @@
             margin-bottom: 14px;
         }
 
+        .modal-info-box {
+            background: rgba(0,0,0,0.3);
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            line-height: 1.8;
+        }
+
+        .modal-info-box span {
+            color: #ffd700;
+        }
+
         /* ========== 图片预览 ========== */
         .img-preview {
             margin-top: 8px;
@@ -884,227 +1047,371 @@
                 font-size: 0.75rem;
             }
         }
+        /* ========== 鼠标拖尾特效 ========== */
+        .cursor-effect {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 99999;
+        }
+
+        .trail-particle {
+            position: fixed;
+            font-size: 28px;
+            pointer-events: none;
+            animation: trailFade 1.5s ease-out forwards;
+        }
+
+        @keyframes trailFade {
+            0% {
+                opacity: 1;
+                transform: scale(1);
+            }
+            100% {
+                opacity: 0;
+                transform: scale(0);
+            }
+        }
+
+        /* ========== 背景粒子特效 ========== */
+        .particle-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+            overflow: hidden;
+        }
+
+        .bg-particle {
+            position: absolute;
+            font-size: 20px;
+            animation: floatParticle 20s infinite linear;
+        }
+
+        @keyframes floatParticle {
+            0% {
+                transform: translateY(100vh) rotate(0deg);
+                opacity: 0;
+            }
+            10% {
+                opacity: 1;
+            }
+            90% {
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(-100px) rotate(720deg);
+                opacity: 0;
+            }
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <!-- Header -->
-        <div class="header">
-            <div class="header-title">🎮 副本统计</div>
-            <div class="header-controls">
-                <select class="season-select" id="seasonSelect" onchange="switchSeasonFromSelect()"></select>
-                <button class="icon-btn" onclick="addNewSeason()" title="新建赛季">➕</button>
-                <div class="token-status">
-                    <span class="token-dot" id="tokenDot"></span>
-                    <span id="tokenStatusText">未设置</span>
-                </div>
-                <button class="icon-btn" onclick="showSettings()" title="设置">⚙️</button>
-            </div>
-        </div>
+    <!-- ==================== 登录界面 ==================== -->
+    <div id="loginView" class="login-view">
+        <div class="login-card">
+            <div class="login-title">🎮 副本统计</div>
+            <div class="login-subtitle">多盟数据隔离 · 成员身份识别</div>
 
-        <!-- Tab 导航 -->
-        <div class="tab-nav">
-            <button class="tab-btn active" data-tab="overview" onclick="switchTab('overview')">概览</button>
-            <button class="tab-btn" data-tab="members" onclick="switchTab('members')">成员</button>
-            <button class="tab-btn" data-tab="records" onclick="switchTab('records')">记录</button>
-            <button class="tab-btn" data-tab="rankings" onclick="switchTab('rankings')">排名</button>
-        </div>
-
-        <!-- Tab 1: 概览 -->
-        <div class="tab-content active" id="tab-overview">
-            <div class="card">
-                <div class="card-title">📅 赛季进度</div>
-                <div class="progress-wrap">
-                    <div class="progress-label">
-                        <span id="progressDayText">第 1 天 / 14 天</span>
-                        <span id="progressPercent">7%</span>
-                    </div>
-                    <div class="progress-bar">
-                        <div class="progress-fill" id="progressFill" style="width:7%"></div>
-                    </div>
-                </div>
+            <div class="login-tabs">
+                <button class="login-tab active" data-login-tab="create" onclick="switchLoginTab('create')">创建盟</button>
+                <button class="login-tab" data-login-tab="join" onclick="switchLoginTab('join')">加入盟</button>
             </div>
 
-            <div class="card">
-                <div class="card-title">📊 联盟数据</div>
-                <div class="stat-grid">
-                    <div class="stat-item">
-                        <div class="stat-value gold" id="totalCups">0</div>
-                        <div class="stat-label">联盟总杯数</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-value" id="todayRecorded">0 / 0</div>
-                        <div class="stat-label">今日已记录</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-value" id="totalMembers">0</div>
-                        <div class="stat-label">联盟人数</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-value gold" id="totalSpent">¥0</div>
-                        <div class="stat-label">总消费估算</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="card">
-                <div class="card-title">🏆 前3名</div>
-                <div class="podium" id="podiumList">
-                    <div class="empty-state" style="padding:20px;">
-                        <div class="emoji">🎯</div>
-                        <div>暂无数据，请先添加成员并记录</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="card">
-                <div class="card-title">💳 购买统计</div>
-                <div class="stat-grid">
-                    <div class="stat-item">
-                        <div class="stat-value" id="passRate">0%</div>
-                        <div class="stat-label">通行证购买率</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-value gold" id="passCount">0 / 0</div>
-                        <div class="stat-label">通行证 / 总人数</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Tab 2: 成员管理 -->
-        <div class="tab-content" id="tab-members">
-            <div class="card">
-                <div class="card-title">➕ 添加成员</div>
-                <div class="form-row">
-                    <input type="text" class="form-input" id="memberNameInput" placeholder="输入成员名称" onkeydown="if(event.key==='Enter')addMember()">
-                    <button class="btn" onclick="addMember()">添加</button>
-                </div>
-                <div style="font-size:0.8rem;color:rgba(255,255,255,0.5);margin-top:6px;">最多 81 人，当前：<span id="memberCountText">0</span> / 81</div>
-            </div>
-
-            <div class="card">
-                <div class="toolbar">
-                    <div class="card-title" style="margin-bottom:0;">👥 成员列表</div>
-                    <div class="spacer"></div>
-                    <button class="btn btn-danger btn-sm" onclick="clearAllMembers()">清空所有</button>
-                </div>
-                <div class="member-list" id="memberList" style="margin-top:12px;"></div>
-            </div>
-        </div>
-
-        <!-- Tab 3: 每日记录 -->
-        <div class="tab-content" id="tab-records">
-            <div class="card">
-                <div class="card-title">📝 每日记录</div>
-                <div class="form-row">
-                    <div class="form-group" style="min-width:140px;">
-                        <label class="form-label">天数</label>
-                        <select class="form-select" id="daySelect" onchange="loadDailyRecord()"></select>
-                    </div>
-                    <div class="form-group" style="min-width:160px;">
-                        <label class="form-label">成员</label>
-                        <select class="form-select" id="memberSelect" onchange="loadDailyRecord()"></select>
-                    </div>
-                </div>
-                <div id="dayDateText" style="font-size:0.85rem;color:rgba(255,255,255,0.6);margin-bottom:12px;"></div>
-            </div>
-
-            <div class="card">
-                <div class="card-title">⚔️ 体力与杯数</div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label class="form-label">免费体力（默认2）</label>
-                        <input type="number" class="form-input" id="freeStamina" value="2" min="0" oninput="recalcDaily()">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">30元次数（限1）</label>
-                        <input type="number" class="form-input" id="p30" value="0" min="0" max="1" oninput="recalcDaily()">
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label class="form-label">128元次数（限3）</label>
-                        <input type="number" class="form-input" id="p128" value="0" min="0" max="3" oninput="recalcDaily()">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">328元次数（限3）</label>
-                        <input type="number" class="form-input" id="p328" value="0" min="0" max="3" oninput="recalcDaily()">
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label class="form-label">648元次数（不限）</label>
-                        <input type="number" class="form-input" id="p648" value="0" min="0" oninput="recalcDaily()">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">实际杯数</label>
-                        <input type="number" class="form-input" id="actualCups" value="0" min="0" oninput="onActualCupsInput()">
-                    </div>
-                </div>
-
-                <div class="calc-box">
-                    <div class="calc-item">今日体力总计：<span id="totalStamina">0</span></div>
-                    <div class="calc-item">预期杯数：<span id="expectedCups">0</span></div>
-                    <div class="calc-item">今日消费：<span id="dailySpent">¥0</span></div>
-                </div>
-
+            <!-- 创建盟表单 -->
+            <div class="login-form active" id="createForm">
                 <div class="form-group">
-                    <label class="form-label">截图上传</label>
+                    <label class="form-label">盟号</label>
+                    <input type="text" class="form-input" id="createAllianceId" placeholder="如 A001（3-20位字母数字）">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">盟名称</label>
+                    <input type="text" class="form-input" id="createAllianceName" placeholder="如 战神盟">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">盟密码</label>
+                    <input type="password" class="form-input" id="createAlliancePwd" placeholder="加入盟时需要输入">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">你的游戏名</label>
+                    <input type="text" class="form-input" id="createGameName" placeholder="你的游戏内名称">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">你的口令</label>
+                    <input type="password" class="form-input" id="createPasscode" placeholder="换设备时恢复身份用">
+                </div>
+                <button class="btn btn-block btn-gold" onclick="createAlliance()" id="createBtn">创建盟</button>
+            </div>
+
+            <!-- 加入盟表单 -->
+            <div class="login-form" id="joinForm">
+                <div class="form-group">
+                    <label class="form-label">盟号</label>
+                    <input type="text" class="form-input" id="joinAllianceId" placeholder="如 A001">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">盟密码</label>
+                    <input type="password" class="form-input" id="joinAlliancePwd" placeholder="盟主设置的密码">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">你的游戏名</label>
+                    <input type="text" class="form-input" id="joinGameName" placeholder="你的游戏内名称">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">你的口令</label>
+                    <input type="password" class="form-input" id="joinPasscode" placeholder="你设置的口令">
+                </div>
+                <details style="margin-bottom:12px;">
+                    <summary style="font-size:0.85rem;color:rgba(255,255,255,0.6);cursor:pointer;">手动输入 Gist ID（跨设备可选）</summary>
+                    <div class="form-group" style="margin-top:8px;">
+                        <input type="text" class="form-input" id="joinGistId" placeholder="如果知道 Gist ID 可直接输入">
+                    </div>
+                </details>
+                <button class="btn btn-block btn-gold" onclick="joinAlliance()" id="joinBtn">加入盟</button>
+            </div>
+
+            <div class="login-tip">Token 与主站共享，无需重复设置</div>
+            <div id="loginTokenWarn" class="login-token-warn" style="display:none;">
+                ⚠️ Token 未设置，<a href="javascript:void(0)" onclick="showSettings()">点击设置</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== 主界面 ==================== -->
+    <div id="mainView" style="display:none;">
+        <div class="container">
+            <!-- Header -->
+            <div class="header">
+                <div class="header-title">🎮 副本统计</div>
+                <div class="header-alliance">
+                    <span id="allianceInfo">-</span>
+                    <span id="userInfo">-</span>
+                </div>
+                <div class="header-controls">
+                    <select class="season-select" id="seasonSelect" onchange="switchSeasonFromSelect()"></select>
+                    <button class="icon-btn" onclick="addNewSeason()" title="新建赛季" id="newSeasonBtn">➕</button>
+                    <div class="token-status">
+                        <span class="token-dot" id="tokenDot"></span>
+                        <span id="tokenStatusText">未设置</span>
+                    </div>
+                    <button class="icon-btn" onclick="showSettings()" title="设置">⚙️</button>
+                    <button class="icon-btn logout-btn" onclick="logout()" title="退出登录">🚪</button>
+                </div>
+            </div>
+
+            <!-- Tab 导航 -->
+            <div class="tab-nav">
+                <button class="tab-btn active" data-tab="overview" onclick="switchTab('overview')">概览</button>
+                <button class="tab-btn" data-tab="members" onclick="switchTab('members')">成员</button>
+                <button class="tab-btn" data-tab="records" onclick="switchTab('records')">记录</button>
+                <button class="tab-btn" data-tab="rankings" onclick="switchTab('rankings')">排名</button>
+            </div>
+
+            <!-- Tab 1: 概览 -->
+            <div class="tab-content active" id="tab-overview">
+                <div class="card">
+                    <div class="card-title">📅 赛季进度</div>
+                    <div class="progress-wrap">
+                        <div class="progress-label">
+                            <span id="progressDayText">第 1 天 / 14 天</span>
+                            <span id="progressPercent">7%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill" style="width:7%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-title">📊 联盟数据</div>
+                    <div class="stat-grid">
+                        <div class="stat-item">
+                            <div class="stat-value gold" id="totalCups">0</div>
+                            <div class="stat-label">联盟总杯数</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="todayRecorded">0 / 0</div>
+                            <div class="stat-label">今日已记录</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="totalMembers">0</div>
+                            <div class="stat-label">联盟人数</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value gold" id="totalSpent">¥0</div>
+                            <div class="stat-label">总消费估算</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-title">🏆 前3名</div>
+                    <div class="podium" id="podiumList">
+                        <div class="empty-state" style="padding:20px;">
+                            <div class="emoji">🎯</div>
+                            <div>暂无数据，请先添加成员并记录</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-title">💳 购买统计</div>
+                    <div class="stat-grid">
+                        <div class="stat-item">
+                            <div class="stat-value" id="passRate">0%</div>
+                            <div class="stat-label">通行证购买率</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value gold" id="passCount">0 / 0</div>
+                            <div class="stat-label">通行证 / 总人数</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 2: 成员管理 -->
+            <div class="tab-content" id="tab-members">
+                <div class="card" id="memberReadOnlyNotice" style="display:none;">
+                    <div class="modal-tip">📋 您是普通成员，成员列表只读</div>
+                </div>
+                <div class="card" id="addMemberSection">
+                    <div class="card-title">➕ 添加成员</div>
                     <div class="form-row">
-                        <input type="file" class="form-input" id="imageFile" accept="image/*" style="flex:2;min-width:0;" onchange="previewImage(this)">
-                        <button class="btn btn-outline" id="uploadImgBtn" onclick="uploadImageToGist()" style="flex:1;min-width:90px;">上传</button>
+                        <input type="text" class="form-input" id="memberNameInput" placeholder="输入成员名称" onkeydown="if(event.key==='Enter')addMember()">
+                        <button class="btn" onclick="addMember()">添加</button>
                     </div>
-                    <div class="img-preview" id="imgPreview">
-                        <img id="imgPreviewEl" src="" alt="预览" onclick="showLargeImage(this.src)">
-                    </div>
-                    <div id="imgUploadedTip" style="font-size:0.8rem;color:#4ade80;margin-top:6px;display:none;">✅ 已上传截图</div>
+                    <div style="font-size:0.8rem;color:rgba(255,255,255,0.5);margin-top:6px;">最多 81 人，当前：<span id="memberCountText">0</span> / 81</div>
                 </div>
 
-                <div class="form-group">
-                    <label class="form-label">备注</label>
-                    <textarea class="form-textarea" id="noteInput" placeholder="可填写备注信息"></textarea>
-                </div>
-
-                <button class="btn btn-block btn-gold" id="saveRecordBtn" onclick="saveDailyRecord()">保存记录</button>
-            </div>
-        </div>
-
-        <!-- Tab 4: 排名统计 -->
-        <div class="tab-content" id="tab-rankings">
-            <div class="card">
-                <div class="card-title">📈 联盟汇总</div>
-                <div class="stat-grid">
-                    <div class="stat-item">
-                        <div class="stat-value gold" id="rankTotalCups">0</div>
-                        <div class="stat-label">总杯数</div>
+                <div class="card">
+                    <div class="toolbar">
+                        <div class="card-title" style="margin-bottom:0;">👥 成员列表</div>
+                        <div class="spacer"></div>
+                        <button class="btn btn-danger btn-sm" id="clearAllBtn" onclick="clearAllMembers()">清空非盟主</button>
                     </div>
-                    <div class="stat-item">
-                        <div class="stat-value" id="rankTotalStamina">0</div>
-                        <div class="stat-label">总体力</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-value gold" id="rankTotalSpent">¥0</div>
-                        <div class="stat-label">总消费</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-value" id="rankAvgCups">0</div>
-                        <div class="stat-label">平均杯数</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-value" id="rankPassRate">0%</div>
-                        <div class="stat-label">通行证率</div>
-                    </div>
+                    <div class="member-list" id="memberList" style="margin-top:12px;"></div>
                 </div>
             </div>
 
-            <div class="card">
-                <div class="toolbar">
-                    <div class="card-title" style="margin-bottom:0;">🏆 排名列表</div>
-                    <div class="spacer"></div>
-                    <button class="btn btn-outline btn-sm" onclick="exportData()">导出JSON</button>
+            <!-- Tab 3: 每日记录 -->
+            <div class="tab-content" id="tab-records">
+                <div class="card">
+                    <div class="card-title">📝 每日记录</div>
+                    <div class="form-row">
+                        <div class="form-group" style="min-width:140px;">
+                            <label class="form-label">天数</label>
+                            <select class="form-select" id="daySelect" onchange="loadDailyRecord()"></select>
+                        </div>
+                        <div class="form-group" style="min-width:160px;">
+                            <label class="form-label">成员</label>
+                            <select class="form-select" id="memberSelect" onchange="loadDailyRecord()"></select>
+                        </div>
+                    </div>
+                    <div id="dayDateText" style="font-size:0.85rem;color:rgba(255,255,255,0.6);margin-bottom:12px;"></div>
                 </div>
-                <div class="rank-list" id="rankList" style="margin-top:12px;"></div>
+
+                <div class="card">
+                    <div class="card-title">⚔️ 体力与杯数</div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">免费体力（默认2）</label>
+                            <input type="number" class="form-input" id="freeStamina" value="2" min="0" oninput="recalcDaily()">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">30元次数（限1）</label>
+                            <input type="number" class="form-input" id="p30" value="0" min="0" max="1" oninput="recalcDaily()">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">128元次数（限3）</label>
+                            <input type="number" class="form-input" id="p128" value="0" min="0" max="3" oninput="recalcDaily()">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">328元次数（限3）</label>
+                            <input type="number" class="form-input" id="p328" value="0" min="0" max="3" oninput="recalcDaily()">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">648元次数（不限）</label>
+                            <input type="number" class="form-input" id="p648" value="0" min="0" oninput="recalcDaily()">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">实际杯数</label>
+                            <input type="number" class="form-input" id="actualCups" value="0" min="0" oninput="onActualCupsInput()">
+                        </div>
+                    </div>
+
+                    <div class="calc-box">
+                        <div class="calc-item">今日体力总计：<span id="totalStamina">0</span></div>
+                        <div class="calc-item">预期杯数：<span id="expectedCups">0</span></div>
+                        <div class="calc-item">今日消费：<span id="dailySpent">¥0</span></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">截图上传</label>
+                        <div class="form-row">
+                            <input type="file" class="form-input" id="imageFile" accept="image/*" style="flex:2;min-width:0;" onchange="previewImage(this)">
+                            <button class="btn btn-outline" id="uploadImgBtn" onclick="uploadImageToGist()" style="flex:1;min-width:90px;">上传</button>
+                        </div>
+                        <div class="img-preview" id="imgPreview">
+                            <img id="imgPreviewEl" src="" alt="预览" onclick="showLargeImage(this.src)">
+                        </div>
+                        <div id="imgUploadedTip" style="font-size:0.8rem;color:#4ade80;margin-top:6px;display:none;">✅ 已上传截图</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">备注</label>
+                        <textarea class="form-textarea" id="noteInput" placeholder="可填写备注信息"></textarea>
+                    </div>
+
+                    <button class="btn btn-block btn-gold" id="saveRecordBtn" onclick="saveDailyRecord()">保存记录</button>
+                </div>
+            </div>
+
+            <!-- Tab 4: 排名统计 -->
+            <div class="tab-content" id="tab-rankings">
+                <div class="card">
+                    <div class="card-title">📈 联盟汇总</div>
+                    <div class="stat-grid">
+                        <div class="stat-item">
+                            <div class="stat-value gold" id="rankTotalCups">0</div>
+                            <div class="stat-label">总杯数</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="rankTotalStamina">0</div>
+                            <div class="stat-label">总体力</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value gold" id="rankTotalSpent">¥0</div>
+                            <div class="stat-label">总消费</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="rankAvgCups">0</div>
+                            <div class="stat-label">平均杯数</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="rankPassRate">0%</div>
+                            <div class="stat-label">通行证率</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="toolbar">
+                        <div class="card-title" style="margin-bottom:0;">🏆 排名列表</div>
+                        <div class="spacer"></div>
+                        <button class="btn btn-outline btn-sm" onclick="exportData()">导出JSON</button>
+                    </div>
+                    <div class="rank-list" id="rankList" style="margin-top:12px;"></div>
+                </div>
             </div>
         </div>
     </div>
@@ -1118,16 +1425,7 @@
             </div>
 
             <div class="modal-tip" id="tokenTip">
-                请先在主站设置 Token，或在此处输入
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">主数据 Gist ID</label>
-                <input type="text" class="form-input" id="gistIdInput" placeholder="输入已有 Gist ID 或点击创建">
-            </div>
-            <div class="form-row" style="margin-bottom:14px;">
-                <button class="btn btn-outline btn-sm" onclick="createGameGist()" style="flex:1;">创建新 Gist</button>
-                <button class="btn btn-sm" onclick="saveGistId()" style="flex:1;">保存 ID</button>
+                请先设置 GitHub Token
             </div>
 
             <div class="form-group">
@@ -1135,6 +1433,15 @@
                 <input type="password" class="form-input" id="tokenInput" placeholder="输入 ghp_ 开头的 Token">
             </div>
             <button class="btn btn-block" onclick="saveTokenFromSettings()">保存 Token</button>
+
+            <div id="allianceInfoSection" style="margin-top:16px;display:none;">
+                <div class="form-label">当前盟信息</div>
+                <div class="modal-info-box">
+                    <div>盟号：<span id="settingsAllianceId"></span></div>
+                    <div>盟名称：<span id="settingsAllianceName"></span></div>
+                    <div>Gist ID：<span id="settingsGistId"></span></div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -1154,10 +1461,12 @@
     <script>
         // ==================== 常量 ====================
         const GIST_TOKEN_KEY = 'TFJL_Gist_Token';
-        const GIST_ID_KEY = 'GAME_STATS_GIST_ID';
-        const GIST_FILENAME = 'game_stats.json';
+        const SESSION_KEY = 'GAME_ALLIANCE_SESSION';
+        const ALLIANCE_GISTS_KEY = 'GAME_ALLIANCE_GISTS';
+        const GIST_FILENAME = 'alliance_data.json';
         const MAX_MEMBERS = 81;
         const SEASON_DAYS = 14;
+        const PWD_SALT = 'TFJL_2026_SALT_X9K';
         // 购买规则：[金额, 单次体力, 限购次数（-1为不限）]
         const PURCHASE_RULES = {
             p30:  { price: 30,  stamina: 1,  limit: 1 },
@@ -1185,19 +1494,87 @@
             return !!getGistToken();
         }
 
-        function getGistId() {
-            return localStorage.getItem(GIST_ID_KEY) || '';
+        // ==================== 会话管理 ====================
+        function getSession() {
+            try {
+                const raw = localStorage.getItem(SESSION_KEY);
+                return raw ? JSON.parse(raw) : null;
+            } catch (e) {
+                return null;
+            }
         }
 
-        function setGistId(id) {
-            localStorage.setItem(GIST_ID_KEY, id);
+        function setSession(session) {
+            localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+        }
+
+        function clearSession() {
+            localStorage.removeItem(SESSION_KEY);
+        }
+
+        // ==================== 盟 Gist 映射 ====================
+        function getAllianceGists() {
+            try {
+                const raw = localStorage.getItem(ALLIANCE_GISTS_KEY);
+                return raw ? JSON.parse(raw) : {};
+            } catch (e) {
+                return {};
+            }
+        }
+
+        function setAllianceGistId(allianceId, gistId) {
+            const map = getAllianceGists();
+            map[allianceId] = gistId;
+            localStorage.setItem(ALLIANCE_GISTS_KEY, JSON.stringify(map));
+        }
+
+        function getAllianceGistId(allianceId) {
+            const map = getAllianceGists();
+            return map[allianceId] || '';
+        }
+
+        // ==================== 密码哈希 ====================
+        function hashPassword(pwd) {
+            if (!pwd) return '';
+            let result = '';
+            for (let i = 0; i < pwd.length; i++) {
+                result += String.fromCharCode(pwd.charCodeAt(i) ^ PWD_SALT.charCodeAt(i % PWD_SALT.length));
+            }
+            return btoa(unescape(encodeURIComponent(result)));
+        }
+
+        function verifyPassword(pwd, hash) {
+            if (!hash) return false;
+            if (!pwd) return false;
+            return hashPassword(pwd) === hash;
         }
 
         // ==================== 全局状态 ====================
-        let gameData = { seasons: [], currentSeasonId: '' };
+        let gameData = null;
+        let currentSession = null;
         let currentTab = 'overview';
         let saveTimer = null;
         let currentImageGistId = '';
+
+        // ==================== 权限辅助 ====================
+        function isOwner() {
+            if (!currentSession || !gameData) return false;
+            const season = getCurrentSeason();
+            if (!season) return false;
+            const member = season.members.find(m => m.id === currentSession.memberId);
+            return !!(member && member.isOwner === true);
+        }
+
+        function getCurrentMember() {
+            if (!currentSession || !gameData) return null;
+            const season = getCurrentSeason();
+            if (!season) return null;
+            return season.members.find(m => m.id === currentSession.memberId) || null;
+        }
+
+        function getGistId() {
+            return currentSession ? currentSession.gistId : '';
+        }
 
         // ==================== 加载状态 ====================
         function showLoading(text) {
@@ -1219,53 +1596,9 @@
         }
 
         // ==================== Gist 操作 ====================
-        async function createGameGist() {
+        async function getAllianceData(gistId) {
             const token = getGistToken();
-            if (!token) {
-                showToast('请先设置 Token', 'error');
-                return;
-            }
-            showLoading('创建 Gist 中...');
-            try {
-                const initData = { seasons: [], currentSeasonId: '' };
-                const response = await fetch('https://api.github.com/gists', {
-                    method: 'POST',
-                    headers: {
-                        'Accept': 'application/vnd.github.v3+json',
-                        'Content-Type': 'application/json',
-                        'Authorization': `token ${token}`
-                    },
-                    body: JSON.stringify({
-                        description: '副本统计数据',
-                        public: false,
-                        files: {
-                            [GIST_FILENAME]: { content: JSON.stringify(initData, null, 2) }
-                        }
-                    })
-                });
-                if (!response.ok) {
-                    const err = await response.json().catch(() => ({}));
-                    throw new Error('创建失败: ' + (err.message || response.status));
-                }
-                const data = await response.json();
-                setGistId(data.id);
-                document.getElementById('gistIdInput').value = data.id;
-                gameData = initData;
-                showToast('✅ Gist 创建成功', 'success');
-                await refreshAll();
-            } catch (e) {
-                showToast('创建 Gist 失败: ' + e.message, 'error');
-            } finally {
-                hideLoading();
-            }
-        }
-
-        async function getGameGistData() {
-            const token = getGistToken();
-            const gistId = getGistId();
-            if (!gistId) {
-                return null;
-            }
+            if (!gistId) return null;
             const response = await fetch(`https://api.github.com/gists/${gistId}`, {
                 headers: {
                     'Accept': 'application/vnd.github.v3+json',
@@ -1273,7 +1606,7 @@
                 }
             });
             if (response.status === 404) {
-                throw new Error('Gist 不存在，请重新创建');
+                throw new Error('Gist 不存在');
             }
             if (!response.ok) {
                 const err = await response.json().catch(() => ({}));
@@ -1287,9 +1620,8 @@
             throw new Error('Gist 中未找到数据文件');
         }
 
-        async function saveGameGistData(data) {
+        async function saveAllianceDataRaw(data, gistId) {
             const token = getGistToken();
-            const gistId = getGistId();
             if (!gistId) {
                 throw new Error('未设置 Gist ID');
             }
@@ -1306,7 +1638,7 @@
                 body: JSON.stringify({
                     files: {
                         [GIST_FILENAME]: { content: JSON.stringify(data, null, 2) }
-                        }
+                    }
                 })
             });
             if (!response.ok) {
@@ -1315,8 +1647,16 @@
             }
         }
 
+        async function saveGameGistData(data) {
+            if (!currentSession || !currentSession.gistId) {
+                throw new Error('未登录');
+            }
+            await saveAllianceDataRaw(data, currentSession.gistId);
+        }
+
         // 防抖保存
         function debounceSave() {
+            if (!currentSession || !gameData) return;
             if (saveTimer) clearTimeout(saveTimer);
             saveTimer = setTimeout(async () => {
                 try {
@@ -1329,6 +1669,7 @@
 
         // 立即保存（带加载状态）
         async function saveNow() {
+            if (!currentSession || !gameData) return;
             if (saveTimer) {
                 clearTimeout(saveTimer);
                 saveTimer = null;
@@ -1344,6 +1685,321 @@
             }
         }
 
+        // ==================== 登录/注册 ====================
+        function switchLoginTab(tab) {
+            document.querySelectorAll('.login-tab').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.loginTab === tab);
+            });
+            document.querySelectorAll('.login-form').forEach(f => f.classList.remove('active'));
+            document.getElementById(tab === 'create' ? 'createForm' : 'joinForm').classList.add('active');
+        }
+
+        async function createAlliance() {
+            const allianceId = document.getElementById('createAllianceId').value.trim().toUpperCase();
+            const allianceName = document.getElementById('createAllianceName').value.trim();
+            const alliancePwd = document.getElementById('createAlliancePwd').value;
+            const gameName = document.getElementById('createGameName').value.trim();
+            const passcode = document.getElementById('createPasscode').value;
+
+            if (!allianceId || !allianceName || !alliancePwd || !gameName || !passcode) {
+                showToast('请填写所有字段', 'error');
+                return;
+            }
+            if (!/^[A-Za-z0-9]{3,20}$/.test(allianceId)) {
+                showToast('盟号格式不正确（3-20位字母数字）', 'error');
+                return;
+            }
+            const token = getGistToken();
+            if (!token) {
+                showToast('请先设置 Token', 'error');
+                showSettings();
+                return;
+            }
+            // 检查盟号是否已在本地映射中
+            const existingGistId = getAllianceGistId(allianceId);
+            if (existingGistId) {
+                showToast('该盟号已存在，请直接加入', 'error');
+                return;
+            }
+
+            showLoading('创建盟中...');
+            try {
+                const ownerId = 'm' + Date.now() + Math.random().toString(36).substr(2, 4);
+                const seasonId = 's' + Date.now();
+                const initData = {
+                    allianceId: allianceId,
+                    allianceName: allianceName,
+                    alliancePassword: hashPassword(alliancePwd),
+                    seasons: [{
+                        id: seasonId,
+                        name: '第1赛季',
+                        startDate: new Date().toISOString().slice(0, 10),
+                        days: SEASON_DAYS,
+                        members: [{
+                            id: ownerId,
+                            name: gameName,
+                            passcode: hashPassword(passcode),
+                            isOwner: true,
+                            passBought: false,
+                            dailyRecords: {}
+                        }]
+                    }],
+                    currentSeasonId: seasonId
+                };
+
+                const response = await fetch('https://api.github.com/gists', {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json',
+                        'Authorization': `token ${token}`
+                    },
+                    body: JSON.stringify({
+                        description: `[DUNGEON-STATS] 盟号:${allianceId} 盟名称:${allianceName}`,
+                        public: false,
+                        files: {
+                            [GIST_FILENAME]: { content: JSON.stringify(initData, null, 2) }
+                        }
+                    })
+                });
+                if (!response.ok) {
+                    const err = await response.json().catch(() => ({}));
+                    throw new Error('创建失败: ' + (err.message || response.status));
+                }
+                const respData = await response.json();
+                const gistId = respData.id;
+
+                setAllianceGistId(allianceId, gistId);
+
+                currentSession = {
+                    allianceId: allianceId,
+                    memberId: ownerId,
+                    gameName: gameName,
+                    gistId: gistId
+                };
+                setSession(currentSession);
+                gameData = initData;
+
+                showToast('✅ 盟创建成功', 'success');
+                showMainView();
+                renderAll();
+            } catch (e) {
+                showToast('创建盟失败: ' + e.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function joinAlliance() {
+            const allianceId = document.getElementById('joinAllianceId').value.trim().toUpperCase();
+            const alliancePwd = document.getElementById('joinAlliancePwd').value;
+            const gameName = document.getElementById('joinGameName').value.trim();
+            const passcode = document.getElementById('joinPasscode').value;
+            const manualGistId = document.getElementById('joinGistId').value.trim();
+
+            if (!allianceId || !alliancePwd || !gameName || !passcode) {
+                showToast('请填写所有字段', 'error');
+                return;
+            }
+            const token = getGistToken();
+            if (!token) {
+                showToast('请先设置 Token', 'error');
+                showSettings();
+                return;
+            }
+            // 获取 Gist ID
+            let gistId = manualGistId || getAllianceGistId(allianceId);
+            if (!gistId) {
+                showToast('未找到该盟号，请输入正确的 Gist ID', 'error');
+                return;
+            }
+
+            showLoading('加入盟中...');
+            try {
+                const data = await getAllianceData(gistId);
+                if (!data || !data.allianceId) {
+                    throw new Error('数据格式不正确');
+                }
+
+                // 验证盟密码
+                if (!verifyPassword(alliancePwd, data.alliancePassword)) {
+                    showToast('盟密码错误', 'error');
+                    return;
+                }
+
+                // 获取当前赛季
+                const season = data.seasons.find(s => s.id === data.currentSeasonId) || data.seasons[0];
+                if (!season) {
+                    showToast('该盟暂无赛季', 'error');
+                    return;
+                }
+
+                // 查找是否已存在该游戏名
+                const existingMember = season.members.find(m => m.name === gameName);
+                let memberId;
+
+                if (existingMember) {
+                    if (existingMember.passcode) {
+                        // 已有口令，验证
+                        if (!verifyPassword(passcode, existingMember.passcode)) {
+                            showToast('口令错误', 'error');
+                            return;
+                        }
+                        memberId = existingMember.id;
+                    } else {
+                        // 无口令（盟主手动添加的），设置口令并认领身份
+                        existingMember.passcode = hashPassword(passcode);
+                        memberId = existingMember.id;
+                        await saveAllianceDataRaw(data, gistId);
+                    }
+                } else {
+                    // 新成员
+                    memberId = 'm' + Date.now() + Math.random().toString(36).substr(2, 4);
+                    const newMember = {
+                        id: memberId,
+                        name: gameName,
+                        passcode: hashPassword(passcode),
+                        isOwner: false,
+                        passBought: false,
+                        dailyRecords: {}
+                    };
+                    season.members.push(newMember);
+                    await saveAllianceDataRaw(data, gistId);
+                }
+
+                // 保存到本地映射
+                setAllianceGistId(data.allianceId, gistId);
+
+                currentSession = {
+                    allianceId: data.allianceId,
+                    memberId: memberId,
+                    gameName: gameName,
+                    gistId: gistId
+                };
+                setSession(currentSession);
+                gameData = data;
+
+                showToast('✅ 加入成功', 'success');
+                showMainView();
+                renderAll();
+            } catch (e) {
+                showToast('加入盟失败: ' + e.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        function logout() {
+            if (!confirm('确定退出登录？')) return;
+            clearSession();
+            currentSession = null;
+            gameData = null;
+            showLoginView();
+            showToast('已退出登录', 'info');
+        }
+
+        async function tryAutoLogin() {
+            const session = getSession();
+            if (!session) {
+                showLoginView();
+                return;
+            }
+            if (!hasGistToken()) {
+                showLoginView();
+                return;
+            }
+            showLoading('登录中...');
+            try {
+                const data = await getAllianceData(session.gistId);
+                if (!data || !data.allianceId) {
+                    throw new Error('数据格式不正确');
+                }
+
+                // 在当前赛季中查找成员
+                let season = data.seasons.find(s => s.id === data.currentSeasonId) || data.seasons[0];
+                let member = season ? season.members.find(m => m.id === session.memberId) : null;
+
+                // 若当前赛季没有，在所有赛季中查找
+                if (!member) {
+                    for (const s of data.seasons) {
+                        const m = s.members.find(m => m.id === session.memberId);
+                        if (m) {
+                            data.currentSeasonId = s.id;
+                            season = s;
+                            member = m;
+                            break;
+                        }
+                    }
+                }
+
+                if (!member) {
+                    throw new Error('成员不存在');
+                }
+
+                currentSession = session;
+                gameData = data;
+
+                showMainView();
+                renderAll();
+            } catch (e) {
+                showToast('自动登录失败: ' + e.message, 'error');
+                clearSession();
+                showLoginView();
+            } finally {
+                hideLoading();
+            }
+        }
+
+        function showLoginView() {
+            document.getElementById('loginView').style.display = 'flex';
+            document.getElementById('mainView').style.display = 'none';
+            updateLoginTokenWarn();
+        }
+
+        function showMainView() {
+            document.getElementById('loginView').style.display = 'none';
+            document.getElementById('mainView').style.display = 'block';
+            updateHeaderInfo();
+            updatePermissionUI();
+        }
+
+        function updateLoginTokenWarn() {
+            const warn = document.getElementById('loginTokenWarn');
+            if (hasGistToken()) {
+                warn.style.display = 'none';
+            } else {
+                warn.style.display = 'block';
+            }
+        }
+
+        function updateHeaderInfo() {
+            if (!currentSession || !gameData) return;
+            document.getElementById('allianceInfo').textContent =
+                gameData.allianceId + ' · ' + gameData.allianceName;
+            const member = getCurrentMember();
+            const ownerFlag = !!(member && member.isOwner);
+            const roleClass = ownerFlag ? 'owner' : 'member';
+            const roleText = ownerFlag ? '盟主' : '成员';
+            document.getElementById('userInfo').innerHTML =
+                '👤 ' + escapeHtml(currentSession.gameName) +
+                ' <span class="role-badge ' + roleClass + '">' + roleText + '</span>';
+        }
+
+        function updatePermissionUI() {
+            const owner = isOwner();
+            const newSeasonBtn = document.getElementById('newSeasonBtn');
+            const seasonSel = document.getElementById('seasonSelect');
+            const addMemberSection = document.getElementById('addMemberSection');
+            const clearAllBtn = document.getElementById('clearAllBtn');
+            const readOnlyNotice = document.getElementById('memberReadOnlyNotice');
+
+            if (newSeasonBtn) newSeasonBtn.style.display = owner ? 'flex' : 'none';
+            if (seasonSel) seasonSel.disabled = !owner;
+            if (addMemberSection) addMemberSection.style.display = owner ? 'block' : 'none';
+            if (clearAllBtn) clearAllBtn.style.display = owner ? 'block' : 'none';
+            if (readOnlyNotice) readOnlyNotice.style.display = owner ? 'none' : 'block';
+        }
+
         // ==================== 图片操作 ====================
         async function uploadImageToGist() {
             const fileInput = document.getElementById('imageFile');
@@ -1357,14 +2013,23 @@
                 showToast('未设置 Token，无法上传', 'error');
                 return;
             }
+            if (!gameData || !currentSession) {
+                showToast('未登录', 'error');
+                return;
+            }
             showLoading('上传图片中...');
             try {
                 const base64 = await fileToBase64(file);
                 const base64Data = base64.replace(/^data:image\/\w+;base64,/, '');
                 const ext = (file.name.split('.').pop() || 'png').toLowerCase();
                 const timestamp = Date.now();
-                const random = Math.random().toString(36).substr(2, 6);
-                const filename = `dungeon_img_${timestamp}_${random}.${ext}`;
+                const allianceId = gameData.allianceId;
+                const member = getCurrentMember();
+                const memberName = member ? member.name : 'unknown';
+                const sanitizedMemberName = memberName.replace(/[\/\\:*?"<>|]/g, '_');
+                const day = document.getElementById('daySelect').value.replace('d', '');
+                const filename = `img_${allianceId}_${sanitizedMemberName}_d${day}_${timestamp}.${ext}`;
+                const description = `[DUNGEON-IMG] 盟号:${allianceId} 成员:${memberName} 天数:${day}`;
 
                 const response = await fetch('https://api.github.com/gists', {
                     method: 'POST',
@@ -1374,7 +2039,7 @@
                         'Authorization': `token ${token}`
                     },
                     body: JSON.stringify({
-                        description: '副本截图',
+                        description: description,
                         public: false,
                         files: {
                             [filename]: { content: base64Data }
@@ -1385,8 +2050,8 @@
                     const err = await response.json().catch(() => ({}));
                     throw new Error(err.message || response.status);
                 }
-                const data = await response.json();
-                currentImageGistId = data.id;
+                const respData = await response.json();
+                currentImageGistId = respData.id;
                 document.getElementById('imgUploadedTip').style.display = 'block';
                 document.getElementById('uploadImgBtn').disabled = true;
                 showToast('✅ 图片上传成功', 'success');
@@ -1424,7 +2089,6 @@
                         const fileObj = data.files[firstKey];
                         const content = fileObj.content || '';
                         if (content) {
-                            // 根据文件扩展名判断 MIME 类型
                             const ext = (firstKey.split('.').pop() || 'png').toLowerCase();
                             const mimeMap = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp', bmp: 'image/bmp' };
                             const mime = mimeMap[ext] || 'image/png';
@@ -1480,12 +2144,8 @@
             return season;
         }
 
-        function switchSeason(id) {
-            gameData.currentSeasonId = id;
-        }
-
         function getCurrentSeason() {
-            if (!gameData.seasons || gameData.seasons.length === 0) return null;
+            if (!gameData || !gameData.seasons || gameData.seasons.length === 0) return null;
             return gameData.seasons.find(s => s.id === gameData.currentSeasonId) || gameData.seasons[0];
         }
 
@@ -1507,22 +2167,28 @@
         }
 
         function switchSeasonFromSelect() {
+            if (!isOwner()) {
+                showToast('只有盟主可以切换赛季', 'error');
+                renderSeasonSelect();
+                return;
+            }
             const sel = document.getElementById('seasonSelect');
             const id = sel.value;
             if (!id) return;
-            switchSeason(id);
+            gameData.currentSeasonId = id;
             renderAll();
         }
 
         function addNewSeason() {
-            if (!hasGistToken() || !getGistId()) {
-                showToast('请先在设置中配置 Token 和 Gist', 'error');
-                showSettings();
+            if (!isOwner()) {
+                showToast('只有盟主可以创建赛季', 'error');
                 return;
             }
+            if (!gameData) return;
             const name = prompt('请输入赛季名称：', '第' + (gameData.seasons.length + 1) + '赛季');
             if (!name) return;
             const startDate = prompt('请输入赛季开始日期（YYYY-MM-DD，留空使用今天）：', new Date().toISOString().slice(0, 10));
+            const oldSeason = getCurrentSeason();
             const season = {
                 id: 's' + Date.now(),
                 name: name,
@@ -1530,6 +2196,17 @@
                 days: SEASON_DAYS,
                 members: []
             };
+            // 继承所有成员（重置数据，保留身份）
+            if (oldSeason) {
+                season.members = oldSeason.members.map(m => ({
+                    id: m.id,
+                    name: m.name,
+                    passcode: m.passcode,
+                    isOwner: m.isOwner,
+                    passBought: false,
+                    dailyRecords: {}
+                }));
+            }
             gameData.seasons.push(season);
             gameData.currentSeasonId = season.id;
             saveNow().then(() => {
@@ -1540,18 +2217,22 @@
 
         function renderSeasonSelect() {
             const sel = document.getElementById('seasonSelect');
+            if (!gameData || gameData.seasons.length === 0) {
+                sel.innerHTML = '<option value="">暂无赛季</option>';
+                return;
+            }
             const cur = getCurrentSeason();
             sel.innerHTML = gameData.seasons.map(s =>
                 `<option value="${s.id}" ${cur && s.id === cur.id ? 'selected' : ''}>${escapeHtml(s.name)}</option>`
             ).join('');
-            // 新建赛季按钮选项
-            if (gameData.seasons.length === 0) {
-                sel.innerHTML = '<option value="">暂无赛季</option>';
-            }
         }
 
         // ==================== 成员管理 ====================
         function addMember() {
+            if (!isOwner()) {
+                showToast('只有盟主可以添加成员', 'error');
+                return;
+            }
             const season = getCurrentSeason();
             if (!season) {
                 showToast('请先创建赛季', 'error');
@@ -1574,6 +2255,8 @@
             const member = {
                 id: 'm' + Date.now() + Math.random().toString(36).substr(2, 4),
                 name: name,
+                passcode: '',
+                isOwner: false,
                 passBought: false,
                 dailyRecords: {}
             };
@@ -1586,8 +2269,17 @@
         }
 
         function removeMember(id) {
+            if (!isOwner()) {
+                showToast('只有盟主可以删除成员', 'error');
+                return;
+            }
             const season = getCurrentSeason();
             if (!season) return;
+            const member = season.members.find(m => m.id === id);
+            if (member && member.isOwner) {
+                showToast('不能删除盟主', 'error');
+                return;
+            }
             if (!confirm('确定删除该成员？相关记录也会删除。')) return;
             season.members = season.members.filter(m => m.id !== id);
             renderMembers();
@@ -1599,6 +2291,10 @@
         }
 
         function togglePass(id) {
+            if (!isOwner()) {
+                showToast('只有盟主可以修改通行证状态', 'error');
+                return;
+            }
             const season = getCurrentSeason();
             if (!season) return;
             const member = season.members.find(m => m.id === id);
@@ -1611,20 +2307,25 @@
         }
 
         function clearAllMembers() {
+            if (!isOwner()) {
+                showToast('只有盟主可以清空成员', 'error');
+                return;
+            }
             const season = getCurrentSeason();
             if (!season) return;
             if (season.members.length === 0) {
                 showToast('暂无成员', 'info');
                 return;
             }
-            if (!confirm('确定清空所有成员？此操作不可恢复！')) return;
-            season.members = [];
+            if (!confirm('确定清空所有非盟主成员？此操作不可恢复！')) return;
+            // 保留盟主
+            season.members = season.members.filter(m => m.isOwner);
             renderMembers();
             renderOverview();
             renderRankings();
             renderMemberSelect();
             debounceSave();
-            showToast('已清空所有成员', 'success');
+            showToast('已清空非盟主成员', 'success');
         }
 
         // ==================== 杯数/消费计算 ====================
@@ -1719,19 +2420,16 @@
             document.getElementById('expectedCups').textContent = expected;
             document.getElementById('dailySpent').textContent = '¥' + spent;
 
-            // 限购提示
             checkPurchaseLimit('p30', 1);
             checkPurchaseLimit('p128', 3);
             checkPurchaseLimit('p328', 3);
 
-            // 如果实际杯数未手动修改过，自动同步为预期杯数
             const actualInput = document.getElementById('actualCups');
             if (actualInput.dataset.autoSync !== 'no') {
                 actualInput.value = expected;
             }
         }
 
-        // 用户手动修改实际杯数时，停止自动同步
         function onActualCupsInput() {
             const actualInput = document.getElementById('actualCups');
             const record = collectDailyForm();
@@ -1772,7 +2470,6 @@
             const day = document.getElementById('daySelect').value;
             if (!memberId || !day) return;
 
-            // 显示日期
             const dayNum = parseInt(day.replace('d', ''));
             document.getElementById('dayDateText').textContent = '第 ' + dayNum + ' 天 · ' + getDateOfDay(season, dayNum);
 
@@ -1800,7 +2497,6 @@
                 if (currentImageGistId) {
                     document.getElementById('imgUploadedTip').style.display = 'block';
                     document.getElementById('uploadImgBtn').disabled = true;
-                    // 异步加载图片预览
                     loadRecordImage(currentImageGistId);
                 }
                 if (record.actualCups && record.actualCups !== calcExpectedCups(record)) {
@@ -1838,6 +2534,11 @@
                 showToast('请选择成员和天数', 'error');
                 return;
             }
+            // 权限检查：非盟主只能保存自己的记录
+            if (!isOwner() && memberId !== currentSession.memberId) {
+                showToast('只能编辑自己的记录', 'error');
+                return;
+            }
             const member = season.members.find(m => m.id === memberId);
             if (!member) {
                 showToast('成员不存在', 'error');
@@ -1871,12 +2572,24 @@
                 sel.innerHTML = '<option value="">请先添加成员</option>';
                 return;
             }
-            const cur = sel.value;
-            sel.innerHTML = season.members.map(m =>
-                `<option value="${m.id}">${escapeHtml(m.name)}</option>`
-            ).join('');
-            if (cur && season.members.some(m => m.id === cur)) {
-                sel.value = cur;
+            const owner = isOwner();
+            if (owner) {
+                // 盟主可选择所有成员
+                const cur = sel.value;
+                sel.innerHTML = season.members.map(m =>
+                    `<option value="${m.id}">${escapeHtml(m.name)}${m.isOwner ? ' (盟主)' : ''}</option>`
+                ).join('');
+                if (cur && season.members.some(m => m.id === cur)) {
+                    sel.value = cur;
+                }
+                sel.disabled = false;
+            } else {
+                // 普通成员只能选择自己
+                sel.innerHTML = season.members.filter(m => m.id === currentSession.memberId).map(m =>
+                    `<option value="${m.id}">${escapeHtml(m.name)}</option>`
+                ).join('');
+                sel.value = currentSession.memberId;
+                sel.disabled = true;
             }
         }
 
@@ -1889,7 +2602,6 @@
                 html += `<option value="d${i}">第 ${i} 天${dateStr ? ' (' + dateStr + ')' : ''}</option>`;
             }
             sel.innerHTML = html;
-            // 默认选择当前天数
             const curDay = season ? getSeasonDay(season) : 1;
             sel.value = 'd' + curDay;
         }
@@ -1923,7 +2635,7 @@
                 document.getElementById('totalSpent').textContent = '¥0';
                 document.getElementById('passRate').textContent = '0%';
                 document.getElementById('passCount').textContent = '0 / 0';
-                document.getElementById('podiumList').innerHTML = '<div class="empty-state" style="padding:20px;"><div class="emoji">🎯</div><div>暂无赛季，请先在设置中创建</div></div>';
+                document.getElementById('podiumList').innerHTML = '<div class="empty-state" style="padding:20px;"><div class="emoji">🎯</div><div>暂无赛季</div></div>';
                 return;
             }
             const curDay = getSeasonDay(season);
@@ -1980,20 +2692,26 @@
                 list.innerHTML = '<div class="empty-state"><div class="emoji">👥</div><div>暂无成员，请添加</div></div>';
                 return;
             }
+            const owner = isOwner();
             list.innerHTML = season.members.map((m, i) => {
                 const cups = getMemberTotalCups(m);
                 const spent = getMemberTotalSpent(m);
+                const roleTag = m.isOwner ? ' 👑' : '';
+                const passBadge = owner
+                    ? `<span class="pass-badge ${m.passBought ? 'bought' : 'not-bought'}" onclick="togglePass('${m.id}')">通行证：${m.passBought ? '已买' : '未买'}</span>`
+                    : `<span class="pass-badge ${m.passBought ? 'bought' : 'not-bought'}" style="cursor:default;">通行证：${m.passBought ? '已买' : '未买'}</span>`;
+                const deleteBtn = (owner && !m.isOwner)
+                    ? `<button class="btn btn-danger btn-sm" onclick="removeMember('${m.id}')">删除</button>`
+                    : '';
                 return `<div class="member-row">
                     <div class="m-index">${i+1}</div>
-                    <div class="m-name">${escapeHtml(m.name)}</div>
+                    <div class="m-name">${escapeHtml(m.name)}${roleTag}</div>
                     <div class="m-info">
-                        <span class="pass-badge ${m.passBought ? 'bought' : 'not-bought'}" onclick="togglePass('${m.id}')">
-                            通行证：${m.passBought ? '已买' : '未买'}
-                        </span>
+                        ${passBadge}
                         <span>🏆 ${cups.toLocaleString()}杯</span>
                         <span>💰 ¥${spent.toLocaleString()}</span>
                     </div>
-                    <button class="btn btn-danger btn-sm" onclick="removeMember('${m.id}')">删除</button>
+                    ${deleteBtn}
                 </div>`;
             }).join('');
         }
@@ -2028,7 +2746,7 @@
                     return `<div class="rank-row ${rankClass}" onclick="toggleRankDetail(this)">
                         <div class="rank-head">
                             <div class="rank-num">${rank}</div>
-                            <div class="rank-name">${escapeHtml(r.member.name)}</div>
+                            <div class="rank-name">${escapeHtml(r.member.name)}${r.member.isOwner ? ' 👑' : ''}</div>
                             <div class="rank-cups">${r.cups.toLocaleString()}</div>
                         </div>
                         <div class="rank-meta">
@@ -2066,17 +2784,17 @@
 
         // ==================== 导出数据 ====================
         function exportData() {
-            const season = getCurrentSeason();
-            if (!season) {
+            if (!gameData) {
                 showToast('暂无数据可导出', 'error');
                 return;
             }
+            const season = getCurrentSeason();
             const dataStr = JSON.stringify(gameData, null, 2);
             const blob = new Blob([dataStr], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = '副本统计_' + (season.name) + '_' + new Date().toISOString().slice(0, 10) + '.json';
+            a.download = '副本统计_' + (season ? season.name : 'alliance') + '_' + new Date().toISOString().slice(0, 10) + '.json';
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -2086,21 +2804,20 @@
 
         // ==================== 设置面板 ====================
         function showSettings() {
-            document.getElementById('gistIdInput').value = getGistId();
             updateTokenUI();
+            if (currentSession && gameData) {
+                document.getElementById('settingsAllianceId').textContent = gameData.allianceId;
+                document.getElementById('settingsAllianceName').textContent = gameData.allianceName;
+                document.getElementById('settingsGistId').textContent = currentSession.gistId;
+                document.getElementById('allianceInfoSection').style.display = 'block';
+            } else {
+                document.getElementById('allianceInfoSection').style.display = 'none';
+            }
             document.getElementById('settingsModal').classList.add('show');
         }
 
         function closeSettings() {
             document.getElementById('settingsModal').classList.remove('show');
-        }
-
-        function saveGistId() {
-            const id = document.getElementById('gistIdInput').value.trim();
-            setGistId(id);
-            showToast('✅ Gist ID 已保存', 'success');
-            closeSettings();
-            refreshAll();
         }
 
         function saveTokenFromSettings() {
@@ -2116,8 +2833,9 @@
             setGistToken(token);
             document.getElementById('tokenInput').value = '';
             updateTokenUI();
+            updateLoginTokenWarn();
             showToast('✅ Token 已保存', 'success');
-            refreshAll();
+            closeSettings();
         }
 
         function updateTokenUI() {
@@ -2155,41 +2873,29 @@
             renderDaySelect();
             renderRankings();
             updateTokenUI();
+            updateHeaderInfo();
+            updatePermissionUI();
         }
 
         async function refreshAll() {
             updateTokenUI();
-            if (!hasGistToken()) {
-                gameData = { seasons: [], currentSeasonId: '' };
-                renderAll();
+            updateLoginTokenWarn();
+            if (!currentSession) {
+                showLoginView();
                 return;
             }
-            if (!getGistId()) {
-                gameData = { seasons: [], currentSeasonId: '' };
-                // 自动创建第一个赛季便于使用
-                if (gameData.seasons.length === 0) {
-                    // 不自动创建，等待用户在设置中创建 Gist
-                }
-                renderAll();
+            if (!hasGistToken()) {
                 return;
             }
             showLoading('加载数据中...');
             try {
-                const data = await getGameGistData();
-                if (data && data.seasons) {
+                const data = await getAllianceData(currentSession.gistId);
+                if (data && data.allianceId) {
                     gameData = data;
-                } else {
-                    gameData = { seasons: [], currentSeasonId: '' };
+                    renderAll();
                 }
-                // 如果没有赛季，自动创建一个
-                if (gameData.seasons.length === 0) {
-                    createSeason();
-                }
-                renderAll();
             } catch (e) {
                 showToast('加载数据失败: ' + e.message, 'error');
-                gameData = { seasons: [], currentSeasonId: '' };
-                renderAll();
             } finally {
                 hideLoading();
             }
@@ -2198,11 +2904,7 @@
         // ==================== 初始化 ====================
         async function init() {
             updateTokenUI();
-            await refreshAll();
-            // 默认加载记录Tab的表单
-            renderDaySelect();
-            renderMemberSelect();
-            loadDailyRecord();
+            await tryAutoLogin();
         }
 
         // 点击模态框外部关闭
@@ -2210,8 +2912,65 @@
             if (e.target === this) closeSettings();
         });
 
+        // ==================== 鼠标拖尾特效 ====================
+        let effectContainer = null;
+        const trailColors = ['#ff0000', '#ff7f00', '#ffff00', '#00ff00', '#0000ff', '#4b0082', '#8b00ff'];
+
+        function createEffectContainer() {
+            if (!effectContainer) {
+                effectContainer = document.createElement('div');
+                effectContainer.className = 'cursor-effect';
+                effectContainer.id = 'cursorEffectContainer';
+                document.body.appendChild(effectContainer);
+            }
+        }
+
+        function handleTrailEffect(e) {
+            const particle = document.createElement('div');
+            particle.className = 'trail-particle';
+            particle.textContent = '♡';
+            particle.style.left = e.clientX + 'px';
+            particle.style.top = e.clientY + 'px';
+            particle.style.color = trailColors[Math.floor(Math.random() * trailColors.length)];
+            particle.style.textShadow = `0 0 10px ${particle.style.color}`;
+            effectContainer.appendChild(particle);
+            setTimeout(() => particle.remove(), 1500);
+        }
+
+        function initTrailEffect() {
+            createEffectContainer();
+            document.addEventListener('mousemove', handleTrailEffect);
+        }
+
+        // ==================== 背景粒子系统 ====================
+        const bgParticleColors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#ffeaa7', '#dfe6e9', '#fd79a8'];
+
+        function initParticleBackground() {
+            const backgroundContainer = document.createElement('div');
+            backgroundContainer.className = 'particle-container';
+            document.body.appendChild(backgroundContainer);
+
+            for (let i = 0; i < 30; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'bg-particle';
+                particle.textContent = '❤️';
+                const fontSize = Math.random() * 20 + 15;
+                particle.style.fontSize = fontSize + 'px';
+                particle.style.left = Math.random() * 100 + '%';
+                particle.style.color = bgParticleColors[Math.floor(Math.random() * bgParticleColors.length)];
+                particle.style.animationDelay = Math.random() * 20 + 's';
+                particle.style.animationDuration = (15 + Math.random() * 10) + 's';
+                particle.style.opacity = 0.3 + Math.random() * 0.4;
+                backgroundContainer.appendChild(particle);
+            }
+        }
+
         // 页面加载完成初始化
-        window.addEventListener('DOMContentLoaded', init);
+        window.addEventListener('DOMContentLoaded', function() {
+            initTrailEffect();
+            initParticleBackground();
+            init();
+        });
     </script>
 </body>
 </html>
