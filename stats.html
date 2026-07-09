@@ -3580,21 +3580,15 @@
             const key = el.dataset.key;
             const max = parseInt(el.dataset.max);
             const count = parseInt(el.dataset.count || '0');
-            if (el.classList.contains('active')) {
-                // 已激活，取消一次
-                if (count > 0) {
-                    el.dataset.count = count - 1;
-                    if (count - 1 === 0) el.classList.remove('active');
-                }
+            let newCount = count + 1;
+            if (newCount > max) {
+                newCount = 0;
+            }
+            el.dataset.count = newCount;
+            if (newCount > 0) {
+                el.classList.add('active');
             } else {
-                // 未激活，增加一次
-                if (count < max) {
-                    el.dataset.count = count + 1;
-                    el.classList.add('active');
-                } else {
-                    showToast('已达上限 ' + max + ' 次', 'error');
-                    return;
-                }
+                el.classList.remove('active');
             }
             updatePurchaseDisplay(el);
             recalcDaily();
