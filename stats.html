@@ -557,6 +557,81 @@
             font-weight: 600;
         }
 
+        /* ========== 购买勾选卡片 ========== */
+        .purchase-grid {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .purchase-item {
+            flex: 1;
+            min-width: 100px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px;
+            border-radius: 10px;
+            border: 2px solid rgba(255,255,255,0.15);
+            background: rgba(255,255,255,0.05);
+            cursor: pointer;
+            transition: all 0.2s;
+            user-select: none;
+        }
+        .purchase-item:hover {
+            border-color: rgba(0,188,212,0.5);
+            background: rgba(0,188,212,0.1);
+        }
+        .purchase-item.active {
+            border-color: #4ade80;
+            background: rgba(74,222,128,0.15);
+        }
+        .purchase-check {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            border: 2px solid rgba(255,255,255,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            color: transparent;
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+        .purchase-item.active .purchase-check {
+            border-color: #4ade80;
+            background: #4ade80;
+            color: #1a1a2e;
+        }
+        .purchase-info {
+            flex: 1;
+        }
+        .purchase-name {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #fff;
+        }
+        .purchase-desc {
+            font-size: 0.75rem;
+            color: rgba(255,255,255,0.5);
+        }
+        .purchase-count {
+            font-size: 0.85rem;
+            color: rgba(255,255,255,0.6);
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+        .purchase-item.active .purchase-count {
+            color: #4ade80;
+        }
+
+        /* 大号数字输入框 */
+        .stamina-input {
+            font-size: 1.1rem !important;
+            padding: 12px 14px !important;
+            font-weight: 600;
+        }
+
         /* ========== 按钮 ========== */
         .btn {
             background: linear-gradient(135deg, #00bcd4, #00838f);
@@ -791,6 +866,154 @@
 
         .detail-day .d-value {
             color: #00bcd4;
+        }
+
+        /* ========== 日历视图 ========== */
+        .calendar-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            font-size: 0.82rem;
+            color: rgba(255,255,255,0.8);
+            margin-top: 8px;
+        }
+
+        .legend-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .legend-dot {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+        }
+
+        .legend-green { background: rgba(74,222,128,0.6); }
+        .legend-yellow { background: rgba(250,204,21,0.6); }
+        .legend-red { background: rgba(239,68,68,0.4); }
+        .legend-blue { background: rgba(59,130,246,0.6); }
+        .legend-purple { background: rgba(168,85,247,0.6); }
+
+        .calendar-table-wrap {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .calendar-table {
+            border-collapse: separate;
+            border-spacing: 2px;
+            font-size: 0.8rem;
+            width: max-content;
+        }
+
+        .calendar-table th {
+            background: rgba(0,0,0,0.3);
+            color: rgba(255,255,255,0.7);
+            padding: 6px 4px;
+            font-weight: 600;
+            border-radius: 4px;
+            white-space: nowrap;
+            min-width: 60px;
+            text-align: center;
+        }
+
+        .calendar-table th.cal-sticky,
+        .calendar-table td.cal-sticky {
+            position: sticky;
+            left: 0;
+            background: rgba(26,26,46,0.95);
+            z-index: 2;
+            min-width: 70px;
+            max-width: 120px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            text-align: left;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .calendar-table td.cal-sticky {
+            padding: 6px 8px;
+        }
+
+        .calendar-table .cal-cell {
+            min-width: 60px;
+            height: 40px;
+            text-align: center;
+            vertical-align: middle;
+            border-radius: 4px;
+            cursor: pointer;
+            position: relative;
+            transition: transform 0.1s;
+            user-select: none;
+        }
+
+        .calendar-table .cal-cell:hover {
+            transform: scale(1.06);
+            z-index: 3;
+        }
+
+        .calendar-table .cal-cups {
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .calendar-table .cal-none {
+            background: rgba(255,255,255,0.06);
+            color: rgba(255,255,255,0.3);
+        }
+
+        .calendar-table .cal-green {
+            background: rgba(74,222,128,0.35);
+            border: 1px solid rgba(74,222,128,0.5);
+        }
+
+        .calendar-table .cal-yellow {
+            background: rgba(250,204,21,0.3);
+            border: 1px solid rgba(250,204,21,0.5);
+        }
+
+        .calendar-table .cal-blue {
+            background: rgba(59,130,246,0.35);
+            border: 1px solid rgba(59,130,246,0.5);
+        }
+
+        .calendar-table .cal-sum {
+            background: rgba(0,0,0,0.25);
+            color: #ffd700;
+            font-weight: 600;
+            text-align: center;
+            min-width: 60px;
+            padding: 6px 4px;
+            border-radius: 4px;
+            white-space: nowrap;
+        }
+
+        .calendar-table tfoot td {
+            background: rgba(255,215,0,0.12);
+            color: #ffd700;
+            font-weight: 700;
+            text-align: center;
+            border-radius: 4px;
+            padding: 6px 4px;
+            min-width: 60px;
+        }
+
+        .cal-pass-corner {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 0;
+            height: 0;
+            border-style: solid;
+            border-width: 10px 10px 0 0;
+            border-color: #a855f7 transparent transparent transparent;
+            z-index: 1;
         }
 
         /* ========== 模态框 ========== */
@@ -1371,6 +1594,7 @@
                 <button class="tab-btn" data-tab="members" onclick="switchTab('members')">成员</button>
                 <button class="tab-btn" data-tab="records" onclick="switchTab('records')">记录</button>
                 <button class="tab-btn" data-tab="rankings" onclick="switchTab('rankings')">排名</button>
+                <button class="tab-btn" data-tab="calendar" onclick="switchTab('calendar')">📅 日历</button>
             </div>
 
             <!-- Tab 1: 概览 -->
@@ -1503,41 +1727,61 @@
 
                 <div class="card">
                     <div class="card-title">⚔️ 体力与杯数</div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">免费体力（默认2）</label>
-                            <input type="number" class="form-input" id="freeStamina" value="2" min="0" oninput="recalcDaily()">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">30元次数（限1）</label>
-                            <input type="number" class="form-input" id="p30" value="0" min="0" max="1" oninput="recalcDaily()">
+                    <div class="form-group">
+                        <label class="form-label">免费体力（默认2，不可存）</label>
+                        <input type="number" class="form-input stamina-input" id="freeStamina" value="2" min="0" oninput="recalcDaily()">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">购买体力（点击勾选，再点取消）</label>
+                        <div class="purchase-grid">
+                            <div class="purchase-item" data-key="p30" data-max="1" onclick="togglePurchase(this)">
+                                <div class="purchase-check">✓</div>
+                                <div class="purchase-info">
+                                    <div class="purchase-name">30元</div>
+                                    <div class="purchase-desc">1体力 · 限1次</div>
+                                </div>
+                                <div class="purchase-count" id="p30Display">0/1</div>
+                            </div>
+                            <div class="purchase-item" data-key="p128" data-max="3" onclick="togglePurchase(this)">
+                                <div class="purchase-check">✓</div>
+                                <div class="purchase-info">
+                                    <div class="purchase-name">128元</div>
+                                    <div class="purchase-desc">3体力 · 限3次</div>
+                                </div>
+                                <div class="purchase-count" id="p128Display">0/3</div>
+                            </div>
+                            <div class="purchase-item" data-key="p328" data-max="3" onclick="togglePurchase(this)">
+                                <div class="purchase-check">✓</div>
+                                <div class="purchase-info">
+                                    <div class="purchase-name">328元</div>
+                                    <div class="purchase-desc">6体力 · 限3次</div>
+                                </div>
+                                <div class="purchase-count" id="p328Display">0/3</div>
+                            </div>
                         </div>
                     </div>
+
                     <div class="form-row">
                         <div class="form-group">
-                            <label class="form-label">128元次数（限3）</label>
-                            <input type="number" class="form-input" id="p128" value="0" min="0" max="3" oninput="recalcDaily()">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">328元次数（限3）</label>
-                            <input type="number" class="form-input" id="p328" value="0" min="0" max="3" oninput="recalcDaily()">
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">648元次数（不限）</label>
-                            <input type="number" class="form-input" id="p648" value="0" min="0" oninput="recalcDaily()">
+                            <label class="form-label">648元次数（不限，10体力/次）</label>
+                            <input type="number" class="form-input stamina-input" id="p648" value="0" min="0" oninput="recalcDaily()">
                         </div>
                         <div class="form-group">
                             <label class="form-label">实际杯数</label>
-                            <input type="number" class="form-input" id="actualCups" value="0" min="0" oninput="onActualCupsInput()">
+                            <input type="number" class="form-input stamina-input" id="actualCups" value="0" min="0" oninput="onActualCupsInput()">
                         </div>
                     </div>
 
                     <div class="calc-box">
-                        <div class="calc-item">今日体力总计：<span id="totalStamina">0</span></div>
+                        <div class="calc-item">今日体力总计：<span id="totalStamina">0</span> <span style="color:rgba(255,255,255,0.4);font-size:0.8rem;">(免费 <span id="freeStaminaDisplay">0</span> + 可攒 <span id="savableStaminaDisplay">0</span>)</span></div>
                         <div class="calc-item">预期杯数：<span id="expectedCups">0</span></div>
                         <div class="calc-item">今日消费：<span id="dailySpent">¥0</span></div>
+                        <div class="calc-item" id="saveStaminaRow" style="color:#fbbf24;">💾 今日可攒体力：<span id="canSaveStamina">0</span> <span style="font-size:0.8rem;color:rgba(255,255,255,0.4);">(购买的+通行证，免费体力不可存)</span></div>
+                        <div style="margin-top:8px;display:flex;gap:8px;">
+                            <button class="btn btn-outline" style="flex:1;font-size:0.85rem;padding:6px;" onclick="useAllStamina()">全部使用</button>
+                            <button class="btn btn-outline" style="flex:1;font-size:0.85rem;padding:6px;" onclick="saveAllStamina()">💾 只打免费体力</button>
+                        </div>
                     </div>
 
                     <div class="form-group">
@@ -1604,6 +1848,24 @@
                         <button class="btn btn-outline btn-sm" onclick="exportData()">导出JSON</button>
                     </div>
                     <div class="rank-list" id="rankList" style="margin-top:12px;"></div>
+                </div>
+            </div>
+
+            <!-- Tab 5: 日历视图 -->
+            <div class="tab-content" id="tab-calendar">
+                <div class="card">
+                    <div class="card-title">📅 日历视图</div>
+                    <div class="calendar-legend">
+                        <span class="legend-item"><span class="legend-dot legend-green"></span>已记录（正常）</span>
+                        <span class="legend-item"><span class="legend-dot legend-yellow"></span>只打免费</span>
+                        <span class="legend-item"><span class="legend-dot legend-red"></span>未记录</span>
+                        <span class="legend-item"><span class="legend-dot legend-blue"></span>买了体力</span>
+                        <span class="legend-item"><span class="legend-dot legend-purple"></span>通行证</span>
+                    </div>
+                    <div style="font-size:0.8rem;color:rgba(255,255,255,0.5);margin-top:8px;">💡 点击单元格可跳转到对应成员和天数的记录</div>
+                </div>
+                <div class="card">
+                    <div id="calendarContainer" style="margin-top:4px;"></div>
                 </div>
             </div>
         </div>
@@ -2799,12 +3061,50 @@
         }
 
         // ==================== 体力累计机制 ====================
+        // 免费体力不可存，购买+通行证体力可攒
+        // 每日可攒体力 = max(0, (购买+通行证) - max(0, 已用 - 免费))
+        function calcDailySavableStamina(record, member) {
+            if (!record) return 0;
+            const free = record.freeStamina || 0;
+            const purchased = (record.p30 || 0) * PURCHASE_RULES.p30.stamina
+                + (record.p128 || 0) * PURCHASE_RULES.p128.stamina
+                + (record.p328 || 0) * PURCHASE_RULES.p328.stamina
+                + (record.p648 || 0) * PURCHASE_RULES.p648.stamina;
+            const pass = (member && member.passBought) ? PASS_STAMINA : 0;
+            const used = (record.actualCups || 0) / CUPS_PER_STAMINA;
+            // 免费体力先用，超出部分从购买+通行证扣
+            const usedFromSavable = Math.max(0, used - free);
+            return Math.max(0, purchased + pass - usedFromSavable);
+        }
+
+        // 每日购买+通行证体力（可存储的部分）
+        function calcDailySavableGained(record, member) {
+            if (!record) return 0;
+            const purchased = (record.p30 || 0) * PURCHASE_RULES.p30.stamina
+                + (record.p128 || 0) * PURCHASE_RULES.p128.stamina
+                + (record.p328 || 0) * PURCHASE_RULES.p328.stamina
+                + (record.p648 || 0) * PURCHASE_RULES.p648.stamina;
+            const pass = (member && member.passBought) ? PASS_STAMINA : 0;
+            return purchased + pass;
+        }
+
+        // 每日免费体力（不可存储）
+        function calcDailyFreeStamina(record) {
+            return record ? (record.freeStamina || 0) : 0;
+        }
+
         function getMemberUsedStamina(member) {
             return getMemberTotalCups(member) / CUPS_PER_STAMINA;
         }
 
+        // 剩余体力 = 仅购买+通行证中未使用的部分（免费体力不累计）
         function getMemberRemainingStamina(member) {
-            return getMemberTotalStamina(member) - getMemberUsedStamina(member);
+            if (!member || !member.dailyRecords) return 0;
+            let total = 0;
+            for (const key in member.dailyRecords) {
+                total += calcDailySavableStamina(member.dailyRecords[key], member);
+            }
+            return total;
         }
 
         function calcAllianceUsedStamina() {
@@ -2874,6 +3174,46 @@
             }
         }
 
+        function editRivalAlliance(id) {
+            const rivals = getRivalAlliances();
+            const rival = rivals.find(r => r.id === id);
+            if (!rival) return;
+            // 切换为编辑模式
+            rival._editing = true;
+            renderRivalList();
+        }
+
+        function saveRivalAlliance(id) {
+            const rivals = getRivalAlliances();
+            const rival = rivals.find(r => r.id === id);
+            if (!rival) return;
+            const nameInput = document.getElementById('rivalEditName_' + id);
+            const cupsInput = document.getElementById('rivalEditCups_' + id);
+            const countInput = document.getElementById('rivalEditCount_' + id);
+            if (!nameInput || !cupsInput || !countInput) return;
+            const name = nameInput.value.trim();
+            const cups = parseInt(cupsInput.value) || 0;
+            const count = parseInt(countInput.value) || 0;
+            if (!name) { showToast('联盟名称不能为空', 'error'); return; }
+            if (cups < 0 || count < 0) { showToast('杯数和人数不能为负', 'error'); return; }
+            rival.name = name;
+            rival.totalCups = cups;
+            rival.memberCount = count;
+            delete rival._editing;
+            renderRivalList();
+            renderAnalysis();
+            debounceSave();
+            showToast('✅ 已更新', 'success');
+        }
+
+        function cancelEditRival(id) {
+            const rivals = getRivalAlliances();
+            const rival = rivals.find(r => r.id === id);
+            if (!rival) return;
+            delete rival._editing;
+            renderRivalList();
+        }
+
         function renderRivalList() {
             const container = document.getElementById('rivalListContainer');
             if (!container) return;
@@ -2916,15 +3256,28 @@
                 const perCap = r.memberCount > 0 ? Math.round(r.totalCups / r.memberCount) : 0;
                 const selfClass = r.isSelf ? ' class="rival-self"' : '';
                 let actionCell = '';
-                if (owner) {
-                    actionCell = r.isSelf ? '<td>-</td>' : '<td><button class="rival-action" onclick="removeRivalAlliance(\'' + r.id + '\')">删除</button></td>';
+                if (owner && !r.isSelf) {
+                    if (r._editing) {
+                        actionCell = '<td><button class="rival-action" style="color:#4ade80;" onclick="saveRivalAlliance(\'' + r.id + '\')">保存</button> <button class="rival-action" onclick="cancelEditRival(\'' + r.id + '\')">取消</button></td>';
+                    } else {
+                        actionCell = '<td><button class="rival-action" style="color:#60a5fa;" onclick="editRivalAlliance(\'' + r.id + '\')">编辑</button> <button class="rival-action" onclick="removeRivalAlliance(\'' + r.id + '\')">删除</button></td>';
+                    }
+                } else if (owner && r.isSelf) {
+                    actionCell = '<td>-</td>';
                 }
                 html += '<tr' + selfClass + '>';
                 html += '<td>' + (i + 1) + '</td>';
-                html += '<td>' + escapeHtml(r.name) + '</td>';
-                html += '<td>' + r.totalCups.toLocaleString() + '</td>';
-                html += '<td>' + r.memberCount + '</td>';
-                html += '<td>' + perCap.toLocaleString() + '</td>';
+                if (r._editing) {
+                    html += '<td><input type="text" class="form-input" id="rivalEditName_' + r.id + '" value="' + escapeHtml(r.name) + '" style="width:100%;padding:4px 8px;font-size:0.85rem;"></td>';
+                    html += '<td><input type="number" class="form-input" id="rivalEditCups_' + r.id + '" value="' + r.totalCups + '" min="0" style="width:100%;padding:4px 8px;font-size:0.85rem;"></td>';
+                    html += '<td><input type="number" class="form-input" id="rivalEditCount_' + r.id + '" value="' + r.memberCount + '" min="0" style="width:80px;padding:4px 8px;font-size:0.85rem;"></td>';
+                    html += '<td>-</td>';
+                } else {
+                    html += '<td>' + escapeHtml(r.name) + '</td>';
+                    html += '<td>' + r.totalCups.toLocaleString() + '</td>';
+                    html += '<td>' + r.memberCount + '</td>';
+                    html += '<td>' + perCap.toLocaleString() + '</td>';
+                }
                 html += actionCell;
                 html += '</tr>';
             });
@@ -3150,6 +3503,19 @@
             document.getElementById('expectedCups').textContent = expected;
             document.getElementById('dailySpent').textContent = '¥' + spent;
 
+            // 免费体力 vs 可攒体力分解
+            const free = calcDailyFreeStamina(record);
+            const savableGained = calcDailySavableGained(record, member);
+            const freeEl = document.getElementById('freeStaminaDisplay');
+            const savableEl = document.getElementById('savableStaminaDisplay');
+            if (freeEl) freeEl.textContent = free;
+            if (savableEl) savableEl.textContent = savableGained;
+
+            // 今日可攒体力 = 购买+通行证中未使用的部分
+            const canSave = calcDailySavableStamina(record, member);
+            const canSaveEl = document.getElementById('canSaveStamina');
+            if (canSaveEl) canSaveEl.textContent = canSave;
+
             checkPurchaseLimit('p30', 1);
             checkPurchaseLimit('p128', 3);
             checkPurchaseLimit('p328', 3);
@@ -3157,7 +3523,32 @@
             const actualInput = document.getElementById('actualCups');
             if (actualInput.dataset.autoSync !== 'no') {
                 actualInput.value = expected;
+                // 同步可攒体力
+                const updatedCanSave = calcDailySavableStamina(record, member);
+                if (canSaveEl) canSaveEl.textContent = updatedCanSave;
             }
+        }
+
+        // 全部使用：实际杯数 = 预期杯数（打完所有体力）
+        function useAllStamina() {
+            const record = collectDailyForm();
+            const member = getCurrentSelectedMember();
+            const expected = calcExpectedCups(record, member);
+            const actualInput = document.getElementById('actualCups');
+            actualInput.value = expected;
+            actualInput.dataset.autoSync = 'yes';
+            recalcDaily();
+        }
+
+        // 只打免费体力：实际杯数 = 免费体力 * 100，其余攒着
+        function saveAllStamina() {
+            const record = collectDailyForm();
+            const free = calcDailyFreeStamina(record);
+            const actualInput = document.getElementById('actualCups');
+            actualInput.value = free * CUPS_PER_STAMINA;
+            actualInput.dataset.autoSync = 'no';
+            recalcDaily();
+            showToast('💾 已设置只打免费体力，可攒 ' + calcDailySavableStamina(record, getCurrentSelectedMember()) + ' 体力', 'success');
         }
 
         function onActualCupsInput() {
@@ -3180,20 +3571,66 @@
         }
 
         function checkPurchaseLimit(field, limit) {
-            const input = document.getElementById(field);
-            const val = parseInt(input.value) || 0;
-            if (val > limit) {
-                input.value = limit;
-                showToast(PURCHASE_RULES[field].price + '元限购 ' + limit + ' 次', 'error');
+            // 30/128/328 现在用勾选卡片，不需要限购检查
+            if (field === 'p648') return;
+        }
+
+        // 勾选卡片切换
+        function togglePurchase(el) {
+            const key = el.dataset.key;
+            const max = parseInt(el.dataset.max);
+            const count = parseInt(el.dataset.count || '0');
+            if (el.classList.contains('active')) {
+                // 已激活，取消一次
+                if (count > 0) {
+                    el.dataset.count = count - 1;
+                    if (count - 1 === 0) el.classList.remove('active');
+                }
+            } else {
+                // 未激活，增加一次
+                if (count < max) {
+                    el.dataset.count = count + 1;
+                    el.classList.add('active');
+                } else {
+                    showToast('已达上限 ' + max + ' 次', 'error');
+                    return;
+                }
             }
+            updatePurchaseDisplay(el);
+            recalcDaily();
+        }
+
+        function updatePurchaseDisplay(el) {
+            const key = el.dataset.key;
+            const max = parseInt(el.dataset.max);
+            const count = parseInt(el.dataset.count || '0');
+            const display = document.getElementById(key + 'Display');
+            if (display) display.textContent = count + '/' + max;
+        }
+
+        function getPurchaseCount(key) {
+            const el = document.querySelector('.purchase-item[data-key="' + key + '"]');
+            return el ? parseInt(el.dataset.count || '0') : 0;
+        }
+
+        function setPurchaseCount(key, count) {
+            const el = document.querySelector('.purchase-item[data-key="' + key + '"]');
+            if (!el) return;
+            el.dataset.count = count;
+            if (count > 0) {
+                el.classList.add('active');
+            } else {
+                el.classList.remove('active');
+            }
+            updatePurchaseDisplay(el);
         }
 
         function collectDailyForm() {
             return {
                 freeStamina: parseInt(document.getElementById('freeStamina').value) || 0,
-                p30: parseInt(document.getElementById('p30').value) || 0,
-                p128: parseInt(document.getElementById('p128').value) || 0,
-                p328: parseInt(document.getElementById('p328').value) || 0,
+                p30: getPurchaseCount('p30'),
+                p128: getPurchaseCount('p128'),
+                p328: getPurchaseCount('p328'),
                 p648: parseInt(document.getElementById('p648').value) || 0,
                 actualCups: parseInt(document.getElementById('actualCups').value) || 0,
                 imageGistId: currentImageGistId,
@@ -3225,9 +3662,9 @@
 
             if (record) {
                 document.getElementById('freeStamina').value = record.freeStamina ?? 2;
-                document.getElementById('p30').value = record.p30 ?? 0;
-                document.getElementById('p128').value = record.p128 ?? 0;
-                document.getElementById('p328').value = record.p328 ?? 0;
+                setPurchaseCount('p30', record.p30 ?? 0);
+                setPurchaseCount('p128', record.p128 ?? 0);
+                setPurchaseCount('p328', record.p328 ?? 0);
                 document.getElementById('p648').value = record.p648 ?? 0;
                 document.getElementById('actualCups').value = record.actualCups ?? 0;
                 document.getElementById('noteInput').value = record.note || '';
@@ -3242,9 +3679,9 @@
                 }
             } else {
                 document.getElementById('freeStamina').value = 2;
-                document.getElementById('p30').value = 0;
-                document.getElementById('p128').value = 0;
-                document.getElementById('p328').value = 0;
+                setPurchaseCount('p30', 0);
+                setPurchaseCount('p128', 0);
+                setPurchaseCount('p328', 0);
                 document.getElementById('p648').value = 0;
                 document.getElementById('actualCups').value = 200;
                 document.getElementById('noteInput').value = '';
@@ -3358,6 +3795,7 @@
             else if (tab === 'members') renderMembers();
             else if (tab === 'records') { renderMemberSelect(); renderDaySelect(); loadDailyRecord(); }
             else if (tab === 'rankings') renderRankings();
+            else if (tab === 'calendar') renderCalendar();
         }
 
         // ==================== 渲染：概览 ====================
@@ -3601,6 +4039,115 @@
             if (detail) detail.classList.toggle('show');
         }
 
+        // ==================== 渲染：日历 ====================
+        function renderCalendar() {
+            const container = document.getElementById('calendarContainer');
+            if (!container) return;
+            const season = getCurrentSeason();
+            if (!season || season.members.length === 0) {
+                container.innerHTML = '<div class="empty-state"><div class="emoji">📅</div><div>暂无成员数据</div></div>';
+                return;
+            }
+            const days = season.days || SEASON_DAYS;
+            const members = season.members;
+
+            // 计算每天总杯数（底部汇总行）
+            const dayTotals = [];
+            for (let d = 1; d <= days; d++) {
+                let total = 0;
+                members.forEach(m => {
+                    const r = m.dailyRecords && m.dailyRecords['d' + d];
+                    if (r) total += (r.actualCups || 0);
+                });
+                dayTotals.push(total);
+            }
+
+            let html = '<div class="calendar-table-wrap"><table class="calendar-table"><thead><tr>';
+            html += '<th class="cal-sticky">成员</th>';
+            for (let d = 1; d <= days; d++) {
+                html += `<th>第${d}天</th>`;
+            }
+            html += '<th>总杯数</th>';
+            html += '<th>购买次数</th>';
+            html += '<th>总消费</th>';
+            html += '</tr></thead><tbody>';
+
+            members.forEach(m => {
+                const totalCups = getMemberTotalCups(m);
+                const totalSpent = getMemberTotalSpent(m);
+                let totalPurchases = 0;
+                if (m.dailyRecords) {
+                    for (const key in m.dailyRecords) {
+                        const r = m.dailyRecords[key];
+                        totalPurchases += (r.p30 || 0) + (r.p128 || 0) + (r.p328 || 0) + (r.p648 || 0);
+                    }
+                }
+                const roleTag = m.isOwner ? ' 👑' : '';
+                html += '<tr>';
+                html += `<td class="cal-sticky" title="${escapeHtml(m.name)}">${escapeHtml(m.name)}${roleTag}</td>`;
+                for (let d = 1; d <= days; d++) {
+                    const rec = m.dailyRecords && m.dailyRecords['d' + d];
+                    html += renderCalendarCell(rec, m, d);
+                }
+                html += `<td class="cal-sum">${totalCups.toLocaleString()}</td>`;
+                html += `<td class="cal-sum">${totalPurchases}</td>`;
+                html += `<td class="cal-sum">¥${totalSpent.toLocaleString()}</td>`;
+                html += '</tr>';
+            });
+
+            html += '</tbody><tfoot><tr>';
+            html += '<td class="cal-sticky">每日总计</td>';
+            for (let d = 1; d <= days; d++) {
+                html += `<td>${dayTotals[d - 1].toLocaleString()}</td>`;
+            }
+            html += '<td colspan="3"></td>';
+            html += '</tr></tfoot></table></div>';
+
+            container.innerHTML = html;
+        }
+
+        function renderCalendarCell(record, member, day) {
+            if (!record) {
+                return `<td class="cal-cell cal-none" onclick="jumpToRecord('${member.id}',${day})">-</td>`;
+            }
+            const expected = calcExpectedCups(record, member);
+            const cups = record.actualCups || 0;
+            const purchased = (record.p30 || 0) + (record.p128 || 0) + (record.p328 || 0) + (record.p648 || 0);
+            let bgClass = '';
+            // 优先级：正常（绿）> 买了体力（蓝）> 只打免费（黄）
+            if (cups >= expected) {
+                bgClass = 'cal-green';
+            } else if (purchased > 0) {
+                bgClass = 'cal-blue';
+            } else {
+                bgClass = 'cal-yellow';
+            }
+            // 通行证角标（叠加在背景色之上）
+            const passBadge = member.passBought ? '<span class="cal-pass-corner"></span>' : '';
+            return `<td class="cal-cell ${bgClass}" onclick="jumpToRecord('${member.id}',${day})">${passBadge}<span class="cal-cups">${cups}</span></td>`;
+        }
+
+        function jumpToRecord(memberId, day) {
+            switchTab('records');
+            const daySel = document.getElementById('daySelect');
+            const memSel = document.getElementById('memberSelect');
+            if (daySel) daySel.value = 'd' + day;
+            if (memSel) {
+                const owner = isOwner();
+                if (owner) {
+                    // 盟主可选择任意成员
+                    if (Array.from(memSel.options).some(o => o.value === memberId)) {
+                        memSel.value = memberId;
+                    }
+                } else if (memberId !== currentSession.memberId) {
+                    // 普通成员只能查看自己
+                    showToast('普通成员只能查看自己的记录', 'info');
+                    return;
+                }
+            }
+            loadDailyRecord();
+        }
+
         // ==================== 导出数据 ====================
         function exportData() {
             if (!gameData) {
@@ -3692,6 +4239,7 @@
             renderMemberSelect();
             renderDaySelect();
             renderRankings();
+            renderCalendar();
             updateTokenUI();
             updateHeaderInfo();
             updatePermissionUI();
