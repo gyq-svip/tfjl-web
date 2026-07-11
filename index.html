@@ -13279,15 +13279,38 @@ function hasGistToken() {
                 });
             }
 
-            // 需求墙最新消息（最多5条）
+            // 需求墙最新消息（最多5条）- 只显示文件名和作者，去掉网址
             if (wallMessages && wallMessages.length > 0) {
                 const recentMsgs = wallMessages.slice(0, 5);
                 recentMsgs.forEach(msg => {
                     let text = '📢[需求墙] ';
-                    const content = (msg.content || '').substring(0, 60);
-                    text += content;
+                    let content = msg.content || '';
+                    // 去掉内容中包含的脚本网址，只保留文字部分
+                    if (msg.scriptUrl) {
+                        content = content.replace(msg.scriptUrl, '').trim();
+                    }
+                    // 再兜底清理可能残留的网址片段
+                    content = content.replace(/https?:\/\/\S+/g, '').trim();
+                    content = content.substring(0, 60);
+                    // 有脚本分享时显示文件名
+                    if (msg.scriptUrl) {
+                        let fileName = '';
+                        try {
+                            const parts = msg.scriptUrl.split('/');
+                            fileName = decodeURIComponent(parts[parts.length - 1] || '');
+                        } catch (e) {
+                            fileName = msg.scriptUrl.split('/').pop() || '';
+                        }
+                        if (fileName) {
+                            text += `📎${fileName}`;
+                            if (content) text += ` ${content}`;
+                        } else {
+                            text += content || '📎[含脚本分享]';
+                        }
+                    } else {
+                        text += content;
+                    }
                     if (msg.author) text += ` (${msg.author})`;
-                    if (msg.scriptUrl) text += ' 📎[含脚本分享]';
                     allTexts.push(text);
                 });
             }
