@@ -13253,32 +13253,47 @@ function hasGistToken() {
                 return true;
             });
 
-            if (activeItems.length === 0) {
-                return '暂无公告';
+            const allTexts = [];
+
+            // 普通公告
+            if (activeItems.length > 0) {
+                activeItems.forEach(item => {
+                    let text = '';
+                    if (item.category) text += `[${item.category}]`;
+                    if (item.name) {
+                        if (text) text += ' ';
+                        text += item.name;
+                    }
+                    if (item.content && item.content.trim()) {
+                        if (text) text += ' - ';
+                        text += item.content.trim();
+                    }
+                    if (item.author && item.author !== '无名') {
+                        if (text) text += ` (${item.author})`;
+                    }
+                    if (item.publish_time) {
+                        if (text) text += ` [${item.publish_time.substring(0, 16)}]`;
+                    }
+                    text = text.trim();
+                    if (text) allTexts.push(text);
+                });
             }
-            
-            const texts = activeItems.map(item => {
-                // 拼接分类、名称、内容、作者和发布时间
-                let text = '';
-                if (item.category) text += `[${item.category}]`;
-                if (item.name) {
-                    if (text) text += ' ';
-                    text += item.name;
-                }
-                if (item.content && item.content.trim()) {
-                    if (text) text += ' - ';
-                    text += item.content.trim();
-                }
-                if (item.author && item.author !== '无名') {
-                    if (text) text += ` (${item.author})`;
-                }
-                if (item.publish_time) {
-                    if (text) text += ` [${item.publish_time.substring(0, 16)}]`;
-                }
-                return text.trim();
-            }).filter(text => text.length > 0);
-            
-            return texts.join('　　◆　　');
+
+            // 需求墙最新消息（最多5条）
+            if (wallMessages && wallMessages.length > 0) {
+                const recentMsgs = wallMessages.slice(0, 5);
+                recentMsgs.forEach(msg => {
+                    let text = '📢[需求墙] ';
+                    const content = (msg.content || '').substring(0, 60);
+                    text += content;
+                    if (msg.author) text += ` (${msg.author})`;
+                    if (msg.scriptUrl) text += ' 📎[含脚本分享]';
+                    allTexts.push(text);
+                });
+            }
+
+            if (allTexts.length === 0) return '暂无公告';
+            return allTexts.join('　　◆　　');
         }
 
         function showNewsListModal() {
@@ -13352,21 +13367,96 @@ function hasGistToken() {
                 }).join('');
             }
 
+            // 需求咨询HTML（需求墙消息）- 样式与需求墙renderMessages完全一致
+            let wallHtml = '';
+            const nowMs = Date.now();
+            const wallNicknameInput = document.getElementById('messageNickname');
+            const wallCurrentNickname = wallNicknameInput?.value.trim() || localStorage.getItem('TFJL_UserName') || '';
+            const wallAdminNicks = ['gyq', 'GYQ', '龙行'];
+            const wallIsAdmin = wallAdminNicks.some(nick => wallCurrentNickname.toLowerCase() === nick.toLowerCase());
+
+            // 过滤消息（与renderMessages一致：只有设置了expireDays的才过期）
+            const validWallMsgs = (wallMessages || []).filter(msg => {
+                if (msg.expireDays && msg.expireDays > 0) {
+                    const expireTime = msg.expireDays * 24 * 60 * 60 * 1000;
+                    return (nowMs - (msg.time || 0)) < expireTime;
+                }
+                return true;
+            });
+            const recentWallMsgs = validWallMsgs.slice(0, 20);
+
+            if (recentWallMsgs.length === 0) {
+                wallHtml = '<div style="color:rgba(255,255,255,0.5);font-size:0.85rem;text-align:center;padding:20px;">暂无需求咨询，快去需求墙发布吧！</div>';
+            } else {
+                wallHtml = recentWallMsgs.map((msg, index) => {
+                    const timeAgo = formatMessageTime(msg.time);
+                    let contentHtml = escapeHtml(msg.content);
+
+                    // 判断是否可以删除（发布者可删自己的，管理员可删所有）
+                    const isOwner = (msg.author || '').toLowerCase() === wallCurrentNickname.toLowerCase();
+                    const canDelete = isOwner || wallIsAdmin;
+
+                    // 过期标签
+                    const expireLabel = msg.expireDays ? `<span style="color:#ff9800;font-size:0.7rem;margin-left:5px;" title="${msg.expireDays}天后过期">⏱️${msg.expireDays}天</span>` : '';
+
+                    // 脚本分享按钮（与renderMessages一致）
+                    if (msg.scriptUrl) {
+                        const urlFileName = msg.scriptUrl.split('/').pop() || '';
+                        const isJsonFile = urlFileName.toLowerCase().endsWith('.json');
+                        const isBackup = msg.shareType === 'backup' || msg.scriptUrl.includes('backup') || contentHtml.includes('备份') || contentHtml.includes('项目') || isJsonFile;
+
+                        if (isBackup) {
+                            contentHtml = contentHtml.replace(
+                                msg.scriptUrl,
+                                `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+                                    <a href="javascript:void(0)" onclick="previewScriptFile('${msg.scriptUrl}')" style="color:#e0e0e0;text-decoration:underline;cursor:pointer;background:rgba(224,224,224,0.1);padding:4px 10px;border-radius:5px;font-size:0.8rem;">👁️ 预览</a>
+                                    <a href="javascript:void(0)" onclick="downloadScript('${msg.scriptUrl}')" style="color:#4fc3f7;text-decoration:underline;cursor:pointer;background:rgba(79,195,247,0.1);padding:4px 10px;border-radius:5px;font-size:0.8rem;">📥 下载</a>
+                                    <a href="javascript:void(0)" onclick="importBackupFromWall('${msg.scriptUrl}')" style="color:#ff9800;text-decoration:underline;cursor:pointer;background:rgba(255,152,0,0.1);padding:4px 10px;border-radius:5px;font-size:0.8rem;">📦 导入备份</a>
+                                </div>`
+                            );
+                        } else {
+                            contentHtml = contentHtml.replace(
+                                msg.scriptUrl,
+                                `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+                                    <a href="javascript:void(0)" onclick="previewScriptFile('${msg.scriptUrl}')" style="color:#e0e0e0;text-decoration:underline;cursor:pointer;background:rgba(224,224,224,0.1);padding:4px 10px;border-radius:5px;font-size:0.8rem;">👁️ 预览</a>
+                                    <a href="javascript:void(0)" onclick="downloadScript('${msg.scriptUrl}')" style="color:#4fc3f7;text-decoration:underline;cursor:pointer;background:rgba(79,195,247,0.1);padding:4px 10px;border-radius:5px;font-size:0.8rem;">📥 下载</a>
+                                    <a href="javascript:void(0)" onclick="importScriptToTxtFiles('${msg.scriptUrl}')" style="color:#4caf50;text-decoration:underline;cursor:pointer;background:rgba(76,175,80,0.1);padding:4px 10px;border-radius:5px;font-size:0.8rem;">📄 智能导入</a>
+                                </div>`
+                            );
+                        }
+                    }
+
+                    const deleteBtn = canDelete ? `<a href="javascript:void(0)" onclick="deleteWallMsgInModal(${index})" style="color:#ff6b6b;cursor:pointer;margin-left:10px;font-size:0.7rem;" title="${isOwner ? '删除我的消息' : '管理员删除'}">🗑️</a>` : '';
+
+                    return `<div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:10px 12px;font-size:0.85rem;margin-bottom:8px;">
+                        <div style="color:#fff;margin-bottom:6px;line-height:1.5;">${contentHtml}</div>
+                        <div style="color:rgba(255,255,255,0.5);font-size:0.75rem;">${escapeHtml(msg.author || '匿名')} · ${timeAgo}${expireLabel}${deleteBtn}</div>
+                    </div>`;
+                }).join('');
+            }
+
             content.innerHTML = `
-                <div style="display:flex;gap:12px;min-height:300px;">
-                    <div style="flex:1;overflow-y:auto;max-height:65vh;padding-right:6px;border-right:1px solid rgba(255,215,0,0.15);">
+                <div style="display:flex;gap:10px;min-height:300px;">
+                    <div style="flex:1;overflow-y:auto;max-height:65vh;padding-right:5px;border-right:1px solid rgba(255,215,0,0.15);">
                         <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid rgba(255,215,0,0.2);">
-                            <span style="color:#ffd700;font-size:0.95rem;font-weight:600;">📢 普通公告</span>
-                            <span style="color:rgba(255,255,255,0.4);font-size:0.75rem;margin-left:auto;">${activeItems.length}条</span>
+                            <span style="color:#ffd700;font-size:0.9rem;font-weight:600;">📢 普通公告</span>
+                            <span style="color:rgba(255,255,255,0.4);font-size:0.7rem;margin-left:auto;">${activeItems.length}条</span>
                         </div>
                         ${normalHtml}
                     </div>
-                    <div style="flex:1;overflow-y:auto;max-height:65vh;padding-left:6px;">
+                    <div style="flex:1;overflow-y:auto;max-height:65vh;padding:0 5px;border-right:1px solid rgba(255,107,107,0.15);">
                         <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid rgba(255,107,107,0.2);">
-                            <span style="color:#ff6b6b;font-size:0.95rem;font-weight:600;">🔨 拍卖快讯</span>
-                            <span style="color:rgba(255,255,255,0.4);font-size:0.75rem;margin-left:auto;">${auctionBroadcastQueue.length}条</span>
+                            <span style="color:#ff6b6b;font-size:0.9rem;font-weight:600;">🔨 拍卖快讯</span>
+                            <span style="color:rgba(255,255,255,0.4);font-size:0.7rem;margin-left:auto;">${auctionBroadcastQueue.length}条</span>
                         </div>
                         ${auctionHtml}
+                    </div>
+                    <div style="flex:1;overflow-y:auto;max-height:65vh;padding-left:5px;">
+                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid rgba(255,152,0,0.2);">
+                            <span style="color:#ff9800;font-size:0.9rem;font-weight:600;">💡 需求咨询</span>
+                            <span style="color:rgba(255,255,255,0.4);font-size:0.7rem;margin-left:auto;">${recentWallMsgs.length}条</span>
+                        </div>
+                        ${wallHtml}
                     </div>
                 </div>
             `;
@@ -13374,6 +13464,16 @@ function hasGistToken() {
 
         function closeNewsListModal() {
             document.getElementById('newsListModal').style.display = 'none';
+        }
+
+        // 从全部公告弹窗中删除需求墙消息（删除后刷新弹窗）
+        async function deleteWallMsgInModal(index) {
+            await deleteMessage(index);
+            // 删除完成后刷新弹窗（如果还开着）
+            const modal = document.getElementById('newsListModal');
+            if (modal && modal.style.display === 'flex') {
+                showNewsListModal();
+            }
         }
 
         document.addEventListener('keydown', (e) => {
@@ -13508,6 +13608,15 @@ function hasGistToken() {
                     auctionBroadcastQueue = broadcasts;
                 } catch (e) {
                     console.warn('刷新拍卖快讯失败:', e);
+                }
+
+                // 同时预加载需求墙消息（供公告栏滚动显示）
+                try {
+                    if (wallMessages.length === 0) {
+                        await fetchMessages();
+                    }
+                } catch (e) {
+                    console.warn('预加载需求墙失败:', e);
                 }
                 
                 if (titleEl && currentConfig.title) {
@@ -13720,6 +13829,15 @@ function hasGistToken() {
                 }
             } catch (error) {
                 console.warn('加载拍卖快讯失败:', error);
+            }
+
+            // 预加载需求墙消息（供滚动公告栏和全部公告弹窗显示）
+            try {
+                if (wallMessages.length === 0) {
+                    await fetchMessages();
+                }
+            } catch (error) {
+                console.warn('预加载需求墙消息失败:', error);
             }
             
             // 设置网络监听（离线同步）
