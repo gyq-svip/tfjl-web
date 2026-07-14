@@ -1118,10 +1118,23 @@
 
         /* 发光流动字体 */
         .glowing-text {
-            color: #ff0000;
-            text-shadow: 0 0 10px rgba(255,0,0,0.8), 0 0 20px rgba(255,0,0,0.5), 0 0 30px rgba(255,0,0,0.3);
+            background: linear-gradient(90deg, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #8b00ff, #ff0000);
+            background-size: 300% 100%;
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            animation: glowing 3s linear infinite;
+            text-shadow: 0 0 10px rgba(255,215,0,0.5), 0 0 20px rgba(255,215,0,0.3), 0 0 30px rgba(255,215,0,0.2);
             font-weight: bold;
-            transition: color 0.05s, text-shadow 0.05s;
+        }
+
+        @keyframes glowing {
+            0% {
+                background-position: 0% 50%;
+            }
+            100% {
+                background-position: 300% 50%;
+            }
         }
 
         /* 鼠标特效容器 */
@@ -3284,32 +3297,6 @@
                 // 自动保存到IndexedDB
                 autoSaveProject();
             }
-        }
-
-        // ==================== 标题颜色切换 ====================
-        const titleColors = [
-            { color: '#ff0000', shadow: 'rgba(255,0,0,0.8), rgba(255,0,0,0.5), rgba(255,0,0,0.3)' },
-            { color: '#ff7f00', shadow: 'rgba(255,127,0,0.8), rgba(255,127,0,0.5), rgba(255,127,0,0.3)' },
-            { color: '#ffff00', shadow: 'rgba(255,255,0,0.8), rgba(255,255,0,0.5), rgba(255,255,0,0.3)' },
-            { color: '#00ff00', shadow: 'rgba(0,255,0,0.8), rgba(0,255,0,0.5), rgba(0,255,0,0.3)' },
-            { color: '#0000ff', shadow: 'rgba(0,0,255,0.8), rgba(0,0,255,0.5), rgba(0,0,255,0.3)' },
-            { color: '#4b0082', shadow: 'rgba(75,0,130,0.8), rgba(75,0,130,0.5), rgba(75,0,130,0.3)' },
-            { color: '#8b00ff', shadow: 'rgba(139,0,255,0.8), rgba(139,0,255,0.5), rgba(139,0,255,0.3)' },
-        ];
-        let titleColorIndex = 0;
-
-        function startTitleColorCycle() {
-            const titleEl = document.getElementById('mainTitle');
-            if (!titleEl) return;
-
-            function changeColor() {
-                const tc = titleColors[titleColorIndex];
-                titleEl.style.color = tc.color;
-                titleEl.style.textShadow = `0 0 10px ${tc.shadow.split(',')[0]}, 0 0 20px ${tc.shadow.split(',')[1]}, 0 0 30px ${tc.shadow.split(',')[2]}`;
-                titleColorIndex = (titleColorIndex + 1) % titleColors.length;
-                setTimeout(changeColor, 5000);
-            }
-            changeColor();
         }
 
         // ==================== 聊天室+拍卖系统 ====================
@@ -14223,9 +14210,6 @@ function hasGistToken() {
                 console.warn('预加载需求墙消息失败:', error);
             }
 
-            // 启动标题颜色循环
-            startTitleColorCycle();
-            
             // 设置网络监听（离线同步）
             setupNetworkListener();
             
