@@ -6707,9 +6707,10 @@
                 output += '\n最大承伤次数，4\n';
             }
 
-            // 计算总减伤
+            // 计算总减伤（只算实际上阵的卡：6张非工程+工程卡）
             loadDamageReductionData();
-            const totalDamageReduction = calculateDamageReductionForCards(heroNames);
+            const actualBattleCards = [...arrangedCards, ...gongChengCards];
+            const totalDamageReduction = calculateDamageReductionForCards(actualBattleCards);
 
             // 显示结果
             resultEl.innerHTML = `
@@ -7019,9 +7020,15 @@
                 }
             }
 
-            // 计算总减伤
+            // 计算总减伤（只算实际上阵的卡）
             loadDamageReductionData();
-            const totalDamageReduction = calculateDamageReductionForCards(heroNames);
+            let dungeonBattleCards = [];
+            if (hasSheNv) {
+                dungeonBattleCards = [...gongChengOrder, ...arrangedCards];
+            } else {
+                dungeonBattleCards = [...arrangedCards];
+            }
+            const totalDamageReduction = calculateDamageReductionForCards(dungeonBattleCards);
 
             // 显示结果
             resultEl.innerHTML = '<div style="background:rgba(0,0,0,0.3);padding:10px;border-radius:8px;margin-top:5px;">' +
