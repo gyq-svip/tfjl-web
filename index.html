@@ -6718,7 +6718,7 @@
                     <div style="color:#4caf50;font-weight:bold;margin-bottom:8px;">✅ ${includeChengShang ? '活动' : '隐藏榜'}脚本输出：</div>
                     <div style="background:rgba(78,205,196,0.1);border:1px solid rgba(78,205,196,0.3);border-radius:6px;padding:8px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
                         <span style="color:#4ecdc4;font-size:0.85rem;">🛡️ 总减伤：<strong style="color:#fff;font-size:1rem;">${totalDamageReduction}</strong></span>
-                        <span style="color:rgba(255,255,255,0.5);font-size:0.75rem;">主界面「🛡️ 减伤」按钮设置 · 上阵${actualBattleCards.length}张</span>
+                        <span style="color:rgba(255,255,255,0.5);font-size:0.75rem;">主界面「🛡️ 减伤」按钮设置每张卡的减伤洗炼值 · 只计算首次上阵的7张卡总减伤</span>
                     </div>
                     <textarea id="activityScriptTextarea" oninput="window._activityScriptOutput=this.value" style="width:100%;min-height:350px;color:#fff;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.2);border-radius:6px;padding:8px;font-family:monospace;font-size:0.85rem;white-space:pre-wrap;word-break:break-all;resize:vertical;">${output.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</textarea>
                     <div style="display:flex;gap:8px;margin-top:10px;">
@@ -7035,7 +7035,7 @@
                 '<div style="color:#ff9800;font-weight:bold;margin-bottom:8px;">✅ 深海脚本输出：</div>' +
                 '<div style="background:rgba(78,205,196,0.1);border:1px solid rgba(78,205,196,0.3);border-radius:6px;padding:8px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">' +
                 '<span style="color:#4ecdc4;font-size:0.85rem;">🛡️ 总减伤：<strong style="color:#fff;font-size:1rem;">' + totalDamageReduction + '</strong></span>' +
-                '<span style="color:rgba(255,255,255,0.5);font-size:0.75rem;">主界面「🛡️ 减伤」按钮设置 · 上阵' + dungeonBattleCards.length + '张</span>' +
+                '<span style="color:rgba(255,255,255,0.5);font-size:0.75rem;">主界面「🛡️ 减伤」按钮设置每张卡的减伤洗炼值 · 只计算首次上阵的7张卡总减伤</span>' +
                 '</div>' +
                 '<textarea id="dungeonScriptTextarea" oninput="window._dungeonScriptOutput=this.value" style="width:100%;min-height:350px;color:#fff;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.2);border-radius:6px;padding:8px;font-family:monospace;font-size:0.85rem;white-space:pre-wrap;word-break:break-all;resize:vertical;">' + output.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</textarea>' +
                 '<div style="display:flex;gap:8px;margin-top:10px;">' +
