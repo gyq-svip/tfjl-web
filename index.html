@@ -2523,6 +2523,106 @@
                 <button onclick="toggleTxtFilesPanel()" title="脚本文件" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">📄</button>
                 <button onclick="toggleReferencePanel()" title="参考图片" style="background:linear-gradient(135deg,#9c27b0,#7b1fa2);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">🖼️</button>
                 <button onclick="saveCurrentProject()" title="保存" style="background:rgba(76,175,80,0.8);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">💾</button>
+                <button onclick="toggleActivityCalcPanel()" title="活动氪金计算器" style="background:linear-gradient(135deg,#ff6b6b,#feca57);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">🧮</button>
+            </div>
+        </div>
+
+        <!-- 活动氪金计算器面板 -->
+        <div id="activityCalcPanel" style="display:none;position:fixed;top:80px;right:20px;width:520px;max-height:88vh;z-index:9997;background:rgba(30,30,60,0.98);border:2px solid rgba(255,107,107,0.5);border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.6);overflow:auto;resize:both;min-width:400px;min-height:500px;">
+            <div style="background:linear-gradient(135deg,#ff6b6b,#feca57);padding:12px 16px;display:flex;justify-content:space-between;align-items:center;">
+                <span style="color:white;font-weight:bold;font-size:1rem;">🧮 活动氪金计算器</span>
+                <button onclick="toggleActivityCalcPanel()" style="background:transparent;border:none;color:white;font-size:1.5rem;cursor:pointer;">×</button>
+            </div>
+            <div style="padding:15px;">
+                <!-- Tab切换 -->
+                <div style="display:flex;gap:5px;margin-bottom:15px;">
+                    <button onclick="switchCalcTab('skins')" id="calcTabSkins" style="flex:1;padding:8px;border:none;border-radius:6px;cursor:pointer;font-size:0.85rem;background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;">🎯 选择目标</button>
+                    <button onclick="switchCalcTab('data')" id="calcTabData" style="flex:1;padding:8px;border:none;border-radius:6px;cursor:pointer;font-size:0.85rem;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);">📊 数据参考</button>
+                    <button onclick="switchCalcTab('calc')" id="calcTabCalc" style="flex:1;padding:8px;border:none;border-radius:6px;cursor:pointer;font-size:0.85rem;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);">💰 氪金计算器</button>
+                </div>
+
+                <!-- 选择目标皮肤 -->
+                <div id="calcSkinsPanel">
+                    <div style="color:#ff9800;font-weight:600;margin-bottom:10px;font-size:0.9rem;">🎯 选择目标皮肤/战车（可多选）</div>
+                    <div id="calcSkinsList" style="max-height:55vh;overflow-y:auto;"></div>
+                    <div style="margin-top:12px;padding:10px;background:rgba(255,255,255,0.05);border-radius:8px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <span style="color:rgba(255,255,255,0.7);font-size:0.85rem;">已选目标材料总数：</span>
+                            <span id="calcTargetTotal" style="color:#ffd700;font-weight:bold;font-size:1.1rem;">0</span>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;">
+                            <span style="color:rgba(255,255,255,0.7);font-size:0.85rem;">已选项目数：</span>
+                            <span id="calcSelectedCount" style="color:#4ecdc4;font-weight:bold;">0</span>
+                        </div>
+                    </div>
+                    <div style="margin-top:10px;display:flex;gap:8px;">
+                        <button onclick="clearCalcSelection()" style="flex:1;padding:8px;border:none;border-radius:6px;background:rgba(239,68,68,0.3);color:#ef4444;cursor:pointer;font-size:0.8rem;">清空选择</button>
+                        <button onclick="switchCalcTab('calc');focusCalcInputs();" style="flex:1;padding:8px;border:none;border-radius:6px;background:linear-gradient(135deg,#ff6b6b,#feca57);color:white;cursor:pointer;font-size:0.8rem;font-weight:bold;">下一步 →</button>
+                    </div>
+                </div>
+
+                <!-- 数据参考 -->
+                <div id="calcDataPanel" style="display:none;">
+                    <div style="color:#4ecdc4;font-weight:600;margin-bottom:10px;font-size:0.9rem;">📊 礼包性价比</div>
+                    <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:10px;margin-bottom:15px;">
+                        <table style="width:100%;font-size:0.8rem;color:rgba(255,255,255,0.8);border-collapse:collapse;">
+                            <tr style="border-bottom:1px solid rgba(255,255,255,0.1);"><th style="text-align:left;padding:4px;">礼包</th><th style="text-align:right;padding:4px;">金额</th><th style="text-align:right;padding:4px;">材料</th><th style="text-align:right;padding:4px;">材料/元</th></tr>
+                            <tr><td style="padding:4px;color:#ffd700;">战令</td><td style="text-align:right;padding:4px;">98元</td><td style="text-align:right;padding:4px;">200</td><td style="text-align:right;padding:4px;color:#4caf50;">2.04</td></tr>
+                            <tr><td style="padding:4px;">30礼包</td><td style="text-align:right;padding:4px;">30元</td><td style="text-align:right;padding:4px;">20</td><td style="text-align:right;padding:4px;color:#4caf50;">0.67</td></tr>
+                            <tr><td style="padding:4px;">128礼包</td><td style="text-align:right;padding:4px;">128元</td><td style="text-align:right;padding:4px;">60</td><td style="text-align:right;padding:4px;color:#4caf50;">0.47</td></tr>
+                            <tr><td style="padding:4px;">328礼包</td><td style="text-align:right;padding:4px;">328元</td><td style="text-align:right;padding:4px;">120</td><td style="text-align:right;padding:4px;">0.37</td></tr>
+                            <tr><td style="padding:4px;">648礼包</td><td style="text-align:right;padding:4px;">648元</td><td style="text-align:right;padding:4px;">240</td><td style="text-align:right;padding:4px;">0.37</td></tr>
+                        </table>
+                        <div style="margin-top:8px;color:#ff9800;font-size:0.75rem;">💡 性价比排序：战令 > 30礼包 > 128礼包 > 648礼包 > 328礼包</div>
+                    </div>
+                    <div style="color:#4ecdc4;font-weight:600;margin-bottom:10px;font-size:0.9rem;">📊 21天活动材料产出</div>
+                    <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:10px;">
+                        <table style="width:100%;font-size:0.8rem;color:rgba(255,255,255,0.8);border-collapse:collapse;">
+                            <tr style="border-bottom:1px solid rgba(255,255,255,0.1);"><th style="text-align:left;padding:4px;">难度</th><th style="text-align:right;padding:4px;">每日</th><th style="text-align:right;padding:4px;">21天</th><th style="text-align:right;padding:4px;">+战令</th></tr>
+                            <tr><td style="padding:4px;">简单</td><td style="text-align:right;padding:4px;">12</td><td style="text-align:right;padding:4px;">252</td><td style="text-align:right;padding:4px;color:#ffd700;">452</td></tr>
+                            <tr><td style="padding:4px;">普通</td><td style="text-align:right;padding:4px;">18</td><td style="text-align:right;padding:4px;">378</td><td style="text-align:right;padding:4px;color:#ffd700;">578</td></tr>
+                            <tr><td style="padding:4px;">困难</td><td style="text-align:right;padding:4px;">24</td><td style="text-align:right;padding:4px;">504</td><td style="text-align:right;padding:4px;color:#ffd700;">704</td></tr>
+                            <tr><td style="padding:4px;">噩梦</td><td style="text-align:right;padding:4px;">32</td><td style="text-align:right;padding:4px;">672</td><td style="text-align:right;padding:4px;color:#ffd700;">872</td></tr>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 氪金计算 -->
+                <div id="calcCalcPanel" style="display:none;">
+                    <div style="color:#ff9800;font-weight:600;margin-bottom:10px;font-size:0.9rem;">⚙️ 计算参数</div>
+                    <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:12px;margin-bottom:12px;">
+                        <div style="margin-bottom:10px;">
+                            <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;display:block;margin-bottom:4px;">目标材料总数</label>
+                            <input type="number" id="calcTargetInput" value="0" min="0" style="width:100%;padding:8px;border-radius:6px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.3);color:#fff;font-size:0.9rem;box-sizing:border-box;" onchange="updateCalcTargetFromInput()">
+                        </div>
+                        <div style="margin-bottom:10px;">
+                            <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;display:block;margin-bottom:4px;">已有材料</label>
+                            <input type="number" id="calcOwnedInput" value="0" min="0" style="width:100%;padding:8px;border-radius:6px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.3);color:#fff;font-size:0.9rem;box-sizing:border-box;">
+                        </div>
+                        <div style="margin-bottom:10px;">
+                            <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;display:block;margin-bottom:4px;">活动天数</label>
+                            <input type="number" id="calcDaysInput" value="21" min="1" max="30" style="width:100%;padding:8px;border-radius:6px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.3);color:#fff;font-size:0.9rem;box-sizing:border-box;">
+                        </div>
+                        <div style="margin-bottom:10px;">
+                            <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;display:block;margin-bottom:4px;">每日通关难度</label>
+                            <select id="calcDifficultySelect" style="width:100%;padding:8px;border-radius:6px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.3);color:#fff;font-size:0.9rem;box-sizing:border-box;">
+                                <option value="12">简单（12材料/天）</option>
+                                <option value="18">普通（18材料/天）</option>
+                                <option value="24">困难（24材料/天）</option>
+                                <option value="32" selected>噩梦（32材料/天）</option>
+                            </select>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+                            <input type="checkbox" id="calcBuyZhanLing" checked style="width:18px;height:18px;cursor:pointer;">
+                            <label for="calcBuyZhanLing" style="color:rgba(255,255,255,0.8);font-size:0.85rem;cursor:pointer;">购买战令（98元/200材料）</label>
+                        </div>
+                        <button onclick="doActivityCalc()" style="width:100%;padding:10px;border:none;border-radius:8px;background:linear-gradient(135deg,#ff6b6b,#feca57);color:white;font-size:1rem;font-weight:bold;cursor:pointer;">🧮 计算最优方案</button>
+                    </div>
+                    <div id="calcResultArea" style="display:none;">
+                        <div style="color:#4ecdc4;font-weight:600;margin-bottom:10px;font-size:0.9rem;">💰 计算结果</div>
+                        <div id="calcResultContent" style="background:rgba(255,255,255,0.05);border-radius:8px;padding:12px;"></div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -2881,6 +2981,248 @@
         let referenceImages = [];
         let isDraggingRef = false;
         let refDragOffset = {x: 0, y: 0};
+
+        // ==================== 活动氪金计算器 ====================
+        const ACTIVITY_SKINS = [
+            // 480材料档
+            { name: '巨灵神·海妖', cost: 480, category: '480' },
+            { name: '金银法王·恶匪', cost: 480, category: '480' },
+            { name: '电容器', cost: 480, category: '480' },
+            { name: '山河社稷号', cost: 480, category: '480' },
+            { name: '寂静之月号', cost: 480, category: '480' },
+            { name: '浴火凤凰号', cost: 480, category: '480' },
+            { name: '神剑山庄号', cost: 480, category: '480' },
+            // 640材料档
+            { name: '衡山掌门·巫医', cost: 640, category: '640' },
+            // 720材料档
+            { name: '飞龙在天号', cost: 720, category: '720' },
+            // 960材料档
+            { name: '东方不败·虎弓', cost: 960, category: '960' },
+            { name: '魔教教主·魇', cost: 960, category: '960' },
+            { name: '风暴·圣骑', cost: 960, category: '960' },
+            { name: '魔化·幽灵', cost: 960, category: '960' },
+            // 1280材料档
+            { name: '少林掌门·咕咕', cost: 1280, category: '1280' },
+        ];
+        let calcSelectedSkins = new Set();
+
+        function toggleActivityCalcPanel() {
+            const panel = document.getElementById('activityCalcPanel');
+            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+            if (panel.style.display === 'block') {
+                renderCalcSkins();
+                updateCalcSummary();
+            }
+        }
+
+        function switchCalcTab(tab) {
+            document.getElementById('calcSkinsPanel').style.display = tab === 'skins' ? 'block' : 'none';
+            document.getElementById('calcDataPanel').style.display = tab === 'data' ? 'block' : 'none';
+            document.getElementById('calcCalcPanel').style.display = tab === 'calc' ? 'block' : 'none';
+            ['skins', 'data', 'calc'].forEach(t => {
+                const btn = document.getElementById('calcTab' + t.charAt(0).toUpperCase() + t.slice(1));
+                if (t === tab) {
+                    btn.style.background = 'linear-gradient(135deg,#4caf50,#2e7d32)';
+                    btn.style.color = 'white';
+                } else {
+                    btn.style.background = 'rgba(255,255,255,0.1)';
+                    btn.style.color = 'rgba(255,255,255,0.7)';
+                }
+            });
+        }
+
+        function renderCalcSkins() {
+            const container = document.getElementById('calcSkinsList');
+            const categories = ['480', '640', '720', '960', '1280'];
+            const catColors = { '480': '#4caf50', '640': '#2196f3', '720': '#9c27b0', '960': '#ff9800', '1280': '#ef4444' };
+            let html = '';
+            categories.forEach(cat => {
+                const skins = ACTIVITY_SKINS.filter(s => s.category === cat);
+                if (skins.length === 0) return;
+                html += `<div style="margin-bottom:12px;">`;
+                html += `<div style="color:${catColors[cat]};font-size:0.8rem;font-weight:600;margin-bottom:6px;">${cat}材料档</div>`;
+                html += `<div style="display:flex;flex-wrap:wrap;gap:6px;">`;
+                skins.forEach(skin => {
+                    const isSelected = calcSelectedSkins.has(skin.name);
+                    const bg = isSelected ? `background:linear-gradient(135deg,${catColors[cat]},#2e7d32);border-color:${catColors[cat]};` : 'background:rgba(255,255,255,0.05);border-color:rgba(255,255,255,0.1);';
+                    const check = isSelected ? '<span style="margin-right:4px;">✓</span>' : '';
+                    html += `<div onclick="toggleCalcSkin('${skin.name}')" style="${bg}border:1px solid;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:0.8rem;color:${isSelected ? '#fff' : 'rgba(255,255,255,0.8)'};transition:all 0.2s;user-select:none;">${check}${skin.name}<span style="opacity:0.7;margin-left:4px;font-size:0.7rem;">${skin.cost}</span></div>`;
+                });
+                html += `</div></div>`;
+            });
+            container.innerHTML = html;
+        }
+
+        function toggleCalcSkin(name) {
+            if (calcSelectedSkins.has(name)) {
+                calcSelectedSkins.delete(name);
+            } else {
+                calcSelectedSkins.add(name);
+            }
+            renderCalcSkins();
+            updateCalcSummary();
+        }
+
+        function clearCalcSelection() {
+            calcSelectedSkins.clear();
+            renderCalcSkins();
+            updateCalcSummary();
+        }
+
+        function updateCalcSummary() {
+            let total = 0;
+            calcSelectedSkins.forEach(name => {
+                const skin = ACTIVITY_SKINS.find(s => s.name === name);
+                if (skin) total += skin.cost;
+            });
+            document.getElementById('calcTargetTotal').textContent = total;
+            document.getElementById('calcSelectedCount').textContent = calcSelectedSkins.size;
+            // 同步到计算面板
+            document.getElementById('calcTargetInput').value = total;
+        }
+
+        function updateCalcTargetFromInput() {
+            const val = parseInt(document.getElementById('calcTargetInput').value) || 0;
+            document.getElementById('calcTargetTotal').textContent = val;
+        }
+
+        function focusCalcInputs() {
+            setTimeout(() => {
+                document.getElementById('calcOwnedInput').focus();
+            }, 100);
+        }
+
+        // 动态规划计算最优购买方案
+        function calcOptimalPurchase(need) {
+            // 礼包定义（考虑购买上限）
+            const gifts = [
+                { name: '30礼包', cost: 30, mat: 20, max: 63 },
+                { name: '128礼包', cost: 128, mat: 60, max: 63 },
+                { name: '328礼包', cost: 328, mat: 120, max: 63 },
+                { name: '648礼包', cost: 648, mat: 240, max: 999 },
+            ];
+
+            let bestCost = Infinity;
+            let bestPlan = null;
+            let bestTotalMat = 0;
+
+            // 枚举30/128/328的数量，648用来补余数（剪枝优化）
+            const max30 = Math.min(63, Math.ceil(need / 20));
+            for (let c30 = max30; c30 >= 0; c30--) {
+                const mat30 = c30 * 20;
+                const cost30 = c30 * 30;
+                if (cost30 >= bestCost) continue;
+
+                const max128 = Math.min(63, Math.ceil(Math.max(0, need - mat30) / 60));
+                for (let c128 = max128; c128 >= 0; c128--) {
+                    const mat128 = c128 * 60;
+                    const cost128 = c128 * 128;
+                    if (cost30 + cost128 >= bestCost) continue;
+
+                    const max328 = Math.min(63, Math.ceil(Math.max(0, need - mat30 - mat128) / 120));
+                    for (let c328 = max328; c328 >= 0; c328--) {
+                        const mat328 = c328 * 120;
+                        const cost328 = c328 * 328;
+                        if (cost30 + cost128 + cost328 >= bestCost) continue;
+
+                        const total = mat30 + mat128 + mat328;
+                        let cost, c648, planTotal;
+                        if (total >= need) {
+                            cost = cost30 + cost128 + cost328;
+                            c648 = 0;
+                            planTotal = total;
+                        } else {
+                            const remain = need - total;
+                            c648 = Math.ceil(remain / 240);
+                            cost = cost30 + cost128 + cost328 + c648 * 648;
+                            planTotal = total + c648 * 240;
+                        }
+
+                        if (cost < bestCost) {
+                            bestCost = cost;
+                            bestPlan = { '30礼包': c30, '128礼包': c128, '328礼包': c328, '648礼包': c648 };
+                            bestTotalMat = planTotal;
+                        }
+                    }
+                }
+            }
+
+            return { cost: bestCost, plan: bestPlan, totalMat: bestTotalMat };
+        }
+
+        function doActivityCalc() {
+            const target = parseInt(document.getElementById('calcTargetInput').value) || 0;
+            const owned = parseInt(document.getElementById('calcOwnedInput').value) || 0;
+            const days = parseInt(document.getElementById('calcDaysInput').value) || 21;
+            const daily = parseInt(document.getElementById('calcDifficultySelect').value) || 32;
+            const buyZhanLing = document.getElementById('calcBuyZhanLing').checked;
+
+            if (target <= 0) {
+                alert('请先选择目标皮肤或输入目标材料数！');
+                return;
+            }
+
+            // 计算免费产出
+            const freeMat = daily * days + owned;
+            const zhanLingMat = buyZhanLing ? 200 : 0;
+            const zhanLingCost = buyZhanLing ? 98 : 0;
+            const totalFree = freeMat + zhanLingMat;
+
+            // 计算还需
+            const need = Math.max(0, target - totalFree);
+
+            let resultHtml = '';
+
+            // 基本信息
+            resultHtml += `<div style="margin-bottom:12px;">`;
+            resultHtml += `<div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.6);font-size:0.8rem;">目标材料总数</span><span style="color:#ffd700;font-weight:bold;">${target}</span></div>`;
+            resultHtml += `<div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.6);font-size:0.8rem;">免费获得（${daily}/天×${days}天${buyZhanLing ? '+战令200' : ''}${owned > 0 ? '+已有' + owned : ''}）</span><span style="color:#4ecdc4;">${totalFree}</span></div>`;
+            if (need <= 0) {
+                resultHtml += `<div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.6);font-size:0.8rem;">还需材料</span><span style="color:#4caf50;font-weight:bold;">0（已足够）</span></div>`;
+                resultHtml += `</div>`;
+                resultHtml += `<div style="background:linear-gradient(135deg,#4caf50,#2e7d32);border-radius:8px;padding:12px;text-align:center;color:white;margin-top:10px;">`;
+                resultHtml += `<div style="font-size:1.1rem;font-weight:bold;">🎉 无需额外氪金！</div>`;
+                resultHtml += `<div style="font-size:0.85rem;margin-top:4px;opacity:0.9;">免费产出已满足目标，溢出 ${totalFree - target} 材料</div>`;
+                if (buyZhanLing) resultHtml += `<div style="font-size:0.8rem;margin-top:4px;opacity:0.8;">战令花费：98元</div>`;
+                resultHtml += `</div>`;
+            } else {
+                resultHtml += `<div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.6);font-size:0.8rem;">还需材料</span><span style="color:#ff6b6b;font-weight:bold;">${need}</span></div>`;
+                resultHtml += `</div>`;
+
+                // 计算最优方案
+                const opt = calcOptimalPurchase(need);
+                const totalCost = zhanLingCost + opt.cost;
+                const overflow = opt.totalMat - need;
+
+                // 推荐购买方案
+                resultHtml += `<div style="color:#ff9800;font-weight:600;margin-bottom:8px;font-size:0.9rem;">💰 推荐购买方案</div>`;
+                resultHtml += `<div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:10px;margin-bottom:10px;">`;
+                if (buyZhanLing) {
+                    resultHtml += `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.05);"><span style="color:#ffd700;font-size:0.85rem;">战令</span><span style="color:rgba(255,255,255,0.8);font-size:0.85rem;">x1 = 200材料 <span style="color:#ff6b6b;">98元</span></span></div>`;
+                }
+                const giftNames = ['30礼包', '128礼包', '328礼包', '648礼包'];
+                const giftMats = { '30礼包': 20, '128礼包': 60, '328礼包': 120, '648礼包': 240 };
+                giftNames.forEach(name => {
+                    const count = opt.plan[name] || 0;
+                    if (count > 0) {
+                        const mat = count * giftMats[name];
+                        const cost = count * (name === '30礼包' ? 30 : name === '128礼包' ? 128 : name === '328礼包' ? 328 : 648);
+                        resultHtml += `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.05);"><span style="color:rgba(255,255,255,0.8);font-size:0.85rem;">${name}</span><span style="color:rgba(255,255,255,0.8);font-size:0.85rem;">x${count} = ${mat}材料 <span style="color:#ff6b6b;">${cost}元</span></span></div>`;
+                    }
+                });
+                resultHtml += `</div>`;
+
+                // 汇总
+                resultHtml += `<div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:1px solid rgba(255,215,0,0.3);border-radius:8px;padding:12px;">`;
+                resultHtml += `<div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.7);font-size:0.85rem;">总花费</span><span style="color:#ff6b6b;font-weight:bold;font-size:1.2rem;">${totalCost}元</span></div>`;
+                resultHtml += `<div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.7);font-size:0.85rem;">获得材料</span><span style="color:#4ecdc4;font-weight:bold;">${opt.totalMat + zhanLingMat}</span></div>`;
+                resultHtml += `<div style="display:flex;justify-content:space-between;"><span style="color:rgba(255,255,255,0.7);font-size:0.85rem;">溢出材料</span><span style="color:${overflow > 0 ? '#ff9800' : '#4caf50'};font-weight:bold;">${overflow > 0 ? overflow : 0}</span></div>`;
+                resultHtml += `</div>`;
+            }
+
+            document.getElementById('calcResultContent').innerHTML = resultHtml;
+            document.getElementById('calcResultArea').style.display = 'block';
+        }
 
         function toggleReferencePanel() {
             const panel = document.getElementById('referencePanel');
