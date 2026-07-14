@@ -7019,9 +7019,17 @@
                 }
             }
 
+            // 计算总减伤
+            loadDamageReductionData();
+            const totalDamageReduction = calculateDamageReductionForCards(heroNames);
+
             // 显示结果
             resultEl.innerHTML = '<div style="background:rgba(0,0,0,0.3);padding:10px;border-radius:8px;margin-top:5px;">' +
                 '<div style="color:#ff9800;font-weight:bold;margin-bottom:8px;">✅ 深海脚本输出：</div>' +
+                '<div style="background:rgba(78,205,196,0.1);border:1px solid rgba(78,205,196,0.3);border-radius:6px;padding:8px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">' +
+                '<span style="color:#4ecdc4;font-size:0.85rem;">🛡️ 总减伤：<strong style="color:#fff;font-size:1rem;">' + totalDamageReduction + '</strong></span>' +
+                '<span style="color:rgba(255,255,255,0.5);font-size:0.75rem;">（已上阵' + heroNames.length + '张卡，精灵卡不计入）</span>' +
+                '</div>' +
                 '<textarea id="dungeonScriptTextarea" oninput="window._dungeonScriptOutput=this.value" style="width:100%;min-height:350px;color:#fff;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.2);border-radius:6px;padding:8px;font-family:monospace;font-size:0.85rem;white-space:pre-wrap;word-break:break-all;resize:vertical;">' + output.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</textarea>' +
                 '<div style="display:flex;gap:8px;margin-top:10px;">' +
                 '<button onclick="copyDungeonScriptOutput()" style="background:linear-gradient(135deg,#ff9800,#e65100);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.85rem;">📋 复制脚本</button>' +
