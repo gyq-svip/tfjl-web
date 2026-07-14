@@ -1123,20 +1123,18 @@
             -webkit-background-clip: text;
             background-clip: text;
             color: transparent;
-            animation: glowing 20s infinite;
+            animation: glowing 3s linear infinite;
             text-shadow: 0 0 10px rgba(255,215,0,0.5), 0 0 20px rgba(255,215,0,0.3), 0 0 30px rgba(255,215,0,0.2);
             font-weight: bold;
         }
 
         @keyframes glowing {
-            0%, 14% { background-position: 0% 50%; }
-            14.2%, 28% { background-position: 43% 50%; }
-            28.2%, 42% { background-position: 86% 50%; }
-            42.2%, 56% { background-position: 129% 50%; }
-            56.2%, 70% { background-position: 172% 50%; }
-            70.2%, 84% { background-position: 215% 50%; }
-            84.2%, 99% { background-position: 258% 50%; }
-            100% { background-position: 300% 50%; }
+            0% {
+                background-position: 0% 50%;
+            }
+            100% {
+                background-position: 300% 50%;
+            }
         }
 
         /* 鼠标特效容器 */
@@ -3767,7 +3765,7 @@
                         <div style="color:rgba(255,255,255,0.85);font-size:0.85rem;line-height:1.8;">
                             <div style="margin-bottom:8px;">📂 <b>项目管理</b> — 脚本分类存储，支持脚本、图片、阵容、记事本</div>
                             <div style="margin-bottom:8px;">📜 <b>脚本文件</b> — 解析到手牌，支持拖拽、分享到需求墙</div>
-                            <div style="margin-bottom:8px;">🔍 <b>文本解析</b> — 自动生成活动/副本脚本，可手动微调</div>
+                            <div style="margin-bottom:8px;">🔍 <b>脚本解析与生成</b> — 自动生成活动/副本脚本，可手动微调</div>
                             <div style="margin-bottom:8px;">🏪 <b>拍卖行</b> — 闲置物品自由上架、交换、求购，完全免费</div>
                             <div style="margin-bottom:8px;">📢 <b>需求墙</b> — 发布需求、分享脚本、互动交流</div>
                         </div>
@@ -6069,7 +6067,7 @@
                             <p style="margin:0 0 10px 0;"><strong style="color:#ffd700;">📁 项目管理</strong> - 脚本分类存储，便于日后查找。数据存储在本地浏览器缓存中，支持项目中存放脚本文件、图片、阵容站位、皮肤融合，还有记事本可备注战车及注意事项，保存后均跟随单个项目</p>
                             <p style="margin:0 0 10px 0;"><strong style="color:#ffd700;">📝 记事本</strong> - 记录阵容思路、心得笔记，保存后跟随项目</p>
                             <p style="margin:0 0 10px 0;"><strong style="color:#ffd700;">📄 脚本文件</strong> - 支持脚本解析到手牌，方便调整站位一目了然；支持拖拽排序；支持分享到需求墙，所有人均可查看、下载和直接导入使用</p>
-                            <p style="margin:0 0 10px 0;"><strong style="color:#ffd700;">🔍 文本解析</strong> - 支持解析文本到手牌，自动生成活动和隐藏脚本（带时间轴），建议生成后手动微调效果更佳</p>
+                            <p style="margin:0 0 10px 0;"><strong style="color:#ffd700;">🔍 脚本解析与生成</strong> - 支持解析文本到手牌，自动生成活动和隐藏脚本（带时间轴），建议生成后手动微调效果更佳</p>
                             <p style="margin:0 0 10px 0;"><strong style="color:#ff9800;">🏰 副本脚本</strong> - 已支持蛇女、雷精灵、天使、火炮、虎弓、后羿等阵容的自动生成，后续遇到新阵容会持续完善</p>
                             <p style="margin:0 0 10px 0;"><strong style="color:#ffd700;">🖼️ 参考图片</strong> - 上传、预览阵容参考图，可拖动调整大小</p>
                             <p style="margin:0 0 10px 0;"><strong style="color:#ffd700;">🏪 拍卖行</strong> - 闲置物品自由上架、交换、求购，入口在右上角需求墙小喇叭旁边，完全免费！纯玩！</p>
@@ -7693,7 +7691,7 @@
             <!-- Tab切换 -->
             <div style="display:flex;border-bottom:1px solid rgba(255,255,255,0.1);">
                 <button id="txtTabBtn" onclick="switchTxtPanelTab('files')" style="flex:1;padding:8px;border:none;background:rgba(76,175,80,0.3);color:#fff;cursor:pointer;font-size:0.85rem;font-weight:bold;border-bottom:2px solid #4caf50;">📄 脚本文件</button>
-                <button id="parserTabBtn" onclick="switchTxtPanelTab('parser')" style="flex:1;padding:8px;border:none;background:transparent;color:rgba(255,255,255,0.5);cursor:pointer;font-size:0.85rem;">🔍 文本解析</button>
+                <button id="parserTabBtn" onclick="switchTxtPanelTab('parser')" style="flex:1;padding:8px;border:none;background:transparent;color:rgba(255,255,255,0.5);cursor:pointer;font-size:0.85rem;">🔍 脚本解析与生成</button>
             </div>
             <!-- 脚本文件Tab内容 -->
             <div id="txtTabFiles" style="padding:10px;height:calc(100% - 90px);overflow:auto;">
