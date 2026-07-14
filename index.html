@@ -1123,7 +1123,7 @@
             -webkit-background-clip: text;
             background-clip: text;
             color: transparent;
-            animation: glowing 8s linear infinite;
+            animation: glowing 12s steps(7) infinite;
             text-shadow: 0 0 10px rgba(255,215,0,0.5), 0 0 20px rgba(255,215,0,0.3), 0 0 30px rgba(255,215,0,0.2);
             font-weight: bold;
         }
@@ -18637,12 +18637,13 @@ function hasGistToken() {
                 return;
             }
 
+            const btn = document.querySelector('.admin-btn-primary[onclick="adminSaveTitle()"]');
+            const originalText = btn ? btn.textContent : '保存标题';
+            if (btn) btn.textContent = '保存中...';
+
             try {
                 const newsData = await adminFetchNewsFromGist();
                 currentConfig.title = newTitle;
-
-                const titleEl = document.getElementById('mainTitle');
-                if (titleEl) titleEl.textContent = ' ' + newTitle + ' ';
 
                 const fullData = {
                     title: newTitle,
@@ -18678,10 +18679,18 @@ function hasGistToken() {
                 }
 
                 saveConfigToCache(currentConfig);
+
+                const titleEl = document.getElementById('mainTitle');
+                if (titleEl) titleEl.textContent = ' ' + newTitle + ' ';
+
                 showAdminStatus('标题保存成功！', 'success');
+                alert('✅ 标题保存成功！\n\n其他用户刷新页面即可看到新标题。');
             } catch (error) {
                 console.error('保存标题失败:', error);
                 showAdminStatus('保存失败: ' + error.message, 'error');
+                alert('❌ 标题保存失败！\n\n错误信息：' + error.message + '\n\n请检查网络和Token是否正常。');
+            } finally {
+                if (btn) btn.textContent = originalText;
             }
         }
 
