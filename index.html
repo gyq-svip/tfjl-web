@@ -6743,7 +6743,7 @@
             });
         }
 
-        // 副本脚本生成功能
+        // 深海脚本生成功能
         function parseDungeonScript() {
             const input = document.getElementById('parserInput').value.trim();
             const resultEl = document.getElementById('parserResult');
@@ -7021,7 +7021,7 @@
 
             // 显示结果
             resultEl.innerHTML = '<div style="background:rgba(0,0,0,0.3);padding:10px;border-radius:8px;margin-top:5px;">' +
-                '<div style="color:#ff9800;font-weight:bold;margin-bottom:8px;">✅ 副本脚本输出：</div>' +
+                '<div style="color:#ff9800;font-weight:bold;margin-bottom:8px;">✅ 深海脚本输出：</div>' +
                 '<textarea id="dungeonScriptTextarea" oninput="window._dungeonScriptOutput=this.value" style="width:100%;min-height:350px;color:#fff;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.2);border-radius:6px;padding:8px;font-family:monospace;font-size:0.85rem;white-space:pre-wrap;word-break:break-all;resize:vertical;">' + output.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</textarea>' +
                 '<div style="display:flex;gap:8px;margin-top:10px;">' +
                 '<button onclick="copyDungeonScriptOutput()" style="background:linear-gradient(135deg,#ff9800,#e65100);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.85rem;">📋 复制脚本</button>' +
@@ -7725,7 +7725,7 @@
                     <button onclick="parseTextAndAddCards()" style="flex:1;background:linear-gradient(135deg,#00bcd4,#00838f);color:white;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:500;">🔍 解析并添加</button>
                     <button onclick="parseActivityScript(true)" style="flex:1;background:linear-gradient(135deg,#ff5722,#e64a19);color:white;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:500;">📜 活动脚本生成</button>
                     <button onclick="parseActivityScript(false)" style="flex:1;background:linear-gradient(135deg,#9c27b0,#7b1fa2);color:white;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:500;">🎭 隐藏榜脚本生成</button>
-                    <button onclick="parseDungeonScript()" style="flex:1;background:linear-gradient(135deg,#ff9800,#e65100);color:white;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:500;">🏰 副本脚本生成</button>
+                    <button onclick="parseDungeonScript()" style="flex:1;background:linear-gradient(135deg,#ff9800,#e65100);color:white;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:500;">🌊 深海脚本生成</button>
                     <button onclick="clearParserInput()" style="background:rgba(255,255,255,0.1);color:white;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:0.85rem;">清空</button>
                 </div>
                 <div id="parserResult" style="margin-top:10px;font-size:0.85rem;color:rgba(255,255,255,0.7);"></div>
