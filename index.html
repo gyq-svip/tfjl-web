@@ -818,6 +818,19 @@
             font-weight: bold;
         }
         
+        .card-level-badge.has-mohua {
+            box-shadow: 0 0 6px rgba(168, 85, 247, 0.8), 0 0 12px rgba(168, 85, 247, 0.4);
+            border: 1.5px solid rgba(168, 85, 247, 0.7);
+        }
+        
+        .card-level-badge.has-skin.has-mohua {
+            background: linear-gradient(135deg, #ff6b6b, #feca57, #48dbfb, #ff9ff3);
+            background-size: 300% 300%;
+            animation: gradientShift 3s ease infinite;
+            box-shadow: 0 0 6px rgba(168, 85, 247, 0.8), 0 0 12px rgba(168, 85, 247, 0.4);
+            border: 1.5px solid rgba(168, 85, 247, 0.7);
+        }
+        
         .card-level-badge.has-skin:hover {
             filter: brightness(1.2);
         }
@@ -8504,6 +8517,7 @@
                     teammatePlacedCards: currentData?.teammatePlacedCards || (typeof teammatePlacedCards !== 'undefined' ? teammatePlacedCards : []),
                     cardLevels: currentData?.cardLevels || (typeof cardLevels !== 'undefined' ? cardLevels : {}),
                     cardSkins: currentData?.cardSkins || (typeof cardSkins !== 'undefined' ? cardSkins : {}),
+                    cardMoHua: currentData?.cardMoHua || (typeof cardMoHua !== 'undefined' ? cardMoHua : {}),
                     myDeckInfo: currentData?.myDeckInfo || safeMyDeckInfo,
                     teammateDeckInfo: currentData?.teammateDeckInfo || safeTeammateDeckInfo,
                     notepad: currentData?.notepad || safeNotepad,
@@ -8573,6 +8587,7 @@
                         teammatePlacedCards = Array.isArray(project.teammatePlacedCards) ? project.teammatePlacedCards : [];
                         cardLevels = project.cardLevels || {};
                         cardSkins = project.cardSkins || {};
+                        cardMoHua = project.cardMoHua || {};
                         
                         if (document.getElementById('myDeckInfo')) {
                             document.getElementById('myDeckInfo').value = project.myDeckInfo || '';
@@ -8913,6 +8928,7 @@
                     teammatePlacedCards: typeof teammatePlacedCards !== 'undefined' ? teammatePlacedCards : [],
                     cardLevels: typeof cardLevels !== 'undefined' ? cardLevels : {},
                     cardSkins: typeof cardSkins !== 'undefined' ? cardSkins : {},
+                    cardMoHua: typeof cardMoHua !== 'undefined' ? cardMoHua : {},
                     myDeckInfo: document.getElementById('myDeckInfo')?.value || '',
                     teammateDeckInfo: document.getElementById('teammateDeckInfo')?.value || '',
                     notepad: document.getElementById('notepad')?.value || '',
@@ -9093,6 +9109,7 @@
                     teammatePlacedCards: typeof teammatePlacedCards !== 'undefined' ? teammatePlacedCards : [],
                     cardLevels: typeof cardLevels !== 'undefined' ? cardLevels : {},
                     cardSkins: typeof cardSkins !== 'undefined' ? cardSkins : {},
+                    cardMoHua: typeof cardMoHua !== 'undefined' ? cardMoHua : {},
                     myDeckInfo: document.getElementById('myDeckInfo')?.value || '',
                     teammateDeckInfo: document.getElementById('teammateDeckInfo')?.value || '',
                     notepad: document.getElementById('notepad')?.value || '',
@@ -10002,6 +10019,7 @@
                         teammatePlacedCards: teammatePlacedCards,
                         cardLevels: cardLevels,
                         cardSkins: cardSkins,
+                        cardMoHua: cardMoHua,
                         myDeckInfo: myDeckInfo,
                         teammateDeckInfo: teammateDeckInfo,
                         notepad: notepad,
@@ -10082,6 +10100,7 @@
         let cardLevels = {};
         let individualCardLevels = {}; // 每张卡的独立等级存储
         let cardSkins = {}; // 每张卡的皮肤存储 { "my_47": "烈焰皮肤", ... }
+        let cardMoHua = {}; // 每张卡的魔化开关 { "my_47": true, ... }
         let professionOrder = [];
         const MAX_HAND_CARDS = 10;
         const MAX_PLACED_CARDS = 7;
@@ -10111,18 +10130,24 @@
         // 用户自定义皮肤（可手动添加，保存在localStorage）
         let customCardSkins = {};
         
-        // 获取卡牌可用的皮肤列表（默认 + 自定义 + SKIN_ATTRIBUTES自动提取）
+        // 获取卡牌可用的皮肤列表（默认 + 自定义 + SKIN_ATTRIBUTES自动提取，排除魔化）
         function getAvailableSkins(cardName) {
             const mainCardName = getMainCardName(cardName);
             const defaultSkins = DEFAULT_CARD_SKINS[mainCardName] || ["默认"];
             const customSkins = customCardSkins[mainCardName] || [];
-            // 自动从 SKIN_ATTRIBUTES 提取所有皮肤名称（包括魔化）
+            // 自动从 SKIN_ATTRIBUTES 提取所有皮肤名称（排除魔化）
             const attrSkins = [];
             if (SKIN_ATTRIBUTES[mainCardName]) {
-                attrSkins.push(...Object.keys(SKIN_ATTRIBUTES[mainCardName]));
+                attrSkins.push(...Object.keys(SKIN_ATTRIBUTES[mainCardName]).filter(k => k !== '魔化'));
             }
             const allSkins = [...new Set([...defaultSkins, ...customSkins, ...attrSkins])];
             return allSkins;
+        }
+        
+        // 检查卡牌是否有魔化数据
+        function hasMoHuaData(cardName) {
+            const mainCardName = getMainCardName(cardName);
+            return SKIN_ATTRIBUTES[mainCardName] && SKIN_ATTRIBUTES[mainCardName]['魔化'];
         }
         
         function getMainCardName(cardName) {
@@ -10870,6 +10895,36 @@
             }
         };
         
+        // 获取卡牌魔化状态
+        function getCardMoHua(cardId, handType = 'my') {
+            const key = `${handType}_${cardId}`;
+            return cardMoHua[key] === true;
+        }
+        
+        // 设置卡牌魔化状态
+        function setCardMoHua(cardId, enabled, handType = 'my') {
+            const key = `${handType}_${cardId}`;
+            if (enabled) {
+                cardMoHua[key] = true;
+            } else {
+                delete cardMoHua[key];
+            }
+            saveCardMoHua();
+        }
+        
+        // 保存魔化数据到localStorage
+        function saveCardMoHua() {
+            localStorage.setItem('tdjl_cardMoHua', JSON.stringify(cardMoHua));
+        }
+        
+        // 加载魔化数据
+        function loadCardMoHua() {
+            const saved = localStorage.getItem('tdjl_cardMoHua');
+            if (saved) {
+                cardMoHua = JSON.parse(saved);
+            }
+        }
+        
         // 获取卡牌当前皮肤
         function getCardSkin(cardId, cardName, handType = 'my') {
             const key = `${handType}_${cardId}`;
@@ -10899,8 +10954,8 @@
             }
         }
         
-        // 获取皮肤属性描述
-        function getSkinAttribute(cardName, skinName) {
+        // 获取皮肤属性描述（含魔化）
+        function getSkinAttribute(cardName, skinName, includeMoHua = false) {
             const mainCardName = getMainCardName(cardName);
             let defaultAttr = null;
             if (SKIN_ATTRIBUTES[mainCardName] && SKIN_ATTRIBUTES[mainCardName]["默认"]) {
@@ -10908,21 +10963,40 @@
             } else if (customSkinAttributes[mainCardName] && customSkinAttributes[mainCardName]["默认"]) {
                 defaultAttr = customSkinAttributes[mainCardName]["默认"];
             }
-            if (skinName === "默认") {
+            if (skinName === "默认" && !includeMoHua) {
                 return defaultAttr || { desc: "无特殊属性" };
             }
-            let skinAttr = null;
-            if (SKIN_ATTRIBUTES[mainCardName] && SKIN_ATTRIBUTES[mainCardName][skinName]) {
-                skinAttr = SKIN_ATTRIBUTES[mainCardName][skinName];
-            } else if (customSkinAttributes[mainCardName] && customSkinAttributes[mainCardName][skinName]) {
-                skinAttr = customSkinAttributes[mainCardName][skinName];
+            
+            let descParts = [];
+            if (defaultAttr) descParts.push(defaultAttr.desc);
+            
+            // 皮肤属性
+            if (skinName !== "默认") {
+                let skinAttr = null;
+                if (SKIN_ATTRIBUTES[mainCardName] && SKIN_ATTRIBUTES[mainCardName][skinName]) {
+                    skinAttr = SKIN_ATTRIBUTES[mainCardName][skinName];
+                } else if (customSkinAttributes[mainCardName] && customSkinAttributes[mainCardName][skinName]) {
+                    skinAttr = customSkinAttributes[mainCardName][skinName];
+                }
+                if (skinAttr) {
+                    descParts.push(`【${skinName}】\n${skinAttr.desc}`);
+                }
             }
-            if (skinAttr && defaultAttr) {
-                return {
-                    desc: `${defaultAttr.desc}\n\n【${skinName}】\n${skinAttr.desc}`
-                };
+            
+            // 魔化属性
+            if (includeMoHua) {
+                let mohuaAttr = null;
+                if (SKIN_ATTRIBUTES[mainCardName] && SKIN_ATTRIBUTES[mainCardName]["魔化"]) {
+                    mohuaAttr = SKIN_ATTRIBUTES[mainCardName]["魔化"];
+                } else if (customSkinAttributes[mainCardName] && customSkinAttributes[mainCardName]["魔化"]) {
+                    mohuaAttr = customSkinAttributes[mainCardName]["魔化"];
+                }
+                if (mohuaAttr) {
+                    descParts.push(`【魔化】\n${mohuaAttr.desc}`);
+                }
             }
-            return skinAttr || defaultAttr || { desc: "无特殊属性" };
+            
+            return { desc: descParts.join('\n\n') || '无特殊属性' };
         }
 
         // ==================== 卡牌等级管理 ====================
@@ -10997,9 +11071,16 @@
         function createLevelBadgeHTML(cardId, cardType, handType = 'my', cardName = '') {
             const level = getCardLevel(cardId, cardType, handType);
             const skin = getCardSkin(cardId, cardName, handType);
+            const hasMoHua = getCardMoHua(cardId, handType);
             const hasCustomSkin = skin !== '默认';
-            const skinClass = hasCustomSkin ? 'has-skin' : '';
-            const levelBadge = `<span class="card-level-badge ${skinClass}" data-card-id="${cardId}" data-card-type="${cardType}" data-hand-type="${handType}" data-card-name="${cardName}" data-skin="${skin}" title="等级:${level} 皮肤:${skin}">${level}</span>`;
+            let skinClass = '';
+            if (hasCustomSkin && hasMoHua) skinClass = 'has-skin has-mohua';
+            else if (hasCustomSkin) skinClass = 'has-skin';
+            else if (hasMoHua) skinClass = 'has-mohua';
+            const titleParts = [`等级:${level}`];
+            if (hasCustomSkin) titleParts.push(`皮肤:${skin}`);
+            if (hasMoHua) titleParts.push('魔化:已开启');
+            const levelBadge = `<span class="card-level-badge ${skinClass}" data-card-id="${cardId}" data-card-type="${cardType}" data-hand-type="${handType}" data-card-name="${cardName}" data-skin="${skin}" title="${titleParts.join(' ')}">${level}${hasMoHua ? '🔮' : ''}</span>`;
             return levelBadge;
         }
 
@@ -11016,6 +11097,8 @@
             const currentLevel = getCardLevel(cardId, cardType, handType);
             const skins = getAvailableSkins(cardName);
             const currentSkin = getCardSkin(cardId, cardName, handType);
+            const currentMoHua = getCardMoHua(cardId, handType);
+            const canMoHua = hasMoHuaData(cardName);
 
             const dropdown = document.createElement('div');
             dropdown.className = 'level-dropdown';
@@ -11033,13 +11116,13 @@
                 item.onclick = (e) => {
                     e.stopPropagation();
                     setCardLevel(cardId, level, cardType, handType);
-                    badge.textContent = level + (currentSkin !== '默认' ? '🎨' : '');
                     dropdown.remove();
+                    updateAllCardLevelBadges();
                 };
                 dropdown.appendChild(item);
             });
             
-            // 皮肤选择区域（始终显示，因为可以添加自定义皮肤）
+            // 皮肤选择区域
             const skinTitle = document.createElement('div');
             skinTitle.style.cssText = 'color:#ff9800;font-size:0.75rem;padding:5px 10px;border-top:1px solid rgba(255,255,255,0.1);margin-top:5px;border-bottom:1px solid rgba(255,255,255,0.1);';
             skinTitle.textContent = '🎨 皮肤';
@@ -11053,8 +11136,6 @@
                 item.onclick = (e) => {
                     e.stopPropagation();
                     setCardSkin(cardId, skin, handType);
-                    badge.textContent = currentLevel + (skin !== '默认' ? '🎨' : '');
-                    badge.dataset.skin = skin;
                     dropdown.remove();
                     updateAllCardLevelBadges();
                 };
@@ -11072,6 +11153,28 @@
                 showAddSkinDialog(cardName, cardId, cardType, handType, badge, currentLevel);
             };
             dropdown.appendChild(addSkinItem);
+            
+            // 魔化开关区域（仅有魔化数据的卡才显示）
+            if (canMoHua) {
+                const mohuaTitle = document.createElement('div');
+                mohuaTitle.style.cssText = 'color:#a855f7;font-size:0.75rem;padding:5px 10px;border-top:1px solid rgba(255,255,255,0.1);margin-top:5px;border-bottom:1px solid rgba(255,255,255,0.1);';
+                mohuaTitle.textContent = '🔮 魔化';
+                dropdown.appendChild(mohuaTitle);
+                
+                const mohuaItem = document.createElement('div');
+                mohuaItem.className = 'level-dropdown-item' + (currentMoHua ? ' selected' : '');
+                mohuaItem.style.cssText = `cursor:pointer;padding:8px 15px;color:${currentMoHua ? '#a855f7' : '#fff'};font-size:0.85rem;transition:background 0.2s;`;
+                mohuaItem.textContent = currentMoHua ? '✅ 魔化已开启' : '魔化未开启';
+                mohuaItem.onmouseenter = () => mohuaItem.style.background = 'rgba(168,85,247,0.2)';
+                mohuaItem.onmouseleave = () => mohuaItem.style.background = 'transparent';
+                mohuaItem.onclick = (e) => {
+                    e.stopPropagation();
+                    setCardMoHua(cardId, !currentMoHua, handType);
+                    dropdown.remove();
+                    updateAllCardLevelBadges();
+                };
+                dropdown.appendChild(mohuaItem);
+            }
             
             // 将下拉框添加到body，使用fixed定位
             document.body.appendChild(dropdown);
@@ -11243,7 +11346,8 @@
             clearTimeout(tooltipTimeout);
             
             const skin = getCardSkin(cardId, cardName, handType);
-            const skinAttr = getSkinAttribute(cardName, skin);
+            const hasMoHua = getCardMoHua(cardId, handType);
+            const skinAttr = getSkinAttribute(cardName, skin, hasMoHua);
             const mainCardName = getMainCardName(cardName);
             const displayCardName = mainCardName !== cardName ? `${cardName} (${mainCardName})` : cardName;
             
@@ -11251,18 +11355,21 @@
             
             const formattedDesc = skinAttr.desc.replace(/\n/g, '<br>');
             
+            let infoLines = '';
+            infoLines += `<div style="margin-bottom:6px;"><span style="color:#4ecdc4;">皮肤：</span><span style="color:#fff;">${skin}</span></div>`;
+            if (hasMoHuaData(cardName)) {
+                infoLines += `<div style="margin-bottom:6px;"><span style="color:#a855f7;">魔化：</span><span style="color:${hasMoHua ? '#a855f7' : '#666'};">${hasMoHua ? '✅ 已开启' : '未开启'}</span></div>`;
+            }
+            
             skinTooltip.innerHTML = `
                 <div style="color:#ffd700;font-weight:bold;margin-bottom:8px;font-size:0.9rem;">🎨 ${displayCardName}</div>
-                <div style="margin-bottom:6px;">
-                    <span style="color:#4ecdc4;">皮肤：</span>
-                    <span style="color:#fff;">${skin}</span>
-                </div>
+                ${infoLines}
                 <div style="color:#888;font-size:0.8rem;">
                     <span style="color:#ff9800;">属性：</span><br>
                     <span style="color:#ccc;">${formattedDesc}</span>
                 </div>
                 <div style="color:#666;font-size:0.7rem;margin-top:8px;border-top:1px solid rgba(255,255,255,0.1);padding-top:6px;">
-                    点击皮肤图标可设置皮肤
+                    点击等级徽章可设置皮肤和魔化
                 </div>
             `;
             
@@ -11322,6 +11429,8 @@
             
             const skins = getAvailableSkins(cardName);
             const currentSkin = getCardSkin(cardId, cardName, handType);
+            const currentMoHua = getCardMoHua(cardId, handType);
+            const canMoHua = hasMoHuaData(cardName);
             
             const dropdown = document.createElement('div');
             dropdown.className = 'skin-dropdown';
@@ -11336,7 +11445,7 @@
                 box-shadow: 0 5px 20px rgba(0,0,0,0.5);
             `;
             
-            // 标题
+            // 皮肤标题
             const title = document.createElement('div');
             title.style.cssText = 'color:#ff9800;font-size:0.75rem;padding:5px 10px;border-bottom:1px solid rgba(255,255,255,0.1);';
             title.textContent = `🎨 ${cardName}`;
@@ -11375,6 +11484,28 @@
                 showAddSkinDialog(cardName, cardId, null, handType, null, null);
             };
             dropdown.appendChild(addSkinItem);
+            
+            // 魔化开关区域（仅有魔化数据的卡才显示）
+            if (canMoHua) {
+                const mohuaTitle = document.createElement('div');
+                mohuaTitle.style.cssText = 'color:#a855f7;font-size:0.75rem;padding:5px 10px;border-top:1px solid rgba(255,255,255,0.1);margin-top:5px;border-bottom:1px solid rgba(255,255,255,0.1);';
+                mohuaTitle.textContent = '🔮 魔化';
+                dropdown.appendChild(mohuaTitle);
+                
+                const mohuaItem = document.createElement('div');
+                mohuaItem.className = 'skin-dropdown-item';
+                mohuaItem.style.cssText = `cursor:pointer;padding:8px 15px;color:${currentMoHua ? '#a855f7' : '#fff'};font-size:0.85rem;transition:background 0.2s;`;
+                mohuaItem.textContent = currentMoHua ? '✅ 魔化已开启' : '魔化未开启';
+                mohuaItem.onmouseenter = () => mohuaItem.style.background = 'rgba(168,85,247,0.2)';
+                mohuaItem.onmouseleave = () => mohuaItem.style.background = 'transparent';
+                mohuaItem.onclick = (e) => {
+                    e.stopPropagation();
+                    setCardMoHua(cardId, !currentMoHua, handType);
+                    dropdown.remove();
+                    updateAllCardLevelBadges();
+                };
+                dropdown.appendChild(mohuaItem);
+            }
             
             document.body.appendChild(dropdown);
             
@@ -13604,6 +13735,7 @@
             loadCardLevels();
             loadIndividualCardLevels();
             loadCardSkins();
+            loadCardMoHua();
             loadCustomSkins();
             loadCustomSkinAttributes();
             loadCustomCards();
