@@ -8586,8 +8586,11 @@
                         myPlacedCards = Array.isArray(project.myPlacedCards) ? project.myPlacedCards : [];
                         teammatePlacedCards = Array.isArray(project.teammatePlacedCards) ? project.teammatePlacedCards : [];
                         cardLevels = project.cardLevels || {};
-                        cardSkins = project.cardSkins || {};
-                        cardMoHua = project.cardMoHua || {};
+                        // 合并而非覆盖：项目数据优先，但保留localStorage中已有但项目中没有的皮肤
+                        const projectSkins = project.cardSkins || {};
+                        const projectMoHua = project.cardMoHua || {};
+                        cardSkins = { ...cardSkins, ...projectSkins };
+                        cardMoHua = { ...cardMoHua, ...projectMoHua };
                         
                         if (document.getElementById('myDeckInfo')) {
                             document.getElementById('myDeckInfo').value = project.myDeckInfo || '';
@@ -10147,6 +10150,9 @@
         // 检查卡牌是否有魔化数据
         function hasMoHuaData(cardName) {
             const mainCardName = getMainCardName(cardName);
+            // 精灵卡不支持魔化，直接返回false
+            const jingLingNames = ['冰精灵', '光精灵', '魔精灵', '木精灵', '土精灵', '雷精灵', '暗精灵', '幻精灵', '魂精灵', '彩精灵'];
+            if (jingLingNames.some(jl => mainCardName.includes(jl))) return false;
             return SKIN_ATTRIBUTES[mainCardName] && SKIN_ATTRIBUTES[mainCardName]['魔化'];
         }
         
@@ -10910,6 +10916,7 @@
                 delete cardMoHua[key];
             }
             saveCardMoHua();
+            if (typeof autoSaveProject === 'function') autoSaveProject();
         }
         
         // 保存魔化数据到localStorage
@@ -10939,6 +10946,7 @@
             const key = `${handType}_${cardId}`;
             cardSkins[key] = skin;
             saveCardSkins();
+            if (typeof autoSaveProject === 'function') autoSaveProject();
         }
         
         // 保存皮肤数据到localStorage
