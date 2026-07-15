@@ -11077,10 +11077,7 @@
             if (hasCustomSkin && hasMoHua) skinClass = 'has-skin has-mohua';
             else if (hasCustomSkin) skinClass = 'has-skin';
             else if (hasMoHua) skinClass = 'has-mohua';
-            const titleParts = [`等级:${level}`];
-            if (hasCustomSkin) titleParts.push(`皮肤:${skin}`);
-            if (hasMoHua) titleParts.push('魔化:已开启');
-            const levelBadge = `<span class="card-level-badge ${skinClass}" data-card-id="${cardId}" data-card-type="${cardType}" data-hand-type="${handType}" data-card-name="${cardName}" data-skin="${skin}" title="${titleParts.join(' ')}">${level}${hasMoHua ? '🔮' : ''}</span>`;
+            const levelBadge = `<span class="card-level-badge ${skinClass}" data-card-id="${cardId}" data-card-type="${cardType}" data-hand-type="${handType}" data-card-name="${cardName}" data-skin="${skin}">${level}${hasMoHua ? '🔮' : ''}</span>`;
             return levelBadge;
         }
 
