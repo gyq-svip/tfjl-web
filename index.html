@@ -790,17 +790,17 @@
 
         .card-level-badge {
             position: absolute;
-            top: 2px;
-            right: 2px;
+            top: -4px;
+            right: -4px;
             background: rgba(0, 0, 0, 0.7);
             color: #ffd700;
-            font-size: 0.65rem;
+            font-size: 0.6rem;
             font-weight: bold;
-            padding: 1px 4px;
+            padding: 1px 3px;
             border-radius: 4px;
             z-index: 10;
             cursor: pointer;
-            min-width: 16px;
+            min-width: 14px;
             text-align: center;
             line-height: 1.2;
         }
@@ -11373,35 +11373,24 @@
                 </div>
             `;
             
-            // 计算位置
+            // 计算位置 — 悬浮窗显示在角标下方，角标始终在悬浮窗上方不被遮挡
             const rect = event.target.getBoundingClientRect();
-            let left = rect.right + 10;
-            let top = rect.top + rect.height / 2 - 20; // 垂直居中对齐角标
+            let left = rect.left;
+            let top = rect.bottom + 6;
 
-            // 如果超出右侧，显示在左边
+            // 水平方向：优先左对齐角标，超出右侧则右对齐
             if (left + 250 > window.innerWidth) {
-                left = rect.left - 260;
+                left = window.innerWidth - 255;
             }
+            if (left < 5) left = 5;
 
-            // 如果超出底部
+            // 如果超出底部，则改显示在角标上方
             if (top + skinTooltip.offsetHeight > window.innerHeight) {
-                top = window.innerHeight - skinTooltip.offsetHeight - 10;
+                top = rect.top - skinTooltip.offsetHeight - 6;
             }
-
-            // 如果超出顶部
             if (top < 5) {
                 top = 5;
             }
-
-            // 淡化其他角标，突出当前角标，避免悬浮窗遮挡其他角标造成视觉混乱
-            const currentBadge = event.target.closest ? event.target.closest('.card-level-badge') : event.target;
-            document.querySelectorAll('.card-level-badge').forEach(badge => {
-                if (badge !== currentBadge) {
-                    badge.style.opacity = '0.2';
-                } else {
-                    badge.style.opacity = '1';
-                }
-            });
 
             skinTooltip.style.left = left + 'px';
             skinTooltip.style.top = top + 'px';
@@ -11414,10 +11403,6 @@
             if (skinTooltip) {
                 skinTooltip.style.opacity = '0';
             }
-            // 恢复所有角标透明度
-            document.querySelectorAll('.card-level-badge').forEach(badge => {
-                badge.style.opacity = '';
-            });
         }
         
         // 延迟显示tooltip（悬停0.8秒后显示）
