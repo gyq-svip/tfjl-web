@@ -11376,18 +11376,33 @@
             // 计算位置
             const rect = event.target.getBoundingClientRect();
             let left = rect.right + 10;
-            let top = rect.top;
-            
+            let top = rect.top + rect.height / 2 - 20; // 垂直居中对齐角标
+
             // 如果超出右侧，显示在左边
             if (left + 250 > window.innerWidth) {
                 left = rect.left - 260;
             }
-            
+
             // 如果超出底部
             if (top + skinTooltip.offsetHeight > window.innerHeight) {
                 top = window.innerHeight - skinTooltip.offsetHeight - 10;
             }
-            
+
+            // 如果超出顶部
+            if (top < 5) {
+                top = 5;
+            }
+
+            // 淡化其他角标，突出当前角标，避免悬浮窗遮挡其他角标造成视觉混乱
+            const currentBadge = event.target.closest ? event.target.closest('.card-level-badge') : event.target;
+            document.querySelectorAll('.card-level-badge').forEach(badge => {
+                if (badge !== currentBadge) {
+                    badge.style.opacity = '0.2';
+                } else {
+                    badge.style.opacity = '1';
+                }
+            });
+
             skinTooltip.style.left = left + 'px';
             skinTooltip.style.top = top + 'px';
             skinTooltip.style.opacity = '1';
@@ -11399,6 +11414,10 @@
             if (skinTooltip) {
                 skinTooltip.style.opacity = '0';
             }
+            // 恢复所有角标透明度
+            document.querySelectorAll('.card-level-badge').forEach(badge => {
+                badge.style.opacity = '';
+            });
         }
         
         // 延迟显示tooltip（悬停0.8秒后显示）
