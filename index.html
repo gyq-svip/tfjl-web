@@ -15316,10 +15316,12 @@ function hasGistToken() {
                     counterData.daily_stats[today] = {
                         visits: 0,
                         downloads: 0,
-                        new_users: 0
+                        new_users: 0,
+                        hourly_visits: new Array(24).fill(0)
                     };
                 }
                 if (!counterData.daily_stats[today].new_users) counterData.daily_stats[today].new_users = 0;
+                if (!counterData.daily_stats[today].hourly_visits) counterData.daily_stats[today].hourly_visits = new Array(24).fill(0);
                 // 确保 unique_users 和 active_today_users 数组存在
                 if (!counterData.unique_users) counterData.unique_users = [];
                 if (!counterData.active_today_users) counterData.active_today_users = [];
@@ -15353,6 +15355,11 @@ function hasGistToken() {
                     case 'visit':
                         counterData.total_visits++;
                         counterData.daily_stats[today].visits++;
+                        // 记录访问时段
+                        const hour = new Date().getHours();
+                        if (counterData.daily_stats[today].hourly_visits) {
+                            counterData.daily_stats[today].hourly_visits[hour]++;
+                        }
                         
                         // 记录新用户
                         if (!counterData.unique_users.includes(deviceId)) {
@@ -18338,6 +18345,8 @@ function hasGistToken() {
             if (cachePage) cachePage.style.display = 'none';
             const scriptStatsPage = document.getElementById('adminPageScriptStats');
             if (scriptStatsPage) scriptStatsPage.style.display = 'none';
+            const analyticsPage = document.getElementById('adminPageAnalytics');
+            if (analyticsPage) analyticsPage.style.display = 'none';
             updateBroadcastToggleStatus();
         }
 
@@ -18367,6 +18376,11 @@ function hasGistToken() {
             } else if (page === 'stats') {
                 document.getElementById('adminPageStats').style.display = 'block';
                 adminLoadStats();
+            } else if (page === 'analytics') {
+                if (analyticsPage) {
+                    analyticsPage.style.display = 'block';
+                    adminLoadAnalytics();
+                }
             } else if (page === 'scriptStats') {
                 if (scriptStatsPage) {
                     scriptStatsPage.style.display = 'block';
@@ -19533,6 +19547,185 @@ function hasGistToken() {
             openChatRoomEntry();
         }
 
+        // ==================== 数据分析 ====================
+        async function adminLoadAnalytics() {
+            const content = document.getElementById('adminAnalyticsContent');
+            content.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;">📊 加载中...</div>';
+
+            // 从 Gist 获取最新数据
+            let data = null;
+            try {
+                data = await fetchCounterFromGist();
+            } catch (e) {
+                console.warn('获取统计数据失败:', e);
+            }
+            if (!data) data = counterData || getDefaultCounter();
+
+            const today = getTodayString();
+            const dailyStats = data.daily_stats || {};
+            const sortedDates = Object.keys(dailyStats).sort();
+
+            // 取最近30天
+            const recentDates = sortedDates.slice(-30);
+
+            // 统计数据
+            const totalVisits = data.total_visits || 0;
+            const totalUsers = (data.unique_users || []).length;
+            const todayStats = dailyStats[today] || { visits: 0, downloads: 0, new_users: 0, hourly_visits: new Array(24).fill(0) };
+            const activeToday = (data.active_today_users || []).length;
+            const onlineCount = Object.keys(data.online_users || {}).length;
+
+            // 计算最近7天和30天的访问量、新用户数
+            let last7Visits = 0, last7NewUsers = 0;
+            let last30Visits = 0, last30NewUsers = 0;
+            const last7Dates = sortedDates.slice(-7);
+            recentDates.forEach(d => {
+                const s = dailyStats[d];
+                if (s) {
+                    last30Visits += (s.visits || 0);
+                    last30NewUsers += (s.new_users || 0);
+                }
+            });
+            last7Dates.forEach(d => {
+                const s = dailyStats[d];
+                if (s) {
+                    last7Visits += (s.visits || 0);
+                    last7NewUsers += (s.new_users || 0);
+                }
+            });
+
+            // 计算昨天和前天的访问量用于趋势
+            const yesterdayIdx = sortedDates.length - 2;
+            const yesterday = yesterdayIdx >= 0 ? sortedDates[yesterdayIdx] : null;
+            const yesterdayVisits = yesterday ? (dailyStats[yesterday].visits || 0) : 0;
+            const todayVisits = todayStats.visits || 0;
+            const visitTrend = yesterdayVisits > 0 ? ((todayVisits - yesterdayVisits) / yesterdayVisits * 100) : 0;
+
+            // 时段统计（汇总所有有数据的天数）
+            const hourlyAgg = new Array(24).fill(0);
+            recentDates.forEach(d => {
+                const s = dailyStats[d];
+                if (s && s.hourly_visits) {
+                    for (let h = 0; h < 24; h++) {
+                        hourlyAgg[h] += (s.hourly_visits[h] || 0);
+                    }
+                }
+            });
+
+            // 找出访问高峰时段
+            let peakHour = 0, peakHourVal = 0;
+            for (let h = 0; h < 24; h++) {
+                if (hourlyAgg[h] > peakHourVal) { peakHourVal = hourlyAgg[h]; peakHour = h; }
+            }
+
+            // 构建 HTML
+            let html = '';
+
+            // 概览卡片
+            html += `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:20px;">`;
+            html += analyticsCard('总访问', totalVisits, '🔵');
+            html += analyticsCard('总用户', totalUsers, '🟢');
+            html += analyticsCard('今日访问', todayVisits, `📈 ${visitTrend >= 0 ? '↑' : '↓'}${Math.abs(visitTrend).toFixed(0)}%`, visitTrend >= 0 ? '#4caf50' : '#ef4444');
+            html += analyticsCard('今日新用户', todayStats.new_users || 0, '🆕');
+            html += analyticsCard('今日活跃', activeToday, '🔥');
+            html += analyticsCard('当前在线', onlineCount, '⚡');
+            html += `</div>`;
+
+            // 最近7天摘要
+            html += `<div style="background:rgba(255,255,255,0.05);border-radius:10px;padding:15px;margin-bottom:20px;">`;
+            html += `<div style="color:#4ecdc4;font-size:0.9rem;margin-bottom:8px;">📋 近期摘要</div>`;
+            html += `<div style="display:flex;gap:20px;flex-wrap:wrap;font-size:0.85rem;">`;
+            html += `<span>最近7天访问：<b style="color:#ffd700;">${last7Visits}</b></span>`;
+            html += `<span>最近7天新用户：<b style="color:#4caf50;">${last7NewUsers}</b></span>`;
+            html += `<span>最近30天访问：<b style="color:#ffd700;">${last30Visits}</b></span>`;
+            html += `<span>最近30天新用户：<b style="color:#4caf50;">${last30NewUsers}</b></span>`;
+            html += `</div></div>`;
+
+            // 日访问趋势图（柱状图）
+            if (recentDates.length > 0) {
+                const maxVisits = Math.max(...recentDates.map(d => (dailyStats[d].visits || 0)), 1);
+                html += `<div style="background:rgba(255,255,255,0.05);border-radius:10px;padding:15px;margin-bottom:20px;">`;
+                html += `<div style="color:#4ecdc4;font-size:0.9rem;margin-bottom:15px;">📊 日访问趋势（最近${recentDates.length}天）</div>`;
+                html += `<div style="display:flex;align-items:flex-end;gap:2px;height:180px;overflow-x:auto;padding-bottom:25px;position:relative;border-bottom:1px solid rgba(255,255,255,0.1);">`;
+                recentDates.forEach(d => {
+                    const s = dailyStats[d];
+                    const v = s.visits || 0;
+                    const newU = s.new_users || 0;
+                    const barH = Math.max((v / maxVisits) * 150, 2);
+                    const newBarH = v > 0 ? Math.max((newU / v) * barH, 0) : 0;
+                    const dateLabel = d.substring(5); // MM-DD
+                    const isToday = d === today;
+                    html += `<div style="flex:0 0 24px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;position:relative;" title="${d}\n访问: ${v}\n新用户: ${newU}">`;
+                    html += `<div style="position:absolute;top:-16px;font-size:0.65rem;color:#ffd700;white-space:nowrap;">${v > 0 ? v : ''}</div>`;
+                    html += `<div style="width:18px;background:linear-gradient(180deg,#00bcd4,#00838f);border-radius:3px 3px 0 0;height:${barH}px;position:relative;">`;
+                    if (newBarH > 0) {
+                        html += `<div style="position:absolute;bottom:0;width:100%;background:linear-gradient(180deg,#4caf50,#2e7d32);border-radius:0 0 0 0;height:${newBarH}px;"></div>`;
+                    }
+                    html += `</div>`;
+                    html += `<div style="position:absolute;bottom:-20px;font-size:0.6rem;color:${isToday ? '#ffd700' : 'rgba(255,255,255,0.4)'};white-space:nowrap;">${dateLabel}</div>`;
+                    html += `</div>`;
+                });
+                html += `</div>`;
+                html += `<div style="display:flex;gap:15px;margin-top:10px;font-size:0.75rem;">`;
+                html += `<span><span style="display:inline-block;width:12px;height:12px;background:#00bcd4;border-radius:2px;vertical-align:middle;"></span> 访问量</span>`;
+                html += `<span><span style="display:inline-block;width:12px;height:12px;background:#4caf50;border-radius:2px;vertical-align:middle;"></span> 新用户</span>`;
+                html += `</div></div>`;
+            }
+
+            // 时段分布图
+            const maxHourly = Math.max(...hourlyAgg, 1);
+            html += `<div style="background:rgba(255,255,255,0.05);border-radius:10px;padding:15px;margin-bottom:20px;">`;
+            html += `<div style="color:#4ecdc4;font-size:0.9rem;margin-bottom:8px;">🕐 访问时段分布（最近${recentDates.length}天累计）</div>`;
+            html += `<div style="color:rgba(255,255,255,0.5);font-size:0.8rem;margin-bottom:15px;">高峰时段: <b style="color:#ffd700;">${peakHour}:00-${peakHour + 1}:00</b> (共${peakHourVal}次访问)</div>`;
+            html += `<div style="display:flex;align-items:flex-end;gap:1px;height:150px;padding-bottom:25px;position:relative;border-bottom:1px solid rgba(255,255,255,0.1);">`;
+            for (let h = 0; h < 24; h++) {
+                const v = hourlyAgg[h];
+                const barH = Math.max((v / maxHourly) * 120, 1);
+                const isPeak = h === peakHour;
+                html += `<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;position:relative;" title="${h}:00 - ${h+1}:00\n访问: ${v}次">`;
+                if (v > 0) {
+                    html += `<div style="position:absolute;top:-14px;font-size:0.6rem;color:${isPeak ? '#ffd700' : 'rgba(255,255,255,0.4)'};white-space:nowrap;">${v}</div>`;
+                }
+                html += `<div style="width:80%;background:${isPeak ? 'linear-gradient(180deg,#ffd700,#ff9800)' : 'linear-gradient(180deg,#7c4dff,#512da8)'};border-radius:2px 2px 0 0;height:${barH}px;"></div>`;
+                html += `<div style="position:absolute;bottom:-18px;font-size:0.55rem;color:rgba(255,255,255,0.4);">${h}</div>`;
+                html += `</div>`;
+            }
+            html += `</div></div>`;
+
+            // 新用户日趋势（列表）
+            const recentNewUsers = recentDates.slice(-15).reverse().map(d => {
+                const s = dailyStats[d];
+                return { date: d, newUsers: s.new_users || 0, visits: s.visits || 0 };
+            }).filter(x => x.newUsers > 0);
+
+            if (recentNewUsers.length > 0) {
+                html += `<div style="background:rgba(255,255,255,0.05);border-radius:10px;padding:15px;margin-bottom:20px;">`;
+                html += `<div style="color:#4ecdc4;font-size:0.9rem;margin-bottom:10px;">🆕 近期新用户记录</div>`;
+                html += `<div style="max-height:200px;overflow-y:auto;">`;
+                recentNewUsers.forEach(x => {
+                    html += `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.05);font-size:0.85rem;">`;
+                    html += `<span style="color:rgba(255,255,255,0.7);">${x.date}</span>`;
+                    html += `<span><b style="color:#4caf50;">+${x.newUsers}</b> 新用户 <span style="color:rgba(255,255,255,0.4);font-size:0.8rem;">(当日访问${x.visits})</span></span>`;
+                    html += `</div>`;
+                });
+                html += `</div></div>`;
+            }
+
+            // 数据更新时间
+            html += `<div style="color:rgba(255,255,255,0.3);font-size:0.8rem;text-align:center;padding:10px;">最后更新: ${data.last_updated || '未知'}</div>`;
+
+            content.innerHTML = html;
+        }
+
+        function analyticsCard(label, value, icon, trendColor) {
+            const color = trendColor || '#ffd700';
+            return `<div style="background:rgba(255,255,255,0.08);border-radius:10px;padding:12px;text-align:center;">
+                <div style="font-size:1.2rem;">${typeof icon === 'string' && icon.length > 2 ? icon : '📊'}</div>
+                <div style="color:${color};font-size:1.3rem;font-weight:bold;margin:4px 0;">${value}</div>
+                <div style="color:rgba(255,255,255,0.5);font-size:0.75rem;">${label}</div>
+            </div>`;
+        }
+
         function adminLoadStats() {
             const content = document.getElementById('adminStatsContent');
 
@@ -19767,6 +19960,12 @@ function hasGistToken() {
                         <span style="font-size:1.1rem;">📊</span>
                         <div style="margin-left:8px;">
                             <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">访问统计</div>
+                        </div>
+                    </div>
+                    <div class="admin-menu-item" onclick="adminShowPage('analytics')" style="padding:10px;">
+                        <span style="font-size:1.1rem;">📈</span>
+                        <div style="margin-left:8px;">
+                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">数据分析</div>
                         </div>
                     </div>
                     <div class="admin-menu-item" onclick="adminShowPage('scriptStats')" style="padding:10px;">
@@ -20125,6 +20324,17 @@ function hasGistToken() {
                     <h3 style="color:#ffd700;margin:0;font-size:1rem;">📊 访问统计</h3>
                 </div>
                 <div id="adminStatsContent"></div>
+            </div>
+
+            <div id="adminPageAnalytics" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
+                    <button class="admin-btn admin-btn-secondary" onclick="adminShowMenu()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
+                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">📈 数据分析</h3>
+                    <button class="admin-btn admin-btn-secondary" onclick="adminLoadAnalytics()" style="margin-left:auto;font-size:0.8rem;">🔄 刷新</button>
+                </div>
+                <div id="adminAnalyticsContent" style="color:#fff;">
+                    <div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;">点击刷新加载...</div>
+                </div>
             </div>
 
             <div id="adminPageScriptStats" style="display:none;">
