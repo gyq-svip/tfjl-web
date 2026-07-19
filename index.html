@@ -2467,7 +2467,7 @@
         <!-- 固定头部：标题 + 公告栏 -->
         <div id="fixedHeader" style="position:sticky;top:0;z-index:100;background:linear-gradient(135deg,#0f0f23 0%,#1a1a2e 50%,#16213e 100%);padding-bottom:5px;">
         <h1><span id="mainHeader" style="cursor:default;">🛡️</span> 塔防助手</h1>
-        <p id="mainTitle" class="instructions glowing-text" style="cursor:pointer;" onclick="refreshNewsAndTitle()" title="点击刷新公告和标题"> 支持导入脚本解析 | 阵容存储快速查看 | 活动遇到龙行麻烦投一下  </p>
+        <p id="mainTitle" class="instructions glowing-text" style="cursor:pointer;" onclick="refreshNewsAndTitle()" title="点击刷新公告和标题"> 【工具数据本地储存】在浏览器缓存中,清理浏览器前请先备份，避免数据丢失！  </p>
         
         <!-- 滚动公告栏 -->
         <div id="newsMarqueeContainer" style="background:rgba(255,255,255,0.05);border:2px solid rgba(255,215,0,0.3);border-radius:10px;padding:15px;margin-bottom:5px;text-align:center;overflow:hidden;position:relative;cursor:pointer;" onclick="showNewsListModal()" title="点击查看全部公告">
@@ -13988,7 +13988,7 @@
             game: '九区-龙行',
             notice: '',
             open: true,
-            title: '支持导入脚本解析 | 阵容存储快速查看 | 活动遇到龙行麻烦投一下'
+            title: '【工具数据本地储存】在浏览器缓存中,清理浏览器前请先备份，避免数据丢失！'
         };
 
         const DEFAULT_NEWS = [
@@ -14249,6 +14249,7 @@ function hasGistToken() {
                     
                     // 从索引文件获取公告的 GIST_ID
                     let newsGistId = localStorage.getItem('news_gist_id');
+                    let indexGistData = null; // 缓存索引Gist的完整响应
                     
                     if (!newsGistId) {
                         // 从索引文件获取
@@ -14261,10 +14262,10 @@ function hasGistToken() {
                         });
                         
                         if (indexResponse.ok) {
-                            const indexData = await indexResponse.json();
-                            if (indexData.files && indexData.files['room_index.json'] && indexData.files['room_index.json'].content) {
+                            indexGistData = await indexResponse.json();
+                            if (indexGistData.files && indexGistData.files['room_index.json'] && indexGistData.files['room_index.json'].content) {
                                 try {
-                                    const index = JSON.parse(indexData.files['room_index.json'].content);
+                                    const index = JSON.parse(indexGistData.files['room_index.json'].content);
                                     if (index['news']) {
                                         newsGistId = index['news'];
                                         localStorage.setItem('news_gist_id', newsGistId);
@@ -14292,12 +14293,25 @@ function hasGistToken() {
                                 data = JSON.parse(newsContent);
                             }
                         }
+                    } else if (indexGistData) {
+                        // 没有独立公告Gist，直接从索引Gist读取news.json
+                        const newsContent = indexGistData.files?.['news.json']?.content;
+                        if (newsContent) {
+                            data = JSON.parse(newsContent);
+                        }
                     }
                 } catch (gistError) {
                     console.warn('📢 从Gist获取新闻失败，尝试GitHub仓库:', gistError);
                 }
 
                 if (!data) {
+                    // Gist获取失败时，优先使用本地缓存，避免回退到GitHub仓库的旧数据
+                    const cachedNews = loadNewsFromCache();
+                    if (cachedNews && cachedNews.length >= 0) {
+                        // 有本地缓存就用缓存（包括空数组，表示管理员可能已清空公告）
+                        return cachedNews;
+                    }
+                    // 完全没有缓存时才回退到GitHub仓库
                     const response = await fetch(NEWS_URL, {
                         method: 'GET',
                         headers: {
