@@ -18345,8 +18345,6 @@ function hasGistToken() {
             if (cachePage) cachePage.style.display = 'none';
             const scriptStatsPage = document.getElementById('adminPageScriptStats');
             if (scriptStatsPage) scriptStatsPage.style.display = 'none';
-            const analyticsPage = document.getElementById('adminPageAnalytics');
-            if (analyticsPage) analyticsPage.style.display = 'none';
             updateBroadcastToggleStatus();
         }
 
@@ -18364,6 +18362,8 @@ function hasGistToken() {
             if (cachePage) cachePage.style.display = 'none';
             const scriptStatsPage = document.getElementById('adminPageScriptStats');
             if (scriptStatsPage) scriptStatsPage.style.display = 'none';
+            const analyticsPage = document.getElementById('adminPageAnalytics');
+            if (analyticsPage) analyticsPage.style.display = 'none';
 
             if (page === 'help') {
                 if (helpPage) helpPage.style.display = 'block';
