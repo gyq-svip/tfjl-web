@@ -6443,6 +6443,67 @@
             document.getElementById('parserResult').innerHTML = '';
         }
 
+        // 脚本解析输入框 - 拖拽支持
+        function handleParserDragOver(event) {
+            event.preventDefault();
+            event.currentTarget.style.borderColor = '#4caf50';
+            event.currentTarget.style.background = 'rgba(76,175,80,0.15)';
+        }
+
+        function handleParserDragLeave(event) {
+            event.currentTarget.style.borderColor = 'rgba(255,215,0,0.2)';
+            event.currentTarget.style.background = 'rgba(0,0,0,0.3)';
+        }
+
+        function handleParserDrop(event) {
+            event.preventDefault();
+            handleParserDragLeave(event);
+
+            // 优先处理拖拽的文件
+            const files = event.dataTransfer.files;
+            if (files && files.length > 0) {
+                const file = files[0];
+                if (file.type === 'text/plain' || file.name.endsWith('.txt') || file.name.endsWith('.js') || file.name.endsWith('.json')) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        document.getElementById('parserInput').value = e.target.result;
+                        document.getElementById('parserResult').innerHTML = `<span style="color:#4caf50;">✅ 已从文件 "${file.name}" 导入文本</span>`;
+                    };
+                    reader.readAsText(file, 'UTF-8');
+                } else {
+                    document.getElementById('parserResult').innerHTML = '<span style="color:#ef4444;">⚠️ 仅支持 .txt / .js / .json 文本文件</span>';
+                }
+                return;
+            }
+
+            // 没有文件则处理拖拽的文本
+            const text = event.dataTransfer.getData('text');
+            if (text) {
+                document.getElementById('parserInput').value = text;
+            }
+        }
+
+        // 脚本解析输入框 - 全局粘贴支持（当面板可见时拦截纯文本粘贴到输入框）
+        document.addEventListener('paste', function(event) {
+            const panel = document.getElementById('txtFilesPanel');
+            if (!panel || panel.style.display === 'none') return;
+
+            const parserTab = document.getElementById('txtTabParser');
+            if (!parserTab || parserTab.style.display === 'none') return; // 只在解析tab激活时生效
+
+            // 如果焦点已经在输入框内，让浏览器默认行为处理
+            if (document.activeElement && document.activeElement.id === 'parserInput') return;
+
+            const text = event.clipboardData?.getData('text');
+            if (text && text.trim().length > 0) {
+                event.preventDefault();
+                const input = document.getElementById('parserInput');
+                input.value = text;
+                input.focus();
+                document.getElementById('parserResult').innerHTML = '<span style="color:#4caf50;">✅ 已粘贴文本，点击解析或生成</span>';
+            }
+        });
+
         // 解析文本并添加卡牌到手牌
         function parseTextAndAddCards() {
             const input = document.getElementById('parserInput').value.trim();
@@ -7788,7 +7849,8 @@
                 <div style="margin-bottom:10px;flex:1;">
                     <label style="color:rgba(255,255,255,0.8);font-size:0.85rem;margin-bottom:5px;display:block;">输入文本（格式：上阵：英雄1,英雄2,...）：</label>
                     <textarea id="parserInput" placeholder="示例：上阵：水灵,死神,幻精灵,小野,龙王,风灵,木精灵,咕咕,火炮,光精灵
-⚠️只上前6张卡，工程卡不算；🐍有蛇女时需加速的卡放第4、5位，蛇女自动放第6位" style="width:100%;height:8em;min-height:8em;background:rgba(0,0,0,0.3);border:1px solid rgba(255,215,0,0.2);border-radius:8px;padding:10px;color:#fff;font-size:0.9rem;resize:none;font-family:inherit;box-sizing:border-box;"></textarea>
+⚠️只上前6张卡，工程卡不算；🐍有蛇女时需加速的卡放第4、5位，蛇女自动放第6位
+💡支持拖拽.txt文件到此处，或直接粘贴文本" style="width:100%;height:8em;min-height:8em;background:rgba(0,0,0,0.3);border:1px solid rgba(255,215,0,0.2);border-radius:8px;padding:10px;color:#fff;font-size:0.9rem;resize:none;font-family:inherit;box-sizing:border-box;" ondrop="handleParserDrop(event)" ondragover="handleParserDragOver(event)" ondragleave="handleParserDragLeave(event)"></textarea>
                 </div>
                 <div style="display:flex;gap:8px;flex-wrap:wrap;">
                     <button onclick="parseTextAndAddCards()" style="flex:1;background:linear-gradient(135deg,#00bcd4,#00838f);color:white;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:500;">🔍 解析并添加</button>
