@@ -2662,10 +2662,9 @@
 
         // 全局拖拽防护：拖拽文件时阻止浏览器默认打开文件行为（不影响卡牌拖拽）
         window.addEventListener('dragover', function(e) {
-            // 判断是否拖拽的是文件
             const hasFiles = e.dataTransfer && e.dataTransfer.types && e.dataTransfer.types.includes('Files');
-            if (!hasFiles) return; // 非文件拖拽（如卡牌），不干预
-            // 面板内的文件拖拽由面板处理
+            if (!hasFiles) return;
+            // 面板内的文件拖拽由面板处理（解析tab和文件tab都能接收）
             const panel = document.getElementById('txtFilesPanel');
             if (panel && panel.style.display !== 'none' && panel.contains(e.target)) return;
             e.preventDefault();
@@ -6511,13 +6510,122 @@
             }
         }
 
-        // 脚本解析输入框 - 全局粘贴支持（当面板可见时拦截纯文本粘贴到输入框）
+        // 脚本文件Tab - 拖拽支持（拖拽文件直接上传到脚本列表）
+        function handleFilesTabDragOver(event) {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = 'copy';
+            const hint = document.getElementById('filesDropHint');
+            if (hint) hint.style.display = 'flex';
+        }
+
+        function handleFilesTabDragLeave(event) {
+            const panel = document.getElementById('txtTabFiles');
+            if (!panel) return;
+            const rect = panel.getBoundingClientRect();
+            const x = event.clientX, y = event.clientY;
+            if (x < rect.left || x >= rect.right || y < rect.top || y >= rect.bottom) {
+                const hint = document.getElementById('filesDropHint');
+                if (hint) hint.style.display = 'none';
+            }
+        }
+
+        function handleFilesTabDrop(event) {
+            event.preventDefault();
+            const hint = document.getElementById('filesDropHint');
+            if (hint) hint.style.display = 'none';
+
+            const files = event.dataTransfer.files;
+            if (!files || files.length === 0) return;
+
+            const validExts = ['.txt', '.js', '.json', '.lua', '.py', '.sh'];
+            let added = 0, skipped = 0;
+
+            Array.from(files).forEach(file => {
+                const ext = '.' + file.name.split('.').pop().toLowerCase();
+                if (validExts.includes(ext) || file.type === 'text/plain') {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        if (!currentProjectName) {
+                            alert('请先选择或创建一个项目！');
+                            return;
+                        }
+                        if (!txtFiles) txtFiles = [];
+                        // 避免重名
+                        let fileName = file.name;
+                        let counter = 1;
+                        while (txtFiles.some(f => f.name === fileName)) {
+                            const dotIdx = file.name.lastIndexOf('.');
+                            fileName = dotIdx > 0 ? file.name.substring(0, dotIdx) + `(${counter})` + file.name.substring(dotIdx) : file.name + `(${counter})`;
+                            counter++;
+                        }
+                        txtFiles.push({ name: fileName, content: e.target.result });
+                        added++;
+                        updateTxtFilesList();
+                        autoSaveProject();
+                    };
+                    reader.readAsText(file, 'UTF-8');
+                } else {
+                    skipped++;
+                }
+            });
+
+            if (added > 0 && skipped > 0) {
+                // 用延时确保 added 已更新
+            } else if (skipped > 0 && added === 0) {
+                // 所有文件都不支持
+            }
+        }
+
+        // 全局粘贴支持（面板可见时：解析tab粘贴到输入框，文件tab粘贴文件到列表）
         document.addEventListener('paste', function(event) {
             const panel = document.getElementById('txtFilesPanel');
             if (!panel || panel.style.display === 'none') return;
 
+            // 脚本文件tab激活时：粘贴文件到列表
+            const filesTab = document.getElementById('txtTabFiles');
+            if (filesTab && filesTab.style.display !== 'none') {
+                // 如果焦点在搜索框内，不拦截
+                if (document.activeElement && document.activeElement.id === 'txtFileSearchInput') return;
+                const items = event.clipboardData?.items;
+                if (!items) return;
+                let pasted = false;
+                const validExts = ['.txt', '.js', '.json', '.lua', '.py', '.sh'];
+                for (const item of items) {
+                    if (item.kind === 'file') {
+                        const file = item.getAsFile();
+                        if (!file) continue;
+                        const ext = '.' + (file.name.split('.').pop() || '').toLowerCase();
+                        if (validExts.includes(ext) || file.type === 'text/plain') {
+                            const reader = new FileReader();
+                            reader.onload = function(e) {
+                                if (!currentProjectName) {
+                                    alert('请先选择或创建一个项目！');
+                                    return;
+                                }
+                                if (!txtFiles) txtFiles = [];
+                                let fileName = file.name;
+                                let counter = 1;
+                                while (txtFiles.some(f => f.name === fileName)) {
+                                    const dotIdx = file.name.lastIndexOf('.');
+                                    fileName = dotIdx > 0 ? file.name.substring(0, dotIdx) + `(${counter})` + file.name.substring(dotIdx) : file.name + `(${counter})`;
+                                    counter++;
+                                }
+                                txtFiles.push({ name: fileName, content: e.target.result });
+                                updateTxtFilesList();
+                                autoSaveProject();
+                            };
+                            reader.readAsText(file, 'UTF-8');
+                            pasted = true;
+                        }
+                    }
+                }
+                if (pasted) event.preventDefault();
+                return;
+            }
+
+            // 脚本解析tab激活时：粘贴文本到输入框
             const parserTab = document.getElementById('txtTabParser');
-            if (!parserTab || parserTab.style.display === 'none') return; // 只在解析tab激活时生效
+            if (!parserTab || parserTab.style.display === 'none') return;
 
             // 如果焦点已经在输入框内，让浏览器默认行为处理
             if (document.activeElement && document.activeElement.id === 'parserInput') return;
@@ -7893,12 +8001,15 @@
                 <div id="parserResult" style="margin-top:10px;font-size:0.85rem;color:rgba(255,255,255,0.7);"></div>
             </div>
             <!-- 脚本文件Tab内容 -->
-            <div id="txtTabFiles" style="padding:10px;height:calc(100% - 90px);display:none;overflow:auto;">
+            <div id="txtTabFiles" style="padding:10px;height:calc(100% - 90px);display:none;overflow:auto;position:relative;" ondrop="handleFilesTabDrop(event)" ondragover="handleFilesTabDragOver(event)" ondragleave="handleFilesTabDragLeave(event)" ondragend="handleFilesTabDragLeave(event)">
+                <div id="filesDropHint" style="display:none;position:absolute;inset:0;background:rgba(76,175,80,0.2);border:3px dashed #4caf50;border-radius:12px;z-index:10;align-items:center;justify-content:center;pointer-events:none;">
+                    <div style="text-align:center;color:#4caf50;font-size:1.1rem;font-weight:bold;">📄 拖拽文件到此处松手<br><span style="font-size:0.8rem;font-weight:normal;opacity:0.8;">支持 .txt / .js / .json / .lua / .py / .sh 文件</span></div>
+                </div>
                 <div style="margin-bottom:10px;">
                     <input id="txtFileSearchInput" type="text" placeholder="🔍 搜索脚本..." oninput="filterTxtFilesList()" style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid rgba(76,175,80,0.3);background:rgba(0,0,0,0.3);color:#fff;font-size:0.85rem;box-sizing:border-box;">
                 </div>
                 <div id="txtFilesList" style="display:flex;flex-direction:column;gap:10px;"></div>
-                <div style="margin-top:10px;color:rgba(255,255,255,0.5);font-size:0.75rem;">💡 支持上传多个TXT文件，预览时可编辑保存</div>
+                <div style="margin-top:10px;color:rgba(255,255,255,0.5);font-size:0.75rem;">💡 支持上传多个TXT文件，也可拖拽文件到此处或 Ctrl+V 粘贴</div>
             </div>
         </div>
 
