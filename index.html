@@ -2533,7 +2533,7 @@
                 <button onclick="toggleProjectMenu(this)" style="background:#444;color:white;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:1rem;line-height:1;">⋮</button>
                 <button onclick="showProjectSearchPanel()" title="搜索项目" style="background:linear-gradient(135deg,#00bcd4,#00838f);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">🔍</button>
                 <button onclick="toggleNotepadPanel()" title="记事本" style="background:linear-gradient(135deg,#ffd700,#ff6b6b);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">📝</button>
-                <button onclick="toggleTxtFilesPanel()" title="脚本文件" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">📄</button>
+                <button onclick="toggleTxtFilesPanel()" title="脚本生成" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">📄</button>
                 <button onclick="toggleReferencePanel()" title="参考图片" style="background:linear-gradient(135deg,#9c27b0,#7b1fa2);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">🖼️</button>
                 <button onclick="saveCurrentProject()" title="保存" style="background:rgba(76,175,80,0.8);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">💾</button>
                 <button onclick="toggleActivityCalcPanel()" title="活动氪金计算器" style="background:linear-gradient(135deg,#ff6b6b,#feca57);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">🧮</button>
@@ -6254,7 +6254,8 @@
             const panel = document.getElementById('txtFilesPanel');
             panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
             if (panel.style.display === 'block') {
-                updateTxtFilesList();
+                // 默认显示脚本解析与生成tab
+                switchTxtPanelTab('parser');
             }
         }
 
@@ -7764,7 +7765,7 @@
         <!-- 脚本文件悬浮面板 -->
         <div id="txtFilesPanel" style="display:none;position:fixed;top:80px;right:20px;width:450px;height:500px;z-index:9997;background:rgba(30,30,60,0.95);border:2px solid rgba(76,175,80,0.5);border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.5);overflow:auto;resize:both;min-width:350px;min-height:400px;">
             <div id="txtFilesPanelHeader" style="background:linear-gradient(135deg,#4caf50,#2e7d32);padding:10px 15px;cursor:move;display:flex;justify-content:space-between;align-items:center;">
-                <span style="color:white;font-weight:bold;">📄 脚本文件</span>
+                <span style="color:white;font-weight:bold;">📄 脚本生成</span>
                 <div style="display:flex;align-items:center;gap:8px;">
                     <button onclick="uploadTxtFile()" style="background:rgba(255,255,255,0.2);color:white;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:0.8rem;">📤 上传文件</button>
                     <button onclick="toggleTxtFilesPanel()" style="background:transparent;border:none;color:white;font-size:1.2rem;cursor:pointer;padding:0 5px;">×</button>
@@ -7772,19 +7773,11 @@
             </div>
             <!-- Tab切换 -->
             <div style="display:flex;border-bottom:1px solid rgba(255,255,255,0.1);">
-                <button id="txtTabBtn" onclick="switchTxtPanelTab('files')" style="flex:1;padding:8px;border:none;background:rgba(76,175,80,0.3);color:#fff;cursor:pointer;font-size:0.85rem;font-weight:bold;border-bottom:2px solid #4caf50;">📄 脚本文件</button>
-                <button id="parserTabBtn" onclick="switchTxtPanelTab('parser')" style="flex:1;padding:8px;border:none;background:transparent;color:rgba(255,255,255,0.5);cursor:pointer;font-size:0.85rem;">🔍 脚本解析与生成</button>
-            </div>
-            <!-- 脚本文件Tab内容 -->
-            <div id="txtTabFiles" style="padding:10px;height:calc(100% - 90px);overflow:auto;">
-                <div style="margin-bottom:10px;">
-                    <input id="txtFileSearchInput" type="text" placeholder="🔍 搜索脚本..." oninput="filterTxtFilesList()" style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid rgba(76,175,80,0.3);background:rgba(0,0,0,0.3);color:#fff;font-size:0.85rem;box-sizing:border-box;">
-                </div>
-                <div id="txtFilesList" style="display:flex;flex-direction:column;gap:10px;"></div>
-                <div style="margin-top:10px;color:rgba(255,255,255,0.5);font-size:0.75rem;">💡 支持上传多个TXT文件，预览时可编辑保存</div>
+                <button id="parserTabBtn" onclick="switchTxtPanelTab('parser')" style="flex:1;padding:8px;border:none;background:rgba(0,188,212,0.3);color:#fff;cursor:pointer;font-size:0.85rem;font-weight:bold;border-bottom:2px solid #00bcd4;">🔍 脚本解析与生成</button>
+                <button id="txtTabBtn" onclick="switchTxtPanelTab('files')" style="flex:1;padding:8px;border:none;background:transparent;color:rgba(255,255,255,0.5);cursor:pointer;font-size:0.85rem;">📄 脚本文件</button>
             </div>
             <!-- 文本解析Tab内容 -->
-            <div id="txtTabParser" style="padding:15px;height:calc(100% - 90px);display:none;flex-direction:column;overflow:auto;">
+            <div id="txtTabParser" style="padding:15px;height:calc(100% - 90px);display:flex;flex-direction:column;overflow:auto;">
                 <div style="margin-bottom:10px;">
                     <label style="color:rgba(255,255,255,0.8);font-size:0.85rem;margin-bottom:5px;display:block;">分配到手牌：</label>
                     <select id="parserHandTarget" style="width:100%;padding:8px;border-radius:6px;border:1px solid rgba(255,215,0,0.3);background:#2a2a4a;color:#fff;font-size:0.9rem;cursor:pointer;">
@@ -7805,6 +7798,14 @@
                     <button onclick="clearParserInput()" style="background:rgba(255,255,255,0.1);color:white;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:0.85rem;">清空</button>
                 </div>
                 <div id="parserResult" style="margin-top:10px;font-size:0.85rem;color:rgba(255,255,255,0.7);"></div>
+            </div>
+            <!-- 脚本文件Tab内容 -->
+            <div id="txtTabFiles" style="padding:10px;height:calc(100% - 90px);display:none;overflow:auto;">
+                <div style="margin-bottom:10px;">
+                    <input id="txtFileSearchInput" type="text" placeholder="🔍 搜索脚本..." oninput="filterTxtFilesList()" style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid rgba(76,175,80,0.3);background:rgba(0,0,0,0.3);color:#fff;font-size:0.85rem;box-sizing:border-box;">
+                </div>
+                <div id="txtFilesList" style="display:flex;flex-direction:column;gap:10px;"></div>
+                <div style="margin-top:10px;color:rgba(255,255,255,0.5);font-size:0.75rem;">💡 支持上传多个TXT文件，预览时可编辑保存</div>
             </div>
         </div>
 
