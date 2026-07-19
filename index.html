@@ -2660,6 +2660,24 @@
             }
         });
 
+        // 全局拖拽防护：拖拽文件时阻止浏览器默认打开文件行为（不影响卡牌拖拽）
+        window.addEventListener('dragover', function(e) {
+            // 判断是否拖拽的是文件
+            const hasFiles = e.dataTransfer && e.dataTransfer.types && e.dataTransfer.types.includes('Files');
+            if (!hasFiles) return; // 非文件拖拽（如卡牌），不干预
+            // 面板内的文件拖拽由面板处理
+            const panel = document.getElementById('txtFilesPanel');
+            if (panel && panel.style.display !== 'none' && panel.contains(e.target)) return;
+            e.preventDefault();
+        });
+        window.addEventListener('drop', function(e) {
+            const hasFiles = e.dataTransfer && e.dataTransfer.types && e.dataTransfer.types.includes('Files');
+            if (!hasFiles) return;
+            const panel = document.getElementById('txtFilesPanel');
+            if (panel && panel.style.display !== 'none' && panel.contains(e.target)) return;
+            e.preventDefault();
+        });
+
         // ==================== 鼠标特效系统 ====================
         let effectContainer = null;
 
@@ -6446,18 +6464,27 @@
         // 脚本解析输入框 - 拖拽支持
         function handleParserDragOver(event) {
             event.preventDefault();
-            event.currentTarget.style.borderColor = '#4caf50';
-            event.currentTarget.style.background = 'rgba(76,175,80,0.15)';
+            event.dataTransfer.dropEffect = 'copy';
+            const hint = document.getElementById('parserDropHint');
+            if (hint) hint.style.display = 'flex';
         }
 
         function handleParserDragLeave(event) {
-            event.currentTarget.style.borderColor = 'rgba(255,215,0,0.2)';
-            event.currentTarget.style.background = 'rgba(0,0,0,0.3)';
+            // 只有离开整个面板才隐藏（避免子元素间跳动）
+            const panel = document.getElementById('txtTabParser');
+            if (!panel) return;
+            const rect = panel.getBoundingClientRect();
+            const x = event.clientX, y = event.clientY;
+            if (x < rect.left || x >= rect.right || y < rect.top || y >= rect.bottom) {
+                const hint = document.getElementById('parserDropHint');
+                if (hint) hint.style.display = 'none';
+            }
         }
 
         function handleParserDrop(event) {
             event.preventDefault();
-            handleParserDragLeave(event);
+            const hint = document.getElementById('parserDropHint');
+            if (hint) hint.style.display = 'none';
 
             // 优先处理拖拽的文件
             const files = event.dataTransfer.files;
@@ -6480,6 +6507,7 @@
             const text = event.dataTransfer.getData('text');
             if (text) {
                 document.getElementById('parserInput').value = text;
+                document.getElementById('parserResult').innerHTML = '<span style="color:#4caf50;">✅ 已导入拖拽文本</span>';
             }
         }
 
@@ -7824,7 +7852,7 @@
         </div>
 
         <!-- 脚本文件悬浮面板 -->
-        <div id="txtFilesPanel" style="display:none;position:fixed;top:80px;right:20px;width:450px;height:500px;z-index:9997;background:rgba(30,30,60,0.95);border:2px solid rgba(76,175,80,0.5);border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.5);overflow:auto;resize:both;min-width:350px;min-height:400px;">
+        <div id="txtFilesPanel" style="display:none;position:fixed;top:80px;right:20px;width:450px;height:500px;z-index:9997;background:rgba(30,30,60,0.95);border:2px solid rgba(76,175,80,0.5);border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.5);overflow:auto;resize:both;min-width:350px;min-height:400px;" ondragover="event.preventDefault();event.dataTransfer.dropEffect='none';" ondrop="event.preventDefault();">
             <div id="txtFilesPanelHeader" style="background:linear-gradient(135deg,#4caf50,#2e7d32);padding:10px 15px;cursor:move;display:flex;justify-content:space-between;align-items:center;">
                 <span style="color:white;font-weight:bold;">📄 脚本生成</span>
                 <div style="display:flex;align-items:center;gap:8px;">
@@ -7838,7 +7866,10 @@
                 <button id="txtTabBtn" onclick="switchTxtPanelTab('files')" style="flex:1;padding:8px;border:none;background:transparent;color:rgba(255,255,255,0.5);cursor:pointer;font-size:0.85rem;">📄 脚本文件</button>
             </div>
             <!-- 文本解析Tab内容 -->
-            <div id="txtTabParser" style="padding:15px;height:calc(100% - 90px);display:flex;flex-direction:column;overflow:auto;">
+            <div id="txtTabParser" style="padding:15px;height:calc(100% - 90px);display:flex;flex-direction:column;overflow:auto;" ondrop="handleParserDrop(event)" ondragover="handleParserDragOver(event)" ondragleave="handleParserDragLeave(event)" ondragend="handleParserDragLeave(event)">
+                <div id="parserDropHint" style="display:none;position:absolute;inset:0;background:rgba(76,175,80,0.2);border:3px dashed #4caf50;border-radius:12px;z-index:10;align-items:center;justify-content:center;pointer-events:none;">
+                    <div style="text-align:center;color:#4caf50;font-size:1.1rem;font-weight:bold;">📄 拖拽文件到此处松手<br><span style="font-size:0.8rem;font-weight:normal;opacity:0.8;">支持 .txt / .js / .json 文件</span></div>
+                </div>
                 <div style="margin-bottom:10px;">
                     <label style="color:rgba(255,255,255,0.8);font-size:0.85rem;margin-bottom:5px;display:block;">分配到手牌：</label>
                     <select id="parserHandTarget" style="width:100%;padding:8px;border-radius:6px;border:1px solid rgba(255,215,0,0.3);background:#2a2a4a;color:#fff;font-size:0.9rem;cursor:pointer;">
