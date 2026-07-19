@@ -15373,6 +15373,8 @@ function hasGistToken() {
                             counterData.active_today_users.push(deviceId);
                             counterData.active_today = counterData.active_today_users.length;
                         }
+                        // 记录每日活跃用户数到daily_stats
+                        counterData.daily_stats[today].active_users = counterData.active_today_users.length;
                         break;
                         
                     case 'download':
@@ -18345,6 +18347,8 @@ function hasGistToken() {
             if (cachePage) cachePage.style.display = 'none';
             const scriptStatsPage = document.getElementById('adminPageScriptStats');
             if (scriptStatsPage) scriptStatsPage.style.display = 'none';
+            const analyticsPage = document.getElementById('adminPageAnalytics');
+            if (analyticsPage) analyticsPage.style.display = 'none';
             updateBroadcastToggleStatus();
         }
 
@@ -19641,27 +19645,34 @@ function hasGistToken() {
             html += `<span>最近30天新用户：<b style="color:#4caf50;">${last30NewUsers}</b></span>`;
             html += `</div></div>`;
 
-            // 日访问趋势图（柱状图）
+            // 日访问趋势图（柱状图，含活跃用户折线）
             if (recentDates.length > 0) {
                 const maxVisits = Math.max(...recentDates.map(d => (dailyStats[d].visits || 0)), 1);
+                const maxActive = Math.max(...recentDates.map(d => (dailyStats[d].active_users || 0)), 1);
                 html += `<div style="background:rgba(255,255,255,0.05);border-radius:10px;padding:15px;margin-bottom:20px;">`;
                 html += `<div style="color:#4ecdc4;font-size:0.9rem;margin-bottom:15px;">📊 日访问趋势（最近${recentDates.length}天）</div>`;
                 html += `<div style="display:flex;align-items:flex-end;gap:2px;height:180px;overflow-x:auto;padding-bottom:25px;position:relative;border-bottom:1px solid rgba(255,255,255,0.1);">`;
-                recentDates.forEach(d => {
+                recentDates.forEach((d, idx) => {
                     const s = dailyStats[d];
                     const v = s.visits || 0;
                     const newU = s.new_users || 0;
+                    const actU = s.active_users || 0;
                     const barH = Math.max((v / maxVisits) * 150, 2);
                     const newBarH = v > 0 ? Math.max((newU / v) * barH, 0) : 0;
+                    const actDotTop = 150 - Math.max((actU / maxActive) * 150, 0); // 折线点位置
                     const dateLabel = d.substring(5); // MM-DD
                     const isToday = d === today;
-                    html += `<div style="flex:0 0 24px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;position:relative;" title="${d}\n访问: ${v}\n新用户: ${newU}">`;
+                    html += `<div style="flex:0 0 24px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;position:relative;" title="${d}\n访问: ${v}\n新用户: ${newU}\n活跃用户: ${actU}">`;
                     html += `<div style="position:absolute;top:-16px;font-size:0.65rem;color:#ffd700;white-space:nowrap;">${v > 0 ? v : ''}</div>`;
                     html += `<div style="width:18px;background:linear-gradient(180deg,#00bcd4,#00838f);border-radius:3px 3px 0 0;height:${barH}px;position:relative;">`;
                     if (newBarH > 0) {
                         html += `<div style="position:absolute;bottom:0;width:100%;background:linear-gradient(180deg,#4caf50,#2e7d32);border-radius:0 0 0 0;height:${newBarH}px;"></div>`;
                     }
                     html += `</div>`;
+                    // 活跃用户折线点
+                    if (actU > 0) {
+                        html += `<div style="position:absolute;top:${actDotTop}px;left:50%;transform:translateX(-50%);width:6px;height:6px;background:#ff9800;border-radius:50%;border:1px solid #fff;z-index:2;"></div>`;
+                    }
                     html += `<div style="position:absolute;bottom:-20px;font-size:0.6rem;color:${isToday ? '#ffd700' : 'rgba(255,255,255,0.4)'};white-space:nowrap;">${dateLabel}</div>`;
                     html += `</div>`;
                 });
@@ -19669,6 +19680,7 @@ function hasGistToken() {
                 html += `<div style="display:flex;gap:15px;margin-top:10px;font-size:0.75rem;">`;
                 html += `<span><span style="display:inline-block;width:12px;height:12px;background:#00bcd4;border-radius:2px;vertical-align:middle;"></span> 访问量</span>`;
                 html += `<span><span style="display:inline-block;width:12px;height:12px;background:#4caf50;border-radius:2px;vertical-align:middle;"></span> 新用户</span>`;
+                html += `<span><span style="display:inline-block;width:8px;height:8px;background:#ff9800;border-radius:50%;vertical-align:middle;border:1px solid #fff;"></span> 活跃用户</span>`;
                 html += `</div></div>`;
             }
 
