@@ -2980,6 +2980,7 @@
                 <div style="margin-top:10px;">
                     <input type="file" id="refImageInput" accept="image/*" style="display:none;" onchange="handleRefImageUpload(this)">
                     <button onclick="document.getElementById('refImageInput').click()" style="background:linear-gradient(135deg,#9c27b0,#7b1fa2);color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;width:100%;">📤 上传参考图片</button>
+                    <div style="text-align:center;color:rgba(255,255,255,0.35);font-size:0.7rem;margin-top:4px;">💡 也可直接 Ctrl+V 粘贴截图</div>
                 </div>
                 <div id="refImageViewer" style="display:none;margin-top:10px;background:rgba(0,0,0,0.4);border-radius:8px;padding:8px;position:relative;">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
@@ -3301,6 +3302,53 @@
             };
             reader.readAsDataURL(file);
         }
+
+        // 粘贴上传图片功能
+        function handleRefImagePaste(event) {
+            // 只在参考图片面板打开时生效
+            const panel = document.getElementById('referencePanel');
+            if (!panel || panel.style.display === 'none') return;
+            // 如果焦点在输入框/文本域中且不是参考面板内的，不拦截
+            const activeTag = document.activeElement?.tagName;
+            if (activeTag === 'INPUT' || activeTag === 'TEXTAREA') {
+                // 允许参考面板内的输入框粘贴（这里没有输入框，所以直接return）
+                return;
+            }
+
+            const items = event.clipboardData?.items;
+            if (!items) return;
+
+            let pasted = false;
+            for (const item of items) {
+                if (item.type.startsWith('image/')) {
+                    const file = item.getAsFile();
+                    if (!file) continue;
+
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const now = new Date();
+                        const ts = now.getFullYear() +
+                            String(now.getMonth() + 1).padStart(2, '0') +
+                            String(now.getDate()).padStart(2, '0') + '_' +
+                            String(now.getHours()).padStart(2, '0') +
+                            String(now.getMinutes()).padStart(2, '0') +
+                            String(now.getSeconds()).padStart(2, '0');
+                        referenceImages.push({name: `粘贴图片_${ts}.png`, data: e.target.result, projectName: currentProjectName});
+                        renderReferenceImages();
+                        autoSaveProject();
+                    };
+                    reader.readAsDataURL(file);
+                    pasted = true;
+                }
+            }
+
+            if (pasted) {
+                event.preventDefault();
+            }
+        }
+
+        // 注册全局粘贴监听（仅参考图片面板打开时生效）
+        document.addEventListener('paste', handleRefImagePaste);
 
         function deleteRefImage(index) {
             if (confirm('确定删除这张参考图片？')) {
