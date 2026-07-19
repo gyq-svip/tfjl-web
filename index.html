@@ -18928,9 +18928,48 @@ function hasGistToken() {
             showAdminStatus(`密码"${pwdToDelete}"已删除！`, 'success');
         }
 
+        // 获取公告Gist的URL（与用户端读取逻辑保持一致）
+        async function getNewsGistUrl() {
+            const token = getGistToken();
+
+            // 1. 先从 localStorage 获取缓存的公告 Gist ID
+            let newsGistId = localStorage.getItem('news_gist_id');
+
+            // 2. 没有的话，从索引文件获取
+            if (!newsGistId) {
+                const indexUrl = await getIndexGistUrl();
+                const indexResponse = await fetch(indexUrl, {
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        ...(token && { 'Authorization': `token ${token}` })
+                    }
+                });
+
+                if (indexResponse.ok) {
+                    const indexData = await indexResponse.json();
+                    if (indexData.files && indexData.files['room_index.json'] && indexData.files['room_index.json'].content) {
+                        try {
+                            const index = JSON.parse(indexData.files['room_index.json'].content);
+                            if (index['news']) {
+                                newsGistId = index['news'];
+                                localStorage.setItem('news_gist_id', newsGistId);
+                            }
+                        } catch (e) {
+                            console.warn('解析索引文件失败');
+                        }
+                    }
+                }
+            }
+
+            // 3. 如果还是没有独立的公告 Gist，回退到索引 Gist
+            const targetId = newsGistId || GIST_ID;
+            return `https://api.github.com/gists/${targetId}`;
+        }
+
         async function adminFetchNewsFromGist() {
             const token = getGistToken();
-            const response = await fetch(GIST_URL, {
+            const newsGistUrl = await getNewsGistUrl();
+            const response = await fetch(newsGistUrl, {
                 headers: {
                     'Accept': 'application/vnd.github.v3+json',
                     ...(token && { 'Authorization': `token ${token}` })
@@ -18959,7 +18998,8 @@ function hasGistToken() {
                 data: newsData
             };
 
-            const response = await fetch(GIST_URL, {
+            const newsGistUrl = await getNewsGistUrl();
+            const response = await fetch(newsGistUrl, {
                 method: 'PATCH',
                 headers: {
                     'Accept': 'application/vnd.github.v3+json',
