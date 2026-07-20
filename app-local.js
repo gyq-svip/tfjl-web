@@ -297,11 +297,11 @@ if (isTauriApp) {
                     <span style="color:#fff;font-size:0.8rem;flex:1;word-break:break-all;">${f.name}</span>
                     <button onclick="viewFile('${safePath}')" style="background:rgba(0,188,212,0.3);color:#00bcd4;border:1px solid rgba(0,188,212,0.3);padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;">查看</button>
                     <button onclick="loadFileToHand('${safePath}')" style="background:rgba(76,175,80,0.3);color:#4caf50;border:1px solid rgba(76,175,80,0.3);padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;">加载</button>
-                    <button onclick="importFileToProject('${safePath}')" style="background:rgba(255,152,0,0.3);color:#ff9800;border:1px solid rgba(255,152,0,0.3);padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;">导入</button>
                 </div>`;
             });
         }
         listEl.innerHTML = html;
+        window.scannedFiles = scannedFiles;
     }
 
     function saveSettingsAndClose() {
@@ -537,7 +537,7 @@ if (isTauriApp) {
             }
             html += `</div>`;
 
-            const recent = stats.slice(0, 7).reverse();
+            const recent = stats.slice(0, 7);
             html += `<div style="margin-top:12px;"><div style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-bottom:6px;">最近7天明细</div>`;
             for (const s of recent) {
                 const bar = '█'.repeat(Math.min(20, Math.round(s.count / maxCount * 20)));
