@@ -20308,8 +20308,8 @@ function hasGistToken() {
             const dailyStats = data.daily_stats || {};
             const sortedDates = Object.keys(dailyStats).sort();
 
-            // 取最近30天
-            const recentDates = sortedDates.slice(-30);
+            // 取最近30天，反转使"今天→以前"从左到右显示
+            const recentDates = sortedDates.slice(-30).reverse();
 
             // 统计数据
             const totalVisits = data.total_visits || 0;
