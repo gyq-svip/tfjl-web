@@ -6495,75 +6495,97 @@
             document.getElementById('parserResult').innerHTML = '';
         }
 
-        // ==================== 快速输入卡牌（首字母联想） ====================
-        // 拼音首字母映射表（覆盖所有卡牌用到的汉字）
-        const PINYIN_INITIAL_MAP = {
-            '冰':'b','光':'g','雷':'l','暗':'a','木':'m','土':'t','幻':'h','魂':'h','彩':'c','水':'s',
-            '风':'f','火':'h','死':'s','龙':'l','小':'x','幻':'h','悟':'w','空':'k','咕':'g','炮':'p',
-            '邪':'x','能':'n','萨':'s','满':'m','猫':'m','工':'g','匠':'j','圣':'s','骑':'q','天':'t',
-            '使':'s','鱼':'y','人':'r','法':'f','电':'d','死':'s','神':'s','王':'w','魔':'m','影':'y',
-            '黑':'h','暗':'a','战':'z','士':'s','武':'w','僧':'s','刺':'c','客':'k','忍':'r','者':'z',
-            '弓':'g','手':'s','猎':'l','游':'y','侠':'x','盗':'d','贼':'z','骑':'q','士':'s',
-            '月':'y','亮':'l','日':'r','光':'g','星':'x','云':'y','雾':'w','雨':'y','雪':'x',
-            '树':'s','花':'h','草':'c','石':'s','金':'j','银':'y','铜':'t','铁':'t',
-            '骨':'g','血':'x','魂':'h','魄':'p','灵':'l','妖':'y','怪':'g','兽':'s',
-            '甲':'j','盾':'d','剑':'j','刀':'d','枪':'q','斧':'f','锤':'c','鞭':'b',
-            '医':'y','药':'y','毒':'d','瘟':'w','疫':'y','病':'b','伤':'s',
-            '鸟':'n','虫':'c','鱼':'y','蛇':'s','虎':'h','狼':'l','熊':'x','豹':'b',
-            '鸦':'y','鹊':'q','凤':'f','凰':'h','龙':'l','麒':'q','麟':'l','龟':'g',
-            '伞':'s','扇':'s','琴':'q','棋':'q','书':'s','画':'h','珠':'z','宝':'b',
-            '仙':'x','神':'s','佛':'f','魔':'m','妖':'y','鬼':'g','精':'j','灵':'l',
-            '女':'n','男':'n','老':'l','少':'s','童':'t','子':'z','母':'m','父':'f',
-            '冰':'b','火':'h','水':'s','风':'f','雷':'l','电':'d','光':'g','暗':'a',
-            '金':'j','木':'m','水':'s','火':'h','土':'t',
-            '吞':'t','日':'r','月':'y','明':'m','暗':'a','阴阳':'y',
-            '机':'j','器':'q','械':'x','钢':'g','铁':'t','铜':'t','铅':'q','锡':'x',
-            '石':'s','玉':'y','珠':'z','宝':'b','钻':'z','玛':'m','瑙':'n','翡':'f','翠':'c',
-            '矮':'a','巨':'j','小':'x','大':'d','中':'z','高':'g','低':'d',
-            '老':'l','少':'s','幼':'y','成':'c','壮':'z','弱':'r','强':'q',
-            '邪':'x','正':'z','善':'s','恶':'e','凶':'x','吉':'j',
-            '咕':'g','叽':'j','喵':'m','汪':'w','嘶':'s','吼':'h',
-            '百':'b','千':'q','万':'w','亿':'y','零':'l','一':'y','二':'e','三':'s','四':'s','五':'w','六':'l','七':'q','八':'b','九':'j','十':'s',
-            '爆':'b','裂':'l','破':'p','碎':'s','崩':'b','塌':'t','毁':'h','灭':'m',
-            '冰':'b','雪':'x','霜':'s','冻':'d','寒':'h','冷':'l','凉':'l','温':'w','热':'r','烫':'t','沸':'f',
-            '绿':'l','红':'h','黄':'h','蓝':'l','紫':'z','黑':'h','白':'b','灰':'h','橙':'c','粉':'f',
-            '春':'c','夏':'x','秋':'q','冬':'d','早':'z','晚':'w','朝':'z','夕':'x',
-            '东':'d','南':'n','西':'x','北':'b','上':'s','下':'x','左':'z','右':'y','前':'q','后':'h',
-            '内':'n','外':'w','中':'z','旁':'p','侧':'c','底':'d','顶':'d',
-            '战':'z','斗':'d','杀':'s','死':'s','活':'h','生':'s','灭':'m','亡':'w',
-            '攻':'g','守':'s','防':'f','退':'t','进':'j','追':'z','逃':'t','躲':'d','藏':'c',
-            '人':'r','民':'m','众':'z','群':'q','队':'d','团':'t','组':'z','排':'p',
-            '将':'j','帅':'s','王':'w','帝':'d','皇':'h','君':'j','臣':'c','相':'x',
-            '兵':'b','卒':'z','车':'c','马':'m','象':'x','士':'s','帅':'s','将':'j',
-            '毒':'d','药':'y','丹':'d','丸':'w','散':'s','膏':'g','汤':'t','剂':'j',
-            '雪':'x','冰':'b','冻':'d','寒':'h','冷':'l','凉':'l','温':'w','热':'r','烫':'t','沸':'f',
-            '兽':'s','禽':'q','虫':'c','鱼':'y','鸟':'n','蛇':'s','龙':'l','虎':'h','狼':'l','熊':'x','豹':'b','鹰':'y','雕':'d','鹫':'j','雀':'q','雁':'y','鹅':'e','鸭':'y','鸡':'j','猪':'z','狗':'g','猫':'m','鼠':'s','兔':'t','鹿':'l','马':'m','牛':'n','羊':'y','猴':'h'
+        // ==================== 快速输入卡牌（拼音联想，支持全拼+简拼） ====================
+        // 内置字符级拼音映射表，覆盖所有卡牌用到的汉字，无需外部CDN
+
+        const CHAR_PINYIN_MAP = {
+            // 战士类
+            '战':'zhan','将':'jiang','刀':'dao','客':'ke','霸':'ba','王':'wang',
+            '狂':'kuang','龙':'long','亡':'wang','领':'ling','孤':'gu','星':'xing',
+            '拳':'quan','鱼':'yu','铁':'tie','剑':'jian','斧':'fu','恶':'e',
+            '匪':'fei','钢':'gang','鬃':'zong','刺':'ci','神':'shen','石':'shi','头':'tou',
+            // 法师类
+            '小':'xiao','丑':'chou','女':'nv','雷':'lei','谜':'mi','云':'yun',
+            '沙':'sha','龟':'gui','相':'xiang','阿':'a','翼':'yi','火':'huo',
+            '凤':'feng','凰':'huang','冰':'bing','鸟':'niao','电':'dian','法':'fa',
+            '飞':'fei','炎':'yan','暗':'an','炮':'pao','弹':'dan',
+            // 弓箭手类
+            '虎':'hu','毒':'du','后':'hou','船':'chuan','爱':'ai','海':'hai',
+            '骨':'gu','弓':'gong','枪':'qiang','松':'song','绿':'lv','蛛':'zhu',
+            // 召唤师类
+            '幽':'you','灵':'ling','钟':'zhong','馗':'kui','悟':'wu','空':'kong',
+            '骑':'qi','祭':'ji','司':'si','魔':'mo','鬼':'gui','妖':'yao',
+            // 牧师类
+            '咕':'gu','野':'ye','圣':'sheng','鲛':'jiao','天':'tian','使':'shi',
+            '巫':'wu','医':'yi','死':'si','工':'gong','地':'di','精':'jing',
+            '萨':'sa','满':'man','酋':'qiu','长':'zhang','猫':'mao','咪':'mi',
+            '大':'da','树':'shu','鹿':'lu',
+            // 术士类
+            '影':'ying','魇':'yan','葵':'kui','傀':'kui','邪':'xie','闪':'shan',
+            // 熊猫类
+            '萌':'meng','水':'shui','风':'feng','土':'tu',
+            // 工程类
+            '宝':'bao','库':'ku','射':'she','咬':'yao','人':'ren','娃':'wa',
+            '潜':'qian','艇':'ting',
+            // 精灵类
+            '光':'guang','木':'mu','魂':'hun','幻':'huan','彩':'cai',
+            // 其他常见卡牌用字
+            '白':'bai','黑':'hei','红':'hong','金':'jin','银':'yin','木':'mu',
+            '土':'tu','日':'ri','月':'yue','星':'xing','辰':'chen',
+            '甲':'jia','盾':'dun','剑':'jian','刃':'ren','锋':'feng',
+            '兽':'shou','狼':'lang','虎':'hu','豹':'bao','熊':'xiong',
+            '蛇':'she','蝎':'xie','蛛':'zhu','虫':'chong','鱼':'yu',
+            '鸟':'niao','鹰':'ying','雀':'que','凤':'feng','龙':'long',
+            '仙':'xian','神':'shen','鬼':'gui','魔':'mo','妖':'yao','怪':'guai',
+            '皇':'huang','帝':'di','君':'jun','王':'wang','侯':'hou','伯':'bo',
+            '将':'jiang','帅':'shuai','兵':'bing','卒':'zu','士':'shi',
+            '战':'zhan','斗':'dou','攻':'gong','守':'shou','防':'fang',
+            '杀':'sha','生':'sheng','死':'si','灭':'mie','破':'po',
+            '冰':'bing','雪':'xue','霜':'shuang','寒':'han','冻':'dong',
+            '炎':'yan','焰':'yan','烈':'lie','炽':'chi','燃':'ran','烧':'shao',
+            '雷':'lei','电':'dian','闪':'shan','光':'guang','明':'ming','暗':'an',
+            '风':'feng','云':'yun','雨':'yu','雾':'wu','岚':'lan',
+            '山':'shan','岩':'yan','石':'shi','铁':'tie','钢':'gang','金':'jin',
+            '木':'mu','林':'lin','森':'sen','树':'shu','叶':'ye','花':'hua',
+            '水':'shui','海':'hai','江':'jiang','河':'he','湖':'hu','泽':'ze',
+            '火':'huo','焰':'yan','烟':'yan','灰':'hui','炭':'tan',
+            '土':'tu','地':'di','沙':'sha','尘':'chen','泥':'ni'
         };
 
-        // 获取所有卡牌名列表
+        // 获取所有卡牌名列表（含收藏卡牌）
         function getAllCardNames() {
             const names = Object.keys(SKIN_ATTRIBUTES || {});
-            // 也从卡牌数据中补充
-            if (typeof allCards !== 'undefined' && allCards) {
-                allCards.forEach(c => { if (c && c.name) names.push(c.name); });
+            // 从收藏卡牌中补充
+            if (typeof favoriteCards !== 'undefined' && Array.isArray(favoriteCards)) {
+                favoriteCards.forEach(c => { if (c && c.name) names.push(c.name); });
             }
+            // 从DOM中补充已添加的卡牌
+            try {
+                document.querySelectorAll('.card-item[data-name]').forEach(el => {
+                    if (el.dataset.name) names.push(el.dataset.name);
+                });
+            } catch (e) {}
             return [...new Set(names)].sort();
         }
 
-        // 获取卡名的拼音首字母简写
-        function getCardInitial(name) {
-            let result = '';
+        // 获取卡名的全拼（无空格小写）和首字母简拼
+        function getCardPinyin(name) {
+            let full = '', initial = '';
             for (const char of name) {
-                if (PINYIN_INITIAL_MAP[char]) {
-                    result += PINYIN_INITIAL_MAP[char];
-                } else if (/[a-zA-Z0-9]/.test(char)) {
-                    result += char.toLowerCase();
+                if (/[a-zA-Z0-9]/.test(char)) {
+                    full += char.toLowerCase();
+                    initial += char.toLowerCase();
+                } else if (CHAR_PINYIN_MAP[char]) {
+                    const py = CHAR_PINYIN_MAP[char];
+                    full += py;
+                    initial += py[0];
                 }
+                // 未收录的汉字跳过（不影响其他字符的匹配）
             }
-            return result;
+            return { full, initial };
         }
 
-        // 快速输入 - 输入时联想
+        // 快速输入 - 输入时联想（支持全拼、简拼、中文模糊匹配，收藏优先）
         let quickSuggestList = [];
         let quickSuggestIndex = -1;
 
@@ -6577,29 +6599,42 @@
             }
 
             const allNames = getAllCardNames();
+            // 收藏卡牌名集合（用于优先排序）
+            const favNames = new Set();
+            if (typeof favoriteCards !== 'undefined' && Array.isArray(favoriteCards)) {
+                favoriteCards.forEach(c => { if (c && c.name) favNames.add(c.name); });
+            }
             const matched = [];
 
             for (const name of allNames) {
-                const initial = getCardInitial(name);
+                const py = getCardPinyin(name);
                 let score = 0;
-                // 完全匹配首字母
-                if (initial === input) score = 100;
-                // 首字母开头匹配
-                else if (initial.startsWith(input)) score = 80;
-                // 包含首字母
-                else if (initial.includes(input)) score = 60;
-                // 卡名包含输入
-                if (name.includes(input) || name.toLowerCase().includes(input)) score = Math.max(score, 70);
+                // 完全匹配首字母简拼
+                if (py.initial === input) score = 100;
+                // 首字母简拼开头匹配
+                else if (py.initial.startsWith(input)) score = 90;
+                // 首字母简拼包含
+                else if (py.initial.includes(input)) score = 70;
+                // 完全匹配全拼
+                if (py.full === input) score = Math.max(score, 95);
+                // 全拼开头匹配
+                else if (py.full.startsWith(input)) score = Math.max(score, 85);
+                // 全拼包含
+                else if (py.full.includes(input)) score = Math.max(score, 65);
+                // 卡名包含输入（中文模糊）
+                if (name.includes(input) || name.toLowerCase().includes(input)) score = Math.max(score, 80);
                 // 卡名开头匹配
-                if (name.toLowerCase().startsWith(input)) score = Math.max(score, 90);
+                if (name.toLowerCase().startsWith(input)) score = Math.max(score, 88);
 
                 if (score > 0) {
-                    matched.push({ name, score, initial });
+                    // 收藏卡牌加分（优先显示）
+                    if (favNames.has(name)) score += 5;
+                    matched.push({ name, score, initial: py.initial, full: py.full, isFav: favNames.has(name) });
                 }
             }
 
             matched.sort((a, b) => b.score - a.score);
-            quickSuggestList = matched.slice(0, 8);
+            quickSuggestList = matched.slice(0, 10);
             quickSuggestIndex = -1;
 
             if (quickSuggestList.length === 0) {
@@ -6608,11 +6643,13 @@
             }
 
             // 渲染建议列表
-            let html = '<div style="position:absolute;top:0;left:0;right:0;background:#1a1a2e;border:1px solid rgba(0,188,212,0.5);border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.6);max-height:200px;overflow-y:auto;z-index:30;">';
+            let html = '<div style="position:absolute;top:0;left:0;right:0;background:#1a1a2e;border:1px solid rgba(0,188,212,0.5);border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.6);max-height:220px;overflow-y:auto;z-index:30;">';
             quickSuggestList.forEach((item, idx) => {
-                html += `<div class="quick-suggest-item" data-name="${item.name}" onclick="selectQuickCard('${item.name}')" style="padding:6px 12px;cursor:pointer;font-size:0.85rem;color:#fff;border-bottom:1px solid rgba(255,255,255,0.05);display:flex;justify-content:space-between;align-items:center;" onmouseover="this.style.background='rgba(0,188,212,0.2)';quickSuggestIndex=${idx};" onmouseout="this.style.background='';">`;
-                html += `<span style="color:#00bcd4;">${item.name}</span>`;
-                html += `<span style="color:rgba(255,255,255,0.3);font-size:0.75rem;">${item.initial}</span>`;
+                const favStar = item.isFav ? '<span style="color:#ffd700;margin-right:4px;">★</span>' : '';
+                const nameColor = item.isFav ? '#ffd700' : '#00bcd4';
+                html += `<div class="quick-suggest-item" data-name="${item.name}" onclick="selectQuickCard('${item.name}')" style="padding:6px 12px;cursor:pointer;font-size:0.85rem;color:#fff;border-bottom:1px solid rgba(255,255,255,0.05);display:flex;justify-content:space-between;align-items:center;${item.isFav ? 'background:rgba(255,215,0,0.08);' : ''}" onmouseover="this.style.background='rgba(0,188,212,0.2)';quickSuggestIndex=${idx};" onmouseout="this.style.background='${item.isFav ? 'rgba(255,215,0,0.08)' : ''}';">`;
+                html += `<span style="color:${nameColor};">${favStar}${item.name}</span>`;
+                html += `<span style="color:rgba(255,255,255,0.3);font-size:0.72rem;">${item.initial} / ${item.full}</span>`;
                 html += `</div>`;
             });
             html += '</div>';
