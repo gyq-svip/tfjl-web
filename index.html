@@ -8135,6 +8135,18 @@
         </div>
 
         <script>
+        // ==================== Service Worker 注册（PWA缓存） ====================
+        // 首次访问缓存资源，后续打开用缓存秒开，后台静默更新
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('./sw.js', { scope: './' }).then(function(registration) {
+                    console.log('[PWA] Service Worker 注册成功，scope:', registration.scope);
+                }).catch(function(err) {
+                    console.warn('[PWA] Service Worker 注册失败:', err);
+                });
+            });
+        }
+
         function toggleProjectMenu(btn) {
             const menu = document.getElementById('projectMenu');
             if (menu.style.display === 'none' || menu.style.display === '') {
