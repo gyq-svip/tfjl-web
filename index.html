@@ -6968,7 +6968,9 @@
             });
 
             // 限制最多10张
+            let overLimitCards = [];
             if (heroNames.length > 10) {
+                overLimitCards = heroNames.slice(10);
                 heroNames = heroNames.slice(0, 10);
             }
 
@@ -7035,6 +7037,9 @@
             }
             if (filteredFusion.length > 0) {
                 resultHtml += `<br><span style="color:#9c27b0;">🚫 已过滤融合卡：${filteredFusion.join('、')}（融合卡需拆分为单卡）</span>`;
+            }
+            if (overLimitCards.length > 0) {
+                resultHtml += `<br><span style="color:#ff5722;">⚠️ 超出10张上限，已忽略：${overLimitCards.join('、')}</span>`;
             }
             if (duplicateCards.length > 0) {
                 resultHtml += `<br><span style="color:#ff9800;">⚠️ 重复卡牌：${duplicateCards.join('、')}</span>`;
@@ -7125,6 +7130,13 @@
             if (heroNames.length === 0 && filteredFusion.length > 0) {
                 resultEl.innerHTML = '<span style="color:#9c27b0;">🚫 输入的均为融合卡，已过滤。融合卡需拆分为单卡后重新输入。</span>';
                 return;
+            }
+
+            // 超出10张上限提示
+            let overLimitCards = [];
+            if (heroNames.length > 10) {
+                overLimitCards = heroNames.slice(10);
+                heroNames = heroNames.slice(0, 10);
             }
 
             // 精灵类卡名列表（精灵不占位置，跳过）
@@ -7302,9 +7314,11 @@
             const totalDamageReduction = calculateDamageReductionForCards(actualBattleCards);
 
             // 显示结果
+            const overLimitHtml = overLimitCards.length > 0 ? `<div style="color:#ff5722;font-size:0.85rem;margin-bottom:8px;">⚠️ 超出10张上限，已忽略：${overLimitCards.join('、')}</div>` : '';
             resultEl.innerHTML = `
                 <div style="background:rgba(0,0,0,0.3);padding:10px;border-radius:8px;margin-top:5px;">
                     <div style="color:#4caf50;font-weight:bold;margin-bottom:8px;">✅ ${includeChengShang ? '活动' : '隐藏榜'}脚本输出：</div>
+                    ${overLimitHtml}
                     <div style="background:rgba(78,205,196,0.1);border:1px solid rgba(78,205,196,0.3);border-radius:6px;padding:8px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
                         <span style="color:#4ecdc4;font-size:0.85rem;">🛡️ 总减伤：<strong style="color:#fff;font-size:1rem;">${totalDamageReduction}</strong></span>
                         <span style="color:rgba(255,255,255,0.5);font-size:0.75rem;">主界面「🛡️ 减伤」按钮设置每张卡的减伤洗炼值 · 只计算首次上阵的7张卡总减伤</span>
@@ -7408,6 +7422,13 @@
             if (heroNames.length === 0 && filteredFusion.length > 0) {
                 resultEl.innerHTML = '<span style="color:#9c27b0;">🚫 输入的均为融合卡，已过滤。融合卡需拆分为单卡后重新输入。</span>';
                 return;
+            }
+
+            // 超出10张上限提示
+            let overLimitCards = [];
+            if (heroNames.length > 10) {
+                overLimitCards = heroNames.slice(10);
+                heroNames = heroNames.slice(0, 10);
             }
 
             // 卡牌分类
@@ -7649,8 +7670,10 @@
             const totalDamageReduction = calculateDamageReductionForCards(dungeonBattleCards);
 
             // 显示结果
+            const overLimitHtml2 = overLimitCards.length > 0 ? '<div style="color:#ff5722;font-size:0.85rem;margin-bottom:8px;">⚠️ 超出10张上限，已忽略：' + overLimitCards.join('、') + '</div>' : '';
             resultEl.innerHTML = '<div style="background:rgba(0,0,0,0.3);padding:10px;border-radius:8px;margin-top:5px;">' +
                 '<div style="color:#ff9800;font-weight:bold;margin-bottom:8px;">✅ 深海脚本输出：</div>' +
+                overLimitHtml2 +
                 '<div style="background:rgba(78,205,196,0.1);border:1px solid rgba(78,205,196,0.3);border-radius:6px;padding:8px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">' +
                 '<span style="color:#4ecdc4;font-size:0.85rem;">🛡️ 总减伤：<strong style="color:#fff;font-size:1rem;">' + totalDamageReduction + '</strong></span>' +
                 '<span style="color:rgba(255,255,255,0.5);font-size:0.75rem;">主界面「🛡️ 减伤」按钮设置每张卡的减伤洗炼值 · 只计算首次上阵的7张卡总减伤</span>' +
