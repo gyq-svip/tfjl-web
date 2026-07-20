@@ -6379,8 +6379,8 @@
                 parserBtn.style.color = 'rgba(255,255,255,0.5)';
                 parserBtn.style.fontWeight = 'normal';
                 parserBtn.style.borderBottom = 'none';
-                // 自动静默扫描（不阻塞UI）
-                if (typeof silentScanFiles === 'function') { silentScanFiles(); }
+                // 自动静默扫描并刷新列表
+                if (window.silentScanFiles) { window.silentScanFiles().then(() => { if (typeof filterTxtFilesList === 'function') filterTxtFilesList(); }); }
             } else {
                 filesTab.style.display = 'none';
                 parserTab.style.display = 'flex';
@@ -7315,7 +7315,8 @@
                 output += '01:20,下龙王,上龙王不满,\n';
             }
 
-            // 无敌链逻辑（小野8秒无敌 → 凤凰6秒无敌）
+            // 无敌链逻辑（小野8秒无敌 → 凤凰6秒无敌）—— 仅隐藏榜生效，活动脚本不切卡
+            if (!includeChengShang) {
             // 第一张卡名（arrangedCards的第一张）
             const firstCardName = arrangedCards[0] || '第一张卡';
             // 凤凰/小野检测：区分"携带"（在牌库中）和"上阵"（在arrangedCards中）
@@ -7332,9 +7333,10 @@
             ).length;
 
             // 情况1：小野携带但没上阵 + 凤凰携带但没上阵 + 卡>6张 → 上下小野 + 02:38上下凤凰
+            // 情况2：只有凤凰没有小野（凤凰携带但没上阵，小野未携带）→ 下第一张卡切凤凰再切回
             // 情况3：小野携带但没上阵 + 凤凰已上阵 → 02:36下凤凰上小野（不切回）
             // 情况4：小野已上阵 + 凤凰携带但没上阵 → 02:38下小野上下凤凰（切回小野）
-            // 情况2/5：其他情况不切卡（没携带的不切）
+            // 情况5：其他情况不切卡（没携带的不切）
 
             const xiaoYeNotInBattle = xiaoYeCarried && !xiaoYeDeployed;
             const fengHuangNotInBattle = fengHuangCarried && !fengHuangDeployed;
@@ -7352,10 +7354,12 @@
                 output += `02:36,下凤凰,上小野满,\n`;
             }
 
-            // 02:38 上下凤凰（情况1或情况4）
+            // 02:38 上下凤凰（情况1/情况2/情况4）
             // 情况1：小野没上阵+凤凰没上阵+卡>6 → 02:38用{第一张卡}上下凤凰
+            // 情况2：只有凤凰没有小野（凤凰没上阵，小野未携带）→ 02:38用{第一张卡}上下凤凰
             // 情况4：小野已上阵+凤凰没上阵 → 02:38用小野上下凤凰（切回小野）
-            const needFengHuangSwitch = fengHuangNotInBattle && (needXiaoYeSwitch || xiaoYeDeployed);
+            const needFengHuangOnlySwitch = fengHuangNotInBattle && !xiaoYeCarried;  // 情况2：只有凤凰没有小野
+            const needFengHuangSwitch = fengHuangNotInBattle && (needXiaoYeSwitch || xiaoYeDeployed || needFengHuangOnlySwitch);
             if (needFengHuangSwitch) {
                 if (needXiaoYeSwitch) {
                     // 情况1：小野是切换进来的，02:31已下小野，02:38用{第一张卡}上下凤凰
@@ -7363,16 +7367,14 @@
                 } else if (xiaoYeDeployed) {
                     // 情况4：小野本来在阵容，02:38用小野上下凤凰，最后切回小野
                     output += `02:38,下小野,上凤凰4级,时钟秒0.5,下凤凰,上小野满,\n`;
+                } else if (needFengHuangOnlySwitch) {
+                    // 情况2：只有凤凰没有小野，下第一张卡切凤凰再切回
+                    output += `02:38,下${firstCardName},上凤凰4级,时钟秒0.5,下凤凰,上${firstCardName}满,\n`;
                 }
             }
 
-            // 提示标记：上下小野或上下凤凰或下凤凰上小野都要弹窗
-            const needXiaoYeAlert = needXiaoYeSwitch;           // 上下小野提示
-            const needFengHuangAlert = needFengHuangSwitch;       // 上下凤凰提示
-            const needFengHuangToXiaoYeAlert = needFengHuangToXiaoYe;  // 下凤凰上小野提示
-
             // 切卡完成后，如果有精灵，继续打精灵逻辑
-            const hasAnySwitch = needXiaoYeSwitch || needFengHuangSwitch || needFengHuangToXiaoYe;
+            const hasAnySwitch = needXiaoYeSwitch || needFengHuangSwitch || needFengHuangToXiaoYe || needFengHuangOnlySwitch;
             const hasAnyJingLing = hasLeiJingLing || hasMoJingLing || hasMuJingLing || hasHunJingLing;
             if (hasAnySwitch && hasAnyJingLing) {
                 // 切卡最后一步是"上满"，之后继续打精灵
@@ -7384,6 +7386,7 @@
                 if (jingLingAfterSwitch.length > 0) {
                     output += '02:40,' + jingLingAfterSwitch.join(',') + ',\n';
                 }
+            }
             }
 
             // 同排机制：飞机+大圣
@@ -7443,6 +7446,7 @@
                     <div style="display:flex;gap:8px;margin-top:10px;">
                         <button onclick="copyActivityScriptOutput()" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.85rem;">📋 复制脚本</button>
                         <button onclick="showSaveScriptDialog('activity')" style="background:linear-gradient(135deg,#2196f3,#1565c0);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.85rem;">💾 保存到项目</button>
+                        <button onclick="saveActivityScriptToMa()" style="background:linear-gradient(135deg,#e65100,#bf360c);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.85rem;" title="保存到老马的活动脚本目录">💾 保存到老马</button>
                         <button onclick="shareScriptToWall('activity')" style="background:linear-gradient(135deg,#9c27b0,#7b1fa2);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.85rem;">📢 分享到需求墙</button>
                     </div>
                 </div>
@@ -7452,11 +7456,16 @@
             window._activityScriptOutput = output;
 
             // 切卡提示：有凤凰/小野需要切卡时统一提示
-            if (needFengHuangAlert || needXiaoYeAlert || needFengHuangToXiaoYeAlert) {
+            const needXiaoYeAlert = needXiaoYeSwitch;
+            const needFengHuangAlert = needFengHuangSwitch;
+            const needFengHuangToXiaoYeAlert = needFengHuangToXiaoYe;
+            const needFengHuangOnlyAlert = needFengHuangOnlySwitch;
+            if (needFengHuangAlert || needXiaoYeAlert || needFengHuangToXiaoYeAlert || needFengHuangOnlyAlert) {
                 setTimeout(() => {
                     alert('⚠️ 检查到有凤凰或小野，可能要切卡\n\n请注意：\n1. 请根据实际情况修改需要上下的卡\n2. 请根据自身情况修改上下卡时间\n3. 不需要上下卡的请自行删除即可');
                 }, 100);
             }
+            } // 结束 if (!includeChengShang) 隐藏榜切卡逻辑块
         }
 
         // 复制活动脚本输出
@@ -7468,6 +7477,28 @@
             }).catch(err => {
                 console.error('复制失败:', err);
             });
+        }
+
+        // 保存活动脚本到老马目录
+        async function saveActivityScriptToMa() {
+            const content = window._activityScriptOutput || document.getElementById('activityScriptTextarea')?.value;
+            if (!content) { alert('没有可保存的脚本内容'); return; }
+            if (!window.saveScriptToMaDir) { alert('此功能仅在桌面应用中可用\n\n需要先配置老马目录（左上角"APP本地设置"）'); return; }
+            const defaultName = '活动脚本_' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '.txt';
+            const fileName = prompt('请输入脚本文件名（含扩展名）：', defaultName);
+            if (!fileName) return;
+            await window.saveScriptToMaDir('activity', fileName, content);
+        }
+
+        // 保存副本脚本到老马目录
+        async function saveDungeonScriptToMa() {
+            const content = window._dungeonScriptOutput || document.getElementById('dungeonScriptTextarea')?.value;
+            if (!content) { alert('没有可保存的脚本内容'); return; }
+            if (!window.saveScriptToMaDir) { alert('此功能仅在桌面应用中可用\n\n需要先配置老马目录（左上角"APP本地设置"）'); return; }
+            const defaultName = '深海脚本_' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '.txt';
+            const fileName = prompt('请输入脚本文件名（含扩展名）：', defaultName);
+            if (!fileName) return;
+            await window.saveScriptToMaDir('coop', fileName, content);
         }
 
         // 深海脚本生成功能
@@ -7805,6 +7836,7 @@
                 '<div style="display:flex;gap:8px;margin-top:10px;">' +
                 '<button onclick="copyDungeonScriptOutput()" style="background:linear-gradient(135deg,#ff9800,#e65100);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.85rem;">📋 复制脚本</button>' +
                 '<button onclick="showSaveScriptDialog(\'dungeon\')" style="background:linear-gradient(135deg,#2196f3,#1565c0);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.85rem;">💾 保存到项目</button>' +
+                '<button onclick="saveDungeonScriptToMa()" style="background:linear-gradient(135deg,#e65100,#bf360c);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.85rem;" title="保存到老马的合作脚本目录">💾 保存到老马</button>' +
                 '<button onclick="shareScriptToWall(\'dungeon\')" style="background:linear-gradient(135deg,#9c27b0,#7b1fa2);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.85rem;">📢 分享到需求墙</button>' +
                 '</div></div>';
 
@@ -8538,7 +8570,7 @@
                     <div style="text-align:center;color:#4caf50;font-size:1.1rem;font-weight:bold;">📄 拖拽文件到此处松手<br><span style="font-size:0.8rem;font-weight:normal;opacity:0.8;">支持 .txt / .js / .json / .lua / .py / .sh 文件</span></div>
                 </div>
                 <div style="margin-bottom:10px;">
-                    <input id="txtFileSearchInput" type="text" placeholder="🔍 搜索脚本..." oninput="filterTxtFilesList()" style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid rgba(76,175,80,0.3);background:rgba(0,0,0,0.3);color:#fff;font-size:0.85rem;box-sizing:border-box;">
+                    <input id="txtFileSearchInput" type="text" placeholder="🔍 搜索项目脚本或扫描文件…（输入关键字过滤）" oninput="filterTxtFilesList()" style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid rgba(76,175,80,0.3);background:rgba(0,0,0,0.3);color:#fff;font-size:0.85rem;box-sizing:border-box;">
                 </div>
                 <div id="txtFilesList" style="display:flex;flex-direction:column;gap:10px;"></div>
                 <div style="margin-top:10px;color:rgba(255,255,255,0.5);font-size:0.75rem;">💡 支持上传多个TXT文件，也可拖拽文件到此处或 Ctrl+V 粘贴</div>
@@ -9797,6 +9829,86 @@
             list.innerHTML = html;
         }
 
+        // ==================== 脚本列表多选状态 ====================
+        window._selImportPaths = new Set();
+
+        function toggleImportSelect(path, checked) {
+            if (checked) { window._selImportPaths.add(path); }
+            else { window._selImportPaths.delete(path); }
+            refreshBatchImportBtn();
+        }
+
+        function toggleAllImportSelects(checked) {
+            window._selImportPaths.clear();
+            if (checked) {
+                document.querySelectorAll('.import-checkbox').forEach(cb => { cb.checked = true; window._selImportPaths.add(cb.value); });
+            } else {
+                document.querySelectorAll('.import-checkbox').forEach(cb => { cb.checked = false; });
+            }
+            refreshBatchImportBtn();
+        }
+
+        function refreshBatchImportBtn() {
+            const btn = document.getElementById('batchImportBtn');
+            if (!btn) return;
+            const n = window._selImportPaths.size;
+            btn.textContent = n > 0 ? `📥 批量导入 (${n})` : '📥 批量导入';
+            btn.style.opacity = n > 0 ? '1' : '0.5';
+        }
+
+        function doBatchImport() {
+            const paths = Array.from(window._selImportPaths);
+            if (paths.length === 0) { alert('请先勾选要导入的文件'); return; }
+            if (window.batchImportFilesToProject) {
+                window.batchImportFilesToProject(paths);
+            }
+        }
+
+        // 生成可导入扫描文件的HTML（共用）
+        function renderScannedFilesSection(scannedFiles, keyword) {
+            const existingNames = new Set(txtFiles.map(f => f.name));
+            const fresh = scannedFiles.filter(f => !existingNames.has(f.name));
+            if (fresh.length === 0) return '';
+
+            // 有关键字时过滤
+            const list = keyword ? fresh.filter(f => f.name.toLowerCase().includes(keyword)) : fresh;
+            if (list.length === 0) return '';
+
+            let html = `<div style="margin-top:12px;padding-top:10px;border-top:2px solid rgba(0,188,212,0.3);">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
+                    <div style="color:#00bcd4;font-size:0.85rem;font-weight:bold;">📂 可导入文件 (${list.length}个)</div>
+                    <div style="display:flex;gap:6px;align-items:center;">
+                        <label style="color:rgba(255,255,255,0.5);font-size:0.7rem;cursor:pointer;">
+                            <input type="checkbox" onchange="toggleAllImportSelects(this.checked)" style="cursor:pointer;vertical-align:middle;"> 全选
+                        </label>
+                        <button id="batchImportBtn" onclick="doBatchImport()" style="background:linear-gradient(135deg,#ff9800,#f57c00);color:white;border:none;padding:4px 12px;border-radius:5px;cursor:pointer;font-size:0.75rem;opacity:0.5;">📥 批量导入</button>
+                    </div>
+                </div>
+                <div style="max-height:260px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(0,188,212,0.3) transparent;padding-right:4px;display:flex;flex-direction:column;gap:5px;">`;
+
+            list.forEach(f => {
+                const safePath = f.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                let displayName = escapeHtml(f.name);
+                if (keyword) {
+                    const regex = new RegExp(`(${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+                    displayName = displayName.replace(regex, '<span style="background:#00bcd4;color:#000;padding:0 2px;border-radius:2px;">$1</span>');
+                }
+                html += `<div style="background:rgba(0,188,212,0.06);border:1px dashed rgba(0,188,212,0.3);border-radius:6px;padding:8px 10px;display:flex;align-items:center;gap:8px;">
+                    <input type="checkbox" class="import-checkbox" value="${safePath}" onchange="toggleImportSelect('${safePath}', this.checked)" style="flex-shrink:0;cursor:pointer;accent-color:#00bcd4;">
+                    <div style="flex:1;overflow:hidden;">
+                        <div style="color:#00bcd4;font-weight:bold;font-size:0.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${displayName}</div>
+                        <div style="color:rgba(255,255,255,0.35);font-size:0.7rem;">${f.dirLabel} · ${f.ext.toUpperCase()}</div>
+                    </div>
+                    <button onclick="if(window.importFileToProject)window.importFileToProject('${safePath}')" style="background:rgba(255,152,0,0.2);color:#ff9800;border:1px solid rgba(255,152,0,0.3);padding:4px 10px;border-radius:4px;cursor:pointer;font-size:0.7rem;flex-shrink:0;white-space:nowrap;">📥 导入</button>
+                </div>`;
+            });
+
+            html += `</div>
+                <div style="color:rgba(255,255,255,0.3);font-size:0.7rem;margin-top:6px;">💡 勾选多个文件后可批量导入，输入关键字可过滤列表</div>
+            </div>`;
+            return html;
+        }
+
         // 模糊搜索过滤脚本列表（同时搜索项目文件 + 扫描目录文件）
         function filterTxtFilesList() {
             const keyword = (document.getElementById('txtFileSearchInput')?.value || '').trim().toLowerCase();
@@ -9804,6 +9916,7 @@
             if (!list) return;
 
             const scannedFiles = window.scannedFiles || [];
+            window._selImportPaths.clear(); // 切换搜索时清空选择
 
             if (txtFiles.length === 0 && scannedFiles.length === 0) {
                 list.innerHTML = '<div style="color:rgba(255,255,255,0.4);padding:10px;text-align:center;">暂无文本文件</div>';
@@ -9812,13 +9925,11 @@
 
             let html = '';
 
-            // 1. 搜索项目中的脚本文件
-            let projectMatched = false;
+            // 1. 项目中的脚本文件
             txtFiles.forEach((file, i) => {
                 const nameMatch = file.name.toLowerCase().includes(keyword);
                 const contentMatch = keyword ? file.content.toLowerCase().includes(keyword) : true;
                 if (keyword && !nameMatch && !contentMatch) return;
-                projectMatched = true;
 
                 let displayName = escapeHtml(file.name);
                 if (keyword && nameMatch) {
@@ -9833,6 +9944,7 @@
                             <div style="color:rgba(255,255,255,0.5);font-size:0.8rem;">${(file.content.length / 1024).toFixed(1)} KB</div>
                         </div>
                         <div style="display:flex;gap:5px;flex-shrink:0;flex-wrap:wrap;">
+                            <button onclick="shareTxtFileToWall(${i})" title="分享到需求墙" style="background:linear-gradient(135deg,#9c27b0,#7b1fa2);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">📢</button>
                             <button onclick="openTxtFileWindow(${i})" title="打开" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">✏️</button>
                             <button onclick="renameTxtFile(${i})" title="重命名" style="background:linear-gradient(135deg,#ff9800,#f57c00);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">✏️</button>
                             <button onclick="downloadTxtFile(${i})" title="下载" style="background:linear-gradient(135deg,#2196f3,#1565c0);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">📥</button>
@@ -9842,50 +9954,17 @@
                 </div>`;
             });
 
-            // 2. 搜索扫描目录中的文件（仅当有搜索关键字时，且排除已在项目中的文件）
-            if (keyword && scannedFiles.length > 0) {
-                const existingNames = new Set(txtFiles.map(f => f.name));
-                let scannedMatched = false;
-
-                scannedFiles.forEach(f => {
-                    if (existingNames.has(f.name)) return;
-                    if (!f.name.toLowerCase().includes(keyword)) return;
-
-                    if (!scannedMatched) {
-                        html += `<div style="color:#00bcd4;font-size:0.8rem;margin:12px 0 6px;padding:6px 0;border-top:1px solid rgba(0,188,212,0.2);">
-                            📂 来自扫描目录（未导入）
-                        </div>`;
-                        scannedMatched = true;
-                    }
-
-                    const safePath = f.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-                    let displayName = escapeHtml(f.name);
-                    const regex = new RegExp(`(${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-                    displayName = displayName.replace(regex, '<span style="background:#00bcd4;color:#000;padding:0 2px;border-radius:2px;">$1</span>');
-
-                    html += `<div style="background:rgba(0,188,212,0.05);border:1px dashed rgba(0,188,212,0.4);border-radius:8px;padding:12px;">
-                        <div style="display:flex;justify-content:space-between;align-items:center;">
-                            <div style="flex:1;overflow:hidden;">
-                                <div style="color:#00bcd4;font-weight:bold;margin-bottom:2px;">📂 ${displayName}</div>
-                                <div style="color:rgba(255,255,255,0.35);font-size:0.7rem;">${f.dirLabel} · ${f.ext.toUpperCase()}</div>
-                            </div>
-                            <button onclick="importFileToProject('${safePath}')" style="background:linear-gradient(135deg,#ff9800,#f57c00);color:white;border:none;padding:5px 12px;border-radius:5px;cursor:pointer;font-size:0.75rem;flex-shrink:0;">📥 导入到项目</button>
-                        </div>
-                    </div>`;
-                });
+            // 2. 扫描目录文件（有关键字时过滤，无关键字时全显示）
+            if (scannedFiles.length > 0) {
+                html += renderScannedFilesSection(scannedFiles, keyword);
             }
 
             // 2.1 有搜索关键字但扫描文件为空 → 提示扫描
             if (keyword && scannedFiles.length === 0) {
                 html += `<div style="margin-top:10px;padding:10px;background:rgba(255,152,0,0.08);border:1px dashed rgba(255,152,0,0.2);border-radius:6px;text-align:center;">
                     <div style="color:rgba(255,255,255,0.4);font-size:0.75rem;margin-bottom:6px;">尚未扫描文件目录，无法搜索外部脚本</div>
-                    <button onclick="(typeof silentScanFiles==='function')&&silentScanFiles().then(()=>filterTxtFilesList())" style="background:linear-gradient(135deg,#ff9800,#f57c00);color:white;border:none;padding:4px 14px;border-radius:5px;cursor:pointer;font-size:0.75rem;">🔍 扫描文件目录</button>
+                    <button onclick="if(window.silentScanFiles)window.silentScanFiles().then(()=>filterTxtFilesList())" style="background:linear-gradient(135deg,#ff9800,#f57c00);color:white;border:none;padding:4px 14px;border-radius:5px;cursor:pointer;font-size:0.75rem;">🔍 扫描文件目录</button>
                 </div>`;
-            }
-
-            // 无关键字时，仅显示提示（不再展示全部扫描文件，避免列表过长）
-            if (!keyword && scannedFiles.length > 0 && txtFiles.length === 0) {
-                html = '<div style="color:rgba(255,255,255,0.4);padding:10px;text-align:center;">在搜索框中输入关键词，可搜索项目脚本和扫描目录中的文件</div>';
             }
 
             if (!html) {
