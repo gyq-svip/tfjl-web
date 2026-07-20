@@ -7303,6 +7303,43 @@
                 output += '01:20,下龙王,上龙王不满,\n';
             }
 
+            // 凤凰与多卡换卡逻辑（无敌链：小野8秒无敌 → 凤凰6秒无敌）
+            // 第一张卡名（arrangedCards的第一张）
+            const firstCardName = arrangedCards[0] || '第一张卡';
+            const hasFengHuang = heroNames.some(name => name.includes('凤凰'));
+            const hasXiaoYe = heroNames.some(name => name.includes('小野'));
+            // 非工程非精灵卡数量
+            const nonGongChengNonJingLingCount = heroNames.filter(name =>
+                !gongChengNames.some(gc => name.includes(gc)) &&
+                !jingLingNames.some(jl => name.includes(jl))
+            ).length;
+            // 超过6张卡且没有小野时，需要上下小野触发8秒无敌
+            const needXiaoYeSwitch = nonGongChengNonJingLingCount > 6 && !hasXiaoYe;
+
+            // 上下小野（02:26-02:31）：触发小野8秒无敌
+            if (needXiaoYeSwitch) {
+                output += `02:26,下${firstCardName},上小野满,\n`;
+                output += `02:31,下小野,上${firstCardName}满,\n`;
+            }
+
+            // 上下凤凰（02:38）：小野无敌用完后上凤凰触发6秒无敌
+            if (hasFengHuang) {
+                if (needXiaoYeSwitch) {
+                    // 小野是切换进来的，02:31已下小野，所以02:38用{第一张卡}上下凤凰
+                    output += `02:38,下${firstCardName},上凤凰4级,时钟秒0.5,下凤凰,上${firstCardName}满,\n`;
+                } else if (hasXiaoYe) {
+                    // 小野本来就在阵容里，02:38用小野上下凤凰
+                    output += `02:38,下小野,上凤凰4级,时钟秒0.5,下凤凰,上小野满,\n`;
+                } else {
+                    // 没有小野也没切换，02:38用{第一张卡}上下凤凰
+                    output += `02:38,下${firstCardName},上凤凰4级,时钟秒0.5,下凤凰,上${firstCardName}满,\n`;
+                }
+            }
+
+            // 提示标记：上下小野或上下凤凰都要弹窗
+            const needXiaoYeAlert = needXiaoYeSwitch;       // 上下小野提示
+            const needFengHuangAlert = hasFengHuang;          // 上下凤凰提示
+
             // 同排机制：飞机+大圣
             if (hasTongPai) {
                 if (hasGuangJingLing) {
@@ -7367,6 +7404,28 @@
 
             // 保存输出到全局变量供复制使用
             window._activityScriptOutput = output;
+
+            // 上下凤凰提示：生成完成后弹出确认框
+            if (needFengHuangAlert) {
+                let fengHuangLine = '';
+                if (needXiaoYeSwitch) {
+                    fengHuangLine = '02:38,下' + firstCardName + ',上凤凰4级,时钟秒0.5,下凤凰,上' + firstCardName + '满,';
+                } else if (hasXiaoYe) {
+                    fengHuangLine = '02:38,下小野,上凤凰4级,时钟秒0.5,下凤凰,上小野满,';
+                } else {
+                    fengHuangLine = '02:38,下' + firstCardName + ',上凤凰4级,时钟秒0.5,下凤凰,上' + firstCardName + '满,';
+                }
+                setTimeout(() => {
+                    alert('⚠️ 凤凰换卡提示 ⚠️\n\n检测到卡组中有【凤凰】，已自动添加以下换卡指令：\n\n' + fengHuangLine + '\n\n⚠️ 注意：以上指令涉及上下凤凰操作！\n\n逻辑说明：小野8秒无敌用完后，上凤凰触发6秒无敌\n\n请注意：\n1. 请根据实际情况修改上下的卡名\n2. 请根据自身情况修改时间\n3. 不需要上下卡的行请自行删除\n\n请确认后继续使用！');
+                }, 100);
+            }
+
+            // 上下小野提示（超过6张卡且没有小野）
+            if (needXiaoYeAlert) {
+                setTimeout(() => {
+                    alert('⚠️ 上下小野提示 ⚠️\n\n检测到卡组中非工程非精灵卡超过6张（共' + nonGongChengNonJingLingCount + '张）且没有小野，已自动添加上下小野换卡指令：\n\n02:26,下' + firstCardName + ',上小野满,\n02:31,下小野,上' + firstCardName + '满,\n\n⚠️ 注意：以上指令涉及上下小野操作！\n\n逻辑说明：切换小野进场触发8秒无敌，无敌结束后换回原卡\n\n请注意：\n1. 请根据实际情况修改上下的卡名（当前默认第一张卡：' + firstCardName + '）\n2. 请根据自身情况修改时间\n3. 不需要上下卡的行请自行删除\n4. 小野上下卡操作请确认时间正确\n\n请确认后继续使用！');
+                }, 100);
+            }
         }
 
         // 复制活动脚本输出

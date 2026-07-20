@@ -27,49 +27,59 @@ if (isTauriApp) {
 
     async function tauriInvoke(cmd, args = {}) {
         try {
-            // Tauri v2 的 invoke 在 __TAURI_INTERNALS__ 或 __TAURI__.core
+            // Tauri v2 的 invoke 在 __TAURI_INTERNALS__ 中
             let invokeFn = null;
-            if (window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke) {
+            if (window.__TAURI_INTERNALS__ && typeof window.__TAURI_INTERNALS__.invoke === 'function') {
                 invokeFn = window.__TAURI_INTERNALS__.invoke.bind(window.__TAURI_INTERNALS__);
-            } else if (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke) {
+            } else if (window.__TAURI__ && window.__TAURI__.core && typeof window.__TAURI__.core.invoke === 'function') {
                 invokeFn = window.__TAURI__.core.invoke.bind(window.__TAURI__.core);
             }
             if (!invokeFn) {
-                console.error('[APP] 未找到 invoke 函数');
+                console.error('[APP] 未找到 invoke 函数。__TAURI_INTERNALS__:', !!window.__TAURI_INTERNALS__, 
+                    'keys:', window.__TAURI_INTERNALS__ ? Object.keys(window.__TAURI_INTERNALS__) : 'N/A');
+                alert('[调试] 未找到Tauri invoke函数\n__TAURI_INTERNALS__存在: ' + !!window.__TAURI_INTERNALS__ + 
+                    '\nkeys: ' + (window.__TAURI_INTERNALS__ ? Object.keys(window.__TAURI_INTERNALS__).join(', ') : 'N/A'));
                 return null;
             }
             return await invokeFn(cmd, args);
         } catch (e) {
             console.error('[APP] invoke 失败:', cmd, e);
+            alert('[调试] invoke调用失败: ' + cmd + '\n错误: ' + (e.message || e));
             return null;
         }
     }
 
     // ==================== 文件操作封装 ====================
+    // 注意：Tauri v2 自动将 Rust snake_case 命令名转为 camelCase
 
     async function openFileDialog() {
-        const result = await tauriInvoke('open_directory_dialog');
-        return result; // 返回目录路径字符串或null
+        // Rust: open_directory_dialog → JS: openDirectoryDialog
+        const result = await tauriInvoke('openDirectoryDialog');
+        return result;
     }
 
     async function readDir(dirPath) {
-        const result = await tauriInvoke('read_directory', { dirPath });
+        // Rust: read_directory → JS: readDirectory
+        const result = await tauriInvoke('readDirectory', { dirPath });
         return result || [];
     }
 
     async function readTextFile(filePath) {
-        const result = await tauriInvoke('read_text_file', { filePath });
+        // Rust: read_text_file → JS: readTextFile
+        const result = await tauriInvoke('readTextFile', { filePath });
         return result;
     }
 
     async function writeTextFile(filePath, content) {
-        const result = await tauriInvoke('write_text_file', { filePath, content });
-        return result !== null;
+        // Rust: write_text_file → JS: writeTextFile
+        const result = await tauriInvoke('writeTextFile', { filePath, content });
+        return result === null ? false : true;
     }
 
     async function deleteFile(filePath) {
-        const result = await tauriInvoke('delete_file', { filePath });
-        return result !== null;
+        // Rust: delete_file → JS: deleteFile
+        const result = await tauriInvoke('deleteFile', { filePath });
+        return result === null ? false : true;
     }
 
     // ==================== 配置管理 ====================
