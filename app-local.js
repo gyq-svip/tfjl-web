@@ -2,8 +2,10 @@
 // APP本地存储功能（仅Tauri APP可用，网页版不加载此文件）
 // ============================================================
 
-// 检测是否在Tauri APP中运行
-const isTauriApp = (typeof window.__TAURI__ !== 'undefined') || (typeof window.__TAURI_INTERNALS__ !== 'undefined');
+// 检测是否在Tauri APP中运行（__TAURI__ 会延迟注入，用 userAgent 辅助判断）
+const isTauriApp = (typeof window.__TAURI__ !== 'undefined') || 
+                    (typeof window.__TAURI_INTERNALS__ !== 'undefined') ||
+                    navigator.userAgent.includes('Tauri');
 
 if (isTauriApp) {
     // 老马5个固定目录配置
@@ -20,18 +22,37 @@ if (isTauriApp) {
     let tauriFs = null;
     let scannedFiles = [];  // 全局扫描结果缓存
 
-    // 加载Tauri API
+    // 加载Tauri API（withGlobalTauri开启后，API注入到window.__TAURI__）
     async function loadTauriAPIs() {
         try {
-            if (!tauriDialog) {
-                const dialog = await import('@tauri-apps/plugin-dialog');
-                tauriDialog = dialog;
+            // 等待全局对象注入（远程URL加载时可能需要等一会）
+            let retries = 0;
+            while (!window.__TAURI__ && retries < 50) {
+                await new Promise(r => setTimeout(r, 100));
+                retries++;
             }
-            if (!tauriFs) {
-                const fs = await import('@tauri-apps/plugin-fs');
-                tauriFs = fs;
+
+            if (window.__TAURI__) {
+                // Tauri v2 插件API在 window.__TAURI__.plugin 下
+                if (window.__TAURI__.dialog) {
+                    tauriDialog = window.__TAURI__.dialog;
+                } else if (window.__TAURI__?.plugin?.dialog) {
+                    tauriDialog = window.__TAURI__.plugin.dialog;
+                }
+                if (window.__TAURI__.fs) {
+                    tauriFs = window.__TAURI__.fs;
+                } else if (window.__TAURI__?.plugin?.fs) {
+                    tauriFs = window.__TAURI__.plugin.fs;
+                }
             }
-            return !!tauriDialog && !!tauriFs;
+
+            const ok = !!tauriDialog && !!tauriFs;
+            if (!ok) {
+                console.warn('[APP] Tauri API 加载不完整, __TAURI__:', !!window.__TAURI__, 'dialog:', !!tauriDialog, 'fs:', !!tauriFs);
+            } else {
+                console.log('[APP] Tauri API 加载成功');
+            }
+            return ok;
         } catch (e) {
             console.warn('[APP] Tauri API 加载失败:', e);
             return false;
