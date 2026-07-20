@@ -455,6 +455,55 @@ if (isTauriApp) {
         }
     }
 
+    // ==================== 批量导入文件到项目脚本列表 ====================
+
+    async function batchImportFilesToProject(paths) {
+        if (!paths || paths.length === 0) { alert('请先选择要导入的文件'); return; }
+        const validPaths = paths.map(p => String(p).trim()).filter(p => p.length > 0);
+        if (validPaths.length === 0) { alert('请先选择要导入的文件'); return; }
+
+        // 检查项目
+        if (typeof currentProjectName === 'undefined' || !currentProjectName || currentProjectName === '默认项目') {
+            alert('请先在左侧选择一个项目或新建项目！\n文件内容无法导入到"默认项目"。');
+            return;
+        }
+
+        const _txtFiles = (typeof txtFiles !== 'undefined') ? txtFiles : (typeof window !== 'undefined' && window.txtFiles ? window.txtFiles : null);
+        if (!_txtFiles || !Array.isArray(_txtFiles)) {
+            alert('脚本文件列表不可用，请先打开"脚本生成"面板');
+            return;
+        }
+
+        let success = 0, failed = 0;
+        for (const fp of validPaths) {
+            try {
+                const content = await readTextFile(fp);
+                if (content === null) { failed++; continue; }
+                let fileName = fp.split(/[\\/]/).pop();
+                let finalName = fileName, counter = 1;
+                while (_txtFiles.some(f => f.name === finalName)) {
+                    const dotIdx = fileName.lastIndexOf('.');
+                    finalName = dotIdx > 0 ? fileName.substring(0, dotIdx) + `(${counter})` + fileName.substring(dotIdx) : fileName + `(${counter})`;
+                    counter++;
+                }
+                _txtFiles.push({ name: finalName, content: content });
+                success++;
+            } catch (e) { failed++; }
+        }
+
+        if (typeof updateTxtFilesList === 'function') updateTxtFilesList();
+        if (typeof autoSaveProject === 'function') autoSaveProject();
+        if (typeof filterTxtFilesList === 'function') filterTxtFilesList();
+
+        if (success > 0 && failed === 0) {
+            alert(`✅ 成功导入 ${success} 个脚本文件`);
+        } else if (success > 0) {
+            alert(`⚠️ 成功导入 ${success} 个，${failed} 个失败`);
+        } else {
+            alert(`❌ 全部导入失败，请检查文件是否存在`);
+        }
+    }
+
     // ==================== 删除文件（二次确认） ====================
 
     async function deleteFileWithConfirm(filePath, fileName) {
@@ -573,26 +622,53 @@ if (isTauriApp) {
             }
             html += `</div>`;
 
-            // 最近7天趋势图（SVG柱状图，近→远）
+            // 最近7天趋势图（SVG柱状图 + 折线，近→远）
             if (recent.length > 0) {
-                const chartW = Math.min(400, Math.max(200, recent.length * 50));
-                const chartH = 80;
-                const barGap = 6;
-                const barW = Math.max(8, Math.floor((chartW - (recent.length + 1) * barGap) / recent.length));
+                const chartW = 380;
+                const padL = 30, padR = 10, padT = 16, padB = 16;
                 const hMax = Math.max(1, Math.max(...recent.map(s => s.count)));
-                html += `<div style="margin-top:8px;"><div style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-bottom:6px;">趋势图</div>`;
-                html += `<svg width="${chartW}" height="${chartH}" style="display:block;">`;
-                html += `<line x1="0" y1="${chartH}" x2="${chartW}" y2="${chartH}" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>`;
+                const chartH = padT + 100 + padB;
+                const plotW = chartW - padL - padR;
+                const plotH = 100;
+                const barGap = 6;
+                const barW = Math.max(14, Math.floor((plotW - (recent.length - 1) * barGap) / recent.length));
+
+                // 网格线
+                const gridLines = [0.25, 0.5, 0.75, 1.0];
+                let gridHtml = gridLines.map(r => {
+                    const gy = padT + plotH * (1 - r);
+                    return `<line x1="${padL}" y1="${gy}" x2="${padL + plotW}" y2="${gy}" stroke="rgba(255,255,255,0.06)" stroke-width="1"/><text x="${padL - 4}" y="${gy + 3}" fill="rgba(255,255,255,0.25)" font-size="8" text-anchor="end">${Math.round(hMax * r)}</text>`;
+                }).join('');
+
+                // 柱子和折线点数据
+                let points = '';
+                let barsHtml = '';
                 recent.forEach((s, i) => {
-                    const bh = Math.max(3, (s.count / hMax) * (chartH - 15));
-                    const bx = i * (barW + barGap) + barGap;
-                    const by = chartH - bh;
+                    const bh = Math.max(4, (s.count / hMax) * plotH);
+                    const bx = padL + i * (barW + barGap);
+                    const by = padT + plotH - bh;
+                    const cx = bx + barW / 2;
+                    const cy = padT + plotH - (s.count / hMax) * plotH;
                     const c = s.count >= avgCount ? '#e040fb' : '#7c4dff';
-                    html += `<rect x="${bx}" y="${by}" width="${barW}" height="${bh}" fill="${c}" rx="2" opacity="0.85">
-                        <title>${s.date}: ${s.count}局</title></rect>`;
-                    html += `<text x="${bx + barW/2}" y="${chartH - 2}" fill="rgba(255,255,255,0.4)" font-size="7" text-anchor="middle">${s.date.slice(5)}</text>`;
+                    const light = s.count >= avgCount ? '#f48fb1' : '#b39ddb';
+                    // 渐变柱 + 数值
+                    barsHtml += `<defs><linearGradient id="grad${i}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${light}" stop-opacity="0.95"/><stop offset="100%" stop-color="${c}" stop-opacity="0.85"/></linearGradient></defs>`;
+                    barsHtml += `<rect x="${bx}" y="${by}" width="${barW}" height="${bh}" rx="3" fill="url(#grad${i})"/>`;
+                    barsHtml += `<text x="${cx}" y="${by - 4}" fill="rgba(255,255,255,0.7)" font-size="9" font-weight="bold" text-anchor="middle">${s.count}</text>`;
+                    barsHtml += `<text x="${cx}" y="${padT + plotH + 13}" fill="rgba(255,255,255,0.45)" font-size="9" text-anchor="middle">${s.date.slice(5)}</text>`;
+                    points += `${cx},${cy} `;
                 });
-                html += `</svg></div>`;
+
+                // 折线
+                const polyline = recent.length > 1 ? `<polyline points="${points.trim()}" fill="none" stroke="#ff9800" stroke-width="1.5" stroke-dasharray="4,2" opacity="0.7"/>` : '';
+                const dots = recent.map((s, i) => {
+                    const cx = padL + i * (barW + barGap) + barW / 2;
+                    const cy = padT + plotH - (s.count / hMax) * plotH;
+                    return `<circle cx="${cx}" cy="${cy}" r="3" fill="#ff9800" opacity="0.9"><title>${s.date}: ${s.count}局</title></circle>`;
+                }).join('');
+
+                html += `<div style="margin-top:10px;"><div style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-bottom:4px;">📈 趋势图</div>`;
+                html += `<svg width="${chartW}" height="${chartH}" style="display:block;">${gridHtml}${barsHtml}${polyline}${dots}</svg></div>`;
             }
 
             statsEl.innerHTML = html;
@@ -618,6 +694,7 @@ if (isTauriApp) {
     window.saveScriptToMaDir = saveScriptToMaDir;
     window.calcScreenshotStats = calcScreenshotStats;
     window.importFileToProject = importFileToProject;
+    window.batchImportFilesToProject = batchImportFilesToProject;
 
     window.addEventListener('DOMContentLoaded', initAppLocal);
     console.log('[APP] app-local.js 已加载 (IPC模式)');
