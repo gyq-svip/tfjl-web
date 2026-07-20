@@ -297,6 +297,7 @@ if (isTauriApp) {
                     <span style="color:#fff;font-size:0.8rem;flex:1;word-break:break-all;">${f.name}</span>
                     <button onclick="viewFile('${safePath}')" style="background:rgba(0,188,212,0.3);color:#00bcd4;border:1px solid rgba(0,188,212,0.3);padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;">查看</button>
                     <button onclick="loadFileToHand('${safePath}')" style="background:rgba(76,175,80,0.3);color:#4caf50;border:1px solid rgba(76,175,80,0.3);padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;">加载</button>
+                    <button onclick="importFileToProject('${safePath}')" style="background:rgba(255,152,0,0.3);color:#ff9800;border:1px solid rgba(255,152,0,0.3);padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;">导入</button>
                 </div>`;
             });
         }
@@ -393,6 +394,43 @@ if (isTauriApp) {
         await loadFileContentToHand(filePath);
     }
 
+    // ==================== 导入文件到项目脚本列表 ====================
+
+    async function importFileToProject(filePath) {
+        try {
+            // 检查项目是否已选择
+            if (typeof currentProjectName === 'undefined' || !currentProjectName || currentProjectName === '默认项目') {
+                alert('请先在左侧选择一个项目或新建项目！\n文件内容无法导入到"默认项目"。');
+                return;
+            }
+            const content = await readTextFile(filePath);
+            if (content === null) { alert('读取文件失败'); return; }
+            const fileName = filePath.split(/[\\/]/).pop();
+
+            // 获取 txtFiles 引用（兼容 let/var 声明）
+            const _txtFiles = (typeof txtFiles !== 'undefined') ? txtFiles : (typeof window !== 'undefined' && window.txtFiles ? window.txtFiles : null);
+            if (!_txtFiles || !Array.isArray(_txtFiles)) {
+                alert('脚本文件列表不可用，请先打开"脚本生成"面板');
+                return;
+            }
+
+            // 避免重名
+            let finalName = fileName;
+            let counter = 1;
+            while (_txtFiles.some(f => f.name === finalName)) {
+                const dotIdx = fileName.lastIndexOf('.');
+                finalName = dotIdx > 0 ? fileName.substring(0, dotIdx) + `(${counter})` + fileName.substring(dotIdx) : fileName + `(${counter})`;
+                counter++;
+            }
+            _txtFiles.push({ name: finalName, content: content });
+            if (typeof updateTxtFilesList === 'function') updateTxtFilesList();
+            if (typeof autoSaveProject === 'function') autoSaveProject();
+            alert('✅ 已导入脚本：' + finalName);
+        } catch (e) {
+            alert('导入失败：' + e.message);
+        }
+    }
+
     // ==================== 删除文件（二次确认） ====================
 
     async function deleteFileWithConfirm(filePath, fileName) {
@@ -466,7 +504,7 @@ if (isTauriApp) {
                 }
             }
 
-            stats.sort((a, b) => a.date.localeCompare(b.date));
+            stats.sort((a, b) => b.date.localeCompare(a.date));
 
             if (stats.length === 0) {
                 statsEl.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">未找到截图文件</div>';
@@ -499,7 +537,7 @@ if (isTauriApp) {
             }
             html += `</div>`;
 
-            const recent = stats.slice(-7).reverse();
+            const recent = stats.slice(0, 7).reverse();
             html += `<div style="margin-top:12px;"><div style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-bottom:6px;">最近7天明细</div>`;
             for (const s of recent) {
                 const bar = '█'.repeat(Math.min(20, Math.round(s.count / maxCount * 20)));
@@ -532,6 +570,7 @@ if (isTauriApp) {
     window.deleteFileWithConfirm = deleteFileWithConfirm;
     window.saveScriptToMaDir = saveScriptToMaDir;
     window.calcScreenshotStats = calcScreenshotStats;
+    window.importFileToProject = importFileToProject;
 
     window.addEventListener('DOMContentLoaded', initAppLocal);
     console.log('[APP] app-local.js 已加载 (IPC模式)');
