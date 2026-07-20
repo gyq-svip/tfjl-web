@@ -192,7 +192,7 @@ if (isTauriApp) {
 
                 <div style="margin-bottom:20px;">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                        <label style="color:#e040fb;font-size:0.9rem;">📊 对战统计（按截图数统计每天打多少局）</label>
+                        <label style="color:#e040fb;font-size:0.9rem;">📊 副本统计（按截图数统计每天打多少局）</label>
                         <button onclick="calcScreenshotStats()" style="background:linear-gradient(135deg,#9c27b0,#6a1b9a);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">📊 统计</button>
                     </div>
                     <div id="screenshotStats" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:8px;min-height:60px;">
@@ -301,6 +301,30 @@ if (isTauriApp) {
             });
         }
         listEl.innerHTML = html;
+        window.scannedFiles = scannedFiles;
+    }
+
+    // 静默扫描（不上报UI，专门给脚本文件tab搜索用）
+    async function silentScanFiles() {
+        if (!maDirs) return;
+        const dirLabels = { coop: '合作', activity: '活动', battle: '对战', battleMax: '对战MAX', screenshot: '截图' };
+        const allDirs = Object.entries(maDirs).filter(([k, v]) => v && k !== 'screenshot');
+        if (allDirs.length === 0) return;
+
+        scannedFiles = [];
+        for (const [key, dir] of allDirs) {
+            try {
+                const entries = await readDir(dir);
+                for (const entry of entries) {
+                    if (entry.is_file) {
+                        const ext = entry.name.split('.').pop().toLowerCase();
+                        if (ext === 'txt' || ext === 'json') {
+                            scannedFiles.push({ name: entry.name, path: entry.path, dir, dirKey: key, dirLabel: dirLabels[key], ext });
+                        }
+                    }
+                }
+            } catch (e) { /* skip unreadable dirs */ }
+        }
         window.scannedFiles = scannedFiles;
     }
 
@@ -549,6 +573,28 @@ if (isTauriApp) {
             }
             html += `</div>`;
 
+            // 最近7天趋势图（SVG柱状图，近→远）
+            if (recent.length > 0) {
+                const chartW = Math.min(400, Math.max(200, recent.length * 50));
+                const chartH = 80;
+                const barGap = 6;
+                const barW = Math.max(8, Math.floor((chartW - (recent.length + 1) * barGap) / recent.length));
+                const hMax = Math.max(1, Math.max(...recent.map(s => s.count)));
+                html += `<div style="margin-top:8px;"><div style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-bottom:6px;">趋势图</div>`;
+                html += `<svg width="${chartW}" height="${chartH}" style="display:block;">`;
+                html += `<line x1="0" y1="${chartH}" x2="${chartW}" y2="${chartH}" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>`;
+                recent.forEach((s, i) => {
+                    const bh = Math.max(3, (s.count / hMax) * (chartH - 15));
+                    const bx = i * (barW + barGap) + barGap;
+                    const by = chartH - bh;
+                    const c = s.count >= avgCount ? '#e040fb' : '#7c4dff';
+                    html += `<rect x="${bx}" y="${by}" width="${barW}" height="${bh}" fill="${c}" rx="2" opacity="0.85">
+                        <title>${s.date}: ${s.count}局</title></rect>`;
+                    html += `<text x="${bx + barW/2}" y="${chartH - 2}" fill="rgba(255,255,255,0.4)" font-size="7" text-anchor="middle">${s.date.slice(5)}</text>`;
+                });
+                html += `</svg></div>`;
+            }
+
             statsEl.innerHTML = html;
         } catch (e) {
             statsEl.innerHTML = '<div style="color:#f44336;text-align:center;padding:20px;font-size:0.85rem;">统计失败：' + e.message + '</div>';
@@ -561,6 +607,7 @@ if (isTauriApp) {
     window.selectMaDir = selectMaDir;
     window.selectSoftwareDataDir = selectSoftwareDataDir;
     window.scanAllFiles = scanAllFiles;
+    window.silentScanFiles = silentScanFiles;
     window.saveSettingsAndClose = saveSettingsAndClose;
     window.viewFile = viewFile;
     window.loadFileToHand = loadFileToHand;

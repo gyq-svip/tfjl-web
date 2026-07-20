@@ -6379,6 +6379,8 @@
                 parserBtn.style.color = 'rgba(255,255,255,0.5)';
                 parserBtn.style.fontWeight = 'normal';
                 parserBtn.style.borderBottom = 'none';
+                // 自动静默扫描（不阻塞UI）
+                if (typeof silentScanFiles === 'function') { silentScanFiles(); }
             } else {
                 filesTab.style.display = 'none';
                 parserTab.style.display = 'flex';
@@ -9871,6 +9873,14 @@
                         </div>
                     </div>`;
                 });
+            }
+
+            // 2.1 有搜索关键字但扫描文件为空 → 提示扫描
+            if (keyword && scannedFiles.length === 0) {
+                html += `<div style="margin-top:10px;padding:10px;background:rgba(255,152,0,0.08);border:1px dashed rgba(255,152,0,0.2);border-radius:6px;text-align:center;">
+                    <div style="color:rgba(255,255,255,0.4);font-size:0.75rem;margin-bottom:6px;">尚未扫描文件目录，无法搜索外部脚本</div>
+                    <button onclick="(typeof silentScanFiles==='function')&&silentScanFiles().then(()=>filterTxtFilesList())" style="background:linear-gradient(135deg,#ff9800,#f57c00);color:white;border:none;padding:4px 14px;border-radius:5px;cursor:pointer;font-size:0.75rem;">🔍 扫描文件目录</button>
+                </div>`;
             }
 
             // 无关键字时，仅显示提示（不再展示全部扫描文件，避免列表过长）
