@@ -2664,16 +2664,20 @@
         window.addEventListener('dragover', function(e) {
             const hasFiles = e.dataTransfer && e.dataTransfer.types && e.dataTransfer.types.includes('Files');
             if (!hasFiles) return;
-            // 面板内的文件拖拽由面板处理（解析tab和文件tab都能接收）
-            const panel = document.getElementById('txtFilesPanel');
-            if (panel && panel.style.display !== 'none' && panel.contains(e.target)) return;
+            // 面板内的文件拖拽由面板处理（脚本面板和参考图片面板都能接收）
+            const txtPanel = document.getElementById('txtFilesPanel');
+            if (txtPanel && txtPanel.style.display !== 'none' && txtPanel.contains(e.target)) return;
+            const refPanel = document.getElementById('referencePanel');
+            if (refPanel && refPanel.style.display !== 'none' && refPanel.contains(e.target)) return;
             e.preventDefault();
         });
         window.addEventListener('drop', function(e) {
             const hasFiles = e.dataTransfer && e.dataTransfer.types && e.dataTransfer.types.includes('Files');
             if (!hasFiles) return;
-            const panel = document.getElementById('txtFilesPanel');
-            if (panel && panel.style.display !== 'none' && panel.contains(e.target)) return;
+            const txtPanel = document.getElementById('txtFilesPanel');
+            if (txtPanel && txtPanel.style.display !== 'none' && txtPanel.contains(e.target)) return;
+            const refPanel = document.getElementById('referencePanel');
+            if (refPanel && refPanel.style.display !== 'none' && refPanel.contains(e.target)) return;
             e.preventDefault();
         });
 
@@ -2985,7 +2989,7 @@
         </div>
 
         <!-- 参考图片悬浮面板 -->
-        <div id="referencePanel" style="display:none;position:fixed;top:80px;right:20px;width:350px;height:400px;z-index:9998;background:rgba(30,30,60,0.95);border:2px solid rgba(156,39,176,0.5);border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.5);overflow:auto;resize:both;min-width:250px;min-height:300px;">
+        <div id="referencePanel" style="display:none;position:fixed;top:80px;right:20px;width:350px;height:400px;z-index:9998;background:rgba(30,30,60,0.95);border:2px solid rgba(156,39,176,0.5);border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.5);overflow:auto;resize:both;min-width:250px;min-height:300px;" ondrop="handleRefImageDrop(event)" ondragover="handleRefImageDragOver(event)" ondragleave="handleRefImageDragLeave(event)">
             <div id="referencePanelHeader" style="background:linear-gradient(135deg,#9c27b0,#7b1fa2);padding:10px 15px;cursor:move;display:flex;justify-content:space-between;align-items:center;">
                 <span style="color:white;font-weight:bold;">🖼️ 参考图片</span>
                 <div>
@@ -2995,9 +2999,9 @@
             <div id="referencePanelContent" style="padding:10px;height:calc(100% - 50px);overflow:auto;">
                 <div id="referenceImagesGrid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;"></div>
                 <div style="margin-top:10px;">
-                    <input type="file" id="refImageInput" accept="image/*" style="display:none;" onchange="handleRefImageUpload(this)">
+                    <input type="file" id="refImageInput" accept="image/*" multiple style="display:none;" onchange="handleRefImageUpload(this)">
                     <button onclick="document.getElementById('refImageInput').click()" style="background:linear-gradient(135deg,#9c27b0,#7b1fa2);color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;width:100%;">📤 上传参考图片</button>
-                    <div style="text-align:center;color:rgba(255,255,255,0.35);font-size:0.7rem;margin-top:4px;">💡 也可直接 Ctrl+V 粘贴截图</div>
+                    <div style="text-align:center;color:rgba(255,255,255,0.35);font-size:0.7rem;margin-top:4px;">💡 支持拖拽多张图片、Ctrl+V 粘贴、点击上传</div>
                 </div>
                 <div id="refImageViewer" style="display:none;margin-top:10px;background:rgba(0,0,0,0.4);border-radius:8px;padding:8px;position:relative;">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
@@ -3303,21 +3307,52 @@
         }
 
         function handleRefImageUpload(input) {
-            if (!input.files || !input.files[0]) return;
-            const file = input.files[0];
-            if (!file.type.startsWith('image/')) {
-                alert('请选择图片文件！');
-                return;
-            }
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                referenceImages.push({name: file.name, data: e.target.result, projectName: currentProjectName});
-                renderReferenceImages();
-                input.value = '';
-                // 自动保存到IndexedDB
-                autoSaveProject();
-            };
-            reader.readAsDataURL(file);
+            if (!input.files || input.files.length === 0) return;
+            Array.from(input.files).forEach(file => {
+                if (!file.type.startsWith('image/')) return;
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    referenceImages.push({name: file.name, data: e.target.result, projectName: currentProjectName});
+                    renderReferenceImages();
+                    autoSaveProject();
+                };
+                reader.readAsDataURL(file);
+            });
+            input.value = '';
+        }
+
+        // 参考图片拖拽支持
+        function handleRefImageDragOver(event) {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = 'copy';
+            event.currentTarget.style.borderColor = '#9c27b0';
+            event.currentTarget.style.background = 'rgba(156,39,176,0.15)';
+        }
+
+        function handleRefImageDragLeave(event) {
+            event.currentTarget.style.borderColor = 'rgba(156,39,176,0.5)';
+            event.currentTarget.style.background = 'rgba(30,30,60,0.95)';
+        }
+
+        function handleRefImageDrop(event) {
+            event.preventDefault();
+            handleRefImageDragLeave(event);
+
+            const files = event.dataTransfer.files;
+            if (!files || files.length === 0) return;
+
+            let added = 0;
+            Array.from(files).forEach(file => {
+                if (!file.type.startsWith('image/')) return;
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    referenceImages.push({name: file.name, data: e.target.result, projectName: currentProjectName});
+                    renderReferenceImages();
+                    autoSaveProject();
+                    added++;
+                };
+                reader.readAsDataURL(file);
+            });
         }
 
         // 粘贴上传图片功能
@@ -6460,6 +6495,209 @@
             document.getElementById('parserResult').innerHTML = '';
         }
 
+        // ==================== 快速输入卡牌（首字母联想） ====================
+        // 拼音首字母映射表（覆盖所有卡牌用到的汉字）
+        const PINYIN_INITIAL_MAP = {
+            '冰':'b','光':'g','雷':'l','暗':'a','木':'m','土':'t','幻':'h','魂':'h','彩':'c','水':'s',
+            '风':'f','火':'h','死':'s','龙':'l','小':'x','幻':'h','悟':'w','空':'k','咕':'g','炮':'p',
+            '邪':'x','能':'n','萨':'s','满':'m','猫':'m','工':'g','匠':'j','圣':'s','骑':'q','天':'t',
+            '使':'s','鱼':'y','人':'r','法':'f','电':'d','死':'s','神':'s','王':'w','魔':'m','影':'y',
+            '黑':'h','暗':'a','战':'z','士':'s','武':'w','僧':'s','刺':'c','客':'k','忍':'r','者':'z',
+            '弓':'g','手':'s','猎':'l','游':'y','侠':'x','盗':'d','贼':'z','骑':'q','士':'s',
+            '月':'y','亮':'l','日':'r','光':'g','星':'x','云':'y','雾':'w','雨':'y','雪':'x',
+            '树':'s','花':'h','草':'c','石':'s','金':'j','银':'y','铜':'t','铁':'t',
+            '骨':'g','血':'x','魂':'h','魄':'p','灵':'l','妖':'y','怪':'g','兽':'s',
+            '甲':'j','盾':'d','剑':'j','刀':'d','枪':'q','斧':'f','锤':'c','鞭':'b',
+            '医':'y','药':'y','毒':'d','瘟':'w','疫':'y','病':'b','伤':'s',
+            '鸟':'n','虫':'c','鱼':'y','蛇':'s','虎':'h','狼':'l','熊':'x','豹':'b',
+            '鸦':'y','鹊':'q','凤':'f','凰':'h','龙':'l','麒':'q','麟':'l','龟':'g',
+            '伞':'s','扇':'s','琴':'q','棋':'q','书':'s','画':'h','珠':'z','宝':'b',
+            '仙':'x','神':'s','佛':'f','魔':'m','妖':'y','鬼':'g','精':'j','灵':'l',
+            '女':'n','男':'n','老':'l','少':'s','童':'t','子':'z','母':'m','父':'f',
+            '冰':'b','火':'h','水':'s','风':'f','雷':'l','电':'d','光':'g','暗':'a',
+            '金':'j','木':'m','水':'s','火':'h','土':'t',
+            '吞':'t','日':'r','月':'y','明':'m','暗':'a','阴阳':'y',
+            '机':'j','器':'q','械':'x','钢':'g','铁':'t','铜':'t','铅':'q','锡':'x',
+            '石':'s','玉':'y','珠':'z','宝':'b','钻':'z','玛':'m','瑙':'n','翡':'f','翠':'c',
+            '矮':'a','巨':'j','小':'x','大':'d','中':'z','高':'g','低':'d',
+            '老':'l','少':'s','幼':'y','成':'c','壮':'z','弱':'r','强':'q',
+            '邪':'x','正':'z','善':'s','恶':'e','凶':'x','吉':'j',
+            '咕':'g','叽':'j','喵':'m','汪':'w','嘶':'s','吼':'h',
+            '百':'b','千':'q','万':'w','亿':'y','零':'l','一':'y','二':'e','三':'s','四':'s','五':'w','六':'l','七':'q','八':'b','九':'j','十':'s',
+            '爆':'b','裂':'l','破':'p','碎':'s','崩':'b','塌':'t','毁':'h','灭':'m',
+            '冰':'b','雪':'x','霜':'s','冻':'d','寒':'h','冷':'l','凉':'l','温':'w','热':'r','烫':'t','沸':'f',
+            '绿':'l','红':'h','黄':'h','蓝':'l','紫':'z','黑':'h','白':'b','灰':'h','橙':'c','粉':'f',
+            '春':'c','夏':'x','秋':'q','冬':'d','早':'z','晚':'w','朝':'z','夕':'x',
+            '东':'d','南':'n','西':'x','北':'b','上':'s','下':'x','左':'z','右':'y','前':'q','后':'h',
+            '内':'n','外':'w','中':'z','旁':'p','侧':'c','底':'d','顶':'d',
+            '战':'z','斗':'d','杀':'s','死':'s','活':'h','生':'s','灭':'m','亡':'w',
+            '攻':'g','守':'s','防':'f','退':'t','进':'j','追':'z','逃':'t','躲':'d','藏':'c',
+            '人':'r','民':'m','众':'z','群':'q','队':'d','团':'t','组':'z','排':'p',
+            '将':'j','帅':'s','王':'w','帝':'d','皇':'h','君':'j','臣':'c','相':'x',
+            '兵':'b','卒':'z','车':'c','马':'m','象':'x','士':'s','帅':'s','将':'j',
+            '毒':'d','药':'y','丹':'d','丸':'w','散':'s','膏':'g','汤':'t','剂':'j',
+            '雪':'x','冰':'b','冻':'d','寒':'h','冷':'l','凉':'l','温':'w','热':'r','烫':'t','沸':'f',
+            '兽':'s','禽':'q','虫':'c','鱼':'y','鸟':'n','蛇':'s','龙':'l','虎':'h','狼':'l','熊':'x','豹':'b','鹰':'y','雕':'d','鹫':'j','雀':'q','雁':'y','鹅':'e','鸭':'y','鸡':'j','猪':'z','狗':'g','猫':'m','鼠':'s','兔':'t','鹿':'l','马':'m','牛':'n','羊':'y','猴':'h'
+        };
+
+        // 获取所有卡牌名列表
+        function getAllCardNames() {
+            const names = Object.keys(SKIN_ATTRIBUTES || {});
+            // 也从卡牌数据中补充
+            if (typeof allCards !== 'undefined' && allCards) {
+                allCards.forEach(c => { if (c && c.name) names.push(c.name); });
+            }
+            return [...new Set(names)].sort();
+        }
+
+        // 获取卡名的拼音首字母简写
+        function getCardInitial(name) {
+            let result = '';
+            for (const char of name) {
+                if (PINYIN_INITIAL_MAP[char]) {
+                    result += PINYIN_INITIAL_MAP[char];
+                } else if (/[a-zA-Z0-9]/.test(char)) {
+                    result += char.toLowerCase();
+                }
+            }
+            return result;
+        }
+
+        // 快速输入 - 输入时联想
+        let quickSuggestList = [];
+        let quickSuggestIndex = -1;
+
+        function onQuickCardInput(event) {
+            const input = event.target.value.trim().toLowerCase();
+            const suggestBox = document.getElementById('quickCardSuggest');
+            if (!input) {
+                suggestBox.style.display = 'none';
+                quickSuggestList = [];
+                return;
+            }
+
+            const allNames = getAllCardNames();
+            const matched = [];
+
+            for (const name of allNames) {
+                const initial = getCardInitial(name);
+                let score = 0;
+                // 完全匹配首字母
+                if (initial === input) score = 100;
+                // 首字母开头匹配
+                else if (initial.startsWith(input)) score = 80;
+                // 包含首字母
+                else if (initial.includes(input)) score = 60;
+                // 卡名包含输入
+                if (name.includes(input) || name.toLowerCase().includes(input)) score = Math.max(score, 70);
+                // 卡名开头匹配
+                if (name.toLowerCase().startsWith(input)) score = Math.max(score, 90);
+
+                if (score > 0) {
+                    matched.push({ name, score, initial });
+                }
+            }
+
+            matched.sort((a, b) => b.score - a.score);
+            quickSuggestList = matched.slice(0, 8);
+            quickSuggestIndex = -1;
+
+            if (quickSuggestList.length === 0) {
+                suggestBox.style.display = 'none';
+                return;
+            }
+
+            // 渲染建议列表
+            let html = '<div style="position:absolute;top:0;left:0;right:0;background:#1a1a2e;border:1px solid rgba(0,188,212,0.5);border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.6);max-height:200px;overflow-y:auto;z-index:30;">';
+            quickSuggestList.forEach((item, idx) => {
+                html += `<div class="quick-suggest-item" data-name="${item.name}" onclick="selectQuickCard('${item.name}')" style="padding:6px 12px;cursor:pointer;font-size:0.85rem;color:#fff;border-bottom:1px solid rgba(255,255,255,0.05);display:flex;justify-content:space-between;align-items:center;" onmouseover="this.style.background='rgba(0,188,212,0.2)';quickSuggestIndex=${idx};" onmouseout="this.style.background='';">`;
+                html += `<span style="color:#00bcd4;">${item.name}</span>`;
+                html += `<span style="color:rgba(255,255,255,0.3);font-size:0.75rem;">${item.initial}</span>`;
+                html += `</div>`;
+            });
+            html += '</div>';
+            suggestBox.innerHTML = html;
+            suggestBox.style.display = 'block';
+        }
+
+        function onQuickCardKeydown(event) {
+            const suggestBox = document.getElementById('quickCardSuggest');
+            if (suggestBox.style.display === 'none' || quickSuggestList.length === 0) return;
+
+            const items = suggestBox.querySelectorAll('.quick-suggest-item');
+            if (event.key === 'ArrowDown') {
+                event.preventDefault();
+                quickSuggestIndex = Math.min(quickSuggestIndex + 1, items.length - 1);
+                updateSuggestHighlight(items);
+            } else if (event.key === 'ArrowUp') {
+                event.preventDefault();
+                quickSuggestIndex = Math.max(quickSuggestIndex - 1, 0);
+                updateSuggestHighlight(items);
+            } else if (event.key === 'Enter') {
+                event.preventDefault();
+                const name = quickSuggestIndex >= 0 ? quickSuggestList[quickSuggestIndex].name : quickSuggestList[0].name;
+                selectQuickCard(name);
+            } else if (event.key === 'Escape') {
+                suggestBox.style.display = 'none';
+            }
+        }
+
+        function updateSuggestHighlight(items) {
+            items.forEach((item, idx) => {
+                item.style.background = idx === quickSuggestIndex ? 'rgba(0,188,212,0.3)' : '';
+            });
+            // 滚动到可见
+            if (items[quickSuggestIndex]) {
+                items[quickSuggestIndex].scrollIntoView({ block: 'nearest' });
+            }
+        }
+
+        function selectQuickCard(name) {
+            const textarea = document.getElementById('parserInput');
+            let current = textarea.value.trim();
+
+            // 智能拼接
+            if (!current) {
+                // 空文本，自动加上"上阵："前缀
+                textarea.value = `上阵：${name}`;
+            } else if (current.endsWith('：') || current.endsWith(':')) {
+                // 刚好输入了冒号
+                textarea.value = current + name;
+            } else if (current.startsWith('上阵') || current.startsWith('上阵：') || current.startsWith('上阵:')) {
+                // 已有"上阵："前缀，追加卡名
+                if (current.endsWith(',') || current.endsWith('，')) {
+                    textarea.value = current + name;
+                } else {
+                    textarea.value = current + ',' + name;
+                }
+            } else {
+                // 没有前缀，直接追加
+                textarea.value = current + ',' + name;
+            }
+
+            // 清空输入框，继续输入下一张
+            document.getElementById('quickCardInput').value = '';
+            document.getElementById('quickCardSuggest').style.display = 'none';
+            quickSuggestList = [];
+            // 焦点回到输入框，方便连续输入
+            document.getElementById('quickCardInput').focus();
+        }
+
+        function clearQuickCardInput() {
+            document.getElementById('quickCardInput').value = '';
+            document.getElementById('quickCardSuggest').style.display = 'none';
+            quickSuggestList = [];
+            document.getElementById('quickCardInput').focus();
+        }
+
+        // 点击其他地方关闭联想框
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('#quickCardInput') && !e.target.closest('#quickCardSuggest')) {
+                const box = document.getElementById('quickCardSuggest');
+                if (box) box.style.display = 'none';
+            }
+        });
+
         // 脚本解析输入框 - 拖拽支持
         function handleParserDragOver(event) {
             event.preventDefault();
@@ -6485,20 +6723,25 @@
             const hint = document.getElementById('parserDropHint');
             if (hint) hint.style.display = 'none';
 
-            // 优先处理拖拽的文件
+            // 拖拽的文件（仅支持单个文件解析）
             const files = event.dataTransfer.files;
             if (files && files.length > 0) {
-                const file = files[0];
-                if (file.type === 'text/plain' || file.name.endsWith('.txt') || file.name.endsWith('.js') || file.name.endsWith('.json')) {
-                    const reader = new FileReader();
-                    reader.onload = function(e) {
-                        document.getElementById('parserInput').value = e.target.result;
-                        document.getElementById('parserResult').innerHTML = `<span style="color:#4caf50;">✅ 已从文件 "${file.name}" 导入文本</span>`;
-                    };
-                    reader.readAsText(file, 'UTF-8');
-                } else {
-                    document.getElementById('parserResult').innerHTML = '<span style="color:#ef4444;">⚠️ 仅支持 .txt / .js / .json 文本文件</span>';
+                if (files.length > 1) {
+                    document.getElementById('parserResult').innerHTML = '<span style="color:#ff9800;">⚠️ 解析框仅支持单个文件，多文件请拖到"脚本文件"列表</span>';
+                    return;
                 }
+                const file = files[0];
+                const validExts = ['.txt', '.js', '.json', '.lua', '.py', '.sh'];
+                if (!(file.type === 'text/plain' || validExts.some(ext => file.name.toLowerCase().endsWith(ext)))) {
+                    document.getElementById('parserResult').innerHTML = '<span style="color:#ef4444;">⚠️ 仅支持 .txt / .js / .json / .lua / .py / .sh 文本文件</span>';
+                    return;
+                }
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('parserInput').value = e.target.result;
+                    document.getElementById('parserResult').innerHTML = `<span style="color:#4caf50;">✅ 已从文件 "${file.name}" 导入文本</span>`;
+                };
+                reader.readAsText(file, 'UTF-8');
                 return;
             }
 
@@ -7987,9 +8230,19 @@
                 </div>
                 <div style="margin-bottom:10px;flex:1;">
                     <label style="color:rgba(255,255,255,0.8);font-size:0.85rem;margin-bottom:5px;display:block;">输入文本（格式：上阵：英雄1,英雄2,...）：</label>
-                    <textarea id="parserInput" placeholder="示例：上阵：水灵,死神,幻精灵,小野,龙王,风灵,木精灵,咕咕,火炮,光精灵
-⚠️只上前6张卡，工程卡不算；🐍有蛇女时需加速的卡放第4、5位，蛇女自动放第6位
-💡支持拖拽.txt文件到此处，或直接粘贴文本" style="width:100%;height:8em;min-height:8em;background:rgba(0,0,0,0.3);border:1px solid rgba(255,215,0,0.2);border-radius:8px;padding:10px;color:#fff;font-size:0.9rem;resize:none;font-family:inherit;box-sizing:border-box;" ondrop="handleParserDrop(event)" ondragover="handleParserDragOver(event)" ondragleave="handleParserDragLeave(event)"></textarea>
+                    <!-- 快速输入卡牌 -->
+                    <div style="margin-bottom:8px;display:flex;gap:5px;align-items:center;flex-wrap:wrap;">
+                        <input id="quickCardInput" type="text" placeholder="⚡ 输入卡名首字母或关键字快速添加（如 sm=萨满, sl=水灵）" oninput="onQuickCardInput(event)" onkeydown="onQuickCardKeydown(event)" style="flex:1;min-width:120px;padding:6px 10px;border-radius:6px;border:1px solid rgba(0,188,212,0.4);background:rgba(0,0,0,0.3);color:#fff;font-size:0.85rem;box-sizing:border-box;">
+                        <button onclick="clearQuickCardInput()" style="background:rgba(255,255,255,0.1);color:#fff;border:none;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:0.8rem;">清</button>
+                    </div>
+                    <div id="quickCardSuggest" style="display:none;position:relative;z-index:20;"></div>
+                    <textarea id="parserInput" placeholder="示例：上阵：水灵,死神,幻精灵,小野,龙王,风灵,木精灵,咕咕,火炮,光精灵" style="width:100%;height:6em;min-height:6em;background:rgba(0,0,0,0.3);border:1px solid rgba(255,215,0,0.2);border-radius:8px;padding:10px;color:#fff;font-size:0.9rem;resize:none;font-family:inherit;box-sizing:border-box;" ondrop="handleParserDrop(event)" ondragover="handleParserDragOver(event)" ondragleave="handleParserDragLeave(event)"></textarea>
+                    <div style="margin-top:6px;font-size:0.72rem;color:rgba(255,255,255,0.35);line-height:1.6;">
+                        💡 <b>快速输入</b>：在上方输入框打首字母（如 sl→水灵）或关键字，选中后自动追加到下方文本<br>
+                        📋 <b>格式</b>：上阵：英雄1,英雄2,... &nbsp;|&nbsp; 只上前6张卡，工程卡不算<br>
+                        🐍 有蛇女时需加速的卡放第4、5位，蛇女自动放第6位<br>
+                        📎 支持拖拽单个.txt文件到此处，或直接Ctrl+V粘贴文本
+                    </div>
                 </div>
                 <div style="display:flex;gap:8px;flex-wrap:wrap;">
                     <button onclick="parseTextAndAddCards()" style="flex:1;background:linear-gradient(135deg,#00bcd4,#00838f);color:white;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:500;">🔍 解析并添加</button>
