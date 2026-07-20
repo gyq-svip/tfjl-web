@@ -68,8 +68,18 @@ if (isTauriApp) {
     }
 
     async function writeTextFile(filePath, content) {
-        const result = await tauriInvoke('write_text_file', { filePath, content });
-        return result === null ? false : true;
+        // Tauri v2 中 Result<(), String> 的 Ok(()) 序列化为 null
+        // tauriInvoke 在成功时返回 null，失败时 catch 也返回 null（但会弹 debug alert）
+        // 因此通过 try/catch 直接判断，不依赖返回值
+        let invokeFn = window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke;
+        if (!invokeFn) return false;
+        try {
+            await invokeFn('write_text_file', { filePath, content });
+            return true;
+        } catch (e) {
+            console.error('写入文件失败:', filePath, e);
+            return false;
+        }
     }
 
     async function deleteFile(filePath) {

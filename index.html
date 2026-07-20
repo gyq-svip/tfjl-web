@@ -7341,15 +7341,15 @@
             const xiaoYeNotInBattle = xiaoYeCarried && !xiaoYeDeployed;
             const fengHuangNotInBattle = fengHuangCarried && !fengHuangDeployed;
 
-            // 02:26-02:31 上下小野（情况1：都没上阵且卡>6张）
-            const needXiaoYeSwitch = xiaoYeNotInBattle && fengHuangNotInBattle && nonGongChengNonJingLingCount > 6;
+            // 02:26-02:31 上下小野（小野没上阵 + 凤凰没上阵或未携带 + 卡>6张）
+            const needXiaoYeSwitch = xiaoYeNotInBattle && !fengHuangDeployed && nonGongChengNonJingLingCount > 6;
             if (needXiaoYeSwitch) {
                 output += `02:26,下${firstCardName},上小野满,\n`;
                 output += `02:31,下小野,上${firstCardName}满,\n`;
             }
 
-            // 02:36 下凤凰上小野（情况3：小野没上阵，凤凰已上阵）
-            const needFengHuangToXiaoYe = xiaoYeNotInBattle && !fengHuangNotInBattle;
+            // 02:36 下凤凰上小野（情况3：小野没上阵 + 凤凰携带且已上阵）
+            const needFengHuangToXiaoYe = xiaoYeNotInBattle && fengHuangCarried && fengHuangDeployed;
             if (needFengHuangToXiaoYe) {
                 output += `02:36,下凤凰,上小野满,\n`;
             }
