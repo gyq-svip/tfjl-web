@@ -6552,19 +6552,14 @@
             '土':'tu','地':'di','沙':'sha','尘':'chen','泥':'ni'
         };
 
-        // 获取所有卡牌名列表（含收藏卡牌）
+        // 获取所有卡牌名列表（仅含真正的卡牌，排除手牌组合名）
         function getAllCardNames() {
+            // SKIN_ATTRIBUTES 已涵盖全部100张卡牌
             const names = Object.keys(SKIN_ATTRIBUTES || {});
-            // 从收藏卡牌中补充
+            // 从收藏卡牌中补充（自定义卡牌也会收录到这里）
             if (typeof favoriteCards !== 'undefined' && Array.isArray(favoriteCards)) {
                 favoriteCards.forEach(c => { if (c && c.name) names.push(c.name); });
             }
-            // 从DOM中补充已添加的卡牌
-            try {
-                document.querySelectorAll('.card-item[data-name]').forEach(el => {
-                    if (el.dataset.name) names.push(el.dataset.name);
-                });
-            } catch (e) {}
             return [...new Set(names)].sort();
         }
 
@@ -6949,6 +6944,29 @@
                 return;
             }
 
+            // 过滤融合卡（融合卡不能用于脚本，需拆分为单卡）
+            const fusionNames = [
+                '火炮射线', '射线潜艇', '火炮潜艇', '宝库射线', '宝库潜艇', '宝库火炮',
+                '潜艇射线', '潜艇火炮', '射线火炮',
+                '水灵刀客', '刀客水灵', '蛇女爱神', '爱神蛇女',
+                '咕咕天使', '天使咕咕', '圣骑天使', '天使圣骑',
+                '战将鱼人', '鱼人战将', '电法冰法', '冰法电法',
+                '萌萌水灵', '水灵萌萌', '火灵风灵', '风灵火灵'
+            ];
+            const filteredFusion = [];
+            heroNames = heroNames.filter(name => {
+                const isFusion = fusionNames.includes(name) ||
+                    (name.length >= 4 && name.length % 2 === 0 &&
+                     !Object.keys(SKIN_ATTRIBUTES).includes(name) &&
+                     Object.keys(SKIN_ATTRIBUTES).includes(name.substring(0, 2)) &&
+                     Object.keys(SKIN_ATTRIBUTES).includes(name.substring(2)));
+                if (isFusion) {
+                    filteredFusion.push(name);
+                    return false;
+                }
+                return true;
+            });
+
             // 限制最多10张
             if (heroNames.length > 10) {
                 heroNames = heroNames.slice(0, 10);
@@ -7015,6 +7033,9 @@
             if (addedCount > 0) {
                 resultHtml += `<span style="color:#4caf50;">✅ 成功添加 ${addedCount} 张卡牌到${target === 'my' ? '我的手牌' : '队友手牌'}</span>`;
             }
+            if (filteredFusion.length > 0) {
+                resultHtml += `<br><span style="color:#9c27b0;">🚫 已过滤融合卡：${filteredFusion.join('、')}（融合卡需拆分为单卡）</span>`;
+            }
             if (duplicateCards.length > 0) {
                 resultHtml += `<br><span style="color:#ff9800;">⚠️ 重复卡牌：${duplicateCards.join('、')}</span>`;
             }
@@ -7074,6 +7095,35 @@
 
             if (heroNames.length === 0) {
                 resultEl.innerHTML = '<span style="color:#f44336;">未找到英雄名称！</span>';
+                return;
+            }
+
+            // 过滤融合卡（融合卡不能用于脚本，需拆分为单卡）
+            const fusionNames = [
+                '火炮射线', '射线潜艇', '火炮潜艇', '宝库射线', '宝库潜艇', '宝库火炮',
+                '潜艇射线', '潜艇火炮', '射线火炮',
+                '水灵刀客', '刀客水灵', '蛇女爱神', '爱神蛇女',
+                '咕咕天使', '天使咕咕', '圣骑天使', '天使圣骑',
+                '战将鱼人', '鱼人战将', '电法冰法', '冰法电法',
+                '萌萌水灵', '水灵萌萌', '火灵风灵', '风灵火灵'
+            ];
+            const allSkinKeys = Object.keys(SKIN_ATTRIBUTES);
+            const filteredFusion = [];
+            heroNames = heroNames.filter(name => {
+                const isFusion = fusionNames.includes(name) ||
+                    (name.length >= 4 && name.length % 2 === 0 &&
+                     !allSkinKeys.includes(name) &&
+                     allSkinKeys.includes(name.substring(0, 2)) &&
+                     allSkinKeys.includes(name.substring(2)));
+                if (isFusion) {
+                    filteredFusion.push(name);
+                    return false;
+                }
+                return true;
+            });
+
+            if (heroNames.length === 0 && filteredFusion.length > 0) {
+                resultEl.innerHTML = '<span style="color:#9c27b0;">🚫 输入的均为融合卡，已过滤。融合卡需拆分为单卡后重新输入。</span>';
                 return;
             }
 
@@ -7328,6 +7378,35 @@
 
             if (heroNames.length === 0) {
                 resultEl.innerHTML = '<span style="color:#f44336;">未找到英雄名称！</span>';
+                return;
+            }
+
+            // 过滤融合卡（融合卡不能用于脚本，需拆分为单卡）
+            const fusionNames = [
+                '火炮射线', '射线潜艇', '火炮潜艇', '宝库射线', '宝库潜艇', '宝库火炮',
+                '潜艇射线', '潜艇火炮', '射线火炮',
+                '水灵刀客', '刀客水灵', '蛇女爱神', '爱神蛇女',
+                '咕咕天使', '天使咕咕', '圣骑天使', '天使圣骑',
+                '战将鱼人', '鱼人战将', '电法冰法', '冰法电法',
+                '萌萌水灵', '水灵萌萌', '火灵风灵', '风灵火灵'
+            ];
+            const allSkinKeys = Object.keys(SKIN_ATTRIBUTES);
+            const filteredFusion = [];
+            heroNames = heroNames.filter(name => {
+                const isFusion = fusionNames.includes(name) ||
+                    (name.length >= 4 && name.length % 2 === 0 &&
+                     !allSkinKeys.includes(name) &&
+                     allSkinKeys.includes(name.substring(0, 2)) &&
+                     allSkinKeys.includes(name.substring(2)));
+                if (isFusion) {
+                    filteredFusion.push(name);
+                    return false;
+                }
+                return true;
+            });
+
+            if (heroNames.length === 0 && filteredFusion.length > 0) {
+                resultEl.innerHTML = '<span style="color:#9c27b0;">🚫 输入的均为融合卡，已过滤。融合卡需拆分为单卡后重新输入。</span>';
                 return;
             }
 
