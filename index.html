@@ -7303,7 +7303,7 @@
                 output += '01:20,下龙王,上龙王不满,\n';
             }
 
-            // 凤凰与多卡换卡逻辑（无敌链：小野8秒无敌 → 凤凰6秒无敌）
+            // 无敌链逻辑（小野8秒无敌 → 凤凰6秒无敌）
             // 第一张卡名（arrangedCards的第一张）
             const firstCardName = arrangedCards[0] || '第一张卡';
             const hasFengHuang = heroNames.some(name => name.includes('凤凰'));
@@ -7313,32 +7313,61 @@
                 !gongChengNames.some(gc => name.includes(gc)) &&
                 !jingLingNames.some(jl => name.includes(jl))
             ).length;
-            // 超过6张卡且没有小野时，需要上下小野触发8秒无敌
-            const needXiaoYeSwitch = nonGongChengNonJingLingCount > 6 && !hasXiaoYe;
 
-            // 上下小野（02:26-02:31）：触发小野8秒无敌
+            // 情况1：小野没上阵 + 凤凰没上阵 + 卡>6张 → 上下小野 + 02:38上下凤凰
+            // 情况3：小野没上阵 + 凤凰已上阵 → 02:36下凤凰上小野（不切回）
+            // 情况4：小野已上阵 + 凤凰没上阵 → 02:38下小野上下凤凰（切回小野）
+            // 情况2/5：其他情况不切卡
+
+            const xiaoYeNotInBattle = !hasXiaoYe;  // 小野没上阵
+            const fengHuangNotInBattle = !hasFengHuang;  // 凤凰没上阵
+
+            // 02:26-02:31 上下小野（情况1：都没上阵且卡>6张）
+            const needXiaoYeSwitch = xiaoYeNotInBattle && fengHuangNotInBattle && nonGongChengNonJingLingCount > 6;
             if (needXiaoYeSwitch) {
                 output += `02:26,下${firstCardName},上小野满,\n`;
                 output += `02:31,下小野,上${firstCardName}满,\n`;
             }
 
-            // 上下凤凰（02:38）：小野无敌用完后上凤凰触发6秒无敌
-            if (hasFengHuang) {
+            // 02:36 下凤凰上小野（情况3：小野没上阵，凤凰已上阵）
+            const needFengHuangToXiaoYe = xiaoYeNotInBattle && !fengHuangNotInBattle;
+            if (needFengHuangToXiaoYe) {
+                output += `02:36,下凤凰,上小野满,\n`;
+            }
+
+            // 02:38 上下凤凰（情况1或情况4）
+            // 情况1：小野没上阵+凤凰没上阵+卡>6 → 02:38用{第一张卡}上下凤凰
+            // 情况4：小野已上阵+凤凰没上阵 → 02:38用小野上下凤凰（切回小野）
+            const needFengHuangSwitch = fengHuangNotInBattle && (needXiaoYeSwitch || hasXiaoYe);
+            if (needFengHuangSwitch) {
                 if (needXiaoYeSwitch) {
-                    // 小野是切换进来的，02:31已下小野，所以02:38用{第一张卡}上下凤凰
+                    // 情况1：小野是切换进来的，02:31已下小野，02:38用{第一张卡}上下凤凰
                     output += `02:38,下${firstCardName},上凤凰4级,时钟秒0.5,下凤凰,上${firstCardName}满,\n`;
                 } else if (hasXiaoYe) {
-                    // 小野本来就在阵容里，02:38用小野上下凤凰
+                    // 情况4：小野本来在阵容，02:38用小野上下凤凰，最后切回小野
                     output += `02:38,下小野,上凤凰4级,时钟秒0.5,下凤凰,上小野满,\n`;
-                } else {
-                    // 没有小野也没切换，02:38用{第一张卡}上下凤凰
-                    output += `02:38,下${firstCardName},上凤凰4级,时钟秒0.5,下凤凰,上${firstCardName}满,\n`;
                 }
             }
 
-            // 提示标记：上下小野或上下凤凰都要弹窗
-            const needXiaoYeAlert = needXiaoYeSwitch;       // 上下小野提示
-            const needFengHuangAlert = hasFengHuang;          // 上下凤凰提示
+            // 提示标记：上下小野或上下凤凰或下凤凰上小野都要弹窗
+            const needXiaoYeAlert = needXiaoYeSwitch;           // 上下小野提示
+            const needFengHuangAlert = needFengHuangSwitch;       // 上下凤凰提示
+            const needFengHuangToXiaoYeAlert = needFengHuangToXiaoYe;  // 下凤凰上小野提示
+
+            // 切卡完成后，如果有精灵，继续打精灵逻辑
+            const hasAnySwitch = needXiaoYeSwitch || needFengHuangSwitch || needFengHuangToXiaoYe;
+            const hasAnyJingLing = hasLeiJingLing || hasMoJingLing || hasMuJingLing || hasHunJingLing;
+            if (hasAnySwitch && hasAnyJingLing) {
+                // 切卡最后一步是"上满"，之后继续打精灵
+                const jingLingAfterSwitch = [];
+                if (hasLeiJingLing) jingLingAfterSwitch.push('每0.1秒共5000次雷精灵');
+                if (hasMoJingLing) jingLingAfterSwitch.push('每5秒共5000次魔精灵');
+                if (hasMuJingLing) jingLingAfterSwitch.push('每3秒共5000次木精灵');
+                if (hasHunJingLing) jingLingAfterSwitch.push('每3秒共5000次魂精灵');
+                if (jingLingAfterSwitch.length > 0) {
+                    output += '02:40,' + jingLingAfterSwitch.join(',') + ',\n';
+                }
+            }
 
             // 同排机制：飞机+大圣
             if (hasTongPai) {
@@ -7412,18 +7441,23 @@
                     fengHuangLine = '02:38,下' + firstCardName + ',上凤凰4级,时钟秒0.5,下凤凰,上' + firstCardName + '满,';
                 } else if (hasXiaoYe) {
                     fengHuangLine = '02:38,下小野,上凤凰4级,时钟秒0.5,下凤凰,上小野满,';
-                } else {
-                    fengHuangLine = '02:38,下' + firstCardName + ',上凤凰4级,时钟秒0.5,下凤凰,上' + firstCardName + '满,';
                 }
                 setTimeout(() => {
-                    alert('⚠️ 凤凰换卡提示 ⚠️\n\n检测到卡组中有【凤凰】，已自动添加以下换卡指令：\n\n' + fengHuangLine + '\n\n⚠️ 注意：以上指令涉及上下凤凰操作！\n\n逻辑说明：小野8秒无敌用完后，上凤凰触发6秒无敌\n\n请注意：\n1. 请根据实际情况修改上下的卡名\n2. 请根据自身情况修改时间\n3. 不需要上下卡的行请自行删除\n\n请确认后继续使用！');
+                    alert('⚠️ 上下凤凰提示 ⚠️\n\n检测到卡组中凤凰没上阵，已自动添加上下凤凰换卡指令：\n\n' + fengHuangLine + '\n\n⚠️ 注意：以上指令涉及上下凤凰操作！\n\n逻辑说明：小野8秒无敌用完后，上凤凰触发6秒无敌\n\n请注意：\n1. 请根据实际情况修改上下的卡名\n2. 请根据自身情况修改时间\n3. 不需要上下卡的行请自行删除\n\n请确认后继续使用！');
                 }, 100);
             }
 
-            // 上下小野提示（超过6张卡且没有小野）
+            // 上下小野提示（情况1：都没上阵且卡>6张）
             if (needXiaoYeAlert) {
                 setTimeout(() => {
-                    alert('⚠️ 上下小野提示 ⚠️\n\n检测到卡组中非工程非精灵卡超过6张（共' + nonGongChengNonJingLingCount + '张）且没有小野，已自动添加上下小野换卡指令：\n\n02:26,下' + firstCardName + ',上小野满,\n02:31,下小野,上' + firstCardName + '满,\n\n⚠️ 注意：以上指令涉及上下小野操作！\n\n逻辑说明：切换小野进场触发8秒无敌，无敌结束后换回原卡\n\n请注意：\n1. 请根据实际情况修改上下的卡名（当前默认第一张卡：' + firstCardName + '）\n2. 请根据自身情况修改时间\n3. 不需要上下卡的行请自行删除\n4. 小野上下卡操作请确认时间正确\n\n请确认后继续使用！');
+                    alert('⚠️ 上下小野提示 ⚠️\n\n检测到卡组中非工程非精灵卡超过6张（共' + nonGongChengNonJingLingCount + '张）且小野和凤凰都没上阵，已自动添加上下小野换卡指令：\n\n02:26,下' + firstCardName + ',上小野满,\n02:31,下小野,上' + firstCardName + '满,\n\n⚠️ 注意：以上指令涉及上下小野操作！\n\n逻辑说明：切换小野进场触发8秒无敌，无敌结束后换回原卡\n\n请注意：\n1. 请根据实际情况修改上下的卡名（当前默认第一张卡：' + firstCardName + '）\n2. 请根据自身情况修改时间\n3. 不需要上下卡的行请自行删除\n4. 小野上下卡操作请确认时间正确\n\n请确认后继续使用！');
+                }, 100);
+            }
+
+            // 下凤凰上小野提示（情况3：小野没上阵，凤凰已上阵）
+            if (needFengHuangToXiaoYeAlert) {
+                setTimeout(() => {
+                    alert('⚠️ 下凤凰上小野提示 ⚠️\n\n检测到卡组中凤凰已上阵但小野没上阵，已自动添加换卡指令：\n\n02:36,下凤凰,上小野满,\n\n⚠️ 注意：以上指令涉及下凤凰上小野操作！\n\n逻辑说明：凤凰6秒无敌用完后下凤凰上小野（小野比凤凰好，不切回）\n\n请注意：\n1. 请根据自身情况修改时间\n2. 不需要此操作的请自行删除\n3. 确认小野在手机里可上阵\n\n请确认后继续使用！');
                 }, 100);
             }
         }

@@ -50,35 +50,30 @@ if (isTauriApp) {
     }
 
     // ==================== 文件操作封装 ====================
-    // 注意：Tauri v2 自动将 Rust snake_case 命令名转为 camelCase
+    // 命令名和 Rust 函数名一致（snake_case，Tauri v2 不会自动转换）
 
     async function openFileDialog() {
-        // Rust: open_directory_dialog → JS: openDirectoryDialog
-        const result = await tauriInvoke('openDirectoryDialog');
+        const result = await tauriInvoke('open_directory_dialog');
         return result;
     }
 
     async function readDir(dirPath) {
-        // Rust: read_directory → JS: readDirectory
-        const result = await tauriInvoke('readDirectory', { dirPath });
+        const result = await tauriInvoke('read_directory', { dirPath });
         return result || [];
     }
 
     async function readTextFile(filePath) {
-        // Rust: read_text_file → JS: readTextFile
-        const result = await tauriInvoke('readTextFile', { filePath });
+        const result = await tauriInvoke('read_text_file', { filePath });
         return result;
     }
 
     async function writeTextFile(filePath, content) {
-        // Rust: write_text_file → JS: writeTextFile
-        const result = await tauriInvoke('writeTextFile', { filePath, content });
+        const result = await tauriInvoke('write_text_file', { filePath, content });
         return result === null ? false : true;
     }
 
     async function deleteFile(filePath) {
-        // Rust: delete_file → JS: deleteFile
-        const result = await tauriInvoke('deleteFile', { filePath });
+        const result = await tauriInvoke('delete_file', { filePath });
         return result === null ? false : true;
     }
 
