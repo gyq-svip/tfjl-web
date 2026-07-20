@@ -3741,6 +3741,16 @@
             document.getElementById('chatRoomEntryModal').style.display = 'none';
         }
 
+        function hideRefPreview() {
+            document.getElementById('refImagePreview').classList.remove('show');
+        }
+        function showRefPreview(src, title) {
+            const el = document.getElementById('refImagePreview');
+            document.getElementById('refImagePreviewImg').src = src;
+            document.getElementById('refImagePreviewTitle').textContent = title || '';
+            el.classList.add('show');
+        }
+
         async function joinChatRoom() {
             const roomId = document.getElementById('chatRoomIdInput').value.trim();
             const nick = document.getElementById('chatRoomNickInput').value.trim();
@@ -7306,21 +7316,26 @@
             // 无敌链逻辑（小野8秒无敌 → 凤凰6秒无敌）
             // 第一张卡名（arrangedCards的第一张）
             const firstCardName = arrangedCards[0] || '第一张卡';
-            const hasFengHuang = heroNames.some(name => name.includes('凤凰'));
-            const hasXiaoYe = heroNames.some(name => name.includes('小野'));
+            // 凤凰/小野检测：区分"携带"（在牌库中）和"上阵"（在arrangedCards中）
+            // 只有携带但没有上阵的卡才需要切卡提示
+            const fengHuangCarried = heroNames.some(name => name.includes('凤凰'));
+            const xiaoYeCarried = heroNames.some(name => name.includes('小野'));
+            const fengHuangDeployed = arrangedCards.some(name => name.includes('凤凰'));
+            const xiaoYeDeployed = arrangedCards.some(name => name.includes('小野'));
+
             // 非工程非精灵卡数量
             const nonGongChengNonJingLingCount = heroNames.filter(name =>
                 !gongChengNames.some(gc => name.includes(gc)) &&
                 !jingLingNames.some(jl => name.includes(jl))
             ).length;
 
-            // 情况1：小野没上阵 + 凤凰没上阵 + 卡>6张 → 上下小野 + 02:38上下凤凰
-            // 情况3：小野没上阵 + 凤凰已上阵 → 02:36下凤凰上小野（不切回）
-            // 情况4：小野已上阵 + 凤凰没上阵 → 02:38下小野上下凤凰（切回小野）
-            // 情况2/5：其他情况不切卡
+            // 情况1：小野携带但没上阵 + 凤凰携带但没上阵 + 卡>6张 → 上下小野 + 02:38上下凤凰
+            // 情况3：小野携带但没上阵 + 凤凰已上阵 → 02:36下凤凰上小野（不切回）
+            // 情况4：小野已上阵 + 凤凰携带但没上阵 → 02:38下小野上下凤凰（切回小野）
+            // 情况2/5：其他情况不切卡（没携带的不切）
 
-            const xiaoYeNotInBattle = !hasXiaoYe;  // 小野没上阵
-            const fengHuangNotInBattle = !hasFengHuang;  // 凤凰没上阵
+            const xiaoYeNotInBattle = xiaoYeCarried && !xiaoYeDeployed;
+            const fengHuangNotInBattle = fengHuangCarried && !fengHuangDeployed;
 
             // 02:26-02:31 上下小野（情况1：都没上阵且卡>6张）
             const needXiaoYeSwitch = xiaoYeNotInBattle && fengHuangNotInBattle && nonGongChengNonJingLingCount > 6;
@@ -7338,12 +7353,12 @@
             // 02:38 上下凤凰（情况1或情况4）
             // 情况1：小野没上阵+凤凰没上阵+卡>6 → 02:38用{第一张卡}上下凤凰
             // 情况4：小野已上阵+凤凰没上阵 → 02:38用小野上下凤凰（切回小野）
-            const needFengHuangSwitch = fengHuangNotInBattle && (needXiaoYeSwitch || hasXiaoYe);
+            const needFengHuangSwitch = fengHuangNotInBattle && (needXiaoYeSwitch || xiaoYeDeployed);
             if (needFengHuangSwitch) {
                 if (needXiaoYeSwitch) {
                     // 情况1：小野是切换进来的，02:31已下小野，02:38用{第一张卡}上下凤凰
                     output += `02:38,下${firstCardName},上凤凰4级,时钟秒0.5,下凤凰,上${firstCardName}满,\n`;
-                } else if (hasXiaoYe) {
+                } else if (xiaoYeDeployed) {
                     // 情况4：小野本来在阵容，02:38用小野上下凤凰，最后切回小野
                     output += `02:38,下小野,上凤凰4级,时钟秒0.5,下凤凰,上小野满,\n`;
                 }
@@ -7434,30 +7449,10 @@
             // 保存输出到全局变量供复制使用
             window._activityScriptOutput = output;
 
-            // 上下凤凰提示：生成完成后弹出确认框
-            if (needFengHuangAlert) {
-                let fengHuangLine = '';
-                if (needXiaoYeSwitch) {
-                    fengHuangLine = '02:38,下' + firstCardName + ',上凤凰4级,时钟秒0.5,下凤凰,上' + firstCardName + '满,';
-                } else if (hasXiaoYe) {
-                    fengHuangLine = '02:38,下小野,上凤凰4级,时钟秒0.5,下凤凰,上小野满,';
-                }
+            // 切卡提示：有凤凰/小野需要切卡时统一提示
+            if (needFengHuangAlert || needXiaoYeAlert || needFengHuangToXiaoYeAlert) {
                 setTimeout(() => {
-                    alert('⚠️ 上下凤凰提示 ⚠️\n\n检测到卡组中凤凰没上阵，已自动添加上下凤凰换卡指令：\n\n' + fengHuangLine + '\n\n⚠️ 注意：以上指令涉及上下凤凰操作！\n\n逻辑说明：小野8秒无敌用完后，上凤凰触发6秒无敌\n\n请注意：\n1. 请根据实际情况修改上下的卡名\n2. 请根据自身情况修改时间\n3. 不需要上下卡的行请自行删除\n\n请确认后继续使用！');
-                }, 100);
-            }
-
-            // 上下小野提示（情况1：都没上阵且卡>6张）
-            if (needXiaoYeAlert) {
-                setTimeout(() => {
-                    alert('⚠️ 上下小野提示 ⚠️\n\n检测到卡组中非工程非精灵卡超过6张（共' + nonGongChengNonJingLingCount + '张）且小野和凤凰都没上阵，已自动添加上下小野换卡指令：\n\n02:26,下' + firstCardName + ',上小野满,\n02:31,下小野,上' + firstCardName + '满,\n\n⚠️ 注意：以上指令涉及上下小野操作！\n\n逻辑说明：切换小野进场触发8秒无敌，无敌结束后换回原卡\n\n请注意：\n1. 请根据实际情况修改上下的卡名（当前默认第一张卡：' + firstCardName + '）\n2. 请根据自身情况修改时间\n3. 不需要上下卡的行请自行删除\n4. 小野上下卡操作请确认时间正确\n\n请确认后继续使用！');
-                }, 100);
-            }
-
-            // 下凤凰上小野提示（情况3：小野没上阵，凤凰已上阵）
-            if (needFengHuangToXiaoYeAlert) {
-                setTimeout(() => {
-                    alert('⚠️ 下凤凰上小野提示 ⚠️\n\n检测到卡组中凤凰已上阵但小野没上阵，已自动添加换卡指令：\n\n02:36,下凤凰,上小野满,\n\n⚠️ 注意：以上指令涉及下凤凰上小野操作！\n\n逻辑说明：凤凰6秒无敌用完后下凤凰上小野（小野比凤凰好，不切回）\n\n请注意：\n1. 请根据自身情况修改时间\n2. 不需要此操作的请自行删除\n3. 确认小野在手机里可上阵\n\n请确认后继续使用！');
+                    alert('⚠️ 检查到有凤凰或小野，可能要切卡\n\n请注意：\n1. 请根据实际情况修改需要上下的卡\n2. 请根据自身情况修改上下卡时间\n3. 不需要上下卡的请自行删除即可');
                 }, 100);
             }
         }
@@ -9800,48 +9795,88 @@
             list.innerHTML = html;
         }
 
-        // 模糊搜索过滤脚本列表
+        // 模糊搜索过滤脚本列表（同时搜索项目文件 + 扫描目录文件）
         function filterTxtFilesList() {
             const keyword = (document.getElementById('txtFileSearchInput')?.value || '').trim().toLowerCase();
             const list = document.getElementById('txtFilesList');
             if (!list) return;
 
-            if (txtFiles.length === 0) {
+            const scannedFiles = window.scannedFiles || [];
+
+            if (txtFiles.length === 0 && scannedFiles.length === 0) {
                 list.innerHTML = '<div style="color:rgba(255,255,255,0.4);padding:10px;text-align:center;">暂无文本文件</div>';
                 return;
             }
 
             let html = '';
-            txtFiles.forEach((file, i) => {
-                // 模糊匹配文件名和内容
-                const nameMatch = file.name.toLowerCase().includes(keyword);
-                const contentMatch = file.content.toLowerCase().includes(keyword);
-                if (keyword && !nameMatch && !contentMatch) return;
 
-                // 高亮匹配的关键字
+            // 1. 搜索项目中的脚本文件
+            let projectMatched = false;
+            txtFiles.forEach((file, i) => {
+                const nameMatch = file.name.toLowerCase().includes(keyword);
+                const contentMatch = keyword ? file.content.toLowerCase().includes(keyword) : true;
+                if (keyword && !nameMatch && !contentMatch) return;
+                projectMatched = true;
+
                 let displayName = escapeHtml(file.name);
                 if (keyword && nameMatch) {
                     const regex = new RegExp(`(${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
                     displayName = displayName.replace(regex, '<span style="background:#ff9800;color:#000;padding:0 2px;border-radius:2px;">$1</span>');
                 }
 
-                html += `
-                    <div style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,215,0,0.2);border-radius:8px;padding:12px;">
-                        <div style="display:flex;justify-content:space-between;align-items:center;">
-                            <div style="flex:1;overflow:hidden;">
-                                <div style="color:#ffd700;font-weight:bold;margin-bottom:4px;">📄 ${displayName}</div>
-                                <div style="color:rgba(255,255,255,0.5);font-size:0.8rem;">${(file.content.length / 1024).toFixed(1)} KB</div>
-                            </div>
-                            <div style="display:flex;gap:5px;flex-shrink:0;flex-wrap:wrap;">
-                                <button onclick="openTxtFileWindow(${i})" title="打开" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">✏️</button>
-                                <button onclick="renameTxtFile(${i})" title="重命名" style="background:linear-gradient(135deg,#ff9800,#f57c00);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">✏️</button>
-                                <button onclick="downloadTxtFile(${i})" title="下载" style="background:linear-gradient(135deg,#2196f3,#1565c0);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">📥</button>
-                                <button onclick="deleteTxtFile(${i})" title="删除" style="background:linear-gradient(135deg,#f44336,#c62828);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">🗑️</button>
-                            </div>
+                html += `<div style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,215,0,0.2);border-radius:8px;padding:12px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <div style="flex:1;overflow:hidden;">
+                            <div style="color:#ffd700;font-weight:bold;margin-bottom:4px;">📄 ${displayName}</div>
+                            <div style="color:rgba(255,255,255,0.5);font-size:0.8rem;">${(file.content.length / 1024).toFixed(1)} KB</div>
+                        </div>
+                        <div style="display:flex;gap:5px;flex-shrink:0;flex-wrap:wrap;">
+                            <button onclick="openTxtFileWindow(${i})" title="打开" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">✏️</button>
+                            <button onclick="renameTxtFile(${i})" title="重命名" style="background:linear-gradient(135deg,#ff9800,#f57c00);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">✏️</button>
+                            <button onclick="downloadTxtFile(${i})" title="下载" style="background:linear-gradient(135deg,#2196f3,#1565c0);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">📥</button>
+                            <button onclick="deleteTxtFile(${i})" title="删除" style="background:linear-gradient(135deg,#f44336,#c62828);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">🗑️</button>
                         </div>
                     </div>
-                `;
+                </div>`;
             });
+
+            // 2. 搜索扫描目录中的文件（仅当有搜索关键字时，且排除已在项目中的文件）
+            if (keyword && scannedFiles.length > 0) {
+                const existingNames = new Set(txtFiles.map(f => f.name));
+                let scannedMatched = false;
+
+                scannedFiles.forEach(f => {
+                    if (existingNames.has(f.name)) return;
+                    if (!f.name.toLowerCase().includes(keyword)) return;
+
+                    if (!scannedMatched) {
+                        html += `<div style="color:#00bcd4;font-size:0.8rem;margin:12px 0 6px;padding:6px 0;border-top:1px solid rgba(0,188,212,0.2);">
+                            📂 来自扫描目录（未导入）
+                        </div>`;
+                        scannedMatched = true;
+                    }
+
+                    const safePath = f.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                    let displayName = escapeHtml(f.name);
+                    const regex = new RegExp(`(${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+                    displayName = displayName.replace(regex, '<span style="background:#00bcd4;color:#000;padding:0 2px;border-radius:2px;">$1</span>');
+
+                    html += `<div style="background:rgba(0,188,212,0.05);border:1px dashed rgba(0,188,212,0.4);border-radius:8px;padding:12px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <div style="flex:1;overflow:hidden;">
+                                <div style="color:#00bcd4;font-weight:bold;margin-bottom:2px;">📂 ${displayName}</div>
+                                <div style="color:rgba(255,255,255,0.35);font-size:0.7rem;">${f.dirLabel} · ${f.ext.toUpperCase()}</div>
+                            </div>
+                            <button onclick="importFileToProject('${safePath}')" style="background:linear-gradient(135deg,#ff9800,#f57c00);color:white;border:none;padding:5px 12px;border-radius:5px;cursor:pointer;font-size:0.75rem;flex-shrink:0;">📥 导入到项目</button>
+                        </div>
+                    </div>`;
+                });
+            }
+
+            // 无关键字时，仅显示提示（不再展示全部扫描文件，避免列表过长）
+            if (!keyword && scannedFiles.length > 0 && txtFiles.length === 0) {
+                html = '<div style="color:rgba(255,255,255,0.4);padding:10px;text-align:center;">在搜索框中输入关键词，可搜索项目脚本和扫描目录中的文件</div>';
+            }
 
             if (!html) {
                 html = '<div style="color:rgba(255,255,255,0.4);padding:10px;text-align:center;">未找到匹配的脚本</div>';
@@ -20444,7 +20479,7 @@ function hasGistToken() {
             html += `</div></div>`;
 
             // 新用户日趋势（列表）
-            const recentNewUsers = recentDates.slice(-15).reverse().map(d => {
+            const recentNewUsers = recentDates.slice(0, 15).map(d => {
                 const s = dailyStats[d];
                 return { date: d, newUsers: s.new_users || 0, visits: s.visits || 0 };
             }).filter(x => x.newUsers > 0);
@@ -20452,7 +20487,7 @@ function hasGistToken() {
             if (recentNewUsers.length > 0) {
                 html += `<div style="background:rgba(255,255,255,0.05);border-radius:10px;padding:15px;margin-bottom:20px;">`;
                 html += `<div style="color:#4ecdc4;font-size:0.9rem;margin-bottom:10px;">🆕 近期新用户记录</div>`;
-                html += `<div style="max-height:200px;overflow-y:auto;">`;
+                html += `<div style="max-height:200px;overflow-y:auto;padding-right:10px;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,0.2) transparent;">`;
                 recentNewUsers.forEach(x => {
                     html += `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.05);font-size:0.85rem;">`;
                     html += `<span style="color:rgba(255,255,255,0.7);">${x.date}</span>`;
@@ -21261,6 +21296,15 @@ function hasGistToken() {
             background: linear-gradient(135deg, transparent 50%, rgba(78,205,196,0.5) 50%);
             border-radius: 0 0 12px 0;
         }
+        
+        /* 参考图片预览窗 */
+        #refImagePreview { display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); z-index:9999; background:rgba(26,26,46,0.98); border:1px solid rgba(0,188,212,0.4); border-radius:12px; box-shadow:0 4px 30px rgba(0,0,0,0.6); min-width:300px; max-width:90vw; }
+        #refImagePreview.show { display:block; }
+        #refImagePreview .preview-header { display:flex; justify-content:space-between; align-items:center; padding:8px 14px; }
+        #refImagePreview .preview-title { color:#00bcd4; font-size:0.85rem; }
+        #refImagePreview .preview-close { background:none; border:none; color:#fff; font-size:1.2rem; cursor:pointer; padding:0 4px; }
+        #refImagePreview .preview-body { padding:0 14px 14px; }
+        #refImagePreview .preview-img { max-width:100%; border-radius:8px; }
     </style>
     <div id="messageWall" style="position:fixed;top:60px;left:20px;width:380px;height:480px;background:rgba(26,26,46,0.95);border:1px solid rgba(255,215,0,0.3);border-radius:12px;z-index:9980;box-shadow:0 4px 20px rgba(0,0,0,0.5);backdrop-filter:blur(10px);flex-direction:column;min-width:300px;min-height:350px;display:none;">
         <div id="messageWallHeader" style="background:linear-gradient(135deg,rgba(255,215,0,0.2),rgba(255,107,107,0.2));padding:10px 15px;display:flex;justify-content:space-between;align-items:center;cursor:move;user-select:none;" onmousedown="startPanelDrag(event,'messageWall')" ontouchstart="startPanelTouch(event,'messageWall')">
