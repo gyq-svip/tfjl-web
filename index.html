@@ -5392,39 +5392,13 @@
             if (modal) modal.style.display = 'none';
         }
 
-        // 获取 GitHub 最新 Release 信息
+        // 获取最新版本信息（从 GitHub Pages 读取，国内可访问）
         async function fetchLatestRelease() {
-            try {
-                const resp = await fetch(GITHUB_RELEASES_API, {
-                    headers: { 'Accept': 'application/vnd.github.v3+json' }
-                });
-                if (resp.ok) {
-                    const data = await resp.json();
-                    return {
-                        tag: data.tag_name || '',
-                        version: (data.tag_name || '').replace(/^v/i, ''),
-                        name: data.name || '',
-                        body: data.body || '',
-                        htmlUrl: data.html_url || GITHUB_RELEASES_PAGE,
-                        downloadUrl: DIRECT_DOWNLOAD_URL,
-                        assets: (data.assets || []).map(a => ({
-                            name: a.name,
-                            url: a.browser_download_url,
-                            size: a.size
-                        }))
-                    };
-                }
-            } catch (e) {
-                console.warn('GitHub API 直连失败，尝试后备方案:', e.message);
-            }
-
-            // 后备方案：读取 GitHub Pages 上的 version.json（国内可访问）
             try {
                 const resp = await fetch(VERSION_JSON_FALLBACK, { cache: 'no-cache' });
                 if (resp.ok) {
                     const data = await resp.json();
                     if (data.version) {
-                        console.log('通过 GitHub Pages 获取到版本: v' + data.version);
                         return {
                             tag: 'v' + data.version,
                             version: data.version,
@@ -5437,9 +5411,8 @@
                     }
                 }
             } catch (e) {
-                console.warn('后备方案也失败:', e.message);
+                console.warn('获取版本信息失败:', e.message);
             }
-
             return null;
         }
 
