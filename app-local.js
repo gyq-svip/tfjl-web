@@ -198,11 +198,12 @@ if (isTauriApp) {
                     <div id="scannedFileList" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:8px;min-height:60px;max-height:250px;overflow:auto;">
                         <div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">扫描中...</div>
                     </div>
+                    <div id="fuzzyStatsArea" style="margin-top:8px;background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:8px;min-height:24px;"></div>
                 </div>
 
                 <div style="margin-bottom:20px;">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                        <label style="color:#e040fb;font-size:0.9rem;">📊 副本统计（按截图数统计每天打多少局）</label>
+                        <label style="color:#e040fb;font-size:0.9rem;">🚗 车主副本开车统计（按截图数统计每天打多少局）</label>
                         <button onclick="calcScreenshotStats()" style="background:linear-gradient(135deg,#9c27b0,#6a1b9a);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">📊 统计</button>
                     </div>
                     <div id="screenshotStats" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:8px;min-height:60px;">
@@ -247,8 +248,68 @@ if (isTauriApp) {
 
     // ==================== 文件扫描 ====================
 
+    // 递归扫描目录（最大深度3层），收集所有 txt/json 文件
+    async function collectFilesRecursive(dirPath, dirKey, dirLabel, maxDepth) {
+        if (maxDepth === undefined) maxDepth = 3;
+        const files = [];
+        if (maxDepth <= 0) return files;
+        try {
+            const entries = await readDir(dirPath);
+            for (const entry of entries) {
+                if (entry.is_file) {
+                    const ext = entry.name.split('.').pop().toLowerCase();
+                    if (ext === 'txt' || ext === 'json') {
+                        files.push({
+                            name: entry.name,
+                            path: entry.path,
+                            dir: dirPath,
+                            dirKey,
+                            dirLabel,
+                            ext
+                        });
+                    }
+                } else {
+                    // 递归扫描子文件夹
+                    const subFiles = await collectFilesRecursive(entry.path, dirKey, dirLabel, maxDepth - 1);
+                    files.push(...subFiles);
+                }
+            }
+        } catch (e) {
+            console.warn('扫描目录失败:', dirPath, e);
+        }
+        return files;
+    }
+
+    // 计算脚本模糊分类统计
+    function calcFuzzyStats(files) {
+        const keywords = ['寒冰', '暗月', '漩涡', '合作', '深海'];
+        const stats = {};
+        keywords.forEach(k => { stats[k] = 0; });
+        stats['其他'] = 0;
+
+        for (const f of files) {
+            let matched = false;
+            for (const kw of keywords) {
+                if (f.name.includes(kw)) {
+                    stats[kw]++;
+                    matched = true;
+                    break;
+                }
+            }
+            if (!matched) {
+                stats['其他']++;
+            }
+        }
+        // 如果"其他"为0则不显示
+        if (stats['其他'] === 0) delete stats['其他'];
+        // 移除计数为0的关键词
+        keywords.forEach(k => { if (stats[k] === 0) delete stats[k]; });
+        return stats;
+    }
+
     async function scanAllFiles() {
         const listEl = document.getElementById('scannedFileList');
+        const statsEl = document.getElementById('fuzzyStatsArea');
         if (!listEl) return;
 
         const dirLabels = { coop: '合作', activity: '活动', battle: '对战', battleMax: '对战MAX', screenshot: '截图' };
@@ -256,40 +317,26 @@ if (isTauriApp) {
 
         if (allDirs.length === 0) {
             listEl.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">请先配置老马目录</div>';
+            if (statsEl) statsEl.innerHTML = '';
             return;
         }
 
         listEl.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">扫描中...</div>';
         scannedFiles = [];
 
+        // 递归扫描所有目录（含子文件夹）
         for (const [key, dir] of allDirs) {
-            try {
-                const entries = await readDir(dir);
-                for (const entry of entries) {
-                    if (entry.is_file) {
-                        const ext = entry.name.split('.').pop().toLowerCase();
-                        if (ext === 'txt' || ext === 'json') {
-                            scannedFiles.push({
-                                name: entry.name,
-                                path: entry.path,
-                                dir,
-                                dirKey: key,
-                                dirLabel: dirLabels[key],
-                                ext
-                            });
-                        }
-                    }
-                }
-            } catch (e) {
-                console.warn('扫描目录失败:', dir, e);
-            }
+            const subFiles = await collectFilesRecursive(dir, key, dirLabels[key]);
+            scannedFiles.push(...subFiles);
         }
 
         if (scannedFiles.length === 0) {
             listEl.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">未找到 txt/json 文件</div>';
+            if (statsEl) statsEl.innerHTML = '';
             return;
         }
 
+        // 按目录分组显示
         const grouped = {};
         scannedFiles.forEach(f => {
             if (!grouped[f.dirLabel]) grouped[f.dirLabel] = [];
@@ -312,6 +359,34 @@ if (isTauriApp) {
         }
         listEl.innerHTML = html;
         window.scannedFiles = scannedFiles;
+
+        // 显示模糊分类统计
+        if (statsEl) {
+            const fuzzyStats = calcFuzzyStats(scannedFiles);
+            const entries = Object.entries(fuzzyStats);
+            if (entries.length > 0) {
+                const total = entries.reduce((sum, [, c]) => sum + c, 0);
+                const colorMap = {
+                    '寒冰': '#64b5f6', '暗月': '#ce93d8', '漩涡': '#4fc3f7',
+                    '合作': '#ffd54f', '深海': '#4db6ac', '其他': '#bdbdbd'
+                };
+                let statsHtml = '<div style="color:#ffd700;font-size:0.75rem;margin-bottom:6px;">🏷️ 脚本分类模糊统计（共<span style="color:#fff;font-weight:bold;">' + total + '</span>个）：</div>';
+                statsHtml += '<div style="display:flex;flex-wrap:wrap;gap:8px;">';
+                for (const [kw, count] of entries) {
+                    const pct = Math.round(count / total * 100);
+                    const color = colorMap[kw] || '#bdbdbd';
+                    statsHtml += `<span style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:6px;padding:4px 10px;font-size:0.8rem;">
+                        <span style="color:${color};font-weight:bold;">${kw}</span>
+                        <span style="color:#fff;margin-left:4px;">${count}个</span>
+                        <span style="color:rgba(255,255,255,0.4);font-size:0.7rem;margin-left:2px;">(${pct}%)</span>
+                    </span>`;
+                }
+                statsHtml += '</div>';
+                statsEl.innerHTML = statsHtml;
+            } else {
+                statsEl.innerHTML = '';
+            }
+        }
     }
 
     // 静默扫描（不上报UI，专门给脚本文件tab搜索用）
@@ -323,17 +398,8 @@ if (isTauriApp) {
 
         scannedFiles = [];
         for (const [key, dir] of allDirs) {
-            try {
-                const entries = await readDir(dir);
-                for (const entry of entries) {
-                    if (entry.is_file) {
-                        const ext = entry.name.split('.').pop().toLowerCase();
-                        if (ext === 'txt' || ext === 'json') {
-                            scannedFiles.push({ name: entry.name, path: entry.path, dir, dirKey: key, dirLabel: dirLabels[key], ext });
-                        }
-                    }
-                }
-            } catch (e) { /* skip unreadable dirs */ }
+            const subFiles = await collectFilesRecursive(dir, key, dirLabels[key]);
+            scannedFiles.push(...subFiles);
         }
         window.scannedFiles = scannedFiles;
     }
@@ -358,32 +424,142 @@ if (isTauriApp) {
         }
     }
 
-    function showFileEditor(filePath, content) {
+    function showFileEditor(filePath, content, secondFilePath, secondContent) {
         let modal = document.getElementById('fileEditorModal');
         if (modal) modal.remove();
         modal = document.createElement('div');
         modal.id = 'fileEditorModal';
-        modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:99999;display:flex;justify-content:center;align-items:center;';
+        modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:99999;display:flex;justify-content:center;align-items:center;';
+
+        const isCompare = !!(secondFilePath && secondContent !== undefined);
         const fileName = filePath.split(/[\\/]/).pop();
         const safePath = filePath.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-        modal.innerHTML = `
-            <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(0,188,212,0.5);border-radius:12px;padding:20px;width:700px;max-width:95vw;height:80vh;display:flex;flex-direction:column;">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-                    <div>
-                        <h3 style="color:#fff;margin:0;font-size:1.1rem;">📄 ${fileName}</h3>
-                        <div style="color:rgba(255,255,255,0.4);font-size:0.7rem;margin-top:2px;">${filePath}</div>
+        const escapedContent = content.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+        // 存储对比模式用的原始文本
+        window._editorContent1 = content;
+        window._editorPath1 = filePath;
+
+        if (isCompare) {
+            const fileName2 = secondFilePath.split(/[\\/]/).pop();
+            const safePath2 = secondFilePath.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+            const escapedContent2 = secondContent.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            window._editorContent2 = secondContent;
+            window._editorPath2 = secondFilePath;
+
+            // 计算差异
+            const lines1 = content.split('\n');
+            const lines2 = secondContent.split('\n');
+            const diff = computeLineDiff(lines1, lines2);
+            const diffLeft = [], diffRight = [], diffClasses = [];
+            for (const d of diff) {
+                diffLeft.push(d.left !== null ? d.left.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : '');
+                diffRight.push(d.right !== null ? d.right.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : '');
+                diffClasses.push(d.type);
+            }
+
+            const sameCount = diff.filter(d => d.type === 'same').length;
+            const diffCount = diff.filter(d => d.type !== 'same').length;
+
+            window._diffData = { diff, diffLeft, diffRight, diffClasses };
+
+            modal.innerHTML = `
+                <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(233,30,99,0.5);border-radius:12px;padding:20px;width:95vw;max-width:1100px;height:85vh;display:flex;flex-direction:column;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                        <div style="display:flex;gap:20px;align-items:center;">
+                            <div>
+                                <span style="color:#4caf50;font-size:1rem;">📄 ${fileName}</span>
+                                <div style="color:rgba(255,255,255,0.4);font-size:0.65rem;">${filePath}</div>
+                            </div>
+                            <span style="color:#e91e63;font-weight:bold;">⇄</span>
+                            <div>
+                                <span style="color:#ff9800;font-size:1rem;">📄 ${fileName2}</span>
+                                <div style="color:rgba(255,255,255,0.4);font-size:0.65rem;">${secondFilePath}</div>
+                            </div>
+                        </div>
+                        <div style="display:flex;gap:8px;align-items:center;">
+                            <span style="color:rgba(255,255,255,0.5);font-size:0.75rem;">相同<span style="color:#4caf50;font-weight:bold;">${sameCount}</span>行 · 差异<span style="color:#e91e63;font-weight:bold;">${diffCount}</span>行</span>
+                            <button onclick="toggleCompareView()" style="background:rgba(156,39,176,0.4);color:#ce93d8;border:1px solid rgba(156,39,176,0.5);padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">📊 差异视图</button>
+                            <button onclick="document.getElementById('fileEditorModal').remove()" style="background:rgba(255,255,255,0.1);color:#fff;border:none;width:30px;height:30px;border-radius:5px;cursor:pointer;font-size:1.2rem;">×</button>
+                        </div>
                     </div>
-                    <button onclick="document.getElementById('fileEditorModal').remove()" style="background:rgba(255,255,255,0.1);color:#fff;border:none;width:30px;height:30px;border-radius:5px;cursor:pointer;font-size:1.2rem;">×</button>
+                    <!-- 并排编辑视图 -->
+                    <div id="compareSplitView" style="display:flex;gap:8px;flex:1;min-height:0;">
+                        <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+                            <textarea id="fileEditorTextarea" data-editor="left" style="flex:1;width:100%;background:rgba(0,0,0,0.4);color:#0f0;border:1px solid rgba(76,175,80,0.3);border-radius:8px;padding:10px;font-family:'Consolas','Courier New',monospace;font-size:0.8rem;resize:none;box-sizing:border-box;line-height:1.5;overflow:auto;" onscroll="syncCompareScroll(this,'right')">${escapedContent}</textarea>
+                        </div>
+                        <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+                            <textarea id="fileEditorTextarea2" data-editor="right" style="flex:1;width:100%;background:rgba(0,0,0,0.4);color:#0f0;border:1px solid rgba(255,152,0,0.3);border-radius:8px;padding:10px;font-family:'Consolas','Courier New',monospace;font-size:0.8rem;resize:none;box-sizing:border-box;line-height:1.5;overflow:auto;" onscroll="syncCompareScroll(this,'left')">${escapedContent2}</textarea>
+                        </div>
+                    </div>
+                    <!-- 差异高亮视图（默认隐藏） -->
+                    <div id="compareDiffView" style="display:none;flex:1;overflow:auto;border:1px solid rgba(255,255,255,0.1);border-radius:8px;background:rgba(0,0,0,0.4);">
+                        <div style="display:flex;font-family:'Consolas','Courier New',monospace;font-size:0.75rem;line-height:1.6;">${renderDiffView(diff)}</div>
+                    </div>
+                    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px;">
+                        <button onclick="copyFileContent('fileEditorTextarea')" style="background:rgba(255,255,255,0.1);color:#fff;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">📋 复制左侧</button>
+                        <button onclick="copyFileContent('fileEditorTextarea2')" style="background:rgba(255,255,255,0.1);color:#fff;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">📋 复制右侧</button>
+                        <button onclick="saveCompareBoth()" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">💾 保存两侧</button>
+                    </div>
                 </div>
-                <textarea id="fileEditorTextarea" style="flex:1;width:100%;background:rgba(0,0,0,0.4);color:#0f0;border:1px solid rgba(0,188,212,0.3);border-radius:8px;padding:12px;font-family:'Consolas','Courier New',monospace;font-size:0.85rem;resize:none;box-sizing:border-box;line-height:1.5;">${content.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</textarea>
-                <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">
-                    <button onclick="copyFileContent()" style="background:rgba(255,255,255,0.1);color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;">📋 复制</button>
-                    <button onclick="saveFileContent('${safePath}')" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;">💾 保存到原文件</button>
-                    <button onclick="loadFileContentToHand('${safePath}')" style="background:linear-gradient(135deg,#00bcd4,#00838f);color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;">🃏 加载到手牌</button>
+            `;
+        } else {
+            // 单文件编辑模式（含查找替换栏）
+            modal.innerHTML = `
+                <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(0,188,212,0.5);border-radius:12px;padding:20px;width:700px;max-width:95vw;height:85vh;display:flex;flex-direction:column;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                        <div>
+                            <h3 style="color:#fff;margin:0;font-size:1.1rem;">📄 ${fileName}</h3>
+                            <div style="color:rgba(255,255,255,0.4);font-size:0.7rem;margin-top:2px;">${filePath}</div>
+                        </div>
+                        <button onclick="document.getElementById('fileEditorModal').remove()" style="background:rgba(255,255,255,0.1);color:#fff;border:none;width:30px;height:30px;border-radius:5px;cursor:pointer;font-size:1.2rem;">×</button>
+                    </div>
+                    <!-- 查找替换栏 -->
+                    <div id="editorFindReplaceBar" style="display:none;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:8px 10px;margin-bottom:8px;">
+                        <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">
+                            <input id="editorFindInput" placeholder="查找..." onkeydown="if(event.key==='Enter')editorFind('next')" style="flex:1;background:rgba(0,0,0,0.4);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:4px 8px;font-size:0.8rem;">
+                            <span id="editorFindCount" style="color:rgba(255,255,255,0.4);font-size:0.75rem;min-width:50px;text-align:center;">0/0</span>
+                            <button onclick="editorFind('prev')" style="background:rgba(255,255,255,0.1);color:#fff;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:0.75rem;" title="上一个 ↑">◀</button>
+                            <button onclick="editorFind('next')" style="background:rgba(255,255,255,0.1);color:#fff;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:0.75rem;" title="下一个 ↓">▶</button>
+                            <label style="color:rgba(255,255,255,0.5);font-size:0.75rem;cursor:pointer;white-space:nowrap;"><input type="checkbox" id="editorFindCaseSensitive" style="vertical-align:middle;"> 区分大小写</label>
+                        </div>
+                        <div style="display:flex;gap:6px;align-items:center;">
+                            <input id="editorReplaceInput" placeholder="替换为..." style="flex:1;background:rgba(0,0,0,0.4);color:#ffeb3b;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:4px 8px;font-size:0.8rem;">
+                            <button onclick="editorReplace()" style="background:rgba(255,152,0,0.3);color:#ff9800;border:1px solid rgba(255,152,0,0.3);padding:4px 10px;border-radius:4px;cursor:pointer;font-size:0.75rem;">替换</button>
+                            <button onclick="editorReplaceAll()" style="background:rgba(244,67,54,0.3);color:#f44336;border:1px solid rgba(244,67,54,0.3);padding:4px 10px;border-radius:4px;cursor:pointer;font-size:0.75rem;">全部替换</button>
+                        </div>
+                    </div>
+                    <textarea id="fileEditorTextarea" style="flex:1;width:100%;background:rgba(0,0,0,0.4);color:#0f0;border:1px solid rgba(0,188,212,0.3);border-radius:8px;padding:12px;font-family:'Consolas','Courier New',monospace;font-size:0.85rem;resize:none;box-sizing:border-box;line-height:1.5;overflow:auto;" data-editor="main">${escapedContent}</textarea>
+                    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px;">
+                        <button onclick="toggleEditorFindReplace()" style="background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.15);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">🔍 查找替换</button>
+                        <button onclick="startCompareMode('${safePath}')" style="background:rgba(233,30,99,0.3);color:#e91e63;border:1px solid rgba(233,30,99,0.3);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">📊 对比文件</button>
+                        <button onclick="copyFileContent('fileEditorTextarea')" style="background:rgba(255,255,255,0.1);color:#fff;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">📋 复制</button>
+                        <button onclick="saveFileContent('${safePath}')" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.8rem;">💾 保存</button>
+                    </div>
                 </div>
-            </div>
-        `;
+            `;
+        }
         document.body.appendChild(modal);
+
+        // 键盘快捷键：Ctrl+F 打开查找/替换，Esc 关闭
+        if (!isCompare) {
+            const ta = document.getElementById('fileEditorTextarea');
+            if (ta) {
+                ta.addEventListener('keydown', function(e) {
+                    if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+                        e.preventDefault();
+                        toggleEditorFindReplace(true);
+                    }
+                    if (e.key === 'Escape') {
+                        const bar = document.getElementById('editorFindReplaceBar');
+                        if (bar && bar.style.display !== 'none') {
+                            bar.style.display = 'none';
+                            e.preventDefault();
+                        }
+                    }
+                });
+            }
+        }
     }
 
     async function saveFileContent(filePath) {
@@ -397,8 +573,9 @@ if (isTauriApp) {
         }
     }
 
-    function copyFileContent() {
-        const textarea = document.getElementById('fileEditorTextarea');
+    function copyFileContent(textareaId) {
+        const textarea = document.getElementById(textareaId || 'fileEditorTextarea');
+        if (!textarea) return;
         textarea.select();
         document.execCommand('copy');
         alert('已复制到剪贴板');
@@ -426,6 +603,281 @@ if (isTauriApp) {
 
     async function loadFileToHand(filePath) {
         await loadFileContentToHand(filePath);
+    }
+
+    // ==================== 查找替换 ====================
+
+    function toggleEditorFindReplace(forceOpen) {
+        const bar = document.getElementById('editorFindReplaceBar');
+        if (!bar) return;
+        if (forceOpen === true) {
+            bar.style.display = 'block';
+            document.getElementById('editorFindInput')?.focus();
+            // 预填选中文本
+            const ta = document.getElementById('fileEditorTextarea');
+            if (ta) {
+                const sel = ta.value.substring(ta.selectionStart, ta.selectionEnd);
+                if (sel) document.getElementById('editorFindInput').value = sel;
+                editorFind('count'); // 更新计数
+            }
+            return;
+        }
+        bar.style.display = bar.style.display === 'none' ? 'block' : 'none';
+        if (bar.style.display !== 'none') {
+            document.getElementById('editorFindInput')?.focus();
+            const ta = document.getElementById('fileEditorTextarea');
+            if (ta) {
+                const sel = ta.value.substring(ta.selectionStart, ta.selectionEnd);
+                if (sel) document.getElementById('editorFindInput').value = sel;
+                editorFind('count');
+            }
+        }
+    }
+
+    function editorFind(direction) {
+        const ta = document.getElementById('fileEditorTextarea') || document.getElementById('fileEditorTextarea2');
+        const input = document.getElementById('editorFindInput');
+        const countEl = document.getElementById('editorFindCount');
+        if (!ta || !input || !input.value) return;
+        const query = input.value;
+        const caseSensitive = document.getElementById('editorFindCaseSensitive')?.checked || false;
+        const text = ta.value;
+        const flags = caseSensitive ? 'g' : 'gi';
+
+        // 计算所有匹配位置
+        const matches = [];
+        let m;
+        const regex = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), flags);
+        while ((m = regex.exec(text)) !== null) {
+            matches.push(m.index);
+            if (m[0].length === 0) regex.lastIndex++; // 防止死循环
+        }
+
+        if (countEl) countEl.textContent = matches.length > 0 ? `1/${matches.length}` : '0/0';
+
+        if (matches.length === 0) {
+            input.style.borderColor = '#f44336';
+            setTimeout(() => { input.style.borderColor = ''; }, 1000);
+            return;
+        }
+        input.style.borderColor = '';
+
+        if (direction === 'count') return; // 只计数不跳转
+
+        const step = direction === 'prev' ? -1 : 1;
+        let currentIdx = -1;
+        if (direction === 'prev') {
+            // 找当前位置之前最近的匹配
+            for (let i = matches.length - 1; i >= 0; i--) {
+                if (matches[i] < ta.selectionStart) { currentIdx = i; break; }
+            }
+            if (currentIdx === -1) currentIdx = matches.length - 1; // 循环到最后一个
+        } else {
+            // 找当前位置之后最近的匹配
+            for (let i = 0; i < matches.length; i++) {
+                if (matches[i] > ta.selectionStart) { currentIdx = i; break; }
+            }
+            if (currentIdx === -1) currentIdx = 0; // 循环到第一个
+        }
+
+        const pos = matches[currentIdx];
+        ta.focus();
+        ta.setSelectionRange(pos, pos + query.length);
+        ta.blur();
+        ta.focus();
+        // 滚动到可见区域
+        const lineHeight = 20;
+        const before = text.substring(0, pos);
+        const lineNum = before.split('\n').length;
+        ta.scrollTop = Math.max(0, (lineNum - 3) * lineHeight);
+
+        if (countEl) countEl.textContent = `${currentIdx + 1}/${matches.length}`;
+    }
+
+    function editorReplace() {
+        const ta = document.getElementById('fileEditorTextarea') || document.getElementById('fileEditorTextarea2');
+        const findInput = document.getElementById('editorFindInput');
+        const replaceInput = document.getElementById('editorReplaceInput');
+        if (!ta || !findInput || !findInput.value) return;
+        const query = findInput.value;
+        const sel = ta.value.substring(ta.selectionStart, ta.selectionEnd);
+        const caseSensitive = document.getElementById('editorFindCaseSensitive')?.checked || false;
+        const compare = caseSensitive ? sel === query : sel.toLowerCase() === query.toLowerCase();
+        if (!compare) { editorFind('next'); return; }
+        ta.setRangeText(replaceInput.value, ta.selectionStart, ta.selectionEnd, 'select');
+        editorFind('next');
+    }
+
+    function editorReplaceAll() {
+        const ta = document.getElementById('fileEditorTextarea') || document.getElementById('fileEditorTextarea2');
+        const findInput = document.getElementById('editorFindInput');
+        const replaceInput = document.getElementById('editorReplaceInput');
+        if (!ta || !findInput || !findInput.value) return;
+        const query = findInput.value;
+        const caseSensitive = document.getElementById('editorFindCaseSensitive')?.checked || false;
+        const flags = caseSensitive ? 'g' : 'gi';
+        const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const count = (ta.value.match(new RegExp(escaped, flags)) || []).length;
+        if (count === 0) { alert('未找到匹配项'); return; }
+        if (!confirm(`找到 ${count} 处匹配，确认全部替换？`)) return;
+        ta.value = ta.value.replace(new RegExp(escaped, flags), replaceInput.value);
+        const countEl = document.getElementById('editorFindCount');
+        if (countEl) countEl.textContent = '0/0';
+        alert(`已替换 ${count} 处`);
+    }
+
+    // ==================== 双文件对比 ====================
+
+    async function startCompareMode(currentPath) {
+        // 让用户输入第二个文件路径 or 从已扫描文件中选择
+        const allFiles = window.scannedFiles || [];
+        if (allFiles.length === 0) {
+            const path = prompt('请输入第二个文件的完整路径：');
+            if (!path) return;
+            try {
+                const content = await readTextFile(path);
+                if (content === null) { alert('读取文件失败'); return; }
+                const currentContent = window._editorContent1 || document.getElementById('fileEditorTextarea')?.value || '';
+                const currentPath2 = window._editorPath1 || currentPath.replace(/\\\\/g, '\\').replace(/\\'/g, "'");
+                showFileEditor(currentPath2, currentContent, path, content);
+            } catch (e) { alert('读取失败：' + e.message); }
+            return;
+        }
+
+        // 弹窗让用户选择文件
+        let modal = document.getElementById('compareFileSelectModal');
+        if (modal) modal.remove();
+        modal = document.createElement('div');
+        modal.id = 'compareFileSelectModal';
+        modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:100000;display:flex;justify-content:center;align-items:center;';
+        modal.innerHTML = `<div style="background:#1a1a2e;border:2px solid rgba(233,30,99,0.5);border-radius:12px;padding:20px;width:500px;max-width:95vw;height:70vh;display:flex;flex-direction:column;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                <h3 style="color:#fff;margin:0;">📊 选择对比文件</h3>
+                <button onclick="document.getElementById('compareFileSelectModal').remove()" style="background:rgba(255,255,255,0.1);color:#fff;border:none;width:30px;height:30px;border-radius:5px;cursor:pointer;">×</button>
+            </div>
+            <input id="compareFileSearch" placeholder="搜索文件名..." oninput="filterCompareList()" style="background:rgba(0,0,0,0.4);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:6px;padding:8px;font-size:0.85rem;margin-bottom:8px;">
+            <div id="compareFileList" style="flex:1;overflow:auto;">${allFiles.map((f,i) => {
+                const safePath = f.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                return `<div class="compare-file-item" data-index="${i}" data-path="${safePath}" style="color:#fff;padding:6px 8px;border-bottom:1px solid rgba(255,255,255,0.05);cursor:pointer;font-size:0.8rem;" onclick="selectCompareFile('${safePath}')">${f.dirLabel} / ${f.name}</div>`;
+            }).join('')}</div>
+        </div>`;
+        document.body.appendChild(modal);
+
+        // 存储当前路径供回调使用
+        window._pendingComparePath = currentPath;
+    }
+
+    async function selectCompareFile(secondPath) {
+        document.getElementById('compareFileSelectModal')?.remove();
+        const currentPath = window._pendingComparePath?.replace(/\\\\/g, '\\').replace(/\\'/g, "'") || '';
+        const currentContent = window._editorContent1 || document.getElementById('fileEditorTextarea')?.value || '';
+        try {
+            const content2 = await readTextFile(secondPath);
+            if (content2 === null) { alert('读取文件失败'); return; }
+            showFileEditor(currentPath, currentContent, secondPath, content2);
+        } catch (e) { alert('读取失败：' + e.message); }
+    }
+
+    function filterCompareList() {
+        const query = (document.getElementById('compareFileSearch')?.value || '').toLowerCase();
+        document.querySelectorAll('.compare-file-item').forEach(el => {
+            el.style.display = el.textContent.toLowerCase().includes(query) ? '' : 'none';
+        });
+    }
+
+    // 简单的 LCS 行差异算法
+    function computeLineDiff(lines1, lines2) {
+        const m = lines1.length, n = lines2.length;
+        const dp = Array(m + 1).fill(null).map(() => Array(n + 1).fill(0));
+        for (let i = 1; i <= m; i++) {
+            for (let j = 1; j <= n; j++) {
+                if (lines1[i - 1] === lines2[j - 1]) {
+                    dp[i][j] = dp[i - 1][j - 1] + 1;
+                } else {
+                    dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+                }
+            }
+        }
+
+        const result = [];
+        let i = m, j = n;
+        const stack = [];
+        while (i > 0 || j > 0) {
+            if (i > 0 && j > 0 && lines1[i - 1] === lines2[j - 1]) {
+                stack.push({ type: 'same', left: lines1[i - 1], right: lines2[j - 1] });
+                i--; j--;
+            } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+                stack.push({ type: 'added', left: null, right: lines2[j - 1] });
+                j--;
+            } else {
+                stack.push({ type: 'deleted', left: lines1[i - 1], right: null });
+                i--;
+            }
+        }
+        while (stack.length > 0) result.push(stack.pop());
+        return result;
+    }
+
+    function renderDiffView(diff) {
+        let leftHtml = '<div style="flex:1;min-width:0;border-right:1px solid rgba(255,255,255,0.1);"><div style="color:#4caf50;padding:4px 8px;font-size:0.7rem;background:rgba(0,0,0,0.3);border-bottom:1px solid rgba(255,255,255,0.1);font-weight:bold;">左侧文件</div>';
+        let rightHtml = '<div style="flex:1;min-width:0;"><div style="color:#ff9800;padding:4px 8px;font-size:0.7rem;background:rgba(0,0,0,0.3);border-bottom:1px solid rgba(255,255,255,0.1);font-weight:bold;">右侧文件</div>';
+
+        for (let idx = 0; idx < diff.length; idx++) {
+            const d = diff[idx];
+            const ln = idx + 1;
+            if (d.type === 'same') {
+                leftHtml += `<div style="padding:1px 8px;color:rgba(255,255,255,0.7);font-size:0.7rem;">${d.left || ' '}</div>`;
+                rightHtml += `<div style="padding:1px 8px;color:rgba(255,255,255,0.7);font-size:0.7rem;">${d.right || ' '}</div>`;
+            } else if (d.type === 'deleted') {
+                leftHtml += `<div style="padding:1px 8px;background:rgba(244,67,54,0.25);color:#ef9a9a;font-size:0.7rem;">− ${d.left || ' '}</div>`;
+                rightHtml += `<div style="padding:1px 8px;background:rgba(244,67,54,0.08);">&nbsp;</div>`;
+            } else if (d.type === 'added') {
+                leftHtml += `<div style="padding:1px 8px;background:rgba(76,175,80,0.08);">&nbsp;</div>`;
+                rightHtml += `<div style="padding:1px 8px;background:rgba(76,175,80,0.25);color:#a5d6a7;font-size:0.7rem;">+ ${d.right || ' '}</div>`;
+            }
+        }
+        leftHtml += '</div>';
+        rightHtml += '</div>';
+        return leftHtml + rightHtml;
+    }
+
+    function toggleCompareView() {
+        const splitView = document.getElementById('compareSplitView');
+        const diffView = document.getElementById('compareDiffView');
+        const btn = document.querySelector('#fileEditorModal button[onclick="toggleCompareView()"]');
+        if (!splitView || !diffView) return;
+        if (splitView.style.display !== 'none') {
+            splitView.style.display = 'none';
+            diffView.style.display = 'block';
+            if (btn) btn.textContent = '✏️ 编辑视图';
+        } else {
+            splitView.style.display = 'flex';
+            diffView.style.display = 'none';
+            if (btn) btn.textContent = '📊 差异视图';
+        }
+    }
+
+    function syncCompareScroll(source, targetSide) {
+        const target = document.getElementById(targetSide === 'right' ? 'fileEditorTextarea2' : 'fileEditorTextarea');
+        if (target && !target.dataset.scrolling) {
+            target.dataset.scrolling = '1';
+            target.scrollTop = source.scrollTop;
+            setTimeout(() => { delete target.dataset.scrolling; }, 50);
+        }
+    }
+
+    async function saveCompareBoth() {
+        const leftPath = window._editorPath1;
+        const rightPath = window._editorPath2;
+        const leftContent = document.getElementById('fileEditorTextarea')?.value;
+        const rightContent = document.getElementById('fileEditorTextarea2')?.value;
+        let ok1 = true, ok2 = true;
+        if (leftContent !== undefined && leftPath) ok1 = await writeTextFile(leftPath, leftContent);
+        if (rightContent !== undefined && rightPath) ok2 = await writeTextFile(rightPath, rightContent);
+        if (ok1 && ok2) alert('✅ 两侧文件已保存');
+        else if (ok1) alert('⚠️ 左侧已保存，右侧保存失败');
+        else if (ok2) alert('⚠️ 右侧已保存，左侧保存失败');
+        else alert('❌ 保存失败');
     }
 
     // ==================== 导入文件到项目脚本列表 ====================
@@ -694,11 +1146,26 @@ if (isTauriApp) {
     window.selectSoftwareDataDir = selectSoftwareDataDir;
     window.scanAllFiles = scanAllFiles;
     window.silentScanFiles = silentScanFiles;
+    window.collectFilesRecursive = collectFilesRecursive;
     window.saveSettingsAndClose = saveSettingsAndClose;
     window.viewFile = viewFile;
     window.loadFileToHand = loadFileToHand;
     window.saveFileContent = saveFileContent;
     window.copyFileContent = copyFileContent;
+    // 查找替换
+    window.toggleEditorFindReplace = toggleEditorFindReplace;
+    window.editorFind = editorFind;
+    window.editorReplace = editorReplace;
+    window.editorReplaceAll = editorReplaceAll;
+    // 双文件对比
+    window.startCompareMode = startCompareMode;
+    window.selectCompareFile = selectCompareFile;
+    window.filterCompareList = filterCompareList;
+    window.computeLineDiff = computeLineDiff;
+    window.renderDiffView = renderDiffView;
+    window.toggleCompareView = toggleCompareView;
+    window.syncCompareScroll = syncCompareScroll;
+    window.saveCompareBoth = saveCompareBoth;
     window.loadFileContentToHand = loadFileContentToHand;
     window.deleteFileWithConfirm = deleteFileWithConfirm;
     window.saveScriptToMaDir = saveScriptToMaDir;
