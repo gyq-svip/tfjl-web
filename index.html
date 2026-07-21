@@ -5406,6 +5406,7 @@
                         name: data.name || '',
                         body: data.body || '',
                         htmlUrl: data.html_url || GITHUB_RELEASES_PAGE,
+                        downloadUrl: DIRECT_DOWNLOAD_URL,
                         assets: (data.assets || []).map(a => ({
                             name: a.name,
                             url: a.browser_download_url,
