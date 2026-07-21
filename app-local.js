@@ -517,16 +517,17 @@ if (isTauriApp) {
                     <!-- 查找替换栏 -->
                     <div id="editorFindReplaceBar" style="display:none;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:8px 10px;margin-bottom:8px;">
                         <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">
-                            <input id="editorFindInput" placeholder="查找..." onkeydown="if(event.key==='Enter')editorFind('next')" style="flex:1;background:rgba(0,0,0,0.4);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:4px 8px;font-size:0.8rem;">
-                            <span id="editorFindCount" style="color:rgba(255,255,255,0.4);font-size:0.75rem;min-width:50px;text-align:center;">0/0</span>
-                            <button onclick="editorFind('prev')" style="background:rgba(255,255,255,0.1);color:#fff;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:0.75rem;" title="上一个 ↑">◀</button>
-                            <button onclick="editorFind('next')" style="background:rgba(255,255,255,0.1);color:#fff;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:0.75rem;" title="下一个 ↓">▶</button>
-                            <label style="color:rgba(255,255,255,0.5);font-size:0.75rem;cursor:pointer;white-space:nowrap;"><input type="checkbox" id="editorFindCaseSensitive" style="vertical-align:middle;"> 区分大小写</label>
+                            <input id="editorFindInput" placeholder="查找..." oninput="editorFind('count')" onkeydown="if(event.key==='Enter')editorFind('next')" style="width:150px;flex-shrink:0;background:rgba(0,0,0,0.4);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:4px 8px;font-size:0.78rem;">
+                            <span id="editorFindCount" style="color:rgba(255,255,255,0.55);font-size:0.72rem;min-width:80px;text-align:center;white-space:nowrap;">0个匹配</span>
+                            <button onclick="editorFind('prev')" style="background:rgba(255,255,255,0.12);color:#fff;border:1px solid rgba(255,255,255,0.15);padding:5px 10px;border-radius:4px;cursor:pointer;font-size:0.82rem;white-space:nowrap;" title="上一个 (Shift+Enter)">◀ 上一个</button>
+                            <button onclick="editorFind('next')" style="background:rgba(255,255,255,0.12);color:#fff;border:1px solid rgba(255,255,255,0.15);padding:5px 10px;border-radius:4px;cursor:pointer;font-size:0.82rem;white-space:nowrap;" title="下一个 (Enter)">下一个 ▶</button>
+                            <span id="editorCycleHint" style="display:none;color:#ffeb3b;font-size:0.65rem;white-space:nowrap;animation:fadeOut 2s forwards;">↻ 已循环</span>
+                            <label style="color:rgba(255,255,255,0.5);font-size:0.72rem;cursor:pointer;white-space:nowrap;margin-left:4px;"><input type="checkbox" id="editorFindCaseSensitive" style="vertical-align:middle;"> Aa</label>
                         </div>
                         <div style="display:flex;gap:6px;align-items:center;">
-                            <input id="editorReplaceInput" placeholder="替换为..." style="flex:1;background:rgba(0,0,0,0.4);color:#ffeb3b;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:4px 8px;font-size:0.8rem;">
-                            <button onclick="editorReplace()" style="background:rgba(255,152,0,0.3);color:#ff9800;border:1px solid rgba(255,152,0,0.3);padding:4px 10px;border-radius:4px;cursor:pointer;font-size:0.75rem;">替换</button>
-                            <button onclick="editorReplaceAll()" style="background:rgba(244,67,54,0.3);color:#f44336;border:1px solid rgba(244,67,54,0.3);padding:4px 10px;border-radius:4px;cursor:pointer;font-size:0.75rem;">全部替换</button>
+                            <input id="editorReplaceInput" placeholder="替换为..." style="width:150px;flex-shrink:0;background:rgba(0,0,0,0.4);color:#ffeb3b;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:4px 8px;font-size:0.78rem;">
+                            <button onclick="editorReplace()" style="background:rgba(255,152,0,0.25);color:#ff9800;border:1px solid rgba(255,152,0,0.3);padding:4px 10px;border-radius:4px;cursor:pointer;font-size:0.78rem;">替换</button>
+                            <button onclick="editorReplaceAll()" style="background:rgba(244,67,54,0.25);color:#f44336;border:1px solid rgba(244,67,54,0.3);padding:4px 10px;border-radius:4px;cursor:pointer;font-size:0.78rem;">全部替换</button>
                         </div>
                     </div>
                     <textarea id="fileEditorTextarea" style="flex:1;width:100%;background:rgba(0,0,0,0.4);color:#0f0;border:1px solid rgba(0,188,212,0.3);border-radius:8px;padding:12px;font-family:'Consolas','Courier New',monospace;font-size:0.85rem;resize:none;box-sizing:border-box;line-height:1.5;overflow:auto;" data-editor="main">${escapedContent}</textarea>
@@ -638,7 +639,11 @@ if (isTauriApp) {
         const ta = document.getElementById('fileEditorTextarea') || document.getElementById('fileEditorTextarea2');
         const input = document.getElementById('editorFindInput');
         const countEl = document.getElementById('editorFindCount');
-        if (!ta || !input || !input.value) return;
+        const cycleHint = document.getElementById('editorCycleHint');
+        if (!ta || !input || !input.value) {
+            if (countEl) countEl.textContent = '就绪';
+            return;
+        }
         const query = input.value;
         const caseSensitive = document.getElementById('editorFindCaseSensitive')?.checked || false;
         const text = ta.value;
@@ -653,31 +658,36 @@ if (isTauriApp) {
             if (m[0].length === 0) regex.lastIndex++; // 防止死循环
         }
 
-        if (countEl) countEl.textContent = matches.length > 0 ? `1/${matches.length}` : '0/0';
+        if (countEl) countEl.textContent = matches.length > 0 ? '共' + matches.length + '个匹配' : '无匹配';
 
         if (matches.length === 0) {
             input.style.borderColor = '#f44336';
-            setTimeout(() => { input.style.borderColor = ''; }, 1000);
+            setTimeout(() => { input.style.borderColor = ''; }, 1200);
+            if (cycleHint) cycleHint.style.display = 'none';
             return;
         }
         input.style.borderColor = '';
 
-        if (direction === 'count') return; // 只计数不跳转
+        if (direction === 'count') {
+            if (cycleHint) cycleHint.style.display = 'none';
+            return;
+        } // 只计数不跳转
 
         const step = direction === 'prev' ? -1 : 1;
         let currentIdx = -1;
+        let wrapped = false;
         if (direction === 'prev') {
             // 找当前位置之前最近的匹配
             for (let i = matches.length - 1; i >= 0; i--) {
                 if (matches[i] < ta.selectionStart) { currentIdx = i; break; }
             }
-            if (currentIdx === -1) currentIdx = matches.length - 1; // 循环到最后一个
+            if (currentIdx === -1) { currentIdx = matches.length - 1; wrapped = true; }
         } else {
             // 找当前位置之后最近的匹配
             for (let i = 0; i < matches.length; i++) {
                 if (matches[i] > ta.selectionStart) { currentIdx = i; break; }
             }
-            if (currentIdx === -1) currentIdx = 0; // 循环到第一个
+            if (currentIdx === -1) { currentIdx = 0; wrapped = true; }
         }
 
         const pos = matches[currentIdx];
@@ -691,7 +701,15 @@ if (isTauriApp) {
         const lineNum = before.split('\n').length;
         ta.scrollTop = Math.max(0, (lineNum - 3) * lineHeight);
 
-        if (countEl) countEl.textContent = `${currentIdx + 1}/${matches.length}`;
+        if (countEl) countEl.textContent = '第' + (currentIdx + 1) + '/' + matches.length + '个';
+
+        // 循环提示
+        if (wrapped && cycleHint) {
+            cycleHint.style.display = 'inline';
+            cycleHint.style.animation = 'none';
+            void cycleHint.offsetWidth;
+            cycleHint.style.animation = 'fadeOut 2s forwards';
+        }
     }
 
     function editorReplace() {
@@ -1150,6 +1168,7 @@ if (isTauriApp) {
     window.viewFile = viewFile;
     window.loadFileToHand = loadFileToHand;
     window.saveFileContent = saveFileContent;
+    window.writeTextFile = writeTextFile;
     window.copyFileContent = copyFileContent;
     // 查找替换
     window.toggleEditorFindReplace = toggleEditorFindReplace;

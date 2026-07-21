@@ -18,6 +18,11 @@
             from { transform: rotate(0deg); }
             to { transform: rotate(360deg); }
         }
+        @keyframes fadeOut {
+            0% { opacity: 1; }
+            70% { opacity: 0.6; }
+            100% { opacity: 0; }
+        }
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
@@ -10199,8 +10204,19 @@
         // 下载TXT文件
         function downloadTxtFile(index) {
             const file = txtFiles[index];
-            if (!file) return;
+            if (!file) { alert('文件不存在'); return; }
+            if (!file.content) { alert('文件内容为空，无法下载'); return; }
 
+            // Tauri App：使用原生文件保存（避免webview中Blob下载被静默阻止）
+            if (window.__TAURI__ || window.__TAURI_INTERNALS__) {
+                downloadTxtFileApp(file);
+                return;
+            }
+
+            downloadTxtFileBlob(file);
+        }
+
+        function downloadTxtFileBlob(file) {
             const blob = new Blob([file.content], {type: 'text/plain;charset=utf-8'});
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -10210,6 +10226,26 @@
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
+        }
+
+        async function downloadTxtFileApp(file) {
+            const savePath = prompt('输入保存路径（含文件名）：', 'D:\\\\' + file.name);
+            if (!savePath) return;
+
+            const invokeFn = window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke;
+            if (!invokeFn) {
+                // 降级到Blob方式
+                downloadTxtFileBlob(file);
+                return;
+            }
+
+            try {
+                await invokeFn('write_text_file', { filePath: savePath, content: file.content });
+                alert('✅ 已保存到：\n' + savePath);
+            } catch (e) {
+                console.error('Tauri保存失败，降级到Blob下载:', e);
+                downloadTxtFileBlob(file);
+            }
         }
 
         // 删除TXT文件
@@ -10347,17 +10383,18 @@
                 flex-shrink: 0;
             `;
             findReplaceBar.innerHTML = `
-                <div style="display:flex;gap:4px;align-items:center;margin-bottom:4px;">
-                    <input id="${windowId}_findInput" placeholder="查找..." onkeydown="if(event.key==='Enter')webFind('${windowId}','next')" style="flex:1;background:rgba(0,0,0,0.4);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:3px 6px;font-size:0.75rem;min-width:0;">
-                    <span id="${windowId}_findCount" style="color:rgba(255,255,255,0.4);font-size:0.7rem;min-width:36px;text-align:center;">0/0</span>
-                    <button onclick="webFind('${windowId}','prev')" style="background:rgba(255,255,255,0.1);color:#fff;border:none;padding:2px 6px;border-radius:3px;cursor:pointer;font-size:0.7rem;" title="上一个">◀</button>
-                    <button onclick="webFind('${windowId}','next')" style="background:rgba(255,255,255,0.1);color:#fff;border:none;padding:2px 6px;border-radius:3px;cursor:pointer;font-size:0.7rem;" title="下一个">▶</button>
-                    <label style="color:rgba(255,255,255,0.5);font-size:0.7rem;cursor:pointer;white-space:nowrap;"><input type="checkbox" id="${windowId}_caseSensitive" style="vertical-align:middle;">Aa</label>
+                <div style="display:flex;gap:4px;align-items:center;margin-bottom:5px;">
+                    <input id="${windowId}_findInput" placeholder="查找..." oninput="webFind('${windowId}','count')" onkeydown="if(event.key==='Enter')webFind('${windowId}','next')" style="width:150px;flex-shrink:0;background:rgba(0,0,0,0.4);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:4px 8px;font-size:0.78rem;">
+                    <span id="${windowId}_findCount" style="color:rgba(255,255,255,0.55);font-size:0.72rem;min-width:80px;text-align:center;white-space:nowrap;">0个匹配</span>
+                    <button onclick="webFind('${windowId}','prev')" style="background:rgba(255,255,255,0.12);color:#fff;border:1px solid rgba(255,255,255,0.15);padding:5px 10px;border-radius:4px;cursor:pointer;font-size:0.82rem;white-space:nowrap;" title="上一个 (Shift+Enter)">◀ 上一个</button>
+                    <button onclick="webFind('${windowId}','next')" style="background:rgba(255,255,255,0.12);color:#fff;border:1px solid rgba(255,255,255,0.15);padding:5px 10px;border-radius:4px;cursor:pointer;font-size:0.82rem;white-space:nowrap;" title="下一个 (Enter)">下一个 ▶</button>
+                    <span id="${windowId}_cycleHint" style="display:none;color:#ffeb3b;font-size:0.65rem;white-space:nowrap;animation:fadeOut 2s forwards;">↻ 已循环</span>
+                    <label style="color:rgba(255,255,255,0.5);font-size:0.72rem;cursor:pointer;white-space:nowrap;margin-left:4px;"><input type="checkbox" id="${windowId}_caseSensitive" style="vertical-align:middle;"> Aa</label>
                 </div>
                 <div style="display:flex;gap:4px;align-items:center;">
-                    <input id="${windowId}_replaceInput" placeholder="替换为..." style="flex:1;background:rgba(0,0,0,0.4);color:#ffeb3b;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:3px 6px;font-size:0.75rem;min-width:0;">
-                    <button onclick="webReplace('${windowId}')" style="background:rgba(255,152,0,0.25);color:#ff9800;border:1px solid rgba(255,152,0,0.3);padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;">替换</button>
-                    <button onclick="webReplaceAll('${windowId}')" style="background:rgba(244,67,54,0.25);color:#f44336;border:1px solid rgba(244,67,54,0.3);padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;">全部替换</button>
+                    <input id="${windowId}_replaceInput" placeholder="替换为..." style="width:150px;flex-shrink:0;background:rgba(0,0,0,0.4);color:#ffeb3b;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:4px 8px;font-size:0.78rem;">
+                    <button onclick="webReplace('${windowId}')" style="background:rgba(255,152,0,0.25);color:#ff9800;border:1px solid rgba(255,152,0,0.3);padding:4px 10px;border-radius:4px;cursor:pointer;font-size:0.78rem;">替换</button>
+                    <button onclick="webReplaceAll('${windowId}')" style="background:rgba(244,67,54,0.25);color:#f44336;border:1px solid rgba(244,67,54,0.3);padding:4px 10px;border-radius:4px;cursor:pointer;font-size:0.78rem;">全部替换</button>
                 </div>
             `;
 
@@ -10465,7 +10502,11 @@
             const ta = document.getElementById(windowId + '_content');
             const input = document.getElementById(windowId + '_findInput');
             const countEl = document.getElementById(windowId + '_findCount');
-            if (!ta || !input || !input.value) return;
+            const cycleHint = document.getElementById(windowId + '_cycleHint');
+            if (!ta || !input || !input.value) {
+                if (countEl) countEl.textContent = '就绪';
+                return;
+            }
             const query = input.value;
             const caseSensitive = document.getElementById(windowId + '_caseSensitive')?.checked || false;
             const text = ta.value;
@@ -10480,29 +10521,34 @@
                 if (m[0].length === 0) regex.lastIndex++;
             }
 
-            if (countEl) countEl.textContent = matches.length > 0 ? '1/' + matches.length : '0/0';
+            if (countEl) countEl.textContent = matches.length > 0 ? '共' + matches.length + '个匹配' : '无匹配';
 
             if (matches.length === 0) {
                 input.style.borderColor = '#f44336';
-                setTimeout(() => { input.style.borderColor = ''; }, 1000);
+                setTimeout(() => { input.style.borderColor = ''; }, 1200);
+                if (cycleHint) cycleHint.style.display = 'none';
                 return;
             }
             input.style.borderColor = '';
 
-            if (direction === 'count') return;
+            if (direction === 'count') {
+                if (cycleHint) cycleHint.style.display = 'none';
+                return;
+            }
 
             const step = direction === 'prev' ? -1 : 1;
             let currentIdx = -1;
+            let wrapped = false;
             if (direction === 'prev') {
                 for (let i = matches.length - 1; i >= 0; i--) {
                     if (matches[i] < ta.selectionStart) { currentIdx = i; break; }
                 }
-                if (currentIdx === -1) currentIdx = matches.length - 1;
+                if (currentIdx === -1) { currentIdx = matches.length - 1; wrapped = true; }
             } else {
                 for (let i = 0; i < matches.length; i++) {
                     if (matches[i] > ta.selectionStart) { currentIdx = i; break; }
                 }
-                if (currentIdx === -1) currentIdx = 0;
+                if (currentIdx === -1) { currentIdx = 0; wrapped = true; }
             }
 
             const pos = matches[currentIdx];
@@ -10514,7 +10560,15 @@
             const lineNum = before.split('\n').length;
             ta.scrollTop = Math.max(0, (lineNum - 3) * 20);
 
-            if (countEl) countEl.textContent = (currentIdx + 1) + '/' + matches.length;
+            if (countEl) countEl.textContent = '第' + (currentIdx + 1) + '/' + matches.length + '个';
+
+            // 循环提示
+            if (wrapped && cycleHint) {
+                cycleHint.style.display = 'inline';
+                cycleHint.style.animation = 'none';
+                void cycleHint.offsetWidth; // 强制回流
+                cycleHint.style.animation = 'fadeOut 2s forwards';
+            }
         }
 
         function webReplace(windowId) {
