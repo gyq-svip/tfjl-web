@@ -5481,7 +5481,7 @@
             }
 
             if (isNewerVersion(release.version, CURRENT_VERSION)) {
-                if (statusEl) statusEl.innerHTML = '<span style="color:#81c784;">🔄 发现新版本 v' + release.version + '！请在 GitHub Releases 页面下载更新</span>';
+                if (statusEl) statusEl.innerHTML = '<span style="color:#81c784;">🔄 发现新版本 v' + release.version + '！点击下方按钮直接下载</span>';
                 // 在下载弹窗中高亮
                 const versionBox = document.getElementById('downloadVersionInfo');
                 if (versionBox) versionBox.style.borderColor = 'rgba(76,175,80,0.6)';
@@ -5504,7 +5504,7 @@
             }
 
             if (isNewerVersion(release.version, CURRENT_VERSION)) {
-                return { hasUpdate: true, version: release.version, url: release.htmlUrl };
+                return { hasUpdate: true, version: release.version, url: release.downloadUrl || release.htmlUrl };
             }
             return { hasUpdate: false, version: CURRENT_VERSION };
         }
