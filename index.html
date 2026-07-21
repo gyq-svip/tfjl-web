@@ -5365,6 +5365,7 @@
         const CURRENT_VERSION = '1.1.5';
         const GITHUB_RELEASES_API = 'https://api.github.com/repos/gyq-svip/tfjl-web/releases/latest';
         const GITHUB_RELEASES_PAGE = 'https://github.com/gyq-svip/tfjl-web/releases';
+        const VERSION_JSON_FALLBACK = 'https://gyq-svip.github.io/tfjl-web/version.json';
 
         // 初始化版本号显示
         function initVersionDisplay() {
@@ -5396,24 +5397,47 @@
                 const resp = await fetch(GITHUB_RELEASES_API, {
                     headers: { 'Accept': 'application/vnd.github.v3+json' }
                 });
-                if (!resp.ok) return null;
-                const data = await resp.json();
-                return {
-                    tag: data.tag_name || '',
-                    version: (data.tag_name || '').replace(/^v/i, ''),
-                    name: data.name || '',
-                    body: data.body || '',
-                    htmlUrl: data.html_url || GITHUB_RELEASES_PAGE,
-                    assets: (data.assets || []).map(a => ({
-                        name: a.name,
-                        url: a.browser_download_url,
-                        size: a.size
-                    }))
-                };
+                if (resp.ok) {
+                    const data = await resp.json();
+                    return {
+                        tag: data.tag_name || '',
+                        version: (data.tag_name || '').replace(/^v/i, ''),
+                        name: data.name || '',
+                        body: data.body || '',
+                        htmlUrl: data.html_url || GITHUB_RELEASES_PAGE,
+                        assets: (data.assets || []).map(a => ({
+                            name: a.name,
+                            url: a.browser_download_url,
+                            size: a.size
+                        }))
+                    };
+                }
             } catch (e) {
-                console.warn('GitHub Release 获取失败:', e);
-                return null;
+                console.warn('GitHub API 直连失败，尝试后备方案:', e.message);
             }
+
+            // 后备方案：读取 GitHub Pages 上的 version.json（国内可访问）
+            try {
+                const resp = await fetch(VERSION_JSON_FALLBACK, { cache: 'no-cache' });
+                if (resp.ok) {
+                    const data = await resp.json();
+                    if (data.version) {
+                        console.log('通过 GitHub Pages 获取到版本: v' + data.version);
+                        return {
+                            tag: 'v' + data.version,
+                            version: data.version,
+                            name: 'v' + data.version,
+                            body: '',
+                            htmlUrl: data.page || GITHUB_RELEASES_PAGE,
+                            assets: []
+                        };
+                    }
+                }
+            } catch (e) {
+                console.warn('后备方案也失败:', e.message);
+            }
+
+            return null;
         }
 
         // 比较版本号（简单语义化比较）
