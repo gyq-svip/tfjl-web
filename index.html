@@ -3019,6 +3019,7 @@
                     <div onclick="importSingleProject();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📥 恢复项目</div>
                     <div onclick="downloadOfflineVersion();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📥 下载离线版</div>
                     <div onclick="showHelpModal();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📖 使用帮助</div>
+                    <div onclick="openDownloadModal();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#4fc3f7;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📥 下载桌面版</div>
                     <div onclick="window.location.href='auction.html';document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">🏪 进入拍卖系统</div>
                     <div onclick="logoutToLogin();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#ff6b6b;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,107,107,0.1)'" onmouseout="this.style.background='transparent'">🔙 退出登录</div>
                 </div>
@@ -5358,6 +5359,153 @@
             toast.textContent = message;
             document.body.appendChild(toast);
             setTimeout(() => toast.remove(), 2000);
+        }
+
+        // ==================== 下载桌面版 & 版本检查 ====================
+        const CURRENT_VERSION = '1.1.4';
+        const GITHUB_RELEASES_API = 'https://api.github.com/repos/gyq-svip/tfjl-web/releases/latest';
+        const GITHUB_RELEASES_PAGE = 'https://github.com/gyq-svip/tfjl-web/releases';
+
+        // 初始化版本号显示
+        function initVersionDisplay() {
+            const el = document.getElementById('currentVersionText');
+            if (el) el.textContent = CURRENT_VERSION;
+            const el2 = document.getElementById('dlCurrentVersion');
+            if (el2) el2.textContent = CURRENT_VERSION;
+        }
+
+        // 打开下载弹窗
+        function openDownloadModal() {
+            const modal = document.getElementById('downloadModal');
+            if (modal) {
+                modal.style.display = 'flex';
+                // 自动检查最新版本
+                checkLatestReleaseInfo();
+            }
+        }
+
+        // 关闭下载弹窗
+        function closeDownloadModal() {
+            const modal = document.getElementById('downloadModal');
+            if (modal) modal.style.display = 'none';
+        }
+
+        // 获取 GitHub 最新 Release 信息
+        async function fetchLatestRelease() {
+            try {
+                const resp = await fetch(GITHUB_RELEASES_API, {
+                    headers: { 'Accept': 'application/vnd.github.v3+json' }
+                });
+                if (!resp.ok) return null;
+                const data = await resp.json();
+                return {
+                    tag: data.tag_name || '',
+                    version: (data.tag_name || '').replace(/^v/i, ''),
+                    name: data.name || '',
+                    body: data.body || '',
+                    htmlUrl: data.html_url || GITHUB_RELEASES_PAGE,
+                    assets: (data.assets || []).map(a => ({
+                        name: a.name,
+                        url: a.browser_download_url,
+                        size: a.size
+                    }))
+                };
+            } catch (e) {
+                console.warn('GitHub Release 获取失败:', e);
+                return null;
+            }
+        }
+
+        // 比较版本号（简单语义化比较）
+        function isNewerVersion(latest, current) {
+            const v1 = latest.split('.').map(Number);
+            const v2 = current.split('.').map(Number);
+            for (let i = 0; i < Math.max(v1.length, v2.length); i++) {
+                const a = v1[i] || 0;
+                const b = v2[i] || 0;
+                if (a > b) return true;
+                if (a < b) return false;
+            }
+            return false;
+        }
+
+        // 检查最新 Release 并在弹窗中显示
+        async function checkLatestReleaseInfo() {
+            const statusEl = document.getElementById('dlUpdateStatus');
+            const latestInfo = document.getElementById('dlLatestInfo');
+            const githubLink = document.getElementById('dlGithubLink');
+            if (statusEl) statusEl.textContent = '正在检查...';
+            if (latestInfo) latestInfo.textContent = '';
+
+            const release = await fetchLatestRelease();
+            if (!release) {
+                if (statusEl) statusEl.textContent = '⚠️ 无法获取最新版本信息，请访问 GitHub 页面下载';
+                if (githubLink) githubLink.textContent = '前往 GitHub Releases';
+                return;
+            }
+
+            if (githubLink) {
+                githubLink.href = release.htmlUrl;
+                githubLink.textContent = 'GitHub Releases 下载';
+            }
+            if (latestInfo) {
+                latestInfo.innerHTML = '<span style="color:#888;">最新版本: </span><span style="color:#4fc3f7;font-weight:bold;">v' + release.version + '</span>';
+            }
+
+            if (isNewerVersion(release.version, CURRENT_VERSION)) {
+                if (statusEl) statusEl.innerHTML = '<span style="color:#81c784;">🔄 发现新版本 v' + release.version + '！请在 GitHub Releases 页面下载更新</span>';
+                // 在下载弹窗中高亮
+                const versionBox = document.getElementById('downloadVersionInfo');
+                if (versionBox) versionBox.style.borderColor = 'rgba(76,175,80,0.6)';
+                // 显示页脚更新提示
+                const badge = document.getElementById('updateBadgeFooter');
+                if (badge) badge.style.display = 'inline-block';
+            } else if (release.version === CURRENT_VERSION) {
+                if (statusEl) statusEl.innerHTML = '<span style="color:#888;">✅ 已是最新版本</span>';
+            } else {
+                if (statusEl) statusEl.innerHTML = '<span style="color:#ffc107;">ℹ️ 当前版本比 Release 更新（开发版）</span>';
+            }
+        }
+
+        // 检查更新（静默模式，在 App 启动时使用）
+        async function checkForUpdates() {
+            const release = await fetchLatestRelease();
+            if (!release) {
+                showToast('⚠️ 无法获取最新版本信息');
+                return false;
+            }
+
+            if (isNewerVersion(release.version, CURRENT_VERSION)) {
+                return { hasUpdate: true, version: release.version, url: release.htmlUrl };
+            }
+            return { hasUpdate: false, version: CURRENT_VERSION };
+        }
+
+        // App 启动时自动静默检查更新
+        async function autoCheckUpdate() {
+            // 仅在 Tauri App 环境中检查（桌面版才需要更新 exe）
+            const isTauri = !!(window.__TAURI__ || window.__TAURI_INTERNALS__);
+            if (!isTauri) return;
+
+            try {
+                const result = await checkForUpdates();
+                if (result && result.hasUpdate) {
+                    // 显示页脚更新提示
+                    const badge = document.getElementById('updateBadgeFooter');
+                    if (badge) badge.style.display = 'inline-block';
+                    // 显示 Toast 提醒
+                    setTimeout(() => {
+                        const toast = document.createElement('div');
+                        toast.style.cssText = 'position:fixed;top:60px;left:50%;transform:translateX(-50%);padding:12px 25px;border-radius:10px;font-size:0.95rem;font-weight:500;z-index:99999;background:rgba(76,175,80,0.9);color:#fff;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,0.3);';
+                        toast.textContent = '🔄 有新版本 v' + result.version + ' 可下载！点击查看';
+                        toast.onclick = function() { openDownloadModal(); toast.remove(); };
+                        document.body.appendChild(toast);
+                        setTimeout(() => { if (toast.parentNode) toast.remove(); }, 8000);
+                    }, 2000);
+                }
+            } catch (e) {
+                console.warn('自动检查更新失败:', e);
+            }
         }
 
         // 显示拍卖操作提示
@@ -9891,6 +10039,7 @@
 
             list.forEach(f => {
                 const safePath = f.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                const safeName = f.name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
                 let displayName = escapeHtml(f.name);
                 if (keyword) {
                     const regex = new RegExp(`(${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
@@ -9902,7 +10051,13 @@
                         <div style="color:#00bcd4;font-weight:bold;font-size:0.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${displayName}</div>
                         <div style="color:rgba(255,255,255,0.35);font-size:0.7rem;">${f.dirLabel} · ${f.ext.toUpperCase()}</div>
                     </div>
-                    <button onclick="if(window.importFileToProject)window.importFileToProject('${safePath}')" style="background:rgba(255,152,0,0.2);color:#ff9800;border:1px solid rgba(255,152,0,0.3);padding:4px 10px;border-radius:4px;cursor:pointer;font-size:0.7rem;flex-shrink:0;white-space:nowrap;">📥 导入</button>
+                    <div style="display:flex;gap:3px;flex-shrink:0;flex-wrap:wrap;align-items:center;">
+                        <button onclick="openLocalFileWindow('${safePath}','${safeName}',true)" title="预览" style="background:rgba(0,188,212,0.2);color:#00bcd4;border:1px solid rgba(0,188,212,0.3);padding:3px 6px;border-radius:4px;cursor:pointer;font-size:0.68rem;white-space:nowrap;">👁️</button>
+                        <button onclick="openLocalFileWindow('${safePath}','${safeName}',false)" title="编辑" style="background:rgba(76,175,80,0.2);color:#81c784;border:1px solid rgba(76,175,80,0.3);padding:3px 6px;border-radius:4px;cursor:pointer;font-size:0.68rem;white-space:nowrap;">✏️</button>
+                        <button onclick="renameScannedFile('${safePath}','${safeName}')" title="改名" style="background:rgba(255,235,59,0.15);color:#ffee58;border:1px solid rgba(255,235,59,0.25);padding:3px 6px;border-radius:4px;cursor:pointer;font-size:0.68rem;white-space:nowrap;">🔤</button>
+                        <button onclick="shareScannedFileToWall('${safePath}','${safeName}')" title="分享到需求墙" style="background:rgba(156,39,176,0.2);color:#ce93d8;border:1px solid rgba(156,39,176,0.3);padding:3px 6px;border-radius:4px;cursor:pointer;font-size:0.68rem;white-space:nowrap;">📢</button>
+                        <button onclick="if(window.importFileToProject)window.importFileToProject('${safePath}')" title="导入项目" style="background:rgba(255,152,0,0.2);color:#ff9800;border:1px solid rgba(255,152,0,0.3);padding:3px 6px;border-radius:4px;cursor:pointer;font-size:0.68rem;white-space:nowrap;">📥</button>
+                    </div>
                 </div>`;
             });
 
@@ -10864,6 +11019,373 @@
             if (win) {
                 win.remove();
                 txtFileWindows = txtFileWindows.filter(w => w.id !== windowId);
+            }
+        }
+
+        // ==================== 本地扫描文件窗口（预览/编辑） ====================
+        let localFileWindows = [];
+
+        async function openLocalFileWindow(filePath, fileName, readOnly) {
+            // 解码路径（从 HTML 属性中传入的路径可能有转义）
+            let realPath = filePath;
+            let realName = fileName;
+            if (typeof realPath === 'string') realPath = realPath.replace(/\\\\/g, '\\').replace(/\\'/g, "'");
+            if (typeof realName === 'string') realName = realName.replace(/\\\\/g, '\\').replace(/\\'/g, "'");
+
+            // 如果该文件已有打开窗口，直接聚焦
+            const existing = localFileWindows.find(w => w.filePath === realPath);
+            if (existing) {
+                const existingEl = document.getElementById(existing.id);
+                if (existingEl) {
+                    existingEl.style.zIndex = ++windowZIndex;
+                    existingEl.style.display = 'flex';
+                    existingEl.style.opacity = '1';
+                    existingEl.style.borderColor = 'rgba(255,215,0,0.9)';
+                    setTimeout(() => { existingEl.style.borderColor = 'rgba(255,215,0,0.3)'; }, 600);
+                    return;
+                }
+            }
+
+            // 读取文件内容
+            let content = '';
+            try {
+                if (window.readTextFile) {
+                    content = await window.readTextFile(realPath);
+                    if (content === null || content === undefined) {
+                        alert('读取文件失败: ' + realPath);
+                        return;
+                    }
+                } else {
+                    alert('当前环境不支持读取本地文件，请在 App 中使用此功能');
+                    return;
+                }
+            } catch (e) {
+                alert('读取文件失败: ' + e.message);
+                return;
+            }
+
+            const windowId = `localWin_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+            const borderColor = readOnly ? 'rgba(0,188,212,0.3)' : 'rgba(76,175,80,0.3)';
+            const titleColor = readOnly ? '#00bcd4' : '#81c784';
+
+            const windowDiv = document.createElement('div');
+            windowDiv.id = windowId;
+            windowDiv.className = 'floating-txt-window';
+            windowDiv.style.cssText = `
+                position: fixed;
+                top: ${100 + localFileWindows.length * 30}px;
+                left: ${200 + localFileWindows.length * 30}px;
+                width: 650px;
+                height: 500px;
+                min-width: 400px;
+                min-height: 300px;
+                background: linear-gradient(135deg, rgba(30,30,50,0.98), rgba(20,20,40,0.98));
+                border: 2px solid ${borderColor};
+                border-radius: 12px;
+                box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+                z-index: ${++windowZIndex};
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+            `;
+
+            const titleBar = document.createElement('div');
+            titleBar.style.cssText = `
+                background: linear-gradient(90deg, ${readOnly ? 'rgba(0,188,212,0.2), rgba(0,188,212,0.1)' : 'rgba(76,175,80,0.2), rgba(76,175,80,0.1)'});
+                padding: 10px 15px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                cursor: move;
+                border-bottom: 1px solid ${borderColor};
+                flex-shrink: 0;
+            `;
+            const modeLabel = readOnly ? '👁️ 预览' : '✏️ 编辑';
+            titleBar.innerHTML = `
+                <span style="color: ${titleColor}; font-weight: bold; font-size: 14px;">${modeLabel}: ${escapeHtml(realName)}</span>
+                <div style="display: flex; gap: 8px;">
+                    <button onclick="minimizeTxtWindow('${windowId}')" style="background:rgba(255,193,7,0.2);border:none;color:#ffc107;padding:4px 8px;border-radius:4px;cursor:pointer;">−</button>
+                    <button onclick="closeLocalFileWindow('${windowId}')" style="background:rgba(244,67,54,0.2);border:none;color:#f44336;padding:4px 8px;border-radius:4px;cursor:pointer;">×</button>
+                </div>
+            `;
+
+            const contentArea = document.createElement('div');
+            contentArea.style.cssText = `
+                flex: 1;
+                padding: 15px;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+            `;
+
+            const textarea = document.createElement('textarea');
+            textarea.id = `${windowId}_content`;
+            textarea.style.cssText = `
+                width: 100%;
+                flex: 1;
+                background: rgba(0,0,0,0.3);
+                border: 1px solid ${borderColor};
+                border-radius: 8px;
+                color: #e0e0e0;
+                font-family: 'Consolas', 'Monaco', monospace;
+                font-size: 14px;
+                padding: 12px;
+                resize: none;
+                outline: none;
+                line-height: 1.5;
+            `;
+            textarea.value = content;
+            textarea.spellcheck = false;
+            if (readOnly) {
+                textarea.readOnly = true;
+                textarea.style.cursor = 'default';
+            }
+            textarea.addEventListener('keydown', function(e) {
+                if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+                    e.preventDefault();
+                    webToggleFindReplace('${windowId}', true);
+                }
+                if (e.key === 'Escape') {
+                    const bar = document.getElementById('${windowId}_findReplace');
+                    if (bar && bar.style.display !== 'none') {
+                        bar.style.display = 'none';
+                        e.preventDefault();
+                    }
+                }
+            });
+
+            // 查找替换栏
+            const findReplaceBar = document.createElement('div');
+            findReplaceBar.id = `${windowId}_findReplace`;
+            findReplaceBar.style.cssText = `
+                display: none;
+                background: rgba(255,255,255,0.05);
+                border: 1px solid rgba(255,255,255,0.12);
+                border-radius: 8px;
+                padding: 6px 8px;
+                margin-top: 6px;
+                flex-shrink: 0;
+            `;
+            findReplaceBar.innerHTML = `
+                <div style="display:flex;gap:4px;align-items:center;margin-bottom:5px;">
+                    <input id="${windowId}_findInput" placeholder="查找..." oninput="webFind('${windowId}','count')" onkeydown="if(event.key==='Enter')webFind('${windowId}','next')" style="width:150px;flex-shrink:0;background:rgba(0,0,0,0.4);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:4px 8px;font-size:0.78rem;">
+                    <span id="${windowId}_findCount" style="color:rgba(255,255,255,0.55);font-size:0.72rem;min-width:80px;text-align:center;white-space:nowrap;">0个匹配</span>
+                    <button onclick="webFind('${windowId}','prev')" style="background:rgba(255,255,255,0.12);color:#fff;border:1px solid rgba(255,255,255,0.15);padding:5px 10px;border-radius:4px;cursor:pointer;font-size:0.82rem;white-space:nowrap;" title="上一个 (Shift+Enter)">◀ 上一个</button>
+                    <button onclick="webFind('${windowId}','next')" style="background:rgba(255,255,255,0.12);color:#fff;border:1px solid rgba(255,255,255,0.15);padding:5px 10px;border-radius:4px;cursor:pointer;font-size:0.82rem;white-space:nowrap;" title="下一个 (Enter)">下一个 ▶</button>
+                    <span id="${windowId}_cycleHint" style="display:none;color:#ffeb3b;font-size:0.65rem;white-space:nowrap;animation:fadeOut 2s forwards;">↻ 已循环</span>
+                    <label style="color:rgba(255,255,255,0.5);font-size:0.72rem;cursor:pointer;white-space:nowrap;margin-left:4px;"><input type="checkbox" id="${windowId}_caseSensitive" style="vertical-align:middle;"> Aa</label>
+                </div>
+                <div style="display:flex;gap:4px;align-items:center;">
+                    <input id="${windowId}_replaceInput" placeholder="替换为..." style="width:150px;flex-shrink:0;background:rgba(0,0,0,0.4);color:#ffeb3b;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:4px 8px;font-size:0.78rem;">
+                    <button onclick="webReplace('${windowId}')" style="background:rgba(255,152,0,0.25);color:#ff9800;border:1px solid rgba(255,152,0,0.3);padding:4px 10px;border-radius:4px;cursor:pointer;font-size:0.78rem;">替换</button>
+                    <button onclick="webReplaceAll('${windowId}')" style="background:rgba(244,67,54,0.25);color:#f44336;border:1px solid rgba(244,67,54,0.3);padding:4px 10px;border-radius:4px;cursor:pointer;font-size:0.78rem;">全部替换</button>
+                </div>
+            `;
+
+            const buttonBar = document.createElement('div');
+            buttonBar.style.cssText = `
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                gap: 10px;
+                padding-top: 10px;
+                flex-shrink: 0;
+                flex-wrap: wrap;
+            `;
+
+            const saveBtn = readOnly ? '' : `<button onclick="saveLocalFileWindow('${windowId}')" style="background:linear-gradient(135deg,#4CAF50,#45a049);border:none;color:white;padding:8px 20px;border-radius:6px;cursor:pointer;font-weight:bold;">💾 保存</button>`;
+
+            buttonBar.innerHTML = `
+                <div style="display:flex;gap:8px;">
+                    <span style="color:rgba(255,255,255,0.3);font-size:0.75rem;display:flex;align-items:center;">${escapeHtml(realPath)}</span>
+                </div>
+                <div style="display:flex;gap:8px;">
+                    <button onclick="webToggleFindReplace('${windowId}')" style="background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.15);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">🔍 查找替换</button>
+                    <button onclick="downloadLocalFileContent('${windowId}')" style="background:linear-gradient(135deg,#2196f3,#1565c0);border:none;color:white;padding:8px 16px;border-radius:6px;cursor:pointer;">📥 下载</button>
+                    ${saveBtn}
+                </div>
+            `;
+
+            contentArea.appendChild(textarea);
+            contentArea.appendChild(findReplaceBar);
+            contentArea.appendChild(buttonBar);
+
+            windowDiv.appendChild(titleBar);
+            windowDiv.appendChild(contentArea);
+
+            document.body.appendChild(windowDiv);
+
+            makeWindowDraggable(windowDiv, titleBar);
+            makeWindowResizable(windowDiv);
+
+            windowDiv.addEventListener('mousedown', () => {
+                windowDiv.style.zIndex = ++windowZIndex;
+            });
+
+            localFileWindows.push({
+                id: windowId,
+                filePath: realPath,
+                fileName: realName,
+                readOnly: readOnly,
+                element: windowDiv
+            });
+        }
+
+        function closeLocalFileWindow(windowId) {
+            const win = document.getElementById(windowId);
+            if (win) {
+                win.remove();
+                localFileWindows = localFileWindows.filter(w => w.id !== windowId);
+            }
+        }
+
+        async function saveLocalFileWindow(windowId) {
+            const textarea = document.getElementById(`${windowId}_content`);
+            if (!textarea) { alert('找不到编辑区域'); return; }
+            const win = localFileWindows.find(w => w.id === windowId);
+            if (!win) { alert('找不到窗口信息'); return; }
+
+            try {
+                if (window.writeTextFile) {
+                    const ok = await window.writeTextFile(win.filePath, textarea.value);
+                    if (ok) {
+                        showToast('✅ 文件已保存: ' + win.fileName);
+                    } else {
+                        alert('保存失败，请检查文件路径权限');
+                    }
+                } else {
+                    alert('当前环境不支持保存本地文件，请在 App 中使用此功能');
+                }
+            } catch (e) {
+                alert('保存失败: ' + e.message);
+            }
+        }
+
+        function downloadLocalFileContent(windowId) {
+            const textarea = document.getElementById(`${windowId}_content`);
+            if (!textarea) return;
+            const win = localFileWindows.find(w => w.id === windowId);
+            if (!win) return;
+            const blob = new Blob([textarea.value], { type: 'text/plain;charset=utf-8' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = win.fileName;
+            link.click();
+            URL.revokeObjectURL(link.href);
+            showToast('📥 下载已开始: ' + win.fileName);
+        }
+
+        async function renameScannedFile(filePath, fileName) {
+            let realPath = filePath.replace(/\\\\/g, '\\').replace(/\\'/g, "'");
+            let realName = fileName.replace(/\\\\/g, '\\').replace(/\\'/g, "'");
+
+            if (!window.readTextFile || !window.renameLocalFile) {
+                alert('改名功能仅在 App 中可用');
+                return;
+            }
+
+            const newName = prompt('请输入新文件名：', realName);
+            if (!newName || newName === realName) return;
+
+            // 构建新路径（在同一目录下）
+            const dirPath = realPath.substring(0, realPath.lastIndexOf('\\') + 1);
+            const newPath = dirPath + newName;
+
+            try {
+                const ok = await window.renameLocalFile(realPath, newPath);
+                if (ok) {
+                    showToast('✅ 文件已重命名: ' + realName + ' → ' + newName);
+                    // 重新扫描以刷新列表
+                    if (typeof window.scanAllFiles === 'function') {
+                        setTimeout(() => window.scanAllFiles(), 300);
+                    }
+                } else {
+                    alert('重命名失败，请检查目标文件是否已存在');
+                }
+            } catch (e) {
+                alert('重命名失败: ' + e.message);
+            }
+        }
+
+        async function shareScannedFileToWall(filePath, fileName) {
+            let realPath = filePath.replace(/\\\\/g, '\\').replace(/\\'/g, "'");
+            let realName = fileName.replace(/\\\\/g, '\\').replace(/\\'/g, "'");
+
+            if (!getGistToken()) {
+                alert('离线版暂不支持分享，请切换到在线版');
+                return;
+            }
+
+            // 读取文件内容
+            let content = '';
+            try {
+                if (window.readTextFile) {
+                    content = await window.readTextFile(realPath);
+                    if (content === null || content === undefined) {
+                        alert('读取文件失败');
+                        return;
+                    }
+                } else {
+                    alert('当前环境不支持读取本地文件，请在 App 中使用此功能');
+                    return;
+                }
+            } catch (e) {
+                alert('读取文件失败: ' + e.message);
+                return;
+            }
+
+            // 复用 shareTxtFileToWall 的分享逻辑
+            if (wallMessages.length === 0) {
+                try { await fetchMessages(); } catch (e) { console.warn('预加载消息失败:', e); }
+            }
+
+            const now = new Date();
+            const defaultName = realName.replace(/\.\w+$/, '') + '_' + now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0') + '_' + String(now.getHours()).padStart(2, '0') + String(now.getMinutes()).padStart(2, '0');
+            const inputName = prompt('请输入分享文件名（不含扩展名）：', defaultName);
+            if (!inputName) return;
+            const shareFileName = inputName.endsWith('.txt') ? inputName : inputName + '.txt';
+
+            try {
+                const token = getGistToken();
+                const response = await fetch('https://api.github.com/gists', {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json',
+                        'Authorization': `token ${token}`
+                    },
+                    body: JSON.stringify({
+                        description: '脚本分享: ' + shareFileName,
+                        public: true,
+                        files: { [shareFileName]: { content: content } }
+                    })
+                });
+
+                if (!response.ok) throw new Error('上传失败');
+                const data = await response.json();
+                const scriptUrl = data.files[shareFileName]?.raw_url || 'https://gist.githubusercontent.com/' + data.id + '/raw/' + encodeURIComponent(shareFileName);
+
+                const nickname = localStorage.getItem('TFJL_UserName') || '匿名用户';
+                const msgContent = '分享脚本: ' + shareFileName + '\n' + scriptUrl;
+                const newMsg = {
+                    content: msgContent,
+                    author: nickname,
+                    time: Date.now(),
+                    scriptUrl: scriptUrl,
+                    expireDays: null
+                };
+
+                wallMessages.unshift(newMsg);
+                if (wallMessages.length > MAX_MESSAGES) {
+                    wallMessages = wallMessages.slice(0, MAX_MESSAGES);
+                }
+
+                await saveMessagesToGist();
+                renderMessages();
+                showToast('✅ 脚本已分享到需求墙！');
+            } catch (err) {
+                console.error('分享失败:', err);
+                alert('分享失败: ' + err.message);
             }
         }
 
@@ -16205,6 +16727,10 @@ function hasGistToken() {
             
             // 初始化版本切换功能
             initVersionSwitch();
+            
+            // 初始化版本号显示 & 自动检查更新
+            initVersionDisplay();
+            autoCheckUpdate();
             
             // 加载全局拍卖快讯开关状态
             await loadGlobalBroadcastStatus();
@@ -22109,6 +22635,11 @@ function hasGistToken() {
             <p style="margin:5px 0;line-height:1.6;">
                 游戏相关内容版权归官方所有，本工具与游戏官方无任何关联。
             </p>
+            <p style="margin:10px 0 0 0;line-height:1.6;color:#555;font-size:0.78rem;">
+                <span id="footerVersion">v<span id="currentVersionText">1.1.4</span></span>
+                <a href="javascript:openDownloadModal()" style="color:#4fc3f7;margin-left:8px;text-decoration:none;font-size:0.78rem;" title="下载桌面版">📥 下载桌面版</a>
+                <span id="updateBadgeFooter" style="display:none;margin-left:8px;background:rgba(76,175,80,0.3);color:#81c784;padding:2px 8px;border-radius:10px;font-size:0.7rem;animation:pulse 1.5s ease-in-out infinite;">🔄 有新版本可更新!</span>
+            </p>
         </div>
     </div>
     </div><!-- end scrollableContent -->
@@ -22125,5 +22656,46 @@ function hasGistToken() {
                 <div class="resize-handle"></div>
             </div>
         </div>
+
+        <!-- 下载桌面版弹窗 -->
+        <div id="downloadModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;z-index:99999;background:rgba(0,0,0,0.7);align-items:center;justify-content:center;backdrop-filter:blur(4px);" onclick="if(event.target===this)closeDownloadModal()">
+            <div style="background:linear-gradient(135deg,rgba(42,42,74,0.98),rgba(30,30,50,0.98));border:2px solid rgba(33,150,243,0.3);border-radius:16px;padding:30px;max-width:500px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.5);">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                    <h2 style="margin:0;color:#4fc3f7;font-size:1.3rem;">📥 下载桌面版</h2>
+                    <button onclick="closeDownloadModal()" style="background:rgba(255,255,255,0.1);border:none;color:#fff;font-size:1.5rem;cursor:pointer;padding:0 8px;border-radius:4px;">×</button>
+                </div>
+                <div style="color:#ccc;font-size:0.9rem;line-height:1.8;">
+                    <p style="margin:0 0 15px 0;">塔防精灵助手桌面版提供更流畅的本地文件管理体验：</p>
+                    <ul style="padding-left:20px;margin:0 0 15px 0;">
+                        <li>⚡ 本地文件搜索与编辑</li>
+                        <li>💾 直接读写本地脚本文件</li>
+                        <li>📂 多目录项目管理</li>
+                        <li>🔒 数据完全本地存储</li>
+                    </ul>
+                    <div id="downloadVersionInfo" style="background:rgba(0,188,212,0.1);border:1px solid rgba(0,188,212,0.3);border-radius:8px;padding:12px;margin-bottom:15px;text-align:center;">
+                        <div style="font-size:0.85rem;">当前版本</div>
+                        <div style="font-size:1.4rem;font-weight:bold;color:#4fc3f7;margin:5px 0;">v<span id="dlCurrentVersion">1.1.4</span></div>
+                        <div id="dlLatestInfo" style="font-size:0.78rem;color:#888;margin-top:5px;"></div>
+                    </div>
+                    <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;">
+                        <a id="dlGithubLink" href="https://github.com/gyq-svip/tfjl-web/releases" target="_blank" style="flex:1;min-width:180px;background:linear-gradient(135deg,#2196f3,#1565c0);color:white;text-decoration:none;text-align:center;padding:12px 20px;border-radius:8px;font-weight:bold;font-size:0.95rem;display:inline-block;">GitHub Releases 下载</a>
+                        <button id="dlCheckUpdateBtn" onclick="checkForUpdates()" style="background:rgba(76,175,80,0.2);color:#81c784;border:1px solid rgba(76,175,80,0.3);padding:12px 16px;border-radius:8px;cursor:pointer;font-size:0.85rem;white-space:nowrap;">🔄 检查更新</button>
+                    </div>
+                    <div id="dlUpdateStatus" style="margin-top:12px;text-align:center;font-size:0.8rem;color:#888;min-height:20px;"></div>
+                    <p style="margin:15px 0 0 0;font-size:0.72rem;color:#666;text-align:center;">
+                        安装包命名格式：塔防精灵助手_密码tfjl_终极版本_vX.X.X_x64-setup.exe<br>
+                        仅支持 Windows 64位系统
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 脉冲动画（用于更新提示） -->
+        <style>
+            @keyframes pulse {
+                0%, 100% { opacity: 1; }
+                50% { opacity: 0.5; }
+            }
+        </style>
 </body>
 </html>
