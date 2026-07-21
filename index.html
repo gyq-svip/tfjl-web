@@ -6553,7 +6553,8 @@
                 parserBtn.style.fontWeight = 'normal';
                 parserBtn.style.borderBottom = 'none';
                 // 自动静默扫描并刷新列表
-                if (window.silentScanFiles) { window.silentScanFiles().then(() => { if (typeof filterTxtFilesList === 'function') filterTxtFilesList(); }); }
+                if (window.silentScanFiles) { window.silentScanFiles().then(() => { renderScriptFileCategoryFilter(); if (typeof filterTxtFilesList === 'function') filterTxtFilesList(); }); }
+                else { renderScriptFileCategoryFilter(); }
             } else {
                 filesTab.style.display = 'none';
                 parserTab.style.display = 'flex';
@@ -8745,6 +8746,7 @@
                 <div style="margin-bottom:10px;">
                     <input id="txtFileSearchInput" type="text" placeholder="🔍 搜索项目脚本或扫描文件…（输入关键字过滤）" oninput="filterTxtFilesList()" style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid rgba(76,175,80,0.3);background:rgba(0,0,0,0.3);color:#fff;font-size:0.85rem;box-sizing:border-box;">
                 </div>
+                <div id="scriptFileCategoryFilter" style="margin-bottom:10px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;"></div>
                 <div id="txtFilesList" style="display:flex;flex-direction:column;gap:10px;"></div>
                 <div style="margin-top:10px;color:rgba(255,255,255,0.5);font-size:0.75rem;">💡 支持上传多个TXT文件，也可拖拽文件到此处或 Ctrl+V 粘贴</div>
             </div>
@@ -10038,12 +10040,18 @@
         }
 
         // 生成可导入扫描文件的HTML（共用）
-        function renderScannedFilesSection(scannedFiles, keyword) {
+        function renderScannedFilesSection(scannedFiles, keyword, category) {
             const existingNames = new Set(txtFiles.map(f => f.name));
-            const fresh = scannedFiles.filter(f => !existingNames.has(f.name));
+            let fresh = scannedFiles.filter(f => !existingNames.has(f.name));
             if (fresh.length === 0) return '';
 
-            // 有关键字时过滤
+            // 分类筛选
+            if (category && category !== '全部') {
+                fresh = fresh.filter(f => (f.category || '其他') === category);
+            }
+            if (fresh.length === 0) return '';
+
+            // 关键字过滤
             const list = keyword ? fresh.filter(f => f.name.toLowerCase().includes(keyword)) : fresh;
             if (list.length === 0) return '';
 
@@ -10062,16 +10070,21 @@
             list.forEach(f => {
                 const safePath = f.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
                 const safeName = f.name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                const fileCat = f.category || '其他';
+                const catColor = getScriptFileCategoryColor(fileCat);
                 let displayName = escapeHtml(f.name);
                 if (keyword) {
                     const regex = new RegExp(`(${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-                    displayName = displayName.replace(regex, '<span style="background:#00bcd4;color:#000;padding:0 2px;border-radius:2px;">$1</span>');
+                    displayName = displayName.replace(regex, `<span style="background:${catColor};color:#000;padding:0 2px;border-radius:2px;">$1</span>`);
                 }
-                html += `<div style="background:rgba(0,188,212,0.06);border:1px dashed rgba(0,188,212,0.3);border-radius:6px;padding:8px 10px;display:flex;align-items:center;gap:8px;">
-                    <input type="checkbox" class="import-checkbox" value="${safePath}" onchange="toggleImportSelect('${safePath}', this.checked)" style="flex-shrink:0;cursor:pointer;accent-color:#00bcd4;">
+                html += `<div style="background:${catColor}15;border:1px solid ${catColor}40;border-left:3px solid ${catColor};border-radius:6px;padding:8px 10px;display:flex;align-items:center;gap:8px;">
+                    <input type="checkbox" class="import-checkbox" value="${safePath}" onchange="toggleImportSelect('${safePath}', this.checked)" style="flex-shrink:0;cursor:pointer;accent-color:${catColor};">
                     <div style="flex:1;overflow:hidden;">
-                        <div style="color:#00bcd4;font-weight:bold;font-size:0.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${displayName}</div>
-                        <div style="color:rgba(255,255,255,0.35);font-size:0.7rem;">${f.dirLabel} · ${f.ext.toUpperCase()}</div>
+                        <div style="display:flex;align-items:center;gap:6px;">
+                            <span style="color:${catColor};font-size:0.65rem;padding:1px 6px;border-radius:8px;background:${catColor}25;flex-shrink:0;">${fileCat}</span>
+                            <span style="color:#fff;font-weight:bold;font-size:0.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${displayName}</span>
+                        </div>
+                        <div style="color:rgba(255,255,255,0.35);font-size:0.7rem;margin-left:4px;">${f.dirLabel} · ${f.ext.toUpperCase()}</div>
                     </div>
                     <div style="display:flex;gap:3px;flex-shrink:0;flex-wrap:wrap;align-items:center;">
                         <button onclick="openLocalFileWindow('${safePath}','${safeName}',true)" title="预览" style="background:rgba(0,188,212,0.2);color:#00bcd4;border:1px solid rgba(0,188,212,0.3);padding:3px 6px;border-radius:4px;cursor:pointer;font-size:0.68rem;white-space:nowrap;">👁️</button>
@@ -10087,6 +10100,47 @@
                 <div style="color:rgba(255,255,255,0.3);font-size:0.7rem;margin-top:6px;">💡 勾选多个文件后可批量导入，输入关键字可过滤列表</div>
             </div>`;
             return html;
+        }
+
+        // 获取分类颜色
+        function getScriptFileCategoryColor(cat) {
+            const cm = {
+                '寒冰': '#64b5f6', '暗月': '#ce93d8', '漩涡': '#4fc3f7',
+                '合作': '#ffd54f', '深海': '#4db6ac', '活动': '#ff8a65', '其他': '#bdbdbd', '全部': '#ffffff'
+            };
+            return cm[cat] || '#bdbdbd';
+        }
+
+        // 渲染分类筛选按钮
+        window._scriptFileCategory = '全部';
+        function renderScriptFileCategoryFilter() {
+            const el = document.getElementById('scriptFileCategoryFilter');
+            if (!el) return;
+            const cats = ['全部', '寒冰', '暗月', '漩涡', '合作', '深海', '活动', '其他'];
+            // 统计扫描文件各分类数量
+            const scanned = window.scannedFiles || [];
+            const counts = {};
+            cats.forEach(c => { counts[c] = 0; });
+            scanned.forEach(f => { const c = f.category || '其他'; if (counts[c] !== undefined) counts[c]++; else counts['其他']++; });
+            counts['全部'] = scanned.length;
+
+            let html = '';
+            cats.forEach(cat => {
+                const color = getScriptFileCategoryColor(cat);
+                const active = window._scriptFileCategory === cat;
+                const count = counts[cat] || 0;
+                html += `<button onclick="setScriptFileCategory('${cat}')" 
+                    style="background:${active ? color : 'rgba(255,255,255,0.08)'};color:${active ? '#000' : color};border:1px solid ${active ? color : 'rgba(255,255,255,0.15)'};padding:4px 10px;border-radius:14px;cursor:pointer;font-size:0.75rem;font-weight:${active ? 'bold' : 'normal'};transition:all 0.15s;white-space:nowrap;"
+                    title="共 ${count} 个文件">${cat === '全部' ? '📋 ' : ''}${cat}${count > 0 && cat !== '全部' ? ' (' + count + ')' : ''}</button>`;
+            });
+            el.innerHTML = html;
+        }
+
+        // 设置当前分类筛选
+        function setScriptFileCategory(cat) {
+            window._scriptFileCategory = cat;
+            renderScriptFileCategoryFilter();
+            filterTxtFilesList();
         }
 
         // 模糊搜索过滤脚本列表（同时搜索项目文件 + 扫描目录文件）
@@ -10134,9 +10188,9 @@
                 </div>`;
             });
 
-            // 2. 扫描目录文件（有关键字时过滤，无关键字时全显示）
+            // 2. 扫描目录文件（按分类 + 关键字过滤）
             if (scannedFiles.length > 0) {
-                html += renderScannedFilesSection(scannedFiles, keyword);
+                html += renderScannedFilesSection(scannedFiles, keyword, window._scriptFileCategory || '全部');
             }
 
             // 2.1 有搜索关键字但扫描文件为空 → 提示扫描

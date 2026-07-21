@@ -295,7 +295,8 @@ if (isTauriApp) {
                             dir: dirPath,
                             dirKey,
                             dirLabel,
-                            ext
+                            ext,
+                            category: classifyFile(entry.name)
                         });
                     }
                 } else {
@@ -312,7 +313,7 @@ if (isTauriApp) {
 
     // 计算脚本模糊分类统计
     function calcFuzzyStats(files) {
-        const keywords = ['寒冰', '暗月', '漩涡', '合作', '深海'];
+        const keywords = ['寒冰', '暗月', '漩涡', '合作', '深海', '活动'];
         const stats = {};
         keywords.forEach(k => { stats[k] = 0; });
         stats['其他'] = 0;
@@ -335,6 +336,18 @@ if (isTauriApp) {
         // 移除计数为0的关键词
         keywords.forEach(k => { if (stats[k] === 0) delete stats[k]; });
         return stats;
+    }
+
+    // 单文件分类（用于给扫描文件打 category 标签）
+    function classifyFile(fileName) {
+        const nameLower = fileName.toLowerCase();
+        if (nameLower.includes('寒冰')) return '寒冰';
+        if (nameLower.includes('暗月')) return '暗月';
+        if (nameLower.includes('漩涡')) return '漩涡';
+        if (nameLower.includes('合作')) return '合作';
+        if (nameLower.includes('深海')) return '深海';
+        if (nameLower.includes('活动')) return '活动';
+        return '其他';
     }
 
     async function scanAllFiles() {
@@ -398,7 +411,7 @@ if (isTauriApp) {
                 const total = entries.reduce((sum, [, c]) => sum + c, 0);
                 const colorMap = {
                     '寒冰': '#64b5f6', '暗月': '#ce93d8', '漩涡': '#4fc3f7',
-                    '合作': '#ffd54f', '深海': '#4db6ac', '其他': '#bdbdbd'
+                    '合作': '#ffd54f', '深海': '#4db6ac', '活动': '#ff8a65', '其他': '#bdbdbd'
                 };
                 let statsHtml = '<div style="color:#ffd700;font-size:0.75rem;margin-bottom:6px;">🏷️ 脚本分类模糊统计（共<span style="color:#fff;font-weight:bold;">' + total + '</span>个）：</div>';
                 statsHtml += '<div style="display:flex;flex-wrap:wrap;gap:8px;">';
@@ -1195,6 +1208,7 @@ if (isTauriApp) {
     window.scanAllFiles = scanAllFiles;
     window.silentScanFiles = silentScanFiles;
     window.collectFilesRecursive = collectFilesRecursive;
+    window.classifyFile = classifyFile;
     window.saveSettingsAndClose = saveSettingsAndClose;
     window.viewFile = viewFile;
     window.loadFileToHand = loadFileToHand;
