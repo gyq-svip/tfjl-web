@@ -87,6 +87,25 @@ if (isTauriApp) {
         return result === null ? false : true;
     }
 
+    async function renameLocalFile(oldPath, newPath) {
+        try {
+            await tauriInvoke('rename_file', { oldPath, newPath });
+            return true;
+        } catch (e) {
+            console.error('重命名失败:', e);
+            return false;
+        }
+    }
+
+    async function getAppVersion() {
+        try {
+            return await tauriInvoke('get_app_version', {});
+        } catch (e) {
+            console.error('获取版本失败:', e);
+            return null;
+        }
+    }
+
     // ==================== 配置管理 ====================
 
     function loadConfig() {
@@ -208,6 +227,17 @@ if (isTauriApp) {
                     </div>
                     <div id="screenshotStats" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:8px;min-height:60px;">
                         <div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">配置截图目录后点击统计</div>
+                    </div>
+                </div>
+
+                <div style="background:rgba(33,150,243,0.08);border:1px solid rgba(33,150,243,0.2);border-radius:8px;padding:12px 16px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;">
+                    <div>
+                        <div style="color:#4fc3f7;font-size:0.9rem;font-weight:bold;">ℹ️ 当前版本: v<span id="appSettingsVersion">1.1.4</span></div>
+                        <div style="color:rgba(255,255,255,0.4);font-size:0.72rem;margin-top:2px;">需要更新时，请下载新安装包重新安装</div>
+                    </div>
+                    <div style="display:flex;gap:6px;">
+                        <button onclick="window.openDownloadModal()" style="background:rgba(33,150,243,0.15);color:#4fc3f7;border:1px solid rgba(33,150,243,0.3);padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.8rem;white-space:nowrap;">📥 下载</button>
+                        <button onclick="window.checkForUpdates()" style="background:rgba(76,175,80,0.15);color:#81c784;border:1px solid rgba(76,175,80,0.3);padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.8rem;white-space:nowrap;">🔄 检查更新</button>
                     </div>
                 </div>
 
@@ -1168,7 +1198,10 @@ if (isTauriApp) {
     window.viewFile = viewFile;
     window.loadFileToHand = loadFileToHand;
     window.saveFileContent = saveFileContent;
+    window.readTextFile = readTextFile;
     window.writeTextFile = writeTextFile;
+    window.renameLocalFile = renameLocalFile;
+    window.getAppVersion = getAppVersion;
     window.copyFileContent = copyFileContent;
     // 查找替换
     window.toggleEditorFindReplace = toggleEditorFindReplace;
