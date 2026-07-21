@@ -17056,6 +17056,17 @@ function hasGistToken() {
                                                 fresh.daily_stats[date].downloads || 0,
                                                 localData.daily_stats[date].downloads || 0
                                             );
+                                            fresh.daily_stats[date].new_users = Math.max(
+                                                fresh.daily_stats[date].new_users || 0,
+                                                localData.daily_stats[date].new_users || 0
+                                            );
+                                            // 合并时段分布（按小时相加，反映多个设备的真实访问时间）
+                                            if (localData.daily_stats[date].hourly_visits) {
+                                                if (!fresh.daily_stats[date].hourly_visits) fresh.daily_stats[date].hourly_visits = new Array(24).fill(0);
+                                                for (let h = 0; h < 24; h++) {
+                                                    fresh.daily_stats[date].hourly_visits[h] = (fresh.daily_stats[date].hourly_visits[h] || 0) + (localData.daily_stats[date].hourly_visits[h] || 0);
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -21499,6 +21510,43 @@ function hasGistToken() {
                 html += `</div>`;
             }
             html += `</div></div>`;
+
+            // 今日时段分布图（仅当天）
+            const todayHourly = todayStats.hourly_visits || new Array(24).fill(0);
+            const todayHourlyTotal = todayHourly.reduce((a, b) => a + b, 0);
+            const todayMaxHourly = Math.max(...todayHourly, 1);
+            let todayPeakHour = 0, todayPeakVal = 0;
+            for (let h = 0; h < 24; h++) {
+                if (todayHourly[h] > todayPeakVal) { todayPeakVal = todayHourly[h]; todayPeakHour = h; }
+            }
+            html += `<div style="background:rgba(255,255,255,0.05);border-radius:10px;padding:15px;margin-bottom:20px;">`;
+            html += `<div style="display:flex;flex-direction:column;gap:8px;">`;
+            html += `<div style="display:flex;justify-content:space-between;align-items:center;">`;
+            html += `<span style="color:#ffd700;font-size:0.9rem;">📊 今日访问时段分布（${today}）</span>`;
+            html += `<span style="color:rgba(255,255,255,0.5);font-size:0.75rem;">共 ${todayHourlyTotal} 次访问</span>`;
+            html += `</div>`;
+            if (todayHourlyTotal > 0) {
+                html += `<div style="color:rgba(255,255,255,0.5);font-size:0.8rem;">今日高峰: <b style="color:#ffd700;">${todayPeakHour}:00-${todayPeakHour + 1}:00</b> (${todayPeakVal}次)</div>`;
+            }
+            html += `</div>`;
+            html += `<div style="display:flex;align-items:flex-end;gap:1px;height:120px;padding-bottom:22px;margin-top:12px;position:relative;border-bottom:1px solid rgba(255,255,255,0.1);">`;
+            for (let h = 0; h < 24; h++) {
+                const v = todayHourly[h];
+                const barH = Math.max((v / todayMaxHourly) * 95, todayHourlyTotal > 0 ? 2 : 0);
+                const isPeak = h === todayPeakHour && v > 0;
+                html += `<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;position:relative;" title="${h}:00 - ${h+1}:00\n今日访问: ${v}次">`;
+                if (v > 0) {
+                    html += `<div style="position:absolute;top:-12px;font-size:0.6rem;color:${isPeak ? '#ffd700' : 'rgba(255,255,255,0.5)'};white-space:nowrap;">${v}</div>`;
+                }
+                html += `<div style="width:80%;background:${isPeak ? 'linear-gradient(180deg,#ffd700,#ff9800)' : 'linear-gradient(180deg,#4ecdc4,#26a69a)'};border-radius:2px 2px 0 0;height:${barH}px;"></div>`;
+                html += `<div style="position:absolute;bottom:-16px;font-size:0.5rem;color:rgba(255,255,255,0.35);">${h}</div>`;
+                html += `</div>`;
+            }
+            html += `</div>`;
+            if (todayHourlyTotal === 0) {
+                html += `<div style="color:rgba(255,255,255,0.3);font-size:0.8rem;text-align:center;padding:10px;">暂无今日时段数据，访问数据将逐步收集</div>`;
+            }
+            html += `</div>`;
 
             // 新用户日趋势（列表）
             const recentNewUsers = recentDates.slice(0, 15).map(d => {
