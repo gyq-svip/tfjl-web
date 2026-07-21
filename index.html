@@ -5366,6 +5366,7 @@
         const GITHUB_RELEASES_API = 'https://api.github.com/repos/gyq-svip/tfjl-web/releases/latest';
         const GITHUB_RELEASES_PAGE = 'https://github.com/gyq-svip/tfjl-web/releases';
         const VERSION_JSON_FALLBACK = 'https://gyq-svip.github.io/tfjl-web/version.json';
+        const DIRECT_DOWNLOAD_URL = 'https://gyq-svip.github.io/tfjl-web/tfjl-v1.1.5-x64-setup.exe';
 
         // 初始化版本号显示
         function initVersionDisplay() {
@@ -5429,6 +5430,7 @@
                             name: 'v' + data.version,
                             body: '',
                             htmlUrl: data.page || GITHUB_RELEASES_PAGE,
+                            downloadUrl: data.downloadUrl || DIRECT_DOWNLOAD_URL,
                             assets: []
                         };
                     }
@@ -5469,8 +5471,9 @@
             }
 
             if (githubLink) {
-                githubLink.href = release.htmlUrl;
-                githubLink.textContent = 'GitHub Releases 下载';
+                // 优先使用直连下载地址（GitHub Pages 国内更快）
+                githubLink.href = release.downloadUrl || release.htmlUrl;
+                githubLink.textContent = release.downloadUrl ? '📥 直接下载 v' + release.version : 'GitHub Releases 下载';
             }
             if (latestInfo) {
                 latestInfo.innerHTML = '<span style="color:#888;">最新版本: </span><span style="color:#4fc3f7;font-weight:bold;">v' + release.version + '</span>';
