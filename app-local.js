@@ -824,16 +824,15 @@ if (isTauriApp) {
 
         for (let idx = 0; idx < diff.length; idx++) {
             const d = diff[idx];
-            const ln = idx + 1;
             if (d.type === 'same') {
-                leftHtml += `<div style="padding:1px 8px;color:rgba(255,255,255,0.7);font-size:0.7rem;">${d.left || ' '}</div>`;
-                rightHtml += `<div style="padding:1px 8px;color:rgba(255,255,255,0.7);font-size:0.7rem;">${d.right || ' '}</div>`;
+                leftHtml += '<div style="padding:1px 8px;color:rgba(255,255,255,0.7);font-size:0.7rem;">' + escapeHtml(d.left || ' ') + '</div>';
+                rightHtml += '<div style="padding:1px 8px;color:rgba(255,255,255,0.7);font-size:0.7rem;">' + escapeHtml(d.right || ' ') + '</div>';
             } else if (d.type === 'deleted') {
-                leftHtml += `<div style="padding:1px 8px;background:rgba(244,67,54,0.25);color:#ef9a9a;font-size:0.7rem;">− ${d.left || ' '}</div>`;
-                rightHtml += `<div style="padding:1px 8px;background:rgba(244,67,54,0.08);">&nbsp;</div>`;
+                leftHtml += '<div style="padding:1px 8px;background:rgba(244,67,54,0.25);color:#ef9a9a;font-size:0.7rem;">− ' + escapeHtml(d.left || ' ') + '</div>';
+                rightHtml += '<div style="padding:1px 8px;background:rgba(244,67,54,0.08);">&nbsp;</div>';
             } else if (d.type === 'added') {
-                leftHtml += `<div style="padding:1px 8px;background:rgba(76,175,80,0.08);">&nbsp;</div>`;
-                rightHtml += `<div style="padding:1px 8px;background:rgba(76,175,80,0.25);color:#a5d6a7;font-size:0.7rem;">+ ${d.right || ' '}</div>`;
+                leftHtml += '<div style="padding:1px 8px;background:rgba(76,175,80,0.08);">&nbsp;</div>';
+                rightHtml += '<div style="padding:1px 8px;background:rgba(76,175,80,0.25);color:#a5d6a7;font-size:0.7rem;">+ ' + escapeHtml(d.right || ' ') + '</div>';
             }
         }
         leftHtml += '</div>';

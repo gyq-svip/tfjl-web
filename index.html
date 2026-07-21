@@ -10230,7 +10230,22 @@
         // 打开脚本文件窗口（支持多窗口）
         function openTxtFileWindow(index) {
             if (!txtFiles[index]) return;
-            
+
+            // 如果该文件已有打开窗口，直接聚焦到现有窗口（避免同一文件多窗口编辑互相覆盖）
+            const existing = txtFileWindows.find(w => w.fileIndex === index);
+            if (existing) {
+                const existingEl = document.getElementById(existing.id);
+                if (existingEl) {
+                    existingEl.style.zIndex = ++windowZIndex;
+                    existingEl.style.display = 'flex';
+                    existingEl.style.opacity = '1';
+                    // 闪烁提示
+                    existingEl.style.borderColor = 'rgba(255,215,0,0.9)';
+                    setTimeout(() => { existingEl.style.borderColor = 'rgba(255,215,0,0.3)'; }, 600);
+                    return;
+                }
+            }
+
             const file = txtFiles[index];
             const windowId = `txtWindow_${index}_${Date.now()}`;
             
@@ -10304,7 +10319,48 @@
             `;
             textarea.value = file.content;
             textarea.spellcheck = false;
-            
+            // Ctrl+F 打开查找替换，Esc 关闭
+            textarea.addEventListener('keydown', function(e) {
+                if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+                    e.preventDefault();
+                    webToggleFindReplace('${windowId}', true);
+                }
+                if (e.key === 'Escape') {
+                    const bar = document.getElementById('${windowId}_findReplace');
+                    if (bar && bar.style.display !== 'none') {
+                        bar.style.display = 'none';
+                        e.preventDefault();
+                    }
+                }
+            });
+
+            // 查找替换栏（默认隐藏）
+            const findReplaceBar = document.createElement('div');
+            findReplaceBar.id = `${windowId}_findReplace`;
+            findReplaceBar.style.cssText = `
+                display: none;
+                background: rgba(255,255,255,0.05);
+                border: 1px solid rgba(255,255,255,0.12);
+                border-radius: 8px;
+                padding: 6px 8px;
+                margin-top: 6px;
+                flex-shrink: 0;
+            `;
+            findReplaceBar.innerHTML = `
+                <div style="display:flex;gap:4px;align-items:center;margin-bottom:4px;">
+                    <input id="${windowId}_findInput" placeholder="查找..." onkeydown="if(event.key==='Enter')webFind('${windowId}','next')" style="flex:1;background:rgba(0,0,0,0.4);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:3px 6px;font-size:0.75rem;min-width:0;">
+                    <span id="${windowId}_findCount" style="color:rgba(255,255,255,0.4);font-size:0.7rem;min-width:36px;text-align:center;">0/0</span>
+                    <button onclick="webFind('${windowId}','prev')" style="background:rgba(255,255,255,0.1);color:#fff;border:none;padding:2px 6px;border-radius:3px;cursor:pointer;font-size:0.7rem;" title="上一个">◀</button>
+                    <button onclick="webFind('${windowId}','next')" style="background:rgba(255,255,255,0.1);color:#fff;border:none;padding:2px 6px;border-radius:3px;cursor:pointer;font-size:0.7rem;" title="下一个">▶</button>
+                    <label style="color:rgba(255,255,255,0.5);font-size:0.7rem;cursor:pointer;white-space:nowrap;"><input type="checkbox" id="${windowId}_caseSensitive" style="vertical-align:middle;">Aa</label>
+                </div>
+                <div style="display:flex;gap:4px;align-items:center;">
+                    <input id="${windowId}_replaceInput" placeholder="替换为..." style="flex:1;background:rgba(0,0,0,0.4);color:#ffeb3b;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:3px 6px;font-size:0.75rem;min-width:0;">
+                    <button onclick="webReplace('${windowId}')" style="background:rgba(255,152,0,0.25);color:#ff9800;border:1px solid rgba(255,152,0,0.3);padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;">替换</button>
+                    <button onclick="webReplaceAll('${windowId}')" style="background:rgba(244,67,54,0.25);color:#f44336;border:1px solid rgba(244,67,54,0.3);padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;">全部替换</button>
+                </div>
+            `;
+
             // 解析结果显示区
             const parseResult = document.createElement('div');
             parseResult.id = `${windowId}_parseResult`;
@@ -10335,12 +10391,15 @@
                     <button onclick="parseTxtWindowContent('${windowId}', ${index})" style="background:linear-gradient(135deg,#00bcd4,#00838f);border:none;color:white;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;">🔍 解析阵容</button>
                 </div>
                 <div style="display:flex;gap:8px;">
+                    <button onclick="webToggleFindReplace('${windowId}')" style="background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.15);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">🔍 查找替换</button>
+                    <button onclick="webStartCompare(${index})" style="background:rgba(233,30,99,0.2);color:#e91e63;border:1px solid rgba(233,30,99,0.3);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">📊 对比</button>
                     <button onclick="downloadTxtFile(${index})" style="background:linear-gradient(135deg,#2196f3,#1565c0);border:none;color:white;padding:8px 16px;border-radius:6px;cursor:pointer;">📥 下载</button>
                     <button onclick="saveTxtWindowContent('${windowId}', ${index})" style="background:linear-gradient(135deg,#4CAF50,#45a049);border:none;color:white;padding:8px 20px;border-radius:6px;cursor:pointer;font-weight:bold;">💾 保存</button>
                 </div>
             `;
             
             contentArea.appendChild(textarea);
+            contentArea.appendChild(findReplaceBar);
             contentArea.appendChild(parseResult);
             contentArea.appendChild(buttonBar);
             
@@ -10366,6 +10425,303 @@
                 fileIndex: index,
                 element: windowDiv
             });
+        }
+
+        // ==================== 网页版文本查找替换 ====================
+
+        function webToggleFindReplace(windowId, forceOpen) {
+            const bar = document.getElementById(windowId + '_findReplace');
+            if (!bar) return;
+            if (forceOpen === true) {
+                bar.style.display = 'block';
+                const findInput = document.getElementById(windowId + '_findInput');
+                if (findInput) {
+                    const ta = document.getElementById(windowId + '_content');
+                    if (ta) {
+                        const sel = ta.value.substring(ta.selectionStart, ta.selectionEnd);
+                        if (sel) findInput.value = sel;
+                    }
+                    findInput.focus();
+                    webFind(windowId, 'count');
+                }
+                return;
+            }
+            bar.style.display = bar.style.display === 'none' ? 'block' : 'none';
+            if (bar.style.display !== 'none') {
+                const findInput = document.getElementById(windowId + '_findInput');
+                if (findInput) {
+                    const ta = document.getElementById(windowId + '_content');
+                    if (ta) {
+                        const sel = ta.value.substring(ta.selectionStart, ta.selectionEnd);
+                        if (sel) findInput.value = sel;
+                    }
+                    findInput.focus();
+                    webFind(windowId, 'count');
+                }
+            }
+        }
+
+        function webFind(windowId, direction) {
+            const ta = document.getElementById(windowId + '_content');
+            const input = document.getElementById(windowId + '_findInput');
+            const countEl = document.getElementById(windowId + '_findCount');
+            if (!ta || !input || !input.value) return;
+            const query = input.value;
+            const caseSensitive = document.getElementById(windowId + '_caseSensitive')?.checked || false;
+            const text = ta.value;
+            const flags = caseSensitive ? 'g' : 'gi';
+
+            const matches = [];
+            let m;
+            const escQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const regex = new RegExp(escQuery, flags);
+            while ((m = regex.exec(text)) !== null) {
+                matches.push(m.index);
+                if (m[0].length === 0) regex.lastIndex++;
+            }
+
+            if (countEl) countEl.textContent = matches.length > 0 ? '1/' + matches.length : '0/0';
+
+            if (matches.length === 0) {
+                input.style.borderColor = '#f44336';
+                setTimeout(() => { input.style.borderColor = ''; }, 1000);
+                return;
+            }
+            input.style.borderColor = '';
+
+            if (direction === 'count') return;
+
+            const step = direction === 'prev' ? -1 : 1;
+            let currentIdx = -1;
+            if (direction === 'prev') {
+                for (let i = matches.length - 1; i >= 0; i--) {
+                    if (matches[i] < ta.selectionStart) { currentIdx = i; break; }
+                }
+                if (currentIdx === -1) currentIdx = matches.length - 1;
+            } else {
+                for (let i = 0; i < matches.length; i++) {
+                    if (matches[i] > ta.selectionStart) { currentIdx = i; break; }
+                }
+                if (currentIdx === -1) currentIdx = 0;
+            }
+
+            const pos = matches[currentIdx];
+            ta.focus();
+            ta.setSelectionRange(pos, pos + query.length);
+            ta.blur();
+            ta.focus();
+            const before = text.substring(0, pos);
+            const lineNum = before.split('\n').length;
+            ta.scrollTop = Math.max(0, (lineNum - 3) * 20);
+
+            if (countEl) countEl.textContent = (currentIdx + 1) + '/' + matches.length;
+        }
+
+        function webReplace(windowId) {
+            const ta = document.getElementById(windowId + '_content');
+            const findInput = document.getElementById(windowId + '_findInput');
+            const replaceInput = document.getElementById(windowId + '_replaceInput');
+            if (!ta || !findInput || !findInput.value) return;
+            const query = findInput.value;
+            const sel = ta.value.substring(ta.selectionStart, ta.selectionEnd);
+            const caseSensitive = document.getElementById(windowId + '_caseSensitive')?.checked || false;
+            const compare = caseSensitive ? sel === query : sel.toLowerCase() === query.toLowerCase();
+            if (!compare) { webFind(windowId, 'next'); return; }
+            ta.setRangeText(replaceInput.value, ta.selectionStart, ta.selectionEnd, 'select');
+            webFind(windowId, 'next');
+        }
+
+        function webReplaceAll(windowId) {
+            const ta = document.getElementById(windowId + '_content');
+            const findInput = document.getElementById(windowId + '_findInput');
+            const replaceInput = document.getElementById(windowId + '_replaceInput');
+            if (!ta || !findInput || !findInput.value) return;
+            const query = findInput.value;
+            const caseSensitive = document.getElementById(windowId + '_caseSensitive')?.checked || false;
+            const flags = caseSensitive ? 'g' : 'gi';
+            const escQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const count = (ta.value.match(new RegExp(escQuery, flags)) || []).length;
+            if (count === 0) { alert('未找到匹配项'); return; }
+            if (!confirm('找到 ' + count + ' 处匹配，确认全部替换？')) return;
+            ta.value = ta.value.replace(new RegExp(escQuery, flags), replaceInput.value);
+            const countEl = document.getElementById(windowId + '_findCount');
+            if (countEl) countEl.textContent = '0/0';
+            alert('已替换 ' + count + ' 处');
+        }
+
+        // ==================== 网页版文件对比 ====================
+
+        function webStartCompare(currentIndex) {
+            const currentFile = txtFiles[currentIndex];
+            if (!currentFile) return;
+
+            // 列出其他脚本文件供选择
+            const others = txtFiles.filter((f, i) => i !== currentIndex).map((f, i) => {
+                const realIdx = txtFiles.indexOf(f);
+                return { label: `[${realIdx + 1}] ${escapeHtml(f.name)}`, index: realIdx };
+            });
+
+            if (others.length === 0) {
+                alert('没有其他脚本文件可用于对比');
+                return;
+            }
+
+            let modal = document.getElementById('webCompareSelectModal');
+            if (modal) modal.remove();
+            modal = document.createElement('div');
+            modal.id = 'webCompareSelectModal';
+            modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:100000;display:flex;justify-content:center;align-items:center;';
+            modal.innerHTML = `<div style="background:#1a1a2e;border:2px solid rgba(233,30,99,0.5);border-radius:12px;padding:20px;width:480px;max-width:95vw;height:60vh;display:flex;flex-direction:column;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                    <h3 style="color:#fff;margin:0;">📊 选择对比文件</h3>
+                    <button onclick="document.getElementById('webCompareSelectModal').remove()" style="background:rgba(255,255,255,0.1);color:#fff;border:none;width:30px;height:30px;border-radius:5px;cursor:pointer;">×</button>
+                </div>
+                <div style="color:rgba(255,255,255,0.4);font-size:0.75rem;margin-bottom:6px;">当前文件：<span style="color:#4caf50;">${escapeHtml(currentFile.name)}</span></div>
+                <input id="webCompareSearch" placeholder="搜索文件名..." oninput="webFilterCompareList()" style="background:rgba(0,0,0,0.4);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:6px;padding:8px;font-size:0.85rem;margin-bottom:8px;">
+                <div id="webCompareList" style="flex:1;overflow:auto;">${others.map(f =>
+                    `<div class="web-compare-item" data-idx="${f.index}" style="color:#fff;padding:6px 8px;border-bottom:1px solid rgba(255,255,255,0.05);cursor:pointer;font-size:0.8rem;" onclick="webOpenCompare(${currentIndex},${f.index})">${f.label}</div>`
+                ).join('')}</div>
+            </div>`;
+            document.body.appendChild(modal);
+        }
+
+        function webFilterCompareList() {
+            const q = (document.getElementById('webCompareSearch')?.value || '').toLowerCase();
+            document.querySelectorAll('.web-compare-item').forEach(el => {
+                el.style.display = el.textContent.toLowerCase().includes(q) ? '' : 'none';
+            });
+        }
+
+        function webOpenCompare(idx1, idx2) {
+            document.getElementById('webCompareSelectModal')?.remove();
+            const f1 = txtFiles[idx1], f2 = txtFiles[idx2];
+            if (!f1 || !f2) return;
+
+            const lines1 = f1.content.split('\n');
+            const lines2 = f2.content.split('\n');
+            const diff = computeLineDiff(lines1, lines2);
+            const sameCount = diff.filter(d => d.type === 'same').length;
+            const diffCount = diff.filter(d => d.type !== 'same').length;
+
+            let modal = document.getElementById('webDiffModal');
+            if (modal) modal.remove();
+            modal = document.createElement('div');
+            modal.id = 'webDiffModal';
+            modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.88);z-index:100001;display:flex;justify-content:center;align-items:center;';
+
+            const diffViewHtml = renderDiffView(diff);
+            modal.innerHTML = `<div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(233,30,99,0.5);border-radius:12px;padding:16px;width:95vw;max-width:1100px;height:85vh;display:flex;flex-direction:column;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-shrink:0;">
+                    <div style="display:flex;gap:16px;align-items:center;">
+                        <span style="color:#4caf50;font-size:0.9rem;">📄 ${escapeHtml(f1.name)}</span>
+                        <span style="color:#e91e63;">⇄</span>
+                        <span style="color:#ff9800;font-size:0.9rem;">📄 ${escapeHtml(f2.name)}</span>
+                    </div>
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        <span style="color:rgba(255,255,255,0.5);font-size:0.75rem;">相同<span style="color:#4caf50;">${sameCount}</span>行 · 差异<span style="color:#e91e63;">${diffCount}</span>行</span>
+                        <button onclick="webToggleDiffView()" style="background:rgba(156,39,176,0.4);color:#ce93d8;border:1px solid rgba(156,39,176,0.4);padding:4px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">✏️ 并排编辑</button>
+                        <button onclick="document.getElementById('webDiffModal').remove()" style="background:rgba(255,255,255,0.1);color:#fff;border:none;width:28px;height:28px;border-radius:5px;cursor:pointer;font-size:1.1rem;">×</button>
+                    </div>
+                </div>
+                <!-- 差异视图 -->
+                <div id="webDiffView" style="flex:1;overflow:auto;border:1px solid rgba(255,255,255,0.1);border-radius:8px;background:rgba(0,0,0,0.4);">
+                    <div style="display:flex;font-family:'Consolas','Courier New',monospace;font-size:0.75rem;line-height:1.6;">${diffViewHtml}</div>
+                </div>
+                <!-- 并排编辑视图（默认隐藏） -->
+                <div id="webSplitView" style="display:none;flex:1;gap:8px;min-height:0;">
+                    <div style="flex:1;display:flex;flex-direction:column;">
+                        <div style="color:#4caf50;font-size:0.7rem;padding:2px 8px;background:rgba(0,0,0,0.3);border-radius:4px 4px 0 0;">${escapeHtml(f1.name)}</div>
+                        <textarea id="webDiffLeft" style="flex:1;background:rgba(0,0,0,0.4);color:#0f0;border:1px solid rgba(76,175,80,0.3);border-radius:0 0 6px 6px;padding:10px;font-family:'Consolas',monospace;font-size:0.8rem;resize:none;line-height:1.5;overflow:auto;" onscroll="webSyncScroll(this,'right')">${escapeHtml(f1.content)}</textarea>
+                    </div>
+                    <div style="flex:1;display:flex;flex-direction:column;">
+                        <div style="color:#ff9800;font-size:0.7rem;padding:2px 8px;background:rgba(0,0,0,0.3);border-radius:4px 4px 0 0;">${escapeHtml(f2.name)}</div>
+                        <textarea id="webDiffRight" style="flex:1;background:rgba(0,0,0,0.4);color:#0f0;border:1px solid rgba(255,152,0,0.3);border-radius:0 0 6px 6px;padding:10px;font-family:'Consolas',monospace;font-size:0.8rem;resize:none;line-height:1.5;overflow:auto;" onscroll="webSyncScroll(this,'left')">${escapeHtml(f2.content)}</textarea>
+                    </div>
+                </div>
+            </div>`;
+            document.body.appendChild(modal);
+
+            window._webDiffIdx1 = idx1;
+            window._webDiffIdx2 = idx2;
+        }
+
+        function webToggleDiffView() {
+            const diffView = document.getElementById('webDiffView');
+            const splitView = document.getElementById('webSplitView');
+            const btn = document.querySelector('#webDiffModal button[onclick="webToggleDiffView()"]');
+            if (!diffView || !splitView) return;
+            if (diffView.style.display !== 'none') {
+                diffView.style.display = 'none';
+                splitView.style.display = 'flex';
+                if (btn) btn.textContent = '📊 差异视图';
+            } else {
+                diffView.style.display = 'block';
+                splitView.style.display = 'none';
+                if (btn) btn.textContent = '✏️ 并排编辑';
+            }
+        }
+
+        function webSyncScroll(source, targetSide) {
+            const target = document.getElementById(targetSide === 'right' ? 'webDiffRight' : 'webDiffLeft');
+            if (target && !target.dataset.scrolling) {
+                target.dataset.scrolling = '1';
+                target.scrollTop = source.scrollTop;
+                setTimeout(() => { delete target.dataset.scrolling; }, 50);
+            }
+        }
+
+        // ==================== 通用LCS差异算法（app-local.js和网页版共用） ====================
+
+        function computeLineDiff(lines1, lines2) {
+            const m = lines1.length, n = lines2.length;
+            if (m === 0 && n === 0) return [];
+            // 对较短的数组用简化算法
+            const dp = Array(m + 1).fill(null).map(() => Array(n + 1).fill(0));
+            for (let i = 1; i <= m; i++) {
+                for (let j = 1; j <= n; j++) {
+                    if (lines1[i - 1] === lines2[j - 1]) {
+                        dp[i][j] = dp[i - 1][j - 1] + 1;
+                    } else {
+                        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+                    }
+                }
+            }
+            const result = [];
+            let i = m, j = n;
+            const stack = [];
+            while (i > 0 || j > 0) {
+                if (i > 0 && j > 0 && lines1[i - 1] === lines2[j - 1]) {
+                    stack.push({ type: 'same', left: lines1[i - 1], right: lines2[j - 1] });
+                    i--; j--;
+                } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+                    stack.push({ type: 'added', left: null, right: lines2[j - 1] });
+                    j--;
+                } else {
+                    stack.push({ type: 'deleted', left: lines1[i - 1], right: null });
+                    i--;
+                }
+            }
+            while (stack.length > 0) result.push(stack.pop());
+            return result;
+        }
+
+        function renderDiffView(diff) {
+            let leftHtml = '<div style="flex:1;min-width:0;border-right:1px solid rgba(255,255,255,0.1);"><div style="color:#4caf50;padding:4px 8px;font-size:0.7rem;background:rgba(0,0,0,0.3);border-bottom:1px solid rgba(255,255,255,0.1);font-weight:bold;">左侧文件</div>';
+            let rightHtml = '<div style="flex:1;min-width:0;"><div style="color:#ff9800;padding:4px 8px;font-size:0.7rem;background:rgba(0,0,0,0.3);border-bottom:1px solid rgba(255,255,255,0.1);font-weight:bold;">右侧文件</div>';
+            for (const d of diff) {
+                if (d.type === 'same') {
+                    leftHtml += '<div style="padding:1px 8px;color:rgba(255,255,255,0.7);font-size:0.7rem;">' + (d.left ? escapeHtml(d.left) : ' ') + '</div>';
+                    rightHtml += '<div style="padding:1px 8px;color:rgba(255,255,255,0.7);font-size:0.7rem;">' + (d.right ? escapeHtml(d.right) : ' ') + '</div>';
+                } else if (d.type === 'deleted') {
+                    leftHtml += '<div style="padding:1px 8px;background:rgba(244,67,54,0.25);color:#ef9a9a;font-size:0.7rem;">− ' + escapeHtml(d.left || ' ') + '</div>';
+                    rightHtml += '<div style="padding:1px 8px;background:rgba(244,67,54,0.08);">&nbsp;</div>';
+                } else {
+                    leftHtml += '<div style="padding:1px 8px;background:rgba(76,175,80,0.08);">&nbsp;</div>';
+                    rightHtml += '<div style="padding:1px 8px;background:rgba(76,175,80,0.25);color:#a5d6a7;font-size:0.7rem;">+ ' + escapeHtml(d.right || ' ') + '</div>';
+                }
+            }
+            leftHtml += '</div>'; rightHtml += '</div>';
+            return leftHtml + rightHtml;
         }
 
         // 窗口拖拽
