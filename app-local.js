@@ -1029,18 +1029,18 @@ if (isTauriApp) {
 
     // ==================== 生成脚本保存到老马目录 ====================
 
-    async function saveScriptToMaDir(dirKey, fileName, content) {
+    async function saveScriptToMaDir(dirKey, fileName, content, silent) {
         const dir = maDirs[dirKey];
-        if (!dir) { alert('未配置该目录'); return false; }
+        if (!dir) { if (!silent) alert('未配置该目录'); return false; }
         const sep = dir.endsWith('\\') || dir.endsWith('/') ? '' : '\\';
         const filePath = dir + sep + fileName;
         const ok = await writeTextFile(filePath, content);
         if (ok) {
-            alert('✅ 脚本已保存到：\n' + filePath);
+            if (!silent) alert('✅ 脚本已保存到：\n' + filePath);
             scanAllFiles();
             return true;
         } else {
-            alert('保存失败');
+            if (!silent) alert('保存失败');
             return false;
         }
     }
@@ -1187,6 +1187,7 @@ if (isTauriApp) {
     }
 
     // ==================== 导出函数到全局 ====================
+    window.maDirs = maDirs;
     window.openAppLocalSettings = openAppLocalSettings;
     window.closeAppLocalSettings = closeAppLocalSettings;
     window.selectMaDir = selectMaDir;

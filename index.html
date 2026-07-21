@@ -19397,7 +19397,7 @@ function hasGistToken() {
                 toast.textContent = '⏳ 正在保存到老马目录...';
 
                 if (window.saveScriptToMaDir) {
-                    const ok = await window.saveScriptToMaDir(dirKey, scriptName, content);
+                    const ok = await window.saveScriptToMaDir(dirKey, scriptName, content, true);
                     if (ok) {
                         toast.textContent = '✅ 已保存到老马目录！';
                         toast.style.background = 'linear-gradient(135deg,#4CAF50,#45a049)';
