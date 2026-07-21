@@ -232,7 +232,7 @@ if (isTauriApp) {
 
                 <div style="background:rgba(33,150,243,0.08);border:1px solid rgba(33,150,243,0.2);border-radius:8px;padding:12px 16px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;">
                     <div>
-                        <div style="color:#4fc3f7;font-size:0.9rem;font-weight:bold;">ℹ️ 当前版本: v<span id="appSettingsVersion">1.1.4</span></div>
+                        <div style="color:#4fc3f7;font-size:0.9rem;font-weight:bold;">ℹ️ 当前版本: v<span id="appSettingsVersion">1.1.5</span></div>
                         <div style="color:rgba(255,255,255,0.4);font-size:0.72rem;margin-top:2px;">需要更新时，请下载新安装包重新安装</div>
                     </div>
                     <div style="display:flex;gap:6px;">
