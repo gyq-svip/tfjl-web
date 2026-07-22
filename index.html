@@ -156,8 +156,9 @@
         }
 
         .password-box input {
-            width: 100%;
-            padding: 15px;
+            width: 260px;
+            max-width: 90%;
+            padding: 12px 16px;
             font-size: 1.1rem;
             border: 2px solid rgba(255,215,0,0.5);
             border-radius: 10px;
@@ -2264,7 +2265,7 @@
                 <input type="checkbox" id="rememberPassword" checked style="width:16px;height:16px;cursor:pointer;accent-color:#4ecdc4;">
                 记住密码，下次自动登录
             </label>
-            <button onclick="checkPasswordAndEnter()" style="width:100%;padding:12px;border-radius:8px;border:none;background:linear-gradient(135deg,#4ecdc4,#44a08d);color:white;cursor:pointer;font-size:0.95rem;font-weight:600;">进入塔防助手</button>
+            <button onclick="checkPasswordAndEnter()" style="width:260px;max-width:90%;padding:12px;border-radius:8px;border:none;background:linear-gradient(135deg,#4ecdc4,#44a08d);color:white;cursor:pointer;font-size:0.95rem;font-weight:600;">进入塔防助手</button>
         </div>
     </div>
 
@@ -22784,10 +22785,12 @@ function hasGistToken() {
 
             <div id="adminStatus" class="admin-status"></div>
 
-            <div id="adminVerifySection" class="admin-section">
+            <div id="adminVerifySection" class="admin-section" style="text-align:center;">
                 <h3 style="color:#ffd700;text-align:center;margin:0 0 15px 0;">🔐 身份验证</h3>
-                <label>请输入管理员验证码</label>
-                <input type="password" id="adminVerifyCode" placeholder="输入验证码" autocomplete="off" style="padding:8px 12px;font-size:0.9rem;">
+                <label style="display:block;text-align:center;margin-bottom:8px;color:rgba(255,255,255,0.6);font-size:0.85rem;">请输入管理员验证码</label>
+                <div style="display:flex;justify-content:center;">
+                    <input type="password" id="adminVerifyCode" placeholder="输入验证码" autocomplete="off" style="width:220px;padding:10px 14px;font-size:0.9rem;border-radius:10px;border:2px solid rgba(255,215,0,0.4);background:rgba(0,0,0,0.4);color:#fff;text-align:center;outline:none;transition:border-color 0.2s;box-sizing:border-box;" onfocus="this.style.borderColor='#ffd700'" onblur="this.style.borderColor='rgba(255,215,0,0.4)'">
+                </div>
                 <br>
                 <label id="adminRememberLabel" style="display:flex;align-items:center;justify-content:center;gap:8px;margin:10px 0 16px;color:rgba(255,255,255,0.6);font-size:0.85rem;cursor:pointer;">
                     <input type="checkbox" id="adminRememberCode" checked style="width:14px;height:14px;cursor:pointer;accent-color:#ffd700;">
