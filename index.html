@@ -23513,22 +23513,41 @@ function hasGistToken() {
             }
             html += `</div>`;
 
-            // 新用户日趋势（列表）
-            const recentNewUsers = recentDates.slice(0, 15).map(d => {
-                const s = dailyStats[d];
-                return { date: d, newUsers: s.new_users || 0, newApp: s.new_app_users || 0, newWeb: s.new_web_users || 0, visits: s.visits || 0 };
-            }).filter(x => x.newUsers > 0);
-
-            if (recentNewUsers.length > 0) {
+            // 新用户日趋势图（柱状图，APP/网页 堆叠，最近→最旧）
+            if (recentDates.length > 0) {
+                const maxNewUsers = Math.max(...recentDates.map(d => (dailyStats[d].new_users || 0)), 1);
                 html += `<div style="background:rgba(255,255,255,0.05);border-radius:10px;padding:15px;margin-bottom:20px;">`;
-                html += `<div style="color:#4ecdc4;font-size:0.9rem;margin-bottom:10px;">🆕 近期新用户记录</div>`;
-                html += `<div style="max-height:200px;overflow-y:auto;padding-right:10px;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,0.2) transparent;">`;
-                recentNewUsers.forEach(x => {
-                    html += `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.05);font-size:0.85rem;">`;
-                    html += `<span style="color:rgba(255,255,255,0.7);">${x.date}</span>`;
-                    html += `<span><b style="color:#4caf50;">+${x.newUsers}</b> 新用户 <span style="color:rgba(255,255,255,0.4);font-size:0.8rem;">(APP:<b style="color:#1976d2;">${x.newApp}</b> 网页:<b style="color:#00bcd4;">${x.newWeb}</b> | 访问${x.visits})</span></span>`;
+                html += `<div style="color:#4ecdc4;font-size:0.9rem;margin-bottom:15px;">🆕 新增用户趋势（最近${recentDates.length}天）【APP/网页】</div>`;
+                html += `<div style="display:flex;align-items:flex-end;gap:2px;height:150px;overflow-x:auto;padding-bottom:25px;position:relative;border-bottom:1px solid rgba(255,255,255,0.1);">`;
+                recentDates.forEach((d, idx) => {
+                    const s = dailyStats[d];
+                    const newU = s.new_users || 0;
+                    const newApp = s.new_app_users || 0;
+                    const newWeb = s.new_web_users || 0;
+                    const barH = Math.max((newU / maxNewUsers) * 120, newU > 0 ? 2 : 0);
+                    const appBarH = barH > 0 ? Math.max((newApp / Math.max(newU, 1)) * barH, 0) : 0;
+                    const webBarH = barH - appBarH;
+                    const dateLabel = d.substring(5);
+                    const isToday = d === today;
+                    html += `<div style="flex:0 0 24px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;position:relative;" title="${d}\nAPP新增: ${newApp}\n网页新增: ${newWeb}\n总新增: ${newU}">`;
+                    html += `<div style="position:absolute;top:-16px;font-size:0.65rem;color:#ffd700;white-space:nowrap;">${newU > 0 ? newU : ''}</div>`;
+                    html += `<div style="width:18px;border-radius:3px 3px 0 0;height:${barH}px;position:relative;overflow:hidden;">`;
+                    // APP 部分（蓝色）
+                    if (appBarH > 0) {
+                        html += `<div style="position:absolute;bottom:${webBarH > 0 ? webBarH : 0}px;width:100%;background:linear-gradient(180deg,#1976d2,#0d47a1);height:${appBarH}px;border-radius:${webBarH > 0 ? '0' : '3px 3px 0 0'};"></div>`;
+                    }
+                    // 网页部分（青色）
+                    if (webBarH > 0) {
+                        html += `<div style="position:absolute;bottom:0;width:100%;background:linear-gradient(180deg,#4caf50,#2e7d32);height:${webBarH}px;border-radius:${appBarH > 0 ? '0' : '3px 3px 0 0'};"></div>`;
+                    }
+                    html += `</div>`;
+                    html += `<div style="position:absolute;bottom:-20px;font-size:0.6rem;color:${isToday ? '#ffd700' : 'rgba(255,255,255,0.4)'};white-space:nowrap;">${dateLabel}</div>`;
                     html += `</div>`;
                 });
+                html += `</div>`;
+                html += `<div style="display:flex;gap:15px;margin-top:10px;font-size:0.75rem;">`;
+                html += `<span><span style="display:inline-block;width:12px;height:12px;background:#1976d2;border-radius:2px;vertical-align:middle;"></span> APP 新增</span>`;
+                html += `<span><span style="display:inline-block;width:12px;height:12px;background:#4caf50;border-radius:2px;vertical-align:middle;"></span> 网页 新增</span>`;
                 html += `</div></div>`;
             }
 
