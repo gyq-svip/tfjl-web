@@ -19873,6 +19873,13 @@ function hasGistToken() {
             const modal = document.getElementById('laoMaDirPickerModal');
             if (modal) modal.remove();
 
+            // 自动解码 URL 编码的中文文件名（Gist 存储的中文文件名会被编码为 %XX%XX），
+            // 并让用户确认/修改，解决导入老马后文件名乱码问题。
+            let decodedName = scriptName;
+            try { decodedName = decodeURIComponent(scriptName); } catch(e) {}
+            const finalName = prompt('请输入脚本文件名（含扩展名）：', decodedName);
+            if (!finalName) return; // 用户取消保存
+
             const toast = document.createElement('div');
             toast.style.cssText = `position:fixed;top:20px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.85);color:#fff;padding:10px 20px;border-radius:8px;z-index:100000;font-size:0.85rem;`;
             toast.textContent = '⏳ 正在获取脚本...';
@@ -19887,7 +19894,7 @@ function hasGistToken() {
                 toast.textContent = '⏳ 正在保存到老马目录...';
 
                 if (window.saveScriptToMaDir) {
-                    const ok = await window.saveScriptToMaDir(dirKey, scriptName, content, true);
+                    const ok = await window.saveScriptToMaDir(dirKey, finalName, content, true);
                     if (ok) {
                         toast.textContent = '✅ 已保存到老马目录！';
                         toast.style.background = 'linear-gradient(135deg,#4CAF50,#45a049)';
