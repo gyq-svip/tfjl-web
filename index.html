@@ -22467,4 +22467,1257 @@ function hasGistToken() {
             html += `<div style="display:flex;align-items:flex-end;gap:1px;height:150px;padding-bottom:25px;position:relative;border-bottom:1px solid rgba(255,255,255,0.1);">`;
             for (let h = 0; h < 24; h++) {
                 const v = hourlyAgg[h];
-                const barH = Math.max((v / max
+                const barH = Math.max((v / maxHourly) * 120, 1);
+                const isPeak = h === peakHour;
+                html += `<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;position:relative;" title="${h}:00 - ${h+1}:00\n访问: ${v}次">`;
+                if (v > 0) {
+                    html += `<div style="position:absolute;top:-14px;font-size:0.6rem;color:${isPeak ? '#ffd700' : 'rgba(255,255,255,0.4)'};white-space:nowrap;">${v}</div>`;
+                }
+                html += `<div style="width:80%;background:${isPeak ? 'linear-gradient(180deg,#ffd700,#ff9800)' : 'linear-gradient(180deg,#7c4dff,#512da8)'};border-radius:2px 2px 0 0;height:${barH}px;"></div>`;
+                html += `<div style="position:absolute;bottom:-18px;font-size:0.55rem;color:rgba(255,255,255,0.4);">${h}</div>`;
+                html += `</div>`;
+            }
+            html += `</div></div>`;
+
+            // 今日时段分布图（仅当天）
+            const todayHourly = todayStats.hourly_visits || new Array(24).fill(0);
+            const todayHourlyTotal = todayHourly.reduce((a, b) => a + b, 0);
+            const todayMaxHourly = Math.max(...todayHourly, 1);
+            let todayPeakHour = 0, todayPeakVal = 0;
+            for (let h = 0; h < 24; h++) {
+                if (todayHourly[h] > todayPeakVal) { todayPeakVal = todayHourly[h]; todayPeakHour = h; }
+            }
+            html += `<div style="background:rgba(255,255,255,0.05);border-radius:10px;padding:15px;margin-bottom:20px;">`;
+            html += `<div style="display:flex;flex-direction:column;gap:8px;">`;
+            html += `<div style="display:flex;justify-content:space-between;align-items:center;">`;
+            html += `<span style="color:#ffd700;font-size:0.9rem;">📊 今日访问时段分布（${today}）</span>`;
+            html += `<span style="color:rgba(255,255,255,0.5);font-size:0.75rem;">共 ${todayHourlyTotal} 次访问</span>`;
+            html += `</div>`;
+            if (todayHourlyTotal > 0) {
+                html += `<div style="color:rgba(255,255,255,0.5);font-size:0.8rem;">今日高峰: <b style="color:#ffd700;">${todayPeakHour}:00-${todayPeakHour + 1}:00</b> (${todayPeakVal}次)</div>`;
+            }
+            html += `</div>`;
+            html += `<div style="display:flex;align-items:flex-end;gap:1px;height:120px;padding-bottom:22px;margin-top:12px;position:relative;border-bottom:1px solid rgba(255,255,255,0.1);">`;
+            for (let h = 0; h < 24; h++) {
+                const v = todayHourly[h];
+                const barH = Math.max((v / todayMaxHourly) * 95, todayHourlyTotal > 0 ? 2 : 0);
+                const isPeak = h === todayPeakHour && v > 0;
+                html += `<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;position:relative;" title="${h}:00 - ${h+1}:00\n今日访问: ${v}次">`;
+                if (v > 0) {
+                    html += `<div style="position:absolute;top:-12px;font-size:0.6rem;color:${isPeak ? '#ffd700' : 'rgba(255,255,255,0.5)'};white-space:nowrap;">${v}</div>`;
+                }
+                html += `<div style="width:80%;background:${isPeak ? 'linear-gradient(180deg,#ffd700,#ff9800)' : 'linear-gradient(180deg,#4ecdc4,#26a69a)'};border-radius:2px 2px 0 0;height:${barH}px;"></div>`;
+                html += `<div style="position:absolute;bottom:-16px;font-size:0.5rem;color:rgba(255,255,255,0.35);">${h}</div>`;
+                html += `</div>`;
+            }
+            html += `</div>`;
+            if (todayHourlyTotal === 0) {
+                html += `<div style="color:rgba(255,255,255,0.3);font-size:0.8rem;text-align:center;padding:10px;">暂无今日时段数据，访问数据将逐步收集</div>`;
+            }
+            html += `</div>`;
+
+            // 新用户日趋势（列表）
+            const recentNewUsers = recentDates.slice(0, 15).map(d => {
+                const s = dailyStats[d];
+                return { date: d, newUsers: s.new_users || 0, visits: s.visits || 0 };
+            }).filter(x => x.newUsers > 0);
+
+            if (recentNewUsers.length > 0) {
+                html += `<div style="background:rgba(255,255,255,0.05);border-radius:10px;padding:15px;margin-bottom:20px;">`;
+                html += `<div style="color:#4ecdc4;font-size:0.9rem;margin-bottom:10px;">🆕 近期新用户记录</div>`;
+                html += `<div style="max-height:200px;overflow-y:auto;padding-right:10px;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,0.2) transparent;">`;
+                recentNewUsers.forEach(x => {
+                    html += `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.05);font-size:0.85rem;">`;
+                    html += `<span style="color:rgba(255,255,255,0.7);">${x.date}</span>`;
+                    html += `<span><b style="color:#4caf50;">+${x.newUsers}</b> 新用户 <span style="color:rgba(255,255,255,0.4);font-size:0.8rem;">(当日访问${x.visits})</span></span>`;
+                    html += `</div>`;
+                });
+                html += `</div></div>`;
+            }
+
+            // 数据更新时间
+            html += `<div style="color:rgba(255,255,255,0.3);font-size:0.8rem;text-align:center;padding:10px;">最后更新: ${data.last_updated || '未知'}</div>`;
+
+            content.innerHTML = html;
+        }
+
+        function analyticsCard(label, value, icon, trendColor) {
+            const color = trendColor || '#ffd700';
+            return `<div style="background:rgba(255,255,255,0.08);border-radius:10px;padding:12px;text-align:center;">
+                <div style="font-size:1.2rem;">${typeof icon === 'string' && icon.length > 2 ? icon : '📊'}</div>
+                <div style="color:${color};font-size:1.3rem;font-weight:bold;margin:4px 0;">${value}</div>
+                <div style="color:rgba(255,255,255,0.5);font-size:0.75rem;">${label}</div>
+            </div>`;
+        }
+
+        function adminLoadStats() {
+            const content = document.getElementById('adminStatsContent');
+
+            if (!counterData) {
+                content.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:30px;">暂无统计数据，请稍后再试</div>';
+                return;
+            }
+
+            const today = getTodayString();
+            const todayStats = counterData.daily_stats[today] || { visits: 0, downloads: 0, new_users: 0 };
+            const pendingCount = loadPendingSync().length;
+            const totalUsers = counterData.total_users || 0;
+            const activeToday = counterData.active_today || 0;
+
+            let onlineCount = 0;
+            if (counterData.online_users) {
+                const now = Date.now();
+                const timeout = counterData.online_timeout || 3600000;
+                for (const id in counterData.online_users) {
+                    if (now - counterData.online_users[id] <= timeout) {
+                        onlineCount++;
+                    }
+                }
+            }
+            const onlineTimeoutMinutes = Math.round((counterData.online_timeout || 3600000) / 60000);
+
+            // 计算本周/本月新增用户
+            const now = new Date();
+            const todayNew = todayStats.new_users || 0;
+            let weekNew = 0;
+            let monthNew = 0;
+            const weekAgo = new Date(now);
+            weekAgo.setDate(weekAgo.getDate() - 7);
+            const monthAgo = new Date(now);
+            monthAgo.setDate(monthAgo.getDate() - 30);
+            if (counterData.daily_stats) {
+                for (const date in counterData.daily_stats) {
+                    const d = new Date(date);
+                    const nu = counterData.daily_stats[date].new_users || 0;
+                    if (d >= weekAgo) weekNew += nu;
+                    if (d >= monthAgo) monthNew += nu;
+                }
+            }
+
+            content.innerHTML = `
+                <div class="admin-section">
+                    ${pendingCount > 0 ? `<div style="color:#ff9800;margin-bottom:10px;">⚠️ 有 ${pendingCount} 条数据等待同步</div>` : ''}
+                    <h3 style="color:#4ecdc4;">📈 总计数据</h3>
+                    <div style="padding-left:20px;line-height:2;">
+                        <div>• 总访问次数：<span style="color:#ffd700;">${counterData.total_visits}</span></div>
+                        <div>• 总用户数：<span style="color:#ffd700;">${totalUsers}</span></div>
+                        <div>• 当前在线：<span style="color:#4ade80;">${onlineCount}</span> <span style="color:rgba(255,255,255,0.35);font-size:0.8rem;">(${onlineTimeoutMinutes}分钟内活跃)</span></div>
+                        <div>• 今日活跃：<span style="color:#4ade80;">${activeToday}</span></div>
+                        <div>• 总下载次数：<span style="color:#ffd700;">${counterData.total_downloads}</span></div>
+                    </div>
+                </div>
+                <div class="admin-section">
+                    <h3 style="color:#4ade80;">🆕 新增用户</h3>
+                    <div style="padding-left:20px;line-height:2;">
+                        <div>• 今日新增：<span style="color:#4ade80;">${todayNew}</span></div>
+                        <div>• 本周新增：<span style="color:#60a5fa;">${weekNew}</span></div>
+                        <div>• 本月新增：<span style="color:#a78bfa;">${monthNew}</span></div>
+                    </div>
+                </div>
+                <div class="admin-section">
+                    <h3 style="color:#4ecdc4;">📅 今日数据 (${today})</h3>
+                    <div style="padding-left:20px;line-height:2;">
+                        <div>• 今日访问：<span style="color:#ffd700;">${todayStats.visits}</span></div>
+                        <div>• 今日下载：<span style="color:#ffd700;">${todayStats.downloads}</span></div>
+                    </div>
+                </div>
+                <div style="color:rgba(255,255,255,0.3);font-size:0.8rem;text-align:center;margin-top:10px;">最后更新：${counterData.last_updated || '未知'}</div>
+            `;
+        }
+
+        // 加载脚本下载统计
+        async function adminLoadScriptStats() {
+            const content = document.getElementById('adminScriptStatsContent');
+            content.innerHTML = '<div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;">加载中...</div>';
+
+            // 先从Gist获取最新统计数据
+            try {
+                const fresh = await fetchCounterFromGist();
+                if (fresh) {
+                    counterData = fresh;
+                    saveCounterToCache(counterData);
+                }
+            } catch (e) {
+                console.warn('获取最新统计失败，使用本地缓存:', e);
+            }
+
+            if (!counterData) {
+                content.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:30px;">暂无统计数据</div>';
+                return;
+            }
+
+            const scriptDownloads = counterData.script_downloads || {};
+            const scriptNames = Object.keys(scriptDownloads);
+
+            if (scriptNames.length === 0) {
+                content.innerHTML = `
+                    <div style="color:rgba(255,255,255,0.4);text-align:center;padding:30px;">
+                        暂无脚本下载记录<br>
+                        <span style="font-size:0.8rem;">（用户下载脚本后会自动统计）</span>
+                    </div>
+                `;
+                return;
+            }
+
+            // 按下载次数排序
+            const sortedScripts = scriptNames.sort((a, b) => scriptDownloads[b] - scriptDownloads[a]);
+
+            // 计算总下载次数（用于验证）
+            const totalFromScripts = sortedScripts.reduce((sum, name) => sum + scriptDownloads[name], 0);
+
+            let html = `
+                <div style="background:rgba(255,215,0,0.1);border-radius:8px;padding:12px;margin-bottom:15px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <span style="color:#ffd700;font-weight:500;">📊 统计概览</span>
+                        <span style="color:#4ade80;">共 ${sortedScripts.length} 个脚本 | 总下载 ${totalFromScripts} 次</span>
+                    </div>
+                </div>
+                <table style="width:100%;border-collapse:collapse;font-size:0.85rem;">
+                    <thead>
+                        <tr style="background:rgba(79,195,247,0.15);">
+                            <th style="padding:8px;text-align:left;color:#4fc3f7;border-bottom:1px solid rgba(79,195,247,0.3);">排名</th>
+                            <th style="padding:8px;text-align:left;color:#4fc3f7;border-bottom:1px solid rgba(79,195,247,0.3);">脚本名称</th>
+                            <th style="padding:8px;text-align:right;color:#4fc3f7;border-bottom:1px solid rgba(79,195,247,0.3);">下载次数</th>
+                            <th style="padding:8px;text-align:right;color:#4fc3f7;border-bottom:1px solid rgba(79,195,247,0.3);">占比</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            sortedScripts.forEach((name, index) => {
+                const count = scriptDownloads[name];
+                const percent = totalFromScripts > 0 ? ((count / totalFromScripts) * 100).toFixed(1) : 0;
+                const rankColor = index === 0 ? '#ffd700' : (index < 3 ? '#4ade80' : 'rgba(255,255,255,0.7)');
+                const barWidth = Math.min(100, (count / (sortedScripts[0] ? scriptDownloads[sortedScripts[0]] : 1)) * 100);
+
+                html += `
+                    <tr style="border-bottom:1px solid rgba(255,255,255,0.1);">
+                        <td style="padding:8px;color:${rankColor};font-weight:${index < 3 ? 'bold' : 'normal'};">${index + 1}</td>
+                        <td style="padding:8px;color:rgba(255,255,255,0.85);max-width:200px;overflow:hidden;text-overflow:ellipsis;">
+                            ${name}
+                            <div style="height:4px;background:rgba(79,195,247,0.2);border-radius:2px;margin-top:4px;overflow:hidden;">
+                                <div style="height:100%;width:${barWidth}%;background:linear-gradient(90deg,#4fc3f7,#4ade80);border-radius:2px;"></div>
+                            </div>
+                        </td>
+                        <td style="padding:8px;text-align:right;color:#ffd700;font-weight:500;">${count}</td>
+                        <td style="padding:8px;text-align:right;color:rgba(255,255,255,0.5);">${percent}%</td>
+                    </tr>
+                `;
+            });
+
+            html += `
+                    </tbody>
+                </table>
+                <div style="color:rgba(255,255,255,0.3);font-size:0.75rem;text-align:center;margin-top:15px;">
+                    最后更新：${counterData.last_updated || '未知'}
+                </div>
+            `;
+
+            content.innerHTML = html;
+        }
+
+        // ==================== 启动加载动画控制 ====================
+        // 进度条模拟（0→85%随机推进），window.onload完成后跳到100%并淡出
+        // 3秒硬限制：不管加载是否完成，3秒后强制结束动画
+        (function() {
+            var bar = document.getElementById('loadingProgressBar');
+            var progress = 0;
+            var done = false;
+            var timer = setInterval(function() {
+                if (progress < 85) {
+                    progress += Math.random() * 12 + 3;
+                    if (progress > 85) progress = 85;
+                    bar.style.width = progress + '%';
+                }
+            }, 300);
+            window._hideLoadingScreen = function() {
+                if (done) return; done = true;
+                clearInterval(timer);
+                clearTimeout(hardLimit);
+                bar.style.width = '100%';
+                // 标记非首次启动，后续跳过动画
+                try { localStorage['TFJL_NotFirst'] = '1'; } catch(e) {}
+                var screen = document.getElementById('appLoadingScreen');
+                if (screen) {
+                    screen.style.opacity = '0';
+                    setTimeout(function() {
+                        screen.style.display = 'none';
+                        screen.remove();
+                    }, 600);
+                }
+            };
+            // 3秒硬限制：避免网络慢/代理慢导致动画一直转圈
+            var hardLimit = setTimeout(function() {
+                if (!done) window._hideLoadingScreen();
+            }, 3000);
+            // 页面加载完成后触发隐藏
+            window.addEventListener('load', function() {
+                window._hideLoadingScreen();
+            });
+        })();
+    </script>
+
+    <!-- 模态框：创建分类 -->
+    <div id="createCategoryModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;justify-content:center;align-items:center;">
+        <div style="background:#2a2a4a;padding:25px;border-radius:12px;min-width:300px;box-shadow:0 4px 20px rgba(0,0,0,0.5);">
+            <h3 style="margin:0 0 15px 0;color:#ffd700;">➕ 创建新分类</h3>
+            <input type="text" id="newCategoryName" placeholder="输入分类名称" style="width:100%;padding:10px;border-radius:6px;border:1px solid #555;background:#1a1a3a;color:#fff;box-sizing:border-box;margin-bottom:15px;">
+            <div style="display:flex;gap:10px;justify-content:flex-end;">
+                <button onclick="closeCreateCategoryModal()" style="padding:8px 20px;border-radius:6px;border:none;background:#666;color:#fff;cursor:pointer;">取消</button>
+                <button onclick="confirmCreateCategory()" style="padding:8px 20px;border-radius:6px;border:none;background:#4caf50;color:#fff;cursor:pointer;">创建</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 模态框：选择分类 -->
+    <div id="selectCategoryModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;justify-content:center;align-items:center;">
+        <div style="background:#2a2a4a;padding:25px;border-radius:12px;min-width:300px;max-width:400px;box-shadow:0 4px 20px rgba(0,0,0,0.5);">
+            <h3 style="margin:0 0 15px 0;color:#ffd700;">📁 选择保存到哪个分类</h3>
+            <div id="categoryListForSave" style="max-height:300px;overflow-y:auto;margin-bottom:15px;"></div>
+            <div style="display:flex;gap:10px;justify-content:flex-end;">
+                <button onclick="closeSelectCategoryModal()" style="padding:8px 20px;border-radius:6px;border:none;background:#666;color:#fff;cursor:pointer;">取消</button>
+                <button onclick="confirmSelectCategory()" style="padding:8px 20px;border-radius:6px;border:none;background:#4caf50;color:#fff;cursor:pointer;">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 管理员面板 -->
+    <div id="adminPanelOverlay" class="admin-panel-overlay">
+        <div class="admin-panel" style="position:relative;">
+            <button class="admin-close-btn" onclick="closeAdminPanel()">&times;</button>
+
+            <div id="adminStatus" class="admin-status"></div>
+
+            <div id="adminVerifySection" class="admin-section">
+                <h3 style="color:#ffd700;text-align:center;margin:0 0 15px 0;">🔐 身份验证</h3>
+                <label>请输入管理员验证码</label>
+                <input type="password" id="adminVerifyCode" placeholder="输入验证码" autocomplete="off" style="padding:8px 12px;font-size:0.9rem;">
+                <br>
+                <label id="adminRememberLabel" style="display:flex;align-items:center;justify-content:center;gap:8px;margin:10px 0 16px;color:rgba(255,255,255,0.6);font-size:0.85rem;cursor:pointer;">
+                    <input type="checkbox" id="adminRememberCode" checked style="width:14px;height:14px;cursor:pointer;accent-color:#ffd700;">
+                    记住验证码，下次自动登录
+                </label>
+                <div style="display:flex;gap:10px;justify-content:center;">
+                    <button class="admin-btn admin-btn-secondary" onclick="closeAdminPanel()">关闭</button>
+                    <button class="admin-btn admin-btn-primary" onclick="verifyAdmin()">登录</button>
+                </div>
+                <div class="admin-verify-hint">验证后可管理公告和更多功能</div>
+            </div>
+
+            <div id="adminMenuSection" style="display:none;">
+                <h2 style="color:#ffd700;text-align:center;margin:0 0 15px 0;font-size:1.1rem;">🛡️ 管理员菜单</h2>
+                <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;">
+                    <div class="admin-menu-item" onclick="adminShowPage('help')" style="padding:10px;">
+                        <span style="font-size:1.1rem;">📖</span>
+                        <div style="margin-left:8px;">
+                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">使用说明</div>
+                        </div>
+                    </div>
+                    <div class="admin-menu-item" onclick="adminShowPage('news')" style="padding:10px;">
+                        <span style="font-size:1.1rem;">📢</span>
+                        <div style="margin-left:8px;">
+                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">公告管理</div>
+                        </div>
+                    </div>
+                    <div class="admin-menu-item" onclick="adminShowPage('title')" style="padding:10px;">
+                        <span style="font-size:1.1rem;">🏷️</span>
+                        <div style="margin-left:8px;">
+                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">标题管理</div>
+                        </div>
+                    </div>
+                    <div class="admin-menu-item" onclick="adminShowPage('stats')" style="padding:10px;">
+                        <span style="font-size:1.1rem;">📊</span>
+                        <div style="margin-left:8px;">
+                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">访问统计</div>
+                        </div>
+                    </div>
+                    <div class="admin-menu-item" onclick="adminShowPage('analytics')" style="padding:10px;">
+                        <span style="font-size:1.1rem;">📈</span>
+                        <div style="margin-left:8px;">
+                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">数据分析</div>
+                        </div>
+                    </div>
+                    <div class="admin-menu-item" onclick="adminShowPage('scriptStats')" style="padding:10px;">
+                        <span style="font-size:1.1rem;">📥</span>
+                        <div style="margin-left:8px;">
+                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">脚本下载</div>
+                        </div>
+                    </div>
+                    <div class="admin-menu-item" onclick="adminShowPage('settings')" style="padding:10px;">
+                        <span style="font-size:1.1rem;">⚙️</span>
+                        <div style="margin-left:8px;">
+                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">系统设置</div>
+                        </div>
+                    </div>
+                    <div class="admin-menu-item" onclick="adminShowPage('nickManage')" style="padding:10px;">
+                        <span style="font-size:1.1rem;">👤</span>
+                        <div style="margin-left:8px;">
+                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">昵称管理</div>
+                        </div>
+                    </div>
+                    <div class="admin-menu-item" onclick="adminShowPage('passwordManage')" style="padding:10px;">
+                        <span style="font-size:1.1rem;">🔑</span>
+                        <div style="margin-left:8px;">
+                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">密码管理</div>
+                        </div>
+                    </div>
+                    <div class="admin-menu-item" onclick="adminShowPage('cacheManage')" style="padding:10px;">
+                        <span style="font-size:1.1rem;">🧹</span>
+                        <div style="margin-left:8px;">
+                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">清除缓存</div>
+                        </div>
+                    </div>
+                </div>
+                <button class="admin-btn" onclick="logoutToLogin()" style="width:100%;margin-top:12px;background:linear-gradient(135deg,#ef4444,#dc2626);color:white;">🔙 退出登录</button>
+            </div>
+
+            <div id="adminPageHelp" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
+                    <button class="admin-btn admin-btn-secondary" onclick="adminShowMenu()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
+                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">📖 功能使用说明</h3>
+                </div>
+                <div style="max-height:70vh;overflow-y:auto;">
+                    <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:15px;margin-bottom:15px;">
+                        <h4 style="color:#ffd700;margin:0 0 10px 0;">🏠 房间管理</h4>
+                        <div style="color:rgba(255,255,255,0.8);font-size:0.85rem;line-height:1.6;">
+                            <p><strong>白名单模式：</strong></p>
+                            <ul style="margin:5px 0;padding-left:20px;">
+                                <li>白名单为空时，所有房间都可以进入（开放模式）</li>
+                                <li>白名单不为空时，只有列表中的房间可以进入（限制模式）</li>
+                            </ul>
+                            <p><strong>添加房间：</strong></p>
+                            <ul style="margin:5px 0;padding-left:20px;">
+                                <li>输入房间ID（如：TF001）</li>
+                                <li>可选填房主昵称，房主可管理该房间</li>
+                            </ul>
+                            <p><strong>删除房间：</strong></p>
+                            <ul style="margin:5px 0;padding-left:20px;">
+                                <li>删除时会同时删除房间所有数据（拍品、消息、图片）</li>
+                                <li>此操作不可恢复，请谨慎</li>
+                            </ul>
+                            <p><strong>房主功能：</strong></p>
+                            <ul style="margin:5px 0;padding-left:20px;">
+                                <li>房主由管理员指定，只能管理自己房间的商品</li>
+                                <li>房主可以查看房间统计、下架商品</li>
+                                <li>房主入口：拍卖行面板右上角"👑 房主"按钮</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:15px;margin-bottom:15px;">
+                        <h4 style="color:#ffd700;margin:0 0 10px 0;">🏪 商品管理</h4>
+                        <div style="color:rgba(255,255,255,0.8);font-size:0.85rem;line-height:1.6;">
+                            <p><strong>管理员：</strong>可查看所有房间商品，可下架任意商品</p>
+                            <p><strong>房主：</strong>只能查看和管理自己房间的商品</p>
+                            <p><strong>下架操作：</strong>输入房间ID后点击"加载商品"，选择要下架的商品</p>
+                            <p><strong>商品ID格式：</strong>时间戳后6位+随机3位（如：123456_a1b）</p>
+                        </div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:15px;margin-bottom:15px;">
+                        <h4 style="color:#ffd700;margin:0 0 10px 0;">📊 拍卖统计</h4>
+                        <div style="color:rgba(255,255,255,0.8);font-size:0.85rem;line-height:1.6;">
+                            <p><strong>查看统计：</strong>输入房间ID后点击"加载统计"</p>
+                            <p><strong>统计内容：</strong></p>
+                            <ul style="margin:5px 0;padding-left:20px;">
+                                <li>卖家排行榜（按成交金额排序）</li>
+                                <li>买家排行榜（按成交金额排序）</li>
+                                <li>拍卖记录详情</li>
+                                <li><strong>正在拍卖的拍品</strong>（显示卖家、当前买家、剩余时间）</li>
+                            </ul>
+                            <p><strong>数据备份：</strong>可导出JSON格式备份文件</p>
+                        </div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:15px;margin-bottom:15px;">
+                        <h4 style="color:#ffd700;margin:0 0 10px 0;">👤 昵称管理</h4>
+                        <div style="color:rgba(255,255,255,0.8);font-size:0.85rem;line-height:1.6;">
+                            <p><strong>昵称唯一性：</strong></p>
+                            <ul style="margin:5px 0;padding-left:20px;">
+                                <li>昵称全局唯一，不能重复使用</li>
+                                <li>昵称存储在索引文件的 usedNicks 列表中</li>
+                                <li>清除缓存后，之前的昵称无法使用</li>
+                            </ul>
+                            <p><strong>重置昵称：</strong></p>
+                            <ul style="margin:5px 0;padding-left:20px;">
+                                <li>管理员可在"昵称管理"中重置用户昵称</li>
+                                <li>重置后该昵称从 usedNicks 列表中移除</li>
+                                <li>用户可以重新使用该昵称</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:15px;margin-bottom:15px;">
+                        <h4 style="color:#ffd700;margin:0 0 10px 0;">⚙️ 系统设置</h4>
+                        <div style="color:rgba(255,255,255,0.8);font-size:0.85rem;line-height:1.6;">
+                            <p><strong>索引文件ID：</strong></p>
+                            <ul style="margin:5px 0;padding-left:20px;">
+                                <li>固定值：a32a0628bd9275f3a4922cd12cf298c9</li>
+                                <li>所有设备必须使用同一个索引文件ID</li>
+                                <li>如果误删，需要修改代码中的 GIST_ID 常量</li>
+                            </ul>
+                            <p><strong>GitHub Token：</strong></p>
+                            <ul style="margin:5px 0;padding-left:20px;">
+                                <li>需要创建 GitHub Personal Access Token</li>
+                                <li>权限需要勾选 gist</li>
+                                <li>Token 格式：ghp_xxxxxxxxxxxx</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:15px;margin-bottom:15px;">
+                        <h4 style="color:#ffd700;margin:0 0 10px 0;">🧹 清除缓存</h4>
+                        <div style="color:rgba(255,255,255,0.8);font-size:0.85rem;line-height:1.6;">
+                            <p><strong>何时需要清除：</strong></p>
+                            <ul style="margin:5px 0;padding-left:20px;">
+                                <li>出现 403 Forbidden 错误</li>
+                                <li>每次刷新重复创建配置文件</li>
+                                <li>旧的 Gist ID 缓存导致 404 错误</li>
+                            </ul>
+                            <p><strong>清除后：</strong>刷新页面，系统会自动重新获取数据</p>
+                            <p style="color:#f59e0b;"><strong>⚠️ 注意：</strong>清除缓存后，之前的昵称无法使用，需要管理员重置</p>
+                        </div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:15px;margin-bottom:15px;">
+                        <h4 style="color:#ffd700;margin:0 0 10px 0;">🗑️ 配置文件管理</h4>
+                        <div style="color:rgba(255,255,255,0.8);font-size:0.85rem;line-height:1.6;">
+                            <p><strong>功能：</strong>批量删除多余的 Gist 配置文件</p>
+                            <p><strong>操作：</strong></p>
+                            <ul style="margin:5px 0;padding-left:20px;">
+                                <li>全选/反选：快速选择文件</li>
+                                <li>删除选中：删除勾选的文件</li>
+                                <li>删除空配置：删除没有内容的文件</li>
+                            </ul>
+                            <p style="color:#ff6b6b;"><strong>⚠️ 注意：索引文件不要删除！</strong></p>
+                        </div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:15px;margin-bottom:15px;">
+                        <h4 style="color:#ffd700;margin:0 0 10px 0;">🔨 拍卖行使用</h4>
+                        <div style="color:rgba(255,255,255,0.8);font-size:0.85rem;line-height:1.6;">
+                            <p><strong>进入房间：</strong></p>
+                            <ul style="margin:5px 0;padding-left:20px;">
+                                <li>输入房间ID（默认 TF001）</li>
+                                <li>输入昵称（只能设置一次）</li>
+                            </ul>
+                            <p><strong>发布拍品：</strong></p>
+                            <ul style="margin:5px 0;padding-left:20px;">
+                                <li>选择品质、职业、起拍价等</li>
+                                <li>可上传图片（限制2MB）</li>
+                                <li>拍品ID自动生成（时间戳后6位+随机3位）</li>
+                                <li>图片存储在独立Gist，文件名包含时间戳和随机数</li>
+                            </ul>
+                            <p><strong>出价：</strong></p>
+                            <ul style="margin:5px 0;padding-left:20px;">
+                                <li>点击 +10/+20/+50 快速出价</li>
+                                <li>或输入自定义出价（需大于50）</li>
+                                <li>出价有10秒冷却期，防止并发冲突</li>
+                                <li>出价成功后显示当前最高价</li>
+                            </ul>
+                            <p><strong>刷新：</strong>点击刷新按钮获取最新数据</p>
+                            <p><strong>房主管理：</strong>点击"👑 房主"按钮管理房间</p>
+                        </div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:15px;margin-bottom:15px;">
+                        <h4 style="color:#ffd700;margin:0 0 10px 0;">💬 消息管理</h4>
+                        <div style="color:rgba(255,255,255,0.8);font-size:0.85rem;line-height:1.6;">
+                            <p><strong>发送者：</strong></p>
+                            <ul style="margin:5px 0;padding-left:20px;">
+                                <li>2分钟内可撤回（显示"撤回"按钮）</li>
+                                <li>超过2分钟可删除（显示"删除"按钮）</li>
+                                <li>只能撤回/删除自己发的消息</li>
+                            </ul>
+                            <p><strong>管理员/房主：</strong></p>
+                            <ul style="margin:5px 0;padding-left:20px;">
+                                <li>点击聊天框旁的"🛡️ 管理"按钮进入管理模式</li>
+                                <li>管理模式下可删除任何人的消息</li>
+                                <li>管理员（gyq）可管理所有房间</li>
+                                <li>房主只能管理自己房间</li>
+                            </ul>
+                            <p><strong>自动清理：</strong></p>
+                            <ul style="margin:5px 0;padding-left:20px;">
+                                <li>超过7天的非系统消息自动清理</li>
+                                <li>系统消息（拍卖发布提示等）不受影响</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:15px;margin-bottom:15px;">
+                        <h4 style="color:#ffd700;margin:0 0 10px 0;">🔒 安全机制</h4>
+                        <div style="color:rgba(255,255,255,0.8);font-size:0.85rem;line-height:1.6;">
+                            <p><strong>出价锁机制：</strong></p>
+                            <ul style="margin:5px 0;padding-left:20px;">
+                                <li>出价时设置10秒锁，其他人无法同时出价</li>
+                                <li>出价完成后自动释放锁</li>
+                            </ul>
+                            <p><strong>昵称唯一性：</strong></p>
+                            <ul style="margin:5px 0;padding-left:20px;">
+                                <li>昵称全局唯一，防止重复</li>
+                                <li>清除缓存后需要管理员重置</li>
+                            </ul>
+                            <p><strong>图片唯一性：</strong></p>
+                            <ul style="margin:5px 0;padding-left:20px;">
+                                <li>图片文件名包含时间戳和随机数</li>
+                                <li>避免多人同时发布时文件名冲突</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="adminPageCacheManage" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
+                    <button class="admin-btn admin-btn-secondary" onclick="adminShowMenu()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
+                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">🧹 清除缓存</h3>
+                </div>
+                <div style="background:rgba(255,165,0,0.1);border-left:3px solid #ffa500;border-radius:6px;padding:12px;margin-bottom:15px;">
+                    <div style="color:#ffa500;font-size:0.85rem;font-weight:500;">⚠️ 说明</div>
+                    <div style="color:rgba(255,255,255,0.6);font-size:0.75rem;margin-top:5px;">
+                        清除本地缓存可以解决以下问题：<br>
+                        • 配置文件冲突（403 Forbidden）<br>
+                        • 每次刷新重复创建配置文件<br>
+                        • 旧的 Gist ID 缓存导致 404 错误<br>
+                        <span style="color:#4ade80;">清除后刷新页面，系统会自动重新创建配置文件。</span>
+                    </div>
+                </div>
+                <div class="admin-section">
+                    <h3 style="color:#ffd700;margin:0 0 10px 0;font-size:0.9rem;">缓存信息</h3>
+                    <div id="cacheInfoList" style="background:rgba(0,0,0,0.3);border-radius:6px;padding:12px;margin-bottom:15px;font-size:0.85rem;">
+                        <div style="color:rgba(255,255,255,0.5);text-align:center;">点击"查看缓存"加载信息</div>
+                    </div>
+                </div>
+                <div class="admin-section">
+                    <h3 style="color:#ffd700;margin:0 0 10px 0;font-size:0.9rem;">操作选项</h3>
+                    <div style="display:flex;gap:8px;margin-bottom:15px;flex-wrap:wrap;">
+                        <button class="admin-btn admin-btn-secondary" onclick="viewCacheInfo()" style="flex:1;min-width:120px;">📋 查看缓存</button>
+                        <button class="admin-btn admin-btn-primary" onclick="clearGistCache()" style="flex:1;min-width:120px;background:#3b82f6;">🧹 清除Gist缓存</button>
+                        <button class="admin-btn admin-btn-primary" onclick="clearAllCache()" style="flex:1;min-width:120px;background:#ff6b6b;">⚠️ 清除全部</button>
+                    </div>
+                </div>
+                <div id="cacheManageStatus" style="margin-top:10px;"></div>
+            </div>
+
+
+            <div id="adminPageTitle" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
+                    <button class="admin-btn admin-btn-secondary" onclick="adminShowMenu()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
+                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">🏷️ 标题管理</h3>
+                </div>
+                <div class="admin-section">
+                    <label>网站标题（显示在公告栏上方）</label>
+                    <input type="text" id="adminTitleText" placeholder="输入标题文字">
+                    <div style="text-align:right;">
+                        <button class="admin-btn admin-btn-primary" onclick="adminSaveTitle()">保存标题</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="adminPageNews" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
+                    <button class="admin-btn admin-btn-secondary" onclick="adminShowMenu()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
+                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">📢 公告管理</h3>
+                </div>
+                <div class="admin-section">
+                    <h3>📝 发布公告</h3>
+                    <div class="admin-form-row">
+                        <div>
+                            <label>分类</label>
+                            <select id="adminNewsCategory">
+                                <option value="公告">公告</option>
+                                <option value="活动">活动</option>
+                                <option value="更新">更新</option>
+                                <option value="通知">通知</option>
+                                <option value="其他">其他</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label>标题</label>
+                            <input type="text" id="adminNewsName" placeholder="公告标题">
+                        </div>
+                    </div>
+                    <label>内容</label>
+                    <textarea id="adminNewsContent" placeholder="公告内容"></textarea>
+                    <div class="admin-form-row">
+                        <div>
+                            <label>作者</label>
+                            <input type="text" id="adminNewsAuthor" placeholder="作者（可选）" value="龙行">
+                        </div>
+                        <div>
+                            <label>生效时间（留空则立即生效）</label>
+                            <input type="datetime-local" id="adminNewsActiveTime" style="color-scheme:dark;">
+                        </div>
+                    </div>
+                    <div class="admin-form-row">
+                        <div>
+                            <label>终止时间（留空则根据下方选项）</label>
+                            <input type="datetime-local" id="adminNewsExpireTime" style="color-scheme:dark;">
+                        </div>
+                        <div style="display:flex;align-items:center;gap:8px;padding-top:18px;">
+                            <input type="checkbox" id="adminNewsPermanent" checked style="width:16px;height:16px;cursor:pointer;">
+                            <label for="adminNewsPermanent" style="cursor:pointer;">永久有效</label>
+                        </div>
+                    </div>
+                    <div style="text-align:right;">
+                        <button class="admin-btn admin-btn-primary" onclick="adminPublishNews()">发布公告</button>
+                    </div>
+                </div>
+                <div class="admin-section">
+                    <h3>📋 公告列表</h3>
+                    <div style="text-align:right;margin-bottom:10px;">
+                        <button class="admin-btn admin-btn-secondary" onclick="adminRefreshNews()" style="font-size:0.8rem;">🔄 刷新列表</button>
+                    </div>
+                    <div id="adminNewsList" class="admin-news-list">
+                        <div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;">加载中...</div>
+                    </div>
+                </div>
+                <div class="admin-section">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+                        <h3 style="color:#ff6b6b;margin:0;">🔨 拍卖快讯管理</h3>
+                        <div style="margin-left:auto;display:flex;align-items:center;gap:6px;">
+                            <span style="color:rgba(255,255,255,0.5);font-size:0.75rem;">公告栏显示</span>
+                            <button id="broadcastToggleBtn" onclick="toggleAuctionBroadcastInMarquee()" style="padding:4px 12px;border-radius:12px;border:none;cursor:pointer;font-size:0.75rem;font-weight:500;transition:all 0.2s;">已开启</button>
+                        </div>
+                    </div>
+                    <div style="background:rgba(255,107,107,0.1);border-left:3px solid #ff6b6b;border-radius:6px;padding:10px;margin-bottom:10px;">
+                        <div style="color:rgba(255,255,255,0.6);font-size:0.75rem;">
+                            拍卖快讯由拍卖行自动生成，存储在云端所有设备共享。<br>
+                            删除快讯<strong style="color:#4ade80;">不会影响</strong>拍卖行房间的拍品和数据。
+                        </div>
+                    </div>
+                    <div style="text-align:right;margin-bottom:10px;">
+                        <button class="admin-btn admin-btn-secondary" onclick="adminRefreshAuctionBroadcasts()" style="font-size:0.8rem;">🔄 刷新快讯</button>
+                        <button class="admin-btn" style="font-size:0.8rem;background:#ff6b6b;" onclick="adminClearAllAuctionBroadcasts()">🗑️ 清空全部</button>
+                    </div>
+                    <div id="adminAuctionBroadcastList" class="admin-news-list">
+                        <div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;">点击刷新加载</div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="adminPageStats" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
+                    <button class="admin-btn admin-btn-secondary" onclick="adminShowMenu()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
+                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">📊 访问统计</h3>
+                </div>
+                <div id="adminStatsContent"></div>
+            </div>
+
+            <div id="adminPageAnalytics" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
+                    <button class="admin-btn admin-btn-secondary" onclick="adminShowMenu()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
+                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">📈 数据分析</h3>
+                    <button class="admin-btn admin-btn-secondary" onclick="adminLoadAnalytics()" style="margin-left:auto;font-size:0.8rem;">🔄 刷新</button>
+                </div>
+                <div id="adminAnalyticsContent" style="color:#fff;">
+                    <div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;">点击刷新加载...</div>
+                </div>
+            </div>
+
+            <div id="adminPageScriptStats" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
+                    <button class="admin-btn admin-btn-secondary" onclick="adminShowMenu()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
+                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">📥 脚本下载统计</h3>
+                </div>
+                <div class="admin-section">
+                    <div style="background:rgba(79,195,247,0.1);border-left:3px solid #4fc3f7;border-radius:6px;padding:12px;margin-bottom:15px;">
+                        <div style="color:#4fc3f7;font-size:0.85rem;font-weight:500;">💡 说明</div>
+                        <div style="color:rgba(255,255,255,0.6);font-size:0.75rem;margin-top:5px;">
+                            此页面统计需求墙中每个脚本文件的下载次数。<br>
+                            点击"刷新统计"可重新加载最新数据。
+                        </div>
+                    </div>
+                    <div style="text-align:right;margin-bottom:10px;">
+                        <button class="admin-btn admin-btn-secondary" onclick="adminLoadScriptStats()" style="font-size:0.8rem;">🔄 刷新统计</button>
+                    </div>
+                    <div id="adminScriptStatsContent" style="max-height:500px;overflow-y:auto;">
+                        <div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;">点击刷新加载</div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="adminPageSettings" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
+                    <button class="admin-btn admin-btn-secondary" onclick="adminShowMenu()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
+                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">⚙️ 系统设置</h3>
+                </div>
+                <div class="admin-section">
+                    <div style="background:rgba(76,175,80,0.1);border-left:3px solid #4caf50;border-radius:6px;padding:12px;margin-bottom:15px;">
+                        <div style="color:#4caf50;font-size:0.85rem;font-weight:500;">⚠️ 重要说明</div>
+                        <div style="color:rgba(255,255,255,0.6);font-size:0.75rem;margin-top:5px;">
+                            索引文件是所有设备共享数据的关键！<br>
+                            <strong style="color:#ffd700;">所有设备必须使用同一个索引文件ID才能实现数据互通！</strong>
+                        </div>
+                    </div>
+                    <label>索引文件ID（所有设备必须相同）</label>
+                    <input type="text" id="adminIndexGistId" placeholder="输入索引文件ID" autocomplete="off">
+                    <div style="display:flex;gap:8px;justify-content:flex-end;margin-bottom:15px;">
+                        <button class="admin-btn admin-btn-secondary" onclick="adminGetIndexStatus()">查看当前状态</button>
+                        <button class="admin-btn admin-btn-secondary" onclick="adminCreateIndexGist()">创建索引文件</button>
+                        <button class="admin-btn admin-btn-primary" onclick="adminSaveIndexGistId()">保存索引ID</button>
+                    </div>
+                </div>
+                <div class="admin-section">
+                    <div id="adminTokenStatus" style="margin-bottom:10px;"></div>
+                    <label>GitHub Token（用于写入Gist）</label>
+                    <input type="password" id="adminGistToken" placeholder="ghp_xxxxxxxxxxxx" autocomplete="off">
+                    <div style="display:flex;gap:8px;justify-content:flex-end;">
+                        <button class="admin-btn admin-btn-secondary" onclick="adminSaveGistToken()">保存Token</button>
+                        <button class="admin-btn admin-btn-secondary" onclick="adminTestGistToken()">测试连接</button>
+                    </div>
+                </div>
+            </div>
+
+
+            <div id="adminPagePasswordManage" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
+                    <button class="admin-btn admin-btn-secondary" onclick="adminShowMenu()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
+                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">🔑 密码管理</h3>
+                </div>
+                <div class="admin-section">
+                    <div style="background:rgba(76,175,80,0.1);border-left:3px solid #4caf50;border-radius:6px;padding:12px;margin-bottom:15px;">
+                        <div style="color:#4caf50;font-size:0.85rem;font-weight:500;">💡 说明</div>
+                        <div style="color:rgba(255,255,255,0.6);font-size:0.75rem;margin-top:5px;">
+                            在此管理网站的访问密码。<br>
+                            添加密码后，用户可以使用新密码登录。<br>
+                            <strong style="color:#ffd700;">⚠️ 修改密码后，其他用户需要使用新密码才能登录</strong>
+                        </div>
+                    </div>
+                    
+                    <label>添加新密码</label>
+                    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
+                        <input type="text" id="newPasswordInput" placeholder="输入新密码（至少4位）" style="flex:1;" onkeypress="if(event.key==='Enter')addPassword()">
+                        <button class="admin-btn" style="background:linear-gradient(135deg,#4caf50,#2e7d32);" onclick="addPassword()">➕ 添加</button>
+                    </div>
+                    
+                    <label style="margin-top:15px;">当前密码列表（${getAdminPasswords().length}个）</label>
+                    <div id="passwordListDisplay" style="margin-top:10px;max-height:300px;overflow-y:auto;"></div>
+                </div>
+            </div>
+
+            <div id="adminPageNickManage" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
+                    <button class="admin-btn admin-btn-secondary" onclick="adminShowMenu()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
+                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">👤 昵称管理</h3>
+                </div>
+                <div class="admin-section">
+                    <div style="background:rgba(255,165,0,0.1);border-left:3px solid #ffa500;border-radius:6px;padding:12px;margin-bottom:15px;">
+                        <div style="color:#ffa500;font-size:0.85rem;font-weight:500;">💡 说明</div>
+                        <div style="color:rgba(255,255,255,0.6);font-size:0.75rem;margin-top:5px;">
+                            用户昵称设置后无法自行修改，管理员可在此强制重置或修改。<br>
+                            <strong>修改</strong>：直接设置用户的新昵称<br>
+                            <strong>重置</strong>：清除设置，允许用户重新设置一次昵称
+                        </div>
+                    </div>
+                    <label>当前昵称状态</label>
+                    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
+                        <input type="text" id="currentNickDisplay" placeholder="当前昵称" style="flex:1;" readonly>
+                    </div>
+                    <label>设置新昵称</label>
+                    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
+                        <input type="text" id="adminNewNickInput" placeholder="输入新昵称..." style="flex:1;">
+                    </div>
+                    <div style="display:flex;gap:8px;justify-content:flex-end;">
+                        <button class="admin-btn admin-btn-secondary" onclick="loadCurrentNick()">刷新</button>
+                        <button class="admin-btn" style="background:linear-gradient(135deg,#4caf50,#2e7d32);" onclick="setNickByAdmin()">✏️ 修改昵称</button>
+                        <button class="admin-btn" style="background:linear-gradient(135deg,#f44336,#d32f2f);" onclick="resetCurrentNick()">🔄 重置设置</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    </div> <!-- 主内容区域结束 -->
+
+    <!-- 消息墙 -->
+    <style>
+        #messageWallContent::-webkit-scrollbar { width: 6px; }
+        #messageWallContent::-webkit-scrollbar-track { background: rgba(255,255,255,0.1); border-radius: 3px; }
+        #messageWallContent::-webkit-scrollbar-thumb { background: rgba(255,215,0,0.5); border-radius: 3px; }
+        #messageWallContent::-webkit-scrollbar-thumb:hover { background: rgba(255,215,0,0.8); }
+        
+        /* 拍卖行面板拖拽调整大小样式 */
+        #chatRoomPanel {
+            resize: both;
+            overflow: hidden;
+        }
+        #chatRoomPanel::-webkit-scrollbar { width: 6px; height: 6px; }
+        #chatRoomPanel::-webkit-scrollbar-track { background: rgba(255,255,255,0.1); border-radius: 3px; }
+        #chatRoomPanel::-webkit-scrollbar-thumb { background: rgba(78,205,196,0.5); border-radius: 3px; }
+        #chatRoomPanel::-webkit-scrollbar-thumb:hover { background: rgba(78,205,196,0.8); }
+        #chatRoomPanel::-webkit-resizer { 
+            background: linear-gradient(135deg, transparent 50%, rgba(78,205,196,0.5) 50%);
+            border-radius: 0 0 12px 0;
+        }
+        
+        /* 参考图片预览窗 */
+        #refImagePreview { display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); z-index:9999; background:rgba(26,26,46,0.98); border:1px solid rgba(0,188,212,0.4); border-radius:12px; box-shadow:0 4px 30px rgba(0,0,0,0.6); min-width:300px; max-width:90vw; }
+        #refImagePreview.show { display:block; }
+        #refImagePreview .preview-header { display:flex; justify-content:space-between; align-items:center; padding:8px 14px; }
+        #refImagePreview .preview-title { color:#00bcd4; font-size:0.85rem; }
+        #refImagePreview .preview-close { background:none; border:none; color:#fff; font-size:1.2rem; cursor:pointer; padding:0 4px; }
+        #refImagePreview .preview-body { padding:0 14px 14px; }
+        #refImagePreview .preview-img { max-width:100%; border-radius:8px; }
+    </style>
+    <div id="messageWall" style="position:fixed;top:60px;left:20px;width:380px;height:480px;background:rgba(26,26,46,0.95);border:1px solid rgba(255,215,0,0.3);border-radius:12px;z-index:9980;box-shadow:0 4px 20px rgba(0,0,0,0.5);backdrop-filter:blur(10px);flex-direction:column;min-width:300px;min-height:350px;display:none;">
+        <div id="messageWallHeader" style="background:linear-gradient(135deg,rgba(255,215,0,0.2),rgba(255,107,107,0.2));padding:10px 15px;display:flex;justify-content:space-between;align-items:center;cursor:move;user-select:none;" onmousedown="startPanelDrag(event,'messageWall')" ontouchstart="startPanelTouch(event,'messageWall')">
+            <span style="color:#ffd700;font-size:0.9rem;font-weight:bold;">📢 需求墙</span>
+            <div style="display:flex;gap:10px;">
+                <button id="msgRefreshBtn" onclick="fetchMessages();msgRefreshCountdown=30;updateMsgRefreshBtn();" title="刷新消息" style="background:transparent;border:none;color:#4fc3f7;font-size:0.8rem;cursor:pointer;padding:0;font-family:monospace;min-width:32px;text-align:center;">⏳30</button>
+                <button onclick="toggleMessageWallSize()" title="最小化" style="background:transparent;border:none;color:#ffd700;font-size:1rem;cursor:pointer;padding:0;">−</button>
+                <button onclick="closeMessageWall()" title="关闭" style="background:transparent;border:none;color:#ff6b6b;font-size:1rem;cursor:pointer;padding:0;">×</button>
+            </div>
+        </div>
+        <div id="messageWallContent" style="padding:10px 15px;height:320px;overflow-y:auto;overflow-x:hidden;" onmouseenter="pauseMessageScroll()" onmouseleave="resumeMessageScroll()">
+            <div id="messageScroller" style="display:flex;flex-direction:column;gap:10px;">
+                <div style="color:rgba(255,255,255,0.5);font-size:0.85rem;text-align:center;padding:20px;">加载中...</div>
+            </div>
+        </div>
+        <div id="messageWallInput" style="padding:12px 15px;border-top:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.2);">
+            <div style="display:flex;gap:8px;margin-bottom:8px;">
+                <input type="text" id="messageNickname" placeholder="昵称" maxlength="10" style="width:80px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:5px;padding:6px 8px;color:#fff;font-size:0.8rem;outline:none;" onfocus="this.style.borderColor='#ffd700'" onblur="this.style.borderColor='rgba(255,255,255,0.2)'">
+                <input type="file" id="scriptFileInput" accept=".txt,.js,.json,.lua,.py,.sh" style="display:none;" onchange="handleScriptUpload(this)">
+                <button onclick="document.getElementById('scriptFileInput').click()" title="上传脚本(最大10MB)" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:6px 12px;border-radius:5px;font-size:0.8rem;cursor:pointer;display:flex;align-items:center;gap:4px;">📎 脚本</button>
+                <span id="uploadStatus" style="color:#4caf50;font-size:0.75rem;display:none;">✓ 已选文件</span>
+                <label style="display:flex;align-items:center;gap:4px;color:#888;font-size:0.75rem;cursor:pointer;margin-left:auto;" title="选择消息保留时间">
+                    <select id="expireDays" style="background:#2a2a4a;border:1px solid rgba(255,255,255,0.3);border-radius:3px;padding:2px 4px;color:#fff;font-size:0.7rem;cursor:pointer;outline:none;">
+                        <option value="0" style="background:#2a2a4a;color:#fff;">永久</option>
+                        <option value="7" style="background:#2a2a4a;color:#fff;">7天</option>
+                        <option value="15" selected style="background:#2a2a4a;color:#fff;">15天</option>
+                        <option value="30" style="background:#2a2a4a;color:#fff;">30天</option>
+                        <option value="60" style="background:#2a2a4a;color:#fff;">60天</option>
+                    </select>
+                </label>
+            </div>
+            <div style="display:flex;gap:8px;">
+                <input type="text" id="messageInput" placeholder="发布需求或分享脚本（保留时间可自由选择）..." maxlength="200" style="flex:1;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:5px;padding:6px 10px;color:#fff;font-size:0.85rem;outline:none;" onfocus="this.style.borderColor='#ffd700'" onblur="this.style.borderColor='rgba(255,255,255,0.2)'">
+                <button onclick="postMessage()" style="background:linear-gradient(135deg,#ffd700,#ff6b6b);color:#1a1a2e;border:none;padding:6px 16px;border-radius:5px;font-size:0.85rem;cursor:pointer;font-weight:bold;">发布</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 消息墙最小化状态 -->
+    <div id="messageWallMin" style="display:none;position:fixed;top:60px;left:20px;background:rgba(26,26,46,0.9);border:1px solid rgba(255,215,0,0.3);border-radius:8px;padding:8px 14px;z-index:9980;cursor:pointer;" onclick="expandMessageWall()">
+        <span style="color:#ffd700;font-size:0.85rem;">📢 需求墙</span>
+        <span id="messageBadge" style="display:none;background:#ff6b6b;color:#fff;font-size:0.7rem;padding:2px 6px;border-radius:10px;margin-left:6px;">0</span>
+    </div>
+
+
+
+    <!-- 拍卖行主面板 -->
+
+    <!-- 拍卖行入口弹窗 -->
+    <div id="chatRoomEntryModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9998;align-items:center;justify-content:center;">
+        <div style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);border:2px solid rgba(78,205,196,0.4);border-radius:16px;padding:30px;width:90%;max-width:400px;box-shadow:0 10px 50px rgba(0,0,0,0.6);">
+            <h2 style="color:#4ecdc4;text-align:center;margin:0 0 20px 0;">🏪 拍卖一条街</h2>
+            <label style="color:rgba(255,255,255,0.8);display:block;margin-bottom:5px;font-size:0.9rem;">拍卖会ID</label>
+            <input type="text" id="chatRoomIdInput" placeholder="输入拍卖会ID（相同ID进入同一拍卖会）" style="width:100%;padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:white;font-size:0.9rem;margin-bottom:15px;outline:none;box-sizing:border-box;">
+            <label style="color:rgba(255,255,255,0.8);display:block;margin-bottom:5px;font-size:0.9rem;">昵称</label>
+            <div style="display:flex;gap:8px;margin-bottom:8px;">
+                <input type="text" id="chatRoomNickInput" placeholder="输入你的昵称" style="flex:1;padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:white;font-size:0.9rem;outline:none;box-sizing:border-box;" readonly>
+                <button id="nickEditBtn" onclick="toggleNickEdit()" style="padding:0 12px;border-radius:8px;border:none;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);cursor:pointer;font-size:0.8rem;white-space:nowrap;">修改</button>
+            </div>
+            <div id="nickEditHint" style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-bottom:20px;padding:8px;background:rgba(255,165,0,0.1);border-left:3px solid #ffa500;border-radius:4px;">
+                💡 提示：昵称只能设置一次，设置后如需修改请联系管理员
+            </div>
+            <div style="display:flex;gap:10px;justify-content:flex-end;">
+                <button onclick="closeChatRoomEntry()" style="padding:10px 20px;border-radius:8px;border:none;background:rgba(255,255,255,0.1);color:white;cursor:pointer;font-size:0.9rem;">取消</button>
+                <button onclick="joinChatRoom()" style="padding:10px 20px;border-radius:8px;border:none;background:linear-gradient(135deg,#4ecdc4,#44a08d);color:white;cursor:pointer;font-weight:500;font-size:0.9rem;">进入拍卖会</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 拍卖行主面板 -->
+    <div id="chatRoomPanel" style="position:fixed;top:50px;left:20px;width:420px;height:700px;background:rgba(26,26,46,0.95);border:1px solid rgba(78,205,196,0.3);border-radius:12px;z-index:9980;box-shadow:0 4px 20px rgba(0,0,0,0.5);backdrop-filter:blur(10px);flex-direction:column;min-width:320px;min-height:400px;display:none;resize:both;overflow:hidden;">
+        <div id="chatRoomHeader" style="background:linear-gradient(135deg,rgba(78,205,196,0.2),rgba(44,160,141,0.2));padding:10px 15px;display:flex;justify-content:space-between;align-items:center;cursor:move;user-select:none;" onmousedown="startPanelDrag(event,'chatRoomPanel')" ontouchstart="startPanelTouch(event,'chatRoomPanel')">
+            <span style="color:#4ecdc4;font-size:0.9rem;font-weight:bold;">🏪 拍卖行 <span id="chatRoomIdDisplay" style="color:rgba(255,255,255,0.5);font-size:0.75rem;"></span></span>
+            <div style="display:flex;gap:8px;align-items:center;">
+                <button onclick="openOwnerPanel()" title="房主管理" style="background:transparent;border:none;color:#a78bfa;font-size:0.85rem;cursor:pointer;padding:4px 8px;border:1px solid rgba(167,139,250,0.3);border-radius:4px;transition:all 0.2s;" onmouseover="this.style.background='rgba(167,139,250,0.2)'" onmouseout="this.style.background='transparent'">👑 房主</button>
+                <button onclick="switchChatRoom()" title="切换房间" style="background:transparent;border:none;color:#fbbf24;font-size:0.85rem;cursor:pointer;padding:4px 8px;border:1px solid rgba(255,215,0,0.3);border-radius:4px;transition:all 0.2s;" onmouseover="this.style.background='rgba(255,215,0,0.2)'" onmouseout="this.style.background='transparent'">切换房间</button>
+                <button onclick="showAuctionRules()" title="查看规则" style="background:transparent;border:none;color:#4ecdc4;font-size:0.85rem;cursor:pointer;padding:4px 8px;border:1px solid rgba(78,205,196,0.3);border-radius:4px;transition:all 0.2s;" onmouseover="this.style.background='rgba(78,205,196,0.2)'" onmouseout="this.style.background='transparent'">📜 规则</button>
+                <button onclick="toggleChatRoomTab('auctions')" title="拍卖" style="background:transparent;border:none;color:#ffd700;font-size:1.4rem;cursor:pointer;padding:0;text-shadow:0 0 8px rgba(255,215,0,0.6);">🔨</button>
+                <button onclick="closeChatRoom()" title="关闭" style="background:transparent;border:none;color:#ff6b6b;font-size:1rem;cursor:pointer;padding:0;">×</button>
+            </div>
+        </div>
+        <div id="chatRoomTabChat" style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+            <div id="chatMessagesContainer" style="flex:1;overflow-y:auto;padding:10px;"></div>
+            <div style="padding:8px 10px;border-top:1px solid rgba(255,255,255,0.1);display:flex;gap:8px;align-items:center;">
+                <button onclick="toggleMessageManageMode()" id="msgManageBtn" style="padding:6px 10px;border-radius:6px;border:none;background:transparent;color:#ef4444;cursor:pointer;font-size:0.75rem;transition:all 0.2s;" onmouseover="this.style.background='rgba(239,68,68,0.15)'" onmouseout="this.style.background='transparent'">🛡️ 管理</button>
+                <input type="text" id="chatMessageInput" placeholder="输入消息..." style="flex:1;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:white;font-size:0.85rem;outline:none;" onkeydown="if(event.key==='Enter')sendChatMessage()">
+                <button onclick="sendChatMessage()" style="padding:8px 14px;border-radius:8px;border:none;background:linear-gradient(135deg,#4ecdc4,#44a08d);color:white;cursor:pointer;font-size:0.85rem;">发送</button>
+            </div>
+        </div>
+        <div id="chatRoomTabAuctions" style="flex:1;display:none;flex-direction:column;overflow:hidden;">
+            <div style="padding:8px 10px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,0.1);">
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <button onclick="toggleChatRoomTab('chat')" style="background:transparent;border:none;color:#4ecdc4;font-size:0.85rem;cursor:pointer;padding:0;">← 聊天</button>
+                    <span style="color:#ffd700;font-size:0.85rem;">🔨 拍卖列表</span>
+                </div>
+                <div style="display:flex;gap:6px;">
+                    <button onclick="manualRefreshAuctions()" id="manualRefreshBtn" style="padding:6px 10px;border-radius:6px;border:none;background:rgba(255,215,0,0.15);color:rgba(255,215,0,0.9);cursor:pointer;font-size:1rem;transition:all 0.2s;min-width:36px;font-weight:bold;" onmouseover="this.style.background='rgba(255,215,0,0.3)'" onmouseout="this.style.background='rgba(255,215,0,0.15)'">↻</button>
+                    <button onclick="openAuctionPostModal()" style="padding:4px 10px;border-radius:6px;border:none;background:linear-gradient(135deg,#4ade80,#22c55e);color:white;cursor:pointer;font-size:0.75rem;">+ 发布拍卖</button>
+                </div>
+            </div>
+            <div style="padding:6px 10px;background:rgba(255,80,80,0.12);border-bottom:1px solid rgba(255,80,80,0.2);font-size:0.7rem;color:rgba(255,180,180,0.95);text-align:center;line-height:1.4;">
+                ⚠️ <b>防骗提示：</b>交易前务必核实对方信息，建议走官方平台，谨防被骗！
+            </div>
+            <div style="padding:4px 10px;background:rgba(255,215,0,0.08);border-bottom:1px solid rgba(255,215,0,0.15);font-size:0.65rem;color:rgba(255,215,0,0.9);text-align:center;line-height:1.3;">
+                📢 <b>提示：</b>多人同时拍卖可能提交失败，请查看拍主是否为自己再确认出价成功！
+            </div>
+            <div id="auctionsListContainer" style="flex:1;overflow-y:auto;padding:10px;"></div>
+        </div>
+    </div>
+
+    <!-- 房主管理面板 -->
+    <div id="ownerPanel" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:9999;align-items:center;justify-content:center;">
+        <div style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);border:2px solid rgba(167,139,250,0.4);border-radius:16px;padding:20px;width:90%;max-width:500px;max-height:80vh;overflow-y:auto;box-shadow:0 10px 50px rgba(0,0,0,0.6);">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+                <h2 style="color:#a78bfa;margin:0;font-size:1.1rem;">👑 房主管理</h2>
+                <button onclick="closeOwnerPanel()" style="background:transparent;border:none;color:#ff6b6b;font-size:1.2rem;cursor:pointer;">×</button>
+            </div>
+            <div id="ownerPanelContent" style="color:rgba(255,255,255,0.8);">
+                <div style="text-align:center;padding:20px;color:rgba(255,255,255,0.5);">加载中...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 拍卖发布弹窗 -->
+    <div id="auctionPostModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;align-items:center;justify-content:center;">
+        <div style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);border:2px solid rgba(255,215,0,0.4);border-radius:16px;padding:25px;width:90%;max-width:450px;max-height:85vh;overflow-y:auto;box-shadow:0 10px 50px rgba(0,0,0,0.6);">
+            <div style="display:flex;justify-content:center;gap:8px;margin-bottom:15px;">
+                <button id="modeAuctionBtn" onclick="switchPostMode('auction')" style="padding:6px 16px;border-radius:8px;border:2px solid #ffd700;background:linear-gradient(135deg,#ffd700,#ff6b6b);color:#1a1a2e;cursor:pointer;font-weight:600;font-size:0.85rem;">🔨 拍卖</button>
+                <button id="modeBuyRequestBtn" onclick="switchPostMode('buyRequest')" style="padding:6px 16px;border-radius:8px;border:2px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.6);cursor:pointer;font-weight:600;font-size:0.85rem;">🛒 求购</button>
+            </div>
+            <!-- 拍卖模式表单 -->
+            <div id="auctionModeForm">
+                <label style="color:rgba(255,255,255,0.8);display:block;margin-bottom:5px;font-size:0.85rem;">物品图片</label>
+                <div style="color:rgba(255,152,0,0.8);font-size:0.7rem;margin-bottom:8px;">⚠️ 图片大小限制2MB</div>
+                <div style="display:flex;gap:10px;margin-bottom:10px;align-items:flex-start;">
+                    <div id="auctionImagePreview" style="width:100px;height:100px;background:rgba(0,0,0,0.3);border:1px dashed rgba(255,255,255,0.2);border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;cursor:pointer;" onclick="document.getElementById('auctionImageFile').click()">
+                        <span style="color:rgba(255,255,255,0.3);font-size:0.75rem;">点击上传</span>
+                    </div>
+                    <input type="file" id="auctionImageFile" accept="image/*" style="display:none;" onchange="previewAuctionImage(this)">
+                    <div style="flex:1;display:flex;flex-direction:column;gap:8px;">
+                        <div>
+                            <label style="color:rgba(255,255,255,0.6);font-size:0.75rem;">品质</label>
+                            <select id="auctionQuality" style="width:100%;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:white;font-size:0.85rem;outline:none;box-sizing:border-box;">
+                                <option value="红色" style="color:#ef4444;">红色</option>
+                                <option value="金色" style="color:#ffd700;">金色</option>
+                                <option value="紫色" style="color:#a78bfa;">紫色</option>
+                                <option value="蓝色" style="color:#60a5fa;">蓝色</option>
+                                <option value="绿色" style="color:#4ade80;">绿色</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="color:rgba(255,255,255,0.6);font-size:0.75rem;">职业</label>
+                            <select id="auctionProfession" style="width:100%;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:white;font-size:0.85rem;outline:none;box-sizing:border-box;">
+                                <option value="工程">工程</option>
+                                <option value="熊猫">熊猫</option>
+                                <option value="法师">法师</option>
+                                <option value="召唤">召唤</option>
+                                <option value="战士">战士</option>
+                                <option value="猎人">猎人</option>
+                                <option value="牧师">牧师</option>
+                                <option value="术士">术士</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div style="display:flex;gap:8px;margin-bottom:8px;">
+                    <div style="flex:1;">
+                        <label style="color:rgba(255,255,255,0.6);font-size:0.75rem;">附加伤害</label>
+                        <input type="number" id="auctionBonusDmg" placeholder="0" min="0" style="width:100%;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:white;font-size:0.85rem;outline:none;box-sizing:border-box;">
+                    </div>
+                    <div style="flex:1;">
+                        <label style="color:rgba(255,255,255,0.6);font-size:0.75rem;">无视冰甲</label>
+                        <input type="number" id="auctionIgnoreIce" placeholder="0" min="0" style="width:100%;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:white;font-size:0.85rem;outline:none;box-sizing:border-box;">
+                    </div>
+                </div>
+                <div style="display:flex;gap:8px;margin-bottom:8px;">
+                    <div style="flex:1;">
+                        <label style="color:rgba(255,255,255,0.6);font-size:0.75rem;">起拍价</label>
+                        <input type="number" id="auctionStartPrice" placeholder="100" min="0" style="width:100%;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:white;font-size:0.85rem;outline:none;box-sizing:border-box;">
+                    </div>
+                    <div style="flex:1;">
+                        <label style="color:rgba(255,255,255,0.6);font-size:0.75rem;">每次加价</label>
+                        <input type="number" id="auctionBidIncrement" placeholder="10" min="1" style="width:100%;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:white;font-size:0.85rem;outline:none;box-sizing:border-box;">
+                    </div>
+                    <div style="flex:1;">
+                        <label style="color:rgba(255,255,255,0.6);font-size:0.75rem;">时长(分钟)</label>
+                        <input type="number" id="auctionDuration" placeholder="60" min="1" style="width:100%;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:white;font-size:0.85rem;outline:none;box-sizing:border-box;">
+                    </div>
+                </div>
+                <div style="margin-bottom:10px;">
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                        <input type="checkbox" id="auctionIsExchange" style="width:16px;height:16px;cursor:pointer;" onchange="toggleExchangeMode()">
+                        <span style="color:rgba(255,255,255,0.85);font-size:0.85rem;">🔄 愿意交换</span>
+                    </label>
+                    <div id="exchangeModeHint" style="display:none;margin-top:8px;padding:10px;background:rgba(255,152,0,0.1);border-left:3px solid #ff9800;border-radius:6px;">
+                        <div style="color:#ff9800;font-size:0.75rem;font-weight:500;">💡 交换模式</div>
+                        <div style="color:rgba(255,255,255,0.6);font-size:0.7rem;margin-top:4px;">
+                            勾选后，其他玩家可以联系您私聊协商交换物品。<br>
+                            起拍价和加价功能仍然可用，也支持直接出价。
+                        </div>
+                    </div>
+                    <div id="exchangeWantInput" style="display:none;margin-top:8px;">
+                        <label style="color:rgba(255,255,255,0.6);font-size:0.75rem;display:block;margin-bottom:4px;">想要的物品（选填）</label>
+                        <input type="text" id="auctionExchangeWant" placeholder="例如：红色工程卡 或 金色熊猫" style="width:100%;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:white;font-size:0.8rem;outline:none;box-sizing:border-box;">
+                    </div>
+                </div>
+            </div>
+            <!-- 求购模式表单 -->
+            <div id="buyRequestModeForm" style="display:none;">
+                <div style="background:rgba(59,130,246,0.1);border-left:3px solid #3b82f6;border-radius:6px;padding:10px;margin-bottom:12px;">
+                    <div style="color:#60a5fa;font-size:0.75rem;font-weight:500;">🛒 求购说明</div>
+                    <div style="color:rgba(255,255,255,0.6);font-size:0.7rem;margin-top:4px;">发布您想购买的物品需求，其他玩家看到后可以联系您交易。</div>
+                </div>
+                <div style="margin-bottom:8px;">
+                    <label style="color:rgba(255,255,255,0.6);font-size:0.75rem;display:block;margin-bottom:4px;">想要品质（可多选）</label>
+                    <div style="display:flex;flex-wrap:wrap;gap:6px;" id="buyRequestQualityGroup">
+                        <label style="display:flex;align-items:center;gap:3px;cursor:pointer;padding:3px 8px;border-radius:4px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);font-size:0.8rem;"><input type="checkbox" value="红色" style="width:14px;height:14px;cursor:pointer;"><span style="color:#ef4444;">红色</span></label>
+                        <label style="display:flex;align-items:center;gap:3px;cursor:pointer;padding:3px 8px;border-radius:4px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);font-size:0.8rem;"><input type="checkbox" value="金色" style="width:14px;height:14px;cursor:pointer;"><span style="color:#ffd700;">金色</span></label>
+                        <label style="display:flex;align-items:center;gap:3px;cursor:pointer;padding:3px 8px;border-radius:4px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);font-size:0.8rem;"><input type="checkbox" value="紫色" style="width:14px;height:14px;cursor:pointer;"><span style="color:#a78bfa;">紫色</span></label>
+                        <label style="display:flex;align-items:center;gap:3px;cursor:pointer;padding:3px 8px;border-radius:4px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);font-size:0.8rem;"><input type="checkbox" value="蓝色" style="width:14px;height:14px;cursor:pointer;"><span style="color:#60a5fa;">蓝色</span></label>
+                        <label style="display:flex;align-items:center;gap:3px;cursor:pointer;padding:3px 8px;border-radius:4px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);font-size:0.8rem;"><input type="checkbox" value="绿色" style="width:14px;height:14px;cursor:pointer;"><span style="color:#4ade80;">绿色</span></label>
+                    </div>
+                </div>
+                <div style="margin-bottom:8px;">
+                    <label style="color:rgba(255,255,255,0.6);font-size:0.75rem;display:block;margin-bottom:4px;">想要职业（可多选）</label>
+                    <div style="display:flex;flex-wrap:wrap;gap:6px;" id="buyRequestProfessionGroup">
+                        <label style="display:flex;align-items:center;gap:3px;cursor:pointer;padding:3px 8px;border-radius:4px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);font-size:0.8rem;"><input type="checkbox" value="工程" style="width:14px;height:14px;cursor:pointer;"><span>工程</span></label>
+                        <label style="display:flex;align-items:center;gap:3px;cursor:pointer;padding:3px 8px;border-radius:4px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);font-size:0.8rem;"><input type="checkbox" value="熊猫" style="width:14px;height:14px;cursor:pointer;"><span>熊猫</span></label>
+                        <label style="display:flex;align-items:center;gap:3px;cursor:pointer;padding:3px 8px;border-radius:4px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);font-size:0.8rem;"><input type="checkbox" value="法师" style="width:14px;height:14px;cursor:pointer;"><span>法师</span></label>
+                        <label style="display:flex;align-items:center;gap:3px;cursor:pointer;padding:3px 8px;border-radius:4px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);font-size:0.8rem;"><input type="checkbox" value="召唤" style="width:14px;height:14px;cursor:pointer;"><span>召唤</span></label>
+                        <label style="display:flex;align-items:center;gap:3px;cursor:pointer;padding:3px 8px;border-radius:4px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);font-size:0.8rem;"><input type="checkbox" value="战士" style="width:14px;height:14px;cursor:pointer;"><span>战士</span></label>
+                        <label style="display:flex;align-items:center;gap:3px;cursor:pointer;padding:3px 8px;border-radius:4px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);font-size:0.8rem;"><input type="checkbox" value="猎人" style="width:14px;height:14px;cursor:pointer;"><span>猎人</span></label>
+                        <label style="display:flex;align-items:center;gap:3px;cursor:pointer;padding:3px 8px;border-radius:4px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);font-size:0.8rem;"><input type="checkbox" value="牧师" style="width:14px;height:14px;cursor:pointer;"><span>牧师</span></label>
+                        <label style="display:flex;align-items:center;gap:3px;cursor:pointer;padding:3px 8px;border-radius:4px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);font-size:0.8rem;"><input type="checkbox" value="术士" style="width:14px;height:14px;cursor:pointer;"><span>术士</span></label>
+                    </div>
+                </div>
+                <div style="display:flex;gap:8px;margin-bottom:8px;">
+                    <div style="flex:1;">
+                        <label style="color:rgba(255,255,255,0.6);font-size:0.75rem;">最低附加伤害</label>
+                        <input type="number" id="buyRequestMinBonusDmg" placeholder="不限" min="0" style="width:100%;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:white;font-size:0.85rem;outline:none;box-sizing:border-box;">
+                    </div>
+                    <div style="flex:1;">
+                        <label style="color:rgba(255,255,255,0.6);font-size:0.75rem;">最低无视冰甲</label>
+                        <input type="number" id="buyRequestMinIgnoreIce" placeholder="不限" min="0" style="width:100%;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:white;font-size:0.85rem;outline:none;box-sizing:border-box;">
+                    </div>
+                </div>
+                <div style="margin-bottom:8px;">
+                    <label style="color:rgba(255,255,255,0.6);font-size:0.75rem;display:block;margin-bottom:4px;">预算范围</label>
+                    <input type="text" id="buyRequestBudget" placeholder="例如：100-500 或 面议" style="width:100%;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:white;font-size:0.85rem;outline:none;box-sizing:border-box;">
+                </div>
+                <div style="margin-bottom:8px;">
+                    <label style="color:rgba(255,255,255,0.6);font-size:0.75rem;display:block;margin-bottom:4px;">补充说明</label>
+                    <textarea id="buyRequestNote" placeholder="其他要求，如：只要附加伤害20以上的红色工程卡" style="width:100%;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:white;font-size:0.85rem;outline:none;box-sizing:border-box;min-height:60px;resize:vertical;"></textarea>
+                </div>
+            </div>
+            <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:10px;">
+                <button onclick="closeAuctionPostModal()" style="padding:8px 18px;border-radius:8px;border:none;background:rgba(255,255,255,0.1);color:white;cursor:pointer;font-size:0.85rem;">取消</button>
+                <button onclick="postAuction()" id="postAuctionBtn" style="padding:8px 18px;border-radius:8px;border:none;background:linear-gradient(135deg,#ffd700,#ff6b6b);color:#1a1a2e;cursor:pointer;font-weight:500;font-size:0.85rem;">发布拍卖</button>
+                <button onclick="postBuyRequest()" id="postBuyRequestBtn" style="display:none;padding:8px 18px;border-radius:8px;border:none;background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:white;cursor:pointer;font-weight:500;font-size:0.85rem;">发布求购</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 拍卖详情弹窗 -->
+    <div id="auctionDetailModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:10000;align-items:center;justify-content:center;">
+        <div id="auctionDetailContent" style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);border:2px solid rgba(255,215,0,0.4);border-radius:16px;padding:25px;width:90%;max-width:500px;max-height:85vh;overflow-y:auto;box-shadow:0 10px 50px rgba(0,0,0,0.6);position:relative;"></div>
+    </div>
+
+    <!-- 统计数据栏 -->
+    <div id="statsBar" style="position:fixed;bottom:0;left:0;right:0;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);border-top:2px solid rgba(255,215,0,0.5);padding:8px 20px;z-index:9990;display:flex;justify-content:center;align-items:center;gap:20px;font-size:0.82rem;">
+        <div style="display:flex;gap:18px;flex-wrap:wrap;justify-content:center;">
+            <div style="color:#fff;display:flex;align-items:center;gap:4px;">
+                <span style="color:#4ecdc4;">⏱️</span>
+                <span>运行: <strong id="statRuntime" style="color:#ffd700;">-</strong></span>
+            </div>
+            <div style="color:#fff;display:flex;align-items:center;gap:4px;">
+                <span style="color:#4ecdc4;">👁️</span>
+                <span>访问: <strong id="statVisits" style="color:#ffd700;">-</strong></span>
+            </div>
+            <div style="color:#fff;display:flex;align-items:center;gap:4px;">
+                <span style="color:#4ecdc4;">👤</span>
+                <span>用户: <strong id="statUsers" style="color:#ffd700;">-</strong></span>
+            </div>
+            <div style="color:#fff;display:flex;align-items:center;gap:4px;">
+                <span style="color:#4ecdc4;">🟢</span>
+                <span title="60分钟内活跃的用户数">在线: <strong id="statOnline" style="color:#ffd700;">-</strong></span>
+            </div>
+            <div style="color:#fff;display:flex;align-items:center;gap:4px;">
+                <span style="color:#4ecdc4;">📥</span>
+                <span>下载: <strong id="statDownloads" style="color:#ffd700;">-</strong></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 免责声明 -->
+    <div style="position:relative;padding:20px;background:rgba(0,0,0,0.5);border-top:1px solid rgba(255,255,255,0.1);text-align:center;font-size:0.85rem;color:#888;margin-bottom:60px;">
+        <div style="max-width:800px;margin:0 auto;">
+            <h4 style="margin:0 0 10px 0;color:#aaa;">⚠️ 免责声明</h4>
+            <p style="margin:5px 0;line-height:1.6;">
+                本工具仅供学习交流使用，所有数据存储于用户本地设备。
+            </p>
+            <p style="margin:5px 0;line-height:1.6;">
+                开发者不对因使用本工具造成的任何损失承担责任，请合理使用。
+            </p>
+            <p style="margin:5px 0;line-height:1.6;">
+                游戏相关内容版权归官方所有，本工具与游戏官方无任何关联。
+            </p>
+            <p style="margin:10px 0 0 0;line-height:1.6;color:#555;font-size:0.78rem;">
+                <span id="footerVersion">v<span id="currentVersionText">网页版</span></span>
+                <a id="footerDownloadDesktop" href="javascript:openDownloadModal()" style="color:#4fc3f7;margin-left:8px;text-decoration:none;font-size:0.78rem;" title="下载桌面版">📥 下载桌面版</a>
+                <span id="updateBadgeFooter" style="display:none;margin-left:8px;background:rgba(76,175,80,0.3);color:#81c784;padding:2px 8px;border-radius:10px;font-size:0.7rem;animation:pulse 1.5s ease-in-out infinite;">🔄 有新版本可更新!</span>
+            </p>
+        </div>
+    </div>
+    </div><!-- end scrollableContent -->
+    </div><!-- end container -->
+
+        <!-- 参考图片预览窗（悬浮在最顶层） -->
+        <div id="refImagePreview">
+            <div class="preview-header">
+                <span class="preview-title" id="refImagePreviewTitle"></span>
+                <button class="preview-close" onclick="window.hideRefPreview()">×</button>
+            </div>
+            <div class="preview-body">
+                <img class="preview-img" id="refImagePreviewImg">
+                <div class="resize-handle"></div>
+            </div>
+        </div>
+
+        <!-- 下载桌面版弹窗 -->
+        <div id="downloadModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;z-index:99999;background:rgba(0,0,0,0.7);align-items:center;justify-content:center;backdrop-filter:blur(4px);" onclick="if(event.target===this)closeDownloadModal()">
+            <div style="background:linear-gradient(135deg,rgba(42,42,74,0.98),rgba(30,30,50,0.98));border:2px solid rgba(33,150,243,0.3);border-radius:16px;padding:30px;max-width:500px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.5);">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                    <h2 style="margin:0;color:#4fc3f7;font-size:1.3rem;">📥 下载桌面版</h2>
+                    <button onclick="closeDownloadModal()" style="background:rgba(255,255,255,0.1);border:none;color:#fff;font-size:1.5rem;cursor:pointer;padding:0 8px;border-radius:4px;">×</button>
+                </div>
+                <div style="color:#ccc;font-size:0.9rem;line-height:1.8;">
+                    <p style="margin:0 0 15px 0;">塔防精灵助手桌面版提供更流畅的本地文件管理体验：</p>
+                    <ul style="padding-left:20px;margin:0 0 15px 0;">
+                        <li>⚡ 本地文件搜索与编辑</li>
+                        <li>💾 直接读写本地脚本文件</li>
+                        <li>📂 多目录项目管理</li>
+                        <li>🔒 数据完全本地存储</li>
+                    </ul>
+                    <div id="downloadVersionInfo" style="background:rgba(0,188,212,0.1);border:1px solid rgba(0,188,212,0.3);border-radius:8px;padding:12px;margin-bottom:15px;text-align:center;">
+                        <div style="font-size:0.85rem;">当前版本</div>
+                        <div style="font-size:1.4rem;font-weight:bold;color:#4fc3f7;margin:5px 0;">v<span id="dlCurrentVersion">网页版</span></div>
+                        <div id="dlLatestInfo" style="font-size:0.78rem;color:#888;margin-top:5px;"></div>
+                    </div>
+                    <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;">
+                        <a id="dlGithubLink" href="https://github.com/gyq-svip/tfjl-web/releases" target="_blank" style="flex:1;min-width:180px;background:linear-gradient(135deg,#2196f3,#1565c0);color:white;text-decoration:none;text-align:center;padding:12px 20px;border-radius:8px;font-weight:bold;font-size:0.95rem;display:inline-block;">GitHub Releases 下载</a>
+                        <button id="dlCheckUpdateBtn" onclick="manualCheckUpdate()" style="background:rgba(76,175,80,0.2);color:#81c784;border:1px solid rgba(76,175,80,0.3);padding:12px 16px;border-radius:8px;cursor:pointer;font-size:0.85rem;white-space:nowrap;">🔄 检查更新</button>
+                    </div>
+                    <div id="dlUpdateStatus" style="margin-top:12px;text-align:center;font-size:0.8rem;color:#888;min-height:20px;"></div>
+                    <p style="margin:15px 0 0 0;font-size:0.72rem;color:#666;text-align:center;">
+                        安装包命名格式：塔防精灵助手_密码tfjl_终极版本_vX.X.X_x64-setup.exe<br>
+                        仅支持 Windows 64位系统
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 脉冲动画（用于更新提示） -->
+        <style>
+            @keyframes pulse {
+                0%, 100% { opacity: 1; }
+                50% { opacity: 0.5; }
+            }
+        </style>
+</body>
+</html>
