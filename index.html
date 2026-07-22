@@ -7988,53 +7988,48 @@
             const xiaoYeNotInBattle = xiaoYeCarried && !xiaoYeDeployed;
             const fengHuangNotInBattle = fengHuangCarried && !fengHuangDeployed;
 
+            // 精灵字符串：切卡回"上满"后紧接打精灵
+            const jlArr = [];
+            if (hasLeiJingLing) jlArr.push('每0.1秒共5000次雷精灵');
+            if (hasMoJingLing) jlArr.push('每5秒共5000次魔精灵');
+            if (hasMuJingLing) jlArr.push('每3秒共5000次木精灵');
+            if (hasHunJingLing) jlArr.push('每3秒共5000次魂精灵');
+            const jlStr = jlArr.length > 0 ? ',' + jlArr.join(',') : '';
+
             // 02:26-02:31 上下小野（小野没上阵 + 凤凰没上阵或未携带 + 卡>6张）
             const needXiaoYeSwitch = xiaoYeNotInBattle && !fengHuangDeployed && nonGongChengNonJingLingCount > 6;
             if (needXiaoYeSwitch) {
                 output += `02:26,下${firstCardName},上小野满,\n`;
-                output += `02:31,下小野,上${firstCardName}满,\n`;
+                output += `02:31,下小野,上${firstCardName}满${jlStr},\n`;
             }
 
             // 02:36 下凤凰上小野（情况3：小野没上阵 + 凤凰携带且已上阵）
             const needFengHuangToXiaoYe = xiaoYeNotInBattle && fengHuangCarried && fengHuangDeployed;
             if (needFengHuangToXiaoYe) {
-                output += `02:36,下凤凰,上小野满,\n`;
+                output += `02:36,下凤凰,上小野满${jlStr},\n`;
             }
 
             // 02:38 上下凤凰（情况1/情况2/情况4）
             // 情况1：小野没上阵+凤凰没上阵+卡>6 → 02:38用{第一张卡}上下凤凰
-            // 情况2：只有凤凰没有小野（凤凰没上阵，小野未携带）→ 02:38用{第一张卡}上下凤凰
-            // 情况4：小野已上阵+凤凰没上阵 → 02:38用小野上下凤凰（切回小野）
+            // 情况2：只有凤凰没有小野（凤凰没上阵，小野未携带）→ 02:26上凤凰，02:31下凤凰接精灵
+            // 情况4：小野已上阵+凤凰没上阵 → 02:38用小野上下凤凰（切回小野接精灵）
             const needFengHuangOnlySwitch = fengHuangNotInBattle && !xiaoYeCarried;  // 情况2：只有凤凰没有小野
             const needFengHuangSwitch = fengHuangNotInBattle && (needXiaoYeSwitch || xiaoYeDeployed || needFengHuangOnlySwitch);
             if (needFengHuangSwitch) {
                 if (needXiaoYeSwitch) {
-                    // 情况1：小野是切换进来的，02:31已下小野，02:38用{第一张卡}上下凤凰
+                    // 情况1：小野是切换进来的，02:31已下小野并接了精灵，02:38只切凤凰不回精灵
                     output += `02:38,下${firstCardName},上凤凰4级,时钟秒0.5,下凤凰,上${firstCardName}满,\n`;
                 } else if (xiaoYeDeployed) {
-                    // 情况4：小野本来在阵容，02:38用小野上下凤凰，最后切回小野
-                    output += `02:38,下小野,上凤凰4级,时钟秒0.5,下凤凰,上小野满,\n`;
+                    // 情况4：小野本来在阵容，02:38用小野上下凤凰，最后切回小野接精灵
+                    output += `02:38,下小野,上凤凰4级,时钟秒0.5,下凤凰,上小野满${jlStr},\n`;
                 } else if (needFengHuangOnlySwitch) {
-                    // 情况2：只有凤凰没有小野，02:26上凤凰扛02:30 boss，02:31下凤凰恢复原卡
-                    output += `02:26,下${firstCardName},上凤凰4级,时钟秒0.5,\n`;
-                    output += `02:31,下凤凰,上${firstCardName}满,\n`;
+                    // 情况2：只有凤凰没有小野，02:26上凤凰扛02:30 boss，02:31下凤凰接精灵
+                    output += `02:26,下${firstCardName},上凤凰4级,\n`;
+                    output += `02:31,下凤凰,上${firstCardName}满${jlStr},\n`;
                 }
             }
 
-            // 切卡完成后，如果有精灵，继续打精灵逻辑
             const hasAnySwitch = needXiaoYeSwitch || needFengHuangSwitch || needFengHuangToXiaoYe || needFengHuangOnlySwitch;
-            const hasAnyJingLing = hasLeiJingLing || hasMoJingLing || hasMuJingLing || hasHunJingLing;
-            if (hasAnySwitch && hasAnyJingLing) {
-                // 切卡最后一步是"上满"，之后继续打精灵
-                const jingLingAfterSwitch = [];
-                if (hasLeiJingLing) jingLingAfterSwitch.push('每0.1秒共5000次雷精灵');
-                if (hasMoJingLing) jingLingAfterSwitch.push('每5秒共5000次魔精灵');
-                if (hasMuJingLing) jingLingAfterSwitch.push('每3秒共5000次木精灵');
-                if (hasHunJingLing) jingLingAfterSwitch.push('每3秒共5000次魂精灵');
-                if (jingLingAfterSwitch.length > 0) {
-                    output += '02:40,' + jingLingAfterSwitch.join(',') + ',\n';
-                }
-            }
             // 切卡提示：有凤凰/小野需要切卡时统一提示（仅隐藏榜）
             const needXiaoYeAlert = needXiaoYeSwitch;
             const needFengHuangAlert = needFengHuangSwitch;
