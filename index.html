@@ -8017,8 +8017,8 @@
             const needFengHuangSwitch = fengHuangNotInBattle && (needXiaoYeSwitch || xiaoYeDeployed || needFengHuangOnlySwitch);
             if (needFengHuangSwitch) {
                 if (needXiaoYeSwitch) {
-                    // 情况1：小野是切换进来的，02:31已下小野并接了精灵，02:38只切凤凰不回精灵
-                    output += `02:38,下${firstCardName},上凤凰4级,时钟秒0.5,下凤凰,上${firstCardName}满,\n`;
+                    // 情况1：小野是切换进来的，02:31已下小野并接了精灵，02:38再切凤凰也接精灵
+                    output += `02:38,下${firstCardName},上凤凰4级,时钟秒0.5,下凤凰,上${firstCardName}满${jlStr},\n`;
                 } else if (xiaoYeDeployed) {
                     // 情况4：小野本来在阵容，02:38用小野上下凤凰，最后切回小野接精灵
                     output += `02:38,下小野,上凤凰4级,时钟秒0.5,下凤凰,上小野满${jlStr},\n`;
