@@ -5462,6 +5462,10 @@
             if (el) el.textContent = CURRENT_VERSION;
             const el2 = document.getElementById('dlCurrentVersion');
             if (el2) el2.textContent = CURRENT_VERSION;
+            // 桌面版（Tauri）底部隐藏「下载桌面版」（更新统一走菜单），
+            // 仅网页版保留该链接用于引导下载 APP
+            const dl = document.getElementById('footerDownloadDesktop');
+            if (dl) dl.style.display = (window.__TAURI__ ? 'none' : 'inline');
         }
 
         // 初始化版本号显示（异步填充，不阻塞）
@@ -23491,7 +23495,7 @@ function hasGistToken() {
             </p>
             <p style="margin:10px 0 0 0;line-height:1.6;color:#555;font-size:0.78rem;">
                 <span id="footerVersion">v<span id="currentVersionText">网页版</span></span>
-                <a href="javascript:openDownloadModal()" style="color:#4fc3f7;margin-left:8px;text-decoration:none;font-size:0.78rem;" title="下载桌面版">📥 下载桌面版</a>
+                <a id="footerDownloadDesktop" href="javascript:openDownloadModal()" style="color:#4fc3f7;margin-left:8px;text-decoration:none;font-size:0.78rem;" title="下载桌面版">📥 下载桌面版</a>
                 <span id="updateBadgeFooter" style="display:none;margin-left:8px;background:rgba(76,175,80,0.3);color:#81c784;padding:2px 8px;border-radius:10px;font-size:0.7rem;animation:pulse 1.5s ease-in-out infinite;">🔄 有新版本可更新!</span>
             </p>
         </div>

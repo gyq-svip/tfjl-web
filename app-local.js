@@ -245,16 +245,7 @@ if (isTauriApp) {
                     </div>
                 </div>
 
-                <div style="background:rgba(33,150,243,0.08);border:1px solid rgba(33,150,243,0.2);border-radius:8px;padding:12px 16px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;">
-                    <div>
-                        <div style="color:#4fc3f7;font-size:0.9rem;font-weight:bold;">ℹ️ 当前版本: v<span id="appSettingsVersion">1.1.5</span></div>
-                        <div style="color:rgba(255,255,255,0.4);font-size:0.72rem;margin-top:2px;">需要更新时，请下载新安装包重新安装</div>
-                    </div>
-                    <div style="display:flex;gap:6px;">
-                        <button onclick="window.openDownloadModal()" style="background:rgba(33,150,243,0.15);color:#4fc3f7;border:1px solid rgba(33,150,243,0.3);padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.8rem;white-space:nowrap;">📥 下载</button>
-                        <button onclick="window.checkForUpdates()" style="background:rgba(76,175,80,0.15);color:#81c784;border:1px solid rgba(76,175,80,0.3);padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.8rem;white-space:nowrap;">🔄 检查更新</button>
-                    </div>
-                </div>
+
 
                 <div style="display:flex;gap:10px;justify-content:flex-end;">
                     <button onclick="saveSettingsAndClose()" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:10px 24px;border-radius:6px;cursor:pointer;font-size:0.9rem;">💾 保存设置</button>
