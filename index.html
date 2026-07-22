@@ -17405,7 +17405,25 @@ function hasGistToken() {
         }
         
         // 保存统计数据到缓存
+        // 清理异常数据（修复历史累加bug导致的超大数值）
+        function sanitizeCounterData(data) {
+            if (!data || !data.daily_stats) return data;
+            for (const date in data.daily_stats) {
+                const s = data.daily_stats[date];
+                if (s.hourly_visits) {
+                    for (let h = 0; h < 24; h++) {
+                        if (s.hourly_visits[h] > 10000) s.hourly_visits[h] = 0;
+                    }
+                }
+                if (s.visits > 100000) s.visits = 0;
+                if (s.new_users > 100000) s.new_users = 0;
+            }
+            return data;
+        }
+
         function saveCounterToCache(data) {
+            // 保存前先清理异常数据
+            data = sanitizeCounterData(data);
             localStorage.setItem(COUNTER_CACHE_KEY, JSON.stringify(data));
             localStorage.setItem(COUNTER_CACHE_TIME_KEY, new Date().toISOString());
         }
@@ -17616,11 +17634,14 @@ function hasGistToken() {
                                                 fresh.daily_stats[date].new_users || 0,
                                                 localData.daily_stats[date].new_users || 0
                                             );
-                                            // 合并时段分布（按小时相加，反映多个设备的真实访问时间）
+                                            // 合并时段分布（取最大值，避免刷新累加导致数据膨胀）
                                             if (localData.daily_stats[date].hourly_visits) {
                                                 if (!fresh.daily_stats[date].hourly_visits) fresh.daily_stats[date].hourly_visits = new Array(24).fill(0);
                                                 for (let h = 0; h < 24; h++) {
-                                                    fresh.daily_stats[date].hourly_visits[h] = (fresh.daily_stats[date].hourly_visits[h] || 0) + (localData.daily_stats[date].hourly_visits[h] || 0);
+                                                    fresh.daily_stats[date].hourly_visits[h] = Math.max(
+                                                        fresh.daily_stats[date].hourly_visits[h] || 0,
+                                                        localData.daily_stats[date].hourly_visits[h] || 0
+                                                    );
                                                 }
                                             }
                                         }
@@ -17656,6 +17677,23 @@ function hasGistToken() {
                             }
                             
                             counterData = fresh;
+                            // 修复异常数据：清理因累加bug导致的超大hourly_visits值
+                            if (counterData.daily_stats) {
+                                for (const date in counterData.daily_stats) {
+                                    const s = counterData.daily_stats[date];
+                                    if (s.hourly_visits) {
+                                        for (let h = 0; h < 24; h++) {
+                                            // 超过10000的肯定是bug数据，重置为0
+                                            if (s.hourly_visits[h] > 10000) {
+                                                s.hourly_visits[h] = 0;
+                                            }
+                                        }
+                                    }
+                                    // 修复异常大的visits
+                                    if (s.visits > 100000) s.visits = 0;
+                                    if (s.new_users > 100000) s.new_users = 0;
+                                }
+                            }
                         }
                     } catch (error) {
                         console.warn('获取最新数据失败，使用本地数据:', error);
