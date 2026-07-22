@@ -114,6 +114,7 @@ if (isTauriApp) {
             if (saved) {
                 const parsed = JSON.parse(saved);
                 maDirs = { ...maDirs, ...parsed.maDirs };
+                window.maDirs = maDirs;  // 同步更新 window 引用，否则导入到老马检查到的仍是空对象
                 softwareDataDir = parsed.softwareDataDir || '';
             }
         } catch (e) {}
@@ -1239,6 +1240,11 @@ if (isTauriApp) {
     window.importFileToProject = importFileToProject;
     window.batchImportFilesToProject = batchImportFilesToProject;
 
-    window.addEventListener('DOMContentLoaded', initAppLocal);
+    // 确保 DOMContentLoaded 后初始化（处理竞态：script 加载时事件可能已触发）
+    if (document.readyState === 'loading') {
+        window.addEventListener('DOMContentLoaded', initAppLocal);
+    } else {
+        initAppLocal();
+    }
     console.log('[APP] app-local.js 已加载 (IPC模式)');
 }
