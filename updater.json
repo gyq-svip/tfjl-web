@@ -1,11 +1,11 @@
 {
-  "version": "1.1.7",
-  "notes": "启动加速与版本检查修复\n- APP 改为从本地缓存毫秒级加载，不再每次从网络下载 600KB（冷启动约 0.1 秒）\n- 启动动画优化：首次显示完整动画，后续打开跳过，最多 3 秒兜底\n- 版本检查改为运行时从 Tauri 取真实版本，不再硬编码，杜绝漏改导致的误报更新",
-  "pub_date": "2026-07-22T13:00:00Z",
+  "version": "1.1.6",
+  "notes": "首个支持自动更新的版本\n- 安装后程序名简化为「塔防精灵助手」\n- 修复 APP 内新手帮助页无法打开的问题\n- 修复导入到老马文件名乱码问题",
+  "pub_date": "2026-07-22T10:00:00Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRdWJvQ0JvYjZTSEhienlnclRGWThuaEY3NFFXNWZXYytJVUxNRlJwTVI3TE56TjJtcTV4ckFnVlRKb3FrNDRvc0ZPQTVlUS9vQlhHamczMWxSUjlBY3BESUtxRWxYdHdnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg0Njg4Njk5CWZpbGU65aGU6Ziy57K+54G15Yqp5omLXzEuMS43X3g2NC1zZXR1cC5leGUKTFQxQUQ0YkwwdkQyZFN4MTRqSDcwb3hlekdRS1JWU1FaSW4zbDJEVm00SmpWUFZWSmVyM2Y5cnFvbW5VcXRXNFAwZkpzUmJBVzlxY3RTNFRkNTROQmc9PQo=",
-      "url": "https://gyq-svip.github.io/tfjl-web/tfjl-v1.1.7-x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRdWJvQ0JvYjZTSE1rVGc4TE1hdTFWb3BiSlc5d1prN2QwM2cxaU1jQ1dOL3hQR1hWcXFMRzdNdXl6eU1oUnM2b3lZbXZ3WDh3OEJqbFNTeWZJb0U4YWpNam9YV3BaL3dBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg0Njg1Mzg2CWZpbGU65aGU6Ziy57K+54G15Yqp5omLXzEuMS42X3g2NC1zZXR1cC5leGUKN25qT2d0enJkUkFRQlpya2lxTUR2YnQzR1VhSzhJU3NHaEdrR2hjY29hU09lVUV3bkpQQ1VKK0oxcWhkZHBMVTJjLzFnZDVoRmJvWU5tbFlFOU1WQlE9PQo=",
+      "url": "https://gyq-svip.github.io/tfjl-web/tfjl-v1.1.6-x64-setup.exe"
     }
   }
 }
