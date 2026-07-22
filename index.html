@@ -2259,7 +2259,11 @@
             <p id="passwordHint" style="color: rgba(255,255,255,0.7); margin-bottom: 20px;">请输入访问密码</p>
             <div id="passwordError" class="password-error" style="display: none;"></div>
             <input type="password" id="passwordInput" placeholder="请输入密码..." onkeypress="if(event.key==='Enter')checkPasswordAndEnter()">
-            <br><br>
+            <br>
+            <label id="rememberMeLabel" style="display:flex;align-items:center;justify-content:center;gap:8px;margin:10px 0 16px;color:rgba(255,255,255,0.7);font-size:0.85rem;cursor:pointer;">
+                <input type="checkbox" id="rememberPassword" checked style="width:16px;height:16px;cursor:pointer;accent-color:#4ecdc4;">
+                记住密码，下次自动登录
+            </label>
             <button onclick="checkPasswordAndEnter()" style="width:100%;padding:12px;border-radius:8px;border:none;background:linear-gradient(135deg,#4ecdc4,#44a08d);color:white;cursor:pointer;font-size:0.95rem;font-weight:600;">进入塔防助手</button>
         </div>
     </div>
@@ -2860,6 +2864,14 @@
                 recordLogin();
                 localStorage.setItem('TFJL_LoggedIn', 'true');
                 
+                // 记住密码
+                const rememberCb = document.getElementById('rememberPassword');
+                if (rememberCb && rememberCb.checked) {
+                    try { localStorage.setItem('TFJL_SavedPwd', btoa(password)); } catch (e) {}
+                } else {
+                    localStorage.removeItem('TFJL_SavedPwd');
+                }
+                
                 // 密码正确，显示两个选择按钮
                 errorDiv.style.display = 'none';
                 document.getElementById('loginActions').style.display = 'block';
@@ -2910,6 +2922,17 @@
                 // 记录登录
                 recordLogin();
                 localStorage.setItem('TFJL_LoggedIn', 'true');
+                
+                // 记住密码：如果勾选了"记住密码"，保存密码（简单编码混淆）
+                const rememberCb = document.getElementById('rememberPassword');
+                if (rememberCb && rememberCb.checked) {
+                    try {
+                        localStorage.setItem('TFJL_SavedPwd', btoa(password));
+                    } catch (e) {}
+                } else {
+                    localStorage.removeItem('TFJL_SavedPwd');
+                }
+                
                 errorDiv.style.display = 'none';
                 
                 // 根据目标系统进入，默认进入归档系统
@@ -16101,6 +16124,29 @@
             if (isLoggedIn()) {
                 document.getElementById('passwordOverlay').style.display = 'none';
                 document.getElementById('mainContent').classList.add('visible');
+            } else {
+                // 未登录但记住过密码 → 尝试自动登录
+                const savedPwd = localStorage.getItem('TFJL_SavedPwd');
+                if (savedPwd) {
+                    try {
+                        const pwd = atob(savedPwd);
+                        if (pwd && getAdminPasswords().includes(pwd)) {
+                            // 密码有效，自动登录
+                            recordLogin();
+                            localStorage.setItem('TFJL_LoggedIn', 'true');
+                            document.getElementById('passwordOverlay').style.display = 'none';
+                            document.getElementById('mainContent').classList.add('visible');
+                        } else {
+                            // 保存的密码已失效（密码表变了），清除
+                            localStorage.removeItem('TFJL_SavedPwd');
+                            // 预填密码框方便用户
+                            const input = document.getElementById('passwordInput');
+                            if (input) input.value = pwd;
+                        }
+                    } catch (e) {
+                        localStorage.removeItem('TFJL_SavedPwd');
+                    }
+                }
             }
             
             initIndexedDB().then(() => {
@@ -21448,7 +21494,7 @@ function hasGistToken() {
         function logoutToLogin() {
             if (!confirm('确定要退出登录吗？')) return;
             
-            // 清除所有登录相关状态
+            // 清除所有登录相关状态（但保留记住的密码用于下次自动登录）
             localStorage.removeItem('TFJL_LoggedIn');
             localStorage.removeItem('TFJL_Mode');
             localStorage.removeItem('TFJL_AuctionOnlyMode');
@@ -21462,9 +21508,26 @@ function hasGistToken() {
             // 完全重置登录界面
             document.getElementById('loginActions').style.display = 'none';
             document.getElementById('passwordInput').style.display = 'block';
-            document.getElementById('passwordInput').value = '';
             document.getElementById('passwordError').style.display = 'none';
             document.getElementById('passwordHint').textContent = '请输入访问密码';
+            
+            // 如果有记住的密码，自动填充
+            const savedPwd = localStorage.getItem('TFJL_SavedPwd');
+            if (savedPwd) {
+                try {
+                    const pwd = atob(savedPwd);
+                    document.getElementById('passwordInput').value = pwd;
+                    document.getElementById('passwordHint').textContent = '已记住密码，直接点击进入';
+                } catch (e) {
+                    localStorage.removeItem('TFJL_SavedPwd');
+                }
+            } else {
+                document.getElementById('passwordInput').value = '';
+            }
+            
+            // 确保记住密码复选框为勾选状态
+            const rememberCb = document.getElementById('rememberPassword');
+            if (rememberCb && savedPwd) rememberCb.checked = true;
             
             // 关闭所有其他面板
             closeAdminPanel();
