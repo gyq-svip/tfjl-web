@@ -3,8 +3,8 @@
   "productName": "塔防精灵助手",
   "version": "1.1.6",
   "identifier": "com.gyq.tfjl",
-  "build": {
-    "frontendDist": "../src",
+    "build": {
+    "frontendDist": "app-loader",
     "devUrl": "http://localhost:1420",
     "beforeDevCommand": "npx http-server src -p 1420 --cors",
     "beforeBuildCommand": ""
@@ -14,7 +14,7 @@
     "windows": [
       {
         "title": "塔防精灵助手 - 阵容卡搭配",
-        "url": "https://gyq-svip.github.io/tfjl-web/",
+        "url": "index.html",
         "width": 1200,
         "height": 800,
         "minWidth": 400,

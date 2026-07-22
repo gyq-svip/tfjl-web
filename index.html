@@ -5670,8 +5670,8 @@
                 }
                 t.success('✅ 已获取最新，正在重新加载...');
                 t.remove(1500);
-                // 清除首次启动标记，刷新后重走启动动画
-                try { localStorage.removeItem('TFJL_NotFirst'); } catch(e) {}
+                // 清除本地缓存，刷新后 bootstrap 从网络拉取最新
+                try { localStorage.removeItem('TFJL_NotFirst'); localStorage.removeItem('TFJL_CachedHTML'); } catch(e) {}
                 setTimeout(() => location.reload(), 700);
             } catch (e) {
                 t.error('⚠️ 刷新出错，正在重新加载...');
