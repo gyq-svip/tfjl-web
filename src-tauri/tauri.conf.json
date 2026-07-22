@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "塔防精灵助手_密码tfjl_终极版本",
-  "version": "1.1.5",
+  "productName": "塔防精灵助手",
+  "version": "1.1.6",
   "identifier": "com.gyq.tfjl",
   "build": {
     "frontendDist": "../src",
@@ -49,6 +49,15 @@
     },
     "android": {
       "debugApplicationIdSuffix": ".debug"
+    }
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": ["https://gyq-svip.github.io/tfjl-web/updater.json"],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDFDOTJCRUExODE4MDZFMkUKUldRdWJvQ0JvYjZTSElHa3lBcUpXU0szQ0d2TFA4a1VuZFdzNmhlcWx6OER3OEZSMXFiS3hURDQK",
+      "windows": {
+        "installMode": "passive"
+      }
     }
   }
 }
