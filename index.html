@@ -18323,6 +18323,27 @@ function hasGistToken() {
                             if (!parsed.active_today_app_users) parsed.active_today_app_users = [];
                             if (!parsed.active_today_web_users) parsed.active_today_web_users = [];
                             
+                            // ========== 历史数据迁移：旧数据未区分APP/网页来源，全部归为网页 ==========
+                            const srcApp = parsed.sources.app_visits || 0;
+                            const srcWeb = parsed.sources.web_visits || 0;
+                            const srcTotal = parsed.total_visits || 0;
+                            if (srcApp + srcWeb < srcTotal) {
+                                // 差额全部补到网页访问（历史数据无APP来源记录）
+                                parsed.sources.web_visits = srcWeb + (srcTotal - srcApp - srcWeb);
+                                // 对每日数据同样处理
+                                if (parsed.daily_stats) {
+                                    for (const date in parsed.daily_stats) {
+                                        const ds = parsed.daily_stats[date];
+                                        const dApp = ds.app_visits || 0;
+                                        const dWeb = ds.web_visits || 0;
+                                        const dTotal = ds.visits || 0;
+                                        if (dApp + dWeb < dTotal) {
+                                            ds.web_visits = dWeb + (dTotal - dApp - dWeb);
+                                        }
+                                    }
+                                }
+                            }
+                            
                             // 检查日期是否变化，如果新的一天则清空今日活跃用户
                             const today = getTodayString();
                             if (!parsed.active_date || parsed.active_date !== today) {
@@ -18397,6 +18418,31 @@ function hasGistToken() {
                                 fresh.total_downloads = Math.max(fresh.total_downloads || 0, localData.total_downloads || 0);
                                 fresh.active_today = fresh.active_today_users.length;
                                 
+                                // 合并来源统计（APP/网页，取最大值防止数据回退）
+                                if (!fresh.sources) fresh.sources = { app_visits: 0, web_visits: 0 };
+                                if (localData.sources) {
+                                    fresh.sources.app_visits = Math.max(fresh.sources.app_visits || 0, localData.sources.app_visits || 0);
+                                    fresh.sources.web_visits = Math.max(fresh.sources.web_visits || 0, localData.sources.web_visits || 0);
+                                }
+                                
+                                // 合并今日活跃APP/网页用户
+                                if (localData.active_today_app_users && Array.isArray(localData.active_today_app_users)) {
+                                    if (!fresh.active_today_app_users) fresh.active_today_app_users = [];
+                                    localData.active_today_app_users.forEach(id => {
+                                        if (!fresh.active_today_app_users.includes(id)) {
+                                            fresh.active_today_app_users.push(id);
+                                        }
+                                    });
+                                }
+                                if (localData.active_today_web_users && Array.isArray(localData.active_today_web_users)) {
+                                    if (!fresh.active_today_web_users) fresh.active_today_web_users = [];
+                                    localData.active_today_web_users.forEach(id => {
+                                        if (!fresh.active_today_web_users.includes(id)) {
+                                            fresh.active_today_web_users.push(id);
+                                        }
+                                    });
+                                }
+                                
                                 // 合并每日统计数据
                                 if (localData.daily_stats) {
                                     for (const date in localData.daily_stats) {
@@ -18415,6 +18461,15 @@ function hasGistToken() {
                                             fresh.daily_stats[date].new_users = Math.max(
                                                 fresh.daily_stats[date].new_users || 0,
                                                 localData.daily_stats[date].new_users || 0
+                                            );
+                                            // 合并每日APP/网页来源（取最大值防止数据回退）
+                                            fresh.daily_stats[date].app_visits = Math.max(
+                                                fresh.daily_stats[date].app_visits || 0,
+                                                localData.daily_stats[date].app_visits || 0
+                                            );
+                                            fresh.daily_stats[date].web_visits = Math.max(
+                                                fresh.daily_stats[date].web_visits || 0,
+                                                localData.daily_stats[date].web_visits || 0
                                             );
                                             // 合并时段分布（取最大值，避免刷新累加导致数据膨胀）
                                             if (localData.daily_stats[date].hourly_visits) {
