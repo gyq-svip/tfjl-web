@@ -5619,9 +5619,11 @@
                     try {
                         const updater = window.__TAURI__.updater;
                         const result = await updater.check();
-                        if (result && result.update) {
-                            t.update('📥 发现新版本，正在下载安装...');
-                            await result.update.downloadAndInstall();
+                        // Tauri v2 updater.check() 直接返回 Update 对象（或 null），不存在 result.update
+                        const update = result && (result.update || result);
+                        if (update) {
+                            t.update('📥 发现新版本 v' + (update.version || CURRENT_VERSION) + '，正在下载安装...');
+                            await update.downloadAndInstall();
                             t.success('✅ 更新完成，即将重启...');
                             t.remove(1500);
                             setTimeout(() => updater.relaunch(), 800);

@@ -4,10 +4,10 @@
   "version": "1.1.7",
   "identifier": "com.gyq.tfjl",
     "build": {
-    "frontendDist": "app-loader",
+    "frontendDist": "frontend",
     "devUrl": "http://localhost:1420",
-    "beforeDevCommand": "npx http-server src -p 1420 --cors",
-    "beforeBuildCommand": ""
+    "beforeDevCommand": "npx http-server . -p 1420 --cors",
+    "beforeBuildCommand": "node copy-frontend.js"
   },
   "app": {
     "withGlobalTauri": true,
