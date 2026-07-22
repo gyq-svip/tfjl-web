@@ -2824,6 +2824,31 @@
             }
         }
 
+        // ==================== 特效开关 ====================
+        function isEffectsEnabled() {
+            return localStorage.getItem('tfjl_effects_enabled') !== '0';
+        }
+
+        function updateEffectsVisibility() {
+            const enabled = isEffectsEnabled();
+            const menuItem = document.getElementById('menuToggleEffects');
+            if (menuItem) {
+                menuItem.innerHTML = enabled ? '✨ 背景特效：开' : '✨ 背景特效：关';
+            }
+            // 鼠标拖尾容器
+            const cursorContainer = document.getElementById('cursorEffectContainer');
+            if (cursorContainer) cursorContainer.style.display = enabled ? '' : 'none';
+            // 粒子背景容器
+            const bgContainer = document.querySelector('.particle-container');
+            if (bgContainer) bgContainer.style.display = enabled ? '' : 'none';
+        }
+
+        function toggleVisualEffects() {
+            const current = isEffectsEnabled();
+            localStorage.setItem('tfjl_effects_enabled', current ? '0' : '1');
+            updateEffectsVisibility();
+        }
+
         // ==================== 密码验证 ====================
         // 密码存储在localStorage中，支持管理员动态管理
         const PASSWORDS_STORAGE_KEY = 'TFJL_AdminPasswords';
@@ -3086,6 +3111,7 @@
                     <div onclick="openHelpPage();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#4fc3f7;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📖 帮助</div>
                     <div onclick="openMindmap();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#ffd700;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📊 功能导览</div>
                     <div id="menuDownloadDesktop" onclick="openDownloadModal();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#4fc3f7;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📥 下载桌面版</div>
+                    <div id="menuToggleEffects" onclick="toggleVisualEffects();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">✨ 背景特效：开</div>
                     <div id="menuCheckUpdateItem" onclick="menuCheckUpdate();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#81c784;display:none;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">🔄 检查更新</div>
                     <div onclick="forceRefreshLatest();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#ffd54f;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">♻️ 刷新最新资源</div>
                     <div onclick="window.location.href='auction.html';document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">🏪 进入拍卖系统</div>
@@ -17023,6 +17049,9 @@
             
             // 初始化粒子背景
             initParticleBackground();
+
+            // 根据保存的偏好控制特效开关
+            updateEffectsVisibility();
         });
         
         // ==================== 配置管理 ====================
