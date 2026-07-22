@@ -7956,7 +7956,7 @@
             // 龙王+幻精灵同时存在时，01:40重复01:25的精灵操作并加换强袭
             if (hasLongWang && hasHuanJingLing) {
                 if (jingLing01_25.length > 0) {
-                    output += '01:40,' + jingLing01_25.join(',') + ',换强袭,\n';
+                    output += '01:40,换强袭,' + jingLing01_25.join(',') + ',\n';
                 } else {
                     output += '01:40,换强袭,\n';
                 }
@@ -7999,7 +7999,7 @@
             // 02:26-02:31 上下小野（小野没上阵 + 凤凰没上阵或未携带 + 卡>6张）
             const needXiaoYeSwitch = xiaoYeNotInBattle && !fengHuangDeployed && nonGongChengNonJingLingCount > 6;
             if (needXiaoYeSwitch) {
-                output += `02:26,下${firstCardName},上小野满,\n`;
+                output += `02:26,下${firstCardName},上小野满${jlStr},\n`;
                 output += `02:31,下小野,上${firstCardName}满${jlStr},\n`;
             }
 
