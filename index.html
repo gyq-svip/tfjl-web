@@ -9221,7 +9221,49 @@
                 </div>
                 <div id="scriptFileCategoryFilter" style="margin-bottom:10px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;"></div>
                 <div id="txtFilesList" style="display:flex;flex-direction:column;gap:10px;"></div>
-                <div style="margin-top:10px;color:rgba(255,255,255,0.5);font-size:0.75rem;">💡 支持上传多个TXT文件，也可拖拽文件到此处或 Ctrl+V 粘贴</div>
+                <div style="margin-top:10px;color:rgba(255,255,255,0.5);font-size:0.75rem;">💡 支持上传多个TXT文件，也可拖拽文件到此处或 Ctrl+V 粘贴；点击脚本名可在下方标签中打开编辑</div>
+
+                <!-- 底部多标签脚本编辑器 -->
+                <div id="scriptEditorTabs" style="margin-top:12px;border-top:1px solid rgba(255,255,255,0.08);padding-top:10px;display:none;flex-direction:column;">
+                    <!-- 标签栏 -->
+                    <div id="scriptEditorTabBar" style="display:flex;gap:4px;overflow-x:auto;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.08);align-items:flex-end;"></div>
+                    <!-- 编辑器区 -->
+                    <div id="scriptEditorBody" style="display:flex;flex-direction:column;gap:8px;padding-top:8px;min-height:220px;">
+                        <textarea id="scriptEditorTextarea" placeholder="选择标签开始编辑…" style="flex:1;min-height:160px;background:rgba(0,0,0,0.3);border:1px solid rgba(76,175,80,0.25);border-radius:8px;color:#e0e0e0;font-family:'Consolas','Monaco',monospace;font-size:0.85rem;padding:10px;line-height:1.5;resize:vertical;outline:none;box-sizing:border-box;"></textarea>
+                        <!-- 查找替换栏 -->
+                        <div id="scriptEditorFindBar" style="display:none;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:6px 8px;">
+                            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px;">
+                                <input id="scriptEditorFindInput" placeholder="查找…" oninput="scriptEditorFind('count')" onkeydown="if(event.key==='Enter')scriptEditorFind('next')" style="width:150px;background:rgba(0,0,0,0.4);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:5px 8px;font-size:0.8rem;">
+                                <span id="scriptEditorFindCount" style="color:rgba(255,255,255,0.55);font-size:0.75rem;min-width:70px;text-align:center;">0个匹配</span>
+                                <button onclick="scriptEditorFind('prev')" style="background:rgba(255,255,255,0.12);color:#fff;border:1px solid rgba(255,255,255,0.15);padding:4px 8px;border-radius:4px;cursor:pointer;font-size:0.78rem;">◀</button>
+                                <button onclick="scriptEditorFind('next')" style="background:rgba(255,255,255,0.12);color:#fff;border:1px solid rgba(255,255,255,0.15);padding:4px 8px;border-radius:4px;cursor:pointer;font-size:0.78rem;">▶</button>
+                                <label style="color:rgba(255,255,255,0.5);font-size:0.75rem;cursor:pointer;"><input type="checkbox" id="scriptEditorCaseSensitive" style="vertical-align:middle;"> 区分大小写</label>
+                            </div>
+                            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                                <input id="scriptEditorReplaceInput" placeholder="替换为…" style="width:150px;background:rgba(0,0,0,0.4);color:#ffeb3b;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:5px 8px;font-size:0.8rem;">
+                                <button onclick="scriptEditorReplace()" style="background:rgba(255,152,0,0.25);color:#ff9800;border:1px solid rgba(255,152,0,0.3);padding:4px 10px;border-radius:4px;cursor:pointer;font-size:0.78rem;">替换</button>
+                                <button onclick="scriptEditorReplaceAll()" style="background:rgba(244,67,54,0.25);color:#f44336;border:1px solid rgba(244,67,54,0.3);padding:4px 10px;border-radius:4px;cursor:pointer;font-size:0.78rem;">全部替换</button>
+                            </div>
+                        </div>
+                        <!-- 操作栏 -->
+                        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+                            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                                <select id="scriptEditorTarget" style="padding:6px 10px;border-radius:6px;border:1px solid rgba(76,175,80,0.3);background:#2a2a4a;color:#fff;font-size:0.85rem;cursor:pointer;">
+                                    <option value="my">我的手牌</option>
+                                    <option value="teammate">队友手牌</option>
+                                </select>
+                                <button onclick="scriptEditorParse()" style="background:linear-gradient(135deg,#00bcd4,#00838f);border:none;color:white;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.85rem;">🔍 解析阵容</button>
+                                <button onclick="scriptEditorToggleFind()" style="background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.15);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">🔍 查找替换</button>
+                            </div>
+                            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                                <span id="scriptEditorStatus" style="color:rgba(255,255,255,0.5);font-size:0.8rem;"></span>
+                                <button onclick="scriptEditorDownload()" style="background:linear-gradient(135deg,#2196f3,#1565c0);border:none;color:white;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.85rem;">📥 下载</button>
+                                <button onclick="scriptEditorSave()" style="background:linear-gradient(135deg,#4CAF50,#45a049);border:none;color:white;padding:6px 14px;border-radius:6px;cursor:pointer;font-weight:bold;font-size:0.85rem;">💾 保存</button>
+                            </div>
+                        </div>
+                        <div id="scriptEditorParseResult" style="font-size:0.8rem;color:rgba(255,255,255,0.7);min-height:18px;"></div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -10460,12 +10502,12 @@
                     <div style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,215,0,0.2);border-radius:8px;padding:12px;">
                         <div style="display:flex;justify-content:space-between;align-items:center;">
                             <div style="flex:1;overflow:hidden;">
-                                <div style="color:#ffd700;font-weight:bold;margin-bottom:4px;">📄 ${escapeHtml(file.name)}</div>
+                                <div style="color:#ffd700;font-weight:bold;margin-bottom:4px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;padding:2px 6px 2px 0;border-radius:4px;transition:background 0.15s;" onclick="openScriptEditorTab(${i})" onmouseover="this.style.background='rgba(255,215,0,0.12)'" onmouseout="this.style.background='transparent'" title="点击在下方标签中打开编辑">📄 ${escapeHtml(file.name)}</div>
                                 <div style="color:rgba(255,255,255,0.5);font-size:0.8rem;">${(file.content.length / 1024).toFixed(1)} KB</div>
                             </div>
                             <div style="display:flex;gap:5px;flex-shrink:0;flex-wrap:wrap;">
                                 <button onclick="shareTxtFileToWall(${i})" title="分享到需求墙" style="background:linear-gradient(135deg,#9c27b0,#7b1fa2);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">📢</button>
-                                <button onclick="openTxtFileWindow(${i})" title="打开" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">✏️</button>
+                                <button onclick="openTxtFileWindow(${i})" title="浮窗编辑" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">✏️</button>
                                 <button onclick="renameTxtFile(${i})" title="重命名" style="background:linear-gradient(135deg,#ff9800,#f57c00);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">✏️</button>
                                 <button onclick="downloadTxtFile(${i})" title="下载" style="background:linear-gradient(135deg,#2196f3,#1565c0);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">📥</button>
                                 <button onclick="deleteTxtFile(${i})" title="删除" style="background:linear-gradient(135deg,#f44336,#c62828);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">🗑️</button>
@@ -10647,12 +10689,12 @@
                 html += `<div style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,215,0,0.2);border-radius:8px;padding:12px;">
                     <div style="display:flex;justify-content:space-between;align-items:center;">
                         <div style="flex:1;overflow:hidden;">
-                            <div style="color:#ffd700;font-weight:bold;margin-bottom:4px;">📄 ${displayName}</div>
+                            <div style="color:#ffd700;font-weight:bold;margin-bottom:4px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;padding:2px 6px 2px 0;border-radius:4px;transition:background 0.15s;" onclick="openScriptEditorTab(${i})" onmouseover="this.style.background='rgba(255,215,0,0.12)'" onmouseout="this.style.background='transparent'" title="点击在下方标签中打开编辑">📄 ${displayName}</div>
                             <div style="color:rgba(255,255,255,0.5);font-size:0.8rem;">${(file.content.length / 1024).toFixed(1)} KB</div>
                         </div>
                         <div style="display:flex;gap:5px;flex-shrink:0;flex-wrap:wrap;">
                             <button onclick="shareTxtFileToWall(${i})" title="分享到需求墙" style="background:linear-gradient(135deg,#9c27b0,#7b1fa2);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">📢</button>
-                            <button onclick="openTxtFileWindow(${i})" title="打开" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">✏️</button>
+                            <button onclick="openTxtFileWindow(${i})" title="浮窗编辑" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">✏️</button>
                             <button onclick="renameTxtFile(${i})" title="重命名" style="background:linear-gradient(135deg,#ff9800,#f57c00);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">✏️</button>
                             <button onclick="downloadTxtFile(${i})" title="下载" style="background:linear-gradient(135deg,#2196f3,#1565c0);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">📥</button>
                             <button onclick="deleteTxtFile(${i})" title="删除" style="background:linear-gradient(135deg,#f44336,#c62828);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">🗑️</button>
@@ -10961,6 +11003,326 @@
             txtFiles.splice(index, 1);
             updateTxtFilesList();
             autoSaveProject();
+        }
+
+        // ========== 底部多标签脚本编辑器 ==========
+        let scriptEditorTabs = []; // { id, fileIndex, name, content, originalContent, modified }
+        let activeScriptEditorTabId = null;
+
+        function openScriptEditorTab(fileIndex) {
+            if (!txtFiles[fileIndex]) return;
+            const file = txtFiles[fileIndex];
+
+            // 已有该文件的标签则激活
+            const existing = scriptEditorTabs.find(t => t.fileIndex === fileIndex);
+            if (existing) {
+                switchScriptEditorTab(existing.id);
+                return;
+            }
+
+            const tabId = 'tab_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+            scriptEditorTabs.push({
+                id: tabId,
+                fileIndex: fileIndex,
+                name: file.name,
+                content: file.content,
+                originalContent: file.content,
+                modified: false
+            });
+
+            document.getElementById('scriptEditorTabs').style.display = 'flex';
+            switchScriptEditorTab(tabId);
+        }
+
+        function closeScriptEditorTab(tabId, event) {
+            if (event) event.stopPropagation();
+            const idx = scriptEditorTabs.findIndex(t => t.id === tabId);
+            if (idx === -1) return;
+            const tab = scriptEditorTabs[idx];
+
+            if (tab.modified && tab.content !== tab.originalContent) {
+                if (!confirm(`「${tab.name}」已修改但未保存，确定关闭？`)) return;
+            }
+
+            scriptEditorTabs.splice(idx, 1);
+            if (activeScriptEditorTabId === tabId) {
+                activeScriptEditorTabId = scriptEditorTabs.length > 0 ? scriptEditorTabs[Math.max(0, idx - 1)].id : null;
+            }
+
+            renderScriptEditorTabs();
+            refreshScriptEditorBody();
+            if (scriptEditorTabs.length === 0) {
+                document.getElementById('scriptEditorTabs').style.display = 'none';
+            }
+        }
+
+        function switchScriptEditorTab(tabId) {
+            if (!scriptEditorTabs.find(t => t.id === tabId)) return;
+            activeScriptEditorTabId = tabId;
+            renderScriptEditorTabs();
+            refreshScriptEditorBody();
+        }
+
+        function getActiveScriptEditorTab() {
+            return scriptEditorTabs.find(t => t.id === activeScriptEditorTabId) || null;
+        }
+
+        function renderScriptEditorTabs() {
+            const bar = document.getElementById('scriptEditorTabBar');
+            if (!bar) return;
+            bar.innerHTML = scriptEditorTabs.map(tab => {
+                const active = tab.id === activeScriptEditorTabId;
+                const dirty = tab.modified ? ' *' : '';
+                const name = tab.name.length > 18 ? tab.name.slice(0, 16) + '…' : tab.name;
+                return `<div onclick="switchScriptEditorTab('${tab.id}')" style="flex-shrink:0;cursor:pointer;display:flex;align-items:center;gap:5px;padding:6px 10px;border-radius:6px 6px 0 0;font-size:0.8rem;white-space:nowrap;transition:all 0.15s;background:${active ? 'rgba(76,175,80,0.22)' : 'rgba(255,255,255,0.05)'};border:${active ? '1px solid rgba(76,175,80,0.45)' : '1px solid rgba(255,255,255,0.08)'};border-bottom:none;color:${active ? '#4caf50' : 'rgba(255,255,255,0.7)'};font-weight:${active ? 'bold' : 'normal'};">
+                    <span>📄 ${name}${dirty}</span>
+                    <span onclick="closeScriptEditorTab('${tab.id}', event)" style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;font-size:0.75rem;transition:background 0.15s;" onmouseover="this.style.background='rgba(244,67,54,0.35)'" onmouseout="this.style.background='transparent'">×</span>
+                </div>`;
+            }).join('');
+        }
+
+        function refreshScriptEditorBody() {
+            const ta = document.getElementById('scriptEditorTextarea');
+            const status = document.getElementById('scriptEditorStatus');
+            const parseResult = document.getElementById('scriptEditorParseResult');
+            const findBar = document.getElementById('scriptEditorFindBar');
+            if (!ta) return;
+
+            const tab = getActiveScriptEditorTab();
+            if (!tab) {
+                ta.value = '';
+                ta.placeholder = '选择标签开始编辑…';
+                ta.disabled = true;
+                if (status) status.textContent = '';
+                if (parseResult) parseResult.textContent = '';
+                if (findBar) findBar.style.display = 'none';
+                return;
+            }
+
+            ta.disabled = false;
+            ta.value = tab.content;
+            if (status) status.textContent = `共 ${tab.content.length} 字${tab.modified ? ' · 已修改' : ''}`;
+            if (parseResult) parseResult.textContent = '';
+        }
+
+        // 绑定编辑器 textarea 变更同步到标签数据
+        (function bindScriptEditorTextarea() {
+            const ta = document.getElementById('scriptEditorTextarea');
+            if (!ta) return;
+            ta.addEventListener('input', function() {
+                const tab = getActiveScriptEditorTab();
+                if (!tab) return;
+                tab.content = this.value;
+                tab.modified = tab.content !== tab.originalContent;
+                renderScriptEditorTabs();
+                const status = document.getElementById('scriptEditorStatus');
+                if (status) status.textContent = `共 ${tab.content.length} 字 · 已修改`;
+            });
+        })();
+
+        function scriptEditorSave() {
+            const tab = getActiveScriptEditorTab();
+            if (!tab) { alert('请先打开一个标签'); return; }
+            if (!txtFiles[tab.fileIndex]) return;
+
+            txtFiles[tab.fileIndex].content = tab.content;
+            tab.originalContent = tab.content;
+            tab.modified = false;
+            renderScriptEditorTabs();
+            refreshScriptEditorBody();
+            updateTxtFilesList();
+            filterTxtFilesList();
+
+            // 写回源文件
+            if (txtFiles[tab.fileIndex].path && window.saveFileContent) {
+                window.saveFileContent(txtFiles[tab.fileIndex].path, tab.content, (ok, msg) => {
+                    if (!ok) console.warn('写回文件失败:', msg);
+                });
+            }
+
+            // 触发项目自动保存
+            if (typeof autoSaveProject === 'function') {
+                setTimeout(() => autoSaveProject(), 50);
+            }
+
+            const status = document.getElementById('scriptEditorStatus');
+            if (status) {
+                status.textContent = '保存成功';
+                setTimeout(() => { if (status) status.textContent = `共 ${tab.content.length} 字`; }, 1200);
+            }
+        }
+
+        function scriptEditorParse() {
+            const tab = getActiveScriptEditorTab();
+            const resultEl = document.getElementById('scriptEditorParseResult');
+            if (!tab) { alert('请先打开一个标签'); return; }
+            if (!tab.content.trim()) {
+                if (resultEl) resultEl.innerHTML = '<span style="color:#f44336;">文件内容为空！</span>';
+                return;
+            }
+
+            const content = tab.content.trim();
+            const target = document.getElementById('scriptEditorTarget')?.value || 'my';
+
+            // 解析"上阵："后面的内容
+            const match = content.match(/上阵[：:]\s*(.+)/);
+            if (!match || !match[1]) {
+                if (resultEl) resultEl.innerHTML = '<span style="color:#f44336;">未找到"上阵："格式的阵容信息！</span>';
+                return;
+            }
+
+            let heroNames = match[1].split(/[,，]/).map(name => name.trim()).filter(name => name);
+            if (heroNames.length === 0) {
+                if (resultEl) resultEl.innerHTML = '<span style="color:#f44336;">未找到英雄名称！</span>';
+                return;
+            }
+            if (heroNames.length > 10) heroNames = heroNames.slice(0, 10);
+
+            const targetHand = target === 'my' ? myHandCards : teammateHandCards;
+            let addedCount = 0;
+            let notFoundCards = [];
+            let duplicateCards = [];
+
+            heroNames.forEach(heroName => {
+                const cardEl = document.querySelector(`.card-item[data-name="${heroName}"]`);
+                if (!cardEl) { notFoundCards.push(heroName); return; }
+                const cardId = cardEl.dataset.id;
+                const cardType = cardEl.dataset.type;
+                const isEngineering = cardEl.dataset.engineering === 'true';
+                const profession = cardEl.dataset.profession;
+                if (targetHand.some(c => c.id === cardId)) { duplicateCards.push(heroName); return; }
+                if (targetHand.length >= MAX_HAND_CARDS) return;
+                targetHand.push({ id: cardId, name: heroName, placed: null, isEngineering, profession, type: cardType });
+                addedCount++;
+            });
+
+            if (typeof renderMyHand === 'function') renderMyHand();
+            if (typeof renderTeammateHand === 'function') renderTeammateHand();
+            if (typeof updateTimeLines === 'function') updateTimeLines();
+
+            if (resultEl) {
+                let msg = `成功添加 ${addedCount} 张卡牌`;
+                const parts = [];
+                if (notFoundCards.length > 0) parts.push(`未找到: ${notFoundCards.join(', ')}`);
+                if (duplicateCards.length > 0) parts.push(`已存在: ${duplicateCards.join(', ')}`);
+                if (parts.length > 0) msg += ' · ' + parts.join(' · ');
+                resultEl.innerHTML = `<span style="color:${addedCount > 0 ? '#4caf50' : '#ff9800'};">${msg}</span>`;
+            }
+        }
+
+        function scriptEditorDownload() {
+            const tab = getActiveScriptEditorTab();
+            if (!tab) { alert('请先打开一个标签'); return; }
+            const blob = new Blob([tab.content], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = tab.name;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function scriptEditorToggleFind() {
+            const bar = document.getElementById('scriptEditorFindBar');
+            if (!bar) return;
+            const show = bar.style.display === 'none';
+            bar.style.display = show ? 'block' : 'none';
+            if (show) {
+                const input = document.getElementById('scriptEditorFindInput');
+                const ta = document.getElementById('scriptEditorTextarea');
+                if (input && ta) {
+                    const sel = ta.value.substring(ta.selectionStart, ta.selectionEnd);
+                    if (sel) input.value = sel;
+                    input.focus();
+                    scriptEditorFind('count');
+                }
+            }
+        }
+
+        function scriptEditorFind(direction) {
+            const ta = document.getElementById('scriptEditorTextarea');
+            const input = document.getElementById('scriptEditorFindInput');
+            const countEl = document.getElementById('scriptEditorFindCount');
+            if (!ta || !input || !input.value) {
+                if (countEl) countEl.textContent = '0个匹配';
+                return;
+            }
+            const query = input.value;
+            const caseSensitive = document.getElementById('scriptEditorCaseSensitive')?.checked || false;
+            const text = ta.value;
+            const flags = caseSensitive ? 'g' : 'gi';
+
+            const matches = [];
+            let m;
+            const escQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const regex = new RegExp(escQuery, flags);
+            while ((m = regex.exec(text)) !== null) {
+                matches.push(m.index);
+                if (m[0].length === 0) regex.lastIndex++;
+            }
+
+            if (countEl) countEl.textContent = matches.length > 0 ? '共' + matches.length + '个匹配' : '无匹配';
+
+            if (matches.length === 0) {
+                input.style.borderColor = '#f44336';
+                setTimeout(() => { input.style.borderColor = ''; }, 1200);
+                return;
+            }
+            input.style.borderColor = '';
+
+            if (direction === 'count') return;
+
+            const step = direction === 'prev' ? -1 : 1;
+            let currentIdx = -1;
+            if (direction === 'prev') {
+                for (let i = matches.length - 1; i >= 0; i--) {
+                    if (matches[i] < ta.selectionStart) { currentIdx = i; break; }
+                }
+                if (currentIdx === -1) currentIdx = matches.length - 1;
+            } else {
+                for (let i = 0; i < matches.length; i++) {
+                    if (matches[i] > ta.selectionStart) { currentIdx = i; break; }
+                }
+                if (currentIdx === -1) currentIdx = 0;
+            }
+
+            const pos = matches[currentIdx];
+            ta.focus();
+            ta.setSelectionRange(pos, pos + query.length);
+            if (countEl) countEl.textContent = '第' + (currentIdx + 1) + '/' + matches.length + '个';
+        }
+
+        function scriptEditorReplace() {
+            const ta = document.getElementById('scriptEditorTextarea');
+            const findInput = document.getElementById('scriptEditorFindInput');
+            const replaceInput = document.getElementById('scriptEditorReplaceInput');
+            if (!ta || !findInput || !findInput.value) return;
+            const query = findInput.value;
+            const sel = ta.value.substring(ta.selectionStart, ta.selectionEnd);
+            const caseSensitive = document.getElementById('scriptEditorCaseSensitive')?.checked || false;
+            const compare = caseSensitive ? sel === query : sel.toLowerCase() === query.toLowerCase();
+            if (!compare) { scriptEditorFind('next'); return; }
+            ta.setRangeText(replaceInput.value, ta.selectionStart, ta.selectionEnd, 'select');
+            // 触发 input 同步
+            ta.dispatchEvent(new Event('input', { bubbles: true }));
+            scriptEditorFind('next');
+        }
+
+        function scriptEditorReplaceAll() {
+            const ta = document.getElementById('scriptEditorTextarea');
+            const findInput = document.getElementById('scriptEditorFindInput');
+            const replaceInput = document.getElementById('scriptEditorReplaceInput');
+            if (!ta || !findInput || !findInput.value) return;
+            const query = findInput.value;
+            const caseSensitive = document.getElementById('scriptEditorCaseSensitive')?.checked || false;
+            const flags = caseSensitive ? 'g' : 'gi';
+            const escQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const count = (ta.value.match(new RegExp(escQuery, flags)) || []).length;
+            if (count === 0) return;
+            if (!confirm(`确定全部替换？共 ${count} 处「${query}」→「${replaceInput.value}」`)) return;
+            ta.value = ta.value.replace(new RegExp(escQuery, flags), replaceInput.value);
+            ta.dispatchEvent(new Event('input', { bubbles: true }));
+            scriptEditorFind('count');
         }
 
         // ========== 多窗口脚本编辑系统 ==========
