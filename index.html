@@ -1882,40 +1882,7 @@
             .tfjl-tooltip[data-pos="left"]::after { right: -5px; top: 12px; transform: rotate(135deg); }
             .tfjl-tooltip[data-pos="right"]::after { left: -5px; top: 12px; transform: rotate(315deg); }
 
-            /* ===== 方案A：新手引导浮层 ===== */
-            #tfjlTourMask {
-                position: fixed; inset: 0; z-index: 99998;
-                background: rgba(0,0,0,0.55);
-                pointer-events: none;
-            }
-            .tfjl-tour-spot {
-                position: fixed; z-index: 99999;
-                border-radius: 8px;
-                box-shadow: 0 0 0 4px rgba(255,215,0,0.9), 0 0 0 9999px rgba(0,0,0,0.55);
-                pointer-events: none;
-                transition: all 0.3s ease;
-            }
-            #tfjlTourBox {
-                position: fixed; z-index: 100000;
-                max-width: 320px;
-                background: linear-gradient(135deg, #1a1a2e, #16213e);
-                border: 2px solid rgba(255,215,0,0.6);
-                border-radius: 12px;
-                padding: 16px 18px;
-                color: #fff;
-                box-shadow: 0 8px 32px rgba(0,0,0,0.6);
-            }
-            #tfjlTourBox .step-num { color: #ffd700; font-size: 0.8rem; font-weight: bold; }
-            #tfjlTourBox .step-title { font-size: 1rem; font-weight: bold; margin: 4px 0 8px; color: #ffd700; }
-            #tfjlTourBox .step-desc { font-size: 0.85rem; line-height: 1.6; color: rgba(255,255,255,0.88); }
-            #tfjlTourBox .tour-btns { display: flex; gap: 8px; margin-top: 14px; justify-content: flex-end; }
-            #tfjlTourBox button {
-                border: none; padding: 7px 16px; border-radius: 7px; cursor: pointer;
-                font-size: 0.82rem; font-weight: 600;
-            }
-            .tour-btn-skip { background: rgba(255,255,255,0.15); color: #fff; }
-            .tour-btn-prev { background: rgba(79,195,247,0.25); color: #4fc3f7; }
-            .tour-btn-next { background: linear-gradient(135deg,#4fc3f7,#0288d1); color: #fff; }
+
             
 
             /* 记事本面板移动端适配 */
@@ -2972,10 +2939,7 @@
             // 进入归档系统（完整功能）
             document.getElementById('passwordOverlay').style.display = 'none';
             document.getElementById('mainContent').classList.add('visible');
-            // 首次进入启动新手指引（方案A），完成过则不再自动弹
-            if (!localStorage.getItem('TFJL_TourDone')) {
-                setTimeout(() => startNewbieTour(), 700);
-            }
+
         }
 
         function enterAuctionFromLogin() {
@@ -3095,7 +3059,7 @@
                     <div onclick="exportCurrentProject();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📤 备份此项目</div>
                     <div onclick="importSingleProject();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📥 恢复项目</div>
                     <div onclick="downloadOfflineVersion();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📥 下载离线版</div>
-                    <div onclick="startNewbieTour();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#4caf50;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">🔄 新手指引</div>
+
                     <div onclick="openHelpPage();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#4fc3f7;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">🌐 新手帮助页</div>
                     <div onclick="openDownloadModal();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#4fc3f7;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📥 下载桌面版</div>
                     <div onclick="menuCheckUpdate();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#81c784;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">🔄 检查更新</div>
@@ -4010,7 +3974,6 @@
                             <span style="color:#4ecdc4;font-size:0.82rem;">💡 有好的需求、想法，欢迎在需求墙（右上角小喇叭）留言！</span>
                         </div>
                         <div style="display:flex;gap:10px;margin-top:16px;justify-content:center;flex-wrap:wrap;">
-                            <button onclick="closeWelcomeGuide();startNewbieTour();" style="padding:10px 20px;border-radius:8px;border:none;background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;cursor:pointer;font-size:0.85rem;font-weight:600;">🚀 新手指引</button>
                             <button onclick="closeWelcomeGuide();openHelpPage();" style="padding:10px 20px;border-radius:8px;border:none;background:linear-gradient(135deg,#4fc3f7,#0288d1);color:white;cursor:pointer;font-size:0.85rem;font-weight:600;">📖 查看完整帮助</button>
                             <button onclick="closeWelcomeGuide()" style="padding:10px 20px;border-radius:8px;border:none;background:linear-gradient(135deg,#ffd700,#f59e0b);color:#1a1a2e;cursor:pointer;font-size:0.85rem;font-weight:600;">开始使用</button>
                         </div>
@@ -6773,128 +6736,7 @@
             window.addEventListener('scroll', hideTip, true);
         })();
 
-        // ===== 方案A：新手引导浮层（分步高亮） =====
-        const TFJL_TOUR_KEY = 'TFJL_TourDone';
-        let _tourIdx = 0;
-        let _tourSteps = [];
-        let _tourSpot = null;
-        let _tourBox = null;
 
-        function startNewbieTour() {
-            _tourSteps = [
-                {
-                    sel: '#messageWallToggle', title: '需求墙',
-                    desc: '点这里打开「需求墙」：发布你的需求、分享脚本、和其他玩家互动交流。'
-                },
-                {
-                    sel: '#chatRoomToggle', title: '拍卖行',
-                    desc: '闲置物品可在这里免费上架、交换、求购，纯玩不收费，入口就在隔壁。'
-                },
-                {
-                    sel: '#txtFilesToggleBtn', title: '脚本文件',
-                    desc: '核心功能区！扫描/上传脚本、解析到手牌、分享到需求墙，还能「导入到老马」直接存到本地目录。点击打开看看。',
-                    open: function () {
-                        const p = document.getElementById('txtFilesPanel');
-                        if (!p || p.style.display === 'none') toggleTxtFilesPanel();
-                    }
-                },
-                {
-                    sel: '#txtFilesPanel', title: '导入到老马',
-                    desc: '在这里扫描出脚本后，选择「导入到老马」会弹出目录让你选保存位置（需先在 📁 APP本地设置 里配置老马目录）。'
-                },
-                {
-                    sel: '#appLocalSettingsBtn', title: 'APP本地设置', skipIfHidden: true,
-                    desc: '桌面版专属：配置老马目录后，「导入到老马」才能把脚本存到你的本地文件夹。'
-                },
-                {
-                    sel: 'button[title="菜单"]', title: '菜单',
-                    desc: '备份/恢复数据、查看使用帮助、下载离线版/桌面版，都在这个 ☰ 菜单里。'
-                },
-                {
-                    sel: '#statsBar', title: '统计栏',
-                    desc: '页面底部的实时统计：访问量、用户数、在线人数、下载量。'
-                }
-            ];
-            _tourIdx = 0;
-            // 清理旧节点
-            endTour(true);
-            showTourStep();
-        }
-
-        function showTourStep() {
-            // 找一个可见的目标
-            while (_tourIdx < _tourSteps.length) {
-                const step = _tourSteps[_tourIdx];
-                const el = document.querySelector(step.sel);
-                if (!el || (step.skipIfHidden && el.offsetParent === null) || el.style.display === 'none') {
-                    _tourIdx++;
-                    continue;
-                }
-                renderTour(el, step);
-                return;
-            }
-            endTour();
-        }
-
-        function renderTour(el, step) {
-            if (step.open) step.open();
-            // 等待面板打开后再定位
-            setTimeout(function () {
-                const target = document.querySelector(step.sel) || el;
-                const r = target.getBoundingClientRect();
-                if (!_tourSpot) {
-                    _tourSpot = document.createElement('div');
-                    _tourSpot.className = 'tfjl-tour-spot';
-                    document.body.appendChild(_tourSpot);
-                }
-                _tourSpot.style.left = (r.left - 6) + 'px';
-                _tourSpot.style.top = (r.top - 6) + 'px';
-                _tourSpot.style.width = (r.width + 12) + 'px';
-                _tourSpot.style.height = (r.height + 12) + 'px';
-
-                if (!_tourBox) {
-                    _tourBox = document.createElement('div');
-                    _tourBox.id = 'tfjlTourBox';
-                    document.body.appendChild(_tourBox);
-                }
-                const total = _tourSteps.length;
-                const num = _tourIdx + 1;
-                _tourBox.innerHTML =
-                    '<div class="step-num">第 ' + num + ' / ' + total + ' 步</div>' +
-                    '<div class="step-title">' + step.title + '</div>' +
-                    '<div class="step-desc">' + step.desc + '</div>' +
-                    '<div class="tour-btns">' +
-                        '<button class="tour-btn-skip" onclick="endTour()">跳过</button>' +
-                        (_tourIdx > 0 ? '<button class="tour-btn-prev" onclick="tourPrev()">上一步</button>' : '') +
-                        '<button class="tour-btn-next" onclick="tourNext()">' + (_tourIdx === total - 1 ? '完成' : '下一步') + '</button>' +
-                    '</div>';
-                // 定位提示框（优先放目标下方，空间不足放上方）
-                _tourBox.style.visibility = 'hidden';
-                _tourBox.style.display = 'block';
-                const bw = _tourBox.offsetWidth, bh = _tourBox.offsetHeight;
-                let left = r.left;
-                let top = r.bottom + 12;
-                if (top + bh > window.innerHeight - 8) top = Math.max(8, r.top - bh - 12);
-                left = Math.max(8, Math.min(left, window.innerWidth - bw - 8));
-                _tourBox.style.left = left + 'px';
-                _tourBox.style.top = top + 'px';
-                _tourBox.style.visibility = 'visible';
-            }, step.open ? 350 : 0);
-        }
-
-        function tourNext() {
-            _tourIdx++;
-            if (_tourIdx >= _tourSteps.length) { endTour(); return; }
-            showTourStep();
-        }
-        function tourPrev() {
-            if (_tourIdx > 0) { _tourIdx--; showTourStep(); }
-        }
-        function endTour(silent) {
-            if (_tourSpot) { _tourSpot.remove(); _tourSpot = null; }
-            if (_tourBox) { _tourBox.remove(); _tourBox = null; }
-            if (!silent) localStorage.setItem(TFJL_TOUR_KEY, 'true');
-        }
 
 
 
