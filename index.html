@@ -10597,7 +10597,7 @@
                     <div style="flex:1;overflow:hidden;">
                         <div style="display:flex;align-items:center;gap:6px;">
                             <span style="color:${catColor};font-size:0.65rem;padding:1px 6px;border-radius:8px;background:${catColor}25;flex-shrink:0;">${fileCat}</span>
-                            <span style="color:#fff;font-weight:bold;font-size:0.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${displayName}</span>
+                            <span onclick="openScannedFileInEditor('${safePath}','${safeName}')" style="color:#fff;font-weight:bold;font-size:0.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;" title="在编辑器中打开">${displayName}</span>
                         </div>
                         <div style="color:rgba(255,255,255,0.35);font-size:0.7rem;margin-left:4px;">${f.dirLabel} · ${f.ext.toUpperCase()}</div>
                     </div>
@@ -11006,15 +11006,16 @@
         }
 
         // ========== 底部多标签脚本编辑器 ==========
-        let scriptEditorTabs = []; // { id, fileIndex, name, content, originalContent, modified }
+        let scriptEditorTabs = []; // { id, fileIndex, filePath?, name, content, originalContent, modified, isScanned? }
         let activeScriptEditorTabId = null;
 
+        // 打开项目文件到编辑器（fileIndex 为 txtFiles 数组索引）
         function openScriptEditorTab(fileIndex) {
             if (!txtFiles[fileIndex]) return;
             const file = txtFiles[fileIndex];
 
             // 已有该文件的标签则激活
-            const existing = scriptEditorTabs.find(t => t.fileIndex === fileIndex);
+            const existing = scriptEditorTabs.find(t => t.fileIndex === fileIndex && !t.isScanned);
             if (existing) {
                 switchScriptEditorTab(existing.id);
                 return;
@@ -11028,6 +11029,55 @@
                 content: file.content,
                 originalContent: file.content,
                 modified: false
+            });
+
+            document.getElementById('scriptEditorTabs').style.display = 'flex';
+            switchScriptEditorTab(tabId);
+        }
+
+        // 打开扫描文件到编辑器（filePath 为本地路径，用于去重和回写）
+        async function openScannedFileInEditor(filePath, fileName) {
+            // 解码路径
+            let realPath = filePath;
+            let realName = fileName;
+            if (typeof realPath === 'string') realPath = realPath.replace(/\\\\/g, '\\').replace(/\\'/g, "'");
+            if (typeof realName === 'string') realName = realName.replace(/\\\\/g, '\\').replace(/\\'/g, "'");
+
+            // 去重：已有该路径的标签则激活
+            const existing = scriptEditorTabs.find(t => t.filePath === realPath);
+            if (existing) {
+                switchScriptEditorTab(existing.id);
+                return;
+            }
+
+            // 读取文件内容
+            let content = '';
+            try {
+                if (window.readTextFile) {
+                    content = await window.readTextFile(realPath);
+                    if (content === null || content === undefined) {
+                        alert('读取文件失败: ' + realPath);
+                        return;
+                    }
+                } else {
+                    alert('当前环境不支持读取本地文件，请在 App 中使用此功能');
+                    return;
+                }
+            } catch (e) {
+                alert('读取文件失败: ' + e.message);
+                return;
+            }
+
+            const tabId = 'tab_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+            scriptEditorTabs.push({
+                id: tabId,
+                fileIndex: -1,
+                filePath: realPath,
+                name: realName,
+                content: content,
+                originalContent: content,
+                modified: false,
+                isScanned: true
             });
 
             document.getElementById('scriptEditorTabs').style.display = 'flex';
@@ -11074,8 +11124,9 @@
                 const active = tab.id === activeScriptEditorTabId;
                 const dirty = tab.modified ? ' *' : '';
                 const name = tab.name.length > 18 ? tab.name.slice(0, 16) + '…' : tab.name;
-                return `<div onclick="switchScriptEditorTab('${tab.id}')" style="flex-shrink:0;cursor:pointer;display:flex;align-items:center;gap:5px;padding:6px 10px;border-radius:6px 6px 0 0;font-size:0.8rem;white-space:nowrap;transition:all 0.15s;background:${active ? 'rgba(76,175,80,0.22)' : 'rgba(255,255,255,0.05)'};border:${active ? '1px solid rgba(76,175,80,0.45)' : '1px solid rgba(255,255,255,0.08)'};border-bottom:none;color:${active ? '#4caf50' : 'rgba(255,255,255,0.7)'};font-weight:${active ? 'bold' : 'normal'};">
-                    <span>📄 ${name}${dirty}</span>
+                const icon = tab.isScanned ? '📂' : '📄';
+                return `<div onclick="switchScriptEditorTab('${tab.id}')" style="flex-shrink:0;cursor:pointer;display:flex;align-items:center;gap:5px;padding:6px 10px;border-radius:6px 6px 0 0;font-size:0.8rem;white-space:nowrap;transition:all 0.15s;background:${active ? (tab.isScanned ? 'rgba(0,188,212,0.22)' : 'rgba(76,175,80,0.22)') : 'rgba(255,255,255,0.05)'};border:${active ? (tab.isScanned ? '1px solid rgba(0,188,212,0.45)' : '1px solid rgba(76,175,80,0.45)') : '1px solid rgba(255,255,255,0.08)'};border-bottom:none;color:${active ? (tab.isScanned ? '#00bcd4' : '#4caf50') : 'rgba(255,255,255,0.7)'};font-weight:${active ? 'bold' : 'normal'};">
+                    <span>${icon} ${name}${dirty}</span>
                     <span onclick="closeScriptEditorTab('${tab.id}', event)" style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;font-size:0.75rem;transition:background 0.15s;" onmouseover="this.style.background='rgba(244,67,54,0.35)'" onmouseout="this.style.background='transparent'">×</span>
                 </div>`;
             }).join('');
@@ -11123,6 +11174,32 @@
         function scriptEditorSave() {
             const tab = getActiveScriptEditorTab();
             if (!tab) { alert('请先打开一个标签'); return; }
+
+            if (tab.isScanned) {
+                // 扫描文件：写回本地原路径
+                if (tab.filePath && window.saveFileContent) {
+                    window.saveFileContent(tab.filePath, tab.content, (ok, msg) => {
+                        if (ok) {
+                            tab.originalContent = tab.content;
+                            tab.modified = false;
+                            renderScriptEditorTabs();
+                            refreshScriptEditorBody();
+                            const status = document.getElementById('scriptEditorStatus');
+                            if (status) {
+                                status.textContent = '保存成功（已写回源文件）';
+                                setTimeout(() => { if (status) status.textContent = `共 ${tab.content.length} 字`; }, 1500);
+                            }
+                        } else {
+                            alert('保存失败: ' + (msg || '未知错误'));
+                        }
+                    });
+                } else {
+                    alert('当前环境不支持写入本地文件');
+                }
+                return;
+            }
+
+            // 项目文件
             if (!txtFiles[tab.fileIndex]) return;
 
             txtFiles[tab.fileIndex].content = tab.content;
