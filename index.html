@@ -3145,13 +3145,13 @@
                     <div onclick="exportCurrentProject();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📤 备份此项目</div>
                     <div onclick="importSingleProject();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📥 恢复项目</div>
 
-                    <div onclick="openHelpPage();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#4fc3f7;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📖 帮助</div>
                     <div onclick="openMindmap();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#ffd700;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📊 功能导览</div>
                     <div id="menuDownloadDesktop" onclick="openDownloadModal();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#4fc3f7;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📥 下载桌面版</div>
                     <div id="menuToggleEffects" onclick="toggleVisualEffects();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">✨ 背景特效：开</div>
                     <div id="menuCheckUpdateItem" onclick="menuCheckUpdate();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#81c784;display:none;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">🔄 检查更新</div>
                     <div onclick="forceRefreshLatest();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#ffd54f;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">♻️ 刷新最新资源</div>
                     <div onclick="window.location.href='auction.html';document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">🏪 进入拍卖系统</div>
+                    <div onclick="openHelpPage();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#4fc3f7;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📖 帮助</div>
                     <div onclick="logoutToLogin();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#ff6b6b;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,107,107,0.1)'" onmouseout="this.style.background='transparent'">🔙 退出登录</div>
                 </div>
             </div>
@@ -18222,12 +18222,19 @@ function hasGistToken() {
                 total_downloads: 0,
                 active_today: 0,
                 active_today_users: [],
+                active_today_app: 0,
+                active_today_web: 0,
+                active_today_app_users: [],
+                active_today_web_users: [],
                 active_date: today,
                 online_users: {},
                 online_timeout: 3600000,
+                sources: { app_visits: 0, web_visits: 0 },
                 daily_stats: {
                     [today]: {
                         visits: 0,
+                        app_visits: 0,
+                        web_visits: 0,
                         downloads: 0
                     }
                 },
@@ -18310,12 +18317,21 @@ function hasGistToken() {
                             if (parsed.total_downloads === undefined) parsed.total_downloads = 0;
                             if (!parsed.online_users) parsed.online_users = {};
                             if (!parsed.online_timeout) parsed.online_timeout = 3600000;
+                            if (!parsed.sources) parsed.sources = { app_visits: 0, web_visits: 0 };
+                            if (parsed.active_today_app === undefined) parsed.active_today_app = 0;
+                            if (parsed.active_today_web === undefined) parsed.active_today_web = 0;
+                            if (!parsed.active_today_app_users) parsed.active_today_app_users = [];
+                            if (!parsed.active_today_web_users) parsed.active_today_web_users = [];
                             
                             // 检查日期是否变化，如果新的一天则清空今日活跃用户
                             const today = getTodayString();
                             if (!parsed.active_date || parsed.active_date !== today) {
                                 parsed.active_today_users = [];
                                 parsed.active_today = 0;
+                                parsed.active_today_app_users = [];
+                                parsed.active_today_web_users = [];
+                                parsed.active_today_app = 0;
+                                parsed.active_today_web = 0;
                                 parsed.active_date = today;
                             }
                             
@@ -18482,6 +18498,8 @@ function hasGistToken() {
                 if (!counterData.daily_stats[today]) {
                     counterData.daily_stats[today] = {
                         visits: 0,
+                        app_visits: 0,
+                        web_visits: 0,
                         downloads: 0,
                         new_users: 0,
                         hourly_visits: new Array(24).fill(0)
@@ -18489,14 +18507,23 @@ function hasGistToken() {
                 }
                 if (!counterData.daily_stats[today].new_users) counterData.daily_stats[today].new_users = 0;
                 if (!counterData.daily_stats[today].hourly_visits) counterData.daily_stats[today].hourly_visits = new Array(24).fill(0);
+                if (counterData.daily_stats[today].app_visits === undefined) counterData.daily_stats[today].app_visits = 0;
+                if (counterData.daily_stats[today].web_visits === undefined) counterData.daily_stats[today].web_visits = 0;
                 // 确保 unique_users 和 active_today_users 数组存在
                 if (!counterData.unique_users) counterData.unique_users = [];
                 if (!counterData.active_today_users) counterData.active_today_users = [];
+                if (!counterData.active_today_app_users) counterData.active_today_app_users = [];
+                if (!counterData.active_today_web_users) counterData.active_today_web_users = [];
+                if (!counterData.sources) counterData.sources = { app_visits: 0, web_visits: 0 };
                 
                 // 检查日期是否变化，如果新的一天则清空今日活跃用户
                 if (!counterData.active_date || counterData.active_date !== today) {
                     counterData.active_today_users = [];
                     counterData.active_today = 0;
+                    counterData.active_today_app_users = [];
+                    counterData.active_today_web_users = [];
+                    counterData.active_today_app = 0;
+                    counterData.active_today_web = 0;
                     counterData.active_date = today;
                 }
                 
@@ -18520,8 +18547,17 @@ function hasGistToken() {
                 // 更新对应统计
                 switch (type) {
                     case 'visit':
+                        const isApp = !!(window.__TAURI__);
                         counterData.total_visits++;
                         counterData.daily_stats[today].visits++;
+                        // 记录来源（APP/网页）
+                        if (isApp) {
+                            counterData.sources.app_visits++;
+                            counterData.daily_stats[today].app_visits++;
+                        } else {
+                            counterData.sources.web_visits++;
+                            counterData.daily_stats[today].web_visits++;
+                        }
                         // 记录访问时段
                         const hour = new Date().getHours();
                         if (counterData.daily_stats[today].hourly_visits) {
@@ -18542,6 +18578,18 @@ function hasGistToken() {
                         }
                         // 记录每日活跃用户数到daily_stats
                         counterData.daily_stats[today].active_users = counterData.active_today_users.length;
+                        // 记录活跃用户来源
+                        if (isApp) {
+                            if (!counterData.active_today_app_users.includes(deviceId)) {
+                                counterData.active_today_app_users.push(deviceId);
+                                counterData.active_today_app = counterData.active_today_app_users.length;
+                            }
+                        } else {
+                            if (!counterData.active_today_web_users.includes(deviceId)) {
+                                counterData.active_today_web_users.push(deviceId);
+                                counterData.active_today_web = counterData.active_today_web_users.length;
+                            }
+                        }
                         break;
                         
                     case 'download':
@@ -21671,15 +21719,16 @@ function hasGistToken() {
                     <h3 style="color:#4ecdc4;">📈 总计数据</h3>
                     <div style="padding-left:20px;">
                         <p>• 总访问次数：${counterData.total_visits}</p>
+                        <p>• 总 APP 访问：${(counterData.sources && counterData.sources.app_visits) || 0}  |  总 网页 访问：${(counterData.sources && counterData.sources.web_visits) || 0}</p>
                         <p>• 总用户数：${totalUsers}</p>
                         <p>• 当前在线：${onlineCount} <span style="color:#888;font-size:0.8rem;">(${onlineTimeoutMinutes}分钟内活跃)</span></p>
-                        <p>• 今日活跃：${activeToday}</p>
+                        <p>• 今日活跃：${activeToday} (APP: ${(counterData.active_today_app_users || []).length} / 网页: ${(counterData.active_today_web_users || []).length})</p>
                         <p>• 总下载次数：${counterData.total_downloads}</p>
                     </div>
                     
                     <h3 style="color:#4ecdc4;">📅 今日数据 (${today})</h3>
                     <div style="padding-left:20px;">
-                        <p>• 今日访问：${todayStats.visits}</p>
+                        <p>• 今日访问：${todayStats.visits} (APP: ${todayStats.app_visits || 0} / 网页: ${todayStats.web_visits || 0})</p>
                         <p>• 今日下载：${todayStats.downloads}</p>
                     </div>
                     
@@ -23176,38 +23225,68 @@ function hasGistToken() {
             html += analyticsCard('当前在线', onlineCount, '⚡');
             html += `</div>`;
 
+            // APP/网页 来源概览
+            const totalAppVisits = (data.sources && data.sources.app_visits) || 0;
+            const totalWebVisits = (data.sources && data.sources.web_visits) || 0;
+            const todayAppVisits = todayStats.app_visits || 0;
+            const todayWebVisits = todayStats.web_visits || 0;
+            const activeApp = (data.active_today_app_users || []).length;
+            const activeWeb = (data.active_today_web_users || []).length;
+            html += `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:20px;">`;
+            html += analyticsCard('总 APP 访问', totalAppVisits, '📱', '#1976d2');
+            html += analyticsCard('总 网页 访问', totalWebVisits, '🌐', '#00bcd4');
+            html += analyticsCard('今日 APP', todayAppVisits, '📱', activeApp > 0 ? '#4ade80' : 'rgba(255,255,255,0.5)');
+            html += analyticsCard('今日 网页', todayWebVisits, '🌐', activeWeb > 0 ? '#4ade80' : 'rgba(255,255,255,0.5)');
+            html += `</div>`;
+
             // 最近7天摘要
+            let last7AppVisits = 0, last7WebVisits = 0;
+            last7Dates.forEach(d => {
+                const s = dailyStats[d];
+                if (s) {
+                    last7AppVisits += (s.app_visits || 0);
+                    last7WebVisits += (s.web_visits || 0);
+                }
+            });
             html += `<div style="background:rgba(255,255,255,0.05);border-radius:10px;padding:15px;margin-bottom:20px;">`;
             html += `<div style="color:#4ecdc4;font-size:0.9rem;margin-bottom:8px;">📋 近期摘要</div>`;
             html += `<div style="display:flex;gap:20px;flex-wrap:wrap;font-size:0.85rem;">`;
-            html += `<span>最近7天访问：<b style="color:#ffd700;">${last7Visits}</b></span>`;
+            html += `<span>最近7天访问：<b style="color:#ffd700;">${last7Visits}</b> (APP: <span style="color:#1976d2;">${last7AppVisits}</span> / 网页: <span style="color:#00bcd4;">${last7WebVisits}</span>)</span>`;
             html += `<span>最近7天新用户：<b style="color:#4caf50;">${last7NewUsers}</b></span>`;
             html += `<span>最近30天访问：<b style="color:#ffd700;">${last30Visits}</b></span>`;
             html += `<span>最近30天新用户：<b style="color:#4caf50;">${last30NewUsers}</b></span>`;
             html += `</div></div>`;
 
-            // 日访问趋势图（柱状图，含活跃用户折线）
+            // 日访问趋势图（柱状图，含活跃用户折线，APP/网页 堆叠）
             if (recentDates.length > 0) {
                 const maxVisits = Math.max(...recentDates.map(d => (dailyStats[d].visits || 0)), 1);
                 const maxActive = Math.max(...recentDates.map(d => (dailyStats[d].active_users || 0)), 1);
                 html += `<div style="background:rgba(255,255,255,0.05);border-radius:10px;padding:15px;margin-bottom:20px;">`;
-                html += `<div style="color:#4ecdc4;font-size:0.9rem;margin-bottom:15px;">📊 日访问趋势（最近${recentDates.length}天）</div>`;
+                html += `<div style="color:#4ecdc4;font-size:0.9rem;margin-bottom:15px;">📊 日访问趋势（最近${recentDates.length}天）【APP/网页】</div>`;
                 html += `<div style="display:flex;align-items:flex-end;gap:2px;height:180px;overflow-x:auto;padding-bottom:25px;position:relative;border-bottom:1px solid rgba(255,255,255,0.1);">`;
                 recentDates.forEach((d, idx) => {
                     const s = dailyStats[d];
                     const v = s.visits || 0;
+                    const appV = s.app_visits || 0;
+                    const webV = s.web_visits || 0;
                     const newU = s.new_users || 0;
                     const actU = s.active_users || 0;
-                    const barH = Math.max((v / maxVisits) * 150, 2);
-                    const newBarH = v > 0 ? Math.max((newU / v) * barH, 0) : 0;
-                    const actDotTop = 150 - Math.max((actU / maxActive) * 150, 0); // 折线点位置
-                    const dateLabel = d.substring(5); // MM-DD
+                    const barH = Math.max((v / maxVisits) * 150, v > 0 ? 2 : 0);
+                    const appBarH = barH > 0 ? Math.max((appV / Math.max(v,1)) * barH, 0) : 0;
+                    const webBarH = barH - appBarH;
+                    const actDotTop = 150 - Math.max((actU / maxActive) * 150, 0);
+                    const dateLabel = d.substring(5);
                     const isToday = d === today;
-                    html += `<div style="flex:0 0 24px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;position:relative;" title="${d}\n访问: ${v}\n新用户: ${newU}\n活跃用户: ${actU}">`;
+                    html += `<div style="flex:0 0 24px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;position:relative;" title="${d}\nAPP访问: ${appV}\n网页访问: ${webV}\n总访问: ${v}\n活跃用户: ${actU}">`;
                     html += `<div style="position:absolute;top:-16px;font-size:0.65rem;color:#ffd700;white-space:nowrap;">${v > 0 ? v : ''}</div>`;
-                    html += `<div style="width:18px;background:linear-gradient(180deg,#00bcd4,#00838f);border-radius:3px 3px 0 0;height:${barH}px;position:relative;">`;
-                    if (newBarH > 0) {
-                        html += `<div style="position:absolute;bottom:0;width:100%;background:linear-gradient(180deg,#4caf50,#2e7d32);border-radius:0 0 0 0;height:${newBarH}px;"></div>`;
+                    html += `<div style="width:18px;border-radius:3px 3px 0 0;height:${barH}px;position:relative;overflow:hidden;">`;
+                    // APP 部分（蓝色）
+                    if (appBarH > 0) {
+                        html += `<div style="position:absolute;bottom:${webBarH > 0 ? webBarH : 0}px;width:100%;background:linear-gradient(180deg,#1976d2,#0d47a1);height:${appBarH}px;border-radius:${webBarH > 0 ? '0' : '3px 3px 0 0'};"></div>`;
+                    }
+                    // 网页部分（青色）
+                    if (webBarH > 0) {
+                        html += `<div style="position:absolute;bottom:0;width:100%;background:linear-gradient(180deg,#00bcd4,#00838f);height:${webBarH}px;border-radius:${appBarH > 0 ? '0' : '3px 3px 0 0'};"></div>`;
                     }
                     html += `</div>`;
                     // 活跃用户折线点
@@ -23219,8 +23298,8 @@ function hasGistToken() {
                 });
                 html += `</div>`;
                 html += `<div style="display:flex;gap:15px;margin-top:10px;font-size:0.75rem;">`;
-                html += `<span><span style="display:inline-block;width:12px;height:12px;background:#00bcd4;border-radius:2px;vertical-align:middle;"></span> 访问量</span>`;
-                html += `<span><span style="display:inline-block;width:12px;height:12px;background:#4caf50;border-radius:2px;vertical-align:middle;"></span> 新用户</span>`;
+                html += `<span><span style="display:inline-block;width:12px;height:12px;background:#1976d2;border-radius:2px;vertical-align:middle;"></span> APP</span>`;
+                html += `<span><span style="display:inline-block;width:12px;height:12px;background:#00bcd4;border-radius:2px;vertical-align:middle;"></span> 网页</span>`;
                 html += `<span><span style="display:inline-block;width:8px;height:8px;background:#ff9800;border-radius:50%;vertical-align:middle;border:1px solid #fff;"></span> 活跃用户</span>`;
                 html += `</div></div>`;
             }
@@ -23366,9 +23445,10 @@ function hasGistToken() {
                     <h3 style="color:#4ecdc4;">📈 总计数据</h3>
                     <div style="padding-left:20px;line-height:2;">
                         <div>• 总访问次数：<span style="color:#ffd700;">${counterData.total_visits}</span></div>
+                        <div>• 总 APP 访问：<span style="color:#1976d2;">${(counterData.sources && counterData.sources.app_visits) || 0}</span>  |  总 网页 访问：<span style="color:#00bcd4;">${(counterData.sources && counterData.sources.web_visits) || 0}</span></div>
                         <div>• 总用户数：<span style="color:#ffd700;">${totalUsers}</span></div>
                         <div>• 当前在线：<span style="color:#4ade80;">${onlineCount}</span> <span style="color:rgba(255,255,255,0.35);font-size:0.8rem;">(${onlineTimeoutMinutes}分钟内活跃)</span></div>
-                        <div>• 今日活跃：<span style="color:#4ade80;">${activeToday}</span></div>
+                        <div>• 今日活跃：<span style="color:#4ade80;">${activeToday}</span> <span style="font-size:0.8rem;">(APP: <span style="color:#1976d2;">${(counterData.active_today_app_users || []).length}</span> / 网页: <span style="color:#00bcd4;">${(counterData.active_today_web_users || []).length}</span>)</div>
                         <div>• 总下载次数：<span style="color:#ffd700;">${counterData.total_downloads}</span></div>
                     </div>
                 </div>
@@ -23383,7 +23463,7 @@ function hasGistToken() {
                 <div class="admin-section">
                     <h3 style="color:#4ecdc4;">📅 今日数据 (${today})</h3>
                     <div style="padding-left:20px;line-height:2;">
-                        <div>• 今日访问：<span style="color:#ffd700;">${todayStats.visits}</span></div>
+                        <div>• 今日访问：<span style="color:#ffd700;">${todayStats.visits}</span> (APP: <span style="color:#1976d2;">${todayStats.app_visits || 0}</span> / 网页: <span style="color:#00bcd4;">${todayStats.web_visits || 0}</span>)</div>
                         <div>• 今日下载：<span style="color:#ffd700;">${todayStats.downloads}</span></div>
                     </div>
                 </div>
