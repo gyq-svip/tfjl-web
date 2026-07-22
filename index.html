@@ -5443,16 +5443,30 @@
         }
 
         // ==================== 下载桌面版 & 版本检查 ====================
-        const CURRENT_VERSION = '1.1.6';
+        // 注意：当前版本号不再硬编码（容易漏改导致反复弹更新），
+        // 改为运行时从 Tauri 取真实版本（Cargo.toml/tauri.conf.json 每次打包都升，不会漏）。
+        // 在线版（非 Tauri）没有本地版本，显示为「网页版」。
+        let CURRENT_VERSION = '网页版';
         const GITHUB_RELEASES_PAGE = 'https://github.com/gyq-svip/tfjl-web/releases';
         const VERSION_JSON_URL = 'https://gyq-svip.github.io/tfjl-web/version.json';
 
-        // 初始化版本号显示
-        function initVersionDisplay() {
+        // 运行时填充当前版本号（桌面版从 Tauri 取，在线版保持「网页版」）
+        async function fillCurrentVersion() {
+            try {
+                if (window.__TAURI__ && window.__TAURI__.app && window.__TAURI__.app.getVersion) {
+                    const v = await window.__TAURI__.app.getVersion();
+                    if (v) CURRENT_VERSION = v;
+                }
+            } catch (e) {}
             const el = document.getElementById('currentVersionText');
             if (el) el.textContent = CURRENT_VERSION;
             const el2 = document.getElementById('dlCurrentVersion');
             if (el2) el2.textContent = CURRENT_VERSION;
+        }
+
+        // 初始化版本号显示（异步填充，不阻塞）
+        function initVersionDisplay() {
+            fillCurrentVersion();
         }
 
         // 打开下载弹窗
@@ -5510,6 +5524,7 @@
 
         // 检查最新 Release 并在弹窗中显示
         async function checkLatestReleaseInfo() {
+            await fillCurrentVersion();
             const statusEl = document.getElementById('dlUpdateStatus');
             const latestInfo = document.getElementById('dlLatestInfo');
             const githubLink = document.getElementById('dlGithubLink');
@@ -5596,6 +5611,7 @@
         // 菜单「检查更新」：桌面版优先走 Tauri 自动更新器（自动下载安装重启），
         // 不支持时回退到 version.json 检查 + 下载弹窗
         async function menuCheckUpdate() {
+            await fillCurrentVersion();
             const t = showLoadingToast('🔍 正在检查更新...');
             try {
                 // 桌面版且已集成 updater 插件：一键自动更新（免重装）
@@ -5681,6 +5697,7 @@
 
         // 检查更新（静默模式，在 App 启动时使用）
         async function checkForUpdates() {
+            await fillCurrentVersion();
             const release = await fetchLatestRelease();
             if (!release) {
                 showToast('⚠️ 无法获取最新版本信息');
@@ -23471,7 +23488,7 @@ function hasGistToken() {
                 游戏相关内容版权归官方所有，本工具与游戏官方无任何关联。
             </p>
             <p style="margin:10px 0 0 0;line-height:1.6;color:#555;font-size:0.78rem;">
-                <span id="footerVersion">v<span id="currentVersionText">1.1.4</span></span>
+                <span id="footerVersion">v<span id="currentVersionText">网页版</span></span>
                 <a href="javascript:openDownloadModal()" style="color:#4fc3f7;margin-left:8px;text-decoration:none;font-size:0.78rem;" title="下载桌面版">📥 下载桌面版</a>
                 <span id="updateBadgeFooter" style="display:none;margin-left:8px;background:rgba(76,175,80,0.3);color:#81c784;padding:2px 8px;border-radius:10px;font-size:0.7rem;animation:pulse 1.5s ease-in-out infinite;">🔄 有新版本可更新!</span>
             </p>
@@ -23509,7 +23526,7 @@ function hasGistToken() {
                     </ul>
                     <div id="downloadVersionInfo" style="background:rgba(0,188,212,0.1);border:1px solid rgba(0,188,212,0.3);border-radius:8px;padding:12px;margin-bottom:15px;text-align:center;">
                         <div style="font-size:0.85rem;">当前版本</div>
-                        <div style="font-size:1.4rem;font-weight:bold;color:#4fc3f7;margin:5px 0;">v<span id="dlCurrentVersion">1.1.6</span></div>
+                        <div style="font-size:1.4rem;font-weight:bold;color:#4fc3f7;margin:5px 0;">v<span id="dlCurrentVersion">网页版</span></div>
                         <div id="dlLatestInfo" style="font-size:0.78rem;color:#888;margin-top:5px;"></div>
                     </div>
                     <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;">
