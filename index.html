@@ -18229,7 +18229,8 @@ function hasGistToken() {
                 active_date: today,
                 online_users: {},
                 online_timeout: 3600000,
-                sources: { app_visits: 0, web_visits: 0, new_app_users: 0, new_web_users: 0 },
+                sources: { app_visits: 0, web_visits: 0, new_app_users: 0, new_web_users: 0, app_users: 0, web_users: 0 },
+                user_sources: {},  // 每个用户的注册平台：{ deviceId: 'app' | 'web' }
                 daily_stats: {
                     [today]: {
                         visits: 0,
@@ -18323,6 +18324,27 @@ function hasGistToken() {
                             if (!parsed.sources) parsed.sources = { app_visits: 0, web_visits: 0 };
                             if (parsed.sources.new_app_users === undefined) parsed.sources.new_app_users = 0;
                             if (parsed.sources.new_web_users === undefined) parsed.sources.new_web_users = 0;
+                            if (parsed.sources.app_users === undefined) parsed.sources.app_users = 0;
+                            if (parsed.sources.web_users === undefined) parsed.sources.web_users = 0;
+                            if (!parsed.user_sources) parsed.user_sources = {};
+                            
+                            // ========== 历史数据迁移：旧用户统一归为网页来源 ==========
+                            if (parsed.unique_users && parsed.unique_users.length > 0) {
+                                let appUsers = 0, webUsers = 0;
+                                let needRecalc = false;
+                                for (const uid of parsed.unique_users) {
+                                    if (!parsed.user_sources[uid]) {
+                                        parsed.user_sources[uid] = 'web'; // 旧用户归为网页
+                                        needRecalc = true;
+                                    }
+                                    if (parsed.user_sources[uid] === 'app') appUsers++;
+                                    else webUsers++;
+                                }
+                                if (needRecalc || parsed.sources.app_users + parsed.sources.web_users !== parsed.unique_users.length) {
+                                    parsed.sources.app_users = appUsers;
+                                    parsed.sources.web_users = webUsers;
+                                }
+                            }
                             if (parsed.active_today_app === undefined) parsed.active_today_app = 0;
                             if (parsed.active_today_web === undefined) parsed.active_today_web = 0;
                             if (!parsed.active_today_app_users) parsed.active_today_app_users = [];
@@ -18444,6 +18466,27 @@ function hasGistToken() {
                                     fresh.sources.web_visits = Math.max(fresh.sources.web_visits || 0, localData.sources.web_visits || 0);
                                     fresh.sources.new_app_users = Math.max(fresh.sources.new_app_users || 0, localData.sources.new_app_users || 0);
                                     fresh.sources.new_web_users = Math.max(fresh.sources.new_web_users || 0, localData.sources.new_web_users || 0);
+                                    // 合并平台用户数（取最大值）
+                                    fresh.sources.app_users = Math.max(fresh.sources.app_users || 0, localData.sources.app_users || 0);
+                                    fresh.sources.web_users = Math.max(fresh.sources.web_users || 0, localData.sources.web_users || 0);
+                                }
+                                
+                                // 合并用户平台归属（user_sources）
+                                if (localData.user_sources && typeof localData.user_sources === 'object') {
+                                    if (!fresh.user_sources) fresh.user_sources = {};
+                                    for (const uid in localData.user_sources) {
+                                        if (!fresh.user_sources[uid]) {
+                                            fresh.user_sources[uid] = localData.user_sources[uid];
+                                        }
+                                    }
+                                    // 重新统计平台用户数
+                                    let appU = 0, webU = 0;
+                                    for (const uid in fresh.user_sources) {
+                                        if (fresh.user_sources[uid] === 'app') appU++;
+                                        else webU++;
+                                    }
+                                    fresh.sources.app_users = appU;
+                                    fresh.sources.web_users = webU;
                                 }
                                 
                                 // 合并今日活跃APP/网页用户
@@ -18649,10 +18692,23 @@ function hasGistToken() {
                             counterData.daily_stats[today].hourly_visits[hour]++;
                         }
                         
-                        // 记录新用户（含来源）
+                        // 记录新用户（含来源/平台归属）
                         if (!counterData.unique_users.includes(deviceId)) {
                             counterData.unique_users.push(deviceId);
                             counterData.total_users = counterData.unique_users.length;
+                            // 记录用户注册平台（持久化归属）
+                            if (!counterData.user_sources) counterData.user_sources = {};
+                            if (!counterData.user_sources[deviceId]) {
+                                counterData.user_sources[deviceId] = isApp ? 'app' : 'web';
+                            }
+                            // 重新统计平台用户数
+                            let appUserCount = 0, webUserCount = 0;
+                            for (const uid in counterData.user_sources) {
+                                if (counterData.user_sources[uid] === 'app') appUserCount++;
+                                else webUserCount++;
+                            }
+                            counterData.sources.app_users = appUserCount;
+                            counterData.sources.web_users = webUserCount;
                             // 总新增数（全来源）
                             counterData.daily_stats[today].new_users = (counterData.daily_stats[today].new_users || 0) + 1;
                             // 按来源区分新增
@@ -23313,6 +23369,8 @@ function hasGistToken() {
             html += `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:20px;">`;
             html += analyticsCard('累计访问次数', totalVisits, '🔵');
             html += analyticsCard('累计用户数', totalUsers, '🟢');
+            html += analyticsCard('APP 注册用户', (counterData.sources && counterData.sources.app_users) || 0, '📱', '#1976d2');
+            html += analyticsCard('网页 注册用户', (counterData.sources && counterData.sources.web_users) || 0, '🌐', '#00bcd4');
             html += analyticsCard('今日访问次数', todayVisits, `📈 ${visitTrend >= 0 ? '↑' : '↓'}${Math.abs(visitTrend).toFixed(0)}%`, visitTrend >= 0 ? '#4caf50' : '#ef4444');
             html += analyticsCard('今日新增用户', todayStats.new_users || 0, '🆕');
             html += analyticsCard('今日活跃用户', activeToday, '🔥');
@@ -23540,7 +23598,8 @@ function hasGistToken() {
                     <div style="padding-left:20px;line-height:2;">
                         <div>• 累计访问次数：<span style="color:#ffd700;">${counterData.total_visits}</span></div>
                         <div>• 累计 APP 访问次数：<span style="color:#1976d2;">${(counterData.sources && counterData.sources.app_visits) || 0}</span>  |  累计 网页 访问次数：<span style="color:#00bcd4;">${(counterData.sources && counterData.sources.web_visits) || 0}</span></div>
-                        <div>• 累计用户数：<span style="color:#ffd700;">${totalUsers}</span> (APP新增: <span style="color:#1976d2;">${(counterData.sources && counterData.sources.new_app_users) || 0}</span> / 网页新增: <span style="color:#00bcd4;">${(counterData.sources && counterData.sources.new_web_users) || 0}</span>)</div>
+                        <div>• 累计用户数：<span style="color:#ffd700;">${totalUsers}</span></div>
+                        <div>• APP 注册用户：<span style="color:#1976d2;">${(counterData.sources && counterData.sources.app_users) || 0}</span>  |  网页 注册用户：<span style="color:#00bcd4;">${(counterData.sources && counterData.sources.web_users) || 0}</span> <span style="color:rgba(255,255,255,0.3);font-size:0.8rem;">(首次访问时所在的平台)</span></div>
                         <div>• 当前在线用户：<span style="color:#4ade80;">${onlineCount}</span> <span style="color:rgba(255,255,255,0.35);font-size:0.8rem;">(${onlineTimeoutMinutes}分钟内活跃)</span></div>
                         <div>• 今日活跃用户：<span style="color:#4ade80;">${activeToday}</span> <span style="font-size:0.8rem;">(APP: <span style="color:#1976d2;">${(counterData.active_today_app_users || []).length}</span> / 网页: <span style="color:#00bcd4;">${(counterData.active_today_web_users || []).length}</span>)</div>
                         <div>• 累计下载次数：<span style="color:#ffd700;">${counterData.total_downloads}</span></div>
