@@ -5657,18 +5657,26 @@
                             // 使用 download() 分离下载和安装，带进度回调
                             if (typeof update.download === 'function') {
                                 let downloadDone = false;
+                                let totalBytes = 0;
+                                let downloadedBytes = 0;
                                 _currentDownload = new Promise((resolve, reject) => {
                                     update.download((event) => {
                                         if (downloadDone) return;
-                                        if (event.event === 'Progress') {
-                                            _downloadProgress = Math.round((event.data.current / event.data.total) * 100);
+                                        if (event.event === 'Started') {
+                                            totalBytes = event.data && event.data.contentLength ? event.data.contentLength : 0;
+                                        } else if (event.event === 'Progress') {
+                                            downloadedBytes += event.data && event.data.chunkLength ? event.data.chunkLength : 0;
+                                            if (totalBytes > 0) {
+                                                _downloadProgress = Math.round((downloadedBytes / totalBytes) * 100);
+                                            }
                                             t.update('📥 下载中 ' + _downloadProgress + '%');
                                         } else if (event.event === 'Finished') {
+                                            _downloadProgress = 100;
                                             downloadDone = true;
                                             resolve();
                                         }
                                     }).then(() => {
-                                        if (!downloadDone) { downloadDone = true; resolve(); }
+                                        if (!downloadDone) { _downloadProgress = 100; downloadDone = true; resolve(); }
                                     }).catch(reject);
                                 });
 
@@ -5793,17 +5801,25 @@
                         // 后台静默下载（不弹 toast，不打扰用户）
                         if (typeof update.download === 'function') {
                             let downloadDone = false;
+                            let totalBytes = 0;
+                            let downloadedBytes = 0;
                             _currentDownload = new Promise((resolve, reject) => {
                                 update.download((event) => {
                                     if (downloadDone) return;
-                                    if (event.event === 'Progress') {
-                                        _downloadProgress = Math.round((event.data.current / event.data.total) * 100);
+                                    if (event.event === 'Started') {
+                                        totalBytes = event.data && event.data.contentLength ? event.data.contentLength : 0;
+                                    } else if (event.event === 'Progress') {
+                                        downloadedBytes += event.data && event.data.chunkLength ? event.data.chunkLength : 0;
+                                        if (totalBytes > 0) {
+                                            _downloadProgress = Math.round((downloadedBytes / totalBytes) * 100);
+                                        }
                                     } else if (event.event === 'Finished') {
+                                        _downloadProgress = 100;
                                         downloadDone = true;
                                         resolve();
                                     }
                                 }).then(() => {
-                                    if (!downloadDone) { downloadDone = true; resolve(); }
+                                    if (!downloadDone) { _downloadProgress = 100; downloadDone = true; resolve(); }
                                 }).catch(reject);
                             });
 
@@ -5847,17 +5863,25 @@
             }, 2000);
         }
 
-        // 仅检测到新版本但未下载（显示提示，点击打开下载弹窗）
+        // 仅检测到新版本但未下载（显示提示）
+        // APP 内点击走 Tauri 自动更新；网页版才打开下载弹窗
         function _notifyNewVersion(version) {
+            const isTauri = !!(window.__TAURI__ || window.__TAURI_INTERNALS__);
             const badge = document.getElementById('updateBadgeFooter');
             if (badge) badge.style.display = 'inline-block';
             setTimeout(() => {
                 const toast = document.createElement('div');
                 toast.style.cssText = 'position:fixed;top:60px;left:50%;transform:translateX(-50%);padding:12px 25px;border-radius:10px;font-size:0.95rem;font-weight:500;z-index:99999;background:rgba(76,175,80,0.9);color:#fff;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,0.3);';
-                toast.textContent = '🔄 有新版本 v' + version + ' 可下载！点击查看';
-                toast.onclick = function() { openDownloadModal(); toast.remove(); };
+                toast.textContent = isTauri
+                    ? '🔄 有新版本 v' + version + '！点击立即更新'
+                    : '🔄 有新版本 v' + version + ' 可下载！点击查看';
+                toast.onclick = function() {
+                    if (isTauri) { menuCheckUpdate(); }
+                    else { openDownloadModal(); }
+                    toast.remove();
+                };
                 document.body.appendChild(toast);
-                setTimeout(() => { if (toast.parentNode) toast.remove(); }, 8000);
+                setTimeout(() => { if (toast.parentNode) toast.remove(); }, isTauri ? 15000 : 8000);
             }, 2000);
         }
 
