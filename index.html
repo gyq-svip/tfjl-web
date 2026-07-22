@@ -7934,6 +7934,34 @@
                 output += '01:20,下龙王,上龙王不满,\n';
             }
 
+            // 同排机制：飞机+大圣
+            if (hasTongPai) {
+                if (hasGuangJingLing) {
+                    output += '01:20,下大圣,上大圣4级,光葫芦大圣,关闭验光,\n';
+                } else {
+                    output += '01:20,下大圣,上大圣满,\n';
+                }
+            }
+
+            // 如果有魔精灵、木精灵、魂精灵，添加到同一行
+            const jingLing01_25 = [];
+            if (hasLeiJingLing) jingLing01_25.push('每0.1秒共5000次雷精灵');
+            if (hasMoJingLing) jingLing01_25.push('每5秒共5000次魔精灵');
+            if (hasMuJingLing) jingLing01_25.push('每3秒共5000次木精灵');
+            if (hasHunJingLing) jingLing01_25.push('每3秒共5000次魂精灵');
+            if (jingLing01_25.length > 0) {
+                output += '01:25,' + jingLing01_25.join(',') + ',\n';
+            }
+
+            // 龙王+幻精灵同时存在时，01:40重复01:25的精灵操作并加换强袭
+            if (hasLongWang && hasHuanJingLing) {
+                if (jingLing01_25.length > 0) {
+                    output += '01:40,' + jingLing01_25.join(',') + ',换强袭,\n';
+                } else {
+                    output += '01:40,换强袭,\n';
+                }
+            }
+
             // 无敌链逻辑（小野8秒无敌 → 凤凰6秒无敌）—— 仅隐藏榜生效，活动脚本不切卡
             if (!includeChengShang) {
             // 第一张卡名（arrangedCards的第一张）
@@ -8017,34 +8045,6 @@
                 }, 100);
             }
             } // 结束 if (!includeChengShang) 隐藏榜切卡逻辑块
-
-            // 同排机制：飞机+大圣
-            if (hasTongPai) {
-                if (hasGuangJingLing) {
-                    output += '01:20,下大圣,上大圣4级,光葫芦大圣,关闭验光,\n';
-                } else {
-                    output += '01:20,下大圣,上大圣满,\n';
-                }
-            }
-
-            // 如果有魔精灵、木精灵、魂精灵，添加到同一行
-            const jingLing01_25 = [];
-            if (hasLeiJingLing) jingLing01_25.push('每0.1秒共5000次雷精灵');
-            if (hasMoJingLing) jingLing01_25.push('每5秒共5000次魔精灵');
-            if (hasMuJingLing) jingLing01_25.push('每3秒共5000次木精灵');
-            if (hasHunJingLing) jingLing01_25.push('每3秒共5000次魂精灵');
-            if (jingLing01_25.length > 0) {
-                output += '01:25,' + jingLing01_25.join(',') + ',\n';
-            }
-
-            // 龙王+幻精灵同时存在时，01:40重复01:25的精灵操作并加换强袭
-            if (hasLongWang && hasHuanJingLing) {
-                if (jingLing01_25.length > 0) {
-                    output += '01:40,' + jingLing01_25.join(',') + ',换强袭,\n';
-                } else {
-                    output += '01:40,换强袭,\n';
-                }
-            }
 
             // 如果有冰精灵，添加额外输出（空一行）
             if (hasBingJingLing) {
