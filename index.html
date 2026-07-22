@@ -9220,7 +9220,7 @@
                     <input id="txtFileSearchInput" type="text" placeholder="🔍 搜索项目脚本或扫描文件…（输入关键字过滤）" oninput="filterTxtFilesList()" style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid rgba(76,175,80,0.3);background:rgba(0,0,0,0.3);color:#fff;font-size:0.85rem;box-sizing:border-box;">
                 </div>
                 <div id="scriptFileCategoryFilter" style="margin-bottom:10px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;"></div>
-                <div id="txtFilesList" style="display:flex;flex-direction:column;gap:10px;"></div>
+                <div id="txtFilesList" style="display:flex;flex-direction:column;gap:10px;max-height:180px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(255,215,0,0.3) transparent;"></div>
                 <div style="margin-top:10px;color:rgba(255,255,255,0.5);font-size:0.75rem;">💡 支持上传多个TXT文件，也可拖拽文件到此处或 Ctrl+V 粘贴；点击脚本名可在下方标签中打开编辑</div>
 
                 <!-- 底部多标签脚本编辑器 -->
@@ -9228,8 +9228,8 @@
                     <!-- 标签栏 -->
                     <div id="scriptEditorTabBar" style="display:flex;gap:4px;overflow-x:auto;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.08);align-items:flex-end;"></div>
                     <!-- 编辑器区 -->
-                    <div id="scriptEditorBody" style="display:flex;flex-direction:column;gap:8px;padding-top:8px;min-height:220px;">
-                        <textarea id="scriptEditorTextarea" placeholder="选择标签开始编辑…" style="flex:1;min-height:160px;background:rgba(0,0,0,0.3);border:1px solid rgba(76,175,80,0.25);border-radius:8px;color:#e0e0e0;font-family:'Consolas','Monaco',monospace;font-size:0.85rem;padding:10px;line-height:1.5;resize:vertical;outline:none;box-sizing:border-box;"></textarea>
+                    <div id="scriptEditorBody" style="display:flex;flex-direction:column;gap:8px;padding-top:8px;min-height:300px;">
+                        <textarea id="scriptEditorTextarea" placeholder="选择标签开始编辑…" style="flex:1;min-height:300px;background:rgba(0,0,0,0.3);border:1px solid rgba(76,175,80,0.25);border-radius:8px;color:#e0e0e0;font-family:'Consolas','Monaco',monospace;font-size:0.85rem;padding:10px;line-height:1.5;resize:vertical;outline:none;box-sizing:border-box;"></textarea>
                         <!-- 查找替换栏 -->
                         <div id="scriptEditorFindBar" style="display:none;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:6px 8px;">
                             <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px;">
@@ -10580,7 +10580,7 @@
                         <button id="batchImportBtn" onclick="doBatchImport()" style="background:linear-gradient(135deg,#ff9800,#f57c00);color:white;border:none;padding:4px 12px;border-radius:5px;cursor:pointer;font-size:0.75rem;opacity:0.5;">📥 批量导入</button>
                     </div>
                 </div>
-                <div style="max-height:260px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(0,188,212,0.3) transparent;padding-right:4px;display:flex;flex-direction:column;gap:5px;">`;
+                <div style="max-height:180px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(0,188,212,0.3) transparent;padding-right:4px;display:flex;flex-direction:column;gap:5px;">`;
 
             list.forEach(f => {
                 const safePath = f.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
