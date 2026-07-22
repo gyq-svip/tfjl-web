@@ -3087,8 +3087,7 @@
                     <div onclick="importSingleProject();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📥 恢复项目</div>
                     <div onclick="downloadOfflineVersion();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📥 下载离线版</div>
                     <div onclick="startNewbieTour();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#4caf50;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">🔄 新手指引</div>
-                    <div onclick="window.open('help.html','_blank');document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#4fc3f7;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">🌐 新手帮助页</div>
-                    <div onclick="showHelpModal();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📖 使用帮助</div>
+                    <div onclick="openHelpPage();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#4fc3f7;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">🌐 新手帮助页</div>
                     <div onclick="openDownloadModal();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#4fc3f7;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📥 下载桌面版</div>
                     <div onclick="menuCheckUpdate();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#81c784;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">🔄 检查更新</div>
                     <div onclick="forceRefreshLatest();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#ffd54f;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">♻️ 刷新最新资源</div>
@@ -4008,7 +4007,7 @@
                         </div>
                         <div style="display:flex;gap:10px;margin-top:16px;justify-content:center;flex-wrap:wrap;">
                             <button onclick="closeWelcomeGuide();startNewbieTour();" style="padding:10px 20px;border-radius:8px;border:none;background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;cursor:pointer;font-size:0.85rem;font-weight:600;">🚀 新手指引</button>
-                            <button onclick="closeWelcomeGuide();showHelpModal();" style="padding:10px 20px;border-radius:8px;border:none;background:linear-gradient(135deg,#4fc3f7,#0288d1);color:white;cursor:pointer;font-size:0.85rem;font-weight:600;">📖 查看完整帮助</button>
+                            <button onclick="closeWelcomeGuide();openHelpPage();" style="padding:10px 20px;border-radius:8px;border:none;background:linear-gradient(135deg,#4fc3f7,#0288d1);color:white;cursor:pointer;font-size:0.85rem;font-weight:600;">📖 查看完整帮助</button>
                             <button onclick="closeWelcomeGuide()" style="padding:10px 20px;border-radius:8px;border:none;background:linear-gradient(135deg,#ffd700,#f59e0b);color:#1a1a2e;cursor:pointer;font-size:0.85rem;font-weight:600;">开始使用</button>
                         </div>
                     </div>
@@ -5585,10 +5584,33 @@
             };
         }
 
-        // 菜单「检查更新」：检查最新版本号并给出明确反馈
+        // 菜单「检查更新」：桌面版优先走 Tauri 自动更新器（自动下载安装重启），
+        // 不支持时回退到 version.json 检查 + 下载弹窗
         async function menuCheckUpdate() {
             const t = showLoadingToast('🔍 正在检查更新...');
             try {
+                // 桌面版且已集成 updater 插件：一键自动更新（免重装）
+                if (window.__TAURI__ && window.__TAURI__.updater) {
+                    try {
+                        const updater = window.__TAURI__.updater;
+                        const result = await updater.check();
+                        if (result && result.update) {
+                            t.update('📥 发现新版本，正在下载安装...');
+                            await result.update.downloadAndInstall();
+                            t.success('✅ 更新完成，即将重启...');
+                            t.remove(1500);
+                            setTimeout(() => updater.relaunch(), 800);
+                            return;
+                        }
+                        t.success('✅ 当前已是最新版本 v' + CURRENT_VERSION);
+                        t.remove(2500);
+                        return;
+                    } catch (e) {
+                        console.warn('[updater] 自动更新失败，回退手动检查:', e);
+                        // 回退到下面的 version.json 检查
+                    }
+                }
+                // 网页版 / updater 不可用时：检查 version.json
                 const release = await fetchLatestRelease();
                 if (!release) {
                     t.error('⚠️ 无法获取版本信息，请检查网络后重试');
@@ -6523,6 +6545,19 @@
                 </div>
             `;
             renderReferenceImages();
+        }
+
+        // 打开新手帮助页（兼容 Tauri APP 与浏览器）
+        function openHelpPage() {
+            const helpUrl = 'https://gyq-svip.github.io/tfjl-web/help.html';
+            // Tauri APP 环境：webview 禁止 window.open 弹新窗口，改为当前窗口直接跳转
+            // help.html 自带「← 返回助手」按钮可回到主界面
+            if (window.__TAURI__) {
+                window.location.href = helpUrl;
+                return;
+            }
+            // 浏览器环境：新标签页打开，保留主页面
+            window.open(helpUrl, '_blank');
         }
 
         // 帮助模态框
@@ -8761,7 +8796,14 @@
         <script>
         // ==================== Service Worker 注册（PWA缓存） ====================
         // 首次访问缓存资源，后续打开用缓存秒开，后台静默更新
+        // 关键体验：优先用缓存秒开（打开速度不受影响），后台拉到新资源后弹提示「新版本已就绪」
         if ('serviceWorker' in navigator) {
+            // 监听 SW 通知：后台已拉到新版本
+            navigator.serviceWorker.addEventListener('message', function(event) {
+                if (event.data && event.data.type === 'NEW_VERSION_READY') {
+                    showNewVersionReadyBar();
+                }
+            });
             window.addEventListener('load', function() {
                 navigator.serviceWorker.register('./sw.js', { scope: './' }).then(function(registration) {
                     console.log('[PWA] Service Worker 注册成功，scope:', registration.scope);
@@ -8769,6 +8811,30 @@
                     console.warn('[PWA] Service Worker 注册失败:', err);
                 });
             });
+        }
+
+        // 顶部「新版本已就绪」提示条（不打扰，点一下刷新即用新版）
+        let _newVersionBarShown = false;
+        function showNewVersionReadyBar() {
+            if (_newVersionBarShown) return;
+            _newVersionBarShown = true;
+            const bar = document.createElement('div');
+            bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:100001;background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;padding:10px 16px;display:flex;align-items:center;justify-content:center;gap:12px;font-size:0.9rem;font-weight:500;cursor:pointer;box-shadow:0 2px 12px rgba(0,0,0,0.3);';
+            bar.innerHTML = '<span>🎉 新版本已就绪，点击立即刷新使用</span>';
+            const closeBtn = document.createElement('span');
+            closeBtn.textContent = '✕';
+            closeBtn.style.cssText = 'margin-left:auto;opacity:0.8;cursor:pointer;padding:0 4px;';
+            closeBtn.onclick = function(e) {
+                e.stopPropagation();
+                bar.remove();
+                _newVersionBarShown = false;
+            };
+            bar.appendChild(closeBtn);
+            bar.onclick = function() {
+                // 强制从网络重新加载，确保拿到后台已拉取的最新资源
+                location.reload(true);
+            };
+            document.body.appendChild(bar);
         }
 
         // APP本地功能已拆分到 app-local.js（仅Tauri APP加载，网页版不影响）

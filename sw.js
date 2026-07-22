@@ -88,23 +88,47 @@ self.addEventListener('fetch', (event) => {
 });
 
 // ============================================================
-// 策略1：StaleWhileRevalidate（先用缓存，后台更新）
-// 适合：HTML、JS、CSS、图片等静态资源
+// 策略1：StaleWhileRevalidate（先用缓存秒开，后台拉取新资源）
+// 关键优化：仅当后台拉到的新资源与缓存【内容不同】时才更新缓存，
+// 并通知页面「新版本已就绪」，实现「优先缓存秒开 + 静默获取后启用」
 // ============================================================
+let _newVersionAnnounced = false;
+function notifyNewVersion() {
+    if (_newVersionAnnounced) return;
+    _newVersionAnnounced = true;
+    self.clients.matchAll({ includeUncontrolled: true, type: 'window' }).then((clients) => {
+        clients.forEach((client) => client.postMessage({ type: 'NEW_VERSION_READY' }));
+    });
+}
+
 function staleWhileRevalidate(request, cacheName) {
     return caches.open(cacheName).then((cache) => {
         return cache.match(request).then((cachedResponse) => {
-            // 后台静默更新缓存（不影响当前请求）
-            const fetchPromise = fetch(request).then((networkResponse) => {
+            // 后台静默拉取最新资源（不阻塞当前渲染，秒开体验不受影响）
+            const fetchPromise = fetch(request, { cache: 'no-store' }).then((networkResponse) => {
                 if (networkResponse && networkResponse.status === 200 && networkResponse.type !== 'opaque') {
-                    cache.put(request, networkResponse.clone());
+                    // 比较内容是否与缓存不同，避免无变化时误更新/误通知
+                    const netClone = networkResponse.clone();
+                    netClone.text().then((netText) => {
+                        const applyUpdate = () => {
+                            cache.put(request, networkResponse.clone());
+                            notifyNewVersion();
+                        };
+                        if (cachedResponse) {
+                            cachedResponse.clone().text().then((cacheText) => {
+                                if (netText !== cacheText) applyUpdate();
+                            }).catch(applyUpdate);
+                        } else {
+                            applyUpdate();
+                        }
+                    }).catch(() => {});
                 }
                 return networkResponse;
             }).catch(() => {
                 // 网络失败，静默忽略（缓存还在）
             });
 
-            // 有缓存就先返回缓存，没有就等网络
+            // 有缓存就先返回缓存（秒开），没有才等网络
             return cachedResponse || fetchPromise;
         });
     });
