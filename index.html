@@ -20992,7 +20992,29 @@ function hasGistToken() {
             const overlay = document.getElementById('adminPanelOverlay');
             overlay.style.display = 'flex';
 
-            const isVerified = sessionStorage.getItem(ADMIN_VERIFY_KEY) === 'true';
+            // 优先检查 session 级别验证（本次使用期间内）
+            let isVerified = sessionStorage.getItem(ADMIN_VERIFY_KEY) === 'true';
+
+            // 如果 session 没有，检查 localStorage 是否保存了验证码
+            if (!isVerified) {
+                const saved = localStorage.getItem('TFJL_Admin_SavedPwd');
+                if (saved) {
+                    try {
+                        const code = atob(saved);
+                        if (code === ADMIN_VERIFY_CODE) {
+                            // 密码匹配，自动验证
+                            sessionStorage.setItem(ADMIN_VERIFY_KEY, 'true');
+                            isVerified = true;
+                        } else {
+                            // 密码不对（验证码被改了），清除保存
+                            localStorage.removeItem('TFJL_Admin_SavedPwd');
+                        }
+                    } catch (e) {
+                        localStorage.removeItem('TFJL_Admin_SavedPwd');
+                    }
+                }
+            }
+
             if (isVerified) {
                 document.getElementById('adminVerifySection').style.display = 'none';
                 adminShowMenu();
@@ -21008,6 +21030,13 @@ function hasGistToken() {
                 const scriptStatsPage = document.getElementById('adminPageScriptStats');
                 if (scriptStatsPage) scriptStatsPage.style.display = 'none';
                 document.getElementById('adminVerifyCode').value = '';
+                // 如果有保存密码，预填输入框方便用户
+                const saved = localStorage.getItem('TFJL_Admin_SavedPwd');
+                if (saved) {
+                    try {
+                        document.getElementById('adminVerifyCode').value = atob(saved);
+                    } catch (e) {}
+                }
                 document.getElementById('adminVerifyCode').focus();
             }
         }
@@ -21488,6 +21517,9 @@ function hasGistToken() {
 
         function closeAdminPanel() {
             document.getElementById('adminPanelOverlay').style.display = 'none';
+            // 清除 session 级别验证状态（关闭面板后下次进入需要重新验证）
+            // 但如果 localStorage 有保存密码，openAdminPanel 会自动验证
+            sessionStorage.removeItem(ADMIN_VERIFY_KEY);
             hideAdminStatus();
         }
 
@@ -21542,6 +21574,15 @@ function hasGistToken() {
             const code = document.getElementById('adminVerifyCode').value.trim();
             if (code === ADMIN_VERIFY_CODE) {
                 sessionStorage.setItem(ADMIN_VERIFY_KEY, 'true');
+
+                // 记住验证码：如果勾选了"记住验证码"，保存到 localStorage
+                const rememberCb = document.getElementById('adminRememberCode');
+                if (rememberCb && rememberCb.checked) {
+                    try { localStorage.setItem('TFJL_Admin_SavedPwd', btoa(code)); } catch (e) {}
+                } else {
+                    localStorage.removeItem('TFJL_Admin_SavedPwd');
+                }
+
                 document.getElementById('adminVerifySection').style.display = 'none';
                 adminShowMenu();
                 showAdminStatus('验证成功！', 'success');
@@ -22713,6 +22754,11 @@ function hasGistToken() {
                 <h3 style="color:#ffd700;text-align:center;margin:0 0 15px 0;">🔐 身份验证</h3>
                 <label>请输入管理员验证码</label>
                 <input type="password" id="adminVerifyCode" placeholder="输入验证码" autocomplete="off" style="padding:8px 12px;font-size:0.9rem;">
+                <br>
+                <label id="adminRememberLabel" style="display:flex;align-items:center;justify-content:center;gap:8px;margin:10px 0 16px;color:rgba(255,255,255,0.6);font-size:0.85rem;cursor:pointer;">
+                    <input type="checkbox" id="adminRememberCode" checked style="width:14px;height:14px;cursor:pointer;accent-color:#ffd700;">
+                    记住验证码，下次自动登录
+                </label>
                 <div style="display:flex;gap:10px;justify-content:center;">
                     <button class="admin-btn admin-btn-secondary" onclick="closeAdminPanel()">关闭</button>
                     <button class="admin-btn admin-btn-primary" onclick="verifyAdmin()">登录</button>
