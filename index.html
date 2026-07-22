@@ -9220,8 +9220,19 @@
                     <input id="txtFileSearchInput" type="text" placeholder="🔍 搜索项目脚本或扫描文件…（输入关键字过滤）" oninput="filterTxtFilesList()" style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid rgba(76,175,80,0.3);background:rgba(0,0,0,0.3);color:#fff;font-size:0.85rem;box-sizing:border-box;">
                 </div>
                 <div id="scriptFileCategoryFilter" style="margin-bottom:10px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;"></div>
-                <div id="txtFilesList" style="display:flex;flex-direction:column;gap:10px;max-height:55vh;min-height:100px;overflow-y:auto;resize:vertical;border-bottom:2px solid rgba(255,215,0,0.15);padding-bottom:6px;scrollbar-width:thin;scrollbar-color:rgba(255,215,0,0.3) transparent;"></div>
-                <div style="margin-top:10px;color:rgba(255,255,255,0.5);font-size:0.75rem;">💡 支持上传多个TXT文件，也可拖拽文件到此处或 Ctrl+V 粘贴；点击脚本名可在下方标签中打开编辑</div>
+                <div id="txtFilesList" style="display:flex;flex-direction:column;gap:10px;height:240px;min-height:100px;max-height:55vh;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(255,215,0,0.3) transparent;"></div>
+                <!-- 文件列表拖拽缩放条 -->
+                <div id="fileListResizeHandle" style="height:6px;cursor:row-resize;margin:3px 0;display:flex;align-items:center;justify-content:center;border-radius:3px;"
+                     onmouseover="this.style.background='rgba(255,215,0,0.15)';this.style.height='8px';this.style.margin='2px 0';"
+                     onmouseout="if(!window._fileListResizing){this.style.background='transparent';this.style.height='6px';this.style.margin='3px 0';}"
+                     onmousedown="startFileListResize(event)">
+                    <div style="display:flex;gap:4px;opacity:0;transition:opacity 0.15s;" id="fileListResizeGrip">
+                        <span style="display:block;width:24px;height:2px;background:rgba(255,215,0,0.4);border-radius:1px;"></span>
+                        <span style="display:block;width:24px;height:2px;background:rgba(255,215,0,0.4);border-radius:1px;"></span>
+                        <span style="display:block;width:24px;height:2px;background:rgba(255,215,0,0.4);border-radius:1px;"></span>
+                    </div>
+                </div>
+                <div style="margin-top:4px;color:rgba(255,255,255,0.5);font-size:0.75rem;">💡 支持上传多个TXT文件，也可拖拽文件到此处或 Ctrl+V 粘贴；点击脚本名可在下方标签中打开编辑</div>
 
                 <!-- 底部多标签脚本编辑器 -->
                 <div id="scriptEditorTabs" style="margin-top:12px;border-top:1px solid rgba(255,255,255,0.08);padding-top:10px;display:none;flex-direction:column;resize:vertical;overflow:auto;min-height:200px;max-height:80vh;">
@@ -11004,6 +11015,44 @@
             updateTxtFilesList();
             autoSaveProject();
         }
+
+        // ========== 文件列表拖拽缩放 ==========
+        window._fileListResizing = false;
+        let _flrStartY = 0, _flrStartH = 0;
+
+        function startFileListResize(e) {
+            window._fileListResizing = true;
+            _flrStartY = e.clientY;
+            const list = document.getElementById('txtFilesList');
+            _flrStartH = list.offsetHeight;
+            document.body.style.cursor = 'row-resize';
+            document.body.style.userSelect = 'none';
+            const grip = document.getElementById('fileListResizeGrip');
+            if (grip) grip.style.opacity = '1';
+            e.preventDefault();
+        }
+
+        document.addEventListener('mousemove', (e) => {
+            if (!window._fileListResizing) return;
+            const delta = e.clientY - _flrStartY;
+            const maxH = Math.round(window.innerHeight * 0.55);
+            const newH = Math.max(100, Math.min(maxH, _flrStartH + delta));
+            const list = document.getElementById('txtFilesList');
+            list.style.height = newH + 'px';
+            list.style.maxHeight = newH + 'px';
+            list.style.minHeight = newH + 'px';
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (!window._fileListResizing) return;
+            window._fileListResizing = false;
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+            const grip = document.getElementById('fileListResizeGrip');
+            if (grip) grip.style.opacity = '0';
+            const handle = document.getElementById('fileListResizeHandle');
+            if (handle) { handle.style.background = 'transparent'; handle.style.height = '6px'; handle.style.margin = '3px 0'; }
+        });
 
         // ========== 底部多标签脚本编辑器 ==========
         let scriptEditorTabs = []; // { id, fileIndex, filePath?, name, content, originalContent, modified, isScanned? }
