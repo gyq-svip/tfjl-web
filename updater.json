@@ -1,10 +1,10 @@
 {
   "version": "1.1.7",
   "notes": "v1.1.7 测试自动更新\n- 思维导图页全面改版（缩放+拖拽+6大分支）\n- 菜单优化：桌面版隐藏「下载桌面版」、显示「检查更新」\n- 网页版隐藏「检查更新」菜单项",
-  "pub_date": "2026-07-22T14:50:00Z",
+  "pub_date": "2026-07-22T15:12:00Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRdWJvQ0JvYjZTSEhienlnclRGWThuaEY3NFFXNWZXYytJVUxNRlJwTVI3TE56TjJtcTV4ckFnVlRKb3FrNDRvc0ZPQTVlUS9vQlhHamczMWxSUjlBY3BESUtxRWxYdHdnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg0Njg4Njk5CWZpbGU65aGU6Ziy57K+54G15Yqp5omLXzEuMS43X3g2NC1zZXR1cC5leGUKTFQxQUQ0YkwwdkQyZFN4MTRqSDcwb3hlekdRS1JWU1FaSW4zbDJEVm00SmpWUFZWSmVyM2Y5cnFvbW5VcXRXNFAwZkpzUmJBVzlxY3RTNFRkNTROQmc9PQo=",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRdWJvQ0JvYjZTSERUUFhiWlAwRXNSL3FMOGkyWmhFYTlmUDk0RlBWdDRFS3NHZkF4VHlyREJRNTNXN0Q0cURRZktXOFpOdlZ3dWhReFlkNmsrK1RLVGRreWRMRVVVRlFnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg0NzA0MzY1CWZpbGU65aGU6Ziy57K+54G15Yqp5omLXzEuMS43X3g2NC1zZXR1cC5leGUKcUI0NUI1eU84ZTUyV2s5M1lBK3VLZHNRTldEcklOVTVaaE5VNENiWEQxT1p2Tks2Zmh1VVF2U2lVUUVqV0VuTUkwNXRoNlpHRmZqUERQNDJIbVlORFE9PQo=",
       "url": "https://gyq-svip.github.io/tfjl-web/tfjl-v1.1.7-x64-setup.exe"
     }
   }
