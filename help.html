@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>塔防精灵助手 · 新手帮助</title>
+<style>
+    * { box-sizing: border-box; }
+    body {
+        margin: 0; padding: 0;
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        color: #fff;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+        line-height: 1.7;
+    }
+    .wrap { max-width: 860px; margin: 0 auto; padding: 40px 20px 80px; }
+    .hero {
+        text-align: center; margin-bottom: 36px;
+        padding: 30px; border-radius: 16px;
+        background: rgba(255,215,0,0.08);
+        border: 2px solid rgba(255,215,0,0.4);
+    }
+    .hero h1 { margin: 0 0 8px; color: #ffd700; font-size: 1.8rem; }
+    .hero p { margin: 0; color: rgba(255,255,255,0.8); }
+    .back {
+        display: inline-block; margin-bottom: 20px; padding: 8px 16px;
+        background: rgba(79,195,247,0.2); color: #4fc3f7; border-radius: 8px;
+        text-decoration: none; font-size: 0.85rem;
+    }
+    .back:hover { background: rgba(79,195,247,0.35); }
+    section { margin-bottom: 30px; }
+    h2 {
+        color: #4fc3f7; border-left: 4px solid #4fc3f7; padding-left: 12px;
+        margin: 0 0 14px; font-size: 1.25rem;
+    }
+    h3 { color: #ffd700; font-size: 1.05rem; margin: 18px 0 8px; }
+    .card {
+        background: rgba(255,255,255,0.05); border-radius: 12px;
+        padding: 18px 22px; margin-bottom: 14px;
+    }
+    .card p { margin: 6px 0; color: rgba(255,255,255,0.88); font-size: 0.95rem; }
+    .steps { list-style: none; padding: 0; margin: 0; counter-reset: s; }
+    .steps li {
+        position: relative; padding: 10px 10px 10px 46px; margin-bottom: 8px;
+        background: rgba(79,195,247,0.08); border-radius: 8px; font-size: 0.95rem;
+    }
+    .steps li::before {
+        counter-increment: s; content: counter(s);
+        position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+        width: 24px; height: 24px; border-radius: 50%;
+        background: linear-gradient(135deg,#4fc3f7,#0288d1); color: #fff;
+        display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.8rem;
+    }
+    .faq { border-bottom: 1px solid rgba(255,255,255,0.1); padding: 12px 0; }
+    .faq summary { cursor: pointer; color: #ffd700; font-weight: 600; }
+    .faq p { margin: 8px 0 0; color: rgba(255,255,255,0.85); font-size: 0.92rem; }
+    .tip { color: #4ecdc4; }
+    .warn { color: #ff9800; }
+    .contact {
+        text-align: center; margin-top: 40px; padding: 24px;
+        background: rgba(255,215,0,0.1); border: 1px solid rgba(255,215,0,0.3); border-radius: 12px;
+    }
+    .contact p { font-size: 1.3rem; color: #ffd700; font-weight: bold; margin: 6px 0; }
+    footer { text-align: center; color: rgba(255,255,255,0.4); font-size: 0.8rem; margin-top: 40px; }
+    @media (max-width: 600px) { .wrap { padding: 20px 14px 60px; } .hero h1 { font-size: 1.4rem; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+    <a class="back" href="index.html">← 返回助手</a>
+
+    <div class="hero">
+        <h1>🎮 塔防精灵助手 · 新手帮助</h1>
+        <p>一句话：这是一个帮你管理塔防精灵「阵容脚本」的工具，网页就能用，桌面版还能把脚本存到你电脑里。</p>
+    </div>
+
+    <!-- 快速开始 -->
+    <section>
+        <h2>🚀 快速开始（5 步）</h2>
+        <ol class="steps">
+            <li><strong>打开网站 / 桌面版</strong>，输入密码进入主界面。</li>
+            <li><strong>选 10 张卡</strong>组成手牌：点卡牌加到「我的手牌」，右键可收藏常用卡。</li>
+            <li><strong>拖卡到战斗槽</strong>摆好站位，点右上角 💾 保存为一个「项目」。</li>
+            <li><strong>想用别人的脚本？</strong>点右上角 📢 需求墙，看到喜欢的脚本点「导入」即可。</li>
+            <li><strong>想存到本地？</strong>桌面版在 📁 里先配置「老马目录」，脚本就能「导入到老马」存进电脑。</li>
+        </ol>
+    </section>
+
+    <!-- 功能详解 -->
+    <section>
+        <h2>📚 功能详解</h2>
+
+        <div class="card">
+            <h3>📁 项目管理</h3>
+            <p>把阵容按项目分类保存，方便日后查找。每个项目可包含：脚本文件、参考图片、阵容站位、皮肤融合，还有记事本记录战车与注意事项——保存后都跟着这个项目走。</p>
+        </div>
+
+        <div class="card">
+            <h3>📄 脚本文件（核心）</h3>
+            <p>点工具栏的 📄 打开面板：</p>
+            <p>• <strong>扫描</strong>：自动扫描出你电脑/目录里的脚本，按 寒冰 / 暗月 / 漩涡 / 合作 / 深海 / 活动 / 其他 7 类分好。</p>
+            <p>• <strong>搜索</strong>：选某分类后输入关键字模糊匹配，不同类用不同颜色标识。</p>
+            <p>• <strong>解析到手牌</strong>：脚本一键变成可拖拽的站位，调整一目了然。</p>
+            <p>• <strong>分享到需求墙</strong>：所有人都能看、能下载、能直接导入。</p>
+            <p class="tip">💡 桌面版还有「导入到老马」：把选中的脚本存进你本地配置好的目录（需先在 📁 设置里配好目录）。</p>
+        </div>
+
+        <div class="card">
+            <h3>📢 需求墙</h3>
+            <p>发布需求、分享脚本、互动交流的地方。可上传脚本文件（最大 10MB），消息默认永久保存（也可设限时），窗口还能拖动。</p>
+        </div>
+
+        <div class="card">
+            <h3>🏪 拍卖行</h3>
+            <p>闲置物品自由上架、交换、求购，入口在右上角 🏪。完全免费，纯玩！</p>
+        </div>
+
+        <div class="card">
+            <h3>🔍 脚本解析与生成</h3>
+            <p>支持把文本解析成手牌，自动生成活动 / 副本脚本（带时间轴）。已支持蛇女、雷精灵、天使、火炮、虎弓、后羿等阵容，遇到新阵容会持续完善。建议生成后手动微调，效果更佳。</p>
+        </div>
+
+        <div class="card">
+            <h3>🌐 在线版 / 离线版</h3>
+            <p><strong>在线版</strong>：浏览器直接访问，支持访问统计，网络异常可切离线版。</p>
+            <p><strong>离线版</strong>：完全离线可用，数据存在本地，无需网络。</p>
+            <p>点 🌐 按钮可快速切换；☰ 菜单里可下载离线版 / 桌面版。</p>
+        </div>
+
+        <div class="card">
+            <h3>💾 备份恢复 & ⭐ 收藏</h3>
+            <p>☰ 菜单里可<strong>全部备份 / 恢复</strong>，或只备份<strong>单个项目</strong>，方便换设备或分享。</p>
+            <p>右键卡牌可加到常用收藏，下次直接拖用。</p>
+        </div>
+    </section>
+
+    <!-- 常见问题 -->
+    <section>
+        <h2>❓ 新手常见问题</h2>
+        <details class="faq">
+            <summary>「导入到老马」为什么弹出的是设置界面？</summary>
+            <p>说明你还没在 📁 APP本地设置 里配置「老马目录」。先打开 📁 选好合作脚本 / 活动 等目录并保存，之后再点「导入到老马」就会让你选存到哪个目录了。此功能仅桌面版 App 可用。</p>
+        </details>
+        <details class="faq">
+            <summary>数据存在哪里？会丢吗？</summary>
+            <p>在线版数据存在你浏览器的本地缓存；离线版 / 桌面版存在本机。建议定期用 ☰ 菜单的「全部备份」导出一份 json 留底。</p>
+        </details>
+        <details class="faq">
+            <summary>扫描要等多久？</summary>
+            <p>取决于目录里文件多少，一般几秒。扫描按文件名关键字自动归类到 7 个分类。</p>
+        </details>
+        <details class="faq">
+            <summary>生成的副本脚本不准怎么办？</summary>
+            <p>自动生成是参考，建议生成后手动微调站位和时间轴，效果更贴合实战。</p>
+        </details>
+        <details class="faq">
+            <summary>怎么看别人分享的脚本？</summary>
+            <p>点右上角 📢 需求墙，找到脚本点「导入」即可直接用到你的手牌里。</p>
+        </details>
+    </section>
+
+    <div class="contact">
+        <p>微信：GYQSVIP</p>
+        <p>游戏区：九区-龙行</p>
+        <p style="font-size:0.95rem;color:rgba(255,255,255,0.7);font-weight:normal;">有好的需求、想法，欢迎在需求墙（右上角小喇叭）留言！</p>
+    </div>
+
+    <footer>塔防精灵助手 · 新手帮助页 · 如有变动以应用内「使用帮助」为准</footer>
+</div>
+</body>
+</html>
