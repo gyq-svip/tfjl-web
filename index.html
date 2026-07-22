@@ -3061,7 +3061,7 @@
 
                     <div onclick="openHelpPage();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#4fc3f7;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📖 帮助</div>
                     <div onclick="openMindmap();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#ffd700;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📊 功能导览</div>
-                    <div onclick="openDownloadModal();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#4fc3f7;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📥 下载桌面版</div>
+                    <div id="menuDownloadDesktop" onclick="openDownloadModal();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#4fc3f7;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📥 下载桌面版</div>
                     <div id="menuCheckUpdateItem" onclick="menuCheckUpdate();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#81c784;display:none;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">🔄 检查更新</div>
                     <div onclick="forceRefreshLatest();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#ffd54f;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">♻️ 刷新最新资源</div>
                     <div onclick="window.location.href='auction.html';document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">🏪 进入拍卖系统</div>
@@ -5424,7 +5424,9 @@
             // 仅网页版保留该链接用于引导下载 APP
             const dl = document.getElementById('footerDownloadDesktop');
             if (dl) dl.style.display = (window.__TAURI__ ? 'none' : 'inline');
-            // 桌面版（Tauri）显示「检查更新」菜单项，网页版隐藏
+            // 桌面版（Tauri）菜单：隐藏「下载桌面版」、显示「检查更新」；网页版相反
+            const dm = document.getElementById('menuDownloadDesktop');
+            if (dm) dm.style.display = (window.__TAURI__ ? 'none' : 'flex');
             const cu = document.getElementById('menuCheckUpdateItem');
             if (cu) cu.style.display = (window.__TAURI__ ? 'flex' : 'none');
         }
