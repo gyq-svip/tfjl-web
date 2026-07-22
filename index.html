@@ -5408,6 +5408,13 @@
         const GITHUB_RELEASES_PAGE = 'https://github.com/gyq-svip/tfjl-web/releases';
         const VERSION_JSON_URL = 'https://gyq-svip.github.io/tfjl-web/version.json';
 
+        // ========== 更新预下载状态管理 ==========
+        // 启动时后台自动下载新版本，用户点「检查更新」时秒装
+        let _currentUpdate = null;      // Tauri Update 对象
+        let _currentDownload = null;    // Promise（resolve = 下载完成，reject = 下载失败）
+        let _downloadProgress = 0;      // 0-100
+        let _updateVersion = null;      // 检测到的新版本号
+
         // 运行时填充当前版本号（桌面版从 Tauri 取，在线版保持「网页版」）
         async function fillCurrentVersion() {
             try {
@@ -5575,21 +5582,109 @@
             };
         }
 
-        // 菜单「检查更新」：桌面版优先走 Tauri 自动更新器（自动下载安装重启），
-        // 不支持时回退到 version.json 检查 + 下载弹窗
+        // 菜单「检查更新」：桌面版优先走 Tauri 自动更新器（分离下载/安装 + 进度显示）
+        // 启动时后台已预下载完成 → 秒装；下载中 → 显示进度；否则重新走一遍流程
         async function menuCheckUpdate() {
             await fillCurrentVersion();
+
+            // —— 1. 启动时已后台预下载完成？秒装 ——
+            if (_currentUpdate && !_currentDownload) {
+                const t = showLoadingToast('⚡ 已缓存，正在安装 v' + _updateVersion + '...');
+                try {
+                    // 如果 download() 支持分离，需再次 install（因为可能还没 install）
+                    if (typeof _currentUpdate.install === 'function') {
+                        await _currentUpdate.install();
+                    }
+                    t.success('✅ 安装完成，即将重启...');
+                    t.remove(1500);
+                    setTimeout(() => {
+                        try { window.__TAURI__.updater.relaunch(); } catch(e) {}
+                    }, 800);
+                    return;
+                } catch (e) {
+                    console.warn('[updater] 安装已下载包失败:', e);
+                    _currentUpdate = null; _currentDownload = null;
+                    // 回退到下面的重新检查流程
+                }
+            }
+
+            // —— 2. 启动时还在后台下载中？等待完成 ——
+            if (_currentDownload) {
+                const t = showLoadingToast('📥 后台下载中 ' + _downloadProgress + '%');
+                // 轮询等待下载完成（最多等 5 分钟）
+                const start = Date.now();
+                let lastPct = _downloadProgress;
+                while (_currentDownload && Date.now() - start < 300000) {
+                    await new Promise(r => setTimeout(r, 500));
+                    if (_downloadProgress !== lastPct) {
+                        lastPct = _downloadProgress;
+                        t.update('📥 下载中 ' + lastPct + '%');
+                    }
+                }
+                if (!_currentDownload) {
+                    // 下载完成，安装
+                    try {
+                        t.update('📦 正在安装 v' + _updateVersion + '...');
+                        if (_currentUpdate && typeof _currentUpdate.install === 'function') {
+                            await _currentUpdate.install();
+                        }
+                        t.success('✅ 安装完成，即将重启...');
+                        t.remove(1500);
+                        setTimeout(() => {
+                            try { window.__TAURI__.updater.relaunch(); } catch(e) {}
+                        }, 800);
+                        return;
+                    } catch (e) {
+                        t.error('⚠️ 安装失败，请重试');
+                        t.remove(2500);
+                        return;
+                    }
+                }
+            }
+
+            // —— 3. 正常流程：检查 → 下载（带进度） → 安装 ——
             const t = showLoadingToast('🔍 正在检查更新...');
             try {
-                // 桌面版且已集成 updater 插件：一键自动更新（免重装）
                 if (window.__TAURI__ && window.__TAURI__.updater) {
                     try {
                         const updater = window.__TAURI__.updater;
                         const result = await updater.check();
-                        // Tauri v2 updater.check() 直接返回 Update 对象（或 null），不存在 result.update
                         const update = result && (result.update || result);
                         if (update) {
-                            t.update('📥 发现新版本 v' + (update.version || CURRENT_VERSION) + '，正在下载安装...');
+                            _updateVersion = update.version || CURRENT_VERSION;
+                            _currentUpdate = update;
+
+                            // 使用 download() 分离下载和安装，带进度回调
+                            if (typeof update.download === 'function') {
+                                let downloadDone = false;
+                                _currentDownload = new Promise((resolve, reject) => {
+                                    update.download((event) => {
+                                        if (downloadDone) return;
+                                        if (event.event === 'Progress') {
+                                            _downloadProgress = Math.round((event.data.current / event.data.total) * 100);
+                                            t.update('📥 下载中 ' + _downloadProgress + '%');
+                                        } else if (event.event === 'Finished') {
+                                            downloadDone = true;
+                                            resolve();
+                                        }
+                                    }).then(() => {
+                                        if (!downloadDone) { downloadDone = true; resolve(); }
+                                    }).catch(reject);
+                                });
+
+                                await _currentDownload;
+                                _currentDownload = null;
+
+                                t.update('📦 正在安装...');
+                                await update.install();
+                                t.success('✅ 安装完成，即将重启...');
+                                t.remove(1500);
+                                setTimeout(() => updater.relaunch(), 800);
+                                return;
+                            }
+
+                            // 旧版 updater 不支持 download()，用 downloadAndInstall 兜底
+                            t.update('📥 发现新版本 v' + _updateVersion + '，正在下载安装...');
                             await update.downloadAndInstall();
                             t.success('✅ 更新完成，即将重启...');
                             t.remove(1500);
@@ -5601,7 +5696,6 @@
                         return;
                     } catch (e) {
                         console.warn('[updater] 自动更新失败，回退手动检查:', e);
-                        // 回退到下面的 version.json 检查
                     }
                 }
                 // 网页版 / updater 不可用时：检查 version.json
@@ -5679,31 +5773,92 @@
             return { hasUpdate: false, version: CURRENT_VERSION };
         }
 
-        // App 启动时自动静默检查更新
+        // App 启动时后台自动检查更新 + 预下载（用户点「检查更新」时秒装）
         async function autoCheckUpdate() {
-            // 仅在 Tauri App 环境中检查（桌面版才需要更新 exe）
             const isTauri = !!(window.__TAURI__ || window.__TAURI_INTERNALS__);
             if (!isTauri) return;
 
             try {
+                // —— 优先走 Tauri updater：后台静默下载 ——
+                if (window.__TAURI__ && window.__TAURI__.updater) {
+                    try {
+                        const updater = window.__TAURI__.updater;
+                        const result = await updater.check();
+                        const update = result && (result.update || result);
+                        if (!update) return; // 已是最新，无需下载
+
+                        _updateVersion = update.version || 'latest';
+                        _currentUpdate = update;
+
+                        // 后台静默下载（不弹 toast，不打扰用户）
+                        if (typeof update.download === 'function') {
+                            let downloadDone = false;
+                            _currentDownload = new Promise((resolve, reject) => {
+                                update.download((event) => {
+                                    if (downloadDone) return;
+                                    if (event.event === 'Progress') {
+                                        _downloadProgress = Math.round((event.data.current / event.data.total) * 100);
+                                    } else if (event.event === 'Finished') {
+                                        downloadDone = true;
+                                        resolve();
+                                    }
+                                }).then(() => {
+                                    if (!downloadDone) { downloadDone = true; resolve(); }
+                                }).catch(reject);
+                            });
+
+                            await _currentDownload;
+                            _currentDownload = null;
+                            // 下载完成，显示通知
+                            _notifyPreDownloadReady();
+                            return;
+                        }
+                        // 旧版 updater 无 download()，退回到仅提示
+                        _notifyNewVersion(update.version || 'latest');
+                        return;
+                    } catch (e) {
+                        console.warn('[auto-update] Tauri updater 后台预下载失败:', e);
+                    }
+                }
+
+                // —— 退回到 version.json 仅提示（网页版/旧版） ——
                 const result = await checkForUpdates();
                 if (result && result.hasUpdate) {
-                    // 显示页脚更新提示
-                    const badge = document.getElementById('updateBadgeFooter');
-                    if (badge) badge.style.display = 'inline-block';
-                    // 显示 Toast 提醒
-                    setTimeout(() => {
-                        const toast = document.createElement('div');
-                        toast.style.cssText = 'position:fixed;top:60px;left:50%;transform:translateX(-50%);padding:12px 25px;border-radius:10px;font-size:0.95rem;font-weight:500;z-index:99999;background:rgba(76,175,80,0.9);color:#fff;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,0.3);';
-                        toast.textContent = '🔄 有新版本 v' + result.version + ' 可下载！点击查看';
-                        toast.onclick = function() { openDownloadModal(); toast.remove(); };
-                        document.body.appendChild(toast);
-                        setTimeout(() => { if (toast.parentNode) toast.remove(); }, 8000);
-                    }, 2000);
+                    _notifyNewVersion(result.version);
                 }
             } catch (e) {
                 console.warn('自动检查更新失败:', e);
             }
+        }
+
+        // 下载完成提示（预下载成功，点击秒装）
+        function _notifyPreDownloadReady() {
+            const badge = document.getElementById('updateBadgeFooter');
+            if (badge) badge.style.display = 'inline-block';
+            setTimeout(() => {
+                const toast = document.createElement('div');
+                toast.style.cssText = 'position:fixed;top:60px;left:50%;transform:translateX(-50%);padding:12px 25px;border-radius:10px;font-size:0.95rem;font-weight:500;z-index:99999;background:rgba(76,175,80,0.9);color:#fff;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,0.3);transition:transform 0.2s;';
+                toast.textContent = '✅ v' + _updateVersion + ' 已下载完成，点击立即更新';
+                toast.addEventListener('mouseenter', () => { toast.style.transform = 'translateX(-50%) scale(1.05)'; });
+                toast.addEventListener('mouseleave', () => { toast.style.transform = 'translateX(-50%) scale(1)'; });
+                toast.onclick = function() { menuCheckUpdate(); toast.remove(); };
+                document.body.appendChild(toast);
+                setTimeout(() => { if (toast.parentNode) toast.remove(); }, 15000);
+            }, 2000);
+        }
+
+        // 仅检测到新版本但未下载（显示提示，点击打开下载弹窗）
+        function _notifyNewVersion(version) {
+            const badge = document.getElementById('updateBadgeFooter');
+            if (badge) badge.style.display = 'inline-block';
+            setTimeout(() => {
+                const toast = document.createElement('div');
+                toast.style.cssText = 'position:fixed;top:60px;left:50%;transform:translateX(-50%);padding:12px 25px;border-radius:10px;font-size:0.95rem;font-weight:500;z-index:99999;background:rgba(76,175,80,0.9);color:#fff;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,0.3);';
+                toast.textContent = '🔄 有新版本 v' + version + ' 可下载！点击查看';
+                toast.onclick = function() { openDownloadModal(); toast.remove(); };
+                document.body.appendChild(toast);
+                setTimeout(() => { if (toast.parentNode) toast.remove(); }, 8000);
+            }, 2000);
         }
 
         // 显示拍卖操作提示
