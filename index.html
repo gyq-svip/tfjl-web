@@ -3737,21 +3737,16 @@
                 marqueeEl.textContent = '📢 拍卖快讯：' + broadcastTexts;
                 marqueeEl.style.color = '#ff6b6b';
                 marqueeEl.style.textShadow = '0 0 10px #ff6b6b, 0 0 20px #ff6b6b';
-                marqueeEl.style.animation = 'none';
                 marqueeEl.style.paddingLeft = '100%';
-                // 触发重排后重新开始动画
-                void marqueeEl.offsetWidth;
-                marqueeEl.style.animation = 'marqueeScroll 25s linear infinite';
+                restartMarquee(true); // 拍卖播报长度变化，重置动画并恒定速度
             } else {
                 // 没有拍卖播报，恢复普通公告
                 const normalText = getNewsMarqueeText();
                 marqueeEl.textContent = normalText;
                 marqueeEl.style.color = '#ffd700';
                 marqueeEl.style.textShadow = '0 0 10px #ffd700, 0 0 20px #ffd700';
-                marqueeEl.style.animation = 'none';
                 marqueeEl.style.paddingLeft = '100%';
-                void marqueeEl.offsetWidth;
-                marqueeEl.style.animation = 'marqueeScroll 60s linear infinite';
+                restartMarquee(true); // 普通公告长度变化，重置动画并恒定速度
             }
         }
 
@@ -16987,6 +16982,23 @@ function hasGistToken() {
             return marqueeColors[Math.floor(Math.random() * marqueeColors.length)];
         }
         
+        // 重启公告滚动动画：按文本长度动态计算时长，保持恒定滚动速度，
+        // 避免文本从短变长时位移基准突变导致"飞快"。每次文本变化都应调用以重置动画。
+        let _lastMarqueeText = null;
+        function restartMarquee(force) {
+            const marqueeEl = document.getElementById('newsMarquee');
+            if (!marqueeEl) return;
+            const text = marqueeEl.textContent;
+            if (!force && text === _lastMarqueeText) return; // 文本未变则不重置（避免每分钟跳回起点）
+            _lastMarqueeText = text;
+            const SPEED = 100; // px/s，恒定滚动速度
+            const W = marqueeEl.scrollWidth; // 含 paddingLeft:100%
+            const duration = Math.max(8, W / SPEED); // 至少 8 秒，避免极短文本过快
+            marqueeEl.style.animation = 'none';
+            void marqueeEl.offsetWidth; // 触发重排，重置动画进度
+            marqueeEl.style.animation = 'marqueeScroll ' + duration.toFixed(1) + 's linear infinite';
+        }
+
               // 初始化滚动公告
         function initMarquee() {
             initCurrentTime();
@@ -17004,7 +17016,7 @@ function hasGistToken() {
                 
                 setTimeout(() => {
                     marqueeEl.style.paddingLeft = '100%';
-                    marqueeEl.style.animation = 'marqueeScroll 60s linear infinite';
+                    restartMarquee(true);
                 }, 100);
                 
                 setInterval(() => {
@@ -17032,6 +17044,7 @@ function hasGistToken() {
                     const marqueeEl = document.getElementById('newsMarquee');
                     if (marqueeEl) {
                         marqueeEl.textContent = getNewsMarqueeText();
+                        restartMarquee(); // 文本可能变化，按需重置动画（保持速度恒定）
                     }
                 }
             }, 60000);
@@ -17101,7 +17114,7 @@ function hasGistToken() {
                     marqueeEl.textContent = '网络不可用，显示缓存数据';
                     setTimeout(() => {
                         marqueeEl.textContent = getNewsMarqueeText();
-                        marqueeEl.style.animation = 'marqueeScroll 60s linear infinite';
+                        restartMarquee(true);
                     }, 1500);
                 }
             }
