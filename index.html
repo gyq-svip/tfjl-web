@@ -1849,7 +1849,75 @@
                 font-size: 0.8rem;
                 line-height: 1.6;
             }
+
+            /* ===== 方案C：悬浮提示 tooltip ===== */
+            .tfjl-tooltip {
+                position: fixed;
+                z-index: 100000;
+                max-width: 260px;
+                background: linear-gradient(135deg, #1a1a2e, #16213e);
+                color: #fff;
+                border: 1px solid rgba(79,195,247,0.6);
+                border-radius: 8px;
+                padding: 8px 12px;
+                font-size: 0.8rem;
+                line-height: 1.5;
+                box-shadow: 0 4px 18px rgba(0,0,0,0.5);
+                pointer-events: none;
+                opacity: 0;
+                transform: translateY(4px);
+                transition: opacity 0.15s ease, transform 0.15s ease;
+            }
+            .tfjl-tooltip.show { opacity: 1; transform: translateY(0); }
+            .tfjl-tooltip::after {
+                content: '';
+                position: absolute;
+                width: 8px; height: 8px;
+                background: inherit;
+                border-left: 1px solid rgba(79,195,247,0.6);
+                border-top: 1px solid rgba(79,195,247,0.6);
+            }
+            .tfjl-tooltip[data-pos="top"]::after { bottom: -5px; left: 14px; transform: rotate(225deg); }
+            .tfjl-tooltip[data-pos="bottom"]::after { top: -5px; left: 14px; transform: rotate(45deg); }
+            .tfjl-tooltip[data-pos="left"]::after { right: -5px; top: 12px; transform: rotate(135deg); }
+            .tfjl-tooltip[data-pos="right"]::after { left: -5px; top: 12px; transform: rotate(315deg); }
+
+            /* ===== 方案A：新手引导浮层 ===== */
+            #tfjlTourMask {
+                position: fixed; inset: 0; z-index: 99998;
+                background: rgba(0,0,0,0.55);
+                pointer-events: none;
+            }
+            .tfjl-tour-spot {
+                position: fixed; z-index: 99999;
+                border-radius: 8px;
+                box-shadow: 0 0 0 4px rgba(255,215,0,0.9), 0 0 0 9999px rgba(0,0,0,0.55);
+                pointer-events: none;
+                transition: all 0.3s ease;
+            }
+            #tfjlTourBox {
+                position: fixed; z-index: 100000;
+                max-width: 320px;
+                background: linear-gradient(135deg, #1a1a2e, #16213e);
+                border: 2px solid rgba(255,215,0,0.6);
+                border-radius: 12px;
+                padding: 16px 18px;
+                color: #fff;
+                box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+            }
+            #tfjlTourBox .step-num { color: #ffd700; font-size: 0.8rem; font-weight: bold; }
+            #tfjlTourBox .step-title { font-size: 1rem; font-weight: bold; margin: 4px 0 8px; color: #ffd700; }
+            #tfjlTourBox .step-desc { font-size: 0.85rem; line-height: 1.6; color: rgba(255,255,255,0.88); }
+            #tfjlTourBox .tour-btns { display: flex; gap: 8px; margin-top: 14px; justify-content: flex-end; }
+            #tfjlTourBox button {
+                border: none; padding: 7px 16px; border-radius: 7px; cursor: pointer;
+                font-size: 0.82rem; font-weight: 600;
+            }
+            .tour-btn-skip { background: rgba(255,255,255,0.15); color: #fff; }
+            .tour-btn-prev { background: rgba(79,195,247,0.25); color: #4fc3f7; }
+            .tour-btn-next { background: linear-gradient(135deg,#4fc3f7,#0288d1); color: #fff; }
             
+
             /* 记事本面板移动端适配 */
             #notepadPanelHeader {
                 padding: 8px 12px;
@@ -2567,11 +2635,11 @@
                     <option value="">-- 选择项目 --</option>
                 </select>
                 <button onclick="toggleProjectMenu(this)" style="background:#444;color:white;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:1rem;line-height:1;">⋮</button>
-                <button onclick="showProjectSearchPanel()" title="搜索项目" style="background:linear-gradient(135deg,#00bcd4,#00838f);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">🔍</button>
-                <button onclick="toggleNotepadPanel()" title="记事本" style="background:linear-gradient(135deg,#ffd700,#ff6b6b);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">📝</button>
-                <button onclick="toggleTxtFilesPanel()" title="脚本生成" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">📄</button>
-                <button onclick="toggleReferencePanel()" title="参考图片" style="background:linear-gradient(135deg,#9c27b0,#7b1fa2);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">🖼️</button>
-                <button onclick="saveCurrentProject()" title="保存" style="background:rgba(76,175,80,0.8);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">💾</button>
+                <button onclick="showProjectSearchPanel()" title="搜索项目" data-tip="🔍 搜索项目：按名称快速找到已保存的阵容项目" style="background:linear-gradient(135deg,#00bcd4,#00838f);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">🔍</button>
+                <button onclick="toggleNotepadPanel()" title="记事本" data-tip="📝 记事本：记录阵容思路、战车及注意事项，保存后跟随项目" style="background:linear-gradient(135deg,#ffd700,#ff6b6b);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">📝</button>
+                <button id="txtFilesToggleBtn" onclick="toggleTxtFilesPanel()" title="脚本生成" data-tip="📄 脚本文件：扫描/上传脚本，解析到手牌、分享到需求墙、导入到老马" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">📄</button>
+                <button onclick="toggleReferencePanel()" title="参考图片" data-tip="🖼️ 参考图片：上传阵容参考图，可缩放拖动对照" style="background:linear-gradient(135deg,#9c27b0,#7b1fa2);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">🖼️</button>
+                <button onclick="saveCurrentProject()" title="保存" data-tip="💾 保存当前阵容到项目" style="background:rgba(76,175,80,0.8);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">💾</button>
                 <button onclick="toggleActivityCalcPanel()" title="活动氪金计算器" style="background:linear-gradient(135deg,#ff6b6b,#feca57);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">🧮</button>
             </div>
         </div>
@@ -2895,9 +2963,9 @@
             // 进入归档系统（完整功能）
             document.getElementById('passwordOverlay').style.display = 'none';
             document.getElementById('mainContent').classList.add('visible');
-            // 首次进入显示功能说明
-            if (!localStorage.getItem('TFJL_WelcomeRead')) {
-                setTimeout(() => showWelcomeGuide(), 500);
+            // 首次进入启动新手指引（方案A），完成过则不再自动弹
+            if (!localStorage.getItem('TFJL_TourDone')) {
+                setTimeout(() => startNewbieTour(), 700);
             }
         }
 
@@ -3005,21 +3073,25 @@
         <!-- 固定在右上角的按钮 -->
         <div class="sticky-buttons" style="position:fixed;top:12px;right:12px;z-index:9999;display:flex;gap:5px;">
             <!-- APP版本地设置按钮（仅在Tauri APP中显示） -->
-            <button id="appLocalSettingsBtn" onclick="openAppLocalSettings()" title="APP本地设置" style="display:none;background:rgba(156,39,176,0.85);color:white;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 2px 10px rgba(0,0,0,0.3);display:none;align-items:center;justify-content:center;">📁</button>
+            <button id="appLocalSettingsBtn" onclick="openAppLocalSettings()" title="APP本地设置" data-tip="📁 APP本地设置：配置老马目录，导入脚本直接存到本地文件夹（仅桌面版）" style="display:none;background:rgba(156,39,176,0.85);color:white;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 2px 10px rgba(0,0,0,0.3);display:none;align-items:center;justify-content:center;">📁</button>
             <!-- 版本切换按钮（动态显示） -->
-            <button id="versionSwitchBtn" onclick="handleVersionSwitch()" style="display:none;background:rgba(0,188,212,0.8);color:white;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 1px 6px rgba(0,0,0,0.15);backdrop-filter:blur(4px);align-items:center;justify-content:center;">🌐</button>
-            <button id="chatRoomToggle" onclick="window.location.href='auction.html'" title="拍卖行" style="background:rgba(78,205,196,0.85);color:#1a1a2e;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 2px 10px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">🏪</button>
-            <button id="messageWallToggle" onclick="toggleMessageWall()" title="需求墙" style="background:rgba(255,215,0,0.85);color:#1a1a2e;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 2px 10px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">📢</button>
+            <button id="versionSwitchBtn" onclick="handleVersionSwitch()" data-tip="🌐 版本切换：在线版 / 离线版智能切换" style="display:none;background:rgba(0,188,212,0.8);color:white;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 1px 6px rgba(0,0,0,0.15);backdrop-filter:blur(4px);align-items:center;justify-content:center;">🌐</button>
+            <button id="chatRoomToggle" onclick="window.location.href='auction.html'" title="拍卖行" data-tip="🏪 拍卖行：闲置物品免费上架、交换、求购" style="background:rgba(78,205,196,0.85);color:#1a1a2e;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 2px 10px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">🏪</button>
+            <button id="messageWallToggle" onclick="toggleMessageWall()" title="需求墙" data-tip="📢 需求墙：发布需求、分享脚本、互动交流" style="background:rgba(255,215,0,0.85);color:#1a1a2e;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 2px 10px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">📢</button>
             <div style="position:relative;">
-                <button onclick="toggleBackupMenu(this)" title="菜单" style="background:rgba(255,87,34,0.8);color:white;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 1px 6px rgba(0,0,0,0.15);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;">☰</button>
+                <button onclick="toggleBackupMenu(this)" title="菜单" data-tip="☰ 菜单：备份恢复、使用帮助、下载离线/桌面版都在这里" style="background:rgba(255,87,34,0.8);color:white;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 1px 6px rgba(0,0,0,0.15);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;">☰</button>
                 <div id="backupMenu" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:rgba(42,42,74,0.95);border:1px solid rgba(255,215,0,0.3);border-radius:8px;padding:8px 0;min-width:180px;z-index:1000;box-shadow:0 4px 15px rgba(0,0,0,0.4);backdrop-filter:blur(8px);">
                     <div onclick="exportAllData();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📤 全部备份</div>
                     <div onclick="document.getElementById('importFileInput').click();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📥 全部恢复</div>
                     <div onclick="exportCurrentProject();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📤 备份此项目</div>
                     <div onclick="importSingleProject();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📥 恢复项目</div>
                     <div onclick="downloadOfflineVersion();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📥 下载离线版</div>
+                    <div onclick="startNewbieTour();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#4caf50;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">🔄 新手指引</div>
+                    <div onclick="window.open('help.html','_blank');document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#4fc3f7;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">🌐 新手帮助页</div>
                     <div onclick="showHelpModal();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📖 使用帮助</div>
                     <div onclick="openDownloadModal();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#4fc3f7;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📥 下载桌面版</div>
+                    <div onclick="menuCheckUpdate();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#81c784;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">🔄 检查更新</div>
+                    <div onclick="forceRefreshLatest();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#ffd54f;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">♻️ 刷新最新资源</div>
                     <div onclick="window.location.href='auction.html';document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">🏪 进入拍卖系统</div>
                     <div onclick="logoutToLogin();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#ff6b6b;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,107,107,0.1)'" onmouseout="this.style.background='transparent'">🔙 退出登录</div>
                 </div>
@@ -3934,7 +4006,8 @@
                         <div style="background:rgba(78,205,196,0.1);border:1px solid rgba(78,205,196,0.3);border-radius:8px;padding:8px 12px;margin-top:10px;text-align:center;">
                             <span style="color:#4ecdc4;font-size:0.82rem;">💡 有好的需求、想法，欢迎在需求墙（右上角小喇叭）留言！</span>
                         </div>
-                        <div style="display:flex;gap:10px;margin-top:16px;justify-content:center;">
+                        <div style="display:flex;gap:10px;margin-top:16px;justify-content:center;flex-wrap:wrap;">
+                            <button onclick="closeWelcomeGuide();startNewbieTour();" style="padding:10px 20px;border-radius:8px;border:none;background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;cursor:pointer;font-size:0.85rem;font-weight:600;">🚀 新手指引</button>
                             <button onclick="closeWelcomeGuide();showHelpModal();" style="padding:10px 20px;border-radius:8px;border:none;background:linear-gradient(135deg,#4fc3f7,#0288d1);color:white;cursor:pointer;font-size:0.85rem;font-weight:600;">📖 查看完整帮助</button>
                             <button onclick="closeWelcomeGuide()" style="padding:10px 20px;border-radius:8px;border:none;background:linear-gradient(135deg,#ffd700,#f59e0b);color:#1a1a2e;cursor:pointer;font-size:0.85rem;font-weight:600;">开始使用</button>
                         </div>
@@ -5487,6 +5560,92 @@
             }
         }
 
+        // 可持续显示的加载提示（带旋转动画，返回控制对象）
+        function showLoadingToast(message) {
+            if (!document.getElementById('tfjlSpinStyle')) {
+                const s = document.createElement('style');
+                s.id = 'tfjlSpinStyle';
+                s.textContent = '@keyframes tfjlSpin{to{transform:rotate(360deg)}}';
+                document.head.appendChild(s);
+            }
+            const toast = document.createElement('div');
+            toast.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);padding:16px 28px;border-radius:12px;font-size:1rem;font-weight:500;z-index:100000;background:rgba(42,42,74,0.96);color:#fff;box-shadow:0 8px 30px rgba(0,0,0,0.45);display:flex;align-items:center;gap:12px;border:1px solid rgba(255,215,0,0.3);';
+            const spinner = document.createElement('div');
+            spinner.style.cssText = 'width:18px;height:18px;border:3px solid rgba(255,255,255,0.25);border-top-color:#ffd54f;border-radius:50%;animation:tfjlSpin 0.7s linear infinite;flex-shrink:0;';
+            const text = document.createElement('span');
+            text.textContent = message;
+            toast.appendChild(spinner);
+            toast.appendChild(text);
+            document.body.appendChild(toast);
+            return {
+                update(msg) { text.textContent = msg; },
+                success(msg) { spinner.style.display = 'none'; text.textContent = msg; toast.style.borderColor = 'rgba(76,175,80,0.6)'; },
+                error(msg) { spinner.style.display = 'none'; text.textContent = msg; toast.style.borderColor = 'rgba(244,67,54,0.6)'; },
+                remove(delay) { setTimeout(() => { if (toast.parentNode) toast.remove(); }, delay || 0); }
+            };
+        }
+
+        // 菜单「检查更新」：检查最新版本号并给出明确反馈
+        async function menuCheckUpdate() {
+            const t = showLoadingToast('🔍 正在检查更新...');
+            try {
+                const release = await fetchLatestRelease();
+                if (!release) {
+                    t.error('⚠️ 无法获取版本信息，请检查网络后重试');
+                    t.remove(2800);
+                    return;
+                }
+                if (isNewerVersion(release.version, CURRENT_VERSION)) {
+                    t.success('🎉 发现新版本 v' + release.version + '，即将打开下载...');
+                    t.remove(1800);
+                    const badge = document.getElementById('updateBadgeFooter');
+                    if (badge) badge.style.display = 'inline-block';
+                    setTimeout(() => openDownloadModal(), 1300);
+                } else {
+                    t.success('✅ 当前已是最新版本 v' + CURRENT_VERSION);
+                    t.remove(2500);
+                }
+            } catch (e) {
+                t.error('⚠️ 检查失败，请稍后重试');
+                t.remove(2800);
+            }
+        }
+
+        // 菜单「刷新最新资源」：清理缓存并重新加载，一次拿到最新前端
+        // 解决「更新后要开关几次才生效」的缓存问题（Service Worker 缓存策略导致）
+        async function forceRefreshLatest() {
+            const t = showLoadingToast('♻️ 正在获取最新资源...');
+            try {
+                // 1. 通知 Service Worker 清缓存
+                if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+                    await new Promise((resolve) => {
+                        let done = false;
+                        const onMsg = (e) => {
+                            if (e.data === 'CACHE_CLEARED' && !done) {
+                                done = true;
+                                navigator.serviceWorker.removeEventListener('message', onMsg);
+                                resolve();
+                            }
+                        };
+                        navigator.serviceWorker.addEventListener('message', onMsg);
+                        navigator.serviceWorker.controller.postMessage('CLEAR_CACHE');
+                        setTimeout(() => { if (!done) { done = true; resolve(); } }, 2500);
+                    });
+                }
+                // 2. 双保险：直接清空 CacheStorage
+                if (window.caches) {
+                    const names = await caches.keys();
+                    await Promise.all(names.map((n) => caches.delete(n)));
+                }
+                t.success('✅ 已获取最新，正在重新加载...');
+                t.remove(1500);
+                setTimeout(() => location.reload(), 700);
+            } catch (e) {
+                t.error('⚠️ 刷新出错，正在重新加载...');
+                setTimeout(() => location.reload(), 900);
+            }
+        }
+
         // 检查更新（静默模式，在 App 启动时使用）
         async function checkForUpdates() {
             const release = await fetchLatestRelease();
@@ -6507,6 +6666,170 @@
         function closeHelpModal() {
             const modal = document.getElementById('helpModal');
             if (modal) modal.remove();
+        }
+
+        // ===== 方案C：悬浮提示 tooltip（读取 data-tip，事件委托） =====
+        (function initTooltips() {
+            let tipEl = null;
+            function getTip() {
+                if (!tipEl) {
+                    tipEl = document.createElement('div');
+                    tipEl.className = 'tfjl-tooltip';
+                    document.body.appendChild(tipEl);
+                }
+                return tipEl;
+            }
+            function showTip(el) {
+                const text = el.getAttribute('data-tip');
+                if (!text) return;
+                const tip = getTip();
+                tip.textContent = text;
+                const r = el.getBoundingClientRect();
+                const tw = tip.offsetWidth || 240;
+                const th = tip.offsetHeight || 50;
+                let pos = 'bottom';
+                let left = r.left;
+                let top = r.bottom + 8;
+                if (top + th > window.innerHeight - 8) { pos = 'top'; top = r.top - th - 8; }
+                left = Math.max(8, Math.min(left, window.innerWidth - tw - 8));
+                tip.style.left = left + 'px';
+                tip.style.top = top + 'px';
+                tip.setAttribute('data-pos', pos);
+                tip.classList.add('show');
+            }
+            function hideTip() { if (tipEl) tipEl.classList.remove('show'); }
+            document.addEventListener('mouseover', function (e) {
+                const el = e.target.closest('[data-tip]');
+                if (el) showTip(el);
+            });
+            document.addEventListener('mouseout', function (e) {
+                const el = e.target.closest('[data-tip]');
+                if (el) hideTip();
+            });
+            window.addEventListener('scroll', hideTip, true);
+        })();
+
+        // ===== 方案A：新手引导浮层（分步高亮） =====
+        const TFJL_TOUR_KEY = 'TFJL_TourDone';
+        let _tourIdx = 0;
+        let _tourSteps = [];
+        let _tourSpot = null;
+        let _tourBox = null;
+
+        function startNewbieTour() {
+            _tourSteps = [
+                {
+                    sel: '#messageWallToggle', title: '需求墙',
+                    desc: '点这里打开「需求墙」：发布你的需求、分享脚本、和其他玩家互动交流。'
+                },
+                {
+                    sel: '#chatRoomToggle', title: '拍卖行',
+                    desc: '闲置物品可在这里免费上架、交换、求购，纯玩不收费，入口就在隔壁。'
+                },
+                {
+                    sel: '#txtFilesToggleBtn', title: '脚本文件',
+                    desc: '核心功能区！扫描/上传脚本、解析到手牌、分享到需求墙，还能「导入到老马」直接存到本地目录。点击打开看看。',
+                    open: function () {
+                        const p = document.getElementById('txtFilesPanel');
+                        if (!p || p.style.display === 'none') toggleTxtFilesPanel();
+                    }
+                },
+                {
+                    sel: '#txtFilesPanel', title: '导入到老马',
+                    desc: '在这里扫描出脚本后，选择「导入到老马」会弹出目录让你选保存位置（需先在 📁 APP本地设置 里配置老马目录）。'
+                },
+                {
+                    sel: '#appLocalSettingsBtn', title: 'APP本地设置', skipIfHidden: true,
+                    desc: '桌面版专属：配置老马目录后，「导入到老马」才能把脚本存到你的本地文件夹。'
+                },
+                {
+                    sel: 'button[title="菜单"]', title: '菜单',
+                    desc: '备份/恢复数据、查看使用帮助、下载离线版/桌面版，都在这个 ☰ 菜单里。'
+                },
+                {
+                    sel: '#statsBar', title: '统计栏',
+                    desc: '页面底部的实时统计：访问量、用户数、在线人数、下载量。'
+                }
+            ];
+            _tourIdx = 0;
+            // 清理旧节点
+            endTour(true);
+            showTourStep();
+        }
+
+        function showTourStep() {
+            // 找一个可见的目标
+            while (_tourIdx < _tourSteps.length) {
+                const step = _tourSteps[_tourIdx];
+                const el = document.querySelector(step.sel);
+                if (!el || (step.skipIfHidden && el.offsetParent === null) || el.style.display === 'none') {
+                    _tourIdx++;
+                    continue;
+                }
+                renderTour(el, step);
+                return;
+            }
+            endTour();
+        }
+
+        function renderTour(el, step) {
+            if (step.open) step.open();
+            // 等待面板打开后再定位
+            setTimeout(function () {
+                const target = document.querySelector(step.sel) || el;
+                const r = target.getBoundingClientRect();
+                if (!_tourSpot) {
+                    _tourSpot = document.createElement('div');
+                    _tourSpot.className = 'tfjl-tour-spot';
+                    document.body.appendChild(_tourSpot);
+                }
+                _tourSpot.style.left = (r.left - 6) + 'px';
+                _tourSpot.style.top = (r.top - 6) + 'px';
+                _tourSpot.style.width = (r.width + 12) + 'px';
+                _tourSpot.style.height = (r.height + 12) + 'px';
+
+                if (!_tourBox) {
+                    _tourBox = document.createElement('div');
+                    _tourBox.id = 'tfjlTourBox';
+                    document.body.appendChild(_tourBox);
+                }
+                const total = _tourSteps.length;
+                const num = _tourIdx + 1;
+                _tourBox.innerHTML =
+                    '<div class="step-num">第 ' + num + ' / ' + total + ' 步</div>' +
+                    '<div class="step-title">' + step.title + '</div>' +
+                    '<div class="step-desc">' + step.desc + '</div>' +
+                    '<div class="tour-btns">' +
+                        '<button class="tour-btn-skip" onclick="endTour()">跳过</button>' +
+                        (_tourIdx > 0 ? '<button class="tour-btn-prev" onclick="tourPrev()">上一步</button>' : '') +
+                        '<button class="tour-btn-next" onclick="tourNext()">' + (_tourIdx === total - 1 ? '完成' : '下一步') + '</button>' +
+                    '</div>';
+                // 定位提示框（优先放目标下方，空间不足放上方）
+                _tourBox.style.visibility = 'hidden';
+                _tourBox.style.display = 'block';
+                const bw = _tourBox.offsetWidth, bh = _tourBox.offsetHeight;
+                let left = r.left;
+                let top = r.bottom + 12;
+                if (top + bh > window.innerHeight - 8) top = Math.max(8, r.top - bh - 12);
+                left = Math.max(8, Math.min(left, window.innerWidth - bw - 8));
+                _tourBox.style.left = left + 'px';
+                _tourBox.style.top = top + 'px';
+                _tourBox.style.visibility = 'visible';
+            }, step.open ? 350 : 0);
+        }
+
+        function tourNext() {
+            _tourIdx++;
+            if (_tourIdx >= _tourSteps.length) { endTour(); return; }
+            showTourStep();
+        }
+        function tourPrev() {
+            if (_tourIdx > 0) { _tourIdx--; showTourStep(); }
+        }
+        function endTour(silent) {
+            if (_tourSpot) { _tourSpot.remove(); _tourSpot = null; }
+            if (_tourBox) { _tourBox.remove(); _tourBox = null; }
+            if (!silent) localStorage.setItem(TFJL_TOUR_KEY, 'true');
         }
 
 
