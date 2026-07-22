@@ -23311,12 +23311,12 @@ function hasGistToken() {
 
             // 概览卡片
             html += `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:20px;">`;
-            html += analyticsCard('总访问', totalVisits, '🔵');
-            html += analyticsCard('总用户', totalUsers, '🟢');
-            html += analyticsCard('今日访问', todayVisits, `📈 ${visitTrend >= 0 ? '↑' : '↓'}${Math.abs(visitTrend).toFixed(0)}%`, visitTrend >= 0 ? '#4caf50' : '#ef4444');
-            html += analyticsCard('今日新用户', todayStats.new_users || 0, '🆕');
-            html += analyticsCard('今日活跃', activeToday, '🔥');
-            html += analyticsCard('当前在线', onlineCount, '⚡');
+            html += analyticsCard('累计访问次数', totalVisits, '🔵');
+            html += analyticsCard('累计用户数', totalUsers, '🟢');
+            html += analyticsCard('今日访问次数', todayVisits, `📈 ${visitTrend >= 0 ? '↑' : '↓'}${Math.abs(visitTrend).toFixed(0)}%`, visitTrend >= 0 ? '#4caf50' : '#ef4444');
+            html += analyticsCard('今日新增用户', todayStats.new_users || 0, '🆕');
+            html += analyticsCard('今日活跃用户', activeToday, '🔥');
+            html += analyticsCard('当前在线用户', onlineCount, '⚡');
             html += `</div>`;
 
             // APP/网页 来源概览
@@ -23327,10 +23327,10 @@ function hasGistToken() {
             const activeApp = (data.active_today_app_users || []).length;
             const activeWeb = (data.active_today_web_users || []).length;
             html += `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:20px;">`;
-            html += analyticsCard('总 APP 访问', totalAppVisits, '📱', '#1976d2');
-            html += analyticsCard('总 网页 访问', totalWebVisits, '🌐', '#00bcd4');
-            html += analyticsCard('今日 APP', todayAppVisits, '📱', activeApp > 0 ? '#4ade80' : 'rgba(255,255,255,0.5)');
-            html += analyticsCard('今日 网页', todayWebVisits, '🌐', activeWeb > 0 ? '#4ade80' : 'rgba(255,255,255,0.5)');
+            html += analyticsCard('累计 APP 访问', totalAppVisits, '📱', '#1976d2');
+            html += analyticsCard('累计 网页 访问', totalWebVisits, '🌐', '#00bcd4');
+            html += analyticsCard('今日 APP 访问', todayAppVisits, '📱', activeApp > 0 ? '#4ade80' : 'rgba(255,255,255,0.5)');
+            html += analyticsCard('今日 网页 访问', todayWebVisits, '🌐', activeWeb > 0 ? '#4ade80' : 'rgba(255,255,255,0.5)');
             html += `</div>`;
 
             // 最近7天摘要
@@ -23345,10 +23345,10 @@ function hasGistToken() {
             html += `<div style="background:rgba(255,255,255,0.05);border-radius:10px;padding:15px;margin-bottom:20px;">`;
             html += `<div style="color:#4ecdc4;font-size:0.9rem;margin-bottom:8px;">📋 近期摘要</div>`;
             html += `<div style="display:flex;gap:20px;flex-wrap:wrap;font-size:0.85rem;">`;
-            html += `<span>最近7天访问：<b style="color:#ffd700;">${last7Visits}</b> (APP: <span style="color:#1976d2;">${last7AppVisits}</span> / 网页: <span style="color:#00bcd4;">${last7WebVisits}</span>)</span>`;
-            html += `<span>最近7天新用户：<b style="color:#4caf50;">${last7NewUsers}</b></span>`;
-            html += `<span>最近30天访问：<b style="color:#ffd700;">${last30Visits}</b></span>`;
-            html += `<span>最近30天新用户：<b style="color:#4caf50;">${last30NewUsers}</b></span>`;
+            html += `<span>最近7天访问次数：<b style="color:#ffd700;">${last7Visits}</b> (APP: <span style="color:#1976d2;">${last7AppVisits}</span> / 网页: <span style="color:#00bcd4;">${last7WebVisits}</span>)</span>`;
+            html += `<span>最近7天新增用户：<b style="color:#4caf50;">${last7NewUsers}</b></span>`;
+            html += `<span>最近30天访问次数：<b style="color:#ffd700;">${last30Visits}</b></span>`;
+            html += `<span>最近30天新增用户：<b style="color:#4caf50;">${last30NewUsers}</b></span>`;
             html += `</div></div>`;
 
             // 日访问趋势图（柱状图，含活跃用户折线，APP/网页 堆叠）
@@ -23538,27 +23538,27 @@ function hasGistToken() {
                     ${pendingCount > 0 ? `<div style="color:#ff9800;margin-bottom:10px;">⚠️ 有 ${pendingCount} 条数据等待同步</div>` : ''}
                     <h3 style="color:#4ecdc4;">📈 总计数据</h3>
                     <div style="padding-left:20px;line-height:2;">
-                        <div>• 总访问次数：<span style="color:#ffd700;">${counterData.total_visits}</span></div>
-                        <div>• 总 APP 访问：<span style="color:#1976d2;">${(counterData.sources && counterData.sources.app_visits) || 0}</span>  |  总 网页 访问：<span style="color:#00bcd4;">${(counterData.sources && counterData.sources.web_visits) || 0}</span></div>
-                        <div>• 总用户数：<span style="color:#ffd700;">${totalUsers}</span> (APP新增: <span style="color:#1976d2;">${(counterData.sources && counterData.sources.new_app_users) || 0}</span> / 网页新增: <span style="color:#00bcd4;">${(counterData.sources && counterData.sources.new_web_users) || 0}</span>)</div>
-                        <div>• 当前在线：<span style="color:#4ade80;">${onlineCount}</span> <span style="color:rgba(255,255,255,0.35);font-size:0.8rem;">(${onlineTimeoutMinutes}分钟内活跃)</span></div>
-                        <div>• 今日活跃：<span style="color:#4ade80;">${activeToday}</span> <span style="font-size:0.8rem;">(APP: <span style="color:#1976d2;">${(counterData.active_today_app_users || []).length}</span> / 网页: <span style="color:#00bcd4;">${(counterData.active_today_web_users || []).length}</span>)</div>
-                        <div>• 总下载次数：<span style="color:#ffd700;">${counterData.total_downloads}</span></div>
+                        <div>• 累计访问次数：<span style="color:#ffd700;">${counterData.total_visits}</span></div>
+                        <div>• 累计 APP 访问次数：<span style="color:#1976d2;">${(counterData.sources && counterData.sources.app_visits) || 0}</span>  |  累计 网页 访问次数：<span style="color:#00bcd4;">${(counterData.sources && counterData.sources.web_visits) || 0}</span></div>
+                        <div>• 累计用户数：<span style="color:#ffd700;">${totalUsers}</span> (APP新增: <span style="color:#1976d2;">${(counterData.sources && counterData.sources.new_app_users) || 0}</span> / 网页新增: <span style="color:#00bcd4;">${(counterData.sources && counterData.sources.new_web_users) || 0}</span>)</div>
+                        <div>• 当前在线用户：<span style="color:#4ade80;">${onlineCount}</span> <span style="color:rgba(255,255,255,0.35);font-size:0.8rem;">(${onlineTimeoutMinutes}分钟内活跃)</span></div>
+                        <div>• 今日活跃用户：<span style="color:#4ade80;">${activeToday}</span> <span style="font-size:0.8rem;">(APP: <span style="color:#1976d2;">${(counterData.active_today_app_users || []).length}</span> / 网页: <span style="color:#00bcd4;">${(counterData.active_today_web_users || []).length}</span>)</div>
+                        <div>• 累计下载次数：<span style="color:#ffd700;">${counterData.total_downloads}</span></div>
                     </div>
                 </div>
                 <div class="admin-section">
                     <h3 style="color:#4ade80;">🆕 新增用户</h3>
                     <div style="padding-left:20px;line-height:2;">
-                        <div>• 今日新增：<span style="color:#4ade80;">${todayNew}</span> <span style="font-size:0.8rem;">(APP: <span style="color:#1976d2;">${todayStats.new_app_users || 0}</span> / 网页: <span style="color:#00bcd4;">${todayStats.new_web_users || 0}</span>)</span></div>
-                        <div>• 本周新增：<span style="color:#60a5fa;">${weekNew}</span></div>
-                        <div>• 本月新增：<span style="color:#a78bfa;">${monthNew}</span></div>
+                        <div>• 今日新增用户：<span style="color:#4ade80;">${todayNew}</span> <span style="font-size:0.8rem;">(APP: <span style="color:#1976d2;">${todayStats.new_app_users || 0}</span> / 网页: <span style="color:#00bcd4;">${todayStats.new_web_users || 0}</span>)</span></div>
+                        <div>• 本周新增用户：<span style="color:#60a5fa;">${weekNew}</span></div>
+                        <div>• 本月新增用户：<span style="color:#a78bfa;">${monthNew}</span></div>
                     </div>
                 </div>
                 <div class="admin-section">
                     <h3 style="color:#4ecdc4;">📅 今日数据 (${today})</h3>
                     <div style="padding-left:20px;line-height:2;">
-                        <div>• 今日访问：<span style="color:#ffd700;">${todayStats.visits}</span> (APP: <span style="color:#1976d2;">${todayStats.app_visits || 0}</span> / 网页: <span style="color:#00bcd4;">${todayStats.web_visits || 0}</span>)</div>
-                        <div>• 今日下载：<span style="color:#ffd700;">${todayStats.downloads}</span></div>
+                        <div>• 今日访问次数：<span style="color:#ffd700;">${todayStats.visits}</span> (APP: <span style="color:#1976d2;">${todayStats.app_visits || 0}</span> / 网页: <span style="color:#00bcd4;">${todayStats.web_visits || 0}</span>)</div>
+                        <div>• 今日下载次数：<span style="color:#ffd700;">${todayStats.downloads}</span></div>
                     </div>
                 </div>
                 <div style="color:rgba(255,255,255,0.3);font-size:0.8rem;text-align:center;margin-top:10px;">最后更新：${counterData.last_updated || '未知'}</div>
