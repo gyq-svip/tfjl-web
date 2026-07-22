@@ -10,18 +10,25 @@
         min-height: 100vh;
         background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
         font-family: "Microsoft YaHei", "PingFang SC", "Helvetica Neue", sans-serif;
-        overflow-x: auto;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        padding: 20px;
+        overflow: hidden;
+        user-select: none;
     }
-    .container { position: relative; min-width: 1100px; min-height: 850px; }
+
+    /* 缩放容器 */
+    #zoomContainer {
+        position: absolute; inset: 0;
+        transform-origin: 0 0;
+        transition: transform 0.15s ease-out;
+        cursor: grab;
+    }
+    #zoomContainer.dragging { cursor: grabbing; transition: none; }
+
+    svg { display: block; }
 
     /* 返回按钮 */
     .back-btn {
-        position: fixed; top: 16px; left: 16px; z-index: 10;
-        background: rgba(255,255,255,0.1); border: 1px solid rgba(255,215,0,0.4);
+        position: fixed; top: 16px; left: 16px; z-index: 20;
+        background: rgba(255,255,255,0.12); border: 1px solid rgba(255,215,0,0.4);
         color: #ffd700; padding: 8px 18px; border-radius: 8px;
         cursor: pointer; font-size: 0.85rem; font-weight: 600;
         text-decoration: none; transition: all 0.3s;
@@ -31,49 +38,53 @@
 
     /* 标题 */
     .page-title {
-        position: fixed; top: 16px; right: 30px; z-index: 10;
-        color: rgba(255,255,255,0.7); font-size: 0.85rem;
+        position: fixed; top: 16px; right: 30px; z-index: 20;
+        color: rgba(255,255,255,0.7); font-size: 0.85rem; pointer-events: none;
     }
 
-    svg { display: block; }
-
-    /* 节点组样式 */
-    .node-group { cursor: pointer; }
-    .node-group:hover .node-rect { filter: brightness(1.2); }
-    .node-group:hover .node-text { font-weight: 700; }
-
-    .conn-line {
-        fill: none;
-        stroke-width: 2.5;
-        opacity: 0.6;
-        transition: all 0.3s;
+    /* 缩放控件 */
+    .zoom-controls {
+        position: fixed; bottom: 24px; right: 24px; z-index: 20;
+        display: flex; flex-direction: column; gap: 8px;
     }
-    .node-rect {
-        transition: all 0.25s ease;
+    .zoom-btn {
+        width: 38px; height: 38px; border-radius: 10px;
+        background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2);
+        color: #fff; font-size: 1.2rem; cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
+        transition: all 0.2s; backdrop-filter: blur(8px);
     }
-    .node-text {
-        transition: all 0.25s ease;
-        pointer-events: none;
+    .zoom-btn:hover { background: rgba(255,255,255,0.22); border-color: rgba(255,215,0,0.5); }
+    .zoom-level {
+        text-align: center; color: rgba(255,255,255,0.6); font-size: 0.75rem;
+        padding: 2px 0;
     }
 
     /* 图例 */
     .legend {
-        position: fixed; bottom: 20px; right: 30px; z-index: 10;
-        display: flex; gap: 24px;
+        position: fixed; bottom: 24px; left: 24px; z-index: 20;
+        display: flex; flex-wrap: wrap; gap: 16px;
     }
     .legend-item {
-        display: flex; align-items: center; gap: 8px;
-        color: rgba(255,255,255,0.7); font-size: 0.78rem;
+        display: flex; align-items: center; gap: 6px;
+        color: rgba(255,255,255,0.7); font-size: 0.75rem;
     }
     .legend-dot {
-        width: 12px; height: 12px; border-radius: 50%;
-        box-shadow: 0 0 8px currentColor;
+        width: 10px; height: 10px; border-radius: 50%;
+        box-shadow: 0 0 6px currentColor;
     }
+
+    /* 节点动画 */
+    .node-group { cursor: pointer; }
+    .node-group:hover .node-rect { filter: brightness(1.3); }
+    .node-rect { transition: filter 0.2s ease; }
+    .conn-line { fill: none; stroke-width: 2; opacity: 0.5; }
+    .conn-line-sub { fill: none; stroke-width: 1.5; opacity: 0.35; }
 
     /* 提示 */
     .hint {
-        position: fixed; bottom: 56px; left: 50%; transform: translateX(-50%); z-index: 10;
-        color: rgba(255,255,255,0.4); font-size: 0.75rem;
+        position: fixed; bottom: 72px; left: 50%; transform: translateX(-50%); z-index: 20;
+        color: rgba(255,255,255,0.35); font-size: 0.73rem; pointer-events: none;
     }
 </style>
 </head>
@@ -81,146 +92,288 @@
 
 <a class="back-btn" href="https://gyq-svip.github.io/tfjl-web/">← 返回助手</a>
 <div class="page-title">功能导览 · 思维导图</div>
-
-<div class="hint">💡 悬停节点查看高亮，所有功能均为实际可用功能</div>
+<div class="hint">💡 滚轮缩放 | 拖拽平移 | 悬停节点高亮</div>
 
 <div class="legend">
     <div class="legend-item"><div class="legend-dot" style="background:#4fc3f7;"></div> 项目管理</div>
     <div class="legend-item"><div class="legend-dot" style="background:#ffd700;"></div> 分类管理</div>
-    <div class="legend-item"><div class="legend-dot" style="background:#4caf50;"></div> 导出导入</div>
-    <div class="legend-item"><div class="legend-dot" style="background:#ff6b6b;"></div> 脚本解析</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#4caf50;"></div> 导入导出</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#ff6b6b;"></div> 脚本引擎</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#ab47bc;"></div> 社区互动</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#ff9800;"></div> 更多功能</div>
 </div>
 
-<div class="container">
-<svg viewBox="0 0 1180 840" xmlns="http://www.w3.org/2000/svg">
+<div class="zoom-controls">
+    <button class="zoom-btn" id="zoomInBtn" title="放大">＋</button>
+    <div class="zoom-level" id="zoomLevel">100%</div>
+    <button class="zoom-btn" id="zoomOutBtn" title="缩小">−</button>
+    <button class="zoom-btn" id="zoomResetBtn" title="重置视图" style="font-size:0.8rem;">⊙</button>
+</div>
+
+<div id="zoomContainer">
+<svg viewBox="0 0 1400 980" xmlns="http://www.w3.org/2000/svg">
 
     <defs>
-        <filter id="glowBlue"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-        <filter id="glowGold"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-        <filter id="glowGreen"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-        <filter id="glowRed"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        <filter id="glowRoot"><feGaussianBlur stdDeviation="4" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        <filter id="glowBlue"><feGaussianBlur stdDeviation="2.5" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        <filter id="glowGold"><feGaussianBlur stdDeviation="2.5" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        <filter id="glowGreen"><feGaussianBlur stdDeviation="2.5" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        <filter id="glowRed"><feGaussianBlur stdDeviation="2.5" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        <filter id="glowPurple"><feGaussianBlur stdDeviation="2.5" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        <filter id="glowOrange"><feGaussianBlur stdDeviation="2.5" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
 
-        <radialGradient id="gradRoot" cx="50%" cy="50%">
-            <stop offset="0%" stop-color="#ff9800"/>
-            <stop offset="100%" stop-color="#f57c00"/>
-        </radialGradient>
-        <radialGradient id="gradBlue" cx="50%" cy="50%">
-            <stop offset="0%" stop-color="#4fc3f7"/>
-            <stop offset="100%" stop-color="#0288d1"/>
-        </radialGradient>
-        <radialGradient id="gradGold" cx="50%" cy="50%">
-            <stop offset="0%" stop-color="#ffd700"/>
-            <stop offset="100%" stop-color="#ff8f00"/>
-        </radialGradient>
-        <radialGradient id="gradGreen" cx="50%" cy="50%">
-            <stop offset="0%" stop-color="#4caf50"/>
-            <stop offset="100%" stop-color="#2e7d32"/>
-        </radialGradient>
-        <radialGradient id="gradRed" cx="50%" cy="50%">
-            <stop offset="0%" stop-color="#ff6b6b"/>
-            <stop offset="100%" stop-color="#c62828"/>
-        </radialGradient>
+        <radialGradient id="gradRoot" cx="50%" cy="50%"><stop offset="0%" stop-color="#ff9800"/><stop offset="100%" stop-color="#e65100"/></radialGradient>
+        <radialGradient id="gradBlue" cx="50%" cy="50%"><stop offset="0%" stop-color="#4fc3f7"/><stop offset="100%" stop-color="#0288d1"/></radialGradient>
+        <radialGradient id="gradGold" cx="50%" cy="50%"><stop offset="0%" stop-color="#ffd700"/><stop offset="100%" stop-color="#ff8f00"/></radialGradient>
+        <radialGradient id="gradGreen" cx="50%" cy="50%"><stop offset="0%" stop-color="#4caf50"/><stop offset="100%" stop-color="#2e7d32"/></radialGradient>
+        <radialGradient id="gradRed" cx="50%" cy="50%"><stop offset="0%" stop-color="#ff6b6b"/><stop offset="100%" stop-color="#c62828"/></radialGradient>
+        <radialGradient id="gradPurple" cx="50%" cy="50%"><stop offset="0%" stop-color="#ab47bc"/><stop offset="100%" stop-color="#6a1b9a"/></radialGradient>
+        <radialGradient id="gradOrange" cx="50%" cy="50%"><stop offset="0%" stop-color="#ffa726"/><stop offset="100%" stop-color="#ef6c00"/></radialGradient>
     </defs>
 
     <!-- ==================== 连线 ==================== -->
 
-    <!-- Root → 分支1: 项目管理 -->
-    <path d="M168,420 Q 280,420 330,165 Q 345,120 375,115" class="conn-line" stroke="#4fc3f7"/>
-
-    <!-- Root → 分支2: 分类管理 -->
-    <path d="M168,420 Q 280,420 330,288 Q 345,270 375,265" class="conn-line" stroke="#ffd700"/>
-
-    <!-- Root → 分支3: 导出导入 -->
-    <path d="M168,420 Q 280,420 330,456 Q 345,445 375,440" class="conn-line" stroke="#4caf50"/>
-
-    <!-- Root → 分支4: 脚本解析 -->
-    <path d="M168,420 Q 280,420 330,632 Q 345,620 375,615" class="conn-line" stroke="#ff6b6b"/>
+    <!-- Root → 各分支 -->
+    <path d="M 190,490 C 260,490 300,100 360,95" class="conn-line" stroke="#4fc3f7"/>
+    <path d="M 190,490 C 260,490 300,220 360,215" class="conn-line" stroke="#ffd700"/>
+    <path d="M 190,490 C 260,490 300,340 360,335" class="conn-line" stroke="#4caf50"/>
+    <path d="M 190,490 C 260,490 300,480 360,475" class="conn-line" stroke="#ff6b6b"/>
+    <path d="M 190,490 C 260,490 300,620 360,615" class="conn-line" stroke="#ab47bc"/>
+    <path d="M 190,490 C 260,490 300,740 360,735" class="conn-line" stroke="#ff9800"/>
 
     <!-- 分支1 项目管理 → 子节点 -->
-    <path d="M540,115 Q 600,115 610,78" class="conn-line" stroke="#4fc3f7" stroke-width="1.8"/>
-    <path d="M540,115 Q 600,115 610,115" class="conn-line" stroke="#4fc3f7" stroke-width="1.8"/>
-    <path d="M540,115 Q 600,115 610,152" class="conn-line" stroke="#4fc3f7" stroke-width="1.8"/>
-    <path d="M540,115 Q 600,115 610,189" class="conn-line" stroke="#4fc3f7" stroke-width="1.8"/>
+    <path d="M 540,95 C 590,95 600,50 630,42" class="conn-line-sub" stroke="#4fc3f7"/>
+    <path d="M 540,95 C 590,95 600,50 630,78" class="conn-line-sub" stroke="#4fc3f7"/>
+    <path d="M 540,95 C 590,95 600,50 630,114" class="conn-line-sub" stroke="#4fc3f7"/>
+    <path d="M 540,95 C 590,95 600,50 630,150" class="conn-line-sub" stroke="#4fc3f7"/>
 
     <!-- 分支2 分类管理 → 子节点 -->
-    <path d="M540,265 Q 600,265 610,238" class="conn-line" stroke="#ffd700" stroke-width="1.8"/>
-    <path d="M540,265 Q 600,265 610,265" class="conn-line" stroke="#ffd700" stroke-width="1.8"/>
-    <path d="M540,265 Q 600,265 610,292" class="conn-line" stroke="#ffd700" stroke-width="1.8"/>
+    <path d="M 540,215 C 590,215 600,170 630,172" class="conn-line-sub" stroke="#ffd700"/>
+    <path d="M 540,215 C 590,215 600,170 630,208" class="conn-line-sub" stroke="#ffd700"/>
+    <path d="M 540,215 C 590,215 600,170 630,244" class="conn-line-sub" stroke="#ffd700"/>
+    <path d="M 540,215 C 590,215 600,170 630,280" class="conn-line-sub" stroke="#ffd700"/>
 
-    <!-- 分支3 导出导入 → 子节点 -->
-    <path d="M540,440 Q 600,440 610,413" class="conn-line" stroke="#4caf50" stroke-width="1.8"/>
-    <path d="M540,440 Q 604,440 614,440" class="conn-line" stroke="#4caf50" stroke-width="1.8"/>
-    <path d="M540,440 Q 600,440 610,467" class="conn-line" stroke="#4caf50" stroke-width="1.8"/>
+    <!-- 分支3 导入导出 → 子节点 -->
+    <path d="M 540,335 C 590,335 600,290 630,290" class="conn-line-sub" stroke="#4caf50"/>
+    <path d="M 540,335 C 590,335 600,290 630,326" class="conn-line-sub" stroke="#4caf50"/>
+    <path d="M 540,335 C 590,335 600,290 630,362" class="conn-line-sub" stroke="#4caf50"/>
+    <path d="M 540,335 C 590,335 600,290 630,398" class="conn-line-sub" stroke="#4caf50"/>
 
-    <!-- 分支4 脚本解析 → 子节点 -->
-    <path d="M540,615 Q 600,615 610,568" class="conn-line" stroke="#ff6b6b" stroke-width="1.8"/>
-    <path d="M540,615 Q 600,615 610,597" class="conn-line" stroke="#ff6b6b" stroke-width="1.8"/>
-    <path d="M540,615 Q 600,615 610,615" class="conn-line" stroke="#ff6b6b" stroke-width="1.8"/>
-    <path d="M540,615 Q 600,615 610,642" class="conn-line" stroke="#ff6b6b" stroke-width="1.8"/>
-    <path d="M540,615 Q 600,615 610,670" class="conn-line" stroke="#ff6b6b" stroke-width="1.8"/>
+    <!-- 分支4 脚本引擎 → 子节点 -->
+    <path d="M 540,475 C 590,475 600,430 630,422" class="conn-line-sub" stroke="#ff6b6b"/>
+    <path d="M 540,475 C 590,475 600,430 630,458" class="conn-line-sub" stroke="#ff6b6b"/>
+    <path d="M 540,475 C 590,475 600,430 630,494" class="conn-line-sub" stroke="#ff6b6b"/>
+    <path d="M 540,475 C 590,475 600,430 630,530" class="conn-line-sub" stroke="#ff6b6b"/>
+
+    <!-- 分支5 社区互动 → 子节点 -->
+    <path d="M 540,615 C 590,615 600,570 630,570" class="conn-line-sub" stroke="#ab47bc"/>
+    <path d="M 540,615 C 590,615 600,570 630,606" class="conn-line-sub" stroke="#ab47bc"/>
+    <path d="M 540,615 C 590,615 600,570 630,642" class="conn-line-sub" stroke="#ab47bc"/>
+    <path d="M 540,615 C 590,615 600,570 630,678" class="conn-line-sub" stroke="#ab47bc"/>
+
+    <!-- 分支6 更多功能 → 子节点 -->
+    <path d="M 540,735 C 590,735 600,690 630,688" class="conn-line-sub" stroke="#ff9800"/>
+    <path d="M 540,735 C 590,735 600,690 630,724" class="conn-line-sub" stroke="#ff9800"/>
+    <path d="M 540,735 C 590,735 600,690 630,760" class="conn-line-sub" stroke="#ff9800"/>
+    <path d="M 540,735 C 590,735 600,690 630,796" class="conn-line-sub" stroke="#ff9800"/>
 
 
     <!-- ==================== 节点 ==================== -->
 
-    <!-- 根节点: 塔防精灵助手 -->
+    <!-- 根节点 -->
     <g class="node-group">
-        <rect x="40" y="390" rx="16" ry="16" width="130" height="60" fill="url(#gradRoot)" filter="url(#glowGold)" class="node-rect"/>
-        <text x="105" y="415" text-anchor="middle" fill="#fff" font-size="14" font-weight="900" class="node-text">⚔ 塔防精灵</text>
-        <text x="105" y="435" text-anchor="middle" fill="rgba(255,255,255,0.85)" font-size="12" font-weight="700" class="node-text">助手</text>
+        <rect x="40" y="452" rx="18" ry="18" width="150" height="76" fill="url(#gradRoot)" filter="url(#glowRoot)"/>
+        <text x="115" y="480" text-anchor="middle" fill="#fff" font-size="15" font-weight="900">⚔ 塔防精灵</text>
+        <text x="115" y="505" text-anchor="middle" fill="rgba(255,255,255,0.88)" font-size="13" font-weight="700">脚本助手</text>
     </g>
 
     <!-- 分支1: 项目管理 -->
     <g class="node-group">
-        <rect x="375" y="96" rx="10" ry="10" width="165" height="38" fill="url(#gradBlue)" filter="url(#glowBlue)" class="node-rect"/>
-        <text x="457" y="120" text-anchor="middle" fill="#fff" font-size="13" font-weight="800" class="node-text">📁 项目管理</text>
+        <rect x="360" y="76" rx="10" ry="10" width="180" height="38" fill="url(#gradBlue)" filter="url(#glowBlue)"/>
+        <text x="450" y="100" text-anchor="middle" fill="#fff" font-size="13" font-weight="800">📁 项目管理</text>
     </g>
-    <g class="node-group"><rect x="610" y="62" rx="8" ry="8" width="410" height="32" fill="rgba(79,195,247,0.2)" stroke="rgba(79,195,247,0.5)" stroke-width="1.2" class="node-rect"/><text x="630" y="83" fill="rgba(255,255,255,0.9)" font-size="12" class="node-text">📦 创建/加载/保存项目 — 多项目独立管理互不干扰</text></g>
-    <g class="node-group"><rect x="610" y="99" rx="8" ry="8" width="410" height="32" fill="rgba(79,195,247,0.2)" stroke="rgba(79,195,247,0.5)" stroke-width="1.2" class="node-rect"/><text x="630" y="120" fill="rgba(255,255,255,0.9)" font-size="12" class="node-text">🃏 阵容手牌管理 — 手动添加 / 从脚本批量导入卡牌</text></g>
-    <g class="node-group"><rect x="610" y="136" rx="8" ry="8" width="410" height="32" fill="rgba(79,195,247,0.2)" stroke="rgba(79,195,247,0.5)" stroke-width="1.2" class="node-rect"/><text x="630" y="157" fill="rgba(255,255,255,0.9)" font-size="12" class="node-text">📝 记事本 + 🖼️ 参考图片 — 拖拽/粘贴上传, 悬停显示角标</text></g>
-    <g class="node-group"><rect x="610" y="173" rx="8" ry="8" width="410" height="32" fill="rgba(79,195,247,0.2)" stroke="rgba(79,195,247,0.5)" stroke-width="1.2" class="node-rect"/><text x="630" y="194" fill="rgba(255,255,255,0.9)" font-size="12" class="node-text">💾 自动保存 — 切换/关闭时自动存, 防丢失</text></g>
+    <g class="node-group"><rect x="630" y="27" rx="7" ry="7" width="660" height="30" fill="rgba(79,195,247,0.16)" stroke="rgba(79,195,247,0.45)" stroke-width="1"/><text x="645" y="47" fill="rgba(255,255,255,0.88)" font-size="11.5">📦 创建/加载/保存项目 — 多项目独立管理，数据互不干扰</text></g>
+    <g class="node-group"><rect x="630" y="63" rx="7" ry="7" width="660" height="30" fill="rgba(79,195,247,0.16)" stroke="rgba(79,195,247,0.45)" stroke-width="1"/><text x="645" y="83" fill="rgba(255,255,255,0.88)" font-size="11.5">🃏 阵容手牌管理 — 手动添加/从脚本批量导入卡牌，拖拽排序</text></g>
+    <g class="node-group"><rect x="630" y="99" rx="7" ry="7" width="660" height="30" fill="rgba(79,195,247,0.16)" stroke="rgba(79,195,247,0.45)" stroke-width="1"/><text x="645" y="119" fill="rgba(255,255,255,0.88)" font-size="11.5">📝 记事本 + 🖼️ 参考图片 — 拖拽/粘贴上传，悬停查看角标预览</text></g>
+    <g class="node-group"><rect x="630" y="135" rx="7" ry="7" width="660" height="30" fill="rgba(79,195,247,0.16)" stroke="rgba(79,195,247,0.45)" stroke-width="1"/><text x="645" y="155" fill="rgba(255,255,255,0.88)" font-size="11.5">💾 自动保存 + ⋮菜单 — 切换/关闭时自动存；重命名/删除/移动分类</text></g>
 
     <!-- 分支2: 分类管理 -->
     <g class="node-group">
-        <rect x="375" y="246" rx="10" ry="10" width="165" height="38" fill="url(#gradGold)" filter="url(#glowGold)" class="node-rect"/>
-        <text x="457" y="270" text-anchor="middle" fill="#1a1a2e" font-size="13" font-weight="800" class="node-text">📂 分类管理</text>
+        <rect x="360" y="196" rx="10" ry="10" width="180" height="38" fill="url(#gradGold)" filter="url(#glowGold)"/>
+        <text x="450" y="220" text-anchor="middle" fill="#1a1a2e" font-size="13" font-weight="800">📂 分类管理</text>
     </g>
-    <g class="node-group"><rect x="610" y="222" rx="8" ry="8" width="410" height="32" fill="rgba(255,215,0,0.18)" stroke="rgba(255,215,0,0.5)" stroke-width="1.2" class="node-rect"/><text x="630" y="243" fill="rgba(255,255,255,0.9)" font-size="12" class="node-text">➕✏️🗑️ 创建/删除/重命名分类 — 自由组织你的项目</text></g>
-    <g class="node-group"><rect x="610" y="249" rx="8" ry="8" width="410" height="32" fill="rgba(255,215,0,0.18)" stroke="rgba(255,215,0,0.5)" stroke-width="1.2" class="node-rect"/><text x="630" y="270" fill="rgba(255,255,255,0.9)" font-size="12" class="node-text">🎨 默认分类模板 — 暗月、寒冰、漩涡、深海、默认</text></g>
-    <g class="node-group"><rect x="610" y="276" rx="8" ry="8" width="410" height="32" fill="rgba(255,215,0,0.18)" stroke="rgba(255,215,0,0.5)" stroke-width="1.2" class="node-rect"/><text x="630" y="297" fill="rgba(255,255,255,0.9)" font-size="12" class="node-text">🔍 分类筛选 — 快速定位目标项目</text></g>
+    <g class="node-group"><rect x="630" y="157" rx="7" ry="7" width="660" height="30" fill="rgba(255,215,0,0.14)" stroke="rgba(255,215,0,0.4)" stroke-width="1"/><text x="645" y="177" fill="rgba(255,255,255,0.88)" font-size="11.5">➕✏️🗑️ 分类 CRUD — 自由创建/重命名/删除分类标签</text></g>
+    <g class="node-group"><rect x="630" y="193" rx="7" ry="7" width="660" height="30" fill="rgba(255,215,0,0.14)" stroke="rgba(255,215,0,0.4)" stroke-width="1"/><text x="645" y="213" fill="rgba(255,255,255,0.88)" font-size="11.5">🎨 默认分类模板 — 暗月、寒冰、漩涡、深海、默认，开箱即用</text></g>
+    <g class="node-group"><rect x="630" y="229" rx="7" ry="7" width="660" height="30" fill="rgba(255,215,0,0.14)" stroke="rgba(255,215,0,0.4)" stroke-width="1"/><text x="645" y="249" fill="rgba(255,255,255,0.88)" font-size="11.5">🔍 分类筛选 — 按分类标签快速过滤项目列表</text></g>
+    <g class="node-group"><rect x="630" y="265" rx="7" ry="7" width="660" height="30" fill="rgba(255,215,0,0.14)" stroke="rgba(255,215,0,0.4)" stroke-width="1"/><text x="645" y="285" fill="rgba(255,255,255,0.88)" font-size="11.5">🔄 项目管理?移动分类 — 选择已有项目移动到不同分类下</text></g>
 
-    <!-- 分支3: 导出导入 -->
+    <!-- 分支3: 导入导出 -->
     <g class="node-group">
-        <rect x="375" y="421" rx="10" ry="10" width="165" height="38" fill="url(#gradGreen)" filter="url(#glowGreen)" class="node-rect"/>
-        <text x="457" y="445" text-anchor="middle" fill="#fff" font-size="13" font-weight="800" class="node-text">📤 导出导入</text>
+        <rect x="360" y="316" rx="10" ry="10" width="180" height="38" fill="url(#gradGreen)" filter="url(#glowGreen)"/>
+        <text x="450" y="340" text-anchor="middle" fill="#fff" font-size="13" font-weight="800">📤 导入导出</text>
     </g>
-    <g class="node-group"><rect x="610" y="397" rx="8" ry="8" width="410" height="32" fill="rgba(76,175,80,0.2)" stroke="rgba(76,175,80,0.5)" stroke-width="1.2" class="node-rect"/><text x="630" y="418" fill="rgba(255,255,255,0.9)" font-size="12" class="node-text">📤📥 全部备份与恢复 — JSON格式, 完整数据迁移</text></g>
-    <g class="node-group"><rect x="610" y="424" rx="8" ry="8" width="410" height="32" fill="rgba(76,175,80,0.2)" stroke="rgba(76,175,80,0.5)" stroke-width="1.2" class="node-rect"/><text x="630" y="445" fill="rgba(255,255,255,0.9)" font-size="12" class="node-text">📥 单项目备份与恢复 — 精确导入单个项目</text></g>
-    <g class="node-group"><rect x="610" y="451" rx="8" ry="8" width="410" height="32" fill="rgba(76,175,80,0.2)" stroke="rgba(76,175,80,0.5)" stroke-width="1.2" class="node-rect"/><text x="630" y="472" fill="rgba(255,255,255,0.9)" font-size="12" class="node-text">📢 从需求墙导入脚本 — 其他玩家分享的脚本一键导入</text></g>
+    <g class="node-group"><rect x="630" y="275" rx="7" ry="7" width="660" height="30" fill="rgba(76,175,80,0.16)" stroke="rgba(76,175,80,0.4)" stroke-width="1"/><text x="645" y="295" fill="rgba(255,255,255,0.88)" font-size="11.5">📦 全部备份与恢复 — JSON 格式完整数据迁移，含项目+分类+设置</text></g>
+    <g class="node-group"><rect x="630" y="311" rx="7" ry="7" width="660" height="30" fill="rgba(76,175,80,0.16)" stroke="rgba(76,175,80,0.4)" stroke-width="1"/><text x="645" y="331" fill="rgba(255,255,255,0.88)" font-size="11.5">📥 单项目备份与恢复 — 精确导出/导入单个项目数据</text></g>
+    <g class="node-group"><rect x="630" y="347" rx="7" ry="7" width="660" height="30" fill="rgba(76,175,80,0.16)" stroke="rgba(76,175,80,0.4)" stroke-width="1"/><text x="645" y="367" fill="rgba(255,255,255,0.88)" font-size="11.5">📋 批量导入对话框 — 勾选要导入的项目，预览后确认导入</text></g>
+    <g class="node-group"><rect x="630" y="383" rx="7" ry="7" width="660" height="30" fill="rgba(76,175,80,0.16)" stroke="rgba(76,175,80,0.4)" stroke-width="1"/><text x="645" y="403" fill="rgba(255,255,255,0.88)" font-size="11.5">📡 从需求墙导入 — 其他玩家分享的脚本一键导入到当前项目</text></g>
 
-    <!-- 分支4: 脚本解析生成 -->
+    <!-- 分支4: 脚本引擎 -->
     <g class="node-group">
-        <rect x="375" y="596" rx="10" ry="10" width="165" height="38" fill="url(#gradRed)" filter="url(#glowRed)" class="node-rect"/>
-        <text x="457" y="620" text-anchor="middle" fill="#fff" font-size="13" font-weight="800" class="node-text">⚙️ 脚本解析生成</text>
+        <rect x="360" y="456" rx="10" ry="10" width="180" height="38" fill="url(#gradRed)" filter="url(#glowRed)"/>
+        <text x="450" y="480" text-anchor="middle" fill="#fff" font-size="13" font-weight="800">⚙️ 脚本引擎</text>
     </g>
-    <g class="node-group"><rect x="610" y="552" rx="8" ry="8" width="410" height="32" fill="rgba(255,107,107,0.2)" stroke="rgba(255,107,107,0.5)" stroke-width="1.2" class="node-rect"/><text x="630" y="573" fill="rgba(255,255,255,0.9)" font-size="12" class="node-text">📋 粘贴文本解析卡牌 — 复制游戏脚本, 自动解析成手牌</text></g>
-    <g class="node-group"><rect x="610" y="581" rx="8" ry="8" width="410" height="32" fill="rgba(255,107,107,0.2)" stroke="rgba(255,107,107,0.5)" stroke-width="1.2" class="node-rect"/><text x="630" y="602" fill="rgba(255,255,255,0.9)" font-size="12" class="node-text">🎯 活动 / 深海脚本生成 — 一键生成专用格式脚本</text></g>
-    <g class="node-group"><rect x="610" y="599" rx="8" ry="8" width="410" height="32" fill="rgba(255,107,107,0.2)" stroke="rgba(255,107,107,0.5)" stroke-width="1.2" class="node-rect"/><text x="630" y="620" fill="rgba(255,255,255,0.9)" font-size="12" class="node-text">📂 脚本文件上传/预览/下载 — 支持 TXT 文件管理</text></g>
-    <g class="node-group"><rect x="610" y="626" rx="8" ry="8" width="410" height="32" fill="rgba(255,107,107,0.2)" stroke="rgba(255,107,107,0.5)" stroke-width="1.2" class="node-rect"/><text x="630" y="647" fill="rgba(255,255,255,0.9)" font-size="12" class="node-text">📡 分享脚本到需求墙 — 一键发布, 其他玩家可导入</text></g>
-    <g class="node-group"><rect x="610" y="654" rx="8" ry="8" width="410" height="32" fill="rgba(255,107,107,0.2)" stroke="rgba(255,107,107,0.5)" stroke-width="1.2" class="node-rect"/><text x="630" y="675" fill="rgba(255,255,255,0.9)" font-size="12" class="node-text">💻 导入到老马本地目录 — APP专属: 脚本存到本地文件夹</text></g>
+    <g class="node-group"><rect x="630" y="407" rx="7" ry="7" width="660" height="30" fill="rgba(255,107,107,0.16)" stroke="rgba(255,107,107,0.4)" stroke-width="1"/><text x="645" y="427" fill="rgba(255,255,255,0.88)" font-size="11.5">📋 文本解析卡牌 — 粘贴游戏脚本，自动解析生成阵容手牌</text></g>
+    <g class="node-group"><rect x="630" y="443" rx="7" ry="7" width="660" height="30" fill="rgba(255,107,107,0.16)" stroke="rgba(255,107,107,0.4)" stroke-width="1"/><text x="645" y="463" fill="rgba(255,255,255,0.88)" font-size="11.5">🎯 活动/深海脚本生成 — 根据手牌一键生成专用格式脚本（合作/对战）</text></g>
+    <g class="node-group"><rect x="630" y="479" rx="7" ry="7" width="660" height="30" fill="rgba(255,107,107,0.16)" stroke="rgba(255,107,107,0.4)" stroke-width="1"/><text x="645" y="499" fill="rgba(255,255,255,0.88)" font-size="11.5">📂 脚本文件管理 — 上传/预览/编辑/下载 TXT 脚本文件</text></g>
+    <g class="node-group"><rect x="630" y="515" rx="7" ry="7" width="660" height="30" fill="rgba(255,107,107,0.16)" stroke="rgba(255,107,107,0.4)" stroke-width="1"/><text x="645" y="535" fill="rgba(255,255,255,0.88)" font-size="11.5">💻 导入到老马本地 — APP 专属：脚本存到本地文件夹；网页版：下载到本地</text></g>
+
+    <!-- 分支5: 社区互动 -->
+    <g class="node-group">
+        <rect x="360" y="596" rx="10" ry="10" width="180" height="38" fill="url(#gradPurple)" filter="url(#glowPurple)"/>
+        <text x="450" y="620" text-anchor="middle" fill="#fff" font-size="13" font-weight="800">📢 社区互动</text>
+    </g>
+    <g class="node-group"><rect x="630" y="555" rx="7" ry="7" width="660" height="30" fill="rgba(171,71,188,0.16)" stroke="rgba(171,71,188,0.4)" stroke-width="1"/><text x="645" y="575" fill="rgba(255,255,255,0.88)" font-size="11.5">📢 需求墙 — 发布需求、分享脚本到社区，其他玩家可浏览和导入</text></g>
+    <g class="node-group"><rect x="630" y="591" rx="7" ry="7" width="660" height="30" fill="rgba(171,71,188,0.16)" stroke="rgba(171,71,188,0.4)" stroke-width="1"/><text x="645" y="611" fill="rgba(255,255,255,0.88)" font-size="11.5">💬 聊天室 — 全局实时聊天，支持 Markdown，新消息浮动通知</text></g>
+    <g class="node-group"><rect x="630" y="627" rx="7" ry="7" width="660" height="30" fill="rgba(171,71,188,0.16)" stroke="rgba(171,71,188,0.4)" stroke-width="1"/><text x="645" y="647" fill="rgba(255,255,255,0.88)" font-size="11.5">🔔 快讯通知 — 顶栏滚动通知，管理员可通过配置下发公告</text></g>
+    <g class="node-group"><rect x="630" y="663" rx="7" ry="7" width="660" height="30" fill="rgba(171,71,188,0.16)" stroke="rgba(171,71,188,0.4)" stroke-width="1"/><text x="645" y="683" fill="rgba(255,255,255,0.88)" font-size="11.5">📡 脚本分享到需求墙 — 解析后的脚本一键发布，其他玩家可导入</text></g>
+
+    <!-- 分支6: 更多功能 -->
+    <g class="node-group">
+        <rect x="360" y="716" rx="10" ry="10" width="180" height="38" fill="url(#gradOrange)" filter="url(#glowOrange)"/>
+        <text x="450" y="740" text-anchor="middle" fill="#fff" font-size="13" font-weight="800">🔧 更多功能</text>
+    </g>
+    <g class="node-group"><rect x="630" y="673" rx="7" ry="7" width="660" height="30" fill="rgba(255,152,0,0.14)" stroke="rgba(255,152,0,0.4)" stroke-width="1"/><text x="645" y="693" fill="rgba(255,255,255,0.88)" font-size="11.5">🏪 拍卖行 — 闲置物品免费上架/交换/求购，纯玩不收费</text></g>
+    <g class="node-group"><rect x="630" y="709" rx="7" ry="7" width="660" height="30" fill="rgba(255,152,0,0.14)" stroke="rgba(255,152,0,0.4)" stroke-width="1"/><text x="645" y="729" fill="rgba(255,255,255,0.88)" font-size="11.5">📊 统计看板 — 实时访问量/用户数/在线人数/下载量</text></g>
+    <g class="node-group"><rect x="630" y="745" rx="7" ry="7" width="660" height="30" fill="rgba(255,152,0,0.14)" stroke="rgba(255,152,0,0.4)" stroke-width="1"/><text x="645" y="765" fill="rgba(255,255,255,0.88)" font-size="11.5">⚙️ APP 本地设置 — 配置老马目录路径，脚本可直接写入本地文件夹</text></g>
+    <g class="node-group"><rect x="630" y="781" rx="7" ry="7" width="660" height="30" fill="rgba(255,152,0,0.14)" stroke="rgba(255,152,0,0.4)" stroke-width="1"/><text x="645" y="801" fill="rgba(255,255,255,0.88)" font-size="11.5">📖 帮助页 + 功能导览 + 刷新资源 — 完整文档、思维导图、强制刷新缓存</text></g>
 
 </svg>
 </div>
 
 <script>
-// 悬停联动高亮
+// ===== 缩放与拖拽 =====
+let scale = 1;
+let tx = 0, ty = 0;
+const container = document.getElementById('zoomContainer');
+const svg = container.querySelector('svg');
+const MIN_SCALE = 0.4;
+const MAX_SCALE = 2.5;
+const STEP = 0.1;
+
+function applyTransform() {
+    container.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
+    document.getElementById('zoomLevel').textContent = Math.round(scale * 100) + '%';
+}
+
+// 鼠标滚轮缩放
+container.addEventListener('wheel', function(e) {
+    e.preventDefault();
+    const rect = container.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+
+    const prevScale = scale;
+    if (e.deltaY < 0) scale = Math.min(MAX_SCALE, scale + STEP);
+    else scale = Math.max(MIN_SCALE, scale - STEP);
+
+    // 以鼠标位置为中心缩放
+    const ratio = scale / prevScale;
+    tx = mx - ratio * (mx - tx);
+    ty = my - ratio * (my - ty);
+
+    applyTransform();
+}, { passive: false });
+
+// 拖拽平移
+let isDragging = false, startX, startY, startTX, startTY;
+container.addEventListener('mousedown', function(e) {
+    if (e.button !== 0) return;
+    isDragging = true;
+    container.classList.add('dragging');
+    startX = e.clientX;
+    startY = e.clientY;
+    startTX = tx;
+    startTY = ty;
+    e.preventDefault();
+});
+window.addEventListener('mousemove', function(e) {
+    if (!isDragging) return;
+    tx = startTX + (e.clientX - startX);
+    ty = startTY + (e.clientY - startY);
+    applyTransform();
+});
+window.addEventListener('mouseup', function() {
+    isDragging = false;
+    container.classList.remove('dragging');
+});
+
+// 触摸支持（双指缩放）
+let lastDist = 0;
+container.addEventListener('touchstart', function(e) {
+    if (e.touches.length === 2) {
+        lastDist = Math.hypot(
+            e.touches[0].clientX - e.touches[1].clientX,
+            e.touches[0].clientY - e.touches[1].clientY
+        );
+    }
+}, { passive: true });
+container.addEventListener('touchmove', function(e) {
+    if (e.touches.length === 2) {
+        const dist = Math.hypot(
+            e.touches[0].clientX - e.touches[1].clientX,
+            e.touches[0].clientY - e.touches[1].clientY
+        );
+        if (lastDist > 0) {
+            const delta = (dist - lastDist) * 0.01;
+            scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, scale + delta));
+            applyTransform();
+        }
+        lastDist = dist;
+    }
+}, { passive: true });
+
+// 缩放按钮
+document.getElementById('zoomInBtn').addEventListener('click', function() {
+    scale = Math.min(MAX_SCALE, scale + STEP * 1.5);
+    applyTransform();
+});
+document.getElementById('zoomOutBtn').addEventListener('click', function() {
+    scale = Math.max(MIN_SCALE, scale - STEP * 1.5);
+    applyTransform();
+});
+document.getElementById('zoomResetBtn').addEventListener('click', function() {
+    scale = 1; tx = 0; ty = 0;
+    applyTransform();
+});
+
+// 初始适应屏幕
+function autoFit() {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const svgW = 1400, svgH = 980;
+    const fitScale = Math.min(vw / svgW, vh / svgH, 1);
+    scale = Math.max(MIN_SCALE, fitScale * 0.9);
+    tx = (vw - svgW * scale) / 2;
+    ty = Math.max(0, (vh - svgH * scale) / 2);
+    applyTransform();
+}
+autoFit();
+window.addEventListener('resize', autoFit);
+
+// 节点悬停效果
 document.querySelectorAll('.node-group').forEach(group => {
     group.addEventListener('mouseenter', () => {
-        group.querySelector('.node-rect').style.filter = 'brightness(1.4) drop-shadow(0 0 12px currentColor)';
+        const rect = group.querySelector('.node-rect');
+        if (rect) rect.style.filter = 'brightness(1.5) drop-shadow(0 0 14px currentColor)';
     });
     group.addEventListener('mouseleave', () => {
-        group.querySelector('.node-rect').style.filter = '';
+        const rect = group.querySelector('.node-rect');
+        if (rect) rect.style.filter = '';
     });
 });
+
+// 双击节点重置视图
+svg.addEventListener('dblclick', function() { scale = 1; tx = 0; ty = 0; applyTransform(); });
 </script>
 
 </body>
