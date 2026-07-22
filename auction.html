@@ -835,8 +835,14 @@
             <div id="adminVerifySection" style="text-align:center;">
                 <div style="color:#a78bfa;font-size:2rem;margin-bottom:10px;">🔐</div>
                 <h3 style="color:#a78bfa;margin:0 0 15px 0;font-size:1.2rem;">管理员验证</h3>
-                <input type="password" id="adminPasswordInput" placeholder="请输入管理员密码" style="width:100%;padding:12px;border-radius:8px;border:1px solid rgba(167,139,250,0.3);background:rgba(0,0,0,0.4);color:white;font-size:0.9rem;margin-bottom:15px;outline:none;box-sizing:border-box;" onkeydown="if(event.key==='Enter')verifyAdminPassword()">
-                <div id="adminPasswordError" style="color:#ef4444;font-size:0.8rem;margin-bottom:10px;display:none;">密码错误！</div>
+                <div style="display:flex;flex-direction:column;align-items:center;gap:0;">
+                    <input type="password" id="adminPasswordInput" placeholder="请输入管理员密码" style="width:220px;padding:10px 14px;border-radius:10px;border:2px solid rgba(167,139,250,0.4);background:rgba(0,0,0,0.4);color:white;font-size:0.9rem;outline:none;text-align:center;transition:border-color 0.2s;" onkeydown="if(event.key==='Enter')verifyAdminPassword()" onfocus="this.style.borderColor='#a78bfa'" onblur="this.style.borderColor='rgba(167,139,250,0.4)'">
+                    <div id="adminPasswordError" style="color:#ef4444;font-size:0.8rem;margin:8px 0 0;display:none;">密码错误！</div>
+                    <label id="auctionAdminRememberLabel" style="display:flex;align-items:center;gap:6px;margin:12px 0 16px;color:rgba(255,255,255,0.5);font-size:0.8rem;cursor:pointer;">
+                        <input type="checkbox" id="auctionAdminRememberPwd" checked style="width:14px;height:14px;accent-color:#a78bfa;">
+                        记住密码，下次自动登录
+                    </label>
+                </div>
                 <div style="display:flex;gap:10px;justify-content:center;">
                     <button onclick="closeAdminPanel()" style="padding:10px 20px;border-radius:8px;border:none;background:rgba(255,255,255,0.1);color:white;cursor:pointer;font-size:0.9rem;">取消</button>
                     <button onclick="verifyAdminPassword()" style="padding:10px 20px;border-radius:8px;border:none;background:linear-gradient(135deg,#a78bfa,#7c3aed);color:white;cursor:pointer;font-weight:500;font-size:0.9rem;">验证</button>
@@ -4864,6 +4870,11 @@
             document.getElementById('adminVerifyModal').style.display = 'flex';
             document.getElementById('adminPasswordInput').value = '';
             document.getElementById('adminPasswordError').style.display = 'none';
+            // 预填保存的密码
+            const savedPwd = localStorage.getItem('TFJL_Auction_Admin_SavedPwd');
+            if (savedPwd) {
+                try { document.getElementById('adminPasswordInput').value = atob(savedPwd); } catch (e) {}
+            }
             setTimeout(() => document.getElementById('adminPasswordInput').focus(), 100);
         }
 
@@ -4933,11 +4944,38 @@
                 document.getElementById('adminVerifySection').style.display = 'none';
                 adminShowMenu();
             } else {
+                // 检查是否保存了密码
+                const saved = localStorage.getItem('TFJL_Auction_Admin_SavedPwd');
+                let autoVerified = false;
+                if (saved) {
+                    try {
+                        if (atob(saved) === ADMIN_PASSWORD) {
+                            sessionStorage.setItem(ADMIN_VERIFY_KEY, 'true');
+                            autoVerified = true;
+                        } else {
+                            localStorage.removeItem('TFJL_Auction_Admin_SavedPwd');
+                        }
+                    } catch (e) {
+                        localStorage.removeItem('TFJL_Auction_Admin_SavedPwd');
+                    }
+                }
+                if (autoVerified) {
+                    document.getElementById('adminVerifySection').style.display = 'none';
+                    adminShowMenu();
+                    return;
+                }
                 document.getElementById('adminVerifySection').style.display = 'block';
                 document.getElementById('adminMenuSection').style.display = 'none';
                 hideAllAdminPages();
                 document.getElementById('adminPasswordInput').value = '';
-                document.getElementById('adminPasswordInput').focus();
+                document.getElementById('adminPasswordError').style.display = 'none';
+                // 预填保存的密码
+                const savedPwd = localStorage.getItem('TFJL_Auction_Admin_SavedPwd');
+                if (savedPwd) {
+                    try { document.getElementById('adminPasswordInput').value = atob(savedPwd); } catch (e) {}
+                    document.getElementById('auctionAdminRememberPwd').checked = true;
+                }
+                setTimeout(() => document.getElementById('adminPasswordInput').focus(), 100);
             }
         }
 
@@ -4949,6 +4987,13 @@
             const input = document.getElementById('adminPasswordInput');
             const error = document.getElementById('adminPasswordError');
             if (input.value === ADMIN_PASSWORD) {
+                // 记住密码
+                const rememberCb = document.getElementById('auctionAdminRememberPwd');
+                if (rememberCb && rememberCb.checked) {
+                    try { localStorage.setItem('TFJL_Auction_Admin_SavedPwd', btoa(input.value)); } catch (e) {}
+                } else {
+                    localStorage.removeItem('TFJL_Auction_Admin_SavedPwd');
+                }
                 sessionStorage.setItem(ADMIN_VERIFY_KEY, 'true');
                 document.getElementById('adminVerifySection').style.display = 'none';
                 adminShowMenu();
