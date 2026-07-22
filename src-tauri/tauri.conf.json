@@ -4,17 +4,17 @@
   "version": "1.1.7",
   "identifier": "com.gyq.tfjl",
     "build": {
-    "frontendDist": "frontend",
+    "frontendDist": "webroot",
     "devUrl": "http://localhost:1420",
     "beforeDevCommand": "npx http-server . -p 1420 --cors",
-    "beforeBuildCommand": "node copy-frontend.js"
+    "beforeBuildCommand": ""
   },
   "app": {
     "withGlobalTauri": true,
     "windows": [
       {
         "title": "塔防精灵助手 - 阵容卡搭配",
-        "url": "index.html",
+        "url": "https://gyq-svip.github.io/tfjl-web/",
         "width": 1200,
         "height": 800,
         "minWidth": 400,
