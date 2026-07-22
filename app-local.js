@@ -114,10 +114,24 @@ if (isTauriApp) {
             if (saved) {
                 const parsed = JSON.parse(saved);
                 maDirs = { ...maDirs, ...parsed.maDirs };
-                window.maDirs = maDirs;  // 同步更新 window 引用，否则导入到老马检查到的仍是空对象
+                window.maDirs = maDirs;
                 softwareDataDir = parsed.softwareDataDir || '';
             }
         } catch (e) {}
+        // 如果软件数据目录未设置，尝试从已配置的老马目录推算默认值
+        if (!softwareDataDir) {
+            for (const key of ['coop', 'event', 'json', 'max', 'screenshot']) {
+                if (maDirs[key]) {
+                    // 取老马目录的父目录 + \塔防精灵助手数据
+                    const parent = maDirs[key].replace(/[\\/]+$/, '').split(/[\\/]/).slice(0, -1).join('\\');
+                    if (parent) {
+                        softwareDataDir = parent + '\\塔防精灵助手数据';
+                        try { saveConfig(); } catch(e) {}
+                    }
+                    break;
+                }
+            }
+        }
     }
 
     function saveConfig() {
