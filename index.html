@@ -2275,6 +2275,15 @@
             <div style="width:6px;height:6px;background:#00bcd4;border-radius:50%;animation:loadingDotBounce 1.2s ease-in-out 0.4s infinite;"></div>
         </div>
     </div>
+    <script>
+    // 非首次启动跳过启动动画（SW缓存已命中，页面已渲染，动画反而挡屏幕）
+    (function(){
+        if(localStorage['TFJL_NotFirst']){
+            var s=document.getElementById('appLoadingScreen');
+            if(s)s.style.display='none';
+        }
+    })();
+    </script>
 
     <!-- 密码验证层 -->
     <div id="passwordOverlay" class="password-overlay">
@@ -5661,6 +5670,8 @@
                 }
                 t.success('✅ 已获取最新，正在重新加载...');
                 t.remove(1500);
+                // 清除首次启动标记，刷新后重走启动动画
+                try { localStorage.removeItem('TFJL_NotFirst'); } catch(e) {}
                 setTimeout(() => location.reload(), 700);
             } catch (e) {
                 t.error('⚠️ 刷新出错，正在重新加载...');
@@ -22524,10 +22535,12 @@ function hasGistToken() {
         }
 
         // ==================== 启动加载动画控制 ====================
-        // 进度条模拟（从0到85%随机推进，window.onload完成后跳到100%并淡出）
+        // 进度条模拟（0→85%随机推进），window.onload完成后跳到100%并淡出
+        // 3秒硬限制：不管加载是否完成，3秒后强制结束动画
         (function() {
             var bar = document.getElementById('loadingProgressBar');
             var progress = 0;
+            var done = false;
             var timer = setInterval(function() {
                 if (progress < 85) {
                     progress += Math.random() * 12 + 3;
@@ -22535,31 +22548,31 @@ function hasGistToken() {
                     bar.style.width = progress + '%';
                 }
             }, 300);
-            // window.onload完成后调用
             window._hideLoadingScreen = function() {
+                if (done) return; done = true;
                 clearInterval(timer);
+                clearTimeout(hardLimit);
                 bar.style.width = '100%';
-                setTimeout(function() {
-                    var screen = document.getElementById('appLoadingScreen');
-                    if (screen) {
-                        screen.style.opacity = '0';
-                        setTimeout(function() {
-                            screen.style.display = 'none';
-                            screen.remove();
-                        }, 600);
-                    }
-                }, 400);
+                // 标记非首次启动，后续跳过动画
+                try { localStorage['TFJL_NotFirst'] = '1'; } catch(e) {}
+                var screen = document.getElementById('appLoadingScreen');
+                if (screen) {
+                    screen.style.opacity = '0';
+                    setTimeout(function() {
+                        screen.style.display = 'none';
+                        screen.remove();
+                    }, 600);
+                }
             };
-        })();
-        // 在window.onload末尾触发隐藏
-        var _origOnload = window.onload;
-        window.onload = function() {
-            _origOnload().then(function() {
-                window._hideLoadingScreen();
-            }).catch(function() {
+            // 3秒硬限制：避免网络慢/代理慢导致动画一直转圈
+            var hardLimit = setTimeout(function() {
+                if (!done) window._hideLoadingScreen();
+            }, 3000);
+            // 页面加载完成后触发隐藏
+            window.addEventListener('load', function() {
                 window._hideLoadingScreen();
             });
-        };
+        })();
     </script>
 
     <!-- 模态框：创建分类 -->
