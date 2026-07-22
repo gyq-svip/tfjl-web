@@ -3052,17 +3052,17 @@
             <button id="chatRoomToggle" onclick="window.location.href='auction.html'" title="拍卖行" data-tip="🏪 拍卖行：闲置物品免费上架、交换、求购" style="background:rgba(78,205,196,0.85);color:#1a1a2e;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 2px 10px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">🏪</button>
             <button id="messageWallToggle" onclick="toggleMessageWall()" title="需求墙" data-tip="📢 需求墙：发布需求、分享脚本、互动交流" style="background:rgba(255,215,0,0.85);color:#1a1a2e;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 2px 10px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">📢</button>
             <div style="position:relative;">
-                <button onclick="toggleBackupMenu(this)" title="菜单" data-tip="☰ 菜单：备份恢复、使用帮助、下载离线/桌面版都在这里" style="background:rgba(255,87,34,0.8);color:white;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 1px 6px rgba(0,0,0,0.15);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;">☰</button>
+                <button onclick="toggleBackupMenu(this)" title="菜单" data-tip="☰ 菜单：备份恢复、帮助、下载桌面版都在这里" style="background:rgba(255,87,34,0.8);color:white;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 1px 6px rgba(0,0,0,0.15);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;">☰</button>
                 <div id="backupMenu" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:rgba(42,42,74,0.95);border:1px solid rgba(255,215,0,0.3);border-radius:8px;padding:8px 0;min-width:180px;z-index:1000;box-shadow:0 4px 15px rgba(0,0,0,0.4);backdrop-filter:blur(8px);">
                     <div onclick="exportAllData();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📤 全部备份</div>
                     <div onclick="document.getElementById('importFileInput').click();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📥 全部恢复</div>
                     <div onclick="exportCurrentProject();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📤 备份此项目</div>
                     <div onclick="importSingleProject();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📥 恢复项目</div>
-                    <div onclick="downloadOfflineVersion();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📥 下载离线版</div>
 
-                    <div onclick="openHelpPage();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#4fc3f7;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">🌐 新手帮助页</div>
+                    <div onclick="openHelpPage();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#4fc3f7;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📖 帮助</div>
+                    <div onclick="openMindmap();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#ffd700;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📊 功能导览</div>
                     <div onclick="openDownloadModal();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#4fc3f7;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📥 下载桌面版</div>
-                    <div onclick="menuCheckUpdate();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#81c784;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">🔄 检查更新</div>
+                    <div id="menuCheckUpdateItem" onclick="menuCheckUpdate();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#81c784;display:none;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">🔄 检查更新</div>
                     <div onclick="forceRefreshLatest();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#ffd54f;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">♻️ 刷新最新资源</div>
                     <div onclick="window.location.href='auction.html';document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">🏪 进入拍卖系统</div>
                     <div onclick="logoutToLogin();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#ff6b6b;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,107,107,0.1)'" onmouseout="this.style.background='transparent'">🔙 退出登录</div>
@@ -5424,6 +5424,9 @@
             // 仅网页版保留该链接用于引导下载 APP
             const dl = document.getElementById('footerDownloadDesktop');
             if (dl) dl.style.display = (window.__TAURI__ ? 'none' : 'inline');
+            // 桌面版（Tauri）显示「检查更新」菜单项，网页版隐藏
+            const cu = document.getElementById('menuCheckUpdateItem');
+            if (cu) cu.style.display = (window.__TAURI__ ? 'flex' : 'none');
         }
 
         // 初始化版本号显示（异步填充，不阻塞）
@@ -6539,7 +6542,7 @@
             renderReferenceImages();
         }
 
-        // 打开新手帮助页（兼容 Tauri APP 与浏览器）
+        // 打开「帮助」页面（兼容 Tauri APP 与浏览器）
         function openHelpPage() {
             const helpUrl = 'https://gyq-svip.github.io/tfjl-web/help.html';
             // Tauri APP 环境：webview 禁止 window.open 弹新窗口，改为当前窗口直接跳转
@@ -6550,6 +6553,16 @@
             }
             // 浏览器环境：新标签页打开，保留主页面
             window.open(helpUrl, '_blank');
+        }
+
+        // 打开「功能导览」思维导图
+        function openMindmap() {
+            const url = 'https://gyq-svip.github.io/tfjl-web/mindmap.html';
+            if (window.__TAURI__) {
+                window.location.href = url;
+                return;
+            }
+            window.open(url, '_blank');
         }
 
         // 帮助模态框
@@ -6633,7 +6646,6 @@
                             <p style="margin:0 0 5px 0;padding-left:20px;">✓ 完全离线可用</p>
                             <p style="margin:0 0 5px 0;padding-left:20px;">✓ 无需网络连接</p>
                             <p style="margin:0 0 15px 0;padding-left:20px;">✓ 数据保存在本地</p>
-                            <p style="margin:0;"><strong style="color:#ffd700;">提示：</strong>从菜单点击「下载离线版」可获取离线版本</p>
                         </div>
                     </div>
 
@@ -17008,14 +17020,8 @@ function hasGistToken() {
             if (!btn) return;
             
             if (isCurrentVersionOnline) {
-                if (isOnlineVersionAvailable) {
-                    btn.style.display = 'none';
-                } else {
-                    btn.style.display = 'flex';
-                    btn.innerHTML = '💾';
-                    btn.style.background = 'rgba(255,152,0,0.8)';
-                    btn.title = '网络异常，点击下载离线版';
-                }
+                // 在线版：始终隐藏版本切换按钮（不再支持下载离线版）
+                btn.style.display = 'none';
             } else {
                 if (isOnlineVersionAvailable) {
                     btn.style.display = 'flex';
@@ -17031,7 +17037,7 @@ function hasGistToken() {
         function handleVersionSwitch() {
             if (isCurrentVersionOnline) {
                 if (!isOnlineVersionAvailable) {
-                    downloadOfflineVersion();
+                    alert('当前网络异常，部分功能可能受限。请检查网络后刷新页面。');
                 } else {
                     checkOnlineVersionAvailability();
                 }
@@ -17042,39 +17048,7 @@ function hasGistToken() {
             }
         }
         
-        // ==================== 下载离线版本 ====================
-        function downloadOfflineVersion() {
-            // 记录下载
-            recordDownload();
-            
-            // 显示使用说明
-            document.getElementById('versionModal').style.display = 'flex';
-            
-            // 获取当前页面内容
-            let htmlContent = document.documentElement.outerHTML;
-            
-            // 将已注入的Token替换回占位符，确保离线版正确识别
-            htmlContent = htmlContent.replace(/const HARDCODED_TOKEN = 'ghp_[^']+'/g, "const HARDCODED_TOKEN = 'YOUR_GITHUB_TOKEN_HERE'");
-            
-            // 关闭所有弹窗，确保离线版打开时不会弹出
-            htmlContent = htmlContent.replace(/id="versionModal" style="display:flex/g, 'id="versionModal" style="display:none');
-            htmlContent = htmlContent.replace(/id="versionModal" style="display: flex/g, 'id="versionModal" style="display:none');
-            htmlContent = htmlContent.replace(/id="backupMenu" style="display:block/g, 'id="backupMenu" style="display:none');
-            htmlContent = htmlContent.replace(/id="backupMenu" style="display: block/g, 'id="backupMenu" style="display:none');
-            htmlContent = htmlContent.replace(/id="messageWall" style="display:block/g, 'id="messageWall" style="display:none');
-            htmlContent = htmlContent.replace(/id="messageWall" style="display: block/g, 'id="messageWall" style="display:none');
-            htmlContent = htmlContent.replace(/id="messageWallMin" style="display:flex/g, 'id="messageWallMin" style="display:none');
-            htmlContent = htmlContent.replace(/id="messageWallMin" style="display: flex/g, 'id="messageWallMin" style="display:none');
-            
-            // 创建下载
-            const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `塔防精灵_离线版_${new Date().toLocaleDateString('zh-CN').replace(/\//g, '-')}.html`;
-            a.click();
-            URL.revokeObjectURL(url);
-        }
+
         
         // 页面加载时初始化
         window.onload = async function() {
