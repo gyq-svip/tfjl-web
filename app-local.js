@@ -254,6 +254,16 @@ if (isTauriApp) {
                     </div>
                 </div>
 
+                <div style="margin-bottom:20px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                        <label style="color:#ff9800;font-size:0.9rem;">🏆 对战日志胜负统计（每日「对战胜利确定」「对战失败确定」次数）</label>
+                        <button onclick="calcLogBattleStats()" style="background:linear-gradient(135deg,#ff9800,#e65100);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">📊 统计</button>
+                    </div>
+                    <div id="logBattleStats" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:8px;min-height:60px;">
+                        <div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">配置日志目录后点击统计</div>
+                    </div>
+                </div>
+
 
 
                 <div style="display:flex;gap:10px;justify-content:flex-end;">
@@ -312,7 +322,8 @@ if (isTauriApp) {
                             dirKey,
                             dirLabel,
                             ext,
-                            category: classifyFile(entry.name)
+                            category: classifyFile(entry.name),
+                            modified: entry.modified || ''
                         });
                     }
                 } else {
@@ -1215,6 +1226,171 @@ if (isTauriApp) {
         }
     }
 
+    // ==================== 日志胜负统计 ====================
+    async function calcLogBattleStats() {
+        const statsEl = document.getElementById('logBattleStats');
+        if (!statsEl) return;
+
+        if (!maDirs.logs) {
+            statsEl.innerHTML = '<div style="color:#ff9800;text-align:center;padding:20px;font-size:0.85rem;">请先在上方配置「对战日志目录」</div>';
+            return;
+        }
+
+        statsEl.innerHTML = '<div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;font-size:0.85rem;">⏳ 正在扫描日志文件并统计…</div>';
+
+        try {
+            // 1. 递归扫描日志目录下的所有 txt 文件
+            const allFiles = await collectFilesRecursive(maDirs.logs, 'logs', '日志', 3);
+
+            // 2. 过滤出 txt 文件
+            const txtFiles = allFiles.filter(f => f.ext === 'txt');
+
+            if (txtFiles.length === 0) {
+                statsEl.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">日志目录下未找到 .txt 文件</div>';
+                return;
+            }
+
+            // 3. 并行读取所有日志文件 + 统计关键词
+            const dailyMap = {}; // { '2026-07-23': { win: 0, lose: 0 } }
+
+            const readResults = await Promise.all(
+                txtFiles.map(async (f) => {
+                    try {
+                        const content = await readTextFile(f.path);
+                        if (!content) return null;
+
+                        const winCount = (content.match(/对战胜利确定/g) || []).length;
+                        const loseCount = (content.match(/对战失败确定/g) || []).length;
+
+                        if (winCount === 0 && loseCount === 0) return null;
+
+                        // 日期来源：优先文件名中提取，否则用 modified 字段
+                        let date = extractDateFromFilename(f.name);
+                        if (!date && f.modified) {
+                            date = f.modified;
+                        }
+                        if (!date) date = '未知';
+
+                        return { date, win: winCount, lose: loseCount };
+                    } catch (e) {
+                        console.warn('日志读取失败:', f.name, e.message);
+                        return null;
+                    }
+                })
+            );
+
+            // 4. 按日期汇总
+            readResults.forEach(r => {
+                if (!r) return;
+                if (!dailyMap[r.date]) {
+                    dailyMap[r.date] = { win: 0, lose: 0 };
+                }
+                dailyMap[r.date].win += r.win;
+                dailyMap[r.date].lose += r.lose;
+            });
+
+            // 5. 排序：按日期降序（今天在左 = 最新在最前）
+            const sortedDates = Object.keys(dailyMap).sort((a, b) => b.localeCompare(a));
+
+            if (sortedDates.length === 0) {
+                statsEl.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">日志文件中未找到「对战胜利确定」或「对战失败确定」关键词</div>';
+                return;
+            }
+
+            // 6. 渲染图表
+            let html = '';
+            const totalWin = Object.values(dailyMap).reduce((s, d) => s + d.win, 0);
+            const totalLose = Object.values(dailyMap).reduce((s, d) => s + d.lose, 0);
+            const totalDays = sortedDates.length;
+            const totalBattles = totalWin + totalLose;
+            const winRate = totalBattles > 0 ? (totalWin / totalBattles * 100).toFixed(1) : '0';
+
+            // 摘要
+            html += `<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px;">`;
+            html += `<span style="color:#4ecdc4;">✅ 胜利 <b>${totalWin}</b></span>`;
+            html += `<span style="color:#f44336;">❌ 失败 <b>${totalLose}</b></span>`;
+            html += `<span style="color:#ffd700;">📊 总场次 <b>${totalBattles}</b></span>`;
+            html += `<span style="color:#4fc3f7;">📈 胜率 <b>${winRate}%</b></span>`;
+            html += `<span style="color:rgba(255,255,255,0.4);">（${totalDays} 天）</span>`;
+            html += `</div>`;
+
+            // 柱状图
+            const chartW = 390;
+            const padL = 30, padR = 10, padT = 16, padB = 18;
+            const hMax = Math.max(1, ...Object.values(dailyMap).map(d => Math.max(d.win, d.lose)));
+            const chartH = padT + 120 + padB;
+            const plotW = chartW - padL - padR;
+            const plotH = 120;
+            const barGap = 3;
+            const groupGap = 6;
+            const n = sortedDates.length;
+            // 分组柱状图：每组2根柱子（win + lose）
+            const slots = n * 2;
+            const slotW = Math.max(6, Math.floor((plotW - (n - 1) * groupGap) / slots));
+
+            // 网格线
+            const gridLines = [0.25, 0.5, 0.75, 1.0];
+            let gridHtml = gridLines.map(r => {
+                const gy = padT + plotH * (1 - r);
+                return `<line x1="${padL}" y1="${gy}" x2="${padL + plotW}" y2="${gy}" stroke="rgba(255,255,255,0.06)" stroke-width="1"/><text x="${padL - 4}" y="${gy + 3}" fill="rgba(255,255,255,0.25)" font-size="8" text-anchor="end">${Math.round(hMax * r)}</text>`;
+            }).join('');
+
+            let barsHtml = '';
+            sortedDates.forEach((date, i) => {
+                const data = dailyMap[date];
+                const groupX = padL + i * (slotW * 2 + groupGap);
+                // 胜利柱（绿色）
+                const winBH = Math.max(3, (data.win / hMax) * plotH);
+                const winBY = padT + plotH - winBH;
+                barsHtml += `<rect x="${groupX}" y="${winBY}" width="${slotW}" height="${winBH}" rx="2" fill="#4ecdc4" opacity="0.85"><title>${date} 胜利: ${data.win}</title></rect>`;
+                if (data.win > 0) {
+                    barsHtml += `<text x="${groupX + slotW / 2}" y="${winBY - 3}" fill="#4ecdc4" font-size="8" font-weight="bold" text-anchor="middle">${data.win}</text>`;
+                }
+                // 失败柱（红色）
+                const loseBH = Math.max(3, (data.lose / hMax) * plotH);
+                const loseBY = padT + plotH - loseBH;
+                const loseX = groupX + slotW;
+                barsHtml += `<rect x="${loseX}" y="${loseBY}" width="${slotW}" height="${loseBH}" rx="2" fill="#f44336" opacity="0.85"><title>${date} 失败: ${data.lose}</title></rect>`;
+                if (data.lose > 0) {
+                    barsHtml += `<text x="${loseX + slotW / 2}" y="${loseBY - 3}" fill="#f44336" font-size="8" font-weight="bold" text-anchor="middle">${data.lose}</text>`;
+                }
+                // 日期标签
+                barsHtml += `<text x="${groupX + slotW}" y="${padT + plotH + 13}" fill="rgba(255,255,255,0.45)" font-size="9" text-anchor="middle">${date.slice(5)}</text>`;
+            });
+
+            // 图例
+            html += `<div style="display:flex;gap:12px;align-items:center;margin-bottom:4px;font-size:0.7rem;">
+                <span style="display:inline-block;width:10px;height:10px;background:#4ecdc4;border-radius:2px;"></span> 胜利
+                <span style="display:inline-block;width:10px;height:10px;background:#f44336;border-radius:2px;"></span> 失败
+                <span style="margin-left:8px;color:rgba(255,255,255,0.3);">x轴: 月-日（最近在最左）</span>
+            </div>`;
+
+            html += `<svg width="${chartW}" height="${chartH}" style="display:block;">${gridHtml}${barsHtml}</svg>`;
+
+            statsEl.innerHTML = html;
+        } catch (e) {
+            statsEl.innerHTML = '<div style="color:#f44336;text-align:center;padding:20px;font-size:0.85rem;">统计失败：' + e.message + '</div>';
+        }
+    }
+
+    // 从文件名中提取日期（如 2026-07-23.txt → "2026-07-23"）
+    function extractDateFromFilename(filename) {
+        // 匹配 YYYY-MM-DD
+        let m = filename.match(/(\d{4})-(\d{2})-(\d{2})/);
+        if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+        // 匹配 YYYYMMDD
+        m = filename.match(/(\d{4})(\d{2})(\d{2})/);
+        if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+        // 匹配 MM-DD（无年份 — 补当前年份）
+        m = filename.match(/(\d{2})-(\d{2})/);
+        if (m) {
+            const now = new Date();
+            const year = now.getFullYear();
+            return `${year}-${m[1]}-${m[2]}`;
+        }
+        return null;
+    }
+
     // ==================== 导出函数到全局 ====================
     window.maDirs = maDirs;
     window.openAppLocalSettings = openAppLocalSettings;
@@ -1252,6 +1428,7 @@ if (isTauriApp) {
     window.deleteFileWithConfirm = deleteFileWithConfirm;
     window.saveScriptToMaDir = saveScriptToMaDir;
     window.calcScreenshotStats = calcScreenshotStats;
+    window.calcLogBattleStats = calcLogBattleStats;
     window.importFileToProject = importFileToProject;
     window.batchImportFilesToProject = batchImportFilesToProject;
 
