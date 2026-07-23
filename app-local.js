@@ -320,7 +320,12 @@ if (isTauriApp) {
             const saved = localStorage.getItem('maDirsConfig');
             if (saved) {
                 const parsed = JSON.parse(saved);
-                maDirs = { ...maDirs, ...parsed.maDirs };
+                // 保存的值覆盖默认值，但空值不覆盖（保留默认值）
+                if (parsed.maDirs) {
+                    for (const [k, v] of Object.entries(parsed.maDirs)) {
+                        if (v && v.trim()) maDirs[k] = v;
+                    }
+                }
                 softwareDataDir = parsed.softwareDataDir || '';
                 // 恢复开关状态
                 if (typeof parsed.autoLoadScreenshotStats === 'boolean') settingsConfig.autoLoadScreenshotStats = parsed.autoLoadScreenshotStats;
@@ -705,15 +710,12 @@ if (isTauriApp) {
         let html = '';
         for (const [label, files] of Object.entries(grouped)) {
             html += `<div style="color:#00bcd4;font-size:0.75rem;margin:8px 0 4px;font-weight:bold;">${label}（${files.length}个）</div>`;
-            const drIconInfo = '  <span style="color:rgba(255,255,255,0.25);font-size:0.65rem;">🛡️</span>';
             files.forEach((f, idx) => {
                 const icon = f.ext === 'json' ? '🔵' : '📄';
                 const safePath = f.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-                const drBtnId = 'drBtn_' + label.replace(/\s/g, '_') + '_' + idx;
                 html += `<div style="display:flex;align-items:center;gap:6px;padding:4px 6px;border-bottom:1px solid rgba(255,255,255,0.05);">
                     <span>${icon}</span>
                     <span style="color:#fff;font-size:0.8rem;flex:1;word-break:break-all;">${f.name}</span>
-                    <button id="${drBtnId}" onclick="computeFileDr('${safePath}','${drBtnId}')" title="计算减伤" style="background:rgba(255,152,0,0.3);color:#ffd54f;border:1px solid rgba(255,152,0,0.3);padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;white-space:nowrap;">🛡️</button>
                     <button onclick="detectFileEncoding('${safePath}')" style="background:rgba(156,39,176,0.3);color:#ce93d8;border:1px solid rgba(156,39,176,0.3);padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;">编码</button>
                     <button onclick="viewFile('${safePath}')" style="background:rgba(0,188,212,0.3);color:#00bcd4;border:1px solid rgba(0,188,212,0.3);padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;">查看</button>
                     <button onclick="loadFileToHand('${safePath}')" style="background:rgba(76,175,80,0.3);color:#4caf50;border:1px solid rgba(76,175,80,0.3);padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;">加载</button>
@@ -1011,13 +1013,18 @@ if (isTauriApp) {
                 alert('读取文件失败');
                 return;
             }
-            showFileEditor(filePath, content);
+            // 计算减伤信息
+            let drInfo = null;
+            try {
+                drInfo = window.computeScriptDr ? window.computeScriptDr(content) : null;
+            } catch (e) {}
+            showFileEditor(filePath, content, null, null, drInfo);
         } catch (e) {
             alert('读取文件失败：' + e.message);
         }
     }
 
-    function showFileEditor(filePath, content, secondFilePath, secondContent) {
+    function showFileEditor(filePath, content, secondFilePath, secondContent, drInfo) {
         let modal = document.getElementById('fileEditorModal');
         if (modal) modal.remove();
         modal = document.createElement('div');
@@ -1098,11 +1105,19 @@ if (isTauriApp) {
             `;
         } else {
             // 单文件编辑模式（含查找替换栏）
+            // 计算减伤标题
+            let drBadgeHtml = '';
+            if (drInfo && drInfo.first7) {
+                let drColor = '#4ecdc4';
+                if (drInfo.first7 < 100) drColor = '#ff6b6b';
+                else if (drInfo.first7 < 130) drColor = '#ffd700';
+                drBadgeHtml = `<span style="color:${drColor};font-size:0.9rem;font-weight:bold;margin-left:10px;">🛡️ 减伤 ${drInfo.first7}%</span>`;
+            }
             modal.innerHTML = `
                 <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(0,188,212,0.5);border-radius:12px;padding:20px;width:700px;max-width:95vw;height:85vh;display:flex;flex-direction:column;">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
                         <div>
-                            <h3 style="color:#fff;margin:0;font-size:1.1rem;">📄 ${fileName}</h3>
+                            <h3 style="color:#fff;margin:0;font-size:1.1rem;">📄 ${fileName}${drBadgeHtml}</h3>
                             <div style="color:rgba(255,255,255,0.4);font-size:0.7rem;margin-top:2px;">${filePath}</div>
                         </div>
                         <button onclick="document.getElementById('fileEditorModal').remove()" style="background:rgba(255,255,255,0.1);color:#fff;border:none;width:30px;height:30px;border-radius:5px;cursor:pointer;font-size:1.2rem;">×</button>
@@ -2595,6 +2610,7 @@ if (isTauriApp) {
     window.collectFilesRecursive = collectFilesRecursive;
     window.classifyFile = classifyFile;
     window.computeFileDr = computeFileDr;       // 扫描列表减伤按钮
+    window.detectFileEncoding = detectFileEncoding; // 文件编码检测
     window.saveSettingsAndClose = saveSettingsAndClose;
     window.toggleAutoLoadSetting = toggleAutoLoadSetting;
     window.viewFile = viewFile;
