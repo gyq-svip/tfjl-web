@@ -22651,32 +22651,26 @@ function hasGistToken() {
                 const pageEl = document.getElementById('adminPageLogStats');
                 if (pageEl) {
                     pageEl.style.display = 'block';
-                    // 显示当前配置的目录
-                    const dirEl = document.getElementById('adminLogDir');
-                    if (dirEl) {
-                        dirEl.textContent = (window.maDirs && window.maDirs.logs) ? window.maDirs.logs : '未配置';
-                    }
+                    adminRefreshDebugLog();
                 }
             }
         }
 
 
-        // ==================== 对战日志统计（管理员菜单） ====================
-        function adminRefreshLogStats() {
-            // 更新目录显示
-            const dirEl = document.getElementById('adminLogDir');
-            if (dirEl) {
-                dirEl.textContent = (window.maDirs && window.maDirs.logs) ? window.maDirs.logs : '未配置';
+        // ==================== 对战日志诊断（管理员菜单） ====================
+        function adminRefreshDebugLog() {
+            const panel = document.getElementById('logDebugPanel');
+            if (!panel) return;
+            const lines = window._lastLogDebugLines;
+            if (!lines || lines.length === 0) {
+                panel.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:30px;font-size:0.85rem;">暂无诊断数据<br><span style="font-size:0.7rem;">先去「本地设置→对战日志统计」点一次统计</span></div>';
+                return;
             }
-            // 调用 app-local.js 中的统计函数，渲染到管理员页面的 div
-            if (typeof window.calcLogBattleStats === 'function') {
-                window.calcLogBattleStats('logBattleStatsAdmin');
-            } else {
-                const statsEl = document.getElementById('logBattleStatsAdmin');
-                if (statsEl) {
-                    statsEl.innerHTML = '<div style="color:#f44336;text-align:center;padding:20px;font-size:0.85rem;">app-local.js 未加载，请刷新页面</div>';
-                }
-            }
+            const items = lines.map((l, i) => {
+                const cls = l.includes('【失败】') ? 'color:#f44336' : l.includes('【异常】') ? 'color:#ff9800' : 'color:rgba(255,255,255,0.65)';
+                return '<div style="' + cls + ';font-size:0.75rem;font-family:monospace;padding:2px 0;">[' + i + '] ' + l.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>';
+            }).join('');
+            panel.innerHTML = items;
         }
 
 
@@ -24445,9 +24439,9 @@ function hasGistToken() {
                         </div>
                     </div>
                     <div class="admin-menu-item" onclick="adminShowPage('logStats')" style="padding:10px;">
-                        <span style="font-size:1.1rem;">🏆</span>
+                        <span style="font-size:1.1rem;">🔍</span>
                         <div style="margin-left:8px;">
-                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">对战日志</div>
+                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">调试日志</div>
                         </div>
                     </div>
                 </div>
@@ -24676,22 +24670,18 @@ function hasGistToken() {
             <div id="adminPageLogStats" style="display:none;">
                 <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
                     <button class="admin-btn admin-btn-secondary" onclick="adminShowMenu()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
-                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">🏆 对战日志胜负统计</h3>
+                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">🔍 对战日志诊断</h3>
                 </div>
                 <div style="background:rgba(255,152,0,0.1);border-left:3px solid #ff9800;border-radius:6px;padding:12px;margin-bottom:15px;">
                     <div style="color:#ff9800;font-size:0.85rem;font-weight:500;">📋 说明</div>
                     <div style="color:rgba(255,255,255,0.6);font-size:0.75rem;margin-top:5px;">
-                        统计每天「对战胜利确定」「对战失败确定」出现次数。<br>
-                        需要在本地设置中配置「对战日志目录」后才能使用。<br>
-                        支持 .txt / .log / .json / 无后缀文件。
+                        查看最近一次「对战日志胜负统计」的详细诊断信息。<br>
+                        先在本地设置中配置日志目录并点击统计，再回来看诊断。
                     </div>
                 </div>
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-                    <span style="color:rgba(255,255,255,0.5);font-size:0.8rem;">当前目录：<span id="adminLogDir" style="color:#ff9800;">未配置</span></span>
-                    <button onclick="adminRefreshLogStats()" style="background:linear-gradient(135deg,#ff9800,#e65100);color:white;border:none;padding:8px 20px;border-radius:8px;cursor:pointer;font-size:0.9rem;">📊 开始统计</button>
-                </div>
-                <div id="logBattleStatsAdmin" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:10px;min-height:120px;">
-                    <div style="color:rgba(255,255,255,0.4);text-align:center;padding:30px;font-size:0.85rem;">点击「📊 开始统计」查询</div>
+                <button onclick="adminRefreshDebugLog()" style="background:linear-gradient(135deg,#607d8b,#455a64);color:white;border:none;padding:8px 20px;border-radius:8px;cursor:pointer;font-size:0.9rem;margin-bottom:10px;">🔄 刷新</button>
+                <div id="logDebugPanel" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:10px;min-height:120px;">
+                    <div style="color:rgba(255,255,255,0.4);text-align:center;padding:30px;font-size:0.85rem;">暂无诊断数据<br><span style="font-size:0.7rem;">先去「本地设置→对战日志统计」点一次统计</span></div>
                 </div>
             </div>
 

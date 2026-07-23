@@ -255,6 +255,17 @@ if (isTauriApp) {
                 </div>
 
 
+                <div style="margin-bottom:20px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                        <label style="color:#ff9800;font-size:0.9rem;">🏆 对战日志胜负统计（每日「对战胜利确定」「对战失败确定」次数）</label>
+                        <button onclick="calcLogBattleStats()" style="background:linear-gradient(135deg,#ff9800,#e65100);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">📊 统计</button>
+                    </div>
+                    <div id="logBattleStats" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:8px;min-height:60px;">
+                        <div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">配置日志目录后点击统计</div>
+                    </div>
+                </div>
+
+
                 <div style="display:flex;gap:10px;justify-content:flex-end;">
                     <button onclick="saveSettingsAndClose()" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:10px 24px;border-radius:6px;cursor:pointer;font-size:0.9rem;">💾 保存设置</button>
                     <button onclick="closeAppLocalSettings()" style="background:rgba(255,255,255,0.1);color:#fff;border:none;padding:10px 24px;border-radius:6px;cursor:pointer;font-size:0.9rem;">关闭</button>
@@ -1248,6 +1259,7 @@ if (isTauriApp) {
                 }
             } catch (scanErr) {
                 dlog('【失败】目录扫描异常: ' + (scanErr.message || scanErr));
+                window._lastLogDebugLines = debugLines;
                 statsEl.innerHTML = '<div style="color:#f44336;text-align:center;padding:20px;font-size:0.85rem;">目录扫描失败<br><span style="font-size:0.7rem;">错误: ' + (scanErr.message || scanErr) + '</span></div>';
                 return;
             }
@@ -1257,6 +1269,7 @@ if (isTauriApp) {
 
             if (txtFiles.length === 0) {
                 dlog('【失败】目录下未找到任何可读文件（支持: txt/json/log/无后缀）');
+                window._lastLogDebugLines = debugLines;
                 statsEl.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">日志目录下未找到任何可读文件<br><span style="font-size:0.7rem;color:#ff9800;">支持: .txt / .log / .json / 无后缀</span></div>';
                 return;
             }
@@ -1314,8 +1327,8 @@ if (isTauriApp) {
             const sortedDates = Object.keys(dailyMap).sort((a, b) => b.localeCompare(a));
 
             if (sortedDates.length === 0) {
-                let errHtml = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">日志文件中未找到「对战胜利确定」或「对战失败确定」关键词<br><span style="font-size:0.7rem;">共扫描 ' + txtFiles.length + ' 个文件，成功读取 ' + readOk + ' 个，读取失败 ' + readErr + ' 个</span><br><span style="font-size:0.7rem;color:#ff9800;">提示：内容可能是 GBK 编码 → 需重编译 Rust 后端</span></div>';
-                errHtml += buildDebugPanel(debugLines);
+                window._lastLogDebugLines = debugLines;
+                const errHtml = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">日志文件中未找到「对战胜利确定」或「对战失败确定」关键词<br><span style="font-size:0.7rem;">共扫描 ' + txtFiles.length + ' 个文件，成功读取 ' + readOk + ' 个，读取失败 ' + readErr + ' 个</span><br><span style="font-size:0.7rem;color:#ff9800;">提示：内容可能是 GBK 编码 → 需重编译 Rust 后端</span></div>';
                 statsEl.innerHTML = errHtml;
                 return;
             }
@@ -1390,11 +1403,13 @@ if (isTauriApp) {
 
             html += `<svg width="${chartW}" height="${chartH}" style="display:block;">${gridHtml}${barsHtml}</svg>`;
 
-            html += buildDebugPanel(debugLines);
+            // 诊断日志存到全局变量，供管理员面板查看
+            window._lastLogDebugLines = debugLines;
 
             statsEl.innerHTML = html;
         } catch (e) {
-            statsEl.innerHTML = '<div style="color:#f44336;text-align:center;padding:20px;font-size:0.85rem;">统计失败：' + e.message + '</div>' + buildDebugPanel(debugLines);
+            window._lastLogDebugLines = debugLines;
+            statsEl.innerHTML = '<div style="color:#f44336;text-align:center;padding:20px;font-size:0.85rem;">统计失败：' + e.message + '</div>';
         }
     }
 
