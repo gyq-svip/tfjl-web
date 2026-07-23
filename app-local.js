@@ -2532,6 +2532,9 @@ if (isTauriApp) {
     window.loadFileContentToHand = loadFileContentToHand;
     window.deleteFileWithConfirm = deleteFileWithConfirm;
     window.saveScriptToMaDir = saveScriptToMaDir;
+    window.backupAllData = backupAllData;       // 全局备份
+    window.loadBackupList = loadBackupList;       // 加载备份文件列表
+    window.restoreFromBackup = restoreFromBackup; // 从备份还原
     window.syncAllNow = syncAllNow;            // 手动触发全量数据同步到本地目录
     window.initDataSync = initDataSync;        // 重新初始化同步路径
     window.calcScreenshotStats = calcScreenshotStats;
