@@ -9307,6 +9307,10 @@
                         onmouseover="this.style.filter='brightness(1.15)';this.style.transform='scale(1.05)';"
                         onmouseout="this.style.filter='brightness(1)';this.style.transform='scale(1)';"
                     >📋</button>
+                    <button id="textSearchBtn" onclick="openTextSearchModal()" title="在多脚本中检索关键词出现次数" style="flex-shrink:0;height:36px;padding:0 10px;border-radius:6px;border:none;background:linear-gradient(135deg,#4fc3f7,#2196f3);color:white;cursor:pointer;font-weight:bold;font-size:0.8rem;display:flex;align-items:center;justify-content:center;transition:all 0.2s;white-space:nowrap;"
+                        onmouseover="this.style.filter='brightness(1.15)';this.style.transform='scale(1.03)';"
+                        onmouseout="this.style.filter='brightness(1)';this.style.transform='scale(1)';"
+                    >🔍 检索</button>
                 </div>
                 <div id="scriptFileCategoryFilter" style="margin-bottom:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;"></div>
 
@@ -10841,6 +10845,235 @@
                 html = '<div style="color:rgba(255,255,255,0.4);padding:10px;text-align:center;">未找到匹配的脚本</div>';
             }
             list.innerHTML = html;
+        }
+
+        // ==================== 文本检索：多脚本关键词统计 ====================
+        function openTextSearchModal() {
+            // 收集所有可用脚本
+            const allFiles = [];
+            // 1. 项目脚本
+            txtFiles.forEach((f, i) => {
+                if (f.content && f.content.trim()) {
+                    allFiles.push({ name: f.name, content: f.content, source: '项目' });
+                }
+            });
+            // 2. 已打开的本地文件浮动窗口
+            if (typeof localFileWindows !== 'undefined' && localFileWindows.length > 0) {
+                localFileWindows.forEach(w => {
+                    const ta = w.element?.querySelector('textarea');
+                    if (ta && ta.value && ta.value.trim()) {
+                        allFiles.push({ name: w.fileName, content: ta.value, source: '本地' });
+                    }
+                });
+            }
+            // 3. 编辑器标签页中未保存的内容
+            if (typeof scriptEditorTabs !== 'undefined' && scriptEditorTabs.length > 0) {
+                scriptEditorTabs.forEach(tab => {
+                    if (tab.content && tab.content.trim()) {
+                        // 避免与项目脚本重复（通过名称匹配）
+                        const dup = allFiles.find(f => f.name === tab.name && f.source === '项目');
+                        if (!dup) {
+                            allFiles.push({ name: tab.name, content: tab.content, source: '标签' });
+                        }
+                    }
+                });
+            }
+
+            if (allFiles.length === 0) {
+                alert('没有可检索的脚本内容。请先打开项目或本地脚本。');
+                return;
+            }
+
+            // 去重（同名的本地窗口覆盖旧 entry）
+            const seen = new Map();
+            const uniqueFiles = [];
+            allFiles.forEach(f => {
+                const key = f.name + '|' + f.source;
+                seen.set(key, f);
+            });
+            seen.forEach(v => uniqueFiles.push(v));
+
+            const fileCount = uniqueFiles.length;
+
+            // 构建弹窗
+            const modal = document.createElement('div');
+            modal.id = 'textSearchModal';
+            modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:10001;display:flex;align-items:center;justify-content:center;padding:20px;';
+            modal.innerHTML = `
+                <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(79,195,247,0.5);border-radius:12px;width:750px;max-width:95vw;max-height:85vh;display:flex;flex-direction:column;">
+                    <div style="padding:14px 18px;border-bottom:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
+                        <div style="color:#4fc3f7;font-weight:bold;font-size:1rem;">🔍 多脚本关键词检索 <span style="font-size:0.75rem;color:rgba(255,255,255,0.4);">（共 ${fileCount} 个脚本）</span></div>
+                        <button onclick="document.getElementById('textSearchModal').remove()" style="background:transparent;border:none;color:white;font-size:1.3rem;cursor:pointer;">×</button>
+                    </div>
+                    <div style="padding:14px 18px;border-bottom:1px solid rgba(255,255,255,0.08);display:flex;gap:8px;align-items:center;flex-shrink:0;">
+                        <input id="textSearchKeywordInput" type="text" placeholder="输入关键词，多个用逗号/空格分隔…（如：减伤,战车,精灵）" style="flex:1;padding:8px 12px;border-radius:6px;border:1px solid rgba(79,195,247,0.4);background:rgba(0,0,0,0.3);color:#fff;font-size:0.9rem;box-sizing:border-box;"
+                            onkeydown="if(event.key==='Enter'){performTextSearch();}">
+                        <button onclick="performTextSearch()" style="background:linear-gradient(135deg,#4fc3f7,#2196f3);color:white;border:none;padding:8px 18px;border-radius:6px;cursor:pointer;font-weight:bold;font-size:0.85rem;white-space:nowrap;">搜索</button>
+                        <div style="display:flex;align-items:center;gap:4px;font-size:0.75rem;color:rgba(255,255,255,0.5);margin-left:4px;">
+                            <label style="cursor:pointer;display:flex;align-items:center;gap:3px;user-select:none;">
+                                <input type="checkbox" id="textSearchRegex" style="accent-color:#4fc3f7;"> 正则
+                            </label>
+                            <label style="cursor:pointer;display:flex;align-items:center;gap:3px;margin-left:6px;user-select:none;">
+                                <input type="checkbox" id="textSearchCaseSensitive" style="accent-color:#4fc3f7;"> 区分大小写
+                            </label>
+                        </div>
+                    </div>
+                    <div id="textSearchResults" style="flex:1;overflow-y:auto;padding:14px 18px;scrollbar-width:thin;scrollbar-color:rgba(255,215,0,0.3) transparent;">
+                        <div style="color:rgba(255,255,255,0.3);text-align:center;padding:30px;">输入关键词后点击搜索</div>
+                    </div>
+                    <div id="textSearchSummary" style="padding:8px 18px;border-top:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.5);font-size:0.75rem;flex-shrink:0;min-height:20px;"></div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            // 点击背景关闭
+            modal.addEventListener('click', function(e) {
+                if (e.target === modal) modal.remove();
+            });
+            // 自动聚焦输入框
+            setTimeout(() => {
+                const inp = document.getElementById('textSearchKeywordInput');
+                if (inp) inp.focus();
+            }, 100);
+        }
+
+        function performTextSearch() {
+            const keywordRaw = (document.getElementById('textSearchKeywordInput')?.value || '').trim();
+            if (!keywordRaw) return;
+            const useRegex = document.getElementById('textSearchRegex')?.checked || false;
+            const caseSensitive = document.getElementById('textSearchCaseSensitive')?.checked || false;
+
+            // 拆分关键词（逗号/中文逗号/空格分隔）
+            let keywords = [];
+            if (useRegex) {
+                keywords = [keywordRaw]; // 正则模式下视为单个表达式
+            } else {
+                keywords = keywordRaw.split(/[,，\s]+/).filter(k => k.length > 0);
+            }
+            if (keywords.length === 0) return;
+
+            // 收集文件
+            const allFiles = [];
+            txtFiles.forEach(f => {
+                if (f.content && f.content.trim()) allFiles.push({ name: f.name, content: f.content, source: '项目' });
+            });
+            if (typeof localFileWindows !== 'undefined') {
+                localFileWindows.forEach(w => {
+                    const ta = w.element?.querySelector('textarea');
+                    if (ta && ta.value && ta.value.trim()) {
+                        allFiles.push({ name: w.fileName, content: ta.value, source: '本地' });
+                    }
+                });
+            }
+            if (typeof scriptEditorTabs !== 'undefined') {
+                scriptEditorTabs.forEach(tab => {
+                    if (tab.content && tab.content.trim()) {
+                        const dup = allFiles.find(f => f.name === tab.name && f.source === '项目');
+                        if (!dup) allFiles.push({ name: tab.name, content: tab.content, source: '标签' });
+                    }
+                });
+            }
+
+            // 为每个文件统计每个关键词出现次数
+            const results = [];
+            allFiles.forEach(file => {
+                const row = { name: file.name, source: file.source, counts: {}, total: 0 };
+                keywords.forEach(kw => {
+                    let count = 0;
+                    try {
+                        const flags = caseSensitive ? 'g' : 'gi';
+                        if (useRegex) {
+                            const re = new RegExp(kw, flags);
+                            const matches = file.content.match(re);
+                            count = matches ? matches.length : 0;
+                        } else {
+                            // 转义正则特殊字符
+                            const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                            const re = new RegExp(escaped, flags);
+                            const matches = file.content.match(re);
+                            count = matches ? matches.length : 0;
+                        }
+                    } catch (e) {
+                        count = -1; // 正则错误
+                    }
+                    row.counts[kw] = count;
+                    if (count > 0) row.total += count;
+                });
+                // 只有至少匹配一个关键词的文件才显示
+                if (row.total > 0 || Object.values(row.counts).some(c => c === -1)) {
+                    results.push(row);
+                }
+            });
+
+            // 按匹配总数降序排列
+            results.sort((a, b) => b.total - a.total);
+
+            const resultsDiv = document.getElementById('textSearchResults');
+            const summaryDiv = document.getElementById('textSearchSummary');
+            if (!resultsDiv) return;
+
+            if (results.length === 0) {
+                resultsDiv.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:30px;">未找到匹配结果</div>';
+                if (summaryDiv) summaryDiv.textContent = '';
+                return;
+            }
+
+            // 颜色方案：前3个关键词用不同颜色列
+            const colColors = ['#4fc3f7', '#ffd700', '#4ecdc4', '#ff9800', '#e040fb'];
+
+            let html = '';
+            html += `<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;font-size:0.8rem;">`;
+            keywords.forEach((kw, ki) => {
+                html += `<span style="background:rgba(255,255,255,0.06);padding:2px 8px;border-radius:4px;">🔑 <b style="color:${colColors[ki] || '#fff'}">${escapeHtml(kw)}</b></span>`;
+            });
+            html += `</div>`;
+
+            html += `<div style="overflow-x:auto;">`;
+            html += `<table style="width:100%;border-collapse:collapse;font-size:0.82rem;">`;
+            // 表头
+            html += `<thead><tr style="background:rgba(255,255,255,0.06);">`;
+            html += `<th style="padding:6px 10px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);">文件</th>`;
+            html += `<th style="padding:6px 8px;text-align:center;border-bottom:1px solid rgba(255,255,255,0.1);color:rgba(255,255,255,0.5);width:50px;">来源</th>`;
+            keywords.forEach((kw, ki) => {
+                html += `<th style="padding:6px 8px;text-align:center;border-bottom:1px solid rgba(255,255,255,0.1);color:${colColors[ki] || '#fff'};width:60px;">${escapeHtml(kw.length > 6 ? kw.slice(0,6)+'…' : kw)}</th>`;
+            });
+            html += `<th style="padding:6px 8px;text-align:center;border-bottom:1px solid rgba(255,255,255,0.1);color:#ffd700;width:50px;">合计</th>`;
+            html += `</tr></thead><tbody>`;
+
+            // 总计行
+            const totals = {};
+            keywords.forEach(kw => { totals[kw] = 0; });
+            let grandTotal = 0;
+
+            results.forEach((row, ri) => {
+                const bg = ri % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.04)';
+                html += `<tr style="background:${bg};" onmouseover="this.style.background='rgba(79,195,247,0.08)';" onmouseout="this.style.background='${bg}';">`;
+                html += `<td style="padding:5px 10px;border-bottom:1px solid rgba(255,255,255,0.05);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:280px;" title="${escapeHtml(row.name)}">📄 ${escapeHtml(row.name)}</td>`;
+                html += `<td style="padding:5px 8px;text-align:center;border-bottom:1px solid rgba(255,255,255,0.05);font-size:0.7rem;color:${row.source==='本地'?'#ff9800':row.source==='标签'?'#4ecdc4':'rgba(255,255,255,0.5)'};">${row.source}</td>`;
+                keywords.forEach((kw, ki) => {
+                    const cnt = row.counts[kw];
+                    totals[kw] += (cnt > 0 ? cnt : 0);
+                    const color = cnt > 0 ? (cnt >= 10 ? '#4ecdc4' : cnt >= 3 ? '#ffd700' : '#4fc3f7') : 'rgba(255,255,255,0.2)';
+                    html += `<td style="padding:5px 8px;text-align:center;border-bottom:1px solid rgba(255,255,255,0.05);font-weight:${cnt>0?'bold':'normal'};color:${color};">${cnt === -1 ? '⚠' : cnt}</td>`;
+                });
+                html += `<td style="padding:5px 8px;text-align:center;border-bottom:1px solid rgba(255,255,255,0.05);font-weight:bold;color:#ffd700;">${row.total}</td>`;
+                html += `</tr>`;
+                grandTotal += row.total;
+            });
+
+            // 总计行
+            html += `<tr style="background:rgba(255,215,0,0.08);font-weight:bold;">`;
+            html += `<td style="padding:6px 10px;border-top:2px solid rgba(255,215,0,0.3);color:#ffd700;">📊 总计（${results.length} 个文件）</td>`;
+            html += `<td style="padding:6px 8px;text-align:center;border-top:2px solid rgba(255,215,0,0.3);"></td>`;
+            keywords.forEach((kw, ki) => {
+                html += `<td style="padding:6px 8px;text-align:center;border-top:2px solid rgba(255,215,0,0.3);color:${colColors[ki] || '#fff'};">${totals[kw]}</td>`;
+            });
+            html += `<td style="padding:6px 8px;text-align:center;border-top:2px solid rgba(255,215,0,0.3);color:#ffd700;">${grandTotal}</td>`;
+            html += `</tr>`;
+
+            html += `</tbody></table></div>`;
+
+            resultsDiv.innerHTML = html;
+            if (summaryDiv) summaryDiv.textContent = `匹配 ${results.length} 个文件 · 总计 ${grandTotal} 次出现 · ${keywords.length} 个关键词`;
         }
 
         // 触发上传TXT文件
