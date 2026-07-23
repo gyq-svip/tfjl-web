@@ -20659,35 +20659,141 @@ function hasGistToken() {
             }
         }
 
-        // Tauri APP 原生下载：用 write_text_file 保存到老马目录
+        // Tauri APP 原生下载：精美弹窗 → 老马目录（一键）或 自定义文件夹（浏览）
         async function _downloadScriptTauri(fileName, content) {
             const invokeFn = window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke;
+            if (!invokeFn) { _downloadScriptBlob(fileName, content); return; }
 
-            // 构建默认保存路径：优先老马合作目录 → 软件数据目录 → 桌面
-            let defaultPath = '';
-            if (window.maDirs && window.maDirs.coop) {
-                defaultPath = window.maDirs.coop.replace(/[\\/]+$/, '') + '\\' + fileName;
-            } else if (window.maDirs && window.maDirs.activity) {
-                defaultPath = window.maDirs.activity.replace(/[\\/]+$/, '') + '\\' + fileName;
-            }
+            const fileSizeKB = (content.length / 1024).toFixed(1);
+            const dirLabels = {
+                coop:       { label: '合作脚本', icon: '🤝' },
+                activity:   { label: '活动',     icon: '🎉' },
+                battle:     { label: '对战JSON', icon: '⚔️' },
+                battleMax:  { label: '对战MAX',  icon: '📊' },
+                screenshot: { label: '截图',     icon: '📸' },
+                logs:       { label: '日志',     icon: '📋' }
+            };
 
-            if (invokeFn && defaultPath) {
-                // 弹出路径确认框，默认填老马目录（用户直接回车即可保存）
-                const savePath = prompt('💾 保存到：\n（回车确认直接保存到老马合作目录）', defaultPath);
-                if (!savePath) { showToast('已取消下载'); return; }
-
-                try {
-                    await invokeFn('write_text_file', { filePath: savePath, content: content });
-                    showToast('✅ 已保存: ' + fileName);
-                    // 记录成功，不阻塞
-                } catch (e) {
-                    console.warn('Tauri保存失败，降级到浏览器下载:', e);
-                    _downloadScriptBlob(fileName, content);
+            return new Promise((resolve) => {
+                // —— 构建老马目录卡片 ——
+                let dirCardsHtml = '';
+                let hasAnyDir = false;
+                const dirSavePaths = {};
+                for (const [key, info] of Object.entries(dirLabels)) {
+                    const dirPath = (window.maDirs && window.maDirs[key]) || '';
+                    if (!dirPath) continue;
+                    hasAnyDir = true;
+                    const savePath = dirPath.replace(/[\\/]+$/, '') + '\\' + fileName;
+                    const cardId = 'saveCard_' + key;
+                    dirSavePaths[cardId] = savePath;
+                    dirCardsHtml += `
+                <div id="${cardId}" class="save-dir-card"
+                     style="cursor:pointer;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:12px 16px;text-align:left;display:flex;align-items:center;gap:10px;transition:all 0.2s;">
+                    <span style="font-size:1.3rem;">${info.icon}</span>
+                    <div style="flex:1;min-width:0;">
+                        <div style="color:#fff;font-size:0.85rem;">${info.label}</div>
+                        <div style="color:rgba(255,255,255,0.35);font-size:0.68rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(savePath)}</div>
+                    </div>
+                </div>`;
                 }
-            } else {
-                // 降级到浏览器下载
-                _downloadScriptBlob(fileName, content);
-            }
+
+                const maSection = hasAnyDir ? `
+                <div style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-bottom:8px;">📁 保存到老马目录（点击即保存）：</div>
+                <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px;">${dirCardsHtml}</div>` : `
+                <div style="color:rgba(255,255,255,0.3);font-size:0.8rem;text-align:center;margin-bottom:12px;padding:12px;background:rgba(255,152,0,0.08);border-radius:8px;">⚠️ 未配置老马目录，请先在APP本地设置中配置</div>`;
+
+                const modal = document.createElement('div');
+                modal.id = 'downloadSaveModal';
+                modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:99999;';
+                modal.innerHTML = `
+            <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(255,152,0,0.5);border-radius:16px;padding:24px;max-width:480px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.5);max-height:85vh;overflow-y:auto;">
+                <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:16px;">
+                    <div>
+                        <span style="color:#ff9800;font-size:1.1rem;font-weight:bold;">📥 保存脚本</span>
+                        <div style="color:#fff;font-size:0.9rem;margin-top:4px;word-break:break-all;">${escapeHtml(fileName)}</div>
+                        <div style="color:rgba(255,255,255,0.35);font-size:0.7rem;">${fileSizeKB} KB</div>
+                    </div>
+                    <span id="_dlClose" style="cursor:pointer;color:rgba(255,255,255,0.4);font-size:1.5rem;line-height:1;transition:color 0.2s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='rgba(255,255,255,0.4)'">×</span>
+                </div>
+${maSection}
+                <div style="display:flex;align-items:center;gap:10px;margin:14px 0;color:rgba(255,255,255,0.3);font-size:0.75rem;">
+                    <div style="flex:1;height:1px;background:rgba(255,255,255,0.1);"></div>
+                    或者保存到自定义文件夹
+                    <div style="flex:1;height:1px;background:rgba(255,255,255,0.1);"></div>
+                </div>
+
+                <div id="_customSaveArea" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:14px;">
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <span style="font-size:1.2rem;">📂</span>
+                        <button id="_pickCustomFolderBtn" style="background:linear-gradient(135deg,#2196f3,#1565c0);color:white;border:none;padding:7px 16px;border-radius:6px;cursor:pointer;font-size:0.8rem;white-space:nowrap;">浏览文件夹...</button>
+                        <span id="_selectedFolderText" style="color:rgba(255,255,255,0.35);font-size:0.75rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">未选择</span>
+                    </div>
+                    <div id="_customPreview" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.08);">
+                        <div style="color:#4caf50;font-size:0.75rem;margin-bottom:8px;word-break:break-all;" id="_customFullPath"></div>
+                        <button id="_saveToCustomBtn" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:9px 20px;border-radius:8px;cursor:pointer;font-size:0.85rem;width:100%;">✅ 保存到此处</button>
+                    </div>
+                </div>
+
+                <button id="_cancelDownloadBtn" style="background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.6);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:10px;cursor:pointer;font-size:0.85rem;width:100%;margin-top:12px;transition:all 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.15)';this.style.color='#fff'" onmouseout="this.style.background='rgba(255,255,255,0.08)';this.style.color='rgba(255,255,255,0.6)'">取消</button>
+            </div>`;
+
+                document.body.appendChild(modal);
+
+                // 点击遮罩关闭
+                modal.onclick = function(e) { if (e.target === modal) { modal.remove(); resolve(false); } };
+
+                let selectedCustomFolder = '';
+
+                // Close / Cancel
+                document.getElementById('_dlClose').onclick = () => { modal.remove(); resolve(false); };
+                document.getElementById('_cancelDownloadBtn').onclick = () => { modal.remove(); resolve(false); };
+
+                // Save helpers
+                async function doSave(savePath) {
+                    modal.remove();
+                    try {
+                        await invokeFn('write_text_file', { filePath: savePath, content: content });
+                        showToast('✅ 已保存: ' + fileName);
+                        resolve(true);
+                    } catch (e) {
+                        console.warn('Tauri保存失败，降级到浏览器下载:', e);
+                        _downloadScriptBlob(fileName, content);
+                        resolve(true);
+                    }
+                }
+
+                // 老马目录卡片：hover + click
+                for (const [cardId, savePath] of Object.entries(dirSavePaths)) {
+                    const card = document.getElementById(cardId);
+                    if (!card) continue;
+                    card.addEventListener('mouseover', () => { card.style.background = 'rgba(255,152,0,0.15)'; card.style.borderColor = 'rgba(255,152,0,0.5)'; });
+                    card.addEventListener('mouseout',  () => { card.style.background = 'rgba(255,255,255,0.06)'; card.style.borderColor = 'rgba(255,255,255,0.15)'; });
+                    card.addEventListener('click', () => doSave(savePath));
+                }
+
+                // 自定义文件夹 — 浏览
+                document.getElementById('_pickCustomFolderBtn').onclick = async () => {
+                    try {
+                        const folder = await invokeFn('open_directory_dialog');
+                        if (!folder) return;
+                        selectedCustomFolder = folder;
+                        document.getElementById('_selectedFolderText').textContent = folder;
+                        document.getElementById('_selectedFolderText').style.color = 'rgba(255,255,255,0.8)';
+                        const fullPath = folder.replace(/[\\/]+$/, '') + '\\' + fileName;
+                        document.getElementById('_customFullPath').textContent = fullPath;
+                        document.getElementById('_customPreview').style.display = 'block';
+                    } catch (e) {
+                        console.warn('目录选择失败:', e);
+                    }
+                };
+
+                // 自定义文件夹 — 确认保存
+                document.getElementById('_saveToCustomBtn').onclick = () => {
+                    if (!selectedCustomFolder) return;
+                    const savePath = selectedCustomFolder.replace(/[\\/]+$/, '') + '\\' + fileName;
+                    doSave(savePath);
+                };
+            });
         }
 
         // 浏览器传统 Blob 下载（含 Toast 反馈）
