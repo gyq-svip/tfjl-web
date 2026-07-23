@@ -10716,7 +10716,7 @@
                         <button id="batchImportBtn" onclick="doBatchImport()" style="background:linear-gradient(135deg,#ff9800,#f57c00);color:white;border:none;padding:4px 12px;border-radius:5px;cursor:pointer;font-size:0.75rem;opacity:0.5;">📥 批量导入</button>
                     </div>
                 </div>
-                <div style="max-height:180px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(0,188,212,0.3) transparent;padding-right:4px;display:flex;flex-direction:column;gap:5px;">`;
+                <div style="max-height:140px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(0,188,212,0.3) transparent;padding-right:4px;display:flex;flex-direction:column;gap:5px;">`;
 
             list.forEach(f => {
                 const safePath = f.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
@@ -11532,7 +11532,7 @@
                 if (vDivider) vDivider.style.display = 'none';
                 if (collapseBtn) collapseBtn.style.display = 'none';
                 if (hHandle) hHandle.style.display = 'flex';
-                if (fileList) { fileList.style.flex = ''; fileList.style.height = '240px'; fileList.style.maxHeight = '55vh'; fileList.style.minHeight = '100px'; }
+                if (fileList) { fileList.style.flex = ''; fileList.style.height = 'auto'; fileList.style.maxHeight = '240px'; fileList.style.minHeight = '100px'; }
                 editor.style.flex = '1';
                 editor.style.marginTop = '12px';
                 editor.style.borderTop = '1px solid rgba(255,255,255,0.08)';
