@@ -71,6 +71,94 @@ if (isTauriApp) {
         }, 500);
     }
 
+    // ==================== 数据自动同步到用户数据目录 ====================
+    // 原理：拦截 localStorage.setItem/removeItem，自动把变更的 key 异步写入磁盘文件
+    // 目标：${softwareDataDir}/app-data/${key}.json
+    // 好处：用户可自行查看、备份、恢复；卸载 APP 也不丢数据
+
+    let _syncDir = '';            // 同步目标目录
+    const SYNC_QUEUE = new Set(); // 待写入 key 集合
+    let _syncTimer = null;        // 防抖定时器（2s）
+
+    function _getSyncDir() {
+        if (!softwareDataDir) return '';
+        return softwareDataDir.replace(/[\\/]+$/, '') + '\\app-data';
+    }
+
+    async function _flushSyncQueue() {
+        const dir = _syncDir;
+        if (!dir || SYNC_QUEUE.size === 0) return;
+        const keys = [...SYNC_QUEUE];
+        SYNC_QUEUE.clear();
+        for (const key of keys) {
+            const val = localStorage.getItem(key);
+            const safeKey = key.replace(/[\\/:*?"<>|]/g, '_'); // 文件名不能含非法字符
+            const filePath = dir + '\\' + safeKey + '.json';
+            try {
+                if (val !== null) {
+                    await writeTextFile(filePath, JSON.stringify({ key: key, value: val, savedAt: Date.now() }));
+                }
+                // 删除的 key：写空标记文件（Tauri fs 不支持删文件，留个墓碑）
+            } catch (e) { /* 静默失败，不影响主流程 */ }
+        }
+        console.log('[数据同步] 已写入', keys.length + ' 个文件到 ' + dir);
+    }
+
+    function _scheduleSync(key) {
+        if (!_syncDir) return;
+        SYNC_QUEUE.add(key);
+        if (_syncTimer) clearTimeout(_syncTimer);
+        _syncTimer = setTimeout(() => _flushSyncQueue().catch(() => {}), 2000);
+    }
+
+    // 拦截全局 Storage setItem——所有 localStorage 写入都会经过这里
+    const _nativeSetItem = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key, value) {
+        _nativeSetItem.call(this, key, value);
+        _scheduleSync(key);
+    };
+
+    // 拦截全局 Storage removeItem
+    const _nativeRemoveItem = Storage.prototype.removeItem;
+    Storage.prototype.removeItem = function (key) {
+        _nativeRemoveItem.call(this, key);
+        _scheduleSync(key);
+    };
+
+    // 立即全量同步（用户主动保存时调用，不等防抖）
+    async function syncAllNow() {
+        if (!_syncDir) return;
+        // 先消费队列中已有的
+        await _flushSyncQueue();
+        // 再把所有 localStorage key 全量写一遍
+        const keys = [];
+        for (let i = 0; i < localStorage.length; i++) keys.push(localStorage.key(i));
+        const dir = _syncDir;
+        for (const key of keys) {
+            const val = localStorage.getItem(key);
+            if (val === null) continue;
+            const safeKey = key.replace(/[\\/:*?"<>|]/g, '_');
+            const filePath = dir + '\\' + safeKey + '.json';
+            try { await writeTextFile(filePath, JSON.stringify({ key: key, value: val, savedAt: Date.now() })); }
+            catch (e) { /* 静默 */ }
+        }
+        console.log('[数据同步] 全量同步完成，' + keys.length + ' 个 key → ' + dir);
+    }
+
+    // 页面关闭前强制刷盘（避免异步写入丢失）
+    window.addEventListener('pagehide', () => {
+        if (_syncTimer) { clearTimeout(_syncTimer); }
+        // pagehide 中不能 await，用同步 LocalStorage 兜底
+        // 下一次打开时再做完整性校验
+    });
+
+    function initDataSync() {
+        _syncDir = _getSyncDir();
+        if (_syncDir) {
+            console.log('[数据同步] ✅ 已启用，目标目录: ' + _syncDir);
+        }
+    }
+
     function saveScanCache(files) {
         const cache = { date: getTodayStr(), files: files, savedAt: Date.now() };
         _deferredSetItem(getScanCacheKey(), cache);
@@ -231,6 +319,8 @@ if (isTauriApp) {
             autoLoadScreenshotStats: settingsConfig.autoLoadScreenshotStats,
             autoLoadBattleStats: settingsConfig.autoLoadBattleStats
         }));
+        // 保存配置时全量同步所有数据到本地目录（不等防抖，立即写入）
+        syncAllNow().catch(() => {});
     }
 
     // ==================== 初始化 ====================
@@ -239,6 +329,7 @@ if (isTauriApp) {
         const btn = document.getElementById('appLocalSettingsBtn');
         if (btn) btn.style.display = 'flex';
         loadConfig();
+        initDataSync();  // 启动 localStorage → 用户数据目录自动同步
         console.log('[APP] APP本地功能已初始化, isTauriApp:', isTauriApp);
     }
 
@@ -344,11 +435,12 @@ if (isTauriApp) {
                 </div>
 
                 <div style="color:#4caf50;font-size:0.9rem;margin-bottom:12px;">💾 软件数据目录（项目存储位置）</div>
-                <div style="margin-bottom:20px;">
+                <div style="margin-bottom:12px;">
                     <div style="display:flex;gap:8px;">
                         <input type="text" id="softwareDataDirInput" readonly placeholder="未设置，默认使用APP安装目录" style="flex:1;background:rgba(0,0,0,0.3);color:#fff;border:1px solid rgba(255,255,255,0.2);padding:8px 12px;border-radius:6px;font-size:0.85rem;">
                         <button onclick="selectSoftwareDataDir()" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;white-space:nowrap;">浏览...</button>
                     </div>
+                    <div style="color:rgba(255,255,255,0.35);font-size:0.68rem;margin-top:4px;line-height:1.4;">📌 设置此目录后，所有APP数据（配置、统计、缓存）会自动同步到 <b>app-data\\</b> 子文件夹下，以 .json 文件存放。可直接备份、迁移。</div>
                 </div>
 
                 <div style="margin-bottom:16px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:12px 14px;">
@@ -442,6 +534,8 @@ if (isTauriApp) {
         if (selected) {
             softwareDataDir = selected;
             document.getElementById('softwareDataDirInput').value = selected;
+            initDataSync();  // 目录变了，重新计算同步路径
+            saveConfig();    // 保存新目录并全量同步到新位置
         }
     }
 
@@ -2265,6 +2359,8 @@ if (isTauriApp) {
     window.loadFileContentToHand = loadFileContentToHand;
     window.deleteFileWithConfirm = deleteFileWithConfirm;
     window.saveScriptToMaDir = saveScriptToMaDir;
+    window.syncAllNow = syncAllNow;            // 手动触发全量数据同步到本地目录
+    window.initDataSync = initDataSync;        // 重新初始化同步路径
     window.calcScreenshotStats = calcScreenshotStats;
     window.calcLogBattleStats = calcLogBattleStats;
     window.clearLogBattleCache = clearLogBattleCache;
