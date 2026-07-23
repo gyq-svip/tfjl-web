@@ -763,7 +763,6 @@ if (isTauriApp) {
                     <button data-scanned-path="${escPath}" data-scanned-name="${escName}" onclick="shareScannedFileFromMain(this.getAttribute('data-scanned-path'), this.getAttribute('data-scanned-name'))" title="分享到需求墙" style="background:linear-gradient(135deg,#ff6b6b,#ff9e80);color:#fff;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;font-weight:bold;white-space:nowrap;flex-shrink:0;">📢 分享</button>
                 </div>`;
             });
-            });
             html += '</div>';
         } else {
             // 普通模式：按目录分组
