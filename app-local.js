@@ -23,6 +23,48 @@ if (isTauriApp) {
     let softwareDataDir = '';
     let scannedFiles = [];
 
+    // ==================== 扫描缓存（本地设置秒开） ====================
+    const SCAN_CACHE_KEY = 'TFJL_ScannedFilesCache';
+
+    function getScanCacheKey() {
+        // 根据当前配置的目录拼 key，目录变了缓存自动失效
+        const dirStr = Object.entries(maDirs)
+            .filter(([, v]) => v)
+            .map(([k, v]) => k + '=' + v)
+            .join('|');
+        return SCAN_CACHE_KEY + '_' + (dirStr ? btoa(unescape(encodeURIComponent(dirStr))).slice(0, 32) : 'empty');
+    }
+
+    function getTodayStr() {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+
+    function loadScanCache() {
+        try {
+            const raw = localStorage.getItem(getScanCacheKey());
+            if (!raw) return null;
+            const cache = JSON.parse(raw);
+            if (cache.date !== getTodayStr()) return null;
+            return cache;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function saveScanCache(files) {
+        try {
+            const cache = {
+                date: getTodayStr(),
+                files: files,
+                savedAt: Date.now()
+            };
+            localStorage.setItem(getScanCacheKey(), JSON.stringify(cache));
+        } catch (e) {
+            // localStorage 满了，忽略
+        }
+    }
+
     // ==================== IPC 调用封装 ====================
     // 通过 window.__TAURI_INTERNALS__.invoke 调用Rust命令
 
@@ -243,7 +285,7 @@ if (isTauriApp) {
                 <div style="margin-bottom:20px;">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
                         <label style="color:#ffd700;font-size:0.9rem;">📋 扫描到的脚本文件</label>
-                        <button onclick="scanAllFiles()" style="background:linear-gradient(135deg,#ff9800,#e65100);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">🔄 刷新扫描</button>
+                        <button onclick="scanAllFiles(true)" style="background:linear-gradient(135deg,#ff9800,#e65100);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">🔄 刷新扫描</button>
                     </div>
                     <div id="scannedFileList" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:8px;min-height:60px;max-height:250px;overflow:auto;">
                         <div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">扫描中...</div>
@@ -300,7 +342,7 @@ if (isTauriApp) {
         if (selected) {
             maDirs[key] = selected;
             document.getElementById('maDir_' + key).value = selected;
-            scanAllFiles();
+            scanAllFiles(true); // 目录变化强制重新扫描
         }
     }
 
@@ -389,7 +431,7 @@ if (isTauriApp) {
         return '其他';
     }
 
-    async function scanAllFiles() {
+    async function scanAllFiles(force = false) {
         const listEl = document.getElementById('scannedFileList');
         const statsEl = document.getElementById('fuzzyStatsArea');
         if (!listEl) return;
@@ -401,6 +443,16 @@ if (isTauriApp) {
             listEl.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">请先配置老马目录</div>';
             if (statsEl) statsEl.innerHTML = '';
             return;
+        }
+
+        // 优先使用今日缓存（非强制刷新）
+        if (!force) {
+            const cache = loadScanCache();
+            if (cache && cache.files && cache.files.length > 0) {
+                scannedFiles = cache.files;
+                renderScannedFiles();
+                return;
+            }
         }
 
         listEl.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">扫描中...</div>';
@@ -415,6 +467,22 @@ if (isTauriApp) {
         if (scannedFiles.length === 0) {
             listEl.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">未找到 txt/json 文件</div>';
             if (statsEl) statsEl.innerHTML = '';
+            return;
+        }
+
+        saveScanCache(scannedFiles);
+        renderScannedFiles();
+    }
+
+    function renderScannedFiles() {
+        const listEl = document.getElementById('scannedFileList');
+        const statsEl = document.getElementById('fuzzyStatsArea');
+        if (!listEl) return;
+
+        if (scannedFiles.length === 0) {
+            listEl.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">未找到 txt/json 文件</div>';
+            if (statsEl) statsEl.innerHTML = '';
+            window.scannedFiles = scannedFiles;
             return;
         }
 
@@ -434,6 +502,7 @@ if (isTauriApp) {
                 html += `<div style="display:flex;align-items:center;gap:6px;padding:4px 6px;border-bottom:1px solid rgba(255,255,255,0.05);">
                     <span>${icon}</span>
                     <span style="color:#fff;font-size:0.8rem;flex:1;word-break:break-all;">${f.name}</span>
+                    <button onclick="detectFileEncoding('${safePath}')" style="background:rgba(156,39,176,0.3);color:#ce93d8;border:1px solid rgba(156,39,176,0.3);padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;">编码</button>
                     <button onclick="viewFile('${safePath}')" style="background:rgba(0,188,212,0.3);color:#00bcd4;border:1px solid rgba(0,188,212,0.3);padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;">查看</button>
                     <button onclick="loadFileToHand('${safePath}')" style="background:rgba(76,175,80,0.3);color:#4caf50;border:1px solid rgba(76,175,80,0.3);padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;">加载</button>
                 </div>`;
@@ -492,6 +561,33 @@ if (isTauriApp) {
     }
 
     // ==================== 文件查看/编辑器 ====================
+
+    async function detectFileEncoding(filePath) {
+        try {
+            // 优先调用 Rust 后端专用检测命令
+            if (typeof window.__TAURI_INTERNALS__ !== 'undefined' && window.__TAURI_INTERNALS__.invoke) {
+                const encoding = await window.__TAURI_INTERNALS__.invoke('detect_file_encoding', { filePath });
+                alert(`文件编码：${encoding}\n路径：${filePath}`);
+                return;
+            }
+        } catch (e) {
+            // 老版本 APP 没有该命令，回退：读出来看是否成功
+            console.warn('[detectFileEncoding] 后端检测失败:', e);
+        }
+        try {
+            const content = await readTextFile(filePath);
+            if (content === null) {
+                alert('无法读取文件');
+                return;
+            }
+            // 简单启发：出现大量 � 或乱码字符，多半是 GBK/ANSI
+            const hasReplacement = content.includes('\uFFFD');
+            const hasGarbled = /[\u0080-\u00FF]{3,}/.test(content) && !/[\u4e00-\u9fa5]/.test(content);
+            alert(`简易检测：\n路径：${filePath}\n是否含替换符：${hasReplacement ? '是（可能为 GBK/ANSI）' : '否'}\n疑似乱码：${hasGarbled ? '是' : '否'}`);
+        } catch (e) {
+            alert('检测失败：' + e.message);
+        }
+    }
 
     async function viewFile(filePath) {
         try {

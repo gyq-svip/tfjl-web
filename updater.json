@@ -1,11 +1,11 @@
 {
-  "version": "1.1.8",
-  "notes": "v1.1.8 多编码日志读取修复\n- 新增多编码自动检测回退：BOM → UTF-8 → GB18030(简中) → BIG5(繁中) → lossy兜底\n- 修复命令名冲突导致非 UTF-8 日志（GBK等）读取失败\n- 老马电脑 Log 目录的日志文件不再报编码错误",
-  "pub_date": "2026-07-23T15:46:00Z",
+  "version": "1.1.9",
+  "notes": "v1.1.9 本地设置缓存 + 编码检测\n- APP本地设置扫描结果按日缓存，目录不变时秒开\n- 扫描文件列表增加「编码」按钮，可检测日志文件编码\n- 继续优化多编码日志读取稳定性",
+  "pub_date": "2026-07-23T18:00:00Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRdWJvQ0JvYjZTSEVaem8zbGZVZDBPcnlVSzg3WFpFTFptaXRvbVN2N3ZyVURmWkFJRXNXcGMyNDR2UTgwNmNiSXFyU1FJaUcrRE5jTXdtb3VDRlBMTU9QeGxMSFlad2dZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg0NzkyNzc1CWZpbGU6dGZqbC1zaWduLXRlbXAuZXhlCnFKQjFiU1NJanpIbDJMN2VBeC9aYVdtdDdqYXkreDFOYkZwRHVGWUwvcnJLYm5uUEhDcHV5NjFzTGhvTUVNMHNEWlB3UlZmdmdFdWROS3hQTGZoZEN3PT0K",
-      "url": "https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/releases/download/v1.1.8/tfjl-v1.1.8-x64-setup.exe"
+      "signature": "-----BEGIN RSA SIGNATURE-----\ndW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRdWJvQ0JvYjZTSEdtV3VjaVVwUEU5bmo0TmpQakZtY1p0Rzl2cHdyalVubmpRRTNIcUkwVmNIOXgyNkVUSlYrZjd0SnlwZHlaZU8vTTVxUGlPTW9HekFkT1pOQUNFYXc0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg0Nzk1NDEwCWZpbGU6dGZqbC1zaWduLXRlbXAuZXhlCndpamVmb1cxdjRXK3JUUThNVXJxeHdKTGlUWVJGNnZ4YTZhemZKaENFOWlYZzZNT1FhcW13cXM5QjBTZ1RYdU1TMW1YVlNUbmFvdWl5d0JnUmdNMEJnPT0=\n-----END RSA SIGNATURE-----",
+      "url": "https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/releases/download/v1.1.9/tfjl-v1.1.9-x64-setup.exe"
     }
   }
 }

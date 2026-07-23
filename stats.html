@@ -1941,6 +1941,31 @@
         const PASS_PRICE = 50;
         const CUPS_PER_STAMINA = 100;
 
+        // ==================== 本地缓存（历史数据不能变，加缓存加速加载） ====================
+        const DUNGEON_CACHE_PREFIX = 'TFJL_DungeonCache_';
+
+        function getDungeonCacheKey(gistId) {
+            return DUNGEON_CACHE_PREFIX + gistId;
+        }
+
+        function loadGameDataFromCache(gistId) {
+            try {
+                const raw = localStorage.getItem(getDungeonCacheKey(gistId));
+                if (!raw) return null;
+                return JSON.parse(raw);
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function saveGameDataToCache(gistId, data) {
+            try {
+                localStorage.setItem(getDungeonCacheKey(gistId), JSON.stringify(data));
+            } catch (e) {
+                // localStorage 满了，忽略
+            }
+        }
+
         // ==================== Token 管理 ====================
         function getGistToken() {
             const HARDCODED_TOKEN = 'YOUR_GITHUB_TOKEN_HERE';
@@ -2132,6 +2157,8 @@
                 const err = await response.json().catch(() => ({}));
                 throw new Error('保存失败: ' + (err.message || response.status));
             }
+            // 保存成功后同步更新本地缓存
+            saveGameDataToCache(gistId, data);
         }
 
         async function saveGameGistData(data) {
@@ -2265,6 +2292,9 @@
                 };
                 setSession(currentSession);
                 gameData = data;
+
+                // 登录成功后保存缓存（加速下次自动登录）
+                saveGameDataToCache(account.gistId, data);
 
                 showToast('✅ 登录成功', 'success');
                 showMainView();
@@ -2568,18 +2598,41 @@
                 showLoginView();
                 return;
             }
-            showLoading('登录中...');
+
+            // 1. 先尝试本地缓存（秒开，历史数据不变不会过期）
+            const cachedData = loadGameDataFromCache(session.gistId);
+            let cacheShown = false;
+
+            if (cachedData && cachedData.allianceId) {
+                let s = cachedData.seasons.find(s => s.id === cachedData.currentSeasonId) || cachedData.seasons[0];
+                let m = s ? s.members.find(m => m.id === session.memberId) : null;
+                if (!m) {
+                    for (const ss of cachedData.seasons) {
+                        const mm = ss.members.find(m => m.id === session.memberId);
+                        if (mm) { cachedData.currentSeasonId = ss.id; m = mm; break; }
+                    }
+                }
+                if (m) {
+                    currentSession = session;
+                    gameData = cachedData;
+                    showMainView();
+                    renderAll();
+                    cacheShown = true;
+                }
+            }
+
+            if (!cacheShown) showLoading('登录中...');
+
+            // 2. 后台从 Gist 拉取最新数据（同步今天的变化）
             try {
                 const data = await getAllianceData(session.gistId);
                 if (!data || !data.allianceId) {
                     throw new Error('数据格式不正确');
                 }
 
-                // 在当前赛季中查找成员
                 let season = data.seasons.find(s => s.id === data.currentSeasonId) || data.seasons[0];
                 let member = season ? season.members.find(m => m.id === session.memberId) : null;
 
-                // 若当前赛季没有，在所有赛季中查找
                 if (!member) {
                     for (const s of data.seasons) {
                         const m = s.members.find(m => m.id === session.memberId);
@@ -2598,13 +2651,19 @@
 
                 currentSession = session;
                 gameData = data;
+                saveGameDataToCache(session.gistId, data);
 
                 showMainView();
                 renderAll();
+                if (cacheShown) showToast('✅ 数据已同步', 'success');
             } catch (e) {
-                showToast('自动登录失败: ' + e.message, 'error');
-                clearSession();
-                showLoginView();
+                if (!cacheShown) {
+                    showToast('自动登录失败: ' + e.message, 'error');
+                    clearSession();
+                    showLoginView();
+                } else {
+                    showToast('⚠️ 网络同步失败，显示缓存数据', 'error');
+                }
             } finally {
                 hideLoading();
             }
@@ -4254,6 +4313,7 @@
                 const data = await getAllianceData(currentSession.gistId);
                 if (data && data.allianceId) {
                     gameData = data;
+                    saveGameDataToCache(currentSession.gistId, data);
                     renderAll();
                 }
             } catch (e) {
