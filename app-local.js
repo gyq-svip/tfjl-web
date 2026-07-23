@@ -1383,22 +1383,26 @@ if (isTauriApp) {
     // ==================== 日志胜负统计（缓存优化：仅扫描今日，历史数据走 localStorage） ====================
     // ===== 日志文件模式学习引擎 =====
     // 从已缓存的文件中学习：哪些目录/扩展名/命名关键词的文件才包含「对战胜利/失败确定」
-    // 以后新文件（如今天的日志）只看匹配这些特征的，大幅减少无用文件读取
+    // 同时从负面样本（被扫描但无数据的文件）学习排除目录，加快新文件过滤
+    // 以后新文件（如今天的日志）只看匹配正面特征的，大幅减少无用文件读取
     function learnLogPatterns(cache) {
         if (cache._patterns) return cache._patterns; // 已学习过，直接返回
         if (!cache._files) return null;
 
         const entries = Object.entries(cache._files);
+
+        // 正面样本：有对战数据的文件（win > 0）
         const matched = entries.filter(([, d]) => typeof d.win === 'number' && d.win > 0);
+        // 负面样本：扫描过但确认无对战数据的文件（win === -1）
+        const negative = entries.filter(([, d]) => d.win === -1);
+
         if (matched.length < 3) return null; // 样本太少，不敢下结论
 
         const total = matched.length;
 
-        // 统计扩展名分布
+        // === 正面学习：统计扩展名/目录/文件名关键词分布 ===
         const extCount = {};
-        // 统计目录（上级路径前缀）分布
         const dirCount = {};
-        // 统计文件名中出现的非数字 token（中/英文关键词）
         const tokenCount = {};
 
         for (const [path] of matched) {
@@ -1411,7 +1415,7 @@ if (isTauriApp) {
 
             // 目录：保留完整父目录路径
             const parts = norm.split('/');
-            parts.pop(); // 去掉文件名
+            parts.pop();
             if (parts.length > 0) {
                 const dir = parts.join('/');
                 dirCount[dir] = (dirCount[dir] || 0) + 1;
@@ -1426,14 +1430,48 @@ if (isTauriApp) {
             }
         }
 
+        // === 负面学习：统计"已确认无数据"的文件所在目录 ===
+        // 如果一个目录下大量文件都被扫描但无数据，说明整个目录都不是日志目录
+        const skipDirCount = {};
+        const positiveDirSet = new Set(Object.keys(dirCount));
+        for (const [path] of negative) {
+            const norm = path.replace(/\\/g, '/');
+            const parts = norm.split('/');
+            parts.pop();
+            if (parts.length > 0) {
+                const dir = parts.join('/');
+                // 只有不在正面目录里的才纳入排除学习
+                if (!positiveDirSet.has(dir) && ![...positiveDirSet].some(pd => dir.startsWith(pd))) {
+                    skipDirCount[dir] = (skipDirCount[dir] || 0) + 1;
+                }
+            }
+        }
+
         // 只保留高频特征（出现比例 ≥ 阈值）
         const patterns = {
             exts: Object.entries(extCount).filter(([, c]) => c / total >= 0.5).map(([e]) => e),
             dirs: Object.entries(dirCount).filter(([, c]) => c / total >= 0.3).map(([d]) => d),
             tokens: Object.entries(tokenCount).filter(([, c]) => c / total >= 0.3).map(([t]) => t),
+            // 负面排除目录：该目录下≥3个文件确认无数据 → 直接跳过
+            skipDirs: Object.entries(skipDirCount).filter(([, c]) => c >= 3).map(([d]) => d),
             _sampleCount: total,
+            _negativeCount: negative.length,
+            _totalCached: entries.length,
             _learnedAt: Date.now()
         };
+
+        // 清理膨胀的 _files：删除 win=-1 的旧条目（>60天），它们已被模式覆盖
+        // 避免 localStorage 越来越大（每个扫描过的无用文件都占一条缓存）
+        const now = Date.now();
+        const cutoff = 60 * 24 * 3600 * 1000; // 60天
+        let pruned = 0;
+        for (const [p, d] of entries) {
+            if (d.win === -1 && d._scannedAt && (now - d._scannedAt) > cutoff) {
+                delete cache._files[p];
+                pruned++;
+            }
+        }
+        if (pruned > 0) console.log('[学习] 清理了 ' + pruned + ' 条旧的负面缓存（>60天），当前缓存 ' + Object.keys(cache._files).length + ' 条');
 
         return (patterns.exts.length > 0 || patterns.dirs.length > 0) ? patterns : null;
     }
@@ -1446,6 +1484,12 @@ if (isTauriApp) {
         const filename = norm.split('/').pop() || '';
         const ext = (filename.match(/\.(\w+)$/)?.[1] || '').toLowerCase();
         const dir = norm.split('/').slice(0, -1).join('/');
+
+        // 规则0：负面排除 — 如果在已知"全是无用文件"的目录里，直接跳过
+        if (patterns.skipDirs && patterns.skipDirs.length > 0) {
+            const isSkipDir = patterns.skipDirs.some(sd => dir === sd || dir.startsWith(sd + '/') || dir.startsWith(sd + '\\'));
+            if (isSkipDir) return false;
+        }
 
         // 规则1：扩展名必须在命中文件的高频扩展名中
         if (patterns.exts.length > 0 && !patterns.exts.includes(ext)) return false;
@@ -1510,11 +1554,21 @@ if (isTauriApp) {
         } catch (e) { return null; }
     }
 
-    function saveLogBattleResultCache(dailyMap) {
+    function saveLogBattleResultCache(dailyMap, patterns) {
         if (!maDirs.logs) return;
         const key = 'TFJL_LogBattleResult_' + btoa(unescape(encodeURIComponent(maDirs.logs))).slice(0, 32);
         try {
-            localStorage.setItem(key, JSON.stringify({ date: getTodayStr(), dailyMap, savedAt: Date.now() }));
+            const entry = { date: getTodayStr(), dailyMap, savedAt: Date.now() };
+            if (patterns) entry._stats = {
+                positiveCount: patterns._sampleCount || 0,
+                negativeCount: patterns._negativeCount || 0,
+                totalCached: patterns._totalCached || 0,
+                skipDirs: patterns.skipDirs ? patterns.skipDirs.length : 0,
+                exts: patterns.exts || [],
+                dirs: patterns.dirs ? patterns.dirs.length : 0,
+                tokens: patterns.tokens ? patterns.tokens.length : 0
+            };
+            localStorage.setItem(key, JSON.stringify(entry));
         } catch (e) { /* ignore */ }
     }
 
@@ -1609,6 +1663,14 @@ if (isTauriApp) {
         html += '<div style="font-size:0.65rem;color:rgba(255,255,255,0.25);margin-top:6px;text-align:right;">';
         if (fromCache) {
             html += '📦 今日缓存，秒开展示';
+            // 缓存命中时也从 resultCache._stats 显示学习信息
+            if (opts._stats) {
+                const s = opts._stats;
+                html += ' · 🧠 已学习 ' + s.positiveCount + ' 个有效文件';
+                if (s.negativeCount > 0) html += ' + ' + s.negativeCount + ' 个确认无用';
+                if (s.skipDirs > 0) html += ' · 🚫 排除 ' + s.skipDirs + ' 个目录';
+                html += ' · 缓存共 ' + s.totalCached + ' 条';
+            }
         } else if (opts) {
             const cacheHits = opts.cacheHits || 0;
             const todayFiles = opts.todayFiles || [];
@@ -1618,8 +1680,19 @@ if (isTauriApp) {
             if (toReadFiles.length > todayFiles.length) {
                 html += ' · ' + (toReadFiles.length - todayFiles.length) + ' 个历史文件已变化重新读取';
             }
+
+            // 学习效果详细摘要
             if (opts.usingLearned && opts.learnedPatterns) {
-                html += (opts.learnedPatterns.exts.length > 0 ? ' · 🧠 学习模式已启用（扩展名: ' + opts.learnedPatterns.exts.join(',') + '）' : ' · 🧠 学习模式已启用');
+                const p = opts.learnedPatterns;
+                const parts = [];
+                if (p.exts.length > 0) parts.push('扩展名: ' + p.exts.join(','));
+                if (p.dirs.length > 0) parts.push(p.dirs.length + ' 个目录');
+                if (p.tokens.length > 0) parts.push(p.tokens.length + ' 个关键词');
+                if (p.skipDirs && p.skipDirs.length > 0) parts.push('🚫排除' + p.skipDirs.length + '个目录');
+                html += '<br>🧠 学习总结：' + parts.join(' · ') + '（基于 ' + p._sampleCount + ' 个有效文件';
+                if (p._negativeCount > 0) html += ' + ' + p._negativeCount + ' 个确认无用';
+                if (p._totalCached) html += '，缓存共 ' + p._totalCached + ' 条';
+                html += '）';
             }
         }
         html += '</div>';
@@ -1655,7 +1728,7 @@ if (isTauriApp) {
             const resultCache = loadLogBattleResultCache();
             if (resultCache && resultCache.dailyMap && Object.keys(resultCache.dailyMap).length > 0) {
                 dlog('✅ 使用今日结果缓存，跳过全部扫描');
-                renderLogBattleStats(resultCache.dailyMap, statsEl, { fromCache: true });
+                renderLogBattleStats(resultCache.dailyMap, statsEl, { fromCache: true, _stats: resultCache._stats || null });
                 window._lastLogDebugLines = debugLines;
                 return;
             }
@@ -1811,8 +1884,8 @@ if (isTauriApp) {
                     const r = readResults[i];
                     if (!r) continue;
                     if (r.win === -1) {
-                        // 已确认无关键词：缓存标记，不加入统计
-                        cache._files[r.path] = { mtime: r.mtime, date: '', win: -1, lose: 0 };
+                        // 已确认无关键词：缓存标记（带时间戳供60天过期清理），不加入统计
+                        cache._files[r.path] = { mtime: r.mtime, date: '', win: -1, lose: 0, _scannedAt: Date.now() };
                         continue;
                     }
                     if (!dailyMap[r.date]) dailyMap[r.date] = { win: 0, lose: 0 };
@@ -1830,7 +1903,7 @@ if (isTauriApp) {
             try { localStorage.setItem(CACHE_KEY, JSON.stringify(cache)); } catch (e) { dlog('缓存保存失败: ' + e.message); }
 
             // 保存日结果缓存（下次打开直接渲染，跳过全部扫描）
-            saveLogBattleResultCache(dailyMap);
+            saveLogBattleResultCache(dailyMap, cache._patterns);
 
             // 6. 渲染（最近30天）
             renderLogBattleStats(dailyMap, statsEl, {
