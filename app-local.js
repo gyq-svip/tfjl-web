@@ -234,6 +234,7 @@ if (isTauriApp) {
         fillSettingsForm();
         scanAllFiles();
         calcScreenshotStats();  // 自动加载今日缓存，无需手动点击
+        calcLogBattleStats();   // 自动加载对战统计（优先走缓存，只读今日新文件）
     }
 
     function closeAppLocalSettings() {
@@ -335,15 +336,16 @@ if (isTauriApp) {
 
 
                 <div style="margin-bottom:20px;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                        <label style="color:#ff9800;font-size:0.9rem;">🏆 对战日志胜负统计（每日「对战胜利确定」「对战失败确定」次数）</label>
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                        <label style="color:#ff9800;font-size:0.9rem;">🏆 对战统计（只支持单开，无法区分多个账号的单独统计）</label>
                         <div style="display:flex;gap:6px;align-items:center;">
                             <button onclick="clearLogBattleCache()" title="清除缓存后下次会重新扫描所有文件" style="background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.4);border:1px solid rgba(255,255,255,0.1);padding:5px 8px;border-radius:6px;cursor:pointer;font-size:0.7rem;">🗑️ 清除缓存</button>
-                            <button onclick="calcLogBattleStats()" style="background:linear-gradient(135deg,#ff9800,#e65100);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">📊 统计</button>
+                            <button onclick="calcLogBattleStats(true)" style="background:linear-gradient(135deg,#ff9800,#e65100);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">📊 强制刷新</button>
                         </div>
                     </div>
+                    <div style="color:rgba(255,255,255,0.25);font-size:0.65rem;margin-bottom:6px;">⚠️ 第一次加载非常慢，建议日志目录只保留1天的文件，其他的移走/删除</div>
                     <div id="logBattleStats" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:8px;min-height:60px;">
-                        <div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">配置日志目录后点击统计</div>
+                        <div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">配置日志目录后自动统计</div>
                     </div>
                 </div>
 
@@ -1490,7 +1492,11 @@ if (isTauriApp) {
         } catch (e) { /* ignore */ }
     }
 
-    async function calcLogBattleStats(targetId) {
+    async function calcLogBattleStats(targetId, forceParam) {
+        // forceParam: true=强制重新扫描（忽略缓存做全新扫描），false/undefined=正常流程（优先用缓存）
+        // 兼容 onclick="calcLogBattleStats(true)" 写法：targetId 为布尔值时修正为 force 标志
+        if (typeof targetId === 'boolean') { forceParam = targetId; targetId = null; }
+        const force = forceParam === true;
         const id = targetId || 'logBattleStats';
         const statsEl = document.getElementById(id);
         if (!statsEl) return;
@@ -1541,6 +1547,10 @@ if (isTauriApp) {
             if (cache._dir !== maDirs.logs) {
                 dlog('日志目录已变更，缓存失效（旧: ' + (cache._dir || '无') + ' → 新: ' + maDirs.logs + '）');
                 cache = { _dir: maDirs.logs, _files: {} };
+            }
+            if (force) {
+                dlog('强制刷新：忽略文件缓存，重新扫描所有文件');
+                cache._files = {};
             }
             cache._files = cache._files || {};
 
@@ -1667,8 +1677,10 @@ if (isTauriApp) {
             }
             try { localStorage.setItem(CACHE_KEY, JSON.stringify(cache)); } catch (e) { dlog('缓存保存失败: ' + e.message); }
 
-            // 6. 渲染
-            const sortedDates = Object.keys(dailyMap).sort((a, b) => b.localeCompare(a));
+            // 6. 渲染（最近30天）
+            const sortedAllDates = Object.keys(dailyMap).sort((a, b) => b.localeCompare(a));
+            const sortedDates = sortedAllDates.slice(0, 30);
+            const cutOffDays = sortedAllDates.length - sortedDates.length;
 
             if (sortedDates.length === 0) {
                 window._lastLogDebugLines = debugLines;
@@ -1737,7 +1749,7 @@ if (isTauriApp) {
             html += '<div style="display:flex;gap:12px;align-items:center;margin-bottom:4px;font-size:0.7rem;">';
             html += '<span style="display:inline-block;width:10px;height:10px;background:#4ecdc4;border-radius:2px;"></span> 胜利';
             html += '<span style="display:inline-block;width:10px;height:10px;background:#f44336;border-radius:2px;"></span> 失败';
-            html += '<span style="margin-left:8px;color:rgba(255,255,255,0.3);">x轴: 月-日（最近在最左）</span>';
+            html += '<span style="margin-left:8px;color:rgba(255,255,255,0.3);">x轴: 月-日</span>';
             html += '</div>';
 
             html += '<svg width="' + chartW + '" height="' + chartH + '" style="display:block;">' + gridHtml + barsHtml + '</svg>';
@@ -1753,6 +1765,9 @@ if (isTauriApp) {
             html += '</div>';
             if (hasEncodingError) {
                 html += '<div style="font-size:0.65rem;color:#f44336;margin-top:2px;text-align:right;">⚠️ ' + readErr + ' 个文件因 UTF-8 解码失败，请 cargo tauri build 重编译 APP</div>';
+            }
+            if (cutOffDays > 0) {
+                html += '<div style="font-size:0.65rem;color:rgba(255,255,255,0.25);margin-top:2px;text-align:right;">📦 仅显示最近30天，' + cutOffDays + ' 天前的数据已省略</div>';
             }
 
             window._lastLogDebugLines = debugLines;
