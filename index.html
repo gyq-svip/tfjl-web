@@ -22678,6 +22678,26 @@ ${maSection}
                 clearTimeout(adminLongPressTimer);
             });
 
+            // 隐藏触发：三击标题强制清缓存+硬刷新（防缓存死循环）
+            let titleClickCount = 0;
+            let titleClickTimer = null;
+            const titleEl = document.querySelector('h1');
+            if (titleEl) {
+                titleEl.addEventListener('click', () => {
+                    titleClickCount++;
+                    if (titleClickCount >= 3) {
+                        titleClickCount = 0;
+                        clearTimeout(titleClickTimer);
+                        if (confirm('🔧 三击触发：强制清缓存+硬刷新？\n\n将清除全部缓存并用时间戳强刷，确保拉到最新代码。')) {
+                            forceClearAndHardRefresh();
+                        }
+                    } else {
+                        clearTimeout(titleClickTimer);
+                        titleClickTimer = setTimeout(() => { titleClickCount = 0; }, 1500);
+                    }
+                });
+            }
+
             document.getElementById('adminVerifyCode').addEventListener('keydown', (e) => {
                 if (e.key === 'Enter') verifyAdmin();
             });
