@@ -2026,11 +2026,8 @@ if (isTauriApp) {
             for (const s of stats) {
                 oldMap[s.date] = Math.max(oldMap[s.date] || 0, s.count);
             }
-            // 按日期排序，保留最近180天
-            const sorted = Object.entries(oldMap).sort((a, b) => b[0].localeCompare(a[0]));
-            const trimmed = {};
-            sorted.slice(0, 180).forEach(([d, c]) => { trimmed[d] = c; });
-            localStorage.setItem(SCR_PERSIST_KEY, JSON.stringify({ dailyMap: trimmed, savedAt: Date.now() }));
+            // 不分天数限制，永久保存所有历史数据
+            localStorage.setItem(SCR_PERSIST_KEY, JSON.stringify({ dailyMap: oldMap, savedAt: Date.now() }));
         } catch (e) { console.warn('[截图持久化] 保存失败:', e); }
     }
 
@@ -2067,11 +2064,8 @@ if (isTauriApp) {
         try {
             const oldMap = loadBattlePersistStore();
             const merged = { ...oldMap, ...dailyMap };
-            // 按日期排序，保留最近90天（避免无限增长）
-            const sortedDates = Object.keys(merged).sort((a, b) => b.localeCompare(a));
-            const trimmed = {};
-            sortedDates.slice(0, 90).forEach(d => { trimmed[d] = merged[d]; });
-            localStorage.setItem(PERSIST_KEY, JSON.stringify({ dailyMap: trimmed, savedAt: Date.now() }));
+            // 不分天数限制，永久保存所有历史数据（每天数据量极小，即使3年也只有几十KB）
+            localStorage.setItem(PERSIST_KEY, JSON.stringify({ dailyMap: merged, savedAt: Date.now() }));
         } catch (e) { console.warn('[持久化] 保存失败:', e); }
     }
 
@@ -2086,8 +2080,7 @@ if (isTauriApp) {
     function renderLogBattleStats(dailyMap, statsEl, opts) {
         const fromCache = opts && opts.fromCache;
         const sortedAllDates = Object.keys(dailyMap).sort((a, b) => b.localeCompare(a));
-        const sortedDates = sortedAllDates.slice(0, 30);
-        const cutOffDays = sortedAllDates.length - sortedDates.length;
+        const sortedDates = sortedAllDates;  // 显示全部天数，无限制
 
         if (sortedDates.length === 0) {
             if (!fromCache) {
@@ -2211,9 +2204,6 @@ if (isTauriApp) {
         html += '</div>';
         if (opts && !fromCache && opts.hasEncodingError) {
             html += '<div style="font-size:0.65rem;color:#f44336;margin-top:2px;text-align:right;">⚠️ ' + opts.readErr + ' 个文件因 UTF-8 解码失败，请 cargo tauri build 重编译 APP</div>';
-        }
-        if (cutOffDays > 0) {
-            html += '<div style="font-size:0.65rem;color:rgba(255,255,255,0.25);margin-top:2px;text-align:right;">📦 仅显示最近30天，' + cutOffDays + ' 天前的数据已省略</div>';
         }
 
         statsEl.innerHTML = html;
