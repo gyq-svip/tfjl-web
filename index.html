@@ -11822,8 +11822,13 @@
                 border-bottom: 1px solid rgba(255,215,0,0.2);
                 flex-shrink: 0;
             `;
+            const drInfo = computeScriptDr(file.content);
+            const drBadge = drInfo ? buildWindowDrBadge(drInfo) : '';
             titleBar.innerHTML = `
-                <span style="color: #ffd700; font-weight: bold; font-size: 14px;">📄 ${escapeHtml(file.name)}</span>
+                <span style="color: #ffd700; font-weight: bold; font-size: 14px;display:flex;align-items:center;gap:8px;">
+                    📄 ${escapeHtml(file.name)}
+                    <span id="${windowId}_titleDr" style="font-size:0.72rem;font-weight:normal;">${drBadge}</span>
+                </span>
                 <div style="display: flex; gap: 8px;">
                     <button onclick="minimizeTxtWindow('${windowId}')" style="background:rgba(255,193,7,0.2);border:none;color:#ffc107;padding:4px 8px;border-radius:4px;cursor:pointer;">−</button>
                     <button onclick="closeTxtWindow('${windowId}', ${index})" style="background:rgba(244,67,54,0.2);border:none;color:#f44336;padding:4px 8px;border-radius:4px;cursor:pointer;">×</button>
@@ -11866,7 +11871,10 @@
             textarea.value = file.content;
             textarea.spellcheck = false;
             // 实时减伤计算
-            textarea.addEventListener('input', () => updateEditorDamageReduction(windowId));
+            textarea.addEventListener('input', () => {
+                updateEditorDamageReduction(windowId);
+                updateWindowTitleDr(windowId, textarea.value);
+            });
             // 初始计算（如果有内容）
             if (file.content && file.content.trim()) {
                 setTimeout(() => updateEditorDamageReduction(windowId), 300);
@@ -11976,7 +11984,8 @@
             txtFileWindows.push({
                 id: windowId,
                 fileIndex: index,
-                element: windowDiv
+                element: windowDiv,
+                drInfo: drInfo
             });
         }
 
@@ -12462,8 +12471,13 @@
                 flex-shrink: 0;
             `;
             const modeLabel = readOnly ? '👁️ 预览' : '✏️ 编辑';
+            const localDrInfo = computeScriptDr(content);
+            const localDrBadge = localDrInfo ? buildWindowDrBadge(localDrInfo) : '';
             titleBar.innerHTML = `
-                <span style="color: ${titleColor}; font-weight: bold; font-size: 14px;">${modeLabel}: ${escapeHtml(realName)}</span>
+                <span style="color: ${titleColor}; font-weight: bold; font-size: 14px;display:flex;align-items:center;gap:8px;">
+                    ${modeLabel}: ${escapeHtml(realName)}
+                    <span id="${windowId}_titleDr" style="font-size:0.72rem;font-weight:normal;">${localDrBadge}</span>
+                </span>
                 <div style="display: flex; gap: 8px;">
                     <button onclick="minimizeTxtWindow('${windowId}')" style="background:rgba(255,193,7,0.2);border:none;color:#ffc107;padding:4px 8px;border-radius:4px;cursor:pointer;">−</button>
                     <button onclick="closeLocalFileWindow('${windowId}')" style="background:rgba(244,67,54,0.2);border:none;color:#f44336;padding:4px 8px;border-radius:4px;cursor:pointer;">×</button>
@@ -12500,6 +12514,9 @@
             if (readOnly) {
                 textarea.readOnly = true;
                 textarea.style.cursor = 'default';
+            } else {
+                // 本地文件编辑模式：实时更新标题栏减伤
+                textarea.addEventListener('input', () => updateWindowTitleDr(windowId, textarea.value));
             }
             textarea.addEventListener('keydown', function(e) {
                 if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
@@ -12588,7 +12605,8 @@
                 filePath: realPath,
                 fileName: realName,
                 readOnly: readOnly,
-                element: windowDiv
+                element: windowDiv,
+                drInfo: localDrInfo
             });
         }
 
@@ -16444,6 +16462,22 @@
             const first7 = battleCards.slice(0, 7);
             const first7Dr = calculateDamageReductionForCards(first7);
             return { first7: first7Dr, all: allDr };
+        }
+
+        // 构建窗口标题栏减伤徽章 HTML
+        function buildWindowDrBadge(drInfo) {
+            if (!drInfo) return '';
+            const f7c = drInfo.first7 < 100 ? '#ff6b6b' : drInfo.first7 < 130 ? '#ffd700' : '#4ecdc4';
+            const ac = drInfo.all < 100 ? '#ff6b6b' : drInfo.all < 130 ? '#ffd700' : '#4ecdc4';
+            return `🛡<b style="color:${f7c}">${drInfo.first7}</b>/<b style="color:${ac}">${drInfo.all}</b>`;
+        }
+
+        // 更新浮窗标题栏减伤徽章
+        function updateWindowTitleDr(windowId, content) {
+            const titleEl = document.getElementById(`${windowId}_titleDr`);
+            if (!titleEl) return;
+            const drInfo = computeScriptDr(content);
+            titleEl.innerHTML = buildWindowDrBadge(drInfo);
         }
 
         // 编辑器实时减伤显示
