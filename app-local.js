@@ -254,17 +254,6 @@ if (isTauriApp) {
                     </div>
                 </div>
 
-                <div style="margin-bottom:20px;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                        <label style="color:#ff9800;font-size:0.9rem;">🏆 对战日志胜负统计（每日「对战胜利确定」「对战失败确定」次数）</label>
-                        <button onclick="calcLogBattleStats()" style="background:linear-gradient(135deg,#ff9800,#e65100);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">📊 统计</button>
-                    </div>
-                    <div id="logBattleStats" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:8px;min-height:60px;">
-                        <div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">配置日志目录后点击统计</div>
-                    </div>
-                </div>
-
-
 
                 <div style="display:flex;gap:10px;justify-content:flex-end;">
                     <button onclick="saveSettingsAndClose()" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:10px 24px;border-radius:6px;cursor:pointer;font-size:0.9rem;">💾 保存设置</button>
@@ -1229,12 +1218,13 @@ if (isTauriApp) {
     }
 
     // ==================== 日志胜负统计 ====================
-    async function calcLogBattleStats() {
-        const statsEl = document.getElementById('logBattleStats');
+    async function calcLogBattleStats(targetId) {
+        const id = targetId || 'logBattleStats';
+        const statsEl = document.getElementById(id);
         if (!statsEl) return;
 
         if (!maDirs.logs) {
-            statsEl.innerHTML = '<div style="color:#ff9800;text-align:center;padding:20px;font-size:0.85rem;">请先在上方配置「对战日志目录」</div>';
+            statsEl.innerHTML = '<div style="color:#ff9800;text-align:center;padding:20px;font-size:0.85rem;">请先在本地设置中配置「对战日志目录」</div>';
             return;
         }
 
