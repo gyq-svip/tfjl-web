@@ -10,17 +10,19 @@ const isTauriApp = (typeof window.__TAURI_INTERNALS__ !== 'undefined') ||
                     navigator.userAgent.includes('Tauri');
 
 if (isTauriApp) {
-    // 老马6个固定目录配置
-    let maDirs = {
-        coop:       '',  // 合作脚本目录
-        activity:   '',  // 活动脚本目录
-        battle:     '',  // 对战目录（JSON）
-        battleMax:  '',  // 对战MAX目录（TXT）
-        screenshot: '',  // 截图目录（统计每天打多少局）
-        logs:       ''   // 对战日志目录（统计胜负等）
+    // 老马6个固定目录配置（默认值，用户可在设置面板修改）
+    const DEFAULT_MA_DIRS = {
+        coop:       'D:\\withfriends\\塔防老马助手\\合作脚本存档',   // 合作脚本目录
+        activity:   'D:\\withfriends\\塔防老马助手\\活动脚本存档',   // 活动脚本目录
+        battle:     'D:\\withfriends\\塔防老马助手\\对战脚本存档',   // 对战目录（JSON）
+        battleMax:  'D:\\withfriends\\塔防老马助手\\对战Max',        // 对战MAX目录（TXT）
+        screenshot: 'D:\\withfriends\\塔防老马助手\\截图',           // 截图目录（统计每天打多少局）
+        logs:       'D:\\withfriends\\塔防老马助手\\Log'             // 对战日志目录（统计胜负等）
     };
+    const DEFAULT_SOFTWARE_DATA_DIR = 'D:\\withfriends';
 
-    let softwareDataDir = '';
+    let maDirs = { ...DEFAULT_MA_DIRS };
+    let softwareDataDir = DEFAULT_SOFTWARE_DATA_DIR;
     let scannedFiles = [];
 
     // ==================== 扫描缓存（本地设置秒开） ====================
@@ -319,26 +321,18 @@ if (isTauriApp) {
             if (saved) {
                 const parsed = JSON.parse(saved);
                 maDirs = { ...maDirs, ...parsed.maDirs };
-                window.maDirs = maDirs;
                 softwareDataDir = parsed.softwareDataDir || '';
                 // 恢复开关状态
                 if (typeof parsed.autoLoadScreenshotStats === 'boolean') settingsConfig.autoLoadScreenshotStats = parsed.autoLoadScreenshotStats;
                 if (typeof parsed.autoLoadBattleStats === 'boolean') settingsConfig.autoLoadBattleStats = parsed.autoLoadBattleStats;
             }
         } catch (e) {}
-        // 如果软件数据目录未设置，尝试从已配置的老马目录推算默认值
+        // 确保 window.maDirs 总是有值（包括默认值）
+        window.maDirs = maDirs;
+        // 如果软件数据目录未设置，使用默认值
         if (!softwareDataDir) {
-            for (const key of ['coop', 'event', 'json', 'max', 'screenshot']) {
-                if (maDirs[key]) {
-                    // 取老马目录的父目录 + \塔防精灵助手数据
-                    const parent = maDirs[key].replace(/[\\/]+$/, '').split(/[\\/]/).slice(0, -1).join('\\');
-                    if (parent) {
-                        softwareDataDir = parent + '\\塔防精灵助手数据';
-                        try { saveConfig(); } catch(e) {}
-                    }
-                    break;
-                }
-            }
+            softwareDataDir = DEFAULT_SOFTWARE_DATA_DIR;
+            try { saveConfig(); } catch(e) {}
         }
     }
 
