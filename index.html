@@ -20127,6 +20127,10 @@ function hasGistToken() {
                     } catch (e) {}
                 }
 
+                // 计算减伤信息
+                const previewDr = computeScriptDr(content);
+                const previewDrHtml = previewDr ? ` ${buildWindowDrBadge(previewDr)}` : '';
+
                 // 创建预览弹窗
                 const modal = document.createElement('div');
                 modal.id = 'scriptPreviewModal';
@@ -20134,7 +20138,7 @@ function hasGistToken() {
                 modal.innerHTML = `
                     <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(79,195,247,0.5);border-radius:12px;width:600px;max-width:90vw;max-height:80vh;display:flex;flex-direction:column;">
                         <div style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center;">
-                            <div style="color:#4fc3f7;font-weight:bold;font-size:1rem;">👁️ 预览：${escapeHtml(fileName)}</div>
+                            <div style="color:#4fc3f7;font-weight:bold;font-size:1rem;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">👁️ 预览：${escapeHtml(fileName)}<span style="font-size:0.75rem;font-weight:normal;">${previewDrHtml}</span></div>
                             <button onclick="document.getElementById('scriptPreviewModal').remove()" style="background:transparent;border:none;color:white;font-size:1.2rem;cursor:pointer;">×</button>
                         </div>
                         <div style="flex:1;overflow:auto;padding:12px;">
