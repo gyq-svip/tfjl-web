@@ -5530,8 +5530,14 @@
             fillCurrentVersion();
         }
 
-        // 打开下载弹窗
+        // 打开下载弹窗（网页版用）；桌面版已在 APP 内，直接走 Tauri 自动更新器
         function openDownloadModal() {
+            const isTauri = !!(window.__TAURI__ || window.__TAURI_INTERNALS__);
+            if (isTauri) {
+                // 桌面版不需要「下载桌面版」弹窗，统一走自动更新
+                menuCheckUpdate();
+                return;
+            }
             const modal = document.getElementById('downloadModal');
             if (modal) {
                 modal.style.display = 'flex';
@@ -5801,11 +5807,18 @@
                     return;
                 }
                 if (isNewerVersion(release.version, CURRENT_VERSION)) {
-                    t.success('🎉 发现新版本 v' + release.version + '，即将打开下载...');
-                    t.remove(1800);
                     const badge = document.getElementById('updateBadgeFooter');
                     if (badge) badge.style.display = 'inline-block';
-                    setTimeout(() => openDownloadModal(), 1300);
+                    const isTauri = !!(window.__TAURI__ || window.__TAURI_INTERNALS__);
+                    if (isTauri) {
+                        // Tauri 自动更新器走到这里说明 updater 失败，不应打开「下载桌面版」弹窗
+                        t.error('⚠️ 自动更新失败，请关闭代理后重试，或从 Gitee 手动下载 v' + release.version);
+                        t.remove(4000);
+                    } else {
+                        t.success('🎉 发现新版本 v' + release.version + '，即将打开下载...');
+                        t.remove(1800);
+                        setTimeout(() => openDownloadModal(), 1300);
+                    }
                 } else {
                     t.success('✅ 当前已是最新版本 v' + CURRENT_VERSION);
                     t.remove(2500);
