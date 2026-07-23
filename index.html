@@ -11369,13 +11369,15 @@
             }
 
             const tabId = 'tab_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+            const drInfo = computeScriptDr(file.content);
             scriptEditorTabs.push({
                 id: tabId,
                 fileIndex: fileIndex,
                 name: file.name,
                 content: file.content,
                 originalContent: file.content,
-                modified: false
+                modified: false,
+                drInfo: drInfo
             });
 
             document.getElementById('scriptEditorTabs').style.display = 'flex';
@@ -11472,8 +11474,15 @@
                 const dirty = tab.modified ? ' *' : '';
                 const name = tab.name.length > 18 ? tab.name.slice(0, 16) + '…' : tab.name;
                 const icon = tab.isScanned ? '📂' : '📄';
+                // 减伤标签徽章
+                let drBadge = '';
+                if (tab.drInfo) {
+                    const f7c = tab.drInfo.first7 < 100 ? '#ff6b6b' : tab.drInfo.first7 < 130 ? '#ffd700' : '#4ecdc4';
+                    const ac = tab.drInfo.all < 100 ? '#ff6b6b' : tab.drInfo.all < 130 ? '#ffd700' : '#4ecdc4';
+                    drBadge = `<span style="font-size:0.72rem;opacity:0.9;background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:3px;margin-left:2px;">🛡<b style="color:${f7c}">${tab.drInfo.first7}</b>/<b style="color:${ac}">${tab.drInfo.all}</b></span>`;
+                }
                 return `<div onclick="switchScriptEditorTab('${tab.id}')" style="flex-shrink:0;cursor:pointer;display:flex;align-items:center;gap:5px;padding:6px 10px;border-radius:6px 6px 0 0;font-size:0.8rem;white-space:nowrap;transition:all 0.15s;background:${active ? (tab.isScanned ? 'rgba(0,188,212,0.22)' : 'rgba(76,175,80,0.22)') : 'rgba(255,255,255,0.05)'};border:${active ? (tab.isScanned ? '1px solid rgba(0,188,212,0.45)' : '1px solid rgba(76,175,80,0.45)') : '1px solid rgba(255,255,255,0.08)'};border-bottom:none;color:${active ? (tab.isScanned ? '#00bcd4' : '#4caf50') : 'rgba(255,255,255,0.7)'};font-weight:${active ? 'bold' : 'normal'};">
-                    <span>${icon} ${name}${dirty}</span>
+                    <span>${icon} ${name}${dirty}</span>${drBadge}
                     <span onclick="closeScriptEditorTab('${tab.id}', event)" style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;font-size:0.75rem;transition:background 0.15s;" onmouseover="this.style.background='rgba(244,67,54,0.35)'" onmouseout="this.style.background='transparent'">×</span>
                 </div>`;
             }).join('');
@@ -11512,9 +11521,13 @@
                 if (!tab) return;
                 tab.content = this.value;
                 tab.modified = tab.content !== tab.originalContent;
+                // 实时计算减伤显示在标签上
+                tab.drInfo = computeScriptDr(tab.content);
                 renderScriptEditorTabs();
                 const status = document.getElementById('scriptEditorStatus');
-                if (status) status.textContent = `共 ${tab.content.length} 字 · 已修改`;
+                if (status) status.textContent = tab.drInfo
+                    ? `共 ${tab.content.length} 字 · 减伤 前7:${tab.drInfo.first7}% 全部:${tab.drInfo.all}%${tab.modified ? ' · 已修改' : ''}`
+                    : `共 ${tab.content.length} 字${tab.modified ? ' · 已修改' : ''}`;
             });
         })();
 
@@ -16412,6 +16425,27 @@
             detailEl.innerHTML = '📋 单卡减伤：' + details.join(' | ');
         }
         
+        // 从脚本内容中提取减伤信息（供标签栏显示用）
+        function computeScriptDr(content) {
+            if (!content || !content.trim()) return null;
+            loadDamageReductionData();
+            const lines = content.split('\n');
+            let cardNames = [];
+            for (const line of lines) {
+                const m = line.match(/上阵[：:]\s*(.+)/);
+                if (m && m[1]) {
+                    cardNames = cardNames.concat(m[1].split(/[,，、]/).map(n => n.trim()).filter(n => n));
+                }
+            }
+            const isSpirit = (n) => n.includes('精灵') || n === '幻球' || n === '冰球';
+            const battleCards = cardNames.filter(c => !isSpirit(c));
+            if (battleCards.length === 0) return null;
+            const allDr = calculateDamageReductionForCards(battleCards);
+            const first7 = battleCards.slice(0, 7);
+            const first7Dr = calculateDamageReductionForCards(first7);
+            return { first7: first7Dr, all: allDr };
+        }
+
         // 编辑器实时减伤显示
         function updateEditorDamageReduction(windowId) {
             const textarea = document.getElementById(`${windowId}_content`);
