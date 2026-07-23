@@ -305,16 +305,18 @@ if (isTauriApp) {
     // ==================== 文件扫描 ====================
 
     // 递归扫描目录（最大深度3层），收集所有 txt/json 文件
-    async function collectFilesRecursive(dirPath, dirKey, dirLabel, maxDepth) {
+    async function collectFilesRecursive(dirPath, dirKey, dirLabel, maxDepth, allowedExts) {
         if (maxDepth === undefined) maxDepth = 3;
+        if (allowedExts === undefined) allowedExts = ['txt', 'json'];
         const files = [];
         if (maxDepth <= 0) return files;
         try {
             const entries = await readDir(dirPath);
             for (const entry of entries) {
                 if (entry.is_file) {
-                    const ext = entry.name.split('.').pop().toLowerCase();
-                    if (ext === 'txt' || ext === 'json') {
+                    const parts = entry.name.split('.');
+                    const ext = parts.length > 1 ? parts.pop().toLowerCase() : '';
+                    if (allowedExts.includes(ext)) {
                         files.push({
                             name: entry.name,
                             path: entry.path,
@@ -328,7 +330,7 @@ if (isTauriApp) {
                     }
                 } else {
                     // 递归扫描子文件夹
-                    const subFiles = await collectFilesRecursive(entry.path, dirKey, dirLabel, maxDepth - 1);
+                    const subFiles = await collectFilesRecursive(entry.path, dirKey, dirLabel, maxDepth - 1, allowedExts);
                     files.push(...subFiles);
                 }
             }
@@ -1236,17 +1238,29 @@ if (isTauriApp) {
             return;
         }
 
-        statsEl.innerHTML = '<div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;font-size:0.85rem;">⏳ 正在扫描日志文件并统计…</div>';
+        const dirPathSafe = maDirs.logs.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        console.log('[日志统计] 开始扫描目录:', maDirs.logs);
+        statsEl.innerHTML = '<div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;font-size:0.85rem;">⏳ 正在扫描日志文件并统计…（目录: ' + dirPathSafe + '）</div>';
 
         try {
-            // 1. 递归扫描日志目录下的所有 txt 文件
-            const allFiles = await collectFilesRecursive(maDirs.logs, 'logs', '日志', 3);
+            // 1. 递归扫描日志目录下所有可能的文本文件（txt/json/log/无后缀）
+            const allowedExts = ['txt', 'json', 'log', ''];
 
-            // 2. 过滤出 txt 文件
-            const txtFiles = allFiles.filter(f => f.ext === 'txt');
+            let allFiles;
+            try {
+                allFiles = await collectFilesRecursive(maDirs.logs, 'logs', '日志', 3, allowedExts);
+            } catch (scanErr) {
+                console.error('[日志统计] 目录扫描异常:', scanErr);
+                statsEl.innerHTML = '<div style="color:#f44336;text-align:center;padding:20px;font-size:0.85rem;">目录扫描失败<br><span style="font-size:0.7rem;">目录: ' + dirPathSafe + '</span><br><span style="font-size:0.7rem;">错误: ' + (scanErr.message || scanErr) + '</span><br><span style="font-size:0.7rem;color:#ff9800;">提示：请检查目录是否存在且可访问</span></div>';
+                return;
+            }
+            console.log('[日志统计] 扫描到文件数:', allFiles.length, allFiles.map(f => f.name).slice(0, 10));
+
+            // 2. 不过滤扩展名，尝试读取所有文件（Rust read_text_file 对非文本文件会返回乱码或报错，跳过即可）
+            const txtFiles = allFiles;
 
             if (txtFiles.length === 0) {
-                statsEl.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">日志目录下未找到 .txt 文件</div>';
+                statsEl.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">日志目录下未找到任何可读文件<br><span style="font-size:0.7rem;">目录: ' + dirPathSafe + '</span><br><span style="font-size:0.7rem;color:#ff9800;">提示：请确认目录下有 .txt / .log / .json 文件</span></div>';
                 return;
             }
 
@@ -1280,6 +1294,9 @@ if (isTauriApp) {
             );
 
             // 4. 按日期汇总
+            const validResults = readResults.filter(r => r !== null);
+            console.log('[日志统计] 成功读取/关键词匹配:', validResults.length, '/ 总文件:', txtFiles.length);
+
             readResults.forEach(r => {
                 if (!r) return;
                 if (!dailyMap[r.date]) {
@@ -1293,7 +1310,7 @@ if (isTauriApp) {
             const sortedDates = Object.keys(dailyMap).sort((a, b) => b.localeCompare(a));
 
             if (sortedDates.length === 0) {
-                statsEl.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">日志文件中未找到「对战胜利确定」或「对战失败确定」关键词</div>';
+                statsEl.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">日志文件中未找到「对战胜利确定」或「对战失败确定」关键词<br><span style="font-size:0.7rem;">共扫描 ' + txtFiles.length + ' 个文件，目录: ' + dirPathSafe + '</span><br><span style="font-size:0.7rem;color:#ff9800;">提示：请检查日志文件内容是否包含这些关键词（需完全匹配）</span></div>';
                 return;
             }
 
