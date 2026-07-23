@@ -22554,6 +22554,8 @@ function hasGistToken() {
                 document.getElementById('adminPagePasswordManage').style.display = 'none';
                 const scriptStatsPage = document.getElementById('adminPageScriptStats');
                 if (scriptStatsPage) scriptStatsPage.style.display = 'none';
+                const logStatsAdminPage = document.getElementById('adminPageLogStats');
+                if (logStatsAdminPage) logStatsAdminPage.style.display = 'none';
                 document.getElementById('adminVerifyCode').value = '';
                 // 如果有保存密码，预填输入框方便用户
                 const saved = localStorage.getItem('TFJL_Admin_SavedPwd');
@@ -22582,6 +22584,8 @@ function hasGistToken() {
             if (scriptStatsPage) scriptStatsPage.style.display = 'none';
             const analyticsPage = document.getElementById('adminPageAnalytics');
             if (analyticsPage) analyticsPage.style.display = 'none';
+            const logStatsAdminPage2 = document.getElementById('adminPageLogStats');
+            if (logStatsAdminPage2) logStatsAdminPage2.style.display = 'none';
             updateBroadcastToggleStatus();
         }
 
@@ -22601,6 +22605,8 @@ function hasGistToken() {
             if (scriptStatsPage) scriptStatsPage.style.display = 'none';
             const analyticsPage = document.getElementById('adminPageAnalytics');
             if (analyticsPage) analyticsPage.style.display = 'none';
+            const logStatsAdminPage3 = document.getElementById('adminPageLogStats');
+            if (logStatsAdminPage3) logStatsAdminPage3.style.display = 'none';
 
             if (page === 'help') {
                 if (helpPage) helpPage.style.display = 'block';
@@ -22640,6 +22646,35 @@ function hasGistToken() {
             } else if (page === 'cacheManage') {
                 if (cachePage) {
                     cachePage.style.display = 'block';
+                }
+            } else if (page === 'logStats') {
+                const pageEl = document.getElementById('adminPageLogStats');
+                if (pageEl) {
+                    pageEl.style.display = 'block';
+                    // 显示当前配置的目录
+                    const dirEl = document.getElementById('adminLogDir');
+                    if (dirEl) {
+                        dirEl.textContent = (window.maDirs && window.maDirs.logs) ? window.maDirs.logs : '未配置';
+                    }
+                }
+            }
+        }
+
+
+        // ==================== 对战日志统计（管理员菜单） ====================
+        function adminRefreshLogStats() {
+            // 更新目录显示
+            const dirEl = document.getElementById('adminLogDir');
+            if (dirEl) {
+                dirEl.textContent = (window.maDirs && window.maDirs.logs) ? window.maDirs.logs : '未配置';
+            }
+            // 调用 app-local.js 中的统计函数，渲染到管理员页面的 div
+            if (typeof window.calcLogBattleStats === 'function') {
+                window.calcLogBattleStats('logBattleStatsAdmin');
+            } else {
+                const statsEl = document.getElementById('logBattleStatsAdmin');
+                if (statsEl) {
+                    statsEl.innerHTML = '<div style="color:#f44336;text-align:center;padding:20px;font-size:0.85rem;">app-local.js 未加载，请刷新页面</div>';
                 }
             }
         }
@@ -24409,6 +24444,12 @@ function hasGistToken() {
                             <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">清除缓存</div>
                         </div>
                     </div>
+                    <div class="admin-menu-item" onclick="adminShowPage('logStats')" style="padding:10px;">
+                        <span style="font-size:1.1rem;">🏆</span>
+                        <div style="margin-left:8px;">
+                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">对战日志</div>
+                        </div>
+                    </div>
                 </div>
                 <button class="admin-btn" onclick="logoutToLogin()" style="width:100%;margin-top:12px;background:linear-gradient(135deg,#ef4444,#dc2626);color:white;">🔙 退出登录</button>
             </div>
@@ -24630,6 +24671,28 @@ function hasGistToken() {
                     </div>
                 </div>
                 <div id="cacheManageStatus" style="margin-top:10px;"></div>
+            </div>
+
+            <div id="adminPageLogStats" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
+                    <button class="admin-btn admin-btn-secondary" onclick="adminShowMenu()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
+                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">🏆 对战日志胜负统计</h3>
+                </div>
+                <div style="background:rgba(255,152,0,0.1);border-left:3px solid #ff9800;border-radius:6px;padding:12px;margin-bottom:15px;">
+                    <div style="color:#ff9800;font-size:0.85rem;font-weight:500;">📋 说明</div>
+                    <div style="color:rgba(255,255,255,0.6);font-size:0.75rem;margin-top:5px;">
+                        统计每天「对战胜利确定」「对战失败确定」出现次数。<br>
+                        需要在本地设置中配置「对战日志目录」后才能使用。<br>
+                        支持 .txt / .log / .json / 无后缀文件。
+                    </div>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                    <span style="color:rgba(255,255,255,0.5);font-size:0.8rem;">当前目录：<span id="adminLogDir" style="color:#ff9800;">未配置</span></span>
+                    <button onclick="adminRefreshLogStats()" style="background:linear-gradient(135deg,#ff9800,#e65100);color:white;border:none;padding:8px 20px;border-radius:8px;cursor:pointer;font-size:0.9rem;">📊 开始统计</button>
+                </div>
+                <div id="logBattleStatsAdmin" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:10px;min-height:120px;">
+                    <div style="color:rgba(255,255,255,0.4);text-align:center;padding:30px;font-size:0.85rem;">点击「📊 开始统计」查询</div>
+                </div>
             </div>
 
 
