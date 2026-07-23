@@ -1,7 +1,7 @@
 {
   "version": "1.1.9",
   "notes": "v1.1.9 本地设置缓存 + 编码检测\n- APP本地设置扫描结果按日缓存，目录不变时秒开\n- 扫描文件列表增加「编码」按钮，可检测日志文件编码\n- 继续优化多编码日志读取稳定性",
-  "pub_date": "2026-07-23T18:00:00Z",
+  "pub_date": "2026-07-23T18:30:00Z",
   "platforms": {
     "windows-x86_64": {
       "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRdWJvQ0JvYjZTSEdtV3VjaVVwUEU5bmo0TmpQakZtY1p0Rzl2cHdyalVubmpRRTNIcUkwVmNIOXgyNkVUSlYrZjd0SnlwZHlaZU8vTTVxUGlPTW9HekFkT1pOQUNFYXc0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg0Nzk1NDEwCWZpbGU6dGZqbC1zaWduLXRlbXAuZXhlCndpamVmb1cxdjRXK3JUUThNVXJxeHdKTGlUWVJGNnZ4YTZhemZKaENFOWlYZzZNT1FhcW13cXM5QjBTZ1RYdU1TMW1YVlNUbmFvdWl5d0JnUmdNMEJnPT0=",
