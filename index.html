@@ -7073,6 +7073,8 @@
                 parserBtn.style.color = '#fff';
                 parserBtn.style.fontWeight = 'bold';
                 parserBtn.style.borderBottom = '2px solid #00bcd4';
+                // 切到解析tab时触发减伤计算
+                setTimeout(() => updateRealTimeDamageReduction(), 100);
                 filesBtn.style.background = 'transparent';
                 filesBtn.style.color = 'rgba(255,255,255,0.5)';
                 filesBtn.style.fontWeight = 'normal';
@@ -7441,6 +7443,8 @@
             document.getElementById('quickCardInput').value = '';
             document.getElementById('quickCardSuggest').style.display = 'none';
             quickSuggestList = [];
+            // 实时更新减伤显示
+            updateRealTimeDamageReduction();
             // 焦点回到输入框，方便连续输入
             document.getElementById('quickCardInput').focus();
         }
@@ -7642,6 +7646,7 @@
                 input.value = text;
                 input.focus();
                 document.getElementById('parserResult').innerHTML = '<span style="color:#4caf50;">✅ 已粘贴文本，点击解析或生成</span>';
+                updateRealTimeDamageReduction();
             }
         });
 
@@ -9251,6 +9256,21 @@
                         <option value="teammate">队友手牌</option>
                     </select>
                 </div>
+                <!-- 实时减伤计算显示 -->
+                <div id="parserDrDisplay" style="display:none;margin-bottom:10px;padding:10px 14px;border-radius:8px;background:linear-gradient(135deg,rgba(255,215,0,0.08),rgba(255,107,107,0.08));border:2px solid rgba(255,215,0,0.25);">
+                    <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;">
+                        <span style="font-size:0.85rem;color:#ffd700;">🛡️ <b>实时减伤</b></span>
+                        <span style="font-size:0.85rem;display:flex;align-items:center;gap:5px;">
+                            <span style="color:rgba(255,255,255,0.6);">前7张卡：</span>
+                            <b id="parserDrFirst7" style="color:#4ecdc4;font-size:1rem;min-width:50px;">--</b>
+                        </span>
+                        <span style="font-size:0.85rem;display:flex;align-items:center;gap:5px;">
+                            <span style="color:rgba(255,255,255,0.6);">全部卡：</span>
+                            <b id="parserDrAll" style="color:#ff6b6b;font-size:1rem;min-width:50px;">--</b>
+                        </span>
+                    </div>
+                    <div id="parserDrDetail" style="margin-top:6px;font-size:0.75rem;color:rgba(255,255,255,0.5);line-height:1.5;"></div>
+                </div>
                 <div style="margin-bottom:10px;flex:1;">
                     <label style="color:rgba(255,255,255,0.8);font-size:0.85rem;margin-bottom:5px;display:block;">输入文本（格式：上阵：英雄1,英雄2,...）：</label>
                     <!-- 快速输入卡牌 -->
@@ -9259,7 +9279,7 @@
                         <button onclick="clearQuickCardInput()" style="background:rgba(255,255,255,0.1);color:#fff;border:none;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:0.8rem;">清</button>
                     </div>
                     <div id="quickCardSuggest" style="display:none;position:relative;z-index:20;"></div>
-                    <textarea id="parserInput" placeholder="示例：上阵：水灵,死神,幻精灵,小野,龙王,风灵,木精灵,咕咕,火炮,光精灵" style="width:100%;height:6em;min-height:6em;background:rgba(0,0,0,0.3);border:1px solid rgba(255,215,0,0.2);border-radius:8px;padding:10px;color:#fff;font-size:0.9rem;resize:none;font-family:inherit;box-sizing:border-box;" ondrop="handleParserDrop(event)" ondragover="handleParserDragOver(event)" ondragleave="handleParserDragLeave(event)"></textarea>
+                    <textarea id="parserInput" placeholder="示例：上阵：水灵,死神,幻精灵,小野,龙王,风灵,木精灵,咕咕,火炮,光精灵" oninput="updateRealTimeDamageReduction()" style="width:100%;height:6em;min-height:6em;background:rgba(0,0,0,0.3);border:1px solid rgba(255,215,0,0.2);border-radius:8px;padding:10px;color:#fff;font-size:0.9rem;resize:none;font-family:inherit;box-sizing:border-box;" ondrop="handleParserDrop(event)" ondragover="handleParserDragOver(event)" ondragleave="handleParserDragLeave(event)"></textarea>
                     <div style="margin-top:6px;font-size:0.72rem;color:rgba(255,255,255,0.35);line-height:1.6;">
                         💡 <b>快速输入</b>：在上方输入框打首字母（如 sl→水灵）或关键字，选中后自动追加到下方文本<br>
                         📋 <b>格式</b>：上阵：英雄1,英雄2,... &nbsp;|&nbsp; 只上前6张卡，工程卡不算<br>
@@ -11807,6 +11827,13 @@
                 overflow: hidden;
             `;
             
+            // 编辑器实时减伤显示栏
+            const drBar = document.createElement('div');
+            drBar.id = `${windowId}_drBar`;
+            drBar.style.cssText = 'display:none;padding:8px 12px;border-radius:8px;background:linear-gradient(135deg,rgba(255,215,0,0.06),rgba(255,107,107,0.06));border:1px solid rgba(255,215,0,0.18);font-size:0.8rem;margin-bottom:8px;';
+            drBar.innerHTML = '<span style="color:#ffd700;">🛡️ <b>减伤</b></span> <span style="color:rgba(255,255,255,0.5);">前7卡：</span><b id="' + windowId + '_drFirst7" style="color:#4ecdc4;">--</b> <span style="color:rgba(255,255,255,0.5);">| 全部：</span><b id="' + windowId + '_drAll" style="color:#ff6b6b;">--</b>';
+            contentArea.appendChild(drBar);
+            
             const textarea = document.createElement('textarea');
             textarea.id = `${windowId}_content`;
             textarea.style.cssText = `
@@ -11825,6 +11852,12 @@
             `;
             textarea.value = file.content;
             textarea.spellcheck = false;
+            // 实时减伤计算
+            textarea.addEventListener('input', () => updateEditorDamageReduction(windowId));
+            // 初始计算（如果有内容）
+            if (file.content && file.content.trim()) {
+                setTimeout(() => updateEditorDamageReduction(windowId), 300);
+            }
             // Ctrl+F 打开查找替换，Esc 关闭
             textarea.addEventListener('keydown', function(e) {
                 if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
@@ -16309,6 +16342,127 @@
             return parseFloat(total.toFixed(1));
         }
         
+        // 实时更新解析区的减伤显示（前7张卡 / 全部卡）
+        function updateRealTimeDamageReduction() {
+            const input = document.getElementById('parserInput');
+            const display = document.getElementById('parserDrDisplay');
+            const first7El = document.getElementById('parserDrFirst7');
+            const allEl = document.getElementById('parserDrAll');
+            const detailEl = document.getElementById('parserDrDetail');
+            if (!input || !display || !first7El || !allEl) return;
+            
+            const text = input.value.trim();
+            if (!text) {
+                display.style.display = 'none';
+                return;
+            }
+            
+            // 确保减伤数据已加载
+            loadDamageReductionData();
+            
+            // 提取卡牌名称
+            let cardNames = [];
+            const match = text.match(/上阵[：:]\s*(.+)/);
+            if (match && match[1]) {
+                cardNames = match[1].split(/[,，、]/).map(n => n.trim()).filter(n => n);
+            } else {
+                cardNames = text.split(/[,，、\n]/).map(n => n.trim()).filter(n => n);
+            }
+            
+            if (cardNames.length === 0) {
+                display.style.display = 'none';
+                return;
+            }
+            
+            // 过滤掉精灵卡（精灵不参与减伤计算）
+            const isSpirit = (name) => name.includes('精灵') || name === '幻球' || name === '冰球';
+            const battleCards = cardNames.filter(c => !isSpirit(c));
+            
+            if (battleCards.length === 0) {
+                display.style.display = 'none';
+                return;
+            }
+            
+            // 全部卡减伤
+            const allDr = calculateDamageReductionForCards(battleCards);
+            
+            // 前7张卡减伤
+            const first7 = battleCards.slice(0, 7);
+            const first7Dr = calculateDamageReductionForCards(first7);
+            
+            // 显示结果
+            display.style.display = 'block';
+            first7El.textContent = `${first7Dr}%`;
+            allEl.textContent = `${allDr}%`;
+            
+            // 高亮低减伤的等级
+            if (first7Dr < 100) first7El.style.color = '#ff6b6b';
+            else if (first7Dr < 130) first7El.style.color = '#ffd700';
+            else first7El.style.color = '#4ecdc4';
+            
+            if (allDr < 100) allEl.style.color = '#ff6b6b';
+            else if (allDr < 130) allEl.style.color = '#ffd700';
+            else allEl.style.color = '#4ecdc4';
+            
+            // 每张卡的减伤明细
+            const details = battleCards.slice(0, 15).map(name => {
+                const dr = calculateDamageReductionForCards([name]);
+                return `${name}:<b style="color:${dr < 30 ? '#ff6b6b' : dr < 50 ? '#ffd700' : '#4ecdc4'}">${dr}%</b>`;
+            });
+            detailEl.innerHTML = '📋 单卡减伤：' + details.join(' | ');
+        }
+        
+        // 编辑器实时减伤显示
+        function updateEditorDamageReduction(windowId) {
+            const textarea = document.getElementById(`${windowId}_content`);
+            const drBar = document.getElementById(`${windowId}_drBar`);
+            const first7El = document.getElementById(`${windowId}_drFirst7`);
+            const allEl = document.getElementById(`${windowId}_drAll`);
+            if (!textarea || !drBar || !first7El || !allEl) return;
+            
+            const text = textarea.value.trim();
+            if (!text) {
+                drBar.style.display = 'none';
+                return;
+            }
+            
+            loadDamageReductionData();
+            
+            // 尝试提取上阵行
+            let cardNames = [];
+            const lines = text.split('\n');
+            for (const line of lines) {
+                const match = line.match(/上阵[：:]\s*(.+)/);
+                if (match && match[1]) {
+                    cardNames = cardNames.concat(match[1].split(/[,，、]/).map(n => n.trim()).filter(n => n));
+                }
+            }
+            
+            if (cardNames.length === 0) {
+                drBar.style.display = 'none';
+                return;
+            }
+            
+            const isSpirit = (name) => name.includes('精灵') || name === '幻球' || name === '冰球';
+            const battleCards = cardNames.filter(c => !isSpirit(c));
+            
+            if (battleCards.length === 0) {
+                drBar.style.display = 'none';
+                return;
+            }
+            
+            const allDr = calculateDamageReductionForCards(battleCards);
+            const first7 = battleCards.slice(0, 7);
+            const first7Dr = calculateDamageReductionForCards(first7);
+            
+            drBar.style.display = 'block';
+            first7El.textContent = `${first7Dr}%`;
+            allEl.textContent = `${allDr}%`;
+            
+            first7El.style.color = first7Dr < 100 ? '#ff6b6b' : first7Dr < 130 ? '#ffd700' : '#4ecdc4';
+            allEl.style.color = allDr < 100 ? '#ff6b6b' : allDr < 130 ? '#ffd700' : '#4ecdc4';
+        }
+
         // 导出减伤记录为TXT文件
         function exportDamageReductionToTxt() {
             loadDamageReductionData();
