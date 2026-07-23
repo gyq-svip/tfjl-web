@@ -1383,8 +1383,7 @@ if (isTauriApp) {
     // ==================== 日志胜负统计（缓存优化：仅扫描今日，历史数据走 localStorage） ====================
     // ===== 日志文件模式学习引擎 =====
     // 从已缓存的文件中学习：哪些目录/扩展名/命名关键词的文件才包含「对战胜利/失败确定」
-    // 同时从负面样本（被扫描但无数据的文件）学习排除目录，加快新文件过滤
-    // 以后新文件（如今天的日志）只看匹配正面特征的，大幅减少无用文件读取
+    // 学习期策略：必须积累足够多、跨越足够多天的样本后才启用过滤，避免早期样本偏差导致永久漏文件
     function learnLogPatterns(cache) {
         if (cache._patterns) return cache._patterns; // 已学习过，直接返回
         if (!cache._files) return null;
@@ -1396,7 +1395,25 @@ if (isTauriApp) {
         // 负面样本：扫描过但确认无对战数据的文件（win === -1）
         const negative = entries.filter(([, d]) => d.win === -1);
 
-        if (matched.length < 3) return null; // 样本太少，不敢下结论
+        // === 学习期门槛：≥20 个有效文件 且 覆盖 ≥5 个不同日期 ===
+        // 太少的样本偏差大（比如只扫了3天的.txt就漏掉.log），等数据够多了再启用过滤
+        const MIN_POSITIVE_FILES = 20;
+        const MIN_UNIQUE_DATES = 5;
+
+        if (matched.length < MIN_POSITIVE_FILES) {
+            console.log('[学习] 正面样本不足（' + matched.length + '/' + MIN_POSITIVE_FILES + '），暂不启用学习过滤，所有文件都扫描');
+            return null;
+        }
+
+        // 统计覆盖的不同日期数（用缓存中已提取的 date 字段）
+        const uniqueDates = new Set();
+        for (const [, d] of matched) {
+            if (d.date && d.date.length >= 8) uniqueDates.add(d.date.substring(0, 8)); // YYYYMMDD
+        }
+        if (uniqueDates.size < MIN_UNIQUE_DATES) {
+            console.log('[学习] 覆盖天数不足（' + uniqueDates.size + '/' + MIN_UNIQUE_DATES + '），暂不启用学习过滤');
+            return null;
+        }
 
         const total = matched.length;
 
@@ -1431,7 +1448,6 @@ if (isTauriApp) {
         }
 
         // === 负面学习：统计"已确认无数据"的文件所在目录 ===
-        // 如果一个目录下大量文件都被扫描但无数据，说明整个目录都不是日志目录
         const skipDirCount = {};
         const positiveDirSet = new Set(Object.keys(dirCount));
         for (const [path] of negative) {
@@ -1440,28 +1456,44 @@ if (isTauriApp) {
             parts.pop();
             if (parts.length > 0) {
                 const dir = parts.join('/');
-                // 只有不在正面目录里的才纳入排除学习
                 if (!positiveDirSet.has(dir) && ![...positiveDirSet].some(pd => dir.startsWith(pd))) {
                     skipDirCount[dir] = (skipDirCount[dir] || 0) + 1;
                 }
             }
         }
 
-        // 只保留高频特征（出现比例 ≥ 阈值）
+        // === 特征筛选：绝对数量 OR 比例 双门槛，防止小众但真实有用的特征被漏掉 ===
+        // 扩展名：出现 ≥5 次 或 比例 ≥20%
+        const HIGH_PATTERN_ABS_MIN = 5;
+        const exts = Object.entries(extCount)
+            .filter(([, c]) => c >= HIGH_PATTERN_ABS_MIN || c / total >= 0.2)
+            .map(([e]) => e);
+        // 目录：出现 ≥5 次 或 比例 ≥20%
+        const dirs = Object.entries(dirCount)
+            .filter(([, c]) => c >= HIGH_PATTERN_ABS_MIN || c / total >= 0.2)
+            .map(([d]) => d);
+        // token：出现 ≥5 次 或 比例 ≥20%
+        const tokens = Object.entries(tokenCount)
+            .filter(([, c]) => c >= HIGH_PATTERN_ABS_MIN || c / total >= 0.2)
+            .map(([t]) => t);
+        // skipDirs：≥3个文件确认无数据（不参与过滤决策，仅统计展示）
+        const skipDirs = Object.entries(skipDirCount)
+            .filter(([, c]) => c >= 3)
+            .map(([d]) => d);
+
         const patterns = {
-            exts: Object.entries(extCount).filter(([, c]) => c / total >= 0.5).map(([e]) => e),
-            dirs: Object.entries(dirCount).filter(([, c]) => c / total >= 0.3).map(([d]) => d),
-            tokens: Object.entries(tokenCount).filter(([, c]) => c / total >= 0.3).map(([t]) => t),
-            // 负面排除目录：该目录下≥3个文件确认无数据 → 直接跳过
-            skipDirs: Object.entries(skipDirCount).filter(([, c]) => c >= 3).map(([d]) => d),
+            exts,
+            dirs,
+            tokens,
+            skipDirs,
             _sampleCount: total,
+            _uniqueDates: uniqueDates.size,
             _negativeCount: negative.length,
             _totalCached: entries.length,
             _learnedAt: Date.now()
         };
 
-        // 清理膨胀的 _files：删除 win=-1 的旧条目（>60天），它们已被模式覆盖
-        // 避免 localStorage 越来越大（每个扫描过的无用文件都占一条缓存）
+        // 清理膨胀的 _files：删除 win=-1 的旧条目（>60天）
         const now = Date.now();
         const cutoff = 60 * 24 * 3600 * 1000; // 60天
         let pruned = 0;
@@ -1473,7 +1505,8 @@ if (isTauriApp) {
         }
         if (pruned > 0) console.log('[学习] 清理了 ' + pruned + ' 条旧的负面缓存（>60天），当前缓存 ' + Object.keys(cache._files).length + ' 条');
 
-        return (patterns.exts.length > 0 || patterns.dirs.length > 0) ? patterns : null;
+        console.log('[学习] 学习完成：' + total + ' 个有效文件（' + uniqueDates.size + ' 天）→ 扩展名 ' + exts.join(',') + ' · ' + dirs.length + ' 目录 · ' + tokens.length + ' 关键词 · 排除 ' + skipDirs.length + ' 目录');
+        return (exts.length > 0 || dirs.length > 0) ? patterns : null;
     }
 
     // 用学习到的模式判断新文件是否像对战日志
@@ -1561,6 +1594,7 @@ if (isTauriApp) {
             const entry = { date: getTodayStr(), dailyMap, savedAt: Date.now() };
             if (patterns) entry._stats = {
                 positiveCount: patterns._sampleCount || 0,
+                uniqueDates: patterns._uniqueDates || 0,
                 negativeCount: patterns._negativeCount || 0,
                 totalCached: patterns._totalCached || 0,
                 skipDirs: patterns.skipDirs ? patterns.skipDirs.length : 0,
@@ -1666,7 +1700,7 @@ if (isTauriApp) {
             // 缓存命中时也从 resultCache._stats 显示学习信息
             if (opts._stats) {
                 const s = opts._stats;
-                html += ' · 🧠 已学习 ' + s.positiveCount + ' 个有效文件';
+                html += ' · 🧠 已学习 ' + s.positiveCount + ' 个有效文件（' + (s.uniqueDates || '?') + ' 天）';
                 if (s.negativeCount > 0) html += ' + ' + s.negativeCount + ' 个确认无用';
                 if (s.skipDirs > 0) html += ' · 🚫 排除 ' + s.skipDirs + ' 个目录';
                 html += ' · 缓存共 ' + s.totalCached + ' 条';
@@ -1690,9 +1724,13 @@ if (isTauriApp) {
                 if (p.tokens.length > 0) parts.push(p.tokens.length + ' 个关键词');
                 if (p.skipDirs && p.skipDirs.length > 0) parts.push('🚫排除' + p.skipDirs.length + '个目录');
                 html += '<br>🧠 学习总结：' + parts.join(' · ') + '（基于 ' + p._sampleCount + ' 个有效文件';
+                if (p._uniqueDates) html += '，' + p._uniqueDates + ' 天数据';
                 if (p._negativeCount > 0) html += ' + ' + p._negativeCount + ' 个确认无用';
                 if (p._totalCached) html += '，缓存共 ' + p._totalCached + ' 条';
                 html += '）';
+            } else if (!opts.usingLearned && opts.learnedPatterns === null) {
+                // 学习期：样本不足还不敢过滤
+                html += '<br>🔬 学习期：样本不足，全部文件扫描中（需 ≥20 文件 + 5 天数据才启用智能过滤）';
             }
         }
         html += '</div>';
