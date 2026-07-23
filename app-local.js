@@ -64,8 +64,15 @@ if (isTauriApp) {
     }
 
     async function readTextFile(filePath) {
-        const result = await tauriInvoke('read_text_file', { filePath });
-        return result;
+        // 直接调用 invoke，避免 tauriInvoke 的 debug alert 弹窗打扰
+        let invokeFn = window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke;
+        if (!invokeFn) return null;
+        try {
+            return await invokeFn('read_text_file', { filePath });
+        } catch (e) {
+            console.error('[APP] read_text_file 失败:', filePath, e);
+            return null;
+        }
     }
 
     async function writeTextFile(filePath, content) {
@@ -1232,6 +1239,19 @@ if (isTauriApp) {
     }
 
     // ==================== 日志胜负统计（缓存优化：仅扫描今日，历史数据走 localStorage） ====================
+    // 判断文件名是否像对战日志文件（含日期格式或对战/日志关键词）
+    function isLikelyLogFile(filename) {
+        const lower = filename.toLowerCase();
+        // 包含日期格式（YYYY-MM-DD / YYYYMMDD / MM-DD）
+        if (/\d{4}-\d{2}-\d{2}/.test(filename)) return true;
+        if (/\d{8}/.test(filename)) return true;
+        if (/\d{2}-\d{2}/.test(filename)) return true;
+        // 包含对战/日志关键词
+        if (/对战|战斗|battle|战报|胜负|胜利|失败/.test(lower)) return true;
+        if (/log|日志/.test(lower)) return true;
+        return false;
+    }
+
     function getTodayStr() {
         const d = new Date();
         return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
@@ -1301,10 +1321,24 @@ if (isTauriApp) {
             }
             cache._files = cache._files || {};
 
+            // 2.5 文件名预过滤：跳过明显不是对战日志的文件（大幅减少要读取的无关文件）
+            const logFiles = allFiles.filter(f => isLikelyLogFile(f.name));
+            const skippedFiles = allFiles.length - logFiles.length;
+            if (skippedFiles > 0) {
+                dlog('跳过 ' + skippedFiles + ' 个非日志文件（文件名不含日期或对战关键词），剩余 ' + logFiles.length + ' 个');
+            }
+
+            if (logFiles.length === 0) {
+                dlog('【失败】目录下 ' + allFiles.length + ' 个文件全部不像对战日志（文件名不含日期或对战关键词）');
+                window._lastLogDebugLines = debugLines;
+                statsEl.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">目录下 ' + allFiles.length + ' 个文件都不像是对战日志<br><span style="font-size:0.7rem;color:#ff9800;">对战日志文件名通常含日期（如2026-07-23）或"对战""battle"等关键词<br>如需扫描全部文件请先「清除缓存」后重试</span></div>';
+                return;
+            }
+
             // 3. 分离今日/历史文件（按文件名日期或 modified 判断）
             const todayStr = getTodayStr();
             const todayFiles = [], histFiles = [];
-            for (const f of allFiles) {
+            for (const f of logFiles) {
                 const fileDate = extractDateFromFilename(f.name);
                 if (fileDate === todayStr || (f.modified && f.modified.startsWith(todayStr))) {
                     todayFiles.push(f);
@@ -1321,6 +1355,11 @@ if (isTauriApp) {
             for (const f of histFiles) {
                 const cached = cache._files[f.path];
                 if (cached && cached.mtime === f.modified && typeof cached.win === 'number') {
+                    if (cached.win === -1) {
+                        // 之前已确认无对战关键词，直接跳过
+                        cacheHits++;
+                        continue;
+                    }
                     cacheHits++;
                     if (!dailyMap[cached.date]) dailyMap[cached.date] = { win: 0, lose: 0 };
                     dailyMap[cached.date].win += cached.win;
@@ -1330,21 +1369,24 @@ if (isTauriApp) {
                 }
             }
 
-            dlog('今日: ' + todayFiles.length + ' | 历史: ' + histFiles.length + ' | 缓存命中: ' + cacheHits + ' | 需读取: ' + toReadFiles.length);
+            dlog('总文件: ' + allFiles.length + ' | 日志文件: ' + logFiles.length + ' | 今日: ' + todayFiles.length + ' | 历史: ' + histFiles.length + ' | 缓存命中: ' + cacheHits + ' | 需读取: ' + toReadFiles.length);
 
             // 5. 只读取需要读的文件（今日 + 缓存未命中）
             let readOk = 0, readErr = 0, noKeyword = 0;
+            let hasEncodingError = false;
             const readErrs = [];
 
             if (toReadFiles.length > 0) {
+                // calcLogBattleStats 里直接用 invoke，以便捕获 GBK/ANSI 编码错误并统计
+                const invokeFn = window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke;
                 const readResults = await Promise.all(
                     toReadFiles.map(async (f) => {
                         try {
-                            const content = await readTextFile(f.path);
-                            if (!content) { readOk++; noKeyword++; return null; }
+                            const content = await invokeFn('read_text_file', { filePath: f.path });
+                            if (!content) { readOk++; noKeyword++; return { date: '', win: -1, lose: 0, path: f.path, mtime: f.modified }; }
                             const winCount = (content.match(/对战胜利确定/g) || []).length;
                             const loseCount = (content.match(/对战失败确定/g) || []).length;
-                            if (winCount === 0 && loseCount === 0) { readOk++; noKeyword++; return null; }
+                            if (winCount === 0 && loseCount === 0) { readOk++; noKeyword++; return { date: '', win: -1, lose: 0, path: f.path, mtime: f.modified }; }
                             readOk++;
                             let date = extractDateFromFilename(f.name);
                             if (!date && f.modified) date = f.modified;
@@ -1352,7 +1394,12 @@ if (isTauriApp) {
                             return { date, win: winCount, lose: loseCount, path: f.path, mtime: f.modified };
                         } catch (e) {
                             readErr++;
-                            if (readErrs.length < 5) readErrs.push(f.name + ': ' + e.message);
+                            const msg = e.message || e;
+                            if (readErrs.length < 5) readErrs.push(f.name + ': ' + msg);
+                            // 编码错误标记
+                            if (typeof msg === 'string' && (msg.includes('UTF-8') || msg.includes('valid utf-8') || msg.includes('stream did not contain'))) {
+                                hasEncodingError = true;
+                            }
                             return null;
                         }
                     })
@@ -1361,10 +1408,15 @@ if (isTauriApp) {
                 dlog('读取完毕 — 成功: ' + readOk + ' | 无关键词: ' + noKeyword + ' | 读取出错: ' + readErr);
                 if (readErrs.length > 0) dlog('读取错误示例: ' + readErrs.join('; '));
 
-                // 汇总新鲜结果 + 写入缓存
+                // 汇总新鲜结果 + 写入缓存（包括无关键词的文件，标记 win=-1）
                 for (let i = 0; i < toReadFiles.length; i++) {
                     const r = readResults[i];
                     if (!r) continue;
+                    if (r.win === -1) {
+                        // 已确认无关键词：缓存标记，不加入统计
+                        cache._files[r.path] = { mtime: r.mtime, date: '', win: -1, lose: 0 };
+                        continue;
+                    }
                     if (!dailyMap[r.date]) dailyMap[r.date] = { win: 0, lose: 0 };
                     dailyMap[r.date].win += r.win;
                     dailyMap[r.date].lose += r.lose;
@@ -1380,7 +1432,10 @@ if (isTauriApp) {
 
             if (sortedDates.length === 0) {
                 window._lastLogDebugLines = debugLines;
-                const errHtml = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">日志文件中未找到「对战胜利确定」或「对战失败确定」关键词<br><span style="font-size:0.7rem;">共 ' + allFiles.length + ' 个文件（今日 ' + todayFiles.length + '，历史 ' + histFiles.length + '）</span><br><span style="font-size:0.7rem;color:#ff9800;">提示：内容可能是 GBK 编码 → 需重编译 Rust 后端</span></div>';
+                const encodingHint = hasEncodingError
+                    ? '<span style="font-size:0.7rem;color:#f44336;">检测到 ' + readErr + ' 个文件因非 UTF-8 编码读取失败，请重新 cargo tauri build 以启用 GB18030 兼容解码</span>'
+                    : '<span style="font-size:0.7rem;color:#ff9800;">提示：内容可能是 GBK 编码 → 需重编译 Rust 后端</span>';
+                const errHtml = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">日志文件中未找到「对战胜利确定」或「对战失败确定」关键词<br><span style="font-size:0.7rem;">共 ' + allFiles.length + ' 个文件，过滤后 ' + logFiles.length + ' 个（今日 ' + todayFiles.length + '，历史 ' + histFiles.length + '），跳过 ' + skippedFiles + ' 个非日志，读取出错 ' + readErr + ' 个</span><br>' + encodingHint + '</div>';
                 statsEl.innerHTML = errHtml;
                 return;
             }
@@ -1448,11 +1503,14 @@ if (isTauriApp) {
             html += '<svg width="' + chartW + '" height="' + chartH + '" style="display:block;">' + gridHtml + barsHtml + '</svg>';
 
             // 缓存状态提示
-            html += '<div style="font-size:0.65rem;color:rgba(255,255,255,0.25);margin-top:6px;text-align:right;">📦 缓存 ' + cacheHits + ' 天历史 · 今日扫描 ' + todayFiles.length + ' 文件';
+            html += '<div style="font-size:0.65rem;color:rgba(255,255,255,0.25);margin-top:6px;text-align:right;">📦 缓存 ' + cacheHits + ' 天历史 · 今日扫描 ' + todayFiles.length + ' 文件 · 已跳过 ' + skippedFiles + ' 非日志';
             if (toReadFiles.length > todayFiles.length) {
                 html += ' · ' + (toReadFiles.length - todayFiles.length) + ' 个历史文件已变化重新读取';
             }
             html += '</div>';
+            if (hasEncodingError) {
+                html += '<div style="font-size:0.65rem;color:#f44336;margin-top:2px;text-align:right;">⚠️ ' + readErr + ' 个文件因 UTF-8 解码失败，请 cargo tauri build 重编译 APP</div>';
+            }
 
             window._lastLogDebugLines = debugLines;
             statsEl.innerHTML = html;
