@@ -11418,6 +11418,7 @@
             }
 
             const tabId = 'tab_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+            const scannedDrInfo = computeScriptDr(content);
             scriptEditorTabs.push({
                 id: tabId,
                 fileIndex: -1,
@@ -11426,7 +11427,8 @@
                 content: content,
                 originalContent: content,
                 modified: false,
-                isScanned: true
+                isScanned: true,
+                drInfo: scannedDrInfo
             });
 
             document.getElementById('scriptEditorTabs').style.display = 'flex';
@@ -11472,17 +11474,16 @@
             bar.innerHTML = scriptEditorTabs.map(tab => {
                 const active = tab.id === activeScriptEditorTabId;
                 const dirty = tab.modified ? ' *' : '';
-                const name = tab.name.length > 18 ? tab.name.slice(0, 16) + '…' : tab.name;
                 const icon = tab.isScanned ? '📂' : '📄';
-                // 减伤标签徽章
+                // 减伤标签徽章（带文字说明）
                 let drBadge = '';
                 if (tab.drInfo) {
                     const f7c = tab.drInfo.first7 < 100 ? '#ff6b6b' : tab.drInfo.first7 < 130 ? '#ffd700' : '#4ecdc4';
                     const ac = tab.drInfo.all < 100 ? '#ff6b6b' : tab.drInfo.all < 130 ? '#ffd700' : '#4ecdc4';
-                    drBadge = `<span style="font-size:0.72rem;opacity:0.9;background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:3px;margin-left:2px;">🛡<b style="color:${f7c}">${tab.drInfo.first7}</b>/<b style="color:${ac}">${tab.drInfo.all}</b></span>`;
+                    drBadge = `<span style="font-size:0.72rem;opacity:0.92;padding:1px 4px;border-radius:3px;margin-left:1px;white-space:nowrap;flex-shrink:0;">🛡前7:<b style="color:${f7c}">${tab.drInfo.first7}%</b> 全:<b style="color:${ac}">${tab.drInfo.all}%</b></span>`;
                 }
-                return `<div onclick="switchScriptEditorTab('${tab.id}')" style="flex-shrink:0;cursor:pointer;display:flex;align-items:center;gap:5px;padding:6px 10px;border-radius:6px 6px 0 0;font-size:0.8rem;white-space:nowrap;transition:all 0.15s;background:${active ? (tab.isScanned ? 'rgba(0,188,212,0.22)' : 'rgba(76,175,80,0.22)') : 'rgba(255,255,255,0.05)'};border:${active ? (tab.isScanned ? '1px solid rgba(0,188,212,0.45)' : '1px solid rgba(76,175,80,0.45)') : '1px solid rgba(255,255,255,0.08)'};border-bottom:none;color:${active ? (tab.isScanned ? '#00bcd4' : '#4caf50') : 'rgba(255,255,255,0.7)'};font-weight:${active ? 'bold' : 'normal'};">
-                    <span>${icon} ${name}${dirty}</span>${drBadge}
+                return `<div onclick="switchScriptEditorTab('${tab.id}')" style="flex-shrink:0;cursor:pointer;display:flex;align-items:center;gap:5px;padding:6px 8px;border-radius:6px 6px 0 0;font-size:0.8rem;white-space:nowrap;transition:all 0.15s;background:${active ? (tab.isScanned ? 'rgba(0,188,212,0.22)' : 'rgba(76,175,80,0.22)') : 'rgba(255,255,255,0.05)'};border:${active ? (tab.isScanned ? '1px solid rgba(0,188,212,0.45)' : '1px solid rgba(76,175,80,0.45)') : '1px solid rgba(255,255,255,0.08)'};border-bottom:none;color:${active ? (tab.isScanned ? '#00bcd4' : '#4caf50') : 'rgba(255,255,255,0.7)'};font-weight:${active ? 'bold' : 'normal'};">
+                    <span style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(tab.name)}">${icon} ${escapeHtml(tab.name)}${dirty}</span>${drBadge}
                     <span onclick="closeScriptEditorTab('${tab.id}', event)" style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;font-size:0.75rem;transition:background 0.15s;" onmouseover="this.style.background='rgba(244,67,54,0.35)'" onmouseout="this.style.background='transparent'">×</span>
                 </div>`;
             }).join('');
@@ -11526,7 +11527,7 @@
                 renderScriptEditorTabs();
                 const status = document.getElementById('scriptEditorStatus');
                 if (status) status.textContent = tab.drInfo
-                    ? `共 ${tab.content.length} 字 · 减伤 前7:${tab.drInfo.first7}% 全部:${tab.drInfo.all}%${tab.modified ? ' · 已修改' : ''}`
+                    ? `共 ${tab.content.length} 字 · 减伤 前7:${tab.drInfo.first7}% 全:${tab.drInfo.all}%${tab.modified ? ' · 已修改' : ''}`
                     : `共 ${tab.content.length} 字${tab.modified ? ' · 已修改' : ''}`;
             });
         })();
@@ -16469,7 +16470,7 @@
             if (!drInfo) return '';
             const f7c = drInfo.first7 < 100 ? '#ff6b6b' : drInfo.first7 < 130 ? '#ffd700' : '#4ecdc4';
             const ac = drInfo.all < 100 ? '#ff6b6b' : drInfo.all < 130 ? '#ffd700' : '#4ecdc4';
-            return `🛡<b style="color:${f7c}">${drInfo.first7}</b>/<b style="color:${ac}">${drInfo.all}</b>`;
+            return `🛡前7:<b style="color:${f7c}">${drInfo.first7}%</b> 全:<b style="color:${ac}">${drInfo.all}%</b>`;
         }
 
         // 更新浮窗标题栏减伤徽章
