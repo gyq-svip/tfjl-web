@@ -561,7 +561,7 @@ if (isTauriApp) {
                             dirKey,
                             dirLabel,
                             ext,
-                            category: classifyFile(entry.name),
+                            category: classifyFile(entry.name, dirKey),
                             modified: entry.modified || ''
                         });
                     }
@@ -577,35 +577,22 @@ if (isTauriApp) {
         return files;
     }
 
-    // 计算脚本模糊分类统计
+    // 计算脚本模糊分类统计（直接复用每个文件的 category 字段）
     function calcFuzzyStats(files) {
-        const keywords = ['寒冰', '暗月', '漩涡', '合作', '深海', '活动'];
         const stats = {};
-        keywords.forEach(k => { stats[k] = 0; });
-        stats['其他'] = 0;
-
         for (const f of files) {
-            let matched = false;
-            for (const kw of keywords) {
-                if (f.name.includes(kw)) {
-                    stats[kw]++;
-                    matched = true;
-                    break;
-                }
-            }
-            if (!matched) {
-                stats['其他']++;
-            }
+            const cat = f.category || '其他';
+            stats[cat] = (stats[cat] || 0) + 1;
         }
-        // 如果"其他"为0则不显示
-        if (stats['其他'] === 0) delete stats['其他'];
-        // 移除计数为0的关键词
-        keywords.forEach(k => { if (stats[k] === 0) delete stats[k]; });
+        // 移除计数为0的分类
+        Object.keys(stats).forEach(k => { if (stats[k] === 0) delete stats[k]; });
         return stats;
     }
 
     // 单文件分类（用于给扫描文件打 category 标签）
-    function classifyFile(fileName) {
+    function classifyFile(fileName, dirKey) {
+        // 日志目录下的文件统一归为"日志"类
+        if (dirKey === 'logs') return '日志';
         const nameLower = fileName.toLowerCase();
         if (nameLower.includes('寒冰')) return '寒冰';
         if (nameLower.includes('暗月')) return '暗月';
@@ -704,7 +691,8 @@ if (isTauriApp) {
                 const total = entries.reduce((sum, [, c]) => sum + c, 0);
                 const colorMap = {
                     '寒冰': '#64b5f6', '暗月': '#ce93d8', '漩涡': '#4fc3f7',
-                    '合作': '#ffd54f', '深海': '#4db6ac', '活动': '#ff8a65', '其他': '#bdbdbd'
+                    '合作': '#ffd54f', '深海': '#4db6ac', '活动': '#ff8a65',
+                    '日志': '#ef5350', '其他': '#bdbdbd'
                 };
                 let statsHtml = '<div style="color:#ffd700;font-size:0.75rem;margin-bottom:6px;">🏷️ 脚本分类模糊统计（共<span style="color:#fff;font-weight:bold;">' + total + '</span>个）：</div>';
                 statsHtml += '<div style="display:flex;flex-wrap:wrap;gap:8px;">';
