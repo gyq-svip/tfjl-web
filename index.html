@@ -16774,6 +16774,9 @@
             const first7Dr = calculateDamageReductionForCards(first7);
             return { first7: first7Dr, all: allDr };
         }
+        window.computeScriptDr = computeScriptDr;
+        window.calculateDamageReductionForCards = calculateDamageReductionForCards;
+        window.loadDamageReductionData = loadDamageReductionData;
 
         // 构建窗口标题栏减伤徽章 HTML
         function buildWindowDrBadge(drInfo) {
