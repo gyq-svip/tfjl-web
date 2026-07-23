@@ -1239,14 +1239,97 @@ if (isTauriApp) {
     }
 
     // ==================== 日志胜负统计（缓存优化：仅扫描今日，历史数据走 localStorage） ====================
-    // 判断文件名是否像对战日志文件（含日期格式或对战/日志关键词）
-    function isLikelyLogFile(filename) {
+    // ===== 日志文件模式学习引擎 =====
+    // 从已缓存的文件中学习：哪些目录/扩展名/命名关键词的文件才包含「对战胜利/失败确定」
+    // 以后新文件（如今天的日志）只看匹配这些特征的，大幅减少无用文件读取
+    function learnLogPatterns(cache) {
+        if (cache._patterns) return cache._patterns; // 已学习过，直接返回
+        if (!cache._files) return null;
+
+        const entries = Object.entries(cache._files);
+        const matched = entries.filter(([, d]) => typeof d.win === 'number' && d.win > 0);
+        if (matched.length < 3) return null; // 样本太少，不敢下结论
+
+        const total = matched.length;
+
+        // 统计扩展名分布
+        const extCount = {};
+        // 统计目录（上级路径前缀）分布
+        const dirCount = {};
+        // 统计文件名中出现的非数字 token（中/英文关键词）
+        const tokenCount = {};
+
+        for (const [path] of matched) {
+            const norm = path.replace(/\\/g, '/');
+            const filename = norm.split('/').pop() || '';
+
+            // 扩展名
+            const ext = (filename.match(/\.(\w+)$/)?.[1] || '').toLowerCase();
+            extCount[ext] = (extCount[ext] || 0) + 1;
+
+            // 目录：保留完整父目录路径
+            const parts = norm.split('/');
+            parts.pop(); // 去掉文件名
+            if (parts.length > 0) {
+                const dir = parts.join('/');
+                dirCount[dir] = (dirCount[dir] || 0) + 1;
+            }
+
+            // 文件名 token：按非字母数字/中文分割，保留 ≥2 字符的片段
+            const baseName = filename.replace(/\.[^.]+$/, '');
+            const tokens = baseName.split(/[^\u4e00-\u9fff\w]+/).filter(t => t.length >= 2);
+            for (const t of tokens) {
+                const lower = t.toLowerCase();
+                tokenCount[lower] = (tokenCount[lower] || 0) + 1;
+            }
+        }
+
+        // 只保留高频特征（出现比例 ≥ 阈值）
+        const patterns = {
+            exts: Object.entries(extCount).filter(([, c]) => c / total >= 0.5).map(([e]) => e),
+            dirs: Object.entries(dirCount).filter(([, c]) => c / total >= 0.3).map(([d]) => d),
+            tokens: Object.entries(tokenCount).filter(([, c]) => c / total >= 0.3).map(([t]) => t),
+            _sampleCount: total,
+            _learnedAt: Date.now()
+        };
+
+        return (patterns.exts.length > 0 || patterns.dirs.length > 0) ? patterns : null;
+    }
+
+    // 用学习到的模式判断新文件是否像对战日志
+    function matchesLogPattern(filePath, patterns) {
+        if (!patterns) return null; // null = 未学习，无法判断
+
+        const norm = filePath.replace(/\\/g, '/');
+        const filename = norm.split('/').pop() || '';
+        const ext = (filename.match(/\.(\w+)$/)?.[1] || '').toLowerCase();
+        const dir = norm.split('/').slice(0, -1).join('/');
+
+        // 规则1：扩展名必须在命中文件的高频扩展名中
+        if (patterns.exts.length > 0 && !patterns.exts.includes(ext)) return false;
+
+        // 规则2：目录必须是命中文件所在目录或其子目录
+        if (patterns.dirs.length > 0) {
+            const dirOk = patterns.dirs.some(d => dir.startsWith(d) || d.startsWith(dir));
+            if (!dirOk) return false;
+        }
+
+        // 规则3：文件名至少包含一个命中文件的高频 token
+        if (patterns.tokens.length > 0) {
+            const baseName = filename.replace(/\.[^.]+$/, '');
+            const nameTokens = baseName.split(/[^\u4e00-\u9fff\w]+/).filter(t => t.length >= 2).map(t => t.toLowerCase());
+            if (nameTokens.length > 0 && !nameTokens.some(t => patterns.tokens.includes(t))) return false;
+        }
+
+        return true;
+    }
+
+    // 兜底：文件名硬编码规则（学习阶段或无样本时使用，较宽松避免漏文件）
+    function isLikelyLogFileFallback(filename) {
         const lower = filename.toLowerCase();
-        // 包含日期格式（YYYY-MM-DD / YYYYMMDD / MM-DD）
         if (/\d{4}-\d{2}-\d{2}/.test(filename)) return true;
         if (/\d{8}/.test(filename)) return true;
         if (/\d{2}-\d{2}/.test(filename)) return true;
-        // 包含对战/日志关键词
         if (/对战|战斗|battle|战报|胜负|胜利|失败/.test(lower)) return true;
         if (/log|日志/.test(lower)) return true;
         return false;
@@ -1321,17 +1404,30 @@ if (isTauriApp) {
             }
             cache._files = cache._files || {};
 
-            // 2.5 文件名预过滤：跳过明显不是对战日志的文件（大幅减少要读取的无关文件）
-            const logFiles = allFiles.filter(f => isLikelyLogFile(f.name));
+            // 2.5 智能预过滤：优先用学习到的模式，无模式则兜底硬编码规则
+            const learnedPatterns = learnLogPatterns(cache);
+            const usingLearned = !!learnedPatterns;
+            if (usingLearned) {
+                dlog('🧠 已学习日志文件模式: ' + learnedPatterns.exts.length + ' 扩展名, ' + learnedPatterns.dirs.length + ' 目录, ' + learnedPatterns.tokens.length + ' 关键词（基于 ' + learnedPatterns._sampleCount + ' 个命中文件）');
+            }
+
+            const logFiles = allFiles.filter(f => {
+                // 已缓存的文件直接通过（不管结果怎样,缓存已经记录了）
+                if (cache._files[f.path] !== undefined) return true;
+                // 新文件：优先用学习模式，无模式则兜底硬编码
+                if (usingLearned) return matchesLogPattern(f.path, learnedPatterns);
+                return isLikelyLogFileFallback(f.name);
+            });
             const skippedFiles = allFiles.length - logFiles.length;
             if (skippedFiles > 0) {
-                dlog('跳过 ' + skippedFiles + ' 个非日志文件（文件名不含日期或对战关键词），剩余 ' + logFiles.length + ' 个');
+                const reason = usingLearned ? '（学习模式：不匹配已命中文件的目录/扩展名/关键词特征）' : '（文件名不含日期或对战关键词）';
+                dlog('跳过 ' + skippedFiles + ' 个非日志文件' + reason + '，剩余 ' + logFiles.length + ' 个');
             }
 
             if (logFiles.length === 0) {
-                dlog('【失败】目录下 ' + allFiles.length + ' 个文件全部不像对战日志（文件名不含日期或对战关键词）');
+                dlog('【失败】目录下 ' + allFiles.length + ' 个文件全部不像对战日志');
                 window._lastLogDebugLines = debugLines;
-                statsEl.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">目录下 ' + allFiles.length + ' 个文件都不像是对战日志<br><span style="font-size:0.7rem;color:#ff9800;">对战日志文件名通常含日期（如2026-07-23）或"对战""battle"等关键词<br>如需扫描全部文件请先「清除缓存」后重试</span></div>';
+                statsEl.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">目录下 ' + allFiles.length + ' 个文件都不像是对战日志<br><span style="font-size:0.7rem;color:#ff9800;">如需扫描全部文件请先「清除缓存」后重试</span></div>';
                 return;
             }
 
@@ -1424,7 +1520,11 @@ if (isTauriApp) {
                 }
             }
 
-            // 保存缓存
+            // 保存缓存（附带学习到的文件模式）
+            cache._patterns = learnLogPatterns(cache);
+            if (cache._patterns) {
+                dlog('🧠 已保存学习模式: ' + cache._patterns.exts.length + ' 扩展名, ' + cache._patterns.dirs.length + ' 目录, ' + cache._patterns.tokens.length + ' 关键词');
+            }
             try { localStorage.setItem(CACHE_KEY, JSON.stringify(cache)); } catch (e) { dlog('缓存保存失败: ' + e.message); }
 
             // 6. 渲染
@@ -1506,6 +1606,9 @@ if (isTauriApp) {
             html += '<div style="font-size:0.65rem;color:rgba(255,255,255,0.25);margin-top:6px;text-align:right;">📦 缓存 ' + cacheHits + ' 天历史 · 今日扫描 ' + todayFiles.length + ' 文件 · 已跳过 ' + skippedFiles + ' 非日志';
             if (toReadFiles.length > todayFiles.length) {
                 html += ' · ' + (toReadFiles.length - todayFiles.length) + ' 个历史文件已变化重新读取';
+            }
+            if (usingLearned) {
+                html += (learnedPatterns && learnedPatterns.exts.length > 0 ? ' · 🧠 学习模式已启用（扩展名: ' + learnedPatterns.exts.join(',') + '）' : ' · 🧠 学习模式已启用');
             }
             html += '</div>';
             if (hasEncodingError) {
