@@ -11396,23 +11396,8 @@
         }
 
         async function downloadTxtFileApp(file) {
-            const savePath = prompt('输入保存路径（含文件名）：', 'D:\\\\' + file.name);
-            if (!savePath) return;
-
-            const invokeFn = window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke;
-            if (!invokeFn) {
-                // 降级到Blob方式
-                downloadTxtFileBlob(file);
-                return;
-            }
-
-            try {
-                await invokeFn('write_text_file', { filePath: savePath, content: file.content });
-                alert('✅ 已保存到：\n' + savePath);
-            } catch (e) {
-                console.error('Tauri保存失败，降级到Blob下载:', e);
-                downloadTxtFileBlob(file);
-            }
+            // 复用 _downloadScriptTauri 的保存逻辑
+            _downloadScriptTauri(file.name, file.content);
         }
 
         // 删除TXT文件
@@ -20600,24 +20585,26 @@ function hasGistToken() {
         }
         
         async function downloadScript(url) {
+            let fileName = 'download.txt';
             try {
-                // 从URL提取文件名（先提取，后面用于统计）
-                let fileName = 'download.txt';
-                try {
-                    const urlObj = new URL(url);
-                    const pathParts = urlObj.pathname.split('/');
-                    const lastPart = pathParts[pathParts.length - 1];
-                    if (lastPart && lastPart !== 'raw' && lastPart.length > 0) {
-                        fileName = decodeURIComponent(lastPart);
-                    }
-                } catch (e) {
-                    const lastPart = url.split('/').pop();
-                    if (lastPart && lastPart !== 'raw' && lastPart.length > 0) {
-                        fileName = decodeURIComponent(lastPart);
-                    }
+                const urlObj = new URL(url);
+                const pathParts = urlObj.pathname.split('/');
+                const lastPart = pathParts[pathParts.length - 1];
+                if (lastPart && lastPart !== 'raw' && lastPart.length > 0) {
+                    fileName = decodeURIComponent(lastPart);
                 }
+            } catch (e) {
+                const lastPart = url.split('/').pop();
+                if (lastPart && lastPart !== 'raw' && lastPart.length > 0) {
+                    fileName = decodeURIComponent(lastPart);
+                }
+            }
 
-                // 记录下载（包含脚本名统计）
+            try {
+                // 加载提示
+                showToast('📥 正在下载 ' + fileName);
+
+                // 记录下载
                 await recordDownload(fileName);
 
                 // 获取文件内容
@@ -20627,10 +20614,15 @@ function hasGistToken() {
                 }
                 const content = await response.text();
 
-                // 创建Blob并下载
+                const isTauri = !!(window.__TAURI__ || window.__TAURI_INTERNALS__);
+                if (isTauri) {
+                    await _downloadScriptTauri(fileName, content);
+                    return;
+                }
+
+                // —— 网页版：原有流程 ——
                 const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
 
-                // 优先使用文件选择器API（支持选择保存目录）
                 if (window.showSaveFilePicker) {
                     try {
                         const handle = await window.showSaveFilePicker({
@@ -20643,14 +20635,14 @@ function hasGistToken() {
                         const writable = await handle.createWritable();
                         await writable.write(blob);
                         await writable.close();
+                        showToast('✅ 已保存: ' + fileName);
                         return;
                     } catch (e) {
-                        if (e.name === 'AbortError') return; // 用户取消
-                        // 其他错误，回退到传统下载
+                        if (e.name === 'AbortError') { showToast('已取消下载'); return; }
                     }
                 }
 
-                // 回退：传统下载方式
+                // 传统浏览器下载
                 const blobUrl = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = blobUrl;
@@ -20659,10 +20651,57 @@ function hasGistToken() {
                 a.click();
                 document.body.removeChild(a);
                 URL.revokeObjectURL(blobUrl);
+                showToast('✅ 已下载: ' + fileName);
             } catch (error) {
                 console.warn('下载失败，尝试直接打开:', error);
+                showToast('⚠️ 下载失败，在新窗口打开');
                 window.open(url, '_blank');
             }
+        }
+
+        // Tauri APP 原生下载：用 write_text_file 保存到老马目录
+        async function _downloadScriptTauri(fileName, content) {
+            const invokeFn = window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke;
+
+            // 构建默认保存路径：优先老马合作目录 → 软件数据目录 → 桌面
+            let defaultPath = '';
+            if (window.maDirs && window.maDirs.coop) {
+                defaultPath = window.maDirs.coop.replace(/[\\/]+$/, '') + '\\' + fileName;
+            } else if (window.maDirs && window.maDirs.activity) {
+                defaultPath = window.maDirs.activity.replace(/[\\/]+$/, '') + '\\' + fileName;
+            }
+
+            if (invokeFn && defaultPath) {
+                // 弹出路径确认框，默认填老马目录（用户直接回车即可保存）
+                const savePath = prompt('💾 保存到：\n（回车确认直接保存到老马合作目录）', defaultPath);
+                if (!savePath) { showToast('已取消下载'); return; }
+
+                try {
+                    await invokeFn('write_text_file', { filePath: savePath, content: content });
+                    showToast('✅ 已保存: ' + fileName);
+                    // 记录成功，不阻塞
+                } catch (e) {
+                    console.warn('Tauri保存失败，降级到浏览器下载:', e);
+                    _downloadScriptBlob(fileName, content);
+                }
+            } else {
+                // 降级到浏览器下载
+                _downloadScriptBlob(fileName, content);
+            }
+        }
+
+        // 浏览器传统 Blob 下载（含 Toast 反馈）
+        function _downloadScriptBlob(fileName, content) {
+            const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+            const blobUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = blobUrl;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(blobUrl);
+            showToast('✅ 已下载: ' + fileName);
         }
 
         // 显示TXT导入选项对话框
