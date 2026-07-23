@@ -2273,9 +2273,10 @@ if (isTauriApp) {
             }
         }
 
-        // === 快速路径：有历史文件缓存 → 只扫描今日新增（跳过全量递归目录遍历） ===
+        // === 快速路径：有历史文件缓存 → 只扫描今日（跳过全量递归目录遍历） ===
         // 每次新的一天首次打开，无需遍历整个日志目录树
-        if (!force) {
+        // force=true 时仍然走快速路径，但强制重读今天所有文件（不跳过 mtime 相同的）
+        {
             let fastCache = null;
             try {
                 const raw = localStorage.getItem('TFJL_LogBattleV2');
@@ -2283,7 +2284,7 @@ if (isTauriApp) {
             } catch (e) { fastCache = null; }
 
             if (fastCache && fastCache._files && Object.keys(fastCache._files).length > 0) {
-                dlog('🚀 快速路径：缓存 ' + Object.keys(fastCache._files).length + ' 个文件，只扫描今日新增');
+                dlog('🚀 快速路径：缓存 ' + Object.keys(fastCache._files).length + ' 个文件，' + (force ? '强制重读今日所有文件' : '只扫描今日新增'));
 
                 // 从缓存构建历史 dailyMap
                 const todayStr = getTodayStr();
@@ -2308,11 +2309,14 @@ if (isTauriApp) {
 
                 if (todayFiles.length > 0) {
                     // 跳过已缓存的（同路径+mtime一致=内容没变）
-                    const toRead = todayFiles.filter(f => {
-                        const c = fastCache._files[f.path];
-                        return !c || c.mtime !== f.modified;
-                    });
-                    const cachedSkip = todayFiles.length - toRead.length;
+                    // force=true 时不跳过，强制重读今天所有文件
+                    const toRead = force
+                        ? todayFiles
+                        : todayFiles.filter(f => {
+                            const c = fastCache._files[f.path];
+                            return !c || c.mtime !== f.modified;
+                        });
+                    const cachedSkip = force ? 0 : (todayFiles.length - toRead.length);
                     if (cachedSkip > 0) dlog('今日文件中已缓存跳过: ' + cachedSkip + ' 个（未修改）');
 
                     if (toRead.length > 0) {
@@ -2375,6 +2379,7 @@ if (isTauriApp) {
             }
         }
 
+        // force=true 但无缓存，或完全无缓存 → 回退全量扫描
         dlog('开始全量扫描: ' + maDirs.logs);
         statsEl.innerHTML = '<div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;font-size:0.85rem;">⏳ 正在扫描日志文件并统计…</div>';
 
