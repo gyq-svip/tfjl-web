@@ -25,6 +25,12 @@ if (isTauriApp) {
     let softwareDataDir = DEFAULT_SOFTWARE_DATA_DIR;
     let scannedFiles = [];
 
+    // 扫描文件区域分享/筛选状态
+    let _shareModeScanned = false;
+    let _scannedFilterKeyword = '';
+    let _scannedFilterCategory = '全部';
+    let _selScannedSharePaths = new Set();
+
     // ==================== 扫描缓存（本地设置秒开） ====================
     const SCAN_CACHE_KEY = 'TFJL_ScannedFilesCache';
 
@@ -693,37 +699,96 @@ if (isTauriApp) {
         const statsEl = document.getElementById('fuzzyStatsArea');
         if (!listEl) return;
 
-        if (scannedFiles.length === 0) {
+        // 筛选处理
+        let displayFiles = scannedFiles;
+        if (_scannedFilterCategory && _scannedFilterCategory !== '全部') {
+            displayFiles = displayFiles.filter(f => (f.category || '其他') === _scannedFilterCategory);
+        }
+        if (_scannedFilterKeyword) {
+            const kw = _scannedFilterKeyword.toLowerCase();
+            displayFiles = displayFiles.filter(f => f.name.toLowerCase().includes(kw));
+        }
+
+        if (displayFiles.length === 0) {
             listEl.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">未找到 txt/json 文件</div>';
             if (statsEl) statsEl.innerHTML = '';
             window.scannedFiles = scannedFiles;
             return;
         }
 
-        // 按目录分组显示
-        const grouped = {};
-        scannedFiles.forEach(f => {
-            if (!grouped[f.dirLabel]) grouped[f.dirLabel] = [];
-            grouped[f.dirLabel].push(f);
-        });
+        const cats = ['全部', '寒冰', '暗月', '漩涡', '合作', '深海', '活动', '日志', '其他'];
+        const colorMap = {
+            '全部': '#ffffff', '寒冰': '#64b5f6', '暗月': '#ce93d8', '漩涡': '#4fc3f7',
+            '合作': '#ffd54f', '深海': '#4db6ac', '活动': '#ff8a65', '日志': '#ef5350', '其他': '#bdbdbd'
+        };
 
-        let html = '';
-        for (const [label, files] of Object.entries(grouped)) {
-            html += `<div style="color:#00bcd4;font-size:0.75rem;margin:8px 0 4px;font-weight:bold;">${label}（${files.length}个）</div>`;
-            files.forEach((f, idx) => {
-                const icon = f.ext === 'json' ? '🔵' : '📄';
+        // 顶部工具栏
+        let html = '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,0.1);">';
+        html += '<input type="text" id="scannedFileSearchInput" value="' + _scannedFilterKeyword.replace(/"/g, '&quot;') + '" placeholder="🔍 搜索文件名…" oninput="setScannedFilterKeyword(this.value)" style="flex:1;min-width:120px;padding:6px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:rgba(0,0,0,0.3);color:#fff;font-size:0.8rem;box-sizing:border-box;">';
+        html += '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;">';
+        cats.forEach(cat => {
+            const active = _scannedFilterCategory === cat;
+            const color = colorMap[cat] || '#bdbdbd';
+            const count = cat === '全部' ? scannedFiles.length : scannedFiles.filter(f => (f.category || '其他') === cat).length;
+            html += `<button onclick="setScannedFilterCategory('${cat}')" style="background:${active ? color : 'rgba(255,255,255,0.06)'};color:${active ? '#000' : color};border:1px solid ${active ? color : 'rgba(255,255,255,0.12)'};padding:3px 10px;border-radius:14px;cursor:pointer;font-size:0.7rem;transition:all 0.15s;" title="${cat} ${count}个">${cat}${cat !== '全部' && count > 0 ? ' (' + count + ')' : ''}</button>`;
+        });
+        html += '</div>';
+        html += `<button id="scannedShareModeBtn" onclick="toggleScannedShareMode()" title="${_shareModeScanned ? '退出分享模式' : '分享模式：快速分享到需求墙'}" style="background:${_shareModeScanned ? 'linear-gradient(135deg,#ff6b6b,#ff9e80)' : 'linear-gradient(135deg,#7c4dff,#b388ff)'};color:#fff;border:none;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:0.75rem;font-weight:bold;white-space:nowrap;">${_shareModeScanned ? '📢 退出分享' : '📢 分享模式'}</button>`;
+        if (_shareModeScanned) {
+            html += '<button id="batchScannedShareFromMainBtn" onclick="doBatchShareScannedFromMain()" style="background:linear-gradient(135deg,#ff6b6b,#ff9e80);color:#fff;border:none;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:0.75rem;font-weight:bold;opacity:0.5;white-space:nowrap;">📢 批量分享</button>';
+        }
+        html += '</div>';
+
+        if (_shareModeScanned) {
+            // 分享模式：扁平列表，文件名点击直接分享，勾选批量分享
+            html += `<div style="display:flex;align-items:center;justify-content:space-between;margin:6px 0;color:rgba(255,255,255,0.6);font-size:0.75rem;">
+                <span>📢 分享模式：点击文件名直接分享，或勾选批量分享</span>
+                <label style="cursor:pointer;font-size:0.7rem;"><input type="checkbox" onchange="toggleAllScannedShareSelectsFromMain(this.checked)" style="cursor:pointer;vertical-align:middle;"> 全选</label>
+            </div>`;
+            html += '<div style="display:flex;flex-direction:column;gap:5px;">';
+            displayFiles.forEach(f => {
+                const cat = f.category || '其他';
+                const color = colorMap[cat] || '#bdbdbd';
                 const safePath = f.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-                html += `<div style="display:flex;align-items:center;gap:6px;padding:4px 6px;border-bottom:1px solid rgba(255,255,255,0.05);">
-                    <span>${icon}</span>
-                    <span style="color:#fff;font-size:0.8rem;flex:1;word-break:break-all;">${f.name}</span>
-                    <button onclick="detectFileEncoding('${safePath}')" style="background:rgba(156,39,176,0.3);color:#ce93d8;border:1px solid rgba(156,39,176,0.3);padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;">编码</button>
-                    <button onclick="viewFile('${safePath}')" style="background:rgba(0,188,212,0.3);color:#00bcd4;border:1px solid rgba(0,188,212,0.3);padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;">查看</button>
-                    <button onclick="loadFileToHand('${safePath}')" style="background:rgba(76,175,80,0.3);color:#4caf50;border:1px solid rgba(76,175,80,0.3);padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;">加载</button>
+                const safeName = f.name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                html += `<div style="display:flex;align-items:center;gap:8px;background:${color}15;border:1px solid ${color}40;border-left:3px solid ${color};border-radius:6px;padding:8px 10px;">
+                    <input type="checkbox" class="scanned-share-checkbox" value="${safePath}" onchange="toggleScannedShareSelectFromMain('${safePath}', this.checked)" style="flex-shrink:0;cursor:pointer;accent-color:${color};">
+                    <div style="flex:1;overflow:hidden;">
+                        <div style="display:flex;align-items:center;gap:6px;">
+                            <span style="color:${color};font-size:0.65rem;padding:1px 6px;border-radius:8px;background:${color}25;flex-shrink:0;">${cat}</span>
+                            <span onclick="shareScannedFileFromMain('${safePath}', '${safeName}')" style="color:#fff;font-weight:bold;font-size:0.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;" title="点击分享到需求墙">${f.name}</span>
+                        </div>
+                        <div style="color:rgba(255,255,255,0.35);font-size:0.7rem;">${f.dirLabel}</div>
+                    </div>
+                    <button onclick="shareScannedFileFromMain('${safePath}', '${safeName}')" title="分享到需求墙" style="background:linear-gradient(135deg,#ff6b6b,#ff9e80);color:#fff;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;font-weight:bold;white-space:nowrap;flex-shrink:0;">📢 分享</button>
                 </div>`;
             });
+            html += '</div>';
+        } else {
+            // 普通模式：按目录分组
+            const grouped = {};
+            displayFiles.forEach(f => {
+                if (!grouped[f.dirLabel]) grouped[f.dirLabel] = [];
+                grouped[f.dirLabel].push(f);
+            });
+            for (const [label, files] of Object.entries(grouped)) {
+                html += `<div style="color:#00bcd4;font-size:0.75rem;margin:8px 0 4px;font-weight:bold;">${label}（${files.length}个）</div>`;
+                files.forEach(f => {
+                    const icon = f.ext === 'json' ? '🔵' : '📄';
+                    const safePath = f.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                    html += `<div style="display:flex;align-items:center;gap:6px;padding:4px 6px;border-bottom:1px solid rgba(255,255,255,0.05);">
+                        <span>${icon}</span>
+                        <span style="color:#fff;font-size:0.8rem;flex:1;word-break:break-all;">${f.name}</span>
+                        <button onclick="detectFileEncoding('${safePath}')" style="background:rgba(156,39,176,0.3);color:#ce93d8;border:1px solid rgba(156,39,176,0.3);padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;">编码</button>
+                        <button onclick="viewFile('${safePath}')" style="background:rgba(0,188,212,0.3);color:#00bcd4;border:1px solid rgba(0,188,212,0.3);padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;">查看</button>
+                        <button onclick="loadFileToHand('${safePath}')" style="background:rgba(76,175,80,0.3);color:#4caf50;border:1px solid rgba(76,175,80,0.3);padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;">加载</button>
+                    </div>`;
+                });
+            }
         }
         listEl.innerHTML = html;
         window.scannedFiles = scannedFiles;
+        refreshBatchScannedShareBtnFromMain();
 
         // 显示模糊分类统计
         if (statsEl) {
@@ -731,21 +796,17 @@ if (isTauriApp) {
             const entries = Object.entries(fuzzyStats);
             if (entries.length > 0) {
                 const total = entries.reduce((sum, [, c]) => sum + c, 0);
-                const colorMap = {
-                    '寒冰': '#64b5f6', '暗月': '#ce93d8', '漩涡': '#4fc3f7',
-                    '合作': '#ffd54f', '深海': '#4db6ac', '活动': '#ff8a65',
-                    '日志': '#ef5350', '其他': '#bdbdbd'
-                };
                 let statsHtml = '<div style="color:#ffd700;font-size:0.75rem;margin-bottom:6px;">🏷️ 脚本分类模糊统计（共<span style="color:#fff;font-weight:bold;">' + total + '</span>个）：</div>';
                 statsHtml += '<div style="display:flex;flex-wrap:wrap;gap:8px;">';
                 for (const [kw, count] of entries) {
                     const pct = Math.round(count / total * 100);
                     const color = colorMap[kw] || '#bdbdbd';
-                    statsHtml += `<span style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:6px;padding:4px 10px;font-size:0.8rem;">
-                        <span style="color:${color};font-weight:bold;">${kw}</span>
-                        <span style="color:#fff;margin-left:4px;">${count}个</span>
-                        <span style="color:rgba(255,255,255,0.4);font-size:0.7rem;margin-left:2px;">(${pct}%)</span>
-                    </span>`;
+                    const active = _scannedFilterCategory === kw;
+                    statsHtml += `<button onclick="setScannedFilterCategory('${kw}')" style="background:${active ? color : 'rgba(255,255,255,0.06)'};color:${active ? '#000' : '#fff'};border:1px solid ${active ? color : 'rgba(255,255,255,0.12)'};border-radius:6px;padding:4px 10px;font-size:0.8rem;cursor:pointer;transition:all 0.15s;">
+                        <span style="color:${active ? '#000' : color};font-weight:bold;">${kw}</span>
+                        <span style="color:${active ? '#000' : '#fff'};margin-left:4px;">${count}个</span>
+                        <span style="color:${active ? '#000' : 'rgba(255,255,255,0.4)'};font-size:0.7rem;margin-left:2px;">(${pct}%)</span>
+                    </button>`;
                 }
                 statsHtml += '</div>';
                 statsEl.innerHTML = statsHtml;
@@ -754,6 +815,76 @@ if (isTauriApp) {
             }
         }
     }
+
+    function getScannedCategoryColor(cat) {
+        const map = {
+            '全部': '#ffffff', '寒冰': '#64b5f6', '暗月': '#ce93d8', '漩涡': '#4fc3f7',
+            '合作': '#ffd54f', '深海': '#4db6ac', '活动': '#ff8a65', '日志': '#ef5350', '其他': '#bdbdbd'
+        };
+        return map[cat] || '#bdbdbd';
+    }
+
+    function toggleScannedShareMode() {
+        _shareModeScanned = !_shareModeScanned;
+        _selScannedSharePaths.clear();
+        renderScannedFiles();
+    }
+
+    function setScannedFilterKeyword(val) {
+        _scannedFilterKeyword = (val || '').trim();
+        _selScannedSharePaths.clear();
+        renderScannedFiles();
+    }
+
+    function setScannedFilterCategory(cat) {
+        _scannedFilterCategory = cat || '全部';
+        _selScannedSharePaths.clear();
+        renderScannedFiles();
+    }
+
+    function toggleScannedShareSelectFromMain(path, checked) {
+        if (checked) _selScannedSharePaths.add(path);
+        else _selScannedSharePaths.delete(path);
+        refreshBatchScannedShareBtnFromMain();
+    }
+
+    function toggleAllScannedShareSelectsFromMain(checked) {
+        _selScannedSharePaths.clear();
+        if (checked) {
+            document.querySelectorAll('.scanned-share-checkbox').forEach(cb => { cb.checked = true; _selScannedSharePaths.add(cb.value); });
+        } else {
+            document.querySelectorAll('.scanned-share-checkbox').forEach(cb => { cb.checked = false; });
+        }
+        refreshBatchScannedShareBtnFromMain();
+    }
+
+    function refreshBatchScannedShareBtnFromMain() {
+        const btn = document.getElementById('batchScannedShareFromMainBtn');
+        if (!btn) return;
+        const n = _selScannedSharePaths.size;
+        btn.textContent = n > 0 ? `📢 批量分享 (${n})` : '📢 批量分享';
+        btn.style.opacity = n > 0 ? '1' : '0.5';
+    }
+
+    async function doBatchShareScannedFromMain() {
+        const paths = Array.from(_selScannedSharePaths);
+        if (paths.length === 0) { alert('请先勾选要分享的扫描文件'); return; }
+        if (!window.batchShareScannedFilesToWall) { alert('批量分享功能未加载，请刷新页面'); return; }
+        const fileList = paths.map(p => {
+            const f = scannedFiles.find(sf => sf.path === p);
+            return f ? { path: f.path, name: f.name } : null;
+        }).filter(Boolean);
+        window.batchShareScannedFilesToWall(fileList);
+    }
+
+    function shareScannedFileFromMain(path, name) {
+        if (window.shareScannedFileToWall) {
+            window.shareScannedFileToWall(path, name);
+        } else {
+            alert('分享功能未加载，请刷新页面');
+        }
+    }
+
 
     // 扫描列表中点击 🛡️ 按钮：读取文件内容并计算减伤
     async function computeFileDr(filePath, btnId) {
@@ -2608,6 +2739,14 @@ if (isTauriApp) {
     window.classifyFile = classifyFile;
     window.computeFileDr = computeFileDr;       // 扫描列表减伤按钮
     window.detectFileEncoding = detectFileEncoding; // 文件编码检测
+    // 扫描文件分享模式与筛选
+    window.toggleScannedShareMode = toggleScannedShareMode;
+    window.setScannedFilterKeyword = setScannedFilterKeyword;
+    window.setScannedFilterCategory = setScannedFilterCategory;
+    window.toggleScannedShareSelectFromMain = toggleScannedShareSelectFromMain;
+    window.toggleAllScannedShareSelectsFromMain = toggleAllScannedShareSelectsFromMain;
+    window.doBatchShareScannedFromMain = doBatchShareScannedFromMain;
+    window.shareScannedFileFromMain = shareScannedFileFromMain;
     window.saveSettingsAndClose = saveSettingsAndClose;
     window.toggleAutoLoadSetting = toggleAutoLoadSetting;
     window.viewFile = viewFile;
