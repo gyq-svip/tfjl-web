@@ -8643,7 +8643,7 @@
         }
 
         // 分享脚本文件到需求墙
-        async function shareTxtFileToWall(index) {
+        async function shareTxtFileToWall(index, providedName = null) {
             const file = txtFiles[index];
             if (!file) return;
 
@@ -8657,11 +8657,14 @@
                 try { await fetchMessages(); } catch (e) { console.warn('预加载消息失败:', e); }
             }
 
-            const now = new Date();
-            const defaultName = `${file.name.replace(/\.txt$/,'')}_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
-            const inputName = prompt(`请输入分享文件名（不含扩展名）：`, defaultName);
-            if (!inputName) return;
-            const shareFileName = inputName.endsWith('.txt') ? inputName : inputName + '.txt';
+            let shareFileName = providedName;
+            if (!shareFileName) {
+                const now = new Date();
+                const defaultName = `${file.name.replace(/\.txt$/,'')}_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
+                const inputName = prompt(`请输入分享文件名（不含扩展名）：`, defaultName);
+                if (!inputName) return;
+                shareFileName = inputName.endsWith('.txt') ? inputName : inputName + '.txt';
+            }
 
             try {
                 const token = getGistToken();
@@ -8703,13 +8706,33 @@
                 await saveMessagesToGist();
                 renderMessages();
                 showToast('✅ 脚本已分享到需求墙！');
+                return true;
             } catch (err) {
                 console.error('分享失败:', err);
                 alert('分享失败: ' + err.message);
+                return false;
             }
         }
 
-        // 保存脚本到项目 - 显示选择项目对话框
+        // 批量分享项目文件到需求墙
+        async function batchShareTxtFilesToWall(indices) {
+            if (!indices || indices.length === 0) return;
+            if (!getGistToken()) { alert('离线版暂不支持分享，请切换到在线版'); return; }
+            const now = new Date();
+            const suffix = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
+            const baseName = prompt('请输入批量分享文件名前缀（留空则每个用原文件名）：', '');
+            if (baseName === null) return;
+            let success = 0, fail = 0;
+            for (const idx of indices) {
+                const file = txtFiles[idx];
+                if (!file) continue;
+                const name = baseName ? `${baseName}_${file.name.replace(/\.txt$/,'')}_${suffix}.txt` : `${file.name.replace(/\.txt$/,'')}_${suffix}.txt`;
+                const ok = await shareTxtFileToWall(idx, name);
+                if (ok) success++; else fail++;
+            }
+            showToast(`✅ 批量分享完成：成功 ${success} 个${fail ? '，失败 ' + fail + ' 个' : ''}`);
+        }
+
         function showSaveScriptDialog(type) {
             const scriptContent = type === 'activity' ? window._activityScriptOutput : window._dungeonScriptOutput;
             const scriptType = type === 'activity' ? '活动脚本' : '副本脚本';
@@ -9344,6 +9367,10 @@
                 </div>
                 <div style="margin-bottom:10px;display:flex;gap:6px;align-items:center;">
                     <input id="txtFileSearchInput" type="text" placeholder="🔍 搜索项目脚本或扫描文件…（输入关键字过滤）" oninput="filterTxtFilesList()" style="flex:1;padding:8px 10px;border-radius:6px;border:1px solid rgba(76,175,80,0.3);background:rgba(0,0,0,0.3);color:#fff;font-size:0.85rem;box-sizing:border-box;">
+                    <button id="scriptFilesShareModeBtn" onclick="toggleScriptFilesShareMode()" title="分享模式：快速把脚本分享到需求墙" style="flex-shrink:0;height:36px;border-radius:6px;border:none;background:linear-gradient(135deg,#7c4dff,#b388ff);color:#fff;cursor:pointer;font-weight:bold;font-size:0.8rem;padding:0 10px;display:flex;align-items:center;gap:4px;transition:all 0.2s;"
+                        onmouseover="this.style.filter='brightness(1.15)';this.style.transform='scale(1.05)';"
+                        onmouseout="this.style.filter='brightness(1)';this.style.transform='scale(1)';"
+                    >📢 <span id="scriptFilesShareModeLabel">分享模式</span></button>
                     <button id="scriptLayoutToggleBtn" onclick="toggleScriptLayout()" title="切换布局：堆叠 / IDE分栏" style="flex-shrink:0;width:36px;height:36px;border-radius:6px;border:none;background:linear-gradient(135deg,#ffd700,#ff6b6b);color:#1a1a2e;cursor:pointer;font-weight:bold;font-size:1rem;display:flex;align-items:center;justify-content:center;transition:all 0.2s;"
                         onmouseover="this.style.filter='brightness(1.15)';this.style.transform='scale(1.05)';"
                         onmouseout="this.style.filter='brightness(1)';this.style.transform='scale(1)';"
@@ -10683,6 +10710,8 @@
 
         // ==================== 脚本列表多选状态 ====================
         window._selImportPaths = new Set();
+        window._selShareIndices = new Set(); // 分享模式下选中的项目文件索引
+        window._selShareScannedPaths = new Set(); // 分享模式下选中的扫描文件路径
 
         function toggleImportSelect(path, checked) {
             if (checked) { window._selImportPaths.add(path); }
@@ -10716,8 +10745,72 @@
             }
         }
 
-        // 生成可导入扫描文件的HTML（共用）
+        // 分享模式：项目文件多选
+        function toggleShareSelect(index, checked) {
+            if (checked) { window._selShareIndices.add(index); }
+            else { window._selShareIndices.delete(index); }
+            refreshBatchShareBtn();
+        }
+        function toggleAllShareSelects(checked) {
+            window._selShareIndices.clear();
+            if (checked) {
+                document.querySelectorAll('.share-index-checkbox').forEach(cb => { cb.checked = true; window._selShareIndices.add(parseInt(cb.value, 10)); });
+            } else {
+                document.querySelectorAll('.share-index-checkbox').forEach(cb => { cb.checked = false; });
+            }
+            refreshBatchShareBtn();
+        }
+        function refreshBatchShareBtn() {
+            const btn = document.getElementById('batchShareBtn');
+            if (!btn) return;
+            const n = window._selShareIndices.size;
+            btn.textContent = n > 0 ? `📢 批量分享 (${n})` : '📢 批量分享';
+            btn.style.opacity = n > 0 ? '1' : '0.5';
+        }
+        function doBatchShareProjectFiles() {
+            const indices = Array.from(window._selShareIndices).sort((a, b) => a - b);
+            if (indices.length === 0) { alert('请先勾选要分享的项目文件'); return; }
+            batchShareTxtFilesToWall(indices);
+        }
+
+        // 分享模式：扫描文件多选
+        function toggleScannedShareSelect(path, checked) {
+            if (!window._selShareScannedPaths) window._selShareScannedPaths = new Set();
+            if (checked) window._selShareScannedPaths.add(path);
+            else window._selShareScannedPaths.delete(path);
+            refreshBatchScannedShareBtn();
+        }
+        function toggleAllScannedShareSelects(checked) {
+            if (!window._selShareScannedPaths) window._selShareScannedPaths = new Set();
+            window._selShareScannedPaths.clear();
+            if (checked) {
+                document.querySelectorAll('.share-scanned-checkbox').forEach(cb => { cb.checked = true; window._selShareScannedPaths.add(cb.value); });
+            } else {
+                document.querySelectorAll('.share-scanned-checkbox').forEach(cb => { cb.checked = false; });
+            }
+            refreshBatchScannedShareBtn();
+        }
+        function refreshBatchScannedShareBtn() {
+            const btn = document.getElementById('batchScannedShareBtn');
+            if (!btn) return;
+            const n = (window._selShareScannedPaths || new Set()).size;
+            btn.textContent = n > 0 ? `📢 批量分享 (${n})` : '📢 批量分享';
+            btn.style.opacity = n > 0 ? '1' : '0.5';
+        }
+        function doBatchScannedShare() {
+            if (!window._selShareScannedPaths || window._selShareScannedPaths.size === 0) { alert('请先勾选要分享的扫描文件'); return; }
+            const scanned = window.scannedFiles || [];
+            const fileList = [];
+            window._selShareScannedPaths.forEach(path => {
+                const f = scanned.find(sf => sf.path === path);
+                if (f) fileList.push({ path: f.path, name: f.name });
+            });
+            if (window.batchShareScannedFilesToWall) window.batchShareScannedFilesToWall(fileList);
+        }
+
+        // 生成可导入/可分享扫描文件的HTML（共用）
         function renderScannedFilesSection(scannedFiles, keyword, category) {
+            const shareMode = isScriptFilesShareMode();
             const existingNames = new Set(txtFiles.map(f => f.name));
             let fresh = scannedFiles.filter(f => !existingNames.has(f.name));
             if (fresh.length === 0) return '';
@@ -10732,14 +10825,17 @@
             const list = keyword ? fresh.filter(f => f.name.toLowerCase().includes(keyword)) : fresh;
             if (list.length === 0) return '';
 
-            let html = `<div style="margin-top:12px;padding-top:10px;border-top:2px solid rgba(0,188,212,0.3);">
+            let html = `<div style="margin-top:12px;padding-top:10px;border-top:2px solid ${shareMode ? 'rgba(156,39,176,0.3)' : 'rgba(0,188,212,0.3)'};">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
-                    <div style="color:#00bcd4;font-size:0.85rem;font-weight:bold;">📂 可导入文件 (${list.length}个)</div>
+                    <div style="color:${shareMode ? '#ce93d8' : '#00bcd4'};font-size:0.85rem;font-weight:bold;">${shareMode ? '📢 可分享文件' : '📂 可导入文件'} (${list.length}个)</div>
                     <div style="display:flex;gap:6px;align-items:center;">
                         <label style="color:rgba(255,255,255,0.5);font-size:0.7rem;cursor:pointer;">
-                            <input type="checkbox" onchange="toggleAllImportSelects(this.checked)" style="cursor:pointer;vertical-align:middle;"> 全选
+                            <input type="checkbox" onchange="${shareMode ? `toggleAllScannedShareSelects(this.checked)` : `toggleAllImportSelects(this.checked)`}" style="cursor:pointer;vertical-align:middle;"> 全选
                         </label>
-                        <button id="batchImportBtn" onclick="doBatchImport()" style="background:linear-gradient(135deg,#ff9800,#f57c00);color:white;border:none;padding:4px 12px;border-radius:5px;cursor:pointer;font-size:0.75rem;opacity:0.5;">📥 批量导入</button>
+                        ${shareMode ?
+                            `<button id="batchScannedShareBtn" onclick="doBatchScannedShare()" style="background:linear-gradient(135deg,#ff6b6b,#ff9e80);color:white;border:none;padding:4px 12px;border-radius:5px;cursor:pointer;font-size:0.75rem;opacity:0.5;">📢 批量分享</button>` :
+                            `<button id="batchImportBtn" onclick="doBatchImport()" style="background:linear-gradient(135deg,#ff9800,#f57c00);color:white;border:none;padding:4px 12px;border-radius:5px;cursor:pointer;font-size:0.75rem;opacity:0.5;">📥 批量导入</button>`
+                        }
                     </div>
                 </div>
                 <div style="max-height:140px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(0,188,212,0.3) transparent;padding-right:4px;display:flex;flex-direction:column;gap:5px;">`;
@@ -10755,26 +10851,29 @@
                     displayName = displayName.replace(regex, `<span style="background:${catColor};color:#000;padding:0 2px;border-radius:2px;">$1</span>`);
                 }
                 html += `<div style="background:${catColor}15;border:1px solid ${catColor}40;border-left:3px solid ${catColor};border-radius:6px;padding:8px 10px;display:flex;align-items:center;gap:8px;">
-                    <input type="checkbox" class="import-checkbox" value="${safePath}" onchange="toggleImportSelect('${safePath}', this.checked)" style="flex-shrink:0;cursor:pointer;accent-color:${catColor};">
+                    <input type="checkbox" ${shareMode ? 'class="share-scanned-checkbox"' : 'class="import-checkbox"'} value="${safePath}" onchange="${shareMode ? `toggleScannedShareSelect('${safePath}', this.checked)` : `toggleImportSelect('${safePath}', this.checked)`}" style="flex-shrink:0;cursor:pointer;accent-color:${catColor};">
                     <div style="flex:1;overflow:hidden;">
                         <div style="display:flex;align-items:center;gap:6px;">
                             <span style="color:${catColor};font-size:0.65rem;padding:1px 6px;border-radius:8px;background:${catColor}25;flex-shrink:0;">${fileCat}</span>
-                            <span onclick="openScannedFileInEditor('${safePath}','${safeName}')" style="color:#fff;font-weight:bold;font-size:0.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;" title="在编辑器中打开">${displayName}</span>
+                            <span onclick="${shareMode ? `shareScannedFileToWall('${safePath}','${safeName}')` : `openScannedFileInEditor('${safePath}','${safeName}')`}" style="color:#fff;font-weight:bold;font-size:0.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;" title="${shareMode ? '点击分享到需求墙' : '在编辑器中打开'}">${displayName}</span>
                         </div>
                         <div style="color:rgba(255,255,255,0.35);font-size:0.7rem;margin-left:4px;">${f.dirLabel} · ${f.ext.toUpperCase()}</div>
                     </div>
                     <div style="display:flex;gap:3px;flex-shrink:0;flex-wrap:wrap;align-items:center;">
-                        <button onclick="openLocalFileWindow('${safePath}','${safeName}',true)" title="预览" style="background:rgba(0,188,212,0.2);color:#00bcd4;border:1px solid rgba(0,188,212,0.3);padding:3px 6px;border-radius:4px;cursor:pointer;font-size:0.68rem;white-space:nowrap;">👁️</button>
-                        <button onclick="openLocalFileWindow('${safePath}','${safeName}',false)" title="编辑" style="background:rgba(76,175,80,0.2);color:#81c784;border:1px solid rgba(76,175,80,0.3);padding:3px 6px;border-radius:4px;cursor:pointer;font-size:0.68rem;white-space:nowrap;">✏️</button>
-                        <button onclick="renameScannedFile('${safePath}','${safeName}')" title="改名" style="background:rgba(255,235,59,0.15);color:#ffee58;border:1px solid rgba(255,235,59,0.25);padding:3px 6px;border-radius:4px;cursor:pointer;font-size:0.68rem;white-space:nowrap;">🔤</button>
-                        <button onclick="shareScannedFileToWall('${safePath}','${safeName}')" title="分享到需求墙" style="background:rgba(156,39,176,0.2);color:#ce93d8;border:1px solid rgba(156,39,176,0.3);padding:3px 6px;border-radius:4px;cursor:pointer;font-size:0.68rem;white-space:nowrap;">📢</button>
-                        <button onclick="if(window.importFileToProject)window.importFileToProject('${safePath}')" title="导入项目" style="background:rgba(255,152,0,0.2);color:#ff9800;border:1px solid rgba(255,152,0,0.3);padding:3px 6px;border-radius:4px;cursor:pointer;font-size:0.68rem;white-space:nowrap;">📥</button>
+                        ${shareMode ?
+                            `<button onclick="shareScannedFileToWall('${safePath}','${safeName}')" title="分享到需求墙" style="background:linear-gradient(135deg,#ff6b6b,#ff9e80);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;font-weight:bold;white-space:nowrap;">📢 分享</button>` :
+                            `<button onclick="openLocalFileWindow('${safePath}','${safeName}',true)" title="预览" style="background:rgba(0,188,212,0.2);color:#00bcd4;border:1px solid rgba(0,188,212,0.3);padding:3px 6px;border-radius:4px;cursor:pointer;font-size:0.68rem;white-space:nowrap;">👁️</button>
+                            <button onclick="openLocalFileWindow('${safePath}','${safeName}',false)" title="编辑" style="background:rgba(76,175,80,0.2);color:#81c784;border:1px solid rgba(76,175,80,0.3);padding:3px 6px;border-radius:4px;cursor:pointer;font-size:0.68rem;white-space:nowrap;">✏️</button>
+                            <button onclick="renameScannedFile('${safePath}','${safeName}')" title="改名" style="background:rgba(255,235,59,0.15);color:#ffee58;border:1px solid rgba(255,235,59,0.25);padding:3px 6px;border-radius:4px;cursor:pointer;font-size:0.68rem;white-space:nowrap;">🔤</button>
+                            <button onclick="shareScannedFileToWall('${safePath}','${safeName}')" title="分享到需求墙" style="background:rgba(156,39,176,0.2);color:#ce93d8;border:1px solid rgba(156,39,176,0.3);padding:3px 6px;border-radius:4px;cursor:pointer;font-size:0.68rem;white-space:nowrap;">📢</button>
+                            <button onclick="if(window.importFileToProject)window.importFileToProject('${safePath}')" title="导入项目" style="background:rgba(255,152,0,0.2);color:#ff9800;border:1px solid rgba(255,152,0,0.3);padding:3px 6px;border-radius:4px;cursor:pointer;font-size:0.68rem;white-space:nowrap;">📥</button>`
+                        }
                     </div>
                 </div>`;
             });
 
             html += `</div>
-                <div style="color:rgba(255,255,255,0.3);font-size:0.7rem;margin-top:6px;">💡 勾选多个文件后可批量导入，输入关键字可过滤列表</div>
+                <div style="color:rgba(255,255,255,0.3);font-size:0.7rem;margin-top:6px;">${shareMode ? '💡 勾选多个文件后可批量分享到需求墙，输入关键字可过滤列表' : '💡 勾选多个文件后可批量导入，输入关键字可过滤列表'}</div>
             </div>`;
             return html;
         }
@@ -10833,13 +10932,24 @@
 
             const scannedFiles = window.scannedFiles || [];
             window._selImportPaths.clear(); // 切换搜索时清空选择
+            window._selShareScannedPaths.clear(); // 切换搜索时清空扫描分享选择
 
             if (txtFiles.length === 0 && scannedFiles.length === 0) {
                 list.innerHTML = '<div style="color:rgba(255,255,255,0.4);padding:10px;text-align:center;">暂无文本文件</div>';
                 return;
             }
 
+            const shareMode = isScriptFilesShareMode();
+            if (shareMode) window._selShareIndices.clear();
             let html = '';
+
+            // 0. 批量操作栏（分享模式显示批量分享，普通模式保留批量导入按钮等后续区域）
+            if (shareMode) {
+                html += `<div style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+                    <div style="color:rgba(255,255,255,0.7);font-size:0.8rem;">📢 分享模式：点击文件直接分享，或勾选批量分享</div>
+                    <button id="batchShareBtn" onclick="doBatchShareProjectFiles()" style="background:linear-gradient(135deg,#ff6b6b,#ff9e80);color:#fff;border:none;padding:5px 12px;border-radius:5px;cursor:pointer;font-size:0.8rem;font-weight:bold;opacity:0.5;transition:all 0.2s;">📢 批量分享</button>
+                </div>`;
+            }
 
             // 1. 项目中的脚本文件
             txtFiles.forEach((file, i) => {
@@ -10853,18 +10963,22 @@
                     displayName = displayName.replace(regex, '<span style="background:#ff9800;color:#000;padding:0 2px;border-radius:2px;">$1</span>');
                 }
 
-                html += `<div class="scriptFileItem" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,215,0,0.2);border-radius:8px;padding:12px;">
+                html += `<div class="scriptFileItem" style="background:rgba(0,0,0,0.3);border:1px solid ${shareMode ? 'rgba(156,39,176,0.35)' : 'rgba(255,215,0,0.2)'};border-radius:8px;padding:12px;">
                     <div class="scriptFileItemRow">
-                        <div class="scriptFileItemInfo">
-                            <div class="scriptFileItemName" onclick="openScriptEditorTab(${i})" title="点击在下方标签中打开编辑">📄 ${displayName}</div>
+                        ${shareMode ? `<input type="checkbox" class="share-index-checkbox" value="${i}" onchange="toggleShareSelect(${i}, this.checked)" title="勾选批量分享" style="margin-right:8px;cursor:pointer;accent-color:#ff6b6b;">` : ''}
+                        <div class="scriptFileItemInfo" style="flex:1;">
+                            <div class="scriptFileItemName" onclick="${shareMode ? `shareTxtFileToWall(${i})` : `openScriptEditorTab(${i})`}" title="${shareMode ? '点击分享到需求墙' : '点击在下方标签中打开编辑'}" style="cursor:pointer;">📄 ${displayName}</div>
                             <div style="color:rgba(255,255,255,0.5);font-size:0.8rem;">${(file.content.length / 1024).toFixed(1)} KB</div>
                         </div>
                         <div class="scriptFileItemActions">
-                            <button onclick="shareTxtFileToWall(${i})" title="分享到需求墙" style="background:linear-gradient(135deg,#9c27b0,#7b1fa2);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">📢</button>
-                            <button onclick="openTxtFileWindow(${i})" title="浮窗编辑" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">✏️</button>
-                            <button onclick="renameTxtFile(${i})" title="重命名" style="background:linear-gradient(135deg,#ff9800,#f57c00);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">✏️</button>
-                            <button onclick="downloadTxtFile(${i})" title="下载" style="background:linear-gradient(135deg,#2196f3,#1565c0);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">📥</button>
-                            <button onclick="deleteTxtFile(${i})" title="删除" style="background:linear-gradient(135deg,#f44336,#c62828);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">🗑️</button>
+                            ${shareMode ?
+                                `<button onclick="shareTxtFileToWall(${i})" title="分享到需求墙" style="background:linear-gradient(135deg,#ff6b6b,#ff9e80);color:white;border:none;padding:6px 16px;border-radius:5px;cursor:pointer;font-size:0.8rem;font-weight:bold;">📢 分享</button>` :
+                                `<button onclick="shareTxtFileToWall(${i})" title="分享到需求墙" style="background:linear-gradient(135deg,#9c27b0,#7b1fa2);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">📢</button>
+                                <button onclick="openTxtFileWindow(${i})" title="浮窗编辑" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">✏️</button>
+                                <button onclick="renameTxtFile(${i})" title="重命名" style="background:linear-gradient(135deg,#ff9800,#f57c00);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">✏️</button>
+                                <button onclick="downloadTxtFile(${i})" title="下载" style="background:linear-gradient(135deg,#2196f3,#1565c0);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">📥</button>
+                                <button onclick="deleteTxtFile(${i})" title="删除" style="background:linear-gradient(135deg,#f44336,#c62828);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">🗑️</button>`
+                            }
                         </div>
                     </div>
                 </div>`;
@@ -11496,6 +11610,29 @@
             const next = current === 'stacked' ? 'ide' : 'stacked';
             setScriptLayout(next);
         }
+
+        // 脚本文件Tab分享模式
+        let _scriptFilesShareMode = false;
+        function toggleScriptFilesShareMode() {
+            _scriptFilesShareMode = !_scriptFilesShareMode;
+            const btn = document.getElementById('scriptFilesShareModeBtn');
+            const label = document.getElementById('scriptFilesShareModeLabel');
+            if (btn) {
+                if (_scriptFilesShareMode) {
+                    btn.style.background = 'linear-gradient(135deg,#ff6b6b,#ff9e80)';
+                    btn.title = '退出分享模式';
+                    if (label) label.textContent = '退出分享';
+                } else {
+                    btn.style.background = 'linear-gradient(135deg,#7c4dff,#b388ff)';
+                    btn.title = '分享模式：快速把脚本分享到需求墙';
+                    if (label) label.textContent = '分享模式';
+                }
+            }
+            filterTxtFilesList();
+            renderScannedFilesSection();
+        }
+
+        function isScriptFilesShareMode() { return _scriptFilesShareMode; }
 
         function applyScriptLayout(mode) {
             const body = document.getElementById('scriptFileBody');
@@ -12998,7 +13135,7 @@
             }
         }
 
-        async function shareScannedFileToWall(filePath, fileName) {
+        async function shareScannedFileToWall(filePath, fileName, providedName = null) {
             let realPath = filePath.replace(/\\\\/g, '\\').replace(/\\'/g, "'");
             let realName = fileName.replace(/\\\\/g, '\\').replace(/\\'/g, "'");
 
@@ -13014,15 +13151,15 @@
                     content = await window.readTextFile(realPath);
                     if (content === null || content === undefined) {
                         alert('读取文件失败');
-                        return;
+                        return false;
                     }
                 } else {
                     alert('当前环境不支持读取本地文件，请在 App 中使用此功能');
-                    return;
+                    return false;
                 }
             } catch (e) {
                 alert('读取文件失败: ' + e.message);
-                return;
+                return false;
             }
 
             // 复用 shareTxtFileToWall 的分享逻辑
@@ -13030,11 +13167,14 @@
                 try { await fetchMessages(); } catch (e) { console.warn('预加载消息失败:', e); }
             }
 
-            const now = new Date();
-            const defaultName = realName.replace(/\.\w+$/, '') + '_' + now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0') + '_' + String(now.getHours()).padStart(2, '0') + String(now.getMinutes()).padStart(2, '0');
-            const inputName = prompt('请输入分享文件名（不含扩展名）：', defaultName);
-            if (!inputName) return;
-            const shareFileName = inputName.endsWith('.txt') ? inputName : inputName + '.txt';
+            let shareFileName = providedName;
+            if (!shareFileName) {
+                const now = new Date();
+                const defaultName = realName.replace(/\.\w+$/, '') + '_' + now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0') + '_' + String(now.getHours()).padStart(2, '0') + String(now.getMinutes()).padStart(2, '0');
+                const inputName = prompt('请输入分享文件名（不含扩展名）：', defaultName);
+                if (!inputName) return false;
+                shareFileName = inputName.endsWith('.txt') ? inputName : inputName + '.txt';
+            }
 
             try {
                 const token = getGistToken();
@@ -13073,12 +13213,36 @@
 
                 await saveMessagesToGist();
                 renderMessages();
-                showToast('✅ 脚本已分享到需求墙！');
+                if (!providedName) showToast('✅ 脚本已分享到需求墙！');
+                return true;
             } catch (err) {
                 console.error('分享失败:', err);
-                alert('分享失败: ' + err.message);
+                if (!providedName) alert('分享失败: ' + err.message);
+                return false;
             }
         }
+
+        // 批量分享扫描文件到需求墙
+        async function batchShareScannedFilesToWall(fileList) {
+            if (!fileList || fileList.length === 0) return;
+            if (!getGistToken()) { alert('离线版暂不支持分享，请切换到在线版'); return; }
+            const now = new Date();
+            const suffix = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0') + '_' + String(now.getHours()).padStart(2, '0') + String(now.getMinutes()).padStart(2, '0');
+            const baseName = prompt('请输入批量分享文件名前缀（留空则每个用原文件名）：', '');
+            if (baseName === null) return;
+            let success = 0, fail = 0;
+            for (const f of fileList) {
+                if (!f || !f.path || !f.name) continue;
+                const name = baseName ? baseName + '_' + f.name.replace(/\.\w+$/, '') + '_' + suffix + '.txt' : f.name.replace(/\.\w+$/, '') + '_' + suffix + '.txt';
+                const ok = await shareScannedFileToWall(f.path, f.name, name);
+                if (ok) success++; else fail++;
+            }
+            showToast(`✅ 批量分享完成：成功 ${success} 个${fail ? '，失败 ' + fail + ' 个' : ''}`);
+        }
+
+        // 暴露给 app-local.js 的批量分享入口
+        window.batchShareScannedFilesToWall = batchShareScannedFilesToWall;
+        window.shareScannedFileToWall = shareScannedFileToWall;
 
         // 解析窗口内容中的阵容
         function parseTxtWindowContent(windowId, fileIndex) {
