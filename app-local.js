@@ -1239,8 +1239,11 @@ if (isTauriApp) {
         }
 
         const dirPathSafe = maDirs.logs.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        console.log('[日志统计] 开始扫描目录:', maDirs.logs);
-        statsEl.innerHTML = '<div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;font-size:0.85rem;">⏳ 正在扫描日志文件并统计…（目录: ' + dirPathSafe + '）</div>';
+        const debugLines = []; // 收集诊断信息，最后显示在 UI
+        function dlog(msg) { debugLines.push(msg); console.log('[日志统计]', msg); }
+
+        dlog('开始扫描: ' + maDirs.logs);
+        statsEl.innerHTML = '<div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;font-size:0.85rem;">⏳ 正在扫描日志文件并统计…</div>';
 
         try {
             // 1. 递归扫描日志目录下所有可能的文本文件（txt/json/log/无后缀）
@@ -1249,34 +1252,40 @@ if (isTauriApp) {
             let allFiles;
             try {
                 allFiles = await collectFilesRecursive(maDirs.logs, 'logs', '日志', 3, allowedExts);
+                dlog('扫描到文件: ' + allFiles.length + ' 个');
+                if (allFiles.length > 0) {
+                    dlog('前10个: ' + allFiles.slice(0, 10).map(f => f.name + '(' + f.ext + ')').join(', '));
+                }
             } catch (scanErr) {
-                console.error('[日志统计] 目录扫描异常:', scanErr);
-                statsEl.innerHTML = '<div style="color:#f44336;text-align:center;padding:20px;font-size:0.85rem;">目录扫描失败<br><span style="font-size:0.7rem;">目录: ' + dirPathSafe + '</span><br><span style="font-size:0.7rem;">错误: ' + (scanErr.message || scanErr) + '</span><br><span style="font-size:0.7rem;color:#ff9800;">提示：请检查目录是否存在且可访问</span></div>';
+                dlog('【失败】目录扫描异常: ' + (scanErr.message || scanErr));
+                statsEl.innerHTML = '<div style="color:#f44336;text-align:center;padding:20px;font-size:0.85rem;">目录扫描失败<br><span style="font-size:0.7rem;">错误: ' + (scanErr.message || scanErr) + '</span></div>';
                 return;
             }
-            console.log('[日志统计] 扫描到文件数:', allFiles.length, allFiles.map(f => f.name).slice(0, 10));
 
             // 2. 不过滤扩展名，尝试读取所有文件（Rust read_text_file 对非文本文件会返回乱码或报错，跳过即可）
             const txtFiles = allFiles;
 
             if (txtFiles.length === 0) {
-                statsEl.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">日志目录下未找到任何可读文件<br><span style="font-size:0.7rem;">目录: ' + dirPathSafe + '</span><br><span style="font-size:0.7rem;color:#ff9800;">提示：请确认目录下有 .txt / .log / .json 文件</span></div>';
+                dlog('【失败】目录下未找到任何可读文件（支持: txt/json/log/无后缀）');
+                statsEl.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">日志目录下未找到任何可读文件<br><span style="font-size:0.7rem;color:#ff9800;">支持: .txt / .log / .json / 无后缀</span></div>';
                 return;
             }
 
             // 3. 并行读取所有日志文件 + 统计关键词
             const dailyMap = {}; // { '2026-07-23': { win: 0, lose: 0 } }
+            let readOk = 0, readErr = 0, noKeyword = 0;
+            const readErrs = []; // 记录读取失败的文件名
 
             const readResults = await Promise.all(
                 txtFiles.map(async (f) => {
                     try {
                         const content = await readTextFile(f.path);
-                        if (!content) return null;
+                        if (!content) { readOk++; noKeyword++; return null; }
 
                         const winCount = (content.match(/对战胜利确定/g) || []).length;
                         const loseCount = (content.match(/对战失败确定/g) || []).length;
 
-                        if (winCount === 0 && loseCount === 0) return null;
+                        if (winCount === 0 && loseCount === 0) { readOk++; noKeyword++; return null; }
 
                         // 日期来源：优先文件名中提取，否则用 modified 字段
                         let date = extractDateFromFilename(f.name);
@@ -1287,15 +1296,20 @@ if (isTauriApp) {
 
                         return { date, win: winCount, lose: loseCount };
                     } catch (e) {
-                        console.warn('日志读取失败:', f.name, e.message);
+                        readErr++;
+                        if (readErrs.length < 5) readErrs.push(f.name + ': ' + e.message);
                         return null;
                     }
                 })
             );
 
+            dlog('读取完毕 — 成功: ' + readOk + ' | 无关键词: ' + noKeyword + ' | 读取出错: ' + readErr);
+            if (readErrs.length > 0) {
+                dlog('读取错误示例: ' + readErrs.join('; '));
+            }
+
             // 4. 按日期汇总
             const validResults = readResults.filter(r => r !== null);
-            console.log('[日志统计] 成功读取/关键词匹配:', validResults.length, '/ 总文件:', txtFiles.length);
 
             readResults.forEach(r => {
                 if (!r) return;
@@ -1310,7 +1324,9 @@ if (isTauriApp) {
             const sortedDates = Object.keys(dailyMap).sort((a, b) => b.localeCompare(a));
 
             if (sortedDates.length === 0) {
-                statsEl.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">日志文件中未找到「对战胜利确定」或「对战失败确定」关键词<br><span style="font-size:0.7rem;">共扫描 ' + txtFiles.length + ' 个文件，目录: ' + dirPathSafe + '</span><br><span style="font-size:0.7rem;color:#ff9800;">提示：请检查日志文件内容是否包含这些关键词（需完全匹配）</span></div>';
+                let errHtml = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">日志文件中未找到「对战胜利确定」或「对战失败确定」关键词<br><span style="font-size:0.7rem;">共扫描 ' + txtFiles.length + ' 个文件，成功读取 ' + readOk + ' 个，读取失败 ' + readErr + ' 个</span><br><span style="font-size:0.7rem;color:#ff9800;">提示：内容可能是 GBK 编码 → 需重编译 Rust 后端</span></div>';
+                errHtml += buildDebugPanel(debugLines);
+                statsEl.innerHTML = errHtml;
                 return;
             }
 
@@ -1384,9 +1400,11 @@ if (isTauriApp) {
 
             html += `<svg width="${chartW}" height="${chartH}" style="display:block;">${gridHtml}${barsHtml}</svg>`;
 
+            html += buildDebugPanel(debugLines);
+
             statsEl.innerHTML = html;
         } catch (e) {
-            statsEl.innerHTML = '<div style="color:#f44336;text-align:center;padding:20px;font-size:0.85rem;">统计失败：' + e.message + '</div>';
+            statsEl.innerHTML = '<div style="color:#f44336;text-align:center;padding:20px;font-size:0.85rem;">统计失败：' + e.message + '</div>' + buildDebugPanel(debugLines);
         }
     }
 
@@ -1406,6 +1424,15 @@ if (isTauriApp) {
             return `${year}-${m[1]}-${m[2]}`;
         }
         return null;
+    }
+
+    function buildDebugPanel(lines) {
+        if (!lines || lines.length === 0) return '';
+        const items = lines.map((l, i) => {
+            const cls = l.includes('【失败】') ? 'color:#f44336' : l.includes('【异常】') ? 'color:#ff9800' : 'color:rgba(255,255,255,0.5)';
+            return '<div style="' + cls + ';font-size:0.7rem;font-family:monospace;padding:1px 0;">[' + i + '] ' + l.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>';
+        }).join('');
+        return '<details style="margin-top:8px;background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:6px 10px;"><summary style="color:rgba(255,255,255,0.45);font-size:0.75rem;cursor:pointer;">🔍 诊断日志（点击展开）</summary><div style="max-height:200px;overflow-y:auto;margin-top:4px;">' + items + '</div></details>';
     }
 
     // ==================== 导出函数到全局 ====================
