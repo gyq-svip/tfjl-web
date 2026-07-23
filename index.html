@@ -8987,8 +8987,21 @@
                 }
             });
             window.addEventListener('load', function() {
-                navigator.serviceWorker.register('./sw.js', { scope: './' }).then(function(registration) {
+                navigator.serviceWorker.register('./sw.js', { scope: './', updateViaCache: 'none' }).then(function(registration) {
                     console.log('[PWA] Service Worker 注册成功，scope:', registration.scope);
+                    // 每次打开 APP 主动检查 SW 更新（绕过 Tauri WebView 的 SW 更新检测问题）
+                    registration.update().catch(function() {});
+                    // 监听 SW 安装完成
+                    registration.addEventListener('updatefound', function() {
+                        var newWorker = registration.installing;
+                        if (newWorker) {
+                            newWorker.addEventListener('statechange', function() {
+                                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                    console.log('[PWA] 新 Service Worker 已安装，等待激活');
+                                }
+                            });
+                        }
+                    });
                 }).catch(function(err) {
                     console.warn('[PWA] Service Worker 注册失败:', err);
                 });

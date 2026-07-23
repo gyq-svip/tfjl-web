@@ -1,18 +1,11 @@
 // ============================================================
-// Service Worker - 塔防助手 PWA 缓存策略
+// Service Worker v3 - 塔防助手 PWA 缓存策略
 // 策略：StaleWhileRevalidate（先用缓存秒开，后台静默更新）
+// v3: 激进更新——激活时清空自身缓存，确保下次一定拉最新
 // ============================================================
 
-const CACHE_VERSION = 'tfjl-v2';
-const CACHE_STATIC = CACHE_VERSION + '-static';
+const CACHE_VERSION = 'tfjl-v3';
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
-
-// 需要预缓存的核心资源（首次安装时缓存）
-const PRECACHE_URLS = [
-    '/',
-    '/index.html',
-    '/sw.js'
-];
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
 const NEVER_CACHE = [
@@ -23,42 +16,42 @@ const NEVER_CACHE = [
 ];
 
 // ============================================================
-// 安装事件：预缓存核心资源
+// 安装事件：skipWaiting，不预缓存（由runtime按需填充）
 // ============================================================
 self.addEventListener('install', (event) => {
     self.skipWaiting();
-    event.waitUntil(
-        caches.open(CACHE_STATIC).then((cache) => {
-            return cache.addAll(PRECACHE_URLS).catch(() => {});
-        })
-    );
 });
 
 // ============================================================
-// 激活事件：清理旧版本缓存，保留当前版本
+// 激活事件：清空所有 tfjl 缓存（包括新创建的），强制走网络
 // ============================================================
 self.addEventListener('activate', (event) => {
     event.waitUntil(
         caches.keys().then((cacheNames) => {
             return Promise.all(
                 cacheNames
-                    .filter((name) => {
-                        return name.startsWith('tfjl-')
-                            && name !== CACHE_STATIC
-                            && name !== CACHE_RUNTIME;
-                    })
+                    .filter((name) => name.startsWith('tfjl-'))
                     .map((name) => caches.delete(name))
             );
-        }).then(() => self.clients.claim())
+        }).then(() => {
+            // 拿下所有页面控制权
+            return self.clients.claim();
+        }).then(() => {
+            // 通知所有已打开的页面有新版本
+            return self.clients.matchAll().then(clients => {
+                clients.forEach(client => {
+                    client.postMessage({ type: 'NEW_VERSION_READY' });
+                });
+            });
+        })
     );
 });
 
 // ============================================================
-// 请求拦截：根据资源类型选择缓存策略
+// 请求拦截
 // ============================================================
 self.addEventListener('fetch', (event) => {
     const request = event.request;
-
     if (request.method !== 'GET') return;
 
     const url = new URL(request.url);
@@ -68,7 +61,7 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // HTML 页面 / 静态资源：StaleWhileRevalidate（先缓存后更新）
+    // HTML / 静态资源：StaleWhileRevalidate
     if (request.mode === 'navigate'
         || request.destination === 'document'
         || ['script', 'style', 'image', 'font', 'manifest'].includes(request.destination)) {
@@ -76,32 +69,28 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // 其他 GET 请求：NetworkFirst
+    // 其他 GET：NetworkFirst
     event.respondWith(networkFirst(request, CACHE_RUNTIME));
 });
 
 // ============================================================
-// StaleWhileRevalidate：优先返回缓存（秒开），后台更新缓存
-// 增强：内容不同才更新缓存并通知页面有新版本
+// StaleWhileRevalidate：先返回缓存（秒开），后台拉新
 // ============================================================
 function staleWhileRevalidate(request, cacheName) {
     return caches.open(cacheName).then((cache) => {
         return cache.match(request).then((cachedResponse) => {
-            // 后台静默拉取最新资源，不阻塞页面渲染
             const fetchPromise = fetch(request).then(async (networkResponse) => {
                 if (networkResponse && networkResponse.status === 200) {
                     const cachedClone = cachedResponse ? cachedResponse.clone() : null;
                     const cachedText = cachedClone ? await cachedClone.text() : '';
                     const networkClone = networkResponse.clone();
                     const networkText = await networkClone.text();
-                    // 只有内容真的变了才更新缓存并通知页面
                     if (cachedText !== networkText) {
                         cache.put(request, new Response(networkText, {
                             status: networkResponse.status,
                             statusText: networkResponse.statusText,
                             headers: networkResponse.headers
                         }));
-                        // 通知所有客户端有新版本可用
                         if (cachedResponse) {
                             self.clients.matchAll().then(clients => {
                                 clients.forEach(client => {
@@ -114,7 +103,6 @@ function staleWhileRevalidate(request, cacheName) {
                 return networkResponse;
             }).catch(() => {});
 
-            // 有缓存则立即返回，没有才等网络
             return cachedResponse || fetchPromise;
         });
     });
@@ -137,7 +125,7 @@ function networkFirst(request, cacheName) {
 }
 
 // ============================================================
-// 消息通信：允许页面主动清缓存
+// 消息通信
 // ============================================================
 self.addEventListener('message', (event) => {
     if (event.data === 'SKIP_WAITING') {
