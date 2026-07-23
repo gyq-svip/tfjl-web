@@ -18401,7 +18401,7 @@ function hasGistToken() {
             const text = marqueeEl.textContent;
             if (!force && text === _lastMarqueeText) return; // 文本未变则不重置（避免每分钟跳回起点）
             _lastMarqueeText = text;
-            const SPEED = 100; // px/s，恒定滚动速度
+            const SPEED = 45; // px/s，恒定滚动速度
             const W = marqueeEl.scrollWidth; // 含 paddingLeft:100%
             const duration = Math.max(8, W / SPEED); // 至少 8 秒，避免极短文本过快
             marqueeEl.style.animation = 'none';
