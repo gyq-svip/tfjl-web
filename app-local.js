@@ -1477,6 +1477,12 @@ if (isTauriApp) {
     }
 
     // 用学习到的模式判断新文件是否像对战日志
+    // 只用正面规则（安全，不会漏文件）：
+    //   - 扩展名必须在高频扩展名列表中
+    //   - 目录必须是高频目录本身或其父/子目录
+    //   - 文件名至少包含一个高频 token
+    // 注意：不用 skipDirs 做硬排除（否则今天无用的目录明天新出日志会被漏掉）
+    //   skipDirs 仅用于统计展示 + 缓存清理，不参与过滤决策
     function matchesLogPattern(filePath, patterns) {
         if (!patterns) return null; // null = 未学习，无法判断
 
@@ -1485,22 +1491,16 @@ if (isTauriApp) {
         const ext = (filename.match(/\.(\w+)$/)?.[1] || '').toLowerCase();
         const dir = norm.split('/').slice(0, -1).join('/');
 
-        // 规则0：负面排除 — 如果在已知"全是无用文件"的目录里，直接跳过
-        if (patterns.skipDirs && patterns.skipDirs.length > 0) {
-            const isSkipDir = patterns.skipDirs.some(sd => dir === sd || dir.startsWith(sd + '/') || dir.startsWith(sd + '\\'));
-            if (isSkipDir) return false;
-        }
-
         // 规则1：扩展名必须在命中文件的高频扩展名中
         if (patterns.exts.length > 0 && !patterns.exts.includes(ext)) return false;
 
-        // 规则2：目录必须是命中文件所在目录或其子目录
+        // 规则2：目录必须是命中文件所在目录或其父/子目录（父目录包容：logs/ 下的新子目录也能过）
         if (patterns.dirs.length > 0) {
             const dirOk = patterns.dirs.some(d => dir.startsWith(d) || d.startsWith(dir));
             if (!dirOk) return false;
         }
 
-        // 规则3：文件名至少包含一个命中文件的高频 token
+        // 规则3：文件名至少包含一个命中文件的高频 token（如 "log"、"对战"等）
         if (patterns.tokens.length > 0) {
             const baseName = filename.replace(/\.[^.]+$/, '');
             const nameTokens = baseName.split(/[^\u4e00-\u9fff\w]+/).filter(t => t.length >= 2).map(t => t.toLowerCase());
