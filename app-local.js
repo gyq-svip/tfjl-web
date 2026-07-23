@@ -184,6 +184,9 @@ if (isTauriApp) {
 
     // ==================== 配置管理 ====================
 
+    // 自动加载开关：默认全部开启，用户卡顿可关闭
+    const settingsConfig = { autoLoadScreenshotStats: true, autoLoadBattleStats: true };
+
     function loadConfig() {
         try {
             const saved = localStorage.getItem('maDirsConfig');
@@ -192,6 +195,9 @@ if (isTauriApp) {
                 maDirs = { ...maDirs, ...parsed.maDirs };
                 window.maDirs = maDirs;
                 softwareDataDir = parsed.softwareDataDir || '';
+                // 恢复开关状态
+                if (typeof parsed.autoLoadScreenshotStats === 'boolean') settingsConfig.autoLoadScreenshotStats = parsed.autoLoadScreenshotStats;
+                if (typeof parsed.autoLoadBattleStats === 'boolean') settingsConfig.autoLoadBattleStats = parsed.autoLoadBattleStats;
             }
         } catch (e) {}
         // 如果软件数据目录未设置，尝试从已配置的老马目录推算默认值
@@ -211,7 +217,12 @@ if (isTauriApp) {
     }
 
     function saveConfig() {
-        localStorage.setItem('maDirsConfig', JSON.stringify({ maDirs, softwareDataDir }));
+        localStorage.setItem('maDirsConfig', JSON.stringify({
+            maDirs,
+            softwareDataDir,
+            autoLoadScreenshotStats: settingsConfig.autoLoadScreenshotStats,
+            autoLoadBattleStats: settingsConfig.autoLoadBattleStats
+        }));
     }
 
     // ==================== 初始化 ====================
@@ -229,10 +240,31 @@ if (isTauriApp) {
         if (!isTauriApp) return;
         showSettingsModal();
         fillSettingsForm();
-        // 三个统计并发启动，不互相阻塞
+        // 扫描文件列表总是执行（轻量）
         scanAllFiles();
-        calcScreenshotStats();
-        calcLogBattleStats();
+        // 自动加载统计：根据开关决定
+        if (settingsConfig.autoLoadScreenshotStats) calcScreenshotStats();
+        if (settingsConfig.autoLoadBattleStats) calcLogBattleStats();
+    }
+
+    // Toggle 开关切换
+    function toggleAutoLoadSetting(type) {
+        if (type === 'screenshot') {
+            settingsConfig.autoLoadScreenshotStats = !settingsConfig.autoLoadScreenshotStats;
+            updateToggleUI('screenshot', settingsConfig.autoLoadScreenshotStats);
+        } else if (type === 'battle') {
+            settingsConfig.autoLoadBattleStats = !settingsConfig.autoLoadBattleStats;
+            updateToggleUI('battle', settingsConfig.autoLoadBattleStats);
+        }
+        saveConfig();
+    }
+
+    function updateToggleUI(type, on) {
+        const tgl = document.getElementById('tglAuto' + (type === 'screenshot' ? 'Screenshot' : 'Battle'));
+        if (!tgl) return;
+        tgl.style.background = on ? '#4caf50' : 'rgba(255,255,255,0.15)';
+        const knob = tgl.querySelector('span');
+        if (knob) knob.style.left = on ? '18px' : '2px';
     }
 
     function closeAppLocalSettings() {
@@ -311,6 +343,24 @@ if (isTauriApp) {
                     </div>
                 </div>
 
+                <div style="margin-bottom:16px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:12px 14px;">
+                    <div style="color:rgba(255,255,255,0.5);font-size:0.7rem;margin-bottom:8px;">💡 提示：如果打开设置面板或加载统计时感觉很卡，可尝试关闭以下自动加载功能</div>
+                    <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;">
+                        <label id="lblAutoScreenshot" style="display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;" onclick="toggleAutoLoadSetting('screenshot')">
+                            <span id="tglAutoScreenshot" style="display:inline-block;width:36px;height:20px;border-radius:10px;background:#4caf50;position:relative;transition:background 0.2s;">
+                                <span style="display:inline-block;width:16px;height:16px;border-radius:50%;background:#fff;position:absolute;top:2px;left:18px;transition:left 0.2s;"></span>
+                            </span>
+                            <span style="color:rgba(255,255,255,0.7);font-size:0.78rem;">🚗 车主副本统计</span>
+                        </label>
+                        <label id="lblAutoBattle" style="display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;" onclick="toggleAutoLoadSetting('battle')">
+                            <span id="tglAutoBattle" style="display:inline-block;width:36px;height:20px;border-radius:10px;background:#4caf50;position:relative;transition:background 0.2s;">
+                                <span style="display:inline-block;width:16px;height:16px;border-radius:50%;background:#fff;position:absolute;top:2px;left:18px;transition:left 0.2s;"></span>
+                            </span>
+                            <span style="color:rgba(255,255,255,0.7);font-size:0.78rem;">🏆 对战统计</span>
+                        </label>
+                    </div>
+                </div>
+
                 <div style="margin-bottom:20px;">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
                         <label style="color:#ffd700;font-size:0.9rem;">📋 扫描到的脚本文件</label>
@@ -365,6 +415,9 @@ if (isTauriApp) {
         document.getElementById('maDir_screenshot').value = maDirs.screenshot || '';
         document.getElementById('maDir_logs').value = maDirs.logs || '';
         document.getElementById('softwareDataDirInput').value = softwareDataDir || '';
+        // 恢复自动加载开关 UI 状态
+        updateToggleUI('screenshot', settingsConfig.autoLoadScreenshotStats);
+        updateToggleUI('battle', settingsConfig.autoLoadBattleStats);
     }
 
     async function selectMaDir(key) {
@@ -1989,6 +2042,7 @@ if (isTauriApp) {
     window.collectFilesRecursive = collectFilesRecursive;
     window.classifyFile = classifyFile;
     window.saveSettingsAndClose = saveSettingsAndClose;
+    window.toggleAutoLoadSetting = toggleAutoLoadSetting;
     window.viewFile = viewFile;
     window.loadFileToHand = loadFileToHand;
     window.saveFileContent = saveFileContent;
