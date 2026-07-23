@@ -1,11 +1,11 @@
 {
-  "version": "1.1.7",
-  "notes": "v1.1.7 测试自动更新\n- 思维导图页全面改版（缩放+拖拽+6大分支）\n- 菜单优化：桌面版隐藏「下载桌面版」、显示「检查更新」\n- 网页版隐藏「检查更新」菜单项",
-  "pub_date": "2026-07-22T15:12:00Z",
+  "version": "1.1.8",
+  "notes": "v1.1.8 多编码日志读取修复\n- 新增多编码自动检测回退：BOM → UTF-8 → GB18030(简中) → BIG5(繁中) → lossy兜底\n- 修复命令名冲突导致非 UTF-8 日志（GBK等）读取失败\n- 老马电脑 Log 目录的日志文件不再报编码错误",
+  "pub_date": "2026-07-23T15:46:00Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRdWJvQ0JvYjZTSERUUFhiWlAwRXNSL3FMOGkyWmhFYTlmUDk0RlBWdDRFS3NHZkF4VHlyREJRNTNXN0Q0cURRZktXOFpOdlZ3dWhReFlkNmsrK1RLVGRreWRMRVVVRlFnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg0NzA0MzY1CWZpbGU65aGU6Ziy57K+54G15Yqp5omLXzEuMS43X3g2NC1zZXR1cC5leGUKcUI0NUI1eU84ZTUyV2s5M1lBK3VLZHNRTldEcklOVTVaaE5VNENiWEQxT1p2Tks2Zmh1VVF2U2lVUUVqV0VuTUkwNXRoNlpHRmZqUERQNDJIbVlORFE9PQo=",
-      "url": "https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/releases/download/v1.1.7/tfjl-v1.1.7-x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRdWJvQ0JvYjZTSEVaem8zbGZVZDBPcnlVSzg3WFpFTFptaXRvbVN2N3ZyVURmWkFJRXNXcGMyNDR2UTgwNmNiSXFyU1FJaUcrRE5jTXdtb3VDRlBMTU9QeGxMSFlad2dZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg0NzkyNzc1CWZpbGU6dGZqbC1zaWduLXRlbXAuZXhlCnFKQjFiU1NJanpIbDJMN2VBeC9aYVdtdDdqYXkreDFOYkZwRHVGWUwvcnJLYm5uUEhDcHV5NjFzTGhvTUVNMHNEWlB3UlZmdmdFdWROS3hQTGZoZEN3PT0K",
+      "url": "https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/releases/download/v1.1.8/tfjl-v1.1.8-x64-setup.exe"
     }
   }
 }
