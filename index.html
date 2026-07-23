@@ -16293,6 +16293,21 @@
             }
         }
         
+        // 非分隔符融合卡匹配基础卡（如"火炮射线" → "火炮"）
+        function findBaseCardInFusion(name) {
+            if (!damageReductionData || typeof damageReductionData !== 'object') return null;
+            // 获取所有有减伤值的卡名，按长度降序匹配（优先匹配更长的名称）
+            const baseNames = Object.keys(damageReductionData)
+                .filter(k => damageReductionData[k] > 0 && !k.includes('精灵'))
+                .sort((a, b) => b.length - a.length);
+            for (const base of baseNames) {
+                if (name !== base && name.includes(base)) {
+                    return base;
+                }
+            }
+            return null;
+        }
+
         // 计算指定卡牌列表的总减伤（用于脚本解析）
         // side: 'my' 表示我方卡组，'teammate' 表示队友卡组，默认为 'my'
         function calculateDamageReductionForCards(cardNames, side) {
@@ -16346,6 +16361,11 @@
                         }
                     } else {
                         usedKey = parts[0];
+                        // 回退：非分隔符融合卡（如"火炮射线"）→ 匹配基础卡（如"火炮"）
+                        if (damageReductionData[usedKey] === undefined || damageReductionData[usedKey] <= 0) {
+                            const baseCard = findBaseCardInFusion(usedKey);
+                            if (baseCard) usedKey = baseCard;
+                        }
                     }
                     
                     if (!seenCards.has(usedKey)) {
