@@ -1107,11 +1107,12 @@ if (isTauriApp) {
             // 单文件编辑模式（含查找替换栏）
             // 计算减伤标题
             let drBadgeHtml = '';
-            if (drInfo && drInfo.first7) {
+            if (drInfo && typeof drInfo.first7 === 'number') {
                 let drColor = '#4ecdc4';
                 if (drInfo.first7 < 100) drColor = '#ff6b6b';
                 else if (drInfo.first7 < 130) drColor = '#ffd700';
-                drBadgeHtml = `<span style="color:${drColor};font-size:0.9rem;font-weight:bold;margin-left:10px;">🛡️ 减伤 ${drInfo.first7}%</span>`;
+                const drLabel = drInfo.first7 > 0 ? `🛡️ 减伤 ${drInfo.first7}%` : `🛡️ 未配置减伤`;
+                drBadgeHtml = `<span style="color:${drColor};font-size:0.9rem;font-weight:bold;margin-left:10px;">${drLabel}</span>`;
             }
             modal.innerHTML = `
                 <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(0,188,212,0.5);border-radius:12px;padding:20px;width:700px;max-width:95vw;height:85vh;display:flex;flex-direction:column;">
