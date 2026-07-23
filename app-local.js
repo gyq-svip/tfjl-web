@@ -65,6 +65,35 @@ if (isTauriApp) {
         }
     }
 
+    // ==================== 截图统计缓存（与扫描缓存同模式，日缓存） ====================
+    const STATS_CACHE_KEY = 'TFJL_ScreenshotStatsCache';
+
+    function getStatsCacheKey() {
+        const ssDir = maDirs.screenshot || '';
+        return STATS_CACHE_KEY + '_' + (ssDir ? btoa(unescape(encodeURIComponent(ssDir))).slice(0, 32) : 'empty');
+    }
+
+    function loadStatsCache() {
+        try {
+            const raw = localStorage.getItem(getStatsCacheKey());
+            if (!raw) return null;
+            const cache = JSON.parse(raw);
+            if (cache.date !== getTodayStr()) return null;
+            return cache;
+        } catch (e) { return null; }
+    }
+
+    function saveStatsCache(statsData) {
+        try {
+            const cache = {
+                date: getTodayStr(),
+                stats: statsData,
+                savedAt: Date.now()
+            };
+            localStorage.setItem(getStatsCacheKey(), JSON.stringify(cache));
+        } catch (e) { /* ignore */ }
+    }
+
     // ==================== IPC 调用封装 ====================
     // 通过 window.__TAURI_INTERNALS__.invoke 调用Rust命令
 
@@ -204,6 +233,7 @@ if (isTauriApp) {
         showSettingsModal();
         fillSettingsForm();
         scanAllFiles();
+        calcScreenshotStats();  // 自动加载今日缓存，无需手动点击
     }
 
     function closeAppLocalSettings() {
@@ -296,7 +326,7 @@ if (isTauriApp) {
                 <div style="margin-bottom:20px;">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
                         <label style="color:#e040fb;font-size:0.9rem;">🚗 车主副本开车统计（按截图数统计每天打多少局）</label>
-                        <button onclick="calcScreenshotStats()" style="background:linear-gradient(135deg,#9c27b0,#6a1b9a);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">📊 统计</button>
+                        <button onclick="calcScreenshotStats(true)" style="background:linear-gradient(135deg,#9c27b0,#6a1b9a);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">📊 强制刷新</button>
                     </div>
                     <div id="screenshotStats" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:8px;min-height:60px;">
                         <div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">配置截图目录后点击统计</div>
@@ -1195,7 +1225,7 @@ if (isTauriApp) {
 
     // ==================== 截图统计 ====================
 
-    async function calcScreenshotStats() {
+    async function calcScreenshotStats(force = false) {
         const statsEl = document.getElementById('screenshotStats');
         if (!statsEl) return;
 
@@ -1203,6 +1233,15 @@ if (isTauriApp) {
         if (!screenshotDir) {
             statsEl.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">请先配置截图目录</div>';
             return;
+        }
+
+        // 优先使用今日缓存（非强制刷新）
+        if (!force) {
+            const cache = loadStatsCache();
+            if (cache && cache.stats) {
+                renderScreenshotStats(cache.stats);
+                return;
+            }
         }
 
         statsEl.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">统计中...</div>';
@@ -1241,97 +1280,102 @@ if (isTauriApp) {
                 return;
             }
 
-            const totalGames = stats.reduce((sum, s) => sum + s.count, 0);
-            const maxCount = Math.max(...stats.map(s => s.count));
-            const avgCount = (totalGames / stats.length).toFixed(1);
-
-            let html = '';
-            html += `<div style="display:flex;gap:16px;margin-bottom:12px;flex-wrap:wrap;">`;
-            html += `<div style="background:rgba(156,39,176,0.2);padding:8px 12px;border-radius:6px;text-align:center;"><div style="color:#e040fb;font-size:1.4rem;font-weight:bold;">${totalGames}</div><div style="color:rgba(255,255,255,0.5);font-size:0.7rem;">总局数</div></div>`;
-            html += `<div style="background:rgba(0,188,212,0.2);padding:8px 12px;border-radius:6px;text-align:center;"><div style="color:#00bcd4;font-size:1.4rem;font-weight:bold;">${stats.length}</div><div style="color:rgba(255,255,255,0.5);font-size:0.7rem;">天数</div></div>`;
-            html += `<div style="background:rgba(255,152,0,0.2);padding:8px 12px;border-radius:6px;text-align:center;"><div style="color:#ff9800;font-size:1.4rem;font-weight:bold;">${avgCount}</div><div style="color:rgba(255,255,255,0.5);font-size:0.7rem;">日均</div></div>`;
-            html += `<div style="background:rgba(244,67,54,0.2);padding:8px 12px;border-radius:6px;text-align:center;"><div style="color:#f44336;font-size:1.4rem;font-weight:bold;">${maxCount}</div><div style="color:rgba(255,255,255,0.5);font-size:0.7rem;">最高</div></div>`;
-            html += `</div>`;
-
-            const barWidth = Math.max(30, Math.floor(600 / stats.length));
-            const chartHeight = 120;
-            html += `<div style="display:flex;align-items:flex-end;gap:2px;height:${chartHeight}px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.1);overflow-x:auto;">`;
-            for (const s of stats) {
-                const h = Math.max(4, Math.round((s.count / maxCount) * (chartHeight - 20)));
-                const color = s.count >= avgCount ? '#e040fb' : '#7c4dff';
-                html += `<div style="display:flex;flex-direction:column;align-items:center;min-width:${barWidth}px;">
-                    <div style="color:#fff;font-size:0.65rem;margin-bottom:2px;">${s.count}</div>
-                    <div style="width:${Math.max(12, barWidth - 6)}px;height:${h}px;background:linear-gradient(180deg,${color},rgba(156,39,176,0.3));border-radius:3px 3px 0 0;" title="${s.date}: ${s.count}局"></div>
-                    <div style="color:rgba(255,255,255,0.5);font-size:0.6rem;margin-top:2px;">${s.date}</div>
-                </div>`;
-            }
-            html += `</div>`;
-
-            const recent = stats.slice(0, 7);
-            html += `<div style="margin-top:12px;"><div style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-bottom:6px;">最近7天明细</div>`;
-            for (const s of recent) {
-                const bar = '█'.repeat(Math.min(20, Math.round(s.count / maxCount * 20)));
-                html += `<div style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:0.78rem;">
-                    <span style="color:rgba(255,255,255,0.7);width:60px;">${s.date}</span>
-                    <span style="color:#e040fb;font-family:monospace;">${bar}</span>
-                    <span style="color:#fff;font-weight:bold;width:30px;">${s.count}局</span>
-                </div>`;
-            }
-            html += `</div>`;
-
-            // 最近7天趋势图（SVG柱状图 + 折线，近→远）
-            if (recent.length > 0) {
-                const chartW = 380;
-                const padL = 30, padR = 10, padT = 16, padB = 16;
-                const hMax = Math.max(1, Math.max(...recent.map(s => s.count)));
-                const chartH = padT + 100 + padB;
-                const plotW = chartW - padL - padR;
-                const plotH = 100;
-                const barGap = 6;
-                const barW = Math.max(14, Math.floor((plotW - (recent.length - 1) * barGap) / recent.length));
-
-                // 网格线
-                const gridLines = [0.25, 0.5, 0.75, 1.0];
-                let gridHtml = gridLines.map(r => {
-                    const gy = padT + plotH * (1 - r);
-                    return `<line x1="${padL}" y1="${gy}" x2="${padL + plotW}" y2="${gy}" stroke="rgba(255,255,255,0.06)" stroke-width="1"/><text x="${padL - 4}" y="${gy + 3}" fill="rgba(255,255,255,0.25)" font-size="8" text-anchor="end">${Math.round(hMax * r)}</text>`;
-                }).join('');
-
-                // 柱子和折线点数据
-                let points = '';
-                let barsHtml = '';
-                recent.forEach((s, i) => {
-                    const bh = Math.max(4, (s.count / hMax) * plotH);
-                    const bx = padL + i * (barW + barGap);
-                    const by = padT + plotH - bh;
-                    const cx = bx + barW / 2;
-                    const cy = padT + plotH - (s.count / hMax) * plotH;
-                    const c = s.count >= avgCount ? '#e040fb' : '#7c4dff';
-                    const light = s.count >= avgCount ? '#f48fb1' : '#b39ddb';
-                    // 渐变柱 + 数值
-                    barsHtml += `<defs><linearGradient id="grad${i}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${light}" stop-opacity="0.95"/><stop offset="100%" stop-color="${c}" stop-opacity="0.85"/></linearGradient></defs>`;
-                    barsHtml += `<rect x="${bx}" y="${by}" width="${barW}" height="${bh}" rx="3" fill="url(#grad${i})"/>`;
-                    barsHtml += `<text x="${cx}" y="${by - 4}" fill="rgba(255,255,255,0.7)" font-size="9" font-weight="bold" text-anchor="middle">${s.count}</text>`;
-                    barsHtml += `<text x="${cx}" y="${padT + plotH + 13}" fill="rgba(255,255,255,0.45)" font-size="9" text-anchor="middle">${s.date.slice(5)}</text>`;
-                    points += `${cx},${cy} `;
-                });
-
-                // 折线
-                const polyline = recent.length > 1 ? `<polyline points="${points.trim()}" fill="none" stroke="#ff9800" stroke-width="1.5" stroke-dasharray="4,2" opacity="0.7"/>` : '';
-                const dots = recent.map((s, i) => {
-                    const cx = padL + i * (barW + barGap) + barW / 2;
-                    const cy = padT + plotH - (s.count / hMax) * plotH;
-                    return `<circle cx="${cx}" cy="${cy}" r="3" fill="#ff9800" opacity="0.9"><title>${s.date}: ${s.count}局</title></circle>`;
-                }).join('');
-
-                html += `<div style="margin-top:10px;"><div style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-bottom:4px;">📈 趋势图</div>`;
-                html += `<svg width="${chartW}" height="${chartH}" style="display:block;">${gridHtml}${barsHtml}${polyline}${dots}</svg></div>`;
-            }
-
-            statsEl.innerHTML = html;
+            saveStatsCache(stats);
+            renderScreenshotStats(stats);
         } catch (e) {
             statsEl.innerHTML = '<div style="color:#f44336;text-align:center;padding:20px;font-size:0.85rem;">统计失败：' + e.message + '</div>';
         }
+    }
+
+    // 渲染截图统计（纯 UI，由 calcScreenshotStats 或缓存加载后调用）
+    function renderScreenshotStats(stats) {
+        const statsEl = document.getElementById('screenshotStats');
+        if (!statsEl) return;
+
+        const totalGames = stats.reduce((sum, s) => sum + s.count, 0);
+        const maxCount = Math.max(...stats.map(s => s.count));
+        const avgCount = (totalGames / stats.length).toFixed(1);
+
+        let html = '';
+        html += `<div style="display:flex;gap:16px;margin-bottom:12px;flex-wrap:wrap;">`;
+        html += `<div style="background:rgba(156,39,176,0.2);padding:8px 12px;border-radius:6px;text-align:center;"><div style="color:#e040fb;font-size:1.4rem;font-weight:bold;">${totalGames}</div><div style="color:rgba(255,255,255,0.5);font-size:0.7rem;">总局数</div></div>`;
+        html += `<div style="background:rgba(0,188,212,0.2);padding:8px 12px;border-radius:6px;text-align:center;"><div style="color:#00bcd4;font-size:1.4rem;font-weight:bold;">${stats.length}</div><div style="color:rgba(255,255,255,0.5);font-size:0.7rem;">天数</div></div>`;
+        html += `<div style="background:rgba(255,152,0,0.2);padding:8px 12px;border-radius:6px;text-align:center;"><div style="color:#ff9800;font-size:1.4rem;font-weight:bold;">${avgCount}</div><div style="color:rgba(255,255,255,0.5);font-size:0.7rem;">日均</div></div>`;
+        html += `<div style="background:rgba(244,67,54,0.2);padding:8px 12px;border-radius:6px;text-align:center;"><div style="color:#f44336;font-size:1.4rem;font-weight:bold;">${maxCount}</div><div style="color:rgba(255,255,255,0.5);font-size:0.7rem;">最高</div></div>`;
+        html += `</div>`;
+
+        const barWidth = Math.max(30, Math.floor(600 / stats.length));
+        const chartHeight = 120;
+        html += `<div style="display:flex;align-items:flex-end;gap:2px;height:${chartHeight}px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.1);overflow-x:auto;">`;
+        for (const s of stats) {
+            const h = Math.max(4, Math.round((s.count / maxCount) * (chartHeight - 20)));
+            const color = s.count >= avgCount ? '#e040fb' : '#7c4dff';
+            html += `<div style="display:flex;flex-direction:column;align-items:center;min-width:${barWidth}px;">
+                <div style="color:#fff;font-size:0.65rem;margin-bottom:2px;">${s.count}</div>
+                <div style="width:${Math.max(12, barWidth - 6)}px;height:${h}px;background:linear-gradient(180deg,${color},rgba(156,39,176,0.3));border-radius:3px 3px 0 0;" title="${s.date}: ${s.count}局"></div>
+                <div style="color:rgba(255,255,255,0.5);font-size:0.6rem;margin-top:2px;">${s.date}</div>
+            </div>`;
+        }
+        html += `</div>`;
+
+        const recent = stats.slice(0, 7);
+        html += `<div style="margin-top:12px;"><div style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-bottom:6px;">最近7天明细</div>`;
+        for (const s of recent) {
+            const bar = '█'.repeat(Math.min(20, Math.round(s.count / maxCount * 20)));
+            html += `<div style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:0.78rem;">
+                <span style="color:rgba(255,255,255,0.7);width:60px;">${s.date}</span>
+                <span style="color:#e040fb;font-family:monospace;">${bar}</span>
+                <span style="color:#fff;font-weight:bold;width:30px;">${s.count}局</span>
+            </div>`;
+        }
+        html += `</div>`;
+
+        // 最近7天趋势图（SVG柱状图 + 折线，近→远）
+        if (recent.length > 0) {
+            const chartW = 380;
+            const padL = 30, padR = 10, padT = 16, padB = 16;
+            const hMax = Math.max(1, Math.max(...recent.map(s => s.count)));
+            const chartH = padT + 100 + padB;
+            const plotW = chartW - padL - padR;
+            const plotH = 100;
+            const barGap = 6;
+            const barW = Math.max(14, Math.floor((plotW - (recent.length - 1) * barGap) / recent.length));
+
+            const gridLines = [0.25, 0.5, 0.75, 1.0];
+            let gridHtml = gridLines.map(r => {
+                const gy = padT + plotH * (1 - r);
+                return `<line x1="${padL}" y1="${gy}" x2="${padL + plotW}" y2="${gy}" stroke="rgba(255,255,255,0.06)" stroke-width="1"/><text x="${padL - 4}" y="${gy + 3}" fill="rgba(255,255,255,0.25)" font-size="8" text-anchor="end">${Math.round(hMax * r)}</text>`;
+            }).join('');
+
+            let points = '';
+            let barsHtml = '';
+            recent.forEach((s, i) => {
+                const bh = Math.max(4, (s.count / hMax) * plotH);
+                const bx = padL + i * (barW + barGap);
+                const by = padT + plotH - bh;
+                const cx = bx + barW / 2;
+                const cy = padT + plotH - (s.count / hMax) * plotH;
+                const c = s.count >= avgCount ? '#e040fb' : '#7c4dff';
+                const light = s.count >= avgCount ? '#f48fb1' : '#b39ddb';
+                barsHtml += `<defs><linearGradient id="grad${i}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${light}" stop-opacity="0.95"/><stop offset="100%" stop-color="${c}" stop-opacity="0.85"/></linearGradient></defs>`;
+                barsHtml += `<rect x="${bx}" y="${by}" width="${barW}" height="${bh}" rx="3" fill="url(#grad${i})"/>`;
+                barsHtml += `<text x="${cx}" y="${by - 4}" fill="rgba(255,255,255,0.7)" font-size="9" font-weight="bold" text-anchor="middle">${s.count}</text>`;
+                barsHtml += `<text x="${cx}" y="${padT + plotH + 13}" fill="rgba(255,255,255,0.45)" font-size="9" text-anchor="middle">${s.date.slice(5)}</text>`;
+                points += `${cx},${cy} `;
+            });
+
+            const polyline = recent.length > 1 ? `<polyline points="${points.trim()}" fill="none" stroke="#ff9800" stroke-width="1.5" stroke-dasharray="4,2" opacity="0.7"/>` : '';
+            const dots = recent.map((s, i) => {
+                const cx = padL + i * (barW + barGap) + barW / 2;
+                const cy = padT + plotH - (s.count / hMax) * plotH;
+                return `<circle cx="${cx}" cy="${cy}" r="3" fill="#ff9800" opacity="0.9"><title>${s.date}: ${s.count}局</title></circle>`;
+            }).join('');
+
+            html += `<div style="margin-top:10px;"><div style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-bottom:4px;">📈 趋势图</div>`;
+            html += `<svg width="${chartW}" height="${chartH}" style="display:block;">${gridHtml}${barsHtml}${polyline}${dots}</svg></div>`;
+        }
+
+        statsEl.innerHTML = html;
     }
 
     // ==================== 日志胜负统计（缓存优化：仅扫描今日，历史数据走 localStorage） ====================
