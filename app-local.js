@@ -73,39 +73,47 @@ if (isTauriApp) {
 
     // ==================== 数据自动同步到用户数据目录 ====================
     // 原理：拦截 localStorage.setItem/removeItem，自动把变更的 key 异步写入磁盘文件
-    // 目标：${softwareDataDir}/app-data/${key}.json
+    // 目标：${softwareDataDir}/tfjl_${key}.json（直接写，不用子文件夹避免目录不存在）
     // 好处：用户可自行查看、备份、恢复；卸载 APP 也不丢数据
 
     let _syncDir = '';            // 同步目标目录
+    let _syncOk = false;          // 同步是否可用
     const SYNC_QUEUE = new Set(); // 待写入 key 集合
     let _syncTimer = null;        // 防抖定时器（2s）
 
     function _getSyncDir() {
         if (!softwareDataDir) return '';
-        return softwareDataDir.replace(/[\\/]+$/, '') + '\\app-data';
+        return softwareDataDir.replace(/[\\/]+$/, '');
+    }
+
+    function _syncFileName(key) {
+        // 文件名前缀 tfjl_ 标识，非法字符替换为 _
+        return 'tfjl_' + key.replace(/[\\/:*?"<>|]/g, '_') + '.json';
     }
 
     async function _flushSyncQueue() {
+        if (!_syncOk || SYNC_QUEUE.size === 0) return;
         const dir = _syncDir;
-        if (!dir || SYNC_QUEUE.size === 0) return;
         const keys = [...SYNC_QUEUE];
         SYNC_QUEUE.clear();
+        let ok = 0;
         for (const key of keys) {
             const val = localStorage.getItem(key);
-            const safeKey = key.replace(/[\\/:*?"<>|]/g, '_'); // 文件名不能含非法字符
-            const filePath = dir + '\\' + safeKey + '.json';
+            const filePath = dir + '\\' + _syncFileName(key);
             try {
                 if (val !== null) {
-                    await writeTextFile(filePath, JSON.stringify({ key: key, value: val, savedAt: Date.now() }));
+                    const r = await writeTextFile(filePath, JSON.stringify({ key: key, value: val, savedAt: Date.now() }));
+                    if (r) ok++;
                 }
-                // 删除的 key：写空标记文件（Tauri fs 不支持删文件，留个墓碑）
-            } catch (e) { /* 静默失败，不影响主流程 */ }
+            } catch (e) {
+                console.error('[数据同步] 写入失败:', filePath, e);
+            }
         }
-        console.log('[数据同步] 已写入', keys.length + ' 个文件到 ' + dir);
+        if (ok > 0) console.log('[数据同步] 已写入 ' + ok + '/' + keys.length + ' 个文件 → ' + dir);
     }
 
     function _scheduleSync(key) {
-        if (!_syncDir) return;
+        if (!_syncOk) return;
         SYNC_QUEUE.add(key);
         if (_syncTimer) clearTimeout(_syncTimer);
         _syncTimer = setTimeout(() => _flushSyncQueue().catch(() => {}), 2000);
@@ -127,35 +135,57 @@ if (isTauriApp) {
 
     // 立即全量同步（用户主动保存时调用，不等防抖）
     async function syncAllNow() {
-        if (!_syncDir) return;
+        if (!_syncOk) return;
         // 先消费队列中已有的
         await _flushSyncQueue();
         // 再把所有 localStorage key 全量写一遍
         const keys = [];
         for (let i = 0; i < localStorage.length; i++) keys.push(localStorage.key(i));
         const dir = _syncDir;
+        let ok = 0;
         for (const key of keys) {
             const val = localStorage.getItem(key);
             if (val === null) continue;
-            const safeKey = key.replace(/[\\/:*?"<>|]/g, '_');
-            const filePath = dir + '\\' + safeKey + '.json';
-            try { await writeTextFile(filePath, JSON.stringify({ key: key, value: val, savedAt: Date.now() })); }
-            catch (e) { /* 静默 */ }
+            const filePath = dir + '\\' + _syncFileName(key);
+            try {
+                const r = await writeTextFile(filePath, JSON.stringify({ key: key, value: val, savedAt: Date.now() }));
+                if (r) ok++;
+            } catch (e) {
+                console.error('[数据同步] 全量写入失败:', filePath, e);
+            }
         }
-        console.log('[数据同步] 全量同步完成，' + keys.length + ' 个 key → ' + dir);
+        console.log('[数据同步] 全量同步完成，' + ok + '/' + keys.length + ' 个 key → ' + dir);
     }
 
     // 页面关闭前强制刷盘（避免异步写入丢失）
     window.addEventListener('pagehide', () => {
         if (_syncTimer) { clearTimeout(_syncTimer); }
-        // pagehide 中不能 await，用同步 LocalStorage 兜底
-        // 下一次打开时再做完整性校验
     });
 
-    function initDataSync() {
-        _syncDir = _getSyncDir();
-        if (_syncDir) {
-            console.log('[数据同步] ✅ 已启用，目标目录: ' + _syncDir);
+    async function initDataSync() {
+        const dir = _getSyncDir();
+        if (!dir) {
+            _syncOk = false;
+            console.log('[数据同步] ⚠️ 未设置软件数据目录，同步未启用');
+            return;
+        }
+        _syncDir = dir;
+        // 立即试写一个小文件验证目录可写
+        try {
+            const testPath = dir + '\\' + _syncFileName('__SYNC_TEST__');
+            const r = await writeTextFile(testPath, JSON.stringify({ test: true, savedAt: Date.now() }));
+            if (r) {
+                _syncOk = true;
+                console.log('[数据同步] ✅ 已启用，目标目录: ' + dir);
+                // 启动后做一次全量同步（把已有的 localStorage 数据都写过去）
+                syncAllNow().catch(() => {});
+            } else {
+                _syncOk = false;
+                console.error('[数据同步] ❌ 目录写入失败，请检查目录权限: ' + dir);
+            }
+        } catch (e) {
+            _syncOk = false;
+            console.error('[数据同步] ❌ 目录写入异常: ' + dir, e);
         }
     }
 
@@ -440,7 +470,7 @@ if (isTauriApp) {
                         <input type="text" id="softwareDataDirInput" readonly placeholder="未设置，默认使用APP安装目录" style="flex:1;background:rgba(0,0,0,0.3);color:#fff;border:1px solid rgba(255,255,255,0.2);padding:8px 12px;border-radius:6px;font-size:0.85rem;">
                         <button onclick="selectSoftwareDataDir()" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;white-space:nowrap;">浏览...</button>
                     </div>
-                    <div style="color:rgba(255,255,255,0.35);font-size:0.68rem;margin-top:4px;line-height:1.4;">📌 设置此目录后，所有APP数据（配置、统计、缓存）会自动同步到 <b>app-data\\</b> 子文件夹下，以 .json 文件存放。可直接备份、迁移。</div>
+                    <div style="color:rgba(255,255,255,0.35);font-size:0.68rem;margin-top:4px;line-height:1.4;">📌 设置后所有APP数据自动以 <b>tfjl_*.json</b> 文件存到此目录，可直接备份、迁移、查看。</div>
                 </div>
 
                 <div style="margin-bottom:16px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:12px 14px;">
