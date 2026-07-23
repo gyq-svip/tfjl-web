@@ -52,17 +52,20 @@ if (isTauriApp) {
         }
     }
 
+    // 延迟写入：避免同步 JSON.stringify + localStorage.setItem 阻塞主线程
+    // 所有缓存写入统一走防抖队列（500ms 内多次调用只写最后一次）
+    const _deferredSaves = {};
+    function _deferredSetItem(key, data) {
+        if (_deferredSaves[key] !== undefined) clearTimeout(_deferredSaves[key]);
+        _deferredSaves[key] = setTimeout(() => {
+            try { localStorage.setItem(key, JSON.stringify(data)); } catch (e) {}
+            delete _deferredSaves[key];
+        }, 500);
+    }
+
     function saveScanCache(files) {
-        try {
-            const cache = {
-                date: getTodayStr(),
-                files: files,
-                savedAt: Date.now()
-            };
-            localStorage.setItem(getScanCacheKey(), JSON.stringify(cache));
-        } catch (e) {
-            // localStorage 满了，忽略
-        }
+        const cache = { date: getTodayStr(), files: files, savedAt: Date.now() };
+        _deferredSetItem(getScanCacheKey(), cache);
     }
 
     // ==================== 截图统计缓存（与扫描缓存同模式，日缓存） ====================
@@ -84,14 +87,8 @@ if (isTauriApp) {
     }
 
     function saveStatsCache(statsData) {
-        try {
-            const cache = {
-                date: getTodayStr(),
-                stats: statsData,
-                savedAt: Date.now()
-            };
-            localStorage.setItem(getStatsCacheKey(), JSON.stringify(cache));
-        } catch (e) { /* ignore */ }
+        const cache = { date: getTodayStr(), stats: statsData, savedAt: Date.now() };
+        _deferredSetItem(getStatsCacheKey(), cache);
     }
 
     // ==================== IPC 调用封装 ====================
@@ -232,9 +229,10 @@ if (isTauriApp) {
         if (!isTauriApp) return;
         showSettingsModal();
         fillSettingsForm();
+        // 三个统计并发启动，不互相阻塞
         scanAllFiles();
-        calcScreenshotStats();  // 自动加载今日缓存，无需手动点击
-        calcLogBattleStats();   // 自动加载对战统计（优先走缓存，只读今日新文件）
+        calcScreenshotStats();
+        calcLogBattleStats();
     }
 
     function closeAppLocalSettings() {
@@ -1590,20 +1588,18 @@ if (isTauriApp) {
     function saveLogBattleResultCache(dailyMap, patterns) {
         if (!maDirs.logs) return;
         const key = 'TFJL_LogBattleResult_' + btoa(unescape(encodeURIComponent(maDirs.logs))).slice(0, 32);
-        try {
-            const entry = { date: getTodayStr(), dailyMap, savedAt: Date.now() };
-            if (patterns) entry._stats = {
-                positiveCount: patterns._sampleCount || 0,
-                uniqueDates: patterns._uniqueDates || 0,
-                negativeCount: patterns._negativeCount || 0,
-                totalCached: patterns._totalCached || 0,
-                skipDirs: patterns.skipDirs ? patterns.skipDirs.length : 0,
-                exts: patterns.exts || [],
-                dirs: patterns.dirs ? patterns.dirs.length : 0,
-                tokens: patterns.tokens ? patterns.tokens.length : 0
-            };
-            localStorage.setItem(key, JSON.stringify(entry));
-        } catch (e) { /* ignore */ }
+        const entry = { date: getTodayStr(), dailyMap, savedAt: Date.now() };
+        if (patterns) entry._stats = {
+            positiveCount: patterns._sampleCount || 0,
+            uniqueDates: patterns._uniqueDates || 0,
+            negativeCount: patterns._negativeCount || 0,
+            totalCached: patterns._totalCached || 0,
+            skipDirs: patterns.skipDirs ? patterns.skipDirs.length : 0,
+            exts: patterns.exts || [],
+            dirs: patterns.dirs ? patterns.dirs.length : 0,
+            tokens: patterns.tokens ? patterns.tokens.length : 0
+        };
+        _deferredSetItem(key, entry);
     }
 
     // 渲染对战统计图表（由 calcLogBattleStats 或缓存命中后调用）
@@ -1937,7 +1933,7 @@ if (isTauriApp) {
             if (cache._patterns) {
                 dlog('🧠 已保存学习模式: ' + cache._patterns.exts.length + ' 扩展名, ' + cache._patterns.dirs.length + ' 目录, ' + cache._patterns.tokens.length + ' 关键词');
             }
-            try { localStorage.setItem(CACHE_KEY, JSON.stringify(cache)); } catch (e) { dlog('缓存保存失败: ' + e.message); }
+            _deferredSetItem(CACHE_KEY, cache);
 
             // 保存日结果缓存（下次打开直接渲染，跳过全部扫描）
             saveLogBattleResultCache(dailyMap, cache._patterns);
