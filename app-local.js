@@ -473,6 +473,19 @@ if (isTauriApp) {
                     <div style="color:rgba(255,255,255,0.35);font-size:0.68rem;margin-top:4px;line-height:1.4;">📌 设置后所有APP数据自动以 <b>tfjl_*.json</b> 文件存到此目录，可直接备份、迁移、查看。</div>
                 </div>
 
+                <div style="color:#ff9800;font-size:0.9rem;margin-bottom:12px;margin-top:16px;">📦 备份与还原</div>
+                <div style="margin-bottom:12px;background:rgba(255,152,0,0.06);border:1px solid rgba(255,152,0,0.2);border-radius:10px;padding:14px;">
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        <button onclick="backupAllData()" style="background:linear-gradient(135deg,#ff9800,#e65100);color:white;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-size:0.85rem;white-space:nowrap;">📤 一键备份</button>
+                        <span style="color:rgba(255,255,255,0.4);font-size:0.72rem;line-height:1.3;">打包所有配置、项目、统计到一个文件</span>
+                    </div>
+                    <div style="margin-top:10px;display:flex;gap:8px;align-items:center;">
+                        <button onclick="loadBackupList()" style="background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.6);border:1px solid rgba(255,255,255,0.12);border-radius:6px;padding:6px 14px;cursor:pointer;font-size:0.75rem;white-space:nowrap;">📋 查看备份</button>
+                        <span style="color:rgba(255,255,255,0.3);font-size:0.68rem;">选择一个备份 → 点「还原」即可一键恢复全部数据</span>
+                    </div>
+                    <div id="backupFileList" style="margin-top:8px;max-height:180px;overflow:auto;display:none;"></div>
+                </div>
+
                 <div style="margin-bottom:16px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:12px 14px;">
                     <div style="color:rgba(255,255,255,0.5);font-size:0.7rem;margin-bottom:8px;">💡 提示：如果打开设置面板或加载统计时感觉很卡，可尝试关闭以下自动加载功能</div>
                     <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;">
@@ -772,6 +785,148 @@ if (isTauriApp) {
         window.scannedFiles = scannedFiles;
         // 保存缓存，后续切标签或打开设置无需重新扫描
         if (scannedFiles.length > 0) saveScanCache(scannedFiles);
+    }
+
+    // ==================== 全局备份与还原 ====================
+
+    async function backupAllData() {
+        if (!softwareDataDir) { alert('请先设置 💾 软件数据目录'); return; }
+
+        // 收集所有 localStorage 数据
+        const localStorageData = {};
+        for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k) localStorageData[k] = localStorage.getItem(k);
+        }
+
+        // 收集 IndexedDB 数据
+        let projects = [], dbCategories = [];
+        try {
+            if (window.db) {
+                projects = await new Promise((res, rej) => {
+                    const tx = window.db.transaction(['projects'], 'readonly');
+                    const store = tx.objectStore('projects');
+                    const req = store.getAll();
+                    req.onsuccess = () => res(req.result || []);
+                    req.onerror = () => rej(req.error);
+                });
+            }
+            dbCategories = window.categories || [];
+        } catch (e) {
+            console.error('[备份] IndexedDB读取失败:', e);
+        }
+
+        const backup = {
+            type: 'tfjl-full-backup',
+            version: '1.0',
+            backupDate: new Date().toISOString(),
+            localStorage: localStorageData,
+            indexedDB: { projects, categories: dbCategories }
+        };
+
+        const d = new Date();
+        const ts = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' +
+            String(d.getDate()).padStart(2, '0') + '_' +
+            String(d.getHours()).padStart(2, '0') + String(d.getMinutes()).padStart(2, '0');
+        const fileName = 'tfjl-full-backup-' + ts + '.json';
+        const filePath = softwareDataDir.replace(/[\\/]+$/, '') + '\\' + fileName;
+
+        const ok = await writeTextFile(filePath, JSON.stringify(backup, null, 2));
+        if (ok) {
+            alert('✅ 备份成功！\n\n文件：' + fileName + '\n配置项：' + Object.keys(localStorageData).length +
+                ' 个\n项目：' + projects.length + ' 个\n\n存放位置：\n' + softwareDataDir);
+            loadBackupList(); // 刷新备份列表
+        } else {
+            alert('❌ 备份失败，请检查目录权限');
+        }
+    }
+
+    async function loadBackupList() {
+        if (!softwareDataDir) { alert('请先设置 💾 软件数据目录'); return; }
+        const dir = softwareDataDir.replace(/[\\/]+$/, '');
+        let entries;
+        try { entries = await readDir(dir); }
+        catch (e) { alert('无法读取数据目录'); return; }
+
+        const backupFiles = entries
+            .filter(e => e.is_file && e.name.startsWith('tfjl-full-backup-') && e.name.endsWith('.json'))
+            .sort((a, b) => b.name.localeCompare(a.name)); // 最新在前
+
+        const listDiv = document.getElementById('backupFileList');
+        if (!listDiv) return;
+        listDiv.style.display = 'block';
+
+        if (backupFiles.length === 0) {
+            listDiv.innerHTML = '<div style="color:rgba(255,255,255,0.3);text-align:center;padding:10px;font-size:0.75rem;">暂无备份文件，点击上方「📤 一键备份」创建</div>';
+            return;
+        }
+
+        listDiv.innerHTML = backupFiles.map(f => {
+            const displayTs = f.name.replace('tfjl-full-backup-', '').replace('.json', '');
+            const parts = displayTs.split('_');
+            const displayName = parts[0] + ' ' + (parts[1] ? parts[1].slice(0, 2) + ':' + parts[1].slice(2) : '');
+            return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;margin-bottom:4px;background:rgba(255,255,255,0.04);border-radius:6px;">' +
+                '<span style="color:#fff;font-size:0.78rem;">📦 ' + displayName + '</span>' +
+                '<button class="_restoreBackupBtn" data-filename="' + f.name + '" style="background:linear-gradient(135deg,#2196f3,#1565c0);color:white;border:none;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:0.7rem;">还原</button>' +
+                '</div>';
+        }).join('');
+
+        listDiv.querySelectorAll('._restoreBackupBtn').forEach(btn => {
+            btn.addEventListener('click', () => restoreFromBackup(btn.dataset.filename));
+        });
+    }
+
+    async function restoreFromBackup(fileName) {
+        if (!softwareDataDir) return;
+        const filePath = softwareDataDir.replace(/[\\/]+$/, '') + '\\' + fileName;
+        const raw = await readTextFile(filePath);
+        if (!raw) { alert('❌ 无法读取备份文件'); return; }
+
+        let backup;
+        try { backup = JSON.parse(raw); } catch (e) { alert('❌ 备份文件格式错误'); return; }
+        if (backup.type !== 'tfjl-full-backup') { alert('❌ 不是有效的备份文件'); return; }
+
+        const lsKeys = Object.keys(backup.localStorage || {}).length;
+        const projCount = (backup.indexedDB && backup.indexedDB.projects || []).length;
+        const catCount = (backup.indexedDB && backup.indexedDB.categories || []).length;
+
+        if (!confirm('确定要还原此备份吗？\n\n📋 备份日期：' + (backup.backupDate || '未知') +
+            '\n🔑 配置项：' + lsKeys + ' 个' +
+            '\n📁 项目：' + projCount + ' 个' +
+            '\n📂 分类：' + catCount + ' 个' +
+            '\n\n⚠️ 当前所有数据将被覆盖！\n建议先点击「一键备份」保存当前数据。')) {
+            return;
+        }
+
+        // 还原 localStorage
+        if (backup.localStorage) {
+            for (const [key, value] of Object.entries(backup.localStorage)) {
+                try { localStorage.setItem(key, value); }
+                catch (e) { console.error('[还原] localStorage写入失败:', key, e); }
+            }
+        }
+
+        // 还原 IndexedDB
+        if (backup.indexedDB && window.db) {
+            try {
+                if (backup.indexedDB.projects && backup.indexedDB.projects.length > 0) {
+                    await new Promise((res, rej) => {
+                        const tx = window.db.transaction(['projects'], 'readwrite');
+                        const store = tx.objectStore('projects');
+                        for (const p of backup.indexedDB.projects) store.put(p);
+                        tx.oncomplete = res;
+                        tx.onerror = rej;
+                    });
+                }
+                if (backup.indexedDB.categories && backup.indexedDB.categories.length > 0) {
+                    window.categories = backup.indexedDB.categories;
+                    if (typeof window.saveCategories === 'function') window.saveCategories();
+                }
+            } catch (e) { console.error('[还原] IndexedDB恢复失败:', e); }
+        }
+
+        alert('✅ 还原完成！建议刷新页面以应用所有配置。');
+        if (confirm('立即刷新页面？')) { location.reload(); }
     }
 
     function saveSettingsAndClose() {
