@@ -2286,11 +2286,12 @@ if (isTauriApp) {
             if (fastCache && fastCache._files && Object.keys(fastCache._files).length > 0) {
                 dlog('🚀 快速路径：缓存 ' + Object.keys(fastCache._files).length + ' 个文件，' + (force ? '强制重读今日所有文件' : '只扫描今日新增'));
 
-                // 从缓存构建历史 dailyMap
+                // 从缓存构建历史 dailyMap（force时跳过今天，避免叠加翻倍）
                 const todayStr = getTodayStr();
                 let dailyMap = {};
                 for (const [, info] of Object.entries(fastCache._files)) {
                     if (info.win === -1 || !info.date || info.date === '未知') continue;
+                    if (force && info.date === todayStr) continue; // 强制刷新：今天从零开始，只用新读的结果
                     if (!dailyMap[info.date]) dailyMap[info.date] = { win: 0, lose: 0 };
                     dailyMap[info.date].win += (info.win || 0);
                     dailyMap[info.date].lose += (info.lose || 0);
