@@ -1485,11 +1485,152 @@ if (isTauriApp) {
     function clearLogBattleCache() {
         try {
             localStorage.removeItem('TFJL_LogBattleV2');
-            const statsEl = document.getElementById('logBattleStats');
-            if (statsEl) {
-                statsEl.innerHTML = '<div style="color:rgba(255,152,0,0.7);text-align:center;padding:20px;font-size:0.85rem;">✅ 缓存已清除，下次统计将重新扫描所有文件</div>';
+            // 同时清除所有结果缓存（跳过扫描的日缓存）
+            const keys = Object.keys(localStorage);
+            for (const k of keys) {
+                if (k.startsWith('TFJL_LogBattleResult_')) localStorage.removeItem(k);
             }
         } catch (e) { /* ignore */ }
+        const statsEl = document.getElementById('logBattleStats');
+        if (statsEl) {
+            statsEl.innerHTML = '<div style="color:rgba(255,152,0,0.7);text-align:center;padding:20px;font-size:0.85rem;">✅ 缓存已清除，下次统计将重新扫描所有文件</div>';
+        }
+    }
+
+    // 对战统计日结果缓存（跳过扫描，直接渲染，与截图统计同模式）
+    function loadLogBattleResultCache() {
+        if (!maDirs.logs) return null;
+        const key = 'TFJL_LogBattleResult_' + btoa(unescape(encodeURIComponent(maDirs.logs))).slice(0, 32);
+        try {
+            const raw = localStorage.getItem(key);
+            if (!raw) return null;
+            const cache = JSON.parse(raw);
+            if (cache.date !== getTodayStr()) return null;
+            return cache;
+        } catch (e) { return null; }
+    }
+
+    function saveLogBattleResultCache(dailyMap) {
+        if (!maDirs.logs) return;
+        const key = 'TFJL_LogBattleResult_' + btoa(unescape(encodeURIComponent(maDirs.logs))).slice(0, 32);
+        try {
+            localStorage.setItem(key, JSON.stringify({ date: getTodayStr(), dailyMap, savedAt: Date.now() }));
+        } catch (e) { /* ignore */ }
+    }
+
+    // 渲染对战统计图表（由 calcLogBattleStats 或缓存命中后调用）
+    function renderLogBattleStats(dailyMap, statsEl, opts) {
+        const fromCache = opts && opts.fromCache;
+        const sortedAllDates = Object.keys(dailyMap).sort((a, b) => b.localeCompare(a));
+        const sortedDates = sortedAllDates.slice(0, 30);
+        const cutOffDays = sortedAllDates.length - sortedDates.length;
+
+        if (sortedDates.length === 0) {
+            if (!fromCache) {
+                const hasEncodingError = opts && opts.hasEncodingError;
+                const readErr = opts ? opts.readErr : 0;
+                const allFiles = opts ? opts.allFiles : [];
+                const logFiles = opts ? opts.logFiles : [];
+                const todayFiles = opts ? opts.todayFiles : [];
+                const histFiles = opts ? opts.histFiles : [];
+                const skippedFiles = opts ? opts.skippedFiles : 0;
+                const encodingHint = hasEncodingError
+                    ? '<span style="font-size:0.7rem;color:#f44336;">检测到 ' + readErr + ' 个文件因非 UTF-8 编码读取失败，请升级到 1.1.8（支持 BOM/GB18030/BIG5 多编码自动检测）</span>'
+                    : '<span style="font-size:0.7rem;color:#ff9800;">提示：内容可能是 GBK/BIG5 等非 UTF-8 编码 → 升级到 1.1.8 即可自动兼容</span>';
+                const errHtml = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">日志文件中未找到「对战胜利确定」或「对战失败确定」关键词<br><span style="font-size:0.7rem;">共 ' + allFiles.length + ' 个文件，过滤后 ' + logFiles.length + ' 个（今日 ' + todayFiles.length + '，历史 ' + histFiles.length + '），跳过 ' + skippedFiles + ' 个非日志，读取出错 ' + readErr + ' 个</span><br>' + encodingHint + '</div>';
+                statsEl.innerHTML = errHtml;
+            }
+            return;
+        }
+
+        // 摘要
+        let html = '';
+        const totalWin = Object.values(dailyMap).reduce((s, d) => s + d.win, 0);
+        const totalLose = Object.values(dailyMap).reduce((s, d) => s + d.lose, 0);
+        const totalDays = sortedDates.length;
+        const totalBattles = totalWin + totalLose;
+        const winRate = totalBattles > 0 ? (totalWin / totalBattles * 100).toFixed(1) : '0';
+
+        html += '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px;">';
+        html += '<span style="color:#4ecdc4;">✅ 胜利 <b>' + totalWin + '</b></span>';
+        html += '<span style="color:#f44336;">❌ 失败 <b>' + totalLose + '</b></span>';
+        html += '<span style="color:#ffd700;">📊 总场次 <b>' + totalBattles + '</b></span>';
+        html += '<span style="color:#4fc3f7;">📈 胜率 <b>' + winRate + '%</b></span>';
+        html += '<span style="color:rgba(255,255,255,0.4);">（' + totalDays + ' 天）</span>';
+        html += '</div>';
+
+        // 柱状图
+        const chartW = 390;
+        const padL = 30, padR = 10, padT = 16, padB = 18;
+        const hMax = Math.max(1, ...Object.values(dailyMap).map(d => Math.max(d.win, d.lose)));
+        const chartH = padT + 120 + padB;
+        const plotW = chartW - padL - padR;
+        const plotH = 120;
+        const groupGap = 6;
+        const n = sortedDates.length;
+        const slots = n * 2;
+        const slotW = Math.max(6, Math.floor((plotW - (n - 1) * groupGap) / slots));
+
+        const gridLines = [0.25, 0.5, 0.75, 1.0];
+        let gridHtml = gridLines.map(r => {
+            const gy = padT + plotH * (1 - r);
+            return '<line x1="' + padL + '" y1="' + gy + '" x2="' + (padL + plotW) + '" y2="' + gy + '" stroke="rgba(255,255,255,0.06)" stroke-width="1"/><text x="' + (padL - 4) + '" y="' + (gy + 3) + '" fill="rgba(255,255,255,0.25)" font-size="8" text-anchor="end">' + Math.round(hMax * r) + '</text>';
+        }).join('');
+
+        let barsHtml = '';
+        sortedDates.forEach((date, i) => {
+            const data = dailyMap[date];
+            const groupX = padL + i * (slotW * 2 + groupGap);
+            const winBH = Math.max(3, (data.win / hMax) * plotH);
+            const winBY = padT + plotH - winBH;
+            barsHtml += '<rect x="' + groupX + '" y="' + winBY + '" width="' + slotW + '" height="' + winBH + '" rx="2" fill="#4ecdc4" opacity="0.85"><title>' + date + ' 胜利: ' + data.win + '</title></rect>';
+            if (data.win > 0) {
+                barsHtml += '<text x="' + (groupX + slotW / 2) + '" y="' + (winBY - 3) + '" fill="#4ecdc4" font-size="8" font-weight="bold" text-anchor="middle">' + data.win + '</text>';
+            }
+            const loseBH = Math.max(3, (data.lose / hMax) * plotH);
+            const loseBY = padT + plotH - loseBH;
+            const loseX = groupX + slotW;
+            barsHtml += '<rect x="' + loseX + '" y="' + loseBY + '" width="' + slotW + '" height="' + loseBH + '" rx="2" fill="#f44336" opacity="0.85"><title>' + date + ' 失败: ' + data.lose + '</title></rect>';
+            if (data.lose > 0) {
+                barsHtml += '<text x="' + (loseX + slotW / 2) + '" y="' + (loseBY - 3) + '" fill="#f44336" font-size="8" font-weight="bold" text-anchor="middle">' + data.lose + '</text>';
+            }
+            barsHtml += '<text x="' + (groupX + slotW) + '" y="' + (padT + plotH + 13) + '" fill="rgba(255,255,255,0.45)" font-size="9" text-anchor="middle">' + date.slice(5) + '</text>';
+        });
+
+        html += '<div style="display:flex;gap:12px;align-items:center;margin-bottom:4px;font-size:0.7rem;">';
+        html += '<span style="display:inline-block;width:10px;height:10px;background:#4ecdc4;border-radius:2px;"></span> 胜利';
+        html += '<span style="display:inline-block;width:10px;height:10px;background:#f44336;border-radius:2px;"></span> 失败';
+        html += '<span style="margin-left:8px;color:rgba(255,255,255,0.3);">x轴: 月-日</span>';
+        html += '</div>';
+
+        html += '<svg width="' + chartW + '" height="' + chartH + '" style="display:block;">' + gridHtml + barsHtml + '</svg>';
+
+        // 底部状态提示
+        html += '<div style="font-size:0.65rem;color:rgba(255,255,255,0.25);margin-top:6px;text-align:right;">';
+        if (fromCache) {
+            html += '📦 今日缓存，秒开展示';
+        } else if (opts) {
+            const cacheHits = opts.cacheHits || 0;
+            const todayFiles = opts.todayFiles || [];
+            const skippedFiles = opts.skippedFiles || 0;
+            const toReadFiles = opts.toReadFiles || [];
+            html += '📦 缓存 ' + cacheHits + ' 天历史 · 今日扫描 ' + todayFiles.length + ' 文件 · 已跳过 ' + skippedFiles + ' 非日志';
+            if (toReadFiles.length > todayFiles.length) {
+                html += ' · ' + (toReadFiles.length - todayFiles.length) + ' 个历史文件已变化重新读取';
+            }
+            if (opts.usingLearned && opts.learnedPatterns) {
+                html += (opts.learnedPatterns.exts.length > 0 ? ' · 🧠 学习模式已启用（扩展名: ' + opts.learnedPatterns.exts.join(',') + '）' : ' · 🧠 学习模式已启用');
+            }
+        }
+        html += '</div>';
+        if (opts && !fromCache && opts.hasEncodingError) {
+            html += '<div style="font-size:0.65rem;color:#f44336;margin-top:2px;text-align:right;">⚠️ ' + opts.readErr + ' 个文件因 UTF-8 解码失败，请 cargo tauri build 重编译 APP</div>';
+        }
+        if (cutOffDays > 0) {
+            html += '<div style="font-size:0.65rem;color:rgba(255,255,255,0.25);margin-top:2px;text-align:right;">📦 仅显示最近30天，' + cutOffDays + ' 天前的数据已省略</div>';
+        }
+
+        statsEl.innerHTML = html;
     }
 
     async function calcLogBattleStats(targetId, forceParam) {
@@ -1508,6 +1649,17 @@ if (isTauriApp) {
 
         const debugLines = [];
         function dlog(msg) { debugLines.push(msg); console.log('[日志统计]', msg); }
+
+        // 日结果缓存：今天扫过就直接渲染，跳过目录扫描（最耗时，几千文件递归扫描可能要10分钟）
+        if (!force) {
+            const resultCache = loadLogBattleResultCache();
+            if (resultCache && resultCache.dailyMap && Object.keys(resultCache.dailyMap).length > 0) {
+                dlog('✅ 使用今日结果缓存，跳过全部扫描');
+                renderLogBattleStats(resultCache.dailyMap, statsEl, { fromCache: true });
+                window._lastLogDebugLines = debugLines;
+                return;
+            }
+        }
 
         dlog('开始扫描: ' + maDirs.logs);
         statsEl.innerHTML = '<div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;font-size:0.85rem;">⏳ 正在扫描日志文件并统计…</div>';
@@ -1595,7 +1747,7 @@ if (isTauriApp) {
 
             // 4. 历史文件查缓存：路径 + modified 一致则直接复用
             const toReadFiles = [...todayFiles]; // 今日文件全部读取
-            const dailyMap = {};
+            let dailyMap = {};
             let cacheHits = 0;
 
             for (const f of histFiles) {
@@ -1677,101 +1829,16 @@ if (isTauriApp) {
             }
             try { localStorage.setItem(CACHE_KEY, JSON.stringify(cache)); } catch (e) { dlog('缓存保存失败: ' + e.message); }
 
+            // 保存日结果缓存（下次打开直接渲染，跳过全部扫描）
+            saveLogBattleResultCache(dailyMap);
+
             // 6. 渲染（最近30天）
-            const sortedAllDates = Object.keys(dailyMap).sort((a, b) => b.localeCompare(a));
-            const sortedDates = sortedAllDates.slice(0, 30);
-            const cutOffDays = sortedAllDates.length - sortedDates.length;
-
-            if (sortedDates.length === 0) {
-                window._lastLogDebugLines = debugLines;
-                const encodingHint = hasEncodingError
-                    ? '<span style="font-size:0.7rem;color:#f44336;">检测到 ' + readErr + ' 个文件因非 UTF-8 编码读取失败，请升级到 1.1.8（支持 BOM/GB18030/BIG5 多编码自动检测）</span>'
-                    : '<span style="font-size:0.7rem;color:#ff9800;">提示：内容可能是 GBK/BIG5 等非 UTF-8 编码 → 升级到 1.1.8 即可自动兼容</span>';
-                const errHtml = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">日志文件中未找到「对战胜利确定」或「对战失败确定」关键词<br><span style="font-size:0.7rem;">共 ' + allFiles.length + ' 个文件，过滤后 ' + logFiles.length + ' 个（今日 ' + todayFiles.length + '，历史 ' + histFiles.length + '），跳过 ' + skippedFiles + ' 个非日志，读取出错 ' + readErr + ' 个</span><br>' + encodingHint + '</div>';
-                statsEl.innerHTML = errHtml;
-                return;
-            }
-
-            // 摘要 + 图表
-            let html = '';
-            const totalWin = Object.values(dailyMap).reduce((s, d) => s + d.win, 0);
-            const totalLose = Object.values(dailyMap).reduce((s, d) => s + d.lose, 0);
-            const totalDays = sortedDates.length;
-            const totalBattles = totalWin + totalLose;
-            const winRate = totalBattles > 0 ? (totalWin / totalBattles * 100).toFixed(1) : '0';
-
-            html += '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px;">';
-            html += '<span style="color:#4ecdc4;">✅ 胜利 <b>' + totalWin + '</b></span>';
-            html += '<span style="color:#f44336;">❌ 失败 <b>' + totalLose + '</b></span>';
-            html += '<span style="color:#ffd700;">📊 总场次 <b>' + totalBattles + '</b></span>';
-            html += '<span style="color:#4fc3f7;">📈 胜率 <b>' + winRate + '%</b></span>';
-            html += '<span style="color:rgba(255,255,255,0.4);">（' + totalDays + ' 天）</span>';
-            html += '</div>';
-
-            // 柱状图
-            const chartW = 390;
-            const padL = 30, padR = 10, padT = 16, padB = 18;
-            const hMax = Math.max(1, ...Object.values(dailyMap).map(d => Math.max(d.win, d.lose)));
-            const chartH = padT + 120 + padB;
-            const plotW = chartW - padL - padR;
-            const plotH = 120;
-            const groupGap = 6;
-            const n = sortedDates.length;
-            const slots = n * 2;
-            const slotW = Math.max(6, Math.floor((plotW - (n - 1) * groupGap) / slots));
-
-            const gridLines = [0.25, 0.5, 0.75, 1.0];
-            let gridHtml = gridLines.map(r => {
-                const gy = padT + plotH * (1 - r);
-                return '<line x1="' + padL + '" y1="' + gy + '" x2="' + (padL + plotW) + '" y2="' + gy + '" stroke="rgba(255,255,255,0.06)" stroke-width="1"/><text x="' + (padL - 4) + '" y="' + (gy + 3) + '" fill="rgba(255,255,255,0.25)" font-size="8" text-anchor="end">' + Math.round(hMax * r) + '</text>';
-            }).join('');
-
-            let barsHtml = '';
-            sortedDates.forEach((date, i) => {
-                const data = dailyMap[date];
-                const groupX = padL + i * (slotW * 2 + groupGap);
-                const winBH = Math.max(3, (data.win / hMax) * plotH);
-                const winBY = padT + plotH - winBH;
-                barsHtml += '<rect x="' + groupX + '" y="' + winBY + '" width="' + slotW + '" height="' + winBH + '" rx="2" fill="#4ecdc4" opacity="0.85"><title>' + date + ' 胜利: ' + data.win + '</title></rect>';
-                if (data.win > 0) {
-                    barsHtml += '<text x="' + (groupX + slotW / 2) + '" y="' + (winBY - 3) + '" fill="#4ecdc4" font-size="8" font-weight="bold" text-anchor="middle">' + data.win + '</text>';
-                }
-                const loseBH = Math.max(3, (data.lose / hMax) * plotH);
-                const loseBY = padT + plotH - loseBH;
-                const loseX = groupX + slotW;
-                barsHtml += '<rect x="' + loseX + '" y="' + loseBY + '" width="' + slotW + '" height="' + loseBH + '" rx="2" fill="#f44336" opacity="0.85"><title>' + date + ' 失败: ' + data.lose + '</title></rect>';
-                if (data.lose > 0) {
-                    barsHtml += '<text x="' + (loseX + slotW / 2) + '" y="' + (loseBY - 3) + '" fill="#f44336" font-size="8" font-weight="bold" text-anchor="middle">' + data.lose + '</text>';
-                }
-                barsHtml += '<text x="' + (groupX + slotW) + '" y="' + (padT + plotH + 13) + '" fill="rgba(255,255,255,0.45)" font-size="9" text-anchor="middle">' + date.slice(5) + '</text>';
+            renderLogBattleStats(dailyMap, statsEl, {
+                allFiles, logFiles, todayFiles, histFiles, skippedFiles,
+                cacheHits, toReadFiles, usingLearned, learnedPatterns,
+                hasEncodingError, readErr
             });
-
-            html += '<div style="display:flex;gap:12px;align-items:center;margin-bottom:4px;font-size:0.7rem;">';
-            html += '<span style="display:inline-block;width:10px;height:10px;background:#4ecdc4;border-radius:2px;"></span> 胜利';
-            html += '<span style="display:inline-block;width:10px;height:10px;background:#f44336;border-radius:2px;"></span> 失败';
-            html += '<span style="margin-left:8px;color:rgba(255,255,255,0.3);">x轴: 月-日</span>';
-            html += '</div>';
-
-            html += '<svg width="' + chartW + '" height="' + chartH + '" style="display:block;">' + gridHtml + barsHtml + '</svg>';
-
-            // 缓存状态提示
-            html += '<div style="font-size:0.65rem;color:rgba(255,255,255,0.25);margin-top:6px;text-align:right;">📦 缓存 ' + cacheHits + ' 天历史 · 今日扫描 ' + todayFiles.length + ' 文件 · 已跳过 ' + skippedFiles + ' 非日志';
-            if (toReadFiles.length > todayFiles.length) {
-                html += ' · ' + (toReadFiles.length - todayFiles.length) + ' 个历史文件已变化重新读取';
-            }
-            if (usingLearned) {
-                html += (learnedPatterns && learnedPatterns.exts.length > 0 ? ' · 🧠 学习模式已启用（扩展名: ' + learnedPatterns.exts.join(',') + '）' : ' · 🧠 学习模式已启用');
-            }
-            html += '</div>';
-            if (hasEncodingError) {
-                html += '<div style="font-size:0.65rem;color:#f44336;margin-top:2px;text-align:right;">⚠️ ' + readErr + ' 个文件因 UTF-8 解码失败，请 cargo tauri build 重编译 APP</div>';
-            }
-            if (cutOffDays > 0) {
-                html += '<div style="font-size:0.65rem;color:rgba(255,255,255,0.25);margin-top:2px;text-align:right;">📦 仅显示最近30天，' + cutOffDays + ' 天前的数据已省略</div>';
-            }
-
             window._lastLogDebugLines = debugLines;
-            statsEl.innerHTML = html;
         } catch (e) {
             window._lastLogDebugLines = debugLines;
             statsEl.innerHTML = '<div style="color:#f44336;text-align:center;padding:20px;font-size:0.85rem;">统计失败：' + e.message + '</div>';
