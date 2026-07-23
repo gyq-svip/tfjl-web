@@ -10,13 +10,14 @@ const isTauriApp = (typeof window.__TAURI_INTERNALS__ !== 'undefined') ||
                     navigator.userAgent.includes('Tauri');
 
 if (isTauriApp) {
-    // 老马5个固定目录配置
+    // 老马6个固定目录配置
     let maDirs = {
         coop:       '',  // 合作脚本目录
         activity:   '',  // 活动脚本目录
         battle:     '',  // 对战目录（JSON）
         battleMax:  '',  // 对战MAX目录（TXT）
-        screenshot: ''   // 截图目录（统计每天打多少局）
+        screenshot: '',  // 截图目录（统计每天打多少局）
+        logs:       ''   // 对战日志目录（统计胜负等）
     };
 
     let softwareDataDir = '';
@@ -208,11 +209,19 @@ if (isTauriApp) {
                     </div>
                 </div>
 
-                <div style="margin-bottom:20px;">
+                <div style="margin-bottom:12px;">
                     <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;display:block;margin-bottom:4px;">截图目录（按日期子文件夹，统计每天打多少局）</label>
                     <div style="display:flex;gap:8px;">
                         <input type="text" id="maDir_screenshot" readonly placeholder="未设置" style="flex:1;background:rgba(0,0,0,0.3);color:#fff;border:1px solid rgba(255,255,255,0.2);padding:8px 12px;border-radius:6px;font-size:0.85rem;">
                         <button onclick="selectMaDir('screenshot')" style="background:linear-gradient(135deg,#00bcd4,#00838f);color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;white-space:nowrap;">浏览...</button>
+                    </div>
+                </div>
+
+                <div style="margin-bottom:20px;">
+                    <label style="color:#ff9800;font-size:0.8rem;display:block;margin-bottom:4px;">🔍 对战日志目录（统计胜负等关键词检索）</label>
+                    <div style="display:flex;gap:8px;">
+                        <input type="text" id="maDir_logs" readonly placeholder="未设置" style="flex:1;background:rgba(0,0,0,0.3);color:#fff;border:1px solid rgba(255,152,0,0.3);padding:8px 12px;border-radius:6px;font-size:0.85rem;">
+                        <button onclick="selectMaDir('logs')" style="background:linear-gradient(135deg,#ff9800,#e65100);color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;white-space:nowrap;">浏览...</button>
                     </div>
                 </div>
 
@@ -262,6 +271,7 @@ if (isTauriApp) {
         document.getElementById('maDir_battle').value = maDirs.battle || '';
         document.getElementById('maDir_battleMax').value = maDirs.battleMax || '';
         document.getElementById('maDir_screenshot').value = maDirs.screenshot || '';
+        document.getElementById('maDir_logs').value = maDirs.logs || '';
         document.getElementById('softwareDataDirInput').value = softwareDataDir || '';
     }
 
@@ -361,7 +371,7 @@ if (isTauriApp) {
         const statsEl = document.getElementById('fuzzyStatsArea');
         if (!listEl) return;
 
-        const dirLabels = { coop: '合作', activity: '活动', battle: '对战', battleMax: '对战MAX', screenshot: '截图' };
+        const dirLabels = { coop: '合作', activity: '活动', battle: '对战', battleMax: '对战MAX', screenshot: '截图', logs: '日志' };
         const allDirs = Object.entries(maDirs).filter(([k, v]) => v && k !== 'screenshot');
 
         if (allDirs.length === 0) {
@@ -441,7 +451,7 @@ if (isTauriApp) {
     // 静默扫描（不上报UI，专门给脚本文件tab搜索用）
     async function silentScanFiles() {
         if (!maDirs) return;
-        const dirLabels = { coop: '合作', activity: '活动', battle: '对战', battleMax: '对战MAX', screenshot: '截图' };
+        const dirLabels = { coop: '合作', activity: '活动', battle: '对战', battleMax: '对战MAX', screenshot: '截图', logs: '日志' };
         const allDirs = Object.entries(maDirs).filter(([k, v]) => v && k !== 'screenshot');
         if (allDirs.length === 0) return;
 
