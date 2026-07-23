@@ -3,7 +3,7 @@
 // 策略：StaleWhileRevalidate（先用缓存秒开，后台静默更新）
 // ============================================================
 
-const CACHE_VERSION = 'tfjl-v1';
+const CACHE_VERSION = 'tfjl-v2';
 const CACHE_STATIC = CACHE_VERSION + '-static';
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
@@ -82,14 +82,34 @@ self.addEventListener('fetch', (event) => {
 
 // ============================================================
 // StaleWhileRevalidate：优先返回缓存（秒开），后台更新缓存
+// 增强：内容不同才更新缓存并通知页面有新版本
 // ============================================================
 function staleWhileRevalidate(request, cacheName) {
     return caches.open(cacheName).then((cache) => {
         return cache.match(request).then((cachedResponse) => {
             // 后台静默拉取最新资源，不阻塞页面渲染
-            const fetchPromise = fetch(request).then((networkResponse) => {
+            const fetchPromise = fetch(request).then(async (networkResponse) => {
                 if (networkResponse && networkResponse.status === 200) {
-                    cache.put(request, networkResponse.clone());
+                    const cachedClone = cachedResponse ? cachedResponse.clone() : null;
+                    const cachedText = cachedClone ? await cachedClone.text() : '';
+                    const networkClone = networkResponse.clone();
+                    const networkText = await networkClone.text();
+                    // 只有内容真的变了才更新缓存并通知页面
+                    if (cachedText !== networkText) {
+                        cache.put(request, new Response(networkText, {
+                            status: networkResponse.status,
+                            statusText: networkResponse.statusText,
+                            headers: networkResponse.headers
+                        }));
+                        // 通知所有客户端有新版本可用
+                        if (cachedResponse) {
+                            self.clients.matchAll().then(clients => {
+                                clients.forEach(client => {
+                                    client.postMessage({ type: 'NEW_VERSION_READY' });
+                                });
+                            });
+                        }
+                    }
                 }
                 return networkResponse;
             }).catch(() => {});
