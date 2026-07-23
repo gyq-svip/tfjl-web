@@ -6787,9 +6787,9 @@
         }
 
         function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
+            if (!text) return '';
+            const s = String(text);
+            return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
         }
 
         const chatRoomEntryModal = document.getElementById('chatRoomEntryModal');
@@ -7078,8 +7078,8 @@
                 parserBtn.style.borderBottom = 'none';
                 // 恢复布局偏好
                 if (typeof initScriptLayout === 'function') initScriptLayout();
-                // 自动静默扫描并刷新列表
-                if (window.silentScanFiles) { window.silentScanFiles().then(() => { renderScriptFileCategoryFilter(); if (typeof filterTxtFilesList === 'function') filterTxtFilesList(); }); }
+                // 自动静默扫描并刷新列表（setTimeout 确保浏览器先绘制标签切换 UI，再渲染列表）
+                if (window.silentScanFiles) { window.silentScanFiles().then(() => { setTimeout(() => { renderScriptFileCategoryFilter(); if (typeof filterTxtFilesList === 'function') filterTxtFilesList(); }, 0); }); }
                 else { renderScriptFileCategoryFilter(); }
             } else {
                 filesTab.style.display = 'none';
@@ -10800,6 +10800,10 @@
             const list = document.getElementById('txtFilesList');
             if (!list) return;
 
+            // 取消进行中的分批渲染，防止叠加上次未完成的渲染导致白屏
+            window._renderId = (window._renderId || 0) + 1;
+            const renderId = window._renderId;
+
             const scannedFiles = window.scannedFiles || [];
             window._selImportPaths.clear(); // 切换搜索时清空选择
 
@@ -10855,7 +10859,22 @@
             if (!html) {
                 html = '<div style="color:rgba(255,255,255,0.4);padding:10px;text-align:center;">未找到匹配的脚本</div>';
             }
-            list.innerHTML = html;
+
+            // 防白屏：先渲染项目文件（少）+ loading 占位，延迟到下一帧再渲染大块扫描文件列表
+            // requestAnimationFrame 确保浏览器先完成标签切换 UI 的绘制，再处理 innerHTML 解析
+            const scannedHtml = html.indexOf('📂 可导入文件') !== -1 ? html.substring(html.indexOf('<div style="margin-top:12px;padding-top:10px;border-top:')) : '';
+            const projectHtml = scannedHtml ? html.substring(0, html.indexOf(scannedHtml)) : html;
+
+            list.innerHTML = projectHtml + (scannedHtml ? '<div id="scannedFilesLoading" style="color:rgba(255,255,255,0.3);padding:12px;text-align:center;">⏳ 加载扫描文件列表...</div>' : '');
+
+            if (scannedHtml) {
+                // 延迟到下一帧渲染大批量 HTML，避免阻塞标签切换动画
+                requestAnimationFrame(() => {
+                    if (window._renderId !== renderId) return; // 已被新调用取消
+                    const loadingEl = document.getElementById('scannedFilesLoading');
+                    if (loadingEl) loadingEl.outerHTML = scannedHtml;
+                });
+            }
         }
 
         // ==================== 文本检索：多脚本关键词统计 ====================
@@ -20547,9 +20566,9 @@ function hasGistToken() {
         }
         
         function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
+            if (!text) return '';
+            const s = String(text);
+            return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
         }
         
         function startMessageScroll() {
