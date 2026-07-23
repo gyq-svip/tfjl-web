@@ -3139,7 +3139,7 @@
             <button id="messageWallToggle" onclick="toggleMessageWall()" title="需求墙" style="background:rgba(255,215,0,0.85);color:#1a1a2e;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 2px 10px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">📢</button>
             <div style="position:relative;">
                 <button onclick="toggleBackupMenu(this)" title="菜单" style="background:rgba(255,87,34,0.8);color:white;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 1px 6px rgba(0,0,0,0.15);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;">☰</button>
-                <div id="backupMenu" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:rgba(42,42,74,0.95);border:1px solid rgba(255,215,0,0.3);border-radius:8px;padding:8px 0;min-width:180px;z-index:1000;box-shadow:0 4px 15px rgba(0,0,0,0.4);backdrop-filter:blur(8px);">
+                <div id="backupMenu" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:rgba(42,42,74,0.95);border:1px solid rgba(255,215,0,0.3);border-radius:8px;padding:8px 0;width:200px;z-index:1000;box-shadow:0 4px 15px rgba(0,0,0,0.4);backdrop-filter:blur(8px);">
                     <div onclick="exportAllData();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📤 全部备份</div>
                     <div onclick="document.getElementById('importFileInput').click();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📥 全部恢复</div>
                     <div onclick="exportCurrentProject();document.getElementById('backupMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📤 备份此项目</div>
@@ -5831,8 +5831,8 @@
             }
         }
 
-        // 菜单「刷新最新资源」：清理缓存并重新加载，一次拿到最新前端
-        // 解决「更新后要开关几次才生效」的缓存问题（Service Worker 缓存策略导致）
+        // 菜单「刷新最新资源」：清理所有缓存并强制重新加载，确保拿到最新前端
+        // 核心优化：用时间戳 URL 强刷，彻底绕过浏览器/SW/WebView 各级缓存
         async function forceRefreshLatest() {
             const t = showLoadingToast('♻️ 正在获取最新资源...');
             try {
@@ -5857,15 +5857,28 @@
                     const names = await caches.keys();
                     await Promise.all(names.map((n) => caches.delete(n)));
                 }
-                t.success('✅ 已获取最新，正在重新加载...');
-                t.remove(1500);
-                // 清除本地缓存，刷新后 bootstrap 从网络拉取最新
-                try { localStorage.removeItem('TFJL_NotFirst'); localStorage.removeItem('TFJL_CachedHTML'); } catch(e) {}
-                setTimeout(() => location.reload(), 700);
-            } catch (e) {
-                t.error('⚠️ 刷新出错，正在重新加载...');
-                setTimeout(() => location.reload(), 900);
-            }
+                // 3. 清除 localStorage 标记 + 启动动画标记
+                try {
+                    localStorage.removeItem('TFJL_NotFirst');
+                    localStorage.removeItem('TFJL_CachedHTML');
+                } catch(e) {}
+                // 4. 强制注销当前 SW（让下次注册时拉全新 SW）
+                if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+                    try {
+                        navigator.serviceWorker.getRegistrations().then(regs => {
+                            regs.forEach(r => r.unregister());
+                        });
+                    } catch(e) {}
+                }
+            } catch (e) { /* 清理阶段出错不阻塞，继续强刷 */ }
+            // 强刷：带时间戳 URL + hard reload，彻底绕过各级缓存
+            t.success('✅ 已获取最新，正在重新加载...');
+            setTimeout(() => {
+                const url = new URL(location.href);
+                url.searchParams.set('_t', Date.now());
+                // 用 location.replace 替换当前历史，避免回退到旧缓存版本
+                location.replace(url.toString());
+            }, 800);
         }
 
         // 检查更新（静默模式，在 App 启动时使用）
