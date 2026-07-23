@@ -10784,7 +10784,7 @@
             if (!window._selShareScannedPaths) window._selShareScannedPaths = new Set();
             window._selShareScannedPaths.clear();
             if (checked) {
-                document.querySelectorAll('.share-scanned-checkbox').forEach(cb => { cb.checked = true; window._selShareScannedPaths.add(cb.value); });
+                document.querySelectorAll('.share-scanned-checkbox').forEach(cb => { cb.checked = true; window._selShareScannedPaths.add(cb.getAttribute('data-scanned-path')); });
             } else {
                 document.querySelectorAll('.share-scanned-checkbox').forEach(cb => { cb.checked = false; });
             }
@@ -10841,8 +10841,8 @@
                 <div style="max-height:140px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(0,188,212,0.3) transparent;padding-right:4px;display:flex;flex-direction:column;gap:5px;">`;
 
             list.forEach(f => {
-                const safePath = f.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-                const safeName = f.name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                const escPath = escapeHtml(f.path);
+                const escName = escapeHtml(f.name);
                 const fileCat = f.category || '其他';
                 const catColor = getScriptFileCategoryColor(fileCat);
                 let displayName = escapeHtml(f.name);
@@ -10851,22 +10851,22 @@
                     displayName = displayName.replace(regex, `<span style="background:${catColor};color:#000;padding:0 2px;border-radius:2px;">$1</span>`);
                 }
                 html += `<div style="background:${catColor}15;border:1px solid ${catColor}40;border-left:3px solid ${catColor};border-radius:6px;padding:8px 10px;display:flex;align-items:center;gap:8px;">
-                    <input type="checkbox" ${shareMode ? 'class="share-scanned-checkbox"' : 'class="import-checkbox"'} value="${safePath}" onchange="${shareMode ? `toggleScannedShareSelect('${safePath}', this.checked)` : `toggleImportSelect('${safePath}', this.checked)`}" style="flex-shrink:0;cursor:pointer;accent-color:${catColor};">
+                    <input type="checkbox" ${shareMode ? 'class="share-scanned-checkbox"' : 'class="import-checkbox"'} value="${f.path}" data-scanned-path="${escPath}" onchange="${shareMode ? `toggleScannedShareSelect(this.getAttribute('data-scanned-path'), this.checked)` : `toggleImportSelect(this.value, this.checked)`}" style="flex-shrink:0;cursor:pointer;accent-color:${catColor};">
                     <div style="flex:1;overflow:hidden;">
                         <div style="display:flex;align-items:center;gap:6px;">
                             <span style="color:${catColor};font-size:0.65rem;padding:1px 6px;border-radius:8px;background:${catColor}25;flex-shrink:0;">${fileCat}</span>
-                            <span onclick="${shareMode ? `shareScannedFileToWall('${safePath}','${safeName}')` : `openScannedFileInEditor('${safePath}','${safeName}')`}" style="color:#fff;font-weight:bold;font-size:0.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;" title="${shareMode ? '点击分享到需求墙' : '在编辑器中打开'}">${displayName}</span>
+                            <span data-scanned-path="${escPath}" data-scanned-name="${escName}" onclick="${shareMode ? `shareScannedFileToWall(this.getAttribute('data-scanned-path'),this.getAttribute('data-scanned-name'))` : `openScannedFileInEditor('${f.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}','${f.name.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}')`}" style="color:#fff;font-weight:bold;font-size:0.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;" title="${shareMode ? '点击分享到需求墙' : '在编辑器中打开'}">${displayName}</span>
                         </div>
                         <div style="color:rgba(255,255,255,0.35);font-size:0.7rem;margin-left:4px;">${f.dirLabel} · ${f.ext.toUpperCase()}</div>
                     </div>
                     <div style="display:flex;gap:3px;flex-shrink:0;flex-wrap:wrap;align-items:center;">
                         ${shareMode ?
-                            `<button onclick="shareScannedFileToWall('${safePath}','${safeName}')" title="分享到需求墙" style="background:linear-gradient(135deg,#ff6b6b,#ff9e80);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;font-weight:bold;white-space:nowrap;">📢 分享</button>` :
-                            `<button onclick="openLocalFileWindow('${safePath}','${safeName}',true)" title="预览" style="background:rgba(0,188,212,0.2);color:#00bcd4;border:1px solid rgba(0,188,212,0.3);padding:3px 6px;border-radius:4px;cursor:pointer;font-size:0.68rem;white-space:nowrap;">👁️</button>
-                            <button onclick="openLocalFileWindow('${safePath}','${safeName}',false)" title="编辑" style="background:rgba(76,175,80,0.2);color:#81c784;border:1px solid rgba(76,175,80,0.3);padding:3px 6px;border-radius:4px;cursor:pointer;font-size:0.68rem;white-space:nowrap;">✏️</button>
-                            <button onclick="renameScannedFile('${safePath}','${safeName}')" title="改名" style="background:rgba(255,235,59,0.15);color:#ffee58;border:1px solid rgba(255,235,59,0.25);padding:3px 6px;border-radius:4px;cursor:pointer;font-size:0.68rem;white-space:nowrap;">🔤</button>
-                            <button onclick="shareScannedFileToWall('${safePath}','${safeName}')" title="分享到需求墙" style="background:rgba(156,39,176,0.2);color:#ce93d8;border:1px solid rgba(156,39,176,0.3);padding:3px 6px;border-radius:4px;cursor:pointer;font-size:0.68rem;white-space:nowrap;">📢</button>
-                            <button onclick="if(window.importFileToProject)window.importFileToProject('${safePath}')" title="导入项目" style="background:rgba(255,152,0,0.2);color:#ff9800;border:1px solid rgba(255,152,0,0.3);padding:3px 6px;border-radius:4px;cursor:pointer;font-size:0.68rem;white-space:nowrap;">📥</button>`
+                            `<button data-scanned-path="${escPath}" data-scanned-name="${escName}" onclick="shareScannedFileToWall(this.getAttribute('data-scanned-path'),this.getAttribute('data-scanned-name'))" title="分享到需求墙" style="background:linear-gradient(135deg,#ff6b6b,#ff9e80);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;font-weight:bold;white-space:nowrap;">📢 分享</button>` :
+                            `<button onclick="openLocalFileWindow('${f.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}','${f.name.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}',true)" title="预览" style="background:rgba(0,188,212,0.2);color:#00bcd4;border:1px solid rgba(0,188,212,0.3);padding:3px 6px;border-radius:4px;cursor:pointer;font-size:0.68rem;white-space:nowrap;">👁️</button>
+                            <button onclick="openLocalFileWindow('${f.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}','${f.name.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}',false)" title="编辑" style="background:rgba(76,175,80,0.2);color:#81c784;border:1px solid rgba(76,175,80,0.3);padding:3px 6px;border-radius:4px;cursor:pointer;font-size:0.68rem;white-space:nowrap;">✏️</button>
+                            <button onclick="renameScannedFile('${f.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}','${f.name.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}')" title="改名" style="background:rgba(255,235,59,0.15);color:#ffee58;border:1px solid rgba(255,235,59,0.25);padding:3px 6px;border-radius:4px;cursor:pointer;font-size:0.68rem;white-space:nowrap;">🔤</button>
+                            <button onclick="shareScannedFileToWall('${f.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}','${f.name.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}')" title="分享到需求墙" style="background:rgba(156,39,176,0.2);color:#ce93d8;border:1px solid rgba(156,39,176,0.3);padding:3px 6px;border-radius:4px;cursor:pointer;font-size:0.68rem;white-space:nowrap;">📢</button>
+                            <button onclick="if(window.importFileToProject)window.importFileToProject('${f.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}')" title="导入项目" style="background:rgba(255,152,0,0.2);color:#ff9800;border:1px solid rgba(255,152,0,0.3);padding:3px 6px;border-radius:4px;cursor:pointer;font-size:0.68rem;white-space:nowrap;">📥</button>`
                         }
                     </div>
                 </div>`;

@@ -749,19 +749,20 @@ if (isTauriApp) {
             displayFiles.forEach(f => {
                 const cat = f.category || '其他';
                 const color = colorMap[cat] || '#bdbdbd';
-                const safePath = f.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-                const safeName = f.name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-                html += `<div style="display:flex;align-items:center;gap:8px;background:${color}15;border:1px solid ${color}40;border-left:3px solid ${color};border-radius:6px;padding:8px 10px;">
-                    <input type="checkbox" class="scanned-share-checkbox" value="${safePath}" onchange="toggleScannedShareSelectFromMain('${safePath}', this.checked)" style="flex-shrink:0;cursor:pointer;accent-color:${color};">
+                const escPath = escapeHtml(f.path);
+                const escName = escapeHtml(f.name);
+                html += `<div class="scanned-share-row" style="display:flex;align-items:center;gap:8px;background:${color}15;border:1px solid ${color}40;border-left:3px solid ${color};border-radius:6px;padding:8px 10px;">
+                    <input type="checkbox" class="scanned-share-checkbox" data-scanned-path="${escPath}" onchange="toggleScannedShareSelectFromMain(this.getAttribute('data-scanned-path'), this.checked)" style="flex-shrink:0;cursor:pointer;accent-color:${color};">
                     <div style="flex:1;overflow:hidden;">
                         <div style="display:flex;align-items:center;gap:6px;">
                             <span style="color:${color};font-size:0.65rem;padding:1px 6px;border-radius:8px;background:${color}25;flex-shrink:0;">${cat}</span>
-                            <span onclick="shareScannedFileFromMain('${safePath}', '${safeName}')" style="color:#fff;font-weight:bold;font-size:0.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;" title="点击分享到需求墙">${f.name}</span>
+                            <span data-scanned-path="${escPath}" data-scanned-name="${escName}" onclick="shareScannedFileFromMain(this.getAttribute('data-scanned-path'), this.getAttribute('data-scanned-name'))" style="color:#fff;font-weight:bold;font-size:0.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;" title="点击分享到需求墙">${f.name}</span>
                         </div>
                         <div style="color:rgba(255,255,255,0.35);font-size:0.7rem;">${f.dirLabel}</div>
                     </div>
-                    <button onclick="shareScannedFileFromMain('${safePath}', '${safeName}')" title="分享到需求墙" style="background:linear-gradient(135deg,#ff6b6b,#ff9e80);color:#fff;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;font-weight:bold;white-space:nowrap;flex-shrink:0;">📢 分享</button>
+                    <button data-scanned-path="${escPath}" data-scanned-name="${escName}" onclick="shareScannedFileFromMain(this.getAttribute('data-scanned-path'), this.getAttribute('data-scanned-name'))" title="分享到需求墙" style="background:linear-gradient(135deg,#ff6b6b,#ff9e80);color:#fff;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;font-weight:bold;white-space:nowrap;flex-shrink:0;">📢 分享</button>
                 </div>`;
+            });
             });
             html += '</div>';
         } else {
@@ -851,7 +852,7 @@ if (isTauriApp) {
     function toggleAllScannedShareSelectsFromMain(checked) {
         _selScannedSharePaths.clear();
         if (checked) {
-            document.querySelectorAll('.scanned-share-checkbox').forEach(cb => { cb.checked = true; _selScannedSharePaths.add(cb.value); });
+            document.querySelectorAll('.scanned-share-checkbox').forEach(cb => { cb.checked = true; _selScannedSharePaths.add(cb.getAttribute('data-scanned-path')); });
         } else {
             document.querySelectorAll('.scanned-share-checkbox').forEach(cb => { cb.checked = false; });
         }
