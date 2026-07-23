@@ -630,12 +630,23 @@ if (isTauriApp) {
         const allDirs = Object.entries(maDirs).filter(([k, v]) => v && k !== 'screenshot');
         if (allDirs.length === 0) return;
 
+        // 优先使用今日缓存（与 scanAllFiles 共享同一缓存 key）
+        // 避免每次切"脚本文件"标签都做全量 IPC 扫描导致卡顿
+        const cache = loadScanCache();
+        if (cache && cache.files && cache.files.length > 0) {
+            scannedFiles = cache.files;
+            window.scannedFiles = scannedFiles;
+            return;
+        }
+
         scannedFiles = [];
         for (const [key, dir] of allDirs) {
             const subFiles = await collectFilesRecursive(dir, key, dirLabels[key]);
             scannedFiles.push(...subFiles);
         }
         window.scannedFiles = scannedFiles;
+        // 保存缓存，后续切标签或打开设置无需重新扫描
+        if (scannedFiles.length > 0) saveScanCache(scannedFiles);
     }
 
     function saveSettingsAndClose() {
