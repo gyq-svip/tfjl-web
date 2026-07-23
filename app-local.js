@@ -258,7 +258,10 @@ if (isTauriApp) {
                 <div style="margin-bottom:20px;">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
                         <label style="color:#ff9800;font-size:0.9rem;">🏆 对战日志胜负统计（每日「对战胜利确定」「对战失败确定」次数）</label>
-                        <button onclick="calcLogBattleStats()" style="background:linear-gradient(135deg,#ff9800,#e65100);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">📊 统计</button>
+                        <div style="display:flex;gap:6px;align-items:center;">
+                            <button onclick="clearLogBattleCache()" title="清除缓存后下次会重新扫描所有文件" style="background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.4);border:1px solid rgba(255,255,255,0.1);padding:5px 8px;border-radius:6px;cursor:pointer;font-size:0.7rem;">🗑️ 清除缓存</button>
+                            <button onclick="calcLogBattleStats()" style="background:linear-gradient(135deg,#ff9800,#e65100);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">📊 统计</button>
+                        </div>
                     </div>
                     <div id="logBattleStats" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:8px;min-height:60px;">
                         <div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">配置日志目录后点击统计</div>
@@ -1228,7 +1231,22 @@ if (isTauriApp) {
         }
     }
 
-    // ==================== 日志胜负统计 ====================
+    // ==================== 日志胜负统计（缓存优化：仅扫描今日，历史数据走 localStorage） ====================
+    function getTodayStr() {
+        const d = new Date();
+        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+
+    function clearLogBattleCache() {
+        try {
+            localStorage.removeItem('TFJL_LogBattleV2');
+            const statsEl = document.getElementById('logBattleStats');
+            if (statsEl) {
+                statsEl.innerHTML = '<div style="color:rgba(255,152,0,0.7);text-align:center;padding:20px;font-size:0.85rem;">✅ 缓存已清除，下次统计将重新扫描所有文件</div>';
+            }
+        } catch (e) { /* ignore */ }
+    }
+
     async function calcLogBattleStats(targetId) {
         const id = targetId || 'logBattleStats';
         const statsEl = document.getElementById(id);
@@ -1239,15 +1257,14 @@ if (isTauriApp) {
             return;
         }
 
-        const dirPathSafe = maDirs.logs.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        const debugLines = []; // 收集诊断信息，最后显示在 UI
+        const debugLines = [];
         function dlog(msg) { debugLines.push(msg); console.log('[日志统计]', msg); }
 
         dlog('开始扫描: ' + maDirs.logs);
         statsEl.innerHTML = '<div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;font-size:0.85rem;">⏳ 正在扫描日志文件并统计…</div>';
 
         try {
-            // 1. 递归扫描日志目录下所有可能的文本文件（txt/json/log/无后缀）
+            // 1. 递归扫描目录（不读文件内容，只列文件名 + modified）
             const allowedExts = ['txt', 'json', 'log', ''];
 
             let allFiles;
@@ -1264,76 +1281,111 @@ if (isTauriApp) {
                 return;
             }
 
-            // 2. 不过滤扩展名，尝试读取所有文件（Rust read_text_file 对非文本文件会返回乱码或报错，跳过即可）
-            const txtFiles = allFiles;
-
-            if (txtFiles.length === 0) {
+            if (allFiles.length === 0) {
                 dlog('【失败】目录下未找到任何可读文件（支持: txt/json/log/无后缀）');
                 window._lastLogDebugLines = debugLines;
                 statsEl.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">日志目录下未找到任何可读文件<br><span style="font-size:0.7rem;color:#ff9800;">支持: .txt / .log / .json / 无后缀</span></div>';
                 return;
             }
 
-            // 3. 并行读取所有日志文件 + 统计关键词
-            const dailyMap = {}; // { '2026-07-23': { win: 0, lose: 0 } }
-            let readOk = 0, readErr = 0, noKeyword = 0;
-            const readErrs = []; // 记录读取失败的文件名
+            // 2. 加载缓存（key 由目录路径决定，目录变了自动失效）
+            const CACHE_KEY = 'TFJL_LogBattleV2';
+            let cache = {};
+            try {
+                const raw = localStorage.getItem(CACHE_KEY);
+                if (raw) cache = JSON.parse(raw);
+            } catch (e) { cache = {}; }
+            if (cache._dir !== maDirs.logs) {
+                dlog('日志目录已变更，缓存失效（旧: ' + (cache._dir || '无') + ' → 新: ' + maDirs.logs + '）');
+                cache = { _dir: maDirs.logs, _files: {} };
+            }
+            cache._files = cache._files || {};
 
-            const readResults = await Promise.all(
-                txtFiles.map(async (f) => {
-                    try {
-                        const content = await readTextFile(f.path);
-                        if (!content) { readOk++; noKeyword++; return null; }
-
-                        const winCount = (content.match(/对战胜利确定/g) || []).length;
-                        const loseCount = (content.match(/对战失败确定/g) || []).length;
-
-                        if (winCount === 0 && loseCount === 0) { readOk++; noKeyword++; return null; }
-
-                        // 日期来源：优先文件名中提取，否则用 modified 字段
-                        let date = extractDateFromFilename(f.name);
-                        if (!date && f.modified) {
-                            date = f.modified;
-                        }
-                        if (!date) date = '未知';
-
-                        return { date, win: winCount, lose: loseCount };
-                    } catch (e) {
-                        readErr++;
-                        if (readErrs.length < 5) readErrs.push(f.name + ': ' + e.message);
-                        return null;
-                    }
-                })
-            );
-
-            dlog('读取完毕 — 成功: ' + readOk + ' | 无关键词: ' + noKeyword + ' | 读取出错: ' + readErr);
-            if (readErrs.length > 0) {
-                dlog('读取错误示例: ' + readErrs.join('; '));
+            // 3. 分离今日/历史文件（按文件名日期或 modified 判断）
+            const todayStr = getTodayStr();
+            const todayFiles = [], histFiles = [];
+            for (const f of allFiles) {
+                const fileDate = extractDateFromFilename(f.name);
+                if (fileDate === todayStr || (f.modified && f.modified.startsWith(todayStr))) {
+                    todayFiles.push(f);
+                } else {
+                    histFiles.push(f);
+                }
             }
 
-            // 4. 按日期汇总
-            const validResults = readResults.filter(r => r !== null);
+            // 4. 历史文件查缓存：路径 + modified 一致则直接复用
+            const toReadFiles = [...todayFiles]; // 今日文件全部读取
+            const dailyMap = {};
+            let cacheHits = 0;
 
-            readResults.forEach(r => {
-                if (!r) return;
-                if (!dailyMap[r.date]) {
-                    dailyMap[r.date] = { win: 0, lose: 0 };
+            for (const f of histFiles) {
+                const cached = cache._files[f.path];
+                if (cached && cached.mtime === f.modified && typeof cached.win === 'number') {
+                    cacheHits++;
+                    if (!dailyMap[cached.date]) dailyMap[cached.date] = { win: 0, lose: 0 };
+                    dailyMap[cached.date].win += cached.win;
+                    dailyMap[cached.date].lose += (cached.lose || 0);
+                } else {
+                    toReadFiles.push(f);
                 }
-                dailyMap[r.date].win += r.win;
-                dailyMap[r.date].lose += r.lose;
-            });
+            }
 
-            // 5. 排序：按日期降序（今天在左 = 最新在最前）
+            dlog('今日: ' + todayFiles.length + ' | 历史: ' + histFiles.length + ' | 缓存命中: ' + cacheHits + ' | 需读取: ' + toReadFiles.length);
+
+            // 5. 只读取需要读的文件（今日 + 缓存未命中）
+            let readOk = 0, readErr = 0, noKeyword = 0;
+            const readErrs = [];
+
+            if (toReadFiles.length > 0) {
+                const readResults = await Promise.all(
+                    toReadFiles.map(async (f) => {
+                        try {
+                            const content = await readTextFile(f.path);
+                            if (!content) { readOk++; noKeyword++; return null; }
+                            const winCount = (content.match(/对战胜利确定/g) || []).length;
+                            const loseCount = (content.match(/对战失败确定/g) || []).length;
+                            if (winCount === 0 && loseCount === 0) { readOk++; noKeyword++; return null; }
+                            readOk++;
+                            let date = extractDateFromFilename(f.name);
+                            if (!date && f.modified) date = f.modified;
+                            if (!date) date = '未知';
+                            return { date, win: winCount, lose: loseCount, path: f.path, mtime: f.modified };
+                        } catch (e) {
+                            readErr++;
+                            if (readErrs.length < 5) readErrs.push(f.name + ': ' + e.message);
+                            return null;
+                        }
+                    })
+                );
+
+                dlog('读取完毕 — 成功: ' + readOk + ' | 无关键词: ' + noKeyword + ' | 读取出错: ' + readErr);
+                if (readErrs.length > 0) dlog('读取错误示例: ' + readErrs.join('; '));
+
+                // 汇总新鲜结果 + 写入缓存
+                for (let i = 0; i < toReadFiles.length; i++) {
+                    const r = readResults[i];
+                    if (!r) continue;
+                    if (!dailyMap[r.date]) dailyMap[r.date] = { win: 0, lose: 0 };
+                    dailyMap[r.date].win += r.win;
+                    dailyMap[r.date].lose += r.lose;
+                    cache._files[r.path] = { mtime: r.mtime, date: r.date, win: r.win, lose: r.lose };
+                }
+            }
+
+            // 保存缓存
+            try { localStorage.setItem(CACHE_KEY, JSON.stringify(cache)); } catch (e) { dlog('缓存保存失败: ' + e.message); }
+
+            // 6. 渲染
             const sortedDates = Object.keys(dailyMap).sort((a, b) => b.localeCompare(a));
 
             if (sortedDates.length === 0) {
                 window._lastLogDebugLines = debugLines;
-                const errHtml = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">日志文件中未找到「对战胜利确定」或「对战失败确定」关键词<br><span style="font-size:0.7rem;">共扫描 ' + txtFiles.length + ' 个文件，成功读取 ' + readOk + ' 个，读取失败 ' + readErr + ' 个</span><br><span style="font-size:0.7rem;color:#ff9800;">提示：内容可能是 GBK 编码 → 需重编译 Rust 后端</span></div>';
+                const errHtml = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">日志文件中未找到「对战胜利确定」或「对战失败确定」关键词<br><span style="font-size:0.7rem;">共 ' + allFiles.length + ' 个文件（今日 ' + todayFiles.length + '，历史 ' + histFiles.length + '）</span><br><span style="font-size:0.7rem;color:#ff9800;">提示：内容可能是 GBK 编码 → 需重编译 Rust 后端</span></div>';
                 statsEl.innerHTML = errHtml;
                 return;
             }
 
-            // 6. 渲染图表
+            // 摘要 + 图表
             let html = '';
             const totalWin = Object.values(dailyMap).reduce((s, d) => s + d.win, 0);
             const totalLose = Object.values(dailyMap).reduce((s, d) => s + d.lose, 0);
@@ -1341,14 +1393,13 @@ if (isTauriApp) {
             const totalBattles = totalWin + totalLose;
             const winRate = totalBattles > 0 ? (totalWin / totalBattles * 100).toFixed(1) : '0';
 
-            // 摘要
-            html += `<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px;">`;
-            html += `<span style="color:#4ecdc4;">✅ 胜利 <b>${totalWin}</b></span>`;
-            html += `<span style="color:#f44336;">❌ 失败 <b>${totalLose}</b></span>`;
-            html += `<span style="color:#ffd700;">📊 总场次 <b>${totalBattles}</b></span>`;
-            html += `<span style="color:#4fc3f7;">📈 胜率 <b>${winRate}%</b></span>`;
-            html += `<span style="color:rgba(255,255,255,0.4);">（${totalDays} 天）</span>`;
-            html += `</div>`;
+            html += '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px;">';
+            html += '<span style="color:#4ecdc4;">✅ 胜利 <b>' + totalWin + '</b></span>';
+            html += '<span style="color:#f44336;">❌ 失败 <b>' + totalLose + '</b></span>';
+            html += '<span style="color:#ffd700;">📊 总场次 <b>' + totalBattles + '</b></span>';
+            html += '<span style="color:#4fc3f7;">📈 胜率 <b>' + winRate + '%</b></span>';
+            html += '<span style="color:rgba(255,255,255,0.4);">（' + totalDays + ' 天）</span>';
+            html += '</div>';
 
             // 柱状图
             const chartW = 390;
@@ -1357,55 +1408,53 @@ if (isTauriApp) {
             const chartH = padT + 120 + padB;
             const plotW = chartW - padL - padR;
             const plotH = 120;
-            const barGap = 3;
             const groupGap = 6;
             const n = sortedDates.length;
-            // 分组柱状图：每组2根柱子（win + lose）
             const slots = n * 2;
             const slotW = Math.max(6, Math.floor((plotW - (n - 1) * groupGap) / slots));
 
-            // 网格线
             const gridLines = [0.25, 0.5, 0.75, 1.0];
             let gridHtml = gridLines.map(r => {
                 const gy = padT + plotH * (1 - r);
-                return `<line x1="${padL}" y1="${gy}" x2="${padL + plotW}" y2="${gy}" stroke="rgba(255,255,255,0.06)" stroke-width="1"/><text x="${padL - 4}" y="${gy + 3}" fill="rgba(255,255,255,0.25)" font-size="8" text-anchor="end">${Math.round(hMax * r)}</text>`;
+                return '<line x1="' + padL + '" y1="' + gy + '" x2="' + (padL + plotW) + '" y2="' + gy + '" stroke="rgba(255,255,255,0.06)" stroke-width="1"/><text x="' + (padL - 4) + '" y="' + (gy + 3) + '" fill="rgba(255,255,255,0.25)" font-size="8" text-anchor="end">' + Math.round(hMax * r) + '</text>';
             }).join('');
 
             let barsHtml = '';
             sortedDates.forEach((date, i) => {
                 const data = dailyMap[date];
                 const groupX = padL + i * (slotW * 2 + groupGap);
-                // 胜利柱（绿色）
                 const winBH = Math.max(3, (data.win / hMax) * plotH);
                 const winBY = padT + plotH - winBH;
-                barsHtml += `<rect x="${groupX}" y="${winBY}" width="${slotW}" height="${winBH}" rx="2" fill="#4ecdc4" opacity="0.85"><title>${date} 胜利: ${data.win}</title></rect>`;
+                barsHtml += '<rect x="' + groupX + '" y="' + winBY + '" width="' + slotW + '" height="' + winBH + '" rx="2" fill="#4ecdc4" opacity="0.85"><title>' + date + ' 胜利: ' + data.win + '</title></rect>';
                 if (data.win > 0) {
-                    barsHtml += `<text x="${groupX + slotW / 2}" y="${winBY - 3}" fill="#4ecdc4" font-size="8" font-weight="bold" text-anchor="middle">${data.win}</text>`;
+                    barsHtml += '<text x="' + (groupX + slotW / 2) + '" y="' + (winBY - 3) + '" fill="#4ecdc4" font-size="8" font-weight="bold" text-anchor="middle">' + data.win + '</text>';
                 }
-                // 失败柱（红色）
                 const loseBH = Math.max(3, (data.lose / hMax) * plotH);
                 const loseBY = padT + plotH - loseBH;
                 const loseX = groupX + slotW;
-                barsHtml += `<rect x="${loseX}" y="${loseBY}" width="${slotW}" height="${loseBH}" rx="2" fill="#f44336" opacity="0.85"><title>${date} 失败: ${data.lose}</title></rect>`;
+                barsHtml += '<rect x="' + loseX + '" y="' + loseBY + '" width="' + slotW + '" height="' + loseBH + '" rx="2" fill="#f44336" opacity="0.85"><title>' + date + ' 失败: ' + data.lose + '</title></rect>';
                 if (data.lose > 0) {
-                    barsHtml += `<text x="${loseX + slotW / 2}" y="${loseBY - 3}" fill="#f44336" font-size="8" font-weight="bold" text-anchor="middle">${data.lose}</text>`;
+                    barsHtml += '<text x="' + (loseX + slotW / 2) + '" y="' + (loseBY - 3) + '" fill="#f44336" font-size="8" font-weight="bold" text-anchor="middle">' + data.lose + '</text>';
                 }
-                // 日期标签
-                barsHtml += `<text x="${groupX + slotW}" y="${padT + plotH + 13}" fill="rgba(255,255,255,0.45)" font-size="9" text-anchor="middle">${date.slice(5)}</text>`;
+                barsHtml += '<text x="' + (groupX + slotW) + '" y="' + (padT + plotH + 13) + '" fill="rgba(255,255,255,0.45)" font-size="9" text-anchor="middle">' + date.slice(5) + '</text>';
             });
 
-            // 图例
-            html += `<div style="display:flex;gap:12px;align-items:center;margin-bottom:4px;font-size:0.7rem;">
-                <span style="display:inline-block;width:10px;height:10px;background:#4ecdc4;border-radius:2px;"></span> 胜利
-                <span style="display:inline-block;width:10px;height:10px;background:#f44336;border-radius:2px;"></span> 失败
-                <span style="margin-left:8px;color:rgba(255,255,255,0.3);">x轴: 月-日（最近在最左）</span>
-            </div>`;
+            html += '<div style="display:flex;gap:12px;align-items:center;margin-bottom:4px;font-size:0.7rem;">';
+            html += '<span style="display:inline-block;width:10px;height:10px;background:#4ecdc4;border-radius:2px;"></span> 胜利';
+            html += '<span style="display:inline-block;width:10px;height:10px;background:#f44336;border-radius:2px;"></span> 失败';
+            html += '<span style="margin-left:8px;color:rgba(255,255,255,0.3);">x轴: 月-日（最近在最左）</span>';
+            html += '</div>';
 
-            html += `<svg width="${chartW}" height="${chartH}" style="display:block;">${gridHtml}${barsHtml}</svg>`;
+            html += '<svg width="' + chartW + '" height="' + chartH + '" style="display:block;">' + gridHtml + barsHtml + '</svg>';
 
-            // 诊断日志存到全局变量，供管理员面板查看
+            // 缓存状态提示
+            html += '<div style="font-size:0.65rem;color:rgba(255,255,255,0.25);margin-top:6px;text-align:right;">📦 缓存 ' + cacheHits + ' 天历史 · 今日扫描 ' + todayFiles.length + ' 文件';
+            if (toReadFiles.length > todayFiles.length) {
+                html += ' · ' + (toReadFiles.length - todayFiles.length) + ' 个历史文件已变化重新读取';
+            }
+            html += '</div>';
+
             window._lastLogDebugLines = debugLines;
-
             statsEl.innerHTML = html;
         } catch (e) {
             window._lastLogDebugLines = debugLines;
@@ -1478,6 +1527,7 @@ if (isTauriApp) {
     window.saveScriptToMaDir = saveScriptToMaDir;
     window.calcScreenshotStats = calcScreenshotStats;
     window.calcLogBattleStats = calcLogBattleStats;
+    window.clearLogBattleCache = clearLogBattleCache;
     window.importFileToProject = importFileToProject;
     window.batchImportFilesToProject = batchImportFilesToProject;
 
