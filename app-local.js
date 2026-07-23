@@ -19,7 +19,7 @@ if (isTauriApp) {
         screenshot: 'D:\\withfriends\\塔防老马助手\\截图',           // 截图目录（统计每天打多少局）
         logs:       'D:\\withfriends\\塔防老马助手\\Log'             // 对战日志目录（统计胜负等）
     };
-    const DEFAULT_SOFTWARE_DATA_DIR = 'D:\\withfriends';
+    const DEFAULT_SOFTWARE_DATA_DIR = 'D:\\withfriends\\塔防精灵助手数据';
 
     let maDirs = { ...DEFAULT_MA_DIRS };
     let softwareDataDir = DEFAULT_SOFTWARE_DATA_DIR;
