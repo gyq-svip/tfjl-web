@@ -22949,18 +22949,59 @@ ${maSection}
             if (!confirm('⚠️ 确定要清除所有本地缓存吗？\n\n这将清除所有本地存储的数据，包括：\n• Gist 配置缓存\n• 用户昵称\n• 统计数据缓存\n• 其他所有设置\n\n此操作不可恢复！')) {
                 return;
             }
-            
+
             const totalItems = localStorage.length;
             localStorage.clear();
-            
+
+            // 同时清空 CacheStorage（浏览器缓存 API）
+            if (window.caches) {
+                caches.keys().then(names => {
+                    return Promise.all(names.map(n => caches.delete(n)));
+                }).catch(() => {});
+            }
+
             showCacheStatus(`✅ 已清除全部 ${totalItems} 项缓存`, 'success');
             document.getElementById('cacheInfoList').innerHTML = '<div style="color:rgba(255,255,255,0.5);text-align:center;">缓存已清空</div>';
-            
+
             setTimeout(() => {
                 if (confirm('所有缓存已清除！是否立即刷新页面？\n\n刷新后需要重新设置 Token。')) {
                     location.reload();
                 }
             }, 500);
+        }
+
+        // 强制清除所有缓存（SW + CacheStorage + localStorage）+ 时间戳硬刷新
+        // 用于测试：确保一定能拉到 GitHub Pages 最新代码
+        async function forceClearAndHardRefresh() {
+            if (!confirm('🔄 强制清除+硬刷新？\n\n将清除：\n• Service Worker 缓存\n• CacheStorage 全部缓存\n• localStorage 全部数据\n• 注销当前 SW\n\n然后带时间戳强刷，彻底绕过所有缓存。\n\n用于开发测试，普通用户请用「清除全部」即可。')) {
+                return;
+            }
+
+            try {
+                // 1. 通知 SW 清缓存
+                if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+                    navigator.serviceWorker.controller.postMessage('CLEAR_CACHE');
+                }
+                // 2. 清空 CacheStorage
+                if (window.caches) {
+                    const names = await caches.keys();
+                    await Promise.all(names.map(n => caches.delete(n)));
+                }
+                // 3. 清空 localStorage
+                localStorage.clear();
+                // 4. 注销 SW
+                if ('serviceWorker' in navigator) {
+                    const regs = await navigator.serviceWorker.getRegistrations();
+                    await Promise.all(regs.map(r => r.unregister()));
+                }
+            } catch (e) { console.warn('清除失败:', e); }
+
+            showCacheStatus('✅ 全部清除完成，正在硬刷新...', 'success');
+            setTimeout(() => {
+                const url = new URL(location.href);
+                url.searchParams.set('_t', Date.now());
+                location.replace(url.toString());
+            }, 800);
         }
         
         function showCacheStatus(message, type) {
@@ -24854,6 +24895,12 @@ ${maSection}
                         <button class="admin-btn admin-btn-secondary" onclick="viewCacheInfo()" style="flex:1;min-width:120px;">📋 查看缓存</button>
                         <button class="admin-btn admin-btn-primary" onclick="clearGistCache()" style="flex:1;min-width:120px;background:#3b82f6;">🧹 清除Gist缓存</button>
                         <button class="admin-btn admin-btn-primary" onclick="clearAllCache()" style="flex:1;min-width:120px;background:#ff6b6b;">⚠️ 清除全部</button>
+                    </div>
+                    <div style="display:flex;gap:8px;margin-bottom:15px;flex-wrap:wrap;">
+                        <button class="admin-btn admin-btn-primary" onclick="forceClearAndHardRefresh()" style="flex:1;min-width:120px;background:#a78bfa;color:white;font-weight:600;font-size:0.85rem;">🔄 强制清除+硬刷新</button>
+                    </div>
+                    <div style="color:rgba(255,255,255,0.4);font-size:0.7rem;margin-top:-5px;">
+                        💡 「强制清除+硬刷新」= SW缓存 + CacheStorage + localStorage 全部清空 + SW注销 + 时间戳强刷，用于开发测试，确保拉到最新代码
                     </div>
                 </div>
                 <div id="cacheManageStatus" style="margin-top:10px;"></div>
