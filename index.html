@@ -9078,13 +9078,13 @@
                 };
 
                 const jsonStr = JSON.stringify(exportData, null, 2);
-                const blob = new Blob([jsonStr], {type: 'application/json'});
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `塔防阵容_${projectName}_${new Date().toLocaleDateString().replace(/\//g, '-')}.json`;
-                a.click();
-                URL.revokeObjectURL(url);
+                const fileName = `塔防阵容_${projectName}_${new Date().toLocaleDateString().replace(/\//g, '-')}.json`;
+                const isTauri = !!(window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke);
+                if (isTauri) {
+                    _downloadScriptTauri(fileName, jsonStr);
+                } else {
+                    _downloadScriptBlob(fileName, jsonStr);
+                }
 
                 document.getElementById('projectMenu').style.display = 'none';
             });
@@ -11963,13 +11963,12 @@
         function scriptEditorDownload() {
             const tab = getActiveScriptEditorTab();
             if (!tab) { alert('请先打开一个标签'); return; }
-            const blob = new Blob([tab.content], { type: 'text/plain;charset=utf-8' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = tab.name;
-            a.click();
-            URL.revokeObjectURL(url);
+            const isTauri = !!(window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke);
+            if (isTauri) {
+                _downloadScriptTauri(tab.name, tab.content);
+            } else {
+                _downloadScriptBlob(tab.name, tab.content);
+            }
         }
 
         function scriptEditorToggleFind() {
@@ -13455,13 +13454,13 @@
             request.onsuccess = function() {
                 exportData.projects = request.result;
                 const jsonStr = JSON.stringify(exportData, null, 2);
-                const blob = new Blob([jsonStr], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `TFJL-backup-${new Date().toISOString().slice(0,10)}.json`;
-                a.click();
-                URL.revokeObjectURL(url);
+                const fileName = `TFJL-backup-${new Date().toISOString().slice(0,10)}.json`;
+                const isTauri = !!(window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke);
+                if (isTauri) {
+                    _downloadScriptTauri(fileName, jsonStr);
+                } else {
+                    _downloadScriptBlob(fileName, jsonStr);
+                }
                 alert('✅ 数据导出成功！共 ' + exportData.projects.length + ' 个项目，' + exportData.categories.length + ' 个分类');
             };
 
@@ -16900,13 +16899,13 @@
             });
             
             // 创建下载
-            const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `减伤记录_${new Date().toLocaleDateString('zh-CN').replace(/\//g, '-')}.txt`;
-            a.click();
-            URL.revokeObjectURL(url);
+            const fileName = `减伤记录_${new Date().toLocaleDateString('zh-CN').replace(/\//g, '-')}.txt`;
+            const isTauri = !!(window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke);
+            if (isTauri) {
+                _downloadScriptTauri(fileName, content);
+            } else {
+                _downloadScriptBlob(fileName, content);
+            }
         }
         
         // 导入减伤记录从TXT文件
