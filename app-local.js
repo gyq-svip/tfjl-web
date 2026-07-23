@@ -40,12 +40,20 @@ if (isTauriApp) {
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     }
 
+    // 内存缓存：避免反复 JSON.parse 同一个大缓存
+    let _memScanCache = null;
+    let _memScanCacheRaw = null;
+
     function loadScanCache() {
         try {
             const raw = localStorage.getItem(getScanCacheKey());
             if (!raw) return null;
+            // 如果 localStorage 原始字符串没变，直接返回内存中的解析结果（避免反复 JSON.parse 2000+ 条记录）
+            if (_memScanCache && _memScanCacheRaw === raw) return _memScanCache;
             const cache = JSON.parse(raw);
             if (cache.date !== getTodayStr()) return null;
+            _memScanCache = cache;
+            _memScanCacheRaw = raw;
             return cache;
         } catch (e) {
             return null;
@@ -635,6 +643,11 @@ if (isTauriApp) {
         const cache = loadScanCache();
         if (cache && cache.files && cache.files.length > 0) {
             scannedFiles = cache.files;
+            window.scannedFiles = scannedFiles;
+            return;
+        }
+        // 兜底：缓存还没写完时（延迟写入 500ms），用内存中的 scannedFiles
+        if (scannedFiles && scannedFiles.length > 0) {
             window.scannedFiles = scannedFiles;
             return;
         }
