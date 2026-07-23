@@ -406,6 +406,22 @@ if (isTauriApp) {
         if (modal) modal.remove();
     }
 
+    window.toggleMaDirConfig = function() {
+        const body = document.getElementById('maDirConfigBody');
+        const icon = document.getElementById('maDirToggleIcon');
+        const hint = document.getElementById('maDirCollapsedHint');
+        if (!body || !icon) return;
+        if (body.style.display === 'none') {
+            body.style.display = 'block';
+            icon.textContent = '▼';
+            if (hint) hint.style.display = 'none';
+        } else {
+            body.style.display = 'none';
+            icon.textContent = '▶';
+            if (hint) hint.style.display = '';
+        }
+    };
+
     function showSettingsModal() {
         let modal = document.getElementById('appLocalSettingsModal');
         if (modal) modal.remove();
@@ -419,7 +435,13 @@ if (isTauriApp) {
                     <button onclick="closeAppLocalSettings()" style="background:rgba(255,255,255,0.1);color:#fff;border:none;width:30px;height:30px;border-radius:5px;cursor:pointer;font-size:1.2rem;">×</button>
                 </div>
 
-                <div style="color:#00bcd4;font-size:0.9rem;margin-bottom:12px;">📂 老马脚本目录配置</div>
+                <div style="background:rgba(0,188,212,0.06);border:1px solid rgba(0,188,212,0.15);border-radius:10px;padding:12px 14px;margin-bottom:12px;">
+                    <div onclick="toggleMaDirConfig()" style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;">
+                        <span id="maDirToggleIcon" style="color:#00bcd4;font-size:0.75rem;transition:transform 0.2s;">▶</span>
+                        <span style="color:#00bcd4;font-size:0.9rem;font-weight:600;">📂 老马脚本目录配置</span>
+                        <span id="maDirCollapsedHint" style="color:rgba(255,255,255,0.35);font-size:0.72rem;">— 点击展开，设置老马电脑上的脚本/对战/截图等目录路径</span>
+                    </div>
+                    <div id="maDirConfigBody" style="display:none;margin-top:10px;">
 
                 <div style="margin-bottom:12px;">
                     <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;display:block;margin-bottom:4px;">合作脚本目录（寒冰/暗月/合作/漩涡/深海）</label>
@@ -461,11 +483,14 @@ if (isTauriApp) {
                     </div>
                 </div>
 
-                <div style="margin-bottom:20px;">
+                <div>
                     <label style="color:#ff9800;font-size:0.8rem;display:block;margin-bottom:4px;">🔍 对战日志目录（统计胜负等关键词检索）</label>
                     <div style="display:flex;gap:8px;">
                         <input type="text" id="maDir_logs" readonly placeholder="未设置" style="flex:1;background:rgba(0,0,0,0.3);color:#fff;border:1px solid rgba(255,152,0,0.3);padding:8px 12px;border-radius:6px;font-size:0.85rem;">
                         <button onclick="selectMaDir('logs')" style="background:linear-gradient(135deg,#ff9800,#e65100);color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;white-space:nowrap;">浏览...</button>
+                    </div>
+                </div>
+
                     </div>
                 </div>
 
