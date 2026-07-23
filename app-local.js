@@ -1381,7 +1381,7 @@ if (isTauriApp) {
         html += `<div style="background:rgba(244,67,54,0.2);padding:8px 12px;border-radius:6px;text-align:center;"><div style="color:#f44336;font-size:1.4rem;font-weight:bold;">${maxCount}</div><div style="color:rgba(255,255,255,0.5);font-size:0.7rem;">最高</div></div>`;
         html += `</div>`;
 
-        const barWidth = Math.max(18, Math.floor(600 / stats.length));
+        const barWidth = Math.min(50, Math.max(18, Math.floor(600 / stats.length)));
         const chartHeight = 120;
         html += `<div style="display:flex;align-items:flex-end;gap:2px;height:${chartHeight}px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.1);overflow-x:auto;">`;
         for (const s of stats) {
@@ -1416,7 +1416,7 @@ if (isTauriApp) {
             const plotW = chartW - padL - padR;
             const plotH = 100;
             const barGap = 6;
-            const barW = Math.max(14, Math.floor((plotW - (recent.length - 1) * barGap) / recent.length));
+            const barW = Math.min(16, Math.max(14, Math.floor((plotW - (recent.length - 1) * barGap) / recent.length)));
 
             const gridLines = [0.25, 0.5, 0.75, 1.0];
             let gridHtml = gridLines.map(r => {
@@ -1730,7 +1730,7 @@ if (isTauriApp) {
         const groupGap = 6;
         const n = sortedDates.length;
         const slots = n * 2;
-        const slotW = Math.max(6, Math.floor((plotW - (n - 1) * groupGap) / slots));
+        const slotW = Math.min(16, Math.max(6, Math.floor((plotW - (n - 1) * groupGap) / slots)));
 
         const gridLines = [0.25, 0.5, 0.75, 1.0];
         let gridHtml = gridLines.map(r => {
