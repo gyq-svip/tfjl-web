@@ -10757,7 +10757,8 @@
         function getScriptFileCategoryColor(cat) {
             const cm = {
                 '寒冰': '#64b5f6', '暗月': '#ce93d8', '漩涡': '#4fc3f7',
-                '合作': '#ffd54f', '深海': '#4db6ac', '活动': '#ff8a65', '其他': '#bdbdbd', '全部': '#ffffff'
+                '合作': '#ffd54f', '深海': '#4db6ac', '活动': '#ff8a65',
+                '日志': '#8d6e63', '其他': '#bdbdbd', '全部': '#ffffff'
             };
             return cm[cat] || '#bdbdbd';
         }
@@ -10767,7 +10768,7 @@
         function renderScriptFileCategoryFilter() {
             const el = document.getElementById('scriptFileCategoryFilter');
             if (!el) return;
-            const cats = ['全部', '寒冰', '暗月', '漩涡', '合作', '深海', '活动', '其他'];
+            const cats = ['全部', '寒冰', '暗月', '漩涡', '合作', '深海', '活动', '日志', '其他'];
             // 统计扫描文件各分类数量
             const scanned = window.scannedFiles || [];
             const counts = {};

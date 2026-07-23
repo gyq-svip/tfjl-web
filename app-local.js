@@ -1695,15 +1695,15 @@ if (isTauriApp) {
         html += `<div style="background:rgba(244,67,54,0.2);padding:8px 12px;border-radius:6px;text-align:center;"><div style="color:#f44336;font-size:1.4rem;font-weight:bold;">${maxCount}</div><div style="color:rgba(255,255,255,0.5);font-size:0.7rem;">最高</div></div>`;
         html += `</div>`;
 
-        const barWidth = Math.min(50, Math.max(18, Math.floor(600 / stats.length)));
+        const barWidth = Math.min(28, Math.max(14, Math.floor(420 / stats.length)));
         const chartHeight = 120;
-        html += `<div style="display:flex;align-items:flex-end;gap:2px;height:${chartHeight}px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.1);overflow-x:auto;">`;
+        html += `<div style="display:flex;align-items:flex-end;gap:6px;height:${chartHeight}px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.1);overflow-x:auto;">`;
         for (const s of stats) {
             const h = Math.max(4, Math.round((s.count / maxCount) * (chartHeight - 20)));
             const color = s.count >= avgCount ? '#e040fb' : '#7c4dff';
             html += `<div style="display:flex;flex-direction:column;align-items:center;min-width:${barWidth}px;">
                 <div style="color:#fff;font-size:0.65rem;margin-bottom:2px;">${s.count}</div>
-                <div style="width:${Math.max(12, barWidth - 6)}px;height:${h}px;background:linear-gradient(180deg,${color},rgba(156,39,176,0.3));border-radius:3px 3px 0 0;" title="${s.date}: ${s.count}局"></div>
+                <div style="width:${Math.max(8, barWidth - 6)}px;height:${h}px;background:linear-gradient(180deg,${color},rgba(156,39,176,0.3));border-radius:3px 3px 0 0;" title="${s.date}: ${s.count}局"></div>
                 <div style="color:rgba(255,255,255,0.5);font-size:0.6rem;margin-top:2px;">${s.date}</div>
             </div>`;
         }
