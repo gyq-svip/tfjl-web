@@ -9898,6 +9898,7 @@
                 
                 request.onsuccess = function(event) {
                     db = event.target.result;
+                    window.db = db; // 暴露给 app-local.js 等外部脚本用于备份
                     loadCategories().then(() => {
                         // 检查是否有项目，如果没有则保存默认配置
                         checkAndSaveDefaultProject().then(() => resolve(db));
@@ -9983,6 +9984,7 @@
             return new Promise((resolve, reject) => {
                 if (!db) {
                     categories = ['默认分类', '暗月', '寒冰', '漩涡', '深海'];
+                    window.categories = categories;
                     resolve();
                     return;
                 }
@@ -10005,11 +10007,13 @@
                         categories = defaultCategories;
                         saveCategories();
                     }
+                    window.categories = categories;
                     resolve();
                 };
 
                 request.onerror = function() {
                     categories = ['默认分类', '暗月', '寒冰', '漩涡', '深海'];
+                    window.categories = categories;
                     resolve();
                 };
             });
