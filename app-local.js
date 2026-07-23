@@ -292,6 +292,42 @@ if (isTauriApp) {
         }
     }
 
+    async function writeTextFileWithError(filePath, content) {
+        // 返回 {success, error}，方便调用方显示具体错误
+        let invokeFn = window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke;
+        if (!invokeFn) return { success: false, error: '未找到 Tauri invoke 函数' };
+        try {
+            await invokeFn('write_text_file', { filePath, content });
+            return { success: true };
+        } catch (e) {
+            console.error('写入文件失败:', filePath, e);
+            return { success: false, error: e?.message || String(e) };
+        }
+    }
+
+    async function pathExists(path) {
+        let invokeFn = window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke;
+        if (!invokeFn) return false;
+        try {
+            return await invokeFn('path_exists', { path }) === true;
+        } catch (e) {
+            console.error('检查路径失败:', path, e);
+            return false;
+        }
+    }
+
+    async function createDir(dirPath) {
+        let invokeFn = window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke;
+        if (!invokeFn) return { success: false, error: '未找到 Tauri invoke 函数' };
+        try {
+            await invokeFn('create_dir', { dirPath });
+            return { success: true };
+        } catch (e) {
+            console.error('创建目录失败:', dirPath, e);
+            return { success: false, error: e?.message || String(e) };
+        }
+    }
+
     async function deleteFile(filePath) {
         const result = await tauriInvoke('delete_file', { filePath });
         return result === null ? false : true;
@@ -1030,13 +1066,23 @@ if (isTauriApp) {
         const fileName = 'tfjl-full-backup-' + ts + '.json';
         const filePath = softwareDataDir.replace(/[\\/]+$/, '') + '\\' + fileName;
 
-        const ok = await writeTextFile(filePath, JSON.stringify(backup, null, 2));
-        if (ok) {
+        // 自动创建目录（目录被删除或从旧版本升级时常见）
+        const dirExists = await pathExists(softwareDataDir);
+        if (!dirExists) {
+            const createResult = await createDir(softwareDataDir);
+            if (!createResult.success) {
+                alert('❌ 备份失败：无法创建数据目录\n\n目录：' + softwareDataDir + '\n错误：' + createResult.error);
+                return;
+            }
+        }
+
+        const result = await writeTextFileWithError(filePath, JSON.stringify(backup, null, 2));
+        if (result.success) {
             alert('✅ 备份成功！\n\n文件：' + fileName + '\n配置项：' + Object.keys(localStorageData).length +
                 ' 个\n项目：' + projects.length + ' 个\n\n存放位置：\n' + softwareDataDir);
             loadBackupList(); // 刷新备份列表
         } else {
-            alert('❌ 备份失败，请检查目录权限');
+            alert('❌ 备份失败：' + result.error + '\n\n请检查目录是否有写入权限，或尝试换一个数据目录。');
         }
     }
 
