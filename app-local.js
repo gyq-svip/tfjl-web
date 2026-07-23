@@ -1679,6 +1679,38 @@ if (isTauriApp) {
         _deferredSetItem(key, entry);
     }
 
+    // 对战统计持久化存储：独立于日志文件生命周期
+    // 即使游戏自动删除7天前的日志，已统计的历史数据也永久保留
+    const PERSIST_KEY = 'TFJL_LogBattlePersist';
+
+    function loadBattlePersistStore() {
+        try {
+            const raw = localStorage.getItem(PERSIST_KEY);
+            if (!raw) return {};
+            const data = JSON.parse(raw);
+            return data.dailyMap || {};
+        } catch (e) { return {}; }
+    }
+
+    function saveBattlePersistStore(dailyMap) {
+        try {
+            const oldMap = loadBattlePersistStore();
+            const merged = { ...oldMap, ...dailyMap };
+            // 按日期排序，保留最近90天（避免无限增长）
+            const sortedDates = Object.keys(merged).sort((a, b) => b.localeCompare(a));
+            const trimmed = {};
+            sortedDates.slice(0, 90).forEach(d => { trimmed[d] = merged[d]; });
+            localStorage.setItem(PERSIST_KEY, JSON.stringify({ dailyMap: trimmed, savedAt: Date.now() }));
+        } catch (e) { console.warn('[持久化] 保存失败:', e); }
+    }
+
+    // 合并持久化数据到当前扫描结果（持久化补回已被删除的旧日志数据）
+    function mergePersistToDailyMap(dailyMap) {
+        const persistMap = loadBattlePersistStore();
+        // persistMap 作为底，dailyMap 覆盖同日期（当前扫描的数据更新）
+        return { ...persistMap, ...dailyMap };
+    }
+
     // 渲染对战统计图表（由 calcLogBattleStats 或缓存命中后调用）
     function renderLogBattleStats(dailyMap, statsEl, opts) {
         const fromCache = opts && opts.fromCache;
@@ -1871,7 +1903,9 @@ if (isTauriApp) {
             const resultCache = loadLogBattleResultCache();
             if (resultCache && resultCache.dailyMap && Object.keys(resultCache.dailyMap).length > 0) {
                 dlog('✅ 使用今日结果缓存，跳过全部扫描');
-                renderLogBattleStats(resultCache.dailyMap, statsEl, { fromCache: true, _stats: resultCache._stats || null });
+                // 合并持久化数据（补回已被游戏删除的旧日志日期的统计）
+                const mergedDaily = mergePersistToDailyMap(resultCache.dailyMap);
+                renderLogBattleStats(mergedDaily, statsEl, { fromCache: true, _stats: resultCache._stats || null });
                 window._lastLogDebugLines = debugLines;
                 return;
             }
@@ -1961,10 +1995,14 @@ if (isTauriApp) {
                 // 保存缓存 & 结果
                 fastCache._patterns = learnLogPatterns(fastCache);
                 _deferredSetItem('TFJL_LogBattleV2', fastCache);
+
+                // 合并持久化数据 + 保存（补回已被删除的旧日志日期）
+                const mergedDaily = mergePersistToDailyMap(dailyMap);
+                saveBattlePersistStore(mergedDaily);
                 saveLogBattleResultCache(dailyMap, fastCache._patterns);
 
                 const totalCached = Object.keys(fastCache._files).length;
-                renderLogBattleStats(dailyMap, statsEl, {
+                renderLogBattleStats(mergedDaily, statsEl, {
                     allFiles: totalCached, logFiles: totalCached, todayFiles: todayFiles.length, histFiles: 0,
                     skippedFiles: 0, cacheHits: totalCached - todayFiles.length, toReadFiles: todayFiles.length,
                     usingLearned: !!learnedPatterns, learnedPatterns,
@@ -2146,8 +2184,12 @@ if (isTauriApp) {
             // 保存日结果缓存（下次打开直接渲染，跳过全部扫描）
             saveLogBattleResultCache(dailyMap, cache._patterns);
 
+            // 合并持久化数据 + 保存（补回已被删除的旧日志日期）
+            const mergedDaily = mergePersistToDailyMap(dailyMap);
+            saveBattlePersistStore(mergedDaily);
+
             // 6. 渲染（最近30天）
-            renderLogBattleStats(dailyMap, statsEl, {
+            renderLogBattleStats(mergedDaily, statsEl, {
                 allFiles, logFiles, todayFiles, histFiles, skippedFiles,
                 cacheHits, toReadFiles, usingLearned, learnedPatterns,
                 hasEncodingError, readErr
