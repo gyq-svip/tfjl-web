@@ -4,7 +4,7 @@
   "pub_date": "2026-07-23T18:00:00Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "-----BEGIN RSA SIGNATURE-----\ndW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRdWJvQ0JvYjZTSEdtV3VjaVVwUEU5bmo0TmpQakZtY1p0Rzl2cHdyalVubmpRRTNIcUkwVmNIOXgyNkVUSlYrZjd0SnlwZHlaZU8vTTVxUGlPTW9HekFkT1pOQUNFYXc0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg0Nzk1NDEwCWZpbGU6dGZqbC1zaWduLXRlbXAuZXhlCndpamVmb1cxdjRXK3JUUThNVXJxeHdKTGlUWVJGNnZ4YTZhemZKaENFOWlYZzZNT1FhcW13cXM5QjBTZ1RYdU1TMW1YVlNUbmFvdWl5d0JnUmdNMEJnPT0=\n-----END RSA SIGNATURE-----",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRdWJvQ0JvYjZTSEdtV3VjaVVwUEU5bmo0TmpQakZtY1p0Rzl2cHdyalVubmpRRTNIcUkwVmNIOXgyNkVUSlYrZjd0SnlwZHlaZU8vTTVxUGlPTW9HekFkT1pOQUNFYXc0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg0Nzk1NDEwCWZpbGU6dGZqbC1zaWduLXRlbXAuZXhlCndpamVmb1cxdjRXK3JUUThNVXJxeHdKTGlUWVJGNnZ4YTZhemZKaENFOWlYZzZNT1FhcW13cXM5QjBTZ1RYdU1TMW1YVlNUbmFvdWl5d0JnUmdNMEJnPT0=",
       "url": "https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/releases/download/v1.1.9/tfjl-v1.1.9-x64-setup.exe"
     }
   }

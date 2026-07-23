@@ -5696,8 +5696,10 @@
                     return;
                 } catch (e) {
                     console.warn('[updater] 安装已下载包失败:', e);
+                    t.error('⚠️ 安装失败: ' + (e.message || e));
+                    t.remove(3000);
                     _currentUpdate = null; _currentDownload = null;
-                    // 回退到下面的重新检查流程
+                    return;  // 安装失败直接返回，不再触发第二次安装
                 }
             }
 
