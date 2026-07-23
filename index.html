@@ -12953,18 +12953,18 @@
             }
         }
 
-        function downloadLocalFileContent(windowId) {
+        async function downloadLocalFileContent(windowId) {
             const textarea = document.getElementById(`${windowId}_content`);
             if (!textarea) return;
             const win = localFileWindows.find(w => w.id === windowId);
             if (!win) return;
-            const blob = new Blob([textarea.value], { type: 'text/plain;charset=utf-8' });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = win.fileName;
-            link.click();
-            URL.revokeObjectURL(link.href);
-            showToast('📥 下载已开始: ' + win.fileName);
+            const content = textarea.value;
+            const isTauri = !!(window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke);
+            if (isTauri) {
+                await _downloadScriptTauri(win.fileName, content);
+            } else {
+                _downloadScriptBlob(win.fileName, content);
+            }
         }
 
         async function renameScannedFile(filePath, fileName) {
