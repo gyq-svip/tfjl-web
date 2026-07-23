@@ -1306,7 +1306,7 @@ if (isTauriApp) {
         html += `<div style="background:rgba(244,67,54,0.2);padding:8px 12px;border-radius:6px;text-align:center;"><div style="color:#f44336;font-size:1.4rem;font-weight:bold;">${maxCount}</div><div style="color:rgba(255,255,255,0.5);font-size:0.7rem;">最高</div></div>`;
         html += `</div>`;
 
-        const barWidth = Math.max(30, Math.floor(600 / stats.length));
+        const barWidth = Math.max(18, Math.floor(600 / stats.length));
         const chartHeight = 120;
         html += `<div style="display:flex;align-items:flex-end;gap:2px;height:${chartHeight}px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.1);overflow-x:auto;">`;
         for (const s of stats) {
@@ -1320,8 +1320,8 @@ if (isTauriApp) {
         }
         html += `</div>`;
 
-        const recent = stats.slice(0, 7);
-        html += `<div style="margin-top:12px;"><div style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-bottom:6px;">最近7天明细</div>`;
+        const recent = stats.slice(0, 30);
+        html += `<div style="margin-top:12px;"><div style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-bottom:6px;">最近30天明细</div>`;
         for (const s of recent) {
             const bar = '█'.repeat(Math.min(20, Math.round(s.count / maxCount * 20)));
             html += `<div style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:0.78rem;">
@@ -1332,9 +1332,9 @@ if (isTauriApp) {
         }
         html += `</div>`;
 
-        // 最近7天趋势图（SVG柱状图 + 折线，近→远）
+        // 最近30天趋势图（SVG柱状图 + 折线，近→远）
         if (recent.length > 0) {
-            const chartW = 380;
+            const chartW = Math.max(380, recent.length * 20 + 40);
             const padL = 30, padR = 10, padT = 16, padB = 16;
             const hMax = Math.max(1, Math.max(...recent.map(s => s.count)));
             const chartH = padT + 100 + padB;
@@ -1688,7 +1688,6 @@ if (isTauriApp) {
         html += '<div style="display:flex;gap:12px;align-items:center;margin-bottom:4px;font-size:0.7rem;">';
         html += '<span style="display:inline-block;width:10px;height:10px;background:#4ecdc4;border-radius:2px;"></span> 胜利';
         html += '<span style="display:inline-block;width:10px;height:10px;background:#f44336;border-radius:2px;"></span> 失败';
-        html += '<span style="margin-left:8px;color:rgba(255,255,255,0.3);">x轴: 月-日</span>';
         html += '</div>';
 
         html += '<svg width="' + chartW + '" height="' + chartH + '" style="display:block;">' + gridHtml + barsHtml + '</svg>';
