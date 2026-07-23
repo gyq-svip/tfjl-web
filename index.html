@@ -16236,6 +16236,11 @@
                         }
                     } else {
                         usedKey = parts[0];
+                        // 回退：非分隔符融合卡（如"火炮射线"）→ 匹配基础卡（如"火炮"）
+                        if (damageReductionData[usedKey] === undefined || damageReductionData[usedKey] <= 0) {
+                            const baseCard = findBaseCardInFusion(usedKey);
+                            if (baseCard) usedKey = baseCard;
+                        }
                     }
                     
                     if (!seenCards.has(usedKey)) {
