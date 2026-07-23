@@ -68,9 +68,9 @@ if (isTauriApp) {
         let invokeFn = window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke;
         if (!invokeFn) return null;
         try {
-            return await invokeFn('read_text_file', { filePath });
+            return await invokeFn('read_text_file_auto', { filePath });
         } catch (e) {
-            console.error('[APP] read_text_file 失败:', filePath, e);
+            console.error('[APP] read_text_file_auto 失败:', filePath, e);
             return null;
         }
     }
@@ -1478,7 +1478,7 @@ if (isTauriApp) {
                 const readResults = await Promise.all(
                     toReadFiles.map(async (f) => {
                         try {
-                            const content = await invokeFn('read_text_file', { filePath: f.path });
+                            const content = await invokeFn('read_text_file_auto', { filePath: f.path });
                             if (!content) { readOk++; noKeyword++; return { date: '', win: -1, lose: 0, path: f.path, mtime: f.modified }; }
                             const winCount = (content.match(/对战胜利确定/g) || []).length;
                             const loseCount = (content.match(/对战失败确定/g) || []).length;
@@ -1533,8 +1533,8 @@ if (isTauriApp) {
             if (sortedDates.length === 0) {
                 window._lastLogDebugLines = debugLines;
                 const encodingHint = hasEncodingError
-                    ? '<span style="font-size:0.7rem;color:#f44336;">检测到 ' + readErr + ' 个文件因非 UTF-8 编码读取失败，请重新 cargo tauri build 以启用 GB18030 兼容解码</span>'
-                    : '<span style="font-size:0.7rem;color:#ff9800;">提示：内容可能是 GBK 编码 → 需重编译 Rust 后端</span>';
+                    ? '<span style="font-size:0.7rem;color:#f44336;">检测到 ' + readErr + ' 个文件因非 UTF-8 编码读取失败，请升级到 1.1.8（支持 BOM/GB18030/BIG5 多编码自动检测）</span>'
+                    : '<span style="font-size:0.7rem;color:#ff9800;">提示：内容可能是 GBK/BIG5 等非 UTF-8 编码 → 升级到 1.1.8 即可自动兼容</span>';
                 const errHtml = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">日志文件中未找到「对战胜利确定」或「对战失败确定」关键词<br><span style="font-size:0.7rem;">共 ' + allFiles.length + ' 个文件，过滤后 ' + logFiles.length + ' 个（今日 ' + todayFiles.length + '，历史 ' + histFiles.length + '），跳过 ' + skippedFiles + ' 个非日志，读取出错 ' + readErr + ' 个</span><br>' + encodingHint + '</div>';
                 statsEl.innerHTML = errHtml;
                 return;
