@@ -1816,6 +1816,39 @@ if (isTauriApp) {
         statsEl.innerHTML = html;
     }
 
+    // 快速路径：有历史缓存时，只扫描今日可能新增的文件
+    // 避免每次新的一天都全量递归遍历整个日志目录树（几百次 readDir IPC）
+    async function scanTodayOnly(logsDir, learnedPatterns) {
+        const todayStr = getTodayStr();
+        const allowedExts = ['txt', 'json', 'log', ''];
+        const files = [];
+        try {
+            const rootEntries = await readDir(logsDir);
+            for (const entry of rootEntries) {
+                if (entry.is_file) {
+                    // 顶层文件：文件名含今日日期 或 修改时间是今天
+                    const fileDate = extractDateFromFilename(entry.name);
+                    if (fileDate !== todayStr && !(entry.modified && entry.modified.startsWith(todayStr))) continue;
+                    const ext = (entry.name.match(/\.(\w+)$/)?.[1] || '').toLowerCase();
+                    if (!allowedExts.includes(ext)) continue;
+                    const isLog = learnedPatterns ? matchesLogPattern(entry.path, learnedPatterns) : isLikelyLogFileFallback(entry.name);
+                    if (!isLog) continue;
+                    files.push({ name: entry.name, path: entry.path, dir: logsDir, dirKey: 'logs', dirLabel: '日志', ext, category: '对战', modified: entry.modified || '' });
+                } else {
+                    // 子目录：目录名匹配今日日期才进入（如 2026-07-23/）
+                    const dirDate = extractDateFromFilename(entry.name);
+                    if (dirDate !== todayStr) continue;
+                    const subFiles = await collectFilesRecursive(entry.path, 'logs', '日志', 2, allowedExts);
+                    for (const f of subFiles) {
+                        const isLog = learnedPatterns ? matchesLogPattern(f.path, learnedPatterns) : isLikelyLogFileFallback(f.name);
+                        if (isLog) files.push(f);
+                    }
+                }
+            }
+        } catch (e) { console.warn('[快速扫描] 今日文件扫描异常:', e); }
+        return files;
+    }
+
     async function calcLogBattleStats(targetId, forceParam) {
         // forceParam: true=强制重新扫描（忽略缓存做全新扫描），false/undefined=正常流程（优先用缓存）
         // 兼容 onclick="calcLogBattleStats(true)" 写法：targetId 为布尔值时修正为 force 标志
@@ -1844,7 +1877,105 @@ if (isTauriApp) {
             }
         }
 
-        dlog('开始扫描: ' + maDirs.logs);
+        // === 快速路径：有历史文件缓存 → 只扫描今日新增（跳过全量递归目录遍历） ===
+        // 每次新的一天首次打开，无需遍历整个日志目录树
+        if (!force) {
+            let fastCache = null;
+            try {
+                const raw = localStorage.getItem('TFJL_LogBattleV2');
+                if (raw) { fastCache = JSON.parse(raw); if (fastCache._dir !== maDirs.logs) fastCache = null; }
+            } catch (e) { fastCache = null; }
+
+            if (fastCache && fastCache._files && Object.keys(fastCache._files).length > 0) {
+                dlog('🚀 快速路径：缓存 ' + Object.keys(fastCache._files).length + ' 个文件，只扫描今日新增');
+
+                // 从缓存构建历史 dailyMap
+                const todayStr = getTodayStr();
+                let dailyMap = {};
+                for (const [, info] of Object.entries(fastCache._files)) {
+                    if (info.win === -1 || !info.date || info.date === '未知') continue;
+                    if (!dailyMap[info.date]) dailyMap[info.date] = { win: 0, lose: 0 };
+                    dailyMap[info.date].win += (info.win || 0);
+                    dailyMap[info.date].lose += (info.lose || 0);
+                }
+                dlog('从缓存恢复 ' + Object.keys(dailyMap).length + ' 天历史数据');
+
+                statsEl.innerHTML = '<div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;font-size:0.85rem;">⏳ 正在快速扫描今日日志…</div>';
+
+                const learnedPatterns = learnLogPatterns(fastCache);
+                const todayFiles = await scanTodayOnly(maDirs.logs, learnedPatterns);
+                dlog('今日新增日志文件: ' + todayFiles.length + ' 个');
+
+                let readOk = 0, readErr = 0;
+                const readErrs = [];
+                let hasEncodingError = false;
+
+                if (todayFiles.length > 0) {
+                    // 跳过已缓存的（同路径+mtime一致=内容没变）
+                    const toRead = todayFiles.filter(f => {
+                        const c = fastCache._files[f.path];
+                        return !c || c.mtime !== f.modified;
+                    });
+                    const cachedSkip = todayFiles.length - toRead.length;
+                    if (cachedSkip > 0) dlog('今日文件中已缓存跳过: ' + cachedSkip + ' 个（未修改）');
+
+                    if (toRead.length > 0) {
+                        dlog('需读取今日文件: ' + toRead.length + ' 个');
+                        const invokeFn = window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke;
+                        const readResults = await Promise.all(toRead.map(async (f) => {
+                            try {
+                                const content = await invokeFn('read_text_file_auto', { filePath: f.path });
+                                if (!content) { readOk++; return { date: '', win: -1, lose: 0, path: f.path, mtime: f.modified }; }
+                                const w = (content.match(/对战胜利确定/g) || []).length;
+                                const l = (content.match(/对战失败确定/g) || []).length;
+                                if (w === 0 && l === 0) { readOk++; return { date: '', win: -1, lose: 0, path: f.path, mtime: f.modified }; }
+                                readOk++;
+                                let d = extractDateFromFilename(f.name);
+                                if (!d && f.modified) d = f.modified.substring(0, 10);
+                                if (!d) d = todayStr;
+                                return { date: d, win: w, lose: l, path: f.path, mtime: f.modified };
+                            } catch (e) {
+                                readErr++;
+                                const msg = e.message || e;
+                                if (readErrs.length < 3) readErrs.push(f.name + ': ' + msg);
+                                if (typeof msg === 'string' && (msg.includes('UTF-8') || msg.includes('valid utf-8') || msg.includes('stream did not contain'))) hasEncodingError = true;
+                                return null;
+                            }
+                        }));
+
+                        for (const r of readResults) {
+                            if (!r) continue;
+                            if (r.win === -1) {
+                                fastCache._files[r.path] = { mtime: r.mtime, date: '', win: -1, lose: 0, _scannedAt: Date.now() };
+                                continue;
+                            }
+                            const d = r.date || todayStr;
+                            if (!dailyMap[d]) dailyMap[d] = { win: 0, lose: 0 };
+                            dailyMap[d].win += r.win;
+                            dailyMap[d].lose += r.lose;
+                            fastCache._files[r.path] = { mtime: r.mtime, date: d, win: r.win, lose: r.lose };
+                        }
+                    }
+                }
+
+                // 保存缓存 & 结果
+                fastCache._patterns = learnLogPatterns(fastCache);
+                _deferredSetItem('TFJL_LogBattleV2', fastCache);
+                saveLogBattleResultCache(dailyMap, fastCache._patterns);
+
+                const totalCached = Object.keys(fastCache._files).length;
+                renderLogBattleStats(dailyMap, statsEl, {
+                    allFiles: totalCached, logFiles: totalCached, todayFiles: todayFiles.length, histFiles: 0,
+                    skippedFiles: 0, cacheHits: totalCached - todayFiles.length, toReadFiles: todayFiles.length,
+                    usingLearned: !!learnedPatterns, learnedPatterns,
+                    hasEncodingError, readErr
+                });
+                window._lastLogDebugLines = debugLines;
+                return;
+            }
+        }
+
+        dlog('开始全量扫描: ' + maDirs.logs);
         statsEl.innerHTML = '<div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;font-size:0.85rem;">⏳ 正在扫描日志文件并统计…</div>';
 
         try {
