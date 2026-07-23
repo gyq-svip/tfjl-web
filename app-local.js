@@ -1629,8 +1629,10 @@ if (isTauriApp) {
         // 优先使用今日缓存（非强制刷新）
         if (!force) {
             const cache = loadStatsCache();
-            if (cache && cache.stats) {
-                renderScreenshotStats(cache.stats);
+            if (cache && cache.stats && cache.stats.length > 0) {
+                saveScreenshotPersistStore(cache.stats); // 确保持久化包含今日数据
+                const merged = mergeScreenshotPersist(cache.stats);
+                renderScreenshotStats(merged);
                 return;
             }
         }
@@ -1671,8 +1673,10 @@ if (isTauriApp) {
                 return;
             }
 
-            saveStatsCache(stats);
-            renderScreenshotStats(stats);
+            saveStatsCache(stats);                         // 今日扫描缓存
+            saveScreenshotPersistStore(stats);             // 持久化累积
+            const merged = mergeScreenshotPersist(stats);  // 合并历史数据
+            renderScreenshotStats(merged);
         } catch (e) {
             statsEl.innerHTML = '<div style="color:#f44336;text-align:center;padding:20px;font-size:0.85rem;">统计失败：' + e.message + '</div>';
         }
@@ -1991,6 +1995,50 @@ if (isTauriApp) {
             tokens: patterns.tokens ? patterns.tokens.length : 0
         };
         _deferredSetItem(key, entry);
+    }
+
+    // ==================== 截图统计持久化存储 ====================
+    // 游戏只保留7天截图，APP独立累积历史数据永久保留
+    const SCR_PERSIST_KEY = 'TFJL_ScreenshotPersist';
+
+    function loadScreenshotPersistStore() {
+        try {
+            const raw = localStorage.getItem(SCR_PERSIST_KEY);
+            if (!raw) return {};
+            const data = JSON.parse(raw);
+            return data.dailyMap || {};
+        } catch (e) { return {}; }
+    }
+
+    function saveScreenshotPersistStore(stats) {
+        try {
+            const oldMap = loadScreenshotPersistStore();
+            // stats: [{date, count, path}, ...]
+            for (const s of stats) {
+                oldMap[s.date] = Math.max(oldMap[s.date] || 0, s.count);
+            }
+            // 按日期排序，保留最近180天
+            const sorted = Object.entries(oldMap).sort((a, b) => b[0].localeCompare(a[0]));
+            const trimmed = {};
+            sorted.slice(0, 180).forEach(([d, c]) => { trimmed[d] = c; });
+            localStorage.setItem(SCR_PERSIST_KEY, JSON.stringify({ dailyMap: trimmed, savedAt: Date.now() }));
+        } catch (e) { console.warn('[截图持久化] 保存失败:', e); }
+    }
+
+    function mergeScreenshotPersist(stats) {
+        const persistMap = loadScreenshotPersistStore();
+        const merged = [];
+        const seen = new Set();
+        // 当前扫描数据优先
+        for (const s of stats) { merged.push(s); seen.add(s.date); }
+        // 补充持久化中有但当前扫描没有的（已被游戏删除的旧日期）
+        for (const [date, count] of Object.entries(persistMap)) {
+            if (!seen.has(date) && count > 0) {
+                merged.push({ date, count, path: '' });
+            }
+        }
+        merged.sort((a, b) => b.date.localeCompare(a.date));
+        return merged;
     }
 
     // 对战统计持久化存储：独立于日志文件生命周期
