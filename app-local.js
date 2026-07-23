@@ -711,12 +711,15 @@ if (isTauriApp) {
         let html = '';
         for (const [label, files] of Object.entries(grouped)) {
             html += `<div style="color:#00bcd4;font-size:0.75rem;margin:8px 0 4px;font-weight:bold;">${label}（${files.length}个）</div>`;
-            files.forEach(f => {
+            const drIconInfo = '  <span style="color:rgba(255,255,255,0.25);font-size:0.65rem;">🛡️</span>';
+            files.forEach((f, idx) => {
                 const icon = f.ext === 'json' ? '🔵' : '📄';
                 const safePath = f.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                const drBtnId = 'drBtn_' + label.replace(/\s/g, '_') + '_' + idx;
                 html += `<div style="display:flex;align-items:center;gap:6px;padding:4px 6px;border-bottom:1px solid rgba(255,255,255,0.05);">
                     <span>${icon}</span>
                     <span style="color:#fff;font-size:0.8rem;flex:1;word-break:break-all;">${f.name}</span>
+                    <button id="${drBtnId}" onclick="computeFileDr('${safePath}','${drBtnId}')" title="计算减伤" style="background:rgba(255,152,0,0.3);color:#ffd54f;border:1px solid rgba(255,152,0,0.3);padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;white-space:nowrap;">🛡️</button>
                     <button onclick="detectFileEncoding('${safePath}')" style="background:rgba(156,39,176,0.3);color:#ce93d8;border:1px solid rgba(156,39,176,0.3);padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;">编码</button>
                     <button onclick="viewFile('${safePath}')" style="background:rgba(0,188,212,0.3);color:#00bcd4;border:1px solid rgba(0,188,212,0.3);padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;">查看</button>
                     <button onclick="loadFileToHand('${safePath}')" style="background:rgba(76,175,80,0.3);color:#4caf50;border:1px solid rgba(76,175,80,0.3);padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;">加载</button>
@@ -754,6 +757,50 @@ if (isTauriApp) {
                 statsEl.innerHTML = '';
             }
         }
+    }
+
+    // 扫描列表中点击 🛡️ 按钮：读取文件内容并计算减伤
+    async function computeFileDr(filePath, btnId) {
+        const btn = document.getElementById(btnId);
+        if (!btn) return;
+        btn.textContent = '...';
+        btn.disabled = true;
+
+        try {
+            const content = await readTextFile(filePath);
+            if (!content) {
+                btn.textContent = '❌';
+                btn.title = '文件读取失败';
+                btn.disabled = false;
+                return;
+            }
+            // 调用 index.html 暴露的 computeScriptDr
+            const drInfo = window.computeScriptDr ? window.computeScriptDr(content) : null;
+            if (!drInfo) {
+                btn.textContent = '—';
+                btn.title = '未找到上阵信息';
+                btn.style.background = 'rgba(255,255,255,0.06)';
+                btn.style.color = 'rgba(255,255,255,0.3)';
+                btn.style.border = '1px solid rgba(255,255,255,0.1)';
+                btn.disabled = false;
+                return;
+            }
+
+            // 颜色：<100红 <130金 >=130青
+            let drColor = '#4ecdc4';
+            if (drInfo.first7 < 100) drColor = '#ff6b6b';
+            else if (drInfo.first7 < 130) drColor = '#ffd700';
+
+            btn.innerHTML = '<b style="color:' + drColor + '">' + drInfo.first7 + '%</b>';
+            btn.title = '前7减伤：' + drInfo.first7 + '% | 全部减伤：' + drInfo.all + '%';
+            btn.style.background = 'rgba(255,152,0,0.2)';
+            btn.style.color = drColor;
+            btn.style.border = '1px solid rgba(255,152,0,0.4)';
+        } catch (e) {
+            btn.textContent = '❌';
+            btn.title = '读取异常: ' + (e.message || e);
+        }
+        btn.disabled = false;
     }
 
     // 静默扫描（不上报UI，专门给脚本文件tab搜索用）
@@ -2505,6 +2552,7 @@ if (isTauriApp) {
     window.silentScanFiles = silentScanFiles;
     window.collectFilesRecursive = collectFilesRecursive;
     window.classifyFile = classifyFile;
+    window.computeFileDr = computeFileDr;       // 扫描列表减伤按钮
     window.saveSettingsAndClose = saveSettingsAndClose;
     window.toggleAutoLoadSetting = toggleAutoLoadSetting;
     window.viewFile = viewFile;
