@@ -1129,13 +1129,32 @@ if (isTauriApp) {
             const displayName = parts[0] + ' ' + (parts[1] ? parts[1].slice(0, 2) + ':' + parts[1].slice(2) : '');
             return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;margin-bottom:4px;background:rgba(255,255,255,0.04);border-radius:6px;">' +
                 '<span style="color:#fff;font-size:0.78rem;">📦 ' + displayName + '</span>' +
+                '<div style="display:flex;gap:6px;">' +
                 '<button class="_restoreBackupBtn" data-filename="' + f.name + '" style="background:linear-gradient(135deg,#2196f3,#1565c0);color:white;border:none;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:0.7rem;">还原</button>' +
+                '<button class="_deleteBackupBtn" data-filename="' + f.name + '" style="background:rgba(244,67,54,0.3);color:#ef5350;border:1px solid rgba(244,67,54,0.3);padding:4px 12px;border-radius:4px;cursor:pointer;font-size:0.7rem;">删除</button>' +
+                '</div>' +
                 '</div>';
         }).join('');
 
         listDiv.querySelectorAll('._restoreBackupBtn').forEach(btn => {
             btn.addEventListener('click', () => restoreFromBackup(btn.dataset.filename));
         });
+        listDiv.querySelectorAll('._deleteBackupBtn').forEach(btn => {
+            btn.addEventListener('click', () => deleteBackup(btn.dataset.filename));
+        });
+    }
+
+    async function deleteBackup(fileName) {
+        if (!softwareDataDir) return;
+        if (!confirm('确定要删除备份「' + fileName + '」吗？\n此操作不可撤销。')) return;
+        const filePath = softwareDataDir.replace(/[\\/]+$/, '') + '\\' + fileName;
+        const result = await deleteFile(filePath);
+        if (result.success) {
+            alert('✅ 备份已删除：' + fileName);
+            loadBackupList();
+        } else {
+            alert('❌ 删除失败：' + result.error);
+        }
     }
 
     async function restoreFromBackup(fileName) {
@@ -2891,6 +2910,7 @@ if (isTauriApp) {
     window.backupAllData = backupAllData;       // 全局备份
     window.loadBackupList = loadBackupList;       // 加载备份文件列表
     window.restoreFromBackup = restoreFromBackup; // 从备份还原
+    window.deleteBackup = deleteBackup;           // 删除备份文件
     window.syncAllNow = syncAllNow;            // 手动触发全量数据同步到本地目录
     window.initDataSync = initDataSync;        // 重新初始化同步路径
     window.calcScreenshotStats = calcScreenshotStats;
