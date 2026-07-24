@@ -18,7 +18,7 @@ if (isTauriApp) {
         battleMax:  'D:\\withfriends\\塔防老马助手\\对战Max',        // 对战MAX目录（TXT）
         screenshot: 'D:\\withfriends\\塔防老马助手\\截图',           // 截图目录（统计每天打多少局）
         logs:       'D:\\withfriends\\塔防老马助手\\Log',            // 对战日志目录（统计胜负等）
-        temp:       'D:\\Downloads'                                  // 临时脚本目录
+        temp:       'D:\\withfriends\\Downloads'                      // 临时脚本目录
     };
     const DEFAULT_SOFTWARE_DATA_DIR = 'D:\\withfriends\\塔防精灵助手数据';
 
