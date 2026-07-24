@@ -751,8 +751,9 @@ if (isTauriApp) {
         listEl.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">扫描中...</div>';
         scannedFiles = [];
 
-        // 递归扫描所有目录（含子文件夹）
+        // 递归扫描所有目录（含子文件夹），目录不存在则自动创建
         for (const [key, dir] of allDirs) {
+            await createDir(dir);
             const subFiles = await collectFilesRecursive(dir, key, dirLabels[key]);
             scannedFiles.push(...subFiles);
         }
@@ -1029,6 +1030,7 @@ if (isTauriApp) {
 
         scannedFiles = [];
         for (const [key, dir] of allDirs) {
+            await createDir(dir);
             const subFiles = await collectFilesRecursive(dir, key, dirLabels[key]);
             scannedFiles.push(...subFiles);
         }
