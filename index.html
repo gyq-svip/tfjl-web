@@ -3061,7 +3061,7 @@
             const catSel = document.getElementById('categorySelector1');
             if (!catSel) return;
             // 使用默认分类（categories 变量可能在后面定义）
-            const defaultCategories = ['默认分类', '暗月', '寒冰', '漩涡', '深海'];
+            const defaultCategories = ['默认分类', '暗月', '寒冰', '漩涡', '深海', '临时'];
             defaultCategories.forEach(cat => {
                 const opt = document.createElement('option');
                 opt.value = cat;
@@ -9826,7 +9826,7 @@
         const DB_VERSION = 2;
         const STORE_NAME = 'projects';
         const CATEGORIES_STORE = 'categories';
-        let categories = ['默认分类', '暗月', '寒冰', '漩涡', '深海']; // 默认分类
+        let categories = ['默认分类', '暗月', '寒冰', '漩涡', '深海', '临时']; // 默认分类
         
         // 默认配置项目（南门公主）
         const DEFAULT_PROJECT = {
@@ -9983,7 +9983,7 @@
         function loadCategories() {
             return new Promise((resolve, reject) => {
                 if (!db) {
-                    categories = ['默认分类', '暗月', '寒冰', '漩涡', '深海'];
+                    categories = ['默认分类', '暗月', '寒冰', '漩涡', '深海', '临时'];
                     window.categories = categories;
                     resolve();
                     return;
@@ -9994,7 +9994,7 @@
                 const request = store.getAll();
 
                 request.onsuccess = function() {
-                    const defaultCategories = ['默认分类', '暗月', '寒冰', '漩涡', '深海'];
+                    const defaultCategories = ['默认分类', '暗月', '寒冰', '漩涡', '深海', '临时'];
                     if (request.result && request.result.length > 0) {
                         categories = request.result.map(c => c.name);
                         // 确保默认分类存在
@@ -10012,7 +10012,7 @@
                 };
 
                 request.onerror = function() {
-                    categories = ['默认分类', '暗月', '寒冰', '漩涡', '深海'];
+                    categories = ['默认分类', '暗月', '寒冰', '漩涡', '深海', '临时'];
                     window.categories = categories;
                     resolve();
                 };
@@ -10092,7 +10092,7 @@
                 return;
             }
 
-            const defaultCategories = ['默认分类', '暗月', '寒冰', '漩涡', '深海', '合作', '活动', '日志', '其他'];
+            const defaultCategories = ['默认分类', '暗月', '寒冰', '漩涡', '深海', '临时', '合作', '活动', '日志', '其他'];
             // 显示删除确认模态框
             const container = document.getElementById('categoryListForSave');
             container.innerHTML = categories.map((cat, i) =>
@@ -10887,7 +10887,7 @@
             const cm = {
                 '寒冰': '#64b5f6', '暗月': '#ce93d8', '漩涡': '#4fc3f7',
                 '合作': '#ffd54f', '深海': '#4db6ac', '活动': '#ff8a65',
-                '日志': '#8d6e63', '其他': '#bdbdbd', '全部': '#ffffff'
+                '日志': '#8d6e63', '临时': '#a5d6a7', '其他': '#bdbdbd', '全部': '#ffffff'
             };
             return cm[cat] || '#bdbdbd';
         }
@@ -10897,7 +10897,7 @@
         function renderScriptFileCategoryFilter() {
             const el = document.getElementById('scriptFileCategoryFilter');
             if (!el) return;
-            const cats = ['全部', '寒冰', '暗月', '漩涡', '合作', '深海', '活动', '日志', '其他'];
+            const cats = ['全部', '寒冰', '暗月', '漩涡', '合作', '深海', '活动', '日志', '临时', '其他'];
             // 统计扫描文件各分类数量
             const scanned = window.scannedFiles || [];
             const counts = {};
@@ -20868,7 +20868,8 @@ function hasGistToken() {
                 battle:     { label: '对战JSON', icon: '⚔️' },
                 battleMax:  { label: '对战MAX',  icon: '📊' },
                 screenshot: { label: '截图',     icon: '📸' },
-                logs:       { label: '日志',     icon: '📋' }
+                logs:       { label: '日志',     icon: '📋' },
+                temp:       { label: '临时脚本', icon: '📝' }
             };
 
             return new Promise((resolve) => {
@@ -21733,7 +21734,7 @@ ${maSection}
                     alert('此功能仅限桌面版 App 使用');
                     return;
                 }
-                const dirKeys = ['coop', 'activity', 'battle', 'battleMax', 'screenshot'];
+                const dirKeys = ['coop', 'activity', 'battle', 'battleMax', 'screenshot', 'temp'];
                 const hasConfig = dirKeys.some(k => {
                     try { return window.maDirs && window.maDirs[k]; } catch(e) { return false; }
                 });
@@ -21761,7 +21762,8 @@ ${maSection}
                 activity: { label: '活动', icon: '🎉', desc: '活动+隐藏榜' },
                 battle: { label: '对战JSON', icon: '⚔️', desc: '对战目录(JSON)' },
                 battleMax: { label: '对战MAX(TXT)', icon: '📊', desc: '对战MAX目录(TXT)' },
-                screenshot: { label: '截图', icon: '📸', desc: '截图目录' }
+                screenshot: { label: '截图', icon: '📸', desc: '截图目录' },
+                temp: { label: '临时脚本', icon: '📝', desc: '临时存放' }
             };
 
             let btnHtml = '';
