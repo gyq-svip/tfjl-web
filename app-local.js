@@ -843,14 +843,17 @@ if (isTauriApp) {
                 if (!grouped[f.dirLabel]) grouped[f.dirLabel] = [];
                 grouped[f.dirLabel].push(f);
             });
+            let drGlobalIdx = 0;
             for (const [label, files] of Object.entries(grouped)) {
                 html += `<div style="color:#00bcd4;font-size:0.75rem;margin:8px 0 4px;font-weight:bold;">${label}（${files.length}个）</div>`;
-                files.forEach(f => {
+                files.forEach((f, fi) => {
                     const icon = f.ext === 'json' ? '🔵' : '📄';
                     const safePath = f.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                    const drBtnId = 'drbtn_' + (drGlobalIdx++);
                     html += `<div style="display:flex;align-items:center;gap:6px;padding:4px 6px;border-bottom:1px solid rgba(255,255,255,0.05);">
                         <span>${icon}</span>
                         <span style="color:#fff;font-size:0.8rem;flex:1;word-break:break-all;">${f.name}</span>
+                        <button id="${drBtnId}" onclick="computeFileDr('${safePath}','${drBtnId}')" title="计算减伤" style="background:rgba(255,152,0,0.2);color:#ff9800;border:1px solid rgba(255,152,0,0.3);padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;">🛡️</button>
                         <button onclick="detectFileEncoding('${safePath}')" style="background:rgba(156,39,176,0.3);color:#ce93d8;border:1px solid rgba(156,39,176,0.3);padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;">编码</button>
                         <button onclick="viewFile('${safePath}')" style="background:rgba(0,188,212,0.3);color:#00bcd4;border:1px solid rgba(0,188,212,0.3);padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;">查看</button>
                         <button onclick="loadFileToHand('${safePath}')" style="background:rgba(76,175,80,0.3);color:#4caf50;border:1px solid rgba(76,175,80,0.3);padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;">加载</button>
