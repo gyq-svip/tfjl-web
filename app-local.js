@@ -528,14 +528,14 @@ if (isTauriApp) {
                     </div>
                 </div>
 
+                    </div>
+                </div>
+
                 <div style="margin-bottom:12px;">
                     <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;display:block;margin-bottom:4px;">📝 临时脚本目录（临时存放的文件）</label>
                     <div style="display:flex;gap:8px;">
                         <input type="text" id="maDir_temp" readonly placeholder="未设置" style="flex:1;background:rgba(0,0,0,0.3);color:#fff;border:1px solid rgba(255,255,255,0.2);padding:8px 12px;border-radius:6px;font-size:0.85rem;">
                         <button onclick="selectMaDir('temp')" style="background:linear-gradient(135deg,#00bcd4,#00838f);color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;white-space:nowrap;">浏览...</button>
-                    </div>
-                </div>
-
                     </div>
                 </div>
 
@@ -632,6 +632,7 @@ if (isTauriApp) {
         document.getElementById('maDir_battleMax').value = maDirs.battleMax || '';
         document.getElementById('maDir_screenshot').value = maDirs.screenshot || '';
         document.getElementById('maDir_logs').value = maDirs.logs || '';
+        document.getElementById('maDir_temp').value = maDirs.temp || '';
         document.getElementById('softwareDataDirInput').value = softwareDataDir || '';
         // 恢复自动加载开关 UI 状态
         updateToggleUI('screenshot', settingsConfig.autoLoadScreenshotStats);
