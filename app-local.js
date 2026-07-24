@@ -17,7 +17,8 @@ if (isTauriApp) {
         battle:     'D:\\withfriends\\塔防老马助手\\对战脚本存档',   // 对战目录（JSON）
         battleMax:  'D:\\withfriends\\塔防老马助手\\对战Max',        // 对战MAX目录（TXT）
         screenshot: 'D:\\withfriends\\塔防老马助手\\截图',           // 截图目录（统计每天打多少局）
-        logs:       'D:\\withfriends\\塔防老马助手\\Log'             // 对战日志目录（统计胜负等）
+        logs:       'D:\\withfriends\\塔防老马助手\\Log',            // 对战日志目录（统计胜负等）
+        temp:       'D:\\Downloads'                                  // 临时脚本目录
     };
     const DEFAULT_SOFTWARE_DATA_DIR = 'D:\\withfriends\\塔防精灵助手数据';
 
@@ -527,6 +528,14 @@ if (isTauriApp) {
                     </div>
                 </div>
 
+                <div style="margin-bottom:12px;">
+                    <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;display:block;margin-bottom:4px;">📝 临时脚本目录（临时存放的文件）</label>
+                    <div style="display:flex;gap:8px;">
+                        <input type="text" id="maDir_temp" readonly placeholder="未设置" style="flex:1;background:rgba(0,0,0,0.3);color:#fff;border:1px solid rgba(255,255,255,0.2);padding:8px 12px;border-radius:6px;font-size:0.85rem;">
+                        <button onclick="selectMaDir('temp')" style="background:linear-gradient(135deg,#00bcd4,#00838f);color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;white-space:nowrap;">浏览...</button>
+                    </div>
+                </div>
+
                     </div>
                 </div>
 
@@ -702,6 +711,8 @@ if (isTauriApp) {
     function classifyFile(fileName, dirKey) {
         // 日志目录下的文件统一归为"日志"类
         if (dirKey === 'logs') return '日志';
+        // 临时脚本目录下的文件统一归为"临时"类
+        if (dirKey === 'temp') return '临时';
         const nameLower = fileName.toLowerCase();
         if (nameLower.includes('寒冰')) return '寒冰';
         if (nameLower.includes('暗月')) return '暗月';
@@ -717,7 +728,7 @@ if (isTauriApp) {
         const statsEl = document.getElementById('fuzzyStatsArea');
         if (!listEl) return;
 
-        const dirLabels = { coop: '合作', activity: '活动', battle: '对战', battleMax: '对战MAX', screenshot: '截图', logs: '日志' };
+        const dirLabels = { coop: '合作', activity: '活动', battle: '对战', battleMax: '对战MAX', screenshot: '截图', logs: '日志', temp: '临时' };
         const allDirs = Object.entries(maDirs).filter(([k, v]) => v && k !== 'screenshot');
 
         if (allDirs.length === 0) {
@@ -777,10 +788,10 @@ if (isTauriApp) {
             return;
         }
 
-        const cats = ['全部', '寒冰', '暗月', '漩涡', '合作', '深海', '活动', '日志', '其他'];
+        const cats = ['全部', '寒冰', '暗月', '漩涡', '合作', '深海', '活动', '日志', '临时', '其他'];
         const colorMap = {
             '全部': '#ffffff', '寒冰': '#64b5f6', '暗月': '#ce93d8', '漩涡': '#4fc3f7',
-            '合作': '#ffd54f', '深海': '#4db6ac', '活动': '#ff8a65', '日志': '#ef5350', '其他': '#bdbdbd'
+            '合作': '#ffd54f', '深海': '#4db6ac', '活动': '#ff8a65', '日志': '#ef5350', '临时': '#a5d6a7', '其他': '#bdbdbd'
         };
 
         // 顶部工具栏
@@ -880,7 +891,7 @@ if (isTauriApp) {
     function getScannedCategoryColor(cat) {
         const map = {
             '全部': '#ffffff', '寒冰': '#64b5f6', '暗月': '#ce93d8', '漩涡': '#4fc3f7',
-            '合作': '#ffd54f', '深海': '#4db6ac', '活动': '#ff8a65', '日志': '#ef5350', '其他': '#bdbdbd'
+            '合作': '#ffd54f', '深海': '#4db6ac', '活动': '#ff8a65', '日志': '#ef5350', '临时': '#a5d6a7', '其他': '#bdbdbd'
         };
         return map[cat] || '#bdbdbd';
     }
@@ -994,7 +1005,7 @@ if (isTauriApp) {
     // 静默扫描（不上报UI，专门给脚本文件tab搜索用）
     async function silentScanFiles() {
         if (!maDirs) return;
-        const dirLabels = { coop: '合作', activity: '活动', battle: '对战', battleMax: '对战MAX', screenshot: '截图', logs: '日志' };
+        const dirLabels = { coop: '合作', activity: '活动', battle: '对战', battleMax: '对战MAX', screenshot: '截图', logs: '日志', temp: '临时' };
         const allDirs = Object.entries(maDirs).filter(([k, v]) => v && k !== 'screenshot');
         if (allDirs.length === 0) return;
 
