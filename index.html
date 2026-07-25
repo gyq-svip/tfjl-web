@@ -10463,11 +10463,10 @@
                         myPlacedCards = Array.isArray(project.myPlacedCards) ? project.myPlacedCards : [];
                         teammatePlacedCards = Array.isArray(project.teammatePlacedCards) ? project.teammatePlacedCards : [];
                         cardLevels = project.cardLevels || {};
-                        // 合并而非覆盖：项目数据优先，但保留localStorage中已有但项目中没有的皮肤
-                        const projectSkins = project.cardSkins || {};
-                        const projectMoHua = project.cardMoHua || {};
-                        cardSkins = { ...cardSkins, ...projectSkins };
-                        cardMoHua = { ...cardMoHua, ...projectMoHua };
+                        // 直接用项目自己的皮肤设置覆盖（避免上一个项目的皮肤串到这个项目）
+                        cardSkins = project.cardSkins || {};
+                        cardMoHua = project.cardMoHua || {};
+                        saveCardSkins();
                         
                         if (document.getElementById('myDeckInfo')) {
                             document.getElementById('myDeckInfo').value = project.myDeckInfo || '';
@@ -16469,6 +16468,9 @@
                     updateDamageReductionDisplay(); // 更新减伤显示
                 }
             }
+
+            // 上阵数据有变化，自动保存到项目（修复刷新后丢失的问题）
+            if (typeof autoSaveProject === 'function') autoSaveProject();
         }
 
         // 战斗槽点击（移除卡牌）
@@ -16608,6 +16610,8 @@
             
             updateHandDisplay(isUserSlot ? 'my' : 'teammate');
             updateDamageReductionDisplay(); // 更新减伤显示
+            // 卡牌移除后自动保存到项目
+            if (typeof autoSaveProject === 'function') autoSaveProject();
         }
 
         // 重置所有选择
@@ -26523,7 +26527,7 @@ ${maSection}
         </style>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;pointer-events:none;z-index:999;opacity:0.5;">v260725-25</span>
+    <span id="versionTag" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;pointer-events:none;z-index:999;opacity:0.5;">v260725-26</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
