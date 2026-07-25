@@ -2912,16 +2912,15 @@ if (isTauriApp) {
             console.log('[SKIN] read_image_base64 ACL blocked, trying fs plugin...', String(e).slice(0,80));
         }
 
-        // 方案B：用 Tauri 内置 fs 插件 read_file 读二进制，JS 转 base64
+        // 方案B：用 Tauri 内置 fs 插件 read_file 读二进制，Blob+FileReader 转 base64
         // （read_image_base64 的 ACL 需 rebuild exe 才能解锁，fs:default 权限在旧 exe 中已编译）
-        // Tauri v2 fs 插件命令名格式：plugin:fs|read_file，参数 { path, options }，返回 ArrayBuffer 或 number[]
         try {
             const bytes = await invokeFn('plugin:fs|read_file', { path: filePath, options: undefined });
-            console.log('[SKIN] read_file raw type:', filePath, bytes?.constructor?.name, 'len:', bytes?.length);
-            const dataUrl = bytesToDataUrl(bytes, filePath);
+            console.log('[SKIN] read_file raw type:', filePath, bytes?.constructor?.name, 'len:', bytes?.byteLength ?? bytes?.length);
+            const dataUrl = await bytesToDataUrl(bytes, filePath);
             if (dataUrl) {
                 skinImageBase64Cache[filePath] = dataUrl;
-                console.log('[SKIN] base64 via fs plugin OK:', filePath);
+                console.log('[SKIN] base64 via fs plugin OK:', filePath, 'len:', dataUrl.length);
                 return dataUrl;
             }
         } catch(e) {
@@ -2930,8 +2929,8 @@ if (isTauriApp) {
         return null;
     }
 
-    /// 将 invoke 返回的字节数组/Uint8Array/ArrayBuffer 转为 base64 data URL
-    function bytesToDataUrl(bytes, filePath) {
+    /// 用 Blob + FileReader 将 ArrayBuffer/Uint8Array 转为 base64 data URL（比手动 btoa 更可靠）
+    async function bytesToDataUrl(bytes, filePath) {
         if (!bytes) { console.warn('[SKIN] bytesToDataUrl: empty bytes', filePath); return null; }
         let arr;
         if (bytes instanceof Uint8Array) {
@@ -2951,16 +2950,16 @@ if (isTauriApp) {
             return null;
         }
         if (arr.length === 0) { console.warn('[SKIN] bytesToDataUrl: 0 length', filePath); return null; }
-        let binary = '';
-        const chunk = 8192;
-        for (let i = 0; i < arr.length; i += chunk) {
-            binary += String.fromCharCode.apply(null, arr.subarray(i, Math.min(i + chunk, arr.length)));
-        }
-        const base64 = btoa(binary);
         const ext = (filePath.split('.').pop() || 'png').toLowerCase();
         const mimeMap = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp', bmp: 'image/bmp' };
         const mime = mimeMap[ext] || 'image/png';
-        return `data:${mime};base64,${base64}`;
+        const blob = new Blob([arr], { type: mime });
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = () => { console.warn('[SKIN] FileReader error', filePath); resolve(null); };
+            reader.readAsDataURL(blob);
+        });
     }
 
     window.skinRegistry = {};       // { 英雄名: [{ name, url, path }] }
