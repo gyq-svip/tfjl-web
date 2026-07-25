@@ -2004,22 +2004,35 @@ if (isTauriApp) {
         }
         html += `</div>`;
 
-        const recent = stats.slice(0, 30);
-        const wdCounts = [0, 0, 0, 0, 0, 0, 0]; // 0=日,1=一...6=六
-        recent.forEach(s => {
-            const d = new Date(s.date + 'T00:00:00');
-            if (!isNaN(d.getTime())) wdCounts[d.getDay()] += s.count;
+        // 最近7天 · 周一~周日（每天独立一柱，不是聚合！今天数据→对应星期几）
+        const weekDayLabels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+        const weekDayDow = [1, 2, 3, 4, 5, 6, 0]; // getDay() 值
+        const today = new Date();
+        const todayDow = today.getDay();
+        // 建立日期→计数映射
+        const dateMap = {};
+        stats.forEach(s => { dateMap[s.date] = s.count || 0; });
+        // 计算每列对应的日期和计数
+        const wdData = weekDayDow.map((dow, i) => {
+            let daysBack = todayDow - dow;
+            if (daysBack < 0) daysBack += 7;
+            const d = new Date(today);
+            d.setDate(d.getDate() - daysBack);
+            const ds = d.toISOString().slice(0, 10);
+            return { label: weekDayLabels[i], dow, count: dateMap[ds] || 0, date: ds };
         });
-        const wdOrdered = [wdCounts[1], wdCounts[2], wdCounts[3], wdCounts[4], wdCounts[5], wdCounts[6], wdCounts[0]];
-        const wdLabels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
-        const wdMax = Math.max(1, ...wdOrdered);
-        html += `<div style="margin-top:12px;"><div style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-bottom:6px;">最近30天 · 周一~周日</div>`;
+        const recent = stats.slice(0, 30);
+        const wdMax = Math.max(1, ...wdData.map(d => d.count));
+        html += `<div style="margin-top:12px;"><div style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-bottom:6px;">周一~周日</div>`;
         for (let i = 0; i < 7; i++) {
-            const bar = '█'.repeat(Math.min(20, Math.round(wdOrdered[i] / wdMax * 20)));
+            const d = wdData[i];
+            const bar = '█'.repeat(Math.min(20, Math.round(d.count / wdMax * 20)));
+            const todayMark = (d.date === new Date().toISOString().slice(0, 10)) ? ' · 今天' : '';
             html += `<div style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:0.78rem;">
-                <span style="color:rgba(255,255,255,0.7);width:42px;">${wdLabels[i]}</span>
-                <span style="color:#e040fb;font-family:monospace;">${bar}</span>
-                <span style="color:#fff;font-weight:bold;width:30px;">${wdOrdered[i]}局</span>
+                <span style="color:rgba(255,255,255,0.7);width:42px;">${d.label}</span>
+                <span title="${d.date}" style="color:#e040fb;font-family:monospace;">${bar}</span>
+                <span style="color:#fff;font-weight:bold;width:30px;">${d.count}局</span>
+                <span style="color:rgba(255,255,255,0.4);font-size:0.65rem;">${d.date.slice(5)}</span>
             </div>`;
         }
         html += `</div>`;
