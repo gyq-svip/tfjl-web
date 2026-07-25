@@ -9017,7 +9017,7 @@
         </div>
 
         <!-- APP本地功能脚本（网页版不会执行任何代码，isTauriApp判断在文件内部） -->
-        <script src="app-local.js?v=8"></script>
+        <script src="app-local.js?v=9"></script>
 
         <script>
         // ==================== Service Worker 注册（PWA缓存） ====================
@@ -16249,22 +16249,28 @@
 
         async function handleSlotRightClick(e) {
             e.preventDefault();
-            if (e.target.closest('.card-level-badge')) return;
+            console.log('[SKIN] handleSlotRightClick fired, slot:', this.dataset.slot, 'filled:', this.classList.contains('filled'));
+            if (e.target.closest('.card-level-badge')) { console.log('[SKIN] target is card-level-badge, aborting'); return; }
             if (this.classList.contains('filled')) {
                 const slotId = this.dataset.slot;
                 const isUserSlot = slotId.startsWith('u');
                 const placedArray = isUserSlot ? myPlacedCards : teammatePlacedCards;
                 const card = placedArray.find(c => c.slot === slotId);
+                console.log('[SKIN] card found:', card ? card.name : 'null', 'slotId:', slotId, 'isUserSlot:', isUserSlot);
                 const heroName = card ? (card.name || '') : '';
                 // 如果有多个皮肤可选，右键切换皮肤
                 const skins = heroName && window.getHeroSkins ? window.getHeroSkins(heroName) : [];
+                console.log('[SKIN] heroName:', heroName, 'skins count:', skins.length);
                 if (skins.length > 1) {
                     cycleHeroSkin(heroName, slotId);
                     try { await applySkinBgToSlot(this, heroName); } catch (e) { console.error('[SKIN] applySkinBgToSlot error in right-click:', e); }
                     return;
                 }
                 // 否则移除卡牌
+                console.log('[SKIN] skins <= 1 (count=' + skins.length + '), removing card from slot');
                 removeCardFromSlot(slotId);
+            } else {
+                console.log('[SKIN] slot not filled, ignoring right-click');
             }
         }
 
