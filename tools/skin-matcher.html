@@ -125,6 +125,7 @@
         .thumb.current { border-color: #4cc9f0; opacity: 1; }
         .thumb.mapped { border-color: #51cf66; opacity: 1; }
         .thumb.skipped { border-color: #ff6b6b; opacity: 1; }
+        .thumb.hidden-thumb { display: none; }
         .thumb .idx {
             position: absolute;
             top: 2px;
@@ -201,6 +202,10 @@
     <div id="workspace">
         <div class="topbar">
             <span id="progressText">0 / 0</span>
+            <span id="statsText" style="font-size:0.8rem;opacity:0.7;"></span>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.85rem;">
+                <input type="checkbox" id="hideMatched" checked> 隐藏已匹配
+            </label>
             <span id="statusText"></span>
         </div>
         <div class="viewer">
@@ -392,9 +397,28 @@
         function goTo(idx) {
             if (idx < 0) idx = 0;
             if (idx >= files.length) idx = files.length - 1;
+            // 隐藏已匹配模式下：跳过已匹配/跳过的项
+            if (isHidden(idx)) {
+                let found = -1;
+                for (let i = idx + 1; i < files.length; i++) {
+                    if (!isHidden(i)) { found = i; break; }
+                }
+                if (found === -1) {
+                    for (let i = idx - 1; i >= 0; i--) {
+                        if (!isHidden(i)) { found = i; break; }
+                    }
+                }
+                if (found === -1) {
+                    $('statusText').textContent = '🎉 全部已匹配！';
+                    saveLocalProgress();
+                    return;
+                }
+                idx = found;
+            }
             currentIdx = idx;
             renderCurrent();
             updateThumbHighlight();
+            saveCurrentSelection();
             saveLocalProgress();
         }
 
@@ -405,7 +429,13 @@
             previewUrl = URL.createObjectURL(f);
             $('preview').src = previewUrl;
             $('fileName').textContent = f.name;
+
+            const visibleCount = files.filter((_, i) => !isHidden(i)).length;
+            const matchedCount = mappings.filter(m => m && m.hero).length;
+            const skippedCount = mappings.filter(m => m && m.skipped).length;
+            const remainCount = files.length - matchedCount - skippedCount;
             $('progressText').textContent = `${currentIdx + 1} / ${files.length}`;
+            $('statsText').textContent = `已匹配${matchedCount} | 跳过${skippedCount} | 剩余${remainCount}`;
 
             const m = mappings[currentIdx];
             if (m && !m.skipped) {
@@ -414,15 +444,59 @@
                 $('skinSelect').value = m.skin || '';
                 $('customName').value = m.custom || '';
             } else {
-                $('heroSelect').value = '';
-                updateSkinOptions();
-                $('skinSelect').value = '';
-                $('customName').value = '';
+                // 尝试恢复临时选择
+                restoreCurrentSelection();
             }
 
-            const status = m?.skipped ? '已跳过' : (m ? `已映射：${m.hero} / ${m.skin}` : '未匹配');
+            const status = m?.skipped ? '已跳过' : (m && m.hero ? `已映射：${m.hero} / ${m.skin || '?'}` : '未匹配');
             $('statusText').textContent = status;
         }
+
+        // === 隐藏已匹配 ===
+        function isHidden(idx) {
+            if (!$('hideMatched').checked) return false;
+            const m = mappings[idx];
+            return m && (m.hero || m.skipped);
+        }
+
+        // === 实时自动保存当前选择（带 idx 校验） ===
+        function saveCurrentSelection() {
+            try {
+                const m = mappings[currentIdx];
+                if (m && m.hero) return; // 已保存的，不覆盖草稿
+                const sel = {
+                    hero: $('heroSelect').value,
+                    skin: $('skinSelect').value,
+                    custom: $('customName').value.trim(),
+                    idx: currentIdx,
+                    fileName: files[currentIdx]?.name || ''
+                };
+                localStorage.setItem(LOCAL_KEY + '_currentSel', JSON.stringify(sel));
+            } catch (e) {}
+        }
+
+        function restoreCurrentSelection() {
+            try {
+                const raw = localStorage.getItem(LOCAL_KEY + '_currentSel');
+                if (!raw) return;
+                const sel = JSON.parse(raw);
+                // 只有同一张卡才恢复草稿
+                if (sel.idx !== currentIdx) return;
+                if (sel.fileName !== (files[currentIdx]?.name || '')) return;
+                $('heroSelect').value = sel.hero || '';
+                updateSkinOptions();
+                setTimeout(() => { $('skinSelect').value = sel.skin || ''; }, 50);
+                $('customName').value = sel.custom || '';
+                localStorage.removeItem(LOCAL_KEY + '_currentSel');
+            } catch (e) {}
+        }
+
+        // 选择变化时实时保存
+        const selectionEls = ['heroSelect', 'skinSelect', 'customName'];
+        selectionEls.forEach(id => {
+            $(id).addEventListener('change', saveCurrentSelection);
+            $(id).addEventListener('input', saveCurrentSelection);
+        });
 
         function renderThumbnails() {
             const box = $('thumbnails');
@@ -431,6 +505,7 @@
                 const div = document.createElement('div');
                 div.className = 'thumb';
                 div.dataset.idx = i;
+                if (isHidden(i)) div.classList.add('hidden-thumb');
                 const img = document.createElement('img');
                 img.src = URL.createObjectURL(f);
                 div.appendChild(img);
@@ -447,7 +522,8 @@
             const thumbs = document.querySelectorAll('.thumb');
             thumbs.forEach(t => {
                 const i = parseInt(t.dataset.idx, 10);
-                t.classList.remove('current', 'mapped', 'skipped');
+                t.classList.remove('current', 'mapped', 'skipped', 'hidden-thumb');
+                if (isHidden(i)) t.classList.add('hidden-thumb');
                 if (i === currentIdx) t.classList.add('current');
                 const m = mappings[i];
                 if (m) {
@@ -468,23 +544,33 @@
                 skin,
                 custom: $('customName').value.trim()
             };
+            localStorage.removeItem(LOCAL_KEY + '_currentSel');
             updateThumbHighlight();
             saveLocalProgress();
-            if (currentIdx < files.length - 1) {
-                goTo(currentIdx + 1);
-            } else {
-                $('statusText').textContent = '最后一张已保存';
-            }
+            goToNext();
         }
 
         function skipAndNext() {
             mappings[currentIdx] = { skipped: true };
+            localStorage.removeItem(LOCAL_KEY + '_currentSel');
             updateThumbHighlight();
             saveLocalProgress();
-            if (currentIdx < files.length - 1) {
-                goTo(currentIdx + 1);
+            goToNext();
+        }
+
+        function goToNext() {
+            // 找下一个未隐藏的项
+            let next = currentIdx + 1;
+            while (next < files.length && isHidden(next)) {
+                next++;
+            }
+            if (next < files.length) {
+                goTo(next);
             } else {
-                $('statusText').textContent = '最后一张已跳过';
+                $('statusText').textContent = '🎉 全部已匹配！';
+                renderCurrent();
+                updateThumbHighlight();
+                saveLocalProgress();
             }
         }
 
@@ -600,8 +686,28 @@
             renderCurrent();
         });
 
+        // 隐藏已匹配切换
+        $('hideMatched').addEventListener('change', () => {
+            updateThumbHighlight();
+            if (isHidden(currentIdx)) {
+                let found = -1;
+                for (let i = 0; i < files.length; i++) {
+                    if (!isHidden(i)) { found = i; break; }
+                }
+                if (found >= 0) {
+                    currentIdx = found;
+                    renderCurrent();
+                    updateThumbHighlight();
+                }
+            } else {
+                renderCurrent(); // 刷新统计
+            }
+            saveCurrentSelection();
+        });
+
         // 页面关闭前保存
         window.addEventListener('beforeunload', saveLocalProgress);
+        window.addEventListener('beforeunload', saveCurrentSelection);
     </script>
 </body>
 </html>
