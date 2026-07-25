@@ -2914,8 +2914,10 @@ if (isTauriApp) {
 
         // 方案B：用 Tauri 内置 fs 插件 read_file 读二进制，JS 转 base64
         // （read_image_base64 的 ACL 需 rebuild exe 才能解锁，fs:default 权限在旧 exe 中已编译）
+        // Tauri v2 fs 插件命令名格式：plugin:fs|read_file，参数 { path, options }，返回 ArrayBuffer 或 number[]
         try {
-            const bytes = await invokeFn('read_file', { path: filePath });
+            const bytes = await invokeFn('plugin:fs|read_file', { path: filePath, options: undefined });
+            console.log('[SKIN] read_file raw type:', filePath, bytes?.constructor?.name, 'len:', bytes?.length);
             const dataUrl = bytesToDataUrl(bytes, filePath);
             if (dataUrl) {
                 skinImageBase64Cache[filePath] = dataUrl;
@@ -2923,15 +2925,32 @@ if (isTauriApp) {
                 return dataUrl;
             }
         } catch(e) {
-            console.warn('[SKIN] read_file also failed:', filePath, String(e).slice(0,80));
+            console.warn('[SKIN] read_file also failed:', filePath, String(e).slice(0,160));
         }
         return null;
     }
 
-    /// 将 invoke 返回的字节数组/Uint8Array 转为 base64 data URL
+    /// 将 invoke 返回的字节数组/Uint8Array/ArrayBuffer 转为 base64 data URL
     function bytesToDataUrl(bytes, filePath) {
-        if (!bytes) return null;
-        const arr = Array.isArray(bytes) ? new Uint8Array(bytes) : new Uint8Array(Object.values(bytes));
+        if (!bytes) { console.warn('[SKIN] bytesToDataUrl: empty bytes', filePath); return null; }
+        let arr;
+        if (bytes instanceof Uint8Array) {
+            arr = bytes;
+        } else if (bytes instanceof ArrayBuffer) {
+            arr = new Uint8Array(bytes);
+        } else if (Array.isArray(bytes)) {
+            arr = new Uint8Array(bytes);
+        } else if (bytes.bytes && Array.isArray(bytes.bytes)) {
+            arr = new Uint8Array(bytes.bytes);
+        } else if (bytes.data && Array.isArray(bytes.data)) {
+            arr = new Uint8Array(bytes.data);
+        } else if (typeof bytes === 'object' && bytes.length !== undefined) {
+            arr = new Uint8Array(Object.values(bytes));
+        } else {
+            console.warn('[SKIN] bytesToDataUrl: unknown type', filePath, bytes?.constructor?.name);
+            return null;
+        }
+        if (arr.length === 0) { console.warn('[SKIN] bytesToDataUrl: 0 length', filePath); return null; }
         let binary = '';
         const chunk = 8192;
         for (let i = 0; i < arr.length; i += chunk) {
