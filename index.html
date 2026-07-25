@@ -405,7 +405,7 @@
             text-align: center;
             font-size: 0.8rem;
             color: rgba(255,255,255,0.4);
-            min-height: 80px;
+            min-height: 100px;
             min-width: 85px;
             max-width: 85px;
             width: 85px;
@@ -506,24 +506,20 @@
             border: 2px solid rgba(255, 255, 255, 0.25);
             box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.3);
         }
-        /* 有皮肤时：上下各留一条半透明暗条，分别放皮肤名和卡名/等级 */
-        .battle-slot.skin-bg::before,
+        /* 有皮肤时：只在底部留淡黑渐变，保证名字可读；皮肤图片完整显示不被遮罩 */
+        .battle-slot.skin-bg::before {
+            display: none;
+        }
         .battle-slot.skin-bg::after {
             content: '';
             position: absolute;
             left: 0;
             right: 0;
-            height: 16px;
-            background: rgba(0, 0, 0, 0.55);
-            z-index: 2;
-            pointer-events: none;
-        }
-        .battle-slot.skin-bg::before {
-            top: 0;
-            border-radius: 6px 6px 0 0;
-        }
-        .battle-slot.skin-bg::after {
             bottom: 0;
+            height: 24px;
+            background: linear-gradient(to top, rgba(0,0,0,0.75), transparent);
+            z-index: 1;
+            pointer-events: none;
             border-radius: 0 0 6px 6px;
         }
         /* battle-slot 内的卡牌文字层统一透明，由 slot 背景或 skin-layer 提供底色 */
@@ -543,56 +539,40 @@
             justify-content: center;
             border-radius: 4px;
         }
-        /* 皮肤名字：顶部暗条中居中 */
+        /* 皮肤名字：隐藏，避免遮挡皮肤图片 */
         .battle-slot.skin-bg .skin-name {
-            position: absolute;
-            top: 0;
-            left: 2px;
-            right: 2px;
-            z-index: 3;
-            font-size: 0.55rem;
-            line-height: 16px;
-            text-align: center;
-            color: #fff;
-            background: transparent;
-            padding: 0;
-            text-shadow: 0 1px 2px rgba(0,0,0,0.6);
-            pointer-events: none;
-            font-weight: 600;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            display: none;
         }
-        /* 英雄名字：底部暗条中居中 */
+        /* 英雄名字：始终显示在最底部，加粗阴影保证在浅色皮肤上可读 */
         .battle-slot.skin-bg .card-name {
             position: absolute;
-            bottom: 0;
-            left: 20px;
-            right: 20px;
+            bottom: 2px;
+            left: 2px;
+            right: 2px;
             top: auto;
             z-index: 3;
-            font-size: 0.55rem;
+            font-size: 0.6rem;
             line-height: 16px;
             text-align: center;
             color: #fff;
             background: transparent;
             padding: 0;
-            text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+            text-shadow: 0 1px 3px rgba(0,0,0,0.95), 0 0 6px rgba(0,0,0,0.8);
             pointer-events: none;
-            font-weight: 600;
+            font-weight: 700;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
-        /* 等级徽章：底部左侧暗条内（贴合游戏截图风格） */
+        /* 等级徽章：右上角，避免与皮肤图/名字重叠 */
         .battle-slot .card-level-badge {
             position: absolute;
-            bottom: 0;
-            left: 2px;
-            right: auto;
-            top: auto;
+            top: 2px;
+            right: 2px;
+            left: auto;
+            bottom: auto;
             z-index: 4;
-            background: rgba(0,0,0,0.6);
+            background: rgba(0,0,0,0.65);
             color: #ffd700;
             font-size: 0.62rem;
             font-weight: bold;
@@ -1865,7 +1845,7 @@
             }
             
             .battle-slot {
-                height: 90px;
+                height: 110px;
                 font-size: 0.7rem;
                 padding: 6px 4px;
             }
@@ -2206,7 +2186,7 @@
                 }
                 
                 .battle-slot {
-                    height: 85px;
+                    height: 105px;
                     font-size: 0.65rem;
                     padding: 4px 2px;
                 }
@@ -2290,7 +2270,7 @@
             }
             
             .battle-slot {
-                height: 55px;
+                height: 75px;
                 font-size: 0.65rem;
                 padding: 4px 2px;
             }
@@ -15641,15 +15621,25 @@
             if (oldSkinName) oldSkinName.remove();
             slot.classList.remove('skin-bg');
             if (!heroName) { console.log('[SKIN] No heroName, returning'); return; }
+
+            // 融合卡：显示第一卡的皮肤；显示名仍保留完整融合名
+            const displayName = heroName;
+            const skinHeroName = (typeof getMainCardName === 'function' && getMainCardName(heroName) !== heroName)
+                ? getMainCardName(heroName)
+                : heroName;
+            if (skinHeroName !== heroName) {
+                console.log('[SKIN] Fusion card, use first hero skin:', skinHeroName);
+            }
+
             // 优先用 resolveHeroSkinInfo（支持延迟 base64 加载且返回皮肤名）
             let skinInfo = null;
             if (window.resolveHeroSkinInfo) {
-                skinInfo = await window.resolveHeroSkinInfo(heroName);
+                skinInfo = await window.resolveHeroSkinInfo(skinHeroName);
             } else if (window.resolveHeroSkinUrl) {
-                const url = await window.resolveHeroSkinUrl(heroName);
+                const url = await window.resolveHeroSkinUrl(skinHeroName);
                 if (url) skinInfo = { url };
             } else {
-                const url = window.getHeroSkinUrl && window.getHeroSkinUrl(heroName);
+                const url = window.getHeroSkinUrl && window.getHeroSkinUrl(skinHeroName);
                 if (url) skinInfo = { url };
             }
             console.log('[SKIN] skinInfo:', skinInfo ? (skinInfo.url ? skinInfo.url.substring(0, 80) : 'no url') : 'NULL');
@@ -15668,17 +15658,7 @@
             slot.insertBefore(img, slot.firstChild);
             slot.classList.add('skin-bg');
 
-            // 添加皮肤名（顶部暗条显示）
-            if (skinInfo.name) {
-                const cardItem = slot.querySelector('.card-item');
-                if (cardItem) {
-                    const nameEl = document.createElement('span');
-                    nameEl.className = 'skin-name';
-                    nameEl.textContent = skinInfo.name;
-                    cardItem.appendChild(nameEl);
-                }
-            }
-            console.log('[SKIN] Skin <img> + name inserted into slot', slot.dataset.slot);
+            console.log('[SKIN] Skin <img> inserted into slot', slot.dataset.slot);
         }
 
         async function restoreBattleSlots() {
@@ -16466,13 +16446,15 @@
                 const card = placedArray.find(c => c.slot === slotId);
                 console.log('[SKIN] card found:', card ? card.name : 'null', 'slotId:', slotId, 'isUserSlot:', isUserSlot);
                 const heroName = card ? (card.name || '') : '';
-                const skins = heroName && window.getHeroSkins ? window.getHeroSkins(heroName) : [];
+                // 融合卡：取第一卡作为皮肤查询/切换的英雄名，显示名仍保留原融合名
+                const skinHeroName = (typeof getMainCardName === 'function' ? getMainCardName(heroName) : heroName);
+                const skins = skinHeroName && window.getHeroSkins ? window.getHeroSkins(skinHeroName) : [];
                 const hasSkinBg = this.classList.contains('skin-bg');
-                console.log('[SKIN] heroName:', heroName, 'skins count:', skins.length, 'hasSkinBg:', hasSkinBg);
+                console.log('[SKIN] heroName:', heroName, 'skinHeroName:', skinHeroName, 'skins count:', skins.length, 'hasSkinBg:', hasSkinBg);
                 if (skins.length >= 1) {
                     if (skins.length > 1) {
                         // 多皮肤：循环切换
-                        cycleHeroSkin(heroName, slotId);
+                        cycleHeroSkin(skinHeroName, slotId);
                         try { await applySkinBgToSlot(this, heroName); } catch (e) { console.error('[SKIN] applySkinBgToSlot error in right-click:', e); }
                         return;
                     }
@@ -16483,14 +16465,13 @@
                         const oldLayer = this.querySelector('.skin-layer');
                         if (oldLayer) oldLayer.remove();
                         // 用空字符串标记默认无皮肤（避免下次 resolve 又自动填充回皮肤）
-                        const baseHero = (window.getBaseHeroName && window.getBaseHeroName(heroName).heroName) || heroName;
-                        if (window.selectHeroSkin) window.selectHeroSkin(heroName, '');
-                        console.log('[SKIN] Single-skin toggled OFF for', heroName);
+                        if (window.selectHeroSkin) window.selectHeroSkin(skinHeroName, '');
+                        console.log('[SKIN] Single-skin toggled OFF for', heroName, '(skin key:', skinHeroName, ')');
                     } else {
                         // 打开皮肤
-                        if (window.selectHeroSkin) window.selectHeroSkin(heroName, skins[0].name);
+                        if (window.selectHeroSkin) window.selectHeroSkin(skinHeroName, skins[0].name);
                         try { await applySkinBgToSlot(this, heroName); } catch (e) { console.error('[SKIN] applySkinBgToSlot error in right-click:', e); }
-                        console.log('[SKIN] Single-skin toggled ON for', heroName);
+                        console.log('[SKIN] Single-skin toggled ON for', heroName, '(skin key:', skinHeroName, ')');
                     }
                     return;
                 }
