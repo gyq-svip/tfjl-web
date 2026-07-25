@@ -2037,7 +2037,6 @@ if (isTauriApp) {
         }
 
         // ===== 按星期统计（周一~周日，固定7列循环） =====
-        const dayNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
         const dayCounts = [0, 0, 0, 0, 0, 0, 0]; // 索引0=周日,1=周一...6=周六
         stats.forEach(s => {
             const d = new Date(s.date + 'T00:00:00');
