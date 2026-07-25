@@ -206,6 +206,7 @@
             <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.85rem;">
                 <input type="checkbox" id="hideMatched" checked> 隐藏已匹配
             </label>
+            <button id="stopBtn" class="secondary" style="font-size:0.8rem;padding:4px 10px;">停止匹配</button>
             <span id="statusText"></span>
         </div>
         <div class="viewer">
@@ -413,9 +414,25 @@
             $('setupPanel').style.display = 'none';
             $('workspace').style.display = 'block';
             renderThumbnails();
-            goTo(0);
+            // 恢复上次中断的位置，或跳到第一个待匹配项（如果开启隐藏已匹配）
+            let startIdx = 0;
+            if (savedResumeIdx >= 0) {
+                if (isHidden(savedResumeIdx)) {
+                    // 上次停的图已经匹配了，找下一个未处理的
+                    let found = -1;
+                    for (let i = savedResumeIdx; i < files.length; i++) {
+                        if (!isHidden(i)) { found = i; break; }
+                    }
+                    startIdx = found >= 0 ? found : savedResumeIdx;
+                } else {
+                    startIdx = savedResumeIdx;
+                }
+            }
+            goTo(startIdx);
+            savedResumeIdx = -1;
         });
 
+        let savedResumeIdx = -1; // 上次停在哪张图
         function loadLocalProgress() {
             try {
                 const raw = localStorage.getItem(LOCAL_KEY);
@@ -430,6 +447,9 @@
                 mappings = files.map(f => mapByName.get(f.name) || null);
                 if (saved.sourceDir) $('sourceDir').value = saved.sourceDir;
                 if (saved.outputDir) $('outputDir').value = saved.outputDir;
+                // 记住上次位置，下次恢复时跳过去
+                savedResumeIdx = (saved.currentIdx != null && saved.currentIdx >= 0 && saved.currentIdx < files.length)
+                    ? saved.currentIdx : -1;
             } catch (e) {
                 console.warn('恢复本地进度失败', e);
             }
@@ -742,6 +762,15 @@
             mappings = files.map(() => null);
             renderThumbnails();
             renderCurrent();
+        });
+
+        // 停止匹配，回到设置面板（进度已自动保存）
+        $('stopBtn').addEventListener('click', () => {
+            saveLocalProgress();
+            saveCurrentSelection();
+            $('workspace').style.display = 'none';
+            $('setupPanel').style.display = 'block';
+            $('startHint').textContent = `进度已保存（${files.length} 张图片），点击"开始匹配"可继续`;
         });
 
         // 隐藏已匹配切换
