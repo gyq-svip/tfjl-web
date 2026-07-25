@@ -9017,7 +9017,7 @@
         </div>
 
         <!-- APP本地功能脚本（网页版不会执行任何代码，isTauriApp判断在文件内部） -->
-        <script src="app-local.js?v=7"></script>
+        <script src="app-local.js?v=8"></script>
 
         <script>
         // ==================== Service Worker 注册（PWA缓存） ====================
@@ -15467,24 +15467,26 @@
 
         // 给战斗槽卡牌应用皮肤背景
         async function applySkinBgToSlot(slot, heroName) {
+            console.log('[SKIN] applySkinBgToSlot slot:', slot.dataset.slot, 'heroName:', heroName, 'slot.classList:', Array.from(slot.classList));
             // 清除旧皮肤
             slot.classList.remove('skin-bg');
             slot.style.backgroundImage = '';
             slot.style.backgroundSize = '';
             slot.style.backgroundPosition = '';
             slot.style.backgroundRepeat = '';
-            if (!heroName) return;
+            if (!heroName) { console.log('[SKIN] No heroName, returning'); return; }
             // 优先用 resolveHeroSkinUrl（支持延迟 base64 加载），回退 getHeroSkinUrl
             let skinUrl = window.resolveHeroSkinUrl 
                 ? await window.resolveHeroSkinUrl(heroName) 
                 : (window.getHeroSkinUrl && window.getHeroSkinUrl(heroName));
-            console.log('[SKIN] applySkinBgToSlot', heroName, 'url=', skinUrl ? skinUrl.substring(0, 80) : null);
-            if (!skinUrl) return;
+            console.log('[SKIN] applySkinBgToSlot result - skinUrl:', skinUrl ? skinUrl.substring(0, 80) : 'NULL/EMPTY');
+            if (!skinUrl) { console.warn('[SKIN] No skinUrl for', heroName); return; }
             slot.style.backgroundImage = `url("${skinUrl}")`;
             slot.style.backgroundSize = 'cover';
             slot.style.backgroundPosition = 'center';
             slot.style.backgroundRepeat = 'no-repeat';
             slot.classList.add('skin-bg');
+            console.log('[SKIN] Background applied successfully to slot', slot.dataset.slot);
         }
 
         async function restoreBattleSlots() {
@@ -16258,7 +16260,7 @@
                 const skins = heroName && window.getHeroSkins ? window.getHeroSkins(heroName) : [];
                 if (skins.length > 1) {
                     cycleHeroSkin(heroName, slotId);
-                    try { await applySkinBgToSlot(this, heroName); } catch (e) {}
+                    try { await applySkinBgToSlot(this, heroName); } catch (e) { console.error('[SKIN] applySkinBgToSlot error in right-click:', e); }
                     return;
                 }
                 // 否则移除卡牌
@@ -16268,14 +16270,19 @@
 
         // 循环切换英雄皮肤
         function cycleHeroSkin(heroName, slotId) {
+            console.log('[SKIN] cycleHeroSkin called:', heroName, slotId);
             const skins = window.getHeroSkins ? window.getHeroSkins(heroName) : [];
-            if (!skins.length) return;
+            console.log('[SKIN] getHeroSkins result:', skins.length, 'skins:', skins.map(s => s.name));
+            if (!skins.length) { console.warn('[SKIN] No skins available, aborting cycle'); return; }
             const baseHero = (window.getBaseHeroName && window.getBaseHeroName(heroName).heroName) || heroName;
             const current = window.heroSkinSelections ? window.heroSkinSelections[baseHero] : '';
+            console.log('[SKIN] baseHero:', baseHero, 'current selection:', current);
             const idx = skins.findIndex(s => s.name === current);
             const nextIdx = (idx + 1) % skins.length;
             const nextSkin = skins[nextIdx].name;
+            console.log('[SKIN] Cycling from', current || '(none)', 'to', nextSkin, '(idx', idx, '->', nextIdx, ')');
             if (window.selectHeroSkin) window.selectHeroSkin(heroName, nextSkin);
+            console.log('[SKIN] After selectHeroSkin, heroSkinSelections[' + baseHero + ']:', window.heroSkinSelections[baseHero]);
             const slot = document.querySelector('.battle-slot[data-slot="' + slotId + '"]');
             if (slot) {
                 const skinLabel = slot.querySelector('.skin-label') || (() => {
@@ -23215,6 +23222,114 @@ ${maSection}
             panel.scrollTop = 0;
         }
 
+        // ==================== 浮动控制台窗口 ====================
+        let floatConsoleVisible = false;
+        let floatAutoScroll = true;
+        let floatConsoleRefreshTimer = null;
+        let floatDragState = null;
+
+        function toggleFloatConsole() {
+            const con = document.getElementById('floatConsole');
+            floatConsoleVisible = !floatConsoleVisible;
+            con.style.display = floatConsoleVisible ? 'flex' : 'none';
+            if (floatConsoleVisible) {
+                refreshFloatConsole();
+                floatConsoleRefreshTimer = setInterval(refreshFloatConsole, 500);
+            } else {
+                clearInterval(floatConsoleRefreshTimer);
+                floatConsoleRefreshTimer = null;
+            }
+        }
+
+        function floatConsoleClear() {
+            window.__consoleLogs = [];
+            refreshFloatConsole();
+        }
+
+        function toggleFloatAutoScroll() {
+            floatAutoScroll = !floatAutoScroll;
+            const btn = document.getElementById('floatAutoScrollBtn');
+            const content = document.getElementById('floatConsoleContent');
+            btn.textContent = floatAutoScroll ? '⬇' : '⏸';
+            if (floatAutoScroll) { content.classList.add('auto-scroll'); }
+            else { content.classList.remove('auto-scroll'); }
+        }
+
+        function refreshFloatConsole() {
+            const content = document.getElementById('floatConsoleContent');
+            if (!content) return;
+            const logs = window.__consoleLogs;
+            const badge = document.getElementById('floatConsoleBadge');
+            const errCount = logs ? logs.filter(l => l.level === 'error').length : 0;
+            if (badge) {
+                if (errCount > 0) { badge.style.display = 'flex'; badge.textContent = errCount; badge.style.background = '#f44336'; }
+                else if (logs && logs.length > 0) { badge.style.display = 'flex'; badge.textContent = logs.length; badge.style.background = '#00bcd4'; }
+                else { badge.style.display = 'none'; }
+            }
+            if (!floatConsoleVisible) return;
+            if (!logs || logs.length === 0) {
+                content.innerHTML = '<div style="color:rgba(255,255,255,0.25);text-align:center;padding:20px;font-size:0.75rem;">暂无日志</div>';
+                return;
+            }
+            const levelColors = { error: '#f44336', warn: '#ff9800', info: '#00bcd4', log: 'rgba(255,255,255,0.7)' };
+            const wasAtBottom = content.scrollHeight - content.scrollTop - content.clientHeight < 50;
+            const items = logs.slice().reverse().map((l, i) => {
+                const color = levelColors[l.level] || 'rgba(255,255,255,0.6)';
+                return '<div style="color:' + color + ';font-size:0.68rem;padding:1px 4px;border-bottom:1px solid rgba(255,255,255,0.02);line-height:1.35;">' +
+                    '<span style="color:rgba(255,255,255,0.2);margin-right:5px;">' + (logs.length - i) + '</span>' +
+                    '<span style="color:rgba(255,255,255,0.22);margin-right:5px;">' + l.time + '</span>' +
+                    '<span style="font-weight:500;margin-right:3px;">[' + l.level.toUpperCase() + ']</span>' +
+                    l.msg.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>';
+            }).join('');
+            content.innerHTML = items;
+            if (floatAutoScroll && wasAtBottom) content.scrollTop = content.scrollHeight;
+        }
+
+        // 拖拽
+        (function initFloatConsoleDrag() {
+            const title = document.getElementById('floatConsoleTitle');
+            const con = document.getElementById('floatConsole');
+            if (!title || !con) return;
+            title.addEventListener('mousedown', (e) => {
+                if (e.target.tagName === 'BUTTON') return;
+                floatDragState = { startX: e.clientX, startY: e.clientY, startLeft: con.offsetLeft, startTop: con.offsetTop };
+                e.preventDefault();
+            });
+            document.addEventListener('mousemove', (e) => {
+                if (!floatDragState) return;
+                const dx = e.clientX - floatDragState.startX;
+                const dy = e.clientY - floatDragState.startY;
+                const newLeft = floatDragState.startLeft - dx;
+                const newTop = floatDragState.startTop + dy;
+                con.style.left = newLeft + 'px';
+                con.style.right = 'auto';
+                con.style.top = newTop + 'px';
+                con.style.bottom = 'auto';
+            });
+            document.addEventListener('mouseup', () => { floatDragState = null; });
+        })();
+
+        // 缩放
+        (function initFloatConsoleResize() {
+            const handle = document.getElementById('floatConsoleResize');
+            const con = document.getElementById('floatConsole');
+            if (!handle || !con) return;
+            let resizeState = null;
+            handle.addEventListener('mousedown', (e) => {
+                resizeState = { startX: e.clientX, startY: e.clientY, startW: con.offsetWidth, startH: con.offsetHeight };
+                e.preventDefault();
+                e.stopPropagation();
+            });
+            document.addEventListener('mousemove', (e) => {
+                if (!resizeState) return;
+                const dw = e.clientX - resizeState.startX;
+                const dh = e.clientY - resizeState.startY;
+                con.style.width = Math.max(320, Math.min(window.innerWidth * 0.9, resizeState.startW + dw)) + 'px';
+                con.style.height = Math.max(200, Math.min(window.innerHeight * 0.8, resizeState.startH + dh)) + 'px';
+            });
+            document.addEventListener('mouseup', () => { resizeState = null; });
+        })();
+
         // ==================== 缓存管理 ====================
         function viewCacheInfo() {
             const cacheInfo = [];
@@ -25922,6 +26037,72 @@ ${maSection}
                 0%, 100% { opacity: 1; }
                 50% { opacity: 0.5; }
             }
+            /* 浮动控制台窗口 */
+            #floatConsoleToggle {
+                position:fixed;bottom:20px;right:20px;z-index:99999;
+                width:44px;height:44px;border-radius:50%;border:none;
+                background:linear-gradient(135deg,#37474f,#1e272e);
+                color:#00bcd4;font-size:20px;cursor:pointer;
+                box-shadow:0 4px 15px rgba(0,0,0,0.5);
+                display:flex;align-items:center;justify-content:center;
+                transition:transform 0.2s;
+            }
+            #floatConsoleToggle:hover { transform:scale(1.1); }
+            #floatConsoleToggle .badge { position:absolute;top:-4px;right:-4px;background:#f44336;color:#fff;font-size:9px;min-width:16px;height:16px;border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0 4px; }
+            #floatConsole {
+                position:fixed;bottom:80px;right:20px;z-index:99998;
+                width:420px;min-width:320px;max-width:90vw;
+                height:350px;min-height:200px;max-height:80vh;
+                background:rgba(15,20,25,0.97);border:1px solid rgba(0,188,212,0.3);
+                border-radius:10px;box-shadow:0 8px 40px rgba(0,0,0,0.6);
+                display:none;flex-direction:column;overflow:hidden;
+            }
+            #floatConsoleTitle {
+                display:flex;align-items:center;justify-content:space-between;
+                padding:8px 12px;background:rgba(0,188,212,0.15);
+                border-bottom:1px solid rgba(0,188,212,0.2);
+                cursor:move;user-select:none;
+                color:#00bcd4;font-size:0.85rem;font-weight:500;
+                flex-shrink:0;
+            }
+            #floatConsoleTitle .btns { display:flex;gap:6px; }
+            #floatConsoleTitle .btns button {
+                background:rgba(255,255,255,0.1);border:none;color:#ccc;
+                width:24px;height:24px;border-radius:4px;cursor:pointer;
+                font-size:13px;display:flex;align-items:center;justify-content:center;
+            }
+            #floatConsoleTitle .btns button:hover { background:rgba(255,255,255,0.2); }
+            #floatConsoleTitle .btns .btn-close:hover { background:#f44336;color:#fff; }
+            #floatConsoleContent {
+                flex:1;overflow-y:auto;padding:6px 8px;
+                font-family:Consolas,'Courier New',monospace;
+            }
+            #floatConsoleContent div { word-break:break-all; }
+            /* 自动滚动开关指示 */
+            #floatConsoleContent.auto-scroll::after {
+                content:'⬇ 自动滚动';position:sticky;bottom:2px;right:8px;
+                display:block;text-align:right;font-size:9px;color:rgba(0,188,212,0.6);margin-top:-14px;height:0;
+            }
+            #floatConsoleResize {
+                position:absolute;bottom:0;right:0;width:16px;height:16px;
+                cursor:se-resize;
+                background:linear-gradient(135deg,transparent 50%,rgba(0,188,212,0.3) 50%);
+                border-radius:0 0 10px 0;
+            }
         </style>
+    <!-- 浮动控制台 -->
+    <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
+    <div id="floatConsole">
+        <div id="floatConsoleTitle">
+            <span>💻 控制台日志</span>
+            <div class="btns">
+                <button onclick="toggleFloatAutoScroll()" title="自动滚动" id="floatAutoScrollBtn">⬇</button>
+                <button onclick="floatConsoleClear()" title="清空">🗑</button>
+                <button class="btn-close" onclick="toggleFloatConsole()" title="关闭">✕</button>
+            </div>
+        </div>
+        <div id="floatConsoleContent" class="auto-scroll"></div>
+        <div id="floatConsoleResize"></div>
+    </div>
 </body>
 </html>
