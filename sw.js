@@ -1,10 +1,10 @@
 // ============================================================
 // Service Worker v5 - 塔防助手 PWA 缓存策略
 // 策略：StaleWhileRevalidate（先用缓存秒开，后台静默更新）
-// v9: 战场槽右键 capture 兜底 + 全局收藏监听器排除战场槽 + 皮肤重新扫描日志
+// v10: 浮动控制台拖拽方向修正 + 缩放手柄放大 + 触屏支持
 // ============================================================
 
-const CACHE_VERSION = 'tfjl-v9';
+const CACHE_VERSION = 'tfjl-v10';
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
