@@ -262,8 +262,16 @@ if (isTauriApp) {
     }
 
     async function readDir(dirPath) {
-        const result = await tauriInvoke('read_directory', { dirPath });
-        return result || [];
+        // 目录可能不存在，直接调用避免 tauriInvoke 弹调试 alert
+        let invokeFn = window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke;
+        if (!invokeFn) return [];
+        try {
+            const result = await invokeFn('read_directory', { dirPath });
+            return result || [];
+        } catch (e) {
+            console.warn('[APP] read_directory 失败:', dirPath, e.message || e);
+            return [];
+        }
     }
 
     async function readTextFile(filePath) {
