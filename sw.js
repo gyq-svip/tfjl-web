@@ -1,10 +1,10 @@
 // ============================================================
 // Service Worker v5 - 塔防助手 PWA 缓存策略
 // 策略：StaleWhileRevalidate（先用缓存秒开，后台静默更新）
-// v11: 皮肤背景 !important 强制覆盖 + 遮罩减淡 0.45→0.25 + 单皮肤切换开/关 + 缓存破坏
+// v12: HTML 文档改用 NetworkFirst 优先网络（根治"该死的缓存"），静态资源保持 StaleWhileRevalidate
 // ============================================================
 
-const CACHE_VERSION = 'tfjl-v11';
+const CACHE_VERSION = 'tfjl-v12';
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
@@ -61,10 +61,13 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // HTML / 静态资源：StaleWhileRevalidate
-    if (request.mode === 'navigate'
-        || request.destination === 'document'
-        || ['script', 'style', 'image', 'font', 'manifest'].includes(request.destination)) {
+    // HTML 页面：NetworkFirst（优先网络，确保拉到最新版本，避免"该死的缓存"）
+    if (request.mode === 'navigate' || request.destination === 'document') {
+        event.respondWith(networkFirst(request, CACHE_RUNTIME));
+        return;
+    }
+    // JS/CSS/图片/字体等静态资源：StaleWhileRevalidate（缓存秒开 + 后台更新）
+    if (['script', 'style', 'image', 'font', 'manifest'].includes(request.destination)) {
         event.respondWith(staleWhileRevalidate(request, CACHE_RUNTIME));
         return;
     }
