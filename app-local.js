@@ -2937,17 +2937,22 @@ if (isTauriApp) {
         const entries = await readDir(skinRoot);
         if (!entries || !entries.length) return window.skinRegistry;
 
-        for (const heroName of entries) {
+        for (const heroEntry of entries) {
+            // readDir 返回对象 {name, is_file, ...}，取 .name
+            const heroName = (typeof heroEntry === 'string') ? heroEntry : (heroEntry.name || '');
+            if (!heroName) continue;
+            if (heroEntry.is_file) continue; // 跳过根目录中的文件
             const heroDir = skinRoot + '\\' + heroName;
             try {
-                const files = await readDir(heroDir);
-                if (!files || !files.length) continue;
+                const fileEntries = await readDir(heroDir);
+                if (!fileEntries || !fileEntries.length) continue;
                 const skins = [];
-                for (const file of files) {
-                    const m = file.match(/^(.+)\.(png|jpg|jpeg|gif|webp)$/i);
+                for (const fileEntry of fileEntries) {
+                    const fileName = (typeof fileEntry === 'string') ? fileEntry : (fileEntry.name || '');
+                    const m = fileName.match(/^(.+)\.(png|jpg|jpeg|gif|webp)$/i);
                     if (!m) continue;
                     const skinName = m[1];
-                    const filePath = heroDir + '\\' + file;
+                    const filePath = heroDir + '\\' + fileName;
                     // 先尝试 convertFileSrc（零开销），然后存 raw path 延迟加载
                     const assetUrl = convertFileSrc(filePath);
                     skins.push({ name: skinName, url: assetUrl || null, path: filePath, loaded: !!assetUrl });
