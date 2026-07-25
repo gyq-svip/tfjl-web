@@ -405,7 +405,7 @@
             text-align: center;
             font-size: 0.8rem;
             color: rgba(255,255,255,0.4);
-            min-height: 32px;
+            min-height: 50px;
             min-width: 85px;
             max-width: 85px;
             width: 85px;
@@ -442,38 +442,54 @@
         
         .battle-slot.filled[data-profession="warrior"] {
             background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+            --prof-color: #dc2626;
         }
         
         .battle-slot.filled[data-profession="mage"] {
             background: linear-gradient(135deg, #93c5fd 0%, #60a5fa 100%);
+            --prof-color: #60a5fa;
         }
         
         .battle-slot.filled[data-profession="archer"] {
             background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            --prof-color: #3b82f6;
         }
         
         .battle-slot.filled[data-profession="summoner"] {
             background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
+            --prof-color: #a855f7;
         }
         
         .battle-slot.filled[data-profession="priest"] {
             background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
+            --prof-color: #22c55e;
         }
         
         .battle-slot.filled[data-profession="warlock"] {
             background: linear-gradient(135deg, #374151 0%, #1f2937 100%);
+            --prof-color: #374151;
         }
         
         .battle-slot.filled[data-profession="panda"] {
             background: linear-gradient(135deg, #fcd34d 0%, #f59e0b 100%);
+            --prof-color: #f59e0b;
         }
         
         .battle-slot.filled[data-profession="engineering"] {
             background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
+            --prof-color: #14b8a6;
         }
         
         .battle-slot.filled[data-profession="pokeball"] {
             background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+            --prof-color: #ef4444;
+        }
+
+        /* 有皮肤时：去掉卡牌填充背景，改为透明底 + 职业颜色边框 */
+        .battle-slot.skin-bg {
+            background: transparent !important;
+            border: 3px solid var(--prof-color, rgba(255, 255, 255, 0.4)) !important;
+            box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.2);
         }
 
         /* 皮肤层图片——独立 DOM 层，不跟 CSS background 缩写打架 */
@@ -1728,7 +1744,7 @@
             }
             
             .battle-slot {
-                height: 45px;
+                height: 60px;
                 font-size: 0.7rem;
                 padding: 6px 4px;
             }
@@ -2069,7 +2085,7 @@
                 }
                 
                 .battle-slot {
-                    height: 40px;
+                    height: 55px;
                     font-size: 0.65rem;
                     padding: 4px 2px;
                 }
@@ -2153,7 +2169,7 @@
             }
             
             .battle-slot {
-                height: 40px;
+                height: 55px;
                 font-size: 0.65rem;
                 padding: 4px 2px;
             }
@@ -9026,7 +9042,7 @@
         </div>
 
         <!-- APP本地功能脚本（网页版不会执行任何代码，isTauriApp判断在文件内部） -->
-        <script src="app-local.js?v=20"></script>
+        <script src="app-local.js?v=21"></script>
 
         <script>
         // ==================== Service Worker 注册（PWA缓存） ====================
@@ -26246,7 +26262,7 @@ ${maSection}
         </style>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;pointer-events:none;z-index:999;opacity:0.5;">v250725-9</span>
+    <span id="versionTag" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;pointer-events:none;z-index:999;opacity:0.5;">v250725-10</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
