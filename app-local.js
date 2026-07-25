@@ -2978,14 +2978,14 @@ if (isTauriApp) {
     async function resolveHeroSkinUrl(heroName, skinName) {
         const parsed = getBaseHeroName(heroName);
         const baseHero = parsed.heroName;
-        const explicitSkin = skinName || parsed.skinName;
         const skins = window.skinRegistry[baseHero];
         if (!skins || !skins.length) return null;
         // 如果名称中指定了皮肤且没有用户手动选择，自动使用名称中指定的皮肤
         if (parsed.skinName && !window.heroSkinSelections[baseHero]) {
             window.heroSkinSelections[baseHero] = parsed.skinName;
         }
-        const target = explicitSkin || window.heroSkinSelections[baseHero];
+        // 优先级：显式传入 skinName > 用户手动选择 > 名称中嵌入的皮肤 > 第一个皮肤
+        const target = skinName || window.heroSkinSelections[baseHero] || parsed.skinName;
         const skin = target ? skins.find(s => s.name === target) : null;
         const entry = skin || skins[0];
         if (!entry) return null;
