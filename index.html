@@ -476,6 +476,27 @@
             background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
         }
 
+        /* 皮肤背景 */
+        .battle-slot.filled.skin-bg {
+            position: relative;
+            overflow: hidden;
+            /* 皮肤背景会通过内联 style 覆盖 profession 渐变 */
+        }
+        .battle-slot.filled.skin-bg::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.45);
+            z-index: 0;
+            pointer-events: none;
+            border-radius: inherit;
+        }
+        .battle-slot.filled.skin-bg .card-item,
+        .battle-slot.filled.skin-bg .card-level-badge {
+            position: relative;
+            z-index: 1;
+        }
+
         .battle-slot.engineering-slot {
             background: rgba(255,152,0,0.1);
             border-color: rgba(255,152,0,0.3);
@@ -15420,9 +15441,30 @@
             updateDeckLevelDisplay(handType, level);
         }
 
-        function restoreBattleSlots() {
+        // 给战斗槽卡牌应用皮肤背景
+        async function applySkinBgToSlot(slot, heroName) {
+            // 清除旧皮肤
+            slot.classList.remove('skin-bg');
+            slot.style.backgroundImage = '';
+            slot.style.backgroundSize = '';
+            slot.style.backgroundPosition = '';
+            slot.style.backgroundRepeat = '';
+            if (!heroName) return;
+            // 优先用 resolveHeroSkinUrl（支持延迟 base64 加载），回退 getHeroSkinUrl
+            let skinUrl = window.resolveHeroSkinUrl 
+                ? await window.resolveHeroSkinUrl(heroName) 
+                : (window.getHeroSkinUrl && window.getHeroSkinUrl(heroName));
+            if (!skinUrl) return;
+            slot.style.backgroundImage = `url("${skinUrl}")`;
+            slot.style.backgroundSize = 'cover';
+            slot.style.backgroundPosition = 'center';
+            slot.style.backgroundRepeat = 'no-repeat';
+            slot.classList.add('skin-bg');
+        }
+
+        async function restoreBattleSlots() {
             // 恢复我方战斗槽
-            myPlacedCards.forEach(card => {
+            for (const card of myPlacedCards) {
                 const slot = document.querySelector(`.battle-slot[data-slot="${card.slot}"]`);
                 if (slot && !slot.classList.contains('filled')) {
                     const cardType = card.type || findCardTypeById(card.id);
@@ -15433,11 +15475,12 @@
                     slot.classList.remove('empty');
                     slot.dataset.cardId = card.id;
                     slot.dataset.profession = card.profession;
+                    // 应用皮肤背景（异步加载）
+                    await applySkinBgToSlot(slot, card.name);
                 }
-            });
+            }
 
             teammatePlacedCards.forEach(card => {
-                const slot = document.querySelector(`.battle-slot[data-slot="${card.slot}"]`);
                 if (slot && !slot.classList.contains('filled')) {
                     const cardType = card.type || findCardTypeById(card.id);
                     const cardName = card.name || '';
@@ -16164,12 +16207,46 @@
             }
         }
 
-        function handleSlotRightClick(e) {
+        async function handleSlotRightClick(e) {
             e.preventDefault();
             if (e.target.closest('.card-level-badge')) return;
             if (this.classList.contains('filled')) {
                 const slotId = this.dataset.slot;
+                const slotIndex = parseInt(slotId.replace('u', ''));
+                const card = myPlacedCards.find(c => c.slot === slotIndex);
+                const heroName = card ? (card.name || '') : '';
+                // 如果有多个皮肤可选，右键切换皮肤
+                const skins = heroName && window.getHeroSkins ? window.getHeroSkins(heroName) : [];
+                if (skins.length > 1) {
+                    cycleHeroSkin(heroName, slotId);
+                    await applySkinBgToSlot(this, heroName);
+                    return;
+                }
+                // 否则移除卡牌
                 removeCardFromSlot(slotId);
+            }
+        }
+
+        // 循环切换英雄皮肤
+        function cycleHeroSkin(heroName, slotId) {
+            const skins = window.getHeroSkins ? window.getHeroSkins(heroName) : [];
+            if (!skins.length) return;
+            const current = window.heroSkinSelections ? window.heroSkinSelections[heroName] : '';
+            const idx = skins.findIndex(s => s.name === current);
+            const nextIdx = (idx + 1) % skins.length;
+            const nextSkin = skins[nextIdx].name;
+            if (window.selectHeroSkin) window.selectHeroSkin(heroName, nextSkin);
+            const slot = document.querySelector('.battle-slot[data-slot="' + slotId + '"]');
+            if (slot) {
+                const skinLabel = slot.querySelector('.skin-label') || (() => {
+                    const label = document.createElement('span');
+                    label.className = 'skin-label';
+                    label.style.cssText = 'position:absolute;top:2px;right:2px;font-size:9px;background:rgba(0,0,0,0.6);color:#fff;padding:1px 4px;border-radius:4px;z-index:2;pointer-events:none;';
+                    slot.appendChild(label);
+                    return label;
+                })();
+                skinLabel.textContent = nextSkin;
+                setTimeout(() => { if (skinLabel.parentNode) skinLabel.remove(); }, 1500);
             }
         }
 
@@ -16208,6 +16285,12 @@
             slot.classList.add('empty');
             delete slot.dataset.cardId;
             delete slot.dataset.profession;
+            // 清除皮肤背景
+            slot.classList.remove('skin-bg');
+            slot.style.backgroundImage = '';
+            slot.style.backgroundSize = '';
+            slot.style.backgroundPosition = '';
+            slot.style.backgroundRepeat = '';
             
             // 如果是工程槽，恢复提示
             if (slot.dataset.type === 'engineering') {
