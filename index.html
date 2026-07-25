@@ -16231,7 +16231,8 @@
         function cycleHeroSkin(heroName, slotId) {
             const skins = window.getHeroSkins ? window.getHeroSkins(heroName) : [];
             if (!skins.length) return;
-            const current = window.heroSkinSelections ? window.heroSkinSelections[heroName] : '';
+            const baseHero = (window.getBaseHeroName && window.getBaseHeroName(heroName).heroName) || heroName;
+            const current = window.heroSkinSelections ? window.heroSkinSelections[baseHero] : '';
             const idx = skins.findIndex(s => s.name === current);
             const nextIdx = (idx + 1) % skins.length;
             const nextSkin = skins[nextIdx].name;
