@@ -516,8 +516,8 @@
             pointer-events: none;
             border-radius: 5px;
         }
-        /* 有皮肤时：卡牌文字层必须透明，否则 profession 背景会遮住皮肤图片 */
-        .battle-slot.skin-bg .card-item {
+        /* battle-slot 内的卡牌文字层统一透明，由 slot 背景或 skin-layer 提供底色 */
+        .battle-slot .card-item {
             position: relative;
             z-index: 2;
             background: transparent !important;
@@ -533,16 +533,19 @@
             justify-content: center;
             border-radius: 4px;
         }
-        /* 有皮肤时等级徽章半透明黑底，避免彩色 badge 遮住皮肤 */
-        .battle-slot.skin-bg .card-level-badge {
+        /* 等级徽章半透明黑底，避免彩色 badge 遮住皮肤/背景 */
+        .battle-slot .card-level-badge {
             position: absolute;
             top: 2px;
             right: 2px;
             z-index: 3;
-            background: rgba(0,0,0,0.65) !important;
+            background: rgba(0,0,0,0.65);
             color: #ffd700;
             animation: none;
             background-size: auto;
+        }
+        .battle-slot .card-level-badge.has-skin {
+            background: rgba(0,0,0,0.65);
         }
 
         .battle-slot.engineering-slot {
@@ -749,6 +752,36 @@
         .selected-card.placed {
             opacity: 0.4;
             cursor: not-allowed;
+        }
+
+        /* 手牌有皮肤时背景透明，让 skin-layer 作为底色 */
+        .selected-card.card-item.skin-bg {
+            background: transparent !important;
+            color: #fff;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.9), 0 0 6px rgba(0,0,0,0.7);
+            overflow: hidden;
+        }
+        .selected-card.card-item.skin-bg .card-name {
+            position: relative;
+            z-index: 2;
+        }
+        .selected-card.card-item.skin-bg .card-level-badge {
+            position: absolute;
+            top: 1px;
+            right: 1px;
+            z-index: 3;
+            transform: scale(0.85);
+            transform-origin: top right;
+        }
+        .selected-card.card-item .hand-skin-layer {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: inherit;
+            z-index: 0;
+            pointer-events: none;
         }
 
         .selected-card.card-item.engineering-card,
@@ -9065,7 +9098,7 @@
         </div>
 
         <!-- APP本地功能脚本（网页版不会执行任何代码，isTauriApp判断在文件内部） -->
-        <script src="app-local.js?v=23"></script>
+        <script src="app-local.js?v=24"></script>
 
         <script>
         // ==================== Service Worker 注册（PWA缓存） ====================
@@ -15513,6 +15546,26 @@
             updateDeckLevelDisplay(handType, level);
         }
 
+        // 为手牌应用皮肤背景
+        function applySkinBgToHandCard(card, url) {
+            if (!card || !url) return;
+            card.classList.add('skin-bg');
+            let layer = card.querySelector('.hand-skin-layer');
+            if (!layer) {
+                layer = document.createElement('img');
+                layer.className = 'hand-skin-layer';
+                layer.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit;z-index:0;pointer-events:none;';
+                card.insertBefore(layer, card.firstChild);
+            }
+            if (layer.src !== url) layer.src = url;
+        }
+        function removeSkinBgFromHandCard(card) {
+            if (!card) return;
+            card.classList.remove('skin-bg');
+            const layer = card.querySelector('.hand-skin-layer');
+            if (layer) layer.remove();
+        }
+
         // 给战斗槽卡牌应用皮肤背景
         async function applySkinBgToSlot(slot, heroName) {
             console.log('[SKIN] applySkinBgToSlot slot:', slot.dataset.slot, 'heroName:', heroName);
@@ -16134,7 +16187,7 @@
                     // 获取卡牌类型用于显示等级
                     const cardType = card.type || findCardTypeById(card.id);
                     const levelBadge = cardType ? createLevelBadgeHTML(card.id, cardType, handType, card.name) : '';
-                    html += '<div class="selected-card ' + placedClass + ' ' + engineerClass + ' card-item" data-id="' + card.id + '" data-name="' + card.name + '" data-type="' + (cardType || '') + '" data-engineering="' + card.isEngineering + '" data-profession="' + card.profession + '" draggable="' + (!card.placed) + '">' + levelBadge + card.name + '</div>';
+                    html += '<div class="selected-card ' + placedClass + ' ' + engineerClass + ' card-item" data-id="' + card.id + '" data-name="' + card.name + '" data-type="' + (cardType || '') + '" data-engineering="' + card.isEngineering + '" data-profession="' + card.profession + '" draggable="' + (!card.placed) + '">' + levelBadge + '<span class="card-name">' + card.name + '</span></div>';
                 } else {
                     html += '<div class="selected-card empty">空</div>';
                 }
@@ -16151,6 +16204,22 @@
                 }
                 card.addEventListener('contextmenu', (e) => handleHandCardRightClick(e, handType));
             });
+
+            // 为手牌也尝试应用皮肤背景
+            if (window.resolveHeroSkinUrl) {
+                document.querySelectorAll('#' + container.id + ' .selected-card:not(.empty)').forEach(async card => {
+                    const name = card.dataset.name;
+                    if (!name) return;
+                    try {
+                        const url = await window.resolveHeroSkinUrl(name);
+                        if (url) {
+                            applySkinBgToHandCard(card, url);
+                        } else {
+                            removeSkinBgFromHandCard(card);
+                        }
+                    } catch (e) {}
+                });
+            }
             
             countEl.textContent = handCards.length + '/' + MAX_HAND_CARDS;
         }
@@ -19017,6 +19086,11 @@ function hasGistToken() {
         
         // 页面加载时初始化
         window.onload = async function() {
+
+            // 应用管理员对浮动控制台可见性的设置（默认隐藏）
+            try {
+                applyConsoleVisibility(localStorage.getItem(CONSOLE_VISIBILITY_KEY) === '1');
+            } catch (e) {}
             
             // 初始化版本切换功能
             initVersionSwitch();
@@ -23353,6 +23427,29 @@ ${maSection}
             }
         }
 
+        // 管理员开关：浮动控制台入口按钮显示/隐藏
+        const CONSOLE_VISIBILITY_KEY = 'tdjl_consoleVisible';
+        function toggleConsoleVisibility() {
+            const current = localStorage.getItem(CONSOLE_VISIBILITY_KEY) === '1';
+            const next = !current;
+            localStorage.setItem(CONSOLE_VISIBILITY_KEY, next ? '1' : '0');
+            applyConsoleVisibility(next);
+            // 关闭面板，给用户反馈
+            closeAdminPanel();
+            console.log('[ADMIN] 浮动控制台已' + (next ? '开启' : '关闭'));
+        }
+        function applyConsoleVisibility(visible) {
+            const btn = document.getElementById('floatConsoleToggle');
+            const status = document.getElementById('consoleToggleStatus');
+            if (btn) btn.style.display = visible ? 'flex' : 'none';
+            if (status) status.textContent = visible ? '已开启' : '已关闭';
+            if (!visible) {
+                const con = document.getElementById('floatConsole');
+                if (con) con.style.display = 'none';
+                floatConsoleVisible = false;
+            }
+        }
+
         function floatConsoleClear() {
             window.__consoleLogs = [];
             refreshFloatConsole();
@@ -23431,7 +23528,7 @@ ${maSection}
             if (floatAutoScroll && wasAtBottom) content.scrollTop = content.scrollHeight;
         }
 
-        // 拖拽（Pointer Events + setPointerCapture，兼容鼠标/触摸且移出窗口仍有效）
+        // 拖拽（mouse/touch + setCapture/releaseCapture，WebView2 下最稳定）
         (function initFloatConsoleDrag() {
             const title = document.getElementById('floatConsoleTitle');
             const con = document.getElementById('floatConsole');
@@ -23452,19 +23549,35 @@ ${maSection}
                 con.style.top = newTop + 'px';
                 con.style.bottom = 'auto';
             };
-            const onEnd = () => { floatDragState = null; title.style.cursor = ''; };
-            title.addEventListener('pointerdown', (e) => {
+            const onEnd = () => {
+                if (!floatDragState) return;
+                floatDragState = null;
+                title.style.cursor = '';
+                try { if (document.releaseCapture) document.releaseCapture(); } catch (_) {}
+            };
+            title.addEventListener('mousedown', (e) => {
                 if (e.target.tagName === 'BUTTON') return;
-                try { title.setPointerCapture(e.pointerId); } catch (_) {}
                 onStart(e.clientX, e.clientY);
                 e.preventDefault();
+                try { if (title.setCapture) title.setCapture(); } catch (_) {}
             });
-            title.addEventListener('pointermove', (e) => { if (floatDragState) onMove(e.clientX, e.clientY); });
-            title.addEventListener('pointerup', (e) => { try { title.releasePointerCapture(e.pointerId); } catch (_) {} onEnd(); });
-            title.addEventListener('pointercancel', (e) => { try { title.releasePointerCapture(e.pointerId); } catch (_) {} onEnd(); });
+            document.addEventListener('mousemove', (e) => { onMove(e.clientX, e.clientY); });
+            document.addEventListener('mouseup', onEnd);
+            title.addEventListener('touchstart', (e) => {
+                if (e.target.tagName === 'BUTTON') return;
+                if (e.touches.length === 1) {
+                    onStart(e.touches[0].clientX, e.touches[0].clientY);
+                    e.preventDefault();
+                }
+            }, {passive: false});
+            document.addEventListener('touchmove', (e) => {
+                if (floatDragState && e.touches.length === 1) onMove(e.touches[0].clientX, e.touches[0].clientY);
+            }, {passive: false});
+            document.addEventListener('touchend', onEnd);
+            document.addEventListener('touchcancel', onEnd);
         })();
 
-        // 缩放（Pointer Events + setPointerCapture）
+        // 缩放（mouse/touch + setCapture/releaseCapture）
         (function initFloatConsoleResize() {
             const handle = document.getElementById('floatConsoleResize');
             const con = document.getElementById('floatConsole');
@@ -23485,17 +23598,29 @@ ${maSection}
                 if (resizeState) {
                     resizeState = null;
                     con.classList.remove('resizing');
+                    try { if (document.releaseCapture) document.releaseCapture(); } catch (_) {}
                 }
             };
-            handle.addEventListener('pointerdown', (e) => {
-                try { handle.setPointerCapture(e.pointerId); } catch (_) {}
+            handle.addEventListener('mousedown', (e) => {
                 onStart(e.clientX, e.clientY);
                 e.preventDefault();
                 e.stopPropagation();
+                try { if (handle.setCapture) handle.setCapture(); } catch (_) {}
             });
-            handle.addEventListener('pointermove', (e) => { if (resizeState) onMove(e.clientX, e.clientY); });
-            handle.addEventListener('pointerup', (e) => { try { handle.releasePointerCapture(e.pointerId); } catch (_) {} onEnd(); });
-            handle.addEventListener('pointercancel', (e) => { try { handle.releasePointerCapture(e.pointerId); } catch (_) {} onEnd(); });
+            document.addEventListener('mousemove', (e) => { onMove(e.clientX, e.clientY); });
+            document.addEventListener('mouseup', onEnd);
+            handle.addEventListener('touchstart', (e) => {
+                if (e.touches.length === 1) {
+                    onStart(e.touches[0].clientX, e.touches[0].clientY);
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+            }, {passive: false});
+            document.addEventListener('touchmove', (e) => {
+                if (resizeState && e.touches.length === 1) onMove(e.touches[0].clientX, e.touches[0].clientY);
+            }, {passive: false});
+            document.addEventListener('touchend', onEnd);
+            document.addEventListener('touchcancel', onEnd);
         })();
 
         // ==================== 缓存管理 ====================
@@ -25309,6 +25434,13 @@ ${maSection}
                             <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">调试日志</div>
                         </div>
                     </div>
+                    <div class="admin-menu-item" onclick="toggleConsoleVisibility()" style="padding:10px;">
+                        <span style="font-size:1.1rem;">🖥️</span>
+                        <div style="margin-left:8px;">
+                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">浮动控制台</div>
+                            <div id="consoleToggleStatus" style="font-size:0.7rem;color:rgba(255,255,255,0.5);">已关闭</div>
+                        </div>
+                    </div>
                 </div>
                 <button class="admin-btn" onclick="logoutToLogin()" style="width:100%;margin-top:12px;background:linear-gradient(135deg,#ef4444,#dc2626);color:white;">🔙 退出登录</button>
             </div>
@@ -26212,7 +26344,8 @@ ${maSection}
                 background:linear-gradient(135deg,#37474f,#1e272e);
                 color:#00bcd4;font-size:20px;cursor:pointer;
                 box-shadow:0 4px 15px rgba(0,0,0,0.5);
-                display:flex;align-items:center;justify-content:center;
+                display:none; /* 默认隐藏，需管理员开启 */
+                align-items:center;justify-content:center;
                 transition:transform 0.2s;
             }
             #floatConsoleToggle:hover { transform:scale(1.1); }
@@ -26273,7 +26406,7 @@ ${maSection}
         </style>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;pointer-events:none;z-index:999;opacity:0.5;">v250725-12</span>
+    <span id="versionTag" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;pointer-events:none;z-index:999;opacity:0.5;">v250725-13</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>

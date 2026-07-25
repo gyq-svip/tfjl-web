@@ -1,7 +1,7 @@
 // ============================================================
 // Service Worker v5 - 塔防助手 PWA 缓存策略
 // 策略：StaleWhileRevalidate（先用缓存秒开，后台静默更新）
-// v23: 皮肤循环加入默认选项；图片 object-fit:contain 完整显示；槽位高度再提高
+// v24: battle-slot 内 card-item 统一透明；手牌支持皮肤；控制台默认隐藏且仅管理员可开启；拖拽缩放回退 mouse/touch+setCapture
 // ============================================================
 
 const CACHE_VERSION = 'tfjl-v19';
