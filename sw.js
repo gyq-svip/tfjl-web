@@ -1,10 +1,10 @@
 // ============================================================
 // Service Worker v5 - 塔防助手 PWA 缓存策略
 // 策略：StaleWhileRevalidate（先用缓存秒开，后台静默更新）
-// v16: fs 插件 fallback 命令名修正为 plugin:fs|read_file，增强 ArrayBuffer/number[] 解析
+// v17: 浮动控制台加复制/导出按钮，日志可导出到本地文件供 AI 诊断
 // ============================================================
 
-const CACHE_VERSION = 'tfjl-v16';
+const CACHE_VERSION = 'tfjl-v17';
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）

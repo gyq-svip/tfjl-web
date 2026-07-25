@@ -3083,6 +3083,28 @@ if (isTauriApp) {
         }
     }
 
+    // ==================== 控制台日志导出到本地文件（便于 AI 助手诊断） ====================
+    async function exportConsoleLogsToFile(logs, timestamp) {
+        if (!softwareDataDir) return 'ERR: no softwareDataDir';
+        const logsDir = softwareDataDir.replace(/[\\/]+$/, '') + '\\logs';
+        // 确保 logs 目录存在
+        const dirExists = await pathExists(logsDir);
+        if (!dirExists) {
+            const r = await createDir(logsDir);
+            if (!r.success) return 'ERR: cannot create logs dir: ' + r.error;
+        }
+        const fileName = 'console-' + timestamp + '.log';
+        const filePath = logsDir + '\\' + fileName;
+        // 生成带时间戳的可读日志文本
+        const text = logs.map(l => `[${l.time}] [${l.level.toUpperCase()}] ${l.msg}`).join('\n');
+        const result = await writeTextFileWithError(filePath, text);
+        if (result.success) {
+            return 'OK: ' + filePath;
+        } else {
+            return 'ERR: ' + result.error;
+        }
+    }
+
     // ==================== 导出函数到全局 ====================
     window.maDirs = maDirs;
     window.openAppLocalSettings = openAppLocalSettings;
@@ -3151,6 +3173,7 @@ if (isTauriApp) {
     window.getSkinRootDir = getSkinRootDir;
     window.convertFileSrc = convertFileSrc;
     window.loadSkinSelections = loadSkinSelections;
+    window.exportConsoleLogsToFile = exportConsoleLogsToFile;
 
     // 确保 DOMContentLoaded 后初始化（处理竞态：script 加载时事件可能已触发）
     if (document.readyState === 'loading') {
