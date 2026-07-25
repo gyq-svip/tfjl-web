@@ -409,6 +409,8 @@ if (isTauriApp) {
         if (btn) btn.style.display = 'flex';
         loadConfig();
         initDataSync();  // 启动 localStorage → 用户数据目录自动同步
+        loadSkinSelections();  // 恢复皮肤选择记录
+        scanSkins();           // 扫描英雄皮肤目录（异步，不阻塞）
         console.log('[APP] APP本地功能已初始化, isTauriApp:', isTauriApp);
     }
 
@@ -2867,6 +2869,120 @@ if (isTauriApp) {
         return '<details style="margin-top:8px;background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:6px 10px;"><summary style="color:rgba(255,255,255,0.45);font-size:0.75rem;cursor:pointer;">🔍 诊断日志（点击展开）</summary><div style="max-height:200px;overflow-y:auto;margin-top:4px;">' + items + '</div></details>';
     }
 
+    // ==================== 英雄皮肤系统 ====================
+
+    function getSkinRootDir() {
+        return (softwareDataDir || '').replace(/[\\/]+$/, '') + '\\data\\skin';
+    }
+
+    // Tauri v2 本地文件路径转可加载 URL（优先 asset://，回退 base64）
+    function convertFileSrc(filePath) {
+        try {
+            if (window.__TAURI__?.core?.convertFileSrc) {
+                return window.__TAURI__.core.convertFileSrc(filePath);
+            }
+        } catch(e) { /* fallback */ }
+        return null;
+    }
+    // base64 备用方案（通过 Rust 命令读取）
+    const skinImageBase64Cache = {};
+    async function getSkinImageDataUrl(filePath) {
+        // 先尝试 convertFileSrc
+        const assetUrl = convertFileSrc(filePath);
+        if (assetUrl) return assetUrl;
+        // 回退到 base64
+        if (skinImageBase64Cache[filePath]) return skinImageBase64Cache[filePath];
+        const invokeFn = window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke;
+        if (!invokeFn) return null;
+        try {
+            const dataUrl = await invokeFn('read_image_base64', { filePath });
+            skinImageBase64Cache[filePath] = dataUrl;
+            return dataUrl;
+        } catch(e) {
+            console.warn('read_image_base64 失败:', filePath, e);
+            return null;
+        }
+    }
+
+    window.skinRegistry = {};       // { 英雄名: [{ name, url, path }] }
+    window.heroSkinSelections = {};  // { 英雄名: 皮肤名 }
+
+    async function scanSkins() {
+        window.skinRegistry = {};
+        if (!softwareDataDir) return window.skinRegistry;
+        const skinRoot = getSkinRootDir();
+        const exists = await pathExists(skinRoot);
+        if (!exists) return window.skinRegistry;
+
+        const entries = await readDir(skinRoot);
+        if (!entries || !entries.length) return window.skinRegistry;
+
+        for (const heroName of entries) {
+            const heroDir = skinRoot + '\\' + heroName;
+            try {
+                const files = await readDir(heroDir);
+                if (!files || !files.length) continue;
+                const skins = [];
+                for (const file of files) {
+                    const m = file.match(/^(.+)\.(png|jpg|jpeg|gif|webp)$/i);
+                    if (!m) continue;
+                    const skinName = m[1];
+                    const filePath = heroDir + '\\' + file;
+                    // 先尝试 convertFileSrc（零开销），然后存 raw path 延迟加载
+                    const assetUrl = convertFileSrc(filePath);
+                    skins.push({ name: skinName, url: assetUrl || null, path: filePath, loaded: !!assetUrl });
+                }
+                if (skins.length > 0) window.skinRegistry[heroName] = skins;
+            } catch(e) { /* 跳过非目录项 */ }
+        }
+        return window.skinRegistry;
+    }
+
+    function getHeroSkinUrl(heroName, skinName) {
+        const skins = window.skinRegistry[heroName];
+        if (!skins || !skins.length) return null;
+        const target = skinName || window.heroSkinSelections[heroName];
+        const skin = target ? skins.find(s => s.name === target) : null;
+        return skin ? (skin.url || null) : (skins[0].url || null);
+    }
+
+    // 获取皮肤 dataUrl，支持延迟 base64 加载
+    async function resolveHeroSkinUrl(heroName, skinName) {
+        const skins = window.skinRegistry[heroName];
+        if (!skins || !skins.length) return null;
+        const target = skinName || window.heroSkinSelections[heroName];
+        const skin = target ? skins.find(s => s.name === target) : null;
+        const entry = skin || skins[0];
+        if (!entry) return null;
+        if (entry.url) return entry.url; // 已有 asset:// 或 base64
+        // 延迟加载 base64
+        const dataUrl = await getSkinImageDataUrl(entry.path);
+        if (dataUrl) { entry.url = dataUrl; entry.loaded = true; }
+        return dataUrl;
+    }
+
+    function getHeroSkins(heroName) {
+        return window.skinRegistry[heroName] || [];
+    }
+
+    function selectHeroSkin(heroName, skinName) {
+        window.heroSkinSelections[heroName] = skinName;
+        try {
+            const all = JSON.parse(localStorage.getItem('tdjl_heroSkinSelections') || '{}');
+            if (skinName === null || skinName === undefined) delete all[heroName];
+            else all[heroName] = skinName;
+            localStorage.setItem('tdjl_heroSkinSelections', JSON.stringify(all));
+        } catch(e) {}
+    }
+
+    function loadSkinSelections() {
+        try {
+            window.heroSkinSelections = JSON.parse(localStorage.getItem('tdjl_heroSkinSelections') || '{}');
+        } catch(e) {
+            window.heroSkinSelections = {};
+        }
+    }
+
     // ==================== 导出函数到全局 ====================
     window.maDirs = maDirs;
     window.openAppLocalSettings = openAppLocalSettings;
@@ -2925,6 +3041,15 @@ if (isTauriApp) {
     window.clearLogBattleCache = clearLogBattleCache;
     window.importFileToProject = importFileToProject;
     window.batchImportFilesToProject = batchImportFilesToProject;
+    // 英雄皮肤系统
+    window.scanSkins = scanSkins;
+    window.getHeroSkinUrl = getHeroSkinUrl;
+    window.resolveHeroSkinUrl = resolveHeroSkinUrl;
+    window.getHeroSkins = getHeroSkins;
+    window.selectHeroSkin = selectHeroSkin;
+    window.getSkinRootDir = getSkinRootDir;
+    window.convertFileSrc = convertFileSrc;
+    window.loadSkinSelections = loadSkinSelections;
 
     // 确保 DOMContentLoaded 后初始化（处理竞态：script 加载时事件可能已触发）
     if (document.readyState === 'loading') {
