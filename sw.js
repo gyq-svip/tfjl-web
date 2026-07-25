@@ -1,10 +1,10 @@
 // ============================================================
 // Service Worker v5 - 塔防助手 PWA 缓存策略
 // 策略：StaleWhileRevalidate（先用缓存秒开，后台静默更新）
-// v12: HTML 文档改用 NetworkFirst 优先网络（根治"该死的缓存"），静态资源保持 StaleWhileRevalidate
+// v13: 皮肤背景彻底改为 <img> DOM 层（告别 CSS background 缩写级联打架）
 // ============================================================
 
-const CACHE_VERSION = 'tfjl-v12';
+const CACHE_VERSION = 'tfjl-v13';
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
