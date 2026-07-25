@@ -1911,6 +1911,8 @@ if (isTauriApp) {
         if (!force) {
             const cache = loadStatsCache();
             if (cache && cache.stats && cache.stats.length > 0) {
+                // 兼容旧缓存中的 MM-DD 日期（归一化为 YYYY-MM-DD，确保周一~周日统计匹配）
+                cache.stats = cache.stats.map(s => ({ ...s, date: normalizeDirDate(s.date) }));
                 await saveScreenshotPersistStore(cache.stats); // 确保持久化包含今日数据
                 const merged = await mergeScreenshotPersist(cache.stats);
                 if (merged.length > 0) {
