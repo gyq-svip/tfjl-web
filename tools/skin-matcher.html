@@ -206,6 +206,9 @@
             <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.85rem;">
                 <input type="checkbox" id="hideMatched" checked> 隐藏已匹配
             </label>
+            <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:0.85rem;" id="reviewLabel">
+                <input type="checkbox" id="reviewMode"> 核对模式
+            </label>
             <button id="stopBtn" class="secondary" style="font-size:0.8rem;padding:4px 10px;">停止匹配</button>
             <span id="statusText"></span>
         </div>
@@ -247,8 +250,12 @@
                 <div class="actions">
                     <button id="prevBtn">上一张 (←)</button>
                     <button id="skipBtn" class="secondary">跳过 (Del)</button>
-                    <button id="saveBtn" class="primary">保存并下一张 (Enter)</button>
+                    <button id="saveBtn" class="primary" id="saveBtn">保存并下一张 (Enter)</button>
                     <button id="nextBtn">下一张 (→)</button>
+                </div>
+                <div class="actions" id="reviewActions" style="display:none;">
+                    <button id="saveOnlyBtn" class="secondary">仅保存（不跳）</button>
+                    <button id="clearMatchBtn" class="secondary" style="background:#e63946;">清除当前匹配</button>
                 </div>
 
                 <div class="exports">
@@ -592,8 +599,14 @@
                 restoreCurrentSelection();
             }
 
-            const status = m?.skipped ? '已跳过' : (m && m.hero ? `已映射：${m.hero} / ${m.skin || '?'}` : '未匹配');
-            $('statusText').textContent = status;
+            const status = m?.skipped
+                ? '已跳过'
+                : (m && m.hero ? `已映射：${m.hero} · ${m.skin || '?'}` : '未匹配');
+            if ($('reviewMode').checked && m && m.hero) {
+                $('statusText').innerHTML = `<span style="color:#51cf66;">✅</span> ${status}`;
+            } else {
+                $('statusText').textContent = status;
+            }
         }
 
         // === 隐藏已匹配 ===
@@ -862,6 +875,11 @@
 
         // 隐藏已匹配切换
         $('hideMatched').addEventListener('change', () => {
+            // 核对模式下强制显示全部
+            if ($('reviewMode').checked) {
+                $('hideMatched').checked = false;
+                return;
+            }
             updateThumbHighlight();
             if (isHidden(currentIdx)) {
                 let found = -1;
@@ -877,6 +895,68 @@
                 renderCurrent(); // 刷新统计
             }
             saveCurrentSelection();
+        });
+
+        // 核对模式切换
+        $('reviewMode').addEventListener('change', () => {
+            const on = $('reviewMode').checked;
+            $('reviewActions').style.display = on ? 'flex' : 'none';
+            if (on) {
+                // 核对模式：强制显示全部缩略图
+                $('hideMatched').checked = false;
+                $('hideMatched').disabled = true;
+                $('saveBtn').textContent = '保存并下一张 (Enter)';
+                $('saveBtn').title = '保存修改并跳到下一张';
+                $('statusText').textContent = '🔍 核对模式 — 可修改或清除任一匹配';
+            } else {
+                $('hideMatched').disabled = false;
+                $('hideMatched').checked = true;
+                $('saveBtn').textContent = '保存并下一张 (Enter)';
+                $('statusText').textContent = '';
+            }
+            updateThumbHighlight();
+            renderCurrent();
+            saveCurrentSelection();
+        });
+
+        // 仅保存（不跳）
+        $('saveOnlyBtn').addEventListener('click', () => {
+            const hero = $('heroSelect').value;
+            const skin = $('skinSelect').value;
+            if (!hero || !skin) {
+                $('statusText').textContent = '请先选择英雄和皮肤';
+                return;
+            }
+            mappings[currentIdx] = {
+                hero,
+                skin,
+                custom: $('customName').value.trim()
+            };
+            localStorage.removeItem(LOCAL_KEY + '_currentSel');
+            updateThumbHighlight();
+            updateSkinOptions();
+            updateHeroCountDisplay();
+            saveLocalProgress();
+            $('statusText').textContent = '✅ 已保存（未跳转）';
+        });
+
+        // 清除当前匹配
+        $('clearMatchBtn').addEventListener('click', () => {
+            if (!mappings[currentIdx] || mappings[currentIdx].skipped) {
+                $('statusText').textContent = '当前项无需清除';
+                return;
+            }
+            if (!confirm(`确定清除「${files[currentIdx].name}」的匹配吗？（${mappings[currentIdx].hero}·${mappings[currentIdx].skin}）`)) return;
+            mappings[currentIdx] = null;
+            localStorage.removeItem(LOCAL_KEY + '_currentSel');
+            $('heroSelect').value = '';
+            $('skinSelect').innerHTML = '<option value="">-- 请选择皮肤 --</option>';
+            $('customName').value = '';
+            updateThumbHighlight();
+            updateHeroCountDisplay();
+            saveLocalProgress();
+            renderCurrent();
+            $('statusText').textContent = '🗑️ 已清除匹配，可重新选择';
         });
 
         // 页面关闭前保存
