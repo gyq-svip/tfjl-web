@@ -232,7 +232,8 @@
                 </label>
                 <label>
                     英雄
-                    <select id="heroSelect"></select>
+                    <input type="text" id="heroSearch" placeholder="搜英雄（拼音首字母/汉字），如 sl=水灵、战=战士" autocomplete="off" style="margin-bottom:4px;">
+                    <select id="heroSelect" size="8" style="height:auto;"></select>
                 </label>
                 <label>
                     皮肤
@@ -289,6 +290,27 @@
             "暗精灵":"精灵","魂精灵":"精灵"
         };
 
+        // 英雄→拼音首字母映射（用于搜索框快速定位）
+        const HERO_PINYIN = {
+            "天使":"ts","圣骑":"sq","死神":"ss","酋长":"qz","咕咕":"gg","小野":"xy",
+            "鲛女":"jn","巫医":"wy","小鹿":"xl","大树":"ds","猫咪":"mm","萨满":"sm",
+            "地精":"dj","工匠":"gj","鱼人":"yr","战将":"zj","刀客":"dk","霸王":"bw",
+            "亡将":"wj","铁骑":"tq","石头":"st","神龛":"sk","刺客":"ck","钢鬃":"gz",
+            "恶匪":"ef","斧客":"fk","剑客":"jk","龙拳":"lq","狂将":"kj","孤星":"gx",
+            "领主":"lz","狂龙":"kl","电法":"df","小丑":"xc","女王":"nw","沙皇":"sh",
+            "飞机":"fj","炎魔":"ym","火法":"hf","暗法":"af","冰法":"bf","凤凰":"fh",
+            "火神":"hs","阿翼":"ay","龟相":"gv","谜云":"my","雷神":"ls","女妖":"ny",
+            "冰鸟":"bn","蛇女":"sn","虎弓":"hg","后羿":"hy","海妖":"ha","小炮":"xp",
+            "爱神":"as","船长":"cz","毒王":"dw","炸弹":"zd","火枪":"hq","松鼠":"shu",
+            "绿弓":"lg","蜘蛛":"zz","冰弓":"bg","风灵":"fl","火灵":"hl","水灵":"sl",
+            "萌萌":"mem","土灵":"tl","射线":"sx","宝库":"bk","潜艇":"qt","火炮":"hp",
+            "咬人娃娃":"yrww","影":"y","魇":"ye","葵":"kui","傀":"kui2","邪":"xie",
+            "大圣":"das","闪":"shan","龙王":"lw","钟馗":"zk","悟空":"wk","冰骑":"bq",
+            "恶魔":"em","幽灵":"yl","神龙":"snl","骨龙":"gl","祭司":"js",
+            "土精灵":"tjl","彩精灵":"cjl","魔精灵":"mjl","木精灵":"mujl","光精灵":"gjl",
+            "幻精灵":"hjl","雷精灵":"ljl","冰精灵":"bjl","暗精灵":"ajl","魂精灵":"hunjl"
+        };
+
         let registry = { heroes: {} };
         let files = [];
         let mappings = [];
@@ -330,21 +352,40 @@
         function populateHeroSelect() {
             const sel = $('heroSelect');
             const filterProf = $('professionFilter').value;
+            const searchText = ($('heroSearch').value || '').trim().toLowerCase();
             sel.innerHTML = '<option value="">-- 请选择英雄 --</option>';
             const heroes = Object.keys(registry.heroes).sort();
             let count = 0;
             for (const h of heroes) {
-                // 职业筛选：非"全部"时只显示该职业的英雄
+                // 职业筛选
                 if (filterProf && HERO_PROFESSION[h] !== filterProf) continue;
+                // 搜索筛选：匹配英雄名（汉字）或拼音首字母
+                if (searchText) {
+                    const py = (HERO_PINYIN[h] || '').toLowerCase();
+                    const nameMatch = h.includes(searchText);
+                    const pyMatch = py && py.includes(searchText);
+                    if (!nameMatch && !pyMatch) continue;
+                }
                 const opt = document.createElement('option');
                 opt.value = h;
-                opt.textContent = `${h}（${registry.heroes[h].length}）`;
+                // 显示数量：总皮肤数 / 已匹配数（如有）
+                const matchedCount = mappings.filter(m => m && m.hero === h && !m.skipped).length;
+                const totalCount = registry.heroes[h].length;
+                if (matchedCount > 0) {
+                    opt.textContent = `${h}（${totalCount}，已配${matchedCount}）`;
+                } else {
+                    opt.textContent = `${h}（${totalCount}）`;
+                }
                 sel.appendChild(opt);
                 count++;
             }
-            if (count === 0 && filterProf) {
+            if (count === 0 && searchText) {
+                sel.innerHTML = '<option value="">-- 无匹配英雄 --</option>';
+            } else if (count === 0 && filterProf) {
                 sel.innerHTML = '<option value="">-- 该职业无英雄 --</option>';
             }
+            // 根据结果数量调整 size
+            sel.size = Math.max(2, Math.min(count + 1, 12));
             updateSkinOptions();
         }
 
@@ -353,11 +394,26 @@
             const sel = $('skinSelect');
             sel.innerHTML = '<option value="">-- 请选择皮肤 --</option>';
             if (!hero || !registry.heroes[hero]) return;
+            // 收集当前批次已用过的 (hero, skin) 对
+            const usedSkins = new Set();
+            mappings.forEach(m => {
+                if (m && m.hero === hero && m.skin && !m.skipped) {
+                    usedSkins.add(m.skin);
+                }
+            });
             const skins = registry.heroes[hero];
+            let available = 0;
             for (const s of skins) {
                 const opt = document.createElement('option');
                 opt.value = s.name;
-                opt.textContent = s.name;
+                if (usedSkins.has(s.name)) {
+                    opt.textContent = `✓ ${s.name}（已配）`;
+                    opt.style.color = '#51cf66';
+                    opt.style.opacity = '0.6';
+                } else {
+                    opt.textContent = s.name;
+                    available++;
+                }
                 sel.appendChild(opt);
             }
         }
@@ -380,6 +436,16 @@
         });
 
         $('heroSelect').addEventListener('change', updateSkinOptions);
+
+        // 搜索框实时过滤英雄列表
+        $('heroSearch').addEventListener('input', () => {
+            const prevHero = $('heroSelect').value;
+            populateHeroSelect();
+            if (prevHero && [...$('heroSelect').options].some(o => o.value === prevHero)) {
+                $('heroSelect').value = prevHero;
+                updateSkinOptions();
+            }
+        });
 
         $('professionFilter').addEventListener('change', () => {
             // 保存当前选择的英雄
@@ -624,8 +690,29 @@
             };
             localStorage.removeItem(LOCAL_KEY + '_currentSel');
             updateThumbHighlight();
+            updateSkinOptions(); // 立即刷新皮肤下拉框（标记已用皮肤）
+            updateHeroCountDisplay(); // 更新英雄下拉框已配数量
             saveLocalProgress();
             goToNext();
+        }
+
+        // 更新当前选中英雄的已配数量（不重建整个下拉框）
+        function updateHeroCountDisplay() {
+            const hero = $('heroSelect').value;
+            if (!hero) return;
+            const sel = $('heroSelect');
+            for (const opt of sel.options) {
+                if (opt.value === hero) {
+                    const matchedCount = mappings.filter(m => m && m.hero === hero && !m.skipped).length;
+                    const totalCount = registry.heroes[hero] ? registry.heroes[hero].length : 0;
+                    if (matchedCount > 0) {
+                        opt.textContent = `${hero}（${totalCount}，已配${matchedCount}）`;
+                    } else {
+                        opt.textContent = `${hero}（${totalCount}）`;
+                    }
+                    break;
+                }
+            }
         }
 
         function skipAndNext() {
