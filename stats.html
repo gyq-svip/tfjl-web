@@ -2880,6 +2880,23 @@
             start.setDate(start.getDate() + dayIdx - 1);
             return start.toISOString().slice(0, 10);
         }
+        // 获取某一天的星期几（中文）
+        function getWeekdayOfday(season, dayIdx) {
+            if (!season || !season.startDate) return '';
+            const start = new Date(season.startDate);
+            start.setDate(start.getDate() + dayIdx - 1);
+            const weekdays = ['周日','周一','周二','周三','周四','周五','周六'];
+            return weekdays[start.getDay()];
+        }
+        // 获取某一天的日期（MM-DD格式）
+        function getShortDateOfday(season, dayIdx) {
+            if (!season || !season.startDate) return '';
+            const start = new Date(season.startDate);
+            start.setDate(start.getDate() + dayIdx - 1);
+            const m = String(start.getMonth() + 1).padStart(2, '0');
+            const d = String(start.getDate()).padStart(2, '0');
+            return m + '-' + d;
+        }
 
         function switchSeasonFromSelect() {
             if (!isOwner()) {
@@ -4118,7 +4135,11 @@
             let html = '<div class="calendar-table-wrap"><table class="calendar-table"><thead><tr>';
             html += '<th class="cal-sticky">成员</th>';
             for (let d = 1; d <= days; d++) {
-                html += `<th>第${d}天</th>`;
+                const wd = getWeekdayOfday(season, d);
+                const date = getShortDateOfday(season, d);
+                const isWeekend = (wd === '周六' || wd === '周日');
+                const wdColor = isWeekend ? 'color:#ff9800;' : 'color:rgba(255,255,255,0.7);';
+                html += `<th title="${date}"><div style="${wdColor}font-weight:600;">${wd}</div><div style="font-size:0.7rem;color:rgba(255,255,255,0.5);">${date}</div><div style="font-size:0.65rem;color:rgba(255,255,255,0.35);">第${d}天</div></th>`;
             }
             html += '<th>总杯数</th>';
             html += '<th>购买次数</th>';
@@ -4151,10 +4172,44 @@
             html += '</tbody><tfoot><tr>';
             html += '<td class="cal-sticky">每日总计</td>';
             for (let d = 1; d <= days; d++) {
-                html += `<td>${dayTotals[d - 1].toLocaleString()}</td>`;
+                const wd = getWeekdayOfday(season, d);
+                const isWeekend = (wd === '周六' || wd === '周日');
+                const color = isWeekend ? 'color:#ff9800;' : '';
+                html += `<td style="${color}">${dayTotals[d - 1].toLocaleString()}</td>`;
             }
             html += '<td colspan="3"></td>';
             html += '</tr></tfoot></table></div>';
+
+            // 按星期汇总（统计周一~周日各自的总杯数）
+            const weekdayNames = ['周日','周一','周二','周三','周四','周五','周六'];
+            const weekdayTotals = [0,0,0,0,0,0,0]; // 索引 0=周日, 1=周一...
+            const weekdayCounts = [0,0,0,0,0,0,0];
+            for (let d = 1; d <= days; d++) {
+                const start = new Date(season.startDate);
+                start.setDate(start.getDate() + d - 1);
+                const wd = start.getDay();
+                weekdayTotals[wd] += dayTotals[d - 1];
+                weekdayCounts[wd]++;
+            }
+            let summaryHtml = '<div class="card" style="margin-top:12px;"><div class="card-title">📊 按星期汇总（总杯数）</div>';
+            summaryHtml += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;">';
+            // 按周一~周日顺序展示
+            const order = [1,2,3,4,5,6,0]; // 周一~周日
+            order.forEach(wd => {
+                const name = weekdayNames[wd];
+                const total = weekdayTotals[wd];
+                const count = weekdayCounts[wd];
+                const avg = count > 0 ? Math.round(total / count) : 0;
+                const isWeekend = (wd === 0 || wd === 6);
+                const bg = isWeekend ? 'background:rgba(255,152,0,0.15);border:1px solid rgba(255,152,0,0.4);' : 'background:rgba(0,188,212,0.1);border:1px solid rgba(0,188,212,0.3);';
+                summaryHtml += `<div style="${bg}padding:8px 12px;border-radius:8px;text-align:center;min-width:80px;">`;
+                summaryHtml += `<div style="font-size:0.85rem;color:#fff;font-weight:600;">${name}</div>`;
+                summaryHtml += `<div style="font-size:1.1rem;color:#ffd700;font-weight:700;margin:4px 0;">${total.toLocaleString()}</div>`;
+                summaryHtml += `<div style="font-size:0.7rem;color:rgba(255,255,255,0.6);">${count}天 · 均${avg}</div>`;
+                summaryHtml += `</div>`;
+            });
+            summaryHtml += '</div></div>';
+            html += summaryHtml;
 
             container.innerHTML = html;
         }
