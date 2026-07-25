@@ -1892,10 +1892,10 @@ if (isTauriApp) {
             return;
         }
 
-        // 优先使用今日缓存（非强制刷新）
+        // 优先使用今日缓存（非强制刷新，且缓存中有实际数据）
         if (!force) {
             const cache = loadStatsCache();
-            if (cache && cache.stats) {
+            if (cache && cache.stats && cache.stats.length > 0) {
                 saveScreenshotPersistStore(cache.stats); // 确保持久化包含今日数据
                 const merged = mergeScreenshotPersist(cache.stats);
                 if (merged.length > 0) {
@@ -1911,30 +1911,53 @@ if (isTauriApp) {
             const entries = await readDir(screenshotDir);
             const allDateDirs = entries.filter(e => !e.is_file);
             const todayStr = getTodayStr();
-
-            // 只扫描今天的目录，历史数据从 localStorage 持久化存储读取
-            const todayDir = allDateDirs.find(e => e.name === todayStr);
-
-            const stats = [];
             const imageExts = ['png', 'jpg', 'jpeg', 'bmp', 'webp'];
 
-            if (todayDir) {
-                try {
-                    const files = await readDir(todayDir.path);
-                    let count = 0;
-                    for (const f of files) {
-                        if (f.is_file) {
-                            const ext = f.name.split('.').pop().toLowerCase();
-                            if (imageExts.includes(ext)) count++;
+            // 检查持久化存储是否有历史数据
+            const persistMap = loadScreenshotPersistStore();
+            const persistHasData = Object.keys(persistMap).length > 0;
+
+            let stats = [];
+
+            if (!persistHasData) {
+                // 首次使用/数据丢失：全量扫描所有目录，一次性填充持久化存储
+                for (const dir of allDateDirs) {
+                    try {
+                        const files = await readDir(dir.path);
+                        let count = 0;
+                        for (const f of files) {
+                            if (f.is_file) {
+                                const ext = f.name.split('.').pop().toLowerCase();
+                                if (imageExts.includes(ext)) count++;
+                            }
                         }
+                        stats.push({ date: dir.name, count, path: dir.path });
+                    } catch (e) {
+                        console.warn('统计目录失败:', dir.path, e);
                     }
-                    stats.push({ date: todayStr, count, path: todayDir.path });
-                } catch (e) {
-                    console.warn('统计今天目录失败:', todayDir.path, e);
+                }
+                stats.sort((a, b) => b.date.localeCompare(a.date));
+            } else {
+                // 已有历史数据：只扫描今天，历史从 localStorage 读
+                const todayDir = allDateDirs.find(e => e.name === todayStr);
+                if (todayDir) {
+                    try {
+                        const files = await readDir(todayDir.path);
+                        let count = 0;
+                        for (const f of files) {
+                            if (f.is_file) {
+                                const ext = f.name.split('.').pop().toLowerCase();
+                                if (imageExts.includes(ext)) count++;
+                            }
+                        }
+                        stats.push({ date: todayStr, count, path: todayDir.path });
+                    } catch (e) {
+                        console.warn('统计今天目录失败:', todayDir.path, e);
+                    }
                 }
             }
 
-            // 今天扫描的结果缓存 + 持久化累积
+            // 扫描结果缓存 + 持久化累积
             saveStatsCache(stats);
             saveScreenshotPersistStore(stats);
             const merged = mergeScreenshotPersist(stats);  // 合并历史数据
