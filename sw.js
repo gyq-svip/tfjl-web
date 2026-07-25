@@ -1,10 +1,10 @@
 // ============================================================
 // Service Worker v5 - 塔防助手 PWA 缓存策略
 // 策略：StaleWhileRevalidate（先用缓存秒开，后台静默更新）
-// v13: 皮肤背景彻底改为 <img> DOM 层（告别 CSS background 缩写级联打架）
+// v14: 皮肤图片统一走 base64（convertFileSrc 对 Windows 含盘符路径无效）
 // ============================================================
 
-const CACHE_VERSION = 'tfjl-v13';
+const CACHE_VERSION = 'tfjl-v14';
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）

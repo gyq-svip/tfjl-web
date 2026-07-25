@@ -2895,10 +2895,8 @@ if (isTauriApp) {
     // base64 备用方案（通过 Rust 命令读取）
     const skinImageBase64Cache = {};
     async function getSkinImageDataUrl(filePath) {
-        // 先尝试 convertFileSrc
-        const assetUrl = convertFileSrc(filePath);
-        if (assetUrl) return assetUrl;
-        // 回退到 base64
+        // Windows 路径下的 convertFileSrc 在 Tauri v2 中生成 http://asset.localhost/<URL-encoded-path> 的 URL，
+        // 该 URL 会被 asset 协议拒绝（含 D:\ 盘符和反斜杠编码）。皮肤统一走 base64 data URL，彻底稳定。
         if (skinImageBase64Cache[filePath]) return skinImageBase64Cache[filePath];
         const invokeFn = window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke;
         if (!invokeFn) return null;
@@ -2958,9 +2956,8 @@ if (isTauriApp) {
                     if (!m) continue;
                     const skinName = m[1];
                     const filePath = heroDir + '\\' + fileName;
-                    // 先尝试 convertFileSrc（零开销），然后存 raw path 延迟加载
-                    const assetUrl = convertFileSrc(filePath);
-                    skins.push({ name: skinName, url: assetUrl || null, path: filePath, loaded: !!assetUrl });
+                    // 统一存 raw path，由 resolveHeroSkinUrl 异步转 base64（convertFileSrc 对 Windows 含盘符路径无效）
+                    skins.push({ name: skinName, url: null, path: filePath, loaded: false });
                 }
                 if (skins.length > 0) { window.skinRegistry[heroName] = skins; console.log('[SKIN] Hero:', heroName, 'skins:', skins.map(s => s.name).join(',')); }
             } catch(e) { console.warn('[SKIN] Error reading hero dir:', heroDir, e); }
@@ -3001,7 +2998,7 @@ if (isTauriApp) {
         console.log('[SKIN] entry:', entry ? entry.name : 'null', 'url:', entry ? (entry.url ? entry.url.substring(0, 60) + '...' : 'no url') : 'N/A');
         if (!entry) return null;
         if (entry.url) return entry.url; // 已有 asset:// 或 base64
-        // 延迟加载 base64
+        // 延迟加载 base64（convertFileSrc 对 Windows 含盘符路径无效，统一走 Rust 命令读图）
         console.log('[SKIN] Loading base64 from path:', entry.path);
         const dataUrl = await getSkinImageDataUrl(entry.path);
         console.log('[SKIN] getSkinImageDataUrl result:', dataUrl ? dataUrl.substring(0, 60) + '...' : 'null/empty');
