@@ -1,10 +1,10 @@
 // ============================================================
 // Service Worker v5 - 塔防助手 PWA 缓存策略
 // 策略：StaleWhileRevalidate（先用缓存秒开，后台静默更新）
-// v6: 修复皮肤切换——用户手动选择优先于名称嵌入皮肤
+// v7: 皮肤切换添加追踪日志 + 控制台浮动窗
 // ============================================================
 
-const CACHE_VERSION = 'tfjl-v6';
+const CACHE_VERSION = 'tfjl-v7';
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）

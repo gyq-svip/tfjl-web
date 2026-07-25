@@ -2978,20 +2978,27 @@ if (isTauriApp) {
     async function resolveHeroSkinUrl(heroName, skinName) {
         const parsed = getBaseHeroName(heroName);
         const baseHero = parsed.heroName;
+        console.log('[SKIN] resolveHeroSkinUrl input:', heroName, 'skinName:', skinName, 'parsed:', JSON.stringify(parsed));
         const skins = window.skinRegistry[baseHero];
-        if (!skins || !skins.length) return null;
+        console.log('[SKIN] skinRegistry for', baseHero, ':', skins ? skins.length + ' skins' : 'null');
+        if (!skins || !skins.length) { console.warn('[SKIN] No skins for hero:', baseHero); return null; }
         // 如果名称中指定了皮肤且没有用户手动选择，自动使用名称中指定的皮肤
         if (parsed.skinName && !window.heroSkinSelections[baseHero]) {
             window.heroSkinSelections[baseHero] = parsed.skinName;
         }
         // 优先级：显式传入 skinName > 用户手动选择 > 名称中嵌入的皮肤 > 第一个皮肤
-        const target = skinName || window.heroSkinSelections[baseHero] || parsed.skinName;
+        const userSel = window.heroSkinSelections[baseHero];
+        const target = skinName || userSel || parsed.skinName;
+        console.log('[SKIN] target:', target, 'userSel:', userSel, 'parsedSkin:', parsed.skinName, 'skins list:', skins.map(s => s.name));
         const skin = target ? skins.find(s => s.name === target) : null;
         const entry = skin || skins[0];
+        console.log('[SKIN] entry:', entry ? entry.name : 'null', 'url:', entry ? (entry.url ? entry.url.substring(0, 60) + '...' : 'no url') : 'N/A');
         if (!entry) return null;
         if (entry.url) return entry.url; // 已有 asset:// 或 base64
         // 延迟加载 base64
+        console.log('[SKIN] Loading base64 from path:', entry.path);
         const dataUrl = await getSkinImageDataUrl(entry.path);
+        console.log('[SKIN] getSkinImageDataUrl result:', dataUrl ? dataUrl.substring(0, 60) + '...' : 'null/empty');
         if (dataUrl) { entry.url = dataUrl; entry.loaded = true; }
         return dataUrl;
     }
