@@ -4,7 +4,7 @@
 // v29: 有皮肤的战斗槽顶部加半透明暗条，名字居中、等级右上角，都在暗条内清晰可见
 // ============================================================
 
-const CACHE_VERSION = 'tfjl-v25';
+const CACHE_VERSION = 'tfjl-v26';
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）

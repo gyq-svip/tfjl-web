@@ -830,6 +830,73 @@
             box-shadow: 0 4px 15px rgba(255,152,0,0.4) !important;
         }
 
+        /* 职业筛选栏 */
+        .profession-filter-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 15px;
+            padding: 12px 16px;
+            background: rgba(255,255,255,0.06);
+            backdrop-filter: blur(10px);
+            border-radius: 14px;
+            border: 1px solid rgba(255,255,255,0.08);
+            align-items: center;
+        }
+        .prof-filter-label {
+            color: rgba(255,255,255,0.5);
+            font-size: 0.8rem;
+            margin-right: 4px;
+            white-space: nowrap;
+        }
+        .prof-filter-btn {
+            padding: 5px 14px;
+            border-radius: 20px;
+            border: 1px solid rgba(255,255,255,0.2);
+            background: transparent;
+            color: rgba(255,255,255,0.7);
+            font-size: 0.78rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+            user-select: none;
+        }
+        .prof-filter-btn:hover {
+            background: rgba(255,255,255,0.1);
+            border-color: rgba(255,255,255,0.4);
+            color: #fff;
+        }
+        .prof-filter-btn.active {
+            background: rgba(255,255,255,0.15);
+            border-color: rgba(255,255,255,0.5);
+            color: #fff;
+            font-weight: bold;
+        }
+        .prof-filter-btn[data-prof="warrior"].active { border-color: #dc2626; background: rgba(220,38,38,0.2); color: #f87171; }
+        .prof-filter-btn[data-prof="mage"].active { border-color: #93c5fd; background: rgba(147,197,253,0.15); color: #93c5fd; }
+        .prof-filter-btn[data-prof="archer"].active { border-color: #3b82f6; background: rgba(59,130,246,0.15); color: #60a5fa; }
+        .prof-filter-btn[data-prof="summoner"].active { border-color: #a855f7; background: rgba(168,85,247,0.15); color: #c084fc; }
+        .prof-filter-btn[data-prof="priest"].active { border-color: #4ade80; background: rgba(74,222,128,0.15); color: #86efac; }
+        .prof-filter-btn[data-prof="warlock"].active { border-color: #9ca3af; background: rgba(156,163,175,0.15); color: #d1d5db; }
+        .prof-filter-btn[data-prof="panda"].active { border-color: #fcd34d; background: rgba(252,211,77,0.15); color: #fde68a; }
+        .prof-filter-btn[data-prof="engineering"].active { border-color: #14b8a6; background: rgba(20,184,166,0.15); color: #5eead4; }
+        .prof-filter-btn[data-prof="pokeball"].active { border-color: #ef4444; background: rgba(239,68,68,0.15); color: #f87171; }
+        .prof-filter-clear {
+            margin-left: auto;
+            padding: 5px 12px;
+            border-radius: 20px;
+            border: 1px solid rgba(255,255,255,0.15);
+            background: transparent;
+            color: rgba(255,255,255,0.5);
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .prof-filter-clear:hover {
+            background: rgba(255,255,255,0.08);
+            color: #fff;
+        }
+
         .collapsible-section {
             background: rgba(255,255,255,0.08);
             backdrop-filter: blur(10px);
@@ -9662,6 +9729,21 @@
             </div>
         </div>
 
+        <!-- 职业筛选栏 -->
+        <div class="profession-filter-bar" id="professionFilterBar">
+            <span class="prof-filter-label">🔍 职业：</span>
+            <button class="prof-filter-btn active" data-prof="all" onclick="filterByProfession('all')">全部</button>
+            <button class="prof-filter-btn" data-prof="warrior" onclick="filterByProfession('warrior')">⚔️ 战士</button>
+            <button class="prof-filter-btn" data-prof="mage" onclick="filterByProfession('mage')">🔮 法师</button>
+            <button class="prof-filter-btn" data-prof="archer" onclick="filterByProfession('archer')">🏹 射手</button>
+            <button class="prof-filter-btn" data-prof="summoner" onclick="filterByProfession('summoner')">🐉 召唤</button>
+            <button class="prof-filter-btn" data-prof="priest" onclick="filterByProfession('priest')">💚 牧师</button>
+            <button class="prof-filter-btn" data-prof="warlock" onclick="filterByProfession('warlock')">🌑 术士</button>
+            <button class="prof-filter-btn" data-prof="panda" onclick="filterByProfession('panda')">🐼 熊猫</button>
+            <button class="prof-filter-btn" data-prof="engineering" onclick="filterByProfession('engineering')">⚙️ 工程</button>
+            <button class="prof-filter-btn" data-prof="pokeball" onclick="filterByProfession('pokeball')">🔴 精灵球</button>
+        </div>
+
         <div class="collapsible-section favorite">
             <div class="collapsible-header favorite open" onclick="toggleSection(this)">
                 <h3><span>⭐</span> 收藏 <span class="small-text">（点击卡片上的⭐添加/删除）</span></h3>
@@ -17505,6 +17587,103 @@
                     const isOpen = header.classList.contains('open');
                     localStorage.setItem('tdjl_notepad_open', isOpen);
                 }
+            }
+        }
+
+        // 职业筛选
+        function filterByProfession(prof) {
+            // 更新按钮激活状态
+            document.querySelectorAll('.prof-filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.getAttribute('data-prof') === prof) {
+                    btn.classList.add('active');
+                }
+            });
+
+            // 获取所有品质区域
+            const sections = document.querySelectorAll('.collapsible-section.gold, .collapsible-section.purple, .collapsible-section.blue, .collapsible-section.green');
+            
+            if (prof === 'all') {
+                // 显示全部：恢复所有 profession-section
+                sections.forEach(section => {
+                    section.style.display = '';
+                    section.querySelectorAll('.profession-section').forEach(ps => {
+                        ps.style.display = '';
+                        ps.querySelectorAll('.card-item').forEach(card => {
+                            card.style.display = '';
+                        });
+                    });
+                    section.querySelectorAll('.collapsible-content').forEach(cc => {
+                        cc.style.display = '';
+                        cc.classList.add('open');
+                    });
+                    const header = section.querySelector('.collapsible-header');
+                    if (header) {
+                        header.classList.add('open');
+                        const icon = header.querySelector('.toggle-icon');
+                        if (icon) icon.textContent = '▲';
+                    }
+                });
+                // 也显示收藏区
+                const favSection = document.querySelector('.collapsible-section.favorite');
+                if (favSection) {
+                    favSection.style.display = '';
+                }
+                return;
+            }
+
+            // 筛选特定职业：隐藏整个品质区再按需显示，或者逐层处理
+            sections.forEach(section => {
+                const profSections = section.querySelectorAll('.profession-section');
+                let hasVisibleCards = false;
+
+                profSections.forEach(ps => {
+                    const h4 = ps.querySelector('h4');
+                    // 提取纯职业名：去掉 emoji 前缀（如 "⚔️ 战士" → "战士"）
+                    const rawProfName = h4 ? h4.textContent.split(' ').pop().trim() : '';
+                    const profMap = {
+                        '战士': 'warrior', '法师': 'mage', '射手': 'archer',
+                        '召唤': 'summoner', '牧师': 'priest', '术士': 'warlock',
+                        '熊猫': 'panda', '工程': 'engineering', '精灵球': 'pokeball'
+                    };
+                    const psProf = profMap[rawProfName];
+
+                    if (psProf === prof) {
+                        // 匹配的职业：显示整个 profession-section 和所有卡片
+                        ps.style.display = '';
+                        ps.querySelectorAll('.card-item').forEach(card => {
+                            card.style.display = '';
+                        });
+                        hasVisibleCards = true;
+                    } else {
+                        // 不匹配的职业：隐藏
+                        ps.style.display = 'none';
+                    }
+                });
+
+                // 如果该品质区域没有可见卡片，隐藏整个区域
+                if (hasVisibleCards) {
+                    section.style.display = '';
+                    const content = section.querySelector('.collapsible-content');
+                    if (content) {
+                        content.style.display = 'block';
+                        content.classList.add('open');
+                    }
+                    const header = section.querySelector('.collapsible-header');
+                    if (header) {
+                        header.classList.add('open');
+                        const icon = header.querySelector('.toggle-icon');
+                        if (icon) icon.textContent = '▲';
+                    }
+                } else {
+                    section.style.display = 'none';
+                }
+            });
+
+            // 筛选时不显示收藏区（收藏区混了所有职业）
+            const favSection = document.querySelector('.collapsible-section.favorite');
+            if (favSection) {
+                favSection.style.display = 'none';
             }
         }
 
