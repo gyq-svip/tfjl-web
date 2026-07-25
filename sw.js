@@ -1,10 +1,10 @@
 // ============================================================
 // Service Worker v5 - 塔防助手 PWA 缓存策略
 // 策略：StaleWhileRevalidate（先用缓存秒开，后台静默更新）
-// v15: 皮肤读图增加 fs 插件 fallback（read_file→base64），绕过 read_image_base64 ACL
+// v16: fs 插件 fallback 命令名修正为 plugin:fs|read_file，增强 ArrayBuffer/number[] 解析
 // ============================================================
 
-const CACHE_VERSION = 'tfjl-v15';
+const CACHE_VERSION = 'tfjl-v16';
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
