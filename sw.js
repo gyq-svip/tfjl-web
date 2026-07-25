@@ -1,10 +1,10 @@
 // ============================================================
 // Service Worker v5 - 塔防助手 PWA 缓存策略
 // 策略：StaleWhileRevalidate（先用缓存秒开，后台静默更新）
-// v29: 有皮肤的战斗槽顶部加半透明暗条，名字居中、等级右上角，都在暗条内清晰可见
+// v30: 回滚主页职业筛选（移至 skin-matcher 工具），皮肤匹配工具侧边栏加职业筛选下拉框
 // ============================================================
 
-const CACHE_VERSION = 'tfjl-v26';
+const CACHE_VERSION = 'tfjl-v27';
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
