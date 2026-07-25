@@ -1,10 +1,11 @@
 // ============================================================
 // Service Worker v5 - 塔防助手 PWA 缓存策略
 // 策略：StaleWhileRevalidate（先用缓存秒开，后台静默更新）
-// v31: 战斗槽皮肤显示布局改为上皮肤名/中皮肤图/下卡名+等级
+// v32: 战斗槽皮肤显示布局优化（名字置底、等级徽章置右上角、皮肤完整显示）
+//      + setCardSkin 修复（手动设置皮肤后刷新战斗槽皮肤显示）
 // ============================================================
 
-const CACHE_VERSION = 'tfjl-v28';
+const CACHE_VERSION = 'tfjl-v29';
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）

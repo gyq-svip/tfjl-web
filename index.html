@@ -14814,11 +14814,50 @@
         }
         
         // 设置卡牌皮肤
-        function setCardSkin(cardId, skin, handType = 'my') {
+        async function setCardSkin(cardId, skin, handType = 'my') {
             const key = `${handType}_${cardId}`;
             cardSkins[key] = skin;
             saveCardSkins();
             if (typeof autoSaveProject === 'function') autoSaveProject();
+
+            // 同步刷新该卡牌所有相关位置（手牌 + 战斗槽）
+            try {
+                // 1. 刷新手牌中的卡牌皮肤
+                const handContainerId = handType === 'my' ? 'myHandContainer' : 'teammateHandContainer';
+                const handCard = document.querySelector(`#${handContainerId} .selected-card[data-id="${cardId}"]`);
+                if (handCard) {
+                    const cardName = handCard.dataset.name || '';
+                    if (window.resolveHeroSkinUrl) {
+                        const url = await window.resolveHeroSkinUrl(cardName, skin);
+                        if (url) {
+                            if (typeof applySkinBgToHandCard === 'function') applySkinBgToHandCard(handCard, url);
+                        } else if (typeof removeSkinBgFromHandCard === 'function') {
+                            removeSkinBgFromHandCard(handCard);
+                        }
+                    }
+                }
+                // 2. 刷新所有战斗槽里该卡牌的皮肤（我方+队友）
+                document.querySelectorAll('.battle-slot.filled').forEach(async (slot) => {
+                    if (slot.dataset.cardId !== cardId) return;
+                    const slotCardName = slot.querySelector('.card-name')?.textContent
+                        || (handCard && handCard.dataset.name)
+                        || '';
+                    if (typeof applySkinBgToSlot === 'function') {
+                        try { await applySkinBgToSlot(slot, slotCardName); } catch (e) {}
+                    }
+                });
+                // 3. 刷新收藏区的卡牌皮肤
+                const favCard = document.querySelector(`#favoriteCardsGrid .card-item[data-id="${cardId}"]`);
+                if (favCard) {
+                    const cardName = favCard.dataset.name || '';
+                    if (window.resolveHeroSkinUrl) {
+                        const url = await window.resolveHeroSkinUrl(cardName, skin);
+                        if (url && typeof applySkinBgToHandCard === 'function') applySkinBgToHandCard(favCard, url);
+                    }
+                }
+            } catch (e) {
+                console.warn('[SKIN] setCardSkin refresh error:', e);
+            }
         }
         
         // 保存皮肤数据到localStorage
