@@ -9017,7 +9017,7 @@
         </div>
 
         <!-- APP本地功能脚本（网页版不会执行任何代码，isTauriApp判断在文件内部） -->
-        <script src="app-local.js?v=5"></script>
+        <script src="app-local.js?v=6"></script>
 
         <script>
         // ==================== Service Worker 注册（PWA缓存） ====================
@@ -9839,6 +9839,30 @@
         </div>
 
     <script>
+        // ==================== 控制台日志捕获（Tauri APP 无法 F12，在此捕获供管理员面板查看） ====================
+        window.__consoleLogs = [];
+        const MAX_CONSOLE_LOGS = 500;
+        (function captureConsole() {
+            const orig = { log: console.log, warn: console.warn, error: console.error, info: console.info };
+            function addLog(level, args) {
+                const now = new Date();
+                const time = now.toTimeString().slice(0, 8);
+                const msg = Array.from(args).map(a => {
+                    if (a instanceof Error) return a.stack || a.message;
+                    if (typeof a === 'object') try { return JSON.stringify(a).slice(0, 300); } catch (e) { return String(a); }
+                    return String(a);
+                }).join(' ');
+                window.__consoleLogs.push({ time, level, msg });
+                if (window.__consoleLogs.length > MAX_CONSOLE_LOGS) window.__consoleLogs.splice(0, 100);
+                orig[level] && orig[level].apply(console, args);
+            }
+            console.log = (...args) => addLog('log', args);
+            console.warn = (...args) => addLog('warn', args);
+            console.error = (...args) => addLog('error', args);
+            console.info = (...args) => addLog('info', args);
+        })();
+        window.__consoleLogs.push({ time: new Date().toTimeString().slice(0, 8), level: 'info', msg: '控制台日志捕获已启动' });
+
         // ==================== IndexedDB 项目管理 ====================
         let currentProjectName = '默认项目';
         let currentProjectCategory = '默认分类';
@@ -23147,6 +23171,7 @@ ${maSection}
                 if (pageEl) {
                     pageEl.style.display = 'block';
                     adminRefreshDebugLog();
+                    adminRefreshConsoleLog();
                 }
             }
         }
@@ -23168,6 +23193,27 @@ ${maSection}
             panel.innerHTML = items;
         }
 
+        function adminRefreshConsoleLog() {
+            const panel = document.getElementById('consoleLogPanel');
+            if (!panel) return;
+            const logs = window.__consoleLogs;
+            if (!logs || logs.length === 0) {
+                panel.innerHTML = '<div style="color:rgba(255,255,255,0.3);text-align:center;padding:30px;font-size:0.85rem;">暂无日志输出</div>';
+                return;
+            }
+            const levelColors = { error: '#f44336', warn: '#ff9800', info: '#00bcd4', log: 'rgba(255,255,255,0.75)' };
+            const items = logs.slice().reverse().map((l, i) => {
+                const color = levelColors[l.level] || 'rgba(255,255,255,0.6)';
+                return `<div style="color:${color};font-size:0.7rem;padding:2px 4px;border-bottom:1px solid rgba(255,255,255,0.03);line-height:1.4;">
+                    <span style="color:rgba(255,255,255,0.3);margin-right:6px;">${logs.length - i}</span>
+                    <span style="color:rgba(255,255,255,0.25);margin-right:6px;">${l.time}</span>
+                    <span style="font-weight:500;margin-right:4px;">[${l.level.toUpperCase()}]</span>
+                    ${l.msg.replace(/</g, '&lt;').replace(/>/g, '&gt;')}
+                </div>`;
+            }).join('');
+            panel.innerHTML = items;
+            panel.scrollTop = 0;
+        }
 
         // ==================== 缓存管理 ====================
         function viewCacheInfo() {
@@ -25212,10 +25258,31 @@ ${maSection}
             <div id="adminPageLogStats" style="display:none;">
                 <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
                     <button class="admin-btn admin-btn-secondary" onclick="adminShowMenu()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
-                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">🔍 对战日志诊断</h3>
+                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">🔍 调试日志</h3>
                 </div>
+
+                <!-- 控制台日志 -->
+                <div style="background:rgba(0,200,255,0.1);border-left:3px solid #00bcd4;border-radius:6px;padding:12px;margin-bottom:10px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;">
+                        <div style="color:#00bcd4;font-size:0.85rem;font-weight:500;">💻 控制台日志（实时）</div>
+                        <div>
+                            <button onclick="adminRefreshConsoleLog()" style="background:linear-gradient(135deg,#00bcd4,#0097a7);color:white;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.8rem;margin-right:6px;">🔄 刷新</button>
+                            <button onclick="window.__consoleLogs=[];adminRefreshConsoleLog();" style="background:linear-gradient(135deg,#ef4444,#dc2626);color:white;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.8rem;">🗑 清空</button>
+                        </div>
+                    </div>
+                    <div style="color:rgba(255,255,255,0.5);font-size:0.7rem;margin-top:4px;">
+                        捕获所有 console.log/warn/error/info 输出（最多500条）。Tauri APP 无法 F12 调试时可用此面板排查。
+                    </div>
+                </div>
+                <div id="consoleLogPanel" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:10px;min-height:150px;max-height:400px;overflow-y:auto;font-family:monospace;margin-bottom:20px;">
+                    <div style="color:rgba(255,255,255,0.3);text-align:center;padding:30px;font-size:0.85rem;">点击「刷新」查看日志</div>
+                </div>
+
+                <hr style="border-color:rgba(255,255,255,0.08);margin:20px 0;">
+
+                <!-- 对战日志诊断（原有） -->
                 <div style="background:rgba(255,152,0,0.1);border-left:3px solid #ff9800;border-radius:6px;padding:12px;margin-bottom:15px;">
-                    <div style="color:#ff9800;font-size:0.85rem;font-weight:500;">📋 说明</div>
+                    <div style="color:#ff9800;font-size:0.85rem;font-weight:500;">📋 对战日志诊断</div>
                     <div style="color:rgba(255,255,255,0.6);font-size:0.75rem;margin-top:5px;">
                         查看最近一次「对战日志胜负统计」的详细诊断信息。<br>
                         先在本地设置中配置日志目录并点击统计，再回来看诊断。

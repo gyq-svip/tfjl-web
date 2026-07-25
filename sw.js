@@ -1,10 +1,10 @@
 // ============================================================
-// Service Worker v4 - 塔防助手 PWA 缓存策略
+// Service Worker v5 - 塔防助手 PWA 缓存策略
 // 策略：StaleWhileRevalidate（先用缓存秒开，后台静默更新）
-// v4: 强制清空旧缓存（修复 skin 系统导致的 JS 语法错误缓存）
+// v5: 增加控制台日志捕获功能，管理员面板可查看 console.log
 // ============================================================
 
-const CACHE_VERSION = 'tfjl-v4';
+const CACHE_VERSION = 'tfjl-v5';
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
