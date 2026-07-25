@@ -3014,10 +3014,17 @@ if (isTauriApp) {
     function getHeroSkinUrl(heroName, skinName) {
         const parsed = getBaseHeroName(heroName);
         const baseHero = parsed.heroName;
-        const explicitSkin = skinName || parsed.skinName;
         const skins = window.skinRegistry[baseHero];
         if (!skins || !skins.length) return null;
-        const target = explicitSkin || window.heroSkinSelections[baseHero];
+        const userSel = window.heroSkinSelections[baseHero];
+        // 显式传入 skinName 时优先；空字符串表示默认无皮肤
+        if (skinName !== undefined && skinName !== null) {
+            if (skinName === '') return null;
+            const skin = skins.find(s => s.name === skinName);
+            return skin ? (skin.url || null) : null;
+        }
+        if (userSel === '') return null; // 用户明确选择默认
+        const target = userSel || parsed.skinName;
         const skin = target ? skins.find(s => s.name === target) : null;
         return skin ? (skin.url || null) : (skins[0].url || null);
     }
@@ -3031,14 +3038,19 @@ if (isTauriApp) {
         console.log('[SKIN] skinRegistry for', baseHero, ':', skins ? skins.length + ' skins' : 'null');
         if (!skins || !skins.length) { console.warn('[SKIN] No skins for hero:', baseHero); return null; }
         // 如果名称中指定了皮肤且没有用户手动选择，自动使用名称中指定的皮肤
-        if (parsed.skinName && !window.heroSkinSelections[baseHero]) {
+        // 注意：空字符串表示用户已手动选择"默认"，必须用 === undefined 判断才自动填充
+        if (parsed.skinName && window.heroSkinSelections[baseHero] === undefined) {
             window.heroSkinSelections[baseHero] = parsed.skinName;
         }
         // 优先级：显式传入 skinName > 用户手动选择 > 名称中嵌入的皮肤 > 第一个皮肤
         const userSel = window.heroSkinSelections[baseHero];
-        const target = skinName || userSel || parsed.skinName;
+        const target = skinName || (userSel !== undefined && userSel !== '' ? userSel : null) || parsed.skinName;
         console.log('[SKIN] target:', target, 'userSel:', userSel, 'parsedSkin:', parsed.skinName, 'skins list:', skins.map(s => s.name));
-        const skin = target ? skins.find(s => s.name === target) : null;
+        if (target === null || target === undefined || target === '') {
+            console.log('[SKIN] Default (no skin) selected for', baseHero);
+            return null;
+        }
+        const skin = skins.find(s => s.name === target);
         const entry = skin || skins[0];
         console.log('[SKIN] entry:', entry ? entry.name : 'null', 'url:', entry ? (entry.url ? entry.url.substring(0, 60) + '...' : 'no url') : 'N/A');
         if (!entry) return null;
