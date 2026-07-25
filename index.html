@@ -486,7 +486,7 @@
             content: '';
             position: absolute;
             inset: 0;
-            background: rgba(0, 0, 0, 0.45);
+            background: rgba(0, 0, 0, 0.25);
             z-index: 0;
             pointer-events: none;
             border-radius: inherit;
@@ -9017,7 +9017,7 @@
         </div>
 
         <!-- APP本地功能脚本（网页版不会执行任何代码，isTauriApp判断在文件内部） -->
-        <script src="app-local.js?v=11"></script>
+        <script src="app-local.js?v=12"></script>
 
         <script>
         // ==================== Service Worker 注册（PWA缓存） ====================
@@ -15470,10 +15470,10 @@
             console.log('[SKIN] applySkinBgToSlot slot:', slot.dataset.slot, 'heroName:', heroName, 'slot.classList:', Array.from(slot.classList));
             // 清除旧皮肤
             slot.classList.remove('skin-bg');
-            slot.style.backgroundImage = '';
-            slot.style.backgroundSize = '';
-            slot.style.backgroundPosition = '';
-            slot.style.backgroundRepeat = '';
+            slot.style.removeProperty('background-image');
+            slot.style.removeProperty('background-size');
+            slot.style.removeProperty('background-position');
+            slot.style.removeProperty('background-repeat');
             if (!heroName) { console.log('[SKIN] No heroName, returning'); return; }
             // 优先用 resolveHeroSkinUrl（支持延迟 base64 加载），回退 getHeroSkinUrl
             let skinUrl = window.resolveHeroSkinUrl 
@@ -15481,11 +15481,16 @@
                 : (window.getHeroSkinUrl && window.getHeroSkinUrl(heroName));
             console.log('[SKIN] applySkinBgToSlot result - skinUrl:', skinUrl ? skinUrl.substring(0, 80) : 'NULL/EMPTY');
             if (!skinUrl) { console.warn('[SKIN] No skinUrl for', heroName); return; }
-            slot.style.backgroundImage = `url("${skinUrl}")`;
-            slot.style.backgroundSize = 'cover';
-            slot.style.backgroundPosition = 'center';
-            slot.style.backgroundRepeat = 'no-repeat';
+            // 添加缓存破坏参数，确保浏览器重新加载新图片
+            const cacheBust = '?t=' + Date.now();
+            // 使用 setProperty + 'important' 彻底覆盖 CSS profession 渐变
+            slot.style.setProperty('background-image', `url("${skinUrl}${cacheBust}")`, 'important');
+            slot.style.setProperty('background-size', 'cover', 'important');
+            slot.style.setProperty('background-position', 'center', 'important');
+            slot.style.setProperty('background-repeat', 'no-repeat', 'important');
             slot.classList.add('skin-bg');
+            // 强制重绘确保视觉更新
+            void slot.offsetHeight;
             console.log('[SKIN] Background applied successfully to slot', slot.dataset.slot);
         }
 
@@ -16258,16 +16263,38 @@
                 const card = placedArray.find(c => c.slot === slotId);
                 console.log('[SKIN] card found:', card ? card.name : 'null', 'slotId:', slotId, 'isUserSlot:', isUserSlot);
                 const heroName = card ? (card.name || '') : '';
-                // 如果有多个皮肤可选，右键切换皮肤
                 const skins = heroName && window.getHeroSkins ? window.getHeroSkins(heroName) : [];
-                console.log('[SKIN] heroName:', heroName, 'skins count:', skins.length);
-                if (skins.length > 1) {
-                    cycleHeroSkin(heroName, slotId);
-                    try { await applySkinBgToSlot(this, heroName); } catch (e) { console.error('[SKIN] applySkinBgToSlot error in right-click:', e); }
+                const hasSkinBg = this.classList.contains('skin-bg');
+                console.log('[SKIN] heroName:', heroName, 'skins count:', skins.length, 'hasSkinBg:', hasSkinBg);
+                if (skins.length >= 1) {
+                    if (skins.length > 1) {
+                        // 多皮肤：循环切换
+                        cycleHeroSkin(heroName, slotId);
+                        try { await applySkinBgToSlot(this, heroName); } catch (e) { console.error('[SKIN] applySkinBgToSlot error in right-click:', e); }
+                        return;
+                    }
+                    // 单皮肤：切换皮肤开/关
+                    if (hasSkinBg) {
+                        // 关闭皮肤，恢复默认 profession 渐变
+                        this.classList.remove('skin-bg');
+                        this.style.removeProperty('background-image');
+                        this.style.removeProperty('background-size');
+                        this.style.removeProperty('background-position');
+                        this.style.removeProperty('background-repeat');
+                        // 清除皮肤选择
+                        const baseHero = (window.getBaseHeroName && window.getBaseHeroName(heroName).heroName) || heroName;
+                        if (window.selectHeroSkin) window.selectHeroSkin(heroName, null);
+                        console.log('[SKIN] Single-skin toggled OFF for', heroName);
+                    } else {
+                        // 打开皮肤
+                        if (window.selectHeroSkin) window.selectHeroSkin(heroName, skins[0].name);
+                        try { await applySkinBgToSlot(this, heroName); } catch (e) { console.error('[SKIN] applySkinBgToSlot error in right-click:', e); }
+                        console.log('[SKIN] Single-skin toggled ON for', heroName);
+                    }
                     return;
                 }
-                // 否则移除卡牌
-                console.log('[SKIN] skins <= 1 (count=' + skins.length + '), removing card from slot');
+                // 无皮肤：移除卡牌
+                console.log('[SKIN] No skins available, removing card from slot');
                 removeCardFromSlot(slotId);
             } else {
                 console.log('[SKIN] slot not filled, ignoring right-click');
@@ -16340,10 +16367,10 @@
             delete slot.dataset.profession;
             // 清除皮肤背景
             slot.classList.remove('skin-bg');
-            slot.style.backgroundImage = '';
-            slot.style.backgroundSize = '';
-            slot.style.backgroundPosition = '';
-            slot.style.backgroundRepeat = '';
+            slot.style.removeProperty('background-image');
+            slot.style.removeProperty('background-size');
+            slot.style.removeProperty('background-position');
+            slot.style.removeProperty('background-repeat');
             
             // 如果是工程槽，恢复提示
             if (slot.dataset.type === 'engineering') {
