@@ -476,25 +476,32 @@
             background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
         }
 
-        /* 皮肤背景 */
-        .battle-slot.filled.skin-bg {
-            position: relative;
-            overflow: hidden;
-            /* 皮肤背景会通过内联 style 覆盖 profession 渐变 */
-        }
-        .battle-slot.filled.skin-bg::after {
-            content: '';
+        /* 皮肤层图片——独立 DOM 层，不跟 CSS background 缩写打架 */
+        .battle-slot .skin-layer {
             position: absolute;
             inset: 0;
-            background: rgba(0, 0, 0, 0.25);
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
             z-index: 0;
             pointer-events: none;
             border-radius: inherit;
         }
-        .battle-slot.filled.skin-bg .card-item,
-        .battle-slot.filled.skin-bg .card-level-badge {
-            position: relative;
+        /* 半透明遮罩，让文字可读 */
+        .battle-slot.skin-bg::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.25);
             z-index: 1;
+            pointer-events: none;
+            border-radius: inherit;
+        }
+        /* 文字浮在遮罩之上 */
+        .battle-slot.skin-bg .card-item,
+        .battle-slot.skin-bg .card-level-badge {
+            position: relative;
+            z-index: 2;
         }
 
         .battle-slot.engineering-slot {
@@ -9017,7 +9024,7 @@
         </div>
 
         <!-- APP本地功能脚本（网页版不会执行任何代码，isTauriApp判断在文件内部） -->
-        <script src="app-local.js?v=12"></script>
+        <script src="app-local.js?v=13"></script>
 
         <script>
         // ==================== Service Worker 注册（PWA缓存） ====================
@@ -15467,31 +15474,29 @@
 
         // 给战斗槽卡牌应用皮肤背景
         async function applySkinBgToSlot(slot, heroName) {
-            console.log('[SKIN] applySkinBgToSlot slot:', slot.dataset.slot, 'heroName:', heroName, 'slot.classList:', Array.from(slot.classList));
-            // 清除旧皮肤
+            console.log('[SKIN] applySkinBgToSlot slot:', slot.dataset.slot, 'heroName:', heroName);
+            // 移除旧皮肤层
+            const oldLayer = slot.querySelector('.skin-layer');
+            if (oldLayer) oldLayer.remove();
             slot.classList.remove('skin-bg');
-            slot.style.removeProperty('background-image');
-            slot.style.removeProperty('background-size');
-            slot.style.removeProperty('background-position');
-            slot.style.removeProperty('background-repeat');
             if (!heroName) { console.log('[SKIN] No heroName, returning'); return; }
             // 优先用 resolveHeroSkinUrl（支持延迟 base64 加载），回退 getHeroSkinUrl
             let skinUrl = window.resolveHeroSkinUrl 
                 ? await window.resolveHeroSkinUrl(heroName) 
                 : (window.getHeroSkinUrl && window.getHeroSkinUrl(heroName));
-            console.log('[SKIN] applySkinBgToSlot result - skinUrl:', skinUrl ? skinUrl.substring(0, 80) : 'NULL/EMPTY');
+            console.log('[SKIN] skinUrl:', skinUrl ? skinUrl.substring(0, 80) : 'NULL');
             if (!skinUrl) { console.warn('[SKIN] No skinUrl for', heroName); return; }
-            // 添加缓存破坏参数，确保浏览器重新加载新图片
+            // 创建独立的 <img> 皮肤层，彻底绕开 CSS background 缩写级联问题
             const cacheBust = '?t=' + Date.now();
-            // 使用 setProperty + 'important' 彻底覆盖 CSS profession 渐变
-            slot.style.setProperty('background-image', `url("${skinUrl}${cacheBust}")`, 'important');
-            slot.style.setProperty('background-size', 'cover', 'important');
-            slot.style.setProperty('background-position', 'center', 'important');
-            slot.style.setProperty('background-repeat', 'no-repeat', 'important');
+            const img = document.createElement('img');
+            img.className = 'skin-layer';
+            img.src = skinUrl + cacheBust;
+            img.alt = '';
+            img.onerror = function() { console.error('[SKIN] Failed to load skin image:', skinUrl); img.remove(); };
+            img.onload = function() { console.log('[SKIN] Skin image loaded OK for slot', slot.dataset.slot); };
+            slot.insertBefore(img, slot.firstChild);
             slot.classList.add('skin-bg');
-            // 强制重绘确保视觉更新
-            void slot.offsetHeight;
-            console.log('[SKIN] Background applied successfully to slot', slot.dataset.slot);
+            console.log('[SKIN] Skin <img> inserted into slot', slot.dataset.slot);
         }
 
         async function restoreBattleSlots() {
@@ -16277,10 +16282,8 @@
                     if (hasSkinBg) {
                         // 关闭皮肤，恢复默认 profession 渐变
                         this.classList.remove('skin-bg');
-                        this.style.removeProperty('background-image');
-                        this.style.removeProperty('background-size');
-                        this.style.removeProperty('background-position');
-                        this.style.removeProperty('background-repeat');
+                        const oldLayer = this.querySelector('.skin-layer');
+                        if (oldLayer) oldLayer.remove();
                         // 清除皮肤选择
                         const baseHero = (window.getBaseHeroName && window.getBaseHeroName(heroName).heroName) || heroName;
                         if (window.selectHeroSkin) window.selectHeroSkin(heroName, null);
@@ -16367,10 +16370,8 @@
             delete slot.dataset.profession;
             // 清除皮肤背景
             slot.classList.remove('skin-bg');
-            slot.style.removeProperty('background-image');
-            slot.style.removeProperty('background-size');
-            slot.style.removeProperty('background-position');
-            slot.style.removeProperty('background-repeat');
+            const oldLayer2 = slot.querySelector('.skin-layer');
+            if (oldLayer2) oldLayer2.remove();
             
             // 如果是工程槽，恢复提示
             if (slot.dataset.type === 'engineering') {
@@ -26201,6 +26202,7 @@ ${maSection}
         </style>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
+    <span id="versionTag" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;pointer-events:none;z-index:999;opacity:0.5;">v250725-2</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
