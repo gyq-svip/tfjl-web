@@ -2900,14 +2900,48 @@ if (isTauriApp) {
         if (skinImageBase64Cache[filePath]) return skinImageBase64Cache[filePath];
         const invokeFn = window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke;
         if (!invokeFn) return null;
+
+        // 方案A：优先用 read_image_base64 自定义命令（秒级返回 base64 data URL）
         try {
             const dataUrl = await invokeFn('read_image_base64', { filePath });
-            skinImageBase64Cache[filePath] = dataUrl;
-            return dataUrl;
+            if (dataUrl) {
+                skinImageBase64Cache[filePath] = dataUrl;
+                return dataUrl;
+            }
         } catch(e) {
-            console.warn('read_image_base64 失败:', filePath, e);
-            return null;
+            console.log('[SKIN] read_image_base64 ACL blocked, trying fs plugin...', String(e).slice(0,80));
         }
+
+        // 方案B：用 Tauri 内置 fs 插件 read_file 读二进制，JS 转 base64
+        // （read_image_base64 的 ACL 需 rebuild exe 才能解锁，fs:default 权限在旧 exe 中已编译）
+        try {
+            const bytes = await invokeFn('read_file', { path: filePath });
+            const dataUrl = bytesToDataUrl(bytes, filePath);
+            if (dataUrl) {
+                skinImageBase64Cache[filePath] = dataUrl;
+                console.log('[SKIN] base64 via fs plugin OK:', filePath);
+                return dataUrl;
+            }
+        } catch(e) {
+            console.warn('[SKIN] read_file also failed:', filePath, String(e).slice(0,80));
+        }
+        return null;
+    }
+
+    /// 将 invoke 返回的字节数组/Uint8Array 转为 base64 data URL
+    function bytesToDataUrl(bytes, filePath) {
+        if (!bytes) return null;
+        const arr = Array.isArray(bytes) ? new Uint8Array(bytes) : new Uint8Array(Object.values(bytes));
+        let binary = '';
+        const chunk = 8192;
+        for (let i = 0; i < arr.length; i += chunk) {
+            binary += String.fromCharCode.apply(null, arr.subarray(i, Math.min(i + chunk, arr.length)));
+        }
+        const base64 = btoa(binary);
+        const ext = (filePath.split('.').pop() || 'png').toLowerCase();
+        const mimeMap = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp', bmp: 'image/bmp' };
+        const mime = mimeMap[ext] || 'image/png';
+        return `data:${mime};base64,${base64}`;
     }
 
     window.skinRegistry = {};       // { 英雄名: [{ name, url, path }] }
