@@ -1980,13 +1980,21 @@ if (isTauriApp) {
         html += `</div>`;
 
         const recent = stats.slice(0, 30);
-        html += `<div style="margin-top:12px;"><div style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-bottom:6px;">最近30天明细</div>`;
-        for (const s of recent) {
-            const bar = '█'.repeat(Math.min(20, Math.round(s.count / maxCount * 20)));
+        const wdCounts = [0, 0, 0, 0, 0, 0, 0]; // 0=日,1=一...6=六
+        recent.forEach(s => {
+            const d = new Date(s.date + 'T00:00:00');
+            if (!isNaN(d.getTime())) wdCounts[d.getDay()] += s.count;
+        });
+        const wdOrdered = [wdCounts[1], wdCounts[2], wdCounts[3], wdCounts[4], wdCounts[5], wdCounts[6], wdCounts[0]];
+        const wdLabels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+        const wdMax = Math.max(1, ...wdOrdered);
+        html += `<div style="margin-top:12px;"><div style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-bottom:6px;">最近30天 · 周一~周日</div>`;
+        for (let i = 0; i < 7; i++) {
+            const bar = '█'.repeat(Math.min(20, Math.round(wdOrdered[i] / wdMax * 20)));
             html += `<div style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:0.78rem;">
-                <span style="color:rgba(255,255,255,0.7);width:60px;">${s.date}</span>
+                <span style="color:rgba(255,255,255,0.7);width:42px;">${wdLabels[i]}</span>
                 <span style="color:#e040fb;font-family:monospace;">${bar}</span>
-                <span style="color:#fff;font-weight:bold;width:30px;">${s.count}局</span>
+                <span style="color:#fff;font-weight:bold;width:30px;">${wdOrdered[i]}局</span>
             </div>`;
         }
         html += `</div>`;
@@ -2036,30 +2044,6 @@ if (isTauriApp) {
             html += `<svg width="${chartW}" height="${chartH}" style="display:block;">${gridHtml}${barsHtml}${polyline}${dots}</svg></div>`;
         }
 
-        // ===== 按星期统计（周一~周日，固定7列循环） =====
-        const dayCounts = [0, 0, 0, 0, 0, 0, 0]; // 索引0=周日,1=周一...6=周六
-        stats.forEach(s => {
-            const d = new Date(s.date + 'T00:00:00');
-            if (!isNaN(d.getTime())) dayCounts[d.getDay()] += s.count;
-        });
-        // 旋转为周一~周日显示
-        const orderedLabels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
-        const orderedCounts = [dayCounts[1], dayCounts[2], dayCounts[3], dayCounts[4], dayCounts[5], dayCounts[6], dayCounts[0]];
-        const weekMax = Math.max(1, ...orderedCounts);
-        const weekTotal = orderedCounts.reduce((s, c) => s + c, 0);
-
-        html += `<div style="margin-top:14px;"><div style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-bottom:4px;">📅 按星期统计（总${weekTotal}局）</div>`;
-        html += `<div style="display:flex;align-items:flex-end;gap:8px;height:100px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.1);">`;
-        for (let i = 0; i < 7; i++) {
-            const h = Math.max(4, Math.round((orderedCounts[i] / weekMax) * 80));
-            const barColor = orderedCounts[i] >= weekMax * 0.7 ? '#4caf50' : (orderedCounts[i] >= weekMax * 0.35 ? '#ff9800' : '#607d8b');
-            html += `<div style="flex:1;display:flex;flex-direction:column;align-items:center;">
-                <div style="color:#fff;font-size:0.7rem;font-weight:bold;margin-bottom:2px;">${orderedCounts[i]}</div>
-                <div style="width:100%;max-width:44px;height:${h}px;background:linear-gradient(180deg,${barColor},rgba(76,175,80,0.2));border-radius:3px 3px 0 0;" title="${orderedLabels[i]}: ${orderedCounts[i]}局"></div>
-                <div style="color:${orderedCounts[i] === weekMax ? '#ff9800' : 'rgba(255,255,255,0.5)'};font-size:0.65rem;margin-top:4px;font-weight:${orderedCounts[i] === weekMax ? 'bold' : 'normal'};">${orderedLabels[i]}</div>
-            </div>`;
-        }
-        html += `</div></div>`;
 
         statsEl.innerHTML = html;
     }
