@@ -418,8 +418,8 @@ if (isTauriApp) {
         loadConfig();
         initDataSync();  // 启动 localStorage → 用户数据目录自动同步
         loadSkinSelections();  // 恢复皮肤选择记录
-        scanSkins();           // 扫描英雄皮肤目录（异步，不阻塞）
-        syncRemoteSkins();     // 从 GitHub Pages 拉取远程皮肤注册表（异步，不阻塞）
+        // 先扫描本地，再同步远程；如果并行会导致 scanSkins 清空 registry 把远程条目冲掉
+        scanSkins().then(() => syncRemoteSkins());
         console.log('[APP] APP本地功能已初始化, isTauriApp:', isTauriApp);
     }
 
@@ -2977,6 +2977,11 @@ if (isTauriApp) {
 
     async function scanSkins() {
         console.log('[SKIN] scanSkins() START');
+        // 保留已有的远程皮肤条目，避免和 syncRemoteSkins 并行/重复调用时把远程条目冲掉
+        const existingRemote = {};
+        for (const [heroName, skins] of Object.entries(window.skinRegistry || {})) {
+            existingRemote[heroName] = (skins || []).filter(s => s.remote && s.url);
+        }
         window.skinRegistry = {};
         console.log('[SKIN] softwareDataDir:', softwareDataDir);
         if (!softwareDataDir) { console.warn('[SKIN] No softwareDataDir, aborting scanSkins'); return window.skinRegistry; }
@@ -3011,6 +3016,18 @@ if (isTauriApp) {
                 }
                 if (skins.length > 0) { window.skinRegistry[heroName] = skins; console.log('[SKIN] Hero:', heroName, 'skins:', skins.map(s => s.name).join(',')); }
             } catch(e) { console.warn('[SKIN] Error reading hero dir:', heroDir, e); }
+        }
+        // 把之前保留的远程皮肤条目合并回来（本地没有的才加）
+        for (const [heroName, remoteSkins] of Object.entries(existingRemote)) {
+            if (!remoteSkins.length) continue;
+            const localSkins = window.skinRegistry[heroName] || [];
+            const localNames = new Set(localSkins.map(s => s.name));
+            for (const r of remoteSkins) {
+                if (!localNames.has(r.name)) {
+                    localSkins.push(r);
+                }
+            }
+            if (localSkins.length > 0) window.skinRegistry[heroName] = localSkins;
         }
         console.log('[SKIN] scanSkins() DONE, registry keys:', Object.keys(window.skinRegistry).join(',') || '(empty)');
         return window.skinRegistry;
@@ -3073,89 +3090,11 @@ if (isTauriApp) {
     }
 
     // 后台下载远程皮肤到本地磁盘（Tauri 环境下，方便离线使用）
+    // ⚠️ 当前 exe 未提供 write_binary_file 命令，且 fs 插件 write_file 在部分环境不可用，
+    //    因此暂时禁用本地缓存，避免生成无法读取的 .png.b64 文件。远程 HTTPS URL 已足够显示皮肤。
     async function _downloadRemoteSkinsToLocal(heroes) {
-        if (!isTauriApp || !softwareDataDir) return;
-        const invokeFn = window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke;
-        if (!invokeFn) return;
-
-        const skinRoot = getSkinRootDir();
-        // 确保根目录存在
-        try {
-            const rootExists = await pathExists(skinRoot);
-            if (!rootExists) {
-                const r = await createDir(skinRoot);
-                if (!r || !r.success) { console.warn('[SKIN] Cannot create skin root dir for download'); return; }
-            }
-        } catch(e) { return; }
-
-        let downloadedCount = 0;
-        for (const [heroName, skinList] of Object.entries(heroes)) {
-            if (!Array.isArray(skinList)) continue;
-            const heroDir = skinRoot + '\\' + heroName;
-            try {
-                const heroDirExists = await pathExists(heroDir);
-                if (!heroDirExists) {
-                    const r = await createDir(heroDir);
-                    if (!r || !r.success) continue;
-                }
-            } catch(e) { continue; }
-
-            for (const remoteSkin of skinList) {
-                const skinName = remoteSkin.name;
-                const fileName = (remoteSkin.file || (skinName + '.png'));
-                const localPath = heroDir + '\\' + fileName;
-                // 如果本地文件已存在，跳过
-                try {
-                    const exists = await pathExists(localPath);
-                    if (exists) continue;
-                } catch(e) { continue; }
-
-                // 下载图片
-                const remoteUrl = REMOTE_SKIN_BASE + '/' + encodeURIComponent(heroName) + '/' + encodeURIComponent(fileName);
-                try {
-                    const imgResp = await fetch(remoteUrl);
-                    if (!imgResp.ok) continue;
-                    const blob = await imgResp.blob();
-                    const buf = await blob.arrayBuffer();
-                    const bytes = Array.from(new Uint8Array(buf));
-
-                    // 尝试多种写磁盘方式
-                    let written = false;
-                    // 方式1：Rust write_binary_file 命令
-                    try { await invokeFn('write_binary_file', { filePath: localPath, bytes }); written = true; } catch(e) {}
-                    // 方式2：Tauri fs 插件 write_file（传 ArrayBuffer）
-                    if (!written) {
-                        try { await invokeFn('plugin:fs|write_file', { path: localPath, contents: Array.from(new Uint8Array(buf)) }); written = true; } catch(e2) {}
-                    }
-                    // 方式3：base64 编码后用 write_text_file
-                    if (!written) {
-                        try {
-                            let binary = '';
-                            const u8 = new Uint8Array(buf);
-                            for (let i = 0; i < u8.length; i++) binary += String.fromCharCode(u8[i]);
-                            const base64 = btoa(binary);
-                            const dataUrl = 'data:image/png;base64,' + base64;
-                            // 把 base64 文本写入 .png.b64 文件（标记为 base64 编码）
-                            await invokeFn('write_text_file', { filePath: localPath + '.b64', content: dataUrl });
-                            written = true;
-                        } catch(e3) {}
-                    }
-
-                    if (written) {
-                        downloadedCount++;
-                        console.log('[SKIN] Downloaded to local:', heroName + '/' + fileName);
-                        // 更新 skinRegistry 中的条目指向本地文件（下次加载走本地更快）
-                        const entry = (window.skinRegistry[heroName] || []).find(s => s.name === skinName);
-                        if (entry) { entry.path = localPath; entry.remote = false; }
-                    }
-                } catch(e) {
-                    // 下载失败静默跳过（远程 URL 仍可用）
-                }
-            }
-        }
-        if (downloadedCount > 0) {
-            console.log('[SKIN] Downloaded', downloadedCount, 'remote skins to local disk');
-        }
+        console.log('[SKIN] Local binary caching skipped: write_binary_file not available in current exe');
+        return;
     }
 
     function getHeroSkinUrl(heroName, skinName) {
