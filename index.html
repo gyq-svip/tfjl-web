@@ -329,13 +329,13 @@
 
         .battle-field {
             display: flex;
-            justify-content: space-between;
+            justify-content: center;
             align-items: flex-start;
-            gap: 40px;
+            gap: 50px;
             margin: 2px auto;
             width: 100%;
             max-width: 920px;
-            padding: 0 30px;
+            padding: 0 10px;
             box-sizing: border-box;
         }
 
@@ -360,12 +360,14 @@
 
         .battle-column h4 {
             text-align: center;
+            margin-top: 0;
             margin-bottom: 6px;
             font-size: 0.9rem;
+            width: 100%;
         }
 
-        .user-column h4 { color: #4fc3f7; }
-        .teammate-column h4 { color: #ba68c8; }
+        .user-column h4 { color: #4fc3f7; text-align: left; align-self: flex-start; }
+        .teammate-column h4 { color: #ba68c8; text-align: right; align-self: flex-end; }
         
         .user-column {
             align-items: center;
@@ -16335,6 +16337,28 @@
             countEl.textContent = handCards.length + '/' + MAX_HAND_CARDS;
         }
 
+        // 远程皮肤注册表加载完成后，为已上阵/手牌刷新皮肤
+        async function refreshAllBattleSlotSkins() {
+            const slots = document.querySelectorAll('.battle-slot.filled');
+            const jobs = [];
+            slots.forEach(slot => {
+                const name = slot.querySelector('.card-name')?.textContent || '';
+                if (!name) return;
+                jobs.push((async () => {
+                    try { await applySkinBgToSlot(slot, name); } catch (e) {}
+                })());
+            });
+            await Promise.all(jobs);
+        }
+
+        window.reapplyAllSkins = async function() {
+            console.log('[SKIN] reapplyAllSkins start');
+            await refreshAllBattleSlotSkins();
+            updateHandDisplay('my');
+            updateHandDisplay('teammate');
+            console.log('[SKIN] reapplyAllSkins done');
+        };
+
         // 战斗槽拖拽经过
         function handleSlotDragOver(e) {
             e.preventDefault();
@@ -26530,7 +26554,7 @@ ${maSection}
         </style>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;pointer-events:none;z-index:999;opacity:0.5;">v260726-38</span>
+    <span id="versionTag" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;pointer-events:none;z-index:999;opacity:0.5;">v260726-39</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
