@@ -21832,6 +21832,8 @@ ${maSection}
                 if (!resp.ok) throw new Error('下载失败');
                 const content = await resp.text();
 
+                recordDownload(finalName); // 导入到老马也算一次下载
+
                 toast.textContent = '⏳ 正在保存到老马目录...';
 
                 if (window.saveScriptToMaDir) {
