@@ -506,15 +506,18 @@
             border: 2px solid rgba(255, 255, 255, 0.25);
             box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.3);
         }
-        /* 半透明遮罩，让文字可读；与 skin-layer 同 inset，避免遮住 profession 边框 */
+        /* 皮肤遮罩：只在上下文字条位置加微弱暗条，不盖住中间皮肤主体 */
         .battle-slot.skin-bg::after {
             content: '';
             position: absolute;
-            inset: 3px;
-            background: rgba(0, 0, 0, 0.25);
+            left: 3px;
+            right: 3px;
+            top: 3px;
+            height: 14px;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.45), transparent);
             z-index: 1;
             pointer-events: none;
-            border-radius: 5px;
+            border-radius: 5px 5px 0 0;
         }
         /* battle-slot 内的卡牌文字层统一透明，由 slot 背景或 skin-layer 提供底色 */
         .battle-slot .card-item {
@@ -524,7 +527,7 @@
             border-color: transparent !important;
             box-shadow: none !important;
             color: #fff;
-            text-shadow: 0 1px 3px rgba(0,0,0,0.9), 0 0 6px rgba(0,0,0,0.7);
+            text-shadow: none;
             height: 100%;
             width: 100%;
             padding: 0;
@@ -533,21 +536,38 @@
             justify-content: center;
             border-radius: 4px;
         }
-        /* 等级徽章半透明黑底，放在左下角不遮挡皮肤图片主体 */
+        /* 有皮肤时名字移到顶部小条里，不再居中挡住人物 */
+        .battle-slot.skin-bg .card-name {
+            position: absolute;
+            top: 2px;
+            left: 0;
+            right: 0;
+            z-index: 3;
+            font-size: 0.55rem;
+            line-height: 1.2;
+            text-align: center;
+            color: #fff;
+            background: rgba(0,0,0,0.35);
+            padding: 1px 0;
+            border-radius: 5px 5px 0 0;
+            pointer-events: none;
+        }
+        /* 等级徽章：更小、更透明、左下角 */
         .battle-slot .card-level-badge {
             position: absolute;
             bottom: 1px;
             left: 1px;
             z-index: 3;
-            background: rgba(0,0,0,0.65);
+            background: rgba(0,0,0,0.45);
             color: #ffd700;
-            font-size: 0.55rem;
-            padding: 0px 3px;
+            font-size: 0.45rem;
+            padding: 0px 2px;
+            border-radius: 3px;
             animation: none;
             background-size: auto;
         }
         .battle-slot .card-level-badge.has-skin {
-            background: rgba(0,0,0,0.65);
+            background: rgba(0,0,0,0.45);
         }
 
         .battle-slot.engineering-slot {
@@ -26412,7 +26432,7 @@ ${maSection}
         </style>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;pointer-events:none;z-index:999;opacity:0.5;">v250725-14</span>
+    <span id="versionTag" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;pointer-events:none;z-index:999;opacity:0.5;">v250725-15</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>

@@ -1,10 +1,10 @@
 // ============================================================
 // Service Worker v5 - 塔防助手 PWA 缓存策略
 // 策略：StaleWhileRevalidate（先用缓存秒开，后台静默更新）
-// v25: 战斗槽等级徽章移至左下角；新增远程皮肤同步（GitHub Pages 托管 registry.json + skins/）
+// v26: 有皮肤的战斗槽去掉中间黑遮罩，名字移顶部小条，等级徽章更小更透明
 // ============================================================
 
-const CACHE_VERSION = 'tfjl-v20';
+const CACHE_VERSION = 'tfjl-v21';
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
