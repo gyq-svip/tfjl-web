@@ -215,6 +215,21 @@
             <div class="side-panel">
                 <h2 id="fileName">-</h2>
                 <label>
+                    职业筛选
+                    <select id="professionFilter">
+                        <option value="">全部职业</option>
+                        <option value="战士">⚔️ 战士</option>
+                        <option value="法师">🔮 法师</option>
+                        <option value="射手">🏹 射手</option>
+                        <option value="召唤">🐉 召唤</option>
+                        <option value="牧师">💚 牧师</option>
+                        <option value="术士">🌑 术士</option>
+                        <option value="熊猫">🐼 熊猫</option>
+                        <option value="工程">⚙️ 工程</option>
+                        <option value="精灵">🔴 精灵</option>
+                    </select>
+                </label>
+                <label>
                     英雄
                     <select id="heroSelect"></select>
                 </label>
@@ -248,6 +263,30 @@
         const DEFAULT_REGISTRY_URL = 'https://gyq-svip.github.io/tfjl-web/skins/registry.json';
         const LOCAL_KEY = 'skinMatcher_progress_v1';
         const IMAGE_EXTS = /\.(png|jpe?g|gif|webp|bmp)$/i;
+
+        // 英雄→职业映射表
+        const HERO_PROFESSION = {
+            "天使": "牧师","圣骑": "牧师","死神": "牧师","酋长": "牧师","咕咕": "牧师","小野": "牧师",
+            "鲛女": "牧师","巫医": "牧师","小鹿":"牧师","大树":"牧师","猫咪":"牧师","萨满":"牧师",
+            "地精":"牧师","工匠":"牧师",
+            "鱼人":"战士","战将":"战士","刀客":"战士","霸王":"战士","亡将":"战士","铁骑":"战士",
+            "石头":"战士","神龛":"战士","刺客":"战士","钢鬃":"战士","恶匪":"战士","斧客":"战士",
+            "剑客":"战士","龙拳":"战士","狂将":"战士","孤星":"战士","领主":"战士","狂龙":"战士",
+            "电法":"法师","小丑":"法师","女王":"法师","沙皇":"法师","飞机":"法师","炎魔":"法师",
+            "火法":"法师","暗法":"法师","冰法":"法师","凤凰":"法师","火神":"法师","阿翼":"法师",
+            "龟相":"法师","谜云":"法师","雷神":"法师","女妖":"法师","冰鸟":"法师",
+            "蛇女":"射手","虎弓":"射手","后羿":"射手","海妖":"射手","骨弓":"射手",
+            "小炮":"射手","爱神":"射手","船长":"射手","毒王":"射手","炸弹":"射手",
+            "火枪":"射手","松鼠":"射手","绿弓":"射手","蜘蛛":"射手","冰弓":"射手",
+            "风灵":"熊猫","火灵":"熊猫","水灵":"熊猫","萌萌":"熊猫","土灵":"熊猫",
+            "射线":"工程","宝库":"工程","潜艇":"工程","火炮":"工程","咬人娃娃":"工程",
+            "影":"术士","魇":"术士","葵":"术士","傀":"术士","邪":"术士","大圣":"术士","闪":"术士",
+            "龙王":"召唤","钟馗":"召唤","悟空":"召唤","冰骑":"召唤","恶魔":"召唤",
+            "幽灵":"召唤","神龙":"召唤","骨龙":"召唤","祭司":"召唤",
+            "土精灵":"精灵","彩精灵":"精灵","魔精灵":"精灵","木精灵":"精灵",
+            "光精灵":"精灵","幻精灵":"精灵","雷精灵":"精灵","冰精灵":"精灵",
+            "暗精灵":"精灵","魂精灵":"精灵"
+        };
 
         let registry = { heroes: {} };
         let files = [];
@@ -289,13 +328,21 @@
 
         function populateHeroSelect() {
             const sel = $('heroSelect');
+            const filterProf = $('professionFilter').value;
             sel.innerHTML = '<option value="">-- 请选择英雄 --</option>';
             const heroes = Object.keys(registry.heroes).sort();
+            let count = 0;
             for (const h of heroes) {
+                // 职业筛选：非"全部"时只显示该职业的英雄
+                if (filterProf && HERO_PROFESSION[h] !== filterProf) continue;
                 const opt = document.createElement('option');
                 opt.value = h;
                 opt.textContent = `${h}（${registry.heroes[h].length}）`;
                 sel.appendChild(opt);
+                count++;
+            }
+            if (count === 0 && filterProf) {
+                sel.innerHTML = '<option value="">-- 该职业无英雄 --</option>';
             }
             updateSkinOptions();
         }
@@ -332,6 +379,17 @@
         });
 
         $('heroSelect').addEventListener('change', updateSkinOptions);
+
+        $('professionFilter').addEventListener('change', () => {
+            // 保存当前选择的英雄
+            const prevHero = $('heroSelect').value;
+            populateHeroSelect();
+            // 如果之前选的英雄还在列表中，恢复选择
+            if (prevHero && [...$('heroSelect').options].some(o => o.value === prevHero)) {
+                $('heroSelect').value = prevHero;
+                updateSkinOptions();
+            }
+        });
 
         $('imageInput').addEventListener('change', e => {
             const all = Array.from(e.target.files || []);
