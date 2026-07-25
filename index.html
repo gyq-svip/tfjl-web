@@ -9017,7 +9017,7 @@
         </div>
 
         <!-- APP本地功能脚本（网页版不会执行任何代码，isTauriApp判断在文件内部） -->
-        <script src="app-local.js?v=3"></script>
+        <script src="app-local.js?v=4"></script>
 
         <script>
         // ==================== Service Worker 注册（PWA缓存） ====================
@@ -15454,6 +15454,7 @@
             let skinUrl = window.resolveHeroSkinUrl 
                 ? await window.resolveHeroSkinUrl(heroName) 
                 : (window.getHeroSkinUrl && window.getHeroSkinUrl(heroName));
+            console.log('[SKIN] applySkinBgToSlot', heroName, 'url=', skinUrl ? skinUrl.substring(0, 80) : null);
             if (!skinUrl) return;
             slot.style.backgroundImage = `url("${skinUrl}")`;
             slot.style.backgroundSize = 'cover';
@@ -15480,7 +15481,9 @@
                 }
             }
 
-            teammatePlacedCards.forEach(card => {
+            // 恢复队友战斗槽
+            for (const card of teammatePlacedCards) {
+                const slot = document.querySelector(`.battle-slot[data-slot="${card.slot}"]`);
                 if (slot && !slot.classList.contains('filled')) {
                     const cardType = card.type || findCardTypeById(card.id);
                     const cardName = card.name || '';
@@ -15490,8 +15493,10 @@
                     slot.classList.remove('empty');
                     slot.dataset.cardId = card.id;
                     slot.dataset.profession = card.profession;
+                    // 应用皮肤背景（异步加载）
+                    await applySkinBgToSlot(slot, card.name);
                 }
-            });
+            }
         }
 
         function updateDeckLevelDisplay(handType, level) {
@@ -15812,7 +15817,10 @@
                 slot.classList.remove('empty');
                 slot.dataset.cardId = cardId;
                 slot.dataset.profession = profession;
-                
+
+                // 应用皮肤背景
+                await applySkinBgToSlot(slot, cardName);
+
                 // 更新放置卡牌数组
                 const placedArray = isUserSlot ? myPlacedCards : teammatePlacedCards;
                 if (!Array.isArray(placedArray)) {
@@ -15894,7 +15902,7 @@
         }
 
         // 手牌卡牌点击（上卡到战斗槽）
-        function handleHandCardClick(e, handType) {
+        async function handleHandCardClick(e, handType) {
             if (e.target.closest('.card-level-badge')) return;
             
             const cardEl = e.target.closest('.selected-card');
@@ -15949,8 +15957,10 @@
                     slot.classList.remove('empty');
                     slot.dataset.cardId = cardId;
                     slot.dataset.profession = profession;
+
+                    await applySkinBgToSlot(slot, cardName);
                 }
-                
+
                 // 手牌中的卡牌变暗，但不移除
                 cardEl.classList.add('placed');
                 
@@ -16079,7 +16089,7 @@
         }
 
         // 战斗槽放置
-        function handleSlotDrop(e) {
+        async function handleSlotDrop(e) {
             e.preventDefault();
             this.classList.remove('drag-over');
             
@@ -16154,7 +16164,9 @@
                 this.classList.remove('empty');
                 this.dataset.cardId = cardId;
                 this.dataset.profession = profession;
-                
+
+                await applySkinBgToSlot(this, cardName);
+
                 const placedArray = isUserSlot ? myPlacedCards : teammatePlacedCards;
                 if (!Array.isArray(placedArray)) {
                     if (isUserSlot) myPlacedCards = [];
@@ -16184,7 +16196,9 @@
                     this.classList.remove('empty');
                     this.dataset.cardId = cardId;
                     this.dataset.profession = prof;
-                    
+
+                    await applySkinBgToSlot(this, cardName);
+
                     const existingIndex = placedArray.findIndex(c => c.id === cardId);
                     if (existingIndex > -1) {
                         placedArray[existingIndex].slot = slotId;
@@ -16212,8 +16226,9 @@
             if (e.target.closest('.card-level-badge')) return;
             if (this.classList.contains('filled')) {
                 const slotId = this.dataset.slot;
-                const slotIndex = parseInt(slotId.replace('u', ''));
-                const card = myPlacedCards.find(c => c.slot === slotIndex);
+                const isUserSlot = slotId.startsWith('u');
+                const placedArray = isUserSlot ? myPlacedCards : teammatePlacedCards;
+                const card = placedArray.find(c => c.slot === slotId);
                 const heroName = card ? (card.name || '') : '';
                 // 如果有多个皮肤可选，右键切换皮肤
                 const skins = heroName && window.getHeroSkins ? window.getHeroSkins(heroName) : [];
