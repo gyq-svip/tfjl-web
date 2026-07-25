@@ -1895,11 +1895,13 @@ if (isTauriApp) {
         // 优先使用今日缓存（非强制刷新）
         if (!force) {
             const cache = loadStatsCache();
-            if (cache && cache.stats && cache.stats.length > 0) {
+            if (cache && cache.stats) {
                 saveScreenshotPersistStore(cache.stats); // 确保持久化包含今日数据
                 const merged = mergeScreenshotPersist(cache.stats);
-                renderScreenshotStats(merged);
-                return;
+                if (merged.length > 0) {
+                    renderScreenshotStats(merged);
+                    return;
+                }
             }
         }
 
@@ -1907,18 +1909,18 @@ if (isTauriApp) {
 
         try {
             const entries = await readDir(screenshotDir);
-            const dateDirs = entries.filter(e => !e.is_file);
+            const allDateDirs = entries.filter(e => !e.is_file);
+            const todayStr = getTodayStr();
 
-            if (dateDirs.length === 0) {
-                statsEl.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">未找到日期子文件夹</div>';
-                return;
-            }
+            // 只扫描今天的目录，历史数据从 localStorage 持久化存储读取
+            const todayDir = allDateDirs.find(e => e.name === todayStr);
 
             const stats = [];
             const imageExts = ['png', 'jpg', 'jpeg', 'bmp', 'webp'];
-            for (const dir of dateDirs) {
+
+            if (todayDir) {
                 try {
-                    const files = await readDir(dir.path);
+                    const files = await readDir(todayDir.path);
                     let count = 0;
                     for (const f of files) {
                         if (f.is_file) {
@@ -1926,22 +1928,22 @@ if (isTauriApp) {
                             if (imageExts.includes(ext)) count++;
                         }
                     }
-                    stats.push({ date: dir.name, count, path: dir.path });
+                    stats.push({ date: todayStr, count, path: todayDir.path });
                 } catch (e) {
-                    console.warn('统计目录失败:', dir.path, e);
+                    console.warn('统计今天目录失败:', todayDir.path, e);
                 }
             }
 
-            stats.sort((a, b) => b.date.localeCompare(a.date));
+            // 今天扫描的结果缓存 + 持久化累积
+            saveStatsCache(stats);
+            saveScreenshotPersistStore(stats);
+            const merged = mergeScreenshotPersist(stats);  // 合并历史数据
 
-            if (stats.length === 0) {
+            if (merged.length === 0) {
                 statsEl.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">未找到截图文件</div>';
                 return;
             }
 
-            saveStatsCache(stats);                         // 今日扫描缓存
-            saveScreenshotPersistStore(stats);             // 持久化累积
-            const merged = mergeScreenshotPersist(stats);  // 合并历史数据
             renderScreenshotStats(merged);
         } catch (e) {
             statsEl.innerHTML = '<div style="color:#f44336;text-align:center;padding:20px;font-size:0.85rem;">统计失败：' + e.message + '</div>';
