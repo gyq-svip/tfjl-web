@@ -2928,14 +2928,19 @@ if (isTauriApp) {
     }
 
     async function scanSkins() {
+        console.log('[SKIN] scanSkins() START');
         window.skinRegistry = {};
-        if (!softwareDataDir) return window.skinRegistry;
+        console.log('[SKIN] softwareDataDir:', softwareDataDir);
+        if (!softwareDataDir) { console.warn('[SKIN] No softwareDataDir, aborting scanSkins'); return window.skinRegistry; }
         const skinRoot = getSkinRootDir();
+        console.log('[SKIN] skinRoot:', skinRoot);
         const exists = await pathExists(skinRoot);
-        if (!exists) return window.skinRegistry;
+        console.log('[SKIN] skinRoot exists:', exists);
+        if (!exists) { console.warn('[SKIN] Skin root dir does not exist'); return window.skinRegistry; }
 
         const entries = await readDir(skinRoot);
-        if (!entries || !entries.length) return window.skinRegistry;
+        console.log('[SKIN] entries count:', entries ? entries.length : 0);
+        if (!entries || !entries.length) { console.warn('[SKIN] No entries in skin root'); return window.skinRegistry; }
 
         for (const heroEntry of entries) {
             // readDir 返回对象 {name, is_file, ...}，取 .name
@@ -2957,9 +2962,10 @@ if (isTauriApp) {
                     const assetUrl = convertFileSrc(filePath);
                     skins.push({ name: skinName, url: assetUrl || null, path: filePath, loaded: !!assetUrl });
                 }
-                if (skins.length > 0) window.skinRegistry[heroName] = skins;
-            } catch(e) { /* 跳过非目录项 */ }
+                if (skins.length > 0) { window.skinRegistry[heroName] = skins; console.log('[SKIN] Hero:', heroName, 'skins:', skins.map(s => s.name).join(',')); }
+            } catch(e) { console.warn('[SKIN] Error reading hero dir:', heroDir, e); }
         }
+        console.log('[SKIN] scanSkins() DONE, registry keys:', Object.keys(window.skinRegistry).join(',') || '(empty)');
         return window.skinRegistry;
     }
 
