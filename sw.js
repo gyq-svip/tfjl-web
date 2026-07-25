@@ -1,10 +1,10 @@
 // ============================================================
 // Service Worker v5 - 塔防助手 PWA 缓存策略
 // 策略：StaleWhileRevalidate（先用缓存秒开，后台静默更新）
-// v18: base64 转换改用 Blob+FileReader（修复 WebView2 中 fromCharCode.apply 兼容性问题）
+// v19: data: URL → blob: URL（修复 ?t= 缓存防破污染），控制台拖拽修复 + resize 把手增强
 // ============================================================
 
-const CACHE_VERSION = 'tfjl-v18';
+const CACHE_VERSION = 'tfjl-v19';
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
