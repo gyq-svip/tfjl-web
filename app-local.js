@@ -3218,14 +3218,21 @@ if (isTauriApp) {
         if (parsed.skinName && window.heroSkinSelections[baseHero] === undefined) {
             window.heroSkinSelections[baseHero] = parsed.skinName;
         }
-        // 优先级：显式传入 skinName > 用户手动选择 > 名称中嵌入的皮肤 > 第一个皮肤
+        // 优先级：显式传入 skinName > 用户手动选择 > 名称中嵌入的皮肤 > 默认皮肤（与英雄同名）
         const userSel = window.heroSkinSelections[baseHero];
-        const target = skinName || (userSel !== undefined && userSel !== '' ? userSel : null) || parsed.skinName;
+        let target = skinName || (userSel !== undefined && userSel !== '' ? userSel : null) || parsed.skinName;
+        // 如果用户没设置皮肤且名称中也没指定，使用默认皮肤（即皮肤名 = 英雄名的那个）
+        if (target === null || target === undefined || target === '') {
+            const defaultSkin = skins.find(s => s.name === baseHero) || skins.find(s => s.name === heroName);
+            if (defaultSkin) target = defaultSkin.name;
+            // 如果用户显式选了 ''（默认皮肤），仍然展示默认皮肤
+            if (userSel === '') target = (defaultSkin ? defaultSkin.name : (skins[0] ? skins[0].name : null));
+        }
         if (target === null || target === undefined || target === '') {
             return null;
         }
         const skin = skins.find(s => s.name === target);
-        const entry = skin || skins[0];
+        const entry = skin || skins.find(s => s.name === baseHero) || skins[0];
         if (!entry) return null;
         // 优先用 IndexedDB 缓存（毫秒级返回），否则走网络并回写
         if (entry.url) {
