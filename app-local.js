@@ -1930,54 +1930,35 @@ if (isTauriApp) {
             const todayStr = getTodayStr();
             const imageExts = ['png', 'jpg', 'jpeg', 'bmp', 'webp'];
 
-            // 检查持久化存储是否有历史数据
-            const persistMap = await loadScreenshotPersistStore();
-            const persistHasData = Object.keys(persistMap).length > 0;
-
+            // 始终扫描磁盘上实际存在的日期目录（游戏仅保留约7天，目录数极少、开销可忽略）。
+            // 这能修复「某天在首次全量扫描时缺失后永远补不回来」的问题：
+            // 只要该天的目录还在磁盘上，重新统计时就会被重新计入，周一~周日图表即可显示。
             let stats = [];
-
-            if (!persistHasData) {
-                // 首次使用/数据丢失：全量扫描所有目录，一次性填充持久化存储
-                for (const dir of allDateDirs) {
-                    try {
-                        const files = await readDir(dir.path);
-                        let count = 0;
-                        for (const f of files) {
-                            if (f.is_file) {
-                                const ext = f.name.split('.').pop().toLowerCase();
-                                if (imageExts.includes(ext)) count++;
-                            }
+            const scannedDates = new Set();
+            for (const dir of allDateDirs) {
+                const dname = normalizeDirDate(dir.name);
+                if (scannedDates.has(dname)) continue; // 跳过重复目录名
+                scannedDates.add(dname);
+                try {
+                    const files = await readDir(dir.path);
+                    let count = 0;
+                    for (const f of files) {
+                        if (f.is_file) {
+                            const ext = f.name.split('.').pop().toLowerCase();
+                            if (imageExts.includes(ext)) count++;
                         }
-                        stats.push({ date: normalizeDirDate(dir.name), count, path: dir.path });
-                    } catch (e) {
-                        console.warn('统计目录失败:', dir.path, e);
                     }
-                }
-                stats.sort((a, b) => b.date.localeCompare(a.date));
-            } else {
-                // 已有历史数据：只扫描今天，历史从 localStorage 读
-                const todayDir = allDateDirs.find(e => normalizeDirDate(e.name) === todayStr);
-                if (todayDir) {
-                    try {
-                        const files = await readDir(todayDir.path);
-                        let count = 0;
-                        for (const f of files) {
-                            if (f.is_file) {
-                                const ext = f.name.split('.').pop().toLowerCase();
-                                if (imageExts.includes(ext)) count++;
-                            }
-                        }
-                        stats.push({ date: todayStr, count, path: todayDir.path });
-                    } catch (e) {
-                        console.warn('统计今天目录失败:', todayDir.path, e);
-                    }
+                    stats.push({ date: dname, count, path: dir.path });
+                } catch (e) {
+                    console.warn('统计目录失败:', dir.path, e);
                 }
             }
+            stats.sort((a, b) => b.date.localeCompare(a.date));
 
-            // 扫描结果缓存 + 持久化累积
+            // 扫描结果缓存 + 持久化累积（Math.max 累加，长期保留历史）
             saveStatsCache(stats);
             await saveScreenshotPersistStore(stats);
-            const merged = await mergeScreenshotPersist(stats);  // 合并历史数据
+            const merged = await mergeScreenshotPersist(stats);  // 合并长期历史数据（超磁盘保留期的天数）
 
             if (merged.length === 0) {
                 statsEl.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">未找到截图文件</div>';
@@ -2029,9 +2010,14 @@ if (isTauriApp) {
         const formatLocalDate = (d) => {
             return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         };
-        // 建立日期→计数映射
+        // 建立日期→计数映射（同时兼容 MM-DD 旧格式，避免周X图表查不到）
         const dateMap = {};
-        stats.forEach(s => { dateMap[s.date] = s.count || 0; });
+        stats.forEach(s => {
+            dateMap[s.date] = s.count || 0;
+            if (/^\d{4}-\d{2}-\d{2}$/.test(s.date)) {
+                dateMap[s.date.slice(5)] = s.count || 0; // "07-21" 兜底
+            }
+        });
         // 计算每列对应的日期和计数
         const wdData = weekDayDow.map((dow, i) => {
             let daysBack = todayDow - dow;
