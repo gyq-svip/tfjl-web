@@ -2298,12 +2298,21 @@ if (isTauriApp) {
     }
 
     // ==================== 统计持久化存储（磁盘优先，不依赖浏览器） ====================
-    // 写入 {softwareDataDir}/tfjl_ScreenshotStats.json 和 tfjl_BattleStats.json
+    // 写入 {softwareDataDir}/stats/tfjl_ScreenshotStats.json 和 tfjl_BattleStats.json
     // 刷新/清缓存不丢数据；网页版回退 localStorage
 
     function _statsFileDir() {
         if (!softwareDataDir) return '';
-        return softwareDataDir.replace(/[\\/]+$/, '');
+        return softwareDataDir.replace(/[\\/]+$/, '') + '\\stats';
+    }
+
+    let _statsDirEnsured = false;
+    async function _ensureStatsDir() {
+        if (_statsDirEnsured || !isTauriApp) return;
+        const dir = _statsFileDir();
+        if (!dir) return;
+        try { await createDir(dir); _statsDirEnsured = true; }
+        catch (e) { console.warn('[统计] 创建 stats 目录失败:', e); }
     }
 
     async function _readStatsFile(filename) {
@@ -2323,6 +2332,7 @@ if (isTauriApp) {
 
     async function _writeStatsFile(filename, data) {
         if (!isTauriApp) return false;
+        await _ensureStatsDir();
         const dir = _statsFileDir();
         if (!dir) return false;
         const filePath = dir + '\\' + filename;
@@ -3153,19 +3163,104 @@ if (isTauriApp) {
         }
     }
 
-    // 后台下载远程皮肤到本地磁盘（Tauri 环境下，方便离线使用）
-    // ⚠️ 当前 exe 未提供 write_binary_file 命令，且 fs 插件 write_file 在部分环境不可用，
-    //    因此暂时禁用本地缓存，避免生成无法读取的 .png.b64 文件。远程 HTTPS URL 已足够显示皮肤。
+    // ==================== 皮肤磁盘缓存（APP 优先本地磁盘，网页版走 IndexedDB） ====================
+    // - APP: 下载 PNG → base64 文本写 {softwareDataDir}/data/skin/{英雄}/{皮肤}.png.b64
+    // - APP 读取: readTextFile → atob → Uint8Array → blob: URL（毫秒级）
+    // - 网页版: 走 IndexedDB（浏览器缓存）
+    // - 刷新/清缓存不丢；完全脱离浏览器缓存
+
+    function _skinDiskBase() {
+        if (!softwareDataDir) return '';
+        return softwareDataDir.replace(/[\\/]+$/, '') + '\\data\\skin';
+    }
+
+    // 已创建过目录的英雄集合（避免重复 createDir）
+    const _skinDiskDirsEnsured = new Set();
+    let _skinDiskBaseEnsured = false;
+    async function _ensureSkinDiskDir(heroName) {
+        if (!isTauriApp || !heroName) return;
+        // 先确保 data/skin 基础目录存在
+        if (!_skinDiskBaseEnsured) {
+            const base = _skinDiskBase();
+            try { await createDir(base); _skinDiskBaseEnsured = true; }
+            catch (e) { console.warn('[SKIN] 创建基础目录失败:', base, e); return; }
+        }
+        if (_skinDiskDirsEnsured.has(heroName)) return;
+        const dir = _skinDiskBase() + '\\' + heroName;
+        try { await createDir(dir); _skinDiskDirsEnsured.add(heroName); }
+        catch (e) { console.warn('[SKIN] 创建英雄目录失败:', dir, e); }
+    }
+
+    // blob / ArrayBuffer → base64 字符串（用于写磁盘文本文件）
+    function _blobToBase64(blob) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                const dataUrl = reader.result; // "data:image/png;base64,xxxxx"
+                const b64 = dataUrl.split(',')[1];
+                resolve(b64 || '');
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
+    }
+
+    // base64 字符串 → Uint8Array（用于创建 Blob URL）
+    function _base64ToBytes(b64) {
+        const binary = atob(b64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        return bytes;
+    }
+
+    // 从远程 URL 解析英雄名和皮肤文件名
+    function _parseSkinUrl(remoteUrl) {
+        const m = remoteUrl.match(/\/skins\/([^/]+)\/([^/]+)$/);
+        if (!m) return null;
+        return { hero: decodeURIComponent(m[1]), file: decodeURIComponent(m[2]) };
+    }
+
+    // 后台下载远程皮肤到本地磁盘（Tauri 环境下，写入 .png.b64 文本文件）
+    let _remoteSkinDownloadStarted = false;
     async function _downloadRemoteSkinsToLocal(heroes) {
-        console.log('[SKIN] Local binary caching skipped: write_binary_file not available in current exe');
-        return;
+        if (!isTauriApp || _remoteSkinDownloadStarted) return;
+        _remoteSkinDownloadStarted = true;
+        const base = _skinDiskBase();
+        if (!base) return;
+        let downloaded = 0, skipped = 0;
+        for (const [heroName, skinList] of Object.entries(heroes || {})) {
+            if (!Array.isArray(skinList) || !skinList.length) continue;
+            await _ensureSkinDiskDir(heroName);
+            for (const s of skinList) {
+                const file = s.file || (s.name + '.png');
+                const b64Path = base + '\\' + heroName + '\\' + file + '.b64';
+                // 已存在则跳过
+                try {
+                    const exists = await readTextFile(b64Path);
+                    if (exists && exists.length > 100) { skipped++; continue; }
+                } catch(e) { /* 不存在，继续下载 */ }
+                try {
+                    const url = REMOTE_SKIN_BASE + '/' + encodeURIComponent(heroName) + '/' + encodeURIComponent(file);
+                    const resp = await fetch(url);
+                    if (!resp.ok) continue;
+                    const blob = await resp.blob();
+                    const b64 = await _blobToBase64(blob);
+                    if (!b64) continue;
+                    await writeTextFile(b64Path, b64);
+                    downloaded++;
+                } catch(e) {
+                    console.warn('[SKIN] 下载皮肤失败:', heroName, file, e.message || e);
+                }
+                if (downloaded % 10 === 0) await new Promise(r => setTimeout(r, 10));
+            }
+        }
+        if (downloaded > 0 || skipped > 0) {
+            console.log('[SKIN] 磁盘缓存: 新下载', downloaded, '跳过', skipped);
+        }
     }
 
     // ============================================================
-    // IndexedDB 皮肤缓存（替代 Tauri 文件系统缓存，APP/网页通用）
-    // - 首次访问某皮肤 → 下载后存到 IndexedDB
-    // - 再次访问 → 直接从 IndexedDB 读取 blob URL（毫秒级）
-    // - 后台批量预热常用皮肤
+    // IndexedDB 皮肤缓存（网页版使用；APP 优先磁盘缓存）
     // ============================================================
     const SKIN_DB_NAME = 'tfjl-skin-cache';
     const SKIN_DB_VERSION = 1;
@@ -3209,24 +3304,60 @@ if (isTauriApp) {
             });
         } catch (e) { return false; }
     }
-    // 异步获取皮肤 blob URL，优先 IndexedDB 缓存；命中失败再走网络并回写缓存
+
+    // 获取皮肤 blob URL
+    // APP（Tauri）：优先读磁盘 .png.b64 文件（刷新不丢）；未命中则网络下载 → 写磁盘
+    // 网页版：优先 IndexedDB；未命中则网络下载 → 写 IndexedDB
     async function _getCachedSkinUrl(remoteUrl) {
         if (!remoteUrl) return null;
-        // 仅缓存远程 HTTP(S) URL；data:/blob: 不缓存
         if (!/^https?:\/\//i.test(remoteUrl)) return remoteUrl;
+
+        // === Tauri APP：磁盘优先 ===
+        if (isTauriApp) {
+            const parsed = _parseSkinUrl(remoteUrl);
+            if (parsed) {
+                const b64Path = _skinDiskBase() + '\\' + parsed.hero + '\\' + parsed.file + '.b64';
+                // 1. 尝试读磁盘缓存
+                try {
+                    const b64 = await readTextFile(b64Path);
+                    if (b64 && b64.length > 100) {
+                        const bytes = _base64ToBytes(b64);
+                        return URL.createObjectURL(new Blob([bytes], { type: 'image/png' }));
+                    }
+                } catch(e) { /* 磁盘无缓存 */ }
+                // 2. 网络下载 → 写磁盘
+                try {
+                    await _ensureSkinDiskDir(parsed.hero);
+                    const resp = await fetch(remoteUrl);
+                    if (!resp.ok) return remoteUrl;
+                    const blob = await resp.blob();
+                    const b64 = await _blobToBase64(blob);
+                    if (b64) { writeTextFile(b64Path, b64).catch(() => {}); /* 异步写，不等 */ }
+                    return URL.createObjectURL(blob);
+                } catch(e) {
+                    console.warn('[SKIN] 网络兜底失败:', remoteUrl, e.message || e);
+                    return remoteUrl;
+                }
+            }
+            // URL 解析失败，回退网络
+            try {
+                const resp = await fetch(remoteUrl);
+                if (!resp.ok) return remoteUrl;
+                return URL.createObjectURL(await resp.blob());
+            } catch(e) { return remoteUrl; }
+        }
+
+        // === 网页版：IndexedDB 优先 ===
         const key = 'skin:' + remoteUrl;
-        // 1. 命中 IndexedDB
         const cached = await _idbGet(key);
         if (cached && cached.blob) {
             try { return URL.createObjectURL(cached.blob); }
             catch (e) { console.warn('[SKIN] createObjectURL failed:', e); }
         }
-        // 2. 走网络下载
         try {
             const resp = await fetch(remoteUrl, { cache: 'force-cache' });
-            if (!resp.ok) return remoteUrl; // 失败回退直传 URL
+            if (!resp.ok) return remoteUrl;
             const blob = await resp.blob();
-            // 异步写缓存（不等）
             _idbPut(key, blob);
             return URL.createObjectURL(blob);
         } catch (e) {
@@ -3234,11 +3365,20 @@ if (isTauriApp) {
             return remoteUrl;
         }
     }
-    // 后台批量预热所有皮肤（首次打开慢一点，之后毫秒开）
+
+    // 后台批量预热所有皮肤
+    // APP（Tauri）：下载到本地磁盘 .b64（持久化，刷新不丢）
+    // 网页版：下载到 IndexedDB
     let _preheatStarted = false;
     async function _preheatSkins(heroes) {
         if (_preheatStarted) return;
         _preheatStarted = true;
+        if (isTauriApp) {
+            // Tauri: 磁盘缓存（一次性全量下载，后续秒开）
+            _downloadRemoteSkinsToLocal(heroes).catch(() => {});
+            return;
+        }
+        // 网页版: IndexedDB 预热
         let count = 0;
         for (const [heroName, skinList] of Object.entries(heroes || {})) {
             if (!Array.isArray(skinList)) continue;
@@ -3246,7 +3386,7 @@ if (isTauriApp) {
                 const url = REMOTE_SKIN_BASE + '/' + encodeURIComponent(heroName) + '/' + encodeURIComponent(s.file || (s.name + '.png'));
                 _getCachedSkinUrl(url).catch(() => {});
                 count++;
-                if (count % 20 === 0) await new Promise(r => setTimeout(r, 30)); // 让出主线程
+                if (count % 20 === 0) await new Promise(r => setTimeout(r, 30));
             }
         }
         console.log('[SKIN] Preheat queued:', count, 'skins');
