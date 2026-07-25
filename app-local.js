@@ -3084,6 +3084,8 @@ if (isTauriApp) {
 
             // 后台尝试下载远程皮肤到本地 data/skin 目录（仅 Tauri 环境）
             _downloadRemoteSkinsToLocal(registry.heroes);
+            // IndexedDB 预热（APP/网页通用，无需 Tauri 文件系统）
+            _preheatSkins(registry.heroes);
         } catch(e) {
             console.warn('[SKIN] syncRemoteSkins() failed:', String(e).slice(0, 200));
         }
@@ -3095,6 +3097,97 @@ if (isTauriApp) {
     async function _downloadRemoteSkinsToLocal(heroes) {
         console.log('[SKIN] Local binary caching skipped: write_binary_file not available in current exe');
         return;
+    }
+
+    // ============================================================
+    // IndexedDB 皮肤缓存（替代 Tauri 文件系统缓存，APP/网页通用）
+    // - 首次访问某皮肤 → 下载后存到 IndexedDB
+    // - 再次访问 → 直接从 IndexedDB 读取 blob URL（毫秒级）
+    // - 后台批量预热常用皮肤
+    // ============================================================
+    const SKIN_DB_NAME = 'tfjl-skin-cache';
+    const SKIN_DB_VERSION = 1;
+    const SKIN_STORE = 'skins';
+    let _skinDbPromise = null;
+    function _openSkinDb() {
+        if (_skinDbPromise) return _skinDbPromise;
+        _skinDbPromise = new Promise((resolve, reject) => {
+            if (!window.indexedDB) { reject('indexeddb unavailable'); return; }
+            const req = indexedDB.open(SKIN_DB_NAME, SKIN_DB_VERSION);
+            req.onupgradeneeded = () => {
+                const db = req.result;
+                if (!db.objectStoreNames.contains(SKIN_STORE)) {
+                    db.createObjectStore(SKIN_STORE, { keyPath: 'key' });
+                }
+            };
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+        });
+        return _skinDbPromise;
+    }
+    async function _idbGet(key) {
+        try {
+            const db = await _openSkinDb();
+            return await new Promise((resolve) => {
+                const tx = db.transaction(SKIN_STORE, 'readonly');
+                const req = tx.objectStore(SKIN_STORE).get(key);
+                req.onsuccess = () => resolve(req.result || null);
+                req.onerror = () => resolve(null);
+            });
+        } catch (e) { return null; }
+    }
+    async function _idbPut(key, blob) {
+        try {
+            const db = await _openSkinDb();
+            return await new Promise((resolve) => {
+                const tx = db.transaction(SKIN_STORE, 'readwrite');
+                tx.objectStore(SKIN_STORE).put({ key, blob, time: Date.now() });
+                tx.oncomplete = () => resolve(true);
+                tx.onerror = () => resolve(false);
+            });
+        } catch (e) { return false; }
+    }
+    // 异步获取皮肤 blob URL，优先 IndexedDB 缓存；命中失败再走网络并回写缓存
+    async function _getCachedSkinUrl(remoteUrl) {
+        if (!remoteUrl) return null;
+        // 仅缓存远程 HTTP(S) URL；data:/blob: 不缓存
+        if (!/^https?:\/\//i.test(remoteUrl)) return remoteUrl;
+        const key = 'skin:' + remoteUrl;
+        // 1. 命中 IndexedDB
+        const cached = await _idbGet(key);
+        if (cached && cached.blob) {
+            try { return URL.createObjectURL(cached.blob); }
+            catch (e) { console.warn('[SKIN] createObjectURL failed:', e); }
+        }
+        // 2. 走网络下载
+        try {
+            const resp = await fetch(remoteUrl, { cache: 'force-cache' });
+            if (!resp.ok) return remoteUrl; // 失败回退直传 URL
+            const blob = await resp.blob();
+            // 异步写缓存（不等）
+            _idbPut(key, blob);
+            return URL.createObjectURL(blob);
+        } catch (e) {
+            console.warn('[SKIN] fetch skin failed:', remoteUrl, e);
+            return remoteUrl;
+        }
+    }
+    // 后台批量预热所有皮肤（首次打开慢一点，之后毫秒开）
+    let _preheatStarted = false;
+    async function _preheatSkins(heroes) {
+        if (_preheatStarted) return;
+        _preheatStarted = true;
+        let count = 0;
+        for (const [heroName, skinList] of Object.entries(heroes || {})) {
+            if (!Array.isArray(skinList)) continue;
+            for (const s of skinList) {
+                const url = REMOTE_SKIN_BASE + '/' + encodeURIComponent(heroName) + '/' + encodeURIComponent(s.file || (s.name + '.png'));
+                _getCachedSkinUrl(url).catch(() => {});
+                count++;
+                if (count % 20 === 0) await new Promise(r => setTimeout(r, 30)); // 让出主线程
+            }
+        }
+        console.log('[SKIN] Preheat queued:', count, 'skins');
     }
 
     function getHeroSkinUrl(heroName, skinName) {
@@ -3134,10 +3227,18 @@ if (isTauriApp) {
         const skin = skins.find(s => s.name === target);
         const entry = skin || skins[0];
         if (!entry) return null;
-        if (entry.url) return { url: entry.url, name: entry.name, path: entry.path };
+        // 优先用 IndexedDB 缓存（毫秒级返回），否则走网络并回写
+        if (entry.url) {
+            const cachedUrl = await _getCachedSkinUrl(entry.url);
+            return { url: cachedUrl, name: entry.name, path: entry.path };
+        }
         const dataUrl = await getSkinImageUrl(entry.path);
-        if (dataUrl) { entry.url = dataUrl; entry.loaded = true; }
-        return dataUrl ? { url: dataUrl, name: entry.name, path: entry.path } : null;
+        if (dataUrl) {
+            entry.url = dataUrl; entry.loaded = true;
+            const cachedUrl = await _getCachedSkinUrl(dataUrl);
+            return { url: cachedUrl, name: entry.name, path: entry.path };
+        }
+        return null;
     }
 
     async function resolveHeroSkinUrl(heroName, skinName) {
