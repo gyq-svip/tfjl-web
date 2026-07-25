@@ -1892,6 +1892,21 @@ if (isTauriApp) {
             return;
         }
 
+        // 老马电脑的日期目录是 MM-DD，统一补齐为 YYYY-MM-DD 再参与统计
+        const normalizeDirDate = (dirName) => {
+            if (/^\d{4}-\d{2}-\d{2}$/.test(dirName)) return dirName;
+            const m = dirName.match(/^(\d{2})-(\d{2})$/);
+            if (!m) return dirName;
+            const now = new Date();
+            let year = now.getFullYear();
+            const candidate = new Date(year, parseInt(m[1], 10) - 1, parseInt(m[2], 10));
+            // 未来日期视为去年（跨年目录）
+            if (candidate > new Date(now.getFullYear(), now.getMonth(), now.getDate())) {
+                year--;
+            }
+            return `${year}-${m[1]}-${m[2]}`;
+        };
+
         // 优先使用今日缓存（非强制刷新，且缓存中有实际数据）
         if (!force) {
             const cache = loadStatsCache();
@@ -1931,7 +1946,7 @@ if (isTauriApp) {
                                 if (imageExts.includes(ext)) count++;
                             }
                         }
-                        stats.push({ date: dir.name, count, path: dir.path });
+                        stats.push({ date: normalizeDirDate(dir.name), count, path: dir.path });
                     } catch (e) {
                         console.warn('统计目录失败:', dir.path, e);
                     }
@@ -1939,7 +1954,7 @@ if (isTauriApp) {
                 stats.sort((a, b) => b.date.localeCompare(a.date));
             } else {
                 // 已有历史数据：只扫描今天，历史从 localStorage 读
-                const todayDir = allDateDirs.find(e => e.name === todayStr);
+                const todayDir = allDateDirs.find(e => normalizeDirDate(e.name) === todayStr);
                 if (todayDir) {
                     try {
                         const files = await readDir(todayDir.path);
@@ -2369,22 +2384,43 @@ if (isTauriApp) {
 
     async function loadScreenshotPersistStore() {
         // Tauri APP：优先读磁盘文件（刷新不丢）
+        let dailyMap = {};
         if (isTauriApp) {
             const diskData = await _readStatsFile(SCR_PERSIST_FILE);
-            if (diskData && diskData.dailyMap) return diskData.dailyMap;
+            if (diskData && diskData.dailyMap) dailyMap = diskData.dailyMap;
         }
         // 回退 localStorage（网页版 / 首次迁移前数据）
-        try {
-            const raw = localStorage.getItem(SCR_PERSIST_KEY);
-            if (!raw) return {};
-            const data = JSON.parse(raw);
-            const dailyMap = data.dailyMap || {};
-            // 迁移：localStorage 有数据但磁盘无文件 → 写入磁盘
-            if (isTauriApp && Object.keys(dailyMap).length > 0) {
-                _writeStatsFile(SCR_PERSIST_FILE, data).catch(() => {});
-            }
-            return dailyMap;
-        } catch (e) { return {}; }
+        if (Object.keys(dailyMap).length === 0) {
+            try {
+                const raw = localStorage.getItem(SCR_PERSIST_KEY);
+                if (raw) {
+                    const data = JSON.parse(raw);
+                    dailyMap = data.dailyMap || {};
+                }
+            } catch (e) {}
+        }
+
+        // 兼容旧数据：把 MM-DD 键统一补齐为 YYYY-MM-DD
+        const normalizeDateKey = (k) => {
+            if (/^\d{4}-\d{2}-\d{2}$/.test(k)) return k;
+            const m = k.match(/^(\d{2})-(\d{2})$/);
+            if (!m) return k;
+            const now = new Date();
+            let year = now.getFullYear();
+            const candidate = new Date(year, parseInt(m[1], 10) - 1, parseInt(m[2], 10));
+            if (candidate > new Date(now.getFullYear(), now.getMonth(), now.getDate())) year--;
+            return `${year}-${m[1]}-${m[2]}`;
+        };
+        const normalizedMap = {};
+        for (const [k, v] of Object.entries(dailyMap)) {
+            normalizedMap[normalizeDateKey(k)] = v;
+        }
+
+        // 迁移：localStorage 有数据但磁盘无文件 → 写入磁盘（并带上规范化后的键）
+        if (isTauriApp && Object.keys(normalizedMap).length > 0) {
+            _writeStatsFile(SCR_PERSIST_FILE, { dailyMap: normalizedMap, savedAt: Date.now() }).catch(() => {});
+        }
+        return normalizedMap;
     }
 
     async function saveScreenshotPersistStore(stats) {
