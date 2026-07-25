@@ -4,7 +4,7 @@
 // v26: 有皮肤的战斗槽去掉中间黑遮罩，名字移顶部小条，等级徽章更小更透明
 // ============================================================
 
-const CACHE_VERSION = 'tfjl-v21';
+const CACHE_VERSION = 'tfjl-v22';
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
