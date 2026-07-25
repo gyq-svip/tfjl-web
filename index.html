@@ -9017,7 +9017,7 @@
         </div>
 
         <!-- APP本地功能脚本（网页版不会执行任何代码，isTauriApp判断在文件内部） -->
-        <script src="app-local.js?v=9"></script>
+        <script src="app-local.js?v=10"></script>
 
         <script>
         // ==================== Service Worker 注册（PWA缓存） ====================
@@ -17878,7 +17878,11 @@
             
             document.addEventListener('contextmenu', (e) => {
                 const card = e.target.closest('.card-item');
+                console.log('[SKIN] global contextmenu target:', e.target.tagName, e.target.className, 'card-item:', card ? 'yes' : 'no', 'battle-slot:', card && card.closest('.battle-slot') ? 'yes' : 'no');
                 if (!card) return;
+                
+                // 战场槽内的 card-item 由 handleSlotRightClick 处理，不在这里处理
+                if (card.closest('.battle-slot')) { console.log('[SKIN] card-item inside battle-slot, skip global favorite handler'); return; }
                 
                 if (card.closest('#favoriteCardsGrid')) return;
                 
@@ -17888,6 +17892,7 @@
                 const section = grid.closest('.collapsible-section');
                 if (!section) return;
                 
+                console.log('[SKIN] global favorite right-click on', card.dataset.name);
                 handleCardRightClick(e, card);
             });
             
@@ -17944,8 +17949,20 @@
                 slot.addEventListener('dragleave', handleSlotDragLeave);
                 slot.addEventListener('drop', handleSlotDrop);
                 slot.addEventListener('click', handleSlotClick);
+                console.log('[SKIN] binding battle-slot contextmenu:', slot.dataset.slot);
                 slot.addEventListener('contextmenu', handleSlotRightClick);
             });
+
+            // 捕获阶段兜底：确保战场槽右键优先被处理，不被 card-item 全局事件干扰
+            document.addEventListener('contextmenu', (e) => {
+                const slot = e.target.closest('.battle-slot');
+                if (!slot) return;
+                // 只处理战场槽本身（不处理卡池/手牌中的 card-item，那些已被上方监听器排除）
+                console.log('[SKIN] capture battle-slot contextmenu on', slot.dataset.slot, 'filled:', slot.classList.contains('filled'));
+                e.preventDefault();
+                e.stopPropagation();
+                handleSlotRightClick.call(slot, e);
+            }, true);
 
             updateHandDisplay('my');
             updateHandDisplay('teammate');
@@ -17973,6 +17990,23 @@
 
             // 根据保存的偏好控制特效开关
             updateEffectsVisibility();
+
+            // 重新扫描皮肤目录，让日志在浮动控制台可见（app-local.js 初始化时控制台捕获器尚未启动）
+            setTimeout(async () => {
+                if (window.scanSkins) {
+                    console.log('[SKIN] Re-scanning skins from DOMContentLoaded...');
+                    try {
+                        await window.scanSkins();
+                        const keys = window.skinRegistry ? Object.keys(window.skinRegistry) : [];
+                        console.log('[SKIN] Re-scan complete, registry keys:', keys.join(',') || '(empty)');
+                        console.log('[SKIN] heroSkinSelections:', JSON.stringify(window.heroSkinSelections || {}));
+                    } catch (err) {
+                        console.error('[SKIN] Re-scan skins error:', err);
+                    }
+                } else {
+                    console.warn('[SKIN] window.scanSkins not available');
+                }
+            }, 500);
         });
         
         // ==================== 配置管理 ====================
