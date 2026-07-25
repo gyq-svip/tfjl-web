@@ -506,19 +506,7 @@
             border: 2px solid rgba(255, 255, 255, 0.25);
             box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.3);
         }
-        /* 皮肤遮罩：只在上下文字条位置加微弱暗条，不盖住中间皮肤主体 */
-        .battle-slot.skin-bg::after {
-            content: '';
-            position: absolute;
-            left: 3px;
-            right: 3px;
-            top: 3px;
-            height: 14px;
-            background: linear-gradient(to bottom, rgba(0,0,0,0.45), transparent);
-            z-index: 1;
-            pointer-events: none;
-            border-radius: 5px 5px 0 0;
-        }
+        /* 皮肤槽不再加任何顶部暗条/遮罩，让皮肤完全露出 */
         /* battle-slot 内的卡牌文字层统一透明，由 slot 背景或 skin-layer 提供底色 */
         .battle-slot .card-item {
             position: relative;
@@ -536,7 +524,7 @@
             justify-content: center;
             border-radius: 4px;
         }
-        /* 有皮肤时名字移到顶部小条里，不再居中挡住人物 */
+        /* 有皮肤时名字只保留在顶部，无任何背景条/阴影，最大程度露出皮肤 */
         .battle-slot.skin-bg .card-name {
             position: absolute;
             top: 2px;
@@ -547,10 +535,11 @@
             line-height: 1.2;
             text-align: center;
             color: #fff;
-            background: rgba(0,0,0,0.35);
-            padding: 1px 0;
-            border-radius: 5px 5px 0 0;
+            background: transparent;
+            padding: 0;
+            text-shadow: none;
             pointer-events: none;
+            font-weight: 600;
         }
         /* 等级徽章：更小、更透明、左下角 */
         .battle-slot .card-level-badge {
@@ -26432,7 +26421,7 @@ ${maSection}
         </style>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;pointer-events:none;z-index:999;opacity:0.5;">v250725-16</span>
+    <span id="versionTag" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;pointer-events:none;z-index:999;opacity:0.5;">v250725-17</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>

@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>皮肤截图批量匹配工具</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            line-height: 1.5;
+        }
+        h1 { font-size: 1.3rem; margin: 16px 20px 8px; color: #ffd700; }
+        h2 { font-size: 1rem; margin: 0 0 10px; word-break: break-all; }
+        .panel {
+            background: #16213e;
+            border-radius: 10px;
+            padding: 14px 16px;
+            margin: 10px 20px;
+        }
+        .panel h3 { margin: 0 0 10px; font-size: 0.95rem; color: #4cc9f0; }
+        .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 10px; }
+        .row:last-child { margin-bottom: 0; }
+        label { font-size: 0.85rem; color: #aaa; }
+        input[type="text"], select, textarea {
+            background: #0f3460;
+            color: #fff;
+            border: 1px solid #2a4d7c;
+            border-radius: 6px;
+            padding: 6px 8px;
+            font-size: 0.9rem;
+        }
+        input[type="file"] { color: #ddd; font-size: 0.85rem; max-width: 320px; }
+        button {
+            background: #4361ee;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            padding: 8px 14px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+        button:hover { background: #3a56d4; }
+        button.secondary { background: #6c757d; }
+        button.secondary:hover { background: #5a6268; }
+        button.primary { background: #f72585; }
+        button.primary:hover { background: #d91a6d; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .hint { font-size: 0.8rem; color: #999; margin-top: 4px; }
+        .error { color: #ff6b6b; font-size: 0.85rem; }
+        .success { color: #51cf66; font-size: 0.85rem; }
+
+        #workspace { display: none; }
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 20px;
+            background: #16213e;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        .viewer {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            padding: 14px 20px;
+        }
+        .preview-wrap {
+            flex: 1 1 320px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #0f1020;
+            border-radius: 10px;
+            min-height: 320px;
+            overflow: hidden;
+            border: 2px solid #2a2a4a;
+        }
+        .preview-wrap img {
+            max-width: 100%;
+            max-height: 70vh;
+            object-fit: contain;
+        }
+        .side-panel {
+            flex: 0 0 300px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .side-panel label { display: flex; flex-direction: column; gap: 4px; }
+        .side-panel select, .side-panel input[type="text"] { width: 100%; }
+        .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+        .actions button { flex: 1 1 auto; }
+        .exports { margin-top: 8px; display: flex; flex-direction: column; gap: 8px; }
+        .exports button { width: 100%; }
+
+        #thumbnails {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+            gap: 6px;
+            padding: 12px 20px 30px;
+            max-height: 220px;
+            overflow-y: auto;
+        }
+        .thumb {
+            position: relative;
+            aspect-ratio: 1;
+            background: #0f1020;
+            border: 2px solid #2a2a4a;
+            border-radius: 6px;
+            overflow: hidden;
+            cursor: pointer;
+            opacity: 0.7;
+        }
+        .thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .thumb.current { border-color: #4cc9f0; opacity: 1; }
+        .thumb.mapped { border-color: #51cf66; opacity: 1; }
+        .thumb.skipped { border-color: #ff6b6b; opacity: 1; }
+        .thumb .idx {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            background: rgba(0,0,0,0.6);
+            color: #fff;
+            font-size: 0.6rem;
+            padding: 1px 3px;
+            border-radius: 3px;
+        }
+
+        .path-inputs { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+        .path-inputs input { width: 100%; }
+
+        @media (max-width: 720px) {
+            .side-panel { flex: 1 1 100%; }
+            .preview-wrap { min-height: 240px; }
+        }
+    </style>
+</head>
+<body>
+    <h1>皮肤截图批量匹配工具</h1>
+
+    <div id="setupPanel">
+        <div class="panel">
+            <h3>① 加载皮肤注册表（registry.json）</h3>
+            <div class="row">
+                <button id="fetchRegistryBtn">从线上拉取默认 registry</button>
+                <span class="hint">来源：https://gyq-svip.github.io/tfjl-web/skins/registry.json</span>
+            </div>
+            <div class="row">
+                <label>或粘贴 JSON：</label>
+            </div>
+            <textarea id="registryJson" rows="6" style="width:100%; font-family: monospace;" placeholder='{"version":1,"heroes":{"女王":[{"name":"任盈盈","file":"任盈盈.jpg"}]}}'></textarea>
+            <div class="row">
+                <button id="parseRegistryBtn" class="secondary">解析粘贴的 JSON</button>
+                <span id="registryStatus" class="hint"></span>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h3>② 选择截图文件夹</h3>
+            <div class="row">
+                <input type="file" id="imageInput" webkitdirectory directory multiple accept="image/*">
+            </div>
+            <div class="hint">截图请按数字命名（如 1.png、2.png …），工具会按数字排序。</div>
+        </div>
+
+        <div class="panel">
+            <h3>③ 继续上次的进度（可选）</h3>
+            <div class="row">
+                <input type="file" id="mappingInput" accept=".json">
+                <button id="loadMappingBtn" class="secondary">导入映射 JSON</button>
+            </div>
+            <div class="hint">自动保存到浏览器本地，换浏览器/清缓存需手动导入。</div>
+        </div>
+
+        <div class="panel">
+            <h3>④ 设置重命名输出路径</h3>
+            <div class="path-inputs">
+                <label>截图所在文件夹（PowerShell 路径，如 C:\screenshots）</label>
+                <input type="text" id="sourceDir" placeholder="C:\screenshots">
+                <label>输出到（会按 skins\英雄名 自动建子目录）</label>
+                <input type="text" id="outputDir" placeholder="C:\output\skins">
+            </div>
+        </div>
+
+        <div class="row" style="margin: 0 20px;">
+            <button id="startBtn" class="primary" disabled>开始匹配</button>
+            <span id="startHint" class="hint">请先加载注册表和截图文件夹</span>
+        </div>
+    </div>
+
+    <div id="workspace">
+        <div class="topbar">
+            <span id="progressText">0 / 0</span>
+            <span id="statusText"></span>
+        </div>
+        <div class="viewer">
+            <div class="preview-wrap">
+                <img id="preview" src="" alt="预览">
+            </div>
+            <div class="side-panel">
+                <h2 id="fileName">-</h2>
+                <label>
+                    英雄
+                    <select id="heroSelect"></select>
+                </label>
+                <label>
+                    皮肤
+                    <select id="skinSelect"></select>
+                </label>
+                <label>
+                    自定义文件名（可选，留空用皮肤名）
+                    <input type="text" id="customName" placeholder="例如：任盈盈_冰雪">
+                </label>
+
+                <div class="actions">
+                    <button id="prevBtn">上一张 (←)</button>
+                    <button id="skipBtn" class="secondary">跳过 (Del)</button>
+                    <button id="saveBtn" class="primary">保存并下一张 (Enter)</button>
+                    <button id="nextBtn">下一张 (→)</button>
+                </div>
+
+                <div class="exports">
+                    <button id="exportJsonBtn" class="secondary">导出映射 JSON</button>
+                    <button id="exportPsBtn" class="secondary">导出 PowerShell 重命名脚本</button>
+                    <button id="clearProgressBtn" class="secondary">清除本地进度</button>
+                </div>
+            </div>
+        </div>
+        <div id="thumbnails"></div>
+    </div>
+
+    <script>
+        const DEFAULT_REGISTRY_URL = 'https://gyq-svip.github.io/tfjl-web/skins/registry.json';
+        const LOCAL_KEY = 'skinMatcher_progress_v1';
+        const IMAGE_EXTS = /\.(png|jpe?g|gif|webp|bmp)$/i;
+
+        let registry = { heroes: {} };
+        let files = [];
+        let mappings = [];
+        let currentIdx = 0;
+        let previewUrl = null;
+
+        const $ = id => document.getElementById(id);
+
+        // 自然排序：先按前导数字，再按字符串
+        function naturalCompare(a, b) {
+            const na = parseInt(a.name.match(/^\d+/)?.[0] || '0', 10);
+            const nb = parseInt(b.name.match(/^\d+/)?.[0] || '0', 10);
+            if (na !== nb) return na - nb;
+            return a.name.localeCompare(b.name, undefined, { numeric: true });
+        }
+
+        function setStatus(el, text, isError) {
+            el.textContent = text;
+            el.className = isError ? 'error' : 'success';
+        }
+
+        function parseRegistryJson(text) {
+            try {
+                const data = JSON.parse(text);
+                if (!data || typeof data !== 'object' || !data.heroes || typeof data.heroes !== 'object') {
+                    throw new Error('JSON 格式不对：缺少 heroes 字段');
+                }
+                registry = data;
+                populateHeroSelect();
+                setStatus($('registryStatus'), `已解析：${Object.keys(registry.heroes).length} 位英雄`, false);
+                checkStartReady();
+                return true;
+            } catch (e) {
+                setStatus($('registryStatus'), '解析失败：' + e.message, true);
+                return false;
+            }
+        }
+
+        function populateHeroSelect() {
+            const sel = $('heroSelect');
+            sel.innerHTML = '<option value="">-- 请选择英雄 --</option>';
+            const heroes = Object.keys(registry.heroes).sort();
+            for (const h of heroes) {
+                const opt = document.createElement('option');
+                opt.value = h;
+                opt.textContent = `${h}（${registry.heroes[h].length}）`;
+                sel.appendChild(opt);
+            }
+            updateSkinOptions();
+        }
+
+        function updateSkinOptions() {
+            const hero = $('heroSelect').value;
+            const sel = $('skinSelect');
+            sel.innerHTML = '<option value="">-- 请选择皮肤 --</option>';
+            if (!hero || !registry.heroes[hero]) return;
+            const skins = registry.heroes[hero];
+            for (const s of skins) {
+                const opt = document.createElement('option');
+                opt.value = s.name;
+                opt.textContent = s.name;
+                sel.appendChild(opt);
+            }
+        }
+
+        $('fetchRegistryBtn').addEventListener('click', async () => {
+            setStatus($('registryStatus'), '正在拉取…', false);
+            try {
+                const resp = await fetch(DEFAULT_REGISTRY_URL, { cache: 'no-cache' });
+                if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                const text = await resp.text();
+                $('registryJson').value = text;
+                parseRegistryJson(text);
+            } catch (e) {
+                setStatus($('registryStatus'), '拉取失败：' + e.message, true);
+            }
+        });
+
+        $('parseRegistryBtn').addEventListener('click', () => {
+            parseRegistryJson($('registryJson').value.trim());
+        });
+
+        $('heroSelect').addEventListener('change', updateSkinOptions);
+
+        $('imageInput').addEventListener('change', e => {
+            const all = Array.from(e.target.files || []);
+            files = all.filter(f => IMAGE_EXTS.test(f.name)).sort(naturalCompare);
+            mappings = files.map(() => null);
+            $('startHint').textContent = `已选择 ${files.length} 张图片`;
+            checkStartReady();
+        });
+
+        function checkStartReady() {
+            const ready = Object.keys(registry.heroes).length > 0 && files.length > 0;
+            $('startBtn').disabled = !ready;
+            if (ready) {
+                $('startHint').textContent = `注册表 + ${files.length} 张图片已就绪，点击开始匹配`;
+            }
+        }
+
+        $('startBtn').addEventListener('click', () => {
+            // 尝试恢复本地进度
+            loadLocalProgress();
+            $('setupPanel').style.display = 'none';
+            $('workspace').style.display = 'block';
+            renderThumbnails();
+            goTo(0);
+        });
+
+        function loadLocalProgress() {
+            try {
+                const raw = localStorage.getItem(LOCAL_KEY);
+                if (!raw) return;
+                const saved = JSON.parse(raw);
+                if (!saved || !Array.isArray(saved.mappings) || !Array.isArray(saved.filesMeta)) return;
+                // 按当前文件顺序匹配
+                const mapByName = new Map();
+                saved.filesMeta.forEach((name, i) => {
+                    mapByName.set(name, saved.mappings[i]);
+                });
+                mappings = files.map(f => mapByName.get(f.name) || null);
+                if (saved.sourceDir) $('sourceDir').value = saved.sourceDir;
+                if (saved.outputDir) $('outputDir').value = saved.outputDir;
+            } catch (e) {
+                console.warn('恢复本地进度失败', e);
+            }
+        }
+
+        function saveLocalProgress() {
+            try {
+                const payload = {
+                    registry,
+                    filesMeta: files.map(f => f.name),
+                    mappings,
+                    currentIdx,
+                    sourceDir: $('sourceDir').value.trim(),
+                    outputDir: $('outputDir').value.trim(),
+                    timestamp: new Date().toISOString()
+                };
+                localStorage.setItem(LOCAL_KEY, JSON.stringify(payload));
+            } catch (e) {
+                console.warn('保存本地进度失败', e);
+            }
+        }
+
+        function goTo(idx) {
+            if (idx < 0) idx = 0;
+            if (idx >= files.length) idx = files.length - 1;
+            currentIdx = idx;
+            renderCurrent();
+            updateThumbHighlight();
+            saveLocalProgress();
+        }
+
+        function renderCurrent() {
+            const f = files[currentIdx];
+            if (!f) return;
+            if (previewUrl) URL.revokeObjectURL(previewUrl);
+            previewUrl = URL.createObjectURL(f);
+            $('preview').src = previewUrl;
+            $('fileName').textContent = f.name;
+            $('progressText').textContent = `${currentIdx + 1} / ${files.length}`;
+
+            const m = mappings[currentIdx];
+            if (m && !m.skipped) {
+                $('heroSelect').value = m.hero || '';
+                updateSkinOptions();
+                $('skinSelect').value = m.skin || '';
+                $('customName').value = m.custom || '';
+            } else {
+                $('heroSelect').value = '';
+                updateSkinOptions();
+                $('skinSelect').value = '';
+                $('customName').value = '';
+            }
+
+            const status = m?.skipped ? '已跳过' : (m ? `已映射：${m.hero} / ${m.skin}` : '未匹配');
+            $('statusText').textContent = status;
+        }
+
+        function renderThumbnails() {
+            const box = $('thumbnails');
+            box.innerHTML = '';
+            files.forEach((f, i) => {
+                const div = document.createElement('div');
+                div.className = 'thumb';
+                div.dataset.idx = i;
+                const img = document.createElement('img');
+                img.src = URL.createObjectURL(f);
+                div.appendChild(img);
+                const badge = document.createElement('span');
+                badge.className = 'idx';
+                badge.textContent = i + 1;
+                div.appendChild(badge);
+                div.addEventListener('click', () => goTo(i));
+                box.appendChild(div);
+            });
+        }
+
+        function updateThumbHighlight() {
+            const thumbs = document.querySelectorAll('.thumb');
+            thumbs.forEach(t => {
+                const i = parseInt(t.dataset.idx, 10);
+                t.classList.remove('current', 'mapped', 'skipped');
+                if (i === currentIdx) t.classList.add('current');
+                const m = mappings[i];
+                if (m) {
+                    t.classList.add(m.skipped ? 'skipped' : 'mapped');
+                }
+            });
+        }
+
+        function saveAndNext() {
+            const hero = $('heroSelect').value;
+            const skin = $('skinSelect').value;
+            if (!hero || !skin) {
+                $('statusText').textContent = '请先选择英雄和皮肤';
+                return;
+            }
+            mappings[currentIdx] = {
+                hero,
+                skin,
+                custom: $('customName').value.trim()
+            };
+            updateThumbHighlight();
+            saveLocalProgress();
+            if (currentIdx < files.length - 1) {
+                goTo(currentIdx + 1);
+            } else {
+                $('statusText').textContent = '最后一张已保存';
+            }
+        }
+
+        function skipAndNext() {
+            mappings[currentIdx] = { skipped: true };
+            updateThumbHighlight();
+            saveLocalProgress();
+            if (currentIdx < files.length - 1) {
+                goTo(currentIdx + 1);
+            } else {
+                $('statusText').textContent = '最后一张已跳过';
+            }
+        }
+
+        $('saveBtn').addEventListener('click', saveAndNext);
+        $('skipBtn').addEventListener('click', skipAndNext);
+        $('prevBtn').addEventListener('click', () => goTo(currentIdx - 1));
+        $('nextBtn').addEventListener('click', () => goTo(currentIdx + 1));
+
+        document.addEventListener('keydown', e => {
+            if ($('workspace').style.display === 'none') return;
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+            if (e.key === 'ArrowRight') { e.preventDefault(); goTo(currentIdx + 1); }
+            else if (e.key === 'ArrowLeft') { e.preventDefault(); goTo(currentIdx - 1); }
+            else if (e.key === 'Enter') { e.preventDefault(); saveAndNext(); }
+            else if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); skipAndNext(); }
+        });
+
+        // 导入映射 JSON
+        $('loadMappingBtn').addEventListener('click', () => {
+            const input = $('mappingInput');
+            if (!input.files || !input.files[0]) return;
+            const reader = new FileReader();
+            reader.onload = ev => {
+                try {
+                    const data = JSON.parse(ev.target.result);
+                    if (!data.mappings || !Array.isArray(data.mappings)) throw new Error('缺少 mappings 数组');
+                    const mapByName = new Map();
+                    (data.filesMeta || []).forEach((name, i) => {
+                        mapByName.set(name, data.mappings[i]);
+                    });
+                    mappings = files.map(f => mapByName.get(f.name) || null);
+                    if (data.sourceDir) $('sourceDir').value = data.sourceDir;
+                    if (data.outputDir) $('outputDir').value = data.outputDir;
+                    saveLocalProgress();
+                    renderThumbnails();
+                    updateThumbHighlight();
+                    if ($('workspace').style.display !== 'none') renderCurrent();
+                    setStatus($('startHint'), '已导入映射', false);
+                } catch (e) {
+                    setStatus($('startHint'), '导入失败：' + e.message, true);
+                }
+            };
+            reader.readAsText(input.files[0]);
+        });
+
+        function downloadBlob(content, filename, type) {
+            const blob = new Blob([content], { type });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 100);
+        }
+
+        $('exportJsonBtn').addEventListener('click', () => {
+            const data = {
+                version: 1,
+                createdAt: new Date().toISOString(),
+                sourceDir: $('sourceDir').value.trim(),
+                outputDir: $('outputDir').value.trim(),
+                filesMeta: files.map(f => f.name),
+                mappings
+            };
+            downloadBlob(JSON.stringify(data, null, 2), 'skin-mapping.json', 'application/json');
+        });
+
+        function getFileExt(name) {
+            const m = name.match(/\.[^.]+$/);
+            return m ? m[0] : '.png';
+        }
+
+        function safeFileName(name) {
+            return name.replace(/[\\/:*?"<>|]/g, '_');
+        }
+
+        $('exportPsBtn').addEventListener('click', () => {
+            const src = $('sourceDir').value.trim() || 'C:\\screenshots';
+            const dst = $('outputDir').value.trim() || 'C:\\output\\skins';
+            const lines = [
+                '# 皮肤截图批量重命名脚本',
+                '# 生成时间：' + new Date().toLocaleString(),
+                `$sourceDir = "${src.replace(/"/g, '\\"')}"`,
+                `$outputDir = "${dst.replace(/"/g, '\\"')}"`,
+                'New-Item -ItemType Directory -Force -Path $outputDir | Out-Null',
+                ''
+            ];
+            let moved = 0;
+            for (let i = 0; i < files.length; i++) {
+                const m = mappings[i];
+                if (!m || m.skipped) continue;
+                const srcName = files[i].name;
+                const ext = getFileExt(srcName);
+                const heroDir = safeFileName(m.hero);
+                const skinName = safeFileName(m.custom || m.skin);
+                const targetName = `${skinName}${ext}`;
+                lines.push(`# ${srcName} -> ${heroDir}/${targetName}`);
+                lines.push(`New-Item -ItemType Directory -Force -Path (Join-Path $outputDir "${heroDir}") | Out-Null`);
+                lines.push(`Move-Item -Path (Join-Path $sourceDir "${srcName}") -Destination (Join-Path (Join-Path $outputDir "${heroDir}") "${targetName}") -ErrorAction SilentlyContinue`);
+                lines.push('');
+                moved++;
+            }
+            lines.push(`Write-Host "完成：共处理 ${moved} 张图片"`);
+            downloadBlob(lines.join("\r\n"), 'rename-skins.ps1', 'text/plain');
+        });
+
+        $('clearProgressBtn').addEventListener('click', () => {
+            if (!confirm('确定清除本地保存的进度？（已导出的 JSON 不受影响）')) return;
+            localStorage.removeItem(LOCAL_KEY);
+            mappings = files.map(() => null);
+            renderThumbnails();
+            renderCurrent();
+        });
+
+        // 页面关闭前保存
+        window.addEventListener('beforeunload', saveLocalProgress);
+    </script>
+</body>
+</html>

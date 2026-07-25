@@ -1,10 +1,10 @@
 // ============================================================
 // Service Worker v5 - 塔防助手 PWA 缓存策略
 // 策略：StaleWhileRevalidate（先用缓存秒开，后台静默更新）
-// v26: 有皮肤的战斗槽去掉中间黑遮罩，名字移顶部小条，等级徽章更小更透明
+// v27: 有皮肤的战斗槽名字去掉背景条/阴影，只留顶部纯文字
 // ============================================================
 
-const CACHE_VERSION = 'tfjl-v22';
+const CACHE_VERSION = 'tfjl-v23';
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
