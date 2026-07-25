@@ -9017,7 +9017,7 @@
         </div>
 
         <!-- APP本地功能脚本（网页版不会执行任何代码，isTauriApp判断在文件内部） -->
-        <script src="app-local.js?v=4"></script>
+        <script src="app-local.js?v=5"></script>
 
         <script>
         // ==================== Service Worker 注册（PWA缓存） ====================
@@ -15476,8 +15476,8 @@
                     slot.classList.remove('empty');
                     slot.dataset.cardId = card.id;
                     slot.dataset.profession = card.profession;
-                    // 应用皮肤背景（异步加载）
-                    await applySkinBgToSlot(slot, card.name);
+                    // 应用皮肤背景（异步加载，错误不中断）
+                    try { await applySkinBgToSlot(slot, card.name); } catch (e) {}
                 }
             }
 
@@ -15493,8 +15493,8 @@
                     slot.classList.remove('empty');
                     slot.dataset.cardId = card.id;
                     slot.dataset.profession = card.profession;
-                    // 应用皮肤背景（异步加载）
-                    await applySkinBgToSlot(slot, card.name);
+                    // 应用皮肤背景（异步加载，错误不中断）
+                    try { await applySkinBgToSlot(slot, card.name); } catch (e) {}
                 }
             }
         }
@@ -15751,7 +15751,7 @@
             slot.addEventListener('dragover', (e) => {
                 e.preventDefault();
             });
-            slot.addEventListener('drop', (e) => {
+            slot.addEventListener('drop', async (e) => {
                 e.preventDefault();
                 const source = e.dataTransfer.getData('text/source');
                 if (source !== 'favorite') return;
@@ -15819,7 +15819,7 @@
                 slot.dataset.profession = profession;
 
                 // 应用皮肤背景
-                await applySkinBgToSlot(slot, cardName);
+                try { await applySkinBgToSlot(slot, cardName); } catch (e) {}
 
                 // 更新放置卡牌数组
                 const placedArray = isUserSlot ? myPlacedCards : teammatePlacedCards;
@@ -15958,7 +15958,7 @@
                     slot.dataset.cardId = cardId;
                     slot.dataset.profession = profession;
 
-                    await applySkinBgToSlot(slot, cardName);
+                    try { await applySkinBgToSlot(slot, cardName); } catch (e) {}
                 }
 
                 // 手牌中的卡牌变暗，但不移除
@@ -16165,7 +16165,7 @@
                 this.dataset.cardId = cardId;
                 this.dataset.profession = profession;
 
-                await applySkinBgToSlot(this, cardName);
+                try { await applySkinBgToSlot(this, cardName); } catch (e) {}
 
                 const placedArray = isUserSlot ? myPlacedCards : teammatePlacedCards;
                 if (!Array.isArray(placedArray)) {
@@ -16197,7 +16197,7 @@
                     this.dataset.cardId = cardId;
                     this.dataset.profession = prof;
 
-                    await applySkinBgToSlot(this, cardName);
+                    try { await applySkinBgToSlot(this, cardName); } catch (e) {}
 
                     const existingIndex = placedArray.findIndex(c => c.id === cardId);
                     if (existingIndex > -1) {
@@ -16234,7 +16234,7 @@
                 const skins = heroName && window.getHeroSkins ? window.getHeroSkins(heroName) : [];
                 if (skins.length > 1) {
                     cycleHeroSkin(heroName, slotId);
-                    await applySkinBgToSlot(this, heroName);
+                    try { await applySkinBgToSlot(this, heroName); } catch (e) {}
                     return;
                 }
                 // 否则移除卡牌
