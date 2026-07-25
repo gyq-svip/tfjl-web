@@ -2892,36 +2892,34 @@ if (isTauriApp) {
         } catch(e) { /* fallback */ }
         return null;
     }
-    // base64 备用方案（通过 Rust 命令读取）
-    const skinImageBase64Cache = {};
-    async function getSkinImageDataUrl(filePath) {
-        // Windows 路径下的 convertFileSrc 在 Tauri v2 中生成 http://asset.localhost/<URL-encoded-path> 的 URL，
-        // 该 URL 会被 asset 协议拒绝（含 D:\ 盘符和反斜杠编码）。皮肤统一走 base64 data URL，彻底稳定。
-        if (skinImageBase64Cache[filePath]) return skinImageBase64Cache[filePath];
+    // 皮肤图片 URL 缓存（blob: URL，比 data: URL 更可靠，不会被 ?t= 参数污染）
+    const skinImageUrlCache = {};
+    async function getSkinImageUrl(filePath) {
+        if (skinImageUrlCache[filePath]) return skinImageUrlCache[filePath];
         const invokeFn = window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke;
         if (!invokeFn) return null;
 
-        // 方案A：优先用 read_image_base64 自定义命令（秒级返回 base64 data URL）
+        // 方案A：优先用 read_image_base64 自定义命令（rebuild exe 后可用）
         try {
             const dataUrl = await invokeFn('read_image_base64', { filePath });
             if (dataUrl) {
-                skinImageBase64Cache[filePath] = dataUrl;
+                skinImageUrlCache[filePath] = dataUrl;
                 return dataUrl;
             }
         } catch(e) {
             console.log('[SKIN] read_image_base64 ACL blocked, trying fs plugin...', String(e).slice(0,80));
         }
 
-        // 方案B：用 Tauri 内置 fs 插件 read_file 读二进制，Blob+FileReader 转 base64
-        // （read_image_base64 的 ACL 需 rebuild exe 才能解锁，fs:default 权限在旧 exe 中已编译）
+        // 方案B：用 Tauri 内置 fs 插件读二进制 → blob: URL
+        // （read_image_base64 的 ACL 需 rebuild exe 才能解锁，fs:default 在旧 exe 中已编译）
         try {
             const bytes = await invokeFn('plugin:fs|read_file', { path: filePath, options: undefined });
             console.log('[SKIN] read_file raw type:', filePath, bytes?.constructor?.name, 'len:', bytes?.byteLength ?? bytes?.length);
-            const dataUrl = await bytesToDataUrl(bytes, filePath);
-            if (dataUrl) {
-                skinImageBase64Cache[filePath] = dataUrl;
-                console.log('[SKIN] base64 via fs plugin OK:', filePath, 'len:', dataUrl.length);
-                return dataUrl;
+            const blobUrl = bytesToBlobUrl(bytes, filePath);
+            if (blobUrl) {
+                skinImageUrlCache[filePath] = blobUrl;
+                console.log('[SKIN] blob URL via fs plugin OK:', filePath);
+                return blobUrl;
             }
         } catch(e) {
             console.warn('[SKIN] read_file also failed:', filePath, String(e).slice(0,160));
@@ -2929,9 +2927,9 @@ if (isTauriApp) {
         return null;
     }
 
-    /// 用 Blob + FileReader 将 ArrayBuffer/Uint8Array 转为 base64 data URL（比手动 btoa 更可靠）
-    async function bytesToDataUrl(bytes, filePath) {
-        if (!bytes) { console.warn('[SKIN] bytesToDataUrl: empty bytes', filePath); return null; }
+    /// 将 ArrayBuffer/Uint8Array 转为 blob: URL（比 data: URL 更可靠，浏览器原生支持）
+    function bytesToBlobUrl(bytes, filePath) {
+        if (!bytes) { console.warn('[SKIN] bytesToBlobUrl: empty bytes', filePath); return null; }
         let arr;
         if (bytes instanceof Uint8Array) {
             arr = bytes;
@@ -2946,20 +2944,15 @@ if (isTauriApp) {
         } else if (typeof bytes === 'object' && bytes.length !== undefined) {
             arr = new Uint8Array(Object.values(bytes));
         } else {
-            console.warn('[SKIN] bytesToDataUrl: unknown type', filePath, bytes?.constructor?.name);
+            console.warn('[SKIN] bytesToBlobUrl: unknown type', filePath, bytes?.constructor?.name);
             return null;
         }
-        if (arr.length === 0) { console.warn('[SKIN] bytesToDataUrl: 0 length', filePath); return null; }
+        if (arr.length === 0) { console.warn('[SKIN] bytesToBlobUrl: 0 length', filePath); return null; }
         const ext = (filePath.split('.').pop() || 'png').toLowerCase();
         const mimeMap = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp', bmp: 'image/bmp' };
         const mime = mimeMap[ext] || 'image/png';
         const blob = new Blob([arr], { type: mime });
-        return new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result);
-            reader.onerror = () => { console.warn('[SKIN] FileReader error', filePath); resolve(null); };
-            reader.readAsDataURL(blob);
-        });
+        return URL.createObjectURL(blob);
     }
 
     window.skinRegistry = {};       // { 英雄名: [{ name, url, path }] }
@@ -3049,11 +3042,11 @@ if (isTauriApp) {
         const entry = skin || skins[0];
         console.log('[SKIN] entry:', entry ? entry.name : 'null', 'url:', entry ? (entry.url ? entry.url.substring(0, 60) + '...' : 'no url') : 'N/A');
         if (!entry) return null;
-        if (entry.url) return entry.url; // 已有 asset:// 或 base64
-        // 延迟加载 base64（convertFileSrc 对 Windows 含盘符路径无效，统一走 Rust 命令读图）
-        console.log('[SKIN] Loading base64 from path:', entry.path);
-        const dataUrl = await getSkinImageDataUrl(entry.path);
-        console.log('[SKIN] getSkinImageDataUrl result:', dataUrl ? dataUrl.substring(0, 60) + '...' : 'null/empty');
+        if (entry.url) return entry.url; // 已有缓存
+        // 延迟加载（通过 Rust 命令读图 → blob: URL）
+        console.log('[SKIN] Loading image from path:', entry.path);
+        const dataUrl = await getSkinImageUrl(entry.path);
+        console.log('[SKIN] getSkinImageUrl result:', dataUrl ? 'OK' : 'null/empty');
         if (dataUrl) { entry.url = dataUrl; entry.loaded = true; }
         return dataUrl;
     }
