@@ -1896,8 +1896,8 @@ if (isTauriApp) {
         if (!force) {
             const cache = loadStatsCache();
             if (cache && cache.stats && cache.stats.length > 0) {
-                saveScreenshotPersistStore(cache.stats); // 确保持久化包含今日数据
-                const merged = mergeScreenshotPersist(cache.stats);
+                await saveScreenshotPersistStore(cache.stats); // 确保持久化包含今日数据
+                const merged = await mergeScreenshotPersist(cache.stats);
                 if (merged.length > 0) {
                     renderScreenshotStats(merged);
                     return;
@@ -1914,7 +1914,7 @@ if (isTauriApp) {
             const imageExts = ['png', 'jpg', 'jpeg', 'bmp', 'webp'];
 
             // 检查持久化存储是否有历史数据
-            const persistMap = loadScreenshotPersistStore();
+            const persistMap = await loadScreenshotPersistStore();
             const persistHasData = Object.keys(persistMap).length > 0;
 
             let stats = [];
@@ -1959,8 +1959,8 @@ if (isTauriApp) {
 
             // 扫描结果缓存 + 持久化累积
             saveStatsCache(stats);
-            saveScreenshotPersistStore(stats);
-            const merged = mergeScreenshotPersist(stats);  // 合并历史数据
+            await saveScreenshotPersistStore(stats);
+            const merged = await mergeScreenshotPersist(stats);  // 合并历史数据
 
             if (merged.length === 0) {
                 statsEl.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">未找到截图文件</div>';
@@ -2297,38 +2297,86 @@ if (isTauriApp) {
         _deferredSetItem(key, entry);
     }
 
+    // ==================== 统计持久化存储（磁盘优先，不依赖浏览器） ====================
+    // 写入 {softwareDataDir}/tfjl_ScreenshotStats.json 和 tfjl_BattleStats.json
+    // 刷新/清缓存不丢数据；网页版回退 localStorage
+
+    function _statsFileDir() {
+        if (!softwareDataDir) return '';
+        return softwareDataDir.replace(/[\\/]+$/, '');
+    }
+
+    async function _readStatsFile(filename) {
+        if (!isTauriApp) return null;
+        const dir = _statsFileDir();
+        if (!dir) return null;
+        const filePath = dir + '\\' + filename;
+        try {
+            const raw = await readTextFile(filePath);
+            if (!raw) return null;
+            return JSON.parse(raw);
+        } catch (e) {
+            console.warn('[统计磁盘读] 失败:', filePath, e.message || e);
+            return null;
+        }
+    }
+
+    async function _writeStatsFile(filename, data) {
+        if (!isTauriApp) return false;
+        const dir = _statsFileDir();
+        if (!dir) return false;
+        const filePath = dir + '\\' + filename;
+        try {
+            const json = JSON.stringify(data);
+            const ok = await writeTextFile(filePath, json);
+            return ok === true;
+        } catch (e) {
+            console.error('[统计磁盘写] 失败:', filePath, e.message || e);
+            return false;
+        }
+    }
+
     // ==================== 截图统计持久化存储 ====================
     // 游戏只保留7天截图，APP独立累积历史数据永久保留
     const SCR_PERSIST_KEY = 'TFJL_ScreenshotPersist';
+    const SCR_PERSIST_FILE = 'tfjl_ScreenshotStats.json';
 
-    function loadScreenshotPersistStore() {
+    async function loadScreenshotPersistStore() {
+        // Tauri APP：优先读磁盘文件（刷新不丢）
+        if (isTauriApp) {
+            const diskData = await _readStatsFile(SCR_PERSIST_FILE);
+            if (diskData && diskData.dailyMap) return diskData.dailyMap;
+        }
+        // 回退 localStorage（网页版 / 首次迁移前数据）
         try {
             const raw = localStorage.getItem(SCR_PERSIST_KEY);
             if (!raw) return {};
             const data = JSON.parse(raw);
-            return data.dailyMap || {};
+            const dailyMap = data.dailyMap || {};
+            // 迁移：localStorage 有数据但磁盘无文件 → 写入磁盘
+            if (isTauriApp && Object.keys(dailyMap).length > 0) {
+                _writeStatsFile(SCR_PERSIST_FILE, data).catch(() => {});
+            }
+            return dailyMap;
         } catch (e) { return {}; }
     }
 
-    function saveScreenshotPersistStore(stats) {
-        try {
-            const oldMap = loadScreenshotPersistStore();
-            // stats: [{date, count, path}, ...]
-            for (const s of stats) {
-                oldMap[s.date] = Math.max(oldMap[s.date] || 0, s.count);
-            }
-            // 不分天数限制，永久保存所有历史数据
-            localStorage.setItem(SCR_PERSIST_KEY, JSON.stringify({ dailyMap: oldMap, savedAt: Date.now() }));
-        } catch (e) { console.warn('[截图持久化] 保存失败:', e); }
+    async function saveScreenshotPersistStore(stats) {
+        const oldMap = await loadScreenshotPersistStore();
+        for (const s of stats) {
+            oldMap[s.date] = Math.max(oldMap[s.date] || 0, s.count);
+        }
+        const data = { dailyMap: oldMap, savedAt: Date.now() };
+        // 优先写磁盘（Tauri），同时写 localStorage（网页版/双保险）
+        if (isTauriApp) { await _writeStatsFile(SCR_PERSIST_FILE, data); }
+        try { localStorage.setItem(SCR_PERSIST_KEY, JSON.stringify(data)); } catch (e) {}
     }
 
-    function mergeScreenshotPersist(stats) {
-        const persistMap = loadScreenshotPersistStore();
+    async function mergeScreenshotPersist(stats) {
+        const persistMap = await loadScreenshotPersistStore();
         const merged = [];
         const seen = new Set();
-        // 当前扫描数据优先
         for (const s of stats) { merged.push(s); seen.add(s.date); }
-        // 补充持久化中有但当前扫描没有的（已被游戏删除的旧日期）
         for (const [date, count] of Object.entries(persistMap)) {
             if (!seen.has(date) && count > 0) {
                 merged.push({ date, count, path: '' });
@@ -2341,29 +2389,35 @@ if (isTauriApp) {
     // 对战统计持久化存储：独立于日志文件生命周期
     // 即使游戏自动删除7天前的日志，已统计的历史数据也永久保留
     const PERSIST_KEY = 'TFJL_LogBattlePersist';
+    const BATTLE_PERSIST_FILE = 'tfjl_BattleStats.json';
 
-    function loadBattlePersistStore() {
+    async function loadBattlePersistStore() {
+        if (isTauriApp) {
+            const diskData = await _readStatsFile(BATTLE_PERSIST_FILE);
+            if (diskData && diskData.dailyMap) return diskData.dailyMap;
+        }
         try {
             const raw = localStorage.getItem(PERSIST_KEY);
             if (!raw) return {};
             const data = JSON.parse(raw);
-            return data.dailyMap || {};
+            const dailyMap = data.dailyMap || {};
+            if (isTauriApp && Object.keys(dailyMap).length > 0) {
+                _writeStatsFile(BATTLE_PERSIST_FILE, data).catch(() => {});
+            }
+            return dailyMap;
         } catch (e) { return {}; }
     }
 
-    function saveBattlePersistStore(dailyMap) {
-        try {
-            const oldMap = loadBattlePersistStore();
-            const merged = { ...oldMap, ...dailyMap };
-            // 不分天数限制，永久保存所有历史数据（每天数据量极小，即使3年也只有几十KB）
-            localStorage.setItem(PERSIST_KEY, JSON.stringify({ dailyMap: merged, savedAt: Date.now() }));
-        } catch (e) { console.warn('[持久化] 保存失败:', e); }
+    async function saveBattlePersistStore(dailyMap) {
+        const oldMap = await loadBattlePersistStore();
+        const merged = { ...oldMap, ...dailyMap };
+        const data = { dailyMap: merged, savedAt: Date.now() };
+        if (isTauriApp) { await _writeStatsFile(BATTLE_PERSIST_FILE, data); }
+        try { localStorage.setItem(PERSIST_KEY, JSON.stringify(data)); } catch (e) {}
     }
 
-    // 合并持久化数据到当前扫描结果（持久化补回已被删除的旧日志数据）
-    function mergePersistToDailyMap(dailyMap) {
-        const persistMap = loadBattlePersistStore();
-        // persistMap 作为底，dailyMap 覆盖同日期（当前扫描的数据更新）
+    async function mergePersistToDailyMap(dailyMap) {
+        const persistMap = await loadBattlePersistStore();
         return { ...persistMap, ...dailyMap };
     }
 
@@ -2556,7 +2610,7 @@ if (isTauriApp) {
             if (resultCache && resultCache.dailyMap && Object.keys(resultCache.dailyMap).length > 0) {
                 dlog('✅ 使用今日结果缓存，跳过全部扫描');
                 // 合并持久化数据（补回已被游戏删除的旧日志日期的统计）
-                const mergedDaily = mergePersistToDailyMap(resultCache.dailyMap);
+                const mergedDaily = await mergePersistToDailyMap(resultCache.dailyMap);
                 renderLogBattleStats(mergedDaily, statsEl, { fromCache: true, _stats: resultCache._stats || null });
                 window._lastLogDebugLines = debugLines;
                 return;
@@ -2654,8 +2708,8 @@ if (isTauriApp) {
                 _deferredSetItem('TFJL_LogBattleV2', fastCache);
 
                 // 合并持久化数据 + 保存（补回已被删除的旧日志日期）
-                const mergedDaily = mergePersistToDailyMap(dailyMap);
-                saveBattlePersistStore(mergedDaily);
+                const mergedDaily = await mergePersistToDailyMap(dailyMap);
+                await saveBattlePersistStore(mergedDaily);
                 saveLogBattleResultCache(dailyMap, fastCache._patterns);
 
                 const totalCached = Object.keys(fastCache._files).length;
@@ -2843,8 +2897,8 @@ if (isTauriApp) {
             saveLogBattleResultCache(dailyMap, cache._patterns);
 
             // 合并持久化数据 + 保存（补回已被删除的旧日志日期）
-            const mergedDaily = mergePersistToDailyMap(dailyMap);
-            saveBattlePersistStore(mergedDaily);
+            const mergedDaily = await mergePersistToDailyMap(dailyMap);
+            await saveBattlePersistStore(mergedDaily);
 
             // 6. 渲染（最近30天）
             renderLogBattleStats(mergedDaily, statsEl, {

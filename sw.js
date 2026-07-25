@@ -5,7 +5,7 @@
 //      + setCardSkin 修复（手动设置皮肤后刷新战斗槽皮肤显示）
 // ============================================================
 
-const CACHE_VERSION = 'tfjl-v39';
+const CACHE_VERSION = 'tfjl-v40';
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
