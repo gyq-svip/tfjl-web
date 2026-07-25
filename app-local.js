@@ -330,8 +330,15 @@ if (isTauriApp) {
     }
 
     async function deleteFile(filePath) {
-        const result = await tauriInvoke('delete_file', { filePath });
-        return result === null ? false : true;
+        let invokeFn = window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke;
+        if (!invokeFn) return { success: false, error: '未找到 Tauri invoke 函数' };
+        try {
+            await invokeFn('delete_file', { filePath });
+            return { success: true };
+        } catch (e) {
+            console.error('删除文件失败:', filePath, e);
+            return { success: false, error: e?.message || String(e) };
+        }
     }
 
     async function renameLocalFile(oldPath, newPath) {
@@ -1836,11 +1843,11 @@ if (isTauriApp) {
         if (!confirm(`确定要删除文件吗？\n\n文件名：${fileName}\n路径：${filePath}\n\n此操作将永久删除老马目录中的原文件！`)) return;
         if (!confirm(`⚠️ 再次确认！\n\n即将删除：${fileName}\n\n这个文件会从老马目录中永久消失，老马软件将无法使用此脚本！\n\n确定删除？`)) return;
         const ok = await deleteFile(filePath);
-        if (ok) {
+        if (ok.success) {
             alert('✅ 文件已删除');
             scanAllFiles();
         } else {
-            alert('删除失败');
+            alert('删除失败：' + (ok.error || '未知错误'));
         }
     }
 
