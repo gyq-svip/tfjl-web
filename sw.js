@@ -1,10 +1,10 @@
 // ============================================================
 // Service Worker v5 - 塔防助手 PWA 缓存策略
 // 策略：StaleWhileRevalidate（先用缓存秒开，后台静默更新）
-// v24: battle-slot 内 card-item 统一透明；手牌支持皮肤；控制台默认隐藏且仅管理员可开启；拖拽缩放回退 mouse/touch+setCapture
+// v25: 战斗槽等级徽章移至左下角；新增远程皮肤同步（GitHub Pages 托管 registry.json + skins/）
 // ============================================================
 
-const CACHE_VERSION = 'tfjl-v19';
+const CACHE_VERSION = 'tfjl-v20';
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）

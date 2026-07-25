@@ -533,14 +533,16 @@
             justify-content: center;
             border-radius: 4px;
         }
-        /* 等级徽章半透明黑底，避免彩色 badge 遮住皮肤/背景 */
+        /* 等级徽章半透明黑底，放在左下角不遮挡皮肤图片主体 */
         .battle-slot .card-level-badge {
             position: absolute;
-            top: 2px;
-            right: 2px;
+            bottom: 1px;
+            left: 1px;
             z-index: 3;
             background: rgba(0,0,0,0.65);
             color: #ffd700;
+            font-size: 0.55rem;
+            padding: 0px 3px;
             animation: none;
             background-size: auto;
         }
@@ -9098,7 +9100,7 @@
         </div>
 
         <!-- APP本地功能脚本（网页版不会执行任何代码，isTauriApp判断在文件内部） -->
-        <script src="app-local.js?v=24"></script>
+        <script src="app-local.js?v=25"></script>
 
         <script>
         // ==================== Service Worker 注册（PWA缓存） ====================
@@ -18141,6 +18143,10 @@
                         const keys = window.skinRegistry ? Object.keys(window.skinRegistry) : [];
                         console.log('[SKIN] Re-scan complete, registry keys:', keys.join(',') || '(empty)');
                         console.log('[SKIN] heroSkinSelections:', JSON.stringify(window.heroSkinSelections || {}));
+                        // 同步远程皮肤（GitHub Pages 托管，所有设备打开即自动获取）
+                        if (window.syncRemoteSkins) {
+                            await window.syncRemoteSkins();
+                        }
                     } catch (err) {
                         console.error('[SKIN] Re-scan skins error:', err);
                     }
@@ -26406,7 +26412,7 @@ ${maSection}
         </style>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;pointer-events:none;z-index:999;opacity:0.5;">v250725-13</span>
+    <span id="versionTag" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;pointer-events:none;z-index:999;opacity:0.5;">v250725-14</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
