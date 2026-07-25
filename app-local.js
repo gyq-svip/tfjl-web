@@ -2907,6 +2907,18 @@ if (isTauriApp) {
     window.skinRegistry = {};       // { 英雄名: [{ name, url, path }] }
     window.heroSkinSelections = {};  // { 英雄名: 皮肤名 }
 
+    // 解析 "皮肤名·英雄名" 格式，返回基础英雄名
+    // 如 "牛魔王·魇" → { heroName: "魇", skinName: "牛魔王" }
+    // "海妖" → { heroName: "海妖", skinName: null }
+    function getBaseHeroName(fullName) {
+        if (!fullName) return { heroName: '', skinName: null };
+        const idx = fullName.indexOf('·');
+        if (idx > 0) {
+            return { heroName: fullName.substring(idx + 1), skinName: fullName.substring(0, idx) };
+        }
+        return { heroName: fullName, skinName: null };
+    }
+
     async function scanSkins() {
         window.skinRegistry = {};
         if (!softwareDataDir) return window.skinRegistry;
@@ -2939,18 +2951,28 @@ if (isTauriApp) {
     }
 
     function getHeroSkinUrl(heroName, skinName) {
-        const skins = window.skinRegistry[heroName];
+        const parsed = getBaseHeroName(heroName);
+        const baseHero = parsed.heroName;
+        const explicitSkin = skinName || parsed.skinName;
+        const skins = window.skinRegistry[baseHero];
         if (!skins || !skins.length) return null;
-        const target = skinName || window.heroSkinSelections[heroName];
+        const target = explicitSkin || window.heroSkinSelections[baseHero];
         const skin = target ? skins.find(s => s.name === target) : null;
         return skin ? (skin.url || null) : (skins[0].url || null);
     }
 
     // 获取皮肤 dataUrl，支持延迟 base64 加载
     async function resolveHeroSkinUrl(heroName, skinName) {
-        const skins = window.skinRegistry[heroName];
+        const parsed = getBaseHeroName(heroName);
+        const baseHero = parsed.heroName;
+        const explicitSkin = skinName || parsed.skinName;
+        const skins = window.skinRegistry[baseHero];
         if (!skins || !skins.length) return null;
-        const target = skinName || window.heroSkinSelections[heroName];
+        // 如果名称中指定了皮肤且没有用户手动选择，自动使用名称中指定的皮肤
+        if (parsed.skinName && !window.heroSkinSelections[baseHero]) {
+            window.heroSkinSelections[baseHero] = parsed.skinName;
+        }
+        const target = explicitSkin || window.heroSkinSelections[baseHero];
         const skin = target ? skins.find(s => s.name === target) : null;
         const entry = skin || skins[0];
         if (!entry) return null;
@@ -2962,15 +2984,17 @@ if (isTauriApp) {
     }
 
     function getHeroSkins(heroName) {
-        return window.skinRegistry[heroName] || [];
+        const baseHero = getBaseHeroName(heroName).heroName;
+        return window.skinRegistry[baseHero] || [];
     }
 
     function selectHeroSkin(heroName, skinName) {
-        window.heroSkinSelections[heroName] = skinName;
+        const baseHero = getBaseHeroName(heroName).heroName;
+        window.heroSkinSelections[baseHero] = skinName;
         try {
             const all = JSON.parse(localStorage.getItem('tdjl_heroSkinSelections') || '{}');
-            if (skinName === null || skinName === undefined) delete all[heroName];
-            else all[heroName] = skinName;
+            if (skinName === null || skinName === undefined) delete all[baseHero];
+            else all[baseHero] = skinName;
             localStorage.setItem('tdjl_heroSkinSelections', JSON.stringify(all));
         } catch(e) {}
     }
@@ -3043,6 +3067,7 @@ if (isTauriApp) {
     window.batchImportFilesToProject = batchImportFilesToProject;
     // 英雄皮肤系统
     window.scanSkins = scanSkins;
+    window.getBaseHeroName = getBaseHeroName;
     window.getHeroSkinUrl = getHeroSkinUrl;
     window.resolveHeroSkinUrl = resolveHeroSkinUrl;
     window.getHeroSkins = getHeroSkins;
