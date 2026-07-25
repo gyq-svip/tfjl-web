@@ -2009,6 +2009,9 @@ if (isTauriApp) {
         const weekDayDow = [1, 2, 3, 4, 5, 6, 0]; // getDay() 值
         const today = new Date();
         const todayDow = today.getDay();
+        const formatLocalDate = (d) => {
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        };
         // 建立日期→计数映射
         const dateMap = {};
         stats.forEach(s => { dateMap[s.date] = s.count || 0; });
@@ -2018,7 +2021,7 @@ if (isTauriApp) {
             if (daysBack < 0) daysBack += 7;
             const d = new Date(today);
             d.setDate(d.getDate() - daysBack);
-            const ds = d.toISOString().slice(0, 10);
+            const ds = formatLocalDate(d);
             return { label: weekDayLabels[i], dow, count: dateMap[ds] || 0, date: ds };
         });
         const recent = stats.slice(0, 30);
@@ -2027,7 +2030,7 @@ if (isTauriApp) {
         for (let i = 0; i < 7; i++) {
             const d = wdData[i];
             const bar = '█'.repeat(Math.min(20, Math.round(d.count / wdMax * 20)));
-            const todayMark = (d.date === new Date().toISOString().slice(0, 10)) ? ' · 今天' : '';
+            const todayMark = (d.date === formatLocalDate(new Date())) ? ' · 今天' : '';
             html += `<div style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:0.78rem;">
                 <span style="color:rgba(255,255,255,0.7);width:42px;">${d.label}</span>
                 <span title="${d.date}" style="color:#e040fb;font-family:monospace;">${bar}</span>
@@ -3171,6 +3174,16 @@ if (isTauriApp) {
             _downloadRemoteSkinsToLocal(registry.heroes);
             // IndexedDB 预热（APP/网页通用，无需 Tauri 文件系统）
             _preheatSkins(registry.heroes);
+
+            // 远程皮肤注册表就绪后，自动刷新已渲染的英雄皮肤（解决首次打开项目皮肤不显示）
+            try {
+                if (typeof window.reapplyAllSkins === 'function') {
+                    window.reapplyAllSkins();
+                    console.log('[SKIN] syncRemoteSkins() 触发皮肤重刷');
+                }
+            } catch(e) {
+                console.warn('[SKIN] 皮肤重刷失败:', e);
+            }
         } catch(e) {
             console.warn('[SKIN] syncRemoteSkins() failed:', String(e).slice(0, 200));
         }
