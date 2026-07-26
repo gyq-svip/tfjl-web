@@ -548,7 +548,9 @@ if (isTauriApp) {
     async function tfjlSaveAllProjects(projectsArray) {
         if (!isTauriApp) return false;
         _projectsCache = projectsArray || [];
-        _scheduleFlush();
+        // 立即落盘：项目是重要数据，不能仅依赖防抖/pagehide（APP 关闭时异步写常丢失，导致重启后项目与默认项目丢失）
+        if (_syncOk) { syncAllNow().catch(() => {}); }
+        else { _scheduleFlush(); }
         return true;
     }
 
