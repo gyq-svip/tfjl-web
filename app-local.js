@@ -2139,29 +2139,7 @@ if (isTauriApp) {
         const maxCount = Math.max(...stats.map(s => s.count));
         const avgCount = (totalGames / stats.length).toFixed(1);
 
-        let html = '';
-        html += `<div style="display:flex;gap:16px;margin-bottom:12px;flex-wrap:wrap;">`;
-        html += `<div style="background:rgba(156,39,176,0.2);padding:8px 12px;border-radius:6px;text-align:center;"><div style="color:#e040fb;font-size:1.4rem;font-weight:bold;">${totalGames}</div><div style="color:rgba(255,255,255,0.5);font-size:0.7rem;">总局数</div></div>`;
-        html += `<div style="background:rgba(0,188,212,0.2);padding:8px 12px;border-radius:6px;text-align:center;"><div style="color:#00bcd4;font-size:1.4rem;font-weight:bold;">${stats.length}</div><div style="color:rgba(255,255,255,0.5);font-size:0.7rem;">天数</div></div>`;
-        html += `<div style="background:rgba(255,152,0,0.2);padding:8px 12px;border-radius:6px;text-align:center;"><div style="color:#ff9800;font-size:1.4rem;font-weight:bold;">${avgCount}</div><div style="color:rgba(255,255,255,0.5);font-size:0.7rem;">日均</div></div>`;
-        html += `<div style="background:rgba(244,67,54,0.2);padding:8px 12px;border-radius:6px;text-align:center;"><div style="color:#f44336;font-size:1.4rem;font-weight:bold;">${maxCount}</div><div style="color:rgba(255,255,255,0.5);font-size:0.7rem;">最高</div></div>`;
-        html += `</div>`;
-
-        const barWidth = Math.min(28, Math.max(14, Math.floor(420 / stats.length)));
-        const chartHeight = 120;
-        html += `<div style="display:flex;align-items:flex-end;gap:6px;height:${chartHeight}px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.1);overflow-x:auto;">`;
-        for (const s of stats) {
-            const h = Math.max(4, Math.round((s.count / maxCount) * (chartHeight - 20)));
-            const color = s.count >= avgCount ? '#e040fb' : '#7c4dff';
-            html += `<div style="display:flex;flex-direction:column;align-items:center;min-width:${barWidth}px;">
-                <div style="color:#fff;font-size:0.65rem;margin-bottom:2px;">${s.count}</div>
-                <div style="width:${Math.max(8, barWidth - 6)}px;height:${h}px;background:linear-gradient(180deg,${color},rgba(156,39,176,0.3));border-radius:3px 3px 0 0;" title="${s.date}: ${s.count}局"></div>
-                <div style="color:rgba(255,255,255,0.5);font-size:0.6rem;margin-top:2px;">${s.date}</div>
-            </div>`;
-        }
-        html += `</div>`;
-
-        // 最近7天 · 周一~周日（每天独立一柱，不是聚合！今天数据→对应星期几）
+        // === 本周（周一~周日）合计计算（提前，供顶部卡片与周X区共用）===
         const weekDayLabels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
         const weekDayDow = [1, 2, 3, 4, 5, 6, 0]; // getDay() 值
         const today = new Date();
@@ -2186,9 +2164,35 @@ if (isTauriApp) {
             const ds = formatLocalDate(d);
             return { label: weekDayLabels[i], dow, count: dateMap[ds] || 0, date: ds };
         });
+        // 本周总局数（周一~周日 合计）
+        const weekTotal = wdData.reduce((sum, d) => sum + d.count, 0);
+
+        let html = '';
+        html += `<div style="display:flex;gap:16px;margin-bottom:12px;flex-wrap:wrap;">`;
+        html += `<div style="background:rgba(156,39,176,0.2);padding:8px 12px;border-radius:6px;text-align:center;"><div style="color:#e040fb;font-size:1.4rem;font-weight:bold;">${totalGames}</div><div style="color:rgba(255,255,255,0.5);font-size:0.7rem;">总局数</div></div>`;
+        html += `<div style="background:rgba(0,188,212,0.2);padding:8px 12px;border-radius:6px;text-align:center;"><div style="color:#00bcd4;font-size:1.4rem;font-weight:bold;">${stats.length}</div><div style="color:rgba(255,255,255,0.5);font-size:0.7rem;">天数</div></div>`;
+        html += `<div style="background:rgba(255,152,0,0.2);padding:8px 12px;border-radius:6px;text-align:center;"><div style="color:#ff9800;font-size:1.4rem;font-weight:bold;">${avgCount}</div><div style="color:rgba(255,255,255,0.5);font-size:0.7rem;">日均</div></div>`;
+        html += `<div style="background:rgba(244,67,54,0.2);padding:8px 12px;border-radius:6px;text-align:center;"><div style="color:#f44336;font-size:1.4rem;font-weight:bold;">${maxCount}</div><div style="color:rgba(255,255,255,0.5);font-size:0.7rem;">最高</div></div>`;
+        html += `<div style="background:rgba(0,230,118,0.2);padding:8px 12px;border-radius:6px;text-align:center;"><div style="color:#00e676;font-size:1.4rem;font-weight:bold;">${weekTotal}</div><div style="color:rgba(255,255,255,0.5);font-size:0.7rem;">本周局数</div></div>`;
+        html += `</div>`;
+
+        const barWidth = Math.min(28, Math.max(14, Math.floor(420 / stats.length)));
+        const chartHeight = 120;
+        html += `<div style="display:flex;align-items:flex-end;gap:6px;height:${chartHeight}px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.1);overflow-x:auto;">`;
+        for (const s of stats) {
+            const h = Math.max(4, Math.round((s.count / maxCount) * (chartHeight - 20)));
+            const color = s.count >= avgCount ? '#e040fb' : '#7c4dff';
+            html += `<div style="display:flex;flex-direction:column;align-items:center;min-width:${barWidth}px;">
+                <div style="color:#fff;font-size:0.65rem;margin-bottom:2px;">${s.count}</div>
+                <div style="width:${Math.max(8, barWidth - 6)}px;height:${h}px;background:linear-gradient(180deg,${color},rgba(156,39,176,0.3));border-radius:3px 3px 0 0;" title="${s.date}: ${s.count}局"></div>
+                <div style="color:rgba(255,255,255,0.5);font-size:0.6rem;margin-top:2px;">${s.date}</div>
+            </div>`;
+        }
+        html += `</div>`;
+
         const recent = stats.slice(0, 30);
         const wdMax = Math.max(1, ...wdData.map(d => d.count));
-        html += `<div style="margin-top:12px;"><div style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-bottom:6px;">周一~周日</div>`;
+        html += `<div style="margin-top:12px;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.5);font-size:0.75rem;">周一~周日</span><span style="color:#00e676;font-size:0.9rem;font-weight:bold;">本周合计 ${weekTotal} 局</span></div>`;
         for (let i = 0; i < 7; i++) {
             const d = wdData[i];
             const bar = '█'.repeat(Math.min(20, Math.round(d.count / wdMax * 20)));
