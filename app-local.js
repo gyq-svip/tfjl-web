@@ -80,121 +80,213 @@ if (isTauriApp) {
         }, 500);
     }
 
-    // ==================== 数据自动同步到用户数据目录 ====================
-    // 原理：拦截 localStorage.setItem/removeItem，自动把变更的 key 异步写入磁盘文件
-    // 目标：${softwareDataDir}/tfjl_${key}.json（直接写，不用子文件夹避免目录不存在）
-    // 好处：用户可自行查看、备份、恢复；卸载 APP 也不丢数据
+    // ==================== 数据统一存储到单一文件（不再散落一堆 tfjl_*.json） ====================
+    // 原理：拦截 localStorage.setItem/removeItem，把变更汇总进内存 Map，
+    //       防抖后整包写入 {softwareDataDir}/tfjl.dat（base64 打包的二进制，肉眼不可读、不易误改）
+    // 好处：数据目录只剩一个 tfjl.dat（外加 data/skin 等物理资源），清爽；重装/清缓存不丢；
+    //       需要查看/备份时用「导出备份」功能（可读 JSON），无需直接翻 tfjl.dat。
 
-    let _syncDir = '';            // 同步目标目录
-    let _syncOk = false;          // 同步是否可用
-    const SYNC_QUEUE = new Set(); // 待写入 key 集合
-    let _syncTimer = null;        // 防抖定时器（2s）
+    const DATA_FILE_NAME = 'tfjl.dat';
+    const STORE_MAGIC = [0x54, 0x46, 0x4A, 0x4C, 0x44, 0x31]; // "TFJLD1"
+    const STORE_VERSION = 1;
+    const PROJECTS_KEY = '__tfjl_projects__';          // 项目数据在统一存储里的保留键
+    const RESERVED_KEYS = new Set([PROJECTS_KEY]);
+
+    let _syncDir = '';            // 存储目标目录
+    let _syncOk = false;          // 存储是否可用
+    let _storeMap = new Map();    // 磁盘上的全部键值（localStorage 镜像 + 项目）
+    let _projectsCache = null;    // 当前项目数组（null=尚未写入过）
+    let _storeLoaded = false;     // 是否已从磁盘加载过
+    let _flushTimer = null;       // 防抖定时器
 
     function _getSyncDir() {
         if (!softwareDataDir) return '';
         return softwareDataDir.replace(/[\\/]+$/, '');
     }
-
-    function _syncFileName(key) {
-        // 文件名前缀 tfjl_ 标识，非法字符替换为 _
-        return 'tfjl_' + key.replace(/[\\/:*?"<>|]/g, '_') + '.json';
+    function _getDatPath(dir) {
+        return (dir || _getSyncDir()).replace(/[\\/]+$/, '') + '\\' + DATA_FILE_NAME;
     }
 
-    async function _flushSyncQueue() {
-        if (!_syncOk || SYNC_QUEUE.size === 0) return;
-        const dir = _syncDir;
-        const keys = [...SYNC_QUEUE];
-        SYNC_QUEUE.clear();
-        let ok = 0;
-        for (const key of keys) {
-            const val = localStorage.getItem(key);
-            const filePath = dir + '\\' + _syncFileName(key);
+    // ---- 二进制打包 / base64 ----
+    function _u32le(n) {
+        return [n & 0xff, (n >>> 8) & 0xff, (n >>> 16) & 0xff, (n >>> 24) & 0xff];
+    }
+    function _bytesToBase64(bytes) {
+        let s = '';
+        const chunk = 0x8000;
+        for (let i = 0; i < bytes.length; i += chunk) {
+            s += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+        }
+        return btoa(s);
+    }
+    function _base64ToBytes(b64) {
+        const s = atob(b64);
+        const bytes = new Uint8Array(s.length);
+        for (let i = 0; i < s.length; i++) bytes[i] = s.charCodeAt(i);
+        return bytes;
+    }
+    function _packStore(map) {
+        const enc = new TextEncoder();
+        const parts = [];
+        for (const b of STORE_MAGIC) parts.push(b);
+        parts.push(..._u32le(STORE_VERSION));
+        parts.push(..._u32le(map.size));
+        for (const [k, v] of map.entries()) {
+            const kb = enc.encode(String(k));
+            const vb = enc.encode(String(v));
+            parts.push(..._u32le(kb.length), ...kb, ..._u32le(vb.length), ...vb);
+        }
+        return new Uint8Array(parts);
+    }
+    function _unpackStore(bytes) {
+        const map = new Map();
+        if (!bytes || bytes.length < 14) return map;
+        for (let i = 0; i < STORE_MAGIC.length; i++) {
+            if (bytes[i] !== STORE_MAGIC[i]) throw new Error('magic mismatch');
+        }
+        let p = STORE_MAGIC.length;
+        const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+        const version = dv.getUint32(p, true); p += 4;
+        const count = dv.getUint32(p, true); p += 4;
+        const dec = new TextDecoder();
+        for (let i = 0; i < count; i++) {
+            const kl = dv.getUint32(p, true); p += 4;
+            const kb = bytes.subarray(p, p + kl); p += kl;
+            const vl = dv.getUint32(p, true); p += 4;
+            const vb = bytes.subarray(p, p + vl); p += vl;
+            map.set(dec.decode(kb), dec.decode(vb));
+        }
+        return map;
+    }
+
+    // ---- 加载 / 迁移 ----
+    async function _ensureStoreLoaded(dir) {
+        if (_storeLoaded) return;
+        _storeLoaded = true;
+        const path = _getDatPath(dir);
+        const raw = await readTextFile(path);
+        if (raw) {
             try {
-                if (val !== null) {
-                    const r = await writeTextFile(filePath, JSON.stringify({ key: key, value: val, savedAt: Date.now() }));
-                    if (r) ok++;
-                }
+                _storeMap = _unpackStore(_base64ToBytes(raw.trim()));
+                console.log('[数据存储] 已加载统一存储: ' + path + ' (' + _storeMap.size + ' 项)');
+                return;
             } catch (e) {
-                console.error('[数据同步] 写入失败:', filePath, e);
+                console.warn('[数据存储] tfjl.dat 解析失败，尝试旧文件迁移:', e);
             }
         }
-        if (ok > 0) console.log('[数据同步] 已写入 ' + ok + '/' + keys.length + ' 个文件 → ' + dir);
+        // 无 tfjl.dat → 迁移旧的 tfjl_*.json + projects/projects.json
+        _storeMap = await _importLegacyFiles(dir);
+        // 迁移后立刻写一份新的统一存储
+        await _writeStoreFile(dir, _storeMap);
     }
 
-    function _scheduleSync(key) {
+    async function _importLegacyFiles(dir) {
+        const map = new Map();
+        let migrated = 0;
+        try {
+            const files = await readDir(dir);
+            const KEEP = new Set(['tfjl_datadir.json', 'tfjl_maDirsConfig.json']);
+            for (const f of files) {
+                if (!f.name || !f.name.startsWith('tfjl_') || !f.name.endsWith('.json')) continue;
+                if (KEEP.has(f.name)) continue;
+                try {
+                    const parsed = JSON.parse(await readTextFile(dir + '\\' + f.name));
+                    const key = f.name.slice(5, -5);
+                    if (parsed && parsed.value !== null && parsed.value !== undefined) {
+                        map.set(key, parsed.value);
+                        migrated++;
+                    }
+                    await deleteFile(dir + '\\' + f.name);
+                } catch (e) {}
+            }
+        } catch (e) {}
+        // 迁移 projects/projects.json
+        try {
+            const praw = await readTextFile(dir + '\\projects\\projects.json');
+            if (praw) {
+                const pdata = JSON.parse(praw);
+                if (Array.isArray(pdata.projects)) {
+                    map.set(PROJECTS_KEY, JSON.stringify(pdata.projects));
+                    await deleteFile(dir + '\\projects\\projects.json');
+                }
+            }
+        } catch (e) {}
+        if (migrated > 0) console.log('[数据存储] 已迁移 ' + migrated + ' 个旧配置文件 → tfjl.dat');
+        return map;
+    }
+
+    async function _writeStoreFile(dir, map) {
+        const path = _getDatPath(dir);
+        const bytes = _packStore(map);
+        return await writeTextFile(path, _bytesToBase64(bytes));
+    }
+
+    // 构建当前最新存储内容（localStorage 全量 + 项目缓存），写盘
+    async function _flushStore() {
         if (!_syncOk) return;
-        SYNC_QUEUE.add(key);
-        if (_syncTimer) clearTimeout(_syncTimer);
-        _syncTimer = setTimeout(() => _flushSyncQueue().catch(() => {}), 2000);
+        const map = new Map();
+        // 项目（优先用内存缓存，避免回退到旧值）
+        if (_projectsCache !== null) map.set(PROJECTS_KEY, JSON.stringify(_projectsCache));
+        else if (_storeMap.has(PROJECTS_KEY)) map.set(PROJECTS_KEY, _storeMap.get(PROJECTS_KEY));
+        // localStorage 当前全部键值（已删除的键自然不会出现在 localStorage 里，故不再保留）
+        for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (RESERVED_KEYS.has(k)) continue;
+            map.set(k, localStorage.getItem(k));
+        }
+        _storeMap = map;
+        const ok = await _writeStoreFile(_syncDir, map);
+        if (ok) console.log('[数据存储] 已写入统一存储 tfjl.dat (' + map.size + ' 项)');
     }
 
-    // 拦截全局 Storage setItem——所有 localStorage 写入都会经过这里
+    function _scheduleFlush() {
+        if (!_syncOk) return;
+        if (_flushTimer) clearTimeout(_flushTimer);
+        _flushTimer = setTimeout(() => _flushStore().catch(() => {}), 1000);
+    }
+
+    // 拦截全局 Storage 写入——所有 localStorage 变更都触发统一存储刷新
     const _nativeSetItem = Storage.prototype.setItem;
     Storage.prototype.setItem = function (key, value) {
         _nativeSetItem.call(this, key, value);
-        _scheduleSync(key);
+        _scheduleFlush();
     };
-
-    // 拦截全局 Storage removeItem
     const _nativeRemoveItem = Storage.prototype.removeItem;
     Storage.prototype.removeItem = function (key) {
         _nativeRemoveItem.call(this, key);
-        _scheduleSync(key);
+        _scheduleFlush();
     };
 
-    // 立即全量同步（用户主动保存时调用，不等防抖）
+    // 立即全量落盘（用户主动保存 / 目录变更时调用，不等防抖）
     async function syncAllNow() {
-        if (!_syncOk) return;
-        // 先消费队列中已有的
-        await _flushSyncQueue();
-        // 再把所有 localStorage key 全量写一遍
-        const keys = [];
-        for (let i = 0; i < localStorage.length; i++) keys.push(localStorage.key(i));
-        const dir = _syncDir;
-        let ok = 0;
-        for (const key of keys) {
-            const val = localStorage.getItem(key);
-            if (val === null) continue;
-            const filePath = dir + '\\' + _syncFileName(key);
-            try {
-                const r = await writeTextFile(filePath, JSON.stringify({ key: key, value: val, savedAt: Date.now() }));
-                if (r) ok++;
-            } catch (e) {
-                console.error('[数据同步] 全量写入失败:', filePath, e);
-            }
-        }
-        console.log('[数据同步] 全量同步完成，' + ok + '/' + keys.length + ' 个 key → ' + dir);
+        if (_flushTimer) { clearTimeout(_flushTimer); _flushTimer = null; }
+        await _flushStore();
     }
 
-    // 页面关闭前强制刷盘（避免异步写入丢失）
+    // 页面关闭前尽量刷盘（避免异步写入丢失）
     window.addEventListener('pagehide', () => {
-        if (_syncTimer) { clearTimeout(_syncTimer); }
+        if (_flushTimer) { clearTimeout(_flushTimer); _flushTimer = null; }
+        _flushStore().catch(() => {});
     });
 
     async function initDataSync() {
         const dir = _getSyncDir();
         if (!dir) {
             _syncOk = false;
-            console.log('[数据同步] ⚠️ 未设置软件数据目录，同步未启用');
+            console.log('[数据存储] ⚠️ 未设置软件数据目录，存储未启用');
             return;
         }
+        // 目录发生变化（用户在设置里改过）→ 重新从新目录加载存储
+        if (dir !== _syncDir) { _storeLoaded = false; _storeMap = new Map(); _projectsCache = null; }
         _syncDir = dir;
-        // 立即试写一个小文件验证目录可写
         try {
-            const testPath = dir + '\\' + _syncFileName('__SYNC_TEST__');
-            const r = await writeTextFile(testPath, JSON.stringify({ test: true, savedAt: Date.now() }));
-            if (r) {
-                _syncOk = true;
-                console.log('[数据同步] ✅ 已启用，目标目录: ' + dir);
-                // 启动后做一次全量同步（把已有的 localStorage 数据都写过去）
-                syncAllNow().catch(() => {});
-            } else {
-                _syncOk = false;
-                console.error('[数据同步] ❌ 目录写入失败，请检查目录权限: ' + dir);
-            }
+            await _ensureStoreLoaded(dir);   // 加载现有 tfjl.dat 或迁移旧文件
+            _syncOk = true;
+            await _flushStore();             // 立即写一次，验证目录可写
+            console.log('[数据存储] ✅ 已启用单一文件存储: ' + _getDatPath(dir));
         } catch (e) {
             _syncOk = false;
-            console.error('[数据同步] ❌ 目录写入异常: ' + dir, e);
+            console.error('[数据存储] ❌ 初始化失败: ' + dir, e);
         }
     }
 
@@ -433,49 +525,42 @@ if (isTauriApp) {
         return def;
     }
 
-    // 启动时从磁盘恢复所有 tfjl_*.json 到 localStorage（仅当 localStorage 无该 key，不打扰正常会话）
+    // 启动时从统一存储(tfjl.dat)恢复配置到 localStorage（仅补空 key，不打扰正常会话）
     async function restoreLocalFromDisk() {
         if (!isTauriApp) return;
         const dir = await _resolveRealDataDir();
-        let files = [];
-        try { files = await readDir(dir); } catch (e) { return; }
+        await _ensureStoreLoaded(dir);
         let restored = 0;
-        for (const f of files) {
-            if (!f.name || !f.name.startsWith('tfjl_') || !f.name.endsWith('.json')) continue;
-            const key = f.name.slice(5, -5);
-            if (localStorage.getItem(key) !== null) continue;
-            try {
-                const raw = await readTextFile(dir + '\\' + f.name);
-                const parsed = JSON.parse(raw);
-                if (parsed && parsed.value !== null && parsed.value !== undefined) {
-                    localStorage.setItem(key, parsed.value);
-                    restored++;
-                }
-            } catch (e) {}
+        for (const [key, val] of _storeMap.entries()) {
+            if (RESERVED_KEYS.has(key)) continue;
+            if (localStorage.getItem(key) === null && val !== null && val !== undefined) {
+                localStorage.setItem(key, val);
+                restored++;
+            }
         }
-        if (restored > 0) console.log('[数据同步] 已从磁盘恢复 ' + restored + ' 项配置 → ' + dir);
+        // 恢复项目缓存
+        const pj = _storeMap.get(PROJECTS_KEY);
+        if (pj) { try { _projectsCache = JSON.parse(pj); } catch (e) {} }
+        if (restored > 0) console.log('[数据存储] 已从 tfjl.dat 恢复 ' + restored + ' 项配置');
     }
 
-    // 项目整体落盘（Tauri）：softwareDataDir/projects/projects.json
+    // 项目整体落盘：统一写进 tfjl.dat（不再单独 projects/projects.json）
     async function tfjlSaveAllProjects(projectsArray) {
         if (!isTauriApp) return false;
-        const dir = await _resolveRealDataDir();
-        const pdir = dir + '\\projects';
-        try { await createDir(pdir); } catch (e) {}
-        try {
-            await writeTextFile(pdir + '\\projects.json', JSON.stringify({ projects: projectsArray || [], savedAt: Date.now() }));
-            return true;
-        } catch (e) { console.error('[项目磁盘写] 失败:', e); return false; }
+        _projectsCache = projectsArray || [];
+        _scheduleFlush();
+        return true;
     }
 
     async function tfjlRestoreAllProjects() {
         if (!isTauriApp) return [];
+        if (_projectsCache !== null) return _projectsCache;
+        // 兜底：store 尚未加载则现加载
         const dir = await _resolveRealDataDir();
-        try {
-            const raw = await readTextFile(dir + '\\projects\\projects.json');
-            const data = JSON.parse(raw);
-            return Array.isArray(data.projects) ? data.projects : [];
-        } catch (e) { return []; }
+        await _ensureStoreLoaded(dir);
+        const pj = _storeMap.get(PROJECTS_KEY);
+        if (pj) { try { _projectsCache = JSON.parse(pj); } catch (e) {} }
+        return _projectsCache || [];
     }
 
     async function initAppLocal() {
@@ -738,7 +823,12 @@ if (isTauriApp) {
         if (selected) {
             softwareDataDir = selected;
             document.getElementById('softwareDataDirInput').value = selected;
-            initDataSync();  // 目录变了，重新计算同步路径
+            // 在默认目录写引导标记，确保重装/清缓存后仍能定位到真实数据目录里的 tfjl.dat
+            try {
+                const guideDir = DEFAULT_SOFTWARE_DATA_DIR.replace(/[\\/]+$/, '');
+                await writeTextFile(guideDir + '\\tfjl_datadir.json', JSON.stringify({ dir: selected, savedAt: Date.now() }));
+            } catch (e) {}
+            initDataSync();  // 目录变了，重新加载统一存储
             saveConfig();    // 保存新目录并全量同步到新位置
         }
     }
