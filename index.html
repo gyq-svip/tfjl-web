@@ -9350,6 +9350,7 @@
                 const request = store.put(projectData);
 
                 request.onsuccess = function() {
+                    persistProjectsToDisk();
                     resolve();
                 };
 
@@ -10056,42 +10057,45 @@
             });
         }
         
-        // 检查并保存默认项目（只在第一次打开时）
-        function checkAndSaveDefaultProject() {
-            return new Promise((resolve, reject) => {
-                if (!db) {
-                    resolve();
+        // 检查并保存默认项目；重装/清缓存后优先从磁盘恢复项目
+        async function checkAndSaveDefaultProject() {
+            if (!db) return;
+
+            const projects = await new Promise((res) => {
+                const r = db.transaction([STORE_NAME], 'readonly').objectStore(STORE_NAME).getAll();
+                r.onsuccess = () => res(r.result || []);
+                r.onerror = () => res([]);
+            });
+
+            if (projects.length === 0) {
+                // 重装/清缓存后：优先从磁盘恢复项目
+                let restored = [];
+                if (typeof window.__tfjlRestoreAllProjects === 'function') {
+                    try { restored = await window.__tfjlRestoreAllProjects(); } catch (e) { console.warn('[项目恢复] 失败:', e); }
+                }
+                if (restored && restored.length > 0) {
+                    console.log('[项目恢复] 从磁盘恢复', restored.length, '个项目');
+                    await new Promise((res) => {
+                        const t = db.transaction([STORE_NAME], 'readwrite');
+                        const s = t.objectStore(STORE_NAME);
+                        restored.forEach(p => { try { s.put(p); } catch (e) {} });
+                        t.oncomplete = res; t.onerror = res; t.onabort = res;
+                    });
+                    await restoreCategoriesFromLocalStorage();
+                    await loadCategories();
                     return;
                 }
-                
-                // 检查是否已有项目
-                const transaction = db.transaction([STORE_NAME], 'readonly');
-                const store = transaction.objectStore(STORE_NAME);
-                const request = store.getAll();
-                
-                request.onsuccess = function() {
-                    const projects = request.result || [];
-                    
-                    // 如果没有项目，保存默认配置
-                    if (projects.length === 0) {
-                        console.log('首次打开，保存默认配置...');
-                        saveDefaultProject().then(() => resolve());
-                    } else {
-                        // 检查是否已有"南门公主"项目
-                        const hasDefault = projects.some(p => p.name === DEFAULT_PROJECT.name);
-                        if (!hasDefault) {
-                            console.log('添加默认配置到项目列表...');
-                            saveDefaultProject().then(() => resolve());
-                        } else {
-                            resolve();
-                        }
-                    }
-                };
-                
-                request.onerror = function() {
-                    resolve();
-                };
-            });
+                console.log('首次打开，保存默认配置...');
+                await saveDefaultProject();
+                return;
+            }
+
+            // 检查是否已有"南门公主"项目
+            const hasDefault = projects.some(p => p.name === DEFAULT_PROJECT.name);
+            if (!hasDefault) {
+                console.log('添加默认配置到项目列表...');
+                await saveDefaultProject();
+            }
         }
         
         // 保存默认项目到 IndexedDB
@@ -10108,6 +10112,7 @@
                 
                 request.onsuccess = function() {
                     console.log('默认配置已保存:', DEFAULT_PROJECT.name);
+                    persistProjectsToDisk();
                     resolve();
                 };
                 
@@ -10368,6 +10373,7 @@
                 const putRequest = store.put(projectData);
                 
                 putRequest.onsuccess = function() {
+                    persistProjectsToDisk();
                     currentProjectName = projectName;
                     currentProjectCategory = category || '默认分类';
                     try { localStorage.setItem('tdjl_lastProject', projectName); } catch(e) {}
@@ -10535,6 +10541,7 @@
                 const request = store.delete(projectName);
                 
                 request.onsuccess = function() {
+                    persistProjectsToDisk();
                     resolve();
                 };
                 
@@ -10543,6 +10550,36 @@
                     reject(event.target.error);
                 };
             });
+        }
+
+        // ==================== 项目磁盘持久化（重装/清缓存后不丢） ====================
+        async function persistProjectsToDisk() {
+            if (typeof window.__tfjlSaveAllProjects !== 'function') return;
+            try {
+                const all = await loadProjectListFromDB();
+                await window.__tfjlSaveAllProjects(all);
+            } catch (e) { console.warn('[项目磁盘持久化] 失败:', e); }
+        }
+
+        async function restoreCategoriesFromLocalStorage() {
+            if (!db) return;
+            const stored = await new Promise((res) => {
+                const t = db.transaction([CATEGORIES_STORE], 'readonly');
+                const r = t.objectStore(CATEGORIES_STORE).getAll();
+                r.onsuccess = () => res(r.result || []);
+                r.onerror = () => res([]);
+            });
+            if (stored.length > 0) return;
+            let localCats = [];
+            try { localCats = JSON.parse(localStorage.getItem('tfjl_categories') || '[]'); } catch (e) {}
+            if (!Array.isArray(localCats) || localCats.length === 0) return;
+            await new Promise((res) => {
+                const t = db.transaction([CATEGORIES_STORE], 'readwrite');
+                const s = t.objectStore(CATEGORIES_STORE);
+                localCats.forEach(c => { try { s.put({ name: c }); } catch (e) {} });
+                t.oncomplete = res; t.onerror = res; t.onabort = res;
+            });
+            console.log('[分类恢复] 从 localStorage 恢复', localCats.length, '个分类');
         }
 
         // 显示项目列表弹窗（点击项目名直接加载）
@@ -26525,7 +26562,7 @@ ${maSection}
         </style>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;pointer-events:none;z-index:999;opacity:0.5;">v260726-44</span>
+    <span id="versionTag" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;pointer-events:none;z-index:999;opacity:0.5;">v260726-45</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
