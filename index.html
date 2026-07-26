@@ -2813,7 +2813,8 @@
                 <button onclick="toggleNotepadPanel()" title="记事本" style="background:linear-gradient(135deg,#ffd700,#ff6b6b);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">📝</button>
                 <button id="txtFilesToggleBtn" onclick="toggleTxtFilesPanel()" title="脚本生成" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">📄</button>
                 <button onclick="toggleReferencePanel()" title="参考图片" style="background:linear-gradient(135deg,#9c27b0,#7b1fa2);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">🖼️</button>
-                <button onclick="saveCurrentProject()" title="保存" style="background:rgba(76,175,80,0.8);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">💾</button>
+                <button onclick="saveCurrentProject()" title="确定保存（不再自动保存：调卡调错也不会存盘）" style="background:rgba(76,175,80,0.8);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">💾 确定保存</button>
+                <span id="saveDirtyIndicator" style="display:none;color:#ff5252;font-size:0.85rem;font-weight:bold;align-self:center;" title="有未保存的修改">●未保存</span>
                 <button onclick="toggleActivityCalcPanel()" title="活动氪金计算器" style="background:linear-gradient(135deg,#ff6b6b,#feca57);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">🧮</button>
             </div>
         </div>
@@ -10453,6 +10454,9 @@
 
                         currentProjectName = projectName;
                         currentProjectCategory = project.category || '默认分类';
+                        // 刚加载的项目是干净的，清除“未保存”标记
+                        window.__tfjlProjectDirty = false;
+                        if (typeof updateSaveIndicator === 'function') updateSaveIndicator();
 
                         loadReferenceImagesFromProject(project);
 
@@ -11536,24 +11540,15 @@
         }
 
         // 自动保存项目
+        // 【改动】不再自动保存项目：避免调卡调错了被直接存盘。请点工具栏 💾（确定保存）手动保存。
+        // 这里只标记“有未保存的修改”，供 💾 旁的 ●未保存 提示。
         function autoSaveProject() {
-            if (currentProjectName && currentProjectName !== '默认项目') {
-                const currentData = {
-                    myHandCards: typeof myHandCards !== 'undefined' ? myHandCards : [],
-                    teammateHandCards: typeof teammateHandCards !== 'undefined' ? teammateHandCards : [],
-                    myPlacedCards: typeof myPlacedCards !== 'undefined' ? myPlacedCards : [],
-                    teammatePlacedCards: typeof teammatePlacedCards !== 'undefined' ? teammatePlacedCards : [],
-                    cardLevels: typeof cardLevels !== 'undefined' ? cardLevels : {},
-                    cardSkins: typeof cardSkins !== 'undefined' ? cardSkins : {},
-                    cardMoHua: typeof cardMoHua !== 'undefined' ? cardMoHua : {},
-                    myDeckInfo: document.getElementById('myDeckInfo')?.value || '',
-                    teammateDeckInfo: document.getElementById('teammateDeckInfo')?.value || '',
-                    notepad: document.getElementById('notepad')?.value || '',
-                    txtFiles: typeof txtFiles !== 'undefined' ? txtFiles : [],
-                    referenceImages: typeof referenceImages !== 'undefined' ? referenceImages : []
-                };
-                saveProjectToDB(currentProjectName, currentProjectCategory || '默认分类', currentData).catch(e => console.error('项目自动保存失败:', e));
-            }
+            window.__tfjlProjectDirty = true;
+            if (typeof updateSaveIndicator === 'function') updateSaveIndicator();
+        }
+        function updateSaveIndicator() {
+            const el = document.getElementById('saveDirtyIndicator');
+            if (el) el.style.display = (window.__tfjlProjectDirty ? 'inline' : 'none');
         }
 
         // 预览/编辑TXT文件
@@ -13909,43 +13904,40 @@
         let pendingSaveProjectName = '';
 
         function saveCurrentProject() {
-            const current = currentProjectName === '默认项目' ? '' : currentProjectName;
-            const isNewProject = currentProjectName === '默认项目' || !current;
-            pendingSaveProjectName = prompt('请输入项目名称：', current);
-
-            if (!pendingSaveProjectName || !pendingSaveProjectName.trim()) return;
-            pendingSaveProjectName = pendingSaveProjectName.trim();
-
-            // 检查是否是现有项目
+            const currentData = {
+                myHandCards: myHandCards,
+                teammateHandCards: teammateHandCards,
+                myPlacedCards: myPlacedCards,
+                teammatePlacedCards: teammatePlacedCards,
+                cardLevels: cardLevels,
+                cardSkins: cardSkins,
+                cardMoHua: cardMoHua,
+                myDeckInfo: document.getElementById('myDeckInfo')?.value || '',
+                teammateDeckInfo: document.getElementById('teammateDeckInfo')?.value || '',
+                notepad: document.getElementById('notepad')?.value || '',
+                txtFiles: typeof txtFiles !== 'undefined' ? txtFiles : [],
+                referenceImages: typeof referenceImages !== 'undefined' ? referenceImages : []
+            };
+            const isOpen = currentProjectName && currentProjectName !== '默认项目';
+            if (!isOpen) {
+                // 未打开具体项目：仍需输入名称
+                const name = prompt('请输入项目名称：', '');
+                if (!name || !name.trim()) return;
+                const targetName = name.trim();
+                saveProjectToDB(targetName, currentProjectCategory || '默认分类', currentData).then(() => {
+                    window.__tfjlProjectDirty = false; updateSaveIndicator();
+                    alert(`✅ 项目"${targetName}"保存成功！`);
+                }).catch(e => alert('❌ 保存失败：' + e));
+                return;
+            }
+            // 已打开的项目：直接覆盖保存（确定保存），不再弹分类框
             loadProjectListFromDB().then(projects => {
-                const existingProject = projects.find(p => p.name === pendingSaveProjectName);
-
-                if (existingProject) {
-                    // 现有项目：直接保存到当前分类，跳过分类选择
-                    const currentData = {
-                        myHandCards: myHandCards,
-                        teammateHandCards: teammateHandCards,
-                        myPlacedCards: myPlacedCards,
-                        teammatePlacedCards: teammatePlacedCards,
-                        cardLevels: cardLevels,
-                        cardSkins: cardSkins,
-                        cardMoHua: cardMoHua,
-                        myDeckInfo: myDeckInfo,
-                        teammateDeckInfo: teammateDeckInfo,
-                        notepad: notepad,
-                        txtFiles: txtFiles,
-                        referenceImages: referenceImages
-                    };
-                    const cat = existingProject.category || currentProjectCategory || '默认分类';
-                    saveProjectToDB(pendingSaveProjectName, cat, currentData).then(() => {
-                        alert(`✅ 项目"${pendingSaveProjectName}"保存成功！\n分类：${cat}`);
-                    }).catch(e => {
-                        alert('❌ 保存失败：' + e);
-                    });
-                } else {
-                    // 新项目：显示分类选择
-                    showCategorySelectModal();
-                }
+                const existing = projects.find(p => p.name === currentProjectName);
+                const cat = (existing && existing.category) || currentProjectCategory || '默认分类';
+                saveProjectToDB(currentProjectName, cat, currentData).then(() => {
+                    window.__tfjlProjectDirty = false; updateSaveIndicator();
+                    alert(`✅ 项目"${currentProjectName}"已保存`);
+                }).catch(e => alert('❌ 保存失败：' + e));
             });
         }
 
@@ -14850,6 +14842,13 @@
             // 2) 全局默认皮肤（英雄级 cardId，跨项目/跨上阵记住；队友卡未单独设时自动同步）
             if (typeof defaultCardSkins !== 'undefined' && defaultCardSkins[cardId] !== undefined) {
                 return defaultCardSkins[cardId];
+            }
+            // 3) 全局英雄级选择（右键 selectHeroSkin 设置）；不回退到这里切换皮肤会无效
+            if (typeof window.heroSkinSelections !== 'undefined' && cardName) {
+                const baseHero = (typeof getBaseHeroName === 'function') ? getBaseHeroName(cardName).heroName : cardName;
+                if (window.heroSkinSelections[baseHero] !== undefined) {
+                    return window.heroSkinSelections[baseHero];
+                }
             }
             return "默认";
         }
@@ -26656,7 +26655,7 @@ ${maSection}
         </style>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;pointer-events:none;z-index:999;opacity:0.5;">v260727-50</span>
+    <span id="versionTag" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;pointer-events:none;z-index:999;opacity:0.5;">v260727-51</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
