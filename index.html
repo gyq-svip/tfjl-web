@@ -15917,6 +15917,7 @@
                     e.dataTransfer.setData('text/source', 'favorite');
                     e.dataTransfer.setData('text/profession', card.dataset.profession || '');
                     draggedCard = card;
+                    window.__dragPayload = { source: 'favorite', id: card.dataset.id || '', name: card.dataset.name || '', isEngineering: card.dataset.engineering === 'true', profession: card.dataset.profession || '', handType: 'favorite' };
                     card.classList.add('dragging');
                 });
             });
@@ -15997,13 +15998,13 @@
             });
             slot.addEventListener('drop', async (e) => {
                 e.preventDefault();
-                const source = e.dataTransfer.getData('text/source');
+                const source = e.dataTransfer.getData('text/source') || (window.__dragPayload && window.__dragPayload.source) || '';
                 if (source !== 'favorite') return;
                 
-                const cardId = e.dataTransfer.getData('text/id');
-                const cardName = e.dataTransfer.getData('text/plain');
-                const isEngineering = e.dataTransfer.getData('text/engineer') === 'true';
-                const profession = e.dataTransfer.getData('text/profession');
+                const cardId = e.dataTransfer.getData('text/id') || (window.__dragPayload && window.__dragPayload.id) || '';
+                const cardName = e.dataTransfer.getData('text/plain') || (window.__dragPayload && window.__dragPayload.name) || '';
+                const isEngineering = (e.dataTransfer.getData('text/engineer') === 'true') || !!(window.__dragPayload && window.__dragPayload.isEngineering);
+                const profession = e.dataTransfer.getData('text/profession') || (window.__dragPayload && window.__dragPayload.profession) || '';
                 const slotId = slot.dataset.slot;
                 const slotType = slot.dataset.type;
                 const isUserSlot = slotId.startsWith('u');
@@ -16127,6 +16128,7 @@
             e.dataTransfer.setData('text/engineer', card.dataset.engineering || 'false');
             e.dataTransfer.setData('text/source', 'pool');
             e.dataTransfer.setData('text/profession', card.dataset.profession || '');
+            window.__dragPayload = { source: 'pool', id: card.dataset.id || '', name: card.dataset.name || '', isEngineering: card.dataset.engineering === 'true', profession: card.dataset.profession || '' };
         }
 
         // 手牌拖拽开始
@@ -16143,6 +16145,7 @@
             e.dataTransfer.setData('text/source', 'hand');
             e.dataTransfer.setData('text/hand', handType);
             e.dataTransfer.setData('text/profession', profession);
+            window.__dragPayload = { source: 'hand', id: cardId, name: cardName, isEngineering: isEngineering, profession: profession, handType: handType };
         }
 
         // 手牌卡牌点击（上卡到战斗槽）
@@ -16375,11 +16378,11 @@
             e.preventDefault();
             this.classList.remove('drag-over');
             
-            const source = e.dataTransfer.getData('text/source');
-            const cardId = e.dataTransfer.getData('text/id');
-            const cardName = e.dataTransfer.getData('text/plain');
-            const isEngineering = e.dataTransfer.getData('text/engineer') === 'true';
-            const profession = e.dataTransfer.getData('text/profession');
+            const source = e.dataTransfer.getData('text/source') || (window.__dragPayload && window.__dragPayload.source) || '';
+            const cardId = e.dataTransfer.getData('text/id') || (window.__dragPayload && window.__dragPayload.id) || '';
+            const cardName = e.dataTransfer.getData('text/plain') || (window.__dragPayload && window.__dragPayload.name) || '';
+            const isEngineering = (e.dataTransfer.getData('text/engineer') === 'true') || !!(window.__dragPayload && window.__dragPayload.isEngineering);
+            const profession = e.dataTransfer.getData('text/profession') || (window.__dragPayload && window.__dragPayload.profession) || '';
             const slotId = this.dataset.slot;
             const slotType = this.dataset.type;
             const isUserSlot = slotId.startsWith('u');
@@ -16406,7 +16409,7 @@
             }
             
             if (source === 'hand') {
-                const handType = e.dataTransfer.getData('text/hand');
+                const handType = e.dataTransfer.getData('text/hand') || (window.__dragPayload && window.__dragPayload.handType) || '';
                 if (isUserSlot && handType !== 'my') return;
                 if (isTeammateSlot && handType !== 'teammate') return;
             }
@@ -16459,7 +16462,7 @@
                 updateHandDisplay(isUserSlot ? 'my' : 'teammate');
                 updateDamageReductionDisplay(); // 更新减伤显示
             } else if (source === 'hand') {
-                const handType = e.dataTransfer.getData('text/hand');
+                const handType = e.dataTransfer.getData('text/hand') || (window.__dragPayload && window.__dragPayload.handType) || '';
                 const handCards = handType === 'my' ? myHandCards : teammateHandCards;
                 const placedArray = handType === 'my' ? myPlacedCards : teammatePlacedCards;
                 if (!Array.isArray(placedArray)) {
@@ -17903,6 +17906,8 @@
         
         // 卡牌拖动排序
         let draggedCard = null;
+        // 拖拽数据兜底：WebView2 下自定义 MIME 的 getData 常返回空，用全局变量回退
+        window.__dragPayload = null;
         let cardOrder = {}; // 存储卡牌顺序
         
         // 加载卡牌顺序
@@ -26562,7 +26567,7 @@ ${maSection}
         </style>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;pointer-events:none;z-index:999;opacity:0.5;">v260726-46</span>
+    <span id="versionTag" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;pointer-events:none;z-index:999;opacity:0.5;">v260726-47</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
