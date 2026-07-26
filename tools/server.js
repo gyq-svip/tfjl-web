@@ -9,7 +9,7 @@ const path = require('path');
 const ROOT = 'C:\\gyq\\tfjl\\tfjl-web';                       // 项目目录（本文件所在目录的上级）
 const TESS = 'D:\\withfriends\\塔防精灵助手数据\\tessdata';    // OCR 资源目录（与 tfjl.dat 同目录）
 const LAOMA = 'D:\\withfriends\\塔防老马助手';                // 老马助手本地目录（直接引用其资源，零拷贝）
-const RESEARCH = 'D:\\withfriends\\tfjl-research';           // 研究抽取产物（卡名表/阵容库等，C 盘空间不足故全放 D）
+const RESEARCH = 'D:\\withfriends\\塔防精灵助手数据\\research'; // 研究抽取产物（卡名表/阵容库等），统一放在助手自己的数据目录下
 const PORT = 8765;
 
 const TYPES = {
