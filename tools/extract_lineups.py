@@ -1,7 +1,7 @@
 import os, glob, json
 
 WECHAT = r'D:\SYS\Documents\WeChat Files\ymkfqtbl\Applet\wxa46b2910643e4c31\usr\gamecaches'
-RESEARCH = r'D:\withfriends\tfjl-research'
+RESEARCH = r'D:\withfriends\塔防精灵助手数据\research'
 os.makedirs(RESEARCH, exist_ok=True)
 
 # 卡名表（用于从描述里抽取英雄名）

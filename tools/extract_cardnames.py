@@ -6,7 +6,7 @@
 import os, json
 
 CACHE = r"D:\SYS\Documents\WeChat Files\ymkfqtbl\Applet\wxa46b2910643e4c31\usr\gamecaches\resources"
-OUT = r"D:\withfriends\tfjl-research\game_cardnames.json"
+OUT = r"D:\withfriends\塔防精灵助手数据\research\game_cardnames.json"
 
 # 卡牌总表文件(含 ui/cardpic_l/ 明文路径)
 JF = os.path.join(CACHE, "17294991223931.json")

@@ -565,7 +565,7 @@ async function loadLineups(){
       }
     }catch(e){}
   }
-  $('lineupStatus').textContent = '未找到 /research/lineups.json —— 请重启 tools/start.bat 或检查 D:\\withfriends\\tfjl-research';
+  $('lineupStatus').textContent = '未找到 /research/lineups.json —— 请重启 tools/start.bat 或检查 D:\\withfriends\\塔防精灵助手数据\\research';
 }
 
 function parseLineups(){
@@ -617,7 +617,7 @@ async function saveLineup(){
   const ta = $('lineupLib');
   try{
     const r = await fetch('/research/lineups_user.json', {method:'POST', headers:{'Content-Type':'text/plain'}, body: ta.value});
-    $('lineupStatus').textContent = r.ok ? '已保存到 D:\\withfriends\\tfjl-research\\lineups_user.json' : '保存失败：' + r.status;
+    $('lineupStatus').textContent = r.ok ? '已保存到 D:\\withfriends\\塔防精灵助手数据\\research\\lineups_user.json' : '保存失败：' + r.status;
   }catch(e){ $('lineupStatus').textContent = '保存失败：' + e.message; }
 }
 
