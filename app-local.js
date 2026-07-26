@@ -2140,6 +2140,8 @@ if (isTauriApp) {
         const avgCount = (totalGames / stats.length).toFixed(1);
 
         // === 本周（周一~周日）合计计算（提前，供顶部卡片与周X区共用）===
+        // 注意：只有「按周统计」这块每周一重置——它只累加「本周一~今天」的每日数据，
+        // 其它卡片（总局数/天数/日均/最高/历史趋势）均为永久累计，不受周一影响。
         const weekDayLabels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
         const weekDayDow = [1, 2, 3, 4, 5, 6, 0]; // getDay() 值
         const today = new Date();
@@ -2164,8 +2166,9 @@ if (isTauriApp) {
             const ds = formatLocalDate(d);
             return { label: weekDayLabels[i], dow, count: dateMap[ds] || 0, date: ds };
         });
-        // 本周总局数（周一~周日 合计）
+        // 本周总局数（周一~周日 合计）—— 仅取本周一至今的每日数据，故每周一自然归零
         const weekTotal = wdData.reduce((sum, d) => sum + d.count, 0);
+        const mondayDate = wdData[0].date; // wdData[0] = 本周一，用于显示本周边界
 
         let html = '';
         html += `<div style="display:flex;gap:16px;margin-bottom:12px;flex-wrap:wrap;">`;
@@ -2173,7 +2176,7 @@ if (isTauriApp) {
         html += `<div style="background:rgba(0,188,212,0.2);padding:8px 12px;border-radius:6px;text-align:center;"><div style="color:#00bcd4;font-size:1.4rem;font-weight:bold;">${stats.length}</div><div style="color:rgba(255,255,255,0.5);font-size:0.7rem;">天数</div></div>`;
         html += `<div style="background:rgba(255,152,0,0.2);padding:8px 12px;border-radius:6px;text-align:center;"><div style="color:#ff9800;font-size:1.4rem;font-weight:bold;">${avgCount}</div><div style="color:rgba(255,255,255,0.5);font-size:0.7rem;">日均</div></div>`;
         html += `<div style="background:rgba(244,67,54,0.2);padding:8px 12px;border-radius:6px;text-align:center;"><div style="color:#f44336;font-size:1.4rem;font-weight:bold;">${maxCount}</div><div style="color:rgba(255,255,255,0.5);font-size:0.7rem;">最高</div></div>`;
-        html += `<div style="background:rgba(0,230,118,0.2);padding:8px 12px;border-radius:6px;text-align:center;"><div style="color:#00e676;font-size:1.4rem;font-weight:bold;">${weekTotal}</div><div style="color:rgba(255,255,255,0.5);font-size:0.7rem;">本周局数</div></div>`;
+        html += `<div style="background:rgba(0,230,118,0.2);padding:8px 12px;border-radius:6px;text-align:center;"><div style="color:#00e676;font-size:1.4rem;font-weight:bold;" title="仅统计本周一~今天，每周一 0 点自动重置">${weekTotal}</div><div style="color:rgba(255,255,255,0.5);font-size:0.7rem;" title="每周一 0 点自动重置">本周局数·周一重置</div></div>`;
         html += `</div>`;
 
         const barWidth = Math.min(28, Math.max(14, Math.floor(420 / stats.length)));
@@ -2192,7 +2195,7 @@ if (isTauriApp) {
 
         const recent = stats.slice(0, 30);
         const wdMax = Math.max(1, ...wdData.map(d => d.count));
-        html += `<div style="margin-top:12px;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.5);font-size:0.75rem;">周一~周日</span><span style="color:#00e676;font-size:0.9rem;font-weight:bold;">本周合计 ${weekTotal} 局</span></div>`;
+        html += `<div style="margin-top:12px;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.5);font-size:0.75rem;">周一~周日<span style="color:#00e676;margin-left:6px;">· 每周一重置</span></span><span style="color:#00e676;font-size:0.9rem;font-weight:bold;" title="本周边界：自 ${mondayDate}（周一）起">本周合计 ${weekTotal} 局</span></div>`;
         for (let i = 0; i < 7; i++) {
             const d = wdData[i];
             const bar = '█'.repeat(Math.min(20, Math.round(d.count / wdMax * 20)));

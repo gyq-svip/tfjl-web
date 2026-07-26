@@ -14009,7 +14009,8 @@
         let favoriteCards = [];
         let cardLevels = {};
         let individualCardLevels = {}; // 每张卡的独立等级存储
-        let cardSkins = {}; // 每张卡的皮肤存储 { "my_47": "烈焰皮肤", ... }
+        let cardSkins = {}; // 每张卡的皮肤存储（项目级）{ "my_47": "烈焰皮肤", ... }
+        let defaultCardSkins = {}; // 全局默认皮肤（英雄级，跨项目/跨上阵记住）{ "47": "太平乐·火灵", ... }
         let cardMoHua = {}; // 每张卡的魔化开关 { "my_47": true, ... }
         let professionOrder = [];
         const MAX_HAND_CARDS = 10;
@@ -14842,8 +14843,13 @@
         // 获取卡牌当前皮肤
         function getCardSkin(cardId, cardName, handType = 'my') {
             const key = `${handType}_${cardId}`;
+            // 1) 当前项目内手动设置的皮肤（最高优先级）
             if (cardSkins[key] !== undefined) {
                 return cardSkins[key];
+            }
+            // 2) 全局默认皮肤（英雄级 cardId，跨项目/跨上阵记住；队友卡未单独设时自动同步）
+            if (typeof defaultCardSkins !== 'undefined' && defaultCardSkins[cardId] !== undefined) {
+                return defaultCardSkins[cardId];
             }
             return "默认";
         }
@@ -14906,6 +14912,35 @@
             if (saved) {
                 cardSkins = JSON.parse(saved);
             }
+        }
+        // 保存全局默认皮肤到 localStorage
+        function saveDefaultCardSkins() {
+            localStorage.setItem('tdjl_defaultCardSkins', JSON.stringify(defaultCardSkins));
+        }
+        function loadDefaultCardSkins() {
+            const saved = localStorage.getItem('tdjl_defaultCardSkins');
+            if (saved) {
+                try { defaultCardSkins = JSON.parse(saved); } catch (e) { defaultCardSkins = {}; }
+            }
+        }
+        // 设置全局默认皮肤（英雄级，跨项目/跨上阵记住；队友卡未单独设时自动同步）
+        async function setDefaultCardSkin(cardId, skin) {
+            defaultCardSkins[cardId] = skin;
+            saveDefaultCardSkins();
+            // 刷新该卡所有相关位置（手牌 + 战斗槽），让默认皮立即生效
+            try {
+                const refreshHandCard = async (el) => {
+                    const name = el.dataset.name || '';
+                    if (!name) return;
+                    const url = await window.resolveHeroSkinUrl(name, skin);
+                    if (url) applySkinBgToHandCard(el, url);
+                    else removeSkinBgFromHandCard(el);
+                };
+                document.querySelectorAll('.selected-card[data-id="' + cardId + '"]').forEach(el => refreshHandCard(el));
+                document.querySelectorAll('.battle-slot.filled[data-card-id="' + cardId + '"]').forEach(async (slot) => {
+                    try { await applySkinBgToSlot(slot, slot.querySelector('.card-name') ? slot.querySelector('.card-name').textContent : ''); } catch (e) {}
+                });
+            } catch (e) { console.warn('[SKIN] setDefaultCardSkin refresh error:', e); }
         }
         
         // 获取皮肤属性描述（含魔化）
@@ -15039,6 +15074,10 @@
         function showLevelDropdown(event, cardId, cardType, handType = 'my', cardName = '') {
             event.stopPropagation();
             event.preventDefault();
+            // 判断右键的卡属于「项目上阵卡」还是「卡池/收藏定义卡」：
+            // 手牌容器/战斗槽内 → 选皮肤=当前阵容(project)；卡池/收藏内 → 选皮肤=全局默认(default)
+            const _scopeEl = (event.target && event.target.closest) ? event.target.closest('#myHandContainer, #teammateHandContainer, .battle-slot') : null;
+            const isProjectScope = !!_scopeEl;
 
             // 移除已存在的下拉框
             document.querySelectorAll('.level-dropdown').forEach(el => el.remove());
@@ -15086,7 +15125,8 @@
                 item.style.color = skin === currentSkin ? '#ff9800' : '#fff';
                 item.onclick = (e) => {
                     e.stopPropagation();
-                    setCardSkin(cardId, skin, handType);
+                    if (isProjectScope) setCardSkin(cardId, skin, handType);
+                    else setDefaultCardSkin(cardId, skin);
                     dropdown.remove();
                     updateAllCardLevelBadges();
                 };
@@ -15377,6 +15417,9 @@
         function showSkinOnlyDropdown(event, cardId, cardName, handType = 'my') {
             event.stopPropagation();
             event.preventDefault();
+            // 判断右键的卡属于「项目上阵卡」还是「卡池/收藏定义卡」
+            const _scopeEl = (event.target && event.target.closest) ? event.target.closest('#myHandContainer, #teammateHandContainer, .battle-slot') : null;
+            const isProjectScope = !!_scopeEl;
             
             hideSkinTooltip(); // 关闭tooltip
             document.querySelectorAll('.skin-dropdown').forEach(el => el.remove());
@@ -15421,7 +15464,8 @@
                 item.onmouseleave = () => item.style.background = 'transparent';
                 item.onclick = (e) => {
                     e.stopPropagation();
-                    setCardSkin(cardId, skin, handType);
+                    if (isProjectScope) setCardSkin(cardId, skin, handType);
+                    else setDefaultCardSkin(cardId, skin);
                     dropdown.remove();
                     updateAllCardLevelBadges();
                 };
@@ -15511,7 +15555,8 @@
                 item.onmouseleave = () => item.style.background = 'transparent';
                 item.onclick = (e) => {
                     e.stopPropagation();
-                    setCardSkin(cardId, skin, handType);
+                    if (isProjectScope) setCardSkin(cardId, skin, handType);
+                    else setDefaultCardSkin(cardId, skin);
                     dropdown.remove();
                     updateAllCardLevelBadges();
                 };
@@ -15534,7 +15579,7 @@
         }
         
         // 显示添加皮肤对话框
-        function showAddSkinDialog(cardName, cardId, cardType, handType, badge, currentLevel) {
+        function showAddSkinDialog(cardName, cardId, cardType, handType, badge, currentLevel, scope = 'project') {
             const existingSkins = getAvailableSkins(cardName);
             
             const modal = document.createElement('div');
@@ -15611,7 +15656,8 @@
                     addCustomSkinAttribute(cardName, skinName, skinAttr);
                 }
                 
-                setCardSkin(cardId, skinName, handType);
+                if (scope === 'project') setCardSkin(cardId, skinName, handType);
+                else setDefaultCardSkin(cardId, skinName);
                 
                 modal.remove();
                 
@@ -15706,11 +15752,18 @@
             }
 
             // 优先用 resolveHeroSkinInfo（支持延迟 base64 加载且返回皮肤名）
+            // 取该卡当前皮肤（项目级 → 全局默认 → 默认），让背景图随卡牌皮肤生效
+            let slotSkin = '默认';
+            const slotCardId = slot && slot.dataset ? slot.dataset.cardId : null;
+            const slotHandType = (slot && slot.dataset && slot.dataset.handType) ? slot.dataset.handType : 'my';
+            if (slotCardId) {
+                slotSkin = getCardSkin(slotCardId, skinHeroName, slotHandType);
+            }
             let skinInfo = null;
             if (window.resolveHeroSkinInfo) {
-                skinInfo = await window.resolveHeroSkinInfo(skinHeroName);
+                skinInfo = await window.resolveHeroSkinInfo(skinHeroName, slotSkin);
             } else if (window.resolveHeroSkinUrl) {
-                const url = await window.resolveHeroSkinUrl(skinHeroName);
+                const url = await window.resolveHeroSkinUrl(skinHeroName, slotSkin);
                 if (url) skinInfo = { url };
             } else {
                 const url = window.getHeroSkinUrl && window.getHeroSkinUrl(skinHeroName);
@@ -15747,6 +15800,7 @@
                     slot.classList.add('filled');
                     slot.classList.remove('empty');
                     slot.dataset.cardId = card.id;
+                    slot.dataset.handType = 'my';
                     slot.dataset.profession = card.profession;
                     // 应用皮肤背景（异步加载，错误不中断）
                     try { await applySkinBgToSlot(slot, card.name); } catch (e) {}
@@ -15764,6 +15818,7 @@
                     slot.classList.add('filled');
                     slot.classList.remove('empty');
                     slot.dataset.cardId = card.id;
+                    slot.dataset.handType = 'teammate';
                     slot.dataset.profession = card.profession;
                     // 应用皮肤背景（异步加载，错误不中断）
                     try { await applySkinBgToSlot(slot, card.name); } catch (e) {}
@@ -16089,6 +16144,7 @@
                 slot.classList.add('filled');
                 slot.classList.remove('empty');
                 slot.dataset.cardId = cardId;
+                slot.dataset.handType = slotHandType;
                 slot.dataset.profession = profession;
 
                 // 应用皮肤背景
@@ -16231,6 +16287,7 @@
                     slot.classList.add('filled');
                     slot.classList.remove('empty');
                     slot.dataset.cardId = cardId;
+                    slot.dataset.handType = handType;
                     slot.dataset.profession = profession;
 
                     try { await applySkinBgToSlot(slot, cardName); } catch (e) {}
@@ -16354,8 +16411,10 @@
                 document.querySelectorAll('#' + container.id + ' .selected-card:not(.empty)').forEach(async card => {
                     const name = getMainCardName(card.dataset.name);
                     if (!name) return;
+                    const cid = card.dataset.id;
+                    const skin = cid ? getCardSkin(cid, name, handType) : '默认';
                     try {
-                        const url = await window.resolveHeroSkinUrl(name);
+                        const url = await window.resolveHeroSkinUrl(name, skin);
                         if (url) {
                             applySkinBgToHandCard(card, url);
                         } else {
@@ -16476,6 +16535,7 @@
                 this.classList.add('filled');
                 this.classList.remove('empty');
                 this.dataset.cardId = cardId;
+                this.dataset.handType = isUserSlot ? 'my' : 'teammate';
                 this.dataset.profession = profession;
 
                 try { await applySkinBgToSlot(this, cardName); } catch (e) {}
@@ -18103,6 +18163,7 @@
             loadCardLevels();
             loadIndividualCardLevels();
             loadCardSkins();
+            loadDefaultCardSkins();
             loadCardMoHua();
             loadCustomSkins();
             loadCustomSkinAttributes();
@@ -26595,7 +26656,7 @@ ${maSection}
         </style>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;pointer-events:none;z-index:999;opacity:0.5;">v260726-49</span>
+    <span id="versionTag" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;pointer-events:none;z-index:999;opacity:0.5;">v260727-50</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
