@@ -412,9 +412,76 @@ if (isTauriApp) {
 
     // ==================== 初始化 ====================
 
+    // ==================== 磁盘配置恢复（重装/清缓存后复原） ====================
+    // 解析真正的软件数据目录：优先读默认目录下的引导标记，避免用户改过目录后重装找不到数据
+    async function _resolveRealDataDir() {
+        const def = DEFAULT_SOFTWARE_DATA_DIR.replace(/[\\/]+$/, '');
+        try {
+            const raw = await readTextFile(def + '\\tfjl_datadir.json');
+            if (raw) { const d = JSON.parse(raw); if (d && d.dir) return d.dir.replace(/[\\/]+$/, ''); }
+        } catch (e) {}
+        try {
+            const raw = await readTextFile(def + '\\tfjl_maDirsConfig.json');
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (parsed && parsed.value) {
+                    const c = JSON.parse(parsed.value);
+                    if (c && c.softwareDataDir) return c.softwareDataDir.replace(/[\\/]+$/, '');
+                }
+            }
+        } catch (e) {}
+        return def;
+    }
+
+    // 启动时从磁盘恢复所有 tfjl_*.json 到 localStorage（仅当 localStorage 无该 key，不打扰正常会话）
+    async function restoreLocalFromDisk() {
+        if (!isTauriApp) return;
+        const dir = await _resolveRealDataDir();
+        let files = [];
+        try { files = await readDir(dir); } catch (e) { return; }
+        let restored = 0;
+        for (const f of files) {
+            if (!f.name || !f.name.startsWith('tfjl_') || !f.name.endsWith('.json')) continue;
+            const key = f.name.slice(5, -5);
+            if (localStorage.getItem(key) !== null) continue;
+            try {
+                const raw = await readTextFile(dir + '\\' + f.name);
+                const parsed = JSON.parse(raw);
+                if (parsed && parsed.value !== null && parsed.value !== undefined) {
+                    localStorage.setItem(key, parsed.value);
+                    restored++;
+                }
+            } catch (e) {}
+        }
+        if (restored > 0) console.log('[数据同步] 已从磁盘恢复 ' + restored + ' 项配置 → ' + dir);
+    }
+
+    // 项目整体落盘（Tauri）：softwareDataDir/projects/projects.json
+    async function tfjlSaveAllProjects(projectsArray) {
+        if (!isTauriApp) return false;
+        const dir = await _resolveRealDataDir();
+        const pdir = dir + '\\projects';
+        try { await createDir(pdir); } catch (e) {}
+        try {
+            await writeTextFile(pdir + '\\projects.json', JSON.stringify({ projects: projectsArray || [], savedAt: Date.now() }));
+            return true;
+        } catch (e) { console.error('[项目磁盘写] 失败:', e); return false; }
+    }
+
+    async function tfjlRestoreAllProjects() {
+        if (!isTauriApp) return [];
+        const dir = await _resolveRealDataDir();
+        try {
+            const raw = await readTextFile(dir + '\\projects\\projects.json');
+            const data = JSON.parse(raw);
+            return Array.isArray(data.projects) ? data.projects : [];
+        } catch (e) { return []; }
+    }
+
     async function initAppLocal() {
         const btn = document.getElementById('appLocalSettingsBtn');
         if (btn) btn.style.display = 'flex';
+        await restoreLocalFromDisk();  // 先恢复磁盘配置（重装/清缓存后复原）
         loadConfig();
         initDataSync();  // 启动 localStorage → 用户数据目录自动同步
         loadSkinSelections();  // 恢复皮肤选择记录
@@ -3604,8 +3671,10 @@ if (isTauriApp) {
     window.deleteBackup = deleteBackup;           // 删除备份文件
     window.syncAllNow = syncAllNow;            // 手动触发全量数据同步到本地目录
     window.initDataSync = initDataSync;        // 重新初始化同步路径
-    window.calcScreenshotStats = calcScreenshotStats;
-    window.calcLogBattleStats = calcLogBattleStats;
+        window.calcScreenshotStats = calcScreenshotStats;
+        window.calcLogBattleStats = calcLogBattleStats;
+        window.__tfjlSaveAllProjects = tfjlSaveAllProjects;
+        window.__tfjlRestoreAllProjects = tfjlRestoreAllProjects;
     window.clearLogBattleCache = clearLogBattleCache;
     window.importFileToProject = importFileToProject;
     window.batchImportFilesToProject = batchImportFilesToProject;
