@@ -57,7 +57,13 @@ tr:hover td{background:rgba(77,182,172,0.06)}
 </head>
 <body>
 <div class="container">
-    <h1>🌊 深海统计</h1>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:6px;">
+        <h1 style="margin:0;">🌊 深海统计</h1>
+        <div style="display:flex;gap:6px;">
+            <button class="ghost small" onclick="history.back()" title="返回主站">← 返回</button>
+            <button class="ghost small" onclick="window.close()" title="关闭此页">✕ 关闭</button>
+        </div>
+    </div>
     <div class="sub">每日战况 + 杯数趋势 + 阵营联盟前50</div>
 
     <!-- 赛季管理 -->
