@@ -10616,36 +10616,46 @@
             const projects = await loadProjectListFromDB();
             const startupProject = localStorage.getItem('tdjl_startupProject'); // 固定启动项目（null=用上次项目）
 
-            let html = '<div id="projectDialogBox" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:2000;display:flex;align-items:center;justify-content:center;">';
-            html += '<div style="background:#1a1a2e;padding:30px;border-radius:16px;min-width:420px;max-width:520px;border:2px solid rgba(255,215,0,0.3);">';
-            html += '<h2 style="color:#ffd700;margin-bottom:14px;">📂 选择项目</h2>';
+            // 顶部全宽、可下滑的面板（不再用居中小弹窗）
+            let html = '<div id="projectDialogBox" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.55);z-index:2000;" onclick="closeProjectDialog()">';
+            html += '<div onclick="event.stopPropagation()" style="position:fixed;top:0;left:0;right:0;background:linear-gradient(180deg,#1a1a2e,#16213e);box-shadow:0 10px 30px rgba(0,0,0,0.5);max-height:88vh;display:flex;flex-direction:column;">';
 
+            // 头部：标题 + 关闭
+            html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid rgba(255,215,0,0.15);">';
+            html += '<h2 style="margin:0;color:#ffd700;font-size:1.15rem;">📂 选择项目</h2>';
+            html += '<button onclick="closeProjectDialog()" title="关闭" style="background:rgba(255,255,255,0.08);color:#fff;border:none;width:36px;height:36px;border-radius:8px;cursor:pointer;font-size:1.2rem;line-height:1;">✕</button>';
+            html += '</div>';
+
+            // 可下滑的项目列表
+            html += '<div style="overflow-y:auto;padding:12px 16px;flex:1;-webkit-overflow-scrolling:touch;">';
             if (projects.length === 0) {
-                html += '<p style="color:rgba(255,255,255,0.6);text-align:center;padding:20px;">暂无保存的项目</p>';
+                html += '<p style="color:rgba(255,255,255,0.6);text-align:center;padding:24px;">暂无保存的项目</p>';
             } else {
                 projects.forEach(p => {
                     const date = new Date(p.timestamp).toLocaleString('zh-CN');
                     const isCurrent = p.name === currentProjectName;
                     const isStartup = startupProject === p.name;
-                    html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px;background:rgba(255,255,255,0.05);border-radius:8px;margin-bottom:10px;${isCurrent ? 'border:2px solid #4fc3f7;' : ''}">`;
-                    html += `<div style="flex:1;cursor:pointer;" onclick="loadProjectFromDB('${p.name}').then(()=>closeProjectDialog()).catch(e=>alert('加载失败:'+e))">`;
-                    html += `<div style="color:${isCurrent ? '#4fc3f7' : '#fff'};font-weight:bold;">${p.name}${isCurrent ? ' ✓' : ''}</div>`;
-                    html += `<div style="color:rgba(255,255,255,0.5);font-size:0.85rem;">${date}</div>`;
+                    html += `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px 16px;background:rgba(255,255,255,0.04);border-radius:12px;margin-bottom:10px;${isCurrent ? 'border:1px solid #4fc3f7;' : 'border:1px solid rgba(255,255,255,0.06)'}">`;
+                    html += `<div style="flex:1;min-width:0;cursor:pointer;" onclick="loadProjectFromDB('${p.name}').then(()=>closeProjectDialog()).catch(e=>alert('加载失败:'+e))">`;
+                    html += `<div style="color:${isCurrent ? '#4fc3f7' : '#fff'};font-weight:bold;font-size:1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.name}${isCurrent ? ' ✓' : ''}</div>`;
+                    html += `<div style="color:rgba(255,255,255,0.5);font-size:0.8rem;margin-top:2px;">${date}</div>`;
                     html += `</div>`;
+                    html += `<div style="display:flex;gap:8px;align-items:center;flex-shrink:0;">`;
                     // 启动项目星标（★=已固定为启动项目）
-                    html += `<button onclick="event.stopPropagation();toggleStartupProject('${p.name}')" title="${isStartup ? '已设为启动项目（点击取消固定）' : '设为每次启动自动打开的项目'}" style="background:${isStartup ? 'linear-gradient(135deg,#ffd700,#ff9800)' : 'rgba(255,255,255,0.1)'};color:${isStartup ? '#1a1a2e' : '#ffd700'};border:none;padding:8px 10px;border-radius:8px;cursor:pointer;font-size:1rem;line-height:1;margin:0 6px;">${isStartup ? '★' : '☆'}</button>`;
-                    html += `<button onclick="event.stopPropagation();confirmDeleteProject('${p.name}')" style="background:linear-gradient(135deg,#f44336,#c62828);color:white;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:0.85rem;">🗑️</button>`;
+                    html += `<button onclick="event.stopPropagation();toggleStartupProject('${p.name}')" title="${isStartup ? '已设为启动项目（点击取消固定）' : '设为每次启动自动打开的项目'}" style="background:${isStartup ? 'linear-gradient(135deg,#ffd700,#ff9800)' : 'rgba(255,255,255,0.08)'};color:${isStartup ? '#1a1a2e' : 'rgba(255,215,0,0.85)'};border:none;width:38px;height:38px;border-radius:10px;cursor:pointer;font-size:1.15rem;line-height:1;">${isStartup ? '★' : '☆'}</button>`;
+                    html += `<button onclick="event.stopPropagation();confirmDeleteProject('${p.name}')" title="删除项目" style="background:linear-gradient(135deg,#f44336,#c62828);color:white;border:none;width:38px;height:38px;border-radius:10px;cursor:pointer;font-size:1rem;line-height:1;">🗑️</button>`;
+                    html += `</div>`;
                     html += `</div>`;
                 });
             }
+            html += '</div>';
 
-            // 启动项目说明 + 清除
-            html += `<div style="margin-top:8px;padding:10px;background:rgba(255,215,0,0.08);border-radius:8px;font-size:0.82rem;color:rgba(255,255,255,0.7);text-align:center;line-height:1.6;">`;
-            html += `启动时自动打开：<b style="color:#ffd700;">${startupProject ? '「' + startupProject + '」' : '（上次使用的项目）'}</b><br>`;
-            html += `<button onclick="clearStartupProject()" style="margin-top:6px;background:rgba(255,255,255,0.1);color:white;border:1px solid rgba(255,255,255,0.2);padding:4px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">清除固定（恢复用上次项目）</button>`;
+            // 底部：启动项目说明 + 清除
+            html += `<div style="padding:12px 20px;border-top:1px solid rgba(255,255,255,0.08);background:rgba(255,215,0,0.05);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">`;
+            html += `<div style="font-size:0.85rem;color:rgba(255,255,255,0.75);line-height:1.5;">启动自动打开：<b style="color:#ffd700;">${startupProject ? '「' + startupProject + '」' : '（上次使用的项目）'}</b></div>`;
+            html += `<button onclick="clearStartupProject()" style="background:rgba(255,255,255,0.1);color:white;border:1px solid rgba(255,255,255,0.2);padding:7px 14px;border-radius:8px;cursor:pointer;font-size:0.82rem;white-space:nowrap;">清除固定</button>`;
             html += `</div>`;
 
-            html += '<button onclick="closeProjectDialog()" style="margin-top:14px;width:100%;padding:12px;background:rgba(255,255,255,0.1);color:white;border:1px solid rgba(255,255,255,0.2);border-radius:8px;cursor:pointer;">关闭</button>';
             html += '</div></div>';
 
             document.body.insertAdjacentHTML('beforeend', html);
@@ -26712,7 +26722,7 @@ ${maSection}
         </style>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;pointer-events:none;z-index:999;opacity:0.5;">v260727-58</span>
+    <span id="versionTag" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;pointer-events:none;z-index:999;opacity:0.5;">v260728-01</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
