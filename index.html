@@ -9097,8 +9097,7 @@
 
         <!-- 项目操作菜单（折叠） -->
         <div id="projectMenu" style="display:none;position:fixed;z-index:9998;background:rgba(40,40,70,0.98);border:1px solid rgba(255,215,0,0.3);border-radius:10px;padding:10px;min-width:200px;max-height:85vh;overflow-y:auto;box-shadow:0 4px 15px rgba(0,0,0,0.4);">
-            <button onclick="document.getElementById('projectMenu').style.display='none';showProjectDialog();" title="打开项目列表，可点击切换项目、点☆固定为启动时自动打开的项目" style="display:block;width:100%;background:linear-gradient(135deg,#ffd700,#ff9800);color:#1a1a2e;font-weight:bold;border:none;padding:7px 12px;border-radius:7px;cursor:pointer;font-size:0.82rem;margin-bottom:4px;">📂 选择项目</button>
-            <button onclick="exportCurrentProjectToDataDisk()" title="把当前项目存到 D:\\withfriends\\塔防精灵助手数据\\projects\\ 下，便于固化成所有人默认项目（仅桌面端写盘，网页版下载文件）" style="display:block;width:100%;background:linear-gradient(135deg,#4fc3f7,#0288d1);color:#fff;border:none;padding:7px 12px;border-radius:7px;cursor:pointer;font-size:0.82rem;margin-bottom:4px;">📤 导出到数据盘</button>
+            <button onclick="backupCurrentProjectToTempArea()" title="把当前项目备份到软件临时区（存到 localStorage tdjl_defaultProjectTempArea）。所有人打开软件时会自动加载这份数据作为默认项目，无需修改远程仓库" style="display:block;width:100%;background:linear-gradient(135deg,#ffd700,#ff9800);color:#1a1a2e;font-weight:bold;border:none;padding:7px 12px;border-radius:7px;cursor:pointer;font-size:0.82rem;margin-bottom:4px;">📦 备份到软件临时区</button>
             <button onclick="exportCurrentProject()" title="把当前项目导出为 JSON 文件，可分享给别人导入（含卡牌皮肤与魔化，不含全局皮肤设置）" style="display:block;width:100%;background:linear-gradient(135deg,#26a69a,#00796b);color:#fff;border:none;padding:7px 12px;border-radius:7px;cursor:pointer;font-size:0.82rem;margin-bottom:4px;">📤 备份此项目</button>
             <button onclick="importSingleProject()" title="从 JSON 文件导入单个项目（别人分享给你的项目文件）" style="display:block;width:100%;background:linear-gradient(135deg,#66bb6a,#388e3c);color:#fff;border:none;padding:7px 12px;border-radius:7px;cursor:pointer;font-size:0.82rem;margin-bottom:4px;">📥 恢复项目</button>
             <button onclick="renameProject()" title="重命名当前项目" style="display:block;width:100%;background:linear-gradient(135deg,#ff9800,#f57c00);color:white;border:none;padding:7px 12px;border-radius:7px;cursor:pointer;font-size:0.82rem;margin-bottom:4px;">✏️ 重命名项目</button>
@@ -9271,6 +9270,27 @@
 
                 document.getElementById('projectMenu').style.display = 'none';
             });
+        }
+
+        // 备份当前项目到软件临时区（localStorage tdjl_defaultProjectTempArea），所有人打开软件时会自动加载
+        async function backupCurrentProjectToTempArea() {
+            const projectName = document.getElementById('projectSelector1') ? document.getElementById('projectSelector1').value : currentProjectName;
+            if (!projectName) { alert('请先选择项目！'); return; }
+            const all = await loadProjectListFromDB();
+            const project = all.find(p => p.name === projectName && (p.category || '默认分类') === (currentProjectCategory || '默认分类')) || all.find(p => p.name === projectName);
+            if (!project) { alert('未找到该项目：' + projectName); return; }
+            try {
+                // 写入软件临时区（localStorage，所有人启动时优先从这里加载）
+                localStorage.setItem('tdjl_defaultProjectTempArea', JSON.stringify(project));
+                // 同时同步注入到 IndexedDB（命名为"深海/王城低配版"），保证本次会话立即生效
+                const projForDB = { ...project, name: '王城低配版', category: '深海', timestamp: new Date().toISOString() };
+                await saveProjectToDB('王城低配版', '深海', projForDB).catch(() => {});
+                await loadProjectFromDB('王城低配版').catch(() => {});
+                alert('✅ 已备份到软件临时区！\n\n本机立即以「深海/王城低配版」加载此配置。\n\n如果要让所有人/其他设备也用这份数据，把同一份 JSON 提交到远程仓库 projects/wangcheng-dipin.json（开发者处理）。');
+            } catch (e) {
+                alert('❌ 备份失败：' + (e.message || e));
+            }
+            document.getElementById('projectMenu').style.display = 'none';
         }
 
         // 导出当前项目到数据盘（固化成"所有人默认项目"用）：D:\withfriends\塔防精灵助手数据\projects\王城低配版.json
@@ -19563,10 +19583,27 @@ function hasGistToken() {
             }
         };
 
-        // 确保「深海 / 王城低配版」默认项目已加载：本地没有就远程拉取
+        // 确保「深海 / 王城低配版」默认项目已加载：软件临时区 > 远程拉取 > 内置默认项目
         async function ensureDefaultProjectLoaded() {
             const DEFAULT_CAT = '深海';
             const DEFAULT_NAME = '王城低配版';
+
+            // 1. 优先：软件临时区（用户在 ⋮ 菜单点「📦 备份到软件临时区」写入）
+            try {
+                const tempRaw = localStorage.getItem('tdjl_defaultProjectTempArea');
+                if (tempRaw) {
+                    const proj = JSON.parse(tempRaw);
+                    proj.name = DEFAULT_NAME;
+                    proj.category = DEFAULT_CAT;
+                    proj.timestamp = new Date().toISOString();
+                    await saveProjectToDB(DEFAULT_NAME, DEFAULT_CAT, proj).catch(() => {});
+                    await loadProjectFromDB(DEFAULT_NAME).catch(() => {});
+                    console.log('[默认项目] 从软件临时区加载');
+                    return;
+                }
+            } catch (e) { console.warn('[默认项目] 读软件临时区失败:', e); }
+
+            // 2. 兜底：IndexedDB 里已有王城低配版
             try {
                 const all = await loadProjectListFromDB();
                 const local = all.find(p => p.name === DEFAULT_NAME && (p.category || '默认分类') === DEFAULT_CAT)
@@ -19576,7 +19613,8 @@ function hasGistToken() {
                     return;
                 }
             } catch (e) {}
-            // 本地没有 → 远程拉取（仓库 projects/wangcheng-dipin.json）
+
+            // 3. 兜底：远程拉取（仓库 projects/wangcheng-dipin.json）
             try {
                 const resp = await fetch('./projects/wangcheng-dipin.json', { cache: 'no-cache' });
                 if (!resp.ok) throw new Error('HTTP ' + resp.status);
@@ -26812,7 +26850,7 @@ ${maSection}
         </style>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;pointer-events:none;z-index:999;opacity:0.5;">v260728-07</span>
+    <span id="versionTag" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;pointer-events:none;z-index:999;opacity:0.5;">v260728-08</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
