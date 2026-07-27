@@ -9250,7 +9250,7 @@
             });
         }
 
-        // 导出当前项目到数据盘（固化成“所有人默认项目”用）：D:\withfriends\塔防精灵助手数据\projects\王城低配版.json
+        // 导出当前项目到数据盘（固化成"所有人默认项目"用）：D:\withfriends\塔防精灵助手数据\projects\王城低配版.json
         async function exportCurrentProjectToDataDisk() {
             const projectName = document.getElementById('projectSelector1') ? document.getElementById('projectSelector1').value : currentProjectName;
             if (!projectName) { alert('请先选择一个项目！'); return; }
@@ -9260,7 +9260,8 @@
             const exportData = { type: 'tower-defense-project', version: '1.0', exportDate: new Date().toISOString(), project: project };
             const jsonStr = JSON.stringify(exportData, null, 2);
             const targetName = '王城低配版'; // 固定文件名，便于所有人默认拉取
-            const isTauri = !!(window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke);
+            // 更健壮的 Tauri 检测：检查 __TAURI__ 全局对象 + invoke API可用性
+            const isTauri = !!window.__TAURI__ && typeof window.__TAURI__.invoke === 'function';
             if (isTauri) {
                 try {
                     const dataDir = await window.__TAURI__.path.appDataDir();
@@ -9276,9 +9277,10 @@
                     console.warn('导出到数据盘失败，回退下载:', e);
                 }
             }
-            // 网页版兜底：下载
-            _downloadScriptBlob('塔防阵容_' + targetName + '.json', jsonStr);
-            alert('网页版无法写数据盘，已下载文件，请把它放到 D:\\withfriends\\塔防精灵助手数据\\projects\\ 下');
+            // 网页版兜底：下载（文件名更明确，方便你找到）
+            const downloadFileName = '王城低配版_导出项目.json';
+            _downloadScriptBlob(downloadFileName, jsonStr);
+            alert('网页版无法写数据盘，已下载文件：\n"' + downloadFileName + '"\n请到浏览器下载栏找到它，然后复制到：\nD:\\withfriends\\塔防精灵助手数据\\projects\\\n再告诉我一声，我帮你替换远程默认文件');
         }
 
         function importSingleProject() {
@@ -10505,7 +10507,7 @@
 
                         currentProjectName = projectName;
                         currentProjectCategory = project.category || '默认分类';
-                        // 刚加载的项目是干净的，清除“未保存”标记
+                        // 刚加载的项目是干净的，清除"未保存"标记
                         window.__tfjlProjectDirty = false;
                         if (typeof updateSaveIndicator === 'function') updateSaveIndicator();
 
@@ -10697,7 +10699,7 @@
             if (d) d.remove();
         }
 
-        // 设置/取消“启动自动打开的项目”
+        // 设置/取消"启动自动打开的项目"
         function toggleStartupProject(name) {
             const cur = localStorage.getItem('tdjl_startupProject');
             if (cur === name) localStorage.removeItem('tdjl_startupProject');
@@ -11626,7 +11628,7 @@
 
         // 自动保存项目
         // 【改动】不再自动保存项目：避免调卡调错了被直接存盘。请点工具栏 💾（确定保存）手动保存。
-        // 这里只标记“有未保存的修改”，供 💾 旁的 ●未保存 提示。
+        // 这里只标记"有未保存的修改"，供 💾 旁的 ●未保存 提示。
         function autoSaveProject() {
             window.__tfjlProjectDirty = true;
             if (typeof updateSaveIndicator === 'function') updateSaveIndicator();
@@ -26787,7 +26789,7 @@ ${maSection}
         </style>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;pointer-events:none;z-index:999;opacity:0.5;">v260728-03</span>
+    <span id="versionTag" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;pointer-events:none;z-index:999;opacity:0.5;">v260728-04</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
