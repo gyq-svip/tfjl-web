@@ -9123,12 +9123,32 @@
                 if (event.data && event.data.type === 'NEW_VERSION_READY') {
                     showNewVersionReadyBar();
                 }
+                // SW 回报的缓存版本号（如 tfjl-v62）→ 显示在右下角版本标签，便于核对缓存是否更新
+                if (event.data && event.data.type === 'SW_VERSION') {
+                    updateCacheVersionDisplay(event.data.version);
+                }
             });
+            // 把 SW 缓存版本号显示到右下角版本标签（如 "v260727-57 · sw-v62"）
+            function updateCacheVersionDisplay(swVersion) {
+                const tag = document.getElementById('versionTag');
+                if (!tag || !swVersion) return;
+                const short = swVersion.indexOf('tfjl-') === 0 ? swVersion.slice('tfjl-'.length) : swVersion;
+                const base = tag.textContent.split(' · ')[0];
+                tag.textContent = base + ' · ' + short;
+            }
             window.addEventListener('load', function() {
                 navigator.serviceWorker.register('./sw.js', { scope: './', updateViaCache: 'none' }).then(function(registration) {
                     console.log('[PWA] Service Worker 注册成功，scope:', registration.scope);
                     // 每次打开 APP 主动检查 SW 更新（绕过 Tauri WebView 的 SW 更新检测问题）
                     registration.update().catch(function() {});
+                    // 向当前 SW 询问缓存版本号并显示到版本标签（controller 未就绪时稍后 controllerchange 再问）
+                    const askSwVersion = function() {
+                        if (navigator.serviceWorker.controller) {
+                            navigator.serviceWorker.controller.postMessage({ type: 'GET_SW_VERSION' });
+                        }
+                    };
+                    askSwVersion();
+                    navigator.serviceWorker.addEventListener('controllerchange', askSwVersion);
                     // 监听 SW 安装完成
                     registration.addEventListener('updatefound', function() {
                         var newWorker = registration.installing;
@@ -26691,7 +26711,7 @@ ${maSection}
         </style>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;pointer-events:none;z-index:999;opacity:0.5;">v260727-56</span>
+    <span id="versionTag" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;pointer-events:none;z-index:999;opacity:0.5;">v260727-57</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>

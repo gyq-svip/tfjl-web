@@ -5,7 +5,7 @@
 //      + setCardSkin 修复（手动设置皮肤后刷新战斗槽皮肤显示）
 // ============================================================
 
-const CACHE_VERSION = 'tfjl-v61';
+const CACHE_VERSION = 'tfjl-v62';
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
@@ -38,10 +38,11 @@ self.addEventListener('activate', (event) => {
             // 拿下所有页面控制权
             return self.clients.claim();
         }).then(() => {
-            // 通知所有已打开的页面有新版本
+            // 通知所有已打开的页面有新版本，并报告自身缓存版本号（供页面在右下角显示，便于核对缓存是否更新）
             return self.clients.matchAll().then(clients => {
                 clients.forEach(client => {
                     client.postMessage({ type: 'NEW_VERSION_READY' });
+                    client.postMessage({ type: 'SW_VERSION', version: CACHE_VERSION });
                 });
             });
         })
@@ -141,5 +142,9 @@ self.addEventListener('message', (event) => {
         }).then(() => {
             if (event.source) event.source.postMessage('CACHE_CLEARED');
         });
+    }
+    // 页面主动询问当前 SW 缓存版本号（页面加载/controllerchange 时调用）
+    if (event.data && event.data.type === 'GET_SW_VERSION') {
+        if (event.source) event.source.postMessage({ type: 'SW_VERSION', version: CACHE_VERSION });
     }
 });
