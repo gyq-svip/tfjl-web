@@ -369,55 +369,69 @@
         .user-column h4 { color: #4fc3f7; text-align: left; align-self: flex-start; }
         .teammate-column h4 { color: #ba68c8; text-align: right; align-self: flex-end; }
 
-        /* ==================== 深海统计 小窗 ==================== */
-        .deepsea-mini-panel {
-            flex: 0 0 220px;
-            background: linear-gradient(135deg, rgba(0,150,136,0.18), rgba(0,188,212,0.12));
-            border: 1px solid rgba(77,182,172,0.5);
-            border-radius: 10px;
-            padding: 10px 12px;
-            color: #fff;
-            cursor: pointer;
-            transition: all 0.2s;
-            align-self: flex-start;
-            margin-top: 22px;
-            user-select: none;
+        /* ==================== 深海统计 浮窗（可拖拽可缩放） ==================== */
+        .deepsea-float-panel {
+            position: fixed; right: 12px; top: 90px; width: 250px;
+            background: linear-gradient(135deg, rgba(20,30,50,0.97), rgba(10,20,40,0.97));
+            border: 1.5px solid rgba(77,182,172,0.6);
+            border-radius: 10px; color: #fff; z-index: 9990;
+            box-shadow: 0 6px 22px rgba(0,0,0,0.5);
+            display: flex; flex-direction: column;
+            max-height: calc(100vh - 110px); overflow: hidden;
         }
-        .deepsea-mini-panel:hover {
-            background: linear-gradient(135deg, rgba(0,150,136,0.32), rgba(0,188,212,0.22));
-            border-color: rgba(77,182,172,0.85);
-            transform: translateY(-2px);
-            box-shadow: 0 4px 14px rgba(0,150,136,0.35);
-        }
-        .dsmp-header {
+        .deepsea-float-panel .dfp-header {
             display: flex; justify-content: space-between; align-items: center;
-            font-weight: bold; font-size: 0.95rem; color: #4dd0e1;
-            border-bottom: 1px solid rgba(77,182,172,0.3);
-            padding-bottom: 6px; margin-bottom: 8px;
+            padding: 7px 10px; cursor: move;
+            background: linear-gradient(135deg, rgba(0,150,136,0.35), rgba(0,188,212,0.25));
+            border-bottom: 1px solid rgba(77,182,172,0.4);
+            border-radius: 9px 9px 0 0; user-select: none;
         }
-        .dsmp-header-tag {
-            font-size: 0.65rem; background: rgba(77,182,172,0.25);
-            color: #4dd0e1; padding: 2px 7px; border-radius: 4px; font-weight: normal;
+        .dfp-title { font-weight: bold; font-size: 0.88rem; color: #4dd0e1; display: flex; align-items: center; gap: 6px; }
+        .dfp-tag { font-size: 0.62rem; color: #4dd0e1; background: rgba(77,182,172,0.2); padding: 1px 6px; border-radius: 4px; font-weight: normal; }
+        .dfp-actions { display: flex; gap: 4px; }
+        .dfp-btn {
+            background: rgba(255,255,255,0.1); border: none; color: #fff;
+            width: 20px; height: 20px; border-radius: 4px; cursor: pointer;
+            font-size: 0.75rem; line-height: 1; display: flex; align-items: center; justify-content: center;
         }
-        .dsmp-row { display: flex; justify-content: space-between; font-size: 0.78rem; margin-bottom: 5px; color: rgba(255,255,255,0.85); }
-        .dsmp-row-val { font-weight: bold; color: #ffd700; }
-        .dsmp-rankings { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(77,182,172,0.2); }
-        .dsmp-rank-title { font-size: 0.7rem; color: rgba(255,255,255,0.55); margin-bottom: 5px; letter-spacing: 0.5px; }
-        .dsmp-rank-item {
-            display: flex; align-items: center; font-size: 0.74rem; padding: 2px 0;
-            color: rgba(255,255,255,0.85);
+        .dfp-btn:hover { background: rgba(255,255,255,0.25); }
+        .dfp-body { padding: 9px 11px; overflow-y: auto; flex: 1; }
+        .dfp-row { display: flex; justify-content: space-between; font-size: 0.76rem; margin-bottom: 4px; color: rgba(255,255,255,0.85); }
+        .dfp-row-val { font-weight: bold; color: #ffd700; }
+        .dfp-rankings { margin-top: 7px; padding-top: 7px; border-top: 1px solid rgba(77,182,172,0.2); }
+        .dfp-rank-title { font-size: 0.68rem; color: rgba(255,255,255,0.55); margin-bottom: 4px; }
+        .dfp-rank-item { display: flex; align-items: center; font-size: 0.72rem; padding: 2px 0; color: rgba(255,255,255,0.85); }
+        .dfp-rank-item .rk { color: #4dd0e1; width: 22px; font-weight: bold; }
+        .dfp-rank-item .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0 6px; }
+        .dfp-rank-item .pw { color: #ffd700; font-weight: bold; }
+        .dfp-empty { font-size: 0.74rem; color: rgba(255,255,255,0.5); text-align: center; padding: 16px 4px; line-height: 1.6; }
+        .dfp-footer {
+            padding: 6px 10px; border-top: 1px solid rgba(77,182,172,0.3);
+            display: flex; gap: 6px;
         }
-        .dsmp-rank-item .rk { color: #4dd0e1; width: 22px; font-weight: bold; }
-        .dsmp-rank-item .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0 6px; }
-        .dsmp-rank-item .pw { color: #ffd700; font-weight: bold; }
-        .dsmp-empty { font-size: 0.75rem; color: rgba(255,255,255,0.5); text-align: center; padding: 18px 0; line-height: 1.6; }
-        .dsmp-footer {
-            margin-top: 8px; padding-top: 8px;
-            border-top: 1px solid rgba(77,182,172,0.3);
-            text-align: center; font-size: 0.78rem; color: #4dd0e1;
+        .dfp-footer button {
+            flex: 1; background: linear-gradient(135deg,#4dd0e1,#00838f);
+            border: none; color: #fff; padding: 5px; border-radius: 5px;
+            cursor: pointer; font-size: 0.76rem; font-weight: 500;
+        }
+        .dfp-footer button.ghost { background: rgba(255,255,255,0.1); }
+        .dfp-resizer {
+            position: absolute; right: 0; bottom: 0; width: 16px; height: 16px;
+            cursor: se-resize; background: linear-gradient(135deg, transparent 50%, rgba(77,182,172,0.5) 50%);
+            border-radius: 0 0 9px 0;
+        }
+        .deepsea-float-panel.minimized .dfp-body, .deepsea-float-panel.minimized .dfp-footer { display: none; }
+        .deepsea-float-panel.minimized { max-height: 40px; }
+        .deepsea-toggle {
+            position: fixed; right: 12px; top: 90px; z-index: 9989;
+            background: linear-gradient(135deg,#4dd0e1,#00838f); color: #fff;
+            border: none; border-radius: 8px; padding: 8px 12px;
+            cursor: pointer; font-size: 0.85rem; font-weight: bold;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
         }
         @media (max-width: 768px) {
-            .deepsea-mini-panel { flex: 0 0 auto; width: 100%; max-width: 320px; margin: 10px auto 0; }
+            .deepsea-float-panel { right: 6px; left: 6px; width: auto; top: auto; bottom: 60px; max-height: 50vh; }
+            .deepsea-toggle { right: 10px; top: auto; bottom: 60px; }
         }
         
         .user-column {
@@ -9754,22 +9768,12 @@
                     </div>
                 </div>
 
-                <!-- 深海统计 小窗 -->
-                <div class="deepsea-mini-panel" id="deepseaMiniPanel" onclick="openDeepseaStats()" title="点击进入深海统计详情">
-                    <div class="dsmp-header">
-                        <span>🌊 深海统计</span>
-                        <span class="dsmp-header-tag" id="dsmpSeasonTag">未开始</span>
-                    </div>
-                    <div id="dsmpBody">
-                        <div class="dsmp-empty">暂无数据<br><span style="font-size:0.7rem;">点击进入录入</span></div>
-                    </div>
-                    <div class="dsmp-footer">📊 查看详情 →</div>
-                </div>
+                <!-- 深海统计 小窗（改为右边缘浮窗，见页面底部 #deepseaFloatPanel） -->
             </div>
 
             <script>
             // ===========================================
-            // 深海统计 小窗 初始化
+            // 深海统计 浮窗（可拖拽/缩放/最小化 + Tauri新窗口打开详情）
             // ===========================================
             function dsEsc(s) {
                 if (s == null) return '';
@@ -9791,6 +9795,27 @@
                     localStorage.setItem(key, val);
                 } catch (e) {}
             }
+            // 兼容 APP/网页 打开详情页：优先 Tauri 新窗口，其次 location.href
+            async function openDeepseaStats() {
+                try {
+                    const T = window.__TAURI__;
+                    const WV = (T && T.webviewWindow && T.webviewWindow.WebviewWindow) || (T && T.webview && T.webview.WebviewWindow) || (T && T.window && T.window.WebviewWindow);
+                    if (WV) {
+                        const label = 'deepsea_' + Date.now();
+                        const url = (location.href.replace(/[^/]*$/, '')) + 'deepsea.html';
+                        const w = new WV(label, { url, title: '深海统计', width: 1050, height: 820, resizable: true });
+                        try { await w; } catch (e) {}
+                        return;
+                    }
+                } catch (e) { console.warn('[深海] Tauri 新窗口失败，回退 location.href:', e); }
+                // 网页版优先新标签
+                if (!window.__TAURI__) {
+                    const w = window.open('deepsea.html', '_blank');
+                    if (w) return;
+                }
+                // 最终回退：当前页跳转
+                location.href = 'deepsea.html';
+            }
             async function initDeepseaMiniPanel() {
                 const body = document.getElementById('dsmpBody');
                 const seasonTag = document.getElementById('dsmpSeasonTag');
@@ -9803,41 +9828,160 @@
                     daily = rawDaily ? JSON.parse(rawDaily) : [];
                     const rawR = dsGet('deepsea_rankings');
                     rankings = rawR ? JSON.parse(rawR) : [];
+                    // APP 环境：若本地无排行，自动从 dataDir 读盘
+                    if (!rankings.length && window.__TAURI__) {
+                        try {
+                            const T = window.__TAURI__;
+                            const invoke = T && T.core && T.core.invoke;
+                            if (invoke) {
+                                const txt = await invoke('read_text_file_auto', { path: 'D:\\withfriends\\塔防精灵助手数据\\data\\deepsea-rankings.json' });
+                                const json = JSON.parse(txt);
+                                const list = Array.isArray(json) ? json : (json.totalRanking || []);
+                                if (list.length) {
+                                    dsSet('deepsea_rankings', JSON.stringify(list));
+                                    rankings = list;
+                                }
+                            }
+                        } catch (e) {}
+                    }
                 } catch (e) { console.warn('[深海] 数据读取失败:', e); }
-                seasonTag.textContent = cur ? cur.name : '未开始';
+                if (seasonTag) seasonTag.textContent = cur ? cur.name : '未开始';
                 const seasonDaily = cur ? daily.filter(d => d.seasonId === cur.id).sort((a, b) => String(a.date).localeCompare(String(b.date))) : [];
                 const latest = seasonDaily[seasonDaily.length - 1];
                 const top5 = (rankings || []).slice(0, 5);
                 let html = '';
                 if (cur) {
-                    html += '<div class="dsmp-row"><span>当前赛季</span><span class="dsmp-row-val">' + dsEsc(cur.name) + '</span></div>';
+                    html += '<div class="dfp-row"><span>当前赛季</span><span class="dfp-row-val">' + dsEsc(cur.name) + '</span></div>';
                     if (latest) {
-                        html += '<div class="dsmp-row"><span>' + dsEsc(String(latest.date).slice(5)) + ' 杯数</span><span class="dsmp-row-val">' + dsEsc(latest.cups) + '</span></div>';
+                        html += '<div class="dfp-row"><span>' + dsEsc(String(latest.date).slice(5)) + ' 杯数</span><span class="dfp-row-val">' + dsEsc(latest.cups) + '</span></div>';
                         if (latest.delta != null && latest.delta !== '') {
                             const dc = latest.delta >= 0 ? '+' + latest.delta : latest.delta;
                             const cl = latest.delta >= 0 ? '#4caf50' : '#ef5350';
-                            html += '<div class="dsmp-row"><span>今日变化</span><span style="color:' + cl + ';font-weight:bold;">' + dc + '</span></div>';
+                            html += '<div class="dfp-row"><span>今日变化</span><span style="color:' + cl + ';font-weight:bold;">' + dc + '</span></div>';
                         }
                     } else {
-                        html += '<div class="dsmp-row"><span>最新杯数</span><span class="dsmp-row-val">--</span></div>';
+                        html += '<div class="dfp-row"><span>最新杯数</span><span class="dfp-row-val">--</span></div>';
                     }
                 }
                 if (top5.length) {
-                    html += '<div class="dsmp-rankings"><div class="dsmp-rank-title">🏆 联盟前5</div>';
+                    html += '<div class="dfp-rankings"><div class="dfp-rank-title">🏆 联盟前5</div>';
                     top5.forEach(r => {
-                        html += '<div class="dsmp-rank-item"><span class="rk">#' + dsEsc(r['排名']) + '</span><span class="nm" title="' + dsEsc(r['联盟名称']) + '">' + dsEsc(r['联盟名称']) + '</span><span class="pw">' + dsEsc(r['联盟战力']) + '</span></div>';
+                        html += '<div class="dfp-rank-item"><span class="rk">#' + dsEsc(r['排名']) + '</span><span class="nm" title="' + dsEsc(r['联盟名称']) + '">' + dsEsc(r['联盟名称']) + '</span><span class="pw">' + dsEsc(r['联盟战力']) + '</span></div>';
                     });
                     html += '</div>';
                 }
-                if (!html) html = '<div class="dsmp-empty">暂无数据<br><span style="font-size:0.7rem;">点击进入录入</span></div>';
+                if (!html) html = '<div class="dfp-empty">暂无数据<br><span style="font-size:0.7rem;">点下方「完整统计」录入</span></div>';
                 body.innerHTML = html;
             }
-            function openDeepseaStats() {
-                window.open('deepsea.html', '_blank');
+            // 拖拽
+            function dsInitDrag() {
+                const panel = document.getElementById('deepseaFloatPanel');
+                const header = document.getElementById('dfpHeader');
+                if (!panel || !header) return;
+                const start = (cx, cy, target) => {
+                    if (target.closest('button')) return;
+                    const r = panel.getBoundingClientRect();
+                    const ox = cx - r.left, oy = cy - r.top;
+                    panel.style.right = 'auto'; panel.style.bottom = 'auto';
+                    const move = (x, y) => {
+                        panel.style.left = Math.max(0, Math.min(window.innerWidth - 60, x - ox)) + 'px';
+                        panel.style.top = Math.max(0, Math.min(window.innerHeight - 40, y - oy)) + 'px';
+                    };
+                    const up = () => {
+                        document.removeEventListener('mousemove', mm); document.removeEventListener('mouseup', mu);
+                        document.removeEventListener('touchmove', tm); document.removeEventListener('touchend', tu);
+                    };
+                    const mm = e => move(e.clientX, e.clientY);
+                    const mu = up;
+                    const tm = e => { if (e.touches.length === 1) { move(e.touches[0].clientX, e.touches[0].clientY); } };
+                    const tu = up;
+                    document.addEventListener('mousemove', mm); document.addEventListener('mouseup', mu);
+                    document.addEventListener('touchmove', tm, { passive: false }); document.addEventListener('touchend', tu);
+                };
+                header.addEventListener('mousedown', e => start(e.clientX, e.clientY, e.target));
+                header.addEventListener('touchstart', e => { if (e.touches.length === 1) { start(e.touches[0].clientX, e.touches[0].clientY, e.target); } }, { passive: true });
+            }
+            // 缩放
+            function dsInitResize() {
+                const panel = document.getElementById('deepseaFloatPanel');
+                const handle = document.getElementById('dfpResizer');
+                if (!panel || !handle) return;
+                const start = (cx, cy) => {
+                    const r = panel.getBoundingClientRect();
+                    const sw = r.width, sh = r.height;
+                    const move = (x, y) => {
+                        panel.style.width = Math.max(180, Math.min(window.innerWidth - 20, sw + (x - cx))) + 'px';
+                        panel.style.height = Math.max(120, Math.min(window.innerHeight - 20, sh + (y - cy))) + 'px';
+                    };
+                    const up = () => {
+                        document.removeEventListener('mousemove', mm); document.removeEventListener('mouseup', mu);
+                        document.removeEventListener('touchmove', tm); document.removeEventListener('touchend', tu);
+                    };
+                    const mm = e => move(e.clientX, e.clientY);
+                    const mu = up;
+                    const tm = e => { if (e.touches.length === 1) { move(e.touches[0].clientX, e.touches[0].clientY); } };
+                    const tu = up;
+                    document.addEventListener('mousemove', mm); document.addEventListener('mouseup', mu);
+                    document.addEventListener('touchmove', tm, { passive: false }); document.addEventListener('touchend', tu);
+                };
+                handle.addEventListener('mousedown', e => { e.preventDefault(); e.stopPropagation(); start(e.clientX, e.clientY); });
+                handle.addEventListener('touchstart', e => { if (e.touches.length === 1) { e.stopPropagation(); start(e.touches[0].clientX, e.touches[0].clientY); } }, { passive: true });
+            }
+            function dsToggleMinimize() {
+                const panel = document.getElementById('deepseaFloatPanel');
+                if (!panel) return;
+                panel.classList.toggle('minimized');
+            }
+            function dsClosePanel() {
+                const panel = document.getElementById('deepseaFloatPanel');
+                const toggle = document.getElementById('deepseaToggle');
+                if (panel) panel.style.display = 'none';
+                if (toggle) toggle.style.display = 'block';
+            }
+            function dsOpenPanel() {
+                const panel = document.getElementById('deepseaFloatPanel');
+                const toggle = document.getElementById('deepseaToggle');
+                if (panel) panel.style.display = 'flex';
+                if (toggle) toggle.style.display = 'none';
+            }
+            // 记忆浮窗显隐/位置
+            function dsSavePanelState() {
+                try {
+                    const panel = document.getElementById('deepseaFloatPanel');
+                    if (!panel) return;
+                    const st = { display: panel.style.display || 'flex', left: panel.style.left, top: panel.style.top, width: panel.style.width, height: panel.style.height };
+                    localStorage.setItem('deepsea_panel_state', JSON.stringify(st));
+                } catch (e) {}
+            }
+            function dsRestorePanelState() {
+                try {
+                    const panel = document.getElementById('deepseaFloatPanel');
+                    const toggle = document.getElementById('deepseaToggle');
+                    const raw = localStorage.getItem('deepsea_panel_state');
+                    if (!raw || !panel) return;
+                    const st = JSON.parse(raw);
+                    if (st.left) panel.style.left = st.left;
+                    if (st.top) panel.style.top = st.top;
+                    if (st.width) panel.style.width = st.width;
+                    if (st.height) panel.style.height = st.height;
+                    if (st.display === 'none') { panel.style.display = 'none'; if (toggle) toggle.style.display = 'block'; }
+                } catch (e) {}
             }
             window.initDeepseaMiniPanel = initDeepseaMiniPanel;
             window.openDeepseaStats = openDeepseaStats;
-            document.addEventListener('DOMContentLoaded', () => { setTimeout(initDeepseaMiniPanel, 300); });
+            window.dsToggleMinimize = dsToggleMinimize;
+            window.dsClosePanel = dsClosePanel;
+            window.dsOpenPanel = dsOpenPanel;
+            document.addEventListener('DOMContentLoaded', () => {
+                dsRestorePanelState();
+                dsInitDrag();
+                dsInitResize();
+                setTimeout(initDeepseaMiniPanel, 300);
+                // 离开页面前存状态
+                window.addEventListener('beforeunload', dsSavePanelState);
+                // 定期存（拖拽/缩放后）
+                setInterval(dsSavePanelState, 4000);
+            });
             </script>
 
             <div class="hands-area">
@@ -27025,7 +27169,7 @@ ${maSection}
         </style>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;pointer-events:none;z-index:999;opacity:0.5;">v260728-16</span>
+    <span id="versionTag" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;pointer-events:none;z-index:999;opacity:0.5;">v260728-17</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
@@ -27040,5 +27184,25 @@ ${maSection}
         <div id="floatConsoleContent" class="auto-scroll"></div>
         <div id="floatConsoleResize"></div>
     </div>
+
+    <!-- 深海统计 浮窗 -->
+    <div class="deepsea-float-panel" id="deepseaFloatPanel">
+        <div class="dfp-header" id="dfpHeader">
+            <span class="dfp-title">🌊 深海统计 <span class="dfp-tag" id="dsmpSeasonTag">未开始</span></span>
+            <span class="dfp-actions">
+                <button class="dfp-btn" onclick="dsToggleMinimize()" title="最小化/展开">—</button>
+                <button class="dfp-btn" onclick="dsClosePanel()" title="关闭">×</button>
+            </span>
+        </div>
+        <div class="dfp-body" id="dsmpBody">
+            <div class="dfp-empty">暂无数据<br><span style="font-size:0.7rem;">点下方「完整统计」录入</span></div>
+        </div>
+        <div class="dfp-footer">
+            <button onclick="openDeepseaStats()">📊 完整统计</button>
+            <button class="ghost" onclick="initDeepseaMiniPanel()" title="刷新">🔄</button>
+        </div>
+        <div class="dfp-resizer" id="dfpResizer"></div>
+    </div>
+    <button class="deepsea-toggle" id="deepseaToggle" style="display:none;" onclick="dsOpenPanel()" title="打开深海统计">🌊</button>
 </body>
 </html>
