@@ -9103,6 +9103,7 @@
         <!-- 项目操作菜单（折叠） -->
         <div id="projectMenu" style="display:none;position:fixed;z-index:9998;background:rgba(40,40,70,0.98);border:1px solid rgba(255,215,0,0.3);border-radius:10px;padding:15px;min-width:180px;box-shadow:0 4px 15px rgba(0,0,0,0.4);">
             <button onclick="document.getElementById('projectMenu').style.display='none';showProjectDialog();" style="display:block;width:100%;background:linear-gradient(135deg,#ffd700,#ff9800);color:#1a1a2e;font-weight:bold;border:none;padding:10px 15px;border-radius:8px;cursor:pointer;font-size:0.9rem;margin-bottom:8px;">📂 选择项目（可固定启动项目）</button>
+            <button onclick="exportCurrentProjectToDataDisk()" title="把当前项目存到 D:\\withfriends\\塔防精灵助手数据\\projects\\ 下，便于固化成所有人默认项目" style="display:block;width:100%;background:linear-gradient(135deg,#4fc3f7,#0288d1);color:#fff;border:none;padding:10px 15px;border-radius:8px;cursor:pointer;font-size:0.9rem;margin-bottom:8px;">📤 导出到数据盘</button>
             <button onclick="renameProject()" style="display:block;width:100%;background:linear-gradient(135deg,#ff9800,#f57c00);color:white;border:none;padding:10px 15px;border-radius:8px;cursor:pointer;font-size:0.9rem;margin-bottom:8px;">✏️ 重命名项目</button>
             <button onclick="deleteCurrentProject()" style="display:block;width:100%;background:linear-gradient(135deg,#f44336,#c62828);color:white;border:none;padding:10px 15px;border-radius:8px;cursor:pointer;font-size:0.9rem;margin-bottom:8px;">🗑️ 删除项目</button>
             <button onclick="moveProjectToCategory()" style="display:block;width:100%;background:linear-gradient(135deg,#3f51b5,#303f9f);color:white;border:none;padding:10px 15px;border-radius:8px;cursor:pointer;font-size:0.9rem;margin-bottom:8px;">📦 移动到分类</button>
@@ -9249,7 +9250,37 @@
             });
         }
 
-        // 导入单个项目
+        // 导出当前项目到数据盘（固化成“所有人默认项目”用）：D:\withfriends\塔防精灵助手数据\projects\王城低配版.json
+        async function exportCurrentProjectToDataDisk() {
+            const projectName = document.getElementById('projectSelector1') ? document.getElementById('projectSelector1').value : currentProjectName;
+            if (!projectName) { alert('请先选择一个项目！'); return; }
+            const all = await loadProjectListFromDB();
+            const project = all.find(p => p.name === projectName && (p.category || '默认分类') === (currentProjectCategory || '默认分类')) || all.find(p => p.name === projectName);
+            if (!project) { alert('未找到该项目：' + projectName); return; }
+            const exportData = { type: 'tower-defense-project', version: '1.0', exportDate: new Date().toISOString(), project: project };
+            const jsonStr = JSON.stringify(exportData, null, 2);
+            const targetName = '王城低配版'; // 固定文件名，便于所有人默认拉取
+            const isTauri = !!(window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke);
+            if (isTauri) {
+                try {
+                    const dataDir = await window.__TAURI__.path.appDataDir();
+                    const base = dataDir.replace(/[\\/]?$/, '');
+                    const projDir = base + '\\projects';
+                    // 确保目录存在
+                    try { await window.__TAURI__.fs.mkdir(projDir, { recursive: true }); } catch (e) {}
+                    const filePath = projDir + '\\' + targetName + '.json';
+                    await window.__TAURI__.fs.writeTextFile(filePath, jsonStr);
+                    alert('✅ 已导出到：\n' + filePath + '\n告诉开发者即可固化成所有人默认项目');
+                    return;
+                } catch (e) {
+                    console.warn('导出到数据盘失败，回退下载:', e);
+                }
+            }
+            // 网页版兜底：下载
+            _downloadScriptBlob('塔防阵容_' + targetName + '.json', jsonStr);
+            alert('网页版无法写数据盘，已下载文件，请把它放到 D:\\withfriends\\塔防精灵助手数据\\projects\\ 下');
+        }
+
         function importSingleProject() {
             if (!requireLogin()) return;
             document.getElementById('projectMenu').style.display = 'none';
@@ -19491,19 +19522,53 @@ function hasGistToken() {
             updateStatsBar();
 
             // 自动加载启动项目
-            // 优先级：固定启动项目(tdjl_startupProject) > 上次项目(tdjl_lastProject) > 内置默认项目(南门公主)
+            // 规则：所有人默认打开「深海 / 王城低配版」（写死的内置默认项目），
+            // 本地 IndexedDB 没有就从远程仓库拉取并注入；用户手动选了别的项目时以用户为准。
             try {
                 await initIndexedDB();
                 const startupProjectName = localStorage.getItem('tdjl_startupProject') || localStorage.getItem('tdjl_lastProject');
-                if (startupProjectName) {
-                    await loadProjectFromDB(startupProjectName).catch(() => {});
-                } else if (DEFAULT_PROJECT && DEFAULT_PROJECT.name) {
-                    await loadProjectFromDB(DEFAULT_PROJECT.name).catch(() => {});
+                if (startupProjectName && startupProjectName !== '王城低配版') {
+                    // 用户明确选过其他项目（或固定了其他项目）→ 尊重用户，但兜底仍回到默认
+                    await loadProjectFromDB(startupProjectName).catch(() => ensureDefaultProjectLoaded());
+                } else {
+                    await ensureDefaultProjectLoaded();
                 }
             } catch (e) {
                 console.warn('自动加载项目失败:', e);
             }
         };
+
+        // 确保「深海 / 王城低配版」默认项目已加载：本地没有就远程拉取
+        async function ensureDefaultProjectLoaded() {
+            const DEFAULT_CAT = '深海';
+            const DEFAULT_NAME = '王城低配版';
+            try {
+                const all = await loadProjectListFromDB();
+                const local = all.find(p => p.name === DEFAULT_NAME && (p.category || '默认分类') === DEFAULT_CAT)
+                           || all.find(p => p.name === DEFAULT_NAME);
+                if (local) {
+                    await loadProjectFromDB(DEFAULT_NAME).catch(() => {});
+                    return;
+                }
+            } catch (e) {}
+            // 本地没有 → 远程拉取（仓库 projects/wangcheng-dipin.json）
+            try {
+                const resp = await fetch('./projects/wangcheng-dipin.json', { cache: 'no-cache' });
+                if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                const data = await resp.json();
+                const proj = data.project || data;
+                proj.name = DEFAULT_NAME;
+                proj.category = DEFAULT_CAT;
+                await saveProjectToDB(DEFAULT_NAME, DEFAULT_CAT, proj).catch(() => {});
+                await loadProjectFromDB(DEFAULT_NAME).catch(() => {});
+            } catch (e) {
+                console.warn('远程拉取默认项目失败，回退内置默认项目:', e);
+                if (DEFAULT_PROJECT && DEFAULT_PROJECT.name) {
+                    await loadProjectFromDB(DEFAULT_PROJECT.name).catch(() => {});
+                }
+            }
+        }
+
         
         // ==================== 统计功能 ====================
         
@@ -26722,7 +26787,7 @@ ${maSection}
         </style>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;pointer-events:none;z-index:999;opacity:0.5;">v260728-01</span>
+    <span id="versionTag" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;pointer-events:none;z-index:999;opacity:0.5;">v260728-02</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
