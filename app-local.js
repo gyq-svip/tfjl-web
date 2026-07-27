@@ -358,10 +358,16 @@ if (isTauriApp) {
         let invokeFn = window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke;
         if (!invokeFn) return [];
         try {
-            const result = await invokeFn('read_directory', { dirPath });
+            // 超时保护：避免 read_directory 命令因异常目录(超大/符号链接/网络盘)一直 pending 导致前端“扫描中”卡死
+            const timeoutMs = 8000;
+            const timeoutP = new Promise((_, rej) => setTimeout(() => rej(new Error('read_directory 超时 ' + timeoutMs + 'ms')), timeoutMs));
+            const result = await Promise.race([
+                invokeFn('read_directory', { dirPath }),
+                timeoutP
+            ]);
             return result || [];
         } catch (e) {
-            console.warn('[APP] read_directory 失败:', dirPath, e.message || e);
+            console.warn('[APP] read_directory 失败/超时:', dirPath, e.message || e);
             return [];
         }
     }
@@ -649,6 +655,7 @@ if (isTauriApp) {
                         <span id="maDirToggleIcon" style="color:#00bcd4;font-size:0.75rem;transition:transform 0.2s;">▶</span>
                         <span style="color:#00bcd4;font-size:0.9rem;font-weight:600;">📂 老马脚本目录配置</span>
                         <span id="maDirCollapsedHint" style="color:rgba(255,255,255,0.35);font-size:0.72rem;">— 点击展开，设置老马电脑上的脚本/对战/截图等目录路径</span>
+                        <button onclick="event.stopPropagation();restoreDefaultMaDirs()" title="把6个目录恢复为默认路径（解决改错路径导致扫描卡死）" style="margin-left:auto;background:rgba(255,255,255,0.1);color:#ffd700;border:1px solid rgba(255,215,0,0.3);padding:4px 12px;border-radius:6px;cursor:pointer;font-size:0.75rem;white-space:nowrap;">↺ 恢复默认目录</button>
                     </div>
                     <div id="maDirConfigBody" style="display:none;margin-top:10px;">
 
@@ -837,14 +844,23 @@ if (isTauriApp) {
 
     // ==================== 文件扫描 ====================
 
+    // 单目录条目上限：超过则只收集文件、不再递归子目录（防超大目录卡死）
+    const SCAN_MAX_DIR_ENTRIES = 5000;
+    // 全局文件软上限：超过则停止扫描（防整盘误扫）
+    const SCAN_MAX_TOTAL_FILES = 40000;
+
     // 递归扫描目录（最大深度3层），收集所有 txt/json 文件
-    async function collectFilesRecursive(dirPath, dirKey, dirLabel, maxDepth, allowedExts) {
+    // shared: { total, skipped } 跨递归共享的计数器；allowedExts/scanned 透传
+    async function collectFilesRecursive(dirPath, dirKey, dirLabel, maxDepth, allowedExts, shared) {
         if (maxDepth === undefined) maxDepth = 3;
         if (allowedExts === undefined) allowedExts = ['txt', 'json'];
         const files = [];
         if (maxDepth <= 0) return files;
+        if (shared && shared.total >= SCAN_MAX_TOTAL_FILES) { if (shared.skipped) shared.skipped.push(dirPath + '（已达总文件上限）'); return files; }
         try {
             const entries = await readDir(dirPath);
+            // 单目录过大保护：条目数超过阈值则不再递归子目录，仅收集本层文件并标记跳过
+            const tooBig = entries.length > SCAN_MAX_DIR_ENTRIES;
             for (const entry of entries) {
                 if (entry.is_file) {
                     const parts = entry.name.split('.');
@@ -860,13 +876,15 @@ if (isTauriApp) {
                             category: classifyFile(entry.name, dirKey),
                             modified: entry.modified || ''
                         });
+                        if (shared) shared.total++;
                     }
-                } else {
+                } else if (!tooBig) {
                     // 递归扫描子文件夹
-                    const subFiles = await collectFilesRecursive(entry.path, dirKey, dirLabel, maxDepth - 1, allowedExts);
+                    const subFiles = await collectFilesRecursive(entry.path, dirKey, dirLabel, maxDepth - 1, allowedExts, shared);
                     files.push(...subFiles);
                 }
             }
+            if (tooBig && shared && shared.skipped) shared.skipped.push(dirPath + '（单目录条目 ' + entries.length + ' 超过上限 ' + SCAN_MAX_DIR_ENTRIES + '，已跳过子目录）');
         } catch (e) {
             console.warn('扫描目录失败:', dirPath, e);
         }
@@ -928,20 +946,41 @@ if (isTauriApp) {
         listEl.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">扫描中...</div>';
         scannedFiles = [];
 
-        // 递归扫描所有目录（含子文件夹），目录不存在则自动创建
-        for (const [key, dir] of allDirs) {
-            await createDir(dir);
-            const subFiles = await collectFilesRecursive(dir, key, dirLabels[key]);
-            scannedFiles.push(...subFiles);
+        // 跨目录共享计数器（单目录/总文件上限保护 + 跳过记录）
+        const shared = { total: 0, skipped: [] };
+        const SCAN_TOTAL_CAP = 40000;
+        let hitCap = false;
+        try {
+            // 递归扫描所有目录（含子文件夹），目录不存在则自动创建
+            for (const [key, dir] of allDirs) {
+                if (shared.total >= SCAN_TOTAL_CAP) { hitCap = true; break; }
+                // 显示当前正在扫描的目录，便于发现卡在哪个（之前只显示“扫描中”无进度）
+                const label = dirLabels[key] || key;
+                listEl.innerHTML = '<div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;font-size:0.85rem;">扫描中...（正在扫描：' + label + '<br><span style="font-size:0.75rem;opacity:0.7;">' + dir + '</span>）</div>';
+                await createDir(dir);
+                const subFiles = await collectFilesRecursive(dir, key, dirLabels[key], 3, ['txt', 'json'], shared);
+                scannedFiles.push(...subFiles);
+            }
+        } catch (e) {
+            console.error('[APP] 扫描过程异常:', e);
         }
 
+        // 异常/超时兜底：即使中途出错也不永久停在“扫描中”，已收集的部分照常渲染
         if (scannedFiles.length === 0) {
-            listEl.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">未找到 txt/json 文件</div>';
+            let msg = '未找到 txt/json 文件';
+            if (shared.skipped && shared.skipped.length > 0) {
+                msg += '<br><span style="color:#ff9800;font-size:0.75rem;">以下目录过大已跳过：<br>' + shared.skipped.slice(0, 5).join('<br>') + '</span>';
+            }
+            listEl.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">' + msg + '</div>';
             if (statsEl) statsEl.innerHTML = '';
             return;
         }
 
         saveScanCache(scannedFiles);
+        if (hitCap || (shared.skipped && shared.skipped.length > 0)) {
+            const skipMsg = (hitCap ? '已达总文件上限，扫描中止。' : '') + (shared.skipped && shared.skipped.length ? '部分过大目录已跳过：' + shared.skipped.slice(0, 3).join('；') : '');
+            console.warn('[APP] 扫描受限:', skipMsg);
+        }
         renderScannedFiles();
     }
 
@@ -1390,6 +1429,15 @@ if (isTauriApp) {
     function saveSettingsAndClose() {
         saveConfig();
         closeAppLocalSettings();
+    }
+
+    // 恢复默认老马目录（解决用户改错路径导致“扫描中”卡死）
+    function restoreDefaultMaDirs() {
+        if (!confirm('确定把6个老马目录恢复为默认路径？\n（用于修复目录改错导致扫描卡死）\n当前自定义路径将被覆盖。')) return;
+        maDirs = Object.assign({}, DEFAULT_MA_DIRS);
+        saveConfig();
+        if (typeof fillSettingsForm === 'function') fillSettingsForm();
+        alert('✅ 已恢复默认目录。\n请点「🔄 刷新扫描」重新扫描（现在已加超时与过大目录保护，不会再卡死）。');
     }
 
     // ==================== 文件查看/编辑器 ====================
