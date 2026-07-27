@@ -9168,28 +9168,33 @@
             });
         }
 
-        // 顶部「新版本已就绪」提示条（不打扰，点一下刷新即用新版）
+        // 右下角「新版本已就绪」悬浮卡片（精致、不打扰，点一下刷新即用新版）
         let _newVersionBarShown = false;
         function showNewVersionReadyBar() {
             if (_newVersionBarShown) return;
             _newVersionBarShown = true;
-            const bar = document.createElement('div');
-            bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:100001;background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;padding:10px 16px;display:flex;align-items:center;justify-content:center;gap:12px;font-size:0.9rem;font-weight:500;cursor:pointer;box-shadow:0 2px 12px rgba(0,0,0,0.3);';
-            bar.innerHTML = '<span>🎉 新版本已就绪，点击立即刷新使用</span>';
-            const closeBtn = document.createElement('span');
+            const card = document.createElement('div');
+            card.style.cssText = 'position:fixed;bottom:24px;right:16px;z-index:100001;background:rgba(26,26,46,0.92);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);color:#fff;padding:14px 16px;border-radius:14px;display:flex;align-items:center;gap:12px;font-size:0.85rem;cursor:pointer;box-shadow:0 8px 28px rgba(0,0,0,0.45);border:1px solid rgba(76,175,80,0.4);max-width:300px;transform:translateX(120%);transition:transform 0.4s cubic-bezier(0.22,1,0.36,1);';
+            card.innerHTML = '<div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#4caf50,#2e7d32);display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0;">🔄</div>'
+                           + '<div style="flex:1;min-width:0;"><div style="font-weight:600;color:#81c784;line-height:1.3;">新版本已就绪</div><div style="font-size:0.75rem;color:rgba(255,255,255,0.6);margin-top:2px;">点击立即刷新使用</div></div>';
+            const closeBtn = document.createElement('div');
             closeBtn.textContent = '✕';
-            closeBtn.style.cssText = 'margin-left:auto;opacity:0.8;cursor:pointer;padding:0 4px;';
+            closeBtn.style.cssText = 'opacity:0.5;cursor:pointer;padding:2px 6px;font-size:0.8rem;flex-shrink:0;border-radius:4px;';
+            closeBtn.onmouseenter = function() { closeBtn.style.opacity = '1'; closeBtn.style.background = 'rgba(255,255,255,0.1)'; };
+            closeBtn.onmouseleave = function() { closeBtn.style.opacity = '0.5'; closeBtn.style.background = 'transparent'; };
             closeBtn.onclick = function(e) {
                 e.stopPropagation();
-                bar.remove();
-                _newVersionBarShown = false;
+                card.style.transform = 'translateX(120%)';
+                setTimeout(() => { card.remove(); _newVersionBarShown = false; }, 400);
             };
-            bar.appendChild(closeBtn);
-            bar.onclick = function() {
+            card.appendChild(closeBtn);
+            card.onclick = function() {
                 // 强制从网络重新加载，确保拿到后台已拉取的最新资源
                 location.reload(true);
             };
-            document.body.appendChild(bar);
+            document.body.appendChild(card);
+            // 触发滑入动画
+            requestAnimationFrame(() => { card.style.transform = 'translateX(0)'; });
         }
 
         // APP本地功能已拆分到 app-local.js（仅Tauri APP加载，网页版不影响）
@@ -26789,7 +26794,7 @@ ${maSection}
         </style>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;pointer-events:none;z-index:999;opacity:0.5;">v260728-04</span>
+    <span id="versionTag" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;pointer-events:none;z-index:999;opacity:0.5;">v260728-05</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
