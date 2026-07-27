@@ -2802,6 +2802,7 @@
         <div id="scheme1">
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:rgba(255,255,255,0.05);border-radius:10px;padding:12px;margin-bottom:10px;">
                 <span style="color:#ffd700;font-weight:bold;">📁</span>
+                <span id="currentProjectLabel" style="background:rgba(255,215,0,0.12);color:#ffd700;border:1px solid rgba(255,215,0,0.4);padding:6px 12px;border-radius:8px;font-size:0.85rem;white-space:nowrap;max-width:340px;overflow:hidden;text-overflow:ellipsis;"></span>
                 <select id="categorySelector1" onchange="handleCategoryChange()" style="background:#2a2a4a;color:#fff;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);font-size:0.9rem;min-width:120px;cursor:pointer;">
                     <option value="">-- 选择分类 --</option>
                 </select>
@@ -10165,12 +10166,8 @@
                 return;
             }
 
-            // 清理历史遗留的内置「南门公主」默认项目（现已改用王城低配版作为默认，避免残留列表/被误加载）
-            const legacy = projects.find(p => p.name === DEFAULT_PROJECT.name);
-            if (legacy) {
-                await deleteProjectFromDB(DEFAULT_PROJECT.name).catch(() => {});
-                console.log('[项目清理] 已移除历史默认项目「南门公主」');
-            }
+            // 注意：不再自动注入、也不再强制删除任何历史项目（含「南门公主」）。
+            // 用户手动保留的项目一律保留；默认启动项目由 ensureDefaultProjectLoaded 决定（王城低配版）。
         }
         
         // 保存默认项目到 IndexedDB
@@ -10528,6 +10525,7 @@
 
                         currentProjectName = projectName;
                         currentProjectCategory = project.category || '默认分类';
+                        updateCurrentProjectIndicator();
                         // 刚加载的项目是干净的，清除"未保存"标记
                         window.__tfjlProjectDirty = false;
                         if (typeof updateSaveIndicator === 'function') updateSaveIndicator();
@@ -10726,6 +10724,7 @@
             if (cur === name) localStorage.removeItem('tdjl_startupProject');
             else localStorage.setItem('tdjl_startupProject', name);
             showProjectDialog(); // 刷新弹窗以更新星标
+            updateCurrentProjectIndicator(); // 同步顶部「当前项目」的默认标记
         }
 
         function clearStartupProject() {
@@ -10927,8 +10926,19 @@
                         if (p.name === currentProjectName) opt.selected = true;
                         projSel.appendChild(opt);
                     });
+                    updateCurrentProjectIndicator();
                 }
             }).catch(e => console.error('刷新项目选择器失败:', e));
+        }
+
+        // 更新顶部「当前项目」指示器（显示当前打开的项目名，并标注是否为默认启动项目）
+        function updateCurrentProjectIndicator() {
+            const label = document.getElementById('currentProjectLabel');
+            if (!label) return;
+            const name = currentProjectName || '（未选择）';
+            const startup = (typeof localStorage !== 'undefined') ? localStorage.getItem('tdjl_startupProject') : null;
+            const isDefault = (startup && startup !== '' && startup === name) || (!startup && name === '王城低配版');
+            label.innerHTML = '📍 当前：<b style="color:#fff;">' + name + '</b>' + (isDefault ? ' &nbsp;★ 默认启动' : '');
         }
 
         // 自动保存记事本到当前项目（防抖）
@@ -26863,7 +26873,7 @@ ${maSection}
         </style>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;pointer-events:none;z-index:999;opacity:0.5;">v260728-11</span>
+    <span id="versionTag" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;pointer-events:none;z-index:999;opacity:0.5;">v260728-12</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
