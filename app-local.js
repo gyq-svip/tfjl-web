@@ -2193,6 +2193,7 @@ if (isTauriApp) {
         const weekDayLabels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
         const weekDayDow = [1, 2, 3, 4, 5, 6, 0]; // getDay() 值
         const today = new Date();
+        today.setHours(0, 0, 0, 0); // 归一化到当天 0 点，避免时分秒影响“未来日期”判定
         const todayDow = today.getDay();
         const formatLocalDate = (d) => {
             return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -2205,19 +2206,21 @@ if (isTauriApp) {
                 dateMap[s.date.slice(5)] = s.count || 0; // "07-21" 兜底
             }
         });
-        // 计算每列对应的日期和计数
-        // 关键修复：daysBack < 0 表示“本周尚未到来的星期几”，应记为 0，
-        // 绝不能 +7 回绕到上周同日（否则每周一并不会真正清零，还会把上周二~周日带进本周）。
+        // 计算每列对应的日期和计数：以“本周一”为锚点，依次 +0~+6 天得到周一~周日。
+        // 用“日期 > 今天”判定未来（而不是 daysBack 正负），避免周日(dow=0)被误判为已过去、
+        // 从而把“上周日”显示成本周周日（上一版 bug：周一当天仍显示上周日数据）。
+        const monday = new Date(today);
+        // 周日(dow=0)属于上一周末尾，本周一应回退 6 天；其余回退 (dow-1) 天
+        monday.setDate(today.getDate() - (todayDow === 0 ? 6 : todayDow - 1));
         const wdData = weekDayDow.map((dow, i) => {
-            const daysBack = todayDow - dow; // <0 = 本周未来的星期几
-            const d = new Date(today);
-            d.setDate(d.getDate() - daysBack); // daysBack<0 时 +days 得到未来日期
+            const d = new Date(monday);
+            d.setDate(monday.getDate() + i); // i=0 周一 ... i=6 周日
             const ds = formatLocalDate(d);
-            const isFuture = daysBack < 0;
+            const isFuture = d > today; // 本周尚未到来的日期一律记 0（每周一清零、按天累加、每周循环）
             return {
                 label: weekDayLabels[i],
                 dow,
-                count: isFuture ? 0 : (dateMap[ds] || 0), // 未来星期几一律 0，实现“每周一 0 点清空、按天累加、每周循环”
+                count: isFuture ? 0 : (dateMap[ds] || 0),
                 date: ds
             };
         });
