@@ -488,9 +488,12 @@ function renderRankings(){
         tbody.innerHTML = '<tr><td colspan="'+cols.length+'" class="empty">未导入排行数据<br>点上面"选择 JSON 文件"导入 deepsea-rankings.json</td></tr>';
         return;
     }
-    tbody.innerHTML = data.slice(0,50).map(r=>'<tr>'+cols.map(c=>{
+    tbody.innerHTML = data.slice(0,20).map(r=>'<tr>'+cols.map(c=>{
         let v = r[c];
-        if(c==='联盟战力') v = `<b style="color:#ffd700">${esc(v)}</b>`;
+        if(c==='联盟战力') {
+            // 联盟战力已含 HTML 标签，直接输出（不 esc）
+            return `<td>${v ?? '-'}</td>`;
+        }
         return `<td>${esc(v??'-')}</td>`;
     }).join('')+'</tr>').join('');
 }
