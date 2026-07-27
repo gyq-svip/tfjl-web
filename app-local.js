@@ -2206,13 +2206,20 @@ if (isTauriApp) {
             }
         });
         // 计算每列对应的日期和计数
+        // 关键修复：daysBack < 0 表示“本周尚未到来的星期几”，应记为 0，
+        // 绝不能 +7 回绕到上周同日（否则每周一并不会真正清零，还会把上周二~周日带进本周）。
         const wdData = weekDayDow.map((dow, i) => {
-            let daysBack = todayDow - dow;
-            if (daysBack < 0) daysBack += 7;
+            const daysBack = todayDow - dow; // <0 = 本周未来的星期几
             const d = new Date(today);
-            d.setDate(d.getDate() - daysBack);
+            d.setDate(d.getDate() - daysBack); // daysBack<0 时 +days 得到未来日期
             const ds = formatLocalDate(d);
-            return { label: weekDayLabels[i], dow, count: dateMap[ds] || 0, date: ds };
+            const isFuture = daysBack < 0;
+            return {
+                label: weekDayLabels[i],
+                dow,
+                count: isFuture ? 0 : (dateMap[ds] || 0), // 未来星期几一律 0，实现“每周一 0 点清空、按天累加、每周循环”
+                date: ds
+            };
         });
         // 本周总局数（周一~周日 合计）—— 仅取本周一至今的每日数据，故每周一自然归零
         const weekTotal = wdData.reduce((sum, d) => sum + d.count, 0);
