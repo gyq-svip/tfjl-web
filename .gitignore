@@ -80,3 +80,10 @@ backup/
 tauri.key
 *.key
 密钥.txt
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+.env*
+!.env.example
