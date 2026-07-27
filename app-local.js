@@ -3679,7 +3679,8 @@ if (isTauriApp) {
     }
 
     function getHeroSkinUrl(heroName, skinName) {
-        const parsed = getBaseHeroName(heroName);
+        const mainName = (typeof getMainCardName === 'function') ? getMainCardName(heroName) : heroName;
+        const parsed = getBaseHeroName(mainName);
         const baseHero = parsed.heroName;
         const skins = window.skinRegistry[baseHero];
         if (!skins || !skins.length) return null;
@@ -3698,7 +3699,8 @@ if (isTauriApp) {
 
     // 获取皮肤信息（dataUrl + 名字），支持延迟 base64 加载
     async function resolveHeroSkinInfo(heroName, skinName) {
-        const parsed = getBaseHeroName(heroName);
+        const mainName = (typeof getMainCardName === 'function') ? getMainCardName(heroName) : heroName;
+        const parsed = getBaseHeroName(mainName);
         const baseHero = parsed.heroName;
         const skins = window.skinRegistry[baseHero];
         if (!skins || !skins.length) return null;
@@ -3742,12 +3744,14 @@ if (isTauriApp) {
     }
 
     function getHeroSkins(heroName) {
-        const baseHero = getBaseHeroName(heroName).heroName;
+        const mainName = (typeof getMainCardName === 'function') ? getMainCardName(heroName) : heroName;
+        const baseHero = getBaseHeroName(mainName).heroName;
         return window.skinRegistry[baseHero] || [];
     }
 
     function selectHeroSkin(heroName, skinName) {
-        const baseHero = getBaseHeroName(heroName).heroName;
+        const mainName = (typeof getMainCardName === 'function') ? getMainCardName(heroName) : heroName;
+        const baseHero = getBaseHeroName(mainName).heroName;
         window.heroSkinSelections[baseHero] = skinName;
         try {
             const all = JSON.parse(localStorage.getItem('tdjl_heroSkinSelections') || '{}');
