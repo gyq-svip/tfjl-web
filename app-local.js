@@ -1598,6 +1598,7 @@ if (isTauriApp) {
                         </div>
                         <div style="display:flex;gap:6px;align-items:center;">
                             <input id="editorReplaceInput" placeholder="替换为..." style="width:150px;flex-shrink:0;background:rgba(0,0,0,0.4);color:#ffeb3b;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:4px 8px;font-size:0.78rem;">
+                            <button onclick="editorSwapFindReplace()" title="互换查找与替换内容" style="background:rgba(79,195,247,0.2);color:#4fc3f7;border:1px solid rgba(79,195,247,0.35);padding:4px 10px;border-radius:4px;cursor:pointer;font-size:0.78rem;white-space:nowrap;">⇄ 互换</button>
                             <button onclick="editorReplace()" style="background:rgba(255,152,0,0.25);color:#ff9800;border:1px solid rgba(255,152,0,0.3);padding:4px 10px;border-radius:4px;cursor:pointer;font-size:0.78rem;">替换</button>
                             <button onclick="editorReplaceAll()" style="background:rgba(244,67,54,0.25);color:#f44336;border:1px solid rgba(244,67,54,0.3);padding:4px 10px;border-radius:4px;cursor:pointer;font-size:0.78rem;">全部替换</button>
                         </div>
@@ -1814,6 +1815,17 @@ if (isTauriApp) {
         const countEl = document.getElementById('editorFindCount');
         if (countEl) countEl.textContent = '0/0';
         alert(`已替换 ${count} 处`);
+    }
+
+    // 互换查找与替换内容：查找↔替换为
+    function editorSwapFindReplace() {
+        const findInput = document.getElementById('editorFindInput');
+        const replaceInput = document.getElementById('editorReplaceInput');
+        if (!findInput || !replaceInput) return;
+        const tmp = findInput.value;
+        findInput.value = replaceInput.value;
+        replaceInput.value = tmp;
+        editorFind('count'); // 互换后重新统计新查找词的匹配数
     }
 
     // ==================== 双文件对比 ====================
