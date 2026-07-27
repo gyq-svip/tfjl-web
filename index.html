@@ -9102,6 +9102,7 @@
 
         <!-- 项目操作菜单（折叠） -->
         <div id="projectMenu" style="display:none;position:fixed;z-index:9998;background:rgba(40,40,70,0.98);border:1px solid rgba(255,215,0,0.3);border-radius:10px;padding:15px;min-width:180px;box-shadow:0 4px 15px rgba(0,0,0,0.4);">
+            <button onclick="document.getElementById('projectMenu').style.display='none';showProjectDialog();" style="display:block;width:100%;background:linear-gradient(135deg,#ffd700,#ff9800);color:#1a1a2e;font-weight:bold;border:none;padding:10px 15px;border-radius:8px;cursor:pointer;font-size:0.9rem;margin-bottom:8px;">📂 选择项目（可固定启动项目）</button>
             <button onclick="renameProject()" style="display:block;width:100%;background:linear-gradient(135deg,#ff9800,#f57c00);color:white;border:none;padding:10px 15px;border-radius:8px;cursor:pointer;font-size:0.9rem;margin-bottom:8px;">✏️ 重命名项目</button>
             <button onclick="deleteCurrentProject()" style="display:block;width:100%;background:linear-gradient(135deg,#f44336,#c62828);color:white;border:none;padding:10px 15px;border-radius:8px;cursor:pointer;font-size:0.9rem;margin-bottom:8px;">🗑️ 删除项目</button>
             <button onclick="moveProjectToCategory()" style="display:block;width:100%;background:linear-gradient(135deg,#3f51b5,#303f9f);color:white;border:none;padding:10px 15px;border-radius:8px;cursor:pointer;font-size:0.9rem;margin-bottom:8px;">📦 移动到分类</button>
@@ -26711,7 +26712,7 @@ ${maSection}
         </style>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;pointer-events:none;z-index:999;opacity:0.5;">v260727-57</span>
+    <span id="versionTag" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;pointer-events:none;z-index:999;opacity:0.5;">v260727-58</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
