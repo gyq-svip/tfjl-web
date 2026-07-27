@@ -368,6 +368,57 @@
 
         .user-column h4 { color: #4fc3f7; text-align: left; align-self: flex-start; }
         .teammate-column h4 { color: #ba68c8; text-align: right; align-self: flex-end; }
+
+        /* ==================== 深海统计 小窗 ==================== */
+        .deepsea-mini-panel {
+            flex: 0 0 220px;
+            background: linear-gradient(135deg, rgba(0,150,136,0.18), rgba(0,188,212,0.12));
+            border: 1px solid rgba(77,182,172,0.5);
+            border-radius: 10px;
+            padding: 10px 12px;
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.2s;
+            align-self: flex-start;
+            margin-top: 22px;
+            user-select: none;
+        }
+        .deepsea-mini-panel:hover {
+            background: linear-gradient(135deg, rgba(0,150,136,0.32), rgba(0,188,212,0.22));
+            border-color: rgba(77,182,172,0.85);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 14px rgba(0,150,136,0.35);
+        }
+        .dsmp-header {
+            display: flex; justify-content: space-between; align-items: center;
+            font-weight: bold; font-size: 0.95rem; color: #4dd0e1;
+            border-bottom: 1px solid rgba(77,182,172,0.3);
+            padding-bottom: 6px; margin-bottom: 8px;
+        }
+        .dsmp-header-tag {
+            font-size: 0.65rem; background: rgba(77,182,172,0.25);
+            color: #4dd0e1; padding: 2px 7px; border-radius: 4px; font-weight: normal;
+        }
+        .dsmp-row { display: flex; justify-content: space-between; font-size: 0.78rem; margin-bottom: 5px; color: rgba(255,255,255,0.85); }
+        .dsmp-row-val { font-weight: bold; color: #ffd700; }
+        .dsmp-rankings { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(77,182,172,0.2); }
+        .dsmp-rank-title { font-size: 0.7rem; color: rgba(255,255,255,0.55); margin-bottom: 5px; letter-spacing: 0.5px; }
+        .dsmp-rank-item {
+            display: flex; align-items: center; font-size: 0.74rem; padding: 2px 0;
+            color: rgba(255,255,255,0.85);
+        }
+        .dsmp-rank-item .rk { color: #4dd0e1; width: 22px; font-weight: bold; }
+        .dsmp-rank-item .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0 6px; }
+        .dsmp-rank-item .pw { color: #ffd700; font-weight: bold; }
+        .dsmp-empty { font-size: 0.75rem; color: rgba(255,255,255,0.5); text-align: center; padding: 18px 0; line-height: 1.6; }
+        .dsmp-footer {
+            margin-top: 8px; padding-top: 8px;
+            border-top: 1px solid rgba(77,182,172,0.3);
+            text-align: center; font-size: 0.78rem; color: #4dd0e1;
+        }
+        @media (max-width: 768px) {
+            .deepsea-mini-panel { flex: 0 0 auto; width: 100%; max-width: 320px; margin: 10px auto 0; }
+        }
         
         .user-column {
             align-items: center;
@@ -9702,8 +9753,93 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- 深海统计 小窗 -->
+                <div class="deepsea-mini-panel" id="deepseaMiniPanel" onclick="openDeepseaStats()" title="点击进入深海统计详情">
+                    <div class="dsmp-header">
+                        <span>🌊 深海统计</span>
+                        <span class="dsmp-header-tag" id="dsmpSeasonTag">未开始</span>
+                    </div>
+                    <div id="dsmpBody">
+                        <div class="dsmp-empty">暂无数据<br><span style="font-size:0.7rem;">点击进入录入</span></div>
+                    </div>
+                    <div class="dsmp-footer">📊 查看详情 →</div>
+                </div>
             </div>
-            
+
+            <script>
+            // ===========================================
+            // 深海统计 小窗 初始化
+            // ===========================================
+            function dsEsc(s) {
+                if (s == null) return '';
+                return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+            }
+            function dsGet(key) {
+                try {
+                    if (window.__tfjlStore && typeof window.__tfjlStore.get === 'function') {
+                        return window.__tfjlStore.get(key);
+                    }
+                    return localStorage.getItem(key);
+                } catch (e) { return null; }
+            }
+            function dsSet(key, val) {
+                try {
+                    if (window.__tfjlStore && typeof window.__tfjlStore.set === 'function') {
+                        return window.__tfjlStore.set(key, val);
+                    }
+                    localStorage.setItem(key, val);
+                } catch (e) {}
+            }
+            async function initDeepseaMiniPanel() {
+                const body = document.getElementById('dsmpBody');
+                const seasonTag = document.getElementById('dsmpSeasonTag');
+                if (!body) return;
+                let cur = null, daily = [], rankings = [];
+                try {
+                    const rawCur = dsGet('deepsea_current_season');
+                    cur = rawCur ? JSON.parse(rawCur) : null;
+                    const rawDaily = dsGet('deepsea_daily_entries');
+                    daily = rawDaily ? JSON.parse(rawDaily) : [];
+                    const rawR = dsGet('deepsea_rankings');
+                    rankings = rawR ? JSON.parse(rawR) : [];
+                } catch (e) { console.warn('[深海] 数据读取失败:', e); }
+                seasonTag.textContent = cur ? cur.name : '未开始';
+                const seasonDaily = cur ? daily.filter(d => d.seasonId === cur.id).sort((a, b) => String(a.date).localeCompare(String(b.date))) : [];
+                const latest = seasonDaily[seasonDaily.length - 1];
+                const top5 = (rankings || []).slice(0, 5);
+                let html = '';
+                if (cur) {
+                    html += '<div class="dsmp-row"><span>当前赛季</span><span class="dsmp-row-val">' + dsEsc(cur.name) + '</span></div>';
+                    if (latest) {
+                        html += '<div class="dsmp-row"><span>' + dsEsc(String(latest.date).slice(5)) + ' 杯数</span><span class="dsmp-row-val">' + dsEsc(latest.cups) + '</span></div>';
+                        if (latest.delta != null && latest.delta !== '') {
+                            const dc = latest.delta >= 0 ? '+' + latest.delta : latest.delta;
+                            const cl = latest.delta >= 0 ? '#4caf50' : '#ef5350';
+                            html += '<div class="dsmp-row"><span>今日变化</span><span style="color:' + cl + ';font-weight:bold;">' + dc + '</span></div>';
+                        }
+                    } else {
+                        html += '<div class="dsmp-row"><span>最新杯数</span><span class="dsmp-row-val">--</span></div>';
+                    }
+                }
+                if (top5.length) {
+                    html += '<div class="dsmp-rankings"><div class="dsmp-rank-title">🏆 联盟前5</div>';
+                    top5.forEach(r => {
+                        html += '<div class="dsmp-rank-item"><span class="rk">#' + dsEsc(r['排名']) + '</span><span class="nm" title="' + dsEsc(r['联盟名称']) + '">' + dsEsc(r['联盟名称']) + '</span><span class="pw">' + dsEsc(r['联盟战力']) + '</span></div>';
+                    });
+                    html += '</div>';
+                }
+                if (!html) html = '<div class="dsmp-empty">暂无数据<br><span style="font-size:0.7rem;">点击进入录入</span></div>';
+                body.innerHTML = html;
+            }
+            function openDeepseaStats() {
+                window.open('deepsea.html', '_blank');
+            }
+            window.initDeepseaMiniPanel = initDeepseaMiniPanel;
+            window.openDeepseaStats = openDeepseaStats;
+            document.addEventListener('DOMContentLoaded', () => { setTimeout(initDeepseaMiniPanel, 300); });
+            </script>
+
             <div class="hands-area">
                 <div class="hand-cards-column user-hand">
                     <h3>📋 我的手牌 <span id="myHandCount">0/10</span></h3>
@@ -26889,7 +27025,7 @@ ${maSection}
         </style>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;pointer-events:none;z-index:999;opacity:0.5;">v260728-15</span>
+    <span id="versionTag" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;pointer-events:none;z-index:999;opacity:0.5;">v260728-16</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
