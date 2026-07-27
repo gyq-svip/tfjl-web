@@ -2813,8 +2813,7 @@
                 <button onclick="toggleNotepadPanel()" title="记事本" style="background:linear-gradient(135deg,#ffd700,#ff6b6b);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">📝</button>
                 <button id="txtFilesToggleBtn" onclick="toggleTxtFilesPanel()" title="脚本生成" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">📄</button>
                 <button onclick="toggleReferencePanel()" title="参考图片" style="background:linear-gradient(135deg,#9c27b0,#7b1fa2);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">🖼️</button>
-                <button onclick="saveCurrentProject()" title="确定保存（不再自动保存：调卡调错也不会存盘）" style="background:rgba(76,175,80,0.8);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">💾 确定保存</button>
-                <span id="saveDirtyIndicator" style="display:none;color:#ff5252;font-size:0.85rem;font-weight:bold;align-self:center;" title="有未保存的修改">●未保存</span>
+                <button onclick="saveCurrentProject()" id="saveBtn" title="确定保存：有未保存的改动时点此落盘（已取消自动保存，调错也不会存盘）" style="background:rgba(76,175,80,0.8);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;position:relative;">💾<span id="saveDirtyDot" style="display:none;position:absolute;top:-3px;right:-3px;width:10px;height:10px;background:#ff5252;border:2px solid #1a1a2e;border-radius:50%;box-shadow:0 0 6px #ff5252;"></span></button>
                 <button onclick="toggleActivityCalcPanel()" title="活动氪金计算器" style="background:linear-gradient(135deg,#ff6b6b,#feca57);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">🧮</button>
             </div>
         </div>
@@ -10588,15 +10587,17 @@
 
         // 显示项目列表弹窗（点击项目名直接加载）
         async function showProjectDialog() {
+            closeProjectDialog(); // 先关旧弹窗，避免叠加
             if (!db) {
                 await initIndexedDB();
             }
 
             const projects = await loadProjectListFromDB();
+            const startupProject = localStorage.getItem('tdjl_startupProject'); // 固定启动项目（null=用上次项目）
 
-            let html = '<div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:2000;display:flex;align-items:center;justify-content:center;">';
-            html += '<div style="background:#1a1a2e;padding:30px;border-radius:16px;min-width:400px;max-width:500px;border:2px solid rgba(255,215,0,0.3);">';
-            html += '<h2 style="color:#ffd700;margin-bottom:20px;">📂 选择项目</h2>';
+            let html = '<div id="projectDialogBox" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:2000;display:flex;align-items:center;justify-content:center;">';
+            html += '<div style="background:#1a1a2e;padding:30px;border-radius:16px;min-width:420px;max-width:520px;border:2px solid rgba(255,215,0,0.3);">';
+            html += '<h2 style="color:#ffd700;margin-bottom:14px;">📂 选择项目</h2>';
 
             if (projects.length === 0) {
                 html += '<p style="color:rgba(255,255,255,0.6);text-align:center;padding:20px;">暂无保存的项目</p>';
@@ -10604,25 +10605,47 @@
                 projects.forEach(p => {
                     const date = new Date(p.timestamp).toLocaleString('zh-CN');
                     const isCurrent = p.name === currentProjectName;
+                    const isStartup = startupProject === p.name;
                     html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px;background:rgba(255,255,255,0.05);border-radius:8px;margin-bottom:10px;${isCurrent ? 'border:2px solid #4fc3f7;' : ''}">`;
                     html += `<div style="flex:1;cursor:pointer;" onclick="loadProjectFromDB('${p.name}').then(()=>closeProjectDialog()).catch(e=>alert('加载失败:'+e))">`;
                     html += `<div style="color:${isCurrent ? '#4fc3f7' : '#fff'};font-weight:bold;">${p.name}${isCurrent ? ' ✓' : ''}</div>`;
                     html += `<div style="color:rgba(255,255,255,0.5);font-size:0.85rem;">${date}</div>`;
                     html += `</div>`;
+                    // 启动项目星标（★=已固定为启动项目）
+                    html += `<button onclick="event.stopPropagation();toggleStartupProject('${p.name}')" title="${isStartup ? '已设为启动项目（点击取消固定）' : '设为每次启动自动打开的项目'}" style="background:${isStartup ? 'linear-gradient(135deg,#ffd700,#ff9800)' : 'rgba(255,255,255,0.1)'};color:${isStartup ? '#1a1a2e' : '#ffd700'};border:none;padding:8px 10px;border-radius:8px;cursor:pointer;font-size:1rem;line-height:1;margin:0 6px;">${isStartup ? '★' : '☆'}</button>`;
                     html += `<button onclick="event.stopPropagation();confirmDeleteProject('${p.name}')" style="background:linear-gradient(135deg,#f44336,#c62828);color:white;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:0.85rem;">🗑️</button>`;
                     html += `</div>`;
                 });
             }
 
-            html += '<button onclick="closeProjectDialog()" style="margin-top:20px;width:100%;padding:12px;background:rgba(255,255,255,0.1);color:white;border:1px solid rgba(255,255,255,0.2);border-radius:8px;cursor:pointer;">关闭</button>';
+            // 启动项目说明 + 清除
+            html += `<div style="margin-top:8px;padding:10px;background:rgba(255,215,0,0.08);border-radius:8px;font-size:0.82rem;color:rgba(255,255,255,0.7);text-align:center;line-height:1.6;">`;
+            html += `启动时自动打开：<b style="color:#ffd700;">${startupProject ? '「' + startupProject + '」' : '（上次使用的项目）'}</b><br>`;
+            html += `<button onclick="clearStartupProject()" style="margin-top:6px;background:rgba(255,255,255,0.1);color:white;border:1px solid rgba(255,255,255,0.2);padding:4px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">清除固定（恢复用上次项目）</button>`;
+            html += `</div>`;
+
+            html += '<button onclick="closeProjectDialog()" style="margin-top:14px;width:100%;padding:12px;background:rgba(255,255,255,0.1);color:white;border:1px solid rgba(255,255,255,0.2);border-radius:8px;cursor:pointer;">关闭</button>';
             html += '</div></div>';
 
             document.body.insertAdjacentHTML('beforeend', html);
         }
 
         function closeProjectDialog() {
-            const dialog = document.querySelector('div[style*="position:fixed"]');
-            if (dialog) dialog.remove();
+            const d = document.getElementById('projectDialogBox');
+            if (d) d.remove();
+        }
+
+        // 设置/取消“启动自动打开的项目”
+        function toggleStartupProject(name) {
+            const cur = localStorage.getItem('tdjl_startupProject');
+            if (cur === name) localStorage.removeItem('tdjl_startupProject');
+            else localStorage.setItem('tdjl_startupProject', name);
+            showProjectDialog(); // 刷新弹窗以更新星标
+        }
+
+        function clearStartupProject() {
+            localStorage.removeItem('tdjl_startupProject');
+            showProjectDialog();
         }
 
         function confirmDeleteProject(name) {
@@ -11547,8 +11570,8 @@
             if (typeof updateSaveIndicator === 'function') updateSaveIndicator();
         }
         function updateSaveIndicator() {
-            const el = document.getElementById('saveDirtyIndicator');
-            if (el) el.style.display = (window.__tfjlProjectDirty ? 'inline' : 'none');
+            const dot = document.getElementById('saveDirtyDot');
+            if (dot) dot.style.display = (window.__tfjlProjectDirty ? 'inline-block' : 'none');
         }
 
         // 预览/编辑TXT文件
@@ -19436,12 +19459,13 @@ function hasGistToken() {
             // 更新底部统计栏显示
             updateStatsBar();
 
-            // 自动加载上次使用的项目（避免刷新后丢失）
+            // 自动加载启动项目
+            // 优先级：固定启动项目(tdjl_startupProject) > 上次项目(tdjl_lastProject) > 内置默认项目(南门公主)
             try {
                 await initIndexedDB();
-                const lastProjectName = localStorage.getItem('tdjl_lastProject');
-                if (lastProjectName) {
-                    await loadProjectFromDB(lastProjectName).catch(() => {});
+                const startupProjectName = localStorage.getItem('tdjl_startupProject') || localStorage.getItem('tdjl_lastProject');
+                if (startupProjectName) {
+                    await loadProjectFromDB(startupProjectName).catch(() => {});
                 } else if (DEFAULT_PROJECT && DEFAULT_PROJECT.name) {
                     await loadProjectFromDB(DEFAULT_PROJECT.name).catch(() => {});
                 }
@@ -26667,7 +26691,7 @@ ${maSection}
         </style>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;pointer-events:none;z-index:999;opacity:0.5;">v260727-52</span>
+    <span id="versionTag" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;pointer-events:none;z-index:999;opacity:0.5;">v260727-53</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
