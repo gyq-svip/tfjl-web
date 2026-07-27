@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=3.0, user-scalable=yes">
+<title>🌊 深海统计 — 塔防助手</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{touch-action:manipulation}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%);min-height:100vh;padding:14px;color:#fff;-webkit-font-smoothing:antialiased}
+.container{max-width:1180px;margin:0 auto}
+h1{font-size:1.5rem;color:#4dd0e1;text-align:center;margin-bottom:4px}
+.sub{text-align:center;color:rgba(255,255,255,0.5);font-size:0.78rem;margin-bottom:14px}
+.card{background:rgba(255,255,255,0.06);backdrop-filter:blur(8px);border:1px solid rgba(77,182,172,0.3);border-radius:12px;padding:14px;margin-bottom:12px}
+.card h3{color:#4dd0e1;font-size:1rem;margin-bottom:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.card h3 .badge{font-size:0.7rem;color:rgba(255,255,255,0.6);font-weight:normal;background:rgba(255,255,255,0.08);padding:2px 8px;border-radius:10px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+.row > *{flex:0 0 auto}
+label{font-size:0.78rem;color:rgba(255,255,255,0.75);min-width:60px}
+input,select,textarea{background:rgba(0,0,0,0.3);border:1px solid rgba(77,182,172,0.4);color:#fff;padding:6px 10px;border-radius:6px;font-size:0.85rem;font-family:inherit}
+input[type=date],input[type=text],input[type=number]{min-width:120px}
+textarea{min-width:200px;min-height:50px;resize:vertical}
+button{background:linear-gradient(135deg,#4dd0e1,#00838f);border:none;color:#fff;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.82rem;font-weight:500;font-family:inherit;transition:transform 0.1s}
+button:hover{transform:translateY(-1px);box-shadow:0 3px 10px rgba(77,182,172,0.3)}
+button:active{transform:translateY(0)}
+button.warn{background:linear-gradient(135deg,#ff9800,#e65100)}
+button.danger{background:linear-gradient(135deg,#ef5350,#c62828)}
+button.ghost{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2)}
+button.small{padding:3px 8px;font-size:0.74rem}
+table{width:100%;border-collapse:collapse;font-size:0.78rem}
+th,td{padding:5px 6px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08)}
+th{color:#4dd0e1;font-weight:600;font-size:0.74rem;background:rgba(77,182,172,0.08);position:sticky;top:0}
+tr:hover td{background:rgba(77,182,172,0.06)}
+.scroll-y{max-height:380px;overflow-y:auto;border:1px solid rgba(77,182,172,0.15);border-radius:6px}
+.tab-bar{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+.tab{padding:5px 12px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:16px;cursor:pointer;font-size:0.78rem;color:rgba(255,255,255,0.7)}
+.tab.active{background:rgba(77,182,172,0.3);border-color:#4dd0e1;color:#fff}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:10px}
+.kpi{background:rgba(77,182,172,0.1);border:1px solid rgba(77,182,172,0.2);border-radius:8px;padding:10px;text-align:center}
+.kpi-label{font-size:0.7rem;color:rgba(255,255,255,0.55)}
+.kpi-val{font-size:1.2rem;color:#ffd700;font-weight:bold;margin-top:4px}
+.kpi-delta{font-size:0.85rem;color:#4caf50;margin-top:2px}
+.kpi-delta.neg{color:#ef5350}
+.chart-svg{width:100%;height:280px;background:rgba(0,0,0,0.2);border-radius:8px;display:block}
+.flex-grow{flex:1}
+.season-bar{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.season-bar select{max-width:200px}
+.empty{padding:30px 10px;text-align:center;color:rgba(255,255,255,0.4);font-size:0.85rem;line-height:1.7}
+.delta-pos{color:#4caf50;font-weight:bold}
+.delta-neg{color:#ef5350;font-weight:bold}
+.delta-zero{color:rgba(255,255,255,0.5)}
+.hidden{display:none!important}
+.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.85);color:#fff;padding:10px 20px;border-radius:8px;font-size:0.85rem;z-index:99999;animation:fadeInOut 2s forwards}
+@keyframes fadeInOut{0%{opacity:0;transform:translate(-50%,-10px)}15%{opacity:1;transform:translate(-50%,0)}85%{opacity:1}100%{opacity:0}}
+@media (max-width:640px){input,select,textarea{font-size:0.95rem}.kpi-grid{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<div class="container">
+    <h1>🌊 深海统计</h1>
+    <div class="sub">每日战况 + 杯数趋势 + 阵营联盟前50</div>
+
+    <!-- 赛季管理 -->
+    <div class="card">
+        <h3>📅 赛季管理 <span class="badge" id="seasonBadge">无</span></h3>
+        <div class="season-bar">
+            <label>赛季</label>
+            <select id="seasonSelect" onchange="onSeasonChange()"></select>
+            <button onclick="newSeason()">+ 新建赛季</button>
+            <button onclick="archiveSeason()" id="archiveBtn" class="warn hidden">📦 归档当前赛季</button>
+            <button onclick="deleteSeason()" class="danger small">🗑 删除</button>
+            <button onclick="exportData()" class="ghost small">📤 导出 JSON</button>
+            <label class="ghost small" style="cursor:pointer;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);padding:3px 8px;border-radius:6px;font-size:0.74rem;">
+                📥 导入 JSON<input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
+            </label>
+        </div>
+        <div style="margin-top:8px;font-size:0.78rem;color:rgba(255,255,255,0.6);">
+            <span id="seasonInfo"></span>
+        </div>
+    </div>
+
+    <!-- KPI -->
+    <div class="kpi-grid" id="kpiGrid">
+        <div class="kpi"><div class="kpi-label">赛季初杯数</div><div class="kpi-val" id="kpiInit">--</div></div>
+        <div class="kpi"><div class="kpi-label">当前杯数</div><div class="kpi-val" id="kpiCups">--</div></div>
+        <div class="kpi"><div class="kpi-label">累计增长</div><div class="kpi-val" id="kpiTotal">--</div><div class="kpi-delta" id="kpiAvg"></div></div>
+        <div class="kpi"><div class="kpi-label">已记录天数</div><div class="kpi-val" id="kpiDays">--</div><div class="kpi-delta" id="kpiStreak"></div></div>
+    </div>
+
+    <!-- 每日录入 -->
+    <div class="card">
+        <h3>📝 每日录入</h3>
+        <div class="row">
+            <label>日期</label>
+            <input type="date" id="entryDate">
+            <label>杯数</label>
+            <input type="number" id="entryCups" placeholder="自动算Δ">
+            <label>战况</label>
+            <input type="text" id="entrySummary" placeholder="如: 8胜2负 主C输出拉满" style="flex:1;min-width:200px;">
+            <button onclick="addEntry()">+ 添加</button>
+            <button onclick="resetEntryForm()" class="ghost small">清空</button>
+        </div>
+        <div style="font-size:0.74rem;color:rgba(255,255,255,0.5);margin-top:4px;" id="entryHint">提示: 同一日期已有记录会覆盖；Δ 自动根据前一日计算（首次记为初始杯数差）</div>
+    </div>
+
+    <!-- 战况列表 + 趋势图 -->
+    <div class="card">
+        <h3>📈 杯数趋势</h3>
+        <svg class="chart-svg" id="trendChart" viewBox="0 0 800 280" preserveAspectRatio="none"></svg>
+        <div id="trendEmpty" class="empty hidden">还没有数据，先在上方录入今天的杯数吧</div>
+    </div>
+
+    <div class="card">
+        <h3>📜 每日战况 <span class="badge" id="entryCount">0</span></h3>
+        <div class="scroll-y">
+            <table id="entryTable">
+                <thead><tr><th>日期</th><th>杯数</th><th>Δ</th><th>战况</th><th>操作</th></tr></thead>
+                <tbody id="entryTbody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 联盟前50 -->
+    <div class="card">
+        <h3>🏆 联盟前50 <span class="badge" id="rankingBadge">未导入</span></h3>
+        <div class="tab-bar" id="factionTabs">
+            <div class="tab active" data-faction="total" onclick="switchFaction('total')">总排名</div>
+            <div class="tab" data-faction="暗月地精" onclick="switchFaction('暗月地精')">暗月</div>
+            <div class="tab" data-faction="人类联盟" onclick="switchFaction('人类联盟')">人类</div>
+            <div class="tab" data-faction="天灾亡灵" onclick="switchFaction('天灾亡灵')">天灾</div>
+            <div class="tab" data-faction="兽人部落" onclick="switchFaction('兽人部落')">兽人</div>
+        </div>
+        <div class="row" style="margin-bottom:8px;">
+            <button onclick="importRankingsFromDisk()" class="ghost small">📂 从 dataDir 加载</button>
+            <label class="ghost small" style="cursor:pointer;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);padding:3px 8px;border-radius:6px;font-size:0.74rem;">
+                📤 选择 JSON 文件<input type="file" id="rankingFile" accept=".json" style="display:none" onchange="importRankingsFile(event)">
+            </label>
+            <span style="font-size:0.72rem;color:rgba(255,255,255,0.5);">来源: 四大阵营联盟实力前50汇总.xlsx</span>
+        </div>
+        <div class="scroll-y">
+            <table id="rankingTable">
+                <thead id="rankingHead"></thead>
+                <tbody id="rankingTbody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 历史赛季归档 -->
+    <div class="card">
+        <h3>📦 历史赛季归档 <span class="badge" id="archiveBadge">0</span></h3>
+        <div id="archiveList" class="empty">暂无归档</div>
+    </div>
+</div>
+
+<script>
+// ===================== 存储辅助 =====================
+function dsGet(key){
+    try{
+        if(window.__tfjlStore && typeof window.__tfjlStore.get==='function') return window.__tfjlStore.get(key);
+        return localStorage.getItem(key);
+    }catch(e){return null}
+}
+function dsSet(key,val){
+    try{
+        if(window.__tfjlStore && typeof window.__tfjlStore.set==='function') return window.__tfjlStore.set(key,val);
+        localStorage.setItem(key,val);
+    }catch(e){}
+}
+function esc(s){if(s==null)return'';return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function today(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function toast(msg){const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2100)}
+
+// ===================== 数据层 =====================
+let state = {
+    current: null,
+    daily: [],
+    archives: [],
+    rankings: [],
+    curFaction: 'total'
+};
+
+function loadAll(){
+    try{
+        const c = dsGet('deepsea_current_season');
+        state.current = c ? JSON.parse(c) : null;
+        const d = dsGet('deepsea_daily_entries');
+        state.daily = d ? JSON.parse(d) : [];
+        const a = dsGet('deepsea_archived_seasons');
+        state.archives = a ? JSON.parse(a) : [];
+        const r = dsGet('deepsea_rankings');
+        state.rankings = r ? JSON.parse(r) : [];
+    }catch(e){console.warn('加载失败',e)}
+}
+function saveDaily(){dsSet('deepsea_daily_entries', JSON.stringify(state.daily))}
+function saveCurrent(){dsSet('deepsea_current_season', JSON.stringify(state.current))}
+function saveArchives(){dsSet('deepsea_archived_seasons', JSON.stringify(state.archives))}
+function saveRankings(){dsSet('deepsea_rankings', JSON.stringify(state.rankings))}
+
+// ===================== 赛季 =====================
+function renderSeasonSelect(){
+    const sel = document.getElementById('seasonSelect');
+    const list = [];
+    if(state.current) list.push({id:state.current.id, name:state.current.name+' (当前)', current:true});
+    state.archives.forEach(a=>list.push({id:a.id, name:a.name+' (归档)'}));
+    sel.innerHTML = list.length ? list.map(s=>`<option value="${esc(s.id)}" ${s.current?'selected':''}>${esc(s.name)}</option>`).join('') : '<option value="">-- 无 --</option>';
+    const badge = document.getElementById('seasonBadge');
+    badge.textContent = state.current ? state.current.name : '无';
+    const info = document.getElementById('seasonInfo');
+    if(state.current){
+        const entries = state.daily.filter(d=>d.seasonId===state.current.id);
+        info.innerHTML = `开始: ${esc(state.current.startDate)} | 初始杯数: <b style="color:#ffd700">${esc(state.current.initialCups)}</b> | 已记录: <b style="color:#4dd0e1">${entries.length}</b> 天`;
+        document.getElementById('archiveBtn').classList.toggle('hidden', entries.length<1);
+    } else {
+        info.textContent = '请新建一个赛季开始记录';
+        document.getElementById('archiveBtn').classList.add('hidden');
+    }
+}
+
+function newSeason(){
+    const name = prompt('新赛季名称:', '第1赛季');
+    if(!name) return;
+    const init = parseInt(prompt('赛季初始杯数:', '1000'));
+    if(!init && init!==0){toast('已取消');return}
+    const id = 's_'+Date.now();
+    state.current = {
+        id, name,
+        startDate: today(),
+        endDate: '',
+        initialCups: init,
+        createdAt: new Date().toISOString()
+    };
+    saveCurrent();
+    renderSeasonSelect();
+    renderAll();
+    toast('✅ 新赛季已创建');
+}
+function onSeasonChange(){
+    const id = document.getElementById('seasonSelect').value;
+    if(!id) return;
+    const arc = state.archives.find(a=>a.id===id);
+    if(arc){
+        // 查看归档（只读视图）
+        if(!confirm(`"${arc.name}" 是已归档赛季，只能查看不能录入。\n确定切换为只读视图？\n（取消将切回当前赛季）`)){
+            const curOpt = Array.from(document.getElementById('seasonSelect').options).find(o=>o.text.includes('当前'));
+            if(curOpt) document.getElementById('seasonSelect').value = curOpt.value;
+            return;
+        }
+        state.current = {...arc, _readonly:true};
+    } else {
+        state.current = JSON.parse(dsGet('deepsea_current_season')||'null');
+    }
+    renderAll();
+}
+function deleteSeason(){
+    if(!state.current){toast('无当前赛季');return}
+    if(state.current._readonly){
+        // 删除归档
+        if(!confirm(`确定删除归档 "${state.current.name}"?`)) return;
+        state.archives = state.archives.filter(a=>a.id!==state.current.id);
+        saveArchives();
+        state.current = JSON.parse(dsGet('deepsea_current_season')||'null');
+        renderAll();
+        toast('已删除归档');
+        return;
+    }
+    if(!confirm(`确定删除当前赛季 "${state.current.name}" 及其所有每日记录？`)) return;
+    state.daily = state.daily.filter(d=>d.seasonId!==state.current.id);
+    state.current = null;
+    saveDaily(); saveCurrent();
+    renderAll();
+    toast('已删除');
+}
+function archiveSeason(){
+    if(!state.current || state.current._readonly) return;
+    if(!confirm(`确定归档 "${state.current.name}"? 归档后只读，但可永久查看对比。`)) return;
+    const entries = state.daily.filter(d=>d.seasonId===state.current.id).sort((a,b)=>a.date.localeCompare(b.date));
+    if(!entries.length){toast('无记录，归档为空');return}
+    const last = entries[entries.length-1];
+    const arc = {
+        ...state.current,
+        endDate: last.date,
+        finalCups: last.cups,
+        totalDelta: last.cups - state.current.initialCups,
+        days: entries.length,
+        entries,
+        archivedAt: new Date().toISOString()
+    };
+    state.archives.unshift(arc);
+    saveArchives();
+    state.current = null;
+    saveCurrent();
+    renderAll();
+    toast('📦 已归档');
+}
+
+// ===================== 每日录入 =====================
+function renderEntryForm(){
+    document.getElementById('entryDate').value = today();
+    document.getElementById('entryCups').value = '';
+    document.getElementById('entrySummary').value = '';
+}
+function resetEntryForm(){renderEntryForm()}
+function addEntry(){
+    if(!state.current || state.current._readonly){toast('请先新建或切回当前赛季');return}
+    const date = document.getElementById('entryDate').value;
+    const cups = parseInt(document.getElementById('entryCups').value);
+    const summary = document.getElementById('entrySummary').value.trim();
+    if(!date){toast('请选择日期');return}
+    if(!cups && cups!==0){toast('请输入杯数');return}
+    // 算 Δ
+    const sameSeason = state.daily.filter(d=>d.seasonId===state.current.id).sort((a,b)=>a.date.localeCompare(b.date));
+    const prev = sameSeason.filter(d=>d.date<date).slice(-1)[0];
+    const init = state.current.initialCups;
+    const baseCups = prev ? prev.cups : init;
+    const delta = cups - baseCups;
+    // 移除同一天旧记录
+    state.daily = state.daily.filter(d=>!(d.seasonId===state.current.id && d.date===date));
+    state.daily.push({
+        seasonId: state.current.id,
+        date, cups, delta, summary,
+        ts: new Date().toISOString()
+    });
+    saveDaily();
+    renderEntryForm();
+    renderAll();
+    toast(`✅ ${date} 已记录（Δ ${delta>=0?'+':''}${delta}）`);
+}
+function deleteEntry(date){
+    if(!confirm(`删除 ${date} 的记录？`)) return;
+    state.daily = state.daily.filter(d=>!(d.seasonId===state.current.id && d.date===date));
+    saveDaily();
+    renderAll();
+}
+function editEntry(date){
+    const e = state.daily.find(d=>d.seasonId===state.current.id && d.date===date);
+    if(!e) return;
+    document.getElementById('entryDate').value = e.date;
+    document.getElementById('entryCups').value = e.cups;
+    document.getElementById('entrySummary').value = e.summary||'';
+    // 删除旧记录，保存时新增（覆盖）
+    state.daily = state.daily.filter(d=>!(d.seasonId===state.current.id && d.date===date));
+    saveDaily();
+    renderAll();
+}
+
+function renderEntries(){
+    const tbody = document.getElementById('entryTbody');
+    const cnt = document.getElementById('entryCount');
+    if(!state.current){
+        tbody.innerHTML = '<tr><td colspan="5" class="empty">请先选择/新建赛季</td></tr>';
+        cnt.textContent = '0';
+        return;
+    }
+    const list = state.daily.filter(d=>d.seasonId===state.current.id).sort((a,b)=>b.date.localeCompare(a.date));
+    cnt.textContent = list.length;
+    if(!list.length){
+        tbody.innerHTML = '<tr><td colspan="5" class="empty">本季暂无记录</td></tr>';
+        return;
+    }
+    tbody.innerHTML = list.map(e=>{
+        const dc = e.delta>0?'+'+e.delta:e.delta;
+        const cls = e.delta>0?'delta-pos':(e.delta<0?'delta-neg':'delta-zero');
+        const readonly = state.current._readonly ? 'disabled' : '';
+        return `<tr>
+            <td>${esc(e.date)}</td>
+            <td><b style="color:#ffd700">${esc(e.cups)}</b></td>
+            <td class="${cls}">${dc}</td>
+            <td title="${esc(e.summary||'')}" style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(e.summary||'-')}</td>
+            <td>
+                <button class="small ghost" onclick="editEntry('${esc(e.date)}')" ${readonly}>✏</button>
+                <button class="small danger" onclick="deleteEntry('${esc(e.date)}')" ${readonly}>🗑</button>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+// ===================== KPI =====================
+function renderKPI(){
+    const k = (id,v)=>document.getElementById(id).textContent=v;
+    if(!state.current){
+        k('kpiInit','--');k('kpiCups','--');k('kpiTotal','--');k('kpiAvg','');k('kpiDays','--');k('kpiStreak','');
+        return;
+    }
+    const list = state.daily.filter(d=>d.seasonId===state.current.id).sort((a,b)=>a.date.localeCompare(b.date));
+    const init = state.current.initialCups;
+    const last = list[list.length-1];
+    const cups = last ? last.cups : init;
+    const total = cups - init;
+    const days = list.length;
+    const avg = days ? (total/days).toFixed(1) : '0';
+    k('kpiInit', init);
+    k('kpiCups', cups);
+    k('kpiTotal', (total>=0?'+':'')+total);
+    document.getElementById('kpiTotal').style.color = total>=0?'#4caf50':'#ef5350';
+    k('kpiAvg', `日均 ${avg>=0?'+':''}${avg}`);
+    document.getElementById('kpiAvg').className = 'kpi-delta'+(total<0?' neg':'');
+    k('kpiDays', days);
+    // 连续天数
+    let streak = 0;
+    if(list.length){
+        const todayStr = today();
+        for(let i=list.length-1;i>=0;i--){
+            const diff = (new Date(todayStr) - new Date(list[i].date)) / 86400000;
+            if(diff<=streak+1) streak++;
+            else break;
+        }
+    }
+    k('kpiStreak', streak>1?`连续 ${streak} 天`:'');
+}
+
+// ===================== 趋势图 SVG =====================
+function renderChart(){
+    const svg = document.getElementById('trendChart');
+    const empty = document.getElementById('trendEmpty');
+    if(!state.current){svg.innerHTML='';empty.classList.remove('hidden');return}
+    const list = state.daily.filter(d=>d.seasonId===state.current.id).sort((a,b)=>a.date.localeCompare(b.date));
+    if(!list.length){svg.innerHTML='';empty.classList.remove('hidden');return}
+    empty.classList.add('hidden');
+    const W=800, H=280, P_L=50, P_R=20, P_T=20, P_B=40;
+    const init = state.current.initialCups;
+    const all = [init, ...list.map(e=>e.cups)];
+    const minV = Math.min(...all), maxV = Math.max(...all);
+    const span = Math.max(1, maxV-minV);
+    const stepX = list.length>1 ? (W-P_L-P_R)/(list.length-1) : 0;
+    const yToPx = v => P_T + (H-P_T-P_B) * (1 - (v-minV)/span);
+    const points = [{date:'初', cups:init}].concat(list.map(e=>({date:e.date, cups:e.cups})));
+    let path = '';
+    points.forEach((p,i)=>{
+        const x = P_L + i*stepX;
+        const y = yToPx(p.cups);
+        path += (i===0?'M':'L')+x.toFixed(1)+','+y.toFixed(1)+' ';
+    });
+    // 网格
+    let grid = '';
+    for(let i=0;i<=4;i++){
+        const y = P_T + (H-P_T-P_B)*i/4;
+        const v = maxV - span*i/4;
+        grid += `<line x1="${P_L}" y1="${y}" x2="${W-P_R}" y2="${y}" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>`;
+        grid += `<text x="${P_L-6}" y="${y+4}" fill="rgba(255,255,255,0.5)" font-size="10" text-anchor="end">${v.toFixed(0)}</text>`;
+    }
+    // 点 + 标签
+    let dots = '';
+    points.forEach((p,i)=>{
+        const x = P_L + i*stepX, y = yToPx(p.cups);
+        const color = i===0 ? '#4dd0e1' : '#ffd700';
+        dots += `<circle cx="${x}" cy="${y}" r="4" fill="${color}" stroke="#1a1a2e" stroke-width="1.5"/>`;
+        if(i>0){
+            dots += `<text x="${x}" y="${y-10}" fill="#fff" font-size="10" text-anchor="middle">${p.cups}</text>`;
+        }
+        if(i%Math.max(1,Math.floor(points.length/8))===0 || i===points.length-1){
+            dots += `<text x="${x}" y="${H-P_B+14}" fill="rgba(255,255,255,0.5)" font-size="9" text-anchor="middle">${p.date.slice(5)}</text>`;
+        }
+    });
+    svg.innerHTML = grid + `<path d="${path}" fill="none" stroke="#4dd0e1" stroke-width="2.5"/>` + dots;
+}
+
+// ===================== 排行 =====================
+function switchFaction(f){
+    state.curFaction = f;
+    document.querySelectorAll('#factionTabs .tab').forEach(t=>{
+        t.classList.toggle('active', t.dataset.faction===f);
+    });
+    renderRankings();
+}
+function renderRankings(){
+    const head = document.getElementById('rankingHead');
+    const tbody = document.getElementById('rankingTbody');
+    const badge = document.getElementById('rankingBadge');
+    let data = [];
+    let cols = ['排名','联盟名称','联盟ID','会长','人数','联盟等级','联盟战力'];
+    if(state.curFaction==='total'){
+        data = state.rankings;
+        cols = ['排名','所属阵营','联盟名称','联盟ID','会长','人数','联盟等级','联盟战力'];
+    } else {
+        // 从总排名筛该阵营，或从单阵营
+        const sub = state.rankings.filter(r=>r['所属阵营']===state.curFaction);
+        data = sub.length ? sub : state.rankings.filter(r=>true); // fallback
+    }
+    badge.textContent = data.length?`${data.length} 条`:'未导入';
+    head.innerHTML = '<tr>'+cols.map(c=>`<th>${esc(c)}</th>`).join('')+'</tr>';
+    if(!data.length){
+        tbody.innerHTML = '<tr><td colspan="'+cols.length+'" class="empty">未导入排行数据<br>点上面"选择 JSON 文件"导入 deepsea-rankings.json</td></tr>';
+        return;
+    }
+    tbody.innerHTML = data.slice(0,50).map(r=>'<tr>'+cols.map(c=>{
+        let v = r[c];
+        if(c==='联盟战力') v = `<b style="color:#ffd700">${esc(v)}</b>`;
+        return `<td>${esc(v??'-')}</td>`;
+    }).join('')+'</tr>').join('');
+}
+async function importRankingsFile(event){
+    const f = event.target.files[0]; if(!f) return;
+    try{
+        const txt = await f.text();
+        const json = JSON.parse(txt);
+        let rankings = [];
+        if(Array.isArray(json)) rankings = json;
+        else if(json.totalRanking) rankings = json.totalRanking;
+        else {toast('JSON 格式不识别');return}
+        state.rankings = rankings;
+        saveRankings();
+        renderRankings();
+        toast(`✅ 已导入 ${rankings.length} 条`);
+    }catch(e){toast('导入失败：'+e.message)}
+    event.target.value = '';
+}
+async function importRankingsFromDisk(){
+    // 尝试 Tauri 命令读取 dataDir JSON
+    try{
+        if(window.__TAURI_INTERNALS__ || window.__TAURI__){
+            const invoke = (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke) || (window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke);
+            if(invoke){
+                // 读取 dataDir/data/deepsea-rankings.json
+                const txt = await invoke('read_text_file_auto', {path:'D:\\withfriends\\塔防精灵助手数据\\data\\deepsea-rankings.json'});
+                const json = JSON.parse(txt);
+                let rankings = Array.isArray(json)?json:(json.totalRanking||[]);
+                state.rankings = rankings;
+                saveRankings();
+                renderRankings();
+                toast(`✅ 从 dataDir 导入 ${rankings.length} 条`);
+                return;
+            }
+        }
+        toast('非 Tauri 环境，请用上方"选择 JSON 文件"');
+    }catch(e){
+        toast('读取失败：'+e.message+'。可手动选 JSON 文件');
+    }
+}
+
+// ===================== 归档列表 =====================
+function renderArchives(){
+    const el = document.getElementById('archiveList');
+    const badge = document.getElementById('archiveBadge');
+    badge.textContent = state.archives.length;
+    if(!state.archives.length){el.className='empty';el.textContent='暂无归档';return}
+    el.className='';
+    el.innerHTML = state.archives.map((a,i)=>{
+        const dColor = a.totalDelta>=0?'#4caf50':'#ef5350';
+        return `<div style="background:rgba(77,182,172,0.08);border:1px solid rgba(77,182,172,0.2);border-radius:8px;padding:10px;margin-bottom:6px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
+                <div>
+                    <b style="color:#4dd0e1;font-size:0.95rem;">${esc(a.name)}</b>
+                    <span style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-left:8px;">${esc(a.startDate)} → ${esc(a.endDate||'?')}</span>
+                </div>
+                <div>
+                    <span style="font-size:0.8rem;color:rgba(255,255,255,0.7);margin-right:10px;">${a.days}天</span>
+                    <span style="font-size:0.95rem;color:${dColor};font-weight:bold;">${a.totalDelta>=0?'+':''}${a.totalDelta}</span>
+                    <span style="font-size:0.75rem;color:rgba(255,255,255,0.5);margin-left:4px;">杯</span>
+                </div>
+            </div>
+            <div style="font-size:0.78rem;color:rgba(255,255,255,0.7);margin-top:4px;">
+                初始: ${a.initialCups} → 最终: <b style="color:#ffd700">${a.finalCups}</b>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+// ===================== 导入/导出 =====================
+function exportData(){
+    const blob = new Blob([JSON.stringify({current:state.current, daily:state.daily, archives:state.archives, rankings:state.rankings}, null, 2)], {type:'application/json'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = `deepsea-stats-${today()}.json`; a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 500);
+    toast('📤 已导出');
+}
+async function importData(event){
+    const f = event.target.files[0]; if(!f) return;
+    try{
+        const json = JSON.parse(await f.text());
+        if(json.current) state.current = json.current;
+        if(Array.isArray(json.daily)) state.daily = json.daily;
+        if(Array.isArray(json.archives)) state.archives = json.archives;
+        if(Array.isArray(json.rankings)) state.rankings = json.rankings;
+        saveCurrent(); saveDaily(); saveArchives(); saveRankings();
+        renderAll();
+        toast('📥 已导入');
+    }catch(e){toast('导入失败：'+e.message)}
+    event.target.value = '';
+}
+
+// ===================== 主渲染 =====================
+function renderAll(){
+    renderSeasonSelect();
+    renderKPI();
+    renderEntries();
+    renderChart();
+    renderRankings();
+    renderArchives();
+    // 通知父页面刷新小窗
+    try{ if(window.opener && window.opener.initDeepseaMiniPanel) window.opener.initDeepseaMiniPanel(); }catch(e){}
+}
+
+// ===================== 初始化 =====================
+window.addEventListener('load', ()=>{
+    loadAll();
+    // 尝试从 Tauri 读取最新排行（如果是 APP 环境且本地无数据）
+    if(!state.rankings.length){importRankingsFromDisk()}
+    renderEntryForm();
+    renderAll();
+});
+</script>
+</body>
+</html>
