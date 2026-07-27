@@ -10145,7 +10145,7 @@
             });
 
             if (projects.length === 0) {
-                // 重装/清缓存后：优先从磁盘恢复项目
+                // 重装/清缓存后：优先从磁盘恢复项目（APP 数据恢复，保留）
                 let restored = [];
                 if (typeof window.__tfjlRestoreAllProjects === 'function') {
                     try { restored = await window.__tfjlRestoreAllProjects(); } catch (e) { console.warn('[项目恢复] 失败:', e); }
@@ -10160,18 +10160,16 @@
                     });
                     await restoreCategoriesFromLocalStorage();
                     await loadCategories();
-                    return;
                 }
-                console.log('首次打开，保存默认配置...');
-                await saveDefaultProject();
+                // 不再自动注入内置「南门公主」默认项目：默认启动项目统一由 ensureDefaultProjectLoaded 加载「王城低配版」
                 return;
             }
 
-            // 检查是否已有"南门公主"项目
-            const hasDefault = projects.some(p => p.name === DEFAULT_PROJECT.name);
-            if (!hasDefault) {
-                console.log('添加默认配置到项目列表...');
-                await saveDefaultProject();
+            // 清理历史遗留的内置「南门公主」默认项目（现已改用王城低配版作为默认，避免残留列表/被误加载）
+            const legacy = projects.find(p => p.name === DEFAULT_PROJECT.name);
+            if (legacy) {
+                await deleteProjectFromDB(DEFAULT_PROJECT.name).catch(() => {});
+                console.log('[项目清理] 已移除历史默认项目「南门公主」');
             }
         }
         
@@ -19551,11 +19549,12 @@ function hasGistToken() {
             // 本地 IndexedDB 没有就从远程仓库拉取并注入；用户手动选了别的项目时以用户为准。
             try {
                 await initIndexedDB();
-                const startupProjectName = localStorage.getItem('tdjl_startupProject') || localStorage.getItem('tdjl_lastProject');
-                if (startupProjectName && startupProjectName !== '王城低配版') {
-                    // 用户明确选过其他项目（或固定了其他项目）→ 尊重用户，但兜底仍回到默认
-                    await loadProjectFromDB(startupProjectName).catch(() => ensureDefaultProjectLoaded());
+                const fixedProject = localStorage.getItem('tdjl_startupProject');
+                if (fixedProject && fixedProject !== '' && fixedProject !== '王城低配版') {
+                    // 仅当用户主动「固定为启动项目」了其他项目时才尊重；否则一律默认展示王城低配版
+                    await loadProjectFromDB(fixedProject).catch(() => ensureDefaultProjectLoaded());
                 } else {
+                    // 默认：所有人打开即展示「深海 / 王城低配版」（不再受残留 tdjl_lastProject 干扰）
                     await ensureDefaultProjectLoaded();
                 }
             } catch (e) {
@@ -19580,6 +19579,7 @@ function hasGistToken() {
                                || all.find(p => p.name === DEFAULT_NAME);
                 if (local && hasRealCards(local)) {
                     await loadProjectFromDB(DEFAULT_NAME).catch(() => {});
+                    refreshProjectSelectors();
                     console.log('[默认项目] 从本地缓存加载:', DEFAULT_NAME);
                     // 后台静默检查远程是否有更新（不会覆盖用户本地编辑，除非作者发布了新版本）
                     refreshDefaultProjectFromRemote(DEFAULT_CAT, DEFAULT_NAME);
@@ -19612,11 +19612,13 @@ function hasGistToken() {
                 try { localStorage.setItem(DEFAULT_PROJECT_CACHE_KEY, data.exportDate || ''); } catch (e) {}
                 await saveProjectToDB(name, cat, proj).catch(() => {});
                 await loadProjectFromDB(name).catch(() => {});
+                refreshProjectSelectors();
                 console.log('[默认项目] 已从远程拉取并缓存:', name);
             } catch (e) {
                 console.warn('[默认项目] 远程拉取失败，回退内置默认项目:', e);
                 if (DEFAULT_PROJECT && DEFAULT_PROJECT.name) {
                     await loadProjectFromDB(DEFAULT_PROJECT.name).catch(() => {});
+                    refreshProjectSelectors();
                 }
             }
         }
@@ -19637,6 +19639,7 @@ function hasGistToken() {
                     try { localStorage.setItem(DEFAULT_PROJECT_CACHE_KEY, remoteExport); } catch (e) {}
                     await saveProjectToDB(name, cat, proj).catch(() => {});
                     await loadProjectFromDB(name).catch(() => {});
+                refreshProjectSelectors();
                     console.log('[默认项目] 远程有更新，已刷新缓存:', name);
                 }
             } catch (e) {}
@@ -26860,7 +26863,7 @@ ${maSection}
         </style>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;pointer-events:none;z-index:999;opacity:0.5;">v260728-10</span>
+    <span id="versionTag" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;pointer-events:none;z-index:999;opacity:0.5;">v260728-11</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
