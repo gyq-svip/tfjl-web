@@ -1,0 +1,60 @@
+{
+  "type": "tower-defense-project",
+  "version": "1.0",
+  "exportDate": "2026-07-28T00:00:00.000Z",
+  "note": "所有人默认项目（深海/王城低配版）。当前为占位骨架，待用户从软件「导出到数据盘」后替换为真实内容。",
+  "project": {
+    "name": "王城低配版",
+    "category": "深海",
+    "timestamp": "2026-07-28T00:00:00.000Z",
+    "myHandCards": [
+      { "id": "46", "name": "水灵", "placed": "u2", "isEngineering": false, "profession": "panda", "type": "gold" },
+      { "id": "77", "name": "死神", "placed": "u1", "isEngineering": false, "profession": "priest", "type": "purple" },
+      { "id": "34", "name": "咕咕", "placed": "u6", "isEngineering": false, "profession": "priest", "type": "gold" },
+      { "id": "21", "name": "蛇女", "placed": "u3", "isEngineering": false, "profession": "archer", "type": "gold" },
+      { "id": "47", "name": "火灵", "placed": "u4", "isEngineering": false, "profession": "panda", "type": "gold" },
+      { "id": "55", "name": "光精灵", "placed": null, "isEngineering": false, "profession": "pokeball", "type": "gold" },
+      { "id": "85", "name": "雷精灵", "placed": null, "isEngineering": false, "profession": "pokeball", "type": "purple" },
+      { "id": "57", "name": "木精灵", "placed": null, "isEngineering": false, "profession": "pokeball", "type": "gold" },
+      { "id": "custom_1780506538530", "name": "火炮射线", "placed": "u0", "isEngineering": true, "profession": "engineering", "type": "gold" },
+      { "id": "custom_1780506403323", "name": "小野酋长", "placed": "u5", "isEngineering": false, "profession": "priest", "type": "gold" }
+    ],
+    "teammateHandCards": [
+      { "id": "47", "name": "火灵", "placed": "t6", "isEngineering": false, "profession": "panda", "type": "gold" },
+      { "id": "45", "name": "萌萌", "placed": "t5", "isEngineering": false, "profession": "panda", "type": "gold" },
+      { "id": "12", "name": "女妖", "placed": "t4", "isEngineering": false, "profession": "mage", "type": "gold" },
+      { "id": "71", "name": "骨弓", "placed": "t3", "isEngineering": false, "profession": "archer", "type": "purple" },
+      { "id": "66", "name": "电法", "placed": "t2", "isEngineering": false, "profession": "mage", "type": "purple" },
+      { "id": "74", "name": "悟空", "placed": "t1", "isEngineering": false, "profession": "summoner", "type": "purple" },
+      { "id": "56", "name": "幻精灵", "placed": null, "isEngineering": false, "profession": "pokeball", "type": "gold" },
+      { "id": "58", "name": "魔精灵", "placed": null, "isEngineering": false, "profession": "pokeball", "type": "gold" },
+      { "id": "55", "name": "光精灵", "placed": null, "isEngineering": false, "profession": "pokeball", "type": "gold" },
+      { "id": "custom_1780506528280", "name": "火炮宝库", "placed": "t0", "isEngineering": true, "profession": "engineering", "type": "gold" }
+    ],
+    "myPlacedCards": [
+      { "id": "34", "name": "咕咕", "slot": "u6", "isEngineering": false, "profession": "priest" },
+      { "id": "47", "name": "火灵", "slot": "u4", "isEngineering": false, "profession": "panda" },
+      { "id": "21", "name": "蛇女", "slot": "u3", "isEngineering": false, "profession": "archer" },
+      { "id": "46", "name": "水灵", "slot": "u2", "isEngineering": false, "profession": "panda" },
+      { "id": "77", "name": "死神", "slot": "u1", "isEngineering": false, "profession": "priest" },
+      { "id": "custom_1780506538530", "name": "火炮射线", "slot": "u0", "isEngineering": true, "profession": "engineering" },
+      { "id": "custom_1780506403323", "name": "小野酋长", "slot": "u5", "isEngineering": false, "profession": "priest" }
+    ],
+    "teammatePlacedCards": [
+      { "id": "47", "name": "火灵", "slot": "t6", "isEngineering": false, "profession": "panda" },
+      { "id": "45", "name": "萌萌", "slot": "t5", "isEngineering": false, "profession": "panda" },
+      { "id": "12", "name": "女妖", "slot": "t4", "isEngineering": false, "profession": "mage" },
+      { "id": "71", "name": "骨弓", "slot": "t3", "isEngineering": false, "profession": "archer" },
+      { "id": "66", "name": "电法", "slot": "t2", "isEngineering": false, "profession": "mage" },
+      { "id": "74", "name": "悟空", "slot": "t1", "isEngineering": false, "profession": "summoner" },
+      { "id": "custom_1780506528280", "name": "火炮宝库", "slot": "t0", "isEngineering": true, "profession": "engineering" }
+    ],
+    "cardLevels": {},
+    "cardSkins": { "my_custom_1779492294329": "张顺·鱼人", "my_47": "太平乐·火灵", "my_34": "老爷爷·咕咕" },
+    "myDeckInfo": "",
+    "teammateDeckInfo": "",
+    "notepad": "（占位）待替换为用户真实王城低配版数据",
+    "txtFiles": [],
+    "referenceImages": []
+  }
+}
