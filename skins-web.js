@@ -119,6 +119,12 @@
 
   // 从 GitHub Pages 拉取远程皮肤注册表
   var _remoteSkinSynced = false;
+  var _syncPromise = null;
+  // 缓存 syncRemoteSkins 的 promise，让 resolve* 调用可 await 注册表就绪（解决首屏皮肤不显示的时序问题）
+  function _ensureSynced() {
+    if (!_syncPromise) _syncPromise = syncRemoteSkins();
+    return _syncPromise;
+  }
   async function syncRemoteSkins() {
     if (_remoteSkinSynced) return;
     _remoteSkinSynced = true;
@@ -189,6 +195,7 @@
   }
 
   async function resolveHeroSkinInfo(heroName, skinName) {
+    await _ensureSynced();
     var mainName = (typeof getMainCardName === 'function') ? getMainCardName(heroName) : heroName;
     var parsed = getBaseHeroName(mainName);
     var baseHero = parsed.heroName;
@@ -216,6 +223,7 @@
   }
 
   async function resolveHeroSkinUrl(heroName, skinName) {
+    await _ensureSynced();
     var info = await resolveHeroSkinInfo(heroName, skinName);
     return info ? info.url : null;
   }
@@ -261,5 +269,13 @@
 
   // 启动：恢复已选皮肤并拉取远程皮肤注册表
   loadSkinSelections();
-  syncRemoteSkins();
+  _ensureSynced();
+  // 兜底：页面 load 后再触发一次皮肤重刷，确保异步渲染出来的卡片也能补上皮肤
+  if (typeof window.addEventListener === 'function') {
+    window.addEventListener('load', function () {
+      setTimeout(function () {
+        try { if (typeof window.reapplyAllSkins === 'function') window.reapplyAllSkins(); } catch (e) {}
+      }, 1200);
+    });
+  }
 })();
