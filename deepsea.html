@@ -80,6 +80,29 @@ td .strong-tag{color:#ffd700;font-size:0.7rem;margin-left:4px;}
 .faction-icon .emo{font-size:1.3rem;line-height:1}
 .faction-icon:hover{background:rgba(77,182,172,0.12)}
 .faction-icon.active{background:rgba(77,182,172,0.28);border-color:#4dd0e1;color:#fff;box-shadow:0 2px 10px rgba(77,182,172,0.25)}
+/* 夺冠概率 */
+.champ-fac{background:rgba(255,255,255,0.04);border-left:4px solid var(--fac,#4dd0e1);border-radius:10px;padding:8px 10px;margin-bottom:10px}
+.champ-fac-h{font-weight:700;color:#fff;margin-bottom:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.champ-top{font-size:0.7rem;color:#ffd700;background:rgba(255,215,0,0.15);padding:1px 8px;border-radius:10px;font-weight:500}
+.champ-row{display:flex;align-items:center;gap:8px;padding:3px 0;font-size:0.78rem}
+.champ-rk{width:34px;color:#4dd0e1;font-weight:700;flex:0 0 auto}
+.champ-nm{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.champ-nm2{flex:0 0 auto;font-size:0.7rem;color:rgba(255,255,255,0.5);max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.champ-bar{flex:0 0 36%;display:flex;align-items:center;gap:6px;min-width:120px}
+.champ-bar .fill{height:8px;border-radius:4px}
+.champ-bar i{font-style:normal;font-size:0.72rem;color:rgba(255,255,255,0.7);min-width:40px;text-align:right}
+/* 实战战况 */
+.battle-ref{background:rgba(77,182,172,0.12);border-radius:8px;padding:7px 10px;margin-bottom:8px;font-size:0.8rem;color:rgba(255,255,255,0.85);line-height:1.6}
+.battle-ref b{color:#ffd700}
+/* 赛季快照 */
+.snap-fac{background:rgba(255,255,255,0.04);border-left:4px solid var(--fac,#4dd0e1);border-radius:10px;padding:8px 10px;margin-bottom:10px}
+.snap-fac-h{font-weight:700;color:#fff;margin-bottom:6px}
+.snap-row{display:flex;align-items:center;gap:6px;padding:3px 0;font-size:0.76rem;flex-wrap:wrap}
+.snap-rk{width:30px;color:#4dd0e1;font-weight:700;flex:0 0 auto}
+.snap-nm{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.snap-own{font-size:0.7rem;color:rgba(255,255,255,0.5);flex:0 0 auto}
+.snap-per{flex:0 0 auto;color:#e0f7fa}
+.snap-pw{flex:0 0 auto;color:rgba(255,255,255,0.6)}
 @media (max-width:640px){input,select,textarea{font-size:0.95rem}}
 </style>
 <script src="vendor/xlsx.full.min.js"></script>
@@ -93,11 +116,11 @@ td .strong-tag{color:#ffd700;font-size:0.7rem;margin-left:4px;}
             <button class="ghost small" onclick="window.close()" title="关闭此页">✕ 关闭</button>
         </div>
     </div>
-    <div class="sub">四大阵营联盟实力 · 前20名</div>
+    <div class="sub">四大阵营联盟实力 · 全量排行</div>
 
     <!-- 联盟排行（唯一板块） -->
     <div class="card">
-        <h3>🏆 联盟前20 <span class="badge" id="rankingBadge">未导入</span></h3>
+        <h3>🏆 联盟排行 <span class="badge" id="rankingBadge">未导入</span></h3>
         <div class="faction-bar" id="factionBar">
             <div class="faction-icon active" data-faction="总排名" onclick="switchFaction('总排名')"><span class="emo">📊</span>总排名</div>
             <div class="faction-icon" data-faction="暗月地精" onclick="switchFaction('暗月地精')"><span class="emo">🌙</span>暗月地精</div>
@@ -117,45 +140,57 @@ td .strong-tag{color:#ffd700;font-size:0.7rem;margin-left:4px;}
         <div id="rankingGrid" class="scroll-y"></div>
     </div>
 
-    <!-- 板块A：赛季末记录（最后3天战况 + 各势力代表战绩） -->
+    <!-- 板块B：夺冠概率/推荐（按人均战力） -->
     <div class="card">
-        <h3>🏁 赛季末记录 <span class="badge" id="seasonEndBadge">共 0 个赛季</span></h3>
-        <div class="row" style="margin-bottom:10px;">
-            <label style="min-width:auto;">赛季名</label>
-            <input id="seSeason" placeholder="如 S1 / 2026夏季" style="flex:1 1 130px;min-width:110px;">
-            <label style="min-width:auto;">日期</label>
-            <input id="seDate" type="date" style="flex:0 1 140px;min-width:120px;">
+        <h3>🏆 夺冠预测 <span class="badge" id="champBadge">按人均战力</span></h3>
+        <div class="row" style="margin-bottom:8px;font-size:0.74rem;color:rgba(255,255,255,0.6);">
+            每个阵营内按"人均战力"排名，夺冠概率 = 该联盟人均战力 ÷ 阵营人均战力总和。🏅 推荐 = 各阵营最强联盟。
         </div>
-        <div class="row" style="margin-bottom:8px;font-size:0.75rem;color:rgba(255,255,255,0.6);">
-            赛季最后3天战况（每一天一段，记录当日联盟表现/关键事件）
-        </div>
-        <div class="row" style="margin-bottom:6px;">
-            <label style="min-width:auto;">第3天</label>
-            <textarea id="seDay3" rows="2" placeholder="倒数第3天战况" style="flex:1 1 200px;min-width:160px;resize:vertical;"></textarea>
-        </div>
-        <div class="row" style="margin-bottom:6px;">
-            <label style="min-width:auto;">第2天</label>
-            <textarea id="seDay2" rows="2" placeholder="倒数第2天战况" style="flex:1 1 200px;min-width:160px;resize:vertical;"></textarea>
-        </div>
-        <div class="row" style="margin-bottom:10px;">
-            <label style="min-width:auto;">第1天</label>
-            <textarea id="seDay1" rows="2" placeholder="赛季最后一天战况" style="flex:1 1 200px;min-width:160px;resize:vertical;"></textarea>
-        </div>
+        <div id="championBox" class="scroll-y" style="max-height:520px;"></div>
+    </div>
+
+    <!-- 板块C：实战战况（杯数涨跌 · 对照排行） -->
+    <div class="card">
+        <h3>⚔️ 实战战况 <span class="badge" id="battleBadge">未记录</span></h3>
         <div class="row" style="margin-bottom:8px;">
-            <button onclick="saveSeasonEnd()">💾 记录本赛季（自动抓各势力代表战绩）</button>
-            <span style="font-size:0.72rem;color:rgba(255,255,255,0.5);">代表战绩 = 当前排行中各阵营战力最高的联盟</span>
+            <label style="min-width:auto;">我的联盟</label>
+            <select id="myAlliance" onchange="setMyAlliance()" style="flex:1 1 160px;min-width:130px;"></select>
+        </div>
+        <div class="row" style="margin-bottom:6px;">
+            <label style="min-width:auto;">日期</label>
+            <input id="battleDate" type="date" style="flex:0 1 130px;min-width:110px;">
+            <label style="min-width:auto;">杯数</label>
+            <input id="battleCups" type="number" placeholder="如 1280" style="flex:1 1 110px;min-width:80px;">
+            <button onclick="addBattle()">➕ 记录</button>
+        </div>
+        <div class="row" style="margin-bottom:8px;font-size:0.72rem;color:rgba(255,255,255,0.5);">
+            录入每日杯数后自动算"今日涨跌"，并和上方排行对照（排名 / 人均战力 / 夺冠概率），看自己联盟实际升跌。
+        </div>
+        <div id="battleSvg"></div>
+        <div id="battleList" class="scroll-y" style="max-height:260px;"></div>
+    </div>
+
+    <!-- 板块D：赛季快照（自动记前5 · 按日期） -->
+    <div class="card">
+        <h3>🏁 赛季快照 <span class="badge" id="snapBadge">共 0 个</span></h3>
+        <div class="row" style="margin-bottom:8px;">
+            <label style="min-width:auto;">赛季标签</label>
+            <input id="snapLabel" placeholder="留空=按当天日期，如 S1" style="flex:1 1 140px;min-width:120px;">
+            <button onclick="saveSnapshot()">📸 记录本赛季前5</button>
+        </div>
+        <div class="row" style="margin-bottom:8px;font-size:0.72rem;color:rgba(255,255,255,0.5);">
+            赛季最后一天点一下，按当前排行每个阵营截取前5名（含人均战力）存下，下赛季可对比自己联盟能否夺冠。
         </div>
         <div class="row" style="margin-bottom:8px;">
             <label style="min-width:auto;">查看</label>
-            <select id="seSelect" onchange="renderSeasonEnd()" style="flex:1 1 140px;min-width:120px;">
+            <select id="snapSelect" onchange="renderSnapshot()" style="flex:1 1 140px;min-width:120px;">
                 <option value="">— 选择赛季 —</option>
             </select>
-            <button class="ghost small" onclick="deleteSeasonEnd()">🗑 删除</button>
+            <button class="ghost small" onclick="deleteSnapshot()">🗑 删除</button>
         </div>
-        <div id="seDetail" class="scroll-y" style="max-height:300px;"></div>
-
-        <h3 style="margin-top:14px;">📈 势力战绩趋势 <span style="font-size:0.7rem;color:rgba(255,255,255,0.5);font-weight:normal;">（各阵营代表联盟战力随赛季变化）</span></h3>
-        <div id="trendSvg"></div>
+        <div id="snapDetail" class="scroll-y" style="max-height:440px;"></div>
+        <h3 style="margin-top:14px;">📈 势力代表战力趋势 <span style="font-size:0.7rem;color:rgba(255,255,255,0.5);font-weight:normal;">（各阵营代表联盟战力随赛季变化）</span></h3>
+        <div id="snapTrend"></div>
     </div>
 </div>
 
@@ -289,6 +324,8 @@ async function importRankingsFile(event){
         state.rankings = rankings;
         saveRankings();
         renderRankings();
+        renderChampionship();
+        renderBattle();
         toast(`✅ 已导入 ${rankings.length} 条`);
     }catch(e){toast('导入失败：'+e.message)}
     event.target.value = '';
@@ -304,6 +341,8 @@ async function importRankingsFromDisk(){
                 state.rankings = rankings;
                 saveRankings();
                 renderRankings();
+                renderChampionship();
+                renderBattle();
                 toast(`✅ 从 dataDir 导入 ${rankings.length} 条`);
                 return;
             }
@@ -369,158 +408,270 @@ async function importRankingsXlsx(event){
             }catch(e){ toast('已导入(本地)，但写数据盘失败：'+e.message); }
         }
         renderRankings();
+        renderChampionship();
+        renderBattle();
         toast(`✅ 已从 xlsx 导入 ${list.length} 条（${totalName}）`);
     }catch(e){ toast('xlsx 导入失败：'+e.message); }
     event.target.value='';
 }
 
-// ===================== 赛季末记录 + 势力趋势 =====================
+// ===================== 夺冠概率 / 实战战况 / 赛季快照 =====================
 const FACTIONS = ['暗月地精','人类联盟','天灾亡灵','兽人部落'];
-function loadSeasonEnd(){
-    try{
-        const t = dsGet('deepsea_season_end');
-        return t ? JSON.parse(t) : {};
-    }catch(e){return {}}
-}
-function saveSeasonEndMap(map){dsSet('deepsea_season_end', JSON.stringify(map))}
-// 当前排行里各阵营战力最高的联盟
-function factionReps(){
-    const reps = {};
-    FACTIONS.forEach(f=>{
-        const sub = state.rankings.filter(r=>r['所属阵营']===f);
-        if(sub.length){
-            sub.sort((a,b)=>(+parsePower(b['联盟战力']||0))-(+parsePower(a['联盟战力']||0)));
-            const top = sub[0];
-            reps[f] = { '联盟名称': top['联盟名称'], '联盟战力': top['联盟战力'], '会长': top['会长'], '排名': top['排名'] };
-        }
-    });
-    return reps;
-}
+function factionEmoji(f){return {'暗月地精':'🌙','人类联盟':'⚔️','天灾亡灵':'💀','兽人部落':'👹'}[f]||'🏳️'}
 function parsePower(v){
     if(typeof v === 'number') return v;
     if(!v) return 0;
     return +String(v).replace(/[^\d]/g,'') || 0;
 }
-function saveSeasonEnd(){
-    const name = (document.getElementById('seSeason').value||'').trim();
-    const date = document.getElementById('seDate').value || today();
-    if(!name){toast('请先输入赛季名');return}
-    const reps = factionReps();
-    if(!Object.keys(reps).length){toast('请先导入排行数据');return}
-    const rec = {
-        date,
-        factions: reps,
-        days: {
-            d3: document.getElementById('seDay3').value || '',
-            d2: document.getElementById('seDay2').value || '',
-            d1: document.getElementById('seDay1').value || ''
-        },
-        savedAt: today()
-    };
-    const map = loadSeasonEnd();
-    map[name] = rec;
-    saveSeasonEndMap(map);
-    refreshSeasonSelect(name);
-    renderSeasonEnd();
-    renderTrend();
-    toast(`✅ 已记录「${name}」`);
+// 人均战力 = 联盟战力 ÷ 实际人数（满员率分母）
+function getPerCap(r){
+    const fr = fillRate(r['人数']); const denom = fr?fr.cur:parseNum(r['人数']);
+    const pw = parsePower(r['联盟战力']);
+    return denom? Math.round(pw/denom):0;
 }
-function refreshSeasonSelect(sel){
-    const map = loadSeasonEnd();
-    const selEl = document.getElementById('seSelect');
-    const names = Object.keys(map).sort((a,b)=>(map[b].date||'') > (map[a].date||'') ? 1 : -1);
-    selEl.innerHTML = '<option value="">— 选择赛季 —</option>' + names.map(n=>`<option value="${esc(n)}">${esc(n)}（${esc(map[n].date||'')}）</option>`).join('');
-    if(sel) selEl.value = sel;
-    document.getElementById('seasonEndBadge').textContent = `共 ${names.length} 个赛季`;
+// 某阵营按人均战力降序
+function factionList(f){
+    return state.rankings.filter(r=>r['所属阵营']===f)
+        .sort((a,b)=> getPerCap(b)-getPerCap(a));
 }
-function renderSeasonEnd(){
-    const name = document.getElementById('seSelect').value;
-    const box = document.getElementById('seDetail');
-    const map = loadSeasonEnd();
-    if(!name || !map[name]){
-        box.innerHTML = '<div class="empty">选择赛季查看详情，或上方记录本赛季</div>';
-        return;
-    }
-    const rec = map[name];
-    let html = `<div style="font-size:0.8rem;line-height:1.9;">`;
-    html += `<div style="margin-bottom:8px;"><b style="color:#4dd0e1;">📅 ${esc(rec.date||'-')}</b></div>`;
-    // 各势力代表战绩
-    html += '<table style="margin-bottom:10px;"><thead><tr><th>阵营</th><th>代表联盟</th><th>联盟战力</th><th>会长</th></tr></thead><tbody>';
+
+// ---------- 夺冠预测 ----------
+function renderChampionship(){
+    const box = document.getElementById('championBox');
+    if(!box) return;
+    if(!state.rankings.length){ box.innerHTML='<div class="empty">请先导入排行（📥 导入 xlsx / 📂 从 dataDir 加载）</div>'; return; }
+    let html='';
     FACTIONS.forEach(f=>{
-        const r = rec.factions[f];
-        if(r) html += `<tr><td>${esc(f)}</td><td>${esc(r['联盟名称']||'-')}</td><td>${r['联盟战力']!=null?r['联盟战力']:'-'}</td><td>${esc(r['会长']||'-')}</td></tr>`;
-        else html += `<tr><td>${esc(f)}</td><td colspan="3" style="color:rgba(255,255,255,0.4)">无数据</td></tr>`;
+        const list = factionList(f);
+        if(!list.length) return;
+        const totalPer = list.reduce((s,r)=>s+getPerCap(r),0) || 1;
+        const color = FACTION_COLOR[f]||'#4dd0e1';
+        html += `<div class="champ-fac" style="--fac:${color}">
+            <div class="champ-fac-h">${factionEmoji(f)} ${esc(f)} <span class="champ-top">🏅 推荐 ${esc(list[0]['联盟名称'])}</span></div>`;
+        list.slice(0,10).forEach((r,i)=>{
+            const per = getPerCap(r);
+            const prob = Math.round(per/totalPer*1000)/10;
+            const w = Math.max(2, Math.round(per/totalPer*100));
+            const medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':('#'+(i+1));
+            html += `<div class="champ-row">
+                <span class="champ-rk">${medal}</span>
+                <span class="champ-nm" title="${esc(r['联盟名称'])}">${esc(r['联盟名称'])}</span>
+                <span class="champ-nm2" title="${esc(r['会长']||'')}">👑${esc(r['会长']||'-')}</span>
+                <div class="champ-bar"><div class="fill" style="width:${w}%;background:${color}"></div><i>${prob}%</i></div>
+            </div>`;
+        });
+        if(list.length>10) html += `<div style="font-size:0.7rem;color:rgba(255,255,255,0.4);text-align:right;margin-top:2px;">… 仅显示前10 / 共 ${list.length} 个</div>`;
+        html += '</div>';
     });
-    html += '</tbody></table>';
-    // 最后3天战况
-    const d = rec.days||{};
-    const labels = [['d3','⏳ 倒数第3天'],['d2','⏳ 倒数第2天'],['d1','🏁 赛季最后一天']];
-    labels.forEach(([k,lab])=>{
-        html += `<div style="margin-bottom:6px;"><b style="color:#ffd700;">${lab}</b><div style="color:rgba(255,255,255,0.85);white-space:pre-wrap;padding:4px 0;">${esc(d[k]||'（未填写）')}</div></div>`;
-    });
-    html += '</div>';
     box.innerHTML = html;
 }
-function deleteSeasonEnd(){
-    const name = document.getElementById('seSelect').value;
-    if(!name){toast('请先选择赛季');return}
-    const map = loadSeasonEnd();
-    if(!map[name]){toast('赛季不存在');return}
-    delete map[name];
-    saveSeasonEndMap(map);
-    refreshSeasonSelect();
-    renderSeasonEnd();
-    renderTrend();
-    toast(`🗑 已删除「${name}」`);
+
+// ---------- 实战战况（杯数涨跌 · 对照排行） ----------
+function loadBattle(){ try{const t=dsGet('deepsea_daily_entries');return t?JSON.parse(t):[]}catch(e){return[]} }
+function saveBattle(a){dsSet('deepsea_daily_entries',JSON.stringify(a))}
+function myAllianceName(){ return dsGet('deepsea_my_alliance')||''; }
+function setMyAlliance(){ dsSet('deepsea_my_alliance', document.getElementById('myAlliance').value); renderBattle(); }
+function populateMyAlliance(){
+    const sel=document.getElementById('myAlliance'); if(!sel) return;
+    const names=[...new Set(state.rankings.map(r=>r['联盟名称']).filter(Boolean))].sort();
+    const cur=myAllianceName();
+    sel.innerHTML='<option value="">— 选择我的联盟 —</option>'+names.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');
+    if(cur) sel.value=cur;
 }
-// SVG 折线：X=赛季，Y=各阵营代表联盟战力，4条线
-function renderTrend(){
-    const wrap = document.getElementById('trendSvg');
-    if(!wrap) return;
-    const map = loadSeasonEnd();
-    const names = Object.keys(map).sort((a,b)=>(map[a].date||'') > (map[b].date||'') ? 1 : -1);
-    if(names.length < 1){wrap.innerHTML = '<div class="empty">记录至少 1 个赛季后显示趋势</div>';return;}
-    const W=760,H=320,padL=64,padR=20,padT=20,padB=40;
-    const maxP = Math.max(1, ...names.flatMap(n=>FACTIONS.map(f=>parsePower((map[n].factions[f]||{}).联盟战力||0))));
-    const xStep = names.length>1 ? (W-padL-padR)/(names.length-1) : 0;
-    const xOf = i => names.length>1 ? padL + i*xStep : W/2;
-    const yOf = v => padT + (H-padT-padB)*(1 - v/maxP);
-    const colors = {'暗月地精':'#9b59b6','人类联盟':'#3498db','天灾亡灵':'#2ecc71','兽人部落':'#e67e22'};
-    let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:${W}px;">`;
-    // 网格 + Y轴刻度
-    for(let g=0;g<=4;g++){
-        const y = padT + (H-padT-padB)*g/4;
-        const val = Math.round(maxP*(1-g/4));
-        svg += `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="rgba(255,255,255,0.08)"/>`;
-        svg += `<text x="${padL-6}" y="${y+4}" fill="rgba(255,255,255,0.5)" font-size="10" text-anchor="end">${val}</text>`;
+function addBattle(){
+    const cups = parseNum(document.getElementById('battleCups').value);
+    const date = document.getElementById('battleDate').value || today();
+    if(!cups){toast('请输入杯数');return;}
+    const a = loadBattle();
+    const sorted = a.slice().sort((x,y)=>x.date<y.date?-1:1);
+    const lastCups = sorted.length? sorted[sorted.length-1].cups : null;
+    const delta = lastCups!=null? cups-lastCups : 0;
+    const ex = a.findIndex(x=>x.date===date);
+    const rec = {date, cups, delta};
+    if(ex>=0) a[ex]=rec; else a.push(rec);
+    a.sort((x,y)=>x.date<y.date?-1:1);
+    saveBattle(a);
+    document.getElementById('battleCups').value='';
+    renderBattle();
+    toast(`✅ ${date} 杯数 ${cups}`+(delta>=0?` (↑+${delta})`:` (↓${delta})`));
+}
+function renderBattle(){
+    populateMyAlliance();
+    const a=loadBattle();
+    const badge=document.getElementById('battleBadge');
+    if(badge) badge.textContent = a.length?`${a.length} 天记录`:'未记录';
+    const nm=myAllianceName();
+    const myR = nm? state.rankings.find(r=>r['联盟名称']===nm):null;
+    let refHtml='';
+    if(myR){
+        const per=getPerCap(myR);
+        const fac=myR['所属阵营']||'';
+        const fl=factionList(fac);
+        const pr=fl.findIndex(r=>r['联盟名称']===nm)+1;
+        const totalPer=fl.reduce((s,r)=>s+getPerCap(r),0)||1;
+        const prob=Math.round(per/totalPer*1000)/10;
+        const rk=parseNum(myR['排名']);
+        refHtml=`<div class="battle-ref">我的联盟 <b>${esc(nm)}</b>（${esc(fac)}）· 排行 <b>#${rk||'-'}</b> · 人均战力 <b>${per.toLocaleString()}</b> · 夺冠概率 <b>${prob}%</b></div>`;
+    } else {
+        refHtml=`<div class="battle-ref" style="color:rgba(255,255,255,0.5)">选择"我的联盟"可对照其排行 / 人均战力 / 夺冠概率</div>`;
     }
-    // X轴标签
-    names.forEach((n,i)=>{ svg += `<text x="${xOf(i)}" y="${H-padB+16}" fill="rgba(255,255,255,0.6)" font-size="10" text-anchor="middle">${esc(n.length>6?n.slice(0,6)+'…':n)}</text>`; });
-    // 每条阵营线
-    FACTIONS.forEach(f=>{
-        const pts = names.map((n,i)=>{const v=parsePower((map[n].factions[f]||{}).联盟战力||0);return `${xOf(i)},${yOf(v)}`;});
-        svg += `<polyline points="${pts.join(' ')}" fill="none" stroke="${colors[f]}" stroke-width="2.5"/>`;
-        names.forEach((n,i)=>{
-            const v=parsePower((map[n].factions[f]||{}).联盟战力||0);
-            if(v>0) svg += `<circle cx="${xOf(i)}" cy="${yOf(v)}" r="3.5" fill="${colors[f]}"/>`;
-        });
+    let listHtml='';
+    if(a.length){
+        listHtml='<table><thead><tr><th>日期</th><th>杯数</th><th>今日涨跌</th></tr></thead><tbody>'+a.map(x=>{
+            const dc=x.delta>=0?('+'+x.delta):(''+x.delta);
+            const cl=x.delta>=0?'#4caf50':'#ef5350';
+            const arrow=x.delta>0?'↑':x.delta<0?'↓':'–';
+            return `<tr><td>${esc(x.date)}</td><td>${x.cups}</td><td style="color:${cl};font-weight:bold">${arrow}${dc}</td></tr>`;
+        }).join('')+'</tbody></table>';
+    } else {
+        listHtml='<div class="empty">还没有战况记录，上方录入每日杯数</div>';
+    }
+    document.getElementById('battleList').innerHTML = refHtml+listHtml;
+    renderBattleSvg(a);
+}
+// SVG 折线：杯数随日期变化，点标注涨跌
+function renderBattleSvg(a){
+    const wrap=document.getElementById('battleSvg'); if(!wrap) return;
+    if(a.length<1){wrap.innerHTML='';return;}
+    const W=760,H=220,padL=50,padR=16,padT=16,padB=34;
+    const cups=a.map(x=>x.cups);
+    const maxC=Math.max(...cups), minC=Math.min(...cups);
+    const span=Math.max(1,maxC-minC);
+    const xStep=a.length>1?(W-padL-padR)/(a.length-1):0;
+    const xOf=i=>a.length>1?padL+i*xStep:W/2;
+    const yOf=v=>padT+(H-padT-padB)*(1-(v-minC)/span);
+    let svg=`<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:${W}px;">`;
+    for(let g=0;g<=3;g++){
+        const y=padT+(H-padT-padB)*g/3;
+        const val=Math.round(maxC-(maxC-minC)*g/3);
+        svg+=`<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="rgba(255,255,255,0.08)"/>`;
+        svg+=`<text x="${padL-6}" y="${y+4}" fill="rgba(255,255,255,0.5)" font-size="10" text-anchor="end">${val}</text>`;
+    }
+    a.forEach((x,i)=>{ svg+=`<text x="${xOf(i)}" y="${H-padB+16}" fill="rgba(255,255,255,0.6)" font-size="10" text-anchor="middle">${esc(String(x.date).slice(5))}</text>`; });
+    const pts=a.map((x,i)=>`${xOf(i)},${yOf(x.cups)}`).join(' ');
+    svg+=`<polyline points="${pts}" fill="none" stroke="#4dd0e1" stroke-width="2.5"/>`;
+    a.forEach((x,i)=>{
+        const c=x.delta>=0?'#4caf50':'#ef5350';
+        svg+=`<circle cx="${xOf(i)}" cy="${yOf(x.cups)}" r="4" fill="${c}"/>`;
     });
-    svg += '</svg>';
-    // 图例
-    let legend = '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:6px;font-size:0.74rem;">';
-    FACTIONS.forEach(f=>{ legend += `<span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:12px;height:3px;background:${colors[f]};display:inline-block;border-radius:2px;"></span>${esc(f)}</span>`; });
-    legend += '</div>';
-    wrap.innerHTML = svg + legend;
+    svg+='</svg>';
+    wrap.innerHTML=svg;
+}
+
+// ---------- 赛季快照（自动记前5 · 按日期） ----------
+function loadSnap(){ try{const t=dsGet('deepsea_season_snapshot');return t?JSON.parse(t):{}}catch(e){return{}} }
+function saveSnapMap(m){dsSet('deepsea_season_snapshot',JSON.stringify(m))}
+function factionTop5(f){
+    return state.rankings.filter(r=>r['所属阵营']===f)
+        .sort((a,b)=>(+a['排名']||0)-(+b['排名']||0)).slice(0,5)
+        .map(r=>({
+            排名:r['排名'], 所属阵营:f, 联盟名称:r['联盟名称'], 联盟ID:r['联盟ID'],
+            会长:r['会长'], 人数:r['人数'], 联盟等级:r['联盟等级'], 联盟战力:r['联盟战力'], 人均战力:getPerCap(r)
+        }));
+}
+function saveSnapshot(){
+    const label=(document.getElementById('snapLabel').value||'').trim();
+    if(!state.rankings.length){toast('请先导入排行');return;}
+    const factions={};
+    FACTIONS.forEach(f=>{const t=factionTop5(f); if(t.length) factions[f]=t;});
+    if(!Object.keys(factions).length){toast('排行无数据');return;}
+    const date=today();
+    const id=label||date;
+    const rec={date, label:label||'', factions};
+    const m=loadSnap(); m[id]=rec; saveSnapMap(m);
+    refreshSnapSelect(id); renderSnapshot(); renderSnapTrend();
+    toast(`✅ 已记录 ${id}（各阵营前5）`);
+}
+function refreshSnapSelect(sel){
+    const m=loadSnap();
+    const selEl=document.getElementById('snapSelect');
+    if(!selEl) return;
+    const ids=Object.keys(m).sort((a,b)=>(m[a].date||'')>(m[b].date||'')?1:-1);
+    selEl.innerHTML='<option value="">— 选择赛季 —</option>'+ids.map(n=>`<option value="${esc(n)}">${esc(n)}${m[n].label?(' · '+esc(m[n].label)):''}</option>`).join('');
+    if(sel) selEl.value=sel;
+    const badge=document.getElementById('snapBadge');
+    if(badge) badge.textContent=`共 ${ids.length} 个`;
+}
+function renderSnapshot(){
+    const id=document.getElementById('snapSelect').value;
+    const box=document.getElementById('snapDetail');
+    const m=loadSnap();
+    if(!id||!m[id]){ if(box) box.innerHTML='<div class="empty">选择赛季查看各阵营前5详情</div>'; return; }
+    const rec=m[id];
+    let html=`<div style="font-size:0.8rem;margin-bottom:8px;">📅 <b style="color:#4dd0e1">${esc(rec.date)}</b>${rec.label?(' · '+esc(rec.label)):''} · 各阵营前5（含人均战力）</div>`;
+    FACTIONS.forEach(f=>{
+        const list=rec.factions[f]; if(!list||!list.length) return;
+        const color=FACTION_COLOR[f]||'#4dd0e1';
+        html+=`<div class="snap-fac" style="--fac:${color}"><div class="snap-fac-h">${factionEmoji(f)} ${esc(f)} 前5</div>`;
+        html+=list.map((r,i)=>{
+            const medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':('#'+(i+1));
+            const per=r['人均战力']!=null?Number(r['人均战力']).toLocaleString():'-';
+            return `<div class="snap-row">
+                <span class="snap-rk">${medal}</span>
+                <span class="snap-nm" title="${esc(r['联盟名称'])}">${esc(r['联盟名称'])}</span>
+                <span class="snap-own" title="${esc(r['会长']||'')}">👑${esc(r['会长']||'-')}</span>
+                <span class="snap-per">人均 ${per}</span>
+                <span class="snap-pw">战力 ${esc(r['联盟战力'])}</span>
+            </div>`;
+        }).join('');
+        html+='</div>';
+    });
+    box.innerHTML=html;
+}
+function deleteSnapshot(){
+    const id=document.getElementById('snapSelect').value;
+    if(!id){toast('请先选择赛季');return}
+    const m=loadSnap();
+    if(!m[id]){toast('赛季不存在');return}
+    delete m[id]; saveSnapMap(m);
+    refreshSnapSelect(); renderSnapshot(); renderSnapTrend();
+    toast(`🗑 已删除 ${id}`);
+}
+// SVG 折线：各阵营代表联盟（前5之首）战力随赛季变化
+function renderSnapTrend(){
+    const wrap=document.getElementById('snapTrend');
+    if(!wrap) return;
+    const m=loadSnap();
+    const ids=Object.keys(m).sort((a,b)=>(m[a].date||'')>(m[b].date||'')?1:-1);
+    if(ids.length<1){wrap.innerHTML='<div class="empty">记录至少 1 个赛季后显示趋势</div>';return;}
+    const W=760,H=320,padL=64,padR=20,padT=20,padB=40;
+    const maxP=Math.max(1,...ids.flatMap(id=>FACTIONS.map(f=>{
+        const t=(m[id].factions[f]||[])[0]; return t?parsePower(t['联盟战力']):0;
+    })));
+    const xStep=ids.length>1?(W-padL-padR)/(ids.length-1):0;
+    const xOf=i=>ids.length>1?padL+i*xStep:W/2;
+    const yOf=v=>padT+(H-padT-padB)*(1-v/maxP);
+    const colors={'暗月地精':'#9b59b6','人类联盟':'#3498db','天灾亡灵':'#2ecc71','兽人部落':'#e67e22'};
+    let svg=`<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:${W}px;">`;
+    for(let g=0;g<=4;g++){
+        const y=padT+(H-padT-padB)*g/4;
+        const val=Math.round(maxP*(1-g/4));
+        svg+=`<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="rgba(255,255,255,0.08)"/>`;
+        svg+=`<text x="${padL-6}" y="${y+4}" fill="rgba(255,255,255,0.5)" font-size="10" text-anchor="end">${val}</text>`;
+    }
+    ids.forEach((n,i)=>{ svg+=`<text x="${xOf(i)}" y="${H-padB+16}" fill="rgba(255,255,255,0.6)" font-size="10" text-anchor="middle">${esc(n.length>8?n.slice(0,8)+'…':n)}</text>`; });
+    FACTIONS.forEach(f=>{
+        const pts=ids.map((n,i)=>{const t=(m[n].factions[f]||[])[0];const v=t?parsePower(t['联盟战力']):0;return `${xOf(i)},${yOf(v)}`;});
+        svg+=`<polyline points="${pts.join(' ')}" fill="none" stroke="${colors[f]}" stroke-width="2.5"/>`;
+        ids.forEach((n,i)=>{const t=(m[n].factions[f]||[])[0];const v=t?parsePower(t['联盟战力']):0;if(v>0) svg+=`<circle cx="${xOf(i)}" cy="${yOf(v)}" r="3.5" fill="${colors[f]}"/>`;});
+    });
+    svg+='</svg>';
+    let legend='<div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:6px;font-size:0.74rem;">';
+    FACTIONS.forEach(f=>{ legend+=`<span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:12px;height:3px;background:${colors[f]};display:inline-block;border-radius:2px;"></span>${esc(f)}</span>`; });
+    legend+='</div>';
+    wrap.innerHTML=svg+legend;
 }
 
 // ===================== 初始化 =====================
 window.addEventListener('load', ()=>{
     loadAll();
     if(!state.rankings.length){importRankingsFromDisk()}
-    refreshSeasonSelect();
-    renderSeasonEnd();
-    renderTrend();
     renderRankings();
+    renderChampionship();
+    renderBattle();
+    refreshSnapSelect();
+    renderSnapshot();
+    renderSnapTrend();
 });
 </script>
 </body>
