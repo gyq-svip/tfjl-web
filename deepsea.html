@@ -91,18 +91,17 @@ td .strong-tag{color:#ffd700;font-size:0.7rem;margin-left:4px;}
 .champ-bar{flex:0 0 36%;display:flex;align-items:center;gap:6px;min-width:120px}
 .champ-bar .fill{height:8px;border-radius:4px}
 .champ-bar i{font-style:normal;font-size:0.72rem;color:rgba(255,255,255,0.7);min-width:40px;text-align:right}
-/* 实战战况 */
-.battle-ref{background:rgba(77,182,172,0.12);border-radius:8px;padding:7px 10px;margin-bottom:8px;font-size:0.8rem;color:rgba(255,255,255,0.85);line-height:1.6}
-.battle-ref b{color:#ffd700}
 /* 赛季快照 */
 .snap-fac{background:rgba(255,255,255,0.04);border-left:4px solid var(--fac,#4dd0e1);border-radius:10px;padding:8px 10px;margin-bottom:10px}
 .snap-fac-h{font-weight:700;color:#fff;margin-bottom:6px}
-.snap-row{display:flex;align-items:center;gap:6px;padding:3px 0;font-size:0.76rem;flex-wrap:wrap}
-.snap-rk{width:30px;color:#4dd0e1;font-weight:700;flex:0 0 auto}
-.snap-nm{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.snap-own{font-size:0.7rem;color:rgba(255,255,255,0.5);flex:0 0 auto}
-.snap-per{flex:0 0 auto;color:#e0f7fa}
-.snap-pw{flex:0 0 auto;color:rgba(255,255,255,0.6)}
+/* 赛季快照柱状图（各阵营前5 · 按人均战力） */
+.snap-bar-row{display:flex;align-items:center;gap:6px;padding:4px 0;font-size:0.76rem}
+.snap-bar-row .snap-rk{width:24px;color:#4dd0e1;font-weight:700;flex:0 0 auto;text-align:center}
+.snap-bar-row .snap-nm{flex:0 0 120px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:rgba(255,255,255,0.9)}
+.snap-bar-row .snap-bar{flex:1 1 auto;min-width:30px;height:14px;background:rgba(255,255,255,0.08);border-radius:7px;overflow:hidden}
+.snap-bar-row .snap-bar .fill{display:block;height:100%;border-radius:7px;opacity:0.85}
+.snap-bar-row .snap-per{flex:0 0 64px;text-align:right;color:#e0f7fa;font-weight:bold}
+.snap-bar-row .snap-pw{flex:0 0 96px;text-align:right;color:rgba(255,255,255,0.55);font-size:0.7rem}
 /* ===== 排行列表(table) ===== */
 .rank-table{width:100%;border-collapse:collapse;font-size:0.8rem}
 .rank-table th,.rank-table td{padding:6px 8px;white-space:nowrap;text-align:left}
@@ -232,27 +231,6 @@ tr.rk-weak:hover td{opacity:1}
             每个阵营内按"人均战力"排名，夺冠概率 = 该联盟人均战力 ÷ 阵营人均战力总和。🏅 推荐 = 各阵营最强联盟。
         </div>
         <div id="championBox" class="scroll-y" style="max-height:520px;"></div>
-    </div>
-
-    <!-- 板块C：实战战况（杯数涨跌 · 对照排行） -->
-    <div class="card">
-        <h3>⚔️ 实战战况 <span class="badge" id="battleBadge">未记录</span></h3>
-        <div class="row" style="margin-bottom:8px;">
-            <label style="min-width:auto;">我的联盟</label>
-            <select id="myAlliance" onchange="setMyAlliance()" style="flex:1 1 160px;min-width:130px;"></select>
-        </div>
-        <div class="row" style="margin-bottom:6px;">
-            <label style="min-width:auto;">日期</label>
-            <input id="battleDate" type="date" style="flex:0 1 130px;min-width:110px;">
-            <label style="min-width:auto;">杯数</label>
-            <input id="battleCups" type="number" placeholder="如 1280" style="flex:1 1 110px;min-width:80px;">
-            <button onclick="addBattle()">➕ 记录</button>
-        </div>
-        <div class="row" style="margin-bottom:8px;font-size:0.72rem;color:rgba(255,255,255,0.5);">
-            录入每日杯数后自动算"今日涨跌"，并和上方排行对照（排名 / 人均战力 / 夺冠概率），看自己联盟实际升跌。
-        </div>
-        <div id="battleSvg"></div>
-        <div id="battleList" class="scroll-y" style="max-height:260px;"></div>
     </div>
 
     <!-- 板块D：赛季快照（自动记前5 · 按日期） -->
@@ -476,7 +454,6 @@ async function importRankingsFile(event){
         saveRankings();
         renderRankings();
         renderChampionship();
-        renderBattle();
         recordImport('JSON 文件', rankings);
         toast(`✅ 已导入 ${rankings.length} 条`);
     }catch(e){toast('导入失败：'+e.message)}
@@ -494,7 +471,6 @@ async function importRankingsFromDisk(record){
                 saveRankings();
                 renderRankings();
                 renderChampionship();
-                renderBattle();
                 if(record!==false) recordImport('dataDir', rankings);
                 toast(`✅ 从 dataDir 导入 ${rankings.length} 条`);
                 return;
@@ -563,13 +539,12 @@ async function importRankingsXlsx(event){
         }
         renderRankings();
         renderChampionship();
-        renderBattle();
         toast(`✅ 已从 xlsx 导入 ${list.length} 条（${totalName}）`);
     }catch(e){ toast('xlsx 导入失败：'+e.message); }
     event.target.value='';
 }
 
-// ===================== 夺冠概率 / 实战战况 / 赛季快照 =====================
+// ===================== 夺冠概率 / 赛季快照 =====================
 const FACTIONS = ['暗月地精','人类联盟','天灾亡灵','兽人部落'];
 function factionEmoji(f){return {'暗月地精':'🌙','人类联盟':'⚔️','天灾亡灵':'💀','兽人部落':'👹'}[f]||'🏳️'}
 function parsePower(v){
@@ -684,97 +659,7 @@ function renderChampionship(){
     box.innerHTML = html;
 }
 
-// ---------- 实战战况（杯数涨跌 · 对照排行） ----------
-function loadBattle(){ try{const t=dsGet('deepsea_daily_entries');return t?JSON.parse(t):[]}catch(e){return[]} }
-function saveBattle(a){dsSet('deepsea_daily_entries',JSON.stringify(a))}
-function myAllianceName(){ return dsGet('deepsea_my_alliance')||''; }
-function setMyAlliance(){ dsSet('deepsea_my_alliance', document.getElementById('myAlliance').value); renderBattle(); }
-function populateMyAlliance(){
-    const sel=document.getElementById('myAlliance'); if(!sel) return;
-    const names=[...new Set(state.rankings.map(r=>r['联盟名称']).filter(Boolean))].sort();
-    const cur=myAllianceName();
-    sel.innerHTML='<option value="">— 选择我的联盟 —</option>'+names.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');
-    if(cur) sel.value=cur;
-}
-function addBattle(){
-    const cups = parseNum(document.getElementById('battleCups').value);
-    const date = document.getElementById('battleDate').value || today();
-    if(!cups){toast('请输入杯数');return;}
-    const a = loadBattle();
-    const sorted = a.slice().sort((x,y)=>x.date<y.date?-1:1);
-    const lastCups = sorted.length? sorted[sorted.length-1].cups : null;
-    const delta = lastCups!=null? cups-lastCups : 0;
-    const ex = a.findIndex(x=>x.date===date);
-    const rec = {date, cups, delta};
-    if(ex>=0) a[ex]=rec; else a.push(rec);
-    a.sort((x,y)=>x.date<y.date?-1:1);
-    saveBattle(a);
-    document.getElementById('battleCups').value='';
-    renderBattle();
-    toast(`✅ ${date} 杯数 ${cups}`+(delta>=0?` (↑+${delta})`:` (↓${delta})`));
-}
-function renderBattle(){
-    populateMyAlliance();
-    const a=loadBattle();
-    const badge=document.getElementById('battleBadge');
-    if(badge) badge.textContent = a.length?`${a.length} 天记录`:'未记录';
-    const nm=myAllianceName();
-    const myR = nm? state.rankings.find(r=>r['联盟名称']===nm):null;
-    let refHtml='';
-    if(myR){
-        const per=getPerCap(myR);
-        const fac=myR['所属阵营']||'';
-        const fl=factionList(fac);
-        const pr=fl.findIndex(r=>r['联盟名称']===nm)+1;
-        const totalPer=fl.reduce((s,r)=>s+getPerCap(r),0)||1;
-        const prob=Math.round(per/totalPer*1000)/10;
-        const rk=parseNum(myR['排名']);
-        refHtml=`<div class="battle-ref">我的联盟 <b>${esc(nm)}</b>（${esc(fac)}）· 排行 <b>#${rk||'-'}</b> · 人均战力 <b>${per.toLocaleString()}</b> · 夺冠概率 <b>${prob}%</b></div>`;
-    } else {
-        refHtml=`<div class="battle-ref" style="color:rgba(255,255,255,0.5)">选择"我的联盟"可对照其排行 / 人均战力 / 夺冠概率</div>`;
-    }
-    let listHtml='';
-    if(a.length){
-        listHtml='<table><thead><tr><th>日期</th><th>杯数</th><th>今日涨跌</th></tr></thead><tbody>'+a.map(x=>{
-            const dc=x.delta>=0?('+'+x.delta):(''+x.delta);
-            const cl=x.delta>=0?'#4caf50':'#ef5350';
-            const arrow=x.delta>0?'↑':x.delta<0?'↓':'–';
-            return `<tr><td>${esc(x.date)}</td><td>${x.cups}</td><td style="color:${cl};font-weight:bold">${arrow}${dc}</td></tr>`;
-        }).join('')+'</tbody></table>';
-    } else {
-        listHtml='<div class="empty">还没有战况记录，上方录入每日杯数</div>';
-    }
-    document.getElementById('battleList').innerHTML = refHtml+listHtml;
-    renderBattleSvg(a);
-}
-// SVG 折线：杯数随日期变化，点标注涨跌
-function renderBattleSvg(a){
-    const wrap=document.getElementById('battleSvg'); if(!wrap) return;
-    if(a.length<1){wrap.innerHTML='';return;}
-    const W=760,H=220,padL=50,padR=16,padT=16,padB=34;
-    const cups=a.map(x=>x.cups);
-    const maxC=Math.max(...cups), minC=Math.min(...cups);
-    const span=Math.max(1,maxC-minC);
-    const xStep=a.length>1?(W-padL-padR)/(a.length-1):0;
-    const xOf=i=>a.length>1?padL+i*xStep:W/2;
-    const yOf=v=>padT+(H-padT-padB)*(1-(v-minC)/span);
-    let svg=`<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:${W}px;">`;
-    for(let g=0;g<=3;g++){
-        const y=padT+(H-padT-padB)*g/3;
-        const val=Math.round(maxC-(maxC-minC)*g/3);
-        svg+=`<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="rgba(255,255,255,0.08)"/>`;
-        svg+=`<text x="${padL-6}" y="${y+4}" fill="rgba(255,255,255,0.5)" font-size="10" text-anchor="end">${val}</text>`;
-    }
-    a.forEach((x,i)=>{ svg+=`<text x="${xOf(i)}" y="${H-padB+16}" fill="rgba(255,255,255,0.6)" font-size="10" text-anchor="middle">${esc(String(x.date).slice(5))}</text>`; });
-    const pts=a.map((x,i)=>`${xOf(i)},${yOf(x.cups)}`).join(' ');
-    svg+=`<polyline points="${pts}" fill="none" stroke="#4dd0e1" stroke-width="2.5"/>`;
-    a.forEach((x,i)=>{
-        const c=x.delta>=0?'#4caf50':'#ef5350';
-        svg+=`<circle cx="${xOf(i)}" cy="${yOf(x.cups)}" r="4" fill="${c}"/>`;
-    });
-    svg+='</svg>';
-    wrap.innerHTML=svg;
-}
+
 
 // ---------- 赛季快照（自动记前5 · 按日期） ----------
 function loadSnap(){ try{const t=dsGet('deepsea_season_snapshot');return t?JSON.parse(t):{}}catch(e){return{}} }
@@ -816,19 +701,21 @@ function renderSnapshot(){
     const m=loadSnap();
     if(!id||!m[id]){ if(box) box.innerHTML='<div class="empty">选择赛季查看各阵营前5详情</div>'; return; }
     const rec=m[id];
-    let html=`<div style="font-size:0.8rem;margin-bottom:8px;">📅 <b style="color:#4dd0e1">${esc(rec.date)}</b>${rec.label?(' · '+esc(rec.label)):''} · 各阵营前5（含人均战力）</div>`;
+    let html=`<div style="font-size:0.8rem;margin-bottom:8px;">📅 <b style="color:#4dd0e1">${esc(rec.date)}</b>${rec.label?(' · '+esc(rec.label)):''} · 各阵营前5（人均战力柱状图）</div>`;
     FACTIONS.forEach(f=>{
         const list=rec.factions[f]; if(!list||!list.length) return;
         const color=FACTION_COLOR[f]||'#4dd0e1';
+        const maxPer=Math.max.apply(null, list.map(r=>Number(r['人均战力']||0)).concat([1]));
         html+=`<div class="snap-fac" style="--fac:${color}"><div class="snap-fac-h">${factionEmoji(f)} ${esc(f)} 前5</div>`;
         html+=list.map((r,i)=>{
             const medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':('#'+(i+1));
-            const per=r['人均战力']!=null?Number(r['人均战力']).toLocaleString():'-';
-            return `<div class="snap-row">
+            const per=Number(r['人均战力']||0);
+            const pct=Math.max(4, Math.round(per/maxPer*100));
+            return `<div class="snap-bar-row">
                 <span class="snap-rk">${medal}</span>
                 <span class="snap-nm" title="${esc(r['联盟名称'])}">${esc(r['联盟名称'])}</span>
-                <span class="snap-own" title="${esc(r['会长']||'')}">👑${esc(r['会长']||'-')}</span>
-                <span class="snap-per">人均 ${per}</span>
+                <span class="snap-bar"><span class="fill" style="width:${pct}%;background:${color}"></span></span>
+                <span class="snap-per">${per.toLocaleString()}</span>
                 <span class="snap-pw">战力 ${esc(r['联盟战力'])}</span>
             </div>`;
         }).join('');
@@ -1057,7 +944,7 @@ function viewImport(id){
 function loadImportAsCurrent(id){
     const log=loadImportLog(); const rec=log.find(x=>x.id===id); if(!rec){toast('记录不存在');return;}
     state.rankings=rec.rankings; saveRankings();
-    renderRankings(); renderChampionship(); renderBattle(); populateCalcAlliance();
+    renderRankings(); renderChampionship(); populateCalcAlliance();
     toast('📥 已载入 '+id+' 为当前排行');
 }
 function deleteImport(id){
@@ -1105,7 +992,6 @@ window.addEventListener('load', ()=>{
     populateCalcAlliance();
     const cd=document.getElementById('calcDays'); if(cd) cd.value=state.seasonDays;
     renderChampionship();
-    renderBattle();
     refreshSnapSelect();
     renderSnapshot();
     renderTrend();
