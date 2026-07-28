@@ -89,27 +89,45 @@ tr.top1:hover td,tr.top2:hover td,tr.top3:hover td{background:rgba(77,182,172,0.
         </div>
     </div>
 
-    <!-- 赛季前三记录（单独存，日后对比） -->
+    <!-- 板块A：赛季末记录（最后3天战况 + 各势力代表战绩） -->
     <div class="card">
-        <h3>🏁 赛季前三记录 <span class="badge" id="top3Badge">共 0 个赛季</span></h3>
+        <h3>🏁 赛季末记录 <span class="badge" id="seasonEndBadge">共 0 个赛季</span></h3>
         <div class="row" style="margin-bottom:10px;">
             <label style="min-width:auto;">赛季名</label>
-            <input id="seasonName" placeholder="如 S1 / 2026夏季" style="flex:1 1 140px;min-width:120px;">
-            <button onclick="saveTop3()">💾 保存当前前三</button>
+            <input id="seSeason" placeholder="如 S1 / 2026夏季" style="flex:1 1 130px;min-width:110px;">
+            <label style="min-width:auto;">日期</label>
+            <input id="seDate" type="date" style="flex:0 1 140px;min-width:120px;">
+        </div>
+        <div class="row" style="margin-bottom:8px;font-size:0.75rem;color:rgba(255,255,255,0.6);">
+            赛季最后3天战况（每一天一段，记录当日联盟表现/关键事件）
+        </div>
+        <div class="row" style="margin-bottom:6px;">
+            <label style="min-width:auto;">第3天</label>
+            <textarea id="seDay3" rows="2" placeholder="倒数第3天战况" style="flex:1 1 200px;min-width:160px;resize:vertical;"></textarea>
+        </div>
+        <div class="row" style="margin-bottom:6px;">
+            <label style="min-width:auto;">第2天</label>
+            <textarea id="seDay2" rows="2" placeholder="倒数第2天战况" style="flex:1 1 200px;min-width:160px;resize:vertical;"></textarea>
+        </div>
+        <div class="row" style="margin-bottom:10px;">
+            <label style="min-width:auto;">第1天</label>
+            <textarea id="seDay1" rows="2" placeholder="赛季最后一天战况" style="flex:1 1 200px;min-width:160px;resize:vertical;"></textarea>
+        </div>
+        <div class="row" style="margin-bottom:8px;">
+            <button onclick="saveSeasonEnd()">💾 记录本赛季（自动抓各势力代表战绩）</button>
+            <span style="font-size:0.72rem;color:rgba(255,255,255,0.5);">代表战绩 = 当前排行中各阵营战力最高的联盟</span>
         </div>
         <div class="row" style="margin-bottom:8px;">
             <label style="min-width:auto;">查看</label>
-            <select id="seasonSelect" onchange="renderTop3()" style="flex:1 1 140px;min-width:120px;">
+            <select id="seSelect" onchange="renderSeasonEnd()" style="flex:1 1 140px;min-width:120px;">
                 <option value="">— 选择赛季 —</option>
             </select>
-            <button class="ghost small" onclick="deleteTop3()">🗑 删除</button>
+            <button class="ghost small" onclick="deleteSeasonEnd()">🗑 删除</button>
         </div>
-        <div class="scroll-y">
-            <table>
-                <thead><tr><th>名次</th><th>联盟名称</th><th>阵营</th><th>会长</th><th>联盟战力</th></tr></thead>
-                <tbody id="top3Tbody"></tbody>
-            </table>
-        </div>
+        <div id="seDetail" class="scroll-y" style="max-height:300px;"></div>
+
+        <h3 style="margin-top:14px;">📈 势力战绩趋势 <span style="font-size:0.7rem;color:rgba(255,255,255,0.5);font-weight:normal;">（各阵营代表联盟战力随赛季变化）</span></h3>
+        <div id="trendSvg"></div>
     </div>
 </div>
 
@@ -224,62 +242,143 @@ async function importRankingsFromDisk(){
     }
 }
 
-// ===================== 赛季前三 =====================
-function loadTop3Map(){
+// ===================== 赛季末记录 + 势力趋势 =====================
+const FACTIONS = ['暗月地精','人类联盟','天灾亡灵','兽人部落'];
+function loadSeasonEnd(){
     try{
-        const t = dsGet('deepsea_season_top3');
+        const t = dsGet('deepsea_season_end');
         return t ? JSON.parse(t) : {};
     }catch(e){return {}}
 }
-function saveTop3Map(map){dsSet('deepsea_season_top3', JSON.stringify(map))}
-function saveTop3(){
-    const name = (document.getElementById('seasonName').value||'').trim();
+function saveSeasonEndMap(map){dsSet('deepsea_season_end', JSON.stringify(map))}
+// 当前排行里各阵营战力最高的联盟
+function factionReps(){
+    const reps = {};
+    FACTIONS.forEach(f=>{
+        const sub = state.rankings.filter(r=>r['所属阵营']===f);
+        if(sub.length){
+            sub.sort((a,b)=>(+parsePower(b['联盟战力']||0))-(+parsePower(a['联盟战力']||0)));
+            const top = sub[0];
+            reps[f] = { '联盟名称': top['联盟名称'], '联盟战力': top['联盟战力'], '会长': top['会长'], '排名': top['排名'] };
+        }
+    });
+    return reps;
+}
+function parsePower(v){
+    if(typeof v === 'number') return v;
+    if(!v) return 0;
+    return +String(v).replace(/[^\d]/g,'') || 0;
+}
+function saveSeasonEnd(){
+    const name = (document.getElementById('seSeason').value||'').trim();
+    const date = document.getElementById('seDate').value || today();
     if(!name){toast('请先输入赛季名');return}
-    if(!state.rankings.length){toast('请先导入排行数据');return}
-    const sorted = state.rankings.slice().sort((a,b)=>(+a['排名']||0)-(+b['排名']||0));
-    const top3 = sorted.slice(0,3).map(r=>({
-        '排名': r['排名'], '联盟名称': r['联盟名称'], '所属阵营': r['所属阵营'],
-        '会长': r['会长'], '联盟战力': r['联盟战力'], '人数': r['人数'], '联盟等级': r['联盟等级']
-    }));
-    const map = loadTop3Map();
-    map[name] = { savedAt: today(), top3 };
-    saveTop3Map(map);
+    const reps = factionReps();
+    if(!Object.keys(reps).length){toast('请先导入排行数据');return}
+    const rec = {
+        date,
+        factions: reps,
+        days: {
+            d3: document.getElementById('seDay3').value || '',
+            d2: document.getElementById('seDay2').value || '',
+            d1: document.getElementById('seDay1').value || ''
+        },
+        savedAt: today()
+    };
+    const map = loadSeasonEnd();
+    map[name] = rec;
+    saveSeasonEndMap(map);
     refreshSeasonSelect(name);
-    renderTop3();
-    toast(`✅ 已保存「${name}」前三`);
+    renderSeasonEnd();
+    renderTrend();
+    toast(`✅ 已记录「${name}」`);
 }
 function refreshSeasonSelect(sel){
-    const map = loadTop3Map();
-    const selEl = document.getElementById('seasonSelect');
-    const names = Object.keys(map).sort((a,b)=>{
-        // 按保存时间倒序
-        return (map[b].savedAt||'') > (map[a].savedAt||'') ? 1 : -1;
-    });
-    selEl.innerHTML = '<option value="">— 选择赛季 —</option>' + names.map(n=>`<option value="${esc(n)}">${esc(n)}（${esc(map[n].savedAt||'')}）</option>`).join('');
+    const map = loadSeasonEnd();
+    const selEl = document.getElementById('seSelect');
+    const names = Object.keys(map).sort((a,b)=>(map[b].date||'') > (map[a].date||'') ? 1 : -1);
+    selEl.innerHTML = '<option value="">— 选择赛季 —</option>' + names.map(n=>`<option value="${esc(n)}">${esc(n)}（${esc(map[n].date||'')}）</option>`).join('');
     if(sel) selEl.value = sel;
-    document.getElementById('top3Badge').textContent = `共 ${names.length} 个赛季`;
+    document.getElementById('seasonEndBadge').textContent = `共 ${names.length} 个赛季`;
 }
-function renderTop3(){
-    const name = document.getElementById('seasonSelect').value;
-    const tbody = document.getElementById('top3Tbody');
-    const map = loadTop3Map();
+function renderSeasonEnd(){
+    const name = document.getElementById('seSelect').value;
+    const box = document.getElementById('seDetail');
+    const map = loadSeasonEnd();
     if(!name || !map[name]){
-        tbody.innerHTML = '<tr><td colspan="5" class="empty">选择赛季查看前三，或上方保存当前前三</td></tr>';
+        box.innerHTML = '<div class="empty">选择赛季查看详情，或上方记录本赛季</div>';
         return;
     }
-    const list = map[name].top3 || [];
-    tbody.innerHTML = list.map((r,idx)=>{const rankCls=['top1','top2','top3'][idx]||'';const rkClass=['rk-gold','rk-silver','rk-bronze'][idx]||'';return `<tr class="${rankCls}"><td class="${rkClass}">${esc(r['排名']??'-')}</td><td>${esc(r['联盟名称']??'-')}</td><td>${esc(r['所属阵营']??'-')}</td><td>${esc(r['会长']??'-')}</td><td>${r['联盟战力']!=null?r['联盟战力']:'-'}</td></tr>`}).join('');
+    const rec = map[name];
+    let html = `<div style="font-size:0.8rem;line-height:1.9;">`;
+    html += `<div style="margin-bottom:8px;"><b style="color:#4dd0e1;">📅 ${esc(rec.date||'-')}</b></div>`;
+    // 各势力代表战绩
+    html += '<table style="margin-bottom:10px;"><thead><tr><th>阵营</th><th>代表联盟</th><th>联盟战力</th><th>会长</th></tr></thead><tbody>';
+    FACTIONS.forEach(f=>{
+        const r = rec.factions[f];
+        if(r) html += `<tr><td>${esc(f)}</td><td>${esc(r['联盟名称']||'-')}</td><td>${r['联盟战力']!=null?r['联盟战力']:'-'}</td><td>${esc(r['会长']||'-')}</td></tr>`;
+        else html += `<tr><td>${esc(f)}</td><td colspan="3" style="color:rgba(255,255,255,0.4)">无数据</td></tr>`;
+    });
+    html += '</tbody></table>';
+    // 最后3天战况
+    const d = rec.days||{};
+    const labels = [['d3','⏳ 倒数第3天'],['d2','⏳ 倒数第2天'],['d1','🏁 赛季最后一天']];
+    labels.forEach(([k,lab])=>{
+        html += `<div style="margin-bottom:6px;"><b style="color:#ffd700;">${lab}</b><div style="color:rgba(255,255,255,0.85);white-space:pre-wrap;padding:4px 0;">${esc(d[k]||'（未填写）')}</div></div>`;
+    });
+    html += '</div>';
+    box.innerHTML = html;
 }
-function deleteTop3(){
-    const name = document.getElementById('seasonSelect').value;
+function deleteSeasonEnd(){
+    const name = document.getElementById('seSelect').value;
     if(!name){toast('请先选择赛季');return}
-    const map = loadTop3Map();
+    const map = loadSeasonEnd();
     if(!map[name]){toast('赛季不存在');return}
     delete map[name];
-    saveTop3Map(map);
+    saveSeasonEndMap(map);
     refreshSeasonSelect();
-    renderTop3();
+    renderSeasonEnd();
+    renderTrend();
     toast(`🗑 已删除「${name}」`);
+}
+// SVG 折线：X=赛季，Y=各阵营代表联盟战力，4条线
+function renderTrend(){
+    const wrap = document.getElementById('trendSvg');
+    if(!wrap) return;
+    const map = loadSeasonEnd();
+    const names = Object.keys(map).sort((a,b)=>(map[a].date||'') > (map[b].date||'') ? 1 : -1);
+    if(names.length < 1){wrap.innerHTML = '<div class="empty">记录至少 1 个赛季后显示趋势</div>';return;}
+    const W=760,H=320,padL=64,padR=20,padT=20,padB=40;
+    const maxP = Math.max(1, ...names.flatMap(n=>FACTIONS.map(f=>parsePower((map[n].factions[f]||{}).联盟战力||0))));
+    const xStep = names.length>1 ? (W-padL-padR)/(names.length-1) : 0;
+    const xOf = i => names.length>1 ? padL + i*xStep : W/2;
+    const yOf = v => padT + (H-padT-padB)*(1 - v/maxP);
+    const colors = {'暗月地精':'#9b59b6','人类联盟':'#3498db','天灾亡灵':'#2ecc71','兽人部落':'#e67e22'};
+    let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:${W}px;">`;
+    // 网格 + Y轴刻度
+    for(let g=0;g<=4;g++){
+        const y = padT + (H-padT-padB)*g/4;
+        const val = Math.round(maxP*(1-g/4));
+        svg += `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="rgba(255,255,255,0.08)"/>`;
+        svg += `<text x="${padL-6}" y="${y+4}" fill="rgba(255,255,255,0.5)" font-size="10" text-anchor="end">${val}</text>`;
+    }
+    // X轴标签
+    names.forEach((n,i)=>{ svg += `<text x="${xOf(i)}" y="${H-padB+16}" fill="rgba(255,255,255,0.6)" font-size="10" text-anchor="middle">${esc(n.length>6?n.slice(0,6)+'…':n)}</text>`; });
+    // 每条阵营线
+    FACTIONS.forEach(f=>{
+        const pts = names.map((n,i)=>{const v=parsePower((map[n].factions[f]||{}).联盟战力||0);return `${xOf(i)},${yOf(v)}`;});
+        svg += `<polyline points="${pts.join(' ')}" fill="none" stroke="${colors[f]}" stroke-width="2.5"/>`;
+        names.forEach((n,i)=>{
+            const v=parsePower((map[n].factions[f]||{}).联盟战力||0);
+            if(v>0) svg += `<circle cx="${xOf(i)}" cy="${yOf(v)}" r="3.5" fill="${colors[f]}"/>`;
+        });
+    });
+    svg += '</svg>';
+    // 图例
+    let legend = '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:6px;font-size:0.74rem;">';
+    FACTIONS.forEach(f=>{ legend += `<span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:12px;height:3px;background:${colors[f]};display:inline-block;border-radius:2px;"></span>${esc(f)}</span>`; });
+    legend += '</div>';
+    wrap.innerHTML = svg + legend;
 }
 
 // ===================== 初始化 =====================
@@ -287,7 +386,8 @@ window.addEventListener('load', ()=>{
     loadAll();
     if(!state.rankings.length){importRankingsFromDisk()}
     refreshSeasonSelect();
-    renderTop3();
+    renderSeasonEnd();
+    renderTrend();
     renderRankings();
 });
 </script>
