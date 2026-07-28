@@ -29,6 +29,17 @@ th{color:#4dd0e1;font-weight:600;font-size:0.74rem;background:rgba(77,182,172,0.
 tr:hover td{background:rgba(77,182,172,0.06)}
 .scroll-y{max-height:560px;overflow-y:auto;border:1px solid rgba(77,182,172,0.15);border-radius:6px}
 .empty{padding:30px 10px;text-align:center;color:rgba(255,255,255,0.4);font-size:0.85rem;line-height:1.7}
+/* 前三名颜色标记（金/银/铜） */
+.rk-gold{color:#ffd700;font-weight:bold;text-shadow:0 0 6px rgba(255,215,0,0.4)}
+.rk-silver{color:#d8d8d8;font-weight:bold}
+.rk-bronze{color:#e0985a;font-weight:bold}
+tr.top1 td:first-child{box-shadow:inset 3px 0 0 #ffd700}
+tr.top2 td:first-child{box-shadow:inset 3px 0 0 #d8d8d8}
+tr.top3 td:first-child{box-shadow:inset 3px 0 0 #e0985a}
+tr.top1 td{background:rgba(255,215,0,0.06)}
+tr.top2 td{background:rgba(216,216,216,0.05)}
+tr.top3 td{background:rgba(224,152,90,0.05)}
+tr.top1:hover td,tr.top2:hover td,tr.top3:hover td{background:rgba(77,182,172,0.10)}
 .hidden{display:none!important}
 .toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.85);color:#fff;padding:10px 20px;border-radius:8px;font-size:0.85rem;z-index:99999;animation:fadeInOut 2s forwards}
 @keyframes fadeInOut{0%{opacity:0;transform:translate(-50%,-10px)}15%{opacity:1;transform:translate(-50%,0)}85%{opacity:1}100%{opacity:0}}
@@ -163,14 +174,18 @@ function renderRankings(){
         tbody.innerHTML = '<tr><td colspan="'+FACTION_COLS.length+'" class="empty">未导入排行数据<br>点上方"📂 从 dataDir 加载"或"📤 选择 JSON 文件"导入 deepsea-rankings.json</td></tr>';
         return;
     }
-    tbody.innerHTML = data.slice(0,20).map(r=>'<tr>'+FACTION_COLS.map(c=>{
+    tbody.innerHTML = data.slice(0,20).map((r,idx)=>{const rankCls=['top1','top2','top3'][idx]||'';return '<tr class="'+(rankCls)+'">'+FACTION_COLS.map(c=>{
         let v = r[c];
+        if(c==='排名'){
+            const rkClass=['rk-gold','rk-silver','rk-bronze'][idx]||'';
+            return `<td class="${rkClass}">${esc(v??'-')}</td>`;
+        }
         if(c==='联盟战力') {
             // 联盟战力已含 HTML 标签，直接输出（不 esc）
             return `<td>${v ?? '-'}</td>`;
         }
         return `<td>${esc(v??'-')}</td>`;
-    }).join('')+'</tr>').join('');
+    }).join('')+'</tr>'}).join('');
 }
 async function importRankingsFile(event){
     const f = event.target.files[0]; if(!f) return;
@@ -253,7 +268,7 @@ function renderTop3(){
         return;
     }
     const list = map[name].top3 || [];
-    tbody.innerHTML = list.map(r=>`<tr><td>${esc(r['排名']??'-')}</td><td>${esc(r['联盟名称']??'-')}</td><td>${esc(r['所属阵营']??'-')}</td><td>${esc(r['会长']??'-')}</td><td>${r['联盟战力']!=null?r['联盟战力']:'-'}</td></tr>`).join('');
+    tbody.innerHTML = list.map((r,idx)=>{const rankCls=['top1','top2','top3'][idx]||'';const rkClass=['rk-gold','rk-silver','rk-bronze'][idx]||'';return `<tr class="${rankCls}"><td class="${rkClass}">${esc(r['排名']??'-')}</td><td>${esc(r['联盟名称']??'-')}</td><td>${esc(r['所属阵营']??'-')}</td><td>${esc(r['会长']??'-')}</td><td>${r['联盟战力']!=null?r['联盟战力']:'-'}</td></tr>`}).join('');
 }
 function deleteTop3(){
     const name = document.getElementById('seasonSelect').value;
