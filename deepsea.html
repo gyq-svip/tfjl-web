@@ -57,7 +57,8 @@ tr:hover td{background:rgba(77,182,172,0.06)}
     <div class="card">
         <h3>🏆 联盟前20 <span class="badge" id="rankingBadge">未导入</span></h3>
         <div class="faction-bar" id="factionBar">
-            <div class="faction-icon active" data-faction="暗月地精" onclick="switchFaction('暗月地精')"><span class="emo">🌙</span>暗月地精</div>
+            <div class="faction-icon active" data-faction="总排名" onclick="switchFaction('总排名')"><span class="emo">📊</span>总排名</div>
+            <div class="faction-icon" data-faction="暗月地精" onclick="switchFaction('暗月地精')"><span class="emo">🌙</span>暗月地精</div>
             <div class="faction-icon" data-faction="人类联盟" onclick="switchFaction('人类联盟')"><span class="emo">⚔️</span>人类联盟</div>
             <div class="faction-icon" data-faction="天灾亡灵" onclick="switchFaction('天灾亡灵')"><span class="emo">💀</span>天灾亡灵</div>
             <div class="faction-icon" data-faction="兽人部落" onclick="switchFaction('兽人部落')"><span class="emo">👹</span>兽人部落</div>
@@ -73,6 +74,29 @@ tr:hover td{background:rgba(77,182,172,0.06)}
             <table id="rankingTable">
                 <thead id="rankingHead"></thead>
                 <tbody id="rankingTbody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 赛季前三记录（单独存，日后对比） -->
+    <div class="card">
+        <h3>🏁 赛季前三记录 <span class="badge" id="top3Badge">共 0 个赛季</span></h3>
+        <div class="row" style="margin-bottom:10px;">
+            <label style="min-width:auto;">赛季名</label>
+            <input id="seasonName" placeholder="如 S1 / 2026夏季" style="flex:1 1 140px;min-width:120px;">
+            <button onclick="saveTop3()">💾 保存当前前三</button>
+        </div>
+        <div class="row" style="margin-bottom:8px;">
+            <label style="min-width:auto;">查看</label>
+            <select id="seasonSelect" onchange="renderTop3()" style="flex:1 1 140px;min-width:120px;">
+                <option value="">— 选择赛季 —</option>
+            </select>
+            <button class="ghost small" onclick="deleteTop3()">🗑 删除</button>
+        </div>
+        <div class="scroll-y">
+            <table>
+                <thead><tr><th>名次</th><th>联盟名称</th><th>阵营</th><th>会长</th><th>联盟战力</th></tr></thead>
+                <tbody id="top3Tbody"></tbody>
             </table>
         </div>
     </div>
@@ -99,7 +123,7 @@ function toast(msg){const t=document.createElement('div');t.className='toast';t.
 // ===================== 数据层 =====================
 let state = {
     rankings: [],
-    curFaction: '暗月地精'
+    curFaction: '总排名'
 };
 
 function loadAll(){
@@ -123,10 +147,17 @@ function renderRankings(){
     const head = document.getElementById('rankingHead');
     const tbody = document.getElementById('rankingTbody');
     const badge = document.getElementById('rankingBadge');
-    // 该阵营前20（数据里 所属阵营 字段匹配；无匹配则退回总排名前20）
-    const sub = state.rankings.filter(r=>r['所属阵营']===state.curFaction);
-    const data = sub.length ? sub : state.rankings.filter(r=>true);
-    badge.textContent = data.length ? `${state.curFaction} · ${data.length} 条` : '未导入';
+    let data;
+    if(state.curFaction === '总排名'){
+        // 总排名：每个联盟作为单位，按全局 排名 排序
+        data = state.rankings.slice().sort((a,b)=>(+a['排名']||0)-(+b['排名']||0));
+        badge.textContent = data.length ? `总排名 · ${data.length} 个联盟` : '未导入';
+    }else{
+        // 各阵营前20
+        const sub = state.rankings.filter(r=>r['所属阵营']===state.curFaction);
+        data = sub.length ? sub : [];
+        badge.textContent = data.length ? `${state.curFaction} · ${data.length} 条` : '未导入';
+    }
     head.innerHTML = '<tr>'+FACTION_COLS.map(c=>`<th>${esc(c)}</th>`).join('')+'</tr>';
     if(!data.length){
         tbody.innerHTML = '<tr><td colspan="'+FACTION_COLS.length+'" class="empty">未导入排行数据<br>点上方"📂 从 dataDir 加载"或"📤 选择 JSON 文件"导入 deepsea-rankings.json</td></tr>';
@@ -178,10 +209,70 @@ async function importRankingsFromDisk(){
     }
 }
 
+// ===================== 赛季前三 =====================
+function loadTop3Map(){
+    try{
+        const t = dsGet('deepsea_season_top3');
+        return t ? JSON.parse(t) : {};
+    }catch(e){return {}}
+}
+function saveTop3Map(map){dsSet('deepsea_season_top3', JSON.stringify(map))}
+function saveTop3(){
+    const name = (document.getElementById('seasonName').value||'').trim();
+    if(!name){toast('请先输入赛季名');return}
+    if(!state.rankings.length){toast('请先导入排行数据');return}
+    const sorted = state.rankings.slice().sort((a,b)=>(+a['排名']||0)-(+b['排名']||0));
+    const top3 = sorted.slice(0,3).map(r=>({
+        '排名': r['排名'], '联盟名称': r['联盟名称'], '所属阵营': r['所属阵营'],
+        '会长': r['会长'], '联盟战力': r['联盟战力'], '人数': r['人数'], '联盟等级': r['联盟等级']
+    }));
+    const map = loadTop3Map();
+    map[name] = { savedAt: today(), top3 };
+    saveTop3Map(map);
+    refreshSeasonSelect(name);
+    renderTop3();
+    toast(`✅ 已保存「${name}」前三`);
+}
+function refreshSeasonSelect(sel){
+    const map = loadTop3Map();
+    const selEl = document.getElementById('seasonSelect');
+    const names = Object.keys(map).sort((a,b)=>{
+        // 按保存时间倒序
+        return (map[b].savedAt||'') > (map[a].savedAt||'') ? 1 : -1;
+    });
+    selEl.innerHTML = '<option value="">— 选择赛季 —</option>' + names.map(n=>`<option value="${esc(n)}">${esc(n)}（${esc(map[n].savedAt||'')}）</option>`).join('');
+    if(sel) selEl.value = sel;
+    document.getElementById('top3Badge').textContent = `共 ${names.length} 个赛季`;
+}
+function renderTop3(){
+    const name = document.getElementById('seasonSelect').value;
+    const tbody = document.getElementById('top3Tbody');
+    const map = loadTop3Map();
+    if(!name || !map[name]){
+        tbody.innerHTML = '<tr><td colspan="5" class="empty">选择赛季查看前三，或上方保存当前前三</td></tr>';
+        return;
+    }
+    const list = map[name].top3 || [];
+    tbody.innerHTML = list.map(r=>`<tr><td>${esc(r['排名']??'-')}</td><td>${esc(r['联盟名称']??'-')}</td><td>${esc(r['所属阵营']??'-')}</td><td>${esc(r['会长']??'-')}</td><td>${r['联盟战力']!=null?r['联盟战力']:'-'}</td></tr>`).join('');
+}
+function deleteTop3(){
+    const name = document.getElementById('seasonSelect').value;
+    if(!name){toast('请先选择赛季');return}
+    const map = loadTop3Map();
+    if(!map[name]){toast('赛季不存在');return}
+    delete map[name];
+    saveTop3Map(map);
+    refreshSeasonSelect();
+    renderTop3();
+    toast(`🗑 已删除「${name}」`);
+}
+
 // ===================== 初始化 =====================
 window.addEventListener('load', ()=>{
     loadAll();
     if(!state.rankings.length){importRankingsFromDisk()}
+    refreshSeasonSelect();
+    renderTop3();
     renderRankings();
 });
 </script>
