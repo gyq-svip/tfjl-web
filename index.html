@@ -9689,6 +9689,7 @@
                                 <input id="scriptEditorReplaceInput" placeholder="替换为…" style="width:150px;background:rgba(0,0,0,0.4);color:#ffeb3b;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:5px 8px;font-size:0.8rem;">
                                 <button onclick="scriptEditorReplace()" style="background:rgba(255,152,0,0.25);color:#ff9800;border:1px solid rgba(255,152,0,0.3);padding:4px 10px;border-radius:4px;cursor:pointer;font-size:0.78rem;">替换</button>
                                 <button onclick="scriptEditorReplaceAll()" style="background:rgba(244,67,54,0.25);color:#f44336;border:1px solid rgba(244,67,54,0.3);padding:4px 10px;border-radius:4px;cursor:pointer;font-size:0.78rem;">全部替换</button>
+                                <button onclick="swapFindReplaceInputs('scriptEditorFindInput','scriptEditorReplaceInput')" style="background:rgba(77,208,225,0.2);color:#4dd0e1;border:1px solid rgba(77,208,225,0.3);padding:4px 10px;border-radius:4px;cursor:pointer;font-size:0.78rem;">⇄ 互换</button>
                             </div>
                         </div>
                         <!-- 操作栏 -->
@@ -12955,6 +12956,7 @@
                     <input id="${windowId}_replaceInput" placeholder="替换为..." style="width:150px;flex-shrink:0;background:rgba(0,0,0,0.4);color:#ffeb3b;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:4px 8px;font-size:0.78rem;">
                     <button onclick="webReplace('${windowId}')" style="background:rgba(255,152,0,0.25);color:#ff9800;border:1px solid rgba(255,152,0,0.3);padding:4px 10px;border-radius:4px;cursor:pointer;font-size:0.78rem;">替换</button>
                     <button onclick="webReplaceAll('${windowId}')" style="background:rgba(244,67,54,0.25);color:#f44336;border:1px solid rgba(244,67,54,0.3);padding:4px 10px;border-radius:4px;cursor:pointer;font-size:0.78rem;">全部替换</button>
+                    <button onclick="swapFindReplaceInputs('${windowId}_findInput','${windowId}_replaceInput')" style="background:rgba(77,208,225,0.2);color:#4dd0e1;border:1px solid rgba(77,208,225,0.3);padding:4px 10px;border-radius:4px;cursor:pointer;font-size:0.78rem;">⇄ 互换</button>
                 </div>
             `;
 
@@ -13593,6 +13595,7 @@
                     <input id="${windowId}_replaceInput" placeholder="替换为..." style="width:150px;flex-shrink:0;background:rgba(0,0,0,0.4);color:#ffeb3b;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:4px 8px;font-size:0.78rem;">
                     <button onclick="webReplace('${windowId}')" style="background:rgba(255,152,0,0.25);color:#ff9800;border:1px solid rgba(255,152,0,0.3);padding:4px 10px;border-radius:4px;cursor:pointer;font-size:0.78rem;">替换</button>
                     <button onclick="webReplaceAll('${windowId}')" style="background:rgba(244,67,54,0.25);color:#f44336;border:1px solid rgba(244,67,54,0.3);padding:4px 10px;border-radius:4px;cursor:pointer;font-size:0.78rem;">全部替换</button>
+                    <button onclick="swapFindReplaceInputs('${windowId}_findInput','${windowId}_replaceInput')" style="background:rgba(77,208,225,0.2);color:#4dd0e1;border:1px solid rgba(77,208,225,0.3);padding:4px 10px;border-radius:4px;cursor:pointer;font-size:0.78rem;">⇄ 互换</button>
                 </div>
             `;
 
@@ -19755,105 +19758,18 @@ function hasGistToken() {
             // 初始化版本切换功能
             initVersionSwitch();
             
-            // 初始化版本号显示 & 自动检查更新
+            // 初始化版本号显示 & 自动检查更新（非阻塞）
             initVersionDisplay();
             autoCheckUpdate();
             
-            // 加载全局拍卖快讯开关状态
-            await loadGlobalBroadcastStatus();
-            
-            // 初始化消息墙
+            // 初始化消息墙 & 网络监听（非阻塞，不拖慢首屏）
             initMessageWall();
-            
-            // 先初始化统计数据
-            try {
-                // 始终优先从Gist获取最新数据，确保多设备同步
-                try {
-                    const fresh = await fetchCounterFromGist();
-                    if (fresh) {
-                        counterData = fresh;
-                        // 保存到缓存
-                        saveCounterToCache(counterData);
-                    } else {
-                        // Gist获取失败，尝试使用缓存
-                        const cached = loadCounterFromCache();
-                        counterData = cached || getDefaultCounter();
-                    }
-                } catch (error) {
-                    console.warn('从Gist获取失败，尝试使用缓存:', error);
-                    // 网络失败，使用缓存
-                    const cached = loadCounterFromCache();
-                    counterData = cached || getDefaultCounter();
-                }
-            } catch (error) {
-                console.error('❌ 初始化统计数据失败:', error);
-                counterData = getDefaultCounter();
-            }
-            
-            // 记录访问
-            try {
-                await recordVisit();
-            } catch (error) {
-                console.error('❌ 记录访问失败:', error);
-            }
-            
-            // 启动图片清理定时任务
-            startImageCleanup();
-            
-            // 加载配置和新闻
-            try {
-                await loadConfig();
-                await loadNews();
-            } catch (error) {
-                console.error('❌ 加载配置和新闻失败:', error);
-            }
-
-            // 从Gist加载拍卖快讯（持久化，所有设备共享）
-            try {
-                const broadcasts = await fetchAuctionBroadcastsFromGist();
-                if (broadcasts && broadcasts.length > 0) {
-                    auctionBroadcastQueue = broadcasts;
-                    updateMarqueeWithBroadcast();
-                }
-            } catch (error) {
-                console.warn('加载拍卖快讯失败:', error);
-            }
-
-            // 预加载需求墙消息（供滚动公告栏和全部公告弹窗显示）
-            try {
-                if (wallMessages.length === 0) {
-                    await fetchMessages();
-                }
-            } catch (error) {
-                console.warn('预加载需求墙消息失败:', error);
-            }
-
-            // 设置网络监听（离线同步）
             setupNetworkListener();
-            
-            // 检查登录状态
-            if (localStorage.getItem('TFJL_LoggedIn') === 'true') {
-                document.getElementById('passwordOverlay').style.display = 'none';
-                document.getElementById('mainContent').classList.add('visible');
-                
-                // 检查是否是纯拍卖模式，如果是则自动打开拍卖行
-                if (localStorage.getItem('TFJL_AuctionOnlyMode') === 'true') {
-                    // 延迟打开，确保DOM加载完成
-                    setTimeout(() => {
-                        openChatRoomEntry();
-                    }, 300);
-                }
-            }
-            
-            // 更新底部统计栏显示
-            updateStatsBar();
 
-            // 自动加载启动项目
-            // 规则：所有人默认打开「深海 / 王城低配版」（写死的内置默认项目），
-            // 本地 IndexedDB 没有就从远程仓库拉取并注入；用户手动选了别的项目时以用户为准。
+            // —— 首屏核心：尽早加载王城低配版，不排队等待下面的网络统计请求 ——
             try {
                 await initIndexedDB();
-                // 任何非「王城低配版」的固定启动项都视为残留（典型：恢复旧备份带回的旧固定项），启动时一律清除，统一默认启动王城低配版
+                // 任何非「王城低配版」的固定启动项都视为残留，统一默认启动王城低配版
                 const fixedProject = localStorage.getItem('tdjl_startupProject');
                 if (fixedProject && fixedProject !== '' && fixedProject !== '王城低配版') {
                     console.warn('[默认项目] 清除残留固定启动项「' + fixedProject + '」，统一默认启动王城低配版');
@@ -19864,6 +19780,66 @@ function hasGistToken() {
             } catch (e) {
                 console.warn('自动加载项目失败:', e);
             }
+
+            // —— 以下网络统计/快讯请求改为后台非阻塞，不再阻塞首屏 ——
+            // 加载全局拍卖快讯开关状态
+            loadGlobalBroadcastStatus().catch(()=>{});
+
+            // 初始化统计数据：始终优先从Gist获取最新数据，失败用缓存
+            (async () => {
+                try {
+                    const fresh = await fetchCounterFromGist();
+                    if (fresh) { counterData = fresh; saveCounterToCache(counterData); }
+                    else { counterData = loadCounterFromCache() || getDefaultCounter(); }
+                } catch (error) {
+                    console.warn('从Gist获取失败，尝试使用缓存:', error);
+                    counterData = loadCounterFromCache() || getDefaultCounter();
+                }
+                updateStatsBar();
+            })();
+
+            // 记录访问
+            recordVisit().catch((error) => { console.error('❌ 记录访问失败:', error); });
+
+            // 启动图片清理定时任务
+            startImageCleanup();
+
+            // 加载配置和新闻
+            (async () => {
+                try { await loadConfig(); await loadNews(); }
+                catch (error) { console.error('❌ 加载配置和新闻失败:', error); }
+            })();
+
+            // 从Gist加载拍卖快讯
+            (async () => {
+                try {
+                    const broadcasts = await fetchAuctionBroadcastsFromGist();
+                    if (broadcasts && broadcasts.length > 0) {
+                        auctionBroadcastQueue = broadcasts;
+                        updateMarqueeWithBroadcast();
+                    }
+                } catch (error) { console.warn('加载拍卖快讯失败:', error); }
+            })();
+
+            // 预加载需求墙消息
+            (async () => {
+                try { if (wallMessages.length === 0) await fetchMessages(); }
+                catch (error) { console.warn('预加载需求墙消息失败:', error); }
+            })();
+
+            // 检查登录状态
+            if (localStorage.getItem('TFJL_LoggedIn') === 'true') {
+                document.getElementById('passwordOverlay').style.display = 'none';
+                document.getElementById('mainContent').classList.add('visible');
+                
+                // 检查是否是纯拍卖模式，如果是则自动打开拍卖行
+                if (localStorage.getItem('TFJL_AuctionOnlyMode') === 'true') {
+                    setTimeout(() => {
+                        openChatRoomEntry();
+                    }, 300);
+                }
+            }
+            updateStatsBar();
         };
 
         // 确保「深海 / 王城低配版」默认项目已加载：本地缓存(IndexedDB) > 远程拉取并缓存 > 内置默认项目
@@ -19884,9 +19860,15 @@ function hasGistToken() {
                 if (local && hasRealCards(local)) {
                     await loadProjectFromDB(DEFAULT_NAME).catch(() => {});
                     refreshProjectSelectors();
+                    if (window._hideLoadingScreen) window._hideLoadingScreen();
                     console.log('[默认项目] 从本地缓存加载:', DEFAULT_NAME);
                     // 后台静默检查远程是否有更新（不会覆盖用户本地编辑，除非作者发布了新版本）
-                    refreshDefaultProjectFromRemote(DEFAULT_CAT, DEFAULT_NAME);
+                    // 节流：24h 内只检查一次，避免每次启动都重新下载 9.7MB 项目 JSON
+                    const lastChk = (function(){try{return localStorage.getItem('tdjl_defaultProjectLastRemoteCheck');}catch(e){return '';}})();
+                    if (!lastChk || Date.now() - (+lastChk) > 24*3600*1000) {
+                        try { localStorage.setItem('tdjl_defaultProjectLastRemoteCheck', String(Date.now())); } catch(e){}
+                        refreshDefaultProjectFromRemote(DEFAULT_CAT, DEFAULT_NAME);
+                    }
                     return;
                 }
             } catch (e) { console.warn('[默认项目] 读本地缓存失败:', e); }
@@ -19906,7 +19888,7 @@ function hasGistToken() {
 
         async function fetchAndCacheDefaultProject(cat, name) {
             try {
-                const resp = await fetch(DEFAULT_PROJECT_REMOTE, { cache: 'no-cache' });
+                const resp = await fetch(DEFAULT_PROJECT_REMOTE);
                 if (!resp.ok) throw new Error('HTTP ' + resp.status);
                 const data = await resp.json();
                 const proj = data.project || data;
@@ -19917,12 +19899,14 @@ function hasGistToken() {
                 await saveProjectToDB(name, cat, proj).catch(() => {});
                 await loadProjectFromDB(name).catch(() => {});
                 refreshProjectSelectors();
+                if (window._hideLoadingScreen) window._hideLoadingScreen();
                 console.log('[默认项目] 已从远程拉取并缓存:', name);
             } catch (e) {
                 console.warn('[默认项目] 远程拉取失败，回退内置默认项目:', e);
                 if (DEFAULT_PROJECT && DEFAULT_PROJECT.name) {
                     await loadProjectFromDB(DEFAULT_PROJECT.name).catch(() => {});
                     refreshProjectSelectors();
+                    if (window._hideLoadingScreen) window._hideLoadingScreen();
                 }
             }
         }
@@ -19930,8 +19914,8 @@ function hasGistToken() {
         // 后台检查远程是否有更新：仅当远程 exportDate 与已缓存版本不同才覆盖（保留用户本地编辑）
         async function refreshDefaultProjectFromRemote(cat, name) {
             try {
-                const resp = await fetch(DEFAULT_PROJECT_REMOTE, { cache: 'no-cache' });
-                if (!resp.ok) return;
+            const resp = await fetch(DEFAULT_PROJECT_REMOTE);
+            if (!resp.ok) return;
                 const data = await resp.json();
                 const remoteExport = data.exportDate || '';
                 const cached = (function () { try { return localStorage.getItem(DEFAULT_PROJECT_CACHE_KEY) || ''; } catch (e) { return ''; } })();
@@ -27174,7 +27158,7 @@ ${maSection}
         </style>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;pointer-events:none;z-index:999;opacity:0.5;">v260728-29</span>
+    <span id="versionTag" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;pointer-events:none;z-index:999;opacity:0.5;">v260728-30</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
@@ -27209,5 +27193,92 @@ ${maSection}
         <div class="dfp-resizer" id="dfpResizer"></div>
     </div>
     <button class="deepsea-toggle" id="deepseaToggle" style="display:none;" onclick="dsOpenPanel()" title="打开深海统计">🌊</button>
+
+    <!-- 全局查找/替换：作用于当前聚焦的文本框，覆盖所有文本编辑区 -->
+    <button id="gfrTrigger" onclick="gfrOpen()" title="查找 / 替换（Ctrl+F）" style="position:fixed;left:16px;bottom:16px;z-index:100000;background:linear-gradient(135deg,#4dd0e1,#0097a7);color:#fff;border:none;border-radius:24px;padding:10px 16px;font-size:0.85rem;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.4);font-weight:bold;">🔍 查找/替换</button>
+    <div id="globalFindReplace" style="display:none;position:fixed;left:16px;bottom:64px;z-index:100001;background:#2a2a4a;border:1px solid #4dd0e1;border-radius:10px;padding:8px 10px;box-shadow:0 6px 24px rgba(0,0,0,0.5);width:min(94vw,440px);">
+        <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap;">
+            <input id="gfrFind" placeholder="查找" style="flex:1 1 120px;min-width:0;padding:6px 8px;border-radius:6px;border:1px solid #555;background:#1a1a3a;color:#fff;">
+            <input id="gfrReplace" placeholder="替换为" style="flex:1 1 120px;min-width:0;padding:6px 8px;border-radius:6px;border:1px solid #555;background:#1a1a3a;color:#ffeb3b;">
+            <button onclick="gfrSwap()" title="互换查找与替换" style="background:rgba(255,255,255,0.12);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:6px;padding:6px 10px;cursor:pointer;font-size:0.82rem;">⇄ 互换</button>
+            <label style="font-size:0.72rem;color:rgba(255,255,255,0.6);white-space:nowrap;cursor:pointer;"><input type="checkbox" id="gfrCase"> 区分</label>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+            <button onclick="gfrFind('prev')" style="background:rgba(255,255,255,0.12);color:#fff;border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:5px 10px;cursor:pointer;font-size:0.8rem;">↑ 上</button>
+            <button onclick="gfrFind('next')" style="background:rgba(255,255,255,0.12);color:#fff;border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:5px 10px;cursor:pointer;font-size:0.8rem;">↓ 下</button>
+            <button onclick="gfrReplace()" style="background:rgba(255,152,0,0.25);color:#ff9800;border:1px solid rgba(255,152,0,0.3);border-radius:6px;padding:5px 10px;cursor:pointer;font-size:0.8rem;">替换</button>
+            <button onclick="gfrReplaceAll()" style="background:rgba(244,67,54,0.25);color:#f44336;border:1px solid rgba(244,67,54,0.3);border-radius:6px;padding:5px 10px;cursor:pointer;font-size:0.8rem;">全部替换</button>
+            <span id="gfrCount" style="flex:1 1 auto;text-align:right;font-size:0.72rem;color:rgba(255,255,255,0.6);"></span>
+            <button onclick="gfrClose()" style="background:rgba(255,255,255,0.1);color:#fff;border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:5px 9px;cursor:pointer;font-size:0.8rem;">✕</button>
+        </div>
+    </div>
+    <script>
+    /* 全局查找/替换：作用于当前聚焦的文本框，覆盖所有文本编辑区（便签/阵容解析/脚本/扫描文件/活动/副本等） */
+    (function(){
+        var gfrTarget=null, gfrMatches=[], gfrIdx=-1;
+        document.addEventListener('focusin', function(e){ if(e.target && e.target.tagName==='TEXTAREA') gfrTarget=e.target; });
+        function el(id){ return document.getElementById(id); }
+        function esc(s){ return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); }
+        window.gfrOpen = function(){
+            var bar=el('globalFindReplace'); if(!bar) return;
+            var ta = (document.activeElement && document.activeElement.tagName==='TEXTAREA') ? document.activeElement : gfrTarget;
+            if(!ta){ if(typeof toast==='function') toast('请先点进要查找的文本框'); return; }
+            gfrTarget=ta; bar.style.display='block';
+            var fi=el('gfrFind');
+            try{ if(ta.selectionStart!=null){ var s=ta.value.substring(ta.selectionStart,ta.selectionEnd); if(s) fi.value=s; } }catch(e){}
+            fi.focus(); fi.select(); gfrFind('count');
+        };
+        window.gfrClose = function(){ var bar=el('globalFindReplace'); if(bar) bar.style.display='none'; };
+        window.gfrSwap = function(){ var a=el('gfrFind'), b=el('gfrReplace'); var t=a.value; a.value=b.value; b.value=t; a.focus(); };
+        window.swapFindReplaceInputs = function(findId, replaceId){ var a=el(findId), b=el(replaceId); if(!a||!b) return; var t=a.value; a.value=b.value; b.value=t; a.focus(); };
+        function recompute(){
+            gfrMatches=[]; if(!gfrTarget) return;
+            var q=el('gfrFind').value; if(!q){ el('gfrCount').textContent=''; return; }
+            var flags=el('gfrCase').checked?'g':'gi', re;
+            try{ re=new RegExp(esc(q),flags); }catch(e){ el('gfrCount').textContent='正则无效'; return; }
+            var text=gfrTarget.value, m;
+            while((m=re.exec(text))!==null){ gfrMatches.push(m.index); if(m.index===re.lastIndex) re.lastIndex++; if(gfrMatches.length>200000) break; }
+        }
+        window.gfrFind = function(dir){
+            if(!gfrTarget){ if(typeof toast==='function') toast('请先点进要查找的文本框'); return; }
+            var q=el('gfrFind').value; if(!q){ el('gfrCount').textContent='输入查找内容'; return; }
+            recompute();
+            if(!gfrMatches.length){ el('gfrCount').textContent='0 个'; return; }
+            if(dir==='count'){ el('gfrCount').textContent=gfrMatches.length+' 个'; return; }
+            if(gfrIdx<0) gfrIdx=0; else gfrIdx = dir==='next' ? (gfrIdx+1)%gfrMatches.length : (gfrIdx-1+gfrMatches.length)%gfrMatches.length;
+            var pos=gfrMatches[gfrIdx], len=q.length;
+            gfrTarget.focus();
+            try{ gfrTarget.setSelectionRange(pos,pos+len); }catch(e){}
+            el('gfrCount').textContent=(gfrIdx+1)+'/'+gfrMatches.length;
+        };
+        window.gfrReplace = function(){
+            if(!gfrTarget || gfrIdx<0 || gfrIdx>=gfrMatches.length){ gfrFind('next'); if(gfrIdx<0) return; }
+            var q=el('gfrFind').value, r=el('gfrReplace').value, pos=gfrMatches[gfrIdx];
+            try{ gfrTarget.setRangeText(r,pos,pos+q.length,'select'); }catch(e){ return; }
+            afterReplace(); recompute(); if(gfrIdx>=gfrMatches.length) gfrIdx=gfrMatches.length-1; gfrFind('next');
+        };
+        window.gfrReplaceAll = function(){
+            if(!gfrTarget) return;
+            var q=el('gfrFind').value; if(!q) return;
+            var r=el('gfrReplace').value;
+            if(typeof confirm==='function' && !confirm('确定把全部「'+q+'」替换为「'+r+'」？')) return;
+            var flags=el('gfrCase').checked?'g':'gi', re;
+            try{ re=new RegExp(esc(q),flags); }catch(e){ return; }
+            var before=gfrTarget.value, after=before.replace(re,r), n=(before.match(re)||[]).length;
+            gfrTarget.value=after; afterReplace(); recompute(); gfrIdx=-1; el('gfrCount').textContent='已替换 '+n+' 处';
+        };
+        function afterReplace(){
+            try{ gfrTarget.dispatchEvent(new Event('input',{bubbles:true})); }catch(e){}
+            try{ gfrTarget.dispatchEvent(new Event('change',{bubbles:true})); }catch(e){}
+        }
+        document.addEventListener('keydown', function(e){
+            if((e.ctrlKey||e.metaKey) && (e.key==='f'||e.key==='F')){
+                var ae=document.activeElement;
+                if(ae && ae.tagName==='TEXTAREA'){ e.preventDefault(); gfrOpen(); }
+            }
+            if(e.key==='Escape'){ var bar=el('globalFindReplace'); if(bar && bar.style.display!=='none'){ bar.style.display='none'; } }
+        });
+    })();
+    </script>
 </body>
 </html>
