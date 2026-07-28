@@ -148,15 +148,31 @@ tr.rk-weak:hover td{opacity:1}
     </div>
     <div class="sub">四大阵营联盟实力 · 全量排行</div>
 
-    <!-- 战力与夺冠说明（供查看者了解战力来源） -->
+    <!-- 战力/氪金换算计算器（估算各联盟氪金体力/花费，供做计算预估，非科普） -->
     <div class="info-card">
         <details>
-            <summary>ℹ️ 战力与夺冠说明（点开）</summary>
+            <summary>🧮 战力/氪金换算计算器（点开估算各联盟氪金）</summary>
             <div class="info-body">
-                • 每人每天基础战力 <b>200</b>。<br>
-                • 额外战力来自氪金体力：<code>30元=1体力</code>(每日限购1次) / <code>128元=3体力</code>(限购3次) / <code>648元=6体力</code>(限购3次) / <code>648元=12体力</code>(不限购)；<b>1体力=200战力</b>。<br>
-                • 每赛季 <b>14~15 天</b>，下方趋势按收集天数展示战力变化。<br>
-                • 夺冠看「人均战力」+「增长势头」：人均战力高、且战力增长猛的联盟，夺冠概率越大。
+                <div style="margin-bottom:8px;font-size:0.74rem;color:rgba(255,255,255,0.65);line-height:1.7;">
+                    规则：每人每天基础 <b>200</b> 战力；<b>1体力=200战力</b>。氪金档（每体力成本由低到高）：<code>30元=1体力</code>(每人每日限1) / <code>128元=3体力</code>(每人限3) / <code>648元=12体力</code>(不限) / <code>648元=6体力</code>(每人限3)。每赛季约 <b>14~15 天</b>。夺冠看「人均战力」+「增长势头」。
+                </div>
+                <div class="row" style="margin-bottom:8px;">
+                    <label style="min-width:auto;">赛季天数</label>
+                    <input id="calcDays" type="number" value="15" style="width:64px;" oninput="onSeasonDaysChange()">
+                    <label style="min-width:auto;margin-left:8px;">从排行选</label>
+                    <select id="calcAlliance" onchange="calcFromRanking()" style="flex:1 1 150px;min-width:120px;"></select>
+                </div>
+                <div class="row" style="margin-bottom:6px;">
+                    <label style="min-width:auto;">联盟战力</label>
+                    <input id="calcPower" type="number" placeholder="如 8000000" style="flex:1 1 120px;min-width:90px;">
+                    <label style="min-width:auto;margin-left:6px;">人数</label>
+                    <input id="calcMembers" type="number" placeholder="如 30" style="flex:1 1 80px;min-width:64px;">
+                    <button onclick="runCalc()">🧮 估算</button>
+                </div>
+                <div id="calcResult" style="margin-top:6px;"></div>
+                <div style="margin-top:6px;font-size:0.7rem;color:rgba(255,255,255,0.45);line-height:1.6;">
+                    说明：按「联盟战力 − 基础战力(200×人数×天数)」反推氪金体力，再用优先级（每人每日30元档先用满，剩余按便宜档优先）估出花费区间。下方排行表「估算氪金」列即为各联盟同样估算。
+                </div>
             </div>
         </details>
     </div>
@@ -345,7 +361,7 @@ function renderRankings(){
         return;
     }
     let html = '<table class="rank-table"><thead><tr>'
-        + '<th>排名</th><th>联盟</th><th>会长</th><th>人数</th><th>满员率</th><th>联盟战力</th><th>人均战力</th><th>人均阵营排名</th><th>阵营内名次</th>'
+        + '<th>排名</th><th>联盟</th><th>会长</th><th>人数</th><th>满员率</th><th>联盟战力</th><th>人均战力</th><th>人均阵营排名</th><th>阵营内名次</th><th>估算氪金</th>'
         + '</tr></thead><tbody>';
     html += data.map((r)=>{
         const pr = factionInnerPowerRank(r);
@@ -370,6 +386,7 @@ function renderRankings(){
             <td><b>${per?per.toLocaleString():'-'}</b></td>
             <td>#${pr!=null?pr:'-'}</td>
             <td>#${ir!=null?ir:'-'}</td>
+            <td>${estimateKryptonCell(r)}</td>
         </tr>`;
     }).join('');
     html += '</tbody></table>';
@@ -491,6 +508,70 @@ function getPerCap(r){
     const fr = fillRate(r['人数']); const denom = fr?fr.cur:parseNum(r['人数']);
     const pw = parsePower(r['联盟战力']);
     return denom? Math.round(pw/denom):0;
+}
+// 赛季天数（供氪金估算；与计算器联动，默认 15）
+state.seasonDays = 15;
+// 估算某联盟氪金体力/花费（用于计算器与排行"估算氪金"列）
+// 优先级：先每人每日 30元档(1体力)用满，剩余按每体力成本由低到高分配
+function estimateKrypton(power, members, days){
+    const base = 200*members*days;
+    let kp = power - base; if(kp<0) kp=0;
+    const stamina = Math.ceil(kp/200);
+    // 各氪金档：每体力成本 + 上限（按每人）
+    const TIERS = [
+        {cost:30,     cap:members*days},   // 30元=1体力，每人每日1
+        {cost:128/3,  cap:members*9},      // 128元=3体力，每人限3→9体力
+        {cost:648/12, cap:Infinity},       // 648元=12体力，不限
+        {cost:648/6,  cap:members*18}      // 648元=6体力，每人限3→18体力
+    ];
+    const fill = (order)=>{
+        let rem=stamina, sum=0;
+        order.forEach(i=>{const t=TIERS[i]; const take=Math.min(rem,t.cap); rem-=take; sum+=t.cost*take;});
+        return Math.round(sum);
+    };
+    const minCost = fill([0,1,2,3]); // 便宜优先 → 最小花费
+    const maxCost = fill([3,2,1,0]); // 贵优先 → 最大花费
+    const perCap = members? Math.round(power/members):0;
+    return {base, kryptonPower:kp, stamina, minCost, maxCost, perCap};
+}
+function onSeasonDaysChange(){
+    const v = parseNum(document.getElementById('calcDays').value);
+    state.seasonDays = v>0? v : 15;
+    renderRankings();
+}
+function populateCalcAlliance(){
+    const sel=document.getElementById('calcAlliance'); if(!sel) return;
+    const names=[...new Set(state.rankings.map(r=>r['联盟名称']).filter(Boolean))].sort();
+    sel.innerHTML='<option value="">— 手动输入 —</option>'+names.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');
+}
+function calcFromRanking(){
+    const nm=document.getElementById('calcAlliance').value; if(!nm) return;
+    const r=state.rankings.find(x=>x['联盟名称']===nm); if(!r) return;
+    const pw=parsePower(r['联盟战力']); const mem=parseNum(r['人数']);
+    if(pw) document.getElementById('calcPower').value=pw;
+    if(mem) document.getElementById('calcMembers').value=mem;
+}
+function runCalc(){
+    const power=parseNum(document.getElementById('calcPower').value);
+    const members=parseNum(document.getElementById('calcMembers').value);
+    const days=state.seasonDays;
+    const box=document.getElementById('calcResult');
+    if(!power||!members){box.innerHTML='<div style="color:#ef5350;font-size:0.78rem;">请填联盟战力和人数（或从排行选联盟）</div>';return;}
+    const e=estimateKrypton(power,members,days);
+    const wan=n=> (n/10000).toFixed(1)+'万';
+    box.innerHTML=`<div style="font-size:0.78rem;line-height:1.9;">
+        • 基础战力（200×${members}人×${days}天）：<b>${e.base.toLocaleString()}</b><br>
+        • 氪金战力：<b style="color:#ffd700">${e.kryptonPower.toLocaleString()}</b> → 约 <b>${e.stamina.toLocaleString()}</b> 体力<br>
+        • 估算花费（优先每人每日30元档）：<b style="color:#4dd0e1">¥${wan(e.minCost)} ~ ¥${wan(e.maxCost)}</b><br>
+        • 人均战力：<b>${e.perCap.toLocaleString()}</b>
+    </div>`;
+}
+function estimateKryptonCell(r){
+    const pw=parsePower(r['联盟战力']); const fr=fillRate(r['人数']); const denom=fr?fr.cur:parseNum(r['人数']);
+    if(!pw||!denom) return '-';
+    const e=estimateKrypton(pw,denom,state.seasonDays);
+    if(e.stamina<=0) return '<span style="color:rgba(255,255,255,0.4)">—</span>';
+    return `<span style="color:#4dd0e1">≈${e.stamina.toLocaleString()}体力</span><br><span style="color:rgba(255,255,255,0.6);font-size:0.72rem">¥${(e.minCost/10000).toFixed(1)}~${(e.maxCost/10000).toFixed(1)}万</span>`;
 }
 // 某阵营按人均战力降序
 function factionList(f){
@@ -788,6 +869,8 @@ window.addEventListener('load', ()=>{
     loadAll();
     if(!state.rankings.length){importRankingsFromDisk()}
     renderRankings();
+    populateCalcAlliance();
+    const cd=document.getElementById('calcDays'); if(cd) cd.value=state.seasonDays;
     renderChampionship();
     renderBattle();
     refreshSnapSelect();
