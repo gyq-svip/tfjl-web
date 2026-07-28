@@ -109,10 +109,10 @@ td .strong-tag{color:#ffd700;font-size:0.7rem;margin-left:4px;}
 .rank-table th{position:sticky;top:0;background:#1b2a3a;color:rgba(255,255,255,0.7);font-weight:600;z-index:2}
 .rank-table td{border-bottom:1px solid rgba(255,255,255,0.06)}
 .rank-table tbody tr:hover td{background:rgba(255,255,255,0.05)}
-.rank-table td:nth-child(6),.rank-table td:nth-child(7){text-align:right}
-.rank-table td:nth-child(4),.rank-table td:nth-child(5),.rank-table td:nth-child(8),.rank-table td:nth-child(9){text-align:center}
-.rate-bar{display:flex;align-items:center;gap:6px;font-size:0.7rem;color:rgba(255,255,255,0.55)}
-.rate-bar .bar{flex:1;height:7px;background:rgba(255,255,255,0.12);border-radius:4px;overflow:hidden;min-width:42px}
+.rank-table td:nth-child(5),.rank-table td:nth-child(6){text-align:right}
+.rank-table td:nth-child(4),.rank-table td:nth-child(7),.rank-table td:nth-child(8),.rank-table td:nth-child(9),.rank-table td:nth-child(10){text-align:center}
+.rate-bar{display:flex;align-items:center;gap:6px;font-size:0.7rem;color:rgba(255,255,255,0.55);justify-content:center}
+.rate-bar .bar{width:58px;flex:none;height:7px;background:rgba(255,255,255,0.12);border-radius:4px;overflow:hidden}
 .rate-bar .fill{height:100%;border-radius:4px}
 .rate-bar i{font-style:normal;min-width:34px;text-align:right}
 tr.rk-strong td{background:rgba(255,215,0,0.06)}
@@ -122,6 +122,7 @@ tr.rk-weak:hover td{opacity:1}
 /* ===== 趋势按阵营切换 ===== */
 .trend-metric{font-size:0.72rem;color:rgba(255,255,255,0.6);margin-bottom:6px}
 .trend-metric button{margin-left:4px}
+.sort-btn.active{background:rgba(77,182,172,0.32);border-color:#4dd0e1;color:#fff}
 .trend-grow{font-size:0.78rem;margin:6px 0 2px;color:#7bed9f}
 .trend-legend{font-size:0.72rem;margin-top:8px;display:flex;flex-wrap:wrap;gap:4px 14px}
 .trend-legend .li{display:flex;align-items:center;gap:5px;color:rgba(255,255,255,0.8)}
@@ -203,6 +204,12 @@ tr.rk-weak:hover td{opacity:1}
             <div class="faction-icon" data-faction="天灾亡灵" onclick="switchFaction('天灾亡灵')"><span class="emo">💀</span>天灾亡灵</div>
             <div class="faction-icon" data-faction="兽人部落" onclick="switchFaction('兽人部落')"><span class="emo">👹</span>兽人部落</div>
         </div>
+        <div class="trend-metric" style="margin-top:8px;">
+            排序：
+            <button class="ghost small sort-btn active" id="sortPowerBtn" onclick="setRankSort('power')">总战力排名</button>
+            <button class="ghost small sort-btn" id="sortPerBtn" onclick="setRankSort('percap')">人均战力排名</button>
+            <button class="ghost small sort-btn" id="sortTotalBtn" onclick="setRankSort('total')">总排名</button>
+        </div>
         <div id="rankingGrid" class="scroll-y"></div>
     </div>
 
@@ -266,6 +273,9 @@ tr.rk-weak:hover td{opacity:1}
             指标：
             <button class="ghost small" id="trendMetricBtn" onclick="toggleTrendMetric()">联盟战力</button>
             <span style="color:rgba(255,255,255,0.4);">（点按钮切换「人均战力」）</span>
+            &nbsp;|&nbsp; 图表：
+            <button class="ghost small sort-btn active" id="trendLineBtn" onclick="setTrendChart('line')">折线</button>
+            <button class="ghost small sort-btn" id="trendBarBtn" onclick="setTrendChart('bar')">柱状</button>
         </div>
         <div id="snapTrend"></div>
     </div>
@@ -296,6 +306,8 @@ let state = {
     trendFaction: '暗月地精',
     trendMetric: '联盟战力'   // 或 '人均战力'
 };
+state.rankSort = 'power';   // 'power' 总战力排名(默认) | 'percap' 人均战力排名 | 'total' 总排名
+state.trendChart = 'line';  // 'line' 折线(默认) | 'bar' 柱状
 
 function loadAll(){
     try{
@@ -360,37 +372,52 @@ function renderRankings(){
         grid.innerHTML = '<div class="empty">未导入排行数据<br>点上方"⚙️ 数据管理 / 导入"选 xlsx 或 JSON</div>';
         return;
     }
+    // 按当前排序方式重排（默认总战力排名）
+    if(state.rankSort==='percap'){
+        data.sort((a,b)=>getPerCap(b)-getPerCap(a));
+    }else if(state.rankSort==='total'){
+        data.sort((a,b)=>(+a['排名']||0)-(+b['排名']||0));
+    }else{
+        data.sort((a,b)=>parsePower(b['联盟战力'])-parsePower(a['联盟战力']));
+    }
     let html = '<table class="rank-table"><thead><tr>'
-        + '<th>排名</th><th>联盟</th><th>会长</th><th>人数</th><th>满员率</th><th>联盟战力</th><th>人均战力</th><th>人均阵营排名</th><th>阵营内名次</th><th>估算氪金</th>'
+        + '<th>排名</th><th>联盟</th><th>会长</th><th>人数</th><th>联盟战力</th><th>人均战力</th><th>人均阵营排名</th><th>阵营内名次</th><th>估算氪金</th><th>满员率</th>'
         + '</tr></thead><tbody>';
-    html += data.map((r)=>{
+    html += data.map((r,i)=>{
         const pr = factionInnerPowerRank(r);
         const cnt = state.rankings.filter(x=>x['所属阵营']===r['所属阵营']).length;
         const isStrong = (pr!=null && pr<=3);
         const isWeak = (pr!=null && pr>cnt-3);
         const rowCls = isStrong ? 'rk-strong' : (isWeak ? 'rk-weak' : '');
-        const medal = pr===1?'🥇 ':pr===2?'🥈 ':pr===3?'🥉 ':'';
+        const medal = i===0?'🥇 ':i===1?'🥈 ':i===2?'🥉 ':'';
         const tag = isStrong ? '<span class="rc-tag strong">🔥强</span>' : (isWeak?'<span class="rc-tag weak">⬇弱</span>':'');
         const pw=parsePower(r['联盟战力']); const fr=fillRate(r['人数']); const denom=fr?fr.cur:parseNum(r['人数']);
         const per=denom?Math.round(pw/denom):0;
         const frColor=fr?(fr.pct>=95?'#2ecc71':fr.pct>=80?'#f1c40f':'#e67e22'):'#888';
         const ir=factionInnerRank(r);
-        const rk=parseNum(r['排名']);
         return `<tr class="${rowCls}">
-            <td>${medal}${rk?rk:'-'}</td>
+            <td>${medal}${i+1}</td>
             <td><b>${esc(r['联盟名称']??'-')}</b>${tag}</td>
             <td>${esc(r['会长']??'-')}</td>
             <td>${esc(r['人数']??'-')}</td>
-            <td><div class="rate-bar"><div class="bar"><div class="fill" style="width:${fr?fr.pct:0}%;background:${frColor}"></div></div><i>${fr?fr.pct+'%':'-'}</i></div></td>
             <td style="color:#ffd700;font-weight:700">${pw?pw.toLocaleString():'-'}</td>
             <td><b>${per?per.toLocaleString():'-'}</b></td>
             <td>#${pr!=null?pr:'-'}</td>
             <td>#${ir!=null?ir:'-'}</td>
             <td>${estimateKryptonCell(r)}</td>
+            <td><div class="rate-bar"><div class="bar"><div class="fill" style="width:${fr?fr.pct:0}%;background:${frColor}"></div></div><i>${fr?fr.pct+'%':'-'}</i></div></td>
         </tr>`;
     }).join('');
     html += '</tbody></table>';
     grid.innerHTML = html;
+}
+// 排序切换：总战力(默认) / 人均战力 / 总排名
+function setRankSort(s){
+    state.rankSort = s;
+    document.getElementById('sortPowerBtn').classList.toggle('active', s==='power');
+    document.getElementById('sortPerBtn').classList.toggle('active', s==='percap');
+    document.getElementById('sortTotalBtn').classList.toggle('active', s==='total');
+    renderRankings();
 }
 async function importRankingsFile(event){
     const f = event.target.files[0]; if(!f) return;
@@ -784,6 +811,12 @@ function toggleTrendMetric(){
     const b=document.getElementById('trendMetricBtn'); if(b) b.textContent=state.trendMetric;
     renderSnapTrend();
 }
+function setTrendChart(t){
+    state.trendChart = t;
+    document.getElementById('trendLineBtn').classList.toggle('active', t==='line');
+    document.getElementById('trendBarBtn').classList.toggle('active', t==='bar');
+    renderSnapTrend();
+}
 function toggleDataMgr(){
     const d=document.getElementById('dataMgr'); if(d) d.classList.toggle('hidden');
 }
@@ -835,16 +868,36 @@ function renderSnapTrend(){
         svg+=`<text x="${padL-6}" y="${y+4}" fill="rgba(255,255,255,0.5)" font-size="10" text-anchor="end">${val.toLocaleString()}</text>`;
     }
     svg+=`<text x="${padL-6}" y="${padT-6}" fill="rgba(255,255,255,0.45)" font-size="9" text-anchor="end">${usePer?'人均战力':'联盟战力'}</text>`;
-    order.forEach((n,i)=>{ svg+=`<text x="${xOf(i)}" y="${H-padB+16}" fill="rgba(255,255,255,0.6)" font-size="10" text-anchor="middle">${esc(n.length>8?n.slice(0,8)+'…':n)}</text>`; });
-    // 每联盟一条折线（缺失快照断开）
-    names.forEach((nm,idx)=>{
-        const color=palette[idx%palette.length];
-        let seg=[];
-        const flush=()=>{ if(seg.length>1){ const pts=seg.map(j=>`${xOf(j)},${yOf(series[nm][order[j]])}`).join(' '); svg+=`<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2.5"/>`; } seg=[]; };
-        order.forEach((id,i)=>{ const v=series[nm][id]; if(v==null){flush();return;} seg.push(i); });
-        flush();
-        order.forEach((id,i)=>{ const v=series[nm][id]; if(v==null) return; svg+=`<circle cx="${xOf(i)}" cy="${yOf(v)}" r="3.2" fill="${color}"/>`; });
-    });
+    if(state.trendChart!=='bar'){
+        order.forEach((n,i)=>{ svg+=`<text x="${xOf(i)}" y="${H-padB+16}" fill="rgba(255,255,255,0.6)" font-size="10" text-anchor="middle">${esc(n.length>8?n.slice(0,8)+'…':n)}</text>`; });
+    }
+    // 柱状图：每日期一组，组内每联盟一根柱（多联盟对比更清晰）
+    if(state.trendChart==='bar'){
+        const n=names.length;
+        const groupW=(W-padL-padR)/order.length;
+        const bw=Math.min(30, groupW/n*0.82);
+        order.forEach((id,gi)=>{
+            const gx=padL+groupW*gi+groupW/2;
+            names.forEach((nm,ni)=>{
+                const v=series[nm][id]; if(v==null) return;
+                const color=palette[ni%palette.length];
+                const bh=(H-padT-padB)*(v/maxV);
+                const bx=gx-(n*bw)/2+ni*bw;
+                svg+=`<rect x="${bx}" y="${H-padB-bh}" width="${Math.max(1,bw-2)}" height="${bh}" fill="${color}" rx="2"><title>${esc(nm)}: ${v.toLocaleString()}</title></rect>`;
+            });
+            svg+=`<text x="${gx}" y="${H-padB+16}" fill="rgba(255,255,255,0.6)" font-size="10" text-anchor="middle">${esc(id.length>8?id.slice(0,8)+'…':id)}</text>`;
+        });
+    }else{
+        // 每联盟一条折线（缺失快照断开）
+        names.forEach((nm,idx)=>{
+            const color=palette[idx%palette.length];
+            let seg=[];
+            const flush=()=>{ if(seg.length>1){ const pts=seg.map(j=>`${xOf(j)},${yOf(series[nm][order[j]])}`).join(' '); svg+=`<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2.5"/>`; } seg=[]; };
+            order.forEach((id,i)=>{ const v=series[nm][id]; if(v==null){flush();return;} seg.push(i); });
+            flush();
+            order.forEach((id,i)=>{ const v=series[nm][id]; if(v==null) return; svg+=`<circle cx="${xOf(i)}" cy="${yOf(v)}" r="3.2" fill="${color}"/>`; });
+        });
+    }
     svg+='</svg>';
     // 增长最快提示
     let grow='';
