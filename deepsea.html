@@ -171,7 +171,21 @@ function switchFaction(f){
     });
     renderRankings();
 }
-const FACTION_COLS = ['排名','联盟名称','联盟ID','会长','人数','联盟等级','联盟战力'];
+const FACTION_COLS = ['排名','联盟名称','联盟ID','会长','人数','满员率','人均战力','联盟等级','联盟战力','阵营内名次'];
+// 派生指标
+function parseNum(v){ if(typeof v==='number') return v; if(!v) return 0; const m=String(v).match(/-?\d+(\.\d+)?/); return m?parseFloat(m[0]):0; }
+function fillRate(ren){ // 人数 "77/84"
+    const m=String(ren||'').match(/(\d+)\s*\/\s*(\d+)/);
+    if(!m) return null;
+    const cur=+m[1], max=+m[2];
+    return max? {cur,max,pct:Math.round(cur/max*100)} : null;
+}
+function factionInnerRank(r){ // 该联盟在自己阵营内的名次
+    const sub = state.rankings.filter(x=>x['所属阵营']===r['所属阵营']);
+    sub.sort((a,b)=>(+a['排名']||0)-(+b['排名']||0));
+    const i = sub.findIndex(x=>x['联盟名称']===r['联盟名称'] && x['联盟ID']===r['联盟ID']);
+    return i>=0 ? i+1 : null;
+}
 function renderRankings(){
     const head = document.getElementById('rankingHead');
     const tbody = document.getElementById('rankingTbody');
@@ -197,6 +211,22 @@ function renderRankings(){
         if(c==='排名'){
             const rkClass=['rk-gold','rk-silver','rk-bronze'][idx]||'';
             return `<td class="${rkClass}">${esc(v??'-')}</td>`;
+        }
+        if(c==='满员率'){
+            const fr = fillRate(r['人数']);
+            if(!fr) return `<td>${esc(r['人数']??'-')}</td>`;
+            const color = fr.pct>=95?'#2ecc71':fr.pct>=80?'#f1c40f':'#e67e22';
+            return `<td><div style="display:flex;align-items:center;gap:5px;"><div style="flex:1;min-width:40px;height:6px;background:rgba(255,255,255,0.12);border-radius:3px;overflow:hidden;"><div style="width:${fr.pct}%;height:100%;background:${color};"></div></div><span style="font-size:0.72rem;color:${color};min-width:30px;">${fr.pct}%</span></div></td>`;
+        }
+        if(c==='人均战力'){
+            const pw = parsePower(r['联盟战力']); const fr = fillRate(r['人数']);
+            const denom = fr?fr.cur:parseNum(r['人数']);
+            const per = denom?Math.round(pw/denom):0;
+            return `<td>${per?per.toLocaleString():'-'}</td>`;
+        }
+        if(c==='阵营内名次'){
+            const ir = factionInnerRank(r);
+            return `<td>${ir!=null?('#'+ir):'-'}</td>`;
         }
         if(c==='联盟战力') {
             // 联盟战力已含 HTML 标签，直接输出（不 esc）
