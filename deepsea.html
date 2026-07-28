@@ -103,6 +103,36 @@ td .strong-tag{color:#ffd700;font-size:0.7rem;margin-left:4px;}
 .snap-own{font-size:0.7rem;color:rgba(255,255,255,0.5);flex:0 0 auto}
 .snap-per{flex:0 0 auto;color:#e0f7fa}
 .snap-pw{flex:0 0 auto;color:rgba(255,255,255,0.6)}
+/* ===== 排行列表(table) ===== */
+.rank-table{width:100%;border-collapse:collapse;font-size:0.8rem}
+.rank-table th,.rank-table td{padding:6px 8px;white-space:nowrap;text-align:left}
+.rank-table th{position:sticky;top:0;background:#1b2a3a;color:rgba(255,255,255,0.7);font-weight:600;z-index:2}
+.rank-table td{border-bottom:1px solid rgba(255,255,255,0.06)}
+.rank-table tbody tr:hover td{background:rgba(255,255,255,0.05)}
+.rank-table td:nth-child(6),.rank-table td:nth-child(7){text-align:right}
+.rank-table td:nth-child(4),.rank-table td:nth-child(5),.rank-table td:nth-child(8),.rank-table td:nth-child(9){text-align:center}
+.rate-bar{display:flex;align-items:center;gap:6px;font-size:0.7rem;color:rgba(255,255,255,0.55)}
+.rate-bar .bar{flex:1;height:7px;background:rgba(255,255,255,0.12);border-radius:4px;overflow:hidden;min-width:42px}
+.rate-bar .fill{height:100%;border-radius:4px}
+.rate-bar i{font-style:normal;min-width:34px;text-align:right}
+tr.rk-strong td{background:rgba(255,215,0,0.06)}
+tr.rk-strong td:first-child{box-shadow:inset 3px 0 0 #ffd700}
+tr.rk-weak td{opacity:0.5}
+tr.rk-weak:hover td{opacity:1}
+/* ===== 趋势按阵营切换 ===== */
+.trend-metric{font-size:0.72rem;color:rgba(255,255,255,0.6);margin-bottom:6px}
+.trend-metric button{margin-left:4px}
+.trend-grow{font-size:0.78rem;margin:6px 0 2px;color:#7bed9f}
+.trend-legend{font-size:0.72rem;margin-top:8px;display:flex;flex-wrap:wrap;gap:4px 14px}
+.trend-legend .li{display:flex;align-items:center;gap:5px;color:rgba(255,255,255,0.8)}
+.trend-legend .dot{width:10px;height:10px;border-radius:50%;flex:none}
+/* ===== 战力说明 ===== */
+.info-card details{background:rgba(77,182,172,0.07);border:1px solid rgba(77,182,172,0.25);border-radius:10px;padding:8px 12px;margin-bottom:10px}
+.info-card summary{cursor:pointer;font-weight:600;color:#4dd0e1;font-size:0.85rem;outline:none}
+.info-card .info-body{font-size:0.76rem;line-height:1.8;color:rgba(255,255,255,0.78);margin-top:8px}
+.info-card .info-body b{color:#ffd700}
+.info-card .info-body code{background:rgba(255,255,255,0.1);padding:1px 5px;border-radius:4px;color:#7bed9f}
+.hidden{display:none}
 @media (max-width:640px){input,select,textarea{font-size:0.95rem}}
 </style>
 <script src="vendor/xlsx.full.min.js"></script>
@@ -118,24 +148,44 @@ td .strong-tag{color:#ffd700;font-size:0.7rem;margin-left:4px;}
     </div>
     <div class="sub">四大阵营联盟实力 · 全量排行</div>
 
-    <!-- 联盟排行（唯一板块） -->
+    <!-- 战力与夺冠说明（供查看者了解战力来源） -->
+    <div class="info-card">
+        <details>
+            <summary>ℹ️ 战力与夺冠说明（点开）</summary>
+            <div class="info-body">
+                • 每人每天基础战力 <b>200</b>。<br>
+                • 额外战力来自氪金体力：<code>30元=1体力</code>(每日限购1次) / <code>128元=3体力</code>(限购3次) / <code>648元=6体力</code>(限购3次) / <code>648元=12体力</code>(不限购)；<b>1体力=200战力</b>。<br>
+                • 每赛季 <b>14~15 天</b>，下方趋势按收集天数展示战力变化。<br>
+                • 夺冠看「人均战力」+「增长势头」：人均战力高、且战力增长猛的联盟，夺冠概率越大。
+            </div>
+        </details>
+    </div>
+
+    <!-- 联盟排行（列表，便于比较） -->
     <div class="card">
         <h3>🏆 联盟排行 <span class="badge" id="rankingBadge">未导入</span></h3>
+        <div class="row" style="margin-bottom:8px;">
+            <button class="ghost small" onclick="toggleDataMgr()">⚙️ 数据管理 / 导入</button>
+        </div>
+        <div id="dataMgr" class="hidden" style="border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:10px;margin-bottom:10px;">
+            <div class="row" style="margin-bottom:8px;font-size:0.74rem;color:rgba(255,255,255,0.78);background:rgba(77,182,172,0.08);padding:8px 10px;border-radius:8px;line-height:1.7;">
+                📥 <b>导入方法</b>：① 点「导入 xlsx」选择 <b>四大阵营联盟实力前50汇总.xlsx</b>（自动解析 4 阵营 + 总排名）；② 或点「选择 JSON 文件」选已导出的排行 JSON。导入后本页各板块自动更新。
+            </div>
+            <div class="row" style="margin-bottom:8px;">
+                <button class="ghost small" onclick="importRankingsFromDisk()">📂 从 dataDir 加载</button>
+                <label class="ghost small" style="cursor:pointer;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);padding:3px 8px;border-radius:6px;font-size:0.74rem;">
+                    📤 选择 JSON 文件<input type="file" id="rankingFile" accept=".json" style="display:none" onchange="importRankingsFile(event)">
+                </label>
+                <button class="ghost small" onclick="document.getElementById('rankingXlsx').click()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);padding:3px 8px;border-radius:6px;font-size:0.74rem;">📥 导入 xlsx</button>
+                <input type="file" id="rankingXlsx" accept=".xlsx,.xls" style="display:none" onchange="importRankingsXlsx(event)">
+            </div>
+        </div>
         <div class="faction-bar" id="factionBar">
             <div class="faction-icon active" data-faction="总排名" onclick="switchFaction('总排名')"><span class="emo">📊</span>总排名</div>
             <div class="faction-icon" data-faction="暗月地精" onclick="switchFaction('暗月地精')"><span class="emo">🌙</span>暗月地精</div>
             <div class="faction-icon" data-faction="人类联盟" onclick="switchFaction('人类联盟')"><span class="emo">⚔️</span>人类联盟</div>
             <div class="faction-icon" data-faction="天灾亡灵" onclick="switchFaction('天灾亡灵')"><span class="emo">💀</span>天灾亡灵</div>
             <div class="faction-icon" data-faction="兽人部落" onclick="switchFaction('兽人部落')"><span class="emo">👹</span>兽人部落</div>
-        </div>
-        <div class="row" style="margin-bottom:8px;">
-            <button onclick="importRankingsFromDisk()" class="ghost small">📂 从 dataDir 加载</button>
-            <label class="ghost small" style="cursor:pointer;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);padding:3px 8px;border-radius:6px;font-size:0.74rem;">
-                📤 选择 JSON 文件<input type="file" id="rankingFile" accept=".json" style="display:none" onchange="importRankingsFile(event)">
-            </label>
-            <button onclick="document.getElementById('rankingXlsx').click()" class="ghost small">📥 导入 xlsx</button>
-            <input type="file" id="rankingXlsx" accept=".xlsx,.xls" style="display:none" onchange="importRankingsXlsx(event)">
-            <span style="font-size:0.72rem;color:rgba(255,255,255,0.5);">来源: 四大阵营联盟实力前50汇总.xlsx</span>
         </div>
         <div id="rankingGrid" class="scroll-y"></div>
     </div>
@@ -189,7 +239,18 @@ td .strong-tag{color:#ffd700;font-size:0.7rem;margin-left:4px;}
             <button class="ghost small" onclick="deleteSnapshot()">🗑 删除</button>
         </div>
         <div id="snapDetail" class="scroll-y" style="max-height:440px;"></div>
-        <h3 style="margin-top:14px;">📈 势力代表战力趋势 <span style="font-size:0.7rem;color:rgba(255,255,255,0.5);font-weight:normal;">（各阵营代表联盟战力随赛季变化）</span></h3>
+        <h3 style="margin-top:16px;">📈 势力代表战力趋势 <span style="font-size:0.7rem;color:rgba(255,255,255,0.5);font-weight:normal;">（选阵营看各联盟战力随收集天数变化）</span></h3>
+        <div class="faction-bar" id="trendFactionBar">
+            <div class="faction-icon active" data-faction="暗月地精" onclick="switchTrendFaction('暗月地精')"><span class="emo">🌙</span>暗月地精</div>
+            <div class="faction-icon" data-faction="人类联盟" onclick="switchTrendFaction('人类联盟')"><span class="emo">⚔️</span>人类联盟</div>
+            <div class="faction-icon" data-faction="天灾亡灵" onclick="switchTrendFaction('天灾亡灵')"><span class="emo">💀</span>天灾亡灵</div>
+            <div class="faction-icon" data-faction="兽人部落" onclick="switchTrendFaction('兽人部落')"><span class="emo">👹</span>兽人部落</div>
+        </div>
+        <div class="trend-metric">
+            指标：
+            <button class="ghost small" id="trendMetricBtn" onclick="toggleTrendMetric()">联盟战力</button>
+            <span style="color:rgba(255,255,255,0.4);">（点按钮切换「人均战力」）</span>
+        </div>
         <div id="snapTrend"></div>
     </div>
 </div>
@@ -215,7 +276,9 @@ function toast(msg){const t=document.createElement('div');t.className='toast';t.
 // ===================== 数据层 =====================
 let state = {
     rankings: [],
-    curFaction: '总排名'
+    curFaction: '总排名',
+    trendFaction: '暗月地精',
+    trendMetric: '联盟战力'   // 或 '人均战力'
 };
 
 function loadAll(){
@@ -278,39 +341,39 @@ function renderRankings(){
         badge.textContent = data.length ? `${state.curFaction} · ${data.length} 个联盟` : '未导入';
     }
     if(!data.length){
-        grid.innerHTML = '<div class="empty">未导入排行数据<br>点上方"📥 导入 xlsx"直接选 四大阵营联盟实力前50汇总.xlsx，或"📂 从 dataDir 加载"/"📤 选择 JSON 文件"</div>';
+        grid.innerHTML = '<div class="empty">未导入排行数据<br>点上方"⚙️ 数据管理 / 导入"选 xlsx 或 JSON</div>';
         return;
     }
-    const facColor = FACTION_COLOR[state.curFaction] || '#4dd0e1';
-    grid.innerHTML = '<div class="rank-grid">'+data.map((r)=>{
+    let html = '<table class="rank-table"><thead><tr>'
+        + '<th>排名</th><th>联盟</th><th>会长</th><th>人数</th><th>满员率</th><th>联盟战力</th><th>人均战力</th><th>人均阵营排名</th><th>阵营内名次</th>'
+        + '</tr></thead><tbody>';
+    html += data.map((r)=>{
         const pr = factionInnerPowerRank(r);
-        let cardCls='rank-card';
-        let medal='';
-        if(pr===1){cardCls+=' strong'; medal='🥇';}
-        else if(pr===2){cardCls+=' strong'; medal='🥈';}
-        else if(pr===3){cardCls+=' strong'; medal='🥉';}
-        else if(pr!=null){ const cnt=state.rankings.filter(x=>x['所属阵营']===r['所属阵营']).length; if(pr>cnt-3) cardCls+=' weak'; }
+        const cnt = state.rankings.filter(x=>x['所属阵营']===r['所属阵营']).length;
         const isStrong = (pr!=null && pr<=3);
-        const strongTag = isStrong ? '<span class="rc-tag strong">🔥强</span>' : (cardCls.indexOf('weak')>=0?'<span class="rc-tag weak">⬇弱</span>':'');
+        const isWeak = (pr!=null && pr>cnt-3);
+        const rowCls = isStrong ? 'rk-strong' : (isWeak ? 'rk-weak' : '');
+        const medal = pr===1?'🥇 ':pr===2?'🥈 ':pr===3?'🥉 ':'';
+        const tag = isStrong ? '<span class="rc-tag strong">🔥强</span>' : (isWeak?'<span class="rc-tag weak">⬇弱</span>':'');
         const pw=parsePower(r['联盟战力']); const fr=fillRate(r['人数']); const denom=fr?fr.cur:parseNum(r['人数']);
         const per=denom?Math.round(pw/denom):0;
         const frColor=fr?(fr.pct>=95?'#2ecc71':fr.pct>=80?'#f1c40f':'#e67e22'):'#888';
         const ir=factionInnerRank(r);
         const rk=parseNum(r['排名']);
-        return `<div class="${cardCls}" style="--fac:${facColor}">
-            <div class="rc-top"><span class="rc-rank">${medal?medal+' ':''}第 ${rk?rk:'-'} 名</span>${strongTag}</div>
-            <div class="rc-name">${esc(r['联盟名称']??'-')}</div>
-            <div class="rc-owner">👑 ${esc(r['会长']??'未知会长')}</div>
-            <div class="rc-metrics">
-                <div class="rc-m"><span class="lbl">人均战力</span><b>${per?per.toLocaleString():'-'}</b></div>
-                <div class="rc-m"><span class="lbl">联盟战力</span><b class="gold">${pw?pw.toLocaleString():'-'}</b></div>
-                <div class="rc-m"><span class="lbl">人数</span><b>${esc(r['人数']??'-')}</b></div>
-                <div class="rc-m"><span class="lbl">联盟等级</span><b>${esc(r['联盟等级']??'-')}</b></div>
-            </div>
-            <div class="rc-bar"><span>满员率</span><div class="bar"><div class="fill" style="width:${fr?fr.pct:0}%;background:${frColor}"></div></div><i>${fr?fr.pct+'%':'-'}</i></div>
-            <div class="rc-foot">人均阵营排名 <b>#${pr!=null?pr:'-'}</b> · 阵营内名次 <b>#${ir!=null?ir:'-'}</b></div>
-        </div>`;
-    }).join('')+'</div>';
+        return `<tr class="${rowCls}">
+            <td>${medal}${rk?rk:'-'}</td>
+            <td><b>${esc(r['联盟名称']??'-')}</b>${tag}</td>
+            <td>${esc(r['会长']??'-')}</td>
+            <td>${esc(r['人数']??'-')}</td>
+            <td><div class="rate-bar"><div class="bar"><div class="fill" style="width:${fr?fr.pct:0}%;background:${frColor}"></div></div><i>${fr?fr.pct+'%':'-'}</i></div></td>
+            <td style="color:#ffd700;font-weight:700">${pw?pw.toLocaleString():'-'}</td>
+            <td><b>${per?per.toLocaleString():'-'}</b></td>
+            <td>#${pr!=null?pr:'-'}</td>
+            <td>#${ir!=null?ir:'-'}</td>
+        </tr>`;
+    }).join('');
+    html += '</tbody></table>';
+    grid.innerHTML = html;
 }
 async function importRankingsFile(event){
     const f = event.target.files[0]; if(!f) return;
@@ -627,39 +690,97 @@ function deleteSnapshot(){
     refreshSnapSelect(); renderSnapshot(); renderSnapTrend();
     toast(`🗑 已删除 ${id}`);
 }
-// SVG 折线：各阵营代表联盟（前5之首）战力随赛季变化
+// 趋势：按所选阵营，画该阵营各联盟（top5）战力随快照天数变化的多条折线
+function switchTrendFaction(f){
+    state.trendFaction = f;
+    document.querySelectorAll('#trendFactionBar .faction-icon').forEach(t=>{
+        t.classList.toggle('active', t.dataset.faction===f);
+    });
+    renderSnapTrend();
+}
+function toggleTrendMetric(){
+    state.trendMetric = state.trendMetric==='联盟战力' ? '人均战力' : '联盟战力';
+    const b=document.getElementById('trendMetricBtn'); if(b) b.textContent=state.trendMetric;
+    renderSnapTrend();
+}
+function toggleDataMgr(){
+    const d=document.getElementById('dataMgr'); if(d) d.classList.toggle('hidden');
+}
 function renderSnapTrend(){
     const wrap=document.getElementById('snapTrend');
     if(!wrap) return;
     const m=loadSnap();
     const ids=Object.keys(m).sort((a,b)=>(m[a].date||'')>(m[b].date||'')?1:-1);
-    if(ids.length<1){wrap.innerHTML='<div class="empty">记录至少 1 个赛季后显示趋势</div>';return;}
-    const W=760,H=320,padL=64,padR=20,padT=20,padB=40;
-    const maxP=Math.max(1,...ids.flatMap(id=>FACTIONS.map(f=>{
-        const t=(m[id].factions[f]||[])[0]; return t?parsePower(t['联盟战力']):0;
-    })));
-    const xStep=ids.length>1?(W-padL-padR)/(ids.length-1):0;
-    const xOf=i=>ids.length>1?padL+i*xStep:W/2;
-    const yOf=v=>padT+(H-padT-padB)*(1-v/maxP);
-    const colors={'暗月地精':'#9b59b6','人类联盟':'#3498db','天灾亡灵':'#2ecc71','兽人部落':'#e67e22'};
+    if(ids.length<1){wrap.innerHTML='<div class="empty">记录至少 1 个赛季快照后显示趋势（在上方点「📸 记录本赛季前5」）</div>';return;}
+    const f=state.trendFaction;
+    const usePer = state.trendMetric==='人均战力';
+    // 收集该阵营各联盟在每次快照的战力（每人/联盟）
+    const series={}; // name -> {id:val}
+    ids.forEach(id=>{
+        const t=(m[id].factions[f]||[]);
+        t.forEach(r=>{
+            const nm=r['联盟名称']; if(!nm) return;
+            const v = usePer ? (r['人均战力']!=null?Number(r['人均战力']):getPerCap(r)) : parsePower(r['联盟战力']);
+            if(!series[nm]) series[nm]={};
+            series[nm][id]=v;
+        });
+    });
+    const names=Object.keys(series);
+    if(!names.length){wrap.innerHTML='<div class="empty">该阵营暂无快照数据</div>';return;}
+    // 增长：快照顺序 (首->尾)
+    const order=ids;
+    const growth=names.map(nm=>{
+        const present=order.filter(id=>series[nm][id]!=null);
+        const first=series[nm][present[0]], last=series[nm][present[present.length-1]];
+        const delta=last-first;
+        const pct= first? Math.round(delta/first*1000)/10 : 0;
+        return {nm, first, last, delta, pct, n:present.length};
+    }).sort((a,b)=>b.delta-a.delta);
+    const topGrow=growth[0];
+    // 调色板（每联盟一条颜色）
+    const palette=['#4dd0e1','#ffd700','#ff7eb3','#7bed9f','#ff9f43','#a55eea','#54a0ff','#ff6b6b','#1dd1a1','#feca57','#ee5253','#48dbfb'];
+    const W=760,H=340,padL=72,padR=20,padT=20,padB=44;
+    let maxV=1;
+    names.forEach(nm=>order.forEach(id=>{const v=series[nm][id]; if(v!=null&&v>maxV) maxV=v;}));
+    maxV = Math.ceil(maxV/(usePer?50:1000))*(usePer?50:1000);
+    const xStep=order.length>1?(W-padL-padR)/(order.length-1):0;
+    const xOf=i=>order.length>1?padL+i*xStep:W/2;
+    const yOf=v=>padT+(H-padT-padB)*(1-v/maxV);
     let svg=`<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:${W}px;">`;
     for(let g=0;g<=4;g++){
         const y=padT+(H-padT-padB)*g/4;
-        const val=Math.round(maxP*(1-g/4));
+        const val=Math.round(maxV*(1-g/4));
         svg+=`<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="rgba(255,255,255,0.08)"/>`;
-        svg+=`<text x="${padL-6}" y="${y+4}" fill="rgba(255,255,255,0.5)" font-size="10" text-anchor="end">${val}</text>`;
+        svg+=`<text x="${padL-6}" y="${y+4}" fill="rgba(255,255,255,0.5)" font-size="10" text-anchor="end">${val.toLocaleString()}</text>`;
     }
-    ids.forEach((n,i)=>{ svg+=`<text x="${xOf(i)}" y="${H-padB+16}" fill="rgba(255,255,255,0.6)" font-size="10" text-anchor="middle">${esc(n.length>8?n.slice(0,8)+'…':n)}</text>`; });
-    FACTIONS.forEach(f=>{
-        const pts=ids.map((n,i)=>{const t=(m[n].factions[f]||[])[0];const v=t?parsePower(t['联盟战力']):0;return `${xOf(i)},${yOf(v)}`;});
-        svg+=`<polyline points="${pts.join(' ')}" fill="none" stroke="${colors[f]}" stroke-width="2.5"/>`;
-        ids.forEach((n,i)=>{const t=(m[n].factions[f]||[])[0];const v=t?parsePower(t['联盟战力']):0;if(v>0) svg+=`<circle cx="${xOf(i)}" cy="${yOf(v)}" r="3.5" fill="${colors[f]}"/>`;});
+    svg+=`<text x="${padL-6}" y="${padT-6}" fill="rgba(255,255,255,0.45)" font-size="9" text-anchor="end">${usePer?'人均战力':'联盟战力'}</text>`;
+    order.forEach((n,i)=>{ svg+=`<text x="${xOf(i)}" y="${H-padB+16}" fill="rgba(255,255,255,0.6)" font-size="10" text-anchor="middle">${esc(n.length>8?n.slice(0,8)+'…':n)}</text>`; });
+    // 每联盟一条折线（缺失快照断开）
+    names.forEach((nm,idx)=>{
+        const color=palette[idx%palette.length];
+        let seg=[];
+        const flush=()=>{ if(seg.length>1){ const pts=seg.map(j=>`${xOf(j)},${yOf(series[nm][order[j]])}`).join(' '); svg+=`<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2.5"/>`; } seg=[]; };
+        order.forEach((id,i)=>{ const v=series[nm][id]; if(v==null){flush();return;} seg.push(i); });
+        flush();
+        order.forEach((id,i)=>{ const v=series[nm][id]; if(v==null) return; svg+=`<circle cx="${xOf(i)}" cy="${yOf(v)}" r="3.2" fill="${color}"/>`; });
     });
     svg+='</svg>';
-    let legend='<div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:6px;font-size:0.74rem;">';
-    FACTIONS.forEach(f=>{ legend+=`<span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:12px;height:3px;background:${colors[f]};display:inline-block;border-radius:2px;"></span>${esc(f)}</span>`; });
+    // 增长最快提示
+    let grow='';
+    if(topGrow && topGrow.n>=1){
+        const arrow = topGrow.delta>0?'🚀':(topGrow.delta<0?'📉':'➖');
+        grow=`<div class="trend-grow">${arrow} 增长最快：<b>${esc(topGrow.nm)}</b> ${topGrow.first.toLocaleString()} → ${topGrow.last.toLocaleString()}（${topGrow.delta>0?'+':''}${topGrow.delta.toLocaleString()}${topGrow.pct?('，'+topGrow.pct+'%'):''}）</div>`;
+    }
+    // 图例（按最终战力降序，🚀=增长最快）
+    const legendSorted=names.map((nm,idx)=>({nm,color:palette[idx%palette.length],last:series[nm][order[order.length-1]]}))
+        .sort((a,b)=>(b.last||0)-(a.last||0));
+    let legend='<div class="trend-legend">';
+    legendSorted.forEach(o=>{
+        const isTop = topGrow && o.nm===topGrow.nm && topGrow.delta>0;
+        legend+=`<span class="li"><span class="dot" style="background:${o.color}"></span>${esc(o.nm)}${isTop?' 🚀':''}</span>`;
+    });
     legend+='</div>';
-    wrap.innerHTML=svg+legend;
+    wrap.innerHTML=svg+grow+legend;
 }
 
 // ===================== 初始化 =====================
