@@ -57,6 +57,7 @@ td .strong-tag{color:#ffd700;font-size:0.7rem;margin-left:4px;}
 .faction-icon.active{background:rgba(77,182,172,0.28);border-color:#4dd0e1;color:#fff;box-shadow:0 2px 10px rgba(77,182,172,0.25)}
 @media (max-width:640px){input,select,textarea{font-size:0.95rem}}
 </style>
+<script src="vendor/xlsx.full.min.js"></script>
 </head>
 <body>
 <div class="container">
@@ -84,6 +85,8 @@ td .strong-tag{color:#ffd700;font-size:0.7rem;margin-left:4px;}
             <label class="ghost small" style="cursor:pointer;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);padding:3px 8px;border-radius:6px;font-size:0.74rem;">
                 📤 选择 JSON 文件<input type="file" id="rankingFile" accept=".json" style="display:none" onchange="importRankingsFile(event)">
             </label>
+            <button onclick="document.getElementById('rankingXlsx').click()" class="ghost small">📥 导入 xlsx</button>
+            <input type="file" id="rankingXlsx" accept=".xlsx,.xls" style="display:none" onchange="importRankingsXlsx(event)">
             <span style="font-size:0.72rem;color:rgba(255,255,255,0.5);">来源: 四大阵营联盟实力前50汇总.xlsx</span>
         </div>
         <div class="scroll-y">
@@ -222,7 +225,7 @@ function renderRankings(){
     }
     head.innerHTML = '<tr>'+FACTION_COLS.map(c=>`<th>${esc(c)}</th>`).join('')+'</tr>';
     if(!data.length){
-        tbody.innerHTML = '<tr><td colspan="'+FACTION_COLS.length+'" class="empty">未导入排行数据<br>点上方"📂 从 dataDir 加载"或"📤 选择 JSON 文件"导入 deepsea-rankings.json</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="'+FACTION_COLS.length+'" class="empty">未导入排行数据<br>点上方"📥 导入 xlsx"直接选 四大阵营联盟实力前50汇总.xlsx，或"📂 从 dataDir 加载"/"📤 选择 JSON 文件"</td></tr>';
         return;
     }
     tbody.innerHTML = data.slice(0,20).map((r,idx)=>{
@@ -299,6 +302,66 @@ async function importRankingsFromDisk(){
     }catch(e){
         toast('读取失败：'+e.message+'。可手动选 JSON 文件');
     }
+}
+// 一键导入 xlsx（你拿到"四大阵营联盟实力前50汇总.xlsx"直接选，自动解析生成排行）
+async function importRankingsXlsx(event){
+    const f = event.target.files[0]; if(!f) return;
+    try{
+        if(typeof XLSX === 'undefined'){ toast('解析库未加载，请刷新页面重试'); return; }
+        const buf = await f.arrayBuffer();
+        const wb = XLSX.read(buf, {type:'array'});
+        // 定位"总排名"工作表（含全部 200 条 + 所属阵营列）
+        let totalName = wb.SheetNames.find(n=>n.includes('总排名'))
+                      || wb.SheetNames.find(n=>n.includes('四大阵营'));
+        if(!totalName){ // 兜底：含 所属阵营+排名 两列、且行数最多的表
+            let best=null, bestRows=-1;
+            wb.SheetNames.forEach(n=>{
+                const rows=XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,defval:''});
+                const h=(rows[0]||[]).map(x=>String(x));
+                if(h.some(x=>x.includes('所属阵营')) && h.some(x=>x.includes('排名')) && rows.length>bestRows){
+                    bestRows=rows.length; best=n;
+                }
+            });
+            totalName=best;
+        }
+        if(!totalName){ toast('未找到含排行数据的工作表'); return; }
+        const rows = XLSX.utils.sheet_to_json(wb.Sheets[totalName], {header:1, defval:''});
+        const headers = (rows[0]||[]).map(h=>String(h).trim());
+        const FIELDS=['排名','所属阵营','联盟名称','联盟ID','会长','人数','联盟等级','联盟战力'];
+        const idx={};
+        FIELDS.forEach(fld=>{ idx[fld]=headers.findIndex(h=>h===fld || h.includes(fld)); });
+        if(idx['排名']<0 || idx['联盟名称']<0){ toast('表格列头不匹配（需含 排名/联盟名称 等列）'); return; }
+        const list=[];
+        rows.slice(1).forEach(r=>{
+            if(!r || r.every(c=>!c && c!==0)) return;
+            const name = r[idx['联盟名称']];
+            if(name==null || name==='') return;
+            list.push({
+                排名: parseNum(r[idx['排名']]),
+                所属阵营: idx['所属阵营']>=0 ? (r[idx['所属阵营']]??'') : '',
+                联盟名称: String(name),
+                联盟ID: parseNum(r[idx['联盟ID']]),
+                会长: idx['会长']>=0 ? (r[idx['会长']]??'') : '',
+                人数: idx['人数']>=0 ? (r[idx['人数']]??'') : '',
+                联盟等级: idx['联盟等级']>=0 ? (r[idx['联盟等级']]??'') : '',
+                联盟战力: parseNum(r[idx['联盟战力']])
+            });
+        });
+        if(!list.length){ toast('未解析到任何联盟数据'); return; }
+        state.rankings = list;
+        saveRankings();
+        // Tauri：落盘到 dataDir，避免重启被启动读取覆盖
+        if(window.writeTextFile){
+            try{
+                const factions={};
+                list.forEach(r=>{const fk=r['所属阵营']||'未知';(factions[fk]=factions[fk]||[]).push(r);});
+                await window.writeTextFile('D:\\withfriends\\塔防精灵助手数据\\data\\deepsea-rankings.json', JSON.stringify({totalRanking:list, factions}, null, 2));
+            }catch(e){ toast('已导入(本地)，但写数据盘失败：'+e.message); }
+        }
+        renderRankings();
+        toast(`✅ 已从 xlsx 导入 ${list.length} 条（${totalName}）`);
+    }catch(e){ toast('xlsx 导入失败：'+e.message); }
+    event.target.value='';
 }
 
 // ===================== 赛季末记录 + 势力趋势 =====================
