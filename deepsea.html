@@ -40,6 +40,11 @@ tr.top1 td{background:rgba(255,215,0,0.06)}
 tr.top2 td{background:rgba(216,216,216,0.05)}
 tr.top3 td{background:rgba(224,152,90,0.05)}
 tr.top1:hover td,tr.top2:hover td,tr.top3:hover td{background:rgba(77,182,172,0.10)}
+/* 人均阵营排名末3：弱联盟，弱化显示 */
+tr.weak td{opacity:0.5}
+tr.weak:hover td{opacity:1;background:rgba(77,182,172,0.10)}
+td .weak-tag{color:#ef5350;font-size:0.7rem;margin-left:4px;}
+td .strong-tag{color:#ffd700;font-size:0.7rem;margin-left:4px;}
 .hidden{display:none!important}
 .toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.85);color:#fff;padding:10px 20px;border-radius:8px;font-size:0.85rem;z-index:99999;animation:fadeInOut 2s forwards}
 @keyframes fadeInOut{0%{opacity:0;transform:translate(-50%,-10px)}15%{opacity:1;transform:translate(-50%,0)}85%{opacity:1}100%{opacity:0}}
@@ -171,7 +176,21 @@ function switchFaction(f){
     });
     renderRankings();
 }
-const FACTION_COLS = ['排名','联盟名称','联盟ID','会长','人数','满员率','人均战力','联盟等级','联盟战力','阵营内名次'];
+const FACTION_COLS = ['排名','联盟名称','人均战力','人均阵营排名','人数','满员率','联盟等级','联盟战力','阵营内名次'];
+// 该联盟在所属阵营内，按"人均战力"降序的名次（反映真实实力/夺冠概率）
+function factionInnerPowerRank(r){
+    const fr0 = fillRate(r['人数']); const denom0 = fr0?fr0.cur:parseNum(r['人数']);
+    const p0 = denom0? parsePower(r['联盟战力'])/denom0 : 0;
+    const sub = state.rankings.filter(x=>x['所属阵营']===r['所属阵营']);
+    sub.sort((a,b)=>{
+        const fa=fillRate(a['人数']), da=fa?fa.cur:parseNum(a['人数']);
+        const fb=fillRate(b['人数']), db=fb?fb.cur:parseNum(b['人数']);
+        const pa=da?parsePower(a['联盟战力'])/da:0, pb=db?parsePower(b['联盟战力'])/db:0;
+        return pb-pa;
+    });
+    const i = sub.findIndex(x=>x['联盟名称']===r['联盟名称'] && x['联盟ID']===r['联盟ID']);
+    return i>=0 ? i+1 : null;
+}
 // 派生指标
 function parseNum(v){ if(typeof v==='number') return v; if(!v) return 0; const m=String(v).match(/-?\d+(\.\d+)?/); return m?parseFloat(m[0]):0; }
 function fillRate(ren){ // 人数 "77/84"
@@ -206,23 +225,33 @@ function renderRankings(){
         tbody.innerHTML = '<tr><td colspan="'+FACTION_COLS.length+'" class="empty">未导入排行数据<br>点上方"📂 从 dataDir 加载"或"📤 选择 JSON 文件"导入 deepsea-rankings.json</td></tr>';
         return;
     }
-    tbody.innerHTML = data.slice(0,20).map((r,idx)=>{const rankCls=['top1','top2','top3'][idx]||'';return '<tr class="'+(rankCls)+'">'+FACTION_COLS.map(c=>{
+    tbody.innerHTML = data.slice(0,20).map((r,idx)=>{
+        // 高强度判定统一用"阵营内人均战力排名"：前3强、末3弱
+        const pr = factionInnerPowerRank(r);
+        let rowCls='';
+        if(pr===1) rowCls='top1'; else if(pr===2) rowCls='top2'; else if(pr===3) rowCls='top3';
+        else if(pr!=null){ const cnt = state.rankings.filter(x=>x['所属阵营']===r['所属阵营']).length; if(pr>cnt-3) rowCls='weak'; }
+        const strongTag = (pr!=null && pr<=3) ? '<span class="strong-tag">🔥强</span>' : (rowCls==='weak'?'<span class="weak-tag">⬇弱</span>':'');
+        return '<tr class="'+(rowCls)+'">'+FACTION_COLS.map(c=>{
         let v = r[c];
         if(c==='排名'){
             const rkClass=['rk-gold','rk-silver','rk-bronze'][idx]||'';
             return `<td class="${rkClass}">${esc(v??'-')}</td>`;
+        }
+        if(c==='人均战力'){
+            const pw = parsePower(r['联盟战力']); const fr = fillRate(r['人数']);
+            const denom = fr?fr.cur:parseNum(r['人数']);
+            const per = denom?Math.round(pw/denom):0;
+            return `<td>${per?per.toLocaleString():'-'}${strongTag}</td>`;
+        }
+        if(c==='人均阵营排名'){
+            return `<td>${pr!=null?('#'+pr):'-'}</td>`;
         }
         if(c==='满员率'){
             const fr = fillRate(r['人数']);
             if(!fr) return `<td>${esc(r['人数']??'-')}</td>`;
             const color = fr.pct>=95?'#2ecc71':fr.pct>=80?'#f1c40f':'#e67e22';
             return `<td><div style="display:flex;align-items:center;gap:5px;"><div style="flex:1;min-width:40px;height:6px;background:rgba(255,255,255,0.12);border-radius:3px;overflow:hidden;"><div style="width:${fr.pct}%;height:100%;background:${color};"></div></div><span style="font-size:0.72rem;color:${color};min-width:30px;">${fr.pct}%</span></div></td>`;
-        }
-        if(c==='人均战力'){
-            const pw = parsePower(r['联盟战力']); const fr = fillRate(r['人数']);
-            const denom = fr?fr.cur:parseNum(r['人数']);
-            const per = denom?Math.round(pw/denom):0;
-            return `<td>${per?per.toLocaleString():'-'}</td>`;
         }
         if(c==='阵营内名次'){
             const ir = factionInnerRank(r);
