@@ -1,11 +1,11 @@
 {
     "platforms":  {
                       "windows-x86_64":  {
-                                             "signature":  "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRdWJvQ0JvYjZTSE1WalN5YkJxWGVaM1A0cGIyckpuQTNlOU52TWR6WFByYWZJZ0R2a21KK1hKY3FZbzlNd0NpUXZWZmJoVW9TVDJtdktXd1VSSXp2MkxhYmlZT0xQZlFZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg1MzYwMTIxCWZpbGU6dGZqbC1zaWduLXRlbXAuZXhlCkRtWCtvTjcySnlKTUp0M1dSQ3l5dzFTMkdmNWpLRE8vT2YvaEg3Nit2UGdYZGdzSnJybldvd04zY0IzUmN1eGw4eEY3aVNJSGtXVWgzeElYVTVKZUR3PT0K",
-                                             "url":  "https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/raw/main/tfjl-assistant_1.2.8_x64-setup.exe"
+                                             "signature":  "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRdWJvQ0JvYjZTSENLcUlwcTEyUndNeGJVNjlGbDVFYnRZUEZJdEUxL3hVcURSdW9YZ25xd01IMmxEODdYK0t6OWR3YVN0d1A2ZWhBRXdOT2I5L2xtRm1xNkwvdGhDZXc4PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg1MzYyMzc3CWZpbGU6dGZqbC1zaWduLXRlbXAuZXhlCjVodFV3SkxwT1VQMXJtUzlmV3BmZkJ3QkU0NmR1K1luM0JwaStMdHduRDBjbWFaSCtUMGtKMmltN2QzY3E1OTZUancyRHdsMlVQZ1BTdzFqb2Z5OER3PT0K",
+                                             "url":  "https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/raw/main/tfjl-assistant_1.2.9_x64-setup.exe"
                                          }
                   },
-    "notes":  "v1.2.8 升级版本号以触发自动更新（修复 1.2.7 未升号导致更新器不弹的冲突）\n- 版本号 1.2.7 → 1.2.8，所有低于 1.2.8 的版本点检查更新都会自动收到\n- 托盘修复同 1.2.7：左键开窗、右键菜单(显示窗口 / 隐藏到托盘 / 退出)\n- 安装包随 git 直接推送 Gitee 仓库(raw 直链)，不再需要手动上传 Release 附件",
-    "pub_date":  "2026-07-30T05:30:00+08:00",
-    "version":  "1.2.8"
+    "notes":  "v1.2.9 修复托盘右键菜单闪退 + 智能导入/导入到老马密码逻辑\n- 托盘：仅左键开窗、右键弹菜单（修复右键弹菜单瞬间消失、左右键都开窗、无法退出的问题）\n- 智能导入/导入到老马：密码校验提前到最前，取消密码不再卡死加载提示\n- 安装包随 git 直接推送 Gitee 仓库(raw 直链)，无需手动上传 Release",
+    "pub_date":  "2026-07-30T06:10:00+08:00",
+    "version":  "1.2.9"
 }
