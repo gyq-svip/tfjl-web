@@ -30,11 +30,18 @@
         || !!(window.__TAURI__ && window.__TAURI__.core && typeof window.__TAURI__.core.invoke === 'function');
   }
   async function tauriInvoke(cmd, args){
-    if(window.__TAURI_INTERNALS__ && typeof window.__TAURI_INTERNALS__.invoke === 'function')
-      return await window.__TAURI_INTERNALS__.invoke(cmd, args);
-    if(window.__TAURI__ && window.__TAURI__.core && typeof window.__TAURI__.core.invoke === 'function')
-      return await window.__TAURI__.core.invoke(cmd, args);
-    throw new Error('Tauri 不可用');
+    try{
+      if(window.__TAURI_INTERNALS__ && typeof window.__TAURI_INTERNALS__.invoke === 'function')
+        return await window.__TAURI_INTERNALS__.invoke(cmd, args);
+      if(window.__TAURI__ && window.__TAURI__.core && typeof window.__TAURI__.core.invoke === 'function')
+        return await window.__TAURI__.core.invoke(cmd, args);
+      throw new Error('Tauri 不可用');
+    }catch(e){
+      // 统一成 Error，避免上层 e.message 为 undefined（Tauri 偶尔以字符串拒绝）
+      throw (e instanceof Error) ? e
+        : new Error(typeof e === 'string' ? e
+            : ((e && e.message) || (typeof e === 'object' ? JSON.stringify(e) : '调用失败')));
+    }
   }
 
   // ====================== Umi-OCR 离线引擎探测 + 无感启动 ======================
@@ -66,6 +73,64 @@
     try{ localStorage.setItem('tfjl_umi_ocr_path', p); }catch(e){}
   }
 
+  // ====================== Umi-OCR 后台运行自动配置 ======================
+  // 把 Umi-OCR 配置成“后台运行”：开机自启 + 隐藏系统托盘 + 启动即隐藏
+  // （HTTP 服务与“启动后缩小到托盘”我们已用 --hide + 默认配置保证；这里补另外两项用户常想要的）
+  function umiSettingsGuideHtml(){
+    return '关于 Umi-OCR 后台运行：<br>'
+      + '• <b>允许 HTTP 服务</b>：默认已开启（主机 127.0.0.1:1224），自动启动依赖它；<br>'
+      + '• <b>启动后缩小到托盘</b>：我们每次自动启动都带 <code>--hide</code>，已自动处理；<br>'
+      + '• <b>开机自启 / 隐藏系统托盘</b>：Umi-OCR 自己的设置，'
+      + '<a href="#" data-act="cfgumi" style="color:#4fc3f7;text-decoration:underline;">点此让助手自动写入配置</a>'
+      + '（写入后需重启 Umi-OCR 生效），或你自行在 Umi-OCR「全局设置」里勾选。';
+  }
+  // 计算 Umi-OCR 的 .settings 路径（exe 同级 UmiOCR-data/.settings）
+  function umiSettingsPathOf(exe){
+    const i = Math.max(exe.lastIndexOf('\\'), exe.lastIndexOf('/'));
+    return exe.slice(0, i) + '\\UmiOCR-data\\.settings';
+  }
+  // 自动写入后台运行三项设置；返回 {ok, msg}
+  async function applyUmiBackgroundSettings(){
+    const p = await getStoredUmiPath();
+    if(!p) return { ok:false, msg:'请先选择/自动查找到 Umi-OCR.exe' };
+    const settingsPath = umiSettingsPathOf(p);
+    let text = '';
+    try{ text = await tauriInvoke('read_text_file_auto', { file_path: settingsPath }); }
+    catch(e){ return { ok:false, msg:'读取 Umi-OCR 配置失败（'+((e&&e.message)||e)+'），请直接在 Umi-OCR 全局设置里勾选' }; }
+    const keys = { 'shortcut.startup':'true', 'window.hideTrayIcon':'true', 'window.startupInvisible':'true' };
+    const lines = text.split(/\r?\n/);
+    const changed = {}; for(const k in keys) changed[k] = false;
+    let inGlobal = false;
+    for(let i=0;i<lines.length;i++){
+      const line = lines[i];
+      if(/^\s*\[/.test(line)){ inGlobal = /^\[Global\]/i.test(line.trim()); continue; }
+      if(!inGlobal) continue;
+      for(const k in keys){
+        if(new RegExp('^\\s*'+k.replace(/\./g,'\\.')+'\\s*=').test(line)){
+          lines[i] = k + '=' + keys[k]; changed[k] = true;
+        }
+      }
+    }
+    const inserted = [];
+    for(const k in keys){ if(!changed[k]) inserted.push(k+'='+keys[k]); }
+    if(inserted.length){
+      for(let i=0;i<lines.length;i++){
+        if(/^\[Global\]/i.test(lines[i].trim())){ lines.splice(i+1, 0, ...inserted); break; }
+      }
+    }
+    const out = lines.join('\r\n');
+    try{ await tauriInvoke('write_text_file', { file_path: settingsPath, content: out }); }
+    catch(e){ return { ok:false, msg:'写入 Umi-OCR 配置失败（'+((e&&e.message)||e)+'）' }; }
+    return { ok:true, msg:'已写入配置（开机自启 + 隐藏托盘 + 启动即隐藏）。需重启 Umi-OCR 生效：关掉它再点「🚀 启动识别引擎」即可。' };
+  }
+  async function cfgUmiHandler(tip){
+    tip = tip || $('recUmiTip');
+    tip.innerHTML = '正在写入 Umi-OCR 后台运行配置…';
+    const r = await applyUmiBackgroundSettings();
+    if(r.ok) setTip(tip,'rgba(76,175,80,0.15)','#81c784','✅ '+r.msg);
+    else setTip(tip,'rgba(255,167,38,0.18)','#ffb74d','⚠️ '+r.msg);
+  }
+
   // 返回 true=已连接 / false=未安装或未启动 / null=非 APP 环境（不提示）
   async function checkUmiOcrAvailable(){
     if(!isTauri()) return null;
@@ -83,15 +148,33 @@
     }
   }
 
-  // 用已记住的路径自动拉起 Umi-OCR，并轮询等待服务就绪
+  // 探测一次：Umi-OCR 返回任意 JSON（未抛网络错误）= 服务/引擎已就绪
+  async function probeUmiReady(){
+    try{
+      await tauriInvoke('umi_ocr', {
+        base64: TINY_PNG.split(',')[1],
+        options: { data:{format:'dict'}, ocr:{language:'models/config_chinese.txt', cls:true} }
+      });
+      return true;
+    }catch(e){ return false; }
+  }
+
+  // 用已记住的路径自动拉起 Umi-OCR：先无感隐藏启动并轮询引擎就绪；
+  // 若隐藏启动始终起不来（部分机器隐藏态引擎不加载），回退为可见窗口启动（用户实测可见窗口可用）
   async function autoStartUmiOcr(){
     const p = await getStoredUmiPath();
     if(!p) return false;
-    try{ await tauriInvoke('start_umi_ocr', { exe_path: p, hidden: true }); }
-    catch(e){ return false; }
+    // 1) 无感隐藏启动
+    try{ await tauriInvoke('start_umi_ocr', { exe_path: p, hidden: true }); }catch(e){}
+    for(let i=0;i<40;i++){            // 最多 ~28s 等引擎就绪
+      await sleep(700);
+      if(await probeUmiReady()) return true;
+    }
+    // 2) 回退：显示窗口启动（Umi-OCR 已运行时再调一次会唤出已隐藏的窗口）
+    try{ await tauriInvoke('start_umi_ocr', { exe_path: p, hidden: false }); }catch(e){}
     for(let i=0;i<25;i++){
-      await sleep(800);
-      if(await checkUmiOcrAvailable() === true) return true;
+      await sleep(700);
+      if(await probeUmiReady()) return true;
     }
     return false;
   }
@@ -252,7 +335,8 @@
         + '③ 点「🚀 启动识别引擎」手动启动，或重装：'
         + '<a href="#" data-act="install" style="color:#4fc3f7;text-decoration:underline;margin:0 4px;">⬇ 一键下载安装</a>'
         + '<a href="#" data-act="find" style="color:#4fc3f7;text-decoration:underline;margin:0 4px;">🔍 自动查找</a>'
-        + '<a href="#" id="recPickUmi" style="color:#4fc3f7;text-decoration:underline;margin:0 4px;">选择 exe</a>');
+        + '<a href="#" id="recPickUmi" style="color:#4fc3f7;text-decoration:underline;margin:0 4px;">选择 exe</a>'
+        + '<br><br>' + umiSettingsGuideHtml());
       bindPickUmi(tip);
       return;
     }
@@ -263,7 +347,8 @@
       + '<a href="#" data-act="install" style="color:#4fc3f7;text-decoration:underline;margin:0 4px;">⬇ 一键下载安装</a>（自动装到本助手目录）'
       + '<a href="#" data-act="find" style="color:#4fc3f7;text-decoration:underline;margin:0 4px;">🔍 自动查找</a>'
       + '<a href="#" id="recPickUmi" style="color:#4fc3f7;text-decoration:underline;margin:0 4px;">选择 exe</a>'
-      + '（或<a href="#" data-act="dl" style="color:#4fc3f7;text-decoration:underline;">浏览器下载</a>后解压到 D:\\withfriends\\塔防精灵助手数据\\Umi-OCR）。配好后助手会<b>自动后台启动</b>。');
+      + '（或<a href="#" data-act="dl" style="color:#4fc3f7;text-decoration:underline;">浏览器下载</a>后解压到 D:\\withfriends\\塔防精灵助手数据\\Umi-OCR）。配好后助手会<b>自动后台启动</b>。'
+      + '<br><br>' + umiSettingsGuideHtml());
     bindPickUmi(tip);
   }
 
@@ -351,7 +436,11 @@
       }
       drawBoxes(canvas, img, results);
       onDone(results, source, rows.length);
-    }).catch(e=>{ statusEl.textContent='识别失败'; alert('识别失败: '+e.message); });
+    }).catch(e=>{
+      const m = (e && e.message) ? e.message
+        : (typeof e === 'string' ? e : ((e && JSON.stringify(e)) || '未知错误'));
+      statusEl.textContent='识别失败'; alert('识别失败: '+m);
+    });
   }
 
   function drawBoxes(canvas, img, results){
@@ -546,6 +635,8 @@
       if(find){ e.preventDefault(); findAndSetUmi(recTipEl); return; }
       const install = e.target.closest && e.target.closest('a[data-act="install"]');
       if(install){ e.preventDefault(); downloadAndInstallUmi(recTipEl); return; }
+      const cfg = e.target.closest && e.target.closest('a[data-act="cfgumi"]');
+      if(cfg){ e.preventDefault(); cfgUmiHandler(recTipEl); return; }
     });
     // 工具栏“🔍 自动查找”按钮：扫描本机常见位置并自动设置
     const recFindBtn = $('recFind');
