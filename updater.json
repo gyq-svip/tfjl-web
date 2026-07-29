@@ -1,11 +1,11 @@
-{
-  "version": "1.2.0",
-  "notes": "v1.2.0 阵容识别\n- 阵容识别独立入口：Tauri桥接Umi-OCR+100库校验+填入脚本生成\n- 识别匹配集改为仅100精确英雄卡名（不再并入224皮肤名避免误判）\n- 修复冰鸟等8个英雄识别不上（天使/风灵/射线/宝库/潜艇/钟馗/小炮/冰鸟）\n- 测试台支持Ctrl+V粘贴+自动识别（全图OCR+100库过滤）\n- 版本号弹窗仅在有新版本时显示强制刷新；版本号变绿高亮\n- 修复减伤记录丢失（APP下额外持久化到D盘）\n- 深海：xlsx智能表头+立体数据库+氪金体力估算+排行对比\n- 网页版皮肤显示修复",
-  "pub_date": "2026-07-29T15:30:00+08:00",
-  "platforms": {
-    "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRdWJvQ0JvYjZTSEJlU3ArTXhtT1QxY2JTaDJUZ3BWVGE1aUR5RU94OVgzZ25jVHVDcmVUUWRBcjB1OStWZ3BLSHhhVnJ3WU5aNGU0T0t3aGh3bEZyWE9MRXpLTnBaOGdjPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg1MzA5MjUxCWZpbGU65aGU6Ziy57K+54G15Yqp5omLXzEuMi4wX3g2NC1zZXR1cC5leGUKeno3RVdrUTB1WDg0Y2EyY2pZZmxCaktlU295bkdIaFMrTGFrcDNVV1QwbFpDcXdlbmJwajhqQVRBdDhBRmZmTGVpSUR2V0Y3WGtCa2VBbjBCaFhIRHc9PQo=",
-      "url": "https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/releases/download/v1.2.0/tfjl-v1.2.0-x64-setup.exe"
-    }
-  }
+﻿{
+    "platforms":  {
+                      "windows-x86_64":  {
+                                             "signature":  "ZFc1MGNuVnpkR1ZrSUdOdmJXMWxiblE2SUhOcFoyNWhkSFZ5WlNCbWNtOXRJSFJoZFhKcElITmxZM0psZENCclpYa0tVbFZSZFdKdlEwSnZZalpUU0VNMWVXOXhhVkpLV201UGJ6QllNekZPTUZoSVdrSjFibVp4YWpSMVpHSm1VVlUwVHpKS1JEWnNaV2swVGxKdk9WZElkR0l3Ukd4dVNFcFFOM2R0WWpCMGNrWmthemxvZDJwQmMzbDJOVWRYWVN0cFRVRlZQUXAwY25WemRHVmtJR052YlcxbGJuUTZJSFJwYldWemRHRnRjRG94TnpnMU16RTRPVGt4Q1dacGJHVTY1YUdVNlppeTU3Sys1NEcxNVlxcDVvbUxYekV1TWk0eVgzZzJOQzF6WlhSMWNDNWxlR1VLZWxKeVJtcElOV2hMYjFoa1ZYWnBSR3RKT0doTlNWQjVPRUZFT0VFM1EyWmhkalp2TWk5eFJHcG5hRzl0YkdSb0syOXVaR1ZsT0VSMU5GSkRXVkZLY0RjMFptWjRTMHN3VmpWRmNGQlJNeTgyYldKQlJHYzlQUW89",
+                                             "url":  "https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/releases/download/v1.2.2/tfjl-v1.2.2-x64-setup.exe"
+                                         }
+                  },
+    "pub_date":  "2026-07-29T18:00:00+08:00",
+    "version":  "1.2.2",
+    "notes":  "v1.2.2 无感体验\n- Umi-OCR 自动启动：记住 exe 路径后，APP 启动或打开阵容识别浮窗会自动后台拉起，无需手动打开\n- 新增系统托盘：右下角小图标，右键 显示窗口/隐藏到托盘/退出；点窗口 X 最小化到托盘常驻后台"
 }

@@ -37,11 +37,34 @@
     throw new Error('Tauri 不可用');
   }
 
-  // ====================== Umi-OCR 离线引擎探测 + 安装提示 ======================
+  // ====================== Umi-OCR 离线引擎探测 + 无感启动 ======================
   // 官方下载（建议装 Paddle 版，精度最高）：https://github.com/hiroi-sora/Umi-OCR/releases
   const UMI_OCR_DOWNLOAD = 'https://github.com/hiroi-sora/Umi-OCR/releases';
+  // 记住 exe 路径：APP 存 D 盘 json，浏览器存 localStorage
+  const UMI_PATH_FILE = 'D:\\withfriends\\塔防精灵助手数据\\data\\umi-ocr-path.json';
   // 1x1 透明 PNG，仅用于探测服务是否可达（不真正识别）
   const TINY_PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+
+  const sleep = ms => new Promise(r=>setTimeout(r, ms));
+  function escapeHtml(s){ return (s||'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+  function setTip(tip, bg, color, html){
+    tip.style.background = bg; tip.style.color = color; tip.innerHTML = html;
+  }
+
+  // 读取已记住的 Umi-OCR.exe 路径
+  async function getStoredUmiPath(){
+    if(isTauri()){
+      try{ const s = await tauriInvoke('read_text_file_auto', { file_path: UMI_PATH_FILE });
+           const j = JSON.parse(s); return (j && j.path) || ''; }catch(e){ return ''; }
+    }
+    try{ return localStorage.getItem('tfjl_umi_ocr_path') || ''; }catch(e){ return ''; }
+  }
+  async function setStoredUmiPath(p){
+    if(isTauri()){
+      try{ await tauriInvoke('write_text_file', { file_path: UMI_PATH_FILE, content: JSON.stringify({path:p}) }); }catch(e){}
+    }
+    try{ localStorage.setItem('tfjl_umi_ocr_path', p); }catch(e){}
+  }
 
   // 返回 true=已连接 / false=未安装或未启动 / null=非 APP 环境（不提示）
   async function checkUmiOcrAvailable(){
@@ -60,28 +83,73 @@
     }
   }
 
-  function showUmiTip(){
+  // 用已记住的路径自动拉起 Umi-OCR，并轮询等待服务就绪
+  async function autoStartUmiOcr(){
+    const p = await getStoredUmiPath();
+    if(!p) return false;
+    try{ await tauriInvoke('start_umi_ocr', { exe_path: p }); }
+    catch(e){ return false; }
+    for(let i=0;i<12;i++){
+      await sleep(800);
+      if(await checkUmiOcrAvailable() === true) return true;
+    }
+    return false;
+  }
+
+  // 用户点“选择 Umi-OCR.exe”：弹系统文件框 → 记住路径 → 自动拉起
+  function bindPickUmi(tip){
+    const a = $('recPickUmi');
+    if(!a) return;
+    a.onclick = async (e)=>{
+      e.preventDefault();
+      tip.innerHTML = '请选择本机 Umi-OCR.exe …';
+      try{
+        const p = await tauriInvoke('pick_umi_ocr_exe');
+        if(!p){ tip.innerHTML = '已取消选择。'; return; }
+        await setStoredUmiPath(p);
+        tip.innerHTML = '已选择，正在自动启动 Umi-OCR …';
+        const ok = await autoStartUmiOcr();
+        if(ok) setTip(tip, 'rgba(76,175,80,0.15)', '#81c784', '✅ 已自动启动本机 Umi-OCR（离线精准识别）');
+        else setTip(tip, 'rgba(255,167,38,0.18)', '#ffb74d',
+          '⚠️ 已选择该 exe 但仍无法启动。请确认路径正确，或手动双击打开 Umi-OCR 后重试。');
+      }catch(err){ tip.innerHTML = '选择失败: ' + (err && err.message || err); }
+    };
+  }
+
+  async function showUmiTip(){
     const tip = $('recUmiTip');
     if(!tip) return;
+    if(!isTauri()){ tip.style.display = 'none'; return; } // 浏览器环境不提示安装
     tip.style.display = 'block';
-    tip.style.background = 'rgba(255,167,38,0.15)';
-    tip.style.color = '#ffb74d';
-    tip.innerHTML = '检测本机 Umi-OCR 中…';
-    checkUmiOcrAvailable().then(av=>{
-      if(av === true){
-        tip.style.background = 'rgba(76,175,80,0.15)';
-        tip.style.color = '#81c784';
-        tip.innerHTML = '✅ 已连接本机 Umi-OCR（离线精准识别）';
-      } else if(av === false){
-        tip.style.background = 'rgba(255,167,38,0.18)';
-        tip.style.color = '#ffb74d';
-        tip.innerHTML = '⚠️ 阵容识别依赖本机 Umi-OCR（<b>完全免费开源</b>，需自行安装）。'
-          + '<a href="'+UMI_OCR_DOWNLOAD+'" target="_blank" rel="noopener" style="color:#4fc3f7;text-decoration:underline;margin:0 4px;">点击下载安装</a>'
-          + '（建议选 Paddle 版）。安装后<b>双击打开 Umi-OCR 并保持后台运行</b>即可使用；未安装则不支持此功能。';
-      } else {
-        tip.style.display = 'none'; // 浏览器环境不提示安装
+    setTip(tip, 'rgba(255,167,38,0.15)', '#ffb74d', '检测本机 Umi-OCR 中…');
+
+    const av = await checkUmiOcrAvailable();
+    if(av === true){
+      setTip(tip, 'rgba(76,175,80,0.15)', '#81c784', '✅ 已连接本机 Umi-OCR（离线精准识别）');
+      return;
+    }
+    // 未连接：若已记住路径则无感自动拉起
+    const stored = await getStoredUmiPath();
+    if(stored){
+      tip.innerHTML = '未检测到 Umi-OCR，正在自动启动…';
+      const ok = await autoStartUmiOcr();
+      if(ok){
+        setTip(tip, 'rgba(76,175,80,0.15)', '#81c784', '✅ 已自动启动本机 Umi-OCR（离线精准识别）');
+        return;
       }
-    });
+      setTip(tip, 'rgba(255,167,38,0.18)', '#ffb74d',
+        '⚠️ 已尝试自动启动 Umi-OCR 但失败（记录路径：' + escapeHtml(stored) + '）。'
+        + '<a href="#" id="recPickUmi" style="color:#4fc3f7;text-decoration:underline;margin:0 4px;">重新选择 Umi-OCR.exe</a>'
+        + '，或<a href="'+UMI_OCR_DOWNLOAD+'" target="_blank" rel="noopener" style="color:#4fc3f7;text-decoration:underline;margin:0 4px;">下载安装</a>。');
+      bindPickUmi(tip);
+      return;
+    }
+    // 从未选过：提示选择（选完即自动后台拉起，无需手动打开）
+    setTip(tip, 'rgba(255,167,38,0.18)', '#ffb74d',
+      '⚠️ 阵容识别依赖本机 Umi-OCR（<b>完全免费开源</b>），需先选择本机 Umi-OCR.exe。'
+      + '<a href="#" id="recPickUmi" style="color:#4fc3f7;text-decoration:underline;margin:0 4px;">选择 Umi-OCR.exe</a>'
+      + '（<a href="'+UMI_OCR_DOWNLOAD+'" target="_blank" rel="noopener" style="color:#4fc3f7;text-decoration:underline;">下载</a>，建议 Paddle 版）。选好后助手会<b>自动后台启动</b>，无需手动打开。');
+    bindPickUmi(tip);
   }
 
   // ====================== OCR 原文 → 库名 ======================
