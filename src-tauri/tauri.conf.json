@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "塔防精灵助手",
-  "version": "1.1.9",
+  "version": "1.2.0",
   "identifier": "com.gyq.tfjl",
     "build": {
     "frontendDist": "webroot",
@@ -26,7 +26,11 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["**"]
+      }
     }
   },
   "bundle": {
