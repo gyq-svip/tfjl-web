@@ -1,11 +1,11 @@
 {
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRdWJvQ0JvYjZTSEZIcTdrQ3dWR1NVNEZNVWlWdHRhbklxbUltZ2RPQkNqd0Nmdk5IeE9heWQxelVLUGpTNitTOHF2S1lDdWZYaU5FeW8wUVRKNGlLTGVKc0drcDczcFFFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg1MzQzMzY0CWZpbGU6dGZqbC1hc3Npc3RhbnRfMS4yLjZfeDY0LXNldHVwLmV4ZQo1UzJNZVROdjBodkdZWkFONEx5bzFkSHhyOUIydGFDLytRQ3RRZ09CZ1p2MUhLZkRXK2gwaEpHdnk3MmZlYU4rdko5c3lIL2RpZ3Jjd1dDQUt3T0tBdz09Cg==",
-      "url": "https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/releases/download/v1.2.6/tfjl-assistant_1.2.6_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRdWJvQ0JvYjZTSEQ4VDZ2MXA2SDg0ODVRZ250NTdhNWZFdEx0M0tiMmFEYU1xcndJWHRLUGczd3pDRXYraU1zdmZOMVZWQU9pdTc4YVVYWUFEMElaNkJMYVBpKzZIM2dnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg1MzUxODUxCWZpbGU6dGZqbC1hc3Npc3RhbnRfMS4yLjdfeDY0LXNldHVwLmV4ZQowclArK3hpMGxZZEw3RHZ3SDllbVNuZDhzVHcvbXlKaEN1UmFSb3ZLRDlUQ3MzTkZhTmhUbEExd25OZkJxeTVoZlE1T3dRQmFyV0l6Z1dTWG44Y1ZEUT09Cg==",
+      "url": "https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/releases/download/v1.2.7/tfjl-assistant_1.2.7_x64-setup.exe"
     }
   },
-  "notes": "v1.2.6 修复托盘 + 分享加密加固\n- 修复托盘左键点击不弹菜单导致无法打开/退出的问题（改为左键右键都弹菜单）\n- 分享加密增加 crypto.subtle 降级（WebView 不支持 Web Crypto 时仍能正常加密）\n- 自动更新安装前增加 300ms 等待 + downloadAndInstall 兜底，修复 Update.install called before Update.download\n- 分享成功后弹密码提醒框（带复制按钮），方便把密码转发给接收者",
-  "pub_date": "2026-07-30T00:45:00+08:00",
-  "version": "1.2.6"
+  "notes": "v1.2.7 修复托盘菜单失灵 + 更新真正生效\n- 修复点窗口X后托盘菜单(显示窗口/退出)全部失灵：改为在 CloseRequested 阶段 prevent_close 并隐藏到托盘，窗口不再被销毁\n- 托盘菜单\"退出\"不再依赖窗口是否存在，确保一定能退出\n- 单实例锁改为新版本接管旧进程，确保自动更新后真正运行新代码(不再被旧进程顶掉)\n- 提升前端缓存版本(tfjl-v117 / 页面 v260730-02)，强制刷新到最新前端(顺带修掉分享加密的旧缓存问题)",
+  "pub_date": "2026-07-30T03:30:00+08:00",
+  "version": "1.2.7"
 }
