@@ -134,7 +134,15 @@
   async function downloadAndInstallUmi(tip){
     tip = tip || $('recUmiTip');
     const st = $('recStatus');
-    if(tip) tip.innerHTML = '正在从官网下载 Umi-OCR（约 130MB，请耐心等待，勿关闭助手）…';
+    const btn = $('recInstall');
+    if(window._umiDownloading) return; // 防重复点击
+    window._umiDownloading = true;
+    // 立即反馈：禁用按钮 + 变更文案（点了和没点一眼区分）
+    if(btn){ btn.disabled = true; btn.dataset.label = btn.textContent; btn.textContent = '⏳ 下载中…'; btn.style.opacity = '0.6'; btn.style.cursor = 'wait'; }
+    // 动画进度条（Rust 当前不发进度，用不确定进度条表示"正在下载"）
+    const bar = '<div style="margin:8px 0 2px;height:10px;border-radius:6px;background:rgba(255,255,255,0.12);overflow:hidden;">'
+      + '<div style="height:100%;width:42%;border-radius:6px;background:linear-gradient(90deg,#26c6da,#00838f);animation:recDL 1.1s ease-in-out infinite;"></div></div>';
+    if(tip) tip.innerHTML = '正在从官网下载 Umi-OCR（约 130MB，请耐心等待，勿关闭助手）…' + bar;
     if(st) st.textContent = '下载安装中…';
     let path = null;
     try{ path = await tauriInvoke('download_umi_ocr'); }
@@ -143,8 +151,12 @@
       if(tip) setTip(tip,'rgba(255,167,38,0.18)','#ffb74d',
         '⚠️ 自动下载失败：'+escapeHtml(msg)+'。可改用<a href="#" data-act="dl" style="color:#4fc3f7;text-decoration:underline;margin:0 4px;">浏览器下载</a>，解压到 <b>D:\\withfriends\\塔防精灵助手数据\\Umi-OCR</b> 后点「🔍 自动查找」。');
       if(st) st.textContent = '下载失败';
+      window._umiDownloading = false;
+      if(btn){ btn.disabled = false; btn.textContent = btn.dataset.label || '⬇ 下载安装'; btn.style.opacity=''; btn.style.cursor='pointer'; }
       return;
     }
+    window._umiDownloading = false;
+    if(btn){ btn.disabled = false; btn.textContent = '✅ 已安装'; btn.style.opacity=''; btn.style.cursor='pointer'; }
     if(!path){ if(st) st.textContent='下载完成但未找到程序'; return; }
     await setStoredUmiPath(path);
     if(tip) tip.innerHTML = '已下载并解压到：' + escapeHtml(path) + '，正在自动启动…';
@@ -409,6 +421,12 @@
         </div>
       </div>`;
     document.body.appendChild(overlay);
+    // 下载进度条动画（不确定进度，Rust 当前不发进度事件）
+    if(!document.getElementById('recDlStyle')){
+      const s = document.createElement('style'); s.id = 'recDlStyle';
+      s.textContent = '@keyframes recDL{0%{margin-left:-42%}100%{margin-left:100%}}';
+      document.head.appendChild(s);
+    }
     overlay.onclick = (e)=>{ if(e.target===overlay) overlay.style.display='none'; };
     $('recClose').onclick = ()=> overlay.style.display='none';
 
