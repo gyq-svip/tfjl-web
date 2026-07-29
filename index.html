@@ -25685,63 +25685,99 @@ ${maSection}
             loadCurrentNick();
         }
 
-        // 渲染全局用户注册表（usedNicks）
+        // ============== 全局用户注册表（增删改查） ==============
+        // 缓存全量列表：搜索/改名/删除直接复用，避免每次按键都请求 gist
         async function renderNickRegistry() {
             const list = document.getElementById('nickRegistryList');
             if (!list) return;
-            list.innerHTML = '<div style="color:rgba(255,255,255,0.5);font-size:0.8rem;text-align:center;padding:10px;">加载中...</div>';
-            const used = await getUsedNicks();
-            if (!used.length) {
+            const q = (document.getElementById('nickSearchInput') ? document.getElementById('nickSearchInput').value.trim().toLowerCase() : '');
+            if (!window._nickAllUsed) {
+                list.innerHTML = '<div style="color:rgba(255,255,255,0.5);font-size:0.8rem;text-align:center;padding:10px;">加载中...</div>';
+                window._nickAllUsed = await getUsedNicks();
+            }
+            const allUsed = window._nickAllUsed || [];
+            if (!allUsed.length) {
                 list.innerHTML = '<div style="color:rgba(255,255,255,0.5);font-size:0.8rem;text-align:center;padding:10px;">暂无注册用户</div>';
                 return;
             }
+            const used = allUsed.filter(function(n){ return !q || n.toLowerCase().indexOf(q) >= 0; });
+            if (!used.length) {
+                list.innerHTML = '<div style="color:rgba(255,255,255,0.5);font-size:0.8rem;text-align:center;padding:10px;">未找到匹配 "' + escapeHtml(q) + '" 的昵称</div>';
+                return;
+            }
             const cur = localStorage.getItem('TFJL_UserName');
-            let html = '';
+            let html = '<div style="color:rgba(255,255,255,0.4);font-size:0.72rem;margin-bottom:6px;">共 ' + allUsed.length + ' 个用户' + (q ? '，匹配 ' + used.length + ' 个' : '') + '</div>';
             for (let i = 0; i < used.length; i++) {
                 const n = used[i];
                 const isCur = (n === cur);
                 html += '<div style="display:flex;gap:8px;align-items:center;padding:8px;background:rgba(255,255,255,0.05);border-radius:6px;margin-bottom:6px;">'
                     + '<span style="flex:1;color:' + (isCur ? '#ffd700' : '#fff') + ';font-size:0.85rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(n) + (isCur ? '（本机）' : '') + '</span>'
-                    + '<button class="admin-btn admin-btn-secondary" style="padding:4px 10px;font-size:0.75rem;" onclick="adminRenameUser(' + i + ')">重命名</button>'
-                    + '<button class="admin-btn" style="padding:4px 10px;font-size:0.75rem;background:linear-gradient(135deg,#f44336,#d32f2f);" onclick="adminDeleteUser(' + i + ')">删除</button>'
+                    + '<button class="admin-btn admin-btn-secondary" style="padding:4px 10px;font-size:0.75rem;" onclick="adminRenameUser(' + i + ')">改</button>'
+                    + '<button class="admin-btn" style="padding:4px 10px;font-size:0.75rem;background:linear-gradient(135deg,#f44336,#d32f2f);" onclick="adminDeleteUser(' + i + ')">删</button>'
                     + '</div>';
             }
+            window._nickRegistryCache = used;
             list.innerHTML = html;
         }
 
-        // 管理员重命名用户（同步需求墙署名）
-        async function adminRenameUser(idx) {
+        // 管理员新增用户（保留昵称，防止他人注册）
+        async function adminAddUser() {
+            const v = prompt('新增昵称（将保留该昵称，他人不可注册）：');
+            if (!v) return;
+            const name = v.trim();
+            if (name.length < 2) { alert('昵称至少 2 个字'); return; }
             const used = await getUsedNicks();
-            const oldName = used[idx];
+            if (used.includes(name)) { alert('昵称 "' + name + '" 已存在'); return; }
+            if (!confirm('确定新增昵称 "' + name + '"？')) return;
+            used.push(name);
+            const ok = await saveUsedNicks(used);
+            if (!ok) { alert('保存失败，请确认是否已登录且有写入权限'); return; }
+            window._nickAllUsed = used;
+            renderNickRegistry();
+            showAdminStatus('已新增昵称 "' + name + '"', 'success');
+        }
+
+        // 管理员重命名用户（同步需求墙署名）
+        async function adminRenameUser(filteredIdx) {
+            const used = window._nickRegistryCache || [];
+            const oldName = used[filteredIdx];
             if (!oldName) return;
+            const full = await getUsedNicks();
+            const idx = full.indexOf(oldName);
+            if (idx < 0) return;
             const newName = prompt('将昵称重命名为：', oldName);
             if (!newName) return;
             const v = newName.trim();
             if (v.length < 2) { alert('昵称至少 2 个字'); return; }
-            if (used.includes(v)) { alert('昵称 "' + v + '" 已被使用'); return; }
+            if (full.includes(v)) { alert('昵称 "' + v + '" 已被使用'); return; }
             if (!confirm('确定将 "' + oldName + '" 重命名为 "' + v + '"？\n需求墙署名也会同步更新。')) return;
-            used[idx] = v;
+            full[idx] = v;
             wallMessages.forEach(function(m) { if (m.author === oldName) m.author = v; });
-            await saveUsedNicks(used);
+            await saveUsedNicks(full);
             await saveMessagesToGist();
+            window._nickAllUsed = full;
             renderMessages();
             renderNickRegistry();
             showAdminStatus('已重命名为 "' + v + '"', 'success');
         }
 
         // 管理员删除用户（昵称释放可重注册；若为本机则清本地设置）
-        async function adminDeleteUser(idx) {
-            const used = await getUsedNicks();
-            const name = used[idx];
+        async function adminDeleteUser(filteredIdx) {
+            const used = window._nickRegistryCache || [];
+            const name = used[filteredIdx];
             if (!name) return;
             if (!confirm('确定删除用户 "' + name + '"？\n删除后该昵称可被他人重新注册。')) return;
-            used.splice(idx, 1);
-            await saveUsedNicks(used);
+            const full = await getUsedNicks();
+            const idx = full.indexOf(name);
+            if (idx < 0) return;
+            full.splice(idx, 1);
+            await saveUsedNicks(full);
             if (localStorage.getItem('TFJL_UserName') === name) {
                 localStorage.removeItem('TFJL_UserName');
                 localStorage.removeItem('TFJL_HasSetNick');
                 loadCurrentNick();
             }
+            window._nickAllUsed = full;
             renderNickRegistry();
             showAdminStatus('已删除用户 "' + name + '"', 'success');
         }
@@ -27508,10 +27544,14 @@ ${maSection}
                 <div class="admin-section" style="margin-top:15px;">
                     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
                         <h4 style="color:#4ecdc4;margin:0;font-size:0.9rem;">🌐 全局用户注册表（唯一用户）</h4>
-                        <button class="admin-btn admin-btn-secondary" onclick="renderNickRegistry()">🔄 刷新</button>
+                        <button class="admin-btn admin-btn-secondary" onclick="window._nickAllUsed=null;renderNickRegistry()">🔄 刷新</button>
                     </div>
-                    <div style="color:rgba(255,255,255,0.5);font-size:0.72rem;margin-bottom:10px;">可在此删除或重命名用户（重命名会同步更新其在需求墙的发言/分享署名）。</div>
-                    <div id="nickRegistryList" style="max-height:280px;overflow-y:auto;"></div>
+                    <div style="display:flex;gap:8px;margin-bottom:10px;">
+                        <input type="text" id="nickSearchInput" placeholder="🔍 搜索昵称..." oninput="renderNickRegistry()" style="flex:1;padding:8px;border-radius:6px;border:1px solid rgba(255,255,255,0.25);background:rgba(0,0,0,0.4);color:white;font-size:0.8rem;outline:none;">
+                        <button class="admin-btn" style="background:linear-gradient(135deg,#4caf50,#2e7d32);padding:8px 14px;font-size:0.8rem;white-space:nowrap;" onclick="adminAddUser()">➕ 新增</button>
+                    </div>
+                    <div style="color:rgba(255,255,255,0.5);font-size:0.72rem;margin-bottom:10px;">可在此 <strong style="color:#4ecdc4;">增 / 删 / 改 / 查</strong> 用户：搜索框按昵称过滤；「改」会同步更新需求墙发言与分享署名；「删」释放昵称可被他人重注册。本机昵称重置见上方「重置设置」。</div>
+                    <div id="nickRegistryList" style="max-height:300px;overflow-y:auto;"></div>
                 </div>
             </div>
         </div>
@@ -28008,7 +28048,7 @@ ${maSection}
         </style>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260730-08</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260730-09</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
