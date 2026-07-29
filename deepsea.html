@@ -481,6 +481,52 @@ async function importRankingsFromDisk(record){
         toast('读取失败：'+e.message+'。可手动选 JSON 文件');
     }
 }
+// ===== 智能表头识别：顺序无关 / 多别名 / 容错 =====
+// 字段语义 → 候选表头别名（越靠前优先级越高；先精确后模糊）
+const XLSX_FIELD_ALIASES = {
+    '排名':     ['排名','总排名','名次','排行','序号','位次','排行名次'],
+    '所属阵营': ['所属阵营','阵营','阵营名','势力','派系','所属势力'],
+    '联盟名称': ['联盟名称','联盟名','公会名','公会','联盟名稱','公会名稱','公會名','公會','联盟'],
+    '联盟ID':   ['联盟id','联盟id','联盟编号','公会id','公会编号','id'],
+    '会长':     ['会长','盟主','首领','会长名','盟主名','公会会长','老大'],
+    '人数':     ['人数','成员数','成员','联盟人数','在线人数','总人数','人数上限','人数/上限'],
+    '联盟等级': ['联盟等级','等级','公会等级','lv','lv.'],
+    '联盟战力': ['联盟战力','战力','总战力','公会战力','战斗力','联盟戰力','总戰力']
+};
+// 归一化表头：去空白/标点/全角，转小写，便于比较
+function normHeader(h){
+    return String(h==null?'':h)
+        .replace(/[\s　]/g,'')
+        .replace(/[．.。·]/g,'')
+        .replace(/[（）()\[\]【】]/g,'')
+        .replace(/[，,、]/g,'')
+        .toLowerCase();
+}
+// 返回 { 字段: 列索引 }，顺序无关；先精确匹配，再模糊子串匹配，避免一列被多字段抢占
+function buildXlsxFieldMap(headers){
+    const norm = headers.map(normHeader);
+    const map = {}; const used = {};
+    // 第一轮：归一化精确相等（最具体，避免被宽泛别名抢列）
+    for(const field in XLSX_FIELD_ALIASES){
+        if(map[field]!==undefined) continue;
+        for(const alias of XLSX_FIELD_ALIASES[field]){
+            const ci = norm.findIndex((h,i)=> !used[i] && h && h===normHeader(alias));
+            if(ci>=0){ map[field]=ci; used[ci]=true; break; }
+        }
+    }
+    // 第二轮：模糊包含（别名长度>=2 且表头包含别名），兼容简写/顺序颠倒
+    for(const field in XLSX_FIELD_ALIASES){
+        if(map[field]!==undefined) continue;
+        for(const alias of XLSX_FIELD_ALIASES[field]){
+            const na = normHeader(alias);
+            if(na.length<2) continue;
+            const ci = norm.findIndex((h,i)=> !used[i] && h && h.includes(na));
+            if(ci>=0){ map[field]=ci; used[ci]=true; break; }
+        }
+    }
+    return map;
+}
+
 // 一键导入 xlsx（你拿到"四大阵营联盟实力前50汇总.xlsx"直接选，自动解析生成排行）
 async function importRankingsXlsx(event){
     const f = event.target.files[0]; if(!f) return;
@@ -504,25 +550,31 @@ async function importRankingsXlsx(event){
         }
         if(!totalName){ toast('未找到含排行数据的工作表'); return; }
         const rows = XLSX.utils.sheet_to_json(wb.Sheets[totalName], {header:1, defval:''});
-        const headers = (rows[0]||[]).map(h=>String(h).trim());
-        const FIELDS=['排名','所属阵营','联盟名称','联盟ID','会长','人数','联盟等级','联盟战力'];
-        const idx={};
-        FIELDS.forEach(fld=>{ idx[fld]=headers.findIndex(h=>h===fld || h.includes(fld)); });
-        if(idx['排名']<0 || idx['联盟名称']<0){ toast('表格列头不匹配（需含 排名/联盟名称 等列）'); return; }
+        // —— 智能表头：自动定位表头行 + 按语义匹配列（顺序无关 / 容错）——
+        let headerRowIdx = 0, headers = [], colMap = {};
+        for(let i=0;i<Math.min(rows.length,6);i++){
+            const h = (rows[i]||[]).map(x=>String(x==null?'':x).trim());
+            const m = buildXlsxFieldMap(h);
+            if(m['联盟名称']>=0 || m['排名']>=0){ headerRowIdx=i; headers=h; colMap=m; break; }
+        }
+        if(!headers.length || colMap['联盟名称']<0){
+            toast('未识别到表头（需含 联盟名称/排名 等列，列顺序不要求固定）'); return;
+        }
+        if(window.console) console.log('[XLSX] 表头行#'+headerRowIdx+' 列映射=', colMap, '表头=', headers.join(' | '));
         const list=[];
-        rows.slice(1).forEach(r=>{
+        rows.slice(headerRowIdx+1).forEach((r, ri)=>{
             if(!r || r.every(c=>!c && c!==0)) return;
-            const name = r[idx['联盟名称']];
-            if(name==null || name==='') return;
+            const nm = colMap['联盟名称']>=0 ? r[colMap['联盟名称']] : null;
+            if(nm==null || String(nm).trim()==='') return;
             list.push({
-                排名: parseNum(r[idx['排名']]),
-                所属阵营: idx['所属阵营']>=0 ? (r[idx['所属阵营']]??'') : '',
-                联盟名称: String(name),
-                联盟ID: parseNum(r[idx['联盟ID']]),
-                会长: idx['会长']>=0 ? (r[idx['会长']]??'') : '',
-                人数: idx['人数']>=0 ? (r[idx['人数']]??'') : '',
-                联盟等级: idx['联盟等级']>=0 ? (r[idx['联盟等级']]??'') : '',
-                联盟战力: parseNum(r[idx['联盟战力']])
+                排名:      colMap['排名']>=0      ? parseNum(r[colMap['排名']])      : (ri+1),
+                所属阵营:  colMap['所属阵营']>=0  ? (r[colMap['所属阵营']]??'')       : '',
+                联盟名称:  String(nm).trim(),
+                联盟ID:    colMap['联盟ID']>=0    ? parseNum(r[colMap['联盟ID']])    : '',
+                会长:      colMap['会长']>=0      ? (r[colMap['会长']]??'')          : '',
+                人数:      colMap['人数']>=0      ? (r[colMap['人数']]??'')          : '',
+                联盟等级:  colMap['联盟等级']>=0  ? (r[colMap['联盟等级']]??'')       : '',
+                联盟战力:  colMap['联盟战力']>=0  ? parseNum(r[colMap['联盟战力']])  : 0
             });
         });
         if(!list.length){ toast('未解析到任何联盟数据'); return; }
