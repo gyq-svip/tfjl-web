@@ -17334,10 +17334,47 @@
             }
         }
         
+        // 减伤数据 D 盘持久化路径（与 deepsea-rankings.json 同目录），避免 WebView2 缓存失效导致丢失
+        const DAMAGE_REDUCTION_FILE = 'D:\\withfriends\\塔防精灵助手数据\\data\\damageReduction.json';
+
         // 保存减伤数据
         function saveDamageReductionData() {
             localStorage.setItem('tdjl_damageReduction', JSON.stringify(damageReductionData));
             localStorage.setItem('tdjl_specialDamageReduction', JSON.stringify(specialDamageReduction));
+            // APP 环境：额外写入 D 盘文件作为可靠真相源；网页版无 window.__TAURI__，仅用 localStorage
+            persistDamageReductionToDisk();
+        }
+
+        // APP 下异步把减伤数据写入 D 盘（失败静默，不阻塞）
+        function persistDamageReductionToDisk() {
+            const T = window.__TAURI__ || window.__TAURI_INTERNALS__;
+            const invoke = T && (T.core && T.core.invoke || T.invoke);
+            if (!invoke) return;
+            try {
+                invoke('write_text_file', { filePath: DAMAGE_REDUCTION_FILE, content: JSON.stringify({ damageReductionData, specialDamageReduction }) });
+            } catch (e) { /* 忽略写入异常 */ }
+        }
+
+        // APP 启动/初始化时：从 D 盘恢复减伤数据并写回 localStorage，确保缓存失效后也不丢
+        async function loadDamageReductionFromDisk() {
+            const T = window.__TAURI__ || window.__TAURI_INTERNALS__;
+            const invoke = T && (T.core && T.core.invoke || T.invoke);
+            if (!invoke) return;
+            try {
+                const txt = await invoke('read_text_file_auto', { path: DAMAGE_REDUCTION_FILE });
+                const json = JSON.parse(txt);
+                if (json && typeof json === 'object') {
+                    if (json.damageReductionData && typeof json.damageReductionData === 'object') {
+                        damageReductionData = json.damageReductionData;
+                        localStorage.setItem('tdjl_damageReduction', JSON.stringify(damageReductionData));
+                    }
+                    if (json.specialDamageReduction && typeof json.specialDamageReduction === 'object') {
+                        specialDamageReduction = json.specialDamageReduction;
+                        localStorage.setItem('tdjl_specialDamageReduction', JSON.stringify(specialDamageReduction));
+                    }
+                    updateDamageReductionDisplay();
+                }
+            } catch (e) { /* 文件不存在或解析失败则忽略 */ }
         }
         
         // 显示减伤记录弹窗
@@ -18691,7 +18728,8 @@
             loadCustomSkinAttributes();
             loadCustomCards();
             loadFavorites();
-            loadDamageReductionData(); // 加载减伤数据
+            loadDamageReductionData(); // 加载减伤数据（localStorage）
+            loadDamageReductionFromDisk(); // APP 下额外从 D 盘恢复（缓存失效保护）
             setupAddCardButtons();
             setupCardSortDrag();
             updateTxtFilesList();
@@ -27259,7 +27297,7 @@ ${maSection}
         </style>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260729-41</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260729-42</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
