@@ -741,39 +741,52 @@ async function recognizeCurrent(){
       return;
     }
   }
-  await loadTplRefs();
-  await loadNameTpls();
-  await loadCardTpls();
+  // 仅在 Tesseract 引擎下加载模板底图；Umi-OCR 原文已全对，无需模板，跳过以提速
+  const useTpl = (engine==='tesseract');
+  if(useTpl){
+    await loadTplRefs();
+    await loadNameTpls();
+    await loadCardTpls();
+  }
   const boxes = computeBoxes();
   lastBoxes = boxes;
   const ns=+$('nameStrip').value/100, pt=+$('pTop').value/100;
   const results=[];
   for(let i=0;i<boxes.length;i++){
     const b=boxes[i];
-    // OCR：卡名条区域（卡牌顶部）放大 4 倍 + 多通道/饱和度二值化 + 白名单
+    // OCR：卡名条区域（卡牌顶部）放大 4 倍
     const nameC = cropRegion(b.x, b.y, b.w, b.h*ns, 4);
-    let raw='';
+    let raw='', ocr, tpl, nameTpl, cardTpl, comb;
     if(engine==='umi'){
+      // —— Umi-OCR 路径：原文已全对，跳过三套模板，直接采信 OCR 原文→库名 ——
       try { raw = await umiOcrCanvas(nameC); }
       catch(e){ log('[Umi] '+e.message); raw=''; }
+      ocr = matchHero(raw);
+      tpl = {hero:null, mae:NaN};
+      nameTpl = {hero:null, iou:NaN};
+      cardTpl = {hero:null, mae:NaN};
+      comb = ocr.hero || null;
     } else {
       raw = await ocrTextBest(nameC);
+      ocr = matchHero(raw);
+      // 模板：头像区（去顶部卡名条，去底部留白）
+      const portY = b.y + b.h*ns;
+      const portH = b.h*(1-ns-pt);
+      const portC = cropRegion(b.x, portY, b.w, portH, 1);
+      const gray = toGray(portC, TPL_SIZE);
+      tpl = tplMatch(gray);
+      // ③ 卡名模板匹配（老马 卡牌名称 字条）
+      nameTpl = await matchNameStrip(nameC);
+      // ④ 整卡模板匹配（老马 快速手牌 整卡图）
+      const cardC = cropRegion(b.x, b.y, b.w, b.h, 1);
+      cardTpl = matchCardTpl(cardC);
+      comb = combinedPick(ocr, tpl, nameTpl, cardTpl);
     }
-    const ocr = matchHero(raw);
-    // 模板：头像区（去顶部卡名条，去底部留白）
-    const portY = b.y + b.h*ns;
-    const portH = b.h*(1-ns-pt);
-    const portC = cropRegion(b.x, portY, b.w, portH, 1);
-    const gray = toGray(portC, TPL_SIZE);
-    const tpl = tplMatch(gray);
-    // ③ 卡名模板匹配（老马 卡牌名称 字条）
-    const nameTpl = await matchNameStrip(nameC);
-    // ④ 整卡模板匹配（老马 快速手牌 整卡图）
-    const cardC = cropRegion(b.x, b.y, b.w, b.h, 1);
-    const cardTpl = matchCardTpl(cardC);
-    const comb = combinedPick(ocr, tpl, nameTpl, cardTpl);
     results.push({raw, ocr, tpl, nameTpl, cardTpl, comb});
-    log(`[${i+1}] OCR=${ocr.hero||'×'}(${ocr.score.toFixed(2)}) | 头像=${tpl.hero||'×'}(mae=${tpl.mae.toFixed(3)}) | 卡名=${nameTpl.hero||'×'}(IoU=${nameTpl.iou.toFixed(2)}) | 整卡=${cardTpl.hero||'×'}(mae=${cardTpl.mae.toFixed(3)}) | 综合=${comb||'×'}`);
+    const tail = engine==='umi'
+      ? ' [跳过模板]'
+      : ` | 头像=${tpl.hero||'×'}(mae=${tpl.mae.toFixed(3)}) | 卡名=${nameTpl.hero||'×'}(IoU=${nameTpl.iou.toFixed(2)}) | 整卡=${cardTpl.hero||'×'}(mae=${cardTpl.mae.toFixed(3)})`;
+    log(`[${i+1}] OCR=${ocr.hero||'×'}(${ocr.score.toFixed(2)})${tail} | 综合=${comb||'×'}`);
   }
   lastResults = results;
   renderResultTable(results);
@@ -789,9 +802,9 @@ function renderResultTable(results){
       <td>${i+1}</td>
       <td>${r.raw.replace(/\n/g,' ').slice(0,12)||'—'}</td>
       <td>${r.ocr.hero||'×'}<br><span class="muted">${r.ocr.method}/${r.ocr.score.toFixed(2)}</span></td>
-      <td>${r.tpl.hero||'×'}<br><span class="muted">mae ${r.tpl.mae.toFixed(3)}</span></td>
-      <td>${r.nameTpl.hero||'×'}<br><span class="muted">IoU ${r.nameTpl.iou.toFixed(2)}</span></td>
-      <td>${r.cardTpl.hero||'×'}<br><span class="muted">mae ${r.cardTpl.mae.toFixed(3)}</span></td>
+      <td>${r.tpl.hero||'×'}<br><span class="muted">mae ${isNaN(r.tpl.mae)?'—':r.tpl.mae.toFixed(3)}</span></td>
+      <td>${r.nameTpl.hero||'×'}<br><span class="muted">IoU ${isNaN(r.nameTpl.iou)?'—':r.nameTpl.iou.toFixed(2)}</span></td>
+      <td>${r.cardTpl.hero||'×'}<br><span class="muted">mae ${isNaN(r.cardTpl.mae)?'—':r.cardTpl.mae.toFixed(3)}</span></td>
       <td><b>${r.comb||'×'}</b></td>
       <td><input type="text" class="truth" placeholder="库名" value=""></td>`;
     tb.appendChild(tr);
