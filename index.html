@@ -5675,7 +5675,36 @@
         let _currentUpdate = null;      // Tauri Update 对象
         let _currentDownload = null;    // Promise（resolve = 下载完成，reject = 下载失败）
         let _downloadProgress = 0;      // 0-100
+        let _downloadSucceeded = false; // 下载是否真的成功完成
         let _updateVersion = null;      // 检测到的新版本号
+
+        function _resetUpdateState() {
+            _currentUpdate = null;
+            _currentDownload = null;
+            _downloadProgress = 0;
+            _downloadSucceeded = false;
+        }
+
+        function _markDownloadSuccess() {
+            _currentDownload = null;
+            _downloadSucceeded = true;
+        }
+
+        // 用系统默认浏览器打开 URL（APP 内 WebView 拦截 target=_blank）
+        async function openUrl(url) {
+            if (!url) return;
+            const isTauri = !!(window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke);
+            if (isTauri) {
+                try {
+                    const invokeFn = window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke;
+                    await invokeFn('open_url', { url: url });
+                    return;
+                } catch (e) {
+                    console.warn('[openUrl] open_url 命令失败，回退 window.open:', e);
+                }
+            }
+            window.open(url, '_blank');
+        }
 
         // 运行时填充当前版本号（桌面版从 Tauri 取，在线版保持「网页版」）
         async function fillCurrentVersion() {
@@ -5856,10 +5885,9 @@
             await fillCurrentVersion();
 
             // —— 1. 启动时已后台预下载完成？秒装 ——
-            if (_currentUpdate && !_currentDownload) {
+            if (_currentUpdate && _downloadSucceeded && !_currentDownload) {
                 const t = showLoadingToast('⚡ 已缓存，正在安装 v' + _updateVersion + '...');
                 try {
-                    // 如果 download() 支持分离，需再次 install（因为可能还没 install）
                     if (typeof _currentUpdate.install === 'function') {
                         await _currentUpdate.install();
                     }
@@ -5873,15 +5901,14 @@
                     console.warn('[updater] 安装已下载包失败:', e);
                     t.error('⚠️ 安装失败: ' + (e.message || e));
                     t.remove(3000);
-                    _currentUpdate = null; _currentDownload = null;
-                    return;  // 安装失败直接返回，不再触发第二次安装
+                    _resetUpdateState();
+                    return;
                 }
             }
 
             // —— 2. 启动时还在后台下载中？等待完成 ——
             if (_currentDownload) {
                 const t = showLoadingToast('📥 后台下载中 ' + _downloadProgress + '%');
-                // 轮询等待下载完成（最多等 5 分钟）
                 const start = Date.now();
                 let lastPct = _downloadProgress;
                 while (_currentDownload && Date.now() - start < 300000) {
@@ -5891,8 +5918,7 @@
                         t.update('📥 下载中 ' + lastPct + '%');
                     }
                 }
-                if (!_currentDownload) {
-                    // 下载完成，安装
+                if (!_currentDownload && _downloadSucceeded) {
                     try {
                         t.update('📦 正在安装 v' + _updateVersion + '...');
                         if (_currentUpdate && typeof _currentUpdate.install === 'function') {
@@ -5907,9 +5933,12 @@
                     } catch (e) {
                         t.error('⚠️ 安装失败，请重试');
                         t.remove(2500);
+                        _resetUpdateState();
                         return;
                     }
                 }
+                // 等到的结果是失败，清空状态继续走下方完整流程重试
+                _resetUpdateState();
             }
 
             // —— 3. 正常流程：检查 → 下载（带进度） → 安装 ——
@@ -5924,7 +5953,6 @@
                             _updateVersion = update.version || CURRENT_VERSION;
                             _currentUpdate = update;
 
-                            // 使用 download() 分离下载和安装，带进度回调
                             if (typeof update.download === 'function') {
                                 let downloadDone = false;
                                 let totalBytes = 0;
@@ -5951,7 +5979,7 @@
                                 });
 
                                 await _currentDownload;
-                                _currentDownload = null;
+                                _markDownloadSuccess();
 
                                 t.update('📦 正在安装...');
                                 await update.install();
@@ -5974,6 +6002,7 @@
                         return;
                     } catch (e) {
                         console.warn('[updater] 自动更新失败，回退手动检查:', e);
+                        _resetUpdateState();
                     }
                 }
                 // 网页版 / updater 不可用时：检查 version.json
@@ -5988,9 +6017,12 @@
                     if (badge) badge.style.display = 'inline-block';
                     const isTauri = !!(window.__TAURI__ || window.__TAURI_INTERNALS__);
                     if (isTauri) {
-                        // Tauri 自动更新器走到这里说明 updater 失败，不应打开「下载桌面版」弹窗
+                        // Tauri 自动更新器走到这里说明 updater 失败，引导用户手动下载
                         t.error('⚠️ 自动更新失败，请关闭代理后重试，或从 Gitee 手动下载 v' + release.version);
                         t.remove(4000);
+                        setTimeout(() => {
+                            try { openUrl(release.downloadUrl); } catch(e) {}
+                        }, 800);
                     } else {
                         t.success('🎉 发现新版本 v' + release.version + '，即将打开下载...');
                         t.remove(1800);
@@ -6001,6 +6033,8 @@
                     t.remove(2500);
                 }
             } catch (e) {
+                console.warn('[updater] menuCheckUpdate 异常:', e);
+                _resetUpdateState();
                 t.error('⚠️ 检查失败，请稍后重试');
                 t.remove(2800);
             }
@@ -6114,7 +6148,7 @@
                             });
 
                             await _currentDownload;
-                            _currentDownload = null;
+                            _markDownloadSuccess();
                             // 下载完成，显示通知
                             _notifyPreDownloadReady();
                             return;
@@ -6124,6 +6158,7 @@
                         return;
                     } catch (e) {
                         console.warn('[auto-update] Tauri updater 后台预下载失败:', e);
+                        _resetUpdateState();
                     }
                 }
 
@@ -27340,7 +27375,7 @@ ${maSection}
         </style>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260729-45</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260729-46</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
