@@ -37,6 +37,53 @@
     throw new Error('Tauri 不可用');
   }
 
+  // ====================== Umi-OCR 离线引擎探测 + 安装提示 ======================
+  // 官方下载（建议装 Paddle 版，精度最高）：https://github.com/hiroi-sora/Umi-OCR/releases
+  const UMI_OCR_DOWNLOAD = 'https://github.com/hiroi-sora/Umi-OCR/releases';
+  // 1x1 透明 PNG，仅用于探测服务是否可达（不真正识别）
+  const TINY_PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+
+  // 返回 true=已连接 / false=未安装或未启动 / null=非 APP 环境（不提示）
+  async function checkUmiOcrAvailable(){
+    if(!isTauri()) return null;
+    try{
+      await tauriInvoke('umi_ocr', {
+        base64: TINY_PNG.split(',')[1],
+        options: { data:{format:'dict'}, ocr:{language:'models/config_chinese.txt', cls:true} }
+      });
+      return true; // 能连通（哪怕识别结果为空，也算服务在跑）
+    }catch(e){
+      const msg = ((e && (e.message || e)) + '') || '';
+      // reqwest 连接被拒 / 超时 = Umi-OCR 未启动
+      if(/请求 Umi-OCR 失败|error sending request|connection|refused|timed out|无法连接/i.test(msg)) return false;
+      return true; // 其他错误（如图片太小）视为服务在跑
+    }
+  }
+
+  function showUmiTip(){
+    const tip = $('recUmiTip');
+    if(!tip) return;
+    tip.style.display = 'block';
+    tip.style.background = 'rgba(255,167,38,0.15)';
+    tip.style.color = '#ffb74d';
+    tip.innerHTML = '检测本机 Umi-OCR 中…';
+    checkUmiOcrAvailable().then(av=>{
+      if(av === true){
+        tip.style.background = 'rgba(76,175,80,0.15)';
+        tip.style.color = '#81c784';
+        tip.innerHTML = '✅ 已连接本机 Umi-OCR（离线精准识别）';
+      } else if(av === false){
+        tip.style.background = 'rgba(255,167,38,0.15)';
+        tip.style.color = '#ffb74d';
+        tip.innerHTML = '⚠️ 未检测到本机 Umi-OCR 离线识别引擎。'
+          + '<a href="'+UMI_OCR_DOWNLOAD+'" target="_blank" rel="noopener" style="color:#4fc3f7;text-decoration:underline;margin:0 4px;">点击下载安装</a>'
+          + '（建议选 Paddle 版）后保持后台运行即可获得精准识别；不安装也能用（联网云端识别，精度略低）。';
+      } else {
+        tip.style.display = 'none'; // 浏览器环境不提示安装
+      }
+    });
+  }
+
   // ====================== OCR 原文 → 库名 ======================
   function matchHero(raw){
     let t = norm(raw);
@@ -201,6 +248,7 @@
           <span id="recStatus" class="hint" style="font-size:0.8rem;color:#aaa;"></span>
           <span style="cursor:pointer;font-size:1.3rem;padding:0 6px;" id="recClose">✕</span>
         </div>
+        <div id="recUmiTip" style="display:none;font-size:0.78rem;margin-bottom:10px;padding:7px 10px;border-radius:8px;line-height:1.5;"></div>
         <div style="display:flex;gap:14px;flex-wrap:wrap;">
           <div style="flex:1;min-width:280px;">
             <div style="margin-bottom:8px;">
@@ -279,7 +327,7 @@
     };
   }
 
-  function openModal(){ const o=$('recognizeOverlay'); if(o) o.style.display='flex'; }
+  function openModal(){ const o=$('recognizeOverlay'); if(o) o.style.display='flex'; showUmiTip(); }
 
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', buildUI);
   else buildUI();
