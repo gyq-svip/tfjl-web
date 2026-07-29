@@ -69,7 +69,7 @@
   <h3>① 载入截图（可多选批量）</h3>
   <div class="row">
     <input type="file" id="imgInput" accept="image/*" multiple>
-    <span class="hint">支持多张，逐张识别并累计准确率</span>
+    <span class="hint">支持多张批量；也可直接 <b>Ctrl+V 粘贴截图</b>（截图后无需保存）</span>
   </div>
   <div class="row">
     <label>OCR 资源目录（与 tfjl.dat 同目录的 tessdata，已离线放好）：</label>
@@ -398,16 +398,33 @@ function loadImageFile(file){
   });
 }
 
+// 载入一张图片为当前 boardImg（共用：文件选择 / 粘贴）
+async function loadBoardImage(file, label){
+  $('reconBtn').disabled=false; $('reconAllBtn').disabled=false; $('autoBtn').disabled=false;
+  lastAutoBoxes=[];
+  boardImg = await loadImageFile(file);
+  drawBoard();
+  $('status').textContent = `已载入：${label||file.name||'图片'} (${boardImg.naturalWidth}×${boardImg.naturalHeight})`;
+  log(`[载入] ${label||file.name} (${boardImg.naturalWidth}x${boardImg.naturalHeight})`);
+}
+
 $('imgInput').addEventListener('change', async e=>{
   boardFiles = Array.from(e.target.files||[]);
   if(!boardFiles.length) return;
   boardIdx=0;
-  $('reconBtn').disabled=false; $('reconAllBtn').disabled=false; $('autoBtn').disabled=false;
-  lastAutoBoxes=[];
-  boardImg = await loadImageFile(boardFiles[0]);
-  drawBoard();
-  $('status').textContent = `已载入第 1/${boardFiles.length} 张：${boardFiles[0].name}`;
-  log(`[载入] ${boardFiles[0].name} (${boardImg.naturalWidth}x${boardImg.naturalHeight})`);
+  await loadBoardImage(boardFiles[0], `第 1/${boardFiles.length} 张：${boardFiles[0].name}`);
+});
+
+// Ctrl+V 粘贴截图：直接载入剪贴板里的图片，无需先保存成文件
+document.addEventListener('paste', e=>{
+  const items = e.clipboardData && e.clipboardData.items;
+  if(!items) return;
+  for(const it of items){
+    if(it.type && it.type.startsWith('image/')){
+      const file = it.getAsFile();
+      if(file){ e.preventDefault(); boardFiles=[file]; boardIdx=0; loadBoardImage(file, '粘贴图片'); break; }
+    }
+  }
 });
 
 // 裁剪区域到离屏 canvas（可放大 scale 提升 OCR）
