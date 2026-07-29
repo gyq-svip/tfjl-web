@@ -96,6 +96,16 @@
     <button id="reconAllBtn" disabled>▶▶ 批量识别全部</button>
     <span id="status" class="hint"></span>
   </div>
+  <div class="row">
+    <label>OCR 引擎
+      <select id="ocrEngine">
+        <option value="tesseract">Tesseract.js（浏览器内离线）</option>
+        <option value="umi">Umi-OCR（本地服务·更准）</option>
+      </select>
+    </label>
+    <span id="umiStatus" class="hint"></span>
+    <button id="retryUmiBtn">重试检测</button>
+  </div>
 </div>
 
 <div id="stage">
@@ -132,6 +142,18 @@
     <label style="margin-left:8px;font-size:12px;">命中阈值 <input id="lineupThresh" type="number" value="30" min="0" max="100" style="width:52px;">%</label>
   </div>
   <div id="lineupResult" style="margin-top:8px;"></div>
+</div>
+
+<!-- ⑤ 通用图片转文字（Umi-OCR 本地·更准） -->
+<div class="panel">
+  <h3>⑤ 通用图片转文字（Umi-OCR 本地·更准）</h3>
+  <div class="hint">任意图片（截图/文档/卡牌）丢进来即转文字，全部走本地 Umi-OCR，不出本机。若"OCR 引擎"选 Tesseract.js，则走浏览器内识别（中文较弱）。</div>
+  <div class="row">
+    <input type="file" id="genInput" accept="image/*">
+    <button id="genBtn" class="primary">识别图片文字</button>
+    <span id="genStatus" class="hint"></span>
+  </div>
+  <textarea id="genOut" spellcheck="false" style="width:100%;height:160px;font-size:13px;white-space:pre-wrap;"></textarea>
 </div>
 
 <details>
@@ -211,6 +233,37 @@ async function applyWhitelist(){
 buildWhitelist();
 $('applyDictBtn').addEventListener('click', applyDict);
 $('heroList').value = DEFAULT_HEROES.join('\n');
+
+// ====================== Umi-OCR 本地服务（同源代理 /umi-ocr → 127.0.0.1:1224） ======================
+let UMI_OK = false;
+async function checkUmi(){
+  try{
+    const r = await fetch('/umi-options', {cache:'no-store'});
+    UMI_OK = r.ok;
+    const el = $('umiStatus');
+    if(UMI_OK){ el.innerHTML = '<span class="ok">✅ Umi-OCR 已连接(127.0.0.1:1224)</span>'; }
+    else { el.innerHTML = '<span class="warn">⚠ 未检测到 Umi-OCR 本地服务</span>'; }
+  }catch(e){ UMI_OK=false; $('umiStatus').innerHTML='<span class="warn">⚠ 未检测到 Umi-OCR 本地服务</span>'; }
+  return UMI_OK;
+}
+async function umiOcrCanvas(canvas){
+  const dataUrl = canvas.toDataURL('image/png');
+  const b64 = dataUrl.split(',')[1];
+  const resp = await fetch('/umi-ocr', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({base64:b64, options:{data:{format:'text'}, ocr:{language:'models/config_chinese.txt', cls:true}}})});
+  const j = await resp.json();
+  if(j.code===100){ return (typeof j.data==='string') ? j.data.replace(/\s+/g,' ').trim() : (j.data||[]).map(x=>x.text).join(' ').trim(); }
+  if(j.code===101) return '';
+  throw new Error('Umi-OCR 识别失败: ' + (j.data || '未知'));
+}
+async function umiOcrFile(file){
+  const dataUrl = await new Promise(res=>{ const fr=new FileReader(); fr.onload=()=>res(fr.result); fr.readAsDataURL(file); });
+  const b64 = dataUrl.split(',')[1];
+  const resp = await fetch('/umi-ocr', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({base64:b64, options:{data:{format:'text'}, ocr:{language:'models/config_chinese.txt', cls:true}}})});
+  const j = await resp.json();
+  if(j.code===100){ return (typeof j.data==='string') ? j.data : (j.data||[]).map(x=>x.text).join('\n'); }
+  if(j.code===101) return '';
+  throw new Error('Umi-OCR 识别失败: ' + (j.data || '未知'));
+}
 
 // 编辑距离
 function lev(a,b){
@@ -677,8 +730,17 @@ function combinedPick(ocr, tpl, nameTpl, cardTpl){
 
 async function recognizeCurrent(){
   if(!boardImg) return;
-  await ensureWorker();
-  await applyWhitelist();
+  const engine = $('ocrEngine').value;
+  if(engine==='tesseract'){
+    await ensureWorker();
+    await applyWhitelist();
+  } else {
+    if(!UMI_OK){ await checkUmi(); }
+    if(!UMI_OK){
+      alert('未检测到 Umi-OCR 本地服务。请先启动 Umi-OCR（D:\\withfriends\\Umi-OCR\\app\\Umi-OCR_Paddle_v2.1.5\\Umi-OCR.exe），或把"OCR 引擎"切回 Tesseract.js。');
+      return;
+    }
+  }
   await loadTplRefs();
   await loadNameTpls();
   await loadCardTpls();
@@ -690,7 +752,13 @@ async function recognizeCurrent(){
     const b=boxes[i];
     // OCR：卡名条区域（卡牌顶部）放大 4 倍 + 多通道/饱和度二值化 + 白名单
     const nameC = cropRegion(b.x, b.y, b.w, b.h*ns, 4);
-    const raw = await ocrTextBest(nameC);
+    let raw='';
+    if(engine==='umi'){
+      try { raw = await umiOcrCanvas(nameC); }
+      catch(e){ log('[Umi] '+e.message); raw=''; }
+    } else {
+      raw = await ocrTextBest(nameC);
+    }
     const ocr = matchHero(raw);
     // 模板：头像区（去顶部卡名条，去底部留白）
     const portY = b.y + b.h*ns;
@@ -797,11 +865,38 @@ if(location.protocol==='http:' || location.protocol==='https:'){
 }
 log('就绪。请通过本地服务器打开本页（双击 tools/start.bat 后访问 http://localhost:8765/tools/ai-recognize-test.html），OCR 资源与模板底图均走同源 http，识别才能正常初始化。');
 
+// ====================== ⑤ 通用图片转文字工具 ======================
+$('genBtn').addEventListener('click', async ()=>{
+  const f = $('genInput').files[0];
+  if(!f){ $('genStatus').textContent='请先选择图片'; return; }
+  const engine = $('ocrEngine').value;
+  $('genStatus').textContent='识别中…';
+  try{
+    let text='';
+    if(engine==='umi'){
+      if(!UMI_OK){ await checkUmi(); }
+      if(!UMI_OK){ $('genStatus').textContent='未检测到 Umi-OCR，请先启动或切回 Tesseract.js'; return; }
+      text = await umiOcrFile(f);
+    } else {
+      await ensureWorker(); await applyWhitelist();
+      const img = await loadImageFile(f);
+      const cv = document.createElement('canvas'); cv.width=img.naturalWidth; cv.height=img.naturalHeight;
+      cv.getContext('2d').drawImage(img,0,0);
+      const { data } = await worker.recognize(cv);
+      text = data.text || '';
+    }
+    $('genOut').value = text;
+    $('genStatus').textContent='完成（'+text.length+' 字）';
+  }catch(e){ $('genStatus').textContent='失败：'+e.message; }
+});
+
 // ====================== ④ 阵容匹配：按钮与启动加载 ======================
 $('btnMatchLineup').addEventListener('click', matchLineups);
 $('btnSaveLineup').addEventListener('click', saveLineup);
+$('retryUmiBtn').addEventListener('click', checkUmi);
 loadGameHeroes();   // 选项A：用游戏卡名表(224名)覆盖 OCR 白名单
 loadLineups();      // 载入游戏预设阵容 + 用户自己的参考库
+checkUmi();         // 启动即检测 Umi-OCR 本地服务
 </script>
 </body>
 </html>
