@@ -6002,8 +6002,11 @@
                         t.remove(2500);
                         return;
                     } catch (e) {
+                        const errMsg = String(e && (e.message || e) || '未知错误');
                         console.warn('[updater] 自动更新失败，回退手动检查:', e);
                         _resetUpdateState();
+                        // 把真实错误暂存，fallback 时展示给用户，而不是一刀切说"代理"
+                        try { window.__tfjlUpdaterError = errMsg; } catch(e2) {}
                     }
                 }
                 // 网页版 / updater 不可用时：检查 version.json
@@ -6019,8 +6022,14 @@
                     const isTauri = !!(window.__TAURI__ || window.__TAURI_INTERNALS__);
                     if (isTauri) {
                         // Tauri 自动更新器走到这里说明 updater 失败，引导用户手动下载
-                        t.error('⚠️ 自动更新失败，请关闭代理后重试，或从 Gitee 手动下载 v' + release.version);
-                        t.remove(4000);
+                        const realErr = window.__tfjlUpdaterError || '';
+                        const isProxyErr = /proxy|127\.0\.0\.1|7890|7897|1080|10809/i.test(realErr);
+                        const shortErr = realErr.length > 60 ? realErr.slice(0, 58) + '...' : realErr;
+                        const msg = isProxyErr
+                            ? '⚠️ 自动更新失败，请关闭代理后重试，或从 Gitee 手动下载 v' + release.version
+                            : '⚠️ 自动更新失败: ' + (shortErr || '更新器异常') + '，请从 Gitee 手动下载 v' + release.version;
+                        t.error(msg);
+                        t.remove(isProxyErr ? 4000 : 5000);
                         setTimeout(() => {
                             try { openUrl(release.downloadUrl); } catch(e) {}
                         }, 800);
@@ -6176,7 +6185,9 @@
                         _notifyNewVersion(newVer);
                         return;
                     } catch (e) {
+                        const errMsg = String(e && (e.message || e) || '未知错误');
                         console.warn('[auto-update] Tauri updater 后台预下载失败:', e);
+                        try { window.__tfjlUpdaterError = errMsg; } catch(e2) {}
                         _resetUpdateState();
                     }
                 }
@@ -27398,7 +27409,7 @@ ${maSection}
         </style>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260729-48</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260729-49</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
