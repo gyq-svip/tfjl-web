@@ -1,11 +1,11 @@
 {
-    "platforms":  {
-                      "windows-x86_64":  {
-                                             "signature":  "ZFc1MGNuVnpkR1ZrSUdOdmJXMWxiblE2SUhOcFoyNWhkSFZ5WlNCbWNtOXRJSFJoZFhKcElITmxZM0psZENCclpYa0tVbFZSZFdKdlEwSnZZalpUU0VaSWNUZHJRM2RXUjFOVk5FWk5WV2xXZEhSaGJrbHxiVWx0WjJSUFFrTnFkME5tZGs1SWVFOWhlV1F4ZWxWTFVHcFROaXRUT0hGMlMxbERkV1pZYVU1RmVXOHdVVlJLTkdsTFRHVktjMGRyY0RjemNGRkZQUXAwY25WemRHVmtJR052YlcxbGJuUTZJSFJwYldWemRHRnRjRG94TnpnMU16UXpNelkwQ1dacGJHVTZkR1pxYkMxaGMzTnBjM1JoYm5SZk1TNHlMalpmZURZMExYTmxkSFZ3TG1WNFpRcDdVekpOWlZST2RqQm9ka2RaV2tGT05FeDViekZrU0hoeU9VSXlkR0ZETHl0UlEzUlJaMDlDWjFwMk1VaExaa1JYSzJnd2FFcEhkbmszTW1abFlVNHJka281YzNsSUwyUnBaM0pqZDFkRFFVdDNUMHRCZHowOUNnPT0=",
-                                             "url":  "https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/releases/download/v1.2.6/tfjl-assistant_1.2.6_x64-setup.exe"
-                                         }
-                  },
-    "notes":  "v1.2.6 修复托盘 + 分享加密加固\n- 修复托盘左键点击不弹菜单导致无法打开/退出的问题（改为左键右键都弹菜单）\n- 分享加密增加 crypto.subtle 降级（WebView 不支持 Web Crypto 时仍能正常加密）\n- 自动更新安装前增加 300ms 等待 + downloadAndInstall 兜底，修复 Update.install called before Update.download\n- 分享成功后弹密码提醒框（带复制按钮），方便把密码转发给接收者",
-    "pub_date":  "2026-07-30T00:45:00+08:00",
-    "version":  "1.2.6"
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRdWJvQ0JvYjZTSEZIcTdrQ3dWR1NVNEZNVWlWdHRhbklxbUltZ2RPQkNqd0Nmdk5IeE9heWQxelVLUGpTNitTOHF2S1lDdWZYaU5FeW8wUVRKNGlLTGVKc0drcDczcFFFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg1MzQzMzY0CWZpbGU6dGZqbC1hc3Npc3RhbnRfMS4yLjZfeDY0LXNldHVwLmV4ZQo1UzJNZVROdjBodkdZWkFONEx5bzFkSHhyOUIydGFDLytRQ3RRZ09CZ1p2MUhLZkRXK2gwaEpHdnk3MmZlYU4rdko5c3lIL2RpZ3Jjd1dDQUt3T0tBdz09Cg==",
+      "url": "https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/releases/download/v1.2.6/tfjl-assistant_1.2.6_x64-setup.exe"
+    }
+  },
+  "notes": "v1.2.6 修复托盘 + 分享加密加固\n- 修复托盘左键点击不弹菜单导致无法打开/退出的问题（改为左键右键都弹菜单）\n- 分享加密增加 crypto.subtle 降级（WebView 不支持 Web Crypto 时仍能正常加密）\n- 自动更新安装前增加 300ms 等待 + downloadAndInstall 兜底，修复 Update.install called before Update.download\n- 分享成功后弹密码提醒框（带复制按钮），方便把密码转发给接收者",
+  "pub_date": "2026-07-30T00:45:00+08:00",
+  "version": "1.2.6"
 }
