@@ -22127,7 +22127,7 @@ function hasGistToken() {
                             `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
                                 <a href="javascript:void(0)" onclick="previewScriptFile('${msg.scriptUrl}'${encInfo2})" style="color:#e0e0e0;text-decoration:underline;cursor:pointer;background:rgba(224,224,224,0.1);padding:4px 10px;border-radius:5px;font-size:0.8rem;">👁️ 预览</a>
                                 <a href="javascript:void(0)" onclick="downloadScript('${msg.scriptUrl}'${encInfo2})" style="color:#4fc3f7;text-decoration:underline;cursor:pointer;background:rgba(79,195,247,0.1);padding:4px 10px;border-radius:5px;font-size:0.8rem;">📥 下载</a>
-                                <a href="javascript:void(0)" onclick="importBackupFromWall('${msg.scriptUrl}')" style="color:#ff9800;text-decoration:underline;cursor:pointer;background:rgba(255,152,0,0.1);padding:4px 10px;border-radius:5px;font-size:0.8rem;">📦 导入备份</a>
+                                <a href="javascript:void(0)" onclick="importBackupFromWall('${msg.scriptUrl}'${encInfo2})" style="color:#ff9800;text-decoration:underline;cursor:pointer;background:rgba(255,152,0,0.1);padding:4px 10px;border-radius:5px;font-size:0.8rem;">📦 导入备份</a>
                             </div>`
                         );
                     } else {
@@ -22138,8 +22138,8 @@ function hasGistToken() {
                             `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
                                 <a href="javascript:void(0)" onclick="previewScriptFile('${msg.scriptUrl}'${encInfo})" style="color:#e0e0e0;text-decoration:underline;cursor:pointer;background:rgba(224,224,224,0.1);padding:4px 10px;border-radius:5px;font-size:0.8rem;">👁️ 预览</a>
                                 <a href="javascript:void(0)" onclick="downloadScript('${msg.scriptUrl}'${encInfo})" style="color:#4fc3f7;text-decoration:underline;cursor:pointer;background:rgba(79,195,247,0.1);padding:4px 10px;border-radius:5px;font-size:0.8rem;">📥 下载</a>
-                                <a href="javascript:void(0)" onclick="importScriptToTxtFiles('${msg.scriptUrl}')" style="color:#4caf50;text-decoration:underline;cursor:pointer;background:rgba(76,175,80,0.1);padding:4px 10px;border-radius:5px;font-size:0.8rem;">📄 智能导入</a>
-                                <a href="javascript:void(0)" onclick="importToLaoMaFromWall('${msg.scriptUrl}','${urlFileName2.replace(/'/g,"\\'")}')" style="color:#ff9800;text-decoration:underline;cursor:pointer;background:rgba(255,152,0,0.1);padding:4px 10px;border-radius:5px;font-size:0.8rem;" id="laoLaoImportBtn_${index}">📁 导入到老马</a>
+                                <a href="javascript:void(0)" onclick="importScriptToTxtFiles('${msg.scriptUrl}'${encInfo})" style="color:#4caf50;text-decoration:underline;cursor:pointer;background:rgba(76,175,80,0.1);padding:4px 10px;border-radius:5px;font-size:0.8rem;">📄 智能导入</a>
+                                <a href="javascript:void(0)" onclick="importToLaoMaFromWall('${msg.scriptUrl}','${urlFileName2.replace(/'/g,"\\'")}'${encInfo})" style="color:#ff9800;text-decoration:underline;cursor:pointer;background:rgba(255,152,0,0.1);padding:4px 10px;border-radius:5px;font-size:0.8rem;" id="laoLaoImportBtn_${index}">📁 导入到老马</a>
                             </div>`
                         );
                     }
@@ -22896,7 +22896,7 @@ ${maSection}
         }
 
         // 从需求墙导入脚本到脚本文件
-        async function importScriptToTxtFiles(url) {
+        async function importScriptToTxtFiles(url, isEncrypted = false, passwordHash = '') {
             try {
                 // 显示加载提示
                 const toast = document.createElement('div');
@@ -22982,8 +22982,17 @@ ${maSection}
                 let importedProjects = 0;
                 
                 for (const fileName of fileNames) {
-                    const content = files[fileName].content;
+                    let content = files[fileName].content;
                     if (!content) continue;
+                    if (isEncrypted) {
+                        const decPwd = prompt('该文件已加密，请输入导入密码：');
+                        if (!decPwd) return;
+                        const decHash = await hashPassword(decPwd);
+                        if (decHash !== passwordHash) { alert('❌ 密码错误，无法导入'); return; }
+                        const decrypted = decryptContent(content, decPwd);
+                        if (decrypted === null) { alert('❌ 解密失败，可能密码不正确或文件已损坏'); return; }
+                        content = decrypted;
+                    }
                     
                     // 判断文件类型
                     const isJsonFile = fileName.toLowerCase().endsWith('.json');
@@ -23377,7 +23386,7 @@ ${maSection}
         }
 
         // 从需求墙导入脚本到老马目录（App端）
-        async function importToLaoMaFromWall(scriptUrl, scriptName) {
+        async function importToLaoMaFromWall(scriptUrl, scriptName, isEncrypted = false, passwordHash = '') {
             try {
                 if (typeof window.__TAURI_INTERNALS__ === 'undefined') {
                     alert('此功能仅限桌面版 App 使用');
@@ -23398,14 +23407,14 @@ ${maSection}
                     return;
                 }
                 // 显示目录选择弹窗
-                showLaoMaDirPicker(scriptUrl, scriptName);
+                showLaoMaDirPicker(scriptUrl, scriptName, isEncrypted, passwordHash);
             } catch (e) {
                 alert('操作失败: ' + e.message);
             }
         }
 
         // 显示老马目录选择弹窗
-        function showLaoMaDirPicker(scriptUrl, scriptName) {
+        function showLaoMaDirPicker(scriptUrl, scriptName, isEncrypted = false, passwordHash = '') {
             const dirLabels = {
                 coop: { label: '合作脚本', icon: '🤝', desc: '寒冰/暗月/合作/漩涡/深海' },
                 activity: { label: '活动', icon: '🎉', desc: '活动+隐藏榜' },
@@ -23421,7 +23430,7 @@ ${maSection}
                 const disabledStyle = hasDir ? '' : 'opacity:0.4;pointer-events:none;';
                 const dirPath = hasDir ? (window.maDirs[key]) : '未配置';
                 btnHtml += `
-                    <div onclick="${hasDir ? `doImportToLaoMaDir('${key}','${scriptUrl}','${scriptName.replace(/'/g,"\\'")}')` : ''}" 
+                    <div onclick="${hasDir ? `doImportToLaoMaDir('${key}','${scriptUrl}','${scriptName.replace(/'/g,"\\'")}',${isEncrypted ? 'true' : 'false'},'${(passwordHash||'').replace(/'/g,"\\'")}')` : ''}" 
                          style="cursor:${hasDir ? 'pointer' : 'not-allowed'};background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:14px 16px;text-align:left;transition:all 0.2s;${disabledStyle}"
                          onmouseover="if(${hasDir})this.style.background='rgba(255,152,0,0.15)';if(${hasDir})this.style.borderColor='rgba(255,152,0,0.5)'"
                          onmouseout="if(${hasDir})this.style.background='rgba(255,255,255,0.06)';if(${hasDir})this.style.borderColor='rgba(255,255,255,0.15)'">
@@ -23459,7 +23468,7 @@ ${maSection}
         }
 
         // 执行导入到老马
-        async function doImportToLaoMaDir(dirKey, scriptUrl, scriptName) {
+        async function doImportToLaoMaDir(dirKey, scriptUrl, scriptName, isEncrypted = false, passwordHash = '') {
             const modal = document.getElementById('laoMaDirPickerModal');
             if (modal) modal.remove();
 
@@ -23479,7 +23488,17 @@ ${maSection}
                 // 下载脚本内容
                 const resp = await fetch(scriptUrl);
                 if (!resp.ok) throw new Error('下载失败');
-                const content = await resp.text();
+                let content = await resp.text();
+
+                if (isEncrypted) {
+                    const decPwd = prompt('该文件已加密，请输入导入密码：');
+                    if (!decPwd) return;
+                    const decHash = await hashPassword(decPwd);
+                    if (decHash !== passwordHash) { alert('❌ 密码错误，无法导入'); return; }
+                    const decrypted = decryptContent(content, decPwd);
+                    if (decrypted === null) { alert('❌ 解密失败，可能密码不正确或文件已损坏'); return; }
+                    content = decrypted;
+                }
 
                 recordDownload(finalName); // 导入到老马也算一次下载
 
@@ -23710,7 +23729,7 @@ ${maSection}
         }
 
         // 从需求墙导入备份
-        async function importBackupFromWall(url) {
+        async function importBackupFromWall(url, isEncrypted = false, passwordHash = '') {
             try {
                 // 显示加载提示
                 const toast = document.createElement('div');
@@ -23820,6 +23839,16 @@ ${maSection}
                     }
                 }
                 
+                if (isEncrypted) {
+                    const decPwd = prompt('该备份已加密，请输入导入密码：');
+                    if (!decPwd) return;
+                    const decHash = await hashPassword(decPwd);
+                    if (decHash !== passwordHash) { alert('❌ 密码错误，无法导入'); return; }
+                    const decrypted = decryptContent(backupContent, decPwd);
+                    if (decrypted === null) { alert('❌ 解密失败，可能密码不正确或文件已损坏'); return; }
+                    backupContent = decrypted;
+                }
+
                 const importData = JSON.parse(backupContent);
                 
                 // 支持两种备份格式
@@ -27769,7 +27798,7 @@ ${maSection}
         </style>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260730-04</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260730-05</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
