@@ -551,14 +551,21 @@ async function importRankingsXlsx(event){
         if(!totalName){ toast('未找到含排行数据的工作表'); return; }
         const rows = XLSX.utils.sheet_to_json(wb.Sheets[totalName], {header:1, defval:''});
         // —— 智能表头：自动定位表头行 + 按语义匹配列（顺序无关 / 容错）——
-        let headerRowIdx = 0, headers = [], colMap = {};
-        for(let i=0;i<Math.min(rows.length,6);i++){
+        let headerRowIdx = -1, headers = [], colMap = {};
+        // 扫描前 15 行定位表头（兼容前面有标题/说明行的表）
+        for(let i=0;i<Math.min(rows.length,15);i++){
             const h = (rows[i]||[]).map(x=>String(x==null?'':x).trim());
             const m = buildXlsxFieldMap(h);
             if(m['联盟名称']>=0 || m['排名']>=0){ headerRowIdx=i; headers=h; colMap=m; break; }
         }
-        if(!headers.length || colMap['联盟名称']<0){
-            toast('未识别到表头（需含 联盟名称/排名 等列，列顺序不要求固定）'); return;
+        if(headerRowIdx<0 || colMap['联盟名称']<0){
+            // 诊断信息：把前 3 个非空行的表头打出来，便于用户反馈具体表头长啥样
+            const preview = [];
+            for(let i=0;i<Math.min(rows.length,3);i++){
+                const h=(rows[i]||[]).map(x=>String(x==null?'':x).trim()).filter(Boolean);
+                if(h.length) preview.push('行'+i+': '+h.join(' | '));
+            }
+            toast('未识别到表头（需含 联盟名称/排名 列）。前几行：'+preview.join('  ')); return;
         }
         if(window.console) console.log('[XLSX] 表头行#'+headerRowIdx+' 列映射=', colMap, '表头=', headers.join(' | '));
         const list=[];
