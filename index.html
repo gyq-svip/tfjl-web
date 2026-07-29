@@ -8847,8 +8847,16 @@
             }
         }
 
+        // 格式化时长显示（分钟 → 可读文本）
+        function formatDuration(minutes) {
+            if (!minutes || minutes <= 0) return '永久';
+            if (minutes < 60) return minutes + '分钟';
+            if (minutes < 1440) return Math.floor(minutes / 60) + '小时';
+            return Math.floor(minutes / 1440) + '天';
+        }
+
         // 分享选项弹窗（时长 + 密码，所有分享入口统一调用）
-        // callback(expireDays, password): expireDays 0=永久, null=用户取消; password ''=无密码
+        // callback(expireMinutes, password): expireMinutes 0=永久, null=用户取消; password ''=无密码
         function showShareOptionsDialog(callback) {
             const existing = document.getElementById('shareOptionsModal');
             if (existing) existing.remove();
@@ -8864,13 +8872,21 @@
                     <div style="color:#ff9800;font-size:1.1rem;font-weight:bold;margin-bottom:16px;">🔒 分享选项</div>
                     <div style="margin-bottom:14px;">
                         <label style="color:rgba(255,255,255,0.8);font-size:0.85rem;display:block;margin-bottom:6px;">⏱️ 有效期</label>
-                        <select id="shareExpireDays" style="width:100%;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:white;font-size:0.85rem;outline:none;cursor:pointer;">
+                        <select id="shareExpireMinutes" style="width:100%;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:white;font-size:0.85rem;outline:none;cursor:pointer;">
                             <option value="0" style="background:#1a1a2e;">永久</option>
-                            <option value="1" style="background:#1a1a2e;">1天</option>
-                            <option value="3" style="background:#1a1a2e;">3天</option>
-                            <option value="7" selected style="background:#1a1a2e;">7天</option>
-                            <option value="15" style="background:#1a1a2e;">15天</option>
-                            <option value="30" style="background:#1a1a2e;">30天</option>
+                            <option disabled style="background:#1a1a2e;color:#666;">──── 短时效 ────</option>
+                            <option value="3" style="background:#1a1a2e;">3分钟</option>
+                            <option value="10" style="background:#1a1a2e;">10分钟</option>
+                            <option value="30" style="background:#1a1a2e;">30分钟</option>
+                            <option value="60" style="background:#1a1a2e;">1小时</option>
+                            <option value="360" style="background:#1a1a2e;">6小时</option>
+                            <option value="720" style="background:#1a1a2e;">12小时</option>
+                            <option disabled style="background:#1a1a2e;color:#666;">──── 长时效 ────</option>
+                            <option value="1440" style="background:#1a1a2e;">1天</option>
+                            <option value="4320" style="background:#1a1a2e;">3天</option>
+                            <option value="10080" selected style="background:#1a1a2e;">7天</option>
+                            <option value="21600" style="background:#1a1a2e;">15天</option>
+                            <option value="43200" style="background:#1a1a2e;">30天</option>
                         </select>
                     </div>
                     <div style="margin-bottom:16px;">
@@ -8888,13 +8904,13 @@
             };
             const confirmBtn = modal.querySelector('#shareOptionsConfirmBtn');
             const cancelBtn = modal.querySelector('#shareOptionsCancelBtn');
-            const expireSelect = modal.querySelector('#shareExpireDays');
+            const expireSelect = modal.querySelector('#shareExpireMinutes');
             const passwordInput = modal.querySelector('#sharePassword');
             confirmBtn.onclick = function() {
-                const expireDays = parseInt(expireSelect.value) || 0;
+                const expireMinutes = parseInt(expireSelect.value) || 0;
                 const password = passwordInput.value.trim();
                 modal.remove();
-                callback(expireDays, password);
+                callback(expireMinutes, password);
             };
             cancelBtn.onclick = function() {
                 modal.remove();
@@ -8936,7 +8952,7 @@
             // 分享选项弹窗（时长 + 密码）
             const shareOpts = await new Promise(function(resolve) { showShareOptionsDialog(resolve); });
             if (shareOpts === null || shareOpts[0] === null) return;
-            const expireDays = shareOpts[0];
+            const expireMinutes = shareOpts[0];
             const sharePassword = shareOpts[1];
 
             try {
@@ -8977,7 +8993,7 @@
                     author: nickname,
                     time: Date.now(),
                     scriptUrl: scriptUrl,
-                    expireDays: expireDays > 0 ? expireDays : null,
+                    expireMinutes: expireMinutes > 0 ? expireMinutes : null,
                     isEncrypted: !!sharePassword
                 };
                 if (passwordHash) newMsg.passwordHash = passwordHash;
@@ -8997,7 +9013,7 @@
         }
 
         // 分享脚本文件到需求墙
-        // shareOpts: { expireDays, password } 预选选项（批量调用时传入，跳过弹窗）
+        // shareOpts: { expireMinutes, password } 预选选项（批量调用时传入，跳过弹窗）
         async function shareTxtFileToWall(index, providedName = null, shareOpts = null) {
             const file = txtFiles[index];
             if (!file) return;
@@ -9022,15 +9038,15 @@
             }
 
             // 分享选项弹窗（时长 + 密码），批量时使用预选值
-            let expireDays = 0;
+            let expireMinutes = 0;
             let sharePassword = '';
             if (shareOpts) {
-                expireDays = shareOpts.expireDays;
+                expireMinutes = shareOpts.expireMinutes;
                 sharePassword = shareOpts.password;
             } else {
                 const opts = await new Promise(function(resolve) { showShareOptionsDialog(resolve); });
                 if (opts === null || opts[0] === null) return;
-                expireDays = opts[0];
+                expireMinutes = opts[0];
                 sharePassword = opts[1];
             }
 
@@ -9070,7 +9086,7 @@
                     author: nickname,
                     time: Date.now(),
                     scriptUrl: scriptUrl,
-                    expireDays: expireDays > 0 ? expireDays : null,
+                    expireMinutes: expireMinutes > 0 ? expireMinutes : null,
                     isEncrypted: !!sharePassword
                 };
                 if (passwordHash) newMsg.passwordHash = passwordHash;
@@ -9102,7 +9118,7 @@
             // 批量统一选择分享选项
             const opts = await new Promise(function(resolve) { showShareOptionsDialog(resolve); });
             if (opts === null || opts[0] === null) return;
-            const shareOpts = { expireDays: opts[0], password: opts[1] };
+            const shareOpts = { expireMinutes: opts[0], password: opts[1] };
             let success = 0, fail = 0;
             for (const idx of indices) {
                 const file = txtFiles[idx];
@@ -14105,15 +14121,15 @@
             }
 
             // 分享选项弹窗（时长 + 密码），批量时使用预选值
-            let expireDays = 0;
+            let expireMinutes = 0;
             let sharePassword = '';
             if (shareOpts) {
-                expireDays = shareOpts.expireDays;
+                expireMinutes = shareOpts.expireMinutes;
                 sharePassword = shareOpts.password;
             } else {
                 const opts = await new Promise(function(resolve) { showShareOptionsDialog(resolve); });
                 if (opts === null || opts[0] === null) return false;
-                expireDays = opts[0];
+                expireMinutes = opts[0];
                 sharePassword = opts[1];
             }
 
@@ -14151,7 +14167,7 @@
                     author: nickname,
                     time: Date.now(),
                     scriptUrl: scriptUrl,
-                    expireDays: expireDays > 0 ? expireDays : null,
+                    expireMinutes: expireMinutes > 0 ? expireMinutes : null,
                     isEncrypted: !!sharePassword
                 };
                 if (passwordHash) newMsg.passwordHash = passwordHash;
@@ -14183,7 +14199,7 @@
             // 批量统一选择分享选项
             const opts = await new Promise(function(resolve) { showShareOptionsDialog(resolve); });
             if (opts === null || opts[0] === null) return;
-            const shareOpts = { expireDays: opts[0], password: opts[1] };
+            const shareOpts = { expireMinutes: opts[0], password: opts[1] };
             let success = 0, fail = 0;
             for (const f of fileList) {
                 if (!f || !f.path || !f.name) continue;
@@ -19786,10 +19802,10 @@ function hasGistToken() {
             const wallAdminNicks = ['gyq', 'GYQ', '龙行'];
             const wallIsAdmin = wallAdminNicks.some(nick => wallCurrentNickname.toLowerCase() === nick.toLowerCase());
 
-            // 过滤消息（与renderMessages一致：只有设置了expireDays的才过期）
+            // 过滤消息（与renderMessages一致：只有设置了expireMinutes的才过期）
             const validWallMsgs = (wallMessages || []).filter(msg => {
-                if (msg.expireDays && msg.expireDays > 0) {
-                    const expireTime = msg.expireDays * 24 * 60 * 60 * 1000;
+                if (msg.expireMinutes && msg.expireMinutes > 0) {
+                    const expireTime = msg.expireMinutes * 60 * 1000;
                     return (nowMs - (msg.time || 0)) < expireTime;
                 }
                 return true;
@@ -19808,7 +19824,7 @@ function hasGistToken() {
                     const canDelete = isOwner || wallIsAdmin;
 
                     // 过期标签
-                    const expireLabel = msg.expireDays ? `<span style="color:#ff9800;font-size:0.7rem;margin-left:5px;" title="${msg.expireDays}天后过期">⏱️${msg.expireDays}天</span>` : '';
+                    const expireLabel = msg.expireMinutes ? `<span style="color:#ff9800;font-size:0.7rem;margin-left:5px;" title="${formatDuration(msg.expireMinutes)}后过期">⏱️${formatDuration(msg.expireMinutes)}</span>` : '';
 
                     // 脚本分享按钮（与renderMessages一致）
                     if (msg.scriptUrl) {
@@ -21969,10 +21985,10 @@ function hasGistToken() {
             const adminNicknames = ['gyq', 'GYQ', '龙行'];
             const isAdmin = adminNicknames.some(nick => currentNickname.toLowerCase() === nick.toLowerCase());
             
-            // 过滤消息：默认永久保存，只有设置了expireDays的消息才过期
+            // 过滤消息：默认永久保存，只有设置了expireMinutes的消息才过期
             const validMessages = wallMessages.filter(msg => {
-                if (msg.expireDays && msg.expireDays > 0) {
-                    const expireTime = msg.expireDays * 24 * 60 * 60 * 1000;
+                if (msg.expireMinutes && msg.expireMinutes > 0) {
+                    const expireTime = msg.expireMinutes * 60 * 1000;
                     return (now - msg.time) < expireTime;
                 }
                 return true; // 没有设置过期时间的消息永久保存
@@ -21992,7 +22008,7 @@ function hasGistToken() {
                 const canDelete = isOwner || isAdmin;
                 
                 // 过期标签
-                const expireLabel = msg.expireDays ? `<span style="color:#ff9800;font-size:0.7rem;margin-left:5px;" title="${msg.expireDays}天后过期">⏱️${msg.expireDays}天</span>` : '';
+                const expireLabel = msg.expireMinutes ? `<span style="color:#ff9800;font-size:0.7rem;margin-left:5px;" title="${formatDuration(msg.expireMinutes)}后过期">⏱️${formatDuration(msg.expireMinutes)}</span>` : '';
                 // 加密标签
                 const encryptedLabel = msg.isEncrypted ? `<span style="color:#ce93d8;font-size:0.7rem;margin-left:5px;" title="密码保护">🔒</span>` : '';
                 
@@ -23493,7 +23509,7 @@ ${maSection}
             // 分享选项弹窗（时长 + 密码，批量统一）
             const opts = await new Promise(function(resolve) { showShareOptionsDialog(resolve); });
             if (opts === null || opts[0] === null) return;
-            const expireDays = opts[0];
+            const expireMinutes = opts[0];
             const sharePassword = opts[1];
             let passwordHash = null;
             if (sharePassword) passwordHash = await hashPassword(sharePassword);
@@ -23562,7 +23578,7 @@ ${maSection}
                         text: `分享了脚本: ${fileName}`,
                         scriptUrl: scriptUrl,
                         timestamp: Date.now(),
-                        expireAt: expireDays > 0 ? Date.now() + (expireDays * 24 * 60 * 60 * 1000) : null,
+                        expireAt: expireMinutes > 0 ? Date.now() + (expireMinutes * 60 * 1000) : null,
                         isSystem: false,
                         shareType: 'scanned',
                         isEncrypted: !!sharePassword
@@ -23919,13 +23935,13 @@ ${maSection}
                     }
                 }
 
-                const expireDaysValue = parseInt(expireDaysSelect.value);
+                const expireMinutesValue = parseInt(expireDaysSelect.value);
                 const newMsg = {
                     content: content,
                     author: nickname,
                     time: Date.now(),
                     scriptUrl: scriptUrl,
-                    expireDays: expireDaysValue > 0 ? expireDaysValue : null
+                    expireMinutes: expireMinutesValue > 0 ? expireMinutesValue : null
                 };
 
                 wallMessages.unshift(newMsg);
@@ -27231,10 +27247,17 @@ ${maSection}
                 <label style="display:flex;align-items:center;gap:4px;color:#888;font-size:0.75rem;cursor:pointer;margin-left:auto;" title="选择消息保留时间">
                     <select id="expireDays" style="background:#2a2a4a;border:1px solid rgba(255,255,255,0.3);border-radius:3px;padding:2px 4px;color:#fff;font-size:0.7rem;cursor:pointer;outline:none;">
                         <option value="0" style="background:#2a2a4a;color:#fff;">永久</option>
-                        <option value="7" style="background:#2a2a4a;color:#fff;">7天</option>
-                        <option value="15" selected style="background:#2a2a4a;color:#fff;">15天</option>
-                        <option value="30" style="background:#2a2a4a;color:#fff;">30天</option>
-                        <option value="60" style="background:#2a2a4a;color:#fff;">60天</option>
+                        <option value="3" style="background:#2a2a4a;color:#fff;">3分钟</option>
+                        <option value="10" style="background:#2a2a4a;color:#fff;">10分钟</option>
+                        <option value="30" style="background:#2a2a4a;color:#fff;">30分钟</option>
+                        <option value="60" style="background:#2a2a4a;color:#fff;">1小时</option>
+                        <option value="360" style="background:#2a2a4a;color:#fff;">6小时</option>
+                        <option value="720" style="background:#2a2a4a;color:#fff;">12小时</option>
+                        <option value="1440" style="background:#2a2a4a;color:#fff;">1天</option>
+                        <option value="4320" style="background:#2a2a4a;color:#fff;">3天</option>
+                        <option value="10080" style="background:#2a2a4a;color:#fff;">7天</option>
+                        <option value="21600" selected style="background:#2a2a4a;color:#fff;">15天</option>
+                        <option value="43200" style="background:#2a2a4a;color:#fff;">30天</option>
                     </select>
                 </label>
             </div>
@@ -27644,7 +27667,7 @@ ${maSection}
         </style>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260729-50</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260729-51</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
