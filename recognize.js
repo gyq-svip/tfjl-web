@@ -87,13 +87,73 @@
   async function autoStartUmiOcr(){
     const p = await getStoredUmiPath();
     if(!p) return false;
-    try{ await tauriInvoke('start_umi_ocr', { exe_path: p }); }
+    try{ await tauriInvoke('start_umi_ocr', { exe_path: p, hidden: true }); }
     catch(e){ return false; }
-    for(let i=0;i<12;i++){
+    for(let i=0;i<25;i++){
       await sleep(800);
       if(await checkUmiOcrAvailable() === true) return true;
     }
     return false;
+  }
+
+  // 用系统默认浏览器打开 Umi-OCR 下载页（APP 内 target=_blank 被 Tauri 拦截，故走 open_url 命令）
+  function openUmiDownload(){
+    if(isTauri()){
+      tauriInvoke('open_url', { url: UMI_OCR_DOWNLOAD })
+        .catch(()=>{ try{ window.open(UMI_OCR_DOWNLOAD,'_blank'); }catch(_){} });
+    } else {
+      window.open(UMI_OCR_DOWNLOAD, '_blank');
+    }
+  }
+
+  // 自动查找本机 Umi-OCR.exe（用户常不知道装在哪）：扫常见位置 → 记住 → 拉起
+  async function findAndSetUmi(tip){
+    tip = tip || $('recUmiTip');
+    const st = $('recStatus');
+    if(tip) tip.innerHTML = '正在本机常见位置查找 Umi-OCR.exe （下载目录 / 桌面 / Program Files / Umi-OCR 文件夹）…';
+    let found = null;
+    try{ found = await tauriInvoke('find_umi_ocr'); }catch(e){ found = null; }
+    if(found){
+      await setStoredUmiPath(found);
+      if(tip) tip.innerHTML = '已找到：' + escapeHtml(found) + '，正在自动启动…';
+      const ok = await autoStartUmiOcr();
+      if(tip){
+        if(ok) setTip(tip,'rgba(76,175,80,0.15)','#81c784','✅ 已自动找到并启动本机 Umi-OCR（离线精准识别）');
+        else setTip(tip,'rgba(255,167,38,0.18)','#ffb74d','✅ 已记住路径：'+escapeHtml(found)+'，但启动失败，请手动双击打开 Umi-OCR 后重试。');
+      }
+      if(st) st.textContent = ok ? '✅ 已自动启动 Umi-OCR' : '⚠️ 找到路径但启动失败';
+      return;
+    }
+    if(tip) setTip(tip,'rgba(255,167,38,0.18)','#ffb74d',
+      '🔍 未在本机常见位置找到 Umi-OCR.exe。'
+      + 'Umi-OCR 是个<b>绿色压缩包</b>（不是安装程序）：先<a href="#" data-act="dl" style="color:#4fc3f7;text-decoration:underline;margin:0 4px;">下载</a>，解压到任意文件夹（例如 D:\\withfriends\\Umi-OCR），'
+      + '解压后点「🔍 自动查找」或「选择 Umi-OCR.exe」指到解压出来的 <b>Umi-OCR.exe</b> 即可。');
+  }
+
+  // 一键下载并安装 Umi-OCR 到本助手数据目录（不散落到浏览器默认下载目录），随后自动配置并拉起
+  async function downloadAndInstallUmi(tip){
+    tip = tip || $('recUmiTip');
+    const st = $('recStatus');
+    if(tip) tip.innerHTML = '正在从官网下载 Umi-OCR（约 130MB，请耐心等待，勿关闭助手）…';
+    if(st) st.textContent = '下载安装中…';
+    let path = null;
+    try{ path = await tauriInvoke('download_umi_ocr'); }
+    catch(e){
+      const msg = (e && e.message || e) + '';
+      if(tip) setTip(tip,'rgba(255,167,38,0.18)','#ffb74d',
+        '⚠️ 自动下载失败：'+escapeHtml(msg)+'。可改用<a href="#" data-act="dl" style="color:#4fc3f7;text-decoration:underline;margin:0 4px;">浏览器下载</a>，解压到 <b>D:\\withfriends\\塔防精灵助手数据\\Umi-OCR</b> 后点「🔍 自动查找」。');
+      if(st) st.textContent = '下载失败';
+      return;
+    }
+    if(!path){ if(st) st.textContent='下载完成但未找到程序'; return; }
+    await setStoredUmiPath(path);
+    if(tip) tip.innerHTML = '已下载并解压到：' + escapeHtml(path) + '，正在自动启动…';
+    const ok = await autoStartUmiOcr();
+    if(tip){
+      if(ok) setTip(tip,'rgba(76,175,80,0.15)','#81c784','✅ 已下载安装并自动启动本机 Umi-OCR（离线精准识别）');
+      else setTip(tip,'rgba(255,167,38,0.18)','#ffb74d','✅ 已安装到 '+escapeHtml(path)+'，但启动失败，请手动双击打开 Umi-OCR 后重试。');
+    }
+    if(st) st.textContent = ok ? '✅ 已自动启动 Umi-OCR' : '⚠️ 已安装但启动失败';
   }
 
   // 用户点“选择 Umi-OCR.exe”：弹系统文件框 → 记住路径 → 自动拉起
@@ -140,15 +200,19 @@
       setTip(tip, 'rgba(255,167,38,0.18)', '#ffb74d',
         '⚠️ 已尝试自动启动 Umi-OCR 但失败（记录路径：' + escapeHtml(stored) + '）。'
         + '<a href="#" id="recPickUmi" style="color:#4fc3f7;text-decoration:underline;margin:0 4px;">重新选择 Umi-OCR.exe</a>'
-        + '，或<a href="'+UMI_OCR_DOWNLOAD+'" target="_blank" rel="noopener" style="color:#4fc3f7;text-decoration:underline;margin:0 4px;">下载安装</a>。');
+        + '，或<a href="#" data-act="find" style="color:#4fc3f7;text-decoration:underline;margin:0 4px;">🔍 自动查找</a>'
+        + '，或<a href="#" data-act="install" style="color:#4fc3f7;text-decoration:underline;margin:0 4px;">⬇ 一键下载安装</a>'
+        + '，或<a href="#" data-act="dl" style="color:#4fc3f7;text-decoration:underline;margin:0 4px;">浏览器下载</a>。');
       bindPickUmi(tip);
       return;
     }
     // 从未选过：提示选择（选完即自动后台拉起，无需手动打开）
     setTip(tip, 'rgba(255,167,38,0.18)', '#ffb74d',
-      '⚠️ 阵容识别依赖本机 Umi-OCR（<b>完全免费开源</b>），需先选择本机 Umi-OCR.exe。'
-      + '<a href="#" id="recPickUmi" style="color:#4fc3f7;text-decoration:underline;margin:0 4px;">选择 Umi-OCR.exe</a>'
-      + '（<a href="'+UMI_OCR_DOWNLOAD+'" target="_blank" rel="noopener" style="color:#4fc3f7;text-decoration:underline;">下载</a>，建议 Paddle 版）。选好后助手会<b>自动后台启动</b>，无需手动打开。');
+      '⚠️ 阵容识别依赖本机 Umi-OCR（<b>完全免费开源</b>、绿色软件）。不想手动找？点 '
+      + '<a href="#" data-act="install" style="color:#4fc3f7;text-decoration:underline;margin:0 4px;">⬇ 一键下载安装</a>'
+      + ' 助手会自动下到咱们目录并配好；或点<a href="#" data-act="find" style="color:#4fc3f7;text-decoration:underline;margin:0 4px;">🔍 自动查找</a>扫描本机；'
+      + '也可<a href="#" id="recPickUmi" style="color:#4fc3f7;text-decoration:underline;margin:0 4px;">手动选择 Umi-OCR.exe</a>'
+      + '（<a href="#" data-act="dl" style="color:#4fc3f7;text-decoration:underline;">浏览器下载</a>）。配好后助手会<b>自动后台启动</b>。');
     bindPickUmi(tip);
   }
 
@@ -302,6 +366,9 @@
             <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
               <button id="recAuto" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;border:none;padding:9px 14px;border-radius:8px;cursor:pointer;font-weight:600;">⚡ 自动识别(无需对齐)</button>
               <button id="recFill" style="background:linear-gradient(135deg,#42a5f5,#1565c0);color:#fff;border:none;padding:9px 14px;border-radius:8px;cursor:pointer;">➡ 填入脚本生成</button>
+              <button id="recLaunch" style="background:linear-gradient(135deg,#ff9800,#e65100);color:#fff;border:none;padding:9px 14px;border-radius:8px;cursor:pointer;font-weight:600;" title="关掉 Umi-OCR 后，点此重新打开它">🚀 启动识别引擎</button>
+              <button id="recFind" style="background:linear-gradient(135deg,#ab47bc,#6a1b9a);color:#fff;border:none;padding:9px 14px;border-radius:8px;cursor:pointer;font-weight:600;" title="本机找不到 Umi-OCR 装哪了？点此自动扫描常见位置">🔍 自动查找</button>
+              <button id="recInstall" style="background:linear-gradient(135deg,#26c6da,#00838f);color:#fff;border:none;padding:9px 14px;border-radius:8px;cursor:pointer;font-weight:600;" title="一键把 Umi-OCR 下载安装到咱们的数据目录">⬇ 下载安装</button>
             </div>
             <div style="font-size:0.72rem;color:#789;margin-top:6px;">识别只认 100 个精确英雄卡名（皮肤不参与）；不在 100 库内即判“疑似识别错”。</div>
           </div>
@@ -368,6 +435,36 @@
         overlay.style.display='none';
       }
     };
+    // 常驻“启动识别引擎”按钮：关掉 Umi-OCR 后随时重新打开（显示窗口，用户可见）
+    $('recLaunch').onclick = async ()=>{
+      const st = $('recStatus');
+      if(isTauri() && await checkUmiOcrAvailable() === true){ st.textContent = '✅ Umi-OCR 已在运行'; return; }
+      const p = await getStoredUmiPath();
+      if(!p){ alert('请先选择本机 Umi-OCR.exe（点击浮窗里的「选择 Umi-OCR.exe」）'); return; }
+      st.textContent = '正在启动 Umi-OCR（显示窗口）…';
+      try{
+        await tauriInvoke('start_umi_ocr', { exe_path: p, hidden: false });
+        let ok=false;
+        for(let i=0;i<25;i++){ await sleep(800); if(await checkUmiOcrAvailable() === true){ ok=true; break; } }
+        st.textContent = ok ? '✅ Umi-OCR 已启动（窗口已显示）' : '⚠️ 启动超时，请手动打开 Umi-OCR';
+      }catch(e){ st.textContent = '启动失败: ' + (e&&e.message||e); }
+    };
+    // 提示区“下载 / 自动查找 / 一键下载安装”链接委托
+    const recTipEl = $('recUmiTip');
+    if(recTipEl) recTipEl.addEventListener('click', (e)=>{
+      const dl = e.target.closest && e.target.closest('a[data-act="dl"]');
+      if(dl){ e.preventDefault(); openUmiDownload(); return; }
+      const find = e.target.closest && e.target.closest('a[data-act="find"]');
+      if(find){ e.preventDefault(); findAndSetUmi(recTipEl); return; }
+      const install = e.target.closest && e.target.closest('a[data-act="install"]');
+      if(install){ e.preventDefault(); downloadAndInstallUmi(recTipEl); return; }
+    });
+    // 工具栏“🔍 自动查找”按钮：扫描本机常见位置并自动设置
+    const recFindBtn = $('recFind');
+    if(recFindBtn) recFindBtn.onclick = ()=> findAndSetUmi($('recUmiTip'));
+    // 工具栏“⬇ 下载安装”按钮：一键下载到咱们目录并配置
+    const recInstallBtn = $('recInstall');
+    if(recInstallBtn) recInstallBtn.onclick = ()=> downloadAndInstallUmi($('recUmiTip'));
   }
 
   function openModal(){ const o=$('recognizeOverlay'); if(o) o.style.display='flex'; showUmiTip(); }
