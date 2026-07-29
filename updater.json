@@ -1,11 +1,11 @@
 ﻿{
     "platforms":  {
                       "windows-x86_64":  {
-                                             "signature":  "ZFc1MGNuVnpkR1ZrSUdOdmJXMWxiblE2SUhOcFoyNWhkSFZ5WlNCbWNtOXRJSFJoZFhKcElITmxZM0psZENCclpYa0tVbFZSZFdKdlEwSnZZalpUU0VNMWVXOXhhVkpLV201UGJ6QllNekZPTUZoSVdrSjFibVp4YWpSMVpHSm1VVlUwVHpKS1JEWnNaV2swVGxKdk9WZElkR0l3Ukd4dVNFcFFOM2R0WWpCMGNrWmthemxvZDJwQmMzbDJOVWRYWVN0cFRVRlZQUXAwY25WemRHVmtJR052YlcxbGJuUTZJSFJwYldWemRHRnRjRG94TnpnMU16RTRPVGt4Q1dacGJHVTY1YUdVNlppeTU3Sys1NEcxNVlxcDVvbUxYekV1TWk0eVgzZzJOQzF6WlhSMWNDNWxlR1VLZWxKeVJtcElOV2hMYjFoa1ZYWnBSR3RKT0doTlNWQjVPRUZFT0VFM1EyWmhkalp2TWk5eFJHcG5hRzl0YkdSb0syOXVaR1ZsT0VSMU5GSkRXVkZLY0RjMFptWjRTMHN3VmpWRmNGQlJNeTgyYldKQlJHYzlQUW89",
-                                             "url":  "https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/releases/download/v1.2.2/tfjl-v1.2.2-x64-setup.exe"
+                                             "signature":  "ZFc1MGNuVnpkR1ZrSUdOdmJXMWxiblE2SUhOcFoyNWhkSFZ5WlNCbWNtOXRJSFJoZFhKcElITmxZM0psZENCclpYa0tVbFZSZFdKdlEwSnZZalpUU0VsaWEwRkRMekUwUjBFMGJERjBiblZUWm14b1luWmFNMk5HY1ZCSlVEWlJVMDlwTld4VWJHNVVURlJvVjFBM1dGZEZXVmxNYW5abE0wOU5VRVpJV0hsbU9XaHpLMUUxUm5Sa1JuaE5TR1ZMSzJ4S2FsRkZQUXAwY25WemRHVmtJR052YlcxbGJuUTZJSFJwYldWemRHRnRjRG94TnpnMU16SXdPVGc0Q1dacGJHVTY1YUdVNlppeTU3Sys1NEcxNVlxcDVvbUxYekV1TWk0elgzZzJOQzF6WlhSMWNDNWxlR1VLVW5wUlJIWkROMVp5Y0ZVelJYUkRabFIxV2xSQkwxZFRNakpJWmxCNGJEZGtMemRoU1VFMmRUUXZSMW8zZVhVMUx6Tk1NRFF4YURsTWN5dFpSV2RhWldKM2FtWktRbXBWTWpOWFRFZDZka0Z0T1hWNFJGRTlQUW89",
+                                             "url":  "https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/releases/download/v1.2.3/tfjl-v1.2.3-x64-setup.exe"
                                          }
                   },
-    "pub_date":  "2026-07-29T18:00:00+08:00",
-    "version":  "1.2.2",
-    "notes":  "v1.2.2 无感体验\n- Umi-OCR 自动启动：记住 exe 路径后，APP 启动或打开阵容识别浮窗会自动后台拉起，无需手动打开\n- 新增系统托盘：右下角小图标，右键 显示窗口/隐藏到托盘/退出；点窗口 X 最小化到托盘常驻后台"
+    "pub_date":  "2026-07-29T18:40:00+08:00",
+    "version":  "1.2.3",
+    "notes":  "v1.2.3 修复自动更新下载\n- 修复更新下载被本机残留代理端口(127.0.0.1:7897)拦截导致失败的问题，更新改为直连下载\n- 含 1.2.2 的 Umi-OCR 自动启动 + 系统托盘"
 }
