@@ -114,7 +114,7 @@
     <div class="panel" style="margin:0;">
       <h3>② 单卡结果（可在"真值"列填正确答案）</h3>
       <table id="resultTbl">
-        <thead><tr><th>位</th><th>OCR原文</th><th>OCR→库名</th><th>头像模板</th><th>卡名模板</th><th>整卡模板</th><th>综合</th><th>真值(你填)</th></tr></thead>
+        <thead><tr><th>位</th><th>OCR原文</th><th>OCR→库名</th><th>头像模板</th><th>卡名模板</th><th>整卡模板</th><th>综合</th><th>校验(100库)</th><th>真值(你填)</th></tr></thead>
         <tbody></tbody>
       </table>
       <div class="row" style="margin-top:8px;">
@@ -301,6 +301,27 @@ function matchHero(raw){
   for(const h of HEROES){ const d=lev(t,h); if(d<bd){bd=d;best=h;} }
   const ratio = 1 - bd/Math.max(1,Math.max(t.length,best.length));
   return {hero:best,score:ratio,method: ratio>=0.5?'模糊':'模糊(低)'};
+}
+
+// ====================== 100 英雄库校验（最权威库；不在 100 内即疑似识别错） ======================
+// DEFAULT_HEROES 即 英雄数据导出.json 的 100 英雄，是“错不了”的基准库。
+// 4 字英雄（咬人娃娃 / 邪能火炮→火炮 / 地精宝库→宝库 / 微型潜艇→潜艇 等）即使对上也要“留意”。
+function isFourCharName(n){ return [...norm(n)].length === 4; }
+function validateHero100(name){
+  const n = norm(name);
+  if(!n) return {ok:false, reason:'空/未识别', four:false, hero:null};
+  if(DEFAULT_HEROES.includes(n)) return {ok:true, hero:n, four:isFourCharName(n)};
+  // 显示名别名（邪能火炮 → 火炮）：目标在 100 内才算对，并保留 4 字标记
+  if(ALIASES[n] && DEFAULT_HEROES.includes(ALIASES[n])) return {ok:true, hero:ALIASES[n], four:isFourCharName(n)};
+  return {ok:false, reason:'不在100英雄库', four:isFourCharName(n), hero:null};
+}
+function validCell(r){
+  const v = r.valid;
+  if(!v) return '<span class="muted">—</span>';
+  if(v.ok) return v.four
+    ? '<span style="color:#f9a825;font-weight:600;">⚠ 4字·对</span>'
+    : '<span style="color:#2e7d32;font-weight:600;">✓ 对</span>';
+  return '<span style="color:#c62828;font-weight:600;">✗ '+v.reason+'</span>';
 }
 
 // ====================== 图像 / 网格 ======================
@@ -639,7 +660,9 @@ function matchLineups(){
   const out = $('lineupResult');
   if(!lastResults || !lastResults.length){ out.innerHTML = '<span class="hint">请先识别一张截图</span>'; return; }
   parseLineups();
-  const recSet = new Set(lastResults.filter(r=>r.comb).map(r=>normHero(r.comb)));
+  // 仅计入通过 100 英雄库校验的英雄（呼应“匹配到了才行”；未对上的视为疑似识别错，不污染阵容）
+  const recSet = new Set(lastResults.filter(r=>r.comb && r.valid && r.valid.ok).map(r=>normHero(r.comb)));
+  const bad = lastResults.filter(r=>r.comb && (!r.valid || !r.valid.ok));
   const thresh = (+$('lineupThresh').value || 0) / 100;
   const scored = LINEUPS.map(L=>{
     const lhs = new Set(L.heroes);
@@ -653,7 +676,10 @@ function matchLineups(){
   if(hits.length){
     html += '<div style="background:#fff3cd;color:#856404;padding:6px 8px;border-radius:6px;margin-bottom:6px;">⚠ 命中关注卡组：'+hits.map(x=>x.name+'('+Math.round(x.recall*100)+'%)').join('、')+'</div>';
   }
-  html += '<div class="hint">已识别英雄（'+recSet.size+'）：'+[...recSet].join('、')+'</div>';
+  if(bad.length){
+    html += '<div style="background:#fdecea;color:#c62828;padding:6px 8px;border-radius:6px;margin-bottom:6px;">✗ '+bad.length+' 张不在100英雄库（疑似识别错）：'+bad.map(r=>(r.comb||'—')+'('+(r.valid?r.valid.reason:'未识别')+')').join('、')+'</div>';
+  }
+  html += '<div class="hint">已识别英雄（'+recSet.size+'，仅含通过100库校验者）：'+[...recSet].join('、')+'</div>';
   scored.slice(0, 8).forEach(x=>{
     const pct = Math.round(x.recall*100);
     const color = pct>=80 ? '#2e7d32' : (pct>=thresh*100 ? '#f9a825' : '#888');
@@ -782,11 +808,12 @@ async function recognizeCurrent(){
       cardTpl = matchCardTpl(cardC);
       comb = combinedPick(ocr, tpl, nameTpl, cardTpl);
     }
-    results.push({raw, ocr, tpl, nameTpl, cardTpl, comb});
+    const valid = validateHero100(comb || raw);
+    results.push({raw, ocr, tpl, nameTpl, cardTpl, comb, valid});
     const tail = engine==='umi'
       ? ' [跳过模板]'
       : ` | 头像=${tpl.hero||'×'}(mae=${tpl.mae.toFixed(3)}) | 卡名=${nameTpl.hero||'×'}(IoU=${nameTpl.iou.toFixed(2)}) | 整卡=${cardTpl.hero||'×'}(mae=${cardTpl.mae.toFixed(3)})`;
-    log(`[${i+1}] OCR=${ocr.hero||'×'}(${ocr.score.toFixed(2)})${tail} | 综合=${comb||'×'}`);
+    log(`[${i+1}] OCR=${ocr.hero||'×'}(${ocr.score.toFixed(2)})${tail} | 综合=${comb||'×'} | 校验=${valid.ok ? (valid.four?'⚠4字·对':'✓对') : '✗'+valid.reason}`);
   }
   lastResults = results;
   renderResultTable(results);
@@ -806,6 +833,7 @@ function renderResultTable(results){
       <td>${r.nameTpl.hero||'×'}<br><span class="muted">IoU ${isNaN(r.nameTpl.iou)?'—':r.nameTpl.iou.toFixed(2)}</span></td>
       <td>${r.cardTpl.hero||'×'}<br><span class="muted">mae ${isNaN(r.cardTpl.mae)?'—':r.cardTpl.mae.toFixed(3)}</span></td>
       <td><b>${r.comb||'×'}</b></td>
+      <td>${validCell(r)}</td>
       <td><input type="text" class="truth" placeholder="库名" value=""></td>`;
     tb.appendChild(tr);
   });
