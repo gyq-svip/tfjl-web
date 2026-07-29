@@ -1,11 +1,11 @@
-﻿{
+{
     "platforms":  {
                       "windows-x86_64":  {
-                                             "signature":  "ZFc1MGNuVnpkR1ZrSUdOdmJXMWxiblE2SUhOcFoyNWhkSFZ5WlNCbWNtOXRJSFJoZFhKcElITmxZM0psZENCclpYa0tVbFZSZFdKdlEwSnZZalpUU0VsaWEwRkRMekUwUjBFMGJERjBiblZUWm14b1luWmFNMk5HY1ZCSlVEWlJVMDlwTld4VWJHNVVURlJvVjFBM1dGZEZXVmxNYW5abE0wOU5VRVpJV0hsbU9XaHpLMUUxUm5Sa1JuaE5TR1ZMSzJ4S2FsRkZQUXAwY25WemRHVmtJR052YlcxbGJuUTZJSFJwYldWemRHRnRjRG94TnpnMU16SXdPVGc0Q1dacGJHVTY1YUdVNlppeTU3Sys1NEcxNVlxcDVvbUxYekV1TWk0elgzZzJOQzF6WlhSMWNDNWxlR1VLVW5wUlJIWkROMVp5Y0ZVelJYUkRabFIxV2xSQkwxZFRNakpJWmxCNGJEZGtMemRoU1VFMmRUUXZSMW8zZVhVMUx6Tk1NRFF4YURsTWN5dFpSV2RhWldKM2FtWktRbXBWTWpOWFRFZDZka0Z0T1hWNFJGRTlQUW89",
-                                             "url":  "https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/releases/download/v1.2.3/tfjl-v1.2.3-x64-setup.exe"
+                                             "signature":  "ZFc1MGNuVnpkR1ZrSUdOdmJXMWxiblE2SUhOcFoyNWhkSFZ5WlNCbWNtOXRJSFJoZFhKcElITmxZM0psZENCclpYa0tVbFZSZFdKdlEwSnZZalpUU0VsNVFuUkliMjVyTVhvNWVVUkNZMHAyYXpKR1UxZEZXVmRGTlhWa1lreG9lVmh1SzJSeVIyVmxjMmxTTDNGVVkyMTJjMWd5TkZNNWVUQTBVbXN4Y2toTE5VcGtOamhrT0Vkd09WWnJkRlZDUTBOTlMwRXdQUXAwY25WemRHVmtJR052YlcxbGJuUTZJSFJwYldWemRHRnRjRG94TnpnMU16SXpOakF3Q1dacGJHVTZkR1pxYkMxaGMzTnBjM1JoYm5SZk1TNHlMalJmZURZMExYTmxkSFZ3TG1WNFpRcE1PV05YV1ZWSlVrZGxka0Z4Y0hkNlZrZExjVk5QVjFsa1VHcHlSMGRQZEhaSU56bE5jMWRuYlhKblZITm5hME0xUVRGQ1FYZE5jM1ZMV0V0TFEyVkhiMk5PY1d0YU5ISTVRMFUwWlRCbmFrbDRlREpEWnowOUNnPT0=",
+                                             "url":  "https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/releases/download/v1.2.4/tfjl-assistant_1.2.4_x64-setup.exe"
                                          }
                   },
-    "pub_date":  "2026-07-29T18:40:00+08:00",
-    "version":  "1.2.3",
-    "notes":  "v1.2.3 修复自动更新下载\n- 修复更新下载被本机残留代理端口(127.0.0.1:7897)拦截导致失败的问题，更新改为直连下载\n- 含 1.2.2 的 Umi-OCR 自动启动 + 系统托盘"
+    "notes":  "v1.2.4 阵容识别体验大优化\n- 新增 Umi-OCR 一键下载安装（自动下到本助手数据目录并静默解压）\n- 新增「🔍 自动查找」自动扫描本机 Umi-OCR 位置\n- 新增「🚀 启动识别引擎」按钮，关掉后可一键重开\n- 修复 APP 内下载按钮无法弹浏览器的问题\n- 安装包文件名改为英文便于更新（桌面程序名仍为中文「塔防精灵助手」）",
+    "pub_date":  "2026-07-29T19:15:00+08:00",
+    "version":  "1.2.4"
 }
