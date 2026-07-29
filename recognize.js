@@ -148,14 +148,28 @@
     try{ path = await tauriInvoke('download_umi_ocr'); }
     catch(e){
       const msg = (e && e.message || e) + '';
-      if(tip) setTip(tip,'rgba(255,167,38,0.18)','#ffb74d',
-        '⚠️ 自动下载失败：'+escapeHtml(msg)+'。可改用<a href="#" data-act="dl" style="color:#4fc3f7;text-decoration:underline;margin:0 4px;">浏览器下载</a>，解压到 <b>D:\\withfriends\\塔防精灵助手数据\\Umi-OCR</b> 后点「🔍 自动查找」。');
+      if(window._umiDlFailCount == null) window._umiDlFailCount = 0;
+      window._umiDlFailCount++;
+      const times = window._umiDlFailCount;
+      const dlDir = 'D:\\withfriends\\塔防精灵助手数据\\Umi-OCR';
+      const manual = '① 点 <a href="#" data-act="dl" style="color:#4fc3f7;text-decoration:underline;">🌐 手动下载</a>（或打开 <span style="color:#ffd54f;">'+UMI_OCR_DOWNLOAD+'</span> 下 <b>Umi-OCR_Paddle_v2.1.5</b> 版）<br>'
+        + '② 把下载的 <b>Umi-OCR_Paddle_v2.1.5.7z.exe</b> 自解压包<b>解压</b>到：<br>'
+        + '<b style="color:#ffd54f;word-break:break-all;">'+dlDir+'</b><br>（解压后会生成 <b>Umi-OCR_Paddle_v2.1.5</b> 文件夹）<br>'
+        + '③ 回来点「🔍 自动查找」或「选择 Umi-OCR.exe」指向里面的 <b>Umi-OCR.exe</b>';
+      const head = times >= 2
+        ? '⚠️ 已自动下载失败 <b>'+times+'</b> 次，建议改用手动下载：'
+        : '⚠️ 自动下载失败：'+escapeHtml(msg)+'。可重试，或按下面手动下载：';
+      const failHtml = head + '<div style="margin-top:6px;line-height:1.75;font-size:0.82rem;">' + manual
+        + '<div style="margin-top:8px;"><a href="#" data-act="install" style="color:#4fc3f7;text-decoration:underline;margin-right:14px;">🔄 重试自动下载</a>'
+        + '<a href="#" data-act="find" style="color:#4fc3f7;text-decoration:underline;">🔍 我已放好，去查找</a></div></div>';
+      if(tip) setTip(tip,'rgba(255,167,38,0.18)','#ffb74d', failHtml);
       if(st) st.textContent = '下载失败';
       window._umiDownloading = false;
       if(btn){ btn.disabled = false; btn.textContent = btn.dataset.label || '⬇ 下载安装'; btn.style.opacity=''; btn.style.cursor='pointer'; }
       return;
     }
     window._umiDownloading = false;
+    window._umiDlFailCount = 0;
     if(btn){ btn.disabled = false; btn.textContent = '✅ 已安装'; btn.style.opacity=''; btn.style.cursor='pointer'; }
     if(!path){ if(st) st.textContent='下载完成但未找到程序'; return; }
     await setStoredUmiPath(path);
