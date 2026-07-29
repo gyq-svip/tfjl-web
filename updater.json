@@ -1,11 +1,11 @@
 {
     "platforms":  {
                       "windows-x86_64":  {
-                                             "signature":  "ZFc1MGNuVnpkR1ZrSUdOdmJXMWxiblE2SUhOcFoyNWhkSFZ5WlNCbWNtOXRJSFJoZFhKcElITmxZM0psZENCclpYa0tVbFZSZFdKdlEwSnZZalpUU0V4emVtTXZibVZqYVZOSVdYaHpSSHBNVFRkM05EY3ZNVWt4WjIxWGJqWldTeTgzV0M5R1dUbE5hVk5OY3k5bVNVNVZWMWR5VUVadmVWSlJNbFJUUTBkeGEyTjVTV3BqU2tWU1EzaFJTME41TTI1VFUxRXdQUXAwY25WemRHVmtJR052YlcxbGJuUTZJSFJwYldWemRHRnRjRG94TnpnMU16TTJNelEzQ1dacGJHVTZkR1pxYkMxaGMzTnBjM1JoYm5SZk1TNHlMalZmZURZMExYTmxkSFZ3TG1WNFpRcFlPWHBuTjB4SVMyTkJNVlpuY0VORGEyMXdSSGhUY1ZKRmVtcHJiMWwwVURjemMyTldXRmxyYWtrNWRVeFlTazlvYWpKNVZDOVFTbVI2ZW5sd1pVNHJZMGxCVUM5MWNrbHJNRFUzY0haYVpHWTNZakpFZHowOUNnPT0=",
-                                             "url":  "https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/releases/download/v1.2.5/tfjl-assistant_1.2.5_x64-setup.exe"
+                                             "signature":  "ZFc1MGNuVnpkR1ZrSUdOdmJXMWxiblE2SUhOcFoyNWhkSFZ5WlNCbWNtOXRJSFJoZFhKcElITmxZM0psZENCclpYa0tVbFZSZFdKdlEwSnZZalpUU0VaSWNUZHJRM2RXUjFOVk5FWk5WV2xXZEhSaGJrbHxiVWx0WjJSUFFrTnFkME5tZGs1SWVFOWhlV1F4ZWxWTFVHcFROaXRUT0hGMlMxbERkV1pZYVU1RmVXOHdVVlJLTkdsTFRHVktjMGRyY0RjemNGRkZQUXAwY25WemRHVmtJR052YlcxbGJuUTZJSFJwYldWemRHRnRjRG94TnpnMU16UXpNelkwQ1dacGJHVTZkR1pxYkMxaGMzTnBjM1JoYm5SZk1TNHlMalpmZURZMExYTmxkSFZ3TG1WNFpRcDdVekpOWlZST2RqQm9ka2RaV2tGT05FeDViekZrU0hoeU9VSXlkR0ZETHl0UlEzUlJaMDlDWjFwMk1VaExaa1JYSzJnd2FFcEhkbmszTW1abFlVNHJka281YzNsSUwyUnBaM0pqZDFkRFFVdDNUMHRCZHowOUNnPT0=",
+                                             "url":  "https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/releases/download/v1.2.6/tfjl-assistant_1.2.6_x64-setup.exe"
                                          }
                   },
-    "notes":  "v1.2.5 修复多开实例 + 更新通知去重\n- 修复双击 exe 多开进程导致托盘图标叠加、窗口打不开退不出的问题（新增单实例 TCP 锁）\n- 修复每次启动都重复弹出更新通知的问题（localStorage 版本去重）\n- 修复更新状态机竞态（fillCurrentVersion 先于 updater 检查）\n- APP 本地设置扫描文件新增「📢 分享到需求墙」按钮",
-    "pub_date":  "2026-07-29T22:45:00+08:00",
-    "version":  "1.2.5"
+    "notes":  "v1.2.6 修复托盘 + 分享加密加固\n- 修复托盘左键点击不弹菜单导致无法打开/退出的问题（改为左键右键都弹菜单）\n- 分享加密增加 crypto.subtle 降级（WebView 不支持 Web Crypto 时仍能正常加密）\n- 自动更新安装前增加 300ms 等待 + downloadAndInstall 兜底，修复 Update.install called before Update.download\n- 分享成功后弹密码提醒框（带复制按钮），方便把密码转发给接收者",
+    "pub_date":  "2026-07-30T00:45:00+08:00",
+    "version":  "1.2.6"
 }
