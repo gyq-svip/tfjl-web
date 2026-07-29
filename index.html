@@ -8916,29 +8916,29 @@
 
         // ===== 分享选项（时长 + 密码） =====
 
-        // 密码哈希（SHA-256，用于消息元数据中验证）
-        // 优先用 Web Crypto（安全），不可用时降级到简单哈希（保证功能可用）
-        async function hashPassword(password) {
-            try {
-                if (window.crypto && window.crypto.subtle) {
-                    const encoder = new TextEncoder();
-                    const data = encoder.encode(password);
-                    const hash = await crypto.subtle.digest('SHA-256', data);
-                    return btoa(String.fromCharCode(...new Uint8Array(hash)));
-                }
-            } catch (e) { /* 降级到简单哈希 */ }
-            // 降级哈希（FNV-1a 变体）
-            let h1 = 0x811c9dc5, h2 = 0x1000193;
-            for (let i = 0; i < password.length; i++) {
-                const c = password.charCodeAt(i);
-                h1 = (h1 ^ c) * 0x01000193;
-                h2 = (h2 + c * 16777619) >>> 0;
-            }
-            return 'fnv' + (h1 >>> 0).toString(16) + (h2 >>> 0).toString(16);
+        // ===== 分享加密（方案A：PBKDF2 + AES-GCM） =====
+        // 防暴力/字典破解靠：①KDF 故意算很慢（迭代次数高，每试一个密码都要跑很多轮哈希）
+        // ②随机 salt（存在密文里，salt 不需保密，仅用于防止预存彩虹表）
+        // 说明：不靠"加时间/日期"——时间若保密则合法方也解不开，若公开则攻击者也能用，毫无净收益。
+        const _ENC_FIXED_SALT = 'tfjl-share-v2-salt'; // 应用级固定 salt（公开无妨），仅用于密码哈希校验
+        const _PBKDF2_ITER = 200000;                  // 迭代次数：让单次猜测成本≈数十毫秒，拖慢字典攻击
+        const _ENC_PREFIX = 'tfjlA1$';                // 新格式标记，用于与旧 XOR 密文区分（兼容历史分享）
+
+        function _abToB64(buf) {
+            const bytes = new Uint8Array(buf);
+            let bin = '';
+            for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+            return btoa(bin);
+        }
+        function _b64ToAb(b64) {
+            const bin = atob(b64);
+            const bytes = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+            return bytes.buffer;
         }
 
-        // 简单加密（XOR + Base64）—— 防止明文直接暴露在公开 Gist 中
-        function encryptContent(content, password) {
+        // 旧 XOR 实现（仅作兼容回退，不再用于新分享）
+        function _legacyEncrypt(content, password) {
             const key = password;
             let encrypted = '';
             for (let i = 0; i < content.length; i++) {
@@ -8946,9 +8946,7 @@
             }
             return btoa(unescape(encodeURIComponent(encrypted)));
         }
-
-        // 解密
-        function decryptContent(encryptedBase64, password) {
+        function _legacyDecrypt(encryptedBase64, password) {
             try {
                 const key = password;
                 const encrypted = decodeURIComponent(escape(atob(encryptedBase64)));
@@ -8958,8 +8956,91 @@
                 }
                 return decrypted;
             } catch (e) {
-                return null; // 密码错误或数据损坏
+                return null;
             }
+        }
+
+        // 密码哈希（v2：PBKDF2-SHA256 慢哈希，抵抗对公开哈希的离线暴破）
+        // 返回 'v2$<base64>'
+        async function hashPassword(password) {
+            try {
+                if (window.crypto && window.crypto.subtle) {
+                    const enc = new TextEncoder();
+                    const salt = enc.encode(_ENC_FIXED_SALT);
+                    const km = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveBits']);
+                    const bits = await crypto.subtle.deriveBits(
+                        { name: 'PBKDF2', salt: salt, iterations: _PBKDF2_ITER, hash: 'SHA-256' }, km, 256);
+                    return 'v2$' + _abToB64(bits);
+                }
+            } catch (e) { /* 降级 */ }
+            let h1 = 0x811c9dc5, h2 = 0x1000193;
+            for (let i = 0; i < password.length; i++) {
+                const c = password.charCodeAt(i);
+                h1 = (h1 ^ c) * 0x01000193;
+                h2 = (h2 + c * 16777619) >>> 0;
+            }
+            return 'fnv' + (h1 >>> 0).toString(16) + (h2 >>> 0).toString(16);
+        }
+
+        // 验证密码：兼容旧 SHA-256/fnv 哈希 与 新 v2 PBKDF2 哈希（旧分享仍可解密）
+        async function verifyPassword(input, storedHash) {
+            if (!storedHash) return false;
+            if (storedHash.indexOf('v2$') === 0) {
+                return (await hashPassword(input)) === storedHash;
+            }
+            // 旧版哈希
+            try {
+                if (window.crypto && window.crypto.subtle) {
+                    const data = new TextEncoder().encode(input);
+                    const hash = await crypto.subtle.digest('SHA-256', data);
+                    if (btoa(String.fromCharCode(...new Uint8Array(hash))) === storedHash) return true;
+                }
+            } catch (e) {}
+            let h1 = 0x811c9dc5, h2 = 0x1000193;
+            for (let i = 0; i < input.length; i++) {
+                const c = input.charCodeAt(i);
+                h1 = (h1 ^ c) * 0x01000193;
+                h2 = (h2 + c * 16777619) >>> 0;
+            }
+            return ('fnv' + (h1 >>> 0).toString(16) + (h2 >>> 0).toString(16)) === storedHash;
+        }
+
+        // 加密（方案A：PBKDF2 派生密钥 + AES-GCM，密文 = tfjlA1$ + base64(salt|iv|ct)）
+        async function encryptContent(content, password) {
+            try {
+                if (window.crypto && window.crypto.subtle) {
+                    const enc = new TextEncoder();
+                    const salt = crypto.getRandomValues(new Uint8Array(16));
+                    const iv = crypto.getRandomValues(new Uint8Array(12));
+                    const km = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']);
+                    const key = await crypto.subtle.deriveKey(
+                        { name: 'PBKDF2', salt: salt, iterations: _PBKDF2_ITER, hash: 'SHA-256' },
+                        km, { name: 'AES-GCM', length: 256 }, false, ['encrypt']);
+                    const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, enc.encode(content));
+                    const blob = new Uint8Array(16 + 12 + ct.byteLength);
+                    blob.set(salt, 0); blob.set(iv, 16); blob.set(new Uint8Array(ct), 28);
+                    return _ENC_PREFIX + _abToB64(blob.buffer);
+                }
+            } catch (e) { /* 降级到旧 XOR */ }
+            return _legacyEncrypt(content, password);
+        }
+
+        // 解密：新格式(AES-GCM)优先；否则回退旧 XOR（兼容历史分享）
+        async function decryptContent(encryptedBase64, password) {
+            try {
+                if (encryptedBase64 && encryptedBase64.indexOf(_ENC_PREFIX) === 0 && window.crypto && window.crypto.subtle) {
+                    const blob = new Uint8Array(_b64ToAb(encryptedBase64.slice(_ENC_PREFIX.length)));
+                    const salt = blob.slice(0, 16), iv = blob.slice(16, 28), ct = blob.slice(28);
+                    const enc = new TextEncoder();
+                    const km = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']);
+                    const key = await crypto.subtle.deriveKey(
+                        { name: 'PBKDF2', salt: salt, iterations: _PBKDF2_ITER, hash: 'SHA-256' },
+                        km, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
+                    const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv }, key, ct);
+                    return new TextDecoder().decode(pt);
+                }
+            } catch (e) { /* 密码错/损坏 → 回退旧 XOR */ }
+            return _legacyDecrypt(encryptedBase64, password);
         }
 
         // 分享成功后的密码提醒弹窗（让用户记住/复制密码，转发给接收者）
@@ -9132,7 +9213,7 @@
                 let uploadContent = scriptContent;
                 let passwordHash = null;
                 if (sharePassword) {
-                    uploadContent = encryptContent(scriptContent, sharePassword);
+                    uploadContent = await encryptContent(scriptContent, sharePassword);
                     passwordHash = await hashPassword(sharePassword);
                 }
                 const response = await fetch('https://api.github.com/gists', {
@@ -9234,7 +9315,7 @@
                 let uploadContent = file.content;
                 let passwordHash = null;
                 if (sharePassword) {
-                    uploadContent = encryptContent(file.content, sharePassword);
+                    uploadContent = await encryptContent(file.content, sharePassword);
                     passwordHash = await hashPassword(sharePassword);
                 }
                 const response = await fetch('https://api.github.com/gists', {
@@ -14325,7 +14406,7 @@
                 let uploadContent = content;
                 let passwordHash = null;
                 if (sharePassword) {
-                    uploadContent = encryptContent(content, sharePassword);
+                    uploadContent = await encryptContent(content, sharePassword);
                     passwordHash = await hashPassword(sharePassword);
                 }
                 const response = await fetch('https://api.github.com/gists', {
@@ -22248,7 +22329,7 @@ function hasGistToken() {
         }
 
         // 预览需求墙分享的脚本文件
-        // isEncrypted: 是否加密, passwordHash: SHA-256 hash 用于验证密码
+        // isEncrypted: 是否加密, passwordHash: v2 PBKDF2 哈希(或旧 SHA-256/fnv) 用于验证密码
         async function previewScriptFile(url, isEncrypted = false, passwordHash = '') {
             // 加密文件先提示输入密码
             let decryptPassword = '';
@@ -22256,7 +22337,7 @@ function hasGistToken() {
                 decryptPassword = prompt('该文件已加密，请输入查看密码：');
                 if (!decryptPassword) return;
                 // 验证密码
-                const inputHash = await hashPassword(decryptPassword);
+                const inputHash = await verifyPassword(decryptPassword, passwordHash);
                 if (inputHash !== passwordHash) {
                     alert('❌ 密码错误，无法查看此文件');
                     return;
@@ -22337,7 +22418,7 @@ function hasGistToken() {
 
                 // 解密（如果文件被加密）
                 if (isEncrypted && decryptPassword) {
-                    const decrypted = decryptContent(content, decryptPassword);
+                    const decrypted = await decryptContent(content, decryptPassword);
                     if (decrypted === null) {
                         alert('❌ 解密失败，可能是密码不正确或文件已损坏');
                         return;
@@ -22504,7 +22585,7 @@ function hasGistToken() {
             if (isEncrypted) {
                 decryptPassword = prompt('该文件已加密，请输入下载密码：');
                 if (!decryptPassword) return;
-                const inputHash = await hashPassword(decryptPassword);
+                const inputHash = await verifyPassword(decryptPassword, passwordHash);
                 if (inputHash !== passwordHash) {
                     alert('❌ 密码错误，无法下载');
                     return;
@@ -22542,7 +22623,7 @@ function hasGistToken() {
 
                 // 解密（如果加密）
                 if (isEncrypted && decryptPassword) {
-                    const decrypted = decryptContent(content, decryptPassword);
+                    const decrypted = await decryptContent(content, decryptPassword);
                     if (decrypted === null) {
                         alert('❌ 解密失败，可能密码不正确');
                         return;
@@ -22992,7 +23073,7 @@ ${maSection}
             if (isEncrypted) {
                 const decPwd = prompt('该文件已加密，请输入导入密码：');
                 if (!decPwd) return; // 用户取消，不显示任何提示，直接退出
-                const decHash = await hashPassword(decPwd);
+                const decHash = await verifyPassword(decPwd, passwordHash);
                 if (decHash !== passwordHash) { alert('❌ 密码错误，无法导入'); return; }
                 verifiedPwd = decPwd;
             }
@@ -23085,7 +23166,7 @@ ${maSection}
                     if (!content) continue;
                     if (isEncrypted) {
                         // 密码已在进入函数前核对，直接使用已验证密码解密
-                        const decrypted = decryptContent(content, verifiedPwd);
+                        const decrypted = await decryptContent(content, verifiedPwd);
                         if (decrypted === null) { toast.remove(); alert('❌ 解密失败，可能密码不正确或文件已损坏'); return; }
                         content = decrypted;
                     }
@@ -23496,7 +23577,7 @@ ${maSection}
                 if (isEncrypted) {
                     const decPwd = prompt('该文件已加密，请输入导入密码：');
                     if (!decPwd) return; // 用户取消，不弹任何界面，直接退出
-                    const decHash = await hashPassword(decPwd);
+                    const decHash = await verifyPassword(decPwd, passwordHash);
                     if (decHash !== passwordHash) { alert('❌ 密码错误，无法导入'); return; }
                     _laoMaVerifiedPwd = decPwd;
                 } else {
@@ -23609,7 +23690,7 @@ ${maSection}
                         _laoMaVerifiedPwd = null;
                         return;
                     }
-                    const decrypted = decryptContent(content, pwd);
+                    const decrypted = await decryptContent(content, pwd);
                     if (decrypted === null) {
                         toast.remove();
                         alert('❌ 解密失败，可能密码不正确或文件已损坏');
@@ -23782,7 +23863,7 @@ ${maSection}
                     // 有密码则加密内容
                     let uploadContent = content;
                     if (sharePassword) {
-                        uploadContent = encryptContent(content, sharePassword);
+                        uploadContent = await encryptContent(content, sharePassword);
                     }
 
                     // 上传到 Gist
@@ -23962,9 +24043,9 @@ ${maSection}
                 if (isEncrypted) {
                     const decPwd = prompt('该备份已加密，请输入导入密码：');
                     if (!decPwd) return;
-                    const decHash = await hashPassword(decPwd);
+                    const decHash = await verifyPassword(decPwd, passwordHash);
                     if (decHash !== passwordHash) { alert('❌ 密码错误，无法导入'); return; }
-                    const decrypted = decryptContent(backupContent, decPwd);
+                    const decrypted = await decryptContent(backupContent, decPwd);
                     if (decrypted === null) { alert('❌ 解密失败，可能密码不正确或文件已损坏'); return; }
                     backupContent = decrypted;
                 }
@@ -28048,7 +28129,7 @@ ${maSection}
         </style>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260730-09</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260730-10</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
