@@ -1,11 +1,11 @@
 // ============================================================
 // Service Worker v5 - 塔防助手 PWA 缓存策略
 // 策略：StaleWhileRevalidate（先用缓存秒开，后台静默更新）
-// v33: 强制刷新缓存（1.2.7）——修复托盘菜单失灵 + 单实例更新接管；
-//      提升 CACHE_VERSION 触发 activate 清空所有 tfjl- 缓存，确保拿到最新前端
+// v34: 再次强制刷新缓存——修复"分享加密密码框不显示"（旧 SW 用 cacheFirst 缓存旧 index.html 不更新）；
+//      提升 CACHE_VERSION 触发 activate 清空所有 tfjl- 缓存，确保拿到最新前端（含分享密码框）
 // ============================================================
 
-const CACHE_VERSION = 'tfjl-v117';
+const CACHE_VERSION = 'tfjl-v118';
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
