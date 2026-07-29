@@ -989,6 +989,12 @@ if (isTauriApp) {
         const statsEl = document.getElementById('fuzzyStatsArea');
         if (!listEl) return;
 
+        // 记录焦点与光标位置，渲染后恢复（避免搜索框每输入一个字母就丢焦点、需重新点）
+        const _active = document.activeElement;
+        const _prevId = _active && _active.id;
+        const _prevStart = (_active && typeof _active.selectionStart === 'number') ? _active.selectionStart : null;
+        const _prevEnd = (_active && typeof _active.selectionEnd === 'number') ? _active.selectionEnd : null;
+
         // 筛选处理
         let displayFiles = scannedFiles;
         if (_scannedFilterCategory && _scannedFilterCategory !== '全部') {
@@ -999,12 +1005,7 @@ if (isTauriApp) {
             displayFiles = displayFiles.filter(f => f.name.toLowerCase().includes(kw));
         }
 
-        if (displayFiles.length === 0) {
-            listEl.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">未找到 txt/json 文件</div>';
-            if (statsEl) statsEl.innerHTML = '';
-            window.scannedFiles = scannedFiles;
-            return;
-        }
+        const isEmpty = displayFiles.length === 0;
 
         const cats = ['全部', '寒冰', '暗月', '漩涡', '合作', '深海', '活动', '日志', '临时', '其他'];
         const colorMap = {
@@ -1029,7 +1030,9 @@ if (isTauriApp) {
         }
         html += '</div>';
 
-        if (_shareModeScanned) {
+        if (isEmpty) {
+            html += '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">未找到 txt/json 文件</div>';
+        } else if (_shareModeScanned) {
             // 分享模式：扁平列表，文件名点击直接分享，勾选批量分享
             html += `<div style="display:flex;align-items:center;justify-content:space-between;margin:6px 0;color:rgba(255,255,255,0.6);font-size:0.75rem;">
                 <span>📢 分享模式：点击文件名直接分享，或勾选批量分享</span>
@@ -1082,6 +1085,13 @@ if (isTauriApp) {
         }
         listEl.innerHTML = html;
         window.scannedFiles = scannedFiles;
+        // 恢复搜索框焦点与光标（关键修复：输入时不丢焦点，无需每输一个字母再点一次）
+        if (_prevId) {
+            const _el = document.getElementById(_prevId);
+            if (_el) {
+                try { _el.focus(); if (_prevStart != null) _el.setSelectionRange(_prevStart, _prevEnd); } catch (e) {}
+            }
+        }
         refreshBatchScannedShareBtnFromMain();
 
         // 显示模糊分类统计
