@@ -1214,9 +1214,9 @@
             // 设置管理员面板触发
             setupAdminTrigger();
             
-            // 恢复上次房间
+            // 恢复上次房间（昵称统一用全局昵称 TFJL_UserName）
             const savedRoom = localStorage.getItem('TFJL_ChatRoom');
-            const savedNick = localStorage.getItem('TFJL_ChatNick');
+            const savedNick = localStorage.getItem('TFJL_UserName') || localStorage.getItem('TFJL_ChatNick');
             if (savedRoom && savedNick) {
                 currentChatRoom = savedRoom;
                 currentChatNick = savedNick;
@@ -2130,15 +2130,27 @@
         function openChatRoomEntry() {
             document.getElementById('chatRoomEntryModal').style.display = 'flex';
             
-            // 填充已保存的房间和昵称
+            // 填充已保存的房间和昵称（昵称统一用全局昵称 TFJL_UserName）
             const savedRoom = localStorage.getItem('TFJL_ChatRoom');
-            const savedNick = localStorage.getItem('TFJL_ChatNick') || localStorage.getItem('TFJL_UserName');
-            
+            const savedNick = localStorage.getItem('TFJL_UserName') || '';
+            const hasSetNick = localStorage.getItem('TFJL_HasSetNick') === 'true';
+            const nickInput = document.getElementById('chatRoomNickInput');
+            const nickEditBtn = document.getElementById('nickEditBtn');
+            nickInput.value = savedNick;
+            if (hasSetNick && savedNick) {
+                nickInput.readOnly = true;
+                nickEditBtn.textContent = '已设置';
+                nickEditBtn.disabled = true;
+                nickEditBtn.style.opacity = '0.5';
+            } else if (savedNick) {
+                nickInput.readOnly = true;
+                nickEditBtn.textContent = '设置';
+            } else {
+                nickInput.readOnly = false;
+                nickEditBtn.textContent = '保存';
+            }
             if (savedRoom) {
                 document.getElementById('chatRoomIdInput').value = savedRoom;
-            }
-            if (savedNick) {
-                document.getElementById('chatRoomNickInput').value = savedNick;
             }
         }
 
@@ -2229,13 +2241,13 @@
                             }
                         }
                         
-                        const savedNick = localStorage.getItem('TFJL_ChatNick');
-                        const userSetName = localStorage.getItem('TFJL_UserName');
-                        
+                        // 昵称统一用全局昵称（TFJL_UserName）判断是否已注册，避免与聊天室独立键不一致
+                        const savedNick = localStorage.getItem('TFJL_UserName') || localStorage.getItem('TFJL_ChatNick');
+
                         // 检查昵称是否被占用，但允许用户使用自己设置过的昵称
                         if (usedNicks.includes(nick)) {
                             // 如果用户之前已经设置过这个昵称，允许继续使用
-                            if (!userSetName || nick !== userSetName) {
+                            if (!savedNick || nick !== savedNick) {
                                 alert(`昵称 "${nick}" 已被使用，请换一个昵称`);
                                 return;
                             }
@@ -2268,7 +2280,12 @@
             currentChatRoom = roomId;
             currentChatNick = nick;
             localStorage.setItem('TFJL_ChatRoom', roomId);
-            localStorage.setItem('TFJL_ChatNick', nick);
+            localStorage.setItem('TFJL_ChatNick', nick); // 冗余兼容旧逻辑
+            // 昵称统一到全局昵称：首次进入聊天室且未设全局昵称时，把聊天昵称同步为全局昵称
+            if (!localStorage.getItem('TFJL_UserName')) {
+                localStorage.setItem('TFJL_UserName', nick);
+                localStorage.setItem('TFJL_HasSetNick', 'true');
+            }
 
             closeChatRoomEntry();
             document.getElementById('chatRoomPanel').style.display = 'flex';
