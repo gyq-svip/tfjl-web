@@ -1,11 +1,11 @@
 {
-  "platforms": {
-    "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRdWJvQ0JvYjZTSElySGdDM0NtM1NCOTkyNndpMmpDOHFTSTlveXVGUEVxNXZnaU1ZeDVWVElZTWRubWFlTTYxOGJET3NvOFlzdENyckUxNk8vZytDM2RNYzZ6R0l4aXdNPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg1MzU4MDc0CWZpbGU6dGZqbC1zaWduLXRlbXAuZXhlCjRUSU1BL1VtaG52azVWcjJ4ODhOK0g5dGtScFpvZ0pmWFYxY1dLYzR6ZmJtaVdpM3BNSkJ3WnB0TjJaUCtLWEFPMElVV2xuN1dJQnlaVE4yL1owSER3PT0K",
-      "url": "https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/releases/download/v1.2.7/tfjl-assistant_1.2.7_x64-setup.exe"
-    }
-  },
-  "notes": "v1.2.7 修复托盘菜单失灵 + 更新真正生效\n- 修复点窗口X后托盘菜单(显示窗口/退出)全部失灵：改为在 CloseRequested 阶段 prevent_close 并隐藏到托盘，窗口不再被销毁\n- 托盘菜单\"退出\"不再依赖窗口是否存在，确保一定能退出\n- 单实例锁改为新版本接管旧进程，确保自动更新后真正运行新代码(不再被旧进程顶掉)\n- 提升前端缓存版本(tfjl-v117 / 页面 v260730-02)，强制刷新到最新前端(顺带修掉分享加密的旧缓存问题)",
-  "pub_date": "2026-07-30T03:30:00+08:00",
-  "version": "1.2.7"
+    "platforms":  {
+                      "windows-x86_64":  {
+                                             "signature":  "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRdWJvQ0JvYjZTSE1WalN5YkJxWGVaM1A0cGIyckpuQTNlOU52TWR6WFByYWZJZ0R2a21KK1hKY3FZbzlNd0NpUXZWZmJoVW9TVDJtdktXd1VSSXp2MkxhYmlZT0xQZlFZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg1MzYwMTIxCWZpbGU6dGZqbC1zaWduLXRlbXAuZXhlCkRtWCtvTjcySnlKTUp0M1dSQ3l5dzFTMkdmNWpLRE8vT2YvaEg3Nit2UGdYZGdzSnJybldvd04zY0IzUmN1eGw4eEY3aVNJSGtXVWgzeElYVTVKZUR3PT0K",
+                                             "url":  "https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/releases/download/v1.2.8/tfjl-assistant_1.2.8_x64-setup.exe"
+                                         }
+                  },
+    "notes":  "v1.2.8 升级版本号以触发自动更新（修复 1.2.7 未升号导致更新器不弹的冲突）\n- 版本号 1.2.7 → 1.2.8，所有低于 1.2.8 的版本点检查更新都会自动收到\n- 托盘修复同 1.2.7：左键开窗、右键菜单(显示窗口 / 隐藏到托盘 / 退出)\n- Gitee Release 仅作国内安装包下载镜像（无需上传 .sig，签名写在 updater.json 中）",
+    "pub_date":  "2026-07-30T05:30:00+08:00",
+    "version":  "1.2.8"
 }
