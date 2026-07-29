@@ -2,7 +2,7 @@
  * 阵容识别模块（独立入口 + 灌入脚本生成）
  * - 粘贴/选择战斗截图 → ⚡自动识别 10 张英雄卡（全图 OCR，无需对齐）
  * - 100 英雄库校验（✓对 / ⚠4字留意 / ✗不在100库）
- * - OCR 来源优先级：Tauri 桥接(umi_ocr) → /umi-ocr 本地代理 → Tesseract.js(CDN 兜底)
+ * - OCR 仅用本机 Umi-OCR：Tauri 桥接(umi_ocr) → /umi-ocr 本地代理（开发环境）；不依赖任何云端 OCR，未安装 Umi-OCR 则不支持识别
  * - “填入脚本生成”把通过校验的英雄按 上阵：英雄1,英雄2,… 写入 #parserInput
  * 说明：皮肤不参与识别，只认 100 个精确英雄卡名。
  * ============================================================ */
@@ -73,11 +73,11 @@
         tip.style.color = '#81c784';
         tip.innerHTML = '✅ 已连接本机 Umi-OCR（离线精准识别）';
       } else if(av === false){
-        tip.style.background = 'rgba(255,167,38,0.15)';
+        tip.style.background = 'rgba(255,167,38,0.18)';
         tip.style.color = '#ffb74d';
-        tip.innerHTML = '⚠️ 未检测到本机 Umi-OCR 离线识别引擎。'
+        tip.innerHTML = '⚠️ 阵容识别依赖本机 Umi-OCR（<b>完全免费开源</b>，需自行安装）。'
           + '<a href="'+UMI_OCR_DOWNLOAD+'" target="_blank" rel="noopener" style="color:#4fc3f7;text-decoration:underline;margin:0 4px;">点击下载安装</a>'
-          + '（建议选 Paddle 版）后保持后台运行即可获得精准识别；不安装也能用（联网云端识别，精度略低）。';
+          + '（建议选 Paddle 版）。安装后<b>双击打开 Umi-OCR 并保持后台运行</b>即可使用；未安装则不支持此功能。';
       } else {
         tip.style.display = 'none'; // 浏览器环境不提示安装
       }
@@ -114,49 +114,24 @@
     return {x0,y0,x1,y1,cx:(x0+x1)/2,cy:(y0+y1)/2,w:x1-x0,h:y1-y0};
   }
 
-  // 优先级：Tauri 桥接 → /umi-ocr 代理 → Tesseract.js(CDN)
+  // 仅使用本机 Umi-OCR：APP 内走 Tauri 桥接，开发环境走本地代理。
+  // 不依赖任何云端 OCR；未安装 Umi-OCR 则直接报错，由弹窗提示用户安装。
   async function ocrItems(dataUrl){
     const b64 = dataUrl.split(',')[1];
     if(isTauri()){
-      try{
-        const j = await tauriInvoke('umi_ocr', {
-          base64: b64,
-          options: { data:{format:'dict'}, ocr:{language:'models/config_chinese.txt', cls:true} }
-        });
-        if(j && j.code===100) return {items: j.data||[], source:'Umi-OCR(桥接)'};
-        if(j && j.code===101) return {items:[], source:'Umi-OCR(空)'};
-        throw new Error(typeof j==='string'?j:(j&&j.data)||'未知');
-      }catch(e){ /* 桥接失败，回退 */ console.warn('[识别] 桥接失败:', e.message); }
+      const j = await tauriInvoke('umi_ocr', {
+        base64: b64,
+        options: { data:{format:'dict'}, ocr:{language:'models/config_chinese.txt', cls:true} }
+      });
+      if(j && j.code===100) return {items: j.data||[], source:'Umi-OCR(桥接)'};
+      if(j && j.code===101) return {items:[], source:'Umi-OCR(空)'};
+      throw new Error(typeof j==='string'?j:(j&&j.data)||'Umi-OCR 返回异常');
     }
-    // 本地代理（tools/server.js）
-    try{
-      const resp = await fetch('/umi-ocr', {method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({base64:b64, options:{data:{format:'dict'}, ocr:{language:'models/config_chinese.txt', cls:true}}})});
-      if(resp.ok){ const j = await resp.json(); if(j.code===100) return {items:j.data||[], source:'Umi-OCR(代理)'}; }
-    }catch(e){ /* 回退 */ }
-    // Tesseract.js 兜底（需联网加载 CDN）
-    return await tesseractItems(dataUrl);
-  }
-
-  let _worker = null;
-  async function tesseractItems(dataUrl){
-    if(!_worker){
-      const s = document.createElement('script');
-      s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
-      document.head.appendChild(s);
-      await new Promise((res,rej)=>{ s.onload=res; s.onerror=()=>rej(new Error('Tesseract CDN 加载失败(需联网)')); });
-      _worker = await Tesseract.createWorker('chi_sim', 1, { logger:()=>{} });
-    }
-    const cv = document.createElement('canvas');
-    const img = new Image();
-    await new Promise((res,rej)=>{ img.onload=res; img.onerror=rej; img.src=dataUrl; });
-    cv.width=img.naturalWidth; cv.height=img.naturalHeight;
-    cv.getContext('2d').drawImage(img,0,0);
-    const { data } = await _worker.recognize(cv);
-    const items = (data.words||[])
-      .filter(w => w.text && w.text.trim())
-      .map(w => ({ text: w.text.trim(), box:[[w.bbox.x0,w.bbox.y0],[w.bbox.x1,w.bbox.y0],[w.bbox.x1,w.bbox.y1],[w.bbox.x0,w.bbox.y1]] }));
-    return {items, source:'Tesseract.js(兜底)'};
+    // 开发环境：本地代理（tools/server.js）
+    const resp = await fetch('/umi-ocr', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({base64:b64, options:{data:{format:'dict'}, ocr:{language:'models/config_chinese.txt', cls:true}}})});
+    if(resp.ok){ const j = await resp.json(); if(j.code===100) return {items:j.data||[], source:'Umi-OCR(代理)'}; }
+    throw new Error('本功能需要本机 Umi-OCR（免费开源），未安装则不支持识别。请在桌面端安装并双击打开 Umi-OCR 后重试。');
   }
 
   // ====================== 自动识别主流程 ======================
