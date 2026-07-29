@@ -5677,6 +5677,7 @@
         let _downloadProgress = 0;      // 0-100
         let _downloadSucceeded = false; // 下载是否真的成功完成
         let _updateVersion = null;      // 检测到的新版本号
+        const LAST_NOTIFIED_VERSION_KEY = 'tfjl_last_notified_version'; // 防止重复弹出同一版本通知
 
         function _resetUpdateState() {
             _currentUpdate = null;
@@ -6106,9 +6107,13 @@
         }
 
         // App 启动时后台自动检查更新 + 预下载（用户点「检查更新」时秒装）
+        // 注意：自动检测有去重逻辑（同一版本只通知一次），手动「检查更新」无去重（用户主动触发应如实反馈）
         async function autoCheckUpdate() {
             const isTauri = !!(window.__TAURI__ || window.__TAURI_INTERNALS__);
             if (!isTauri) return;
+
+            // 先填充当前版本号（避免竞态：Tauri updater 失败时 fallback 依赖正确的 CURRENT_VERSION）
+            await fillCurrentVersion();
 
             try {
                 // —— 优先走 Tauri updater：后台静默下载 ——
@@ -6117,10 +6122,22 @@
                         const updater = window.__TAURI__.updater;
                         const result = await updater.check();
                         const update = result && (result.update || result);
-                        if (!update) return; // 已是最新，无需下载
+                        if (!update) {
+                            // 确实已是最新 → 清除旧版本通知记录（比如用户降级后又升级的场景）
+                            try { localStorage.removeItem(LAST_NOTIFIED_VERSION_KEY); } catch(e) {}
+                            return;
+                        }
 
-                        _updateVersion = update.version || 'latest';
+                        const newVer = update.version || 'latest';
+                        _updateVersion = newVer;
                         _currentUpdate = update;
+
+                        // —— 去重：同一版本已通知过则跳过（避免每次启动都弹 toast） ——
+                        const lastNotified = (function(){ try { return localStorage.getItem(LAST_NOTIFIED_VERSION_KEY) || ''; } catch(e) { return ''; } })();
+                        if (lastNotified === newVer) {
+                            console.log('[auto-update] 版本 v' + newVer + ' 已通知过，跳过（点「检查更新」可强制重试）');
+                            return;
+                        }
 
                         // 后台静默下载（不弹 toast，不打扰用户）
                         if (typeof update.download === 'function') {
@@ -6149,12 +6166,14 @@
 
                             await _currentDownload;
                             _markDownloadSuccess();
-                            // 下载完成，显示通知
+                            // 记录已通知，防止下次启动重复弹出
+                            try { localStorage.setItem(LAST_NOTIFIED_VERSION_KEY, newVer); } catch(e) {}
                             _notifyPreDownloadReady();
                             return;
                         }
                         // 旧版 updater 无 download()，退回到仅提示
-                        _notifyNewVersion(update.version || 'latest');
+                        try { localStorage.setItem(LAST_NOTIFIED_VERSION_KEY, newVer); } catch(e) {}
+                        _notifyNewVersion(newVer);
                         return;
                     } catch (e) {
                         console.warn('[auto-update] Tauri updater 后台预下载失败:', e);
@@ -6165,7 +6184,11 @@
                 // —— 退回到 version.json 仅提示（网页版/旧版） ——
                 const result = await checkForUpdates();
                 if (result && result.hasUpdate) {
-                    _notifyNewVersion(result.version);
+                    const lastNotified = (function(){ try { return localStorage.getItem(LAST_NOTIFIED_VERSION_KEY) || ''; } catch(e) { return ''; } })();
+                    if (lastNotified !== result.version) {
+                        try { localStorage.setItem(LAST_NOTIFIED_VERSION_KEY, result.version); } catch(e) {}
+                        _notifyNewVersion(result.version);
+                    }
                 }
             } catch (e) {
                 console.warn('自动检查更新失败:', e);
@@ -27375,7 +27398,7 @@ ${maSection}
         </style>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260729-47</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260729-48</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
