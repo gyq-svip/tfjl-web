@@ -176,43 +176,68 @@
     };
   }
 
-  async function showUmiTip(){
-    const tip = $('recUmiTip');
-    if(!tip) return;
-    if(!isTauri()){ tip.style.display = 'none'; return; } // 浏览器环境不提示安装
-    tip.style.display = 'block';
-    setTip(tip, 'rgba(255,167,38,0.15)', '#ffb74d', '检测本机 Umi-OCR 中…');
+  // 把状态做成醒目的彩色药丸（🟢运行中 / 🔴异常 / 🟡进行中）
+  function setStatusPill(el, icon, text){
+    if(!el) return;
+    el.textContent = icon + ' ' + text;
+    el.style.padding = '3px 12px';
+    el.style.borderRadius = '12px';
+    el.style.fontWeight = '700';
+    el.style.fontSize = '0.82rem';
+    el.style.display = 'inline-block';
+    if(icon === '🟢'){ el.style.background = 'rgba(76,175,80,0.22)'; el.style.color = '#81c784'; }
+    else if(icon === '🔴'){ el.style.background = 'rgba(244,67,54,0.22)'; el.style.color = '#ff8a80'; }
+    else { el.style.background = 'rgba(255,167,38,0.22)'; el.style.color = '#ffb74d'; }
+  }
 
-    const av = await checkUmiOcrAvailable();
-    if(av === true){
-      setTip(tip, 'rgba(76,175,80,0.15)', '#81c784', '✅ 已连接本机 Umi-OCR（离线精准识别）');
+  // 打开阵容识别时：先检测本地引擎状态 → 未运行则自动无感启动 → 失败则醒目引导排查/下载
+  async function initUmiOnOpen(){
+    const tip = $('recUmiTip');
+    const st = $('recStatus');
+    if(!isTauri()){
+      if(tip) tip.style.display = 'none';
+      setStatusPill(st, '🔴', '浏览器环境不支持本地 OCR（请用桌面版 App）');
       return;
     }
-    // 未连接：若已记住路径则无感自动拉起
+    if(tip) tip.style.display = 'block';
+    setStatusPill(st, '🟡', '检测 Umi-OCR 状态中…');
+    const av = await checkUmiOcrAvailable();
+    if(av === true){
+      setStatusPill(st, '🟢', 'Umi-OCR 运行中（离线识别可用）');
+      if(tip) tip.style.display = 'none';
+      return;
+    }
+    // 未运行：若已记住路径则自动无感拉起
     const stored = await getStoredUmiPath();
     if(stored){
-      tip.innerHTML = '未检测到 Umi-OCR，正在自动启动…';
+      setStatusPill(st, '🟡', '未检测到引擎，正在自动启动…');
       const ok = await autoStartUmiOcr();
       if(ok){
-        setTip(tip, 'rgba(76,175,80,0.15)', '#81c784', '✅ 已自动启动本机 Umi-OCR（离线精准识别）');
+        setStatusPill(st, '🟢', 'Umi-OCR 已自动启动（离线识别可用）');
+        if(tip) tip.style.display = 'none';
         return;
       }
-      setTip(tip, 'rgba(255,167,38,0.18)', '#ffb74d',
-        '⚠️ 已尝试自动启动 Umi-OCR 但失败（记录路径：' + escapeHtml(stored) + '）。'
-        + '<a href="#" id="recPickUmi" style="color:#4fc3f7;text-decoration:underline;margin:0 4px;">重新选择 Umi-OCR.exe</a>'
-        + '，或<a href="#" data-act="find" style="color:#4fc3f7;text-decoration:underline;margin:0 4px;">🔍 自动查找</a>'
-        + '，或<a href="#" data-act="install" style="color:#4fc3f7;text-decoration:underline;margin:0 4px;">⬇ 一键下载安装</a>'
-        + '，或<a href="#" data-act="dl" style="color:#4fc3f7;text-decoration:underline;margin:0 4px;">浏览器下载</a>。');
+      // 自动启动失败 → 醒目提示排查
+      setStatusPill(st, '🔴', 'Umi-OCR 启动失败，请排查');
+      setTip(tip, 'rgba(244,67,54,0.18)', '#ff8a80',
+        '⚠️ <b>无法自动启动 Umi-OCR</b>。请排查：<br>'
+        + '① 记录路径是否还在（可能误删/移动）：<code style="font-size:0.72rem;">' + escapeHtml(stored) + '</code><br>'
+        + '② 是否被杀毒软件拦截<br>'
+        + '③ 点「🚀 启动识别引擎」手动启动，或重装：'
+        + '<a href="#" data-act="install" style="color:#4fc3f7;text-decoration:underline;margin:0 4px;">⬇ 一键下载安装</a>'
+        + '<a href="#" data-act="find" style="color:#4fc3f7;text-decoration:underline;margin:0 4px;">🔍 自动查找</a>'
+        + '<a href="#" id="recPickUmi" style="color:#4fc3f7;text-decoration:underline;margin:0 4px;">选择 exe</a>');
       bindPickUmi(tip);
       return;
     }
-    // 从未选过：提示选择（选完即自动后台拉起，无需手动打开）
+    // 从未配置：引导三种方式
+    setStatusPill(st, '🔴', '未配置 Umi-OCR');
     setTip(tip, 'rgba(255,167,38,0.18)', '#ffb74d',
-      '⚠️ 阵容识别依赖本机 Umi-OCR（<b>完全免费开源</b>、绿色软件）。不想手动找？点 '
-      + '<a href="#" data-act="install" style="color:#4fc3f7;text-decoration:underline;margin:0 4px;">⬇ 一键下载安装</a>'
-      + ' 助手会自动下到咱们目录并配好；或点<a href="#" data-act="find" style="color:#4fc3f7;text-decoration:underline;margin:0 4px;">🔍 自动查找</a>扫描本机；'
-      + '也可<a href="#" id="recPickUmi" style="color:#4fc3f7;text-decoration:underline;margin:0 4px;">手动选择 Umi-OCR.exe</a>'
-      + '（<a href="#" data-act="dl" style="color:#4fc3f7;text-decoration:underline;">浏览器下载</a>）。配好后助手会<b>自动后台启动</b>。');
+      '⚠️ 阵容识别依赖本机 <b>Umi-OCR</b>（免费开源、绿色软件，不打包进安装包）。三种方式搞定：'
+      + '<a href="#" data-act="install" style="color:#4fc3f7;text-decoration:underline;margin:0 4px;">⬇ 一键下载安装</a>（自动装到本助手目录）'
+      + '<a href="#" data-act="find" style="color:#4fc3f7;text-decoration:underline;margin:0 4px;">🔍 自动查找</a>'
+      + '<a href="#" id="recPickUmi" style="color:#4fc3f7;text-decoration:underline;margin:0 4px;">选择 exe</a>'
+      + '（或<a href="#" data-act="dl" style="color:#4fc3f7;text-decoration:underline;">浏览器下载</a>后解压到 D:\\withfriends\\塔防精灵助手数据\\Umi-OCR）。配好后助手会<b>自动后台启动</b>。');
     bindPickUmi(tip);
   }
 
@@ -373,9 +398,10 @@
             <div style="font-size:0.72rem;color:#789;margin-top:6px;">识别只认 100 个精确英雄卡名（皮肤不参与）；不在 100 库内即判“疑似识别错”。</div>
           </div>
           <div style="flex:1;min-width:280px;overflow:auto;max-height:60vh;">
+            <div id="recWarn" style="display:none;font-size:0.78rem;color:#ffb74d;background:rgba(255,167,38,0.15);padding:6px 10px;border-radius:8px;margin-bottom:8px;line-height:1.5;"></div>
             <table style="width:100%;border-collapse:collapse;font-size:0.8rem;">
               <thead><tr style="text-align:left;color:#90caf9;">
-                <th style="padding:4px;">#</th><th>OCR原文</th><th>英雄</th><th>校验(100库)</th>
+                <th style="padding:4px;">#</th><th>OCR原文</th><th>英雄</th><th>校验(100库)</th><th>操作</th>
               </tr></thead>
               <tbody id="recBody"></tbody>
             </table>
@@ -402,38 +428,68 @@
       const it = e.clipboardData && e.clipboardData.items && [...e.clipboardData.items].find(i=>i.type&&i.type.startsWith('image/'));
       if(it){ const f=it.getAsFile(); if(f){ e.preventDefault(); loadImg(f); } }
     });
+    // 超量识别（>10）提示：有人把卡组名叫英雄名会多识别，需手动删多余卡
+    function updateRecWarn(results){
+      const warn = $('recWarn');
+      if(!warn) return;
+      const remaining = results.filter(r=>!r._deleted);
+      if(remaining.length > 10){
+        warn.style.display = 'block';
+        warn.innerHTML = '⚠️ 识别到 <b>'+remaining.length+'</b> 个卡（标准应为 10 张）。可能有人把<b>卡组名</b>起了英雄名导致多识别，请在多余行的「✕ 删」去掉，否则灌入脚本生成会出错。';
+      } else {
+        warn.style.display = 'none';
+      }
+    }
+
     $('recAuto').onclick = ()=>{
       autoRecognize(currentImg, $('recCanvas'), $('recStatus'), (results, source, rowCount)=>{
         $('recSrc').textContent = '来源: '+source;
-        $('recStatus').textContent = `识别完成：${results.length} 个英雄（${rowCount} 行）`;
         const tb = $('recBody'); tb.innerHTML='';
         results.forEach(r=>{
+          r._deleted = false;
           const tr = document.createElement('tr');
           tr.style.borderTop = '1px solid #333';
           tr.innerHTML = `<td style="padding:4px;color:#90a4ae;">${r.idx}</td>
             <td style="padding:4px;">${r.text}</td>
             <td style="padding:4px;font-weight:600;color:#fff;">${r.hero}</td>
-            <td style="padding:4px;">${validCellHtml(r.valid)}</td>`;
+            <td style="padding:4px;">${validCellHtml(r.valid)}</td>
+            <td style="padding:4px;"><button data-del="${r.idx}" title="删除这张（识别多了就删掉）" style="background:rgba(244,67,54,0.25);color:#ff8a80;border:none;border-radius:6px;cursor:pointer;padding:2px 8px;font-size:0.72rem;">✕ 删</button></td>`;
           tb.appendChild(tr);
         });
+        // 绑定删除
+        tb.querySelectorAll('button[data-del]').forEach(b=>{
+          b.onclick = ()=>{
+            const id = +b.getAttribute('data-del');
+            const r = results.find(x=>x.idx===id);
+            if(r) r._deleted = true;
+            const tr = b.closest('tr');
+            if(tr){ tr.style.opacity='0.35'; tr.style.textDecoration='line-through'; }
+            updateRecWarn(results);
+          };
+        });
         overlay._results = results;
+        updateRecWarn(results);
+        $('recStatus').textContent = `识别完成：${results.length} 个英雄（${rowCount} 行）`;
       });
     };
     $('recFill').onclick = ()=>{
-      const results = overlay._results;
-      if(!results || !results.length){ alert('请先识别'); return; }
+      const all = overlay._results || [];
+      const results = all.filter(r=>!r._deleted);
+      if(!results.length){ alert('请先识别（或别把卡都删光了）'); return; }
       const heroes = results.filter(r=>r.valid && r.valid.ok).map(r=>r.hero);
       if(!heroes.length){ alert('没有通过校验的英雄可填入'); return; }
       if(typeof selectQuickCard === 'function'){
         heroes.forEach(h=> selectQuickCard(h));
         $('recStatus').textContent = `已填入 ${heroes.length} 个英雄到脚本生成`;
-        setTimeout(()=>{ overlay.style.display='none'; }, 600);
       } else {
         // 兜底：直接写 #parserInput
         const ta = $('parserInput');
         if(ta){ ta.value = '上阵：' + heroes.join(','); ta.dispatchEvent(new Event('input')); }
-        overlay.style.display='none';
       }
+      // 打开“脚本生成”界面，让用户直接看到灌入结果
+      const p = $('txtFilesPanel');
+      if(p && p.style.display === 'none' && typeof toggleTxtFilesPanel === 'function') toggleTxtFilesPanel();
+      setTimeout(()=>{ overlay.style.display='none'; }, 600);
     };
     // 常驻“启动识别引擎”按钮：关掉 Umi-OCR 后随时重新打开（显示窗口，用户可见）
     $('recLaunch').onclick = async ()=>{
@@ -467,7 +523,7 @@
     if(recInstallBtn) recInstallBtn.onclick = ()=> downloadAndInstallUmi($('recUmiTip'));
   }
 
-  function openModal(){ const o=$('recognizeOverlay'); if(o) o.style.display='flex'; showUmiTip(); }
+  function openModal(){ const o=$('recognizeOverlay'); if(o) o.style.display='flex'; initUmiOnOpen(); }
 
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', buildUI);
   else buildUI();
