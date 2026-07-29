@@ -54,6 +54,28 @@ http.createServer((req, res) => {
     });
     return;
   }
+  // —— Umi-OCR 本地服务代理（同源转发到 127.0.0.1:1224，避开浏览器 CORS / 混合内容）——
+  if (p === '/umi-ocr' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      const ureq = http.request({ host:'127.0.0.1', port:1224, path:'/api/ocr', method:'POST',
+        headers:{'Content-Type':'application/json','Content-Length':Buffer.byteLength(body)} }, ures => {
+        let ud=''; ures.on('data',c=>ud+=c); ures.on('end',()=>{ res.writeHead(ures.statusCode,{'Content-Type':'application/json; charset=utf-8','Access-Control-Allow-Origin':'*'}); res.end(ud); });
+      });
+      ureq.on('error', e => { res.writeHead(502,{'Content-Type':'application/json; charset=utf-8'}); res.end(JSON.stringify({code:-1,data:'Umi-OCR 未运行或代理错误: '+e.message})); });
+      ureq.write(body); ureq.end();
+    });
+    return;
+  }
+  if (p === '/umi-options' && req.method === 'GET') {
+    const ureq = http.request({ host:'127.0.0.1', port:1224, path:'/api/ocr/get_options', method:'GET' }, ures => {
+      let ud=''; ures.on('data',c=>ud+=c); ures.on('end',()=>{ res.writeHead(ures.statusCode,{'Content-Type':'application/json; charset=utf-8','Access-Control-Allow-Origin':'*'}); res.end(ud); });
+    });
+    ureq.on('error', e => { res.writeHead(502,{'Content-Type':'application/json; charset=utf-8'}); res.end(JSON.stringify({error:e.message})); });
+    ureq.end();
+    return;
+  }
   fs.readFile(fp, (e, d) => {
     if (e) { res.writeHead(404, {'Content-Type':'text/plain; charset=utf-8'}); res.end('404: ' + fp); return; }
     res.writeHead(200, {'Content-Type': TYPES[path.extname(fp)] || 'application/octet-stream'});
