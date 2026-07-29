@@ -639,23 +639,26 @@ let LINEUPS = [];                                   // [{name, heroes:[norm名]}
 function normHero(s){ return (s||'').toLowerCase().replace(/·/g,'').replace(/\s/g,'').replace(/[，。、:：]/g,'').trim(); }
 
 async function loadGameHeroes(){
-  // 选项A：用游戏卡名表(224名)扩充英雄库，提升 OCR 白名单覆盖。
-  // ⚠️ 必须【合并】而非覆盖：224 表抽取不全，缺 天使/风灵/射线/宝库/潜艇/钟馗/小炮/冰鸟 等 8 个 100 库英雄，
-  //    若直接覆盖会导致 matchHero 匹配不上这些英雄（冰鸟等“一直识别有问题”的根因）。100 库全保留。
+  // 匹配目标 = 100 精确英雄卡名（DEFAULT_HEROES）。不引入 224 名表（含大量皮肤名）。
+  // 理由：①100 英雄卡才是最准基准；②皮肤名混进匹配集会让 OCR 命中皮肤后被判“不在100库”→ 误判✗；
+  //       ③显示名变体（如 邪能火炮）已由 matchHero 的“包含(显⊃库)”+ 手动 ALIASES 覆盖，无需皮肤名兜底。
+  // 224 表仅作可选白名单增强（注释保留），默认不启用，避免噪声。
   try{
     const r = await fetch('/research/game_cardnames.json');
     if(r.ok){
       const j = await r.json();
       if(j.names && j.names.length){
-        const merged = [...new Set([...DEFAULT_HEROES, ...j.names])];
-        $('heroList').value = merged.join('\n');
-        applyDict();
-        $('dictStatus').textContent = `已合并 游戏卡名表(${j.names.length}名)+100英雄库，共 ${merged.length} 名（100库全保留）`;
-        $('dictStatus').className = 'ok';
-        log(`[字典] 已加载游戏卡名表 ${j.names.length} 名 + 100英雄库，合并 ${merged.length} 名（含皮肤，100库全保留）`);
+        // ⚠️ 仅记录，不并入匹配集：HEROES 保持 100 精确英雄名。
+        log(`[字典] 224名表可用但【不并入匹配集】（含皮肤名，易致误判）；匹配仅用 100 精确英雄名 + 手动别名`);
       }
     }
-  }catch(e){ /* 忽略，沿用默认英雄库 */ }
+  }catch(e){ /* 224 表缺失不影响 100 库匹配 */ }
+  // 匹配集固定为 100 英雄名（用户可在「英雄库」框手动追加别名行，不影响基础 100）
+  $('heroList').value = DEFAULT_HEROES.join('\n');
+  applyDict();
+  $('dictStatus').textContent = `匹配集 = 100 精确英雄卡名（不含皮肤；可手动加别名）`;
+  $('dictStatus').className = 'ok';
+  log(`[字典] 匹配集已设为 100 精确英雄卡名（${DEFAULT_HEROES.length} 名），皮肤名不进入匹配`);
 }
 
 async function loadLineups(){
