@@ -1075,6 +1075,7 @@ if (isTauriApp) {
                         <button onclick="detectFileEncoding('${safePath}')" style="background:rgba(156,39,176,0.3);color:#ce93d8;border:1px solid rgba(156,39,176,0.3);padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;">编码</button>
                         <button onclick="viewFile('${safePath}')" style="background:rgba(0,188,212,0.3);color:#00bcd4;border:1px solid rgba(0,188,212,0.3);padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;">查看</button>
                         <button onclick="loadFileToHand('${safePath}')" style="background:rgba(76,175,80,0.3);color:#4caf50;border:1px solid rgba(76,175,80,0.3);padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;">加载</button>
+                        <button onclick="shareScannedFileFromMain('${safePath}','${f.name.replace(/'/g, "\\'")}')" title="分享到需求墙" style="background:rgba(156,39,176,0.25);color:#ce93d8;border:1px solid rgba(156,39,176,0.35);padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;">📢</button>
                     </div>`;
                 });
             }
