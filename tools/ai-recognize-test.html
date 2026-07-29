@@ -94,6 +94,7 @@
     <label>模板相似阈值(越小越像) <input type="range" id="tplThr" min="5" max="40" value="20"><span id="tplThrv"></span></label>
     <button id="reconBtn" class="primary" disabled>▶ 识别当前图</button>
     <button id="reconAllBtn" disabled>▶▶ 批量识别全部</button>
+    <button id="autoBtn" class="primary" disabled style="background:linear-gradient(135deg,#4caf50,#2e7d32);">⚡ 自动识别(全图OCR·无需对齐)</button>
     <span id="status" class="hint"></span>
   </div>
   <div class="row">
@@ -330,6 +331,7 @@ let boardFiles = [];       // 批量文件
 let boardIdx = 0;
 let lastBoxes = [];        // 当前图计算出的 box 列表 {x,y,w,h}
 let lastResults = [];      // 当前图识别结果（与 boxes 对齐）
+let lastAutoBoxes = [];    // 自动识别模式下的名字框 [{x0,y0,x1,y1,cx,cy,w,h,hero,text,idx}]
 
 function refreshLabels(){
   $('bxv').textContent=$('bx').value+'%'; $('byv').textContent=$('by').value+'%';
@@ -360,6 +362,18 @@ function drawBoard(){
   const cv=$('board'), ctx=cv.getContext('2d');
   cv.width=boardImg.naturalWidth; cv.height=boardImg.naturalHeight;
   ctx.drawImage(boardImg,0,0);
+  ctx.lineWidth=Math.max(2, cv.width/600);
+  // 自动识别模式：画检测到的名字框 + 编号
+  if(lastAutoBoxes && lastAutoBoxes.length){
+    lastAutoBoxes.forEach(b=>{
+      ctx.strokeStyle='rgba(76,201,240,0.95)';
+      ctx.strokeRect(b.x0, b.y0, b.x1-b.x0, b.y1-b.y0);
+      ctx.fillStyle='rgba(76,201,240,1)';
+      ctx.font=`bold ${Math.max(13,cv.width/100)}px sans-serif`;
+      ctx.fillText(String(b.idx), b.x0+2, b.y0-3);
+    });
+    return;
+  }
   const boxes=computeBoxes();
   ctx.lineWidth=Math.max(2, cv.width/600);
   boxes.forEach((b,i)=>{
@@ -388,7 +402,8 @@ $('imgInput').addEventListener('change', async e=>{
   boardFiles = Array.from(e.target.files||[]);
   if(!boardFiles.length) return;
   boardIdx=0;
-  $('reconBtn').disabled=false; $('reconAllBtn').disabled=false;
+  $('reconBtn').disabled=false; $('reconAllBtn').disabled=false; $('autoBtn').disabled=false;
+  lastAutoBoxes=[];
   boardImg = await loadImageFile(boardFiles[0]);
   drawBoard();
   $('status').textContent = `已载入第 1/${boardFiles.length} 张：${boardFiles[0].name}`;
@@ -756,6 +771,7 @@ function combinedPick(ocr, tpl, nameTpl, cardTpl){
 
 async function recognizeCurrent(){
   if(!boardImg) return;
+  lastAutoBoxes=[];   // 切回手动模式，清掉自动框
   const engine = $('ocrEngine').value;
   if(engine==='tesseract'){
     await ensureWorker();
@@ -821,6 +837,67 @@ async function recognizeCurrent(){
   $('status').textContent='识别完成，请在"真值"列填正确答案后点"计算本图准确率"';
 }
 
+// ====================== 自动识别（全图 Umi-OCR，无需手动对齐） ======================
+// 思路：整图扔给 Umi-OCR → 过滤出能匹配 100 英雄库的名字 → 按 y 聚类成行 → 即得 10 张卡。
+// 比手动网格/图像投影都稳：Umi-OCR 中文极准且自带文字坐标，截图大小变了也能自适应。
+function boxFromUmi(ub){
+  const xs=ub.map(p=>p[0]), ys=ub.map(p=>p[1]);
+  const x0=Math.min(...xs), x1=Math.max(...xs), y0=Math.min(...ys), y1=Math.max(...ys);
+  return {x0,y0,x1,y1,cx:(x0+x1)/2,cy:(y0+y1)/2,w:x1-x0,h:y1-y0};
+}
+async function autoRecognize(){
+  if(!boardImg){ alert('请先载入截图'); return; }
+  if(!UMI_OK){ await checkUmi(); }
+  if(!UMI_OK){ alert('自动识别需 Umi-OCR 本地服务。请先启动 Umi-OCR，或改用上方手动网格 + Tesseract。'); return; }
+  $('status').textContent='全图 OCR 识别中…';
+  log('\n===== 自动识别（全图 OCR · 无需对齐）=====');
+  const cv=document.createElement('canvas'); cv.width=boardImg.naturalWidth; cv.height=boardImg.naturalHeight;
+  cv.getContext('2d').drawImage(boardImg,0,0);
+  const b64=cv.toDataURL('image/png').split(',')[1];
+  let j;
+  try{
+    const resp=await fetch('/umi-ocr',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({base64:b64,options:{data:{format:'dict'},ocr:{language:'models/config_chinese.txt',cls:true}}})});
+    j=await resp.json();
+  }catch(e){ $('status').textContent='请求失败'; alert('请求 Umi-OCR 失败: '+e.message); return; }
+  if(j.code!==100){ $('status').textContent='识别失败'; alert('Umi-OCR 失败: '+(j.data||'未知')); return; }
+  const items=j.data||[];
+  // 过滤英雄名：排除“库⊃显/模糊”等易误判 UI 文字（如“水”→水灵、“天”→天使）的弱匹配
+  const LOOSE=['包含(库⊃显)','模糊','模糊(低)'];
+  const anchors=[];
+  for(const it of items){
+    const m=matchHero(it.text);
+    if(!m.hero || LOOSE.includes(m.method)) continue;
+    const v=validateHero100(m.hero);
+    if(!v.ok) continue;            // 必须在 100 英雄库内才算一张卡
+    anchors.push({text:it.text, hero:v.hero, score:m.score, method:m.method, box:boxFromUmi(it.box), valid:v});
+  }
+  // 按 y 聚类成行（行间距 > 文字高度×1.2 视为新行）
+  anchors.sort((a,b)=>a.box.cy-b.box.cy);
+  const rows=[];
+  for(const a of anchors){
+    const last=rows.length?rows[rows.length-1]:null;
+    if(!last || Math.abs(a.box.cy-last[0].box.cy) > Math.max(a.box.h,last[0].box.h)*1.2) rows.push([a]);
+    else last.push(a);
+  }
+  rows.forEach(r=>r.sort((a,b)=>a.box.cx-b.box.cx));
+  // 生成结果（结构与 recognizeCurrent 兼容）
+  const results=[]; const autoBoxes=[]; let idx=0;
+  for(const r of rows) for(const a of r){
+    idx++;
+    const ocr={hero:a.hero, score:a.score, method:a.method};
+    results.push({raw:a.text, ocr, tpl:{hero:null,mae:NaN}, nameTpl:{hero:null,iou:NaN}, cardTpl:{hero:null,mae:NaN}, comb:a.hero, valid:a.valid});
+    autoBoxes.push({...a.box, hero:a.hero, text:a.text, idx});
+    log(`[${idx}] "${a.text}" → ${a.hero}(${a.score.toFixed(2)}) ${a.valid.ok?(a.valid.four?'⚠4字·对':'✓对'):'✗'+a.valid.reason}  @x=${(a.box.cx/cv.width*100).toFixed(0)}% y=${(a.box.cy/cv.height*100).toFixed(0)}%`);
+  }
+  lastResults=results;
+  lastAutoBoxes=autoBoxes;
+  lastBoxes=autoBoxes.map(b=>({x:b.x0,y:b.y0,w:b.x1-b.x0,h:b.y1-b.y0}));
+  renderResultTable(results);
+  matchLineups();
+  drawBoard();
+  $('status').textContent=`自动识别完成：${results.length} 个英雄（${rows.length} 行）`;
+}
+
 function renderResultTable(results){
   const tb=$('resultTbl').querySelector('tbody'); tb.innerHTML='';
   results.forEach((r,i)=>{
@@ -877,6 +954,7 @@ function renderAgg(){
 }
 
 $('reconBtn').addEventListener('click', recognizeCurrent);
+$('autoBtn').addEventListener('click', autoRecognize);
 $('calcBtn').addEventListener('click', calcAccuracy);
 $('clearTruthBtn').addEventListener('click', ()=>{
   $('resultTbl').querySelectorAll('.truth').forEach(i=>i.value='');
