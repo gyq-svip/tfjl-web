@@ -4048,6 +4048,84 @@
             document.getElementById('chatRoomEntryModal').style.display = 'none';
         }
 
+        // ========== 昵称设置（全局唯一，仅用于发言/分享脚本展示） ==========
+        async function getUsedNicks() {
+            try {
+                const token = getGistToken();
+                const r = await fetch('https://api.github.com/gists/' + GIST_ID, {
+                    headers: { 'Accept': 'application/vnd.github.v3+json', ...(token && { 'Authorization': 'token ' + token }) }
+                });
+                if (!r.ok) return [];
+                const d = await r.json();
+                const c = d.files && d.files['room_index.json'] && d.files['room_index.json'].content;
+                if (!c) return [];
+                const index = JSON.parse(c);
+                return index.usedNicks || [];
+            } catch (e) { return []; }
+        }
+
+        async function saveUsedNicks(usedNicks) {
+            const token = getGistToken();
+            if (!token) return false;
+            try {
+                const r = await fetch('https://api.github.com/gists/' + GIST_ID, {
+                    headers: { 'Accept': 'application/vnd.github.v3+json', ...(token && { 'Authorization': 'token ' + token }) }
+                });
+                if (!r.ok) return false;
+                const d = await r.json();
+                const c = d.files && d.files['room_index.json'] && d.files['room_index.json'].content;
+                const index = c ? JSON.parse(c) : {};
+                index.usedNicks = usedNicks;
+                const pr = await fetch('https://api.github.com/gists/' + GIST_ID, {
+                    method: 'PATCH',
+                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': 'token ' + token },
+                    body: JSON.stringify({ files: { 'room_index.json': { content: JSON.stringify(index, null, 2) } } })
+                });
+                return pr.ok;
+            } catch (e) { return false; }
+        }
+
+        // 确保已设置昵称：已设置直接返回；未设置弹窗强制设置（全局唯一）。取消返回 null。
+        function ensureNickname() {
+            return new Promise((resolve) => {
+                const existing = localStorage.getItem('TFJL_UserName');
+                const hasSet = localStorage.getItem('TFJL_HasSetNick') === 'true';
+                if (hasSet && existing) { resolve(existing); return; }
+
+                const modal = document.getElementById('nickSetupModal');
+                const input = document.getElementById('nickSetupInput');
+                const errEl = document.getElementById('nickSetupErr');
+                const saveBtn = document.getElementById('nickSetupSave');
+                const cancelBtn = document.getElementById('nickSetupCancel');
+                input.value = '';
+                errEl.textContent = '';
+                modal.style.display = 'flex';
+                setTimeout(() => input.focus(), 50);
+
+                const cleanup = () => {
+                    modal.style.display = 'none';
+                    saveBtn.onclick = null;
+                    cancelBtn.onclick = null;
+                    input.onkeydown = null;
+                };
+
+                cancelBtn.onclick = () => { cleanup(); resolve(null); };
+                input.onkeydown = (e) => { if (e.key === 'Enter') saveBtn.click(); };
+                saveBtn.onclick = async () => {
+                    const v = input.value.trim();
+                    if (v.length < 2) { errEl.textContent = '昵称至少 2 个字'; return; }
+                    const used = await getUsedNicks();
+                    if (used.includes(v)) { errEl.textContent = '昵称 "' + v + '" 已被使用，请换一个'; return; }
+                    localStorage.setItem('TFJL_UserName', v);
+                    localStorage.setItem('TFJL_HasSetNick', 'true');
+                    used.push(v);
+                    await saveUsedNicks(used);
+                    cleanup();
+                    resolve(v);
+                };
+            });
+        }
+
         function hideRefPreview() {
             document.getElementById('refImagePreview').classList.remove('show');
         }
@@ -9020,6 +9098,10 @@
                 return;
             }
 
+            // 强需求：分享前必须设置昵称（仅用于展示，全局唯一，取消则不打开发布）
+            const nick = await ensureNickname();
+            if (!nick) { alert('分享脚本需要先设置昵称（昵称仅用于发言/分享脚本展示，设置后不可自行修改）'); return; }
+
             if (!getGistToken()) {
                 alert('离线版暂不支持分享，请切换到在线版');
                 return;
@@ -9109,6 +9191,10 @@
         async function shareTxtFileToWall(index, providedName = null, shareOpts = null) {
             const file = txtFiles[index];
             if (!file) return;
+
+            // 强需求：分享前必须设置昵称（仅用于展示，全局唯一，取消则不打开发布）
+            const nick = await ensureNickname();
+            if (!nick) { alert('分享脚本需要先设置昵称（昵称仅用于发言/分享脚本展示，设置后不可自行修改）'); return; }
 
             if (!getGistToken()) {
                 alert('离线版暂不支持分享，请切换到在线版');
@@ -14178,6 +14264,10 @@
         async function shareScannedFileToWall(filePath, fileName, providedName = null, shareOpts = null) {
             let realPath = filePath.replace(/\\\\/g, '\\').replace(/\\'/g, "'");
             let realName = fileName.replace(/\\\\/g, '\\').replace(/\\'/g, "'");
+
+            // 强需求：分享前必须设置昵称（仅用于展示，全局唯一，取消则不打开发布）
+            const nick = await ensureNickname();
+            if (!nick) { alert('分享脚本需要先设置昵称（昵称仅用于发言/分享脚本展示，设置后不可自行修改）'); return; }
 
             if (!getGistToken()) {
                 alert('离线版暂不支持分享，请切换到在线版');
@@ -24061,12 +24151,16 @@ ${maSection}
             const nicknameInput = document.getElementById('messageNickname');
             const expireDaysSelect = document.getElementById('expireDays');
             let content = input.value.trim();
-            const nickname = nicknameInput.value.trim() || '匿名用户';
+            const nickname = nick;
 
             if (!content && !pendingScriptFile) {
                 alert('请输入内容或选择脚本文件');
                 return;
             }
+
+            // 强需求：发言前必须设置昵称（仅用于展示，全局唯一，取消则不发布）
+            const nick = await ensureNickname();
+            if (!nick) { alert('发布消息需要先设置昵称（昵称仅用于发言/分享脚本展示，设置后不可自行修改）'); return; }
 
             if (!getGistToken()) {
                 alert('离线版暂不支持发布消息，请切换到在线版');
@@ -24117,7 +24211,7 @@ ${maSection}
                 const expireCheckbox = document.getElementById('expireCheckbox');
                 if (expireCheckbox) expireCheckbox.checked = false;
 
-                localStorage.setItem('TFJL_UserName', nickname);
+                nicknameInput.value = nickname;
 
                 renderMessages();
 
@@ -24760,6 +24854,7 @@ ${maSection}
             } else if (page === 'nickManage') {
                 document.getElementById('adminPageNickManage').style.display = 'block';
                 loadCurrentNick();
+                renderNickRegistry();
             } else if (page === 'passwordManage') {
                 document.getElementById('adminPagePasswordManage').style.display = 'block';
                 loadPasswordList();
@@ -25588,6 +25683,67 @@ ${maSection}
             localStorage.setItem('TFJL_HasSetNick', 'true');
             showAdminStatus(`昵称已修改为"${newNick}"！`, 'success');
             loadCurrentNick();
+        }
+
+        // 渲染全局用户注册表（usedNicks）
+        async function renderNickRegistry() {
+            const list = document.getElementById('nickRegistryList');
+            if (!list) return;
+            list.innerHTML = '<div style="color:rgba(255,255,255,0.5);font-size:0.8rem;text-align:center;padding:10px;">加载中...</div>';
+            const used = await getUsedNicks();
+            if (!used.length) {
+                list.innerHTML = '<div style="color:rgba(255,255,255,0.5);font-size:0.8rem;text-align:center;padding:10px;">暂无注册用户</div>';
+                return;
+            }
+            const cur = localStorage.getItem('TFJL_UserName');
+            let html = '';
+            for (let i = 0; i < used.length; i++) {
+                const n = used[i];
+                const isCur = (n === cur);
+                html += '<div style="display:flex;gap:8px;align-items:center;padding:8px;background:rgba(255,255,255,0.05);border-radius:6px;margin-bottom:6px;">'
+                    + '<span style="flex:1;color:' + (isCur ? '#ffd700' : '#fff') + ';font-size:0.85rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(n) + (isCur ? '（本机）' : '') + '</span>'
+                    + '<button class="admin-btn admin-btn-secondary" style="padding:4px 10px;font-size:0.75rem;" onclick="adminRenameUser(' + i + ')">重命名</button>'
+                    + '<button class="admin-btn" style="padding:4px 10px;font-size:0.75rem;background:linear-gradient(135deg,#f44336,#d32f2f);" onclick="adminDeleteUser(' + i + ')">删除</button>'
+                    + '</div>';
+            }
+            list.innerHTML = html;
+        }
+
+        // 管理员重命名用户（同步需求墙署名）
+        async function adminRenameUser(idx) {
+            const used = await getUsedNicks();
+            const oldName = used[idx];
+            if (!oldName) return;
+            const newName = prompt('将昵称重命名为：', oldName);
+            if (!newName) return;
+            const v = newName.trim();
+            if (v.length < 2) { alert('昵称至少 2 个字'); return; }
+            if (used.includes(v)) { alert('昵称 "' + v + '" 已被使用'); return; }
+            if (!confirm('确定将 "' + oldName + '" 重命名为 "' + v + '"？\n需求墙署名也会同步更新。')) return;
+            used[idx] = v;
+            wallMessages.forEach(function(m) { if (m.author === oldName) m.author = v; });
+            await saveUsedNicks(used);
+            await saveMessagesToGist();
+            renderMessages();
+            renderNickRegistry();
+            showAdminStatus('已重命名为 "' + v + '"', 'success');
+        }
+
+        // 管理员删除用户（昵称释放可重注册；若为本机则清本地设置）
+        async function adminDeleteUser(idx) {
+            const used = await getUsedNicks();
+            const name = used[idx];
+            if (!name) return;
+            if (!confirm('确定删除用户 "' + name + '"？\n删除后该昵称可被他人重新注册。')) return;
+            used.splice(idx, 1);
+            await saveUsedNicks(used);
+            if (localStorage.getItem('TFJL_UserName') === name) {
+                localStorage.removeItem('TFJL_UserName');
+                localStorage.removeItem('TFJL_HasSetNick');
+                loadCurrentNick();
+            }
+            renderNickRegistry();
+            showAdminStatus('已删除用户 "' + name + '"', 'success');
         }
 
         // ==================== 密码管理功能（管理员面板） ====================
@@ -27349,6 +27505,14 @@ ${maSection}
                         <button class="admin-btn" style="background:linear-gradient(135deg,#f44336,#d32f2f);" onclick="resetCurrentNick()">🔄 重置设置</button>
                     </div>
                 </div>
+                <div class="admin-section" style="margin-top:15px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                        <h4 style="color:#4ecdc4;margin:0;font-size:0.9rem;">🌐 全局用户注册表（唯一用户）</h4>
+                        <button class="admin-btn admin-btn-secondary" onclick="renderNickRegistry()">🔄 刷新</button>
+                    </div>
+                    <div style="color:rgba(255,255,255,0.5);font-size:0.72rem;margin-bottom:10px;">可在此删除或重命名用户（重命名会同步更新其在需求墙的发言/分享署名）。</div>
+                    <div id="nickRegistryList" style="max-height:280px;overflow-y:auto;"></div>
+                </div>
             </div>
         </div>
     </div>
@@ -27451,11 +27615,27 @@ ${maSection}
                 <button id="nickEditBtn" onclick="toggleNickEdit()" style="padding:0 12px;border-radius:8px;border:none;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);cursor:pointer;font-size:0.8rem;white-space:nowrap;">修改</button>
             </div>
             <div id="nickEditHint" style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-bottom:20px;padding:8px;background:rgba(255,165,0,0.1);border-left:3px solid #ffa500;border-radius:4px;">
-                💡 提示：昵称只能设置一次，设置后如需修改请联系管理员
+                💡 提示：昵称只能设置一次，设置后如需修改请联系管理员（昵称仅用于发言/分享脚本展示，全局唯一）
             </div>
             <div style="display:flex;gap:10px;justify-content:flex-end;">
                 <button onclick="closeChatRoomEntry()" style="padding:10px 20px;border-radius:8px;border:none;background:rgba(255,255,255,0.1);color:white;cursor:pointer;font-size:0.9rem;">取消</button>
                 <button onclick="joinChatRoom()" style="padding:10px 20px;border-radius:8px;border:none;background:linear-gradient(135deg,#4ecdc4,#44a08d);color:white;cursor:pointer;font-weight:500;font-size:0.9rem;">进入拍卖会</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 设置昵称（强制，仅用于发言/分享脚本展示） -->
+    <div id="nickSetupModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.65);z-index:99999;align-items:center;justify-content:center;">
+        <div style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);border:2px solid rgba(255,215,0,0.4);border-radius:16px;padding:24px;width:90%;max-width:380px;box-shadow:0 10px 50px rgba(0,0,0,0.6);">
+            <h3 style="color:#ffd700;margin:0 0 8px 0;font-size:1.05rem;">👤 设置昵称（必填）</h3>
+            <p style="color:rgba(255,255,255,0.6);font-size:0.76rem;line-height:1.6;margin:0 0 16px;">
+                昵称<strong style="color:#4fc3f7;">仅用于发言与分享脚本时的展示</strong>，设置后无法自行修改（需联系管理员）。全局唯一，他人不可重复使用。
+            </p>
+            <input type="text" id="nickSetupInput" maxlength="12" placeholder="输入昵称（2-12字）" style="width:100%;box-sizing:border-box;padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.25);background:rgba(0,0,0,0.4);color:white;font-size:0.9rem;outline:none;">
+            <div id="nickSetupErr" style="color:#ff8a80;font-size:0.74rem;margin-top:8px;min-height:18px;"></div>
+            <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">
+                <button id="nickSetupCancel" style="padding:10px 18px;border-radius:8px;border:none;background:rgba(255,255,255,0.1);color:white;cursor:pointer;font-size:0.85rem;">取消</button>
+                <button id="nickSetupSave" style="padding:10px 20px;border-radius:8px;border:none;background:linear-gradient(135deg,#ffd700,#ff6b6b);color:#1a1a2e;cursor:pointer;font-weight:bold;font-size:0.9rem;">确定</button>
             </div>
         </div>
     </div>
@@ -27828,7 +28008,7 @@ ${maSection}
         </style>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260730-07</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260730-08</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
