@@ -207,6 +207,19 @@ tr.rk-weak:hover td{opacity:1}
                 <button class="ghost small" onclick="document.getElementById('rankingXlsx').click()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);padding:3px 8px;border-radius:6px;font-size:0.74rem;">📥 导入 xlsx</button>
                 <input type="file" id="rankingXlsx" accept=".xlsx,.xls" style="display:none" onchange="importRankingsXlsx(event)">
             </div>
+            <div class="row" style="margin-bottom:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                <button class="ghost small" onclick="document.getElementById('deepseaOcrFile').click()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);padding:3px 8px;border-radius:6px;font-size:0.74rem;">📷 OCR 识别截图</button>
+                <input type="file" id="deepseaOcrFile" accept="image/*" style="display:none" onchange="deepseaOcrFileChanged(event)">
+                <span id="deepseaOcrStatus" style="font-size:0.72rem;color:rgba(255,255,255,0.6);"></span>
+            </div>
+            <div id="deepseaOcrPanel" class="hidden" style="border:1px dashed rgba(77,182,172,0.4);border-radius:8px;padding:8px;margin-bottom:8px;">
+                <div style="font-size:0.72rem;color:rgba(255,255,255,0.7);margin-bottom:6px;">识别原文（可全选复制发给我整理）：</div>
+                <textarea id="deepseaOcrRaw" style="width:100%;height:120px;background:rgba(0,0,0,0.3);color:#cfe;font-size:0.72rem;border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:6px;" placeholder="OCR 结果将显示在这里"></textarea>
+                <div style="margin-top:6px;display:flex;gap:8px;">
+                    <button class="ghost small" onclick="deepseaParseAndImport()" style="background:rgba(77,182,172,0.18);border:1px solid rgba(77,182,172,0.4);padding:3px 8px;border-radius:6px;font-size:0.74rem;">解析并填入表格（尝试）</button>
+                    <button class="ghost small" onclick="copyDeepseaOcrRaw()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);padding:3px 8px;border-radius:6px;font-size:0.74rem;">复制原文</button>
+                </div>
+            </div>
         </div>
         <div class="faction-bar" id="factionBar">
             <div class="faction-icon active" data-faction="总排名" onclick="switchFaction('总排名')"><span class="emo">📊</span>总排名</div>
@@ -601,6 +614,85 @@ async function importRankingsXlsx(event){
         toast(`✅ 已从 xlsx 导入 ${list.length} 条（${totalName}）`);
     }catch(e){ toast('xlsx 导入失败：'+e.message); }
     event.target.value='';
+}
+
+// ===================== 深海统计：OCR 截图自动识别（离线 Umi-OCR） =====================
+// 复用已修好的本机 Umi-OCR；format:'text' 直接拿纯文本便于按行解析成排行表。
+function deepseaGetInvoke(){
+    return (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke)
+        || (window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke);
+}
+function deepseaFileToBase64(file){
+    return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res((r.result||'').split(',')[1]); r.onerror=rej; r.readAsDataURL(file); });
+}
+async function deepseaOcrFileChanged(e){
+    const f = e.target.files && e.target.files[0]; e.target.value='';
+    if(f) await deepseaRunOcr(f);
+}
+document.addEventListener('paste', (e)=>{
+    const panel = document.getElementById('deepseaOcrPanel');
+    if(!panel || panel.classList.contains('hidden')) return;
+    const it = e.clipboardData && e.clipboardData.items && [...e.clipboardData.items].find(i=>i.type && i.type.startsWith('image/'));
+    if(it){ const f=it.getAsFile(); if(f){ e.preventDefault(); deepseaRunOcr(f); } }
+});
+async function deepseaRunOcr(file){
+    const status=document.getElementById('deepseaOcrStatus');
+    const panel=document.getElementById('deepseaOcrPanel');
+    const raw=document.getElementById('deepseaOcrRaw');
+    if(panel) panel.classList.remove('hidden');
+    if(status) status.textContent='识别中…';
+    try{
+        if(!window.__TAURI_INTERNALS__ && !window.__TAURI__) throw new Error('OCR 需在桌面 App 内运行（本机 Umi-OCR）');
+        const invoke=deepseaGetInvoke(); if(!invoke) throw new Error('未找到 Tauri invoke');
+        const b64=await deepseaFileToBase64(file);
+        const j=await invoke('umi_ocr', { base64:b64, options:{ data:{format:'text', outputDirName:'', outputFileName:'', outputFileFormat:[]}, ocr:{language:'models/config_chinese.txt', cls:true} } });
+        let text='';
+        if(j && j.code===100){ text = (typeof j.data==='string') ? j.data : (Array.isArray(j.data) ? j.data.map(x=>x.text||x).join('\n') : ''); }
+        else if(j && j.code===101){ text=''; }
+        else { throw new Error(typeof j==='string'?j:(j&&j.data)||'Umi-OCR 返回异常'); }
+        if(raw) raw.value=text;
+        if(status) status.textContent = text ? ('识别完成，'+text.split(/\r?\n/).filter(Boolean).length+' 行') : '识别为空';
+    }catch(err){
+        if(status) status.textContent='识别失败：'+err.message;
+        toast('OCR 失败：'+err.message);
+    }
+}
+function deepseaParseAndImport(){
+    const raw=document.getElementById('deepseaOcrRaw');
+    const text=raw?raw.value:'';
+    if(!text.trim()){ toast('请先 OCR 识别截图'); return; }
+    const rows=parseDeepseaOcrText(text);
+    if(!rows.length){ toast('未能从原文解析出联盟数据，请把原文复制发给我'); return; }
+    state.rankings=rows;
+    saveRankings();
+    renderRankings(); renderChampionship(); populateCalcAlliance();
+    toast('✅ 已从 OCR 导入 '+rows.length+' 条');
+}
+// 从 OCR 纯文本解析排行：定位表头行 → 按字段别名映射列 → 逐行取数
+function parseDeepseaOcrText(text){
+    const lines=text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+    let headerIdx=-1, headerCells=[];
+    for(let i=0;i<lines.length;i++){
+        const cells=lines[i].split(/\s+/);
+        const m=buildXlsxFieldMap(cells);
+        if(Object.keys(m).length>=2 && (m['联盟名称']!==undefined || m['排名']!==undefined)){ headerIdx=i; headerCells=cells; break; }
+    }
+    if(headerIdx<0) return [];
+    const colMap=buildXlsxFieldMap(headerCells);
+    const rows=[];
+    for(let i=headerIdx+1;i<lines.length;i++){
+        const cells=lines[i].split(/\s+/);
+        if(cells.length<2) continue;
+        const row={};
+        for(const f in colMap){ const v=cells[colMap[f]]; if(v!==undefined) row[f]=v; }
+        if(row['联盟名称'] || row['排名']!==undefined){ rows.push(row); }
+    }
+    return rows;
+}
+function copyDeepseaOcrRaw(){
+    const raw=document.getElementById('deepseaOcrRaw'); if(!raw) return;
+    raw.select();
+    try{ if(navigator.clipboard) navigator.clipboard.writeText(raw.value); else document.execCommand('copy'); toast('已复制原文'); }catch(e){ document.execCommand('copy'); }
 }
 
 // ===================== 夺冠概率 / 赛季快照 =====================
