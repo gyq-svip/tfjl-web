@@ -67,11 +67,14 @@ Write-Host "Signature verified (keynum=$kSig)" -ForegroundColor Green
 
 $pubDate = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
 $rawUrl = "https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/releases/download/v$ver/$ExeName"
+# GitHub Pages 镜像作为备用下载源（Gitee 主、GitHub 备；Gitee raw 强制登录不可用，故 exe 由 Pages 托管兜底）
+$fallbackUrl = "https://gyq-svip.github.io/tfjl-web/$ExeName"
 
 $updater = [ordered]@{
     version  = $ver
     notes    = "auto update v$ver"
     pub_date = $pubDate
+    fallbackUrl = $fallbackUrl
     platforms = [ordered]@{
         windows = [ordered]@{
             url       = $rawUrl
@@ -84,6 +87,7 @@ $versionJson = [ordered]@{
     notes       = "auto update v$ver"
     pub_date    = $pubDate
     downloadUrl = $rawUrl
+    fallbackUrl = $fallbackUrl
 }
 
 $updaterPath = Join-Path $RootDir "updater.json"
@@ -93,11 +97,12 @@ $versionPath = Join-Path $RootDir "version.json"
 Write-Host "Wrote updater.json / version.json" -ForegroundColor Green
 
 Set-Location $RootDir
-# exe 由 Gitee 发行版托管（免登录下载、不入库二进制）；仅 updater.json/version.json 入库
+# exe 双源：Gitee 发行版(主,免登录) + GitHub Pages(备,镜像)；均入库(镜像供 Pages 兜底)
 Publish-GiteeRelease $ver $ExePath
+git add -f $ExePath
 git add updater.json version.json
-git commit -m "release v$ver (updater + pages; installer on gitee release)"
+git commit -m "release v$ver (updater+pages; installer: gitee release primary, github pages fallback)"
 git push gitee main
 git push origin main
-Write-Host "Published: v$ver (updater.json->Pages, installer->Gitee release)" -ForegroundColor Green
-Write-Host "NOTE: exe 已上传 Gitee 发行版 v$ver（免登录）；旧根用户仍需手动重装一次。" -ForegroundColor Yellow
+Write-Host "Published: v$ver (updater.json->Pages; installer: Gitee release primary + GitHub Pages fallback)" -ForegroundColor Green
+Write-Host "NOTE: exe 已上传 Gitee 发行版 v$ver（主,免登录）并提交 origin（GitHub Pages 备）；旧根用户仍需手动重装一次。" -ForegroundColor Yellow
