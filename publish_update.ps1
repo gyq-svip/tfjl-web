@@ -106,7 +106,16 @@ Publish-GiteeRelease $ver $ExePath
 git add -f $ExePath
 git add updater.json version.json
 git commit -m "release v$ver (updater+pages; installer on gitee release; exe tracked in repos)"
-git push gitee main
-git push origin main
+# git push 的远程提示（如 "remote: Powered by GITEE.COM"）走 stderr，
+# 在 $ErrorActionPreference="Stop" 下会被当成 NativeCommandError 中断整个脚本
+# （v1.3.8/v1.3.9 都在此翻过车，导致 origin 没推）。这里临时降为 Continue 吞 stderr，
+# 仅当 git 真返回非 0 退出码才判失败。
+$prevEAP = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+git push gitee main 2>$null; $pg = $LASTEXITCODE
+git -c http.proxy=127.0.0.1:7897 -c https.proxy=127.0.0.1:7897 push origin main 2>$null; $po = $LASTEXITCODE
+$ErrorActionPreference = $prevEAP
+if ($pg -ne 0) { Write-Host "ERROR: git push gitee 失败 (exit=$pg)" -ForegroundColor Red; exit 1 }
+if ($po -ne 0) { Write-Host "ERROR: git push origin 失败 (exit=$po)" -ForegroundColor Red; exit 1 }
 Write-Host "Published: v$ver (updater.json->Pages; installer->Gitee release; exe tracked in repos)" -ForegroundColor Green
 Write-Host "NOTE: exe 已上传 Gitee 发行版 v$ver（主,免登录）；旧根用户仍需手动重装一次。" -ForegroundColor Yellow
