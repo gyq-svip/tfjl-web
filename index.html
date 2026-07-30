@@ -6328,11 +6328,59 @@
             const dlBtn = document.getElementById('_updDlBtn');
             const copyBtn = document.getElementById('_updCopyBtn');
             const browserBtn = document.getElementById('_updBrowserBtn');
-            if (dlBtn) dlBtn.onclick = () => { modal.remove(); showInstallerSaveDialog(dlUrl, dlVer, dlName); };
-            if (copyBtn) copyBtn.onclick = () => {
-                if (dlUrl) { try { navigator.clipboard.writeText(dlUrl); showToast('✅ 已复制下载地址'); } catch (e) { showToast('复制失败: ' + dlUrl); } }
+
+            // 给弹窗按钮加「按下」视觉反馈（缩放+高亮），让用户明确感知点中了
+            function _updBtnFeedback(btn) {
+                if (!btn) return;
+                btn.style.transition = 'transform 0.08s ease, filter 0.08s ease, opacity 0.12s ease';
+                const press = () => { btn.style.transform = 'scale(0.95)'; btn.style.filter = 'brightness(1.18)'; };
+                const release = () => { btn.style.transform = 'scale(1)'; btn.style.filter = ''; };
+                btn.addEventListener('mousedown', press);
+                btn.addEventListener('mouseup', release);
+                btn.addEventListener('mouseleave', release);
+                btn.addEventListener('touchstart', press, { passive: true });
+                btn.addEventListener('touchend', release);
+            }
+            _updBtnFeedback(dlBtn); _updBtnFeedback(copyBtn); _updBtnFeedback(browserBtn);
+
+            if (dlBtn) dlBtn.onclick = () => {
+                dlBtn.disabled = true;
+                dlBtn.style.opacity = '0.65';
+                dlBtn.style.pointerEvents = 'none';
+                dlBtn.innerHTML = '⏳ 正在打开下载...';
+                showToast('📥 正在打开下载窗口');
+                setTimeout(() => { modal.remove(); showInstallerSaveDialog(dlUrl, dlVer, dlName); }, 180);
             };
-            if (browserBtn) browserBtn.onclick = () => { if (dlUrl) { try { openUrl(dlUrl); } catch (e) {} } };
+            if (copyBtn) copyBtn.onclick = () => {
+                if (!dlUrl) { showToast('⚠️ 没有可用的下载地址'); return; }
+                try {
+                    navigator.clipboard.writeText(dlUrl);
+                    copyBtn.innerHTML = '✓ 已复制';
+                    copyBtn.style.background = 'rgba(76,175,80,0.35)';
+                    copyBtn.style.borderColor = 'rgba(76,175,80,0.6)';
+                    copyBtn.style.color = '#a5d6a7';
+                    showToast('✅ 已复制下载地址');
+                    setTimeout(() => {
+                        copyBtn.innerHTML = '📋 复制地址';
+                        copyBtn.style.background = ''; copyBtn.style.borderColor = ''; copyBtn.style.color = '';
+                    }, 1600);
+                } catch (e) { showToast('复制失败: ' + dlUrl); }
+            };
+            if (browserBtn) browserBtn.onclick = () => {
+                if (!dlUrl) { showToast('⚠️ 没有可用的下载地址'); return; }
+                try {
+                    openUrl(dlUrl);
+                    browserBtn.innerHTML = '✓ 已打开';
+                    browserBtn.style.background = 'rgba(76,175,80,0.35)';
+                    browserBtn.style.borderColor = 'rgba(76,175,80,0.6)';
+                    browserBtn.style.color = '#a5d6a7';
+                    showToast('🌐 已在浏览器打开下载页');
+                    setTimeout(() => {
+                        browserBtn.innerHTML = '🌐 浏览器打开';
+                        browserBtn.style.background = ''; browserBtn.style.borderColor = ''; browserBtn.style.color = '';
+                    }, 1600);
+                } catch (e) {}
+            };
         }
 
         // 选择保存位置并把安装包下载到该文件夹（复用「需求墙下载」那种文件夹选择器）
@@ -6373,6 +6421,22 @@
             const invokeFn = window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke;
 
             const pickBtn = document.getElementById('_instPickBtn');
+            const cancelBtn = document.getElementById('_instCancel');
+            const saveBtn = document.getElementById('_instSaveBtn');
+            // 按下缩放+高亮反馈
+            function _instBtnFeedback(btn) {
+                if (!btn) return;
+                btn.style.transition = 'transform 0.08s ease, filter 0.08s ease';
+                const press = () => { btn.style.transform = 'scale(0.95)'; btn.style.filter = 'brightness(1.15)'; };
+                const release = () => { btn.style.transform = 'scale(1)'; btn.style.filter = ''; };
+                btn.addEventListener('mousedown', press);
+                btn.addEventListener('mouseup', release);
+                btn.addEventListener('mouseleave', release);
+                btn.addEventListener('touchstart', press, { passive: true });
+                btn.addEventListener('touchend', release);
+            }
+            _instBtnFeedback(pickBtn); _instBtnFeedback(cancelBtn); _instBtnFeedback(saveBtn);
+
             const cancelBtn = document.getElementById('_instCancel');
             const saveBtn = document.getElementById('_instSaveBtn');
             if (pickBtn) pickBtn.onclick = async () => {
@@ -28521,7 +28585,7 @@ ${maSection}
         </style>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260730-24</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260730-25</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
