@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     tfjl one-shot publisher: write updater.json/version.json + push installer + verify signature.
     Prereq: npx tauri build done, english exe copied to repo root, and .\sign.ps1 <englishExe> done.
@@ -67,16 +67,13 @@ Write-Host "Signature verified (keynum=$kSig)" -ForegroundColor Green
 
 $pubDate = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
 $rawUrl = "https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/releases/download/v$ver/$ExeName"
-# GitHub Pages 镜像作为备用下载源（Gitee 主、GitHub 备；Gitee raw 强制登录不可用，故 exe 由 Pages 托管兜底）
-$fallbackUrl = "https://gyq-svip.github.io/tfjl-web/$ExeName"
 
 $updater = [ordered]@{
     version  = $ver
     notes    = "auto update v$ver"
     pub_date = $pubDate
-    fallbackUrl = $fallbackUrl
     platforms = [ordered]@{
-        windows = [ordered]@{
+        "windows-x86_64" = [ordered]@{
             url       = $rawUrl
             signature = $sigContent
         }
@@ -87,7 +84,6 @@ $versionJson = [ordered]@{
     notes       = "auto update v$ver"
     pub_date    = $pubDate
     downloadUrl = $rawUrl
-    fallbackUrl = $fallbackUrl
 }
 
 $updaterPath = Join-Path $RootDir "updater.json"
