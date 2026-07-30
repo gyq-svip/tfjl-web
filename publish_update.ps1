@@ -19,6 +19,26 @@ function Get-Keynum($b64) {
     return $sb.ToString()
 }
 
+function Publish-GiteeRelease($ver, $exePath) {
+    $tok = [Environment]::GetEnvironmentVariable("GITEE_TOKEN", "User")
+    if (-not $tok) { Write-Host "WARN: GITEE_TOKEN 未设置，跳过 Gitee 发行版上传（请手动上传 exe 到发行版 v$ver）" -ForegroundColor Yellow; return }
+    $owner = "dragon-soars-across-the-world_0"; $repo = "tfjl-web"; $tag = "v$ver"; $fname = Split-Path $exePath -Leaf
+    try { $list = Invoke-RestMethod -Uri ("https://gitee.com/api/v5/repos/$owner/$repo/releases?access_token=$tok") -Method Get } catch { Write-Host "WARN: 查 Gitee releases 失败: $($_.Exception.Message)" -ForegroundColor Yellow; return }
+    $rel = $list | Where-Object { $_.tag_name -eq $tag }
+    if (-not $rel) {
+        $body = @{ tag_name=$tag; target_commitish="main"; name=$tag; body="auto update $tag"; prerelease=$false } | ConvertTo-Json -Compress
+        try { $rel = Invoke-RestMethod -Uri ("https://gitee.com/api/v5/repos/$owner/$repo/releases?access_token=$tok") -Method Post -ContentType "application/json; charset=utf-8" -Body $body } catch { Write-Host "WARN: 创建 Gitee release 失败: $($_.Exception.Message)" -ForegroundColor Yellow; return }
+    }
+    $rid = $rel.id
+    if ($rel.assets -and ($rel.assets | Where-Object { $_.name -eq $fname })) {
+        Write-Host "exe 已在 Gitee release $tag，跳过上传" -ForegroundColor Cyan
+    } else {
+        $up = "https://gitee.com/api/v5/repos/$owner/$repo/releases/$rid/attach_files?access_token=$tok"
+        curl.exe -X POST $up -F ("file=@" + $exePath) 2>&1 | Out-Null
+        Write-Host "Uploaded $fname -> Gitee release $tag" -ForegroundColor Green
+    }
+}
+
 $confJson = [System.IO.File]::ReadAllText($ConfPath, [System.Text.Encoding]::UTF8) | ConvertFrom-Json
 $ver = $confJson.version
 $confPubB64 = $confJson.plugins.updater.pubkey
@@ -46,7 +66,7 @@ if ($kSig -ne $kConf) {
 Write-Host "Signature verified (keynum=$kSig)" -ForegroundColor Green
 
 $pubDate = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
-$rawUrl = "https://gyq-svip.github.io/tfjl-web/$ExeName"
+$rawUrl = "https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/releases/download/v$ver/$ExeName"
 
 $updater = [ordered]@{
     version  = $ver
@@ -73,10 +93,11 @@ $versionPath = Join-Path $RootDir "version.json"
 Write-Host "Wrote updater.json / version.json" -ForegroundColor Green
 
 Set-Location $RootDir
-git add -f $ExePath
+# exe 由 Gitee 发行版托管（免登录下载、不入库二进制）；仅 updater.json/version.json 入库
+Publish-GiteeRelease $ver $ExePath
 git add updater.json version.json
-git commit -m "release v$ver (updater + installer)"
+git commit -m "release v$ver (updater + pages; installer on gitee release)"
 git push gitee main
 git push origin main
-Write-Host "Published: v$ver pushed to Gitee + GitHub Pages" -ForegroundColor Green
-Write-Host "NOTE: existing users must manually reinstall once (trust-root changed, one-time B cost)." -ForegroundColor Yellow
+Write-Host "Published: v$ver (updater.json->Pages, installer->Gitee release)" -ForegroundColor Green
+Write-Host "NOTE: exe 已上传 Gitee 发行版 v$ver（免登录）；旧根用户仍需手动重装一次。" -ForegroundColor Yellow
