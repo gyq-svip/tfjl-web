@@ -34,7 +34,15 @@ function Publish-GiteeRelease($ver, $exePath) {
         Write-Host "exe 已在 Gitee release $tag，跳过上传" -ForegroundColor Cyan
     } else {
         $up = "https://gitee.com/api/v5/repos/$owner/$repo/releases/$rid/attach_files?access_token=$tok"
-        curl.exe -X POST $up -F ("file=@" + $exePath) 2>&1 | Out-Null
+        # 注意：curl.exe 的进度条走 stderr，PowerShell 会把它当作 NativeCommandError，
+        # 在 $ErrorActionPreference="Stop" 下直接中断整个发布脚本（v1.3.7/1.3.8 都翻过此车）。
+        # 这里临时降为 Continue 并吞掉 stderr，仅当 curl 真返回非 0 退出码才判为失败。
+        $prevEAP = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        & curl.exe -X POST $up -F ("file=@" + $exePath) 2>$null
+        $curlExit = $LASTEXITCODE
+        $ErrorActionPreference = $prevEAP
+        if ($curlExit -ne 0) { Write-Host "ERROR: 上传 exe 到 Gitee 失败 (curl exit=$curlExit)" -ForegroundColor Red; exit 1 }
         Write-Host "Uploaded $fname -> Gitee release $tag" -ForegroundColor Green
     }
 }
