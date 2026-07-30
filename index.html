@@ -24736,7 +24736,6 @@ ${maSection}
             const nicknameInput = document.getElementById('messageNickname');
             const expireDaysSelect = document.getElementById('expireDays');
             let content = input.value.trim();
-            const nickname = nick;
 
             if (!content && !pendingScriptFile) {
                 alert('请输入内容或选择脚本文件');
@@ -24746,6 +24745,7 @@ ${maSection}
             // 强需求：发言前必须设置昵称（仅用于展示，全局唯一，取消则不发布）
             const nick = await ensureNickname();
             if (!nick) { alert('发布消息需要先设置昵称（昵称仅用于发言/分享脚本展示，设置后不可自行修改）'); return; }
+            const nickname = nick;
 
             if (!getGistToken()) {
                 alert('离线版暂不支持发布消息，请切换到在线版');
@@ -28636,7 +28636,7 @@ ${maSection}
         </style>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260731-31</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260731-32</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
