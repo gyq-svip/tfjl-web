@@ -97,12 +97,12 @@ $versionPath = Join-Path $RootDir "version.json"
 Write-Host "Wrote updater.json / version.json" -ForegroundColor Green
 
 Set-Location $RootDir
-# exe 双源：Gitee 发行版(主,免登录) + GitHub Pages(备,镜像)；均入库(镜像供 Pages 兜底)
+# exe 入库两个代码仓库（延续历史：GitHub 代码仓库保留 exe 资源；Gitee 发行版为主下载源免登录）
 Publish-GiteeRelease $ver $ExePath
 git add -f $ExePath
 git add updater.json version.json
-git commit -m "release v$ver (updater+pages; installer: gitee release primary, github pages fallback)"
+git commit -m "release v$ver (updater+pages; installer on gitee release; exe tracked in repos)"
 git push gitee main
 git push origin main
-Write-Host "Published: v$ver (updater.json->Pages; installer: Gitee release primary + GitHub Pages fallback)" -ForegroundColor Green
-Write-Host "NOTE: exe 已上传 Gitee 发行版 v$ver（主,免登录）并提交 origin（GitHub Pages 备）；旧根用户仍需手动重装一次。" -ForegroundColor Yellow
+Write-Host "Published: v$ver (updater.json->Pages; installer->Gitee release; exe tracked in repos)" -ForegroundColor Green
+Write-Host "NOTE: exe 已上传 Gitee 发行版 v$ver（主,免登录）；旧根用户仍需手动重装一次。" -ForegroundColor Yellow
