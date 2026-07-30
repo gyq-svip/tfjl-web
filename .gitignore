@@ -78,5 +78,12 @@ backup/
 # 签名密钥（本地保管，切勿上传到仓库！）
 # ====================
 tauri.key
+taui.key
 *.key
+# 私钥的 base64 副本（等同私钥，严禁入库）
+tfjl-sign-key.b64
+# 公钥/备份副本（虽无密级，但避免误提交造成混淆）
+tauri.key.pub
+taui.key.pub
+tauri.key.bak
 密钥.txt
