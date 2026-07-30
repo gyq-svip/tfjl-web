@@ -161,9 +161,45 @@
 
   // 用已记住的路径自动拉起 Umi-OCR：先无感隐藏启动并轮询引擎就绪；
   // 若隐藏启动始终起不来（部分机器隐藏态引擎不加载），回退为可见窗口启动（用户实测可见窗口可用）
+  // 仅确保 Umi-OCR“托盘图标隐藏 + 启动即隐藏”（用户常问“OCR 图标为什么没隐藏”）：
+  // --hide 只是启动后缩小到托盘（托盘图标仍在），必须 window.hideTrayIcon=true 才真正不显示图标。
+  // 每次自动启动 OCR 前 best-effort 写入（失败不影响启动）。配置是纯 ASCII（@Variant 是文本转义），read_text_file_auto 不会损坏。
+  async function ensureUmiTrayHidden(){
+    try{
+      const p = await getStoredUmiPath();
+      if(!p) return;
+      const settingsPath = umiSettingsPathOf(p);
+      let text = '';
+      try{ text = await tauriInvoke('read_text_file_auto', { file_path: settingsPath }); }
+      catch(e){ return; }
+      const want = { 'window.hideTrayIcon':'true', 'window.startupInvisible':'true' };
+      const lines = text.split(/\r?\n/);
+      const done = {}; for(const k in want) done[k] = false;
+      let inGlobal = false;
+      for(let i=0;i<lines.length;i++){
+        const line = lines[i];
+        if(/^\s*\[/.test(line)){ inGlobal = /^\[Global\]/i.test(line.trim()); continue; }
+        if(!inGlobal) continue;
+        for(const k in want){
+          if(new RegExp('^\\s*'+k.replace(/\./g,'\\.')+'\\s*=').test(line)){ lines[i] = k+'='+want[k]; done[k] = true; }
+        }
+      }
+      const inserted = [];
+      for(const k in want){ if(!done[k]) inserted.push(k+'='+want[k]); }
+      if(inserted.length){
+        for(let i=0;i<lines.length;i++){
+          if(/^\[Global\]/i.test(lines[i].trim())){ lines.splice(i+1, 0, ...inserted); break; }
+        }
+      }
+      await tauriInvoke('write_text_file', { file_path: settingsPath, content: lines.join('\r\n') });
+    }catch(e){ /* best-effort，忽略 */ }
+  }
+
   async function autoStartUmiOcr(){
     const p = await getStoredUmiPath();
     if(!p) return false;
+    // 0) 先确保托盘图标已设为隐藏（写入配置，下次启动即生效）
+    await ensureUmiTrayHidden();
     // 1) 无感隐藏启动
     try{ await tauriInvoke('start_umi_ocr', { exe_path: p, hidden: true }); }catch(e){}
     for(let i=0;i<40;i++){            // 最多 ~28s 等引擎就绪
@@ -665,6 +701,7 @@
       if(!p){ alert('未找到本机 Umi-OCR，请点「选择 Umi-OCR.exe」或「一键下载安装」'); return; }
       st.textContent = '正在启动 Umi-OCR（显示窗口）…';
       const tryStart = async (exe)=>{
+        await ensureUmiTrayHidden(); // 先确保托盘图标隐藏
         await tauriInvoke('start_umi_ocr', { exe_path: exe, hidden: false });
         for(let i=0;i<25;i++){ await sleep(800); if(await checkUmiOcrAvailable() === true) return true; }
         return false;
