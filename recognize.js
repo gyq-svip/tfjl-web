@@ -61,14 +61,14 @@
   // 读取已记住的 Umi-OCR.exe 路径
   async function getStoredUmiPath(){
     if(isTauri()){
-      try{ const s = await tauriInvoke('read_text_file_auto', { file_path: UMI_PATH_FILE });
+      try{ const s = await tauriInvoke('read_text_file_auto', { filePath: UMI_PATH_FILE });
            const j = JSON.parse(s); return (j && j.path) || ''; }catch(e){ return ''; }
     }
     try{ return localStorage.getItem('tfjl_umi_ocr_path') || ''; }catch(e){ return ''; }
   }
   async function setStoredUmiPath(p){
     if(isTauri()){
-      try{ await tauriInvoke('write_text_file', { file_path: UMI_PATH_FILE, content: JSON.stringify({path:p}) }); }catch(e){}
+      try{ await tauriInvoke('write_text_file', { filePath: UMI_PATH_FILE, content: JSON.stringify({path:p}) }); }catch(e){}
     }
     try{ localStorage.setItem('tfjl_umi_ocr_path', p); }catch(e){}
   }
@@ -95,7 +95,7 @@
     if(!p) return { ok:false, msg:'请先选择/自动查找到 Umi-OCR.exe' };
     const settingsPath = umiSettingsPathOf(p);
     let text = '';
-    try{ text = await tauriInvoke('read_text_file_auto', { file_path: settingsPath }); }
+    try{ text = await tauriInvoke('read_text_file_auto', { filePath: settingsPath }); }
     catch(e){ return { ok:false, msg:'读取 Umi-OCR 配置失败（'+((e&&e.message)||e)+'），请直接在 Umi-OCR 全局设置里勾选' }; }
     const keys = { 'shortcut.startup':'true', 'window.hideTrayIcon':'true', 'window.startupInvisible':'true' };
     const lines = text.split(/\r?\n/);
@@ -119,7 +119,7 @@
       }
     }
     const out = lines.join('\r\n');
-    try{ await tauriInvoke('write_text_file', { file_path: settingsPath, content: out }); }
+    try{ await tauriInvoke('write_text_file', { filePath: settingsPath, content: out }); }
     catch(e){ return { ok:false, msg:'写入 Umi-OCR 配置失败（'+((e&&e.message)||e)+'）' }; }
     return { ok:true, msg:'已写入配置（开机自启 + 隐藏托盘 + 启动即隐藏）。需重启 Umi-OCR 生效：关掉它再点「🚀 启动识别引擎」即可。' };
   }
@@ -170,7 +170,7 @@
       if(!p) return;
       const settingsPath = umiSettingsPathOf(p);
       let text = '';
-      try{ text = await tauriInvoke('read_text_file_auto', { file_path: settingsPath }); }
+      try{ text = await tauriInvoke('read_text_file_auto', { filePath: settingsPath }); }
       catch(e){ return; }
       const want = { 'window.hideTrayIcon':'true', 'window.startupInvisible':'true' };
       const lines = text.split(/\r?\n/);
@@ -191,7 +191,7 @@
           if(/^\[Global\]/i.test(lines[i].trim())){ lines.splice(i+1, 0, ...inserted); break; }
         }
       }
-      await tauriInvoke('write_text_file', { file_path: settingsPath, content: lines.join('\r\n') });
+      await tauriInvoke('write_text_file', { filePath: settingsPath, content: lines.join('\r\n') });
     }catch(e){ /* best-effort，忽略 */ }
   }
 
@@ -205,7 +205,7 @@
     // Umi-OCR(Paddle) 首次冷启动要加载引擎，端口 1224 往往几十秒后才就绪
     // （本机实测约 60s 才进入 LISTENING）。之前 ~45s 的等待预算太短，会误报“启动失败”。
     // 这里放宽到 ~100s 并实时提示，避免被误判成卡死。
-    try{ await tauriInvoke('start_umi_ocr', { exe_path: p, hidden: true }); }catch(e){}
+    try{ await tauriInvoke('start_umi_ocr', { exePath: p, hidden: true }); }catch(e){}
     say('已发送启动指令，Umi-OCR 引擎加载中（首次约需 1 分钟，请稍候，勿关闭助手）…');
     for(let i=0;i<100;i++){            // 最多 ~100s 等引擎就绪
       await sleep(1000);
@@ -213,7 +213,7 @@
       if(i % 10 === 9) say('引擎加载中…（已等待 ' + (i+1) + 's，Umi-OCR 首次启动较慢属正常）');
     }
     // 2) 回退：显示窗口启动（Umi-OCR 已运行时再调一次会唤出已隐藏的窗口）
-    try{ await tauriInvoke('start_umi_ocr', { exe_path: p, hidden: false }); }catch(e){}
+    try{ await tauriInvoke('start_umi_ocr', { exePath: p, hidden: false }); }catch(e){}
     for(let i=0;i<40;i++){
       await sleep(1000);
       if(await probeUmiReady()) return true;
@@ -725,7 +725,7 @@
       if(await checkUmiOcrAvailable() === true){
         // 已运行：尝试唤出窗口（无害），并给出明确反馈（不再静默 return 让人以为没反应）
         const p = await getStoredUmiPath();
-        if(p){ try{ await tauriInvoke('start_umi_ocr', { exe_path: p, hidden: false }); }catch(e){} }
+        if(p){ try{ await tauriInvoke('start_umi_ocr', { exePath: p, hidden: false }); }catch(e){} }
         st.textContent = '✅ Umi-OCR 已在运行（已尝试唤出窗口）';
         return;
       }
@@ -739,7 +739,7 @@
       st.textContent = '正在启动 Umi-OCR（显示窗口）…';
       const tryStart = async (exe)=>{
         await ensureUmiTrayHidden(); // 先确保托盘图标隐藏
-        await tauriInvoke('start_umi_ocr', { exe_path: exe, hidden: false });
+        await tauriInvoke('start_umi_ocr', { exePath: exe, hidden: false });
         for(let i=0;i<25;i++){ await sleep(800); if(await checkUmiOcrAvailable() === true) return true; }
         return false;
       };
