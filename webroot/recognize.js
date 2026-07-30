@@ -259,6 +259,28 @@
       + '解压后点「🔍 自动查找」或「选择 Umi-OCR.exe」指到解压出来的 <b>Umi-OCR.exe</b> 即可。');
   }
 
+  // 根据 Rust 发来的 umi-ocr-download-progress 事件更新真实进度条
+  function updateUmiDlProgress(p){
+    const barEl = document.getElementById('recDLBar');
+    const pctEl = document.getElementById('recDLPct');
+    if(!barEl) return;
+    p = p || {};
+    if(p.stage === 'start'){ barEl.style.width = '2%'; if(pctEl) pctEl.textContent = '连接镜像中…'; return; }
+    if(p.stage === 'progress'){
+      const mb = (n)=> (n/1048576).toFixed(1);
+      if(p.total && p.total > 0){
+        const pct = Math.max(2, Math.min(100, Math.round(p.downloaded * 100 / p.total)));
+        barEl.style.width = pct + '%';
+        if(pctEl) pctEl.textContent = pct + '%  (' + mb(p.downloaded) + '/' + mb(p.total) + 'MB)';
+      } else {
+        barEl.style.width = '50%';
+        if(pctEl) pctEl.textContent = '已下载 ' + mb(p.downloaded) + 'MB';
+      }
+      return;
+    }
+    if(p.stage === 'done' || p.stage === 'extract'){ barEl.style.width = '100%'; if(pctEl) pctEl.textContent = (p.stage==='extract' ? '下载完成，正在解压安装…' : '下载完成…'); return; }
+  }
+
   // 一键下载并安装 Umi-OCR 到本助手数据目录（不散落到浏览器默认下载目录），随后自动配置并拉起
   async function downloadAndInstallUmi(tip){
     tip = tip || $('recUmiTip');
@@ -268,13 +290,21 @@
     window._umiDownloading = true;
     // 立即反馈：禁用按钮 + 变更文案（点了和没点一眼区分）
     if(btn){ btn.disabled = true; btn.dataset.label = btn.textContent; btn.textContent = '⏳ 下载中…'; btn.style.opacity = '0.6'; btn.style.cursor = 'wait'; }
-    // 动画进度条（Rust 当前不发进度，用不确定进度条表示"正在下载"）
-    const bar = '<div style="margin:8px 0 2px;height:10px;border-radius:6px;background:rgba(255,255,255,0.12);overflow:hidden;">'
-      + '<div style="height:100%;width:42%;border-radius:6px;background:linear-gradient(90deg,#26c6da,#00838f);animation:recDL 1.1s ease-in-out infinite;"></div></div>';
+    // 真实进度条（Rust 通过 umi-ocr-download-progress 事件回传已下载/总字节，前端据此填充）
+    const bar = '<div id="recDLWrap" style="margin:8px 0 2px;height:10px;border-radius:6px;background:rgba(255,255,255,0.12);overflow:hidden;">'
+      + '<div id="recDLBar" style="height:100%;width:2%;border-radius:6px;background:linear-gradient(90deg,#26c6da,#00838f);transition:width .25s;"></div></div>'
+      + '<div id="recDLPct" style="font-size:0.72rem;color:#b2ebf2;margin-top:2px;">准备下载…</div>';
     if(tip) tip.innerHTML = '正在从官网下载 Umi-OCR（约 130MB，请耐心等待，勿关闭助手）…' + bar;
     if(st) st.textContent = '下载安装中…';
     let path = null;
-    try{ path = await tauriInvoke('download_umi_ocr'); }
+    let unlisten = null;
+    try{
+      // 监听 Rust 下载进度事件，实时刷新进度条（避免“是不是卡死”的困惑）
+      if(window.__TAURI__ && window.__TAURI__.event && window.__TAURI__.event.listen){
+        unlisten = await window.__TAURI__.event.listen('umi-ocr-download-progress', (e)=>{ updateUmiDlProgress(e && e.payload); });
+      }
+      path = await tauriInvoke('download_umi_ocr');
+    }
     catch(e){
       const msg = (e && e.message || e) + '';
       if(window._umiDlFailCount == null) window._umiDlFailCount = 0;
@@ -297,6 +327,7 @@
       if(btn){ btn.disabled = false; btn.textContent = btn.dataset.label || '⬇ 下载安装'; btn.style.opacity=''; btn.style.cursor='pointer'; }
       return;
     }
+    finally{ if(unlisten){ try{ unlisten(); }catch(_){} } }
     window._umiDownloading = false;
     window._umiDlFailCount = 0;
     if(btn){ btn.disabled = false; btn.textContent = '✅ 已安装'; btn.style.opacity=''; btn.style.cursor='pointer'; }
