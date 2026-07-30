@@ -2,6 +2,7 @@
     "version":  "1.3.5",
     "notes":  "auto update v1.3.5",
     "pub_date":  "2026-07-30T15:24:35Z",
+    "fallbackUrl":  "https://gyq-svip.github.io/tfjl-web/tfjl-assistant_1.3.5_x64-setup.exe",
     "platforms":  {
                       "windows":  {
                                       "url":  "https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/releases/download/v1.3.5/tfjl-assistant_1.3.5_x64-setup.exe",
