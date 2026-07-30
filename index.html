@@ -6080,10 +6080,6 @@
 
             // —— 3. 正常流程：检查 → 下载（带进度） → 安装 ——
             const t = showLoadingToast('🔍 正在检查更新...（点击可取消）');
-            // 兜底保险：任何路径遗漏或 check 永久卡住，25s 后强制关闭，避免 loading 永不消失
-            const _checkSafe = setTimeout(() => {
-                try { t.error('⌛ 检查超时，请稍后重试或刷新'); t.remove(3000); } catch(e){}
-            }, 25000);
             try {
                 if (window.__TAURI__ && window.__TAURI__.updater) {
                     try {
