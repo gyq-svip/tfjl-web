@@ -5752,6 +5752,8 @@
         let CURRENT_VERSION = '网页版';
         const GITHUB_RELEASES_PAGE = 'https://gyq-svip.github.io/tfjl-web/';
         const VERSION_JSON_URL = 'https://gyq-svip.github.io/tfjl-web/version.json';
+        // 更新文件（含安装包下载地址，每次发布都会更新 → 下载地址动态解析，无需手工维护渠道）
+        const UPDATER_JSON_URL = 'https://gyq-svip.github.io/tfjl-web/updater.json';
 
         // ========== 更新预下载状态管理 ==========
         // 启动时后台自动下载新版本，用户点「检查更新」时秒装
@@ -6089,10 +6091,10 @@
                                         return;
                                     } catch (fallbackErr) {
                                         const errMsg = String(fallbackErr && (fallbackErr.message || fallbackErr) || '未知错误');
-                                        t2.error('⚠️ 更新失败: ' + errMsg);
-                                        t2.remove(4000);
                                         try { window.__tfjlUpdaterError = errMsg; } catch(e) {}
                                         _resetUpdateState();
+                                        // 兜底仍失败 → 弹窗引导手动下载最新版（地址动态解析自 updater.json）
+                                        showUpdateFailedModal(errMsg, _updateVersion);
                                     }
                                 }
                             }
@@ -6128,18 +6130,9 @@
                     if (badge) badge.style.display = 'inline-block';
                     const isTauri = !!(window.__TAURI__ || window.__TAURI_INTERNALS__);
                     if (isTauri) {
-                        // Tauri 自动更新器走到这里说明 updater 失败，引导用户手动下载
+                        // Tauri 自动更新器走到这里说明 updater 失败 → 弹窗引导手动下载（地址动态解析自 updater.json）
                         const realErr = window.__tfjlUpdaterError || '';
-                        const isProxyErr = /proxy|127\.0\.0\.1|7890|7897|1080|10809/i.test(realErr);
-                        const shortErr = realErr.length > 60 ? realErr.slice(0, 58) + '...' : realErr;
-                        const msg = isProxyErr
-                            ? '⚠️ 自动更新失败，请关闭代理后重试，或从 Gitee 手动下载 v' + release.version
-                            : '⚠️ 自动更新失败: ' + (shortErr || '更新器异常') + '，请从 Gitee 手动下载 v' + release.version;
-                        t.error(msg);
-                        t.remove(isProxyErr ? 4000 : 5000);
-                        setTimeout(() => {
-                            try { openUrl(release.downloadUrl); } catch(e) {}
-                        }, 800);
+                        showUpdateFailedModal(realErr, release.version);
                     } else {
                         t.success('🎉 发现新版本 v' + release.version + '，即将打开下载...');
                         t.remove(1800);
@@ -6220,6 +6213,156 @@
                 return { hasUpdate: true, version: release.version, url: release.downloadUrl || release.htmlUrl };
             }
             return { hasUpdate: false, version: CURRENT_VERSION };
+        }
+
+        // ========== 更新失败补救：弹窗 + 动态下载地址 + 选择保存位置 ==========
+
+        // 解析 updater.json，拿到当前最新安装包下载地址（Gitee 安装包，每次发布都会更新）
+        async function fetchInstallerInfo() {
+            try {
+                const resp = await fetch(UPDATER_JSON_URL, { cache: 'no-cache' });
+                if (!resp.ok) throw new Error('获取更新文件失败');
+                const data = await resp.json();
+                const url = data && data.platforms && data.platforms.windows && data.platforms.windows.url;
+                if (!url) throw new Error('更新文件缺少下载地址');
+                const fileName = decodeURIComponent(url.split('?')[0].split('/').pop()) || 'tfjl-assistant-setup.exe';
+                return { url: url, version: data.version || '', fileName: fileName };
+            } catch (e) {
+                console.warn('[updater] 解析 updater.json 失败:', e);
+                return null;
+            }
+        }
+
+        // ArrayBuffer -> base64（用于二进制安装包写盘）
+        function arrayBufferToBase64(buffer) {
+            const bytes = new Uint8Array(buffer);
+            let binary = '';
+            const chunk = 0x8000;
+            for (let i = 0; i < bytes.length; i += chunk) {
+                binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+            }
+            return btoa(binary);
+        }
+
+        // 弹出「更新失败」引导弹窗（含「下载最新版」按钮，地址动态解析自 updater.json）
+        async function showUpdateFailedModal(errMsg, version) {
+            const info = await fetchInstallerInfo();
+            const dlUrl = info ? info.url : '';
+            const dlVer = (info && info.version) ? info.version : (version || '');
+            const dlName = info ? info.fileName : 'tfjl-assistant-setup.exe';
+
+            const modal = document.createElement('div');
+            modal.id = 'updateFailedModal';
+            modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;z-index:100001;';
+            modal.innerHTML = `
+                <div style="background:linear-gradient(135deg,#2a1a1a,#3a1620);border:2px solid rgba(255,82,82,0.6);border-radius:16px;padding:24px;max-width:460px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.6);">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">
+                        <span style="color:#ff5252;font-size:1.1rem;font-weight:bold;">⚠️ 自动更新失败</span>
+                        <span onclick="document.getElementById('updateFailedModal').remove()" style="cursor:pointer;color:rgba(255,255,255,0.4);font-size:1.5rem;line-height:1;">×</span>
+                    </div>
+                    <div style="color:rgba(255,255,255,0.7);font-size:0.82rem;line-height:1.6;margin-bottom:8px;">
+                        自动更新没能完成（可能是网络/代理或签名校验问题）。请下载最新版手动安装，安装包会覆盖升级、数据不丢。
+                    </div>
+                    <div style="color:rgba(255,255,255,0.45);font-size:0.72rem;word-break:break-all;background:rgba(0,0,0,0.3);padding:8px 10px;border-radius:8px;margin-bottom:14px;">
+                        ${errMsg ? ('错误: ' + (errMsg.length > 80 ? errMsg.slice(0, 78) + '…' : errMsg)) : ''}
+                    </div>
+                    <button id="_updDlBtn" style="width:100%;background:linear-gradient(135deg,#ff9800,#f57c00);color:#fff;border:none;padding:12px;border-radius:10px;cursor:pointer;font-size:0.95rem;font-weight:bold;">
+                        📥 下载最新版${dlVer ? ' v' + dlVer : ''}
+                    </button>
+                    <div style="display:flex;gap:8px;margin-top:8px;">
+                        <button id="_updCopyBtn" style="flex:1;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.15);padding:9px;border-radius:8px;cursor:pointer;font-size:0.8rem;">📋 复制地址</button>
+                        <button id="_updBrowserBtn" style="flex:1;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.15);padding:9px;border-radius:8px;cursor:pointer;font-size:0.8rem;">🌐 浏览器打开</button>
+                    </div>
+                    <div style="color:rgba(255,255,255,0.3);font-size:0.68rem;text-align:center;margin-top:12px;">下载地址随每次发布自动更新，无需手动维护</div>
+                </div>`;
+            modal.onclick = function(e) { if (e.target === modal) modal.remove(); };
+            document.body.appendChild(modal);
+
+            const dlBtn = document.getElementById('_updDlBtn');
+            const copyBtn = document.getElementById('_updCopyBtn');
+            const browserBtn = document.getElementById('_updBrowserBtn');
+            if (dlBtn) dlBtn.onclick = () => { modal.remove(); showInstallerSaveDialog(dlUrl, dlVer, dlName); };
+            if (copyBtn) copyBtn.onclick = () => {
+                if (dlUrl) { try { navigator.clipboard.writeText(dlUrl); showToast('✅ 已复制下载地址'); } catch (e) { showToast('复制失败: ' + dlUrl); } }
+            };
+            if (browserBtn) browserBtn.onclick = () => { if (dlUrl) { try { openUrl(dlUrl); } catch (e) {} } };
+        }
+
+        // 选择保存位置并把安装包下载到该文件夹（复用「需求墙下载」那种文件夹选择器）
+        async function showInstallerSaveDialog(url, version, fileName) {
+            if (!url) { alert('未获取到下载地址'); return; }
+            const safeName = fileName || 'tfjl-assistant-setup.exe';
+
+            const modal = document.createElement('div');
+            modal.id = 'installerSaveModal';
+            modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:100000;';
+            modal.innerHTML = `
+                <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(255,152,0,0.5);border-radius:16px;padding:24px;max-width:480px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;">
+                        <div>
+                            <span style="color:#ff9800;font-size:1.1rem;font-weight:bold;">📥 保存安装包</span>
+                            <div style="color:rgba(255,255,255,0.4);font-size:0.72rem;margin-top:4px;">${safeName}${version ? ('  ·  v' + version) : ''}</div>
+                        </div>
+                        <span onclick="document.getElementById('installerSaveModal').remove()" style="cursor:pointer;color:rgba(255,255,255,0.4);font-size:1.5rem;line-height:1;">×</span>
+                    </div>
+                    <div style="color:rgba(255,255,255,0.5);font-size:0.76rem;margin-bottom:12px;">选择文件夹，安装包将下载并保存到该位置（覆盖升级，数据不丢）。</div>
+                    <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:14px;">
+                        <div style="display:flex;align-items:center;gap:10px;">
+                            <span style="font-size:1.2rem;">📂</span>
+                            <button id="_instPickBtn" style="background:linear-gradient(135deg,#2196f3,#1565c0);color:#fff;border:none;padding:7px 16px;border-radius:6px;cursor:pointer;font-size:0.8rem;white-space:nowrap;">浏览文件夹...</button>
+                            <span id="_instFolderText" style="color:rgba(255,255,255,0.35);font-size:0.75rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">未选择</span>
+                        </div>
+                        <div id="_instPreview" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.08);">
+                            <div style="color:#4caf50;font-size:0.75rem;margin-bottom:8px;word-break:break-all;" id="_instFullPath"></div>
+                            <button id="_instSaveBtn" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;border:none;padding:9px 20px;border-radius:8px;cursor:pointer;font-size:0.85rem;width:100%;">✅ 下载并保存到此处</button>
+                        </div>
+                    </div>
+                    <button id="_instCancel" style="background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.6);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:10px;cursor:pointer;font-size:0.85rem;width:100%;margin-top:12px;">取消</button>
+                </div>`;
+            modal.onclick = function(e) { if (e.target === modal) modal.remove(); };
+            document.body.appendChild(modal);
+
+            let selectedFolder = '';
+            const invokeFn = window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke;
+
+            const pickBtn = document.getElementById('_instPickBtn');
+            const cancelBtn = document.getElementById('_instCancel');
+            const saveBtn = document.getElementById('_instSaveBtn');
+            if (pickBtn) pickBtn.onclick = async () => {
+                try {
+                    const folder = invokeFn ? await invokeFn('open_directory_dialog') : null;
+                    if (!folder) return;
+                    selectedFolder = folder;
+                    const ft = document.getElementById('_instFolderText');
+                    if (ft) { ft.textContent = folder; ft.style.color = 'rgba(255,255,255,0.8)'; }
+                    const fp = document.getElementById('_instFullPath');
+                    if (fp) fp.textContent = folder.replace(/[\\/]+$/, '') + '\\' + safeName;
+                    const pv = document.getElementById('_instPreview');
+                    if (pv) pv.style.display = 'block';
+                } catch (e) { console.warn('目录选择失败:', e); }
+            };
+            if (cancelBtn) cancelBtn.onclick = () => modal.remove();
+            if (saveBtn) saveBtn.onclick = async () => {
+                if (!selectedFolder) return;
+                const savePath = selectedFolder.replace(/[\\/]+$/, '') + '\\' + safeName;
+                const t = showLoadingToast('⏳ 正在下载安装包...');
+                try {
+                    const resp = await fetch(url, { cache: 'no-cache' });
+                    if (!resp.ok) throw new Error('下载失败 (' + resp.status + ')');
+                    const buf = await resp.arrayBuffer();
+                    if (t && t.update) t.update('💾 正在保存到 ' + safeName + ' ...');
+                    const b64 = arrayBufferToBase64(buf);
+                    if (!invokeFn) throw new Error('当前环境不支持本地保存');
+                    await invokeFn('write_binary_file', { filePath: savePath, content_base64: b64 });
+                    if (t && t.success) { t.success('✅ 已保存: ' + safeName); t.remove(2600); }
+                    modal.remove();
+                    showToast('✅ 安装包已保存到：' + savePath);
+                } catch (e) {
+                    console.warn('[updater] 安装包保存失败，回退浏览器下载:', e);
+                    if (t && t.error) { t.error('⚠️ 本地下载失败，改用浏览器下载'); t.remove(2500); }
+                    try { openUrl(url); } catch (e2) {}
+                }
+            };
         }
 
         // App 启动时后台自动检查更新 + 预下载（用户点「检查更新」时秒装）
@@ -28325,7 +28468,7 @@ ${maSection}
         </style>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260730-22</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260730-23</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
