@@ -316,28 +316,36 @@
       if(tip) tip.style.display = 'none';
       return;
     }
-    // 未运行：若已记住路径则自动无感拉起
+    // 未运行：若已记住路径则先尝试自动无感拉起（路径可能失效/文件已移动）
     const stored = await getStoredUmiPath();
     if(stored){
       setStatusPill(st, '🟡', '未检测到引擎，正在自动启动…');
-      const ok = await autoStartUmiOcr();
-      if(ok){
+      if(await autoStartUmiOcr()){
         setStatusPill(st, '🟢', 'Umi-OCR 已自动启动（离线识别可用）');
         if(tip) tip.style.display = 'none';
         return;
       }
-      // 自动启动失败 → 醒目提示排查
-      setStatusPill(st, '🔴', 'Umi-OCR 启动失败，请排查');
-      setTip(tip, 'rgba(244,67,54,0.18)', '#ff8a80',
-        '⚠️ <b>无法自动启动 Umi-OCR</b>。请排查：<br>'
-        + '① 记录路径是否还在（可能误删/移动）：<code style="font-size:0.72rem;">' + escapeHtml(stored) + '</code><br>'
-        + '② 是否被杀毒软件拦截<br>'
-        + '③ 点「🚀 启动识别引擎」手动启动，或重装：'
-        + '<a href="#" data-act="install" style="color:#4fc3f7;text-decoration:underline;margin:0 4px;">⬇ 一键下载安装</a>'
-        + '<a href="#" data-act="find" style="color:#4fc3f7;text-decoration:underline;margin:0 4px;">🔍 自动查找</a>'
-        + '<a href="#" id="recPickUmi" style="color:#4fc3f7;text-decoration:underline;margin:0 4px;">选择 exe</a>'
-        + '<br><br>' + umiSettingsGuideHtml());
-      bindPickUmi(tip);
+      // 记住的路径启动失败（多半是路径失效）→ 不阻塞，继续自动查找新位置
+    }
+    // 自动查找本机 Umi-OCR（找到后会更新记住的路径并自动拉起）
+    const found = await findUmiOcr(tip);
+    if(found){
+      const ok2 = await checkUmiOcrAvailable();
+      if(ok2 === true){
+        setStatusPill(st, '🟢', 'Umi-OCR 已自动启动（离线识别可用）');
+        if(tip) tip.style.display = 'none';
+      } else {
+        setStatusPill(st, '🔴', 'Umi-OCR 启动失败，请排查');
+        setTip(tip, 'rgba(244,67,54,0.18)', '#ff8a80',
+          '⚠️ <b>已找到 Umi-OCR 但启动失败</b>：<code style="font-size:0.72rem;">' + escapeHtml(found) + '</code><br>'
+          + '① 是否被杀毒软件拦截<br>'
+          + '② 点「🚀 启动识别引擎」手动启动，或重装：'
+          + '<a href="#" data-act="install" style="color:#4fc3f7;text-decoration:underline;margin:0 4px;">⬇ 一键下载安装</a>'
+          + '<a href="#" data-act="find" style="color:#4fc3f7;text-decoration:underline;margin:0 4px;">🔍 重新查找</a>'
+          + '<a href="#" id="recPickUmi" style="color:#4fc3f7;text-decoration:underline;margin:0 4px;">选择 exe</a>'
+          + '<br><br>' + umiSettingsGuideHtml());
+        bindPickUmi(tip);
+      }
       return;
     }
     // 从未配置：引导三种方式
@@ -616,13 +624,27 @@
     $('recLaunch').onclick = async ()=>{
       const st = $('recStatus');
       if(isTauri() && await checkUmiOcrAvailable() === true){ st.textContent = '✅ Umi-OCR 已在运行'; return; }
-      const p = await getStoredUmiPath();
-      if(!p){ alert('请先选择本机 Umi-OCR.exe（点击浮窗里的「选择 Umi-OCR.exe」）'); return; }
+      let p = await getStoredUmiPath();
+      if(!p){
+        // 没有记录路径 → 先自动查找
+        const found = await findUmiOcr($('recUmiTip'));
+        p = found || await getStoredUmiPath();
+      }
+      if(!p){ alert('未找到本机 Umi-OCR，请点「选择 Umi-OCR.exe」或「一键下载安装」'); return; }
       st.textContent = '正在启动 Umi-OCR（显示窗口）…';
+      const tryStart = async (exe)=>{
+        await tauriInvoke('start_umi_ocr', { exe_path: exe, hidden: false });
+        for(let i=0;i<25;i++){ await sleep(800); if(await checkUmiOcrAvailable() === true) return true; }
+        return false;
+      };
       try{
-        await tauriInvoke('start_umi_ocr', { exe_path: p, hidden: false });
-        let ok=false;
-        for(let i=0;i<25;i++){ await sleep(800); if(await checkUmiOcrAvailable() === true){ ok=true; break; } }
+        let ok = await tryStart(p);
+        if(!ok){
+          // 启动失败（多半路径失效）→ 重新查找后重试一次
+          const found = await findUmiOcr($('recUmiTip'));
+          const p2 = found || await getStoredUmiPath();
+          if(p2 && p2 !== p) ok = await tryStart(p2);
+        }
         st.textContent = ok ? '✅ Umi-OCR 已启动（窗口已显示）' : '⚠️ 启动超时，请手动打开 Umi-OCR';
       }catch(e){ st.textContent = '启动失败: ' + (e&&e.message||e); }
     };
