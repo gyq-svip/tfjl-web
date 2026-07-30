@@ -4036,6 +4036,7 @@
                 }
                 localStorage.setItem('TFJL_UserName', newNick);
                 localStorage.setItem('TFJL_HasSetNick', 'true'); // 标记已设置
+                persistNicknameToDisk(); // 同步写入本地磁盘（重装不丢）
                 nickInput.readOnly = true;
                 nickEditBtn.textContent = '已设置';
                 nickEditBtn.disabled = true;
@@ -4046,6 +4047,50 @@
 
         function closeChatRoomEntry() {
             document.getElementById('chatRoomEntryModal').style.display = 'none';
+        }
+
+        // ========== 昵称本地磁盘持久化（独立于安装目录，重启/更新/卸载重装都不丢） ==========
+        const NICK_DISK_PATH = 'D:\\withfriends\\塔防精灵助手数据\\data\\nickname.json';
+
+        async function _tauriInvoke(name, args) {
+            const fn = window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke;
+            if (!fn) return null;
+            try { return await fn(name, args); } catch (e) { return null; }
+        }
+
+        // 把当前昵称状态写入本地磁盘（网页版无 Tauri 时仅用 localStorage，不写盘）
+        async function persistNicknameToDisk() {
+            if (!(window.__TAURI__ || window.__TAURI_INTERNALS__)) return;
+            const nick = localStorage.getItem('TFJL_UserName') || '';
+            const hasSet = localStorage.getItem('TFJL_HasSetNick') === 'true';
+            try {
+                if (!nick) {
+                    await _tauriInvoke('delete_file', { filePath: NICK_DISK_PATH }); // 昵称被清空则一并删除磁盘记录
+                    return;
+                }
+                await _tauriInvoke('write_text_file', {
+                    filePath: NICK_DISK_PATH,
+                    content: JSON.stringify({ nick: nick, hasSet: hasSet, savedAt: new Date().toISOString() })
+                });
+            } catch (e) {}
+        }
+
+        // 加载时从本地磁盘读回昵称，同步进 localStorage（使所有读取逻辑默认加载到已保存昵称）
+        async function restoreNicknameFromDisk() {
+            if (!(window.__TAURI__ || window.__TAURI_INTERNALS__)) return;
+            try {
+                const txt = await _tauriInvoke('read_text_file_auto', { filePath: NICK_DISK_PATH });
+                if (txt) {
+                    const obj = JSON.parse(txt);
+                    if (obj && obj.nick) {
+                        localStorage.setItem('TFJL_UserName', obj.nick);
+                        localStorage.setItem('TFJL_HasSetNick', obj.hasSet ? 'true' : 'false');
+                    }
+                } else {
+                    // 磁盘无记录：若 localStorage 已有昵称，迁移写入磁盘（兼容旧版仅存 localStorage 的用户）
+                    if (localStorage.getItem('TFJL_UserName')) await persistNicknameToDisk();
+                }
+            } catch (e) {}
         }
 
         // ========== 昵称设置（全局唯一，仅用于发言/分享脚本展示） ==========
@@ -4118,6 +4163,7 @@
                     if (used.includes(v)) { errEl.textContent = '昵称 "' + v + '" 已被使用，请换一个'; return; }
                     localStorage.setItem('TFJL_UserName', v);
                     localStorage.setItem('TFJL_HasSetNick', 'true');
+                    persistNicknameToDisk(); // 同步写入本地磁盘（重装不丢）
                     used.push(v);
                     await saveUsedNicks(used);
                     cleanup();
@@ -4228,6 +4274,7 @@
             if (!localStorage.getItem('TFJL_UserName')) {
                 localStorage.setItem('TFJL_UserName', nick);
                 localStorage.setItem('TFJL_HasSetNick', 'true');
+                persistNicknameToDisk(); // 同步写入本地磁盘（重装不丢）
             }
 
             closeChatRoomEntry();
@@ -20801,6 +20848,9 @@ function hasGistToken() {
         // 页面加载时初始化
         window.onload = async function() {
 
+            // 启动即从本地磁盘恢复昵称（独立于安装目录，重启/更新/卸载重装都不丢），须早于 initMessageWall 等读取逻辑
+            await restoreNicknameFromDisk();
+
             // 应用管理员对浮动控制台可见性的设置（默认隐藏）
             try {
                 applyConsoleVisibility(localStorage.getItem(CONSOLE_VISIBILITY_KEY) === '1');
@@ -26085,6 +26135,7 @@ ${maSection}
             if (!confirm) return;
             
             localStorage.removeItem('TFJL_HasSetNick');
+            persistNicknameToDisk(); // 同步更新磁盘记录
             showAdminStatus('昵称设置已重置！用户可以重新设置昵称了。', 'success');
             loadCurrentNick();
         }
@@ -26101,6 +26152,7 @@ ${maSection}
             
             localStorage.setItem('TFJL_UserName', newNick);
             localStorage.setItem('TFJL_HasSetNick', 'true');
+            persistNicknameToDisk(); // 同步写入本地磁盘
             showAdminStatus(`昵称已修改为"${newNick}"！`, 'success');
             loadCurrentNick();
         }
@@ -26195,6 +26247,7 @@ ${maSection}
             if (localStorage.getItem('TFJL_UserName') === name) {
                 localStorage.removeItem('TFJL_UserName');
                 localStorage.removeItem('TFJL_HasSetNick');
+                persistNicknameToDisk(); // 同步删除磁盘记录
                 loadCurrentNick();
             }
             window._nickAllUsed = full;
@@ -28468,7 +28521,7 @@ ${maSection}
         </style>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260730-23</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260730-24</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
