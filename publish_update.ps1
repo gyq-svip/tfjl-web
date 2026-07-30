@@ -46,7 +46,7 @@ if ($kSig -ne $kConf) {
 Write-Host "Signature verified (keynum=$kSig)" -ForegroundColor Green
 
 $pubDate = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
-$rawUrl = "https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/raw/main/$ExeName"
+$rawUrl = "https://gyq-svip.github.io/tfjl-web/$ExeName"
 
 $updater = [ordered]@{
     version  = $ver
