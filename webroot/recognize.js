@@ -61,14 +61,14 @@
   // 读取已记住的 Umi-OCR.exe 路径
   async function getStoredUmiPath(){
     if(isTauri()){
-      try{ const s = await tauriInvoke('read_text_file_auto', { file_path: UMI_PATH_FILE });
+      try{ const s = await tauriInvoke('read_text_file_auto', { filePath: UMI_PATH_FILE });
            const j = JSON.parse(s); return (j && j.path) || ''; }catch(e){ return ''; }
     }
     try{ return localStorage.getItem('tfjl_umi_ocr_path') || ''; }catch(e){ return ''; }
   }
   async function setStoredUmiPath(p){
     if(isTauri()){
-      try{ await tauriInvoke('write_text_file', { file_path: UMI_PATH_FILE, content: JSON.stringify({path:p}) }); }catch(e){}
+      try{ await tauriInvoke('write_text_file', { filePath: UMI_PATH_FILE, content: JSON.stringify({path:p}) }); }catch(e){}
     }
     try{ localStorage.setItem('tfjl_umi_ocr_path', p); }catch(e){}
   }
@@ -95,7 +95,7 @@
     if(!p) return { ok:false, msg:'请先选择/自动查找到 Umi-OCR.exe' };
     const settingsPath = umiSettingsPathOf(p);
     let text = '';
-    try{ text = await tauriInvoke('read_text_file_auto', { file_path: settingsPath }); }
+    try{ text = await tauriInvoke('read_text_file_auto', { filePath: settingsPath }); }
     catch(e){ return { ok:false, msg:'读取 Umi-OCR 配置失败（'+((e&&e.message)||e)+'），请直接在 Umi-OCR 全局设置里勾选' }; }
     const keys = { 'shortcut.startup':'true', 'window.hideTrayIcon':'true', 'window.startupInvisible':'true' };
     const lines = text.split(/\r?\n/);
@@ -119,7 +119,7 @@
       }
     }
     const out = lines.join('\r\n');
-    try{ await tauriInvoke('write_text_file', { file_path: settingsPath, content: out }); }
+    try{ await tauriInvoke('write_text_file', { filePath: settingsPath, content: out }); }
     catch(e){ return { ok:false, msg:'写入 Umi-OCR 配置失败（'+((e&&e.message)||e)+'）' }; }
     return { ok:true, msg:'已写入配置（开机自启 + 隐藏托盘 + 启动即隐藏）。需重启 Umi-OCR 生效：关掉它再点「🚀 启动识别引擎」即可。' };
   }
@@ -170,7 +170,7 @@
       if(!p) return;
       const settingsPath = umiSettingsPathOf(p);
       let text = '';
-      try{ text = await tauriInvoke('read_text_file_auto', { file_path: settingsPath }); }
+      try{ text = await tauriInvoke('read_text_file_auto', { filePath: settingsPath }); }
       catch(e){ return; }
       const want = { 'window.hideTrayIcon':'true', 'window.startupInvisible':'true' };
       const lines = text.split(/\r?\n/);
@@ -191,7 +191,7 @@
           if(/^\[Global\]/i.test(lines[i].trim())){ lines.splice(i+1, 0, ...inserted); break; }
         }
       }
-      await tauriInvoke('write_text_file', { file_path: settingsPath, content: lines.join('\r\n') });
+      await tauriInvoke('write_text_file', { filePath: settingsPath, content: lines.join('\r\n') });
     }catch(e){ /* best-effort，忽略 */ }
   }
 
