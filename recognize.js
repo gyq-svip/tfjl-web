@@ -198,18 +198,24 @@
   async function autoStartUmiOcr(){
     const p = await getStoredUmiPath();
     if(!p) return false;
+    const tip = $('recUmiTip');
+    const say = (t)=>{ if(tip) tip.innerHTML = t; };
     // 0) 先确保托盘图标已设为隐藏（写入配置，下次启动即生效）
     await ensureUmiTrayHidden();
-    // 1) 无感隐藏启动
+    // Umi-OCR(Paddle) 首次冷启动要加载引擎，端口 1224 往往几十秒后才就绪
+    // （本机实测约 60s 才进入 LISTENING）。之前 ~45s 的等待预算太短，会误报“启动失败”。
+    // 这里放宽到 ~100s 并实时提示，避免被误判成卡死。
     try{ await tauriInvoke('start_umi_ocr', { exe_path: p, hidden: true }); }catch(e){}
-    for(let i=0;i<40;i++){            // 最多 ~28s 等引擎就绪
-      await sleep(700);
+    say('已发送启动指令，Umi-OCR 引擎加载中（首次约需 1 分钟，请稍候，勿关闭助手）…');
+    for(let i=0;i<100;i++){            // 最多 ~100s 等引擎就绪
+      await sleep(1000);
       if(await probeUmiReady()) return true;
+      if(i % 10 === 9) say('引擎加载中…（已等待 ' + (i+1) + 's，Umi-OCR 首次启动较慢属正常）');
     }
     // 2) 回退：显示窗口启动（Umi-OCR 已运行时再调一次会唤出已隐藏的窗口）
     try{ await tauriInvoke('start_umi_ocr', { exe_path: p, hidden: false }); }catch(e){}
-    for(let i=0;i<25;i++){
-      await sleep(700);
+    for(let i=0;i<40;i++){
+      await sleep(1000);
       if(await probeUmiReady()) return true;
     }
     return false;
