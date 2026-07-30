@@ -208,16 +208,17 @@ tr.rk-weak:hover td{opacity:1}
                 <input type="file" id="rankingXlsx" accept=".xlsx,.xls" style="display:none" onchange="importRankingsXlsx(event)">
             </div>
             <div class="row" style="margin-bottom:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-                <button class="ghost small" onclick="document.getElementById('deepseaOcrFile').click()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);padding:3px 8px;border-radius:6px;font-size:0.74rem;">📷 OCR 识别截图</button>
-                <input type="file" id="deepseaOcrFile" accept="image/*" style="display:none" onchange="deepseaOcrFileChanged(event)">
+                <button class="ghost small" onclick="document.getElementById('deepseaOcrFile').click()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);padding:3px 8px;border-radius:6px;font-size:0.74rem;">📷 OCR 识别截图（可多选 4 张势力图）</button>
+                <input type="file" id="deepseaOcrFile" accept="image/*" multiple style="display:none" onchange="deepseaOcrFileChanged(event)">
                 <span id="deepseaOcrStatus" style="font-size:0.72rem;color:rgba(255,255,255,0.6);"></span>
             </div>
             <div id="deepseaOcrPanel" class="hidden" style="border:1px dashed rgba(77,182,172,0.4);border-radius:8px;padding:8px;margin-bottom:8px;">
                 <div style="font-size:0.72rem;color:rgba(255,255,255,0.7);margin-bottom:6px;">识别原文（可全选复制发给我整理）：</div>
                 <textarea id="deepseaOcrRaw" style="width:100%;height:120px;background:rgba(0,0,0,0.3);color:#cfe;font-size:0.72rem;border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:6px;" placeholder="OCR 结果将显示在这里"></textarea>
-                <div style="margin-top:6px;display:flex;gap:8px;">
+                <div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;">
                     <button class="ghost small" onclick="deepseaParseAndImport()" style="background:rgba(77,182,172,0.18);border:1px solid rgba(77,182,172,0.4);padding:3px 8px;border-radius:6px;font-size:0.74rem;">解析并填入表格（尝试）</button>
                     <button class="ghost small" onclick="copyDeepseaOcrRaw()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);padding:3px 8px;border-radius:6px;font-size:0.74rem;">复制原文</button>
+                    <button class="ghost small" onclick="deepseaClearOcr()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);padding:3px 8px;border-radius:6px;font-size:0.74rem;">清空重来</button>
                 </div>
             </div>
         </div>
@@ -626,34 +627,50 @@ function deepseaFileToBase64(file){
     return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res((r.result||'').split(',')[1]); r.onerror=rej; r.readAsDataURL(file); });
 }
 async function deepseaOcrFileChanged(e){
-    const f = e.target.files && e.target.files[0]; e.target.value='';
-    if(f) await deepseaRunOcr(f);
+    const files = e.target.files ? [...e.target.files] : [];
+    e.target.value='';
+    if(files.length) await deepseaRunOcr(files);
 }
-document.addEventListener('paste', (e)=>{
+document.addEventListener('paste', async (e)=>{
     const panel = document.getElementById('deepseaOcrPanel');
     if(!panel || panel.classList.contains('hidden')) return;
-    const it = e.clipboardData && e.clipboardData.items && [...e.clipboardData.items].find(i=>i.type && i.type.startsWith('image/'));
-    if(it){ const f=it.getAsFile(); if(f){ e.preventDefault(); deepseaRunOcr(f); } }
+    const items = e.clipboardData && e.clipboardData.items ? [...e.clipboardData.items] : [];
+    const imgs = items.filter(i=>i.type && i.type.startsWith('image/'));
+    for(const it of imgs){ const f=it.getAsFile(); if(f){ e.preventDefault(); await deepseaRunOcr([f]); } }
 });
-async function deepseaRunOcr(file){
+// 支持多张图片：files 为数组，逐张识别并【累积追加】到原文框（不覆盖），
+// 这样 4 个势力的截图可一次多选或分次粘贴，拼接成一份完整原文后再统一解析填表。
+async function deepseaRunOcr(files){
+    if(!Array.isArray(files)) files=[files];
     const status=document.getElementById('deepseaOcrStatus');
     const panel=document.getElementById('deepseaOcrPanel');
     const raw=document.getElementById('deepseaOcrRaw');
     if(panel) panel.classList.remove('hidden');
-    if(status) status.textContent='识别中…';
+    let done=0;
     try{
         if(!window.__TAURI_INTERNALS__ && !window.__TAURI__) throw new Error('OCR 需在桌面 App 内运行（本机 Umi-OCR）');
         const invoke=deepseaGetInvoke(); if(!invoke) throw new Error('未找到 Tauri invoke');
-        const b64=await deepseaFileToBase64(file);
-        const j=await invoke('umi_ocr', { base64:b64, options:{ data:{format:'text', outputDirName:'', outputFileName:'', outputFileFormat:[]}, ocr:{language:'models/config_chinese.txt', cls:true} } });
-        let text='';
-        if(j && j.code===100){ text = (typeof j.data==='string') ? j.data : (Array.isArray(j.data) ? j.data.map(x=>x.text||x).join('\n') : ''); }
-        else if(j && j.code===101){ text=''; }
-        else { throw new Error(typeof j==='string'?j:(j&&j.data)||'Umi-OCR 返回异常'); }
-        if(raw) raw.value=text;
-        if(status) status.textContent = text ? ('识别完成，'+text.split(/\r?\n/).filter(Boolean).length+' 行') : '识别为空';
+        for(let idx=0; idx<files.length; idx++){
+            if(status) status.textContent='识别中… ('+(idx+1)+'/'+files.length+')';
+            const b64=await deepseaFileToBase64(files[idx]);
+            const j=await invoke('umi_ocr', { base64:b64, options:{ data:{format:'text', outputDirName:'', outputFileName:'', outputFileFormat:[]}, ocr:{language:'models/config_chinese.txt', cls:true} } });
+            let text='';
+            if(j && j.code===100){ text = (typeof j.data==='string') ? j.data : (Array.isArray(j.data) ? j.data.map(x=>x.text||x).join('\n') : ''); }
+            else if(j && j.code===101){ text=''; }
+            else { throw new Error(typeof j==='string'?j:(j&&j.data)||'Umi-OCR 返回异常'); }
+            if(raw){
+                if(raw.value && !raw.value.endsWith('\n')) raw.value += '\n';
+                raw.value += text + '\n';
+            }
+            done++;
+        }
+        if(status){
+            const totalLines = raw ? raw.value.split(/\r?\n/).filter(Boolean).length : 0;
+            status.textContent = '已识别 '+done+' 张，共 '+totalLines+' 行（已拼接，可继续加图）';
+        }
+        toast('✅ 已识别 '+done+' 张，点「解析并填入表格」导入');
     }catch(err){
-        if(status) status.textContent='识别失败：'+err.message;
+        if(status) status.textContent='识别失败：'+err.message+'（已识别 '+done+' 张）';
         toast('OCR 失败：'+err.message);
     }
 }
@@ -668,20 +685,18 @@ function deepseaParseAndImport(){
     renderRankings(); renderChampionship(); populateCalcAlliance();
     toast('✅ 已从 OCR 导入 '+rows.length+' 条');
 }
-// 从 OCR 纯文本解析排行：定位表头行 → 按字段别名映射列 → 逐行取数
+// 从 OCR 纯文本解析排行：支持【多张图拼接】（每张图各自带表头行，如 4 个势力 4 张图）。
+// 遍历所有行，遇到表头行就【重置列映射】（兼容不同图列顺序不同），之后逐行取数并累积所有块的数据。
 function parseDeepseaOcrText(text){
     const lines=text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
-    let headerIdx=-1, headerCells=[];
+    const rows=[];
+    let colMap=null;
     for(let i=0;i<lines.length;i++){
         const cells=lines[i].split(/\s+/);
         const m=buildXlsxFieldMap(cells);
-        if(Object.keys(m).length>=2 && (m['联盟名称']!==undefined || m['排名']!==undefined)){ headerIdx=i; headerCells=cells; break; }
-    }
-    if(headerIdx<0) return [];
-    const colMap=buildXlsxFieldMap(headerCells);
-    const rows=[];
-    for(let i=headerIdx+1;i<lines.length;i++){
-        const cells=lines[i].split(/\s+/);
+        const isHeader = Object.keys(m).length>=2 && (m['联盟名称']!==undefined || m['排名']!==undefined);
+        if(isHeader){ colMap=m; continue; }   // 表头行只用于建立列映射，本身不是数据
+        if(!colMap) continue;                 // 还没遇到表头，跳过（如图片标题行）
         if(cells.length<2) continue;
         const row={};
         for(const f in colMap){ const v=cells[colMap[f]]; if(v!==undefined) row[f]=v; }
@@ -693,6 +708,10 @@ function copyDeepseaOcrRaw(){
     const raw=document.getElementById('deepseaOcrRaw'); if(!raw) return;
     raw.select();
     try{ if(navigator.clipboard) navigator.clipboard.writeText(raw.value); else document.execCommand('copy'); toast('已复制原文'); }catch(e){ document.execCommand('copy'); }
+}
+function deepseaClearOcr(){
+    const raw=document.getElementById('deepseaOcrRaw'); if(raw) raw.value='';
+    const status=document.getElementById('deepseaOcrStatus'); if(status) status.textContent='已清空，可重新选图';
 }
 
 // ===================== 夺冠概率 / 赛季快照 =====================
