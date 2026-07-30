@@ -5810,6 +5810,7 @@
         let _downloadSucceeded = false; // 下载是否真的成功完成
         let _updateVersion = null;      // 检测到的新版本号
         const LAST_NOTIFIED_VERSION_KEY = 'tfjl_last_notified_version'; // 防止重复弹出同一版本通知
+        const DOWNLOADED_VERSION_KEY = 'tfjl_downloaded_version'; // 已真正下载完成的版本（持久化，避免重复下载）
 
         function _resetUpdateState() {
             _currentUpdate = null;
@@ -6544,8 +6545,11 @@
                         const result = await updater.check();
                         const update = result && (result.update || result);
                         if (!update) {
-                            // 确实已是最新 → 清除旧版本通知记录（比如用户降级后又升级的场景）
-                            try { localStorage.removeItem(LAST_NOTIFIED_VERSION_KEY); } catch(e) {}
+                            // 确实已是最新 → 清除旧版本通知/下载记录（比如用户降级后又升级的场景）
+                            try {
+                                localStorage.removeItem(LAST_NOTIFIED_VERSION_KEY);
+                                localStorage.removeItem(DOWNLOADED_VERSION_KEY);
+                            } catch(e) {}
                             return;
                         }
 
@@ -6553,15 +6557,23 @@
                         _updateVersion = newVer;
                         _currentUpdate = update;
 
-                        // —— 去重：同一版本已通知过则跳过（避免每次启动都弹 toast） ——
-                        const lastNotified = (function(){ try { return localStorage.getItem(LAST_NOTIFIED_VERSION_KEY) || ''; } catch(e) { return ''; } })();
-                        if (lastNotified === newVer) {
-                            console.log('[auto-update] 版本 v' + newVer + ' 已通知过，跳过（点「检查更新」可强制重试）');
-                            return;
-                        }
+                        // —— 去重：只控制「是否弹 toast」，【绝不能阻止下载】——
+                        // 旧逻辑曾把「已通知」误当「已下载」直接 return，导致下载被跳过、自动更新形同虚设。
+                        // 现在下载始终执行；用 DOWNLOADED_VERSION_KEY 记录真正下载过的版本，避免每次启动重复下载。
+                        const getLS = (k) => { try { return localStorage.getItem(k) || ''; } catch(e) { return ''; } };
+                        const lastNotified = getLS(LAST_NOTIFIED_VERSION_KEY);
+                        const downloadedVer = getLS(DOWNLOADED_VERSION_KEY);
+                        const isFirstDownload = (downloadedVer !== newVer); // 本版本尚未真正下载过
 
-                        // 后台静默下载（不弹 toast，不打扰用户）
                         if (typeof update.download === 'function') {
+                            // 已下载完成且已通知过 → 仅确保角标常驻，不重复下载/弹窗
+                            if (_downloadSucceeded && !isFirstDownload && lastNotified === newVer) {
+                                const badge = document.getElementById('updateBadgeFooter');
+                                if (badge) badge.style.display = 'inline-block';
+                                return;
+                            }
+
+                            // 后台静默下载（不弹 toast，不打扰用户）
                             let downloadDone = false;
                             let totalBytes = 0;
                             let downloadedBytes = 0;
@@ -6587,14 +6599,21 @@
 
                             await _currentDownload;
                             _markDownloadSuccess();
-                            // 记录已通知，防止下次启动重复弹出
-                            try { localStorage.setItem(LAST_NOTIFIED_VERSION_KEY, newVer); } catch(e) {}
-                            _notifyPreDownloadReady();
+                            // 记录已下载版本（持久化，避免每次启动重复下载）
+                            try { localStorage.setItem(DOWNLOADED_VERSION_KEY, newVer); } catch(e) {}
+                            // 首下载（含脏数据场景：LAST_NOTIFIED 被旧 fallback 污染但从未真下载过）
+                            // 或尚未通知过 → 弹「已下载完成」提示；否则仅常驻角标
+                            if (isFirstDownload || lastNotified !== newVer) {
+                                try { localStorage.setItem(LAST_NOTIFIED_VERSION_KEY, newVer); } catch(e) {}
+                                _notifyPreDownloadReady();
+                            }
                             return;
                         }
                         // 旧版 updater 无 download()，退回到仅提示
-                        try { localStorage.setItem(LAST_NOTIFIED_VERSION_KEY, newVer); } catch(e) {}
-                        _notifyNewVersion(newVer);
+                        if (lastNotified !== newVer) {
+                            try { localStorage.setItem(LAST_NOTIFIED_VERSION_KEY, newVer); } catch(e) {}
+                            _notifyNewVersion(newVer);
+                        }
                         return;
                     } catch (e) {
                         const errMsg = String(e && (e.message || e) || '未知错误');
@@ -28649,7 +28668,7 @@ ${maSection}
         </style>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260731-34</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260731-35</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
