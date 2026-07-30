@@ -10616,7 +10616,7 @@
                             const T = window.__TAURI__;
                             const invoke = T && T.core && T.core.invoke;
                             if (invoke) {
-                                const txt = await invoke('read_text_file_auto', { path: 'D:\\withfriends\\塔防精灵助手数据\\data\\deepsea-rankings.json' });
+                                const txt = await invoke('read_text_file_auto', { filePath: 'D:\\withfriends\\塔防精灵助手数据\\data\\deepsea-rankings.json' });
                                 const json = JSON.parse(txt);
                                 const list = Array.isArray(json) ? json : (json.totalRanking || []);
                                 if (list.length) {
@@ -18066,6 +18066,7 @@
             "酋长": 0,
             "宝库": 0
         };
+        let damageReductionDiskLoaded = false; // 磁盘恢复是否已完成首次尝试（防止加载完成前把空数据回写覆盖真数据）
         
         // 加载减伤数据
         function loadDamageReductionData() {
@@ -18120,6 +18121,7 @@
             const T = window.__TAURI__ || window.__TAURI_INTERNALS__;
             const invoke = T && (T.core && T.core.invoke || T.invoke);
             if (!invoke) return;
+            if (!damageReductionDiskLoaded) return; // 磁盘首次加载完成前，禁止回写，避免把空数据覆盖真数据
             try {
                 invoke('write_text_file', { filePath: DAMAGE_REDUCTION_FILE, content: JSON.stringify({ damageReductionData, specialDamageReduction }) });
             } catch (e) { /* 忽略写入异常 */ }
@@ -18129,9 +18131,10 @@
         async function loadDamageReductionFromDisk() {
             const T = window.__TAURI__ || window.__TAURI_INTERNALS__;
             const invoke = T && (T.core && T.core.invoke || T.invoke);
-            if (!invoke) return;
+            if (!invoke) { damageReductionDiskLoaded = true; return; }
             try {
-                const txt = await invoke('read_text_file_auto', { path: DAMAGE_REDUCTION_FILE });
+                // 注意：Tauri v2 命令参数名为 file_path，JS 侧须用 filePath（或 file_path），不能写 path（匹配不到会报错被吞）
+                const txt = await invoke('read_text_file_auto', { filePath: DAMAGE_REDUCTION_FILE });
                 const json = JSON.parse(txt);
                 if (json && typeof json === 'object') {
                     if (json.damageReductionData && typeof json.damageReductionData === 'object') {
@@ -18145,6 +18148,7 @@
                     updateDamageReductionDisplay();
                 }
             } catch (e) { /* 文件不存在或解析失败则忽略 */ }
+            damageReductionDiskLoaded = true; // 无论成功失败，首次尝试后允许回写磁盘
         }
         
         // 显示减伤记录弹窗
@@ -28321,7 +28325,7 @@ ${maSection}
         </style>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260730-21</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260730-22</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>

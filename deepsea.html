@@ -464,7 +464,7 @@ async function importRankingsFromDisk(record){
         if(window.__TAURI_INTERNALS__ || window.__TAURI__){
             const invoke = (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke) || (window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke);
             if(invoke){
-                const txt = await invoke('read_text_file_auto', {path:'D:\\withfriends\\塔防精灵助手数据\\data\\deepsea-rankings.json'});
+                const txt = await invoke('read_text_file_auto', { filePath: 'D:\\withfriends\\塔防精灵助手数据\\data\\deepsea-rankings.json' });
                 const json = JSON.parse(txt);
                 let rankings = Array.isArray(json)?json:(json.totalRanking||[]);
                 state.rankings = rankings;
