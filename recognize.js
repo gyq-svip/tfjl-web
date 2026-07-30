@@ -294,7 +294,7 @@
     const bar = '<div id="recDLWrap" style="margin:8px 0 2px;height:10px;border-radius:6px;background:rgba(255,255,255,0.12);overflow:hidden;">'
       + '<div id="recDLBar" style="height:100%;width:2%;border-radius:6px;background:linear-gradient(90deg,#26c6da,#00838f);transition:width .25s;"></div></div>'
       + '<div id="recDLPct" style="font-size:0.72rem;color:#b2ebf2;margin-top:2px;">准备下载…</div>';
-    if(tip) tip.innerHTML = '正在从官网下载 Umi-OCR（约 130MB，请耐心等待，勿关闭助手）…' + bar;
+    if(tip) tip.innerHTML = '正在从 Gitee 国内加速下载 Umi-OCR（约 130MB，分 2 卷，请耐心等待，勿关闭助手）…' + bar;
     if(st) st.textContent = '下载安装中…';
     let path = null;
     let unlisten = null;
