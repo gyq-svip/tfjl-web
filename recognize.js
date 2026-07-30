@@ -137,7 +137,7 @@
     try{
       await tauriInvoke('umi_ocr', {
         base64: TINY_PNG.split(',')[1],
-        options: { data:{format:'dict'}, ocr:{language:'models/config_chinese.txt', cls:true} }
+        options: { data:{format:'dict', outputDirName:'', outputFileName:'', outputFileFormat:[]}, ocr:{language:'models/config_chinese.txt', cls:true} }
       });
       return true; // 能连通（哪怕识别结果为空，也算服务在跑）
     }catch(e){
@@ -153,7 +153,7 @@
     try{
       await tauriInvoke('umi_ocr', {
         base64: TINY_PNG.split(',')[1],
-        options: { data:{format:'dict'}, ocr:{language:'models/config_chinese.txt', cls:true} }
+        options: { data:{format:'dict', outputDirName:'', outputFileName:'', outputFileFormat:[]}, ocr:{language:'models/config_chinese.txt', cls:true} }
       });
       return true;
     }catch(e){ return false; }
@@ -444,7 +444,7 @@
     if(isTauri()){
       const j = await tauriInvoke('umi_ocr', {
         base64: b64,
-        options: { data:{format:'dict'}, ocr:{language:'models/config_chinese.txt', cls:true} }
+        options: { data:{format:'dict', outputDirName:'', outputFileName:'', outputFileFormat:[]}, ocr:{language:'models/config_chinese.txt', cls:true} }
       });
       if(j && j.code===100) return {items: j.data||[], source:'Umi-OCR(桥接)'};
       if(j && j.code===101) return {items:[], source:'Umi-OCR(空)'};
@@ -452,7 +452,7 @@
     }
     // 开发环境：本地代理（tools/server.js）
     const resp = await fetch('/umi-ocr', {method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({base64:b64, options:{data:{format:'dict'}, ocr:{language:'models/config_chinese.txt', cls:true}}})});
+      body: JSON.stringify({base64:b64, options:{data:{format:'dict', outputDirName:'', outputFileName:'', outputFileFormat:[]}, ocr:{language:'models/config_chinese.txt', cls:true}}})});
     if(resp.ok){ const j = await resp.json(); if(j.code===100) return {items:j.data||[], source:'Umi-OCR(代理)'}; }
     throw new Error('本功能需要本机 Umi-OCR（免费开源），未安装则不支持识别。请在桌面端安装并双击打开 Umi-OCR 后重试。');
   }
