@@ -179,6 +179,16 @@
     return false;
   }
 
+  // 仅查找本机 Umi-OCR.exe：扫描常见位置 → 记住路径 → 返回路径（找不到返回 null）。
+  // 供 initUmiOnOpen / 启动引擎按钮复用（注意：本函数只负责“找+记”，不负责拉起，拉起由调用方 autoStartUmiOcr 完成）
+  async function findUmiOcr(tip){
+    tip = tip || $('recUmiTip');
+    let found = null;
+    try{ found = await tauriInvoke('find_umi_ocr'); }catch(e){ found = null; }
+    if(found) await setStoredUmiPath(found);
+    return found;
+  }
+
   // 用系统默认浏览器打开 Umi-OCR 下载页（APP 内 target=_blank 被 Tauri 拦截，故走 open_url 命令）
   function openUmiDownload(){
     if(isTauri()){
@@ -193,20 +203,20 @@
   async function findAndSetUmi(tip){
     tip = tip || $('recUmiTip');
     const st = $('recStatus');
+    if(tip) tip.style.display = 'block'; // 操作期间确保提示区可见（“运行中”时默认隐藏，否则点了像没反应）
     if(tip) tip.innerHTML = '正在本机常见位置查找 Umi-OCR.exe （下载目录 / 桌面 / Program Files / Umi-OCR 文件夹）…';
-    let found = null;
-    try{ found = await tauriInvoke('find_umi_ocr'); }catch(e){ found = null; }
+    const found = await findUmiOcr(tip);
     if(found){
-      await setStoredUmiPath(found);
       if(tip) tip.innerHTML = '已找到：' + escapeHtml(found) + '，正在自动启动…';
       const ok = await autoStartUmiOcr();
       if(tip){
         if(ok) setTip(tip,'rgba(76,175,80,0.15)','#81c784','✅ 已自动找到并启动本机 Umi-OCR（离线精准识别）');
         else setTip(tip,'rgba(255,167,38,0.18)','#ffb74d','✅ 已记住路径：'+escapeHtml(found)+'，但启动失败，请手动双击打开 Umi-OCR 后重试。');
       }
-      if(st) st.textContent = ok ? '✅ 已自动启动 Umi-OCR' : '⚠️ 找到路径但启动失败';
+      if(st) st.textContent = ok ? '✅ 已自动启动 Umi-OCR（离线识别可用）' : '⚠️ 找到路径但启动失败';
       return;
     }
+    if(st) st.textContent = '⚠️ 未找到本机 Umi-OCR';
     if(tip) setTip(tip,'rgba(255,167,38,0.18)','#ffb74d',
       '🔍 未在本机常见位置找到 Umi-OCR.exe。'
       + 'Umi-OCR 是个<b>绿色压缩包</b>（不是安装程序）：先<a href="#" data-act="dl" style="color:#4fc3f7;text-decoration:underline;margin:0 4px;">下载</a>，解压到任意文件夹（例如 D:\\withfriends\\Umi-OCR），'
@@ -327,9 +337,10 @@
       }
       // 记住的路径启动失败（多半是路径失效）→ 不阻塞，继续自动查找新位置
     }
-    // 自动查找本机 Umi-OCR（找到后会更新记住的路径并自动拉起）
+    // 自动查找本机 Umi-OCR（找到后更新记住的路径并自动拉起）
     const found = await findUmiOcr(tip);
     if(found){
+      await autoStartUmiOcr(); // 找到后真正拉起引擎（之前漏了这步，会误报“启动失败”）
       const ok2 = await checkUmiOcrAvailable();
       if(ok2 === true){
         setStatusPill(st, '🟢', 'Umi-OCR 已自动启动（离线识别可用）');
@@ -635,12 +646,21 @@
     // 常驻“启动识别引擎”按钮：关掉 Umi-OCR 后随时重新打开（显示窗口，用户可见）
     $('recLaunch').onclick = async ()=>{
       const st = $('recStatus');
-      if(isTauri() && await checkUmiOcrAvailable() === true){ st.textContent = '✅ Umi-OCR 已在运行'; return; }
+      const tip = $('recUmiTip');
+      if(!isTauri()){ alert('仅桌面版 App 支持本地 OCR，请用桌面版'); return; }
+      st.textContent = '正在检查 Umi-OCR 状态…';
+      if(await checkUmiOcrAvailable() === true){
+        // 已运行：尝试唤出窗口（无害），并给出明确反馈（不再静默 return 让人以为没反应）
+        const p = await getStoredUmiPath();
+        if(p){ try{ await tauriInvoke('start_umi_ocr', { exe_path: p, hidden: false }); }catch(e){} }
+        st.textContent = '✅ Umi-OCR 已在运行（已尝试唤出窗口）';
+        return;
+      }
       let p = await getStoredUmiPath();
       if(!p){
-        // 没有记录路径 → 先自动查找
-        const found = await findUmiOcr($('recUmiTip'));
-        p = found || await getStoredUmiPath();
+        st.textContent = '未记录路径，正在自动查找…';
+        const f = await findUmiOcr(tip);
+        p = f || await getStoredUmiPath();
       }
       if(!p){ alert('未找到本机 Umi-OCR，请点「选择 Umi-OCR.exe」或「一键下载安装」'); return; }
       st.textContent = '正在启动 Umi-OCR（显示窗口）…';
@@ -653,8 +673,8 @@
         let ok = await tryStart(p);
         if(!ok){
           // 启动失败（多半路径失效）→ 重新查找后重试一次
-          const found = await findUmiOcr($('recUmiTip'));
-          const p2 = found || await getStoredUmiPath();
+          const f = await findUmiOcr(tip);
+          const p2 = f || await getStoredUmiPath();
           if(p2 && p2 !== p) ok = await tryStart(p2);
         }
         st.textContent = ok ? '✅ Umi-OCR 已启动（窗口已显示）' : '⚠️ 启动超时，请手动打开 Umi-OCR';
