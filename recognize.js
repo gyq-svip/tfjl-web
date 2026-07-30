@@ -413,7 +413,13 @@
   // ====================== 自动识别主流程 ======================
   function autoRecognize(img, canvas, statusEl, onDone){
     if(!img){ alert('请先粘贴或选择一张截图'); return; }
-    statusEl.textContent = '全图 OCR 识别中…';
+    const _bar = document.getElementById('recProgressBar');
+    const _stage = document.getElementById('recStage');
+    const _showBar = (txt)=>{ if(_bar) _bar.style.display='block'; if(_stage){ _stage.style.display='inline'; _stage.textContent=txt; } statusEl.textContent='识别中…'; };
+    const _hideBar = ()=>{ if(_bar) _bar.style.display='none'; if(_stage) _stage.style.display='none'; };
+    _showBar('① 发送截图到本地 Umi-OCR 引擎…');
+    // 发送极快，约 0.7s 后切到“引擎识别中”（Umi-OCR 单次 HTTP 不回传真实进度，故用阶段标注而非假百分比）
+    const _stageTimer = setTimeout(()=>{ if(_stage) _stage.textContent='② 引擎识别中（本地 Paddle 推理）…'; }, 700);
     const cv = document.createElement('canvas');
     cv.width = img.naturalWidth; cv.height = img.naturalHeight;
     cv.getContext('2d').drawImage(img,0,0);
@@ -443,8 +449,10 @@
         results.push({idx, text:a.text, hero:a.hero, score:a.score, method:a.method, valid:a.valid, box:a.box});
       }
       drawBoxes(canvas, img, results);
+      clearTimeout(_stageTimer); _hideBar();
       onDone(results, source, rows.length);
     }).catch(e=>{
+      clearTimeout(_stageTimer); _hideBar();
       const m = (e && e.message) ? e.message
         : (typeof e === 'string' ? e : ((e && JSON.stringify(e)) || '未知错误'));
       statusEl.textContent='识别失败'; alert('识别失败: '+m);
@@ -501,6 +509,10 @@
           <span id="recSrc" style="font-size:0.75rem;color:#90caf9;"></span>
           <span style="flex:1;"></span>
           <span id="recStatus" class="hint" style="font-size:0.8rem;color:#aaa;"></span>
+          <div id="recProgressBar" style="display:none;margin:6px 0 2px;height:10px;border-radius:6px;background:rgba(255,255,255,0.12);overflow:hidden;">
+            <div style="height:100%;width:42%;border-radius:6px;background:linear-gradient(90deg,#26c6da,#00838f);animation:recDL 1.1s ease-in-out infinite;"></div>
+          </div>
+          <span id="recStage" style="display:none;font-size:0.72rem;color:#90caf9;"></span>
           <span style="cursor:pointer;font-size:1.3rem;padding:0 6px;" id="recClose">✕</span>
         </div>
         <div id="recUmiTip" style="display:none;font-size:0.78rem;margin-bottom:10px;padding:7px 10px;border-radius:8px;line-height:1.5;"></div>
