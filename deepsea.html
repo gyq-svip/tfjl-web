@@ -640,20 +640,60 @@ document.addEventListener('paste', async (e)=>{
 });
 // 支持多张图片：files 为数组，逐张识别并【累积追加】到原文框（不覆盖），
 // 这样 4 个势力的截图可一次多选或分次粘贴，拼接成一份完整原文后再统一解析填表。
+// 自动把大图切成多个小块（每块 ≤ maxH 像素，块间留 overlap 重叠防止切断某一行文字），
+// 逐块 OCR 再合并——解决"整张长图识别很烂、单条小图很准"的问题。
+// 小图（高度≤maxH）不切，原样送 OCR；大图按高度分块，每块内文字像素更大、识别率等同单条截。
+function deepseaSliceImage(file, maxH){
+    return new Promise((resolve,reject)=>{
+        const img=new Image();
+        img.onload=()=>{
+            const w=img.naturalWidth, h=img.naturalHeight;
+            const slices=[];
+            if(h<=maxH){
+                const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+                cv.getContext('2d').drawImage(img,0,0);
+                slices.push(cv.toDataURL('image/png').split(',')[1]);
+                URL.revokeObjectURL(img.src);
+                resolve(slices); return;
+            }
+            const overlap=Math.min(40, Math.floor(maxH/4));
+            const step=maxH-overlap;
+            let y=0;
+            while(y<h){
+                const sh=Math.min(maxH, h-y);
+                const cv=document.createElement('canvas'); cv.width=w; cv.height=sh;
+                cv.getContext('2d').drawImage(img, 0, y, w, sh, 0, 0, w, sh);
+                slices.push(cv.toDataURL('image/png').split(',')[1]);
+                if(y+sh>=h) break;
+                y+=step;
+            }
+            URL.revokeObjectURL(img.src);
+            resolve(slices);
+        };
+        img.onerror=()=>reject(new Error('图片加载失败'));
+        img.src=URL.createObjectURL(file);
+    });
+}
 async function deepseaRunOcr(files){
     if(!Array.isArray(files)) files=[files];
     const status=document.getElementById('deepseaOcrStatus');
     const panel=document.getElementById('deepseaOcrPanel');
     const raw=document.getElementById('deepseaOcrRaw');
     if(panel) panel.classList.remove('hidden');
-    let done=0;
+    let doneImg=0, doneSlice=0, totalSlice=0;
     try{
         if(!window.__TAURI_INTERNALS__ && !window.__TAURI__) throw new Error('OCR 需在桌面 App 内运行（本机 Umi-OCR）');
         const invoke=deepseaGetInvoke(); if(!invoke) throw new Error('未找到 Tauri invoke');
-        for(let idx=0; idx<files.length; idx++){
-            if(status) status.textContent='识别中… ('+(idx+1)+'/'+files.length+')';
-            const b64=await deepseaFileToBase64(files[idx]);
-            const j=await invoke('umi_ocr', { base64:b64, options:{ data:{format:'text', outputDirName:'', outputFileName:'', outputFileFormat:[]}, ocr:{language:'models/config_chinese.txt', cls:true} } });
+        // 先把每张大图切成小块，扁平化成待识别队列（4 张势力图各自切片）
+        const allSlices=[];
+        for(const file of files){
+            const s=await deepseaSliceImage(file, 900);
+            allSlices.push(...s);
+        }
+        totalSlice=allSlices.length;
+        for(let i=0;i<totalSlice;i++){
+            if(status) status.textContent='识别中… (块 '+(i+1)+'/'+totalSlice+')';
+            const j=await invoke('umi_ocr', { base64:allSlices[i], options:{ data:{format:'text', outputDirName:'', outputFileName:'', outputFileFormat:[]}, ocr:{language:'models/config_chinese.txt', cls:true} } });
             let text='';
             if(j && j.code===100){ text = (typeof j.data==='string') ? j.data : (Array.isArray(j.data) ? j.data.map(x=>x.text||x).join('\n') : ''); }
             else if(j && j.code===101){ text=''; }
@@ -662,15 +702,16 @@ async function deepseaRunOcr(files){
                 if(raw.value && !raw.value.endsWith('\n')) raw.value += '\n';
                 raw.value += text + '\n';
             }
-            done++;
+            doneSlice++;
         }
+        doneImg=files.length;
         if(status){
             const totalLines = raw ? raw.value.split(/\r?\n/).filter(Boolean).length : 0;
-            status.textContent = '已识别 '+done+' 张，共 '+totalLines+' 行（已拼接，可继续加图）';
+            status.textContent = '已识别 '+doneImg+' 张图（切 '+doneSlice+' 块），共 '+totalLines+' 行（已拼接）';
         }
-        toast('✅ 已识别 '+done+' 张，点「解析并填入表格」导入');
+        toast('✅ 已识别 '+doneImg+' 张，点「解析并填入表格」导入');
     }catch(err){
-        if(status) status.textContent='识别失败：'+err.message+'（已识别 '+done+' 张）';
+        if(status) status.textContent='识别失败：'+err.message+'（已识别 '+doneSlice+'/'+totalSlice+' 块）';
         toast('OCR 失败：'+err.message);
     }
 }
