@@ -5,7 +5,7 @@
 //      提升 CACHE_VERSION 触发 activate 清空所有 tfjl- 缓存，确保拿到最新前端（含分享密码框）
 // ============================================================
 
-const CACHE_VERSION = 'tfjl-v135';
+const CACHE_VERSION = 'tfjl-v136';
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
@@ -68,8 +68,13 @@ self.addEventListener('fetch', (event) => {
         event.respondWith(networkFirst(request, CACHE_RUNTIME));
         return;
     }
-    // JS/CSS/图片/字体等静态资源：StaleWhileRevalidate（缓存秒开 + 后台更新）
-    if (['script', 'style', 'image', 'font', 'manifest'].includes(request.destination)) {
+    // JS/CSS 走 network-first：保证识别浮窗等脚本永远是最新，杜绝“缓存旧 JS 导致按钮无反应 / 需刷新两次才生效”
+    if (['script', 'style'].includes(request.destination)) {
+        event.respondWith(networkFirst(request, CACHE_RUNTIME));
+        return;
+    }
+    // 图片/字体等静态资源：StaleWhileRevalidate（缓存秒开 + 后台更新）
+    if (['image', 'font', 'manifest'].includes(request.destination)) {
         event.respondWith(staleWhileRevalidate(request, CACHE_RUNTIME));
         return;
     }
@@ -114,13 +119,33 @@ function staleWhileRevalidate(request, cacheName) {
 }
 
 // ============================================================
-// NetworkFirst：优先网络，失败回退缓存
+// NetworkFirst：优先网络（保证永远拿到最新脚本），失败回退缓存
+// 并在“网络内容 ≠ 缓存内容”时通知页面有新版本（触发自动刷新）
 // ============================================================
 function networkFirst(request, cacheName) {
     return caches.open(cacheName).then((cache) => {
         return fetch(request).then((networkResponse) => {
             if (networkResponse && networkResponse.status === 200) {
-                cache.put(request, networkResponse.clone());
+                // 比较缓存与网络内容，决定是否通知页面“有新版本”
+                cache.match(request).then((cachedResponse) => {
+                    const cachedClone = cachedResponse ? cachedResponse.clone() : null;
+                    const networkClone = networkResponse.clone();
+                    Promise.all([
+                        cachedClone ? cachedClone.text() : Promise.resolve(''),
+                        networkClone.text()
+                    ]).then(([cachedText, networkText]) => {
+                        cache.put(request, new Response(networkText, {
+                            status: networkResponse.status,
+                            statusText: networkResponse.statusText,
+                            headers: networkResponse.headers
+                        }));
+                        if (cachedText !== networkText) {
+                            self.clients.matchAll().then(clients => {
+                                clients.forEach(client => client.postMessage({ type: 'NEW_VERSION_READY' }));
+                            });
+                        }
+                    }).catch(() => {});
+                }).catch(() => {});
             }
             return networkResponse;
         }).catch(() => {
