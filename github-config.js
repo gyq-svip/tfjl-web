@@ -1,12 +1,25 @@
 // github-config.js — 盟战战绩(联盟) 网络版共享配置
-// 说明：GitHub Token 由部署时注入（GitHub Actions 会把下方占位符替换为真实 Token），
-//       或读取 localStorage('TFJL_Gist_Token')。代码不写死真实 token。
-//       与 index.html 的 getGistToken 逻辑保持一致。
-window.GITHUB_TOKEN = 'YOUR_GITHUB_TOKEN_HERE';
+// 说明：GitHub Token 复用 index.html 既有的 getGistToken()（部署时由 GitHub Actions 注入 /
+//       本地开发从 localStorage('TFJL_Gist_Token') 读取），无需在此填写任何 token。
+//       沿用现有需求墙 / 拍卖 / 聊天室同一套 Gist 读写能力。
+// 注意：只提供 getGistToken 的兜底实现；若本页在 index.html 内嵌/同源加载，
+//       会优先使用 index.html 已定义的 getGistToken（更权威）。
 
 // 盟战战绩总数据库 gist id（registry）。留空则首次注册会自动创建并提示管理员，
 // 把提示的 id 复制到此处即可让所有用户共享同一份数据。
 window.TFJL_ALLIANCE_DB_GIST_ID = '';
+
+// 兜底：若页面未定义 getGistToken（独立打开 alliance.html 时 index.html 的函数不可用），
+// 这里提供一份一致的实现。优先用已存在的全局函数。
+if (typeof window.getGistToken !== 'function') {
+    window.getGistToken = function () {
+        const HARDCODED_TOKEN = 'YOUR_GITHUB_TOKEN_HERE';
+        if (HARDCODED_TOKEN && HARDCODED_TOKEN.length > 20 && HARDCODED_TOKEN.startsWith('ghp_')) {
+            return HARDCODED_TOKEN;
+        }
+        return localStorage.getItem('TFJL_Gist_Token') || '';
+    };
+}
 
 // ===== 沿用 index.html 的 PBKDF2 加密（密码方案完全一致） =====
 const _ENC_FIXED_SALT = 'tfjl-share-v2-salt'; // 应用级固定 salt（公开无妨），仅用于密码哈希校验
