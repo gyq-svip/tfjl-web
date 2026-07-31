@@ -5,7 +5,7 @@
 //      提升 CACHE_VERSION 触发 activate 清空所有 tfjl- 缓存，确保拿到最新前端（含分享密码框）
 // ============================================================
 
-const CACHE_VERSION = 'tfjl-v178';
+const CACHE_VERSION = 'tfjl-v179';
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
@@ -124,7 +124,8 @@ function staleWhileRevalidate(request, cacheName) {
 // ============================================================
 function networkFirst(request, cacheName) {
     return caches.open(cacheName).then((cache) => {
-        return fetch(request).then((networkResponse) => {
+        // cache:'no-store' 强制绕过浏览器/webview 的 HTTP 磁盘缓存，杜绝 GitHub Pages 静态资源 304 返回旧版
+        return fetch(request, { cache: 'no-store' }).then((networkResponse) => {
             if (networkResponse && networkResponse.status === 200) {
                 // 比较缓存与网络内容，决定是否通知页面“有新版本”
                 cache.match(request).then((cachedResponse) => {
