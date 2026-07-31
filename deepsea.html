@@ -872,6 +872,7 @@ async function deepseaRunOcr(files){
         }
         totalSlice=allSlices.length;
         deepseaSliceResults=[];
+        deepseaTabOrder=null; deepseaCurrentFaction=''; // 每次重新识别，重置势力选择
         if(raw) raw.value=''; // 每次 OCR 重新拼接，避免跨次污染
         for(let i=0;i<totalSlice;i++){
             if(status) status.textContent='识别中… (块 '+(i+1)+'/'+totalSlice+')';
@@ -903,13 +904,12 @@ async function deepseaRunOcr(files){
 function deepseaParseAndImport(){
     if(!deepseaCanImport()){ toast('⛔ 仅管理员可导入数据'); return; }
     const facSel=document.getElementById('deepseaOcrFaction');
-    let fac=facSel?facSel.value:'';
+    // 势力来源优先级：下拉框 > 用户在对比视图点选的当前高亮势力
+    let fac=(facSel?facSel.value:'') || deepseaCurrentFaction;
+    if(!fac){ toast('请先在对比视图点选当前高亮的势力，或在下拉框选择势力'); return; }
     let rows=[];
     // 优先按切片逐块解析：避免顶部 tab 栏把全部数据串到最后一势力
     if(deepseaSliceResults && deepseaSliceResults.length){
-        // 自动从第一张 tab 栏切片推断“当前高亮势力”，覆盖下拉（满足“以后不分势力上传”）
-        const autoFac=deepseaDetectCurrentFaction(deepseaSliceResults);
-        if(autoFac){ fac=autoFac; if(facSel) facSel.value=autoFac; }
         for(const slice of deepseaSliceResults){
             let r=parseDeepseaOcrText(slice.text||'');
             if(!r.length){ r=parseDeepseaCardText(slice.text||'', fac); }
@@ -941,23 +941,20 @@ function deepseaParseAndImport(){
 // 势力识别：文本里出现势力名（暗月地精/人类联盟/天灾亡灵/兽人部落/HE）则给后续行打 所属阵营；
 //          若用户在导入前用下拉框选了势力，则以下拉框为准（见 deepseaParseAndImport）。
 const DEEPSEA_FACTION_LIST=['暗月地精','人类联盟','天灾亡灵','兽人部落','HE'];
-// 在一批切片文本里推断“当前选中的势力”：
-// 第一张含全部势力名的 tab 栏切片中，最后出现的那个势力名 = 高亮(被选中)的势力。
-// 这是游戏截图惯例：tab 栏从左到右排列，最后一个即当前所在势力（其余是灰的）。
-function deepseaDetectCurrentFaction(slices){
-    let best=null;
+let deepseaTabOrder=null;       // tab 栏里按出现顺序排列的势力名数组
+let deepseaCurrentFaction='';   // 用户点选的当前高亮势力
+// 在一批切片里找到“势力分类 tab 栏”切片（含多个势力名），返回其中势力名按出现顺序排列的数组。
+// 游戏 tab 栏顺序固定：暗月地精→人类联盟→天灾亡灵→兽人部落（→HE），但 OCR 不识别颜色，无法直接知道哪个高亮，
+// 故只返回顺序，由用户点选（见 deepseaPickFaction）。
+function deepseaGetTabOrder(slices){
     for(const slice of (slices||[])){
         const t=slice.text||'';
-        const allPresent=DEEPSEA_FACTION_LIST.every(f=>t.includes(f));
-        if(allPresent){
-            // 最后一个出现的势力名 = 当前激活 tab
-            let lastIdx=-1, lastF=null;
-            DEEPSEA_FACTION_LIST.forEach(f=>{ const i=t.lastIndexOf(f); if(i>lastIdx){ lastIdx=i; lastF=f; } });
-            if(lastF) best=lastF;
-            break; // 找到 tab 栏切片即可
+        const present=DEEPSEA_FACTION_LIST.filter(f=>t.includes(f));
+        if(present.length>=3){ // 多个势力名同块出现 = tab 栏切片（数据卡片通常不含势力名）
+            return DEEPSEA_FACTION_LIST.filter(f=>t.includes(f)).sort((a,b)=> t.indexOf(a)-t.indexOf(b));
         }
     }
-    return best;
+    return null;
 }
 function parseDeepseaOcrText(text){
     const lines=text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
@@ -1130,6 +1127,7 @@ function deepseaClearOcr(){
     const raw=document.getElementById('deepseaOcrRaw'); if(raw) raw.value='';
     const status=document.getElementById('deepseaOcrStatus'); if(status) status.textContent='已清空，可重新选图';
     deepseaSliceResults=[];
+    deepseaTabOrder=null; deepseaCurrentFaction='';
     const c=document.getElementById('deepseaOcrCompare'); if(c) c.classList.add('hidden');
     const list=document.getElementById('deepseaOcrCompareList'); if(list) list.innerHTML='';
 }
@@ -1141,22 +1139,34 @@ function toggleDeepseaOcrCompare(){
     c.classList.toggle('hidden');
     if(!c.classList.contains('hidden')) renderDeepseaOcrCompare();
 }
-function deepseaApplyAutoFaction(){
-    const autoFac=deepseaDetectCurrentFaction(deepseaSliceResults);
+// 用户在对比视图点选 tab 栏里“当前高亮”的势力（OCR 不识别颜色，只能靠点选）
+function deepseaPickFaction(f){
+    deepseaCurrentFaction=f;
     const sel=document.getElementById('deepseaOcrFaction');
-    if(autoFac && sel){ sel.value=autoFac; toast('已应用当前势力：'+autoFac); }
+    if(sel) sel.value=f;
+    renderDeepseaOcrCompare();
+    toast('已选当前势力：'+f);
 }
 function renderDeepseaOcrCompare(){
     const list=document.getElementById('deepseaOcrCompareList'); if(!list) return;
     if(!deepseaSliceResults.length){ list.innerHTML='<div style="font-size:0.72rem;color:rgba(255,255,255,0.5);">还没有切片结果，先 OCR 识别一张截图。</div>'; return; }
-    // 顶部汇总：自动推断的当前高亮势力
-    const autoFac=deepseaDetectCurrentFaction(deepseaSliceResults);
-    const summary = autoFac
-        ? '<div style="font-size:0.74rem;color:#7CFC9B;margin-bottom:8px;padding:6px 8px;background:rgba(77,182,172,0.15);border:1px solid rgba(77,182,172,0.4);border-radius:6px;">🎯 自动识别当前势力：<b>'+autoFac+'</b>（将用于全部联盟，无需下拉选势力）<button class="ghost small" onclick="deepseaApplyAutoFaction()" style="margin-left:8px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);padding:1px 6px;border-radius:6px;font-size:0.7rem;">应用到下拉</button></div>'
-        : '<div style="font-size:0.72rem;color:rgba(255,255,255,0.6);margin-bottom:8px;">（未检测到势力分类 tab 栏，请手动在下拉选择势力）</div>';
+    // 顶部：检测到 tab 栏则让用户点选当前高亮势力（OCR 不识别颜色，只能靠点选）
+    const order=deepseaGetTabOrder(deepseaSliceResults);
+    let summary;
+    if(order && order.length){
+        summary = '<div style="font-size:0.74rem;color:#ffd479;margin-bottom:8px;padding:6px 8px;background:rgba(255,180,77,0.12);border:1px solid rgba(255,180,77,0.4);border-radius:6px;">'
+            + '👉 OCR 无法识别颜色，请点一下<b>当前高亮</b>的势力（顺序固定：'+order.join(' → ')+'）：'
+            + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">'
+            + order.map(f=> '<button class="ghost small" onclick="deepseaPickFaction(\''+f+'\')" style="padding:3px 10px;border-radius:6px;font-size:0.72rem;cursor:pointer;'+(deepseaCurrentFaction===f?'background:rgba(77,182,172,0.45);border:1px solid rgba(77,182,172,0.9);color:#fff;':'background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#cfe;')+'\">'+f+'</button>').join('')
+            + '</div>'
+            + (deepseaCurrentFaction? '<div style="font-size:0.72rem;color:#7CFC9B;margin-top:6px;">✅ 已选当前势力：<b>'+deepseaCurrentFaction+'</b>（将用于全部联盟）</div>' : '')
+            + '</div>';
+    }else{
+        summary='<div style="font-size:0.72rem;color:rgba(255,255,255,0.6);margin-bottom:8px;">（未检测到势力分类 tab 栏，请在下拉框手动选择势力）</div>';
+    }
     list.innerHTML = summary + deepseaSliceResults.map((it,idx)=>{
         let parsed = parseDeepseaOcrText(it.text||'');
-        if(!parsed.length){ parsed = parseDeepseaCardText(it.text||'', autoFac||''); }
+        if(!parsed.length){ parsed = parseDeepseaCardText(it.text||'', deepseaCurrentFaction||''); }
         const names = parsed.slice(0,6).map(r=>r['联盟名称']||'?').join('、');
         const parsedTag = parsed.length ? ('✅ 解析出 '+parsed.length+' 条：'+names) : '⚠️ 未解析出联盟（可能切错/识错/表头不全）';
         const FACTION_LIST=DEEPSEA_FACTION_LIST;
