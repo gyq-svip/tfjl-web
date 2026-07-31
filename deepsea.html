@@ -903,10 +903,13 @@ async function deepseaRunOcr(files){
 function deepseaParseAndImport(){
     if(!deepseaCanImport()){ toast('⛔ 仅管理员可导入数据'); return; }
     const facSel=document.getElementById('deepseaOcrFaction');
-    const fac=facSel?facSel.value:'';
+    let fac=facSel?facSel.value:'';
     let rows=[];
     // 优先按切片逐块解析：避免顶部 tab 栏把全部数据串到最后一势力
     if(deepseaSliceResults && deepseaSliceResults.length){
+        // 自动从第一张 tab 栏切片推断“当前高亮势力”，覆盖下拉（满足“以后不分势力上传”）
+        const autoFac=deepseaDetectCurrentFaction(deepseaSliceResults);
+        if(autoFac){ fac=autoFac; if(facSel) facSel.value=autoFac; }
         for(const slice of deepseaSliceResults){
             let r=parseDeepseaOcrText(slice.text||'');
             if(!r.length){ r=parseDeepseaCardText(slice.text||'', fac); }
@@ -917,7 +920,7 @@ function deepseaParseAndImport(){
         rows=parseDeepseaOcrText(raw?raw.value:'');
     }
     if(!rows.length){ toast('未能从原文解析出联盟数据，请把原文复制发给我'); return; }
-    // 上传前若选了势力，覆盖所有行的 所属阵营（用户手动选择势力上传，优先级最高）
+    // 上传前若识别出势力（自动或手动），覆盖所有行的 所属阵营
     if(fac) rows.forEach(r=>{ r['所属阵营']=fac; });
     // 按势力合并：若新数据带了某势力，先移除旧表中该势力的行，再追加（分势力上传不互相覆盖）
     const newFactions=new Set(rows.map(r=>r['所属阵营']).filter(Boolean));
@@ -928,7 +931,7 @@ function deepseaParseAndImport(){
     }
     saveRankings();
     renderRankings(); renderChampionship(); populateCalcAlliance();
-    toast('✅ 已从 OCR 导入 '+rows.length+' 条（共 '+state.rankings.length+' 条）');
+    toast('✅ 已从 OCR 导入 '+rows.length+' 条（'+(fac?('势力：'+fac):'未识别势力')+'，共 '+state.rankings.length+' 条）');
 }
 // 从 OCR 纯文本解析排行。两种格式都兼容（自动判断用哪种）：
 //   策略一【表格式】：截图切片是带表头的干净表格（如 排名 联盟 会长 人数 联盟ID 联盟战力），
@@ -937,9 +940,28 @@ function deepseaParseAndImport(){
 //             → 退化为「势力分段 + 成对提取」：名↔ID / 等级↔战力 / 会长↔人数（两种顺序都兼容）。
 // 势力识别：文本里出现势力名（暗月地精/人类联盟/天灾亡灵/兽人部落/HE）则给后续行打 所属阵营；
 //          若用户在导入前用下拉框选了势力，则以下拉框为准（见 deepseaParseAndImport）。
+const DEEPSEA_FACTION_LIST=['暗月地精','人类联盟','天灾亡灵','兽人部落','HE'];
+// 在一批切片文本里推断“当前选中的势力”：
+// 第一张含全部势力名的 tab 栏切片中，最后出现的那个势力名 = 高亮(被选中)的势力。
+// 这是游戏截图惯例：tab 栏从左到右排列，最后一个即当前所在势力（其余是灰的）。
+function deepseaDetectCurrentFaction(slices){
+    let best=null;
+    for(const slice of (slices||[])){
+        const t=slice.text||'';
+        const allPresent=DEEPSEA_FACTION_LIST.every(f=>t.includes(f));
+        if(allPresent){
+            // 最后一个出现的势力名 = 当前激活 tab
+            let lastIdx=-1, lastF=null;
+            DEEPSEA_FACTION_LIST.forEach(f=>{ const i=t.lastIndexOf(f); if(i>lastIdx){ lastIdx=i; lastF=f; } });
+            if(lastF) best=lastF;
+            break; // 找到 tab 栏切片即可
+        }
+    }
+    return best;
+}
 function parseDeepseaOcrText(text){
     const lines=text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
-    const FACTION_LIST=['暗月地精','人类联盟','天灾亡灵','兽人部落','HE'];
+    const FACTION_LIST=DEEPSEA_FACTION_LIST;
 
     // —— 策略一：表格式（带表头行）——
     const headerIdx=[];
@@ -975,7 +997,13 @@ function parseDeepseaOcrText(text){
     let cur=null, pendingName=null, pendingLv=null, pendingNum=null, pendingChair=null;
     const push=(r)=>{ if(cur) r['所属阵营']=cur; rows.push(r); };
     for(const line of lines){
-        if(FACTION_LIST.includes(line)){ cur=line; pendingName=pendingLv=pendingNum=pendingChair=null; continue; }
+        // 单卡切片(tab 栏)里整串势力名只作“当前势力”推断，不再用扁平策略逐行打标
+        if(FACTION_LIST.some(f=>line.includes(f)) && line.length<=8){
+            line.split(/(?=[暗月地精人类联盟天灾亡灵兽人部落])/).forEach(seg=>{
+                if(FACTION_LIST.includes(seg.trim())) cur=seg.trim();
+            });
+            pendingName=pendingLv=pendingNum=pendingChair=null; continue;
+        }
         if(cur===null) continue;
         let m;
         if((m=line.match(/^ID[:：]+(.+)$/))){
@@ -1113,15 +1141,25 @@ function toggleDeepseaOcrCompare(){
     c.classList.toggle('hidden');
     if(!c.classList.contains('hidden')) renderDeepseaOcrCompare();
 }
+function deepseaApplyAutoFaction(){
+    const autoFac=deepseaDetectCurrentFaction(deepseaSliceResults);
+    const sel=document.getElementById('deepseaOcrFaction');
+    if(autoFac && sel){ sel.value=autoFac; toast('已应用当前势力：'+autoFac); }
+}
 function renderDeepseaOcrCompare(){
     const list=document.getElementById('deepseaOcrCompareList'); if(!list) return;
     if(!deepseaSliceResults.length){ list.innerHTML='<div style="font-size:0.72rem;color:rgba(255,255,255,0.5);">还没有切片结果，先 OCR 识别一张截图。</div>'; return; }
-    list.innerHTML = deepseaSliceResults.map((it,idx)=>{
+    // 顶部汇总：自动推断的当前高亮势力
+    const autoFac=deepseaDetectCurrentFaction(deepseaSliceResults);
+    const summary = autoFac
+        ? '<div style="font-size:0.74rem;color:#7CFC9B;margin-bottom:8px;padding:6px 8px;background:rgba(77,182,172,0.15);border:1px solid rgba(77,182,172,0.4);border-radius:6px;">🎯 自动识别当前势力：<b>'+autoFac+'</b>（将用于全部联盟，无需下拉选势力）<button class="ghost small" onclick="deepseaApplyAutoFaction()" style="margin-left:8px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);padding:1px 6px;border-radius:6px;font-size:0.7rem;">应用到下拉</button></div>'
+        : '<div style="font-size:0.72rem;color:rgba(255,255,255,0.6);margin-bottom:8px;">（未检测到势力分类 tab 栏，请手动在下拉选择势力）</div>';
+    list.innerHTML = summary + deepseaSliceResults.map((it,idx)=>{
         let parsed = parseDeepseaOcrText(it.text||'');
-        if(!parsed.length){ parsed = parseDeepseaCardText(it.text||'', ''); }
+        if(!parsed.length){ parsed = parseDeepseaCardText(it.text||'', autoFac||''); }
         const names = parsed.slice(0,6).map(r=>r['联盟名称']||'?').join('、');
         const parsedTag = parsed.length ? ('✅ 解析出 '+parsed.length+' 条：'+names) : '⚠️ 未解析出联盟（可能切错/识错/表头不全）';
-        const FACTION_LIST=['暗月地精','人类联盟','天灾亡灵','兽人部落','HE'];
+        const FACTION_LIST=DEEPSEA_FACTION_LIST;
         const foundFactions = FACTION_LIST.filter(f=>(it.text||'').includes(f));
         const factionTag = foundFactions.length ? ('🏷 含势力：'+foundFactions.join('、')) : '🏷 不含势力名';
         const first = parsed[0] || {};
