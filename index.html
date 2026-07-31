@@ -25361,13 +25361,11 @@ ${maSection}
                 const saved = localStorage.getItem('TFJL_Admin_SavedPwd');
                 if (saved) {
                     try {
-                        const code = atob(saved);
-                        if (await verifyPassword(code, ADMIN_VERIFY_HASH)) {
-                            // 密码匹配，自动验证
+                        // 存的是管理员哈希的 base64，直接比对，不暴露明文
+                        if (atob(saved) === ADMIN_VERIFY_HASH) {
                             sessionStorage.setItem(ADMIN_VERIFY_KEY, 'true');
                             isVerified = true;
                         } else {
-                            // 密码不对（验证码被改了），清除保存
                             localStorage.removeItem('TFJL_Admin_SavedPwd');
                         }
                     } catch (e) {
@@ -25393,13 +25391,6 @@ ${maSection}
                 const logStatsAdminPage = document.getElementById('adminPageLogStats');
                 if (logStatsAdminPage) logStatsAdminPage.style.display = 'none';
                 document.getElementById('adminVerifyCode').value = '';
-                // 如果有保存密码，预填输入框方便用户
-                const saved = localStorage.getItem('TFJL_Admin_SavedPwd');
-                if (saved) {
-                    try {
-                        document.getElementById('adminVerifyCode').value = atob(saved);
-                    } catch (e) {}
-                }
                 document.getElementById('adminVerifyCode').focus();
             }
         }
@@ -26247,7 +26238,7 @@ ${maSection}
                 // 记住验证码：如果勾选了"记住验证码"，保存到 localStorage
                 const rememberCb = document.getElementById('adminRememberCode');
                 if (rememberCb && rememberCb.checked) {
-                    try { localStorage.setItem('TFJL_Admin_SavedPwd', btoa(code)); } catch (e) {}
+                    try { localStorage.setItem('TFJL_Admin_SavedPwd', btoa(await hashPassword(code))); } catch (e) {}
                 } else {
                     localStorage.removeItem('TFJL_Admin_SavedPwd');
                 }
@@ -28674,7 +28665,7 @@ ${maSection}
         </style>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260731-45</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260731-46</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
