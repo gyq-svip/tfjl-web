@@ -4,9 +4,9 @@
     const GH_API = 'https://api.github.com';
 
     function ghToken() {
-        return (window.GITHUB_TOKEN && window.GITHUB_TOKEN !== 'YOUR_GITHUB_TOKEN_HERE')
-            ? window.GITHUB_TOKEN
-            : (localStorage.getItem('TFJL_Gist_Token') || '');
+        // 复用 index.html 既有的 getGistToken()（部署注入 / localStorage 兜底）
+        if (typeof window.getGistToken === 'function') return window.getGistToken();
+        return localStorage.getItem('TFJL_Gist_Token') || '';
     }
     function ghHeaders(extra) {
         const t = ghToken();
