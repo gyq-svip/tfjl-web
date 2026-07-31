@@ -345,8 +345,13 @@ tr.rk-weak:hover td{opacity:1}
         <div class="modal-box" style="width:min(420px,96vw);">
             <div class="row" style="justify-content:space-between;margin-bottom:10px;">
                 <h3 id="editRowModalTitle" style="margin:0;">✏️ 编辑记录</h3>
-                <button class="ghost small" onclick="document.getElementById('editRowModal').classList.add('hidden')">✖ 关闭</button>
-            </div>
+            <button class="ghost small" onclick="document.getElementById('editRowModal').classList.add('hidden')">✖ 关闭</button>
+        </div>
+        <div id="editSlicePreview" class="hidden" style="border:1px dashed rgba(77,182,172,0.4);border-radius:8px;padding:8px;margin-bottom:10px;background:rgba(0,0,0,0.18);">
+            <div style="font-size:0.72rem;color:#7CFC9B;margin-bottom:6px;">📷 来源切片（OCR 原图，供人工校对——识别不准时对照填写）</div>
+            <img id="editSliceImg" style="max-width:100%;max-height:220px;border:1px solid rgba(255,255,255,0.2);border-radius:6px;display:block;">
+            <pre id="editSliceText" style="white-space:pre-wrap;word-break:break-all;font-size:0.68rem;color:#cfe;background:rgba(0,0,0,0.3);padding:6px;border-radius:4px;max-height:120px;overflow:auto;margin:6px 0 0;"></pre>
+        </div>
             <div style="display:grid;gap:8px;">
                 <div class="row" style="margin-bottom:0;"><label style="min-width:84px;">排名</label><input id="editRank" type="number" style="flex:1"></div>
                 <div class="row" style="margin-bottom:0;"><label style="min-width:84px;">所属阵营</label><input id="editFaction" style="flex:1" placeholder="暗月地精/人类联盟/..."></div>
@@ -526,6 +531,7 @@ function addRankRow(){
     _editRowIdx = -1;
     const t = document.getElementById('editRowModalTitle'); if(t) t.textContent = '➕ 新增记录';
     ['editRank','editFaction','editName','editId','editLeader','editCount','editLevel','editPower'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+    const _pv=document.getElementById('editSlicePreview'); if(_pv) _pv.classList.add('hidden');
     document.getElementById('editRowModal').classList.remove('hidden');
 }
 function editRankRow(idx){
@@ -540,6 +546,16 @@ function editRankRow(idx){
     document.getElementById('editCount').value = r['人数']||'';
     document.getElementById('editLevel').value = r['联盟等级']||'';
     document.getElementById('editPower').value = r['联盟战力']||'';
+    // 回显该条记录对应的来源切片图 + OCR 原文，方便人工校对
+    const _pv=document.getElementById('editSlicePreview');
+    const _img=document.getElementById('editSliceImg');
+    const _txt=document.getElementById('editSliceText');
+    const _meta = (r && r._sliceKey) ? deepseaSliceMeta[r._sliceKey] : null;
+    if(_pv && _meta && _meta.img){
+        _img.src=_meta.img;
+        if(_txt) _txt.textContent = _meta.text ? _meta.text.trim() : '（无识别文本）';
+        _pv.classList.remove('hidden');
+    } else if(_pv){ _pv.classList.add('hidden'); }
     document.getElementById('editRowModal').classList.remove('hidden');
 }
 function saveEditRow(){
@@ -554,7 +570,11 @@ function saveEditRow(){
         '联盟等级': document.getElementById('editLevel').value,
         '联盟战力': document.getElementById('editPower').value
     };
-    if(idx>=0 && idx<state.rankings.length){ state.rankings[idx] = obj; }
+    if(idx>=0 && idx<state.rankings.length){
+        const _orig = state.rankings[idx];
+        if(_orig && _orig._sliceKey) obj._sliceKey = _orig._sliceKey; // 保留来源切片关联，便于再次编辑时回显
+        state.rankings[idx] = obj;
+    }
     else { state.rankings.push(obj); }
     saveRankings(); renderRankings(); renderChampionship(); populateCalcAlliance();
     document.getElementById('editRowModal').classList.add('hidden');
@@ -872,6 +892,7 @@ async function deepseaRunOcr(files){
         }
         totalSlice=allSlices.length;
         deepseaSliceResults=[];
+        deepseaRunCounter++; // 新一次 OCR，保证切片 key 唯一
         deepseaTabOrder=null; deepseaCurrentFaction=''; // 每次重新识别，重置势力选择
         if(raw) raw.value=''; // 每次 OCR 重新拼接，避免跨次污染
         for(let i=0;i<totalSlice;i++){
@@ -885,10 +906,13 @@ async function deepseaRunOcr(files){
                 if(raw.value && !raw.value.endsWith('\n')) raw.value += '\n';
                 raw.value += text + '\n';
             }
-            deepseaSliceResults.push({ img:'data:image/png;base64,'+allSlices[i], text });
+            const _metaKey='deepseaSlice_'+deepseaRunCounter+'_'+i;
+            deepseaSliceMeta[_metaKey]={ img:'data:image/png;base64,'+allSlices[i], text };
+            deepseaSliceResults.push({ img:'data:image/png;base64,'+allSlices[i], text, metaKey:_metaKey });
             doneSlice++;
         }
         renderDeepseaOcrCompare();
+        persistDeepseaSliceMeta(); // 落 sessionStorage，刷新后仍可回显切片
         const cmp=document.getElementById('deepseaOcrCompare'); if(cmp) cmp.classList.remove('hidden');
         doneImg=files.length;
         if(status){
@@ -910,9 +934,12 @@ function deepseaParseAndImport(){
     let rows=[];
     // 优先按切片逐块解析：避免顶部 tab 栏把全部数据串到最后一势力
     if(deepseaSliceResults && deepseaSliceResults.length){
-        for(const slice of deepseaSliceResults){
+        for(let i=0;i<deepseaSliceResults.length;i++){
+            const slice=deepseaSliceResults[i];
             let r=parseDeepseaOcrText(slice.text||'');
             if(!r.length){ r=parseDeepseaCardText(slice.text||'', fac); }
+            const mk='deepseaSlice_'+deepseaRunCounter+'_'+i; // 该切片对应的 metaKey
+            r.forEach(rr=>{ if(rr) rr._sliceKey=mk; }); // 每条记录记住来源切片，供编辑时回显
             rows.push(...r);
         }
     }else{
@@ -1132,7 +1159,17 @@ function deepseaClearOcr(){
     const list=document.getElementById('deepseaOcrCompareList'); if(list) list.innerHTML='';
 }
 // ===================== 切片↔识别对比视图（调试用：定位错位/错字） =====================
-let deepseaSliceResults=[]; // 每项 {img: dataURL, text: OCR文本}
+let deepseaSliceResults=[]; // 每项 {img: dataURL, text: OCR文本, metaKey}
+// 切片元数据：metaKey -> {img, text}。每条导入记录会带上自己的 metaKey，
+// 编辑该条时回显来源切片图 + OCR 原文，供人工校对（识别不准时对照填写）。
+let deepseaSliceMeta={};
+let deepseaRunCounter=0; // 每次 OCR 自增，保证切片 key 跨多次导入全局唯一，不串图
+function persistDeepseaSliceMeta(){
+    try{ sessionStorage.setItem('deepsea_slice_meta', JSON.stringify(deepseaSliceMeta)); }catch(e){ /* 超出配额则仅保留内存态（本会话可用，刷新丢失） */ }
+}
+function restoreDeepseaSliceMeta(){
+    try{ const s=sessionStorage.getItem('deepsea_slice_meta'); if(s) deepseaSliceMeta=JSON.parse(s)||{}; }catch(e){ deepseaSliceMeta={}; }
+}
 function dsEscapeHtml(s){ return (s||'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function toggleDeepseaOcrCompare(){
     const c=document.getElementById('deepseaOcrCompare'); if(!c) return;
@@ -1630,6 +1667,7 @@ function compareImports(){
 // ===================== 初始化 =====================
 window.addEventListener('load', ()=>{
     applyDeepseaImportPermission();
+    restoreDeepseaSliceMeta(); // 恢复本会话 OCR 的切片元数据，编辑记录时回显来源图
     loadAll();
     if(!state.rankings.length){importRankingsFromDisk(false)}
     renderRankings();
