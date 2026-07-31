@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>盟战个人战绩 · 塔防精灵助手</title>
+<style>
+  :root { --gold:#ffd700; --bg:#0f1320; --card:rgba(255,255,255,0.06); }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; padding:0; background:linear-gradient(160deg,#0b0f1a,#141a2e); color:#eaeefb; font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; min-height:100vh; }
+  .wrap { max-width:860px; margin:0 auto; padding:14px 12px 40px; }
+  .topbar { display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+  .topbar a, .topbar button { font-size:0.8rem; color:#9fb3d9; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); border-radius:8px; padding:6px 10px; cursor:pointer; text-decoration:none; }
+  .topbar .title { font-size:1.05rem; font-weight:700; color:#fff; flex:1; }
+  .card { background:var(--card); border:1px solid rgba(255,255,255,0.1); border-radius:14px; padding:16px; margin-bottom:14px; }
+  h2 { margin:0 0 12px; font-size:1rem; color:var(--gold); display:flex; align-items:center; gap:8px; }
+  label { display:block; font-size:0.78rem; color:#9fb3d9; margin:10px 0 4px; }
+  input, select { width:100%; padding:10px 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.14); background:rgba(0,0,0,0.25); color:#fff; font-size:0.92rem; }
+  .row2 { display:flex; gap:10px; }
+  .row2 > div { flex:1; }
+  .btn { display:inline-block; padding:11px 16px; border-radius:10px; border:none; font-size:0.92rem; font-weight:600; cursor:pointer; }
+  .btn-primary { background:linear-gradient(135deg,#ffd700,#ff9d00); color:#241a00; }
+  .btn-ghost { background:rgba(255,255,255,0.08); color:#cfe0ff; border:1px solid rgba(255,255,255,0.14); }
+  .btn-sm { padding:6px 10px; font-size:0.78rem; }
+  .tabs { display:flex; gap:8px; margin-bottom:6px; }
+  .tab { flex:1; text-align:center; padding:9px; border-radius:10px; background:rgba(255,255,255,0.06); color:#9fb3d9; cursor:pointer; font-size:0.86rem; border:1px solid transparent; }
+  .tab.active { color:#fff; border-color:var(--gold); background:rgba(255,215,0,0.12); }
+  .msg { font-size:0.8rem; margin-top:8px; min-height:1em; }
+  .msg.err { color:#ff8a8a; }
+  .msg.ok { color:#8affb0; }
+  .msg.warn { color:#ffd27a; }
+  table { width:100%; border-collapse:collapse; margin-top:8px; }
+  th,td { padding:7px 5px; text-align:center; font-size:0.8rem; border-bottom:1px solid rgba(255,255,255,0.08); }
+  th { color:#9fb3d9; font-weight:600; }
+  td input { padding:7px 6px; font-size:0.84rem; text-align:center; }
+  .del { color:#ff8a8a; cursor:pointer; font-weight:700; }
+  .hist { display:flex; flex-wrap:wrap; gap:8px; margin-top:6px; }
+  .hist .d { padding:7px 11px; border-radius:9px; background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.12); cursor:pointer; font-size:0.82rem; }
+  .hist .d.cached { border-color:#4dd0e1; }
+  .verify-wrap { display:flex; gap:14px; flex-wrap:wrap; align-items:flex-start; }
+  .verify-img { max-width:280px; max-height:380px; border-radius:10px; border:1px solid rgba(255,255,255,0.15); }
+  .info { font-size:0.82rem; color:#cfe0ff; line-height:1.7; }
+  .info b { color:var(--gold); }
+  .hint { font-size:0.72rem; color:rgba(255,255,255,0.45); margin-top:6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <a href="index.html">← 首页</a>
+    <div class="title" id="pageTitle">🛡️ 盟战个人战绩</div>
+    <button id="logoutBtn" style="display:none;" onclick="doLogout()">退出</button>
+  </div>
+
+  <!-- 登录/注册 -->
+  <div class="card" id="authCard">
+    <div class="tabs">
+      <div class="tab active" id="tabLogin" onclick="switchTab('login')">登录</div>
+      <div class="tab" id="tabReg" onclick="switchTab('reg')">注册</div>
+    </div>
+
+    <div id="loginBox">
+      <label>账号</label>
+      <input id="loginUser" placeholder="注册时的账号" autocomplete="username">
+      <label>密码</label>
+      <input id="loginPwd" type="password" placeholder="密码" autocomplete="current-password">
+      <div style="margin-top:14px;">
+        <button class="btn btn-primary" style="width:100%;" onclick="onLogin()">登录</button>
+      </div>
+      <div class="msg" id="loginMsg"></div>
+    </div>
+
+    <div id="regBox" style="display:none;">
+      <label>账号</label>
+      <input id="regUser" placeholder="用于登录的账号" autocomplete="username">
+      <label>密码</label>
+      <input id="regPwd" type="password" placeholder="设置密码" autocomplete="new-password">
+      <label>确认密码</label>
+      <input id="regPwd2" type="password" placeholder="再次输入密码" autocomplete="new-password">
+      <div class="row2">
+        <div>
+          <label>联盟号</label>
+          <input id="regAlId" placeholder="如 A123">
+        </div>
+        <div>
+          <label>联盟名</label>
+          <input id="regAlName" placeholder="如 战狼联盟">
+        </div>
+      </div>
+      <div class="hint">注册成功后，此账号自动绑定该联盟号（联盟号已存在则直接绑定）。</div>
+      <div style="margin-top:14px;">
+        <button class="btn btn-primary" style="width:100%;" onclick="onRegister()">注册并绑定联盟</button>
+      </div>
+      <div class="msg" id="regMsg"></div>
+    </div>
+  </div>
+
+  <!-- 主界面 -->
+  <div id="mainCard" style="display:none;">
+    <div class="card">
+      <h2>📋 联盟信息</h2>
+      <div class="info">
+        联盟名：<b id="iAlName">-</b><br>
+        联盟号：<b id="iAlId">-</b><br>
+        当前账号：<b id="iUser">-</b>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>📅 选择日期（按周统计）</h2>
+      <div class="row2">
+        <div><input id="datePick" type="date"></div>
+        <div><button class="btn btn-ghost" style="width:100%;" onclick="onLoadDate()">载入 / 刷新</button></div>
+      </div>
+      <div class="msg" id="loadMsg"></div>
+    </div>
+
+    <div class="card">
+      <h2>📝 个人战绩（排名 / 人名 / 奖杯数 / 最大连胜）</h2>
+      <div id="tblBox">
+        <table id="recTbl">
+          <thead><tr><th>排名</th><th>人名</th><th>奖杯数</th><th>最大连胜</th><th></th></tr></thead>
+          <tbody id="recBody"></tbody>
+        </table>
+      </div>
+      <div style="margin-top:10px;">
+        <button class="btn btn-ghost btn-sm" onclick="addRow()">+ 添加一行</button>
+        <button class="btn btn-primary" style="float:right;" onclick="onSave()">保存并上传 Gist</button>
+      </div>
+      <div class="msg" id="saveMsg"></div>
+    </div>
+
+    <div class="card">
+      <h2>🔍 核验截图（上传战绩来源图，便于对照校准）</h2>
+      <input id="shotInput" type="file" accept="image/*" onchange="onShotChange(event)">
+      <div class="verify-wrap" style="margin-top:10px;">
+        <img id="shotImg" class="verify-img" style="display:none;">
+        <div class="hint" id="shotHint">上传一张清晰截图，编辑时对照表格逐行校准，保存后一并存入 Gist（已压缩，便于下周继续）。</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>🕑 历史记录</h2>
+      <div class="hist" id="histBox"></div>
+      <div class="hint">蓝色为本地缓存（离线可用）；点击任意日期载入该期战绩。</div>
+    </div>
+  </div>
+</div>
+
+<script src="github-config.js"></script>
+<script src="gh-gist.js"></script>
+<script>
+const DB = window.AllianceDB;
+const SKEY = 'TFJL_AllianceSession';
+let session = null;
+let state = { date: todayStr(), rows: [], shot: '' };
+
+function todayStr() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function $(id){ return document.getElementById(id); }
+function setMsg(id, txt, cls){ const e=$(id); e.textContent=txt||''; e.className='msg'+(cls?(' '+cls):''); }
+
+function switchTab(t){
+  $('tabLogin').classList.toggle('active', t==='login');
+  $('tabReg').classList.toggle('active', t==='reg');
+  $('loginBox').style.display = t==='login'?'block':'none';
+  $('regBox').style.display = t==='reg'?'block':'none';
+}
+
+function doLogout(){
+  localStorage.removeItem(SKEY);
+  session = null;
+  location.reload();
+}
+
+// ---------- 登录 / 注册 ----------
+async function onLogin(){
+  const u=$('loginUser').value.trim(), p=$('loginPwd').value;
+  if(!u||!p){ setMsg('loginMsg','请填写账号和密码','err'); return; }
+  try{
+    session = await DB.loginAccount(u,p);
+    localStorage.setItem(SKEY, JSON.stringify(session));
+    enterMain();
+  }catch(e){ setMsg('loginMsg', e.message||'登录失败','err'); }
+}
+
+async function onRegister(){
+  const u=$('regUser').value.trim(), p=$('regPwd').value, p2=$('regPwd2').value;
+  const alId=$('regAlId').value.trim(), alName=$('regAlName').value.trim();
+  if(!u||!p||!alId){ setMsg('regMsg','账号/密码/联盟号必填','err'); return; }
+  if(p.length<4){ setMsg('regMsg','密码至少4位','err'); return; }
+  if(p!==p2){ setMsg('regMsg','两次密码不一致','err'); return; }
+  try{
+    const al = await DB.registerAccount(u,p,alId,alName);
+    session = { username:u, allianceId:alId, allianceName:al.name||alName, gistId:al.gistId };
+    localStorage.setItem(SKEY, JSON.stringify(session));
+    if(window.__ALLIANCE_REGISTRY_CREATED__){
+      setMsg('regMsg','注册成功！数据库已自动创建，管理员请把此 id 写入 github-config.js 的 TFJL_ALLIANCE_DB_GIST_ID：'+window.__ALLIANCE_REGISTRY_CREATED__,'warn');
+    }
+    enterMain();
+  }catch(e){ setMsg('regMsg', e.message||'注册失败','err'); }
+}
+
+// ---------- 主界面 ----------
+function enterMain(){
+  $('authCard').style.display='none';
+  $('mainCard').style.display='block';
+  $('logoutBtn').style.display='inline-block';
+  $('iAlName').textContent = session.allianceName||'-';
+  $('iAlId').textContent = session.allianceId||'-';
+  $('iUser').textContent = session.username||'-';
+  $('datePick').value = state.date;
+  if(!session.gistId){ setMsg('loadMsg','该联盟尚未创建 Gist（首次保存时会自动创建）。','warn'); }
+  renderHistory();
+  onLoadDate();
+}
+
+function addRow(rank,name,cups,streak){
+  const tb=$('recBody');
+  const tr=document.createElement('tr');
+  tr.innerHTML = `<td><input class="c-rank" type="number" min="1" value="${rank||''}" placeholder="#"></td>`+
+    `<td><input class="c-name" value="${esc(name||'')}" placeholder="人名"></td>`+
+    `<td><input class="c-cups" type="number" min="0" value="${cups!=null?cups:''}" placeholder="奖杯"></td>`+
+    `<td><input class="c-streak" type="number" min="0" value="${streak!=null?streak:''}" placeholder="连胜"></td>`+
+    `<td><span class="del" onclick="this.parentNode.parentNode.remove()">✕</span></td>`;
+  tb.appendChild(tr);
+}
+function readRows(){
+  return [...$('recBody').querySelectorAll('tr')].map(tr=>{
+    const g=s=>tr.querySelector(s).value;
+    return {
+      rank: Number(g('.c-rank'))||0,
+      name: g('.c-name').trim(),
+      cups: Number(g('.c-cups'))||0,
+      streak: Number(g('.c-streak'))||0
+    };
+  }).filter(r=>r.name);
+}
+
+async function onLoadDate(){
+  state.date = $('datePick').value || todayStr();
+  $('datePick').value = state.date;
+  if(!session.gistId){ setMsg('loadMsg','联盟 Gist 未就绪，先用本地/新建。','warn'); }
+  let data=null;
+  if(session.gistId){ try{ data = await DB.loadDateRecords(session.gistId, state.date); }catch(e){} }
+  if(!data){ data = DB.cacheGet(session.gistId, state.date); if(data) setMsg('loadMsg','已载入本地缓存（联网后可上传/刷新）','ok'); }
+  $('recBody').innerHTML='';
+  if(data && data.records && data.records.length){
+    data.records.forEach(r=>addRow(r.rank, r.name, r.cups, r.streak));
+    if(data.screenshot){ state.shot=data.screenshot; showShot(data.screenshot); }
+    setMsg('loadMsg', (data.updatedBy?('上次由 '+data.updatedBy+' 更新 · ':'')+new Date(data.updatedAt||Date.now()).toLocaleString()), 'ok');
+  } else {
+    addRow();
+    setMsg('loadMsg','该日期暂无记录，新增后保存即可。','');
+  }
+}
+
+function onShotChange(e){
+  const f=e.target.files[0]; if(!f) return;
+  const rd=new FileReader();
+  rd.onload=()=>{
+    const img=new Image();
+    img.onload=()=>{
+      let w=img.width,h=img.height,max=800;
+      if(w>max){ h=Math.round(h*max/w); w=max; }
+      const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+      cv.getContext('2d').drawImage(img,0,0,w,h);
+      const url=cv.toDataURL('image/jpeg',0.7);
+      state.shot=url; showShot(url);
+    };
+    img.src=rd.result;
+  };
+  rd.readAsDataURL(f);
+}
+function showShot(url){ const i=$('shotImg'); i.src=url; i.style.display='block'; $('shotHint').style.display='none'; }
+
+async function onSave(){
+  if(!session.gistId){ setMsg('saveMsg','联盟 Gist 未就绪，无法上传（仍可本地缓存）。','warn'); }
+  const rows=readRows();
+  if(!rows.length){ setMsg('saveMsg','请至少填写一行（含人名）','err'); return; }
+  const data={ date:state.date, updatedAt:Date.now(), updatedBy:session.username, screenshot:state.shot, records:rows };
+  DB.cacheSet(session.gistId, state.date, data); // 本地缓存（离线可用）
+  if(session.gistId){
+    try{
+      await DB.saveDateRecords(session.gistId, state.date, data);
+      setMsg('saveMsg','已保存并上传 Gist ✓','ok');
+    }catch(e){ setMsg('saveMsg','本地已存，Gist 上传失败：'+(e.message||e),'warn'); }
+  }
+  renderHistory();
+}
+
+async function renderHistory(){
+  const box=$('histBox'); box.innerHTML='';
+  let dates=[];
+  if(session.gistId){ try{ dates = await DB.listAllianceDates(session.gistId); }catch(e){} }
+  const cached = session.gistId ? DB.cacheDates(session.gistId) : [];
+  const all=[...new Set([...dates, ...cached])].sort();
+  if(!all.length){ box.innerHTML='<span class="hint">暂无历史</span>'; return; }
+  all.forEach(d=>{
+    const el=document.createElement('div');
+    el.className='d'+(cached.includes(d)?' cached':'');
+    el.textContent=d;
+    el.onclick=()=>{ $('datePick').value=d; onLoadDate(); window.scrollTo({top:document.getElementById('tblBox').offsetTop-20,behavior:'smooth'}); };
+    box.appendChild(el);
+  });
+}
+
+// ---------- 启动 ----------
+(function init(){
+  try{ const s=localStorage.getItem(SKEY); if(s) session=JSON.parse(s); }catch(e){}
+  if(session && session.gistId){
+    enterMain();
+  } else {
+    $('authCard').style.display='block';
+  }
+})();
+</script>
+</body>
+</html>
