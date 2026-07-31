@@ -872,6 +872,7 @@ async function deepseaRunOcr(files){
         }
         totalSlice=allSlices.length;
         deepseaSliceResults=[];
+        if(raw) raw.value=''; // 每次 OCR 重新拼接，避免跨次污染
         for(let i=0;i<totalSlice;i++){
             if(status) status.textContent='识别中… (块 '+(i+1)+'/'+totalSlice+')';
             const j=await invoke('umi_ocr', { base64:allSlices[i], options:{ data:{format:'text', outputDirName:'', outputFileName:'', outputFileFormat:[]}, ocr:{language:'models/config_chinese.txt', cls:true} } });
@@ -901,14 +902,22 @@ async function deepseaRunOcr(files){
 }
 function deepseaParseAndImport(){
     if(!deepseaCanImport()){ toast('⛔ 仅管理员可导入数据'); return; }
-    const raw=document.getElementById('deepseaOcrRaw');
-    const text=raw?raw.value:'';
-    if(!text.trim()){ toast('请先 OCR 识别截图'); return; }
-    const rows=parseDeepseaOcrText(text);
-    if(!rows.length){ toast('未能从原文解析出联盟数据，请把原文复制发给我'); return; }
-    // 上传前若选了势力，覆盖所有行的 所属阵营（用户手动选择势力上传，优先级最高）
     const facSel=document.getElementById('deepseaOcrFaction');
     const fac=facSel?facSel.value:'';
+    let rows=[];
+    // 优先按切片逐块解析：避免顶部 tab 栏把全部数据串到最后一势力
+    if(deepseaSliceResults && deepseaSliceResults.length){
+        for(const slice of deepseaSliceResults){
+            let r=parseDeepseaOcrText(slice.text||'');
+            if(!r.length){ r=parseDeepseaCardText(slice.text||'', fac); }
+            rows.push(...r);
+        }
+    }else{
+        const raw=document.getElementById('deepseaOcrRaw');
+        rows=parseDeepseaOcrText(raw?raw.value:'');
+    }
+    if(!rows.length){ toast('未能从原文解析出联盟数据，请把原文复制发给我'); return; }
+    // 上传前若选了势力，覆盖所有行的 所属阵营（用户手动选择势力上传，优先级最高）
     if(fac) rows.forEach(r=>{ r['所属阵营']=fac; });
     // 按势力合并：若新数据带了某势力，先移除旧表中该势力的行，再追加（分势力上传不互相覆盖）
     const newFactions=new Set(rows.map(r=>r['所属阵营']).filter(Boolean));
@@ -992,6 +1001,98 @@ function parseDeepseaOcrText(text){
     }
     return rows;
 }
+// 策略三：单张联盟卡片（无表头、无势力标题，常见于截图切出来的单个联盟块）
+// 字段顺序任意，支持 "联盟名" 在 ID 前或 ID 后、会长名在人数后等 OCR 乱序。
+function parseDeepseaCardText(text, defaultFaction){
+    const lines=text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+    const FACTION_LIST=['暗月地精','人类联盟','天灾亡灵','兽人部落','HE'];
+    let faction=defaultFaction||'';
+    lines.forEach(l=>{ if(FACTION_LIST.includes(l)) faction=l; });
+
+    const isIdLine = l=> l.match(/^ID[:：]+\s*(.+)$/);
+    const isCountLine = l=> l.match(/^(\d+)\s*[/|]\s*(\d+)$/);
+    const isLevelLine = l=> l.match(/^(\d+)级(联盟)?$/);
+
+    let idVal=null, idIdx=-1, countVal=null, countIdx=-1, levelVal=null, levelIdx=-1, powerVal=0, powerIdx=-1;
+    lines.forEach((l,i)=>{
+        let m;
+        if(idVal===null && (m=isIdLine(l))){ idVal=m[1].replace(/\D/g,''); idIdx=i; }
+        if(countVal===null && (m=isCountLine(l))){ countVal=l; countIdx=i; }
+        if(levelVal===null && (m=isLevelLine(l))){ levelVal=m[1]+'级联盟'; levelIdx=i; }
+    });
+
+    if(levelIdx>=0){
+        for(let i=levelIdx+1;i<lines.length;i++){
+            if(i===idIdx || i===countIdx) continue;
+            const l=lines[i];
+            if(/^\d[\d\s,]*$/.test(l.replace(/[^\d\s,]/g,''))){
+                const p=parsePower(l); if(p>=1000){ powerVal=p; powerIdx=i; break; }
+            }
+        }
+    }
+    if(!powerVal){
+        let best=0, bestIdx=-1;
+        lines.forEach((l,i)=>{
+            if(i===idIdx || i===countIdx || i===levelIdx) return;
+            if(/\d{4,}/.test(l)){
+                const p=parsePower(l); if(p>best){ best=p; bestIdx=i; }
+            }
+        });
+        if(best){ powerVal=best; powerIdx=bestIdx; }
+    }
+
+    const skipIdx=new Set([idIdx,countIdx,levelIdx,powerIdx]);
+    lines.forEach((l,i)=>{ if(FACTION_LIST.includes(l)) skipIdx.add(i); });
+    const candidates=lines.map((l,i)=>({l,i,len:[...l].length})).filter(o=>{
+        if(skipIdx.has(o.i)) return false;
+        if(/^\d+$/.test(o.l)) return false;
+        if(/^ID[:：]/.test(o.l)) return false;
+        if(/^(\d+)级/.test(o.l)) return false;
+        if(isCountLine(o.l)) return false;
+        if(['会长','长'].includes(o.l)) return false;
+        if(o.len<2) return false;
+        return true;
+    });
+    if(!candidates.length) return [];
+
+    let name='', nameIdx=-1;
+    const beforeId=candidates.find(o=> idIdx>=0 && o.i===idIdx-1);
+    if(beforeId){
+        name=beforeId.l; nameIdx=beforeId.i;
+        const longer=candidates.find(o=> o.i>beforeId.i && o.l.length>beforeId.l.length && (o.l.includes(beforeId.l) || beforeId.l.includes(o.l)));
+        if(longer){ name=longer.l; nameIdx=longer.i; }
+    }
+    if(!name && countIdx>=0){
+        const beforeCount=candidates.filter(o=> o.i<countIdx).sort((a,b)=>b.len-a.len)[0];
+        if(beforeCount){ name=beforeCount.l; nameIdx=beforeCount.i; }
+    }
+    if(!name){
+        const longest=candidates.sort((a,b)=>b.len-a.len)[0];
+        name=longest.l; nameIdx=longest.i;
+    }
+
+    let chair='';
+    if(countIdx>=0){
+        const after=candidates.find(o=> o.i===countIdx+1 && o.i!==nameIdx);
+        if(after) chair=after.l;
+    }
+    if(!chair){
+        const other=candidates.filter(o=> o.i!==nameIdx && (countIdx<0 || o.i>countIdx)).sort((a,b)=>b.len-a.len)[0];
+        if(other) chair=other.l;
+    }
+
+    const row={};
+    if(name) row['联盟名称']=name;
+    if(idVal) row['联盟ID']=idVal;
+    if(chair) row['会长']=chair;
+    if(countVal) row['人数']=countVal;
+    if(levelVal) row['联盟等级']=levelVal;
+    if(powerVal) row['联盟战力']=powerVal;
+    if(faction) row['所属阵营']=faction;
+    if(!name) return [];
+    if(!(idVal || powerVal || countVal || levelVal || chair)) return [];
+    return [row];
+}
 function copyDeepseaOcrRaw(){
     const raw=document.getElementById('deepseaOcrRaw'); if(!raw) return;
     raw.select();
@@ -1016,17 +1117,22 @@ function renderDeepseaOcrCompare(){
     const list=document.getElementById('deepseaOcrCompareList'); if(!list) return;
     if(!deepseaSliceResults.length){ list.innerHTML='<div style="font-size:0.72rem;color:rgba(255,255,255,0.5);">还没有切片结果，先 OCR 识别一张截图。</div>'; return; }
     list.innerHTML = deepseaSliceResults.map((it,idx)=>{
-        const parsed = parseDeepseaOcrText(it.text||'');
+        let parsed = parseDeepseaOcrText(it.text||'');
+        if(!parsed.length){ parsed = parseDeepseaCardText(it.text||'', ''); }
         const names = parsed.slice(0,6).map(r=>r['联盟名称']||'?').join('、');
         const parsedTag = parsed.length ? ('✅ 解析出 '+parsed.length+' 条：'+names) : '⚠️ 未解析出联盟（可能切错/识错/表头不全）';
         const FACTION_LIST=['暗月地精','人类联盟','天灾亡灵','兽人部落','HE'];
         const foundFactions = FACTION_LIST.filter(f=>(it.text||'').includes(f));
         const factionTag = foundFactions.length ? ('🏷 含势力：'+foundFactions.join('、')) : '🏷 不含势力名';
+        const first = parsed[0] || {};
+        const fields = ['联盟ID','会长','人数','联盟等级','联盟战力'].filter(k=>first[k]).map(k=> k+'='+(k==='联盟战力'?(first[k]||0).toLocaleString():first[k])).join(' / ');
+        const fieldsTag = fields ? ('📝 '+fields) : '';
         const txt = (it.text||'').trim() || '（空）';
         return '<div style="display:flex;gap:10px;border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:8px;background:rgba(0,0,0,0.2);">'
             + '<div style="flex:0 0 auto;"><div style="font-size:0.66rem;color:rgba(255,255,255,0.5);margin-bottom:4px;">块 #'+(idx+1)+'</div><img src="'+it.img+'" style="max-width:300px;max-height:200px;border:1px solid rgba(255,255,255,0.2);border-radius:4px;display:block;"></div>'
             + '<div style="flex:1;min-width:0;"><pre style="white-space:pre-wrap;word-break:break-all;font-size:0.7rem;color:#cfe;margin:0 0 6px;max-height:200px;overflow:auto;background:rgba(0,0,0,0.3);padding:6px;border-radius:4px;">'+dsEscapeHtml(txt)+'</pre>'
             + '<div style="font-size:0.68rem;color:'+(parsed.length?'#7CFC9B':'#ffb84d')+';">'+parsedTag+'</div>'
+            + (fieldsTag ? '<div style="font-size:0.68rem;color:#bde;margin-top:2px;">'+fieldsTag+'</div>' : '')
             + '<div style="font-size:0.68rem;color:#9ad;margin-top:2px;">'+factionTag+'</div></div>'
             + '</div>';
     }).join('');
