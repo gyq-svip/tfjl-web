@@ -18,6 +18,9 @@ h1{font-size:1.5rem;color:#4dd0e1;text-align:center;margin-bottom:4px}
 .row > *{flex:0 0 auto}
 label{font-size:0.78rem;color:rgba(255,255,255,0.75);min-width:60px}
 input,select,textarea{background:rgba(0,0,0,0.3);border:1px solid rgba(77,182,172,0.4);color:#fff;padding:6px 10px;border-radius:6px;font-size:0.85rem;font-family:inherit}
+/* 深海选势力下拉：加深色背景，避免原生 option 在深色界面下纯白看不清 */
+#deepseaOcrFaction{background:#16243c!important;color:#fff;border:1px solid rgba(255,255,255,0.25)}
+#deepseaOcrFaction option{background:#16243c;color:#fff}
 button{background:linear-gradient(135deg,#4dd0e1,#00838f);border:none;color:#fff;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.82rem;font-weight:500;font-family:inherit;transition:transform 0.1s}
 button:hover{transform:translateY(-1px);box-shadow:0 3px 10px rgba(77,182,172,0.3)}
 button:active{transform:translateY(0)}
@@ -196,6 +199,7 @@ tr.rk-weak:hover td{opacity:1}
             <button class="ghost small" onclick="toggleDataMgr()">⚙️ 数据管理 / 导入</button>
         </div>
         <div id="dataMgr" class="hidden" style="border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:10px;margin-bottom:10px;">
+            <div id="deepseaImportZone">
             <div class="row" style="margin-bottom:8px;font-size:0.74rem;color:rgba(255,255,255,0.78);background:rgba(77,182,172,0.08);padding:8px 10px;border-radius:8px;line-height:1.7;">
                 📥 <b>导入方法</b>：① 点「导入 xlsx」选择 <b>四大阵营联盟实力前50汇总.xlsx</b>（自动解析 4 阵营 + 总排名）；② 或点「选择 JSON 文件」选已导出的排行 JSON。导入后本页各板块自动更新。
             </div>
@@ -205,6 +209,7 @@ tr.rk-weak:hover td{opacity:1}
                     📤 选择 JSON 文件<input type="file" id="rankingFile" accept=".json" style="display:none" onchange="importRankingsFile(event)">
                 </label>
                 <button class="ghost small" onclick="document.getElementById('rankingXlsx').click()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);padding:3px 8px;border-radius:6px;font-size:0.74rem;">📥 导入 xlsx</button>
+                <button class="ghost small" onclick="addRankRow()" style="background:rgba(77,182,172,0.18);border:1px solid rgba(77,182,172,0.4);padding:3px 8px;border-radius:6px;font-size:0.74rem;">➕ 手动新增</button>
                 <input type="file" id="rankingXlsx" accept=".xlsx,.xls" style="display:none" onchange="importRankingsXlsx(event)">
             </div>
             <div class="row" style="margin-bottom:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
@@ -228,6 +233,10 @@ tr.rk-weak:hover td{opacity:1}
                     <button class="ghost small" onclick="copyDeepseaOcrRaw()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);padding:3px 8px;border-radius:6px;font-size:0.74rem;">复制原文</button>
                     <button class="ghost small" onclick="deepseaClearOcr()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);padding:3px 8px;border-radius:6px;font-size:0.74rem;">清空重来</button>
                 </div>
+            </div>
+            </div><!-- /deepseaImportZone -->
+            <div id="deepseaImportLock" class="hidden" style="font-size:0.78rem;color:#ffb84d;background:rgba(255,184,77,0.1);padding:8px 10px;border-radius:8px;line-height:1.5;">
+                🔒 数据导入仅管理员可用。如需新增 / 修改深海数据，请联系管理员。
             </div>
         </div>
         <div class="faction-bar" id="factionBar">
@@ -323,6 +332,29 @@ tr.rk-weak:hover td{opacity:1}
         </div>
     </div>
 </div>
+    <!-- 编辑/新增单条记录弹窗 -->
+    <div id="editRowModal" class="modal hidden" onclick="if(event.target===this)document.getElementById('editRowModal').classList.add('hidden')">
+        <div class="modal-box" style="width:min(420px,96vw);">
+            <div class="row" style="justify-content:space-between;margin-bottom:10px;">
+                <h3 id="editRowModalTitle" style="margin:0;">✏️ 编辑记录</h3>
+                <button class="ghost small" onclick="document.getElementById('editRowModal').classList.add('hidden')">✖ 关闭</button>
+            </div>
+            <div style="display:grid;gap:8px;">
+                <div class="row" style="margin-bottom:0;"><label style="min-width:84px;">排名</label><input id="editRank" type="number" style="flex:1"></div>
+                <div class="row" style="margin-bottom:0;"><label style="min-width:84px;">所属阵营</label><input id="editFaction" style="flex:1" placeholder="暗月地精/人类联盟/..."></div>
+                <div class="row" style="margin-bottom:0;"><label style="min-width:84px;">联盟名称</label><input id="editName" style="flex:1"></div>
+                <div class="row" style="margin-bottom:0;"><label style="min-width:84px;">联盟ID</label><input id="editId" style="flex:1"></div>
+                <div class="row" style="margin-bottom:0;"><label style="min-width:84px;">会长</label><input id="editLeader" style="flex:1"></div>
+                <div class="row" style="margin-bottom:0;"><label style="min-width:84px;">人数</label><input id="editCount" style="flex:1" placeholder="如 77/84"></div>
+                <div class="row" style="margin-bottom:0;"><label style="min-width:84px;">联盟等级</label><input id="editLevel" style="flex:1"></div>
+                <div class="row" style="margin-bottom:0;"><label style="min-width:84px;">联盟战力</label><input id="editPower" type="number" style="flex:1"></div>
+            </div>
+            <div class="row" style="justify-content:flex-end;margin-top:12px;margin-bottom:0;">
+                <button class="ghost small" onclick="document.getElementById('editRowModal').classList.add('hidden')">取消</button>
+                <button onclick="saveEditRow()">💾 保存</button>
+            </div>
+        </div>
+    </div>
 
 <script>
 // ===================== 存储辅助 =====================
@@ -352,6 +384,28 @@ let state = {
 state.rankSort = 'power';   // 'power' 总战力排名(默认) | 'percap' 人均战力排名 | 'total' 总排名
 state.trendChart = 'line';  // 'line' 折线(默认) | 'bar' 柱状
 state.trendSource = 'snapshot'; // 'snapshot' 赛季快照(前5) | 'import' 导入记录(全部)
+
+// ===== 数据导入权限（需求：仅管理员可导入，其他人只能看）=====
+// deepseaImportPublic=false：导入入口只对管理员开放；测试 ok 后改为 true 即对所有用户开放（并可显示在主页）
+const deepseaImportPublic = false;
+const DEEPSEA_ADMIN_HASH = 'v2$kXtI5wHYUFcdTBV24RhVpwTHyM83gmQ0r3hhIY9rVnM='; // 与 index.html ADMIN_VERIFY_HASH 一致（源码不含明文）
+function deepseaCanImport() {
+    if (deepseaImportPublic) return true;
+    try {
+        const p = new URLSearchParams(location.search).get('admin');
+        if (p === '1') return true; // 从已验证的管理员会话打开（openDeepseaStats 带 ?admin=1）
+        const saved = localStorage.getItem('TFJL_Admin_SavedPwd'); // "记住验证码"写入的哈希 base64
+        if (saved && atob(saved) === DEEPSEA_ADMIN_HASH) return true;
+    } catch (e) {}
+    return false;
+}
+function applyDeepseaImportPermission() {
+    const can = deepseaCanImport();
+    const zone = document.getElementById('deepseaImportZone');
+    const lock = document.getElementById('deepseaImportLock');
+    if (zone) zone.style.display = can ? '' : 'none';
+    if (lock) lock.style.display = can ? 'none' : '';
+}
 
 function loadAll(){
     try{
@@ -425,9 +479,10 @@ function renderRankings(){
         data.sort((a,b)=>parsePower(b['联盟战力'])-parsePower(a['联盟战力']));
     }
     let html = '<table class="rank-table"><thead><tr>'
-        + '<th>排名</th><th>联盟</th><th>会长</th><th>人数</th><th>联盟战力</th><th>人均战力</th><th>人均阵营排名</th><th>阵营内名次</th><th>估算氪金</th><th>满员率</th>'
+        + '<th>排名</th><th>联盟</th><th>会长</th><th>人数</th><th>联盟战力</th><th>人均战力</th><th>人均阵营排名</th><th>阵营内名次</th><th>估算氪金</th><th>满员率</th><th>操作</th>'
         + '</tr></thead><tbody>';
     html += data.map((r,i)=>{
+        const ri = state.rankings.indexOf(r);
         const pr = factionInnerPowerRank(r);
         const cnt = state.rankings.filter(x=>x['所属阵营']===r['所属阵营']).length;
         const isStrong = (pr!=null && pr<=3);
@@ -450,10 +505,60 @@ function renderRankings(){
             <td>#${ir!=null?ir:'-'}</td>
             <td>${estimateKryptonCell(r)}</td>
             <td><div class="rate-bar"><div class="bar"><div class="fill" style="width:${fr?fr.pct:0}%;background:${frColor}"></div></div><i>${fr?fr.pct+'%':'-'}</i></div></td>
+            <td><button class="ghost small" onclick="editRankRow(${ri})" style="background:rgba(77,182,172,0.18);border:1px solid rgba(77,182,172,0.4);padding:2px 6px;border-radius:6px;font-size:0.72rem;margin-right:4px;">✏️</button><button class="ghost small" onclick="deleteRankRow(${ri})" style="background:rgba(255,107,107,0.18);border:1px solid rgba(255,107,107,0.4);padding:2px 6px;border-radius:6px;font-size:0.72rem;">🗑</button></td>
         </tr>`;
     }).join('');
     html += '</tbody></table>';
     grid.innerHTML = html;
+}
+// ===================== 单条记录的增删改（权限：仅管理员，见 deepseaCanImport） =====================
+let _editRowIdx = -1;
+function addRankRow(){
+    if(!deepseaCanImport()){ toast('⛔ 仅管理员可新增数据'); return; }
+    _editRowIdx = -1;
+    const t = document.getElementById('editRowModalTitle'); if(t) t.textContent = '➕ 新增记录';
+    ['editRank','editFaction','editName','editId','editLeader','editCount','editLevel','editPower'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+    document.getElementById('editRowModal').classList.remove('hidden');
+}
+function editRankRow(idx){
+    const r = state.rankings[idx]; if(!r){ toast('记录不存在'); return; }
+    _editRowIdx = idx;
+    const t = document.getElementById('editRowModalTitle'); if(t) t.textContent = '✏️ 编辑记录';
+    document.getElementById('editRank').value = r['排名']||'';
+    document.getElementById('editFaction').value = r['所属阵营']||'';
+    document.getElementById('editName').value = r['联盟名称']||'';
+    document.getElementById('editId').value = r['联盟ID']||'';
+    document.getElementById('editLeader').value = r['会长']||'';
+    document.getElementById('editCount').value = r['人数']||'';
+    document.getElementById('editLevel').value = r['联盟等级']||'';
+    document.getElementById('editPower').value = r['联盟战力']||'';
+    document.getElementById('editRowModal').classList.remove('hidden');
+}
+function saveEditRow(){
+    const idx = _editRowIdx;
+    const obj = {
+        '排名': document.getElementById('editRank').value,
+        '所属阵营': document.getElementById('editFaction').value,
+        '联盟名称': document.getElementById('editName').value,
+        '联盟ID': document.getElementById('editId').value,
+        '会长': document.getElementById('editLeader').value,
+        '人数': document.getElementById('editCount').value,
+        '联盟等级': document.getElementById('editLevel').value,
+        '联盟战力': document.getElementById('editPower').value
+    };
+    if(idx>=0 && idx<state.rankings.length){ state.rankings[idx] = obj; }
+    else { state.rankings.push(obj); }
+    saveRankings(); renderRankings(); renderChampionship(); populateCalcAlliance();
+    document.getElementById('editRowModal').classList.add('hidden');
+    toast(idx>=0 ? '✅ 已保存修改' : '➕ 已新增 1 条记录');
+}
+function deleteRankRow(idx){
+    if(idx<0 || idx>=state.rankings.length) return;
+    const r = state.rankings[idx];
+    if(!confirm('确认删除【'+(r['联盟名称']||'未命名')+'】（'+(r['所属阵营']||'')+'）这条记录？')) return;
+    state.rankings.splice(idx, 1);
+    saveRankings(); renderRankings(); renderChampionship(); populateCalcAlliance();
+    toast('🗑 已删除 1 条记录');
 }
 // 排序切换：总战力(默认) / 人均战力 / 总排名
 function setRankSort(s){
@@ -464,6 +569,7 @@ function setRankSort(s){
     renderRankings();
 }
 async function importRankingsFile(event){
+    if(!deepseaCanImport()){ toast('⛔ 仅管理员可导入数据'); return; }
     const f = event.target.files[0]; if(!f) return;
     try{
         const txt = await f.text();
@@ -551,6 +657,7 @@ function buildXlsxFieldMap(headers){
 
 // 一键导入 xlsx（你拿到"四大阵营联盟实力前50汇总.xlsx"直接选，自动解析生成排行）
 async function importRankingsXlsx(event){
+    if(!deepseaCanImport()){ toast('⛔ 仅管理员可导入数据'); return; }
     const f = event.target.files[0]; if(!f) return;
     try{
         if(typeof XLSX === 'undefined'){ toast('解析库未加载，请刷新页面重试'); return; }
@@ -660,40 +767,83 @@ document.addEventListener('paste', async (e)=>{
     const imgs = items.filter(i=>i.type && i.type.startsWith('image/'));
     for(const it of imgs){ const f=it.getAsFile(); if(f){ e.preventDefault(); await deepseaRunOcr([f]); } }
 });
-// 支持多张图片：files 为数组，逐张识别并【累积追加】到原文框（不覆盖），
-// 这样 4 个势力的截图可一次多选或分次粘贴，拼接成一份完整原文后再统一解析填表。
-// 自动把大图切成多个小块（每块 ≤ maxH 像素，块间留 overlap 重叠防止切断某一行文字），
-// 逐块 OCR 再合并——解决"整张长图识别很烂、单条小图很准"的问题。
-// 小图（高度≤maxH）不切，原样送 OCR；大图按高度分块，每块内文字像素更大、识别率等同单条截。
-function deepseaSliceImage(file, maxH){
-    return new Promise((resolve,reject)=>{
-        const img=new Image();
-        img.onload=()=>{
-            const w=img.naturalWidth, h=img.naturalHeight;
-            const slices=[];
-            if(h<=maxH){
-                const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
-                cv.getContext('2d').drawImage(img,0,0);
-                slices.push(cv.toDataURL('image/png').split(',')[1]);
-                URL.revokeObjectURL(img.src);
-                resolve(slices); return;
-            }
-            const overlap=Math.min(40, Math.floor(maxH/4));
-            const step=maxH-overlap;
-            let y=0;
-            while(y<h){
-                const sh=Math.min(maxH, h-y);
-                const cv=document.createElement('canvas'); cv.width=w; cv.height=sh;
-                cv.getContext('2d').drawImage(img, 0, y, w, sh, 0, 0, w, sh);
-                slices.push(cv.toDataURL('image/png').split(',')[1]);
-                if(y+sh>=h) break;
-                y+=step;
-            }
-            URL.revokeObjectURL(img.src);
-            resolve(slices);
+// 切片策略（需求优化）：默认"一个联盟(=一行)切一张图"，避免多盟同图错位。
+// 先按表格横线检测行边界，把每个联盟单独裁成一张小图逐个识别（慢但准、不错位）；
+// 检测不到分隔线（如无缝表格）则回退到较小的定高切片（≤240px，仍比旧 900px/约11盟错位少）。
+// 小图（高度≤maxH 且无分隔线）原样送 OCR。
+function deepseaDetectRowSlices(img, w, h) {
+    const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+    const ctx = cv.getContext('2d'); ctx.drawImage(img, 0, 0);
+    let data;
+    try { data = ctx.getImageData(0, 0, w, h).data; } catch (e) { return null; }
+    const rowIsLine = [];
+    const stepX = Math.max(1, Math.floor(w / 200));
+    for (let y = 0; y < h; y++) {
+        let sum = 0, sum2 = 0, n = 0;
+        for (let x = 0; x < w; x += stepX) {
+            const i = (y * w + x) * 4;
+            const lum = (data[i] + data[i + 1] + data[i + 2]) / 3;
+            sum += lum; sum2 += lum * lum; n++;
+        }
+        const mean = sum / n;
+        const variance = sum2 / n - mean * mean;
+        rowIsLine.push(variance < 80); // 整行近似纯色=分隔线/间隔
+    }
+    const segs = []; let start = -1;
+    for (let y = 0; y < h; y++) {
+        if (!rowIsLine[y]) { if (start < 0) start = y; }
+        else if (start >= 0) { segs.push({ top: start, bottom: y }); start = -1; }
+    }
+    if (start >= 0) segs.push({ top: start, bottom: h });
+    const merged = [];
+    for (const s of segs) {
+        if (s.bottom - s.top < 8) { if (merged.length) merged[merged.length - 1].bottom = s.bottom; continue; }
+        merged.push({ top: s.top, bottom: s.bottom });
+    }
+    return merged.length >= 2 ? merged : null;
+}
+
+function deepseaSliceImage(file, maxH) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+            const w = img.naturalWidth, h = img.naturalHeight;
+            const slices = [];
+            // 优先：一个联盟(行)切一张
+            try {
+                const rows = deepseaDetectRowSlices(img, w, h);
+                if (rows) {
+                    rows.forEach(seg => {
+                        const sh = seg.bottom - seg.top;
+                        if (sh < 4) return;
+                        const cv = document.createElement('canvas'); cv.width = w; cv.height = sh;
+                        cv.getContext('2d').drawImage(img, 0, seg.top, w, sh, 0, 0, w, sh);
+                        slices.push(cv.toDataURL('image/png').split(',')[1]);
+                    });
+                    URL.revokeObjectURL(img.src); resolve(slices); return;
+                }
+            } catch (e) { console.warn('行检测失败，回退定高切片', e); }
+            // 回退：定高切片（较小块，错位更少）
+            try {
+                const fbMax = Math.min(maxH || 900, 240);
+                const overlap = 30;
+                const step = fbMax - overlap;
+                let y = 0;
+                while (y < h) {
+                    const sh = Math.min(fbMax, h - y);
+                    if (sh >= 10) {
+                        const cv = document.createElement('canvas'); cv.width = w; cv.height = sh;
+                        cv.getContext('2d').drawImage(img, 0, y, w, sh, 0, 0, w, sh);
+                        slices.push(cv.toDataURL('image/png').split(',')[1]);
+                    }
+                    if (y + sh >= h) break;
+                    y += step;
+                }
+                URL.revokeObjectURL(img.src); resolve(slices);
+            } catch (e) { reject(e); }
         };
-        img.onerror=()=>reject(new Error('图片加载失败'));
-        img.src=URL.createObjectURL(file);
+        img.onerror = () => reject(new Error('图片加载失败'));
+        img.src = URL.createObjectURL(file);
     });
 }
 async function deepseaRunOcr(files){
@@ -738,6 +888,7 @@ async function deepseaRunOcr(files){
     }
 }
 function deepseaParseAndImport(){
+    if(!deepseaCanImport()){ toast('⛔ 仅管理员可导入数据'); return; }
     const raw=document.getElementById('deepseaOcrRaw');
     const text=raw?raw.value:'';
     if(!text.trim()){ toast('请先 OCR 识别截图'); return; }
@@ -1054,6 +1205,7 @@ function setTrendChart(t){
 }
 function toggleDataMgr(){
     const d=document.getElementById('dataMgr'); if(d) d.classList.toggle('hidden');
+    applyDeepseaImportPermission();
 }
 // 指标取值：联盟战力 / 人均战力 / 估算花费(¥，取 minCost)
 function metricValue(r, metric){
@@ -1281,6 +1433,7 @@ function compareImports(){
 
 // ===================== 初始化 =====================
 window.addEventListener('load', ()=>{
+    applyDeepseaImportPermission();
     loadAll();
     if(!state.rankings.length){importRankingsFromDisk(false)}
     renderRankings();
