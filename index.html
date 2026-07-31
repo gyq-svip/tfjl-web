@@ -3110,18 +3110,20 @@
         // ==================== 密码验证 ====================
         // 密码存储在localStorage中，支持管理员动态管理
         const PASSWORDS_STORAGE_KEY = 'TFJL_AdminPasswords';
-        const DEFAULT_PASSWORDS = ['tfjl', 'TFJL','ymkfqtbl', 'gyq'];
+        // 访问密码以 PBKDF2 哈希(v2$)存储，源码不含明文。原始明文仅开发者本地改密用：tfjl / TFJL / ymkfqtbl / gyq
+        const DEFAULT_PASSWORD_HASHES = ['v2$V8Crw2nuBjPl7sZVBfjnmKV13TjXkwXEsFJoLwZxaeg=', 'v2$YLaCsuaTJM9dxJZULdL+Di3jD7SDx+8QnGY3uyZrKJo=', 'v2$KDYq+zl4oiPcvk8gW6BKbypOW7mmUatgKg5pQIRCIxM=', 'v2$RVaqgAE/QYaCaHytPLaM/ADr411QeDBbo8VOBH1OSoQ='];
 
         function getAdminPasswords() {
+            // 返回哈希数组：初始哈希 + 本地存储中已哈希(v2$)的项；忽略旧明文项(避免比对失败，用户重加即可)
             const saved = localStorage.getItem(PASSWORDS_STORAGE_KEY);
+            let extra = [];
             if (saved) {
                 try {
-                    return JSON.parse(saved);
-                } catch (e) {
-                    return DEFAULT_PASSWORDS.slice();
-                }
+                    const arr = JSON.parse(saved);
+                    if (Array.isArray(arr)) extra = arr.filter(x => typeof x === 'string' && x.indexOf('v2$') === 0);
+                } catch (e) {}
             }
-            return DEFAULT_PASSWORDS.slice();
+            return DEFAULT_PASSWORD_HASHES.concat(extra);
         }
 
         // 检查是否已登录，未登录则不允许执行操作
@@ -3138,7 +3140,7 @@
             return true;
         }
 
-        function checkPasswordAndEnter(targetSystem) {
+        async function checkPasswordAndEnter(targetSystem) {
             const input = document.getElementById('passwordInput');
             const errorDiv = document.getElementById('passwordError');
             const password = input.value.trim();
@@ -3166,7 +3168,10 @@
                 }
             }
 
-            if (getAdminPasswords().includes(password)) {
+            const _hashes = getAdminPasswords();
+            let _ok = false;
+            for (const _h of _hashes) { if (await verifyPassword(password, _h)) { _ok = true; break; } }
+            if (_ok) {
                 // 密码正确，清除错误计数
                 localStorage.setItem('TFJL_PasswordErrorCount', '0');
                 localStorage.setItem('TFJL_PasswordLockStart', '0');
@@ -25263,7 +25268,7 @@ ${maSection}
 
         // ==================== 管理员面板 ====================
         const ADMIN_VERIFY_KEY = 'TFJL_Admin_Verified';
-        const ADMIN_VERIFY_CODE = 'gyq2024';
+        const ADMIN_VERIFY_HASH = 'v2$kXtI5wHYUFcdTBV24RhVpwTHyM83gmQ0r3hhIY9rVnM='; // 源码不含明文(原 gyq2024)
         let adminLongPressTimer = null;
         let adminLongPressTriggered = false;
 
@@ -25344,7 +25349,7 @@ ${maSection}
             }
         });
 
-        function openAdminPanel() {
+        async function openAdminPanel() {
             const overlay = document.getElementById('adminPanelOverlay');
             overlay.style.display = 'flex';
 
@@ -25357,7 +25362,7 @@ ${maSection}
                 if (saved) {
                     try {
                         const code = atob(saved);
-                        if (code === ADMIN_VERIFY_CODE) {
+                        if (await verifyPassword(code, ADMIN_VERIFY_HASH)) {
                             // 密码匹配，自动验证
                             sessionStorage.setItem(ADMIN_VERIFY_KEY, 'true');
                             isVerified = true;
@@ -26234,9 +26239,9 @@ ${maSection}
             document.getElementById('notepadPanel').style.display = 'none';
         }
 
-        function verifyAdmin() {
+        async function verifyAdmin() {
             const code = document.getElementById('adminVerifyCode').value.trim();
-            if (code === ADMIN_VERIFY_CODE) {
+            if (await verifyPassword(code, ADMIN_VERIFY_HASH)) {
                 sessionStorage.setItem(ADMIN_VERIFY_KEY, 'true');
 
                 // 记住验证码：如果勾选了"记住验证码"，保存到 localStorage
@@ -26416,16 +26421,16 @@ ${maSection}
             
             let html = '';
             passwords.forEach((pwd, index) => {
-                const isDefault = DEFAULT_PASSWORDS.includes(pwd);
+                const isDefault = DEFAULT_PASSWORD_HASHES.includes(pwd);
                 html += `
                     <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:rgba(255,255,255,0.05);border-radius:6px;margin-bottom:8px;border:1px solid rgba(255,255,255,0.1);">
                         <div style="display:flex;align-items:center;gap:10px;">
                             <span style="color:#ffd700;font-weight:bold;">${index + 1}.</span>
-                            <span style="color:#fff;font-family:monospace;">${escapeHtml(pwd)}</span>
+                            <span style="color:#fff;font-family:monospace;">${escapeHtml((pwd||'').length>10 ? pwd.substring(0,10)+'…' : pwd)}</span>
                             ${isDefault ? '<span style="background:#4caf50;color:#fff;font-size:0.7rem;padding:2px 6px;border-radius:4px;">初始</span>' : ''}
                         </div>
                         <div style="display:flex;gap:6px;">
-                            <button onclick="editPassword(${index}, '${escapeHtml(pwd)}')" style="background:linear-gradient(135deg,#ff9800,#f57c00);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">✏️</button>
+                            <button onclick="editPassword(${index})" style="background:linear-gradient(135deg,#ff9800,#f57c00);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">✏️</button>
                             <button onclick="deletePassword(${index})" style="background:linear-gradient(135deg,#f44336,#d32f2f);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">🗑️</button>
                         </div>
                     </div>
@@ -26434,8 +26439,8 @@ ${maSection}
             listContainer.innerHTML = html;
         }
 
-        function editPassword(index, currentPwd) {
-            const newPwd = prompt('请输入新密码：', currentPwd);
+        async function editPassword(index) {
+            const newPwd = prompt('请输入新密码：', '');
             if (!newPwd || newPwd.trim() === '') {
                 showAdminStatus('密码不能为空！', 'error');
                 return;
@@ -26453,19 +26458,18 @@ ${maSection}
             }
             
             const passwords = getAdminPasswords();
-            
-            if (passwords.includes(trimmedPwd)) {
+            const newHash = await hashPassword(trimmedPwd);
+            if (passwords.includes(newHash)) {
                 showAdminStatus('该密码已存在！', 'error');
                 return;
             }
-            
-            passwords[index] = trimmedPwd;
+            passwords[index] = newHash;
             localStorage.setItem(PASSWORDS_STORAGE_KEY, JSON.stringify(passwords));
             loadPasswordList();
-            showAdminStatus(`密码已修改为"${trimmedPwd}"！`, 'success');
+            showAdminStatus('密码已修改！', 'success');
         }
 
-        function addPassword() {
+        async function addPassword() {
             const newPwd = document.getElementById('newPasswordInput').value.trim();
             if (!newPwd) {
                 showAdminStatus('请输入密码！', 'error');
@@ -26477,37 +26481,39 @@ ${maSection}
                 return;
             }
             
+            const newHash = await hashPassword(newPwd);
             const passwords = getAdminPasswords();
             
-            if (passwords.includes(newPwd)) {
+            if (passwords.includes(newHash)) {
                 showAdminStatus('该密码已存在！', 'error');
                 return;
             }
             
-            passwords.push(newPwd);
+            passwords.push(newHash);
             localStorage.setItem(PASSWORDS_STORAGE_KEY, JSON.stringify(passwords));
             document.getElementById('newPasswordInput').value = '';
             loadPasswordList();
-            showAdminStatus(`密码"${newPwd}"添加成功！`, 'success');
+            showAdminStatus('密码添加成功！', 'success');
         }
 
         function deletePassword(index) {
             const passwords = getAdminPasswords();
             const pwdToDelete = passwords[index];
+            const _mask = (pwdToDelete||'').length>10 ? pwdToDelete.substring(0,10)+'…' : pwdToDelete;
             
             if (passwords.length <= 1) {
                 showAdminStatus('至少需要保留一个密码！', 'error');
                 return;
             }
             
-            if (!confirm(`确定要删除密码"${pwdToDelete}"吗？`)) {
+            if (!confirm(`确定要删除密码"${_mask}"吗？`)) {
                 return;
             }
             
             passwords.splice(index, 1);
             localStorage.setItem(PASSWORDS_STORAGE_KEY, JSON.stringify(passwords));
             loadPasswordList();
-            showAdminStatus(`密码"${pwdToDelete}"已删除！`, 'success');
+            showAdminStatus('密码已删除！', 'success');
         }
 
         // 获取公告Gist的URL（与用户端读取逻辑保持一致）
@@ -28668,7 +28674,7 @@ ${maSection}
         </style>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260731-44</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260731-45</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
