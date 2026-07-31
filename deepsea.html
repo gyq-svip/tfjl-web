@@ -83,17 +83,6 @@ td .strong-tag{color:#ffd700;font-size:0.7rem;margin-left:4px;}
 .faction-icon .emo{font-size:1.3rem;line-height:1}
 .faction-icon:hover{background:rgba(77,182,172,0.12)}
 .faction-icon.active{background:rgba(77,182,172,0.28);border-color:#4dd0e1;color:#fff;box-shadow:0 2px 10px rgba(77,182,172,0.25)}
-/* 夺冠概率 */
-.champ-fac{background:rgba(255,255,255,0.04);border-left:4px solid var(--fac,#4dd0e1);border-radius:10px;padding:8px 10px;margin-bottom:10px}
-.champ-fac-h{font-weight:700;color:#fff;margin-bottom:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.champ-top{font-size:0.7rem;color:#ffd700;background:rgba(255,215,0,0.15);padding:1px 8px;border-radius:10px;font-weight:500}
-.champ-row{display:flex;align-items:center;gap:8px;padding:3px 0;font-size:0.78rem}
-.champ-rk{width:34px;color:#4dd0e1;font-weight:700;flex:0 0 auto}
-.champ-nm{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.champ-nm2{flex:0 0 auto;font-size:0.7rem;color:rgba(255,255,255,0.5);max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.champ-bar{flex:0 0 36%;display:flex;align-items:center;gap:6px;min-width:120px}
-.champ-bar .fill{height:8px;border-radius:4px}
-.champ-bar i{font-style:normal;font-size:0.72rem;color:rgba(255,255,255,0.7);min-width:40px;text-align:right}
 /* 赛季快照 */
 .snap-fac{background:rgba(255,255,255,0.04);border-left:4px solid var(--fac,#4dd0e1);border-radius:10px;padding:8px 10px;margin-bottom:10px}
 .snap-fac-h{font-weight:700;color:#fff;margin-bottom:6px}
@@ -275,15 +264,6 @@ tr.rk-weak:hover td{opacity:1}
         <div id="rankingGrid" class="scroll-y"></div>
     </div>
 
-    <!-- 板块B：夺冠概率/推荐（按人均战力） -->
-    <div class="card">
-        <h3>🏆 夺冠预测 <span class="badge" id="champBadge">按人均战力</span></h3>
-        <div class="row" style="margin-bottom:8px;font-size:0.74rem;color:rgba(255,255,255,0.6);">
-            每个阵营内按"人均战力"排名，夺冠概率 = 该联盟人均战力 ÷ 阵营人均战力总和。🏅 推荐 = 各阵营最强联盟。
-        </div>
-        <div id="championBox" class="scroll-y" style="max-height:520px;"></div>
-    </div>
-
     <!-- 板块D：赛季快照（自动记前5 · 按日期） -->
     <div class="card">
         <h3>🏁 赛季快照 <span class="badge" id="snapBadge">共 0 个</span></h3>
@@ -428,13 +408,13 @@ function createVersion(){
     deepseaVersions.push(v); state.versionId=id; dsSet('deepsea_cur_version',id);
     state.rankings=v.rows;
     saveRankings(); refreshVersionSelect();
-    renderRankings(); renderChampionship(); populateCalcAlliance();
+    renderRankings();  populateCalcAlliance();
     toast('🆕 已新建时间点：'+id);
 }
 function selectVersion(id){
     const v=deepseaVersions.find(x=>x.id===id); if(!v) return;
     state.versionId=id; state.rankings=v.rows; dsSet('deepsea_cur_version',id);
-    renderRankings(); renderChampionship(); populateCalcAlliance();
+    renderRankings();  populateCalcAlliance();
 }
 function refreshVersionSelect(){
     const sel=document.getElementById('versionSelect'); if(!sel) return;
@@ -597,7 +577,7 @@ function deepseaDeleteSelected(){
     if(!confirm('确认删除选中的 '+n+' 条记录？此操作不可撤销')) return;
     state.rankings = state.rankings.filter(r=>!deepseaSelRows.has(r));
     deepseaSelRows.clear();
-    saveRankings(); renderRankings(); renderChampionship(); populateCalcAlliance();
+    saveRankings(); renderRankings();  populateCalcAlliance();
     toast('🗑 已删除 '+n+' 条记录');
 }
 function addRankRow(){
@@ -650,7 +630,7 @@ function saveEditRow(){
         state.rankings[idx] = obj;
     }
     else { state.rankings.push(obj); }
-    saveRankings(); renderRankings(); renderChampionship(); populateCalcAlliance();
+    saveRankings(); renderRankings();  populateCalcAlliance();
     document.getElementById('editRowModal').classList.add('hidden');
     toast(idx>=0 ? '✅ 已保存修改' : '➕ 已新增 1 条记录');
 }
@@ -660,7 +640,7 @@ function deleteRankRow(idx){
     if(!confirm('确认删除【'+(r['联盟名称']||'未命名')+'】（'+(r['所属阵营']||'')+'）这条记录？')) return;
     deepseaSelRows.delete(r);
     state.rankings.splice(idx, 1);
-    saveRankings(); renderRankings(); renderChampionship(); populateCalcAlliance();
+    saveRankings(); renderRankings();  populateCalcAlliance();
     toast('🗑 已删除 1 条记录');
 }
 // 排序切换：总战力(默认) / 人均战力 / 总排名
@@ -686,7 +666,7 @@ async function importRankingsFile(event){
         saveRankings();
         refreshVersionSelect();
         renderRankings();
-        renderChampionship();
+        
         toast(`✅ 已导入 ${rankings.length} 条（时间点：${state.versionId}）`);
     }catch(e){toast('导入失败：'+e.message)}
     event.target.value = '';
@@ -704,7 +684,7 @@ async function importRankingsFromDisk(record){
                 saveRankings();
                 refreshVersionSelect();
                 renderRankings();
-                renderChampionship();
+                
                 toast(`✅ 从 dataDir 导入 ${rankings.length} 条（时间点：${state.versionId}）`);
                 return;
             }
@@ -832,7 +812,7 @@ async function importRankingsXlsx(event){
             }catch(e){ toast('已导入(本地)，但写数据盘失败：'+e.message); }
         }
         renderRankings();
-        renderChampionship();
+        
         toast(`✅ 已从 xlsx 导入 ${list.length} 条（${totalName}）`);
     }catch(e){ toast('xlsx 导入失败：'+e.message); }
     event.target.value='';
@@ -1036,7 +1016,7 @@ function deepseaParseAndImport(){
         state.rankings=state.rankings.concat(rows);
     }
     saveRankings();
-    renderRankings(); renderChampionship(); populateCalcAlliance();
+    renderRankings();  populateCalcAlliance();
     toast('✅ 已从 OCR 导入 '+rows.length+' 条（'+(fac?('势力：'+fac):'未识别势力')+'，共 '+state.rankings.length+' 条）');
 }
 // 从 OCR 纯文本解析排行。两种格式都兼容（自动判断用哪种）：
@@ -1386,39 +1366,6 @@ function factionList(f){
         .sort((a,b)=> getPerCap(b)-getPerCap(a));
 }
 
-// ---------- 夺冠预测 ----------
-function renderChampionship(){
-    const box = document.getElementById('championBox');
-    if(!box) return;
-    if(!state.rankings.length){ box.innerHTML='<div class="empty">请先导入排行（📥 导入 xlsx / 📂 从 dataDir 加载）</div>'; return; }
-    let html='';
-    FACTIONS.forEach(f=>{
-        const list = factionList(f);
-        if(!list.length) return;
-        const totalPer = list.reduce((s,r)=>s+getPerCap(r),0) || 1;
-        const color = FACTION_COLOR[f]||'#4dd0e1';
-        html += `<div class="champ-fac" style="--fac:${color}">
-            <div class="champ-fac-h">${factionEmoji(f)} ${esc(f)} <span class="champ-top">🏅 推荐 ${esc(list[0]['联盟名称'])}</span></div>`;
-        list.slice(0,10).forEach((r,i)=>{
-            const per = getPerCap(r);
-            const prob = Math.round(per/totalPer*1000)/10;
-            const w = Math.max(2, Math.round(per/totalPer*100));
-            const medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':('#'+(i+1));
-            html += `<div class="champ-row">
-                <span class="champ-rk">${medal}</span>
-                <span class="champ-nm" title="${esc(r['联盟名称'])}">${esc(r['联盟名称'])}</span>
-                <span class="champ-nm2" title="${esc(r['会长']||'')}">👑${esc(r['会长']||'-')}</span>
-                <div class="champ-bar"><div class="fill" style="width:${w}%;background:${color}"></div><i>${prob}%</i></div>
-            </div>`;
-        });
-        if(list.length>10) html += `<div style="font-size:0.7rem;color:rgba(255,255,255,0.4);text-align:right;margin-top:2px;">… 仅显示前10 / 共 ${list.length} 个</div>`;
-        html += '</div>';
-    });
-    box.innerHTML = html;
-}
-
-
-
 // ---------- 赛季快照（自动记前5 · 按日期） ----------
 function loadSnap(){ try{const t=dsGet('deepsea_season_snapshot');return t?JSON.parse(t):{}}catch(e){return{}} }
 function saveSnapMap(m){dsSet('deepsea_season_snapshot',JSON.stringify(m))}
@@ -1648,7 +1595,7 @@ window.addEventListener('load', ()=>{
     renderRankings();
     populateCalcAlliance();
     const cd=document.getElementById('calcDays'); if(cd) cd.value=state.seasonDays;
-    renderChampionship();
+    
     refreshSnapSelect();
     renderSnapshot();
     renderTrend();
