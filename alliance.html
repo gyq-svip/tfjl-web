@@ -42,6 +42,10 @@
   .info { font-size:0.82rem; color:#cfe0ff; line-height:1.7; }
   .info b { color:var(--gold); }
   .hint { font-size:0.72rem; color:rgba(255,255,255,0.45); margin-top:6px; }
+  /* 登录/注册：居中悬浮模态（与登录APP一致） */
+  .auth-overlay { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.62); z-index:1000; padding:14px; }
+  .auth-card { width:min(380px,94vw); max-height:90vh; overflow:auto; padding:20px; box-shadow:0 20px 60px rgba(0,0,0,0.55); border:1px solid rgba(255,255,255,0.16); }
+  .auth-card label { margin:8px 0 4px; }
 </style>
 </head>
 <body>
@@ -52,8 +56,9 @@
     <button id="logoutBtn" style="display:none;" onclick="doLogout()">退出</button>
   </div>
 
-  <!-- 登录/注册 -->
-  <div class="card" id="authCard">
+  <!-- 登录/注册（居中悬浮模态） -->
+  <div class="auth-overlay" id="authOverlay">
+  <div class="card auth-card" id="authCard">
     <div class="tabs">
       <div class="tab active" id="tabLogin" onclick="switchTab('login')">登录</div>
       <div class="tab" id="tabReg" onclick="switchTab('reg')">注册</div>
@@ -93,6 +98,7 @@
       </div>
       <div class="msg" id="regMsg"></div>
     </div>
+  </div>
   </div>
 
   <!-- 主界面 -->
@@ -203,7 +209,7 @@ async function onRegister(){
 
 // ---------- 主界面 ----------
 function enterMain(){
-  $('authCard').style.display='none';
+  $('authOverlay').style.display='none';
   $('mainCard').style.display='block';
   $('logoutBtn').style.display='inline-block';
   $('iAlName').textContent = session.allianceName||'-';
@@ -311,7 +317,7 @@ async function renderHistory(){
   if(session && session.gistId){
     enterMain();
   } else {
-    $('authCard').style.display='block';
+    $('authOverlay').style.display='flex';
   }
 })();
 </script>
