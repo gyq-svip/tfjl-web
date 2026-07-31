@@ -216,7 +216,7 @@ tr.rk-weak:hover td{opacity:1}
                     <option value="兽人部落">兽人部落</option>
                     <option value="HE">HE</option>
                 </select>
-                <button class="ghost small" onclick="document.getElementById('deepseaOcrFile').click()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);padding:3px 8px;border-radius:6px;font-size:0.74rem;">📷 OCR 识别截图（可多选 4 张势力图）</button>
+                <button class="ghost small" onclick="document.getElementById('deepseaOcrFile').click()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);padding:3px 8px;border-radius:6px;font-size:0.74rem;">📷 OCR 识别截图（可多选 / 也可 Ctrl+V 粘贴）</button>
                 <input type="file" id="deepseaOcrFile" accept="image/*" multiple style="display:none" onchange="deepseaOcrFileChanged(event)">
                 <span id="deepseaOcrStatus" style="font-size:0.72rem;color:rgba(255,255,255,0.6);"></span>
             </div>
@@ -639,6 +639,20 @@ async function deepseaOcrFileChanged(e){
     e.target.value='';
     if(files.length) await deepseaRunOcr(files);
 }
+// 支持 Ctrl+V 直接粘贴截图走 OCR（与选文件等效：自动切片后送本机 Umi-OCR）。
+// 仅当剪贴板含图片时拦截；粘贴纯文字（如把 OCR 原文贴进文本框）不拦截，正常输入。
+document.addEventListener('paste', (e)=>{
+    const cd = e.clipboardData || (e.originalEvent && e.originalEvent.clipboardData);
+    if(!cd || !cd.items) return;
+    const files=[];
+    for(const it of cd.items){
+        if(it.kind==='file' && it.type && it.type.indexOf('image/')===0){
+            const f=it.getAsFile();
+            if(f) files.push(new File([f], 'pasted-'+Date.now()+'.png', {type: f.type||'image/png'}));
+        }
+    }
+    if(files.length){ e.preventDefault(); deepseaRunOcr(files); }
+});
 document.addEventListener('paste', async (e)=>{
     const panel = document.getElementById('deepseaOcrPanel');
     if(!panel || panel.classList.contains('hidden')) return;
