@@ -260,6 +260,12 @@ tr.rk-weak:hover td{opacity:1}
             <button class="ghost small sort-btn" id="sortPerBtn" onclick="setRankSort('percap')">人均战力排名</button>
             <button class="ghost small sort-btn" id="sortTotalBtn" onclick="setRankSort('total')">总排名</button>
         </div>
+        <div id="rankBulkBar" class="hidden" style="display:flex;align-items:center;gap:12px;margin:8px 0;">
+            <label style="font-size:0.78rem;cursor:pointer;user-select:none;display:inline-flex;align-items:center;gap:4px;">
+                <input type="checkbox" id="rankSelAll" onchange="deepseaToggleSelAll(this)"> 全选本页
+            </label>
+            <button class="ghost small" onclick="deepseaDeleteSelected()" style="background:rgba(255,107,107,0.18);border:1px solid rgba(255,107,107,0.4);font-size:0.72rem;">🗑 删除选中（<span id="rankSelCount">0</span>）</button>
+        </div>
         <div id="rankingGrid" class="scroll-y"></div>
     </div>
 
@@ -481,6 +487,7 @@ function renderRankings(){
     }
     if(!data.length){
         grid.innerHTML = '<div class="empty">未导入排行数据<br>点上方"⚙️ 数据管理 / 导入"选 xlsx 或 JSON</div>';
+        const bar=document.getElementById('rankBulkBar'); if(bar) bar.classList.add('hidden');
         return;
     }
     // 按当前排序方式重排（默认总战力排名）
@@ -492,6 +499,7 @@ function renderRankings(){
         data.sort((a,b)=>parsePower(b['联盟战力'])-parsePower(a['联盟战力']));
     }
     let html = '<table class="rank-table"><thead><tr>'
+        + '<th style="width:34px;">选择</th>'
         + '<th>排名</th><th>联盟</th><th>会长</th><th>人数</th><th>联盟战力</th><th>人均战力</th><th>人均阵营排名</th><th>阵营内名次</th><th>估算氪金</th><th>满员率</th><th>操作</th>'
         + '</tr></thead><tbody>';
     html += data.map((r,i)=>{
@@ -508,6 +516,7 @@ function renderRankings(){
         const frColor=fr?(fr.pct>=95?'#2ecc71':fr.pct>=80?'#f1c40f':'#e67e22'):'#888';
         const ir=factionInnerRank(r);
         return `<tr class="${rowCls}">
+            <td style="text-align:center"><input type="checkbox" class="rk-sel" data-ri="${ri}" ${deepseaSelRows.has(r)?'checked':''} onchange="deepseaRowToggle(this)"></td>
             <td>${medal}${i+1}</td>
             <td><b>${esc(r['联盟名称']??'-')}</b>${tag}</td>
             <td>${esc(r['会长']??'-')}</td>
@@ -523,9 +532,48 @@ function renderRankings(){
     }).join('');
     html += '</tbody></table>';
     grid.innerHTML = html;
+    const bar=document.getElementById('rankBulkBar'); if(bar) bar.classList.remove('hidden');
+    updateRankSelUI();
+    deepseaSyncSelAll();
 }
 // ===================== 单条记录的增删改（权限：仅管理员，见 deepseaCanImport） =====================
 let _editRowIdx = -1;
+// 批量选择：存行对象引用（排序/重渲染后仍稳定），删除按引用过滤
+let deepseaSelRows = new Set();
+function deepseaRowToggle(ch){
+    const r = state.rankings[+ch.dataset.ri];
+    if(!r) return;
+    if(ch.checked) deepseaSelRows.add(r); else deepseaSelRows.delete(r);
+    updateRankSelUI(); deepseaSyncSelAll();
+}
+function deepseaToggleSelAll(cb){
+    const grid=document.getElementById('rankingGrid');
+    const boxes=grid?grid.querySelectorAll('.rk-sel'):[];
+    boxes.forEach(ch=>{ const r=state.rankings[+ch.dataset.ri]; if(!r) return; if(cb.checked) deepseaSelRows.add(r); else deepseaSelRows.delete(r); });
+    boxes.forEach(ch=>{ const r=state.rankings[+ch.dataset.ri]; if(r) ch.checked = deepseaSelRows.has(r); });
+    updateRankSelUI(); deepseaSyncSelAll();
+}
+function updateRankSelUI(){
+    const c=document.getElementById('rankSelCount'); if(c) c.textContent=deepseaSelRows.size;
+}
+function deepseaSyncSelAll(){
+    const cb=document.getElementById('rankSelAll'); if(!cb) return;
+    const grid=document.getElementById('rankingGrid');
+    const boxes=grid?grid.querySelectorAll('.rk-sel'):[];
+    if(!boxes.length){ cb.checked=false; cb.indeterminate=false; return; }
+    let n=0; boxes.forEach(ch=>{ const r=state.rankings[+ch.dataset.ri]; if(r && deepseaSelRows.has(r)) n++; });
+    cb.checked = (n===boxes.length);
+    cb.indeterminate = (n>0 && n<boxes.length);
+}
+function deepseaDeleteSelected(){
+    if(!deepseaSelRows.size){ toast('未选择任何记录'); return; }
+    const n=deepseaSelRows.size;
+    if(!confirm('确认删除选中的 '+n+' 条记录？此操作不可撤销')) return;
+    state.rankings = state.rankings.filter(r=>!deepseaSelRows.has(r));
+    deepseaSelRows.clear();
+    saveRankings(); renderRankings(); renderChampionship(); populateCalcAlliance();
+    toast('🗑 已删除 '+n+' 条记录');
+}
 function addRankRow(){
     if(!deepseaCanImport()){ toast('⛔ 仅管理员可新增数据'); return; }
     _editRowIdx = -1;
@@ -584,6 +632,7 @@ function deleteRankRow(idx){
     if(idx<0 || idx>=state.rankings.length) return;
     const r = state.rankings[idx];
     if(!confirm('确认删除【'+(r['联盟名称']||'未命名')+'】（'+(r['所属阵营']||'')+'）这条记录？')) return;
+    deepseaSelRows.delete(r);
     state.rankings.splice(idx, 1);
     saveRankings(); renderRankings(); renderChampionship(); populateCalcAlliance();
     toast('🗑 已删除 1 条记录');
