@@ -264,6 +264,19 @@ tr.rk-weak:hover td{opacity:1}
         <div id="rankingGrid" class="scroll-y"></div>
     </div>
 
+    <!-- 板块C：势力统计共享 Gist（所有人可见） -->
+    <div class="card">
+        <h3>🌐 势力统计共享 <span class="badge" id="shareBadge">未同步</span></h3>
+        <div class="row" style="margin-bottom:8px;font-size:0.74rem;color:rgba(255,255,255,0.7);">
+            把当前势力统计上传到 GitHub Gist，<b>所有人打开本页都能看到同一份数据</b>。仅管理员可上传；普通用户每次打开自动从 Gist 载入。
+        </div>
+        <div class="row" style="margin-bottom:8px;">
+            <button onclick="dsPushToGist()">⬆️ 上传到 Gist（共享）</button>
+            <button class="ghost small" onclick="dsPullFromGist(true)">🔄 从 Gist 强制刷新</button>
+        </div>
+        <div id="shareStatus" style="font-size:0.74rem;color:rgba(255,255,255,0.55);"></div>
+    </div>
+
     <!-- 板块D：赛季快照（自动记前5 · 按日期） -->
     <div class="card">
         <h3>🏁 赛季快照 <span class="badge" id="snapBadge">共 0 个</span></h3>
@@ -336,6 +349,8 @@ tr.rk-weak:hover td{opacity:1}
         </div>
     </div>
 
+<script src="github-config.js"></script>
+<script src="gh-gist.js"></script>
 <script>
 // ===================== 存储辅助 =====================
 function dsGet(key){
@@ -1587,6 +1602,74 @@ function renderImportTrend(){
 // 立体数据库（导入历史）已移除：数据改按时间点版本保存/查看（见 #versionBar 与 deepseaVersions）
 
 // ===================== 初始化 =====================
+// ===================== 势力统计共享 Gist =====================
+const DEEPSEA_SHARE_KEY = 'TFJL_DeepseaShareGistId';
+let _deepseaShareGistId = (window.TFJL_DEEPSEA_GIST_ID)||'';
+function deepseaShareGistId(){
+    if(!_deepseaShareGistId) _deepseaShareGistId = localStorage.getItem(DEEPSEA_SHARE_KEY)||'';
+    return _deepseaShareGistId;
+}
+async function dsEnsureShareGist(){
+    let id = deepseaShareGistId();
+    if(id){ try{ await AllianceDB.ghGistGet(id); return id; }catch(e){ /* placeholder 无效，重建 */ } }
+    const g = await AllianceDB.ghGistCreate(
+        {'deepsea_rankings.json':{content: JSON.stringify({meta:{note:'init'}, rankings:[]}, null, 2)}},
+        'tfjl-deepsea-share', true);
+    _deepseaShareGistId = g.id;
+    localStorage.setItem(DEEPSEA_SHARE_KEY, g.id);
+    window.__DEEPSEA_SHARE_CREATED__ = g.id; // 供 UI 提示管理员写入配置，实现全用户共享
+    return g.id;
+}
+function dsShareMeta(){ try{ const s=dsGet('deepsea_share_meta'); return s?JSON.parse(s):null; }catch(e){ return null; } }
+function renderShareStatus(){
+    const el=document.getElementById('shareStatus'); const badge=document.getElementById('shareBadge');
+    if(!el) return;
+    const m=dsShareMeta();
+    if(window.__DEEPSEA_SHARE_CREATED__){
+        el.innerHTML = '<span style="color:#ffd27a;">⚠ 首次创建共享 Gist，管理员请把此 id 写入 github-config.js 的 TFJL_DEEPSEA_GIST_ID：'+window.__DEEPSEA_SHARE_CREATED__+'</span>';
+        if(badge){ badge.textContent='未同步'; }
+        return;
+    }
+    if(m && m.updatedAt){
+        el.innerHTML = '最近上传：<b style="color:#4dd0e1">'+(m.updatedBy||'?')+'</b> · '+(m.count||0)+' 条 · '+new Date(m.updatedAt).toLocaleString()+(m.versionLabel?(' · 版本：'+esc(m.versionLabel)):'');
+        if(badge){ badge.textContent='已同步'; badge.style.background='rgba(77,208,225,0.18)'; }
+    }else{
+        el.textContent='尚未上传过共享数据。';
+        if(badge){ badge.textContent='未同步'; }
+    }
+}
+async function dsPushToGist(){
+    if(!deepseaCanImport()){ toast('⛔ 仅管理员可上传共享'); return; }
+    if(!state.rankings.length){ toast('请先导入排行再上传'); return; }
+    toast('上传中…');
+    try{
+        const id = await dsEnsureShareGist();
+        const ver = deepseaVersions.find(v=>v.id===state.versionId);
+        const meta = { updatedAt:Date.now(), updatedBy:'管理员', versionLabel: ver?ver.label:state.versionId, count: state.rankings.length, factions:[...new Set(state.rankings.map(r=>r['所属阵营']).filter(Boolean))] };
+        const payload = JSON.stringify({ meta, rankings: state.rankings }, null, 2);
+        await AllianceDB.ghGistPatch(id, { 'deepsea_rankings.json':{ content: payload } });
+        dsSet('deepsea_share_meta', JSON.stringify(meta));
+        renderShareStatus();
+        toast('✅ 已上传共享（所有人可见）');
+    }catch(e){ toast('上传失败：'+(e.message||e)); }
+}
+async function dsPullFromGist(force){
+    const id = deepseaShareGistId();
+    if(!id){ if(force) toast('尚未设置共享 Gist（管理员先上传一次）'); return; }
+    // 本地已有数据时不自动覆盖，避免清掉本地编辑；强制刷新才覆盖
+    if(!force && state.rankings.length){ renderShareStatus(); return; }
+    try{
+        const c = await AllianceDB.ghGistFileContent(id, 'deepsea_rankings.json');
+        if(!c){ if(force) toast('Gist 为空'); return; }
+        const obj = JSON.parse(c);
+        state.rankings = obj.rankings||[];
+        saveRankings(); renderRankings(); populateCalcAlliance();
+        dsSet('deepsea_share_meta', JSON.stringify(obj.meta||{}));
+        renderShareStatus();
+        toast('🌐 已从共享 Gist 载入（'+(obj.meta&&obj.meta.updatedBy||'?')+' · '+(state.rankings.length)+' 条）');
+    }catch(e){ if(force) toast('从 Gist 载入失败：'+(e.message||e)); }
+}
+
 window.addEventListener('load', ()=>{
     applyDeepseaImportPermission();
     restoreDeepseaSliceMeta(); // 恢复本会话 OCR 的切片元数据，编辑记录时回显来源图
@@ -1594,6 +1677,8 @@ window.addEventListener('load', ()=>{
     if(!state.rankings.length){importRankingsFromDisk(false)}
     renderRankings();
     populateCalcAlliance();
+    dsPullFromGist(false);   // 本地无数据时自动从共享 Gist 载入（所有人可见）
+    renderShareStatus();
     const cd=document.getElementById('calcDays'); if(cd) cd.value=state.seasonDays;
     
     refreshSnapSelect();
