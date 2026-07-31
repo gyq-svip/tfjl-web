@@ -231,7 +231,15 @@ tr.rk-weak:hover td{opacity:1}
                 <div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;">
                     <button class="ghost small" onclick="deepseaParseAndImport()" style="background:rgba(77,182,172,0.18);border:1px solid rgba(77,182,172,0.4);padding:3px 8px;border-radius:6px;font-size:0.74rem;">解析并填入表格（尝试）</button>
                     <button class="ghost small" onclick="copyDeepseaOcrRaw()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);padding:3px 8px;border-radius:6px;font-size:0.74rem;">复制原文</button>
+                    <button class="ghost small" onclick="toggleDeepseaOcrCompare()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);padding:3px 8px;border-radius:6px;font-size:0.74rem;">🔍 切片对比</button>
                     <button class="ghost small" onclick="deepseaClearOcr()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);padding:3px 8px;border-radius:6px;font-size:0.74rem;">清空重来</button>
+                </div>
+                <div id="deepseaOcrCompare" class="hidden" style="margin-top:8px;border-top:1px dashed rgba(255,255,255,0.15);padding-top:8px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                        <span style="font-size:0.72rem;color:rgba(255,255,255,0.7);">🔍 切片↔识别对比（左图右文，逐块对照定位错位/错字）</span>
+                        <button class="ghost small" onclick="deepseaClearOcr()" style="background:rgba(255,107,107,0.18);border:1px solid rgba(255,107,107,0.4);padding:2px 6px;border-radius:6px;font-size:0.7rem;">🗑 清空对比</button>
+                    </div>
+                    <div id="deepseaOcrCompareList" style="display:grid;gap:10px;max-height:60vh;overflow:auto;"></div>
                 </div>
             </div>
             </div><!-- /deepseaImportZone -->
@@ -863,6 +871,7 @@ async function deepseaRunOcr(files){
             allSlices.push(...s);
         }
         totalSlice=allSlices.length;
+        deepseaSliceResults=[];
         for(let i=0;i<totalSlice;i++){
             if(status) status.textContent='识别中… (块 '+(i+1)+'/'+totalSlice+')';
             const j=await invoke('umi_ocr', { base64:allSlices[i], options:{ data:{format:'text', outputDirName:'', outputFileName:'', outputFileFormat:[]}, ocr:{language:'models/config_chinese.txt', cls:true} } });
@@ -874,8 +883,11 @@ async function deepseaRunOcr(files){
                 if(raw.value && !raw.value.endsWith('\n')) raw.value += '\n';
                 raw.value += text + '\n';
             }
+            deepseaSliceResults.push({ img:'data:image/png;base64,'+allSlices[i], text });
             doneSlice++;
         }
+        renderDeepseaOcrCompare();
+        const cmp=document.getElementById('deepseaOcrCompare'); if(cmp) cmp.classList.remove('hidden');
         doneImg=files.length;
         if(status){
             const totalLines = raw ? raw.value.split(/\r?\n/).filter(Boolean).length : 0;
@@ -988,6 +1000,36 @@ function copyDeepseaOcrRaw(){
 function deepseaClearOcr(){
     const raw=document.getElementById('deepseaOcrRaw'); if(raw) raw.value='';
     const status=document.getElementById('deepseaOcrStatus'); if(status) status.textContent='已清空，可重新选图';
+    deepseaSliceResults=[];
+    const c=document.getElementById('deepseaOcrCompare'); if(c) c.classList.add('hidden');
+    const list=document.getElementById('deepseaOcrCompareList'); if(list) list.innerHTML='';
+}
+// ===================== 切片↔识别对比视图（调试用：定位错位/错字） =====================
+let deepseaSliceResults=[]; // 每项 {img: dataURL, text: OCR文本}
+function dsEscapeHtml(s){ return (s||'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function toggleDeepseaOcrCompare(){
+    const c=document.getElementById('deepseaOcrCompare'); if(!c) return;
+    c.classList.toggle('hidden');
+    if(!c.classList.contains('hidden')) renderDeepseaOcrCompare();
+}
+function renderDeepseaOcrCompare(){
+    const list=document.getElementById('deepseaOcrCompareList'); if(!list) return;
+    if(!deepseaSliceResults.length){ list.innerHTML='<div style="font-size:0.72rem;color:rgba(255,255,255,0.5);">还没有切片结果，先 OCR 识别一张截图。</div>'; return; }
+    list.innerHTML = deepseaSliceResults.map((it,idx)=>{
+        const parsed = parseDeepseaOcrText(it.text||'');
+        const names = parsed.slice(0,6).map(r=>r['联盟名称']||'?').join('、');
+        const parsedTag = parsed.length ? ('✅ 解析出 '+parsed.length+' 条：'+names) : '⚠️ 未解析出联盟（可能切错/识错/表头不全）';
+        const FACTION_LIST=['暗月地精','人类联盟','天灾亡灵','兽人部落','HE'];
+        const foundFactions = FACTION_LIST.filter(f=>(it.text||'').includes(f));
+        const factionTag = foundFactions.length ? ('🏷 含势力：'+foundFactions.join('、')) : '🏷 不含势力名';
+        const txt = (it.text||'').trim() || '（空）';
+        return '<div style="display:flex;gap:10px;border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:8px;background:rgba(0,0,0,0.2);">'
+            + '<div style="flex:0 0 auto;"><div style="font-size:0.66rem;color:rgba(255,255,255,0.5);margin-bottom:4px;">块 #'+(idx+1)+'</div><img src="'+it.img+'" style="max-width:300px;max-height:200px;border:1px solid rgba(255,255,255,0.2);border-radius:4px;display:block;"></div>'
+            + '<div style="flex:1;min-width:0;"><pre style="white-space:pre-wrap;word-break:break-all;font-size:0.7rem;color:#cfe;margin:0 0 6px;max-height:200px;overflow:auto;background:rgba(0,0,0,0.3);padding:6px;border-radius:4px;">'+dsEscapeHtml(txt)+'</pre>'
+            + '<div style="font-size:0.68rem;color:'+(parsed.length?'#7CFC9B':'#ffb84d')+';">'+parsedTag+'</div>'
+            + '<div style="font-size:0.68rem;color:#9ad;margin-top:2px;">'+factionTag+'</div></div>'
+            + '</div>';
+    }).join('');
 }
 
 // ===================== 夺冠概率 / 赛季快照 =====================
