@@ -247,6 +247,12 @@ tr.rk-weak:hover td{opacity:1}
                 🔒 数据导入仅管理员可用。如需新增 / 修改深海数据，请联系管理员。
             </div>
         </div>
+        <div id="versionBar" class="row" style="margin:8px 0;align-items:center;gap:8px;flex-wrap:wrap;">
+            <span style="font-size:0.74rem;color:rgba(255,255,255,0.72);">📅 时间点</span>
+            <select id="versionSelect" onchange="selectVersion(this.value)" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:6px;padding:3px 6px;font-size:0.74rem;max-width:200px;"></select>
+            <input id="newVersionLabel" placeholder="如 8月1日" style="width:84px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:6px;padding:3px 6px;font-size:0.74rem;">
+            <button class="ghost small" onclick="createVersion()" style="background:rgba(77,182,172,0.18);border:1px solid rgba(77,182,172,0.4);font-size:0.74rem;">＋新建并选中</button>
+        </div>
         <div class="faction-bar" id="factionBar">
             <div class="faction-icon active" data-faction="总排名" onclick="switchFaction('总排名')"><span class="emo">📊</span>总排名</div>
             <div class="faction-icon" data-faction="暗月地精" onclick="switchFaction('暗月地精')"><span class="emo">🌙</span>暗月地精</div>
@@ -307,7 +313,7 @@ tr.rk-weak:hover td{opacity:1}
         <div class="trend-metric">
             数据源：
             <button class="ghost small sort-btn active" id="srcSnapBtn" onclick="setTrendSource('snapshot')">赛季快照</button>
-            <button class="ghost small sort-btn" id="srcImpBtn" onclick="setTrendSource('import')">导入记录</button>
+            <button class="ghost small sort-btn" id="srcImpBtn" onclick="setTrendSource('import')">按时间点</button>
             &nbsp;|&nbsp; 指标：
             <select id="trendMetricSel" onchange="setTrendMetric(this.value)" style="flex:0 1 110px;min-width:90px;">
                 <option value="联盟战力">联盟战力</option>
@@ -319,31 +325,7 @@ tr.rk-weak:hover td{opacity:1}
         </div>
         <div id="snapTrend"></div>
     </div>
-    <!-- 立体数据库：每次导入自动存为记录，可回看/对比 -->
-    <div class="card">
-        <h3>🗄️ 导入历史库 <span class="badge" id="importLogBadge">共 0 次</span></h3>
-        <div class="row" style="margin-bottom:8px;font-size:0.72rem;color:rgba(255,255,255,0.55);line-height:1.6;">
-            每次导入（xlsx / JSON / dataDir）自动存一条带时间戳的记录，形成可回看、可对比的<b style="color:#4dd0e1;">立体数据库</b>。点「📋 查看」看那次导入的完整排行，选 A/B 两次点「📊 对比」做差值对比。
-        </div>
-        <div id="importLogList" class="scroll-y" style="max-height:300px;margin-bottom:8px;"></div>
-        <div class="row" style="margin-bottom:4px;">
-            <label style="min-width:auto;">对比 A</label>
-            <select id="cmpA" style="flex:1 1 120px;min-width:90px;"></select>
-            <label style="min-width:auto;margin-left:6px;">对比 B</label>
-            <select id="cmpB" style="flex:1 1 120px;min-width:90px;"></select>
-            <button class="ghost small" onclick="compareImports()">📊 对比</button>
-        </div>
-    </div>
-    <!-- 查看/对比弹窗 -->
-    <div id="importModal" class="modal hidden" onclick="if(event.target===this)closeImportModal()">
-        <div class="modal-box">
-            <div class="row" style="justify-content:space-between;margin-bottom:10px;">
-                <h3 id="importModalTitle" style="margin:0;">查看导入</h3>
-                <button class="ghost small" onclick="closeImportModal()">✖ 关闭</button>
-            </div>
-            <div id="importModalBody" class="scroll-y" style="max-height:74vh;"></div>
-        </div>
-    </div>
+    <!-- 导入历史库已移除：改由顶部「时间点」选择器按时间保存 / 查看（见 #versionBar） -->
 </div>
     <!-- 编辑/新增单条记录弹窗 -->
     <div id="editRowModal" class="modal hidden" onclick="if(event.target===this)document.getElementById('editRowModal').classList.add('hidden')">
@@ -401,7 +383,8 @@ let state = {
 };
 state.rankSort = 'power';   // 'power' 总战力排名(默认) | 'percap' 人均战力排名 | 'total' 总排名
 state.trendChart = 'bar';  // 仅柱状图（已移除折线）
-state.trendSource = 'snapshot'; // 'snapshot' 赛季快照(前5) | 'import' 导入记录(全部)
+state.trendSource = 'snapshot'; // 'snapshot' 赛季快照(前5) | 'import' 按时间点版本
+state.versionId = null;     // 当前查看的时间点版本 id（= 月日标签，唯一）
 
 // ===== 数据导入权限（需求：仅管理员可导入，其他人只能看）=====
 // deepseaImportPublic=false：导入入口只对管理员开放；测试 ok 后改为 true 即对所有用户开放（并可显示在主页）
@@ -425,13 +408,57 @@ function applyDeepseaImportPermission() {
     if (lock) lock.style.display = can ? 'none' : '';
 }
 
-function loadAll(){
-    try{
-        const r = dsGet('deepsea_rankings');
-        state.rankings = r ? JSON.parse(r) : [];
-    }catch(e){console.warn('加载失败',e)}
+let deepseaVersions = [];   // 时间点版本库：[{id,label,createdAt,rows:[...]}]（id=月日标签，唯一）
+function fmtMonthDay(d){ return (d.getMonth()+1)+'月'+d.getDate()+'日'; }
+function loadVersions(){ try{ const t=dsGet('deepsea_versions'); deepseaVersions = t?JSON.parse(t):[]; }catch(e){ deepseaVersions=[]; } }
+// 确保存在当前时间点版本；不存在则用今天日期自动建一个（同名自增后缀保证唯一）
+function ensureVersion(){
+    if(state.versionId && deepseaVersions.some(v=>v.id===state.versionId)) return state.versionId;
+    const lbl=fmtMonthDay(new Date());
+    let id=lbl, n=2; while(deepseaVersions.some(v=>v.id===id)){ id=lbl+'('+n+')'; n++; }
+    const v={id,label:id,createdAt:Date.now(),rows:[]};
+    deepseaVersions.push(v); state.versionId=id; dsSet('deepsea_cur_version',id); refreshVersionSelect();
+    return id;
 }
-function saveRankings(){dsSet('deepsea_rankings', JSON.stringify(state.rankings))}
+function createVersion(){
+    const inp=document.getElementById('newVersionLabel');
+    let label=(inp?inp.value:'').trim() || fmtMonthDay(new Date());
+    let id=label, n=2; while(deepseaVersions.some(v=>v.id===id)){ id=label+'('+n+')'; n++; }
+    const v={id,label:id,createdAt:Date.now(),rows:[]};
+    deepseaVersions.push(v); state.versionId=id; dsSet('deepsea_cur_version',id);
+    state.rankings=v.rows;
+    saveRankings(); refreshVersionSelect();
+    renderRankings(); renderChampionship(); populateCalcAlliance();
+    toast('🆕 已新建时间点：'+id);
+}
+function selectVersion(id){
+    const v=deepseaVersions.find(x=>x.id===id); if(!v) return;
+    state.versionId=id; state.rankings=v.rows; dsSet('deepsea_cur_version',id);
+    renderRankings(); renderChampionship(); populateCalcAlliance();
+}
+function refreshVersionSelect(){
+    const sel=document.getElementById('versionSelect'); if(!sel) return;
+    sel.innerHTML = deepseaVersions.map(v=>`<option value="${esc(v.id)}">${esc(v.label)}${v.rows&&v.rows.length?' · '+v.rows.length+'条':''}</option>`).join('');
+    if(state.versionId) sel.value=state.versionId;
+}
+function loadAll(){
+    loadVersions();
+    if(!deepseaVersions.length){
+        // 迁移：旧 deepsea_rankings 整体包成一个版本，避免历史数据丢失
+        const old=dsGet('deepsea_rankings');
+        if(old){ try{ const arr=JSON.parse(old); if(Array.isArray(arr)&&arr.length){ const lbl='历史导入'; deepseaVersions=[{id:lbl,label:lbl,createdAt:Date.now(),rows:arr}]; dsSet('deepsea_versions',JSON.stringify(deepseaVersions)); dsSet('deepsea_cur_version',lbl); } }catch(e){} }
+    }
+    const cur=dsGet('deepsea_cur_version');
+    const v=(cur && deepseaVersions.find(x=>x.id===cur)) || deepseaVersions[deepseaVersions.length-1];
+    if(v){ state.versionId=v.id; state.rankings=v.rows; }
+    else { state.rankings=[]; }
+}
+function saveRankings(){
+    // 同步当前版本 + 兼容外部读取（deepsea_rankings 只存当前版本）
+    if(state.versionId){ const v=deepseaVersions.find(x=>x.id===state.versionId); if(v) v.rows=state.rankings; }
+    dsSet('deepsea_rankings', JSON.stringify(state.rankings));
+    dsSet('deepsea_versions', JSON.stringify(deepseaVersions));
+}
 
 // ===================== 排行 =====================
 function switchFaction(f){
@@ -654,12 +681,13 @@ async function importRankingsFile(event){
         if(Array.isArray(json)) rankings = json;
         else if(json.totalRanking) rankings = json.totalRanking;
         else {toast('JSON 格式不识别');return}
+        ensureVersion();
         state.rankings = rankings;
         saveRankings();
+        refreshVersionSelect();
         renderRankings();
         renderChampionship();
-        recordImport('JSON 文件', rankings);
-        toast(`✅ 已导入 ${rankings.length} 条`);
+        toast(`✅ 已导入 ${rankings.length} 条（时间点：${state.versionId}）`);
     }catch(e){toast('导入失败：'+e.message)}
     event.target.value = '';
 }
@@ -671,12 +699,13 @@ async function importRankingsFromDisk(record){
                 const txt = await invoke('read_text_file_auto', { filePath: 'D:\\withfriends\\塔防精灵助手数据\\data\\deepsea-rankings.json' });
                 const json = JSON.parse(txt);
                 let rankings = Array.isArray(json)?json:(json.totalRanking||[]);
+                ensureVersion();
                 state.rankings = rankings;
                 saveRankings();
+                refreshVersionSelect();
                 renderRankings();
                 renderChampionship();
-                if(record!==false) recordImport('dataDir', rankings);
-                toast(`✅ 从 dataDir 导入 ${rankings.length} 条`);
+                toast(`✅ 从 dataDir 导入 ${rankings.length} 条（时间点：${state.versionId}）`);
                 return;
             }
         }
@@ -790,9 +819,10 @@ async function importRankingsXlsx(event){
             });
         });
         if(!list.length){ toast('未解析到任何联盟数据'); return; }
+        ensureVersion();
         state.rankings = list;
         saveRankings();
-        recordImport('xlsx', list);
+        refreshVersionSelect();
         // Tauri：落盘到 dataDir，避免重启被启动读取覆盖
         if(window.writeTextFile){
             try{
@@ -975,6 +1005,7 @@ async function deepseaRunOcr(files){
 }
 function deepseaParseAndImport(){
     if(!deepseaCanImport()){ toast('⛔ 仅管理员可导入数据'); return; }
+    ensureVersion(); // 确保有当前时间点版本（无则按今天新建）
     const facSel=document.getElementById('deepseaOcrFaction');
     // 势力来源优先级：下拉框 > 用户在对比视图点选的当前高亮势力
     let fac=(facSel?facSel.value:'') || deepseaCurrentFaction;
@@ -1587,14 +1618,13 @@ function renderSnapTrend(){
     const step = state.trendMetric==='人均战力'?50 : (state.trendMetric==='估算花费'?100000:1000);
     wrap.innerHTML = drawTrendChart(series, ids, names, state.trendMetric, step);
 }
-// 来源2：导入记录（立体数据库，全量，按时间戳排序）
+// 来源2：按时间点版本（全量，按收集时间排序，X 轴即各时间点）
 function renderImportTrend(){
     const wrap=document.getElementById('snapTrend'); if(!wrap) return;
-    const log=loadImportLog();
-    if(!log.length){wrap.innerHTML='<div class="empty">立体数据库还没有导入记录。导入一次 xlsx/JSON 后，这里会按每次导入画出各联盟趋势（含「估算花费」）。</div>';return;}
-    const order=log.slice().sort((a,b)=>(a.time||a.date||'')>(b.time||b.date||'')?1:-1).map(x=>x.id);
+    if(!deepseaVersions.length){wrap.innerHTML='<div class="empty">还没有按时间点保存的版本。导入一次（或选 xlsx/JSON）后，这里会按各时间点画出各联盟战力趋势（含「估算花费」）。</div>';return;}
+    const order=deepseaVersions.slice().sort((a,b)=>a.createdAt-b.createdAt).map(v=>v.id);
     const f=state.trendFaction;
-    const rowsByOrder={}; log.forEach(rec=>{ rowsByOrder[rec.id]=rec.rankings.filter(r=>!r['所属阵营']||r['所属阵营']===f); });
+    const rowsByOrder={}; deepseaVersions.forEach(v=>{ rowsByOrder[v.id]=(v.rows||[]).filter(r=>!r['所属阵营']||r['所属阵营']===f); });
     let series=buildTrendSeries(rowsByOrder, order, state.trendMetric);
     let names=Object.keys(series);
     // 导入记录通常联盟很多，按最终值取前 15 条，避免图太挤
@@ -1602,102 +1632,12 @@ function renderImportTrend(){
         names.sort((a,b)=>(series[b][order[order.length-1]]||0)-(series[a][order[order.length-1]]||0));
         names=names.slice(0,15);
     }
-    if(!names.length){wrap.innerHTML='<div class="empty">该阵营在导入记录中暂无数据</div>';return;}
+    if(!names.length){wrap.innerHTML='<div class="empty">该阵营在各时间点暂无数据</div>';return;}
     const step = state.trendMetric==='人均战力'?50 : (state.trendMetric==='估算花费'?100000:1000);
     wrap.innerHTML = drawTrendChart(series, order, names, state.trendMetric, step);
 }
 
-// ===================== 立体数据库（导入历史） =====================
-function loadImportLog(){ try{const t=dsGet('deepsea_import_log');return t?JSON.parse(t):[]}catch(e){return[]} }
-function saveImportLog(a){ dsSet('deepsea_import_log', JSON.stringify(a)); }
-// 每次导入后调用；auto=true 表示启动自动导入（不入库，避免重复）
-function recordImport(source, rankings, auto){
-    if(auto) return;
-    if(!rankings || !rankings.length) return;
-    const log=loadImportLog();
-    const d=new Date();
-    const date=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-    const time=date+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
-    const sameDay=log.filter(x=>x.date===date).length+1;
-    const id=date+'-'+sameDay;
-    log.push({id,date,time,source,count:rankings.length,rankings});
-    saveImportLog(log);
-    renderImportLog();
-    toast('🗄 已存入导入库：'+id);
-}
-function renderImportLog(){
-    const log=loadImportLog();
-    const badge=document.getElementById('importLogBadge'); if(badge) badge.textContent='共 '+log.length+' 次';
-    const box=document.getElementById('importLogList'); if(!box) return;
-    if(!log.length){ box.innerHTML='<div class="empty">还没有导入记录。导入一次 xlsx/JSON 后，这里会自动累积。</div>'; }
-    else{
-        box.innerHTML=log.slice().reverse().map(r=>`
-            <div class="imp-row">
-                <div class="imp-meta"><b>${esc(r.id)}</b> · ${esc(r.source)} · ${r.count} 条${r.time?(' · '+esc(r.time)):''}</div>
-                <button class="ghost small" onclick="viewImport('${esc(r.id)}')">📋 查看</button>
-                <button class="ghost small" onclick="loadImportAsCurrent('${esc(r.id)}')">📥 载入当前</button>
-                <button class="ghost small" onclick="deleteImport('${esc(r.id)}')">🗑</button>
-            </div>`).join('');
-    }
-    const opt='<option value="">— 选择 —</option>'+log.slice().reverse().map(r=>`<option value="${esc(r.id)}">${esc(r.id)} · ${r.count}条</option>`).join('');
-    ['cmpA','cmpB'].forEach(id=>{const e=document.getElementById(id); if(e) e.innerHTML=opt;});
-}
-function viewImport(id){
-    const log=loadImportLog(); const rec=log.find(x=>x.id===id); if(!rec){toast('记录不存在');return;}
-    const rows=rec.rankings.slice().sort((a,b)=>(+a['排名']||0)-(+b['排名']||0));
-    let html='<p style="font-size:0.78rem;color:rgba(255,255,255,0.6);margin:0 0 8px;">📅 <b style="color:#4dd0e1">'+esc(rec.id)+'</b> · 来源 '+esc(rec.source)+' · 共 '+rec.count+' 个联盟</p>';
-    html+='<table class="rank-table"><thead><tr><th>排名</th><th>联盟</th><th>会长</th><th>人数</th><th>联盟战力</th><th>人均战力</th><th>估算氪金</th></tr></thead><tbody>';
-    html+=rows.map(r=>{
-        const pw=parsePower(r['联盟战力']); const per=getPerCap(r);
-        return `<tr><td>${esc(r['排名']||'-')}</td><td><b>${esc(r['联盟名称']??'-')}</b></td><td>${esc(r['会长']??'-')}</td><td>${esc(r['人数']??'-')}</td><td style="color:#ffd700;font-weight:700">${pw?pw.toLocaleString():'-'}</td><td>${per?per.toLocaleString():'-'}</td><td>${estimateKryptonCell(r)}</td></tr>`;
-    }).join('');
-    html+='</tbody></table>';
-    document.getElementById('importModalTitle').textContent='查看导入：'+rec.id;
-    document.getElementById('importModalBody').innerHTML=html;
-    document.getElementById('importModal').classList.remove('hidden');
-}
-function loadImportAsCurrent(id){
-    const log=loadImportLog(); const rec=log.find(x=>x.id===id); if(!rec){toast('记录不存在');return;}
-    state.rankings=rec.rankings; saveRankings();
-    renderRankings(); renderChampionship(); populateCalcAlliance();
-    toast('📥 已载入 '+id+' 为当前排行');
-}
-function deleteImport(id){
-    let log=loadImportLog(); log=log.filter(x=>x.id!==id); saveImportLog(log); renderImportLog();
-    toast('🗑 已删除 '+id);
-}
-function closeImportModal(){const m=document.getElementById('importModal'); if(m) m.classList.add('hidden');}
-// 对比两次导入：按联盟做差值（战力 / 人均 / 估算花费）
-function compareImports(){
-    const aId=document.getElementById('cmpA').value, bId=document.getElementById('cmpB').value;
-    const log=loadImportLog();
-    const A=log.find(x=>x.id===aId), B=log.find(x=>x.id===bId);
-    if(!A||!B){toast('请选择两次导入做对比');return;}
-    const map=r=>{const m2={}; r.rankings.forEach(x=>{m2[x['联盟名称']]=x;}); return m2;};
-    const ma=map(A), mb=map(B);
-    const names=[...new Set([...Object.keys(ma),...Object.keys(mb)])];
-    const rows=names.map(nm=>{
-        const ra=ma[nm], rb=mb[nm];
-        const pwA=ra?parsePower(ra['联盟战力']):null, pwB=rb?parsePower(rb['联盟战力']):null;
-        const dPw=(pwB!=null&&pwA!=null)?pwB-pwA:null;
-        const perA=ra?getPerCap(ra):null, perB=rb?getPerCap(rb):null;
-        const kA=ra?estimateKrypton(parsePower(ra['联盟战力']),actMembers(ra),state.seasonDays).minCost:null;
-        const kB=rb?estimateKrypton(parsePower(rb['联盟战力']),actMembers(rb),state.seasonDays).minCost:null;
-        return {nm,pwA,pwB,dPw,perA,perB,kA,kB};
-    }).sort((x,y)=>Math.abs(y.dPw||0)-Math.abs(x.dPw||0));
-    const fmt=v=>v==null?'<span style="color:#888">—</span>':v.toLocaleString();
-    const dCls=d=>d==null?'':(d>0?'cmp-up':(d<0?'cmp-down':''));
-    const dTxt=d=>d==null?'':(d>0?'+':'')+d.toLocaleString();
-    const kf=v=>v==null?'<span style="color:#888">—</span>':(v/10000).toFixed(1)+'万';
-    let html='<p style="font-size:0.78rem;color:rgba(255,255,255,0.6);margin:0 0 8px;">对比 <b style="color:#4dd0e1">'+esc(A.id)+'</b> → <b style="color:#ffd700">'+esc(B.id)+'</b>（按战力变化绝对值排序，绿=升 红=降）</p>';
-    html+='<table class="cmp-table"><thead><tr><th>联盟</th><th>A战力</th><th>B战力</th><th>Δ战力</th><th>A人均</th><th>B人均</th><th>A估算¥</th><th>B估算¥</th></tr></thead><tbody>';
-    html+=rows.map(r=>`
-        <tr><td>${esc(r.nm)}</td><td>${fmt(r.pwA)}</td><td>${fmt(r.pwB)}</td><td class="${dCls(r.dPw)}">${dTxt(r.dPw)}</td><td>${fmt(r.perA)}</td><td>${fmt(r.perB)}</td><td>${kf(r.kA)}</td><td>${kf(r.kB)}</td></tr>`).join('');
-    html+='</tbody></table>';
-    document.getElementById('importModalTitle').textContent='导入对比';
-    document.getElementById('importModalBody').innerHTML=html;
-    document.getElementById('importModal').classList.remove('hidden');
-}
+// 立体数据库（导入历史）已移除：数据改按时间点版本保存/查看（见 #versionBar 与 deepseaVersions）
 
 // ===================== 初始化 =====================
 window.addEventListener('load', ()=>{
@@ -1712,7 +1652,7 @@ window.addEventListener('load', ()=>{
     refreshSnapSelect();
     renderSnapshot();
     renderTrend();
-    renderImportLog();
+    refreshVersionSelect();
     const ms=document.getElementById('trendMetricSel'); if(ms) ms.value=state.trendMetric;
 });
 </script>
