@@ -12,6 +12,9 @@ window.TFJL_ALLIANCE_DB_GIST_ID = '';
 // 深海「势力统计」共享 Gist id（所有人可见）。留空则管理员首次上传时自动创建并提示。
 window.TFJL_DEEPSEA_GIST_ID = '';
 
+// 深海「个人排名战绩（图2）」共享 Gist id（所有人可见，含 OCR 切片校对）。留空则管理员首次上传时自动创建并提示。
+window.TFJL_DEEPSEA_PLAYER_GIST_ID = '';
+
 // 兜底：若页面未定义 getGistToken（独立打开 alliance.html 时 index.html 的函数不可用），
 // 这里提供一份一致的实现。优先用已存在的全局函数。
 if (typeof window.getGistToken !== 'function') {

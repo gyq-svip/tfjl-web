@@ -277,6 +277,51 @@ tr.rk-weak:hover td{opacity:1}
         <div id="shareStatus" style="font-size:0.74rem;color:rgba(255,255,255,0.55);"></div>
     </div>
 
+    <!-- 板块E：个人排名战绩（图2）+ OCR 切片校对 + 共享 Gist -->
+    <div class="card">
+        <h3>🏅 个人排名战绩 <span class="badge" id="playerShareBadge">未同步</span></h3>
+        <div class="row" style="margin-bottom:8px;font-size:0.74rem;color:rgba(255,255,255,0.7);">
+            各势力个人排名（排名 / 人名 / 联盟名 / 战绩），支持 <b>OCR 切片对照</b>人工校对，发布到共享 Gist <b>所有人可见</b>。仅管理员可上传。
+        </div>
+        <!-- 势力栏 -->
+        <div id="playerFactionBar" class="faction-bar" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;"></div>
+        <!-- OCR 导入区 -->
+        <div class="import-zone" style="border:1px dashed rgba(255,255,255,0.18);border-radius:10px;padding:12px;margin-bottom:10px;">
+            <div style="font-size:0.8rem;color:#ffd700;margin-bottom:8px;">📷 导入（OCR 切片校对）</div>
+            <div class="row" style="margin-bottom:8px;">
+                <input type="file" id="playerImgFiles" accept="image/*" multiple style="font-size:0.72rem;flex:1;min-width:160px;">
+                <select id="playerOcrFaction" style="font-size:0.72rem;padding:4px 6px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:#1a2235;color:#fff;">
+                    <option value="">势力（必选）</option>
+                    <option value="暗月地精">暗月地精</option>
+                    <option value="人类联盟">人类联盟</option>
+                    <option value="天灾亡灵">天灾亡灵</option>
+                    <option value="兽人部落">兽人部落</option>
+                    <option value="HE">HE</option>
+                </select>
+            </div>
+            <div class="row" style="margin-bottom:8px;">
+                <button onclick="playerRunOcrFromInput()">🔍 读取并切片</button>
+                <span style="font-size:0.68rem;color:rgba(255,255,255,0.5);align-self:center;">或粘贴原文↓</span>
+            </div>
+            <textarea id="playerOcrText" placeholder="也可直接粘贴 OCR 原文（每行一条：排名 人名 联盟名 战绩）" style="width:100%;height:60px;font-size:0.72rem;background:#10182a;color:#cfe;border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:6px;"></textarea>
+            <div class="row" style="margin-top:8px;">
+                <button onclick="playerParseAndImport()">✅ 解析并导入</button>
+                <button class="ghost small" onclick="playerClearImport()">清空</button>
+                <span id="playerImportStatus" style="font-size:0.72rem;color:rgba(255,255,255,0.6);align-self:center;"></span>
+            </div>
+        </div>
+        <!-- 切片对照（左图右文） -->
+        <div id="playerOcrCompare" class="ocr-compare" style="display:none;margin-bottom:10px;"></div>
+        <!-- 玩家表格 -->
+        <div id="playerTable"></div>
+        <!-- Gist 同步 -->
+        <div class="row" style="margin:10px 0 6px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+            <button onclick="playerPushToGist()">⬆️ 上传到 Gist（共享）</button>
+            <button class="ghost small" onclick="playerPullFromGist(true)">🔄 从 Gist 强制刷新</button>
+            <span id="playerShareStatus" style="font-size:0.72rem;color:rgba(255,255,255,0.55);"></span>
+        </div>
+    </div>
+
     <!-- 板块D：赛季快照（自动记前5 · 按日期） -->
     <div class="card">
         <h3>🏁 赛季快照 <span class="badge" id="snapBadge">共 0 个</span></h3>
@@ -349,6 +394,32 @@ tr.rk-weak:hover td{opacity:1}
         </div>
     </div>
 
+    <!-- 编辑/新增图2 个人排名战绩弹窗 -->
+    <div id="editPlayerModal" class="modal hidden" onclick="if(event.target===this)document.getElementById('editPlayerModal').classList.add('hidden')">
+        <div class="modal-box" style="width:min(420px,96vw);">
+            <div class="row" style="justify-content:space-between;margin-bottom:10px;">
+                <b style="color:#ffd700;">🏅 编辑个人排名战绩</b>
+                <button class="ghost small" onclick="document.getElementById('editPlayerModal').classList.add('hidden')">✖ 关闭</button>
+            </div>
+            <div id="editPlayerSlicePreview" class="hidden" style="border:1px dashed rgba(77,182,172,0.4);border-radius:8px;padding:8px;margin-bottom:10px;background:rgba(0,0,0,0.18);">
+                <div style="font-size:0.72rem;color:#7CFC9B;margin-bottom:6px;">📷 来源切片（OCR 原图，供人工校对——识别不准时对照填写）</div>
+                <img id="editPlayerSliceImg" style="max-width:100%;max-height:220px;border:1px solid rgba(255,255,255,0.2);border-radius:6px;display:block;">
+                <pre id="editPlayerSliceText" style="white-space:pre-wrap;word-break:break-all;font-size:0.68rem;color:#cfe;background:rgba(0,0,0,0.3);padding:6px;border-radius:4px;max-height:120px;overflow:auto;margin:6px 0 0;"></pre>
+            </div>
+            <div style="display:grid;gap:8px;">
+                <div class="row" style="margin-bottom:0;"><label style="min-width:84px;">排名</label><input id="editPlayerRank" type="number" style="flex:1"></div>
+                <div class="row" style="margin-bottom:0;"><label style="min-width:84px;">人名</label><input id="editPlayerName" style="flex:1"></div>
+                <div class="row" style="margin-bottom:0;"><label style="min-width:84px;">联盟名</label><input id="editPlayerAlliance" style="flex:1"></div>
+                <div class="row" style="margin-bottom:0;"><label style="min-width:84px;">战绩</label><input id="editPlayerRecord" style="flex:1" placeholder="积分/胜场等"></div>
+                <div class="row" style="margin-bottom:0;"><label style="min-width:84px;">所属阵营</label><input id="editPlayerFaction" style="flex:1" placeholder="暗月地精/人类联盟/..."></div>
+            </div>
+            <div class="row" style="justify-content:flex-end;margin-top:12px;margin-bottom:0;">
+                <button class="ghost small" onclick="document.getElementById('editPlayerModal').classList.add('hidden')">取消</button>
+                <button onclick="saveEditPlayer()">💾 保存</button>
+            </div>
+        </div>
+    </div>
+
 <script src="github-config.js"></script>
 <script src="gh-gist.js"></script>
 <script>
@@ -372,6 +443,7 @@ function toast(msg){const t=document.createElement('div');t.className='toast';t.
 // ===================== 数据层 =====================
 let state = {
     rankings: [],
+    players: [],          // 图2 个人排名战绩：{排名, 人名, 联盟名, 战绩, 所属阵营, _sliceKey?}
     curFaction: '总排名',
     trendFaction: '暗月地精',
     trendMetric: '联盟战力'   // 或 '人均战力'
@@ -1670,6 +1742,225 @@ async function dsPullFromGist(force){
     }catch(e){ if(force) toast('从 Gist 载入失败：'+(e.message||e)); }
 }
 
+// ===================== 图2 个人排名战绩（OCR 切片校对 + 共享 Gist）=====================
+let playerSliceResults = [];            // [{key, dataUrl, text}]
+let playerSliceMeta = {};               // key -> {dataUrl, text, faction}
+let playerRunCounter = 0;
+let playerCurrentFactionFilter = '总榜';
+let _editPlayerIdx = -1;
+const PLAYER_SHARE_KEY = 'TFJL_DeepseaPlayerShareGistId';
+let _playerShareGistId = (window.TFJL_DEEPSEA_PLAYER_GIST_ID)||'';
+
+function loadPlayers(){ try{ const s=dsGet('deepsea_player_rankings'); if(s) state.players=JSON.parse(s)||[]; }catch(e){ state.players=[]; } }
+function savePlayers(){ try{ dsSet('deepsea_player_rankings', JSON.stringify(state.players)); }catch(e){} }
+
+// ---------- OCR 切片校对 ----------
+function playerRunOcrFromInput(){
+    const files = Array.from(document.getElementById('playerImgFiles').files||[]);
+    if(!files.length){ toast('请先选图片'); return; }
+    playerRunOcr(files);
+}
+async function playerRunOcr(files){
+    if(!deepseaCanImport()){ toast('⛔ 仅管理员可导入'); return; }
+    const inv = deepseaGetInvoke();
+    if(!inv){ toast('OCR 需要桌面版（本机 Umi-OCR）'); return; }
+    toast('切片+OCR 中…');
+    playerRunCounter++; const myRun = playerRunCounter; playerSliceResults = [];
+    const faction = document.getElementById('playerOcrFaction').value;
+    for(const file of files){
+        let slices;
+        try{ slices = await deepseaSliceImage(file); }
+        catch(e){ toast('切片失败：'+(e.message||e)); continue; }
+        for(const sl of slices){
+            if(myRun!==playerRunCounter) return;
+            const b64 = sl.dataUrl.split(',')[1];
+            let txt='';
+            try{ const r = await inv('umi_ocr', { base64:b64 }); txt = (r&&r.ocr&&r.ocr.text)||(r&&r.text)||''; }
+            catch(e){ txt=''; }
+            const key = 'player_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
+            playerSliceMeta[key] = { dataUrl: sl.dataUrl, text: txt, faction };
+            playerSliceResults.push({ key, dataUrl: sl.dataUrl, text: txt });
+        }
+    }
+    renderPlayerOcrCompare();
+    document.getElementById('playerOcrText').value = playerSliceResults.map(s=>s.text).join('\n');
+    toast('✅ 切片完成，可逐块对照后点「解析并导入」');
+}
+function renderPlayerOcrCompare(){
+    const box = document.getElementById('playerOcrCompare');
+    if(!playerSliceResults.length){ box.style.display='none'; box.innerHTML=''; return; }
+    box.style.display='block';
+    box.innerHTML = '<div style="font-size:0.72rem;color:#7CFC9B;margin-bottom:6px;">🔍 切片↔识别对比（左图右文，逐块对照定位错位/错字）</div>'
+        + playerSliceResults.map(s=>'<div style="display:flex;gap:10px;border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:8px;margin-bottom:8px;">'
+            + '<div style="flex:1;min-width:0;"><img src="'+s.dataUrl+'" style="max-width:100%;max-height:260px;border-radius:6px;"></div>'
+            + '<pre style="flex:1;min-width:0;white-space:pre-wrap;word-break:break-all;font-size:0.68rem;color:#cfe;background:rgba(0,0,0,0.3);padding:6px;border-radius:4px;max-height:260px;overflow:auto;margin:0;">'+esc(s.text||'(空)')+'</pre>'
+            + '</div>').join('');
+}
+function playerClearImport(){
+    playerSliceResults=[]; playerRenderOcrCompareSafe();
+    document.getElementById('playerOcrText').value='';
+    document.getElementById('playerImportStatus').textContent='';
+    function playerRenderOcrCompareSafe(){ const b=document.getElementById('playerOcrCompare'); b.style.display='none'; b.innerHTML=''; }
+}
+
+// ---------- 解析 ----------
+function parsePlayerHeader(line){
+    const cols = line.split(/\s+/); const map={};
+    cols.forEach((c,i)=>{
+        if(/排名/.test(c)) map.rank=i;
+        else if(/(人名|玩家|昵称|名称)/.test(c)) map.name=i;
+        else if(/联盟/.test(c)) map.alliance=i;
+        else if(/(战绩|积分|胜场|战力|得分)/.test(c)) map.record=i;
+    });
+    return Object.keys(map).length>=3 ? map : null;
+}
+function parsePlayerLine(line, headerMap){
+    const m = line.match(/^(\d+)\b/); if(!m) return null;
+    const rank = parseInt(m[1],10);
+    const cols = line.split(/\s+/);
+    if(headerMap && headerMap.rank!=null){
+        const get=k=>(headerMap[k]!=null && cols[headerMap[k]]!=null)?cols[headerMap[k]]:'';
+        if(cols.length<3) return null;
+        return {排名:rank, 人名:get('name'), 联盟名:get('alliance'), 战绩:get('record')};
+    }
+    if(cols.length<4) return null;
+    return {排名:rank, 人名:cols[1]||'', 联盟名:cols[2]||'', 战绩:cols.slice(3).join(' ')};
+}
+function parseDeepseaPlayerOcrText(text, forceFaction){
+    const lines = (text||'').split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+    const out = []; let headerMap=null;
+    const facInText = (DEEPSEA_FACTION_LIST.find(f=>lines.some(l=>l.includes(f)))||'');
+    const faction = forceFaction || facInText || '';
+    for(const line of lines){
+        if(/排名/.test(line) && /(人名|玩家|昵称|名称)/.test(line) && /联盟/.test(line) && /(战绩|积分|胜场|战力|得分)/.test(line)){
+            headerMap = parsePlayerHeader(line); continue;
+        }
+        const rec = parsePlayerLine(line, headerMap);
+        if(rec) out.push(Object.assign({所属阵营: faction}, rec));
+    }
+    return out;
+}
+async function playerParseAndImport(){
+    if(!deepseaCanImport()){ toast('⛔ 仅管理员可导入'); return; }
+    const faction = document.getElementById('playerOcrFaction').value;
+    let all = [];
+    for(const s of playerSliceResults){ if(s.text) all = all.concat(parseDeepseaPlayerOcrText(s.text, faction)); }
+    const manual = document.getElementById('playerOcrText').value;
+    if(manual.trim()) all = all.concat(parseDeepseaPlayerOcrText(manual, faction));
+    if(!all.length){ document.getElementById('playerImportStatus').textContent='没有解析到记录'; return; }
+    const groups = {};
+    all.forEach(r=>{ const f=r.所属阵营||'未指定'; (groups[f]=groups[f]||[]).push(r); });
+    let added=0;
+    for(const f in groups){ state.players = state.players.filter(p=>p.所属阵营!==f); state.players = state.players.concat(groups[f]); added += groups[f].length; }
+    savePlayers(); renderPlayers(); renderPlayerFactionBar();
+    document.getElementById('playerImportStatus').textContent='已导入 '+added+' 条（'+(Object.keys(groups).join('/'))+'）';
+    toast('✅ 导入 '+added+' 条');
+}
+
+// ---------- 渲染 / 编辑 ----------
+const PLAYER_FACTION_EMO = {'暗月地精':'🌙','人类联盟':'⚔️','天灾亡灵':'💀','兽人部落':'👹','HE':'🌀'};
+function renderPlayerFactionBar(){
+    const bar = document.getElementById('playerFactionBar'); if(!bar) return;
+    const factions = ['总榜', ...DEEPSEA_FACTION_LIST];
+    bar.innerHTML = factions.map(f=>'<div class="faction-icon '+(playerCurrentFactionFilter===f?'active':'')+'" data-faction="'+f+'" onclick="playerSwitchFaction(\''+f+'\')"><span class="emo">'+(f==='总榜'?'🏆':(PLAYER_FACTION_EMO[f]||'🏅'))+'</span>'+f+'</div>').join('');
+}
+function playerSwitchFaction(f){ playerCurrentFactionFilter=f; renderPlayerFactionBar(); renderPlayers(); }
+function renderPlayers(){
+    const box = document.getElementById('playerTable'); if(!box) return;
+    let list = state.players.slice();
+    if(playerCurrentFactionFilter!=='总榜') list = list.filter(p=>p.所属阵营===playerCurrentFactionFilter);
+    list.sort((a,b)=>(parseInt(a.排名)||0)-(parseInt(b.排名)||0));
+    if(!list.length){ box.innerHTML = '<div style="font-size:0.74rem;color:rgba(255,255,255,0.5);padding:8px 0;">（暂无数据，管理员用上方导入 / 或从共享 Gist 载入）</div>'; return; }
+    box.innerHTML = '<div style="font-size:0.74rem;color:rgba(255,255,255,0.6);margin:6px 0;">共 '+list.length+' 条'+(playerCurrentFactionFilter!=='总榜'?('（'+esc(playerCurrentFactionFilter)+'）'):'')+'</div>'
+        + '<div style="display:grid;grid-template-columns:54px 1fr 1fr 1fr 56px;gap:4px;font-size:0.72rem;">'
+        + '<div style="color:#ffd700;font-weight:600;padding:4px;">排名</div><div style="color:#ffd700;font-weight:600;padding:4px;">人名</div><div style="color:#ffd700;font-weight:600;padding:4px;">联盟名</div><div style="color:#ffd700;font-weight:600;padding:4px;">战绩</div><div style="color:#ffd700;font-weight:600;padding:4px;">操作</div>'
+        + list.map(p=>{ const idx=state.players.indexOf(p); return '<div style="padding:4px;">'+esc(p.排名)+'</div><div style="padding:4px;">'+esc(p.人名)+'</div><div style="padding:4px;">'+esc(p.联盟名)+'</div><div style="padding:4px;">'+esc(p.战绩)+'</div><div style="padding:4px;"><button class="ghost small" onclick="editPlayerRow('+idx+')">✎</button></div>'; }).join('')
+        + '</div>';
+}
+function editPlayerRow(idx){
+    const p = state.players[idx]; if(!p) return;
+    _editPlayerIdx = idx;
+    document.getElementById('editPlayerRank').value = p.排名||'';
+    document.getElementById('editPlayerName').value = p.人名||'';
+    document.getElementById('editPlayerAlliance').value = p.联盟名||'';
+    document.getElementById('editPlayerRecord').value = p.战绩||'';
+    document.getElementById('editPlayerFaction').value = p.所属阵营||'';
+    const sp = document.getElementById('editPlayerSlicePreview');
+    if(p._sliceKey && playerSliceMeta[p._sliceKey]){
+        const sm = playerSliceMeta[p._sliceKey];
+        document.getElementById('editPlayerSliceImg').src = sm.dataUrl||'';
+        document.getElementById('editPlayerSliceText').textContent = sm.text||'';
+        sp.classList.remove('hidden');
+    } else { sp.classList.add('hidden'); }
+    document.getElementById('editPlayerModal').classList.remove('hidden');
+}
+function saveEditPlayer(){
+    if(_editPlayerIdx<0) return;
+    const p = state.players[_editPlayerIdx]; if(!p) return;
+    p.排名 = parseInt(document.getElementById('editPlayerRank').value,10)||p.排名;
+    p.人名 = document.getElementById('editPlayerName').value.trim();
+    p.联盟名 = document.getElementById('editPlayerAlliance').value.trim();
+    p.战绩 = document.getElementById('editPlayerRecord').value.trim();
+    p.所属阵营 = document.getElementById('editPlayerFaction').value.trim()||p.所属阵营;
+    savePlayers(); renderPlayers();
+    document.getElementById('editPlayerModal').classList.add('hidden');
+    toast('已保存');
+}
+
+// ---------- 共享 Gist ----------
+function playerShareGistId(){ if(!_playerShareGistId) _playerShareGistId = localStorage.getItem(PLAYER_SHARE_KEY)||''; return _playerShareGistId; }
+async function playerEnsureShareGist(){
+    let id = playerShareGistId();
+    if(id){ try{ await AllianceDB.ghGistGet(id); return id; }catch(e){} }
+    const g = await AllianceDB.ghGistCreate({'deepsea_player_rankings.json':{content: JSON.stringify({meta:{note:'init'}, players:[]}, null, 2)}}, 'tfjl-deepsea-player-share', true);
+    _playerShareGistId = g.id; localStorage.setItem(PLAYER_SHARE_KEY, g.id);
+    window.__DEEPSEA_PLAYER_SHARE_CREATED__ = g.id;
+    return g.id;
+}
+function playerShareMeta(){ try{ const s=dsGet('deepsea_player_share_meta'); return s?JSON.parse(s):null; }catch(e){ return null; } }
+function renderPlayerShareStatus(){
+    const el=document.getElementById('playerShareStatus'); const badge=document.getElementById('playerShareBadge');
+    if(!el) return;
+    const m=playerShareMeta();
+    if(window.__DEEPSEA_PLAYER_SHARE_CREATED__){
+        el.innerHTML = '<span style="color:#ffd27a;">⚠ 首次创建共享 Gist，管理员请把此 id 写入 github-config.js 的 TFJL_DEEPSEA_PLAYER_GIST_ID：'+window.__DEEPSEA_PLAYER_SHARE_CREATED__+'</span>';
+        if(badge){ badge.textContent='未同步'; } return;
+    }
+    if(m && m.updatedAt){
+        el.innerHTML = '最近上传：<b style="color:#4dd0e1">'+(m.updatedBy||'?')+'</b> · '+(m.count||0)+' 条 · '+new Date(m.updatedAt).toLocaleString();
+        if(badge){ badge.textContent='已同步'; badge.style.background='rgba(77,208,225,0.18)'; }
+    }else{ el.textContent='尚未上传过共享数据。'; if(badge){ badge.textContent='未同步'; } }
+}
+async function playerPushToGist(){
+    if(!deepseaCanImport()){ toast('⛔ 仅管理员可上传共享'); return; }
+    if(!state.players.length){ toast('请先导入数据再上传'); return; }
+    toast('上传中…');
+    try{
+        const id = await playerEnsureShareGist();
+        const m = { updatedAt:Date.now(), updatedBy:'管理员', count: state.players.length, factions:[...new Set(state.players.map(r=>r.所属阵营).filter(Boolean))] };
+        const payload = JSON.stringify({ meta:m, players: state.players }, null, 2);
+        await AllianceDB.ghGistPatch(id, { 'deepsea_player_rankings.json':{ content: payload } });
+        dsSet('deepsea_player_share_meta', JSON.stringify(m));
+        renderPlayerShareStatus();
+        toast('✅ 已上传共享（所有人可见）');
+    }catch(e){ toast('上传失败：'+(e.message||e)); }
+}
+async function playerPullFromGist(force){
+    const id = playerShareGistId();
+    if(!id){ if(force) toast('尚未设置共享 Gist（管理员先上传一次）'); return; }
+    if(!force && state.players.length){ renderPlayerShareStatus(); return; }
+    try{
+        const c = await AllianceDB.ghGistFileContent(id, 'deepsea_player_rankings.json');
+        if(!c){ if(force) toast('Gist 为空'); return; }
+        const obj = JSON.parse(c);
+        state.players = obj.players||[];
+        savePlayers(); renderPlayers(); renderPlayerFactionBar();
+        dsSet('deepsea_player_share_meta', JSON.stringify(obj.meta||{}));
+        renderPlayerShareStatus();
+        toast('🌐 已从共享 Gist 载入（'+(obj.meta&&obj.meta.updatedBy||'?')+' · '+(state.players.length)+' 条）');
+    }catch(e){ if(force) toast('从 Gist 载入失败：'+(e.message||e)); }
+}
+
 window.addEventListener('load', ()=>{
     applyDeepseaImportPermission();
     restoreDeepseaSliceMeta(); // 恢复本会话 OCR 的切片元数据，编辑记录时回显来源图
@@ -1679,6 +1970,9 @@ window.addEventListener('load', ()=>{
     populateCalcAlliance();
     dsPullFromGist(false);   // 本地无数据时自动从共享 Gist 载入（所有人可见）
     renderShareStatus();
+    loadPlayers(); renderPlayerFactionBar(); renderPlayers();
+    playerPullFromGist(false);   // 图2 个人排名战绩：本地为空时自动从共享 Gist 载入
+    renderPlayerShareStatus();
     const cd=document.getElementById('calcDays'); if(cd) cd.value=state.seasonDays;
     
     refreshSnapSelect();
