@@ -794,7 +794,7 @@ function parseDeepseaOcrText(text){
         let m;
         if((m=line.match(/^ID[:：]+(.+)$/))){
             const idv=(m[1].replace(/\D/g,'')||'');
-            if(pendingName!=null){ push({联盟名称:pendingName, 联盟ID:idv}); pendingName=null; }
+            if(pendingName!=null){ push({联盟名称:pendingName, 联盟ID:idv}); pendingName=null; pendingChair=null; }
             continue;
         }
         if((m=line.match(/^(\d+)级(联盟)?$/))){ pendingLv=m[1]; continue; }
@@ -805,7 +805,12 @@ function parseDeepseaOcrText(text){
             continue;
         }
         if(line==='会长' || line==='长'){ continue; }
+        // 会长名在前、人数(漏斜杠的纯数字，如 77178 实为 77/81)在后：补配对
+        if(pendingChair!=null && /^\d{3,5}$/.test(line)){ push({会长:pendingChair, 人数:line}); pendingChair=null; continue; }
         if(pendingNum!=null){ push({会长:line, 人数:pendingNum}); pendingNum=null; continue; }
+        // 其余当作新的联盟名/会长名候选；先丢弃未配对的等级(避免污染后续纯数字如 77178)，孤立纯数字不当中联盟名
+        if(/^\d+$/.test(line)){ pendingLv=null; continue; }
+        pendingLv=null; pendingNum=null;
         pendingName=line; pendingChair=line;
     }
     return rows;
