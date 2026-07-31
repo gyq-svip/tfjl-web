@@ -51,7 +51,7 @@
 <body>
 <div class="wrap">
   <div class="topbar">
-    <a href="index.html">← 首页</a>
+    <a href="index.html" onclick="if(window.parent&&window.parent!==window&&window.parent.closeSubpage){window.parent.closeSubpage();return false;}return true;">← 首页</a>
     <div class="title" id="pageTitle">🛡️ 盟战个人战绩</div>
     <button id="logoutBtn" style="display:none;" onclick="doLogout()">退出</button>
   </div>

@@ -18,12 +18,20 @@ window.TFJL_DEEPSEA_PLAYER_GIST_ID = '';
 // 兜底：若页面未定义 getGistToken（独立打开 alliance.html 时 index.html 的函数不可用），
 // 这里提供一份一致的实现。优先用已存在的全局函数。
 if (typeof window.getGistToken !== 'function') {
-    window.getGistToken = function () {
+    window.getGistToken = async function () {
         const HARDCODED_TOKEN = 'YOUR_GITHUB_TOKEN_HERE';
         if (HARDCODED_TOKEN && HARDCODED_TOKEN.length > 20 && HARDCODED_TOKEN.startsWith('ghp_')) {
             return HARDCODED_TOKEN;
         }
-        return localStorage.getItem('TFJL_Gist_Token') || '';
+        // 子页经 iframe 内嵌时，复用父窗口（index.html）运行时注入的真实 token（避免占位符空 token）
+        try {
+            if (window.parent && window.parent !== window && typeof window.parent.getGistToken === 'function') {
+                const pt = await window.parent.getGistToken();
+                if (pt && pt !== 'YOUR_GITHUB_TOKEN_HERE' && pt.length > 10) return pt;
+            }
+        } catch (e) {}
+        try { const ls = localStorage.getItem('TFJL_Gist_Token'); if (ls) return ls; } catch (e) {}
+        return '';
     };
 }
 
