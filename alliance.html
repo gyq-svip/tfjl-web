@@ -210,8 +210,11 @@ const SKEY = 'TFJL_AllianceSession';
 // 再退化父窗 getGistToken，最后直读 localStorage。保证"其他 gist 功能能读写"时联盟页也能拿到。
 function resolveToken(){
   let tk='';
-  try{ if(DB && typeof DB.ghToken==='function'){ tk=DB.ghToken(); if(tk) return tk; } }catch(e){ console.warn('[联盟][token] DB.ghToken 失败', e); }
+  // 优先取父窗口（index.html 主文档）注入的真实 token —— iframe 子页自身 window 没有 getGistToken，
+  // 它定义在父窗全局，子页独立文档拿不到（诊断按钮也专门用 window.parent.getGistToken 才成功）。
   try{ if(window.parent && typeof window.parent.getGistToken==='function'){ tk=window.parent.getGistToken(); if(tk) return tk; } }catch(e){ console.warn('[联盟][token] parent.getGistToken 失败', e); }
+  // 退化：本页 gh-gist.js 自带的 ghToken（内部也会回退 localStorage）
+  try{ if(DB && typeof DB.ghToken==='function'){ tk=DB.ghToken(); if(tk) return tk; } }catch(e){ console.warn('[联盟][token] DB.ghToken 失败', e); }
   try{ tk=localStorage.getItem('TFJL_Gist_Token')||''; if(tk) return tk; }catch(e){}
   return '';
 }
@@ -329,7 +332,7 @@ async function onLogin(){
   const u=$('loginUser').value.trim(), p=$('loginPwd').value;
   if(!u||!p){ setMsg('loginMsg','请填写账号和密码','err'); if(btn){btn.disabled=false;btn.textContent='登录';} return; }
   setMsg('loginMsg','正在查询联盟总表…');
-  console.log('[联盟] onLogin 开始:', { u, hasToken: !!(typeof window.getGistToken==='function' && window.getGistToken()) });
+  console.log('[联盟] onLogin 开始:', { u, hasToken: !!resolveToken() });
   allianceDebugEnv();
   try{
     session = await DB.loginAccount(u,p);
@@ -350,7 +353,7 @@ async function onRegister(){
   if(p.length<4){ setMsg('regMsg','密码至少4位','err'); if(btn){btn.disabled=false;btn.textContent='注册并绑定联盟';} return; }
   if(p!==p2){ setMsg('regMsg','两次密码不一致','err'); if(btn){btn.disabled=false;btn.textContent='注册并绑定联盟';} return; }
   setMsg('regMsg',''); setMsg('regStep','① 正在查询联盟总表（是否已存在该联盟号）…');
-  console.log('[联盟] onRegister 开始:', { u, alId, alName, hasToken: !!(typeof window.getGistToken==='function' && window.getGistToken()) });
+  console.log('[联盟] onRegister 开始:', { u, alId, alName, hasToken: !!resolveToken() });
   allianceDebugEnv();
   try{
     const al = await DB.registerAccount(u,p,alId,alName, (s)=>{
