@@ -487,14 +487,32 @@ function allianceDetectRowSlices(img, w, h){
     if(merged.length && (b.top-merged[merged.length-1].bottom-1)<=gapThresh) merged[merged.length-1].bottom=b.bottom;
     else merged.push({top:b.top,bottom:b.bottom});
   }
-  // 每个带精确切片：文字顶→底，上下各留 1px 安全边（不跨入相邻带文字，绝不切到字）
-  const segs=merged.map(m=>({ top:Math.max(0,m.top-1), bottom:Math.min(h,m.bottom+1) }));
-  // 量出行距与行间间距，供状态栏核对
-  let gapSum=0,gapN=0;
-  for(let k=1;k<merged.length;k++){ gapSum+=merged[k].top-merged[k-1].bottom; gapN++; }
-  allianceLastSliceInfo={ lineSpacing:med, gap: gapN?Math.round(gapSum/gapN):0, mergeGap:gapThresh, rows:merged.length };
-  console.log('[联盟][切片] 行距≈'+med+'px 间距≈'+(gapN?Math.round(gapSum/gapN):0)+'px mergeGap='+gapThresh+' 共切 '+merged.length+' 块', merged);
-  return segs.length>=2 ? segs : null;
+  // ⑥ 固定网格切片（用户方案：以第一行为锚点 + 固定行距循环，绝不累积漂移）
+  // 行距 = 合并后各人行的真实间距中位数；第一行 top = 锚点。每行位置 = 锚点 + k*行距（绝对定位，不依赖上一行）。
+  // 每个网格点就近吸附到实际文字带(窗口±0.45*行距)，避免个别行略高时切到字；吸附不到才用网格框(容缺行)。
+  const pitchArr=[];
+  for(let k=1;k<merged.length;k++) pitchArr.push(merged[k].top-merged[k-1].top);
+  pitchArr.sort((a,b)=>a-b);
+  const stride = pitchArr.length ? pitchArr[Math.floor(pitchArr.length/2)] : ((merged[0].bottom-merged[0].top) + (merged.length>1 ? merged[1].top-merged[0].bottom : 10));
+  const anchor = merged[0].top;
+  const used = new Array(merged.length).fill(false);
+  const segs=[]; let k=0;
+  while(true){
+    const gtop = anchor + k*stride;
+    if(gtop >= h-2) break;
+    let best=-1, bestd=1e9;
+    for(let i=0;i<merged.length;i++){ if(used[i]) continue; const d=Math.abs(merged[i].top-gtop); if(d<bestd){ bestd=d; best=i; } }
+    let top,bottom;
+    if(best>=0 && bestd <= stride*0.45){ used[best]=true; top=merged[best].top; bottom=merged[best].bottom; }
+    else { top=gtop; bottom=Math.min(h, gtop+stride); }
+    segs.push({ top:Math.max(0,top-1), bottom:Math.min(h,bottom+1) });
+    k++;
+    if(k>1000) break;
+  }
+  // 量出行距与行数，供状态栏核对
+  allianceLastSliceInfo={ lineSpacing:med, stride:stride, anchor:anchor, mergeGap:gapThresh, rows:segs.length };
+  console.log('[联盟][切片] 锚点='+anchor+' 行距(stride)='+stride+'px 共切 '+segs.length+' 块', segs);
+  return segs.length>=1 ? segs : null;
 }
 function allianceSliceImage(file, maxH){
   return new Promise((resolve,reject)=>{
@@ -573,7 +591,7 @@ async function allianceRunOcr(files){
   $('ocrRawBox').style.display='block';
   persistAllianceSlices();
   const totalLines=$('ocrRaw').value.split(/\r?\n/).filter(Boolean).length;
-  const sp=allianceLastSliceInfo?('｜行距≈'+allianceLastSliceInfo.lineSpacing+'px 行间间距≈'+allianceLastSliceInfo.gap+'px'):'';
+  const sp=allianceLastSliceInfo?('｜锚点='+allianceLastSliceInfo.anchor+' 行距≈'+allianceLastSliceInfo.stride+'px 共'+allianceLastSliceInfo.rows+'块'):'';
   if(status) status.textContent='已切 '+totalSlice+' 块（识别 '+files.length+' 张图），共 '+totalLines+' 行'+sp+'，逐块对照后点「解析并填入战绩表」';
 }
 function allianceRenderOcrCompare(){
