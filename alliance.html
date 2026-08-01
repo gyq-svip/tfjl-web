@@ -170,7 +170,36 @@
 <script src="github-config.js"></script>
 <script src="gh-gist.js"></script>
 <script>
-const DB = window.AllianceDB;
+// ==================== 联盟子页日志转发（Tauri 无法 F12，转发到首页浮窗"控制台日志"） ====================
+(function forwardIframeConsole(){
+  // 父页 index.html 已把全部 console 捕获进 window.__consoleLogs，并渲染到浮窗
+  // 子页是独立 document，自己的 console 不会进父页浮窗 → 这里把子页日志也转发过去，保证"所有操作日志都可见"
+  const tag = '[联盟]';
+  function pushToParent(level, args){
+    try{
+      if(window.parent && window.parent !== window && typeof window.parent.__consoleLogs !== 'undefined'){
+        const msg = Array.from(args).map(a => {
+          if(a instanceof Error) return a.stack || a.message;
+          if(typeof a === 'object') try { return JSON.stringify(a).slice(0, 300); } catch(e){ return String(a); }
+          return String(a);
+        }).join(' ');
+        window.parent.__consoleLogs.push({ time: new Date().toTimeString().slice(0,8), level, msg: tag + ' ' + msg });
+        if(typeof window.parent.refreshFloatConsole === 'function') window.parent.refreshFloatConsole();
+      }
+    }catch(e){ /* 转发失败不阻断业务 */ }
+  }
+  const orig = { log: console.log, warn: console.warn, error: console.error, info: console.info };
+  console.log = (...a) => { pushToParent('log', a); orig.log.apply(console, a); };
+  console.warn = (...a) => { pushToParent('warn', a); orig.warn.apply(console, a); };
+  console.error = (...a) => { pushToParent('error', a); orig.error.apply(console, a); };
+  console.info = (...a) => { pushToParent('info', a); orig.info.apply(console, a); };
+})();
+
+// DB 必须在父页（index.html 加载 gh-gist.js 后挂到父 window）拿，子页自己的 window.AllianceDB 永远是 undefined
+// 这是 v260801-74 后联盟"注册/登录点了完全没反应"的真正根因（子页拿不到父页全局）
+const DB = (window.parent && window.parent.AllianceDB) ? window.parent.AllianceDB
+          : (window.AllianceDB || null);
+if(!DB){ console.error('[联盟][致命] window.parent.AllianceDB 不存在！父页 gh-gist.js 可能未加载或抛错。请刷新首页后重试。'); }
 const SKEY = 'TFJL_AllianceSession';
 let session = null;
 let state = { date: todayStr(), rows: [], shot: '' };
@@ -195,9 +224,10 @@ function doLogout(){
 
 // ---------- 关闭 / 取消 ----------
 function closeAuth(){
-  try{ if(window.parent && typeof window.parent.closeSubpage==='function'){ window.parent.closeSubpage(); return; } }catch(e){}
+  console.log('[联盟][关闭] closeAuth 被调用');
+  try{ if(window.parent && typeof window.parent.closeSubpage==='function'){ window.parent.closeSubpage(); return; } }catch(e){ console.error('[联盟][关闭] 调父页 closeSubpage 失败', e); }
   try{ if(window.parent && window.parent!==window && window.parent.location){ window.parent.location.href='index.html'; return; } }catch(e){}
-  history.length>1 ? history.back() : ($('authOverlay').style.display='none');
+  try{ history.length>1 ? history.back() : ($('authOverlay').style.display='none'); }catch(e){}
 }
 
 // ---------- 登录 / 注册 ----------
@@ -215,7 +245,7 @@ function allianceErr(where, e){
 // 打印当前 token 状态与总表 gist id（定位"写总表失败"的关键线索）
 function allianceDebugEnv(){
   let tk = '';
-  try { tk = (typeof window.getGistToken==='function') ? window.getGistToken() : ''; } catch(e){}
+  try { tk = (typeof window.parent.getGistToken==='function') ? window.parent.getGistToken() : ''; } catch(e){}
   const masked = tk ? (tk.slice(0,4) + '…' + tk.slice(-4) + ' (len=' + tk.length + ')') : '(空/未配置)';
   console.log('[联盟][环境] token=', masked, '| 总表GIST_ID=', window.TFJL_MASTER_GIST_ID || '(未设置)');
   return { has: !!tk, masked };
@@ -225,7 +255,7 @@ async function allianceDiag(){
   const out = document.getElementById('regStep');
   const btn = document.getElementById('diagBtn');
   if(btn){ btn.disabled=true; btn.textContent='诊断中…'; }
-  const tk = (typeof window.getGistToken==='function') ? window.getGistToken() : '';
+  const tk = (typeof window.parent.getGistToken==='function') ? window.parent.getGistToken() : '';
   const MASTER = window.TFJL_MASTER_GIST_ID;
   if(!tk){ if(out){ out.style.color='#ffa500'; out.textContent='⚠️ 未检测到 token，请先配置 GitHub token'; } if(btn){btn.disabled=false;btn.textContent='🔍 诊断：我的 token 能否读写总表';} return; }
   if(!MASTER){ if(out){ out.style.color='#ffa500'; out.textContent='⚠️ 总表 GIST_ID 未配置'; } if(btn){btn.disabled=false;btn.textContent='🔍 诊断：我的 token 能否读写总表';} return; }
@@ -418,7 +448,7 @@ async function renderHistory(){
 (function init(){
   // 同步状态横幅：Token 由部署自动注入（与首页同源/同 iframe），无 token 则醒目告警
   try{
-    const tk = (typeof window.getGistToken==='function') ? window.getGistToken() : '';
+    const tk = (typeof window.parent.getGistToken==='function') ? window.parent.getGistToken() : '';
     const banner = $('tokenBanner');
     if(banner){
       if(tk && tk.length>10 && tk!=='YOUR_GITHUB_TOKEN_HERE'){
