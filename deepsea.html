@@ -989,15 +989,26 @@ function deepseaDetectRowSlices(img, w, h) {
     }
     if (start >= 0) bands.push({ top: start, bottom: h - 1 });
     if (bands.length < 2) return null;
-    // ⑤ 仅极小间隔(<6px，抗锯齿桥接)才合并，绝不跨人合并（避免"几个并一块"）
+    // ⑤ 自适应合并：对"带间间隔"直方图再做 Otsu，≤阈值的间隔=同一人(名字+联盟名等多行/细标)，>阈值才切到下一行。绝不跨人合并。
     const diffs = [];
     for (let k = 0; k < bands.length - 1; k++) { const d = bands[k + 1].top - bands[k].top; if (d >= 6) diffs.push(d); }
     diffs.sort((a, b) => a - b);
     const med = diffs.length ? diffs[Math.floor(diffs.length / 2)] : 24;
-    const mergeGap = Math.max(2, Math.min(6, Math.floor(med * 0.15)));
+    const gaps = [];
+    for (let k = 1; k < bands.length; k++) { let g = bands[k].top - bands[k - 1].bottom - 1; if (g < 1) g = 1; gaps.push(g); }
+    let gapThresh = 2;
+    if (gaps.length >= 2) {
+        let gm = 0; for (const g of gaps) if (g > gm) gm = g;
+        const bins = 128; const hist = new Int32Array(bins);
+        for (const g of gaps) { let bi = Math.floor(g / gm * (bins - 1)); if (bi < 0) bi = 0; else if (bi >= bins) bi = bins - 1; hist[bi]++; }
+        let sumAll = 0; for (let i = 0; i < bins; i++) sumAll += i * hist[i];
+        let sumB = 0, wB = 0, maxVar = -1, ti = 0;
+        for (let i = 0; i < bins; i++) { wB += hist[i]; if (wB === 0) continue; const wF = gaps.length - wB; if (wF === 0) break; sumB += i * hist[i]; const mB = sumB / wB; const mF = (sumAll - sumB) / wF; const between = wB * wF * (mB - mF) * (mB - mF); if (between > maxVar) { maxVar = between; ti = i; } }
+        gapThresh = Math.max(2, Math.floor(ti / (bins - 1) * gm));
+    }
     const merged = [];
     for (const b of bands) {
-        if (merged.length && (b.top - merged[merged.length - 1].bottom) <= mergeGap) merged[merged.length - 1].bottom = b.bottom;
+        if (merged.length && (b.top - merged[merged.length - 1].bottom - 1) <= gapThresh) merged[merged.length - 1].bottom = b.bottom;
         else merged.push({ top: b.top, bottom: b.bottom });
     }
     // 每个带精确切片：文字顶→底，上下各留 1px 安全边（不跨入相邻带文字，绝不切到字）
