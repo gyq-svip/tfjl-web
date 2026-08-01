@@ -46,6 +46,11 @@
   .auth-overlay { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.62); z-index:1000; padding:14px; }
   .auth-card { width:min(380px,94vw); max-height:90vh; overflow:auto; padding:20px; box-shadow:0 20px 60px rgba(0,0,0,0.55); border:1px solid rgba(255,255,255,0.16); }
   .auth-card label { margin:8px 0 4px; }
+  .auth-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+  .auth-head .title { font-size:1.05rem; font-weight:700; color:#fff; }
+  .auth-close { background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.14); color:#cfe0ff; border-radius:8px; width:32px; height:32px; font-size:1rem; cursor:pointer; }
+  .auth-close:hover { background:rgba(255,138,138,0.18); color:#ff8a8a; }
+  button:disabled { opacity:0.6; cursor:not-allowed; }
 </style>
 </head>
 <body>
@@ -59,6 +64,11 @@
   <!-- 登录/注册（居中悬浮模态） -->
   <div class="auth-overlay" id="authOverlay">
   <div class="card auth-card" id="authCard">
+    <div class="auth-head">
+      <div class="title">🛡️ 联盟个人战绩</div>
+      <button class="auth-close" title="关闭" onclick="closeAuth()">✕</button>
+    </div>
+    <div class="msg" id="tokenBanner" style="margin:4px 0 10px;"></div>
     <div class="tabs">
       <div class="tab active" id="tabLogin" onclick="switchTab('login')">登录</div>
       <div class="tab" id="tabReg" onclick="switchTab('reg')">注册</div>
@@ -70,7 +80,7 @@
       <label>密码</label>
       <input id="loginPwd" type="password" placeholder="密码" autocomplete="current-password">
       <div style="margin-top:14px;">
-        <button class="btn btn-primary" style="width:100%;" onclick="onLogin()">登录</button>
+        <button class="btn btn-primary" style="width:100%;" id="loginBtn" onclick="onLogin()">登录</button>
       </div>
       <div class="msg" id="loginMsg"></div>
     </div>
@@ -92,12 +102,12 @@
           <input id="regAlName" placeholder="如 战狼联盟">
         </div>
       </div>
-      <div class="hint">注册成功后，此账号自动绑定该联盟号（联盟号已存在则直接绑定）。</div>
+      <div class="hint">注册成功后，此账号自动绑定该联盟号（联盟号已存在则直接绑定，多人可共同编辑同一联盟）。</div>
       <div style="margin-top:14px;">
-        <button class="btn btn-primary" style="width:100%;" onclick="onRegister()">注册并绑定联盟</button>
+        <button class="btn btn-primary" style="width:100%;" id="regBtn" onclick="onRegister()">注册并绑定联盟</button>
       </div>
       <div class="msg" id="regMsg"></div>
-      <div class="hint" id="syncHint" style="margin-top:12px;padding-top:10px;border-top:1px dashed rgba(255,255,255,0.15);"></div>
+      <div class="msg" id="regStep" style="color:rgba(255,255,255,0.55);font-size:0.74rem;min-height:1em;"></div>
     </div>
   </div>
   </div>
@@ -180,15 +190,26 @@ function doLogout(){
   location.reload();
 }
 
+// ---------- 关闭 / 取消 ----------
+function closeAuth(){
+  try{ if(window.parent && typeof window.parent.closeSubpage==='function'){ window.parent.closeSubpage(); return; } }catch(e){}
+  try{ if(window.parent && window.parent!==window && window.parent.location){ window.parent.location.href='index.html'; return; } }catch(e){}
+  history.length>1 ? history.back() : ($('authOverlay').style.display='none');
+}
+
 // ---------- 登录 / 注册 ----------
 async function onLogin(){
   const u=$('loginUser').value.trim(), p=$('loginPwd').value;
   if(!u||!p){ setMsg('loginMsg','请填写账号和密码','err'); return; }
+  const btn=$('loginBtn'); if(btn) btn.disabled=true;
+  setMsg('loginMsg','正在查询联盟总表…');
   try{
     session = await DB.loginAccount(u,p);
     localStorage.setItem(SKEY, JSON.stringify(session));
+    setMsg('loginMsg','登录成功 ✓');
     enterMain();
   }catch(e){ setMsg('loginMsg', e.message||'登录失败','err'); }
+  finally{ if(btn) btn.disabled=false; }
 }
 
 async function onRegister(){
@@ -197,13 +218,19 @@ async function onRegister(){
   if(!u||!p||!alId){ setMsg('regMsg','账号/密码/联盟号必填','err'); return; }
   if(p.length<4){ setMsg('regMsg','密码至少4位','err'); return; }
   if(p!==p2){ setMsg('regMsg','两次密码不一致','err'); return; }
+  const btn=$('regBtn'); if(btn) btn.disabled=true;
+  setMsg('regMsg',''); setMsg('regStep','① 正在查询联盟总表（是否已存在该联盟号）…');
   try{
-    const al = await DB.registerAccount(u,p,alId,alName);
+    const al = await DB.registerAccount(u,p,alId,alName, (s)=>{
+      if(s==='creating') setMsg('regStep','② 联盟号不存在 → 正在新建联盟战绩库 Gist…');
+    });
+    setMsg('regStep','③ 已写入联盟总表 ✓');
     session = { username:u, allianceId:alId, allianceName:al.name||alName, gistId:al.gistId };
     localStorage.setItem(SKEY, JSON.stringify(session));
-    setMsg('regMsg','注册成功，战绩库已自动创建并加入联盟总库 ✓','ok');
+    setMsg('regMsg','注册成功，战绩库已自动创建并加入联盟总表 ✓','ok');
     enterMain();
-  }catch(e){ setMsg('regMsg', e.message||'注册失败','err'); }
+  }catch(e){ setMsg('regMsg', e.message||'注册失败','err'); setMsg('regStep',''); }
+  finally{ if(btn) btn.disabled=false; }
 }
 
 // ---------- 主界面 ----------
@@ -312,15 +339,18 @@ async function renderHistory(){
 
 // ---------- 启动 ----------
 (function init(){
-  // 同步状态提示：Token 由部署自动注入（与首页同源/同 iframe），无需手动填写
+  // 同步状态横幅：Token 由部署自动注入（与首页同源/同 iframe），无 token 则醒目告警
   try{
     const tk = (typeof window.getGistToken==='function') ? window.getGistToken() : '';
-    const hint = $('syncHint');
-    if(hint){
+    const banner = $('tokenBanner');
+    if(banner){
       if(tk && tk.length>10 && tk!=='YOUR_GITHUB_TOKEN_HERE'){
-        hint.textContent='✅ GitHub 同步已自动启用（Token 由部署注入），注册即自动建库。';
+        banner.textContent='✅ GitHub 同步已自动启用（Token 由部署注入），注册即自动建库。';
+        banner.className='msg ok';
       } else {
-        hint.textContent='⚠️ 未检测到同步 Token：请通过首页「联盟个人战绩统计」入口打开本页（勿直接双击文件）。';
+        banner.textContent='⚠️ 未检测到同步 Token：请通过首页「联盟个人战绩统计」入口打开本页（勿直接双击文件）。无 Token 时无法联网建库，按钮将不可用。';
+        banner.className='msg err';
+        ['loginBtn','regBtn'].forEach(id=>{ const b=$(id); if(b) b.disabled=true; });
       }
     }
   }catch(e){}

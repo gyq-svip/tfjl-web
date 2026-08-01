@@ -95,7 +95,8 @@
 
     // 注册：账号 + 密码 + 联盟号 + 联盟名，自动绑定
     // 乐观并发：循环「读最新总表→改→写回」，冲突/失败重试；首次文件不存在时 loadRegistry 返回空索引即自动建。
-    async function registerAccount(username, password, allianceId, allianceName) {
+    // onStep('creating') 在需要新建联盟 gist 时回调（供 UI 显示进度）。
+    async function registerAccount(username, password, allianceId, allianceName, onStep) {
         const passwordHash = await hashPassword(password);
         for (let attempt = 0; attempt < 3; attempt++) {
             const data = await loadRegistry();
@@ -103,14 +104,16 @@
             let al = data.alliances[allianceId];
             if (!al || !al.gistId) {
                 // 首次创建联盟 gist
+                if (typeof onStep === 'function') onStep('creating');
                 const ag = await ghGistCreate(
                     { 'readme.json': { content: '联盟战绩：' + (allianceName || allianceId) } },
                     'tfjl-alliance-' + (allianceName || allianceId), false);
-                al = { name: allianceName, gistId: ag.id, createdBy: username, createdAt: Date.now() };
+                al = { name: allianceName, gistId: ag.id, createdBy: username, members: [username], createdAt: Date.now() };
                 data.alliances[allianceId] = al;
             } else if (allianceName && !al.name) {
                 al.name = allianceName;
             }
+            if (al.members && !al.members.includes(username)) al.members.push(username);
             data.accounts[username] = { passwordHash, allianceId, allianceName, createdAt: Date.now() };
             try {
                 await saveRegistry(data);
