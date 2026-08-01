@@ -1,175 +1,4 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>盟战个人战绩 · 塔防精灵助手</title>
-<style>
-  :root { --gold:#ffd700; --bg:#0f1320; --card:rgba(255,255,255,0.06); }
-  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-  html,body { margin:0; padding:0; background:linear-gradient(160deg,#0b0f1a,#141a2e); color:#eaeefb; font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; min-height:100vh; }
-  .wrap { max-width:860px; margin:0 auto; padding:14px 12px 40px; }
-  .topbar { display:flex; align-items:center; gap:10px; margin-bottom:14px; }
-  .topbar a, .topbar button { font-size:0.8rem; color:#9fb3d9; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); border-radius:8px; padding:6px 10px; cursor:pointer; text-decoration:none; }
-  .topbar .title { font-size:1.05rem; font-weight:700; color:#fff; flex:1; }
-  .card { background:var(--card); border:1px solid rgba(255,255,255,0.1); border-radius:14px; padding:16px; margin-bottom:14px; }
-  h2 { margin:0 0 12px; font-size:1rem; color:var(--gold); display:flex; align-items:center; gap:8px; }
-  label { display:block; font-size:0.78rem; color:#9fb3d9; margin:10px 0 4px; }
-  input, select { width:100%; padding:10px 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.14); background:rgba(0,0,0,0.25); color:#fff; font-size:0.92rem; }
-  .row2 { display:flex; gap:10px; }
-  .row2 > div { flex:1; }
-  .btn { display:inline-block; padding:11px 16px; border-radius:10px; border:none; font-size:0.92rem; font-weight:600; cursor:pointer; }
-  .btn-primary { background:linear-gradient(135deg,#ffd700,#ff9d00); color:#241a00; }
-  .btn-ghost { background:rgba(255,255,255,0.08); color:#cfe0ff; border:1px solid rgba(255,255,255,0.14); }
-  .btn-sm { padding:6px 10px; font-size:0.78rem; }
-  .tabs { display:flex; gap:8px; margin-bottom:6px; }
-  .tab { flex:1; text-align:center; padding:9px; border-radius:10px; background:rgba(255,255,255,0.06); color:#9fb3d9; cursor:pointer; font-size:0.86rem; border:1px solid transparent; }
-  .tab.active { color:#fff; border-color:var(--gold); background:rgba(255,215,0,0.12); }
-  .msg { font-size:0.8rem; margin-top:8px; min-height:1em; }
-  .msg.err { color:#ff8a8a; }
-  .msg.ok { color:#8affb0; }
-  .msg.warn { color:#ffd27a; }
-  table { width:100%; border-collapse:collapse; margin-top:8px; }
-  th,td { padding:7px 5px; text-align:center; font-size:0.8rem; border-bottom:1px solid rgba(255,255,255,0.08); }
-  th { color:#9fb3d9; font-weight:600; }
-  td input { padding:7px 6px; font-size:0.84rem; text-align:center; }
-  .del { color:#ff8a8a; cursor:pointer; font-weight:700; }
-  .hist { display:flex; flex-wrap:wrap; gap:8px; margin-top:6px; }
-  .hist .d { padding:7px 11px; border-radius:9px; background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.12); cursor:pointer; font-size:0.82rem; }
-  .hist .d.cached { border-color:#4dd0e1; }
-  .verify-wrap { display:flex; gap:14px; flex-wrap:wrap; align-items:flex-start; }
-  .verify-img { max-width:280px; max-height:380px; border-radius:10px; border:1px solid rgba(255,255,255,0.15); }
-  .info { font-size:0.82rem; color:#cfe0ff; line-height:1.7; }
-  .info b { color:var(--gold); }
-  .hint { font-size:0.72rem; color:rgba(255,255,255,0.45); margin-top:6px; }
-  /* 登录/注册：居中悬浮模态（与登录APP一致） */
-  .auth-overlay { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.62); z-index:1000; padding:14px; }
-  .auth-card { width:min(380px,94vw); max-height:90vh; overflow:auto; padding:20px; box-shadow:0 20px 60px rgba(0,0,0,0.55); border:1px solid rgba(255,255,255,0.16); }
-  .auth-card label { margin:8px 0 4px; }
-  .auth-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
-  .auth-head .title { font-size:1.05rem; font-weight:700; color:#fff; }
-  .auth-close { background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.14); color:#cfe0ff; border-radius:8px; width:32px; height:32px; font-size:1rem; cursor:pointer; }
-  .auth-close:hover { background:rgba(255,138,138,0.18); color:#ff8a8a; }
-  button:disabled { opacity:0.6; cursor:not-allowed; }
-</style>
-</head>
-<body>
-<div class="wrap">
-  <div class="topbar">
-    <a href="index.html" onclick="if(window.parent&&window.parent!==window&&window.parent.closeSubpage){window.parent.closeSubpage();return false;}return true;">← 首页</a>
-    <div class="title" id="pageTitle">🛡️ 联盟个人战绩统计</div>
-    <button id="logoutBtn" style="display:none;" onclick="doLogout()">退出</button>
-  </div>
 
-  <!-- 登录/注册（居中悬浮模态） -->
-  <div class="auth-overlay" id="authOverlay">
-  <div class="card auth-card" id="authCard">
-    <div class="auth-head">
-      <div class="title">🛡️ 联盟个人战绩</div>
-      <button class="auth-close" title="关闭" onclick="closeAuth()">✕</button>
-    </div>
-    <div class="msg" id="tokenBanner" style="margin:4px 0 10px;"></div>
-    <div class="tabs">
-      <div class="tab active" id="tabLogin" onclick="switchTab('login')">登录</div>
-      <div class="tab" id="tabReg" onclick="switchTab('reg')">注册</div>
-    </div>
-
-    <div id="loginBox">
-      <label>账号</label>
-      <input id="loginUser" placeholder="注册时的账号" autocomplete="username">
-      <label>密码</label>
-      <input id="loginPwd" type="password" placeholder="密码" autocomplete="current-password">
-      <div style="margin-top:14px;">
-        <button class="btn btn-primary" style="width:100%;" id="loginBtn" onclick="onLogin()">登录</button>
-      </div>
-      <div class="msg" id="loginMsg"></div>
-    </div>
-
-    <div id="regBox" style="display:none;">
-      <label>账号</label>
-      <input id="regUser" placeholder="用于登录的账号" autocomplete="username">
-      <label>密码</label>
-      <input id="regPwd" type="password" placeholder="设置密码" autocomplete="new-password">
-      <label>确认密码</label>
-      <input id="regPwd2" type="password" placeholder="再次输入密码" autocomplete="new-password">
-      <div class="row2">
-        <div>
-          <label>联盟号</label>
-          <input id="regAlId" placeholder="如 A123">
-        </div>
-        <div>
-          <label>联盟名</label>
-          <input id="regAlName" placeholder="如 战狼联盟">
-        </div>
-      </div>
-      <div class="hint">注册成功后，此账号自动绑定该联盟号（联盟号已存在则直接绑定，多人可共同编辑同一联盟）。</div>
-      <div style="margin-top:14px;">
-        <button class="btn btn-primary" style="width:100%;" id="regBtn" onclick="onRegister()">注册并绑定联盟</button>
-      </div>
-      <div style="margin-top:8px;">
-        <button class="btn" style="width:100%;font-size:0.8rem;" id="diagBtn" onclick="allianceDiag()">🔍 诊断：我的 token 能否读写总表</button>
-      </div>
-      <div class="msg" id="regMsg"></div>
-      <div class="msg" id="regStep" style="color:rgba(255,255,255,0.55);font-size:0.74rem;min-height:1em;"></div>
-    </div>
-  </div>
-  </div>
-
-  <!-- 主界面 -->
-  <div id="mainCard" style="display:none;">
-    <div class="card">
-      <h2>📋 联盟信息</h2>
-      <div class="info">
-        联盟名：<b id="iAlName">-</b><br>
-        联盟号：<b id="iAlId">-</b><br>
-        当前账号：<b id="iUser">-</b>
-      </div>
-    </div>
-
-    <div class="card">
-      <h2>📅 选择日期（按周统计）</h2>
-      <div class="row2">
-        <div><input id="datePick" type="date"></div>
-        <div><button class="btn btn-ghost" style="width:100%;" onclick="onLoadDate()">载入 / 刷新</button></div>
-      </div>
-      <div class="msg" id="loadMsg"></div>
-    </div>
-
-    <div class="card">
-      <h2>📝 联盟个人战绩（排名 / 人名 / 奖杯数 / 最大连胜）</h2>
-      <div id="tblBox">
-        <table id="recTbl">
-          <thead><tr><th>排名</th><th>人名</th><th>奖杯数</th><th>最大连胜</th><th></th></tr></thead>
-          <tbody id="recBody"></tbody>
-        </table>
-      </div>
-      <div style="margin-top:10px;">
-        <button class="btn btn-ghost btn-sm" onclick="addRow()">+ 添加一行</button>
-        <button class="btn btn-primary" style="float:right;" onclick="onSave()">保存并上传 Gist</button>
-      </div>
-      <div class="msg" id="saveMsg"></div>
-    </div>
-
-    <div class="card">
-      <h2>🔍 核验截图（上传战绩来源图，便于对照校准）</h2>
-      <input id="shotInput" type="file" accept="image/*" onchange="onShotChange(event)">
-      <div class="verify-wrap" style="margin-top:10px;">
-        <img id="shotImg" class="verify-img" style="display:none;">
-        <div class="hint" id="shotHint">上传一张清晰截图，编辑时对照表格逐行校准，保存后一并存入 Gist（已压缩，便于下周继续）。</div>
-      </div>
-    </div>
-
-    <div class="card">
-      <h2>🕑 历史记录</h2>
-      <div class="hist" id="histBox"></div>
-      <div class="hint">蓝色为本地缓存（离线可用）；点击任意日期载入该期战绩。</div>
-    </div>
-  </div>
-</div>
-
-<script src="github-config.js"></script>
-<script src="gh-gist.js"></script>
-<script>
 // ==================== 联盟子页日志转发（Tauri 无法 F12，转发到首页浮窗"控制台日志"） ====================
 (function forwardIframeConsole(){
   // 父页 index.html 已把全部 console 捕获进 window.__consoleLogs，并渲染到浮窗
@@ -197,7 +26,8 @@
 
 // DB 必须在父页（index.html 加载 gh-gist.js 后挂到父 window）拿，子页自己的 window.AllianceDB 永远是 undefined
 // 这是 v260801-74 后联盟"注册/登录点了完全没反应"的真正根因（子页拿不到父页全局）
-const DB = window.AllianceDB || (window.parent && window.parent.AllianceDB) || null;
+const DB = (window.parent && window.parent.AllianceDB) ? window.parent.AllianceDB
+          : (window.AllianceDB || null);
 if(!DB){ console.error('[联盟][致命] window.parent.AllianceDB 不存在！父页 gh-gist.js 可能未加载或抛错。请刷新首页后重试。'); }
 const SKEY = 'TFJL_AllianceSession';
 let session = null;
@@ -386,7 +216,7 @@ async function onLoadDate(){
   if(data && data.records && data.records.length){
     data.records.forEach(r=>addRow(r.rank, r.name, r.cups, r.streak));
     if(data.screenshot){ state.shot=data.screenshot; showShot(data.screenshot); }
-    setMsg('loadMsg', (data.updatedBy?('上次由 '+data.updatedBy+' 更新 · ') : ''+new Date(data.updatedAt||Date.now()).toLocaleString()), 'ok');
+    setMsg('loadMsg', (data.updatedBy?('上次由 '+data.updatedBy+' 更新 · ':'')+new Date(data.updatedAt||Date.now()).toLocaleString()), 'ok');
   } else {
     addRow();
     setMsg('loadMsg','该日期暂无记录，新增后保存即可。','');
@@ -467,6 +297,3 @@ async function renderHistory(){
     $('authOverlay').style.display='flex';
   }
 })();
-</script>
-</body>
-</html>
