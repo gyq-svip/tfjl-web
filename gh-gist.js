@@ -38,6 +38,11 @@
         if (!r.ok) throw new Error('更新 Gist 失败 (' + r.status + ')');
         return r.json();
     }
+    async function ghGistDelete(id) {
+        const r = await fetch(`${GH_API}/gists/${id}`, { method: 'DELETE', headers: ghHeaders() });
+        if (!r.ok && r.status !== 404) throw new Error('删除 Gist 失败 (' + r.status + ')');
+        return true;
+    }
     async function ghGistFileContent(id, filename) {
         const g = await ghGistGet(id);
         const f = g.files && g.files[filename];
@@ -100,20 +105,30 @@
     async function registerAccount(username, password, allianceId, allianceName, onStep) {
         console.log('[联盟] registerAccount 开始:', { username, allianceId, allianceName, hasToken: !!ghToken() });
         const passwordHash = await hashPassword(password);
+        // 本次运行内新建的联盟 gist：写总表失败时回滚删除，避免孤儿 gist 累积；
+        // 重试时复用同一 gist，绝不在重试中重复创建。
+        let createdGistThisRun = null;
         for (let attempt = 0; attempt < 3; attempt++) {
             const data = await loadRegistry();
             if (data.accounts[username]) throw new Error('账号已存在');
             let al = data.alliances[allianceId];
             if (!al || !al.gistId) {
-                // 首次创建联盟 gist
-                if (typeof onStep === 'function') onStep('creating');
-                console.log('[联盟] 联盟号不存在，新建 Gist 中…');
-                const ag = await ghGistCreate(
-                    { 'readme.json': { content: '联盟战绩：' + (allianceName || allianceId) } },
-                    'tfjl-alliance-' + (allianceName || allianceId), false);
-                console.log('[联盟] 已创建联盟 Gist:', ag.id);
-                al = { name: allianceName, gistId: ag.id, createdBy: username, members: [username], createdAt: Date.now() };
-                data.alliances[allianceId] = al;
+                if (createdGistThisRun) {
+                    // 重试：复用本次已建的 gist，不再新建
+                    console.log('[联盟] 复用本次已建联盟 Gist:', createdGistThisRun);
+                    al = { name: allianceName, gistId: createdGistThisRun, createdBy: username, members: [username], createdAt: Date.now() };
+                    data.alliances[allianceId] = al;
+                } else {
+                    if (typeof onStep === 'function') onStep('creating');
+                    console.log('[联盟] 联盟号不存在，新建 Gist 中…');
+                    const ag = await ghGistCreate(
+                        { 'readme.json': { content: '联盟战绩：' + (allianceName || allianceId) } },
+                        'tfjl-alliance-' + (allianceName || allianceId), false);
+                    console.log('[联盟] 已创建联盟 Gist:', ag.id);
+                    createdGistThisRun = ag.id;
+                    al = { name: allianceName, gistId: ag.id, createdBy: username, members: [username], createdAt: Date.now() };
+                    data.alliances[allianceId] = al;
+                }
             } else if (allianceName && !al.name) {
                 al.name = allianceName;
             }
@@ -124,6 +139,16 @@
                 console.log('[联盟] registerAccount 成功，联盟号=' + allianceId + ' gistId=' + al.gistId);
                 return al;
             } catch (e) {
+                // 写总表失败 → 回滚本次新建的联盟 gist，避免孤儿 gist 累积
+                if (createdGistThisRun) {
+                    try {
+                        await ghGistDelete(createdGistThisRun);
+                        console.warn('[联盟] 注册失败，已回滚新建的联盟 Gist:', createdGistThisRun);
+                    } catch (de) {
+                        console.error('[联盟] 回滚联盟 Gist 失败(需手动删除):', createdGistThisRun, (de && (de.stack || de.message)) || de);
+                    }
+                    createdGistThisRun = null;
+                }
                 if (attempt >= 2) throw e;
                 await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
             }
