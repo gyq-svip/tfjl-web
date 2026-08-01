@@ -147,11 +147,19 @@
     </div>
 
     <div class="card">
-      <h2>🔍 核验截图（上传战绩来源图，便于对照校准）</h2>
+      <h2>🔍 战绩截图（上传 → OCR 一键识别）</h2>
       <input id="shotInput" type="file" accept="image/*" onchange="onShotChange(event)">
+      <div style="margin-top:8px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+        <button class="btn btn-ghost btn-sm" id="ocrBtn" onclick="allianceOcrShot()">📷 OCR 识别并填充战绩表</button>
+        <span id="ocrStatus" class="hint"></span>
+      </div>
       <div class="verify-wrap" style="margin-top:10px;">
         <img id="shotImg" class="verify-img" style="display:none;">
-        <div class="hint" id="shotHint">上传一张清晰截图，编辑时对照表格逐行校准，保存后一并存入 Gist（已压缩，便于下周继续）。</div>
+        <div class="hint" id="shotHint">上传清晰截图，系统自动 OCR 识别「排名 / 人名 / 奖杯数 / 最大连胜」并填入上表；也可 Ctrl+V 直接粘贴截图。识别后请核对再保存。</div>
+      </div>
+      <div id="ocrRawBox" style="display:none;margin-top:8px;">
+        <div style="font-size:0.72rem;color:rgba(255,255,255,0.6);margin-bottom:4px;">识别原文（供校对，识别不准时对照此原文手动填）：</div>
+        <textarea id="ocrRaw" readonly style="width:100%;height:90px;background:rgba(0,0,0,0.3);color:#cfe;font-size:0.72rem;border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:6px;"></textarea>
       </div>
     </div>
 
@@ -206,7 +214,7 @@ function resolveToken(){
   return '';
 }
 let session = null;
-let state = { date: todayStr(), rows: [], shot: '' };
+let state = { date: todayStr(), rows: [], shot: '', shotRaw: '' };
 
 function todayStr() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
@@ -348,6 +356,7 @@ function onShotChange(e){
   const f=e.target.files[0]; if(!f) return;
   const rd=new FileReader();
   rd.onload=()=>{
+    state.shotRaw = rd.result; // 原图 base64 供 OCR（压缩图仅用于显示）
     const img=new Image();
     img.onload=()=>{
       let w=img.width,h=img.height,max=800;
@@ -362,6 +371,100 @@ function onShotChange(e){
   rd.readAsDataURL(f);
 }
 function showShot(url){ const i=$('shotImg'); i.src=url; i.style.display='block'; $('shotHint').style.display='none'; }
+
+// ===================== 联盟个人战绩：OCR 截图一键识别（复用本机 Umi-OCR） =====================
+// 与深海统计同一套离线 Umi-OCR（Rust umi_ocr 命令）；iframe 子页同样能拿到 window.__TAURI__。
+function allianceGetInvoke(){
+  return (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke)
+      || (window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke);
+}
+function allianceExtractOcrText(r){
+  if(!r) return '';
+  if(typeof r === 'string') return r;
+  if(r.code === 100 && r.data){
+    return typeof r.data === 'string' ? r.data : (Array.isArray(r.data) ? r.data.map(x=>x.text||x).join('\n') : '');
+  }
+  if(r.ocr && r.ocr.text) return r.ocr.text;
+  if(r.text) return r.text;
+  if(r.data) return typeof r.data === 'string' ? r.data : '';
+  return '';
+}
+// 解析 OCR 文本 → [{rank,name,cups,streak}]
+// 每行形如：排名 人名 奖杯数 最大连胜（奖杯/连胜可能带"奖杯"/"连胜"等后缀，已忽略）
+function parseAllianceOcrText(text){
+  const rows=[];
+  const lines = String(text||'').split(/\r?\n/);
+  for(const raw of lines){
+    const line = raw.trim();
+    if(!line) continue;
+    // 跳过表头（含列名且无"数字 姓名 数字 数字"结构）
+    if(/^(排名|名次|姓名|人名|奖杯|连胜|排行|战绩|联盟)/.test(line) && !/\d+\s+\S+\s+\d+\s+\d/.test(line)) continue;
+    const nums = [...line.matchAll(/-?\d+/g)].map(m=>({ v:parseInt(m[0],10), idx:m.index }));
+    if(nums.length < 3) continue;            // 至少需要 排名+奖杯+连胜
+    const rank = nums[0].v;
+    const cups = nums[nums.length-2].v;
+    const streak = nums[nums.length-1].v;
+    if(rank<=0 || cups<0 || streak<0) continue;
+    // 人名 = 第一个数字之后、倒数第二个数字之前的文本（去掉标点/空格/数字）
+    const nameStart = nums[0].idx + String(nums[0].v).length;
+    const nameEnd = nums[nums.length-2].idx;
+    let name = line.slice(nameStart, nameEnd).replace(/[\s.、，。,:：#()\-_|]/g,'').replace(/\d+/g,'').trim();
+    if(!name) continue;
+    rows.push({ rank, name, cups, streak });
+  }
+  return rows;
+}
+async function allianceOcrShot(){
+  const status = $('ocrStatus');
+  const inv = allianceGetInvoke();
+  if(!inv){
+    setMsg('saveMsg','OCR 识别需在本机桌面 App 内运行（网页版不支持，请用电脑桌面端打开）','warn');
+    return;
+  }
+  const b64 = (state.shotRaw || state.shot || '').split(',')[1];
+  if(!b64){ setMsg('saveMsg','请先上传一张战绩截图，或 Ctrl+V 粘贴截图','err'); return; }
+  if(status) status.textContent='识别中…';
+  try{
+    const r = await inv('umi_ocr', { base64:b64 });
+    const text = allianceExtractOcrText(r);
+    $('ocrRaw').value = text;
+    $('ocrRawBox').style.display='block';
+    const rows = parseAllianceOcrText(text);
+    if(!rows.length){ if(status) status.textContent='未能解析出战绩行（可在上方原文区对照手动填）'; return; }
+    $('recBody').innerHTML='';
+    rows.forEach(rw=>addRow(rw.rank, rw.name, rw.cups, rw.streak));
+    if(status) status.textContent='已识别 '+rows.length+' 条战绩 ✓（请核对后保存）';
+    setMsg('saveMsg','OCR 识别完成，已自动填入 '+rows.length+' 条，请核对无误后点「保存并上传 Gist」','ok');
+  }catch(e){
+    console.error('[联盟][OCR]', e);
+    if(status) status.textContent='OCR 失败：'+(e.message||e);
+    setMsg('saveMsg','OCR 识别失败：'+(e.message||e),'err');
+  }
+}
+// 支持 Ctrl+V 直接粘贴截图 → 自动识别
+document.addEventListener('paste', (e)=>{
+  const cd = e.clipboardData || (e.originalEvent && e.originalEvent.clipboardData);
+  if(!cd) return;
+  const item = [...cd.items].find(it=>it.type && it.type.startsWith('image/'));
+  if(!item) return;
+  const f = item.getAsFile(); if(!f) return;
+  const rd = new FileReader();
+  rd.onload = ()=>{
+    state.shotRaw = rd.result;
+    const im = new Image();
+    im.onload = ()=>{
+      let w=im.width,h=im.height,max=800; if(w>max){ h=Math.round(h*max/w); w=max; }
+      const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+      cv.getContext('2d').drawImage(im,0,0,w,h);
+      state.shot = cv.toDataURL('image/jpeg',0.7);
+      showShot(state.shot);
+    };
+    im.src = rd.result;
+    allianceOcrShot();
+  };
+  rd.readAsDataURL(f);
+  e.preventDefault();
+});
 
 async function onSave(){
   if(!session.gistId){ setMsg('saveMsg','联盟 Gist 未就绪，无法上传（仍可本地缓存）。','warn'); }
