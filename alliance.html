@@ -416,36 +416,62 @@ function allianceSliceStoreKey(){ return 'TFJL_AllianceSlices_' + (session?sessi
 function persistAllianceSlices(){ try{ localStorage.setItem(allianceSliceStoreKey(), JSON.stringify(allianceSliceMeta)); }catch(e){} }
 function restoreAllianceSlices(){ try{ const s=localStorage.getItem(allianceSliceStoreKey()); allianceSliceMeta = s?JSON.parse(s):{}; }catch(e){ allianceSliceMeta={}; } }
 
-// 切片策略（与深海势力识别同套，已验证可用）：默认"一行(一人)切一张图"，避免多行同图错位。
-// 先按表格横线检测行边界，把每一行单独裁成一张小图逐个识别（慢但准、不错位）；
-// 检测不到分隔线（如无缝表格）则回退到较小的定高切片（≤240px，仍比旧 900px/约多人错位少）。
+// 切片策略（按"文字带"精确切，绝不切到字、绝不几行并一块）：
+// ①逐行算墨量(深色像素占比)→判定文字行；②把连续文字行合成"文字带"(带内若夹着 <4px 细黑线(分隔线)则排除，避免被横线连成一行)；
+// ③每个文字带 = 一个人(一行)，精确切该带(上/下各留 1px 安全边，绝不跨入相邻带的文字)；④相邻带间隔极小(抗锯齿桥接)才合并，绝不跨人合并。
+// 并自动量出"行距 / 行间间距"供状态栏显示核对。
+let allianceLastSliceInfo=null;
 function allianceDetectRowSlices(img, w, h){
   const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
   const ctx=cv.getContext('2d'); ctx.drawImage(img,0,0);
   let data; try{ data=ctx.getImageData(0,0,w,h).data; }catch(e){ return null; }
-  const rowIsLine=[];
   const stepX=Math.max(1, Math.floor(w/200));
+  // 每行墨量（深色文字像素占比，文字深、背景浅）
+  const ink=new Float32Array(h);
   for(let y=0;y<h;y++){
-    let sum=0,sum2=0,n=0;
+    let dark=0,n=0;
     for(let x=0;x<w;x+=stepX){
       const i=(y*w+x)*4; const lum=(data[i]+data[i+1]+data[i+2])/3;
-      sum+=lum; sum2+=lum*lum; n++;
+      if(lum<140) dark++; n++;
     }
-    const mean=sum/n; const variance=sum2/n-mean*mean;
-    rowIsLine.push(variance<80); // 整行近似纯色=分隔线/间隔
+    ink[y]=dark/n;
   }
-  const segs=[]; let start=-1;
+  const eps=0.02, MIN_BAND=4;
+  // 判定文字行：连续"含文字"且高度达标(>=4px)的行才记作文字；孤立 <4px 的细黑线(分隔线)不算文字→自然断开相邻行
+  const isText=new Array(h).fill(false);
+  let runStart=-1;
   for(let y=0;y<h;y++){
-    if(!rowIsLine[y]){ if(start<0) start=y; }
-    else if(start>=0){ segs.push({ top:start, bottom:y }); start=-1; }
+    if(ink[y]>eps){ if(runStart<0) runStart=y; }
+    else if(runStart>=0){ const len=y-runStart; if(len>=MIN_BAND) for(let yy=runStart;yy<y;yy++) isText[yy]=true; runStart=-1; }
   }
-  if(start>=0) segs.push({ top:start, bottom:h });
+  if(runStart>=0){ const len=h-runStart; if(len>=MIN_BAND) for(let yy=runStart;yy<h;yy++) isText[yy]=true; }
+  // 文字带
+  const bands=[]; let start=-1;
+  for(let y=0;y<h;y++){
+    if(isText[y]){ if(start<0) start=y; }
+    else if(start>=0){ bands.push({top:start,bottom:y-1}); start=-1; }
+  }
+  if(start>=0) bands.push({top:start,bottom:h-1});
+  if(bands.length<2){ allianceLastSliceInfo=null; return null; }
+  // 估算行距 P（相邻文字带 top 之差的众数）：仅用于把"同一人换行/图标"的抗锯齿桥接合并回来，绝不跨人合并
+  const diffs=[];
+  for(let k=0;k<bands.length-1;k++){ const d=bands[k+1].top-bands[k].top; if(d>=6) diffs.push(d); }
+  diffs.sort((a,b)=>a-b);
+  const med=diffs.length?diffs[Math.floor(diffs.length/2)]:24;
+  const mergeGap=Math.max(3, Math.floor(med*0.4)); // 仅合并真正相邻的带（抗锯齿桥接），绝不跨行人合并
   const merged=[];
-  for(const s of segs){
-    if(s.bottom-s.top<8){ if(merged.length) merged[merged.length-1].bottom=s.bottom; continue; }
-    merged.push({ top:s.top, bottom:s.bottom });
+  for(const b of bands){
+    if(merged.length && (b.top-merged[merged.length-1].bottom)<=mergeGap) merged[merged.length-1].bottom=b.bottom;
+    else merged.push({top:b.top,bottom:b.bottom});
   }
-  return merged.length>=2 ? merged : null;
+  // 每个带精确切片：文字顶→底，上下各留 1px 安全边（不跨入相邻带文字，绝不切到字）
+  const segs=merged.map(m=>({ top:Math.max(0,m.top-1), bottom:Math.min(h,m.bottom+1) }));
+  // 量出行距与行间间距，供状态栏核对
+  let gapSum=0,gapN=0;
+  for(let k=1;k<merged.length;k++){ gapSum+=merged[k].top-merged[k-1].bottom; gapN++; }
+  allianceLastSliceInfo={ lineSpacing:med, gap: gapN?Math.round(gapSum/gapN):0, rows:merged.length };
+  console.log('[联盟][切片] 行距≈'+med+'px 行间间距≈'+(gapN?Math.round(gapSum/gapN):0)+'px 共切 '+merged.length+' 块', merged);
+  return segs.length>=2 ? segs : null;
 }
 function allianceSliceImage(file, maxH){
   return new Promise((resolve,reject)=>{
@@ -524,7 +550,8 @@ async function allianceRunOcr(files){
   $('ocrRawBox').style.display='block';
   persistAllianceSlices();
   const totalLines=$('ocrRaw').value.split(/\r?\n/).filter(Boolean).length;
-  if(status) status.textContent='已切 '+totalSlice+' 块（识别 '+files.length+' 张图），共 '+totalLines+' 行，逐块对照后点「解析并填入战绩表」';
+  const sp=allianceLastSliceInfo?('｜行距≈'+allianceLastSliceInfo.lineSpacing+'px 行间间距≈'+allianceLastSliceInfo.gap+'px'):'';
+  if(status) status.textContent='已切 '+totalSlice+' 块（识别 '+files.length+' 张图），共 '+totalLines+' 行'+sp+'，逐块对照后点「解析并填入战绩表」';
 }
 function allianceRenderOcrCompare(){
   const box=$('allianceOcrCompare');
