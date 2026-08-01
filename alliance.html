@@ -472,15 +472,17 @@ function allianceDetectRowSlices(img, w, h){
   const med=diffs.length?diffs[Math.floor(diffs.length/2)]:24;
   const gaps=[];
   for(let k=1;k<bands.length;k++){ let g=bands[k].top-bands[k-1].bottom-1; if(g<1)g=1; gaps.push(g); }
+  // 合并阈值：长图拼接处常有异常大间隙，会把 Otsu 阈值推高→把"两人之间"误当"同人多行"→并块。
+  // 改法：①先排除顶部10%异常大间隙(长图拼接边)；②在剩余间隔里找"同人内间隔簇"与"两人间间隔簇"的最大跳变点，取中点为阈值。
+  // 落在两簇中间→既不并块(阈值<两人间最小)、也不拆人(阈值>同人内最大)。
   let gapThresh=2;
   if(gaps.length>=2){
-    let gm=0; for(const g of gaps) if(g>gm) gm=g;
-    const bins=128; const hist=new Int32Array(bins);
-    for(const g of gaps){ let bi=Math.floor(g/gm*(bins-1)); if(bi<0)bi=0; else if(bi>=bins)bi=bins-1; hist[bi]++; }
-    let sumAll=0; for(let i=0;i<bins;i++) sumAll+=i*hist[i];
-    let sumB=0,wB=0,maxVar=-1,ti=0;
-    for(let i=0;i<bins;i++){ wB+=hist[i]; if(wB===0)continue; const wF=gaps.length-wB; if(wF===0)break; sumB+=i*hist[i]; const mB=sumB/wB; const mF=(sumAll-sumB)/wF; const between=wB*wF*(mB-mF)*(mB-mF); if(between>maxVar){maxVar=between;ti=i;} }
-    gapThresh=Math.max(2, Math.floor(ti/(bins-1)*gm));
+    const gs=[...gaps].sort((a,b)=>a-b);
+    const cut=gs[Math.min(gs.length-1, Math.floor(0.9*(gs.length-1)))]; // 排除顶部10%异常大间隙
+    const inner=gs.filter(g=>g<=cut);
+    let maxJump=0, jumpAt=-1;
+    for(let i=1;i<inner.length;i++){ const j=inner[i]-inner[i-1]; if(j>maxJump){ maxJump=j; jumpAt=i; } }
+    gapThresh = (jumpAt>0 && jumpAt<inner.length) ? Math.max(2, Math.floor((inner[jumpAt-1]+inner[jumpAt])/2)) : Math.max(2, Math.floor(cut*0.6));
   }
   const merged=[];
   for(const b of bands){
