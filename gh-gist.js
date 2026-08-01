@@ -65,18 +65,17 @@
     }
 
     // ===== 盟战战绩数据库（registry 总索引 + 每个联盟一个 gist） =====
-    let _registryGistId = (window.TFJL_ALLIANCE_DB_GIST_ID) || '';
+    let _registryGistId = (window.TFJL_ALLIANCE_DB_GIST_ID) || localStorage.getItem('TFJL_AllianceDbGistId') || '';
 
     async function ensureRegistry() {
         if (_registryGistId) {
-            try { await ghGistGet(_registryGistId); return _registryGistId; } catch (e) { /* placeholder 无效，重建 */ }
+            try { await ghGistGet(_registryGistId); return _registryGistId; } catch (e) { /* id 失效，重建 */ }
         }
         const g = await ghGistCreate(
             { 'registry.json': { content: JSON.stringify({ accounts: {}, alliances: {} }, null, 2) } },
             'tfjl-alliance-registry', false);
         _registryGistId = g.id;
-        localStorage.setItem('TFJL_AllianceDbGistId', g.id);
-        window.__ALLIANCE_REGISTRY_CREATED__ = g.id; // 供 UI 提示管理员复制此 id
+        try { localStorage.setItem('TFJL_AllianceDbGistId', g.id); } catch (e) {}
         return g.id;
     }
 

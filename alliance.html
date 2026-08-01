@@ -97,21 +97,7 @@
         <button class="btn btn-primary" style="width:100%;" onclick="onRegister()">注册并绑定联盟</button>
       </div>
       <div class="msg" id="regMsg"></div>
-    </div>
-
-    <!-- GitHub Token（部署未注入时手动填一次，存本地共享，注册/登录必需） -->
-    <div style="margin-top:14px;padding-top:12px;border-top:1px dashed rgba(255,255,255,0.15);">
-      <details>
-        <summary style="cursor:pointer;font-size:0.74rem;color:rgba(255,255,255,0.6);">⚙️ GitHub Token（注册/登录必需，若部署未注入请填）</summary>
-        <div style="margin-top:8px;">
-          <input id="gistTokenInput" type="password" placeholder="粘贴 GitHub Personal Access Token（ghp_...）" style="font-size:0.78rem;">
-          <div class="row" style="margin-top:8px;gap:8px;">
-            <button class="ghost small" onclick="saveGistTokenFromInput()">保存 Token</button>
-            <span id="tokenStatus" style="font-size:0.72rem;color:rgba(255,255,255,0.55);align-self:center;"></span>
-          </div>
-          <div class="hint">Token 仅存于本机浏览器，不上传；拥有 gist 权限的 PAT 即可。保存后刷新页面生效。</div>
-        </div>
-      </details>
+      <div class="hint" id="syncHint" style="margin-top:12px;padding-top:10px;border-top:1px dashed rgba(255,255,255,0.15);"></div>
     </div>
   </div>
   </div>
@@ -194,16 +180,6 @@ function doLogout(){
   location.reload();
 }
 
-// 手动保存 GitHub Token（部署未注入时），存到共享 localStorage（iframe 同域即首页也能读到）
-function saveGistTokenFromInput(){
-  const v = $('gistTokenInput').value.trim();
-  if(!v){ setMsg('tokenStatus','请先粘贴 Token','err'); return; }
-  if(!v.startsWith('ghp_') && !v.startsWith('github_pat_')){ setMsg('tokenStatus','Token 应以 ghp_ 或 github_pat_ 开头','err'); return; }
-  try{ localStorage.setItem('TFJL_Gist_Token', v); }catch(e){}
-  setMsg('tokenStatus','已保存，刷新后生效','ok');
-  toast('✅ Token 已保存');
-}
-
 // ---------- 登录 / 注册 ----------
 async function onLogin(){
   const u=$('loginUser').value.trim(), p=$('loginPwd').value;
@@ -225,9 +201,7 @@ async function onRegister(){
     const al = await DB.registerAccount(u,p,alId,alName);
     session = { username:u, allianceId:alId, allianceName:al.name||alName, gistId:al.gistId };
     localStorage.setItem(SKEY, JSON.stringify(session));
-    if(window.__ALLIANCE_REGISTRY_CREATED__){
-      setMsg('regMsg','注册成功！数据库已自动创建，管理员请把此 id 写入 github-config.js 的 TFJL_ALLIANCE_DB_GIST_ID：'+window.__ALLIANCE_REGISTRY_CREATED__,'warn');
-    }
+    setMsg('regMsg','注册成功，战绩库已自动创建并加入联盟总库 ✓','ok');
     enterMain();
   }catch(e){ setMsg('regMsg', e.message||'注册失败','err'); }
 }
@@ -338,11 +312,17 @@ async function renderHistory(){
 
 // ---------- 启动 ----------
 (function init(){
-  // 预填已保存的 GitHub Token（若有），并提示是否需要手动填
+  // 同步状态提示：Token 由部署自动注入（与首页同源/同 iframe），无需手动填写
   try{
-    const tk = (typeof window.getGistToken==='function') ? window.getGistToken() : (localStorage.getItem('TFJL_Gist_Token')||'');
-    if(tk && tk.length>10 && tk!=='YOUR_GITHUB_TOKEN_HERE'){ const ti=$('gistTokenInput'); if(ti) ti.value=tk; }
-    else { const ts=$('tokenStatus'); if(ts) ts.textContent='未检测到 Token，请展开填写'; }
+    const tk = (typeof window.getGistToken==='function') ? window.getGistToken() : '';
+    const hint = $('syncHint');
+    if(hint){
+      if(tk && tk.length>10 && tk!=='YOUR_GITHUB_TOKEN_HERE'){
+        hint.textContent='✅ GitHub 同步已自动启用（Token 由部署注入），注册即自动建库。';
+      } else {
+        hint.textContent='⚠️ 未检测到同步 Token：请通过首页「联盟个人战绩统计」入口打开本页（勿直接双击文件）。';
+      }
+    }
   }catch(e){}
   try{ const s=localStorage.getItem(SKEY); if(s) session=JSON.parse(s); }catch(e){}
   if(session && session.gistId){
