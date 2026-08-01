@@ -198,17 +198,20 @@ function closeAuth(){
 }
 
 // ---------- 登录 / 注册 ----------
+function allianceErr(where, e){ console.error('[联盟]['+where+']', (e&&(e.stack||e.message))||e); }
+
 async function onLogin(){
   const u=$('loginUser').value.trim(), p=$('loginPwd').value;
   if(!u||!p){ setMsg('loginMsg','请填写账号和密码','err'); return; }
   const btn=$('loginBtn'); if(btn) btn.disabled=true;
   setMsg('loginMsg','正在查询联盟总表…');
+  console.log('[联盟] onLogin 开始:', { u, hasToken: !!(typeof window.getGistToken==='function' && window.getGistToken()) });
   try{
     session = await DB.loginAccount(u,p);
     localStorage.setItem(SKEY, JSON.stringify(session));
     setMsg('loginMsg','登录成功 ✓');
     enterMain();
-  }catch(e){ setMsg('loginMsg', e.message||'登录失败','err'); }
+  }catch(e){ allianceErr('login', e); setMsg('loginMsg', (e&&e.message)||'登录失败','err'); }
   finally{ if(btn) btn.disabled=false; }
 }
 
@@ -220,6 +223,7 @@ async function onRegister(){
   if(p!==p2){ setMsg('regMsg','两次密码不一致','err'); return; }
   const btn=$('regBtn'); if(btn) btn.disabled=true;
   setMsg('regMsg',''); setMsg('regStep','① 正在查询联盟总表（是否已存在该联盟号）…');
+  console.log('[联盟] onRegister 开始:', { u, alId, alName, hasToken: !!(typeof window.getGistToken==='function' && window.getGistToken()) });
   try{
     const al = await DB.registerAccount(u,p,alId,alName, (s)=>{
       if(s==='creating') setMsg('regStep','② 联盟号不存在 → 正在新建联盟战绩库 Gist…');
@@ -229,7 +233,7 @@ async function onRegister(){
     localStorage.setItem(SKEY, JSON.stringify(session));
     setMsg('regMsg','注册成功，战绩库已自动创建并加入联盟总表 ✓','ok');
     enterMain();
-  }catch(e){ setMsg('regMsg', e.message||'注册失败','err'); setMsg('regStep',''); }
+  }catch(e){ allianceErr('register', e); setMsg('regMsg', (e&&e.message)||'注册失败','err'); setMsg('regStep',''); }
   finally{ if(btn) btn.disabled=false; }
 }
 

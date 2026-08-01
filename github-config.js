@@ -5,6 +5,30 @@
 // 注意：只提供 getGistToken 的兜底实现；若本页在 index.html 内嵌/同源加载，
 //       会优先使用 index.html 已定义的 getGistToken（更权威）。
 
+// ===== 把本页(iframe)的 console 日志转发到父窗口浮动控制台 =====
+// 盟战页以 iframe 内嵌于 index.html，自身 console 不进首页浮窗；同一域下可直接调用父窗口已被
+// captureConsole 重写的 console.*（会写入父窗口 __consoleLogs，并被浮动控制台渲染），便于在 APP 内观测报错。
+(function forwardIframeConsole() {
+    const FWD = ['log', 'warn', 'error', 'info'];
+    FWD.forEach(function (level) {
+        const orig = (console[level] || console.log).bind(console);
+        console[level] = function () {
+            const args = Array.prototype.slice.call(arguments);
+            try {
+                const p = window.parent;
+                if (p && p !== window && p.console && typeof p.console[level] === 'function') {
+                    p.console[level].apply(p.console, ['[联盟]'].concat(args));
+                }
+                if (p && p !== window && typeof p.refreshFloatConsole === 'function') {
+                    try { p.refreshFloatConsole(); } catch (e) {}
+                }
+            } catch (e) {}
+            orig.apply(null, args);
+        };
+    });
+})();
+
+
 // 盟战战绩总索引：复用主站固定的「总表 gist」(GIST_ID = a32a0628bd9275f3a4922cd12cf298c9)，
 // 与 room_index.json 共存于同一 gist。所有用户/设备共用同一份，注册时自动写入 alliance_index.json。
 window.TFJL_MASTER_GIST_ID = 'a32a0628bd9275f3a4922cd12cf298c9';

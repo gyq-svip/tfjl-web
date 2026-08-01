@@ -77,7 +77,7 @@
             const g = await ghGistGet(MASTER_GIST_ID);
             const f = g.files && g.files[REGISTRY_FILE];
             if (f && f.content) return JSON.parse(f.content);
-        } catch (e) { /* 总表读不到 → 空索引 */ }
+        } catch (e) { console.warn('[联盟] 读取总表失败(将按空索引处理):', (e && e.message) || e); }
         return { accounts: {}, alliances: {} };
     }
 
@@ -88,8 +88,9 @@
             try {
                 await ghGistPatch(MASTER_GIST_ID, { [REGISTRY_FILE]: { content: JSON.stringify(data, null, 2) } });
                 return;
-            } catch (e) { lastErr = e; await new Promise(r => setTimeout(r, 400 * (attempt + 1))); }
+            } catch (e) { lastErr = e; console.warn('[联盟] 写入联盟总表失败(重试 ' + (attempt + 1) + '):', (e && e.message) || e); await new Promise(r => setTimeout(r, 400 * (attempt + 1))); }
         }
+        console.error('[联盟] 写入联盟总表最终失败:', (lastErr && (lastErr.stack || lastErr.message)) || lastErr);
         throw lastErr || new Error('写入联盟总表失败');
     }
 
@@ -97,6 +98,7 @@
     // 乐观并发：循环「读最新总表→改→写回」，冲突/失败重试；首次文件不存在时 loadRegistry 返回空索引即自动建。
     // onStep('creating') 在需要新建联盟 gist 时回调（供 UI 显示进度）。
     async function registerAccount(username, password, allianceId, allianceName, onStep) {
+        console.log('[联盟] registerAccount 开始:', { username, allianceId, allianceName, hasToken: !!ghToken() });
         const passwordHash = await hashPassword(password);
         for (let attempt = 0; attempt < 3; attempt++) {
             const data = await loadRegistry();
@@ -105,9 +107,11 @@
             if (!al || !al.gistId) {
                 // 首次创建联盟 gist
                 if (typeof onStep === 'function') onStep('creating');
+                console.log('[联盟] 联盟号不存在，新建 Gist 中…');
                 const ag = await ghGistCreate(
                     { 'readme.json': { content: '联盟战绩：' + (allianceName || allianceId) } },
                     'tfjl-alliance-' + (allianceName || allianceId), false);
+                console.log('[联盟] 已创建联盟 Gist:', ag.id);
                 al = { name: allianceName, gistId: ag.id, createdBy: username, members: [username], createdAt: Date.now() };
                 data.alliances[allianceId] = al;
             } else if (allianceName && !al.name) {
@@ -117,6 +121,7 @@
             data.accounts[username] = { passwordHash, allianceId, allianceName, createdAt: Date.now() };
             try {
                 await saveRegistry(data);
+                console.log('[联盟] registerAccount 成功，联盟号=' + allianceId + ' gistId=' + al.gistId);
                 return al;
             } catch (e) {
                 if (attempt >= 2) throw e;
