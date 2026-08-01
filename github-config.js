@@ -5,9 +5,9 @@
 // 注意：只提供 getGistToken 的兜底实现；若本页在 index.html 内嵌/同源加载，
 //       会优先使用 index.html 已定义的 getGistToken（更权威）。
 
-// 盟战战绩总数据库 gist id（registry）。留空则首次注册会自动创建并提示管理员，
-// 把提示的 id 复制到此处即可让所有用户共享同一份数据。
-window.TFJL_ALLIANCE_DB_GIST_ID = '';
+// 盟战战绩总索引：复用主站固定的「总表 gist」(GIST_ID = a32a0628bd9275f3a4922cd12cf298c9)，
+// 与 room_index.json 共存于同一 gist。所有用户/设备共用同一份，注册时自动写入 alliance_index.json。
+window.TFJL_MASTER_GIST_ID = 'a32a0628bd9275f3a4922cd12cf298c9';
 
 // 深海「势力统计」共享 Gist id（所有人可见）。留空则管理员首次上传时自动创建并提示。
 window.TFJL_DEEPSEA_GIST_ID = '';

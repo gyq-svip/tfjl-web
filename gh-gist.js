@@ -64,53 +64,67 @@
         try { return JSON.parse(localStorage.getItem('tfjl_al_dates_' + gistId) || '[]'); } catch (e) { return []; }
     }
 
-    // ===== 盟战战绩数据库（registry 总索引 + 每个联盟一个 gist） =====
-    let _registryGistId = (window.TFJL_ALLIANCE_DB_GIST_ID) || localStorage.getItem('TFJL_AllianceDbGistId') || '';
+    // ===== 盟战战绩数据库（共享总表 gist + 每个联盟一个 gist） =====
+    // 复用主站固定的「总表 gist」(GIST_ID = a32a0628bd9275f3a4922cd12cf298c9)，所有用户/设备共用同一份。
+    // 该 gist 内用 alliance_index.json 记录 { accounts:{用户名:{...}}, alliances:{联盟号:{name,gistId}} }，
+    // 与 room_index.json 等共存（PATCH 仅改本文件，不破坏其它文件）。所有人读它查当前联盟 gist 地址。
+    const MASTER_GIST_ID = window.TFJL_MASTER_GIST_ID;
+    const REGISTRY_FILE = 'alliance_index.json';
 
-    async function ensureRegistry() {
-        if (_registryGistId) {
-            try { await ghGistGet(_registryGistId); return _registryGistId; } catch (e) { /* id 失效，重建 */ }
-        }
-        const g = await ghGistCreate(
-            { 'registry.json': { content: JSON.stringify({ accounts: {}, alliances: {} }, null, 2) } },
-            'tfjl-alliance-registry', false);
-        _registryGistId = g.id;
-        try { localStorage.setItem('TFJL_AllianceDbGistId', g.id); } catch (e) {}
-        return g.id;
-    }
-
+    // 读总表：首次（文件不存在）或读不到（网络/权限/404）都返回空索引；注册时会自动建文件。
     async function loadRegistry() {
-        const id = await ensureRegistry();
-        let data = { accounts: {}, alliances: {} };
-        try { const c = await ghGistFileContent(id, 'registry.json'); if (c) data = JSON.parse(c); } catch (e) {}
-        return { id, data };
+        try {
+            const g = await ghGistGet(MASTER_GIST_ID);
+            const f = g.files && g.files[REGISTRY_FILE];
+            if (f && f.content) return JSON.parse(f.content);
+        } catch (e) { /* 总表读不到 → 空索引 */ }
+        return { accounts: {}, alliances: {} };
     }
+
+    // 写总表：仅 PATCH 本文件；带重试避免瞬时失败丢数据。
     async function saveRegistry(data) {
-        const id = await ensureRegistry();
-        await ghGistPatch(id, { 'registry.json': { content: JSON.stringify(data, null, 2) } });
+        let lastErr;
+        for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+                await ghGistPatch(MASTER_GIST_ID, { [REGISTRY_FILE]: { content: JSON.stringify(data, null, 2) } });
+                return;
+            } catch (e) { lastErr = e; await new Promise(r => setTimeout(r, 400 * (attempt + 1))); }
+        }
+        throw lastErr || new Error('写入联盟总表失败');
     }
 
     // 注册：账号 + 密码 + 联盟号 + 联盟名，自动绑定
+    // 乐观并发：循环「读最新总表→改→写回」，冲突/失败重试；首次文件不存在时 loadRegistry 返回空索引即自动建。
     async function registerAccount(username, password, allianceId, allianceName) {
-        const { id, data } = await loadRegistry();
-        if (data.accounts[username]) throw new Error('账号已存在');
         const passwordHash = await hashPassword(password);
-        let al = data.alliances[allianceId];
-        if (!al) {
-            const ag = await ghGistCreate(
-                { 'readme.json': { content: '联盟战绩：' + (allianceName || allianceId) } },
-                'tfjl-alliance-' + (allianceName || allianceId), false);
-            al = { name: allianceName, gistId: ag.id, createdBy: username, createdAt: Date.now() };
-            data.alliances[allianceId] = al;
+        for (let attempt = 0; attempt < 3; attempt++) {
+            const data = await loadRegistry();
+            if (data.accounts[username]) throw new Error('账号已存在');
+            let al = data.alliances[allianceId];
+            if (!al || !al.gistId) {
+                // 首次创建联盟 gist
+                const ag = await ghGistCreate(
+                    { 'readme.json': { content: '联盟战绩：' + (allianceName || allianceId) } },
+                    'tfjl-alliance-' + (allianceName || allianceId), false);
+                al = { name: allianceName, gistId: ag.id, createdBy: username, createdAt: Date.now() };
+                data.alliances[allianceId] = al;
+            } else if (allianceName && !al.name) {
+                al.name = allianceName;
+            }
+            data.accounts[username] = { passwordHash, allianceId, allianceName, createdAt: Date.now() };
+            try {
+                await saveRegistry(data);
+                return al;
+            } catch (e) {
+                if (attempt >= 2) throw e;
+                await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
+            }
         }
-        data.accounts[username] = { passwordHash, allianceId, allianceName, createdAt: Date.now() };
-        await saveRegistry(data);
-        return al;
     }
 
     // 登录：校验账号密码，返回绑定信息
     async function loginAccount(username, password) {
-        const { id, data } = await loadRegistry();
+        const data = await loadRegistry();
         const acc = data.accounts[username];
         if (!acc) throw new Error('账号不存在，请先注册');
         if (!(await verifyPassword(password, acc.passwordHash))) throw new Error('密码错误');
@@ -128,7 +142,7 @@
     async function listAllianceDates(gistId) {
         const g = await ghGistGet(gistId);
         return Object.keys(g.files || {})
-            .filter(f => f.endsWith('.json') && f !== 'readme.json' && f !== 'registry.json')
+            .filter(f => f.endsWith('.json') && f !== 'readme.json')
             .map(f => f.replace(/\.json$/, ''))
             .sort();
     }
@@ -137,7 +151,7 @@
     window.AllianceDB = {
         ghToken, ghGistGet, ghGistCreate, ghGistPatch, ghGistFileContent,
         cacheSet, cacheGet, cacheDates,
-        ensureRegistry, loadRegistry, saveRegistry,
+        loadRegistry, saveRegistry,
         registerAccount, loginAccount,
         loadDateRecords, saveDateRecords, listAllianceDates
     };
