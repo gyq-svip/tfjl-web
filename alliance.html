@@ -507,7 +507,12 @@ async function allianceRunOcr(files){
   for(let i=0;i<totalSlice;i++){
     if(myRun!==allianceRunCounter) return;   // 新一轮 OCR，放弃本轮
     const b64=allSlices[i];
-    let txt=''; try{ const r=await inv('umi_ocr',{ base64:b64 }); txt=allianceExtractOcrText(r); }catch(e){ txt=''; }
+    let txt='';
+    try{
+      // 与深海势力识别同套 options：指定中文模型 + 方向校正(cls)，否则本机 Umi-OCR 默认配置可能识别不到中文
+      const r=await inv('umi_ocr',{ base64:b64, options:{ data:{format:'text', outputDirName:'', outputFileName:'', outputFileFormat:[]}, ocr:{language:'models/config_chinese.txt', cls:true} } });
+      txt=allianceExtractOcrText(r);
+    }catch(e){ txt=''; }
     const key='alliance_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
     allianceSliceMeta[key]={ dataUrl:'data:image/png;base64,'+b64, text:txt };
     allianceSliceResults.push({ key, dataUrl:'data:image/png;base64,'+b64, text:txt });

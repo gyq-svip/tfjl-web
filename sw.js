@@ -5,7 +5,7 @@
 //      提升 CACHE_VERSION 触发 activate 清空所有 tfjl- 缓存，确保拿到最新前端（含分享密码框）
 // ============================================================
 
-const CACHE_VERSION = 'tfjl-v203';
+const CACHE_VERSION = 'tfjl-v204';
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
