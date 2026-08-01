@@ -197,8 +197,7 @@
 
 // DB 必须在父页（index.html 加载 gh-gist.js 后挂到父 window）拿，子页自己的 window.AllianceDB 永远是 undefined
 // 这是 v260801-74 后联盟"注册/登录点了完全没反应"的真正根因（子页拿不到父页全局）
-const DB = (window.parent && window.parent.AllianceDB) ? window.parent.AllianceDB
-          : (window.AllianceDB || null);
+const DB = window.AllianceDB || (window.parent && window.parent.AllianceDB) || null;
 if(!DB){ console.error('[联盟][致命] window.parent.AllianceDB 不存在！父页 gh-gist.js 可能未加载或抛错。请刷新首页后重试。'); }
 const SKEY = 'TFJL_AllianceSession';
 let session = null;
@@ -387,7 +386,7 @@ async function onLoadDate(){
   if(data && data.records && data.records.length){
     data.records.forEach(r=>addRow(r.rank, r.name, r.cups, r.streak));
     if(data.screenshot){ state.shot=data.screenshot; showShot(data.screenshot); }
-    setMsg('loadMsg', (data.updatedBy?('上次由 '+data.updatedBy+' 更新 · ':'')+new Date(data.updatedAt||Date.now()).toLocaleString()), 'ok');
+    setMsg('loadMsg', (data.updatedBy?('上次由 '+data.updatedBy+' 更新 · ') : ''+new Date(data.updatedAt||Date.now()).toLocaleString()), 'ok');
   } else {
     addRow();
     setMsg('loadMsg','该日期暂无记录，新增后保存即可。','');
