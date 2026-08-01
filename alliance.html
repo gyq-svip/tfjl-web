@@ -106,6 +106,9 @@
       <div style="margin-top:14px;">
         <button class="btn btn-primary" style="width:100%;" id="regBtn" onclick="onRegister()">注册并绑定联盟</button>
       </div>
+      <div style="margin-top:8px;">
+        <button class="btn" style="width:100%;font-size:0.8rem;" id="diagBtn" onclick="allianceDiag()">🔍 诊断：我的 token 能否读写总表</button>
+      </div>
       <div class="msg" id="regMsg"></div>
       <div class="msg" id="regStep" style="color:rgba(255,255,255,0.55);font-size:0.74rem;min-height:1em;"></div>
     </div>
@@ -216,6 +219,44 @@ function allianceDebugEnv(){
   const masked = tk ? (tk.slice(0,4) + '…' + tk.slice(-4) + ' (len=' + tk.length + ')') : '(空/未配置)';
   console.log('[联盟][环境] token=', masked, '| 总表GIST_ID=', window.TFJL_MASTER_GIST_ID || '(未设置)');
   return { has: !!tk, masked };
+}
+// 一键诊断：当前 token 对共享总表 gist 是否【可读+可写】
+async function allianceDiag(){
+  const out = document.getElementById('regStep');
+  const tk = (typeof window.getGistToken==='function') ? window.getGistToken() : '';
+  const MASTER = window.TFJL_MASTER_GIST_ID;
+  if(!tk){ if(out){ out.style.color='#ffa500'; out.textContent='⚠️ 未检测到 token，请先配置 GitHub token'; } return; }
+  if(!MASTER){ if(out){ out.style.color='#ffa500'; out.textContent='⚠️ 总表 GIST_ID 未配置'; } return; }
+  if(out){ out.style.color='#ffd700'; out.textContent='🔍 正在诊断总表读写权限…'; }
+  const H = { 'Accept':'application/vnd.github.v3+json', 'Authorization':'token '+tk };
+  try{
+    const r = await fetch('https://api.github.com/gists/'+MASTER, { headers: H });
+    const scope = r.headers.get('X-OAuth-Scopes') || '(无 scope 头)';
+    console.log('[联盟][诊断] 读总表状态='+r.status, '| token scope='+scope);
+    if(!r.ok){
+      if(out){ out.style.color='#ff6b6b'; out.textContent='❌ 总表不可读(状态='+r.status+')：token 无法访问该 gist（可能总表不存在或 token 无效）'; }
+      return;
+    }
+    // 试写总表（写个临时字段再删掉）
+    const p = await fetch('https://api.github.com/gists/'+MASTER, {
+      method:'PATCH', headers: Object.assign({ 'Content-Type':'application/json' }, H),
+      body: JSON.stringify({ files: { '__write_test__': { content: 'diag_'+Date.now() } } })
+    });
+    if(p.ok){
+      await fetch('https://api.github.com/gists/'+MASTER, {
+        method:'PATCH', headers: Object.assign({ 'Content-Type':'application/json' }, H),
+        body: JSON.stringify({ files: { '__write_test__': null } })
+      });
+      if(out){ out.style.color='#4ade80'; out.textContent='✅ 诊断通过：你的 token 可【读+写】总表 gist，注册应能成功'; }
+      console.log('[联盟][诊断] 可写总表 ✓');
+    }else{
+      if(out){ out.style.color='#ff6b6b'; out.textContent='❌ 你的 token 能读总表但【不能写】(PATCH 状态='+p.status+')。原因：总表 gist 属于开发者账户，你自己的 token 无写权限 → 注册会因写总表失败而报错，但联盟 gist 已建在你账户下。'; }
+      console.error('[联盟][诊断] 不可写总表，PATCH 状态='+p.status);
+    }
+  }catch(e){
+    if(out){ out.style.color='#ff6b6b'; out.textContent='❌ 诊断异常: '+((e&&e.message)||e); }
+    console.error('[联盟][诊断] 异常', e);
+  }
 }
 
 async function onLogin(){
