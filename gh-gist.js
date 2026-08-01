@@ -17,13 +17,29 @@
         );
     }
 
+    // 带超时的 fetch：网络不通/代理挂起时不再永久 pending，10s 后明确抛错
+    async function ghFetch(url, options, timeoutMs) {
+        const ms = timeoutMs || 10000;
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), ms);
+        try {
+            const r = await fetch(url, Object.assign({ signal: ctrl.signal }, options || {}));
+            return r;
+        } catch (e) {
+            if (e && e.name === 'AbortError') throw new Error('请求 GitHub 超时(' + ms / 1000 + 's)：请检查网络/代理是否能访问 api.github.com');
+            throw e;
+        } finally {
+            clearTimeout(timer);
+        }
+    }
+
     async function ghGistGet(id) {
-        const r = await fetch(`${GH_API}/gists/${id}`, { headers: ghHeaders() });
+        const r = await ghFetch(`${GH_API}/gists/${id}`, { headers: ghHeaders() });
         if (!r.ok) throw new Error('读取 Gist 失败 (' + r.status + ')');
         return r.json();
     }
     async function ghGistCreate(files, desc, pub) {
-        const r = await fetch(`${GH_API}/gists`, {
+        const r = await ghFetch(`${GH_API}/gists`, {
             method: 'POST', headers: ghHeaders(),
             body: JSON.stringify({ description: desc || 'tfjl', public: !!pub, files })
         });
@@ -31,7 +47,7 @@
         return r.json();
     }
     async function ghGistPatch(id, files) {
-        const r = await fetch(`${GH_API}/gists/${id}`, {
+        const r = await ghFetch(`${GH_API}/gists/${id}`, {
             method: 'PATCH', headers: ghHeaders(),
             body: JSON.stringify({ files })
         });
@@ -39,7 +55,7 @@
         return r.json();
     }
     async function ghGistDelete(id) {
-        const r = await fetch(`${GH_API}/gists/${id}`, { method: 'DELETE', headers: ghHeaders() });
+        const r = await ghFetch(`${GH_API}/gists/${id}`, { method: 'DELETE', headers: ghHeaders() });
         if (!r.ok && r.status !== 404) throw new Error('删除 Gist 失败 (' + r.status + ')');
         return true;
     }
