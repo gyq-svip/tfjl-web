@@ -416,18 +416,59 @@ function allianceSliceStoreKey(){ return 'TFJL_AllianceSlices_' + (session?sessi
 function persistAllianceSlices(){ try{ localStorage.setItem(allianceSliceStoreKey(), JSON.stringify(allianceSliceMeta)); }catch(e){} }
 function restoreAllianceSlices(){ try{ const s=localStorage.getItem(allianceSliceStoreKey()); allianceSliceMeta = s?JSON.parse(s):{}; }catch(e){ allianceSliceMeta={}; } }
 
-// 行分隔线检测（整行近似纯色=分隔线）→ 把每个联盟/每行单独切成一张小图，避免多行同图错位
+// 行切片：先按"文字墨量"找文本行带，再算行距 P（取较大间隔的众数，避免被行内细横线骗），按 P 等分且底边吸附到真正的行间隙，绝不切到文字
 function allianceDetectRowSlices(img, w, h){
   const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
   const ctx=cv.getContext('2d'); ctx.drawImage(img,0,0);
   let data; try{ data=ctx.getImageData(0,0,w,h).data; }catch(e){ return null; }
-  const rowIsLine=[]; const stepX=Math.max(1, Math.floor(w/200));
-  for(let y=0;y<h;y++){ let sum=0,sum2=0,n=0; for(let x=0;x<w;x+=stepX){ const i=(y*w+x)*4; const lum=(data[i]+data[i+1]+data[i+2])/3; sum+=lum; sum2+=lum*lum; n++; } const mean=sum/n; const variance=sum2/n-mean*mean; rowIsLine.push(variance<80); }
-  const segs=[]; let start=-1;
-  for(let y=0;y<h;y++){ if(!rowIsLine[y]){ if(start<0) start=y; } else if(start>=0){ segs.push({top:start,bottom:y}); start=-1; } }
-  if(start>=0) segs.push({top:start,bottom:h});
-  const merged=[]; for(const s of segs){ if(s.bottom-s.top<8){ if(merged.length) merged[merged.length-1].bottom=s.bottom; continue; } merged.push({top:s.top,bottom:s.bottom}); }
-  return merged.length>=2 ? merged : null;
+  const stepX=Math.max(1, Math.floor(w/200));
+  // 每行"墨量"：深色文字像素占比（文字深、背景浅；彩色底/分隔条不算墨，不会制造假间隙）
+  const ink=new Float32Array(h);
+  for(let y=0;y<h;y++){
+    let dark=0,n=0;
+    for(let x=0;x<w;x+=stepX){
+      const i=(y*w+x)*4; const lum=(data[i]+data[i+1]+data[i+2])/3;
+      if(lum<140) dark++; n++;
+    }
+    ink[y]=dark/Math.max(1,n);
+  }
+  // 文本行带（含文字的行）
+  const eps=0.015;
+  const bands=[]; let start=-1;
+  for(let y=0;y<h;y++){ if(ink[y]>eps){ if(start<0) start=y; } else if(start>=0){ bands.push({top:start,bottom:y}); start=-1; } }
+  if(start>=0) bands.push({top:start,bottom:h});
+  if(bands.length<2) return null;
+  // 估算行距 P：相邻文本带"起点"之差；用中位数过滤掉个别大间隙后取众数，且偏向较大间隔 → 不被行内细线骗成半行距
+  const diffs=[];
+  for(let k=0;k<bands.length-1;k++){ const d=bands[k+1].top-bands[k].top; if(d>=8) diffs.push(d); }
+  if(diffs.length<1) return null;
+  diffs.sort((a,b)=>a-b);
+  const med=diffs[Math.floor(diffs.length/2)];
+  const cand=diffs.filter(d=>d>=med);
+  const bucket={}; let P=0,maxc=0;
+  for(const d of cand){ const b=Math.round(d/4)*4; bucket[b]=(bucket[b]||0)+1; if(bucket[b]>maxc){ maxc=bucket[b]; P=b; } }
+  if(!P) P=med;
+  if(P<12) return null; // 行距过小，放弃智能切片
+  // 从首个文本带顶部起按 P 等分；每块底边吸附到最近的"行间隙"（连续无墨行），避免切到文字
+  const T0=bands[0].top;
+  const segs=[]; let top=T0;
+  while(top<h){
+    let bottom=Math.min(h, top+P);
+    let bestGap=-1, bestY=bottom;
+    const scanFrom=Math.floor(top+P*0.4);
+    for(let y=scanFrom; y<bottom; y++){
+      if(ink[y]<eps){
+        let y2=y; while(y2<bottom && ink[y2]<eps) y2++;
+        const gap=y2-y; if(gap>bestGap){ bestGap=gap; bestY=y; }
+        y=y2;
+      }
+    }
+    if(bestGap>=3 && bestY>top+Math.floor(P*0.4)) bottom=bestY;
+    if(bottom-top>=10) segs.push({top, bottom});
+    top+=P;
+    if(bottom>=h) break;
+  }
+  return segs.length>=2 ? segs : null;
 }
 function allianceSliceImage(file){
   return new Promise((resolve,reject)=>{
@@ -436,11 +477,10 @@ function allianceSliceImage(file){
       const w=img.naturalWidth,h=img.naturalHeight; const slices=[];
       try{ const rows=allianceDetectRowSlices(img,w,h);
         if(rows){ rows.forEach(seg=>{ const sh=seg.bottom-seg.top; if(sh<4) return; const cv=document.createElement('canvas'); cv.width=w; cv.height=sh; cv.getContext('2d').drawImage(img,0,seg.top,w,sh,0,0,w,sh); slices.push(cv.toDataURL('image/png').split(',')[1]); }); URL.revokeObjectURL(img.src); resolve(slices); return; }
-      }catch(e){ console.warn('行检测失败，回退定高切片',e); }
-      try{ const fbMax=240, overlap=30, step=fbMax-overlap; let y=0;
-        while(y<h){ const sh=Math.min(fbMax,h-y); if(sh>=10){ const cv=document.createElement('canvas'); cv.width=w; cv.height=sh; cv.getContext('2d').drawImage(img,0,y,w,sh,0,0,w,sh); slices.push(cv.toDataURL('image/png').split(',')[1]); } if(y+sh>=h) break; y+=step; }
-        URL.revokeObjectURL(img.src); resolve(slices);
-      }catch(e){ reject(e); }
+      }catch(e){ console.warn('行检测失败，回退整图输出',e); }
+      // 兜底：不强行按固定高度切片（会切断行），直接整图输出一整张交给 Umi-OCR 按行解析
+      try{ const cv=document.createElement('canvas'); cv.width=w; cv.height=h; cv.getContext('2d').drawImage(img,0,0,w,h); slices.push(cv.toDataURL('image/png').split(',')[1]); URL.revokeObjectURL(img.src); resolve(slices); }
+      catch(e){ reject(e); }
     };
     img.onerror=()=>reject(new Error('图片加载失败'));
     img.src=URL.createObjectURL(file);
