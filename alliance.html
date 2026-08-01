@@ -52,7 +52,7 @@
 <div class="wrap">
   <div class="topbar">
     <a href="index.html" onclick="if(window.parent&&window.parent!==window&&window.parent.closeSubpage){window.parent.closeSubpage();return false;}return true;">← 首页</a>
-    <div class="title" id="pageTitle">🛡️ 盟战个人战绩</div>
+    <div class="title" id="pageTitle">🛡️ 联盟个人战绩统计</div>
     <button id="logoutBtn" style="display:none;" onclick="doLogout()">退出</button>
   </div>
 
@@ -98,6 +98,21 @@
       </div>
       <div class="msg" id="regMsg"></div>
     </div>
+
+    <!-- GitHub Token（部署未注入时手动填一次，存本地共享，注册/登录必需） -->
+    <div style="margin-top:14px;padding-top:12px;border-top:1px dashed rgba(255,255,255,0.15);">
+      <details>
+        <summary style="cursor:pointer;font-size:0.74rem;color:rgba(255,255,255,0.6);">⚙️ GitHub Token（注册/登录必需，若部署未注入请填）</summary>
+        <div style="margin-top:8px;">
+          <input id="gistTokenInput" type="password" placeholder="粘贴 GitHub Personal Access Token（ghp_...）" style="font-size:0.78rem;">
+          <div class="row" style="margin-top:8px;gap:8px;">
+            <button class="ghost small" onclick="saveGistTokenFromInput()">保存 Token</button>
+            <span id="tokenStatus" style="font-size:0.72rem;color:rgba(255,255,255,0.55);align-self:center;"></span>
+          </div>
+          <div class="hint">Token 仅存于本机浏览器，不上传；拥有 gist 权限的 PAT 即可。保存后刷新页面生效。</div>
+        </div>
+      </details>
+    </div>
   </div>
   </div>
 
@@ -122,7 +137,7 @@
     </div>
 
     <div class="card">
-      <h2>📝 个人战绩（排名 / 人名 / 奖杯数 / 最大连胜）</h2>
+      <h2>📝 联盟个人战绩（排名 / 人名 / 奖杯数 / 最大连胜）</h2>
       <div id="tblBox">
         <table id="recTbl">
           <thead><tr><th>排名</th><th>人名</th><th>奖杯数</th><th>最大连胜</th><th></th></tr></thead>
@@ -177,6 +192,16 @@ function doLogout(){
   localStorage.removeItem(SKEY);
   session = null;
   location.reload();
+}
+
+// 手动保存 GitHub Token（部署未注入时），存到共享 localStorage（iframe 同域即首页也能读到）
+function saveGistTokenFromInput(){
+  const v = $('gistTokenInput').value.trim();
+  if(!v){ setMsg('tokenStatus','请先粘贴 Token','err'); return; }
+  if(!v.startsWith('ghp_') && !v.startsWith('github_pat_')){ setMsg('tokenStatus','Token 应以 ghp_ 或 github_pat_ 开头','err'); return; }
+  try{ localStorage.setItem('TFJL_Gist_Token', v); }catch(e){}
+  setMsg('tokenStatus','已保存，刷新后生效','ok');
+  toast('✅ Token 已保存');
 }
 
 // ---------- 登录 / 注册 ----------
@@ -313,6 +338,12 @@ async function renderHistory(){
 
 // ---------- 启动 ----------
 (function init(){
+  // 预填已保存的 GitHub Token（若有），并提示是否需要手动填
+  try{
+    const tk = (typeof window.getGistToken==='function') ? window.getGistToken() : (localStorage.getItem('TFJL_Gist_Token')||'');
+    if(tk && tk.length>10 && tk!=='YOUR_GITHUB_TOKEN_HERE'){ const ti=$('gistTokenInput'); if(ti) ti.value=tk; }
+    else { const ts=$('tokenStatus'); if(ts) ts.textContent='未检测到 Token，请展开填写'; }
+  }catch(e){}
   try{ const s=localStorage.getItem(SKEY); if(s) session=JSON.parse(s); }catch(e){}
   if(session && session.gistId){
     enterMain();
