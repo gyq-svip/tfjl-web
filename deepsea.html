@@ -940,16 +940,16 @@ document.addEventListener('paste', async (e)=>{
     for(const it of imgs){ const f=it.getAsFile(); if(f){ e.preventDefault(); await deepseaRunOcr([f]); } }
 });
 // 切片策略（需求优化）：默认"一个联盟(=一行)切一张图"，避免多盟同图错位。
-// 先按表格横线检测行边界，把每个联盟单独裁成一张小图逐个识别（慢但准、不错位）；
-// 检测不到分隔线（如无缝表格）则回退到较小的定高切片（≤240px，仍比旧 900px/约11盟错位少）。
-// 小图（高度≤maxH 且无分隔线）原样送 OCR。
+// 用 Otsu 自适应阈值判"文字行"（整行亮度方差高=有文字），对深/浅背景都准（势力个人排行为暗紫灰底）；
+// 每个文字带=一个人(一行，哪怕名字+联盟上下两行也合并为一个带)，精确切该带，绝不切到字、绝不几行并一块。
 function deepseaDetectRowSlices(img, w, h) {
     const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
     const ctx = cv.getContext('2d'); ctx.drawImage(img, 0, 0);
     let data;
     try { data = ctx.getImageData(0, 0, w, h).data; } catch (e) { return null; }
-    const rowIsLine = [];
     const stepX = Math.max(1, Math.floor(w / 200));
+    // ① 每行亮度方差
+    const varRow = new Float32Array(h);
     for (let y = 0; y < h; y++) {
         let sum = 0, sum2 = 0, n = 0;
         for (let x = 0; x < w; x += stepX) {
@@ -957,22 +957,51 @@ function deepseaDetectRowSlices(img, w, h) {
             const lum = (data[i] + data[i + 1] + data[i + 2]) / 3;
             sum += lum; sum2 += lum * lum; n++;
         }
-        const mean = sum / n;
-        const variance = sum2 / n - mean * mean;
-        rowIsLine.push(variance < 80); // 整行近似纯色=分隔线/间隔
+        const mean = sum / n; let v = sum2 / n - mean * mean; if (v < 0) v = 0;
+        varRow[y] = v;
     }
-    const segs = []; let start = -1;
+    // ② Otsu 阈值（把行分高/低方差两类）
+    let mx = 0; for (let y = 0; y < h; y++) if (varRow[y] > mx) mx = varRow[y];
+    const bins = 256; const hist = new Int32Array(bins);
+    for (let y = 0; y < h; y++) { let bi = Math.floor(varRow[y] / mx * (bins - 1)); if (bi < 0) bi = 0; else if (bi >= bins) bi = bins - 1; hist[bi]++; }
+    const total = h; let sumAll = 0; for (let i = 0; i < bins; i++) sumAll += i * hist[i];
+    let sumB = 0, wB = 0, maxVar = -1, threshBin = 0;
+    for (let i = 0; i < bins; i++) {
+        wB += hist[i]; if (wB === 0) continue; const wF = total - wB; if (wF === 0) break;
+        sumB += i * hist[i]; const mB = sumB / wB; const mF = (sumAll - sumB) / wF;
+        const between = wB * wF * (mB - mF) * (mB - mF);
+        if (between > maxVar) { maxVar = between; threshBin = i; }
+    }
+    const thresh = threshBin / (bins - 1) * mx;
+    // ③ 文字行（方差>thresh）；<MIN_BAND 的细线当分隔线排除
+    const MIN_BAND = 4;
+    const isText = new Array(h).fill(false); let runStart = -1;
     for (let y = 0; y < h; y++) {
-        if (!rowIsLine[y]) { if (start < 0) start = y; }
-        else if (start >= 0) { segs.push({ top: start, bottom: y }); start = -1; }
+        if (varRow[y] > thresh) { if (runStart < 0) runStart = y; }
+        else if (runStart >= 0) { const len = y - runStart; if (len >= MIN_BAND) for (let yy = runStart; yy < y; yy++) isText[yy] = true; runStart = -1; }
     }
-    if (start >= 0) segs.push({ top: start, bottom: h });
+    if (runStart >= 0) { const len = h - runStart; if (len >= MIN_BAND) for (let yy = runStart; yy < h; yy++) isText[yy] = true; }
+    // ④ 文字带
+    const bands = []; let start = -1;
+    for (let y = 0; y < h; y++) {
+        if (isText[y]) { if (start < 0) start = y; }
+        else if (start >= 0) { bands.push({ top: start, bottom: y - 1 }); start = -1; }
+    }
+    if (start >= 0) bands.push({ top: start, bottom: h - 1 });
+    if (bands.length < 2) return null;
+    // ⑤ 仅极小间隔(<6px，抗锯齿桥接)才合并，绝不跨人合并（避免"几个并一块"）
+    const diffs = [];
+    for (let k = 0; k < bands.length - 1; k++) { const d = bands[k + 1].top - bands[k].top; if (d >= 6) diffs.push(d); }
+    diffs.sort((a, b) => a - b);
+    const med = diffs.length ? diffs[Math.floor(diffs.length / 2)] : 24;
+    const mergeGap = Math.max(2, Math.min(6, Math.floor(med * 0.15)));
     const merged = [];
-    for (const s of segs) {
-        if (s.bottom - s.top < 8) { if (merged.length) merged[merged.length - 1].bottom = s.bottom; continue; }
-        merged.push({ top: s.top, bottom: s.bottom });
+    for (const b of bands) {
+        if (merged.length && (b.top - merged[merged.length - 1].bottom) <= mergeGap) merged[merged.length - 1].bottom = b.bottom;
+        else merged.push({ top: b.top, bottom: b.bottom });
     }
-    return merged.length >= 2 ? merged : null;
+    // 每个带精确切片：文字顶→底，上下各留 1px 安全边（不跨入相邻带文字，绝不切到字）
+    return merged.map(m => ({ top: Math.max(0, m.top - 1), bottom: Math.min(h, m.bottom + 1) }));
 }
 
 function deepseaSliceImage(file, maxH) {

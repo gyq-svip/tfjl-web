@@ -417,35 +417,47 @@ function persistAllianceSlices(){ try{ localStorage.setItem(allianceSliceStoreKe
 function restoreAllianceSlices(){ try{ const s=localStorage.getItem(allianceSliceStoreKey()); allianceSliceMeta = s?JSON.parse(s):{}; }catch(e){ allianceSliceMeta={}; } }
 
 // 切片策略（按"文字带"精确切，绝不切到字、绝不几行并一块）：
-// ①逐行算墨量(深色像素占比)→判定文字行；②把连续文字行合成"文字带"(带内若夹着 <4px 细黑线(分隔线)则排除，避免被横线连成一行)；
-// ③每个文字带 = 一个人(一行)，精确切该带(上/下各留 1px 安全边，绝不跨入相邻带的文字)；④相邻带间隔极小(抗锯齿桥接)才合并，绝不跨人合并。
-// 并自动量出"行距 / 行间间距"供状态栏显示核对。
+// 用 Otsu 自适应阈值判"文字行"（整行亮度方差高=有文字），对深/浅背景都准（盟战战绩为深蓝渐变底）；
+// 每个文字带=一个人(一行，名字+奖杯/连胜等上下多行也合并为一个带)，精确切该带，绝不切到字、绝不几行并一块。
+// 自动量出"行距 / 行间间距"供状态栏显示核对。
 let allianceLastSliceInfo=null;
 function allianceDetectRowSlices(img, w, h){
   const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
   const ctx=cv.getContext('2d'); ctx.drawImage(img,0,0);
   let data; try{ data=ctx.getImageData(0,0,w,h).data; }catch(e){ return null; }
   const stepX=Math.max(1, Math.floor(w/200));
-  // 每行墨量（深色文字像素占比，文字深、背景浅）
-  const ink=new Float32Array(h);
+  // ① 每行亮度方差
+  const varRow=new Float32Array(h);
   for(let y=0;y<h;y++){
-    let dark=0,n=0;
+    let sum=0,sum2=0,n=0;
     for(let x=0;x<w;x+=stepX){
       const i=(y*w+x)*4; const lum=(data[i]+data[i+1]+data[i+2])/3;
-      if(lum<140) dark++; n++;
+      sum+=lum; sum2+=lum*lum; n++;
     }
-    ink[y]=dark/n;
+    const mean=sum/n; let v=sum2/n-mean*mean; if(v<0) v=0; varRow[y]=v;
   }
-  const eps=0.02, MIN_BAND=4;
-  // 判定文字行：连续"含文字"且高度达标(>=4px)的行才记作文字；孤立 <4px 的细黑线(分隔线)不算文字→自然断开相邻行
-  const isText=new Array(h).fill(false);
-  let runStart=-1;
+  // ② Otsu 阈值
+  let mx=0; for(let y=0;y<h;y++) if(varRow[y]>mx) mx=varRow[y];
+  const bins=256; const hist=new Int32Array(bins);
+  for(let y=0;y<h;y++){ let bi=Math.floor(varRow[y]/mx*(bins-1)); if(bi<0)bi=0; else if(bi>=bins)bi=bins-1; hist[bi]++; }
+  const total=h; let sumAll=0; for(let i=0;i<bins;i++) sumAll+=i*hist[i];
+  let sumB=0,wB=0,maxVar=-1,threshBin=0;
+  for(let i=0;i<bins;i++){
+    wB+=hist[i]; if(wB===0) continue; const wF=total-wB; if(wF===0) break;
+    sumB+=i*hist[i]; const mB=sumB/wB; const mF=(sumAll-sumB)/wF;
+    const between=wB*wF*(mB-mF)*(mB-mF);
+    if(between>maxVar){ maxVar=between; threshBin=i; }
+  }
+  const thresh=threshBin/(bins-1)*mx;
+  // ③ 文字行（方差>thresh）；<MIN_BAND 的细线当分隔线排除
+  const MIN_BAND=4;
+  const isText=new Array(h).fill(false); let runStart=-1;
   for(let y=0;y<h;y++){
-    if(ink[y]>eps){ if(runStart<0) runStart=y; }
+    if(varRow[y]>thresh){ if(runStart<0) runStart=y; }
     else if(runStart>=0){ const len=y-runStart; if(len>=MIN_BAND) for(let yy=runStart;yy<y;yy++) isText[yy]=true; runStart=-1; }
   }
   if(runStart>=0){ const len=h-runStart; if(len>=MIN_BAND) for(let yy=runStart;yy<h;yy++) isText[yy]=true; }
-  // 文字带
+  // ④ 文字带
   const bands=[]; let start=-1;
   for(let y=0;y<h;y++){
     if(isText[y]){ if(start<0) start=y; }
@@ -453,12 +465,12 @@ function allianceDetectRowSlices(img, w, h){
   }
   if(start>=0) bands.push({top:start,bottom:h-1});
   if(bands.length<2){ allianceLastSliceInfo=null; return null; }
-  // 估算行距 P（相邻文字带 top 之差的众数）：仅用于把"同一人换行/图标"的抗锯齿桥接合并回来，绝不跨人合并
+  // ⑤ 仅极小间隔(<6px，抗锯齿桥接)才合并，绝不跨人合并
   const diffs=[];
   for(let k=0;k<bands.length-1;k++){ const d=bands[k+1].top-bands[k].top; if(d>=6) diffs.push(d); }
   diffs.sort((a,b)=>a-b);
   const med=diffs.length?diffs[Math.floor(diffs.length/2)]:24;
-  const mergeGap=Math.max(3, Math.floor(med*0.4)); // 仅合并真正相邻的带（抗锯齿桥接），绝不跨行人合并
+  const mergeGap=Math.max(2, Math.min(6, Math.floor(med*0.15)));
   const merged=[];
   for(const b of bands){
     if(merged.length && (b.top-merged[merged.length-1].bottom)<=mergeGap) merged[merged.length-1].bottom=b.bottom;
