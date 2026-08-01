@@ -223,28 +223,32 @@ function allianceDebugEnv(){
 // 一键诊断：当前 token 对共享总表 gist 是否【可读+可写】
 async function allianceDiag(){
   const out = document.getElementById('regStep');
+  const btn = document.getElementById('diagBtn');
+  if(btn){ btn.disabled=true; btn.textContent='诊断中…'; }
   const tk = (typeof window.getGistToken==='function') ? window.getGistToken() : '';
   const MASTER = window.TFJL_MASTER_GIST_ID;
-  if(!tk){ if(out){ out.style.color='#ffa500'; out.textContent='⚠️ 未检测到 token，请先配置 GitHub token'; } return; }
-  if(!MASTER){ if(out){ out.style.color='#ffa500'; out.textContent='⚠️ 总表 GIST_ID 未配置'; } return; }
+  if(!tk){ if(out){ out.style.color='#ffa500'; out.textContent='⚠️ 未检测到 token，请先配置 GitHub token'; } if(btn){btn.disabled=false;btn.textContent='🔍 诊断：我的 token 能否读写总表';} return; }
+  if(!MASTER){ if(out){ out.style.color='#ffa500'; out.textContent='⚠️ 总表 GIST_ID 未配置'; } if(btn){btn.disabled=false;btn.textContent='🔍 诊断：我的 token 能否读写总表';} return; }
   if(out){ out.style.color='#ffd700'; out.textContent='🔍 正在诊断总表读写权限…'; }
   const H = { 'Accept':'application/vnd.github.v3+json', 'Authorization':'token '+tk };
+  const ctrl = new AbortController();
+  const timer = setTimeout(()=>ctrl.abort(), 10000);
   try{
-    const r = await fetch('https://api.github.com/gists/'+MASTER, { headers: H });
+    const r = await fetch('https://api.github.com/gists/'+MASTER, { headers: H, signal: ctrl.signal });
     const scope = r.headers.get('X-OAuth-Scopes') || '(无 scope 头)';
     console.log('[联盟][诊断] 读总表状态='+r.status, '| token scope='+scope);
     if(!r.ok){
-      if(out){ out.style.color='#ff6b6b'; out.textContent='❌ 总表不可读(状态='+r.status+')：token 无法访问该 gist（可能总表不存在或 token 无效）'; }
+      if(out){ out.style.color='#ff6b6b'; out.textContent='❌ 总表不可读(状态='+r.status+')：token 无法访问该 gist（可能总表不存在或 token 无效/网络不通）'; }
       return;
     }
     // 试写总表（写个临时字段再删掉）
     const p = await fetch('https://api.github.com/gists/'+MASTER, {
-      method:'PATCH', headers: Object.assign({ 'Content-Type':'application/json' }, H),
+      method:'PATCH', headers: Object.assign({ 'Content-Type':'application/json' }, H), signal: ctrl.signal,
       body: JSON.stringify({ files: { '__write_test__': { content: 'diag_'+Date.now() } } })
     });
     if(p.ok){
       await fetch('https://api.github.com/gists/'+MASTER, {
-        method:'PATCH', headers: Object.assign({ 'Content-Type':'application/json' }, H),
+        method:'PATCH', headers: Object.assign({ 'Content-Type':'application/json' }, H), signal: ctrl.signal,
         body: JSON.stringify({ files: { '__write_test__': null } })
       });
       if(out){ out.style.color='#4ade80'; out.textContent='✅ 诊断通过：你的 token 可【读+写】总表 gist，注册应能成功'; }
@@ -254,15 +258,21 @@ async function allianceDiag(){
       console.error('[联盟][诊断] 不可写总表，PATCH 状态='+p.status);
     }
   }catch(e){
-    if(out){ out.style.color='#ff6b6b'; out.textContent='❌ 诊断异常: '+((e&&e.message)||e); }
+    const msg = (e && e.name==='AbortError') ? '❌ 诊断超时(10s)：请检查网络/代理能否访问 api.github.com' : ('❌ 诊断异常: '+((e&&e.message)||e));
+    if(out){ out.style.color='#ff6b6b'; out.textContent=msg; }
     console.error('[联盟][诊断] 异常', e);
+  }finally{
+    clearTimeout(timer);
+    if(btn){ btn.disabled=false; btn.textContent='🔍 诊断：我的 token 能否读写总表'; }
   }
 }
 
 async function onLogin(){
+  const btn=$('loginBtn');
+  if(btn){ btn.disabled=true; btn.textContent='处理中…'; }
+  console.log('[联盟][onLogin] 函数已执行');   // 最前置：点按钮后若此日志都没有，说明脚本未加载(缓存)
   const u=$('loginUser').value.trim(), p=$('loginPwd').value;
-  if(!u||!p){ setMsg('loginMsg','请填写账号和密码','err'); return; }
-  const btn=$('loginBtn'); if(btn) btn.disabled=true;
+  if(!u||!p){ setMsg('loginMsg','请填写账号和密码','err'); if(btn){btn.disabled=false;btn.textContent='登录';} return; }
   setMsg('loginMsg','正在查询联盟总表…');
   console.log('[联盟] onLogin 开始:', { u, hasToken: !!(typeof window.getGistToken==='function' && window.getGistToken()) });
   allianceDebugEnv();
@@ -272,16 +282,18 @@ async function onLogin(){
     setMsg('loginMsg','登录成功 ✓');
     enterMain();
   }catch(e){ allianceErr('login', e); setMsg('loginMsg', (e&&e.message)||'登录失败','err'); }
-  finally{ if(btn) btn.disabled=false; }
+  finally{ if(btn){ btn.disabled=false; btn.textContent='登录'; } }
 }
 
 async function onRegister(){
+  const btn=$('regBtn');
+  if(btn){ btn.disabled=true; btn.textContent='处理中…'; }
+  console.log('[联盟][onRegister] 函数已执行');  // 最前置：点按钮后若此日志都没有，说明脚本未加载(缓存)
   const u=$('regUser').value.trim(), p=$('regPwd').value, p2=$('regPwd2').value;
   const alId=$('regAlId').value.trim(), alName=$('regAlName').value.trim();
-  if(!u||!p||!alId){ setMsg('regMsg','账号/密码/联盟号必填','err'); return; }
-  if(p.length<4){ setMsg('regMsg','密码至少4位','err'); return; }
-  if(p!==p2){ setMsg('regMsg','两次密码不一致','err'); return; }
-  const btn=$('regBtn'); if(btn) btn.disabled=true;
+  if(!u||!p||!alId){ setMsg('regMsg','账号/密码/联盟号必填','err'); if(btn){btn.disabled=false;btn.textContent='注册并绑定联盟';} return; }
+  if(p.length<4){ setMsg('regMsg','密码至少4位','err'); if(btn){btn.disabled=false;btn.textContent='注册并绑定联盟';} return; }
+  if(p!==p2){ setMsg('regMsg','两次密码不一致','err'); if(btn){btn.disabled=false;btn.textContent='注册并绑定联盟';} return; }
   setMsg('regMsg',''); setMsg('regStep','① 正在查询联盟总表（是否已存在该联盟号）…');
   console.log('[联盟] onRegister 开始:', { u, alId, alName, hasToken: !!(typeof window.getGistToken==='function' && window.getGistToken()) });
   allianceDebugEnv();
@@ -295,7 +307,7 @@ async function onRegister(){
     setMsg('regMsg','注册成功，战绩库已自动创建并加入联盟总表 ✓','ok');
     enterMain();
   }catch(e){ allianceErr('register', e); setMsg('regMsg', (e&&e.message)||'注册失败','err'); }
-  finally{ if(btn) btn.disabled=false; }
+  finally{ if(btn){ btn.disabled=false; btn.textContent='注册并绑定联盟'; } }
 }
 
 // ---------- 主界面 ----------
