@@ -68,7 +68,6 @@
       <div class="title">🛡️ 联盟个人战绩</div>
       <button class="auth-close" title="关闭" onclick="closeAuth()">✕</button>
     </div>
-    <div class="msg" id="tokenBanner" style="margin:4px 0 10px;"></div>
     <div class="tabs">
       <div class="tab active" id="tabLogin" onclick="switchTab('login')">登录</div>
       <div class="tab" id="tabReg" onclick="switchTab('reg')">注册</div>
@@ -105,9 +104,6 @@
       <div class="hint">注册成功后，此账号自动绑定该联盟号（联盟号已存在则直接绑定，多人可共同编辑同一联盟）。</div>
       <div style="margin-top:14px;">
         <button class="btn btn-primary" style="width:100%;" id="regBtn" onclick="onRegister()">注册并绑定联盟</button>
-      </div>
-      <div style="margin-top:8px;">
-        <button class="btn" style="width:100%;font-size:0.8rem;" id="diagBtn" onclick="allianceDiag()">🔍 诊断：我的 token 能否读写总表</button>
       </div>
       <div class="msg" id="regMsg"></div>
       <div class="msg" id="regStep" style="color:rgba(255,255,255,0.55);font-size:0.74rem;min-height:1em;"></div>
@@ -204,13 +200,9 @@ const SKEY = 'TFJL_AllianceSession';
 // 健壮解析同步 Token：优先用与其他正常功能同一套的 DB.ghToken()（读 localStorage），
 // 再退化父窗 getGistToken，最后直读 localStorage。保证"其他 gist 功能能读写"时联盟页也能拿到。
 function resolveToken(){
-  let tk='';
-  // 优先取父窗口（index.html 主文档）注入的真实 token —— iframe 子页自身 window 没有 getGistToken，
-  // 它定义在父窗全局，子页独立文档拿不到（诊断按钮也专门用 window.parent.getGistToken 才成功）。
-  try{ if(window.parent && typeof window.parent.getGistToken==='function'){ tk=window.parent.getGistToken(); if(tk) return tk; } }catch(e){ console.warn('[联盟][token] parent.getGistToken 失败', e); }
-  // 退化：本页 gh-gist.js 自带的 ghToken（内部也会回退 localStorage）
-  try{ if(DB && typeof DB.ghToken==='function'){ tk=DB.ghToken(); if(tk) return tk; } }catch(e){ console.warn('[联盟][token] DB.ghToken 失败', e); }
-  try{ tk=localStorage.getItem('TFJL_Gist_Token')||''; if(tk) return tk; }catch(e){}
+  // 与需求墙/聊天室同构：token 由部署（GitHub Pages）注入到父窗 index.html 的 getGistToken()，
+  // 子页（iframe）直接复用父窗注入的 token，拼入 Authorization 头即可，不做任何"检查/横幅/输入框"。
+  try{ if(window.parent && typeof window.parent.getGistToken==='function') return window.parent.getGistToken(); }catch(e){}
   return '';
 }
 let session = null;
@@ -254,60 +246,8 @@ function allianceErr(where, e){
     stepEl.textContent = '❌ 出错['+where+']: ' + ((e && e.message) || detail);
   }
 }
-// 打印当前 token 状态与总表 gist id（定位"写总表失败"的关键线索）
-function allianceDebugEnv(){
-  let tk = '';
-  try { tk = (typeof window.parent.getGistToken==='function') ? window.parent.getGistToken() : ''; } catch(e){}
-  const masked = tk ? (tk.slice(0,4) + '…' + tk.slice(-4) + ' (len=' + tk.length + ')') : '(空/未配置)';
-  console.log('[联盟][环境] token=', masked, '| 总表GIST_ID=', window.TFJL_MASTER_GIST_ID || '(未设置)');
-  return { has: !!tk, masked };
-}
-// 一键诊断：当前 token 对共享总表 gist 是否【可读+可写】
-async function allianceDiag(){
-  const out = document.getElementById('regStep');
-  const btn = document.getElementById('diagBtn');
-  if(btn){ btn.disabled=true; btn.textContent='诊断中…'; }
-  const tk = (typeof window.parent.getGistToken==='function') ? window.parent.getGistToken() : '';
-  const MASTER = window.TFJL_MASTER_GIST_ID;
-  if(!tk){ if(out){ out.style.color='#ffa500'; out.textContent='⚠️ 未检测到 token，请先配置 GitHub token'; } if(btn){btn.disabled=false;btn.textContent='🔍 诊断：我的 token 能否读写总表';} return; }
-  if(!MASTER){ if(out){ out.style.color='#ffa500'; out.textContent='⚠️ 总表 GIST_ID 未配置'; } if(btn){btn.disabled=false;btn.textContent='🔍 诊断：我的 token 能否读写总表';} return; }
-  if(out){ out.style.color='#ffd700'; out.textContent='🔍 正在诊断总表读写权限…'; }
-  const H = { 'Accept':'application/vnd.github.v3+json', 'Authorization':'token '+tk };
-  const ctrl = new AbortController();
-  const timer = setTimeout(()=>ctrl.abort(), 10000);
-  try{
-    const r = await fetch('https://api.github.com/gists/'+MASTER, { headers: H, signal: ctrl.signal });
-    const scope = r.headers.get('X-OAuth-Scopes') || '(无 scope 头)';
-    console.log('[联盟][诊断] 读总表状态='+r.status, '| token scope='+scope);
-    if(!r.ok){
-      if(out){ out.style.color='#ff6b6b'; out.textContent='❌ 总表不可读(状态='+r.status+')：token 无法访问该 gist（可能总表不存在或 token 无效/网络不通）'; }
-      return;
-    }
-    // 试写总表（写个临时字段再删掉）
-    const p = await fetch('https://api.github.com/gists/'+MASTER, {
-      method:'PATCH', headers: Object.assign({ 'Content-Type':'application/json' }, H), signal: ctrl.signal,
-      body: JSON.stringify({ files: { '__write_test__': { content: 'diag_'+Date.now() } } })
-    });
-    if(p.ok){
-      await fetch('https://api.github.com/gists/'+MASTER, {
-        method:'PATCH', headers: Object.assign({ 'Content-Type':'application/json' }, H), signal: ctrl.signal,
-        body: JSON.stringify({ files: { '__write_test__': null } })
-      });
-      if(out){ out.style.color='#4ade80'; out.textContent='✅ 诊断通过：你的 token 可【读+写】总表 gist，注册应能成功'; }
-      console.log('[联盟][诊断] 可写总表 ✓');
-    }else{
-      if(out){ out.style.color='#ff6b6b'; out.textContent='❌ 你的 token 能读总表但【不能写】(PATCH 状态='+p.status+')。原因：总表 gist 属于开发者账户，你自己的 token 无写权限 → 注册会因写总表失败而报错，但联盟 gist 已建在你账户下。'; }
-      console.error('[联盟][诊断] 不可写总表，PATCH 状态='+p.status);
-    }
-  }catch(e){
-    const msg = (e && e.name==='AbortError') ? '❌ 诊断超时(10s)：请检查网络/代理能否访问 api.github.com' : ('❌ 诊断异常: '+((e&&e.message)||e));
-    if(out){ out.style.color='#ff6b6b'; out.textContent=msg; }
-    console.error('[联盟][诊断] 异常', e);
-  }finally{
-    clearTimeout(timer);
-    if(btn){ btn.disabled=false; btn.textContent='🔍 诊断：我的 token 能否读写总表'; }
-  }
-}
+// 联盟页 token 由部署（GitHub Pages）注入，与需求墙/聊天室同构：直接复用父窗 getGistToken() 拼入请求头，
+// 不做任何"诊断/检查/横幅"。token 为空时由 GitHub 返回 401，注册/登录自然报错，无需前端预检。
 
 async function onLogin(){
   const btn=$('loginBtn');
@@ -317,7 +257,6 @@ async function onLogin(){
   if(!u||!p){ setMsg('loginMsg','请填写账号和密码','err'); if(btn){btn.disabled=false;btn.textContent='登录';} return; }
   setMsg('loginMsg','正在查询联盟总表…');
   console.log('[联盟] onLogin 开始:', { u, hasToken: !!resolveToken() });
-  allianceDebugEnv();
   try{
     session = await DB.loginAccount(u,p);
     localStorage.setItem(SKEY, JSON.stringify(session));
@@ -338,7 +277,6 @@ async function onRegister(){
   if(p!==p2){ setMsg('regMsg','两次密码不一致','err'); if(btn){btn.disabled=false;btn.textContent='注册并绑定联盟';} return; }
   setMsg('regMsg',''); setMsg('regStep','① 正在查询联盟总表（是否已存在该联盟号）…');
   console.log('[联盟] onRegister 开始:', { u, alId, alName, hasToken: !!resolveToken() });
-  allianceDebugEnv();
   try{
     const al = await DB.registerAccount(u,p,alId,alName, (s)=>{
       if(s==='creating') setMsg('regStep','② 联盟号不存在 → 正在新建联盟战绩库 Gist…');
@@ -458,22 +396,8 @@ async function renderHistory(){
 
 // ---------- 启动 ----------
 (function init(){
-  // 同步状态横幅：Token 由部署自动注入（父窗 index.html 统一写入，子页只读，绝不在此让用户粘贴明文）
-  try{
-    const tk = resolveToken();
-    const banner = $('tokenBanner');
-    if(banner){
-      if(tk && tk.length>10 && tk!=='YOUR_GITHUB_TOKEN_HERE'){
-        banner.textContent='✅ GitHub 同步已自动启用（Token 已就绪），注册即自动建库。';
-        banner.className='msg ok';
-      } else {
-        banner.textContent='⚠️ 未检测到同步 Token：Token 由部署/首页统一注入，请勿在此粘贴明文。若首页已登录仍提示此处无 Token，请刷新首页后重试（或重启 App 重载前端）。无 Token 时按钮将不可用。';
-        banner.className='msg err';
-        ['loginBtn','regBtn'].forEach(id=>{ const b=$(id); if(b) b.disabled=true; });
-        console.warn('[联盟][token] 未检测到 token（部署注入缺失或需刷新首页）');
-      }
-    }
-  }catch(e){}
+  // 联盟页 token 由部署（GitHub Pages）统一注入父窗，子页直接复用，不做任何预检/横幅/禁用。
+  // 与需求墙/聊天室同构：拿父窗注入的 token 直接发 gist 请求，401 由后端自然报错。
   try{ const s=localStorage.getItem(SKEY); if(s) session=JSON.parse(s); }catch(e){}
   if(session && session.gistId){
     enterMain();
