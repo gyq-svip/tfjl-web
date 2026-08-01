@@ -52,7 +52,12 @@
     }
 
     function ghToken() {
-        // 复用 index.html 既有的 getGistToken()（部署注入 / localStorage 兜底）
+        // iframe 子页（alliance.html/deepsea.html）独立文档拿不到父窗全局函数，
+        // 必须优先查 window.parent.getGistToken（父窗已注入真实 token），否则子页自身无此函数。
+        if (window.parent && window.parent !== window && typeof window.parent.getGistToken === 'function') {
+            const pt = window.parent.getGistToken();
+            if (pt) return pt;
+        }
         if (typeof window.getGistToken === 'function') return window.getGistToken();
         return localStorage.getItem('TFJL_Gist_Token') || '';
     }
