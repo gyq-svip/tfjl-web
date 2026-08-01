@@ -492,23 +492,33 @@ async function allianceRunOcr(files){
   if(!files.length) return;
   const inv=allianceGetInvoke(); const status=$('ocrStatus');
   if(!inv){ setMsg('saveMsg','OCR 识别需在本机桌面 App 内运行（网页版不支持，请用电脑桌面端打开）','warn'); return; }
-  if(status) status.textContent='切片 + OCR 中…';
   allianceRunCounter++; const myRun=allianceRunCounter; allianceSliceResults=[];
+  // 先切片（快、同步 canvas）→ 汇总成待识别队列，先显示「已切 N 块」让你确认切完没
+  const allSlices=[]; let sliceFail=false;
   for(const file of files){
-    let slices; try{ slices=await allianceSliceImage(file); }catch(e){ console.error('[联盟][切片]',e); setMsg('saveMsg','切片失败：'+(e.message||e),'err'); continue; }
-    for(const b64 of slices){
-      if(myRun!==allianceRunCounter) return;
-      let txt=''; try{ const r=await inv('umi_ocr',{ base64:b64 }); txt=allianceExtractOcrText(r); }catch(e){ txt=''; }
-      const key='alliance_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
-      allianceSliceMeta[key]={ dataUrl:'data:image/png;base64,'+b64, text:txt };
-      allianceSliceResults.push({ key, dataUrl:'data:image/png;base64,'+b64, text:txt });
-    }
+    let slices; try{ slices=await allianceSliceImage(file); }catch(e){ console.error('[联盟][切片]',e); sliceFail=true; continue; }
+    for(const b64 of slices) allSlices.push(b64);
+  }
+  const totalSlice=allSlices.length;
+  if(!totalSlice){ setMsg('saveMsg','切片失败，未切出任何块（'+(sliceFail?'图片加载/切片异常':'图片中未检测到文字行')+'）','err'); if(status) status.textContent=''; return; }
+  if(status) status.textContent='已切 '+totalSlice+' 块，OCR 中… (0/'+totalSlice+')';
+  let done=0;
+  for(let i=0;i<totalSlice;i++){
+    if(myRun!==allianceRunCounter) return;   // 新一轮 OCR，放弃本轮
+    const b64=allSlices[i];
+    let txt=''; try{ const r=await inv('umi_ocr',{ base64:b64 }); txt=allianceExtractOcrText(r); }catch(e){ txt=''; }
+    const key='alliance_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
+    allianceSliceMeta[key]={ dataUrl:'data:image/png;base64,'+b64, text:txt };
+    allianceSliceResults.push({ key, dataUrl:'data:image/png;base64,'+b64, text:txt });
+    done++;
+    if(status) status.textContent='已切 '+totalSlice+' 块，OCR 中… ('+done+'/'+totalSlice+')';
   }
   allianceRenderOcrCompare();
   $('ocrRaw').value=allianceSliceResults.map(s=>s.text).join('\n');
   $('ocrRawBox').style.display='block';
   persistAllianceSlices();
-  if(status) status.textContent='已识别 '+allianceSliceResults.length+' 块切片，逐块对照后点「解析并填入战绩表」';
+  const totalLines=$('ocrRaw').value.split(/\r?\n/).filter(Boolean).length;
+  if(status) status.textContent='已切 '+totalSlice+' 块（识别 '+files.length+' 张图），共 '+totalLines+' 行，逐块对照后点「解析并填入战绩表」';
 }
 function allianceRenderOcrCompare(){
   const box=$('allianceOcrCompare');
