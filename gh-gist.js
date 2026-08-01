@@ -1,7 +1,55 @@
 // gh-gist.js — GitHub Gist 读写层 + 盟战战绩数据库逻辑 + 本地缓存
-// 依赖：github-config.js（提供 window.GITHUB_TOKEN / hashPassword / verifyPassword）
 (function () {
     const GH_API = 'https://api.github.com';
+
+    // ===== 密码哈希（自包含，字节级对齐 index.html 的 hashPassword/verifyPassword）=====
+    // 关键修复：联盟页以 iframe 独立文档加载，拿不到父窗口全局的 hashPassword，
+    // 导致 registerAccount/loginAccount 调用 undefined → 注册/登录点不动。此处自带实现。
+    const _ENC_FIXED_SALT = 'tfjl-share-v2-salt';
+    const _PBKDF2_ITER = 200000;
+    function _abToB64(buf) {
+        const bytes = new Uint8Array(buf);
+        let bin = '';
+        for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+        return btoa(bin);
+    }
+    async function ghGistHashPassword(password) {
+        try {
+            if (window.crypto && window.crypto.subtle) {
+                const enc = new TextEncoder();
+                const salt = enc.encode(_ENC_FIXED_SALT);
+                const km = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveBits']);
+                const bits = await crypto.subtle.deriveBits(
+                    { name: 'PBKDF2', salt: salt, iterations: _PBKDF2_ITER, hash: 'SHA-256' }, km, 256);
+                return 'v2$' + _abToB64(bits);
+            }
+        } catch (e) { /* 降级 */ }
+        let h1 = 0x811c9dc5, h2 = 0x1000193;
+        for (let i = 0; i < password.length; i++) {
+            const c = password.charCodeAt(i);
+            h1 = (h1 ^ c) * 0x01000193;
+            h2 = (h2 + c * 16777619) >>> 0;
+        }
+        return 'fnv' + (h1 >>> 0).toString(16) + (h2 >>> 0).toString(16);
+    }
+    async function ghGistVerifyPassword(input, storedHash) {
+        if (!storedHash) return false;
+        if (storedHash.indexOf('v2$') === 0) return (await ghGistHashPassword(input)) === storedHash;
+        try {
+            if (window.crypto && window.crypto.subtle) {
+                const data = new TextEncoder().encode(input);
+                const hash = await crypto.subtle.digest('SHA-256', data);
+                if (btoa(String.fromCharCode(...new Uint8Array(hash))) === storedHash) return true;
+            }
+        } catch (e) {}
+        let h1 = 0x811c9dc5, h2 = 0x1000193;
+        for (let i = 0; i < input.length; i++) {
+            const c = input.charCodeAt(i);
+            h1 = (h1 ^ c) * 0x01000193;
+            h2 = (h2 + c * 16777619) >>> 0;
+        }
+        return ('fnv' + (h1 >>> 0).toString(16) + (h2 >>> 0).toString(16)) === storedHash;
+    }
 
     function ghToken() {
         // 复用 index.html 既有的 getGistToken()（部署注入 / localStorage 兜底）
@@ -120,7 +168,7 @@
     // onStep('creating') 在需要新建联盟 gist 时回调（供 UI 显示进度）。
     async function registerAccount(username, password, allianceId, allianceName, onStep) {
         console.log('[联盟] registerAccount 开始:', { username, allianceId, allianceName, hasToken: !!ghToken() });
-        const passwordHash = await hashPassword(password);
+        const passwordHash = await ghGistHashPassword(password);
         // 本次运行内新建的联盟 gist：写总表失败时回滚删除，避免孤儿 gist 累积；
         // 重试时复用同一 gist，绝不在重试中重复创建。
         let createdGistThisRun = null;
@@ -176,7 +224,7 @@
         const data = await loadRegistry();
         const acc = data.accounts[username];
         if (!acc) throw new Error('账号不存在，请先注册');
-        if (!(await verifyPassword(password, acc.passwordHash))) throw new Error('密码错误');
+        if (!(await ghGistVerifyPassword(password, acc.passwordHash))) throw new Error('密码错误');
         const al = data.alliances[acc.allianceId] || { name: acc.allianceName, gistId: null };
         return { username, allianceId: acc.allianceId, allianceName: al.name || acc.allianceName, gistId: al.gistId };
     }
