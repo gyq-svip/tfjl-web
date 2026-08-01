@@ -384,28 +384,80 @@ function allianceExtractOcrText(r){
   return '';
 }
 // 解析 OCR 文本 → [{rank,name,cups,streak}]
+// 盟战每行4字段：排名(左侧数字框) + 名字 + 杯数(🏆图标旁数字,无文字标签) + 最大连胜("最大连胜："标签)。
+// Umi-OCR 对"奖杯"图标旁的杯数数字极不稳定：常漏识、或把"奖"误识为 G、把杯数飘成孤行。
+// 旧逻辑逐行且强求3个数字 → 杯数一漏整行被丢。新逻辑：
+//  ① 先按"行首为数字/整行纯数字(排名框)"把文本切成"每人一块"，连胜行/杯数孤行/名字续行并入上一块；
+//  ② 块内：连胜用关键词(最大连胜|大连胜|连胜,抗"最"→"大"误识)；杯数优先"奖杯/奖/杯"标签后的数字，
+//     否则取"排名之后、连胜数字之前"的最后一个数字(杯数在连胜正上方)；不再因缺数字丢行(缺失补0)。
 function parseAllianceOcrText(text){
   const rows=[];
-  const lines = String(text||'').split(/\r?\n/);
-  for(const raw of lines){
-    const line = raw.trim();
+  const rawLines = String(text||'').split(/\r?\n/).map(l=>l.trim());
+  // 分块：以"行首为数字或整行纯数字(排名框)"的行作为新一人起点；连胜行/杯数孤行/名字续行并入当前块
+  const blocks=[]; let cur=null;
+  for(const line of rawLines){
     if(!line) continue;
-    // 跳过表头（含列名且无"数字 姓名 数字 数字"结构）
-    if(/^(排名|名次|姓名|人名|奖杯|连胜|排行|战绩|联盟)/.test(line) && !/\d+\s+\S+\s+\d+\s+\d/.test(line)) continue;
-    const nums = [...line.matchAll(/-?\d+/g)].map(m=>({ v:parseInt(m[0],10), idx:m.index }));
-    if(nums.length < 3) continue;            // 至少需要 排名+奖杯+连胜
+    const hasStreak=/(最大连胜|大连胜|连胜)/.test(line);
+    const m=line.match(/-?\d+/);
+    const isNewPerson = !!m && (line===String(m[0]) || /^\d/.test(line)) && !hasStreak;
+    if(isNewPerson && cur!==null){ blocks.push(cur); cur=[line]; }
+    else { if(cur===null) cur=[line]; else cur.push(line); }
+  }
+  if(cur) blocks.push(cur);
+  for(const blk of blocks){
+    const full = blk.join('\n');
+    const streakM = full.match(/(?:最大连胜|大连胜|连胜)\D*?(-?\d+)/);
+    const streak = streakM ? parseInt(streakM[1],10) : null;
+    const cupM = full.match(/(?:奖杯|奖\s*杯|杯)\D*?(-?\d+)/);
+    const nums = [...full.matchAll(/-?\d+/g)].map(mm=>({v:parseInt(mm[0],10), idx:mm.index}));
+    if(!nums.length) continue;
     const rank = nums[0].v;
-    const cups = nums[nums.length-2].v;
-    const streak = nums[nums.length-1].v;
-    if(rank<=0 || cups<0 || streak<0) continue;
-    // 人名 = 第一个数字之后、倒数第二个数字之前的文本（去掉标点/空格/数字）
-    const nameStart = nums[0].idx + String(nums[0].v).length;
-    const nameEnd = nums[nums.length-2].idx;
-    let name = line.slice(nameStart, nameEnd).replace(/[\s.、，。,:：#()\-_|]/g,'').replace(/\d+/g,'').trim();
+    if(rank<=0) continue;
+    // 名字：连胜关键词之前文字，去掉 rank 本身 + 标点 + 关键词（保留名字内数字如"果子13"）
+    const cut = streakM ? streakM.index : full.length;
+    const head = full.slice(0, cut);
+    const fi = nums[0].idx;
+    let name = (head.slice(0, fi) + head.slice(fi + String(rank).length))
+      .replace(/[\s.、，。,:：#()\-_|]/g,'')
+      .replace(/(最大连胜|大连胜|连胜|奖杯|奖|杯)/g,'')
+      .trim();
     if(!name) continue;
-    rows.push({ rank, name, cups, streak });
+    // 杯数：优先关键词；否则取 rank 之后、连胜数字之前的"最后一个"剩余数字（杯数在连胜正上方）
+    let cups = null;
+    if(cupM) cups = parseInt(cupM[1],10);
+    else {
+      const sIdx = streakM ? full.indexOf(streakM[1], streakM.index) : -1;
+      const between = nums.filter(n=> n.idx>fi && (sIdx<0 || n.idx<sIdx));
+      if(between.length) cups = between[between.length-1].v;
+    }
+    const c = (cups==null)?0:cups;
+    const st = (streak==null)?0:streak;
+    if(c<0 || st<0) continue;
+    rows.push({ rank, name, cups:c, streak:st });
   }
   return rows;
+}
+// 解析"分列 OCR"结果 → {rank,name,cups,streak}
+// 名次来自左列(rankText)首个数字；名字+连胜来自整块(nameText)；杯数来自右列(cupText)，排除连胜数字后的剩余数字。
+function parseAllianceFields(o){
+  const nameText=o.nameText||'', rankText=o.rankText||'', cupText=o.cupText||'';
+  const rankM=rankText.match(/-?\d+/) || nameText.match(/-?\d+/);
+  const rank=rankM?parseInt(rankM[0],10):null;
+  if(rank==null || rank<=0) return null;
+  const streakM=nameText.match(/(?:最大连胜|大连胜|连胜)\D*?(-?\d+)/);
+  const streak=streakM?parseInt(streakM[1],10):null;
+  const cut=streakM?streakM.index:nameText.length;
+  let name=nameText.slice(0,cut).replace(/[\s.、，。,:：#()\-_|]/g,'').replace(/(最大连胜|大连胜|连胜|奖杯|奖|杯)/g,'').trim();
+  if(!name) return null;
+  let cups=0;
+  const cupNums=[...cupText.matchAll(/-?\d+/g)].map(m=>parseInt(m[0],10));
+  if(cupNums.length){
+    const cands=cupNums.filter(v=> v!==(streak==null?NaN:streak));
+    if(cands.length) cups=cands[0];
+  }
+  const st=(streak==null)?0:streak;
+  if(st<0 || cups<0) return null;
+  return { rank, name, cups, streak:st };
 }
 
 let allianceSliceResults = [];   // [{key, dataUrl, text}]
@@ -493,7 +545,7 @@ function allianceDetectRowSlices(img, w, h){
   // 不用"固定网格/anchor"——盟战图是拼接图、行距不恒定，且顶部表头/标题会被并进 merged[0]，
   // 一旦 anchor 定在表头，整盘错位。改为：每个检测到的人(merged 元素) = 一刀，用真实位置 ±1px，
   // 绝不切到字、绝不几行并一块。表头那刀会被解析器(text 含"排名/奖杯/连胜")自动跳过，不影响数据。
-  const segs=merged.map(m=>({ top:Math.max(0,m.top-1), bottom:Math.min(h,m.bottom+1) }));
+  const segs=merged.map(m=>({ top:Math.max(0,m.top-2), bottom:Math.min(h,m.bottom+2) }));
   // 量出行数与合并阈值，供状态栏核对
   allianceLastSliceInfo={ lineSpacing:med, mergeGap:gapThresh, rows:segs.length };
   console.log('[联盟][切片] 合并='+merged.length+'块 mergeGap='+gapThresh+'px 共切 '+segs.length+' 块', segs);
@@ -504,17 +556,19 @@ function allianceSliceImage(file, maxH){
     const img=new Image();
     img.onload=()=>{
       const w=img.naturalWidth,h=img.naturalHeight; const slices=[];
-      // 优先：一行(一人)切一张
+      // 优先：一行(一人)切一张，并自适应裁出"排名左列"与"杯数右列"分别放大 OCR
       try{
         const rows=allianceDetectRowSlices(img,w,h);
         if(rows){
-          rows.forEach(seg=>{
+          for(const seg of rows){
             const sh=seg.bottom-seg.top;
-            if(sh<4) return;
+            if(sh<4) continue;
             const cv=document.createElement('canvas'); cv.width=w; cv.height=sh;
             cv.getContext('2d').drawImage(img,0,seg.top,w,sh,0,0,w,sh);
-            slices.push(cv.toDataURL('image/png').split(',')[1]);
-          });
+            const mid=cv.toDataURL('image/png').split(',')[1];
+            const crops=allianceColumnCrops(cv,w,sh);
+            slices.push({ mid, left:crops?crops.left:null, right:crops?crops.right:null });
+          }
           URL.revokeObjectURL(img.src); resolve(slices); return;
         }
       }catch(e){ console.warn('行检测失败，回退定高切片',e); }
@@ -527,7 +581,9 @@ function allianceSliceImage(file, maxH){
           if(sh>=10){
             const cv=document.createElement('canvas'); cv.width=w; cv.height=sh;
             cv.getContext('2d').drawImage(img,0,y,w,sh,0,0,w,sh);
-            slices.push(cv.toDataURL('image/png').split(',')[1]);
+            const mid=cv.toDataURL('image/png').split(',')[1];
+            const crops=allianceColumnCrops(cv,w,sh);
+            slices.push({ mid, left:crops?crops.left:null, right:crops?crops.right:null });
           }
           if(y+sh>=h) break;
           y+=step;
@@ -538,6 +594,43 @@ function allianceSliceImage(file, maxH){
     img.onerror=()=>reject(new Error('图片加载失败'));
     img.src=URL.createObjectURL(file);
   });
+}
+// 对"单行块 canvas"做横向投影：自适应找最左高方差簇(排名框)与最右高方差簇(杯数+连胜)，
+// 分别放大2×裁出，供 Umi-OCR 单独识别（奖杯图标/排名框会干扰整行 OCR，分列后可认出杯数与排名）。
+function allianceColumnCrops(cv,w,sh){
+  try{
+    const ctx=cv.getContext('2d');
+    const data=ctx.getImageData(0,0,w,sh).data;
+    const stepY=Math.max(1,Math.floor(sh/200));
+    const varCol=new Float32Array(w);
+    for(let x=0;x<w;x++){
+      let sum=0,sum2=0,n=0;
+      for(let y=0;y<sh;y+=stepY){ const i=(y*w+x)*4; const lum=(data[i]+data[i+1]+data[i+2])/3; sum+=lum; sum2+=lum*lum; n++; }
+      const mean=sum/n; let v=sum2/n-mean*mean; if(v<0)v=0; varCol[x]=v;
+    }
+    let mx=0; for(let x=0;x<w;x++) if(varCol[x]>mx) mx=varCol[x];
+    if(mx<=0) return null;
+    const bins=256; const hist=new Int32Array(bins);
+    for(let x=0;x<w;x++){ let bi=Math.floor(varCol[x]/mx*(bins-1)); if(bi<0)bi=0; else if(bi>=bins)bi=bins-1; hist[bi]++; }
+    const total=w; let sumAll=0; for(let i=0;i<bins;i++) sumAll+=i*hist[i];
+    let sumB=0,wB=0,maxVar=-1,threshBin=0;
+    for(let i=0;i<bins;i++){ wB+=hist[i]; if(wB===0)continue; const wF=total-wB; if(wF===0)break; sumB+=i*hist[i]; const mB=sumB/wB; const mF=(sumAll-sumB)/wF; const between=wB*wF*(mB-mF)*(mB-mF); if(between>maxVar){maxVar=between;threshBin=i;} }
+    const thresh=threshBin/(bins-1)*mx;
+    const isCol=new Array(w).fill(false); let rs=-1;
+    for(let x=0;x<w;x++){ if(varCol[x]>thresh){ if(rs<0)rs=x; } else { if(rs>=0){ if(x-rs>=3) for(let xx=rs;xx<x;xx++) isCol[xx]=true; rs=-1; } } }
+    if(rs>=0 && w-rs>=3) for(let xx=rs;xx<w;xx++) isCol[xx]=true;
+    const clusters=[]; let cs=-1;
+    for(let x=0;x<w;x++){ if(isCol[x]){ if(cs<0)cs=x; } else { if(cs>=0){ clusters.push({x0:cs,x1:x-1}); cs=-1; } } }
+    if(cs>=0) clusters.push({x0:cs,x1:w-1});
+    if(clusters.length<2) return null;
+    const left=clusters[0], right=clusters[clusters.length-1];
+    const pad=Math.max(2,Math.floor(w*0.02));
+    const crop=(x0,x1)=>{ x0=Math.max(0,x0-pad); x1=Math.min(w-1,x1+pad); const cw=x1-x0+1;
+      const c2=document.createElement('canvas'); c2.width=cw; c2.height=sh; c2.getContext('2d').drawImage(cv,x0,0,cw,sh,0,0,cw,sh);
+      const c3=document.createElement('canvas'); c3.width=cw*2; c3.height=sh*2; c3.getContext('2d').drawImage(c2,0,0,cw*2,sh*2);
+      return c3.toDataURL('image/png').split(',')[1]; };
+    return { left:crop(left.x0,left.x1), right:crop(right.x0,right.x1) };
+  }catch(e){ return null; }
 }
 function allianceOcrFromInput(e){ const files=Array.from((e&&e.target&&e.target.files)||[]); if(files.length) allianceRunOcr(files); }
 async function allianceRunOcr(files){
@@ -558,16 +651,20 @@ async function allianceRunOcr(files){
   let done=0;
   for(let i=0;i<totalSlice;i++){
     if(myRun!==allianceRunCounter) return;   // 新一轮 OCR，放弃本轮
-    const b64=allSlices[i];
-    let txt='';
+    const sl=allSlices[i];
+    const b64=sl.mid;
+    let txt='', rankTxt='', cupTxt='';
+    const ocrOpts={ data:{format:'text', outputDirName:'', outputFileName:'', outputFileFormat:[]}, ocr:{language:'models/config_chinese.txt', cls:true} };
     try{
-      // 与深海势力识别同套 options：指定中文模型 + 方向校正(cls)，否则本机 Umi-OCR 默认配置可能识别不到中文
-      const r=await inv('umi_ocr',{ base64:b64, options:{ data:{format:'text', outputDirName:'', outputFileName:'', outputFileFormat:[]}, ocr:{language:'models/config_chinese.txt', cls:true} } });
+      const r=await inv('umi_ocr',{ base64:b64, options:ocrOpts });
       txt=allianceExtractOcrText(r);
     }catch(e){ txt=''; }
+    // 排名左列、杯数右列分别放大 OCR（整行 OCR 会把排名框/奖杯图标当图形忽略）
+    if(sl.left){ try{ const rl=await inv('umi_ocr',{ base64:sl.left, options:ocrOpts }); rankTxt=allianceExtractOcrText(rl); }catch(e){ rankTxt=''; } }
+    if(sl.right){ try{ const rr=await inv('umi_ocr',{ base64:sl.right, options:ocrOpts }); cupTxt=allianceExtractOcrText(rr); }catch(e){ cupTxt=''; } }
     const key='alliance_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
-    allianceSliceMeta[key]={ dataUrl:'data:image/png;base64,'+b64, text:txt };
-    allianceSliceResults.push({ key, dataUrl:'data:image/png;base64,'+b64, text:txt });
+    allianceSliceMeta[key]={ dataUrl:'data:image/png;base64,'+b64, text:txt, rankText:rankTxt, cupText:cupTxt };
+    allianceSliceResults.push({ key, dataUrl:'data:image/png;base64,'+b64, text:txt, rankText:rankTxt, cupText:cupTxt });
     done++;
     if(status) status.textContent='已切 '+totalSlice+' 块，OCR 中… ('+done+'/'+totalSlice+')';
   }
@@ -596,7 +693,8 @@ async function allianceParseAndImport(){
   let added=0;
   $('recBody').innerHTML='';   // OCR 以截图为准，先清空再填（手动行请识别后补）
   for(const s of allianceSliceResults){
-    parseAllianceOcrText(s.text||'').forEach(rw=>{ addRow(rw.rank, rw.name, rw.cups, rw.streak, s.key); added++; });
+    const rw=parseAllianceFields({ nameText:s.text||'', rankText:s.rankText||'', cupText:s.cupText||'' });
+    if(rw){ addRow(rw.rank, rw.name, rw.cups, rw.streak, s.key); added++; }
   }
   const manual=$('ocrRaw').value.trim();
   if(manual){ parseAllianceOcrText(manual).forEach(rw=>{ addRow(rw.rank,rw.name,rw.cups,rw.streak,''); added++; }); }
