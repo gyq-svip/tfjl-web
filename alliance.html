@@ -69,11 +69,6 @@
       <button class="auth-close" title="关闭" onclick="closeAuth()">✕</button>
     </div>
     <div class="msg" id="tokenBanner" style="margin:4px 0 10px;"></div>
-    <div id="tokenFallback" style="display:none; margin:6px 0 10px; padding:10px; border:1px dashed rgba(255,200,80,0.5); border-radius:8px;">
-      <div style="font-size:0.76rem;color:#ffd47a;margin-bottom:6px;">未自动检测到 Token，可在此直接粘贴你的 GitHub Token（仅存本地浏览器，用于联网建库）：</div>
-      <input id="tokenInput" type="password" placeholder="ghp_xxx 你的 GitHub Token" style="width:100%;padding:8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.06);color:#fff;">
-      <button class="btn" style="width:100%;margin-top:8px;font-size:0.8rem;" onclick="saveInlineToken()">💾 保存并启用</button>
-    </div>
     <div class="tabs">
       <div class="tab active" id="tabLogin" onclick="switchTab('login')">登录</div>
       <div class="tab" id="tabReg" onclick="switchTab('reg')">注册</div>
@@ -217,17 +212,6 @@ function resolveToken(){
   try{ if(DB && typeof DB.ghToken==='function'){ tk=DB.ghToken(); if(tk) return tk; } }catch(e){ console.warn('[联盟][token] DB.ghToken 失败', e); }
   try{ tk=localStorage.getItem('TFJL_Gist_Token')||''; if(tk) return tk; }catch(e){}
   return '';
-}
-function saveInlineToken(){
-  const v=($('tokenInput').value||'').trim();
-  if(!v){ allianceErr('token','请输入 GitHub Token'); return; }
-  try{ localStorage.setItem('TFJL_Gist_Token', v); }catch(e){}
-  const banner=$('tokenBanner');
-  banner.textContent='✅ 已保存 Token 到本地浏览器，注册即自动建库。';
-  banner.className='msg ok';
-  const fb=$('tokenFallback'); if(fb) fb.style.display='none';
-  ['loginBtn','regBtn'].forEach(id=>{ const b=$(id); if(b) b.disabled=false; });
-  console.log('[联盟][token] 用户手动保存 token 成功');
 }
 let session = null;
 let state = { date: todayStr(), rows: [], shot: '' };
@@ -474,22 +458,19 @@ async function renderHistory(){
 
 // ---------- 启动 ----------
 (function init(){
-  // 同步状态横幅：Token 由部署自动注入（与首页同源/同 iframe），无 token 则醒目告警
+  // 同步状态横幅：Token 由部署自动注入（父窗 index.html 统一写入，子页只读，绝不在此让用户粘贴明文）
   try{
     const tk = resolveToken();
     const banner = $('tokenBanner');
-    const fb = $('tokenFallback');
     if(banner){
       if(tk && tk.length>10 && tk!=='YOUR_GITHUB_TOKEN_HERE'){
         banner.textContent='✅ GitHub 同步已自动启用（Token 已就绪），注册即自动建库。';
         banner.className='msg ok';
-        if(fb) fb.style.display='none';
       } else {
-        banner.textContent='⚠️ 未检测到同步 Token：可点下方直接粘贴你的 GitHub Token（仅存本地浏览器）。无 Token 时无法联网建库，按钮将不可用。';
+        banner.textContent='⚠️ 未检测到同步 Token：Token 由部署/首页统一注入，请勿在此粘贴明文。若首页已登录仍提示此处无 Token，请刷新首页后重试（或重启 App 重载前端）。无 Token 时按钮将不可用。';
         banner.className='msg err';
         ['loginBtn','regBtn'].forEach(id=>{ const b=$(id); if(b) b.disabled=true; });
-        if(fb) fb.style.display='block';
-        console.warn('[联盟][token] 未检测到 token，已显示内联输入兜底');
+        console.warn('[联盟][token] 未检测到 token（部署注入缺失或需刷新首页）');
       }
     }
   }catch(e){}
