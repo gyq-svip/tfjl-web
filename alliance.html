@@ -34,6 +34,8 @@
   th { color:#9fb3d9; font-weight:600; }
   td input { padding:7px 6px; font-size:0.84rem; text-align:center; }
   .del { color:#ff8a8a; cursor:pointer; font-weight:700; }
+  .rec-slice { cursor:pointer; font-size:0.95rem; margin-right:6px; opacity:0.85; }
+  .rec-slice:hover { opacity:1; }
   .hist { display:flex; flex-wrap:wrap; gap:8px; margin-top:6px; }
   .hist .d { padding:7px 11px; border-radius:9px; background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.12); cursor:pointer; font-size:0.82rem; }
   .hist .d.cached { border-color:#4dd0e1; }
@@ -147,19 +149,18 @@
     </div>
 
     <div class="card">
-      <h2>🔍 战绩截图（上传 → OCR 一键识别）</h2>
-      <input id="shotInput" type="file" accept="image/*" onchange="onShotChange(event)">
+      <h2>📷 战绩截图切片识别（OCR）</h2>
+      <input id="shotInput" type="file" accept="image/*" multiple onchange="allianceOcrFromInput(event)">
       <div style="margin-top:8px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-        <button class="btn btn-ghost btn-sm" id="ocrBtn" onclick="allianceOcrShot()">📷 OCR 识别并填充战绩表</button>
+        <button class="btn btn-ghost btn-sm" onclick="allianceParseAndImport()">✅ 解析并填入战绩表</button>
+        <button class="btn btn-ghost btn-sm" onclick="allianceClearOcr()">🗑 清空</button>
         <span id="ocrStatus" class="hint"></span>
       </div>
-      <div class="verify-wrap" style="margin-top:10px;">
-        <img id="shotImg" class="verify-img" style="display:none;">
-        <div class="hint" id="shotHint">上传清晰截图，系统自动 OCR 识别「排名 / 人名 / 奖杯数 / 最大连胜」并填入上表；也可 Ctrl+V 直接粘贴截图。识别后请核对再保存。</div>
-      </div>
+      <div class="hint" style="margin-top:6px;">上传战绩截图（可多选）→ 自动按行切片并调本机 Umi-OCR 逐块识别；下方「切片↔识别」左图右文逐块对照，确认无误后点「解析并填入战绩表」即把每行结果填入上表，并保留来源切片（点表中 📷 可回看该行原图）。也可 Ctrl+V 直接粘贴截图。</div>
+      <div id="allianceOcrCompare" style="display:none;margin-top:10px;"></div>
       <div id="ocrRawBox" style="display:none;margin-top:8px;">
-        <div style="font-size:0.72rem;color:rgba(255,255,255,0.6);margin-bottom:4px;">识别原文（供校对，识别不准时对照此原文手动填）：</div>
-        <textarea id="ocrRaw" readonly style="width:100%;height:90px;background:rgba(0,0,0,0.3);color:#cfe;font-size:0.72rem;border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:6px;"></textarea>
+        <div style="font-size:0.72rem;color:rgba(255,255,255,0.6);margin-bottom:4px;">识别原文（识别失败/需补正时可在此对照手动补填）：</div>
+        <textarea id="ocrRaw" style="width:100%;height:90px;background:rgba(0,0,0,0.3);color:#cfe;font-size:0.72rem;border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:6px;"></textarea>
       </div>
     </div>
 
@@ -170,6 +171,16 @@
     </div>
   </div>
 </div>
+
+  <!-- 来源切片查看模态 -->
+  <div class="auth-overlay" id="sliceModal" style="display:none;" onclick="if(event.target===this)closeSliceModal()">
+    <div class="card auth-card">
+      <div class="auth-head"><div class="title">📷 来源切片（该行的 OCR 原图）</div><button class="auth-close" onclick="closeSliceModal()">✕</button></div>
+      <img id="sliceModalImg" style="max-width:100%;max-height:48vh;border-radius:8px;border:1px solid rgba(255,255,255,0.2);display:block;">
+      <pre id="sliceModalText" style="white-space:pre-wrap;word-break:break-all;font-size:0.72rem;color:#cfe;background:rgba(0,0,0,0.3);padding:8px;border-radius:6px;max-height:30vh;overflow:auto;margin:8px 0 0;"></pre>
+      <div class="hint" style="margin-top:6px;">识别不准时，对照此原图手动修改上方表格中对应一行的字段，再保存。</div>
+    </div>
+  </div>
 
 <script src="github-config.js"></script>
 <script src="gh-gist.js"></script>
@@ -214,7 +225,7 @@ function resolveToken(){
   return '';
 }
 let session = null;
-let state = { date: todayStr(), rows: [], shot: '', shotRaw: '' };
+let state = { date: todayStr() };
 
 function todayStr() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
@@ -312,25 +323,28 @@ function enterMain(){
   onLoadDate();
 }
 
-function addRow(rank,name,cups,streak){
+function addRow(rank,name,cups,streak,sliceKey){
   const tb=$('recBody');
   const tr=document.createElement('tr');
+  if(sliceKey) tr.dataset.sliceKey = sliceKey;
   tr.innerHTML = `<td><input class="c-rank" type="number" min="1" value="${rank||''}" placeholder="#"></td>`+
     `<td><input class="c-name" value="${esc(name||'')}" placeholder="人名"></td>`+
     `<td><input class="c-cups" type="number" min="0" value="${cups!=null?cups:''}" placeholder="奖杯"></td>`+
     `<td><input class="c-streak" type="number" min="0" value="${streak!=null?streak:''}" placeholder="连胜"></td>`+
-    `<td><span class="del" onclick="this.parentNode.parentNode.remove()">✕</span></td>`;
+    `<td><span class="rec-slice" title="查看来源切片" onclick="viewRecSlice(this)" ${sliceKey?'':'style="display:none;"'}>📷</span> <span class="del" onclick="this.parentNode.parentNode.remove()">✕</span></td>`;
   tb.appendChild(tr);
 }
 function readRows(){
   return [...$('recBody').querySelectorAll('tr')].map(tr=>{
     const g=s=>tr.querySelector(s).value;
-    return {
+    const row={
       rank: Number(g('.c-rank'))||0,
       name: g('.c-name').trim(),
       cups: Number(g('.c-cups'))||0,
       streak: Number(g('.c-streak'))||0
     };
+    if(tr.dataset.sliceKey) row._sliceKey = tr.dataset.sliceKey;
+    return row;
   }).filter(r=>r.name);
 }
 
@@ -342,9 +356,9 @@ async function onLoadDate(){
   if(session.gistId){ try{ data = await DB.loadDateRecords(session.gistId, state.date); }catch(e){} }
   if(!data){ data = DB.cacheGet(session.gistId, state.date); if(data) setMsg('loadMsg','已载入本地缓存（联网后可上传/刷新）','ok'); }
   $('recBody').innerHTML='';
+  restoreAllianceSlices();
   if(data && data.records && data.records.length){
-    data.records.forEach(r=>addRow(r.rank, r.name, r.cups, r.streak));
-    if(data.screenshot){ state.shot=data.screenshot; showShot(data.screenshot); }
+    data.records.forEach(r=>addRow(r.rank, r.name, r.cups, r.streak, r._sliceKey));
     setMsg('loadMsg', (data.updatedBy?('上次由 '+data.updatedBy+' 更新 · ') : ''+new Date(data.updatedAt||Date.now()).toLocaleString()), 'ok');
   } else {
     addRow();
@@ -352,28 +366,8 @@ async function onLoadDate(){
   }
 }
 
-function onShotChange(e){
-  const f=e.target.files[0]; if(!f) return;
-  const rd=new FileReader();
-  rd.onload=()=>{
-    state.shotRaw = rd.result; // 原图 base64 供 OCR（压缩图仅用于显示）
-    const img=new Image();
-    img.onload=()=>{
-      let w=img.width,h=img.height,max=800;
-      if(w>max){ h=Math.round(h*max/w); w=max; }
-      const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
-      cv.getContext('2d').drawImage(img,0,0,w,h);
-      const url=cv.toDataURL('image/jpeg',0.7);
-      state.shot=url; showShot(url);
-    };
-    img.src=rd.result;
-  };
-  rd.readAsDataURL(f);
-}
-function showShot(url){ const i=$('shotImg'); i.src=url; i.style.display='block'; $('shotHint').style.display='none'; }
-
-// ===================== 联盟个人战绩：OCR 截图一键识别（复用本机 Umi-OCR） =====================
-// 与深海统计同一套离线 Umi-OCR（Rust umi_ocr 命令）；iframe 子页同样能拿到 window.__TAURI__。
+// ===================== 联盟个人战绩：切片 OCR（与深海个人排名同套） =====================
+// 按行切片 → 逐块调本机 Umi-OCR 识别 → 左图右文逐块对照；每行保留来源切片，点表中 📷 回看。
 function allianceGetInvoke(){
   return (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke)
       || (window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke);
@@ -390,7 +384,6 @@ function allianceExtractOcrText(r){
   return '';
 }
 // 解析 OCR 文本 → [{rank,name,cups,streak}]
-// 每行形如：排名 人名 奖杯数 最大连胜（奖杯/连胜可能带"奖杯"/"连胜"等后缀，已忽略）
 function parseAllianceOcrText(text){
   const rows=[];
   const lines = String(text||'').split(/\r?\n/);
@@ -414,63 +407,119 @@ function parseAllianceOcrText(text){
   }
   return rows;
 }
-async function allianceOcrShot(){
-  const status = $('ocrStatus');
-  const inv = allianceGetInvoke();
-  if(!inv){
-    setMsg('saveMsg','OCR 识别需在本机桌面 App 内运行（网页版不支持，请用电脑桌面端打开）','warn');
-    return;
-  }
-  const b64 = (state.shotRaw || state.shot || '').split(',')[1];
-  if(!b64){ setMsg('saveMsg','请先上传一张战绩截图，或 Ctrl+V 粘贴截图','err'); return; }
-  if(status) status.textContent='识别中…';
-  try{
-    const r = await inv('umi_ocr', { base64:b64 });
-    const text = allianceExtractOcrText(r);
-    $('ocrRaw').value = text;
-    $('ocrRawBox').style.display='block';
-    const rows = parseAllianceOcrText(text);
-    if(!rows.length){ if(status) status.textContent='未能解析出战绩行（可在上方原文区对照手动填）'; return; }
-    $('recBody').innerHTML='';
-    rows.forEach(rw=>addRow(rw.rank, rw.name, rw.cups, rw.streak));
-    if(status) status.textContent='已识别 '+rows.length+' 条战绩 ✓（请核对后保存）';
-    setMsg('saveMsg','OCR 识别完成，已自动填入 '+rows.length+' 条，请核对无误后点「保存并上传 Gist」','ok');
-  }catch(e){
-    console.error('[联盟][OCR]', e);
-    if(status) status.textContent='OCR 失败：'+(e.message||e);
-    setMsg('saveMsg','OCR 识别失败：'+(e.message||e),'err');
-  }
+
+let allianceSliceResults = [];   // [{key, dataUrl, text}]
+let allianceSliceMeta = {};      // key -> {dataUrl, text}
+let allianceRunCounter = 0;
+
+function allianceSliceStoreKey(){ return 'TFJL_AllianceSlices_' + (session?session.allianceId:'') + '_' + state.date; }
+function persistAllianceSlices(){ try{ localStorage.setItem(allianceSliceStoreKey(), JSON.stringify(allianceSliceMeta)); }catch(e){} }
+function restoreAllianceSlices(){ try{ const s=localStorage.getItem(allianceSliceStoreKey()); allianceSliceMeta = s?JSON.parse(s):{}; }catch(e){ allianceSliceMeta={}; } }
+
+// 行分隔线检测（整行近似纯色=分隔线）→ 把每个联盟/每行单独切成一张小图，避免多行同图错位
+function allianceDetectRowSlices(img, w, h){
+  const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+  const ctx=cv.getContext('2d'); ctx.drawImage(img,0,0);
+  let data; try{ data=ctx.getImageData(0,0,w,h).data; }catch(e){ return null; }
+  const rowIsLine=[]; const stepX=Math.max(1, Math.floor(w/200));
+  for(let y=0;y<h;y++){ let sum=0,sum2=0,n=0; for(let x=0;x<w;x+=stepX){ const i=(y*w+x)*4; const lum=(data[i]+data[i+1]+data[i+2])/3; sum+=lum; sum2+=lum*lum; n++; } const mean=sum/n; const variance=sum2/n-mean*mean; rowIsLine.push(variance<80); }
+  const segs=[]; let start=-1;
+  for(let y=0;y<h;y++){ if(!rowIsLine[y]){ if(start<0) start=y; } else if(start>=0){ segs.push({top:start,bottom:y}); start=-1; } }
+  if(start>=0) segs.push({top:start,bottom:h});
+  const merged=[]; for(const s of segs){ if(s.bottom-s.top<8){ if(merged.length) merged[merged.length-1].bottom=s.bottom; continue; } merged.push({top:s.top,bottom:s.bottom}); }
+  return merged.length>=2 ? merged : null;
 }
-// 支持 Ctrl+V 直接粘贴截图 → 自动识别
-document.addEventListener('paste', (e)=>{
-  const cd = e.clipboardData || (e.originalEvent && e.originalEvent.clipboardData);
-  if(!cd) return;
-  const item = [...cd.items].find(it=>it.type && it.type.startsWith('image/'));
-  if(!item) return;
-  const f = item.getAsFile(); if(!f) return;
-  const rd = new FileReader();
-  rd.onload = ()=>{
-    state.shotRaw = rd.result;
-    const im = new Image();
-    im.onload = ()=>{
-      let w=im.width,h=im.height,max=800; if(w>max){ h=Math.round(h*max/w); w=max; }
-      const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
-      cv.getContext('2d').drawImage(im,0,0,w,h);
-      state.shot = cv.toDataURL('image/jpeg',0.7);
-      showShot(state.shot);
+function allianceSliceImage(file){
+  return new Promise((resolve,reject)=>{
+    const img=new Image();
+    img.onload=()=>{
+      const w=img.naturalWidth,h=img.naturalHeight; const slices=[];
+      try{ const rows=allianceDetectRowSlices(img,w,h);
+        if(rows){ rows.forEach(seg=>{ const sh=seg.bottom-seg.top; if(sh<4) return; const cv=document.createElement('canvas'); cv.width=w; cv.height=sh; cv.getContext('2d').drawImage(img,0,seg.top,w,sh,0,0,w,sh); slices.push(cv.toDataURL('image/png').split(',')[1]); }); URL.revokeObjectURL(img.src); resolve(slices); return; }
+      }catch(e){ console.warn('行检测失败，回退定高切片',e); }
+      try{ const fbMax=240, overlap=30, step=fbMax-overlap; let y=0;
+        while(y<h){ const sh=Math.min(fbMax,h-y); if(sh>=10){ const cv=document.createElement('canvas'); cv.width=w; cv.height=sh; cv.getContext('2d').drawImage(img,0,y,w,sh,0,0,w,sh); slices.push(cv.toDataURL('image/png').split(',')[1]); } if(y+sh>=h) break; y+=step; }
+        URL.revokeObjectURL(img.src); resolve(slices);
+      }catch(e){ reject(e); }
     };
-    im.src = rd.result;
-    allianceOcrShot();
-  };
-  rd.readAsDataURL(f);
-  e.preventDefault();
+    img.onerror=()=>reject(new Error('图片加载失败'));
+    img.src=URL.createObjectURL(file);
+  });
+}
+function allianceOcrFromInput(e){ const files=Array.from((e&&e.target&&e.target.files)||[]); if(files.length) allianceRunOcr(files); }
+async function allianceRunOcr(files){
+  if(!Array.isArray(files)) files=[files];
+  if(!files.length) return;
+  const inv=allianceGetInvoke(); const status=$('ocrStatus');
+  if(!inv){ setMsg('saveMsg','OCR 识别需在本机桌面 App 内运行（网页版不支持，请用电脑桌面端打开）','warn'); return; }
+  if(status) status.textContent='切片 + OCR 中…';
+  allianceRunCounter++; const myRun=allianceRunCounter; allianceSliceResults=[];
+  for(const file of files){
+    let slices; try{ slices=await allianceSliceImage(file); }catch(e){ console.error('[联盟][切片]',e); setMsg('saveMsg','切片失败：'+(e.message||e),'err'); continue; }
+    for(const b64 of slices){
+      if(myRun!==allianceRunCounter) return;
+      let txt=''; try{ const r=await inv('umi_ocr',{ base64:b64 }); txt=allianceExtractOcrText(r); }catch(e){ txt=''; }
+      const key='alliance_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
+      allianceSliceMeta[key]={ dataUrl:'data:image/png;base64,'+b64, text:txt };
+      allianceSliceResults.push({ key, dataUrl:'data:image/png;base64,'+b64, text:txt });
+    }
+  }
+  allianceRenderOcrCompare();
+  $('ocrRaw').value=allianceSliceResults.map(s=>s.text).join('\n');
+  $('ocrRawBox').style.display='block';
+  persistAllianceSlices();
+  if(status) status.textContent='已识别 '+allianceSliceResults.length+' 块切片，逐块对照后点「解析并填入战绩表」';
+}
+function allianceRenderOcrCompare(){
+  const box=$('allianceOcrCompare');
+  if(!allianceSliceResults.length){ box.style.display='none'; box.innerHTML=''; return; }
+  box.style.display='block';
+  box.innerHTML='<div style="font-size:0.72rem;color:#7CFC9B;margin-bottom:6px;">🔍 切片↔识别对比（左图右文，逐块对照定位错位/错字）</div>'
+    + allianceSliceResults.map(s=>'<div style="display:flex;gap:10px;border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:8px;margin-bottom:8px;">'
+      + '<div style="flex:1;min-width:0;"><img src="'+s.dataUrl+'" style="max-width:100%;max-height:260px;border-radius:6px;"></div>'
+      + '<pre style="flex:1;min-width:0;white-space:pre-wrap;word-break:break-all;font-size:0.68rem;color:#cfe;background:rgba(0,0,0,0.3);padding:6px;border-radius:4px;max-height:260px;overflow:auto;margin:0;">'+esc(s.text||'(空)')+'</pre>'
+      + '</div>').join('');
+}
+function allianceClearOcr(){ allianceSliceResults=[]; allianceRenderOcrCompare(); $('ocrRaw').value=''; if($('ocrStatus')) $('ocrStatus').textContent=''; }
+async function allianceParseAndImport(){
+  const status=$('ocrStatus');
+  if(!allianceSliceResults.length && !$('ocrRaw').value.trim()){ setMsg('saveMsg','请先上传战绩截图并切片识别','err'); return; }
+  let added=0;
+  $('recBody').innerHTML='';   // OCR 以截图为准，先清空再填（手动行请识别后补）
+  for(const s of allianceSliceResults){
+    parseAllianceOcrText(s.text||'').forEach(rw=>{ addRow(rw.rank, rw.name, rw.cups, rw.streak, s.key); added++; });
+  }
+  const manual=$('ocrRaw').value.trim();
+  if(manual){ parseAllianceOcrText(manual).forEach(rw=>{ addRow(rw.rank,rw.name,rw.cups,rw.streak,''); added++; }); }
+  persistAllianceSlices();
+  if(status) status.textContent='已填入 '+added+' 条战绩（点表中 📷 可回看每行原图）';
+  setMsg('saveMsg','OCR 解析完成，已填入 '+added+' 条战绩，请核对无误后点「保存并上传 Gist」','ok');
+}
+// 查看某行的来源切片
+function viewRecSlice(btn){
+  const tr=btn.closest('tr'); const key=tr&&tr.dataset?tr.dataset.sliceKey:'';
+  const meta=key&&allianceSliceMeta[key];
+  if(!meta||!meta.dataUrl){ setMsg('saveMsg','该行没有关联的来源切片（可能是手动添加的行）','warn'); return; }
+  $('sliceModalImg').src=meta.dataUrl; $('sliceModalText').textContent=meta.text||'(空)';
+  $('sliceModal').style.display='flex';
+}
+function closeSliceModal(){ $('sliceModal').style.display='none'; }
+// 支持 Ctrl+V 直接粘贴截图 → 自动切片识别
+document.addEventListener('paste', (e)=>{
+  const cd=e.clipboardData || (e.originalEvent && e.originalEvent.clipboardData);
+  if(!cd) return;
+  const items=[...cd.items].filter(it=>it.type && it.type.startsWith('image/'));
+  if(!items.length) return;
+  const files=items.map(it=>it.getAsFile()).filter(Boolean);
+  if(files.length){ e.preventDefault(); allianceRunOcr(files); }
 });
 
 async function onSave(){
   if(!session.gistId){ setMsg('saveMsg','联盟 Gist 未就绪，无法上传（仍可本地缓存）。','warn'); }
   const rows=readRows();
   if(!rows.length){ setMsg('saveMsg','请至少填写一行（含人名）','err'); return; }
-  const data={ date:state.date, updatedAt:Date.now(), updatedBy:session.username, screenshot:state.shot, records:rows };
+  const data={ date:state.date, updatedAt:Date.now(), updatedBy:session.username, records:rows };
+  persistAllianceSlices();
   DB.cacheSet(session.gistId, state.date, data); // 本地缓存（离线可用）
   if(session.gistId){
     try{
