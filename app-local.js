@@ -3455,6 +3455,19 @@ if (isTauriApp) {
                 }
             } catch (fe) { console.warn('[SKIN] load fusions.json failed:', fe); }
 
+            // 拉取云端基础卡定义（cards.json，管理员维护新英雄）
+            try {
+                const cResp = await fetch(REMOTE_SKIN_BASE + '/cards.json', { cache: 'no-cache' });
+                if (cResp.ok) {
+                    const cData = await cResp.json();
+                    if (cData && cData.cards) {
+                        window.cloudCards = cData.cards;
+                        console.log('[SKIN] cloud cards loaded:', Object.keys(cData.cards).length);
+                        if (typeof window.renderCloudCardsToPool === 'function') window.renderCloudCardsToPool();
+                    }
+                }
+            } catch (ce) { console.warn('[SKIN] load cards.json failed:', ce); }
+
             // 后台尝试下载远程皮肤到本地 data/skin 目录（仅 Tauri 环境）
             _downloadRemoteSkinsToLocal(registry.heroes);
             // IndexedDB 预热（APP/网页通用，无需 Tauri 文件系统）
