@@ -12222,7 +12222,7 @@
                     const isCurrent = p.name === currentProjectName;
                     const isStartup = startupProject === p.name;
                     html += `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px 16px;background:rgba(255,255,255,0.04);border-radius:12px;margin-bottom:10px;${isCurrent ? 'border:1px solid #4fc3f7;' : 'border:1px solid rgba(255,255,255,0.06)'}">`;
-                    html += `<div style="flex:1;min-width:0;cursor:pointer;" onclick="loadProjectFromDB('${p.name}').then(()=>closeProjectDialog()).catch(e=>alert('加载失败:'+e))">`;
+                    html += `<div style="flex:1;min-width:0;cursor:pointer;" onclick="loadProjectByName('${p.name}').then(()=>closeProjectDialog()).catch(e=>alert('加载失败:'+e))">`;
                     html += `<div style="color:${isCurrent ? '#4fc3f7' : '#fff'};font-weight:bold;font-size:1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.name}${isCurrent ? ' ✓' : ''}</div>`;
                     html += `<div style="color:rgba(255,255,255,0.5);font-size:0.8rem;margin-top:2px;">${date}</div>`;
                     html += `</div>`;
@@ -12331,6 +12331,8 @@
         function loadProjectByName(name) {
             if (!name) return;
             if (name === '-- 选择项目 --' || name === '') return;
+            // 已是当前项目：不重载，避免丢失未保存修改
+            if (name === currentProjectName) { const dlg = document.getElementById('projectDialog'); if (dlg) dlg.style.display = 'none'; return; }
 
             // 处理"新建项目"选项
             if (name === '__NEW__') {
@@ -12382,24 +12384,9 @@
                         });
                 };
 
-                // 新建前先把手头当前项目（若有未保存改动）落盘，避免误丢旧内容
+                // 新建前若当前项目有未保存改动，弹确认（保存当前 / 放弃当前），再建空白
                 if (currentProjectName && currentProjectName !== safeName && window.__tfjlProjectDirty) {
-                    const cur = {
-                        myHandCards: (typeof myHandCards !== 'undefined') ? myHandCards : [],
-                        teammateHandCards: (typeof teammateHandCards !== 'undefined') ? teammateHandCards : [],
-                        myPlacedCards: (typeof myPlacedCards !== 'undefined') ? myPlacedCards : [],
-                        teammatePlacedCards: (typeof teammatePlacedCards !== 'undefined') ? teammatePlacedCards : [],
-                        cardLevels: (typeof cardLevels !== 'undefined') ? cardLevels : {},
-                        cardSkins: (typeof cardSkins !== 'undefined') ? cardSkins : {},
-                        cardMoHua: (typeof cardMoHua !== 'undefined') ? cardMoHua : {},
-                        myDeckInfo: (document.getElementById('myDeckInfo') ? document.getElementById('myDeckInfo').value : ''),
-                        teammateDeckInfo: (document.getElementById('teammateDeckInfo') ? document.getElementById('teammateDeckInfo').value : ''),
-                        notepad: (document.getElementById('notepad') ? document.getElementById('notepad').value : ''),
-                        txtFiles: (typeof txtFiles !== 'undefined') ? txtFiles : [],
-                        referenceImages: (typeof referenceImages !== 'undefined') ? referenceImages : []
-                    };
-                    saveProjectToDB(currentProjectName, (typeof currentProjectCategory !== 'undefined' ? currentProjectCategory : '默认分类'), cur)
-                        .then(createBlank).catch(createBlank);
+                    showSwitchConfirmModal('__NEW__', createBlank);
                 } else {
                     createBlank();
                 }
@@ -12423,30 +12410,84 @@
             };
 
             if (currentProjectName && currentProjectName !== name) {
-                const currentData = {
-                    myHandCards: (typeof myHandCards !== 'undefined') ? myHandCards : [],
-                    teammateHandCards: (typeof teammateHandCards !== 'undefined') ? teammateHandCards : [],
-                    myPlacedCards: (typeof myPlacedCards !== 'undefined') ? myPlacedCards : [],
-                    teammatePlacedCards: (typeof teammatePlacedCards !== 'undefined') ? teammatePlacedCards : [],
-                    cardLevels: (typeof cardLevels !== 'undefined') ? cardLevels : {},
-                    cardSkins: (typeof cardSkins !== 'undefined') ? cardSkins : {},
-                    cardMoHua: (typeof cardMoHua !== 'undefined') ? cardMoHua : {},
-                    myDeckInfo: (document.getElementById('myDeckInfo') ? document.getElementById('myDeckInfo').value : ''),
-                    teammateDeckInfo: (document.getElementById('teammateDeckInfo') ? document.getElementById('teammateDeckInfo').value : ''),
-                    notepad: (document.getElementById('notepad') ? document.getElementById('notepad').value : ''),
-                    txtFiles: (typeof txtFiles !== 'undefined') ? txtFiles : [],
-                    referenceImages: (typeof referenceImages !== 'undefined') ? referenceImages : []
-                };
-                // 先保存当前项目（await 后再加载目标，确保落盘完成）
-                saveProjectToDB(currentProjectName, (typeof currentProjectCategory !== 'undefined' ? currentProjectCategory : '默认分类'), currentData)
-                    .then(doLoadTarget)
-                    .catch(doLoadTarget); // 即便保存失败也继续加载目标项目
+                // 不再自动落盘：有未保存修改时弹确认框（保存并切换 / 放弃修改 / 取消）
+                requestSwitchProject(name);
             } else {
                 doLoadTarget();
             }
         }
 
         // 刷新项目选择器（分类+项目下拉框）
+        // 收集当前工作区内存数据（用于手动保存 / 切换确认时落盘）
+        function collectCurrentProjectData() {
+            return {
+                myHandCards: (typeof myHandCards !== 'undefined') ? myHandCards : [],
+                teammateHandCards: (typeof teammateHandCards !== 'undefined') ? teammateHandCards : [],
+                myPlacedCards: (typeof myPlacedCards !== 'undefined') ? myPlacedCards : [],
+                teammatePlacedCards: (typeof teammatePlacedCards !== 'undefined') ? teammatePlacedCards : [],
+                cardLevels: (typeof cardLevels !== 'undefined') ? cardLevels : {},
+                cardSkins: (typeof cardSkins !== 'undefined') ? cardSkins : {},
+                cardMoHua: (typeof cardMoHua !== 'undefined') ? cardMoHua : {},
+                myDeckInfo: (document.getElementById('myDeckInfo') ? document.getElementById('myDeckInfo').value : ''),
+                teammateDeckInfo: (document.getElementById('teammateDeckInfo') ? document.getElementById('teammateDeckInfo').value : ''),
+                notepad: (document.getElementById('notepad') ? document.getElementById('notepad').value : ''),
+                txtFiles: (typeof txtFiles !== 'undefined') ? txtFiles : [],
+                referenceImages: (typeof referenceImages !== 'undefined') ? referenceImages : []
+            };
+        }
+
+        // 切换项目守卫：若当前有未保存修改，弹确认（保存并切换 / 放弃修改 / 取消）。绝不自动落盘。
+        function requestSwitchProject(targetName) {
+            const doLoad = () => {
+                loadProjectFromDB(targetName).then(() => {
+                    refreshProjectSelectors();
+                    const sp = document.getElementById('projectSearchPanel');
+                    if (sp) sp.style.display = 'none';
+                }).catch(e => console.error('加载项目失败:', e));
+            };
+            if (window.__tfjlProjectDirty && currentProjectName && currentProjectName !== targetName) {
+                showSwitchConfirmModal(targetName, doLoad);
+            } else {
+                doLoad();
+            }
+        }
+
+        // 未保存修改确认框：保存并切换 / 放弃修改 / 取消
+        function showSwitchConfirmModal(targetName, doLoad) {
+            if (document.getElementById('__switchConfirm')) return;
+            const isNew = (targetName === '__NEW__');
+            const overlay = document.createElement('div');
+            overlay.id = '__switchConfirm';
+            overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:5000;display:flex;align-items:center;justify-content:center;padding:20px;';
+            overlay.innerHTML =
+                '<div style="background:#1a1a2e;border:2px solid rgba(255,215,0,0.4);border-radius:14px;padding:22px;max-width:430px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,0.5);">' +
+                    '<div style="color:#ffd700;font-size:1.05rem;font-weight:600;margin-bottom:8px;">⚠️ 未保存的修改</div>' +
+                    '<div style="color:rgba(255,255,255,0.85);font-size:0.86rem;line-height:1.55;margin-bottom:18px;">当前项目「' + (currentProjectName || '') + '」有未保存的改动（如下卡槽、移动卡牌、互换位置等）。' + (isNew ? '新建前请选择：' : '切换前请选择：') + '</div>' +
+                    '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
+                        '<button id="__scSave" style="flex:1;min-width:120px;padding:10px;border-radius:8px;border:none;background:linear-gradient(135deg,#4ade80,#22c55e);color:#fff;cursor:pointer;font-weight:600;">💾 保存并切换</button>' +
+                        '<button id="__scDiscard" style="flex:1;min-width:120px;padding:10px;border-radius:8px;border:1px solid rgba(255,158,128,0.5);background:rgba(255,158,128,0.12);color:#ff9e80;cursor:pointer;font-weight:600;">🗑 放弃修改</button>' +
+                        '<button id="__scCancel" style="flex:1;min-width:120px;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.06);color:#fff;cursor:pointer;">✖ 取消</button>' +
+                    '</div>' +
+                '</div>';
+            document.body.appendChild(overlay);
+            const close = () => { overlay.remove(); };
+            document.getElementById('__scSave').onclick = () => {
+                const cur = collectCurrentProjectData();
+                const cat = (typeof currentProjectCategory !== 'undefined' ? currentProjectCategory : '默认分类');
+                saveProjectToDB(currentProjectName, cat, cur).then(() => {
+                    window.__tfjlProjectDirty = false;
+                    if (typeof updateSaveIndicator === 'function') updateSaveIndicator();
+                    close(); doLoad();
+                }).catch(() => { close(); doLoad(); });
+            };
+            document.getElementById('__scDiscard').onclick = () => { close(); doLoad(); };
+            document.getElementById('__scCancel').onclick = () => {
+                close();
+                const sel = document.getElementById('projectSelector1');
+                if (sel && currentProjectName) sel.value = currentProjectName;
+            };
+        }
+
         function refreshProjectSelectors() {
             // 先加载项目列表
             loadProjectListFromDB().then(allProjects => {
@@ -29996,7 +30037,7 @@ ${maSection}
     </div>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260803-140</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260803-141</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
