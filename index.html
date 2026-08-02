@@ -18753,7 +18753,7 @@
             });
             // 重新绑定拖拽/长按（与基础卡一致）
             document.querySelectorAll('.card-item[data-id^="fusion_"]').forEach(card => {
-                card.setAttribute('draggable', 'true');
+                card.setAttribute('draggable', 'false');
                 setupLongPress(card, (e) => handleCardRightClick(e, card));
             });
         }
@@ -19023,7 +19023,7 @@
             // 直接给每个卡牌元素添加事件监听器
             document.querySelectorAll('#' + container.id + ' .selected-card:not(.empty)').forEach(card => {
                 if (!card.classList.contains('placed')) {
-                    card.setAttribute('draggable', 'true');
+                    card.setAttribute('draggable', 'false');
                     card.addEventListener('dragstart', (e) => handleHandDragStart(e, handType));
                     card.addEventListener('click', (e) => handleHandCardClick(e, handType));
                 }
@@ -21006,7 +21006,8 @@
                 const section = grid.closest('.collapsible-section');
                 if (!section) return;
                 
-                card.setAttribute('draggable', 'true');
+                // 非收藏卡禁用原生 DnD，改由 Pointer Events 拖拽层接管（不依赖 webview 原生拖拽，避开卡槽/角标事件干扰）
+                card.setAttribute('draggable', card.closest('#favoriteCardsGrid') ? 'true' : 'false');
                 if (!card.dataset.id || !card.dataset.id.startsWith('custom_')) {
                     setupLongPress(card, (e) => handleCardRightClick(e, card));
                 }
@@ -29828,7 +29829,7 @@ ${maSection}
     </div>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260803-135</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260803-136</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
