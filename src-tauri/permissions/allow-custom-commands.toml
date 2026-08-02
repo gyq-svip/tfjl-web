@@ -1,0 +1,99 @@
+[[permission]]
+identifier = "allow-open-directory-dialog"
+description = "Allow opening directory dialog"
+commands.allow = ["open_directory_dialog"]
+
+[[permission]]
+identifier = "allow-read-directory"
+description = "Allow reading directory contents"
+commands.allow = ["read_directory"]
+
+[[permission]]
+identifier = "allow-read-text-file"
+description = "Allow reading text files"
+commands.allow = ["read_text_file_auto"]
+
+[[permission]]
+identifier = "allow-detect-file-encoding"
+description = "Allow detecting file encoding"
+commands.allow = ["detect_file_encoding"]
+
+[[permission]]
+identifier = "allow-write-text-file"
+description = "Allow writing text files"
+commands.allow = ["write_text_file"]
+
+[[permission]]
+identifier = "allow-git-push-fusions"
+description = "Allow one-click git push of skins/fusions.json from 卡组管理"
+commands.allow = ["git_push_fusions"]
+
+[[permission]]
+identifier = "allow-flash-tray-icon"
+description = "Allow flashing the system tray icon for new-message alert"
+commands.allow = ["flash_tray_icon"]
+
+[[permission]]
+identifier = "allow-delete-file"
+description = "Allow deleting files"
+commands.allow = ["delete_file"]
+
+[[permission]]
+identifier = "allow-path-exists"
+description = "Allow checking if path exists"
+commands.allow = ["path_exists"]
+
+[[permission]]
+identifier = "allow-create-dir"
+description = "Allow creating directories"
+commands.allow = ["create_dir"]
+
+[[permission]]
+identifier = "allow-rename-file"
+description = "Allow renaming files"
+commands.allow = ["rename_file"]
+
+[[permission]]
+identifier = "allow-read-image-base64"
+description = "Allow reading image files as base64 for skin system"
+commands.allow = ["read_image_base64"]
+
+[[permission]]
+identifier = "allow-get-app-version"
+description = "Allow getting app version"
+commands.allow = ["get_app_version"]
+
+[[permission]]
+identifier = "allow-umi-ocr"
+description = "Allow calling local Umi-OCR service (127.0.0.1:1224)"
+commands.allow = ["umi_ocr"]
+
+[[permission]]
+identifier = "allow-start-umi-ocr"
+description = "Allow auto-starting local Umi-OCR process in background"
+commands.allow = ["start_umi_ocr"]
+
+[[permission]]
+identifier = "allow-pick-umi-ocr-exe"
+description = "Allow picking local Umi-OCR.exe via native file dialog"
+commands.allow = ["pick_umi_ocr_exe"]
+
+[[permission]]
+identifier = "allow-open-url"
+description = "Allow opening external links in system browser (bypass WebView target=_blank)"
+commands.allow = ["open_url"]
+
+[[permission]]
+identifier = "allow-write-binary-file"
+description = "Allow writing binary files (installer manual-save fallback)"
+commands.allow = ["write_binary_file"]
+
+[[permission]]
+identifier = "allow-find-umi-ocr"
+description = "Allow auto-finding local Umi-OCR.exe"
+commands.allow = ["find_umi_ocr"]
+
+[[permission]]
+identifier = "allow-download-umi-ocr"
+description = "Allow downloading Umi-OCR Paddle build"
+commands.allow = ["download_umi_ocr"]
