@@ -731,19 +731,45 @@ document.addEventListener('paste', (e)=>{
 });
 
 async function onSave(){
-  if(!session.gistId){ setMsg('saveMsg','联盟 Gist 未就绪，无法上传（仍可本地缓存）。','warn'); }
   const rows=readRows();
   if(!rows.length){ setMsg('saveMsg','请至少填写一行（含人名）','err'); return; }
+  const btn=document.querySelector('button[onclick="onSave()"]');
+  if(btn){ btn.disabled=true; btn.textContent='⏳ 上传中…'; }
+  setMsg('saveMsg','⏳ 正在保存并上传 Gist…','');
   const data={ date:state.date, updatedAt:Date.now(), updatedBy:session.username, records:rows };
   persistAllianceSlices();
   DB.cacheSet(session.gistId, state.date, data); // 本地缓存（离线可用）
-  if(session.gistId){
-    try{
-      await DB.saveDateRecords(session.gistId, state.date, data);
-      setMsg('saveMsg','已保存并上传 Gist ✓','ok');
-    }catch(e){ setMsg('saveMsg','本地已存，Gist 上传失败：'+(e.message||e),'warn'); }
+  if(!session.gistId){
+    setMsg('saveMsg','⚠️ 联盟 Gist 未就绪，仅本地保存。注册/绑定联盟后即可上传。','warn');
+    if(btn){ btn.disabled=false; btn.textContent='保存并上传 Gist'; }
+    renderHistory();
+    return;
   }
+  try{
+    // 15s 超时保护：网络挂起时也要给用户明确反馈，而不是一直"上传中…"
+    const timeout=new Promise((_,rej)=>setTimeout(()=>rej(new Error('上传超时（15s 无响应）')),15000));
+    await Promise.race([ DB.saveDateRecords(session.gistId, state.date, data), timeout ]);
+    const t=new Date(data.updatedAt).toLocaleTimeString();
+    setMsg('saveMsg','✅ 已保存并上传 Gist 成功（'+t+'，共 '+rows.length+' 条）','ok');
+    allianceToast('✅ 上传成功（'+rows.length+' 条战绩）');
+  }catch(e){
+    setMsg('saveMsg','❌ Gist 上传失败：'+(e.message||e)+' —— 本地已缓存，可重试。','err');
+    allianceToast('❌ 上传失败：'+(e.message||e), true);
+  }
+  if(btn){ btn.disabled=false; btn.textContent='保存并上传 Gist'; }
   renderHistory();
+}
+
+// 轻量 toast（iframe 内居中顶部，明显反馈上传结果）
+function allianceToast(msg, isErr){
+  let t=$('allianceToast');
+  if(!t){ t=document.createElement('div'); t.id='allianceToast'; t.style.cssText='position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:9999;padding:10px 18px;border-radius:10px;font-size:0.9rem;font-weight:600;box-shadow:0 4px 16px rgba(0,0,0,.4);max-width:90%;text-align:center;transition:opacity .3s;'; document.body.appendChild(t); }
+  t.textContent=msg;
+  t.style.background=isErr?'rgba(220,40,40,.95)':'rgba(40,160,80,.95)';
+  t.style.color='#fff';
+  t.style.opacity='1';
+  clearTimeout(t._h);
+  t._h=setTimeout(()=>{ t.style.opacity='0'; }, 3500);
 }
 
 async function renderHistory(){
