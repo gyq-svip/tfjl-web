@@ -10926,7 +10926,11 @@
             
             <div class="battle-field">
                 <div class="battle-column user-column">
-                    <h4>👤 我卡组（7格）<span id="myDamageReduction" style="color:#4ecdc4;font-size:0.85rem;margin-left:8px;">洗炼总减伤:0</span></h4>
+                    <h4>👤 我的卡组（7格）<span id="myDamageReduction" style="color:#4ecdc4;font-size:0.85rem;margin-left:8px;">洗炼总减伤:0</span></h4>
+                    <div id="myFusionLockRow" onclick="toggleMyFusionLock()" style="margin:2px 0 6px;font-size:0.72rem;color:rgba(255,255,255,0.7);display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;">
+                        <span id="myFusionLockIcon" style="font-size:0.95rem;">🔓</span>
+                        <span id="myFusionLockText">融合编辑中（右键切被融合卡皮）</span>
+                    </div>
                     <div class="battle-slots-container">
                         <div class="battle-slot engineering-slot empty" data-slot="u0" data-type="engineering">
                             <span class="slot-label">🔧</span>
@@ -10944,6 +10948,10 @@
                 </div>
                 <div class="battle-column teammate-column">
                     <h4>👥 队友卡组（7格）<span id="teammateDamageReduction" style="color:#4ecdc4;font-size:0.85rem;margin-left:8px;">洗炼总减伤:0</span></h4>
+                    <div id="teammateFusionLockRow" onclick="toggleTeammateFusionLock()" style="margin:2px 0 6px;font-size:0.72rem;color:rgba(255,255,255,0.7);display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;">
+                        <span id="teammateFusionLockIcon" style="font-size:0.95rem;">🔓</span>
+                        <span id="teammateFusionLockText">融合编辑中（右键切被融合卡皮）</span>
+                    </div>
                     <div class="battle-slots-container">
                         <div class="battle-slot engineering-slot empty" data-slot="t0" data-type="engineering">
                             <span class="slot-label">🔧</span>
@@ -15812,6 +15820,8 @@
         let teammateFusionLocked = false;
         try { myFusionLocked = (localStorage.getItem('tfjl_my_fusion_locked') === '1'); } catch (e) {}
         try { teammateFusionLocked = (localStorage.getItem('tfjl_teammate_fusion_locked') === '1'); } catch (e) {}
+        // 初始化卡组标题下的融合锁图标（函数声明已提升，此处可安全调用）
+        refreshFusionLockIcons();
 
         // 融合卡拆分：返回各英雄名数组（≥2 视为融合卡），否则 null
         function getFusionParts(cardName) {
@@ -15903,45 +15913,37 @@
                 b.addEventListener('click', (e) => { e.stopPropagation(); e.preventDefault(); openFusionVariantMenu(slot, baseHero, variants, name); });
                 ctrl.appendChild(b);
             }
-            // 「锁定融合」：按卡组(我方/队友)整体锁定，每侧只在「第一张融合卡」上显示一把锁
-            // 未锁定(编辑中)→右键改被融合卡皮；锁定→右键改主卡皮
-            if (isFusion) {
-                // 计算该侧第一张融合卡槽位（锁只显示在这一张上）
-                let _firstFusionSlot = null;
-                document.querySelectorAll('.battle-slot.filled').forEach(s => {
-                    const sid = s.dataset.slot || '';
-                    if (sid.startsWith('u') !== isUserSlot) return;
-                    if (_firstFusionSlot !== null) return;
-                    const cn = s.querySelector('.card-name'); const nm = cn ? cn.textContent : '';
-                    if (getFusionParts(nm) && getFusionParts(nm).length >= 2) _firstFusionSlot = sid;
-                });
-                if (slotId === _firstFusionSlot) {
-                const sideLocked = isUserSlot ? myFusionLocked : teammateFusionLocked;
-                const lb = document.createElement('div');
-                lb.className = 'fusion-lock-btn';
-                lb.textContent = sideLocked ? '🔒' : '🔓';
-                lb.title = sideLocked ? '本侧融合已锁定：右键切换主卡皮肤（点击解锁本侧全部）' : '本侧融合编辑中：右键切换被融合卡皮肤（点击锁定本侧全部）';
-                lb.style.cssText = 'font-size:10px;line-height:15px;padding:0 4px;background:' + (sideLocked ? 'rgba(120,255,160,0.92)' : 'rgba(255,200,120,0.92)') + ';color:#06283d;border-radius:7px;cursor:pointer;';
-                lb.addEventListener('click', (e) => {
-                    e.stopPropagation(); e.preventDefault();
-                    if (isUserSlot) {
-                        myFusionLocked = !myFusionLocked;
-                        try { localStorage.setItem('tfjl_my_fusion_locked', myFusionLocked ? '1' : '0'); } catch (e2) {}
-                    } else {
-                        teammateFusionLocked = !teammateFusionLocked;
-                        try { localStorage.setItem('tfjl_teammate_fusion_locked', teammateFusionLocked ? '1' : '0'); } catch (e2) {}
-                    }
-                    // 刷新本侧所有槽位的融合控件，使锁态同步到全部卡
-                    document.querySelectorAll('.battle-slot.filled').forEach(s => {
-                        const sid = s.dataset.slot || '';
-                        if (isUserSlot ? sid.startsWith('u') : !sid.startsWith('u')) refreshSlotFusionControl(s);
-                    });
-                    if (typeof autoSaveProject === 'function') autoSaveProject();
-                });
-                ctrl.appendChild(lb);
-                }
-            }
             slot.appendChild(ctrl);
+        }
+        // ===== 融合锁图标：放在卡组标题下（不在卡上），按侧整体锁 =====
+        function refreshFusionLockIcons() {
+            const myIcon = document.getElementById('myFusionLockIcon');
+            const myText = document.getElementById('myFusionLockText');
+            if (myIcon) {
+                myIcon.textContent = myFusionLocked ? '🔒' : '🔓';
+                myIcon.title = myFusionLocked ? '我方融合已锁定：右键切换主卡皮肤（点击解锁）' : '我方融合编辑中：右键切换被融合卡皮肤（点击锁定）';
+            }
+            if (myText) myText.textContent = myFusionLocked ? '融合已锁定（右键切主卡皮）' : '融合编辑中（右键切被融合卡皮）';
+            const tmIcon = document.getElementById('teammateFusionLockIcon');
+            const tmText = document.getElementById('teammateFusionLockText');
+            if (tmIcon) {
+                tmIcon.textContent = teammateFusionLocked ? '🔒' : '🔓';
+                tmIcon.title = teammateFusionLocked ? '队友融合已锁定：右键切换主卡皮肤（点击解锁）' : '队友融合编辑中：右键切换被融合卡皮肤（点击锁定）';
+            }
+            if (tmText) tmText.textContent = teammateFusionLocked ? '融合已锁定（右键切主卡皮）' : '融合编辑中（右键切被融合卡皮）';
+        }
+        function toggleMyFusionLock() {
+            myFusionLocked = !myFusionLocked;
+            try { localStorage.setItem('tfjl_my_fusion_locked', myFusionLocked ? '1' : '0'); } catch (e) {}
+            refreshFusionLockIcons();
+            if (typeof autoSaveProject === 'function') autoSaveProject();
+        }
+        function toggleTeammateFusionLock() {
+            teammateFusionLocked = !teammateFusionLocked;
+            try { localStorage.setItem('tfjl_teammate_fusion_locked', teammateFusionLocked ? '1' : '0'); } catch (e) {}
+            refreshFusionLockIcons();
+            if (typeof autoSaveProject === 'function') autoSaveProject();
+        }
         }
         // 弹出融合变体选择菜单（第一项=原卡不融合）
         function openFusionVariantMenu(slot, baseHero, variants, currentName) {
@@ -29594,7 +29596,7 @@ ${maSection}
     </div>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260803-124</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260803-125</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
