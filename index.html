@@ -19146,6 +19146,28 @@
         }
 
         // 战斗槽放置
+        // 把一张卡数据渲染进槽位（含等级徽章 + 皮肤背景）
+        async function paintSlotCard(slot, card, isUser) {
+            if (!card) { clearSlotVisual(slot); return; }
+            const cardId = card.id, cardName = card.name, prof = card.profession, isEng = !!card.isEngineering;
+            const cardType = card.type || (typeof findCardTypeById === 'function' ? findCardTypeById(cardId) : '');
+            const handType = isUser ? 'my' : 'teammate';
+            const levelBadge = cardType ? createLevelBadgeHTML(cardId, cardType, handType, cardName) : '';
+            slot.innerHTML = '<span class="card-item" data-profession="' + prof + '">' + levelBadge + '<span class="card-name">' + cardName + '</span></span>';
+            slot.classList.add('filled'); slot.classList.remove('empty');
+            slot.dataset.cardId = cardId; slot.dataset.profession = prof;
+            if (isEng) slot.dataset.engineering = 'true'; else delete slot.dataset.engineering;
+            try { await applySkinBgToSlot(slot, cardName); } catch (e) {}
+            refreshSlotFusionControl(slot);
+        }
+        // 清空槽位视觉
+        function clearSlotVisual(slot) {
+            slot.innerHTML = (slot.dataset.type === 'engineering') ? '<span class="slot-label">🔧</span><span class="slot-empty">空</span>' : '空';
+            slot.classList.remove('filled', 'skin-bg'); slot.classList.add('empty');
+            delete slot.dataset.cardId; delete slot.dataset.profession; delete slot.dataset.engineering;
+            const oldLayer = slot.querySelector('.skin-layer'); if (oldLayer) oldLayer.remove();
+        }
+
         async function handleSlotDrop(e) {
             e.preventDefault();
             this.classList.remove('drag-over');
@@ -19185,7 +19207,44 @@
                 if (isUserSlot && handType !== 'my') return;
                 if (isTeammateSlot && handType !== 'teammate') return;
             }
-            
+
+            // ===== 卡槽卡 → 卡槽：互换位置 =====
+            if (source === 'slot') {
+                const fromSlotId = (window.__dragPayload && window.__dragPayload.slotId) || '';
+                if (!fromSlotId || fromSlotId === slotId) return;
+                const fromSlot = document.querySelector('.battle-slot[data-slot="' + fromSlotId + '"]');
+                if (!fromSlot || !fromSlot.classList.contains('filled')) return;
+                // 阵营约束：u 槽只与 u 槽换，t 槽只与 t 槽换
+                if (slotId.charAt(0) !== fromSlotId.charAt(0)) {
+                    this.classList.add('invalid-drop'); setTimeout(() => this.classList.remove('invalid-drop'), 500); return;
+                }
+                const fromIsEng = fromSlot.dataset.type === 'engineering';
+                const toIsEng = slotType === 'engineering';
+                if (fromIsEng !== toIsEng) {
+                    this.classList.add('invalid-drop'); setTimeout(() => this.classList.remove('invalid-drop'), 500); return;
+                }
+                const isUser = slotId.startsWith('u');
+                const placedArray = isUser ? myPlacedCards : teammatePlacedCards;
+                if (!Array.isArray(placedArray)) return;
+                const fromCard = placedArray.find(c => c.slot === fromSlotId);
+                const toCard = placedArray.find(c => c.slot === slotId);
+                if (fromCard) fromCard.slot = slotId;
+                if (toCard) toCard.slot = fromSlotId;
+                const handCards = isUser ? myHandCards : teammateHandCards;
+                if (fromCard) { const h = handCards.find(c => c.id === fromCard.id); if (h) h.placed = slotId; }
+                if (toCard) { const h = handCards.find(c => c.id === toCard.id); if (h) h.placed = fromSlotId; }
+                await paintSlotCard(this, toCard, isUser);
+                if (toCard) {
+                    await paintSlotCard(fromSlot, fromCard, isUser);
+                } else {
+                    clearSlotVisual(fromSlot);
+                }
+                updateHandDisplay(isUser ? 'my' : 'teammate');
+                updateDamageReductionDisplay();
+                if (typeof autoSaveProject === 'function') autoSaveProject();
+                return;
+            }
+
             if (this.classList.contains('filled')) {
                 removeCardFromSlot(slotId);
             }
@@ -21093,8 +21152,9 @@
                 window.__pd = null; window.__ghost = null; window.__suppressClick = false; window.__nativeDrag = false;
                 document.addEventListener('pointerdown', (e) => {
                     if (e.button !== undefined && e.button !== 0) return;
-                    const card = e.target.closest('.selected-card:not(.empty)');
+                    const card = e.target.closest('.selected-card:not(.empty), .battle-slot.filled .card-item');
                     if (!card || card.closest('#favoriteCardsGrid')) return;
+                    if (e.target.closest('.card-level-badge')) return; // 等级徽章不触发拖拽
                     window.__pd = { el: card, x: e.clientX, y: e.clientY, started: false, payload: buildDragPayload(card) };
                 }, true);
                 document.addEventListener('pointermove', (e) => {
@@ -21121,6 +21181,10 @@
                     if (slot && pd.payload) {
                         window.__dragPayload = pd.payload;
                         try { await handleSlotDrop.call(slot, { preventDefault(){}, dataTransfer: { getData: () => '' } }); } catch (err) { console.error('[DRAG] pointer drop error', err); }
+                    } else if (pd.payload && pd.payload.source === 'slot') {
+                        // 从卡槽拖到手牌区 = 取下回手牌
+                        const hand = el && (el.closest('#myHandContainer') || el.closest('#teammateHandContainer'));
+                        if (hand) { window.__dragPayload = pd.payload; removeCardFromSlot(pd.payload.slotId); }
                     }
                 }, true);
                 document.addEventListener('click', (e) => {
@@ -21130,6 +21194,12 @@
             }
 
             function buildDragPayload(card) {
+                const slotEl = card.closest('.battle-slot');
+                if (slotEl) {
+                    const nm = card.dataset.name || (slotEl.querySelector('.card-name') ? slotEl.querySelector('.card-name').textContent : '');
+                    const isEng = card.dataset.engineering === 'true' || !!(slotEl.querySelector('.card-item[data-profession="engineering"]'));
+                    return { source: 'slot', slotId: slotEl.dataset.slot, id: slotEl.dataset.cardId || card.dataset.id || '', name: nm, isEngineering: isEng, profession: slotEl.dataset.profession || card.dataset.profession || '' };
+                }
                 const handType = card.closest('#myHandContainer') ? 'my' : (card.closest('#teammateHandContainer') ? 'teammate' : (card.dataset.handType || 'my'));
                 return { source: 'hand', id: card.dataset.id || '', name: card.dataset.name || '', isEngineering: card.dataset.engineering === 'true', profession: card.dataset.profession || '', handType: handType };
             }
@@ -29926,7 +29996,7 @@ ${maSection}
     </div>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260803-139</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260803-140</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
