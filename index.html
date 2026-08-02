@@ -19346,6 +19346,15 @@
                 
                 const cardIndex = handCards.findIndex(c => c.id === cardId);
                 if (cardIndex > -1) {
+                    // 【修复】一张卡在同一边只能占据一个槽位：放下前先从它已有的槽位移除，
+                    // 避免同一张卡被拖到多个卡槽形成重复上阵。
+                    const prevSlot = handCards[cardIndex].placed;
+                    if (prevSlot && prevSlot !== slotId) {
+                        const prevSlotEl = document.querySelector('.battle-slot[data-slot="' + prevSlot + '"]');
+                        const prevIdx = placedArray.findIndex(c => c.slot === prevSlot);
+                        if (prevIdx > -1) placedArray.splice(prevIdx, 1);
+                        if (prevSlotEl) clearSlotVisual(prevSlotEl);
+                    }
                     handCards[cardIndex].placed = slotId;
                     const prof = handCards[cardIndex].profession;
                     const cardType = handCards[cardIndex].type || findCardTypeById(cardId);
@@ -30037,7 +30046,7 @@ ${maSection}
     </div>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260803-141</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260803-142</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
