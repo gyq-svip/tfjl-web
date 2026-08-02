@@ -1,0 +1,49 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "enables the default permissions",
+  "windows": [
+    "main"
+  ],
+  "remote": {
+    "urls": ["https://gyq-svip.github.io/*", "https://*.github.io/*", "https://gyq-svip.github.io/tfjl-web/*"]
+  },
+    "permissions": [
+    "core:default",
+    "updater:default",
+    "core:event:default",
+    "core:window:default",
+    "core:webview:default",
+    "allow-open-directory-dialog",
+    "allow-open-url",
+    "allow-write-binary-file",
+    "allow-read-directory",
+    "allow-read-text-file",
+    "allow-detect-file-encoding",
+    "allow-write-text-file",
+    "allow-git-push-fusions",
+    "allow-flash-tray-icon",
+    "allow-delete-file",
+    "allow-path-exists",
+    "allow-create-dir",
+    "allow-read-image-base64",
+    "allow-umi-ocr",
+    "allow-start-umi-ocr",
+    "allow-pick-umi-ocr-exe",
+    "allow-find-umi-ocr",
+    "allow-download-umi-ocr",
+    "dialog:default",
+    "dialog:allow-open",
+    "dialog:allow-save",
+    "dialog:allow-message",
+    "dialog:allow-ask",
+    "dialog:allow-confirm",
+    "fs:default",
+    {
+      "identifier": "fs:scope",
+      "allow": [
+        { "path": "**" }
+      ]
+    }
+  ]
+}
