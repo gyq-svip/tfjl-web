@@ -422,6 +422,10 @@ function parseAllianceOcrText(text){
       .replace(/(最大连胜|大连胜|连胜|奖杯|奖|杯)/g,'')
       .trim();
     if(!name) continue;
+    // 过滤表头行/多行合并
+    if(/联盟成员|联盟商店|联盟聊天|聊天|奖杯|最大连胜|排名|成员|商店/.test(name)) continue;
+    if((name.match(/果子/g)||[]).length>=2) continue;
+    if(name.length>12) continue;
     // 杯数：优先关键词；否则取 rank 之后、连胜数字之前的"最后一个"剩余数字（杯数在连胜正上方）
     let cups = null;
     if(cupM) cups = parseInt(cupM[1],10);
@@ -449,6 +453,12 @@ function parseAllianceFields(o){
   const cut=streakM?streakM.index:nameText.length;
   let name=nameText.slice(0,cut).replace(/[\s.、，。,:：#()\-_|]/g,'').replace(/(最大连胜|大连胜|连胜|奖杯|奖|杯)/g,'').trim();
   if(!name) return null;
+  // 过滤表头行/多行合并：表头文字、多个名字粘连、重复出现"果子"等
+  if(/联盟成员|联盟商店|联盟聊天|聊天|奖杯|最大连胜|排名|成员|商店/.test(name)) return null;
+  // 名字里出现两次及以上"果子"（如"果子13果子14"）说明合并了多个人名
+  if((name.match(/果子/g)||[]).length>=2) return null;
+  // 名字长度异常长（合并多行/表头）也丢弃
+  if(name.length>12) return null;
   // 杯数 = 奖杯右边的数字（最关键）。
   // 右列现在放宽到 66-100%，包含"奖杯+杯数+最大连胜"。
   // 解析时：若有"最大连胜"关键词，取它之前的最后一个数字作为杯数；否则取右列首个数字。
