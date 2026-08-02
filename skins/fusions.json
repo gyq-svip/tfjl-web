@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated": "2026-08-02T22:33:22.777Z",
+  "updated": "2026-08-02T22:38:13.821Z",
   "note": "融合卡定义：components 为参与融合的2张基础卡。",
   "fusions": {
     "火炮射线": {
@@ -23,6 +23,54 @@
       "components": [
         "小野",
         "酋长"
+      ],
+      "profession": "牧师",
+      "quality": "金"
+    },
+    "死神钢鬃": {
+      "components": [
+        "死神",
+        "钢鬃"
+      ],
+      "profession": "牧师",
+      "quality": "紫"
+    },
+    "魇傀": {
+      "components": [
+        "魇",
+        "傀"
+      ],
+      "profession": "术士",
+      "quality": "金"
+    },
+    "葵钢鬃": {
+      "components": [
+        "葵",
+        "钢鬃"
+      ],
+      "profession": "术士",
+      "quality": "金"
+    },
+    "电法炎魔": {
+      "components": [
+        "电法",
+        "炎魔"
+      ],
+      "profession": "法师",
+      "quality": "紫"
+    },
+    "水灵刀客": {
+      "components": [
+        "水灵",
+        "刀客"
+      ],
+      "profession": "熊猫",
+      "quality": "金"
+    },
+    "咕咕萨满": {
+      "components": [
+        "咕咕",
+        "萨满"
       ],
       "profession": "牧师",
       "quality": "金"
