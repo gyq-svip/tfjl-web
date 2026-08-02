@@ -19148,32 +19148,8 @@
             if (typeof autoSaveProject === 'function') autoSaveProject();
         }
 
-        // 从卡槽取下卡牌前的二次确认（防止误触把已上阵的卡下掉）
-        function confirmRemoveSlotCard(slotId, cardName) {
-            return new Promise(resolve => {
-                const overlay = document.createElement('div');
-                overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;';
-                const box = document.createElement('div');
-                box.style.cssText = 'background:#1b1e29;border:1px solid rgba(255,215,0,0.4);border-radius:10px;padding:18px 20px;max-width:280px;color:#fff;font-size:0.9rem;box-shadow:0 8px 30px rgba(0,0,0,0.6);';
-                box.innerHTML = '<div style="margin-bottom:12px;">确定要把「' + (cardName || '这张卡') + '」从卡槽下掉吗？</div>';
-                const btnRow = document.createElement('div');
-                btnRow.style.cssText = 'display:flex;gap:10px;justify-content:flex-end;';
-                const cancel = document.createElement('button');
-                cancel.textContent = '取消';
-                cancel.style.cssText = 'padding:6px 14px;border:none;border-radius:6px;background:#444;color:#fff;cursor:pointer;';
-                const yes = document.createElement('button');
-                yes.textContent = '确定下掉';
-                yes.style.cssText = 'padding:6px 14px;border:none;border-radius:6px;background:#e53935;color:#fff;cursor:pointer;';
-                cancel.onclick = () => { overlay.remove(); resolve(false); };
-                yes.onclick = () => { overlay.remove(); resolve(true); };
-                btnRow.appendChild(cancel); btnRow.appendChild(yes);
-                box.appendChild(btnRow); overlay.appendChild(box);
-                overlay.addEventListener('click', (ev) => { if (ev.target === overlay) { overlay.remove(); resolve(false); } });
-                document.body.appendChild(overlay);
-            });
-        }
         // 战斗槽点击（移除卡牌）
-        async function handleSlotClick(e) {
+        function handleSlotClick(e) {
             if (e.target.closest('.card-level-badge')) return;
             if (!this.classList.contains('filled')) return; // 空槽不处理（放卡由手牌点击负责）
             const slotId = this.dataset.slot;
@@ -19181,8 +19157,6 @@
             const _locked = isUserSlot ? myFusionLocked : teammateFusionLocked;
             if (_locked) {
                 // 🔒 锁定：单击取下回手牌（编辑完成后整理阵容用）
-                const _ok = await confirmRemoveSlotCard(slotId, name);
-                if (!_ok) return;
                 removeCardFromSlot(slotId);
                 return;
             }
@@ -19256,8 +19230,6 @@
                 // 无皮肤：🔒锁定态不删卡（下卡只走单击）；🔓解锁态才移除卡牌
                 if (_locked) { console.log('[SKIN] locked + no skins, ignoring right-click (use single-click to remove)'); return; }
                 console.log('[SKIN] No skins available, removing card from slot');
-                const _ok2 = await confirmRemoveSlotCard(slotId, heroName);
-                if (!_ok2) return;
                 removeCardFromSlot(slotId);
             } else {
                 console.log('[SKIN] slot not filled, ignoring right-click');
@@ -20957,6 +20929,8 @@
             });
             
             document.addEventListener('dragstart', (e) => {
+                window.__nativeDrag = true;
+                if (window.__pd) { window.__pd = null; if (window.__ghost) { window.__ghost.remove(); window.__ghost = null; } }
                 const card = e.target.closest('.card-item');
                 if (!card) return;
                 
@@ -20984,6 +20958,68 @@
                     setupLongPress(card, (e) => handleCardRightClick(e, card));
                 }
             });
+
+            // ===== Pointer Events 拖拽兜底（不依赖 webview 原生 DnD，桌面/触屏通用）=====
+            if (!window.__pointerDragInited) {
+                window.__pointerDragInited = true;
+                window.__pd = null; window.__ghost = null; window.__suppressClick = false; window.__nativeDrag = false;
+                document.addEventListener('pointerdown', (e) => {
+                    if (e.button !== undefined && e.button !== 0) return;
+                    const card = e.target.closest('.card-item:not(#favoriteCardsGrid .card-item), .selected-card:not(.empty)');
+                    if (!card || card.closest('#favoriteCardsGrid')) return;
+                    window.__pd = { el: card, x: e.clientX, y: e.clientY, started: false, payload: buildDragPayload(card) };
+                }, true);
+                document.addEventListener('pointermove', (e) => {
+                    if (window.__nativeDrag) { cleanupPointerDrag(); return; }
+                    if (!window.__pd) return;
+                    if (!window.__pd.started) {
+                        if (Math.hypot(e.clientX - window.__pd.x, e.clientY - window.__pd.y) < 8) return;
+                        window.__pd.started = true;
+                        window.__ghost = createDragGhost(window.__pd.el);
+                        document.body.style.userSelect = 'none';
+                    }
+                    if (window.__ghost) { window.__ghost.style.left = e.clientX + 'px'; window.__ghost.style.top = e.clientY + 'px'; }
+                }, true);
+                document.addEventListener('pointerup', async (e) => {
+                    if (window.__nativeDrag) return;
+                    if (!window.__pd) return;
+                    const pd = window.__pd; window.__pd = null;
+                    if (!pd.started) return;
+                    e.preventDefault();
+                    window.__suppressClick = true;
+                    cleanupPointerDrag();
+                    const el = document.elementFromPoint(e.clientX, e.clientY);
+                    const slot = el && el.closest('.battle-slot');
+                    if (slot && pd.payload) {
+                        window.__dragPayload = pd.payload;
+                        try { await handleSlotDrop.call(slot, { preventDefault(){}, dataTransfer: { getData: () => '' } }); } catch (err) { console.error('[DRAG] pointer drop error', err); }
+                    }
+                }, true);
+                document.addEventListener('click', (e) => {
+                    if (window.__suppressClick) { window.__suppressClick = false; e.stopPropagation(); e.preventDefault(); }
+                }, true);
+                document.addEventListener('dragend', () => { window.__nativeDrag = false; });
+            }
+
+            function buildDragPayload(card) {
+                if (card.classList.contains('selected-card')) {
+                    const handType = card.closest('#myHandContainer') ? 'my' : (card.closest('#teammateHandContainer') ? 'teammate' : (card.dataset.handType || 'my'));
+                    return { source: 'hand', id: card.dataset.id || '', name: card.dataset.name || '', isEngineering: card.dataset.engineering === 'true', profession: card.dataset.profession || '', handType: handType };
+                }
+                return { source: 'pool', id: card.dataset.id || '', name: card.dataset.name || '', isEngineering: card.dataset.engineering === 'true', profession: card.dataset.profession || '', cardType: card.dataset.type || '' };
+            }
+            function createDragGhost(card) {
+                const g = document.createElement('div');
+                g.textContent = (card.dataset && card.dataset.name) || '';
+                g.style.cssText = 'position:fixed;z-index:100000;pointer-events:none;transform:translate(-50%,-50%);background:#2a2a4a;color:#fff;padding:6px 12px;border-radius:16px;border:2px solid #ffd700;font-size:0.85rem;box-shadow:0 6px 20px rgba(0,0,0,0.6);opacity:0.92;';
+                document.body.appendChild(g);
+                return g;
+            }
+            function cleanupPointerDrag() {
+                if (window.__ghost) { window.__ghost.remove(); window.__ghost = null; }
+                window.__pd = null;
+                document.body.style.userSelect = '';
+            }
 
             document.addEventListener('mouseover', (e) => {
                 if (!e.target || !e.target.closest) return;
@@ -29739,7 +29775,7 @@ ${maSection}
     </div>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260803-133</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260803-134</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
