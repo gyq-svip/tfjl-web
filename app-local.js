@@ -3242,6 +3242,7 @@ if (isTauriApp) {
     // 远程皮肤注册表（GitHub Pages 托管，所有设备打开即自动同步）
     const REMOTE_SKIN_BASE = 'https://gyq-svip.github.io/tfjl-web/skins';
     const REMOTE_SKIN_REGISTRY_URL = REMOTE_SKIN_BASE + '/registry.json';
+    const REMOTE_SKIN_FUSIONS_URL = REMOTE_SKIN_BASE + '/fusions.json';
 
     function getSkinRootDir() {
         return (softwareDataDir || '').replace(/[\\/]+$/, '') + '\\data\\skin';
@@ -3440,6 +3441,18 @@ if (isTauriApp) {
             if (addedCount > 0) {
                 console.log('[SKIN] syncRemoteSkins() added', addedCount, 'remote skins');
             }
+
+            // 拉取融合卡定义（云端 fusions.json，管理员维护）
+            try {
+                const fResp = await fetch(REMOTE_SKIN_FUSIONS_URL, { cache: 'no-cache' });
+                if (fResp.ok) {
+                    const fData = await fResp.json();
+                    if (fData && fData.fusions) {
+                        window.cloudFusions = fData.fusions;
+                        console.log('[SKIN] cloud fusions loaded:', Object.keys(fData.fusions).length);
+                    }
+                }
+            } catch (fe) { console.warn('[SKIN] load fusions.json failed:', fe); }
 
             // 后台尝试下载远程皮肤到本地 data/skin 目录（仅 Tauri 环境）
             _downloadRemoteSkinsToLocal(registry.heroes);
@@ -3755,6 +3768,8 @@ if (isTauriApp) {
     }
 
     function getHeroSkins(heroName) {
+        // 融合卡切半皮（融合XX）不进入皮肤选择器
+        if (heroName && typeof heroName === 'string' && heroName.startsWith('融合')) return [];
         const mainName = (typeof getMainCardName === 'function') ? getMainCardName(heroName) : heroName;
         const baseHero = getBaseHeroName(mainName).heroName;
         return window.skinRegistry[baseHero] || [];

@@ -16,6 +16,7 @@
 
   var REMOTE_SKIN_BASE = 'https://gyq-svip.github.io/tfjl-web/skins';
   var REMOTE_SKIN_REGISTRY_URL = REMOTE_SKIN_BASE + '/registry.json';
+  var REMOTE_SKIN_FUSIONS_URL = REMOTE_SKIN_BASE + '/fusions.json';
 
   window.skinRegistry = {};       // { 英雄名: [{ name, url, path }] }
   window.heroSkinSelections = {};  // { 英雄名: 皮肤名 }
@@ -164,6 +165,17 @@
         }
       }
       if (addedCount > 0) console.log('[SKIN-WEB] added', addedCount, 'remote skins');
+      // 拉取融合卡定义（云端 fusions.json，管理员维护）
+      try {
+        var fResp = await fetch(REMOTE_SKIN_FUSIONS_URL, { cache: 'no-cache' });
+        if (fResp.ok) {
+          var fData = await fResp.json();
+          if (fData && fData.fusions) {
+            window.cloudFusions = fData.fusions;
+            console.log('[SKIN-WEB] cloud fusions loaded:', Object.keys(fData.fusions).length);
+          }
+        }
+      } catch (fe) { console.warn('[SKIN-WEB] load fusions.json failed:', fe); }
       _preheatSkins(registry.heroes);
       try {
         if (typeof window.reapplyAllSkins === 'function') {
@@ -229,6 +241,7 @@
   }
 
   function getHeroSkins(heroName) {
+    if (heroName && typeof heroName === 'string' && heroName.startsWith('融合')) return [];
     var mainName = (typeof getMainCardName === 'function') ? getMainCardName(heroName) : heroName;
     var baseHero = getBaseHeroName(mainName).heroName;
     return window.skinRegistry[baseHero] || [];
