@@ -15847,7 +15847,7 @@
         }
 
         // ===== 融合卡徽章皮：canvas 切右下角缩放徽章 + 本地缓存 + 云端预切优先 =====
-        // 生成"右下角徽章"PNG：把被融合卡图缩放约45%后放在右下透明底图上（尺寸与主卡一致）
+        // 生成"右下角徽章"PNG：把被融合卡图缩放约 1/4 后放在右下透明底图上（尺寸与主卡一致）
         function cropFusionBadgeFromUrl(url, w, h) {
             return new Promise((resolve) => {
                 const img = new Image();
@@ -15857,7 +15857,7 @@
                     const canvas = document.createElement('canvas');
                     canvas.width = cw; canvas.height = ch;
                     const ctx = canvas.getContext('2d');
-                    const badgeRatio = 0.45;
+                    const badgeRatio = 0.25;
                     const bw = cw * badgeRatio, bh = ch * badgeRatio;
                     const iw = img.naturalWidth, ih = img.naturalHeight;
                     const scale = Math.max(bw / iw, bh / ih);
@@ -15932,13 +15932,52 @@
                         return { url: URL.createObjectURL(blob), isBadge: true };
                     }
                 } catch (e) {}
-                // ④ 兜底：用整图走 CSS 右下角徽章
-                return { url: fullUrl, isBadge: true };
+                // ④ 兜底：用整图走 CSS 右下角徽章（非预切 PNG，需按 1/4 角标显示）
+                return { url: fullUrl, isBadge: false };
             }
             return null;
         }
 
-        // 手牌：主卡整皮(底层) + 被融合卡右下角徽章(上层缩放约45%)
+        // 失效某被融合卡的徽章缓存（换皮肤后须重切，缓存只按英雄不按皮肤）
+        async function invalidateFusionHalfCache(fusedHero) {
+            try {
+                const db = await _openFusionHalfDB();
+                await new Promise((resolve) => {
+                    const tx = db.transaction('halves', 'readwrite');
+                    tx.objectStore('halves').delete('融合' + fusedHero);
+                    tx.oncomplete = () => resolve();
+                    tx.onerror = () => resolve();
+                });
+            } catch (e) {}
+        }
+
+        // 循环切换被融合卡(徽章)皮肤：只更新全局 heroSkinSelections[副卡]，不动主卡皮肤
+        async function cycleFusionFusedSkin(fusedHero, slotId) {
+            const skins = window.getHeroSkins ? window.getHeroSkins(fusedHero) : [];
+            if (!skins.length) return;
+            const current = window.heroSkinSelections ? window.heroSkinSelections[fusedHero] : '';
+            const cycleList = skins.map(s => s.name).filter(name => name !== fusedHero).concat(['']);
+            const effectiveCurrent = (current === fusedHero) ? '' : current;
+            const idx = cycleList.indexOf(effectiveCurrent);
+            const nextIdx = (idx + 1) % cycleList.length;
+            const nextSkin = cycleList[nextIdx];
+            if (window.selectHeroSkin) window.selectHeroSkin(fusedHero, nextSkin);
+            await invalidateFusionHalfCache(fusedHero); // 旧皮肤徽章缓存失效，重新切
+            const slot = document.querySelector('.battle-slot[data-slot="' + slotId + '"]');
+            if (slot) {
+                const skinLabel = slot.querySelector('.skin-label') || (() => {
+                    const label = document.createElement('span');
+                    label.className = 'skin-label';
+                    label.style.cssText = 'position:absolute;top:2px;right:2px;font-size:9px;background:rgba(0,0,0,0.6);color:#fff;padding:1px 4px;border-radius:4px;z-index:4;pointer-events:none;';
+                    slot.appendChild(label);
+                    return label;
+                })();
+                skinLabel.textContent = '融合·' + (nextSkin || '默认');
+                setTimeout(() => { if (skinLabel.parentNode) skinLabel.remove(); }, 1500);
+            }
+        }
+
+        // 手牌：主卡整皮(底层) + 被融合卡右下角徽章(上层缩放约1/4)
         function applyFusionSkinToHandCard(card, mainUrl, fusedUrl, fusedIsBadge) {
             if (!card) return;
             card.classList.add('skin-bg');
@@ -15956,9 +15995,12 @@
                 if (!overlay) {
                     overlay = document.createElement('img');
                     overlay.className = 'hand-skin-fused';
-                    overlay.style.cssText = 'position:absolute;right:2px;bottom:2px;width:45%;height:45%;object-fit:contain;border-radius:4px;z-index:1;pointer-events:none;';
                     card.insertBefore(overlay, base.nextSibling);
                 }
+                // isBadge:预切PNG(透明底+角落已含被融合卡)→满铺；否则整图→按1/4角标显示
+                overlay.style.cssText = fusedIsBadge
+                    ? 'position:absolute;inset:0;width:100%;height:100%;object-fit:contain;border-radius:inherit;z-index:1;pointer-events:none;'
+                    : 'position:absolute;right:2px;bottom:2px;width:25%;height:25%;object-fit:contain;border-radius:4px;z-index:1;pointer-events:none;';
                 if (overlay.src !== fusedUrl) overlay.src = fusedUrl;
             } else if (overlay && overlay.parentNode) {
                 overlay.remove();
@@ -15982,9 +16024,12 @@
                 if (!overlay) {
                     overlay = document.createElement('img');
                     overlay.className = 'skin-layer-fused';
-                    overlay.style.cssText = 'position:absolute;right:3px;bottom:3px;width:45%;height:45%;object-fit:contain;border-radius:4px;z-index:1;pointer-events:none;';
                     slot.insertBefore(overlay, base.nextSibling);
                 }
+                // isBadge:预切PNG(透明底+角落已含被融合卡)→满铺；否则整图→按1/4角标显示
+                overlay.style.cssText = fusedIsBadge
+                    ? 'position:absolute;inset:3px;width:calc(100% - 6px);height:calc(100% - 6px);object-fit:contain;border-radius:5px;z-index:1;pointer-events:none;'
+                    : 'position:absolute;right:3px;bottom:3px;width:25%;height:25%;object-fit:contain;border-radius:4px;z-index:1;pointer-events:none;';
                 if (overlay.src !== fusedUrl) overlay.src = fusedUrl;
             } else if (overlay && overlay.parentNode) {
                 overlay.remove();
@@ -18770,7 +18815,25 @@
                 const card = placedArray.find(c => c.slot === slotId);
                 console.log('[SKIN] card found:', card ? card.name : 'null', 'slotId:', slotId, 'isUserSlot:', isUserSlot);
                 const heroName = card ? (card.name || '') : '';
-                // 融合卡：取第一卡作为皮肤查询/切换的英雄名，显示名仍保留原融合名
+                // 融合卡：右击只切换【被融合卡(徽章)】皮肤，不动主卡
+                const fusionParts = (typeof getFusionParts === 'function') ? getFusionParts(heroName) : null;
+                if (fusionParts && fusionParts.length >= 2) {
+                    const fusedHero = fusionParts[1];
+                    const fskins = window.getHeroSkins ? window.getHeroSkins(fusedHero) : [];
+                    console.log('[SKIN] fusion card, cycling fused hero:', fusedHero, 'fskins:', fskins.length);
+                    if (fskins.length >= 1) {
+                        await cycleFusionFusedSkin(fusedHero, slotId);
+                        try { await applySkinBgToSlot(this, heroName); } catch (e) {}
+                        // 同步刷新手牌中的同一张融合卡
+                        const _ht = isUserSlot ? 'my' : 'teammate';
+                        const handCard = document.querySelector('#' + (_ht === 'my' ? 'myHandContainer' : 'teammateHandContainer') + ' .selected-card[data-id="' + card.id + '"]');
+                        if (handCard) { try { await reapplySingleHandCard(handCard, card.id, _ht); } catch (e) {} }
+                    } else {
+                        removeCardFromSlot(slotId);
+                    }
+                    return;
+                }
+                // 非融合：取第一卡作为皮肤查询/切换的英雄名，显示名仍保留原融合名
                 const skinHeroName = (typeof getMainCardName === 'function' ? getMainCardName(heroName) : heroName);
                 const skins = skinHeroName && window.getHeroSkins ? window.getHeroSkins(skinHeroName) : [];
                 const hasSkinBg = this.classList.contains('skin-bg');
@@ -29294,7 +29357,7 @@ ${maSection}
     </div>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260803-110</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260803-111</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
