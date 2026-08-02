@@ -1069,6 +1069,46 @@
             100% { background-position: 0% 50%; }
         }
 
+        /* 需求墙小喇叭：呼吸发光 + 轻微跳动特效（更醒目） */
+        @keyframes wallHornGlow {
+            0%, 100% {
+                box-shadow: 0 2px 10px rgba(0,0,0,0.3), 0 0 6px rgba(255,215,0,0.55), 0 0 12px rgba(255,170,0,0.35);
+                transform: translateY(0) scale(1);
+            }
+            50% {
+                box-shadow: 0 2px 14px rgba(0,0,0,0.35), 0 0 16px rgba(255,225,80,0.95), 0 0 28px rgba(255,180,0,0.7);
+                transform: translateY(-3px) scale(1.12);
+            }
+        }
+        #messageWallToggle {
+            animation: wallHornGlow 2.2s ease-in-out infinite;
+        }
+        /* 有人新留言时的强提醒：QQ 式跳动 + 红色光圈（由 JS 按需添加 .wall-attention） */
+        @keyframes wallHornAlert {
+            0%, 100% { box-shadow: 0 0 8px rgba(255,80,80,0.8), 0 0 16px rgba(255,60,60,0.6); transform: translateY(0) scale(1) rotate(0deg); }
+            20% { transform: translateY(-7px) scale(1.22) rotate(-12deg); }
+            40% { transform: translateY(0) scale(1.05) rotate(10deg); }
+            60% { transform: translateY(-7px) scale(1.22) rotate(-12deg); }
+            80% { transform: translateY(0) scale(1.05) rotate(10deg); }
+        }
+        #messageWallToggle.wall-attention {
+            animation: wallHornAlert 0.9s ease-in-out infinite;
+        }
+        /* 未读小红点 + 脉冲 + 未读数角标 */
+        #messageWallToggle .wall-unread-dot {
+            position: absolute; top: -6px; right: -6px;
+            min-width: 16px; height: 16px; padding: 0 3px; box-sizing: border-box;
+            border-radius: 9px;
+            background: #ff3b3b; box-shadow: 0 0 8px rgba(255,59,59,0.95);
+            border: 1px solid #fff;
+            color: #fff; font-size: 0.62rem; font-weight: 700; line-height: 14px; text-align: center;
+            animation: wallDotPulse 1s ease-in-out infinite;
+        }
+        @keyframes wallDotPulse {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 6px rgba(255,59,59,0.8); }
+            50% { transform: scale(1.25); box-shadow: 0 0 12px rgba(255,59,59,1); }
+        }
+
         .card-item {
             position: relative;
         }
@@ -2511,8 +2551,8 @@
     })();
     </script>
 
-    <!-- 密码验证层 -->
-    <div id="passwordOverlay" class="password-overlay">
+    <!-- 密码验证层（默认隐藏；启动逻辑确认"未登录"后才显示，避免已登录用户闪一下登录界面） -->
+    <div id="passwordOverlay" class="password-overlay" style="display:none;">
         <div class="password-box">
             <h2>🔐 塔防小助手</h2>
             <p id="passwordHint" style="color: rgba(255,255,255,0.7); margin-bottom: 20px;">请输入访问密码</p>
@@ -3110,18 +3150,20 @@
         // ==================== 密码验证 ====================
         // 密码存储在localStorage中，支持管理员动态管理
         const PASSWORDS_STORAGE_KEY = 'TFJL_AdminPasswords';
-        const DEFAULT_PASSWORDS = ['tfjl', 'TFJL','ymkfqtbl', 'gyq'];
+        // 访问密码以 PBKDF2 哈希(v2$)存储，源码不含明文。原始明文仅开发者本地改密用：tfjl / TFJL / ymkfqtbl / gyq
+        const DEFAULT_PASSWORD_HASHES = ['v2$V8Crw2nuBjPl7sZVBfjnmKV13TjXkwXEsFJoLwZxaeg=', 'v2$YLaCsuaTJM9dxJZULdL+Di3jD7SDx+8QnGY3uyZrKJo=', 'v2$KDYq+zl4oiPcvk8gW6BKbypOW7mmUatgKg5pQIRCIxM=', 'v2$RVaqgAE/QYaCaHytPLaM/ADr411QeDBbo8VOBH1OSoQ='];
 
         function getAdminPasswords() {
+            // 返回哈希数组：初始哈希 + 本地存储中已哈希(v2$)的项；忽略旧明文项(避免比对失败，用户重加即可)
             const saved = localStorage.getItem(PASSWORDS_STORAGE_KEY);
+            let extra = [];
             if (saved) {
                 try {
-                    return JSON.parse(saved);
-                } catch (e) {
-                    return DEFAULT_PASSWORDS.slice();
-                }
+                    const arr = JSON.parse(saved);
+                    if (Array.isArray(arr)) extra = arr.filter(x => typeof x === 'string' && x.indexOf('v2$') === 0);
+                } catch (e) {}
             }
-            return DEFAULT_PASSWORDS.slice();
+            return DEFAULT_PASSWORD_HASHES.concat(extra);
         }
 
         // 检查是否已登录，未登录则不允许执行操作
@@ -3138,7 +3180,7 @@
             return true;
         }
 
-        function checkPasswordAndEnter(targetSystem) {
+        async function checkPasswordAndEnter(targetSystem) {
             const input = document.getElementById('passwordInput');
             const errorDiv = document.getElementById('passwordError');
             const password = input.value.trim();
@@ -3166,7 +3208,10 @@
                 }
             }
 
-            if (getAdminPasswords().includes(password)) {
+            const _hashes = getAdminPasswords();
+            let _ok = false;
+            for (const _h of _hashes) { if (await verifyPassword(password, _h)) { _ok = true; break; } }
+            if (_ok) {
                 // 密码正确，清除错误计数
                 localStorage.setItem('TFJL_PasswordErrorCount', '0');
                 localStorage.setItem('TFJL_PasswordLockStart', '0');
@@ -3174,6 +3219,7 @@
                 // 记录登录
                 recordLogin();
                 localStorage.setItem('TFJL_LoggedIn', 'true');
+                saveAuthToDisk(true);   // 落地到磁盘：重启/更新/清缓存后都不弹密码门
                 
                 // 记住密码：如果勾选了"记住密码"，保存密码（简单编码混淆）
                 const rememberCb = document.getElementById('rememberPassword');
@@ -3316,7 +3362,7 @@
             <!-- 版本切换按钮（动态显示） -->
             <button id="versionSwitchBtn" onclick="handleVersionSwitch()" style="display:none;background:rgba(0,188,212,0.8);color:white;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 1px 6px rgba(0,0,0,0.15);backdrop-filter:blur(4px);align-items:center;justify-content:center;">🌐</button>
             <button id="chatRoomToggle" onclick="window.location.href='auction.html'" title="拍卖行" style="background:rgba(78,205,196,0.85);color:#1a1a2e;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 2px 10px rgba(0,0,0,0.3);display:none;align-items:center;justify-content:center;">🏪</button>
-            <button id="messageWallToggle" onclick="toggleMessageWall()" title="需求墙" style="background:rgba(255,215,0,0.85);color:#1a1a2e;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 2px 10px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">📢</button>
+            <button id="messageWallToggle" onclick="toggleMessageWall()" title="需求墙" style="position:relative;background:rgba(255,215,0,0.85);color:#1a1a2e;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 2px 10px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">📢<span class="wall-unread-dot" id="wallUnreadDot" style="display:none;"></span></button>
             <div style="position:relative;">
                 <button onclick="toggleBackupMenu(this)" title="菜单" style="background:rgba(255,87,34,0.8);color:white;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 1px 6px rgba(0,0,0,0.15);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;">☰</button>
                 <div id="backupMenu" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:rgba(42,42,74,0.95);border:1px solid rgba(255,215,0,0.3);border-radius:8px;padding:8px 0;width:200px;z-index:1000;box-shadow:0 4px 15px rgba(0,0,0,0.4);backdrop-filter:blur(8px);">
@@ -4047,6 +4093,39 @@
 
         function closeChatRoomEntry() {
             document.getElementById('chatRoomEntryModal').style.display = 'none';
+        }
+
+        // ========== 登录状态本地磁盘持久化（独立于 webview 存储，重启/更新/清缓存都不丢） ==========
+        // 用户初衷：安装后登录一次，之后（重启 App / 自动更新 / webview 缓存被清）都不再弹密码门。
+        // webview localStorage 在某些更新/重开场景下会被清空，所以把"已登录"标记落地到 D 盘文件。
+        const AUTH_DISK_PATH = 'D:\\withfriends\\塔防精灵助手数据\\data\\auth_state.json';
+
+        // 写登录状态到磁盘（仅桌面端；网页版无 Tauri 时忽略）
+        function saveAuthToDisk(loggedIn) {
+            const T = window.__TAURI__ || window.__TAURI_INTERNALS__;
+            if (!T) return;
+            try {
+                _tauriInvoke('write_text_file', {
+                    filePath: AUTH_DISK_PATH,
+                    content: JSON.stringify({ loggedIn: !!loggedIn, at: new Date().toISOString() })
+                });
+            } catch (e) {}
+        }
+        // 从磁盘读登录状态（异步；丢失/异常时回退 false 不阻塞）
+        async function isLoggedInFromDisk() {
+            const T = window.__TAURI__ || window.__TAURI_INTERNALS__;
+            if (!T) return false;
+            try {
+                const txt = await _tauriInvoke('read_text_file_auto', { filePath: AUTH_DISK_PATH });
+                if (txt) { const o = JSON.parse(txt); return !!(o && o.loggedIn); }
+            } catch (e) {}
+            return false;
+        }
+        // 清磁盘登录标记（退出登录时调用）
+        function clearAuthOnDisk() {
+            const T = window.__TAURI__ || window.__TAURI_INTERNALS__;
+            if (!T) return;
+            try { _tauriInvoke('delete_file', { filePath: AUTH_DISK_PATH }); } catch (e) {}
         }
 
         // ========== 昵称本地磁盘持久化（独立于安装目录，重启/更新/卸载重装都不丢） ==========
@@ -10154,7 +10233,7 @@
         <!-- APP本地功能脚本（网页版不会执行任何代码，isTauriApp判断在文件内部） -->
         <script src="app-local.js?v=26"></script>
         <!-- 阵容识别模块（独立入口 + 灌入脚本生成） -->
-        <script src="recognize.js?v=6"></script>
+        <script src="recognize.js?v=8"></script>
         <!-- 网页版皮肤系统（仅非 Tauri 浏览器执行；Tauri 由 app-local.js 负责，文件内部自动跳过） -->
         <script src="skins-web.js?v=1"></script>
 
@@ -10829,7 +10908,10 @@
         <div class="selection-area">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
                 <h2 style="margin:0;">⚔️ 出战选择</h2>
-                <div style="display:flex;gap:8px;">
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <label style="font-size:0.7rem;color:rgba(255,255,255,0.7);display:flex;align-items:center;gap:4px;cursor:pointer;user-select:none;">
+                        <input type="checkbox" id="fusionSkinSplitToggle" checked onchange="toggleFusionSkinSplit(this.checked)" title="勾选：融合卡显示完整融合皮肤（主卡整皮 + 被融合卡右下角小图）；不勾：只显示主卡（单卡）整张皮肤。卡名始终按现状显示。"> 显示融合
+                    </label>
                     <div style="position:relative;">
                         <button onclick="toggleDamageReductionMenu(this)" style="background:rgba(78,205,196,0.2);border:1px solid rgba(78,205,196,0.4);color:#4ecdc4;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:0.75rem;">🛡️ 减伤</button>
                         <div id="damageReductionMenu" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:rgba(42,42,74,0.95);border:1px solid rgba(78,205,196,0.3);border-radius:8px;padding:8px 0;min-width:140px;z-index:1000;box-shadow:0 4px 15px rgba(0,0,0,0.4);">
@@ -10844,7 +10926,11 @@
             
             <div class="battle-field">
                 <div class="battle-column user-column">
-                    <h4>👤 我卡组（7格）<span id="myDamageReduction" style="color:#4ecdc4;font-size:0.85rem;margin-left:8px;">洗炼总减伤:0</span></h4>
+                    <h4>👤 我的卡组（7格）<span id="myDamageReduction" style="color:#4ecdc4;font-size:0.85rem;margin-left:8px;">洗炼总减伤:0</span></h4>
+                    <div id="myFusionLockRow" onclick="toggleMyFusionLock()" style="margin:2px 0 6px;font-size:0.72rem;color:rgba(255,255,255,0.7);display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;">
+                        <span id="myFusionLockIcon" style="font-size:0.95rem;">🔓</span>
+                        <span id="myFusionLockText">融合编辑中（右键切被融合卡皮）</span>
+                    </div>
                     <div class="battle-slots-container">
                         <div class="battle-slot engineering-slot empty" data-slot="u0" data-type="engineering">
                             <span class="slot-label">🔧</span>
@@ -10862,6 +10948,10 @@
                 </div>
                 <div class="battle-column teammate-column">
                     <h4>👥 队友卡组（7格）<span id="teammateDamageReduction" style="color:#4ecdc4;font-size:0.85rem;margin-left:8px;">洗炼总减伤:0</span></h4>
+                    <div id="teammateFusionLockRow" onclick="toggleTeammateFusionLock()" style="margin:2px 0 6px;font-size:0.72rem;color:rgba(255,255,255,0.7);display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;">
+                        <span id="teammateFusionLockIcon" style="font-size:0.95rem;">🔓</span>
+                        <span id="teammateFusionLockText">融合编辑中（右键切被融合卡皮）</span>
+                    </div>
                     <div class="battle-slots-container">
                         <div class="battle-slot engineering-slot empty" data-slot="t0" data-type="engineering">
                             <span class="slot-label">🔧</span>
@@ -11051,12 +11141,19 @@
                 if (toggle) toggle.style.display = 'none';
             }
             // 记忆浮窗显隐/位置
+            var _lastDsPanelState = '';
             function dsSavePanelState() {
                 try {
                     const panel = document.getElementById('deepseaFloatPanel');
                     if (!panel) return;
-                    const st = { display: panel.style.display || 'flex', left: panel.style.left, top: panel.style.top, width: panel.style.width, height: panel.style.height };
-                    localStorage.setItem('deepsea_panel_state', JSON.stringify(st));
+                    // 面板隐藏时无需保存（避免无意义的定时写盘刷屏）
+                    const disp = panel.style.display || 'flex';
+                    if (disp === 'none') return;
+                    const st = { display: disp, left: panel.style.left, top: panel.style.top, width: panel.style.width, height: panel.style.height };
+                    const json = JSON.stringify(st);
+                    if (json === _lastDsPanelState) return; // 状态未变不写
+                    _lastDsPanelState = json;
+                    localStorage.setItem('deepsea_panel_state', json);
                 } catch (e) {}
             }
             function dsRestorePanelState() {
@@ -11077,6 +11174,27 @@
             }
             window.initDeepseaMiniPanel = initDeepseaMiniPanel;
             window.openDeepseaStats = openDeepseaStats;
+            // 子页内嵌弹窗：同域 iframe，子页可复用 window.parent.getGistToken()，避免整页跳转触发重新登录
+            function openSubpage(url) {
+                const frame = document.getElementById('subpageFrame');
+                const modal = document.getElementById('subpageModal');
+                frame.src = url;
+                modal.style.display = 'flex';
+            }
+            function closeSubpage() {
+                const modal = document.getElementById('subpageModal');
+                const frame = document.getElementById('subpageFrame');
+                modal.style.display = 'none';
+                frame.src = 'about:blank';   // 释放子页
+            }
+            function openAlliancePage() {
+                // 加缓存破坏参数，强制 Tauri webview 发无条件请求，避免拿到旧的 alliance.html（GitHub Pages+webview 304 缓存）
+                openSubpage('alliance.html?_=' + Date.now());
+            }
+            function openDeepseaStats() {
+                openSubpage('deepsea.html?_=' + Date.now());
+            }
+            window.openAlliancePage = openAlliancePage;
             window.dsToggleMinimize = dsToggleMinimize;
             window.dsClosePanel = dsClosePanel;
             window.dsOpenPanel = dsOpenPanel;
@@ -15668,6 +15786,14 @@
 
         function getMainCardName(cardName) {
             if (!cardName) return cardName;
+            // 云端已启用(有≥1条融合定义)时，严格只认云端：云端定义的融合卡取主卡(part[0])，
+            // 其余一律按单卡/英雄名返回，禁用内置硬编码融合表与兜底拆分，避免假融合卡污染。
+            const cloudEnabled = window.cloudFusions && typeof window.cloudFusions === 'object' && Object.keys(window.cloudFusions).length > 0;
+            if (cloudEnabled) {
+                const cf = window.cloudFusions[cardName];
+                if (cf && Array.isArray(cf.components) && cf.components.length >= 2) return cf.components[0];
+                return cardName;
+            }
             const fusionCards = [
                 '火炮射线', '射线潜艇', '火炮潜艇', '宝库射线', '宝库潜艇', '宝库火炮',
                 '潜艇射线', '潜艇火炮', '射线火炮',
@@ -15691,6 +15817,690 @@
                 if (heroSet.has(firstTwo)) return firstTwo;
             }
             return cardName;
+        }
+
+        // ===== 融合卡对角切割皮肤 =====
+        // 默认开启；关掉则回到只显示主卡整张皮肤
+        let fusionSkinSplitEnabled = true;
+        try { fusionSkinSplitEnabled = (localStorage.getItem('tfjl_fusion_skin_split') !== '0'); } catch (e) {}
+        // 融合锁：按「卡组(我方/队友)」整体锁定，而非逐张卡。锁一方→该侧全部融合卡锁定
+        let myFusionLocked = false;
+        let teammateFusionLocked = false;
+        try { myFusionLocked = (localStorage.getItem('tfjl_my_fusion_locked') === '1'); } catch (e) {}
+        try { teammateFusionLocked = (localStorage.getItem('tfjl_teammate_fusion_locked') === '1'); } catch (e) {}
+        // 初始化卡组标题下的融合锁图标（函数声明已提升，此处可安全调用）
+        refreshFusionLockIcons();
+
+        // 融合卡拆分：返回各英雄名数组（≥2 视为融合卡），否则 null
+        function getFusionParts(cardName) {
+            if (!cardName) return null;
+            // 云端融合定义优先（管理员维护，含2基础卡校验）
+            if (window.cloudFusions && window.cloudFusions[cardName] && Array.isArray(window.cloudFusions[cardName].components) && window.cloudFusions[cardName].components.length >= 2) {
+                return window.cloudFusions[cardName].components.slice();
+            }
+            // 严格只认云端 fusions.json（管理员维护）。一旦云端已启用(有≥1条定义)，
+            // 立即禁用内置硬编码回退表与兜底拆分——管理员没加过的卡绝不当作融合卡，
+            // 杜绝界面浮现大量「假融合卡」(内置24个+兜底拆分凑出的"29个")。
+            // 仅当云端完全未配置(无 window.cloudFusions 或为空对象)时，才回退老内置表保证不失效。
+            const cloudEnabled = window.cloudFusions && typeof window.cloudFusions === 'object' && Object.keys(window.cloudFusions).length > 0;
+            if (cloudEnabled) return null;
+            const fusionCards = [
+                '火炮射线', '射线潜艇', '火炮潜艇', '宝库射线', '宝库潜艇', '宝库火炮',
+                '潜艇射线', '潜艇火炮', '射线火炮',
+                '水灵刀客', '刀客水灵', '蛇女爱神', '爱神蛇女',
+                '咕咕天使', '天使咕咕', '圣骑天使', '天使圣骑',
+                '战将鱼人', '鱼人战将', '电法冰法', '冰法电法',
+                '萌萌水灵', '水灵萌萌', '火灵风灵', '风灵火灵'
+            ];
+            if (fusionCards.includes(cardName)) {
+                return [cardName.substring(0, 2), cardName.substring(2)];
+            }
+            const heroSet = getAllHeroNames();
+            if (heroSet.has(cardName)) return null;
+            const parts = splitIntoHeroes(cardName, heroSet);
+            if (parts.length >= 2) return parts;
+            // 兜底：4字融合且前2字为已知英雄
+            if (cardName.length === 4 && !DEFAULT_CARD_SKINS[cardName] && heroSet.has(cardName.substring(0, 2))) {
+                return [cardName.substring(0, 2), cardName.substring(2)];
+            }
+            return null;
+        }
+
+        // 被融合卡（副卡）皮肤：取该英雄当前选中皮肤（heroSkinSelections，即卡分类里设的皮肤），无则默认
+        function getFusionComponentSkin(heroName) {
+            if (window.heroSkinSelections && window.heroSkinSelections[heroName] !== undefined) {
+                const s = window.heroSkinSelections[heroName];
+                return s ? s : '默认';
+            }
+            return '默认';
+        }
+
+        // ===== 上阵卡"融合卡切换"角标：基础英雄 → 可融合变体 =====
+        // 已知融合卡名：以云端(管理员维护的 fusions.json)为准，避免硬编码污染；
+        // 仅当云端为空（管理员尚未添加任何融合）才回退内置表，保证老功能不失效
+        // 融合卡名：严格只认云端(管理员维护的 fusions.json = window.cloudFusions)。
+        // 不再内置任何硬编码回退表——管理员没加过的卡绝不显示「融合」按钮，杜绝数据污染。
+        function getAllFusionNames() {
+            const names = new Set();
+            if (window.cloudFusions) Object.keys(window.cloudFusions).forEach(n => names.add(n));
+            return [...names];
+        }
+        // 基础英雄 → 以其为主卡(part[0])的融合卡列表
+        function getFusionVariantsForBase(baseHero) {
+            if (!baseHero) return [];
+            const out = new Set();
+            getAllFusionNames().forEach(fn => {
+                const parts = (typeof getFusionParts === 'function') ? getFusionParts(fn) : null;
+                if (parts && parts.length >= 2 && parts[0] === baseHero) out.add(fn);
+            });
+            return [...out];
+        }
+            // 在槽位上刷新"融合卡切换"控件（基础英雄有融合变体→显示「融合」；当前卡本身是融合卡→额外显示「编辑融合」）
+        function refreshSlotFusionControl(slot) {
+            if (!slot || !slot.classList.contains('filled')) return;
+            const slotId = slot.dataset.slot;
+            if (!slotId) return;
+            const isUserSlot = slotId.startsWith('u');
+            const handCards = isUserSlot ? myHandCards : teammateHandCards;
+            const cardId = slot.dataset.cardId;
+            const card = handCards.find(c => c.id === cardId);
+            const name = card ? card.name : (slot.querySelector('.card-name') ? slot.querySelector('.card-name').textContent : '');
+            const baseHero = (typeof getMainCardName === 'function') ? getMainCardName(name) : name;
+            const variants = getFusionVariantsForBase(baseHero);
+            const isFusion = !!(getFusionParts(name) && getFusionParts(name).length >= 2);
+            const old = slot.querySelector('.fusion-ctrl');
+            if (old) old.remove();
+            if (variants.length === 0 && !isFusion) return;
+            const ctrl = document.createElement('div');
+            ctrl.className = 'fusion-ctrl';
+            ctrl.style.cssText = 'position:absolute;top:1px;left:1px;display:flex;gap:2px;z-index:6;pointer-events:auto;';
+            ctrl.addEventListener('contextmenu', (e) => { e.stopPropagation(); });
+            ctrl.addEventListener('click', (e) => { e.stopPropagation(); e.preventDefault(); });
+            // 「融合」：只对非融合的基础卡显示，用于把单卡就地升级/切换为融合卡。
+            // 融合卡本身卡面已显示完整卡名，顶部不再显示黄色"融合·XX"长条。
+            if (!isFusion && variants.length > 0) {
+                const b = document.createElement('div');
+                b.className = 'fusion-btn';
+                b.textContent = '融合';
+                b.title = '转换为融合卡（' + baseHero + ' 系）';
+                b.style.cssText = 'font-size:10px;line-height:15px;padding:0 5px;background:rgba(255,180,0,0.92);color:#000;border-radius:7px;cursor:pointer;white-space:nowrap;';
+                b.addEventListener('click', (e) => { e.stopPropagation(); e.preventDefault(); openFusionVariantMenu(slot, baseHero, variants, name); });
+                ctrl.appendChild(b);
+            }
+            slot.appendChild(ctrl);
+        }
+        // ===== 融合锁图标：放在卡组标题下（不在卡上），按侧整体锁 =====
+        function refreshFusionLockIcons() {
+            const myIcon = document.getElementById('myFusionLockIcon');
+            const myText = document.getElementById('myFusionLockText');
+            if (myIcon) {
+                myIcon.textContent = myFusionLocked ? '🔒' : '🔓';
+                myIcon.title = myFusionLocked ? '我方融合已锁定：右键切换主卡皮肤（点击解锁）' : '我方融合编辑中：右键切换被融合卡皮肤（点击锁定）';
+            }
+            if (myText) myText.textContent = myFusionLocked ? '融合已锁定（右键切主卡皮）' : '融合编辑中（右键切被融合卡皮）';
+            const tmIcon = document.getElementById('teammateFusionLockIcon');
+            const tmText = document.getElementById('teammateFusionLockText');
+            if (tmIcon) {
+                tmIcon.textContent = teammateFusionLocked ? '🔒' : '🔓';
+                tmIcon.title = teammateFusionLocked ? '队友融合已锁定：右键切换主卡皮肤（点击解锁）' : '队友融合编辑中：右键切换被融合卡皮肤（点击锁定）';
+            }
+            if (tmText) tmText.textContent = teammateFusionLocked ? '融合已锁定（右键切主卡皮）' : '融合编辑中（右键切被融合卡皮）';
+        }
+        function toggleMyFusionLock() {
+            myFusionLocked = !myFusionLocked;
+            try { localStorage.setItem('tfjl_my_fusion_locked', myFusionLocked ? '1' : '0'); } catch (e) {}
+            refreshFusionLockIcons();
+            if (typeof autoSaveProject === 'function') autoSaveProject();
+        }
+        function toggleTeammateFusionLock() {
+            teammateFusionLocked = !teammateFusionLocked;
+            try { localStorage.setItem('tfjl_teammate_fusion_locked', teammateFusionLocked ? '1' : '0'); } catch (e) {}
+            refreshFusionLockIcons();
+            if (typeof autoSaveProject === 'function') autoSaveProject();
+        }
+        // 弹出融合变体选择菜单（第一项=原卡不融合）
+        function openFusionVariantMenu(slot, baseHero, variants, currentName) {
+            const oldMenu = document.getElementById('fusionVariantMenu');
+            if (oldMenu) oldMenu.remove();
+            const menu = document.createElement('div');
+            menu.id = 'fusionVariantMenu';
+            menu.style.cssText = 'position:fixed;z-index:9999;background:rgba(20,22,30,0.98);border:1px solid rgba(255,215,0,0.4);border-radius:8px;padding:6px;min-width:128px;box-shadow:0 4px 16px rgba(0,0,0,0.6);font-size:0.85rem;';
+            const rect = slot.getBoundingClientRect();
+            menu.style.left = Math.min(rect.left, window.innerWidth - 170) + 'px';
+            menu.style.top = (rect.bottom + 4) + 'px';
+            const title = document.createElement('div');
+            title.textContent = baseHero + ' 系融合卡';
+            title.style.cssText = 'color:#ffd700;font-size:0.72rem;padding:2px 6px 6px;opacity:0.85;';
+            menu.appendChild(title);
+            [baseHero].concat(variants).forEach(opt => {
+                const isCurrent = (opt === currentName);
+                const item = document.createElement('div');
+                item.textContent = isCurrent ? (opt + ' ✓') : opt;
+                item.style.cssText = 'padding:6px 10px;border-radius:6px;cursor:pointer;color:' + (isCurrent ? '#4caf50' : '#fff') + ';' + (isCurrent ? 'background:rgba(76,175,80,0.12);' : '');
+                item.addEventListener('mouseenter', () => { if (!isCurrent) item.style.background = 'rgba(255,255,255,0.08)'; });
+                item.addEventListener('mouseleave', () => { if (!isCurrent) item.style.background = 'transparent'; });
+                item.addEventListener('click', (e) => { e.stopPropagation(); upgradeCardToFusion(slot, opt); menu.remove(); });
+                menu.appendChild(item);
+            });
+            document.body.appendChild(menu);
+            setTimeout(() => {
+                const close = (ev) => { if (!menu.contains(ev.target)) { menu.remove(); document.removeEventListener('click', close, true); } };
+                document.addEventListener('click', close, true);
+            }, 0);
+        }
+        // 原地升级/降级为某融合卡（不替换卡，只改名字+重渲染皮肤）
+        async function upgradeCardToFusion(slot, newName) {
+            const slotId = slot.dataset.slot;
+            if (!slotId) return;
+            const isUserSlot = slotId.startsWith('u');
+            const handCards = isUserSlot ? myHandCards : teammateHandCards;
+            const placedArray = isUserSlot ? myPlacedCards : teammatePlacedCards;
+            const cardId = slot.dataset.cardId;
+            const hc = handCards.find(c => c.id === cardId);
+            if (hc) hc.name = newName;
+            const pc = placedArray.find(c => c.id === cardId);
+            if (pc) pc.name = newName;
+            const nameSpan = slot.querySelector('.card-name');
+            if (nameSpan) nameSpan.textContent = newName;
+            slot.classList.remove('skin-bg');
+            const oldBase = slot.querySelector('.skin-layer'); if (oldBase) oldBase.remove();
+            const oldFused = slot.querySelector('.skin-layer-fused'); if (oldFused) oldFused.remove();
+            try { await applySkinBgToSlot(slot, newName); } catch (e) {}
+            updateHandDisplay(isUserSlot ? 'my' : 'teammate');
+            refreshSlotFusionControl(slot);
+            if (typeof autoSaveProject === 'function') autoSaveProject();
+        }
+
+        // ===== 融合卡徽章皮：canvas 切右下角缩放徽章 + 本地缓存 + 云端预切优先 =====
+        // 生成"右下角徽章"PNG：把被融合卡图缩放约 1/4 后放在右下透明底图上（尺寸与主卡一致）
+        function cropFusionBadgeFromUrl(url, w, h) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                if (/^https?:/i.test(url)) img.crossOrigin = 'anonymous';
+                img.onload = () => {
+                    const cw = w && w > 0 ? w : 400, ch = h && h > 0 ? h : 520;
+                    const canvas = document.createElement('canvas');
+                    canvas.width = cw; canvas.height = ch;
+                    const ctx = canvas.getContext('2d');
+                    const badgeRatio = 0.25;
+                    const bw = cw * badgeRatio, bh = ch * badgeRatio;
+                    const iw = img.naturalWidth, ih = img.naturalHeight;
+                    const scale = Math.max(bw / iw, bh / ih);
+                    const dw = iw * scale, dh = ih * scale;
+                    const dx = cw - dw - 2, dy = ch - dh - 2;
+                    ctx.drawImage(img, dx, dy, dw, dh);
+                    canvas.toBlob(b => resolve(b), 'image/png');
+                };
+                img.onerror = () => resolve(null);
+                img.src = url;
+            });
+        }
+
+        // 本地 IndexedDB 缓存切半皮（key = 融合{英雄}），命中即复用，免重复切割
+        let _fusionHalfDB = null;
+        function _openFusionHalfDB() {
+            return new Promise((res, rej) => {
+                if (_fusionHalfDB) return res(_fusionHalfDB);
+                const r = indexedDB.open('tfjl_fusion_halves', 1);
+                r.onupgradeneeded = () => { try { r.result.createObjectStore('halves'); } catch (e) {} };
+                r.onsuccess = () => { _fusionHalfDB = r.result; res(_fusionHalfDB); };
+                r.onerror = () => rej(r.error);
+            });
+        }
+        async function getFusionHalfCached(fusedHero) {
+            try {
+                const db = await _openFusionHalfDB();
+                return await new Promise((resolve) => {
+                    const tx = db.transaction('halves', 'readonly');
+                    const req = tx.objectStore('halves').get('融合' + fusedHero);
+                    req.onsuccess = () => {
+                        const blob = req.result;
+                        resolve(blob ? URL.createObjectURL(blob) : null);
+                    };
+                    req.onerror = () => resolve(null);
+                });
+            } catch (e) { return null; }
+        }
+        async function setFusionHalfCached(fusedHero, blob) {
+            try {
+                const db = await _openFusionHalfDB();
+                await new Promise((resolve) => {
+                    const tx = db.transaction('halves', 'readwrite');
+                    tx.objectStore('halves').put(blob, '融合' + fusedHero);
+                    tx.oncomplete = () => resolve();
+                    tx.onerror = () => resolve();
+                });
+            } catch (e) {}
+        }
+
+        // 解析被融合卡显示源：默认直接用【副卡当前皮肤的整图】缩成右下角小图（缩小版整图，不切、不透明、皮肤正常）
+        // 仅当云端有管理员上传的 融合XX 透明徽章时，才用预切满铺式徽章(isBadge:true)
+        async function resolveFusionHalf(fusedHero, el) {
+            if (!fusedHero) return null;
+            // ① 云端预切（管理员上传的 融合XX 透明徽章，满铺式）
+            if (window.skinRegistry && window.skinRegistry['融合' + fusedHero] && window.resolveHeroSkinUrl) {
+                try {
+                    const u = await window.resolveHeroSkinUrl('融合' + fusedHero, '默认');
+                    if (u) return { url: u, isBadge: true };
+                } catch (e) {}
+            }
+            // ② 直接用副卡当前皮肤的整图（缩小版整图直显，皮肤生效）
+            const fullUrl = window.resolveHeroSkinUrl ? await window.resolveHeroSkinUrl(fusedHero, getFusionComponentSkin(fusedHero)) : null;
+            if (fullUrl) return { url: fullUrl, isBadge: false };
+            return null;
+        }
+
+        // 失效某被融合卡的徽章缓存（换皮肤后须重切，缓存只按英雄不按皮肤）
+        async function invalidateFusionHalfCache(fusedHero) {
+            try {
+                const db = await _openFusionHalfDB();
+                await new Promise((resolve) => {
+                    const tx = db.transaction('halves', 'readwrite');
+                    tx.objectStore('halves').delete('融合' + fusedHero);
+                    tx.oncomplete = () => resolve();
+                    tx.onerror = () => resolve();
+                });
+            } catch (e) {}
+        }
+
+        // 循环切换被融合卡(徽章)皮肤：只更新全局 heroSkinSelections[副卡]，不动主卡皮肤
+        async function cycleFusionFusedSkin(fusedHero, slotId) {
+            const skins = window.getHeroSkins ? window.getHeroSkins(fusedHero) : [];
+            if (!skins.length) return;
+            const current = window.heroSkinSelections ? window.heroSkinSelections[fusedHero] : '';
+            const cycleList = skins.map(s => s.name).filter(name => name !== fusedHero).concat(['']);
+            const effectiveCurrent = (current === fusedHero) ? '' : current;
+            const idx = cycleList.indexOf(effectiveCurrent);
+            const nextIdx = (idx + 1) % cycleList.length;
+            const nextSkin = cycleList[nextIdx];
+            if (window.selectHeroSkin) window.selectHeroSkin(fusedHero, nextSkin);
+            await invalidateFusionHalfCache(fusedHero); // 旧皮肤徽章缓存失效，重新切
+            const slot = document.querySelector('.battle-slot[data-slot="' + slotId + '"]');
+            if (slot) {
+                const skinLabel = slot.querySelector('.skin-label') || (() => {
+                    const label = document.createElement('span');
+                    label.className = 'skin-label';
+                    label.style.cssText = 'position:absolute;top:2px;right:2px;font-size:9px;background:rgba(0,0,0,0.6);color:#fff;padding:1px 4px;border-radius:4px;z-index:4;pointer-events:none;';
+                    slot.appendChild(label);
+                    return label;
+                })();
+                skinLabel.textContent = '融合·' + (nextSkin || '默认');
+                setTimeout(() => { if (skinLabel.parentNode) skinLabel.remove(); }, 1500);
+            }
+        }
+
+        // 手牌：主卡整皮(底层) + 被融合卡右下角徽章(上层缩放约1/4)
+        function applyFusionSkinToHandCard(card, mainUrl, fusedUrl, fusedIsBadge) {
+            if (!card) return;
+            card.classList.add('skin-bg');
+            let base = card.querySelector('.hand-skin-layer');
+            if (!base) {
+                base = document.createElement('img');
+                base.className = 'hand-skin-layer';
+                base.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit;z-index:0;pointer-events:none;';
+                card.insertBefore(base, card.firstChild);
+            }
+            if (mainUrl && base.src !== mainUrl) base.src = mainUrl;
+            if (!mainUrl && base.parentNode) base.remove();
+            let overlay = card.querySelector('.hand-skin-fused');
+            if (fusedUrl) {
+                if (!overlay) {
+                    overlay = document.createElement('img');
+                    overlay.className = 'hand-skin-fused';
+                    card.insertBefore(overlay, base.nextSibling);
+                }
+                // isBadge:预切PNG(透明底+角落已含被融合卡)→满铺；否则整图→右下角缩小版整图直显
+                overlay.style.cssText = fusedIsBadge
+                    ? 'position:absolute;inset:0;width:100%;height:100%;object-fit:contain;border-radius:inherit;z-index:1;pointer-events:none;'
+                    : 'position:absolute;right:2px;bottom:2px;width:42%;height:58%;object-fit:contain;border-radius:4px;z-index:2;pointer-events:none;background:rgba(0,0,0,0.25);';
+                if (overlay.src !== fusedUrl) overlay.src = fusedUrl;
+            } else if (overlay && overlay.parentNode) {
+                overlay.remove();
+            }
+        }
+
+        // 槽位：主卡整皮(底层) + 被融合卡右下角缩小版整图(上层)
+        function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
+            if (!slot) return;
+            let base = slot.querySelector('.skin-layer');
+            if (!base) {
+                base = document.createElement('img');
+                base.className = 'skin-layer';
+                base.style.cssText = 'position:absolute;inset:3px;width:calc(100% - 6px);height:calc(100% - 6px);object-fit:contain;object-position:center center;border-radius:5px;border:2px solid rgba(255,255,255,0.25);box-shadow:inset 0 0 8px rgba(0,0,0,0.3);z-index:0;pointer-events:none;';
+                slot.insertBefore(base, slot.firstChild);
+            }
+            if (mainUrl && base.src !== mainUrl) base.src = mainUrl;
+            if (!mainUrl && base.parentNode) base.remove();
+            let overlay = slot.querySelector('.skin-layer-fused');
+            if (fusedUrl) {
+                if (!overlay) {
+                    overlay = document.createElement('img');
+                    overlay.className = 'skin-layer-fused';
+                    slot.insertBefore(overlay, base.nextSibling);
+                    overlay.style.cursor = 'pointer';
+                    overlay.title = '点击切换被融合卡(徽章)皮肤';
+                    overlay.addEventListener('click', async (ev) => {
+                        ev.stopPropagation(); ev.preventDefault();
+                        const slotEl = overlay.closest('.battle-slot');
+                        if (!slotEl) return;
+                        const sid = slotEl.dataset.slot;
+                        const isUser = sid && sid.startsWith('u');
+                        const arr = isUser ? myPlacedCards : teammatePlacedCards;
+                        const c = arr.find(x => x.slot === sid);
+                        const hn = c ? c.name : '';
+                        const parts = (typeof getFusionParts === 'function') ? getFusionParts(hn) : null;
+                        if (parts && parts.length >= 2) {
+                            await cycleFusionFusedSkin(parts[1], sid);
+                            try { await applySkinBgToSlot(slotEl, hn); } catch (e) {}
+                            const _ht = isUser ? 'my' : 'teammate';
+                            const hc = document.querySelector('#' + (_ht === 'my' ? 'myHandContainer' : 'teammateHandContainer') + ' .selected-card[data-id="' + c.id + '"]');
+                            if (hc) { try { await reapplySingleHandCard(hc, c.id, _ht); } catch (e) {} }
+                        }
+                    });
+                }
+                // isBadge:预切PNG(透明底+角落已含被融合卡)→满铺；否则整图→右下角缩小版整图直显
+                overlay.style.cssText = fusedIsBadge
+                    ? 'position:absolute;inset:3px;width:calc(100% - 6px);height:calc(100% - 6px);object-fit:contain;border-radius:5px;z-index:1;pointer-events:none;'
+                    : 'position:absolute;right:3px;bottom:3px;width:42%;height:58%;object-fit:contain;border-radius:4px;z-index:2;pointer-events:none;background:rgba(0,0,0,0.25);';
+                if (overlay.src !== fusedUrl) overlay.src = fusedUrl;
+            } else if (overlay && overlay.parentNode) {
+                overlay.remove();
+            }
+            if (mainUrl || fusedUrl) slot.classList.add('skin-bg');
+        }
+
+        // 开关：默认开启，可一键关
+        // ==================== 卡组管理（管理员·仅桌面端）===================
+        function _cgmIsTauri() { return !!(window.__TAURI__ || window.__TAURI_INTERNALS__); }
+        async function _cgmInvoke(cmd, args) {
+            const fn = window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke;
+            if (!fn) throw new Error('非桌面端');
+            return await fn(cmd, args);
+        }
+        async function _cgmWriteRepoFile(relPath, content) {
+            const filePath = 'd:\\tfjl-web\\' + relPath.split('/').join('\\');
+            await _cgmInvoke('write_text_file', { filePath, content });
+        }
+        async function _cgmReadRepoFile(relPath) {
+            const filePath = 'd:\\tfjl-web\\' + relPath.split('/').join('\\');
+            try { return await _cgmInvoke('read_text_file_auto', { filePath }); } catch (e) { return null; }
+        }
+        function openCardGroupManager() {
+            if (!_cgmIsTauri()) { alert('❌ 卡组管理仅桌面端可用（网页版不提供上传通道）'); return; }
+            const modal = document.getElementById('cardGroupMgrModal');
+            if (modal) modal.style.display = 'flex';
+            cgmSwitchTab('fusion');
+            cgmInitFusedHeroSelect();
+            cgmRefreshFusionList();
+        }
+        function cgmSwitchTab(tab) {
+            const f = document.getElementById('cgmFusionPane'), fu = document.getElementById('cgmFusedPane');
+            const bf = document.getElementById('cgmTabFusion'), bfu = document.getElementById('cgmTabFused');
+            const on = 'rgba(255,215,0,0.18)', off = 'rgba(255,255,255,0.05)';
+            if (tab === 'fusion') {
+                f.style.display = ''; fu.style.display = 'none';
+                bf.style.background = on; bf.style.color = '#ffd700'; bf.style.borderColor = 'rgba(255,215,0,0.4)';
+                bfu.style.background = off; bfu.style.color = 'rgba(255,255,255,0.8)'; bfu.style.borderColor = 'rgba(255,255,255,0.2)';
+            } else {
+                f.style.display = 'none'; fu.style.display = '';
+                bfu.style.background = on; bfu.style.color = '#ffd700'; bfu.style.borderColor = 'rgba(255,215,0,0.4)';
+                bf.style.background = off; bf.style.color = 'rgba(255,255,255,0.8)'; bf.style.borderColor = 'rgba(255,255,255,0.2)';
+            }
+        }
+        function cgmInitFusedHeroSelect() {
+            const sel = document.getElementById('cgmFusedHero');
+            if (!sel) return;
+            sel.innerHTML = '<option value="">选择基础英雄…</option>';
+            Object.keys(SKIN_ATTRIBUTES || {}).filter(h => !h.startsWith('融合')).forEach(h => {
+                const o = document.createElement('option'); o.value = h; o.textContent = h; sel.appendChild(o);
+            });
+        }
+        // 添加融合卡：校验"必须正好是100张基础卡里的2张"
+        let _cgmValidParts = null;
+        function cgmValidateFusion() {
+            const name = (document.getElementById('cgmFusionName').value || '').trim();
+            const res = document.getElementById('cgmFusionResult');
+            const addBtn = document.getElementById('cgmFusionAddBtn');
+            _cgmValidParts = null;
+            if (!name) { res.style.color = '#ff9e80'; res.textContent = '请输入融合卡名'; addBtn.disabled = true; addBtn.style.opacity = 0.5; return; }
+            const baseSet = new Set(Object.keys(SKIN_ATTRIBUTES || {}));
+            const parts = splitIntoHeroes(name, baseSet);
+            if (parts.length === 2 && baseSet.has(parts[0]) && baseSet.has(parts[1])) {
+                _cgmValidParts = parts;
+                res.style.color = '#4ade80';
+                res.textContent = '✓ 校验通过：' + parts[0] + ' + ' + parts[1] + '（均为基础卡）';
+                addBtn.disabled = false; addBtn.style.opacity = 1;
+            } else if (parts.length < 2) {
+                res.style.color = '#ff9e80';
+                res.textContent = '✗ 无法拆成2张基础卡，请确认名字由2张100张卡内的英雄组成（如 小野酋长 / 影魇）';
+                addBtn.disabled = true; addBtn.style.opacity = 0.5;
+            } else {
+                res.style.color = '#ff9e80';
+                res.textContent = '✗ 拆出 ' + parts.length + ' 段（' + parts.join('+') + '），融合卡只能由恰好2张基础卡组成';
+                addBtn.disabled = true; addBtn.style.opacity = 0.5;
+            }
+        }
+        async function cgmAddFusionCard() {
+            if (!_cgmValidParts) return;
+            const name = (document.getElementById('cgmFusionName').value || '').trim();
+            const prof = document.getElementById('cgmFusionProf').value;
+            const quality = document.getElementById('cgmFusionQuality').value;
+            const status = document.getElementById('cgmFusionStatus');
+            try {
+                const base = (window.cloudFusions && typeof window.cloudFusions === 'object') ? JSON.parse(JSON.stringify(window.cloudFusions)) : {};
+                base[name] = { components: _cgmValidParts.slice(), profession: prof || undefined, quality: quality || undefined };
+                const content = JSON.stringify({ version: 1, updated: new Date().toISOString(), note: '融合卡定义：components 为参与融合的2张基础卡。', fusions: base }, null, 2);
+                await _cgmWriteRepoFile('skins/fusions.json', content);
+                window.cloudFusions = base;
+                cgmRefreshFusionList();
+                cgmRefreshAllSlots();
+                status.style.color = '#4ade80';
+                status.textContent = '✓ 已写入 d:\\tfjl-web\\skins\\fusions.json\n请在本机终端运行：\n  cd d:\\tfjl-web\n  git add skins/fusions.json\n  git commit -m "fusion: ' + name + '"\n  git push origin main\n  git -c http.proxy= -c https.proxy= push gitee';
+            } catch (e) {
+                status.style.color = '#ff9e80';
+                status.textContent = '✗ 写入失败：' + e.message;
+            }
+        }
+        // 已添加融合卡列表（带删除）
+        function cgmRefreshAllSlots() {
+            document.querySelectorAll('.battle-slot.filled').forEach(slot => {
+                if (typeof refreshSlotFusionControl === 'function') refreshSlotFusionControl(slot);
+            });
+        }
+        function cgmRefreshFusionList() {
+            const list = document.getElementById('cgmFusionList');
+            const cnt = document.getElementById('cgmFusionCount');
+            if (!list) return;
+            const fusions = (window.cloudFusions && typeof window.cloudFusions === 'object') ? window.cloudFusions : {};
+            const names = Object.keys(fusions);
+            if (cnt) cnt.textContent = names.length;
+            if (names.length === 0) {
+                list.innerHTML = '<div style="font-size:0.78rem;color:rgba(255,255,255,0.5);padding:6px 0;">（暂无，添加后会出现在这里）</div>';
+                return;
+            }
+            list.innerHTML = '';
+            // 按 components 排序，便于查看哪些开过
+            names.sort((a, b) => {
+                const ca = (fusions[a].components || []).join('+'), cb = (fusions[b].components || []).join('+');
+                return ca.localeCompare(cb);
+            });
+            for (const n of names) {
+                const c = fusions[n].components || [];
+                const tags = [];
+                if (fusions[n].profession) tags.push(fusions[n].profession);
+                if (fusions[n].quality) tags.push(fusions[n].quality);
+                const row = document.createElement('div');
+                row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:8px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);';
+                const info = document.createElement('div');
+                info.style.cssText = 'flex:1;min-width:0;';
+                info.innerHTML = '<div style="font-size:0.86rem;color:#fff;font-weight:600;">' + n + '</div>' +
+                    '<div style="font-size:0.72rem;color:rgba(255,255,255,0.6);">' + (c.length ? ('组成：' + c.join(' + ')) : '（无 components）') + (tags.length ? ' · ' + tags.join(' · ') : '') + '</div>';
+                const del = document.createElement('button');
+                del.textContent = '🗑 删除';
+                del.title = '从 fusions.json 删除「' + n + '」';
+                del.style.cssText = 'flex:none;padding:5px 10px;border-radius:6px;border:1px solid rgba(255,120,120,0.5);background:rgba(255,80,80,0.15);color:#ff9e9e;cursor:pointer;font-size:0.76rem;white-space:nowrap;';
+                del.addEventListener('click', () => cgmDeleteFusionCard(n));
+                row.appendChild(info);
+                row.appendChild(del);
+                list.appendChild(row);
+            }
+        }
+        async function cgmDeleteFusionCard(name) {
+            if (!window.cloudFusions || !window.cloudFusions[name]) return;
+            if (!confirm('确认删除融合卡「' + name + '」？\n删除仅改本地 fusions.json，需重新 git 推送才对线上生效。')) return;
+            const status = document.getElementById('cgmFusionStatus');
+            try {
+                const base = JSON.parse(JSON.stringify(window.cloudFusions));
+                delete base[name];
+                const content = JSON.stringify({ version: 1, updated: new Date().toISOString(), note: '融合卡定义：components 为参与融合的2张基础卡。', fusions: base }, null, 2);
+                await _cgmWriteRepoFile('skins/fusions.json', content);
+                window.cloudFusions = base;
+                cgmRefreshFusionList();
+                cgmRefreshAllSlots();
+                if (status) {
+                    status.style.color = '#4ade80';
+                    status.textContent = '✓ 已删除「' + name + '」并写入 fusions.json\n请在本机终端运行：\n  cd d:\\tfjl-web\n  git add skins/fusions.json\n  git commit -m "fusion: 删除 ' + name + '"\n  git push origin main\n  git -c http.proxy= -c https.proxy= push gitee';
+                }
+            } catch (e) {
+                if (status) { status.style.color = '#ff9e80'; status.textContent = '✗ 删除失败：' + e.message; }
+            }
+        }
+        // 一键推送：调用 Rust 命令把本地 fusions.json 推到 GitHub（及 Gitee），Pages 自动部署
+        async function cgmPushFusions() {
+            if (!_cgmIsTauri()) { alert('❌ 仅桌面端可用（网页版无 git 通道）'); return; }
+            const status = document.getElementById('cgmFusionStatus');
+            const btn = document.getElementById('cgmPushBtn');
+            btn.disabled = true; const old = btn.textContent; btn.textContent = '⏳ 推送中…';
+            try {
+                const out = await _cgmInvoke('git_push_fusions', {});
+                if (status) { status.style.color = '#4ade80'; status.textContent = '✓ 推送完成：\n' + out; }
+                cgmRefreshFusionList();
+            } catch (e) {
+                if (status) { status.style.color = '#ff9e80'; status.textContent = '✗ 推送失败：' + (e.message || e); }
+            } finally {
+                btn.disabled = false; btn.textContent = old;
+            }
+        }
+        // 系统托盘图标闪动（需求墙新未读提醒）：仅桌面端有效；on=true 闪动，on=false 停
+        function flashTray(on) {
+            if (!_cgmIsTauri()) return;
+            _cgmInvoke('flash_tray_icon', { on: !!on }).catch(() => {});
+        }
+        // 添加被融合的卡：选英雄→切全部皮肤→预览→发布
+        let _cgmCutBlobs = [];
+        async function cgmLoadHeroSkins() {
+            const hero = document.getElementById('cgmFusedHero').value;
+            const list = document.getElementById('cgmFusedSkinList');
+            if (!hero) { list.textContent = '请先选择英雄'; return; }
+            const skins = (window.skinRegistry && window.skinRegistry[hero]) || [];
+            list.textContent = skins.length ? ('共 ' + skins.length + ' 个皮肤：' + skins.map(s => s.name).join('、')) : '该英雄暂无皮肤（需先有云端皮肤）';
+        }
+        async function cgmCutHeroSkins() {
+            const hero = document.getElementById('cgmFusedHero').value;
+            const preview = document.getElementById('cgmFusedPreview');
+            const status = document.getElementById('cgmFusedStatus');
+            const pubBtn = document.getElementById('cgmPublishBtn');
+            if (!hero) { status.style.color = '#ff9e80'; status.textContent = '请先选择英雄并加载皮肤'; return; }
+            const skins = (window.skinRegistry && window.skinRegistry[hero]) || [];
+            if (!skins.length) { status.style.color = '#ff9e80'; status.textContent = '该英雄暂无皮肤'; return; }
+            status.style.color = '#4ecdc4'; status.textContent = '切割中…';
+            preview.innerHTML = ''; _cgmCutBlobs = [];
+            for (const s of skins) {
+                try {
+                    const url = window.resolveHeroSkinUrl ? await window.resolveHeroSkinUrl(hero, s.name) : null;
+                    if (!url) continue;
+                    const blob = await cropFusionBadgeFromUrl(url, 360, 480);
+                    if (!blob) continue;
+                    _cgmCutBlobs.push({ name: s.name, blob });
+                    const img = document.createElement('img');
+                    img.src = URL.createObjectURL(blob);
+                    img.style.cssText = 'width:90px;height:120px;object-fit:contain;border-radius:6px;border:1px solid rgba(255,255,255,0.2);';
+                    const wrap = document.createElement('div');
+                    wrap.style.cssText = 'text-align:center;font-size:0.7rem;color:rgba(255,255,255,0.8);';
+                    wrap.appendChild(img);
+                    wrap.appendChild(Object.assign(document.createElement('div'), { textContent: s.name }));
+                    preview.appendChild(wrap);
+                } catch (e) {}
+            }
+            status.style.color = '#4ade80';
+            status.textContent = '✓ 已切 ' + _cgmCutBlobs.length + ' 张徽章皮，可发布';
+            pubBtn.disabled = false; pubBtn.style.opacity = 1;
+        }
+        async function cgmPublishFused() {
+            const hero = document.getElementById('cgmFusedHero').value;
+            const status = document.getElementById('cgmFusedStatus');
+            if (!hero || !_cgmCutBlobs.length) { status.style.color = '#ff9e80'; status.textContent = '请先切皮'; return; }
+            try {
+                let registry = null;
+                const local = await _cgmReadRepoFile('skins/registry.json');
+                if (local) { try { registry = JSON.parse(local); } catch (e) { registry = null; } }
+                if (!registry || !registry.heroes) registry = { version: 2, heroes: {} };
+                const key = '融合' + hero;
+                registry.heroes[key] = _cgmCutBlobs.map(b => ({ name: b.name, file: key + '_' + (b.name === '默认' ? 'default' : b.name) + '.png' }));
+                registry.updated = new Date().toISOString();
+                await _cgmWriteRepoFile('skins/registry.json', JSON.stringify(registry, null, 2));
+                for (const b of _cgmCutBlobs) {
+                    const fn = key + '_' + (b.name === '默认' ? 'default' : b.name) + '.png';
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(b.blob); a.download = fn;
+                    document.body.appendChild(a); a.click(); a.remove();
+                }
+                window.skinRegistry[key] = _cgmCutBlobs.map(b => ({ name: b.name, url: URL.createObjectURL(b.blob), path: null, loaded: true, remote: false }));
+                status.style.color = '#4ade80';
+                status.textContent = '✓ 已写入 d:\\tfjl-web\\skins\\registry.json\n✓ 已导出 ' + _cgmCutBlobs.length + ' 张 PNG（浏览器下载），请放入：\n  d:\\tfjl-web\\skins\\' + key + '\\\n然后在本机终端运行：\n  cd d:\\tfjl-web\n  git add skins\n  git commit -m "fusion skin: ' + key + '"\n  git push origin main\n  git -c http.proxy= -c https.proxy= push gitee';
+            } catch (e) {
+                status.style.color = '#ff9e80';
+                status.textContent = '✗ 发布失败：' + e.message;
+            }
+        }
+
+        function toggleFusionSkinSplit(on) {
+            fusionSkinSplitEnabled = !!on;
+            try { localStorage.setItem('tfjl_fusion_skin_split', fusionSkinSplitEnabled ? '1' : '0'); } catch (e) {}
+            refreshAllFusionSkins();
+        }
+
+        // 重新应用所有融合卡皮肤（换肤 / 切开关后调用）
+        async function refreshAllFusionSkins() {
+            document.querySelectorAll('.selected-card[data-name]').forEach(card => {
+                const parts = getFusionParts(card.dataset.name);
+                if (parts && parts.length >= 2) reapplySingleHandCard(card, card.dataset.id, card.dataset.handType || 'my');
+            });
+            const slots = document.querySelectorAll('.battle-slot.filled');
+            const jobs = [];
+            slots.forEach(slot => {
+                const name = slot.querySelector('.card-name') ? slot.querySelector('.card-name').textContent : '';
+                if (getFusionParts(name)) jobs.push((async () => {
+                    try { await applySkinBgToSlot(slot, name); } catch (e) {}
+                })());
+            });
+            await Promise.all(jobs);
+        }
+
+        // 单个手牌卡重铺皮肤（融合→对角切，非融合→原逻辑）
+        async function reapplySingleHandCard(card, cid, ht) {
+            const cardName = card.dataset.name;
+            if (!cardName) return;
+            if (fusionSkinSplitEnabled) {
+                const parts = getFusionParts(cardName);
+                if (parts && parts.length >= 2) {
+                    const mainHero = parts[0], fusedHero = parts[1];
+                    const mainSkin = cid ? getCardSkin(cid, mainHero, ht) : '默认';
+                    const mainUrl = window.resolveHeroSkinUrl ? await window.resolveHeroSkinUrl(mainHero, mainSkin) : null;
+                    const fusedInfo = await resolveFusionHalf(fusedHero, card);
+                    const fusedUrl = fusedInfo ? fusedInfo.url : null;
+                    const fusedIsBadge = fusedInfo ? fusedInfo.isBadge : false;
+                    if (mainUrl || fusedUrl) { applyFusionSkinToHandCard(card, mainUrl, fusedUrl, fusedIsBadge); return; }
+                }
+            }
+            const name = getMainCardName(cardName);
+            if (!name) return;
+            const skin = cid ? getCardSkin(cid, name, ht) : '默认';
+            if (window.resolveHeroSkinUrl) {
+                const url = await window.resolveHeroSkinUrl(name, skin);
+                if (url) { applySkinBgToHandCard(card, url); }
+                else { removeSkinBgFromHandCard(card); }
+            }
         }
         
         function addCustomSkin(cardName, skinName) {
@@ -16513,6 +17323,8 @@
             } catch (e) {
                 console.warn('[SKIN] setCardSkin refresh error:', e);
             }
+            // 换肤后刷新所有融合卡（主卡或被融合卡皮肤变化都要即时反映）
+            if (typeof refreshAllFusionSkins === 'function') refreshAllFusionSkins();
         }
         
         // 保存皮肤数据到localStorage
@@ -17373,30 +18185,54 @@
             card.classList.remove('skin-bg');
             const layer = card.querySelector('.hand-skin-layer');
             if (layer) layer.remove();
+            const fused = card.querySelector('.hand-skin-fused');
+            if (fused) fused.remove();
         }
 
         // 给战斗槽卡牌应用皮肤背景
         async function applySkinBgToSlot(slot, heroName) {
-            console.log('[SKIN] applySkinBgToSlot slot:', slot.dataset.slot, 'heroName:', heroName);
-            // 移除旧皮肤层和旧皮肤名
+            console.log('[SKIN] applySkinBgToSlot slot:', slot.dataset ? slot.dataset.slot : '?', 'heroName:', heroName);
+            // 移除旧皮肤层（含融合上层）和旧皮肤名
             const oldLayer = slot.querySelector('.skin-layer');
             if (oldLayer) oldLayer.remove();
+            const oldFused = slot.querySelector('.skin-layer-fused');
+            if (oldFused) oldFused.remove();
             const oldSkinName = slot.querySelector('.skin-name');
             if (oldSkinName) oldSkinName.remove();
             slot.classList.remove('skin-bg');
             if (!heroName) { console.log('[SKIN] No heroName, returning'); return; }
 
-            // 融合卡：显示第一卡的皮肤；显示名仍保留完整融合名
-            const displayName = heroName;
+            // 融合卡：主卡整皮(底层) + 被融合卡右下角徽章(上层)
+            if (fusionSkinSplitEnabled) {
+                const parts = getFusionParts(heroName);
+                if (parts && parts.length >= 2) {
+                    const mainHero = parts[0], fusedHero = parts[1];
+                    const slotCardId = slot && slot.dataset ? slot.dataset.cardId : null;
+                    const slotHandType = (slot && slot.dataset && slot.dataset.handType) ? slot.dataset.handType : 'my';
+                    const mainSkin = slotCardId ? getCardSkin(slotCardId, mainHero, slotHandType) : '默认';
+                    let mainInfo = null;
+                    if (window.resolveHeroSkinInfo) {
+                        mainInfo = await window.resolveHeroSkinInfo(mainHero, mainSkin);
+                    } else if (window.resolveHeroSkinUrl) {
+                        const mu = await window.resolveHeroSkinUrl(mainHero, mainSkin);
+                        if (mu) mainInfo = { url: mu };
+                    } else if (window.getHeroSkinUrl) {
+                        const mu = window.getHeroSkinUrl(mainHero);
+                        if (mu) mainInfo = { url: mu };
+                    }
+                    const fusedInfo = await resolveFusionHalf(fusedHero, slot);
+                    const mainUrl = mainInfo ? mainInfo.url : null;
+                    const fusedUrl = fusedInfo ? fusedInfo.url : null;
+                    const fusedIsBadge = fusedInfo ? fusedInfo.isBadge : false;
+                    if (mainUrl || fusedUrl) { applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge); return; }
+                    return;
+                }
+            }
+
+            // 非融合 / 未开启：原逻辑（显示主卡整张皮肤）
             const skinHeroName = (typeof getMainCardName === 'function' && getMainCardName(heroName) !== heroName)
                 ? getMainCardName(heroName)
                 : heroName;
-            if (skinHeroName !== heroName) {
-                console.log('[SKIN] Fusion card, use first hero skin:', skinHeroName);
-            }
-
-            // 优先用 resolveHeroSkinInfo（支持延迟 base64 加载且返回皮肤名）
-            // 取该卡当前皮肤（项目级 → 全局默认 → 默认），让背景图随卡牌皮肤生效
             let slotSkin = '默认';
             const slotCardId = slot && slot.dataset ? slot.dataset.cardId : null;
             const slotHandType = (slot && slot.dataset && slot.dataset.handType) ? slot.dataset.handType : 'my';
@@ -17448,6 +18284,7 @@
                     slot.dataset.profession = card.profession;
                     // 应用皮肤背景（异步加载，错误不中断）
                     try { await applySkinBgToSlot(slot, card.name); } catch (e) {}
+                    refreshSlotFusionControl(slot);
                 }
             }
 
@@ -17466,6 +18303,7 @@
                     slot.dataset.profession = card.profession;
                     // 应用皮肤背景（异步加载，错误不中断）
                     try { await applySkinBgToSlot(slot, card.name); } catch (e) {}
+                    refreshSlotFusionControl(slot);
                 }
             }
         }
@@ -17793,6 +18631,7 @@
 
                 // 应用皮肤背景
                 try { await applySkinBgToSlot(slot, cardName); } catch (e) {}
+                refreshSlotFusionControl(slot);
 
                 // 更新放置卡牌数组
                 const placedArray = isUserSlot ? myPlacedCards : teammatePlacedCards;
@@ -18050,23 +18889,10 @@
                 card.addEventListener('contextmenu', (e) => handleHandCardRightClick(e, handType));
             });
 
-            // 为手牌也尝试应用皮肤背景（融合卡取主卡名查询皮肤）
-            if (window.resolveHeroSkinUrl) {
-                document.querySelectorAll('#' + container.id + ' .selected-card:not(.empty)').forEach(async card => {
-                    const name = getMainCardName(card.dataset.name);
-                    if (!name) return;
-                    const cid = card.dataset.id;
-                    const skin = cid ? getCardSkin(cid, name, handType) : '默认';
-                    try {
-                        const url = await window.resolveHeroSkinUrl(name, skin);
-                        if (url) {
-                            applySkinBgToHandCard(card, url);
-                        } else {
-                            removeSkinBgFromHandCard(card);
-                        }
-                    } catch (e) {}
-                });
-            }
+            // 为手牌应用皮肤背景（融合卡：主卡整皮 + 被融合卡右下角徽章）
+            document.querySelectorAll('#' + container.id + ' .selected-card:not(.empty)').forEach(async card => {
+                try { await reapplySingleHandCard(card, card.dataset.id, handType); } catch (e) {}
+            });
             
             countEl.textContent = handCards.length + '/' + MAX_HAND_CARDS;
         }
@@ -18183,6 +19009,7 @@
                 this.dataset.profession = profession;
 
                 try { await applySkinBgToSlot(this, cardName); } catch (e) {}
+                refreshSlotFusionControl(this);
 
                 const placedArray = isUserSlot ? myPlacedCards : teammatePlacedCards;
                 if (!Array.isArray(placedArray)) {
@@ -18215,6 +19042,7 @@
                     this.dataset.profession = prof;
 
                     try { await applySkinBgToSlot(this, cardName); } catch (e) {}
+                    refreshSlotFusionControl(this);
 
                     const existingIndex = placedArray.findIndex(c => c.id === cardId);
                     if (existingIndex > -1) {
@@ -18252,8 +19080,21 @@
                 const card = placedArray.find(c => c.slot === slotId);
                 console.log('[SKIN] card found:', card ? card.name : 'null', 'slotId:', slotId, 'isUserSlot:', isUserSlot);
                 const heroName = card ? (card.name || '') : '';
-                // 融合卡：取第一卡作为皮肤查询/切换的英雄名，显示名仍保留原融合名
-                const skinHeroName = (typeof getMainCardName === 'function' ? getMainCardName(heroName) : heroName);
+                const _parts = (typeof getFusionParts === 'function') ? getFusionParts(heroName) : null;
+                const isFusionCard = (_parts && _parts.length >= 2);
+                const _locked = isUserSlot ? myFusionLocked : teammateFusionLocked;
+                // 融合卡且未锁定（编辑中）：右键切换【被融合卡】皮肤，无需点到角标
+                if (isFusionCard && !_locked) {
+                    await cycleFusionFusedSkin(_parts[1], slotId);
+                    try { await applySkinBgToSlot(this, heroName); } catch (e) {}
+                    const _ht = isUserSlot ? 'my' : 'teammate';
+                    const hc = document.querySelector('#' + (_ht === 'my' ? 'myHandContainer' : 'teammateHandContainer') + ' .selected-card[data-id="' + (card ? card.id : '') + '"]');
+                    if (hc) { try { await reapplySingleHandCard(hc, card.id, _ht); } catch (e) {} }
+                    if (typeof autoSaveProject === 'function') autoSaveProject();
+                    return;
+                }
+                // 非融合 / 已锁定：右键切换【主卡】皮肤（原逻辑）
+                const skinHeroName = isFusionCard ? _parts[0] : (typeof getMainCardName === 'function' ? getMainCardName(heroName) : heroName);
                 const skins = skinHeroName && window.getHeroSkins ? window.getHeroSkins(skinHeroName) : [];
                 const hasSkinBg = this.classList.contains('skin-bg');
                 console.log('[SKIN] heroName:', heroName, 'skinHeroName:', skinHeroName, 'skins count:', skins.length, 'hasSkinBg:', hasSkinBg);
@@ -19824,26 +20665,38 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            // 检查登录状态，如果已经登录则直接显示主内容
-            if (isLoggedIn()) {
-                document.getElementById('passwordOverlay').style.display = 'none';
-                document.getElementById('mainContent').classList.add('visible');
-            } else {
-                // 未登录但记住过密码 → 尝试自动登录
+            // 登录检查（异步：需读磁盘 auth_state.json 判断是否已登录过）。
+            // 优先级：localStorage 已登录 → 磁盘已登录 → 记住密码且校验通过 → 否则显示密码门。
+            // 注：网页版（无 Tauri）isLoggedInFromDisk 永远 false，仅依赖 localStorage，与原行为一致。
+            (async () => {
+                const overlay = document.getElementById('passwordOverlay');
+                const main = document.getElementById('mainContent');
+                const enter = () => { overlay.style.display = 'none'; main.classList.add('visible'); };
+                const showLogin = () => { overlay.style.display = 'flex'; };
+                // 已登录（localStorage 或磁盘 auth_state.json）→ 直接进入，完全不显示密码门
+                const diskLoggedIn = await isLoggedInFromDisk();
+                if (isLoggedIn() || diskLoggedIn) {
+                    localStorage.setItem('TFJL_LoggedIn', 'true');
+                    saveAuthToDisk(true);
+                    enter();
+                    return;
+                }
+                // 未登录但记住过密码 → 尝试自动登录（修复旧 bug：原用 getAdminPasswords().includes(明文) 永远不成立）
                 const savedPwd = localStorage.getItem('TFJL_SavedPwd');
                 if (savedPwd) {
                     try {
                         const pwd = atob(savedPwd);
-                        if (pwd && getAdminPasswords().includes(pwd)) {
-                            // 密码有效，自动登录
+                        let ok = false;
+                        for (const h of getAdminPasswords()) { if (await verifyPassword(pwd, h)) { ok = true; break; } }
+                        if (ok) {
                             recordLogin();
                             localStorage.setItem('TFJL_LoggedIn', 'true');
-                            document.getElementById('passwordOverlay').style.display = 'none';
-                            document.getElementById('mainContent').classList.add('visible');
+                            saveAuthToDisk(true);
+                            enter();
+                            return;
                         } else {
-                            // 保存的密码已失效（密码表变了），清除
+                            // 保存的密码已失效（密码表变了），清除并预填方便重输
                             localStorage.removeItem('TFJL_SavedPwd');
-                            // 预填密码框方便用户
                             const input = document.getElementById('passwordInput');
                             if (input) input.value = pwd;
                         }
@@ -19851,7 +20704,9 @@
                         localStorage.removeItem('TFJL_SavedPwd');
                     }
                 }
-            }
+                // 确认未登录 → 显示密码门（此刻才出现，已登录用户全程看不到）
+                showLogin();
+            })();
             
             initIndexedDB().then(() => {
                 refreshProjectSelectors();
@@ -19863,6 +20718,9 @@
             loadDefaultCardSkins();
             loadCardMoHua();
             loadCustomSkins();
+            // 同步融合卡显示开关初始状态（默认开启）
+            try { const t = document.getElementById('fusionSkinSplitToggle'); if (t) t.checked = fusionSkinSplitEnabled; } catch (e) {}
+            if (typeof refreshAllFusionSkins === 'function') refreshAllFusionSkins();
             loadCustomSkinAttributes();
             loadCustomCards();
             loadFavorites();
@@ -20024,17 +20882,6 @@
                 console.log('[SKIN] binding battle-slot contextmenu:', slot.dataset.slot);
                 slot.addEventListener('contextmenu', handleSlotRightClick);
             });
-
-            // 捕获阶段兜底：确保战场槽右键优先被处理，不被 card-item 全局事件干扰
-            document.addEventListener('contextmenu', (e) => {
-                const slot = e.target.closest('.battle-slot');
-                if (!slot) return;
-                // 只处理战场槽本身（不处理卡池/手牌中的 card-item，那些已被上方监听器排除）
-                console.log('[SKIN] capture battle-slot contextmenu on', slot.dataset.slot, 'filled:', slot.classList.contains('filled'));
-                e.preventDefault();
-                e.stopPropagation();
-                handleSlotRightClick.call(slot, e);
-            }, true);
 
             updateHandDisplay('my');
             updateHandDisplay('teammate');
@@ -20205,14 +21052,24 @@ const GIST_TOKEN_KEY = 'TFJL_Gist_Token';
 function getGistToken() {
     // 优先使用硬编码Token（GitHub Actions部署时会替换为实际的Token）
     const HARDCODED_TOKEN = 'YOUR_GITHUB_TOKEN_HERE';
-    
+
     // 如果Token不是占位符，就使用它
     if (HARDCODED_TOKEN && HARDCODED_TOKEN.length > 20 && HARDCODED_TOKEN.startsWith('ghp_')) {
         return HARDCODED_TOKEN;
     }
-    
-    // 其次从localStorage读取（本地开发时使用）
-    return localStorage.getItem(GIST_TOKEN_KEY) || '';
+
+    // 其次从localStorage读取（本地开发/用户手动填写时使用，iframe 同域共享）
+    try { const ls = localStorage.getItem(GIST_TOKEN_KEY); if (ls) return ls; } catch (e) {}
+
+    // iframe 内嵌时，复用父窗口（首页）已注入的真实 token（兜底，避免子页 token 为空）
+    try {
+        if (window.parent && window.parent !== window && typeof window.parent.getGistToken === 'function') {
+            const pt = window.parent.getGistToken();
+            if (pt && pt !== 'YOUR_GITHUB_TOKEN_HERE' && pt.length > 10) return pt;
+        }
+    } catch (e) {}
+
+    return '';
 }
 function setGistToken(token) {
     localStorage.setItem(GIST_TOKEN_KEY, token);
@@ -20843,8 +21700,8 @@ function hasGistToken() {
                 }, 100);
                 
                 setInterval(() => {
-                    // 有拍卖播报时不改变颜色，保持红色
-                    if (auctionBroadcastQueue.length > 0) return;
+                    // 有拍卖播报且不关闭开关时不改变颜色，保持红色
+                    if (_globalBroadcastEnabled && auctionBroadcastQueue.length > 0) return;
                     const newColor = getRandomMarqueeColor();
                     marqueeEl.style.color = newColor;
                     marqueeEl.style.textShadow = `0 0 10px ${newColor}, 0 0 20px ${newColor}`;
@@ -20862,8 +21719,8 @@ function hasGistToken() {
                     return false;
                 });
                 if (hasTimeChange) {
-                    // 有拍卖播报时不覆盖，由播报系统管理
-                    if (auctionBroadcastQueue.length > 0) return;
+                    // 有拍卖播报且不关闭开关时不覆盖，由播报系统管理
+                    if (_globalBroadcastEnabled && auctionBroadcastQueue.length > 0) return;
                     const marqueeEl = document.getElementById('newsMarquee');
                     if (marqueeEl) {
                         marqueeEl.textContent = getNewsMarqueeText();
@@ -21085,14 +21942,15 @@ function hasGistToken() {
                 catch (error) { console.error('❌ 加载配置和新闻失败:', error); }
             })();
 
-            // 从Gist加载拍卖快讯
+            // 从Gist加载拍卖快讯（先确保开关状态已加载，避免竞态导致关闭后仍显示）
             (async () => {
                 try {
+                    await loadGlobalBroadcastStatus().catch(()=>{});
                     const broadcasts = await fetchAuctionBroadcastsFromGist();
                     if (broadcasts && broadcasts.length > 0) {
                         auctionBroadcastQueue = broadcasts;
-                        updateMarqueeWithBroadcast();
                     }
+                    updateMarqueeWithBroadcast(); // 内部已按 _globalBroadcastEnabled 决定显示拍卖/普通公告
                 } catch (error) { console.warn('加载拍卖快讯失败:', error); }
             })();
 
@@ -22611,6 +23469,7 @@ function hasGistToken() {
         // ==================== 消息墙功能 ====================
         let wallMessages = [];
         let messageWallOpen = false;
+        let wallLastSeenTime = Number(localStorage.getItem('TFJL_WallLastSeen') || 0);
         let messageScrollInterval = null;
         let messageFetchInterval = null;
         let msgRefreshCountdown = 30;
@@ -22665,6 +23524,7 @@ function hasGistToken() {
                 // 需求墙最小化时，拍卖行按钮右移
                 if (chatToggle) chatToggle.style.left = '160px';
                 messageWallOpen = false;
+                updateWallAttention();   // 关闭后重新评估未读提醒
             } else {
                 const ok = await ensureWallNickBeforeOpen();
                 if (!ok) return; // 强制必须设昵称：取消设置则不开墙，保持入口按钮
@@ -22674,11 +23534,37 @@ function hasGistToken() {
                 // 需求墙打开时，拍卖行按钮回到原位置
                 if (chatToggle) chatToggle.style.left = '68px';
                 messageWallOpen = true;
+                wallLastSeenTime = Date.now();
+                localStorage.setItem('TFJL_WallLastSeen', String(wallLastSeenTime));
+                updateWallAttention();   // 打开即清除未读提醒
                 if (wallMessages.length === 0) fetchMessages();
                 initMessageWallDrag();
             }
         }
         
+        // 未读提醒：墙关闭状态下，若自上次打开后出现了新留言 → 图标 QQ 式闪动 + 红点(未读数)；打开墙即清除
+        function updateWallAttention() {
+            const toggle = document.getElementById('messageWallToggle');
+            const dot = document.getElementById('wallUnreadDot');
+            if (!toggle) return;
+            if (messageWallOpen) {
+                toggle.classList.remove('wall-attention');
+                if (dot) dot.style.display = 'none';
+                flashTray(false);   // 墙已开 → 停托盘闪动
+                return;
+            }
+            const newCount = wallMessages.filter(m => m.time > wallLastSeenTime).length;
+            if (newCount > 0) {
+                toggle.classList.add('wall-attention');
+                if (dot) { dot.style.display = 'block'; dot.textContent = newCount > 99 ? '99+' : String(newCount); }
+                flashTray(true);    // 有未读新消息 → 托盘图标闪动提醒
+            } else {
+                toggle.classList.remove('wall-attention');
+                if (dot) { dot.style.display = 'none'; dot.textContent = ''; }
+                flashTray(false);   // 无未读 → 停闪动
+            }
+        }
+
         function closeMessageWall() {
             const wall = document.getElementById('messageWall');
             const toggle = document.getElementById('messageWallToggle');
@@ -22687,6 +23573,7 @@ function hasGistToken() {
             toggle.style.display = 'flex';
             if (chatToggle) chatToggle.style.left = '68px';
             messageWallOpen = false;
+            updateWallAttention();
         }
         
         function toggleMessageWallSize() {
@@ -22808,6 +23695,7 @@ function hasGistToken() {
                                     }
                                     
                                     renderMessages();
+                                    updateWallAttention();
                                     console.log('[消息加载] 成功加载', wallMessages.length, '条消息');
                                     return;
                                 } catch (e) { console.warn('解析消息 JSON 失败:', e); }
@@ -25303,7 +26191,7 @@ ${maSection}
 
         // ==================== 管理员面板 ====================
         const ADMIN_VERIFY_KEY = 'TFJL_Admin_Verified';
-        const ADMIN_VERIFY_CODE = 'gyq2024';
+        const ADMIN_VERIFY_HASH = 'v2$kXtI5wHYUFcdTBV24RhVpwTHyM83gmQ0r3hhIY9rVnM='; // 源码不含明文(原 gyq2024)
         let adminLongPressTimer = null;
         let adminLongPressTriggered = false;
 
@@ -25384,7 +26272,7 @@ ${maSection}
             }
         });
 
-        function openAdminPanel() {
+        async function openAdminPanel() {
             const overlay = document.getElementById('adminPanelOverlay');
             overlay.style.display = 'flex';
 
@@ -25396,13 +26284,11 @@ ${maSection}
                 const saved = localStorage.getItem('TFJL_Admin_SavedPwd');
                 if (saved) {
                     try {
-                        const code = atob(saved);
-                        if (code === ADMIN_VERIFY_CODE) {
-                            // 密码匹配，自动验证
+                        // 存的是管理员哈希的 base64，直接比对，不暴露明文
+                        if (atob(saved) === ADMIN_VERIFY_HASH) {
                             sessionStorage.setItem(ADMIN_VERIFY_KEY, 'true');
                             isVerified = true;
                         } else {
-                            // 密码不对（验证码被改了），清除保存
                             localStorage.removeItem('TFJL_Admin_SavedPwd');
                         }
                     } catch (e) {
@@ -25428,13 +26314,6 @@ ${maSection}
                 const logStatsAdminPage = document.getElementById('adminPageLogStats');
                 if (logStatsAdminPage) logStatsAdminPage.style.display = 'none';
                 document.getElementById('adminVerifyCode').value = '';
-                // 如果有保存密码，预填输入框方便用户
-                const saved = localStorage.getItem('TFJL_Admin_SavedPwd');
-                if (saved) {
-                    try {
-                        document.getElementById('adminVerifyCode').value = atob(saved);
-                    } catch (e) {}
-                }
                 document.getElementById('adminVerifyCode').focus();
             }
         }
@@ -26234,6 +27113,7 @@ ${maSection}
             localStorage.removeItem('TFJL_LoggedIn');
             localStorage.removeItem('TFJL_Mode');
             localStorage.removeItem('TFJL_AuctionOnlyMode');
+            clearAuthOnDisk();   // 同步清磁盘登录标记，下次需重新输入密码
             
             // 隐藏主内容
             document.getElementById('mainContent').classList.remove('visible');
@@ -26274,15 +27154,15 @@ ${maSection}
             document.getElementById('notepadPanel').style.display = 'none';
         }
 
-        function verifyAdmin() {
+        async function verifyAdmin() {
             const code = document.getElementById('adminVerifyCode').value.trim();
-            if (code === ADMIN_VERIFY_CODE) {
+            if (await verifyPassword(code, ADMIN_VERIFY_HASH)) {
                 sessionStorage.setItem(ADMIN_VERIFY_KEY, 'true');
 
                 // 记住验证码：如果勾选了"记住验证码"，保存到 localStorage
                 const rememberCb = document.getElementById('adminRememberCode');
                 if (rememberCb && rememberCb.checked) {
-                    try { localStorage.setItem('TFJL_Admin_SavedPwd', btoa(code)); } catch (e) {}
+                    try { localStorage.setItem('TFJL_Admin_SavedPwd', btoa(await hashPassword(code))); } catch (e) {}
                 } else {
                     localStorage.removeItem('TFJL_Admin_SavedPwd');
                 }
@@ -26456,16 +27336,16 @@ ${maSection}
             
             let html = '';
             passwords.forEach((pwd, index) => {
-                const isDefault = DEFAULT_PASSWORDS.includes(pwd);
+                const isDefault = DEFAULT_PASSWORD_HASHES.includes(pwd);
                 html += `
                     <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:rgba(255,255,255,0.05);border-radius:6px;margin-bottom:8px;border:1px solid rgba(255,255,255,0.1);">
                         <div style="display:flex;align-items:center;gap:10px;">
                             <span style="color:#ffd700;font-weight:bold;">${index + 1}.</span>
-                            <span style="color:#fff;font-family:monospace;">${escapeHtml(pwd)}</span>
+                            <span style="color:#fff;font-family:monospace;">${escapeHtml((pwd||'').length>10 ? pwd.substring(0,10)+'…' : pwd)}</span>
                             ${isDefault ? '<span style="background:#4caf50;color:#fff;font-size:0.7rem;padding:2px 6px;border-radius:4px;">初始</span>' : ''}
                         </div>
                         <div style="display:flex;gap:6px;">
-                            <button onclick="editPassword(${index}, '${escapeHtml(pwd)}')" style="background:linear-gradient(135deg,#ff9800,#f57c00);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">✏️</button>
+                            <button onclick="editPassword(${index})" style="background:linear-gradient(135deg,#ff9800,#f57c00);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">✏️</button>
                             <button onclick="deletePassword(${index})" style="background:linear-gradient(135deg,#f44336,#d32f2f);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">🗑️</button>
                         </div>
                     </div>
@@ -26474,8 +27354,8 @@ ${maSection}
             listContainer.innerHTML = html;
         }
 
-        function editPassword(index, currentPwd) {
-            const newPwd = prompt('请输入新密码：', currentPwd);
+        async function editPassword(index) {
+            const newPwd = prompt('请输入新密码：', '');
             if (!newPwd || newPwd.trim() === '') {
                 showAdminStatus('密码不能为空！', 'error');
                 return;
@@ -26493,19 +27373,18 @@ ${maSection}
             }
             
             const passwords = getAdminPasswords();
-            
-            if (passwords.includes(trimmedPwd)) {
+            const newHash = await hashPassword(trimmedPwd);
+            if (passwords.includes(newHash)) {
                 showAdminStatus('该密码已存在！', 'error');
                 return;
             }
-            
-            passwords[index] = trimmedPwd;
+            passwords[index] = newHash;
             localStorage.setItem(PASSWORDS_STORAGE_KEY, JSON.stringify(passwords));
             loadPasswordList();
-            showAdminStatus(`密码已修改为"${trimmedPwd}"！`, 'success');
+            showAdminStatus('密码已修改！', 'success');
         }
 
-        function addPassword() {
+        async function addPassword() {
             const newPwd = document.getElementById('newPasswordInput').value.trim();
             if (!newPwd) {
                 showAdminStatus('请输入密码！', 'error');
@@ -26517,37 +27396,39 @@ ${maSection}
                 return;
             }
             
+            const newHash = await hashPassword(newPwd);
             const passwords = getAdminPasswords();
             
-            if (passwords.includes(newPwd)) {
+            if (passwords.includes(newHash)) {
                 showAdminStatus('该密码已存在！', 'error');
                 return;
             }
             
-            passwords.push(newPwd);
+            passwords.push(newHash);
             localStorage.setItem(PASSWORDS_STORAGE_KEY, JSON.stringify(passwords));
             document.getElementById('newPasswordInput').value = '';
             loadPasswordList();
-            showAdminStatus(`密码"${newPwd}"添加成功！`, 'success');
+            showAdminStatus('密码添加成功！', 'success');
         }
 
         function deletePassword(index) {
             const passwords = getAdminPasswords();
             const pwdToDelete = passwords[index];
+            const _mask = (pwdToDelete||'').length>10 ? pwdToDelete.substring(0,10)+'…' : pwdToDelete;
             
             if (passwords.length <= 1) {
                 showAdminStatus('至少需要保留一个密码！', 'error');
                 return;
             }
             
-            if (!confirm(`确定要删除密码"${pwdToDelete}"吗？`)) {
+            if (!confirm(`确定要删除密码"${_mask}"吗？`)) {
                 return;
             }
             
             passwords.splice(index, 1);
             localStorage.setItem(PASSWORDS_STORAGE_KEY, JSON.stringify(passwords));
             loadPasswordList();
-            showAdminStatus(`密码"${pwdToDelete}"已删除！`, 'success');
+            showAdminStatus('密码已删除！', 'success');
         }
 
         // 获取公告Gist的URL（与用户端读取逻辑保持一致）
@@ -27652,6 +28533,13 @@ ${maSection}
                             <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">访问统计</div>
                         </div>
                     </div>
+                    <div class="admin-menu-item" onclick="openCardGroupManager()" style="padding:10px;">
+                        <span style="font-size:1.1rem;">🃏</span>
+                        <div style="margin-left:8px;">
+                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">卡组管理</div>
+                            <div style="color:rgba(255,255,255,0.5);font-size:0.68rem;">融合卡 / 融合皮肤</div>
+                        </div>
+                    </div>
                     <div class="admin-menu-item" onclick="adminShowPage('analytics')" style="padding:10px;">
                         <span style="font-size:1.1rem;">📈</span>
                         <div style="margin-left:8px;">
@@ -27706,6 +28594,13 @@ ${maSection}
                         <div style="margin-left:8px;">
                             <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">深海统计</div>
                             <div style="font-size:0.7rem;color:rgba(255,255,255,0.5);">每日战况与杯数趋势</div>
+                        </div>
+                    </div>
+                    <div class="admin-menu-item" onclick="openAlliancePage()" style="padding:10px;">
+                        <span style="font-size:1.1rem;">🛡️</span>
+                        <div style="margin-left:8px;">
+                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">盟战战绩</div>
+                            <div style="font-size:0.7rem;color:rgba(255,255,255,0.5);">联盟个人战绩 · 注册/登录/存Gist</div>
                         </div>
                     </div>
                 </div>
@@ -28706,9 +29601,15 @@ ${maSection}
             #floatConsole.resizing { user-select:none; }
             #floatConsole.resizing #floatConsoleContent { pointer-events:none; }
         </style>
+    <!-- 子页内嵌弹窗（盟战/深海 同域 iframe，复用首页已注入的 getGistToken，避免整页跳转触发重新登录） -->
+    <div id="subpageModal" style="position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,0.7);align-items:center;justify-content:center;display:none;">
+        <div style="position:relative;width:100%;height:100%;background:#0b0f1a;">
+            <iframe id="subpageFrame" src="about:blank" style="width:100%;height:100%;border:0;background:#0b0f1a;"></iframe>
+        </div>
+    </div>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260731-37</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260803-127</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
@@ -28753,5 +29654,62 @@ ${maSection}
         var t = a.value; a.value = b.value; b.value = t; a.focus();
     };
     </script>
+    <!-- 卡组管理（管理员·仅桌面端）：添加融合卡 / 添加被融合的卡(融合皮肤) -->
+    <div id="cardGroupMgrModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;align-items:center;justify-content:center;">
+        <div style="width:min(720px,94vw);max-height:90vh;overflow:auto;background:linear-gradient(135deg,#1a1a2e,#16213e);border:1px solid rgba(255,215,0,0.3);border-radius:14px;padding:20px;box-shadow:0 20px 60px rgba(0,0,0,0.6);">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                <h2 style="margin:0;color:#ffd700;font-size:1.1rem;">🃏 卡组管理（融合皮肤库）</h2>
+                <button onclick="document.getElementById('cardGroupMgrModal').style.display='none'" style="background:rgba(255,255,255,0.1);border:none;color:#fff;width:30px;height:30px;border-radius:6px;cursor:pointer;font-size:1rem;">✕</button>
+            </div>
+            <p style="color:#4ecdc4;font-size:0.78rem;margin:0 0 12px 0;">🖥️ 仅桌面端可用。切割好的徽章皮会写入本地仓库 <code>d:\tfjl-web\skins\</code> 并提示你 git 推送（全自动推送需后续加 Rust 命令）。</p>
+            <div style="display:flex;gap:8px;margin-bottom:14px;">
+                <button onclick="cgmSwitchTab('fusion')" id="cgmTabFusion" style="flex:1;padding:8px;border-radius:8px;cursor:pointer;border:1px solid rgba(255,215,0,0.4);background:rgba(255,215,0,0.18);color:#ffd700;font-weight:600;">➕ 添加融合卡</button>
+                <button onclick="cgmSwitchTab('fused')" id="cgmTabFused" style="flex:1;padding:8px;border-radius:8px;cursor:pointer;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.8);">✂️ 添加被融合的卡</button>
+            </div>
+
+            <!-- 添加融合卡 -->
+            <div id="cgmFusionPane">
+                <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+                    <select id="cgmFusionProf" style="flex:1;min-width:120px;padding:7px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:#0f3460;color:#fff;">
+                        <option value="">职业(可选)</option>
+                        <option>战士</option><option>法师</option><option>射手</option><option>召唤</option><option>牧师</option><option>术士</option><option>熊猫</option><option>精灵球</option><option>工程</option><option>通用</option>
+                    </select>
+                    <select id="cgmFusionQuality" style="flex:1;min-width:120px;padding:7px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:#0f3460;color:#fff;">
+                        <option value="">品质(可选)</option>
+                        <option>金</option><option>紫</option><option>蓝</option><option>白</option>
+                    </select>
+                </div>
+                <div style="display:flex;gap:8px;margin-bottom:10px;">
+                    <input id="cgmFusionName" placeholder="融合卡名，如 小野酋长 / 影魇" style="flex:1;padding:8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:#0f3460;color:#fff;">
+                    <button onclick="cgmValidateFusion()" style="padding:8px 12px;border-radius:6px;border:none;background:rgba(78,205,196,0.85);color:#06283d;cursor:pointer;font-weight:600;">校验</button>
+                </div>
+                <div id="cgmFusionResult" style="font-size:0.82rem;color:rgba(255,255,255,0.85);margin-bottom:10px;min-height:20px;"></div>
+                <button onclick="cgmAddFusionCard()" id="cgmFusionAddBtn" disabled style="width:100%;padding:9px;border-radius:8px;border:none;background:linear-gradient(135deg,#4ade80,#22c55e);color:#fff;cursor:pointer;font-weight:700;opacity:0.5;">✅ 确认添加并写入 fusions.json</button>
+                <div id="cgmFusionStatus" style="font-size:0.78rem;margin-top:8px;color:#4ecdc4;"></div>
+                <button onclick="cgmPushFusions()" id="cgmPushBtn" style="width:100%;margin-top:8px;padding:9px;border-radius:8px;border:1px solid rgba(120,180,255,0.5);background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;cursor:pointer;font-weight:700;">🚀 一键推送 fusions.json 到 GitHub（自动部署）</button>
+                <div style="margin-top:16px;border-top:1px dashed rgba(255,255,255,0.18);padding-top:12px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                        <div style="color:#ffd700;font-weight:600;font-size:0.9rem;">📋 已添加的融合卡（共 <span id="cgmFusionCount">0</span> 张）</div>
+                        <button onclick="cgmRefreshFusionList()" style="padding:4px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.25);background:rgba(255,255,255,0.06);color:#fff;cursor:pointer;font-size:0.76rem;">🔄 刷新</button>
+                    </div>
+                    <div id="cgmFusionList" style="display:flex;flex-direction:column;gap:6px;max-height:220px;overflow:auto;"></div>
+                </div>
+            </div>
+
+            <!-- 添加被融合的卡 -->
+            <div id="cgmFusedPane" style="display:none;">
+                <div style="display:flex;gap:8px;margin-bottom:10px;">
+                    <select id="cgmFusedHero" style="flex:1;padding:8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:#0f3460;color:#fff;"></select>
+                    <button onclick="cgmLoadHeroSkins()" style="padding:8px 12px;border-radius:6px;border:none;background:rgba(120,180,255,0.85);color:#06283d;cursor:pointer;font-weight:600;">加载皮肤</button>
+                </div>
+                <div id="cgmFusedSkinList" style="font-size:0.78rem;color:rgba(255,255,255,0.7);margin-bottom:10px;"></div>
+                <button onclick="cgmCutHeroSkins()" id="cgmCutBtn" style="width:100%;padding:9px;border-radius:8px;border:none;background:linear-gradient(135deg,#f59e0b,#e65100);color:#fff;cursor:pointer;font-weight:700;margin-bottom:10px;">✂️ 切全部皮肤并预览</button>
+                <div id="cgmFusedPreview" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;"></div>
+                <button onclick="cgmPublishFused()" id="cgmPublishBtn" disabled style="width:100%;padding:9px;border-radius:8px;border:none;background:linear-gradient(135deg,#4ade80,#22c55e);color:#fff;cursor:pointer;font-weight:700;opacity:0.5;">📤 发布到云端（写入仓库+导出PNG）</button>
+                <div id="cgmFusedStatus" style="font-size:0.78rem;margin-top:8px;color:#4ecdc4;white-space:pre-wrap;"></div>
+            </div>
+        </div>
+    </div>
+
 </body>
 </html>
