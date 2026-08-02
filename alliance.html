@@ -449,21 +449,12 @@ function parseAllianceFields(o){
   const cut=streakM?streakM.index:nameText.length;
   let name=nameText.slice(0,cut).replace(/[\s.、，。,:：#()\-_|]/g,'').replace(/(最大连胜|大连胜|连胜|奖杯|奖|杯)/g,'').trim();
   if(!name) return null;
-  // 杯数 = 奖杯右边的数字（最关键）；最大连胜可有可无。
-  // 右列(cupText)读取顺序：奖杯+杯数(在上) → 最大连胜:数(在下)，故杯数总是 cupText 中"最大连胜"之前的最后一个数字；无连胜词则取首个数字。
-  let cups=0, streak=0;
+  // 杯数 = 奖杯右边的数字（最关键）。
+  // 右列现在只包含奖杯+杯数（最大连胜区域已被裁掉丢弃），所以直接取右列第一个数字即可。
   const cupNums=[...cupText.matchAll(/-?\d+/g)].map(m=>parseInt(m[0],10));
-  const sm=cupText.match(/(?:最大连胜|大连胜|连胜)\D*?(-?\d+)/);
-  if(sm){
-    streak=parseInt(sm[1],10);
-    const sIdx=cupText.indexOf(sm[1], sm.index);
-    const before=cupNums.filter(v=> cupText.indexOf(String(v)) < sIdx);
-    cups = before.length ? before[before.length-1] : (cupNums[0]||0);
-  } else {
-    cups = cupNums.length ? cupNums[0] : 0;
-  }
-  if(streak<0 || cups<0) return null;
-  return { rank, name, cups, streak };
+  const cups=cupNums.length?cupNums[0]:0;
+  if(cups<0) return null;
+  return { rank, name, cups, streak:0 };
 }
 
 let allianceSliceResults = [];   // [{key, dataUrl, text}]
@@ -604,9 +595,10 @@ function allianceSliceImage(file, maxH){
 // 对"单行块 canvas"按固定比例切三列，分别放大 OCR。
 // 盟战游戏截图列宽比例稳定：
 //   左列≈0-20%  排名框（含1-3名圆形奖牌）；
-//   中列≈20-78% 名字 + 最大连胜文字；
-//   右列≈78-100% 奖杯图标 + 杯数数字。
-// 此前用"方差聚类"，但排名框背景均匀、只有数字边缘高方差，导致左列只切到一条细边；右列则抓到最右空白边框。比例切更稳。
+//   中列≈20-55% 名字（不含奖杯/杯数/最大连胜）；
+//   右列≈55-70% 奖杯图标 + 杯数数字（最重要！）。
+//   70%-100%  最大连胜区域 → 直接丢弃，不参与识别。
+// 此前右列设成 67%-100%，结果切到的是"最大连胜：0"灰条，真正要的奖杯+杯数没进右列。
 function allianceColumnCrops(cv,w,sh){
   try{
     const pad=Math.max(2,Math.floor(w*0.01));
@@ -618,11 +610,12 @@ function allianceColumnCrops(cv,w,sh){
       return c3.toDataURL('image/png').split(',')[1];
     };
     const leftEnd=Math.floor(w*0.20);
-    const midEnd=Math.floor(w*0.67);
+    const midEnd=Math.floor(w*0.55);
+    const rightEnd=Math.floor(w*0.70);
     return {
       left:crop(0,leftEnd),
       mid:crop(leftEnd-2,midEnd+2),      // 中列左右让2px，确保不漏字
-      right:crop(midEnd-2,w-1)
+      right:crop(midEnd-2,rightEnd+2)    // 右列只取奖杯+杯数，70%之后丢弃
     };
   }catch(e){ return null; }
 }
@@ -676,11 +669,11 @@ function allianceRenderOcrCompare(){
   const box=$('allianceOcrCompare');
   if(!allianceSliceResults.length){ box.style.display='none'; box.innerHTML=''; return; }
   box.style.display='block';
-  box.innerHTML='<div style="font-size:0.72rem;color:#7CFC9B;margin-bottom:6px;">🔍 切片↔识别对比（左=排名列 / 中=名字+连胜 / 右=杯数列；逐块对照）</div>'
+  box.innerHTML='<div style="font-size:0.72rem;color:#7CFC9B;margin-bottom:6px;">🔍 切片↔识别对比（左=排名列 / 中=名字 / 右=奖杯+杯数；最大连胜区域已丢弃）</div>'
     + allianceSliceResults.map((s,idx)=>{
         const imgs=(s.leftDataUrl?'<img src="'+s.leftDataUrl+'" title="排名列" style="max-width:90px;max-height:120px;border:1px solid rgba(255,255,255,0.2);border-radius:4px;display:block;">':'')
-          +'<img src="'+s.dataUrl+'" title="名字+连胜" style="max-width:180px;max-height:120px;border:1px solid rgba(255,255,255,0.2);border-radius:4px;display:block;">'
-          +(s.rightDataUrl?'<img src="'+s.rightDataUrl+'" title="杯数列" style="max-width:90px;max-height:120px;border:1px solid rgba(255,255,255,0.2);border-radius:4px;display:block;">':'');
+          +'<img src="'+s.dataUrl+'" title="名字" style="max-width:180px;max-height:120px;border:1px solid rgba(255,255,255,0.2);border-radius:4px;display:block;">'
+          +(s.rightDataUrl?'<img src="'+s.rightDataUrl+'" title="奖杯+杯数" style="max-width:90px;max-height:120px;border:1px solid rgba(255,255,255,0.2);border-radius:4px;display:block;">':'');
         return '<div style="display:flex;gap:10px;border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:8px;margin-bottom:8px;background:rgba(0,0,0,0.2);">'
           + '<div style="flex:0 0 auto;"><div style="font-size:0.66rem;color:rgba(255,255,255,0.5);margin-bottom:4px;">块 #'+(idx+1)+'</div><div style="display:flex;gap:4px;align-items:flex-start;">'+imgs+'</div></div>'
           + '<pre style="flex:1;min-width:0;white-space:pre-wrap;word-break:break-all;font-size:0.68rem;color:#cfe;background:rgba(0,0,0,0.3);padding:6px;border-radius:4px;max-height:200px;overflow:auto;margin:0;">中：'+esc(s.text||'(空)')+'\n左：'+esc(s.rankText||'(空)')+'\n右：'+esc(s.cupText||'(空)')+'</pre>'
