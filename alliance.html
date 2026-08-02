@@ -593,13 +593,14 @@ function allianceSliceImage(file, maxH){
   });
 }
 // 对"单行块 canvas"按固定比例切三列，分别放大 OCR。
-// 盟战游戏截图列宽比例（以用户最新图实测）：
-//   左列≈0-15%   排名框（含1-3名圆形奖牌）；
-//   头像≈15-28%  丢弃，避免干扰名字识别；
-//   中列≈28-55%  名字（不含头像/奖杯/杯数/最大连胜）；
-//   右列≈70-90%  奖杯图标 + 杯数数字（最重要！）；
-//   90%-100%     最大连胜区域 → 直接丢弃，不参与识别。
-// 之前按 0-20/20-55/55-70 切，结果右列根本没切到奖杯，中列包进头像导致名字错。
+// 比例由 Node.js 量图实测（盟战最新图.png，宽554px）：列方差峰值 →
+//   左列≈0-18%   排名框（含1-3名圆形奖牌、排名数字）；
+//   头像≈18-28%  丢弃，避免污染排名数字；
+//   中列≈28-66%  名字（含名字里的数字，如"果子13"的13）；
+//   66-78%       名字↔奖杯间空白，丢弃；
+//   右列≈79-93%  奖杯图标 + 杯数数字（最重要！）；
+//   94%+         最大连胜区域 → 直接丢弃，不参与识别。
+// 此前 0-15/28-55/70-90 完全偏离实测布局：左列只切到框左边→全识别成"1"、名字丢数字、右列切不中杯数。
 function allianceColumnCrops(cv,w,sh){
   try{
     const pad=Math.max(2,Math.floor(w*0.01));
@@ -610,11 +611,11 @@ function allianceColumnCrops(cv,w,sh){
       const c3=document.createElement('canvas'); c3.width=cw*3; c3.height=sh*3; c3.getContext('2d').drawImage(c2,0,0,cw*3,sh*3);
       return c3.toDataURL('image/png').split(',')[1];
     };
-    const leftEnd=Math.floor(w*0.15);
+    const leftEnd=Math.floor(w*0.18);
     const midStart=Math.floor(w*0.28);
-    const midEnd=Math.floor(w*0.55);
-    const rightStart=Math.floor(w*0.70);
-    const rightEnd=Math.floor(w*0.90);
+    const midEnd=Math.floor(w*0.66);
+    const rightStart=Math.floor(w*0.79);
+    const rightEnd=Math.floor(w*0.93);
     return {
       left:crop(0,leftEnd),
       mid:crop(midStart-2,midEnd+2),      // 中列左右让2px，确保不漏字
