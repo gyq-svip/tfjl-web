@@ -444,20 +444,26 @@ function parseAllianceFields(o){
   const rankM=rankText.match(/-?\d+/) || nameText.match(/-?\d+/);
   const rank=rankM?parseInt(rankM[0],10):null;
   if(rank==null || rank<=0) return null;
+  // 名字：从整块(mid)取，遇到"最大连胜/连胜"关键词即截断（该词现在多在右列，但保险起见仍处理）
   const streakM=nameText.match(/(?:最大连胜|大连胜|连胜)\D*?(-?\d+)/);
-  const streak=streakM?parseInt(streakM[1],10):null;
   const cut=streakM?streakM.index:nameText.length;
   let name=nameText.slice(0,cut).replace(/[\s.、，。,:：#()\-_|]/g,'').replace(/(最大连胜|大连胜|连胜|奖杯|奖|杯)/g,'').trim();
   if(!name) return null;
-  let cups=0;
+  // 杯数 = 奖杯右边的数字（最关键）；最大连胜可有可无。
+  // 右列(cupText)读取顺序：奖杯+杯数(在上) → 最大连胜:数(在下)，故杯数总是 cupText 中"最大连胜"之前的最后一个数字；无连胜词则取首个数字。
+  let cups=0, streak=0;
   const cupNums=[...cupText.matchAll(/-?\d+/g)].map(m=>parseInt(m[0],10));
-  if(cupNums.length){
-    const cands=cupNums.filter(v=> v!==(streak==null?NaN:streak));
-    if(cands.length) cups=cands[0];
+  const sm=cupText.match(/(?:最大连胜|大连胜|连胜)\D*?(-?\d+)/);
+  if(sm){
+    streak=parseInt(sm[1],10);
+    const sIdx=cupText.indexOf(sm[1], sm.index);
+    const before=cupNums.filter(v=> cupText.indexOf(String(v)) < sIdx);
+    cups = before.length ? before[before.length-1] : (cupNums[0]||0);
+  } else {
+    cups = cupNums.length ? cupNums[0] : 0;
   }
-  const st=(streak==null)?0:streak;
-  if(st<0 || cups<0) return null;
-  return { rank, name, cups, streak:st };
+  if(streak<0 || cups<0) return null;
+  return { rank, name, cups, streak };
 }
 
 let allianceSliceResults = [];   // [{key, dataUrl, text}]
@@ -612,7 +618,7 @@ function allianceColumnCrops(cv,w,sh){
       return c3.toDataURL('image/png').split(',')[1];
     };
     const leftEnd=Math.floor(w*0.20);
-    const midEnd=Math.floor(w*0.78);
+    const midEnd=Math.floor(w*0.67);
     return {
       left:crop(0,leftEnd),
       mid:crop(leftEnd-2,midEnd+2),      // 中列左右让2px，确保不漏字
