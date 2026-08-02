@@ -5,7 +5,7 @@
 //      提升 CACHE_VERSION 触发 activate 清空所有 tfjl- 缓存，确保拿到最新前端（含分享密码框）
 // ============================================================
 
-const CACHE_VERSION = 'tfjl-v217';
+const CACHE_VERSION = 'tfjl-v218';
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
@@ -63,14 +63,17 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // HTML 页面：NetworkFirst（优先网络，确保拉到最新版本，避免"该死的缓存"）
+    // HTML 页面：StaleWhileRevalidate（先用缓存秒开，后台静默更新并检测新版本）
+    // 改回 SWR 的原因：原 networkFirst 每次启动都走网络拉 index.html（cache:'no-store'），
+    // 导致 Tauri 桌面端每次冷启动都要等远程 Pages 下载，黑屏久、达不到秒开。
+    // SWR 先返回 SW 缓存的 index.html 即刻渲染，后台 fetch 比较内容，有新版本才提示刷新。
     if (request.mode === 'navigate' || request.destination === 'document') {
-        event.respondWith(networkFirst(request, CACHE_RUNTIME));
+        event.respondWith(staleWhileRevalidate(request, CACHE_RUNTIME));
         return;
     }
-    // JS/CSS 走 network-first：保证识别浮窗等脚本永远是最新，杜绝“缓存旧 JS 导致按钮无反应 / 需刷新两次才生效”
+    // JS/CSS 同样 SWR：首次用缓存秒开，后台更新；内容变化自动提示刷新（保留"永不跑旧 JS"安全性）
     if (['script', 'style'].includes(request.destination)) {
-        event.respondWith(networkFirst(request, CACHE_RUNTIME));
+        event.respondWith(staleWhileRevalidate(request, CACHE_RUNTIME));
         return;
     }
     // 图片/字体等静态资源：StaleWhileRevalidate（缓存秒开 + 后台更新）
@@ -89,7 +92,7 @@ self.addEventListener('fetch', (event) => {
 function staleWhileRevalidate(request, cacheName) {
     return caches.open(cacheName).then((cache) => {
         return cache.match(request).then((cachedResponse) => {
-            const fetchPromise = fetch(request).then(async (networkResponse) => {
+            const fetchPromise = fetch(request, { cache: 'no-store' }).then(async (networkResponse) => {
                 if (networkResponse && networkResponse.status === 200) {
                     const cachedClone = cachedResponse ? cachedResponse.clone() : null;
                     const cachedText = cachedClone ? await cachedClone.text() : '';
