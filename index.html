@@ -16244,18 +16244,17 @@
             cgmRefreshFusionList();
         }
         function cgmSwitchTab(tab) {
-            const f = document.getElementById('cgmFusionPane'), fu = document.getElementById('cgmFusedPane');
-            const bf = document.getElementById('cgmTabFusion'), bfu = document.getElementById('cgmTabFused');
+            const panes = { fusion: 'cgmFusionPane', fused: 'cgmFusedPane', hero: 'cgmHeroPane' };
+            const tabs = { fusion: 'cgmTabFusion', fused: 'cgmTabFused', hero: 'cgmTabHero' };
             const on = 'rgba(255,215,0,0.18)', off = 'rgba(255,255,255,0.05)';
-            if (tab === 'fusion') {
-                f.style.display = ''; fu.style.display = 'none';
-                bf.style.background = on; bf.style.color = '#ffd700'; bf.style.borderColor = 'rgba(255,215,0,0.4)';
-                bfu.style.background = off; bfu.style.color = 'rgba(255,255,255,0.8)'; bfu.style.borderColor = 'rgba(255,255,255,0.2)';
-            } else {
-                f.style.display = 'none'; fu.style.display = '';
-                bfu.style.background = on; bfu.style.color = '#ffd700'; bfu.style.borderColor = 'rgba(255,215,0,0.4)';
-                bf.style.background = off; bf.style.color = 'rgba(255,255,255,0.8)'; bf.style.borderColor = 'rgba(255,255,255,0.2)';
-            }
+            Object.keys(panes).forEach(k => {
+                const p = document.getElementById(panes[k]); if (p) p.style.display = (k === tab) ? '' : 'none';
+                const t = document.getElementById(tabs[k]);
+                if (t) {
+                    if (k === tab) { t.style.background = on; t.style.color = '#ffd700'; t.style.borderColor = 'rgba(255,215,0,0.4)'; }
+                    else { t.style.background = off; t.style.color = 'rgba(255,255,255,0.8)'; t.style.borderColor = 'rgba(255,255,255,0.2)'; }
+                }
+            });
         }
         function cgmInitFusedHeroSelect() {
             const sel = document.getElementById('cgmFusedHero');
@@ -16291,6 +16290,34 @@
                 res.style.color = '#ff9e80';
                 res.textContent = '✗ 拆出 ' + parts.length + ' 段（' + parts.join('+') + '），融合卡只能由恰好2张基础卡组成';
                 addBtn.disabled = true; addBtn.style.opacity = 0.5;
+            }
+        }
+        // 添加新英雄（基础卡）：写入 skins/cards.json，云端生效无需发版
+        async function cgmAddNewHeroCard() {
+            if (!_cgmIsTauri()) { alert('❌ 仅桌面端可用（网页版无上传通道）'); return; }
+            const name = (document.getElementById('cgmHeroName').value || '').trim();
+            const prof = document.getElementById('cgmHeroProf').value;
+            const quality = document.getElementById('cgmHeroQuality').value;
+            const status = document.getElementById('cgmHeroStatus');
+            if (!name) { status.style.color = '#ff9e80'; status.textContent = '请输入英雄名'; return; }
+            try {
+                let base = { cards: {} };
+                const local = await _cgmReadRepoFile('skins/cards.json');
+                if (local) { try { const p = JSON.parse(local); if (p && p.cards) base = p; else if (p) { base.cards = p; } } catch (e) { base = { cards: {} }; } }
+                if (!base.cards) base.cards = {};
+                base.cards[name] = { quality: quality || undefined, profession: prof || undefined };
+                base.updated = new Date().toISOString();
+                const content = JSON.stringify(base, null, 2);
+                await _cgmWriteRepoFile('skins/cards.json', content);
+                window.cloudCards = base.cards;
+                if (typeof renderCloudCardsToPool === 'function') renderCloudCardsToPool();
+                cgmInitFusedHeroSelect();
+                status.style.color = '#4ade80';
+                status.textContent = '✓ 已写入 d:\\tfjl-web\\skins\\cards.json\n请在本机终端运行：\n  cd d:\\tfjl-web\n  git add skins/cards.json\n  git commit -m "hero: ' + name + '"\n  git push origin main\n  git -c http.proxy= -c https.proxy= push gitee';
+                document.getElementById('cgmHeroName').value = '';
+            } catch (e) {
+                status.style.color = '#ff9e80';
+                status.textContent = '✗ 写入失败：' + e.message;
             }
         }
         async function cgmAddFusionCard() {
@@ -18746,7 +18773,7 @@
                 card.dataset.type = quality;
                 card.dataset.fusion = 'true';
                 if (profKey === 'engineering') card.dataset.engineering = 'true';
-                card.setAttribute('draggable', 'true');
+                card.setAttribute('draggable', 'false');
                 card.style.cursor = 'pointer';
                 card.innerHTML = '<span class="card-name">' + name + '</span>';
                 grid.appendChild(card);
@@ -18794,13 +18821,13 @@
                 card.dataset.profession = profKey || 'newcard';
                 card.dataset.type = quality;
                 if (profKey === 'engineering') card.dataset.engineering = 'true';
-                card.setAttribute('draggable', 'true');
+                card.setAttribute('draggable', 'false');
                 card.style.cursor = 'pointer';
                 card.innerHTML = '<span class="card-name">' + name + '</span>';
                 grid.appendChild(card);
             });
             document.querySelectorAll('.card-item[data-id^="cloudcard_"]').forEach(card => {
-                card.setAttribute('draggable', 'true');
+                card.setAttribute('draggable', 'false');
                 setupLongPress(card, (e) => handleCardRightClick(e, card));
             });
         }
@@ -21019,7 +21046,7 @@
                 window.__pd = null; window.__ghost = null; window.__suppressClick = false; window.__nativeDrag = false;
                 document.addEventListener('pointerdown', (e) => {
                     if (e.button !== undefined && e.button !== 0) return;
-                    const card = e.target.closest('.card-item:not(#favoriteCardsGrid .card-item), .selected-card:not(.empty)');
+                    const card = e.target.closest('.selected-card:not(.empty)');
                     if (!card || card.closest('#favoriteCardsGrid')) return;
                     window.__pd = { el: card, x: e.clientX, y: e.clientY, started: false, payload: buildDragPayload(card) };
                 }, true);
@@ -21056,11 +21083,8 @@
             }
 
             function buildDragPayload(card) {
-                if (card.classList.contains('selected-card')) {
-                    const handType = card.closest('#myHandContainer') ? 'my' : (card.closest('#teammateHandContainer') ? 'teammate' : (card.dataset.handType || 'my'));
-                    return { source: 'hand', id: card.dataset.id || '', name: card.dataset.name || '', isEngineering: card.dataset.engineering === 'true', profession: card.dataset.profession || '', handType: handType };
-                }
-                return { source: 'pool', id: card.dataset.id || '', name: card.dataset.name || '', isEngineering: card.dataset.engineering === 'true', profession: card.dataset.profession || '', cardType: card.dataset.type || '' };
+                const handType = card.closest('#myHandContainer') ? 'my' : (card.closest('#teammateHandContainer') ? 'teammate' : (card.dataset.handType || 'my'));
+                return { source: 'hand', id: card.dataset.id || '', name: card.dataset.name || '', isEngineering: card.dataset.engineering === 'true', profession: card.dataset.profession || '', handType: handType };
             }
             function createDragGhost(card) {
                 const g = document.createElement('div');
@@ -29011,6 +29035,31 @@ ${maSection}
                             </ul>
                         </div>
                     </div>
+                    <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:15px;margin-bottom:15px;">
+                        <h4 style="color:#ffd700;margin:0 0 10px 0;">🃏 卡牌数据管理（管理员）</h4>
+                        <div style="color:rgba(255,255,255,0.8);font-size:0.85rem;line-height:1.6;">
+                            <p><strong>① 添加融合卡：</strong></p>
+                            <ul style="margin:5px 0;padding-left:20px;">
+                                <li>管理员面板 → 🃏 卡组管理 →「➕ 添加融合卡」</li>
+                                <li>填融合卡名（必须正好=2张基础卡，如 小野酋长 / 影魇）+ 选职业/品质 → 校验 → 确认写入 fusions.json</li>
+                                <li>点「🚀 一键推送 fusions.json」到 GitHub（自动部署）；或手动 git push</li>
+                                <li>下方「已添加的融合卡」列表可查看 / 🗑 删除</li>
+                            </ul>
+                            <p><strong>② 添加新基础卡（新英雄）：</strong></p>
+                            <ul style="margin:5px 0;padding-left:20px;">
+                                <li>卡组管理 →「🆕 添加新英雄」页签 → 填英雄名 + 选职业 + 选品质(金/紫) → 确认写入 cards.json</li>
+                                <li>写入后需 <code>git push origin main</code>（融合卡的一键推送只推 fusions.json，不含 cards.json）</li>
+                                <li>用户 App 重启 + 硬刷新，新英雄自动出现在对应金/紫卡类职业子分类</li>
+                            </ul>
+                            <p><strong>③ 上传皮肤立绘：</strong></p>
+                            <ul style="margin:5px 0;padding-left:20px;">
+                                <li>放 <code>skins/{英雄名}/{皮肤名}.png</code></li>
+                                <li>在 <code>skins/registry.json</code> 的 <code>heroes</code> 下登记 <code>{ "name":"显示名", "file":"文件名.png" }</code></li>
+                                <li>和 registry 一起 <code>git push</code> 即上线</li>
+                            </ul>
+                            <p><strong>④ 云端同步：</strong>所有卡/皮肤数据从 GitHub Pages 实时拉取，推 Pages 即生效，<strong>不用重打包 exe</strong>。用户侧需重启 + 硬刷新。</p>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -29829,7 +29878,7 @@ ${maSection}
     </div>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260803-136</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260803-137</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
@@ -29885,6 +29934,7 @@ ${maSection}
             <div style="display:flex;gap:8px;margin-bottom:14px;">
                 <button onclick="cgmSwitchTab('fusion')" id="cgmTabFusion" style="flex:1;padding:8px;border-radius:8px;cursor:pointer;border:1px solid rgba(255,215,0,0.4);background:rgba(255,215,0,0.18);color:#ffd700;font-weight:600;">➕ 添加融合卡</button>
                 <button onclick="cgmSwitchTab('fused')" id="cgmTabFused" style="flex:1;padding:8px;border-radius:8px;cursor:pointer;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.8);">✂️ 添加被融合的卡</button>
+                <button onclick="cgmSwitchTab('hero')" id="cgmTabHero" style="flex:1;padding:8px;border-radius:8px;cursor:pointer;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.8);">🆕 添加新英雄</button>
             </div>
 
             <!-- 添加融合卡 -->
@@ -29927,6 +29977,26 @@ ${maSection}
                 <div id="cgmFusedPreview" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;"></div>
                 <button onclick="cgmPublishFused()" id="cgmPublishBtn" disabled style="width:100%;padding:9px;border-radius:8px;border:none;background:linear-gradient(135deg,#4ade80,#22c55e);color:#fff;cursor:pointer;font-weight:700;opacity:0.5;">📤 发布到云端（写入仓库+导出PNG）</button>
                 <div id="cgmFusedStatus" style="font-size:0.78rem;margin-top:8px;color:#4ecdc4;white-space:pre-wrap;"></div>
+            </div>
+
+            <!-- 添加新英雄（基础卡） -->
+            <div id="cgmHeroPane" style="display:none;">
+                <p style="font-size:0.78rem;color:rgba(255,255,255,0.7);margin:0 0 10px 0;">添加游戏内新英雄（基础卡），写入 <code>skins/cards.json</code>，推送后全站实时生效，无需发版。职业/品质用于卡池自动归类到对应金/紫卡类。</p>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+                    <select id="cgmHeroProf" style="flex:1;min-width:120px;padding:7px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:#0f3460;color:#fff;">
+                        <option value="">职业(可选)</option>
+                        <option>战士</option><option>法师</option><option>射手</option><option>召唤</option><option>牧师</option><option>术士</option><option>熊猫</option><option>精灵球</option><option>工程</option><option>通用</option>
+                    </select>
+                    <select id="cgmHeroQuality" style="flex:1;min-width:120px;padding:7px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:#0f3460;color:#fff;">
+                        <option value="">品质(可选)</option>
+                        <option>金</option><option>紫</option><option>蓝</option><option>白</option>
+                    </select>
+                </div>
+                <div style="display:flex;gap:8px;margin-bottom:10px;">
+                    <input id="cgmHeroName" placeholder="英雄名，如 新英雄甲" style="flex:1;padding:8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:#0f3460;color:#fff;">
+                    <button onclick="cgmAddNewHeroCard()" style="padding:8px 12px;border-radius:6px;border:none;background:linear-gradient(135deg,#4ade80,#22c55e);color:#fff;cursor:pointer;font-weight:600;white-space:nowrap;">✅ 确认添加</button>
+                </div>
+                <div id="cgmHeroStatus" style="font-size:0.78rem;margin-top:8px;color:#4ecdc4;white-space:pre-wrap;"></div>
             </div>
         </div>
     </div>
