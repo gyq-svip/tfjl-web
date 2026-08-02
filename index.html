@@ -16339,6 +16339,11 @@
                 btn.disabled = false; btn.textContent = old;
             }
         }
+        // 系统托盘图标闪动（需求墙新未读提醒）：仅桌面端有效；on=true 闪动，on=false 停
+        function flashTray(on) {
+            if (!_cgmIsTauri()) return;
+            _cgmInvoke('flash_tray_icon', { on: !!on }).catch(() => {});
+        }
         // 添加被融合的卡：选英雄→切全部皮肤→预览→发布
         let _cgmCutBlobs = [];
         async function cgmLoadHeroSkins() {
@@ -23491,15 +23496,18 @@ function hasGistToken() {
             if (messageWallOpen) {
                 toggle.classList.remove('wall-attention');
                 if (dot) dot.style.display = 'none';
+                flashTray(false);   // 墙已开 → 停托盘闪动
                 return;
             }
             const newCount = wallMessages.filter(m => m.time > wallLastSeenTime).length;
             if (newCount > 0) {
                 toggle.classList.add('wall-attention');
                 if (dot) { dot.style.display = 'block'; dot.textContent = newCount > 99 ? '99+' : String(newCount); }
+                flashTray(true);    // 有未读新消息 → 托盘图标闪动提醒
             } else {
                 toggle.classList.remove('wall-attention');
                 if (dot) { dot.style.display = 'none'; dot.textContent = ''; }
+                flashTray(false);   // 无未读 → 停闪动
             }
         }
 
@@ -29547,7 +29555,7 @@ ${maSection}
     </div>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260803-118</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260803-119</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
