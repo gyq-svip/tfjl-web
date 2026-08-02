@@ -3211,6 +3211,7 @@
                 // 记录登录
                 recordLogin();
                 localStorage.setItem('TFJL_LoggedIn', 'true');
+                saveAuthToDisk(true);   // 落地到磁盘：重启/更新/清缓存后都不弹密码门
                 
                 // 记住密码：如果勾选了"记住密码"，保存密码（简单编码混淆）
                 const rememberCb = document.getElementById('rememberPassword');
@@ -4084,6 +4085,39 @@
 
         function closeChatRoomEntry() {
             document.getElementById('chatRoomEntryModal').style.display = 'none';
+        }
+
+        // ========== 登录状态本地磁盘持久化（独立于 webview 存储，重启/更新/清缓存都不丢） ==========
+        // 用户初衷：安装后登录一次，之后（重启 App / 自动更新 / webview 缓存被清）都不再弹密码门。
+        // webview localStorage 在某些更新/重开场景下会被清空，所以把"已登录"标记落地到 D 盘文件。
+        const AUTH_DISK_PATH = 'D:\\withfriends\\塔防精灵助手数据\\data\\auth_state.json';
+
+        // 写登录状态到磁盘（仅桌面端；网页版无 Tauri 时忽略）
+        function saveAuthToDisk(loggedIn) {
+            const T = window.__TAURI__ || window.__TAURI_INTERNALS__;
+            if (!T) return;
+            try {
+                _tauriInvoke('write_text_file', {
+                    filePath: AUTH_DISK_PATH,
+                    content: JSON.stringify({ loggedIn: !!loggedIn, at: new Date().toISOString() })
+                });
+            } catch (e) {}
+        }
+        // 从磁盘读登录状态（异步；丢失/异常时回退 false 不阻塞）
+        async function isLoggedInFromDisk() {
+            const T = window.__TAURI__ || window.__TAURI_INTERNALS__;
+            if (!T) return false;
+            try {
+                const txt = await _tauriInvoke('read_text_file_auto', { filePath: AUTH_DISK_PATH });
+                if (txt) { const o = JSON.parse(txt); return !!(o && o.loggedIn); }
+            } catch (e) {}
+            return false;
+        }
+        // 清磁盘登录标记（退出登录时调用）
+        function clearAuthOnDisk() {
+            const T = window.__TAURI__ || window.__TAURI_INTERNALS__;
+            if (!T) return;
+            try { _tauriInvoke('delete_file', { filePath: AUTH_DISK_PATH }); } catch (e) {}
         }
 
         // ========== 昵称本地磁盘持久化（独立于安装目录，重启/更新/卸载重装都不丢） ==========
@@ -19849,26 +19883,35 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            // 检查登录状态，如果已经登录则直接显示主内容
-            if (isLoggedIn()) {
-                document.getElementById('passwordOverlay').style.display = 'none';
-                document.getElementById('mainContent').classList.add('visible');
-            } else {
-                // 未登录但记住过密码 → 尝试自动登录
+            // 登录检查（异步：需读磁盘 auth_state.json 判断是否已登录过）。
+            // 优先级：localStorage 已登录 → 磁盘已登录 → 记住密码且校验通过 → 否则显示密码门。
+            // 注：网页版（无 Tauri）isLoggedInFromDisk 永远 false，仅依赖 localStorage，与原行为一致。
+            (async () => {
+                const diskLoggedIn = await isLoggedInFromDisk();
+                if (isLoggedIn() || diskLoggedIn) {
+                    // 同步两端状态，保证后续 isLoggedIn() 也成立
+                    localStorage.setItem('TFJL_LoggedIn', 'true');
+                    saveAuthToDisk(true);
+                    document.getElementById('passwordOverlay').style.display = 'none';
+                    document.getElementById('mainContent').classList.add('visible');
+                    return;
+                }
+                // 未登录但记住过密码 → 尝试自动登录（修复旧 bug：原用 getAdminPasswords().includes(明文) 永远不成立）
                 const savedPwd = localStorage.getItem('TFJL_SavedPwd');
                 if (savedPwd) {
                     try {
                         const pwd = atob(savedPwd);
-                        if (pwd && getAdminPasswords().includes(pwd)) {
-                            // 密码有效，自动登录
+                        let ok = false;
+                        for (const h of getAdminPasswords()) { if (await verifyPassword(pwd, h)) { ok = true; break; } }
+                        if (ok) {
                             recordLogin();
                             localStorage.setItem('TFJL_LoggedIn', 'true');
+                            saveAuthToDisk(true);
                             document.getElementById('passwordOverlay').style.display = 'none';
                             document.getElementById('mainContent').classList.add('visible');
                         } else {
                             // 保存的密码已失效（密码表变了），清除
                             localStorage.removeItem('TFJL_SavedPwd');
-                            // 预填密码框方便用户
                             const input = document.getElementById('passwordInput');
                             if (input) input.value = pwd;
                         }
@@ -19876,7 +19919,7 @@
                         localStorage.removeItem('TFJL_SavedPwd');
                     }
                 }
-            }
+            })();
             
             initIndexedDB().then(() => {
                 refreshProjectSelectors();
@@ -26288,6 +26331,7 @@ ${maSection}
             localStorage.removeItem('TFJL_LoggedIn');
             localStorage.removeItem('TFJL_Mode');
             localStorage.removeItem('TFJL_AuctionOnlyMode');
+            clearAuthOnDisk();   // 同步清磁盘登录标记，下次需重新输入密码
             
             // 隐藏主内容
             document.getElementById('mainContent').classList.remove('visible');
@@ -28776,7 +28820,7 @@ ${maSection}
     </div>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260802-98</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260802-99</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
