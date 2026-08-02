@@ -10537,6 +10537,7 @@
                     _downloadScriptBlob(fileName, jsonStr);
                 }
 
+                if (typeof showToast === 'function') showToast('✅ 已备份项目「' + projectName + '」为 JSON 文件（可分享给他人导入）');
                 document.getElementById('projectMenu').style.display = 'none';
             });
         }
@@ -10670,14 +10671,26 @@
                 data.project.category = category;
 
                 // 直接保存项目数据（包含参考图片和脚本文件）
+                if (typeof showToast === 'function') showToast('⏳ 正在恢复项目「' + newName + '」…');
                 saveProjectToDBDirect(data.project).then(() => {
-                    // 更新分类和项目列表
                     loadCategoriesFromDB();
                     updateCategorySelector();
+                    refreshProjectSelectors();
+                    // 刷新下拉后把选中切到刚导入的项目，并自动加载到工作区，避免"重启才出来"
                     setTimeout(() => {
-                        updateProjectList1();
-                        alert('导入成功！');
-                    }, 100);
+                        const sel = document.getElementById('projectSelector1');
+                        if (sel) sel.value = newName;
+                        const csel = document.getElementById('categorySelector1');
+                        if (csel && category) csel.value = category;
+                        loadProjectFromDB(newName).then(() => {
+                            if (typeof showToast === 'function') showToast('✅ 已恢复并打开项目「' + newName + '」');
+                        }).catch(err => {
+                            if (typeof showToast === 'function') showToast('✅ 项目已保存「' + newName + '」，请在下拉选择打开');
+                        });
+                    }, 150);
+                }).catch(err => {
+                    console.error('恢复项目失败', err);
+                    if (typeof showToast === 'function') showToast('❌ 恢复项目失败：' + (err && err.message ? err.message : err));
                 });
 
                 closeImportModal();
@@ -15584,6 +15597,7 @@
                         // 使用 put 代替 add，避免主键冲突
                         let imported = 0;
                         let errors = 0;
+                        const importedNames = importData.projects.map(p => p.name);
                         const transaction = db.transaction(['projects'], 'readwrite');
                         const store = transaction.objectStore('projects');
 
@@ -15595,7 +15609,17 @@
 
                         transaction.oncomplete = function() {
                             refreshProjectSelectors();
-                            alert(`✅ 成功导入 ${imported} 个项目！${errors > 0 ? '（' + errors + ' 个失败）' : ''}`);
+                            const lastName = importedNames.length ? importedNames[importedNames.length - 1] : null;
+                            const baseMsg = `成功恢复 ${imported} 个项目${errors > 0 ? '（' + errors + ' 个失败）' : ''}`;
+                            if (lastName) {
+                                loadProjectFromDB(lastName).then(() => {
+                                    if (typeof showToast === 'function') showToast('✅ ' + baseMsg + '，已打开「' + lastName + '」');
+                                }).catch(() => {
+                                    if (typeof showToast === 'function') showToast('✅ ' + baseMsg + '，请在下拉选择打开');
+                                });
+                            } else {
+                                if (typeof showToast === 'function') showToast('✅ ' + baseMsg);
+                            }
                         };
 
                         transaction.onerror = function() {
@@ -29878,7 +29902,7 @@ ${maSection}
     </div>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260803-137</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260803-138</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
