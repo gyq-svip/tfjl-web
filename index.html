@@ -10900,7 +10900,10 @@
         <div class="selection-area">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
                 <h2 style="margin:0;">⚔️ 出战选择</h2>
-                <div style="display:flex;gap:8px;">
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <label style="font-size:0.7rem;color:rgba(255,255,255,0.7);display:flex;align-items:center;gap:4px;cursor:pointer;user-select:none;">
+                        <input type="checkbox" id="fusionSkinSplitToggle" checked onchange="toggleFusionSkinSplit(this.checked)"> 融合卡对角切皮
+                    </label>
                     <div style="position:relative;">
                         <button onclick="toggleDamageReductionMenu(this)" style="background:rgba(78,205,196,0.2);border:1px solid rgba(78,205,196,0.4);color:#4ecdc4;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:0.75rem;">🛡️ 减伤</button>
                         <div id="damageReductionMenu" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:rgba(42,42,74,0.95);border:1px solid rgba(78,205,196,0.3);border-radius:8px;padding:8px 0;min-width:140px;z-index:1000;box-shadow:0 4px 15px rgba(0,0,0,0.4);">
@@ -15791,6 +15794,148 @@
             }
             return cardName;
         }
+
+        // ===== 融合卡对角切割皮肤 =====
+        // 默认开启；关掉则回到只显示主卡整张皮肤
+        let fusionSkinSplitEnabled = true;
+        try { fusionSkinSplitEnabled = (localStorage.getItem('tfjl_fusion_skin_split') !== '0'); } catch (e) {}
+
+        // 融合卡拆分：返回各英雄名数组（≥2 视为融合卡），否则 null
+        function getFusionParts(cardName) {
+            if (!cardName) return null;
+            const fusionCards = [
+                '火炮射线', '射线潜艇', '火炮潜艇', '宝库射线', '宝库潜艇', '宝库火炮',
+                '潜艇射线', '潜艇火炮', '射线火炮',
+                '水灵刀客', '刀客水灵', '蛇女爱神', '爱神蛇女',
+                '咕咕天使', '天使咕咕', '圣骑天使', '天使圣骑',
+                '战将鱼人', '鱼人战将', '电法冰法', '冰法电法',
+                '萌萌水灵', '水灵萌萌', '火灵风灵', '风灵火灵'
+            ];
+            if (fusionCards.includes(cardName)) {
+                return [cardName.substring(0, 2), cardName.substring(2)];
+            }
+            const heroSet = getAllHeroNames();
+            if (heroSet.has(cardName)) return null;
+            const parts = splitIntoHeroes(cardName, heroSet);
+            if (parts.length >= 2) return parts;
+            // 兜底：4字融合且前2字为已知英雄
+            if (cardName.length === 4 && !DEFAULT_CARD_SKINS[cardName] && heroSet.has(cardName.substring(0, 2))) {
+                return [cardName.substring(0, 2), cardName.substring(2)];
+            }
+            return null;
+        }
+
+        // 被融合卡（副卡）皮肤：取该英雄当前选中皮肤（heroSkinSelections，即卡分类里设的皮肤），无则默认
+        function getFusionComponentSkin(heroName) {
+            if (window.heroSkinSelections && window.heroSkinSelections[heroName] !== undefined) {
+                const s = window.heroSkinSelections[heroName];
+                return s ? s : '默认';
+            }
+            return '默认';
+        }
+
+        // 手牌：主卡整皮(底层) + 被融合卡右下三角(上层)。clip-path 把整张卡切成 50/50 对角。
+        function applyFusionSkinToHandCard(card, mainUrl, fusedUrl) {
+            if (!card) return;
+            card.classList.add('skin-bg');
+            let base = card.querySelector('.hand-skin-layer');
+            if (!base) {
+                base = document.createElement('img');
+                base.className = 'hand-skin-layer';
+                base.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit;z-index:0;pointer-events:none;';
+                card.insertBefore(base, card.firstChild);
+            }
+            if (mainUrl && base.src !== mainUrl) base.src = mainUrl;
+            if (!mainUrl && base.parentNode) base.remove();
+            let overlay = card.querySelector('.hand-skin-fused');
+            if (fusedUrl) {
+                if (!overlay) {
+                    overlay = document.createElement('img');
+                    overlay.className = 'hand-skin-fused';
+                    overlay.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit;z-index:0;pointer-events:none;clip-path:polygon(100% 0,100% 100%,0 100%);';
+                    card.insertBefore(overlay, base.nextSibling);
+                }
+                if (overlay.src !== fusedUrl) overlay.src = fusedUrl;
+            } else if (overlay && overlay.parentNode) {
+                overlay.remove();
+            }
+        }
+
+        // 槽位：主卡整皮(底层) + 被融合卡右下三角(上层)
+        function applyFusionSkinToSlot(slot, mainUrl, fusedUrl) {
+            if (!slot) return;
+            let base = slot.querySelector('.skin-layer');
+            if (!base) {
+                base = document.createElement('img');
+                base.className = 'skin-layer';
+                base.style.cssText = 'position:absolute;inset:3px;width:calc(100% - 6px);height:calc(100% - 6px);object-fit:contain;object-position:center center;border-radius:5px;border:2px solid rgba(255,255,255,0.25);box-shadow:inset 0 0 8px rgba(0,0,0,0.3);z-index:0;pointer-events:none;';
+                slot.insertBefore(base, slot.firstChild);
+            }
+            if (mainUrl && base.src !== mainUrl) base.src = mainUrl;
+            if (!mainUrl && base.parentNode) base.remove();
+            let overlay = slot.querySelector('.skin-layer-fused');
+            if (fusedUrl) {
+                if (!overlay) {
+                    overlay = document.createElement('img');
+                    overlay.className = 'skin-layer-fused';
+                    overlay.style.cssText = 'position:absolute;inset:3px;width:calc(100% - 6px);height:calc(100% - 6px);object-fit:contain;object-position:center center;border-radius:5px;z-index:0;pointer-events:none;clip-path:polygon(100% 0,100% 100%,0 100%);';
+                    slot.insertBefore(overlay, base.nextSibling);
+                }
+                if (overlay.src !== fusedUrl) overlay.src = fusedUrl;
+            } else if (overlay && overlay.parentNode) {
+                overlay.remove();
+            }
+            if (mainUrl || fusedUrl) slot.classList.add('skin-bg');
+        }
+
+        // 开关：默认开启，可一键关
+        function toggleFusionSkinSplit(on) {
+            fusionSkinSplitEnabled = !!on;
+            try { localStorage.setItem('tfjl_fusion_skin_split', fusionSkinSplitEnabled ? '1' : '0'); } catch (e) {}
+            refreshAllFusionSkins();
+        }
+
+        // 重新应用所有融合卡皮肤（换肤 / 切开关后调用）
+        async function refreshAllFusionSkins() {
+            document.querySelectorAll('.selected-card[data-name]').forEach(card => {
+                const parts = getFusionParts(card.dataset.name);
+                if (parts && parts.length >= 2) reapplySingleHandCard(card, card.dataset.id, card.dataset.handType || 'my');
+            });
+            const slots = document.querySelectorAll('.battle-slot.filled');
+            const jobs = [];
+            slots.forEach(slot => {
+                const name = slot.querySelector('.card-name') ? slot.querySelector('.card-name').textContent : '';
+                if (getFusionParts(name)) jobs.push((async () => {
+                    try { await applySkinBgToSlot(slot, name); } catch (e) {}
+                })());
+            });
+            await Promise.all(jobs);
+        }
+
+        // 单个手牌卡重铺皮肤（融合→对角切，非融合→原逻辑）
+        async function reapplySingleHandCard(card, cid, ht) {
+            const cardName = card.dataset.name;
+            if (!cardName) return;
+            if (fusionSkinSplitEnabled) {
+                const parts = getFusionParts(cardName);
+                if (parts && parts.length >= 2) {
+                    const mainHero = parts[0], fusedHero = parts[1];
+                    const mainSkin = cid ? getCardSkin(cid, mainHero, ht) : '默认';
+                    const fusedSkin = getFusionComponentSkin(fusedHero);
+                    const mainUrl = window.resolveHeroSkinUrl ? await window.resolveHeroSkinUrl(mainHero, mainSkin) : null;
+                    const fusedUrl = window.resolveHeroSkinUrl ? await window.resolveHeroSkinUrl(fusedHero, fusedSkin) : null;
+                    if (mainUrl || fusedUrl) { applyFusionSkinToHandCard(card, mainUrl, fusedUrl); return; }
+                }
+            }
+            const name = getMainCardName(cardName);
+            if (!name) return;
+            const skin = cid ? getCardSkin(cid, name, ht) : '默认';
+            if (window.resolveHeroSkinUrl) {
+                const url = await window.resolveHeroSkinUrl(name, skin);
+                if (url) { applySkinBgToHandCard(card, url); }
+                else { removeSkinBgFromHandCard(card); }
+            }
+        }
         
         function addCustomSkin(cardName, skinName) {
             const mainCardName = getMainCardName(cardName);
@@ -16612,6 +16757,8 @@
             } catch (e) {
                 console.warn('[SKIN] setCardSkin refresh error:', e);
             }
+            // 换肤后刷新所有融合卡（主卡或被融合卡皮肤变化都要即时反映）
+            if (typeof refreshAllFusionSkins === 'function') refreshAllFusionSkins();
         }
         
         // 保存皮肤数据到localStorage
@@ -17472,30 +17619,58 @@
             card.classList.remove('skin-bg');
             const layer = card.querySelector('.hand-skin-layer');
             if (layer) layer.remove();
+            const fused = card.querySelector('.hand-skin-fused');
+            if (fused) fused.remove();
         }
 
         // 给战斗槽卡牌应用皮肤背景
         async function applySkinBgToSlot(slot, heroName) {
-            console.log('[SKIN] applySkinBgToSlot slot:', slot.dataset.slot, 'heroName:', heroName);
-            // 移除旧皮肤层和旧皮肤名
+            console.log('[SKIN] applySkinBgToSlot slot:', slot.dataset ? slot.dataset.slot : '?', 'heroName:', heroName);
+            // 移除旧皮肤层（含融合上层）和旧皮肤名
             const oldLayer = slot.querySelector('.skin-layer');
             if (oldLayer) oldLayer.remove();
+            const oldFused = slot.querySelector('.skin-layer-fused');
+            if (oldFused) oldFused.remove();
             const oldSkinName = slot.querySelector('.skin-name');
             if (oldSkinName) oldSkinName.remove();
             slot.classList.remove('skin-bg');
             if (!heroName) { console.log('[SKIN] No heroName, returning'); return; }
 
-            // 融合卡：显示第一卡的皮肤；显示名仍保留完整融合名
-            const displayName = heroName;
+            // 融合卡：主卡整皮(底层) + 被融合卡右下三角(上层)
+            if (fusionSkinSplitEnabled) {
+                const parts = getFusionParts(heroName);
+                if (parts && parts.length >= 2) {
+                    const mainHero = parts[0], fusedHero = parts[1];
+                    const slotCardId = slot && slot.dataset ? slot.dataset.cardId : null;
+                    const slotHandType = (slot && slot.dataset && slot.dataset.handType) ? slot.dataset.handType : 'my';
+                    const mainSkin = slotCardId ? getCardSkin(slotCardId, mainHero, slotHandType) : '默认';
+                    const fusedSkin = getFusionComponentSkin(fusedHero);
+                    let mainInfo = null, fusedInfo = null;
+                    if (window.resolveHeroSkinInfo) {
+                        mainInfo = await window.resolveHeroSkinInfo(mainHero, mainSkin);
+                        fusedInfo = await window.resolveHeroSkinInfo(fusedHero, fusedSkin);
+                    } else if (window.resolveHeroSkinUrl) {
+                        const mu = await window.resolveHeroSkinUrl(mainHero, mainSkin);
+                        if (mu) mainInfo = { url: mu };
+                        const fu = await window.resolveHeroSkinUrl(fusedHero, fusedSkin);
+                        if (fu) fusedInfo = { url: fu };
+                    } else if (window.getHeroSkinUrl) {
+                        const mu = window.getHeroSkinUrl(mainHero);
+                        if (mu) mainInfo = { url: mu };
+                        const fu = window.getHeroSkinUrl(fusedHero);
+                        if (fu) fusedInfo = { url: fu };
+                    }
+                    const mainUrl = mainInfo ? mainInfo.url : null;
+                    const fusedUrl = fusedInfo ? fusedInfo.url : null;
+                    if (mainUrl || fusedUrl) { applyFusionSkinToSlot(slot, mainUrl, fusedUrl); return; }
+                    return;
+                }
+            }
+
+            // 非融合 / 未开启：原逻辑（显示主卡整张皮肤）
             const skinHeroName = (typeof getMainCardName === 'function' && getMainCardName(heroName) !== heroName)
                 ? getMainCardName(heroName)
                 : heroName;
-            if (skinHeroName !== heroName) {
-                console.log('[SKIN] Fusion card, use first hero skin:', skinHeroName);
-            }
-
-            // 优先用 resolveHeroSkinInfo（支持延迟 base64 加载且返回皮肤名）
-            // 取该卡当前皮肤（项目级 → 全局默认 → 默认），让背景图随卡牌皮肤生效
             let slotSkin = '默认';
             const slotCardId = slot && slot.dataset ? slot.dataset.cardId : null;
             const slotHandType = (slot && slot.dataset && slot.dataset.handType) ? slot.dataset.handType : 'my';
@@ -18149,23 +18324,10 @@
                 card.addEventListener('contextmenu', (e) => handleHandCardRightClick(e, handType));
             });
 
-            // 为手牌也尝试应用皮肤背景（融合卡取主卡名查询皮肤）
-            if (window.resolveHeroSkinUrl) {
-                document.querySelectorAll('#' + container.id + ' .selected-card:not(.empty)').forEach(async card => {
-                    const name = getMainCardName(card.dataset.name);
-                    if (!name) return;
-                    const cid = card.dataset.id;
-                    const skin = cid ? getCardSkin(cid, name, handType) : '默认';
-                    try {
-                        const url = await window.resolveHeroSkinUrl(name, skin);
-                        if (url) {
-                            applySkinBgToHandCard(card, url);
-                        } else {
-                            removeSkinBgFromHandCard(card);
-                        }
-                    } catch (e) {}
-                });
-            }
+            // 为手牌应用皮肤背景（融合卡：主卡整皮 + 被融合卡右下三角）
+            document.querySelectorAll('#' + container.id + ' .selected-card:not(.empty)').forEach(async card => {
+                try { await reapplySingleHandCard(card, card.dataset.id, handType); } catch (e) {}
+            });
             
             countEl.textContent = handCards.length + '/' + MAX_HAND_CARDS;
         }
@@ -19976,6 +20138,9 @@
             loadDefaultCardSkins();
             loadCardMoHua();
             loadCustomSkins();
+            // 同步融合卡对角切皮开关初始状态（默认开启）
+            try { const t = document.getElementById('fusionSkinSplitToggle'); if (t) t.checked = fusionSkinSplitEnabled; } catch (e) {}
+            if (typeof refreshAllFusionSkins === 'function') refreshAllFusionSkins();
             loadCustomSkinAttributes();
             loadCustomCards();
             loadFavorites();
@@ -28865,7 +29030,7 @@ ${maSection}
     </div>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260803-106</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260803-107</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
