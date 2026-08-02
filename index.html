@@ -15803,6 +15803,10 @@
         // 融合卡拆分：返回各英雄名数组（≥2 视为融合卡），否则 null
         function getFusionParts(cardName) {
             if (!cardName) return null;
+            // 云端融合定义优先（管理员维护，含2基础卡校验）
+            if (window.cloudFusions && window.cloudFusions[cardName] && Array.isArray(window.cloudFusions[cardName].components) && window.cloudFusions[cardName].components.length >= 2) {
+                return window.cloudFusions[cardName].components.slice();
+            }
             const fusionCards = [
                 '火炮射线', '射线潜艇', '火炮潜艇', '宝库射线', '宝库潜艇', '宝库火炮',
                 '潜艇射线', '潜艇火炮', '射线火炮',
@@ -15834,8 +15838,103 @@
             return '默认';
         }
 
-        // 手牌：主卡整皮(底层) + 被融合卡右下三角(上层)。clip-path 把整张卡切成 50/50 对角。
-        function applyFusionSkinToHandCard(card, mainUrl, fusedUrl) {
+        // ===== 融合卡切半皮：canvas 切三角 + 本地缓存 + 云端预切优先 =====
+        // 把整张被融合卡图按卡片框(cover)绘制，裁右下三角(对角线 100% 0 → 100% 100% → 0 100%)，返回 PNG blob
+        function cropFusionHalfFromUrl(url, w, h) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                if (/^https?:/i.test(url)) img.crossOrigin = 'anonymous';
+                img.onload = () => {
+                    const cw = w && w > 0 ? w : 400, ch = h && h > 0 ? h : 520;
+                    const canvas = document.createElement('canvas');
+                    canvas.width = cw; canvas.height = ch;
+                    const ctx = canvas.getContext('2d');
+                    const iw = img.naturalWidth, ih = img.naturalHeight;
+                    const scale = Math.max(cw / iw, ch / ih);
+                    const dw = iw * scale, dh = ih * scale;
+                    const dx = (cw - dw) / 2, dy = (ch - dh) / 2;
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.moveTo(cw, 0); ctx.lineTo(cw, ch); ctx.lineTo(0, ch); ctx.closePath();
+                    ctx.clip();
+                    ctx.drawImage(img, dx, dy, dw, dh);
+                    ctx.restore();
+                    canvas.toBlob(b => resolve(b), 'image/png');
+                };
+                img.onerror = () => resolve(null);
+                img.src = url;
+            });
+        }
+
+        // 本地 IndexedDB 缓存切半皮（key = 融合{英雄}），命中即复用，免重复切割
+        let _fusionHalfDB = null;
+        function _openFusionHalfDB() {
+            return new Promise((res, rej) => {
+                if (_fusionHalfDB) return res(_fusionHalfDB);
+                const r = indexedDB.open('tfjl_fusion_halves', 1);
+                r.onupgradeneeded = () => { try { r.result.createObjectStore('halves'); } catch (e) {} };
+                r.onsuccess = () => { _fusionHalfDB = r.result; res(_fusionHalfDB); };
+                r.onerror = () => rej(r.error);
+            });
+        }
+        async function getFusionHalfCached(fusedHero) {
+            try {
+                const db = await _openFusionHalfDB();
+                return await new Promise((resolve) => {
+                    const tx = db.transaction('halves', 'readonly');
+                    const req = tx.objectStore('halves').get('融合' + fusedHero);
+                    req.onsuccess = () => {
+                        const blob = req.result;
+                        resolve(blob ? URL.createObjectURL(blob) : null);
+                    };
+                    req.onerror = () => resolve(null);
+                });
+            } catch (e) { return null; }
+        }
+        async function setFusionHalfCached(fusedHero, blob) {
+            try {
+                const db = await _openFusionHalfDB();
+                await new Promise((resolve) => {
+                    const tx = db.transaction('halves', 'readwrite');
+                    tx.objectStore('halves').put(blob, '融合' + fusedHero);
+                    tx.oncomplete = () => resolve();
+                    tx.onerror = () => resolve();
+                });
+            } catch (e) {}
+        }
+
+        // 解析被融合卡的半皮来源：①云端预切(融合XX) ②本地缓存 ③现切并缓存 ④兜底整图+clip-path
+        async function resolveFusionHalf(fusedHero, el) {
+            if (!fusedHero) return null;
+            // ① 云端预切（管理员上传的 融合XX 三角皮）
+            if (window.skinRegistry && window.skinRegistry['融合' + fusedHero] && window.resolveHeroSkinUrl) {
+                try {
+                    const u = await window.resolveHeroSkinUrl('融合' + fusedHero, '默认');
+                    if (u) return { url: u, isTriangle: true };
+                } catch (e) {}
+            }
+            // ② 本地缓存
+            const cached = await getFusionHalfCached(fusedHero);
+            if (cached) return { url: cached, isTriangle: true };
+            // ③ 现切并缓存
+            const fullUrl = window.resolveHeroSkinUrl ? await window.resolveHeroSkinUrl(fusedHero, getFusionComponentSkin(fusedHero)) : null;
+            if (fullUrl) {
+                const w = el ? el.clientWidth : 0, h = el ? el.clientHeight : 0;
+                try {
+                    const blob = await cropFusionHalfFromUrl(fullUrl, w || 400, h || 520);
+                    if (blob) {
+                        setFusionHalfCached(fusedHero, blob);
+                        return { url: URL.createObjectURL(blob), isTriangle: true };
+                    }
+                } catch (e) {}
+                // ④ 兜底：整图 + clip-path
+                return { url: fullUrl, isTriangle: false };
+            }
+            return null;
+        }
+
+        // 手牌：主卡整皮(底层) + 被融合卡右下三角(上层)。三角图(isTriangle)本身已透明，不套 clip-path。
+        function applyFusionSkinToHandCard(card, mainUrl, fusedUrl, fusedIsTriangle) {
             if (!card) return;
             card.classList.add('skin-bg');
             let base = card.querySelector('.hand-skin-layer');
@@ -15852,17 +15951,18 @@
                 if (!overlay) {
                     overlay = document.createElement('img');
                     overlay.className = 'hand-skin-fused';
-                    overlay.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit;z-index:0;pointer-events:none;clip-path:polygon(100% 0,100% 100%,0 100%);';
+                    overlay.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit;z-index:0;pointer-events:none;';
                     card.insertBefore(overlay, base.nextSibling);
                 }
+                overlay.style.clipPath = (fusedIsTriangle ? 'none' : 'polygon(100% 0,100% 100%,0 100%)');
                 if (overlay.src !== fusedUrl) overlay.src = fusedUrl;
             } else if (overlay && overlay.parentNode) {
                 overlay.remove();
             }
         }
 
-        // 槽位：主卡整皮(底层) + 被融合卡右下三角(上层)
-        function applyFusionSkinToSlot(slot, mainUrl, fusedUrl) {
+        // 槽位：主卡整皮(底层) + 被融合卡右下三角(上层)。三角图(isTriangle)本身已透明，不套 clip-path。
+        function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsTriangle) {
             if (!slot) return;
             let base = slot.querySelector('.skin-layer');
             if (!base) {
@@ -15878,9 +15978,10 @@
                 if (!overlay) {
                     overlay = document.createElement('img');
                     overlay.className = 'skin-layer-fused';
-                    overlay.style.cssText = 'position:absolute;inset:3px;width:calc(100% - 6px);height:calc(100% - 6px);object-fit:contain;object-position:center center;border-radius:5px;z-index:0;pointer-events:none;clip-path:polygon(100% 0,100% 100%,0 100%);';
+                    overlay.style.cssText = 'position:absolute;inset:3px;width:calc(100% - 6px);height:calc(100% - 6px);object-fit:contain;object-position:center center;border-radius:5px;z-index:0;pointer-events:none;';
                     slot.insertBefore(overlay, base.nextSibling);
                 }
+                overlay.style.clipPath = (fusedIsTriangle ? 'none' : 'polygon(100% 0,100% 100%,0 100%)');
                 if (overlay.src !== fusedUrl) overlay.src = fusedUrl;
             } else if (overlay && overlay.parentNode) {
                 overlay.remove();
@@ -15921,10 +16022,11 @@
                 if (parts && parts.length >= 2) {
                     const mainHero = parts[0], fusedHero = parts[1];
                     const mainSkin = cid ? getCardSkin(cid, mainHero, ht) : '默认';
-                    const fusedSkin = getFusionComponentSkin(fusedHero);
                     const mainUrl = window.resolveHeroSkinUrl ? await window.resolveHeroSkinUrl(mainHero, mainSkin) : null;
-                    const fusedUrl = window.resolveHeroSkinUrl ? await window.resolveHeroSkinUrl(fusedHero, fusedSkin) : null;
-                    if (mainUrl || fusedUrl) { applyFusionSkinToHandCard(card, mainUrl, fusedUrl); return; }
+                    const fusedInfo = await resolveFusionHalf(fusedHero, card);
+                    const fusedUrl = fusedInfo ? fusedInfo.url : null;
+                    const fusedIsTriangle = fusedInfo ? fusedInfo.isTriangle : false;
+                    if (mainUrl || fusedUrl) { applyFusionSkinToHandCard(card, mainUrl, fusedUrl, fusedIsTriangle); return; }
                 }
             }
             const name = getMainCardName(cardName);
@@ -17644,25 +17746,21 @@
                     const slotCardId = slot && slot.dataset ? slot.dataset.cardId : null;
                     const slotHandType = (slot && slot.dataset && slot.dataset.handType) ? slot.dataset.handType : 'my';
                     const mainSkin = slotCardId ? getCardSkin(slotCardId, mainHero, slotHandType) : '默认';
-                    const fusedSkin = getFusionComponentSkin(fusedHero);
-                    let mainInfo = null, fusedInfo = null;
+                    let mainInfo = null;
                     if (window.resolveHeroSkinInfo) {
                         mainInfo = await window.resolveHeroSkinInfo(mainHero, mainSkin);
-                        fusedInfo = await window.resolveHeroSkinInfo(fusedHero, fusedSkin);
                     } else if (window.resolveHeroSkinUrl) {
                         const mu = await window.resolveHeroSkinUrl(mainHero, mainSkin);
                         if (mu) mainInfo = { url: mu };
-                        const fu = await window.resolveHeroSkinUrl(fusedHero, fusedSkin);
-                        if (fu) fusedInfo = { url: fu };
                     } else if (window.getHeroSkinUrl) {
                         const mu = window.getHeroSkinUrl(mainHero);
                         if (mu) mainInfo = { url: mu };
-                        const fu = window.getHeroSkinUrl(fusedHero);
-                        if (fu) fusedInfo = { url: fu };
                     }
+                    const fusedInfo = await resolveFusionHalf(fusedHero, slot);
                     const mainUrl = mainInfo ? mainInfo.url : null;
                     const fusedUrl = fusedInfo ? fusedInfo.url : null;
-                    if (mainUrl || fusedUrl) { applyFusionSkinToSlot(slot, mainUrl, fusedUrl); return; }
+                    const fusedIsTriangle = fusedInfo ? fusedInfo.isTriangle : false;
+                    if (mainUrl || fusedUrl) { applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsTriangle); return; }
                     return;
                 }
             }
@@ -29030,7 +29128,7 @@ ${maSection}
     </div>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260803-107</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260803-108</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
