@@ -16322,6 +16322,8 @@
             const name = (document.getElementById('cgmHeroName').value || '').trim();
             const prof = document.getElementById('cgmHeroProf').value;
             const quality = document.getElementById('cgmHeroQuality').value;
+            const desc = (document.getElementById('cgmHeroDesc').value || '').trim();
+            const skinDesc = (document.getElementById('cgmHeroSkinDesc').value || '').trim();
             const status = document.getElementById('cgmHeroStatus');
             if (!name) { status.style.color = '#ff9e80'; status.textContent = '请输入英雄名'; return; }
             try {
@@ -16329,7 +16331,12 @@
                 const local = await _cgmReadRepoFile('skins/cards.json');
                 if (local) { try { const p = JSON.parse(local); if (p && p.cards) base = p; else if (p) { base.cards = p; } } catch (e) { base = { cards: {} }; } }
                 if (!base.cards) base.cards = {};
-                base.cards[name] = { quality: quality || undefined, profession: prof || undefined };
+                const rec = {};
+                if (quality) rec.quality = quality;
+                if (prof) rec.profession = prof;
+                if (desc) rec.desc = desc;
+                if (skinDesc) rec.skinDesc = skinDesc;
+                base.cards[name] = rec;
                 base.updated = new Date().toISOString();
                 const content = JSON.stringify(base, null, 2);
                 await _cgmWriteRepoFile('skins/cards.json', content);
@@ -18847,7 +18854,23 @@
                 if (profKey === 'engineering') card.dataset.engineering = 'true';
                 card.setAttribute('draggable', 'false');
                 card.style.cursor = 'pointer';
-                card.innerHTML = '<span class="card-name">' + name + '</span>';
+                // 描述（悬停可见）
+                const tipParts = [];
+                if (def.desc) tipParts.push('📝 ' + def.desc);
+                if (def.skinDesc) tipParts.push('🖼️ ' + def.skinDesc);
+                card.title = tipParts.length ? name + '\n' + tipParts.join('\n') : name;
+                // 皮肤图：有则显示，无则默认背景占位 + 角标提示
+                const heroSkins = (window.skinRegistry && window.skinRegistry[name]) || [];
+                let inner = '<span class="card-name">' + name + '</span>';
+                if (heroSkins.length) {
+                    const s0 = heroSkins[0];
+                    const imgUrl = s0.url || (s0.path ? 'file://' + s0.path : '');
+                    if (imgUrl) inner = '<img src="' + imgUrl + '" style="width:100%;height:100%;object-fit:cover;border-radius:6px;" onerror="this.outerHTML=\'<span class=&quot;card-name&quot;>' + name + '</span>\'"><span class="card-name" style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.6);font-size:0.6rem;padding:1px 2px;">' + name + '</span>';
+                } else {
+                    inner += '<span style="position:absolute;top:2px;right:2px;font-size:0.55rem;background:rgba(255,165,0,0.85);color:#000;padding:0 3px;border-radius:3px;line-height:1.3;">皮肤未配置</span>';
+                }
+                card.style.position = 'relative';
+                card.innerHTML = inner;
                 grid.appendChild(card);
             });
             document.querySelectorAll('.card-item[data-id^="cloudcard_"]').forEach(card => {
@@ -29071,9 +29094,10 @@ ${maSection}
                             </ul>
                             <p><strong>② 添加新基础卡（新英雄）：</strong></p>
                             <ul style="margin:5px 0;padding-left:20px;">
-                                <li>卡组管理 →「🆕 添加新英雄」页签 → 填英雄名 + 选职业 + 选品质(金/紫) → 确认写入 cards.json</li>
+                                <li>卡组管理 →「🆕 添加新英雄」页签 → 填英雄名 + 选职业 + 选品质(金/紫) → 可填「卡牌描述」「皮肤/立绘说明」(均可选，悬停卡牌可见) → 确认写入 cards.json</li>
                                 <li>写入后需 <code>git push origin main</code>（融合卡的一键推送只推 fusions.json，不含 cards.json）</li>
                                 <li>用户 App 重启 + 硬刷新，新英雄自动出现在对应金/紫卡类职业子分类</li>
+                                <li>没皮肤图时卡池该英雄用【默认背景占位图】并显示「皮肤未配置」角标，不影响使用；面板内已内置「如何放皮肤 + 同步」一步教程</li>
                             </ul>
                             <p><strong>③ 上传皮肤立绘：</strong></p>
                             <ul style="margin:5px 0;padding-left:20px;">
@@ -29902,7 +29926,7 @@ ${maSection}
     </div>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260803-138</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260803-139</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
@@ -30019,6 +30043,17 @@ ${maSection}
                 <div style="display:flex;gap:8px;margin-bottom:10px;">
                     <input id="cgmHeroName" placeholder="英雄名，如 新英雄甲" style="flex:1;padding:8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:#0f3460;color:#fff;">
                     <button onclick="cgmAddNewHeroCard()" style="padding:8px 12px;border-radius:6px;border:none;background:linear-gradient(135deg,#4ade80,#22c55e);color:#fff;cursor:pointer;font-weight:600;white-space:nowrap;">✅ 确认添加</button>
+                </div>
+                <textarea id="cgmHeroDesc" placeholder="卡牌描述（可选，如：定位/技能特点，鼠标悬停卡牌可见）" style="width:100%;height:48px;padding:8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:#0f3460;color:#fff;font-size:0.82rem;resize:vertical;box-sizing:border-box;margin-bottom:10px;"></textarea>
+                <textarea id="cgmHeroSkinDesc" placeholder="皮肤/立绘说明（可选，如：皮肤命名规则、已有哪些皮肤）" style="width:100%;height:48px;padding:8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:#0f3460;color:#fff;font-size:0.82rem;resize:vertical;box-sizing:border-box;margin-bottom:10px;"></textarea>
+                <div style="background:rgba(255,215,0,0.08);border:1px solid rgba(255,215,0,0.25);border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:0.76rem;color:rgba(255,255,255,0.82);line-height:1.55;">
+                    <div style="color:#ffd700;font-weight:600;margin-bottom:5px;">🖼️ 没有皮肤图片？这样放好并同步（一眼教程）</div>
+                    • 把皮肤 PNG 放到仓库：<code style="color:#4ade80;">skins/{英雄名}/{皮肤名}.png</code><br>
+                    • 在 <code style="color:#4ade80;">skins/registry.json</code> 的 <code>heroes</code> 下登记：<code style="color:#4ade80;">{"name":"显示名","file":"文件名.png"}</code><br>
+                    • 没有皮肤图时，卡池里该英雄用【默认背景占位图】显示，并标注「皮肤未配置」，不影响正常使用<br>
+                    • 同步：写好 cards.json / 皮肤图 / registry.json 后，在本机终端运行（或让 AI 代跑）<br>
+                    &nbsp;&nbsp;<code style="color:#4ade80;">git add skins/ &amp;&amp; git commit -m "hero: 英雄名" &amp;&amp; git push origin main &amp;&amp; git -c http.proxy= -c https.proxy= push gitee</code><br>
+                    • 推送后用户重启 App + 硬刷新即生效，<strong>无需重打包 exe</strong>。
                 </div>
                 <div id="cgmHeroStatus" style="font-size:0.78rem;margin-top:8px;color:#4ecdc4;white-space:pre-wrap;"></div>
             </div>
