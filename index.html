@@ -15893,17 +15893,29 @@
             ctrl.addEventListener('contextmenu', (e) => { e.stopPropagation(); });
             ctrl.addEventListener('click', (e) => { e.stopPropagation(); e.preventDefault(); });
             // 「融合」：基础英雄→转换为融合卡；或融合卡→在同系融合间切换
+            // 融合卡名已在卡上显示，按钮不再重复显示卡名（避免顶部黄色长条挡角标）
             if (variants.length > 0) {
                 const b = document.createElement('div');
                 b.className = 'fusion-btn';
-                b.textContent = isFusion ? ('融合·' + name) : '融合';
+                b.textContent = '融合';
                 b.title = isFusion ? '切换融合卡（' + baseHero + ' 系）' : '转换为融合卡（' + baseHero + ' 系）';
                 b.style.cssText = 'font-size:10px;line-height:15px;padding:0 5px;background:rgba(255,180,0,0.92);color:#000;border-radius:7px;cursor:pointer;white-space:nowrap;';
                 b.addEventListener('click', (e) => { e.stopPropagation(); e.preventDefault(); openFusionVariantMenu(slot, baseHero, variants, name); });
                 ctrl.appendChild(b);
             }
-            // 「锁定融合」：按卡组(我方/队友)整体锁定。未锁定(编辑中)→右键改被融合卡皮；锁定→右键改主卡皮
+            // 「锁定融合」：按卡组(我方/队友)整体锁定，每侧只在「第一张融合卡」上显示一把锁
+            // 未锁定(编辑中)→右键改被融合卡皮；锁定→右键改主卡皮
             if (isFusion) {
+                // 计算该侧第一张融合卡槽位（锁只显示在这一张上）
+                let _firstFusionSlot = null;
+                document.querySelectorAll('.battle-slot.filled').forEach(s => {
+                    const sid = s.dataset.slot || '';
+                    if (sid.startsWith('u') !== isUserSlot) return;
+                    if (_firstFusionSlot !== null) return;
+                    const cn = s.querySelector('.card-name'); const nm = cn ? cn.textContent : '';
+                    if (getFusionParts(nm) && getFusionParts(nm).length >= 2) _firstFusionSlot = sid;
+                });
+                if (slotId === _firstFusionSlot) {
                 const sideLocked = isUserSlot ? myFusionLocked : teammateFusionLocked;
                 const lb = document.createElement('div');
                 lb.className = 'fusion-lock-btn';
@@ -15927,6 +15939,7 @@
                     if (typeof autoSaveProject === 'function') autoSaveProject();
                 });
                 ctrl.appendChild(lb);
+                }
             }
             slot.appendChild(ctrl);
         }
@@ -29581,7 +29594,7 @@ ${maSection}
     </div>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260803-122</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260803-123</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
