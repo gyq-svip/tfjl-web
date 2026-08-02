@@ -3450,6 +3450,7 @@ if (isTauriApp) {
                     if (fData && fData.fusions) {
                         window.cloudFusions = fData.fusions;
                         console.log('[SKIN] cloud fusions loaded:', Object.keys(fData.fusions).length);
+                        if (typeof window.renderFusionCardsToPool === 'function') window.renderFusionCardsToPool();
                     }
                 }
             } catch (fe) { console.warn('[SKIN] load fusions.json failed:', fe); }
