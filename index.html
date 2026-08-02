@@ -15847,11 +15847,14 @@
         }
 
         // ===== 上阵卡"融合卡切换"角标：基础英雄 → 可融合变体 =====
-        // 已知融合卡名（云端 + 内置）
+        // 已知融合卡名：以云端(管理员维护的 fusions.json)为准，避免硬编码污染；
+        // 仅当云端为空（管理员尚未添加任何融合）才回退内置表，保证老功能不失效
         function getAllFusionNames() {
             const names = new Set();
             if (window.cloudFusions) Object.keys(window.cloudFusions).forEach(n => names.add(n));
-            ['火炮射线','射线潜艇','火炮潜艇','宝库射线','宝库潜艇','宝库火炮','潜艇射线','潜艇火炮','射线火炮','水灵刀客','刀客水灵','蛇女爱神','爱神蛇女','咕咕天使','天使咕咕','圣骑天使','天使圣骑','战将鱼人','鱼人战将','电法冰法','冰法电法','萌萌水灵','水灵萌萌','火灵风灵','风灵火灵'].forEach(n => names.add(n));
+            if (names.size === 0) {
+                ['火炮射线','射线潜艇','火炮潜艇','宝库射线','宝库潜艇','宝库火炮','潜艇射线','潜艇火炮','射线火炮','水灵刀客','刀客水灵','蛇女爱神','爱神蛇女','咕咕天使','天使咕咕','圣骑天使','天使圣骑','战将鱼人','鱼人战将','电法冰法','冰法电法','萌萌水灵','水灵萌萌','火灵风灵','风灵火灵'].forEach(n => names.add(n));
+            }
             return [...names];
         }
         // 基础英雄 → 以其为主卡(part[0])的融合卡列表
@@ -15864,7 +15867,7 @@
             });
             return [...out];
         }
-        // 在槽位上刷新"融合卡切换"角标（仅当基础英雄有融合变体才显示）
+            // 在槽位上刷新"融合卡切换"控件（基础英雄有融合变体→显示「融合」；当前卡本身是融合卡→额外显示「编辑融合」）
         function refreshSlotFusionControl(slot) {
             if (!slot || !slot.classList.contains('filled')) return;
             const slotId = slot.dataset.slot;
@@ -15876,16 +15879,36 @@
             const name = card ? card.name : (slot.querySelector('.card-name') ? slot.querySelector('.card-name').textContent : '');
             const baseHero = (typeof getMainCardName === 'function') ? getMainCardName(name) : name;
             const variants = getFusionVariantsForBase(baseHero);
-            const old = slot.querySelector('.fusion-variant-btn');
+            const isFusion = !!(getFusionParts(name) && getFusionParts(name).length >= 2);
+            const old = slot.querySelector('.fusion-ctrl');
             if (old) old.remove();
-            if (variants.length === 0) return;
-            const btn = document.createElement('div');
-            btn.className = 'fusion-variant-btn';
-            btn.textContent = '⚡';
-            btn.title = '切换融合卡（' + baseHero + ' 系）';
-            btn.style.cssText = 'position:absolute;top:1px;left:1px;min-width:16px;height:16px;line-height:16px;text-align:center;font-size:11px;background:rgba(255,180,0,0.92);color:#000;border-radius:8px;cursor:pointer;z-index:6;pointer-events:auto;padding:0 2px;box-shadow:0 0 4px rgba(0,0,0,0.5);';
-            btn.addEventListener('click', (e) => { e.stopPropagation(); e.preventDefault(); openFusionVariantMenu(slot, baseHero, variants, name); });
-            slot.appendChild(btn);
+            if (variants.length === 0 && !isFusion) return;
+            const ctrl = document.createElement('div');
+            ctrl.className = 'fusion-ctrl';
+            ctrl.style.cssText = 'position:absolute;top:1px;left:1px;display:flex;gap:2px;z-index:6;pointer-events:auto;';
+            ctrl.addEventListener('contextmenu', (e) => { e.stopPropagation(); });
+            ctrl.addEventListener('click', (e) => { e.stopPropagation(); e.preventDefault(); });
+            // 「融合」：基础英雄→转换为融合卡；或融合卡→在同系融合间切换
+            if (variants.length > 0) {
+                const b = document.createElement('div');
+                b.className = 'fusion-btn';
+                b.textContent = isFusion ? ('融合·' + name) : '融合';
+                b.title = isFusion ? '切换融合卡（' + baseHero + ' 系）' : '转换为融合卡（' + baseHero + ' 系）';
+                b.style.cssText = 'font-size:10px;line-height:15px;padding:0 5px;background:rgba(255,180,0,0.92);color:#000;border-radius:7px;cursor:pointer;white-space:nowrap;';
+                b.addEventListener('click', (e) => { e.stopPropagation(); e.preventDefault(); openFusionVariantMenu(slot, baseHero, variants, name); });
+                ctrl.appendChild(b);
+            }
+            // 「编辑融合」：仅当此卡本身是融合卡，打开卡组管理预填以编辑其定义
+            if (isFusion) {
+                const eb = document.createElement('div');
+                eb.className = 'fusion-edit-btn';
+                eb.textContent = '编辑融合';
+                eb.title = '编辑融合卡定义（' + name + '）';
+                eb.style.cssText = 'font-size:10px;line-height:15px;padding:0 5px;background:rgba(120,180,255,0.92);color:#06283d;border-radius:7px;cursor:pointer;white-space:nowrap;';
+                eb.addEventListener('click', (e) => { e.stopPropagation(); e.preventDefault(); cgmEditFusionPrefill(name); });
+                ctrl.appendChild(eb);
+            }
+            slot.appendChild(ctrl);
         }
         // 弹出融合变体选择菜单（第一项=原卡不融合）
         function openFusionVariantMenu(slot, baseHero, variants, currentName) {
@@ -16226,6 +16249,13 @@
                 status.style.color = '#ff9e80';
                 status.textContent = '✗ 写入失败：' + e.message;
             }
+        }
+        // 从槽位「编辑融合」入口：打开卡组管理并预填该融合卡名，便于编辑其 components 定义
+        function cgmEditFusionPrefill(name) {
+            openCardGroupManager();
+            cgmSwitchTab('fusion');
+            const nm = document.getElementById('cgmFusionName');
+            if (nm) { nm.value = name || ''; cgmValidateFusion(); }
         }
         // 添加被融合的卡：选英雄→切全部皮肤→预览→发布
         let _cgmCutBlobs = [];
@@ -18921,9 +18951,9 @@
                 const card = placedArray.find(c => c.slot === slotId);
                 console.log('[SKIN] card found:', card ? card.name : 'null', 'slotId:', slotId, 'isUserSlot:', isUserSlot);
                 const heroName = card ? (card.name || '') : '';
-                // 右击统一只切换【主卡】皮肤（融合卡取主卡 part[0]）。副卡(徽章)皮肤改点角标切换
-                // 非融合：取第一卡作为皮肤查询/切换的英雄名，显示名仍保留原融合名
-                const skinHeroName = (typeof getMainCardName === 'function' ? getMainCardName(heroName) : heroName);
+                // 右击统一只切换【主卡】皮肤（融合卡取主卡 part[0]，绝不切被融合卡）。副卡(徽章)皮肤改点角标切换
+                const _parts = (typeof getFusionParts === 'function') ? getFusionParts(heroName) : null;
+                const skinHeroName = (_parts && _parts.length >= 2) ? _parts[0] : (typeof getMainCardName === 'function' ? getMainCardName(heroName) : heroName);
                 const skins = skinHeroName && window.getHeroSkins ? window.getHeroSkins(skinHeroName) : [];
                 const hasSkinBg = this.classList.contains('skin-bg');
                 console.log('[SKIN] heroName:', heroName, 'skinHeroName:', skinHeroName, 'skins count:', skins.length, 'hasSkinBg:', hasSkinBg);
@@ -20711,17 +20741,6 @@
                 console.log('[SKIN] binding battle-slot contextmenu:', slot.dataset.slot);
                 slot.addEventListener('contextmenu', handleSlotRightClick);
             });
-
-            // 捕获阶段兜底：确保战场槽右键优先被处理，不被 card-item 全局事件干扰
-            document.addEventListener('contextmenu', (e) => {
-                const slot = e.target.closest('.battle-slot');
-                if (!slot) return;
-                // 只处理战场槽本身（不处理卡池/手牌中的 card-item，那些已被上方监听器排除）
-                console.log('[SKIN] capture battle-slot contextmenu on', slot.dataset.slot, 'filled:', slot.classList.contains('filled'));
-                e.preventDefault();
-                e.stopPropagation();
-                handleSlotRightClick.call(slot, e);
-            }, true);
 
             updateHandDisplay('my');
             updateHandDisplay('teammate');
@@ -29446,7 +29465,7 @@ ${maSection}
     </div>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260803-114</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260803-115</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
