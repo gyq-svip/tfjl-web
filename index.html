@@ -10910,7 +10910,7 @@
                 <h2 style="margin:0;">⚔️ 出战选择</h2>
                 <div style="display:flex;gap:8px;align-items:center;">
                     <label style="font-size:0.7rem;color:rgba(255,255,255,0.7);display:flex;align-items:center;gap:4px;cursor:pointer;user-select:none;">
-                        <input type="checkbox" id="fusionSkinSplitToggle" checked onchange="toggleFusionSkinSplit(this.checked)"> 融合卡对角切皮
+                        <input type="checkbox" id="fusionSkinSplitToggle" checked onchange="toggleFusionSkinSplit(this.checked)" title="勾选：融合卡显示对角切割的融合皮肤；不勾：只显示主卡（单卡）整张皮肤。卡名始终按现状显示。"> 显示融合
                     </label>
                     <div style="position:relative;">
                         <button onclick="toggleDamageReductionMenu(this)" style="background:rgba(78,205,196,0.2);border:1px solid rgba(78,205,196,0.4);color:#4ecdc4;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:0.75rem;">🛡️ 减伤</button>
@@ -15897,16 +15897,6 @@
                 b.addEventListener('click', (e) => { e.stopPropagation(); e.preventDefault(); openFusionVariantMenu(slot, baseHero, variants, name); });
                 ctrl.appendChild(b);
             }
-            // 「编辑融合」：仅当此卡本身是融合卡，打开卡组管理预填以编辑其定义
-            if (isFusion) {
-                const eb = document.createElement('div');
-                eb.className = 'fusion-edit-btn';
-                eb.textContent = '编辑融合';
-                eb.title = '编辑融合卡定义（' + name + '）';
-                eb.style.cssText = 'font-size:10px;line-height:15px;padding:0 5px;background:rgba(120,180,255,0.92);color:#06283d;border-radius:7px;cursor:pointer;white-space:nowrap;';
-                eb.addEventListener('click', (e) => { e.stopPropagation(); e.preventDefault(); cgmEditFusionPrefill(name); });
-                ctrl.appendChild(eb);
-            }
             slot.appendChild(ctrl);
         }
         // 弹出融合变体选择菜单（第一项=原卡不融合）
@@ -16251,13 +16241,6 @@
                 status.style.color = '#ff9e80';
                 status.textContent = '✗ 写入失败：' + e.message;
             }
-        }
-        // 从槽位「编辑融合」入口：打开卡组管理并预填该融合卡名，便于编辑其 components 定义
-        function cgmEditFusionPrefill(name) {
-            openCardGroupManager();
-            cgmSwitchTab('fusion');
-            const nm = document.getElementById('cgmFusionName');
-            if (nm) { nm.value = name || ''; cgmValidateFusion(); }
         }
         // 已添加融合卡列表（带删除）
         function cgmRefreshAllSlots() {
@@ -29555,7 +29538,7 @@ ${maSection}
     </div>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260803-119</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260803-120</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
