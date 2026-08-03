@@ -29442,6 +29442,13 @@ ${maSection}
                             <div style="font-size:0.7rem;color:rgba(255,255,255,0.5);">联盟个人战绩 · 注册/登录/存Gist</div>
                         </div>
                     </div>
+                    <div class="admin-menu-item" onclick="openSkinMaker()" style="padding:10px;">
+                        <span style="font-size:1.1rem;">🎨</span>
+                        <div style="margin-left:8px;">
+                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">皮肤制作</div>
+                            <div style="font-size:0.7rem;color:rgba(255,255,255,0.5);">裁切 / 换底色 / 入库</div>
+                        </div>
+                    </div>
                 </div>
                 <button class="admin-btn" onclick="logoutToLogin()" style="width:100%;margin-top:12px;background:linear-gradient(135deg,#ef4444,#dc2626);color:white;">🔙 退出登录</button>
             </div>
@@ -30474,7 +30481,7 @@ ${maSection}
     </div>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260804-164</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260804-165</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
@@ -30652,5 +30659,205 @@ ${maSection}
   }catch(err){}
 })();
 </script>
+  <!-- 皮肤制作工具 -->
+  <div id="skinMakerOverlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:10002;align-items:center;justify-content:center;">
+    <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:1px solid rgba(255,215,0,0.3);border-radius:16px;padding:20px;max-width:960px;width:94%;max-height:94vh;overflow:auto;box-shadow:0 10px 40px rgba(0,0,0,0.6);">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+        <h3 style="color:#ffd700;margin:0;font-size:1.1rem;">🎨 皮肤制作工具</h3>
+        <button onclick="closeSkinMaker()" style="background:transparent;border:none;color:#ff6b6b;font-size:1.5rem;cursor:pointer;line-height:1;">×</button>
+      </div>
+      <div style="display:flex;gap:20px;flex-wrap:wrap;">
+        <div style="flex:1 1 420px;min-width:320px;">
+          <input type="file" id="skinMakerFile" accept="image/*" style="color:#fff;margin-bottom:10px;font-size:0.85rem;">
+          <canvas id="skinMakerCanvas" width="412" height="400" style="width:412px;height:400px;max-width:100%;border:1px solid rgba(255,255,255,0.2);border-radius:10px;background:#000;cursor:grab;display:block;"></canvas>
+          <div style="color:rgba(255,255,255,0.5);font-size:0.72rem;margin:6px 0 10px;">滚轮缩放 · 拖拽移动</div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
+            <span style="color:#ffd700;font-size:0.8rem;">底色：</span>
+            <button data-sm-rarity="gold" title="金卡" style="width:34px;height:34px;border-radius:8px;border:none;cursor:pointer;background:linear-gradient(135deg,#ffd86b,#c8862a);"></button>
+            <button data-sm-rarity="purple" title="紫卡" style="width:34px;height:34px;border-radius:8px;border:none;cursor:pointer;background:linear-gradient(135deg,#c79bff,#6a2db0);"></button>
+            <button data-sm-rarity="blue" title="蓝卡" style="width:34px;height:34px;border-radius:8px;border:none;cursor:pointer;background:linear-gradient(135deg,#9bd0ff,#2d6db0);"></button>
+            <button data-sm-rarity="green" title="绿卡" style="width:34px;height:34px;border-radius:8px;border:none;cursor:pointer;background:linear-gradient(135deg,#aef0b0,#2d9e3a);"></button>
+          </div>
+          <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">
+            <label style="color:#ffd700;font-size:0.8rem;">缩放 <span id="smZoomVal">1.00</span></label>
+            <input type="range" id="smZoom" min="0.2" max="6" step="0.01" value="1" style="width:150px;accent-color:#ffd700;">
+            <label style="color:#ffd700;font-size:0.8rem;">留白 <span id="smMarginVal">6</span>px</label>
+            <input type="range" id="smMargin" min="0" max="30" step="1" value="6" style="width:120px;accent-color:#ffd700;">
+            <button id="smReset" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:8px;padding:5px 12px;cursor:pointer;font-size:0.8rem;">重置</button>
+          </div>
+          <button id="smDownload" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:8px;padding:8px 14px;cursor:pointer;font-size:0.85rem;">⬇️ 下载 PNG</button>
+        </div>
+        <div style="flex:1 1 280px;min-width:260px;">
+          <div style="color:#ffd700;font-size:0.85rem;margin-bottom:6px;">入库信息</div>
+          <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;">
+            <input id="smHero" placeholder="英雄名（决定目录，如 天使 / 死神）" style="padding:9px 12px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.4);color:#fff;font-size:0.85rem;">
+            <input id="smLabel" placeholder="皮肤标签（如 风清扬 / 一指名医）" style="padding:9px 12px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.4);color:#fff;font-size:0.85rem;">
+            <div style="color:rgba(255,255,255,0.5);font-size:0.72rem;">将生成：<span id="smNamePreview" style="color:#ffd700;">皮肤标签·英雄名.png</span></div>
+            <input id="smBasePath" value="D:\tfjl-web\skins" style="padding:9px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:#fff;font-size:0.78rem;">
+          </div>
+          <div style="color:#ffd700;font-size:0.85rem;margin-bottom:6px;">最终效果预览（206×200）</div>
+          <canvas id="skinMakerPreview" width="206" height="200" style="width:206px;height:200px;border:1px solid rgba(255,255,255,0.2);border-radius:10px;background:#000;display:block;margin-bottom:12px;"></canvas>
+          <button id="smSave" style="width:100%;background:linear-gradient(135deg,#ffd700,#ff9800);border:none;color:#1a1a2e;border-radius:10px;padding:10px;cursor:pointer;font-size:0.9rem;font-weight:600;">💾 保存并登记到 skins 目录</button>
+          <div id="smStatus" style="margin-top:10px;font-size:0.78rem;color:rgba(255,255,255,0.7);line-height:1.5;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+  (function(){
+    var smImg=null, smScale=1, smOffX=0, smOffY=0, smMargin=6, smRarity='gold';
+    var SM_W=206, SM_H=200, SM_D=2;
+    var SM_RARITY={
+      gold:['#ffd86b','#c8862a'],
+      purple:['#c79bff','#6a2db0'],
+      blue:['#9bd0ff','#2d6db0'],
+      green:['#aef0b0','#2d9e3a']
+    };
+    var smInited=false;
+    function smStatus(msg,isErr){ var el=document.getElementById('smStatus'); if(!el) return; el.textContent=msg; el.style.color=isErr?'#ff6b6b':'rgba(255,255,255,0.7)'; }
+    function smRender(ctx,scale){
+      var W=SM_W*scale, H=SM_H*scale;
+      ctx.clearRect(0,0,W,H);
+      var col=SM_RARITY[smRarity];
+      var g=ctx.createLinearGradient(0,0,0,H);
+      g.addColorStop(0,col[0]); g.addColorStop(1,col[1]);
+      ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+      if(!smImg) return;
+      ctx.save(); ctx.beginPath(); ctx.rect(0,0,W,H); ctx.clip();
+      var innerW=SM_W-2*smMargin, innerH=SM_H-2*smMargin;
+      var base=Math.max(innerW/smImg.width, innerH/smImg.height);
+      var dw=smImg.width*base*smScale, dh=smImg.height*base*smScale;
+      var cx=SM_W/2+smOffX, cy=SM_H/2+smOffY;
+      var dx=cx-dw/2, dy=cy-dh/2;
+      ctx.drawImage(smImg, dx*scale, dy*scale, dw*scale, dh*scale);
+      ctx.restore();
+      ctx.strokeStyle='rgba(255,255,255,0.3)'; ctx.lineWidth=Math.max(1,scale);
+      ctx.strokeRect(0.5,0.5,W-1,H-1);
+    }
+    function smRenderAll(){
+      var cv=document.getElementById('skinMakerCanvas'); if(cv) smRender(cv.getContext('2d'), SM_D);
+      var pv=document.getElementById('skinMakerPreview'); if(pv) smRender(pv.getContext('2d'), 1);
+      var h=document.getElementById('smHero'), l=document.getElementById('smLabel'), np=document.getElementById('smNamePreview');
+      if(h&&l&&np) np.textContent=((l.value.trim()&&h.value.trim())?(l.value.trim()+'·'+h.value.trim()):'皮肤标签·英雄名')+'.png';
+    }
+    function smSetRarity(r){
+      smRarity=r;
+      var btns=document.querySelectorAll('[data-sm-rarity]');
+      for(var i=0;i<btns.length;i++){ btns[i].style.outline=(btns[i].getAttribute('data-sm-rarity')===r)?'3px solid #ffd700':'none'; }
+      smRenderAll();
+    }
+    function smLoadFile(e){
+      var f=e.target.files&&e.target.files[0]; if(!f) return;
+      var r=new FileReader();
+      r.onload=function(ev){
+        var img=new Image();
+        img.onload=function(){ smImg=img; smScale=1; smOffX=0; smOffY=0; var z=document.getElementById('smZoom'); if(z){z.value=1; document.getElementById('smZoomVal').textContent='1.00';} smRenderAll(); };
+        img.src=ev.target.result;
+      };
+      r.readAsDataURL(f);
+    }
+    function smWheel(e){
+      if(!smImg) return;
+      var rect=document.getElementById('skinMakerCanvas').getBoundingClientRect();
+      var cardX=(e.clientX-rect.left)/SM_D, cardY=(e.clientY-rect.top)/SM_D;
+      var innerW=SM_W-2*smMargin, innerH=SM_H-2*smMargin;
+      var base=Math.max(innerW/smImg.width, innerH/smImg.height);
+      var dw=smImg.width*base*smScale, dh=smImg.height*base*smScale;
+      var cx=SM_W/2+smOffX, cy=SM_H/2+smOffY;
+      var dx=cx-dw/2, dy=cy-dh/2;
+      var localX=(cardX-dx)/dw*smImg.width, localY=(cardY-dy)/dh*smImg.height;
+      var factor=e.deltaY<0?1.12:0.89;
+      var ns=Math.min(6,Math.max(0.2,smScale*factor));
+      var ndw=smImg.width*base*ns, ndh=smImg.height*base*ns;
+      var ndx=cardX-localX/smImg.width*ndw, ndy=cardY-localY/smImg.height*ndh;
+      smOffX=(ndx+ndw/2)-SM_W/2;
+      smOffY=(ndy+ndh/2)-SM_H/2;
+      smScale=ns;
+      var z=document.getElementById('smZoom'); if(z){ z.value=ns; document.getElementById('smZoomVal').textContent=ns.toFixed(2); }
+      smRenderAll();
+    }
+    function smExportDataURL(){
+      var c=document.createElement('canvas'); c.width=SM_W; c.height=SM_H;
+      smRender(c.getContext('2d'),1);
+      return c.toDataURL('image/png');
+    }
+    function smDownload(){
+      if(!smImg){ smStatus('请先选择图片',true); return; }
+      var hero=document.getElementById('smHero').value.trim();
+      var label=document.getElementById('smLabel').value.trim();
+      var name=(label&&hero)?(label+'·'+hero):'skin';
+      var a=document.createElement('a'); a.href=smExportDataURL(); a.download=name+'.png'; a.click();
+      smStatus('已下载 '+name+'.png（如需直接入库请点"保存并登记"）');
+    }
+    function smInvoke(cmd,args){
+      if(window.__TAURI__&&window.__TAURI__.core&&window.__TAURI__.core.invoke) return window.__TAURI__.core.invoke(cmd,args);
+      return Promise.reject(new Error('NOT_TAURI'));
+    }
+    function smSave(){
+      var hero=document.getElementById('smHero').value.trim();
+      var label=document.getElementById('smLabel').value.trim();
+      if(!hero||!label){ smStatus('请填写英雄名和皮肤标签',true); return; }
+      if(!smImg){ smStatus('请先选择图片',true); return; }
+      var name=label+'·'+hero, file=name+'.png';
+      var base=document.getElementById('smBasePath').value.trim().replace(/[\\/]$/,'');
+      smStatus('保存中…');
+      smInvoke('write_binary_file',{file_path:base+'\\'+hero+'\\'+file, content_base64:smExportDataURL().split(',')[1]})
+        .then(function(){
+          return smInvoke('read_text_file_auto',{file_path:base+'\\registry.json'}).catch(function(){ return null; });
+        })
+        .then(function(regText){
+          if(!regText) throw new Error('registry 读取失败');
+          var reg=JSON.parse(regText);
+          reg.heroes=reg.heroes||{};
+          if(!reg.heroes[hero]) reg.heroes[hero]=[];
+          if(!reg.heroes[hero].some(function(s){return s.name===name;})){
+            reg.heroes[hero].push({name:name, file:file});
+            reg.updated=new Date().toISOString();
+          }
+          var regB64=btoa(unescape(encodeURIComponent(JSON.stringify(reg,null,2))));
+          return smInvoke('write_binary_file',{file_path:base+'\\registry.json', content_base64:regB64});
+        })
+        .then(function(){
+          smStatus('✅ 已保存 '+base+'\\'+hero+'\\'+file+' 并登记 registry.json（告诉我推送即可上线）');
+        })
+        .catch(function(err){
+          smStatus('保存失败：'+err.message+'（可能不在桌面App内，可改用"下载PNG"后交给我）',true);
+        });
+    }
+    function smInit(){
+      if(smInited) return; smInited=true;
+      var cv=document.getElementById('skinMakerCanvas');
+      if(cv) cv.addEventListener('wheel', function(e){ e.preventDefault(); smWheel(e); }, {passive:false});
+      var dragging=false, lx=0, ly=0;
+      if(cv){
+        cv.addEventListener('mousedown', function(e){ dragging=true; lx=e.clientX; ly=e.clientY; cv.style.cursor='grabbing'; });
+        cv.addEventListener('mousemove', function(e){
+          if(!dragging) return;
+          smOffX+=(e.clientX-lx)/SM_D; smOffY+=(e.clientY-ly)/SM_D; lx=e.clientX; ly=e.clientY; smRenderAll();
+        });
+        cv.addEventListener('mouseup', function(){ dragging=false; cv.style.cursor='grab'; });
+        cv.addEventListener('mouseleave', function(){ dragging=false; cv.style.cursor='grab'; });
+      }
+      var fi=document.getElementById('skinMakerFile'); if(fi) fi.addEventListener('change', smLoadFile);
+      var btns=document.querySelectorAll('[data-sm-rarity]');
+      for(var i=0;i<btns.length;i++){ btns[i].addEventListener('click', (function(b){ return function(){ smSetRarity(b.getAttribute('data-sm-rarity')); }; })(btns[i])); }
+      var z=document.getElementById('smZoom'); if(z) z.addEventListener('input', function(e){ smScale=parseFloat(e.target.value); document.getElementById('smZoomVal').textContent=smScale.toFixed(2); smRenderAll(); });
+      var m=document.getElementById('smMargin'); if(m) m.addEventListener('input', function(e){ smMargin=parseInt(e.target.value); document.getElementById('smMarginVal').textContent=smMargin; smRenderAll(); });
+      var rs=document.getElementById('smReset'); if(rs) rs.addEventListener('click', function(){ smScale=1; smOffX=0; smOffY=0; if(z){z.value=1; document.getElementById('smZoomVal').textContent='1.00';} smRenderAll(); });
+      var dl=document.getElementById('smDownload'); if(dl) dl.addEventListener('click', smDownload);
+      var sv=document.getElementById('smSave'); if(sv) sv.addEventListener('click', smSave);
+      var h=document.getElementById('smHero'), l=document.getElementById('smLabel');
+      if(h) h.addEventListener('input', smRenderAll);
+      if(l) l.addEventListener('input', smRenderAll);
+      smSetRarity('gold');
+    }
+    window.openSkinMaker=function(){
+      var ov=document.getElementById('skinMakerOverlay'); if(ov) ov.style.display='flex';
+      smInit(); smRenderAll();
+      smStatus('选择一张透明/干净立绘，滚轮缩放、拖拽移动，选好底色后保存。');
+    };
+    window.closeSkinMaker=function(){ var ov=document.getElementById('skinMakerOverlay'); if(ov) ov.style.display='none'; };
+  })();
+  </script>
 </body>
 </html>
