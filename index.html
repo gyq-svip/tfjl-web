@@ -18065,9 +18065,11 @@
 
         // 卡池皮肤铺满：基础卡 / 融合卡主卡用 .skin-layer cover 铺满卡牌，融合卡副卡用 .skin-layer-fused 小图
         // 全部基于全局预设（defaultCardSkins / heroSkinSelections / cloudFusions），跨项目保留
+        // 未设置过皮肤（"默认"）的卡，也显示皮肤库里的默认皮肤图（与英雄同名那张）
         async function updateCardPoolSkins() {
             if (typeof window.resolveHeroSkinUrl !== 'function') return;
             const cards = document.querySelectorAll('.collapsible-section .card-item');
+            const tasks = [];
             for (const card of cards) {
                 if (card.closest('#favoriteCardsGrid')) continue;
                 card.classList.remove('skin-bg');
@@ -18080,24 +18082,36 @@
                     const comps = (def.components && def.components.length >= 2) ? def.components : null;
                     if (!comps) continue;
                     const mainHero = comps[0], subHero = comps[1];
-                    const mainSkin = getHeroDefaultSkin(mainHero);
-                    if (mainSkin && mainSkin !== '默认') {
-                        const u = await window.resolveHeroSkinUrl(mainHero, mainSkin);
+                    tasks.push((async () => {
+                        const mainSkin = getHeroDefaultSkin(mainHero);
+                        const u = await resolvePoolSkinUrl(mainHero, mainSkin);
                         if (u) { card.classList.add('skin-bg'); card.style.backgroundImage = 'url("' + u + '")'; }
-                    }
-                    const subSkin = getHeroDefaultSkin(subHero);
-                    if (subSkin && subSkin !== '默认') {
-                        const u2 = await window.resolveHeroSkinUrl(subHero, subSkin);
-                        if (u2) addSkinThumb(card, u2, 'skin-layer-fused', subHero + '·' + subSkin);
-                    }
+                        const subSkin = getHeroDefaultSkin(subHero);
+                        const u2 = await resolvePoolSkinUrl(subHero, subSkin);
+                        if (u2) addSkinThumb(card, u2, 'skin-layer-fused', subHero + (subSkin && subSkin !== '默认' ? '·' + subSkin : ''));
+                    })());
                 } else {
-                    const skin = getCardSkin(card.dataset.id, cardName, 'my');
-                    if (skin && skin !== '默认') {
-                        const u = await window.resolveHeroSkinUrl(cardName, skin);
+                    tasks.push((async () => {
+                        const skin = getCardSkin(card.dataset.id, cardName, 'my');
+                        const u = await resolvePoolSkinUrl(cardName, skin);
                         if (u) { card.classList.add('skin-bg'); card.style.backgroundImage = 'url("' + u + '")'; }
-                    }
+                    })());
                 }
             }
+            await Promise.all(tasks);
+        }
+
+        // 卡池取皮肤图：未设置 / "默认" → 回退到皮肤库里与英雄同名的默认图（再兜底第一张）
+        // 显式空串 '' = 用户主动选择「不显示皮肤」，保持原样不铺图
+        async function resolvePoolSkinUrl(heroName, skin) {
+            if (skin === '') return null;
+            try {
+                if (!skin || skin === '默认') {
+                    return (await window.resolveHeroSkinUrl(heroName, heroName))
+                        || (await window.resolveHeroSkinUrl(heroName));
+                }
+                return await window.resolveHeroSkinUrl(heroName, skin);
+            } catch (e) { return null; }
         }
         function getHeroDefaultSkin(heroName) {
             // 英雄名 → cardId（卡池静态映射）→ defaultCardSkins，回退 heroSkinSelections（均为全局预设）
@@ -30325,7 +30339,7 @@ ${maSection}
     </div>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260804-155</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260804-156</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
