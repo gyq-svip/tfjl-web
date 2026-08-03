@@ -10235,6 +10235,7 @@
         <!-- 项目操作菜单（折叠） -->
         <div id="projectMenu" style="display:none;position:fixed;z-index:9998;background:rgba(40,40,70,0.98);border:1px solid rgba(255,215,0,0.3);border-radius:10px;padding:10px;min-width:200px;max-height:85vh;overflow-y:auto;box-shadow:0 4px 15px rgba(0,0,0,0.4);">
             <button onclick="exportCurrentProject()" title="把当前项目导出为 JSON 文件，可分享给别人导入（含卡牌皮肤与魔化，不含全局皮肤设置）" style="display:block;width:100%;background:linear-gradient(135deg,#26a69a,#00796b);color:#fff;border:none;padding:7px 12px;border-radius:7px;cursor:pointer;font-size:0.82rem;margin-bottom:4px;">📤 备份此项目</button>
+            <button onclick="shareProjectToWall()" title="把当前阵容项目分享到需求墙：对方只能智能导入或下载，不支持预览/导入到老马" style="display:block;width:100%;background:linear-gradient(135deg,#9c27b0,#7b1fa2);color:#fff;border:none;padding:7px 12px;border-radius:7px;cursor:pointer;font-size:0.82rem;margin-bottom:4px;">📢 分享阵容到需求墙</button>
             <button onclick="importSingleProject()" title="从 JSON 文件导入单个项目（别人分享给你的项目文件）" style="display:block;width:100%;background:linear-gradient(135deg,#66bb6a,#388e3c);color:#fff;border:none;padding:7px 12px;border-radius:7px;cursor:pointer;font-size:0.82rem;margin-bottom:4px;">📥 恢复项目</button>
             <button onclick="renameProject()" title="重命名当前项目" style="display:block;width:100%;background:linear-gradient(135deg,#ff9800,#f57c00);color:white;border:none;padding:7px 12px;border-radius:7px;cursor:pointer;font-size:0.82rem;margin-bottom:4px;">✏️ 重命名项目</button>
             <button onclick="deleteCurrentProject()" title="删除当前项目（不可恢复）" style="display:block;width:100%;background:linear-gradient(135deg,#f44336,#c62828);color:white;border:none;padding:7px 12px;border-radius:7px;cursor:pointer;font-size:0.82rem;margin-bottom:4px;">🗑️ 删除项目</button>
@@ -10543,6 +10544,107 @@
         }
 
         // （已移除"备份到软件临时区"：默认项目统一由远程 projects/wangcheng-dipin.json 分发，启动时拉取并缓存到本地 IndexedDB，无需用户手动备份）
+
+        // 分享当前阵容项目到需求墙（整项目 JSON，接收方只能智能导入/下载，不支持预览/导入到老马）
+        // 复用与脚本分享一致的 Gist 上传 + 加密 + 需求墙消息机制
+        async function shareProjectToWall() {
+            const projectName = (document.getElementById('projectSelector1') && document.getElementById('projectSelector1').value) || currentProjectName;
+            if (!projectName) { alert('请先选择一个项目！'); return; }
+
+            const cat = currentProjectCategory || '默认分类';
+            let project = null;
+            try {
+                const all = await loadProjectListFromDB();
+                project = all.find(p => p.name === projectName && (p.category || '默认分类') === cat) || all.find(p => p.name === projectName);
+            } catch (e) { project = null; }
+            if (!project) { alert('未找到该项目：' + projectName); return; }
+
+            // 强需求：分享前必须设置昵称
+            const nick = await ensureNickname();
+            if (!nick) { alert('分享阵容需要先设置昵称（昵称仅用于发言/分享展示，设置后不可自行修改）'); return; }
+
+            if (!getGistToken()) { alert('离线版暂不支持分享，请切换到在线版'); return; }
+
+            // 【关键安全】分享前先加载历史消息，避免覆盖
+            if (wallMessages.length === 0) {
+                try { await fetchMessages(); } catch (e) { console.warn('预加载消息失败:', e); }
+            }
+
+            const now = new Date();
+            const defaultName = `塔防阵容_${projectName}_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
+            const inputName = prompt('请输入分享阵容文件名（不含扩展名）：', defaultName);
+            if (!inputName) return;
+            const fileName = inputName.endsWith('.json') ? inputName : inputName + '.json';
+
+            // 分享选项弹窗（时长 + 密码），与脚本分享一致
+            const shareOpts = await new Promise(function(resolve) { showShareOptionsDialog(function(e, p, rk) { resolve([e, p, rk]); }); });
+            if (shareOpts === null || shareOpts[0] === null) return;
+            const expireMinutes = shareOpts[0];
+            const sharePassword = shareOpts[1];
+            const recoveryKey = shareOpts[2] || '';
+
+            try {
+                const token = getGistToken();
+                // 序列化整项目（与导出备份同一格式，接收方智能导入可直接识别）
+                const exportData = { type: 'tower-defense-project', version: '1.0', exportDate: new Date().toISOString(), project: project };
+                let uploadContent = JSON.stringify(exportData, null, 2);
+                let passwordHash = null;
+                const willEncrypt = !!(sharePassword || recoveryKey);
+                if (willEncrypt) {
+                    uploadContent = recoveryKey ? await encryptContentB(uploadContent, sharePassword, recoveryKey) : await encryptContent(uploadContent, sharePassword);
+                    passwordHash = await hashPassword(sharePassword || '');
+                }
+
+                const response = await fetch('https://api.github.com/gists', {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json',
+                        'Authorization': `token ${token}`
+                    },
+                    body: JSON.stringify({
+                        description: `阵容分享: ${fileName}` + (willEncrypt ? ' [加密]' : ''),
+                        public: true,
+                        files: { [fileName]: { content: uploadContent } }
+                    })
+                });
+
+                if (!response.ok) throw new Error('上传失败');
+                const data = await response.json();
+                const scriptUrl = data.files[fileName]?.raw_url || `https://gist.githubusercontent.com/${data.id}/raw/${encodeURIComponent(fileName)}`;
+
+                const nickname = localStorage.getItem('TFJL_UserName') || '匿名用户';
+                const content = `分享阵容: ${fileName}\n${scriptUrl}`;
+                const newMsg = {
+                    content: content,
+                    author: nickname,
+                    time: Date.now(),
+                    scriptUrl: scriptUrl,
+                    expireMinutes: expireMinutes > 0 ? expireMinutes : null,
+                    isEncrypted: !!willEncrypt,
+                    shareType: 'project'
+                };
+                if (passwordHash) newMsg.passwordHash = passwordHash;
+                if (recoveryKey) newMsg.encScheme = 'B';
+
+                wallMessages.unshift(newMsg);
+                if (wallMessages.length > MAX_MESSAGES) {
+                    wallMessages = wallMessages.slice(0, MAX_MESSAGES);
+                }
+
+                await saveMessagesToGist();
+                renderMessages();
+                if (sharePassword || recoveryKey) {
+                    showPasswordReminder(fileName, sharePassword, '阵容已分享', recoveryKey);
+                } else {
+                    showToast('✅ 阵容已分享到需求墙！');
+                }
+                document.getElementById('projectMenu').style.display = 'none';
+            } catch (err) {
+                console.error('分享失败:', err);
+                alert('分享失败: ' + err.message);
+            }
+        }
 
         // 导出当前项目到数据盘（固化成"所有人默认项目"用）：D:\withfriends\塔防精灵助手数据\projects\王城低配版.json
         async function exportCurrentProjectToDataDisk() {
@@ -24181,7 +24283,16 @@ function hasGistToken() {
                     const isBackup = msg.shareType === 'backup' || msg.scriptUrl.includes('backup') || contentHtml.includes('备份') || contentHtml.includes('项目') || isJsonFile;
                     const encInfo2 = msg.isEncrypted ? `,true,'${(msg.passwordHash || '').replace(/'/g,"\\'")}'` : `,false,''`;
                     
-                    if (isBackup) {
+                    if (msg.shareType === 'project') {
+                        // 阵容项目分享：整项目 JSON，只支持「智能导入」+「下载」，不支持预览/导入到老马
+                        contentHtml = contentHtml.replace(
+                            msg.scriptUrl,
+                            `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+                                <a href="javascript:void(0)" onclick="importScriptToTxtFiles('${msg.scriptUrl}'${encInfo2})" style="color:#4caf50;text-decoration:underline;cursor:pointer;background:rgba(76,175,80,0.1);padding:4px 10px;border-radius:5px;font-size:0.8rem;">📄 智能导入</a>
+                                <a href="javascript:void(0)" onclick="downloadScript('${msg.scriptUrl}'${encInfo2})" style="color:#4fc3f7;text-decoration:underline;cursor:pointer;background:rgba(79,195,247,0.1);padding:4px 10px;border-radius:5px;font-size:0.8rem;">📥 下载</a>
+                            </div>`
+                        );
+                    } else if (isBackup) {
                         contentHtml = contentHtml.replace(
                             msg.scriptUrl,
                             `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
@@ -30046,7 +30157,7 @@ ${maSection}
     </div>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260803-142</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260803-143</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
