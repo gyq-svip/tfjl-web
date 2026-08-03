@@ -16418,7 +16418,7 @@
             } catch (e) {}
         }
 
-        // 解析被融合卡显示源：默认直接用【副卡当前皮肤的整图】缩成右下角小图（缩小版整图，不切、不透明、皮肤正常）
+        // 解析被融合卡显示源：默认用【副卡当前皮肤的整图】做左上角斜切半张(与卡池一致，无需上传)
         // 仅当云端有管理员上传的 融合XX 透明徽章时，才用预切满铺式徽章(isBadge:true)
         async function resolveFusionHalf(fusedHero, el) {
             if (!fusedHero) return null;
@@ -16474,7 +16474,7 @@
             }
         }
 
-        // 手牌：主卡整皮(底层) + 被融合卡右下角徽章(上层缩放约1/4)
+        // 手牌：主卡整皮(底层) + 被融合卡左上斜切半张(上层)
         function applyFusionSkinToHandCard(card, mainUrl, fusedUrl, fusedIsBadge) {
             if (!card) return;
             card.classList.add('skin-bg');
@@ -16494,10 +16494,10 @@
                     overlay.className = 'hand-skin-fused';
                     card.insertBefore(overlay, base.nextSibling);
                 }
-                // isBadge:预切PNG(透明底+角落已含被融合卡)→满铺；否则整图→右下角缩小版整图直显
+                // isBadge:预切PNG(透明底+角落已含被融合卡)→满铺；否则副卡整图→左上角斜切半张(与卡池一致)
                 overlay.style.cssText = fusedIsBadge
                     ? 'position:absolute;inset:0;width:100%;height:100%;object-fit:contain;border-radius:inherit;z-index:1;pointer-events:none;'
-                    : 'position:absolute;right:2px;bottom:2px;width:42%;height:58%;object-fit:contain;border-radius:4px;z-index:2;pointer-events:none;background:rgba(0,0,0,0.25);';
+                    : 'position:absolute;left:3px;top:3px;width:52%;height:52%;object-fit:cover;border-radius:4px;z-index:2;pointer-events:none;clip-path:polygon(0 0,90% 0,0 90%);';
                 if (overlay.src !== fusedUrl) overlay.src = fusedUrl;
             } else if (overlay && overlay.parentNode) {
                 overlay.remove();
@@ -16543,10 +16543,10 @@
                         }
                     });
                 }
-                // isBadge:预切PNG(透明底+角落已含被融合卡)→满铺；否则整图→右下角缩小版整图直显
+                // isBadge:预切PNG(透明底+角落已含被融合卡)→满铺；否则副卡整图→左上角斜切半张(与卡池一致)
                 overlay.style.cssText = fusedIsBadge
                     ? 'position:absolute;inset:3px;width:calc(100% - 6px);height:calc(100% - 6px);object-fit:contain;border-radius:5px;z-index:1;pointer-events:none;'
-                    : 'position:absolute;right:3px;bottom:3px;width:42%;height:58%;object-fit:contain;border-radius:4px;z-index:2;pointer-events:none;background:rgba(0,0,0,0.25);';
+                    : 'position:absolute;left:3px;top:3px;width:52%;height:52%;object-fit:cover;border-radius:4px;z-index:2;pointer-events:none;clip-path:polygon(0 0,90% 0,0 90%);';
                 if (overlay.src !== fusedUrl) overlay.src = fusedUrl;
             } else if (overlay && overlay.parentNode) {
                 overlay.remove();
@@ -18725,7 +18725,7 @@
             slot.classList.remove('skin-bg');
             if (!heroName) { console.log('[SKIN] No heroName, returning'); return; }
 
-            // 融合卡：主卡整皮(底层) + 被融合卡右下角徽章(上层)
+            // 融合卡：主卡整皮(底层) + 被融合卡左上斜切半张(上层)
             if (fusionSkinSplitEnabled) {
                 const parts = getFusionParts(heroName);
                 if (parts && parts.length >= 2) {
@@ -30483,7 +30483,7 @@ ${maSection}
     </div>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260804-172</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260804-173</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
