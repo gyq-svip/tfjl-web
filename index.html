@@ -1105,9 +1105,9 @@
             font-weight: bold;
             text-shadow: 0 1px 3px rgba(0,0,0,0.95), 0 0 5px rgba(0,0,0,0.85);
         }
-        /* 融合卡主卡：缩小并右下对齐，与左上斜切的副卡沿对角线互补错开 */
+        /* 融合卡主卡：缩小并右下对齐，与左上斜切的副卡沿对角线排列（中间留分隔阴影） */
         .collapsible-section .card-item[data-fusion="true"].skin-bg {
-            background-size: 82% auto !important;
+            background-size: 62% auto !important;
             background-position: right bottom !important;
         }
         /* 融合卡副卡皮：斜切取左上半 + 缩小放主卡左上角（主卡铺满更大面积，副卡显示斜切半张） */
@@ -1115,13 +1115,13 @@
             position: absolute;
             left: 2px;
             top: 2px;
-            width: 82%;
-            height: 82%;
+            width: 62%;
+            height: 62%;
             border-radius: 4px;
             object-fit: cover;
             pointer-events: none;
             z-index: 3;
-            clip-path: polygon(0 0, 90% 0, 0 90%);
+            clip-path: polygon(0 0, 100% 0, 0 100%);
             filter: drop-shadow(1px 1px 3px rgba(0,0,0,0.6));
         }
 
@@ -16489,10 +16489,10 @@
                 base.className = 'hand-skin-layer';
                 card.insertBefore(base, card.firstChild);
             }
-            // 有副卡时主卡缩小并右下对齐(与左上斜切副卡互补)；无副卡时铺满。
+            // 有副卡时主卡缩小到~62% 并右下对齐（与左上斜切副卡对角排列，中间留分隔阴影线）
             // ⚠️ 必须每次都设置：复用已有节点时若只在创建时设样式，切换融合/非融合不会更新
             base.style.cssText = (fusedUrl && !fusedIsBadge)
-                ? 'position:absolute;right:0;bottom:0;width:82%;height:82%;object-fit:cover;border-radius:4px;z-index:0;pointer-events:none;'
+                ? 'position:absolute;right:0;bottom:0;width:62%;height:62%;object-fit:cover;border-radius:4px;z-index:0;pointer-events:none;'
                 : 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit;z-index:0;pointer-events:none;';
             if (mainUrl && base.src !== mainUrl) base.src = mainUrl;
             if (!mainUrl && base.parentNode) base.remove();
@@ -16506,7 +16506,7 @@
                 // isBadge:预切PNG(透明底+角落已含被融合卡)→满铺；否则副卡整图→左上角斜切半张(与卡池一致)
                 overlay.style.cssText = fusedIsBadge
                     ? 'position:absolute;inset:0;width:100%;height:100%;object-fit:contain;border-radius:inherit;z-index:1;pointer-events:none;'
-                    : 'position:absolute;left:3px;top:3px;width:82%;height:82%;object-fit:cover;border-radius:4px;z-index:2;pointer-events:none;clip-path:polygon(0 0,90% 0,0 90%);';
+                    : 'position:absolute;left:3px;top:3px;width:62%;height:62%;object-fit:cover;border-radius:4px;z-index:2;pointer-events:none;clip-path:polygon(0 0,100% 0,0 100%);';
                 if (overlay.src !== fusedUrl) overlay.src = fusedUrl;
             } else if (overlay && overlay.parentNode) {
                 overlay.remove();
@@ -16522,10 +16522,10 @@
                 base.className = 'skin-layer';
                 slot.insertBefore(base, slot.firstChild);
             }
-            // 有副卡时主卡缩小并右下对齐(与左上斜切副卡互补)；无副卡时铺满。
+            // 有副卡时主卡缩小到~62% 并右下对齐（与左上斜切副卡对角排列，中间留分隔阴影线）
             // ⚠️ 必须每次都设置，理由同手牌
             base.style.cssText = (fusedUrl && !fusedIsBadge)
-                ? 'position:absolute;right:3px;bottom:3px;width:82%;height:82%;object-fit:cover;border-radius:5px;z-index:0;pointer-events:none;'
+                ? 'position:absolute;right:3px;bottom:3px;width:62%;height:62%;object-fit:cover;border-radius:5px;z-index:0;pointer-events:none;'
                 : 'position:absolute;inset:3px;width:calc(100% - 6px);height:calc(100% - 6px);object-fit:contain;object-position:center center;border-radius:5px;border:2px solid rgba(255,255,255,0.25);box-shadow:inset 0 0 8px rgba(0,0,0,0.3);z-index:0;pointer-events:none;';
             if (mainUrl && base.src !== mainUrl) base.src = mainUrl;
             if (!mainUrl && base.parentNode) base.remove();
@@ -16559,7 +16559,7 @@
                 // isBadge:预切PNG(透明底+角落已含被融合卡)→满铺；否则副卡整图→左上角斜切半张(与卡池一致)
                 overlay.style.cssText = fusedIsBadge
                     ? 'position:absolute;inset:3px;width:calc(100% - 6px);height:calc(100% - 6px);object-fit:contain;border-radius:5px;z-index:1;pointer-events:none;'
-                    : 'position:absolute;left:3px;top:3px;width:82%;height:82%;object-fit:cover;border-radius:4px;z-index:2;pointer-events:none;clip-path:polygon(0 0,90% 0,0 90%);';
+                    : 'position:absolute;left:3px;top:3px;width:62%;height:62%;object-fit:cover;border-radius:4px;z-index:2;pointer-events:none;clip-path:polygon(0 0,100% 0,0 100%);';
                 if (overlay.src !== fusedUrl) overlay.src = fusedUrl;
             } else if (overlay && overlay.parentNode) {
                 overlay.remove();
@@ -30500,7 +30500,7 @@ ${maSection}
     </div>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260804-182</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260804-183</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
