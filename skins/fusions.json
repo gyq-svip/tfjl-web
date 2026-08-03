@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated": "2026-08-02T22:48:07.603Z",
+  "updated": "2026-08-03T01:15:08.314Z",
   "note": "融合卡定义：components 为参与融合的2张基础卡。",
   "fusions": {
     "火炮射线": {
@@ -89,6 +89,14 @@
         "冰骑"
       ],
       "profession": "牧师",
+      "quality": "金"
+    },
+    "潜艇射线": {
+      "components": [
+        "潜艇",
+        "射线"
+      ],
+      "profession": "工程",
       "quality": "金"
     }
   }
