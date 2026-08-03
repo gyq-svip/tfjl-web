@@ -1105,41 +1105,27 @@
             font-weight: bold;
             text-shadow: 0 1px 3px rgba(0,0,0,0.95), 0 0 5px rgba(0,0,0,0.85);
         }
-        /* ===== 融合卡拼图：容器铺稀有度渐变底(JS 设置) + 主卡右下 + 副卡左上(切角) ===== */
-        /* 尺寸/切角与 JS 常量 FUSION_SIZE / FUSION_SUB_CLIP 保持一致，改大小两处都要改 */
+        /* ===== 融合卡：主卡满铺当背景 + 副卡缩小放左上角圆图（带白边框） ===== */
+        /* 尺寸与 JS 常量 FUSION_SIZE 保持一致，改大小只动一处 */
         .collapsible-section .card-item[data-fusion="true"] {
             background-size: cover;
             background-position: center;
         }
-        /* 融合卡主卡：缩小放右下，完整矩形 + 白描边
-           ⚠️ 卡池卡名是裸文本节点(无法加 z-index)，两张图必须用负 z-index：
-              负 z 会画在卡片自身背景之上、行内文字之下 → 渐变底+两张图都可见，卡名不被挡 */
-        .collapsible-section .card-item .skin-layer-main-fused {
-            position: absolute;
-            right: 2px;
-            bottom: 2px;
-            width: 60%;
-            height: 60%;
-            border-radius: 4px;
-            object-fit: cover;
-            pointer-events: none;
-            z-index: -2;
-            box-shadow: 0 0 0 1px rgba(255,255,255,0.7), 1px 1px 4px rgba(0,0,0,0.5);
-        }
-        /* 融合卡副卡：缩小放左上，右下角切 45° 斜角让出主卡，形成斜线分隔 */
+        /* 融合卡副卡：左上角小圆图 + 白边框（filter:drop-shadow 不会被 background-image 裁掉） */
         .collapsible-section .card-item .skin-layer-fused {
             position: absolute;
             left: 2px;
             top: 2px;
-            width: 60%;
-            height: 60%;
-            border-radius: 4px;
+            width: 38%;
+            height: auto;
+            aspect-ratio: 1 / 1;          /* 锁死正方形，配合 max-height 防止把卡牌撑变形 */
+            max-height: 80%;
+            border-radius: 50%;           /* 圆形，跟参考图一致 */
             object-fit: cover;
             pointer-events: none;
-            z-index: -1;
-            clip-path: polygon(0 0, 100% 0, 100% 50%, 50% 100%, 0 100%);
-            /* clip-path 会裁掉 box-shadow，描边只能用 drop-shadow 才贴合斜角 */
-            filter: drop-shadow(0 0 1px rgba(255,255,255,0.85)) drop-shadow(1px 1px 3px rgba(0,0,0,0.55));
+            z-index: 2;
+            /* drop-shadow 不会撑大盒子，描边干净贴合圆形 */
+            filter: drop-shadow(0 0 1.5px #fff) drop-shadow(0 0 2px rgba(0,0,0,0.6));
         }
 
         @keyframes gradientShift {
@@ -16496,120 +16482,95 @@
             }
         }
 
-        // ==================== 融合卡拼图布局（统一配置）====================
-        // 思路：容器铺稀有度渐变底 → 副卡缩小放左上(右下角切45°斜角) → 主卡缩小放右下(完整矩形)
-        // 斜角让出主卡左上，形成清晰斜线分隔；四周露出的底色即稀有度颜色，两张卡都完整可辨。
-        const FUSION_RARITY_BG = {
-            gold:   'linear-gradient(135deg,#ffd86b,#c8862a)',
-            purple: 'linear-gradient(135deg,#c79bff,#6a2db0)',
-            blue:   'linear-gradient(135deg,#9bd0ff,#2d6db0)',
-            green:  'linear-gradient(135deg,#aef0b0,#2d9e3a)'
-        };
-        const FUSION_SIZE = '60%';                                        // 单张卡占比，调大小改这里
-        const FUSION_SUB_CLIP = 'polygon(0 0,100% 0,100% 50%,50% 100%,0 100%)'; // 副卡右下角切斜角
-        function getFusionRarityBg(rarity) { return FUSION_RARITY_BG[rarity] || FUSION_RARITY_BG.gold; }
-        // clip-path 会裁掉 box-shadow，描边必须用 drop-shadow 才能贴合斜角
-        const FUSION_SUB_FILTER = 'drop-shadow(0 0 1px rgba(255,255,255,0.85)) drop-shadow(1px 1px 3px rgba(0,0,0,0.55))';
+// ==================== 融合卡（统一配置）====================
+// 思路：主卡满铺当背景（与基础卡一致），副卡缩小放左上角圆形小图（带白边）。
+// 改大小只动 FUSION_SIZE 一处，CSS+三处 JS 全靠它。
+const FUSION_SIZE = '38%';                                        // 副卡直径，调大小改这里
 
-        // 手牌：稀有度底 + 副卡左上(切角) + 主卡右下
-        function applyFusionSkinToHandCard(card, mainUrl, fusedUrl, fusedIsBadge) {
-            if (!card) return;
-            card.classList.add('skin-bg');
-            const isFusedLayout = !!(fusedUrl && !fusedIsBadge);
-            // 拼图模式下铺稀有度渐变底（两张缩小的卡之间露出的就是它）
-            card.style.background = isFusedLayout ? getFusionRarityBg(card.dataset.type) : '';
-            let base = card.querySelector('.hand-skin-layer');
-            if (!base) {
-                base = document.createElement('img');
-                base.className = 'hand-skin-layer';
-                card.insertBefore(base, card.firstChild);
-            }
-            // 拼图模式：主卡缩小放右下；否则铺满。
-            // ⚠️ 必须每次都设置：复用已有节点时若只在创建时设样式，切换融合/非融合不会更新
-            base.style.cssText = isFusedLayout
-                ? 'position:absolute;right:2px;bottom:2px;width:' + FUSION_SIZE + ';height:' + FUSION_SIZE + ';object-fit:cover;border-radius:4px;z-index:1;pointer-events:none;box-shadow:0 0 0 1px rgba(255,255,255,0.7),1px 1px 4px rgba(0,0,0,0.5);'
-                : 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit;z-index:0;pointer-events:none;';
-            if (mainUrl && base.src !== mainUrl) base.src = mainUrl;
-            if (!mainUrl && base.parentNode) base.remove();
-            let overlay = card.querySelector('.hand-skin-fused');
-            if (fusedUrl) {
-                if (!overlay) {
-                    overlay = document.createElement('img');
-                    overlay.className = 'hand-skin-fused';
-                    card.insertBefore(overlay, base.nextSibling);
-                }
-                // isBadge:预切PNG(透明底+角落已含被融合卡)→满铺；否则副卡缩小放左上+右下角切斜角
-                overlay.style.cssText = fusedIsBadge
-                    ? 'position:absolute;inset:0;width:100%;height:100%;object-fit:contain;border-radius:inherit;z-index:1;pointer-events:none;'
-                    : 'position:absolute;left:2px;top:2px;width:' + FUSION_SIZE + ';height:' + FUSION_SIZE + ';object-fit:cover;border-radius:4px;z-index:2;pointer-events:none;clip-path:' + FUSION_SUB_CLIP + ';filter:' + FUSION_SUB_FILTER + ';';
-                if (overlay.src !== fusedUrl) overlay.src = fusedUrl;
-            } else if (overlay && overlay.parentNode) {
-                overlay.remove();
-            }
+// 手牌：主卡满铺当背景 + 副卡左上角圆图（带白边）
+function applyFusionSkinToHandCard(card, mainUrl, fusedUrl, fusedIsBadge) {
+    if (!card) return;
+    card.classList.add('skin-bg');
+    const isFusedLayout = !!(fusedUrl && !fusedIsBadge);
+    // 主卡按普通卡处理：满铺背景（无稀有度渐变）
+    if (mainUrl) {
+        card.style.backgroundImage = 'url("' + mainUrl + '")';
+        card.style.background = '';
+    } else {
+        card.style.backgroundImage = '';
+        card.style.background = '';
+    }
+    let base = card.querySelector('.hand-skin-layer');
+    if (base) { base.remove(); }   // 新方案：主卡用 backgroundImage，不再需要 img 层
+    let overlay = card.querySelector('.hand-skin-fused');
+    if (fusedUrl) {
+        if (!overlay) {
+            overlay = document.createElement('img');
+            overlay.className = 'hand-skin-fused';
+            // 插在 card-name 后面，确保名字在副卡之上
+            card.appendChild(overlay);
         }
+        // isBadge:预切PNG(透明底+角落已含被融合卡)→满铺；否则副卡缩成圆图放左上白边框
+        overlay.style.cssText = fusedIsBadge
+            ? 'position:absolute;inset:0;width:100%;height:100%;object-fit:contain;border-radius:inherit;z-index:1;pointer-events:none;'
+            : 'position:absolute;left:2px;top:2px;width:' + FUSION_SIZE + ';height:auto;aspect-ratio:1/1;max-height:80%;border-radius:50%;object-fit:cover;z-index:2;pointer-events:none;filter:drop-shadow(0 0 1.5px #fff) drop-shadow(0 0 2px rgba(0,0,0,0.6));';
+        if (overlay.src !== fusedUrl) overlay.src = fusedUrl;
+    } else if (overlay && overlay.parentNode) {
+        overlay.remove();
+    }
+}
 
-        // 槽位：稀有度底 + 副卡左上(切角) + 主卡右下
-        function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
-            if (!slot) return;
-            const isFusedLayout = !!(fusedUrl && !fusedIsBadge);
-            // 拼图模式下铺稀有度渐变底（槽位稀有度需用 cardId 反查，slot.dataset.type 是槽位类型不是稀有度）
-            if (isFusedLayout) {
-                let _r = 'gold';
-                try { if (slot.dataset.cardId && typeof findCardTypeById === 'function') _r = findCardTypeById(slot.dataset.cardId) || 'gold'; } catch (e) {}
-                slot.style.background = getFusionRarityBg(_r);
-            } else {
-                slot.style.background = '';
-            }
-            let base = slot.querySelector('.skin-layer');
-            if (!base) {
-                base = document.createElement('img');
-                base.className = 'skin-layer';
-                slot.insertBefore(base, slot.firstChild);
-            }
-            // 拼图模式：主卡缩小放右下；否则铺满。
-            // ⚠️ 必须每次都设置，理由同手牌
-            base.style.cssText = isFusedLayout
-                ? 'position:absolute;right:4px;bottom:4px;width:' + FUSION_SIZE + ';height:' + FUSION_SIZE + ';object-fit:cover;border-radius:5px;z-index:1;pointer-events:none;box-shadow:0 0 0 1px rgba(255,255,255,0.7),1px 1px 4px rgba(0,0,0,0.5);'
-                : 'position:absolute;inset:3px;width:calc(100% - 6px);height:calc(100% - 6px);object-fit:contain;object-position:center center;border-radius:5px;border:2px solid rgba(255,255,255,0.25);box-shadow:inset 0 0 8px rgba(0,0,0,0.3);z-index:0;pointer-events:none;';
-            if (mainUrl && base.src !== mainUrl) base.src = mainUrl;
-            if (!mainUrl && base.parentNode) base.remove();
-            let overlay = slot.querySelector('.skin-layer-fused');
-            if (fusedUrl) {
-                if (!overlay) {
-                    overlay = document.createElement('img');
-                    overlay.className = 'skin-layer-fused';
-                    slot.insertBefore(overlay, base.nextSibling);
-                    overlay.style.cursor = 'pointer';
-                    overlay.title = '点击切换被融合卡(徽章)皮肤';
-                    overlay.addEventListener('click', async (ev) => {
-                        ev.stopPropagation(); ev.preventDefault();
-                        const slotEl = overlay.closest('.battle-slot');
-                        if (!slotEl) return;
-                        const sid = slotEl.dataset.slot;
-                        const isUser = sid && sid.startsWith('u');
-                        const arr = isUser ? myPlacedCards : teammatePlacedCards;
-                        const c = arr.find(x => x.slot === sid);
-                        const hn = c ? c.name : '';
-                        const parts = (typeof getFusionParts === 'function') ? getFusionParts(hn) : null;
-                        if (parts && parts.length >= 2) {
-                            await cycleFusionFusedSkin(parts[1], sid);
-                            try { await applySkinBgToSlot(slotEl, hn); } catch (e) {}
-                            const _ht = isUser ? 'my' : 'teammate';
-                            const hc = document.querySelector('#' + (_ht === 'my' ? 'myHandContainer' : 'teammateHandContainer') + ' .selected-card[data-id="' + c.id + '"]');
-                            if (hc) { try { await reapplySingleHandCard(hc, c.id, _ht); } catch (e) {} }
-                        }
-                    });
+// 槽位：主卡满铺当背景 + 副卡左上角圆图（带白边）
+function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
+    if (!slot) return;
+    const isFusedLayout = !!(fusedUrl && !fusedIsBadge);
+    // 主卡按普通卡处理：满铺背景（无稀有度渐变）
+    if (mainUrl) {
+        slot.style.backgroundImage = 'url("' + mainUrl + '")';
+        slot.style.background = '';
+    } else {
+        slot.style.backgroundImage = '';
+        slot.style.background = '';
+    }
+    let base = slot.querySelector('.skin-layer');
+    if (base) { base.remove(); }   // 新方案：主卡用 backgroundImage，不再需要 img 层
+    let overlay = slot.querySelector('.skin-layer-fused');
+    if (fusedUrl) {
+        if (!overlay) {
+            overlay = document.createElement('img');
+            overlay.className = 'skin-layer-fused';
+            slot.appendChild(overlay);
+            overlay.style.cursor = 'pointer';
+            overlay.title = '点击切换被融合卡(徽章)皮肤';
+            overlay.addEventListener('click', async (ev) => {
+                ev.stopPropagation(); ev.preventDefault();
+                const slotEl = overlay.closest('.battle-slot');
+                if (!slotEl) return;
+                const sid = slotEl.dataset.slot;
+                const isUser = sid && sid.startsWith('u');
+                const arr = isUser ? myPlacedCards : teammatePlacedCards;
+                const c = arr.find(x => x.slot === sid);
+                const hn = c ? c.name : '';
+                const parts = (typeof getFusionParts === 'function') ? getFusionParts(hn) : null;
+                if (parts && parts.length >= 2) {
+                    await cycleFusionFusedSkin(parts[1], sid);
+                    try { await applySkinBgToSlot(slotEl, hn); } catch (e) {}
+                    const _ht = isUser ? 'my' : 'teammate';
+                    const hc = document.querySelector('#' + (_ht === 'my' ? 'myHandContainer' : 'teammateHandContainer') + ' .selected-card[data-id="' + c.id + '"]');
+                    if (hc) { try { await reapplySingleHandCard(hc, c.id, _ht); } catch (e) {} }
                 }
-                // isBadge:预切PNG(透明底+角落已含被融合卡)→满铺；否则副卡整图→左上角斜切半张(与卡池一致)
-                overlay.style.cssText = fusedIsBadge
-                    ? 'position:absolute;inset:3px;width:calc(100% - 6px);height:calc(100% - 6px);object-fit:contain;border-radius:5px;z-index:1;pointer-events:none;'
-                    : 'position:absolute;left:4px;top:4px;width:' + FUSION_SIZE + ';height:' + FUSION_SIZE + ';object-fit:cover;border-radius:5px;z-index:2;cursor:pointer;clip-path:' + FUSION_SUB_CLIP + ';filter:' + FUSION_SUB_FILTER + ';';
-                if (overlay.src !== fusedUrl) overlay.src = fusedUrl;
-            } else if (overlay && overlay.parentNode) {
-                overlay.remove();
-            }
-            if (mainUrl || fusedUrl) slot.classList.add('skin-bg');
+            });
         }
+        // isBadge:预切PNG(透明底+角落已含被融合卡)→满铺；否则副卡缩成圆图放左上白边框
+        overlay.style.cssText = fusedIsBadge
+            ? 'position:absolute;inset:3px;width:calc(100% - 6px);height:calc(100% - 6px);object-fit:contain;border-radius:5px;z-index:1;pointer-events:none;'
+            : 'position:absolute;left:4px;top:4px;width:' + FUSION_SIZE + ';height:auto;aspect-ratio:1/1;max-height:80%;border-radius:50%;object-fit:cover;z-index:2;cursor:pointer;filter:drop-shadow(0 0 1.5px #fff) drop-shadow(0 0 2px rgba(0,0,0,0.6));';
+        if (overlay.src !== fusedUrl) overlay.src = fusedUrl;
+    } else if (overlay && overlay.parentNode) {
+        overlay.remove();
+    }
+    if (mainUrl || fusedUrl) slot.classList.add('skin-bg');
+}
 
         // 开关：默认开启，可一键关
         // ==================== 卡组管理（管理员·仅桌面端）===================
@@ -18209,7 +18170,7 @@
                 card.classList.remove('skin-bg');
                 card.style.backgroundImage = '';
                 card.style.background = '';
-                card.querySelectorAll('.card-skin-thumb, .card-skin-thumb-fused, .skin-layer-fused, .skin-layer-main-fused').forEach(e => e.remove());
+                card.querySelectorAll('.card-skin-thumb, .card-skin-thumb-fused, .skin-layer-fused').forEach(e => e.remove());
                 const cardName = card.dataset.name || '';
                 if (!cardName) continue;
                 if (card.dataset.fusion === 'true') {
@@ -18223,10 +18184,10 @@
                         const subSkin = getHeroDefaultSkin(subHero);
                         const u2 = await resolvePoolSkinUrl(subHero, subSkin);
                         if (u && u2) {
-                            // 拼图模式：容器铺稀有度渐变底，主卡缩小右下、副卡缩小左上(切角)，都用 img 层
-                            card.classList.add('skin-bg');   // 只为拿白字+描边，背景由下面的渐变覆盖
-                            card.style.background = getFusionRarityBg(card.dataset.type);
-                            addSkinThumb(card, u, 'skin-layer-main-fused', mainHero + (mainSkin && mainSkin !== '默认' ? '·' + mainSkin : ''));
+                            // 新方案：主卡满铺当背景（与基础卡一致），副卡缩成圆图放左上角白边框
+                            card.classList.add('skin-bg');
+                            card.style.backgroundImage = 'url("' + u + '")';
+                            card.style.background = '';
                             addSkinThumb(card, u2, 'skin-layer-fused', subHero + (subSkin && subSkin !== '默认' ? '·' + subSkin : ''));
                         } else if (u) {
                             // 只有主卡图 → 退回整张铺满
@@ -30553,7 +30514,7 @@ ${maSection}
     </div>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260804-186</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260804-187</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
