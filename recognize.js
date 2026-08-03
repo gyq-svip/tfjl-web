@@ -570,6 +570,7 @@
     const btn = document.createElement('div');
     btn.textContent = '📷 阵容识别';
     btn.title = '粘贴/选择战斗截图，自动识别 10 张英雄卡';
+    btn.setAttribute('data-tip', '阵容识别：粘贴或选择战斗截图，自动识别 10 张英雄卡（依赖本机 Umi-OCR 离线引擎）');
     Object.assign(btn.style, {
       position:'fixed', bottom:'52px', right:'10px', zIndex:'9999',
       background:'linear-gradient(135deg,#4caf50,#2e7d32)', color:'#fff',
