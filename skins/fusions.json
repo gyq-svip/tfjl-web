@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated": "2026-08-03T01:57:12.987Z",
+  "updated": "2026-08-03T02:07:48.639Z",
   "note": "融合卡定义：components 为参与融合的2张基础卡。",
   "fusions": {
     "火炮射线": {
@@ -106,6 +106,14 @@
       ],
       "profession": "牧师",
       "quality": "金"
+    },
+    "死神冰骑": {
+      "components": [
+        "死神",
+        "冰骑"
+      ],
+      "profession": "牧师",
+      "quality": "紫"
     }
   }
 }
