@@ -1063,24 +1063,20 @@
             filter: brightness(1.2);
         }
 
-        /* 卡池皮肤小图（右下角缩略，不铺满，保证卡名清晰可读） */
+        /* 卡池皮肤铺满：基础卡 / 融合卡主卡用 background 铺满；融合卡副卡用右下角小图 */
         .collapsible-section .card-item {
             position: relative;
         }
-        .card-skin-thumb {
-            position: absolute;
-            right: 2px;
-            bottom: 2px;
-            width: 26px;
-            height: 26px;
-            border-radius: 3px;
-            object-fit: cover;
-            pointer-events: none;
-            border: 1px solid rgba(255,255,255,0.45);
-            z-index: 2;
+        .collapsible-section .card-item.skin-bg {
+            background-size: cover !important;
+            background-position: center !important;
+            background-repeat: no-repeat !important;
+            color: #fff !important;
+            font-weight: bold;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.95), 0 0 5px rgba(0,0,0,0.85);
         }
-        /* 融合卡副卡皮（右下角更小图） */
-        .card-skin-thumb-fused {
+        /* 融合卡副卡皮（右下角小图） */
+        .collapsible-section .card-item .skin-layer-fused {
             position: absolute;
             right: 1px;
             bottom: 1px;
@@ -18027,7 +18023,8 @@
             for (const card of cards) {
                 if (card.closest('#favoriteCardsGrid')) continue;
                 card.classList.remove('skin-bg');
-                card.querySelectorAll('.skin-layer, .skin-layer-fused, .card-skin-thumb, .card-skin-thumb-fused').forEach(e => e.remove());
+                card.style.backgroundImage = '';
+                card.querySelectorAll('.card-skin-thumb, .card-skin-thumb-fused, .skin-layer-fused').forEach(e => e.remove());
                 const cardName = card.dataset.name || '';
                 if (!cardName) continue;
                 if (card.dataset.fusion === 'true') {
@@ -18038,18 +18035,18 @@
                     const mainSkin = getHeroDefaultSkin(mainHero);
                     if (mainSkin && mainSkin !== '默认') {
                         const u = await window.resolveHeroSkinUrl(mainHero, mainSkin);
-                        if (u) addSkinThumb(card, u, 'card-skin-thumb', mainHero + '·' + mainSkin);
+                        if (u) { card.classList.add('skin-bg'); card.style.backgroundImage = 'url("' + u + '")'; }
                     }
                     const subSkin = getHeroDefaultSkin(subHero);
                     if (subSkin && subSkin !== '默认') {
                         const u2 = await window.resolveHeroSkinUrl(subHero, subSkin);
-                        if (u2) addSkinThumb(card, u2, 'card-skin-thumb-fused', subHero + '·' + subSkin);
+                        if (u2) addSkinThumb(card, u2, 'skin-layer-fused', subHero + '·' + subSkin);
                     }
                 } else {
                     const skin = getCardSkin(card.dataset.id, cardName, 'my');
                     if (skin && skin !== '默认') {
                         const u = await window.resolveHeroSkinUrl(cardName, skin);
-                        if (u) addSkinThumb(card, u, 'card-skin-thumb', cardName + '·' + skin);
+                        if (u) { card.classList.add('skin-bg'); card.style.backgroundImage = 'url("' + u + '")'; }
                     }
                 }
             }
@@ -30280,7 +30277,7 @@ ${maSection}
     </div>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260803-150</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260803-151</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
