@@ -2957,10 +2957,10 @@
                 </select>
                 <button onclick="toggleProjectMenu(this)" style="background:#444;color:white;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:1rem;line-height:1;">⋮</button>
                 <button onclick="showProjectSearchPanel()" title="搜索项目" style="background:linear-gradient(135deg,#00bcd4,#00838f);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">🔍</button>
-                <button onclick="toggleNotepadPanel()" title="记事本" style="background:linear-gradient(135deg,#ffd700,#ff6b6b);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">📝</button>
+                <button onclick="toggleNotepadPanel()" title="记事本" data-tip="记事本：记录当前项目的笔记（随项目走，不同项目互不干扰；自动保存仅在该项目已打开时生效）" style="background:linear-gradient(135deg,#ffd700,#ff6b6b);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">📝</button>
                 <button id="txtFilesToggleBtn" onclick="toggleTxtFilesPanel()" title="脚本生成" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">📄</button>
                 <button onclick="toggleReferencePanel()" title="参考图片" style="background:linear-gradient(135deg,#9c27b0,#7b1fa2);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">🖼️</button>
-                <button onclick="saveCurrentProject()" id="saveBtn" title="确定保存：有未保存的改动时点此落盘（已取消自动保存，调错也不会存盘）" style="background:rgba(76,175,80,0.8);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;position:relative;">💾<span id="saveDirtyDot" style="display:none;position:absolute;top:-3px;right:-3px;width:10px;height:10px;background:#ff5252;border:2px solid #1a1a2e;border-radius:50%;box-shadow:0 0 6px #ff5252;"></span></button>
+                <button onclick="saveCurrentProject()" id="saveBtn" title="确定保存：有未保存的改动时点此落盘（已取消自动保存，调错也不会存盘）" data-tip="确定保存：把当前项目的所有改动落盘（手牌/记事本/脚本/图片）。已取消自动保存，调错了也不会自动存盘" style="background:rgba(76,175,80,0.8);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;position:relative;">💾<span id="saveDirtyDot" style="display:none;position:absolute;top:-3px;right:-3px;width:10px;height:10px;background:#ff5252;border:2px solid #1a1a2e;border-radius:50%;box-shadow:0 0 6px #ff5252;"></span></button>
                 <button onclick="toggleActivityCalcPanel()" title="活动氪金计算器" style="background:linear-gradient(135deg,#ff6b6b,#feca57);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">🧮</button>
             </div>
         </div>
@@ -8612,6 +8612,33 @@
         }
 
         // 活动脚本生成功能
+        // 读取手牌到脚本输入框：取「分配到手牌」所选那份，融合卡自动取主卡，只填不生成（生成由用户自行选择）
+        function importHandToParser() {
+            const targetSel = document.getElementById('parserHandTarget');
+            const target = targetSel ? (targetSel.value || 'my') : 'my';
+            const isTeammate = (target === 'teammate');
+            const src = isTeammate
+                ? (typeof teammateHandCards !== 'undefined' ? teammateHandCards : [])
+                : (typeof myHandCards !== 'undefined' ? myHandCards : []);
+            if (!src || !src.length) {
+                const r = document.getElementById('parserResult');
+                if (r) r.innerHTML = '<span style="color:#ffb74d;">⚠️ 「' + (isTeammate ? '队友手牌' : '我的手牌') + '」为空，无法读取。请先在卡池点选加入手牌。</span>';
+                return;
+            }
+            const names = src.map(c => (c && c.name) ? c.name : '').filter(Boolean)
+                .map(n => (typeof getMainCardName === 'function') ? getMainCardName(n) : n);
+            const seen = new Set(); const uniq = [];
+            names.forEach(n => { if (!seen.has(n)) { seen.add(n); uniq.push(n); } });
+            const input = document.getElementById('parserInput');
+            if (input) {
+                input.value = '上阵：' + uniq.join(',');
+                if (typeof updateRealTimeDamageReduction === 'function') updateRealTimeDamageReduction();
+            }
+            if (typeof switchTxtPanelTab === 'function') switchTxtPanelTab('parser');
+            const r = document.getElementById('parserResult');
+            if (r) r.innerHTML = '<span style="color:#4caf50;">✅ 已从「' + (isTeammate ? '队友手牌' : '我的手牌') + '」读取 ' + uniq.length + ' 张（融合卡已自动取主卡），已填入输入框。请选择下方按钮生成对应脚本。</span>';
+        }
+
         function parseActivityScript(includeChengShang) {
             if (typeof includeChengShang === 'undefined') includeChengShang = true;
             const input = document.getElementById('parserInput').value.trim();
@@ -10916,7 +10943,7 @@
             <!-- Tab切换 -->
             <div style="display:flex;border-bottom:1px solid rgba(255,255,255,0.1);">
                 <button id="parserTabBtn" onclick="switchTxtPanelTab('parser')" style="flex:1;padding:8px;border:none;background:rgba(0,188,212,0.3);color:#fff;cursor:pointer;font-size:0.85rem;font-weight:bold;border-bottom:2px solid #00bcd4;">🔍 脚本解析与生成</button>
-                <button id="txtTabBtn" onclick="switchTxtPanelTab('files')" style="flex:1;padding:8px;border:none;background:transparent;color:rgba(255,255,255,0.5);cursor:pointer;font-size:0.85rem;">📄 脚本文件</button>
+                <button id="txtTabBtn" onclick="switchTxtPanelTab('files')" data-tip="脚本文件：管理已保存的脚本文件（按项目归类）" style="flex:1;padding:8px;border:none;background:transparent;color:rgba(255,255,255,0.5);cursor:pointer;font-size:0.85rem;">📄 脚本文件</button>
             </div>
             <!-- 文本解析Tab内容 -->
             <div id="txtTabParser" style="padding:15px;height:calc(100% - 90px);display:flex;flex-direction:column;overflow:auto;" ondrop="handleParserDrop(event)" ondragover="handleParserDragOver(event)" ondragleave="handleParserDragLeave(event)" ondragend="handleParserDragLeave(event)">
@@ -10925,10 +10952,13 @@
                 </div>
                 <div style="margin-bottom:10px;">
                     <label style="color:rgba(255,255,255,0.8);font-size:0.85rem;margin-bottom:5px;display:block;">分配到手牌：</label>
-                    <select id="parserHandTarget" style="width:100%;padding:8px;border-radius:6px;border:1px solid rgba(255,215,0,0.3);background:#2a2a4a;color:#fff;font-size:0.9rem;cursor:pointer;">
-                        <option value="my">我的手牌</option>
-                        <option value="teammate">队友手牌</option>
-                    </select>
+                    <div style="display:flex;gap:6px;align-items:center;">
+                        <select id="parserHandTarget" data-tip="选择读取/添加手牌的目标：我的手牌 或 队友手牌（读取手牌、解析并添加都按此选择）" style="flex:1;min-width:0;padding:8px;border-radius:6px;border:1px solid rgba(255,215,0,0.3);background:#2a2a4a;color:#fff;font-size:0.9rem;cursor:pointer;">
+                            <option value="my">我的手牌</option>
+                            <option value="teammate">队友手牌</option>
+                        </select>
+                        <button onclick="importHandToParser()" data-tip="读取下拉所选的手牌，融合卡自动取主卡，填入上方输入框（不自动生成，你自己选脚本类型）" style="white-space:nowrap;background:linear-gradient(135deg,#26c6da,#00838f);color:#fff;border:none;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:500;">📥 读取手牌</button>
+                    </div>
                 </div>
                 <!-- 实时减伤计算显示 -->
                 <div id="parserDrDisplay" style="display:none;margin-bottom:10px;padding:10px 14px;border-radius:8px;background:linear-gradient(135deg,rgba(255,215,0,0.08),rgba(255,107,107,0.08));border:2px solid rgba(255,215,0,0.25);">
@@ -10950,7 +10980,7 @@
                     <!-- 快速输入卡牌 -->
                     <div style="margin-bottom:8px;display:flex;gap:5px;align-items:center;flex-wrap:wrap;">
                         <input id="quickCardInput" type="text" placeholder="⚡ 输入卡名首字母或关键字快速添加（如 sm=萨满, sl=水灵）" oninput="onQuickCardInput(event)" onkeydown="onQuickCardKeydown(event)" style="flex:1;min-width:120px;padding:6px 10px;border-radius:6px;border:1px solid rgba(0,188,212,0.4);background:rgba(0,0,0,0.3);color:#fff;font-size:0.85rem;box-sizing:border-box;">
-                        <button onclick="clearQuickCardInput()" style="background:rgba(255,255,255,0.1);color:#fff;border:none;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:0.8rem;">清</button>
+                        <button onclick="clearQuickCardInput()" data-tip="清空上方快速输入卡名框" style="background:rgba(255,255,255,0.1);color:#fff;border:none;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:0.8rem;">清</button>
                     </div>
                     <div id="quickCardSuggest" style="display:none;position:relative;z-index:20;"></div>
                     <textarea id="parserInput" placeholder="示例：上阵：水灵,死神,幻精灵,小野,龙王,风灵,木精灵,咕咕,火炮,光精灵" oninput="updateRealTimeDamageReduction()" style="width:100%;height:6em;min-height:6em;background:rgba(0,0,0,0.3);border:1px solid rgba(255,215,0,0.2);border-radius:8px;padding:10px;color:#fff;font-size:0.9rem;resize:none;font-family:inherit;box-sizing:border-box;" ondrop="handleParserDrop(event)" ondragover="handleParserDragOver(event)" ondragleave="handleParserDragLeave(event)"></textarea>
@@ -10962,11 +10992,11 @@
                     </div>
                 </div>
                 <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                    <button onclick="parseTextAndAddCards()" style="flex:1;background:linear-gradient(135deg,#00bcd4,#00838f);color:white;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:500;">🔍 解析并添加</button>
+                    <button onclick="parseTextAndAddCards()" data-tip="把输入框里的卡解析并加入上方「分配到手牌」所选的那份手牌（工程/精灵按规则处理）" style="flex:1;background:linear-gradient(135deg,#00bcd4,#00838f);color:white;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:500;">🔍 解析并添加</button>
                     <button onclick="parseActivityScript(true)" style="flex:1;background:linear-gradient(135deg,#ff5722,#e64a19);color:white;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:500;">📜 活动脚本生成</button>
                     <button onclick="parseActivityScript(false)" style="flex:1;background:linear-gradient(135deg,#9c27b0,#7b1fa2);color:white;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:500;">🎭 隐藏榜脚本生成</button>
                     <button onclick="parseDungeonScript()" style="flex:1;background:linear-gradient(135deg,#ff9800,#e65100);color:white;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:500;">🌊 深海脚本生成</button>
-                    <button onclick="clearParserInput()" style="background:rgba(255,255,255,0.1);color:white;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:0.85rem;">清空</button>
+                    <button onclick="clearParserInput()" data-tip="清空输入框与下方生成结果" style="background:rgba(255,255,255,0.1);color:white;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:0.85rem;">清空</button>
                 </div>
                 <div id="parserResult" style="margin-top:10px;font-size:0.85rem;color:rgba(255,255,255,0.7);"></div>
             </div>
@@ -30295,7 +30325,7 @@ ${maSection}
     </div>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260804-154</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260804-155</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
@@ -30429,5 +30459,49 @@ ${maSection}
         </div>
     </div>
 
+<!-- 全局悬浮说明（B 方案）：任意元素挂 data-tip 即悬停显示；固定定位，不被面板 overflow 裁剪 -->
+<script>
+(function(){
+  try{
+    var style = document.createElement('style');
+    style.textContent = '#globalTip{position:fixed;z-index:100000;display:none;max-width:260px;padding:6px 10px;'
+      + 'border-radius:6px;background:rgba(18,18,32,0.97);color:#fff;font-size:0.78rem;line-height:1.45;'
+      + 'pointer-events:none;border:1px solid rgba(255,255,255,0.18);box-shadow:0 4px 14px rgba(0,0,0,0.55);white-space:normal;}';
+    document.head.appendChild(style);
+    var tip = document.createElement('div');
+    tip.id = 'globalTip';
+    document.body.appendChild(tip);
+    var hideTimer = null;
+    function show(el){
+      var t = el.getAttribute('data-tip');
+      if(!t) return;
+      if(hideTimer){ clearTimeout(hideTimer); hideTimer = null; }
+      tip.textContent = t;
+      tip.style.display = 'block';
+      var r = el.getBoundingClientRect();
+      var tr = tip.getBoundingClientRect();
+      var top = r.top - tr.height - 8;
+      var left = r.left + r.width/2 - tr.width/2;
+      if(top < 4) top = r.bottom + 8;
+      if(left < 4) left = 4;
+      if(left + tr.width > window.innerWidth - 4) left = window.innerWidth - tr.width - 4;
+      tip.style.top = top + 'px';
+      tip.style.left = left + 'px';
+    }
+    function hide(){ tip.style.display = 'none'; }
+    document.addEventListener('mouseover', function(e){
+      var el = e.target && e.target.closest ? e.target.closest('[data-tip]') : null;
+      if(el) show(el);
+    });
+    document.addEventListener('mouseout', function(e){
+      var el = e.target && e.target.closest ? e.target.closest('[data-tip]') : null;
+      if(!el) return;
+      if(e.relatedTarget && el.contains(e.relatedTarget)) return;
+      hideTimer = setTimeout(hide, 60);
+    });
+    document.addEventListener('scroll', hide, true);
+  }catch(err){}
+})();
+</script>
 </body>
 </html>
