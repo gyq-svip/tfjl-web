@@ -1063,6 +1063,32 @@
             filter: brightness(1.2);
         }
 
+        /* 卡池分区皮肤锁：🔒=右键收藏(默认)  🔓=右键循环换皮 */
+        .pool-skin-lock {
+            font-size: 0.9rem;
+            cursor: pointer;
+            user-select: none;
+            padding: 0 4px;
+            border-radius: 4px;
+            transition: all .15s;
+            opacity: 0.55;
+        }
+        .pool-skin-lock:hover {
+            opacity: 1;
+            background: rgba(255,255,255,0.12);
+            transform: scale(1.15);
+        }
+        .pool-skin-lock.unlocked {
+            opacity: 1;
+            background: rgba(78,205,196,0.22);
+            box-shadow: 0 0 6px rgba(78,205,196,0.55);
+        }
+        /* 解锁态：卡池该分区的卡加青色描边，提示右键可换皮 */
+        .collapsible-section.skin-unlocked .cards-grid .card-item {
+            outline: 1px dashed rgba(78,205,196,0.55);
+            outline-offset: -2px;
+        }
+
         /* 卡池皮肤铺满：基础卡 / 融合卡主卡用 background 铺满；融合卡副卡用右下角小图 */
         .collapsible-section .card-item {
             position: relative;
@@ -11432,7 +11458,7 @@
 
         <div class="collapsible-section gold">
             <div class="collapsible-header gold" onclick="toggleSection(this)">
-                <h3><span>🥇</span> 金卡类</h3>
+                <h3><span>🥇</span> 金卡类 <span class="pool-skin-lock" data-rarity="gold" onclick="togglePoolSkinLock(event,'gold')">🔒</span></h3>
                 <span class="toggle-icon">▼</span>
             </div>
             <div class="collapsible-content">
@@ -11550,7 +11576,7 @@
 
         <div class="collapsible-section purple">
             <div class="collapsible-header purple" onclick="toggleSection(this)">
-                <h3><span>🥈</span> 紫卡类</h3>
+                <h3><span>🥈</span> 紫卡类 <span class="pool-skin-lock" data-rarity="purple" onclick="togglePoolSkinLock(event,'purple')">🔒</span></h3>
                 <span class="toggle-icon">▼</span>
             </div>
             <div class="collapsible-content">
@@ -11628,7 +11654,7 @@
 
         <div class="collapsible-section blue">
             <div class="collapsible-header blue" onclick="toggleSection(this)">
-                <h3><span>🥉</span> 蓝卡类</h3>
+                <h3><span>🥉</span> 蓝卡类 <span class="pool-skin-lock" data-rarity="blue" onclick="togglePoolSkinLock(event,'blue')">🔒</span></h3>
                 <span class="toggle-icon">▼</span>
             </div>
             <div class="collapsible-content">
@@ -11670,7 +11696,7 @@
 
         <div class="collapsible-section green">
             <div class="collapsible-header green" onclick="toggleSection(this)">
-                <h3><span>🌿</span> 绿卡类</h3>
+                <h3><span>🌿</span> 绿卡类 <span class="pool-skin-lock" data-rarity="green" onclick="togglePoolSkinLock(event,'green')">🔒</span></h3>
                 <span class="toggle-icon">▼</span>
             </div>
             <div class="collapsible-content">
@@ -18101,6 +18127,63 @@
             await Promise.all(tasks);
         }
 
+        // ==================== 卡池分区皮肤锁 ====================
+        // 🔒 上锁(默认)：左键上卡、右键收藏（原行为不变）
+        // 🔓 解锁：左键上卡不变、右键循环切换该卡皮肤（全局预设，跨项目保留）
+        const POOL_SKIN_LOCK_KEY = 'tdjl_poolSkinUnlocked';
+        let poolSkinUnlocked = {};
+        try { poolSkinUnlocked = JSON.parse(localStorage.getItem(POOL_SKIN_LOCK_KEY) || '{}') || {}; } catch (e) { poolSkinUnlocked = {}; }
+
+        function togglePoolSkinLock(e, rarity) {
+            e.preventDefault();
+            e.stopPropagation();   // 别触发标题栏的折叠
+            poolSkinUnlocked[rarity] = !poolSkinUnlocked[rarity];
+            localStorage.setItem(POOL_SKIN_LOCK_KEY, JSON.stringify(poolSkinUnlocked));
+            applyPoolSkinLockUI();
+            const on = poolSkinUnlocked[rarity];
+            showToast(on ? '🔓 已解锁：右键卡牌可循环换皮' : '🔒 已上锁：右键恢复为收藏');
+        }
+
+        function applyPoolSkinLockUI() {
+            document.querySelectorAll('.pool-skin-lock').forEach(icon => {
+                const r = icon.dataset.rarity;
+                const on = !!poolSkinUnlocked[r];
+                icon.textContent = on ? '🔓' : '🔒';
+                icon.classList.toggle('unlocked', on);
+                icon.setAttribute('data-tip', on
+                    ? '已解锁：右键卡牌循环切换皮肤（左键上卡不变）。点此上锁恢复右键收藏'
+                    : '点击解锁后，右键卡牌可快速循环换皮肤；上锁时右键=收藏');
+                const sec = icon.closest('.collapsible-section');
+                if (sec) sec.classList.toggle('skin-unlocked', on);
+            });
+        }
+
+        // 右键循环切换皮肤：默认 → 皮肤1 → 皮肤2 → ... → 回到默认
+        // 注意：getAvailableSkins 是同步函数且已含「默认」；setDefaultCardSkin 第一个参数是 cardId
+        async function cyclePoolCardSkin(card) {
+            const cardName = card.dataset.name || '';
+            const cardId = card.dataset.id;
+            if (!cardName || !cardId) return;
+
+            // 融合卡按主卡取皮肤列表（getAvailableSkins 内部已做 getMainCardName）
+            const skins = getAvailableSkins(cardName) || [];
+            if (skins.length <= 1) {
+                showToast(`「${cardName}」只有默认皮肤，无可切换`);
+                return;
+            }
+
+            // 保证「默认」排在序列首位
+            const seq = ['默认', ...skins.filter(s => s !== '默认')];
+            const cur = getCardSkin(cardId, cardName, 'my') || '默认';
+            let idx = seq.indexOf(cur);
+            if (idx < 0) idx = 0;
+            const next = seq[(idx + 1) % seq.length];
+
+            await setDefaultCardSkin(cardId, next);
+            await updateCardPoolSkins();
+            showToast(`${cardName} → ${next}（${seq.indexOf(next) + 1}/${seq.length}）`);
+        }
+
         // 卡池取皮肤图：未设置 / "默认" → 回退到皮肤库里与英雄同名的默认图（再兜底第一张）
         // 显式空串 '' = 用户主动选择「不显示皮肤」，保持原样不铺图
         async function resolvePoolSkinUrl(heroName, skin) {
@@ -18716,7 +18799,14 @@
 
         function handleCardRightClick(e, card) {
             e.preventDefault();
-            
+
+            // 分区皮肤锁已解锁 → 右键改为「循环切换皮肤」，不再收藏
+            const sec = card.closest('.collapsible-section');
+            if (sec && sec.classList.contains('skin-unlocked') && !card.closest('#favoriteCardsGrid')) {
+                cyclePoolCardSkin(card);
+                return;
+            }
+
             const cardId = card.dataset.id;
             const cardName = card.dataset.name;
             const cardType = card.dataset.type;
@@ -21618,6 +21708,8 @@
                         }
                         // 皮肤加载完成后刷新卡池皮肤小图
                         if (typeof updateCardPoolSkins === 'function') updateCardPoolSkins().catch(() => {});
+                        // 恢复卡池分区皮肤锁的显示状态
+                        if (typeof applyPoolSkinLockUI === 'function') applyPoolSkinLockUI();
                     } catch (err) {
                         console.error('[SKIN] Re-scan skins error:', err);
                     }
@@ -30339,7 +30431,7 @@ ${maSection}
     </div>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260804-156</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260804-157</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
