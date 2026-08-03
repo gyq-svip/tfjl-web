@@ -12147,6 +12147,8 @@
         }
 
         function loadProjectFromDB(projectName) {
+            // 取消挂起的记事本自动保存定时器，防止把上一个项目的草稿写入即将打开的项目（切换/新建竞态）
+            try { if (typeof notepadSaveTimer !== 'undefined' && notepadSaveTimer) clearTimeout(notepadSaveTimer); } catch (e) {}
             return new Promise((resolve, reject) => {
                 if (!db) {
                     reject('DB not initialized');
@@ -12262,9 +12264,10 @@
             updateHandDisplay('my');
             updateHandDisplay('teammate');
 
-            // 【修复】清空记事本（textarea 内容 + 内存回写）
+            // 【修复】清空记事本（textarea 内容 + 内存回写 + 清草稿缓存，避免跨项目残留）
             const notepadEl = document.getElementById('notepad');
             if (notepadEl) notepadEl.value = '';
+            try { localStorage.removeItem('tdjl_notepad_temp'); } catch (e) {}
 
             // 【修复】清空脚本文件（全局变量 + 列表 UI）
             if (typeof txtFiles !== 'undefined') txtFiles = [];
@@ -30277,7 +30280,7 @@ ${maSection}
     </div>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260803-151</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260803-152</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
