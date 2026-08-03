@@ -1063,6 +1063,36 @@
             filter: brightness(1.2);
         }
 
+        /* 卡池皮肤小图（基础卡默认皮 / 融合卡主卡皮） */
+        .collapsible-section .card-item {
+            position: relative;
+        }
+        .card-skin-thumb {
+            position: absolute;
+            right: 2px;
+            bottom: 2px;
+            width: 20px;
+            height: 20px;
+            border-radius: 3px;
+            object-fit: cover;
+            pointer-events: none;
+            border: 1px solid rgba(255,255,255,0.45);
+            z-index: 2;
+        }
+        /* 融合卡副卡皮（右下角更小图） */
+        .card-skin-thumb-fused {
+            position: absolute;
+            right: 1px;
+            bottom: 1px;
+            width: 13px;
+            height: 13px;
+            border-radius: 2px;
+            object-fit: cover;
+            pointer-events: none;
+            border: 1px solid rgba(255,158,128,0.85);
+            z-index: 3;
+        }
+
         @keyframes gradientShift {
             0% { background-position: 0% 50%; }
             50% { background-position: 100% 50%; }
@@ -17984,6 +18014,63 @@
                 card.querySelector('.card-level-badge')?.remove();
                 card.insertAdjacentHTML('afterbegin', createLevelBadgeHTML(cardId, actualType, 'teammate', cardName));
             });
+
+            // 同步刷新卡池皮肤小图（全局预设：defaultCardSkins / heroSkinSelections）
+            if (typeof updateCardPoolSkins === 'function') updateCardPoolSkins().catch(() => {});
+        }
+
+        // 卡池皮肤小图：基础卡显示默认皮肤缩略，融合卡显示主卡皮(大)+副卡皮(小)
+        // 全部基于全局预设（defaultCardSkins / heroSkinSelections / cloudFusions），跨项目保留
+        async function updateCardPoolSkins() {
+            if (typeof window.resolveHeroSkinUrl !== 'function') return;
+            const cards = document.querySelectorAll('.collapsible-section .card-item');
+            for (const card of cards) {
+                if (card.closest('#favoriteCardsGrid')) continue;
+                card.querySelectorAll('.card-skin-thumb, .card-skin-thumb-fused').forEach(e => e.remove());
+                const cardName = card.dataset.name || '';
+                if (!cardName) continue;
+                if (card.dataset.fusion === 'true') {
+                    const def = (window.cloudFusions && window.cloudFusions[cardName]) || {};
+                    const comps = (def.components && def.components.length >= 2) ? def.components : null;
+                    if (!comps) continue;
+                    const mainHero = comps[0], subHero = comps[1];
+                    const mainSkin = getHeroDefaultSkin(mainHero);
+                    if (mainSkin && mainSkin !== '默认') {
+                        const u = await window.resolveHeroSkinUrl(mainHero, mainSkin);
+                        if (u) addSkinThumb(card, u, 'card-skin-thumb', mainHero + '·' + mainSkin);
+                    }
+                    const subSkin = getHeroDefaultSkin(subHero);
+                    if (subSkin && subSkin !== '默认') {
+                        const u2 = await window.resolveHeroSkinUrl(subHero, subSkin);
+                        if (u2) addSkinThumb(card, u2, 'card-skin-thumb-fused', subHero + '·' + subSkin);
+                    }
+                } else {
+                    const skin = getCardSkin(card.dataset.id, cardName, 'my');
+                    if (skin && skin !== '默认') {
+                        const u = await window.resolveHeroSkinUrl(cardName, skin);
+                        if (u) addSkinThumb(card, u, 'card-skin-thumb', cardName + '·' + skin);
+                    }
+                }
+            }
+        }
+        function getHeroDefaultSkin(heroName) {
+            // 英雄名 → cardId（卡池静态映射）→ defaultCardSkins，回退 heroSkinSelections（均为全局预设）
+            const el = document.querySelector('.collapsible-section .card-item[data-name="' + (heroName || '').replace(/"/g, '\\"') + '"]');
+            const cid = el ? el.dataset.id : null;
+            if (cid && typeof defaultCardSkins !== 'undefined' && defaultCardSkins[cid] !== undefined) return defaultCardSkins[cid];
+            if (typeof window.heroSkinSelections !== 'undefined' && window.heroSkinSelections[heroName] !== undefined) return window.heroSkinSelections[heroName];
+            return '默认';
+        }
+        function addSkinThumb(card, url, cls, title) {
+            const img = document.createElement('img');
+            img.className = cls;
+            img.src = url;
+            img.title = title || '';
+            img.draggable = false;
+            img.style.opacity = '0';
+            img.style.transition = 'opacity .2s';
+            img.addEventListener('load', () => { img.style.opacity = '1'; });
+            card.appendChild(img);
         }
 
         // 根据卡牌ID查找卡牌类型
@@ -18987,6 +19074,9 @@
                 card.setAttribute('draggable', 'false');
                 setupLongPress(card, (e) => handleCardRightClick(e, card));
             });
+
+            // 融合卡节点生成后刷新主/副卡皮（全局预设）
+            if (typeof updateCardPoolSkins === 'function') updateCardPoolSkins().catch(() => {});
         }
 
         // 把云端基础卡（管理员在 skins/cards.json 添加的新英雄）同步到卡池对应职业子分类
@@ -21466,6 +21556,8 @@
                         if (window.syncRemoteSkins) {
                             await window.syncRemoteSkins();
                         }
+                        // 皮肤加载完成后刷新卡池皮肤小图
+                        if (typeof updateCardPoolSkins === 'function') updateCardPoolSkins().catch(() => {});
                     } catch (err) {
                         console.error('[SKIN] Re-scan skins error:', err);
                     }
@@ -30187,7 +30279,7 @@ ${maSection}
     </div>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260803-145</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260803-146</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
