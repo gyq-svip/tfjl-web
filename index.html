@@ -1063,34 +1063,54 @@
             filter: brightness(1.2);
         }
 
-        /* 卡池皮肤小图（基础卡默认皮 / 融合卡主卡皮） */
+        /* 卡池皮肤铺满（卡牌大小不变）：基础卡 / 融合卡主卡用 .skin-layer cover，融合卡副卡用 .skin-layer-fused */
         .collapsible-section .card-item {
             position: relative;
         }
-        .card-skin-thumb {
-            position: absolute;
-            right: 2px;
-            bottom: 2px;
-            width: 20px;
-            height: 20px;
-            border-radius: 3px;
-            object-fit: cover;
-            pointer-events: none;
-            border: 1px solid rgba(255,255,255,0.45);
-            z-index: 2;
+        .collapsible-section .card-item.skin-bg {
+            background: transparent !important;
+            color: #fff;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.9), 0 0 6px rgba(0,0,0,0.7);
+            overflow: hidden;
+            display: inline-flex;
+            align-items: flex-end;
+            padding: 1px 4px;
         }
-        /* 融合卡副卡皮（右下角更小图） */
-        .card-skin-thumb-fused {
+        .collapsible-section .card-item .skin-layer {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: inherit;
+            z-index: 0;
+            pointer-events: none;
+        }
+        .collapsible-section .card-item.skin-bg .card-name {
+            position: absolute;
+            bottom: 1px;
+            left: 3px;
+            font-size: 0.7rem;
+            line-height: 1;
+            z-index: 2;
+            background: transparent;
+            text-shadow: 0 1px 2px rgba(0,0,0,1), 0 0 3px rgba(0,0,0,0.9);
+        }
+        .collapsible-section .card-item.skin-bg .card-level-badge {
+            z-index: 3;
+        }
+        /* 融合卡副卡皮（右下角小图） */
+        .collapsible-section .card-item.skin-bg .skin-layer-fused {
             position: absolute;
             right: 1px;
             bottom: 1px;
             width: 13px;
             height: 13px;
-            border-radius: 2px;
             object-fit: cover;
+            border-radius: 2px;
+            z-index: 3;
             pointer-events: none;
             border: 1px solid rgba(255,158,128,0.85);
-            z-index: 3;
         }
 
         @keyframes gradientShift {
@@ -18019,38 +18039,42 @@
             if (typeof updateCardPoolSkins === 'function') updateCardPoolSkins().catch(() => {});
         }
 
-        // 卡池皮肤小图：基础卡显示默认皮肤缩略，融合卡显示主卡皮(大)+副卡皮(小)
+        // 卡池皮肤铺满：基础卡 / 融合卡主卡用 .skin-layer cover 铺满卡牌，融合卡副卡用 .skin-layer-fused 小图
         // 全部基于全局预设（defaultCardSkins / heroSkinSelections / cloudFusions），跨项目保留
         async function updateCardPoolSkins() {
             if (typeof window.resolveHeroSkinUrl !== 'function') return;
             const cards = document.querySelectorAll('.collapsible-section .card-item');
             for (const card of cards) {
                 if (card.closest('#favoriteCardsGrid')) continue;
-                card.querySelectorAll('.card-skin-thumb, .card-skin-thumb-fused').forEach(e => e.remove());
+                card.classList.remove('skin-bg');
+                card.querySelectorAll('.skin-layer, .skin-layer-fused, .card-skin-thumb, .card-skin-thumb-fused').forEach(e => e.remove());
                 const cardName = card.dataset.name || '';
                 if (!cardName) continue;
+                let hasSkin = false;
                 if (card.dataset.fusion === 'true') {
                     const def = (window.cloudFusions && window.cloudFusions[cardName]) || {};
                     const comps = (def.components && def.components.length >= 2) ? def.components : null;
-                    if (!comps) continue;
-                    const mainHero = comps[0], subHero = comps[1];
-                    const mainSkin = getHeroDefaultSkin(mainHero);
-                    if (mainSkin && mainSkin !== '默认') {
-                        const u = await window.resolveHeroSkinUrl(mainHero, mainSkin);
-                        if (u) addSkinThumb(card, u, 'card-skin-thumb', mainHero + '·' + mainSkin);
-                    }
-                    const subSkin = getHeroDefaultSkin(subHero);
-                    if (subSkin && subSkin !== '默认') {
-                        const u2 = await window.resolveHeroSkinUrl(subHero, subSkin);
-                        if (u2) addSkinThumb(card, u2, 'card-skin-thumb-fused', subHero + '·' + subSkin);
+                    if (comps) {
+                        const mainHero = comps[0], subHero = comps[1];
+                        const mainSkin = getHeroDefaultSkin(mainHero);
+                        if (mainSkin && mainSkin !== '默认') {
+                            const u = await window.resolveHeroSkinUrl(mainHero, mainSkin);
+                            if (u) { addSkinLayer(card, u, 'skin-layer'); hasSkin = true; }
+                        }
+                        const subSkin = getHeroDefaultSkin(subHero);
+                        if (subSkin && subSkin !== '默认') {
+                            const u2 = await window.resolveHeroSkinUrl(subHero, subSkin);
+                            if (u2) { addSkinLayer(card, u2, 'skin-layer-fused'); hasSkin = true; }
+                        }
                     }
                 } else {
                     const skin = getCardSkin(card.dataset.id, cardName, 'my');
                     if (skin && skin !== '默认') {
                         const u = await window.resolveHeroSkinUrl(cardName, skin);
-                        if (u) addSkinThumb(card, u, 'card-skin-thumb', cardName + '·' + skin);
+                        if (u) { addSkinLayer(card, u, 'skin-layer'); hasSkin = true; }
                     }
                 }
+                if (hasSkin) card.classList.add('skin-bg');
             }
         }
         function getHeroDefaultSkin(heroName) {
@@ -18061,11 +18085,10 @@
             if (typeof window.heroSkinSelections !== 'undefined' && window.heroSkinSelections[heroName] !== undefined) return window.heroSkinSelections[heroName];
             return '默认';
         }
-        function addSkinThumb(card, url, cls, title) {
+        function addSkinLayer(card, url, cls) {
             const img = document.createElement('img');
             img.className = cls;
             img.src = url;
-            img.title = title || '';
             img.draggable = false;
             img.style.opacity = '0';
             img.style.transition = 'opacity .2s';
@@ -30279,7 +30302,7 @@ ${maSection}
     </div>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260803-146</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260803-147</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
