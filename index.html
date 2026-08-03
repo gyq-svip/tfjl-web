@@ -12176,7 +12176,11 @@
                         updateFavoritesDisplay();
                         updateAllCardLevelDisplays();
                         updateDamageReductionDisplay(); // 切换项目后更新减伤显示
-                        
+
+                        // 【修复】刷新卡池等级/皮肤徽章（基于全局预设 individualCardLevels / defaultCardSkins），
+                        // 确保新建/切换项目后卡池显示与全局预设一致（魔化等上一个项目的标记被清空）
+                        updateAllCardLevelBadges();
+
                         // 更新卡池中的常用卡标记
                         document.querySelectorAll('.card-item').forEach(card => {
                             const cardId = card.dataset.id;
@@ -12255,6 +12259,8 @@
             if (typeof cardSkins !== 'undefined') cardSkins = {};
             if (typeof cardMoHua !== 'undefined') cardMoHua = {};
             if (typeof updateAllCardLevelDisplays === 'function') updateAllCardLevelDisplays();
+            // 刷新卡池徽章，反映清理后的全局预设状态（魔化等上一个项目的残留标记一并清除）
+            if (typeof updateAllCardLevelBadges === 'function') updateAllCardLevelBadges();
         }
         
         // 更新所有卡牌等级显示
@@ -30181,7 +30187,7 @@ ${maSection}
     </div>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260803-144</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260803-145</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
