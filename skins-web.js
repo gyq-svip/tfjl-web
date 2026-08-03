@@ -176,6 +176,15 @@
           }
         }
       } catch (fe) { console.warn('[SKIN-WEB] load fusions.json failed:', fe); }
+      // 拉取皮肤属性表（云端 skin-attributes.json，管理员维护，随 git_push_skins 推送）
+      try {
+        var aResp = await fetch(REMOTE_SKIN_BASE + '/skin-attributes.json', { cache: 'no-cache' });
+        if (aResp.ok) {
+          var aData = await aResp.json();
+          window.skinAttributesCloud = aData || {};
+          console.log('[SKIN-WEB] skin-attributes.json loaded, heroes:', Object.keys(aData || {}).length);
+        }
+      } catch (ae) { console.warn('[SKIN-WEB] load skin-attributes.json failed:', ae); }
       _preheatSkins(registry.heroes);
       try {
         if (typeof window.reapplyAllSkins === 'function') {
