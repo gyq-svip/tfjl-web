@@ -16520,20 +16520,33 @@ function applyFusionSkinToHandCard(card, mainUrl, fusedUrl, fusedIsBadge) {
     }
 }
 
-// 槽位：主卡满铺当背景 + 副卡右下角小圆角矩形（带白边）
+// 槽位：主卡用独立 <img class="skin-layer"> 满铺（与普通卡槽 applySkinBgToSlot 一致）
+//   + 副卡 <img class="skin-layer-fused"> 右下角小圆角矩形（带白边）
+// ⚠️ 早期曾用 slot.style.backgroundImage 走背景图路径，但 .battle-slot.skin-bg { background: transparent !important }
+//   会用 CSS !important 强制干掉 inline backgroundImage（CSS !important 优先级 > inline style），
+//   导致主卡永远不显示。改用独立 img 层后完全规避。
 function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
     if (!slot) return;
     const isFusedLayout = !!(fusedUrl && !fusedIsBadge);
-    // 主卡按普通卡处理：满铺背景（无稀有度渐变）
-    if (mainUrl) {
-        slot.style.background = '';
-        slot.style.backgroundImage = 'url("' + mainUrl + '")';
-    } else {
-        slot.style.backgroundImage = '';
-        slot.style.background = '';
-    }
+
+    // 主卡：独立 <img class="skin-layer"> 满铺（与 applySkinBgToSlot 同款，带白边/圆角/inset 阴影）
     let base = slot.querySelector('.skin-layer');
-    if (base) { base.remove(); }   // 新方案：主卡用 backgroundImage，不再需要 img 层
+    if (mainUrl) {
+        if (!base) {
+            base = document.createElement('img');
+            base.className = 'skin-layer';
+            base.alt = '';
+            slot.insertBefore(base, slot.firstChild);
+        }
+        const isDataOrBlob = mainUrl.startsWith('data:') || mainUrl.startsWith('blob:');
+        const next = isDataOrBlob ? mainUrl : (mainUrl + '?t=' + Date.now());
+        if (base.src !== next) base.src = next;
+        base.onerror = function () { /* 静默：与 applySkinBgToSlot 一致不报警 */ };
+    } else if (base) {
+        base.remove();
+    }
+
+    // 副卡：右下角小圆角矩形（带白边）
     let overlay = slot.querySelector('.skin-layer-fused');
     if (fusedUrl) {
         if (!overlay) {
@@ -16570,6 +16583,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         overlay.remove();
     }
     if (mainUrl || fusedUrl) slot.classList.add('skin-bg');
+    else slot.classList.remove('skin-bg');
 }
 
         // 开关：默认开启，可一键关
@@ -30514,7 +30528,7 @@ ${maSection}
     </div>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260804-190</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260804-191</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
