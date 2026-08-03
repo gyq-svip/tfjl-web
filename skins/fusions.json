@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated": "2026-08-03T02:07:48.639Z",
+  "updated": "2026-08-03T03:03:41.364Z",
   "note": "融合卡定义：components 为参与融合的2张基础卡。",
   "fusions": {
     "火炮射线": {
@@ -114,6 +114,94 @@
       ],
       "profession": "牧师",
       "quality": "紫"
+    },
+    "蛇女爱神": {
+      "components": [
+        "蛇女",
+        "爱神"
+      ],
+      "profession": "射手",
+      "quality": "金"
+    },
+    "战将石头": {
+      "components": [
+        "战将",
+        "石头"
+      ],
+      "profession": "战士",
+      "quality": "金"
+    },
+    "战将斧客": {
+      "components": [
+        "战将",
+        "斧客"
+      ],
+      "profession": "战士",
+      "quality": "金"
+    },
+    "圣骑海妖": {
+      "components": [
+        "圣骑",
+        "海妖"
+      ],
+      "profession": "牧师",
+      "quality": "金"
+    },
+    "女王工匠": {
+      "components": [
+        "女王",
+        "工匠"
+      ],
+      "profession": "法师",
+      "quality": "金"
+    },
+    "霸王石头": {
+      "components": [
+        "霸王",
+        "石头"
+      ],
+      "profession": "战士",
+      "quality": "金"
+    },
+    "鲛女萨满": {
+      "components": [
+        "鲛女",
+        "萨满"
+      ],
+      "profession": "牧师",
+      "quality": "金"
+    },
+    "鲛女绿弓": {
+      "components": [
+        "鲛女",
+        "绿弓"
+      ],
+      "profession": "牧师",
+      "quality": "金"
+    },
+    "咬人娃娃射线": {
+      "components": [
+        "咬人娃娃",
+        "射线"
+      ],
+      "profession": "工程",
+      "quality": "金"
+    },
+    "鱼人石头": {
+      "components": [
+        "鱼人",
+        "石头"
+      ],
+      "profession": "战士",
+      "quality": "金"
+    },
+    "蛇女冰弓": {
+      "components": [
+        "蛇女",
+        "冰弓"
+      ],
+      "profession": "射手",
+      "quality": "金"
     }
   }
 }
