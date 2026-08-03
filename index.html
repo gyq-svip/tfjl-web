@@ -10139,6 +10139,12 @@
                     document.getElementById('saveScriptModal')?.remove();
                     showToast(`✅ 新项目"${newProjectName}"已创建（分类：${newCategory}），脚本已保存！`);
                     refreshProjectSelectors();
+                    // 【修复】新建项目后切换到它：loadProjectFromDB 内部 clearCurrentData() 会清空记事本等残留，
+                    // 避免屏幕上仍显示上一个项目的旧记事本（此前只存库不切项目，文本框未清）
+                    return loadProjectFromDB(newProjectName);
+                }).then(() => {
+                    const sel = document.getElementById('projectSelector1');
+                    if (sel && newProjectName) sel.value = newProjectName;
                 }).catch(err => {
                     console.error('创建项目失败:', err);
                     alert('创建项目失败: ' + err);
@@ -12097,9 +12103,10 @@
                     cardLevels: currentData?.cardLevels || (typeof cardLevels !== 'undefined' ? cardLevels : {}),
                     cardSkins: currentData?.cardSkins || (typeof cardSkins !== 'undefined' ? cardSkins : {}),
                     cardMoHua: currentData?.cardMoHua || (typeof cardMoHua !== 'undefined' ? cardMoHua : {}),
-                    myDeckInfo: currentData?.myDeckInfo || safeMyDeckInfo,
-                    teammateDeckInfo: currentData?.teammateDeckInfo || safeTeammateDeckInfo,
-                    notepad: currentData?.notepad || safeNotepad,
+                    // 【修复】新建项目显式传空串 '' 也要保留，不能用 || 被旧 DOM 值覆盖（否则新项目记事本/卡组残留旧内容）
+                    myDeckInfo: (currentData && currentData.myDeckInfo !== undefined) ? currentData.myDeckInfo : safeMyDeckInfo,
+                    teammateDeckInfo: (currentData && currentData.teammateDeckInfo !== undefined) ? currentData.teammateDeckInfo : safeTeammateDeckInfo,
+                    notepad: (currentData && currentData.notepad !== undefined) ? currentData.notepad : safeNotepad,
                     txtFiles: currentData?.txtFiles || (typeof txtFiles !== 'undefined' ? txtFiles : []),
                     referenceImages: currentData?.referenceImages || (typeof referenceImages !== 'undefined' ? referenceImages : [])
                 };
@@ -12530,6 +12537,8 @@
                 // 创建并加载空白项目：loadProjectFromDB 内部会 clearCurrentData() +
                 // 重置所有变量 + 重绘空白工作区，确保新建项目是「全新空白」而非残留上一个项目。
                 const createBlank = () => {
+                    // 【修复】取消挂起的记事本防抖定时器，避免保存→加载窗口内把旧记事本写入新项目（竞态）
+                    try { if (typeof notepadSaveTimer !== 'undefined' && notepadSaveTimer) clearTimeout(notepadSaveTimer); } catch (e) {}
                     saveProjectToDB(safeName, currentCat, emptyData)
                         .then(() => loadProjectFromDB(safeName))
                         .then(() => {
@@ -30280,7 +30289,7 @@ ${maSection}
     </div>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260803-152</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260804-153</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
