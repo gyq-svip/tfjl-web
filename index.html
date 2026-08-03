@@ -559,13 +559,13 @@
             box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.2);
         }
 
-        /* 皮肤层图片——独立 DOM 层，不跟 CSS background 缩写打架 */
+        /* 皮肤层图片——独立 DOM 层，不跟 CSS background 缩写打架；放大填满 cover 让皮肤细节更清楚 */
         .battle-slot .skin-layer {
             position: absolute;
-            inset: 3px;                 /* 留出边缘，显示下方卡牌的 profession 颜色 */
-            width: calc(100% - 6px);
-            height: calc(100% - 6px);
-            object-fit: contain;        /* 完整显示图片，避免 cover 裁切人物 */
+            inset: 0;                   /* 填满整个槽位，最大化皮肤可见区 */
+            width: 100%;
+            height: 100%;
+            object-fit: cover;          /* 填满放大，边缘裁切但人物清晰可辨 */
             object-position: center center;
             z-index: 0;
             pointer-events: none;
@@ -30474,7 +30474,7 @@ ${maSection}
     </div>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260804-163</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260804-164</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
