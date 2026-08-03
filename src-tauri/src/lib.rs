@@ -262,6 +262,69 @@ fn git_push_fusions() -> Result<String, String> {
     Ok(log)
 }
 
+/// 皮肤制作工具「一键推送」：自动 bump 前端版本号 + 提交 skins/ 改动 + 推双远端
+/// 复用 run_git（origin 走仓库默认代理；gitee 直连清空代理）
+#[tauri::command]
+fn git_push_skins() -> Result<String, String> {
+    let repo = "d:\\tfjl-web";
+    // 1) 仅在本地有改动时继续
+    let status = run_git(repo, &["status", "--porcelain"])?;
+    if status.trim().is_empty() {
+        return Ok("• 无本地改动，无需推送。".to_string());
+    }
+    let mut log = String::new();
+    // 2) bump 前端版本号（versionTag + CACHE_VERSION），便于用户刷新识别
+    match bump_skin_versions(repo) {
+        Ok(_) => log.push_str("✓ 已自增前端版本号。\n"),
+        Err(e) => log.push_str(&format!("• 版本号自增跳过（{}）\n", e)),
+    }
+    // 3) 暂存 skins/ 及前端版本文件
+    run_git(repo, &["add", "skins/", "index.html", "sw.js"])?;
+    // 4) 提交
+    run_git(repo, &["commit", "-m", "feat: 皮肤制作一键推送（自动 bump 版本）"])?;
+    log.push_str("✓ 已提交本地改动。\n");
+    // 5) push origin main（仓库默认代理）
+    match run_git(repo, &["push", "origin", "main"]) {
+        Ok(p1) => { log.push_str("✓ origin/main: "); log.push_str(p1.trim()); log.push('\n'); }
+        Err(e) => return Err(format!("push origin/main 失败: {}", e)),
+    }
+    // 6) push gitee（直连，清空代理）
+    match run_git(repo, &["-c", "http.proxy=", "-c", "https.proxy=", "push", "gitee"]) {
+        Ok(p2) => { log.push_str("✓ gitee: "); log.push_str(p2.trim()); log.push('\n'); }
+        Err(e) => { log.push_str("• gitee: 跳过（"); log.push_str(&e); log.push_str("）\n"); }
+    }
+    Ok(log)
+}
+
+/// 自增 index.html 的 versionTag 与 sw.js 的 CACHE_VERSION
+fn bump_skin_versions(repo: &str) -> Result<(), String> {
+    bump_in_file(&format!("{}\\index.html", repo), "id=\"versionTag\"", ">v", '<')?;
+    bump_in_file(&format!("{}\\sw.js", repo), "CACHE_VERSION = 'tfjl-v", "tfjl-v", '\'')?;
+    Ok(())
+}
+
+/// 在文件中定位 marker，找到 token_prefix 后的数字（或 日期-数字），自增其末位序号
+fn bump_in_file(path: &str, marker: &str, prefix: &str, end_char: char) -> Result<(), String> {
+    let mut content = fs::read_to_string(path).map_err(|e| format!("读取失败: {}", e))?;
+    let pos = content.find(marker).ok_or("未找到版本标记")?;
+    let after = &content[pos..];
+    let vpos = after.find(prefix).ok_or("未找到版本前缀")?;
+    let start = pos + vpos + prefix.len();
+    let rest = &content[start..];
+    let end = rest.find(end_char).ok_or("未找到版本结束符")?;
+    let token = &rest[..end];
+    let new_token: String = if let Some(dash) = token.find('-') {
+        let num = token[dash + 1..].parse::<u32>().map_err(|_| "版本号解析失败")?;
+        format!("{}-{}", &token[..dash], num + 1)
+    } else {
+        let num = token.parse::<u32>().map_err(|_| "版本号解析失败")?;
+        format!("{}", num + 1)
+    };
+    content.replace_range(start..start + token.len(), &new_token);
+    fs::write(path, content).map_err(|e| format!("写回失败: {}", e))?;
+    Ok(())
+}
+
 /// 系统托盘图标闪动（需求墙新未读提醒）：on=true 启动闪动，on=false 停止
 /// 闪动原理：在正常窗口图标与一张同尺寸透明图标之间每 500ms 交替 set_icon，直到 on=false 才恢复
 #[tauri::command]
@@ -826,6 +889,7 @@ pub fn run() {
             detect_file_encoding,
             write_text_file,
             git_push_fusions,
+            git_push_skins,
             flash_tray_icon,
             write_binary_file,
             delete_file,

@@ -29,6 +29,11 @@ description = "Allow one-click git push of skins/fusions.json from 卡组管理"
 commands.allow = ["git_push_fusions"]
 
 [[permission]]
+identifier = "allow-git-push-skins"
+description = "Allow one-click git push of skins from 皮肤制作 tool"
+commands.allow = ["git_push_skins"]
+
+[[permission]]
 identifier = "allow-flash-tray-icon"
 description = "Allow flashing the system tray icon for new-message alert"
 commands.allow = ["flash_tray_icon"]
