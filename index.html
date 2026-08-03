@@ -965,6 +965,10 @@
             border: 2px solid transparent;
             box-shadow: 0 0 10px rgba(0,0,0,0.3);
             position: relative;
+        }
+        /* 收藏卡去掉职业渐变底色，只保留边框区分职业；
+           但有皮肤时(.skin-bg)必须放行，否则 !important 会把 inline 的皮肤图一起抹掉 */
+        .card-item.favorite-card:not(.skin-bg) {
             background: transparent !important;
         }
 
@@ -18122,10 +18126,10 @@
         // 未设置过皮肤（"默认"）的卡，也显示皮肤库里的默认皮肤图（与英雄同名那张）
         async function updateCardPoolSkins() {
             if (typeof window.resolveHeroSkinUrl !== 'function') return;
+            // 含收藏区（#favoriteCardsGrid）：收藏的卡同样铺皮肤
             const cards = document.querySelectorAll('.collapsible-section .card-item');
             const tasks = [];
             for (const card of cards) {
-                if (card.closest('#favoriteCardsGrid')) continue;
                 card.classList.remove('skin-bg');
                 card.style.backgroundImage = '';
                 card.querySelectorAll('.card-skin-thumb, .card-skin-thumb-fused, .skin-layer-fused').forEach(e => e.remove());
@@ -18932,7 +18936,9 @@
                     professionGroups[profession].forEach(card => {
                         // 添加等级徽章
                         const levelBadge = createLevelBadgeHTML(card.id, card.type, 'my', card.name);
-                        html += '<div class="card-item favorite-card" data-id="' + card.id + '" data-name="' + card.name + '" data-type="' + card.type + '" data-engineering="' + card.isEngineering + '" data-profession="' + card.profession + '">' + levelBadge + card.name + '</div>';
+                        // 带上 data-fusion，融合卡才能正确铺「主卡整皮 + 副卡右下角小图」
+                        const isFusion = !!(window.cloudFusions && window.cloudFusions[card.name]);
+                        html += '<div class="card-item favorite-card"' + (isFusion ? ' data-fusion="true"' : '') + ' data-id="' + card.id + '" data-name="' + card.name + '" data-type="' + card.type + '" data-engineering="' + card.isEngineering + '" data-profession="' + card.profession + '">' + levelBadge + card.name + '</div>';
                     });
                     html += '</div></div>';
                 }
@@ -18979,6 +18985,9 @@
                     }
                 });
             });
+
+            // 收藏区是 innerHTML 整体重绘，重绘后必须重新铺皮肤，否则收藏的卡是光板
+            if (typeof updateCardPoolSkins === 'function') updateCardPoolSkins().catch(() => {});
         }
         
         // 设置常用卡拖拽
@@ -30459,7 +30468,7 @@ ${maSection}
     </div>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260804-158</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260804-159</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
