@@ -3454,6 +3454,15 @@ if (isTauriApp) {
                     }
                 }
             } catch (fe) { console.warn('[SKIN] load fusions.json failed:', fe); }
+            // 拉取皮肤属性表（云端 skin-attributes.json，管理员维护，随 git_push_skins 推送）
+            try {
+                const aResp = await fetch(REMOTE_SKIN_BASE + '/skin-attributes.json', { cache: 'no-cache' });
+                if (aResp.ok) {
+                    const aData = await aResp.json();
+                    window.skinAttributesCloud = aData || {};
+                    console.log('[SKIN] skin-attributes.json loaded, heroes:', Object.keys(aData || {}).length);
+                }
+            } catch (ae) { console.warn('[SKIN] load skin-attributes.json failed:', ae); }
 
             // 拉取云端基础卡定义（cards.json，管理员维护新英雄）
             try {
