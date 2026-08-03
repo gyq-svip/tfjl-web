@@ -30481,7 +30481,7 @@ ${maSection}
     </div>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260804-166</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260804-167</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
@@ -30782,18 +30782,24 @@ ${maSection}
       return c.toDataURL('image/png');
     }
     function smErrMsg(err){ return (err&&(err.message||(err.toString&&err.toString())||JSON.stringify(err)))||String(err)||'未知错误'; }
+    function smGetInvoke(){
+      if(window.__TAURI_INTERNALS__&&typeof window.__TAURI_INTERNALS__.invoke==='function') return window.__TAURI_INTERNALS__.invoke;
+      if(window.__TAURI__&&window.__TAURI__.core&&typeof window.__TAURI__.core.invoke==='function') return window.__TAURI__.core.invoke;
+      if(window.__TAURI__&&typeof window.__TAURI__.invoke==='function') return window.__TAURI__.invoke;
+      return null;
+    }
     function smInvoke(cmd,args){
-      var fn=(window.__TAURI_INTERNALS__&&window.__TAURI_INTERNALS__.invoke)||(window.__TAURI__&&window.__TAURI__.core&&window.__TAURI__.core.invoke);
-      if(typeof fn==='function') return fn(cmd,args);
+      var fn=smGetInvoke();
+      if(fn) return fn(cmd,args);
       return Promise.reject(new Error('NOT_TAURI_ENV'));
     }
-    function smDownload(){
+    async function smDownload(){
       if(!smImg){ smStatus('请先选择图片',true); return; }
       var hero=document.getElementById('smHero').value.trim();
       var label=document.getElementById('smLabel').value.trim();
       var name=(label&&hero)?(label+'·'+hero):'skin';
-      var fn=(window.__TAURI_INTERNALS__&&window.__TAURI_INTERNALS__.invoke)||(window.__TAURI__&&window.__TAURI__.core&&window.__TAURI__.core.invoke);
-      if(typeof fn==='function'){
+      var fn=smGetInvoke();
+      if(fn){
         var base=document.getElementById('smBasePath').value.trim().replace(/[\\/]$/,'');
         var pngPath=base+'\\'+hero+'\\'+name+'.png';
         smStatus('下载中（写入 '+pngPath+'）…');
@@ -30802,8 +30808,17 @@ ${maSection}
           .catch(function(err){ smStatus('写入失败：'+smErrMsg(err)+'（可改路径或检查权限）',true); });
         return;
       }
+      if(window.showSaveFilePicker){
+        try{
+          var blob=await (await fetch(smExportDataURL())).blob();
+          var handle=await window.showSaveFilePicker({suggestedName:name+'.png', types:[{description:'PNG 图片', accept:{'image/png':['.png']}}]});
+          var w=await handle.createWritable(); await w.write(blob); await w.close();
+          smStatus('✅ 已保存到您选择的位置（'+name+'.png）。请存到 D:\\tfjl-web\\skins\\'+hero+'\\ 再让我入库', true);
+          return;
+        }catch(e){ if(e&&e.name==='AbortError'){ smStatus('已取消保存'); return; } }
+      }
       var a=document.createElement('a'); a.href=smExportDataURL(); a.download=name+'.png'; a.click();
-      smStatus('已触发浏览器下载 '+name+'.png（请到浏览器下载目录查看）');
+      smStatus('已下载到浏览器默认下载目录（'+name+'.png）。请手动移到 D:\\tfjl-web\\skins\\'+hero+'\\ ，再让我入库', true);
     }
     function smSave(){
       var hero=document.getElementById('smHero').value.trim();
@@ -30866,7 +30881,8 @@ ${maSection}
     window.openSkinMaker=function(){
       var ov=document.getElementById('skinMakerOverlay'); if(ov) ov.style.display='flex';
       smInit(); smRenderAll();
-      smStatus('选择一张透明/干净立绘，滚轮缩放、拖拽移动，选好底色后保存。');
+      var fn=smGetInvoke();
+      smStatus((fn?'✅ 已检测到 Tauri（可直接写 skins 目录）；':'⚠️ 未检测到 Tauri（将走「文件另存」，请手动选 D:\\tfjl-web\\skins\\英雄\\）；')+'选择透明立绘，滚轮缩放、拖拽移动，选好底色后点下载/保存。');
     };
     window.closeSkinMaker=function(){ var ov=document.getElementById('skinMakerOverlay'); if(ov) ov.style.display='none'; };
   })();
