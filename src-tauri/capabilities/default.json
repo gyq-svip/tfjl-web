@@ -22,6 +22,7 @@
     "allow-detect-file-encoding",
     "allow-write-text-file",
     "allow-git-push-fusions",
+    "allow-git-push-skins",
     "allow-flash-tray-icon",
     "allow-delete-file",
     "allow-path-exists",

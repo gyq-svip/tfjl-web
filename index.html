@@ -30481,7 +30481,7 @@ ${maSection}
     </div>
     <!-- 浮动控制台 -->
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" title="控制台日志">📟<span id="floatConsoleBadge" class="badge" style="display:none">0</span></button>
-    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260804-169</span>
+    <span id="versionTag" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新" style="position:fixed;bottom:10px;right:60px;font-size:10px;color:#666;cursor:pointer;pointer-events:auto;z-index:999;opacity:0.5;">v260804-170</span>
     <div id="floatConsole">
         <div id="floatConsoleTitle">
             <span>💻 控制台日志</span>
@@ -30698,7 +30698,8 @@ ${maSection}
           <div style="color:#ffd700;font-size:0.85rem;margin-bottom:6px;">最终效果预览（206×200）</div>
           <canvas id="skinMakerPreview" width="206" height="200" style="width:206px;height:200px;border:1px solid rgba(255,255,255,0.2);border-radius:10px;background:#000;display:block;margin-bottom:12px;"></canvas>
           <button id="smSave" style="width:100%;background:linear-gradient(135deg,#ffd700,#ff9800);border:none;color:#1a1a2e;border-radius:10px;padding:10px;cursor:pointer;font-size:0.9rem;font-weight:600;">💾 保存并登记到 skins 目录</button>
-          <div id="smStatus" style="margin-top:10px;font-size:0.78rem;color:rgba(255,255,255,0.7);line-height:1.5;"></div>
+          <button id="smPush" style="width:100%;margin-top:8px;background:linear-gradient(135deg,#4caf50,#2e7d32);border:none;color:#fff;border-radius:10px;padding:10px;cursor:pointer;font-size:0.9rem;font-weight:600;">🚀 一键推送到 GitHub / Gitee</button>
+          <div id="smStatus" style="margin-top:10px;font-size:0.78rem;color:rgba(255,255,255,0.7);line-height:1.5;white-space:pre-line;"></div>
         </div>
       </div>
     </div>
@@ -30851,6 +30852,14 @@ ${maSection}
           smStatus('保存失败：'+smErrMsg(err)+'（若不在桌面App内，可用"下载PNG"拿到图片后交给我）',true);
         });
     }
+    function smPush(){
+      var fn=smGetInvoke();
+      if(!fn){ smStatus('当前环境无法推送：需在桌面App内且已更新到含「一键推送」的版本。可手动让我推送。',true); return; }
+      smStatus('推送中…');
+      fn('git_push_skins').then(function(res){
+        smStatus('✅ 推送完成：\n'+res+'\n刷新 App 即可看到新皮肤。');
+      }).catch(function(err){ smStatus('推送失败：'+smErrMsg(err),true); });
+    }
     function smInit(){
       if(smInited) return; smInited=true;
       var cv=document.getElementById('skinMakerCanvas');
@@ -30873,6 +30882,7 @@ ${maSection}
       var rs=document.getElementById('smReset'); if(rs) rs.addEventListener('click', function(){ smScale=1; smOffX=0; smOffY=0; if(z){z.value=1; document.getElementById('smZoomVal').textContent='1.00';} smRenderAll(); });
       var dl=document.getElementById('smDownload'); if(dl) dl.addEventListener('click', smDownload);
       var sv=document.getElementById('smSave'); if(sv) sv.addEventListener('click', smSave);
+      var pb=document.getElementById('smPush'); if(pb) pb.addEventListener('click', function(){ smPush(); });
       var h=document.getElementById('smHero'), l=document.getElementById('smLabel');
       if(h) h.addEventListener('input', smRenderAll);
       if(l) l.addEventListener('input', smRenderAll);
