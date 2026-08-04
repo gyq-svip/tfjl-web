@@ -3025,6 +3025,10 @@
                     <div id="cgmFusionStatus" style="font-size:0.78rem;white-space:pre-wrap;margin-top:8px;min-height:16px;"></div>
                     <div style="margin-top:10px;padding-top:10px;border-top:1px dashed rgba(255,255,255,0.15);">
                         <button id="cgmCutAllBtn" onclick="cgmCutAllFusions()" style="width:100%;padding:9px 12px;border:none;border-radius:8px;background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;cursor:pointer;font-size:0.85rem;font-weight:600;">🚀 一键全切所有融合卡副卡（补刀：把全部副卡皮肤批量切好入库）</button>
+                        <div id="cgmCutProgressWrap" style="display:none;margin-top:8px;">
+                            <div style="display:flex;justify-content:space-between;font-size:0.72rem;color:rgba(255,255,255,0.7);margin-bottom:3px;"><span id="cgmCutProgressText">切皮中…</span><span id="cgmCutProgressPct">0%</span></div>
+                            <div style="height:8px;background:rgba(255,255,255,0.12);border-radius:5px;overflow:hidden;"><div id="cgmCutProgressBar" style="height:100%;width:0%;background:linear-gradient(90deg,#4caf50,#2e7d32);transition:width .2s;"></div></div>
+                        </div>
                         <div id="cgmFusedStatus" style="font-size:0.78rem;white-space:pre-wrap;margin-top:8px;min-height:16px;"></div>
                     </div>
                 </div>
@@ -17051,6 +17055,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         async function cgmCutAllFusions() {
             const status = document.getElementById('cgmFusedStatus');
             const btn = document.getElementById('cgmCutAllBtn');
+            const progWrap = document.getElementById('cgmCutProgressWrap');
+            const progBar = document.getElementById('cgmCutProgressBar');
+            const progText = document.getElementById('cgmCutProgressText');
+            const progPct = document.getElementById('cgmCutProgressPct');
             if (!window.cloudFusions || !Object.keys(window.cloudFusions).length) {
                 status.style.color = '#ff9e80'; status.textContent = '没有融合卡定义，请先去「融合卡」Tab 添加'; return;
             }
@@ -17061,7 +17069,11 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const subs = [...subSet];
             if (!subs.length) { status.style.color = '#ff9e80'; status.textContent = '融合卡未包含副卡英雄'; return; }
             btn.disabled = true; const old = btn.textContent; btn.textContent = '⏳ 批量切皮中…';
-            status.style.color = '#4ecdc4'; status.textContent = '批量切皮中：共 ' + subs.length + ' 个副卡英雄…';
+            if (progWrap) progWrap.style.display = 'block';
+            if (progBar) progBar.style.width = '0%';
+            if (progPct) progPct.textContent = '0%';
+            if (progText) progText.textContent = '批量切皮中：共 ' + subs.length + ' 个副卡英雄…';
+            status.style.color = '#4ecdc4'; status.textContent = '批量切皮中…（进度见上方进度条）';
             let registry = null;
             try { const local = await _cgmReadRepoFile('skins/registry.json'); if (local) registry = JSON.parse(local); } catch (e) {}
             if (!registry || !registry.heroes) registry = { version: 2, heroes: {} };
@@ -17081,13 +17093,18 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 if (!blobs.length) { skip++; continue; }
                 registry.heroes['融合' + hero] = await cgmWriteFusedHero(hero, blobs);
                 ok++;
-                status.textContent = '批量切皮中：' + ok + '/' + subs.length + '（' + hero + ' 完成）';
+                const pct = Math.round(ok / subs.length * 100);
+                if (progBar) progBar.style.width = pct + '%';
+                if (progPct) progPct.textContent = pct + '%';
+                if (progText) progText.textContent = '切皮中：' + ok + '/' + subs.length + '（' + hero + ' 完成）';
+                if (status) status.textContent = '切皮中：' + ok + '/' + subs.length + '（' + hero + ' 完成）';
             }
             registry.updated = new Date().toISOString();
             try { await _cgmWriteRepoFile('skins/registry.json', JSON.stringify(registry, null, 2)); } catch (e) {}
             btn.disabled = false; btn.textContent = old;
+            if (progWrap) progWrap.style.display = 'none';
             status.style.color = '#4ade80';
-            status.textContent = '✓ 已批量切 ' + ok + ' 个副卡英雄（共 ' + skip + ' 个无皮肤跳过）\n✓ 已写入 skins/registry.json 与各 skins/融合XX/ 目录\n下一步：到「🎨 皮肤制作」Tab 点「🚀 一键推送」把 skins/ 推上线（git_push_skins 会自动包含 skins/）';
+            status.textContent = '✅ 全部切完！共切 ' + ok + ' 个副卡英雄（' + skip + ' 个无皮肤跳过）\n已写入 skins/registry.json 与各 skins/融合XX/ 目录\n👉 现在切到「🎨 皮肤制作」Tab，点 🚀 一键推送 把 skins/ 推上线（git_push_skins 会自动包含 skins/）';
         }
 
         function toggleFusionSkinSplit(on) {
