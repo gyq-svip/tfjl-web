@@ -30212,7 +30212,11 @@ ${maSection}
             </div>
             <div style="color:#fff;display:flex;align-items:center;gap:6px;">
                 <span style="color:#4ecdc4;">🔖</span>
-                <span>版本: <strong id="versionTag" style="color:#ffd700;cursor:pointer;user-select:none;" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新">v260804-203 · sw-v321</strong></span>
+                <span>版本: <strong id="currentVersionText" style="color:#ffd700;">加载中…</strong></span>
+            </div>
+            <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏，仅开发者可点击核对/强制刷新 -->
+            <div style="display:flex;align-items:center;margin-left:auto;opacity:0.18;">
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.6);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260804-204 · sw-v322</span>
             </div>
         </div>
     </div>
