@@ -3117,6 +3117,7 @@
                     <option value="">选择皮肤…</option>
                   </select>
                   <button id="smDelBtn" onclick="smDeleteSkin()" style="padding:8px 14px;border:none;border-radius:8px;background:linear-gradient(135deg,#ff5252,#b71c1c);color:#fff;cursor:pointer;font-size:0.85rem;font-weight:600;white-space:nowrap;">🗑 删除此皮肤</button>
+                  <button onclick="smInitDelSkinUI()" title="皮肤注册表是异步加载的，列表为空时点此刷新" style="padding:8px 12px;border:1px solid rgba(255,255,255,0.25);border-radius:8px;background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;font-size:0.85rem;white-space:nowrap;">🔄 刷新</button>
                 </div>
                 <div id="smDelStatus" style="font-size:0.76rem;white-space:pre-wrap;min-height:14px;"></div>
               </div>
@@ -30531,7 +30532,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260804-223 · sw-v340</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260804-224 · sw-v341</span>
             </div>
         </div>
     </div>
@@ -30829,6 +30830,9 @@ ${maSection}
     }
     window.openSkinMaker=function(){
       smInit(); smRenderAll(); smInitDelSkinUI();
+      // 皮肤注册表（scanSkins + syncRemoteSkins）是异步加载的，刚打开 Tab 时可能尚未就绪 → 延迟补填删除列表，避免空列表
+      setTimeout(function(){ try{ smInitDelSkinUI(); }catch(e){} }, 600);
+      setTimeout(function(){ try{ smInitDelSkinUI(); }catch(e){} }, 1600);
       var fn=smGetInvoke();
       smStatus((fn?'✅ 已检测到 Tauri（可直接写 skins 目录）；':'⚠️ 未检测到 Tauri（将走「文件另存」，请手动选 D:\\tfjl-web\\skins\\英雄\\）；')+'选择透明立绘，滚轮缩放、拖拽移动，选好底色后点下载/保存。');
     };
