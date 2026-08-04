@@ -10730,6 +10730,7 @@
                     teammatePlacedCards: [],
                     cardLevels: {},
                     cardSkins: {},
+                    fusionSkins: {},
                     myDeckInfo: '',
                     teammateDeckInfo: '',
                     notepad: '',
@@ -12828,6 +12829,7 @@
                         cardLevels = project.cardLevels || {};
                         // 直接用项目自己的皮肤设置覆盖（避免上一个项目的皮肤串到这个项目）
                         cardSkins = project.cardSkins || {};
+                        fusionSkins = project.fusionSkins || {}; // 副卡皮肤按项目独立保存，不污染全局
                         cardMoHua = project.cardMoHua || {};
                         saveCardSkins();
                         
@@ -12943,6 +12945,7 @@
             // 清空皮肤/墨化/等级（避免上个项目残留）
             if (typeof cardLevels !== 'undefined') cardLevels = {};
             if (typeof cardSkins !== 'undefined') cardSkins = {};
+            if (typeof fusionSkins !== 'undefined') fusionSkins = {};
             if (typeof cardMoHua !== 'undefined') cardMoHua = {};
             if (typeof updateAllCardLevelDisplays === 'function') updateAllCardLevelDisplays();
             // 刷新卡池徽章，反映清理后的全局预设状态（魔化等上一个项目的残留标记一并清除）
@@ -13177,6 +13180,7 @@
                     teammatePlacedCards: [],
                     cardLevels: {},
                     cardSkins: {},
+                    fusionSkins: {},
                     myDeckInfo: '',
                     teammateDeckInfo: '',
                     notepad: '',
@@ -13247,6 +13251,7 @@
                 teammatePlacedCards: (typeof teammatePlacedCards !== 'undefined') ? teammatePlacedCards : [],
                 cardLevels: (typeof cardLevels !== 'undefined') ? cardLevels : {},
                 cardSkins: (typeof cardSkins !== 'undefined') ? cardSkins : {},
+                fusionSkins: (typeof fusionSkins !== 'undefined') ? fusionSkins : {},
                 cardMoHua: (typeof cardMoHua !== 'undefined') ? cardMoHua : {},
                 myDeckInfo: (document.getElementById('myDeckInfo') ? document.getElementById('myDeckInfo').value : ''),
                 teammateDeckInfo: (document.getElementById('teammateDeckInfo') ? document.getElementById('teammateDeckInfo').value : ''),
@@ -16514,6 +16519,7 @@
                 teammatePlacedCards: teammatePlacedCards,
                 cardLevels: cardLevels,
                 cardSkins: cardSkins,
+                fusionSkins: (typeof fusionSkins !== 'undefined') ? fusionSkins : {},
                 cardMoHua: cardMoHua,
                 myDeckInfo: document.getElementById('myDeckInfo')?.value || '',
                 teammateDeckInfo: document.getElementById('teammateDeckInfo')?.value || '',
@@ -16605,7 +16611,8 @@
         let cardLevels = {};
         let individualCardLevels = {}; // 每张卡的独立等级存储
         let cardSkins = {}; // 每张卡的皮肤存储（项目级）{ "my_47": "烈焰皮肤", ... }
-        let defaultCardSkins = {}; // 全局默认皮肤（英雄级，跨项目/跨上阵记住）{ "47": "太平乐·火灵", ... }
+        let fusionSkins = {}; // 副卡（被融合卡）皮肤存储（项目级）{ "副卡英雄名": "皮肤名"/""(关闭) }，只作用于当前项目，不污染全局
+        let defaultCardSkins = {}; // 全局默认皮肤（英雄级，卡池常用皮，跨项目保留）{ "47": "太平乐·火灵", ... }
         let cardMoHua = {}; // 每张卡的魔化开关 { "my_47": true, ... }
         let professionOrder = [];
         const MAX_HAND_CARDS = 10;
@@ -16786,8 +16793,16 @@
             return null;
         }
 
-        // 被融合卡（副卡）皮肤：取该英雄当前选中皮肤（heroSkinSelections，即卡分类里设的皮肤），无则默认
+        // 被融合卡（副卡）皮肤：优先取当前项目独立设置的 fusionSkins，无则回退卡池全局默认皮肤（defaultCardSkins → heroSkinSelections）
         function getFusionComponentSkin(heroName) {
+            if (window.fusionSkins && window.fusionSkins[heroName] !== undefined) {
+                const s = window.fusionSkins[heroName];
+                return s ? s : '默认';
+            }
+            if (typeof getHeroDefaultSkin === 'function') {
+                const s = getHeroDefaultSkin(heroName);
+                return s ? s : '默认';
+            }
             if (window.heroSkinSelections && window.heroSkinSelections[heroName] !== undefined) {
                 const s = window.heroSkinSelections[heroName];
                 return s ? s : '默认';
@@ -16797,8 +16812,9 @@
         // 融合关闭（副卡隐藏，heroSkinSelections[副卡]===''）时，卡面只显示主卡名；否则显示完整融合名
         function getFusionDisplayName(fullName) {
             const parts = (typeof getFusionParts === 'function') ? getFusionParts(fullName) : null;
-            if (parts && parts.length >= 2 && window.heroSkinSelections && window.heroSkinSelections[parts[1]] === '') {
-                return parts[0];
+            if (parts && parts.length >= 2) {
+                if (window.fusionSkins && window.fusionSkins[parts[1]] === '') return parts[0];
+                if (window.heroSkinSelections && window.heroSkinSelections[parts[1]] === '') return parts[0];
             }
             return fullName;
         }
@@ -17020,6 +17036,7 @@
             if (!fusedHero) return null;
             // 用户明确选了「不显示副卡」→ 直接不显示
             // （getFusionComponentSkin 会把 '' 归一为 '默认'，需在此提前判，否则下面仍会回退到默认图）
+            if (window.fusionSkins && window.fusionSkins[fusedHero] === '') return null;
             if (window.heroSkinSelections && window.heroSkinSelections[fusedHero] === '') return null;
             const sel = getFusionComponentSkin(fusedHero) || '默认';
             // ① 云端已发布融合整图（融合XX 切皮）：必须按用户【当前选择的副卡皮肤】取对应切图，
@@ -17053,13 +17070,13 @@
         async function cycleFusionFusedSkin(fusedHero, slotId) {
             const skins = window.getHeroSkins ? window.getHeroSkins(fusedHero) : [];
             if (!skins.length) return;
-            const current = window.heroSkinSelections ? window.heroSkinSelections[fusedHero] : '';
+            const current = (window.fusionSkins && window.fusionSkins[fusedHero] !== undefined) ? window.fusionSkins[fusedHero] : (window.heroSkinSelections ? window.heroSkinSelections[fusedHero] : '');
             const cycleList = skins.map(s => s.name).filter(name => name !== fusedHero).concat(['']);
             const effectiveCurrent = (current === fusedHero) ? '' : current;
             const idx = cycleList.indexOf(effectiveCurrent);
             const nextIdx = (idx + 1) % cycleList.length;
             const nextSkin = cycleList[nextIdx];
-            if (window.selectHeroSkin) window.selectHeroSkin(fusedHero, nextSkin);
+            await setFusionSkin(fusedHero, nextSkin); // 只写当前项目副卡皮肤，不污染全局
             await invalidateFusionHalfCache(fusedHero); // 旧皮肤徽章缓存失效，重新切
             const slot = document.querySelector('.battle-slot[data-slot="' + slotId + '"]');
             if (slot) {
@@ -17112,7 +17129,7 @@
             const isNowFusion = !!(curParts && curParts.length >= 2);
             const currentVariant = isNowFusion ? heroName : null;
             const currentSubHero = isNowFusion ? curParts[1] : null;
-            const currentSkin = currentSubHero ? (window.heroSkinSelections ? (window.heroSkinSelections[currentSubHero] || '') : '') : '';
+            const currentSkin = currentSubHero ? ((window.fusionSkins && window.fusionSkins[currentSubHero] !== undefined) ? (window.fusionSkins[currentSubHero] || '') : (window.heroSkinSelections ? (window.heroSkinSelections[currentSubHero] || '') : '')) : '';
             // '' / '默认' / 副卡同名 都视为默认皮（对应循环里副卡同名条目）
             const effectiveCurrentSkin = (currentSkin === '' || currentSkin === '默认') ? currentSubHero : currentSkin;
             let idx = -1;
@@ -17129,8 +17146,8 @@
                 return;
             }
             const entry = entries[nextIdx];
-            // 先设副卡皮肤，再切变体（升级卡名会按新变体重渲染皮肤）
-            if (window.selectHeroSkin) window.selectHeroSkin(entry.subHero, entry.skin);
+            // 先设副卡皮肤（只写当前项目），再切变体（升级卡名会按新变体重渲染皮肤）
+            await setFusionSkin(entry.subHero, entry.skin);
             await invalidateFusionHalfCache(entry.subHero);
             if (entry.variant !== heroName) {
                 // 换变体：upgradeCardToFusion 内部已 applySkinBgToSlot + updateHandDisplay + autoSaveProject
@@ -18593,6 +18610,35 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             }
             // 换肤后刷新所有融合卡（主卡或被融合卡皮肤变化都要即时反映）
             if (typeof refreshAllFusionSkins === 'function') refreshAllFusionSkins();
+        }
+
+        // 设置副卡（被融合卡）皮肤：只写当前项目 fusionSkins，绝不污染全局 heroSkinSelections
+        async function setFusionSkin(fusedHero, skin) {
+            if (!fusedHero) return;
+            if (typeof window.fusionSkins === 'undefined') window.fusionSkins = {};
+            window.fusionSkins[fusedHero] = skin; // '' = 关闭副卡显示
+            if (typeof persistFusionSkins === 'function') await persistFusionSkins();
+        }
+        // 立即把副卡皮肤偏好落盘到当前项目记录（与 persistProjectSkins 对称）
+        async function persistFusionSkins() {
+            if (typeof window.fusionSkins === 'undefined') window.fusionSkins = {};
+            if (!db || !currentProjectName) return;
+            try {
+                await new Promise((resolve) => {
+                    const t = db.transaction([STORE_NAME], 'readwrite');
+                    const s = t.objectStore(STORE_NAME);
+                    const req = s.get(currentProjectName);
+                    req.onsuccess = () => {
+                        const p = req.result;
+                        if (p) { p.fusionSkins = window.fusionSkins; s.put(p); }
+                        resolve();
+                    };
+                    req.onerror = () => resolve();
+                    t.oncomplete = () => resolve();
+                    t.onerror = () => resolve();
+                });
+                if (typeof persistProjectsToDisk === 'function') persistProjectsToDisk();
+            } catch (e) { console.warn('[SKIN] persistFusionSkins failed:', e); }
         }
         
         // 保存皮肤数据到localStorage
@@ -20786,13 +20832,11 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         this.classList.remove('skin-bg');
                         const oldLayer = this.querySelector('.skin-layer');
                         if (oldLayer) oldLayer.remove();
-                        // 用空字符串标记默认无皮肤（避免下次 resolve 又自动填充回皮肤）
-                        if (window.selectHeroSkin) window.selectHeroSkin(skinHeroName, '');
+                        // 用空字符串标记默认无皮肤（仅写当前项目卡级皮肤，不污染全局）
                         if (_cid) { try { await setCardSkin(_cid, '', _ht); } catch (e) {} }
                         console.log('[SKIN] Single-skin toggled OFF for', heroName, '(skin key:', skinHeroName, ')');
                     } else {
-                        // 打开皮肤
-                        if (window.selectHeroSkin) window.selectHeroSkin(skinHeroName, skins[0].name);
+                        // 打开皮肤（仅写当前项目卡级皮肤，不污染全局）
                         if (_cid) { try { await setCardSkin(_cid, skins[0].name, _ht); } catch (e) {} }
                         try { await applySkinBgToSlot(this, heroName); } catch (e) { console.error('[SKIN] applySkinBgToSlot error in right-click:', e); }
                         console.log('[SKIN] Single-skin toggled ON for', heroName, '(skin key:', skinHeroName, ')');
@@ -20815,8 +20859,14 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             console.log('[SKIN] getHeroSkins result:', skins.length, 'skins:', skins.map(s => s.name));
             if (!skins.length) { console.warn('[SKIN] No skins available, aborting cycle'); return; }
             const baseHero = (typeof getMainCardName === 'function') ? getMainCardName(heroName) : ((window.getBaseHeroName && window.getBaseHeroName(heroName).heroName) || heroName);
-            const current = window.heroSkinSelections ? window.heroSkinSelections[baseHero] : '';
-            console.log('[SKIN] baseHero:', baseHero, 'current selection:', current);
+            // 先拿到槽位上的卡 id / 阵营，用于读取"当前项目内该卡皮肤"作为循环起点
+            const cycleSlot = document.querySelector('.battle-slot[data-slot="' + slotId + '"]');
+            const cardId = cycleSlot && cycleSlot.dataset ? cycleSlot.dataset.cardId : null;
+            const handType = (cycleSlot && cycleSlot.dataset && cycleSlot.dataset.handType) ? cycleSlot.dataset.handType : 'my';
+            // 当前皮肤 = 当前项目该卡已设皮肤（cardSkins 优先）；无则读取全局默认（只读，不写全局）
+            let current = (cardId && typeof getCardSkin === 'function') ? (getCardSkin(cardId, heroName, handType) || '') : '';
+            if (current === '默认' || current === baseHero) current = ''; // 归一化：默认/英雄同名 → 空(默认档)
+            console.log('[SKIN] baseHero:', baseHero, 'current project skin:', current);
             // 循环列表：排除与英雄同名的默认皮肤（'' 即代表默认，避免重复显示同一张图）
             // 如 水灵 skins=[水灵, 刘备·水灵, ...] → cycleList=[刘备·水灵, 其他·水灵, ..., '']
             const cycleList = skins.map(s => s.name).filter(name => name !== baseHero).concat(['']);
@@ -20826,13 +20876,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const nextIdx = (idx + 1) % cycleList.length;
             const nextSkin = cycleList[nextIdx];
             console.log('[SKIN] Cycling from', current || '(default)', 'to', nextSkin || '(default)', '(idx', idx, '->', nextIdx, ')');
-            if (window.selectHeroSkin) window.selectHeroSkin(heroName, nextSkin);
-            console.log('[SKIN] After selectHeroSkin, heroSkinSelections[' + baseHero + ']:', window.heroSkinSelections[baseHero]);
-            // 同时写回卡级存储（最高优先级），让当前这张卡立刻切换皮肤图
-            // —— 否则角标设过的皮肤（cardSkins）会一直压住 heroSkinSelections，右键只改名字不改图
-            const cycleSlot = document.querySelector('.battle-slot[data-slot="' + slotId + '"]');
-            const cardId = cycleSlot && cycleSlot.dataset ? cycleSlot.dataset.cardId : null;
-            const handType = (cycleSlot && cycleSlot.dataset && cycleSlot.dataset.handType) ? cycleSlot.dataset.handType : 'my';
+            // 只写当前项目卡级皮肤（cardSkins），绝不调用 selectHeroSkin 污染全局 heroSkinSelections
             if (cardId) {
                 try { await setCardSkin(cardId, nextSkin, handType); } catch (e) { console.warn('[SKIN] setCardSkin in cycle failed:', e); }
             }
@@ -31037,7 +31081,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-258 · sw-v375</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-260 · sw-v377</span>
             </div>
         </div>
     </div>
@@ -31343,12 +31387,21 @@ ${maSection}
       if(!hero) return;
       var list=[];
       // 优先读仓库 skins/registry.json（切皮/删皮的权威源），兜底回退 skinRegistry
+      var readErr=null;
       try{
         var local=await _cgmReadRepoFile('skins/registry.json');
         if(local){ var reg=JSON.parse(local); if(reg&&reg.heroes&&reg.heroes[hero]) list=reg.heroes[hero]; }
-      }catch(e){}
+      }catch(e){ readErr=e; }
       if(!list.length && window.skinRegistry && window.skinRegistry[hero]) list=window.skinRegistry[hero];
-      if(!list.length){ var o=document.createElement('option'); o.value=''; o.textContent='（该英雄暂无可删皮肤）'; o.disabled=true; ssel.appendChild(o); return; }
+      if(!list.length){
+        var msg;
+        if(readErr){
+          msg='（读取仓库失败：'+ (readErr.message||readErr) +'；请在 App 内操作或刷新皮肤库）';
+        } else {
+          msg='（该英雄暂无可删皮肤）';
+        }
+        var o=document.createElement('option'); o.value=''; o.textContent=msg; o.disabled=true; o.style.color='#ff9e80'; ssel.appendChild(o); return;
+      }
       list.forEach(function(s){ var o=document.createElement('option'); o.value=s.name; o.textContent=s.name; ssel.appendChild(o); });
     }
     async function smDeleteSkin(){
@@ -31368,7 +31421,18 @@ ${maSection}
         await _cgmWriteRepoFile('skins/registry.json', JSON.stringify(registry,null,2));
         if(window.skinRegistry&&window.skinRegistry[hero]){ window.skinRegistry[hero]=window.skinRegistry[hero].filter(function(s){ return s.name!==skin; }); }
         smRefreshDelSkinList();
-        if(status){ status.style.color='#4ade80'; status.textContent='✓ 已移除「'+hero+' · '+skin+'」的皮肤登记\n（磁盘文件 skins/'+hero+'/ 未删，需彻底清理可手动删除对应 png）'; }
+        // 推送到云端（GitHub + Gitee），让所有人刷新即生效；非 App 环境（纯网页无 Tauri）则提示手动处理
+        var fn=smGetInvoke();
+        if(fn){
+          try{
+            await fn('git_push_skins', {});
+            if(status){ status.style.color='#4ade80'; status.textContent='✓ 已移除「'+hero+' · '+skin+'」的皮肤登记，并已推送云端（GitHub/Gitee）。\n（磁盘文件 skins/'+hero+'/ 未删，需彻底清理可手动删除对应 png）'; }
+          }catch(e2){
+            if(status){ status.style.color='#ff9e80'; status.textContent='⚠️ 本地登记已移除，但云端推送失败：'+(e2&&e2.message?e2.message:e2)+'\n请检查网络/代理后重试，或手动 git 推送。'; }
+          }
+        } else {
+          if(status){ status.style.color='#ffd700'; status.textContent='✓ 本地登记已移除（仅网页环境，无法自动推送）。\n请在 App 内执行删除，或手动 git 推送 skins/registry.json。\n（磁盘文件 skins/'+hero+'/ 未删）'; }
+        }
       }catch(e){ if(status){status.style.color='#ff9e80';status.textContent='✗ 删除失败：'+e.message;} }
     }
     window.openSkinMaker=function(){
