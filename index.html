@@ -17068,9 +17068,42 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 list.appendChild(row);
             }
         }
+        // 删除融合卡定义时，同步清理其副卡（components[1]）切出来的「融合XX」皮
+        async function cgmDeleteFusionSkin(subHero) {
+            const key = '融合' + subHero;
+            try {
+                const local = await _cgmReadRepoFile('skins/registry.json');
+                const registry = local ? JSON.parse(local) : { version: 2, heroes: {} };
+                if (!registry.heroes) registry.heroes = {};
+                const skins = registry.heroes[key] || [];
+                // 删磁盘 png
+                for (const s of skins) {
+                    const fn = s.file || (key + '_' + (s.name === '默认' ? 'default' : s.name) + '.png');
+                    try { await _cgmInvoke('delete_file', { filePath: 'd:\\tfjl-web\\skins\\' + key + '\\' + fn }); } catch (e) {}
+                }
+                delete registry.heroes[key];
+                registry.updated = new Date().toISOString();
+                await _cgmWriteRepoFile('skins/registry.json', JSON.stringify(registry, null, 2));
+                if (window.skinRegistry) delete window.skinRegistry[key];
+                return skins.length;
+            } catch (e) { return -1; }
+        }
         async function cgmDeleteFusionCard(name) {
             if (!window.cloudFusions || !window.cloudFusions[name]) return;
-            if (!confirm('确认删除融合卡「' + name + '」？\n删除仅改本地 fusions.json，需重新 git 推送才对线上生效。')) return;
+            const fusion = window.cloudFusions[name];
+            const subHero = (fusion && Array.isArray(fusion.components) && fusion.components.length >= 2) ? fusion.components[1] : null;
+            // 三档：仅删定义 / 删定义+副卡皮 / 取消
+            let mode = 'def';
+            if (subHero) {
+                const msg = '删除融合卡「' + name + '」：\n\n点「确定」= 仅删定义（皮「融合' + subHero + '」保留）\n点「取消」后弹窗选「删皮」= 定义+切的皮一起删\n\n是否仅删除定义？';
+                if (!confirm(msg)) {
+                    const del = confirm('确认同时删除切出来的皮肤「融合' + subHero + '」？\n（将从 registry.json 移除并删除 skins/融合' + subHero + '/ 下相关 png）');
+                    if (!del) return; // 用户两次都取消 → 不删
+                    mode = 'both';
+                }
+            } else {
+                if (!confirm('确认删除融合卡「' + name + '」？\n删除仅改本地 fusions.json，需重新 git 推送才对线上生效。')) return;
+            }
             const status = document.getElementById('cgmFusionStatus');
             try {
                 const base = JSON.parse(JSON.stringify(window.cloudFusions));
@@ -17078,12 +17111,17 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 const content = JSON.stringify({ version: 1, updated: new Date().toISOString(), note: '融合卡定义：components 为参与融合的2张基础卡。', fusions: base }, null, 2);
                 await _cgmWriteRepoFile('skins/fusions.json', content);
                 window.cloudFusions = base;
+                let skinMsg = '';
+                if (mode === 'both' && subHero) {
+                    const n = await cgmDeleteFusionSkin(subHero);
+                    skinMsg = (n > 0 ? '\n✓ 已一并删除副卡皮「融合' + subHero + '」（' + n + ' 张 png + registry 登记）' : (n === 0 ? '\n（副卡皮「融合' + subHero + '」无登记，跳过）' : ''));
+                }
                 cgmRefreshFusionList();
                 cgmRefreshAllSlots();
                 if (typeof renderFusionCardsToPool === 'function') renderFusionCardsToPool();
                 if (status) {
                     status.style.color = '#4ade80';
-                    status.textContent = '✓ 已删除「' + name + '」并写入 fusions.json\n请在本机终端运行：\n  cd d:\\tfjl-web\n  git add skins/fusions.json\n  git commit -m "fusion: 删除 ' + name + '"\n  git push origin main\n  git -c http.proxy= -c https.proxy= push gitee';
+                    status.textContent = '✓ 已删除「' + name + '」并写入 fusions.json' + skinMsg + '\n请在本机终端运行：\n  cd d:\\tfjl-web\n  git add skins/fusions.json' + (mode === 'both' ? ' skins/registry.json skins/融合' + subHero + '/*' : '') + '\n  git commit -m "fusion: 删除 ' + name + '"\n  git push origin main\n  git -c http.proxy= -c https.proxy= push gitee';
                 }
             } catch (e) {
                 if (status) { status.style.color = '#ff9e80'; status.textContent = '✗ 删除失败：' + e.message; }
@@ -30492,7 +30530,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260804-220 · sw-v337</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260804-221 · sw-v338</span>
             </div>
         </div>
     </div>
