@@ -3011,7 +3011,6 @@
                     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
                         <select id="cgmFusionProf" style="flex:1;min-width:120px;padding:8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:#2a2a4a;color:#fff;font-size:0.85rem;cursor:pointer;">
                             <option value="">职业（可选）</option>
-                            <option>战士</option><option>法师</option><option>射手</option><option>辅助</option><option>刺客</option>
                         </select>
                         <select id="cgmFusionQuality" style="flex:1;min-width:120px;padding:8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:#2a2a4a;color:#fff;font-size:0.85rem;cursor:pointer;">
                             <option value="">品质（可选）</option>
@@ -3039,7 +3038,6 @@
                     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
                         <select id="cgmHeroProf" style="flex:1;min-width:120px;padding:8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:#2a2a4a;color:#fff;font-size:0.85rem;cursor:pointer;">
                             <option value="">职业（可选）</option>
-                            <option>战士</option><option>法师</option><option>射手</option><option>辅助</option><option>刺客</option>
                         </select>
                         <select id="cgmHeroQuality" style="flex:1;min-width:120px;padding:8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:#2a2a4a;color:#fff;font-size:0.85rem;cursor:pointer;">
                             <option value="">品质（可选）</option>
@@ -16930,8 +16928,21 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const modal = document.getElementById('cardGroupMgrModal');
             if (modal) modal.style.display = 'flex';
             const t = tab || 'fusion';
+            cgmInitProfOptions();
             cgmSwitchTab(t);
             cgmRefreshFusionList();
+        }
+        // 职业下拉动态填充现有职业（读取 PROFESSION_KEY_MAP，不再硬编码乱写的职业）
+        function cgmInitProfOptions() {
+            const profs = (typeof PROFESSION_KEY_MAP === 'object' && PROFESSION_KEY_MAP)
+                ? Object.keys(PROFESSION_KEY_MAP)
+                : ['工程', '战士', '法师', '射手', '召唤', '牧师', '术士', '熊猫', '精灵球'];
+            ['cgmFusionProf', 'cgmHeroProf'].forEach(id => {
+                const sel = document.getElementById(id);
+                if (!sel) return;
+                sel.innerHTML = '<option value="">职业（可选）</option>' +
+                    profs.map(p => '<option value="' + p + '">' + p + '</option>').join('');
+            });
         }
         function cgmSwitchTab(tab) {
             const panes = { fusion: 'cgmFusionPane', hero: 'cgmHeroPane', skin: 'cgmSkinPane' };
@@ -30671,7 +30682,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260804-238 · sw-v355</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260804-239 · sw-v356</span>
             </div>
         </div>
     </div>
