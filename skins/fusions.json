@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated": "2026-08-04T05:41:49.642Z",
+  "updated": "2026-08-04T05:42:41.398Z",
   "note": "融合卡定义：components 为参与融合的2张基础卡。",
   "fusions": {
     "火炮射线": {
@@ -193,6 +193,14 @@
         "冰弓"
       ],
       "profession": "射手",
+      "quality": "金"
+    },
+    "霸王石头": {
+      "components": [
+        "霸王",
+        "石头"
+      ],
+      "profession": "战士",
       "quality": "金"
     }
   }
