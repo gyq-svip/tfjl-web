@@ -7988,14 +7988,15 @@
             if (modal) modal.remove();
         }
 
-        // ===== 方案C：悬浮提示 tooltip（读取 data-tip，事件委托） =====
+        // ===== 悬浮提示 tooltip（读取 data-tip） =====
         (function initTooltips() {
             let tipEl = null;
-            let _lastShowTime = 0;
+            let _curEl = null;
             function getTip() {
                 if (!tipEl) {
                     tipEl = document.createElement('div');
                     tipEl.className = 'tfjl-tooltip';
+                    tipEl.setAttribute('role', 'tooltip');
                     document.body.appendChild(tipEl);
                 }
                 return tipEl;
@@ -8003,6 +8004,9 @@
             function showTip(el) {
                 const text = el.getAttribute('data-tip');
                 if (!text) return;
+                // 保底：把 data-tip 同步到原生 title。WebView2 下若自定义提示仍不弹，
+                // 至少原生 tooltip 能弹，杜绝"静默失效"（多次反馈的根因）。
+                if (!el.getAttribute('title')) { try { el.setAttribute('title', text); } catch (e2) {} }
                 const tip = getTip();
                 tip.textContent = text;
                 const r = el.getBoundingClientRect();
@@ -8017,25 +8021,35 @@
                 tip.style.top = top + 'px';
                 tip.setAttribute('data-pos', pos);
                 tip.classList.add('show');
-                _lastShowTime = Date.now();
             }
-            function hideTip() { if (tipEl) tipEl.classList.remove('show'); }
-            let _curEl = null;
+            function hideTip() { if (tipEl) tipEl.classList.remove('show'); _curEl = null; }
+            function findTipEl(e) {
+                // WebView2 下 e.target 命中偶发不准，优先用元素命中测试取真实顶层元素
+                let el = null;
+                try {
+                    if (typeof e.clientX === 'number' && typeof e.clientY === 'number') {
+                        const hit = document.elementFromPoint(e.clientX, e.clientY);
+                        if (hit && hit.closest) el = hit.closest('[data-tip]');
+                    }
+                } catch (e2) {}
+                if (!el && e.target && e.target.closest) el = e.target.closest('[data-tip]');
+                return el;
+            }
             function onMove(e) {
-                const el = (e.target && e.target.closest) ? e.target.closest('[data-tip]') : null;
+                const el = findTipEl(e);
                 if (el) {
                     if (el !== _curEl) { _curEl = el; showTip(el); }
                 } else if (_curEl) {
-                    _curEl = null; hideTip();
+                    hideTip();
                 }
             }
-            // WebView2（桌面 App）下 mouseover/pointerover 委托多次反馈"悬浮提示不弹"——这类
-            // enter/leave 事件在 WebView2 中偶发不触发。改用 pointermove/mousemove 持续检测
-            // e.target.closest('[data-tip]')，鼠标只要在带 data-tip 的元素上移动就必弹，最稳妥。
+            // 多事件源兜底：WebView2 对不同指针事件的派发不稳定，pointermove/mousemove
+            // 持续检测 + mouseover/pointerover 补一组，任一触发即可弹。
             document.addEventListener('pointermove', onMove, { passive: true });
             document.addEventListener('mousemove', onMove, { passive: true });
+            document.addEventListener('mouseover', onMove, { passive: true });
+            document.addEventListener('pointerover', onMove, { passive: true });
             window.addEventListener('scroll', hideTip, true);
-            // 指针离开窗口时也隐藏，避免残留在屏幕上
             document.addEventListener('pointerleave', hideTip);
             window.addEventListener('blur', hideTip);
         })();
@@ -30528,7 +30542,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260804-226 · sw-v343</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260804-227 · sw-v344</span>
             </div>
         </div>
     </div>
