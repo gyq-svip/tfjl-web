@@ -1105,17 +1105,17 @@
             font-weight: bold;
             text-shadow: 0 1px 3px rgba(0,0,0,0.95), 0 0 5px rgba(0,0,0,0.85);
         }
-        /* ===== 融合卡：主卡满铺当背景 + 副卡缩小放右上角小圆角矩形（带金色外框 + 左下角切角） ===== */
+        /* ===== 融合卡：主卡满铺当背景 + 副卡缩小放左上角小圆角矩形（带金色外框 + 右下角切角） ===== */
         /* 尺寸与 JS 常量 FUSION_SIZE 保持一致，改大小只动一处 */
         .collapsible-section .card-item[data-fusion="true"] {
             background-size: cover;
             background-position: center;
         }
-        /* 融合卡副卡：右上角小圆角矩形 + 金色外框（filter:drop-shadow 不会被 background-image 裁掉） */
+        /* 融合卡副卡：左上角小圆角矩形 + 金色外框（filter:drop-shadow 不会被 background-image 裁掉） */
         .collapsible-section .card-item .skin-layer-fused {
             position: absolute;
-            right: 6px;
-            top: 6px;              /* 改到右上角，不遮挡卡牌下方的卡名 */
+            left: 6px;
+            top: 6px;              /* 改到左上角，不遮挡卡牌下方的卡名 */
             width: 40%;
             height: auto;
             aspect-ratio: 1 / 1;          /* 锁死正方形，配合 max-height 防止把卡牌撑变形 */
@@ -1125,7 +1125,7 @@
             z-index: 2;
             box-sizing: border-box;
             border: 3px solid #FFD700;    /* 金色外框，与主卡区分 */
-            clip-path: polygon(0 0, 100% 0, 100% 85%, 85% 100%, 0 100%);  /* 左下角切角，露出主卡 */
+            clip-path: polygon(0 0, 100% 0, 100% 85%, 85% 100%, 0 100%);  /* 右下角切角，露出主卡 */
             filter: drop-shadow(0 0 2px rgba(0,0,0,0.7));
         }
 
@@ -16543,7 +16543,7 @@ function applyFusionSkinToHandCard(card, mainUrl, fusedUrl, fusedIsBadge) {
         base.remove();
     }
 
-    // 副卡：右上角小圆角矩形 + 金色外框 + 左下角切角（好区分）
+    // 副卡：左上角小圆角矩形 + 金色外框 + 右下角切角（好区分）
     let overlay = card.querySelector('.hand-skin-fused');
     if (fusedUrl) {
         if (!overlay) {
@@ -16553,7 +16553,7 @@ function applyFusionSkinToHandCard(card, mainUrl, fusedUrl, fusedIsBadge) {
         }
         overlay.style.cssText = fusedIsBadge
             ? 'position:absolute;inset:0;width:100%;height:100%;object-fit:contain;border-radius:inherit;z-index:1;pointer-events:none;'
-            : 'position:absolute;right:6px;top:6px;width:' + FUSION_SIZE + ';height:auto;aspect-ratio:1/1;max-height:70%;object-fit:cover;box-sizing:border-box;border:3px solid #FFD700;clip-path:polygon(0 0,100% 0,100% 85%,85% 100%,0 100%);z-index:2;pointer-events:none;filter:drop-shadow(0 0 2px rgba(0,0,0,0.7));';
+            : 'position:absolute;left:6px;top:6px;width:' + FUSION_SIZE + ';height:auto;aspect-ratio:1/1;max-height:70%;object-fit:cover;box-sizing:border-box;border:3px solid #FFD700;clip-path:polygon(0 0,100% 0,100% 85%,85% 100%,0 100%);z-index:2;pointer-events:none;filter:drop-shadow(0 0 2px rgba(0,0,0,0.7));';
         if (overlay.src !== fusedUrl) overlay.src = fusedUrl;
     } else if (overlay && overlay.parentNode) {
         overlay.remove();
@@ -16586,7 +16586,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         base.remove();
     }
 
-    // 副卡：右上角小圆角矩形（金色外框 + 左下角切角）
+    // 副卡：左上角小圆角矩形（金色外框 + 右下角切角）
     let overlay = slot.querySelector('.skin-layer-fused');
     if (fusedUrl) {
         if (!overlay) {
@@ -16614,10 +16614,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 }
             });
         }
-        // isBadge:预切PNG(透明底+角落已含被融合卡)→满铺；否则副卡缩成小圆角矩形放右下白边框
+        // isBadge:预切PNG(透明底+角落已含被融合卡)→满铺；否则副卡缩成小圆角矩形放左上金边框
         overlay.style.cssText = fusedIsBadge
             ? 'position:absolute;inset:3px;width:calc(100% - 6px);height:calc(100% - 6px);object-fit:contain;border-radius:5px;z-index:1;pointer-events:none;'
-            : 'position:absolute;right:8px;top:8px;width:' + FUSION_SIZE + ';height:auto;aspect-ratio:1/1;max-height:70%;object-fit:cover;box-sizing:border-box;border:3px solid #FFD700;clip-path:polygon(0 0,100% 0,100% 85%,85% 100%,0 100%);z-index:2;cursor:pointer;filter:drop-shadow(0 0 2px rgba(0,0,0,0.7));';
+            : 'position:absolute;left:8px;top:8px;width:' + FUSION_SIZE + ';height:auto;aspect-ratio:1/1;max-height:70%;object-fit:cover;box-sizing:border-box;border:3px solid #FFD700;clip-path:polygon(0 0,100% 0,100% 85%,85% 100%,0 100%);z-index:2;cursor:pointer;filter:drop-shadow(0 0 2px rgba(0,0,0,0.7));';
         if (overlay.src !== fusedUrl) overlay.src = fusedUrl;
     } else if (overlay && overlay.parentNode) {
         overlay.remove();
@@ -30200,4 +30200,74 @@ ${maSection}
             <span style="color:#4ecdc4;font-size:0.9rem;font-weight:bold;">🏪 拍卖行 <span id="chatRoomIdDisplay" style="color:rgba(255,255,255,0.5);font-size:0.75rem;"></span></span>
             <div style="display:flex;gap:8px;align-items:center;">
                 <button onclick="openOwnerPanel()" title="房主管理" style="background:transparent;border:none;color:#a78bfa;font-size:0.85rem;cursor:pointer;padding:4px 8px;border:1px solid rgba(167,139,250,0.3);border-radius:4px;transition:all 0.2s;" onmouseover="this.style.background='rgba(167,139,250,0.2)'" onmouseout="this.style.background='transparent'">👑 房主</button>
-                <button onclick="switchChatRoom()" title="切换房间" style="background:transparent;border:none;color:#fbbf24;font-size:0.85rem;cursor:pointer;padding:4px 8px;border:1px solid rgba(255,215,0,0.3);border-radius:4px;transition:all 0.2s;" onmouseover="this.style.background='rgba(255,215,0,0.2)
+                <button onclick="switchChatRoom()" title="切换房间" style="background:transparent;border:none;color:#fbbf24;font-size:0.85rem;cursor:pointer;padding:4px 8px;border:1px solid rgba(255,215,0,0.3);border-radius:4px;transition:all 0.2s;" onmouseover="this.style.background='rgba(255,215,0,0.2)'" onmouseout="this.style.background='transparent'">🔄 切换</button>
+                <button onclick="closeChatRoom()" title="关闭" style="background:transparent;border:none;color:#ff6b6b;font-size:1rem;cursor:pointer;padding:4px 8px;">×</button>
+            </div>
+        </div>
+        <div id="chatRoomBody" style="flex:1;overflow-y:auto;padding:10px 15px;"></div>
+        <div id="chatRoomInputBar" style="padding:10px 15px;border-top:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.2);display:none;"></div>
+    </div>
+
+    <!-- 右下角版本标记（供前端更新核对 + extractVersion 解析） -->
+    <span id="versionTag" style="position:fixed;right:8px;bottom:54px;z-index:9991;font-size:0.72rem;color:#666;background:rgba(0,0,0,0.35);padding:2px 8px;border-radius:10px;pointer-events:auto;cursor:pointer;user-select:none;" onclick="showVersionPopup()" title="点击查看版本 / 刷新">v260804-197 · sw-v315</span>
+
+    <!-- 底部状态栏（在线统计 + 版本显示） -->
+    <div id="statsBar" style="position:fixed;bottom:0;left:0;right:0;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);border-top:2px solid rgba(255,215,0,0.5);padding:10px 20px;z-index:9990;display:flex;justify-content:center;align-items:center;gap:24px;font-size:0.9rem;flex-wrap:wrap;">
+        <div style="display:flex;gap:22px;flex-wrap:wrap;justify-content:center;align-items:center;">
+            <div style="color:#fff;display:flex;align-items:center;gap:6px;">
+                <span style="color:#4ecdc4;">⏱️</span>
+                <span>运行: <strong id="statRuntime" style="color:#ffd700;">-</strong></span>
+            </div>
+            <div style="color:#fff;display:flex;align-items:center;gap:6px;">
+                <span style="color:#4ecdc4;">👁️</span>
+                <span>访问: <strong id="statVisits" style="color:#ffd700;">-</strong></span>
+            </div>
+            <div style="color:#fff;display:flex;align-items:center;gap:6px;">
+                <span style="color:#4ecdc4;">👤</span>
+                <span>用户: <strong id="statUsers" style="color:#ffd700;">-</strong></span>
+            </div>
+            <div style="color:#fff;display:flex;align-items:center;gap:6px;">
+                <span style="color:#4ecdc4;">🟢</span>
+                <span>在线: <strong id="statOnline" style="color:#ffd700;">-</strong></span>
+            </div>
+            <div style="color:#fff;display:flex;align-items:center;gap:6px;">
+                <span style="color:#4ecdc4;">📥</span>
+                <span>下载: <strong id="statDownloads" style="color:#ffd700;">-</strong></span>
+            </div>
+            <div style="color:#fff;display:flex;align-items:center;gap:6px;">
+                <span style="color:#4ecdc4;">✨</span>
+                <span>今日新增: <strong id="statTodayNew" style="color:#ffd700;">-</strong></span>
+            </div>
+            <div style="color:#fff;display:flex;align-items:center;gap:6px;">
+                <span style="color:#4ecdc4;">📅</span>
+                <span>本周新增: <strong id="statWeekNew" style="color:#ffd700;">-</strong></span>
+            </div>
+            <div style="color:#fff;display:flex;align-items:center;gap:6px;">
+                <span style="color:#4ecdc4;">🗓️</span>
+                <span>本月新增: <strong id="statMonthNew" style="color:#ffd700;">-</strong></span>
+            </div>
+            <div style="color:#fff;display:flex;align-items:center;gap:6px;">
+                <span style="color:#4ecdc4;">🔖</span>
+                <span>版本: <strong id="currentVersionText" style="color:#ffd700;">网页版</strong></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 免责声明 -->
+    <div style="position:relative;padding:20px;background:rgba(0,0,0,0.5);border-top:1px solid rgba(255,255,255,0.1);text-align:center;font-size:0.85rem;color:#888;margin-bottom:60px;">
+        <div style="max-width:800px;margin:0 auto;">
+            <h4 style="margin:0 0 10px 0;color:#aaa;">⚠️ 免责声明</h4>
+            <p style="margin:5px 0;line-height:1.6;">
+                本工具仅供学习交流使用，所有数据存储于用户本地设备。
+            </p>
+            <p style="margin:5px 0;line-height:1.6;">
+                开发者不对因使用本工具造成的任何损失承担责任，请合理使用。
+            </p>
+            <p style="margin:5px 0;line-height:1.6;">
+                游戏相关内容版权归官方所有，本工具与游戏官方无任何关联。
+            </p>
+        </div>
+    </div>
+
+</body>
+</html>
