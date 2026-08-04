@@ -3000,7 +3000,6 @@
                 </div>
                 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
                     <button id="cgmTabFusion" onclick="cgmSwitchTab('fusion')" style="padding:8px 14px;border:1px solid rgba(255,255,255,0.2);border-radius:8px;background:rgba(255,215,0,0.18);color:#ffd700;cursor:pointer;font-size:0.85rem;">➕ 添加融合卡</button>
-                    <button id="cgmTabFused" onclick="cgmSwitchTab('fused')" style="padding:8px 14px;border:1px solid rgba(255,255,255,0.2);border-radius:8px;background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.8);cursor:pointer;font-size:0.85rem;">🖼 被融合卡</button>
                     <button id="cgmTabHero" onclick="cgmSwitchTab('hero')" style="padding:8px 14px;border:1px solid rgba(255,255,255,0.2);border-radius:8px;background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.8);cursor:pointer;font-size:0.85rem;">🆕 添加新英雄</button>
                     <button id="cgmTabSkin" onclick="cgmSwitchTab('skin')" style="padding:8px 14px;border:1px solid rgba(255,255,255,0.2);border-radius:8px;background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.8);cursor:pointer;font-size:0.85rem;">🎨 皮肤制作</button>
                 </div>
@@ -3024,23 +3023,10 @@
                     <div style="margin:12px 0 4px;font-size:0.85rem;color:rgba(255,255,255,0.8);">已添加融合卡（<span id="cgmFusionCount">0</span>）：</div>
                     <div id="cgmFusionList" style="max-height:160px;overflow:auto;"></div>
                     <div id="cgmFusionStatus" style="font-size:0.78rem;white-space:pre-wrap;margin-top:8px;min-height:16px;"></div>
-                </div>
-                <!-- 被融合的卡 -->
-                <div id="cgmFusedPane" style="display:none;">
-                    <div style="font-size:0.82rem;color:rgba(255,255,255,0.7);margin-bottom:8px;">选英雄 → 加载其全部皮肤 → 切整图皮 → 发布到 registry（导出 PNG 需手动放入 skins 目录并 git 推送）。或直接用下方「一键全切」把全部融合卡的副卡一次性生成。</div>
-                    <input id="cgmFusedHeroFilter" oninput="cgmFilterFusedHero()" placeholder="🔍 筛选英雄（输入关键字即时过滤下拉）" style="width:100%;padding:8px 12px;border-radius:6px;border:1px solid rgba(255,215,0,0.3);background:#1f1f3a;color:#fff;font-size:0.85rem;box-sizing:border-box;margin-bottom:6px;">
-                    <select id="cgmFusedHero" onchange="cgmLoadHeroSkins()" style="width:100%;padding:8px;border-radius:6px;border:1px solid rgba(255,215,0,0.3);background:#2a2a4a;color:#fff;font-size:0.9rem;cursor:pointer;box-sizing:border-box;">
-                        <option value="">选择基础英雄…</option>
-                    </select>
-                    <div style="margin:8px 0;">
-                        <button onclick="cgmLoadHeroSkins()" style="padding:6px 12px;border:none;border-radius:6px;background:rgba(255,255,255,0.15);color:#fff;cursor:pointer;font-size:0.8rem;">🔄 加载皮肤</button>
-                        <button onclick="cgmCutHeroSkins()" style="padding:6px 12px;border:none;border-radius:6px;background:linear-gradient(135deg,#26c6da,#00838f);color:#fff;cursor:pointer;font-size:0.8rem;">✂️ 切皮</button>
-                        <button id="cgmPublishBtn" onclick="cgmPublishFused()" disabled style="padding:6px 12px;border:1px solid rgba(79,195,247,0.5);border-radius:6px;background:rgba(79,195,247,0.15);color:#4fc3f7;cursor:pointer;font-size:0.8rem;opacity:0.5;">🚀 发布</button>
+                    <div style="margin-top:10px;padding-top:10px;border-top:1px dashed rgba(255,255,255,0.15);">
+                        <button id="cgmCutAllBtn" onclick="cgmCutAllFusions()" style="width:100%;padding:9px 12px;border:none;border-radius:8px;background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;cursor:pointer;font-size:0.85rem;font-weight:600;">🚀 一键全切所有融合卡副卡（补刀：把全部副卡皮肤批量切好入库）</button>
+                        <div id="cgmFusedStatus" style="font-size:0.78rem;white-space:pre-wrap;margin-top:8px;min-height:16px;"></div>
                     </div>
-                    <button id="cgmCutAllBtn" onclick="cgmCutAllFusions()" style="width:100%;padding:9px 12px;border:none;border-radius:8px;background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;cursor:pointer;font-size:0.85rem;font-weight:600;margin-bottom:8px;">🚀 一键全切所有融合卡副卡</button>
-                    <div id="cgmFusedSkinList" style="font-size:0.78rem;color:rgba(255,255,255,0.7);min-height:18px;"></div>
-                    <div id="cgmFusedPreview" style="display:flex;flex-wrap:wrap;gap:8px;margin:8px 0;"></div>
-                    <div id="cgmFusedStatus" style="font-size:0.78rem;white-space:pre-wrap;min-height:16px;"></div>
                 </div>
                 <!-- 添加新英雄 -->
                 <div id="cgmHeroPane" style="display:none;">
@@ -3063,47 +3049,50 @@
                 </div>
                 <!-- 皮肤制作 -->
             <div id="cgmSkinPane" style="display:none;">
-              <!-- 同一排：原图画布 + 成品预览 + 入库信息，方便边预览边填名观察 -->
+              <!-- 第一排：原图画布 + 成品预览 并排，调参实时看预览 -->
               <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start;margin-bottom:14px;">
                 <div style="flex:1 1 420px;min-width:320px;">
                   <input type="file" id="skinMakerFile" accept="image/*" style="color:#fff;margin-bottom:10px;font-size:0.85rem;">
                   <canvas id="skinMakerCanvas" width="412" height="400" style="width:412px;height:400px;max-width:100%;border:1px solid rgba(255,255,255,0.2);border-radius:10px;background:#000;cursor:grab;display:block;"></canvas>
-                  <div style="color:rgba(255,255,255,0.5);font-size:0.72rem;margin:6px 0 10px;">滚轮缩放 · 拖拽移动</div>
-                  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
-                    <span style="color:#ffd700;font-size:0.8rem;">底色：</span>
-                    <button data-sm-rarity="gold" title="金卡" style="width:34px;height:34px;border-radius:8px;border:none;cursor:pointer;background:linear-gradient(135deg,#ffd86b,#c8862a);"></button>
-                    <button data-sm-rarity="purple" title="紫卡" style="width:34px;height:34px;border-radius:8px;border:none;cursor:pointer;background:linear-gradient(135deg,#c79bff,#6a2db0);"></button>
-                    <button data-sm-rarity="blue" title="蓝卡" style="width:34px;height:34px;border-radius:8px;border:none;cursor:pointer;background:linear-gradient(135deg,#9bd0ff,#2d6db0);"></button>
-                    <button data-sm-rarity="green" title="绿卡" style="width:34px;height:34px;border-radius:8px;border:none;cursor:pointer;background:linear-gradient(135deg,#aef0b0,#2d9e3a);"></button>
-                  </div>
-                  <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">
-                    <label style="color:#ffd700;font-size:0.8rem;">缩放 <span id="smZoomVal">1.00</span></label>
-                    <input type="range" id="smZoom" min="0.2" max="6" step="0.01" value="1" style="width:150px;accent-color:#ffd700;">
-                    <label style="color:#ffd700;font-size:0.8rem;">留白 <span id="smMarginVal">6</span>px</label>
-                    <input type="range" id="smMargin" min="0" max="30" step="1" value="6" style="width:120px;accent-color:#ffd700;">
-                    <button id="smReset" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:8px;padding:5px 12px;cursor:pointer;font-size:0.8rem;">重置</button>
-                  </div>
-                  <button id="smDownload" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:8px;padding:8px 14px;cursor:pointer;font-size:0.85rem;">⬇️ 下载 PNG</button>
+                  <div style="color:rgba(255,255,255,0.5);font-size:0.72rem;margin-top:6px;">滚轮缩放 · 拖拽移动</div>
                 </div>
                 <div style="flex:0 0 auto;min-width:220px;">
                   <div style="color:#ffd700;font-size:0.85rem;margin-bottom:6px;">成品预览（206×200）</div>
                   <canvas id="skinMakerPreview" width="206" height="200" style="width:206px;height:200px;border:1px solid rgba(255,255,255,0.2);border-radius:10px;background:#000;display:block;"></canvas>
                   <div style="color:rgba(255,255,255,0.5);font-size:0.72rem;margin-top:8px;max-width:206px;">左侧调好 → 右侧即最终成品</div>
                 </div>
-                <div style="flex:1 1 280px;min-width:260px;">
-                  <div style="color:#ffd700;font-size:0.85rem;margin-bottom:6px;">入库信息（与预览同排，边填边看）</div>
-                  <div style="display:flex;flex-direction:column;gap:8px;">
-                    <input id="smHero" placeholder="英雄名（必填，如 天使 / 死神）" style="padding:9px 12px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.4);color:#fff;font-size:0.85rem;">
-                    <input id="smLabel" placeholder="皮肤标签（必填，如 风清扬 / 一指名医）" style="padding:9px 12px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.4);color:#fff;font-size:0.85rem;">
-                    <div style="color:rgba(255,255,255,0.5);font-size:0.72rem;">将生成：<span id="smNamePreview" style="color:#ffd700;">皮肤标签·英雄名.png</span></div>
-                    <input id="smBasePath" value="D:\tfjl-web\skins" style="padding:9px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:#fff;font-size:0.78rem;">
-                    <textarea id="smAttr" placeholder="皮肤属性（可选，如：技能/被动描述，支持多行）" style="padding:9px 12px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.4);color:#fff;font-size:0.82rem;resize:vertical;box-sizing:border-box;min-height:64px;"></textarea>
-                    <div style="color:rgba(255,255,255,0.5);font-size:0.72rem;line-height:1.5;">💡 <b style="color:#ffd700;">给老皮肤补属性</b>：不用选图，填好「英雄名 + 皮肤标签 + 皮肤属性」直接点保存即可（只写属性，不动图片）。</div>
-                  </div>
+              </div>
+              <!-- 调参：底色 -->
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
+                <span style="color:#ffd700;font-size:0.8rem;">底色：</span>
+                <button data-sm-rarity="gold" title="金卡" style="width:34px;height:34px;border-radius:8px;border:none;cursor:pointer;background:linear-gradient(135deg,#ffd86b,#c8862a);"></button>
+                <button data-sm-rarity="purple" title="紫卡" style="width:34px;height:34px;border-radius:8px;border:none;cursor:pointer;background:linear-gradient(135deg,#c79bff,#6a2db0);"></button>
+                <button data-sm-rarity="blue" title="蓝卡" style="width:34px;height:34px;border-radius:8px;border:none;cursor:pointer;background:linear-gradient(135deg,#9bd0ff,#2d6db0);"></button>
+                <button data-sm-rarity="green" title="绿卡" style="width:34px;height:34px;border-radius:8px;border:none;cursor:pointer;background:linear-gradient(135deg,#aef0b0,#2d9e3a);"></button>
+              </div>
+              <!-- 调参：缩放 / 留白 -->
+              <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">
+                <label style="color:#ffd700;font-size:0.8rem;">缩放 <span id="smZoomVal">1.00</span></label>
+                <input type="range" id="smZoom" min="0.2" max="6" step="0.01" value="1" style="width:150px;accent-color:#ffd700;">
+                <label style="color:#ffd700;font-size:0.8rem;">留白 <span id="smMarginVal">6</span>px</label>
+                <input type="range" id="smMargin" min="0" max="30" step="1" value="6" style="width:120px;accent-color:#ffd700;">
+                <button id="smReset" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:8px;padding:5px 12px;cursor:pointer;font-size:0.8rem;">重置</button>
+              </div>
+              <!-- 入库信息（在按钮上方，先填好再下载/保存/推送） -->
+              <div style="margin-bottom:14px;">
+                <div style="color:#ffd700;font-size:0.85rem;margin-bottom:6px;">入库信息（先填好，再下载 / 保存 / 推送）</div>
+                <div style="display:flex;flex-direction:column;gap:8px;max-width:520px;">
+                  <input id="smHero" placeholder="英雄名（必填，如 天使 / 死神）" style="padding:9px 12px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.4);color:#fff;font-size:0.85rem;">
+                  <input id="smLabel" placeholder="皮肤标签（必填，如 风清扬 / 一指名医）" style="padding:9px 12px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.4);color:#fff;font-size:0.85rem;">
+                  <div style="color:rgba(255,255,255,0.5);font-size:0.72rem;">将生成：<span id="smNamePreview" style="color:#ffd700;">皮肤标签·英雄名.png</span></div>
+                  <input id="smBasePath" value="D:\tfjl-web\skins" style="padding:9px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:#fff;font-size:0.78rem;">
+                  <textarea id="smAttr" placeholder="皮肤属性（可选，如：技能/被动描述，支持多行）" style="padding:9px 12px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.4);color:#fff;font-size:0.82rem;resize:vertical;box-sizing:border-box;min-height:64px;"></textarea>
+                  <div style="color:rgba(255,255,255,0.5);font-size:0.72rem;line-height:1.5;">💡 <b style="color:#ffd700;">给老皮肤补属性</b>：不用选图，填好「英雄名 + 皮肤标签 + 皮肤属性」直接点保存即可（只写属性，不动图片）。</div>
                 </div>
               </div>
-              <!-- 操作按钮 -->
+              <!-- 操作按钮：下载 + 保存 + 推送 同排（下载紧挨保存） -->
               <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start;">
+                <button id="smDownload" style="flex:1 1 200px;min-width:180px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:10px;padding:12px;cursor:pointer;font-size:0.9rem;font-weight:600;">⬇️ 下载 PNG</button>
                 <button id="smSave" style="flex:1 1 220px;min-width:200px;background:linear-gradient(135deg,#ffd700,#ff9800);border:none;color:#1a1a2e;border-radius:10px;padding:12px;cursor:pointer;font-size:0.9rem;font-weight:600;">💾 保存并登记到 skins 目录</button>
                 <button id="smPush" style="flex:1 1 220px;min-width:200px;background:linear-gradient(135deg,#4caf50,#2e7d32);border:none;color:#fff;border-radius:10px;padding:12px;cursor:pointer;font-size:0.9rem;font-weight:600;">🚀 一键推送到 GitHub / Gitee</button>
                 <div id="smStatus" style="flex:2 1 300px;min-width:240px;font-size:0.78rem;color:rgba(255,255,255,0.7);line-height:1.5;white-space:pre-line;"></div>
@@ -16803,12 +16792,11 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             if (modal) modal.style.display = 'flex';
             const t = tab || 'fusion';
             cgmSwitchTab(t);
-            cgmInitFusedHeroSelect();
             cgmRefreshFusionList();
         }
         function cgmSwitchTab(tab) {
-            const panes = { fusion: 'cgmFusionPane', fused: 'cgmFusedPane', hero: 'cgmHeroPane', skin: 'cgmSkinPane' };
-            const tabs = { fusion: 'cgmTabFusion', fused: 'cgmTabFused', hero: 'cgmTabHero', skin: 'cgmTabSkin' };
+            const panes = { fusion: 'cgmFusionPane', hero: 'cgmHeroPane', skin: 'cgmSkinPane' };
+            const tabs = { fusion: 'cgmTabFusion', hero: 'cgmTabHero', skin: 'cgmTabSkin' };
             const on = 'rgba(255,215,0,0.18)', off = 'rgba(255,255,255,0.05)';
             Object.keys(panes).forEach(k => {
                 const p = document.getElementById(panes[k]); if (p) p.style.display = (k === tab) ? '' : 'none';
@@ -16823,33 +16811,6 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             if (tab === 'skin' && typeof window.openSkinMaker === 'function') {
                 requestAnimationFrame(function () { try { window.openSkinMaker(); } catch (e) { console.warn('[skinMaker] init failed', e); } });
             }
-        }
-        let _cgmAllFusedHeroes = [];
-        function cgmInitFusedHeroSelect() {
-            const sel = document.getElementById('cgmFusedHero');
-            if (!sel) return;
-            const _baseHeroes = Object.keys(SKIN_ATTRIBUTES || {});
-            if (window.cloudCards) Object.keys(window.cloudCards).forEach(n => { if (!_baseHeroes.includes(n)) _baseHeroes.push(n); });
-            _cgmAllFusedHeroes = _baseHeroes.filter(h => !h.startsWith('融合'));
-            const f = document.getElementById('cgmFusedHeroFilter');
-            if (f) f.value = '';
-            cgmFilterFusedHero();
-        }
-        // 被融合卡英雄筛选器：按输入框关键字即时过滤下拉项（保留完整列表，仅重建可见项）
-        function cgmFilterFusedHero() {
-            const sel = document.getElementById('cgmFusedHero');
-            const fin = document.getElementById('cgmFusedHeroFilter');
-            if (!sel) return;
-            const kw = (fin ? fin.value : '').trim().toLowerCase();
-            sel.innerHTML = '<option value="">选择基础英雄…</option>';
-            const matched = _cgmAllFusedHeroes.filter(h => !kw || h.toLowerCase().includes(kw));
-            if (!matched.length) {
-                const o = document.createElement('option'); o.value = ''; o.textContent = '（无匹配英雄）'; o.disabled = true; sel.appendChild(o);
-                return;
-            }
-            matched.forEach(h => {
-                const o = document.createElement('option'); o.value = h; o.textContent = (kw ? '🔎 ' : '') + h; sel.appendChild(o);
-            });
         }
         // 添加融合卡：校验"必须正好是100张基础卡里的2张"
         let _cgmValidParts = null;
@@ -17054,51 +17015,6 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             if (!_cgmIsTauri()) return;
             _cgmInvoke('flash_tray_icon', { on: !!on }).catch(() => {});
         }
-        // 添加被融合的卡：选英雄→切全部皮肤→预览→发布
-        let _cgmCutBlobs = [];
-        async function cgmLoadHeroSkins() {
-            const hero = document.getElementById('cgmFusedHero').value;
-            const list = document.getElementById('cgmFusedSkinList');
-            if (!hero) { list.textContent = '请先选择英雄'; return; }
-            const skins = (window.skinRegistry && window.skinRegistry[hero]) || [];
-            list.textContent = skins.length ? ('共 ' + skins.length + ' 个皮肤：' + skins.map(s => s.name).join('、')) : '该英雄暂无皮肤（需先有云端皮肤）';
-        }
-        async function cgmCutHeroSkins() {
-            const hero = document.getElementById('cgmFusedHero').value;
-            const preview = document.getElementById('cgmFusedPreview');
-            const status = document.getElementById('cgmFusedStatus');
-            const pubBtn = document.getElementById('cgmPublishBtn');
-            if (!hero) { status.style.color = '#ff9e80'; status.textContent = '请先选择英雄并加载皮肤'; return; }
-            const skins = (window.skinRegistry && window.skinRegistry[hero]) || [];
-            if (!skins.length) { status.style.color = '#ff9e80'; status.textContent = '该英雄暂无皮肤'; return; }
-            status.style.color = '#4ecdc4'; status.textContent = '切皮中…';
-            preview.innerHTML = ''; _cgmCutBlobs = [];
-            // 副卡预览样式：与卡池副卡一致（整图 + 右上角金边 + 左下切角），不再切割右下角小徽章
-            const fusedCss = 'width:90px;height:120px;object-fit:contain;border:none;border-radius:8px;border:3px solid gold;clip-path:polygon(0 0,100% 0,100% 85%,85% 100%,0 100%);background:#1a1a2e;';
-            for (const s of skins) {
-                try {
-                    const url = window.resolveHeroSkinUrl ? await window.resolveHeroSkinUrl(hero, s.name) : null;
-                    if (!url) continue;
-                    // 直接取副卡皮肤整图（不缩放裁切），与 resolveFusionHalf 模式②整图直显对齐
-                    const blob = await (async () => {
-                        try { return await (await fetch(url)).blob(); } catch (e) { return null; }
-                    })();
-                    if (!blob) continue;
-                    _cgmCutBlobs.push({ name: s.name, blob });
-                    const img = document.createElement('img');
-                    img.src = URL.createObjectURL(blob);
-                    img.style.cssText = fusedCss;
-                    const wrap = document.createElement('div');
-                    wrap.style.cssText = 'text-align:center;font-size:0.7rem;color:rgba(255,255,255,0.8);';
-                    wrap.appendChild(img);
-                    wrap.appendChild(Object.assign(document.createElement('div'), { textContent: s.name }));
-                    preview.appendChild(wrap);
-                } catch (e) {}
-            }
-            status.style.color = '#4ade80';
-            status.textContent = '✓ 已切 ' + _cgmCutBlobs.length + ' 张整图皮（副卡同款样式），可发布';
-            pubBtn.disabled = false; pubBtn.style.opacity = 1;
-        }
         // blob → base64（去掉 data URL 前缀），供 Tauri write_binary_file 直写
         function cgmBlobToBase64(blob) {
             return new Promise((resolve, reject) => {
@@ -17130,26 +17046,6 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             }
             window.skinRegistry[key] = blobs.map(b => ({ name: b.name, url: URL.createObjectURL(b.blob), path: null, loaded: true, remote: false }));
             return blobs.map(b => ({ name: b.name, file: key + '_' + (b.name === '默认' ? 'default' : b.name) + '.png' }));
-        }
-        async function cgmPublishFused() {
-            const hero = document.getElementById('cgmFusedHero').value;
-            const status = document.getElementById('cgmFusedStatus');
-            if (!hero || !_cgmCutBlobs.length) { status.style.color = '#ff9e80'; status.textContent = '请先切皮'; return; }
-            try {
-                let registry = null;
-                const local = await _cgmReadRepoFile('skins/registry.json');
-                if (local) { try { registry = JSON.parse(local); } catch (e) { registry = null; } }
-                if (!registry || !registry.heroes) registry = { version: 2, heroes: {} };
-                const key = '融合' + hero;
-                registry.heroes[key] = await cgmWriteFusedHero(hero, _cgmCutBlobs);
-                registry.updated = new Date().toISOString();
-                await _cgmWriteRepoFile('skins/registry.json', JSON.stringify(registry, null, 2));
-                status.style.color = '#4ade80';
-                status.textContent = '✓ 已写入 d:\\tfjl-web\\skins\\registry.json\n✓ 已导出 ' + _cgmCutBlobs.length + ' 张整图 PNG 到 d:\\tfjl-web\\skins\\' + key + '\\（' + (_cgmIsTauri() ? 'Tauri 已直写' : '浏览器下载，请确认放入') + '）\n然后到「🎨 皮肤制作」Tab 点「🚀 一键推送」把 skins/ 推上线';
-            } catch (e) {
-                status.style.color = '#ff9e80';
-                status.textContent = '✗ 发布失败：' + e.message;
-            }
         }
         // 一键全切：遍历所有融合卡，取其副卡英雄（components[1]）一次性生成 融合XX 整图皮
         async function cgmCutAllFusions() {
@@ -30488,7 +30384,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260804-216 · sw-v334</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260804-217 · sw-v335</span>
             </div>
         </div>
     </div>
