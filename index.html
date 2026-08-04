@@ -16600,15 +16600,15 @@
             } catch (e) {}
         }
 
-        // 解析被融合卡显示源：默认用【副卡当前皮肤的整图】做左上角斜切半张(与卡池一致，无需上传)
-        // 仅当云端有管理员上传的 融合XX 透明徽章时，才用预切满铺式徽章(isBadge:true)
+        // 解析被融合卡显示源：副卡皮肤整图 → 右上角金边+左下切角小图（与卡池副卡一致）
+        // 融合XX 现统一为整图（被融合卡面板 cgmCutHeroSkins 产出整图），不再用满铺透明徽章，故 isBadge:false
         async function resolveFusionHalf(fusedHero, el) {
             if (!fusedHero) return null;
-            // ① 云端预切（管理员上传的 融合XX 透明徽章，满铺式）
+            // ① 云端已发布融合整图（resolveFusionHalf 模式①）：整图小图直显，与模式②风格统一
             if (window.skinRegistry && window.skinRegistry['融合' + fusedHero] && window.resolveHeroSkinUrl) {
                 try {
                     const u = await window.resolveHeroSkinUrl('融合' + fusedHero, '默认');
-                    if (u) return { url: u, isBadge: true };
+                    if (u) return { url: u, isBadge: false };
                 } catch (e) {}
             }
             // ② 直接用副卡当前皮肤的整图（缩小版整图直显，皮肤生效）
@@ -17025,18 +17025,23 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             if (!hero) { status.style.color = '#ff9e80'; status.textContent = '请先选择英雄并加载皮肤'; return; }
             const skins = (window.skinRegistry && window.skinRegistry[hero]) || [];
             if (!skins.length) { status.style.color = '#ff9e80'; status.textContent = '该英雄暂无皮肤'; return; }
-            status.style.color = '#4ecdc4'; status.textContent = '切割中…';
+            status.style.color = '#4ecdc4'; status.textContent = '切皮中…';
             preview.innerHTML = ''; _cgmCutBlobs = [];
+            // 副卡预览样式：与卡池副卡一致（整图 + 右上角金边 + 左下切角），不再切割右下角小徽章
+            const fusedCss = 'width:90px;height:120px;object-fit:contain;border:none;border-radius:8px;border:3px solid gold;clip-path:polygon(0 0,100% 0,100% 85%,85% 100%,0 100%);background:#1a1a2e;';
             for (const s of skins) {
                 try {
                     const url = window.resolveHeroSkinUrl ? await window.resolveHeroSkinUrl(hero, s.name) : null;
                     if (!url) continue;
-                    const blob = await cropFusionBadgeFromUrl(url, 360, 480);
+                    // 直接取副卡皮肤整图（不缩放裁切），与 resolveFusionHalf 模式②整图直显对齐
+                    const blob = await (async () => {
+                        try { return await (await fetch(url)).blob(); } catch (e) { return null; }
+                    })();
                     if (!blob) continue;
                     _cgmCutBlobs.push({ name: s.name, blob });
                     const img = document.createElement('img');
                     img.src = URL.createObjectURL(blob);
-                    img.style.cssText = 'width:90px;height:120px;object-fit:contain;border-radius:6px;border:1px solid rgba(255,255,255,0.2);';
+                    img.style.cssText = fusedCss;
                     const wrap = document.createElement('div');
                     wrap.style.cssText = 'text-align:center;font-size:0.7rem;color:rgba(255,255,255,0.8);';
                     wrap.appendChild(img);
@@ -17045,7 +17050,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 } catch (e) {}
             }
             status.style.color = '#4ade80';
-            status.textContent = '✓ 已切 ' + _cgmCutBlobs.length + ' 张徽章皮，可发布';
+            status.textContent = '✓ 已切 ' + _cgmCutBlobs.length + ' 张整图皮（副卡同款样式），可发布';
             pubBtn.disabled = false; pubBtn.style.opacity = 1;
         }
         async function cgmPublishFused() {
@@ -17069,7 +17074,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 }
                 window.skinRegistry[key] = _cgmCutBlobs.map(b => ({ name: b.name, url: URL.createObjectURL(b.blob), path: null, loaded: true, remote: false }));
                 status.style.color = '#4ade80';
-                status.textContent = '✓ 已写入 d:\\tfjl-web\\skins\\registry.json\n✓ 已导出 ' + _cgmCutBlobs.length + ' 张 PNG（浏览器下载），请放入：\n  d:\\tfjl-web\\skins\\' + key + '\\\n然后在本机终端运行：\n  cd d:\\tfjl-web\n  git add skins\n  git commit -m "fusion skin: ' + key + '"\n  git push origin main\n  git -c http.proxy= -c https.proxy= push gitee';
+                status.textContent = '✓ 已写入 d:\\tfjl-web\\skins\\registry.json\n✓ 已导出 ' + _cgmCutBlobs.length + ' 张整图 PNG（副卡同款，浏览器下载），请放入：\n  d:\\tfjl-web\\skins\\' + key + '\\\n然后在本机终端运行：\n  cd d:\\tfjl-web\n  git add skins\n  git commit -m "fusion skin: ' + key + '"\n  git push origin main\n  git -c http.proxy= -c https.proxy= push gitee';
             } catch (e) {
                 status.style.color = '#ff9e80';
                 status.textContent = '✗ 发布失败：' + e.message;
@@ -30370,7 +30375,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260804-213 · sw-v331</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260804-214 · sw-v332</span>
             </div>
         </div>
     </div>
