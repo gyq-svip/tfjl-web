@@ -30187,9 +30187,6 @@ ${maSection}
         <div id="chatRoomInputBar" style="padding:10px 15px;border-top:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.2);display:none;"></div>
     </div>
 
-    <!-- 右下角版本标记（供前端更新核对 + extractVersion 解析） -->
-    <span id="versionTag" style="position:fixed;left:8px;bottom:54px;z-index:10002;font-size:0.72rem;color:#666;background:rgba(0,0,0,0.35);padding:2px 8px;border-radius:10px;pointer-events:auto;cursor:pointer;user-select:none;" onclick="showVersionPopup()" title="点击查看版本 / 强制刷新">v260804-202 · sw-v320</span>
-
     <!-- 底部状态栏（在线统计 + 版本显示） -->
     <div id="statsBar" style="position:fixed;bottom:0;left:0;right:0;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);border-top:2px solid rgba(255,215,0,0.5);padding:10px 20px;z-index:9990;display:flex;justify-content:center;align-items:center;gap:24px;font-size:0.9rem;flex-wrap:wrap;">
         <div style="display:flex;gap:22px;flex-wrap:wrap;justify-content:center;align-items:center;">
@@ -30215,7 +30212,7 @@ ${maSection}
             </div>
             <div style="color:#fff;display:flex;align-items:center;gap:6px;">
                 <span style="color:#4ecdc4;">🔖</span>
-                <span>版本: <strong id="currentVersionText" style="color:#ffd700;">网页版</strong></span>
+                <span>版本: <strong id="versionTag" style="color:#ffd700;cursor:pointer;user-select:none;" onclick="onVersionTagClick()" title="点击查看版本 / 强制刷新">v260804-203 · sw-v321</strong></span>
             </div>
         </div>
     </div>
