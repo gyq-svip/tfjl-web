@@ -3245,7 +3245,7 @@
                             </div>
                             <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
                                 <input type="checkbox" id="calcBeixiangBuyZhanLing" checked style="width:18px;height:18px;cursor:pointer;">
-                                <label for="calcBeixiangBuyZhanLing" style="color:rgba(255,255,255,0.8);font-size:0.85rem;cursor:pointer;">购买战令（98元/200战旗）</label>
+                                <label for="calcBeixiangBuyZhanLing" style="color:rgba(255,255,255,0.8);font-size:0.85rem;cursor:pointer;">购买战令（98元得200战旗，勾选即计入方案）</label>
                             </div>
                             <button onclick="doBeixiangCalc()" style="width:100%;padding:10px;border:none;border-radius:8px;background:linear-gradient(135deg,#9c27b0,#e91e63);color:white;font-size:1rem;font-weight:bold;cursor:pointer;">🧮 计算最优方案</button>
                         </div>
@@ -3948,6 +3948,10 @@
                 html += `<div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.7);font-size:0.85rem;">获得战旗</span><span style="color:#4ecdc4;font-weight:bold;">${totalMat}</span></div>`;
                 html += `<div style="display:flex;justify-content:space-between;"><span style="color:rgba(255,255,255,0.7);font-size:0.85rem;">溢出战旗</span><span style="color:${overflow > 0 ? '#ff9800' : '#4caf50'};font-weight:bold;">${overflow > 0 ? overflow : 0}</span></div>`;
                 html += `</div>`;
+            }
+
+            if (!buyZhanLing) {
+                html += `<div style="margin-top:10px;padding:8px 10px;background:rgba(255,215,0,0.08);border-radius:6px;color:#ffd700;font-size:0.78rem;line-height:1.5;">💡 还没买战令？勾选上方「购买战令」即可计入：花 <b>98元</b> 得 <b>200战旗</b>（自动算进免费合计与总花费）。战令性价比最高，想买就勾上。</div>`;
             }
 
             document.getElementById('calcBeixiangResultContent').innerHTML = html;
@@ -31033,7 +31037,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-256 · sw-v373</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-257 · sw-v374</span>
             </div>
         </div>
     </div>
