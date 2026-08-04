@@ -8793,7 +8793,7 @@
                 const profession = cardEl.dataset.profession;
 
                 // 检查是否已在手牌中
-                if (targetHand.some(c => c.id === cardId)) {
+                if (targetHand.some(c => c.id === cardId) || handHasIdentity(targetHand, heroName)) {
                     duplicateCards.push(heroName);
                     return;
                 }
@@ -13841,7 +13841,7 @@
                 const profession = cardEl.dataset.profession;
 
                 // 检查是否已在手牌中
-                if (targetHand.some(c => c.id === cardId)) {
+                if (targetHand.some(c => c.id === cardId) || handHasIdentity(targetHand, heroName)) {
                     duplicateCards.push(heroName);
                     return;
                 }
@@ -14473,7 +14473,7 @@
                 const cardType = cardEl.dataset.type;
                 const isEngineering = cardEl.dataset.engineering === 'true';
                 const profession = cardEl.dataset.profession;
-                if (targetHand.some(c => c.id === cardId)) { duplicateCards.push(heroName); return; }
+                if (targetHand.some(c => c.id === cardId) || handHasIdentity(targetHand, heroName)) { duplicateCards.push(heroName); return; }
                 if (targetHand.length >= MAX_HAND_CARDS) return;
                 targetHand.push({ id: cardId, name: heroName, placed: null, isEngineering, profession, type: cardType });
                 addedCount++;
@@ -15742,7 +15742,7 @@
                 const profession = cardEl.dataset.profession;
 
                 // 检查是否已在手牌中
-                if (targetHand.some(c => c.id === cardId)) {
+                if (targetHand.some(c => c.id === cardId) || handHasIdentity(targetHand, heroName)) {
                     duplicateCards.push(heroName);
                     return;
                 }
@@ -16458,6 +16458,16 @@
             const el = slot.querySelector('.card-name');
             if (!el) return '';
             return el.dataset.fullName || el.textContent || '';
+        }
+        // 卡牌身份 = 主卡英雄名（融合卡取主卡，基础卡即自身）。同一身份在同一侧手牌只能 1 张。
+        function cardIdentity(name) {
+            return (typeof getMainCardName === 'function' && name) ? getMainCardName(name) : name;
+        }
+        // 该手牌里是否已有同一张卡（含基础卡与它的融合形态）
+        function handHasIdentity(hand, name) {
+            const id = cardIdentity(name);
+            if (!id) return false;
+            return (hand || []).some(c => c && cardIdentity(c.name) === id);
         }
 
         // ===== 上阵卡"融合卡切换"角标：基础英雄 → 可融合变体 =====
@@ -19395,8 +19405,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const profession = card.dataset.profession;
             const cardType = card.dataset.type;
             
-            const myHasThis = myHandCards.some(c => c.id === cardId);
-            const teammateHasThis = teammateHandCards.some(c => c.id === cardId);
+            const myHasThis = myHandCards.some(c => c.id === cardId) || handHasIdentity(myHandCards, cardName);
+            const teammateHasThis = teammateHandCards.some(c => c.id === cardId) || handHasIdentity(teammateHandCards, cardName);
             
             if (myHandCards.length < MAX_HAND_CARDS && !myHasThis) {
                 myHandCards.push({ id: cardId, name: cardName, placed: null, isEngineering, profession, type: cardType });
@@ -19404,6 +19414,9 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             } else if (teammateHandCards.length < MAX_HAND_CARDS && !teammateHasThis) {
                 teammateHandCards.push({ id: cardId, name: cardName, placed: null, isEngineering, profession, type: cardType });
                 updateHandDisplay('teammate');
+            } else if (handHasIdentity(myHandCards, cardName) || handHasIdentity(teammateHandCards, cardName)) {
+                // 手牌已有同一张卡（含融合形态），同一张卡只能带 1 张
+                if (typeof showToast === 'function') showToast('⚠️ 手牌已有「' + cardName + '」（含融合形态），同一张卡只能带 1 张');
             }
         }
 
@@ -19583,9 +19596,13 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 const profession = e.dataTransfer.getData('text/profession') || (window.__dragPayload && window.__dragPayload.profession) || '';
 
                 const existingIndex = handCardsArray.findIndex(c => c.id === cardId);
-                if (existingIndex === -1 && handCardsArray.length < MAX_HAND_CARDS) {
+                const blockedByIdentity = (existingIndex === -1) && handHasIdentity(handCardsArray, cardName);
+                if (!blockedByIdentity && existingIndex === -1 && handCardsArray.length < MAX_HAND_CARDS) {
                     handCardsArray.push({ id: cardId, name: cardName, placed: null, isEngineering, profession });
                     updateHandDisplay(containerId === 'myHandContainer' ? 'my' : 'teammate');
+                } else if (blockedByIdentity) {
+                    // 手牌已有同一张卡（含融合形态），同一张卡只能带 1 张
+                    if (typeof showToast === 'function') showToast('⚠️ 手牌已有「' + cardName + '」（含融合形态），同一张卡只能带 1 张');
                 }
             });
         }
@@ -19632,8 +19649,14 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     removeCardFromSlot(slotId);
                 }
                 
-                // 检查是否已在手牌中
+                // 检查是否已在手牌中（含基础卡/融合形态同身份的不同卡）
                 const existingInHand = handCardsArray.findIndex(c => c.id === cardId);
+                if (existingInHand === -1 && handHasIdentity(handCardsArray, cardName)) {
+                    slot.classList.add('invalid-drop');
+                    setTimeout(() => slot.classList.remove('invalid-drop'), 500);
+                    if (typeof showToast === 'function') showToast('⚠️ 手牌已有同一张卡（含融合形态），不能重复上阵');
+                    return;
+                }
                 if (existingInHand === -1) {
                     // 不在手牌中，先添加到手牌
                     if (handCardsArray.length >= MAX_HAND_CARDS) return;
@@ -19693,8 +19716,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const profession = card.dataset.profession;
             const cardType = card.dataset.type;
             
-            const myHasThis = myHandCards.some(c => c.id === cardId);
-            const teammateHasThis = teammateHandCards.some(c => c.id === cardId);
+            const myHasThis = myHandCards.some(c => c.id === cardId) || handHasIdentity(myHandCards, cardName);
+            const teammateHasThis = teammateHandCards.some(c => c.id === cardId) || handHasIdentity(teammateHandCards, cardName);
             
             if (myHandCards.length < MAX_HAND_CARDS && !myHasThis) {
                 if (isEngineering) {
@@ -19718,6 +19741,9 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 
                 teammateHandCards.push({ id: cardId, name: cardName, placed: null, isEngineering, profession, type: cardType });
                 updateHandDisplay('teammate');
+            } else if (handHasIdentity(myHandCards, cardName) || handHasIdentity(teammateHandCards, cardName)) {
+                // 手牌已有同一张卡（含融合形态），同一张卡只能带 1 张
+                if (typeof showToast === 'function') showToast('⚠️ 手牌已有「' + cardName + '」（含融合形态），同一张卡只能带 1 张');
             }
         }
 
@@ -20217,8 +20243,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 const targetHand = isUserSlot ? myHandCards : teammateHandCards;
                 if (targetHand.length >= MAX_HAND_CARDS) return;
                 
-                // 检查是否已存在相同卡牌
-                if (targetHand.some(c => c.id === cardId)) {
+                // 检查是否已存在相同卡牌（含基础卡/融合形态同身份）
+                if (targetHand.some(c => c.id === cardId) || handHasIdentity(targetHand, cardName)) {
                     this.classList.add('invalid-drop');
                     setTimeout(() => this.classList.remove('invalid-drop'), 500);
                     return;
@@ -30638,7 +30664,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260804-235 · sw-v352</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260804-236 · sw-v353</span>
             </div>
         </div>
     </div>
