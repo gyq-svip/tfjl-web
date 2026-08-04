@@ -16749,7 +16749,8 @@
                 if (!parts || parts.length < 2) continue;
                 const subHero = parts[1];
                 const skins = window.getHeroSkins ? window.getHeroSkins(subHero) : [];
-                const names = skins.map(s => s.name).filter(n => n !== subHero);
+                // 保留副卡同名的默认皮条目，让默认皮也能循环切到
+                const names = skins.map(s => s.name);
                 for (const n of names) entries.push({ variant: v, subHero: subHero, skin: n });
             }
             const CLOSE = '__FUSION_CLOSE__';
@@ -16760,10 +16761,12 @@
             const currentVariant = isNowFusion ? heroName : null;
             const currentSubHero = isNowFusion ? curParts[1] : null;
             const currentSkin = currentSubHero ? (window.heroSkinSelections ? (window.heroSkinSelections[currentSubHero] || '') : '') : '';
+            // '' / '默认' / 副卡同名 都视为默认皮（对应循环里副卡同名条目）
+            const effectiveCurrentSkin = (currentSkin === '' || currentSkin === '默认') ? currentSubHero : currentSkin;
             let idx = -1;
             if (currentVariant) {
                 for (let i = 0; i < entries.length; i++) {
-                    if (entries[i].variant === currentVariant && entries[i].skin === currentSkin) { idx = i; break; }
+                    if (entries[i].variant === currentVariant && entries[i].skin === effectiveCurrentSkin) { idx = i; break; }
                 }
             }
             const nextIdx = (idx + 1) % totalLen;
@@ -16791,7 +16794,7 @@
                 if (hc) { try { await reapplySingleHandCard(hc, c.id, _ht); } catch (e) {} }
                 if (typeof autoSaveProject === 'function') autoSaveProject();
             }
-            _showFusionRightLabel(slot, '融合·' + entry.skin);
+            _showFusionRightLabel(slot, '融合·' + (entry.skin === entry.subHero ? '默认' : entry.skin));
         }
 
 // ==================== 融合卡（统一配置）====================
@@ -30682,7 +30685,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260804-241 · sw-v356</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260804-242 · sw-v359</span>
             </div>
         </div>
     </div>
