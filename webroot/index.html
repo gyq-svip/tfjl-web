@@ -30542,7 +30542,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260804-227 · sw-v344</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260804-228 · sw-v345</span>
             </div>
         </div>
     </div>
@@ -30580,9 +30580,11 @@ ${maSection}
       var el=document.getElementById('smVerifyStatus'); var inp=document.getElementById('smVerifyHero');
       var hero=(inp?inp.value:'').trim();
       if(el){ el.style.color='rgba(255,255,255,0.7)'; el.textContent='查询中…'; }
+      var ctrl=new AbortController(); var timer=setTimeout(function(){ ctrl.abort(); }, 12000);
       try{
         var url='https://gyq-svip.github.io/tfjl-web/skins/registry.json?_='+Date.now();
-        var resp=await fetch(url,{cache:'no-store',mode:'cors'});
+        var resp=await fetch(url,{cache:'no-store',mode:'cors',signal:ctrl.signal});
+        clearTimeout(timer);
         if(!resp.ok) throw new Error('HTTP '+resp.status);
         var data=await resp.json();
         var heroes=(data&&data.heroes)?Object.keys(data.heroes):[];
@@ -30596,7 +30598,8 @@ ${maSection}
           if(el){ el.style.color='#4ade80'; el.textContent='✅ 线上已登记 '+heroes.length+' 个英雄皮肤：\n'+(heroes.join('、')||'(空)'); }
         }
       }catch(e){
-        if(el){ el.style.color='#ff6b6b'; el.textContent='✗ 查询失败：'+e.message+'（多为网络/CORS；可手动浏览器打开 https://gyq-svip.github.io/tfjl-web/skins/registry.json 核对）'; }
+        clearTimeout(timer);
+        if(el){ el.style.color='#ff6b6b'; el.textContent='✗ 查询失败：'+((e&&e.name==='AbortError')?'超时（12s 无响应，可能网络不通/被墙）':e.message)+'（可手动浏览器打开 https://gyq-svip.github.io/tfjl-web/skins/registry.json 核对）'; }
       }
     }
     function smRender(ctx,scale){
@@ -30824,21 +30827,33 @@ ${maSection}
       smSetRarity('gold');
     }
     // 删除已入库皮肤：初始化英雄下拉（含 融合XX）+ 联动皮肤下拉
-    function smInitDelSkinUI(){
+    async function smInitDelSkinUI(){
       var sel=document.getElementById('smDelHero'); if(!sel) return;
       var keys=new Set();
       if(window.skinRegistry) Object.keys(window.skinRegistry).forEach(function(k){ keys.add(k); });
       if(window.cloudCards) Object.keys(window.cloudCards).forEach(function(k){ keys.add(k); });
+      // 补全：仓库 skins/registry.json（切皮/删皮的权威源，App 运行时可能尚未同步到 skinRegistry）
+      try{
+        var local=await _cgmReadRepoFile('skins/registry.json');
+        if(local){ var reg=JSON.parse(local); if(reg&&reg.heroes) Object.keys(reg.heroes).forEach(function(k){ keys.add(k); }); }
+      }catch(e){}
       sel.innerHTML='<option value="">选择英雄…</option>';
       Array.from(keys).sort().forEach(function(k){ var o=document.createElement('option'); o.value=k; o.textContent=k; sel.appendChild(o); });
       smRefreshDelSkinList();
     }
-    function smRefreshDelSkinList(){
+    async function smRefreshDelSkinList(){
       var hsel=document.getElementById('smDelHero'); var ssel=document.getElementById('smDelSkin');
       if(!hsel||!ssel) return;
       var hero=hsel.value; ssel.innerHTML='<option value="">选择皮肤…</option>';
       if(!hero) return;
-      var list=(window.skinRegistry&&window.skinRegistry[hero])||[];
+      var list=[];
+      // 优先读仓库 skins/registry.json（切皮/删皮的权威源），兜底回退 skinRegistry
+      try{
+        var local=await _cgmReadRepoFile('skins/registry.json');
+        if(local){ var reg=JSON.parse(local); if(reg&&reg.heroes&&reg.heroes[hero]) list=reg.heroes[hero]; }
+      }catch(e){}
+      if(!list.length && window.skinRegistry && window.skinRegistry[hero]) list=window.skinRegistry[hero];
+      if(!list.length){ var o=document.createElement('option'); o.value=''; o.textContent='（该英雄暂无可删皮肤）'; o.disabled=true; ssel.appendChild(o); return; }
       list.forEach(function(s){ var o=document.createElement('option'); o.value=s.name; o.textContent=s.name; ssel.appendChild(o); });
     }
     async function smDeleteSkin(){
