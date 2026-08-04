@@ -3396,12 +3396,34 @@ if (isTauriApp) {
     // 从 GitHub Pages 拉取远程皮肤注册表，与本地 skinRegistry 合并
     // 这样任何设备打开 APP/网页即可自动获取皮肤，无需手动创建本地文件夹
     let _remoteSkinSynced = false;
+    // fetch 加超时：网络被墙/慢时不挂起启动（本地优先，远端只是后台补充）
+    async function _fetchWithTimeout(url, ms, options) {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), ms || 8000);
+        try {
+            return await fetch(url, Object.assign({}, options || {}, { signal: ctrl.signal }));
+        } finally {
+            clearTimeout(timer);
+        }
+    }
+    // 左下角提示：后台拉取到新皮肤时弹出（点一下强制刷新）
+    function _showSkinUpdateToast(count) {
+        try {
+            const div = document.createElement('div');
+            div.style.cssText = 'position:fixed;left:16px;bottom:16px;z-index:100002;background:rgba(26,26,46,0.94);color:#fff;padding:11px 14px;border-radius:10px;font-size:0.8rem;max-width:300px;box-shadow:0 4px 16px rgba(0,0,0,0.45);border:1px solid rgba(79,195,247,0.45);cursor:pointer;line-height:1.4;';
+            div.textContent = '🆕 后台已拉取 ' + count + ' 张新皮肤并缓存，点击刷新后即可使用';
+            div.title = '点击强制刷新';
+            div.onclick = function () { try { location.reload(); } catch (e) {} };
+            document.body.appendChild(div);
+            setTimeout(function () { div.style.opacity = '0'; div.style.transition = 'opacity 0.4s'; setTimeout(function () { if (div.parentNode) div.parentNode.removeChild(div); }, 400); }, 6000);
+        } catch (e) {}
+    }
     async function syncRemoteSkins() {
         if (_remoteSkinSynced) return;
         _remoteSkinSynced = true;
         console.log('[SKIN] syncRemoteSkins() fetching registry from:', REMOTE_SKIN_REGISTRY_URL);
         try {
-            const resp = await fetch(REMOTE_SKIN_REGISTRY_URL, { cache: 'no-cache' });
+            const resp = await _fetchWithTimeout(REMOTE_SKIN_REGISTRY_URL, 8000, { cache: 'no-cache' });
             if (!resp.ok) {
                 console.warn('[SKIN] Remote registry not found (HTTP ' + resp.status + '), using local only');
                 return;
@@ -3456,7 +3478,7 @@ if (isTauriApp) {
             } catch (fe) { console.warn('[SKIN] load fusions.json failed:', fe); }
             // 拉取皮肤属性表（云端 skin-attributes.json，管理员维护，随 git_push_skins 推送）
             try {
-                const aResp = await fetch(REMOTE_SKIN_BASE + '/skin-attributes.json', { cache: 'no-cache' });
+                const aResp = await _fetchWithTimeout(REMOTE_SKIN_BASE + '/skin-attributes.json', 8000, { cache: 'no-cache' });
                 if (aResp.ok) {
                     const aData = await aResp.json();
                     window.skinAttributesCloud = aData || {};
@@ -3574,7 +3596,7 @@ if (isTauriApp) {
                 } catch(e) { /* 不存在，继续下载 */ }
                 try {
                     const url = REMOTE_SKIN_BASE + '/' + encodeURIComponent(heroName) + '/' + encodeURIComponent(file);
-                    const resp = await fetch(url);
+                    const resp = await _fetchWithTimeout(url, 8000);
                     if (!resp.ok) continue;
                     const blob = await resp.blob();
                     const b64 = await _blobToBase64(blob);
@@ -3589,6 +3611,11 @@ if (isTauriApp) {
         }
         if (downloaded > 0 || skipped > 0) {
             console.log('[SKIN] 磁盘缓存: 新下载', downloaded, '跳过', skipped);
+        }
+        // 后台拉到新皮肤 → 左下角弹更新提示，并重刷一次皮肤让新皮尽快可见
+        if (downloaded > 0) {
+            _showSkinUpdateToast(downloaded);
+            try { if (typeof window.reapplyAllSkins === 'function') window.reapplyAllSkins(); } catch (e) {}
         }
     }
 
