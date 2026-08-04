@@ -3121,6 +3121,15 @@
                 </div>
                 <div id="smDelStatus" style="font-size:0.76rem;white-space:pre-wrap;min-height:14px;"></div>
               </div>
+              <!-- 皮肤上线自检 -->
+              <div style="margin-top:14px;padding-top:10px;border-top:1px dashed rgba(255,255,255,0.15);">
+                <div style="color:#4dd0e1;font-size:0.85rem;margin-bottom:6px;">🔍 验证皮肤是否上传成功（拉取线上 registry.json 比对）</div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:6px;">
+                  <input id="smVerifyHero" placeholder="英雄名（留空=列出线上全部）" style="flex:1;min-width:160px;padding:8px;border-radius:6px;border:1px solid rgba(77,208,225,0.3);background:#2a2a4a;color:#fff;font-size:0.85rem;">
+                  <button onclick="smVerifyOnline()" style="padding:8px 14px;border:none;border-radius:8px;background:linear-gradient(135deg,#4dd0e1,#0097a7);color:#fff;cursor:pointer;font-weight:600;font-size:0.85rem;white-space:nowrap;">🔍 查线上</button>
+                </div>
+                <div id="smVerifyStatus" style="font-size:0.76rem;white-space:pre-wrap;min-height:14px;color:rgba(255,255,255,0.7);"></div>
+              </div>
             </div>
             </div>
         </div>
@@ -30532,7 +30541,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260804-224 · sw-v341</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260804-225 · sw-v342</span>
             </div>
         </div>
     </div>
@@ -30566,6 +30575,29 @@ ${maSection}
     };
     var smInited=false;
     function smStatus(msg,isErr){ var el=document.getElementById('smStatus'); if(!el) return; el.textContent=msg; el.style.color=isErr?'#ff6b6b':'rgba(255,255,255,0.7)'; }
+    async function smVerifyOnline(){
+      var el=document.getElementById('smVerifyStatus'); var inp=document.getElementById('smVerifyHero');
+      var hero=(inp?inp.value:'').trim();
+      if(el){ el.style.color='rgba(255,255,255,0.7)'; el.textContent='查询中…'; }
+      try{
+        var url='https://gyq-svip.github.io/tfjl-web/skins/registry.json?_='+Date.now();
+        var resp=await fetch(url,{cache:'no-store',mode:'cors'});
+        if(!resp.ok) throw new Error('HTTP '+resp.status);
+        var data=await resp.json();
+        var heroes=(data&&data.heroes)?Object.keys(data.heroes):[];
+        if(hero){
+          if(heroes.indexOf(hero)>=0){
+            if(el){ el.style.color='#4ade80'; el.textContent='✅ 线上已登记英雄「'+hero+'」——你切的皮已成功上线。\n线上共 '+heroes.length+' 个英雄皮肤。'; }
+          } else {
+            if(el){ el.style.color='#ffd54f'; el.textContent='⏳ 线上未查到「'+hero+'」。可能：①还没推送 / ②Pages 部署延迟（等约 1 分钟再查）/ ③英雄名不一致。\n线上目前共 '+heroes.length+' 个：'+(heroes.join('、')||'(空)'); }
+          }
+        } else {
+          if(el){ el.style.color='#4ade80'; el.textContent='✅ 线上已登记 '+heroes.length+' 个英雄皮肤：\n'+(heroes.join('、')||'(空)'); }
+        }
+      }catch(e){
+        if(el){ el.style.color='#ff6b6b'; el.textContent='✗ 查询失败：'+e.message+'（多为网络/CORS；可手动浏览器打开 https://gyq-svip.github.io/tfjl-web/skins/registry.json 核对）'; }
+      }
+    }
     function smRender(ctx,scale){
       var W=SM_W*scale, H=SM_H*scale;
       ctx.clearRect(0,0,W,H);

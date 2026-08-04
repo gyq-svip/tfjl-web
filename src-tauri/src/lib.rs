@@ -303,7 +303,8 @@ fn bump_skin_versions(repo: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// 在文件中定位 marker，找到 token_prefix 后的数字（或 日期-数字），自增其末位序号
+/// 在文件中定位 marker，找到 token_prefix 后的数字（或 日期-数字），自增其末位序号。
+/// 容忍 token 末尾附加字符（如 versionTag 的 " · sw-vXXX"），只替换数字序号部分。
 fn bump_in_file(path: &str, marker: &str, prefix: &str, end_char: char) -> Result<(), String> {
     let mut content = fs::read_to_string(path).map_err(|e| format!("读取失败: {}", e))?;
     let pos = content.find(marker).ok_or("未找到版本标记")?;
@@ -313,14 +314,22 @@ fn bump_in_file(path: &str, marker: &str, prefix: &str, end_char: char) -> Resul
     let rest = &content[start..];
     let end = rest.find(end_char).ok_or("未找到版本结束符")?;
     let token = &rest[..end];
-    let new_token: String = if let Some(dash) = token.find('-') {
-        let num = token[dash + 1..].parse::<u32>().map_err(|_| "版本号解析失败")?;
-        format!("{}-{}", &token[..dash], num + 1)
+    if let Some(dash) = token.find('-') {
+        // 形如 v260804-224 · sw-v341：只取 dash 后前导数字，其余附加字符原样保留
+        let tail = &token[dash + 1..];
+        let num_str: String = tail.chars().take_while(|c| c.is_ascii_digit()).collect();
+        if num_str.is_empty() { return Err("版本号解析失败".into()); }
+        let num = num_str.parse::<u32>().map_err(|_| "版本号解析失败")?;
+        let num_start = start + dash + 1;
+        let num_end = num_start + num_str.len();
+        content.replace_range(num_start..num_end, &(num + 1).to_string());
     } else {
-        let num = token.parse::<u32>().map_err(|_| "版本号解析失败")?;
-        format!("{}", num + 1)
-    };
-    content.replace_range(start..start + token.len(), &new_token);
+        let num_str: String = token.chars().take_while(|c| c.is_ascii_digit()).collect();
+        if num_str.is_empty() { return Err("版本号解析失败".into()); }
+        let num = num_str.parse::<u32>().map_err(|_| "版本号解析失败")?;
+        let num_end = start + num_str.len();
+        content.replace_range(start..num_end, &(num + 1).to_string());
+    }
     fs::write(path, content).map_err(|e| format!("写回失败: {}", e))?;
     Ok(())
 }
