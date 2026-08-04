@@ -3162,13 +3162,101 @@
                 <button onclick="toggleActivityCalcPanel()" style="background:transparent;border:none;color:white;font-size:1.5rem;cursor:pointer;">×</button>
             </div>
             <div style="padding:15px;">
-                <!-- Tab切换 -->
-                <div style="display:flex;gap:4px;margin-bottom:15px;">
-                    <button onclick="switchCalcTab('skins')" id="calcTabSkins" style="flex:1;padding:7px;border:none;border-radius:6px;cursor:pointer;font-size:0.8rem;background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;">🎯 选择目标</button>
-                    <button onclick="switchCalcTab('beixiang')" id="calcTabBeixiang" style="flex:1;padding:7px;border:none;border-radius:6px;cursor:pointer;font-size:0.8rem;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);">🏆 封神杯襄</button>
-                    <button onclick="switchCalcTab('data')" id="calcTabData" style="flex:1;padding:7px;border:none;border-radius:6px;cursor:pointer;font-size:0.8rem;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);">📊 数据参考</button>
-                    <button onclick="switchCalcTab('calc')" id="calcTabCalc" style="flex:1;padding:7px;border:none;border-radius:6px;cursor:pointer;font-size:0.8rem;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);">💰 氪金计算器</button>
+                <!-- 顶层 2 tabs：新活动 / 旧活动 -->
+                <div style="display:flex;gap:5px;margin-bottom:15px;">
+                    <button onclick="switchCalcTopTab('new')" id="calcTopNew" style="flex:1;padding:8px;border:none;border-radius:6px;cursor:pointer;font-size:0.85rem;background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;">🆕 新活动·封神杯襄</button>
+                    <button onclick="switchCalcTopTab('old')" id="calcTopOld" style="flex:1;padding:8px;border:none;border-radius:6px;cursor:pointer;font-size:0.85rem;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);">📦 旧活动·轮回</button>
                 </div>
+
+                <!-- ============ 新活动容器 ============ -->
+                <div id="calcNewContainer">
+                    <div style="display:flex;gap:4px;margin-bottom:12px;">
+                        <button onclick="switchNewCalcTab('target')" id="calcNewTabTarget" style="flex:1;padding:7px;border:none;border-radius:6px;cursor:pointer;font-size:0.8rem;background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;">🎯 选择目标</button>
+                        <button onclick="switchNewCalcTab('ref')" id="calcNewTabRef" style="flex:1;padding:7px;border:none;border-radius:6px;cursor:pointer;font-size:0.8rem;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);">📊 数据参考</button>
+                        <button onclick="switchNewCalcTab('calc')" id="calcNewTabCalc" style="flex:1;padding:7px;border:none;border-radius:6px;cursor:pointer;font-size:0.8rem;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);">💰 氪金计算器</button>
+                    </div>
+
+                    <!-- 新：选择目标 -->
+                    <div id="calcNewTargetPanel">
+                        <div style="color:#ff9800;font-weight:600;margin-bottom:10px;font-size:0.9rem;">🏆 第四话·封神台 · 杯襄商店</div>
+                        <div style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-bottom:10px;">⚔️ 每日 5 局对战（赢=6战旗，输=2战旗）→ 攒战旗买皮肤/战车</div>
+                        <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:12px;margin-bottom:12px;">
+                            <div style="color:#4ecdc4;font-weight:600;margin-bottom:8px;font-size:0.85rem;">🎯 选择目标（多选）</div>
+                            <div id="calcBeixiangSkinsList" style="max-height:220px;overflow-y:auto;"></div>
+                            <div style="display:flex;justify-content:space-between;margin-top:8px;">
+                                <span style="color:rgba(255,255,255,0.7);font-size:0.8rem;">已选目标战旗总数：</span>
+                                <span id="calcBeixiangTargetTotal" style="color:#ffd700;font-weight:bold;font-size:1.05rem;">0</span>
+                            </div>
+                            <button onclick="clearBeixiangSelection()" style="margin-top:8px;padding:5px 12px;border:none;border-radius:6px;background:rgba(239,68,68,0.3);color:#ef4444;cursor:pointer;font-size:0.78rem;">清空选择</button>
+                        </div>
+                    </div>
+
+                    <!-- 新：数据参考 -->
+                    <div id="calcNewRefPanel" style="display:none;">
+                        <div style="color:#4ecdc4;font-weight:600;margin-bottom:10px;font-size:0.9rem;">📊 礼包性价比</div>
+                        <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:10px;margin-bottom:15px;">
+                            <table style="width:100%;font-size:0.8rem;color:rgba(255,255,255,0.8);border-collapse:collapse;">
+                                <tr style="border-bottom:1px solid rgba(255,255,255,0.1);"><th style="text-align:left;padding:4px;">礼包</th><th style="text-align:right;padding:4px;">金额</th><th style="text-align:right;padding:4px;">战旗</th><th style="text-align:right;padding:4px;">战旗/元</th></tr>
+                                <tr><td style="padding:4px;color:#ffd700;">战令</td><td style="text-align:right;padding:4px;">98元</td><td style="text-align:right;padding:4px;">200</td><td style="text-align:right;padding:4px;color:#4caf50;">2.04</td></tr>
+                                <tr><td style="padding:4px;">30礼包</td><td style="text-align:right;padding:4px;">30元</td><td style="text-align:right;padding:4px;">20</td><td style="text-align:right;padding:4px;color:#4caf50;">0.67</td></tr>
+                                <tr><td style="padding:4px;">128礼包</td><td style="text-align:right;padding:4px;">128元</td><td style="text-align:right;padding:4px;">60</td><td style="text-align:right;padding:4px;color:#4caf50;">0.47</td></tr>
+                                <tr><td style="padding:4px;">328礼包</td><td style="text-align:right;padding:4px;">328元</td><td style="text-align:right;padding:4px;">120</td><td style="text-align:right;padding:4px;">0.37</td></tr>
+                                <tr><td style="padding:4px;">648礼包</td><td style="text-align:right;padding:4px;">648元</td><td style="text-align:right;padding:4px;">240</td><td style="text-align:right;padding:4px;">0.37</td></tr>
+                            </table>
+                            <div style="margin-top:8px;color:#ff9800;font-size:0.75rem;">💡 性价比排序：战令 > 30礼包 > 128礼包 > 648礼包 > 328礼包</div>
+                        </div>
+                        <div style="color:#4ecdc4;font-weight:600;margin-bottom:10px;font-size:0.9rem;">📊 每日对战产出（5局/天）</div>
+                        <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:10px;">
+                            <table style="width:100%;font-size:0.8rem;color:rgba(255,255,255,0.8);border-collapse:collapse;">
+                                <tr style="border-bottom:1px solid rgba(255,255,255,0.1);"><th style="text-align:left;padding:4px;">胜率</th><th style="text-align:right;padding:4px;">每日</th><th style="text-align:right;padding:4px;">21天</th><th style="text-align:right;padding:4px;">+战令</th></tr>
+                                <tr><td style="padding:4px;">100%</td><td style="text-align:right;padding:4px;">30</td><td style="text-align:right;padding:4px;">630</td><td style="text-align:right;padding:4px;color:#ffd700;">830</td></tr>
+                                <tr><td style="padding:4px;">75%</td><td style="text-align:right;padding:4px;">25</td><td style="text-align:right;padding:4px;">525</td><td style="text-align:right;padding:4px;color:#ffd700;">725</td></tr>
+                                <tr><td style="padding:4px;">50%</td><td style="text-align:right;padding:4px;">20</td><td style="text-align:right;padding:4px;">420</td><td style="text-align:right;padding:4px;color:#ffd700;">620</td></tr>
+                                <tr><td style="padding:4px;">25%</td><td style="text-align:right;padding:4px;">15</td><td style="text-align:right;padding:4px;">315</td><td style="text-align:right;padding:4px;color:#ffd700;">515</td></tr>
+                                <tr><td style="padding:4px;">0%</td><td style="text-align:right;padding:4px;">10</td><td style="text-align:right;padding:4px;">210</td><td style="text-align:right;padding:4px;color:#ff3333;">410</td></tr>
+                            </table>
+                            <div style="margin-top:8px;color:rgba(255,255,255,0.4);font-size:0.7rem;">💡 每日产出 = 5 × (胜率×6 + 败率×2) 战旗</div>
+                        </div>
+                    </div>
+
+                    <!-- 新：氪金计算器 -->
+                    <div id="calcNewCalcPanel" style="display:none;">
+                        <div style="color:#ff9800;font-weight:600;margin-bottom:10px;font-size:0.9rem;">⚙️ 计算参数</div>
+                        <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:12px;margin-bottom:12px;">
+                            <div style="margin-bottom:10px;">
+                                <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;display:block;margin-bottom:4px;">已有战旗</label>
+                                <input type="number" id="calcBeixiangOwnedInput" value="0" min="0" style="width:100%;padding:7px;border-radius:6px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.3);color:#fff;font-size:0.9rem;box-sizing:border-box;">
+                            </div>
+                            <div style="margin-bottom:10px;">
+                                <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;display:block;margin-bottom:4px;">活动天数</label>
+                                <input type="number" id="calcBeixiangDaysInput" value="21" min="1" max="30" style="width:100%;padding:7px;border-radius:6px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.3);color:#fff;font-size:0.9rem;box-sizing:border-box;">
+                            </div>
+                            <div style="margin-bottom:10px;">
+                                <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;display:block;margin-bottom:4px;">每日对战胜率：<span id="calcBeixiangWinRateLabel" style="color:#ffd700;font-weight:bold;">50%</span></label>
+                                <input type="range" id="calcBeixiangWinRate" min="0" max="100" value="50" step="5" style="width:100%;cursor:pointer;" oninput="document.getElementById('calcBeixiangWinRateLabel').textContent=this.value+'%'">
+                                <div style="color:rgba(255,255,255,0.4);font-size:0.7rem;margin-top:4px;">💡 每人每天打5次，赢=6战旗，输=2战旗（按经验估算）</div>
+                            </div>
+                            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+                                <input type="checkbox" id="calcBeixiangBuyZhanLing" checked style="width:18px;height:18px;cursor:pointer;">
+                                <label for="calcBeixiangBuyZhanLing" style="color:rgba(255,255,255,0.8);font-size:0.85rem;cursor:pointer;">购买战令（98元/200战旗）</label>
+                            </div>
+                            <button onclick="doBeixiangCalc()" style="width:100%;padding:10px;border:none;border-radius:8px;background:linear-gradient(135deg,#9c27b0,#e91e63);color:white;font-size:1rem;font-weight:bold;cursor:pointer;">🧮 计算最优方案</button>
+                        </div>
+                        <div id="calcBeixiangResultArea" style="display:none;">
+                            <div style="color:#4ecdc4;font-weight:600;margin-bottom:10px;font-size:0.9rem;">💰 计算结果</div>
+                            <div id="calcBeixiangResultContent" style="background:rgba(255,255,255,0.05);border-radius:8px;padding:12px;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ============ 旧活动容器 ============ -->
+                <div id="calcOldContainer" style="display:none;">
+                    <div style="display:flex;gap:4px;margin-bottom:12px;">
+                        <button onclick="switchOldCalcTab('skins')" id="calcOldTabSkins" style="flex:1;padding:7px;border:none;border-radius:6px;cursor:pointer;font-size:0.8rem;background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;">🎯 选择目标</button>
+                        <button onclick="switchOldCalcTab('data')" id="calcOldTabData" style="flex:1;padding:7px;border:none;border-radius:6px;cursor:pointer;font-size:0.8rem;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);">📊 数据参考</button>
+                        <button onclick="switchOldCalcTab('calc')" id="calcOldTabCalc" style="flex:1;padding:7px;border:none;border-radius:6px;cursor:pointer;font-size:0.8rem;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);">💰 氪金计算器</button>
+                    </div>
+
 
                 <!-- 选择目标皮肤 -->
                 <div id="calcSkinsPanel">
@@ -3186,7 +3274,7 @@
                     </div>
                     <div style="margin-top:10px;display:flex;gap:8px;">
                         <button onclick="clearCalcSelection()" style="flex:1;padding:8px;border:none;border-radius:6px;background:rgba(239,68,68,0.3);color:#ef4444;cursor:pointer;font-size:0.8rem;">清空选择</button>
-                        <button onclick="switchCalcTab('calc');focusCalcInputs();" style="flex:1;padding:8px;border:none;border-radius:6px;background:linear-gradient(135deg,#ff6b6b,#feca57);color:white;cursor:pointer;font-size:0.8rem;font-weight:bold;">下一步 →</button>
+                        <button onclick="switchOldCalcTab('calc');focusCalcInputs();" style="flex:1;padding:8px;border:none;border-radius:6px;background:linear-gradient(135deg,#ff6b6b,#feca57);color:white;cursor:pointer;font-size:0.8rem;font-weight:bold;">下一步 →</button>
                     </div>
                 </div>
 
@@ -3216,51 +3304,6 @@
                     </div>
                 </div>
 
-                <!-- 封神杯襄（新活动） -->
-                <div id="calcBeixiangPanel" style="display:none;">
-                    <div style="color:#ff9800;font-weight:600;margin-bottom:10px;font-size:0.9rem;">🏆 第四话·封神台 · 杯襄商店</div>
-                    <div style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-bottom:10px;">⚔️ 每日 5 局对战（赢=6战旗，输=2战旗）→ 攒战旗买皮肤/战车</div>
-
-                    <!-- 目标选择 -->
-                    <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:12px;margin-bottom:12px;">
-                        <div style="color:#4ecdc4;font-weight:600;margin-bottom:8px;font-size:0.85rem;">🎯 选择目标（多选）</div>
-                        <div id="calcBeixiangSkinsList" style="max-height:220px;overflow-y:auto;"></div>
-                        <div style="display:flex;justify-content:space-between;margin-top:8px;">
-                            <span style="color:rgba(255,255,255,0.7);font-size:0.8rem;">已选目标战旗总数：</span>
-                            <span id="calcBeixiangTargetTotal" style="color:#ffd700;font-weight:bold;font-size:1.05rem;">0</span>
-                        </div>
-                        <button onclick="clearBeixiangSelection()" style="margin-top:8px;padding:5px 12px;border:none;border-radius:6px;background:rgba(239,68,68,0.3);color:#ef4444;cursor:pointer;font-size:0.78rem;">清空选择</button>
-                    </div>
-
-                    <!-- 参数 -->
-                    <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:12px;margin-bottom:12px;">
-                        <div style="color:#4ecdc4;font-weight:600;margin-bottom:8px;font-size:0.85rem;">⚙️ 计算参数</div>
-
-                        <div style="margin-bottom:10px;">
-                            <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;display:block;margin-bottom:4px;">已有战旗</label>
-                            <input type="number" id="calcBeixiangOwnedInput" value="0" min="0" style="width:100%;padding:7px;border-radius:6px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.3);color:#fff;font-size:0.9rem;box-sizing:border-box;">
-                        </div>
-
-                        <div style="margin-bottom:10px;">
-                            <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;display:block;margin-bottom:4px;">活动天数</label>
-                            <input type="number" id="calcBeixiangDaysInput" value="21" min="1" max="30" style="width:100%;padding:7px;border-radius:6px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.3);color:#fff;font-size:0.9rem;box-sizing:border-box;">
-                        </div>
-
-                        <div style="margin-bottom:10px;">
-                            <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;display:block;margin-bottom:4px;">每日对战胜率：<span id="calcBeixiangWinRateLabel" style="color:#ffd700;font-weight:bold;">50%</span></label>
-                            <input type="range" id="calcBeixiangWinRate" min="0" max="100" value="50" step="5" style="width:100%;cursor:pointer;" oninput="document.getElementById('calcBeixiangWinRateLabel').textContent=this.value+'%'">
-                            <div style="color:rgba(255,255,255,0.4);font-size:0.7rem;margin-top:4px;">💡 每人每天打5次，赢=6战旗，输=2战旗（按经验估算）</div>
-                        </div>
-
-                        <button onclick="doBeixiangCalc()" style="width:100%;padding:10px;border:none;border-radius:8px;background:linear-gradient(135deg,#9c27b0,#e91e63);color:white;font-size:1rem;font-weight:bold;cursor:pointer;">🧮 计算最优方案</button>
-                    </div>
-
-                    <!-- 结果 -->
-                    <div id="calcBeixiangResultArea" style="display:none;">
-                        <div style="color:#4ecdc4;font-weight:600;margin-bottom:10px;font-size:0.9rem;">💰 计算结果</div>
-                        <div id="calcBeixiangResultContent" style="background:rgba(255,255,255,0.05);border-radius:8px;padding:12px;"></div>
-                    </div>
-                </div>
 
                 <!-- 氪金计算 -->
                 <div id="calcCalcPanel" style="display:none;">
@@ -3788,6 +3831,9 @@
             const owned = parseInt(document.getElementById('calcBeixiangOwnedInput').value) || 0;
             const days = parseInt(document.getElementById('calcBeixiangDaysInput').value) || 21;
             const winRate = (parseInt(document.getElementById('calcBeixiangWinRate').value) || 50) / 100;
+            const buyZhanLing = document.getElementById('calcBeixiangBuyZhanLing').checked;
+            const zhanLingFlag = buyZhanLing ? 200 : 0;
+            const zhanLingCost = buyZhanLing ? 98 : 0;
 
             if (target <= 0) {
                 alert('请先选择目标皮肤！');
@@ -3796,21 +3842,22 @@
 
             // 每日产出：5局 × (胜率×6 + 败率×2) 战旗
             const dailyAvg = 5 * (winRate * 6 + (1 - winRate) * 2);
-            const totalFree = Math.round(dailyAvg * days) + owned;
+            const battleFree = Math.round(dailyAvg * days);
+            const totalFree = battleFree + owned + zhanLingFlag;
             const need = Math.max(0, target - totalFree);
 
             let html = '';
             html += `<div style="margin-bottom:12px;">`;
             html += `<div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.6);font-size:0.8rem;">目标战旗总数</span><span style="color:#ffd700;font-weight:bold;">${target}</span></div>`;
             html += `<div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.6);font-size:0.8rem;">每日对战（5局·胜率${Math.round(winRate*100)}%）</span><span style="color:#4ecdc4;">${dailyAvg.toFixed(1)} 战旗/天</span></div>`;
-            html += `<div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.6);font-size:0.8rem;">免费获得（${dailyAvg.toFixed(1)}/天×${days}天${owned > 0 ? '+已有' + owned : ''}）</span><span style="color:#4ecdc4;">${totalFree}</span></div>`;
+            html += `<div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.6);font-size:0.8rem;">免费获得（对战${battleFree}${owned > 0 ? '+已有' + owned : ''}${buyZhanLing ? '+战令200' : ''}）</span><span style="color:#4ecdc4;">${totalFree}</span></div>`;
 
             if (need <= 0) {
                 html += `<div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.6);font-size:0.8rem;">还需战旗</span><span style="color:#4caf50;font-weight:bold;">0（已足够）</span></div>`;
                 html += `</div>`;
                 html += `<div style="background:linear-gradient(135deg,#4caf50,#2e7d32);border-radius:8px;padding:12px;text-align:center;color:white;margin-top:10px;">`;
                 html += `<div style="font-size:1.1rem;font-weight:bold;">🎉 无需额外氪金！</div>`;
-                html += `<div style="font-size:0.85rem;margin-top:4px;opacity:0.9;">免费产出已满足目标，溢出 ${totalFree - target} 战旗</div>`;
+                html += `<div style="font-size:0.85rem;margin-top:4px;opacity:0.9;">${buyZhanLing ? '战令已含200战旗，' : ''}免费产出已满足目标，溢出 ${totalFree - target} 战旗</div>`;
                 html += `</div>`;
             } else {
                 html += `<div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.6);font-size:0.8rem;">还需战旗</span><span style="color:#ff6b6b;font-weight:bold;">${need}</span></div>`;
@@ -3822,6 +3869,9 @@
 
                 html += `<div style="color:#ff9800;font-weight:600;margin-bottom:8px;font-size:0.9rem;">💰 推荐购买方案</div>`;
                 html += `<div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:10px;margin-bottom:10px;">`;
+                if (buyZhanLing) {
+                    html += `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.05);"><span style="color:rgba(255,255,255,0.8);font-size:0.85rem;">战令</span><span style="color:rgba(255,255,255,0.8);font-size:0.85rem;">200战旗 <span style="color:#ff6b6b;">98元</span></span></div>`;
+                }
                 const giftNames = ['30礼包', '128礼包', '328礼包', '648礼包'];
                 const giftMats = { '30礼包': 20, '128礼包': 60, '328礼包': 120, '648礼包': 240 };
                 giftNames.forEach(name => {
@@ -3834,9 +3884,11 @@
                 });
                 html += `</div>`;
 
+                const totalCost = opt.cost + zhanLingCost;
+                const totalMat = opt.totalMat + zhanLingFlag;
                 html += `<div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:1px solid rgba(255,215,0,0.3);border-radius:8px;padding:12px;">`;
-                html += `<div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.7);font-size:0.85rem;">总花费</span><span style="color:#ff6b6b;font-weight:bold;font-size:1.2rem;">${opt.cost}元</span></div>`;
-                html += `<div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.7);font-size:0.85rem;">获得战旗</span><span style="color:#4ecdc4;font-weight:bold;">${opt.totalMat}</span></div>`;
+                html += `<div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.7);font-size:0.85rem;">总花费</span><span style="color:#ff6b6b;font-weight:bold;font-size:1.2rem;">${totalCost}元</span></div>`;
+                html += `<div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.7);font-size:0.85rem;">获得战旗</span><span style="color:#4ecdc4;font-weight:bold;">${totalMat}</span></div>`;
                 html += `<div style="display:flex;justify-content:space-between;"><span style="color:rgba(255,255,255,0.7);font-size:0.85rem;">溢出战旗</span><span style="color:${overflow > 0 ? '#ff9800' : '#4caf50'};font-weight:bold;">${overflow > 0 ? overflow : 0}</span></div>`;
                 html += `</div>`;
             }
@@ -3851,19 +3903,42 @@
             const panel = document.getElementById('activityCalcPanel');
             panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
             if (panel.style.display === 'block') {
-                renderCalcSkins();
-                updateCalcSummary();
+                switchCalcTopTab('new');
             }
         }
 
-        function switchCalcTab(tab) {
-            document.getElementById('calcSkinsPanel').style.display = tab === 'skins' ? 'block' : 'none';
-            document.getElementById('calcDataPanel').style.display = tab === 'data' ? 'block' : 'none';
-            document.getElementById('calcCalcPanel').style.display = tab === 'calc' ? 'block' : 'none';
-            document.getElementById('calcBeixiangPanel').style.display = tab === 'beixiang' ? 'block' : 'none';
-            ['skins', 'beixiang', 'data', 'calc'].forEach(t => {
-                const id = t === 'beixiang' ? 'calcTabBeixiang' : ('calcTab' + t.charAt(0).toUpperCase() + t.slice(1));
-                const btn = document.getElementById(id);
+        // 顶层 Tab：新活动 / 旧活动
+        function switchCalcTopTab(tab) {
+            const isNew = tab === 'new';
+            document.getElementById('calcNewContainer').style.display = isNew ? 'block' : 'none';
+            document.getElementById('calcOldContainer').style.display = isNew ? 'none' : 'block';
+            const btnNew = document.getElementById('calcTopNew');
+            const btnOld = document.getElementById('calcTopOld');
+            if (isNew) {
+                btnNew.style.background = 'linear-gradient(135deg,#4caf50,#2e7d32)';
+                btnNew.style.color = 'white';
+                btnOld.style.background = 'rgba(255,255,255,0.1)';
+                btnOld.style.color = 'rgba(255,255,255,0.7)';
+                switchNewCalcTab('target');
+            } else {
+                btnOld.style.background = 'linear-gradient(135deg,#4caf50,#2e7d32)';
+                btnOld.style.color = 'white';
+                btnNew.style.background = 'rgba(255,255,255,0.1)';
+                btnNew.style.color = 'rgba(255,255,255,0.7)';
+                renderCalcSkins();
+                updateCalcSummary();
+                switchOldCalcTab('skins');
+            }
+        }
+
+        // 新活动内部子 Tab：选择目标 / 数据参考 / 氪金计算器
+        function switchNewCalcTab(tab) {
+            document.getElementById('calcNewTargetPanel').style.display = tab === 'target' ? 'block' : 'none';
+            document.getElementById('calcNewRefPanel').style.display = tab === 'ref' ? 'block' : 'none';
+            document.getElementById('calcNewCalcPanel').style.display = tab === 'calc' ? 'block' : 'none';
+            const map = { target: 'calcNewTabTarget', ref: 'calcNewTabRef', calc: 'calcNewTabCalc' };
+            Object.keys(map).forEach(t => {
+                const btn = document.getElementById(map[t]);
                 if (t === tab) {
                     btn.style.background = 'linear-gradient(135deg,#4caf50,#2e7d32)';
                     btn.style.color = 'white';
@@ -3872,8 +3947,25 @@
                     btn.style.color = 'rgba(255,255,255,0.7)';
                 }
             });
-            // 首次进入封神杯襄 Tab 时渲染皮肤清单
-            if (tab === 'beixiang') renderBeixiangSkins();
+            if (tab === 'target') renderBeixiangSkins();
+        }
+
+        // 旧活动内部子 Tab：选择目标 / 数据参考 / 氪金计算器
+        function switchOldCalcTab(tab) {
+            document.getElementById('calcSkinsPanel').style.display = tab === 'skins' ? 'block' : 'none';
+            document.getElementById('calcDataPanel').style.display = tab === 'data' ? 'block' : 'none';
+            document.getElementById('calcCalcPanel').style.display = tab === 'calc' ? 'block' : 'none';
+            const map = { skins: 'calcOldTabSkins', data: 'calcOldTabData', calc: 'calcOldTabCalc' };
+            Object.keys(map).forEach(t => {
+                const btn = document.getElementById(map[t]);
+                if (t === tab) {
+                    btn.style.background = 'linear-gradient(135deg,#4caf50,#2e7d32)';
+                    btn.style.color = 'white';
+                } else {
+                    btn.style.background = 'rgba(255,255,255,0.1)';
+                    btn.style.color = 'rgba(255,255,255,0.7)';
+                }
+            });
         }
 
         function renderCalcSkins() {
@@ -30884,7 +30976,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-246 · sw-v363</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-247 · sw-v364</span>
             </div>
         </div>
     </div>
