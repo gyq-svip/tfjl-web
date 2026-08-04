@@ -11097,9 +11097,9 @@
                 </div>
                 <div style="display:flex;gap:8px;flex-wrap:wrap;">
                     <button onclick="parseTextAndAddCards()" data-tip="把输入框里的卡解析并加入上方「分配到手牌」所选的那份手牌（工程/精灵按规则处理）" style="flex:1;background:linear-gradient(135deg,#00bcd4,#00838f);color:white;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:500;">🔍 解析并添加</button>
-                    <button onclick="parseActivityScript(true)" style="flex:1;background:linear-gradient(135deg,#ff5722,#e64a19);color:white;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:500;">📜 活动脚本生成</button>
-                    <button onclick="parseActivityScript(false)" style="flex:1;background:linear-gradient(135deg,#9c27b0,#7b1fa2);color:white;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:500;">🎭 隐藏榜脚本生成</button>
-                    <button onclick="parseDungeonScript()" style="flex:1;background:linear-gradient(135deg,#ff9800,#e65100);color:white;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:500;">🌊 深海脚本生成</button>
+                    <button onclick="parseActivityScript(true)" data-tip="生成「活动脚本」：把上方文本解析成可直接复制进游戏的活动阵容脚本（按规则处理工程/精灵卡）" style="flex:1;background:linear-gradient(135deg,#ff5722,#e64a19);color:white;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:500;">📜 活动脚本生成</button>
+                    <button onclick="parseActivityScript(false)" data-tip="生成「隐藏榜脚本」：把上方文本解析成隐藏排行榜用的阵容脚本（与活动脚本格式不同）" style="flex:1;background:linear-gradient(135deg,#9c27b0,#7b1fa2);color:white;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:500;">🎭 隐藏榜脚本生成</button>
+                    <button onclick="parseDungeonScript()" data-tip="生成「深海脚本」：把上方文本按深海副本规则解析，输出深海阵容脚本（一势力一图）" style="flex:1;background:linear-gradient(135deg,#ff9800,#e65100);color:white;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:500;">🌊 深海脚本生成</button>
                     <button onclick="clearParserInput()" data-tip="清空输入框与下方生成结果" style="background:rgba(255,255,255,0.1);color:white;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:0.85rem;">清空</button>
                 </div>
                 <div id="parserResult" style="margin-top:10px;font-size:0.85rem;color:rgba(255,255,255,0.7);"></div>
@@ -16133,7 +16133,11 @@
             const remoteSkins = (window.skinRegistry && Array.isArray(window.skinRegistry[mainCardName]))
                 ? window.skinRegistry[mainCardName].map(s => s.name).filter(Boolean)
                 : [];
-            const allSkins = [...new Set([...defaultSkins, ...customSkins, ...attrSkins, ...remoteSkins])];
+            // 过滤与英雄同名的「默认等价」条目：它与合成「默认」指向同一张基础图，
+            // 不过滤会在切皮列表里重复出现（如 冰弓 → 默认/冰弓/雪莲·冰弓 三选）。
+            // 仅影响展示列表；registry 中的同名条目保留，保证「默认」仍能解析到基础图。
+            const remoteSkinsFiltered = remoteSkins.filter(n => n !== mainCardName);
+            const allSkins = [...new Set([...defaultSkins, ...customSkins, ...attrSkins, ...remoteSkinsFiltered])];
             return allSkins;
         }
         
@@ -30216,7 +30220,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260804-207 · sw-v325</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260804-208 · sw-v326</span>
             </div>
         </div>
     </div>
