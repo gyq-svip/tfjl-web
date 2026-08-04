@@ -10858,14 +10858,19 @@
                 const jsonStr = JSON.stringify(exportData, null, 2);
                 const fileName = `塔防阵容_${projectName}_${new Date().toLocaleDateString().replace(/\//g, '-')}.json`;
                 const isTauri = !!(window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke);
+                const finish = function() {
+                    if (typeof showToast === 'function') showToast('✅ 已备份项目「' + projectName + '」为 JSON 文件（可分享给他人导入）');
+                    document.getElementById('projectMenu').style.display = 'none';
+                };
                 if (isTauri) {
-                    _downloadScriptTauri(fileName, jsonStr);
+                    // 先让用户选目的地，saved=true 才提示成功；取消不误报
+                    _downloadScriptTauri(fileName, jsonStr).then(function(saved) {
+                        if (saved) finish(); else document.getElementById('projectMenu').style.display = 'none';
+                    });
                 } else {
                     _downloadScriptBlob(fileName, jsonStr);
+                    finish();
                 }
-
-                if (typeof showToast === 'function') showToast('✅ 已备份项目「' + projectName + '」为 JSON 文件（可分享给他人导入）');
-                document.getElementById('projectMenu').style.display = 'none';
             });
         }
 
@@ -16069,11 +16074,16 @@
                 const fileName = `TFJL-backup-${new Date().toISOString().slice(0,10)}.json`;
                 const isTauri = !!(window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke);
                 if (isTauri) {
-                    _downloadScriptTauri(fileName, jsonStr);
+                    // 先让用户选目的地，saved=true 才提示成功；取消(saved=false)不误报
+                    _downloadScriptTauri(fileName, jsonStr).then(function(saved) {
+                        if (saved) {
+                            alert('✅ 数据导出成功！共 ' + exportData.projects.length + ' 个项目，' + exportData.categories.length + ' 个分类');
+                        }
+                    });
                 } else {
                     _downloadScriptBlob(fileName, jsonStr);
+                    alert('✅ 数据导出成功！共 ' + exportData.projects.length + ' 个项目，' + exportData.categories.length + ' 个分类');
                 }
-                alert('✅ 数据导出成功！共 ' + exportData.projects.length + ' 个项目，' + exportData.categories.length + ' 个分类');
             };
 
             request.onerror = function() {
@@ -30688,7 +30698,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260804-244 · sw-v361</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-245 · sw-v362</span>
             </div>
         </div>
     </div>
