@@ -1114,8 +1114,8 @@
         /* 融合卡副卡：左上角小圆角矩形 + 金色外框（filter:drop-shadow 不会被 background-image 裁掉） */
         .collapsible-section .card-item .skin-layer-fused {
             position: absolute;
-            left: 6px;
-            top: 6px;              /* 改到左上角，不遮挡卡牌下方的卡名 */
+            left: 2px;
+            top: 2px;              /* 紧贴左上角，不遮挡卡牌下方的卡名 */
             width: 40%;
             height: auto;
             aspect-ratio: 1 / 1;          /* 锁死正方形，配合 max-height 防止把卡牌撑变形 */
@@ -16559,7 +16559,7 @@ function applyFusionSkinToHandCard(card, mainUrl, fusedUrl, fusedIsBadge) {
         }
         overlay.style.cssText = fusedIsBadge
             ? 'position:absolute;inset:0;width:100%;height:100%;object-fit:contain;border-radius:inherit;z-index:1;pointer-events:none;'
-            : 'position:absolute;left:6px;top:6px;width:' + FUSION_SIZE + ';height:auto;aspect-ratio:1/1;max-height:70%;object-fit:cover;box-sizing:border-box;border:3px solid #FFD700;clip-path:polygon(0 0,100% 0,100% 85%,85% 100%,0 100%);z-index:2;pointer-events:none;filter:drop-shadow(0 0 2px rgba(0,0,0,0.7));';
+            : 'position:absolute;left:2px;top:2px;width:' + FUSION_SIZE + ';height:auto;aspect-ratio:1/1;max-height:70%;object-fit:cover;box-sizing:border-box;border:3px solid #FFD700;clip-path:polygon(0 0,100% 0,100% 85%,85% 100%,0 100%);z-index:2;pointer-events:none;filter:drop-shadow(0 0 2px rgba(0,0,0,0.7));';
         if (overlay.src !== fusedUrl) overlay.src = fusedUrl;
     } else if (overlay && overlay.parentNode) {
         overlay.remove();
@@ -16623,7 +16623,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         // isBadge:预切PNG(透明底+角落已含被融合卡)→满铺；否则副卡缩成小圆角矩形放左上金边框
         overlay.style.cssText = fusedIsBadge
             ? 'position:absolute;inset:3px;width:calc(100% - 6px);height:calc(100% - 6px);object-fit:contain;border-radius:5px;z-index:1;pointer-events:none;'
-            : 'position:absolute;left:8px;top:8px;width:' + FUSION_SIZE + ';height:auto;aspect-ratio:1/1;max-height:70%;object-fit:cover;box-sizing:border-box;border:3px solid #FFD700;clip-path:polygon(0 0,100% 0,100% 85%,85% 100%,0 100%);z-index:2;cursor:pointer;filter:drop-shadow(0 0 2px rgba(0,0,0,0.7));';
+            : 'position:absolute;left:3px;top:3px;width:' + FUSION_SIZE + ';height:auto;aspect-ratio:1/1;max-height:70%;object-fit:cover;box-sizing:border-box;border:3px solid #FFD700;clip-path:polygon(0 0,100% 0,100% 85%,85% 100%,0 100%);z-index:2;cursor:pointer;filter:drop-shadow(0 0 2px rgba(0,0,0,0.7));';
         if (overlay.src !== fusedUrl) overlay.src = fusedUrl;
     } else if (overlay && overlay.parentNode) {
         overlay.remove();
@@ -30188,7 +30188,7 @@ ${maSection}
     </div>
 
     <!-- 右下角版本标记（供前端更新核对 + extractVersion 解析） -->
-    <span id="versionTag" style="position:fixed;left:8px;bottom:54px;z-index:10002;font-size:0.72rem;color:#666;background:rgba(0,0,0,0.35);padding:2px 8px;border-radius:10px;pointer-events:auto;cursor:pointer;user-select:none;" onclick="showVersionPopup()" title="点击查看版本 / 强制刷新">v260804-201 · sw-v319</span>
+    <span id="versionTag" style="position:fixed;left:8px;bottom:54px;z-index:10002;font-size:0.72rem;color:#666;background:rgba(0,0,0,0.35);padding:2px 8px;border-radius:10px;pointer-events:auto;cursor:pointer;user-select:none;" onclick="showVersionPopup()" title="点击查看版本 / 强制刷新">v260804-202 · sw-v320</span>
 
     <!-- 底部状态栏（在线统计 + 版本显示） -->
     <div id="statsBar" style="position:fixed;bottom:0;left:0;right:0;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);border-top:2px solid rgba(255,215,0,0.5);padding:10px 20px;z-index:9990;display:flex;justify-content:center;align-items:center;gap:24px;font-size:0.9rem;flex-wrap:wrap;">
