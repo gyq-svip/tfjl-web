@@ -3061,7 +3061,8 @@
                 </div>
                 <!-- 皮肤制作 -->
             <div id="cgmSkinPane" style="display:none;">
-              <div style="display:flex;gap:20px;flex-wrap:wrap;">
+              <!-- 第一行：原图画布 + 成品预览 并排对照 -->
+              <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start;margin-bottom:14px;">
                 <div style="flex:1 1 420px;min-width:320px;">
                   <input type="file" id="skinMakerFile" accept="image/*" style="color:#fff;margin-bottom:10px;font-size:0.85rem;">
                   <canvas id="skinMakerCanvas" width="412" height="400" style="width:412px;height:400px;max-width:100%;border:1px solid rgba(255,255,255,0.2);border-radius:10px;background:#000;cursor:grab;display:block;"></canvas>
@@ -3082,20 +3083,29 @@
                   </div>
                   <button id="smDownload" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:8px;padding:8px 14px;cursor:pointer;font-size:0.85rem;">⬇️ 下载 PNG</button>
                 </div>
+                <div style="flex:0 0 auto;min-width:220px;">
+                  <div style="color:#ffd700;font-size:0.85rem;margin-bottom:6px;">成品预览（206×200）</div>
+                  <canvas id="skinMakerPreview" width="206" height="200" style="width:206px;height:200px;border:1px solid rgba(255,255,255,0.2);border-radius:10px;background:#000;display:block;"></canvas>
+                  <div style="color:rgba(255,255,255,0.5);font-size:0.72rem;margin-top:8px;max-width:206px;">左侧调好 → 右侧即最终成品</div>
+                </div>
+              </div>
+              <!-- 第二行：入库信息 + 操作 -->
+              <div style="display:flex;gap:20px;flex-wrap:wrap;">
                 <div style="flex:1 1 280px;min-width:260px;">
                   <div style="color:#ffd700;font-size:0.85rem;margin-bottom:6px;">入库信息</div>
-                  <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;">
+                  <div style="display:flex;flex-direction:column;gap:8px;">
                     <input id="smHero" placeholder="英雄名（决定目录，如 天使 / 死神）" style="padding:9px 12px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.4);color:#fff;font-size:0.85rem;">
                     <input id="smLabel" placeholder="皮肤标签（如 风清扬 / 一指名医）" style="padding:9px 12px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.4);color:#fff;font-size:0.85rem;">
                     <div style="color:rgba(255,255,255,0.5);font-size:0.72rem;">将生成：<span id="smNamePreview" style="color:#ffd700;">皮肤标签·英雄名.png</span></div>
-                    <input id="smBasePath" value="D:\\tfjl-web\\skins" style="padding:9px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:#fff;font-size:0.78rem;">
+                    <input id="smBasePath" value="D:\tfjl-web\skins" style="padding:9px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:#fff;font-size:0.78rem;">
                     <textarea id="smAttr" placeholder="皮肤属性（可选，如：技能/被动描述，支持多行）" style="padding:9px 12px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.4);color:#fff;font-size:0.82rem;resize:vertical;box-sizing:border-box;min-height:64px;"></textarea>
+                    <div style="color:rgba(255,255,255,0.5);font-size:0.72rem;line-height:1.5;">💡 <b style="color:#ffd700;">给老皮肤补属性</b>：不用选图，填好「英雄名 + 皮肤标签 + 皮肤属性」直接点保存即可（只写属性，不动图片）。</div>
                   </div>
-                  <div style="color:#ffd700;font-size:0.85rem;margin-bottom:6px;">最终效果预览（206×200）</div>
-                  <canvas id="skinMakerPreview" width="206" height="200" style="width:206px;height:200px;border:1px solid rgba(255,255,255,0.2);border-radius:10px;background:#000;display:block;margin-bottom:12px;"></canvas>
+                </div>
+                <div style="flex:1 1 280px;min-width:260px;display:flex;flex-direction:column;gap:8px;">
                   <button id="smSave" style="width:100%;background:linear-gradient(135deg,#ffd700,#ff9800);border:none;color:#1a1a2e;border-radius:10px;padding:10px;cursor:pointer;font-size:0.9rem;font-weight:600;">💾 保存并登记到 skins 目录</button>
-                  <button id="smPush" style="width:100%;margin-top:8px;background:linear-gradient(135deg,#4caf50,#2e7d32);border:none;color:#fff;border-radius:10px;padding:10px;cursor:pointer;font-size:0.9rem;font-weight:600;">🚀 一键推送到 GitHub / Gitee</button>
-                  <div id="smStatus" style="margin-top:10px;font-size:0.78rem;color:rgba(255,255,255,0.7);line-height:1.5;white-space:pre-line;"></div>
+                  <button id="smPush" style="width:100%;background:linear-gradient(135deg,#4caf50,#2e7d32);border:none;color:#fff;border-radius:10px;padding:10px;cursor:pointer;font-size:0.9rem;font-weight:600;">🚀 一键推送到 GitHub / Gitee</button>
+                  <div id="smStatus" style="font-size:0.78rem;color:rgba(255,255,255,0.7);line-height:1.5;white-space:pre-line;"></div>
                 </div>
               </div>
             </div>
@@ -30342,7 +30352,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260804-211 · sw-v329</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260804-212 · sw-v330</span>
             </div>
         </div>
     </div>
@@ -30458,11 +30468,13 @@ ${maSection}
       if(!smImg){ smStatus('请先选择图片',true); return; }
       var hero=document.getElementById('smHero').value.trim();
       var label=document.getElementById('smLabel').value.trim();
-      var name=(label&&hero)?(label+'·'+hero):'skin';
+      // 必填校验：缺任一项会让路径退化成 skins\skin.png 这种野文件，且会被一键推送带上线
+      if(!hero||!label){ smStatus('请先填写「英雄名」和「皮肤标签」再下载（否则会生成无法识别的 skin.png 垃圾文件）',true); return; }
+      var name=label+'·'+hero;
       var fn=smGetInvoke();
       if(fn){
         var base=document.getElementById('smBasePath').value.trim().replace(/[\\/]$/,'');
-        var pngPath=base+'\\\\'+hero+'\\\\'+name+'.png';
+        var pngPath=base+'\\'+hero+'\\'+name+'.png';
         smStatus('下载中（写入 '+pngPath+'）…');
         fn('write_binary_file',{filePath:pngPath, contentBase64:smExportDataURL().split(',')[1]})
           .then(function(){ smStatus('✅ 已写入 '+pngPath+'（仅图片，未登记 registry；入库请用"保存并登记"）'); })
@@ -30474,24 +30486,60 @@ ${maSection}
           var blob=await (await fetch(smExportDataURL())).blob();
           var handle=await window.showSaveFilePicker({suggestedName:name+'.png', types:[{description:'PNG 图片', accept:{'image/png':['.png']}}]});
           var w=await handle.createWritable(); await w.write(blob); await w.close();
-          smStatus('✅ 已保存到您选择的位置（'+name+'.png）。请存到 D:\\\\tfjl-web\\\\skins\\\\'+hero+'\\\\ 再让我入库', true);
+          smStatus('✅ 已保存到您选择的位置（'+name+'.png）。请存到 D:\\tfjl-web\\skins\\'+hero+'\\ 再让我入库', true);
           return;
         }catch(e){ if(e&&e.name==='AbortError'){ smStatus('已取消保存'); return; } }
       }
       var a=document.createElement('a'); a.href=smExportDataURL(); a.download=name+'.png'; a.click();
-      smStatus('已下载到浏览器默认下载目录（'+name+'.png）。请手动移到 D:\\\\tfjl-web\\\\skins\\\\'+hero+'\\\\ ，再让我入库', true);
+      smStatus('已下载到浏览器默认下载目录（'+name+'.png）。请手动移到 D:\\tfjl-web\\skins\\'+hero+'\\ ，再让我入库', true);
+    }
+    // 仅补属性模式：不选图，只给【已存在于 registry 的旧皮肤】补写属性到 skin-attributes.json
+    function smSaveAttrOnly(hero,label,attrVal,base){
+      smStatus('补充属性中…');
+      smInvoke('read_text_file_auto',{filePath:base+'\\registry.json'}).catch(function(){ return null; })
+        .then(function(regText){
+          if(!regText) throw new Error('registry.json 读取失败');
+          var reg=JSON.parse(regText);
+          var list=(reg.heroes&&reg.heroes[hero])||[];
+          if(!list.length) throw new Error('registry 里没有英雄「'+hero+'」，请检查英雄名是否写对');
+          var full=label+'·'+hero;
+          // 皮肤名两种形态：带标签的「标签·英雄」，或默认皮肤直接叫「英雄」
+          var hit=null;
+          if(list.some(function(s){return s.name===full;})) hit=full;
+          else if(list.some(function(s){return s.name===label;})) hit=label;
+          if(!hit) throw new Error('「'+hero+'」下找不到皮肤「'+full+'」。现有皮肤：'+list.map(function(s){return s.name;}).join('、'));
+          return hit;
+        })
+        .then(function(skinName){
+          return smInvoke('read_text_file_auto',{filePath:base+'\\skin-attributes.json'}).catch(function(){ return null; })
+            .then(function(at){
+              var obj=at?JSON.parse(at):{};
+              if(!obj[hero]) obj[hero]={};
+              obj[hero][skinName]={desc:attrVal};
+              var ab=btoa(unescape(encodeURIComponent(JSON.stringify(obj,null,2))));
+              return smInvoke('write_binary_file',{filePath:base+'\\skin-attributes.json', contentBase64:ab})
+                .then(function(){ smStatus('✅ 已为「'+skinName+'」写入属性（未改图片、未动 registry）\n点「🚀 一键推送」即可上线给所有人'); });
+            });
+        })
+        .catch(function(err){ smStatus('补属性失败：'+smErrMsg(err),true); });
     }
     function smSave(){
       var hero=document.getElementById('smHero').value.trim();
       var label=document.getElementById('smLabel').value.trim();
       if(!hero||!label){ smStatus('请填写英雄名和皮肤标签',true); return; }
-      if(!smImg){ smStatus('请先选择图片',true); return; }
-      var name=label+'·'+hero, file=name+'.png';
       var base=document.getElementById('smBasePath').value.trim().replace(/[\\/]$/,'');
+      // 没选图但填了属性 → 走「仅补属性」，用于给以前没写属性的老皮肤补资料
+      if(!smImg){
+        var a0=document.getElementById('smAttr').value.trim();
+        if(!a0){ smStatus('未选择图片。若想给已有皮肤补属性，请填好英雄名+皮肤标签+「皮肤属性」再点保存',true); return; }
+        smSaveAttrOnly(hero,label,a0,base);
+        return;
+      }
+      var name=label+'·'+hero, file=name+'.png';
       smStatus('保存中…');
-      smInvoke('write_binary_file',{filePath:base+'\\\\'+hero+'\\\\'+file, contentBase64:smExportDataURL().split(',')[1]})
+      smInvoke('write_binary_file',{filePath:base+'\\'+hero+'\\'+file, contentBase64:smExportDataURL().split(',')[1]})
         .then(function(){
-          return smInvoke('read_text_file_auto',{filePath:base+'\\\\registry.json'}).catch(function(){ return null; });
+          return smInvoke('read_text_file_auto',{filePath:base+'\\registry.json'}).catch(function(){ return null; });
         })
         .then(function(regText){
           if(!regText) throw new Error('registry 读取失败');
@@ -30503,23 +30551,24 @@ ${maSection}
             reg.updated=new Date().toISOString();
           }
           var regB64=btoa(unescape(encodeURIComponent(JSON.stringify(reg,null,2))));
-          return smInvoke('write_binary_file',{filePath:base+'\\\\registry.json', contentBase64:regB64});
+          return smInvoke('write_binary_file',{filePath:base+'\\registry.json', contentBase64:regB64});
         })
         .then(function(){
+          // 可选：皮肤属性写入云端 skins/skin-attributes.json（随 git_push_skins 一起推送）
           var attrVal=document.getElementById('smAttr').value.trim();
           if(!attrVal) return;
-          return smInvoke('read_text_file_auto',{filePath:base+'\\\\skin-attributes.json'}).catch(function(){ return null; })
+          return smInvoke('read_text_file_auto',{filePath:base+'\\skin-attributes.json'}).catch(function(){ return null; })
             .then(function(at){
               var obj=at?JSON.parse(at):{};
               if(!obj[hero]) obj[hero]={};
               obj[hero][name]={desc:attrVal};
               var ab=btoa(unescape(encodeURIComponent(JSON.stringify(obj,null,2))));
-              return smInvoke('write_binary_file',{filePath:base+'\\\\skin-attributes.json', contentBase64:ab});
+              return smInvoke('write_binary_file',{filePath:base+'\\skin-attributes.json', contentBase64:ab});
             });
         })
         .then(function(){
           var attrVal=document.getElementById('smAttr').value.trim();
-          smStatus('✅ 已保存 '+base+'\\\\'+hero+'\\\\'+file+' 并登记 registry.json'+(attrVal?' 及皮肤属性':'')+'（告诉我推送即可上线）');
+          smStatus('✅ 已保存 '+base+'\\'+hero+'\\'+file+' 并登记 registry.json'+(attrVal?' 及皮肤属性':'')+'（告诉我推送即可上线）');
         })
         .catch(function(err){
           smStatus('保存失败：'+smErrMsg(err)+'（若不在桌面App内，可用"下载PNG"拿到图片后交给我）',true);
@@ -30564,7 +30613,7 @@ ${maSection}
     window.openSkinMaker=function(){
       smInit(); smRenderAll();
       var fn=smGetInvoke();
-      smStatus((fn?'✅ 已检测到 Tauri（可直接写 skins 目录）；':'⚠️ 未检测到 Tauri（将走「文件另存」，请手动选 D:\\\\tfjl-web\\\\skins\\\\英雄\\\\）；')+'选择透明立绘，滚轮缩放、拖拽移动，选好底色后点下载/保存。');
+      smStatus((fn?'✅ 已检测到 Tauri（可直接写 skins 目录）；':'⚠️ 未检测到 Tauri（将走「文件另存」，请手动选 D:\\tfjl-web\\skins\\英雄\\）；')+'选择透明立绘，滚轮缩放、拖拽移动，选好底色后点下载/保存。');
     };
     window.closeSkinMaker=function(){ var m=document.getElementById('cardGroupMgrModal'); if(m) m.style.display='none'; };
   })();
