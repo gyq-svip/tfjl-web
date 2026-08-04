@@ -3050,6 +3050,10 @@
                     <textarea id="cgmHeroSkinDesc" placeholder="皮肤/立绘说明（可选）" style="width:100%;height:46px;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:#2a2a4a;color:#fff;font-size:0.85rem;box-sizing:border-box;margin-bottom:8px;resize:vertical;"></textarea>
                     <button onclick="cgmAddNewHeroCard()" style="padding:8px 16px;border:none;border-radius:8px;background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;cursor:pointer;font-size:0.85rem;">✓ 写入</button>
                     <div id="cgmHeroStatus" style="font-size:0.78rem;white-space:pre-wrap;margin-top:8px;min-height:16px;"></div>
+                    <div style="margin-top:12px;padding-top:10px;border-top:1px dashed rgba(255,255,255,0.15);">
+                        <div style="font-size:0.82rem;color:rgba(255,255,255,0.8);margin-bottom:6px;">已添加英雄（<span id="cgmHeroCount">0</span>）：</div>
+                        <div id="cgmHeroList" style="max-height:150px;overflow:auto;"></div>
+                    </div>
                 </div>
                 <!-- 皮肤制作 -->
             <div id="cgmSkinPane" style="display:none;">
@@ -3100,6 +3104,20 @@
                 <button id="smSave" style="flex:1 1 220px;min-width:200px;background:linear-gradient(135deg,#ffd700,#ff9800);border:none;color:#1a1a2e;border-radius:10px;padding:12px;cursor:pointer;font-size:0.9rem;font-weight:600;">💾 保存并登记到 skins 目录</button>
                 <button id="smPush" style="flex:1 1 220px;min-width:200px;background:linear-gradient(135deg,#4caf50,#2e7d32);border:none;color:#fff;border-radius:10px;padding:12px;cursor:pointer;font-size:0.9rem;font-weight:600;">🚀 一键推送到 GitHub / Gitee</button>
                 <div id="smStatus" style="flex:2 1 300px;min-width:240px;font-size:0.78rem;color:rgba(255,255,255,0.7);line-height:1.5;white-space:pre-line;"></div>
+              </div>
+              <!-- 删除已入库皮肤（切错 / 切多的清理） -->
+              <div style="margin-top:14px;padding-top:10px;border-top:1px dashed rgba(255,255,255,0.15);">
+                <div style="color:#ff9e80;font-size:0.85rem;margin-bottom:6px;">🗑 删除已入库皮肤（切错 / 切多的清理）</div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:6px;">
+                  <select id="smDelHero" onchange="smRefreshDelSkinList()" style="flex:1;min-width:130px;padding:8px;border-radius:6px;border:1px solid rgba(255,120,120,0.3);background:#2a2a4a;color:#fff;font-size:0.85rem;cursor:pointer;">
+                    <option value="">选择英雄…</option>
+                  </select>
+                  <select id="smDelSkin" style="flex:1;min-width:130px;padding:8px;border-radius:6px;border:1px solid rgba(255,120,120,0.3);background:#2a2a4a;color:#fff;font-size:0.85rem;cursor:pointer;">
+                    <option value="">选择皮肤…</option>
+                  </select>
+                  <button id="smDelBtn" onclick="smDeleteSkin()" style="padding:8px 14px;border:none;border-radius:8px;background:linear-gradient(135deg,#ff5252,#b71c1c);color:#fff;cursor:pointer;font-size:0.85rem;font-weight:600;white-space:nowrap;">🗑 删除此皮肤</button>
+                </div>
+                <div id="smDelStatus" style="font-size:0.76rem;white-space:pre-wrap;min-height:14px;"></div>
               </div>
             </div>
             </div>
@@ -16815,6 +16833,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             if (tab === 'skin' && typeof window.openSkinMaker === 'function') {
                 requestAnimationFrame(function () { try { window.openSkinMaker(); } catch (e) { console.warn('[skinMaker] init failed', e); } });
             }
+            if (tab === 'hero') { try { cgmRefreshHeroList(); } catch (e) {} }
         }
         // 添加融合卡：校验"必须正好是100张基础卡里的2张"
         let _cgmValidParts = null;
@@ -16877,6 +16896,71 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 status.textContent = '✗ 写入失败：' + e.message;
             }
         }
+        // 已添加英雄列表（带删除）
+        function cgmRefreshHeroList() {
+            const list = document.getElementById('cgmHeroList');
+            const cnt = document.getElementById('cgmHeroCount');
+            if (!list) return;
+            const cards = (window.cloudCards && typeof window.cloudCards === 'object') ? window.cloudCards : {};
+            const names = Object.keys(cards);
+            if (cnt) cnt.textContent = names.length;
+            if (!names.length) { list.innerHTML = '<div style="font-size:0.78rem;color:rgba(255,255,255,0.5);padding:6px 0;">（暂无自定义英雄）</div>'; return; }
+            list.innerHTML = '';
+            names.forEach(n => {
+                const row = document.createElement('div');
+                row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:6px 9px;border-radius:8px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);margin-bottom:6px;';
+                const info = document.createElement('div');
+                info.style.cssText = 'flex:1;min-width:0;font-size:0.84rem;color:#fff;';
+                const c = cards[n] || {};
+                const tags = [];
+                if (c.profession) tags.push(c.profession);
+                if (c.quality) tags.push(c.quality);
+                info.textContent = n + (tags.length ? ('（' + tags.join('·') + '）') : '');
+                const del = document.createElement('button');
+                del.textContent = '🗑 删除';
+                del.style.cssText = 'flex:none;padding:4px 9px;border-radius:6px;border:1px solid rgba(255,120,120,0.5);background:rgba(255,80,80,0.15);color:#ff9e9e;cursor:pointer;font-size:0.74rem;white-space:nowrap;';
+                del.addEventListener('click', () => cgmDeleteHeroCard(n));
+                row.appendChild(info); row.appendChild(del);
+                list.appendChild(row);
+            });
+        }
+        async function cgmDeleteHeroCard(name) {
+            if (!confirm('确认删除英雄「' + name + '」？\n仅改本地 cards.json，需重新 git 推送才对线上生效。\n（该英雄已切的皮肤图片仍在 skins/' + name + '/ 不受影响）')) return;
+            const status = document.getElementById('cgmHeroStatus');
+            try {
+                let base = { cards: {} };
+                const local = await _cgmReadRepoFile('skins/cards.json');
+                if (local) { try { const p = JSON.parse(local); if (p && p.cards) base = p; else if (p) base.cards = p; } catch (e) { base = { cards: {} }; } }
+                if (!base.cards || !base.cards[name]) { if (status) { status.style.color = '#ff9e80'; status.textContent = '该英雄不存在'; } return; }
+                delete base.cards[name];
+                base.updated = new Date().toISOString();
+                await _cgmWriteRepoFile('skins/cards.json', JSON.stringify(base, null, 2));
+                window.cloudCards = base.cards;
+                if (typeof renderCloudCardsToPool === 'function') renderCloudCardsToPool();
+                cgmRefreshHeroList();
+                if (status) { status.style.color = '#4ade80'; status.textContent = '✓ 已删除「' + name + '」并写入 cards.json\n请 git add skins/cards.json 并提交推送'; }
+            } catch (e) {
+                if (status) { status.style.color = '#ff9e80'; status.textContent = '✗ 删除失败：' + e.message; }
+            }
+        }
+        // 融合卡编辑：填充表单进入覆盖模式（_cgmEditFusionName 非空时保存即覆盖同名条目）
+        let _cgmEditFusionName = null;
+        function cgmEditFusionCard(name) {
+            const f = window.cloudFusions && window.cloudFusions[name];
+            if (!f) return;
+            _cgmEditFusionName = name;
+            const ni = document.getElementById('cgmFusionName');
+            const pi = document.getElementById('cgmFusionProf');
+            const qi = document.getElementById('cgmFusionQuality');
+            if (ni) ni.value = name;
+            if (pi) pi.value = f.profession || '';
+            if (qi) qi.value = f.quality || '';
+            cgmValidateFusion();
+            const addBtn = document.getElementById('cgmFusionAddBtn');
+            if (addBtn) addBtn.textContent = '✓ 保存修改';
+            const status = document.getElementById('cgmFusionStatus');
+            if (status) { status.style.color = '#ffd700'; status.textContent = '✏️ 正在编辑「' + name + '」，修改职业/品质后点「保存修改」覆盖（组成须仍为 2 张基础卡；改名会变为新增另一张）'; }
+        }
         async function cgmAddFusionCard() {
             if (!_cgmValidParts) return;
             const name = (document.getElementById('cgmFusionName').value || '').trim();
@@ -16917,17 +17001,18 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                                 await _cgmWriteRepoFile('skins/registry.json', JSON.stringify(registry, null, 2));
                                 cutMsg = '\n✓ 已自动切副卡「' + subHero + '」' + blobs.length + ' 张皮肤并入 skins/融合' + subHero + '\\（到「🎨 皮肤制作」Tab 点「🚀 一键推送」推上线即可）';
                             } else {
-                                cutMsg = '\n⚠ 副卡「' + subHero + '」暂未加载到皮肤，可稍后在「被融合卡」Tab 用「🚀 一键全切」补切';
+                                cutMsg = '\n⚠ 副卡「' + subHero + '」暂未加载到皮肤，可稍后点「🚀 一键全切所有融合卡副卡」补切';
                             }
                         } else {
-                            cutMsg = '\n⚠ 副卡「' + subHero + '」暂未加载到皮肤，可稍后在「被融合卡」Tab 用「🚀 一键全切」补切';
+                            cutMsg = '\n⚠ 副卡「' + subHero + '」暂未加载到皮肤，可稍后点「🚀 一键全切所有融合卡副卡」补切';
                         }
                     }
                 } catch (e2) {
-                    cutMsg = '\n⚠ 自动切副卡皮失败：' + e2.message + '（可在「被融合卡」Tab 用「🚀 一键全切」重试）';
+                    cutMsg = '\n⚠ 自动切副卡皮失败：' + e2.message + '（可点「🚀 一键全切所有融合卡副卡」重试）';
                 }
                 status.style.color = '#4ade80';
                 status.textContent = '✓ 已写入 d:\\tfjl-web\\skins\\fusions.json\n请在本机终端运行：\n  cd d:\\tfjl-web\n  git add skins/fusions.json skins/registry.json skins/融合*\n  git commit -m "fusion: ' + name + '"\n  git push origin main\n  git -c http.proxy= -c https.proxy= push gitee' + cutMsg;
+                if (_cgmEditFusionName) { const ab = document.getElementById('cgmFusionAddBtn'); if (ab) ab.textContent = '✓ 添加融合卡'; _cgmEditFusionName = null; }
             } catch (e) {
                 status.style.color = '#ff9e80';
                 status.textContent = '✗ 写入失败：' + e.message;
@@ -16972,7 +17057,13 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 del.title = '从 fusions.json 删除「' + n + '」';
                 del.style.cssText = 'flex:none;padding:5px 10px;border-radius:6px;border:1px solid rgba(255,120,120,0.5);background:rgba(255,80,80,0.15);color:#ff9e9e;cursor:pointer;font-size:0.76rem;white-space:nowrap;';
                 del.addEventListener('click', () => cgmDeleteFusionCard(n));
+                const edt = document.createElement('button');
+                edt.textContent = '✏️ 编辑';
+                edt.title = '修改「' + n + '」组成 / 属性（覆盖同名条目）';
+                edt.style.cssText = 'flex:none;padding:5px 10px;border-radius:6px;border:1px solid rgba(255,215,0,0.5);background:rgba(255,215,0,0.15);color:#ffd700;cursor:pointer;font-size:0.76rem;white-space:nowrap;';
+                edt.addEventListener('click', () => cgmEditFusionCard(n));
                 row.appendChild(info);
+                row.appendChild(edt);
                 row.appendChild(del);
                 list.appendChild(row);
             }
@@ -30401,7 +30492,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260804-218 · sw-v336</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260804-220 · sw-v337</span>
             </div>
         </div>
     </div>
@@ -30659,8 +30750,46 @@ ${maSection}
       if(l) l.addEventListener('input', smRenderAll);
       smSetRarity('gold');
     }
+    // 删除已入库皮肤：初始化英雄下拉（含 融合XX）+ 联动皮肤下拉
+    function smInitDelSkinUI(){
+      var sel=document.getElementById('smDelHero'); if(!sel) return;
+      var keys=new Set();
+      if(window.skinRegistry) Object.keys(window.skinRegistry).forEach(function(k){ keys.add(k); });
+      if(window.cloudCards) Object.keys(window.cloudCards).forEach(function(k){ keys.add(k); });
+      sel.innerHTML='<option value="">选择英雄…</option>';
+      Array.from(keys).sort().forEach(function(k){ var o=document.createElement('option'); o.value=k; o.textContent=k; sel.appendChild(o); });
+      smRefreshDelSkinList();
+    }
+    function smRefreshDelSkinList(){
+      var hsel=document.getElementById('smDelHero'); var ssel=document.getElementById('smDelSkin');
+      if(!hsel||!ssel) return;
+      var hero=hsel.value; ssel.innerHTML='<option value="">选择皮肤…</option>';
+      if(!hero) return;
+      var list=(window.skinRegistry&&window.skinRegistry[hero])||[];
+      list.forEach(function(s){ var o=document.createElement('option'); o.value=s.name; o.textContent=s.name; ssel.appendChild(o); });
+    }
+    async function smDeleteSkin(){
+      var hsel=document.getElementById('smDelHero'); var ssel=document.getElementById('smDelSkin'); var status=document.getElementById('smDelStatus');
+      var hero=hsel?hsel.value:''; var skin=ssel?ssel.value:'';
+      if(!hero||!skin){ if(status){status.style.color='#ff9e80';status.textContent='请先选择英雄和皮肤';} return; }
+      if(!confirm('确认删除「'+hero+'」的皮肤「'+skin+'」？\n将从 registry.json 移除该皮肤登记（界面不再显示）。\n磁盘 png 仍保留在 skins/'+hero+'/，如需彻底删除请手动清理对应文件。')) return;
+      try{
+        var registry=null;
+        var local=await _cgmReadRepoFile('skins/registry.json');
+        if(local) registry=JSON.parse(local);
+        if(!registry||!registry.heroes) registry={version:2,heroes:{}};
+        if(!registry.heroes[hero]){ if(status){status.style.color='#ff9e80';status.textContent='该英雄无登记皮肤';} return; }
+        registry.heroes[hero]=registry.heroes[hero].filter(function(s){ return s.name!==skin; });
+        if(!registry.heroes[hero].length) delete registry.heroes[hero];
+        registry.updated=new Date().toISOString();
+        await _cgmWriteRepoFile('skins/registry.json', JSON.stringify(registry,null,2));
+        if(window.skinRegistry&&window.skinRegistry[hero]){ window.skinRegistry[hero]=window.skinRegistry[hero].filter(function(s){ return s.name!==skin; }); }
+        smRefreshDelSkinList();
+        if(status){ status.style.color='#4ade80'; status.textContent='✓ 已移除「'+hero+' · '+skin+'」的皮肤登记\n（磁盘文件 skins/'+hero+'/ 未删，需彻底清理可手动删除对应 png）'; }
+      }catch(e){ if(status){status.style.color='#ff9e80';status.textContent='✗ 删除失败：'+e.message;} }
+    }
     window.openSkinMaker=function(){
-      smInit(); smRenderAll();
+      smInit(); smRenderAll(); smInitDelSkinUI();
       var fn=smGetInvoke();
       smStatus((fn?'✅ 已检测到 Tauri（可直接写 skins 目录）；':'⚠️ 未检测到 Tauri（将走「文件另存」，请手动选 D:\\tfjl-web\\skins\\英雄\\）；')+'选择透明立绘，滚轮缩放、拖拽移动，选好底色后点下载/保存。');
     };
