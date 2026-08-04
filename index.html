@@ -3028,6 +3028,7 @@
                 <!-- 被融合的卡 -->
                 <div id="cgmFusedPane" style="display:none;">
                     <div style="font-size:0.82rem;color:rgba(255,255,255,0.7);margin-bottom:8px;">选英雄 → 加载其全部皮肤 → 切徽章皮 → 发布到 registry（导出 PNG 需手动放入 skins 目录并 git 推送）。</div>
+                    <input id="cgmFusedHeroFilter" oninput="cgmFilterFusedHero()" placeholder="🔍 筛选英雄（输入关键字即时过滤下拉）" style="width:100%;padding:8px 12px;border-radius:6px;border:1px solid rgba(255,215,0,0.3);background:#1f1f3a;color:#fff;font-size:0.85rem;box-sizing:border-box;margin-bottom:6px;">
                     <select id="cgmFusedHero" onchange="cgmLoadHeroSkins()" style="width:100%;padding:8px;border-radius:6px;border:1px solid rgba(255,215,0,0.3);background:#2a2a4a;color:#fff;font-size:0.9rem;cursor:pointer;box-sizing:border-box;">
                         <option value="">选择基础英雄…</option>
                     </select>
@@ -16811,14 +16812,31 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 requestAnimationFrame(function () { try { window.openSkinMaker(); } catch (e) { console.warn('[skinMaker] init failed', e); } });
             }
         }
+        let _cgmAllFusedHeroes = [];
         function cgmInitFusedHeroSelect() {
             const sel = document.getElementById('cgmFusedHero');
             if (!sel) return;
-            sel.innerHTML = '<option value="">选择基础英雄…</option>';
             const _baseHeroes = Object.keys(SKIN_ATTRIBUTES || {});
             if (window.cloudCards) Object.keys(window.cloudCards).forEach(n => { if (!_baseHeroes.includes(n)) _baseHeroes.push(n); });
-            _baseHeroes.filter(h => !h.startsWith('融合')).forEach(h => {
-                const o = document.createElement('option'); o.value = h; o.textContent = h; sel.appendChild(o);
+            _cgmAllFusedHeroes = _baseHeroes.filter(h => !h.startsWith('融合'));
+            const f = document.getElementById('cgmFusedHeroFilter');
+            if (f) f.value = '';
+            cgmFilterFusedHero();
+        }
+        // 被融合卡英雄筛选器：按输入框关键字即时过滤下拉项（保留完整列表，仅重建可见项）
+        function cgmFilterFusedHero() {
+            const sel = document.getElementById('cgmFusedHero');
+            const fin = document.getElementById('cgmFusedHeroFilter');
+            if (!sel) return;
+            const kw = (fin ? fin.value : '').trim().toLowerCase();
+            sel.innerHTML = '<option value="">选择基础英雄…</option>';
+            const matched = _cgmAllFusedHeroes.filter(h => !kw || h.toLowerCase().includes(kw));
+            if (!matched.length) {
+                const o = document.createElement('option'); o.value = ''; o.textContent = '（无匹配英雄）'; o.disabled = true; sel.appendChild(o);
+                return;
+            }
+            matched.forEach(h => {
+                const o = document.createElement('option'); o.value = h; o.textContent = (kw ? '🔎 ' : '') + h; sel.appendChild(o);
             });
         }
         // 添加融合卡：校验"必须正好是100张基础卡里的2张"
@@ -30352,7 +30370,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260804-212 · sw-v330</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260804-213 · sw-v331</span>
             </div>
         </div>
     </div>
