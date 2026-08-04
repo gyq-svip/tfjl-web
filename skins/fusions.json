@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated": "2026-08-04T05:42:41.398Z",
+  "updated": "2026-08-04T14:25:48.331Z",
   "note": "融合卡定义：components 为参与融合的2张基础卡。",
   "fusions": {
     "火炮射线": {
@@ -201,6 +201,14 @@
         "石头"
       ],
       "profession": "战士",
+      "quality": "金"
+    },
+    "火炮宝库": {
+      "components": [
+        "火炮",
+        "宝库"
+      ],
+      "profession": "工程",
       "quality": "金"
     }
   }
