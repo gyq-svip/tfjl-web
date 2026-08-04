@@ -7875,14 +7875,25 @@
                 tip.classList.add('show');
             }
             function hideTip() { if (tipEl) tipEl.classList.remove('show'); }
-            document.addEventListener('mouseover', function (e) {
-                const el = e.target.closest('[data-tip]');
+            function onOver(e) {
+                const el = e.target.closest && e.target.closest('[data-tip]');
                 if (el) showTip(el);
-            });
-            document.addEventListener('mouseout', function (e) {
-                const el = e.target.closest('[data-tip]');
-                if (el) hideTip();
-            });
+            }
+            function onOut(e) {
+                const el = e.target.closest && e.target.closest('[data-tip]');
+                if (!el) return;
+                // 仅当指针真正离开带 data-tip 的元素（而非进入其子节点）时才隐藏，
+                // 避免 WebView 里 mouseout/pointerout 在子节点间冒泡造成的闪烁/不弹。
+                const to = e.relatedTarget;
+                if (to && el.contains(to)) return;
+                hideTip();
+            }
+            // 同时挂 mouse* 与 pointer*：WebView2 环境下 pointer 事件更可靠，
+            // 桌面 App 此前只挂 mouseover/mouseout 导致悬停提示不弹。
+            document.addEventListener('mouseover', onOver);
+            document.addEventListener('mouseout', onOut);
+            document.addEventListener('pointerover', onOver);
+            document.addEventListener('pointerout', onOut);
             window.addEventListener('scroll', hideTip, true);
         })();
 
@@ -30220,7 +30231,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260804-208 · sw-v326</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260804-209 · sw-v327</span>
             </div>
         </div>
     </div>
