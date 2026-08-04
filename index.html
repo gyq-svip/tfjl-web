@@ -7970,6 +7970,7 @@
         // ===== 方案C：悬浮提示 tooltip（读取 data-tip，事件委托） =====
         (function initTooltips() {
             let tipEl = null;
+            let _lastShowTime = 0;
             function getTip() {
                 if (!tipEl) {
                     tipEl = document.createElement('div');
@@ -7995,6 +7996,7 @@
                 tip.style.top = top + 'px';
                 tip.setAttribute('data-pos', pos);
                 tip.classList.add('show');
+                _lastShowTime = Date.now();
             }
             function hideTip() { if (tipEl) tipEl.classList.remove('show'); }
             function onOver(e) {
@@ -8008,15 +8010,26 @@
                 // 避免 WebView 里 mouseout/pointerout 在子节点间冒泡造成的闪烁/不弹。
                 const to = e.relatedTarget;
                 if (to && el.contains(to)) return;
+                // WebView2 偶发 pointerout(relatedTarget=null) 或鼠标刚进入随即的误触发，
+                // 若离开点实际仍在元素矩形内 / 刚 show 不久，则不隐藏（防"闪一下消失"）。
+                if (!to) {
+                    const r = el.getBoundingClientRect();
+                    const px = e.clientX, py = e.clientY;
+                    if (px >= r.left && px <= r.right && py >= r.top && py <= r.bottom) return;
+                    if (Date.now() - _lastShowTime < 80) return;
+                }
                 hideTip();
             }
-            // 同时挂 mouse* 与 pointer*：WebView2 环境下 pointer 事件更可靠，
-            // 桌面 App 此前只挂 mouseover/mouseout 导致悬停提示不弹。
+            // WebView2 环境下 pointer 事件最可靠，桌面 App 此前只挂 mouseover/mouseout 导致悬停提示不弹。
+            // 仍同时挂 mouse* 作为浏览器兜底；双组监听配合 onOut 的防抖/矩形判断，互不冲突。
             document.addEventListener('mouseover', onOver);
             document.addEventListener('mouseout', onOut);
             document.addEventListener('pointerover', onOver);
             document.addEventListener('pointerout', onOut);
             window.addEventListener('scroll', hideTip, true);
+            // 指针离开窗口时也隐藏，避免残留在屏幕上
+            document.addEventListener('pointerleave', hideTip);
+            window.addEventListener('blur', hideTip);
         })();
 
 
@@ -30375,7 +30388,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260804-214 · sw-v332</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260804-215 · sw-v333</span>
             </div>
         </div>
     </div>
