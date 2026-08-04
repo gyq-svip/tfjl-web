@@ -24311,46 +24311,6 @@ function hasGistToken() {
             }
         }
         
-        // 绘制迷你趋势曲线（sparkline）
-        // data: 数字数组；color: 线条颜色
-        function drawSparkline(elId, data, color) {
-            const el = document.getElementById(elId);
-            if (!el) return;
-            if (!data || data.length === 0) { el.innerHTML = ''; return; }
-            const W = 90, H = 18, pad = 2;
-            const max = Math.max.apply(null, data);
-            const min = Math.min.apply(null, data);
-            const range = (max - min) || 1;
-            const stepX = data.length > 1 ? (W - pad * 2) / (data.length - 1) : 0;
-            const pts = data.map((v, i) => {
-                const x = pad + i * stepX;
-                const y = H - pad - ((v - min) / range) * (H - pad * 2);
-                return `${x.toFixed(1)},${y.toFixed(1)}`;
-            });
-            const path = pts.join(' ');
-            const last = pts[pts.length - 1];
-            const area = `${pad},${H - pad} ${path} ${(W - pad).toFixed(1)},${H - pad}`;
-            el.innerHTML =
-                `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="display:block;">` +
-                `<polygon points="${area}" fill="${color}" opacity="0.12"/>` +
-                `<polyline points="${path}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>` +
-                (last ? `<circle cx="${last.split(',')[0]}" cy="${last.split(',')[1]}" r="2" fill="${color}"/>` : '') +
-                `</svg>`;
-        }
-
-        // 取最近 N 天每日新增用户数组（含今天，按时间升序）
-        function getRecentDailyNewUsers(days) {
-            const arr = [];
-            const base = new Date();
-            for (let i = days - 1; i >= 0; i--) {
-                const d = new Date(base);
-                d.setDate(d.getDate() - i);
-                const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-                arr.push((counterData.daily_stats[key] && counterData.daily_stats[key].new_users) || 0);
-            }
-            return arr;
-        }
-
         // 更新底部统计栏显示
         function updateStatsBar() {
             if (!counterData) return;
@@ -24360,10 +24320,7 @@ function hasGistToken() {
             const usersEl = document.getElementById('statUsers');
             const onlineEl = document.getElementById('statOnline');
             const downloadEl = document.getElementById('statDownloads');
-            const todayNewEl = document.getElementById('statTodayNew');
-            const weekNewEl = document.getElementById('statWeekNew');
-            const monthNewEl = document.getElementById('statMonthNew');
-            
+
             // 计算在线用户数（清理过期用户后）
             let onlineCount = 0;
             if (counterData.online_users) {
@@ -24375,43 +24332,12 @@ function hasGistToken() {
                     }
                 }
             }
-            
-            // 计算今日/本周/本月新增用户
-            const today = getTodayString();
-            const now = new Date();
-            const todayNew = (counterData.daily_stats[today] && counterData.daily_stats[today].new_users) || 0;
-            
-            let weekNew = 0;
-            let monthNew = 0;
-            const weekAgo = new Date(now);
-            weekAgo.setDate(weekAgo.getDate() - 7);
-            const monthAgo = new Date(now);
-            monthAgo.setDate(monthAgo.getDate() - 30);
-            
-            if (counterData.daily_stats) {
-                for (const date in counterData.daily_stats) {
-                    const d = new Date(date);
-                    const nu = counterData.daily_stats[date].new_users || 0;
-                    if (d >= weekAgo) weekNew += nu;
-                    if (d >= monthAgo) monthNew += nu;
-                }
-            }
-            
+
             if (runtimeEl) runtimeEl.textContent = calculateRuntime();
             if (visitEl) visitEl.textContent = counterData.total_visits || 0;
             if (usersEl) usersEl.textContent = counterData.total_users || 0;
             if (onlineEl) onlineEl.textContent = onlineCount;
             if (downloadEl) downloadEl.textContent = counterData.total_downloads || 0;
-            if (todayNewEl) todayNewEl.textContent = todayNew;
-            if (weekNewEl) weekNewEl.textContent = weekNew;
-            if (monthNewEl) monthNewEl.textContent = monthNew;
-
-            // 底部曲线显示：今日=近14天每日新增；本周=近7天；本月=近30天
-            if (counterData.daily_stats) {
-                drawSparkline('sparkToday', getRecentDailyNewUsers(14), '#ffd700');
-                drawSparkline('sparkWeek', getRecentDailyNewUsers(7), '#60a5fa');
-                drawSparkline('sparkMonth', getRecentDailyNewUsers(30), '#a78bfa');
-            }
         }
         
         // 计算网站运行时长（从2026年5月20日开始）
@@ -30262,7 +30188,7 @@ ${maSection}
     </div>
 
     <!-- 右下角版本标记（供前端更新核对 + extractVersion 解析） -->
-    <span id="versionTag" style="position:fixed;right:8px;bottom:54px;z-index:9991;font-size:0.72rem;color:#666;background:rgba(0,0,0,0.35);padding:2px 8px;border-radius:10px;pointer-events:auto;cursor:pointer;user-select:none;" onclick="showVersionPopup()" title="点击查看版本 / 刷新">v260804-199 · sw-v317</span>
+    <span id="versionTag" style="position:fixed;right:8px;bottom:54px;z-index:9991;font-size:0.72rem;color:#666;background:rgba(0,0,0,0.35);padding:2px 8px;border-radius:10px;pointer-events:auto;cursor:pointer;user-select:none;" onclick="showVersionPopup()" title="点击查看版本 / 刷新">v260804-200 · sw-v318</span>
 
     <!-- 底部状态栏（在线统计 + 版本显示） -->
     <div id="statsBar" style="position:fixed;bottom:0;left:0;right:0;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);border-top:2px solid rgba(255,215,0,0.5);padding:10px 20px;z-index:9990;display:flex;justify-content:center;align-items:center;gap:24px;font-size:0.9rem;flex-wrap:wrap;">
@@ -30286,21 +30212,6 @@ ${maSection}
             <div style="color:#fff;display:flex;align-items:center;gap:6px;">
                 <span style="color:#4ecdc4;">📥</span>
                 <span>下载: <strong id="statDownloads" style="color:#ffd700;">-</strong></span>
-            </div>
-            <div style="color:#fff;display:flex;align-items:center;gap:6px;">
-                <span style="color:#4ecdc4;">✨</span>
-                <span>今日新增: <strong id="statTodayNew" style="color:#ffd700;">-</strong></span>
-                <span id="sparkToday" style="display:inline-flex;align-items:center;height:18px;"></span>
-            </div>
-            <div style="color:#fff;display:flex;align-items:center;gap:6px;">
-                <span style="color:#4ecdc4;">📅</span>
-                <span>本周新增: <strong id="statWeekNew" style="color:#ffd700;">-</strong></span>
-                <span id="sparkWeek" style="display:inline-flex;align-items:center;height:18px;"></span>
-            </div>
-            <div style="color:#fff;display:flex;align-items:center;gap:6px;">
-                <span style="color:#4ecdc4;">🗓️</span>
-                <span>本月新增: <strong id="statMonthNew" style="color:#ffd700;">-</strong></span>
-                <span id="sparkMonth" style="display:inline-flex;align-items:center;height:18px;"></span>
             </div>
             <div style="color:#fff;display:flex;align-items:center;gap:6px;">
                 <span style="color:#4ecdc4;">🔖</span>
