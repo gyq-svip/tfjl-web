@@ -16444,6 +16444,21 @@
             }
             return '默认';
         }
+        // 融合关闭（副卡隐藏，heroSkinSelections[副卡]===''）时，卡面只显示主卡名；否则显示完整融合名
+        function getFusionDisplayName(fullName) {
+            const parts = (typeof getFusionParts === 'function') ? getFusionParts(fullName) : null;
+            if (parts && parts.length >= 2 && window.heroSkinSelections && window.heroSkinSelections[parts[1]] === '') {
+                return parts[0];
+            }
+            return fullName;
+        }
+        // 读槽位卡的完整名字：优先 data-full-name（显示名可能已被截为主卡名），否则回退 .card-name 文本
+        function getSlotCardName(slot) {
+            if (!slot) return '';
+            const el = slot.querySelector('.card-name');
+            if (!el) return '';
+            return el.dataset.fullName || el.textContent || '';
+        }
 
         // ===== 上阵卡"融合卡切换"角标：基础英雄 → 可融合变体 =====
         // 已知融合卡名：以云端(管理员维护的 fusions.json)为准，避免硬编码污染；
@@ -16474,7 +16489,7 @@
             const handCards = isUserSlot ? myHandCards : teammateHandCards;
             const cardId = slot.dataset.cardId;
             const card = handCards.find(c => c.id === cardId);
-            const name = card ? card.name : (slot.querySelector('.card-name') ? slot.querySelector('.card-name').textContent : '');
+            const name = card ? card.name : getSlotCardName(slot);
             const baseHero = (typeof getMainCardName === 'function') ? getMainCardName(name) : name;
             const variants = getFusionVariantsForBase(baseHero);
             const isFusion = !!(getFusionParts(name) && getFusionParts(name).length >= 2);
@@ -16563,7 +16578,7 @@
             const pc = placedArray.find(c => c.id === cardId);
             if (pc) pc.name = newName;
             const nameSpan = slot.querySelector('.card-name');
-            if (nameSpan) nameSpan.textContent = newName;
+            if (nameSpan) { nameSpan.dataset.fullName = newName; nameSpan.textContent = getFusionDisplayName(newName); }
             slot.classList.remove('skin-bg');
             const oldBase = slot.querySelector('.skin-layer'); if (oldBase) oldBase.remove();
             const oldFused = slot.querySelector('.skin-layer-fused'); if (oldFused) oldFused.remove();
@@ -17269,7 +17284,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const slots = document.querySelectorAll('.battle-slot.filled');
             const jobs = [];
             slots.forEach(slot => {
-                const name = slot.querySelector('.card-name') ? slot.querySelector('.card-name').textContent : '';
+                const name = getSlotCardName(slot);
                 if (getFusionParts(name)) jobs.push((async () => {
                     try { await applySkinBgToSlot(slot, name); } catch (e) {}
                 })());
@@ -17281,6 +17296,9 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         async function reapplySingleHandCard(card, cid, ht) {
             const cardName = card.dataset.name;
             if (!cardName) return;
+            // 刷新手牌卡名显示：融合关闭（副卡隐藏）时只显主卡名；完整名存 data-full-name 供逻辑读取
+            const nameEl0 = card.querySelector('.card-name');
+            if (nameEl0) { nameEl0.dataset.fullName = cardName; nameEl0.textContent = getFusionDisplayName(cardName); }
             if (fusionSkinSplitEnabled) {
                 const parts = getFusionParts(cardName);
                 if (parts && parts.length >= 2) {
@@ -18104,7 +18122,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 // 2. 刷新所有战斗槽里该卡牌的皮肤（我方+队友）
                 document.querySelectorAll('.battle-slot.filled').forEach(async (slot) => {
                     if (slot.dataset.cardId !== cardId) return;
-                    const slotCardName = slot.querySelector('.card-name')?.textContent
+                    const slotCardName = getSlotCardName(slot)
                         || (handCard && handCard.dataset.name)
                         || '';
                     if (typeof applySkinBgToSlot === 'function') {
@@ -18193,7 +18211,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 };
                 document.querySelectorAll('.selected-card[data-id="' + cardId + '"]').forEach(el => refreshHandCard(el));
                 document.querySelectorAll('.battle-slot.filled[data-card-id="' + cardId + '"]').forEach(async (slot) => {
-                    try { await applySkinBgToSlot(slot, slot.querySelector('.card-name') ? slot.querySelector('.card-name').textContent : ''); } catch (e) {}
+                    try { await applySkinBgToSlot(slot, getSlotCardName(slot)); } catch (e) {}
                 });
             } catch (e) { console.warn('[SKIN] setDefaultCardSkin refresh error:', e); }
             if (typeof persistProjectSkins === 'function') persistProjectSkins();
@@ -19146,6 +19164,11 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const oldSkinName = slot.querySelector('.skin-name');
             if (oldSkinName) oldSkinName.remove();
             slot.classList.remove('skin-bg');
+            // 刷新卡面显示名：融合关闭（副卡隐藏）时只显主卡名；完整名存 data-full-name 供逻辑读取
+            if (heroName) {
+                const nameEl = slot.querySelector('.card-name');
+                if (nameEl) { nameEl.dataset.fullName = heroName; nameEl.textContent = getFusionDisplayName(heroName); }
+            }
             if (!heroName) { console.log('[SKIN] No heroName, returning'); return; }
 
             // 融合卡：主卡整皮(底层) + 被融合卡左上斜切半张(上层)
@@ -19974,7 +19997,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     // 获取卡牌类型用于显示等级
                     const cardType = card.type || findCardTypeById(card.id);
                     const levelBadge = cardType ? createLevelBadgeHTML(card.id, cardType, handType, card.name) : '';
-                    html += '<div class="selected-card ' + placedClass + ' ' + engineerClass + ' card-item" data-id="' + card.id + '" data-name="' + card.name + '" data-type="' + (cardType || '') + '" data-engineering="' + card.isEngineering + '" data-profession="' + card.profession + '" draggable="' + (!card.placed) + '">' + levelBadge + '<span class="card-name">' + card.name + '</span></div>';
+                    html += '<div class="selected-card ' + placedClass + ' ' + engineerClass + ' card-item" data-id="' + card.id + '" data-name="' + card.name + '" data-type="' + (cardType || '') + '" data-engineering="' + card.isEngineering + '" data-profession="' + card.profession + '" draggable="' + (!card.placed) + '">' + levelBadge + '<span class="card-name" data-full-name="' + card.name + '">' + getFusionDisplayName(card.name) + '</span></div>';
                 } else {
                     html += '<div class="selected-card empty">空</div>';
                 }
@@ -20005,7 +20028,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const slots = document.querySelectorAll('.battle-slot.filled');
             const jobs = [];
             slots.forEach(slot => {
-                const name = slot.querySelector('.card-name')?.textContent || '';
+                const name = getSlotCardName(slot);
                 if (!name) return;
                 jobs.push((async () => {
                     try { await applySkinBgToSlot(slot, name); } catch (e) {}
@@ -20247,7 +20270,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const handCards = isUserSlot ? myHandCards : teammateHandCards;
             const cardId = this.dataset.cardId;
             const card = handCards.find(c => c.id === cardId);
-            const name = card ? card.name : (this.querySelector('.card-name') ? this.querySelector('.card-name').textContent : '');
+            const name = card ? card.name : getSlotCardName(this);
             const baseHero = (typeof getMainCardName === 'function') ? getMainCardName(name) : name;
             const variants = getFusionVariantsForBase(baseHero);
             openFusionVariantMenu(this, baseHero, variants, name);
@@ -22093,7 +22116,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             function buildDragPayload(card) {
                 const slotEl = card.closest('.battle-slot');
                 if (slotEl) {
-                    const nm = card.dataset.name || (slotEl.querySelector('.card-name') ? slotEl.querySelector('.card-name').textContent : '');
+                    const nm = card.dataset.name || getSlotCardName(slotEl);
                     const isEng = card.dataset.engineering === 'true' || !!(slotEl.querySelector('.card-item[data-profession="engineering"]'));
                     return { source: 'slot', slotId: slotEl.dataset.slot, id: slotEl.dataset.cardId || card.dataset.id || '', name: nm, isEngineering: isEng, profession: slotEl.dataset.profession || card.dataset.profession || '' };
                 }
@@ -30548,7 +30571,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260804-233 · sw-v350</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260804-234 · sw-v351</span>
             </div>
         </div>
     </div>
