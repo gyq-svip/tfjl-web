@@ -11395,7 +11395,7 @@
                     <h4>👤 我的卡组（7格）<span id="myDamageReduction" style="color:#4ecdc4;font-size:0.85rem;margin-left:8px;">洗炼总减伤:0</span></h4>
                     <div id="myFusionLockRow" onclick="toggleMyFusionLock()" style="margin:2px 0 6px;font-size:0.72rem;color:rgba(255,255,255,0.7);display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;">
                         <span id="myFusionLockIcon" style="font-size:0.95rem;">🔓</span>
-                        <span id="myFusionLockText">融合编辑中（右键开/切融合）</span>
+                        <span id="myFusionLockText">融合编辑中（右键切被融合卡皮）</span>
                     </div>
                     <div class="battle-slots-container">
                         <div class="battle-slot engineering-slot empty" data-slot="u0" data-type="engineering">
@@ -11416,7 +11416,7 @@
                     <h4>👥 队友卡组（7格）<span id="teammateDamageReduction" style="color:#4ecdc4;font-size:0.85rem;margin-left:8px;">洗炼总减伤:0</span></h4>
                     <div id="teammateFusionLockRow" onclick="toggleTeammateFusionLock()" style="margin:2px 0 6px;font-size:0.72rem;color:rgba(255,255,255,0.7);display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;">
                         <span id="teammateFusionLockIcon" style="font-size:0.95rem;">🔓</span>
-                        <span id="teammateFusionLockText">融合编辑中（右键开/切融合）</span>
+                        <span id="teammateFusionLockText">融合编辑中（右键切被融合卡皮）</span>
                     </div>
                     <div class="battle-slots-container">
                         <div class="battle-slot engineering-slot empty" data-slot="t0" data-type="engineering">
@@ -16497,14 +16497,14 @@
             const myText = document.getElementById('myFusionLockText');
             const myTip = myFusionLocked
                 ? '🔒 我方融合已锁定（点此图标可解锁）\n· 单击卡槽的卡 → 取下回手牌\n· 右击卡槽的卡 → 切换【主卡】皮肤'
-                : '🔓 我方融合编辑中（点此图标可锁定）\n· 单击卡槽的卡 → 弹出融合切换菜单（选/退回/切别的融合卡）\n· 右击卡槽的卡 → 开启/切换融合（切到「关闭」退回非融合）\n· 点手牌的卡 → 上到卡槽（只上不下）';
+                : '🔓 我方融合编辑中（点此图标可锁定）\n· 单击卡槽的卡 → 弹出融合切换菜单（选/退回/切别的融合卡）\n· 右击卡槽的卡 → 切换【被融合卡】皮肤\n· 点手牌的卡 → 上到卡槽（只上不下）';
             if (myIcon) { myIcon.textContent = myFusionLocked ? '🔒' : '🔓'; myIcon.title = myTip; }
             if (myText) { myText.textContent = myFusionLocked ? '融合已锁定' : '融合编辑中'; myText.title = myTip; }
             const tmIcon = document.getElementById('teammateFusionLockIcon');
             const tmText = document.getElementById('teammateFusionLockText');
             const tmTip = teammateFusionLocked
                 ? '🔒 队友融合已锁定（点此图标可解锁）\n· 单击卡槽的卡 → 取下回手牌\n· 右击卡槽的卡 → 切换【主卡】皮肤'
-                : '🔓 队友融合编辑中（点此图标可锁定）\n· 单击卡槽的卡 → 弹出融合切换菜单（选/退回/切别的融合卡）\n· 右击卡槽的卡 → 开启/切换融合（切到「关闭」退回非融合）\n· 点手牌的卡 → 上到卡槽（只上不下）';
+                : '🔓 队友融合编辑中（点此图标可锁定）\n· 单击卡槽的卡 → 弹出融合切换菜单（选/退回/切别的融合卡）\n· 右击卡槽的卡 → 切换【被融合卡】皮肤\n· 点手牌的卡 → 上到卡槽（只上不下）';
             if (tmIcon) { tmIcon.textContent = teammateFusionLocked ? '🔒' : '🔓'; tmIcon.title = tmTip; }
             if (tmText) { tmText.textContent = teammateFusionLocked ? '融合已锁定' : '融合编辑中'; tmText.title = tmTip; }
         }
@@ -16695,53 +16695,6 @@
                 skinLabel.textContent = nextSkin === '' ? '融合关闭' : ('融合·' + nextSkin);
                 setTimeout(() => { if (skinLabel.parentNode) skinLabel.remove(); }, 1500);
             }
-        }
-
-        // 右击融合流程用的瞬时标签
-        function _showFusionRightLabel(slot, text) {
-            if (!slot) return;
-            const label = slot.querySelector('.skin-label') || (() => {
-                const l = document.createElement('span');
-                l.className = 'skin-label';
-                l.style.cssText = 'position:absolute;top:2px;right:2px;font-size:9px;background:rgba(0,0,0,0.6);color:#fff;padding:1px 4px;border-radius:4px;z-index:4;pointer-events:none;';
-                slot.appendChild(l);
-                return l;
-            })();
-            label.textContent = text;
-            setTimeout(() => { if (label.parentNode) label.remove(); }, 1500);
-        }
-        // 🔓 解锁右击融合流程：循环切【被融合卡】皮肤，末尾「关闭」= 退回非融合（基础英雄），而非隐藏副卡
-        async function _safeCycleFusionSkinOrClose(slot, slotId, heroName, baseHeroInput) {
-            const parts = (typeof getFusionParts === 'function') ? getFusionParts(heroName) : null;
-            if (!parts || parts.length < 2) return;
-            const fusedHero = parts[1];
-            const skins = window.getHeroSkins ? window.getHeroSkins(fusedHero) : [];
-            const skinNames = skins.map(s => s.name).filter(name => name !== fusedHero);
-            const CLOSE = '__FUSION_CLOSE__';
-            const cycleList = skinNames.concat([CLOSE]);
-            const current = window.heroSkinSelections ? window.heroSkinSelections[fusedHero] : '';
-            const effectiveCurrent = (current === fusedHero) ? '' : current;
-            let idx = cycleList.indexOf(effectiveCurrent);
-            if (idx < 0) idx = -1;
-            const nextIdx = (idx + 1) % cycleList.length;
-            const nextSkin = cycleList[nextIdx];
-            if (nextSkin === CLOSE) {
-                // 关闭 = 退回非融合（基础英雄）
-                await upgradeCardToFusion(slot, baseHeroInput);
-                _showFusionRightLabel(slot, '融合关闭');
-                return;
-            }
-            if (window.selectHeroSkin) window.selectHeroSkin(fusedHero, nextSkin);
-            await invalidateFusionHalfCache(fusedHero);
-            _showFusionRightLabel(slot, '融合·' + nextSkin);
-            try { await applySkinBgToSlot(slot, heroName); } catch (e) {}
-            const isUserSlot = slotId && slotId.startsWith('u');
-            const _ht = isUserSlot ? 'my' : 'teammate';
-            const placedArray = isUserSlot ? myPlacedCards : teammatePlacedCards;
-            const c = placedArray.find(x => x.slot === slotId);
-            const hc = c ? document.querySelector('#' + (_ht === 'my' ? 'myHandContainer' : 'teammateHandContainer') + ' .selected-card[data-id="' + c.id + '"]') : null;
-            if (hc) { try { await reapplySingleHandCard(hc, c.id, _ht); } catch (e) {} }
-            if (typeof autoSaveProject === 'function') autoSaveProject();
         }
 
 // ==================== 融合卡（统一配置）====================
@@ -20314,27 +20267,15 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 const _parts = (typeof getFusionParts === 'function') ? getFusionParts(heroName) : null;
                 const isFusionCard = (_parts && _parts.length >= 2);
                 const _locked = isUserSlot ? myFusionLocked : teammateFusionLocked;
-                // 🔓 解锁 + 可融合（含已是融合）卡：右击走「融合流程」
-                //   非融合 → 首次右击开启融合；已是融合 → 循环切副卡皮肤，末尾「关闭」退回非融合
-                if (!_locked) {
-                    const baseHero = isFusionCard ? _parts[0] : ((typeof getMainCardName === 'function') ? getMainCardName(heroName) : heroName);
-                    const variants = (typeof getFusionVariantsForBase === 'function') ? getFusionVariantsForBase(baseHero) : [];
-                    if (variants.length > 0) {
-                        if (!isFusionCard) {
-                            // 首次右击：开启融合（取第一个变体）
-                            await upgradeCardToFusion(this, variants[0]);
-                            _showFusionRightLabel(this, '融合开启');
-                            const _ht = isUserSlot ? 'my' : 'teammate';
-                            const hc0 = document.querySelector('#' + (_ht === 'my' ? 'myHandContainer' : 'teammateHandContainer') + ' .selected-card[data-id="' + (card ? card.id : '') + '"]');
-                            if (hc0) { try { await reapplySingleHandCard(hc0, card.id, _ht); } catch (e) {} }
-                            if (typeof autoSaveProject === 'function') autoSaveProject();
-                            return;
-                        }
-                        // 已是融合：循环切副卡皮肤，末尾「关闭」= 退回非融合
-                        await _safeCycleFusionSkinOrClose(this, slotId, heroName, baseHero);
-                        return;
-                    }
-                    // 无法融合的非融合卡：继续向下走「切主卡皮」原逻辑
+                // 融合卡且未锁定（编辑中）：右键切换【被融合卡】皮肤，无需点到角标
+                if (isFusionCard && !_locked) {
+                    await cycleFusionFusedSkin(_parts[1], slotId);
+                    try { await applySkinBgToSlot(this, heroName); } catch (e) {}
+                    const _ht = isUserSlot ? 'my' : 'teammate';
+                    const hc = document.querySelector('#' + (_ht === 'my' ? 'myHandContainer' : 'teammateHandContainer') + ' .selected-card[data-id="' + (card ? card.id : '') + '"]');
+                    if (hc) { try { await reapplySingleHandCard(hc, card.id, _ht); } catch (e) {} }
+                    if (typeof autoSaveProject === 'function') autoSaveProject();
+                    return;
                 }
                 // 非融合 / 已锁定：右键切换【主卡】皮肤（原逻辑）
                 const skinHeroName = isFusionCard ? _parts[0] : (typeof getMainCardName === 'function' ? getMainCardName(heroName) : heroName);
@@ -30607,7 +30548,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260804-232 · sw-v349</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260804-233 · sw-v350</span>
             </div>
         </div>
     </div>
