@@ -3208,12 +3208,12 @@
                         <div style="color:#4ecdc4;font-weight:600;margin-bottom:10px;font-size:0.9rem;">📊 每日对战产出（5局/天）</div>
                         <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:10px;">
                             <table style="width:100%;font-size:0.8rem;color:rgba(255,255,255,0.8);border-collapse:collapse;">
-                                <tr style="border-bottom:1px solid rgba(255,255,255,0.1);"><th style="text-align:left;padding:4px;">胜率</th><th style="text-align:right;padding:4px;">每日</th><th style="text-align:right;padding:4px;">21天</th><th style="text-align:right;padding:4px;">+战令</th></tr>
-                                <tr><td style="padding:4px;">100%</td><td style="text-align:right;padding:4px;">30</td><td style="text-align:right;padding:4px;">630</td><td style="text-align:right;padding:4px;color:#ffd700;">830</td></tr>
-                                <tr><td style="padding:4px;">75%</td><td style="text-align:right;padding:4px;">25</td><td style="text-align:right;padding:4px;">525</td><td style="text-align:right;padding:4px;color:#ffd700;">725</td></tr>
-                                <tr><td style="padding:4px;">50%</td><td style="text-align:right;padding:4px;">20</td><td style="text-align:right;padding:4px;">420</td><td style="text-align:right;padding:4px;color:#ffd700;">620</td></tr>
-                                <tr><td style="padding:4px;">25%</td><td style="text-align:right;padding:4px;">15</td><td style="text-align:right;padding:4px;">315</td><td style="text-align:right;padding:4px;color:#ffd700;">515</td></tr>
-                                <tr><td style="padding:4px;">0%</td><td style="text-align:right;padding:4px;">10</td><td style="text-align:right;padding:4px;">210</td><td style="text-align:right;padding:4px;color:#ff3333;">410</td></tr>
+                                <tr style="border-bottom:1px solid rgba(255,255,255,0.1);"><th style="text-align:left;padding:4px;">胜率</th><th style="text-align:right;padding:4px;">每日</th><th style="text-align:right;padding:4px;" id="calcRefDaysTh">21天</th><th style="text-align:right;padding:4px;">+战令</th></tr>
+                                <tr><td style="padding:4px;">100%</td><td style="text-align:right;padding:4px;">30</td><td style="text-align:right;padding:4px;" id="calcRefT0">630</td><td style="text-align:right;padding:4px;color:#ffd700;" id="calcRefZ0">830</td></tr>
+                                <tr><td style="padding:4px;">75%</td><td style="text-align:right;padding:4px;">25</td><td style="text-align:right;padding:4px;" id="calcRefT1">525</td><td style="text-align:right;padding:4px;color:#ffd700;" id="calcRefZ1">725</td></tr>
+                                <tr><td style="padding:4px;">50%</td><td style="text-align:right;padding:4px;">20</td><td style="text-align:right;padding:4px;" id="calcRefT2">420</td><td style="text-align:right;padding:4px;color:#ffd700;" id="calcRefZ2">620</td></tr>
+                                <tr><td style="padding:4px;">25%</td><td style="text-align:right;padding:4px;">15</td><td style="text-align:right;padding:4px;" id="calcRefT3">315</td><td style="text-align:right;padding:4px;color:#ffd700;" id="calcRefZ3">515</td></tr>
+                                <tr><td style="padding:4px;">0%</td><td style="text-align:right;padding:4px;">10</td><td style="text-align:right;padding:4px;" id="calcRefT4">210</td><td style="text-align:right;padding:4px;color:#ff3333;" id="calcRefZ4">410</td></tr>
                             </table>
                             <div style="margin-top:8px;color:rgba(255,255,255,0.4);font-size:0.7rem;">💡 每日产出 = 5 × (胜率×6 + 败率×2) 战旗</div>
                         </div>
@@ -3228,8 +3228,9 @@
                                 <input type="number" id="calcBeixiangOwnedInput" value="0" min="0" style="width:100%;padding:7px;border-radius:6px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.3);color:#fff;font-size:0.9rem;box-sizing:border-box;">
                             </div>
                             <div style="margin-bottom:10px;">
-                                <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;display:block;margin-bottom:4px;">活动天数</label>
-                                <input type="number" id="calcBeixiangDaysInput" value="23" min="1" max="30" style="width:100%;padding:7px;border-radius:6px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.3);color:#fff;font-size:0.9rem;box-sizing:border-box;">
+                                <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;display:block;margin-bottom:4px;">活动结束日期</label>
+                                <input type="date" id="calcBeixiangEndDate" onchange="updateBeixiangRemainDays()" style="width:100%;padding:7px;border-radius:6px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.3);color:#fff;font-size:0.9rem;box-sizing:border-box;">
+                                <div style="color:rgba(255,255,255,0.5);font-size:0.72rem;margin-top:4px;">⏳ 距结束还剩 <span id="calcBeixiangRemainDays" style="color:#ffd700;font-weight:bold;">--</span> 天（按日期自动算，无需手填）</div>
                             </div>
                             <div style="margin-bottom:10px;">
                                 <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;display:block;margin-bottom:4px;">每日对战胜率：<span id="calcBeixiangWinRateLabel" style="color:#ffd700;font-weight:bold;">50%</span></label>
@@ -3823,6 +3824,44 @@
             container.innerHTML = html;
         }
 
+        // 活动结束日期 → 自动算剩余天数（按自然日向上取整）
+        function getBeixiangRemainingDays() {
+            const el = document.getElementById('calcBeixiangEndDate');
+            if (!el || !el.value) return 23; // 未设日期时兜底
+            const end = new Date(el.value + 'T23:59:59');
+            const now = new Date();
+            const diff = Math.ceil((end - now) / 86400000);
+            return diff > 0 ? diff : 0;
+        }
+        function updateBeixiangRemainDays() {
+            const days = getBeixiangRemainingDays();
+            const span = document.getElementById('calcBeixiangRemainDays');
+            if (span) span.textContent = days;
+            // 同步更新「数据参考」表的剩余天数与对应产出
+            const th = document.getElementById('calcRefDaysTh');
+            if (th) th.textContent = days + '天';
+            const dailies = [30, 25, 20, 15, 10];
+            for (let i = 0; i < 5; i++) {
+                const t = document.getElementById('calcRefT' + i);
+                const z = document.getElementById('calcRefZ' + i);
+                if (t) t.textContent = dailies[i] * days;
+                if (z) z.textContent = dailies[i] * days + 200;
+            }
+        }
+        // 默认结束日期 = 今天+23天（与原默认一致），用户可改；改后自动重算
+        (function initBeixiangEndDate(){
+            const el = document.getElementById('calcBeixiangEndDate');
+            if (el && !el.value) {
+                const d = new Date();
+                d.setDate(d.getDate() + 23);
+                const y = d.getFullYear();
+                const m = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                el.value = y + '-' + m + '-' + day;
+                updateBeixiangRemainDays();
+            }
+        })();
+
         function doBeixiangCalc() {
             let target = 0;
             calcBeixiangSelected.forEach(name => {
@@ -3830,7 +3869,7 @@
                 if (s) target += s.cost;
             });
             const owned = parseInt(document.getElementById('calcBeixiangOwnedInput').value) || 0;
-            const days = parseInt(document.getElementById('calcBeixiangDaysInput').value) || 21;
+            const days = getBeixiangRemainingDays();
             const winRate = (parseInt(document.getElementById('calcBeixiangWinRate').value) || 50) / 100;
             const buyZhanLing = document.getElementById('calcBeixiangBuyZhanLing').checked;
             const zhanLingFlag = buyZhanLing ? 200 : 0;
@@ -30977,7 +31016,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-249 · sw-v366</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-250 · sw-v367</span>
             </div>
         </div>
     </div>
