@@ -3234,7 +3234,7 @@
                             </div>
                             <div style="margin-bottom:10px;">
                                 <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;display:block;margin-bottom:4px;">每日对战胜率：<span id="calcBeixiangWinRateLabel" style="color:#ffd700;font-weight:bold;">50%</span></label>
-                                <input type="range" id="calcBeixiangWinRate" min="0" max="100" value="50" step="5" style="width:100%;cursor:pointer;" oninput="document.getElementById('calcBeixiangWinRateLabel').textContent=this.value+'%'">
+                                <input type="range" id="calcBeixiangWinRate" min="0" max="100" value="50" step="5" style="width:100%;cursor:pointer;" oninput="document.getElementById('calcBeixiangWinRateLabel').textContent=this.value+'%';updateBeixiangRemainDays();">
                                 <div style="color:rgba(255,255,255,0.4);font-size:0.7rem;margin-top:4px;">💡 每人每天打5次，赢=6战旗，输=2战旗（按经验估算）</div>
                             </div>
                             <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
@@ -3837,15 +3837,19 @@
             const days = getBeixiangRemainingDays();
             const span = document.getElementById('calcBeixiangRemainDays');
             if (span) span.textContent = days;
-            // 同步更新「数据参考」表的剩余天数与对应产出
+            // 胜率（滑块实时值）也参与参考表刷新，让"剩余天数胜率"一眼可见
+            const winRate = (parseInt(document.getElementById('calcBeixiangWinRate')?.value) || 50) / 100;
+            const dailyAvg = 5 * (winRate * 6 + (1 - winRate) * 2);
+            // 同步更新「数据参考」表的剩余天数与对应产出（按实际胜率×剩余天数）
             const th = document.getElementById('calcRefDaysTh');
-            if (th) th.textContent = days + '天';
+            if (th) th.textContent = days + '天·' + Math.round(winRate * 100) + '%';
             const dailies = [30, 25, 20, 15, 10];
+            const battleFreeTotal = Math.round(dailyAvg * days);
             for (let i = 0; i < 5; i++) {
                 const t = document.getElementById('calcRefT' + i);
                 const z = document.getElementById('calcRefZ' + i);
-                if (t) t.textContent = dailies[i] * days;
-                if (z) z.textContent = dailies[i] * days + 200;
+                if (t) t.textContent = Math.round(dailies[i] * days) + battleFreeTotal;
+                if (z) z.textContent = Math.round(dailies[i] * days) + battleFreeTotal + 200;
             }
         }
         // 默认结束日期 = 今天+23天（与原默认一致），用户可改；改后自动重算
@@ -3888,19 +3892,24 @@
 
             let html = '';
             html += `<div style="margin-bottom:12px;">`;
-            html += `<div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.6);font-size:0.8rem;">目标战旗总数</span><span style="color:#ffd700;font-weight:bold;">${target}</span></div>`;
+            html += `<div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.6);font-size:0.8rem;">目标战旗总数</span><span style="color:#ff6b6b;font-weight:bold;">${target}</span></div>`;
             html += `<div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.6);font-size:0.8rem;">每日对战（5局·胜率${Math.round(winRate*100)}%）</span><span style="color:#4ecdc4;">${dailyAvg.toFixed(1)} 战旗/天</span></div>`;
-            html += `<div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.6);font-size:0.8rem;">免费获得（对战${battleFree}${owned > 0 ? '+已有' + owned : ''}${buyZhanLing ? '+战令200' : ''}）</span><span style="color:#4ecdc4;">${totalFree}</span></div>`;
+            html += `<div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.6);font-size:0.8rem;">⏳ 剩余 ${days} 天白嫖（胜率${Math.round(winRate*100)}%×${days}天）</span><span style="color:#4ecdc4;">${battleFree}</span></div>`;
+            html += `<div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.6);font-size:0.8rem;">已有战旗（已减去）</span><span style="color:#4ecdc4;">${owned}</span></div>`;
+            if (buyZhanLing) {
+                html += `<div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.6);font-size:0.8rem;">战令（98元/200战旗）</span><span style="color:#4ecdc4;">200</span></div>`;
+            }
+            html += `<div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.6);font-size:0.8rem;">免费合计（白嫖+已有${buyZhanLing ? '+战令' : ''}）</span><span style="color:#4ecdc4;">${totalFree}</span></div>`;
 
             if (need <= 0) {
-                html += `<div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.6);font-size:0.8rem;">还需战旗</span><span style="color:#4caf50;font-weight:bold;">0（已足够）</span></div>`;
+                html += `<div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.6);font-size:0.8rem;">还需氪金战旗</span><span style="color:#4caf50;font-weight:bold;">0（已足够）</span></div>`;
                 html += `</div>`;
                 html += `<div style="background:linear-gradient(135deg,#4caf50,#2e7d32);border-radius:8px;padding:12px;text-align:center;color:white;margin-top:10px;">`;
                 html += `<div style="font-size:1.1rem;font-weight:bold;">🎉 无需额外氪金！</div>`;
-                html += `<div style="font-size:0.85rem;margin-top:4px;opacity:0.9;">${buyZhanLing ? '战令已含200战旗，' : ''}免费产出已满足目标，溢出 ${totalFree - target} 战旗</div>`;
+                html += `<div style="font-size:0.85rem;margin-top:4px;opacity:0.9;">${buyZhanLing ? '战令已含200战旗，' : ''}按剩余 ${days} 天胜率白嫖 + 已有已满足目标，溢出 ${totalFree - target} 战旗</div>`;
                 html += `</div>`;
             } else {
-                html += `<div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.6);font-size:0.8rem;">还需战旗</span><span style="color:#ff6b6b;font-weight:bold;">${need}</span></div>`;
+                html += `<div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.6);font-size:0.8rem;">还需氪金战旗（目标−白嫖−已有${buyZhanLing ? '−战令' : ''}）</span><span style="color:#ff6b6b;font-weight:bold;">${need}</span></div>`;
                 html += `</div>`;
 
                 // 复用现成的动态规划最优购买
@@ -31016,7 +31025,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-250 · sw-v367</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-251 · sw-v368</span>
             </div>
         </div>
     </div>
