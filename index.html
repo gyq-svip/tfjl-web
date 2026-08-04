@@ -10490,47 +10490,9 @@
 
         // 点击右下角版本号 → 弹出版本详情 + 强制刷新（解决「看不清版本/跟不上新版」痛点）
         let _versionPopupShown = false;
-        async function onVersionTagClick() {
-            if (_versionPopupShown) { _removeVersionPopup(); return; }
-            _versionPopupShown = true;
-            // 获取 SW 缓存版本号（实时问 SW）
-            let swVer = (function() {
-                const tag = document.getElementById('versionTag');
-                const parts = tag ? tag.textContent.replace('●', '').split(' · ') : [];
-                return parts[1] || '加载中…';
-            })();
-            if (swVer === '加载中…') {
-                try {
-                    await new Promise((resolve) => {
-                        const onMsg = (e) => {
-                            if (e.data && e.data.type === 'SW_VERSION') {
-                                swVer = e.data.version.indexOf('tfjl-') === 0 ? e.data.version.slice('tfjl-'.length) : e.data.version;
-                                navigator.serviceWorker.removeEventListener('message', onMsg);
-                                resolve();
-                            }
-                        };
-                        if (navigator.serviceWorker && navigator.serviceWorker.controller) {
-                            navigator.serviceWorker.addEventListener('message', onMsg);
-                            navigator.serviceWorker.controller.postMessage({ type: 'GET_SW_VERSION' });
-                            setTimeout(resolve, 1200);
-                        } else { resolve(); }
-                    });
-                } catch (e) {}
-            }
-            const frontVer = (function() {
-                const tag = document.getElementById('versionTag');
-                const parts = tag ? tag.textContent.replace('●', '').split(' · ') : [];
-                return (parts[0] || tag.textContent || '').trim();
-            })();
-            const appVer = (typeof CURRENT_VERSION !== 'undefined') ? CURRENT_VERSION : '网页版';
-            // 是否已检测到服务器有新版本（SW 后台拉到新资源时置位）
-            const hasNew = window.__tfjlHasNewVersion === true;
-            const overlay = document.createElement('div');
-            overlay.id = '__versionPopup';
-            overlay.style.cssText = 'position:fixed;inset:0;z-index:100002;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;';
-            overlay.onclick = function(e) { if (e.target === overlay) _removeVersionPopup(); };
-            const box = document.createElement('div');
-            box.style.cssText = 'background:rgba(26,26,46,0.96);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);color:#fff;width:300px;max-width:90vw;border-radius:16px;padding:20px;box-shadow:0 12px 40px rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.12);font-family:inherit;';
+        // 填充版本弹窗主体（hasNew 决定按钮文案/动作）。
+        // 抽出来是因为要异步拉远端 versionTag，检测到新版本时无需重建整个 overlay，只重填 body。
+        function _fillVersionPopupBody(frontVer, swVer, appVer, hasNew, box) {
             box.innerHTML = '<div style="font-size:1.05rem;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px;">📌 版本信息</div>'
                 + '<div style="display:flex;justify-content:space-between;font-size:0.85rem;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.08);"><span style="color:rgba(255,255,255,0.6);">前端标记</span><span style="font-weight:600;">' + escapeHtml(frontVer) + '</span></div>'
                 + '<div style="display:flex;justify-content:space-between;font-size:0.85rem;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.08);"><span style="color:rgba(255,255,255,0.6);">缓存版本(SW)</span><span style="font-weight:600;">' + escapeHtml(swVer) + '</span></div>'
@@ -10567,14 +10529,82 @@
                 };
                 box.appendChild(link);
             }
-            const close = document.createElement('div');
-            close.textContent = '✕';
-            close.style.cssText = 'position:absolute;top:12px;right:14px;opacity:0.5;cursor:pointer;font-size:0.9rem;';
-            close.onclick = function(e) { e.stopPropagation(); _removeVersionPopup(); };
-            box.style.position = 'relative';
-            box.appendChild(close);
+        }
+        // 拉远端 index.html 解析前端 versionTag —— 不依赖 Service Worker（Tauri WebView 下 SW message 通道不可靠，
+        // 导致 __tfjlHasNewVersion 永远收不到 NEW_VERSION_READY）。优先 raw.githubusercontent (CORS *)，失败回退同域 GitHub Pages。
+        async function _checkRemoteFrontVerAsync() {
+            const sources = [
+                'https://raw.githubusercontent.com/gyq-svip/tfjl-web/main/index.html?t=' + Date.now(),
+                'https://gyq-svip.github.io/tfjl-web/index.html?t=' + Date.now()
+            ];
+            for (const u of sources) {
+                try {
+                    const r = await fetch(u, { cache: 'no-store' });
+                    if (r.ok) {
+                        const txt = await r.text();
+                        const m = txt.match(/id="versionTag"[^>]*>([^<]+)</);
+                        if (m) return m[1].trim();
+                    }
+                } catch (e) { /* 试下一个源 */ }
+            }
+            return null;
+        }
+        async function onVersionTagClick() {
+            if (_versionPopupShown) { _removeVersionPopup(); return; }
+            _versionPopupShown = true;
+            // 获取 SW 缓存版本号（实时问 SW）
+            let swVer = (function() {
+                const tag = document.getElementById('versionTag');
+                const parts = tag ? tag.textContent.replace('●', '').split(' · ') : [];
+                return parts[1] || '加载中…';
+            })();
+            if (swVer === '加载中…') {
+                try {
+                    await new Promise((resolve) => {
+                        const onMsg = (e) => {
+                            if (e.data && e.data.type === 'SW_VERSION') {
+                                swVer = e.data.version.indexOf('tfjl-') === 0 ? e.data.version.slice('tfjl-'.length) : e.data.version;
+                                navigator.serviceWorker.removeEventListener('message', onMsg);
+                                resolve();
+                            }
+                        };
+                        if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+                            navigator.serviceWorker.addEventListener('message', onMsg);
+                            navigator.serviceWorker.controller.postMessage({ type: 'GET_SW_VERSION' });
+                            setTimeout(resolve, 1200);
+                        } else { resolve(); }
+                    });
+                } catch (e) {}
+            }
+            const frontVer = (function() {
+                const tag = document.getElementById('versionTag');
+                const parts = tag ? tag.textContent.replace('●', '').split(' · ') : [];
+                return (parts[0] || tag.textContent || '').trim();
+            })();
+            const appVer = (typeof CURRENT_VERSION !== 'undefined') ? CURRENT_VERSION : '网页版';
+            const overlay = document.createElement('div');
+            overlay.id = '__versionPopup';
+            overlay.style.cssText = 'position:fixed;inset:0;z-index:100002;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;';
+            overlay.onclick = function(e) { if (e.target === overlay) _removeVersionPopup(); };
+            const box = document.createElement('div');
+            box.style.cssText = 'background:rgba(26,26,46,0.96);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);color:#fff;width:300px;max-width:90vw;border-radius:16px;padding:20px;box-shadow:0 12px 40px rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.12);font-family:inherit;position:relative;';
             overlay.appendChild(box);
             document.body.appendChild(overlay);
+            // 先用 SW 是否已报新版本渲染（__tfjlHasNewVersion 由 SW 的 NEW_VERSION_READY 置位）
+            _fillVersionPopupBody(frontVer, swVer, appVer, window.__tfjlHasNewVersion === true, box);
+            // 异步拉远端 versionTag 比较：不依赖 SW，Tauri WebView 下也能正确检测新前端
+            try {
+                const remoteVer = await _checkRemoteFrontVerAsync();
+                if (remoteVer && remoteVer !== frontVer && !window.__tfjlHasNewVersion) {
+                    window.__tfjlHasNewVersion = true;
+                    _fillVersionPopupBody(frontVer, swVer, appVer, true, box);  // 刷新为「强制刷新」状态
+                }
+            } catch (e) {}
+            const close = document.createElement('div');
+            close.textContent = '✕';
+            close.style.cssText = 'position:absolute;top:12px;right:14px;opacity:0.5;cursor:pointer;font-size:0.9rem;z-index:2;';
+            close.onclick = function(e) { e.stopPropagation(); _removeVersionPopup(); };
+            box.appendChild(close);
         }
         function _removeVersionPopup() {
             const o = document.getElementById('__versionPopup');
