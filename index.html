@@ -1510,22 +1510,28 @@
             z-index: 99999;
         }
 
-        /* 跟随拖尾特效 */
+        /* 跟随拖尾特效（升级版：放大+旋转+飘移+淡出，像烟花消散） */
         .trail-particle {
             position: fixed;
             font-size: 28px;
             pointer-events: none;
-            animation: trailFade 1.5s ease-out forwards;
+            z-index: 9998;
+            animation: trailFade 1.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+            will-change: transform, opacity;
         }
 
         @keyframes trailFade {
             0% {
                 opacity: 1;
-                transform: scale(1);
+                transform: scale(1) rotate(0deg) translate(0, 0);
+            }
+            60% {
+                opacity: 0.85;
+                transform: scale(1.8) rotate(140deg) translate(0, -12px);
             }
             100% {
                 opacity: 0;
-                transform: scale(0);
+                transform: scale(2.4) rotate(260deg) translate(0, -28px);
             }
         }
 
@@ -30209,7 +30215,7 @@ ${maSection}
     </div>
 
     <!-- 右下角版本标记（供前端更新核对 + extractVersion 解析） -->
-    <span id="versionTag" style="position:fixed;right:8px;bottom:54px;z-index:9991;font-size:0.72rem;color:#666;background:rgba(0,0,0,0.35);padding:2px 8px;border-radius:10px;pointer-events:auto;cursor:pointer;user-select:none;" onclick="showVersionPopup()" title="点击查看版本 / 刷新">v260804-197 · sw-v315</span>
+    <span id="versionTag" style="position:fixed;right:8px;bottom:54px;z-index:9991;font-size:0.72rem;color:#666;background:rgba(0,0,0,0.35);padding:2px 8px;border-radius:10px;pointer-events:auto;cursor:pointer;user-select:none;" onclick="showVersionPopup()" title="点击查看版本 / 刷新">v260804-198 · sw-v316</span>
 
     <!-- 底部状态栏（在线统计 + 版本显示） -->
     <div id="statsBar" style="position:fixed;bottom:0;left:0;right:0;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);border-top:2px solid rgba(255,215,0,0.5);padding:10px 20px;z-index:9990;display:flex;justify-content:center;align-items:center;gap:24px;font-size:0.9rem;flex-wrap:wrap;">
