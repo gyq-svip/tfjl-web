@@ -3227,11 +3227,17 @@
                                 <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;display:block;margin-bottom:4px;">已有战旗</label>
                                 <input type="number" id="calcBeixiangOwnedInput" value="0" min="0" style="width:100%;padding:7px;border-radius:6px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.3);color:#fff;font-size:0.9rem;box-sizing:border-box;">
                             </div>
-                            <div style="margin-bottom:10px;">
-                                <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;display:block;margin-bottom:4px;">活动结束日期</label>
-                                <input type="date" id="calcBeixiangEndDate" onchange="updateBeixiangRemainDays()" style="width:100%;padding:7px;border-radius:6px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.3);color:#fff;font-size:0.9rem;box-sizing:border-box;">
-                                <div style="color:rgba(255,255,255,0.5);font-size:0.72rem;margin-top:4px;">⏳ 距结束还剩 <span id="calcBeixiangRemainDays" style="color:#ffd700;font-weight:bold;">--</span> 天（按日期自动算，无需手填）</div>
+                            <div style="display:flex;gap:10px;margin-bottom:10px;">
+                                <div style="flex:1;">
+                                    <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;display:block;margin-bottom:4px;">活动总天数</label>
+                                    <input type="number" id="calcBeixiangTotalDays" value="23" min="1" max="60" style="width:100%;padding:7px;border-radius:6px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.3);color:#fff;font-size:0.9rem;box-sizing:border-box;" onchange="updateBeixiangRemainDays()">
+                                </div>
+                                <div style="flex:1;">
+                                    <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;display:block;margin-bottom:4px;">今天第几天</label>
+                                    <input type="number" id="calcBeixiangCurrentDay" value="2" min="1" style="width:100%;padding:7px;border-radius:6px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.3);color:#fff;font-size:0.9rem;box-sizing:border-box;" onchange="updateBeixiangRemainDays()">
+                                </div>
                             </div>
+                            <div style="color:rgba(255,255,255,0.5);font-size:0.72rem;margin-top:4px;">⏳ 剩余 <span id="calcBeixiangRemainDays" style="color:#ffd700;font-weight:bold;">--</span> 天（结束日期：<span id="calcBeixiangEndDateShow" style="color:#ffd700;">--</span>，按 总天数−当前天 自动算）</div>
                             <div style="margin-bottom:10px;">
                                 <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;display:block;margin-bottom:4px;">每天能赢几局（共5局）：<span id="calcBeixiangWinRateLabel" style="color:#ffd700;font-weight:bold;">赢3局</span></label>
                                 <input type="range" id="calcBeixiangWinRate" min="0" max="5" value="3" step="1" style="width:100%;cursor:pointer;" oninput="document.getElementById('calcBeixiangWinRateLabel').textContent='赢'+this.value+'局';updateBeixiangRemainDays();">
@@ -3824,19 +3830,22 @@
             container.innerHTML = html;
         }
 
-        // 活动结束日期 → 自动算剩余天数（按自然日向上取整）
+        // 剩余天数 = 活动总天数 − 今天第几天（如总23天·今天第2天 → 剩21天）
         function getBeixiangRemainingDays() {
-            const el = document.getElementById('calcBeixiangEndDate');
-            if (!el || !el.value) return 23; // 未设日期时兜底
-            const end = new Date(el.value + 'T23:59:59');
-            const now = new Date();
-            const diff = Math.ceil((end - now) / 86400000);
-            return diff > 0 ? diff : 0;
+            const total = parseInt(document.getElementById('calcBeixiangTotalDays')?.value) || 23;
+            const cur = parseInt(document.getElementById('calcBeixiangCurrentDay')?.value) || 1;
+            const rem = total - cur;
+            return rem > 0 ? rem : 0;
         }
         function updateBeixiangRemainDays() {
             const days = getBeixiangRemainingDays();
             const span = document.getElementById('calcBeixiangRemainDays');
             if (span) span.textContent = days;
+            // 推算结束日期 = 今天 + 剩余天数
+            const d = new Date();
+            d.setDate(d.getDate() + days);
+            const show = document.getElementById('calcBeixiangEndDateShow');
+            if (show) show.textContent = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
             // 滑块=每天赢几局(0~5)，每日战旗 = 赢×6 + 输×2
             const wins = parseInt(document.getElementById('calcBeixiangWinRate')?.value) || 0;
             const dailyAvg = wins * 6 + (5 - wins) * 2;
@@ -3851,18 +3860,9 @@
                 if (z) z.textContent = Math.round(dailies[i] * days) + 200;
             }
         }
-        // 默认结束日期 = 今天+23天（与原默认一致），用户可改；改后自动重算
-        (function initBeixiangEndDate(){
-            const el = document.getElementById('calcBeixiangEndDate');
-            if (el && !el.value) {
-                const d = new Date();
-                d.setDate(d.getDate() + 23);
-                const y = d.getFullYear();
-                const m = String(d.getMonth() + 1).padStart(2, '0');
-                const day = String(d.getDate()).padStart(2, '0');
-                el.value = y + '-' + m + '-' + day;
-                updateBeixiangRemainDays();
-            }
+        // 初始化剩余天数展示（默认活动23天·今天第2天 → 剩21天）
+        (function initBeixiangRemain(){
+            updateBeixiangRemainDays();
         })();
 
         function doBeixiangCalc() {
@@ -31024,7 +31024,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-252 · sw-v369</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-253 · sw-v370</span>
             </div>
         </div>
     </div>
