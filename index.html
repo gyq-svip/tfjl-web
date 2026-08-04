@@ -16888,7 +16888,6 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 await _cgmWriteRepoFile('skins/cards.json', content);
                 window.cloudCards = base.cards;
                 if (typeof renderCloudCardsToPool === 'function') renderCloudCardsToPool();
-                cgmInitFusedHeroSelect();
                 cgmRefreshHeroList();
                 status.style.color = '#4ade80';
                 status.textContent = '✓ 已写入 d:\\tfjl-web\\skins\\cards.json\n请在本机终端运行：\n  cd d:\\tfjl-web\n  git add skins/cards.json\n  git commit -m "hero: ' + name + '"\n  git push origin main\n  git -c http.proxy= -c https.proxy= push gitee';
@@ -30532,7 +30531,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260804-222 · sw-v339</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260804-223 · sw-v340</span>
             </div>
         </div>
     </div>
