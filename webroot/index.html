@@ -1094,8 +1094,13 @@
         }
 
         /* 卡池皮肤铺满：基础卡 / 融合卡主卡用 background 铺满；融合卡副卡用右下角小图 */
+        /* 卡名改到底部显示，避免融合副卡小图（左上角）挡住卡名，尤其融合卡名 */
         .collapsible-section .card-item {
             position: relative;
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
         }
         .collapsible-section .card-item.skin-bg {
             background-size: cover !important;
@@ -30685,7 +30690,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260804-242 · sw-v359</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260804-243 · sw-v360</span>
             </div>
         </div>
     </div>
