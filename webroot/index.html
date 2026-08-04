@@ -16459,9 +16459,13 @@
             if (!el) return '';
             return el.dataset.fullName || el.textContent || '';
         }
-        // 卡牌身份 = 主卡英雄名（融合卡取主卡，基础卡即自身）。同一身份在同一侧手牌只能 1 张。
+        // 卡牌身份 = 主卡英雄名。融合卡「主卡·副卡」只看 · 前的主卡（不考虑副卡，且不依赖云端是否收录）；
+        // 无 · 的融合卡（内置格式如 水灵刀客）由 getMainCardName 取主卡；基础卡即自身。
         function cardIdentity(name) {
-            return (typeof getMainCardName === 'function' && name) ? getMainCardName(name) : name;
+            if (!name) return name;
+            const dot = name.indexOf('·');
+            if (dot > 0) return name.substring(0, dot);
+            return (typeof getMainCardName === 'function') ? getMainCardName(name) : name;
         }
         // 该手牌里是否已有同一张卡（含基础卡与它的融合形态）
         function handHasIdentity(hand, name) {
@@ -30664,7 +30668,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260804-236 · sw-v353</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260804-237 · sw-v354</span>
             </div>
         </div>
     </div>
