@@ -22102,9 +22102,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         }
         
         // 从脚本内容中提取减伤信息（供标签栏显示用）
-        function computeScriptDr(content) {
+        function computeScriptDr(content, tableName) {
             if (!content || !content.trim()) return null;
             loadDamageReductionData();
+            const tbl = tableName || '我的';
             const lines = content.split('\n');
             let cardNames = [];
             for (const line of lines) {
@@ -22116,9 +22117,9 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const isSpirit = (n) => n.includes('精灵') || n === '幻球' || n === '冰球';
             const battleCards = cardNames.filter(c => !isSpirit(c));
             if (battleCards.length === 0) return null;
-            const allDr = calculateDamageReductionForCards(battleCards);
+            const allDr = calculateDamageReductionForCards(battleCards, 'my', tbl);
             const first7 = battleCards.slice(0, 7);
-            const first7Dr = calculateDamageReductionForCards(first7);
+            const first7Dr = calculateDamageReductionForCards(first7, 'my', tbl);
             return { first7: first7Dr, all: allDr };
         }
         window.computeScriptDr = computeScriptDr;
@@ -22180,7 +22181,12 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             }
             
             if (cardNames.length === 0) {
-                drBar.style.display = 'none';
+                // 没有「上阵：」行也让减伤栏（含减伤表下拉）可见，方便选择表；仅减伤值显示占位
+                drBar.style.display = 'flex';
+                first7El.textContent = '--';
+                allEl.textContent = '--';
+                first7El.style.color = 'rgba(255,255,255,0.5)';
+                allEl.style.color = 'rgba(255,255,255,0.5)';
                 return;
             }
             
@@ -22188,7 +22194,11 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const battleCards = cardNames.filter(c => !isSpirit(c));
             
             if (battleCards.length === 0) {
-                drBar.style.display = 'none';
+                drBar.style.display = 'flex';
+                first7El.textContent = '--';
+                allEl.textContent = '--';
+                first7El.style.color = 'rgba(255,255,255,0.5)';
+                allEl.style.color = 'rgba(255,255,255,0.5)';
                 return;
             }
             
@@ -26173,9 +26183,11 @@ function hasGistToken() {
                     }
                 }
 
-                // 计算减伤信息
-                const previewDr = computeScriptDr(content);
+                // 计算减伤信息（支持切换减伤表）
+                let previewTableName = (window.drActiveTable && window.drTables[window.drActiveTable]) ? window.drActiveTable : '我的';
+                const previewDr = computeScriptDr(content, previewTableName);
                 const previewDrHtml = previewDr ? ` ${buildWindowDrBadge(previewDr)}` : '';
+                const previewDrOptions = (window.drTableOrder && window.drTableOrder.length ? window.drTableOrder : Object.keys(window.drTables || {})).map(n => `<option value="${n}" ${n === previewTableName ? 'selected' : ''}>${n}</option>`).join('');
 
                 // 创建预览弹窗
                 const modal = document.createElement('div');
@@ -26184,7 +26196,13 @@ function hasGistToken() {
                 modal.innerHTML = `
                     <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(79,195,247,0.5);border-radius:12px;width:600px;max-width:90vw;max-height:80vh;display:flex;flex-direction:column;">
                         <div style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center;">
-                            <div style="color:#4fc3f7;font-weight:bold;font-size:1rem;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">👁️ 预览：${escapeHtml(fileName)}<span style="font-size:0.75rem;font-weight:normal;">${previewDrHtml}</span></div>
+                            <div style="color:#4fc3f7;font-weight:bold;font-size:1rem;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">👁️ 预览：${escapeHtml(fileName)}
+                                <span style="font-size:0.8rem;font-weight:normal;display:inline-flex;align-items:center;gap:5px;">
+                                    <span style="color:#ffd700;">🛡️</span>
+                                    <select id="previewDrTable" onchange="(function(){const c=window.__previewContent;const t=this.value;const d=window.computeScriptDr(c,t);const el=document.getElementById('previewDrBadge');el.innerHTML=d?window.buildWindowDrBadge(d):'';})()" style="background:rgba(30,30,60,0.95);border:1px solid rgba(255,215,0,0.4);color:#ffd700;padding:3px 8px;border-radius:6px;font-size:0.78rem;">${previewDrOptions}</select>
+                                    <span id="previewDrBadge" style="font-size:0.75rem;">${previewDrHtml}</span>
+                                </span>
+                            </div>
                             <button onclick="document.getElementById('scriptPreviewModal').remove()" style="background:transparent;border:none;color:white;font-size:1.2rem;cursor:pointer;">×</button>
                         </div>
                         <div style="flex:1;overflow:auto;padding:12px;">
@@ -26196,6 +26214,7 @@ function hasGistToken() {
                         </div>
                     </div>
                 `;
+                window.__previewContent = content;
                 document.body.appendChild(modal);
                 // 点击背景关闭
                 modal.addEventListener('click', (e) => {
@@ -31642,7 +31661,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-279 · sw-v396</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-280 · sw-v397</span>
             </div>
         </div>
     </div>
