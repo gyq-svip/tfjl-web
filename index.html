@@ -29708,25 +29708,41 @@ ${maSection}
                 const token = getGistToken();
                 if (!token) throw new Error('未设置GitHub Token');
 
-                const response = await fetch(GIST_URL, {
-                    method: 'PATCH',
-                    headers: {
-                        'Accept': 'application/vnd.github.v3+json',
-                        'Content-Type': 'application/json',
-                        'Authorization': `token ${token}`
-                    },
-                    body: JSON.stringify({
-                        files: {
-                            'news.json': {
-                                content: JSON.stringify(fullData, null, 2)
-                            }
+                const patchBody = JSON.stringify({
+                    files: {
+                        'news.json': {
+                            content: JSON.stringify(fullData, null, 2)
                         }
-                    })
+                    }
+                });
+                const patchHeaders = {
+                    'Accept': 'application/vnd.github.v3+json',
+                    'Content-Type': 'application/json',
+                    'Authorization': `token ${token}`
+                };
+
+                // 🔴 必须写「公告 Gist」——前台 fetchNewsFromGitHub() 读的就是它。
+                // 旧代码错写成索引 GIST_URL，导致 Gist 里能看到新标题、但页面刷新后被公告 Gist 的旧值顶回去。
+                const newsGistUrl = await getNewsGistUrl();
+                const response = await fetch(newsGistUrl, {
+                    method: 'PATCH',
+                    headers: patchHeaders,
+                    body: patchBody
                 });
 
                 if (!response.ok) {
                     const errData = await response.json().catch(() => ({}));
                     throw new Error(errData.message || `保存失败 HTTP ${response.status}`);
+                }
+
+                // 兜底：公告 Gist 与索引 Gist 不是同一个时，把索引 Gist 的 news.json 也刷成同一份，
+                // 避免某些设备没拿到 news_gist_id 而回退读索引 Gist 时又看到旧标题。失败不影响主流程。
+                if (newsGistUrl !== GIST_URL) {
+                    try {
+                        await fetch(GIST_URL, { method: 'PATCH', headers: patchHeaders, body: patchBody });
+                    } catch (e) {
+                        console.warn('同步索引Gist标题失败(不影响主流程):', e);
+                    }
                 }
 
                 saveConfigToCache(currentConfig);
@@ -31081,7 +31097,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-260 · sw-v377</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-261 · sw-v378</span>
             </div>
         </div>
     </div>
