@@ -9554,7 +9554,8 @@
             // 计算总减伤（只算实际上阵的卡：6张非工程+工程卡）
             loadDamageReductionData();
             const actualBattleCards = [...arrangedCards, ...gongChengCards];
-            const totalDamageReduction = calculateDamageReductionForCards(actualBattleCards);
+            window._autoGenBattleCards = actualBattleCards;
+            const totalDamageReduction = calculateDamageReductionForCards(actualBattleCards, 'my', window._autoGenDrTable || '我的');
 
             // 显示结果
             const overLimitHtml = overLimitCards.length > 0 ? `<div style="color:#ff5722;font-size:0.85rem;margin-bottom:8px;">⚠️ 超出10张上限，已忽略：${overLimitCards.join('、')}</div>` : '';
@@ -9563,7 +9564,8 @@
                     <div style="color:#4caf50;font-weight:bold;margin-bottom:8px;">✅ ${includeChengShang ? '活动' : '隐藏榜'}脚本输出：</div>
                     ${overLimitHtml}
                     <div style="background:rgba(78,205,196,0.1);border:1px solid rgba(78,205,196,0.3);border-radius:6px;padding:8px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
-                        <span style="color:#4ecdc4;font-size:0.85rem;">🛡️ 总减伤：<strong style="color:#fff;font-size:1rem;">${totalDamageReduction}</strong></span>
+                        <span style="color:#4ecdc4;font-size:0.85rem;">🛡️ 总减伤：<strong id="autoGenDrValue" style="color:#fff;font-size:1rem;">${totalDamageReduction}</strong></span>
+                        <select id="autoGenDrTable" onchange="recomputeAutoGenDr()" style="background:rgba(30,30,60,0.95);border:1px solid rgba(78,205,196,0.4);color:#fff;padding:4px 8px;border-radius:6px;font-size:0.8rem;">${drTableSelectOptions(window._autoGenDrTable || '我的')}</select>
                         <span style="color:rgba(255,255,255,0.5);font-size:0.75rem;">主界面「🛡️ 减伤」按钮设置每张卡的减伤洗炼值 · 支持多张减伤表，我的/队友可分开</span>
                     </div>
                     <textarea id="activityScriptTextarea" oninput="window._activityScriptOutput=this.value" style="width:100%;min-height:350px;color:#fff;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.2);border-radius:6px;padding:8px;font-family:monospace;font-size:0.85rem;white-space:pre-wrap;word-break:break-all;resize:vertical;">${output.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</textarea>
@@ -9942,7 +9944,8 @@
                 '<div style="color:#ff9800;font-weight:bold;margin-bottom:8px;">✅ 深海脚本输出：</div>' +
                 overLimitHtml2 +
                 '<div style="background:rgba(78,205,196,0.1);border:1px solid rgba(78,205,196,0.3);border-radius:6px;padding:8px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">' +
-                '<span style="color:#4ecdc4;font-size:0.85rem;">🛡️ 总减伤：<strong style="color:#fff;font-size:1rem;">' + totalDamageReduction + '</strong></span>' +
+                '<span style="color:#4ecdc4;font-size:0.85rem;">🛡️ 总减伤：<strong id="dungeonDrValue" style="color:#fff;font-size:1rem;">' + totalDamageReduction + '</strong></span>' +
+                '<select id="dungeonDrTable" onchange="recomputeDungeonDr()" style="background:rgba(30,30,60,0.95);border:1px solid rgba(78,205,196,0.4);color:#fff;padding:4px 8px;border-radius:6px;font-size:0.8rem;">' + drTableSelectOptions(window._dungeonDrTable || '我的') + '</select>' +
                 '<span style="color:rgba(255,255,255,0.5);font-size:0.75rem;">主界面「🛡️ 减伤」按钮设置每张卡的减伤洗炼值 · 支持多张减伤表，我的/队友可分开</span>' +
                 '</div>' +
                 '<textarea id="dungeonScriptTextarea" oninput="window._dungeonScriptOutput=this.value" style="width:100%;min-height:350px;color:#fff;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.2);border-radius:6px;padding:8px;font-family:monospace;font-size:0.85rem;white-space:pre-wrap;word-break:break-all;resize:vertical;">' + output.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</textarea>' +
@@ -11590,6 +11593,7 @@
                             <span style="color:rgba(255,255,255,0.6);">全部卡：</span>
                             <b id="parserDrAll" style="color:#ff6b6b;font-size:1rem;min-width:50px;">--</b>
                         </span>
+                        <select id="parserDrTable" onchange="window._parserDrTable=this.value;updateRealTimeDamageReduction();" style="background:rgba(30,30,60,0.95);border:1px solid rgba(255,215,0,0.4);color:#ffd700;padding:4px 8px;border-radius:6px;font-size:0.8rem;"></select>
                     </div>
                     <div id="parserDrDetail" style="margin-top:6px;font-size:0.75rem;color:rgba(255,255,255,0.5);line-height:1.5;"></div>
                 </div>
@@ -21795,10 +21799,11 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 
                     if (!seenCards.has(usedKey)) {
                         seenCards.add(usedKey);
-                        // 小野/酋长/宝库是被动「技能减伤」，只走共享技能栏，不计入卡的洗炼（避免两路混淆）
-                        const _cn = (typeof cardName !== 'undefined') ? (cardName || '') : ((typeof name !== 'undefined') ? (name || '') : '');
-                        const isSpecialCard = ['小野', '酋长', '宝库'].some(function (s) { return _cn.includes(s); });
-                        if (!isSpecialCard && tableData[usedKey] && tableData[usedKey] > 0) {
+                        // 小野/酋长/宝库是被动「技能减伤」（出现就算，哪怕副卡），只走共享技能栏；
+                        // 仅当洗炼查询键 usedKey 本身正好是这3张卡时才跳过其洗炼（它们没有洗炼），
+                        // 绝不影响与之融合的主卡洗炼（主卡洗炼该算还得算）。
+                        const isSpecialKey = ['小野', '酋长', '宝库'].indexOf(usedKey) !== -1;
+                        if (!isSpecialKey && tableData[usedKey] && tableData[usedKey] > 0) {
                             total += tableData[usedKey];
                         }
                     }
@@ -21842,6 +21847,30 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 
             // 对比区：展示每张被勾选的表在我方/队友侧的减伤汇总
             renderDrComparisonPanel();
+        }
+
+        // 减伤表下拉选项（供各显示处复用）
+        function drTableSelectOptions(selected) {
+            const order = window.drTableOrder || (window.drTables ? Object.keys(window.drTables) : []);
+            return order.map(function (n) {
+                return '<option value="' + escapeHtml(n) + '"' + (n === selected ? ' selected' : '') + '>' + escapeHtml(n) + '</option>';
+            }).join('');
+        }
+        // 自动生成（活动）减伤按所选表实时重算
+        function recomputeAutoGenDr() {
+            const sel = document.getElementById('autoGenDrTable');
+            const el = document.getElementById('autoGenDrValue');
+            if (!sel || !el) return;
+            window._autoGenDrTable = sel.value || '我的';
+            el.textContent = calculateDamageReductionForCards(window._autoGenBattleCards || [], 'my', window._autoGenDrTable);
+        }
+        // 自动生成（深海）减伤按所选表实时重算
+        function recomputeDungeonDr() {
+            const sel = document.getElementById('dungeonDrTable');
+            const el = document.getElementById('dungeonDrValue');
+            if (!sel || !el) return;
+            window._dungeonDrTable = sel.value || '我的';
+            el.textContent = calculateDamageReductionForCards(window._dungeonBattleCards || [], 'my', window._dungeonDrTable);
         }
 
         // 渲染「多减伤表对比」面板：列每张表 × 我方/队友
@@ -21900,8 +21929,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             if (!side) side = 'my';
             // 选表
             if (!tableName) {
-                tableName = (side === 'teammate') ? '队友' : window.drActiveTable;
-                // 若「我的/队友」都没找到（自定义表），回退激活表
+                tableName = (side === 'teammate') ? '队友' : '我的';
+                // 无显式表名时，「我方」默认用「我的」表（与主界面显示一致），「队友」用「队友」表
                 if (!window.drTables[tableName]) tableName = '我的';
             }
             const table = getDrTable(tableName);
@@ -21965,10 +21994,11 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 
                     if (!seenCards.has(usedKey)) {
                         seenCards.add(usedKey);
-                        // 小野/酋长/宝库是被动「技能减伤」，只走共享技能栏，不计入卡的洗炼（避免两路混淆）
-                        const _cn = (typeof cardName !== 'undefined') ? (cardName || '') : ((typeof name !== 'undefined') ? (name || '') : '');
-                        const isSpecialCard = ['小野', '酋长', '宝库'].some(function (s) { return _cn.includes(s); });
-                        if (!isSpecialCard && tableData[usedKey] && tableData[usedKey] > 0) {
+                        // 小野/酋长/宝库是被动「技能减伤」（出现就算，哪怕副卡），只走共享技能栏；
+                        // 仅当洗炼查询键 usedKey 本身正好是这3张卡时才跳过其洗炼（它们没有洗炼），
+                        // 绝不影响与之融合的主卡洗炼（主卡洗炼该算还得算）。
+                        const isSpecialKey = ['小野', '酋长', '宝库'].indexOf(usedKey) !== -1;
+                        if (!isSpecialKey && tableData[usedKey] && tableData[usedKey] > 0) {
                             total += tableData[usedKey];
                         }
                     }
@@ -22056,7 +22086,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             
             // 每张卡的减伤明细
             const details = battleCards.slice(0, 15).map(name => {
-                const dr = calculateDamageReductionForCards([name]);
+                const dr = calculateDamageReductionForCards([name], 'my', parserTable);
                 return `${name}:<b style="color:${dr < 30 ? '#ff6b6b' : dr < 50 ? '#ffd700' : '#4ecdc4'}">${dr}%</b>`;
             });
             detailEl.innerHTML = '📋 单卡减伤：' + details.join(' | ');
@@ -22094,11 +22124,12 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             return `🛡前7:<b style="color:${f7c}">${drInfo.first7}%</b> 全:<b style="color:${ac}">${drInfo.all}%</b>`;
         }
 
-        // 更新浮窗标题栏减伤徽章
+        // 更新浮窗标题栏减伤徽章（跟随该脚本窗口自己选的减伤表）
         function updateWindowTitleDr(windowId, content) {
             const titleEl = document.getElementById(`${windowId}_titleDr`);
             if (!titleEl) return;
-            const drInfo = computeScriptDr(content);
+            const tbl = (window.__drTableByEditor && window.__drTableByEditor[windowId]) ? window.__drTableByEditor[windowId] : '我的';
+            const drInfo = computeScriptDr(content, tbl);
             titleEl.innerHTML = buildWindowDrBadge(drInfo);
         }
 
@@ -31552,7 +31583,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-270 · sw-v387</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-271 · sw-v388</span>
             </div>
         </div>
     </div>
