@@ -10643,6 +10643,7 @@
             if (!scriptContent) {
                 scriptContent = (type === 'activity' ? window._activityScriptOutput : window._dungeonScriptOutput);
             }
+            const isCopy = !!(externalContent || (windowId && window.__notebookSaveContent && window.__notebookSaveContent[windowId]));
             const scriptType = (externalContent || (windowId && window.__notebookSaveContent && window.__notebookSaveContent[windowId]))
                 ? (typeof type === 'string' && type !== 'activity' && type !== 'dungeon' ? type : '脚本')
                 : (type === 'activity' ? '活动脚本' : '副本脚本');
@@ -10651,8 +10652,8 @@
                 return;
             }
 
-            // 获取所有项目列表
-            loadProjectListFromDB().then(projects => {
+            // 获取所有项目列表（失败兜底：仍可新建项目保存副本）
+            const renderSaveModal = (projects) => {
                 // 按分类分组
                 const grouped = {};
                 if (projects && projects.length > 0) {
@@ -10685,7 +10686,8 @@
                 modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:10000;display:flex;align-items:center;justify-content:center;';
                 modal.innerHTML = `
                     <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(33,150,243,0.5);border-radius:12px;padding:20px;width:360px;max-width:90vw;">
-                        <div style="color:#fff;font-weight:bold;font-size:1.1rem;margin-bottom:15px;">💾 保存${scriptType}到项目</div>
+                        <div style="color:#fff;font-weight:bold;font-size:1.1rem;margin-bottom:8px;">💾 保存${scriptType}到项目</div>
+                        ${isCopy ? `<div style="color:rgba(255,255,255,0.55);font-size:0.78rem;margin-bottom:12px;line-height:1.4;">📌 另存为<b>副本</b>：仅写入所选项目的脚本列表，<b>需求墙源文件不会被修改</b></div>` : ''}
                         <div style="margin-bottom:10px;">
                             <label style="color:rgba(255,255,255,0.7);font-size:0.85rem;display:block;margin-bottom:5px;">选择项目：</label>
                             <select id="saveScriptProjectSelect" onchange="toggleNewProjectInput()" style="width:100%;padding:8px;border-radius:6px;border:1px solid rgba(33,150,243,0.3);background:#2a2a4a;color:#fff;font-size:0.9rem;">${optionsHtml}</select>
@@ -10709,9 +10711,13 @@
                     </div>
                 `;
                 document.body.appendChild(modal);
+            };
+            loadProjectListFromDB().then(projects => {
+                renderSaveModal(projects);
             }).catch(err => {
                 console.error('加载项目列表失败:', err);
-                alert('加载项目列表失败！');
+                showToast('⚠️ 项目列表读取失败，仅可新建项目保存副本');
+                renderSaveModal([]);
             });
         }
 
@@ -10741,6 +10747,7 @@
             if (!scriptContent) {
                 scriptContent = (type === 'activity' ? window._activityScriptOutput : window._dungeonScriptOutput);
             }
+            const isCopy = !!(externalContent || (windowId && window.__notebookSaveContent && window.__notebookSaveContent[windowId]));
             const selectValue = document.getElementById('saveScriptProjectSelect')?.value;
             const fileName = document.getElementById('saveScriptFileName')?.value?.trim();
 
@@ -10781,7 +10788,7 @@
                 // 直接保存新项目
                 saveProjectToDBDirect(newProjectData).then(() => {
                     document.getElementById('saveScriptModal')?.remove();
-                    showToast(`✅ 新项目"${newProjectName}"已创建（分类：${newCategory}），脚本已保存！`);
+                    showToast(`✅ 新项目"${newProjectName}"已创建（分类：${newCategory}）${isCopy ? '，副本已保存（源文件不变）' : '，脚本已保存'}！`);
                     refreshProjectSelectors();
                     // 【修复】新建项目后切换到它：loadProjectFromDB 内部 clearCurrentData() 会清空记事本等残留，
                     // 避免屏幕上仍显示上一个项目的旧记事本（此前只存库不切项目，文本框未清）
@@ -10827,7 +10834,7 @@
                     return saveProjectToDBDirect(project);
                 }).then(() => {
                     document.getElementById('saveScriptModal')?.remove();
-                    showToast(`✅ 脚本已保存到项目"${projectName}"`);
+                    showToast(isCopy ? `✅ 已另存副本到项目"${projectName}"（需求墙源文件不变）` : `✅ 脚本已保存到项目"${projectName}"`);
 
                     // 如果保存到当前项目，刷新脚本文件列表
                     if (projectName === currentProjectName) {
@@ -15245,7 +15252,7 @@
                     <button onclick="${isLocal ? `downloadTxtFile(${fileIndex})` : `downloadNotebookContent('${windowId}')`}" style="background:linear-gradient(135deg,#2196f3,#1565c0);border:none;color:white;padding:8px 16px;border-radius:6px;cursor:pointer;">📥 下载</button>
                     ${isLocal
                         ? `<button onclick="saveTxtWindowContent('${windowId}', ${fileIndex})" style="background:linear-gradient(135deg,#4CAF50,#45a049);border:none;color:white;padding:8px 20px;border-radius:6px;cursor:pointer;font-weight:bold;">💾 保存</button>`
-                        : `<button onclick="(function(){window.__notebookSaveContent=window.__notebookSaveContent||{};window.__notebookSaveContent['${windowId}']=document.getElementById('${windowId}_content').value;showSaveScriptDialog(${JSON.stringify(name)}, null, '${windowId}');})()" style="background:linear-gradient(135deg,#4CAF50,#45a049);border:none;color:white;padding:8px 20px;border-radius:6px;cursor:pointer;font-weight:bold;">💾 保存副本</button>`}
+                        : `<button onclick="(function(){try{window.__notebookSaveContent=window.__notebookSaveContent||{};window.__notebookSaveContent['${windowId}']=document.getElementById('${windowId}_content').value;showSaveScriptDialog(${JSON.stringify(name)}, null, '${windowId}');}catch(e){console.error('保存副本失败:',e);showToast('❌ 打开保存失败：'+(e&&e.message||e));}})()" style="background:linear-gradient(135deg,#4CAF50,#45a049);border:none;color:white;padding:8px 20px;border-radius:6px;cursor:pointer;font-weight:bold;">💾 保存副本</button>`}
                 </div>
             `;
             
@@ -31680,7 +31687,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-284 · sw-v401</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-285 · sw-v402</span>
             </div>
         </div>
     </div>
