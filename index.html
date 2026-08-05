@@ -15100,7 +15100,7 @@
                 </span>
                 <div style="display: flex; gap: 8px;">
                     <button onclick="minimizeTxtWindow('${windowId}')" style="background:rgba(255,193,7,0.2);border:none;color:#ffc107;padding:4px 8px;border-radius:4px;cursor:pointer;">−</button>
-                    <button onclick="closeTxtWindow('${windowId}', ${index})" style="background:rgba(244,67,54,0.2);border:none;color:#f44336;padding:4px 8px;border-radius:4px;cursor:pointer;">×</button>
+                    <button onclick="closeTxtWindow('${windowId}', ${fileIndex})" style="background:rgba(244,67,54,0.2);border:none;color:#f44336;padding:4px 8px;border-radius:4px;cursor:pointer;">×</button>
                 </div>
             `;
             
@@ -15151,7 +15151,7 @@
                 outline: none;
                 line-height: 1.5;
             `;
-            textarea.value = file.content;
+            textarea.value = content;
             textarea.spellcheck = false;
             // 实时减伤计算
             if (!readonly) {
@@ -15169,10 +15169,10 @@
             textarea.addEventListener('keydown', function(e) {
                 if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
                     e.preventDefault();
-                    webToggleFindReplace('${windowId}', true);
+                    webToggleFindReplace(windowId, true);
                 }
                 if (e.key === 'Escape') {
-                    const bar = document.getElementById('${windowId}_findReplace');
+                    const bar = document.getElementById(windowId + '_findReplace');
                     if (bar && bar.style.display !== 'none') {
                         bar.style.display = 'none';
                         e.preventDefault();
@@ -31680,7 +31680,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-283 · sw-v400</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-284 · sw-v401</span>
             </div>
         </div>
     </div>
