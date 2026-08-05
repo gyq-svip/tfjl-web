@@ -12750,6 +12750,8 @@
                     teammatePlacedCards: currentData?.teammatePlacedCards || (typeof teammatePlacedCards !== 'undefined' ? teammatePlacedCards : []),
                     cardLevels: currentData?.cardLevels || (typeof cardLevels !== 'undefined' ? cardLevels : {}),
                     cardSkins: currentData?.cardSkins || (typeof cardSkins !== 'undefined' ? cardSkins : {}),
+                    // 🔴 必须带 fusionSkins：手动保存会整条覆盖项目记录，若这里漏掉，persistFusionSkins 刚写好的副卡皮肤会被清空（v260805-264 修复）
+                    fusionSkins: currentData?.fusionSkins || (typeof window.fusionSkins !== 'undefined' ? window.fusionSkins : {}),
                     cardMoHua: currentData?.cardMoHua || (typeof cardMoHua !== 'undefined' ? cardMoHua : {}),
                     // 【修复】新建项目显式传空串 '' 也要保留，不能用 || 被旧 DOM 值覆盖（否则新项目记事本/卡组残留旧内容）
                     myDeckInfo: (currentData && currentData.myDeckInfo !== undefined) ? currentData.myDeckInfo : safeMyDeckInfo,
@@ -16591,6 +16593,7 @@
                 teammatePlacedCards: teammatePlacedCards,
                 cardLevels: cardLevels,
                 cardSkins: cardSkins,
+                fusionSkins: window.fusionSkins || {},
                 myDeckInfo: myDeckInfo,
                 teammateDeckInfo: teammateDeckInfo,
                 notepad: notepad,
@@ -31115,7 +31118,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-263 · sw-v380</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-264 · sw-v381</span>
             </div>
         </div>
     </div>
