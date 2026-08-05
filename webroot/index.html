@@ -27983,19 +27983,55 @@ ${maSection}
             if (btn) { btn.disabled = true; btn.textContent = '⏳ 发布中...'; }
 
             let scriptUrl = null;
+            let pendingScriptEnc = null;
+            let scriptExpireMinutes = null;
 
             try {
                 if (pendingScriptFile) {
-                    scriptUrl = await uploadScriptToGist(pendingScriptFile);
+                    // 弹出分享选项（加密方式 / 查看密码 / 有效期），与「分享到需求墙」一致
+                    const shareOpts = await new Promise(function(resolve) {
+                        showShareOptionsDialog(function(e, p, rk) { resolve([e, p, rk]); });
+                    });
+                    if (shareOpts === null || shareOpts[0] === null) {
+                        // 用户取消 → 中止发布，保留已选文件供再次发布
+                        if (btn) { btn.disabled = false; btn.textContent = originalText; }
+                        return;
+                    }
+                    const scriptExpire = shareOpts[0];
+                    const scriptPassword = shareOpts[1];
+                    const scriptRecoveryKey = shareOpts[2] || '';
+                    const fileContent = await readFileAsText(pendingScriptFile);
+                    const willEncrypt = !!(scriptPassword || scriptRecoveryKey);
+                    let uploadContent = fileContent;
+                    let passwordHash = null;
+                    if (willEncrypt) {
+                        uploadContent = scriptRecoveryKey
+                            ? await encryptContentB(fileContent, scriptPassword, scriptRecoveryKey)
+                            : await encryptContent(fileContent, scriptPassword);
+                        passwordHash = await hashPassword(scriptPassword || '');
+                    }
+                    scriptUrl = await uploadScriptToGist(pendingScriptFile, uploadContent);
                     recordScriptUpload();
                     if (!content) {
                         content = `分享脚本: ${pendingScriptFile.name}\n${scriptUrl}`;
                     } else {
                         content = `${content}\n${scriptUrl}`;
                     }
+                    pendingScriptEnc = {
+                        isEncrypted: willEncrypt,
+                        passwordHash: passwordHash,
+                        encScheme: scriptRecoveryKey ? 'B' : (willEncrypt ? 'A' : ''),
+                        password: scriptPassword,
+                        recoveryKey: scriptRecoveryKey,
+                        fileName: pendingScriptFile.name
+                    };
+                    scriptExpireMinutes = scriptExpire;
                 }
 
-                const expireMinutesValue = parseInt(expireDaysSelect.value);
+                let expireMinutesValue = parseInt(expireDaysSelect.value);
+                if (pendingScriptEnc && scriptExpireMinutes !== null) {
+                    expireMinutesValue = scriptExpireMinutes;
+                }
                 const newMsg = {
                     content: content,
                     author: nickname,
@@ -28003,6 +28039,11 @@ ${maSection}
                     scriptUrl: scriptUrl,
                     expireMinutes: expireMinutesValue > 0 ? expireMinutesValue : null
                 };
+                if (pendingScriptEnc) {
+                    if (pendingScriptEnc.isEncrypted) newMsg.isEncrypted = true;
+                    if (pendingScriptEnc.passwordHash) newMsg.passwordHash = pendingScriptEnc.passwordHash;
+                    if (pendingScriptEnc.encScheme) newMsg.encScheme = pendingScriptEnc.encScheme;
+                }
 
                 wallMessages.unshift(newMsg);
                 if (wallMessages.length > MAX_MESSAGES) {
@@ -28022,6 +28063,11 @@ ${maSection}
 
                 await saveMessagesToGist();
 
+                // 若脚本已加密，弹出密码/恢复密钥提示（与「分享到需求墙」一致），方便分享者记住
+                if (pendingScriptEnc && pendingScriptEnc.isEncrypted && typeof showPasswordReminder === 'function') {
+                    showPasswordReminder(pendingScriptEnc.fileName, pendingScriptEnc.password || '', '脚本已上传', pendingScriptEnc.recoveryKey || '');
+                }
+
                 // 显示成功提示
                 const _toast = document.createElement('div');
                 _toast.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);padding:10px 24px;border-radius:8px;z-index:99999;font-size:0.9rem;animation:fadeInOut 2s ease-in-out;background:rgba(74,222,128,0.9);color:#1a1a2e;';
@@ -28036,11 +28082,11 @@ ${maSection}
             }
         }
         
-        async function uploadScriptToGist(file) {
+        async function uploadScriptToGist(file, contentOverride) {
             const token = getGistToken();
             if (!token) throw new Error('无Token');
             
-            const content = await readFileAsText(file);
+            const content = (contentOverride !== undefined && contentOverride !== null) ? contentOverride : await readFileAsText(file);
             const filename = `scripts/${Date.now()}_${file.name}`;
             
             const response = await fetch('https://api.github.com/gists', {
@@ -31587,7 +31633,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-277 · sw-v394</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-278 · sw-v395</span>
             </div>
         </div>
     </div>
