@@ -2941,7 +2941,7 @@
         <!-- 固定头部：标题 + 公告栏 -->
         <div id="fixedHeader" style="position:sticky;top:0;z-index:100;background:linear-gradient(135deg,#0f0f23 0%,#1a1a2e 50%,#16213e 100%);padding-bottom:5px;">
         <h1><span id="mainHeader" style="cursor:default;">🛡️</span> 塔防助手</h1>
-        <p id="mainTitle" class="instructions glowing-text" style="cursor:pointer;" onclick="refreshNewsAndTitle()" title="点击刷新公告和标题"> 【工具数据本地储存】在浏览器缓存中,清理浏览器前请先备份，避免数据丢失！  </p>
+        <p id="mainTitle" class="instructions glowing-text" style="cursor:pointer;" onclick="refreshNewsAndTitle()" title="点击刷新公告和标题"> 【工具数据本地化储存】【新增PC客户端】【新增老马脚本一键密文分享】【导出 导入 分享 分类管理】【部分副本支持卡组截图识别一键脚本】  </p>
         
         <!-- 滚动公告栏 -->
         <div id="newsMarqueeContainer" style="background:rgba(255,255,255,0.05);border:2px solid rgba(255,215,0,0.3);border-radius:10px;padding:15px;margin-bottom:5px;text-align:center;overflow:hidden;position:relative;cursor:pointer;" onclick="showNewsListModal()" title="点击查看全部公告">
@@ -22741,7 +22741,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             game: '九区-龙行',
             notice: '',
             open: true,
-            title: '【工具数据本地储存】在浏览器缓存中,清理浏览器前请先备份，避免数据丢失！'
+            title: '【工具数据本地化储存】【新增PC客户端】【新增老马脚本一键密文分享】【导出 导入 分享 分类管理】【部分副本支持卡组截图识别一键脚本】'
         };
 
         const DEFAULT_NEWS = [
@@ -29708,25 +29708,41 @@ ${maSection}
                 const token = getGistToken();
                 if (!token) throw new Error('未设置GitHub Token');
 
-                const response = await fetch(GIST_URL, {
-                    method: 'PATCH',
-                    headers: {
-                        'Accept': 'application/vnd.github.v3+json',
-                        'Content-Type': 'application/json',
-                        'Authorization': `token ${token}`
-                    },
-                    body: JSON.stringify({
-                        files: {
-                            'news.json': {
-                                content: JSON.stringify(fullData, null, 2)
-                            }
+                const patchBody = JSON.stringify({
+                    files: {
+                        'news.json': {
+                            content: JSON.stringify(fullData, null, 2)
                         }
-                    })
+                    }
+                });
+                const patchHeaders = {
+                    'Accept': 'application/vnd.github.v3+json',
+                    'Content-Type': 'application/json',
+                    'Authorization': `token ${token}`
+                };
+
+                // 🔴 必须写「公告 Gist」——前台 fetchNewsFromGitHub() 读的就是它。
+                // 旧代码错写成索引 GIST_URL，导致 Gist 里能看到新标题、但页面刷新后被公告 Gist 的旧值顶回去。
+                const newsGistUrl = await getNewsGistUrl();
+                const response = await fetch(newsGistUrl, {
+                    method: 'PATCH',
+                    headers: patchHeaders,
+                    body: patchBody
                 });
 
                 if (!response.ok) {
                     const errData = await response.json().catch(() => ({}));
                     throw new Error(errData.message || `保存失败 HTTP ${response.status}`);
+                }
+
+                // 兜底：公告 Gist 与索引 Gist 不是同一个时，把索引 Gist 的 news.json 也刷成同一份，
+                // 避免某些设备没拿到 news_gist_id 而回退读索引 Gist 时又看到旧标题。失败不影响主流程。
+                if (newsGistUrl !== GIST_URL) {
+                    try {
+                        await fetch(GIST_URL, { method: 'PATCH', headers: patchHeaders, body: patchBody });
+                    } catch (e) {
+                        console.warn('同步索引Gist标题失败(不影响主流程):', e);
+                    }
                 }
 
                 saveConfigToCache(currentConfig);
@@ -31081,7 +31097,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-260 · sw-v377</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-261 · sw-v378</span>
             </div>
         </div>
     </div>
