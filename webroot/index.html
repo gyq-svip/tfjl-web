@@ -31550,6 +31550,11 @@ ${maSection}
         <div id="chatRoomInputBar" style="padding:10px 15px;border-top:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.2);display:none;"></div>
     </div>
 
+    <!-- 网页版常驻「下载桌面版」按钮（白底醒目，点击打开下载弹窗；桌面版自动隐藏） -->
+    <div id="footerDownloadDesktop" onclick="openDownloadModal()" title="下载塔防精灵助手桌面版（体验更流畅的本地文件管理、自动更新）" style="position:fixed;bottom:64px;right:16px;z-index:9991;display:none;background:#ffffff;color:#d32f2f;font-weight:bold;font-size:0.95rem;padding:12px 18px;border-radius:30px;cursor:pointer;box-shadow:0 4px 18px rgba(0,0,0,0.45);border:2px solid #d32f2f;align-items:center;gap:8px;letter-spacing:0.5px;" onmouseover="this.style.transform='scale(1.05)';this.style.boxShadow='0 6px 24px rgba(211,47,47,0.5)'" onmouseout="this.style.transform='scale(1)';this.style.boxShadow='0 4px 18px rgba(0,0,0,0.45)'">
+        📥 下载桌面版
+    </div>
+
     <!-- 底部状态栏（在线统计 + 版本显示） -->
     <div id="statsBar" style="position:fixed;bottom:0;left:0;right:0;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);border-top:2px solid rgba(255,215,0,0.5);padding:10px 20px;z-index:9990;display:flex;justify-content:center;align-items:center;gap:24px;font-size:0.9rem;flex-wrap:wrap;">
         <div style="display:flex;gap:22px;flex-wrap:wrap;justify-content:center;align-items:center;">
@@ -31579,7 +31584,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-273 · sw-v390</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-274 · sw-v391</span>
             </div>
         </div>
     </div>
