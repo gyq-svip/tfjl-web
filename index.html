@@ -10634,9 +10634,18 @@
             showToast(`✅ 批量分享完成：成功 ${success} 个${fail ? '，失败 ' + fail + ' 个' : ''}`);
         }
 
-        function showSaveScriptDialog(type) {
-            const scriptContent = type === 'activity' ? window._activityScriptOutput : window._dungeonScriptOutput;
-            const scriptType = type === 'activity' ? '活动脚本' : '副本脚本';
+        // type: 'activity' | 'dungeon' | 任意自定义标签（externalContent/windowId 提供时为通用"另存为副本"）
+        function showSaveScriptDialog(type, externalContent, windowId) {
+            let scriptContent = externalContent || '';
+            if (!scriptContent && windowId && window.__notebookSaveContent && window.__notebookSaveContent[windowId]) {
+                scriptContent = window.__notebookSaveContent[windowId];
+            }
+            if (!scriptContent) {
+                scriptContent = (type === 'activity' ? window._activityScriptOutput : window._dungeonScriptOutput);
+            }
+            const scriptType = (externalContent || (windowId && window.__notebookSaveContent && window.__notebookSaveContent[windowId]))
+                ? (typeof type === 'string' && type !== 'activity' && type !== 'dungeon' ? type : '脚本')
+                : (type === 'activity' ? '活动脚本' : '副本脚本');
             if (!scriptContent) {
                 alert('没有可保存的脚本内容！');
                 return;
@@ -10695,7 +10704,7 @@
                         </div>
                         <div style="display:flex;gap:10px;justify-content:flex-end;">
                             <button onclick="document.getElementById('saveScriptModal').remove()" style="background:rgba(255,255,255,0.1);color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;">取消</button>
-                            <button onclick="doSaveScriptToProject('${type}')" style="background:linear-gradient(135deg,#2196f3,#1565c0);color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-weight:500;">保存</button>
+                            <button onclick="doSaveScriptToProject('${type}', ${externalContent ? JSON.stringify(externalContent) : 'null'}, ${windowId ? `'${windowId}'` : 'null'})" style="background:linear-gradient(135deg,#2196f3,#1565c0);color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-weight:500;">保存</button>
                         </div>
                     </div>
                 `;
@@ -10723,9 +10732,15 @@
             }
         }
 
-        // 执行保存脚本到项目
-        function doSaveScriptToProject(type) {
-            const scriptContent = type === 'activity' ? window._activityScriptOutput : window._dungeonScriptOutput;
+        // 执行保存脚本到项目（externalContent/windowId 提供副本内容，用于需求墙副本另存为；源文件不变）
+        function doSaveScriptToProject(type, externalContent, windowId) {
+            let scriptContent = externalContent || '';
+            if (!scriptContent && windowId && window.__notebookSaveContent && window.__notebookSaveContent[windowId]) {
+                scriptContent = window.__notebookSaveContent[windowId];
+            }
+            if (!scriptContent) {
+                scriptContent = (type === 'activity' ? window._activityScriptOutput : window._dungeonScriptOutput);
+            }
             const selectValue = document.getElementById('saveScriptProjectSelect')?.value;
             const fileName = document.getElementById('saveScriptFileName')?.value?.trim();
 
@@ -15228,7 +15243,9 @@
                     <button onclick="webToggleFindReplace('${windowId}')" style="background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.15);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">🔍 查找替换</button>
                     ${isLocal ? `<button onclick="webStartCompare(${fileIndex})" style="background:rgba(233,30,99,0.2);color:#e91e63;border:1px solid rgba(233,30,99,0.3);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">📊 对比</button>` : ''}
                     <button onclick="${isLocal ? `downloadTxtFile(${fileIndex})` : `downloadNotebookContent('${windowId}')`}" style="background:linear-gradient(135deg,#2196f3,#1565c0);border:none;color:white;padding:8px 16px;border-radius:6px;cursor:pointer;">📥 下载</button>
-                    ${isLocal ? `<button onclick="saveTxtWindowContent('${windowId}', ${fileIndex})" style="background:linear-gradient(135deg,#4CAF50,#45a049);border:none;color:white;padding:8px 20px;border-radius:6px;cursor:pointer;font-weight:bold;">💾 保存</button>` : ''}
+                    ${isLocal
+                        ? `<button onclick="saveTxtWindowContent('${windowId}', ${fileIndex})" style="background:linear-gradient(135deg,#4CAF50,#45a049);border:none;color:white;padding:8px 20px;border-radius:6px;cursor:pointer;font-weight:bold;">💾 保存</button>`
+                        : `<button onclick="(function(){window.__notebookSaveContent=window.__notebookSaveContent||{};window.__notebookSaveContent['${windowId}']=document.getElementById('${windowId}_content').value;showSaveScriptDialog(${JSON.stringify(name)}, null, '${windowId}');})()" style="background:linear-gradient(135deg,#4CAF50,#45a049);border:none;color:white;padding:8px 20px;border-radius:6px;cursor:pointer;font-weight:bold;">💾 保存副本</button>`}
                 </div>
             `;
             
@@ -31663,7 +31680,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-282 · sw-v399</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-283 · sw-v400</span>
             </div>
         </div>
     </div>
