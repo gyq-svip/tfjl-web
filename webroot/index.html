@@ -14394,7 +14394,7 @@
             if (!window._fileListResizing) return;
             const delta = e.clientY - _flrStartY;
             const maxH = Math.round(window.innerHeight * 0.55);
-            const newH = Math.max(100, Math.min(maxH, _flrStartH + delta));
+            const newH = Math.max(0, Math.min(maxH, _flrStartH + delta));
             const list = document.getElementById('txtFilesList');
             list.style.height = newH + 'px';
             list.style.maxHeight = newH + 'px';
@@ -31749,7 +31749,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260806-291 · sw-v408</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260806-292 · sw-v409</span>
             </div>
         </div>
     </div>
