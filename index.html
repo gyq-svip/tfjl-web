@@ -12829,7 +12829,7 @@
                         cardLevels = project.cardLevels || {};
                         // 直接用项目自己的皮肤设置覆盖（避免上一个项目的皮肤串到这个项目）
                         cardSkins = project.cardSkins || {};
-                        fusionSkins = project.fusionSkins || {}; // 副卡皮肤按项目独立保存，不污染全局
+                        window.fusionSkins = project.fusionSkins || {}; // 副卡皮肤按项目独立保存，不污染全局
                         cardMoHua = project.cardMoHua || {};
                         saveCardSkins();
                         
@@ -12860,6 +12860,10 @@
                         updateHandDisplay('my');
                         updateHandDisplay('teammate');
                         restoreBattleSlots();
+                        // 项目自带的副卡皮肤(fusionSkins)刚恢复，必须重绘融合卡，否则手牌/卡槽还是旧皮
+                        if (typeof refreshAllFusionSkins === 'function') {
+                            setTimeout(() => { refreshAllFusionSkins().catch(() => {}); }, 0);
+                        }
                         updateFavoritesDisplay();
                         updateAllCardLevelDisplays();
                         updateDamageReductionDisplay(); // 切换项目后更新减伤显示
@@ -12945,7 +12949,7 @@
             // 清空皮肤/墨化/等级（避免上个项目残留）
             if (typeof cardLevels !== 'undefined') cardLevels = {};
             if (typeof cardSkins !== 'undefined') cardSkins = {};
-            if (typeof fusionSkins !== 'undefined') fusionSkins = {};
+            window.fusionSkins = {};
             if (typeof cardMoHua !== 'undefined') cardMoHua = {};
             if (typeof updateAllCardLevelDisplays === 'function') updateAllCardLevelDisplays();
             // 刷新卡池徽章，反映清理后的全局预设状态（魔化等上一个项目的残留标记一并清除）
@@ -13251,7 +13255,7 @@
                 teammatePlacedCards: (typeof teammatePlacedCards !== 'undefined') ? teammatePlacedCards : [],
                 cardLevels: (typeof cardLevels !== 'undefined') ? cardLevels : {},
                 cardSkins: (typeof cardSkins !== 'undefined') ? cardSkins : {},
-                fusionSkins: (typeof fusionSkins !== 'undefined') ? fusionSkins : {},
+                fusionSkins: window.fusionSkins || {},
                 cardMoHua: (typeof cardMoHua !== 'undefined') ? cardMoHua : {},
                 myDeckInfo: (document.getElementById('myDeckInfo') ? document.getElementById('myDeckInfo').value : ''),
                 teammateDeckInfo: (document.getElementById('teammateDeckInfo') ? document.getElementById('teammateDeckInfo').value : ''),
@@ -16519,7 +16523,7 @@
                 teammatePlacedCards: teammatePlacedCards,
                 cardLevels: cardLevels,
                 cardSkins: cardSkins,
-                fusionSkins: (typeof fusionSkins !== 'undefined') ? fusionSkins : {},
+                fusionSkins: window.fusionSkins || {},
                 cardMoHua: cardMoHua,
                 myDeckInfo: document.getElementById('myDeckInfo')?.value || '',
                 teammateDeckInfo: document.getElementById('teammateDeckInfo')?.value || '',
@@ -16611,7 +16615,10 @@
         let cardLevels = {};
         let individualCardLevels = {}; // 每张卡的独立等级存储
         let cardSkins = {}; // 每张卡的皮肤存储（项目级）{ "my_47": "烈焰皮肤", ... }
-        let fusionSkins = {}; // 副卡（被融合卡）皮肤存储（项目级）{ "副卡英雄名": "皮肤名"/""(关闭) }，只作用于当前项目，不污染全局
+        // 副卡（被融合卡）皮肤存储（项目级）{ "副卡英雄名": "皮肤名"/""(关闭) }，只作用于当前项目，不污染全局
+        // 🔴 必须挂在 window 上：setFusionSkin/getFusionComponentSkin 等读写都用 window.fusionSkins，
+        //    若这里用 `let` 声明会变成「块级变量 ≠ window.fusionSkins」两个对象，导致保存的永远是空对象、刷新后副卡皮丢失。
+        window.fusionSkins = window.fusionSkins || {};
         let defaultCardSkins = {}; // 全局默认皮肤（英雄级，卡池常用皮，跨项目保留）{ "47": "太平乐·火灵", ... }
         let cardMoHua = {}; // 每张卡的魔化开关 { "my_47": true, ... }
         let professionOrder = [];
@@ -31108,7 +31115,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-262 · sw-v379</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-263 · sw-v380</span>
             </div>
         </div>
     </div>
