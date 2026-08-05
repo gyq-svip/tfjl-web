@@ -14520,9 +14520,9 @@
                 if (hHandle) hHandle.style.display = 'flex';
                 if (fileList) { fileList.style.flex = ''; fileList.style.height = 'auto'; fileList.style.maxHeight = '200px'; fileList.style.minHeight = '90px'; }
                 editor.style.flex = '1';
-                editor.style.marginTop = '12px';
-                editor.style.borderTop = '1px solid rgba(255,255,255,0.08)';
-                editor.style.paddingTop = '10px';
+                editor.style.marginTop = '0';
+                editor.style.borderTop = 'none';
+                editor.style.paddingTop = '0';
                 editor.style.paddingLeft = '0';
                 // 恢复面板宽度
                 if (panel) {
@@ -31749,7 +31749,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260806-290 · sw-v407</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260806-291 · sw-v408</span>
             </div>
         </div>
     </div>
