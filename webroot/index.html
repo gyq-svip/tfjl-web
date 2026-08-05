@@ -18596,15 +18596,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         try { await applySkinBgToSlot(slot, slotCardName); } catch (e) {}
                     }
                 });
-                // 3. 刷新收藏区的卡牌皮肤
-                const favCard = document.querySelector(`#favoriteCardsGrid .card-item[data-id="${cardId}"]`);
-                if (favCard) {
-                    const cardName = favCard.dataset.name || '';
-                    if (window.resolveHeroSkinUrl) {
-                        const url = await window.resolveHeroSkinUrl(cardName, skin);
-                        if (url && typeof applySkinBgToHandCard === 'function') applySkinBgToHandCard(favCard, url);
-                    }
-                }
+                // 3. ❌ 不刷新收藏区/卡池：项目内换皮只作用于卡槽+手牌，
+                //    收藏区与卡池永远显示全局卡池皮（getPoolOnlySkin），不受当前项目影响。
             } catch (e) {
                 console.warn('[SKIN] setCardSkin refresh error:', e);
             }
@@ -19102,7 +19095,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     })());
                 } else {
                     tasks.push((async () => {
-                        const skin = getCardSkin(card.dataset.id, cardName, 'my');
+                        // 只读全局卡池皮：卡槽/手牌在项目里换皮不得反向影响卡池与收藏区
+                        const skin = getPoolOnlySkin(card.dataset.id, cardName);
                         const u = await resolvePoolSkinUrl(cardName, skin);
                         if (u) { card.classList.add('skin-bg'); card.style.backgroundImage = 'url("' + u + '")'; }
                     })());
@@ -19158,7 +19152,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 
             // 保证「默认」排在序列首位
             const seq = ['默认', ...skins.filter(s => s !== '默认')];
-            const cur = getCardSkin(cardId, cardName, 'my') || '默认';
+            // 循环起点只看全局卡池皮，避免被当前项目的卡槽皮带偏
+            const cur = getPoolOnlySkin(cardId, cardName) || '默认';
             let idx = seq.indexOf(cur);
             if (idx < 0) idx = 0;
             const next = seq[(idx + 1) % seq.length];
@@ -19180,6 +19175,22 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 return await window.resolveHeroSkinUrl(heroName, skin);
             } catch (e) { return null; }
         }
+        // 卡池/收藏区专用取皮：**只读全局卡池皮**，绝不读项目级 cardSkins。
+        // 与 getCardSkin 的区别 = 去掉了「当前项目内手动设置」那一层，
+        // 保证卡槽/手牌换皮不会反向污染卡池和收藏区。
+        function getPoolOnlySkin(cardId, cardName) {
+            if (cardId && typeof defaultCardSkins !== 'undefined' && defaultCardSkins[cardId] !== undefined) {
+                return defaultCardSkins[cardId];
+            }
+            if (typeof window.heroSkinSelections !== 'undefined' && cardName) {
+                const baseHero = (typeof getBaseHeroName === 'function') ? getBaseHeroName(cardName).heroName : cardName;
+                if (window.heroSkinSelections[baseHero] !== undefined) {
+                    return window.heroSkinSelections[baseHero];
+                }
+            }
+            return '默认';
+        }
+
         function getHeroDefaultSkin(heroName) {
             // 英雄名 → cardId（卡池静态映射）→ defaultCardSkins，回退 heroSkinSelections（均为全局预设）
             const el = document.querySelector('.collapsible-section .card-item[data-name="' + (heroName || '').replace(/"/g, '\\"') + '"]');
@@ -31097,7 +31108,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-261 · sw-v378</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-262 · sw-v379</span>
             </div>
         </div>
     </div>
