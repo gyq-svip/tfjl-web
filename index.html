@@ -22063,15 +22063,24 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 return;
             }
             
-            // 全部卡减伤
-            const allDr = calculateDamageReductionForCards(battleCards);
+            // 全部卡减伤（按「脚本解析面板」选中的减伤表计算）
+            const parserTable = (window._parserDrTable) || '我的';
+            const allDr = calculateDamageReductionForCards(battleCards, 'my', parserTable);
             
             // 前7张卡减伤
             const first7 = battleCards.slice(0, 7);
-            const first7Dr = calculateDamageReductionForCards(first7);
+            const first7Dr = calculateDamageReductionForCards(first7, 'my', parserTable);
             
             // 显示结果
             display.style.display = 'block';
+            // 确保减伤表下拉有选项（首次显示时填充，记忆上次选择）
+            const drSelect = document.getElementById('parserDrTable');
+            if (drSelect && drSelect.options.length === 0) {
+                if (!window._parserDrTable) window._parserDrTable = '我的';
+                drSelect.innerHTML = drTableSelectOptions(window._parserDrTable);
+            } else if (drSelect && window._parserDrTable && drSelect.value !== window._parserDrTable) {
+                drSelect.value = window._parserDrTable;
+            }
             first7El.textContent = `${first7Dr}%`;
             allEl.textContent = `${allDr}%`;
             
@@ -31633,7 +31642,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-278 · sw-v395</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-279 · sw-v396</span>
             </div>
         </div>
     </div>
