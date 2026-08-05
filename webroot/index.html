@@ -13671,8 +13671,8 @@
                     <div style="display:flex;gap:3px;flex-shrink:0;flex-wrap:wrap;align-items:center;">
                         ${shareMode ?
                             `<button data-scanned-path="${escPath}" data-scanned-name="${escName}" onclick="shareScannedFileToWall(this.getAttribute('data-scanned-path'),this.getAttribute('data-scanned-name'))" title="分享到需求墙" style="background:linear-gradient(135deg,#ff6b6b,#ff9e80);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;font-weight:bold;white-space:nowrap;">📢 分享</button>` :
-                            `<button onclick="openLocalFileWindow('${f.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}','${f.name.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}',true)" title="预览" style="background:rgba(0,188,212,0.2);color:#00bcd4;border:1px solid rgba(0,188,212,0.3);padding:3px 6px;border-radius:4px;cursor:pointer;font-size:0.68rem;white-space:nowrap;">👁️</button>
-                            <button onclick="openLocalFileWindow('${f.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}','${f.name.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}',false)" title="编辑" style="background:rgba(76,175,80,0.2);color:#81c784;border:1px solid rgba(76,175,80,0.3);padding:3px 6px;border-radius:4px;cursor:pointer;font-size:0.68rem;white-space:nowrap;">✏️</button>
+                            `<button onclick="openScannedInNotebook('${f.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}','${f.name.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}',true)" title="预览" style="background:rgba(0,188,212,0.2);color:#00bcd4;border:1px solid rgba(0,188,212,0.3);padding:3px 6px;border-radius:4px;cursor:pointer;font-size:0.68rem;white-space:nowrap;">👁️</button>
+                            <button onclick="openScannedInNotebook('${f.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}','${f.name.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}',false)" title="编辑" style="background:rgba(76,175,80,0.2);color:#81c784;border:1px solid rgba(76,175,80,0.3);padding:3px 6px;border-radius:4px;cursor:pointer;font-size:0.68rem;white-space:nowrap;">✏️</button>
                             <button onclick="renameScannedFile('${f.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}','${f.name.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}')" title="改名" style="background:rgba(255,235,59,0.15);color:#ffee58;border:1px solid rgba(255,235,59,0.25);padding:3px 6px;border-radius:4px;cursor:pointer;font-size:0.68rem;white-space:nowrap;">🔤</button>
                             <button onclick="shareScannedFileToWall('${f.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}','${f.name.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}')" title="分享到需求墙" style="background:rgba(156,39,176,0.2);color:#ce93d8;border:1px solid rgba(156,39,176,0.3);padding:3px 6px;border-radius:4px;cursor:pointer;font-size:0.68rem;white-space:nowrap;">📢</button>
                             <button onclick="if(window.importFileToProject)window.importFileToProject('${f.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}')" title="导入项目" style="background:rgba(255,152,0,0.2);color:#ff9800;border:1px solid rgba(255,152,0,0.3);padding:3px 6px;border-radius:4px;cursor:pointer;font-size:0.68rem;white-space:nowrap;">📥</button>`
@@ -15044,6 +15044,7 @@
             const content = opts.content || '';
             const fileIndex = (typeof opts.fileIndex === 'number') ? opts.fileIndex : -1;
             const readonly = !!opts.readonly;
+            const localPath = opts.localPath || null; // 扫描文件的本地磁盘路径：非项目文件，可写回原文件
 
             // 本地文件（fileIndex>=0）按 fileIndex 去重，避免同文件多窗口编辑互相覆盖
             if (fileIndex >= 0) {
@@ -15055,6 +15056,21 @@
                         existingEl.style.display = 'flex';
                         existingEl.style.opacity = '1';
                         // 闪烁提示
+                        existingEl.style.borderColor = 'rgba(255,215,0,0.9)';
+                        setTimeout(() => { existingEl.style.borderColor = 'rgba(255,215,0,0.3)'; }, 600);
+                        return;
+                    }
+                }
+            }
+            // 扫描文件（localPath）按路径去重
+            if (localPath) {
+                const existing = txtFileWindows.find(w => w.localPath === localPath);
+                if (existing) {
+                    const existingEl = document.getElementById(existing.id);
+                    if (existingEl) {
+                        existingEl.style.zIndex = ++windowZIndex;
+                        existingEl.style.display = 'flex';
+                        existingEl.style.opacity = '1';
                         existingEl.style.borderColor = 'rgba(255,215,0,0.9)';
                         setTimeout(() => { existingEl.style.borderColor = 'rgba(255,215,0,0.3)'; }, 600);
                         return;
@@ -15238,6 +15254,13 @@
                 flex-wrap: wrap;
             `;
             const isLocal = fileIndex >= 0;
+            const isScan = !!localPath && !isLocal;
+            // 保存按钮：本地项目→存回txtFiles；扫描文件→写回原磁盘路径；远程→保存副本到项目
+            const saveBtn = isLocal
+                ? `<button onclick="saveTxtWindowContent('${windowId}', ${fileIndex})" style="background:linear-gradient(135deg,#4CAF50,#45a049);border:none;color:white;padding:8px 20px;border-radius:6px;cursor:pointer;font-weight:bold;">💾 保存</button>`
+                : (isScan
+                    ? `<button onclick="saveNotebookLocalFile('${windowId}')" style="background:linear-gradient(135deg,#4CAF50,#45a049);border:none;color:white;padding:8px 20px;border-radius:6px;cursor:pointer;font-weight:bold;">💾 保存</button>`
+                    : `<button onclick="(function(){try{window.__notebookSaveContent=window.__notebookSaveContent||{};window.__notebookSaveContent['${windowId}']=document.getElementById('${windowId}_content').value;showSaveScriptDialog(${JSON.stringify(name)}, null, '${windowId}');}catch(e){console.error('保存副本失败:',e);showToast('❌ 打开保存失败：'+(e&&e.message||e));}})()" style="background:linear-gradient(135deg,#4CAF50,#45a049);border:none;color:white;padding:8px 20px;border-radius:6px;cursor:pointer;font-weight:bold;">💾 保存副本</button>`);
             buttonBar.innerHTML = `
                 <div style="display:flex;gap:8px;align-items:center;">
                     <select id="${windowId}_target" style="padding:6px 10px;border-radius:6px;border:1px solid rgba(255,215,0,0.3);background:#2a2a4a;color:#fff;font-size:0.85rem;cursor:pointer;">
@@ -15250,9 +15273,7 @@
                     <button onclick="webToggleFindReplace('${windowId}')" style="background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.15);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">🔍 查找替换</button>
                     ${isLocal ? `<button onclick="webStartCompare(${fileIndex})" style="background:rgba(233,30,99,0.2);color:#e91e63;border:1px solid rgba(233,30,99,0.3);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">📊 对比</button>` : ''}
                     <button onclick="${isLocal ? `downloadTxtFile(${fileIndex})` : `downloadNotebookContent('${windowId}')`}" style="background:linear-gradient(135deg,#2196f3,#1565c0);border:none;color:white;padding:8px 16px;border-radius:6px;cursor:pointer;">📥 下载</button>
-                    ${isLocal
-                        ? `<button onclick="saveTxtWindowContent('${windowId}', ${fileIndex})" style="background:linear-gradient(135deg,#4CAF50,#45a049);border:none;color:white;padding:8px 20px;border-radius:6px;cursor:pointer;font-weight:bold;">💾 保存</button>`
-                        : `<button onclick="(function(){try{window.__notebookSaveContent=window.__notebookSaveContent||{};window.__notebookSaveContent['${windowId}']=document.getElementById('${windowId}_content').value;showSaveScriptDialog(${JSON.stringify(name)}, null, '${windowId}');}catch(e){console.error('保存副本失败:',e);showToast('❌ 打开保存失败：'+(e&&e.message||e));}})()" style="background:linear-gradient(135deg,#4CAF50,#45a049);border:none;color:white;padding:8px 20px;border-radius:6px;cursor:pointer;font-weight:bold;">💾 保存副本</button>`}
+                    ${saveBtn}
                 </div>
             `;
             
@@ -15281,6 +15302,7 @@
             txtFileWindows.push({
                 id: windowId,
                 fileIndex: fileIndex,
+                localPath: localPath,
                 name: name,
                 element: windowDiv,
                 drInfo: drInfo
@@ -15698,6 +15720,23 @@
 
         // ==================== 本地扫描文件窗口（预览/编辑） ====================
         let localFileWindows = [];
+
+        // 扫描文件走统一记事本框架：先读磁盘内容，再交给 openScriptNotebook（带减伤栏/解析/查找替换/写回原文件/存项目）
+        async function openScannedInNotebook(filePath, fileName, readOnly) {
+            let realPath = filePath, realName = fileName;
+            if (typeof realPath === 'string') realPath = realPath.replace(/\\\\/g, '\\').replace(/\\'/g, "'");
+            if (typeof realName === 'string') realName = realName.replace(/\\\\/g, '\\').replace(/\\'/g, "'");
+            let content = '';
+            try {
+                if (window.readTextFile) {
+                    content = await window.readTextFile(realPath);
+                    if (content === null || content === undefined) { alert('读取文件失败: ' + realPath); return; }
+                } else {
+                    alert('当前环境不支持读取本地文件，请在 App 中使用此功能'); return;
+                }
+            } catch (e) { alert('读取文件失败: ' + e.message); return; }
+            openScriptNotebook({ name: realName, content: content, localPath: realPath, readonly: !!readOnly });
+        }
 
         async function openLocalFileWindow(filePath, fileName, readOnly) {
             // 解码路径（从 HTML 属性中传入的路径可能有转义）
@@ -16270,6 +16309,28 @@
             toast.textContent = '✅ 保存成功！';
             document.body.appendChild(toast);
             setTimeout(() => toast.remove(), 2000);
+        }
+
+        // 扫描文件：写回原磁盘路径（老马直接用它）
+        async function saveNotebookLocalFile(windowId) {
+            const textarea = document.getElementById(`${windowId}_content`);
+            if (!textarea) { alert('找不到编辑区域'); return; }
+            const win = txtFileWindows.find(w => w.id === windowId);
+            if (!win || !win.localPath) { alert('找不到文件路径'); return; }
+            try {
+                if (window.writeTextFile) {
+                    const ok = await window.writeTextFile(win.localPath, textarea.value);
+                    if (ok) {
+                        showToast('✅ 已写回原文件: ' + win.name);
+                    } else {
+                        alert('保存失败，请检查文件路径权限');
+                    }
+                } else {
+                    alert('当前环境不支持保存本地文件，请在 App 中使用此功能');
+                }
+            } catch (e) {
+                alert('保存失败: ' + e.message);
+            }
         }
 
         // 重命名文件
@@ -31687,7 +31748,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-285 · sw-v402</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260806-286 · sw-v403</span>
             </div>
         </div>
     </div>
