@@ -21446,6 +21446,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                                 </div>
                             </div>
                         </div>
+                        <div id="drActiveEditLabel" style="display:flex;align-items:center;gap:8px;margin:10px 0;padding:10px 14px;border-radius:8px;font-size:0.95rem;font-weight:bold;"></div>
                         <div id="damageReductionCardsList" style="display:flex;flex-direction:column;gap:8px;">
                             ${buildDamageReductionCardsList('all', cardsByProfession, getDrTable(window.drActiveTable).洗炼)}
                         </div>
@@ -21469,6 +21470,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 window.drActiveTable = window.drTableOrder[0] || '我的';
             }
             renderDrTableChips();
+            updateDrActiveEditLabel();
         }
         
         // 构建减伤卡牌列表
@@ -21509,11 +21511,40 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             return html;
         }
         
-        // 筛选减伤卡牌
+        // 每张表固定颜色（我的=青、队友=橙、其余=紫），用于高亮区分当前编辑对象
+        function drTableColor(name) {
+            if (name === '我的') return '#4ecdc4';
+            if (name === '队友') return '#ff9800';
+            return '#b388ff';
+        }
+
+        // 更新弹窗里"正在编辑：XXX 表"的高亮标识
+        function updateDrActiveEditLabel() {
+            const el = document.getElementById('drActiveEditLabel');
+            if (!el) return;
+            const name = window.drActiveTable || '我的';
+            const color = drTableColor(name);
+            const sideNote = name === '我的' ? '（用于「我的卡组」减伤计算）'
+                : name === '队友' ? '（用于「队友卡组」减伤计算）' : '';
+            el.style.background = `rgba(${hexToRgb(color)},0.12)`;
+            el.style.border = `1px solid ${color}`;
+            el.innerHTML = `📝 正在编辑：<span style="color:${color};font-size:1.05rem;">${escapeHtml(name)}</span> 表 ${sideNote}`;
+        }
+
+        // #xxxxxx → "r,g,b"
+        function hexToRgb(hex) {
+            const h = hex.replace('#', '');
+            const r = parseInt(h.substring(0, 2), 16);
+            const g = parseInt(h.substring(2, 4), 16);
+            const b = parseInt(h.substring(4, 6), 16);
+            return `${r},${g},${b}`;
+        }
+
+        // 筛选减伤卡牌（始终按当前激活表筛选，修复"队友表筛选刷不出"的 bug）
         function filterDamageReductionCards() {
             const filter = document.getElementById('professionFilter').value;
             const listContainer = document.getElementById('damageReductionCardsList');
-            listContainer.innerHTML = buildDamageReductionCardsList(filter, window._damageReductionCardsByProfession, damageReductionData);
+            listContainer.innerHTML = buildDamageReductionCardsList(filter, window._damageReductionCardsByProfession, getDrTable(window.drActiveTable).洗炼);
         }
         
         // 从弹窗保存减伤数据：洗炼写当前激活表，战车写当前激活表，小野/酋长/宝库写共享
@@ -21577,9 +21608,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const html = window.drTableOrder.map(name => {
                 const isActive = name === window.drActiveTable;
                 const isChecked = selected.has(name);
-                const tagColor = isActive ? '#4ecdc4' : 'rgba(255,255,255,0.4)';
-                const bg = isActive ? 'rgba(78,205,196,0.2)' : 'rgba(255,255,255,0.05)';
-                const border = isActive ? '1px solid rgba(78,205,196,0.5)' : '1px solid rgba(255,255,255,0.2)';
+                const baseColor = drTableColor(name);
+                const tagColor = isActive ? baseColor : 'rgba(255,255,255,0.4)';
+                const bg = isActive ? `rgba(${hexToRgb(baseColor)},0.2)` : 'rgba(255,255,255,0.05)';
+                const border = isActive ? `1px solid ${baseColor}` : '1px solid rgba(255,255,255,0.2)';
                 return `<label style="display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:14px;background:${bg};border:${border};cursor:pointer;font-size:0.85rem;color:${tagColor};" onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">
                     <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="drToggleSelectTable('${name}', this.checked)" style="cursor:pointer">
                     <span onclick="drSetActiveTable('${name}')" style="cursor:pointer">${escapeHtml(name)}${isActive ? ' ✎' : ''}</span>
@@ -21660,7 +21692,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             });
         }
 
-        // 切表后重渲染弹窗内容（卡牌列表 + 战车输入框）
+        // 切表后重渲染弹窗内容（卡牌列表 + 战车输入框 + 当前表高亮标签）
         function refreshDamageReductionDialogContent() {
             const t = getDrTable(window.drActiveTable);
             const listContainer = document.getElementById('damageReductionCardsList');
@@ -21671,6 +21703,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 inp.value = (typeof t[key] === 'number') ? t[key] : 0;
             });
             renderDrTableChips();
+            updateDrActiveEditLabel();
         }
         
         // 计算卡组的总减伤（洗炼减伤 + 特殊技能减伤）
@@ -31495,7 +31528,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-268 · sw-v385</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-269 · sw-v386</span>
             </div>
         </div>
     </div>
