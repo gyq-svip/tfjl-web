@@ -15328,12 +15328,58 @@
                 drInfo: drInfo,
                 isTop: isTop
             });
+
+            // 恢复记忆的字体颜色（按脚本身份，D 盘/本地）
+            (async () => {
+                try {
+                    const key = notebookColorKey({ localPath, fileIndex, name });
+                    const map = await loadNotebookColorMap();
+                    if (map[key]) {
+                        const ta = document.getElementById(windowId + '_content');
+                        if (ta) ta.style.color = map[key];
+                    }
+                } catch (e) {}
+            })();
         }
 
         // 记事本字体颜色（整篇统一换色，仅显示层，不进文件，不影响保存/老马纯文本）
+        // 颜色记忆：按脚本身份存 D 盘 JSON（App）+ localStorage（网页兜底），重开同一脚本恢复
+        const NOTEBOOK_COLOR_FILE = 'D:\\withfriends\\塔防精灵助手数据\\notebookColors.json';
+        const LS_NOTEBOOK_COLORS = 'tfjl_notebook_colors';
+
+        function notebookColorKey(opts) {
+            if (opts.localPath) return 'p:' + opts.localPath;
+            if (typeof opts.fileIndex === 'number' && opts.fileIndex >= 0) return 'f:' + opts.fileIndex;
+            return 'n:' + (opts.name || '');
+        }
+
+        async function loadNotebookColorMap() {
+            let map = {};
+            try { const s = localStorage.getItem(LS_NOTEBOOK_COLORS); if (s) map = JSON.parse(s) || {}; } catch (e) {}
+            if (window.writeTextFile) { // 仅 Tauri/App 环境读磁盘
+                try {
+                    const s = await window.readTextFile(NOTEBOOK_COLOR_FILE);
+                    if (s) { const dm = JSON.parse(s); if (dm && typeof dm === 'object') map = Object.assign({}, dm, map); }
+                } catch (e) {}
+            }
+            return map;
+        }
+
+        async function saveNotebookColor(key, color) {
+            let map = {};
+            try { const s = localStorage.getItem(LS_NOTEBOOK_COLORS); if (s) map = JSON.parse(s) || {}; } catch (e) {}
+            map[key] = color;
+            try { localStorage.setItem(LS_NOTEBOOK_COLORS, JSON.stringify(map)); } catch (e) {}
+            if (window.writeTextFile) {
+                try { await window.writeTextFile(NOTEBOOK_COLOR_FILE, JSON.stringify(map, null, 2)); } catch (e) {}
+            }
+        }
+
         function applyNotebookColor(windowId, color) {
             const ta = document.getElementById(windowId + '_content');
             if (ta) ta.style.color = color;
+            const win = txtFileWindows.find(w => w.id === windowId);
+            if (win) saveNotebookColor(notebookColorKey({ localPath: win.localPath, fileIndex: win.fileIndex, name: win.name }), color);
         }
 
         // 标题栏 🎨 颜料盘：展开/收起颜色浮层（点其他处自动关闭）
@@ -31795,7 +31841,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260806-302 · sw-v419</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260806-303 · sw-v420</span>
             </div>
         </div>
     </div>
