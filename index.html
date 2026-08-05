@@ -15279,6 +15279,15 @@
                     <button onclick="parseTxtWindowContent('${windowId}', ${fileIndex})" style="background:linear-gradient(135deg,#00bcd4,#00838f);border:none;color:white;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;">🔍 解析阵容</button>
                 </div>
                 <div style="display:flex;gap:8px;">
+                    <div style="display:flex;gap:4px;align-items:center;" title="字体颜色（仅显示，不影响保存/老马纯文本）">
+                        <span style="font-size:0.9rem;">🎨</span>
+                        <button type="button" onclick="applyNotebookColor('${windowId}','#e0e0e0')" style="width:16px;height:16px;border-radius:50%;background:#e0e0e0;border:1px solid rgba(255,255,255,0.6);cursor:pointer;padding:0;" title="默认灰"></button>
+                        <button type="button" onclick="applyNotebookColor('${windowId}','#4caf50')" style="width:16px;height:16px;border-radius:50%;background:#4caf50;border:1px solid rgba(255,255,255,0.6);cursor:pointer;padding:0;" title="绿"></button>
+                        <button type="button" onclick="applyNotebookColor('${windowId}','#ffeb3b')" style="width:16px;height:16px;border-radius:50%;background:#ffeb3b;border:1px solid rgba(255,255,255,0.6);cursor:pointer;padding:0;" title="黄"></button>
+                        <button type="button" onclick="applyNotebookColor('${windowId}','#ff7043')" style="width:16px;height:16px;border-radius:50%;background:#ff7043;border:1px solid rgba(255,255,255,0.6);cursor:pointer;padding:0;" title="橙红"></button>
+                        <button type="button" onclick="applyNotebookColor('${windowId}','#4fc3f7')" style="width:16px;height:16px;border-radius:50%;background:#4fc3f7;border:1px solid rgba(255,255,255,0.6);cursor:pointer;padding:0;" title="蓝"></button>
+                        <input type="color" onchange="applyNotebookColor('${windowId}', this.value)" title="自定义颜色" style="width:22px;height:20px;border:none;background:none;cursor:pointer;padding:0;">
+                    </div>
                     <button onclick="webToggleFindReplace('${windowId}')" style="background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.15);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">🔍 查找替换</button>
                     ${isLocal ? `<button onclick="webStartCompare(${fileIndex})" style="background:rgba(233,30,99,0.2);color:#e91e63;border:1px solid rgba(233,30,99,0.3);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">📊 对比</button>` : ''}
                     <button onclick="${isLocal ? `downloadTxtFile(${fileIndex})` : `downloadNotebookContent('${windowId}')`}" style="background:linear-gradient(135deg,#2196f3,#1565c0);border:none;color:white;padding:8px 16px;border-radius:6px;cursor:pointer;">📥 下载</button>
@@ -15317,6 +15326,12 @@
                 drInfo: drInfo,
                 isTop: isTop
             });
+        }
+
+        // 记事本字体颜色（整篇统一换色，仅显示层，不进文件，不影响保存/老马纯文本）
+        function applyNotebookColor(windowId, color) {
+            const ta = document.getElementById(windowId + '_content');
+            if (ta) ta.style.color = color;
         }
 
         // 兼容包装：脚本文件列表「✏️ 浮窗编辑」仍调用统一浮窗（本地文件，可保存/对比）
@@ -31758,7 +31773,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260806-300 · sw-v417</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260806-301 · sw-v418</span>
             </div>
         </div>
     </div>
