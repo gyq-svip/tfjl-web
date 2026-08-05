@@ -21118,6 +21118,24 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             }
             // 同步兼容旧字段
             damageReductionData = window.drTables['我的'].洗炼;
+            // 迁移：小野/酋长/宝库是被动「技能减伤」，与卡的洗炼是两回事。
+            // 若技能栏为空但某张表的洗炼栏填了这些卡的值，把最大值并入共享技能栏并清掉洗炼栏，避免两路混淆。
+            ['小野', '酋长', '宝库'].forEach(function (s) {
+                if (!specialDamageReduction[s]) {
+                    let max = 0;
+                    Object.keys(window.drTables).forEach(function (tn) {
+                        const tv = window.drTables[tn] && window.drTables[tn].洗炼;
+                        if (tv && tv[s] > max) max = tv[s];
+                    });
+                    if (max > 0) {
+                        specialDamageReduction[s] = max;
+                        Object.keys(window.drTables).forEach(function (tn) {
+                            const tv = window.drTables[tn] && window.drTables[tn].洗炼;
+                            if (tv) delete tv[s];
+                        });
+                    }
+                }
+            });
         }
 
         // 获取指定表的洗炼 DR（兼容未指定，默认 active）
@@ -21430,7 +21448,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                                 </div>
                             </div>
                             <div style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-top:8px;">💡 「主战车」算我方卡组，「副战车」算队友卡组。每张表独立保存。</div>
-                            <div style="color:#ff9800;font-size:0.85rem;margin:10px 0 6px;padding:5px;background:rgba(255,152,0,0.1);border-radius:4px;">⚡ 共享技能减伤（小野/酋长/宝库 — 卡在场上有就算）</div>
+                            <div style="color:#ff9800;font-size:0.85rem;margin:10px 0 6px;padding:5px;background:rgba(255,152,0,0.1);border-radius:4px;">⚡ 共享技能减伤（小野/酋长/宝库 — 被动技能，卡在场上有就算；与上方「卡的洗炼」无关，数值填在这一栏）</div>
                             <div style="display:flex;flex-wrap:wrap;gap:12px;">
                                 <div style="display:flex;align-items:center;gap:6px;">
                                     <span style="color:#fff;font-size:0.85rem;">小野:</span>
@@ -21777,7 +21795,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 
                     if (!seenCards.has(usedKey)) {
                         seenCards.add(usedKey);
-                        if (tableData[usedKey] && tableData[usedKey] > 0) {
+                        // 小野/酋长/宝库是被动「技能减伤」，只走共享技能栏，不计入卡的洗炼（避免两路混淆）
+                        const _cn = (typeof cardName !== 'undefined') ? (cardName || '') : ((typeof name !== 'undefined') ? (name || '') : '');
+                        const isSpecialCard = ['小野', '酋长', '宝库'].some(function (s) { return _cn.includes(s); });
+                        if (!isSpecialCard && tableData[usedKey] && tableData[usedKey] > 0) {
                             total += tableData[usedKey];
                         }
                     }
@@ -21944,7 +21965,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 
                     if (!seenCards.has(usedKey)) {
                         seenCards.add(usedKey);
-                        if (tableData[usedKey] && tableData[usedKey] > 0) {
+                        // 小野/酋长/宝库是被动「技能减伤」，只走共享技能栏，不计入卡的洗炼（避免两路混淆）
+                        const _cn = (typeof cardName !== 'undefined') ? (cardName || '') : ((typeof name !== 'undefined') ? (name || '') : '');
+                        const isSpecialCard = ['小野', '酋长', '宝库'].some(function (s) { return _cn.includes(s); });
+                        if (!isSpecialCard && tableData[usedKey] && tableData[usedKey] > 0) {
                             total += tableData[usedKey];
                         }
                     }
@@ -31528,7 +31552,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-269 · sw-v386</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-270 · sw-v387</span>
             </div>
         </div>
     </div>
