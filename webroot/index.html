@@ -21122,24 +21122,6 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             }
             // 同步兼容旧字段
             damageReductionData = window.drTables['我的'].洗炼;
-            // 迁移：小野/酋长/宝库是被动「技能减伤」，与卡的洗炼是两回事。
-            // 若技能栏为空但某张表的洗炼栏填了这些卡的值，把最大值并入共享技能栏并清掉洗炼栏，避免两路混淆。
-            ['小野', '酋长', '宝库'].forEach(function (s) {
-                if (!specialDamageReduction[s]) {
-                    let max = 0;
-                    Object.keys(window.drTables).forEach(function (tn) {
-                        const tv = window.drTables[tn] && window.drTables[tn].洗炼;
-                        if (tv && tv[s] > max) max = tv[s];
-                    });
-                    if (max > 0) {
-                        specialDamageReduction[s] = max;
-                        Object.keys(window.drTables).forEach(function (tn) {
-                            const tv = window.drTables[tn] && window.drTables[tn].洗炼;
-                            if (tv) delete tv[s];
-                        });
-                    }
-                }
-            });
         }
 
         // 获取指定表的洗炼 DR（兼容未指定，默认 active）
@@ -21799,11 +21781,9 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 
                     if (!seenCards.has(usedKey)) {
                         seenCards.add(usedKey);
-                        // 小野/酋长/宝库是被动「技能减伤」（出现就算，哪怕副卡），只走共享技能栏；
-                        // 仅当洗炼查询键 usedKey 本身正好是这3张卡时才跳过其洗炼（它们没有洗炼），
-                        // 绝不影响与之融合的主卡洗炼（主卡洗炼该算还得算）。
-                        const isSpecialKey = ['小野', '酋长', '宝库'].indexOf(usedKey) !== -1;
-                        if (!isSpecialKey && tableData[usedKey] && tableData[usedKey] > 0) {
+                        // 洗炼减伤永远只算主卡（usedKey=parts[0] 天然排除副卡洗炼）；
+                        // 小野/酋长/宝库的技能减伤走下方共享技能栏（出现就算，哪怕副卡），此处不混入。
+                        if (tableData[usedKey] && tableData[usedKey] > 0) {
                             total += tableData[usedKey];
                         }
                     }
@@ -21994,11 +21974,9 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 
                     if (!seenCards.has(usedKey)) {
                         seenCards.add(usedKey);
-                        // 小野/酋长/宝库是被动「技能减伤」（出现就算，哪怕副卡），只走共享技能栏；
-                        // 仅当洗炼查询键 usedKey 本身正好是这3张卡时才跳过其洗炼（它们没有洗炼），
-                        // 绝不影响与之融合的主卡洗炼（主卡洗炼该算还得算）。
-                        const isSpecialKey = ['小野', '酋长', '宝库'].indexOf(usedKey) !== -1;
-                        if (!isSpecialKey && tableData[usedKey] && tableData[usedKey] > 0) {
+                        // 洗炼减伤永远只算主卡（usedKey=parts[0] 天然排除副卡洗炼）；
+                        // 小野/酋长/宝库的技能减伤走下方共享技能栏（出现就算，哪怕副卡），此处不混入。
+                        if (tableData[usedKey] && tableData[usedKey] > 0) {
                             total += tableData[usedKey];
                         }
                     }
@@ -31583,7 +31561,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-271 · sw-v388</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-272 · sw-v389</span>
             </div>
         </div>
     </div>
