@@ -13505,7 +13505,7 @@
                             </div>
                             <div style="display:flex;gap:5px;flex-shrink:0;flex-wrap:wrap;">
                                 <button onclick="shareTxtFileToWall(${i})" title="分享到需求墙" style="background:linear-gradient(135deg,#9c27b0,#7b1fa2);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">📢</button>
-                                <button onclick="openTxtFileWindow(${i})" title="浮窗编辑" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">✏️</button>
+                                <button onclick="openScriptNotebook({name: txtFiles[${i}].name, content: txtFiles[${i}].content, fileIndex: ${i}, readonly: false})" title="新记事本编辑" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">✏️</button>
                                 <button onclick="renameTxtFile(${i})" title="重命名" style="background:linear-gradient(135deg,#ff9800,#f57c00);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">✏️</button>
                                 <button onclick="downloadTxtFile(${i})" title="下载" style="background:linear-gradient(135deg,#2196f3,#1565c0);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">📥</button>
                                 <button onclick="deleteTxtFile(${i})" title="删除" style="background:linear-gradient(135deg,#f44336,#c62828);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">🗑️</button>
@@ -13783,7 +13783,7 @@
                             ${shareMode ?
                                 `<button onclick="shareTxtFileToWall(${i})" title="分享到需求墙" style="background:linear-gradient(135deg,#ff6b6b,#ff9e80);color:white;border:none;padding:6px 16px;border-radius:5px;cursor:pointer;font-size:0.8rem;font-weight:bold;">📢 分享</button>` :
                                 `<button onclick="shareTxtFileToWall(${i})" title="分享到需求墙" style="background:linear-gradient(135deg,#9c27b0,#7b1fa2);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">📢</button>
-                                <button onclick="openTxtFileWindow(${i})" title="浮窗编辑" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">✏️</button>
+                                <button onclick="openScriptNotebook({name: txtFiles[${i}].name, content: txtFiles[${i}].content, fileIndex: ${i}, readonly: false})" title="新记事本编辑" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">✏️</button>
                                 <button onclick="renameTxtFile(${i})" title="重命名" style="background:linear-gradient(135deg,#ff9800,#f57c00);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">✏️</button>
                                 <button onclick="downloadTxtFile(${i})" title="下载" style="background:linear-gradient(135deg,#2196f3,#1565c0);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">📥</button>
                                 <button onclick="deleteTxtFile(${i})" title="删除" style="background:linear-gradient(135deg,#f44336,#c62828);color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;">🗑️</button>`
@@ -31754,7 +31754,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260806-295 · sw-v412</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260806-296 · sw-v413</span>
             </div>
         </div>
     </div>
