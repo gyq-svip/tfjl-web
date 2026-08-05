@@ -11700,7 +11700,7 @@
                                 <span style="display:block;width:24px;height:2px;background:rgba(255,215,0,0.4);border-radius:1px;"></span>
                             </div>
                         </div>
-                        <div style="margin-top:4px;color:rgba(255,255,255,0.5);font-size:0.75rem;flex-shrink:0;">💡 支持上传多个TXT文件，也可拖拽文件到此处或 Ctrl+V 粘贴；点击脚本名可在下方标签中打开编辑</div>
+                        <div style="margin-top:4px;padding:3px 8px;color:rgba(255,255,255,0.5);font-size:0.7rem;flex-shrink:0;border:1px solid rgba(255,255,255,0.08);border-radius:6px;background:rgba(255,255,255,0.02);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.4;" title="支持上传多个TXT文件，也可拖拽文件到此处或 Ctrl+V 粘贴；点击脚本名可在下方标签中打开编辑">💡 支持上传/拖拽/Ctrl+V 脚本；点击脚本名可在下方打开编辑</div>
                     </div>
                     <!-- 垂直分隔条（IDE分栏模式） -->
                     <div id="fileListVDivider" style="display:none;width:6px;cursor:col-resize;margin:0 2px;border-radius:3px;flex-shrink:0;align-items:center;justify-content:center;flex-direction:column;gap:3px;"
@@ -13682,7 +13682,7 @@
             });
 
             html += `</div>
-                <div style="color:rgba(255,255,255,0.3);font-size:0.7rem;margin-top:6px;">${shareMode ? '💡 勾选多个文件后可批量分享到需求墙，输入关键字可过滤列表' : '💡 勾选多个文件后可批量导入，输入关键字可过滤列表'}</div>
+                <div style="margin-top:6px;padding:3px 8px;color:rgba(255,255,255,0.45);font-size:0.68rem;border:1px solid rgba(255,255,255,0.08);border-radius:5px;background:rgba(255,255,255,0.02);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.4;" title="${shareMode ? '勾选多个文件后可批量分享到需求墙，输入关键字可过滤列表' : '勾选多个文件后可批量导入，输入关键字可过滤列表'}">💡 ${shareMode ? '勾选后可批量分享到需求墙，输入关键字过滤' : '勾选后可批量导入，输入关键字过滤'}</div>
             </div>`;
             return html;
         }
@@ -31749,7 +31749,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260806-287 · sw-v404</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260806-288 · sw-v405</span>
             </div>
         </div>
     </div>
