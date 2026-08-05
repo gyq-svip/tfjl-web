@@ -11688,7 +11688,7 @@
                 <div id="scriptFileBody" style="display:flex;flex-direction:column;flex:1;min-height:0;gap:0;">
                     <!-- 文件列表侧边栏 -->
                     <div id="fileListSidebar" style="display:flex;flex-direction:column;min-height:0;overflow:hidden;">
-                        <div id="txtFilesList" style="display:flex;flex-direction:column;gap:10px;flex:1;min-height:60px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(255,215,0,0.3) transparent;"></div>
+                        <div id="txtFilesList" style="display:flex;flex-direction:column;gap:10px;flex:0 1 auto;max-height:300px;min-height:60px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(255,215,0,0.3) transparent;"></div>
                         <!-- 文件列表拖拽缩放条（堆叠模式） -->
                         <div id="fileListResizeHandle" style="height:6px;cursor:row-resize;margin:3px 0;display:flex;align-items:center;justify-content:center;border-radius:3px;flex-shrink:0;"
                              onmouseover="if(!document.getElementById('scriptFileBody') || document.getElementById('scriptFileBody').dataset.layout!=='ide'){this.style.background='rgba(255,215,0,0.15)';this.style.height='8px';this.style.margin='2px 0';}"
@@ -14482,7 +14482,7 @@
                 if (vDivider) vDivider.style.display = 'flex';
                 if (collapseBtn) collapseBtn.style.display = 'flex';
                 if (hHandle) hHandle.style.display = 'none';
-                if (fileList) { fileList.style.flex = '1'; fileList.style.height = ''; fileList.style.maxHeight = ''; fileList.style.minHeight = '60px'; }
+                if (fileList) { fileList.style.flex = '1'; fileList.style.height = ''; fileList.style.maxHeight = '320px'; fileList.style.minHeight = '60px'; }
                 editor.style.flex = '1';
                 editor.style.marginTop = '0';
                 editor.style.borderTop = 'none';
@@ -14518,7 +14518,7 @@
                 if (vDivider) vDivider.style.display = 'none';
                 if (collapseBtn) collapseBtn.style.display = 'none';
                 if (hHandle) hHandle.style.display = 'flex';
-                if (fileList) { fileList.style.flex = ''; fileList.style.height = 'auto'; fileList.style.maxHeight = '240px'; fileList.style.minHeight = '100px'; }
+                if (fileList) { fileList.style.flex = ''; fileList.style.height = 'auto'; fileList.style.maxHeight = '200px'; fileList.style.minHeight = '90px'; }
                 editor.style.flex = '1';
                 editor.style.marginTop = '12px';
                 editor.style.borderTop = '1px solid rgba(255,255,255,0.08)';
@@ -31749,7 +31749,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260806-288 · sw-v405</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260806-289 · sw-v406</span>
             </div>
         </div>
     </div>
