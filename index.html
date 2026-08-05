@@ -24159,12 +24159,13 @@ function hasGistToken() {
                     }
                 }
                 
-                // 如果没有找到，使用默认数据
-                console.warn('⚠️ 统计数据 Gist 不存在，使用默认数据。首次访问时会自动创建。');
-                return getDefaultCounter();
+                // 🔴 修复（v260805-266）：获取失败（网络/限流）返回 null 而非空默认，
+                // 否则调用方会用空对象覆盖远程、导致统计全丢。调用方会回退到本地缓存。
+                console.warn('⚠️ 统计数据 Gist 获取失败/不存在，返回 null（调用方回退本地缓存）');
+                return null;
             } catch (error) {
-                console.warn('⚠️ 获取统计数据异常，使用默认数据:', error.message);
-                return getDefaultCounter();
+                console.warn('⚠️ 获取统计数据异常，返回 null（调用方回退本地缓存）:', error.message);
+                return null;
             }
         }
         
@@ -24665,6 +24666,7 @@ function hasGistToken() {
                 
                 if (counterGistId) {
                     // PATCH之前先读取远程数据，合并后再写入，防止本地小数据覆盖远程大数据
+                    let remoteOk = false;
                     try {
                         const remoteResp = await fetch(`https://api.github.com/gists/${counterGistId}`, {
                             headers: {
@@ -24672,12 +24674,15 @@ function hasGistToken() {
                                 ...(token && { 'Authorization': `token ${token}` })
                             }
                         });
-                        if (remoteResp.ok) {
+                        if (remoteResp.status === 404) {
+                            remoteOk = true;
+                        } else if (remoteResp.ok) {
                             const remoteJson = await remoteResp.json();
                             if (remoteJson.files && remoteJson.files['counter.json'] && remoteJson.files['counter.json'].content) {
                                 try {
                                     const remoteData = JSON.parse(remoteJson.files['counter.json'].content);
                                     if (remoteData) {
+                                        remoteOk = true;
                                         data.total_visits = Math.max(data.total_visits || 0, remoteData.total_visits || 0);
                                         data.total_downloads = Math.max(data.total_downloads || 0, remoteData.total_downloads || 0);
                                         if (remoteData.unique_users && Array.isArray(remoteData.unique_users)) {
@@ -24712,6 +24717,13 @@ function hasGistToken() {
                         }
                     } catch (fetchErr) {
                         console.warn('syncCounterDataToGist 读取远程数据失败:', fetchErr);
+                    }
+
+                    // 🔴 防御（v260805-266）：读不到远程就绝不写 Gist，避免覆盖导致统计全丢
+                    if (!remoteOk) {
+                        console.warn('⚠️ 未能确认远程统计状态，跳过本次写入（保留待同步）');
+                        addToPendingSync('counter');
+                        return false;
                     }
 
                     let content = JSON.stringify(data, null, 2);
@@ -24908,6 +24920,7 @@ function hasGistToken() {
                 
                 if (counterGistId) {
                     // PATCH之前先读取远程数据，合并后再写入，防止本地小数据覆盖远程大数据
+                    let remoteOk = false;
                     try {
                         const remoteResp = await fetch(`https://api.github.com/gists/${counterGistId}`, {
                             headers: {
@@ -24915,14 +24928,18 @@ function hasGistToken() {
                                 ...(token && { 'Authorization': `token ${token}` })
                             }
                         });
-                        if (remoteResp.ok) {
+                        if (remoteResp.status === 404) {
+                            // Gist 尚不存在（首次创建场景）：视为远程为空，允许后续走创建流程
+                            remoteOk = true;
+                        } else if (remoteResp.ok) {
                             const remoteJson = await remoteResp.json();
                             if (remoteJson.files && remoteJson.files['counter.json'] && remoteJson.files['counter.json'].content) {
                                 try {
                                     const remoteData = JSON.parse(remoteJson.files['counter.json'].content);
-                                    if (remoteData) {
-                                        // 合并远程数据到本地（取最大值，防止数据回退）
-                                        counterData.total_visits = Math.max(counterData.total_visits || 0, remoteData.total_visits || 0);
+                                        if (remoteData) {
+                                            remoteOk = true;
+                                            // 合并远程数据到本地（取最大值，防止数据回退）
+                                            counterData.total_visits = Math.max(counterData.total_visits || 0, remoteData.total_visits || 0);
                                         counterData.total_downloads = Math.max(counterData.total_downloads || 0, remoteData.total_downloads || 0);
                                         if (remoteData.unique_users && Array.isArray(remoteData.unique_users)) {
                                             remoteData.unique_users.forEach(id => {
@@ -24955,7 +24972,14 @@ function hasGistToken() {
                             }
                         }
                     } catch (fetchErr) {
-                        console.warn('读取远程数据失败，直接使用本地数据:', fetchErr);
+                        console.warn('读取远程数据失败（网络/被墙），本次不覆盖远程统计:', fetchErr);
+                    }
+
+                    // 🔴 防御（v260805-266）：读不到远程（限流403/网络错误）就绝不写 Gist，避免把本地空/旧数据顶掉导致统计全丢
+                    if (!remoteOk) {
+                        console.warn('⚠️ 未能确认远程统计状态，跳过本次 Gist 写入（保留待同步）');
+                        addToPendingSync('counter');
+                        return;
                     }
 
                     let content = JSON.stringify(counterData, null, 2);
@@ -30146,11 +30170,14 @@ ${maSection}
 
             // 先从Gist获取最新统计数据
             try {
-                const fresh = await fetchCounterFromGist();
-                if (fresh) {
-                    counterData = fresh;
-                    saveCounterToCache(counterData);
-                }
+            const fresh = await fetchCounterFromGist();
+            if (fresh) {
+                counterData = fresh;
+                saveCounterToCache(counterData);
+            } else if (!counterData) {
+                // Gist 获取失败时回退本地缓存，避免瞬时网络问题把统计显示成"全都没有了"
+                counterData = loadCounterFromCache();
+            }
             } catch (e) {
                 console.warn('获取最新统计失败，使用本地缓存:', e);
             }
@@ -31118,7 +31145,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-265 · sw-v382</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-266 · sw-v383</span>
             </div>
         </div>
     </div>
