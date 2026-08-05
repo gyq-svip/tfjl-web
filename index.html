@@ -10932,7 +10932,7 @@
         </div>
 
         <!-- APP本地功能脚本（网页版不会执行任何代码，isTauriApp判断在文件内部） -->
-        <script src="app-local.js?v=28"></script>
+        <script src="app-local.js?v=29"></script>
         <!-- 阵容识别模块（独立入口 + 灌入脚本生成） -->
         <script src="recognize.js?v=8"></script>
         <!-- 网页版皮肤系统（仅非 Tauri 浏览器执行；Tauri 由 app-local.js 负责，文件内部自动跳过） -->
@@ -15041,6 +15041,7 @@
         // ========== 多窗口脚本编辑系统 ==========
         let txtFileWindows = []; // 存储所有打开的窗口信息
         let windowZIndex = 1000; // 窗口层级管理
+        let topWinZIndex = 0;   // 从设置面板等高层 modal 打开的浮窗专用层级（100000+ 盖过设置面板 99999）
 
         // 统一脚本查看/编辑浮窗（方案B：浮窗为唯一查看/编辑组件，标签页 openScriptEditorTab 保留）
         // opts: { name, content, fileIndex(可选,>=0=本地txtFiles可保存/对比), readonly(可选) }
@@ -15050,6 +15051,7 @@
             const fileIndex = (typeof opts.fileIndex === 'number') ? opts.fileIndex : -1;
             const readonly = !!opts.readonly;
             const localPath = opts.localPath || null; // 扫描文件的本地磁盘路径：非项目文件，可写回原文件
+            const isTop = !!opts.zAboveSettings; // 是否高于设置面板(99999)，用于从 APP 设置内打开时不被遮挡
 
             // 本地文件（fileIndex>=0）按 fileIndex 去重，避免同文件多窗口编辑互相覆盖
             if (fileIndex >= 0) {
@@ -15057,7 +15059,7 @@
                 if (existing) {
                     const existingEl = document.getElementById(existing.id);
                     if (existingEl) {
-                        existingEl.style.zIndex = ++windowZIndex;
+                        existingEl.style.zIndex = existing.isTop ? (100000 + (++topWinZIndex)) : (++windowZIndex);
                         existingEl.style.display = 'flex';
                         existingEl.style.opacity = '1';
                         // 闪烁提示
@@ -15073,7 +15075,7 @@
                 if (existing) {
                     const existingEl = document.getElementById(existing.id);
                     if (existingEl) {
-                        existingEl.style.zIndex = ++windowZIndex;
+                        existingEl.style.zIndex = existing.isTop ? (100000 + (++topWinZIndex)) : (++windowZIndex);
                         existingEl.style.display = 'flex';
                         existingEl.style.opacity = '1';
                         existingEl.style.borderColor = 'rgba(255,215,0,0.9)';
@@ -15084,6 +15086,7 @@
             }
 
             const windowId = `txtWindow_${fileIndex >= 0 ? fileIndex : 'r'}_${Date.now()}`;
+            const winZ = isTop ? (100000 + (++topWinZIndex)) : (++windowZIndex);
             
             // 创建窗口容器
             const windowDiv = document.createElement('div');
@@ -15102,7 +15105,7 @@
                 border: 2px solid rgba(255,215,0,0.3);
                 border-radius: 12px;
                 box-shadow: 0 10px 40px rgba(0,0,0,0.5);
-                z-index: ${++windowZIndex};
+                z-index: ${winZ};
                 display: flex;
                 flex-direction: column;
                 overflow: hidden;
@@ -15311,7 +15314,8 @@
                 localPath: localPath,
                 name: name,
                 element: windowDiv,
-                drInfo: drInfo
+                drInfo: drInfo,
+                isTop: isTop
             });
         }
 
@@ -15728,7 +15732,7 @@
         let localFileWindows = [];
 
         // 扫描文件走统一记事本框架：先读磁盘内容，再交给 openScriptNotebook（带减伤栏/解析/查找替换/写回原文件/存项目）
-        async function openScannedInNotebook(filePath, fileName, readOnly) {
+        async function openScannedInNotebook(filePath, fileName, readOnly, zAboveSettings) {
             let realPath = filePath, realName = fileName;
             if (typeof realPath === 'string') realPath = realPath.replace(/\\\\/g, '\\').replace(/\\'/g, "'");
             if (typeof realName === 'string') realName = realName.replace(/\\\\/g, '\\').replace(/\\'/g, "'");
@@ -15741,7 +15745,7 @@
                     alert('当前环境不支持读取本地文件，请在 App 中使用此功能'); return;
                 }
             } catch (e) { alert('读取文件失败: ' + e.message); return; }
-            openScriptNotebook({ name: realName, content: content, localPath: realPath, readonly: !!readOnly });
+            openScriptNotebook({ name: realName, content: content, localPath: realPath, readonly: !!readOnly, zAboveSettings: !!zAboveSettings });
         }
 
         async function openLocalFileWindow(filePath, fileName, readOnly) {
@@ -31754,7 +31758,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260806-298 · sw-v415</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260806-299 · sw-v416</span>
             </div>
         </div>
     </div>
