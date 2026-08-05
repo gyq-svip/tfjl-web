@@ -13664,7 +13664,7 @@
                     <div style="flex:1;overflow:hidden;">
                         <div style="display:flex;align-items:center;gap:6px;">
                             <span style="color:${catColor};font-size:0.65rem;padding:1px 6px;border-radius:8px;background:${catColor}25;flex-shrink:0;">${fileCat}</span>
-                            <span data-scanned-path="${escPath}" data-scanned-name="${escName}" onclick="${shareMode ? `shareScannedFileToWall(this.getAttribute('data-scanned-path'),this.getAttribute('data-scanned-name'))` : `openScannedFileInEditor('${f.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}','${f.name.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}')`}" style="color:#fff;font-weight:bold;font-size:0.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;" title="${shareMode ? '点击分享到需求墙' : '在编辑器中打开'}">${displayName}</span>
+                            <span data-scanned-path="${escPath}" data-scanned-name="${escName}" onclick="${shareMode ? `shareScannedFileToWall(this.getAttribute('data-scanned-path'),this.getAttribute('data-scanned-name'))` : `openScannedInNotebook('${f.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}','${f.name.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}',true)`}" style="color:#fff;font-weight:bold;font-size:0.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;" title="${shareMode ? '点击分享到需求墙' : '在记事本中预览'}">${displayName}</span>
                         </div>
                         <div style="color:rgba(255,255,255,0.35);font-size:0.7rem;margin-left:4px;">${f.dirLabel} · ${f.ext.toUpperCase()}</div>
                     </div>
@@ -31754,7 +31754,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260806-293 · sw-v410</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260806-294 · sw-v411</span>
             </div>
         </div>
     </div>
