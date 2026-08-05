@@ -31118,7 +31118,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-264 · sw-v381</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-265 · sw-v382</span>
             </div>
         </div>
     </div>
@@ -31481,6 +31481,12 @@ ${maSection}
       smStatus((fn?'✅ 已检测到 Tauri（可直接写 skins 目录）；':'⚠️ 未检测到 Tauri（将走「文件另存」，请手动选 D:\\tfjl-web\\skins\\英雄\\）；')+'选择透明立绘，滚轮缩放、拖拽移动，选好底色后点下载/保存。');
     };
     window.closeSkinMaker=function(){ var m=document.getElementById('cardGroupMgrModal'); if(m) m.style.display='none'; };
+    // 🔴 修复：删除/查线上两个子面板用 inline onclick/onchange，函数在本 IIFE 内不可见 → 全部"点了没反应"。
+    //    必须挂到 window 上，inline 处理器才能找到（v260805-265 修复）
+    window.smRefreshDelSkinList = smRefreshDelSkinList;
+    window.smDeleteSkin = smDeleteSkin;
+    window.smInitDelSkinUI = smInitDelSkinUI;
+    window.smVerifyOnline = smVerifyOnline;
   })();
   </script>
 </body>
