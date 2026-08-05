@@ -15049,9 +15049,23 @@
             // 编辑器实时减伤显示栏
             const drBar = document.createElement('div');
             drBar.id = `${windowId}_drBar`;
-            drBar.style.cssText = 'display:none;padding:8px 12px;border-radius:8px;background:linear-gradient(135deg,rgba(255,215,0,0.06),rgba(255,107,107,0.06));border:1px solid rgba(255,215,0,0.18);font-size:0.8rem;margin-bottom:8px;';
-            drBar.innerHTML = '<span style="color:#ffd700;">🛡️ <b>减伤</b></span> <span style="color:rgba(255,255,255,0.5);">前7卡：</span><b id="' + windowId + '_drFirst7" style="color:#4ecdc4;">--</b> <span style="color:rgba(255,255,255,0.5);">| 全部：</span><b id="' + windowId + '_drAll" style="color:#ff6b6b;">--</b>';
+            drBar.style.cssText = 'display:none;padding:8px 12px;border-radius:8px;background:linear-gradient(135deg,rgba(255,215,0,0.06),rgba(255,107,107,0.06));border:1px solid rgba(255,215,0,0.18);font-size:0.8rem;margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;';
+            drBar.innerHTML = '<span style="color:#ffd700;">🛡️ <b>减伤</b></span>'
+                + '<select id="' + windowId + '_drTable" onchange="updateEditorDamageReduction(\'' + windowId + '\')" style="background:rgba(30,30,60,0.95);border:1px solid rgba(255,215,0,0.4);color:#ffd700;padding:3px 8px;border-radius:6px;font-size:0.78rem;"></select>'
+                + '<span style="color:rgba(255,255,255,0.5);">前7卡：</span><b id="' + windowId + '_drFirst7" style="color:#4ecdc4;">--</b>'
+                + ' <span style="color:rgba(255,255,255,0.5);">| 全部：</span><b id="' + windowId + '_drAll" style="color:#ff6b6b;">--</b>';
             contentArea.appendChild(drBar);
+            
+            // 填充减伤表下拉（每窗口独立选择，默认「我的」）
+            const drTableSel = drBar.querySelector(`#${windowId}_drTable`);
+            if (drTableSel) {
+                try {
+                    const order = (window.drTableOrder && window.drTableOrder.length) ? window.drTableOrder : ['我的'];
+                    drTableSel.innerHTML = order.map(n => `<option value="${n}">${n}</option>`).join('');
+                    if (window.__drTableByEditor && window.__drTableByEditor[windowId]) drTableSel.value = window.__drTableByEditor[windowId];
+                    else drTableSel.value = (window.drActiveTable && window.drTables[window.drActiveTable]) ? window.drActiveTable : '我的';
+                } catch (e) { /* 减伤表尚未初始化则跳过 */ }
+            }
             
             const textarea = document.createElement('textarea');
             textarea.id = `${windowId}_content`;
@@ -22037,8 +22051,19 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const drBar = document.getElementById(`${windowId}_drBar`);
             const first7El = document.getElementById(`${windowId}_drFirst7`);
             const allEl = document.getElementById(`${windowId}_drAll`);
+            const tableSel = document.getElementById(`${windowId}_drTable`);
             if (!textarea || !drBar || !first7El || !allEl) return;
-            
+
+            // 记忆每个脚本窗口选中的减伤表
+            let tableName = (window.drActiveTable && window.drTables[window.drActiveTable]) ? window.drActiveTable : '我的';
+            if (tableSel) {
+                if (tableSel.value) {
+                    tableName = tableSel.value;
+                    window.__drTableByEditor = window.__drTableByEditor || {};
+                    window.__drTableByEditor[windowId] = tableName;
+                }
+            }
+
             const text = textarea.value.trim();
             if (!text) {
                 drBar.style.display = 'none';
@@ -22070,11 +22095,12 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 return;
             }
             
-            const allDr = calculateDamageReductionForCards(battleCards);
+            // 按选中的减伤表计算（脚本编辑器默认算「我方」侧，side='my' 映射到对应表）
+            const allDr = calculateDamageReductionForCards(battleCards, 'my', tableName);
             const first7 = battleCards.slice(0, 7);
-            const first7Dr = calculateDamageReductionForCards(first7);
+            const first7Dr = calculateDamageReductionForCards(first7, 'my', tableName);
             
-            drBar.style.display = 'block';
+            drBar.style.display = 'flex';
             first7El.textContent = `${first7Dr}%`;
             allEl.textContent = `${allDr}%`;
             
@@ -24012,6 +24038,17 @@ function hasGistToken() {
                     console.warn('从Gist获取失败，尝试使用缓存:', error);
                     counterData = loadCounterFromCache() || getDefaultCounter();
                 }
+                // 🔴 D 盘兜底：缓存为空或拿到的仍是默认值时，尝试用本机备份恢复（Gist 被清空场景）
+                if (!counterData || (counterData.total_visits === 0 && counterData.total_downloads === 0 && !counterData.script_downloads)) {
+                    try {
+                        const disk = await restoreStatsFromDisk();
+                        if (disk && (disk.total_visits || disk.total_downloads || (disk.script_downloads && Object.keys(disk.script_downloads).length))) {
+                            counterData = disk;
+                            saveCounterToCache(counterData);
+                            console.warn('✅ 已从 D 盘兜底恢复统计快照');
+                        }
+                    } catch (e) { /* 忽略 */ }
+                }
                 updateStatsBar();
             })();
 
@@ -24206,6 +24243,8 @@ function hasGistToken() {
             data = sanitizeCounterData(data);
             localStorage.setItem(COUNTER_CACHE_KEY, JSON.stringify(data));
             localStorage.setItem(COUNTER_CACHE_TIME_KEY, new Date().toISOString());
+            // D 盘兜底双写（仅 App / Tauri 环境；Gist 被清空时能从本机恢复）
+            backupStatsToDisk();
         }
         
         // 从缓存加载待同步队列
@@ -31456,7 +31495,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-267 · sw-v384</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-268 · sw-v385</span>
             </div>
         </div>
     </div>
