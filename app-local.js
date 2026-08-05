@@ -1481,20 +1481,15 @@ if (isTauriApp) {
     }
 
     async function viewFile(filePath) {
-        try {
+        // 套用统一新记事本框架 openScriptNotebook（与 txtFilesPanel 扫描文件一致：减伤栏/解析/查找替换/写回原文件/存项目）
+        const fileName = filePath.split(/[\\/]/).pop();
+        if (typeof openScannedInNotebook === 'function') {
+            await openScannedInNotebook(filePath, fileName, false);
+        } else {
+            // 兜底（理论上不会到这）
             const content = await readTextFile(filePath);
-            if (content === null) {
-                alert('读取文件失败');
-                return;
-            }
-            // 计算减伤信息
-            let drInfo = null;
-            try {
-                drInfo = window.computeScriptDr ? window.computeScriptDr(content) : null;
-            } catch (e) {}
-            showFileEditor(filePath, content, null, null, drInfo);
-        } catch (e) {
-            alert('读取文件失败：' + e.message);
+            if (content === null) { alert('读取文件失败'); return; }
+            showFileEditor(filePath, content, null, null, null);
         }
     }
 
