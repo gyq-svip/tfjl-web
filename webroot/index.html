@@ -14319,6 +14319,28 @@
             _downloadScriptTauri(file.name, file.content);
         }
 
+        // 下载统一浮窗(openScriptNotebook)当前内容（用于远程/预览内容，fileIndex<0 无法回写本地）
+        function downloadNotebookContent(windowId) {
+            const ta = document.getElementById(windowId + '_content');
+            if (!ta) return;
+            const win = txtFileWindows.find(w => w.id === windowId);
+            const name = (win && win.name) ? win.name : 'script.txt';
+            const content = ta.value;
+            if (window.__TAURI__ || window.__TAURI_INTERNALS__) {
+                _downloadScriptTauri(name, content);
+            } else {
+                const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = name;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+        }
+
         // 删除TXT文件
         function deleteTxtFile(index) {
             if (!txtFiles[index]) return;
@@ -14993,27 +15015,32 @@
         let txtFileWindows = []; // 存储所有打开的窗口信息
         let windowZIndex = 1000; // 窗口层级管理
 
-        // 打开脚本文件窗口（支持多窗口）
-        function openTxtFileWindow(index) {
-            if (!txtFiles[index]) return;
+        // 统一脚本查看/编辑浮窗（方案B：浮窗为唯一查看/编辑组件，标签页 openScriptEditorTab 保留）
+        // opts: { name, content, fileIndex(可选,>=0=本地txtFiles可保存/对比), readonly(可选) }
+        function openScriptNotebook(opts) {
+            const name = opts.name || '未命名脚本';
+            const content = opts.content || '';
+            const fileIndex = (typeof opts.fileIndex === 'number') ? opts.fileIndex : -1;
+            const readonly = !!opts.readonly;
 
-            // 如果该文件已有打开窗口，直接聚焦到现有窗口（避免同一文件多窗口编辑互相覆盖）
-            const existing = txtFileWindows.find(w => w.fileIndex === index);
-            if (existing) {
-                const existingEl = document.getElementById(existing.id);
-                if (existingEl) {
-                    existingEl.style.zIndex = ++windowZIndex;
-                    existingEl.style.display = 'flex';
-                    existingEl.style.opacity = '1';
-                    // 闪烁提示
-                    existingEl.style.borderColor = 'rgba(255,215,0,0.9)';
-                    setTimeout(() => { existingEl.style.borderColor = 'rgba(255,215,0,0.3)'; }, 600);
-                    return;
+            // 本地文件（fileIndex>=0）按 fileIndex 去重，避免同文件多窗口编辑互相覆盖
+            if (fileIndex >= 0) {
+                const existing = txtFileWindows.find(w => w.fileIndex === fileIndex);
+                if (existing) {
+                    const existingEl = document.getElementById(existing.id);
+                    if (existingEl) {
+                        existingEl.style.zIndex = ++windowZIndex;
+                        existingEl.style.display = 'flex';
+                        existingEl.style.opacity = '1';
+                        // 闪烁提示
+                        existingEl.style.borderColor = 'rgba(255,215,0,0.9)';
+                        setTimeout(() => { existingEl.style.borderColor = 'rgba(255,215,0,0.3)'; }, 600);
+                        return;
+                    }
                 }
             }
 
-            const file = txtFiles[index];
-            const windowId = `txtWindow_${index}_${Date.now()}`;
+            const windowId = `txtWindow_${fileIndex >= 0 ? fileIndex : 'r'}_${Date.now()}`;
             
             // 创建窗口容器
             const windowDiv = document.createElement('div');
@@ -15049,11 +15076,11 @@
                 border-bottom: 1px solid rgba(255,215,0,0.2);
                 flex-shrink: 0;
             `;
-            const drInfo = computeScriptDr(file.content);
+            const drInfo = computeScriptDr(content);
             const drBadge = drInfo ? buildWindowDrBadge(drInfo) : '';
             titleBar.innerHTML = `
                 <span style="color: #ffd700; font-weight: bold; font-size: 14px;display:flex;align-items:center;gap:8px;">
-                    📄 ${escapeHtml(file.name)}
+                    📄 ${escapeHtml(name)}
                     <span id="${windowId}_titleDr" style="font-size:0.72rem;font-weight:normal;">${drBadge}</span>
                 </span>
                 <div style="display: flex; gap: 8px;">
@@ -15112,12 +15139,14 @@
             textarea.value = file.content;
             textarea.spellcheck = false;
             // 实时减伤计算
-            textarea.addEventListener('input', () => {
-                updateEditorDamageReduction(windowId);
-                updateWindowTitleDr(windowId, textarea.value);
-            });
+            if (!readonly) {
+                textarea.addEventListener('input', () => {
+                    updateEditorDamageReduction(windowId);
+                    updateWindowTitleDr(windowId, textarea.value);
+                });
+            }
             // 初始计算（如果有内容）
-            if (file.content && file.content.trim()) {
+            if (content && content.trim()) {
                 setTimeout(() => updateEditorDamageReduction(windowId), 300);
             }
 
@@ -15186,19 +15215,20 @@
                 flex-shrink: 0;
                 flex-wrap: wrap;
             `;
+            const isLocal = fileIndex >= 0;
             buttonBar.innerHTML = `
                 <div style="display:flex;gap:8px;align-items:center;">
                     <select id="${windowId}_target" style="padding:6px 10px;border-radius:6px;border:1px solid rgba(255,215,0,0.3);background:#2a2a4a;color:#fff;font-size:0.85rem;cursor:pointer;">
                         <option value="my">我的手牌</option>
                         <option value="teammate">队友手牌</option>
                     </select>
-                    <button onclick="parseTxtWindowContent('${windowId}', ${index})" style="background:linear-gradient(135deg,#00bcd4,#00838f);border:none;color:white;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;">🔍 解析阵容</button>
+                    <button onclick="parseTxtWindowContent('${windowId}', ${fileIndex})" style="background:linear-gradient(135deg,#00bcd4,#00838f);border:none;color:white;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;">🔍 解析阵容</button>
                 </div>
                 <div style="display:flex;gap:8px;">
                     <button onclick="webToggleFindReplace('${windowId}')" style="background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.15);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">🔍 查找替换</button>
-                    <button onclick="webStartCompare(${index})" style="background:rgba(233,30,99,0.2);color:#e91e63;border:1px solid rgba(233,30,99,0.3);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">📊 对比</button>
-                    <button onclick="downloadTxtFile(${index})" style="background:linear-gradient(135deg,#2196f3,#1565c0);border:none;color:white;padding:8px 16px;border-radius:6px;cursor:pointer;">📥 下载</button>
-                    <button onclick="saveTxtWindowContent('${windowId}', ${index})" style="background:linear-gradient(135deg,#4CAF50,#45a049);border:none;color:white;padding:8px 20px;border-radius:6px;cursor:pointer;font-weight:bold;">💾 保存</button>
+                    ${isLocal ? `<button onclick="webStartCompare(${fileIndex})" style="background:rgba(233,30,99,0.2);color:#e91e63;border:1px solid rgba(233,30,99,0.3);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">📊 对比</button>` : ''}
+                    <button onclick="${isLocal ? `downloadTxtFile(${fileIndex})` : `downloadNotebookContent('${windowId}')`}" style="background:linear-gradient(135deg,#2196f3,#1565c0);border:none;color:white;padding:8px 16px;border-radius:6px;cursor:pointer;">📥 下载</button>
+                    ${isLocal ? `<button onclick="saveTxtWindowContent('${windowId}', ${fileIndex})" style="background:linear-gradient(135deg,#4CAF50,#45a049);border:none;color:white;padding:8px 20px;border-radius:6px;cursor:pointer;font-weight:bold;">💾 保存</button>` : ''}
                 </div>
             `;
             
@@ -15226,10 +15256,17 @@
             // 记录窗口信息
             txtFileWindows.push({
                 id: windowId,
-                fileIndex: index,
+                fileIndex: fileIndex,
+                name: name,
                 element: windowDiv,
                 drInfo: drInfo
             });
+        }
+
+        // 兼容包装：脚本文件列表「✏️ 浮窗编辑」仍调用统一浮窗（本地文件，可保存/对比）
+        function openTxtFileWindow(index) {
+            if (!txtFiles[index]) return;
+            openScriptNotebook({ name: txtFiles[index].name, content: txtFiles[index].content, fileIndex: index });
         }
 
         // ==================== 网页版文本查找替换 ====================
@@ -26183,43 +26220,8 @@ function hasGistToken() {
                     }
                 }
 
-                // 计算减伤信息（支持切换减伤表）
-                let previewTableName = (window.drActiveTable && window.drTables[window.drActiveTable]) ? window.drActiveTable : '我的';
-                const previewDr = computeScriptDr(content, previewTableName);
-                const previewDrHtml = previewDr ? ` ${buildWindowDrBadge(previewDr)}` : '';
-                const previewDrOptions = (window.drTableOrder && window.drTableOrder.length ? window.drTableOrder : Object.keys(window.drTables || {})).map(n => `<option value="${n}" ${n === previewTableName ? 'selected' : ''}>${n}</option>`).join('');
-
-                // 创建预览弹窗
-                const modal = document.createElement('div');
-                modal.id = 'scriptPreviewModal';
-                modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;';
-                modal.innerHTML = `
-                    <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(79,195,247,0.5);border-radius:12px;width:600px;max-width:90vw;max-height:80vh;display:flex;flex-direction:column;">
-                        <div style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center;">
-                            <div style="color:#4fc3f7;font-weight:bold;font-size:1rem;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">👁️ 预览：${escapeHtml(fileName)}
-                                <span style="font-size:0.8rem;font-weight:normal;display:inline-flex;align-items:center;gap:5px;">
-                                    <span style="color:#ffd700;">🛡️</span>
-                                    <select id="previewDrTable" onchange="(function(){const c=window.__previewContent;const t=this.value;const d=window.computeScriptDr(c,t);const el=document.getElementById('previewDrBadge');el.innerHTML=d?window.buildWindowDrBadge(d):'';})()" style="background:rgba(30,30,60,0.95);border:1px solid rgba(255,215,0,0.4);color:#ffd700;padding:3px 8px;border-radius:6px;font-size:0.78rem;">${previewDrOptions}</select>
-                                    <span id="previewDrBadge" style="font-size:0.75rem;">${previewDrHtml}</span>
-                                </span>
-                            </div>
-                            <button onclick="document.getElementById('scriptPreviewModal').remove()" style="background:transparent;border:none;color:white;font-size:1.2rem;cursor:pointer;">×</button>
-                        </div>
-                        <div style="flex:1;overflow:auto;padding:12px;">
-                            <pre style="color:#e0e0e0;font-family:monospace;font-size:0.85rem;white-space:pre-wrap;word-break:break-all;margin:0;background:rgba(0,0,0,0.3);padding:12px;border-radius:8px;max-height:55vh;overflow:auto;">${escapeHtml(displayContent)}</pre>
-                        </div>
-                        <div style="padding:10px 16px;border-top:1px solid rgba(255,255,255,0.1);display:flex;gap:8px;justify-content:flex-end;">
-                            <button onclick="navigator.clipboard.writeText(document.querySelector('#scriptPreviewModal pre').textContent).then(()=>showToast('✅ 已复制到剪贴板'))" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.85rem;">📋 复制内容</button>
-                            <button onclick="document.getElementById('scriptPreviewModal').remove()" style="background:rgba(255,255,255,0.1);color:white;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.85rem;">关闭</button>
-                        </div>
-                    </div>
-                `;
-                window.__previewContent = content;
-                document.body.appendChild(modal);
-                // 点击背景关闭
-                modal.addEventListener('click', (e) => {
-                    if (e.target === modal) modal.remove();
-                });
+                // 复用统一脚本浮窗（可编辑，减伤栏与本地脚本完全一致；远程内容无本地 fileIndex，故不可保存/对比）
+                openScriptNotebook({ name: fileName, content: displayContent, fileIndex: -1 });
             } catch (err) {
                 console.error('预览文件失败:', err);
                 alert('预览失败: ' + err.message);
@@ -31661,7 +31663,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-281 · sw-v398</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260805-282 · sw-v399</span>
             </div>
         </div>
     </div>
