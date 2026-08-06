@@ -11134,6 +11134,76 @@
                 };
                 box.appendChild(link);
             }
+            // ===== 皮肤修正区：仅出问题的用户用，正常的无视即可 =====
+            try {
+                const skinBox = document.createElement('div');
+                skinBox.style.cssText = 'margin-top:16px;padding:12px;border:1px solid rgba(255,215,0,0.35);border-radius:10px;background:rgba(255,215,0,0.06);';
+                skinBox.innerHTML = ''
+                    + '<div style="font-size:0.82rem;font-weight:600;color:#ffd54f;margin-bottom:8px;display:flex;align-items:center;gap:6px;">🎨 皮肤显示不对？在这里修正</div>'
+                    + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
+                    + '<select id="vp_heroSel" style="flex:1;min-width:110px;padding:7px;border-radius:7px;border:1px solid rgba(255,255,255,0.2);background:#2a2a4a;color:#fff;font-size:0.8rem;cursor:pointer;"><option value="">英雄…</option></select>'
+                    + '<select id="vp_skinSel" style="flex:1;min-width:110px;padding:7px;border-radius:7px;border:1px solid rgba(255,255,255,0.2);background:#2a2a4a;color:#fff;font-size:0.8rem;cursor:pointer;"><option value="">皮肤…</option></select>'
+                    + '</div>'
+                    + '<div style="display:flex;gap:8px;margin-top:8px;">'
+                    + '<button id="vp_skinApply" style="flex:1;padding:8px;border:none;border-radius:8px;background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;font-size:0.8rem;font-weight:600;cursor:pointer;">✓ 应用</button>'
+                    + '<button id="vp_skinReset" style="flex:1;padding:8px;border:1px solid rgba(255,255,255,0.25);border-radius:8px;background:rgba(255,255,255,0.08);color:#fff;font-size:0.8rem;cursor:pointer;">↺ 恢复默认</button>'
+                    + '</div>'
+                    + '<div id="vp_skinStatus" style="font-size:0.72rem;color:rgba(255,255,255,0.6);margin-top:6px;min-height:14px;"></div>';
+                box.appendChild(skinBox);
+                const heroSel = skinBox.querySelector('#vp_heroSel');
+                const skinSel = skinBox.querySelector('#vp_skinSel');
+                const reg = window.skinRegistry || {};
+                const heroes = Object.keys(reg).filter(h => !h.startsWith('融合') && reg[h] && reg[h].length).sort((a, b) => a.localeCompare(b, 'zh'));
+                heroes.forEach(h => { const o = document.createElement('option'); o.value = h; o.textContent = h; heroSel.appendChild(o); });
+                function fillSkins() {
+                    const hero = heroSel.value; skinSel.innerHTML = '<option value="">皮肤…</option>';
+                    if (!hero) return;
+                    const cur = (window.heroSkinSelections && window.heroSkinSelections[hero]) || '';
+                    (reg[hero] || []).forEach(s => { const o = document.createElement('option'); o.value = s.name; o.textContent = s.name; if (s.name === cur) o.selected = true; skinSel.appendChild(o); });
+                }
+                heroSel.onchange = fillSkins;
+                function setStatus(msg) { const s = skinBox.querySelector('#vp_skinStatus'); if (s) s.textContent = msg; }
+                skinBox.querySelector('#vp_skinApply').onclick = async function() {
+                    const hero = heroSel.value, skin = skinSel.value;
+                    if (!hero) { setStatus('请先选英雄'); return; }
+                    if (typeof window.selectHeroSkin === 'function') window.selectHeroSkin(hero, skin || '');
+                    setStatus('✅ 已应用：' + hero + ' / ' + (skin || '默认'));
+                    await _refreshAllHeroSkins();
+                };
+                skinBox.querySelector('#vp_skinReset').onclick = async function() {
+                    const hero = heroSel.value; if (!hero) { setStatus('请先选英雄'); return; }
+                    const b = (typeof getBaseHeroName === 'function') ? getBaseHeroName((typeof getMainCardName === 'function' ? getMainCardName(hero) : hero)).heroName : hero;
+                    if (window.heroSkinSelections) delete window.heroSkinSelections[b];
+                    try { const all = JSON.parse(localStorage.getItem('tdjl_heroSkinSelections') || '{}'); delete all[b]; localStorage.setItem('tdjl_heroSkinSelections', JSON.stringify(all)); } catch (e) {}
+                    setStatus('↺ 已恢复默认：' + hero);
+                    await _refreshAllHeroSkins();
+                };
+                fillSkins();
+            } catch (e) { console.warn('皮肤修正区初始化失败:', e); }
+        }
+
+        // 改/恢复皮肤后即时刷新所有槽位 + 手牌皮肤（出问题的用户点完立刻看到效果）
+        async function _refreshAllHeroSkins() {
+            try {
+                document.querySelectorAll('.battle-slot.filled').forEach(async slot => {
+                    const name = (typeof getSlotCardName === 'function') ? getSlotCardName(slot) : (slot.dataset.name || '');
+                    if (name && typeof applySkinBgToSlot === 'function') { try { await applySkinBgToSlot(slot, name); } catch (e) {} }
+                });
+                ['myHandContainer', 'teammateHandContainer'].forEach(id => {
+                    const c = document.getElementById(id); if (!c) return;
+                    c.querySelectorAll('.selected-card').forEach(async card => {
+                        const name = card.dataset.name || ''; if (!name || !window.resolveHeroSkinUrl) return;
+                        const baseHero = (typeof getBaseHeroName === 'function') ? getBaseHeroName(name).heroName : name;
+                        const sel = window.heroSkinSelections ? window.heroSkinSelections[baseHero] : undefined;
+                        try {
+                            const url = await window.resolveHeroSkinUrl(name, sel);
+                            if (url && typeof applySkinBgToHandCard === 'function') applySkinBgToHandCard(card, url);
+                            else if (typeof removeSkinBgFromHandCard === 'function') removeSkinBgFromHandCard(card);
+                        } catch (e) {}
+                    });
+                });
+                if (typeof refreshAllFusionSkins === 'function') refreshAllFusionSkins();
+            } catch (e) { console.warn('刷新皮肤失败:', e); }
         }
         // 拉远端 index.html 解析前端 versionTag —— 不依赖 Service Worker（Tauri WebView 下 SW message 通道不可靠，
         // 导致 __tfjlHasNewVersion 永远收不到 NEW_VERSION_READY）。优先 raw.githubusercontent (CORS *)，失败回退同域 GitHub Pages。
@@ -32104,7 +32174,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260806-314 · sw-v431</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260806-315 · sw-v432</span>
             </div>
         </div>
     </div>
