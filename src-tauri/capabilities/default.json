@@ -33,6 +33,7 @@
     "allow-pick-umi-ocr-exe",
     "allow-find-umi-ocr",
     "allow-download-umi-ocr",
+    "allow-download-skins",
     "dialog:default",
     "dialog:allow-open",
     "dialog:allow-save",
