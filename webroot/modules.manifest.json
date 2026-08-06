@@ -1,17 +1,17 @@
 {
-  "version": "v260807-324",
+  "version": "v260807-325",
   "eager": [
     "app-boot.js",
     "app-effects.js",
     "app-features.js",
     "app-local.js",
-    "recognize.js",
     "skins-web.js",
     "app-picker.js",
-    "app-deepsea.js",
     "app-core.js"
   ],
   "lazy": {
-    "skinmaker": { "src": "app-skinmaker.js", "v": "1" }
+    "skinmaker": { "src": "app-skinmaker.js", "v": "1", "preload": false },
+    "recognize": { "src": "recognize.js", "v": "8", "preload": true },
+    "deepsea": { "src": "app-deepsea.js", "v": "1", "preload": true }
   }
 }

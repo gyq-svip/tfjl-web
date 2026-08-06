@@ -1,12 +1,17 @@
 // ============================================================
-// loader.js — 阶段2 按需懒加载器
+// loader.js — 阶段2/2.5 按需懒加载器
 // 首屏必需模块由 index.html 的 <script defer> 负责并行预载；
-// 本文件只处理"按需懒加载"的模块（如皮肤制作器 app-skinmaker.js），
-// 首次用到时才拉取并注入，减少首屏加载体积。
+// 本文件处理"按需懒加载"的模块（皮肤制作器 / 阵容识别 / 深海统计）。
+//   - preload:false（如 skinmaker）：纯按需，首次用到才拉。
+//   - preload:true（如 recognize/deepsea）：空闲预载，它们自己会创建入口 UI。
 // ============================================================
 (function () {
   // 兜底映射（manifest 拉取失败时使用）
-  const FALLBACK = { skinmaker: { src: 'app-skinmaker.js', v: '1' } };
+  const FALLBACK = {
+    skinmaker: { src: 'app-skinmaker.js', v: '1', preload: false },
+    recognize: { src: 'recognize.js', v: '8', preload: true },
+    deepsea: { src: 'app-deepsea.js', v: '1', preload: true }
+  };
   const loaded = Object.create(null);
   const loading = Object.create(null);
   let manifestCache = null;
@@ -23,7 +28,7 @@
       .catch(function () { manifestCache = FALLBACK; return FALLBACK; });
   }
 
-  // 全局懒加载接口：window.loadModule('skinmaker') -> Promise
+  // 全局懒加载接口：window.loadModule('recognize') -> Promise
   window.loadModule = function (name) {
     if (loaded[name]) return Promise.resolve();
     if (loading[name]) return loading[name];
@@ -41,4 +46,24 @@
     });
     return loading[name];
   };
+
+  // 空闲预载需要常驻的懒加载模块（它们自己会创建入口 UI，不能纯按需）
+  function preloadLazy() {
+    getLazyMap().then(function (map) {
+      Object.keys(map).forEach(function (name) {
+        if (map[name] && map[name].preload) {
+          try { window.loadModule(name); } catch (e) { console.warn('[loader] preload fail', name, e); }
+        }
+      });
+    });
+  }
+  function schedulePreload() {
+    var run = function () {
+      if (window.requestIdleCallback) window.requestIdleCallback(preloadLazy);
+      else setTimeout(preloadLazy, 200);
+    };
+    if (document.readyState === 'complete') run();
+    else window.addEventListener('load', run);
+  }
+  schedulePreload();
 })();

@@ -838,7 +838,7 @@
         <!-- APP本地功能脚本（网页版不会执行任何代码，isTauriApp判断在文件内部） -->
         <script defer src="app-local.js?v=26"></script>
         <!-- 阵容识别模块（独立入口 + 灌入脚本生成） -->
-        <script defer src="recognize.js?v=8"></script>
+        
         <!-- 网页版皮肤系统（仅非 Tauri 浏览器执行；Tauri 由 app-local.js 负责，文件内部自动跳过） -->
         <script defer src="skins-web.js?v=2"></script>
 
@@ -1107,7 +1107,7 @@
                 <!-- 深海统计 小窗（改为右边缘浮窗，见页面底部 #deepseaFloatPanel） -->
             </div>
 
-            <script defer src="app-deepsea.js?v=1"></script>
+            
 
             <div class="hands-area">
                 <div class="hand-cards-column user-hand">
@@ -2250,7 +2250,7 @@
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260807-324 · sw-v440</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260807-325 · sw-v441</span>
             </div>
         </div>
     </div>
