@@ -22,7 +22,14 @@
             const placeholder = opts.searchPlaceholder || '🔍 输入关键字或首字母';
             const onPick = opts.onPick || function() {};
             const multi = !!opts.multi; // 卡片多选模式
-            const old = document.getElementById('tfjlGenericPicker');
+            const wide = !!opts.wide; // true=双倍宽（双侧并排时左右各开一个时使用）
+            // 多列密度：'2'|'3'|'4'。手牌多选用 3 列避免拥挤；皮肤等单选仍走默认自适应
+            const cols = opts.columns || (multi ? '4' : 'auto');
+            // 浮层宽度：手牌双侧时拉宽到 ~860，单 picker 用原 420
+            const overlayWidth = wide ? 'min(860px,96vw)' : 'min(420px,92vw)';
+            const noBackdrop = !!opts.noBackdrop; // 双侧并排子 picker 不显示外层黑色背景
+            const overlayId = opts.overlayId || 'tfjlGenericPicker'; // 双侧并排时左右用不同 id 避免 remove 冲突
+            const old = document.getElementById(overlayId);
             if (old) old.remove();
             // 职业分类集合（多选 toggle）；有收藏卡则追加「收藏」
             const profSet = new Set();
@@ -30,10 +37,21 @@
             items.forEach(function(it) { if (it.profession) profSet.add(it.profession); if (it.favorite) hasFav = true; });
             const profs = Array.from(profSet);
             const overlay = document.createElement('div');
-            overlay.id = 'tfjlGenericPicker';
-            overlay.style.cssText = 'position:fixed;inset:0;z-index:100010;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;';
+            overlay.id = overlayId;
+            // 双侧并排的子 picker 嵌到父容器：parent/noBackdrop 决定样式
+            const parent = opts.parent || document.body;
+            if (noBackdrop) {
+                overlay.style.cssText = 'display:flex;align-items:stretch;justify-content:center;min-height:0;width:100%;height:100%;';
+            } else {
+                overlay.style.cssText = 'position:fixed;inset:0;z-index:100010;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;';
+            }
             const box = document.createElement('div');
-            box.style.cssText = 'width:min(420px,92vw);height:min(72vh,560px);background:rgba(28,30,40,0.98);border:1px solid rgba(255,215,0,0.4);border-radius:12px;padding:14px;box-shadow:0 8px 32px rgba(0,0,0,0.6);display:flex;flex-direction:column;';
+            // box 样式：普通模式走原 size；子 picker 走 100% 适配父列
+            if (noBackdrop) {
+                box.style.cssText = 'width:100%;height:100%;background:rgba(28,30,40,0.98);border:1px solid rgba(255,215,0,0.4);border-radius:10px;padding:12px;box-shadow:none;display:flex;flex-direction:column;box-sizing:border-box;';
+            } else {
+                box.style.cssText = 'width:' + overlayWidth + ';height:min(72vh,560px);background:rgba(28,30,40,0.98);border:1px solid rgba(255,215,0,0.4);border-radius:12px;padding:14px;box-shadow:0 8px 32px rgba(0,0,0,0.6);display:flex;flex-direction:column;';
+            }
             overlay.appendChild(box);
             const head = document.createElement('div');
             head.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;';
@@ -85,7 +103,11 @@
             }
             const list = document.createElement('div');
             if (multi) {
-                list.style.cssText = 'overflow-y:auto;flex:1;min-height:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:6px;align-content:start;padding:2px;';
+                // 多列密度：'3'/'2' 走固定列数（手牌选择器用 3 列避免拥挤），其它走自适应
+                const colsCss = cols === '3' ? 'repeat(3,1fr)'
+                              : cols === '2' ? 'repeat(2,1fr)'
+                              : 'repeat(auto-fill,minmax(88px,1fr))';
+                list.style.cssText = 'overflow-y:auto;flex:1;min-height:0;display:grid;grid-template-columns:' + colsCss + ';gap:6px;align-content:start;padding:2px;';
             } else {
                 list.style.cssText = 'overflow-y:auto;flex:1;min-height:0;';
             }
@@ -160,8 +182,11 @@
             }
             inp.oninput = function() { render(inp.value); };
             render('');
-            overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
-            document.body.appendChild(overlay);
+            // 点击外面关闭：仅主 picker（fixed backdrop）启用，避免双侧子 picker 自关闭
+            if (!noBackdrop) {
+                overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+            }
+            parent.appendChild(overlay);
             setTimeout(function() { try { inp.focus(); } catch (e) {} }, 50);
         }
         window.openGenericPicker = openGenericPicker;

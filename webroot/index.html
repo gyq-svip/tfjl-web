@@ -1110,6 +1110,10 @@
             
 
             <div class="hands-area">
+                <div style="margin-bottom:6px;display:flex;gap:6px;align-items:center;">
+                    <button onclick="openPoolCardPickerDual()" title="左右各一个选择器，同时选两边手牌" style="flex:1;background:linear-gradient(135deg,#ff9800,#f44336);color:#fff;border:none;padding:8px 10px;border-radius:6px;cursor:pointer;font-size:0.85rem;font-weight:bold;">🔀 双侧并排选（我 / 队友）</button>
+                    <button onclick="openPoolCardPicker('teammate','2')" title="队友：2 列版本（3列拥挤时试用）" style="background:rgba(255,255,255,0.06);color:#ffb74d;border:1px solid rgba(255,183,77,0.4);padding:6px 8px;border-radius:6px;cursor:pointer;font-size:0.72rem;">👥队友(2列)</button>
+                </div>
                 <div class="hand-cards-column user-hand">
                     <h3>📋 我的手牌 <span id="myHandCount">0/10</span></h3>
                     <div class="selected-cards-container my-hand" id="myHandContainer"></div>
@@ -2251,7 +2255,7 @@
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260807-332 · sw-v448</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260807-333 · sw-v449</span>
             </div>
         </div>
     </div>
