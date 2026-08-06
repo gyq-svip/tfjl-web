@@ -5417,8 +5417,15 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             });
             // 皮肤制作 Tab：无论是带参进入还是手动点 Tab 切换，都要初始化+重绘，
             // 否则画布从未渲染过 → 全黑、选图无反应。用 rAF 等面板 display 生效后再画。
-            if (tab === 'skin' && typeof window.openSkinMaker === 'function') {
-                requestAnimationFrame(function () { try { window.openSkinMaker(); } catch (e) { console.warn('[skinMaker] init failed', e); } });
+            // 皮肤制作器(app-skinmaker.js)已改为按需懒加载：未载入时先 loadModule 再初始化。
+            if (tab === 'skin') {
+                if (typeof window.openSkinMaker === 'function') {
+                    requestAnimationFrame(function () { try { window.openSkinMaker(); } catch (e) { console.warn('[skinMaker] init failed', e); } });
+                } else if (window.loadModule) {
+                    window.loadModule('skinmaker').then(function () {
+                        requestAnimationFrame(function () { try { window.openSkinMaker(); } catch (e) { console.warn('[skinMaker] init failed', e); } });
+                    }).catch(function (e) { console.warn('[skinMaker] load failed', e); });
+                }
             }
             if (tab === 'hero') { try { cgmRefreshHeroList(); } catch (e) {} }
         }

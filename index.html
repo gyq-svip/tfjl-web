@@ -31,7 +31,7 @@
             <div style="width:6px;height:6px;background:#00bcd4;border-radius:50%;animation:loadingDotBounce 1.2s ease-in-out 0.4s infinite;"></div>
         </div>
     </div>
-    <script src="app-boot.js?v=1"></script>
+    <script defer src="app-boot.js?v=1"></script>
 
     <!-- 密码验证层（默认隐藏；启动逻辑确认"未登录"后才显示，避免已登录用户闪一下登录界面） -->
     <div id="passwordOverlay" class="password-overlay" style="display:none;">
@@ -771,7 +771,7 @@
         </div>
         </div><!-- /activityCalcPanel -->
 
-        <script src="app-effects.js?v=1"></script>
+        <script defer src="app-effects.js?v=1"></script>
 
         <!-- 固定在右上角的按钮 -->
         <div class="sticky-buttons" style="position:fixed;top:12px;right:12px;z-index:9999;display:flex;gap:5px;">
@@ -822,7 +822,7 @@
             </div>
         </div>
 
-        <script src="app-features.js?v=1"></script>
+        <script defer src="app-features.js?v=1"></script>
 
         <!-- 项目操作菜单（折叠） -->
         <div id="projectMenu" style="display:none;position:fixed;z-index:9998;background:rgba(40,40,70,0.98);border:1px solid rgba(255,215,0,0.3);border-radius:10px;padding:10px;min-width:200px;max-height:85vh;overflow-y:auto;box-shadow:0 4px 15px rgba(0,0,0,0.4);">
@@ -841,13 +841,13 @@
         </div>
 
         <!-- APP本地功能脚本（网页版不会执行任何代码，isTauriApp判断在文件内部） -->
-        <script src="app-local.js?v=30"></script>
+        <script defer src="app-local.js?v=30"></script>
         <!-- 阵容识别模块（独立入口 + 灌入脚本生成） -->
-        <script src="recognize.js?v=8"></script>
+        <script defer src="recognize.js?v=8"></script>
         <!-- 网页版皮肤系统（仅非 Tauri 浏览器执行；Tauri 由 app-local.js 负责，文件内部自动跳过） -->
-        <script src="skins-web.js?v=2"></script>
+        <script defer src="skins-web.js?v=2"></script>
 
-        <script src="app-picker.js?v=1"></script>
+        <script defer src="app-picker.js?v=1"></script>
 
         <!-- 记事本悬浮面板 -->
         <div id="notepadPanel" style="display:none;position:fixed;top:80px;right:20px;width:400px;height:350px;z-index:9997;background:rgba(30,30,60,0.95);border:2px solid rgba(255,215,0,0.5);border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.5);overflow:auto;resize:both;min-width:280px;min-height:250px;">
@@ -1112,7 +1112,7 @@
                 <!-- 深海统计 小窗（改为右边缘浮窗，见页面底部 #deepseaFloatPanel） -->
             </div>
 
-            <script src="app-deepsea.js?v=1"></script>
+            <script defer src="app-deepsea.js?v=1"></script>
 
             <div class="hands-area">
                 <div class="hand-cards-column user-hand">
@@ -1421,7 +1421,7 @@
             </div>
         </div>
 
-    <script src="app-core.js?v=1"></script>
+    <script defer src="app-core.js?v=1"></script>
 
     <!-- 模态框：创建分类 -->
     <div id="createCategoryModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;justify-content:center;align-items:center;">
@@ -2246,7 +2246,7 @@
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260807-323 · sw-v439</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260807-324 · sw-v440</span>
             </div>
         </div>
     </div>
@@ -2267,7 +2267,7 @@
         </div>
     </div>
 
-  <!-- 皮肤制作工具（openSkinMaker / closeSkinMaker，写入 skins 目录并登记 registry） -->
-  <script src="app-skinmaker.js?v=1"></script>
+  <!-- 皮肤制作工具改为按需懒加载：首次打开皮肤 Tab 时由 loader.js 拉取 app-skinmaker.js -->
+  <script src="loader.js?v=1"></script>
 </body>
 </html>

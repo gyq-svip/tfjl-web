@@ -39,6 +39,9 @@ jobs:
           cp -v recognize.js skins-web.js gh-gist.js github-config.js _site/ 2>/dev/null || true
           cp -v styles.css sw.js _site/ 2>/dev/null || true
 
+          # 阶段2 懒加载器 + 模块清单
+          cp -v loader.js modules.manifest.json _site/ 2>/dev/null || true
+
           # 更新元数据（App 更新器读取）
           cp -v updater.json version.json _site/ 2>/dev/null || true
 
@@ -72,7 +75,7 @@ jobs:
         run: |
           set -e
           MISSING=false
-          for f in index.html sw.js styles.css app-core.js app-features.js; do
+          for f in index.html sw.js styles.css app-core.js app-features.js loader.js; do
             if [ ! -f "_site/$f" ]; then
               echo "❌ ERROR: 缺少关键文件 _site/$f"
               MISSING=true

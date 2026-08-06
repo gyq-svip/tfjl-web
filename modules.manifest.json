@@ -1,0 +1,17 @@
+{
+  "version": "v260807-324",
+  "eager": [
+    "app-boot.js",
+    "app-effects.js",
+    "app-features.js",
+    "app-local.js",
+    "recognize.js",
+    "skins-web.js",
+    "app-picker.js",
+    "app-deepsea.js",
+    "app-core.js"
+  ],
+  "lazy": {
+    "skinmaker": { "src": "app-skinmaker.js", "v": "1" }
+  }
+}
