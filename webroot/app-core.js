@@ -13575,7 +13575,7 @@ function hasGistToken() {
             });
         }
         // 云端备份 Gist（与主 Gist 独立，主 Gist 被删时重建先从此恢复）。初始为空，运行时首个已登录用户保存即创建并记录到 localStorage
-        const MESSAGES_BACKUP_GIST_ID = '';
+        const MESSAGES_BACKUP_GIST_ID = '36a871e70faf95cd86641a7080952192';
         async function backupWallMessages(arr) {
             try {
                 const token = getGistToken();
@@ -13598,7 +13598,19 @@ function hasGistToken() {
         }
         async function restoreWallFromBackup() {
             try {
-                const backupId = localStorage.getItem('messages_backup_gist_id') || MESSAGES_BACKUP_GIST_ID;
+                // 目录式指针：优先从索引 room_index.json 的 backup 字段取备用 Gist（真实数据源，长期保活，无需 token 即可读）
+                let backupId = localStorage.getItem('messages_backup_gist_id') || MESSAGES_BACKUP_GIST_ID;
+                try {
+                    const idxResp = await fetch(`https://api.github.com/gists/${GIST_ID}`, { headers: { 'Accept': 'application/vnd.github.v3+json' } });
+                    if (idxResp.ok) {
+                        const idxData = await idxResp.json();
+                        const ri = idxData.files && idxData.files['room_index.json'];
+                        if (ri && ri.content) {
+                            const idx = JSON.parse(ri.content);
+                            if (idx.backup) { backupId = idx.backup; localStorage.setItem('messages_backup_gist_id', backupId); }
+                        }
+                    }
+                } catch (e) {}
                 if (!backupId) return null;
                 const resp = await fetch('https://api.github.com/gists/' + backupId);
                 if (!resp.ok) return null;
