@@ -27,7 +27,7 @@
             overlay.id = 'tfjlGenericPicker';
             overlay.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;';
             const box = document.createElement('div');
-            box.style.cssText = 'width:min(440px,92vw);max-height:82vh;background:rgba(28,30,40,0.98);border:1px solid rgba(255,215,0,0.4);border-radius:12px;padding:14px;box-shadow:0 8px 32px rgba(0,0,0,0.6);display:flex;flex-direction:column;';
+            box.style.cssText = 'width:min(420px,92vw);height:min(72vh,560px);background:rgba(28,30,40,0.98);border:1px solid rgba(255,215,0,0.4);border-radius:12px;padding:14px;box-shadow:0 8px 32px rgba(0,0,0,0.6);display:flex;flex-direction:column;';
             overlay.appendChild(box);
             const head = document.createElement('div');
             head.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;';
