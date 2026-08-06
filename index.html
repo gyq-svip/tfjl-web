@@ -1552,6 +1552,13 @@
                             <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">调试日志</div>
                         </div>
                     </div>
+                    <div class="admin-menu-item" onclick="adminRestoreFromBackup()" style="padding:10px;">
+                        <span style="font-size:1.1rem;">🛡️</span>
+                        <div style="margin-left:8px;">
+                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">需求墙一键还原</div>
+                            <div style="color:rgba(255,255,255,0.5);font-size:0.68rem;">从备用Gist合并恢复</div>
+                        </div>
+                    </div>
                     <div class="admin-menu-item" onclick="toggleConsoleVisibility()" style="padding:10px;">
                         <span style="font-size:1.1rem;">🖥️</span>
                         <div style="margin-left:8px;">
@@ -2117,7 +2124,7 @@
             <span style="color:#ffd700;font-size:0.9rem;font-weight:bold;">📢 需求墙</span>
             <div style="display:flex;gap:10px;">
                 <button id="msgRefreshBtn" onclick="fetchMessages();msgRefreshCountdown=30;updateMsgRefreshBtn();" title="刷新消息" style="background:transparent;border:none;color:#4fc3f7;font-size:0.8rem;cursor:pointer;padding:0;font-family:monospace;min-width:32px;text-align:center;">⏳30</button>
-                <button id="msgRestoreBtn" onclick="adminRestoreFromBackup()" title="管理员：从备用Gist一键还原需求墙" style="background:transparent;border:none;color:#ffd700;font-size:0.8rem;cursor:pointer;padding:0;font-family:monospace;white-space:nowrap;">🛡还原</button>
+                <button id="msgRestoreBtn" onclick="adminRestoreFromBackup()" title="管理员：从备用Gist一键还原需求墙" style="display:none;background:transparent;border:none;color:#ffd700;font-size:0.8rem;cursor:pointer;padding:0;font-family:monospace;white-space:nowrap;">🛡还原</button>
                 <button onclick="toggleMessageWallSize()" title="最小化" style="background:transparent;border:none;color:#ffd700;font-size:1rem;cursor:pointer;padding:0;">−</button>
                 <button onclick="closeMessageWall()" title="关闭" style="background:transparent;border:none;color:#ff6b6b;font-size:1rem;cursor:pointer;padding:0;">×</button>
             </div>
@@ -2251,7 +2258,7 @@
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260807-333 · sw-v449</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260807-334 · sw-v450</span>
             </div>
         </div>
     </div>

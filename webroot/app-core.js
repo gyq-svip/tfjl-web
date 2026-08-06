@@ -13758,6 +13758,15 @@ function hasGistToken() {
             } catch (e) { showToast('❌ 还原出错：' + (e.message || e)); }
         }
 
+        // 仅管理员可见还原按钮：URL 带 ?admin=1 或 localStorage.tfjl_admin=1 时才显示
+        function showAdminRestoreBtnIfAllowed() {
+            try {
+                const allowed = (new URLSearchParams(location.search).get('admin') === '1') || (localStorage.getItem('tfjl_admin') === '1');
+                const btn = document.getElementById('msgRestoreBtn');
+                if (btn) btn.style.display = allowed ? '' : 'none';
+            } catch (e) {}
+        }
+
 
         function updateMsgRefreshBtn() {
             const btn = document.getElementById('msgRefreshBtn');
@@ -16552,6 +16561,8 @@ ${maSection}
         let adminLongPressTriggered = false;
 
         document.addEventListener('DOMContentLoaded', () => {
+            // 管理员还原按钮：仅 URL ?admin=1 或已激活时才显示
+            showAdminRestoreBtnIfAllowed();
             const header = document.getElementById('mainHeader');
             header.addEventListener('mousedown', (e) => {
                 e.preventDefault();
