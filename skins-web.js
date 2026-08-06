@@ -14,7 +14,8 @@
   }
   console.log('[SKIN-WEB] 网页版皮肤系统初始化');
 
-  var REMOTE_SKIN_BASE = 'https://gyq-svip.github.io/tfjl-web/skins';
+  var REMOTE_SKIN_BASE = 'https://cdn.jsdelivr.net/gh/gyq-svip/tfjl-web@main/skins';
+  var REMOTE_SKIN_BASE_FALLBACK = 'https://gyq-svip.github.io/tfjl-web/skins';
   var REMOTE_SKIN_REGISTRY_URL = REMOTE_SKIN_BASE + '/registry.json';
   var REMOTE_SKIN_FUSIONS_URL = REMOTE_SKIN_BASE + '/fusions.json';
 

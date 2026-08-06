@@ -3234,8 +3234,9 @@ if (isTauriApp) {
 
     // ==================== 英雄皮肤系统 ====================
 
-    // 远程皮肤注册表（GitHub Pages 托管，所有设备打开即自动同步）
-    const REMOTE_SKIN_BASE = 'https://gyq-svip.github.io/tfjl-web/skins';
+    // 远程皮肤注册表（jsDelivr CDN 托管，所有设备打开即自动同步；国内比 GitHub Pages 快）
+    const REMOTE_SKIN_BASE = 'https://cdn.jsdelivr.net/gh/gyq-svip/tfjl-web@main/skins';
+    const REMOTE_SKIN_BASE_FALLBACK = 'https://gyq-svip.github.io/tfjl-web/skins';
     const REMOTE_SKIN_REGISTRY_URL = REMOTE_SKIN_BASE + '/registry.json';
     const REMOTE_SKIN_FUSIONS_URL = REMOTE_SKIN_BASE + '/fusions.json';
 
