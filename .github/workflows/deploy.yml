@@ -33,45 +33,32 @@ jobs:
           for file in *.html; do
             if [ -f "$file" ]; then
               echo "✅ $file exists"
-              if grep -q "YOUR_GITHUB_TOKEN_HERE" "$file"; then
-                echo "  ✅ Token placeholder found in $file"
-              else
-                echo "  ℹ️ No token placeholder in $file (may not need it)"
-              fi
             fi
           done
 
-      - name: Debug - Check secret
+      - name: Inject Token (optional)
         run: |
-          echo "Checking GIST_TOKEN secret..."
-          if [ -n "${{ secrets.GIST_TOKEN }}" ]; then
-            echo "✅ GIST_TOKEN secret exists"
-            echo "Token length: ${#GIST_TOKEN}"
-            echo "Token prefix: ${GIST_TOKEN:0:10}"
-          else
-            echo "❌ GIST_TOKEN secret is empty!"
-            exit 1
-          fi
-
-      - name: Inject Token
-        run: |
-          echo "Injecting GitHub Token..."
-          
-          # 读取Token
           TOKEN="${{ secrets.GIST_TOKEN }}"
-          
-          # 对所有HTML文件进行Token替换
+          if [ -z "$TOKEN" ]; then
+            echo "⚠️ GIST_TOKEN 未设置，跳过注入（前端将回退到 parent.getGistToken()）"
+            exit 0
+          fi
+          echo "Injecting GitHub Token..."
           for file in *.html; do
             if grep -q "YOUR_GITHUB_TOKEN_HERE" "$file"; then
               sed -i "s/YOUR_GITHUB_TOKEN_HERE/$TOKEN/g" "$file"
               echo "✅ Token injected into $file"
             fi
           done
-          
           echo "Token injection completed"
 
-      - name: Verify Injection
+      - name: Verify Injection (optional)
         run: |
+          TOKEN="${{ secrets.GIST_TOKEN }}"
+          if [ -z "$TOKEN" ]; then
+            echo "ℹ️ 无 GIST_TOKEN，跳过注入校验"
+            exit 0
+          fi
           echo "Verifying token injection..."
           ALL_OK=true
           for file in *.html; do
