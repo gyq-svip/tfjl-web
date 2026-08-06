@@ -8300,7 +8300,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         function collectPoolCards() {
             const seen = new Set();
             const list = [];
-            document.querySelectorAll('.collapsible-section .card-item, #favoriteCardsGrid .card-item').forEach(el => {
+            function pushCard(el, favorite) {
                 const id = el.dataset.id;
                 const name = el.dataset.name;
                 if (!name || seen.has(name)) return;
@@ -8317,10 +8317,14 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     profession: el.dataset.profession, // 顶层职业字段，供筛选器分类
                     current: current,
                     sub: (isFusion ? '🜂融合 ' : '') + (current ? '✓ ' + current : ''),
+                    favorite: !!favorite, // 收藏卡标记，供选择器「收藏」分类
                     // 透传上阵所需字段
                     _ds: { id, name, engineering: el.dataset.engineering, profession: el.dataset.profession, type: el.dataset.type }
                 });
-            });
+            }
+            // 收藏卡优先收集（标记 favorite），再收集卡池普通卡（按 name 去重跳过已加）
+            document.querySelectorAll('#favoriteCardsGrid .card-item').forEach(el => pushCard(el, true));
+            document.querySelectorAll('.collapsible-section .card-item').forEach(el => pushCard(el, false));
             // 按首字母排序，方便浏览
             list.sort((a, b) => (a.py || a.label).localeCompare(b.py || b.label, 'zh-Hans-CN'));
             return list;
@@ -8335,9 +8339,12 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 title: title,
                 searchPlaceholder: '输入首字母（如 sl=水灵）或卡名关键字…',
                 items: items,
-                onPick: function (val, it) {
-                    // 构造 mock 节点复用既有上阵逻辑，并透传 side
-                    handlePoolCardClick({ dataset: it._ds }, side);
+                multi: true,
+                onPick: function (vals, its) {
+                    // 多选：批量上阵所有选中卡（复用既有上阵逻辑）
+                    (its || []).forEach(function (it) {
+                        handlePoolCardClick({ dataset: it._ds }, side);
+                    });
                 }
             });
         }

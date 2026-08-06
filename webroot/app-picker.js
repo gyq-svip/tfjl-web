@@ -21,16 +21,22 @@
             const title = opts.title || '请选择';
             const placeholder = opts.searchPlaceholder || '🔍 输入关键字或首字母';
             const onPick = opts.onPick || function() {};
+            const multi = !!opts.multi; // 卡片多选模式
             const old = document.getElementById('tfjlGenericPicker');
             if (old) old.remove();
+            // 职业分类集合（多选 toggle）；有收藏卡则追加「收藏」
+            const profSet = new Set();
+            let hasFav = false;
+            items.forEach(function(it) { if (it.profession) profSet.add(it.profession); if (it.favorite) hasFav = true; });
+            const profs = Array.from(profSet);
             const overlay = document.createElement('div');
             overlay.id = 'tfjlGenericPicker';
-            overlay.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;';
+            overlay.style.cssText = 'position:fixed;inset:0;z-index:100010;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;';
             const box = document.createElement('div');
             box.style.cssText = 'width:min(420px,92vw);height:min(72vh,560px);background:rgba(28,30,40,0.98);border:1px solid rgba(255,215,0,0.4);border-radius:12px;padding:14px;box-shadow:0 8px 32px rgba(0,0,0,0.6);display:flex;flex-direction:column;';
             overlay.appendChild(box);
             const head = document.createElement('div');
-            head.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;';
+            head.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;';
             const hEl = document.createElement('div');
             hEl.textContent = title;
             hEl.style.cssText = 'font-size:0.95rem;font-weight:600;color:#ffd54f;';
@@ -43,11 +49,68 @@
             const inp = document.createElement('input');
             inp.type = 'text';
             inp.placeholder = placeholder;
-            inp.style.cssText = 'width:100%;padding:9px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#fff;font-size:0.85rem;box-sizing:border-box;margin-bottom:8px;';
+            inp.style.cssText = 'width:100%;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#fff;font-size:0.85rem;box-sizing:border-box;margin-bottom:6px;';
             box.appendChild(inp);
+            // 多选状态
+            const selectedProfs = new Set(); // 分类多选（并集）
+            const selectedCards = new Set(); // 卡片多选（pickKey 集合）
+            // 职业/收藏分类栏（可多选 toggle）
+            let profBar = null;
+            if (profs.length > 1 || hasFav) {
+                function makeProfBtn(label, val) {
+                    const b = document.createElement('button');
+                    b.textContent = label;
+                    b.dataset.val = val;
+                    const on = (val === '');
+                    b.style.cssText = 'padding:3px 10px;border-radius:12px;border:1px solid rgba(255,255,255,0.2);background:' + (on ? 'rgba(255,215,0,0.25)' : 'rgba(255,255,255,0.06)') + ';color:#fff;font-size:0.72rem;cursor:pointer;' + (on ? 'border-color:rgba(255,215,0,0.5);' : '');
+                    b.onclick = function() {
+                        if (val === '') { selectedProfs.clear(); }
+                        else { if (selectedProfs.has(val)) selectedProfs.delete(val); else selectedProfs.add(val); }
+                        profBar.querySelectorAll('button').forEach(function(x) {
+                            const v = x.dataset.val;
+                            const active = (v === '') ? (selectedProfs.size === 0) : selectedProfs.has(v);
+                            x.style.background = active ? 'rgba(255,215,0,0.25)' : 'rgba(255,255,255,0.06)';
+                            x.style.borderColor = active ? 'rgba(255,215,0,0.5)' : 'rgba(255,255,255,0.2)';
+                        });
+                        render(inp.value);
+                    };
+                    return b;
+                }
+                profBar = document.createElement('div');
+                profBar.style.cssText = 'display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;';
+                profBar.appendChild(makeProfBtn('全部', ''));
+                profs.forEach(function(p) { profBar.appendChild(makeProfBtn(window.professionToCn ? window.professionToCn(p) : p, p)); });
+                if (hasFav) profBar.appendChild(makeProfBtn('⭐收藏', '__fav'));
+                box.appendChild(profBar);
+            }
             const list = document.createElement('div');
-            list.style.cssText = 'overflow-y:auto;flex:1;min-height:0;';
+            if (multi) {
+                list.style.cssText = 'overflow-y:auto;flex:1;min-height:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:6px;align-content:start;padding:2px;';
+            } else {
+                list.style.cssText = 'overflow-y:auto;flex:1;min-height:0;';
+            }
             box.appendChild(list);
+            // 多选底部操作栏
+            let _doneBtn = null, _infoEl = null;
+            if (multi) {
+                const actionBar = document.createElement('div');
+                actionBar.style.cssText = 'display:flex;gap:8px;margin-top:8px;';
+                const info = document.createElement('div');
+                info.style.cssText = 'flex:1;align-self:center;font-size:0.8rem;color:rgba(255,255,255,0.7);';
+                const done = document.createElement('button');
+                done.textContent = '完成 (0)';
+                done.style.cssText = 'padding:8px 16px;border:none;border-radius:8px;background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;font-size:0.85rem;font-weight:600;cursor:pointer;';
+                done.onclick = function() {
+                    const vals = Array.from(selectedCards);
+                    const its = items.filter(function(it) { return selectedCards.has(pickKey(it)); });
+                    overlay.remove();
+                    onPick(vals, its);
+                };
+                actionBar.appendChild(info); actionBar.appendChild(done);
+                box.appendChild(actionBar);
+                _doneBtn = done; _infoEl = info;
+            }
+            function pickKey(it) { return (it && it._ds && it._ds.id) ? it._ds.id : (it ? it.value : ''); }
             function render(q) {
                 q = (q || '').trim().toLowerCase();
                 list.innerHTML = '';
@@ -57,21 +120,43 @@
                     const py = (it.py != null ? it.py : window.hanziInitials(label)).toLowerCase();
                     const hit = !q || label.toLowerCase().indexOf(q) >= 0 || py.indexOf(q) >= 0;
                     if (!hit) return;
+                    if (selectedProfs.size > 0) {
+                        const okProf = it.profession && selectedProfs.has(it.profession);
+                        const okFav = selectedProfs.has('__fav') && it.favorite;
+                        if (!okProf && !okFav) return;
+                    }
                     shown++;
+                    const profCn = (it.profession && window.professionToCn) ? window.professionToCn(it.profession) : it.profession;
+                    const sub = [profCn ? ('【' + profCn + '】') : '', it.sub ? it.sub : '', it.current ? '✓' : ''].filter(Boolean).join(' ');
                     const row = document.createElement('div');
-                    row.textContent = label + (it.sub ? ('  ·  ' + it.sub) : '') + (it.current ? '  ✓' : '');
-                    row.style.cssText = 'padding:8px 10px;border-radius:7px;cursor:pointer;color:' + (it.current ? '#4caf50' : '#fff') + ';font-size:0.85rem;' + (it.current ? 'background:rgba(76,175,80,0.12);' : '');
-                    row.onmouseenter = function() { if (!it.current) row.style.background = 'rgba(255,255,255,0.08)'; };
-                    row.onmouseleave = function() { if (!it.current) row.style.background = 'transparent'; };
-                    row.onclick = function() { onPick(it.value, it); overlay.remove(); };
+                    const key = pickKey(it);
+                    const isSel = multi && selectedCards.has(key);
+                    if (multi) {
+                        row.style.cssText = 'padding:6px 4px;border-radius:7px;cursor:pointer;color:' + (it.current ? '#4caf50' : '#fff') + ';font-size:0.78rem;text-align:center;line-height:1.2;border:1px solid ' + (isSel ? 'rgba(76,175,80,0.9)' : 'rgba(255,255,255,0.12)') + ';background:' + (isSel ? 'rgba(76,175,80,0.18)' : 'rgba(255,255,255,0.04)') + ';position:relative;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+                        if (isSel) { const badge = document.createElement('span'); badge.textContent = '✓'; badge.style.cssText = 'position:absolute;top:1px;right:3px;color:#81c784;font-size:0.7rem;'; row.appendChild(badge); }
+                    } else {
+                        row.style.cssText = 'padding:7px 10px;border-radius:7px;cursor:pointer;color:' + (it.current ? '#4caf50' : '#fff') + ';font-size:0.85rem;' + (it.current ? 'background:rgba(76,175,80,0.12);' : '');
+                    }
+                    row.textContent = label + (sub ? ('  ·  ' + sub) : '');
+                    if (multi) {
+                        row.onclick = function() {
+                            if (selectedCards.has(key)) selectedCards.delete(key); else selectedCards.add(key);
+                            render(inp.value);
+                        };
+                    } else {
+                        row.onmouseenter = function() { if (!it.current) row.style.background = 'rgba(255,255,255,0.08)'; };
+                        row.onmouseleave = function() { if (!it.current) row.style.background = 'transparent'; };
+                        row.onclick = function() { onPick(it.value, it); overlay.remove(); };
+                    }
                     list.appendChild(row);
                 });
                 if (shown === 0) {
                     const e = document.createElement('div');
                     e.textContent = '无匹配项';
-                    e.style.cssText = 'padding:10px;color:rgba(255,255,255,0.5);font-size:0.8rem;text-align:center;';
+                    e.style.cssText = 'padding:10px;color:rgba(255,255,255,0.5);font-size:0.8rem;text-align:center;' + (multi ? 'grid-column:1/-1;' : '');
                     list.appendChild(e);
                 }
+                if (multi) { _infoEl.textContent = '已选 ' + selectedCards.size + ' 张'; _doneBtn.textContent = '完成 (' + selectedCards.size + ')'; }
             }
             inp.oninput = function() { render(inp.value); };
             render('');
