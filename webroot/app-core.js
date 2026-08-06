@@ -13622,6 +13622,68 @@ function hasGistToken() {
             } catch (e) { return null; }
         }
 
+        // 管理员一键还原：把备用 Gist（目录式 backup 字段）的消息合并写回当前需求墙指向的主 Gist
+        async function adminRestoreFromBackup() {
+            const token = getGistToken();
+            if (!token) { alert('请先登录在线版（GitHub 登录）后再还原'); return; }
+            if (!confirm('确认从备用 Gist 一键还原需求墙？\n\n将把备用 Gist 的消息合并到当前需求墙指向的主 Gist（不会删除主 Gist 中已有的新消息）。')) return;
+            try {
+                showToast('⏳ 正在从备用 Gist 还原...');
+                // 1) 取备用 Gist ID（目录式优先：索引 backup 字段 → 常量）
+                let backupId = localStorage.getItem('messages_backup_gist_id') || MESSAGES_BACKUP_GIST_ID;
+                try {
+                    const idxResp = await fetch(`https://api.github.com/gists/${GIST_ID}`, { headers: { 'Accept': 'application/vnd.github.v3+json' } });
+                    if (idxResp.ok) {
+                        const idxData = await idxResp.json();
+                        const ri = idxData.files && idxData.files['room_index.json'];
+                        if (ri && ri.content) { const idx = JSON.parse(ri.content); if (idx.backup) backupId = idx.backup; }
+                    }
+                } catch (e) {}
+                if (!backupId) { showToast('❌ 未找到备用 Gist'); return; }
+                // 2) 读备用内容（public 免 token）
+                const bkResp = await fetch('https://api.github.com/gists/' + backupId);
+                if (!bkResp.ok) { showToast('❌ 备用 Gist 读取失败(' + bkResp.status + ')'); return; }
+                const bkData = await bkResp.json();
+                const bkContent = bkData.files && bkData.files['messages.json'] && bkData.files['messages.json'].content;
+                if (!bkContent) { showToast('❌ 备用 Gist 无消息'); return; }
+                const bkMsgs = (JSON.parse(bkContent).messages) || [];
+                // 3) 解析当前主 Gist ID（索引 messages 优先 → 硬编码兜底）
+                const gistDeleted = localStorage.getItem('messages_gist_deleted') === 'true';
+                let mainId = (!gistDeleted && MESSAGES_GIST_ID) ? MESSAGES_GIST_ID : (localStorage.getItem('messages_gist_id') || '');
+                if (!gistDeleted) {
+                    try {
+                        const idxResp = await fetch(`https://api.github.com/gists/${GIST_ID}`, { headers: { 'Accept': 'application/vnd.github.v3+json' } });
+                        if (idxResp.ok) {
+                            const idxData = await idxResp.json();
+                            const ri = idxData.files && idxData.files['room_index.json'];
+                            if (ri && ri.content) { const idx = JSON.parse(ri.content); if (idx.messages) { mainId = idx.messages; localStorage.setItem('messages_gist_id', mainId); } }
+                        }
+                    } catch (e) {}
+                }
+                if (!mainId) { showToast('❌ 未确定主 Gist'); return; }
+                // 4) 合并：主现有 wallMessages + 备用，去重（保留主里的新消息）
+                const merged = (wallMessages || []).slice();
+                const seen = new Set(merged.map(m => m.time + '_' + m.author + '_' + (m.content || '').substring(0, 30)));
+                let added = 0;
+                bkMsgs.forEach(m => { const k = m.time + '_' + m.author + '_' + (m.content || '').substring(0, 30); if (!seen.has(k)) { merged.push(m); seen.add(k); added++; } });
+                merged.sort((a, b) => b.time - a.time);
+                const finalMsgs = merged.slice(0, MAX_MESSAGES);
+                // 5) 写回主 Gist（用户 token 可写主 Gist）
+                const resp = await fetch('https://api.github.com/gists/' + mainId, {
+                    method: 'PATCH',
+                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': 'token ' + token },
+                    body: JSON.stringify({ files: { 'messages.json': { content: JSON.stringify({ messages: finalMsgs }, null, 2) } } })
+                });
+                if (!resp.ok) { showToast('❌ 还原写入失败(' + resp.status + ')'); return; }
+                wallMessages = finalMsgs;
+                localStorage.removeItem('messages_gist_deleted');
+                localStorage.removeItem('messages_gist_id');
+                await saveWallToDB(finalMsgs);
+                await fetchMessages();
+                showToast('✅ 已还原：合并 ' + added + ' 条备用消息，共 ' + finalMsgs.length + ' 条');
+            } catch (e) { showToast('❌ 还原出错：' + (e.message || e)); }
+        }
+
 
         function updateMsgRefreshBtn() {
             const btn = document.getElementById('msgRefreshBtn');
