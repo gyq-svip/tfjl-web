@@ -11807,6 +11807,8 @@ function hasGistToken() {
         let versionCheckInterval = null;
         
         function initVersionSwitch() {
+            // APP(Tauri)内不需要在线版/离线版切换提示，直接跳过
+            if (window.__TAURI__ || window.__TAURI_INTERNALS__) return;
             isCurrentVersionOnline = checkIfOnlineVersion();
             checkOnlineVersionAvailability();
             versionCheckInterval = setInterval(checkOnlineVersionAvailability, 30000);
@@ -11844,6 +11846,8 @@ function hasGistToken() {
         function updateVersionSwitchButton() {
             const btn = document.getElementById('versionSwitchBtn');
             if (!btn) return;
+            // APP(Tauri)内永不显示在线版切换图标
+            if (window.__TAURI__ || window.__TAURI_INTERNALS__) { btn.style.display = 'none'; return; }
             
             if (isCurrentVersionOnline) {
                 // 在线版：始终隐藏版本切换按钮（不再支持下载离线版）
