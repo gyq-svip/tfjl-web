@@ -8018,8 +8018,12 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 title: '🔍 搜索选卡上阵',
                 searchPlaceholder: '输入首字母（如 sl=水灵）或卡名关键字…',
                 items: items,
-                onPick: function (val, it) {
-                    handlePoolCardClick({ dataset: it._ds });
+                multi: true,
+                onPick: function (vals, its) {
+                    // 多选：批量上阵所有选中卡（复用既有上阵逻辑）
+                    (its || []).forEach(function (it) {
+                        handlePoolCardClick({ dataset: it._ds });
+                    });
                 }
             });
         }
