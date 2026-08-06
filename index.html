@@ -3804,6 +3804,8 @@
             // 1280战旗档
             { name: '风暴·小炮', cost: 1280, category: '1280' },
             { name: '风清扬·天使', cost: 1280, category: '1280' },
+            // 1600战旗档
+            { name: '随机龙珠', cost: 1600, category: '1600' },
         ];
         let calcBeixiangSelected = new Set();
 
@@ -3832,8 +3834,8 @@
         function renderBeixiangSkins() {
             const container = document.getElementById('calcBeixiangSkinsList');
             if (!container) return;
-            const categories = ['480', '640', '720', '960', '1280'];
-            const catColors = { '480': '#4caf50', '640': '#2196f3', '720': '#9c27b0', '960': '#ff9800', '1280': '#ef4444' };
+            const categories = ['480', '640', '720', '960', '1280', '1600'];
+            const catColors = { '480': '#4caf50', '640': '#2196f3', '720': '#9c27b0', '960': '#ff9800', '1280': '#ef4444', '1600': '#ffd700' };
             let html = '';
             categories.forEach(cat => {
                 const skins = BEIXIANG_SKINS.filter(s => s.category === cat);
@@ -32061,7 +32063,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260806-309 · sw-v426</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260806-310 · sw-v427</span>
             </div>
         </div>
     </div>
