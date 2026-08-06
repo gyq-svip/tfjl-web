@@ -223,9 +223,9 @@
     var baseHero = parsed.heroName;
     var skins = window.skinRegistry[baseHero];
     if (!skins || !skins.length) return null;
-    if (parsed.skinName && window.heroSkinSelections[baseHero] === undefined) {
-      window.heroSkinSelections[baseHero] = parsed.skinName;
-    }
+    // 注意：绝不在此把 parsed.skinName（卡名里「·」前的皮肤标签）写入 heroSkinSelections！
+    // 否则「天蓬元帅·钢鬃」会把「天蓬元帅」误锁成「钢鬃」的全局默认皮肤并持久化，
+    // 导致所有同名英雄默认皮错乱。默认皮肤只应由用户显式选择（selectHeroSkin）写入。
     var userSel = window.heroSkinSelections[baseHero];
     var target = skinName || (userSel !== undefined && userSel !== '' ? userSel : null) || parsed.skinName;
     if (target === null || target === undefined || target === '') {
@@ -280,6 +280,17 @@
     } catch (e) {
       window.heroSkinSelections = {};
     }
+    // 一次性迁移：修复「皮肤·英雄」卡名把皮肤标签误锁成英雄默认皮的脏数据。
+    // 旧版本会把 parsed.skinName 写入 heroSkinSelections 并持久化，导致默认皮肤普遍错乱。
+    // 置位标记后只清一次，清空后所有英雄默认皮回到「英雄同名那张」，用户可按需重新显式选默认。
+    try {
+      if (!localStorage.getItem('tdjl_skinfix_v1')) {
+        localStorage.removeItem('tdjl_heroSkinSelections');
+        window.heroSkinSelections = {};
+        localStorage.setItem('tdjl_skinfix_v1', '1');
+        console.log('[SKIN] 已重置默认皮肤选择（修复带·卡名误锁默认皮的回归）');
+      }
+    } catch (e) { /* ignore */ }
   }
 
   window.resolveHeroSkinUrl = resolveHeroSkinUrl;
