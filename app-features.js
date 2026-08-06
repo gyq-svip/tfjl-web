@@ -5163,7 +5163,7 @@
         function openParserCardPicker() {
             const seen = new Set();
             const items = [];
-            document.querySelectorAll('#cardPoolGrid .card-item, #favoriteCardsGrid .card-item').forEach(el => {
+            document.querySelectorAll('.collapsible-section .card-item, #favoriteCardsGrid .card-item').forEach(el => {
                 const name = el.dataset.name;
                 if (!name || seen.has(name)) return;
                 seen.add(name);

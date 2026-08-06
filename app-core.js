@@ -8293,7 +8293,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         function collectPoolCards() {
             const seen = new Set();
             const list = [];
-            document.querySelectorAll('#cardPoolGrid .card-item, #favoriteCardsGrid .card-item').forEach(el => {
+            document.querySelectorAll('.collapsible-section .card-item, #favoriteCardsGrid .card-item').forEach(el => {
                 const id = el.dataset.id;
                 const name = el.dataset.name;
                 if (!name || seen.has(name)) return;
