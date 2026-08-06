@@ -127,8 +127,8 @@
     if (!_syncPromise) _syncPromise = syncRemoteSkins();
     return _syncPromise;
   }
-  async function syncRemoteSkins() {
-    if (_remoteSkinSynced) return;
+  async function syncRemoteSkins(force) {
+    if (_remoteSkinSynced && !force) return;
     _remoteSkinSynced = true;
     console.log('[SKIN-WEB] syncRemoteSkins() fetching registry from:', REMOTE_SKIN_REGISTRY_URL);
     try {

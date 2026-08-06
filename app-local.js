@@ -3414,8 +3414,8 @@ if (isTauriApp) {
             setTimeout(function () { div.style.opacity = '0'; div.style.transition = 'opacity 0.4s'; setTimeout(function () { if (div.parentNode) div.parentNode.removeChild(div); }, 400); }, 6000);
         } catch (e) {}
     }
-    async function syncRemoteSkins() {
-        if (_remoteSkinSynced) return;
+    async function syncRemoteSkins(force) {
+        if (_remoteSkinSynced && !force) return;
         _remoteSkinSynced = true;
         console.log('[SKIN] syncRemoteSkins() fetching registry from:', REMOTE_SKIN_REGISTRY_URL);
         try {
