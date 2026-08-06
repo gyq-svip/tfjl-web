@@ -832,6 +832,55 @@ async fn download_umi_ocr(app: tauri::AppHandle) -> Result<String, String> {
     }
 }
 
+/// 一键下载皮肤包并解压到本助手数据目录（跟 Umi-OCR 同机制：Gitee 发行版直连、国内快、免登录）。
+/// 皮肤包 skins.zip 由开发者预先打包仓库 skins/ 目录上传到 Gitee 发行版（tag v-skins），
+/// 解压到 D:\withfriends\塔防精灵助手数据\data\skin\，之后 scanSkins 直接读本地，秒开无网可用。
+#[tauri::command]
+async fn download_skins(app: tauri::AppHandle) -> Result<String, String> {
+    let base = r"D:\withfriends\塔防精灵助手数据\data\skin";
+    let _ = std::fs::create_dir_all(base);
+    let zip_path = format!("{}\\skins_download_tmp.zip", base);
+
+    let gitee_tag = "v-skins";
+    let pkg = "skins.zip";
+    let url = format!("https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/releases/download/{}/{}", gitee_tag, pkg);
+
+    let client = reqwest::Client::builder()
+        .no_proxy()
+        .connect_timeout(std::time::Duration::from_secs(20))
+        .timeout(std::time::Duration::from_secs(300))
+        .build()
+        .map_err(|e| format!("创建下载客户端失败: {}", e))?;
+
+    let _ = app.emit("skin-download-progress", serde_json::json!({"stage":"start","url":url}));
+    let data = fetch_to_vec(&client, &url, &app, 0, 0, "skins").await
+        .map_err(|e| format!("下载皮肤包失败: {}。请检查网络或稍后重试", e))?;
+
+    tokio::fs::write(&zip_path, &data).await.map_err(|e| e.to_string())?;
+    let _ = app.emit("skin-download-progress", serde_json::json!({"stage":"extract"}));
+
+    #[cfg(windows)] {
+        use std::os::windows::process::CommandExt;
+        let ps = format!("Expand-Archive -Path '{}' -DestinationPath '{}' -Force", zip_path, base);
+        let out = std::process::Command::new("powershell")
+            .args(["-NoProfile", "-Command", &ps])
+            .creation_flags(0x08000000)
+            .output()
+            .map_err(|e| format!("解压失败: {}", e))?;
+        if !out.status.success() {
+            let msg = String::from_utf8_lossy(&out.stderr);
+            return Err(format!("解压皮肤包失败: {}。可手动下载 skins.zip 解压到 {}", msg, base));
+        }
+    }
+    #[cfg(not(windows))] {
+        return Err("当前仅支持 Windows 解压皮肤包".into());
+    }
+
+    let _ = std::fs::remove_file(&zip_path);
+    let _ = app.emit("skin-download-progress", serde_json::json!({"stage":"done"}));
+    Ok(format!("皮肤包已解压到 {}", base))
+}
+
 /// 弹出系统文件选择框，让用户选择本机 Umi-OCR.exe（返回完整路径，WebView 无法直接拿本地路径）
 #[tauri::command]
 async fn pick_umi_ocr_exe(app: tauri::AppHandle) -> Result<Option<String>, String> {
@@ -913,6 +962,7 @@ pub fn run() {
             open_url,
             find_umi_ocr,
             download_umi_ocr,
+            download_skins,
         ])
         .manage(AppState { umi_pid: std::sync::Mutex::new(None) })
         .setup(|app| {

@@ -102,3 +102,8 @@ commands.allow = ["find_umi_ocr"]
 identifier = "allow-download-umi-ocr"
 description = "Allow downloading Umi-OCR Paddle build"
 commands.allow = ["download_umi_ocr"]
+
+[[permission]]
+identifier = "allow-download-skins"
+description = "Allow downloading skin pack from Gitee release and extracting to local data dir"
+commands.allow = ["download_skins"]
