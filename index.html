@@ -8922,6 +8922,31 @@
             document.getElementById('quickCardInput').focus();
         }
 
+        // 减伤解析页：用通用筛选器从全部英雄卡里挑一张，选完追加到下方文本
+        function openParserCardPicker() {
+            const seen = new Set();
+            const items = [];
+            document.querySelectorAll('#cardPoolGrid .card-item, #favoriteCardsGrid .card-item').forEach(el => {
+                const name = el.dataset.name;
+                if (!name || seen.has(name)) return;
+                seen.add(name);
+                items.push({
+                    value: name,
+                    label: name,
+                    py: window.hanziInitials ? window.hanziInitials(name) : ''
+                });
+            });
+            items.sort((a, b) => (a.py || a.label).localeCompare(b.py || b.label, 'zh-Hans-CN'));
+            openGenericPicker({
+                title: '📋 选择英雄卡（加入减伤计算）',
+                searchPlaceholder: '输入首字母或卡名关键字…',
+                items: items,
+                onPick: function (val) {
+                    selectQuickCard(val);
+                }
+            });
+        }
+
         // 点击其他地方关闭联想框
         document.addEventListener('click', function(e) {
             if (!e.target.closest('#quickCardInput') && !e.target.closest('#quickCardSuggest')) {
@@ -11865,6 +11890,7 @@
                     <!-- 快速输入卡牌 -->
                     <div style="margin-bottom:8px;display:flex;gap:5px;align-items:center;flex-wrap:wrap;">
                         <input id="quickCardInput" type="text" placeholder="⚡ 输入卡名首字母或关键字快速添加（如 sm=萨满, sl=水灵）" oninput="onQuickCardInput(event)" onkeydown="onQuickCardKeydown(event)" style="flex:1;min-width:120px;padding:6px 10px;border-radius:6px;border:1px solid rgba(0,188,212,0.4);background:rgba(0,0,0,0.3);color:#fff;font-size:0.85rem;box-sizing:border-box;">
+                        <button onclick="openParserCardPicker()" data-tip="用通用筛选器（首字母/关键字）从全部英雄卡里挑，点一下直接加入下方文本" style="background:linear-gradient(135deg,#00bcd4,#7b61ff);color:#fff;border:none;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:0.8rem;white-space:nowrap;">📋 列表选</button>
                         <button onclick="clearQuickCardInput()" data-tip="清空上方快速输入卡名框" style="background:rgba(255,255,255,0.1);color:#fff;border:none;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:0.8rem;">清</button>
                     </div>
                     <div id="quickCardSuggest" style="display:none;position:relative;z-index:20;"></div>
@@ -12297,6 +12323,16 @@
                 <div class="hand-cards-column teammate-hand">
                     <h3>📋 队友手牌 <span id="teammateHandCount">0/10</span></h3>
                     <div class="selected-cards-container teammate-hand" id="teammateHandContainer"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== 通用筛选器：从卡池选英雄卡上阵 ===== -->
+        <div class="collapsible-section picker-bar" style="background:linear-gradient(135deg,rgba(0,188,212,0.18),rgba(123,97,255,0.14));border:1px solid rgba(0,188,212,0.35);">
+            <div class="collapsible-inner" style="padding:10px 12px;">
+                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                    <button onclick="openPoolCardPicker()" data-tip="首字母或关键字搜全部英雄卡，点一下直接上阵" style="flex:1;min-width:180px;background:linear-gradient(135deg,#00bcd4,#7b61ff);color:#fff;border:none;padding:10px 14px;border-radius:8px;cursor:pointer;font-size:0.95rem;font-weight:bold;box-shadow:0 2px 8px rgba(0,188,212,0.3);">🔍 搜索选卡上阵（首字母/关键字）</button>
+                    <span style="font-size:0.72rem;color:rgba(255,255,255,0.5);">共 <b id="poolCardCount" style="color:#4ecdc4;">--</b> 张卡</span>
                 </div>
             </div>
         </div>
@@ -20643,6 +20679,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 
             // 收藏区是 innerHTML 整体重绘，重绘后必须重新铺皮肤，否则收藏的卡是光板
             if (typeof updateCardPoolSkins === 'function') updateCardPoolSkins().catch(() => {});
+            // 同步刷新顶部「搜索选卡」按钮栏的卡数统计
+            if (typeof refreshPoolCardCount === 'function') refreshPoolCardCount();
         }
         
         // 设置常用卡拖拽
@@ -20880,6 +20918,56 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             '工程': 'engineering', '战士': 'warrior', '法师': 'mage', '射手': 'archer',
             '召唤': 'summoner', '牧师': 'priest', '术士': 'warlock', '熊猫': 'panda', '精灵球': 'pokeball'
         };
+
+        // ===== 通用筛选器：从卡池选英雄卡上阵 =====
+        // 收集卡池所有英雄卡（基础卡 + 融合卡 + 收藏），来源为卡池 DOM 节点（已含全部 100+ 张）
+        function collectPoolCards() {
+            const seen = new Set();
+            const list = [];
+            document.querySelectorAll('#cardPoolGrid .card-item, #favoriteCardsGrid .card-item').forEach(el => {
+                const id = el.dataset.id;
+                const name = el.dataset.name;
+                if (!name || seen.has(name)) return;
+                seen.add(name);
+                // 手牌是否已上阵（含融合形态）：标记 current 以便筛选器高亮
+                const inMy = myHandCards.some(c => c.id === id) || handHasIdentity(myHandCards, name);
+                const inTeam = teammateHandCards.some(c => c.id === id) || handHasIdentity(teammateHandCards, name);
+                const current = inMy ? '我的手牌' : (inTeam ? '队友手牌' : null);
+                const isFusion = el.dataset.fusion === 'true';
+                list.push({
+                    value: name,
+                    label: name,
+                    py: window.hanziInitials ? window.hanziInitials(name) : '',
+                    current: current,
+                    sub: (isFusion ? '🜂融合 ' : '') + (current ? '✓ ' + current : ''),
+                    // 透传上阵所需字段
+                    _ds: { id, name, engineering: el.dataset.engineering, profession: el.dataset.profession, type: el.dataset.type }
+                });
+            });
+            // 按首字母排序，方便浏览
+            list.sort((a, b) => (a.py || a.label).localeCompare(b.py || b.label, 'zh-Hans-CN'));
+            return list;
+        }
+
+        // 打开通用筛选器选卡 → 复用 handlePoolCardClick（mock dataset）上阵
+        function openPoolCardPicker() {
+            const items = collectPoolCards();
+            openGenericPicker({
+                title: '🔍 搜索选卡上阵',
+                searchPlaceholder: '输入首字母（如 sl=水灵）或卡名关键字…',
+                items: items,
+                onPick: function (val, it) {
+                    // 构造 mock 节点复用既有上阵逻辑
+                    handlePoolCardClick({ dataset: it._ds });
+                }
+            });
+        }
+
+        // 统计卡池卡片数（供按钮栏展示）
+        function refreshPoolCardCount() {
+            const el = document.getElementById('poolCardCount');
+            if (el) el.textContent = collectPoolCards().length;
+        }
         // 把云端融合卡同步到卡池对应「金卡类/紫卡类」的职业子分类（与基础卡并列，点/拖即可上阵）
         function renderFusionCardsToPool() {
             // 先清掉上一轮插入的融合卡节点
@@ -32260,7 +32348,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260806-317 · sw-v434</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260807-318 · sw-v435</span>
             </div>
         </div>
     </div>
