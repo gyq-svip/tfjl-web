@@ -13537,6 +13537,79 @@ function hasGistToken() {
         let pendingScriptFile = null;
         const MESSAGE_REFRESH_INTERVAL = 30000;
         const MAX_MESSAGES = 5000;
+        // ============ 需求墙消息防丢：本地 IndexedDB 兜底 + 云端备份 Gist ============
+        const WALL_DB_NAME = 'TFJLWallDB';
+        const WALL_STORE = 'wallMessages';
+        function openWallDB() {
+            return new Promise((resolve) => {
+                try {
+                    const req = indexedDB.open(WALL_DB_NAME, 1);
+                    req.onupgradeneeded = () => { try { req.result.createObjectStore(WALL_STORE); } catch (e) {} };
+                    req.onsuccess = () => resolve(req.result);
+                    req.onerror = () => resolve(null);
+                } catch (e) { resolve(null); }
+            });
+        }
+        async function loadWallFromDB() {
+            const db = await openWallDB();
+            if (!db) return null;
+            return await new Promise((resolve) => {
+                try {
+                    const tx = db.transaction(WALL_STORE, 'readonly');
+                    const r = tx.objectStore(WALL_STORE).get('messages');
+                    r.onsuccess = () => resolve(r.result || null);
+                    r.onerror = () => resolve(null);
+                } catch (e) { resolve(null); }
+            });
+        }
+        async function saveWallToDB(arr) {
+            const db = await openWallDB();
+            if (!db) return;
+            await new Promise((resolve) => {
+                try {
+                    const tx = db.transaction(WALL_STORE, 'readwrite');
+                    tx.objectStore(WALL_STORE).put(arr, 'messages');
+                    tx.oncomplete = () => resolve();
+                    tx.onerror = () => resolve();
+                } catch (e) { resolve(); }
+            });
+        }
+        // 云端备份 Gist（与主 Gist 独立，主 Gist 被删时重建先从此恢复）。初始为空，运行时首个已登录用户保存即创建并记录到 localStorage
+        const MESSAGES_BACKUP_GIST_ID = '';
+        async function backupWallMessages(arr) {
+            try {
+                const token = getGistToken();
+                if (!token) return;
+                const content = JSON.stringify({ messages: arr }, null, 2);
+                const headers = { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': 'token ' + token };
+                let backupId = localStorage.getItem('messages_backup_gist_id') || MESSAGES_BACKUP_GIST_ID;
+                if (backupId) {
+                    const resp = await fetch('https://api.github.com/gists/' + backupId, {
+                        method: 'PATCH', headers, body: JSON.stringify({ files: { 'messages.json': { content } } })
+                    });
+                    if (resp.ok) { console.log('[消息备份] 已备份', arr.length, '条'); return; }
+                    if (resp.status !== 404) return;
+                }
+                const c = await fetch('https://api.github.com/gists', {
+                    method: 'POST', headers, body: JSON.stringify({ description: 'TFJL 需求墙消息备份(自动)', public: true, files: { 'messages.json': { content } } })
+                });
+                if (c.ok) { const d = await c.json(); localStorage.setItem('messages_backup_gist_id', d.id); console.log('[消息备份] 创建备份Gist:', d.id); }
+            } catch (e) { console.warn('[消息备份] 失败(不影响主保存):', e); }
+        }
+        async function restoreWallFromBackup() {
+            try {
+                const backupId = localStorage.getItem('messages_backup_gist_id') || MESSAGES_BACKUP_GIST_ID;
+                if (!backupId) return null;
+                const resp = await fetch('https://api.github.com/gists/' + backupId);
+                if (!resp.ok) return null;
+                const d = await resp.json();
+                const f = d.files && d.files['messages.json'];
+                if (!f || !f.content) return null;
+                const parsed = JSON.parse(f.content);
+                return parsed.messages || null;
+            } catch (e) { return null; }
+        }
+
 
         function updateMsgRefreshBtn() {
             const btn = document.getElementById('msgRefreshBtn');
@@ -13668,6 +13741,14 @@ function hasGistToken() {
                 const token = getGistToken();
                 
                 // ★ 权威指针：消息Gist ID 优先取索引 room_index.messages（免部署即可迁移Gist），其次硬编码常量
+                // ★ 防丢A：本地 IndexedDB 兜底——内存为空时先显示本地缓存，后台再拉远程
+                if (wallMessages.length === 0) {
+                    try {
+                        const dbCache = await loadWallFromDB();
+                        if (dbCache && dbCache.length) { wallMessages = dbCache; renderMessages(); updateWallAttention(); console.log('[消息] 本地缓存兜底显示', dbCache.length, '条'); }
+                    } catch (e) {}
+                }
+
                 const gistDeleted = localStorage.getItem('messages_gist_deleted') === 'true';
                 let messagesGistId = (!gistDeleted && MESSAGES_GIST_ID) ? MESSAGES_GIST_ID : (localStorage.getItem('messages_gist_id') || '');
                 // 若未确认删除，从索引拿最新 ID（防止硬编码的旧 Gist 被删后卡死、消息全空）
@@ -13767,6 +13848,7 @@ function hasGistToken() {
                                         wallMessages = fetchedMessages;
                                     }
                                     
+                                    await saveWallToDB(wallMessages);
                                     renderMessages();
                                     updateWallAttention();
                                     console.log('[消息加载] 成功加载', wallMessages.length, '条消息');
@@ -16000,8 +16082,16 @@ ${maSection}
                 }
             }
 
+            // 防丢B：主Gist被删重建时，先从云端备份恢复历史，避免空白重建丢数据
+            if (remoteGistDeleted) {
+                try {
+                    const bk = await restoreWallFromBackup();
+                    if (bk && bk.length) { existingMessages = bk; console.log('[消息] 从备份恢复', bk.length, '条'); }
+                } catch (e) {}
+            }
+
             // 【第一层空数据保护】远程有数据但本地为空，阻止保存（如删除操作除外）
-            if (!forceSave && existingMessages.length > 0 && wallMessages.length === 0) {
+            if (!forceSave && !remoteGistDeleted && existingMessages.length > 0 && wallMessages.length === 0) {
                 throw new Error('⚠️ 数据保护：检测到远程有 ' + existingMessages.length + ' 条消息，但本地数据为空。\n\n可能原因：网络问题导致数据加载失败。\n\n请刷新页面重新加载，或联系管理员从备份还原数据。');
             }
 
@@ -16072,6 +16162,8 @@ ${maSection}
                         wallMessages = finalMessages;
                         // PATCH成功，清除删除标记
                         localStorage.removeItem('messages_gist_deleted');
+                        await saveWallToDB(finalMessages);          // 防丢A：本地落盘
+                        await backupWallMessages(finalMessages);  // 防丢B：云端备份
                         return;
                     }
 
