@@ -15133,20 +15133,16 @@
                 <div style="display: flex; gap: 8px; align-items: center;">
                     <div style="position: relative;">
                         <button id="${windowId}_paletteBtn" onclick="toggleNotebookColorPicker('${windowId}')" title="字体颜色" style="background:rgba(255,255,255,0.08);border:none;color:#fff;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:0.9rem;">🎨</button>
-                        <div id="${windowId}_colorPopup" style="display:none;position:absolute;top:110%;right:0;z-index:10;background:rgba(20,20,40,0.98);border:1px solid rgba(255,215,0,0.3);border-radius:8px;padding:8px;gap:6px;align-items:center;flex-wrap:wrap;max-width:240px;box-shadow:0 4px 16px rgba(0,0,0,0.5);">
-                            <span style="font-size:0.68rem;color:#aaa;width:100%;">快速颜色：</span>
-                            <button type="button" onclick="applyNotebookColor('${windowId}','#e0e0e0')" style="width:18px;height:18px;border-radius:50%;background:#e0e0e0;border:1px solid rgba(255,255,255,0.6);cursor:pointer;padding:0;" title="默认灰"></button>
-                            <button type="button" onclick="applyNotebookColor('${windowId}','#4caf50')" style="width:18px;height:18px;border-radius:50%;background:#4caf50;border:1px solid rgba(255,255,255,0.6);cursor:pointer;padding:0;" title="绿"></button>
-                            <button type="button" onclick="applyNotebookColor('${windowId}','#ffeb3b')" style="width:18px;height:18px;border-radius:50%;background:#ffeb3b;border:1px solid rgba(255,255,255,0.6);cursor:pointer;padding:0;" title="黄"></button>
-                            <button type="button" onclick="applyNotebookColor('${windowId}','#ff7043')" style="width:18px;height:18px;border-radius:50%;background:#ff7043;border:1px solid rgba(255,255,255,0.6);cursor:pointer;padding:0;" title="橙红"></button>
-                            <button type="button" onclick="applyNotebookColor('${windowId}','#4fc3f7')" style="width:18px;height:18px;border-radius:50%;background:#4fc3f7;border:1px solid rgba(255,255,255,0.6);cursor:pointer;padding:0;" title="蓝"></button>
-                            <label title="自定义全部颜色（点开可选任意颜色）" style="position:relative;display:inline-block;width:24px;height:24px;border-radius:50%;overflow:hidden;border:1px solid rgba(255,255,255,0.8);cursor:pointer;vertical-align:middle;">
-                                <input type="color" id="${windowId}_customColor" onchange="applyNotebookColor('${windowId}', this.value)" style="position:absolute;inset:0;width:100%;height:100%;border:none;padding:0;opacity:0;cursor:pointer;">
-                            </label>
-                            <span style="font-size:0.68rem;color:#aaa;width:100%;border-top:1px solid rgba(255,255,255,0.12);padding-top:4px;margin-top:2px;">统一默认色（全局）：</span>
-                            <button type="button" onclick="setGlobalFromCurrent('${windowId}')" title="把当前颜色设为统一默认（全局），新开记事本都用它" style="font-size:0.72rem;padding:3px 6px;border:1px solid rgba(255,215,0,0.4);background:rgba(255,215,0,0.12);color:#ffd700;border-radius:6px;cursor:pointer;">🌐 设全局</button>
-                            <button type="button" onclick="resetNotebookToGlobal('${windowId}')" title="清除本笔记本地颜色，改用全局统一色" style="font-size:0.72rem;padding:3px 6px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.8);border-radius:6px;cursor:pointer;">↺ 用全局</button>
-                            <span id="${windowId}_globalHint" style="font-size:0.66rem;color:#aaa;width:100%;"></span>
+                        <div id="${windowId}_colorPopup" style="display:none;position:absolute;top:118%;right:0;z-index:20;min-width:186px;background:linear-gradient(160deg,rgba(40,40,68,0.98),rgba(26,26,48,0.98));border:1px solid rgba(255,215,0,0.35);border-radius:12px;padding:10px 12px;box-shadow:0 8px 30px rgba(0,0,0,0.6);">
+                            <div style="font-size:0.78rem;font-weight:bold;color:#ffd700;margin-bottom:9px;white-space:nowrap;">🎨 字体颜色</div>
+                            <div style="display:flex;align-items:center;gap:9px;">
+                                <div id="${windowId}_colorSlots" style="display:flex;align-items:center;gap:9px;"></div>
+                                <span style="width:1px;height:22px;background:rgba(255,255,255,0.15);"></span>
+                                <label title="自定义颜色（选完自动存为自选色）" style="position:relative;display:inline-block;width:28px;height:28px;border-radius:50%;overflow:hidden;border:2px solid rgba(255,255,255,0.85);cursor:pointer;vertical-align:middle;background:conic-gradient(#ff0000,#ffff00,#00ff00,#00ffff,#0000ff,#ff00ff,#ff0000);box-shadow:0 2px 8px rgba(0,0,0,0.45);">
+                                    <input type="color" id="${windowId}_customColor" onchange="applyNotebookColor('${windowId}', this.value, true)" style="position:absolute;inset:0;width:100%;height:100%;border:none;padding:0;opacity:0;cursor:pointer;">
+                                </label>
+                            </div>
+                            <div style="font-size:0.64rem;color:#9a9ab0;margin-top:8px;white-space:nowrap;">所有记事本统一，自动保存</div>
                         </div>
                     </div>
                     <button onclick="minimizeTxtWindow('${windowId}')" style="background:rgba(255,193,7,0.2);border:none;color:#ffc107;padding:4px 8px;border-radius:4px;cursor:pointer;">−</button>
@@ -15336,12 +15332,12 @@
                 isTop: isTop
             });
 
-            // 恢复记忆的字体颜色：本笔记本地色 > 全局统一色 > 默认色
+            // 恢复记忆的字体颜色（全局统一，一处改处处生效）
             (async () => {
                 try {
-                    const key = notebookColorKey({ localPath, fileIndex, name });
-                    const map = await loadNotebookColorMap();
-                    const color = map[key] || map[GLOBAL_COLOR_KEY] || DEFAULT_NOTEBOOK_COLOR;
+                    const ta0 = document.getElementById(windowId + '_content');
+                    if (ta0) ta0.style.color = notebookColorCfg.color;      // 先用本地缓存秒显
+                    const color = await getNotebookColorAsync();            // 再用磁盘值校正
                     const ta = document.getElementById(windowId + '_content');
                     if (ta) ta.style.color = color;
                 } catch (e) {}
@@ -15349,99 +15345,96 @@
         }
 
         // 记事本字体颜色（整篇统一换色，仅显示层，不进文件，不影响保存/老马纯文本）
-        // 颜色记忆：按脚本身份存 D 盘 JSON（App）+ localStorage（网页兜底），重开同一脚本恢复
+        // 全局统一：所有记事本共用一个颜色；1 个默认色 + 2 个自选色（调色盘选完自动存）
+        // 持久化：D 盘 JSON（App）+ localStorage（网页兜底）
         const NOTEBOOK_COLOR_FILE = 'D:\\withfriends\\塔防精灵助手数据\\notebookColors.json';
         const LS_NOTEBOOK_COLORS = 'tfjl_notebook_colors';
-        const GLOBAL_COLOR_KEY = '__global__';          // 全局统一默认色在 map 中的保留 key
-        const DEFAULT_NOTEBOOK_COLOR = '#e0e0e0';        // 啥都没设时的默认
-
-        function notebookColorKey(opts) {
-            if (opts.localPath) return 'p:' + opts.localPath;
-            if (typeof opts.fileIndex === 'number' && opts.fileIndex >= 0) return 'f:' + opts.fileIndex;
-            return 'n:' + (opts.name || '');
-        }
-
-        async function loadNotebookColorMap() {
-            let map = {};
-            try { const s = localStorage.getItem(LS_NOTEBOOK_COLORS); if (s) map = JSON.parse(s) || {}; } catch (e) {}
-            if (window.writeTextFile) { // 仅 Tauri/App 环境读磁盘
-                try {
-                    const s = await window.readTextFile(NOTEBOOK_COLOR_FILE);
-                    if (s) { const dm = JSON.parse(s); if (dm && typeof dm === 'object') map = Object.assign({}, dm, map); }
-                } catch (e) {}
-            }
-            return map;
-        }
-
-        async function saveNotebookColor(key, color) {
-            let map = {};
-            try { const s = localStorage.getItem(LS_NOTEBOOK_COLORS); if (s) map = JSON.parse(s) || {}; } catch (e) {}
-            map[key] = color;
-            try { localStorage.setItem(LS_NOTEBOOK_COLORS, JSON.stringify(map)); } catch (e) {}
-            if (window.writeTextFile) {
-                try { await window.writeTextFile(NOTEBOOK_COLOR_FILE, JSON.stringify(map, null, 2)); } catch (e) {}
-            }
-        }
-
-        // 删除某 key（清除本地覆盖，回归全局）
-        async function removeNotebookColor(key) {
-            let map = {};
-            try { const s = localStorage.getItem(LS_NOTEBOOK_COLORS); if (s) map = JSON.parse(s) || {}; } catch (e) {}
-            delete map[key];
-            try { localStorage.setItem(LS_NOTEBOOK_COLORS, JSON.stringify(map)); } catch (e) {}
-            if (window.writeTextFile) {
-                try {
-                    let dm = {};
-                    try { const s = await window.readTextFile(NOTEBOOK_COLOR_FILE); if (s) dm = JSON.parse(s) || {}; } catch (e) {}
-                    delete dm[key];
-                    await window.writeTextFile(NOTEBOOK_COLOR_FILE, JSON.stringify(dm, null, 2));
-                } catch (e) {}
-            }
-        }
-
-        // 全局统一默认色（同步读 localStorage，缺省回退默认）
-        function getGlobalNotebookColor() {
-            try { const s = localStorage.getItem(LS_NOTEBOOK_COLORS); if (s) { const m = JSON.parse(s); if (m && m[GLOBAL_COLOR_KEY]) return m[GLOBAL_COLOR_KEY]; } } catch (e) {}
-            return DEFAULT_NOTEBOOK_COLOR;
-        }
-
-        function setGlobalNotebookColor(color) {
-            saveNotebookColor(GLOBAL_COLOR_KEY, color);
-        }
+        const DEFAULT_NOTEBOOK_COLOR = '#e0e0e0';        // 啥都没设时的默认色
 
         // 任意颜色字符串 → #rrggbb（input[type=color] 只认 hex）
         function toHexColor(c) {
             if (!c) return '';
-            if (/^#[0-9a-fA-F]{3}$/.test(c) || /^#[0-9a-fA-F]{6}$/.test(c)) return c;
+            c = String(c).trim();
+            if (/^#[0-9a-fA-F]{6}$/.test(c)) return c.toLowerCase();
+            if (/^#[0-9a-fA-F]{3}$/.test(c)) return ('#' + c[1] + c[1] + c[2] + c[2] + c[3] + c[3]).toLowerCase();
             const m = c.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
             if (m) return '#' + [m[1], m[2], m[3]].map(x => (+x).toString(16).padStart(2, '0')).join('');
             return '';
         }
 
-        // 当前颜色设为全局统一默认（持久化到磁盘）
-        function setGlobalFromCurrent(windowId) {
-            const ta = document.getElementById(windowId + '_content');
-            const color = ta ? (toHexColor(ta.style.color) || getGlobalNotebookColor()) : getGlobalNotebookColor();
-            setGlobalNotebookColor(color);
-            if (ta) ta.style.color = color;
-            const hint = document.getElementById(windowId + '_globalHint');
-            if (hint) hint.textContent = '全局: ' + color;
+        function normalizeNotebookColorCfg(o) {
+            const color = (o && toHexColor(o.color)) || DEFAULT_NOTEBOOK_COLOR;
+            let slots = (o && Array.isArray(o.slots)) ? o.slots.map(toHexColor).filter(Boolean) : [];
+            slots = slots.filter((c, i) => c !== DEFAULT_NOTEBOOK_COLOR && slots.indexOf(c) === i).slice(0, 2);
+            return { color: color, slots: slots };
         }
 
-        // 清除本笔记本地颜色，改用全局统一色
-        function resetNotebookToGlobal(windowId) {
-            const win = txtFileWindows.find(w => w.id === windowId);
-            if (win) removeNotebookColor(notebookColorKey({ localPath: win.localPath, fileIndex: win.fileIndex, name: win.name }));
-            const color = getGlobalNotebookColor();
-            const ta = document.getElementById(windowId + '_content');
-            if (ta) ta.style.color = color;
+        // 当前配置（同步可用，先从 localStorage 秒读，磁盘值异步校正）
+        let notebookColorCfg = (function () {
+            try { const s = localStorage.getItem(LS_NOTEBOOK_COLORS); if (s) return normalizeNotebookColorCfg(JSON.parse(s)); } catch (e) {}
+            return { color: DEFAULT_NOTEBOOK_COLOR, slots: [] };
+        })();
+
+        let _nbColorDiskLoaded = false;
+        async function getNotebookColorAsync() {
+            if (!_nbColorDiskLoaded) {
+                _nbColorDiskLoaded = true;
+                if (window.readTextFile) {
+                    try {
+                        const s = await window.readTextFile(NOTEBOOK_COLOR_FILE);
+                        if (s) {
+                            const o = JSON.parse(s);
+                            if (o && typeof o === 'object') {
+                                notebookColorCfg = normalizeNotebookColorCfg(o);
+                                try { localStorage.setItem(LS_NOTEBOOK_COLORS, JSON.stringify(notebookColorCfg)); } catch (e) {}
+                            }
+                        }
+                    } catch (e) {}
+                }
+            }
+            return notebookColorCfg.color;
         }
 
-        function applyNotebookColor(windowId, color) {
-            const ta = document.getElementById(windowId + '_content');
-            if (ta) ta.style.color = color;
-            const win = txtFileWindows.find(w => w.id === windowId);
-            if (win) saveNotebookColor(notebookColorKey({ localPath: win.localPath, fileIndex: win.fileIndex, name: win.name }), color);
+        async function saveNotebookColorCfg() {
+            try { localStorage.setItem(LS_NOTEBOOK_COLORS, JSON.stringify(notebookColorCfg)); } catch (e) {}
+            if (window.writeTextFile) {
+                try { await window.writeTextFile(NOTEBOOK_COLOR_FILE, JSON.stringify(notebookColorCfg, null, 2)); } catch (e) {}
+            }
+        }
+
+        // 换色：所有已打开记事本同步生效并持久化；remember=true 时把颜色存进 2 个自选槽
+        function applyNotebookColor(windowId, color, remember) {
+            const hex = toHexColor(color) || DEFAULT_NOTEBOOK_COLOR;
+            notebookColorCfg.color = hex;
+            if (remember && hex !== DEFAULT_NOTEBOOK_COLOR) {
+                const slots = notebookColorCfg.slots.filter(c => c !== hex);
+                slots.unshift(hex);
+                notebookColorCfg.slots = slots.slice(0, 2);
+            }
+            saveNotebookColorCfg();
+            (typeof txtFileWindows !== 'undefined' ? txtFileWindows : []).forEach(w => {
+                const ta = document.getElementById(w.id + '_content');
+                if (ta) ta.style.color = hex;
+            });
+            document.querySelectorAll('[id$="_colorSlots"]').forEach(box => {
+                renderNotebookColorSwatches(box.id.replace(/_colorSlots$/, ''));
+            });
+        }
+
+        // 渲染色块：默认色 + 2 个自选色（空槽显示虚线圆占位）
+        function renderNotebookColorSwatches(windowId) {
+            const box = document.getElementById(windowId + '_colorSlots');
+            if (!box) return;
+            const cur = notebookColorCfg.color;
+            const list = [DEFAULT_NOTEBOOK_COLOR].concat(notebookColorCfg.slots);
+            let html = list.map((c, i) => {
+                const on = (c === cur);
+                return `<button type="button" onclick="applyNotebookColor('${windowId}','${c}')" title="${i === 0 ? '默认色' : '自选色'} ${c}" style="width:26px;height:26px;border-radius:50%;background:${c};border:2px solid ${on ? '#ffd700' : 'rgba(255,255,255,0.55)'};cursor:pointer;padding:0;box-shadow:0 2px 6px rgba(0,0,0,0.45);"></button>`;
+            }).join('');
+            for (let i = list.length; i < 3; i++) {
+                html += `<span title="用右侧调色盘选个颜色，会自动存到这里" style="width:26px;height:26px;border-radius:50%;border:1px dashed rgba(255,255,255,0.3);display:inline-block;"></span>`;
+            }
+            box.innerHTML = html;
         }
 
         // 标题栏 🎨 颜料盘：展开/收起颜色浮层（点其他处自动关闭）
@@ -15450,14 +15443,11 @@
             if (!pop) return;
             const show = pop.style.display === 'none';
             document.querySelectorAll('[id$="_colorPopup"]').forEach(p => p.style.display = 'none');
-            pop.style.display = show ? 'flex' : 'none';
+            pop.style.display = show ? 'block' : 'none';
             if (show) {
-                const ta = document.getElementById(windowId + '_content');
-                const cur = ta ? (ta.style.color || getGlobalNotebookColor()) : getGlobalNotebookColor();
+                renderNotebookColorSwatches(windowId);
                 const ci = document.getElementById(windowId + '_customColor');
-                if (ci) { const hex = toHexColor(cur) || DEFAULT_NOTEBOOK_COLOR; ci.value = hex; ci.parentElement.style.background = hex; }
-                const hint = document.getElementById(windowId + '_globalHint');
-                if (hint) hint.textContent = '全局: ' + getGlobalNotebookColor();
+                if (ci) ci.value = notebookColorCfg.color;
                 setTimeout(() => {
                     const docClose = (e) => {
                         if (!pop.contains(e.target) && e.target.id !== windowId + '_paletteBtn') {
@@ -31909,7 +31899,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260806-305 · sw-v422</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260806-308 · sw-v425</span>
             </div>
         </div>
     </div>
