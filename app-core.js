@@ -8282,6 +8282,11 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             '工程': 'engineering', '战士': 'warrior', '法师': 'mage', '射手': 'archer',
             '召唤': 'summoner', '牧师': 'priest', '术士': 'warlock', '熊猫': 'panda', '精灵球': 'pokeball'
         };
+        // 职业英文 key → 中文（供通用筛选器分类标签显示中文；内部 profession 仍用英文 key 不变）
+        const PROFESSION_CN_MAP = {};
+        Object.keys(PROFESSION_KEY_MAP).forEach(function (cn) { PROFESSION_CN_MAP[PROFESSION_KEY_MAP[cn]] = cn; });
+        function professionToCn(key) { return key ? (PROFESSION_CN_MAP[key] || key) : key; }
+        if (typeof window !== 'undefined') window.professionToCn = professionToCn;
 
         // ===== 通用筛选器：从卡池选英雄卡上阵 =====
         // 收集卡池所有英雄卡（基础卡 + 融合卡 + 收藏），来源为卡池 DOM 节点（已含全部 100+ 张）

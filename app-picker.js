@@ -75,7 +75,7 @@
                 profBar = document.createElement('div');
                 profBar.style.cssText = 'display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;';
                 profBar.appendChild(makeProfBtn('全部', ''));
-                profs.forEach(function(p) { profBar.appendChild(makeProfBtn(p, p)); });
+                profs.forEach(function(p) { profBar.appendChild(makeProfBtn(window.professionToCn ? window.professionToCn(p) : p, p)); });
                 box.appendChild(profBar);
             }
             const list = document.createElement('div');
@@ -92,7 +92,8 @@
                     if (!hit) return;
                     if (activeProf && it.profession !== activeProf) return; // 职业分类过滤
                     shown++;
-                    const sub = [it.profession ? ('【' + it.profession + '】') : '', it.sub ? it.sub : '', it.current ? '✓' : ''].filter(Boolean).join(' ');
+                    const profCn = (it.profession && window.professionToCn) ? window.professionToCn(it.profession) : it.profession;
+                    const sub = [profCn ? ('【' + profCn + '】') : '', it.sub ? it.sub : '', it.current ? '✓' : ''].filter(Boolean).join(' ');
                     const row = document.createElement('div');
                     row.textContent = label + (sub ? ('  ·  ' + sub) : '');
                     row.style.cssText = 'padding:7px 10px;border-radius:7px;cursor:pointer;color:' + (it.current ? '#4caf50' : '#fff') + ';font-size:0.85rem;' + (it.current ? 'background:rgba(76,175,80,0.12);' : '');
