@@ -3727,7 +3727,7 @@
                     <div id="menuDownloadDesktop" onclick="openDownloadModal();document.getElementById('backupMenu').style.display='none';" title="下载塔防精灵助手桌面版（Tauri），体验更流畅的本地文件管理" style="padding:8px 15px;cursor:pointer;color:#4fc3f7;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📥 下载桌面版</div>
                     <div id="menuToggleEffects" onclick="toggleVisualEffects();document.getElementById('backupMenu').style.display='none';" title="开关页面背景动画特效" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">✨ 背景特效：开</div>
                     <div id="menuCheckUpdateItem" onclick="menuCheckUpdate();document.getElementById('backupMenu').style.display='none';" title="检查是否有新版本可更新（仅桌面端）" style="padding:8px 15px;cursor:pointer;color:#81c784;display:none;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">🔄 检查更新</div>
-                    <div onclick="forceRefreshLatest();document.getElementById('backupMenu').style.display='none';" title="强制重新拉取最新资源（皮肤表、卡牌数据等）" style="padding:8px 15px;cursor:pointer;color:#ffd54f;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">♻️ 刷新最新资源</div>
+                    <div onclick="updateSkinsResource();document.getElementById('backupMenu').style.display='none';" title="更新皮肤资源：从 Gitee 下载皮肤包解压到本地（首次较慢，之后本地加载秒开）；本地化不可用时回退在线同步" style="padding:8px 15px;cursor:pointer;color:#ffd54f;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">🎨 更新皮肤资源</div>
                     <div onclick="window.location.href='auction.html';document.getElementById('backupMenu').style.display='none';" style="display:none;padding:8px 15px;cursor:pointer;color:#fff;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">🏪 进入拍卖系统</div>
                     <div onclick="openHelpPage();document.getElementById('backupMenu').style.display='none';" title="打开帮助页面，查看使用说明" style="padding:8px 15px;cursor:pointer;color:#4fc3f7;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📖 帮助</div>
                     <div onclick="logoutToLogin();document.getElementById('backupMenu').style.display='none';" title="退出当前登录，返回密码登录页" style="padding:8px 15px;cursor:pointer;color:#ff6b6b;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,107,107,0.1)'" onmouseout="this.style.background='transparent'">🔙 退出登录</div>
@@ -6957,6 +6957,31 @@
                 // 用 location.replace 替换当前历史，避免回退到旧缓存版本
                 location.replace(url.toString());
             }, 800);
+        }
+
+        // 菜单「更新皮肤资源」：优先从 Gitee 发行版下载皮肤包解压到本地（本地化，无网可用）；
+        // 本地化命令不可用时回退在线同步（jsDelivr 主源，GitHub Pages 兜底），force=true 允许重复触发
+        async function updateSkinsResource() {
+            const t = showLoadingToast('🎨 正在更新皮肤资源...');
+            try {
+                const invokeFn = window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke;
+                if (typeof invokeFn === 'function') {
+                    try {
+                        await invokeFn('download_skins');
+                        if (typeof window.scanSkins === 'function') window.scanSkins();
+                    } catch (e) {
+                        console.warn('[SKIN] 本地下载失败，回退在线同步:', e);
+                    }
+                }
+                if (typeof window.syncRemoteSkins === 'function') {
+                    await window.syncRemoteSkins(true);
+                }
+                showToast('✅ 皮肤资源已更新');
+            } catch (e) {
+                showToast('❌ 皮肤更新失败: ' + (e && e.message ? e.message : e));
+            } finally {
+                if (t && t.close) t.close();
+            }
         }
 
         // 检查更新（静默模式，在 App 启动时使用）
@@ -12101,11 +12126,11 @@
         </div>
 
         <div class="collapsible-section favorite">
-            <div class="collapsible-header favorite open" onclick="toggleSection(this)">
+            <div class="collapsible-header favorite" onclick="toggleSection(this)">
                 <h3><span>⭐</span> 收藏 <span class="small-text">（点击卡片上的⭐添加/删除）</span></h3>
-                <span class="toggle-icon">▲</span>
+                <span class="toggle-icon">▼</span>
             </div>
-            <div class="collapsible-content open">
+            <div class="collapsible-content">
                 <div class="collapsible-inner">
                     <div id="favoriteCardsGrid">
                         <div class="no-favorites" id="noFavorites">暂无收藏，点击卡片上的⭐添加到收藏</div>
@@ -23334,16 +23359,16 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             // 更新减伤显示
             updateDamageReductionDisplay();
 
-            // 恢复收藏折叠状态
+            // 恢复收藏折叠状态（默认折叠，仅用户曾显式展开才展开）
             const favoriteOpen = localStorage.getItem('tdjl_favorite_open');
-            if (favoriteOpen !== null && favoriteOpen === 'false') {
+            if (favoriteOpen === 'true') {
                 const favoriteHeader = document.querySelector('.collapsible-header.favorite');
                 const favoriteContent = document.querySelector('.collapsible-content.favorite');
                 if (favoriteHeader && favoriteContent) {
-                    favoriteHeader.classList.remove('open');
-                    favoriteContent.classList.remove('open');
+                    favoriteHeader.classList.add('open');
+                    favoriteContent.classList.add('open');
                     const icon = favoriteHeader.querySelector('.toggle-icon');
-                    if (icon) icon.textContent = '▼';
+                    if (icon) icon.textContent = '▲';
                 }
             }
 
@@ -32079,7 +32104,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260806-312 · sw-v429</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260806-313 · sw-v430</span>
             </div>
         </div>
     </div>
