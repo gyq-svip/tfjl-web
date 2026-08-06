@@ -10967,7 +10967,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 // ⚠️ 重要：这个 GIST_ID 是索引文件的固定 ID，所有设备必须使用同一个！
 const GIST_ID = 'a32a0628bd9275f3a4922cd12cf298c9';
 const COUNTER_GIST_ID = 'e1bd9a5139e1c4e011bfea707e917d61';
-const MESSAGES_GIST_ID = 'a4591ac2200b7638d51ae4c0155d7851';
+const MESSAGES_GIST_ID = 'b02794a8d5c43874b76286185f7b1f7f';
 const INDEX_GIST_ID_KEY = 'TFJL_Index_Gist_ID';
 const COUNTER_CACHE_KEY = 'TFJL_Counter_Cache';
 const COUNTER_CACHE_TIME_KEY = 'TFJL_Counter_Cache_Time';
@@ -13667,10 +13667,23 @@ function hasGistToken() {
             try {
                 const token = getGistToken();
                 
-                // ★ 永远优先使用硬编码的 MESSAGES_GIST_ID（这是所有用户共同的消息存储）
-                // 但如果已确认该Gist被删除(404)，则跳过，从索引文件获取新ID
+                // ★ 权威指针：消息Gist ID 优先取索引 room_index.messages（免部署即可迁移Gist），其次硬编码常量
                 const gistDeleted = localStorage.getItem('messages_gist_deleted') === 'true';
                 let messagesGistId = (!gistDeleted && MESSAGES_GIST_ID) ? MESSAGES_GIST_ID : (localStorage.getItem('messages_gist_id') || '');
+                // 若未确认删除，从索引拿最新 ID（防止硬编码的旧 Gist 被删后卡死、消息全空）
+                if (!gistDeleted) {
+                    try {
+                        const idxResp = await fetch(`https://api.github.com/gists/${GIST_ID}`, { headers: { 'Accept': 'application/vnd.github.v3+json', ...(token && { 'Authorization': `token ${token}` }) } });
+                        if (idxResp.ok) {
+                            const idxData = await idxResp.json();
+                            const ri = idxData.files && idxData.files['room_index.json'];
+                            if (ri && ri.content) {
+                                const idx = JSON.parse(ri.content);
+                                if (idx.messages) { messagesGistId = idx.messages; localStorage.setItem('messages_gist_id', messagesGistId); }
+                            }
+                        }
+                    } catch (e) { console.warn('[消息] 索引解析失败，用硬编码兜底:', e); }
+                }
                 
                 // 如果都没有，从索引文件获取
                 if (!messagesGistId) {
@@ -15913,9 +15926,23 @@ ${maSection}
             const token = getGistToken();
             if (!token) throw new Error('无Token');
 
-            // 优先使用硬编码的 MESSAGES_GIST_ID，但如果已确认删除则跳过
+            // ★ 权威指针：消息Gist ID 优先取索引 room_index.messages（免部署即可迁移Gist），其次硬编码常量
             const gistDeleted = localStorage.getItem('messages_gist_deleted') === 'true';
             let messagesGistId = (!gistDeleted && MESSAGES_GIST_ID) ? MESSAGES_GIST_ID : (localStorage.getItem('messages_gist_id') || '');
+            // 若未确认删除，从索引拿最新 ID（防止硬编码的旧 Gist 被删后卡死、消息全空）
+            if (!gistDeleted) {
+                try {
+                    const idxResp = await fetch(`https://api.github.com/gists/${GIST_ID}`, { headers: { 'Accept': 'application/vnd.github.v3+json', ...(token && { 'Authorization': `token ${token}` }) } });
+                    if (idxResp.ok) {
+                        const idxData = await idxResp.json();
+                        const ri = idxData.files && idxData.files['room_index.json'];
+                        if (ri && ri.content) {
+                            const idx = JSON.parse(ri.content);
+                            if (idx.messages) { messagesGistId = idx.messages; localStorage.setItem('messages_gist_id', messagesGistId); }
+                        }
+                    }
+                } catch (e) { console.warn('[消息] 索引解析失败，用硬编码兜底:', e); }
+                }
 
             // 【关键安全标记】保存前先尝试获取远程消息
             // 注意：如果 messagesGistId 存在，就必须成功获取到远程消息
