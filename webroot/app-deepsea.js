@@ -225,7 +225,8 @@
             window.dsToggleMinimize = dsToggleMinimize;
             window.dsClosePanel = dsClosePanel;
             window.dsOpenPanel = dsOpenPanel;
-            document.addEventListener('DOMContentLoaded', () => {
+            // 阶段2.5：空闲预载后 DOMContentLoaded 可能已错过，用 readyState 双分支兜底
+            function initDeepseaPanel() {
                 dsRestorePanelState();
                 dsInitDrag();
                 dsInitResize();
@@ -234,5 +235,7 @@
                 window.addEventListener('beforeunload', dsSavePanelState);
                 // 定期存（拖拽/缩放后）
                 setInterval(dsSavePanelState, 4000);
-            });
+            }
+            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initDeepseaPanel);
+            else initDeepseaPanel();
             
