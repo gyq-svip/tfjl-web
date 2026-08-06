@@ -459,21 +459,20 @@ function parseAllianceFields(o){
   if((name.match(/果子/g)||[]).length>=2) return null;
   // 名字长度异常长（合并多行/表头）也丢弃
   if(name.length>12) return null;
-  // 杯数 = 奖杯右边的数字（最关键）。
-  // 右列现在放宽到 66-100%，包含"奖杯+杯数+最大连胜"。
-  // 解析时：若有"最大连胜"关键词，取它之前的最后一个数字作为杯数；否则取右列首个数字。
-  // 这样即使列边界略有偏移，也不怕最大连胜的"0"污染杯数。
-  const cupNums=[...cupText.matchAll(/-?\d+/g)].map(m=>({v:parseInt(m[0],10), idx:m.index}));
+  // 杯数 = 右列识别出的数字。
+  // 右列现在切68-88%(奖杯图标+杯数,排除最大连胜),放大6倍。
+  // 右列可能识别出"奖杯 1234"或"1234"或"1 234"(带空格),需拼接。
+  // 策略:去掉"奖杯/奖/杯"等文字后,把数字拼接成完整数字。
+  const cupClean=cupText.replace(/奖杯|奖|杯|[:：]/g,'').replace(/\s+/g,'');
+  const cupMatch=cupClean.match(/-?\d+/);
   let cups=0;
-  const sm=cupText.match(/(?:最大连胜|大连胜|连胜)\D*?(-?\d+)/);
-  if(sm && cupNums.length){
-    const sIdx=cupText.indexOf(sm[1], sm.index);
-    const before=cupNums.filter(n=> n.idx < sIdx);
-    cups = before.length ? before[before.length-1].v : cupNums[0].v;
-  } else {
-    cups = cupNums.length ? cupNums[0].v : 0;
+  if(cupMatch) cups=parseInt(cupMatch[0],10);
+  // 兜底:取右列最大数字
+  if(!cups || cups<0){
+    const cupNums=[...cupText.matchAll(/-?\d+/g)].map(m=>parseInt(m[0],10)).filter(n=>n>=0);
+    if(cupNums.length) cups=Math.max(...cupNums);
   }
-  if(cups<0) return null;
+  if(cups<0) cups=0;
   return { rank, name, cups, streak:0 };
 }
 
@@ -534,30 +533,53 @@ function allianceDetectRowSlices(img, w, h){
   }
   if(start>=0) bands.push({top:start,bottom:h-1});
   if(bands.length<2){ allianceLastSliceInfo=null; return null; }
-  // ⑤ 自适应合并：对"带间间隔"直方图再做 Otsu，≤阈值的间隔=同一人(名字+奖杯等多行/细标)，>阈值才切到下一行。绝不跨人合并。
+
+  // ⑤ 行合并策略(2024重写):基于"行高稳定性"而非"间隔Otsu统计"
+  //   旧痛点:间隔样本少时(如4行只有3个间隔),Otsu/跳变点统计失效→阈值定错→两人并块或一人拆两行。
+  //   新策略核心:盟战截图每行高度高度稳定(名字+奖杯+排名合成约40-55px),行间距也基本恒定。
+  //     1) 先用"相邻带高度+间隔"算出"单人行周期"(bandHeight+gap),取中位数作基准。
+  //     2) 若两个相邻band合并后的总高 ≈ 单行周期 → 是同一人,合并。
+  //     3) 若两个相邻band合并后 >> 单行周期 → 是两个人,不合并。
+  //     4) 处理边界:第一个band可能含表头(更高),最后一个band可能被截断(更矮)。
   const diffs=[];
   for(let k=0;k<bands.length-1;k++){ const d=bands[k+1].top-bands[k].top; if(d>=6) diffs.push(d); }
   diffs.sort((a,b)=>a-b);
   const med=diffs.length?diffs[Math.floor(diffs.length/2)]:24;
   const gaps=[];
   for(let k=1;k<bands.length;k++){ let g=bands[k].top-bands[k-1].bottom-1; if(g<1)g=1; gaps.push(g); }
-  // 合并阈值：长图拼接处常有异常大间隙，会把 Otsu 阈值推高→把"两人之间"误当"同人多行"→并块。
-  // 改法：①先排除顶部10%异常大间隙(长图拼接边)；②在剩余间隔里找"同人内间隔簇"与"两人间间隔簇"的最大跳变点，取中点为阈值。
-  // 落在两簇中间→既不并块(阈值<两人间最小)、也不拆人(阈值>同人内最大)。
-  let gapThresh=2;
-  if(gaps.length>=2){
-    const gs=[...gaps].sort((a,b)=>a-b);
-    const cut=gs[Math.min(gs.length-1, Math.floor(0.9*(gs.length-1)))]; // 排除顶部10%异常大间隙
-    const inner=gs.filter(g=>g<=cut);
-    let maxJump=0, jumpAt=-1;
-    for(let i=1;i<inner.length;i++){ const j=inner[i]-inner[i-1]; if(j>maxJump){ maxJump=j; jumpAt=i; } }
-    gapThresh = (jumpAt>0 && jumpAt<inner.length) ? Math.max(2, Math.floor((inner[jumpAt-1]+inner[jumpAt])/2)) : Math.max(2, Math.floor(cut*0.6));
-  }
+
+  // 计算每个band的高度
+  const bandHeights=bands.map(b=>b.bottom-b.top+1);
+  // 估算"单行周期" = band高度中位数 + 间隔中位数
+  const sortedHeights=[...bandHeights].sort((a,b)=>a-b);
+  const sortedGaps=[...gaps].sort((a,b)=>a-b);
+  const medHeight=sortedHeights.length?sortedHeights[Math.floor(sortedHeights.length/2)]:44;
+  const medGap=sortedGaps.length?sortedGaps[Math.floor(sortedGaps.length/2)]:24;
+  // 单行周期:一行的高度+到下一行的间隔。同一人内的子带间隔应远小于此。
+  const rowPeriod=medHeight+medGap;
+
+  // 合并逻辑:相邻两band合并后总高度若 <= 单行周期*1.3 → 同一人;否则是两人
+  // 阈值1.3倍容差:容纳表头/紧凑行/略大字号
+  // 同时:相邻间隔 < medGap*0.6 → 几乎肯定是同一人的子行(名字+奖杯叠在一起)
+  const mergeMaxHeight=Math.round(rowPeriod*1.3);
+  const mergeMaxGap=Math.max(3, Math.round(medGap*0.6));
+  let gapThresh=mergeMaxGap;  // 供状态栏显示
+
   const merged=[];
   for(const b of bands){
-    if(merged.length && (b.top-merged[merged.length-1].bottom-1)<=gapThresh) merged[merged.length-1].bottom=b.bottom;
-    else merged.push({top:b.top,bottom:b.bottom});
+    if(merged.length){
+      const last=merged[merged.length-1];
+      const gap=b.top-last.bottom-1;
+      const mergedHeight=(b.bottom-last.top+1);
+      // 合并条件:间隔很小(同人子行) OR 合并后总高不超过单行周期*1.3
+      if(gap<=mergeMaxGap || mergedHeight<=mergeMaxHeight){
+        last.bottom=b.bottom;
+        continue;
+      }
+    }
+    merged.push({top:b.top,bottom:b.bottom});
   }
+
   // ⑥ 直接切每个合并后的人行（绝对位置，零漂移）：
   // 不用"固定网格/anchor"——盟战图是拼接图、行距不恒定，且顶部表头/标题会被并进 merged[0]，
   // 一旦 anchor 定在表头，整盘错位。改为：每个检测到的人(merged 元素) = 一刀，用真实位置 ±1px，
@@ -565,7 +587,7 @@ function allianceDetectRowSlices(img, w, h){
   const segs=merged.map(m=>({ top:Math.max(0,m.top-2), bottom:Math.min(h,m.bottom+2) }));
   // 量出行数与合并阈值，供状态栏核对
   allianceLastSliceInfo={ lineSpacing:med, mergeGap:gapThresh, rows:segs.length };
-  console.log('[联盟][切片] 合并='+merged.length+'块 mergeGap='+gapThresh+'px 共切 '+segs.length+' 块', segs);
+  console.log('[联盟][切片] rowPeriod='+rowPeriod+' mergeMaxH='+mergeMaxHeight+' mergeMaxGap='+mergeMaxGap+' 共切 '+segs.length+' 块', segs);
   return segs.length>=1 ? segs : null;
 }
 function allianceSliceImage(file, maxH){
@@ -612,35 +634,34 @@ function allianceSliceImage(file, maxH){
     img.src=URL.createObjectURL(file);
   });
 }
-// 对"单行块 canvas"按固定比例切三列，分别放大 OCR。
-// 策略调整：不再追求"精准丢弃最大连胜"（不同截图列边界偏移大，固定比例容易偏），
-// 改为右列放宽到 66-100%，把"奖杯+杯数+最大连胜"全包进来，后处理再用关键词区分杯数。
+// 对"单行块 canvas"切三列，分别放大 OCR。
 // 列比例（兼容多数截图）：
-//   左列≈0-22%   排名框（含1-3名圆形奖牌、排名数字；21/30/40 两位数也能包住）；
+//   左列≈0-22%   排名框（含1-3名圆形奖牌、排名数字）；
 //   头像≈22-28%  丢弃；
 //   中列≈28-66%  名字（含名字里的数字，如"果子13"的13）；
-//   右列≈66-100% 奖杯图标 + 杯数数字 + 最大连胜；
-// 杯数解析：取右列中"最大连胜"关键词之前的最后一个数字；无关键词则取首个数字。
-// 这样列边界略有偏移也不怕，容错率远高于"硬切掉最大连胜"。
+//   右列≈68-88%  奖杯图标+杯数（排除88%之后的最大连胜），放大6倍；
+// 右列策略(2024重写):旧版66-100%放大4倍,杯数被最大连胜挤得很小。
+//   改为68-88%:①排除88%之后的最大连胜;②保留奖杯图标作锚点(OCR需要上下文);
+//   ③放大6倍(85px宽→510px),比旧版4倍更大;④对照视图显示限制调到200px。
 function allianceColumnCrops(cv,w,sh){
   try{
     const pad=Math.max(2,Math.floor(w*0.01));
-    const crop=(x0,x1)=>{
+    const crop=(x0,x1,scale)=>{
       x0=Math.max(0,x0-pad); x1=Math.min(w-1,x1+pad); const cw=x1-x0+1;
       const c2=document.createElement('canvas'); c2.width=cw; c2.height=sh; c2.getContext('2d').drawImage(cv,x0,0,cw,sh,0,0,cw,sh);
-      // 对窄条/小字再放大3×，比2×更利于 Umi-OCR 识别小数字和圆形奖牌内数字
-      const c3=document.createElement('canvas'); c3.width=cw*4; c3.height=sh*4; c3.getContext('2d').drawImage(c2,0,0,cw*4,sh*4);
+      const sc=scale||4;
+      const c3=document.createElement('canvas'); c3.width=cw*sc; c3.height=sh*sc; c3.getContext('2d').drawImage(c2,0,0,cw*sc,sh*sc);
       return c3.toDataURL('image/png').split(',')[1];
     };
     const leftEnd=Math.floor(w*0.22);
     const midStart=Math.floor(w*0.28);
     const midEnd=Math.floor(w*0.66);
-    const rightStart=Math.floor(w*0.66);
-    const rightEnd=w-1;
+    const rightStart=Math.floor(w*0.68);
+    const rightEnd=Math.floor(w*0.88);
     return {
-      left:crop(0,leftEnd),
-      mid:crop(midStart-2,midEnd+2),      // 中列左右让2px，确保不漏字
-      right:crop(rightStart-2,rightEnd+2) // 右列只取奖杯+杯数，90%之后丢弃
+      left:crop(0,leftEnd,4),
+      mid:crop(midStart-2,midEnd+2,4),      // 中列左右让2px，确保不漏字
+      right:crop(rightStart,rightEnd,6)      // 右列:68-88%(奖杯+杯数,排除最大连胜),放大6倍
     };
   }catch(e){ return null; }
 }
@@ -694,11 +715,11 @@ function allianceRenderOcrCompare(){
   const box=$('allianceOcrCompare');
   if(!allianceSliceResults.length){ box.style.display='none'; box.innerHTML=''; return; }
   box.style.display='block';
-  box.innerHTML='<div style="font-size:0.72rem;color:#7CFC9B;margin-bottom:6px;">🔍 切片↔识别对比（左=排名列 / 中=名字 / 右=奖杯+杯数+最大连胜；解析自动取"最大连胜"前数字作为杯数）</div>'
+  box.innerHTML='<div style="font-size:0.72rem;color:#7CFC9B;margin-bottom:6px;">🔍 切片↔识别对比（左=排名列 / 中=名字 / 右=奖杯+杯数）</div>'
     + allianceSliceResults.map((s,idx)=>{
-        const imgs=(s.leftDataUrl?'<img src="'+s.leftDataUrl+'" title="排名列" style="max-width:90px;max-height:120px;border:1px solid rgba(255,255,255,0.2);border-radius:4px;display:block;">':'')
-          +'<img src="'+s.dataUrl+'" title="名字" style="max-width:180px;max-height:120px;border:1px solid rgba(255,255,255,0.2);border-radius:4px;display:block;">'
-          +(s.rightDataUrl?'<img src="'+s.rightDataUrl+'" title="奖杯+杯数" style="max-width:90px;max-height:120px;border:1px solid rgba(255,255,255,0.2);border-radius:4px;display:block;">':'');
+        const imgs=(s.leftDataUrl?'<img src="'+s.leftDataUrl+'" title="排名列" style="max-width:240px;max-height:300px;border:1px solid rgba(255,255,255,0.2);border-radius:4px;display:block;">':'')
+          +'<img src="'+s.dataUrl+'" title="名字" style="max-width:240px;max-height:300px;border:1px solid rgba(255,255,255,0.2);border-radius:4px;display:block;">'
+          +(s.rightDataUrl?'<img src="'+s.rightDataUrl+'" title="奖杯+杯数" style="max-width:240px;max-height:300px;border:1px solid rgba(255,215,0,0.4);border-radius:4px;display:block;background:rgba(0,0,0,0.3);">':'');
         return '<div style="display:flex;gap:10px;border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:8px;margin-bottom:8px;background:rgba(0,0,0,0.2);">'
           + '<div style="flex:0 0 auto;"><div style="font-size:0.66rem;color:rgba(255,255,255,0.5);margin-bottom:4px;">块 #'+(idx+1)+'</div><div style="display:flex;gap:4px;align-items:flex-start;">'+imgs+'</div></div>'
           + '<pre style="flex:1;min-width:0;white-space:pre-wrap;word-break:break-all;font-size:0.68rem;color:#cfe;background:rgba(0,0,0,0.3);padding:6px;border-radius:4px;max-height:200px;overflow:auto;margin:0;">中：'+esc(s.text||'(空)')+'\n左：'+esc(s.rankText||'(空)')+'\n右：'+esc(s.cupText||'(空)')+'</pre>'
