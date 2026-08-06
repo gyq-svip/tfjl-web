@@ -21,20 +21,36 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-
-      - name: Debug - Check files
+      # 只把「网页真正需要的文件」拷进 _site 后再上传。
+      # 历史问题：原先 upload-pages-artifact 用 path: '.'，会把整个仓库
+      # （6 个 exe 安装包约 27MB + projects/ 9.7MB + src-tauri/ + vendor/ + webroot/）
+      # 全量打包，artifact 过大导致 Set up job 阶段超时失败，
+      # 结果 2026-08-06 之后线上一直停留在旧版本。改为白名单后 artifact 仅几 MB。
+      - name: Stage site files
         run: |
-          echo "Current directory: $(pwd)"
-          echo "Checking HTML files..."
-          for file in *.html; do
-            if [ -f "$file" ]; then
-              echo "✅ $file exists"
-            fi
-          done
+          set -e
+          mkdir -p _site
+
+          # 页面
+          cp -v *.html _site/ 2>/dev/null || true
+
+          # 模块化脚本 + 样式 + Service Worker
+          cp -v app-*.js _site/ 2>/dev/null || true
+          cp -v recognize.js skins-web.js gh-gist.js github-config.js _site/ 2>/dev/null || true
+          cp -v styles.css sw.js _site/ 2>/dev/null || true
+
+          # 更新元数据（App 更新器读取）
+          cp -v updater.json version.json _site/ 2>/dev/null || true
+
+          # 第三方库 & 皮肤资源 & 脚本目录
+          [ -d vendor ]  && cp -rv vendor  _site/ || true
+          [ -d skins ]   && cp -rv skins   _site/ || true
+          [ -d scripts ] && cp -rv scripts _site/ || true
+
+          echo "=== staged size ==="
+          du -sh _site
+          echo "=== top-level entries ==="
+          ls -la _site
 
       - name: Inject Token (optional)
         run: |
@@ -44,7 +60,7 @@ jobs:
             exit 0
           fi
           echo "Injecting GitHub Token..."
-          for file in *.html; do
+          for file in _site/*.html; do
             if grep -q "YOUR_GITHUB_TOKEN_HERE" "$file"; then
               sed -i "s/YOUR_GITHUB_TOKEN_HERE/$TOKEN/g" "$file"
               echo "✅ Token injected into $file"
@@ -52,34 +68,35 @@ jobs:
           done
           echo "Token injection completed"
 
-      - name: Verify Injection (optional)
+      - name: Verify staged site
         run: |
-          TOKEN="${{ secrets.GIST_TOKEN }}"
-          if [ -z "$TOKEN" ]; then
-            echo "ℹ️ 无 GIST_TOKEN，跳过注入校验"
-            exit 0
-          fi
-          echo "Verifying token injection..."
-          ALL_OK=true
-          for file in *.html; do
-            if grep -q "YOUR_GITHUB_TOKEN_HERE" "$file"; then
-              echo "❌ ERROR: Token was NOT injected in $file!"
-              ALL_OK=false
+          set -e
+          MISSING=false
+          for f in index.html sw.js styles.css app-core.js app-features.js; do
+            if [ ! -f "_site/$f" ]; then
+              echo "❌ ERROR: 缺少关键文件 _site/$f"
+              MISSING=true
             else
-              echo "✅ SUCCESS: Token verified in $file"
+              echo "✅ _site/$f"
             fi
           done
-          if [ "$ALL_OK" = false ]; then
+          if [ "$MISSING" = true ]; then exit 1; fi
+
+          # 确保没有 exe 混进来
+          if find _site -name '*.exe' | grep -q .; then
+            echo "❌ ERROR: _site 中混入了 exe 安装包"
+            find _site -name '*.exe'
             exit 1
           fi
+          echo "✅ 无 exe 混入"
 
       - name: Setup Pages
-        uses: actions/configure-pages@v4
+        uses: actions/configure-pages@v5
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '.'
+          path: '_site'
 
       - name: Deploy to GitHub Pages
         uses: actions/deploy-pages@v4
