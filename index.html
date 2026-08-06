@@ -1116,11 +1116,11 @@
 
             <div class="hands-area">
                 <div class="hand-cards-column user-hand">
-                    <h3>📋 我的手牌 <span id="myHandCount">0/10</span></h3>
+                    <h3>📋 我的手牌 <span id="myHandCount">0/10</span> <button onclick="openPoolCardPicker('my')" title="从全部卡里搜索选卡上阵到「我的手牌」" style="margin-left:6px;background:linear-gradient(135deg,#00bcd4,#7b61ff);color:#fff;border:none;width:26px;height:26px;border-radius:50%;cursor:pointer;font-size:0.8rem;line-height:1;vertical-align:middle;box-shadow:0 1px 4px rgba(0,188,212,0.4);">🔍</button></h3>
                     <div class="selected-cards-container my-hand" id="myHandContainer"></div>
                 </div>
                 <div class="hand-cards-column teammate-hand">
-                    <h3>📋 队友手牌 <span id="teammateHandCount">0/10</span></h3>
+                    <h3>📋 队友手牌 <span id="teammateHandCount">0/10</span> <button onclick="openPoolCardPicker('teammate')" title="从全部卡里搜索选卡上阵到「队友手牌」" style="margin-left:6px;background:linear-gradient(135deg,#00bcd4,#7b61ff);color:#fff;border:none;width:26px;height:26px;border-radius:50%;cursor:pointer;font-size:0.8rem;line-height:1;vertical-align:middle;box-shadow:0 1px 4px rgba(0,188,212,0.4);">🔍</button></h3>
                     <div class="selected-cards-container teammate-hand" id="teammateHandContainer"></div>
                 </div>
             </div>
@@ -2255,7 +2255,7 @@
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260807-320 · sw-v436</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260807-321 · sw-v437</span>
             </div>
         </div>
     </div>

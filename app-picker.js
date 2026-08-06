@@ -23,14 +23,20 @@
             const onPick = opts.onPick || function() {};
             const old = document.getElementById('tfjlGenericPicker');
             if (old) old.remove();
+            // 收集职业分类（仅当 items 含 profession 字段时才显示分类栏）
+            const profSet = new Set();
+            items.forEach(function(it) { if (it.profession) profSet.add(it.profession); });
+            const profs = Array.from(profSet);
             const overlay = document.createElement('div');
             overlay.id = 'tfjlGenericPicker';
-            overlay.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;';
+            // 🔴 z-index 提到 100010：压过版本弹窗(100002)等，解决「筛选器显示在后面无法选择」
+            overlay.style.cssText = 'position:fixed;inset:0;z-index:100010;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;';
             const box = document.createElement('div');
-            box.style.cssText = 'width:min(440px,92vw);max-height:82vh;background:rgba(28,30,40,0.98);border:1px solid rgba(255,215,0,0.4);border-radius:12px;padding:14px;box-shadow:0 8px 32px rgba(0,0,0,0.6);display:flex;flex-direction:column;';
+            // 缩小尺寸：不再近乎全屏（max-height 82vh→min(72vh,560px)），列表可滚动下拉即可
+            box.style.cssText = 'width:min(420px,92vw);max-height:min(72vh,560px);background:rgba(28,30,40,0.98);border:1px solid rgba(255,215,0,0.4);border-radius:12px;padding:14px;box-shadow:0 8px 32px rgba(0,0,0,0.6);display:flex;flex-direction:column;';
             overlay.appendChild(box);
             const head = document.createElement('div');
-            head.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;';
+            head.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;';
             const hEl = document.createElement('div');
             hEl.textContent = title;
             hEl.style.cssText = 'font-size:0.95rem;font-weight:600;color:#ffd54f;';
@@ -43,8 +49,35 @@
             const inp = document.createElement('input');
             inp.type = 'text';
             inp.placeholder = placeholder;
-            inp.style.cssText = 'width:100%;padding:9px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#fff;font-size:0.85rem;box-sizing:border-box;margin-bottom:8px;';
+            inp.style.cssText = 'width:100%;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#fff;font-size:0.85rem;box-sizing:border-box;margin-bottom:6px;';
             box.appendChild(inp);
+            // 职业分类标签栏（可选）
+            let profBar = null;
+            let activeProf = '';
+            if (profs.length > 1) {
+                function makeProfBtn(label, val) {
+                    const b = document.createElement('button');
+                    b.textContent = label;
+                    const on = (val === '');
+                    b.style.cssText = 'padding:3px 10px;border-radius:12px;border:1px solid rgba(255,255,255,0.2);background:' + (on ? 'rgba(255,215,0,0.25)' : 'rgba(255,255,255,0.06)') + ';color:#fff;font-size:0.72rem;cursor:pointer;' + (on ? 'border-color:rgba(255,215,0,0.5);' : '');
+                    b.onclick = function() {
+                        activeProf = val;
+                        profBar.querySelectorAll('button').forEach(function(x) {
+                            x.style.background = 'rgba(255,255,255,0.06)';
+                            x.style.borderColor = 'rgba(255,255,255,0.2)';
+                        });
+                        b.style.background = 'rgba(255,215,0,0.25)';
+                        b.style.borderColor = 'rgba(255,215,0,0.5)';
+                        render(inp.value);
+                    };
+                    return b;
+                }
+                profBar = document.createElement('div');
+                profBar.style.cssText = 'display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;';
+                profBar.appendChild(makeProfBtn('全部', ''));
+                profs.forEach(function(p) { profBar.appendChild(makeProfBtn(p, p)); });
+                box.appendChild(profBar);
+            }
             const list = document.createElement('div');
             list.style.cssText = 'overflow-y:auto;flex:1;min-height:0;';
             box.appendChild(list);
@@ -57,10 +90,12 @@
                     const py = (it.py != null ? it.py : window.hanziInitials(label)).toLowerCase();
                     const hit = !q || label.toLowerCase().indexOf(q) >= 0 || py.indexOf(q) >= 0;
                     if (!hit) return;
+                    if (activeProf && it.profession !== activeProf) return; // 职业分类过滤
                     shown++;
+                    const sub = [it.profession ? ('【' + it.profession + '】') : '', it.sub ? it.sub : '', it.current ? '✓' : ''].filter(Boolean).join(' ');
                     const row = document.createElement('div');
-                    row.textContent = label + (it.sub ? ('  ·  ' + it.sub) : '') + (it.current ? '  ✓' : '');
-                    row.style.cssText = 'padding:8px 10px;border-radius:7px;cursor:pointer;color:' + (it.current ? '#4caf50' : '#fff') + ';font-size:0.85rem;' + (it.current ? 'background:rgba(76,175,80,0.12);' : '');
+                    row.textContent = label + (sub ? ('  ·  ' + sub) : '');
+                    row.style.cssText = 'padding:7px 10px;border-radius:7px;cursor:pointer;color:' + (it.current ? '#4caf50' : '#fff') + ';font-size:0.85rem;' + (it.current ? 'background:rgba(76,175,80,0.12);' : '');
                     row.onmouseenter = function() { if (!it.current) row.style.background = 'rgba(255,255,255,0.08)'; };
                     row.onmouseleave = function() { if (!it.current) row.style.background = 'transparent'; };
                     row.onclick = function() { onPick(it.value, it); overlay.remove(); };
@@ -244,8 +279,9 @@
                     + '</div>'
                     + '<div style="display:flex;gap:8px;margin-top:8px;">'
                     + '<button id="vp_skinApply" style="flex:1;padding:8px;border:none;border-radius:8px;background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;font-size:0.8rem;font-weight:600;cursor:pointer;">✓ 应用</button>'
-                    + '<button id="vp_skinReset" style="flex:1;padding:8px;border:1px solid rgba(255,255,255,0.25);border-radius:8px;background:rgba(255,255,255,0.08);color:#fff;font-size:0.8rem;cursor:pointer;">↺ 恢复默认</button>'
+                    + '<button id="vp_skinReset" style="flex:1;padding:8px;border:1px solid rgba(255,255,255,0.25);border-radius:8px;background:rgba(255,255,255,0.08);color:#fff;font-size:0.8rem;cursor:pointer;">↺ 单英雄默认</button>'
                     + '</div>'
+                    + '<button id="vp_skinResetAll" style="width:100%;margin-top:8px;padding:8px;border:1px solid rgba(255,160,0,0.4);border-radius:8px;background:rgba(255,160,0,0.12);color:#ffb74d;font-size:0.8rem;cursor:pointer;">↺ 全部重置默认皮肤（清空所有自定义）</button>'
                     + '<div id="vp_skinStatus" style="font-size:0.72rem;color:rgba(255,255,255,0.6);margin-top:6px;min-height:14px;"></div>';
                 box.appendChild(skinBox);
                 const reg = window.skinRegistry || {};
@@ -300,6 +336,17 @@
                     syncBtns();
                     setStatus('↺ 已恢复默认：' + vpState.hero);
                     await _refreshAllHeroSkins();
+                };
+                skinBox.querySelector('#vp_skinResetAll').onclick = async function() {
+                    if (!confirm('确定将所有英雄的默认皮肤重置为「英雄同名那张」？\n（会清空你之前手动设过的所有默认皮肤，不可撤销）')) return;
+                    try {
+                        window.heroSkinSelections = {};
+                        try { localStorage.removeItem('tdjl_heroSkinSelections'); } catch (e) {}
+                        vpState.skin = '';
+                        syncBtns();
+                        setStatus('↺ 已全部重置为默认皮肤');
+                        await _refreshAllHeroSkins();
+                    } catch (e) { setStatus('重置失败：' + (e && e.message ? e.message : e)); }
                 };
                 syncBtns();
             } catch (e) { console.warn('皮肤修正区初始化失败:', e); }

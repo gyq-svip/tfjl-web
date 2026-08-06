@@ -8242,42 +8242,39 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         }
 
         // 处理卡池卡牌点击（添加到手牌）
-        function handlePoolCardClick(card) {
+        // side 可选：'my' | 'teammate' 指定上阵到哪侧；不传则沿用原自动逻辑（优先我的，满了才队友）
+        function handlePoolCardClick(card, side) {
             const cardId = card.dataset.id;
             const cardName = card.dataset.name;
             const isEngineering = card.dataset.engineering === 'true';
             const profession = card.dataset.profession;
             const cardType = card.dataset.type;
-            
+
             const myHasThis = myHandCards.some(c => c.id === cardId) || handHasIdentity(myHandCards, cardName);
             const teammateHasThis = teammateHandCards.some(c => c.id === cardId) || handHasIdentity(teammateHandCards, cardName);
-            
-            if (myHandCards.length < MAX_HAND_CARDS && !myHasThis) {
-                if (isEngineering) {
-                    const engCount = myHandCards.filter(c => c.isEngineering).length;
-                    if (engCount >= 2) return;
-                } else {
-                    const normalCount = myHandCards.filter(c => !c.isEngineering).length;
-                    if (normalCount >= 9) return;
-                }
-                
-                myHandCards.push({ id: cardId, name: cardName, placed: null, isEngineering, profession, type: cardType });
-                updateHandDisplay('my');
-            } else if (teammateHandCards.length < MAX_HAND_CARDS && !teammateHasThis) {
-                if (isEngineering) {
-                    const engCount = teammateHandCards.filter(c => c.isEngineering).length;
-                    if (engCount >= 2) return;
-                } else {
-                    const normalCount = teammateHandCards.filter(c => !c.isEngineering).length;
-                    if (normalCount >= 9) return;
-                }
-                
-                teammateHandCards.push({ id: cardId, name: cardName, placed: null, isEngineering, profession, type: cardType });
-                updateHandDisplay('teammate');
-            } else if (handHasIdentity(myHandCards, cardName) || handHasIdentity(teammateHandCards, cardName)) {
-                // 手牌已有同一张卡（含融合形态），同一张卡只能带 1 张
-                if (typeof showToast === 'function') showToast('⚠️ 手牌已有「' + cardName + '」（含融合形态），同一张卡只能带 1 张');
+
+            let targetSide = side;
+            if (!targetSide) {
+                // 原自动逻辑：优先我的，满了才队友
+                if (myHandCards.length < MAX_HAND_CARDS && !myHasThis) targetSide = 'my';
+                else if (teammateHandCards.length < MAX_HAND_CARDS && !teammateHasThis) targetSide = 'teammate';
+                else if (myHasThis || teammateHasThis) { if (typeof showToast === 'function') showToast('⚠️ 手牌已有「' + cardName + '」（含融合形态），同一张卡只能带 1 张'); return; }
+                else { if (typeof showToast === 'function') showToast('⚠️ 手牌已满（最多 ' + MAX_HAND_CARDS + ' 张）'); return; }
             }
+            const target = targetSide === 'teammate' ? teammateHandCards : myHandCards;
+            const hasThis = targetSide === 'teammate' ? teammateHasThis : myHasThis;
+            const sideName = targetSide === 'teammate' ? '队友' : '我的';
+            if (hasThis) { if (typeof showToast === 'function') showToast('⚠️ ' + sideName + '手牌已有「' + cardName + '」'); return; }
+            if (target.length >= MAX_HAND_CARDS) { if (typeof showToast === 'function') showToast('⚠️ ' + sideName + '手牌已满（最多 ' + MAX_HAND_CARDS + ' 张）'); return; }
+            if (isEngineering) {
+                const engCount = target.filter(c => c.isEngineering).length;
+                if (engCount >= 2) { if (typeof showToast === 'function') showToast('⚠️ ' + sideName + '手牌工程卡已达上限（2 张）'); return; }
+            } else {
+                const normalCount = target.filter(c => !c.isEngineering).length;
+                if (normalCount >= 9) { if (typeof showToast === 'function') showToast('⚠️ ' + sideName + '手牌普通卡已达上限（9 张）'); return; }
+            }
+            target.push({ id: cardId, name: cardName, placed: null, isEngineering, profession, type: cardType });
+            updateHandDisplay(targetSide);
         }
 
         // 职业中文名 → data-profession（融合卡与云端基础卡共用）
@@ -8305,6 +8302,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     value: name,
                     label: name,
                     py: window.hanziInitials ? window.hanziInitials(name) : '',
+                    profession: el.dataset.profession, // 顶层职业字段，供筛选器分类
                     current: current,
                     sub: (isFusion ? '🜂融合 ' : '') + (current ? '✓ ' + current : ''),
                     // 透传上阵所需字段
@@ -8316,16 +8314,18 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             return list;
         }
 
-        // 打开通用筛选器选卡 → 复用 handlePoolCardClick（mock dataset）上阵
-        function openPoolCardPicker() {
+        // 打开通用筛选器选卡 → 复用 handlePoolCardClick（mock dataset）上阵到指定侧
+        // side: 'my' | 'teammate'，从手牌旁图标入口调用，确保我和队友分开选
+        function openPoolCardPicker(side) {
             const items = collectPoolCards();
+            const title = side === 'teammate' ? '🔍 选卡上阵到「队友手牌」' : '🔍 选卡上阵到「我的手牌」';
             openGenericPicker({
-                title: '🔍 搜索选卡上阵',
+                title: title,
                 searchPlaceholder: '输入首字母（如 sl=水灵）或卡名关键字…',
                 items: items,
                 onPick: function (val, it) {
-                    // 构造 mock 节点复用既有上阵逻辑
-                    handlePoolCardClick({ dataset: it._ds });
+                    // 构造 mock 节点复用既有上阵逻辑，并透传 side
+                    handlePoolCardClick({ dataset: it._ds }, side);
                 }
             });
         }

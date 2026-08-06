@@ -5170,6 +5170,7 @@
                 items.push({
                     value: name,
                     label: name,
+                    profession: el.dataset.profession,
                     py: window.hanziInitials ? window.hanziInitials(name) : ''
                 });
             });
