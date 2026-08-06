@@ -10982,6 +10982,87 @@
         <script src="skins-web.js?v=1"></script>
 
         <script>
+        // ==================== 通用选择器（首字母 + 关键字搜索，所有"选卡/选英雄/选皮肤"场景复用）====================
+        // 汉字→拼音首字母紧凑字典（塔防精灵全部卡名用字，457字全覆盖，由 scripts 生成校验）
+        window._hanziPyMap = null;
+        window.hanziInitials = function(str) {
+            if (!window._hanziPyMap) {
+                const _d = "亡w将j傀k光g精j灵l冰b弓g法f骑q鸟n凤f凰h刀d客k刺c剑j后h羿y咕g咬y人r娃w土t圣s地d大d树s天t使s女n妖y王w孤g星x宝b库k射s线x小x丑c炮p野y鹿l工g匠j巫w医y幻h幽y彩c影y恶e匪f魔m悟w空k战z斧f暗a木m松s鼠s死s神s毒d水s沙s皇h海h潜q艇t火h枪q炎y炸z弹d爱a狂k龙l猫m咪m电d石s头t龛k祭j司s绿l船c长z萌m萨s满m葵k虎h蛇s蜘z蛛z谜m云y邪x酋q钟z馗k钢g鬃z铁t闪s阿a翼y雷l霸b领l主z风f飞f机j骨g魂h魇y鱼y鲛j拳q龟g相x融r合h番f僧s李l公g榴l姐j扇s蜈w蚣g左z慈c传c国g玉y玺x葫h芦l狮s令l牌p雪x莲l暴b诞d郎l寒h真z气q陨y陆l五w教j周z瑜y怪g杰j竖s白b育y娅y太t平p乐l仙x华h夫f佗t老l爷y少s林l掌z门m深s异y兽s宋s江j虚x触c须x关g羽y武w创c世s泰t坦t孙s权q无w士s月y财c阀f美m猴h齐q至z尊z戚q秦q氏s清q扬y晶j娘n子z潘p金j任r盈y如r烟y和h伊y玄x刚g冢z侏z儒r峰f塔t日r晷g川c谱p花h师s提t督d官g貂d蝉c秋q香x沈s璧b君j十s三s姨y万w甜t心x七q仪y琳l紫z霞x蟠p桃t千q年n包b婆p疗l甲j柴c进j衡h山s豚t夏x孔k明m灯d铃l铛d二e卢l俊j义y上s知z钱q楼l马m虹h黄h鸿h之z吕l布b萧x一y许x仕s卷j帘l兔t粉f色s南n瓜g节j指z名m谛d听t杨y志z叶y城c潮c汐x刘l备b有y为w青q西x庆q巨j鲨s号h微w型x狐h冲c谢x晓x张z吼h能n尚s方f霜s向x燕y永y恒h黑h旋x奥a特t曼m艾a斯s唐t豪h银y河h招z春c戴d宗z烈l焰y状z元y猎l手s对d穿c肠c冥m奶n藏c诸z葛g亮l鸦y莫m再z嫦c娥e东d不b败b乔q丝s娜n罗l刹c夺d命m书s生s吹c蝎x牛n智z多d吴w用y蓬p帅s镜j缺q嵩s祝z枝z冬d呼h延y灼z讲j菩p祖z隐y身s哪n吒z科k学x家j符f咒z赛s文w常c威w寻x欢h的d伯b典d狱y鬼g荣r徽h还h丹d曹c操g高g俅q豹b绝j盒h甘g宁n梁l宽k田t儿e顺s碧b蓝l岳y珊s脚j鲁l广g帝d角j宫g象x";
+                const _m = {};
+                for (let _i = 0; _i < _d.length; _i += 2) _m[_d[_i]] = _d[_i + 1];
+                window._hanziPyMap = _m;
+            }
+            let _o = '';
+            const _s = (str == null ? '' : String(str));
+            for (const _c of _s) { if (window._hanziPyMap[_c]) _o += window._hanziPyMap[_c]; }
+            return _o;
+        };
+        // 通用筛选器：居中浮层 + 搜索框（关键字 / 首字母）+ 列表，点击回调 onPick(value, item)
+        function openGenericPicker(opts) {
+            opts = opts || {};
+            const items = opts.items || [];
+            const title = opts.title || '请选择';
+            const placeholder = opts.searchPlaceholder || '🔍 输入关键字或首字母';
+            const onPick = opts.onPick || function() {};
+            const old = document.getElementById('tfjlGenericPicker');
+            if (old) old.remove();
+            const overlay = document.createElement('div');
+            overlay.id = 'tfjlGenericPicker';
+            overlay.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;';
+            const box = document.createElement('div');
+            box.style.cssText = 'width:min(440px,92vw);max-height:82vh;background:rgba(28,30,40,0.98);border:1px solid rgba(255,215,0,0.4);border-radius:12px;padding:14px;box-shadow:0 8px 32px rgba(0,0,0,0.6);display:flex;flex-direction:column;';
+            overlay.appendChild(box);
+            const head = document.createElement('div');
+            head.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;';
+            const hEl = document.createElement('div');
+            hEl.textContent = title;
+            hEl.style.cssText = 'font-size:0.95rem;font-weight:600;color:#ffd54f;';
+            const closeBtn = document.createElement('button');
+            closeBtn.textContent = '✕';
+            closeBtn.style.cssText = 'background:none;border:none;color:#fff;font-size:1.1rem;cursor:pointer;opacity:0.7;';
+            closeBtn.onclick = function() { overlay.remove(); };
+            head.appendChild(hEl); head.appendChild(closeBtn);
+            box.appendChild(head);
+            const inp = document.createElement('input');
+            inp.type = 'text';
+            inp.placeholder = placeholder;
+            inp.style.cssText = 'width:100%;padding:9px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#fff;font-size:0.85rem;box-sizing:border-box;margin-bottom:8px;';
+            box.appendChild(inp);
+            const list = document.createElement('div');
+            list.style.cssText = 'overflow-y:auto;flex:1;min-height:0;';
+            box.appendChild(list);
+            function render(q) {
+                q = (q || '').trim().toLowerCase();
+                list.innerHTML = '';
+                let shown = 0;
+                items.forEach(function(it) {
+                    const label = (it.label != null ? it.label : it.value);
+                    const py = (it.py != null ? it.py : window.hanziInitials(label)).toLowerCase();
+                    const hit = !q || label.toLowerCase().indexOf(q) >= 0 || py.indexOf(q) >= 0;
+                    if (!hit) return;
+                    shown++;
+                    const row = document.createElement('div');
+                    row.textContent = label + (it.sub ? ('  ·  ' + it.sub) : '') + (it.current ? '  ✓' : '');
+                    row.style.cssText = 'padding:8px 10px;border-radius:7px;cursor:pointer;color:' + (it.current ? '#4caf50' : '#fff') + ';font-size:0.85rem;' + (it.current ? 'background:rgba(76,175,80,0.12);' : '');
+                    row.onmouseenter = function() { if (!it.current) row.style.background = 'rgba(255,255,255,0.08)'; };
+                    row.onmouseleave = function() { if (!it.current) row.style.background = 'transparent'; };
+                    row.onclick = function() { onPick(it.value, it); overlay.remove(); };
+                    list.appendChild(row);
+                });
+                if (shown === 0) {
+                    const e = document.createElement('div');
+                    e.textContent = '无匹配项';
+                    e.style.cssText = 'padding:10px;color:rgba(255,255,255,0.5);font-size:0.8rem;text-align:center;';
+                    list.appendChild(e);
+                }
+            }
+            inp.oninput = function() { render(inp.value); };
+            render('');
+            overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+            document.body.appendChild(overlay);
+            setTimeout(function() { try { inp.focus(); } catch (e) {} }, 50);
+        }
+        window.openGenericPicker = openGenericPicker;
         // ==================== Service Worker 注册（PWA缓存） ====================
         // 首次访问缓存资源，后续打开用缓存秒开，后台静默更新
         // 关键体验：优先用缓存秒开（打开速度不受影响），后台拉到新资源后弹提示「新版本已就绪」
@@ -11140,10 +11221,9 @@
                 skinBox.style.cssText = 'margin-top:16px;padding:12px;border:1px solid rgba(255,215,0,0.35);border-radius:10px;background:rgba(255,215,0,0.06);';
                 skinBox.innerHTML = ''
                     + '<div style="font-size:0.82rem;font-weight:600;color:#ffd54f;margin-bottom:8px;display:flex;align-items:center;gap:6px;">🎨 皮肤显示不对？在这里修正</div>'
-                    + '<input id="vp_heroSearch" type="text" placeholder="🔍 搜索英雄（输入关键字过滤）" style="width:100%;padding:7px 10px;border-radius:7px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#fff;font-size:0.8rem;box-sizing:border-box;margin-bottom:8px;">'
-                    + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
-                    + '<select id="vp_heroSel" style="flex:1;min-width:110px;padding:7px;border-radius:7px;border:1px solid rgba(255,255,255,0.2);background:#2a2a4a;color:#fff;font-size:0.8rem;cursor:pointer;"><option value="">英雄…</option></select>'
-                    + '<select id="vp_skinSel" style="flex:1;min-width:110px;padding:7px;border-radius:7px;border:1px solid rgba(255,255,255,0.2);background:#2a2a4a;color:#fff;font-size:0.8rem;cursor:pointer;"><option value="">皮肤…</option></select>'
+                    + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+                    + '<button id="vp_heroBtn" style="flex:1;min-width:120px;padding:9px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:#2a2a4a;color:#fff;font-size:0.8rem;cursor:pointer;text-align:left;">👤 选英雄</button>'
+                    + '<button id="vp_skinBtn" style="flex:1;min-width:120px;padding:9px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:#2a2a4a;color:#fff;font-size:0.8rem;cursor:pointer;text-align:left;opacity:0.6;">🎨 选皮肤</button>'
                     + '</div>'
                     + '<div style="display:flex;gap:8px;margin-top:8px;">'
                     + '<button id="vp_skinApply" style="flex:1;padding:8px;border:none;border-radius:8px;background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;font-size:0.8rem;font-weight:600;cursor:pointer;">✓ 应用</button>'
@@ -11151,47 +11231,60 @@
                     + '</div>'
                     + '<div id="vp_skinStatus" style="font-size:0.72rem;color:rgba(255,255,255,0.6);margin-top:6px;min-height:14px;"></div>';
                 box.appendChild(skinBox);
-                const heroSel = skinBox.querySelector('#vp_heroSel');
-                const skinSel = skinBox.querySelector('#vp_skinSel');
                 const reg = window.skinRegistry || {};
                 const heroes = Object.keys(reg).filter(h => !h.startsWith('融合') && reg[h] && reg[h].length).sort((a, b) => a.localeCompare(b, 'zh'));
-                function renderHeroOptions(q) {
-                    q = (q || '').trim().toLowerCase();
-                    heroSel.innerHTML = '<option value="">英雄…</option>';
-                    heroes.forEach(h => { if (!q || h.toLowerCase().indexOf(q) >= 0) { const o = document.createElement('option'); o.value = h; o.textContent = h; heroSel.appendChild(o); } });
+                const vpState = { hero: '', skin: '' };
+                const heroBtn = skinBox.querySelector('#vp_heroBtn');
+                const skinBtn = skinBox.querySelector('#vp_skinBtn');
+                const statusEl = skinBox.querySelector('#vp_skinStatus');
+                function setStatus(msg) { if (statusEl) statusEl.textContent = msg; }
+                function syncBtns() {
+                    heroBtn.textContent = '👤 ' + (vpState.hero || '选英雄');
+                    const hasHero = !!vpState.hero;
+                    skinBtn.textContent = '🎨 ' + (hasHero ? (vpState.skin || '选皮肤（' + vpState.hero + '）') : '选皮肤');
+                    skinBtn.style.opacity = hasHero ? '1' : '0.6';
+                    skinBtn.disabled = !hasHero;
                 }
-                renderHeroOptions('');
-                const heroSearch = skinBox.querySelector('#vp_heroSearch');
-                if (heroSearch) heroSearch.oninput = function() {
-                    const prev = heroSel.value;
-                    renderHeroOptions(heroSearch.value);
-                    if (prev && Array.from(heroSel.options).some(o => o.value === prev)) heroSel.value = prev;
-                    fillSkins();
+                heroBtn.onclick = function() {
+                    openGenericPicker({
+                        title: '选择英雄',
+                        searchPlaceholder: '🔍 搜英雄（关键字 / 首字母，如 gz=钢鬃）',
+                        items: heroes.map(h => ({ value: h, label: h, py: window.hanziInitials(h) })),
+                        onPick: function(val) {
+                            vpState.hero = val;
+                            vpState.skin = (window.heroSkinSelections && window.heroSkinSelections[val]) || '';
+                            syncBtns();
+                        }
+                    });
                 };
-                function fillSkins() {
-                    const hero = heroSel.value; skinSel.innerHTML = '<option value="">皮肤…</option>';
-                    if (!hero) return;
-                    const cur = (window.heroSkinSelections && window.heroSkinSelections[hero]) || '';
-                    (reg[hero] || []).forEach(s => { const o = document.createElement('option'); o.value = s.name; o.textContent = s.name; if (s.name === cur) o.selected = true; skinSel.appendChild(o); });
-                }
-                heroSel.onchange = fillSkins;
-                function setStatus(msg) { const s = skinBox.querySelector('#vp_skinStatus'); if (s) s.textContent = msg; }
+                skinBtn.onclick = function() {
+                    if (!vpState.hero) { setStatus('请先选英雄'); return; }
+                    const cur = vpState.skin;
+                    const skins = (reg[vpState.hero] || []).map(s => s.name);
+                    openGenericPicker({
+                        title: '选择「' + vpState.hero + '」的皮肤',
+                        searchPlaceholder: '🔍 搜皮肤（关键字 / 首字母）',
+                        items: skins.map(s => ({ value: s, label: s, py: window.hanziInitials(s), current: s === cur })),
+                        onPick: function(val) { vpState.skin = val; syncBtns(); }
+                    });
+                };
                 skinBox.querySelector('#vp_skinApply').onclick = async function() {
-                    const hero = heroSel.value, skin = skinSel.value;
-                    if (!hero) { setStatus('请先选英雄'); return; }
-                    if (typeof window.selectHeroSkin === 'function') window.selectHeroSkin(hero, skin || '');
-                    setStatus('✅ 已应用：' + hero + ' / ' + (skin || '默认'));
+                    if (!vpState.hero) { setStatus('请先选英雄'); return; }
+                    if (typeof window.selectHeroSkin === 'function') window.selectHeroSkin(vpState.hero, vpState.skin || '');
+                    setStatus('✅ 已应用：' + vpState.hero + ' / ' + (vpState.skin || '默认'));
                     await _refreshAllHeroSkins();
                 };
                 skinBox.querySelector('#vp_skinReset').onclick = async function() {
-                    const hero = heroSel.value; if (!hero) { setStatus('请先选英雄'); return; }
-                    const b = (typeof getBaseHeroName === 'function') ? getBaseHeroName((typeof getMainCardName === 'function' ? getMainCardName(hero) : hero)).heroName : hero;
+                    if (!vpState.hero) { setStatus('请先选英雄'); return; }
+                    const b = vpState.hero; // 皮肤修正区选的是英雄名，本就是 heroSkinSelections 的 key
                     if (window.heroSkinSelections) delete window.heroSkinSelections[b];
                     try { const all = JSON.parse(localStorage.getItem('tdjl_heroSkinSelections') || '{}'); delete all[b]; localStorage.setItem('tdjl_heroSkinSelections', JSON.stringify(all)); } catch (e) {}
-                    setStatus('↺ 已恢复默认：' + hero);
+                    vpState.skin = '';
+                    syncBtns();
+                    setStatus('↺ 已恢复默认：' + vpState.hero);
                     await _refreshAllHeroSkins();
                 };
-                fillSkins();
+                syncBtns();
             } catch (e) { console.warn('皮肤修正区初始化失败:', e); }
         }
 
@@ -17528,33 +17621,13 @@
         }
         // 弹出融合变体选择菜单（第一项=原卡不融合）
         function openFusionVariantMenu(slot, baseHero, variants, currentName) {
-            const oldMenu = document.getElementById('fusionVariantMenu');
-            if (oldMenu) oldMenu.remove();
-            const menu = document.createElement('div');
-            menu.id = 'fusionVariantMenu';
-            menu.style.cssText = 'position:fixed;z-index:9999;background:rgba(20,22,30,0.98);border:1px solid rgba(255,215,0,0.4);border-radius:8px;padding:6px;min-width:128px;box-shadow:0 4px 16px rgba(0,0,0,0.6);font-size:0.85rem;';
-            const rect = slot.getBoundingClientRect();
-            menu.style.left = Math.min(rect.left, window.innerWidth - 170) + 'px';
-            menu.style.top = (rect.bottom + 4) + 'px';
-            const title = document.createElement('div');
-            title.textContent = baseHero + ' 系融合卡';
-            title.style.cssText = 'color:#ffd700;font-size:0.72rem;padding:2px 6px 6px;opacity:0.85;';
-            menu.appendChild(title);
-            [baseHero].concat(variants).forEach(opt => {
-                const isCurrent = (opt === currentName);
-                const item = document.createElement('div');
-                item.textContent = isCurrent ? (opt + ' ✓') : opt;
-                item.style.cssText = 'padding:6px 10px;border-radius:6px;cursor:pointer;color:' + (isCurrent ? '#4caf50' : '#fff') + ';' + (isCurrent ? 'background:rgba(76,175,80,0.12);' : '');
-                item.addEventListener('mouseenter', () => { if (!isCurrent) item.style.background = 'rgba(255,255,255,0.08)'; });
-                item.addEventListener('mouseleave', () => { if (!isCurrent) item.style.background = 'transparent'; });
-                item.addEventListener('click', (e) => { e.stopPropagation(); upgradeCardToFusion(slot, opt); menu.remove(); });
-                menu.appendChild(item);
+            const items = [baseHero].concat(variants).map(opt => ({ value: opt, label: opt, py: window.hanziInitials(opt), current: opt === currentName }));
+            openGenericPicker({
+                title: baseHero + ' 系融合卡',
+                searchPlaceholder: '🔍 搜融合卡（关键字 / 首字母）',
+                items: items,
+                onPick: function(val) { upgradeCardToFusion(slot, val); }
             });
-            document.body.appendChild(menu);
-            setTimeout(() => {
-                const close = (ev) => { if (!menu.contains(ev.target)) { menu.remove(); document.removeEventListener('click', close, true); } };
-                document.addEventListener('click', close, true);
-            }, 0);
         }
         // 原地升级/降级为某融合卡（不替换卡，只改名字+重渲染皮肤）
         async function upgradeCardToFusion(slot, newName) {
@@ -32187,7 +32260,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260806-316 · sw-v433</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260806-317 · sw-v434</span>
             </div>
         </div>
     </div>
