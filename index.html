@@ -3259,7 +3259,12 @@
                                     <input type="number" id="calcBeixiangCurrentDay" value="2" min="1" style="width:100%;padding:7px;border-radius:6px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.3);color:#fff;font-size:0.9rem;box-sizing:border-box;" onchange="updateBeixiangRemainDays()">
                                 </div>
                             </div>
-                            <div style="color:rgba(255,255,255,0.5);font-size:0.72rem;margin-top:4px;">⏳ 剩余 <span id="calcBeixiangRemainDays" style="color:#ffd700;font-weight:bold;">--</span>（含今天，已扣今天已过时间；结束日期：<span id="calcBeixiangEndDateShow" style="color:#ffd700;">--</span>）</div>
+                            <div style="color:rgba(255,255,255,0.5);font-size:0.72rem;margin-top:4px;">⏳ 活动还剩 <span id="calcBeixiangRemainDays" style="color:#ffd700;font-weight:bold;">--</span>（结束日期：<span id="calcBeixiangEndDateShow" style="color:#ffd700;">--</span>）</div>
+                            <div style="color:rgba(255,255,255,0.5);font-size:0.72rem;margin:3px 0 8px;">⚔️ 还能打 <span id="calcBeixiangBattleDays" style="color:#4ecdc4;font-weight:bold;">--</span> 天的对战（每天5局整天算，不按小时折算）</div>
+                            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+                                <input type="checkbox" id="calcBeixiangTodayDone" style="width:16px;height:16px;cursor:pointer;" onchange="updateBeixiangRemainDays()">
+                                <label for="calcBeixiangTodayDone" style="color:rgba(255,255,255,0.75);font-size:0.78rem;cursor:pointer;">今天的 5 局已经打完了（战旗已计入上面"已有战旗"）</label>
+                            </div>
                             <div style="margin-bottom:10px;">
                                 <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;display:block;margin-bottom:4px;">每天能赢几局（共5局）：<span id="calcBeixiangWinRateLabel" style="color:#ffd700;font-weight:bold;">赢3局</span></label>
                                 <input type="range" id="calcBeixiangWinRate" min="0" max="5" value="3" step="1" style="width:100%;cursor:pointer;" oninput="document.getElementById('calcBeixiangWinRateLabel').textContent='赢'+this.value+'局';updateBeixiangRemainDays();">
@@ -3871,10 +3876,20 @@
             let rem = (total - cur + 1) - elapsed; // 含今天，扣掉今天已过
             return rem > 0 ? rem : 0;
         }
+        // 对战按"整天"算：每天5局，今天没打完也仍算1整天；今天打完了则今天不计入
+        function getBeixiangBattleDays() {
+            const days = getBeixiangRemainingDays();
+            const todayDone = document.getElementById('calcBeixiangTodayDone')?.checked;
+            const floor = Math.floor(days);
+            return todayDone ? floor : Math.ceil(days);
+        }
         function updateBeixiangRemainDays() {
             const days = getBeixiangRemainingDays();
+            const battleDays = getBeixiangBattleDays();
             const span = document.getElementById('calcBeixiangRemainDays');
             if (span) span.textContent = fmtRemain(days);
+            const battleSpan = document.getElementById('calcBeixiangBattleDays');
+            if (battleSpan) battleSpan.textContent = battleDays;
             // 推算结束日期 = 现在 + 精确剩余天数
             const end = new Date(Date.now() + days * 86400000);
             const show = document.getElementById('calcBeixiangEndDateShow');
@@ -3882,15 +3897,15 @@
             // 滑块=每天赢几局(0~5)，每日战旗 = 赢×6 + 输×2
             const wins = parseInt(document.getElementById('calcBeixiangWinRate')?.value) || 0;
             const dailyAvg = wins * 6 + (5 - wins) * 2;
-            // 参考表按"赢N局"维度刷新（赢5/4/3/2/1局 的每日战旗）
+            // 参考表按"赢N局·整天"维度刷新（对战按整天算，不用小数天）
             const th = document.getElementById('calcRefDaysTh');
-            if (th) th.textContent = (Math.round(days * 10) / 10) + '天·赢' + wins + '局';
+            if (th) th.textContent = battleDays + '天·赢' + wins + '局';
             const dailies = [30, 26, 22, 18, 14]; // 赢5/4/3/2/1局
             for (let i = 0; i < 5; i++) {
                 const t = document.getElementById('calcRefT' + i);
                 const z = document.getElementById('calcRefZ' + i);
-                if (t) t.textContent = Math.round(dailies[i] * days);
-                if (z) z.textContent = Math.round(dailies[i] * days) + 200;
+                if (t) t.textContent = dailies[i] * battleDays;
+                if (z) z.textContent = dailies[i] * battleDays + 200;
             }
         }
         // 初始化剩余天数展示（默认活动23天·今天第2天 → 剩21天）
@@ -3906,6 +3921,7 @@
             });
             const owned = parseInt(document.getElementById('calcBeixiangOwnedInput').value) || 0;
             const days = getBeixiangRemainingDays();
+            const battleDays = getBeixiangBattleDays();
             const wins = parseInt(document.getElementById('calcBeixiangWinRate').value) || 0;
             const buyZhanLing = document.getElementById('calcBeixiangBuyZhanLing').checked;
             const zhanLingFlag = buyZhanLing ? 200 : 0;
@@ -3916,9 +3932,9 @@
                 return;
             }
 
-            // 每日产出：赢×6 + 输×2 战旗（每天打5局）
+            // 每日产出：赢×6 + 输×2 战旗（每天打5局，对战按整天算）
             const dailyAvg = wins * 6 + (5 - wins) * 2;
-            const battleFree = Math.round(dailyAvg * days);
+            const battleFree = dailyAvg * battleDays;
             const totalFree = battleFree + owned + zhanLingFlag;
             const need = Math.max(0, target - totalFree);
 
@@ -3926,7 +3942,7 @@
             html += `<div style="margin-bottom:12px;">`;
             html += `<div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.6);font-size:0.8rem;">目标战旗总数</span><span style="color:#ff6b6b;font-weight:bold;">${target}</span></div>`;
             html += `<div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.6);font-size:0.8rem;">每日对战（5局·赢${wins}局）</span><span style="color:#4ecdc4;">${dailyAvg} 战旗/天</span></div>`;
-            html += `<div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.6);font-size:0.8rem;">⏳ 剩余 ${fmtRemain(days)} 白嫖（赢${wins}局/天×${Math.round(days*10)/10}天）</span><span style="color:#4ecdc4;">${battleFree}</span></div>`;
+            html += `<div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.6);font-size:0.8rem;">⏳ 还能打 ${battleDays} 天白嫖（赢${wins}局/天×${battleDays}天）</span><span style="color:#4ecdc4;">${battleFree}</span></div>`;
             html += `<div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.6);font-size:0.8rem;">已有战旗（已减去）</span><span style="color:#4ecdc4;">${owned}</span></div>`;
             if (buyZhanLing) {
                 html += `<div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.6);font-size:0.8rem;">战令（98元/200战旗）</span><span style="color:#4ecdc4;">200</span></div>`;
@@ -3938,7 +3954,7 @@
                 html += `</div>`;
                 html += `<div style="background:linear-gradient(135deg,#4caf50,#2e7d32);border-radius:8px;padding:12px;text-align:center;color:white;margin-top:10px;">`;
                 html += `<div style="font-size:1.1rem;font-weight:bold;">🎉 无需额外氪金！</div>`;
-                html += `<div style="font-size:0.85rem;margin-top:4px;opacity:0.9;">${buyZhanLing ? '战令已含200战旗，' : ''}按剩余 ${days} 天赢${wins}局白嫖 + 已有已满足目标，溢出 ${totalFree - target} 战旗</div>`;
+                html += `<div style="font-size:0.85rem;margin-top:4px;opacity:0.9;">${buyZhanLing ? '战令已含200战旗，' : ''}按剩余 ${battleDays} 天赢${wins}局白嫖 + 已有已满足目标，溢出 ${totalFree - target} 战旗</div>`;
                 html += `</div>`;
             } else {
                 html += `<div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.6);font-size:0.8rem;">还需氪金战旗（目标−白嫖−已有${buyZhanLing ? '−战令' : ''}）</span><span style="color:#ff6b6b;font-weight:bold;">${need}</span></div>`;
@@ -32063,7 +32079,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260806-310 · sw-v427</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260806-311 · sw-v428</span>
             </div>
         </div>
     </div>
