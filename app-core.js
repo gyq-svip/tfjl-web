@@ -8332,7 +8332,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 
         // 打开通用筛选器选卡 → 复用 handlePoolCardClick（mock dataset）上阵到指定侧
         // side: 'my' | 'teammate'，从手牌旁图标入口调用，确保我和队友分开选
-        function openPoolCardPicker(side) {
+        // columns: '3'(默认，避免拥挤) | '2' | '4'
+        function openPoolCardPicker(side, columns) {
             const items = collectPoolCards();
             const title = side === 'teammate' ? '🔍 选卡上阵到「队友手牌」' : '🔍 选卡上阵到「我的手牌」';
             openGenericPicker({
@@ -8340,6 +8341,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 searchPlaceholder: '输入首字母（如 sl=水灵）或卡名关键字…',
                 items: items,
                 multi: true,
+                columns: columns || '3',
                 onPick: function (vals, its) {
                     // 多选：批量上阵所有选中卡（复用既有上阵逻辑）
                     (its || []).forEach(function (it) {
@@ -8347,6 +8349,85 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     });
                 }
             });
+        }
+
+        // 同时选两边手牌：横向并排两个独立 picker（左我 / 右队友），互不干扰
+        function openPoolCardPickerDual() {
+            const old = document.getElementById('tfjlDualDeckPicker');
+            if (old) old.remove();
+            const overlay = document.createElement('div');
+            overlay.id = 'tfjlDualDeckPicker';
+            overlay.style.cssText = 'position:fixed;inset:0;z-index:100010;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;';
+            const container = document.createElement('div');
+            container.style.cssText = 'width:min(960px,96vw);height:min(78vh,620px);background:rgba(22,24,32,0.98);border:1px solid rgba(255,215,0,0.4);border-radius:12px;padding:12px;box-shadow:0 8px 32px rgba(0,0,0,0.6);display:flex;flex-direction:column;box-sizing:border-box;';
+            overlay.appendChild(container);
+            // 顶部标题栏
+            const head = document.createElement('div');
+            head.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;';
+            head.innerHTML = '<div style="font-size:0.95rem;font-weight:600;color:#ffd54f;">🔀 同时选两边手牌（左=我 / 右=队友）</div>';
+            const closeBtn = document.createElement('button');
+            closeBtn.textContent = '✕';
+            closeBtn.style.cssText = 'background:none;border:none;color:#fff;font-size:1.2rem;cursor:pointer;opacity:0.7;';
+            closeBtn.onclick = function() { overlay.remove(); };
+            head.appendChild(closeBtn);
+            container.appendChild(head);
+            // 左右两列容器
+            const halves = document.createElement('div');
+            halves.style.cssText = 'display:flex;gap:10px;flex:1;min-height:0;';
+            container.appendChild(halves);
+            function makeHalf(side, label, color) {
+                const col = document.createElement('div');
+                col.id = 'tfjlDualHalf_' + side;
+                col.style.cssText = 'flex:1;display:flex;flex-direction:column;min-width:0;min-height:0;gap:4px;';
+                const titleBar = document.createElement('div');
+                titleBar.style.cssText = 'display:flex;align-items:center;justify-content:space-between;font-size:0.82rem;color:' + color + ';font-weight:600;padding:2px 4px;';
+                titleBar.innerHTML = '<span>' + label + '</span><span data-role="count" style="opacity:0.7;font-weight:400;">0/10</span>';
+                col.appendChild(titleBar);
+                halves.appendChild(col);
+                return col;
+            }
+            const leftCol = makeHalf('my', '📋 我', '#4ecdc4');
+            const rightCol = makeHalf('teammate', '📋 队友', '#ffb74d');
+            // 关外层点外面就关整个
+            overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+            document.body.appendChild(overlay);
+            // 两个子 picker：嵌入到左右两列，无全屏遮罩
+            function spawn(side, parent, countEl) {
+                const items = collectPoolCards();
+                openGenericPicker({
+                    title: side === 'my' ? '🔍 我手牌' : '🔍 队友手牌',
+                    searchPlaceholder: '首字母/卡名（如 sl=水灵）…',
+                    items: items,
+                    multi: true,
+                    columns: '3',
+                    noBackdrop: true,
+                    overlayId: 'tfjlDualInnerPicker_' + side,
+                    parent: parent,
+                    onPick: function(vals, its) {
+                        (its || []).forEach(function(it) { handlePoolCardClick({ dataset: it._ds }, side); });
+                        // 完成一侧后实时刷新计数
+                        setTimeout(function() {
+                            const myCount = (typeof myHandCards !== 'undefined' && myHandCards) ? myHandCards.length : 0;
+                            const teCount = (typeof teammateHandCards !== 'undefined' && teammateHandCards) ? teammateHandCards.length : 0;
+                            const lc = leftCol.querySelector('[data-role="count"]');
+                            const rc = rightCol.querySelector('[data-role="count"]');
+                            if (lc) lc.textContent = myCount + '/10';
+                            if (rc) rc.textContent = teCount + '/10';
+                        }, 50);
+                    }
+                });
+            }
+            spawn('teammate', rightCol);
+            spawn('my', leftCol);
+            // 启动时刷新一次初始计数
+            setTimeout(function() {
+                const myCount = (typeof myHandCards !== 'undefined' && myHandCards) ? myHandCards.length : 0;
+                const teCount = (typeof teammateHandCards !== 'undefined' && teammateHandCards) ? teammateHandCards.length : 0;
+                const lc = leftCol.querySelector('[data-role="count"]');
+                const rc = rightCol.querySelector('[data-role="count"]');
+                if (lc) lc.textContent = myCount + '/10';
+                if (rc) rc.textContent = teCount + '/10';
+            }, 100);
         }
 
         // 统计卡池卡片数（供按钮栏展示）
