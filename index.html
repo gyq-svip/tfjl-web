@@ -11140,6 +11140,7 @@
                 skinBox.style.cssText = 'margin-top:16px;padding:12px;border:1px solid rgba(255,215,0,0.35);border-radius:10px;background:rgba(255,215,0,0.06);';
                 skinBox.innerHTML = ''
                     + '<div style="font-size:0.82rem;font-weight:600;color:#ffd54f;margin-bottom:8px;display:flex;align-items:center;gap:6px;">🎨 皮肤显示不对？在这里修正</div>'
+                    + '<input id="vp_heroSearch" type="text" placeholder="🔍 搜索英雄（输入关键字过滤）" style="width:100%;padding:7px 10px;border-radius:7px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#fff;font-size:0.8rem;box-sizing:border-box;margin-bottom:8px;">'
                     + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
                     + '<select id="vp_heroSel" style="flex:1;min-width:110px;padding:7px;border-radius:7px;border:1px solid rgba(255,255,255,0.2);background:#2a2a4a;color:#fff;font-size:0.8rem;cursor:pointer;"><option value="">英雄…</option></select>'
                     + '<select id="vp_skinSel" style="flex:1;min-width:110px;padding:7px;border-radius:7px;border:1px solid rgba(255,255,255,0.2);background:#2a2a4a;color:#fff;font-size:0.8rem;cursor:pointer;"><option value="">皮肤…</option></select>'
@@ -11154,7 +11155,19 @@
                 const skinSel = skinBox.querySelector('#vp_skinSel');
                 const reg = window.skinRegistry || {};
                 const heroes = Object.keys(reg).filter(h => !h.startsWith('融合') && reg[h] && reg[h].length).sort((a, b) => a.localeCompare(b, 'zh'));
-                heroes.forEach(h => { const o = document.createElement('option'); o.value = h; o.textContent = h; heroSel.appendChild(o); });
+                function renderHeroOptions(q) {
+                    q = (q || '').trim().toLowerCase();
+                    heroSel.innerHTML = '<option value="">英雄…</option>';
+                    heroes.forEach(h => { if (!q || h.toLowerCase().indexOf(q) >= 0) { const o = document.createElement('option'); o.value = h; o.textContent = h; heroSel.appendChild(o); } });
+                }
+                renderHeroOptions('');
+                const heroSearch = skinBox.querySelector('#vp_heroSearch');
+                if (heroSearch) heroSearch.oninput = function() {
+                    const prev = heroSel.value;
+                    renderHeroOptions(heroSearch.value);
+                    if (prev && Array.from(heroSel.options).some(o => o.value === prev)) heroSel.value = prev;
+                    fillSkins();
+                };
                 function fillSkins() {
                     const hero = heroSel.value; skinSel.innerHTML = '<option value="">皮肤…</option>';
                     if (!hero) return;
@@ -32174,7 +32187,7 @@ ${maSection}
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260806-315 · sw-v432</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260806-316 · sw-v433</span>
             </div>
         </div>
     </div>
