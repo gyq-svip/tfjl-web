@@ -118,7 +118,7 @@
       if (!Array.isArray(skinList)) continue;
       for (var i = 0; i < skinList.length; i++) {
         var s = skinList[i];
-        var url = REMOTE_SKIN_BASE + '/' + encodeURIComponent(heroName) + '/' + encodeURIComponent(s.file || (s.name + '.png'));
+        var url = REMOTE_SKIN_BASE + '/' + encodeURIComponent(heroName) + '/' + encodeURIComponent(s.file || (s.name + '.skin'));
         _getCachedSkinUrl(url).catch(function () {});
         count++;
         if (count % 20 === 0) await new Promise(function (r) { setTimeout(r, 30); });
@@ -162,7 +162,7 @@
           var remoteSkin = skinList[j];
           var skinName = remoteSkin.name;
           if (!skinName) continue;
-          var remoteUrl = REMOTE_SKIN_BASE + '/' + encodeURIComponent(hn) + '/' + encodeURIComponent(remoteSkin.file || (skinName + '.png'));
+          var remoteUrl = REMOTE_SKIN_BASE + '/' + encodeURIComponent(hn) + '/' + encodeURIComponent(remoteSkin.file || (skinName + '.skin'));
           if (localNames[skinName]) {
             var local = null;
             for (var m = 0; m < localSkins.length; m++) { if (localSkins[m].name === skinName) { local = localSkins[m]; break; } }
