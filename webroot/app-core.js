@@ -12341,8 +12341,6 @@ function hasGistToken() {
                     console.log('[默认项目] 从本地缓存加载:', DEFAULT_NAME);
                     // 标记为已初始化：首次/升级后仅此一次，之后启动不再联网（保证删除持久、启动快、省服务器资源）
                     try { localStorage.setItem(DEFAULT_PROJECT_INIT_KEY, '1'); } catch (e) {}
-                    // 后台比对远端 exportDate：若新版则静默重拉并覆盖本地缓存（用户先看到旧版，毫秒级后被新版替换）
-                    _maybeRefreshDefaultProject(DEFAULT_CAT, DEFAULT_NAME);
                     return;
                 }
             } catch (e) { console.warn('[默认项目] 读本地缓存失败:', e); }
