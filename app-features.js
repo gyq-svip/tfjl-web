@@ -4524,7 +4524,7 @@
                             <p style="margin:0 0 10px 0;"><strong style="color:#ffd700;">🏪 拍卖行</strong> - 闲置物品自由上架、交换、求购，入口在右上角需求墙小喇叭旁边，完全免费！纯玩！</p>
                             <p style="margin:0 0 10px 0;"><strong style="color:#ffd700;">📢 需求墙</strong> - 发布需求、分享脚本、互动交流</p>
                             <p style="margin:0 0 10px 0;"><strong style="color:#ffd700;">💾 备份恢复</strong> - 全部数据或单个项目备份/恢复/分享</p>
-                            <p style="margin:0 0 10px 0;"><strong style="color:#ffd700;">🌐 版本切换</strong> - 在线版/离线版智能切换，网络异常自动提示</p>
+                            
                             <p style="margin:0;"><strong style="color:#ffd700;">⭐ 收藏功能</strong> - 右键卡牌添加到常用收藏</p>
                         </div>
                     </div>
@@ -4550,25 +4550,6 @@
                             <p style="margin:0 0 5px 0;padding-left:20px;">• 点击右上角≡菜单按钮</p>
                             <p style="margin:0 0 5px 0;padding-left:20px;">• 📋全部数据：备份/恢复所有项目</p>
                             <p style="margin:0 0 15px 0;padding-left:20px;">• 📁单个项目：备份/恢复当前项目</p>
-                            <p style="margin:0 0 8px 0;"><strong style="color:#4fc3f7;">版本切换：</strong></p>
-                            <p style="margin:0 0 5px 0;padding-left:20px;">• 在线版：支持访问统计功能</p>
-                            <p style="margin:0 0 5px 0;padding-left:20px;">• 离线版：数据保存在本地，无需网络</p>
-                            <p style="margin:0;padding-left:20px;">• 点击🌐按钮可快速切换版本</p>
-                        </div>
-                    </div>
-
-                    <!-- 在线版与离线版 -->
-                    <div style="margin-bottom:25px;">
-                        <h3 style="color:#00bcd4;margin-bottom:10px;border-left:3px solid #00bcd4;padding-left:10px;">🌐 在线版与离线版</h3>
-                        <div style="background:rgba(0,188,212,0.1);border-radius:8px;padding:15px;font-size:0.9rem;line-height:1.8;">
-                            <p style="margin:0 0 10px 0;"><strong style="color:#4fc3f7;">在线版特点：</strong></p>
-                            <p style="margin:0 0 5px 0;padding-left:20px;">✓ 无需下载，浏览器直接访问</p>
-                            <p style="margin:0 0 5px 0;padding-left:20px;">✓ 支持访问统计显示</p>
-                            <p style="margin:0 0 15px 0;padding-left:20px;">✓ 网络异常时可切换离线版</p>
-                            <p style="margin:0 0 10px 0;"><strong style="color:#4fc3f7;">离线版特点：</strong></p>
-                            <p style="margin:0 0 5px 0;padding-left:20px;">✓ 完全离线可用</p>
-                            <p style="margin:0 0 5px 0;padding-left:20px;">✓ 无需网络连接</p>
-                            <p style="margin:0 0 15px 0;padding-left:20px;">✓ 数据保存在本地</p>
                         </div>
                     </div>
 
@@ -6723,7 +6704,7 @@
             if (!nick) { alert('分享脚本需要先设置昵称（昵称仅用于发言/分享脚本展示，设置后不可自行修改）'); return; }
 
             if (!getGistToken()) {
-                alert('离线版暂不支持分享，请切换到在线版');
+                alert('请先登录（GitHub 登录）后再分享');
                 return;
             }
 
@@ -6820,7 +6801,7 @@
             if (!nick) { alert('分享脚本需要先设置昵称（昵称仅用于发言/分享脚本展示，设置后不可自行修改）'); return; }
 
             if (!getGistToken()) {
-                alert('离线版暂不支持分享，请切换到在线版');
+                alert('请先登录（GitHub 登录）后再分享');
                 return;
             }
 
@@ -6920,7 +6901,7 @@
         // 批量分享项目文件到需求墙
         async function batchShareTxtFilesToWall(indices) {
             if (!indices || indices.length === 0) return;
-            if (!getGistToken()) { alert('离线版暂不支持分享，请切换到在线版'); return; }
+            if (!getGistToken()) { alert('请先登录（GitHub 登录）后再分享'); return; }
             const now = new Date();
             const suffix = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
             const baseName = prompt('请输入批量分享文件名前缀（留空则每个用原文件名）：', '');

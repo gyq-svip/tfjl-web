@@ -713,7 +713,7 @@
             const nick = await ensureNickname();
             if (!nick) { alert('分享阵容需要先设置昵称（昵称仅用于发言/分享展示，设置后不可自行修改）'); return; }
 
-            if (!getGistToken()) { alert('离线版暂不支持分享，请切换到在线版'); return; }
+            if (!getGistToken()) { alert('请先登录（GitHub 登录）后再分享'); return; }
 
             // 【关键安全】分享前先加载历史消息，避免覆盖
             if (wallMessages.length === 0) {
