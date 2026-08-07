@@ -3974,7 +3974,7 @@
             if (!nick) { alert('分享脚本需要先设置昵称（昵称仅用于发言/分享脚本展示，设置后不可自行修改）'); return; }
 
             if (!getGistToken()) {
-                alert('离线版暂不支持分享，请切换到在线版');
+                alert('请先登录（GitHub 登录）后再分享');
                 return;
             }
 
@@ -4092,7 +4092,7 @@
         // 批量分享扫描文件到需求墙
         async function batchShareScannedFilesToWall(fileList) {
             if (!fileList || fileList.length === 0) return;
-            if (!getGistToken()) { alert('离线版暂不支持分享，请切换到在线版'); return; }
+            if (!getGistToken()) { alert('请先登录（GitHub 登录）后再分享'); return; }
             const now = new Date();
             const suffix = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0') + '_' + String(now.getHours()).padStart(2, '0') + String(now.getMinutes()).padStart(2, '0');
             const baseName = prompt('请输入批量分享文件名前缀（留空则每个用原文件名）：', '');
@@ -12222,9 +12222,6 @@ function hasGistToken() {
                 applyConsoleVisibility(localStorage.getItem(CONSOLE_VISIBILITY_KEY) === '1');
             } catch (e) {}
             
-            // 初始化版本切换功能
-            initVersionSwitch();
-            
             // 初始化版本号显示 & 自动检查更新（非阻塞）
             initVersionDisplay();
             autoCheckUpdate();
@@ -13952,7 +13949,7 @@ function hasGistToken() {
         // 管理员一键还原：把备用 Gist（目录式 backup 字段）的消息合并写回当前需求墙指向的主 Gist
         async function adminRestoreFromBackup() {
             const token = getGistToken();
-            if (!token) { alert('请先登录在线版（GitHub 登录）后再还原'); return; }
+            if (!token) { alert('请先登录（GitHub 登录）后再还原'); return; }
             if (!confirm('确认从备用 Gist 一键还原需求墙？\n\n将把备用 Gist 的消息合并到当前需求墙指向的主 Gist（不会删除主 Gist 中已有的新消息）。')) return;
             try {
                 showToast('⏳ 正在从备用 Gist 还原...');
@@ -15743,7 +15740,7 @@ ${maSection}
                 return;
             }
             if (!getGistToken()) {
-                alert('离线版暂不支持分享，请切换到在线版');
+                alert('请先登录（GitHub 登录）后再分享');
                 return;
             }
 
@@ -16256,7 +16253,7 @@ ${maSection}
             const nickname = nick;
 
             if (!getGistToken()) {
-                alert('离线版暂不支持发布消息，请切换到在线版');
+                alert('请先登录（GitHub 登录）后再发布消息');
                 return;
             }
 
