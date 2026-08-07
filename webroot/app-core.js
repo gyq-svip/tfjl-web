@@ -17282,8 +17282,20 @@ ${maSection}
         function applyConsoleVisibility(visible) {
             const btn = document.getElementById('floatConsoleToggle');
             const status = document.getElementById('consoleToggleStatus');
-            // 浮动控制台现已改为「默认常驻显示」，开关仅更新状态文字，不再隐藏浮窗（避免覆盖默认常显）
+            // 开关控制浮窗显示/隐藏（可见性由 initFloatConsoleOnLoad 保证默认显示，此处负责开关真正生效）
+            if (btn) btn.style.display = visible ? 'flex' : 'none';
             if (status) status.textContent = visible ? '已开启' : '已关闭';
+            const con = document.getElementById('floatConsole');
+            if (con) con.style.display = visible ? 'flex' : 'none';
+            floatConsoleVisible = visible;
+            if (visible) {
+                refreshFloatConsole();
+                if (floatConsoleRefreshTimer) clearInterval(floatConsoleRefreshTimer);
+                floatConsoleRefreshTimer = setInterval(refreshFloatConsole, 500);
+            } else {
+                if (floatConsoleRefreshTimer) clearInterval(floatConsoleRefreshTimer);
+                floatConsoleRefreshTimer = null;
+            }
         }
 
         function floatConsoleClear() {
