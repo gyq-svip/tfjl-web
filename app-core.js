@@ -7848,7 +7848,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             // 恢复我方战斗槽
             for (const card of myPlacedCards) {
                 const slot = document.querySelector(`.battle-slot[data-slot="${card.slot}"]`);
-                if (slot && !slot.classList.contains('filled')) {
+                if (!slot) continue;
+                if (!slot.classList.contains('filled')) {
                     const cardType = card.type || findCardTypeById(card.id);
                     const cardName = card.name || '';
                     const levelBadge = cardType ? createLevelBadgeHTML(card.id, cardType, 'my', cardName) : '';
@@ -7858,16 +7859,17 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     slot.dataset.cardId = card.id;
                     slot.dataset.handType = 'my';
                     slot.dataset.profession = card.profession;
-                    // 应用皮肤背景（异步加载，错误不中断）
-                    try { await applySkinBgToSlot(slot, card.name); } catch (e) {}
-                    refreshSlotFusionControl(slot);
                 }
+                // 🔴 皮肤重渲必须每次都跑（重置皮肤/切皮等场景靠这里刷新已填卡槽的视觉）
+                try { await applySkinBgToSlot(slot, card.name); } catch (e) {}
+                refreshSlotFusionControl(slot);
             }
 
             // 恢复队友战斗槽
             for (const card of teammatePlacedCards) {
                 const slot = document.querySelector(`.battle-slot[data-slot="${card.slot}"]`);
-                if (slot && !slot.classList.contains('filled')) {
+                if (!slot) continue;
+                if (!slot.classList.contains('filled')) {
                     const cardType = card.type || findCardTypeById(card.id);
                     const cardName = card.name || '';
                     const levelBadge = cardType ? createLevelBadgeHTML(card.id, cardType, 'teammate', cardName) : '';
@@ -7877,10 +7879,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     slot.dataset.cardId = card.id;
                     slot.dataset.handType = 'teammate';
                     slot.dataset.profession = card.profession;
-                    // 应用皮肤背景（异步加载，错误不中断）
-                    try { await applySkinBgToSlot(slot, card.name); } catch (e) {}
-                    refreshSlotFusionControl(slot);
                 }
+                // 🔴 皮肤重渲必须每次都跑（重置皮肤/切皮等场景靠这里刷新已填卡槽的视觉）
+                try { await applySkinBgToSlot(slot, card.name); } catch (e) {}
+                refreshSlotFusionControl(slot);
             }
         }
 
@@ -9060,13 +9062,17 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             if (cardId) {
                 try { await setCardSkin(cardId, nextSkin, handType); } catch (e) { console.warn('[SKIN] setCardSkin in cycle failed:', e); }
             }
-            const slot = document.querySelector('.battle-slot[data-slot="' + slotId + '"]');
-            if (slot) {
-                const skinLabel = slot.querySelector('.skin-label') || (() => {
+            // 🔴 关键：写完 cardSkins 后必须立即重渲该卡槽皮肤层（融合路径就是这么做的，单卡漏了导致切皮不渲染）
+            const _reSlot = cycleSlot || document.querySelector('.battle-slot[data-slot="' + slotId + '"]');
+            if (_reSlot) {
+                try { await applySkinBgToSlot(_reSlot, heroName); } catch (e) { console.warn('[SKIN] applySkinBgToSlot after cycle failed:', e); }
+            }
+            if (cycleSlot) {
+                const skinLabel = cycleSlot.querySelector('.skin-label') || (() => {
                     const label = document.createElement('span');
                     label.className = 'skin-label';
                     label.style.cssText = 'position:absolute;top:2px;right:2px;font-size:9px;background:rgba(0,0,0,0.6);color:#fff;padding:1px 4px;border-radius:4px;z-index:4;pointer-events:none;';
-                    slot.appendChild(label);
+                    cycleSlot.appendChild(label);
                     return label;
                 })();
                 skinLabel.textContent = nextSkin || '默认';
