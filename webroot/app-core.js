@@ -4857,7 +4857,8 @@
             if (cloudEnabled) {
                 const cf = window.cloudFusions[cardName];
                 if (cf && Array.isArray(cf.components) && cf.components.length >= 2) return cf.components[0];
-                return cardName;
+                // 云端未收录 → 回退内置识别（fusionCards 表 + splitIntoHeroes），
+                // 避免内置融合卡(死神海妖/小野酋长/咕咕萨满等)被当单卡导致皮肤全丢(2026-08-08 回归)
             }
             const fusionCards = [
                 '火炮射线', '射线潜艇', '火炮潜艇', '宝库射线', '宝库潜艇', '宝库火炮',
@@ -4903,12 +4904,9 @@
             if (window.cloudFusions && window.cloudFusions[cardName] && Array.isArray(window.cloudFusions[cardName].components) && window.cloudFusions[cardName].components.length >= 2) {
                 return window.cloudFusions[cardName].components.slice();
             }
-            // 严格只认云端 fusions.json（管理员维护）。一旦云端已启用(有≥1条定义)，
-            // 立即禁用内置硬编码回退表与兜底拆分——管理员没加过的卡绝不当作融合卡，
-            // 杜绝界面浮现大量「假融合卡」(内置24个+兜底拆分凑出的"29个")。
-            // 仅当云端完全未配置(无 window.cloudFusions 或为空对象)时，才回退老内置表保证不失效。
-            const cloudEnabled = window.cloudFusions && typeof window.cloudFusions === 'object' && Object.keys(window.cloudFusions).length > 0;
-            if (cloudEnabled) return null;
+            // 云端优先，但云端未收录的内置/兜底融合卡回退内置识别（fusionCards 表 + splitIntoHeroes）。
+            // 若云端只收录部分融合卡仍"严格只认云端"，其余内置融合卡(死神海妖/小野酋长/咕咕萨满等)
+            // 会被当单卡 → 融合皮肤全丢(2026-08-08 用户反馈回归)。内置识别即云端未启用时的既有可靠逻辑。
             const fusionCards = [
                 '火炮射线', '射线潜艇', '火炮潜艇', '宝库射线', '宝库潜艇', '宝库火炮',
                 '潜艇射线', '潜艇火炮', '射线火炮',
