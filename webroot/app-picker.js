@@ -49,6 +49,25 @@
                 const fLeft = (align === 'right') ? 'auto' : '12px';
                 const fRight = (align === 'right') ? '12px' : 'auto';
                 box.style.cssText = 'position:fixed;top:88px;left:' + fLeft + ';right:' + fRight + ';width:' + floatWidth + ';height:360px;pointer-events:auto;background:rgba(28,30,40,0.98);border:1px solid rgba(255,215,0,0.4);border-radius:12px;padding:14px;box-shadow:0 8px 32px rgba(0,0,0,0.6);display:flex;flex-direction:column;box-sizing:border-box;';
+                // 记忆上次位置/大小：恢复时改 left 定位
+                const _fkey = (typeof opts.floatKey === 'string' && opts.floatKey) ? opts.floatKey : ('gen_' + (title || ''));
+                try {
+                    const _sr = JSON.parse(localStorage.getItem('tfjl_floatrect_' + _fkey) || 'null');
+                    if (_sr) {
+                        if (_sr.left) { box.style.left = _sr.left; box.style.right = 'auto'; }
+                        if (_sr.top) box.style.top = _sr.top;
+                        if (_sr.width) box.style.width = _sr.width + 'px';
+                        if (_sr.height) box.style.height = _sr.height + 'px';
+                    }
+                } catch (e) {}
+                box._saveFloatRect = function() {
+                    try {
+                        const r = { width: box.offsetWidth, height: box.offsetHeight };
+                        if (box.style.left && box.style.left !== 'auto') r.left = box.style.left;
+                        if (box.style.top) r.top = box.style.top;
+                        localStorage.setItem('tfjl_floatrect_' + _fkey, JSON.stringify(r));
+                    } catch (e) {}
+                };
             } else if (noBackdrop) {
                 overlay.style.cssText = 'display:flex;align-items:stretch;justify-content:center;min-height:0;width:100%;height:100%;';
                 box.style.cssText = 'width:100%;height:100%;background:rgba(28,30,40,0.98);border:1px solid rgba(255,215,0,0.4);border-radius:10px;padding:12px;box-shadow:none;display:flex;flex-direction:column;box-sizing:border-box;';
@@ -87,7 +106,7 @@
                     box.style.top = ny + 'px';
                     box.style.right = 'auto';
                 });
-                document.addEventListener('mouseup', function() { drag = null; });
+                document.addEventListener('mouseup', function() { drag = null; if (box._saveFloatRect) box._saveFloatRect(); });
                 const rz = document.createElement('div');
                 rz.title = '拖拽缩放';
                 rz.style.cssText = 'position:absolute;right:0;bottom:0;width:18px;height:18px;cursor:nwse-resize;background:linear-gradient(135deg,transparent 45%,rgba(255,255,255,0.45) 45%,rgba(255,255,255,0.45) 55%,transparent 55%,transparent 70%,rgba(255,255,255,0.45) 70%,rgba(255,255,255,0.45) 80%,transparent 80%);';
@@ -102,7 +121,7 @@
                     box.style.width = Math.max(220, rsize.w + (e.clientX - rsize.x)) + 'px';
                     box.style.height = Math.max(160, rsize.h + (e.clientY - rsize.y)) + 'px';
                 });
-                document.addEventListener('mouseup', function() { rsize = null; });
+                document.addEventListener('mouseup', function() { rsize = null; if (box._saveFloatRect) box._saveFloatRect(); });
             }
             const inp = document.createElement('input');
             inp.type = 'text';
