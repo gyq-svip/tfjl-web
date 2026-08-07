@@ -24,9 +24,9 @@
             const multi = !!opts.multi; // 卡片多选模式
             const wide = !!opts.wide;
             // 多列密度：'2'|'3'|'4'。手牌多选默认 2 列（选多职业卡片变多也不拥挤）；皮肤等单选走自适应
-            const cols = opts.columns || (multi ? '2' : 'auto');
-            // 浮层宽度：默认 420；手牌多选拉宽到 ~720 让 2 列每张卡有充足空间，不再被裁剪
-            const overlayWidth = opts.overlayWidth || (wide ? 'min(860px,96vw)' : (multi ? 'min(720px,96vw)' : 'min(420px,92vw)'));
+            const cols = opts.columns || (multi ? '4' : 'auto');
+            // 浮层宽度：默认 420；手牌多选 4 列用窄框（两行布局不裁切）
+            const overlayWidth = opts.overlayWidth || (wide ? 'min(860px,96vw)' : (multi ? 'min(440px,92vw)' : 'min(420px,92vw)'));
             const align = opts.align || 'center'; // center | left | right —— 手牌选择器靠左/靠右弹出
             const noBackdrop = !!opts.noBackdrop;
             // 不同手牌的 picker 给独立 id，避免「点另一个放大镜先点的消失」（未指定时用单次随机后缀）
@@ -108,8 +108,9 @@
             }
             const list = document.createElement('div');
             if (multi) {
-                // 多列密度：'3'/'2' 走固定列数（手牌选择器用 3 列避免拥挤），其它走自适应
-                const colsCss = cols === '3' ? 'repeat(3,1fr)'
+                // 多列密度：'2'|'3'|'4' 走固定列数；其它走自适应
+                const colsCss = cols === '4' ? 'repeat(4,1fr)'
+                              : cols === '3' ? 'repeat(3,1fr)'
                               : cols === '2' ? 'repeat(2,1fr)'
                               : 'repeat(auto-fill,minmax(88px,1fr))';
                 list.style.cssText = 'overflow-y:auto;flex:1;min-height:0;display:grid;grid-template-columns:' + colsCss + ';gap:6px;align-content:start;padding:2px;';
