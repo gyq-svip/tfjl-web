@@ -49,6 +49,8 @@ jobs:
           [ -d vendor ]  && cp -rv vendor  _site/ || true
           [ -d skins ]   && cp -rv skins   _site/ || true
           [ -d scripts ] && cp -rv scripts _site/ || true
+          # 默认项目（深海-王城低配版，支持皮肤；ensureDefaultProjectLoaded 启动时拉取）
+          [ -d projects ] && cp -rv projects _site/ || true
 
           echo "=== staged size ==="
           du -sh _site
