@@ -75,10 +75,7 @@
        - 拍卖出价函数：quickBid()、customQuickBid()，第 3000 行附近
 
     📌 管理员相关：
-       - 管理员面板打开：openAdminPanel()，第 11688 行起
-       - 管理员菜单：adminMenuSection，第 12800 行附近
-       - 管理员密码验证：verifyAdmin()，第 12211 行起
-       - 长按"龙行"触发：第 11560-11585 行
+       - 管理员面板：openAdminPanel() / 菜单 adminMenuSection（详见源码，入口与密码不在此注释说明）
 
     📌 数据统计和GitHub：
        - 统计数据保存：saveCounterToGist()，第 9700 行附近
@@ -2258,7 +2255,7 @@
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260807-334 · sw-v450</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">v260807-335 · sw-v451</span>
             </div>
         </div>
     </div>
