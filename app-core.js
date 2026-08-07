@@ -12329,7 +12329,7 @@ function hasGistToken() {
             const DEFAULT_CAT = '深海';
             const DEFAULT_NAME = '王城低配版';
 
-            // 1. 本地缓存优先（瞬间展示，无需联网）
+            // 1. 本地缓存优先（瞬间展示，无需联网）；但若远端默认项目已更新（exportDate 更新），则后台重拉覆盖，保证老用户也能自动拿到新皮肤
             try {
                 const all = await loadProjectListFromDB();
                 const local = all.find(p => p.name === DEFAULT_NAME && (p.category || '默认分类') === DEFAULT_CAT)
@@ -12341,6 +12341,8 @@ function hasGistToken() {
                     console.log('[默认项目] 从本地缓存加载:', DEFAULT_NAME);
                     // 标记为已初始化：首次/升级后仅此一次，之后启动不再联网（保证删除持久、启动快、省服务器资源）
                     try { localStorage.setItem(DEFAULT_PROJECT_INIT_KEY, '1'); } catch (e) {}
+                    // 后台比对远端 exportDate：若新版则静默重拉并覆盖本地缓存（用户先看到旧版，毫秒级后被新版替换）
+                    _maybeRefreshDefaultProject(DEFAULT_CAT, DEFAULT_NAME);
                     return;
                 }
             } catch (e) { console.warn('[默认项目] 读本地缓存失败:', e); }
@@ -12389,6 +12391,40 @@ function hasGistToken() {
                     refreshProjectSelectors();
                     if (window._hideLoadingScreen) window._hideLoadingScreen();
                 }
+            }
+        }
+
+        // 后台静默检查远端默认项目是否有更新：比对远程 exportDate 与本地缓存的 exportDate，
+        // 若远程更新则重拉并覆盖本地缓存（老用户强刷即可自动拿到新皮肤，无需手动清 IndexedDB）。
+        // 仅当默认项目确实被本地缓存命中（不是首次安装、不是被删除）时才比对，避免与首装/删除回退逻辑冲突。
+        async function _maybeRefreshDefaultProject(cat, name) {
+            try {
+                const localExport = localStorage.getItem(DEFAULT_PROJECT_CACHE_KEY) || '';
+                const resp = await fetch(DEFAULT_PROJECT_REMOTE, { cache: 'no-cache' });
+                if (!resp.ok) return;
+                const data = await resp.json();
+                const remoteExport = data.exportDate || '';
+                if (!remoteExport) return;
+                // 远程更新（字典序比较 ISO 时间字符串，新日期更大）则重拉覆盖
+                if (localExport && localExport >= remoteExport) {
+                    console.log('[默认项目] 远端无更新，跳过重拉');
+                    return;
+                }
+                console.log('[默认项目] 远端有更新，后台重拉覆盖本地缓存');
+                const proj = data.project || data;
+                proj.name = name;
+                proj.category = cat;
+                proj.timestamp = new Date().toISOString();
+                try { localStorage.setItem(DEFAULT_PROJECT_CACHE_KEY, remoteExport); } catch (e) {}
+                await saveProjectToDB(name, cat, proj).catch(() => {});
+                // 仅当当前展示的正是默认项目时才重新加载并刷新界面
+                if (typeof currentProjectName !== 'undefined' && currentProjectName === name) {
+                    await loadProjectFromDB(name).catch(() => {});
+                    refreshProjectSelectors();
+                    if (typeof updateAllCardLevelBadges === 'function') updateAllCardLevelBadges();
+                }
+            } catch (e) {
+                console.warn('[默认项目] 后台更新检查失败（不影响使用）:', e);
             }
         }
 
