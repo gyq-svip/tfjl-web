@@ -3509,6 +3509,7 @@
                         const newVer = update.version || 'latest';
                         _updateVersion = newVer;
                         _currentUpdate = update;
+                        _markVersionNew(newVer); // 版本号旁闪动提示升级
 
                         // —— 去重：只控制「是否弹 toast」，【绝不能阻止下载】——
                         // 旧逻辑曾把「已通知」误当「已下载」直接 return，导致下载被跳过、自动更新形同虚设。
@@ -3594,6 +3595,7 @@
         function _notifyPreDownloadReady() {
             const badge = document.getElementById('updateBadgeFooter');
             if (badge) badge.style.display = 'inline-block';
+            _markVersionNew(_updateVersion);
             setTimeout(() => {
                 const toast = document.createElement('div');
                 toast.style.cssText = 'position:fixed;top:60px;left:50%;transform:translateX(-50%);padding:12px 25px;border-radius:10px;font-size:0.95rem;font-weight:500;z-index:99999;background:rgba(76,175,80,0.9);color:#fff;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,0.3);transition:transform 0.2s;';
@@ -3612,10 +3614,11 @@
             const isTauri = !!(window.__TAURI__ || window.__TAURI_INTERNALS__);
             const badge = document.getElementById('updateBadgeFooter');
             if (badge) badge.style.display = 'inline-block';
+            _markVersionNew(version);
             setTimeout(() => {
                 const toast = document.createElement('div');
                 toast.style.cssText = 'position:fixed;top:60px;left:50%;transform:translateX(-50%);padding:12px 25px;border-radius:10px;font-size:0.95rem;font-weight:500;z-index:99999;background:rgba(76,175,80,0.9);color:#fff;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,0.3);';
-                toast.textContent = isTauri
+            toast.textContent = isTauri
                     ? '🔄 有新版本 v' + version + '！点击立即更新'
                     : '🔄 有新版本 v' + version + ' 可下载！点击查看';
                 toast.onclick = function() {
@@ -3626,6 +3629,30 @@
                 document.body.appendChild(toast);
                 setTimeout(() => { if (toast.parentNode) toast.remove(); }, isTauri ? 15000 : 8000);
             }, 2000);
+        }
+
+        // 在「版本：X」文字旁闪动提示有新版本（用户要求：版本号处直观提示升级）
+        function _markVersionNew(version) {
+            // 注入闪动动画样式（仅一次）
+            if (!document.getElementById('__verFlashStyle')) {
+                const s = document.createElement('style');
+                s.id = '__verFlashStyle';
+                s.textContent = '@keyframes verNewFlash{0%,100%{color:#ffd700;opacity:1;}50%{color:#4caf50;opacity:0.45;}}'
+                    + '.ver-new-flash{animation:verNewFlash 1.1s ease-in-out infinite;}';
+                document.head.appendChild(s);
+            }
+            const el = document.getElementById('currentVersionText');
+            if (el) {
+                el.classList.add('ver-new-flash');
+                el.style.cursor = 'pointer';
+                el.title = '发现新版本 v' + version + '，点击立即更新';
+                el.onclick = function() { if (typeof menuCheckUpdate === 'function') menuCheckUpdate(); };
+            }
+            const hint = document.getElementById('versionUpdateHint');
+            if (hint) {
+                hint.textContent = '🔔 新版本 v' + version;
+                hint.style.display = 'inline-flex';
+            }
         }
 
         // 显示拍卖操作提示
