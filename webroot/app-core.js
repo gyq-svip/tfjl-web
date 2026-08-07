@@ -15929,15 +15929,13 @@ ${maSection}
             const nickname = nick;
 
             if (!getGistToken()) {
-                // 修正：之前误把“无 GitHub Token”当成“离线版”，提示“检查网络”是误导。
-                // 真实情况：发布消息需写 GitHub Gist，必须有 Token（设置→管理员面板→GitHub Token）。
-                // 真离线用 navigator.onLine 判断；无 Token 则引导去填，不再报“离线版”。
+                // 需求墙发布走部署自动注入的 Gist Token（GitHub Actions 注入 app-core.js 占位符），普通用户无需手动设置。
+                // 真离线用 navigator.onLine 判断；若网络正常仍无 Token，多为部署未注入成功（见 deploy.yml 注入逻辑）。
                 if (typeof navigator !== 'undefined' && navigator.onLine === false) {
                     alert('当前网络已断开，恢复网络后再发布消息');
                     return;
                 }
-                if (typeof openAdminPanel === 'function') openAdminPanel();
-                alert('发布消息需要先设置 GitHub Token（设置 → 管理员面板 → GitHub Token）。\n填好后即可发布，无需联网版本。');
+                alert('发布消息需要 GitHub Token。\n当前环境未注入 Token（部署异常）或网络异常。\n请确认部署已正确注入 Token，或恢复网络后再试。');
                 return;
             }
 
