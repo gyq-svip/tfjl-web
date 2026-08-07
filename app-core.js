@@ -18064,7 +18064,8 @@ ${maSection}
                 list.innerHTML = '<div style="color:rgba(255,255,255,0.5);font-size:0.8rem;text-align:center;padding:10px;">暂无注册用户</div>';
                 return;
             }
-            const used = allUsed.filter(function(n){ return !q     const cur = localStorage.getItem('TFJL_UserName');
+            const used = allUsed.filter(function(n){ return !q || n.toLowerCase().indexOf(q) >= 0; });
+            const cur = localStorage.getItem('TFJL_UserName');
             let html = '<div style="color:rgba(255,255,255,0.4);font-size:0.72rem;margin-bottom:6px;">共 ' + allUsed.length + ' 个用户' + (q ? '，匹配 ' + used.length + ' 个' : '') + '</div>';
             for (let i = 0; i < used.length; i++) {
                 const n = used[i];
