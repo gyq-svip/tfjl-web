@@ -715,37 +715,9 @@
         }
 
         // 导出当前项目到数据盘（固化成"所有人默认项目"用）：D:\withfriends\塔防精灵助手数据\projects\王城低配版.json
-        async function exportCurrentProjectToDataDisk() {
-            const projectName = document.getElementById('projectSelector1') ? document.getElementById('projectSelector1').value : currentProjectName;
-            if (!projectName) { alert('请先选择一个项目！'); return; }
-            const all = await loadProjectListFromDB();
-            const project = all.find(p => p.name === projectName && (p.category || '默认分类') === (currentProjectCategory || '默认分类')) || all.find(p => p.name === projectName);
-            if (!project) { alert('未找到该项目：' + projectName); return; }
-            const exportData = { type: 'tower-defense-project', version: '1.0', exportDate: new Date().toISOString(), project: project };
-            const jsonStr = JSON.stringify(exportData, null, 2);
-            const targetName = '王城低配版'; // 固定文件名，便于所有人默认拉取
-            // 更健壮的 Tauri 检测：检查 __TAURI__ 全局对象 + invoke API可用性
-            const isTauri = !!window.__TAURI__ && typeof window.__TAURI__.invoke === 'function';
-            if (isTauri) {
-                try {
-                    const dataDir = await window.__TAURI__.path.appDataDir();
-                    const base = dataDir.replace(/[\\/]?$/, '');
-                    const projDir = base + '\\projects';
-                    // 确保目录存在
-                    try { await window.__TAURI__.fs.mkdir(projDir, { recursive: true }); } catch (e) {}
-                    const filePath = projDir + '\\' + targetName + '.json';
-                    await window.__TAURI__.fs.writeTextFile(filePath, jsonStr);
-                    alert('✅ 已导出到：\n' + filePath + '\n告诉开发者即可固化成所有人默认项目');
-                    return;
-                } catch (e) {
-                    console.warn('导出到数据盘失败，回退下载:', e);
-                }
-            }
-            // 网页版兜底：下载（文件名更明确，方便你找到）
-            const downloadFileName = '王城低配版_导出项目.json';
-            _downloadScriptBlob(downloadFileName, jsonStr);
-            alert('网页版无法写数据盘，已下载文件：\n"' + downloadFileName + '"\n请到浏览器下载栏找到它，然后复制到：\nD:\\withfriends\\塔防精灵助手数据\\projects\\\n再告诉我一声，我帮你替换远程默认文件');
-        }
+        // 🔴 已删除（2026-08-07）：原函数使用 Tauri v1 API（window.__TAURI__.invoke / .fs.mkdir / .fs.writeTextFile），
+        // 实际项目中零调用入口（全项目 grep 无引用），纯死代码。如需此功能，请用「💾 全部备份」+ 手动把 JSON
+        // 放到远程仓库 projects/wangcheng-dipin.json，或联系开发者手工固化默认项目。
 
         function importSingleProject() {
             if (!requireLogin()) return;

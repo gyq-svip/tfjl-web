@@ -4504,11 +4504,21 @@
         // 导出所有数据为JSON文件
         function exportAllData() {
             if (!requireLogin()) return;
+            // 🔴 白名单备份 localStorage（项目相关前缀），不导出登录态/token/admin哈希等敏感键
+            // 历史教训：原版只备份 projects+categories，所有卡皮肤/减伤/收藏/默认皮肤等全丢了
+            const localStorageData = {};
+            try {
+                for (let i = 0; i < localStorage.length; i++) {
+                    const k = localStorage.key(i);
+                    if (k && /^(tdjl_|tfjl_|TFJL_)/.test(k)) localStorageData[k] = localStorage.getItem(k);
+                }
+            } catch (e) { console.warn('[BACKUP] localStorage 收集失败:', e); }
             const exportData = {
-                version: '2.0',
+                version: '2.1',
                 exportDate: new Date().toISOString(),
                 categories: categories,
-                projects: []
+                projects: [],
+                localStorage: localStorageData
             };
 
             const transaction = db.transaction(['projects'], 'readonly');
@@ -4524,12 +4534,12 @@
                     // 先让用户选目的地，saved=true 才提示成功；取消(saved=false)不误报
                     _downloadScriptTauri(fileName, jsonStr).then(function(saved) {
                         if (saved) {
-                            alert('✅ 数据导出成功！共 ' + exportData.projects.length + ' 个项目，' + exportData.categories.length + ' 个分类');
+                            alert('✅ 数据导出成功！\n项目：' + exportData.projects.length + ' 个\n分类：' + exportData.categories.length + ' 个\n配置：' + Object.keys(localStorageData).length + ' 项');
                         }
                     });
                 } else {
                     _downloadScriptBlob(fileName, jsonStr);
-                    alert('✅ 数据导出成功！共 ' + exportData.projects.length + ' 个项目，' + exportData.categories.length + ' 个分类');
+                    alert('✅ 数据导出成功！\n项目：' + exportData.projects.length + ' 个\n分类：' + exportData.categories.length + ' 个\n配置：' + Object.keys(localStorageData).length + ' 项');
                 }
             };
 
@@ -4560,7 +4570,9 @@
                     }
 
                     const catCount = importData.categories ? importData.categories.length : 0;
-                    if (confirm(`确定要导入吗？\n\n将导入 ${importData.projects.length} 个项目${catCount > 0 ? '，' + catCount + ' 个分类' : ''}。\n同名项目将被覆盖。`)) {
+                    const lsCount = importData.localStorage ? Object.keys(importData.localStorage).length : 0;
+                    const lsMsg = lsCount > 0 ? `，${lsCount} 项配置（卡皮肤/减伤/收藏等）` : '';
+                    if (confirm(`确定要导入吗？\n\n将导入 ${importData.projects.length} 个项目${catCount > 0 ? '，' + catCount + ' 个分类' : ''}${lsMsg}。\n同名项目将被覆盖。`)) {
                         // 导入分类
                         if (importData.categories && Array.isArray(importData.categories)) {
                             importData.categories.forEach(cat => {
@@ -4569,6 +4581,19 @@
                                 }
                             });
                             saveCategories();
+                        }
+
+                        // 🔴 白名单恢复 localStorage（项目相关前缀），跳过登录态/token/admin哈希/设备ID等敏感键
+                        // 历史教训：原版根本漏备份 localStorage，恢复后所有配置全空
+                        if (importData.localStorage && typeof importData.localStorage === 'object') {
+                            const SENSITIVE_KEYS = /^(TFJL_LoggedIn|TFJL_Admin_SavedPwd|TFJL_Pending_Sync|TFJL_Device_ID|HARDCODED_TOKEN|messages_gist_deleted|messages_backup_gist_id|tfjl_admin$)/;
+                            let lsRestored = 0;
+                            Object.keys(importData.localStorage).forEach(k => {
+                                if (!/^(tdjl_|tfjl_|TFJL_)/.test(k)) return;
+                                if (SENSITIVE_KEYS.test(k)) return; // 敏感键永不覆盖
+                                try { localStorage.setItem(k, importData.localStorage[k]); lsRestored++; } catch (e) {}
+                            });
+                            console.log('[BACKUP] localStorage restored:', lsRestored, '/', Object.keys(importData.localStorage).length);
                         }
 
                         // 使用 put 代替 add，避免主键冲突
@@ -4586,6 +4611,9 @@
 
                         transaction.oncomplete = function() {
                             refreshProjectSelectors();
+                            // 触发全局重渲（皮肤/卡池等）以让恢复的配置立即生效
+                            try { if (typeof restoreBattleSlots === 'function') restoreBattleSlots(); } catch (e) {}
+                            try { if (typeof reapplyAllSkins === 'function') reapplyAllSkins(); } catch (e) {}
                             const lastName = importedNames.length ? importedNames[importedNames.length - 1] : null;
                             const baseMsg = `成功恢复 ${imported} 个项目${errors > 0 ? '（' + errors + ' 个失败）' : ''}`;
                             if (lastName) {
