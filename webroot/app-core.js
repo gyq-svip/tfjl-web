@@ -12322,6 +12322,7 @@ function hasGistToken() {
         // 远程 projects/wangcheng-dipin.json 由开发者统一维护（含截图，体积较大），所有用户首次打开即拉取缓存到本地，
         // 之后默认启动展示此项目，无需联网。
         const DEFAULT_PROJECT_REMOTE = './projects/wangcheng-dipin.json';
+        const DEFAULT_PROJECT_META_REMOTE = './projects/wangcheng-dipin.meta.json';
         const DEFAULT_PROJECT_CACHE_KEY = 'tdjl_defaultProjectExportDate';
         const DEFAULT_PROJECT_INIT_KEY = 'tdjl_defaultProjectInitialized'; // 首次安装拉取远端并缓存后置位，之后启动永不联网重拉
 
@@ -12343,6 +12344,12 @@ function hasGistToken() {
                     try { localStorage.setItem(DEFAULT_PROJECT_INIT_KEY, '1'); } catch (e) {}
                     // 后台比对远端 exportDate：若新版则静默重拉并覆盖本地缓存（用户先看到旧版，毫秒级后被新版替换）
                     _maybeRefreshDefaultProject(DEFAULT_CAT, DEFAULT_NAME);
+                    // 兜底：默认项目启动即渲染，皮肤索引可能尚未就绪；等皮肤同步完成后重刷融合卡皮肤，确保融合显示
+                    if (typeof window._ensureSynced === 'function') {
+                        window._ensureSynced().then(() => {
+                            if (typeof refreshAllFusionSkins === 'function') refreshAllFusionSkins().catch(() => {});
+                        }).catch(() => {});
+                    }
                     return;
                 }
             } catch (e) { console.warn('[默认项目] 读本地缓存失败:', e); }
@@ -12384,6 +12391,10 @@ function hasGistToken() {
                 refreshProjectSelectors();
                 if (window._hideLoadingScreen) window._hideLoadingScreen();
                 console.log('[默认项目] 已从远程拉取并缓存:', name);
+                // 兜底：首次拉取即渲染，皮肤索引可能未就绪，等同步后重刷融合卡
+                if (typeof window._ensureSynced === 'function') {
+                    window._ensureSynced().then(() => { if (typeof refreshAllFusionSkins === 'function') refreshAllFusionSkins().catch(() => {}); }).catch(() => {});
+                }
             } catch (e) {
                 console.warn('[默认项目] 远程拉取失败，回退内置默认项目:', e);
                 if (DEFAULT_PROJECT && DEFAULT_PROJECT.name) {
@@ -12400,10 +12411,11 @@ function hasGistToken() {
         async function _maybeRefreshDefaultProject(cat, name) {
             try {
                 const localExport = localStorage.getItem(DEFAULT_PROJECT_CACHE_KEY) || '';
-                const resp = await fetch(DEFAULT_PROJECT_REMOTE, { cache: 'no-cache' });
-                if (!resp.ok) return;
-                const data = await resp.json();
-                const remoteExport = data.exportDate || '';
+                // 🔧 轻量更新检查：只拉几字节的 meta 文件比对 exportDate，避免每次启动下载 10MB 全量 json（占用带宽+主线程解析，拖慢皮肤同步）
+                const metaResp = await fetch(DEFAULT_PROJECT_META_REMOTE, { cache: 'no-cache' });
+                if (!metaResp.ok) return;
+                const meta = await metaResp.json();
+                const remoteExport = meta.exportDate || '';
                 if (!remoteExport) return;
                 // 远程更新（字典序比较 ISO 时间字符串，新日期更大）则重拉覆盖
                 if (localExport && localExport >= remoteExport) {
@@ -12411,6 +12423,9 @@ function hasGistToken() {
                     return;
                 }
                 console.log('[默认项目] 远端有更新，后台重拉覆盖本地缓存');
+                const resp = await fetch(DEFAULT_PROJECT_REMOTE, { cache: 'no-cache' });
+                if (!resp.ok) return;
+                const data = await resp.json();
                 const proj = data.project || data;
                 proj.name = name;
                 proj.category = cat;
@@ -12422,6 +12437,10 @@ function hasGistToken() {
                     await loadProjectFromDB(name).catch(() => {});
                     refreshProjectSelectors();
                     if (typeof updateAllCardLevelBadges === 'function') updateAllCardLevelBadges();
+                    // 兜底：皮肤索引可能尚未就绪，等同步完成后重刷融合卡皮肤
+                    if (typeof window._ensureSynced === 'function') {
+                        window._ensureSynced().then(() => { if (typeof refreshAllFusionSkins === 'function') refreshAllFusionSkins().catch(() => {}); }).catch(() => {});
+                    }
                 }
             } catch (e) {
                 console.warn('[默认项目] 后台更新检查失败（不影响使用）:', e);
