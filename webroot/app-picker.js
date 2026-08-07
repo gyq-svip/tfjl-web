@@ -579,11 +579,14 @@
                     return;
                 }
 
+                // 🔴 物化皮肤：把继承全局默认皮的卡也显式写进本项目配置，使单项目备份自包含、还原不看全局
+                const _mat = (typeof materializeProjectSkinConfig === 'function') ? materializeProjectSkinConfig(project) : null;
+                const exportProject = _mat ? Object.assign({}, project, { cardSkins: _mat.cardSkins, fusionSkins: _mat.fusionSkins }) : project;
                 const exportData = {
                     type: 'tower-defense-project',
                     version: '1.0',
                     exportDate: new Date().toISOString(),
-                    project: project
+                    project: exportProject
                 };
 
                 const jsonStr = JSON.stringify(exportData, null, 2);
@@ -648,7 +651,9 @@
             try {
                 const token = getGistToken();
                 // 序列化整项目（与导出备份同一格式，接收方智能导入可直接识别）
-                const exportData = { type: 'tower-defense-project', version: '1.0', exportDate: new Date().toISOString(), project: project };
+                const _matShare = (typeof materializeProjectSkinConfig === 'function') ? materializeProjectSkinConfig(project) : null;
+                const _shareProject = _matShare ? Object.assign({}, project, { cardSkins: _matShare.cardSkins, fusionSkins: _matShare.fusionSkins }) : project;
+                const exportData = { type: 'tower-defense-project', version: '1.0', exportDate: new Date().toISOString(), project: _shareProject };
                 let uploadContent = JSON.stringify(exportData, null, 2);
                 let passwordHash = null;
                 const willEncrypt = !!(sharePassword || recoveryKey);

@@ -4643,14 +4643,17 @@
         let pendingSaveProjectName = '';
 
         function saveCurrentProject() {
+            const _skinCfg = (typeof materializeProjectSkinConfig === 'function')
+                ? materializeProjectSkinConfig({ cardSkins: cardSkins, fusionSkins: window.fusionSkins, myHandCards: myHandCards, teammateHandCards: teammateHandCards, myPlacedCards: myPlacedCards, teammatePlacedCards: teammatePlacedCards })
+                : { cardSkins: cardSkins, fusionSkins: window.fusionSkins || {} };
             const currentData = {
                 myHandCards: myHandCards,
                 teammateHandCards: teammateHandCards,
                 myPlacedCards: myPlacedCards,
                 teammatePlacedCards: teammatePlacedCards,
                 cardLevels: cardLevels,
-                cardSkins: cardSkins,
-                fusionSkins: window.fusionSkins || {},
+                cardSkins: _skinCfg.cardSkins,
+                fusionSkins: _skinCfg.fusionSkins,
                 cardMoHua: cardMoHua,
                 myDeckInfo: document.getElementById('myDeckInfo')?.value || '',
                 teammateDeckInfo: document.getElementById('teammateDeckInfo')?.value || '',
@@ -6787,6 +6790,52 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 
         // 立即把皮肤偏好（cardSkins / cardMoHua）落盘到当前项目记录（仅更新皮肤字段，不连带存脏阵容）
         // 修复：之前 setCardSkin 只写 localStorage，加载项目时会被项目旧 cardSkins 覆盖并回写 → 皮肤丢失
+        // 物化本项目皮肤为「自包含配置」：把继承全局默认皮的卡 / 融合副卡也显式写进本项目表，
+        // 使备份 / 还原 / 分享只看本项目配置，还原后皮肤与备份时完全一致，不再依赖全局皮肤配置。
+        function materializeProjectSkinConfig(project) {
+            if (!project) return { cardSkins: {}, fusionSkins: {} };
+            const cardOut = Object.assign({}, project.cardSkins || {});
+            const resolveCard = function (cardId, cardName, handType) {
+                const key = handType + '_' + cardId;
+                if (cardOut[key] !== undefined) return cardOut[key];
+                if (typeof defaultCardSkins !== 'undefined' && defaultCardSkins[cardId] !== undefined) return defaultCardSkins[cardId];
+                if (typeof window.heroSkinSelections !== 'undefined' && cardName) {
+                    const baseHero = (typeof getBaseHeroName === 'function') ? getBaseHeroName(cardName).heroName : cardName;
+                    if (window.heroSkinSelections[baseHero] !== undefined) return window.heroSkinSelections[baseHero];
+                }
+                return '默认';
+            };
+            const fillCards = function (cards, handType) {
+                if (!Array.isArray(cards)) return;
+                cards.forEach(function (c) {
+                    if (!c || !c.id) return;
+                    const key = handType + '_' + c.id;
+                    if (cardOut[key] === undefined) {
+                        const eff = resolveCard(c.id, c.name, handType);
+                        if (eff !== undefined && eff !== '默认') cardOut[key] = eff;
+                    }
+                });
+            };
+            fillCards(project.myHandCards, 'my');
+            fillCards(project.teammateHandCards, 'teammate');
+            fillCards(project.myPlacedCards, 'my');
+            fillCards(project.teammatePlacedCards, 'teammate');
+
+            const fusionOut = Object.assign({}, project.fusionSkins || {});
+            const placed = [].concat(project.myPlacedCards || [], project.teammatePlacedCards || []);
+            placed.forEach(function (c) {
+                if (!c || !c.name) return;
+                const parts = (typeof getFusionParts === 'function') ? getFusionParts(c.name) : null;
+                if (!Array.isArray(parts) || parts.length < 2) return;
+                parts.forEach(function (hero) {
+                    if (fusionOut[hero] !== undefined) return;
+                    const eff = (typeof getFusionComponentSkin === 'function') ? getFusionComponentSkin(hero) : undefined;
+                    if (eff !== undefined && eff !== '默认') fusionOut[hero] = eff;
+                });
+            });
+            return { cardSkins: cardOut, fusionSkins: fusionOut };
+        }
+
         async function persistProjectSkins() {
             saveCardSkins();
             if (typeof saveCardMoHua === 'function') saveCardMoHua();
@@ -6799,7 +6848,11 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     req.onsuccess = () => {
                         const p = req.result;
                         if (p) {
-                            p.cardSkins = cardSkins;
+                            const mat = (typeof materializeProjectSkinConfig === 'function')
+                                ? materializeProjectSkinConfig({ cardSkins: cardSkins, fusionSkins: window.fusionSkins, myHandCards: myHandCards, teammateHandCards: teammateHandCards, myPlacedCards: myPlacedCards, teammatePlacedCards: teammatePlacedCards })
+                                : null;
+                            p.cardSkins = mat ? mat.cardSkins : cardSkins;
+                            p.fusionSkins = mat ? mat.fusionSkins : (window.fusionSkins || {});
                             p.cardMoHua = cardMoHua;
                             s.put(p);
                         }
