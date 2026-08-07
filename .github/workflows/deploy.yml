@@ -63,11 +63,12 @@ jobs:
             exit 0
           fi
           echo "Injecting GitHub Token..."
-          for file in _site/*.html; do
-            if grep -q "YOUR_GITHUB_TOKEN_HERE" "$file"; then
-              sed -i "s/YOUR_GITHUB_TOKEN_HERE/$TOKEN/g" "$file"
-              echo "✅ Token injected into $file"
-            fi
+          # 注意：之前只注入 _site/*.html，但模块化后 getGistToken() 已移到 app-core.js(JS 文件)，
+          # 导致线上 app-core.js 的 HARDCODED_TOKEN 占位符从未被替换 → getGistToken() 返回空 →
+          # 需求墙/分享等写 Gist 功能误报“离线版”。现改为注入所有含占位符的文件（含 js）。
+          grep -rl "YOUR_GITHUB_TOKEN_HERE" _site/ 2>/dev/null | while read -r file; do
+            sed -i "s/YOUR_GITHUB_TOKEN_HERE/$TOKEN/g" "$file"
+            echo "✅ Token injected into $file"
           done
           echo "Token injection completed"
 
