@@ -6723,7 +6723,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         || (handCard && handCard.dataset.name)
                         || '';
                     if (typeof applySkinBgToSlot === 'function') {
-                        try { await applySkinBgToSlot(slot, slotCardName); } catch (e) {}
+                        try { await applySkinBgToSlot(slot, slotCardName, undefined, undefined, skin); } catch (e) {}
                     }
                 });
                 // 3. ❌ 不刷新收藏区/卡池：项目内换皮只作用于卡槽+手牌，
@@ -7841,7 +7841,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         }
 
         // 给战斗槽卡牌应用皮肤背景
-        async function applySkinBgToSlot(slot, heroName, forceCardId, forceHandType) {
+        async function applySkinBgToSlot(slot, heroName, forceCardId, forceHandType, forceSkin) {
             console.log('[SKIN] applySkinBgToSlot slot:', slot.dataset ? slot.dataset.slot : '?', 'heroName:', heroName);
             // 移除旧皮肤层（含融合上层）和旧皮肤名
             const oldLayer = slot.querySelector('.skin-layer');
@@ -7889,12 +7889,14 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const skinHeroName = (typeof getMainCardName === 'function' && getMainCardName(heroName) !== heroName)
                 ? getMainCardName(heroName)
                 : heroName;
-            let slotSkin = '默认';
+            // 🔴 优先用调用方已知的确切皮肤值（cycleHeroSkin/setCardSkin 算好的 nextSkin）
+            let slotSkin = (forceSkin !== undefined) ? forceSkin : '默认';
             const slotCardId = forceCardId !== undefined ? forceCardId : (slot && slot.dataset ? slot.dataset.cardId : null);
             const slotHandType = forceHandType !== undefined ? forceHandType : (slot && slot.dataset && slot.dataset.handType ? slot.dataset.handType : 'my');
-            if (slotCardId) {
+            if (slotSkin === '默认' && slotCardId) {
                 slotSkin = getCardSkin(slotCardId, skinHeroName, slotHandType);
             }
+            console.log('[SKIN] slotSkin resolved:', slotSkin, '(forceSkin:', forceSkin !== undefined ? forceSkin : 'n/a', ')');
             let skinInfo = null;
             if (window.resolveHeroSkinInfo) {
                 skinInfo = await window.resolveHeroSkinInfo(skinHeroName, slotSkin);
@@ -9085,9 +9087,9 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 console.log('[SKIN] heroName:', heroName, 'skinHeroName:', skinHeroName, 'skins count:', skins.length, 'hasSkinBg:', hasSkinBg);
                 if (skins.length >= 1) {
                     if (skins.length > 1) {
-                        // 多皮肤：循环切换
-                        cycleHeroSkin(skinHeroName, slotId);
-                        try { await applySkinBgToSlot(this, heroName); } catch (e) { console.error('[SKIN] applySkinBgToSlot error in right-click:', e); }
+                        // 多皮肤：循环切换（用 cycleHeroSkin 返回的 nextSkin 直接重渲战斗槽）
+                        const ns = await cycleHeroSkin(skinHeroName, slotId);
+                        try { await applySkinBgToSlot(this, heroName, undefined, undefined, ns); } catch (e) { console.error('[SKIN] applySkinBgToSlot error in right-click:', e); }
                         return;
                     }
                     // 单皮肤：切换皮肤开/关
@@ -9149,9 +9151,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             // 🔴 关键：写完 cardSkins 后必须立即重渲该卡槽皮肤层（融合路径就是这么做的，单卡漏了导致切皮不渲染）
             const slot = document.querySelector('.battle-slot[data-slot="' + slotId + '"]');
             if (slot) {
-                try { await applySkinBgToSlot(slot, heroName); } catch (e) { console.warn('[SKIN] applySkinBgToSlot after cycle failed:', e); }
+                try { await applySkinBgToSlot(slot, heroName, undefined, undefined, nextSkin); } catch (e) { console.warn('[SKIN] applySkinBgToSlot after cycle failed:', e); }
             }
             if (slot) {
+                console.log('[SKIN] cycleHeroSkin final: cardId=', cardId, 'handType=', handType, 'current=', current, 'nextSkin=', nextSkin);
                 const skinLabel = slot.querySelector('.skin-label') || (() => {
                     const label = document.createElement('span');
                     label.className = 'skin-label';
@@ -9162,6 +9165,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 skinLabel.textContent = nextSkin || '默认';
                 setTimeout(() => { if (skinLabel.parentNode) skinLabel.remove(); }, 1500);
             }
+            return nextSkin;
         }
 
         // 从槽位移除卡牌
