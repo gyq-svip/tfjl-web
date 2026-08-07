@@ -6717,14 +6717,14 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         }
                     }
                 }
-                // 2. 刷新所有战斗槽里该卡牌的皮肤（我方+队友）
+                // 2. 刷新所有战斗槽里该卡牌的皮肤（我方+队友）—— 用已算好的 skin 直接重渲，与手牌对称
                 document.querySelectorAll('.battle-slot.filled').forEach(async (slot) => {
                     if (slot.dataset.cardId !== cardId) return;
                     const slotCardName = getSlotCardName(slot)
                         || (handCard && handCard.dataset.name)
                         || '';
                     if (typeof applySkinBgToSlot === 'function') {
-                        try { await applySkinBgToSlot(slot, slotCardName); } catch (e) {}
+                        try { await applySkinBgToSlot(slot, slotCardName, undefined, undefined, skin); } catch (e) {}
                     }
                 });
                 // 3. ❌ 不刷新收藏区/卡池：项目内换皮只作用于卡槽+手牌，
@@ -7842,7 +7842,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         }
 
         // 给战斗槽卡牌应用皮肤背景
-        async function applySkinBgToSlot(slot, heroName, forceCardId, forceHandType) {
+        async function applySkinBgToSlot(slot, heroName, forceCardId, forceHandType, forceSkin) {
             console.log('[SKIN] applySkinBgToSlot slot:', slot.dataset ? slot.dataset.slot : '?', 'heroName:', heroName);
             // 移除旧皮肤层（含融合上层）和旧皮肤名
             const oldLayer = slot.querySelector('.skin-layer');
@@ -7890,12 +7890,16 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const skinHeroName = (typeof getMainCardName === 'function' && getMainCardName(heroName) !== heroName)
                 ? getMainCardName(heroName)
                 : heroName;
-            let slotSkin = '默认';
+            // 🔴 优先用调用方已知的确切皮肤值（cycleHeroSkin/setCardSkin 算好的 nextSkin），
+            // 避免再经 getCardSkin 反查 slot.dataset.cardId —— 旧项目/跨版本时 dataset 可能陈旧导致反查到默认/旧皮。
+            // 与手牌渲染 resolveHeroSkinUrl(cardName, skin) 完全对称。
+            let slotSkin = (forceSkin !== undefined) ? forceSkin : '默认';
             const slotCardId = forceCardId !== undefined ? forceCardId : (slot && slot.dataset ? slot.dataset.cardId : null);
             const slotHandType = forceHandType !== undefined ? forceHandType : (slot && slot.dataset && slot.dataset.handType ? slot.dataset.handType : 'my');
-            if (slotCardId) {
+            if (slotSkin === '默认' && slotCardId) {
                 slotSkin = getCardSkin(slotCardId, skinHeroName, slotHandType);
             }
+            console.log('[SKIN] slotSkin resolved:', slotSkin, '(forceSkin:', forceSkin !== undefined ? forceSkin : 'n/a', ')');
             let skinInfo = null;
             if (window.resolveHeroSkinInfo) {
                 skinInfo = await window.resolveHeroSkinInfo(skinHeroName, slotSkin);
@@ -9086,9 +9090,9 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 console.log('[SKIN] heroName:', heroName, 'skinHeroName:', skinHeroName, 'skins count:', skins.length, 'hasSkinBg:', hasSkinBg);
                 if (skins.length >= 1) {
                     if (skins.length > 1) {
-                        // 多皮肤：循环切换
-                        cycleHeroSkin(skinHeroName, slotId);
-                        try { await applySkinBgToSlot(this, heroName); } catch (e) { console.error('[SKIN] applySkinBgToSlot error in right-click:', e); }
+                        // 多皮肤：循环切换（用 cycleHeroSkin 返回的 nextSkin 直接重渲战斗槽，避免反查依赖陈旧 dataset）
+                        const ns = await cycleHeroSkin(skinHeroName, slotId);
+                        try { await applySkinBgToSlot(this, heroName, undefined, undefined, ns); } catch (e) { console.error('[SKIN] applySkinBgToSlot error in right-click:', e); }
                         return;
                     }
                     // 单皮肤：切换皮肤开/关
@@ -9143,6 +9147,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const nextIdx = (idx + 1) % cycleList.length;
             const nextSkin = cycleList[nextIdx];
             console.log('[SKIN] Cycling from', current || '(default)', 'to', nextSkin || '(default)', '(idx', idx, '->', nextIdx, ')');
+            console.log('[SKIN] cycleHeroSkin input: cardId=', cardId, 'handType=', handType, 'heroName=', heroName);
             // 只写当前项目卡级皮肤（cardSkins），绝不调用 selectHeroSkin 污染全局 heroSkinSelections
             if (cardId) {
                 try { await setCardSkin(cardId, nextSkin, handType); } catch (e) { console.warn('[SKIN] setCardSkin in cycle failed:', e); }
@@ -9150,9 +9155,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             // 🔴 关键：写完 cardSkins 后必须立即重渲该卡槽皮肤层（融合路径就是这么做的，单卡漏了导致切皮不渲染）
             const _reSlot = cycleSlot || document.querySelector('.battle-slot[data-slot="' + slotId + '"]');
             if (_reSlot) {
-                try { await applySkinBgToSlot(_reSlot, heroName); } catch (e) { console.warn('[SKIN] applySkinBgToSlot after cycle failed:', e); }
+                try { await applySkinBgToSlot(_reSlot, heroName, undefined, undefined, nextSkin); } catch (e) { console.warn('[SKIN] applySkinBgToSlot after cycle failed:', e); }
             }
             if (cycleSlot) {
+                console.log('[SKIN] cycleHeroSkin final: cardId=', cardId, 'handType=', handType, 'current=', current, 'nextSkin=', nextSkin);
                 const skinLabel = cycleSlot.querySelector('.skin-label') || (() => {
                     const label = document.createElement('span');
                     label.className = 'skin-label';
@@ -9163,6 +9169,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 skinLabel.textContent = nextSkin || '默认';
                 setTimeout(() => { if (skinLabel.parentNode) skinLabel.remove(); }, 1500);
             }
+            return nextSkin;
         }
 
         // 从槽位移除卡牌
