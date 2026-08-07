@@ -22,13 +22,14 @@
             const placeholder = opts.searchPlaceholder || '🔍 输入关键字或首字母';
             const onPick = opts.onPick || function() {};
             const multi = !!opts.multi; // 卡片多选模式
-            const wide = !!opts.wide; // true=双倍宽（双侧并排时左右各开一个时使用）
-            // 多列密度：'2'|'3'|'4'。手牌多选用 3 列避免拥挤；皮肤等单选仍走默认自适应
-            const cols = opts.columns || (multi ? '4' : 'auto');
-            // 浮层宽度：手牌双侧时拉宽到 ~860，单 picker 用原 420
-            const overlayWidth = wide ? 'min(860px,96vw)' : 'min(420px,92vw)';
-            const noBackdrop = !!opts.noBackdrop; // 双侧并排子 picker 不显示外层黑色背景
-            const overlayId = opts.overlayId || 'tfjlGenericPicker'; // 双侧并排时左右用不同 id 避免 remove 冲突
+            const wide = !!opts.wide;
+            // 多列密度：'2'|'3'|'4'。手牌多选默认 2 列（选多职业卡片变多也不拥挤）；皮肤等单选走自适应
+            const cols = opts.columns || (multi ? '2' : 'auto');
+            // 浮层宽度：默认 420；手牌多选拉宽到 ~560 让 2 列有充足空间
+            const overlayWidth = opts.overlayWidth || (wide ? 'min(860px,96vw)' : (multi ? 'min(560px,94vw)' : 'min(420px,92vw)'));
+            const align = opts.align || 'center'; // center | left | right —— 手牌选择器靠左/靠右弹出
+            const noBackdrop = !!opts.noBackdrop;
+            const overlayId = opts.overlayId || 'tfjlGenericPicker';
             const old = document.getElementById(overlayId);
             if (old) old.remove();
             // 职业分类集合（多选 toggle）；有收藏卡则追加「收藏」
@@ -42,7 +43,9 @@
             if (noBackdrop) {
                 overlay.style.cssText = 'display:flex;align-items:stretch;justify-content:center;min-height:0;width:100%;height:100%;';
             } else {
-                overlay.style.cssText = 'position:fixed;inset:0;z-index:100010;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;';
+                const justifyContent = (align === 'left') ? 'flex-start' : (align === 'right') ? 'flex-end' : 'center';
+                const padX = (align === 'left') ? '2vw' : (align === 'right') ? '2vw' : '0';
+                overlay.style.cssText = 'position:fixed;inset:0;z-index:100010;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:' + justifyContent + ';padding-left:' + (align === 'left' ? padX : '0') + ';padding-right:' + (align === 'right' ? padX : '0') + ';box-sizing:border-box;';
             }
             const box = document.createElement('div');
             if (noBackdrop) {
