@@ -7841,7 +7841,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         }
 
         // 给战斗槽卡牌应用皮肤背景
-        async function applySkinBgToSlot(slot, heroName) {
+        async function applySkinBgToSlot(slot, heroName, forceCardId, forceHandType) {
             console.log('[SKIN] applySkinBgToSlot slot:', slot.dataset ? slot.dataset.slot : '?', 'heroName:', heroName);
             // 移除旧皮肤层（含融合上层）和旧皮肤名
             const oldLayer = slot.querySelector('.skin-layer');
@@ -7863,8 +7863,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 const parts = getFusionParts(heroName);
                 if (parts && parts.length >= 2) {
                     const mainHero = parts[0], fusedHero = parts[1];
-                    const slotCardId = slot && slot.dataset ? slot.dataset.cardId : null;
-                    const slotHandType = (slot && slot.dataset && slot.dataset.handType) ? slot.dataset.handType : 'my';
+                    const slotCardId = forceCardId !== undefined ? forceCardId : (slot && slot.dataset ? slot.dataset.cardId : null);
+                    const slotHandType = forceHandType !== undefined ? forceHandType : (slot && slot.dataset && slot.dataset.handType ? slot.dataset.handType : 'my');
                     const mainSkin = slotCardId ? getCardSkin(slotCardId, mainHero, slotHandType) : '默认';
                     let mainInfo = null;
                     if (window.resolveHeroSkinInfo) {
@@ -7890,8 +7890,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 ? getMainCardName(heroName)
                 : heroName;
             let slotSkin = '默认';
-            const slotCardId = slot && slot.dataset ? slot.dataset.cardId : null;
-            const slotHandType = (slot && slot.dataset && slot.dataset.handType) ? slot.dataset.handType : 'my';
+            const slotCardId = forceCardId !== undefined ? forceCardId : (slot && slot.dataset ? slot.dataset.cardId : null);
+            const slotHandType = forceHandType !== undefined ? forceHandType : (slot && slot.dataset && slot.dataset.handType ? slot.dataset.handType : 'my');
             if (slotCardId) {
                 slotSkin = getCardSkin(slotCardId, skinHeroName, slotHandType);
             }
@@ -7936,12 +7936,14 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     slot.innerHTML = `<span class="card-item" data-profession="${card.profession}">${levelBadge}<span class="card-name">${card.name}</span></span>`;
                     slot.classList.add('filled');
                     slot.classList.remove('empty');
-                    slot.dataset.cardId = card.id;
-                    slot.dataset.handType = 'my';
-                    slot.dataset.profession = card.profession;
                 }
+                // 🔴 无论是否已 filled 都强制刷新 dataset（旧项目跨版本恢复时槽位可能残留旧 cardId）
+                slot.dataset.cardId = card.id;
+                slot.dataset.handType = 'my';
+                slot.dataset.profession = card.profession;
                 // 🔴 皮肤重渲必须每次都跑（重置皮肤/切皮等场景靠这里刷新已填卡槽的视觉）
-                try { await applySkinBgToSlot(slot, card.name); } catch (e) {}
+                // 显式传入 card.id/'my'，避免回读可能陈旧的 slot.dataset.cardId
+                try { await applySkinBgToSlot(slot, card.name, card.id, 'my'); } catch (e) {}
                 refreshSlotFusionControl(slot);
             }
 
@@ -7956,12 +7958,14 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     slot.innerHTML = `<span class="card-item" data-profession="${card.profession}">${levelBadge}<span class="card-name">${card.name}</span></span>`;
                     slot.classList.add('filled');
                     slot.classList.remove('empty');
-                    slot.dataset.cardId = card.id;
-                    slot.dataset.handType = 'teammate';
-                    slot.dataset.profession = card.profession;
                 }
+                // 🔴 无论是否已 filled 都强制刷新 dataset（旧项目跨版本恢复时槽位可能残留旧 cardId）
+                slot.dataset.cardId = card.id;
+                slot.dataset.handType = 'teammate';
+                slot.dataset.profession = card.profession;
                 // 🔴 皮肤重渲必须每次都跑（重置皮肤/切皮等场景靠这里刷新已填卡槽的视觉）
-                try { await applySkinBgToSlot(slot, card.name); } catch (e) {}
+                // 显式传入 card.id/'teammate'，避免回读可能陈旧的 slot.dataset.cardId
+                try { await applySkinBgToSlot(slot, card.name, card.id, 'teammate'); } catch (e) {}
                 refreshSlotFusionControl(slot);
             }
         }
