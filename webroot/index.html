@@ -2256,7 +2256,7 @@
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">s20260807-018 · s1.0.18</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">s20260807-019 · s1.0.19</span>
             </div>
         </div>
     </div>
@@ -2279,5 +2279,19 @@
 
   <!-- 皮肤制作工具改为按需懒加载：首次打开皮肤 Tab 时由 loader.js 拉取 app-skinmaker.js -->
   <script src="loader.js?v=1"></script>
+
+    <!-- 调试日志浮动控制台（默认显示于右下角，可拖动；Tauri APP 无法 F12 时查看 [SKIN] 等日志） -->
+    <div id="floatConsole" style="position:fixed;right:12px;bottom:12px;width:380px;max-height:42vh;display:flex;flex-direction:column;background:rgba(0,0,0,0.82);border:1px solid rgba(0,188,212,0.5);border-radius:8px;z-index:99999;box-shadow:0 4px 20px rgba(0,0,0,0.5);font-family:monospace;overflow:hidden;">
+        <div id="floatConsoleTitle" style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;cursor:move;background:linear-gradient(135deg,#00838f,#006064);color:#fff;flex-shrink:0;">
+            <span style="font-size:0.78rem;font-weight:600;">💻 调试日志<span id="floatConsoleBadge" style="display:none;margin-left:6px;background:#00bcd4;color:#000;border-radius:10px;padding:0 6px;font-size:0.65rem;"></span></span>
+            <span>
+                <button onclick="toggleFloatOnlySkin()" id="floatOnlySkinBtn" style="background:rgba(255,255,255,0.15);color:#fff;border:none;padding:2px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;margin-right:4px;">仅SKIN</button>
+                <button onclick="floatConsoleClear()" style="background:rgba(255,255,255,0.15);color:#fff;border:none;padding:2px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;margin-right:4px;">清空</button>
+                <button onclick="toggleFloatConsole()" style="background:rgba(255,255,255,0.15);color:#fff;border:none;padding:2px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;">收起</button>
+            </span>
+        </div>
+        <div id="floatConsoleContent" style="flex:1;overflow-y:auto;padding:6px 8px;font-size:0.68rem;line-height:1.35;color:rgba(255,255,255,0.75);"></div>
+    </div>
+    <button id="floatConsoleToggle" onclick="toggleFloatConsole()" style="position:fixed;right:12px;bottom:12px;z-index:99998;display:none;align-items:center;gap:4px;background:linear-gradient(135deg,#00838f,#006064);color:#fff;border:none;padding:6px 12px;border-radius:20px;cursor:pointer;font-size:0.75rem;box-shadow:0 2px 8px rgba(0,0,0,0.4);">💻日志</button>
 </body>
 </html>
