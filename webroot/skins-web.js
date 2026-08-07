@@ -22,6 +22,9 @@
   window.skinRegistry = {};       // { 英雄名: [{ name, url, path }] }
   window.heroSkinSelections = {};  // { 英雄名: 皮肤名 }
 
+  // 王城低配版阵容优先预热（用户主阵容，开项目秒开）：这些英雄皮肤先拉
+  var PRIORITY_HEROES = new Set(['水灵','萌萌','咕咕','钢鬃','木精灵','光精灵','幻精灵','火炮射线','小野酋长','死神海妖','火炮','风灵','死神','骨弓','电法','铁骑','悟空','魂精灵','魔精灵']);
+
   // 解析 "皮肤名·英雄名" 格式，返回基础英雄名
   function getBaseHeroName(fullName) {
     if (!fullName) return { heroName: '', skinName: null };
@@ -104,8 +107,13 @@
     if (_preheatStarted) return;
     _preheatStarted = true;
     var count = 0;
-    for (var heroName in (heroes || {})) {
-      if (!Object.prototype.hasOwnProperty.call(heroes, heroName)) continue;
+    var heroNames = Object.keys(heroes || {});
+    // 王城低配版英雄排前面优先预热
+    heroNames.sort(function (a, b) {
+      return (PRIORITY_HEROES.has(a) ? 0 : 1) - (PRIORITY_HEROES.has(b) ? 0 : 1);
+    });
+    for (var hi = 0; hi < heroNames.length; hi++) {
+      var heroName = heroNames[hi];
       var skinList = heroes[heroName];
       if (!Array.isArray(skinList)) continue;
       for (var i = 0; i < skinList.length; i++) {

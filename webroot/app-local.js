@@ -3579,7 +3579,9 @@ if (isTauriApp) {
         const base = _skinDiskBase();
         if (!base) return;
         let downloaded = 0, skipped = 0;
-        for (const [heroName, skinList] of Object.entries(heroes || {})) {
+        // 王城低配版英雄优先落地磁盘
+        const _dlEntries = Object.entries(heroes || {}).sort(([a], [b]) => (PRIORITY_HEROES.has(a) ? 0 : 1) - (PRIORITY_HEROES.has(b) ? 0 : 1));
+        for (const [heroName, skinList] of _dlEntries) {
             if (!Array.isArray(skinList) || !skinList.length) continue;
             await _ensureSkinDiskDir(heroName);
             for (const s of skinList) {
@@ -3726,6 +3728,9 @@ if (isTauriApp) {
     // APP（Tauri）：下载到本地磁盘 .b64（持久化，刷新不丢）
     // 网页版：下载到 IndexedDB
     let _preheatStarted = false;
+    // 王城低配版阵容优先预热（用户主阵容，开项目秒开）：这些英雄皮肤先拉/先落地磁盘
+    const PRIORITY_HEROES = new Set(['水灵','萌萌','咕咕','钢鬃','木精灵','光精灵','幻精灵','火炮射线','小野酋长','死神海妖','火炮','风灵','死神','骨弓','电法','铁骑','悟空','魂精灵','魔精灵']);
+
     async function _preheatSkins(heroes) {
         if (_preheatStarted) return;
         _preheatStarted = true;
@@ -3734,9 +3739,10 @@ if (isTauriApp) {
             _downloadRemoteSkinsToLocal(heroes).catch(() => {});
             return;
         }
-        // 网页版: IndexedDB 预热
+        // 网页版: IndexedDB 预热（王城低配版英雄优先）
         let count = 0;
-        for (const [heroName, skinList] of Object.entries(heroes || {})) {
+        const _phEntries = Object.entries(heroes || {}).sort(([a], [b]) => (PRIORITY_HEROES.has(a) ? 0 : 1) - (PRIORITY_HEROES.has(b) ? 0 : 1));
+        for (const [heroName, skinList] of _phEntries) {
             if (!Array.isArray(skinList)) continue;
             for (const s of skinList) {
                 const url = REMOTE_SKIN_BASE + '/' + encodeURIComponent(heroName) + '/' + encodeURIComponent(s.file || (s.name + '.png'));
