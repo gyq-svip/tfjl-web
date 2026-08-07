@@ -5886,7 +5886,21 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             }
             return false;
         }
-        
+
+        // 一键全部重置皮肤：清空所有自定义默认皮肤，重渲染所有卡牌/融合卡（无需逐英雄选择）
+        async function resetAllSkins() {
+            try {
+                window.heroSkinSelections = {};
+                try { localStorage.removeItem('tdjl_heroSkinSelections'); } catch (e) {}
+                // 重渲染当前所有战斗槽位 + 全场刷新融合卡
+                if (typeof restoreBattleSlots === 'function') { try { await restoreBattleSlots(); } catch (e) {} }
+                if (typeof refreshAllFusionSkins === 'function') { try { await refreshAllFusionSkins(); } catch (e) {} }
+                if (typeof refreshProjectSelectors === 'function') refreshProjectSelectors();
+                console.log('[皮肤] 已全部重置为默认');
+            } catch (e) { console.warn('[皮肤] 重置失败:', e); }
+        }
+        window.resetAllSkins = resetAllSkins;
+
         let customSkinAttributes = {};
         
         function addCustomSkinAttribute(cardName, skinName, attrDesc) {

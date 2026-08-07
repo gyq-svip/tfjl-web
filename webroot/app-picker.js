@@ -411,77 +411,7 @@
                 };
                 box.appendChild(link);
             }
-            // ===== 皮肤修正区：仅出问题的用户用，正常的无视即可 =====
-            try {
-                const skinBox = document.createElement('div');
-                skinBox.style.cssText = 'margin-top:16px;padding:12px;border:1px solid rgba(255,215,0,0.35);border-radius:10px;background:rgba(255,215,0,0.06);';
-                skinBox.innerHTML = ''
-                    + '<div style="font-size:0.82rem;font-weight:600;color:#ffd54f;margin-bottom:8px;display:flex;align-items:center;gap:6px;">🎨 皮肤显示不对？在这里修正</div>'
-                    + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
-                    + '<button id="vp_heroBtn" style="flex:1;min-width:120px;padding:9px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:#2a2a4a;color:#fff;font-size:0.8rem;cursor:pointer;text-align:left;">👤 选英雄</button>'
-                    + '<button id="vp_skinBtn" style="flex:1;min-width:120px;padding:9px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:#2a2a4a;color:#fff;font-size:0.8rem;cursor:pointer;text-align:left;opacity:0.6;">🎨 选皮肤</button>'
-                    + '</div>'
-                    + '<div style="display:flex;gap:8px;margin-top:8px;">'
-                    + '<button id="vp_skinApply" style="flex:1;padding:8px;border:none;border-radius:8px;background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;font-size:0.8rem;font-weight:600;cursor:pointer;">✓ 应用</button>'
-                    + '<button id="vp_skinReset" style="flex:1;padding:8px;border:1px solid rgba(255,255,255,0.25);border-radius:8px;background:rgba(255,255,255,0.08);color:#fff;font-size:0.8rem;cursor:pointer;">↺ 恢复默认</button>'
-                    + '</div>'
-                    + '<div id="vp_skinStatus" style="font-size:0.72rem;color:rgba(255,255,255,0.6);margin-top:6px;min-height:14px;"></div>';
-                box.appendChild(skinBox);
-                const reg = window.skinRegistry || {};
-                const heroes = Object.keys(reg).filter(h => !h.startsWith('融合') && reg[h] && reg[h].length).sort((a, b) => a.localeCompare(b, 'zh'));
-                const vpState = { hero: '', skin: '' };
-                const heroBtn = skinBox.querySelector('#vp_heroBtn');
-                const skinBtn = skinBox.querySelector('#vp_skinBtn');
-                const statusEl = skinBox.querySelector('#vp_skinStatus');
-                function setStatus(msg) { if (statusEl) statusEl.textContent = msg; }
-                function syncBtns() {
-                    heroBtn.textContent = '👤 ' + (vpState.hero || '选英雄');
-                    const hasHero = !!vpState.hero;
-                    skinBtn.textContent = '🎨 ' + (hasHero ? (vpState.skin || '选皮肤（' + vpState.hero + '）') : '选皮肤');
-                    skinBtn.style.opacity = hasHero ? '1' : '0.6';
-                    skinBtn.disabled = !hasHero;
-                }
-                heroBtn.onclick = function() {
-                    openGenericPicker({
-                        title: '选择英雄',
-                        searchPlaceholder: '🔍 搜英雄（关键字 / 首字母，如 gz=钢鬃）',
-                        items: heroes.map(h => ({ value: h, label: h, py: window.hanziInitials(h) })),
-                        onPick: function(val) {
-                            vpState.hero = val;
-                            vpState.skin = (window.heroSkinSelections && window.heroSkinSelections[val]) || '';
-                            syncBtns();
-                        }
-                    });
-                };
-                skinBtn.onclick = function() {
-                    if (!vpState.hero) { setStatus('请先选英雄'); return; }
-                    const cur = vpState.skin;
-                    const skins = (reg[vpState.hero] || []).map(s => s.name);
-                    openGenericPicker({
-                        title: '选择「' + vpState.hero + '」的皮肤',
-                        searchPlaceholder: '🔍 搜皮肤（关键字 / 首字母）',
-                        items: skins.map(s => ({ value: s, label: s, py: window.hanziInitials(s), current: s === cur })),
-                        onPick: function(val) { vpState.skin = val; syncBtns(); }
-                    });
-                };
-                skinBox.querySelector('#vp_skinApply').onclick = async function() {
-                    if (!vpState.hero) { setStatus('请先选英雄'); return; }
-                    if (typeof window.selectHeroSkin === 'function') window.selectHeroSkin(vpState.hero, vpState.skin || '');
-                    setStatus('✅ 已应用：' + vpState.hero + ' / ' + (vpState.skin || '默认'));
-                    await _refreshAllHeroSkins();
-                };
-                skinBox.querySelector('#vp_skinReset').onclick = async function() {
-                    if (!vpState.hero) { setStatus('请先选英雄'); return; }
-                    const b = vpState.hero;
-                    if (window.heroSkinSelections) delete window.heroSkinSelections[b];
-                    try { const all = JSON.parse(localStorage.getItem('tdjl_heroSkinSelections') || '{}'); delete all[b]; localStorage.setItem('tdjl_heroSkinSelections', JSON.stringify(all)); } catch (e) {}
-                    vpState.skin = '';
-                    syncBtns();
-                    setStatus('↺ 已恢复默认：' + vpState.hero);
-                    await _refreshAllHeroSkins();
-                };
-                syncBtns();
-            } catch (e) { console.warn('皮肤修正区初始化失败:', e); }
+            // ===== 皮肤修正已移入右上角菜单「重置皮肤」（一键全部重置，无需逐英雄选择）=====
         }
         // 改/恢复皮肤后即时刷新所有槽位 + 手牌皮肤（出问题的用户点完立刻看到效果）
         async function _refreshAllHeroSkins() {

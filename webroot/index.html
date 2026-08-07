@@ -781,6 +781,7 @@
                     <div id="menuToggleEffects" onclick="toggleVisualEffects();document.getElementById('backupMenu').style.display='none';" title="开关页面背景动画特效" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">✨ 背景特效：开</div>
                     <div id="menuCheckUpdateItem" onclick="menuCheckUpdate();document.getElementById('backupMenu').style.display='none';" title="检查是否有新版本可更新（仅桌面端）" style="padding:8px 15px;cursor:pointer;color:#81c784;display:none;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">🔄 检查更新</div>
                     <div onclick="forceRefreshLatest();document.getElementById('backupMenu').style.display='none';" title="强制重新拉取最新资源（皮肤表、卡牌数据等）" style="padding:8px 15px;cursor:pointer;color:#ffd54f;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">♻️ 刷新最新资源</div>
+                    <div onclick="if(window.resetAllSkins){window.resetAllSkins();}document.getElementById('backupMenu').style.display='none';" title="一键重置皮肤：清空所有手动设置的默认皮肤，让每张卡都恢复为「英雄同名那张」默认皮肤。融合卡/单卡一并刷新，不影响皮肤资源本身。" style="padding:8px 15px;cursor:pointer;color:#ffb74d;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">↺ 重置皮肤</div>
                     <div onclick="window.location.href='auction.html';document.getElementById('backupMenu').style.display='none';" style="display:none;padding:8px 15px;cursor:pointer;color:#fff;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">🏪 进入拍卖系统</div>
                     <div onclick="openHelpPage();document.getElementById('backupMenu').style.display='none';" title="打开帮助页面，查看使用说明" style="padding:8px 15px;cursor:pointer;color:#4fc3f7;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📖 帮助</div>
                     <div onclick="logoutToLogin();document.getElementById('backupMenu').style.display='none';" title="退出当前登录，返回密码登录页" style="padding:8px 15px;cursor:pointer;color:#ff6b6b;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,107,107,0.1)'" onmouseout="this.style.background='transparent'">🔙 退出登录</div>
@@ -2255,7 +2256,7 @@
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">s20260807-011 · s1.0.11</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">s20260807-012 · s1.0.12</span>
             </div>
         </div>
     </div>
