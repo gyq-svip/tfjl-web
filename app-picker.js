@@ -28,6 +28,8 @@
             // 浮层宽度：默认 420；手牌多选 4 列用窄框（两行布局不裁切）
             const overlayWidth = opts.overlayWidth || (wide ? 'min(860px,96vw)' : (multi ? 'min(440px,92vw)' : 'min(420px,92vw)'));
             const align = opts.align || 'center'; // center | left | right —— 手牌选择器靠左/靠右弹出
+            const floating = !!opts.floating; // 悬浮窗模式：无全屏背景，可拖拽/缩放，多个可并存
+            const floatWidth = opts.floatWidth || 'min(300px,82vw)'; // 悬浮窗默认小框
             const noBackdrop = !!opts.noBackdrop;
             // 不同手牌的 picker 给独立 id，避免「点另一个放大镜先点的消失」（未指定时用单次随机后缀）
             const overlayId = opts.overlayId || ('tfjlGenericPicker_' + Date.now() + '_' + Math.floor(Math.random() * 1e6));
@@ -43,18 +45,20 @@
             overlay.id = overlayId;
             // 双侧并排的子 picker 嵌到父容器：parent/noBackdrop 决定样式
             const parent = opts.parent || document.body;
-            if (noBackdrop) {
+            const box = document.createElement('div');
+            if (floating) {
+                // 悬浮窗：透明全屏容器不挡页面操作；box 固定定位在左/右侧，可拖拽、可缩放
+                overlay.style.cssText = 'position:fixed;inset:0;z-index:100015;pointer-events:none;';
+                const fLeft = (align === 'right') ? 'auto' : '12px';
+                const fRight = (align === 'right') ? '12px' : 'auto';
+                box.style.cssText = 'position:fixed;top:88px;left:' + fLeft + ';right:' + fRight + ';width:' + floatWidth + ';height:360px;pointer-events:auto;background:rgba(28,30,40,0.98);border:1px solid rgba(255,215,0,0.4);border-radius:12px;padding:14px;box-shadow:0 8px 32px rgba(0,0,0,0.6);display:flex;flex-direction:column;box-sizing:border-box;';
+            } else if (noBackdrop) {
                 overlay.style.cssText = 'display:flex;align-items:stretch;justify-content:center;min-height:0;width:100%;height:100%;';
+                box.style.cssText = 'width:100%;height:100%;background:rgba(28,30,40,0.98);border:1px solid rgba(255,215,0,0.4);border-radius:10px;padding:12px;box-shadow:none;display:flex;flex-direction:column;box-sizing:border-box;';
             } else {
                 const justifyContent = (align === 'left') ? 'flex-start' : (align === 'right') ? 'flex-end' : 'center';
                 const padX = (align === 'left') ? '2vw' : (align === 'right') ? '2vw' : '0';
                 overlay.style.cssText = 'position:fixed;inset:0;z-index:100010;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:' + justifyContent + ';padding-left:' + (align === 'left' ? padX : '0') + ';padding-right:' + (align === 'right' ? padX : '0') + ';box-sizing:border-box;';
-            }
-            const box = document.createElement('div');
-            // box 样式：普通模式走原 size；子 picker 走 100% 适配父列
-            if (noBackdrop) {
-                box.style.cssText = 'width:100%;height:100%;background:rgba(28,30,40,0.98);border:1px solid rgba(255,215,0,0.4);border-radius:10px;padding:12px;box-shadow:none;display:flex;flex-direction:column;box-sizing:border-box;';
-            } else {
                 box.style.cssText = 'width:' + overlayWidth + ';height:min(72vh,560px);background:rgba(28,30,40,0.98);border:1px solid rgba(255,215,0,0.4);border-radius:12px;padding:14px;box-shadow:0 8px 32px rgba(0,0,0,0.6);display:flex;flex-direction:column;';
             }
             overlay.appendChild(box);
@@ -69,6 +73,40 @@
             closeBtn.onclick = function() { overlay.remove(); };
             head.appendChild(hEl); head.appendChild(closeBtn);
             box.appendChild(head);
+            // 悬浮窗：拖拽（标题栏）+ 缩放（右下角手柄）
+            if (floating) {
+                head.style.cursor = 'move';
+                let drag = null;
+                head.addEventListener('mousedown', function(e) {
+                    if (e.target === closeBtn) return; // 点关闭不触发拖拽
+                    drag = { x: e.clientX, y: e.clientY, l: box.offsetLeft, t: box.offsetTop };
+                    e.preventDefault();
+                });
+                document.addEventListener('mousemove', function(e) {
+                    if (!drag) return;
+                    const nx = Math.max(0, Math.min(window.innerWidth - box.offsetWidth, drag.l + (e.clientX - drag.x)));
+                    const ny = Math.max(0, Math.min(window.innerHeight - 40, drag.t + (e.clientY - drag.y)));
+                    box.style.left = nx + 'px';
+                    box.style.top = ny + 'px';
+                    box.style.right = 'auto'; // 拖拽后转 left 定位
+                });
+                document.addEventListener('mouseup', function() { drag = null; });
+                const rz = document.createElement('div');
+                rz.title = '拖拽缩放';
+                rz.style.cssText = 'position:absolute;right:0;bottom:0;width:18px;height:18px;cursor:nwse-resize;background:linear-gradient(135deg,transparent 45%,rgba(255,255,255,0.45) 45%,rgba(255,255,255,0.45) 55%,transparent 55%,transparent 70%,rgba(255,255,255,0.45) 70%,rgba(255,255,255,0.45) 80%,transparent 80%);';
+                box.appendChild(rz);
+                let rsize = null;
+                rz.addEventListener('mousedown', function(e) {
+                    rsize = { x: e.clientX, y: e.clientY, w: box.offsetWidth, h: box.offsetHeight };
+                    e.preventDefault(); e.stopPropagation();
+                });
+                document.addEventListener('mousemove', function(e) {
+                    if (!rsize) return;
+                    box.style.width = Math.max(220, rsize.w + (e.clientX - rsize.x)) + 'px';
+                    box.style.height = Math.max(160, rsize.h + (e.clientY - rsize.y)) + 'px';
+                });
+                document.addEventListener('mouseup', function() { rsize = null; });
+            }
             const inp = document.createElement('input');
             inp.type = 'text';
             inp.placeholder = placeholder;
@@ -199,8 +237,8 @@
             }
             inp.oninput = function() { render(inp.value); };
             render('');
-            // 点击外面关闭：仅主 picker（fixed backdrop）启用，避免双侧子 picker 自关闭
-            if (!noBackdrop) {
+            // 点击外面关闭：仅普通主 picker（fixed backdrop）启用；悬浮窗/双排子 picker 不自关
+            if (!noBackdrop && !floating) {
                 overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
             }
             parent.appendChild(overlay);
