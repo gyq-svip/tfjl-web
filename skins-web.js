@@ -308,6 +308,7 @@
   window.selectHeroSkin = selectHeroSkin;
   window.loadSkinSelections = loadSkinSelections;
   window.syncRemoteSkins = syncRemoteSkins;
+  window._ensureSynced = _ensureSynced; // 供默认项目加载后兜底重刷融合皮肤（await 皮肤索引就绪）
 
   // 启动：恢复已选皮肤并拉取远程皮肤注册表
   loadSkinSelections();
