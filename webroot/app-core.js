@@ -17231,6 +17231,18 @@ ${maSection}
         let floatConsoleRefreshTimer = null;
         let floatDragState = null;
         let floatOnlySkin = false;
+        let floatFilter = '';
+
+        function setFloatConsoleFilter(v) {
+            floatFilter = (v || '').trim();
+            refreshFloatConsole();
+        }
+        function clearFloatConsoleFilter() {
+            floatFilter = '';
+            const inp = document.getElementById('floatConsoleFilter');
+            if (inp) inp.value = '';
+            refreshFloatConsole();
+        }
 
         function toggleFloatConsole() {
             const con = document.getElementById('floatConsole');
@@ -17349,7 +17361,12 @@ ${maSection}
         function refreshFloatConsole() {
             const content = document.getElementById('floatConsoleContent');
             if (!content) return;
-            const logs = floatOnlySkin ? (window.__consoleLogs || []).filter(l => l.msg.indexOf('[SKIN]') !== -1) : window.__consoleLogs;
+            let logs = window.__consoleLogs;
+            if (floatOnlySkin) logs = (logs || []).filter(l => l.msg.indexOf('[SKIN]') !== -1);
+            if (floatFilter) {
+                const kw = floatFilter.toLowerCase();
+                logs = (logs || []).filter(l => l.msg.toLowerCase().indexOf(kw) !== -1);
+            }
             const badge = document.getElementById('floatConsoleBadge');
             const errCount = logs ? logs.filter(l => l.level === 'error').length : 0;
             if (badge) {
