@@ -6704,7 +6704,7 @@
             if (!nick) { alert('分享脚本需要先设置昵称（昵称仅用于发言/分享脚本展示，设置后不可自行修改）'); return; }
 
             if (!getGistToken()) {
-                alert('请先登录（GitHub 登录）后再分享');
+                alert('离线版暂不支持发送，请检查网络连接');
                 return;
             }
 
@@ -6801,7 +6801,7 @@
             if (!nick) { alert('分享脚本需要先设置昵称（昵称仅用于发言/分享脚本展示，设置后不可自行修改）'); return; }
 
             if (!getGistToken()) {
-                alert('请先登录（GitHub 登录）后再分享');
+                alert('离线版暂不支持发送，请检查网络连接');
                 return;
             }
 
@@ -6901,7 +6901,7 @@
         // 批量分享项目文件到需求墙
         async function batchShareTxtFilesToWall(indices) {
             if (!indices || indices.length === 0) return;
-            if (!getGistToken()) { alert('请先登录（GitHub 登录）后再分享'); return; }
+            if (!getGistToken()) { alert('离线版暂不支持发送，请检查网络连接'); return; }
             const now = new Date();
             const suffix = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
             const baseName = prompt('请输入批量分享文件名前缀（留空则每个用原文件名）：', '');
