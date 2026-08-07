@@ -16483,7 +16483,7 @@ ${maSection}
 
         // ==================== 管理员面板 ====================
         const ADMIN_VERIFY_KEY = 'TFJL_Admin_Verified';
-        const ADMIN_VERIFY_HASH = 'v2$kXtI5wHYUFcdTBV24RhVpwTHyM83gmQ0r3hhIY9rVnM=';
+        const ADMIN_VERIFY_HASH = 'v2$jkYsjc997BlgafRUyLlagKL62W1iBYfvH2fq1cJBbDs=';
         let adminLongPressTimer = null;
         let adminLongPressTriggered = false;
 
