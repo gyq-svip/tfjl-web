@@ -16253,7 +16253,15 @@ ${maSection}
             const nickname = nick;
 
             if (!getGistToken()) {
-                alert('离线版暂不支持发布消息，请检查网络连接');
+                // 修正：之前误把“无 GitHub Token”当成“离线版”，提示“检查网络”是误导。
+                // 真实情况：发布消息需写 GitHub Gist，必须有 Token（设置→管理员面板→GitHub Token）。
+                // 真离线用 navigator.onLine 判断；无 Token 则引导去填，不再报“离线版”。
+                if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+                    alert('当前网络已断开，恢复网络后再发布消息');
+                    return;
+                }
+                if (typeof openAdminPanel === 'function') openAdminPanel();
+                alert('发布消息需要先设置 GitHub Token（设置 → 管理员面板 → GitHub Token）。\n填好后即可发布，无需联网版本。');
                 return;
             }
 
