@@ -17234,19 +17234,43 @@ ${maSection}
         let floatAutoScroll = true;
         let floatConsoleRefreshTimer = null;
         let floatDragState = null;
+        let floatOnlySkin = false;
 
         function toggleFloatConsole() {
             const con = document.getElementById('floatConsole');
+            const toggle = document.getElementById('floatConsoleToggle');
             floatConsoleVisible = !floatConsoleVisible;
             con.style.display = floatConsoleVisible ? 'flex' : 'none';
+            if (toggle) toggle.style.display = floatConsoleVisible ? 'none' : 'flex';
             if (floatConsoleVisible) {
                 refreshFloatConsole();
+                if (floatConsoleRefreshTimer) clearInterval(floatConsoleRefreshTimer);
                 floatConsoleRefreshTimer = setInterval(refreshFloatConsole, 500);
             } else {
                 clearInterval(floatConsoleRefreshTimer);
                 floatConsoleRefreshTimer = null;
             }
         }
+
+        function toggleFloatOnlySkin() {
+            floatOnlySkin = !floatOnlySkin;
+            const btn = document.getElementById('floatOnlySkinBtn');
+            if (btn) btn.style.background = floatOnlySkin ? '#00bcd4' : 'rgba(255,255,255,0.15)';
+            refreshFloatConsole();
+        }
+
+        // 页面加载即显示浮动控制台（默认展开在右下角，可拖动），方便调试（替代 F12）查看 [SKIN] 等日志
+        (function initFloatConsoleOnLoad() {
+            const con = document.getElementById('floatConsole');
+            if (!con) return;
+            const toggle = document.getElementById('floatConsoleToggle');
+            floatConsoleVisible = true;
+            con.style.display = 'flex';
+            if (toggle) toggle.style.display = 'none';
+            refreshFloatConsole();
+            if (floatConsoleRefreshTimer) clearInterval(floatConsoleRefreshTimer);
+            floatConsoleRefreshTimer = setInterval(refreshFloatConsole, 500);
+        })();
 
         // 管理员开关：浮动控制台入口按钮显示/隐藏
         const CONSOLE_VISIBILITY_KEY = 'tdjl_consoleVisible';
@@ -17262,13 +17286,8 @@ ${maSection}
         function applyConsoleVisibility(visible) {
             const btn = document.getElementById('floatConsoleToggle');
             const status = document.getElementById('consoleToggleStatus');
-            if (btn) btn.style.display = visible ? 'flex' : 'none';
+            // 浮动控制台现已改为「默认常驻显示」，开关仅更新状态文字，不再隐藏浮窗（避免覆盖默认常显）
             if (status) status.textContent = visible ? '已开启' : '已关闭';
-            if (!visible) {
-                const con = document.getElementById('floatConsole');
-                if (con) con.style.display = 'none';
-                floatConsoleVisible = false;
-            }
         }
 
         function floatConsoleClear() {
@@ -17322,7 +17341,7 @@ ${maSection}
         function refreshFloatConsole() {
             const content = document.getElementById('floatConsoleContent');
             if (!content) return;
-            const logs = window.__consoleLogs;
+            const logs = floatOnlySkin ? (window.__consoleLogs || []).filter(l => l.msg.indexOf('[SKIN]') !== -1) : window.__consoleLogs;
             const badge = document.getElementById('floatConsoleBadge');
             const errCount = logs ? logs.filter(l => l.level === 'error').length : 0;
             if (badge) {
