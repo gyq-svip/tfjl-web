@@ -3443,7 +3443,7 @@ if (isTauriApp) {
                 for (const remoteSkin of skinList) {
                     const skinName = remoteSkin.name;
                     if (!skinName) continue;
-                    const remoteUrl = REMOTE_SKIN_BASE + '/' + encodeURIComponent(heroName) + '/' + encodeURIComponent(remoteSkin.file || (skinName + '.png'));
+                    const remoteUrl = REMOTE_SKIN_BASE + '/' + encodeURIComponent(heroName) + '/' + encodeURIComponent(remoteSkin.file || (skinName + '.skin'));
                     if (localNames.has(skinName)) {
                         // 本地已有：如果本地还没加载 url，补上远程 url 作为回退
                         const local = localSkins.find(s => s.name === skinName);
@@ -3573,13 +3573,15 @@ if (isTauriApp) {
         return { hero: decodeURIComponent(m[1]), file: decodeURIComponent(m[2]) };
     }
 
-    // 后台下载远程皮肤到本地磁盘（Tauri 环境下，写入 .png.b64 文本文件）
+    // 后台下载远程皮肤到本地磁盘（Tauri 环境下，写入 .skin 二进制文件，内容仍是 png）
+    // 统一用 .skin 非图片后缀，避免 .b64 文本缓存（体积 +33% 且是可读文本，别人能直接看）
     let _remoteSkinDownloadStarted = false;
     async function _downloadRemoteSkinsToLocal(heroes) {
         if (!isTauriApp || _remoteSkinDownloadStarted) return;
         _remoteSkinDownloadStarted = true;
         const base = _skinDiskBase();
         if (!base) return;
+        const invokeFn = window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke;
         let downloaded = 0, skipped = 0;
         // 王城低配版英雄优先落地磁盘
         const _dlEntries = Object.entries(heroes || {}).sort(([a], [b]) => (PRIORITY_HEROES.has(a) ? 0 : 1) - (PRIORITY_HEROES.has(b) ? 0 : 1));
@@ -3587,21 +3589,26 @@ if (isTauriApp) {
             if (!Array.isArray(skinList) || !skinList.length) continue;
             await _ensureSkinDiskDir(heroName);
             for (const s of skinList) {
-                const file = s.file || (s.name + '.png');
-                const b64Path = base + '\\' + heroName + '\\' + file + '.b64';
-                // 已存在则跳过
+                const file = s.file || (s.name + '.skin');
+                const skinPath = base + '\\' + heroName + '\\' + file;
+                // 已存在则跳过（本地已有 .skin，可能来自 Gitee zip 或之前下载）
                 try {
-                    const exists = await readTextFile(b64Path);
-                    if (exists && exists.length > 100) { skipped++; continue; }
+                    const exists = await invokeFn('plugin:fs|read_file', { path: skinPath, options: undefined });
+                    if (exists && (exists.byteLength ?? exists.length) > 100) { skipped++; continue; }
                 } catch(e) { /* 不存在，继续下载 */ }
                 try {
                     const url = REMOTE_SKIN_BASE + '/' + encodeURIComponent(heroName) + '/' + encodeURIComponent(file);
                     const resp = await _fetchWithTimeout(url, 8000);
                     if (!resp.ok) continue;
                     const blob = await resp.blob();
-                    const b64 = await _blobToBase64(blob);
-                    if (!b64) continue;
-                    await writeTextFile(b64Path, b64);
+                    const arr = new Uint8Array(await blob.arrayBuffer());
+                    // 写 .skin 二进制（内容 png）：优先 Tauri fs 插件，回退自定义命令 write_binary_file
+                    try {
+                        await invokeFn('plugin:fs|write_file', { path: skinPath, contents: arr });
+                    } catch (e1) {
+                        const b64 = (await _blobToBase64(blob)).split(',')[1];
+                        if (b64) await invokeFn('write_binary_file', { file_path: skinPath, content_base64: b64 }).catch(() => {});
+                    }
                     downloaded++;
                 } catch(e) {
                     console.warn('[SKIN] 下载皮肤失败:', heroName, file, e.message || e);
@@ -3676,23 +3683,27 @@ if (isTauriApp) {
         if (isTauriApp) {
             const parsed = _parseSkinUrl(remoteUrl);
             if (parsed) {
-                const b64Path = _skinDiskBase() + '\\' + parsed.hero + '\\' + parsed.file + '.b64';
-                // 1. 尝试读磁盘缓存
+                const invokeFn = window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke;
+                const skinPath = _skinDiskBase() + '\\' + parsed.hero + '\\' + parsed.file;
+                // 1. 尝试读本地 .skin 二进制缓存（来自 Gitee zip 或后台下载，内容仍是 png）
                 try {
-                    const b64 = await readTextFile(b64Path);
-                    if (b64 && b64.length > 100) {
-                        const bytes = _base64ToBytes(b64);
-                        return URL.createObjectURL(new Blob([bytes], { type: 'image/png' }));
-                    }
-                } catch(e) { /* 磁盘无缓存 */ }
-                // 2. 网络下载 → 写磁盘
+                    const bytes = await invokeFn('plugin:fs|read_file', { path: skinPath, options: undefined });
+                    const blobUrl = bytesToBlobUrl(bytes, skinPath);
+                    if (blobUrl) return blobUrl;
+                } catch(e) { /* 磁盘无缓存，走网络 */ }
+                // 2. 网络下载 → 写 .skin 二进制缓存
                 try {
                     await _ensureSkinDiskDir(parsed.hero);
                     const resp = await fetch(remoteUrl);
                     if (!resp.ok) return remoteUrl;
                     const blob = await resp.blob();
-                    const b64 = await _blobToBase64(blob);
-                    if (b64) { writeTextFile(b64Path, b64).catch(() => {}); /* 异步写，不等 */ }
+                    try {
+                        const arr = new Uint8Array(await blob.arrayBuffer());
+                        await invokeFn('plugin:fs|write_file', { path: skinPath, contents: arr });
+                    } catch (e1) {
+                        const b64 = (await _blobToBase64(blob)).split(',')[1];
+                        if (b64) await invokeFn('write_binary_file', { file_path: skinPath, content_base64: b64 }).catch(() => {});
+                    }
                     return URL.createObjectURL(blob);
                 } catch(e) {
                     console.warn('[SKIN] 网络兜底失败:', remoteUrl, e.message || e);
@@ -3747,7 +3758,7 @@ if (isTauriApp) {
         for (const [heroName, skinList] of _phEntries) {
             if (!Array.isArray(skinList)) continue;
             for (const s of skinList) {
-                const url = REMOTE_SKIN_BASE + '/' + encodeURIComponent(heroName) + '/' + encodeURIComponent(s.file || (s.name + '.png'));
+                const url = REMOTE_SKIN_BASE + '/' + encodeURIComponent(heroName) + '/' + encodeURIComponent(s.file || (s.name + '.skin'));
                 _getCachedSkinUrl(url).catch(() => {});
                 count++;
                 if (count % 20 === 0) await new Promise(r => setTimeout(r, 30));
