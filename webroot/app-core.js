@@ -5126,15 +5126,7 @@
             if (window.fusionSkins && window.fusionSkins[fusedHero] === '') return null;
             if (window.heroSkinSelections && window.heroSkinSelections[fusedHero] === '') return null;
             const sel = getFusionComponentSkin(fusedHero) || '默认';
-            // ① 云端已发布融合整图（融合XX 切皮）：必须按用户【当前选择的副卡皮肤】取对应切图，
-            //    否则切割后「切换被融合卡皮肤」会失效——永远停在 融合XX 的默认图（修：v260804-229）。
-            if (window.skinRegistry && window.skinRegistry['融合' + fusedHero] && window.resolveHeroSkinUrl) {
-                try {
-                    const u = await window.resolveHeroSkinUrl('融合' + fusedHero, sel);
-                    if (u) return { url: u, isBadge: false };
-                } catch (e) {}
-            }
-            // ② 直接用副卡当前皮肤的整图（缩小版整图直显，皮肤生效）
+            // 融合卡没有"融合皮肤"这种东西——副卡直接用【它自己英雄当前皮肤】的整图（按 fusionSkins 指定的皮肤取）。
             const fullUrl = window.resolveHeroSkinUrl ? await window.resolveHeroSkinUrl(fusedHero, sel) : null;
             if (fullUrl) return { url: fullUrl, isBadge: false };
             return null;
