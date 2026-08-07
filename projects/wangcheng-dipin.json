@@ -1,15 +1,15 @@
 {
   "type": "tower-defense-project",
   "version": "1.0",
-  "exportDate": "2026-07-27T18:04:40.794Z",
+  "exportDate": "2026-08-07T03:52:08.434Z",
   "project": {
     "name": "王城低配版",
     "category": "深海",
-    "timestamp": "2026-07-27T18:02:34.498Z",
+    "timestamp": "2026-08-07T03:51:56.529Z",
     "myHandCards": [
       {
         "id": "46",
-        "name": "水灵",
+        "name": "水灵刀客",
         "placed": "u6",
         "isEngineering": false,
         "profession": "panda",
@@ -25,7 +25,7 @@
       },
       {
         "id": "34",
-        "name": "咕咕",
+        "name": "咕咕萨满",
         "placed": "u4",
         "isEngineering": false,
         "profession": "priest",
@@ -173,31 +173,17 @@
     "myPlacedCards": [
       {
         "id": "46",
-        "name": "水灵",
+        "name": "水灵刀客",
         "slot": "u6",
         "isEngineering": false,
         "profession": "panda"
       },
       {
-        "id": "45",
-        "name": "萌萌",
-        "slot": "u5",
-        "isEngineering": false,
-        "profession": "panda"
-      },
-      {
-        "id": "34",
-        "name": "咕咕",
-        "slot": "u4",
+        "id": "custom_1780506452548",
+        "name": "死神海妖",
+        "slot": "u1",
         "isEngineering": false,
         "profession": "priest"
-      },
-      {
-        "id": "65",
-        "name": "钢鬃",
-        "slot": "u3",
-        "isEngineering": false,
-        "profession": "warrior"
       },
       {
         "id": "custom_1780506538530",
@@ -214,11 +200,25 @@
         "profession": "priest"
       },
       {
-        "id": "custom_1780506452548",
-        "name": "死神海妖",
-        "slot": "u1",
+        "id": "34",
+        "name": "咕咕萨满",
+        "slot": "u4",
         "isEngineering": false,
         "profession": "priest"
+      },
+      {
+        "id": "65",
+        "name": "钢鬃",
+        "slot": "u3",
+        "isEngineering": false,
+        "profession": "warrior"
+      },
+      {
+        "id": "45",
+        "name": "萌萌",
+        "slot": "u5",
+        "isEngineering": false,
+        "profession": "panda"
       }
     ],
     "teammatePlacedCards": [
@@ -251,6 +251,13 @@
         "profession": "archer"
       },
       {
+        "id": "74",
+        "name": "悟空",
+        "slot": "t1",
+        "isEngineering": false,
+        "profession": "summoner"
+      },
+      {
         "id": "66",
         "name": "电法",
         "slot": "t3",
@@ -263,20 +270,13 @@
         "slot": "t2",
         "isEngineering": false,
         "profession": "warrior"
-      },
-      {
-        "id": "74",
-        "name": "悟空",
-        "slot": "t1",
-        "isEngineering": false,
-        "profession": "summoner"
       }
     ],
     "cardLevels": {},
     "cardSkins": {
       "my_custom_1779492294329": "张顺·鱼人",
       "my_47": "太平乐·火灵",
-      "my_34": "老爷爷·咕咕",
+      "my_34": "华夫人·咕咕",
       "teammate_48": "",
       "teammate_55": "狮王令牌·光精灵",
       "teammate_54": "还魂丹·魂精灵",
@@ -285,12 +285,37 @@
       "my_55": "狮王令牌·光精灵",
       "my_57": "仙葫芦·木精灵",
       "my_custom_1780506403323": "太平乐·小野",
-      "teammate_77": "",
-      "teammate_66": "",
-      "teammate_71": "",
-      "teammate_49": ""
+      "teammate_77": "默认",
+      "teammate_66": "默认",
+      "teammate_71": "默认",
+      "teammate_49": "",
+      "my_custom_1780506452548": "万圣节·死神",
+      "my_custom_1780506538530": "小李飞刀·邪能火炮",
+      "teammate_74": "",
+      "teammate_61": "默认",
+      "my_46": "潮汐·水灵",
+      "my_65": "天蓬元帅·钢鬃",
+      "my_45": "烈火奶奶·萌萌"
     },
-    "cardMoHua": {},
+    "fusionSkins": {
+      "潜艇": "鲨鱼号·微型潜艇",
+      "宝库": "金刚石·地精宝库",
+      "射线": "雷峰塔·侏儒射线",
+      "土灵": "武圣·土灵",
+      "酋长": "奶牛·酋长",
+      "刀客": "圣诞怪杰·刀客",
+      "海妖": "巨灵神·海妖",
+      "冰骑": "星陨·冰骑",
+      "钢鬃": "钢鬃",
+      "萨满": "青城掌门·萨满"
+    },
+    "cardMoHua": {
+      "my_custom_1780506452548": true,
+      "my_custom_1780506538530": true,
+      "my_34": true,
+      "my_46": true,
+      "my_45": true
+    },
     "myDeckInfo": "",
     "teammateDeckInfo": "",
     "notepad": "马车暗月车\n寒冰马车\n死神海妖\n小野牛\n全程强袭\n猫野，副卡死神1级\n合体要7400血\n副卡全程挂机 6风灵即可覆盖小野CD\n不需要副卡猪\n",

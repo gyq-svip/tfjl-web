@@ -2663,6 +2663,7 @@
         // ========== 多窗口脚本编辑系统 ==========
         let txtFileWindows = []; // 存储所有打开的窗口信息
         let windowZIndex = 1000; // 窗口层级管理
+        let topWinZIndex = 0;   // 从设置面板等高层 modal 打开的浮窗专用层级（100000+ 盖过设置面板 99999）
 
         // 统一脚本查看/编辑浮窗（方案B：浮窗为唯一查看/编辑组件，标签页 openScriptEditorTab 保留）
         // opts: { name, content, fileIndex(可选,>=0=本地txtFiles可保存/对比), readonly(可选) }
@@ -2672,6 +2673,7 @@
             const fileIndex = (typeof opts.fileIndex === 'number') ? opts.fileIndex : -1;
             const readonly = !!opts.readonly;
             const localPath = opts.localPath || null; // 扫描文件的本地磁盘路径：非项目文件，可写回原文件
+            const isTop = !!opts.zAboveSettings; // 是否高于设置面板(99999)，用于从 APP 设置内打开时不被遮挡
 
             // 本地文件（fileIndex>=0）按 fileIndex 去重，避免同文件多窗口编辑互相覆盖
             if (fileIndex >= 0) {
@@ -2679,7 +2681,7 @@
                 if (existing) {
                     const existingEl = document.getElementById(existing.id);
                     if (existingEl) {
-                        existingEl.style.zIndex = ++windowZIndex;
+                        existingEl.style.zIndex = existing.isTop ? (100000 + (++topWinZIndex)) : (++windowZIndex);
                         existingEl.style.display = 'flex';
                         existingEl.style.opacity = '1';
                         // 闪烁提示
@@ -2695,7 +2697,7 @@
                 if (existing) {
                     const existingEl = document.getElementById(existing.id);
                     if (existingEl) {
-                        existingEl.style.zIndex = ++windowZIndex;
+                        existingEl.style.zIndex = existing.isTop ? (100000 + (++topWinZIndex)) : (++windowZIndex);
                         existingEl.style.display = 'flex';
                         existingEl.style.opacity = '1';
                         existingEl.style.borderColor = 'rgba(255,215,0,0.9)';
@@ -2706,6 +2708,7 @@
             }
 
             const windowId = `txtWindow_${fileIndex >= 0 ? fileIndex : 'r'}_${Date.now()}`;
+            const winZ = isTop ? (100000 + (++topWinZIndex)) : (++windowZIndex);
             
             // 创建窗口容器
             const windowDiv = document.createElement('div');
@@ -2724,7 +2727,7 @@
                 border: 2px solid rgba(255,215,0,0.3);
                 border-radius: 12px;
                 box-shadow: 0 10px 40px rgba(0,0,0,0.5);
-                z-index: ${++windowZIndex};
+                z-index: ${winZ};
                 display: flex;
                 flex-direction: column;
                 overflow: hidden;
@@ -2749,7 +2752,29 @@
                     📄 ${escapeHtml(name)}
                     <span id="${windowId}_titleDr" style="font-size:0.72rem;font-weight:normal;">${drBadge}</span>
                 </span>
-                <div style="display: flex; gap: 8px;">
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <div style="position: relative;">
+                        <button id="${windowId}_paletteBtn" onclick="toggleNotebookColorPicker('${windowId}')" title="字体颜色" style="background:rgba(255,255,255,0.08);border:none;color:#fff;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:0.9rem;">🎨</button>
+                        <div id="${windowId}_colorPopup" onmousedown="event.stopPropagation()" style="display:none;position:absolute;top:118%;right:0;z-index:20;width:158px;background:linear-gradient(160deg,rgba(40,40,68,0.98),rgba(26,26,48,0.98));border:1px solid rgba(255,215,0,0.35);border-radius:12px;padding:10px 12px;box-shadow:0 8px 30px rgba(0,0,0,0.6);">
+                            <div style="font-size:0.76rem;font-weight:bold;color:#ffd700;margin-bottom:8px;white-space:nowrap;">🎨 字体颜色</div>
+                            <div style="position:relative;width:132px;height:132px;margin:0 auto 9px;">
+                                <canvas id="${windowId}_wheel" style="width:132px;height:132px;border-radius:50%;display:block;cursor:crosshair;box-shadow:0 0 0 1px rgba(255,255,255,0.28),0 4px 14px rgba(0,0,0,0.55);"></canvas>
+                                <div id="${windowId}_wheelDot" style="position:absolute;left:66px;top:66px;width:14px;height:14px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 5px rgba(0,0,0,0.9);transform:translate(-50%,-50%);pointer-events:none;"></div>
+                            </div>
+                            <div style="display:flex;align-items:center;gap:6px;margin-bottom:9px;">
+                                <span style="font-size:0.58rem;color:#9a9ab0;flex-shrink:0;">亮度</span>
+                                <div id="${windowId}_vBar" style="position:relative;flex:1;height:12px;border-radius:6px;cursor:pointer;border:1px solid rgba(255,255,255,0.25);background:linear-gradient(to right,#000,#fff);">
+                                    <div id="${windowId}_vDot" style="position:absolute;left:100%;top:50%;width:14px;height:14px;border-radius:50%;background:#fff;border:2px solid rgba(0,0,0,0.5);box-shadow:0 1px 4px rgba(0,0,0,0.7);transform:translate(-50%,-50%);pointer-events:none;"></div>
+                                </div>
+                            </div>
+                            <div style="display:flex;align-items:center;gap:7px;margin-bottom:8px;">
+                                <span id="${windowId}_preview" style="width:20px;height:20px;border-radius:50%;background:#e0e0e0;border:1px solid rgba(255,255,255,0.6);flex-shrink:0;"></span>
+                                <span id="${windowId}_hexTxt" style="font-size:0.66rem;color:#c9c9dd;font-family:Consolas,monospace;">#e0e0e0</span>
+                            </div>
+                            <div id="${windowId}_colorSlots" style="display:flex;align-items:center;gap:10px;justify-content:center;border-top:1px solid rgba(255,255,255,0.12);padding-top:8px;"></div>
+                            <div style="font-size:0.58rem;color:#9a9ab0;margin-top:7px;text-align:center;white-space:nowrap;">全部记事本统一 · 自动保存</div>
+                        </div>
+                    </div>
                     <button onclick="minimizeTxtWindow('${windowId}')" style="background:rgba(255,193,7,0.2);border:none;color:#ffc107;padding:4px 8px;border-radius:4px;cursor:pointer;">−</button>
                     <button onclick="closeTxtWindow('${windowId}', ${fileIndex})" style="background:rgba(244,67,54,0.2);border:none;color:#f44336;padding:4px 8px;border-radius:4px;cursor:pointer;">×</button>
                 </div>
@@ -2921,9 +2946,9 @@
             // 调整大小功能
             makeWindowResizable(windowDiv);
             
-            // 点击窗口时提升层级
+            // 点击窗口时提升层级（isTop 浮窗保持高于设置面板 99999，避免掉回面板后面导致点不了）
             windowDiv.addEventListener('mousedown', () => {
-                windowDiv.style.zIndex = ++windowZIndex;
+                windowDiv.style.zIndex = isTop ? (100000 + (++topWinZIndex)) : (++windowZIndex);
             });
             
             // 记录窗口信息
@@ -2933,8 +2958,290 @@
                 localPath: localPath,
                 name: name,
                 element: windowDiv,
-                drInfo: drInfo
+                drInfo: drInfo,
+                isTop: isTop
             });
+
+            // 恢复记忆的字体颜色（全局统一，一处改处处生效）
+            (async () => {
+                try {
+                    const ta0 = document.getElementById(windowId + '_content');
+                    if (ta0) ta0.style.color = notebookColorCfg.color;      // 先用本地缓存秒显
+                    const color = await getNotebookColorAsync();            // 再用磁盘值校正
+                    const ta = document.getElementById(windowId + '_content');
+                    if (ta) ta.style.color = color;
+                } catch (e) {}
+            })();
+        }
+
+        // 记事本字体颜色（整篇统一换色，仅显示层，不进文件，不影响保存/老马纯文本）
+        // 全局统一：所有记事本共用一个颜色；1 个默认色 + 2 个自选色（调色盘选完自动存）
+        // 持久化：D 盘 JSON（App）+ localStorage（网页兜底）
+        const NOTEBOOK_COLOR_FILE = 'D:\\withfriends\\塔防精灵助手数据\\notebookColors.json';
+        const LS_NOTEBOOK_COLORS = 'tfjl_notebook_colors';
+        const DEFAULT_NOTEBOOK_COLOR = '#e0e0e0';        // 啥都没设时的默认色
+
+        // 任意颜色字符串 → #rrggbb（input[type=color] 只认 hex）
+        function toHexColor(c) {
+            if (!c) return '';
+            c = String(c).trim();
+            if (/^#[0-9a-fA-F]{6}$/.test(c)) return c.toLowerCase();
+            if (/^#[0-9a-fA-F]{3}$/.test(c)) return ('#' + c[1] + c[1] + c[2] + c[2] + c[3] + c[3]).toLowerCase();
+            const m = c.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+            if (m) return '#' + [m[1], m[2], m[3]].map(x => (+x).toString(16).padStart(2, '0')).join('');
+            return '';
+        }
+
+        function normalizeNotebookColorCfg(o) {
+            const color = (o && toHexColor(o.color)) || DEFAULT_NOTEBOOK_COLOR;
+            let slots = (o && Array.isArray(o.slots)) ? o.slots.map(toHexColor).filter(Boolean) : [];
+            slots = slots.filter((c, i) => c !== DEFAULT_NOTEBOOK_COLOR && slots.indexOf(c) === i).slice(0, 2);
+            return { color: color, slots: slots };
+        }
+
+        // 当前配置（同步可用，先从 localStorage 秒读，磁盘值异步校正）
+        let notebookColorCfg = (function () {
+            try { const s = localStorage.getItem(LS_NOTEBOOK_COLORS); if (s) return normalizeNotebookColorCfg(JSON.parse(s)); } catch (e) {}
+            return { color: DEFAULT_NOTEBOOK_COLOR, slots: [] };
+        })();
+
+        let _nbColorDiskLoaded = false;
+        async function getNotebookColorAsync() {
+            if (!_nbColorDiskLoaded) {
+                _nbColorDiskLoaded = true;
+                if (window.readTextFile) {
+                    try {
+                        const s = await window.readTextFile(NOTEBOOK_COLOR_FILE);
+                        if (s) {
+                            const o = JSON.parse(s);
+                            if (o && typeof o === 'object') {
+                                notebookColorCfg = normalizeNotebookColorCfg(o);
+                                try { localStorage.setItem(LS_NOTEBOOK_COLORS, JSON.stringify(notebookColorCfg)); } catch (e) {}
+                            }
+                        }
+                    } catch (e) {}
+                }
+            }
+            return notebookColorCfg.color;
+        }
+
+        async function saveNotebookColorCfg() {
+            try { localStorage.setItem(LS_NOTEBOOK_COLORS, JSON.stringify(notebookColorCfg)); } catch (e) {}
+            if (window.writeTextFile) {
+                try { await window.writeTextFile(NOTEBOOK_COLOR_FILE, JSON.stringify(notebookColorCfg, null, 2)); } catch (e) {}
+            }
+        }
+
+        // 只改显示（拖动色轮时高频调用，不落盘）
+        function previewNotebookColorLive(hex) {
+            notebookColorCfg.color = hex;
+            (typeof txtFileWindows !== 'undefined' ? txtFileWindows : []).forEach(w => {
+                const ta = document.getElementById(w.id + '_content');
+                if (ta) ta.style.color = hex;
+            });
+        }
+
+        // 换色：所有已打开记事本同步生效并持久化；remember=true 时把颜色存进 2 个自选槽
+        function applyNotebookColor(windowId, color, remember) {
+            const hex = toHexColor(color) || DEFAULT_NOTEBOOK_COLOR;
+            notebookColorCfg.color = hex;
+            if (remember && hex !== DEFAULT_NOTEBOOK_COLOR) {
+                const slots = notebookColorCfg.slots.filter(c => c !== hex);
+                slots.unshift(hex);
+                notebookColorCfg.slots = slots.slice(0, 2);
+            }
+            saveNotebookColorCfg();
+            previewNotebookColorLive(hex);
+            document.querySelectorAll('[id$="_colorSlots"]').forEach(box => {
+                renderNotebookColorSwatches(box.id.replace(/_colorSlots$/, ''));
+            });
+            // 同步所有已展开浮层的色轮指针/亮度条/预览
+            (typeof txtFileWindows !== 'undefined' ? txtFileWindows : []).forEach(w => {
+                const pop = document.getElementById(w.id + '_colorPopup');
+                if (pop && pop.style.display !== 'none') syncNotebookWheelUI(w.id, hex);
+            });
+        }
+
+        // ---------- HSV 圆盘取色器（角度=色相，半径=饱和度，下方滑条=亮度）----------
+        const nbWheelState = {};   // windowId -> {h(0-360), s(0-1), v(0-1)}
+
+        function nbHsvToRgb(h, s, v) {
+            h = ((h % 360) + 360) % 360;
+            const c = v * s, x = c * (1 - Math.abs(((h / 60) % 2) - 1)), m = v - c;
+            let r = 0, g = 0, b = 0;
+            if (h < 60) { r = c; g = x; } else if (h < 120) { r = x; g = c; }
+            else if (h < 180) { g = c; b = x; } else if (h < 240) { g = x; b = c; }
+            else if (h < 300) { r = x; b = c; } else { r = c; b = x; }
+            return [Math.round((r + m) * 255), Math.round((g + m) * 255), Math.round((b + m) * 255)];
+        }
+
+        function nbHsvToHex(h, s, v) {
+            return '#' + nbHsvToRgb(h, s, v).map(x => x.toString(16).padStart(2, '0')).join('');
+        }
+
+        function nbHexToHsv(hex) {
+            const c = toHexColor(hex) || DEFAULT_NOTEBOOK_COLOR;
+            const r = parseInt(c.slice(1, 3), 16) / 255, g = parseInt(c.slice(3, 5), 16) / 255, b = parseInt(c.slice(5, 7), 16) / 255;
+            const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+            let h = 0;
+            if (d !== 0) {
+                if (mx === r) h = 60 * (((g - b) / d) % 6);
+                else if (mx === g) h = 60 * ((b - r) / d + 2);
+                else h = 60 * ((r - g) / d + 4);
+            }
+            if (h < 0) h += 360;
+            return [h, mx === 0 ? 0 : d / mx, mx];
+        }
+
+        // 绘制色轮（按满亮度画，这样亮度调低时仍能看清各色相）
+        function drawNotebookWheel(canvas) {
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width, hgt = canvas.height, R = w / 2;
+            const img = ctx.createImageData(w, hgt);
+            const d = img.data;
+            for (let y = 0; y < hgt; y++) {
+                for (let x = 0; x < w; x++) {
+                    const dx = x - R + 0.5, dy = y - R + 0.5;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    const i = (y * w + x) * 4;
+                    if (dist > R) { d[i + 3] = 0; continue; }
+                    let deg = Math.atan2(dy, dx) * 180 / Math.PI;
+                    if (deg < 0) deg += 360;
+                    const rgb = nbHsvToRgb(deg, Math.min(1, dist / R), 1);
+                    d[i] = rgb[0]; d[i + 1] = rgb[1]; d[i + 2] = rgb[2];
+                    d[i + 3] = dist > R - 1.5 ? Math.max(0, Math.round(255 * (R - dist) / 1.5)) : 255;
+                }
+            }
+            ctx.putImageData(img, 0, 0);
+        }
+
+        // 把 hex 同步到色轮 UI（指针位置 / 亮度条 / 预览 / hex 文本）
+        function syncNotebookWheelUI(windowId, hex) {
+            const canvas = document.getElementById(windowId + '_wheel');
+            if (!canvas || canvas.dataset.inited !== '1') return;
+            const hsv = nbHexToHsv(hex);
+            // 纯黑/纯灰反推不出色相饱和，沿用上一次的，避免亮度拉到 0 再拉回来色相丢失
+            const prev = nbWheelState[windowId];
+            if (prev) {
+                if (hsv[2] === 0) { hsv[0] = prev.h; hsv[1] = prev.s; }
+                else if (hsv[1] === 0) { hsv[0] = prev.h; }
+            }
+            nbWheelState[windowId] = { h: hsv[0], s: hsv[1], v: hsv[2] };
+            const R = (canvas.clientWidth || 132) / 2;
+            const dot = document.getElementById(windowId + '_wheelDot');
+            if (dot) {
+                const rad = hsv[0] * Math.PI / 180;
+                dot.style.left = (R + Math.cos(rad) * hsv[1] * R) + 'px';
+                dot.style.top = (R + Math.sin(rad) * hsv[1] * R) + 'px';
+                dot.style.background = hex;
+            }
+            const bar = document.getElementById(windowId + '_vBar');
+            if (bar) bar.style.background = 'linear-gradient(to right,#000,' + nbHsvToHex(hsv[0], hsv[1], 1) + ')';
+            const vDot = document.getElementById(windowId + '_vDot');
+            if (vDot) { vDot.style.left = (hsv[2] * 100) + '%'; vDot.style.background = hex; }
+            const pv = document.getElementById(windowId + '_preview');
+            if (pv) pv.style.background = hex;
+            const tx = document.getElementById(windowId + '_hexTxt');
+            if (tx) tx.textContent = hex;
+        }
+
+        // 渲染色块：默认色 + 2 个自选色（空槽显示虚线圆占位）
+        function renderNotebookColorSwatches(windowId) {
+            const box = document.getElementById(windowId + '_colorSlots');
+            if (!box) return;
+            const cur = notebookColorCfg.color;
+            const list = [DEFAULT_NOTEBOOK_COLOR].concat(notebookColorCfg.slots);
+            let html = list.map((c, i) => {
+                const on = (c === cur);
+                return `<button type="button" onclick="applyNotebookColor('${windowId}','${c}')" title="${i === 0 ? '默认色' : '自选色'} ${c}" style="width:26px;height:26px;border-radius:50%;background:${c};border:2px solid ${on ? '#ffd700' : 'rgba(255,255,255,0.55)'};cursor:pointer;padding:0;box-shadow:0 2px 6px rgba(0,0,0,0.45);"></button>`;
+            }).join('');
+            for (let i = list.length; i < 3; i++) {
+                html += `<span title="用右侧调色盘选个颜色，会自动存到这里" style="width:26px;height:26px;border-radius:50%;border:1px dashed rgba(255,255,255,0.3);display:inline-block;"></span>`;
+            }
+            box.innerHTML = html;
+        }
+
+        // 首次展开时初始化色轮（canvas 尺寸 + 点击/拖动事件）
+        function setupNotebookColorWheel(windowId) {
+            const canvas = document.getElementById(windowId + '_wheel');
+            const bar = document.getElementById(windowId + '_vBar');
+            if (!canvas || canvas.dataset.inited === '1') return;
+            canvas.dataset.inited = '1';
+            const SIZE = 132, dpr = Math.min(2, window.devicePixelRatio || 1);
+            canvas.width = Math.round(SIZE * dpr);
+            canvas.height = Math.round(SIZE * dpr);
+            drawNotebookWheel(canvas);
+
+            const st = () => (nbWheelState[windowId] = nbWheelState[windowId] || { h: 0, s: 0, v: 0.88 });
+
+            // 色轮：点任意位置 / 按住拖动（超出圆边则贴边取满饱和度）
+            const pickFromWheel = (e) => {
+                const rect = canvas.getBoundingClientRect();
+                const nx = (e.clientX - rect.left) / rect.width * 2 - 1;
+                const ny = (e.clientY - rect.top) / rect.height * 2 - 1;
+                let deg = Math.atan2(ny, nx) * 180 / Math.PI;
+                if (deg < 0) deg += 360;
+                const s = st();
+                s.h = deg;
+                s.s = Math.min(1, Math.sqrt(nx * nx + ny * ny));
+                if (s.v < 0.15) s.v = 1;   // 亮度太低时点色轮看不出变化，自动提亮
+                const hex = nbHsvToHex(s.h, s.s, s.v);
+                previewNotebookColorLive(hex);
+                syncNotebookWheelUI(windowId, hex);
+                return hex;
+            };
+            // 亮度条：点 / 拖
+            const pickFromBar = (e) => {
+                const rect = bar.getBoundingClientRect();
+                const s = st();
+                s.v = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                const hex = nbHsvToHex(s.h, s.s, s.v);
+                previewNotebookColorLive(hex);
+                syncNotebookWheelUI(windowId, hex);
+                return hex;
+            };
+
+            const bindDrag = (el, picker) => {
+                if (!el) return;
+                el.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();   // 关键：不让标题栏 makeWindowDraggable 抢走，否则变成拖窗口
+                    let hex = picker(e);
+                    const onMove = (ev) => { ev.preventDefault(); hex = picker(ev); };
+                    const onUp = () => {
+                        document.removeEventListener('mousemove', onMove, true);
+                        document.removeEventListener('mouseup', onUp, true);
+                        applyNotebookColor(windowId, hex, true);   // 松手才落盘 + 记进自选色
+                    };
+                    document.addEventListener('mousemove', onMove, true);
+                    document.addEventListener('mouseup', onUp, true);
+                });
+            };
+            bindDrag(canvas, pickFromWheel);
+            bindDrag(bar, pickFromBar);
+        }
+
+        // 标题栏 🎨 颜料盘：展开/收起颜色浮层（点其他处自动关闭）
+        function toggleNotebookColorPicker(windowId) {
+            const pop = document.getElementById(windowId + '_colorPopup');
+            if (!pop) return;
+            const show = pop.style.display === 'none';
+            document.querySelectorAll('[id$="_colorPopup"]').forEach(p => p.style.display = 'none');
+            pop.style.display = show ? 'block' : 'none';
+            if (show) {
+                renderNotebookColorSwatches(windowId);
+                setupNotebookColorWheel(windowId);
+                syncNotebookWheelUI(windowId, notebookColorCfg.color);
+                setTimeout(() => {
+                    const docClose = (e) => {
+                        if (!pop.contains(e.target) && e.target.id !== windowId + '_paletteBtn') {
+                            pop.style.display = 'none';
+                            document.removeEventListener('mousedown', docClose, true);
+                        }
+                    };
+                    document.addEventListener('mousedown', docClose, true);
+                }, 0);
+            }
         }
 
         // 兼容包装：脚本文件列表「✏️ 浮窗编辑」仍调用统一浮窗（本地文件，可保存/对比）
@@ -3350,7 +3657,7 @@
         let localFileWindows = [];
 
         // 扫描文件走统一记事本框架：先读磁盘内容，再交给 openScriptNotebook（带减伤栏/解析/查找替换/写回原文件/存项目）
-        async function openScannedInNotebook(filePath, fileName, readOnly) {
+        async function openScannedInNotebook(filePath, fileName, readOnly, zAboveSettings) {
             let realPath = filePath, realName = fileName;
             if (typeof realPath === 'string') realPath = realPath.replace(/\\\\/g, '\\').replace(/\\'/g, "'");
             if (typeof realName === 'string') realName = realName.replace(/\\\\/g, '\\').replace(/\\'/g, "'");
@@ -3363,7 +3670,7 @@
                     alert('当前环境不支持读取本地文件，请在 App 中使用此功能'); return;
                 }
             } catch (e) { alert('读取文件失败: ' + e.message); return; }
-            openScriptNotebook({ name: realName, content: content, localPath: realPath, readonly: !!readOnly });
+            openScriptNotebook({ name: realName, content: content, localPath: realPath, readonly: !!readOnly, zAboveSettings: !!zAboveSettings });
         }
 
         async function openLocalFileWindow(filePath, fileName, readOnly) {
@@ -7657,7 +7964,6 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             
             if (favoriteCards.length === 0) {
                 grid.innerHTML = '<div class="no-favorites" id="noFavorites">暂无收藏，右键点击卡牌添加到收藏</div>';
-                if (typeof refreshPoolCardCount === 'function') refreshPoolCardCount();
                 return;
             }
             
@@ -7747,6 +8053,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 
             // 收藏区是 innerHTML 整体重绘，重绘后必须重新铺皮肤，否则收藏的卡是光板
             if (typeof updateCardPoolSkins === 'function') updateCardPoolSkins().catch(() => {});
+            // 同步刷新顶部「搜索选卡」按钮栏的卡数统计
             if (typeof refreshPoolCardCount === 'function') refreshPoolCardCount();
         }
         
@@ -7942,42 +8249,39 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         }
 
         // 处理卡池卡牌点击（添加到手牌）
-        function handlePoolCardClick(card) {
+        // side 可选：'my' | 'teammate' 指定上阵到哪侧；不传则沿用原自动逻辑（优先我的，满了才队友）
+        function handlePoolCardClick(card, side) {
             const cardId = card.dataset.id;
             const cardName = card.dataset.name;
             const isEngineering = card.dataset.engineering === 'true';
             const profession = card.dataset.profession;
             const cardType = card.dataset.type;
-            
+
             const myHasThis = myHandCards.some(c => c.id === cardId) || handHasIdentity(myHandCards, cardName);
             const teammateHasThis = teammateHandCards.some(c => c.id === cardId) || handHasIdentity(teammateHandCards, cardName);
-            
-            if (myHandCards.length < MAX_HAND_CARDS && !myHasThis) {
-                if (isEngineering) {
-                    const engCount = myHandCards.filter(c => c.isEngineering).length;
-                    if (engCount >= 2) return;
-                } else {
-                    const normalCount = myHandCards.filter(c => !c.isEngineering).length;
-                    if (normalCount >= 9) return;
-                }
-                
-                myHandCards.push({ id: cardId, name: cardName, placed: null, isEngineering, profession, type: cardType });
-                updateHandDisplay('my');
-            } else if (teammateHandCards.length < MAX_HAND_CARDS && !teammateHasThis) {
-                if (isEngineering) {
-                    const engCount = teammateHandCards.filter(c => c.isEngineering).length;
-                    if (engCount >= 2) return;
-                } else {
-                    const normalCount = teammateHandCards.filter(c => !c.isEngineering).length;
-                    if (normalCount >= 9) return;
-                }
-                
-                teammateHandCards.push({ id: cardId, name: cardName, placed: null, isEngineering, profession, type: cardType });
-                updateHandDisplay('teammate');
-            } else if (handHasIdentity(myHandCards, cardName) || handHasIdentity(teammateHandCards, cardName)) {
-                // 手牌已有同一张卡（含融合形态），同一张卡只能带 1 张
-                if (typeof showToast === 'function') showToast('⚠️ 手牌已有「' + cardName + '」（含融合形态），同一张卡只能带 1 张');
+
+            let targetSide = side;
+            if (!targetSide) {
+                // 原自动逻辑：优先我的，满了才队友
+                if (myHandCards.length < MAX_HAND_CARDS && !myHasThis) targetSide = 'my';
+                else if (teammateHandCards.length < MAX_HAND_CARDS && !teammateHasThis) targetSide = 'teammate';
+                else if (myHasThis || teammateHasThis) { if (typeof showToast === 'function') showToast('⚠️ 手牌已有「' + cardName + '」（含融合形态），同一张卡只能带 1 张'); return; }
+                else { if (typeof showToast === 'function') showToast('⚠️ 手牌已满（最多 ' + MAX_HAND_CARDS + ' 张）'); return; }
             }
+            const target = targetSide === 'teammate' ? teammateHandCards : myHandCards;
+            const hasThis = targetSide === 'teammate' ? teammateHasThis : myHasThis;
+            const sideName = targetSide === 'teammate' ? '队友' : '我的';
+            if (hasThis) { if (typeof showToast === 'function') showToast('⚠️ ' + sideName + '手牌已有「' + cardName + '」'); return; }
+            if (target.length >= MAX_HAND_CARDS) { if (typeof showToast === 'function') showToast('⚠️ ' + sideName + '手牌已满（最多 ' + MAX_HAND_CARDS + ' 张）'); return; }
+            if (isEngineering) {
+                const engCount = target.filter(c => c.isEngineering).length;
+                if (engCount >= 2) { if (typeof showToast === 'function') showToast('⚠️ ' + sideName + '手牌工程卡已达上限（2 张）'); return; }
+            } else {
+                const normalCount = target.filter(c => !c.isEngineering).length;
+                if (normalCount >= 9) { if (typeof showToast === 'function') showToast('⚠️ ' + sideName + '手牌普通卡已达上限（9 张）'); return; }
+            }
+            target.push({ id: cardId, name: cardName, placed: null, isEngineering, profession, type: cardType });
+            updateHandDisplay(targetSide);
         }
 
         // 职业中文名 → data-profession（融合卡与云端基础卡共用）
@@ -7985,16 +8289,23 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             '工程': 'engineering', '战士': 'warrior', '法师': 'mage', '射手': 'archer',
             '召唤': 'summoner', '牧师': 'priest', '术士': 'warlock', '熊猫': 'panda', '精灵球': 'pokeball'
         };
+        // 职业英文 key → 中文（供通用筛选器分类标签显示中文；内部 profession 仍用英文 key 不变）
+        const PROFESSION_CN_MAP = {};
+        Object.keys(PROFESSION_KEY_MAP).forEach(function (cn) { PROFESSION_CN_MAP[PROFESSION_KEY_MAP[cn]] = cn; });
+        function professionToCn(key) { return key ? (PROFESSION_CN_MAP[key] || key) : key; }
+        if (typeof window !== 'undefined') window.professionToCn = professionToCn;
 
         // ===== 通用筛选器：从卡池选英雄卡上阵 =====
+        // 收集卡池所有英雄卡（基础卡 + 融合卡 + 收藏），来源为卡池 DOM 节点（已含全部 100+ 张）
         function collectPoolCards() {
             const seen = new Set();
             const list = [];
-            document.querySelectorAll('.collapsible-section .card-item, #favoriteCardsGrid .card-item').forEach(el => {
+            function pushCard(el, favorite) {
                 const id = el.dataset.id;
                 const name = el.dataset.name;
                 if (!name || seen.has(name)) return;
                 seen.add(name);
+                // 手牌是否已上阵（含融合形态）：标记 current 以便筛选器高亮
                 const inMy = myHandCards.some(c => c.id === id) || handHasIdentity(myHandCards, name);
                 const inTeam = teammateHandCards.some(c => c.id === id) || handHasIdentity(teammateHandCards, name);
                 const current = inMy ? '我的手牌' : (inTeam ? '队友手牌' : null);
@@ -8003,15 +8314,26 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     value: name,
                     label: name,
                     py: window.hanziInitials ? window.hanziInitials(name) : '',
+                    profession: el.dataset.profession, // 顶层职业字段，供筛选器分类
                     current: current,
                     sub: (isFusion ? '🜂融合 ' : '') + (current ? '✓ ' + current : ''),
+                    favorite: !!favorite, // 收藏卡标记，供选择器「收藏」分类
+                    // 透传上阵所需字段
                     _ds: { id, name, engineering: el.dataset.engineering, profession: el.dataset.profession, type: el.dataset.type }
                 });
-            });
+            }
+            // 收藏卡优先收集（标记 favorite），再收集卡池普通卡（按 name 去重跳过已加）
+            document.querySelectorAll('#favoriteCardsGrid .card-item').forEach(el => pushCard(el, true));
+            document.querySelectorAll('.collapsible-section .card-item').forEach(el => pushCard(el, false));
+            // 按首字母排序，方便浏览
             list.sort((a, b) => (a.py || a.label).localeCompare(b.py || b.label, 'zh-Hans-CN'));
             return list;
         }
 
+        // 打开通用筛选器选卡 → 复用 handlePoolCardClick（mock dataset）上阵到指定侧
+        // side: 'my' | 'teammate'，从手牌旁放大镜入口调用，确保我和队友分开选
+        // 我点左侧放大镜→面板靠左；点队友右侧放大镜→面板靠右，无需额外按钮
+        // 多职业卡片变多也不拥挤：默认 2 列 + 加宽面板（见 app-picker.js 的 multi 分支）
         function openPoolCardPicker(side) {
             const items = collectPoolCards();
             const title = side === 'teammate' ? '🔍 选卡上阵到「队友手牌」' : '🔍 选卡上阵到「我的手牌」';
@@ -8024,6 +8346,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 floatKey: 'hand_' + side, // 记忆各自的位置/大小
                 floating: true, // 悬浮窗：可拖拽/缩放，左右两个可同时停屏幕上
                 onPick: function (vals, its) {
+                    // 多选：批量上阵所有选中卡（复用既有上阵逻辑）
                     (its || []).forEach(function (it) {
                         handlePoolCardClick({ dataset: it._ds }, side);
                     });
@@ -8031,6 +8354,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             });
         }
 
+        // 统计卡池卡片数（供按钮栏展示）
         function refreshPoolCardCount() {
             const el = document.getElementById('poolCardCount');
             if (el) el.textContent = collectPoolCards().length;
@@ -10670,16 +10994,16 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             // 更新减伤显示
             updateDamageReductionDisplay();
 
-            // 恢复收藏折叠状态
+            // 恢复收藏折叠状态（默认折叠，仅用户曾显式展开才展开）
             const favoriteOpen = localStorage.getItem('tdjl_favorite_open');
-            if (favoriteOpen !== null && favoriteOpen === 'false') {
+            if (favoriteOpen === 'true') {
                 const favoriteHeader = document.querySelector('.collapsible-header.favorite');
                 const favoriteContent = document.querySelector('.collapsible-content.favorite');
                 if (favoriteHeader && favoriteContent) {
-                    favoriteHeader.classList.remove('open');
-                    favoriteContent.classList.remove('open');
+                    favoriteHeader.classList.add('open');
+                    favoriteContent.classList.add('open');
                     const icon = favoriteHeader.querySelector('.toggle-icon');
-                    if (icon) icon.textContent = '▼';
+                    if (icon) icon.textContent = '▲';
                 }
             }
 
@@ -12005,7 +12329,7 @@ function hasGistToken() {
             const DEFAULT_CAT = '深海';
             const DEFAULT_NAME = '王城低配版';
 
-            // 1. 本地缓存优先（瞬间展示，无需联网）
+            // 1. 本地缓存优先（瞬间展示，无需联网）；但若远端默认项目已更新（exportDate 更新），则后台重拉覆盖，保证老用户也能自动拿到新皮肤
             try {
                 const all = await loadProjectListFromDB();
                 const local = all.find(p => p.name === DEFAULT_NAME && (p.category || '默认分类') === DEFAULT_CAT)
@@ -12017,6 +12341,8 @@ function hasGistToken() {
                     console.log('[默认项目] 从本地缓存加载:', DEFAULT_NAME);
                     // 标记为已初始化：首次/升级后仅此一次，之后启动不再联网（保证删除持久、启动快、省服务器资源）
                     try { localStorage.setItem(DEFAULT_PROJECT_INIT_KEY, '1'); } catch (e) {}
+                    // 后台比对远端 exportDate：若新版则静默重拉并覆盖本地缓存（用户先看到旧版，毫秒级后被新版替换）
+                    _maybeRefreshDefaultProject(DEFAULT_CAT, DEFAULT_NAME);
                     return;
                 }
             } catch (e) { console.warn('[默认项目] 读本地缓存失败:', e); }
@@ -12065,6 +12391,40 @@ function hasGistToken() {
                     refreshProjectSelectors();
                     if (window._hideLoadingScreen) window._hideLoadingScreen();
                 }
+            }
+        }
+
+        // 后台静默检查远端默认项目是否有更新：比对远程 exportDate 与本地缓存的 exportDate，
+        // 若远程更新则重拉并覆盖本地缓存（老用户强刷即可自动拿到新皮肤，无需手动清 IndexedDB）。
+        // 仅当默认项目确实被本地缓存命中（不是首次安装、不是被删除）时才比对，避免与首装/删除回退逻辑冲突。
+        async function _maybeRefreshDefaultProject(cat, name) {
+            try {
+                const localExport = localStorage.getItem(DEFAULT_PROJECT_CACHE_KEY) || '';
+                const resp = await fetch(DEFAULT_PROJECT_REMOTE, { cache: 'no-cache' });
+                if (!resp.ok) return;
+                const data = await resp.json();
+                const remoteExport = data.exportDate || '';
+                if (!remoteExport) return;
+                // 远程更新（字典序比较 ISO 时间字符串，新日期更大）则重拉覆盖
+                if (localExport && localExport >= remoteExport) {
+                    console.log('[默认项目] 远端无更新，跳过重拉');
+                    return;
+                }
+                console.log('[默认项目] 远端有更新，后台重拉覆盖本地缓存');
+                const proj = data.project || data;
+                proj.name = name;
+                proj.category = cat;
+                proj.timestamp = new Date().toISOString();
+                try { localStorage.setItem(DEFAULT_PROJECT_CACHE_KEY, remoteExport); } catch (e) {}
+                await saveProjectToDB(name, cat, proj).catch(() => {});
+                // 仅当当前展示的正是默认项目时才重新加载并刷新界面
+                if (typeof currentProjectName !== 'undefined' && currentProjectName === name) {
+                    await loadProjectFromDB(name).catch(() => {});
+                    refreshProjectSelectors();
+                    if (typeof updateAllCardLevelBadges === 'function') updateAllCardLevelBadges();
+                }
+            } catch (e) {
+                console.warn('[默认项目] 后台更新检查失败（不影响使用）:', e);
             }
         }
 
@@ -16113,7 +16473,7 @@ ${maSection}
                         }
                     }
                 } catch (e) { console.warn('[消息] 索引解析失败，用硬编码兜底:', e); }
-                }
+            }
 
             // 【关键安全标记】保存前先尝试获取远程消息
             // 注意：如果 messagesGistId 存在，就必须成功获取到远程消息
