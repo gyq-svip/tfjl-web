@@ -455,7 +455,7 @@ state.versionId = null;     // 当前查看的时间点版本 id（= 月日标�
 // ===== 数据导入权限（需求：仅管理员可导入，其他人只能看）=====
 // deepseaImportPublic=false：导入入口只对管理员开放；测试 ok 后改为 true 即对所有用户开放（并可显示在主页）
 const deepseaImportPublic = false;
-const DEEPSEA_ADMIN_HASH = 'v2$kXtI5wHYUFcdTBV24RhVpwTHyM83gmQ0r3hhIY9rVnM='; // 与 index.html ADMIN_VERIFY_HASH 一致（源码不含明文）
+const DEEPSEA_ADMIN_HASH = 'v2$jkYsjc997BlgafRUyLlagKL62W1iBYfvH2fq1cJBbDs='; // 与 index.html ADMIN_VERIFY_HASH 一致（源码不含明文）
 function deepseaCanImport() {
     if (deepseaImportPublic) return true;
     try {
