@@ -8021,6 +8021,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 items: items,
                 multi: true,
                 align: side === 'teammate' ? 'right' : 'left',
+                floating: true, // 悬浮窗：可拖拽/缩放，左右两个可同时停屏幕上
                 onPick: function (vals, its) {
                     (its || []).forEach(function (it) {
                         handlePoolCardClick({ dataset: it._ds }, side);
