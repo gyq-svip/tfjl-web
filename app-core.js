@@ -17216,10 +17216,10 @@ ${maSection}
                 return;
             }
             const levelColors = { error: '#f44336', warn: '#ff9800', info: '#00bcd4', log: 'rgba(255,255,255,0.75)' };
-            const items = logs.slice().reverse().map((l, i) => {
+            const items = logs.map((l, i) => {
                 const color = levelColors[l.level] || 'rgba(255,255,255,0.6)';
                 return `<div style="color:${color};font-size:0.7rem;padding:2px 4px;border-bottom:1px solid rgba(255,255,255,0.03);line-height:1.4;">
-                    <span style="color:rgba(255,255,255,0.3);margin-right:6px;">${logs.length - i}</span>
+                    <span style="color:rgba(255,255,255,0.3);margin-right:6px;">${i + 1}</span>
                     <span style="color:rgba(255,255,255,0.25);margin-right:6px;">${l.time}</span>
                     <span style="font-weight:500;margin-right:4px;">[${l.level.toUpperCase()}]</span>
                     ${l.msg.replace(/</g, '&lt;').replace(/>/g, '&gt;')}
@@ -17234,7 +17234,6 @@ ${maSection}
         let floatAutoScroll = true;
         let floatConsoleRefreshTimer = null;
         let floatDragState = null;
-        let floatOnlySkin = false;
         let floatFilter = '';
 
         function setFloatConsoleFilter(v) {
@@ -17262,13 +17261,6 @@ ${maSection}
                 clearInterval(floatConsoleRefreshTimer);
                 floatConsoleRefreshTimer = null;
             }
-        }
-
-        function toggleFloatOnlySkin() {
-            floatOnlySkin = !floatOnlySkin;
-            const btn = document.getElementById('floatOnlySkinBtn');
-            if (btn) btn.style.background = floatOnlySkin ? '#00bcd4' : 'rgba(255,255,255,0.15)';
-            refreshFloatConsole();
         }
 
         // 页面加载即显示浮动控制台（默认展开在右下角，可拖动），方便调试（替代 F12）查看 [SKIN] 等日志
@@ -17365,11 +17357,11 @@ ${maSection}
         function refreshFloatConsole() {
             const content = document.getElementById('floatConsoleContent');
             if (!content) return;
-            let logs = window.__consoleLogs;
-            if (floatOnlySkin) logs = (logs || []).filter(l => l.msg.indexOf('[SKIN]') !== -1);
+            let logs = window.__consoleLogs || [];
             if (floatFilter) {
                 const kw = floatFilter.toLowerCase();
-                logs = (logs || []).filter(l => l.msg.toLowerCase().indexOf(kw) !== -1);
+                // 关键字同时匹配日志级别(error/warn/info)与内容，输入 error/err 即可过滤错误日志
+                logs = logs.filter(l => (l.level && l.level.toLowerCase().indexOf(kw) !== -1) || (l.msg || '').toLowerCase().indexOf(kw) !== -1);
             }
             const badge = document.getElementById('floatConsoleBadge');
             const errCount = logs ? logs.filter(l => l.level === 'error').length : 0;
@@ -17384,17 +17376,20 @@ ${maSection}
                 return;
             }
             const levelColors = { error: '#f44336', warn: '#ff9800', info: '#00bcd4', log: 'rgba(255,255,255,0.7)' };
+            const prevScrollTop = content.scrollTop;
             const wasAtBottom = content.scrollHeight - content.scrollTop - content.clientHeight < 50;
-            const items = logs.slice().reverse().map((l, i) => {
+            // 最新日志在底部（logs 为时间顺序，直接顺序渲染），不再 reverse
+            const items = logs.map((l, i) => {
                 const color = levelColors[l.level] || 'rgba(255,255,255,0.6)';
                 return '<div style="color:' + color + ';font-size:0.68rem;padding:1px 4px;border-bottom:1px solid rgba(255,255,255,0.02);line-height:1.35;">' +
-                    '<span style="color:rgba(255,255,255,0.2);margin-right:5px;">' + (logs.length - i) + '</span>' +
+                    '<span style="color:rgba(255,255,255,0.2);margin-right:5px;">' + (i + 1) + '</span>' +
                     '<span style="color:rgba(255,255,255,0.22);margin-right:5px;">' + l.time + '</span>' +
                     '<span style="font-weight:500;margin-right:3px;">[' + l.level.toUpperCase() + ']</span>' +
                     l.msg.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>';
             }).join('');
             content.innerHTML = items;
             if (floatAutoScroll && wasAtBottom) content.scrollTop = content.scrollHeight;
+            else if (floatAutoScroll && prevScrollTop > 0) content.scrollTop = prevScrollTop;
         }
 
         // 拖拽（mouse/touch + setCapture/releaseCapture，WebView2 下最稳定）
@@ -18069,12 +18064,7 @@ ${maSection}
                 list.innerHTML = '<div style="color:rgba(255,255,255,0.5);font-size:0.8rem;text-align:center;padding:10px;">暂无注册用户</div>';
                 return;
             }
-            const used = allUsed.filter(function(n){ return !q || n.toLowerCase().indexOf(q) >= 0; });
-            if (!used.length) {
-                list.innerHTML = '<div style="color:rgba(255,255,255,0.5);font-size:0.8rem;text-align:center;padding:10px;">未找到匹配 "' + escapeHtml(q) + '" 的昵称</div>';
-                return;
-            }
-            const cur = localStorage.getItem('TFJL_UserName');
+            const used = allUsed.filter(function(n){ return !q     const cur = localStorage.getItem('TFJL_UserName');
             let html = '<div style="color:rgba(255,255,255,0.4);font-size:0.72rem;margin-bottom:6px;">共 ' + allUsed.length + ' 个用户' + (q ? '，匹配 ' + used.length + ' 个' : '') + '</div>';
             for (let i = 0; i < used.length; i++) {
                 const n = used[i];
