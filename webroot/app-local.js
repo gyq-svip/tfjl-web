@@ -3363,7 +3363,9 @@ if (isTauriApp) {
                 const skins = [];
                 for (const fileEntry of fileEntries) {
                     const fileName = (typeof fileEntry === 'string') ? fileEntry : (fileEntry.name || '');
-                    const m = fileName.match(/^(.+)\.(png|jpg|jpeg|gif|webp)$/i);
+                    // 本地皮肤缓存支持 .skin 非图片后缀（从 .png 源构建的 skins.zip，见 Gitee v-skins），
+                    // 同时保留 .png 兼容老用户本地已下载的缓存。解码按文件头 magic bytes，与后缀无关。
+                    const m = fileName.match(/^(.+)\.(png|jpg|jpeg|gif|webp|skin)$/i);
                     if (!m) continue;
                     const skinName = m[1];
                     const filePath = heroDir + '\\' + fileName;
