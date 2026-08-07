@@ -3213,11 +3213,12 @@
                 if (typeof window.syncRemoteSkins === 'function') {
                     await window.syncRemoteSkins(true);
                 }
-                showToast('✅ 皮肤资源已更新');
+                t.success('✅ 皮肤资源已更新');
             } catch (e) {
-                showToast('❌ 皮肤更新失败: ' + (e && e.message ? e.message : e));
+                t.error('❌ 皮肤更新失败: ' + (e && e.message ? e.message : e));
             } finally {
-                if (t && t.close) t.close();
+                // 修复：showLoadingToast 返回的对象只有 remove()，没有 close()，之前 t.close() 永远不执行导致 loading 不消失
+                if (t && t.remove) t.remove(2000);
             }
         }
 
