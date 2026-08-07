@@ -8343,6 +8343,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 items: items,
                 multi: true,
                 align: side === 'teammate' ? 'right' : 'left',
+                floatKey: 'hand_' + side, // 记忆各自的位置/大小
                 floating: true, // 悬浮窗：可拖拽/缩放，左右两个可同时停屏幕上
                 onPick: function (vals, its) {
                     // 多选：批量上阵所有选中卡（复用既有上阵逻辑）
