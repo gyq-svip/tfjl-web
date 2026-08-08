@@ -7172,8 +7172,20 @@
         }
 
         // 通用面板拖拽功能
+        // 需求墙移动/缩放时同步贡献榜（保持贴附墙右侧关系，跟随墙一起移动+高度一致）
+        function syncReputationToWall() {
+            const wall = document.getElementById('messageWall');
+            const rp = document.getElementById('reputationPanel');
+            if (!wall || !rp) return;
+            if (rp.style.display === 'none' || rp.style.display === '') return;
+            const r = wall.getBoundingClientRect();
+            rp.style.left = (r.left + r.width + 10) + 'px';
+            rp.style.top = r.top + 'px';
+            rp.style.height = r.height + 'px';
+            rp.style.right = 'auto';
+        }
         function startPanelDrag(e, panelId) {
-            if (e.target.closest('button') || e.target.closest('select') || e.target.closest('input')) return;
+            if (e.target.closest('button') || e.target.closest('select') || e.target.closest('input') || e.target.closest('.wall-resize-handle')) return;
             e.preventDefault();
             const panel = document.getElementById(panelId);
             if (!panel) return;
@@ -7184,6 +7196,7 @@
                 panel.style.left = Math.max(0, ev.clientX - ox) + 'px';
                 panel.style.top = Math.max(0, ev.clientY - oy) + 'px';
                 panel.style.right = 'auto';
+                if (panelId === 'messageWall') syncReputationToWall();
             }
             function onUp() {
                 document.removeEventListener('mousemove', onMove);
@@ -7194,7 +7207,7 @@
         }
 
         function startPanelTouch(e, panelId) {
-            if (e.target.closest('button') || e.target.closest('select') || e.target.closest('input')) return;
+            if (e.target.closest('button') || e.target.closest('select') || e.target.closest('input') || e.target.closest('.wall-resize-handle')) return;
             if (e.touches.length !== 1) return;
             const panel = document.getElementById(panelId);
             if (!panel) return;
@@ -7206,6 +7219,7 @@
                 panel.style.left = Math.max(0, ev.touches[0].clientX - ox) + 'px';
                 panel.style.top = Math.max(0, ev.touches[0].clientY - oy) + 'px';
                 panel.style.right = 'auto';
+                if (panelId === 'messageWall') syncReputationToWall();
             }
             function onUp() {
                 document.removeEventListener('touchmove', onMove);
@@ -7216,6 +7230,34 @@
             document.addEventListener('touchend', onUp);
             document.addEventListener('touchcancel', onUp);
         }
+
+        // 需求墙缩放（右下角手柄拖动改变宽高），并同步贡献榜位置
+        function startPanelResize(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const panel = document.getElementById('messageWall');
+            if (!panel) return;
+            const rect = panel.getBoundingClientRect();
+            const startX = e.clientX, startY = e.clientY;
+            const startW = rect.width, startH = rect.height;
+            function onMove(ev) {
+                const nw = Math.max(300, Math.min(window.innerWidth - 40, startW + (ev.clientX - startX)));
+                const nh = Math.max(350, Math.min(window.innerHeight - 40, startH + (ev.clientY - startY)));
+                panel.style.width = nw + 'px';
+                panel.style.height = nh + 'px';
+                syncReputationToWall();
+            }
+            function onUp() {
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+                document.body.style.userSelect = '';
+            }
+            document.body.style.userSelect = 'none';
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+        }
+        window.startPanelResize = startPanelResize;
+        window.syncReputationToWall = syncReputationToWall;
 
         document.addEventListener('DOMContentLoaded', () => {
             makePanelDraggable('referencePanel', 'referencePanelHeader');
