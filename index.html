@@ -2100,11 +2100,9 @@
             <div style="display:flex;gap:8px;align-items:center;">
                 <span style="color:#ffd700;font-size:0.9rem;flex-shrink:0;" title="昵称已锁定（发布后不可随意修改）">🔒</span>
                 <input type="text" id="messageNickname" readonly maxlength="10" placeholder="未设置" title="昵称已锁定（发布后不可随意修改）" style="width:auto;max-width:84px;min-width:0;flex-shrink:0;background:rgba(255,215,0,0.1);border:1px solid rgba(255,215,0,0.4);border-radius:18px;padding:6px 10px;color:#ffd700;font-size:0.8rem;outline:none;cursor:default;caret-color:transparent;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                <button type="button" id="emojiToggleBtn" onclick="toggleEmojiPicker(event)" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:4px 9px;font-size:1.05rem;cursor:pointer;flex-shrink:0;" title="表情">😊</button>
                 <input type="text" id="messageInput" placeholder="发点什么…（回车发布）" maxlength="200" style="flex:1;min-width:0;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:5px;padding:8px 10px;color:#fff;font-size:0.85rem;outline:none;" onfocus="this.style.borderColor='#ffd700'" onblur="this.style.borderColor='rgba(255,255,255,0.2)'" onkeydown="if(event.key==='Enter')postMessage()">
                 <button onclick="postMessage()" style="background:linear-gradient(135deg,#ffd700,#ff6b6b);color:#1a1a2e;border:none;padding:8px 14px;border-radius:5px;font-size:0.85rem;cursor:pointer;font-weight:bold;flex-shrink:0;">发布</button>
-            </div>
-            <div style="display:flex;gap:5px;margin-top:8px;align-items:center;">
-                <button type="button" id="emojiToggleBtn" onclick="toggleEmojiPicker(event)" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:4px 9px;font-size:1.05rem;cursor:pointer;" title="表情">😊</button>
             </div>
             <div style="display:flex;gap:8px;margin-top:8px;align-items:center;">
                 <input type="file" id="scriptFileInput" accept=".txt,.js,.json,.lua,.py,.sh" style="display:none;" onchange="handleScriptUpload(this)">
@@ -2255,7 +2253,7 @@
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">s20260808-047 · s1.0.47</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">s20260808-048 · s1.0.48</span>
             </div>
         </div>
     </div>
