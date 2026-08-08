@@ -17706,10 +17706,23 @@ ${maSection}
 
         function showSwUpdateBanner() {
             if (document.getElementById('swUpdateBanner')) return;
+            // 注入一次样式：左下角彩色光彩气泡（流动彩色 + 浮动 + 多层光晕呼吸），点击即更新
+            if (!document.getElementById('swUpdateStyle')) {
+                const st = document.createElement('style');
+                st.id = 'swUpdateStyle';
+                st.textContent = [
+                    '@keyframes swBg{0%{background-position:0% 50%}100%{background-position:300% 50%}}',
+                    '@keyframes swFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}',
+                    '@keyframes swGlow{0%,100%{box-shadow:0 0 14px #ff6b6b,0 0 26px #ffd700,0 0 38px #4ecdc4}50%{box-shadow:0 0 18px #4ecdc4,0 0 32px #a78bfa,0 0 46px #ff6b6b}}',
+                    '#swUpdateBanner{position:fixed;left:20px;bottom:20px;z-index:99999;display:flex;align-items:center;gap:7px;padding:12px 18px;border-radius:999px;cursor:pointer;color:#fff;font-size:0.85rem;font-weight:700;letter-spacing:0.5px;background:linear-gradient(90deg,#ff6b6b,#ffd700,#4ecdc4,#a78bfa,#ff6b6b);background-size:300% 100%;animation:swBg 6s linear infinite,swFloat 3s ease-in-out infinite,swGlow 2.4s ease-in-out infinite;user-select:none;}',
+                    '#swUpdateBanner:hover{filter:brightness(1.12);}',
+                    '#swUpdateBanner .sw-dot{width:8px;height:8px;border-radius:50%;background:#fff;box-shadow:0 0 8px #fff;}'
+                ].join('\n');
+                document.head.appendChild(st);
+            }
             const banner = document.createElement('div');
             banner.id = 'swUpdateBanner';
-            banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:linear-gradient(90deg,#ffd700,#ff8c00);color:#1a1a1a;font-size:0.85rem;font-weight:700;text-align:center;padding:9px 12px;cursor:pointer;box-shadow:0 2px 12px rgba(0,0,0,0.35);letter-spacing:0.5px;';
-            banner.textContent = '🎉 发现新版本，点击立即更新';
+            banner.innerHTML = '<span class="sw-dot"></span>🎉 发现新版本，点我更新';
             banner.onclick = function () { location.reload(true); };
             const root = document.body || document.documentElement;
             if (root) root.appendChild(banner);
