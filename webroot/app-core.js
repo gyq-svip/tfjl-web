@@ -14872,8 +14872,10 @@ function hasGistToken() {
         // 去掉所有 http(s) 链接，只保留用户发出的纯文本（用于个人主页展示分享内容）
         function stripAllUrls(t) { return (t || '').replace(/https?:\/\/\S+/gi, '').replace(/[ \t]*\n[ \t]*/g, '\n').replace(/\n{2,}/g, '\n').trim(); }
         let _contribData = null;
-        function getProfile(nick) { try { return JSON.parse(localStorage.getItem('tfjl_profile_' + nick) || 'null') || { mood: '', bio: '' }; } catch (e) { return { mood: '', bio: '' }; } }
-        function setProfile(nick, mood, bio) { try { localStorage.setItem('tfjl_profile_' + nick, JSON.stringify({ mood: mood || '', bio: bio || '' })); } catch (e) {} }
+        function _normNick(n) { return (n || '').trim().toLowerCase(); }
+        // 个人资料按「规范化昵称」(去空格+小写) 作 key，避免同一用户昵称大小写/空格不一致导致存了读不到
+        function getProfile(nick) { try { const norm = localStorage.getItem('tfjl_profile_' + _normNick(nick)); const raw = localStorage.getItem('tfjl_profile_' + nick); const s = norm || raw || 'null'; return JSON.parse(s) || { mood: '', bio: '' }; } catch (e) { return { mood: '', bio: '' }; } }
+        function setProfile(nick, mood, bio) { try { localStorage.setItem('tfjl_profile_' + _normNick(nick), JSON.stringify({ mood: mood || '', bio: bio || '' })); } catch (e) {} }
         // 复制某条分享的内容
         function contribCopyContent(i) {
             const item = _contribData && _contribData.shares[i]; if (!item) return;
