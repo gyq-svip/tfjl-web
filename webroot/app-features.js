@@ -46,6 +46,8 @@
             // 1280战旗档
             { name: '风暴·小炮', cost: 1280, category: '1280' },
             { name: '风清扬·天使', cost: 1280, category: '1280' },
+            // 1600战旗档
+            { name: '随机龙珠', cost: 1600, category: '1600' },
         ];
         let calcBeixiangSelected = new Set();
 
@@ -74,8 +76,8 @@
         function renderBeixiangSkins() {
             const container = document.getElementById('calcBeixiangSkinsList');
             if (!container) return;
-            const categories = ['480', '640', '720', '960', '1280'];
-            const catColors = { '480': '#4caf50', '640': '#2196f3', '720': '#9c27b0', '960': '#ff9800', '1280': '#ef4444' };
+            const categories = ['480', '640', '720', '960', '1280', '1600'];
+            const catColors = { '480': '#4caf50', '640': '#2196f3', '720': '#9c27b0', '960': '#ff9800', '1280': '#ef4444', '1600': '#ffd700' };
             let html = '';
             categories.forEach(cat => {
                 const skins = BEIXIANG_SKINS.filter(s => s.category === cat);
@@ -111,10 +113,20 @@
             let rem = (total - cur + 1) - elapsed; // 含今天，扣掉今天已过
             return rem > 0 ? rem : 0;
         }
+        // 对战按"整天"算：每天5局，今天没打完也仍算1整天；今天打完了则今天不计入
+        function getBeixiangBattleDays() {
+            const days = getBeixiangRemainingDays();
+            const todayDone = document.getElementById('calcBeixiangTodayDone')?.checked;
+            const floor = Math.floor(days);
+            return todayDone ? floor : Math.ceil(days);
+        }
         function updateBeixiangRemainDays() {
             const days = getBeixiangRemainingDays();
+            const battleDays = getBeixiangBattleDays();
             const span = document.getElementById('calcBeixiangRemainDays');
             if (span) span.textContent = fmtRemain(days);
+            const battleSpan = document.getElementById('calcBeixiangBattleDays');
+            if (battleSpan) battleSpan.textContent = battleDays;
             // 推算结束日期 = 现在 + 精确剩余天数
             const end = new Date(Date.now() + days * 86400000);
             const show = document.getElementById('calcBeixiangEndDateShow');
@@ -122,15 +134,15 @@
             // 滑块=每天赢几局(0~5)，每日战旗 = 赢×6 + 输×2
             const wins = parseInt(document.getElementById('calcBeixiangWinRate')?.value) || 0;
             const dailyAvg = wins * 6 + (5 - wins) * 2;
-            // 参考表按"赢N局"维度刷新（赢5/4/3/2/1局 的每日战旗）
+            // 参考表按"赢N局·整天"维度刷新（对战按整天算，不用小数天）
             const th = document.getElementById('calcRefDaysTh');
-            if (th) th.textContent = (Math.round(days * 10) / 10) + '天·赢' + wins + '局';
+            if (th) th.textContent = battleDays + '天·赢' + wins + '局';
             const dailies = [30, 26, 22, 18, 14]; // 赢5/4/3/2/1局
             for (let i = 0; i < 5; i++) {
                 const t = document.getElementById('calcRefT' + i);
                 const z = document.getElementById('calcRefZ' + i);
-                if (t) t.textContent = Math.round(dailies[i] * days);
-                if (z) z.textContent = Math.round(dailies[i] * days) + 200;
+                if (t) t.textContent = dailies[i] * battleDays;
+                if (z) z.textContent = dailies[i] * battleDays + 200;
             }
         }
         // 初始化剩余天数展示（默认活动23天·今天第2天 → 剩21天）
@@ -146,6 +158,7 @@
             });
             const owned = parseInt(document.getElementById('calcBeixiangOwnedInput').value) || 0;
             const days = getBeixiangRemainingDays();
+            const battleDays = getBeixiangBattleDays();
             const wins = parseInt(document.getElementById('calcBeixiangWinRate').value) || 0;
             const buyZhanLing = document.getElementById('calcBeixiangBuyZhanLing').checked;
             const zhanLingFlag = buyZhanLing ? 200 : 0;
@@ -156,9 +169,9 @@
                 return;
             }
 
-            // 每日产出：赢×6 + 输×2 战旗（每天打5局）
+            // 每日产出：赢×6 + 输×2 战旗（每天打5局，对战按整天算）
             const dailyAvg = wins * 6 + (5 - wins) * 2;
-            const battleFree = Math.round(dailyAvg * days);
+            const battleFree = dailyAvg * battleDays;
             const totalFree = battleFree + owned + zhanLingFlag;
             const need = Math.max(0, target - totalFree);
 
@@ -166,7 +179,7 @@
             html += `<div style="margin-bottom:12px;">`;
             html += `<div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.6);font-size:0.8rem;">目标战旗总数</span><span style="color:#ff6b6b;font-weight:bold;">${target}</span></div>`;
             html += `<div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.6);font-size:0.8rem;">每日对战（5局·赢${wins}局）</span><span style="color:#4ecdc4;">${dailyAvg} 战旗/天</span></div>`;
-            html += `<div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.6);font-size:0.8rem;">⏳ 剩余 ${fmtRemain(days)} 白嫖（赢${wins}局/天×${Math.round(days*10)/10}天）</span><span style="color:#4ecdc4;">${battleFree}</span></div>`;
+            html += `<div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.6);font-size:0.8rem;">⏳ 还能打 ${battleDays} 天白嫖（赢${wins}局/天×${battleDays}天）</span><span style="color:#4ecdc4;">${battleFree}</span></div>`;
             html += `<div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.6);font-size:0.8rem;">已有战旗（已减去）</span><span style="color:#4ecdc4;">${owned}</span></div>`;
             if (buyZhanLing) {
                 html += `<div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.6);font-size:0.8rem;">战令（98元/200战旗）</span><span style="color:#4ecdc4;">200</span></div>`;
@@ -178,7 +191,7 @@
                 html += `</div>`;
                 html += `<div style="background:linear-gradient(135deg,#4caf50,#2e7d32);border-radius:8px;padding:12px;text-align:center;color:white;margin-top:10px;">`;
                 html += `<div style="font-size:1.1rem;font-weight:bold;">🎉 无需额外氪金！</div>`;
-                html += `<div style="font-size:0.85rem;margin-top:4px;opacity:0.9;">${buyZhanLing ? '战令已含200战旗，' : ''}按剩余 ${days} 天赢${wins}局白嫖 + 已有已满足目标，溢出 ${totalFree - target} 战旗</div>`;
+                html += `<div style="font-size:0.85rem;margin-top:4px;opacity:0.9;">${buyZhanLing ? '战令已含200战旗，' : ''}按剩余 ${battleDays} 天赢${wins}局白嫖 + 已有已满足目标，溢出 ${totalFree - target} 战旗</div>`;
                 html += `</div>`;
             } else {
                 html += `<div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.6);font-size:0.8rem;">还需氪金战旗（目标−白嫖−已有${buyZhanLing ? '−战令' : ''}）</span><span style="color:#ff6b6b;font-weight:bold;">${need}</span></div>`;
@@ -837,8 +850,8 @@
             const marqueeEl = document.getElementById('newsMarquee');
             if (!marqueeEl) return;
 
-            // 检查全局拍卖快讯公告开关
-            if (_globalBroadcastEnabled && auctionBroadcastQueue.length > 0) {
+            // 检查全局拍卖快讯公告开关 + 全网拍卖快讯开关
+            if (_globalBroadcastEnabled && currentConfig.auctionNews !== false && auctionBroadcastQueue.length > 0) {
                 // 有拍卖播报，显示播报内容
                 const broadcastTexts = auctionBroadcastQueue.map(item => item.text).join('　　◆　　');
                 marqueeEl.textContent = '📢 拍卖快讯：' + broadcastTexts;
@@ -3183,6 +3196,32 @@
             }, 800);
         }
 
+        // 菜单「更新皮肤资源」：优先从 Gitee 发行版下载皮肤包解压到本地（本地化，无网可用）；
+        // 本地化命令不可用时回退在线同步（jsDelivr 主源，GitHub Pages 兜底），force=true 允许重复触发
+        async function updateSkinsResource() {
+            const t = showLoadingToast('🎨 正在更新皮肤资源...');
+            try {
+                const invokeFn = window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke;
+                if (typeof invokeFn === 'function') {
+                    try {
+                        await invokeFn('download_skins');
+                        if (typeof window.scanSkins === 'function') window.scanSkins();
+                    } catch (e) {
+                        console.warn('[SKIN] 本地下载失败，回退在线同步:', e);
+                    }
+                }
+                if (typeof window.syncRemoteSkins === 'function') {
+                    await window.syncRemoteSkins(true);
+                }
+                t.success('✅ 皮肤资源已更新');
+            } catch (e) {
+                t.error('❌ 皮肤更新失败: ' + (e && e.message ? e.message : e));
+            } finally {
+                // 修复：showLoadingToast 返回的对象只有 remove()，没有 close()，之前 t.close() 永远不执行导致 loading 不消失
+                if (t && t.remove) t.remove(2000);
+            }
+        }
+
         // 检查更新（静默模式，在 App 启动时使用）
         async function checkForUpdates() {
             await fillCurrentVersion();
@@ -3594,6 +3633,7 @@
 
         // 在「版本：X」文字旁闪动提示有新版本（用户要求：版本号处直观提示升级）
         function _markVersionNew(version) {
+            // 注入闪动动画样式（仅一次）
             if (!document.getElementById('__verFlashStyle')) {
                 const s = document.createElement('style');
                 s.id = '__verFlashStyle';
@@ -5139,6 +5179,7 @@
                 items.push({
                     value: name,
                     label: name,
+                    profession: el.dataset.profession,
                     py: window.hanziInitials ? window.hanziInitials(name) : ''
                 });
             });
