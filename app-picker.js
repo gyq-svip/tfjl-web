@@ -275,17 +275,8 @@
                     window.__tfjlHasNewVersion = true;
                     _markNewVersionAvailable();
                     showNewVersionReadyBar();
-                    // 自动刷新以应用新版本：避免"缓存旧 JS 导致按钮无反应"反复发生。
-                    // 仅在无弹窗、无输入焦点时刷新，防止丢失未保存内容。
-                    setTimeout(function() {
-                        try {
-                            var ov = document.getElementById('recognizeOverlay');
-                            if (ov && ov.style.display !== 'none') return; // 识别浮窗开着，不刷
-                            var ae = document.activeElement;
-                            if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.tagName === 'SELECT' || ae.isContentEditable)) return; // 正在输入，不刷
-                            location.reload(true);
-                        } catch (e) { /* 出错则交回手动刷新 */ }
-                    }, 1500);
+                    // 注意：不再自动刷新！必须由用户主动点击更新条/版本标签才刷新，
+                    // 否则用户正在写的东西会被打断、且在 WebView2 下易蓝屏卡死。
                 }
                 // SW 回报的缓存版本号（如 tfjl-v62）→ 显示在右下角版本标签，便于核对缓存是否更新
                 if (event.data && event.data.type === 'SW_VERSION') {
@@ -367,6 +358,12 @@
             };
             card.appendChild(closeBtn);
             card.onclick = function() {
+                // 主动激活等待中的新 SW（已不再 skipWaiting，需手动让其接管），再刷新
+                try {
+                    navigator.serviceWorker.ready.then(function(reg) {
+                        if (reg.waiting) reg.waiting.postMessage('SKIP_WAITING');
+                    });
+                } catch (e) {}
                 // 强制从网络重新加载，确保拿到后台已拉取的最新资源
                 location.reload(true);
             };

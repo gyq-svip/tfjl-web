@@ -5,7 +5,7 @@
 //      提升 CACHE_VERSION 触发 activate 清空所有 tfjl- 缓存，确保拿到最新前端（含分享密码框）
 // ============================================================
 
-const CACHE_VERSION = 's1.0.43';
+const CACHE_VERSION = 's1.0.44';
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
@@ -17,21 +17,23 @@ const NEVER_CACHE = [
 ];
 
 // ============================================================
-// 安装事件：skipWaiting，不预缓存（由runtime按需填充）
+// 安装事件：不 skipWaiting（让新 SW 等待，直到用户刷新/旧页面关闭才接管）。
+// 原因：skipWaiting + clients.claim 会在页面运行中强行接管并清空缓存，
+// 在 WebView2 下易触发"缓存已删、新缓存未建好"的蓝屏卡死；且 app-picker.js 已改为纯点击更新。
 // ============================================================
 self.addEventListener('install', (event) => {
-    self.skipWaiting();
+    // 故意不调用 skipWaiting()，新 SW 安装后处于 waiting 状态，等用户点更新再激活
 });
 
 // ============================================================
-// 激活事件：清空所有 tfjl 缓存（包括新创建的），强制走网络
+// 激活事件：只删除"旧版本"运行时缓存，保留当前版本缓存（避免 reload 时空窗蓝屏）
 // ============================================================
 self.addEventListener('activate', (event) => {
     event.waitUntil(
         caches.keys().then((cacheNames) => {
             return Promise.all(
                 cacheNames
-                    .filter((name) => name.startsWith('tfjl-'))
+                    .filter((name) => name.endsWith('-runtime') && name !== CACHE_RUNTIME)
                     .map((name) => caches.delete(name))
             );
         }).then(() => {
