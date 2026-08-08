@@ -15072,10 +15072,17 @@ function hasGistToken() {
 
                 const _aRep = repMap[msgAuthor(msg)] ? repMap[msgAuthor(msg)].rep : 0;
                 const _aTitle = getTitle(_aRep).name;
-                const _whoHtml = `<span onclick="openContributionCard('${encodeURIComponent(msgAuthor(msg))}')" title="查看 ${escapeHtml(msgAuthor(msg))} 的贡献主页" style="color:#ffd700;cursor:pointer;text-decoration:underline;">${escapeHtml(msgAuthor(msg))}</span> <span style="color:rgba(255,215,0,0.6);font-size:0.7rem;">[${_aTitle}]</span> · ${timeAgo}${expireLabel}${encryptedLabel}${deleteBtn}`;
-                return `<div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:10px 12px;font-size:0.85rem;">
-                    <div style="color:rgba(255,255,255,0.6);font-size:0.75rem;margin-bottom:6px;">${_whoHtml}</div>
-                    <div style="color:#fff;line-height:1.5;">${contentHtml}</div>
+                // 取昵称首字做头像圆点
+                const _avatar = (msgAuthor(msg) || '?').trim().charAt(0).toUpperCase();
+                const _whoHtml = `<div onclick="openContributionCard('${encodeURIComponent(msgAuthor(msg))}')" title="查看 ${escapeHtml(msgAuthor(msg))} 的贡献主页" style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                    <span style="flex-shrink:0;width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#ffd700,#ff6b6b);color:#1a1a2e;font-size:0.85rem;font-weight:bold;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,0.3);">${escapeHtml(_avatar)}</span>
+                    <span style="color:#ffd700;font-weight:bold;font-size:0.9rem;text-decoration:underline;">${escapeHtml(msgAuthor(msg))}</span>
+                    <span style="color:rgba(255,215,0,0.7);font-size:0.68rem;background:rgba(255,215,0,0.12);padding:1px 7px;border-radius:10px;">${_aTitle}</span>
+                    <span style="margin-left:auto;color:rgba(255,255,255,0.4);font-size:0.68rem;display:flex;align-items:center;gap:4px;">${timeAgo}${expireLabel}${encryptedLabel}${deleteBtn}</span>
+                </div>`;
+                return `<div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:10px 12px 8px;font-size:0.85rem;">
+                    <div style="margin-bottom:8px;">${_whoHtml}</div>
+                    <div style="background:rgba(0,0,0,0.28);border-left:3px solid #ffd700;border-radius:6px;padding:9px 11px;color:#fff;line-height:1.6;font-size:0.86rem;word-break:break-word;">${contentHtml}</div>
                 </div>`;
             }).join('');
             
