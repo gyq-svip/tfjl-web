@@ -16873,6 +16873,16 @@ ${maSection}
             document.getElementById('uploadStatus').textContent = `✓ ${file.name}`;
         }
         
+        // 快捷表情：插入到发消息输入框光标处
+        function insertEmoji(emoji) {
+            const input = document.getElementById('messageInput');
+            if (!input) return;
+            const s = input.selectionStart || 0, e = input.selectionEnd || 0;
+            input.value = input.value.slice(0, s) + emoji + input.value.slice(e);
+            const pos = s + emoji.length;
+            try { input.focus(); input.setSelectionRange(pos, pos); } catch (_) {}
+        }
+        window.insertEmoji = insertEmoji;
         async function postMessage() {
             const input = document.getElementById('messageInput');
             const nicknameInput = document.getElementById('messageNickname');
