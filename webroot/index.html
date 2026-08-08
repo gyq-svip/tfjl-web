@@ -778,7 +778,6 @@
 
             <button id="chatRoomToggle" onclick="window.location.href='auction.html'" title="拍卖行" style="background:rgba(78,205,196,0.85);color:#1a1a2e;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 2px 10px rgba(0,0,0,0.3);display:none;align-items:center;justify-content:center;">🏪</button>
             <button id="messageWallToggle" onclick="toggleMessageWall()" title="需求墙" style="position:relative;background:rgba(255,215,0,0.85);color:#1a1a2e;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 2px 10px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">📢<span class="wall-unread-dot" id="wallUnreadDot" style="display:none;"></span></button>
-            <button id="reputationToggle" onclick="toggleReputationPanel()" title="贡献排行榜" style="background:rgba(255,107,107,0.85);color:#1a1a2e;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 2px 10px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">🏆</button>
             <div style="position:relative;">
                 <button onclick="toggleBackupMenu(this)" title="菜单" style="background:rgba(255,87,34,0.8);color:white;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 1px 6px rgba(0,0,0,0.15);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;">☰</button>
                 <div id="backupMenu" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:rgba(42,42,74,0.95);border:1px solid rgba(255,215,0,0.3);border-radius:8px;padding:8px 0;width:200px;z-index:1000;box-shadow:0 4px 15px rgba(0,0,0,0.4);backdrop-filter:blur(8px);">
@@ -2087,6 +2086,7 @@
             <div style="display:flex;gap:10px;">
                 <button id="msgRefreshBtn" onclick="fetchMessages();msgRefreshCountdown=30;updateMsgRefreshBtn();" title="刷新消息" style="background:transparent;border:none;color:#4fc3f7;font-size:0.8rem;cursor:pointer;padding:0;font-family:monospace;min-width:32px;text-align:center;">⏳30</button>
                 <button id="msgRestoreBtn" onclick="adminRestoreFromBackup()" title="管理员：从备用Gist一键还原需求墙" style="display:none;background:transparent;border:none;color:#ffd700;font-size:0.8rem;cursor:pointer;padding:0;font-family:monospace;white-space:nowrap;">🛡还原</button>
+                <button onclick="toggleReputationPanel()" title="显示/隐藏右侧贡献排行榜" style="background:transparent;border:none;color:#ffd700;font-size:0.95rem;cursor:pointer;padding:0;">🏆</button>
                 <button onclick="toggleMessageWallSize()" title="最小化" style="background:transparent;border:none;color:#ffd700;font-size:1rem;cursor:pointer;padding:0;">−</button>
                 <button onclick="closeMessageWall()" title="关闭" style="background:transparent;border:none;color:#ff6b6b;font-size:1rem;cursor:pointer;padding:0;">×</button>
             </div>
@@ -2097,8 +2097,12 @@
             </div>
         </div>
         <div id="messageWallInput" style="padding:12px 15px;border-top:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.2);">
-            <div style="display:flex;gap:8px;margin-bottom:8px;">
-                <input type="text" id="messageNickname" placeholder="昵称" maxlength="10" style="width:80px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:5px;padding:6px 8px;color:#fff;font-size:0.8rem;outline:none;" onfocus="this.style.borderColor='#ffd700'" onblur="this.style.borderColor='rgba(255,255,255,0.2)'">
+            <input type="text" id="messageNickname" placeholder="你的昵称（点击留言前需设置）" maxlength="10" style="width:100%;background:rgba(255,215,0,0.08);border:1px solid rgba(255,215,0,0.35);border-radius:6px;padding:7px 10px;color:#ffd700;font-size:0.85rem;outline:none;margin-bottom:8px;" onfocus="this.style.borderColor='#ffd700'" onblur="this.style.borderColor='rgba(255,215,0,0.35)'">
+            <div style="display:flex;gap:8px;">
+                <input type="text" id="messageInput" placeholder="发点什么…（分享脚本/阵容/需求，回车发布）" maxlength="200" style="flex:1;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:5px;padding:8px 10px;color:#fff;font-size:0.85rem;outline:none;" onfocus="this.style.borderColor='#ffd700'" onblur="this.style.borderColor='rgba(255,255,255,0.2)'" onkeydown="if(event.key==='Enter')postMessage()">
+                <button onclick="postMessage()" style="background:linear-gradient(135deg,#ffd700,#ff6b6b);color:#1a1a2e;border:none;padding:8px 18px;border-radius:5px;font-size:0.85rem;cursor:pointer;font-weight:bold;">发布</button>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:8px;align-items:center;">
                 <input type="file" id="scriptFileInput" accept=".txt,.js,.json,.lua,.py,.sh" style="display:none;" onchange="handleScriptUpload(this)">
                 <button onclick="document.getElementById('scriptFileInput').click()" title="上传脚本(最大10MB)" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:6px 12px;border-radius:5px;font-size:0.8rem;cursor:pointer;display:flex;align-items:center;gap:4px;">📎 脚本</button>
                 <span id="uploadStatus" style="color:#4caf50;font-size:0.75rem;display:none;">✓ 已选文件</span>
@@ -2119,10 +2123,6 @@
                     </select>
                 </label>
             </div>
-            <div style="display:flex;gap:8px;">
-                <input type="text" id="messageInput" placeholder="发布需求或分享脚本（保留时间可自由选择）..." maxlength="200" style="flex:1;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:5px;padding:6px 10px;color:#fff;font-size:0.85rem;outline:none;" onfocus="this.style.borderColor='#ffd700'" onblur="this.style.borderColor='rgba(255,255,255,0.2)'">
-                <button onclick="postMessage()" style="background:linear-gradient(135deg,#ffd700,#ff6b6b);color:#1a1a2e;border:none;padding:6px 16px;border-radius:5px;font-size:0.85rem;cursor:pointer;font-weight:bold;">发布</button>
-            </div>
         </div>
     </div>
 
@@ -2134,8 +2134,8 @@
 
 
 
-    <!-- 贡献排行榜面板 -->
-    <div id="reputationPanel" style="display:none;position:fixed;top:60px;right:20px;width:340px;height:520px;background:rgba(26,26,46,0.96);border:1px solid rgba(255,215,0,0.3);border-radius:12px;z-index:9980;box-shadow:0 4px 20px rgba(0,0,0,0.5);backdrop-filter:blur(10px);flex-direction:column;">
+    <!-- 贡献排行榜面板（贴附需求墙右侧，点击墙头🏆切换） -->
+    <div id="reputationPanel" style="display:none;position:fixed;top:60px;left:410px;width:340px;height:520px;background:rgba(26,26,46,0.96);border:1px solid rgba(255,215,0,0.3);border-radius:12px;z-index:9980;box-shadow:0 4px 20px rgba(0,0,0,0.5);backdrop-filter:blur(10px);flex-direction:column;">
         <div style="padding:10px 15px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,0.1);">
             <span style="color:#ffd700;font-size:0.95rem;font-weight:bold;">🏆 贡献排行榜</span>
             <button onclick="document.getElementById('reputationPanel').style.display='none'" style="background:transparent;border:none;color:#ff6b6b;font-size:1.1rem;cursor:pointer;">×</button>
@@ -2145,6 +2145,7 @@
             <span class="rep-tab" data-tab="share" onclick="setRepTab('share')">分享</span>
             <span class="rep-tab" data-tab="copy" onclick="setRepTab('copy')">被复制</span>
             <span class="rep-tab" data-tab="like" onclick="setRepTab('like')">获赞</span>
+            <span class="rep-tab" data-tab="preview" onclick="setRepTab('preview')">预览</span>
             <span class="rep-tab" data-tab="week" onclick="setRepTab('week')">周榜</span>
             <span class="rep-tab" data-tab="newcomer" onclick="setRepTab('newcomer')">新人</span>
         </div>
@@ -2248,7 +2249,7 @@
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">s20260808-033 · s1.0.33</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">s20260808-034 · s1.0.34</span>
             </div>
         </div>
     </div>
