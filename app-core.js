@@ -11914,6 +11914,51 @@ function hasGistToken() {
             updateAuctionNewsToggleStatus();
         }
 
+        // 轻量、独立地拉取「全网拍卖快讯开关」——与每日新闻缓存解耦，
+        // 管理员当天切换后，网页端（含无 token 的纯浏览器用户）也能在数十秒内生效，
+        // 不必等到次日缓存过期。优先读公开仓库 news.json（无 token 也能读、无 API 限流），
+        // 该文件由管理员切换时经 saveAuctionNewsToRepo 同步写入；若缺失则回退到权威公告 Gist。
+        async function fetchAuctionNewsSwitch() {
+            let data = null;
+            try {
+                const r = await fetch(NEWS_URL, { headers: { 'Accept': 'application/json' }, cache: 'no-store' });
+                if (r.ok) {
+                    const d = await r.json().catch(() => null);
+                    if (d && typeof d.auctionNews !== 'undefined') data = d;
+                }
+            } catch (e) { /* 忽略，走 Gist 兜底 */ }
+            if (!data) {
+                const token = getGistToken();
+                if (token) {
+                    try {
+                        const url = await getNewsGistUrl();
+                        const resp = await fetch(url, {
+                            headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` }
+                        });
+                        if (resp.ok) {
+                            const g = await resp.json();
+                            const c = g.files && g.files['news.json'] && g.files['news.json'].content;
+                            if (c) {
+                                const d = JSON.parse(c);
+                                if (typeof d.auctionNews !== 'undefined') data = d;
+                            }
+                        }
+                    } catch (e) { /* 忽略 */ }
+                }
+            }
+            if (data && typeof data.auctionNews !== 'undefined') {
+                const changed = currentConfig.auctionNews !== data.auctionNews;
+                currentConfig.auctionNews = data.auctionNews;
+                try { localStorage.setItem('tdjl_auctionNews_cfg', JSON.stringify(currentConfig.auctionNews)); } catch (e) {}
+                if (changed) {
+                    updateAuctionNewsToggleStatus();
+                    updateMarqueeWithBroadcast();
+                    const modal = document.getElementById('newsListModal');
+                    if (modal && modal.style.display === 'flex') showNewsListModal();
+                }
+            }
+        }
+
         function showNewsListModal() {
             const modal = document.getElementById('newsListModal');
             const content = document.getElementById('newsListContent');
@@ -12444,6 +12489,9 @@ function hasGistToken() {
             (async () => {
                 try { await loadConfig(); await loadNews(); }
                 catch (error) { console.error('❌ 加载配置和新闻失败:', error); }
+                // 独立拉取全网拍卖快讯开关（绕过每日新闻缓存，确保管理员当天切换即时生效）
+                fetchAuctionNewsSwitch().catch(() => {});
+                setInterval(() => { fetchAuctionNewsSwitch().catch(() => {}); }, 30000);
             })();
 
             // 从Gist加载拍卖快讯（先确保开关状态已加载，避免竞态导致关闭后仍显示）
