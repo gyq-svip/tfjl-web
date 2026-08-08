@@ -14873,9 +14873,72 @@ function hasGistToken() {
         function stripAllUrls(t) { return (t || '').replace(/https?:\/\/\S+/gi, '').replace(/[ \t]*\n[ \t]*/g, '\n').replace(/\n{2,}/g, '\n').trim(); }
         let _contribData = null;
         function _normNick(n) { return (n || '').trim().toLowerCase(); }
-        // 个人资料按「规范化昵称」(去空格+小写) 作 key，避免同一用户昵称大小写/空格不一致导致存了读不到
-        function getProfile(nick) { try { const norm = localStorage.getItem('tfjl_profile_' + _normNick(nick)); const raw = localStorage.getItem('tfjl_profile_' + nick); const s = norm || raw || 'null'; return JSON.parse(s) || { mood: '', bio: '' }; } catch (e) { return { mood: '', bio: '' }; } }
-        function setProfile(nick, mood, bio) { try { localStorage.setItem('tfjl_profile_' + _normNick(nick), JSON.stringify({ mood: mood || '', bio: bio || '' })); } catch (e) {} }
+        // ====== 全网个人资料（心情/说明，支持公开/仅自己）======
+        // 本机兜底：localStorage（key=规范化昵称），用于本人即时查看与离线
+        function getProfile(nick) {
+            try {
+                const norm = localStorage.getItem('tfjl_profile_' + _normNick(nick));
+                const raw = localStorage.getItem('tfjl_profile_' + nick);
+                const s = norm || raw || 'null';
+                const o = JSON.parse(s) || {};
+                return { mood: o.mood || '', bio: o.bio || '', visibility: o.visibility || 'public' };
+            } catch (e) { return { mood: '', bio: '', visibility: 'public' }; }
+        }
+        function setLocalProfile(nick, mood, bio, visibility) {
+            try { localStorage.setItem('tfjl_profile_' + _normNick(nick), JSON.stringify({ mood: mood || '', bio: bio || '', visibility: visibility || 'public' })); } catch (e) {}
+        }
+        // 云端 profiles 存储：复用「用户可写」的需求墙 Gist（MESSAGES_GIST_ID），独立文件 profiles.json（不影响 messages.json）
+        const PROFILES_GIST_ID = MESSAGES_GIST_ID;
+        const PROFILES_FILE = 'profiles.json';
+        async function fetchProfilesGist() {
+            try {
+                const token = getGistToken();
+                const resp = await fetch('https://api.github.com/gists/' + PROFILES_GIST_ID, {
+                    headers: { 'Accept': 'application/vnd.github.v3+json', ...(token && { 'Authorization': 'token ' + token }) }
+                });
+                if (!resp.ok) return {};
+                const data = await resp.json();
+                const f = data.files && data.files[PROFILES_FILE];
+                if (!f || !f.content) return {};
+                return JSON.parse(f.content) || {};
+            } catch (e) { return {}; }
+        }
+        async function saveProfileToGist(normNick, payload) {
+            try {
+                const token = getGistToken();
+                if (!token) return;
+                // 先读云端现有，合并后写回（防多人并发覆盖）
+                let current = {};
+                try {
+                    const r = await fetch('https://api.github.com/gists/' + PROFILES_GIST_ID, {
+                        headers: { 'Accept': 'application/vnd.github.v3+json', ...(token && { 'Authorization': 'token ' + token }) }
+                    });
+                    if (r.ok) { const d = await r.json(); const f = d.files && d.files[PROFILES_FILE]; if (f && f.content) current = JSON.parse(f.content) || {}; }
+                } catch (e) {}
+                current[normNick] = payload;
+                const content = JSON.stringify(current);
+                const bodyObj = {}; bodyObj[PROFILES_FILE] = { content: content };
+                const resp = await fetch('https://api.github.com/gists/' + PROFILES_GIST_ID, {
+                    method: 'PATCH',
+                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', ...(token && { 'Authorization': 'token ' + token }) },
+                    body: JSON.stringify({ files: bodyObj })
+                });
+                if (!resp.ok) console.warn('[资料] 云端保存失败', resp.status);
+            } catch (e) { console.warn('[资料] 云端保存异常', e); }
+        }
+        // 保存资料：本机 + 云端（公开存明文；仅自己只存标记不存明文）
+        async function saveProfile(nick, mood, bio, visibility) {
+            const vis = visibility === 'private' ? 'private' : 'public';
+            setLocalProfile(nick, mood, bio, vis);
+            const norm = _normNick(nick);
+            if (vis === 'public') {
+                await saveProfileToGist(norm, { mood: mood || '', bio: bio || '', visibility: 'public', updatedAt: Date.now() });
+            } else {
+                // 仅自己：云端不存明文，只留标记；本机保留明文供自己查看
+                await saveProfileToGist(norm, { visibility: 'private', updatedAt: Date.now() });
+            }
+        }
+        window.saveProfile = saveProfile;
         // 复制某条分享的内容
         function contribCopyContent(i) {
             const item = _contribData && _contribData.shares[i]; if (!item) return;
@@ -14891,19 +14954,38 @@ function hasGistToken() {
             showFloatToast('📥 正在下载全部脚本（' + scripts.length + '）', 'rgba(79,195,247,0.9)');
             for (const s of scripts) { try { await downloadScript(s.scriptUrl, s.isEncrypted, s.passwordHash); } catch (e) {} }
         }
-        // 渲染个性资料（心情/说明），自己可编辑
-        function renderContribProfile(nick) {
+        // 渲染个性资料（心情/说明）自己可编辑；他人异步从云端拉取
+        async function renderContribProfile(nick) {
             const wrap = document.getElementById('contribProfileEdit'); if (!wrap) return;
             wrap.dataset.editing = '0';
-            const p = getProfile(nick);
             const me = localStorage.getItem('TFJL_UserName') || '';
             const isSelf = me && me.toLowerCase() === nick.toLowerCase();
-            const moodHtml = p.mood ? `<div style="color:#ffd700;font-size:0.95rem;margin-bottom:4px;">💭 ${escapeHtml(p.mood)}</div>` : '';
-            const bioHtml = p.bio ? `<div style="color:rgba(255,255,255,0.75);font-size:0.8rem;line-height:1.4;">${escapeHtml(p.bio)}</div>` : '';
             const editBtn = isSelf ? `<button onclick="contribToggleEditProfile()" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:5px;padding:3px 10px;font-size:0.72rem;cursor:pointer;margin-left:auto;">✏️ 编辑</button>` : '';
-            const placeholder = isSelf ? '（点「编辑」设置你的心情 / 个人说明）' : '（该用户暂未公开个性签名）';
-            const has = p.mood || p.bio;
-            wrap.innerHTML = `<div style="display:flex;align-items:center;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.6);font-size:0.78rem;">💬 个性资料</span>${editBtn}</div>` + (has ? moodHtml + bioHtml : `<div style="color:rgba(255,255,255,0.4);font-size:0.78rem;">${placeholder}</div>`);
+            const header = `<div style="display:flex;align-items:center;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.6);font-size:0.78rem;">💬 个性资料</span>${editBtn}</div>`;
+            if (isSelf) {
+                // 本人：直接读本机
+                const p = getProfile(nick);
+                const has = p.mood || p.bio;
+                const visTag = p.visibility === 'private' ? '🔒 仅自己' : '🌐 公开';
+                const body = has
+                    ? `<div style="color:#ffd700;font-size:0.95rem;margin-bottom:4px;">💭 ${escapeHtml(p.mood)}</div>` + (p.bio ? `<div style="color:rgba(255,255,255,0.75);font-size:0.8rem;line-height:1.4;">${escapeHtml(p.bio)}</div>` : '') + `<div style="color:rgba(255,255,255,0.4);font-size:0.68rem;margin-top:4px;">${visTag}</div>`
+                    : `<div style="color:rgba(255,255,255,0.4);font-size:0.78rem;">（点「编辑」设置你的心情 / 个人说明）</div>`;
+                wrap.innerHTML = header + body;
+                return;
+            }
+            // 他人：异步拉云端
+            wrap.innerHTML = header + `<div style="color:rgba(255,255,255,0.4);font-size:0.78rem;">加载中…</div>`;
+            try {
+                const all = await fetchProfilesGist();
+                const p = all[_normNick(nick)] || {};
+                if (p.visibility === 'public' && (p.mood || p.bio)) {
+                    wrap.innerHTML = header + `<div style="color:#ffd700;font-size:0.95rem;margin-bottom:4px;">💭 ${escapeHtml(p.mood)}</div>` + (p.bio ? `<div style="color:rgba(255,255,255,0.75);font-size:0.8rem;line-height:1.4;">${escapeHtml(p.bio)}</div>` : '') + `<div style="color:rgba(255,255,255,0.4);font-size:0.68rem;margin-top:4px;">🌐 公开</div>`;
+                } else {
+                    wrap.innerHTML = header + `<div style="color:rgba(255,255,255,0.4);font-size:0.78rem;">（该用户未公开个性资料）</div>`;
+                }
+            } catch (e) {
+                wrap.innerHTML = header + `<div style="color:rgba(255,255,255,0.4);font-size:0.78rem;">（资料加载失败）</div>`;
+            }
         }
         function contribToggleEditProfile() {
             const nick = _contribData ? _contribData.nick : '';
@@ -14912,14 +14994,23 @@ function hasGistToken() {
             if (wrap.dataset.editing === '1') {
                 const mood = document.getElementById('contribMoodInput').value.trim();
                 const bio = document.getElementById('contribBioInput').value.trim();
-                setProfile(nick, mood, bio);
+                const visRadio = document.querySelector('input[name="contribVis"]:checked');
+                const vis = (visRadio && visRadio.value) || 'public';
+                saveProfile(nick, mood, bio, vis);
                 wrap.dataset.editing = '0'; renderContribProfile(nick);
-                showFloatToast('✅ 已保存个性资料', 'rgba(255,215,0,0.9)');
+                showFloatToast('✅ 已保存（' + (vis === 'private' ? '仅自己可见' : '全网公开') + '）', 'rgba(255,215,0,0.9)');
             } else {
                 wrap.dataset.editing = '1';
-                wrap.innerHTML = `<input id="contribMoodInput" placeholder="心情（一句话，最多30字）" value="${escapeHtml(p.mood)}" maxlength="30" style="width:100%;background:rgba(255,255,255,0.1);border:1px solid rgba(255,215,0,0.4);border-radius:6px;padding:6px 10px;color:#ffd700;font-size:0.82rem;outline:none;margin-bottom:6px;">
+                const vis = p.visibility === 'private' ? 'private' : 'public';
+                wrap.innerHTML = `
+                    <div style="display:flex;align-items:center;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.6);font-size:0.78rem;">💬 个性资料</span><button onclick="contribToggleEditProfile()" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:5px;padding:3px 10px;font-size:0.72rem;cursor:pointer;margin-left:auto;">✏️ 编辑</button></div>
+                    <input id="contribMoodInput" placeholder="心情（一句话，最多30字）" value="${escapeHtml(p.mood)}" maxlength="30" style="width:100%;background:rgba(255,255,255,0.1);border:1px solid rgba(255,215,0,0.4);border-radius:6px;padding:6px 10px;color:#ffd700;font-size:0.82rem;outline:none;margin-bottom:6px;">
                     <textarea id="contribBioInput" placeholder="个人说明（最多120字）" maxlength="120" rows="2" style="width:100%;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:6px;padding:6px 10px;color:#fff;font-size:0.8rem;outline:none;resize:vertical;">${escapeHtml(p.bio)}</textarea>
-                    <button onclick="contribToggleEditProfile()" style="margin-top:6px;background:linear-gradient(135deg,#ffd700,#ff6b6b);color:#1a1a2e;border:none;padding:5px 16px;border-radius:5px;font-size:0.8rem;cursor:pointer;font-weight:bold;">💾 保存</button>`;
+                    <div style="display:flex;gap:12px;align-items:center;margin:6px 0;">
+                        <label style="color:rgba(255,255,255,0.7);font-size:0.74rem;cursor:pointer;"><input type="radio" name="contribVis" value="public" ${vis === 'public' ? 'checked' : ''}> 🌐 公开</label>
+                        <label style="color:rgba(255,255,255,0.7);font-size:0.74rem;cursor:pointer;"><input type="radio" name="contribVis" value="private" ${vis === 'private' ? 'checked' : ''}> 🔒 仅自己</label>
+                    </div>
+                    <button onclick="contribToggleEditProfile()" style="margin-top:2px;background:linear-gradient(135deg,#ffd700,#ff6b6b);color:#1a1a2e;border:none;padding:5px 16px;border-radius:5px;font-size:0.8rem;cursor:pointer;font-weight:bold;">💾 保存</button>`;
             }
         }
         window.contribCopyContent = contribCopyContent;
