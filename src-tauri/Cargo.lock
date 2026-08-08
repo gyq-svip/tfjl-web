@@ -3871,7 +3871,7 @@ dependencies = [
 
 [[package]]
 name = "tfjl"
-version = "1.3.12"
+version = "2.0.2"
 dependencies = [
  "base64 0.22.1",
  "encoding_rs",

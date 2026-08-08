@@ -347,17 +347,26 @@ fn flash_tray_icon(app: tauri::AppHandle, on: bool) -> Result<(), String> {
             });
             std::thread::spawn(move || {
                 if let Some(tray) = TRAY.get().cloned() {
-                    let (w, h) = default.as_ref().map(|i| (i.width(), i.height())).unwrap_or((32, 32));
-                    // 透明图标用拥有数据的 Image（new_owned 返回 'static），与 default 生命周期一致
-                    let buf = vec![0u8; (w as usize) * (h as usize) * 4];
-                    let transparent = tauri::image::Image::new_owned(buf, w, h);
-                    let mut show = false;
-                    while FLASH_ON.load(Ordering::SeqCst) {
-                        let _ = tray.set_icon(if show { default.clone() } else { Some(transparent.clone()) });
-                        show = !show;
-                        std::thread::sleep(std::time::Duration::from_millis(500));
+                    if let Some(def) = default.as_ref() {
+                        let (w, h) = (def.width(), def.height());
+                        // 暗微光版本：压暗 + 偏蓝，替代原来的「全透明」（消除托盘裂纹伪影）
+                        // 闪动 = 亮态(原图标) ↔ 暗态(微光变暗)，形成层次鲜明的呼吸提醒，不再硬切到透明
+                        let dim_buf: Vec<u8> = def.rgba().chunks(4).flat_map(|px| {
+                            let (r, g, b, a) = (px[0] as f32, px[1] as f32, px[2] as f32, px[3]);
+                            let nr = (r * 0.25 + 20.0).min(255.0) as u8;
+                            let ng = (g * 0.30 + 35.0).min(255.0) as u8;
+                            let nb = (b * 0.45 + 75.0).min(255.0) as u8;
+                            [nr, ng, nb, a]
+                        }).collect();
+                        let dim = tauri::image::Image::new_owned(dim_buf, w, h);
+                        let mut show = false;
+                        while FLASH_ON.load(Ordering::SeqCst) {
+                            let _ = tray.set_icon(if show { Some(def.clone()) } else { Some(dim.clone()) });
+                            show = !show;
+                            std::thread::sleep(std::time::Duration::from_millis(500));
+                        }
+                        let _ = tray.set_icon(default.clone());
                     }
-                    let _ = tray.set_icon(default);
                 }
             });
         }
