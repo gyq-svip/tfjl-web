@@ -14605,9 +14605,46 @@ function hasGistToken() {
             _repSaveTimer = setTimeout(() => { _repSaveTimer = null; saveMessagesToGist().catch(() => {}); }, 2500);
         }
         // 复制分享内容（站内复制按钮 = 可捕获的"被下载"事件，owner 加声望）
+        // 取回脚本明文：公开 raw 优先，失败回退 Gist API（支持私有 Gist）
+        async function fetchScriptPlainText(url) {
+            let content = null;
+            try { const resp = await fetch(url); if (resp.ok) content = await resp.text(); } catch (e) {}
+            if (content === null) {
+                const token = getGistToken();
+                const gistMatch = url.match(/gist\.githubusercontent\.com\/[^/]+\/([a-f0-9]+)/i) || url.match(/gist\.github\.com\/[^/]+\/([a-f0-9]+)/i);
+                if (gistMatch && token) {
+                    try {
+                        const apiResp = await fetch(`https://api.github.com/gists/${gistMatch[1]}`, {
+                            headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` }
+                        });
+                        if (apiResp.ok) {
+                            const gistData = await apiResp.json();
+                            const fileName = decodeURIComponent((url.split('/').pop() || '').split('?')[0]);
+                            let c = null;
+                            for (const f of Object.values(gistData.files)) { if (f.filename === fileName || url.includes(f.filename)) { c = f.content; break; } }
+                            if (c === null && gistData.files) c = Object.values(gistData.files)[0].content;
+                            content = c;
+                        }
+                    } catch (e) { console.warn('API方式获取Gist失败:', e); }
+                }
+            }
+            if (content === null) throw new Error('获取文件失败，可能需要登录或文件不存在');
+            return content;
+        }
         async function onShareCopy(b64) {
             const m = findWallMsg(b64); if (!m) return;
-            const text = msgContent(m) + (m.scriptUrl ? '\n' + m.scriptUrl : '');
+            let text = msgContent(m) + (m.scriptUrl ? '\n' + m.scriptUrl : '');
+            // 加密分享特例：先要密码、解密、再拷明文（主人照样 +声望）
+            if (m.isEncrypted && m.scriptUrl) {
+                const pwd = prompt('该分享已加密，请输入密码以复制明文：');
+                if (!pwd) { showFloatToast('🔒 需密码才能复制明文（主人仍记录了你的获取）', 'rgba(255,193,7,0.9)'); return; }
+                try {
+                    const raw = await fetchScriptPlainText(m.scriptUrl);
+                    const dec = await decryptContent(raw, pwd);
+                    if (dec === null) { alert('❌ 解密失败，可能是密码不正确或文件已损坏'); return; }
+                    text = dec;
+                } catch (e) { alert('获取/解密失败: ' + e.message); return; }
+            }
             try { await navigator.clipboard.writeText(text); } catch (e) {
                 const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
                 try { document.execCommand('copy'); } catch (_) {} ta.remove();
@@ -14645,8 +14682,10 @@ function hasGistToken() {
             const myVote = getMyVote(b64);
             const likeCls = myVote === 'like' ? 'color:#ffd700;' : 'color:#4fc3f7;';
             const disCls = myVote === 'dislike' ? 'color:#ff6b6b;' : 'color:rgba(255,255,255,0.5);';
+            const copyLabel = m.isEncrypted ? '📋 复制明文' : '📋 复制';
+            const copyTitle = m.isEncrypted ? '该分享已加密，点击输入密码后复制明文' : '复制分享内容（主人将获得声望）';
             return `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;font-size:0.78rem;align-items:center;">
-                <a href="javascript:void(0)" onclick="onShareCopy('${b64}')" style="color:#4fc3f7;text-decoration:none;cursor:pointer;background:rgba(79,195,247,0.12);padding:3px 10px;border-radius:5px;">📋 复制</a>
+                <a href="javascript:void(0)" onclick="onShareCopy('${b64}')" title="${copyTitle}" style="color:#4fc3f7;text-decoration:none;cursor:pointer;background:rgba(79,195,247,0.12);padding:3px 10px;border-radius:5px;">${copyLabel}</a>
                 <a href="javascript:void(0)" onclick="onShareLike('${b64}')" style="${likeCls}text-decoration:none;cursor:pointer;background:rgba(255,215,0,0.1);padding:3px 10px;border-radius:5px;">👍 ${m.likes || 0}</a>
                 <a href="javascript:void(0)" onclick="onShareDislike('${b64}')" style="${disCls}text-decoration:none;cursor:pointer;background:rgba(255,107,107,0.1);padding:3px 10px;border-radius:5px;">👎 ${m.dislikes || 0}</a>
                 <span style="color:rgba(255,255,255,0.4);">📥 被复制 ${m.copyCount || 0}</span>
