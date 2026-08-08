@@ -14300,9 +14300,9 @@ function hasGistToken() {
 
         // ==================== 需求墙数据备份 / 还原（通用模板，移植自拍卖系统）====================
                 // ==================== Boss减伤参考（管理员可编辑，全网共享 Gist）====================
-        const BOSS_RED_GIST_KEY = 'boss_red_gist_id';
+        const BOSS_RED_GIST_ID = '3d9b72b00cddf7e15ba5da5e82c4c8e9';
         const BOSS_RED_FILE = 'boss_reduction.json';
-        const BOSS_RED_DESC = 'TFJL Boss减伤参考数据（私有）';
+        const BOSS_RED_DESC = 'TFJL Boss减伤参考数据（共享·全网可见）';
         const BOSS_RED_SECTIONS = ['寒冰', '暗月', '漩涡', '深海'];
         const BOSS_RED_WAVE_MAX = { '寒冰': 210, '暗月': 210, '漩涡': 130, '深海': 210 };
         let bossRedCurrent = { '寒冰': {}, '暗月': {}, '漩涡': {}, '深海': {} };
@@ -14311,26 +14311,12 @@ function hasGistToken() {
         let bossRedAdminSection = '寒冰';
         let bossRedAdminBoss = null;
 
-        async function bossRedGetGistId() {
-            const token = getGistToken();
-            if (!token) throw new Error('无Token');
-            let id = localStorage.getItem(BOSS_RED_GIST_KEY);
-            if (id) {
-                try {
-                    const r = await fetch(`https://api.github.com/gists/${id}`, { headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` } });
-                    if (r.ok) return id;
-                } catch (e) {}
-                localStorage.removeItem(BOSS_RED_GIST_KEY); id = null;
-            }
-            const c = await fetch('https://api.github.com/gists', { method: 'POST', headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` }, body: JSON.stringify({ description: BOSS_RED_DESC, public: false, files: { [BOSS_RED_FILE]: { content: JSON.stringify({ '寒冰': {}, '暗月': {}, '漩涡': {}, '深海': {} }, null, 2) } } }) });
-            if (!c.ok) throw new Error('创建Boss减伤Gist失败');
-            const d = await c.json(); localStorage.setItem(BOSS_RED_GIST_KEY, d.id); return d.id;
-        }
+        async function bossRedGetGistId() { return BOSS_RED_GIST_ID; }
 
         async function bossRedLoad() {
             try {
                 const token = getGistToken();
-                const id = localStorage.getItem(BOSS_RED_GIST_KEY) || await bossRedGetGistId();
+                const id = BOSS_RED_GIST_ID;
                 const content = await wallReadGistFile(id, BOSS_RED_FILE, token);
                 if (!content) return { '寒冰': {}, '暗月': {}, '漩涡': {}, '深海': {} };
                 const d = JSON.parse(content);
@@ -14341,7 +14327,7 @@ function hasGistToken() {
         async function bossRedSave(data) {
             const token = getGistToken();
             if (!token) throw new Error('无Token');
-            const id = localStorage.getItem(BOSS_RED_GIST_KEY) || await bossRedGetGistId();
+            const id = BOSS_RED_GIST_ID;
             const r = await fetch(`https://api.github.com/gists/${id}`, { method: 'PATCH', headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` }, body: JSON.stringify({ files: { [BOSS_RED_FILE]: { content: JSON.stringify(data, null, 2) } } }) });
             if (!r.ok) throw new Error('保存失败');
         }
