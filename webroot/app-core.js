@@ -14371,7 +14371,7 @@ function hasGistToken() {
                 initMessageWallDrag();
                 // 打开需求墙默认同时弹出右侧贡献排行榜
                 const rp = document.getElementById('reputationPanel');
-                if (rp) { rp.style.display = 'flex'; renderReputation(); }
+                if (rp) { rp.style.display = 'flex'; renderReputation(); if (window.syncReputationToWall) window.syncReputationToWall(); }
             }
         }
         
@@ -14435,7 +14435,7 @@ function hasGistToken() {
             initMessageWallDrag();
             // 展开需求墙时也默认弹出右侧贡献排行榜
             const rp = document.getElementById('reputationPanel');
-            if (rp) { rp.style.display = 'flex'; renderReputation(); }
+            if (rp) { rp.style.display = 'flex'; renderReputation(); if (window.syncReputationToWall) window.syncReputationToWall(); }
         }
         
         function initMessageWallDrag() {
@@ -14822,7 +14822,7 @@ function hasGistToken() {
             const p = document.getElementById('reputationPanel');
             if (!p) return;
             p.style.display = (p.style.display === 'flex') ? 'none' : 'flex';
-            if (p.style.display === 'flex') renderReputation();
+            if (p.style.display === 'flex') { renderReputation(); if (window.syncReputationToWall) window.syncReputationToWall(); }
         }
         function setRepTab(tab) {
             _repTab = tab;
