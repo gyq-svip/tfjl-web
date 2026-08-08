@@ -17423,12 +17423,17 @@ ${maSection}
             }
         }
         
+        // 把墙上只读昵称框同步为当前 localStorage 昵称（昵称变化后调用，避免显示停在旧值）
+        function refreshWallNickname() {
+            const input = document.getElementById('messageNickname');
+            if (!input) return;
+            const nick = localStorage.getItem('TFJL_UserName') || '';
+            input.value = nick;
+            input.placeholder = nick ? '' : '未设置';
+        }
+        window.refreshWallNickname = refreshWallNickname;
         function initMessageWall() {
-            const savedNickname = localStorage.getItem('TFJL_UserName');
-            if (savedNickname) {
-                const nicknameInput = document.getElementById('messageNickname');
-                if (nicknameInput) nicknameInput.value = savedNickname;
-            }
+            refreshWallNickname();
             
             const nicknameInput = document.getElementById('messageNickname');
             if (nicknameInput) {
@@ -18633,6 +18638,7 @@ ${maSection}
             
             localStorage.removeItem('TFJL_HasSetNick');
             persistNicknameToDisk(); // 同步更新磁盘记录
+            refreshWallNickname(); // 同步刷新需求墙昵称框
             showAdminStatus('昵称设置已重置！用户可以重新设置昵称了。', 'success');
             loadCurrentNick();
         }
@@ -18650,6 +18656,7 @@ ${maSection}
             localStorage.setItem('TFJL_UserName', newNick);
             localStorage.setItem('TFJL_HasSetNick', 'true');
             persistNicknameToDisk(); // 同步写入本地磁盘
+            refreshWallNickname(); // 同步刷新需求墙昵称框
             showAdminStatus(`昵称已修改为"${newNick}"！`, 'success');
             loadCurrentNick();
         }

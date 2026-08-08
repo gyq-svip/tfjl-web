@@ -2099,9 +2099,9 @@
         <div id="messageWallInput" style="padding:12px 15px;border-top:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.2);">
             <div style="display:flex;gap:8px;align-items:center;">
                 <span style="color:#ffd700;font-size:0.9rem;flex-shrink:0;" title="昵称已锁定（发布后不可随意修改）">🔒</span>
-                <input type="text" id="messageNickname" readonly maxlength="10" placeholder="未设置" title="昵称已锁定（发布后不可随意修改）" style="width:auto;max-width:100px;flex-shrink:0;background:rgba(255,215,0,0.1);border:1px solid rgba(255,215,0,0.4);border-radius:18px;padding:6px 12px;color:#ffd700;font-size:0.82rem;outline:none;cursor:default;caret-color:transparent;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-                <input type="text" id="messageInput" placeholder="发点什么…（分享脚本/阵容/需求，回车发布）" maxlength="200" style="flex:1;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:5px;padding:8px 10px;color:#fff;font-size:0.85rem;outline:none;" onfocus="this.style.borderColor='#ffd700'" onblur="this.style.borderColor='rgba(255,255,255,0.2)'" onkeydown="if(event.key==='Enter')postMessage()">
-                <button onclick="postMessage()" style="background:linear-gradient(135deg,#ffd700,#ff6b6b);color:#1a1a2e;border:none;padding:8px 18px;border-radius:5px;font-size:0.85rem;cursor:pointer;font-weight:bold;flex-shrink:0;">发布</button>
+                <input type="text" id="messageNickname" readonly maxlength="10" placeholder="未设置" title="昵称已锁定（发布后不可随意修改）" style="width:auto;max-width:84px;min-width:0;flex-shrink:0;background:rgba(255,215,0,0.1);border:1px solid rgba(255,215,0,0.4);border-radius:18px;padding:6px 10px;color:#ffd700;font-size:0.8rem;outline:none;cursor:default;caret-color:transparent;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                <input type="text" id="messageInput" placeholder="发点什么…（回车发布）" maxlength="200" style="flex:1;min-width:0;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:5px;padding:8px 10px;color:#fff;font-size:0.85rem;outline:none;" onfocus="this.style.borderColor='#ffd700'" onblur="this.style.borderColor='rgba(255,255,255,0.2)'" onkeydown="if(event.key==='Enter')postMessage()">
+                <button onclick="postMessage()" style="background:linear-gradient(135deg,#ffd700,#ff6b6b);color:#1a1a2e;border:none;padding:8px 14px;border-radius:5px;font-size:0.85rem;cursor:pointer;font-weight:bold;flex-shrink:0;">发布</button>
             </div>
             <div style="display:flex;gap:5px;margin-top:8px;align-items:center;flex-wrap:wrap;">
                 <span style="color:rgba(255,255,255,0.4);font-size:0.72rem;align-self:center;">表情:</span>
@@ -2265,7 +2265,7 @@
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">s20260808-039 · s1.0.39</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">s20260808-040 · s1.0.40</span>
             </div>
         </div>
     </div>
