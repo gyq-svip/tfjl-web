@@ -14758,6 +14758,54 @@ function hasGistToken() {
             if (next) { nextRep = next.min; progress = Math.max(0, Math.min(1, (rep - t.min) / (nextRep - t.min))); }
             return { name: t.name, nextName: next ? next.name : null, nextRep, progress };
         }
+        // 成就徽章定义（全部基于 wallMessages 客户端聚合，零新增存储）
+        const BADGE_DEFS = [
+            { id: 'first', icon: '🌱', name: '初来乍到', desc: '发布第 1 个分享', test: e => e.shares >= 1 },
+            { id: 'sharer', icon: '📣', name: '分享达人', desc: '累计分享 ≥ 10 个', test: e => e.shares >= 10 },
+            { id: 'copied', icon: '📋', name: '被复制破百', desc: '作品被复制 ≥ 100 次', test: e => e.copies >= 100 },
+            { id: 'master', icon: '💎', name: '声望宗师', desc: '声望 ≥ 800', test: e => e.rep >= 800 },
+            { id: 'week1', icon: '👑', name: '周榜第一', desc: '近 7 天声望榜第一', test: (e, ctx) => ctx && ctx.isWeekTop1 },
+            { id: 'streak', icon: '🔥', name: '连续分享7天', desc: '分享跨越 ≥ 7 个不同日期', test: e => e.activeDays >= 7 },
+            { id: 'allstar', icon: '🏆', name: '十项全能', desc: '集齐以上所有徽章', test: (e, ctx) => ctx && ctx.earnedCount >= 6 }
+        ];
+        // 计算某个昵称获得的徽章；repMap 可选（外部已算则复用）
+        function computeBadges(nick, repMap) {
+            const map = repMap || computeReputation();
+            const e = map[nick] || { rep: 0, shares: 0, copies: 0, likes: 0, previews: 0, firstShare: 0, activeDays: 0 };
+            // 连续分享天数：求该昵称所有分享消息的去重日期数（跨天即累计）
+            if (!e.activeDays) {
+                const days = new Set();
+                for (const m of wallMessages) { if (isShareMsg(m) && msgAuthor(m) === nick) { const d = new Date(msgTime(m)); days.add(d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate()); } }
+                e.activeDays = days.size;
+            }
+            // 周榜第一判定
+            const w = Date.now() - 7 * 864e5;
+            const weekArr = Object.keys(map).map(n => ({ nick: n, rep: (map[n].firstShare >= w ? map[n].rep : -1) })).sort((a, b) => b.rep - a.rep);
+            const isWeekTop1 = weekArr.length > 0 && weekArr[0].nick === nick && weekArr[0].rep >= 0;
+            const ctx = { isWeekTop1, earnedCount: 0 };
+            const badges = BADGE_DEFS.map(b => { const ok = !!b.test(e, ctx); return { ...b, earned: ok }; });
+            ctx.earnedCount = badges.filter(b => b.earned).length;
+            // 十项全能依赖 earnedCount，需二次计算
+            const allstar = badges.find(b => b.id === 'allstar');
+            if (allstar) allstar.earned = ctx.earnedCount >= 6;
+            return { badges, earnedCount: ctx.earnedCount, total: BADGE_DEFS.length };
+        }
+        // 渲染徽章墙 HTML（earned 高亮，未得灰显+条件）
+        function renderBadgesHtml(nick, repMap) {
+            const { badges, earnedCount, total } = computeBadges(nick, repMap);
+            const items = badges.map(b =>
+                `<div title="${escapeHtml(b.desc)}" style="display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 6px;border-radius:9px;background:${b.earned ? 'rgba(255,215,0,0.14)' : 'rgba(255,255,255,0.04)'};border:1px solid ${b.earned ? 'rgba(255,215,0,0.5)' : 'rgba(255,255,255,0.08)'};flex:1;min-width:62px;opacity:${b.earned ? '1' : '0.55'};">
+                    <span style="font-size:1.5rem;filter:${b.earned ? 'none' : 'grayscale(1)'};">${b.icon}</span>
+                    <span style="font-size:0.68rem;color:${b.earned ? '#ffd700' : 'rgba(255,255,255,0.5)'};font-weight:${b.earned ? 'bold' : 'normal'};text-align:center;line-height:1.1;">${escapeHtml(b.name)}</span>
+                </div>`).join('');
+            return `<div style="margin-bottom:10px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                    <span style="color:rgba(255,255,255,0.7);font-size:0.78rem;">🎖 成就徽章</span>
+                    <span style="color:#ffd700;font-size:0.78rem;font-weight:bold;">${earnedCount}/${total}</span>
+                </div>
+                <div style="display:flex;flex-wrap:wrap;gap:6px;">${items}</div>
+            </div>`;
+        }
         // 在线实时"声望上涨"浮条：对比上次看到的自己声望
         function checkReputationGain() {
             const me = localStorage.getItem('TFJL_UserName') || '';
@@ -14792,11 +14840,28 @@ function hasGistToken() {
             else if (_repTab === 'preview') list = arr.slice().sort((a, b) => b.previews - a.previews);
             else if (_repTab === 'week') { const w = Date.now() - 7 * 864e5; list = arr.filter(a => a.firstShare >= w).sort((a, b) => b.rep - a.rep); }
             else if (_repTab === 'newcomer') { const w = Date.now() - 7 * 864e5; list = arr.filter(a => a.firstShare >= w).sort((a, b) => b.shares - a.shares); }
+            else if (_repTab === 'badge') {
+                // 徽章榜：按已得徽章数降序，再按声望
+                const repMapB = repMap;
+                list = arr.map(a => { const bd = computeBadges(a.nick, repMapB); return { ...a, _badges: bd.badges, _earned: bd.earnedCount }; })
+                          .sort((a, b) => b._earned - a._earned || b.rep - a.rep);
+            }
             const top = list.slice(0, 30);
             const medal = i => i === 0 ? '👑' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1) + '.';
             const valOf = a => _repTab === 'share' ? a.shares + ' 分享' : _repTab === 'copy' ? a.copies + ' 被复制' : _repTab === 'like' ? a.likes + ' 赞' : _repTab === 'preview' ? a.previews + ' 预览' : a.rep + ' 声望';
             const el = document.getElementById('reputationList');
             if (!el) return;
+            if (_repTab === 'badge') {
+                el.innerHTML = top.length ? top.map((a, i) =>
+                    `<div onclick="openContributionCard('${encodeURIComponent(a.nick)}')" style="padding:8px 9px;border-radius:7px;cursor:pointer;${i < 3 ? 'background:rgba(255,215,0,0.12);' : ''};margin-bottom:5px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                            <span>${medal(i)} <span style="color:#ffd700;">${escapeHtml(a.nick)}</span></span>
+                            <span style="color:#ffd700;font-size:0.78rem;font-weight:bold;">🎖 ${a._earned}/${BADGE_DEFS.length}</span>
+                        </div>
+                        <div style="display:flex;gap:3px;flex-wrap:wrap;">${a._badges.map(b => `<span title="${escapeHtml(b.desc)}" style="font-size:1.05rem;filter:${b.earned ? 'none' : 'grayscale(1)'};opacity:${b.earned ? '1' : '0.4'};">${b.icon}</span>`).join('')}</div>
+                    </div>`).join('') : '<div style="color:rgba(255,255,255,0.5);text-align:center;padding:24px;">暂无分享数据，去需求墙分享第一个脚本吧！</div>';
+                return;
+            }
             el.innerHTML = top.length ? top.map((a, i) =>
                 `<div onclick="openContributionCard('${encodeURIComponent(a.nick)}')" style="display:flex;justify-content:space-between;align-items:center;padding:7px 9px;border-radius:7px;cursor:pointer;${i < 3 ? 'background:rgba(255,215,0,0.12);' : ''}">
                     <span>${medal(i)} <span style="color:#ffd700;">${escapeHtml(a.nick)}</span> <span style="color:rgba(255,255,255,0.5);font-size:0.7rem;">[${getTitle(a.rep).name}]</span></span>
@@ -14820,6 +14885,7 @@ function hasGistToken() {
                     <div style="color:#ffd700;font-size:1.3rem;font-weight:bold;">${escapeHtml(nick)}</div>
                     <div style="color:rgba(255,255,255,0.7);font-size:0.9rem;margin-top:2px;">🎖 ${t.name}</div>
                 </div>
+                ${renderBadgesHtml(nick, repMap)}
                 <div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:10px 12px;margin-bottom:10px;">
                     <div style="display:flex;justify-content:space-between;font-size:0.8rem;color:rgba(255,255,255,0.85);"><span>当前声望</span><span style="color:#ffd700;font-weight:bold;">${e.rep}</span></div>
                     ${t.nextName ? `<div style="margin-top:8px;height:7px;background:rgba(255,255,255,0.1);border-radius:4px;overflow:hidden;"><div style="width:${pct}%;height:100%;background:linear-gradient(90deg,#ffd700,#ff6b6b);"></div></div><div style="font-size:0.7rem;color:rgba(255,255,255,0.5);margin-top:4px;">距「${t.nextName}」还需 ${t.nextRep - e.rep} 声望</div>` : '<div style="font-size:0.75rem;color:rgba(255,215,0,0.7);margin-top:6px;">已达到最高头衔 🏆</div>'}
