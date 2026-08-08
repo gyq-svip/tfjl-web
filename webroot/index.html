@@ -2081,7 +2081,7 @@
     <!-- 消息墙 -->
     
     <div id="messageWall" style="position:fixed;top:60px;left:20px;width:380px;height:480px;background:rgba(26,26,46,0.95);border:1px solid rgba(255,215,0,0.3);border-radius:12px;z-index:9980;box-shadow:0 4px 20px rgba(0,0,0,0.5);backdrop-filter:blur(10px);flex-direction:column;min-width:300px;min-height:350px;display:none;">
-        <div id="messageWallHeader" style="background:linear-gradient(135deg,rgba(255,215,0,0.2),rgba(255,107,107,0.2));padding:10px 15px;display:flex;justify-content:space-between;align-items:center;cursor:move;user-select:none;" onmousedown="startPanelDrag(event,'messageWall')" ontouchstart="startPanelTouch(event,'messageWall')">
+        <div id="messageWallHeader" style="background:linear-gradient(135deg,rgba(255,215,0,0.2),rgba(255,107,107,0.2));padding:10px 15px;display:flex;justify-content:space-between;align-items:center;cursor:move;user-select:none;flex-shrink:0;" onmousedown="startPanelDrag(event,'messageWall')" ontouchstart="startPanelTouch(event,'messageWall')">
             <span style="color:#ffd700;font-size:0.9rem;font-weight:bold;">📢 需求墙</span>
             <div style="display:flex;gap:10px;">
                 <button id="msgRefreshBtn" onclick="fetchMessages();msgRefreshCountdown=30;updateMsgRefreshBtn();" title="刷新消息" style="background:transparent;border:none;color:#4fc3f7;font-size:0.8rem;cursor:pointer;padding:0;font-family:monospace;min-width:32px;text-align:center;">⏳30</button>
@@ -2091,12 +2091,12 @@
                 <button onclick="closeMessageWall()" title="关闭" style="background:transparent;border:none;color:#ff6b6b;font-size:1rem;cursor:pointer;padding:0;">×</button>
             </div>
         </div>
-        <div id="messageWallContent" style="padding:10px 15px;height:320px;overflow-y:auto;overflow-x:hidden;" onmouseenter="pauseMessageScroll()" onmouseleave="resumeMessageScroll()">
+        <div id="messageWallContent" style="padding:10px 15px;flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;" onmouseenter="pauseMessageScroll()" onmouseleave="resumeMessageScroll()">
             <div id="messageScroller" style="display:flex;flex-direction:column;gap:10px;">
                 <div style="color:rgba(255,255,255,0.5);font-size:0.85rem;text-align:center;padding:20px;">加载中...</div>
             </div>
         </div>
-        <div id="messageWallInput" style="padding:12px 15px;border-top:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.2);">
+        <div id="messageWallInput" style="padding:12px 15px;border-top:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.2);flex-shrink:0;">
             <div style="display:flex;gap:8px;align-items:center;">
                 <span style="color:#ffd700;font-size:0.9rem;flex-shrink:0;" title="昵称已锁定（发布后不可随意修改）">🔒</span>
                 <input type="text" id="messageNickname" readonly maxlength="10" placeholder="未设置" title="昵称已锁定（发布后不可随意修改）" style="width:auto;max-width:84px;min-width:0;flex-shrink:0;background:rgba(255,215,0,0.1);border:1px solid rgba(255,215,0,0.4);border-radius:18px;padding:6px 10px;color:#ffd700;font-size:0.8rem;outline:none;cursor:default;caret-color:transparent;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
@@ -2266,7 +2266,7 @@
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">s20260808-041 · s1.0.41</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">s20260808-042 · s1.0.42</span>
             </div>
         </div>
     </div>
