@@ -14299,7 +14299,207 @@ function hasGistToken() {
         }
 
         // ==================== 需求墙数据备份 / 还原（通用模板，移植自拍卖系统）====================
-        const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
+                // ==================== Boss减伤参考（管理员可编辑，全网共享 Gist）====================
+        const BOSS_RED_GIST_KEY = 'boss_red_gist_id';
+        const BOSS_RED_FILE = 'boss_reduction.json';
+        const BOSS_RED_DESC = 'TFJL Boss减伤参考数据（私有）';
+        const BOSS_RED_SECTIONS = ['寒冰', '暗月', '漩涡', '深海'];
+        const BOSS_RED_WAVE_MAX = { '寒冰': 210, '暗月': 210, '漩涡': 130, '深海': 210 };
+        let bossRedCurrent = { '寒冰': {}, '暗月': {}, '漩涡': {}, '深海': {} };
+        let bossRedActiveSection = '寒冰';
+        let bossRedActiveBoss = null;
+        let bossRedAdminSection = '寒冰';
+        let bossRedAdminBoss = null;
+
+        async function bossRedGetGistId() {
+            const token = getGistToken();
+            if (!token) throw new Error('无Token');
+            let id = localStorage.getItem(BOSS_RED_GIST_KEY);
+            if (id) {
+                try {
+                    const r = await fetch(`https://api.github.com/gists/${id}`, { headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` } });
+                    if (r.ok) return id;
+                } catch (e) {}
+                localStorage.removeItem(BOSS_RED_GIST_KEY); id = null;
+            }
+            const c = await fetch('https://api.github.com/gists', { method: 'POST', headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` }, body: JSON.stringify({ description: BOSS_RED_DESC, public: false, files: { [BOSS_RED_FILE]: { content: JSON.stringify({ '寒冰': {}, '暗月': {}, '漩涡': {}, '深海': {} }, null, 2) } } }) });
+            if (!c.ok) throw new Error('创建Boss减伤Gist失败');
+            const d = await c.json(); localStorage.setItem(BOSS_RED_GIST_KEY, d.id); return d.id;
+        }
+
+        async function bossRedLoad() {
+            try {
+                const token = getGistToken();
+                const id = localStorage.getItem(BOSS_RED_GIST_KEY) || await bossRedGetGistId();
+                const content = await wallReadGistFile(id, BOSS_RED_FILE, token);
+                if (!content) return { '寒冰': {}, '暗月': {}, '漩涡': {}, '深海': {} };
+                const d = JSON.parse(content);
+                return { '寒冰': d['寒冰'] || {}, '暗月': d['暗月'] || {}, '漩涡': d['漩涡'] || {}, '深海': d['深海'] || {} };
+            } catch (e) { return { '寒冰': {}, '暗月': {}, '漩涡': {}, '深海': {} }; }
+        }
+
+        async function bossRedSave(data) {
+            const token = getGistToken();
+            if (!token) throw new Error('无Token');
+            const id = localStorage.getItem(BOSS_RED_GIST_KEY) || await bossRedGetGistId();
+            const r = await fetch(`https://api.github.com/gists/${id}`, { method: 'PATCH', headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` }, body: JSON.stringify({ files: { [BOSS_RED_FILE]: { content: JSON.stringify(data, null, 2) } } }) });
+            if (!r.ok) throw new Error('保存失败');
+        }
+
+        async function renderBossRed() {
+            const cont = document.getElementById('calcBossContainer');
+            if (!cont) return;
+            try { bossRedCurrent = await bossRedLoad(); } catch (e) { bossRedCurrent = { '寒冰': {}, '暗月': {}, '漩涡': {}, '深海': {} }; }
+            if (!BOSS_RED_SECTIONS.includes(bossRedActiveSection)) bossRedActiveSection = '寒冰';
+            let html = `<div style="display:flex;gap:4px;margin-bottom:12px;">` + BOSS_RED_SECTIONS.map(s => `<button onclick="bossRedShowSection('${s}')" id="bossRedSec_${s}" style="flex:1;padding:7px;border:none;border-radius:6px;cursor:pointer;font-size:0.8rem;${bossRedActiveSection === s ? 'background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;' : 'background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);'}">${s}</button>`).join('') + `</div>`;
+            html += `<div id="bossRedSectionBody"></div>`;
+            cont.innerHTML = html;
+            bossRedShowSection(bossRedActiveSection);
+        }
+
+        function bossRedShowSection(s) {
+            bossRedActiveSection = s;
+            BOSS_RED_SECTIONS.forEach(x => { const b = document.getElementById('bossRedSec_' + x); if (b) { b.style.background = x === s ? 'linear-gradient(135deg,#4caf50,#2e7d32)' : 'rgba(255,255,255,0.1)'; b.style.color = x === s ? 'white' : 'rgba(255,255,255,0.7)'; } });
+            const body = document.getElementById('bossRedSectionBody');
+            if (!body) return;
+            if (s !== '深海') {
+                body.innerHTML = bossRedGridHtml(s, bossRedCurrent[s] || {}, null);
+            } else {
+                const bosses = Object.keys(bossRedCurrent['深海'] || {});
+                if (!bosses.length) { body.innerHTML = '<div style="color:rgba(255,255,255,0.4);font-size:0.82rem;text-align:center;padding:20px;">暂无Boss，请在管理员菜单 → 🛡️ Boss减伤管理 中添加</div>'; return; }
+                if (!bossRedActiveBoss || !bossRedCurrent['深海'][bossRedActiveBoss]) bossRedActiveBoss = bosses[0];
+                let h = `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px;">` + bosses.map(b => `<button onclick="bossRedShowBoss('${b.replace(/'/g, "\\'")}')" style="padding:5px 10px;border:none;border-radius:6px;cursor:pointer;font-size:0.78rem;${bossRedActiveBoss === b ? 'background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;' : 'background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);'}">${b}</button>`).join('') + `</div>`;
+                h += bossRedGridHtml('深海', bossRedCurrent['深海'][bossRedActiveBoss] || {}, bossRedActiveBoss);
+                body.innerHTML = h;
+            }
+        }
+
+        function bossRedShowBoss(b) { bossRedActiveBoss = b; bossRedShowSection('深海'); }
+
+        function bossRedGridHtml(section, dataMap, boss) {
+            const maxBase = BOSS_RED_WAVE_MAX[section] || 210;
+            let maxWave = maxBase;
+            Object.keys(dataMap).forEach(k => { const n = parseInt(k, 10); if (!isNaN(n) && n > maxWave) maxWave = Math.ceil(n / 10) * 10; });
+            let cells = '';
+            for (let w = 10; w <= maxWave; w += 10) {
+                const entry = dataMap[String(w)];
+                const has = entry && entry.info && entry.info.trim();
+                const bossArg = boss ? ("'" + boss.replace(/'/g, "\\'") + "'") : 'null';
+                cells += `<div onmousemove="bossRedHover(event,'${section}',${w},${bossArg})" onmouseleave="bossRedHideTip()" style="padding:6px 4px;border-radius:6px;text-align:center;font-size:0.72rem;cursor:default;${has ? 'background:rgba(255,215,0,0.15);border:1px solid rgba(255,215,0,0.5);color:#ffd700;' : 'background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.4);'}">${w}波</div>`;
+            }
+            return `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(54px,1fr));gap:6px;">${cells}</div>`;
+        }
+
+        function bossRedHover(e, section, wave, boss) {
+            const tip = document.getElementById('bossRedTooltip');
+            if (!tip) return;
+            const data = bossRedCurrent;
+            let entry = null;
+            if (boss) { entry = ((data['深海'][boss] || {})[String(wave)]) || null; }
+            else { entry = (data[section] || {})[String(wave)] || null; }
+            const info = (entry && entry.info && entry.info.trim()) ? entry.info : '（暂无数据，管理员可在管理员菜单添加）';
+            const title = (boss ? (boss + ' ') : '') + wave + '波';
+            tip.innerHTML = `<div style="color:#ffd700;font-weight:bold;margin-bottom:4px;">${title}</div><div style="white-space:pre-wrap;font-size:0.78rem;line-height:1.5;">${info.replace(/</g, '&lt;')}</div>`;
+            tip.style.display = 'block';
+            let x = e.clientX + 14, y = e.clientY + 14;
+            const r = tip.getBoundingClientRect();
+            if (x + r.width > window.innerWidth) x = e.clientX - r.width - 14;
+            if (y + r.height > window.innerHeight) y = e.clientY - r.height - 14;
+            tip.style.left = x + 'px'; tip.style.top = y + 'px';
+        }
+
+        function bossRedHideTip() { const t = document.getElementById('bossRedTooltip'); if (t) t.style.display = 'none'; }
+
+        // ===== 管理员面板 =====
+        function bossRedAdminShow() {
+            const menu = document.getElementById('adminMenuSection');
+            if (menu) menu.style.display = 'none';
+            const p = document.getElementById('adminPageBossRed');
+            if (p) p.style.display = 'flex';
+            bossRedAdminSection = '寒冰';
+            bossRedAdminBoss = null;
+            bossRedRenderSectionSel();
+            bossRedRenderBossSel();
+        }
+
+        function bossRedAdminClose() {
+            const p = document.getElementById('adminPageBossRed');
+            if (p) p.style.display = 'none';
+            const menu = document.getElementById('adminMenuSection');
+            if (menu) menu.style.display = 'grid';
+        }
+
+        function bossRedAdminStatus(msg, type) {
+            const el = document.getElementById('bossRedAdminStatus');
+            if (!el) return;
+            const bg = type === 'success' ? 'rgba(74,222,128,0.2)' : type === 'error' ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.1)';
+            const fg = type === 'success' ? '#4ade80' : type === 'error' ? '#ef4444' : '#fff';
+            el.innerHTML = `<div style="background:${bg};color:${fg};padding:8px;border-radius:6px;text-align:center;font-size:0.82rem;">${msg}</div>`;
+        }
+
+        function bossRedRenderSectionSel() {
+            const wrap = document.getElementById('bossRedSectionSel');
+            if (wrap) wrap.innerHTML = BOSS_RED_SECTIONS.map(s => `<button onclick="bossRedPickSection('${s}')" style="padding:6px 12px;border:none;border-radius:6px;cursor:pointer;font-size:0.8rem;${bossRedAdminSection === s ? 'background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;' : 'background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);'}">${s}</button>`).join('');
+            const isDeep = bossRedAdminSection === '深海';
+            const bw = document.getElementById('bossRedBossWrap');
+            if (bw) bw.style.display = isDeep ? 'block' : 'none';
+            const wl = document.getElementById('bossRedWaveLabel');
+            if (wl) wl.textContent = isDeep ? '③ 波次' : '② 波次';
+        }
+
+        function bossRedPickSection(s) { bossRedAdminSection = s; bossRedAdminBoss = null; bossRedRenderSectionSel(); bossRedRenderBossSel(); }
+
+        async function bossRedRenderBossSel() {
+            if (bossRedAdminSection !== '深海') return;
+            const data = await bossRedLoad();
+            const bosses = Object.keys(data['深海'] || {});
+            const wrap = document.getElementById('bossRedBossSel');
+            if (!wrap) return;
+            wrap.innerHTML = bosses.map(b => `<button onclick="bossRedPickBoss('${b.replace(/'/g, "\\'")}')" style="padding:5px 10px;border:none;border-radius:6px;cursor:pointer;font-size:0.78rem;${bossRedAdminBoss === b ? 'background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;' : 'background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);'}">${b}</button>`).join('') || '<span style="color:rgba(255,255,255,0.4);font-size:0.75rem;">暂无Boss，请在下方添加</span>';
+        }
+
+        function bossRedPickBoss(b) { bossRedAdminBoss = b; bossRedRenderBossSel(); }
+
+        async function bossRedAddBoss() {
+            const name = (document.getElementById('bossRedBossName').value || '').trim();
+            if (!name) { bossRedAdminStatus('请输入Boss名', 'error'); return; }
+            const data = await bossRedLoad();
+            if (!data['深海'][name]) data['深海'][name] = {};
+            await bossRedSave(data);
+            bossRedAdminBoss = name;
+            const bn = document.getElementById('bossRedBossName'); if (bn) bn.value = '';
+            bossRedRenderBossSel();
+            bossRedAdminStatus('已添加/确认Boss：' + name, 'success');
+        }
+
+        async function bossRedSaveEntry() {
+            const wave = parseInt((document.getElementById('bossRedWave').value || ''), 10);
+            const info = (document.getElementById('bossRedInfo').value || '');
+            if (!wave || wave <= 0) { bossRedAdminStatus('请输入有效波次', 'error'); return; }
+            if (bossRedAdminSection === '深海' && !bossRedAdminBoss) { bossRedAdminStatus('请先选择/添加Boss', 'error'); return; }
+            const data = await bossRedLoad();
+            const target = bossRedAdminSection === '深海' ? (data['深海'][bossRedAdminBoss] || (data['深海'][bossRedAdminBoss] = {})) : data[bossRedAdminSection];
+            if (info.trim() === '') { delete target[String(wave)]; }
+            else { target[String(wave)] = { info: info }; }
+            await bossRedSave(data);
+            bossRedAdminStatus('已保存 ' + bossRedAdminSection + (bossRedAdminBoss ? ('·' + bossRedAdminBoss) : '') + ' ' + wave + '波', 'success');
+            if (window.renderBossRed) renderBossRed();
+        }
+
+        async function bossRedDeleteEntry() {
+            const wave = parseInt((document.getElementById('bossRedWave').value || ''), 10);
+            if (!wave) { bossRedAdminStatus('请输入要删除的波次', 'error'); return; }
+            const data = await bossRedLoad();
+            const target = bossRedAdminSection === '深海' ? (data['深海'][bossRedAdminBoss] || {}) : data[bossRedAdminSection];
+            delete target[String(wave)];
+            await bossRedSave(data);
+            bossRedAdminStatus('已删除 ' + wave + '波', 'success');
+            if (window.renderBossRed) renderBossRed();
+        }
+
+        async function bossRedReload() { if (window.renderBossRed) await renderBossRed(); bossRedAdminStatus('已刷新', 'success'); }
+
+const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
         const WALL_BACKUP_DESC = 'TFJL 需求墙数据备份（私有）';
 
         function wallShowBackupStatus(msg, type) {
