@@ -14869,16 +14869,90 @@ function hasGistToken() {
                 </div>`).join('') : '<div style="color:rgba(255,255,255,0.5);text-align:center;padding:24px;">暂无分享数据，去需求墙分享第一个脚本吧！</div>';
         }
         // 个人贡献主页（点昵称打开）
+        // 去掉所有 http(s) 链接，只保留用户发出的纯文本（用于个人主页展示分享内容）
+        function stripAllUrls(t) { return (t || '').replace(/https?:\/\/\S+/gi, '').replace(/[ \t]*\n[ \t]*/g, '\n').replace(/\n{2,}/g, '\n').trim(); }
+        let _contribData = null;
+        function getProfile(nick) { try { return JSON.parse(localStorage.getItem('tfjl_profile_' + nick) || 'null') || { mood: '', bio: '' }; } catch (e) { return { mood: '', bio: '' }; } }
+        function setProfile(nick, mood, bio) { try { localStorage.setItem('tfjl_profile_' + nick, JSON.stringify({ mood: mood || '', bio: bio || '' })); } catch (e) {} }
+        // 复制某条分享的内容
+        function contribCopyContent(i) {
+            const item = _contribData && _contribData.shares[i]; if (!item) return;
+            const text = item.content || '';
+            try { navigator.clipboard.writeText(text); } catch (e) { const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); } catch (_) {} ta.remove(); }
+            showFloatToast('📋 已复制内容', 'rgba(79,195,247,0.9)');
+        }
+        // 下载该用户全部脚本
+        async function contribDownloadAll() {
+            if (!_contribData) return;
+            const scripts = _contribData.shares.filter(s => s.scriptUrl);
+            if (!scripts.length) { showFloatToast('该用户暂无可下载的脚本'); return; }
+            showFloatToast('📥 正在下载全部脚本（' + scripts.length + '）', 'rgba(79,195,247,0.9)');
+            for (const s of scripts) { try { await downloadScript(s.scriptUrl, s.isEncrypted, s.passwordHash); } catch (e) {} }
+        }
+        // 渲染个性资料（心情/说明），自己可编辑
+        function renderContribProfile(nick) {
+            const wrap = document.getElementById('contribProfileEdit'); if (!wrap) return;
+            wrap.dataset.editing = '0';
+            const p = getProfile(nick);
+            const me = localStorage.getItem('TFJL_UserName') || '';
+            const isSelf = me && me.toLowerCase() === nick.toLowerCase();
+            const moodHtml = p.mood ? `<div style="color:#ffd700;font-size:0.95rem;margin-bottom:4px;">💭 ${escapeHtml(p.mood)}</div>` : '';
+            const bioHtml = p.bio ? `<div style="color:rgba(255,255,255,0.75);font-size:0.8rem;line-height:1.4;">${escapeHtml(p.bio)}</div>` : '';
+            const editBtn = isSelf ? `<button onclick="contribToggleEditProfile()" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:5px;padding:3px 10px;font-size:0.72rem;cursor:pointer;margin-left:auto;">✏️ 编辑</button>` : '';
+            const placeholder = isSelf ? '（点「编辑」设置你的心情 / 个人说明）' : '（该用户暂未公开个性签名）';
+            const has = p.mood || p.bio;
+            wrap.innerHTML = `<div style="display:flex;align-items:center;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.6);font-size:0.78rem;">💬 个性资料</span>${editBtn}</div>` + (has ? moodHtml + bioHtml : `<div style="color:rgba(255,255,255,0.4);font-size:0.78rem;">${placeholder}</div>`);
+        }
+        function contribToggleEditProfile() {
+            const nick = _contribData ? _contribData.nick : '';
+            const wrap = document.getElementById('contribProfileEdit'); if (!wrap) return;
+            const p = getProfile(nick);
+            if (wrap.dataset.editing === '1') {
+                const mood = document.getElementById('contribMoodInput').value.trim();
+                const bio = document.getElementById('contribBioInput').value.trim();
+                setProfile(nick, mood, bio);
+                wrap.dataset.editing = '0'; renderContribProfile(nick);
+                showFloatToast('✅ 已保存个性资料', 'rgba(255,215,0,0.9)');
+            } else {
+                wrap.dataset.editing = '1';
+                wrap.innerHTML = `<input id="contribMoodInput" placeholder="心情（一句话，最多30字）" value="${escapeHtml(p.mood)}" maxlength="30" style="width:100%;background:rgba(255,255,255,0.1);border:1px solid rgba(255,215,0,0.4);border-radius:6px;padding:6px 10px;color:#ffd700;font-size:0.82rem;outline:none;margin-bottom:6px;">
+                    <textarea id="contribBioInput" placeholder="个人说明（最多120字）" maxlength="120" rows="2" style="width:100%;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:6px;padding:6px 10px;color:#fff;font-size:0.8rem;outline:none;resize:vertical;">${escapeHtml(p.bio)}</textarea>
+                    <button onclick="contribToggleEditProfile()" style="margin-top:6px;background:linear-gradient(135deg,#ffd700,#ff6b6b);color:#1a1a2e;border:none;padding:5px 16px;border-radius:5px;font-size:0.8rem;cursor:pointer;font-weight:bold;">💾 保存</button>`;
+            }
+        }
+        window.contribCopyContent = contribCopyContent;
+        window.contribDownloadAll = contribDownloadAll;
+        window.contribToggleEditProfile = contribToggleEditProfile;
+        window.renderContribProfile = renderContribProfile;
         function openContributionCard(nickEnc) {
             const nick = decodeURIComponent(nickEnc);
             const repMap = computeReputation();
             const e = repMap[nick] || { rep: 0, shares: 0, copies: 0, likes: 0, firstShare: 0 };
             const t = getTitle(e.rep);
-            const recent = wallMessages.filter(m => isShareMsg(m) && msgAuthor(m) === nick).slice(0, 8);
-            const recentHtml = recent.length ? recent.map(m =>
-                `<div style="padding:6px 8px;border-radius:6px;background:rgba(255,255,255,0.05);margin-bottom:6px;font-size:0.78rem;color:#fff;word-break:break-all;">${stripGithubUrls(escapeHtml(msgContent(m).slice(0, 60)))}${(m.copyCount || 0) > 0 ? ' <span style="color:rgba(255,215,0,0.7);">📥' + m.copyCount + '</span>' : ''}</div>`
-            ).join('') : '<div style="color:rgba(255,255,255,0.5);font-size:0.78rem;">还没有分享记录</div>';
+            const allShares = wallMessages.filter(m => isShareMsg(m) && msgAuthor(m) === nick);
+            window._contribData = { nick, shares: allShares.map(m => ({ content: stripAllUrls(msgContent(m)), scriptUrl: m.scriptUrl || '', isEncrypted: !!m.isEncrypted, passwordHash: m.passwordHash || '', copyCount: m.copyCount || 0, likes: m.likes || 0 })) };
+            const scriptCount = allShares.filter(m => m.scriptUrl).length;
             const pct = Math.round(t.progress * 100);
+            const shareItems = allShares.map((m, i) => {
+                const c = stripAllUrls(msgContent(m));
+                const dlBtn = m.scriptUrl ? `<a href="javascript:void(0)" onclick="downloadScript('${m.scriptUrl}'${m.isEncrypted ? `,true,'${(m.passwordHash || '').replace(/'/g, "\\'")}'` : ',false,\'\''})" style="color:#4fc3f7;text-decoration:none;cursor:pointer;background:rgba(79,195,247,0.1);padding:2px 8px;border-radius:5px;font-size:0.72rem;">📥</a>` : '';
+                return `<div style="padding:7px 9px;border-radius:6px;background:rgba(255,255,255,0.04);margin-bottom:6px;font-size:0.76rem;color:#fff;word-break:break-all;line-height:1.4;">
+                    <div style="margin-bottom:4px;">${escapeHtml(c) || '（分享脚本）'}</div>
+                    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                        <a href="javascript:void(0)" onclick="contribCopyContent(${i})" style="color:#4fc3f7;text-decoration:none;cursor:pointer;background:rgba(79,195,247,0.1);padding:2px 8px;border-radius:5px;font-size:0.72rem;">📋 复制</a>
+                        ${dlBtn}
+                        <span style="color:rgba(255,215,0,0.6);font-size:0.7rem;">📥 ${m.copyCount || 0}</span>
+                        <span style="color:rgba(255,107,107,0.6);font-size:0.7rem;">👍 ${m.likes || 0}</span>
+                    </div>
+                </div>`;
+            }).join('');
+            const sharesHtml = allShares.length ? `
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                    <span style="color:rgba(255,255,255,0.6);font-size:0.78rem;">全部分享（${allShares.length}）</span>
+                    ${scriptCount ? `<a href="javascript:void(0)" onclick="contribDownloadAll()" style="color:#4fc3f7;text-decoration:none;cursor:pointer;background:rgba(79,195,247,0.12);padding:3px 10px;border-radius:5px;font-size:0.74rem;">📥 下载全部脚本 (${scriptCount})</a>` : ''}
+                </div>
+                <div style="max-height:260px;overflow-y:auto;margin-bottom:10px;">${shareItems}</div>
+            ` : '<div style="color:rgba(255,255,255,0.5);font-size:0.78rem;margin-bottom:10px;">还没有分享记录</div>';
             const body = document.getElementById('contributionCardBody');
             if (body) body.innerHTML = `
                 <div style="text-align:center;margin-bottom:12px;">
@@ -14895,10 +14969,11 @@ function hasGistToken() {
                     <div style="flex:1;text-align:center;background:rgba(255,215,0,0.1);border-radius:8px;padding:8px 4px;"><div style="color:#ffd700;font-size:1.1rem;font-weight:bold;">${e.copies}</div><div style="font-size:0.68rem;color:rgba(255,255,255,0.6);">被复制</div></div>
                     <div style="flex:1;text-align:center;background:rgba(255,107,107,0.1);border-radius:8px;padding:8px 4px;"><div style="color:#ff6b6b;font-size:1.1rem;font-weight:bold;">${e.likes}</div><div style="font-size:0.68rem;color:rgba(255,255,255,0.6);">获赞</div></div>
                 </div>
-                <div style="color:rgba(255,255,255,0.6);font-size:0.78rem;margin-bottom:6px;">最近分享</div>
-                ${recentHtml}`;
+                <div id="contribProfileEdit" style="background:rgba(255,255,255,0.04);border-radius:8px;padding:10px 12px;margin-bottom:12px;"></div>
+                ${sharesHtml}`;
             const card = document.getElementById('contributionCard');
             if (card) card.style.display = 'flex';
+            renderContribProfile(nick);
         }
 
         function bumpPreviewCount(url) {
