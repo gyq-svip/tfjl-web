@@ -11860,6 +11860,30 @@ function hasGistToken() {
             return allTexts.join('　　◆　　');
         }
 
+        // 拍卖快讯显示开关（本机 localStorage）：关闭后公告弹窗只显示普通公告+需求咨询，隐藏拍卖快讯
+        let _auctionNewsVisible = true;
+        try { _auctionNewsVisible = localStorage.getItem('tdjl_auctionNewsVisible') !== '0'; } catch (e) {}
+        function toggleAuctionNewsVisibility() {
+            _auctionNewsVisible = !_auctionNewsVisible;
+            try { localStorage.setItem('tdjl_auctionNewsVisible', _auctionNewsVisible ? '1' : '0'); } catch (e) {}
+            updateAuctionNewsToggleStatus();
+            const modal = document.getElementById('newsListModal');
+            if (modal && modal.style.display === 'flex') showNewsListModal();
+            console.log('[公告] 拍卖快讯显示已' + (_auctionNewsVisible ? '开启' : '关闭'));
+        }
+        function updateAuctionNewsToggleStatus() {
+            const status = document.getElementById('auctionNewsToggleStatus');
+            if (status) {
+                status.textContent = _auctionNewsVisible ? '已开启' : '已关闭';
+                status.style.color = _auctionNewsVisible ? 'rgba(74,222,128,0.9)' : 'rgba(239,68,68,0.9)';
+            }
+        }
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', updateAuctionNewsToggleStatus);
+        } else {
+            updateAuctionNewsToggleStatus();
+        }
+
         function showNewsListModal() {
             const modal = document.getElementById('newsListModal');
             const content = document.getElementById('newsListContent');
@@ -11999,22 +12023,27 @@ function hasGistToken() {
                 }).join('');
             }
 
+            // 拍卖快讯显示开关（本机）：关闭后公告弹窗只显示普通公告+需求咨询
+            const auctionVis = _auctionNewsVisible;
+            const auctionCol = auctionVis
+                ? `<div style="flex:1;overflow-y:auto;max-height:65vh;padding:0 5px;border-right:1px solid rgba(255,107,107,0.15);">
+                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid rgba(255,107,107,0.2);">
+                            <span style="color:#ff6b6b;font-size:0.9rem;font-weight:600;">🔨 拍卖快讯</span>
+                            <span style="color:rgba(255,255,255,0.4);font-size:0.7rem;margin-left:auto;">${auctionBroadcastQueue.length}条</span>
+                        </div>
+                        ${auctionHtml}
+                    </div>`
+                : '';
             content.innerHTML = `
                 <div style="display:flex;gap:10px;min-height:300px;">
-                    <div style="flex:1;overflow-y:auto;max-height:65vh;padding-right:5px;border-right:1px solid rgba(255,215,0,0.15);">
+                    <div style="flex:1;overflow-y:auto;max-height:65vh;padding-right:5px;${auctionVis ? 'border-right:1px solid rgba(255,215,0,0.15);' : ''}">
                         <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid rgba(255,215,0,0.2);">
                             <span style="color:#ffd700;font-size:0.9rem;font-weight:600;">📢 普通公告</span>
                             <span style="color:rgba(255,255,255,0.4);font-size:0.7rem;margin-left:auto;">${activeItems.length}条</span>
                         </div>
                         ${normalHtml}
                     </div>
-                    <div style="flex:1;overflow-y:auto;max-height:65vh;padding:0 5px;border-right:1px solid rgba(255,107,107,0.15);">
-                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid rgba(255,107,107,0.2);">
-                            <span style="color:#ff6b6b;font-size:0.9rem;font-weight:600;">🔨 拍卖快讯</span>
-                            <span style="color:rgba(255,255,255,0.4);font-size:0.7rem;margin-left:auto;">${auctionBroadcastQueue.length}条</span>
-                        </div>
-                        ${auctionHtml}
-                    </div>
+                    ${auctionCol}
                     <div style="flex:1;overflow-y:auto;max-height:65vh;padding-left:5px;">
                         <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid rgba(255,152,0,0.2);">
                             <span style="color:#ff9800;font-size:0.9rem;font-weight:600;">💡 需求咨询</span>
