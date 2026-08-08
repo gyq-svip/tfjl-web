@@ -14382,6 +14382,7 @@ function hasGistToken() {
             toggle.style.display = 'flex';
             if (chatToggle) chatToggle.style.left = '68px';
             messageWallOpen = false;
+            const rp = document.getElementById('reputationPanel'); if (rp) rp.style.display = 'none'; // 墙关闭时收起贴附的声望榜
             updateWallAttention();
         }
         
@@ -14393,6 +14394,7 @@ function hasGistToken() {
             min.style.display = 'flex';
             if (chatToggle) chatToggle.style.left = '160px';
             messageWallOpen = false;
+            const rp = document.getElementById('reputationPanel'); if (rp) rp.style.display = 'none';
         }
         
         async function expandMessageWall() {
@@ -14633,17 +14635,24 @@ function hasGistToken() {
         }
         async function onShareCopy(b64) {
             const m = findWallMsg(b64); if (!m) return;
-            let text = msgContent(m) + (m.scriptUrl ? '\n' + m.scriptUrl : '');
-            // 加密分享特例：先要密码、解密、再拷明文（主人照样 +声望）
-            if (m.isEncrypted && m.scriptUrl) {
-                const pwd = prompt('该分享已加密，请输入密码以复制明文：');
-                if (!pwd) { showFloatToast('🔒 需密码才能复制明文（主人仍记录了你的获取）', 'rgba(255,193,7,0.9)'); return; }
+            let text;
+            if (m.scriptUrl) {
+                // 只复制脚本内容本身（不复制链接）；加密的先要密码解密再拷明文
                 try {
-                    const raw = await fetchScriptPlainText(m.scriptUrl);
-                    const dec = await decryptContent(raw, pwd);
-                    if (dec === null) { alert('❌ 解密失败，可能是密码不正确或文件已损坏'); return; }
-                    text = dec;
-                } catch (e) { alert('获取/解密失败: ' + e.message); return; }
+                    let raw = await fetchScriptPlainText(m.scriptUrl);
+                    if (m.isEncrypted) {
+                        const pwd = prompt('该分享已加密，请输入密码以复制明文：');
+                        if (!pwd) { showFloatToast('🔒 需密码才能复制明文', 'rgba(255,193,7,0.9)'); return; }
+                        const dec = await decryptContent(raw, pwd);
+                        if (dec === null) { alert('❌ 解密失败，可能是密码不正确或文件已损坏'); return; }
+                        raw = dec;
+                    }
+                    text = raw;
+                } catch (e) {
+                    text = msgContent(m) + (m.scriptUrl ? '\n' + m.scriptUrl : ''); // 网络失败才回退带链接
+                }
+            } else {
+                text = msgContent(m);
             }
             try { await navigator.clipboard.writeText(text); } catch (e) {
                 const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
@@ -14659,9 +14668,9 @@ function hasGistToken() {
                 localStorage.setItem('tfjl_copy_log', JSON.stringify(log));
                 m.copyCount = (m.copyCount || 0) + 1;
                 saveWallDebounced(); renderMessages();
-                showFloatToast('📋 已复制，感谢支持「' + owner + '」的分享！', 'rgba(79,195,247,0.9)');
+                showFloatToast('📋 已复制内容，感谢支持「' + owner + '」的分享！', 'rgba(79,195,247,0.9)');
             } else {
-                showFloatToast('📋 已复制到剪贴板', 'rgba(79,195,247,0.9)');
+                showFloatToast('📋 已复制内容', 'rgba(79,195,247,0.9)');
             }
         }
         async function onShareLike(b64) {
@@ -14694,13 +14703,15 @@ function hasGistToken() {
         }
         // 聚合所有分享者为声望榜（客户端计算，零存储）
         function computeReputation() {
+            const ANON = ['匿名用户', '匿名', 'anonymous', ''];
             const map = {};
             for (const m of wallMessages) {
                 if (!isShareMsg(m)) continue;
                 const a = msgAuthor(m); if (!a) continue;
-                if (!map[a]) map[a] = { rep: 0, shares: 0, copies: 0, likes: 0, firstShare: msgTime(m) };
+                if (ANON.includes(a) || a.toLowerCase() === '匿名用户') continue; // 排除无昵称的匿名用户
+                if (!map[a]) map[a] = { rep: 0, shares: 0, copies: 0, likes: 0, previews: 0, firstShare: msgTime(m) };
                 const e = map[a];
-                e.shares++; e.copies += (m.copyCount || 0); e.likes += (m.likes || 0);
+                e.shares++; e.copies += (m.copyCount || 0); e.likes += (m.likes || 0); e.previews += (m.previewCount || 0);
                 e.firstShare = Math.min(e.firstShare, msgTime(m));
             }
             for (const a in map) { const e = map[a]; e.rep = e.shares * SHARE_REP + e.copies * COPY_REP + e.likes * LIKE_REP; }
@@ -14745,11 +14756,12 @@ function hasGistToken() {
             else if (_repTab === 'share') list = arr.slice().sort((a, b) => b.shares - a.shares);
             else if (_repTab === 'copy') list = arr.slice().sort((a, b) => b.copies - a.copies);
             else if (_repTab === 'like') list = arr.slice().sort((a, b) => b.likes - a.likes);
+            else if (_repTab === 'preview') list = arr.slice().sort((a, b) => b.previews - a.previews);
             else if (_repTab === 'week') { const w = Date.now() - 7 * 864e5; list = arr.filter(a => a.firstShare >= w).sort((a, b) => b.rep - a.rep); }
             else if (_repTab === 'newcomer') { const w = Date.now() - 7 * 864e5; list = arr.filter(a => a.firstShare >= w).sort((a, b) => b.shares - a.shares); }
             const top = list.slice(0, 30);
             const medal = i => i === 0 ? '👑' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1) + '.';
-            const valOf = a => _repTab === 'share' ? a.shares + ' 分享' : _repTab === 'copy' ? a.copies + ' 被复制' : _repTab === 'like' ? a.likes + ' 赞' : a.rep + ' 声望';
+            const valOf = a => _repTab === 'share' ? a.shares + ' 分享' : _repTab === 'copy' ? a.copies + ' 被复制' : _repTab === 'like' ? a.likes + ' 赞' : _repTab === 'preview' ? a.previews + ' 预览' : a.rep + ' 声望';
             const el = document.getElementById('reputationList');
             if (!el) return;
             el.innerHTML = top.length ? top.map((a, i) =>
@@ -14790,6 +14802,12 @@ function hasGistToken() {
             if (card) card.style.display = 'flex';
         }
 
+        function bumpPreviewCount(url) {
+            try {
+                const m = wallMessages.find(x => x.scriptUrl && x.scriptUrl === url);
+                if (m) { m.previewCount = (m.previewCount || 0) + 1; saveWallDebounced(); }
+            } catch (e) {}
+        }
         async function renderMessages() {
             const scroller = document.getElementById('messageScroller');
             if (!scroller) return;
@@ -14878,10 +14896,10 @@ function hasGistToken() {
 
                 const _aRep = repMap[msgAuthor(msg)] ? repMap[msgAuthor(msg)].rep : 0;
                 const _aTitle = getTitle(_aRep).name;
-                const _authorHtml = `<span onclick="openContributionCard('${encodeURIComponent(msgAuthor(msg))}')" title="查看 ${escapeHtml(msgAuthor(msg))} 的贡献主页" style="color:#ffd700;cursor:pointer;text-decoration:underline;">${escapeHtml(msgAuthor(msg))}</span> <span style="color:rgba(255,215,0,0.6);font-size:0.7rem;">[${_aTitle}]</span>`;
+                const _whoHtml = `<span onclick="openContributionCard('${encodeURIComponent(msgAuthor(msg))}')" title="查看 ${escapeHtml(msgAuthor(msg))} 的贡献主页" style="color:#ffd700;cursor:pointer;text-decoration:underline;">${escapeHtml(msgAuthor(msg))}</span> <span style="color:rgba(255,215,0,0.6);font-size:0.7rem;">[${_aTitle}]</span> · ${timeAgo}${expireLabel}${encryptedLabel}${deleteBtn}`;
                 return `<div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:10px 12px;font-size:0.85rem;">
-                    <div style="color:#fff;margin-bottom:6px;line-height:1.5;">${contentHtml}</div>
-                    <div style="color:rgba(255,255,255,0.5);font-size:0.75rem;">${_authorHtml} · ${timeAgo}${expireLabel}${encryptedLabel}${deleteBtn}</div>
+                    <div style="color:rgba(255,255,255,0.6);font-size:0.75rem;margin-bottom:6px;">${_whoHtml}</div>
+                    <div style="color:#fff;line-height:1.5;">${contentHtml}</div>
                 </div>`;
             }).join('');
             
@@ -14892,6 +14910,7 @@ function hasGistToken() {
         // 预览需求墙分享的脚本文件
         // isEncrypted: 是否加密, passwordHash: v2 PBKDF2 哈希(或旧 SHA-256/fnv) 用于验证密码
         async function previewScriptFile(url, isEncrypted = false, passwordHash = '') {
+            bumpPreviewCount(url); // 预览榜计数（需求墙分享）
             // 加密文件先提示输入密码
             let decryptPassword = '';
             if (isEncrypted) {
@@ -16429,7 +16448,8 @@ ${maSection}
                         isShare: true,
                         likes: 0,
                         dislikes: 0,
-                        copyCount: 0
+                        copyCount: 0,
+                        previewCount: 0
                     };
                     if (passwordHash) msg.passwordHash = passwordHash;
                     if (recoveryKey) msg.encScheme = 'B';
@@ -16849,7 +16869,8 @@ ${maSection}
                     isShare: !!scriptUrl,
                     likes: 0,
                     dislikes: 0,
-                    copyCount: 0
+                    copyCount: 0,
+                    previewCount: 0
                 };
                 if (pendingScriptEnc) {
                     if (pendingScriptEnc.isEncrypted) newMsg.isEncrypted = true;
