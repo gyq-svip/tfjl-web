@@ -866,6 +866,9 @@ async fn download_skins(app: tauri::AppHandle) -> Result<String, String> {
         .map_err(|e| format!("下载皮肤包失败: {}。请检查网络或稍后重试", e))?;
 
     tokio::fs::write(&zip_path, &data).await.map_err(|e| e.to_string())?;
+    // 先删除旧的皮肤目录，再解压新包，避免残留旧皮肤文件导致显示异常 / 更新后不刷新
+    let _ = std::fs::remove_dir_all(&base);
+    let _ = std::fs::create_dir_all(&base);
     let _ = app.emit("skin-download-progress", serde_json::json!({"stage":"extract"}));
 
     #[cfg(windows)] {

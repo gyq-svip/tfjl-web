@@ -90,7 +90,12 @@
       catch (e) { console.warn('[SKIN-WEB] createObjectURL failed:', e); }
     }
     try {
-      var resp = await fetch(remoteUrl, { cache: 'force-cache' });
+      var ctrl = new AbortController();
+      var _timer = setTimeout(function () { ctrl.abort(); }, 10000);
+      var resp;
+      try { resp = await fetch(remoteUrl, { cache: 'force-cache', signal: ctrl.signal }); }
+      catch (e) { clearTimeout(_timer); return remoteUrl; }
+      clearTimeout(_timer);
       if (!resp.ok) return remoteUrl;
       var blob = await resp.blob();
       _idbPut(key, blob);
@@ -195,14 +200,11 @@
         }
       } catch (ae) { console.warn('[SKIN-WEB] load skin-attributes.json failed:', ae); }
       _preheatSkins(registry.heroes);
-      try {
-        if (typeof window.reapplyAllSkins === 'function') {
-          window.reapplyAllSkins();
-          console.log('[SKIN-WEB] 触发皮肤重刷');
-        }
-      } catch (e) { console.warn('[SKIN-WEB] 皮肤重刷失败:', e); }
     } catch (e) {
       console.warn('[SKIN-WEB] syncRemoteSkins() failed:', String(e).slice(0, 200));
+    } finally {
+      // 无论远端是否拉取成功都重刷一次：修复「远端失败时皮肤不重刷导致加载卡住不显示」的概率问题
+      try { if (typeof window.reapplyAllSkins === 'function') await window.reapplyAllSkins(); } catch(e2) {}
     }
   }
 

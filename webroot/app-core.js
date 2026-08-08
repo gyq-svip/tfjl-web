@@ -5916,19 +5916,38 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             return false;
         }
 
-        // 一键全部重置皮肤：清空所有自定义默认皮肤，重渲染所有卡牌/融合卡（无需逐英雄选择）
-        async function resetAllSkins() {
+        // 清空皮肤 IndexedDB 缓存（网页版/APP 共用 tfjl-skin-cache），避免旧 blob 滞留导致皮肤不刷新/异常
+        window.clearSkinIdbCache = async function() {
             try {
-                window.heroSkinSelections = {};
-                try { localStorage.removeItem('tdjl_heroSkinSelections'); } catch (e) {}
-                // 重渲染当前所有战斗槽位 + 全场刷新融合卡
+                if (!window.indexedDB) return;
+                const req = indexedDB.deleteDatabase('tfjl-skin-cache');
+                await new Promise(function (r) { req.onsuccess = r; req.onerror = r; req.onblocked = r; });
+                console.log('[SKIN] 已清空皮肤 IndexedDB 缓存');
+            } catch (e) {}
+        };
+
+        // 皮肤异常修复：清除皮肤缓存 + 重新扫描本地 + 强制重新拉取远程 + 重渲染
+        // （替代原「重置皮肤」：用于解决「加载时皮肤卡着不显示 / 显示异常」等问题，保留用户已选默认皮肤）
+        async function repairSkins() {
+            try {
+                // 1. 清皮肤缓存（网页版 IndexedDB / APP 磁盘图缓存）
+                if (typeof window.clearSkinIdbCache === 'function') { try { await window.clearSkinIdbCache(); } catch (e) {} }
+                // 2. 重新扫描本地皮肤 + 强制重新拉取远程注册表
+                if (typeof window.scanSkins === 'function') { try { await window.scanSkins(); } catch (e) {} }
+                if (typeof window.syncRemoteSkins === 'function') { try { await window.syncRemoteSkins(true); } catch (e) {} }
+                // 3. 重渲染当前所有战斗槽位 + 融合卡 + 手牌
+                if (typeof window.reapplyAllSkins === 'function') { try { await window.reapplyAllSkins(); } catch (e) {} }
                 if (typeof restoreBattleSlots === 'function') { try { await restoreBattleSlots(); } catch (e) {} }
                 if (typeof refreshAllFusionSkins === 'function') { try { await refreshAllFusionSkins(); } catch (e) {} }
                 if (typeof refreshProjectSelectors === 'function') refreshProjectSelectors();
-                console.log('[皮肤] 已全部重置为默认');
-            } catch (e) { console.warn('[皮肤] 重置失败:', e); }
+                showToast('🛠 皮肤资源已修复，正在重新渲染');
+                console.log('[皮肤] 异常修复完成');
+            } catch (e) {
+                console.warn('[皮肤] 修复失败:', e);
+                showToast('⚠️ 皮肤修复失败，请重试');
+            }
         }
-        window.resetAllSkins = resetAllSkins;
+        window.repairSkins = repairSkins;
 
         let customSkinAttributes = {};
         

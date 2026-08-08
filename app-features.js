@@ -3201,6 +3201,8 @@
         async function updateSkinsResource() {
             const t = showLoadingToast('🎨 正在更新皮肤资源...');
             try {
+                // 先清旧皮肤缓存（删除旧皮肤再下载新包，避免残留旧皮肤导致不刷新/异常）
+                if (typeof window.clearSkinIdbCache === 'function') { try { await window.clearSkinIdbCache(); } catch (e) {} }
                 const invokeFn = window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke;
                 if (typeof invokeFn === 'function') {
                     try {
