@@ -14298,6 +14298,365 @@ function hasGistToken() {
             } catch (e) { showToast('❌ 还原出错：' + (e.message || e)); }
         }
 
+        // ==================== 需求墙数据备份 / 还原（通用模板，移植自拍卖系统）====================
+        const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
+        const WALL_BACKUP_DESC = 'TFJL 需求墙数据备份（私有）';
+
+        function wallShowBackupStatus(msg, type) {
+            const el = document.getElementById('wallBackupStatus');
+            if (!el) return;
+            const bg = type === 'success' ? 'rgba(74,222,128,0.2)' : type === 'error' ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.1)';
+            const fg = type === 'success' ? '#4ade80' : type === 'error' ? '#ef4444' : '#fff';
+            el.innerHTML = `<div style="background:${bg};color:${fg};padding:10px;border-radius:6px;text-align:center;font-size:0.85rem;">${msg}</div>`;
+            if (type !== 'loading') setTimeout(() => { if (el) el.innerHTML = ''; }, 5000);
+        }
+
+        async function wallGetOrCreateBackupGist() {
+            const token = getGistToken();
+            if (!token) throw new Error('无Token');
+            let id = localStorage.getItem(WALL_BACKUP_GIST_KEY);
+            if (id) {
+                const r = await fetch(`https://api.github.com/gists/${id}`, { headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` } });
+                if (r.ok) return id;
+                localStorage.removeItem(WALL_BACKUP_GIST_KEY); id = null;
+            }
+            const c = await fetch('https://api.github.com/gists', { method: 'POST', headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` }, body: JSON.stringify({ description: WALL_BACKUP_DESC, public: false, files: { 'backup_info.json': { content: JSON.stringify({ created: Date.now(), type: 'wall_backup' }, null, 2) } } }) });
+            if (!c.ok) throw new Error('创建备份Gist失败');
+            const d = await c.json(); localStorage.setItem(WALL_BACKUP_GIST_KEY, d.id); return d.id;
+        }
+
+        async function wallResolveMessagesGistId() {
+            const gistDeleted = localStorage.getItem('messages_gist_deleted') === 'true';
+            let id = (!gistDeleted && MESSAGES_GIST_ID) ? MESSAGES_GIST_ID : (localStorage.getItem('messages_gist_id') || '');
+            if (!gistDeleted) {
+                try {
+                    const idxResp = await fetch(`https://api.github.com/gists/${GIST_ID}`, { headers: { 'Accept': 'application/vnd.github.v3+json' } });
+                    if (idxResp.ok) { const idxData = await idxResp.json(); const ri = idxData.files && idxData.files['room_index.json']; if (ri && ri.content) { const idx = JSON.parse(ri.content); if (idx.messages) { id = idx.messages; localStorage.setItem('messages_gist_id', id); } } }
+                } catch (e) {}
+            }
+            return id;
+        }
+
+        async function wallReadGistFile(gistId, fileName, token) {
+            const resp = await fetch(`https://api.github.com/gists/${gistId}`, { headers: { 'Accept': 'application/vnd.github.v3+json', ...(token && { 'Authorization': `token ${token}` }) } });
+            if (!resp.ok) return null;
+            const d = await resp.json(); const f = d.files && d.files[fileName]; if (!f) return null;
+            let content = f.content || '';
+            if (f.truncated) { const raw = await fetch(f.raw_url, { headers: { ...(token && { 'Authorization': `token ${token}` }) } }); if (raw.ok) content = await raw.text(); }
+            return content;
+        }
+
+        async function wallFetchScriptsForBackup(token) {
+            const out = [];
+            try {
+                let page = 1;
+                while (page <= 5) {
+                    const resp = await fetch(`https://api.github.com/gists?per_page=100&page=${page}`, { headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` } });
+                    if (!resp.ok) break;
+                    const gists = await resp.json();
+                    if (gists.length === 0) break;
+                    for (const g of gists) {
+                        if (g.description && g.description.includes('脚本分享')) {
+                            try {
+                                const detail = await fetch(`https://api.github.com/gists/${g.id}`, { headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` } });
+                                if (!detail.ok) continue;
+                                const dd = await detail.json(); const names = Object.keys(dd.files || {}); if (!names.length) continue;
+                                const fn = names[0]; let content = (dd.files[fn].content) || '';
+                                if (dd.files[fn].truncated) { const raw = await fetch(dd.files[fn].raw_url, { headers: { 'Authorization': `token ${token}` } }); if (raw.ok) content = await raw.text(); }
+                                const m = g.description.match(/脚本分享:\s*(.+)/); const realName = m ? m[1].trim() : fn;
+                                out.push({ gistId: g.id, description: g.description, fileName: realName, backupFileName: fn, content });
+                            } catch (e) {}
+                        }
+                    }
+                    if (gists.length < 100) break;
+                    page++;
+                }
+            } catch (e) {}
+            return out;
+        }
+
+        async function wallBackupAll() {
+            wallShowBackupStatus('⏳ 正在备份需求墙全部数据...', 'loading');
+            try {
+                const token = getGistToken(); if (!token) throw new Error('无Token');
+                const backupId = await wallGetOrCreateBackupGist();
+                const ts = Date.now();
+                const files = {};
+                wallShowBackupStatus('⏳ 备份消息...', 'loading');
+                const msgGistId = await wallResolveMessagesGistId();
+                let msgContent = null;
+                if (msgGistId) msgContent = await wallReadGistFile(msgGistId, 'messages.json', token);
+                if (msgContent) files[`content_messages_${ts}.json`] = { content: msgContent };
+                wallShowBackupStatus('⏳ 备份个人资料...', 'loading');
+                let profContent = null;
+                if (msgGistId) profContent = await wallReadGistFile(msgGistId, 'profiles.json', token);
+                if (profContent) files[`content_profiles_${ts}.json`] = { content: profContent };
+                wallShowBackupStatus('⏳ 备份脚本内容...', 'loading');
+                const scripts = await wallFetchScriptsForBackup(token);
+                const scriptsRef = [];
+                for (const s of scripts) {
+                    const safe = s.backupFileName.replace(/[^a-zA-Z0-9_\-.]/g, '_');
+                    const ext = s.backupFileName.includes('.') ? s.backupFileName.split('.').pop() : 'js';
+                    const bf = `content_script_${safe}_${ts}.${ext}`;
+                    files[bf] = { content: s.content };
+                    scriptsRef.push({ gistId: s.gistId, description: s.description, fileName: s.fileName, backupFile: bf });
+                }
+                const main = { timestamp: ts, date: new Date().toLocaleString('zh-CN'), type: 'wall_full_v1', messagesGistId: msgGistId, messageCount: msgContent ? (JSON.parse(msgContent).messages || []).length : 0, scriptCount: scripts.length, scripts: scriptsRef, files: { messages: msgContent ? `content_messages_${ts}.json` : null, profiles: profContent ? `content_profiles_${ts}.json` : null } };
+                files[`backup_wall_all_${ts}.json`] = { content: JSON.stringify(main, null, 2) };
+                const resp = await fetch(`https://api.github.com/gists/${backupId}`, { method: 'PATCH', headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` }, body: JSON.stringify({ files }) });
+                if (!resp.ok) throw new Error('保存备份失败');
+                wallShowBackupStatus(`✅ 备份成功！消息:${main.messageCount} 脚本:${main.scriptCount}`, 'success');
+                wallLoadBackupList();
+            } catch (e) { wallShowBackupStatus(`❌ 备份失败：${e.message}`, 'error'); }
+        }
+
+        async function wallLoadBackupList() {
+            const c = document.getElementById('wallBackupListContainer');
+            if (!c) return;
+            c.innerHTML = '<div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;">⏳ 加载中...</div>';
+            try {
+                const token = getGistToken(); if (!token) throw new Error('无Token');
+                const id = localStorage.getItem(WALL_BACKUP_GIST_KEY);
+                if (!id) { c.innerHTML = '<div style="color:rgba(255,255,255,0.5);text-align:center;">暂无备份</div>'; return; }
+                const resp = await fetch(`https://api.github.com/gists/${id}`, { headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` } });
+                if (!resp.ok) { c.innerHTML = '<div style="color:#ef4444;text-align:center;">加载失败</div>'; return; }
+                const d = await resp.json(); const all = Object.keys(d.files || {}).filter(n => n.startsWith('backup_wall_all_')).sort().reverse();
+                if (!all.length) { c.innerHTML = '<div style="color:rgba(255,255,255,0.5);text-align:center;">暂无备份</div>'; return; }
+                let html = `<div style="color:rgba(255,255,255,0.6);font-size:0.75rem;margin-bottom:8px;">📁 备份 ${all.length} 个</div>`;
+                all.forEach(fn => {
+                    const tm = fn.match(/_(\d{13})\.json$/); const disp = tm ? new Date(parseInt(tm[1])).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : fn;
+                    html += `<div style="background:rgba(255,255,255,0.05);border-radius:6px;padding:8px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+                        <span><span style="color:#ffd700;">📦 全量</span><span style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-left:8px;">${disp}</span></span>
+                        <div style="display:flex;gap:4px;">
+                            <button onclick="wallViewBackupDetail('${fn}')" style="background:rgba(255,255,255,0.1);border:none;color:#4ade80;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:0.75rem;">查看</button>
+                            <button onclick="wallExportBackup('${fn}')" style="background:rgba(255,255,255,0.1);border:none;color:#4fc3f7;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:0.75rem;">导出</button>
+                            <button onclick="wallDeleteBackup('${fn}')" style="background:rgba(239,68,68,0.2);border:none;color:#ef4444;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:0.75rem;">删除</button>
+                        </div></div>`;
+                });
+                c.innerHTML = html;
+            } catch (e) { c.innerHTML = `<div style="color:#ef4444;text-align:center;">加载失败：${e.message}</div>`; }
+        }
+
+        async function wallGetBackupFile(backupId, fileName, token) {
+            return await wallReadGistFile(backupId, fileName, token);
+        }
+
+        async function wallRestoreBackup(fileName, merge) {
+            const mEl = document.getElementById('wallBackupDetailModal'); if (mEl) mEl.remove();
+            if (!confirm(`⏳ 确定从该备份还原需求墙吗？\n模式：${merge ? '合并（保留当前新消息，补回丢失的）' : '覆盖（用备份完全替换当前）'}\n\n⚠️ 这将影响全部用户的需求墙！`)) return;
+            wallShowBackupStatus('⏳ 正在还原...', 'loading');
+            try {
+                const token = getGistToken(); if (!token) throw new Error('无Token');
+                const backupId = localStorage.getItem(WALL_BACKUP_GIST_KEY);
+                const mainContent = await wallGetBackupFile(backupId, fileName, token);
+                if (!mainContent) throw new Error('备份文件不存在');
+                const main = JSON.parse(mainContent);
+                const cf = main.files || {};
+                if (cf.messages && main.messagesGistId) {
+                    wallShowBackupStatus('⏳ 还原消息...', 'loading');
+                    const mc = await wallGetBackupFile(backupId, cf.messages, token);
+                    if (mc) {
+                        const bkMsgs = (JSON.parse(mc).messages) || [];
+                        let finalMsgs;
+                        if (merge) {
+                            const seen = new Set((wallMessages || []).map(x => x.time + '_' + x.author + '_' + (x.content || '').substring(0, 30)));
+                            finalMsgs = (wallMessages || []).slice();
+                            let added = 0;
+                            bkMsgs.forEach(x => { const k = x.time + '_' + x.author + '_' + (x.content || '').substring(0, 30); if (!seen.has(k)) { finalMsgs.push(x); seen.add(k); added++; } });
+                            finalMsgs.sort((a, b) => b.time - a.time);
+                            wallShowBackupStatus(`⏳ 合并：补回 ${added} 条，共 ${finalMsgs.length} 条...`, 'loading');
+                        } else {
+                            finalMsgs = bkMsgs.slice();
+                        }
+                        finalMsgs = finalMsgs.slice(0, MAX_MESSAGES);
+                        const resp = await fetch(`https://api.github.com/gists/${main.messagesGistId}`, { method: 'PATCH', headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` }, body: JSON.stringify({ files: { 'messages.json': { content: JSON.stringify({ messages: finalMsgs }, null, 2) } } }) });
+                        if (!resp.ok) throw new Error('消息还原写入失败');
+                    }
+                }
+                if (cf.profiles) {
+                    wallShowBackupStatus('⏳ 还原个人资料...', 'loading');
+                    const pc = await wallGetBackupFile(backupId, cf.profiles, token);
+                    if (pc) { try { await fetch(`https://api.github.com/gists/${main.messagesGistId}`, { method: 'PATCH', headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` }, body: JSON.stringify({ files: { 'profiles.json': { content: pc } } }) }); } catch (e) {} }
+                }
+                if (main.scripts && main.scripts.length) {
+                    wallShowBackupStatus('⏳ 还原脚本内容...', 'loading');
+                    for (const ref of main.scripts) {
+                        const sc = await wallGetBackupFile(backupId, ref.backupFile, token);
+                        if (!sc) continue;
+                        const hdr = { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` };
+                        const chk = await fetch(`https://api.github.com/gists/${ref.gistId}`, { headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` } });
+                        const body = JSON.stringify({ files: { [ref.fileName]: { content: sc } } });
+                        if (chk.ok) { await fetch(`https://api.github.com/gists/${ref.gistId}`, { method: 'PATCH', headers: hdr, body }); }
+                        else { await fetch('https://api.github.com/gists', { method: 'POST', headers: hdr, body: JSON.stringify({ description: ref.description, public: false, files: { [ref.fileName]: { content: sc } } }) }); }
+                    }
+                }
+                wallShowBackupStatus('✅ 还原成功！建议刷新页面查看', 'success');
+                if (typeof fetchMessages === 'function') fetchMessages();
+            } catch (e) { wallShowBackupStatus(`❌ 还原失败：${e.message}`, 'error'); }
+        }
+
+        async function wallViewBackupDetail(fileName) {
+            try {
+                const token = getGistToken();
+                const backupId = localStorage.getItem(WALL_BACKUP_GIST_KEY);
+                const content = await wallGetBackupFile(backupId, fileName, token);
+                const d = JSON.parse(content);
+                const html = `<div id="wallBackupDetailModal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:99999;display:flex;justify-content:center;align-items:center;">
+                    <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:12px;padding:20px;max-width:600px;width:90%;max-height:80vh;overflow-y:auto;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;"><h3 style="color:#ffd700;margin:0;">📋 备份详情</h3><button onclick="document.getElementById('wallBackupDetailModal').remove()" style="background:none;border:none;color:#fff;font-size:1.5rem;cursor:pointer;">✕</button></div>
+                        <div style="background:rgba(0,0,0,0.3);border-radius:8px;padding:12px;font-size:0.85rem;margin-bottom:12px;">
+                            <div style="color:#4ade80;">时间：${d.date || ''}</div>
+                            <div style="color:rgba(255,255,255,0.8);margin-top:6px;">消息数：${d.messageCount || 0}　脚本数：${d.scriptCount || 0}</div>
+                            <div style="color:rgba(255,255,255,0.6);font-size:0.75rem;margin-top:4px;">消息Gist：${(d.messagesGistId || '').substring(0,12)}…</div>
+                        </div>
+                        <div style="display:flex;gap:10px;">
+                            <button onclick="wallRestoreBackup('${fileName}', true)" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:0.82rem;">🔄 合并还原</button>
+                            <button onclick="wallRestoreBackup('${fileName}', false)" style="background:linear-gradient(135deg,#f97316,#ea580c);color:white;border:none;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:0.82rem;">⚠️ 覆盖还原</button>
+                            <button onclick="document.getElementById('wallBackupDetailModal').remove()" style="background:rgba(255,255,255,0.1);color:white;border:none;padding:8px 14px;border-radius:6px;cursor:pointer;">关闭</button>
+                        </div>
+                    </div></div>`;
+                document.body.insertAdjacentHTML('beforeend', html);
+            } catch (e) { alert('查看失败：' + e.message); }
+        }
+        async function wallExportBackup(fileName) {
+            try {
+                const token = getGistToken();
+                const backupId = localStorage.getItem(WALL_BACKUP_GIST_KEY);
+                const content = await wallGetBackupFile(backupId, fileName, token);
+                if (!content) { alert('读取失败'); return; }
+                const blob = new Blob([content], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a'); a.href = url; a.download = fileName; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+            } catch (e) { alert('导出失败：' + e.message); }
+        }
+        async function wallDeleteBackup(fileName) {
+            if (!confirm('⚠️ 确定删除该备份？不可恢复！')) return;
+            try {
+                const token = getGistToken(); if (!token) throw new Error('无Token');
+                const backupId = localStorage.getItem(WALL_BACKUP_GIST_KEY);
+                const resp = await fetch(`https://api.github.com/gists/${backupId}`, { method: 'PATCH', headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` }, body: JSON.stringify({ files: { [fileName]: null } }) });
+                if (resp.ok) { wallShowBackupStatus('✅ 已删除', 'success'); wallLoadBackupList(); } else throw new Error('删除失败');
+            } catch (e) { wallShowBackupStatus(`❌ 删除失败：${e.message}`, 'error'); }
+        }
+        function wallAdminShowBackup() { const p = document.getElementById('adminPageWallBackup'); if (p) p.style.display = 'block'; const o = document.getElementById('adminPageWallGist'); if (o) o.style.display = 'none'; const adm = document.getElementById('adminMenu'); if (adm) adm.style.display = 'none'; }
+
+        // ==================== 需求墙 Gist 文件管理（孤儿扫描+清理，移植自拍卖精细管理）====================
+        let _wallGistList = [];
+        let _wallScriptUrls = new Set();
+        async function wallLoadGistManager() {
+            const c = document.getElementById('wallGistListContainer'); const cnt = document.getElementById('wallGistCount');
+            const token = getGistToken();
+            if (!token) { if (c) c.innerHTML = '<div style="color:#ff6b6b;text-align:center;padding:20px;">请先设置Token</div>'; return; }
+            if (c) c.innerHTML = '<div style="color:#4ade80;text-align:center;padding:20px;">⏳ 扫描所有Gist...</div>';
+            try {
+                _wallGistList = []; let page = 1;
+                while (page <= 5) {
+                    const resp = await fetch(`https://api.github.com/gists?per_page=100&page=${page}`, { headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` } });
+                    if (!resp.ok) break;
+                    const gists = await resp.json(); if (gists.length === 0) break;
+                    const target = gists.filter(g => g.description && (g.description.includes('脚本分享') || g.description.includes('需求墙消息') || g.description.includes('需求墙数据备份') || g.description.includes('拍卖图片')));
+                    _wallGistList = _wallGistList.concat(target);
+                    if (gists.length < 100) break; page++;
+                }
+                _wallScriptUrls = new Set();
+                const msgId = await wallResolveMessagesGistId();
+                if (msgId) {
+                    const mc = await wallReadGistFile(msgId, 'messages.json', token);
+                    if (mc) { try { const ms = (JSON.parse(mc).messages) || []; ms.forEach(x => { if (x.scriptUrl) _wallScriptUrls.add(x.scriptUrl); }); } catch (e) {} }
+                }
+                _wallGistList = _wallGistList.map(g => ({ ...g, _info: wallParseGistInfo(g, msgId) }));
+                wallRenderGistList();
+            } catch (e) { if (c) c.innerHTML = `<div style="color:#ff6b6b;text-align:center;padding:20px;">❌ ${e.message}</div>`; }
+        }
+        function wallParseGistInfo(gist, currentMsgId) {
+            const info = { type: 'unknown', typeLabel: '⚪ 未知', typeColor: '#999', status: 'unknown', statusLabel: '⚪ 未知', statusColor: '#999', fileName: '', fileSize: 0, description: gist.description || '' };
+            const files = Object.keys(gist.files || {}); if (files.length) { info.fileName = files[0]; info.fileSize = gist.files[files[0]].size || 0; }
+            const desc = gist.description || '';
+            if (desc.includes('脚本分享')) {
+                info.type = 'script'; info.typeLabel = '📜 脚本'; info.typeColor = '#ff9800';
+                const m = desc.match(/脚本分享:\s*(.+)/); if (m) info.fileName = m[1].trim();
+                let ref = false; for (const u of _wallScriptUrls) { if (u.includes(gist.id) || u.includes(encodeURIComponent(info.fileName))) { ref = true; break; } }
+                if (ref) { info.status = 'active'; info.statusLabel = '🟢 被引用'; info.statusColor = '#4caf50'; } else { info.status = 'orphan'; info.statusLabel = '🔴 孤儿'; info.statusColor = '#ff6b6b'; }
+            } else if (desc.includes('需求墙消息')) {
+                info.type = 'message'; info.typeLabel = '📢 消息'; info.typeColor = '#2196f3';
+                if (currentMsgId && gist.id === currentMsgId) { info.status = 'current'; info.statusLabel = '🟢 当前使用'; info.statusColor = '#4caf50'; } else { info.status = 'orphan'; info.statusLabel = '🔴 孤儿'; info.statusColor = '#ff6b6b'; }
+            } else if (desc.includes('需求墙数据备份')) {
+                info.type = 'backup'; info.typeLabel = '💾 备份'; info.typeColor = '#a78bfa'; info.status = 'active'; info.statusLabel = '🟢 备份'; info.statusColor = '#4caf50';
+            } else if (desc.includes('拍卖图片')) {
+                info.type = 'image'; info.typeLabel = '🖼️ 图片'; info.typeColor = '#9c27b0'; info.status = 'unknown'; info.statusLabel = '⚪ 图片'; info.statusColor = '#999';
+            }
+            return info;
+        }
+        function wallRenderGistList() {
+            const c = document.getElementById('wallGistListContainer'); const cnt = document.getElementById('wallGistCount');
+            if (!c) return;
+            const typeF = document.getElementById('wallGistTypeFilter'); const statusF = document.getElementById('wallGistStatusFilter');
+            let filtered = _wallGistList;
+            if (typeF && typeF.value !== 'all') filtered = filtered.filter(g => g._info.type === typeF.value);
+            if (statusF && statusF.value !== 'all') filtered = filtered.filter(g => g._info.status === statusF.value);
+            const stats = { script: _wallGistList.filter(g => g._info.type === 'script').length, message: _wallGistList.filter(g => g._info.type === 'message').length, orphan: _wallGistList.filter(g => g._info.status === 'orphan').length, active: _wallGistList.filter(g => g._info.status === 'active' || g._info.status === 'current').length };
+            if (cnt) cnt.textContent = `(脚本${stats.script} 消息${stats.message} | 孤儿${stats.orphan} 在用${stats.active} | 显示${filtered.length})`;
+            if (!filtered.length) { c.innerHTML = '<div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;">无符合条件的Gist</div>'; return; }
+            const order = { orphan: 0, unknown: 1, active: 2, current: 3 };
+            filtered.sort((a, b) => order[a._info.status] - order[b._info.status]);
+            let html = '';
+            for (const g of filtered) {
+                const i = g._info; const sizeKB = (i.fileSize / 1024).toFixed(1);
+                const date = new Date(g.created).toLocaleDateString('zh-CN');
+                html += `<div style="background:rgba(0,0,0,0.2);border-radius:8px;padding:10px;margin-bottom:8px;border-left:3px solid ${i.statusColor};">
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <input type="checkbox" class="wall-gist-checkbox" data-gist-id="${g.id}" style="flex-shrink:0;">
+                        <div style="flex:1;min-width:0;">
+                            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
+                                <span style="color:${i.typeColor};font-weight:bold;font-size:0.8rem;">${i.typeLabel}</span>
+                                <span style="color:${i.statusColor};font-weight:bold;font-size:0.85rem;">${i.statusLabel}</span>
+                                <span style="color:rgba(255,255,255,0.4);font-size:0.7rem;">${date}</span>
+                                <span style="color:rgba(255,255,255,0.4);font-size:0.7rem;">${sizeKB}KB</span>
+                            </div>
+                            <div style="color:rgba(255,255,255,0.3);font-size:0.7rem;font-family:monospace;">ID: ${g.id.substring(0,12)}… | ${(i.description || '').substring(0,40)}</div>
+                        </div>
+                        <a href="https://gist.github.com/${g.id}" target="_blank" style="color:#4ade80;font-size:0.75rem;flex-shrink:0;">查看</a>
+                    </div></div>`;
+            }
+            c.innerHTML = html;
+        }
+        function wallFilterGistList() { wallRenderGistList(); }
+        function wallSelectOrphanGists() {
+            document.querySelectorAll('.wall-gist-checkbox').forEach(cb => {
+                const g = _wallGistList.find(x => x.id === cb.dataset.gistId);
+                cb.checked = !!(g && g._info.status === 'orphan');
+            });
+        }
+        async function wallDeleteSelectedGists() {
+            const cbs = document.querySelectorAll('.wall-gist-checkbox:checked');
+            if (!cbs.length) { alert('请先选择要删除的Gist'); return; }
+            const ids = Array.from(cbs).map(cb => cb.dataset.gistId);
+            if (!confirm(`⚠️ 将删除 ${ids.length} 个选中的Gist，删除后无法恢复！\n\n建议仅删除标记为「🔴 孤儿」的脚本Gist。`)) return;
+            const token = getGistToken(); if (!token) { alert('请先设置Token'); return; }
+            let ok = 0, fail = 0;
+            for (let k = 0; k < ids.length; k++) {
+                try { const r = await fetch(`https://api.github.com/gists/${ids[k]}`, { method: 'DELETE', headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` } }); if (r.ok) ok++; else fail++; } catch (e) { fail++; }
+                if (k < ids.length - 1) await new Promise(r => setTimeout(r, 300));
+            }
+            wallShowGistStatus(`✅ 删除完成：成功 ${ok}，失败 ${fail}`);
+            await wallLoadGistManager();
+        }
+        function wallShowGistStatus(msg) { const el = document.getElementById('wallGistStatus'); if (el) { el.innerHTML = `<div style="color:#ffa500;font-size:0.85rem;text-align:center;padding:10px;">${msg}</div>`; setTimeout(() => { if (el) el.innerHTML = ''; }, 5000); } }
+        function wallAdminShowGist() { const p = document.getElementById('adminPageWallGist'); if (p) p.style.display = 'block'; const o = document.getElementById('adminPageWallBackup'); if (o) o.style.display = 'none'; const adm = document.getElementById('adminMenu'); if (adm) adm.style.display = 'none'; }
+
+        window.wallBackupAll = wallBackupAll;
+        window.wallLoadBackupList = wallLoadBackupList;
+        window.wallViewBackupDetail = wallViewBackupDetail;
+        window.wallExportBackup = wallExportBackup;
+        window.wallDeleteBackup = wallDeleteBackup;
+        window.wallRestoreBackup = wallRestoreBackup;
+        window.wallAdminShowBackup = wallAdminShowBackup;
+        window.wallLoadGistManager = wallLoadGistManager;
+        window.wallFilterGistList = wallFilterGistList;
+        window.wallSelectOrphanGists = wallSelectOrphanGists;
+        window.wallDeleteSelectedGists = wallDeleteSelectedGists;
+        window.wallAdminShowGist = wallAdminShowGist;
+
         // 仅管理员可见还原按钮：URL 带 ?admin=1 或 localStorage.tfjl_admin=1 时才显示
         function showAdminRestoreBtnIfAllowed() {
             try {
