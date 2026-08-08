@@ -11389,6 +11389,11 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         
         // 当前配置
         let currentConfig = { ...DEFAULT_CONFIG };
+        // 启动预填：用上次从云端拉到的全网拍卖快讯开关值（避免缓存未刷新时回到默认"开启"）
+        try {
+            const _cachedAuction = localStorage.getItem('tdjl_auctionNews_cfg');
+            if (_cachedAuction !== null) currentConfig.auctionNews = JSON.parse(_cachedAuction);
+        } catch (e) {}
         
         // 新闻/公告数据
         let newsItems = [];
@@ -11753,6 +11758,8 @@ function hasGistToken() {
                 }
                 if (data && typeof data.auctionNews !== 'undefined') {
                     currentConfig.auctionNews = data.auctionNews;
+                    // 缓存云端值，普通用户即使当天未触发 Gist 刷新也能拿到全网开关状态
+                    try { localStorage.setItem('tdjl_auctionNews_cfg', JSON.stringify(currentConfig.auctionNews)); } catch (e) {}
                 }
                 
                 if (data && data.data && Array.isArray(data.data)) {
@@ -11873,12 +11880,19 @@ function hasGistToken() {
             const next = !_getAuctionNewsVisible();
             currentConfig.auctionNews = next;
             updateAuctionNewsToggleStatus();
-            // 立即重渲（缓存未刷新也能即时生效）
+            // 立即重渲弹窗 + 刷新跑马灯（即时生效，不必等云端/缓存）
             const modal = document.getElementById('newsListModal');
             if (modal && modal.style.display === 'flex') showNewsListModal();
+            updateMarqueeWithBroadcast();
+            // 本地缓存兜底：即使云端未同步或本机网络访问 Gist 失败，也能用上次云端值
+            try { localStorage.setItem('tdjl_auctionNews_cfg', JSON.stringify(next)); } catch (e) {}
             console.log('[公告] 拍卖快讯全网显示已' + (next ? '开启' : '关闭') + '，正在同步到云端...');
             try {
-                await adminSaveNewsToGist(newsItems);
+                // 先取最新公告再保存，避免用可能滞后的 newsItems 覆盖掉公告
+                const latest = await adminFetchNewsFromGist().catch(() => newsItems);
+                await adminSaveNewsToGist(latest || newsItems);
+                // 双保险：同步写入公开仓库 news.json（普通用户 fallback 源）
+                await saveAuctionNewsToRepo(next).catch(() => {});
                 console.log('[公告] 拍卖快讯全网开关已同步到云端');
             } catch (e) {
                 console.error('[公告] 拍卖快讯全网开关同步失败:', e);
@@ -18386,6 +18400,33 @@ ${maSection}
             if (!response.ok) {
                 const errData = await response.json().catch(() => ({}));
                 throw new Error(errData.message || `保存失败 HTTP ${response.status}`);
+            }
+        }
+
+        // 双保险：把拍卖快讯全网开关也写入公开仓库 news.json（NEWS_URL 同源）。
+        // 普通用户（无 token）若无法匿名读公告 Gist，会走 NEWS_URL fallback，
+        // 此文件公开可读，确保全网开关对普通用户也一定生效。
+        async function saveAuctionNewsToRepo(next) {
+            const token = getGistToken();
+            if (!token) return;
+            try {
+                const apiUrl = 'https://api.github.com/repos/gyq-svip/my-web-config/contents/news.json';
+                const headers = { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json' };
+                const getResp = await fetch(apiUrl, { headers });
+                if (!getResp.ok) return;
+                const fileData = await getResp.json();
+                const text = decodeURIComponent(escape(atob((fileData.content || '').replace(/\s/g, ''))));
+                let content;
+                try { content = JSON.parse(text); } catch (e) { return; }
+                content.auctionNews = next;
+                const newContent = btoa(unescape(encodeURIComponent(JSON.stringify(content, null, 2))));
+                await fetch(apiUrl, {
+                    method: 'PUT',
+                    headers: { ...headers, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: 'chore: update auctionNews global switch', content: newContent, sha: fileData.sha })
+                });
+            } catch (e) {
+                console.warn('[公告] 写仓库 news.json 的 auctionNews 失败(忽略):', e);
             }
         }
 
