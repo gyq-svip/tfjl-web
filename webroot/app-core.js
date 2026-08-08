@@ -18247,7 +18247,10 @@ ${maSection}
             const banner = document.createElement('div');
             banner.id = 'swUpdateBanner';
             banner.innerHTML = '<span class="sw-dot"></span>🎉 发现新版本，点我更新';
-            banner.onclick = function () { location.reload(true); };
+            banner.onclick = function () {
+                try { navigator.serviceWorker.ready.then(function(reg){ if(reg.waiting) reg.waiting.postMessage('SKIP_WAITING'); }); } catch(e){}
+                location.reload(true);
+            };
             const root = document.body || document.documentElement;
             if (root) root.appendChild(banner);
         }
