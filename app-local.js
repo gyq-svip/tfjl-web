@@ -580,6 +580,8 @@ if (isTauriApp) {
         loadSkinSelections();  // 恢复皮肤选择记录
         // 先扫描本地，再同步远程；如果并行会导致 scanSkins 清空 registry 把远程条目冲掉
         scanSkins().then(() => syncRemoteSkins());
+        // 兜底：启动 1.5s 后再重刷一次皮肤，确保即使首屏渲染早于皮肤索引就绪也能补上（修复概率性卡住不显示）
+        setTimeout(() => { try { if (typeof window.reapplyAllSkins === 'function') window.reapplyAllSkins(); } catch (e) {} }, 1500);
         console.log('[APP] APP本地功能已初始化, isTauriApp:', isTauriApp);
     }
 
@@ -3339,6 +3341,8 @@ if (isTauriApp) {
             existingRemote[heroName] = (skins || []).filter(s => s.remote && s.url);
         }
         window.skinRegistry = {};
+        // 清内存皮肤图缓存，避免重新扫描后仍命中旧 blob（更新/修复后拿不到新皮肤）
+        try { Object.keys(skinImageUrlCache).forEach(k => delete skinImageUrlCache[k]); } catch (e) {}
         console.log('[SKIN] softwareDataDir:', softwareDataDir);
         if (!softwareDataDir) { console.warn('[SKIN] No softwareDataDir, aborting scanSkins'); return window.skinRegistry; }
         const skinRoot = getSkinRootDir();
@@ -3388,6 +3392,8 @@ if (isTauriApp) {
             if (localSkins.length > 0) window.skinRegistry[heroName] = localSkins;
         }
         console.log('[SKIN] scanSkins() DONE, registry keys:', Object.keys(window.skinRegistry).join(',') || '(empty)');
+        // 扫描完本地皮肤后立刻重刷一次（不依赖远端同步，修复「加载时皮肤卡着不显示」概率问题）
+        try { if (typeof window.reapplyAllSkins === 'function') await window.reapplyAllSkins(); } catch (e) {}
         return window.skinRegistry;
     }
 
@@ -3501,18 +3507,11 @@ if (isTauriApp) {
             _downloadRemoteSkinsToLocal(registry.heroes);
             // IndexedDB 预热（APP/网页通用，无需 Tauri 文件系统）
             _preheatSkins(registry.heroes);
-
-            // 远程皮肤注册表就绪后，自动刷新已渲染的英雄皮肤（解决首次打开项目皮肤不显示）
-            try {
-                if (typeof window.reapplyAllSkins === 'function') {
-                    window.reapplyAllSkins();
-                    console.log('[SKIN] syncRemoteSkins() 触发皮肤重刷');
-                }
-            } catch(e) {
-                console.warn('[SKIN] 皮肤重刷失败:', e);
-            }
         } catch(e) {
             console.warn('[SKIN] syncRemoteSkins() failed:', String(e).slice(0, 200));
+        } finally {
+            // 无论远端是否拉取成功都重刷一次：修复「远端失败时皮肤不重刷导致加载卡住不显示」的概率问题
+            try { if (typeof window.reapplyAllSkins === 'function') await window.reapplyAllSkins(); } catch(e2) {}
         }
     }
 
@@ -3694,7 +3693,7 @@ if (isTauriApp) {
                 // 2. 网络下载 → 写 .skin 二进制缓存
                 try {
                     await _ensureSkinDiskDir(parsed.hero);
-                    const resp = await fetch(remoteUrl);
+                    const resp = await _fetchWithTimeout(remoteUrl, 10000);
                     if (!resp.ok) return remoteUrl;
                     const blob = await resp.blob();
                     try {
@@ -3712,7 +3711,7 @@ if (isTauriApp) {
             }
             // URL 解析失败，回退网络
             try {
-                const resp = await fetch(remoteUrl);
+                const resp = await _fetchWithTimeout(remoteUrl, 10000);
                 if (!resp.ok) return remoteUrl;
                 return URL.createObjectURL(await resp.blob());
             } catch(e) { return remoteUrl; }
