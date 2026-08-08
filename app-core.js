@@ -14483,7 +14483,193 @@ function hasGistToken() {
             if (window.renderBossRed) renderBossRed();
         }
 
-        async function bossRedReload() { if (window.renderBossRed) await renderBossRed(); bossRedAdminStatus('已刷新', 'success'); }
+        async function bossRedReload() { if (window.renderBossRed) await renderBossRed(); bossRedAdminStatus('已刷新', 'success'); }
+
+        // ===== 批量导入 / 导出（文本格式，方便批量编辑）=====
+        // 文本格式说明：
+        //   # 板块名            → 切换板块（寒冰/暗月/漩涡/深海）
+        //   @ Boss名            → 仅深海使用，切换 Boss
+        //   10波 | 信息...      → 一条数据（也支持 "10 | 信息" / "10波: 信息" / "10=信息"）
+        //   信息内多行：续行以两个空格或 Tab 开头，会拼到上一条信息里
+        //   空行 / 以 // 开头的行 → 忽略
+        function bossRedToText(data) {
+            const lines = [];
+            lines.push('// TFJL Boss减伤数据 —— 直接修改本文本后「导入」即可同步全网');
+            lines.push('// 格式： # 板块   @ Boss(仅深海)   波次 | 信息');
+            lines.push('// 信息想换行：下一行开头打两个空格');
+            lines.push('');
+            BOSS_RED_SECTIONS.forEach(sec => {
+                lines.push('# ' + sec);
+                if (sec === '深海') {
+                    const bosses = Object.keys(data['深海'] || {});
+                    if (!bosses.length) { lines.push('// （暂无Boss，可写： @ 南门 ）'); lines.push(''); return; }
+                    bosses.forEach(b => {
+                        lines.push('@ ' + b);
+                        const m = data['深海'][b] || {};
+                        Object.keys(m).map(Number).filter(n => !isNaN(n)).sort((a, x) => a - x).forEach(w => {
+                            const info = ((m[String(w)] || {}).info || '');
+                            lines.push(w + '波 | ' + info.split('\n')[0]);
+                            info.split('\n').slice(1).forEach(l => lines.push('  ' + l));
+                        });
+                        lines.push('');
+                    });
+                } else {
+                    const m = data[sec] || {};
+                    const ws = Object.keys(m).map(Number).filter(n => !isNaN(n)).sort((a, x) => a - x);
+                    if (!ws.length) lines.push('// （暂无数据，可写： 10波 | 减伤50% 血量2亿 ）');
+                    ws.forEach(w => {
+                        const info = ((m[String(w)] || {}).info || '');
+                        lines.push(w + '波 | ' + info.split('\n')[0]);
+                        info.split('\n').slice(1).forEach(l => lines.push('  ' + l));
+                    });
+                    lines.push('');
+                }
+            });
+            return lines.join('\n');
+        }
+
+        function bossRedParseText(text) {
+            const out = { '寒冰': {}, '暗月': {}, '漩涡': {}, '深海': {} };
+            let sec = null, boss = null, last = null;
+            let count = 0;
+            const rawLines = String(text || '').replace(/\r\n/g, '\n').split('\n');
+            for (let i = 0; i < rawLines.length; i++) {
+                const raw = rawLines[i];
+                const line = raw.trim();
+                // 续行：原始行以两个空格或 Tab 开头，且已有上一条
+                if (last && /^(\t| {2})/.test(raw) && line) { last.info += '\n' + line; continue; }
+                if (!line || line.startsWith('//')) continue;
+                if (line.startsWith('#')) {
+                    const name = line.replace(/^#+\s*/, '').trim();
+                    if (!BOSS_RED_SECTIONS.includes(name)) throw new Error('第' + (i + 1) + '行：未知板块「' + name + '」，只能是 ' + BOSS_RED_SECTIONS.join('/'));
+                    sec = name; boss = null; last = null; continue;
+                }
+                if (line.startsWith('@')) {
+                    const name = line.replace(/^@+\s*/, '').trim();
+                    if (sec !== '深海') throw new Error('第' + (i + 1) + '行：@Boss 只能用在「深海」板块下');
+                    if (!name) throw new Error('第' + (i + 1) + '行：Boss名为空');
+                    boss = name; if (!out['深海'][boss]) out['深海'][boss] = {}; last = null; continue;
+                }
+                const m = line.match(/^(\d+)\s*波?\s*[|:：=]\s*([\s\S]*)$/);
+                if (!m) throw new Error('第' + (i + 1) + '行无法识别：' + line.slice(0, 40) + '\n（正确写法： 10波 | 信息内容）');
+                if (!sec) throw new Error('第' + (i + 1) + '行：还没写板块，请先写一行 # 寒冰');
+                if (sec === '深海' && !boss) throw new Error('第' + (i + 1) + '行：深海需要先写一行 @ Boss名');
+                const wave = String(parseInt(m[1], 10));
+                const entry = { info: m[2].trim() };
+                if (sec === '深海') out['深海'][boss][wave] = entry; else out[sec][wave] = entry;
+                last = entry; count++;
+            }
+            return { data: out, count: count };
+        }
+
+        function bossRedCountEntries(data) {
+            let n = 0;
+            BOSS_RED_SECTIONS.forEach(s => {
+                if (s === '深海') Object.keys(data['深海'] || {}).forEach(b => { n += Object.keys(data['深海'][b] || {}).length; });
+                else n += Object.keys(data[s] || {}).length;
+            });
+            return n;
+        }
+
+        async function bossRedOpenIO() {
+            const box = document.getElementById('bossRedIOBox');
+            const ta = document.getElementById('bossRedIOText');
+            if (!box || !ta) return;
+            box.style.display = 'block';
+            bossRedAdminStatus('⏳ 正在从云端读取…', 'loading');
+            try {
+                const data = await bossRedLoad();
+                ta.value = bossRedToText(data);
+                bossRedAdminStatus('✅ 已载入云端数据（' + bossRedCountEntries(data) + ' 条），可直接编辑后点「导入并同步」', 'success');
+            } catch (e) {
+                ta.value = bossRedToText({ '寒冰': {}, '暗月': {}, '漩涡': {}, '深海': {} });
+                bossRedAdminStatus('⚠️ 云端读取失败，已给出空白模板', 'error');
+            }
+        }
+
+        function bossRedCloseIO() { const b = document.getElementById('bossRedIOBox'); if (b) b.style.display = 'none'; }
+
+        async function bossRedDownloadText() {
+            try {
+                const ta = document.getElementById('bossRedIOText');
+                let txt = ta && ta.value.trim() ? ta.value : bossRedToText(await bossRedLoad());
+                const blob = new Blob([txt], { type: 'text/plain;charset=utf-8' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = 'Boss减伤_' + new Date().toISOString().slice(0, 10) + '.txt';
+                document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+                bossRedAdminStatus('✅ 已导出为文件', 'success');
+            } catch (e) { bossRedAdminStatus('❌ 导出失败：' + (e.message || e), 'error'); }
+        }
+
+        function bossRedPickFile() { const f = document.getElementById('bossRedIOFile'); if (f) f.click(); }
+
+        function bossRedOnFile(input) {
+            const file = input && input.files && input.files[0];
+            if (!file) return;
+            const r = new FileReader();
+            r.onload = function () {
+                const box = document.getElementById('bossRedIOBox');
+                const ta = document.getElementById('bossRedIOText');
+                if (box) box.style.display = 'block';
+                if (ta) ta.value = String(r.result || '');
+                bossRedAdminStatus('📄 已读入文件，请核对后点「导入并同步」', 'success');
+            };
+            r.readAsText(file, 'utf-8');
+            input.value = '';
+        }
+
+        async function bossRedImportText(mode) {
+            const ta = document.getElementById('bossRedIOText');
+            if (!ta) return;
+            let parsed;
+            try { parsed = bossRedParseText(ta.value); }
+            catch (e) { bossRedAdminStatus('❌ 格式有误：' + (e.message || e), 'error'); return; }
+            if (!parsed.count) { bossRedAdminStatus('❌ 没解析到任何数据，请检查内容', 'error'); return; }
+            const isOverwrite = mode === 'overwrite';
+            const tip = isOverwrite
+                ? '【覆盖】将用文本内容完全替换云端数据（文本里没有的波次会被删除）。\n\n解析到 ' + parsed.count + ' 条，确定继续？'
+                : '【合并】把文本内容写入云端，同名波次以文本为准，云端其它数据保留。\n\n解析到 ' + parsed.count + ' 条，确定继续？';
+            if (!confirm(tip)) return;
+            bossRedAdminStatus('⏳ 正在同步到云端…', 'loading');
+            try {
+                let finalData;
+                if (isOverwrite) {
+                    finalData = parsed.data;
+                } else {
+                    const cloud = await bossRedLoad();
+                    finalData = cloud;
+                    BOSS_RED_SECTIONS.forEach(s => {
+                        if (s === '深海') {
+                            Object.keys(parsed.data['深海'] || {}).forEach(b => {
+                                if (!finalData['深海'][b]) finalData['深海'][b] = {};
+                                Object.assign(finalData['深海'][b], parsed.data['深海'][b]);
+                            });
+                        } else {
+                            finalData[s] = Object.assign({}, finalData[s] || {}, parsed.data[s] || {});
+                        }
+                    });
+                }
+                await bossRedSave(finalData);
+                bossRedAdminStatus('✅ 已同步到云端，共 ' + bossRedCountEntries(finalData) + ' 条，所有用户刷新即可看到', 'success');
+                if (window.renderBossRed) await renderBossRed();
+                if (bossRedAdminSection === '深海') bossRedRenderBossSel();
+            } catch (e) {
+                bossRedAdminStatus('❌ 同步失败：' + (e.message || e) + '（需管理员Token）', 'error');
+            }
+        }
+
+
+        window.bossRedOpenIO = bossRedOpenIO;
+        window.bossRedCloseIO = bossRedCloseIO;
+        window.bossRedDownloadText = bossRedDownloadText;
+        window.bossRedPickFile = bossRedPickFile;
+        window.bossRedOnFile = bossRedOnFile;
+        window.bossRedImportText = bossRedImportText;
+        window.bossRedToText = bossRedToText;
+        window.bossRedParseText = bossRedParseText;
+
 
 const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
         const WALL_BACKUP_DESC = 'TFJL 需求墙数据备份（私有）';
