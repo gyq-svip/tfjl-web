@@ -11979,7 +11979,7 @@ function hasGistToken() {
                 normalHtml = activeItems.map((item, index) => {
                     const category = item.category || '';
                     const name = item.name || '无标题';
-                    const contentText = item.content || '';
+                    const contentText = stripGithubUrls(item.content || '');
                     const author = item.author || '';
                     const time = item.publish_time || '';
 
@@ -12021,7 +12021,7 @@ function hasGistToken() {
                     return `
                         <div style="background:rgba(255,107,107,0.06);border:1px solid rgba(255,107,107,0.15);border-radius:8px;padding:10px 14px;margin-bottom:8px;">
                             <div style="display:flex;align-items:flex-start;gap:6px;">
-                                <div style="color:rgba(255,255,255,0.85);font-size:0.85rem;line-height:1.5;flex:1;">${item.text}</div>
+                                <div style="color:rgba(255,255,255,0.85);font-size:0.85rem;line-height:1.5;flex:1;">${stripGithubUrls(item.text)}</div>
                                 ${deleteBtn}
                             </div>
                             <div style="color:rgba(255,255,255,0.3);font-size:0.7rem;margin-top:4px;">${timeStr} · ${dateStr}</div>
@@ -12054,6 +12054,8 @@ function hasGistToken() {
                 wallHtml = recentWallMsgs.map((msg, index) => {
                     const timeAgo = formatMessageTime(msg.time);
                     let contentHtml = escapeHtml(msg.content);
+                    // 非分享消息：可见文本里若有 GitHub 地址一律剥离，不引导用户去 GitHub
+                    if (!msg.scriptUrl) contentHtml = stripGithubUrls(contentHtml);
 
                     // 判断是否可以删除（发布者可删自己的，管理员可删所有）
                     const isOwner = (msg.author || '').toLowerCase() === wallCurrentNickname.toLowerCase();
@@ -14348,6 +14350,9 @@ function hasGistToken() {
                 updateWallAttention();   // 打开即清除未读提醒
                 if (wallMessages.length === 0) fetchMessages();
                 initMessageWallDrag();
+                // 打开需求墙默认同时弹出右侧贡献排行榜
+                const rp = document.getElementById('reputationPanel');
+                if (rp) { rp.style.display = 'flex'; renderReputation(); }
             }
         }
         
@@ -14409,6 +14414,9 @@ function hasGistToken() {
             if (chatToggle) chatToggle.style.left = '68px';
             messageWallOpen = true;
             initMessageWallDrag();
+            // 展开需求墙时也默认弹出右侧贡献排行榜
+            const rp = document.getElementById('reputationPanel');
+            if (rp) { rp.style.display = 'flex'; renderReputation(); }
         }
         
         function initMessageWallDrag() {
@@ -14701,6 +14709,12 @@ function hasGistToken() {
                 <span style="color:rgba(255,215,0,0.7);">🏅 声望 +${SHARE_REP + (m.copyCount || 0) * COPY_REP + (m.likes || 0) * LIKE_REP}</span>
             </div>`;
         }
+        // 剥离任何可见文本里的 GitHub 下载地址（需求墙/公告都不引导用户去 GitHub 扒内容）
+        function stripGithubUrls(text) {
+            return (text || '').replace(/https?:\/\/(raw\.)?githubusercontent\.com\S+/gi, '')
+                                  .replace(/https?:\/\/gist\.github\.com\S+/gi, '')
+                                  .replace(/https?:\/\/github\.com\S+/gi, '');
+        }
         // 聚合所有分享者为声望榜（客户端计算，零存储）
         function computeReputation() {
             const ANON = ['匿名用户', '匿名', 'anonymous', ''];
@@ -14778,7 +14792,7 @@ function hasGistToken() {
             const t = getTitle(e.rep);
             const recent = wallMessages.filter(m => isShareMsg(m) && msgAuthor(m) === nick).slice(0, 8);
             const recentHtml = recent.length ? recent.map(m =>
-                `<div style="padding:6px 8px;border-radius:6px;background:rgba(255,255,255,0.05);margin-bottom:6px;font-size:0.78rem;color:#fff;word-break:break-all;">${escapeHtml(msgContent(m).slice(0, 60))}${(m.copyCount || 0) > 0 ? ' <span style="color:rgba(255,215,0,0.7);">📥' + m.copyCount + '</span>' : ''}</div>`
+                `<div style="padding:6px 8px;border-radius:6px;background:rgba(255,255,255,0.05);margin-bottom:6px;font-size:0.78rem;color:#fff;word-break:break-all;">${stripGithubUrls(escapeHtml(msgContent(m).slice(0, 60)))}${(m.copyCount || 0) > 0 ? ' <span style="color:rgba(255,215,0,0.7);">📥' + m.copyCount + '</span>' : ''}</div>`
             ).join('') : '<div style="color:rgba(255,255,255,0.5);font-size:0.78rem;">还没有分享记录</div>';
             const pct = Math.round(t.progress * 100);
             const body = document.getElementById('contributionCardBody');
@@ -14836,7 +14850,9 @@ function hasGistToken() {
             const html = validMessages.map((msg, index) => {
                 const timeAgo = formatMessageTime(msg.time);
                 let contentHtml = escapeHtml(msg.content);
-                
+                // 非分享消息：可见文本里若有 GitHub 地址一律剥离，不引导用户去 GitHub
+                if (!msg.scriptUrl) contentHtml = stripGithubUrls(contentHtml);
+
                 // 判断是否可以删除（发布者可删自己的，管理员可删所有）
                 const isOwner = msg.author.toLowerCase() === currentNickname.toLowerCase();
                 const canDelete = isOwner || isAdmin;
