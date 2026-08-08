@@ -17692,6 +17692,29 @@ ${maSection}
             }, 5000);
         }
 
+        // ==================== Service Worker 新版本自动提示 ====================
+        // SW 后台检测到新版本（网络内容≠缓存）会发 NEW_VERSION_READY，弹提示条让用户一键刷新
+        (function setupSwUpdateListener() {
+            if (!('serviceWorker' in navigator)) return;
+            navigator.serviceWorker.addEventListener('message', function (event) {
+                const data = event.data;
+                if (data && data.type === 'NEW_VERSION_READY') {
+                    showSwUpdateBanner();
+                }
+            });
+        })();
+
+        function showSwUpdateBanner() {
+            if (document.getElementById('swUpdateBanner')) return;
+            const banner = document.createElement('div');
+            banner.id = 'swUpdateBanner';
+            banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:linear-gradient(90deg,#ffd700,#ff8c00);color:#1a1a1a;font-size:0.85rem;font-weight:700;text-align:center;padding:9px 12px;cursor:pointer;box-shadow:0 2px 12px rgba(0,0,0,0.35);letter-spacing:0.5px;';
+            banner.textContent = '🎉 发现新版本，点击立即更新';
+            banner.onclick = function () { location.reload(true); };
+            const root = document.body || document.documentElement;
+            if (root) root.appendChild(banner);
+        }
+
         function updateAdminTokenStatus() {
             const token = getGistToken();
             const tokenSection = document.getElementById('adminTokenSection');
