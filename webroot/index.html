@@ -647,7 +647,12 @@
                                     <input type="number" id="calcBeixiangCurrentDay" value="2" min="1" style="width:100%;padding:7px;border-radius:6px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.3);color:#fff;font-size:0.9rem;box-sizing:border-box;" onchange="updateBeixiangRemainDays()">
                                 </div>
                             </div>
-                            <div style="color:rgba(255,255,255,0.5);font-size:0.72rem;margin-top:4px;">⏳ 剩余 <span id="calcBeixiangRemainDays" style="color:#ffd700;font-weight:bold;">--</span>（含今天，已扣今天已过时间；结束日期：<span id="calcBeixiangEndDateShow" style="color:#ffd700;">--</span>）</div>
+                            <div style="color:rgba(255,255,255,0.5);font-size:0.72rem;margin-top:4px;">⏳ 活动还剩 <span id="calcBeixiangRemainDays" style="color:#ffd700;font-weight:bold;">--</span>（结束日期：<span id="calcBeixiangEndDateShow" style="color:#ffd700;">--</span>）</div>
+                            <div style="color:rgba(255,255,255,0.5);font-size:0.72rem;margin:3px 0 8px;">⚔️ 还能打 <span id="calcBeixiangBattleDays" style="color:#4ecdc4;font-weight:bold;">--</span> 天的对战（每天5局整天算，不按小时折算）</div>
+                            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+                                <input type="checkbox" id="calcBeixiangTodayDone" style="width:16px;height:16px;cursor:pointer;" onchange="updateBeixiangRemainDays()">
+                                <label for="calcBeixiangTodayDone" style="color:rgba(255,255,255,0.75);font-size:0.78rem;cursor:pointer;">今天的 5 局已经打完了（战旗已计入上面"已有战旗"）</label>
+                            </div>
                             <div style="margin-bottom:10px;">
                                 <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;display:block;margin-bottom:4px;">每天能赢几局（共5局）：<span id="calcBeixiangWinRateLabel" style="color:#ffd700;font-weight:bold;">赢3局</span></label>
                                 <input type="range" id="calcBeixiangWinRate" min="0" max="5" value="3" step="1" style="width:100%;cursor:pointer;" oninput="document.getElementById('calcBeixiangWinRateLabel').textContent='赢'+this.value+'局';updateBeixiangRemainDays();">
@@ -780,7 +785,7 @@
                     <div id="menuDownloadDesktop" onclick="openDownloadModal();document.getElementById('backupMenu').style.display='none';" title="下载塔防精灵助手桌面版（Tauri），体验更流畅的本地文件管理" style="padding:8px 15px;cursor:pointer;color:#4fc3f7;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📥 下载桌面版</div>
                     <div id="menuToggleEffects" onclick="toggleVisualEffects();document.getElementById('backupMenu').style.display='none';" title="开关页面背景动画特效" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">✨ 背景特效：开</div>
                     <div id="menuCheckUpdateItem" onclick="menuCheckUpdate();document.getElementById('backupMenu').style.display='none';" title="检查是否有新版本可更新（仅桌面端）" style="padding:8px 15px;cursor:pointer;color:#81c784;display:none;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">🔄 检查更新</div>
-                    <div onclick="forceRefreshLatest();document.getElementById('backupMenu').style.display='none';" title="强制重新拉取最新资源（皮肤表、卡牌数据等）" style="padding:8px 15px;cursor:pointer;color:#ffd54f;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">♻️ 刷新最新资源</div>
+                    <div onclick="updateSkinsResource();document.getElementById('backupMenu').style.display='none';" title="更新皮肤资源：从 Gitee 下载皮肤包解压到本地（首次较慢，之后本地加载秒开）；本地化不可用时回退在线同步" style="padding:8px 15px;cursor:pointer;color:#ffd54f;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">🎨 更新皮肤资源</div>
                     <div onclick="if(window.resetAllSkins){window.resetAllSkins();}document.getElementById('backupMenu').style.display='none';" title="一键重置皮肤：清空所有手动设置的默认皮肤，让每张卡都恢复为「英雄同名那张」默认皮肤。融合卡/单卡一并刷新，不影响皮肤资源本身。" style="padding:8px 15px;cursor:pointer;color:#ffb74d;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">↺ 重置皮肤</div>
                     <div onclick="window.location.href='auction.html';document.getElementById('backupMenu').style.display='none';" style="display:none;padding:8px 15px;cursor:pointer;color:#fff;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">🏪 进入拍卖系统</div>
                     <div onclick="openHelpPage();document.getElementById('backupMenu').style.display='none';" title="打开帮助页面，查看使用说明" style="padding:8px 15px;cursor:pointer;color:#4fc3f7;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📖 帮助</div>
@@ -834,7 +839,7 @@
         </div>
 
         <!-- APP本地功能脚本（网页版不会执行任何代码，isTauriApp判断在文件内部） -->
-        <script defer src="app-local.js?v=26"></script>
+        <script defer src="app-local.js?v=30"></script>
         <!-- 阵容识别模块（独立入口 + 灌入脚本生成） -->
         
         <!-- 网页版皮肤系统（仅非 Tauri 浏览器执行；Tauri 由 app-local.js 负责，文件内部自动跳过） -->
@@ -1119,22 +1124,13 @@
             </div>
         </div>
 
-        <!-- ===== 通用筛选器：从卡池选英雄卡上阵 ===== -->
-        <div class="collapsible-section picker-bar" style="background:linear-gradient(135deg,rgba(0,188,212,0.18),rgba(123,97,255,0.14));border:1px solid rgba(0,188,212,0.35);">
-            <div class="collapsible-inner" style="padding:10px 12px;">
-                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-                    <button onclick="openPoolCardPicker()" data-tip="首字母或关键字搜全部英雄卡，点一下直接上阵" style="flex:1;min-width:180px;background:linear-gradient(135deg,#00bcd4,#7b61ff);color:#fff;border:none;padding:10px 14px;border-radius:8px;cursor:pointer;font-size:0.95rem;font-weight:bold;box-shadow:0 2px 8px rgba(0,188,212,0.3);">🔍 搜索选卡上阵（首字母/关键字）</button>
-                    <span style="font-size:0.72rem;color:rgba(255,255,255,0.5);">共 <b id="poolCardCount" style="color:#4ecdc4;">--</b> 张卡</span>
-                </div>
-            </div>
-        </div>
 
         <div class="collapsible-section favorite">
-            <div class="collapsible-header favorite open" onclick="toggleSection(this)">
+            <div class="collapsible-header favorite" onclick="toggleSection(this)">
                 <h3><span>⭐</span> 收藏 <span class="small-text">（点击卡片上的⭐添加/删除）</span></h3>
-                <span class="toggle-icon">▲</span>
+                <span class="toggle-icon">▼</span>
             </div>
-            <div class="collapsible-content open">
+            <div class="collapsible-content">
                 <div class="collapsible-inner">
                     <div id="favoriteCardsGrid">
                         <div class="no-favorites" id="noFavorites">暂无收藏，点击卡片上的⭐添加到收藏</div>
@@ -1475,118 +1471,78 @@
             </div>
 
             <div id="adminMenuSection" style="display:none;">
-                <h2 style="color:#ffd700;text-align:center;margin:0 0 15px 0;font-size:1.1rem;">🛡️ 管理员菜单</h2>
-                <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;">
-                    <div class="admin-menu-item" onclick="adminShowPage('help')" style="padding:10px;">
-                        <span style="font-size:1.1rem;">📖</span>
-                        <div style="margin-left:8px;">
-                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">使用说明</div>
-                        </div>
+                <h2 style="color:#ffd700;text-align:center;margin:0 0 10px 0;font-size:1rem;">🛡️ 管理员菜单</h2>
+                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;max-height:60vh;overflow-y:auto;padding-right:3px;">
+                    <div class="admin-menu-item" onclick="adminShowPage('help')">
+                        <span class="mi-emoji">📖</span>
+                        <div class="mi-text"><div class="mi-title">使用说明</div></div>
                     </div>
-                    <div class="admin-menu-item" onclick="adminShowPage('news')" style="padding:10px;">
-                        <span style="font-size:1.1rem;">📢</span>
-                        <div style="margin-left:8px;">
-                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">公告管理</div>
-                        </div>
+                    <div class="admin-menu-item" onclick="adminShowPage('news')">
+                        <span class="mi-emoji">📢</span>
+                        <div class="mi-text"><div class="mi-title">公告管理</div></div>
                     </div>
-                    <div class="admin-menu-item" onclick="adminShowPage('title')" style="padding:10px;">
-                        <span style="font-size:1.1rem;">🏷️</span>
-                        <div style="margin-left:8px;">
-                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">标题管理</div>
-                        </div>
+                    <div class="admin-menu-item" onclick="adminShowPage('title')">
+                        <span class="mi-emoji">🏷️</span>
+                        <div class="mi-text"><div class="mi-title">标题管理</div></div>
                     </div>
-                    <div class="admin-menu-item" onclick="adminShowPage('stats')" style="padding:10px;">
-                        <span style="font-size:1.1rem;">📊</span>
-                        <div style="margin-left:8px;">
-                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">访问统计</div>
-                        </div>
+                    <div class="admin-menu-item" onclick="adminShowPage('stats')">
+                        <span class="mi-emoji">📊</span>
+                        <div class="mi-text"><div class="mi-title">访问统计</div></div>
                     </div>
-                    <div class="admin-menu-item" onclick="openCardGroupManager()" style="padding:10px;">
-                        <span style="font-size:1.1rem;">🃏</span>
-                        <div style="margin-left:8px;">
-                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">卡组管理</div>
-                            <div style="color:rgba(255,255,255,0.5);font-size:0.68rem;">融合卡 / 融合皮肤</div>
-                        </div>
+                    <div class="admin-menu-item" onclick="openCardGroupManager()">
+                        <span class="mi-emoji">🃏</span>
+                        <div class="mi-text"><div class="mi-title">卡组管理</div><div class="mi-sub">融合卡 / 融合皮肤</div></div>
                     </div>
-                    <div class="admin-menu-item" onclick="adminShowPage('analytics')" style="padding:10px;">
-                        <span style="font-size:1.1rem;">📈</span>
-                        <div style="margin-left:8px;">
-                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">数据分析</div>
-                        </div>
+                    <div class="admin-menu-item" onclick="adminShowPage('analytics')">
+                        <span class="mi-emoji">📈</span>
+                        <div class="mi-text"><div class="mi-title">数据分析</div></div>
                     </div>
-                    <div class="admin-menu-item" onclick="adminShowPage('scriptStats')" style="padding:10px;">
-                        <span style="font-size:1.1rem;">📥</span>
-                        <div style="margin-left:8px;">
-                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">脚本下载</div>
-                        </div>
+                    <div class="admin-menu-item" onclick="adminShowPage('scriptStats')">
+                        <span class="mi-emoji">📥</span>
+                        <div class="mi-text"><div class="mi-title">脚本下载</div></div>
                     </div>
-                    <div class="admin-menu-item" onclick="adminShowPage('settings')" style="padding:10px;">
-                        <span style="font-size:1.1rem;">⚙️</span>
-                        <div style="margin-left:8px;">
-                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">系统设置</div>
-                        </div>
+                    <div class="admin-menu-item" onclick="adminShowPage('settings')">
+                        <span class="mi-emoji">⚙️</span>
+                        <div class="mi-text"><div class="mi-title">系统设置</div></div>
                     </div>
-                    <div class="admin-menu-item" onclick="adminShowPage('nickManage')" style="padding:10px;">
-                        <span style="font-size:1.1rem;">👤</span>
-                        <div style="margin-left:8px;">
-                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">昵称管理</div>
-                        </div>
+                    <div class="admin-menu-item" onclick="adminShowPage('nickManage')">
+                        <span class="mi-emoji">👤</span>
+                        <div class="mi-text"><div class="mi-title">昵称管理</div></div>
                     </div>
-                    <div class="admin-menu-item" onclick="adminShowPage('passwordManage')" style="padding:10px;">
-                        <span style="font-size:1.1rem;">🔑</span>
-                        <div style="margin-left:8px;">
-                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">密码管理</div>
-                        </div>
+                    <div class="admin-menu-item" onclick="adminShowPage('passwordManage')">
+                        <span class="mi-emoji">🔑</span>
+                        <div class="mi-text"><div class="mi-title">密码管理</div></div>
                     </div>
-                    <div class="admin-menu-item" onclick="adminShowPage('cacheManage')" style="padding:10px;">
-                        <span style="font-size:1.1rem;">🧹</span>
-                        <div style="margin-left:8px;">
-                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">清除缓存</div>
-                        </div>
+                    <div class="admin-menu-item" onclick="adminShowPage('cacheManage')">
+                        <span class="mi-emoji">🧹</span>
+                        <div class="mi-text"><div class="mi-title">清除缓存</div></div>
                     </div>
-                    <div class="admin-menu-item" onclick="adminShowPage('logStats')" style="padding:10px;">
-                        <span style="font-size:1.1rem;">🔍</span>
-                        <div style="margin-left:8px;">
-                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">调试日志</div>
-                        </div>
+                    <div class="admin-menu-item" onclick="adminShowPage('logStats')">
+                        <span class="mi-emoji">🔍</span>
+                        <div class="mi-text"><div class="mi-title">调试日志</div></div>
                     </div>
-                    <div class="admin-menu-item" onclick="toggleConsoleVisibility()" style="padding:10px;">
-                        <span style="font-size:1.1rem;">🖥️</span>
-                        <div style="margin-left:8px;">
-                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">浮动控制台</div>
-                            <div id="consoleToggleStatus" style="font-size:0.7rem;color:rgba(255,255,255,0.5);">已关闭</div>
-                        </div>
+                    <div class="admin-menu-item" onclick="adminRestoreFromBackup()">
+                        <span class="mi-emoji">🛡️</span>
+                        <div class="mi-text"><div class="mi-title">需求墙还原</div><div class="mi-sub">从备用Gist合并恢复</div></div>
                     </div>
-                    <div class="admin-menu-item" onclick="toggleAuctionNewsVisibility()" style="padding:10px;">
-                        <span style="font-size:1.1rem;">🛒</span>
-                        <div style="margin-left:8px;">
-                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">拍卖快讯显示</div>
-                            <div id="auctionNewsToggleStatus" style="font-size:0.7rem;color:rgba(255,255,255,0.5);">全网开启</div>
-                        </div>
+                    <div class="admin-menu-item" onclick="toggleConsoleVisibility()">
+                        <span class="mi-emoji">🖥️</span>
+                        <div class="mi-text"><div class="mi-title">浮动控制台</div><div id="consoleToggleStatus" class="mi-sub">已关闭</div></div>
                     </div>
-                    <div class="admin-menu-item" onclick="openDeepseaStats()" style="padding:10px;">
-                        <span style="font-size:1.1rem;">🌊</span>
-                        <div style="margin-left:8px;">
-                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">深海统计</div>
-                            <div style="font-size:0.7rem;color:rgba(255,255,255,0.5);">每日战况与杯数趋势</div>
-                        </div>
+                    <div class="admin-menu-item" onclick="toggleAuctionNewsVisibility()">
+                        <span class="mi-emoji">🛒</span>
+                        <div class="mi-text"><div class="mi-title">拍卖快讯显示</div><div id="auctionNewsToggleStatus" class="mi-sub">全网开启</div></div>
                     </div>
-                    <div class="admin-menu-item" onclick="openAlliancePage()" style="padding:10px;">
-                        <span style="font-size:1.1rem;">🛡️</span>
-                        <div style="margin-left:8px;">
-                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">盟战战绩</div>
-                            <div style="font-size:0.7rem;color:rgba(255,255,255,0.5);">联盟个人战绩 · 注册/登录/存Gist</div>
-                        </div>
+                    <div class="admin-menu-item" onclick="openDeepseaStats()">
+                        <span class="mi-emoji">🌊</span>
+                        <div class="mi-text"><div class="mi-title">深海统计</div><div class="mi-sub">每日战况与杯数趋势</div></div>
                     </div>
-                    <div class="admin-menu-item" onclick="adminRestoreFromBackup()" style="padding:10px;">
-                        <span style="font-size:1.1rem;">🛡️</span>
-                        <div style="margin-left:8px;">
-                            <div style="color:#ffd700;font-weight:500;font-size:0.85rem;">需求墙一键还原</div>
-                            <div style="color:rgba(255,255,255,0.5);font-size:0.68rem;">从备用Gist合并恢复</div>
-                        </div>
+                    <div class="admin-menu-item" onclick="openAlliancePage()">
+                        <span class="mi-emoji">🛡️</span>
+                        <div class="mi-text"><div class="mi-title">盟战战绩</div><div class="mi-sub">个人战绩 · 注册登录</div></div>
                     </div>
                 </div>
-                <button class="admin-btn" onclick="logoutToLogin()" style="width:100%;margin-top:12px;background:linear-gradient(135deg,#ef4444,#dc2626);color:white;">🔙 退出登录</button>
+                <button class="admin-btn" onclick="logoutToLogin()" style="width:100%;margin-top:10px;background:linear-gradient(135deg,#ef4444,#dc2626);color:white;">🔙 退出登录</button>
             </div>
 
             <div id="adminPageHelp" style="display:none;">
@@ -2263,7 +2219,7 @@
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">s20260808-026 · s1.0.26</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">s20260808-027 · s1.0.27</span>
             </div>
         </div>
     </div>
