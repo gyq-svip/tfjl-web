@@ -16967,45 +16967,59 @@ ${maSection}
         }
         window.insertEmoji = insertEmoji;
 
-        // 表情面板：点 😊 弹出，选中即插入；点外部/滚动关闭
+        // 表情面板：点 😊 弹出（固定定位挂 body，避免被输入框重渲染销毁），选中即插入；点外部关闭
         const EMOJI_LIST = ['😀','😁','😂','🤣','😊','😍','😘','😎','🤩','🥳','😜','🤔','😏','😭','😅','😡','👍','👎','👏','🙏','💪','🤝','✌️','🫡','❤️','💔','🔥','⭐','🎉','🎊','💡','✨','🐉','🐲','⚔️','🛡️','💰','🏆','🥇','🎯','🚀','💯','✅','❌','⚠️','💤','🌟','🌈','🍻','☕','🎮','📢','💬','📌','🔔','🔒','🆙','😴','🤯','😱','🥰','😇','🤗','🙄','😬','😋','🤤','🤑','🤓','😈','💀','👻','🤖','🌹','🍀','⚡','💥','🎁','🏅','🔥🔥','💢','🫢','🤌','🐶','🐱','🦁','🐯','🦄','🌝','🌚','❓','❗','💦','🍎','🥳🎉','😺','🤞','🫶'];
-        let _emojiPickerBound = false;
-        function toggleEmojiPicker() {
-            const picker = document.getElementById('emojiPicker');
-            const grid = document.getElementById('emojiPickerGrid');
-            if (!picker || !grid) return;
-            const open = picker.style.display === 'none' || !picker.style.display;
-            if (open) {
-                if (!grid.childElementCount) {
-                    EMOJI_LIST.forEach(em => {
-                        const b = document.createElement('button');
-                        b.type = 'button';
-                        b.textContent = em;
-                        b.title = em;
-                        b.style.cssText = 'background:transparent;border:none;border-radius:6px;padding:4px 0;font-size:1.15rem;line-height:1;cursor:pointer;';
-                        b.onmouseover = () => b.style.background = 'rgba(255,215,0,0.18)';
-                        b.onmouseout = () => b.style.background = 'transparent';
-                        b.onclick = (ev) => { ev.stopPropagation(); insertEmoji(em); };
-                        grid.appendChild(b);
-                    });
-                }
-                // 定位到表情按钮正下方
-                const btn = document.getElementById('emojiToggleBtn');
-                const wrap = picker.parentElement;
-                picker.style.bottom = 'auto';
-                picker.style.top = (btn.offsetTop + btn.offsetHeight + 6) + 'px';
-                picker.style.left = btn.offsetLeft + 'px';
+        let _emojiJustOpened = false;
+        let _emojiDocBound = false;
+        function toggleEmojiPicker(e) {
+            if (e) { e.stopPropagation(); e.preventDefault(); }
+            let picker = document.getElementById('emojiPicker');
+            // 面板挂到 body，避免作为输入框子节点被重渲染销毁
+            if (!picker) {
+                picker = document.createElement('div');
+                picker.id = 'emojiPicker';
+                picker.style.cssText = 'position:fixed;z-index:100002;width:248px;max-height:192px;overflow-y:auto;background:rgba(26,26,46,0.97);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(255,215,0,0.35);border-radius:10px;padding:8px;box-shadow:0 8px 28px rgba(0,0,0,0.5);display:none;';
+                const grid = document.createElement('div');
+                grid.id = 'emojiPickerGrid';
+                grid.style.cssText = 'display:grid;grid-template-columns:repeat(7,1fr);gap:3px;';
+                EMOJI_LIST.forEach(em => {
+                    const b = document.createElement('button');
+                    b.type = 'button';
+                    b.textContent = em;
+                    b.title = em;
+                    b.style.cssText = 'background:transparent;border:none;border-radius:6px;padding:4px 0;font-size:1.15rem;line-height:1;cursor:pointer;';
+                    b.onmouseover = () => b.style.background = 'rgba(255,215,0,0.18)';
+                    b.onmouseout = () => b.style.background = 'transparent';
+                    b.onclick = (ev) => { ev.stopPropagation(); insertEmoji(em); };
+                    grid.appendChild(b);
+                });
+                picker.appendChild(grid);
+                document.body.appendChild(picker);
+            }
+            const btn = document.getElementById('emojiToggleBtn');
+            const willOpen = picker.style.display === 'none' || !picker.style.display;
+            if (willOpen) {
+                const r = btn.getBoundingClientRect();
+                let top = r.bottom + 6;
+                // 面板高度约 192+padding，超出视口则翻到按钮上方
+                if (top + 210 > window.innerHeight) top = r.top - 210;
+                let left = r.left;
+                if (left + 248 > window.innerWidth) left = window.innerWidth - 248 - 6;
+                picker.style.top = Math.max(6, top) + 'px';
+                picker.style.left = Math.max(6, left) + 'px';
                 picker.style.display = 'block';
-                if (!_emojiPickerBound) {
-                    _emojiPickerBound = true;
-                    document.addEventListener('click', (e) => {
+                _emojiJustOpened = true;
+                setTimeout(() => { _emojiJustOpened = false; }, 0);
+                if (!_emojiDocBound) {
+                    _emojiDocBound = true;
+                    document.addEventListener('click', (ev) => {
+                        if (_emojiJustOpened) return;
                         const p = document.getElementById('emojiPicker');
-                        if (p && p.style.display !== 'none' && !p.contains(e.target) && e.target.id !== 'emojiToggleBtn' && !(e.target.closest && e.target.closest('#emojiToggleBtn'))) {
-                            p.style.display = 'none';
-                        }
+                        if (!p || p.style.display === 'none') return;
+                        if (p.contains(ev.target)) return;
+                        if (ev.target && ev.target.id === 'emojiToggleBtn') return;
+                        p.style.display = 'none';
                     }, true);
-                    const wall = document.getElementById('messageWallContent');
-                    if (wall) wall.addEventListener('scroll', () => { const p = document.getElementById('emojiPicker'); if (p) p.style.display = 'none'; }, true);
                 }
             } else {
                 picker.style.display = 'none';

@@ -271,12 +271,9 @@
             // 监听 SW 通知：后台已拉到新版本
             navigator.serviceWorker.addEventListener('message', function(event) {
                 if (event.data && event.data.type === 'NEW_VERSION_READY') {
-                    // 标记「已有新版本」→ 版本号变绿 + 弹卡片（只有真有新版本才触发）
+                    // 标记「已有新版本」→ 版本号变绿（更新提示统一用 app-core.js 左下角彩色气泡）
                     window.__tfjlHasNewVersion = true;
                     _markNewVersionAvailable();
-                    showNewVersionReadyBar();
-                    // 注意：不再自动刷新！必须由用户主动点击更新条/版本标签才刷新，
-                    // 否则用户正在写的东西会被打断、且在 WebView2 下易蓝屏卡死。
                 }
                 // SW 回报的缓存版本号（如 tfjl-v62）→ 显示在右下角版本标签，便于核对缓存是否更新
                 if (event.data && event.data.type === 'SW_VERSION') {
@@ -335,41 +332,6 @@
                     console.warn('[PWA] Service Worker 注册失败:', err);
                 });
             });
-        }
-
-        // 右下角「新版本已就绪」悬浮卡片（精致、不打扰，点一下刷新即用新版）
-        let _newVersionBarShown = false;
-        function showNewVersionReadyBar() {
-            if (_newVersionBarShown) return;
-            _newVersionBarShown = true;
-            const card = document.createElement('div');
-            card.style.cssText = 'position:fixed;bottom:24px;right:16px;z-index:100001;background:rgba(26,26,46,0.92);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);color:#fff;padding:14px 16px;border-radius:14px;display:flex;align-items:center;gap:12px;font-size:0.85rem;cursor:pointer;box-shadow:0 8px 28px rgba(0,0,0,0.45);border:1px solid rgba(76,175,80,0.4);max-width:300px;transform:translateX(120%);transition:transform 0.4s cubic-bezier(0.22,1,0.36,1);';
-            card.innerHTML = '<div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#4caf50,#2e7d32);display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0;">🔄</div>'
-                           + '<div style="flex:1;min-width:0;"><div style="font-weight:600;color:#81c784;line-height:1.3;">新版本已就绪</div><div style="font-size:0.75rem;color:rgba(255,255,255,0.6);margin-top:2px;">点击立即刷新使用</div></div>';
-            const closeBtn = document.createElement('div');
-            closeBtn.textContent = '✕';
-            closeBtn.style.cssText = 'opacity:0.5;cursor:pointer;padding:2px 6px;font-size:0.8rem;flex-shrink:0;border-radius:4px;';
-            closeBtn.onmouseenter = function() { closeBtn.style.opacity = '1'; closeBtn.style.background = 'rgba(255,255,255,0.1)'; };
-            closeBtn.onmouseleave = function() { closeBtn.style.opacity = '0.5'; closeBtn.style.background = 'transparent'; };
-            closeBtn.onclick = function(e) {
-                e.stopPropagation();
-                card.style.transform = 'translateX(120%)';
-                setTimeout(() => { card.remove(); _newVersionBarShown = false; }, 400);
-            };
-            card.appendChild(closeBtn);
-            card.onclick = function() {
-                // 主动激活等待中的新 SW（已不再 skipWaiting，需手动让其接管），再刷新
-                try {
-                    navigator.serviceWorker.ready.then(function(reg) {
-                        if (reg.waiting) reg.waiting.postMessage('SKIP_WAITING');
-                    });
-                } catch (e) {}
-                // 强制从网络重新加载，确保拿到后台已拉取的最新资源
-                location.reload(true);
-            };
-            document.body.appendChild(card);
-            // 触发滑入动画
-            requestAnimationFrame(() => { card.style.transform = 'translateX(0)'; });
         }
 
         // 点击右下角版本号 → 弹出版本详情 + 强制刷新（解决「看不清版本/跟不上新版」痛点）
