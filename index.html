@@ -2103,19 +2103,11 @@
                 <input type="text" id="messageInput" placeholder="发点什么…（回车发布）" maxlength="200" style="flex:1;min-width:0;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:5px;padding:8px 10px;color:#fff;font-size:0.85rem;outline:none;" onfocus="this.style.borderColor='#ffd700'" onblur="this.style.borderColor='rgba(255,255,255,0.2)'" onkeydown="if(event.key==='Enter')postMessage()">
                 <button onclick="postMessage()" style="background:linear-gradient(135deg,#ffd700,#ff6b6b);color:#1a1a2e;border:none;padding:8px 14px;border-radius:5px;font-size:0.85rem;cursor:pointer;font-weight:bold;flex-shrink:0;">发布</button>
             </div>
-            <div style="display:flex;gap:5px;margin-top:8px;align-items:center;flex-wrap:wrap;">
-                <span style="color:rgba(255,255,255,0.4);font-size:0.72rem;align-self:center;">表情:</span>
-                <button type="button" onclick="insertEmoji('😀')" style="background:rgba(255,255,255,0.08);border:none;border-radius:5px;padding:3px 7px;font-size:1rem;cursor:pointer;">😀</button>
-                <button type="button" onclick="insertEmoji('😂')" style="background:rgba(255,255,255,0.08);border:none;border-radius:5px;padding:3px 7px;font-size:1rem;cursor:pointer;">😂</button>
-                <button type="button" onclick="insertEmoji('😍')" style="background:rgba(255,255,255,0.08);border:none;border-radius:5px;padding:3px 7px;font-size:1rem;cursor:pointer;">😍</button>
-                <button type="button" onclick="insertEmoji('👍')" style="background:rgba(255,255,255,0.08);border:none;border-radius:5px;padding:3px 7px;font-size:1rem;cursor:pointer;">👍</button>
-                <button type="button" onclick="insertEmoji('🔥')" style="background:rgba(255,255,255,0.08);border:none;border-radius:5px;padding:3px 7px;font-size:1rem;cursor:pointer;">🔥</button>
-                <button type="button" onclick="insertEmoji('🎉')" style="background:rgba(255,255,255,0.08);border:none;border-radius:5px;padding:3px 7px;font-size:1rem;cursor:pointer;">🎉</button>
-                <button type="button" onclick="insertEmoji('❤️')" style="background:rgba(255,255,255,0.08);border:none;border-radius:5px;padding:3px 7px;font-size:1rem;cursor:pointer;">❤️</button>
-                <button type="button" onclick="insertEmoji('💡')" style="background:rgba(255,255,255,0.08);border:none;border-radius:5px;padding:3px 7px;font-size:1rem;cursor:pointer;">💡</button>
-                <button type="button" onclick="insertEmoji('🤔')" style="background:rgba(255,255,255,0.08);border:none;border-radius:5px;padding:3px 7px;font-size:1rem;cursor:pointer;">🤔</button>
-                <button type="button" onclick="insertEmoji('🐉')" style="background:rgba(255,255,255,0.08);border:none;border-radius:5px;padding:3px 7px;font-size:1rem;cursor:pointer;">🐉</button>
-                <button type="button" onclick="insertEmoji('⚔️')" style="background:rgba(255,255,255,0.08);border:none;border-radius:5px;padding:3px 7px;font-size:1rem;cursor:pointer;">⚔️</button>
+            <div style="display:flex;gap:5px;margin-top:8px;align-items:center;">
+                <button type="button" id="emojiToggleBtn" onclick="toggleEmojiPicker()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:4px 9px;font-size:1.05rem;cursor:pointer;" title="表情">😊</button>
+                <div id="emojiPicker" style="display:none;position:absolute;bottom:0;left:0;z-index:100002;width:248px;max-height:192px;overflow-y:auto;background:rgba(26,26,46,0.97);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(255,215,0,0.35);border-radius:10px;padding:8px;box-shadow:0 8px 28px rgba(0,0,0,0.5);" onclick="event.stopPropagation()">
+                    <div id="emojiPickerGrid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;"></div>
+                </div>
             </div>
             <div style="display:flex;gap:8px;margin-top:8px;align-items:center;">
                 <input type="file" id="scriptFileInput" accept=".txt,.js,.json,.lua,.py,.sh" style="display:none;" onchange="handleScriptUpload(this)">
@@ -2266,7 +2258,7 @@
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">s20260808-044 · s1.0.44</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">s20260808-045 · s1.0.45</span>
             </div>
         </div>
     </div>

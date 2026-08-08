@@ -16963,8 +16963,55 @@ ${maSection}
             input.value = input.value.slice(0, s) + emoji + input.value.slice(e);
             const pos = s + emoji.length;
             try { input.focus(); input.setSelectionRange(pos, pos); } catch (_) {}
+            input.dispatchEvent(new Event('input'));
         }
         window.insertEmoji = insertEmoji;
+
+        // 表情面板：点 😊 弹出，选中即插入；点外部/滚动关闭
+        const EMOJI_LIST = ['😀','😁','😂','🤣','😊','😍','😘','😎','🤩','🥳','😜','🤔','😏','😭','😅','😡','👍','👎','👏','🙏','💪','🤝','✌️','🫡','❤️','💔','🔥','⭐','🎉','🎊','💡','✨','🐉','🐲','⚔️','🛡️','💰','🏆','🥇','🎯','🚀','💯','✅','❌','⚠️','💤','🌟','🌈','🍻','☕','🎮','📢','💬','📌','🔔','🔒','🆙','😴','🤯','😱','🥰','😇','🤗','🙄','😬','😋','🤤','🤑','🤓','😈','💀','👻','🤖','🌹','🍀','⚡','💥','🎁','🏅','🔥🔥','💢','🫢','🤌','🐶','🐱','🦁','🐯','🦄','🌝','🌚','❓','❗','💦','🍎','🥳🎉','😺','🤞','🫶'];
+        let _emojiPickerBound = false;
+        function toggleEmojiPicker() {
+            const picker = document.getElementById('emojiPicker');
+            const grid = document.getElementById('emojiPickerGrid');
+            if (!picker || !grid) return;
+            const open = picker.style.display === 'none' || !picker.style.display;
+            if (open) {
+                if (!grid.childElementCount) {
+                    EMOJI_LIST.forEach(em => {
+                        const b = document.createElement('button');
+                        b.type = 'button';
+                        b.textContent = em;
+                        b.title = em;
+                        b.style.cssText = 'background:transparent;border:none;border-radius:6px;padding:4px 0;font-size:1.15rem;line-height:1;cursor:pointer;';
+                        b.onmouseover = () => b.style.background = 'rgba(255,215,0,0.18)';
+                        b.onmouseout = () => b.style.background = 'transparent';
+                        b.onclick = (ev) => { ev.stopPropagation(); insertEmoji(em); };
+                        grid.appendChild(b);
+                    });
+                }
+                // 定位到表情按钮正下方
+                const btn = document.getElementById('emojiToggleBtn');
+                const wrap = picker.parentElement;
+                picker.style.bottom = 'auto';
+                picker.style.top = (btn.offsetTop + btn.offsetHeight + 6) + 'px';
+                picker.style.left = btn.offsetLeft + 'px';
+                picker.style.display = 'block';
+                if (!_emojiPickerBound) {
+                    _emojiPickerBound = true;
+                    document.addEventListener('click', (e) => {
+                        const p = document.getElementById('emojiPicker');
+                        if (p && p.style.display !== 'none' && !p.contains(e.target) && e.target.id !== 'emojiToggleBtn' && !(e.target.closest && e.target.closest('#emojiToggleBtn'))) {
+                            p.style.display = 'none';
+                        }
+                    }, true);
+                    const wall = document.getElementById('messageWallContent');
+                    if (wall) wall.addEventListener('scroll', () => { const p = document.getElementById('emojiPicker'); if (p) p.style.display = 'none'; }, true);
+                }
+            } else {
+                picker.style.display = 'none';
+            }
+        }
+        window.toggleEmojiPicker = toggleEmojiPicker;
         async function postMessage() {
             const input = document.getElementById('messageInput');
             const nicknameInput = document.getElementById('messageNickname');
