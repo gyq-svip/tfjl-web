@@ -778,6 +778,7 @@
 
             <button id="chatRoomToggle" onclick="window.location.href='auction.html'" title="拍卖行" style="background:rgba(78,205,196,0.85);color:#1a1a2e;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 2px 10px rgba(0,0,0,0.3);display:none;align-items:center;justify-content:center;">🏪</button>
             <button id="messageWallToggle" onclick="toggleMessageWall()" title="需求墙" style="position:relative;background:rgba(255,215,0,0.85);color:#1a1a2e;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 2px 10px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">📢<span class="wall-unread-dot" id="wallUnreadDot" style="display:none;"></span></button>
+            <button id="reputationToggle" onclick="toggleReputationPanel()" title="贡献排行榜" style="background:rgba(255,107,107,0.85);color:#1a1a2e;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 2px 10px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">🏆</button>
             <div style="position:relative;">
                 <button onclick="toggleBackupMenu(this)" title="菜单" style="background:rgba(255,87,34,0.8);color:white;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 1px 6px rgba(0,0,0,0.15);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;">☰</button>
                 <div id="backupMenu" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:rgba(42,42,74,0.95);border:1px solid rgba(255,215,0,0.3);border-radius:8px;padding:8px 0;width:200px;z-index:1000;box-shadow:0 4px 15px rgba(0,0,0,0.4);backdrop-filter:blur(8px);">
@@ -2133,6 +2134,34 @@
 
 
 
+    <!-- 贡献排行榜面板 -->
+    <div id="reputationPanel" style="display:none;position:fixed;top:60px;right:20px;width:340px;height:520px;background:rgba(26,26,46,0.96);border:1px solid rgba(255,215,0,0.3);border-radius:12px;z-index:9980;box-shadow:0 4px 20px rgba(0,0,0,0.5);backdrop-filter:blur(10px);flex-direction:column;">
+        <div style="padding:10px 15px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,0.1);">
+            <span style="color:#ffd700;font-size:0.95rem;font-weight:bold;">🏆 贡献排行榜</span>
+            <button onclick="document.getElementById('reputationPanel').style.display='none'" style="background:transparent;border:none;color:#ff6b6b;font-size:1.1rem;cursor:pointer;">×</button>
+        </div>
+        <div id="repTabs" style="display:flex;flex-wrap:wrap;gap:5px;padding:8px 10px;border-bottom:1px solid rgba(255,255,255,0.08);">
+            <span class="rep-tab active" data-tab="rep" onclick="setRepTab('rep')">声望</span>
+            <span class="rep-tab" data-tab="share" onclick="setRepTab('share')">分享</span>
+            <span class="rep-tab" data-tab="copy" onclick="setRepTab('copy')">被复制</span>
+            <span class="rep-tab" data-tab="like" onclick="setRepTab('like')">获赞</span>
+            <span class="rep-tab" data-tab="week" onclick="setRepTab('week')">周榜</span>
+            <span class="rep-tab" data-tab="newcomer" onclick="setRepTab('newcomer')">新人</span>
+        </div>
+        <div id="reputationList" style="flex:1;overflow-y:auto;padding:8px 10px;"></div>
+    </div>
+
+    <!-- 个人贡献主页 -->
+    <div id="contributionCard" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:9990;justify-content:center;align-items:center;" onclick="if(event.target===this)this.style.display='none'">
+        <div style="width:420px;max-width:92%;max-height:82%;overflow-y:auto;background:rgba(26,26,46,0.98);border:1px solid rgba(255,215,0,0.4);border-radius:14px;padding:20px;box-shadow:0 8px 40px rgba(0,0,0,0.6);">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                <span style="color:#ffd700;font-size:1.05rem;font-weight:bold;">🏅 贡献主页</span>
+                <button onclick="document.getElementById('contributionCard').style.display='none'" style="background:transparent;border:none;color:#ff6b6b;font-size:1.2rem;cursor:pointer;">×</button>
+            </div>
+            <div id="contributionCardBody"></div>
+        </div>
+    </div>
+
     <!-- 拍卖行主面板 -->
 
     <!-- 拍卖行入口弹窗 -->
@@ -2219,7 +2248,7 @@
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">s20260808-031 · s1.0.31</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">s20260808-032 · s1.0.32</span>
             </div>
         </div>
     </div>
