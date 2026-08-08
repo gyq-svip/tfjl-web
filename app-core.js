@@ -14386,7 +14386,23 @@ function hasGistToken() {
                 const msgGistId = await wallResolveMessagesGistId();
                 let msgContent = null;
                 if (msgGistId) msgContent = await wallReadGistFile(msgGistId, 'messages.json', token);
-                if (msgContent) files[`content_messages_${ts}.json`] = { content: msgContent };
+                // 消息分片：Gist 单文件 API 上限约 1MB，超过则按数组切片成多个 <1MB 文件，主索引只记文件名数组
+                let msgFiles = null;
+                if (msgContent) {
+                    let allMsgs = [];
+                    try { allMsgs = (JSON.parse(msgContent).messages) || []; } catch (e) {}
+                    const bytes = (typeof TextEncoder !== 'undefined') ? new TextEncoder().encode(msgContent).length : msgContent.length * 2;
+                    const CHUNK = 800000; // 单文件上限 800KB（留余量，远低于 Gist 1MB）
+                    const n = bytes > CHUNK ? Math.max(1, Math.ceil(bytes / CHUNK)) : 1;
+                    const per = Math.ceil(allMsgs.length / n);
+                    msgFiles = [];
+                    for (let i = 0; i < n; i++) {
+                        const part = allMsgs.slice(i * per, (i + 1) * per);
+                        const fn = `content_messages_${i}_${ts}.json`;
+                        files[fn] = { content: JSON.stringify({ messages: part }, null, 2) };
+                        msgFiles.push(fn);
+                    }
+                }
                 wallShowBackupStatus('⏳ 备份个人资料...', 'loading');
                 let profContent = null;
                 if (msgGistId) profContent = await wallReadGistFile(msgGistId, 'profiles.json', token);
@@ -14398,10 +14414,12 @@ function hasGistToken() {
                     const safe = s.backupFileName.replace(/[^a-zA-Z0-9_\-.]/g, '_');
                     const ext = s.backupFileName.includes('.') ? s.backupFileName.split('.').pop() : 'js';
                     const bf = `content_script_${safe}_${ts}.${ext}`;
+                    const scBytes = (typeof TextEncoder !== 'undefined') ? new TextEncoder().encode(s.content).length : s.content.length * 2;
+                    if (scBytes > 900000) { console.warn('[备份] 脚本', safe, '约', (scBytes / 1024 / 1024).toFixed(1), 'MB，可能超 Gist 单文件限制'); }
                     files[bf] = { content: s.content };
-                    scriptsRef.push({ gistId: s.gistId, description: s.description, fileName: s.fileName, backupFile: bf });
+                    scriptsRef.push({ gistId: s.gistId, description: s.description, fileName: s.fileName, backupFile: bf, bytes: scBytes });
                 }
-                const main = { timestamp: ts, date: new Date().toLocaleString('zh-CN'), type: 'wall_full_v1', messagesGistId: msgGistId, messageCount: msgContent ? (JSON.parse(msgContent).messages || []).length : 0, scriptCount: scripts.length, scripts: scriptsRef, files: { messages: msgContent ? `content_messages_${ts}.json` : null, profiles: profContent ? `content_profiles_${ts}.json` : null } };
+                const main = { timestamp: ts, date: new Date().toLocaleString('zh-CN'), type: 'wall_full_v1', messagesGistId: msgGistId, messageCount: msgContent ? (JSON.parse(msgContent).messages || []).length : 0, scriptCount: scripts.length, scripts: scriptsRef, files: { messages: msgFiles, profiles: profContent ? `content_profiles_${ts}.json` : null } };
                 files[`backup_wall_all_${ts}.json`] = { content: JSON.stringify(main, null, 2) };
                 const resp = await fetch(`https://api.github.com/gists/${backupId}`, { method: 'PATCH', headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` }, body: JSON.stringify({ files }) });
                 if (!resp.ok) throw new Error('保存备份失败');
@@ -14454,9 +14472,14 @@ function hasGistToken() {
                 const cf = main.files || {};
                 if (cf.messages && main.messagesGistId) {
                     wallShowBackupStatus('⏳ 还原消息...', 'loading');
-                    const mc = await wallGetBackupFile(backupId, cf.messages, token);
-                    if (mc) {
-                        const bkMsgs = (JSON.parse(mc).messages) || [];
+                    // 兼容：分片备份时 cf.messages 为文件名数组，旧单文件时为字符串
+                    const msgFileList = Array.isArray(cf.messages) ? cf.messages : (cf.messages ? [cf.messages] : []);
+                    let bkMsgs = [];
+                    for (const mf of msgFileList) {
+                        const mc = await wallGetBackupFile(backupId, mf, token);
+                        if (mc) { try { const arr = (JSON.parse(mc).messages) || []; bkMsgs = bkMsgs.concat(arr); } catch (e) {} }
+                    }
+                    if (bkMsgs.length) {
                         let finalMsgs;
                         if (merge) {
                             const seen = new Set((wallMessages || []).map(x => x.time + '_' + x.author + '_' + (x.content || '').substring(0, 30)));
