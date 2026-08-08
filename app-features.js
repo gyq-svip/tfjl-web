@@ -850,8 +850,8 @@
             const marqueeEl = document.getElementById('newsMarquee');
             if (!marqueeEl) return;
 
-            // 检查全局拍卖快讯公告开关
-            if (_globalBroadcastEnabled && auctionBroadcastQueue.length > 0) {
+            // 检查全局拍卖快讯公告开关 + 全网拍卖快讯开关
+            if (_globalBroadcastEnabled && currentConfig.auctionNews !== false && auctionBroadcastQueue.length > 0) {
                 // 有拍卖播报，显示播报内容
                 const broadcastTexts = auctionBroadcastQueue.map(item => item.text).join('　　◆　　');
                 marqueeEl.textContent = '📢 拍卖快讯：' + broadcastTexts;

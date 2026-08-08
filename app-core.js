@@ -11379,6 +11379,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             game: '九区-龙行',
             notice: '',
             open: true,
+            auctionNews: true,
             title: '【工具数据本地化储存】【新增PC客户端】【新增老马脚本一键密文分享】【导出 导入 分享 分类管理】【部分副本支持卡组截图识别一键脚本】'
         };
 
@@ -11599,6 +11600,7 @@ function hasGistToken() {
                     if (freshConfig.game) currentConfig.game = freshConfig.game;
                     if (freshConfig.notice) currentConfig.notice = freshConfig.notice;
                     if (freshConfig.open !== undefined) currentConfig.open = freshConfig.open;
+                    if (freshConfig.auctionNews !== undefined) currentConfig.auctionNews = freshConfig.auctionNews;
                     saveConfigToCache(currentConfig);
                 } catch (error) {
                     if (!cachedConfig) {
@@ -11749,6 +11751,9 @@ function hasGistToken() {
                 if (data && typeof data.open !== 'undefined') {
                     currentConfig.open = data.open;
                 }
+                if (data && typeof data.auctionNews !== 'undefined') {
+                    currentConfig.auctionNews = data.auctionNews;
+                }
                 
                 if (data && data.data && Array.isArray(data.data)) {
                     return data.data;
@@ -11860,22 +11865,33 @@ function hasGistToken() {
             return allTexts.join('　　◆　　');
         }
 
-        // 拍卖快讯显示开关（本机 localStorage）：关闭后公告弹窗只显示普通公告+需求咨询，隐藏拍卖快讯
-        let _auctionNewsVisible = true;
-        try { _auctionNewsVisible = localStorage.getItem('tdjl_auctionNewsVisible') !== '0'; } catch (e) {}
-        function toggleAuctionNewsVisibility() {
-            _auctionNewsVisible = !_auctionNewsVisible;
-            try { localStorage.setItem('tdjl_auctionNewsVisible', _auctionNewsVisible ? '1' : '0'); } catch (e) {}
+        // 拍卖快讯显示开关（全网云端 config）：关闭后全网公告弹窗只显示普通公告+需求咨询，隐藏拍卖快讯
+        function _getAuctionNewsVisible() {
+            return currentConfig.auctionNews !== false;
+        }
+        async function toggleAuctionNewsVisibility() {
+            const next = !_getAuctionNewsVisible();
+            currentConfig.auctionNews = next;
             updateAuctionNewsToggleStatus();
+            // 立即重渲（缓存未刷新也能即时生效）
             const modal = document.getElementById('newsListModal');
             if (modal && modal.style.display === 'flex') showNewsListModal();
-            console.log('[公告] 拍卖快讯显示已' + (_auctionNewsVisible ? '开启' : '关闭'));
+            console.log('[公告] 拍卖快讯全网显示已' + (next ? '开启' : '关闭') + '，正在同步到云端...');
+            try {
+                await adminSaveNewsToGist(newsItems);
+                console.log('[公告] 拍卖快讯全网开关已同步到云端');
+            } catch (e) {
+                console.error('[公告] 拍卖快讯全网开关同步失败:', e);
+                alert('拍卖快讯开关已切换，但同步到云端失败：' + (e && e.message ? e.message : e));
+            }
+            updateAuctionNewsToggleStatus();
         }
         function updateAuctionNewsToggleStatus() {
             const status = document.getElementById('auctionNewsToggleStatus');
             if (status) {
-                status.textContent = _auctionNewsVisible ? '已开启' : '已关闭';
-                status.style.color = _auctionNewsVisible ? 'rgba(74,222,128,0.9)' : 'rgba(239,68,68,0.9)';
+                const vis = _getAuctionNewsVisible();
+                status.textContent = vis ? '全网开启' : '全网关闭';
+                status.style.color = vis ? 'rgba(74,222,128,0.9)' : 'rgba(239,68,68,0.9)';
             }
         }
         if (document.readyState === 'loading') {
@@ -12023,8 +12039,8 @@ function hasGistToken() {
                 }).join('');
             }
 
-            // 拍卖快讯显示开关（本机）：关闭后公告弹窗只显示普通公告+需求咨询
-            const auctionVis = _auctionNewsVisible;
+            // 拍卖快讯显示开关（全网云端）：关闭后公告弹窗只显示普通公告+需求咨询
+            const auctionVis = _getAuctionNewsVisible();
             const auctionCol = auctionVis
                 ? `<div style="flex:1;overflow-y:auto;max-height:65vh;padding:0 5px;border-right:1px solid rgba(255,107,107,0.15);">
                         <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid rgba(255,107,107,0.2);">
@@ -12162,8 +12178,8 @@ function hasGistToken() {
                 }, 100);
                 
                 setInterval(() => {
-                    // 有拍卖播报且不关闭开关时不改变颜色，保持红色
-                    if (_globalBroadcastEnabled && auctionBroadcastQueue.length > 0) return;
+                    // 有拍卖播报且全网/本地开关均未关闭时不改变颜色，保持红色
+                    if (_globalBroadcastEnabled && _getAuctionNewsVisible() && auctionBroadcastQueue.length > 0) return;
                     const newColor = getRandomMarqueeColor();
                     marqueeEl.style.color = newColor;
                     marqueeEl.style.textShadow = `0 0 10px ${newColor}, 0 0 20px ${newColor}`;
@@ -12181,8 +12197,8 @@ function hasGistToken() {
                     return false;
                 });
                 if (hasTimeChange) {
-                    // 有拍卖播报且不关闭开关时不覆盖，由播报系统管理
-                    if (_globalBroadcastEnabled && auctionBroadcastQueue.length > 0) return;
+                    // 有拍卖播报且全网/本地开关均未关闭时不覆盖，由播报系统管理
+                    if (_globalBroadcastEnabled && _getAuctionNewsVisible() && auctionBroadcastQueue.length > 0) return;
                     const marqueeEl = document.getElementById('newsMarquee');
                     if (marqueeEl) {
                         marqueeEl.textContent = getNewsMarqueeText();
@@ -18346,6 +18362,7 @@ ${maSection}
                 game: currentConfig.game || '',
                 notice: currentConfig.notice || '',
                 open: currentConfig.open !== undefined ? currentConfig.open : true,
+                auctionNews: currentConfig.auctionNews !== undefined ? currentConfig.auctionNews : true,
                 data: newsData
             };
 
@@ -18773,6 +18790,7 @@ ${maSection}
                     game: currentConfig.game || '',
                     notice: currentConfig.notice || '',
                     open: currentConfig.open !== undefined ? currentConfig.open : true,
+                    auctionNews: currentConfig.auctionNews !== undefined ? currentConfig.auctionNews : true,
                     data: newsData
                 };
 

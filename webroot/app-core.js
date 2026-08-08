@@ -5921,6 +5921,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             try {
                 window.heroSkinSelections = {};
                 try { localStorage.removeItem('tdjl_heroSkinSelections'); } catch (e) {}
+                // 重渲染当前所有战斗槽位 + 全场刷新融合卡
                 if (typeof restoreBattleSlots === 'function') { try { await restoreBattleSlots(); } catch (e) {} }
                 if (typeof refreshAllFusionSkins === 'function') { try { await refreshAllFusionSkins(); } catch (e) {} }
                 if (typeof refreshProjectSelectors === 'function') refreshProjectSelectors();
@@ -6714,7 +6715,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         }
                     }
                 }
-                // 2. 刷新所有战斗槽里该卡牌的皮肤（我方+队友）
+                // 2. 刷新所有战斗槽里该卡牌的皮肤（我方+队友）—— 用已算好的 skin 直接重渲，与手牌对称
                 document.querySelectorAll('.battle-slot.filled').forEach(async (slot) => {
                     if (slot.dataset.cardId !== cardId) return;
                     const slotCardName = getSlotCardName(slot)
@@ -7887,7 +7888,9 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const skinHeroName = (typeof getMainCardName === 'function' && getMainCardName(heroName) !== heroName)
                 ? getMainCardName(heroName)
                 : heroName;
-            // 🔴 优先用调用方已知的确切皮肤值（cycleHeroSkin/setCardSkin 算好的 nextSkin）
+            // 🔴 优先用调用方已知的确切皮肤值（cycleHeroSkin/setCardSkin 算好的 nextSkin），
+            // 避免再经 getCardSkin 反查 slot.dataset.cardId —— 旧项目/跨版本时 dataset 可能陈旧导致反查到默认/旧皮。
+            // 与手牌渲染 resolveHeroSkinUrl(cardName, skin) 完全对称。
             let slotSkin = (forceSkin !== undefined) ? forceSkin : '默认';
             const slotCardId = forceCardId !== undefined ? forceCardId : (slot && slot.dataset ? slot.dataset.cardId : null);
             const slotHandType = forceHandType !== undefined ? forceHandType : (slot && slot.dataset && slot.dataset.handType ? slot.dataset.handType : 'my');
@@ -7942,7 +7945,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 slot.dataset.handType = 'my';
                 slot.dataset.profession = card.profession;
                 // 🔴 皮肤重渲必须每次都跑（重置皮肤/切皮等场景靠这里刷新已填卡槽的视觉）
-                // 显式传入 card.id/'my'，避免回读可能陈旧的 slot.dataset.cardId
+                // 显式传入 card.id/'my'，避免回读可能陈旧的 slot.dataset.cardId（旧项目跨版本恢复时偶发）
                 try { await applySkinBgToSlot(slot, card.name, card.id, 'my'); } catch (e) {}
                 refreshSlotFusionControl(slot);
             }
@@ -9085,7 +9088,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 console.log('[SKIN] heroName:', heroName, 'skinHeroName:', skinHeroName, 'skins count:', skins.length, 'hasSkinBg:', hasSkinBg);
                 if (skins.length >= 1) {
                     if (skins.length > 1) {
-                        // 多皮肤：循环切换（用 cycleHeroSkin 返回的 nextSkin 直接重渲战斗槽）
+                        // 多皮肤：循环切换（用 cycleHeroSkin 返回的 nextSkin 直接重渲战斗槽，避免反查依赖陈旧 dataset）
                         const ns = await cycleHeroSkin(skinHeroName, slotId);
                         try { await applySkinBgToSlot(this, heroName, undefined, undefined, ns); } catch (e) { console.error('[SKIN] applySkinBgToSlot error in right-click:', e); }
                         return;
@@ -9142,22 +9145,23 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const nextIdx = (idx + 1) % cycleList.length;
             const nextSkin = cycleList[nextIdx];
             console.log('[SKIN] Cycling from', current || '(default)', 'to', nextSkin || '(default)', '(idx', idx, '->', nextIdx, ')');
+            console.log('[SKIN] cycleHeroSkin input: cardId=', cardId, 'handType=', handType, 'heroName=', heroName);
             // 只写当前项目卡级皮肤（cardSkins），绝不调用 selectHeroSkin 污染全局 heroSkinSelections
             if (cardId) {
                 try { await setCardSkin(cardId, nextSkin, handType); } catch (e) { console.warn('[SKIN] setCardSkin in cycle failed:', e); }
             }
             // 🔴 关键：写完 cardSkins 后必须立即重渲该卡槽皮肤层（融合路径就是这么做的，单卡漏了导致切皮不渲染）
-            const slot = document.querySelector('.battle-slot[data-slot="' + slotId + '"]');
-            if (slot) {
-                try { await applySkinBgToSlot(slot, heroName, undefined, undefined, nextSkin); } catch (e) { console.warn('[SKIN] applySkinBgToSlot after cycle failed:', e); }
+            const _reSlot = cycleSlot || document.querySelector('.battle-slot[data-slot="' + slotId + '"]');
+            if (_reSlot) {
+                try { await applySkinBgToSlot(_reSlot, heroName, undefined, undefined, nextSkin); } catch (e) { console.warn('[SKIN] applySkinBgToSlot after cycle failed:', e); }
             }
-            if (slot) {
+            if (cycleSlot) {
                 console.log('[SKIN] cycleHeroSkin final: cardId=', cardId, 'handType=', handType, 'current=', current, 'nextSkin=', nextSkin);
-                const skinLabel = slot.querySelector('.skin-label') || (() => {
+                const skinLabel = cycleSlot.querySelector('.skin-label') || (() => {
                     const label = document.createElement('span');
                     label.className = 'skin-label';
                     label.style.cssText = 'position:absolute;top:2px;right:2px;font-size:9px;background:rgba(0,0,0,0.6);color:#fff;padding:1px 4px;border-radius:4px;z-index:4;pointer-events:none;';
-                    slot.appendChild(label);
+                    cycleSlot.appendChild(label);
                     return label;
                 })();
                 skinLabel.textContent = nextSkin || '默认';
@@ -11375,6 +11379,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             game: '九区-龙行',
             notice: '',
             open: true,
+            auctionNews: true,
             title: '【工具数据本地化储存】【新增PC客户端】【新增老马脚本一键密文分享】【导出 导入 分享 分类管理】【部分副本支持卡组截图识别一键脚本】'
         };
 
@@ -11595,6 +11600,7 @@ function hasGistToken() {
                     if (freshConfig.game) currentConfig.game = freshConfig.game;
                     if (freshConfig.notice) currentConfig.notice = freshConfig.notice;
                     if (freshConfig.open !== undefined) currentConfig.open = freshConfig.open;
+                    if (freshConfig.auctionNews !== undefined) currentConfig.auctionNews = freshConfig.auctionNews;
                     saveConfigToCache(currentConfig);
                 } catch (error) {
                     if (!cachedConfig) {
@@ -11745,6 +11751,9 @@ function hasGistToken() {
                 if (data && typeof data.open !== 'undefined') {
                     currentConfig.open = data.open;
                 }
+                if (data && typeof data.auctionNews !== 'undefined') {
+                    currentConfig.auctionNews = data.auctionNews;
+                }
                 
                 if (data && data.data && Array.isArray(data.data)) {
                     return data.data;
@@ -11856,22 +11865,33 @@ function hasGistToken() {
             return allTexts.join('　　◆　　');
         }
 
-        // 拍卖快讯显示开关（本机 localStorage）：关闭后公告弹窗只显示普通公告+需求咨询，隐藏拍卖快讯
-        let _auctionNewsVisible = true;
-        try { _auctionNewsVisible = localStorage.getItem('tdjl_auctionNewsVisible') !== '0'; } catch (e) {}
-        function toggleAuctionNewsVisibility() {
-            _auctionNewsVisible = !_auctionNewsVisible;
-            try { localStorage.setItem('tdjl_auctionNewsVisible', _auctionNewsVisible ? '1' : '0'); } catch (e) {}
+        // 拍卖快讯显示开关（全网云端 config）：关闭后全网公告弹窗只显示普通公告+需求咨询，隐藏拍卖快讯
+        function _getAuctionNewsVisible() {
+            return currentConfig.auctionNews !== false;
+        }
+        async function toggleAuctionNewsVisibility() {
+            const next = !_getAuctionNewsVisible();
+            currentConfig.auctionNews = next;
             updateAuctionNewsToggleStatus();
+            // 立即重渲（缓存未刷新也能即时生效）
             const modal = document.getElementById('newsListModal');
             if (modal && modal.style.display === 'flex') showNewsListModal();
-            console.log('[公告] 拍卖快讯显示已' + (_auctionNewsVisible ? '开启' : '关闭'));
+            console.log('[公告] 拍卖快讯全网显示已' + (next ? '开启' : '关闭') + '，正在同步到云端...');
+            try {
+                await adminSaveNewsToGist(newsItems);
+                console.log('[公告] 拍卖快讯全网开关已同步到云端');
+            } catch (e) {
+                console.error('[公告] 拍卖快讯全网开关同步失败:', e);
+                alert('拍卖快讯开关已切换，但同步到云端失败：' + (e && e.message ? e.message : e));
+            }
+            updateAuctionNewsToggleStatus();
         }
         function updateAuctionNewsToggleStatus() {
             const status = document.getElementById('auctionNewsToggleStatus');
             if (status) {
-                status.textContent = _auctionNewsVisible ? '已开启' : '已关闭';
-                status.style.color = _auctionNewsVisible ? 'rgba(74,222,128,0.9)' : 'rgba(239,68,68,0.9)';
+                const vis = _getAuctionNewsVisible();
+                status.textContent = vis ? '全网开启' : '全网关闭';
+                status.style.color = vis ? 'rgba(74,222,128,0.9)' : 'rgba(239,68,68,0.9)';
             }
         }
         if (document.readyState === 'loading') {
@@ -12019,8 +12039,8 @@ function hasGistToken() {
                 }).join('');
             }
 
-            // 拍卖快讯显示开关（本机）：关闭后公告弹窗只显示普通公告+需求咨询
-            const auctionVis = _auctionNewsVisible;
+            // 拍卖快讯显示开关（全网云端）：关闭后公告弹窗只显示普通公告+需求咨询
+            const auctionVis = _getAuctionNewsVisible();
             const auctionCol = auctionVis
                 ? `<div style="flex:1;overflow-y:auto;max-height:65vh;padding:0 5px;border-right:1px solid rgba(255,107,107,0.15);">
                         <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid rgba(255,107,107,0.2);">
@@ -12158,8 +12178,8 @@ function hasGistToken() {
                 }, 100);
                 
                 setInterval(() => {
-                    // 有拍卖播报且不关闭开关时不改变颜色，保持红色
-                    if (_globalBroadcastEnabled && auctionBroadcastQueue.length > 0) return;
+                    // 有拍卖播报且全网/本地开关均未关闭时不改变颜色，保持红色
+                    if (_globalBroadcastEnabled && _getAuctionNewsVisible() && auctionBroadcastQueue.length > 0) return;
                     const newColor = getRandomMarqueeColor();
                     marqueeEl.style.color = newColor;
                     marqueeEl.style.textShadow = `0 0 10px ${newColor}, 0 0 20px ${newColor}`;
@@ -12177,8 +12197,8 @@ function hasGistToken() {
                     return false;
                 });
                 if (hasTimeChange) {
-                    // 有拍卖播报且不关闭开关时不覆盖，由播报系统管理
-                    if (_globalBroadcastEnabled && auctionBroadcastQueue.length > 0) return;
+                    // 有拍卖播报且全网/本地开关均未关闭时不覆盖，由播报系统管理
+                    if (_globalBroadcastEnabled && _getAuctionNewsVisible() && auctionBroadcastQueue.length > 0) return;
                     const marqueeEl = document.getElementById('newsMarquee');
                     if (marqueeEl) {
                         marqueeEl.textContent = getNewsMarqueeText();
@@ -18088,10 +18108,6 @@ ${maSection}
                 return;
             }
             const used = allUsed.filter(function(n){ return !q || n.toLowerCase().indexOf(q) >= 0; });
-            if (!used.length) {
-                list.innerHTML = '<div style="color:rgba(255,255,255,0.5);font-size:0.8rem;text-align:center;padding:10px;">未找到匹配 "' + escapeHtml(q) + '" 的昵称</div>';
-                return;
-            }
             const cur = localStorage.getItem('TFJL_UserName');
             let html = '<div style="color:rgba(255,255,255,0.4);font-size:0.72rem;margin-bottom:6px;">共 ' + allUsed.length + ' 个用户' + (q ? '，匹配 ' + used.length + ' 个' : '') + '</div>';
             for (let i = 0; i < used.length; i++) {
@@ -18346,6 +18362,7 @@ ${maSection}
                 game: currentConfig.game || '',
                 notice: currentConfig.notice || '',
                 open: currentConfig.open !== undefined ? currentConfig.open : true,
+                auctionNews: currentConfig.auctionNews !== undefined ? currentConfig.auctionNews : true,
                 data: newsData
             };
 
@@ -18773,6 +18790,7 @@ ${maSection}
                     game: currentConfig.game || '',
                     notice: currentConfig.notice || '',
                     open: currentConfig.open !== undefined ? currentConfig.open : true,
+                    auctionNews: currentConfig.auctionNews !== undefined ? currentConfig.auctionNews : true,
                     data: newsData
                 };
 
