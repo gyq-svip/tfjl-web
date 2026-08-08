@@ -1091,6 +1091,7 @@
                     localStorage.setItem('TFJL_UserName', v);
                     localStorage.setItem('TFJL_HasSetNick', 'true');
                     persistNicknameToDisk(); // 同步写入本地磁盘（重装不丢）
+                    if (window.refreshWallNickname) window.refreshWallNickname(); // 同步刷新需求墙昵称框
                     used.push(v);
                     await saveUsedNicks(used);
                     cleanup();
