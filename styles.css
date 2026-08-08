@@ -1877,19 +1877,44 @@
         .admin-menu-item {
             display: flex;
             align-items: center;
-            gap: 15px;
-            padding: 15px 18px;
+            gap: 9px;
+            padding: 7px 10px;
             background: rgba(255, 255, 255, 0.05);
             border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 10px;
+            border-radius: 7px;
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: all 0.15s ease;
+            min-height: 40px;
+            line-height: 1.15;
+        }
+
+        .admin-menu-item .mi-emoji {
+            font-size: 1rem;
+            flex-shrink: 0;
+            line-height: 1;
+        }
+
+        .admin-menu-item .mi-title {
+            color: #ffd700;
+            font-weight: 500;
+            font-size: 0.78rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .admin-menu-item .mi-sub {
+            font-size: 0.62rem;
+            color: rgba(255, 255, 255, 0.5);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .admin-menu-item:hover {
-            background: rgba(255, 215, 0, 0.1);
-            border-color: rgba(255, 215, 0, 0.3);
-            transform: translateX(4px);
+            background: rgba(255, 215, 0, 0.12);
+            border-color: rgba(255, 215, 0, 0.35);
+            transform: translateY(-1px);
         }
 
         /* ==================== 背景动画 ==================== */
