@@ -20819,39 +20819,23 @@ ${maSection}
         // 进度条模拟（0→85%随机推进），window.onload完成后跳到100%并淡出
         // 3秒硬限制：不管加载是否完成，3秒后强制结束动画
         (function() {
-            var bar = document.getElementById('loadingProgressBar');
+            // 仅负责进度条推进。遮罩的隐藏 + 超时兜底统一由 index.html 的内联脚本负责，
+            // 不在本文件定义 _hideLoadingScreen：本文件体积大，一旦加载失败/报错，
+            // 定义在末尾的隐藏逻辑就永远不会执行，会导致启动遮罩永久卡屏。
             var progress = 0;
-            var done = false;
             var timer = setInterval(function() {
+                if (window._loadingHidden && window._loadingHidden()) { clearInterval(timer); return; }
+                var el = document.getElementById('loadingProgressBar');
+                if (!el) { clearInterval(timer); return; }
                 if (progress < 85) {
                     progress += Math.random() * 12 + 3;
                     if (progress > 85) progress = 85;
-                    bar.style.width = progress + '%';
+                    el.style.width = progress + '%';
                 }
             }, 300);
-            window._hideLoadingScreen = function() {
-                if (done) return; done = true;
-                clearInterval(timer);
-                clearTimeout(hardLimit);
-                bar.style.width = '100%';
-                // 标记非首次启动，后续跳过动画
-                try { localStorage['TFJL_NotFirst'] = '1'; } catch(e) {}
-                var screen = document.getElementById('appLoadingScreen');
-                if (screen) {
-                    screen.style.opacity = '0';
-                    setTimeout(function() {
-                        screen.style.display = 'none';
-                        screen.remove();
-                    }, 600);
-                }
-            };
-            // 3秒硬限制：避免网络慢/代理慢导致动画一直转圈
-            var hardLimit = setTimeout(function() {
-                if (!done) window._hideLoadingScreen();
+            // 能执行到这里说明主逻辑已就绪，沿用原来的 3 秒放行（内联兜底仍有 8 秒硬限制）
+            setTimeout(function() {
+                if (window._hideLoadingScreen) window._hideLoadingScreen('app-core就绪');
             }, 3000);
-            // 页面加载完成后触发隐藏
-            window.addEventListener('load', function() {
-                window._hideLoadingScreen();
-            });
         })();
     
