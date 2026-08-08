@@ -561,21 +561,22 @@
                 <button id="txtFilesToggleBtn" onclick="toggleTxtFilesPanel()" title="脚本管理" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">📄</button>
                 <button onclick="toggleReferencePanel()" title="参考图片" style="background:linear-gradient(135deg,#9c27b0,#7b1fa2);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">🖼️</button>
                 <button onclick="saveCurrentProject()" id="saveBtn" title="确定保存：有未保存的改动时点此落盘（已取消自动保存，调错也不会存盘）" data-tip="确定保存：把当前项目的所有改动落盘（手牌/记事本/脚本/图片）。已取消自动保存，调错了也不会自动存盘" style="background:rgba(76,175,80,0.8);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;position:relative;">💾<span id="saveDirtyDot" style="display:none;position:absolute;top:-3px;right:-3px;width:10px;height:10px;background:#ff5252;border:2px solid #1a1a2e;border-radius:50%;box-shadow:0 0 6px #ff5252;"></span></button>
-                <button onclick="toggleActivityCalcPanel()" title="活动氪金计算器" style="background:linear-gradient(135deg,#ff6b6b,#feca57);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">🧮</button>
+                <button onclick="toggleActivityCalcPanel()" title="计算器" style="background:linear-gradient(135deg,#ff6b6b,#feca57);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">🧮</button>
             </div>
         </div>
 
         <!-- 活动氪金计算器面板 -->
         <div id="activityCalcPanel" style="display:none;position:fixed;top:80px;right:20px;width:520px;max-height:88vh;z-index:9997;background:rgba(30,30,60,0.98);border:2px solid rgba(255,107,107,0.5);border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.6);overflow:auto;resize:both;min-width:400px;min-height:500px;">
             <div id="activityCalcPanelHeader" style="background:linear-gradient(135deg,#ff6b6b,#feca57);padding:12px 16px;display:flex;justify-content:space-between;align-items:center;cursor:move;">
-                <span style="color:white;font-weight:bold;font-size:1rem;">🧮 活动氪金计算器</span>
+                <span style="color:white;font-weight:bold;font-size:1rem;">🧮 计算器</span>
                 <button onclick="toggleActivityCalcPanel()" style="background:transparent;border:none;color:white;font-size:1.5rem;cursor:pointer;">×</button>
             </div>
-            <div style="padding:15px;">
+            <div id="calcPanelBody" style="padding:15px;">
                 <!-- 顶层 2 tabs：新活动 / 旧活动 -->
                 <div style="display:flex;gap:5px;margin-bottom:15px;">
                     <button onclick="switchCalcTopTab('new')" id="calcTopNew" style="flex:1;padding:8px;border:none;border-radius:6px;cursor:pointer;font-size:0.85rem;background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;">🆕 新活动·封神杯襄</button>
                     <button onclick="switchCalcTopTab('old')" id="calcTopOld" style="flex:1;padding:8px;border:none;border-radius:6px;cursor:pointer;font-size:0.85rem;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);">📦 旧活动·轮回</button>
+                    <button onclick="switchCalcTopTab('boss')" id="calcTopBoss" style="flex:1;padding:8px;border:none;border-radius:6px;cursor:pointer;font-size:0.85rem;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);">🛡️ Boss减伤</button>
                 </div>
 
                 <!-- ============ 新活动容器 ============ -->
@@ -766,6 +767,47 @@
                 </div>
             </div>
         </div>
+        <!-- ============ Boss减伤容器（顶层 Tab） ============ -->
+        <div id="calcBossContainer" style="display:none;padding:15px;"></div>
+
+        <!-- ============ Boss减伤管理浮层（管理员） ============ -->
+        <div id="adminPageBossRed" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:99990;justify-content:center;align-items:center;">
+            <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:12px;padding:20px;max-width:580px;width:92%;max-height:86vh;overflow-y:auto;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">🛡️ Boss减伤管理</h3>
+                    <button onclick="bossRedAdminClose()" style="background:none;border:none;color:#fff;font-size:1.5rem;cursor:pointer;">✕</button>
+                </div>
+                <div id="bossRedAdminStatus" style="margin-bottom:10px;"></div>
+                <div style="margin-bottom:12px;">
+                    <div style="color:rgba(255,255,255,0.7);font-size:0.8rem;margin-bottom:6px;">① 选择板块</div>
+                    <div id="bossRedSectionSel" style="display:flex;gap:5px;flex-wrap:wrap;"></div>
+                </div>
+                <div id="bossRedBossWrap" style="display:none;margin-bottom:12px;">
+                    <div style="color:rgba(255,255,255,0.7);font-size:0.8rem;margin-bottom:6px;">② 选择 / 添加 Boss</div>
+                    <div id="bossRedBossSel" style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px;"></div>
+                    <div style="display:flex;gap:6px;">
+                        <input id="bossRedBossName" placeholder="新Boss名（如 南门 / 北门 / 王城）" style="flex:1;padding:7px;border-radius:6px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.3);color:#fff;font-size:0.85rem;box-sizing:border-box;">
+                        <button onclick="bossRedAddBoss()" style="padding:7px 12px;border:none;border-radius:6px;background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;cursor:pointer;font-size:0.8rem;">+ 添加</button>
+                    </div>
+                </div>
+                <div style="margin-bottom:12px;">
+                    <div style="color:rgba(255,255,255,0.7);font-size:0.8rem;margin-bottom:6px;" id="bossRedWaveLabel">② 波次</div>
+                    <input id="bossRedWave" type="number" min="1" placeholder="如 10（代表10波）" style="width:100%;padding:7px;border-radius:6px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.3);color:#fff;font-size:0.85rem;box-sizing:border-box;margin-bottom:8px;">
+                    <textarea id="bossRedInfo" placeholder="该波信息：减伤比例 / 血量要求 / 备注… 自由填写，后续可继续补充" rows="5" style="width:100%;padding:8px;border-radius:6px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.3);color:#fff;font-size:0.85rem;box-sizing:border-box;resize:vertical;"></textarea>
+                </div>
+                <div style="display:flex;gap:8px;">
+                    <button onclick="bossRedSaveEntry()" style="flex:1;padding:9px;border:none;border-radius:8px;background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;cursor:pointer;font-size:0.85rem;font-weight:bold;">💾 保存</button>
+                    <button onclick="bossRedDeleteEntry()" style="flex:1;padding:9px;border:none;border-radius:8px;background:rgba(239,68,68,0.4);color:#ef4444;cursor:pointer;font-size:0.85rem;">🗑️ 删除该波</button>
+                </div>
+                <div style="margin-top:10px;text-align:center;">
+                    <button onclick="bossRedReload()" style="padding:6px 14px;border:none;border-radius:6px;background:rgba(255,255,255,0.1);color:#4fc3f7;cursor:pointer;font-size:0.8rem;">🔄 从云端刷新</button>
+                </div>
+                <div style="margin-top:10px;color:rgba(255,255,255,0.4);font-size:0.72rem;line-height:1.5;">💡 寒冰/暗月/漩涡：直接填波次(10/20/…)与信息。深海：先添加Boss(南门/北门/王城/自定)，再填其波次与信息。数据存全网Gist，所有用户刷新可见。</div>
+            </div>
+        </div>
+
+        <!-- Boss减伤悬浮提示 -->
+        <div id="bossRedTooltip" style="display:none;position:fixed;z-index:99999;max-width:300px;background:rgba(20,20,40,0.97);border:1px solid rgba(255,215,0,0.4);border-radius:8px;padding:10px;color:#fff;pointer-events:none;box-shadow:0 4px 16px rgba(0,0,0,0.5);"></div>
         </div><!-- /activityCalcPanel -->
 
         <script defer src="app-effects.js?v=1"></script>
@@ -1549,6 +1591,11 @@
                         <span class="mi-emoji">🛡️</span>
                         <div class="mi-text"><div class="mi-title">盟战战绩</div><div class="mi-sub">个人战绩 · 注册登录</div></div>
                     </div>
+                    <div class="admin-menu-item" onclick="bossRedAdminShow()">
+                        <span class="mi-emoji">🛡️</span>
+                        <div class="mi-text"><div class="mi-title">Boss减伤管理</div><div class="mi-sub">寒冰/暗月/漩涡/深海</div></div>
+                    </div>
+
                 </div>
                 <button class="admin-btn" onclick="logoutToLogin()" style="width:100%;margin-top:10px;background:linear-gradient(135deg,#ef4444,#dc2626);color:white;">🔙 退出登录</button>
             </div>
@@ -2261,7 +2308,7 @@
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">s20260808-051 · s1.0.51</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">s20260808-052 · s1.0.52</span>
             </div>
         </div>
     </div>

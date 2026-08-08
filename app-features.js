@@ -245,29 +245,26 @@
             }
         }
 
-        // 顶层 Tab：新活动 / 旧活动
+        // 顶层 Tab：新活动 / 旧活动 / Boss减伤
         function switchCalcTopTab(tab) {
-            const isNew = tab === 'new';
+            const isNew = tab === 'new', isOld = tab === 'old', isBoss = tab === 'boss';
+            const body = document.getElementById('calcPanelBody');
+            if (body) body.style.display = isBoss ? 'none' : 'block';
+            const boss = document.getElementById('calcBossContainer');
+            if (boss) boss.style.display = isBoss ? 'block' : 'none';
             document.getElementById('calcNewContainer').style.display = isNew ? 'block' : 'none';
-            document.getElementById('calcOldContainer').style.display = isNew ? 'none' : 'block';
-            const btnNew = document.getElementById('calcTopNew');
-            const btnOld = document.getElementById('calcTopOld');
-            if (isNew) {
-                btnNew.style.background = 'linear-gradient(135deg,#4caf50,#2e7d32)';
-                btnNew.style.color = 'white';
-                btnOld.style.background = 'rgba(255,255,255,0.1)';
-                btnOld.style.color = 'rgba(255,255,255,0.7)';
-                switchNewCalcTab('target');
-            } else {
-                btnOld.style.background = 'linear-gradient(135deg,#4caf50,#2e7d32)';
-                btnOld.style.color = 'white';
-                btnNew.style.background = 'rgba(255,255,255,0.1)';
-                btnNew.style.color = 'rgba(255,255,255,0.7)';
-                renderCalcSkins();
-                updateCalcSummary();
-                switchOldCalcTab('skins');
-            }
+            document.getElementById('calcOldContainer').style.display = isOld ? 'block' : 'none';
+            const defs = [['calcTopNew', isNew], ['calcTopOld', isOld], ['calcTopBoss', isBoss]];
+            defs.forEach(function (d) {
+                const b = document.getElementById(d[0]); if (!b) return;
+                if (d[1]) { b.style.background = 'linear-gradient(135deg,#4caf50,#2e7d32)'; b.style.color = 'white'; }
+                else { b.style.background = 'rgba(255,255,255,0.1)'; b.style.color = 'rgba(255,255,255,0.7)'; }
+            });
+            if (isNew) { switchNewCalcTab('target'); }
+            else if (isOld) { renderCalcSkins(); updateCalcSummary(); switchOldCalcTab('skins'); }
+            else if (isBoss) { if (window.renderBossRed) renderBossRed(); }
         }
+
 
         // 新活动内部子 Tab：选择目标 / 数据参考 / 氪金计算器
         function switchNewCalcTab(tab) {
