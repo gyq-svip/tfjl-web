@@ -12510,7 +12510,12 @@ function hasGistToken() {
             (async () => {
                 try { if (wallMessages.length === 0) await fetchMessages(); }
                 catch (error) { console.warn('预加载需求墙消息失败:', error); }
+                try { checkReputationGain(); } catch (e) {}
             })();
+
+            // 声望变化检测（在线实时"声望上涨"浮条，近似实时：每 30s 比对）
+            try { checkReputationGain(); } catch (e) {}
+            setInterval(() => { try { checkReputationGain(); } catch (e) {} }, 30000);
 
             // 检查登录状态
             if (localStorage.getItem('TFJL_LoggedIn') === 'true') {
@@ -14552,6 +14557,200 @@ function hasGistToken() {
             }
         }
         
+        // ===================== 分享 / 声望系统 =====================
+        // 设计：声望完全由需求墙消息客户端聚合得出（分享者=消息作者），
+        // 被复制/被赞计数挂在消息对象上，复用现有 saveMessagesToGist 合并机制持久化，
+        // 不引入新 Gist、不引入余额存储，避免并发覆盖与作弊放大。
+        const SHARE_REP = 10, COPY_REP = 2, LIKE_REP = 3; // 声望权重（可调）
+        const REP_TITLES = [
+            { min: 0, name: '萌新' },
+            { min: 30, name: '分享先锋' },
+            { min: 100, name: '阵容匠人' },
+            { min: 300, name: '塔防贤者' },
+            { min: 800, name: '宗师' },
+            { min: 2000, name: '传说' }
+        ];
+        function msgAuthor(m) { return m.author || m.nickname || '匿名用户'; }
+        function msgTime(m) { return m.time || m.timestamp || 0; }
+        function msgContent(m) { return m.content || m.text || ''; }
+        function isShareMsg(m) { return !!(m.isShare || m.scriptUrl || m.shareType); }
+        // 安全主键：base64(id|time|author)，避免特殊字符破坏 onclick
+        function wallMsgKey(m) { return btoa(unescape(encodeURIComponent((m.id || '') + '|' + msgTime(m) + '|' + msgAuthor(m)))); }
+        function findWallMsg(b64) {
+            try {
+                const s = decodeURIComponent(escape(atob(b64)));
+                const p = s.split('|'); const id = p[0], t = Number(p[1]), a = p.slice(2).join('|');
+                for (const m of wallMessages) { if ((m.id && m.id === id) || (msgTime(m) === t && msgAuthor(m) === a)) return m; }
+            } catch (e) {}
+            return null;
+        }
+        function myDeviceId() {
+            let d = localStorage.getItem('tfjl_device_id');
+            if (!d) { d = 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); localStorage.setItem('tfjl_device_id', d); }
+            return d;
+        }
+        function getMyVote(key) { try { return (JSON.parse(localStorage.getItem('tfjl_share_votes') || '{}'))[key]; } catch (e) { return null; } }
+        function setMyVote(key, v) {
+            try { const o = JSON.parse(localStorage.getItem('tfjl_share_votes') || '{}'); if (v) o[key] = v; else delete o[key]; localStorage.setItem('tfjl_share_votes', JSON.stringify(o)); } catch (e) {}
+        }
+        function showFloatToast(msg, bg) {
+            const t = document.createElement('div');
+            t.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);padding:10px 22px;border-radius:8px;z-index:99999;font-size:0.9rem;box-shadow:0 4px 20px rgba(0,0,0,0.4);animation:fadeInOut 2.4s ease-in-out;color:#1a1a2e;font-weight:bold;';
+            t.style.background = bg || 'rgba(74,222,128,0.9)';
+            t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.remove(), 2400);
+        }
+        let _repSaveTimer = null;
+        function saveWallDebounced() {
+            if (_repSaveTimer) return;
+            _repSaveTimer = setTimeout(() => { _repSaveTimer = null; saveMessagesToGist().catch(() => {}); }, 2500);
+        }
+        // 复制分享内容（站内复制按钮 = 可捕获的"被下载"事件，owner 加声望）
+        async function onShareCopy(b64) {
+            const m = findWallMsg(b64); if (!m) return;
+            const text = msgContent(m) + (m.scriptUrl ? '\n' + m.scriptUrl : '');
+            try { await navigator.clipboard.writeText(text); } catch (e) {
+                const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
+                try { document.execCommand('copy'); } catch (_) {} ta.remove();
+            }
+            const me = localStorage.getItem('TFJL_UserName') || '';
+            const owner = msgAuthor(m);
+            const day = new Date().toISOString().slice(0, 10);
+            const key = myDeviceId() + '|' + b64 + '|' + day;
+            let log = []; try { log = JSON.parse(localStorage.getItem('tfjl_copy_log') || '[]'); } catch (e) {}
+            if (!log.includes(key) && owner.toLowerCase() !== me.toLowerCase()) {
+                log.push(key); if (log.length > 200) log = log.slice(-200);
+                localStorage.setItem('tfjl_copy_log', JSON.stringify(log));
+                m.copyCount = (m.copyCount || 0) + 1;
+                saveWallDebounced(); renderMessages();
+                showFloatToast('📋 已复制，感谢支持「' + owner + '」的分享！', 'rgba(79,195,247,0.9)');
+            } else {
+                showFloatToast('📋 已复制到剪贴板', 'rgba(79,195,247,0.9)');
+            }
+        }
+        async function onShareLike(b64) {
+            const m = findWallMsg(b64); if (!m) return;
+            const cur = getMyVote(b64);
+            if (cur === 'like') { m.likes = (m.likes || 0) - 1; setMyVote(b64, null); }
+            else { if (cur === 'dislike') m.dislikes = (m.dislikes || 0) - 1; m.likes = (m.likes || 0) + 1; setMyVote(b64, 'like'); }
+            saveWallDebounced(); renderMessages();
+        }
+        async function onShareDislike(b64) {
+            const m = findWallMsg(b64); if (!m) return;
+            const cur = getMyVote(b64);
+            if (cur === 'dislike') { m.dislikes = (m.dislikes || 0) - 1; setMyVote(b64, null); }
+            else { if (cur === 'like') m.likes = (m.likes || 0) - 1; m.dislikes = (m.dislikes || 0) + 1; setMyVote(b64, 'dislike'); }
+            saveWallDebounced(); renderMessages();
+        }
+        function renderShareActions(m, b64) {
+            const myVote = getMyVote(b64);
+            const likeCls = myVote === 'like' ? 'color:#ffd700;' : 'color:#4fc3f7;';
+            const disCls = myVote === 'dislike' ? 'color:#ff6b6b;' : 'color:rgba(255,255,255,0.5);';
+            return `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;font-size:0.78rem;align-items:center;">
+                <a href="javascript:void(0)" onclick="onShareCopy('${b64}')" style="color:#4fc3f7;text-decoration:none;cursor:pointer;background:rgba(79,195,247,0.12);padding:3px 10px;border-radius:5px;">📋 复制</a>
+                <a href="javascript:void(0)" onclick="onShareLike('${b64}')" style="${likeCls}text-decoration:none;cursor:pointer;background:rgba(255,215,0,0.1);padding:3px 10px;border-radius:5px;">👍 ${m.likes || 0}</a>
+                <a href="javascript:void(0)" onclick="onShareDislike('${b64}')" style="${disCls}text-decoration:none;cursor:pointer;background:rgba(255,107,107,0.1);padding:3px 10px;border-radius:5px;">👎 ${m.dislikes || 0}</a>
+                <span style="color:rgba(255,255,255,0.4);">📥 被复制 ${m.copyCount || 0}</span>
+                <span style="color:rgba(255,215,0,0.7);">🏅 声望 +${SHARE_REP + (m.copyCount || 0) * COPY_REP + (m.likes || 0) * LIKE_REP}</span>
+            </div>`;
+        }
+        // 聚合所有分享者为声望榜（客户端计算，零存储）
+        function computeReputation() {
+            const map = {};
+            for (const m of wallMessages) {
+                if (!isShareMsg(m)) continue;
+                const a = msgAuthor(m); if (!a) continue;
+                if (!map[a]) map[a] = { rep: 0, shares: 0, copies: 0, likes: 0, firstShare: msgTime(m) };
+                const e = map[a];
+                e.shares++; e.copies += (m.copyCount || 0); e.likes += (m.likes || 0);
+                e.firstShare = Math.min(e.firstShare, msgTime(m));
+            }
+            for (const a in map) { const e = map[a]; e.rep = e.shares * SHARE_REP + e.copies * COPY_REP + e.likes * LIKE_REP; }
+            return map;
+        }
+        function getTitle(rep) {
+            let t = REP_TITLES[0], idx = 0;
+            for (let i = 0; i < REP_TITLES.length; i++) { if (rep >= REP_TITLES[i].min) { t = REP_TITLES[i]; idx = i; } }
+            const next = REP_TITLES[idx + 1];
+            let progress = 1, nextRep = 0;
+            if (next) { nextRep = next.min; progress = Math.max(0, Math.min(1, (rep - t.min) / (nextRep - t.min))); }
+            return { name: t.name, nextName: next ? next.name : null, nextRep, progress };
+        }
+        // 在线实时"声望上涨"浮条：对比上次看到的自己声望
+        function checkReputationGain() {
+            const me = localStorage.getItem('TFJL_UserName') || '';
+            if (!me) return;
+            const repMap = computeReputation();
+            const rep = repMap[me] ? repMap[me].rep : 0;
+            const last = Number(localStorage.getItem('tfjl_my_rep_last') || '0');
+            if (rep > last && last > 0) showFloatToast('🎉 你的声望 +' + (rep - last) + '！当前 ' + rep, 'rgba(255,215,0,0.92)');
+            localStorage.setItem('tfjl_my_rep_last', String(rep));
+        }
+        // 贡献排行榜面板
+        let _repTab = 'rep';
+        function toggleReputationPanel() {
+            const p = document.getElementById('reputationPanel');
+            if (!p) return;
+            p.style.display = (p.style.display === 'flex') ? 'none' : 'flex';
+            if (p.style.display === 'flex') renderReputation();
+        }
+        function setRepTab(tab) {
+            _repTab = tab;
+            document.querySelectorAll('.rep-tab').forEach(el => { el.classList.toggle('active', el.getAttribute('data-tab') === tab); });
+            renderReputation();
+        }
+        function renderReputation() {
+            const repMap = computeReputation();
+            const arr = Object.keys(repMap).map(n => ({ nick: n, ...repMap[n] }));
+            let list = [];
+            if (_repTab === 'rep') list = arr.slice().sort((a, b) => b.rep - a.rep);
+            else if (_repTab === 'share') list = arr.slice().sort((a, b) => b.shares - a.shares);
+            else if (_repTab === 'copy') list = arr.slice().sort((a, b) => b.copies - a.copies);
+            else if (_repTab === 'like') list = arr.slice().sort((a, b) => b.likes - a.likes);
+            else if (_repTab === 'week') { const w = Date.now() - 7 * 864e5; list = arr.filter(a => a.firstShare >= w).sort((a, b) => b.rep - a.rep); }
+            else if (_repTab === 'newcomer') { const w = Date.now() - 7 * 864e5; list = arr.filter(a => a.firstShare >= w).sort((a, b) => b.shares - a.shares); }
+            const top = list.slice(0, 30);
+            const medal = i => i === 0 ? '👑' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1) + '.';
+            const valOf = a => _repTab === 'share' ? a.shares + ' 分享' : _repTab === 'copy' ? a.copies + ' 被复制' : _repTab === 'like' ? a.likes + ' 赞' : a.rep + ' 声望';
+            const el = document.getElementById('reputationList');
+            if (!el) return;
+            el.innerHTML = top.length ? top.map((a, i) =>
+                `<div onclick="openContributionCard('${encodeURIComponent(a.nick)}')" style="display:flex;justify-content:space-between;align-items:center;padding:7px 9px;border-radius:7px;cursor:pointer;${i < 3 ? 'background:rgba(255,215,0,0.12);' : ''}">
+                    <span>${medal(i)} <span style="color:#ffd700;">${escapeHtml(a.nick)}</span> <span style="color:rgba(255,255,255,0.5);font-size:0.7rem;">[${getTitle(a.rep).name}]</span></span>
+                    <span style="color:#4ecdc4;font-size:0.8rem;">${valOf(a)}</span>
+                </div>`).join('') : '<div style="color:rgba(255,255,255,0.5);text-align:center;padding:24px;">暂无分享数据，去需求墙分享第一个脚本吧！</div>';
+        }
+        // 个人贡献主页（点昵称打开）
+        function openContributionCard(nickEnc) {
+            const nick = decodeURIComponent(nickEnc);
+            const repMap = computeReputation();
+            const e = repMap[nick] || { rep: 0, shares: 0, copies: 0, likes: 0, firstShare: 0 };
+            const t = getTitle(e.rep);
+            const recent = wallMessages.filter(m => isShareMsg(m) && msgAuthor(m) === nick).slice(0, 8);
+            const recentHtml = recent.length ? recent.map(m =>
+                `<div style="padding:6px 8px;border-radius:6px;background:rgba(255,255,255,0.05);margin-bottom:6px;font-size:0.78rem;color:#fff;word-break:break-all;">${escapeHtml(msgContent(m).slice(0, 60))}${(m.copyCount || 0) > 0 ? ' <span style="color:rgba(255,215,0,0.7);">📥' + m.copyCount + '</span>' : ''}</div>`
+            ).join('') : '<div style="color:rgba(255,255,255,0.5);font-size:0.78rem;">还没有分享记录</div>';
+            const pct = Math.round(t.progress * 100);
+            const body = document.getElementById('contributionCardBody');
+            if (body) body.innerHTML = `
+                <div style="text-align:center;margin-bottom:12px;">
+                    <div style="color:#ffd700;font-size:1.3rem;font-weight:bold;">${escapeHtml(nick)}</div>
+                    <div style="color:rgba(255,255,255,0.7);font-size:0.9rem;margin-top:2px;">🎖 ${t.name}</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:10px 12px;margin-bottom:10px;">
+                    <div style="display:flex;justify-content:space-between;font-size:0.8rem;color:rgba(255,255,255,0.85);"><span>当前声望</span><span style="color:#ffd700;font-weight:bold;">${e.rep}</span></div>
+                    ${t.nextName ? `<div style="margin-top:8px;height:7px;background:rgba(255,255,255,0.1);border-radius:4px;overflow:hidden;"><div style="width:${pct}%;height:100%;background:linear-gradient(90deg,#ffd700,#ff6b6b);"></div></div><div style="font-size:0.7rem;color:rgba(255,255,255,0.5);margin-top:4px;">距「${t.nextName}」还需 ${t.nextRep - e.rep} 声望</div>` : '<div style="font-size:0.75rem;color:rgba(255,215,0,0.7);margin-top:6px;">已达到最高头衔 🏆</div>'}
+                </div>
+                <div style="display:flex;gap:8px;margin-bottom:12px;">
+                    <div style="flex:1;text-align:center;background:rgba(79,195,247,0.1);border-radius:8px;padding:8px 4px;"><div style="color:#4fc3f7;font-size:1.1rem;font-weight:bold;">${e.shares}</div><div style="font-size:0.68rem;color:rgba(255,255,255,0.6);">分享</div></div>
+                    <div style="flex:1;text-align:center;background:rgba(255,215,0,0.1);border-radius:8px;padding:8px 4px;"><div style="color:#ffd700;font-size:1.1rem;font-weight:bold;">${e.copies}</div><div style="font-size:0.68rem;color:rgba(255,255,255,0.6);">被复制</div></div>
+                    <div style="flex:1;text-align:center;background:rgba(255,107,107,0.1);border-radius:8px;padding:8px 4px;"><div style="color:#ff6b6b;font-size:1.1rem;font-weight:bold;">${e.likes}</div><div style="font-size:0.68rem;color:rgba(255,255,255,0.6);">获赞</div></div>
+                </div>
+                <div style="color:rgba(255,255,255,0.6);font-size:0.78rem;margin-bottom:6px;">最近分享</div>
+                ${recentHtml}`;
+            const card = document.getElementById('contributionCard');
+            if (card) card.style.display = 'flex';
+        }
+
         async function renderMessages() {
             const scroller = document.getElementById('messageScroller');
             if (!scroller) return;
@@ -14576,6 +14775,7 @@ function hasGistToken() {
                 return;
             }
             
+            const repMap = computeReputation();
             const html = validMessages.map((msg, index) => {
                 const timeAgo = formatMessageTime(msg.time);
                 let contentHtml = escapeHtml(msg.content);
@@ -14631,9 +14831,18 @@ function hasGistToken() {
                 
                 const deleteBtn = canDelete ? `<a href="javascript:void(0)" onclick="deleteMessage(${index})" style="color:#ff6b6b;cursor:pointer;margin-left:10px;font-size:0.7rem;" title="${isOwner ? '删除我的消息' : '管理员删除'}">🗑️</a>` : '';
                 
+                // 分享类消息：附加 复制/赞/踩 操作条（声望系统）
+                if (isShareMsg(msg)) {
+                    const _b64 = wallMsgKey(msg);
+                    contentHtml += renderShareActions(msg, _b64);
+                }
+
+                const _aRep = repMap[msgAuthor(msg)] ? repMap[msgAuthor(msg)].rep : 0;
+                const _aTitle = getTitle(_aRep).name;
+                const _authorHtml = `<span onclick="openContributionCard('${encodeURIComponent(msgAuthor(msg))}')" title="查看 ${escapeHtml(msgAuthor(msg))} 的贡献主页" style="color:#ffd700;cursor:pointer;text-decoration:underline;">${escapeHtml(msgAuthor(msg))}</span> <span style="color:rgba(255,215,0,0.6);font-size:0.7rem;">[${_aTitle}]</span>`;
                 return `<div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:10px 12px;font-size:0.85rem;">
                     <div style="color:#fff;margin-bottom:6px;line-height:1.5;">${contentHtml}</div>
-                    <div style="color:rgba(255,255,255,0.5);font-size:0.75rem;">${escapeHtml(msg.author)} · ${timeAgo}${expireLabel}${encryptedLabel}${deleteBtn}</div>
+                    <div style="color:rgba(255,255,255,0.5);font-size:0.75rem;">${_authorHtml} · ${timeAgo}${expireLabel}${encryptedLabel}${deleteBtn}</div>
                 </div>`;
             }).join('');
             
@@ -16177,7 +16386,11 @@ ${maSection}
                         expireAt: expireMinutes > 0 ? Date.now() + (expireMinutes * 60 * 1000) : null,
                         isSystem: false,
                         shareType: 'scanned',
-                        isEncrypted: !!willEncrypt
+                        isEncrypted: !!willEncrypt,
+                        isShare: true,
+                        likes: 0,
+                        dislikes: 0,
+                        copyCount: 0
                     };
                     if (passwordHash) msg.passwordHash = passwordHash;
                     if (recoveryKey) msg.encScheme = 'B';
@@ -16588,11 +16801,16 @@ ${maSection}
                     expireMinutesValue = scriptExpireMinutes;
                 }
                 const newMsg = {
+                    id: Date.now() + '_' + Math.random().toString(36).substr(2, 9),
                     content: content,
                     author: nickname,
                     time: Date.now(),
                     scriptUrl: scriptUrl,
-                    expireMinutes: expireMinutesValue > 0 ? expireMinutesValue : null
+                    expireMinutes: expireMinutesValue > 0 ? expireMinutesValue : null,
+                    isShare: !!scriptUrl,
+                    likes: 0,
+                    dislikes: 0,
+                    copyCount: 0
                 };
                 if (pendingScriptEnc) {
                     if (pendingScriptEnc.isEncrypted) newMsg.isEncrypted = true;
