@@ -31,6 +31,52 @@
             <div style="width:6px;height:6px;background:#00bcd4;border-radius:50%;animation:loadingDotBounce 1.2s ease-in-out 0.4s infinite;"></div>
         </div>
     </div>
+    <!-- 🛡️ 启动遮罩兜底（内联，绝不依赖任何外部 JS 文件）
+         背景：_hideLoadingScreen 原本定义在 app-core.js 的最末尾（2万多行的大文件），
+         一旦 app-core.js 下载失败/超时/中途报错，该函数连同它的 3 秒硬限制都不会被注册，
+         深蓝色启动遮罩就会永久盖屏 → 表现为「蓝屏卡住、一直加载中请稍候」。
+         点「强制刷新」时会清空 CacheStorage + 注销 SW + 移除 TFJL_NotFirst 兜底标记，
+         所有资源都必须重新联网下载，因此最容易复现该卡死。
+         这里内联一份健壮实现：不依赖外部文件，任何情况下最多 8 秒必定放行。 -->
+    <script>
+    (function () {
+        var HARD_MS = 8000;
+        var hidden = false;
+        function hide(reason) {
+            if (hidden) return;
+            var el = document.getElementById('appLoadingScreen');
+            if (!el) { hidden = true; return; }
+            // 先真正把遮罩藏掉，再置标志位。
+            // （原实现把 done=true 写在最前面，中途一旦抛异常就会「标志已置位但遮罩还在」，
+            //   之后所有调用都被 if(done) return 挡掉 → 永久卡死。这里逐段 try/catch 规避。）
+            try { var bar = document.getElementById('loadingProgressBar'); if (bar) bar.style.width = '100%'; } catch (e) {}
+            try { el.style.opacity = '0'; } catch (e) {}
+            try { el.style.pointerEvents = 'none'; } catch (e) {}
+            hidden = true;
+            try { localStorage['TFJL_NotFirst'] = '1'; } catch (e) {}
+            setTimeout(function () {
+                try {
+                    el.style.display = 'none';
+                    if (el.parentNode) el.parentNode.removeChild(el);
+                } catch (e) {}
+            }, 600);
+            try { console.log('[启动遮罩] 已关闭：' + (reason || '')); } catch (e) {}
+        }
+        window._hideLoadingScreen = hide;
+        window._loadingHidden = function () { return hidden; };
+        // ① 正常路径：页面 load 完成
+        window.addEventListener('load', function () { hide('load'); });
+        // ② 硬超时兜底：无论外部 JS 是否加载成功，最多 8 秒必定放行，杜绝永久卡屏
+        setTimeout(function () { hide('8秒超时兜底'); }, HARD_MS);
+        // ③ 关键脚本加载失败也放行（script 的 error 不冒泡，必须用捕获阶段监听）
+        window.addEventListener('error', function (ev) {
+            var t = ev && ev.target;
+            if (t && t.tagName === 'SCRIPT') {
+                setTimeout(function () { hide('脚本加载失败: ' + (t.src || '')); }, 1200);
+            }
+        }, true);
+    })();
+    </script>
     <script defer src="app-boot.js?v=1"></script>
 
     <!-- 密码验证层（默认隐藏；启动逻辑确认"未登录"后才显示，避免已登录用户闪一下登录界面） -->
@@ -2335,7 +2381,7 @@
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">s20260808-055 · s1.0.55</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">s20260808-056 · s1.0.56</span>
             </div>
         </div>
     </div>
