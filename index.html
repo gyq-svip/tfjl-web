@@ -801,6 +801,32 @@
                     <button onclick="bossRedSaveEntry()" style="flex:1;padding:9px;border:none;border-radius:8px;background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;cursor:pointer;font-size:0.85rem;font-weight:bold;">💾 保存</button>
                     <button onclick="bossRedDeleteEntry()" style="flex:1;padding:9px;border:none;border-radius:8px;background:rgba(239,68,68,0.4);color:#ef4444;cursor:pointer;font-size:0.85rem;">🗑️ 删除该波</button>
                 </div>
+                <div style="margin-top:12px;border-top:1px solid rgba(255,255,255,0.12);padding-top:12px;">
+                    <div style="color:rgba(255,255,255,0.7);font-size:0.8rem;margin-bottom:6px;">📋 批量导入 / 导出（推荐：一次填很多波）</div>
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                        <button onclick="bossRedOpenIO()" style="flex:1;min-width:120px;padding:8px;border:none;border-radius:6px;background:linear-gradient(135deg,#4fc3f7,#0288d1);color:#fff;cursor:pointer;font-size:0.8rem;font-weight:bold;">📤 导出/编辑</button>
+                        <button onclick="bossRedDownloadText()" style="flex:1;min-width:120px;padding:8px;border:none;border-radius:6px;background:rgba(255,255,255,0.12);color:#4fc3f7;cursor:pointer;font-size:0.8rem;">💾 下载为文件</button>
+                        <button onclick="bossRedPickFile()" style="flex:1;min-width:120px;padding:8px;border:none;border-radius:6px;background:rgba(255,255,255,0.12);color:#ffd54f;cursor:pointer;font-size:0.8rem;">📂 读取文件</button>
+                    </div>
+                    <input type="file" id="bossRedIOFile" accept=".txt,text/plain" style="display:none;" onchange="bossRedOnFile(this)">
+                    <div id="bossRedIOBox" style="display:none;margin-top:10px;">
+                        <textarea id="bossRedIOText" spellcheck="false" rows="14" placeholder="点「导出/编辑」载入云端数据…" style="width:100%;padding:8px;border-radius:6px;border:1px solid rgba(79,195,247,0.35);background:rgba(0,0,0,0.4);color:#e0f7fa;font-size:0.78rem;font-family:Consolas,Monaco,monospace;line-height:1.6;box-sizing:border-box;resize:vertical;white-space:pre;overflow-wrap:normal;overflow-x:auto;"></textarea>
+                        <div style="display:flex;gap:6px;margin-top:8px;">
+                            <button onclick="bossRedImportText('merge')" style="flex:2;padding:9px;border:none;border-radius:8px;background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;cursor:pointer;font-size:0.85rem;font-weight:bold;">⬆️ 导入并同步（合并）</button>
+                            <button onclick="bossRedImportText('overwrite')" style="flex:1;padding:9px;border:none;border-radius:8px;background:rgba(239,68,68,0.35);color:#ef4444;cursor:pointer;font-size:0.8rem;">覆盖导入</button>
+                            <button onclick="bossRedCloseIO()" style="padding:9px 12px;border:none;border-radius:8px;background:rgba(255,255,255,0.1);color:#fff;cursor:pointer;font-size:0.8rem;">收起</button>
+                        </div>
+                        <div style="margin-top:8px;color:rgba(255,255,255,0.45);font-size:0.7rem;line-height:1.6;background:rgba(0,0,0,0.25);padding:8px;border-radius:6px;">
+                            <b style="color:#4fc3f7;">格式说明</b><br>
+                            <code># 寒冰</code> → 切换板块（寒冰/暗月/漩涡/深海）<br>
+                            <code>@ 南门</code> → 切换Boss（<b>仅深海</b>需要）<br>
+                            <code>10波 | 减伤50% 血量2亿</code> → 一条数据<br>
+                            信息想换行：下一行<b>开头打两个空格</b>即可续写<br>
+                            空行、<code>//</code> 开头的行会被忽略<br>
+                            <b style="color:#4ade80;">合并</b>＝同名波次以文本为准、云端其它保留；<b style="color:#ef4444;">覆盖</b>＝完全替换（文本没有的会删掉）
+                        </div>
+                    </div>
+                </div>
                 <div style="margin-top:10px;text-align:center;">
                     <button onclick="bossRedReload()" style="padding:6px 14px;border:none;border-radius:6px;background:rgba(255,255,255,0.1);color:#4fc3f7;cursor:pointer;font-size:0.8rem;">🔄 从云端刷新</button>
                 </div>
@@ -2309,7 +2335,7 @@
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">s20260808-054 · s1.0.54</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">s20260808-055 · s1.0.55</span>
             </div>
         </div>
     </div>
