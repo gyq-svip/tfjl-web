@@ -249,7 +249,8 @@
         function switchCalcTopTab(tab) {
             const isNew = tab === 'new', isOld = tab === 'old', isBoss = tab === 'boss';
             const body = document.getElementById('calcPanelBody');
-            if (body) body.style.display = isBoss ? 'none' : 'block';
+            // 始终显示 calcPanelBody（内含顶层 Tab 按钮栏），否则切到 Boss 后切换按钮也被隐藏，无法返回
+            if (body) body.style.display = 'block';
             const boss = document.getElementById('calcBossContainer');
             if (boss) boss.style.display = isBoss ? 'block' : 'none';
             document.getElementById('calcNewContainer').style.display = isNew ? 'block' : 'none';
