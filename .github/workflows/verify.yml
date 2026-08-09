@@ -1,0 +1,17 @@
+name: verify
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: 代码结构与语法校验（div 配对 / JS 语法括号 / 内联脚本）
+        run: node .github/verify_build.js
