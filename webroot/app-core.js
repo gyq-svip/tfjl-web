@@ -16165,6 +16165,10 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                     contentHtml += renderShareActions(msg, _b64);
                 }
 
+                // 纯表情消息：放大渲染（更搞笑）
+                const _raw = msg.content || '';
+                const _isEmojiOnly = _raw.length > 0 && /^[\s\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}\u{FE00}-\u{FE0F}\u{1F1E6}-\u{1F1FF}\u{200D}\u{20E3}\u{2049}\u{203C}\u{303D}\u{00A9}\u{00AE}]+$/u.test(_raw) && !/\p{L}/u.test(_raw);
+
                 const _aRep = repMap[msgAuthor(msg)] ? repMap[msgAuthor(msg)].rep : 0;
                 const _aTitle = getTitle(_aRep).name;
                 // 取昵称首字做头像圆点
@@ -16177,7 +16181,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 </div>`;
                 return `<div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:10px 12px 8px;font-size:0.85rem;">
                     <div style="margin-bottom:8px;">${_whoHtml}</div>
-                    <div style="background:rgba(0,0,0,0.28);border-left:3px solid #ffd700;border-radius:6px;padding:9px 11px;color:#fff;line-height:1.6;font-size:0.86rem;word-break:break-word;">${contentHtml}</div>
+                    <div style="background:rgba(0,0,0,0.28);border-left:3px solid #ffd700;border-radius:6px;padding:9px 11px;color:#fff;line-height:1.6;font-size:0.86rem;word-break:break-word;" class="${_isEmojiOnly ? 'msgEmojiOnly' : ''}">${contentHtml}</div>
                 </div>`;
             }).join('');
             
@@ -18062,6 +18066,35 @@ ${maSection}
         }
         window.insertEmoji = insertEmoji;
 
+        // 注入表情放大 / 飘屏动画所需的样式（仅注入一次）
+        (function ensureEmojiStyles() {
+            if (document.getElementById('emojiAnimStyles')) return;
+            const st = document.createElement('style');
+            st.id = 'emojiAnimStyles';
+            st.textContent = `
+.emojiCell{background:transparent;border:none;border-radius:6px;padding:4px 0;font-size:1.15rem;line-height:1;cursor:pointer;transition:transform .15s cubic-bezier(.34,1.56,.64,1);transform-origin:center bottom;position:relative;z-index:1;}
+.emojiCell:hover{transform:scale(1.9);z-index:5;background:rgba(255,215,0,0.18);}
+.emojiBurst{position:fixed;left:50%;top:50%;z-index:100050;pointer-events:none;font-size:7rem;line-height:1;will-change:transform,opacity;transform:translate(-50%,-50%) scale(.2);animation:emojiBurstAnim 1.25s cubic-bezier(.22,1,.36,1) forwards;}
+@keyframes emojiBurstAnim{0%{transform:translate(-50%,-50%) scale(.2) rotate(-12deg);opacity:0;}15%{transform:translate(-50%,-50%) scale(1.25) rotate(8deg);opacity:1;}35%{transform:translate(-50%,-50%) scale(.95) rotate(-6deg);opacity:1;}55%{transform:translate(-50%,-50%) scale(1.08) rotate(5deg);opacity:1;}100%{transform:translate(-50%,-60%) scale(1.1) rotate(0deg);opacity:0;}}
+.msgEmojiOnly{font-size:1.9rem;line-height:1.4;letter-spacing:2px;animation:msgEmojiPop .4s ease;}
+@keyframes msgEmojiPop{0%{transform:scale(.6);opacity:.4;}60%{transform:scale(1.12);}100%{transform:scale(1);opacity:1;}}
+`;
+            document.head.appendChild(st);
+        })();
+
+        // 大表情飘屏：屏幕中央弹出放大弹跳+旋转的搞笑表情，约1.25s后自动消失
+        function playEmojiBurst(emoji) {
+            if (!emoji) return;
+            try {
+                const el = document.createElement('div');
+                el.className = 'emojiBurst';
+                el.textContent = emoji;
+                document.body.appendChild(el);
+                setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 1300);
+            } catch (_) {}
+        }
+        window.playEmojiBurst = playEmojiBurst;
+
         // 表情面板：点 😊 弹出（固定定位挂 body，避免被输入框重渲染销毁），选中即插入；点外部关闭
         const EMOJI_LIST = ['😀','😁','😂','🤣','😊','😍','😘','😎','🤩','🥳','😜','🤔','😏','😭','😅','😡','👍','👎','👏','🙏','💪','🤝','✌️','🫡','❤️','💔','🔥','⭐','🎉','🎊','💡','✨','🐉','🐲','⚔️','🛡️','💰','🏆','🥇','🎯','🚀','💯','✅','❌','⚠️','💤','🌟','🌈','🍻','☕','🎮','📢','💬','📌','🔔','🔒','🆙','😴','🤯','😱','🥰','😇','🤗','🙄','😬','😋','🤤','🤑','🤓','😈','💀','👻','🤖','🌹','🍀','⚡','💥','🎁','🏅','🔥🔥','💢','🫢','🤌','🐶','🐱','🦁','🐯','🦄','🌝','🌚','❓','❗','💦','🍎','🥳🎉','😺','🤞','🫶'];
         let _emojiJustOpened = false;
@@ -18080,12 +18113,12 @@ ${maSection}
                 EMOJI_LIST.forEach(em => {
                     const b = document.createElement('button');
                     b.type = 'button';
+                    b.className = 'emojiCell';
                     b.textContent = em;
                     b.title = em;
-                    b.style.cssText = 'background:transparent;border:none;border-radius:6px;padding:4px 0;font-size:1.15rem;line-height:1;cursor:pointer;';
                     b.onmouseover = () => b.style.background = 'rgba(255,215,0,0.18)';
                     b.onmouseout = () => b.style.background = 'transparent';
-                    b.onclick = (ev) => { ev.stopPropagation(); insertEmoji(em); };
+                    b.onclick = (ev) => { ev.stopPropagation(); insertEmoji(em); playEmojiBurst(em); };
                     grid.appendChild(b);
                 });
                 picker.appendChild(grid);
