@@ -14507,7 +14507,7 @@ function hasGistToken() {
 
                 const bossArg = boss ? ("'" + boss.replace(/'/g, "\\'") + "'") : 'null';
 
-                cells += `<div onmousemove="bossRedHover(event,'${section}',${w},${bossArg})" onmouseleave="bossRedHideTip()" style="padding:6px 4px;border-radius:6px;text-align:center;font-size:0.72rem;cursor:default;${has ? 'background:rgba(255,215,0,0.15);border:1px solid rgba(255,215,0,0.5);color:#ffd700;' : 'background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.4);'}">${w}波</div>`;
+                cells += `<div onmouseenter="bossRedHover(event,this,'${section}',${w},${bossArg})" onmousemove="bossRedHover(event,this,'${section}',${w},${bossArg})" onmouseleave="bossRedHideTip()" style="padding:6px 4px;border-radius:6px;text-align:center;font-size:0.72rem;cursor:default;${has ? 'background:rgba(255,215,0,0.15);border:1px solid rgba(255,215,0,0.5);color:#ffd700;' : 'background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.4);'}">${w}波</div>`;
 
             }
 
@@ -14517,7 +14517,7 @@ function hasGistToken() {
 
 
 
-        function bossRedHover(e, section, wave, boss) {
+        function bossRedHover(e, cellEl, section, wave, boss) {
 
             const tip = document.getElementById('bossRedTooltip');
 
@@ -14539,13 +14539,16 @@ function hasGistToken() {
 
             tip.style.display = 'block';
 
-            // 跟随鼠标，但偏移加大（OFF）避免紧贴光标遮挡；靠近屏幕右/下边缘时翻转到另一侧
-            const OFF = 26;
+            // 方案2：钉在对应减伤格子的固定一侧（不跟随鼠标），避免遮挡
             const r = tip.getBoundingClientRect();
-            let x = e.clientX + OFF, y = e.clientY + OFF;
-            if (x + r.width > window.innerWidth - 4) x = e.clientX - r.width - OFF; // 右侧放不下→翻到左侧
-            if (y + r.height > window.innerHeight - 4) y = e.clientY - r.height - OFF; // 下方放不下→翻到上方
-            if (x < 4) x = 4; if (y < 4) y = 4; // 兜底不跑出视口
+            const cr = (cellEl && cellEl.getBoundingClientRect) ? cellEl.getBoundingClientRect() : { left: e.clientX, top: e.clientY, right: e.clientX, bottom: e.clientY, width: 0, height: 0 };
+            const GAP = 10;
+            let x = cr.right + GAP; // 默认显示在格子右侧
+            let y = cr.top;
+            if (x + r.width > window.innerWidth - 4) x = cr.left - r.width - GAP; // 右侧放不下→翻到左侧
+            if (x < 4) x = 4;
+            if (y + r.height > window.innerHeight - 4) y = window.innerHeight - r.height - 4; // 下方超出→上移
+            if (y < 4) y = 4;
 
             tip.style.left = x + 'px'; tip.style.top = y + 'px';
 
