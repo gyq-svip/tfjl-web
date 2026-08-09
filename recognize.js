@@ -776,7 +776,7 @@
 
     // 🃏 导入到手牌：选框(当前/新建/现有项目) → 选我的/队友手牌 → 逐张加入
     // 注意：Tauri 桌面端 window.prompt 不工作，改用自定义 modal（recChoice/recInput/recToast）
-    $('recImportHand').onclick = ()=>{
+    $('recImportHand').onclick = async ()=>{
       const all = overlay._results || [];
       const results = all.filter(r=>!r._deleted);
       if(!results.length){ recToast('请先识别（或别把卡都删光了）'); return; }
@@ -786,7 +786,9 @@
       if(!heroes.length){ recToast('没有通过校验的英雄（100 精确英雄卡名）可导入手牌。\n识别不到的请手动修改。'); return; }
 
       const curName = (typeof currentProjectName !== 'undefined' && currentProjectName) ? currentProjectName : '';
-      const existing = (typeof loadProjectListFromDB === 'function') ? (loadProjectListFromDB() || []) : [];
+      // loadProjectListFromDB 是异步的（返回 Promise），必须 await，否则 existing 为 Promise 导致 forEach 抛错
+      let existing = [];
+      try { if(typeof loadProjectListFromDB === 'function') existing = (await loadProjectListFromDB()) || []; } catch(e){ existing = []; }
 
       const addToHandByName = (name, type)=>{
         const cardEl = document.querySelector('.card-item[data-name="' + name + '"]');
