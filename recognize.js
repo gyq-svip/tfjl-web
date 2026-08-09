@@ -573,7 +573,7 @@
     ov.id = id;
     ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:20000;display:flex;align-items:center;justify-content:center;padding:18px;';
     const box = document.createElement('div');
-    box.style.cssText = 'background:#1b1f2a;color:#eee;border-radius:12px;max-width:440px;width:100%;padding:18px;box-shadow:0 10px 40px rgba(0,0,0,0.6);';
+    box.style.cssText = 'background:#1b1f2a;color:#eee;border-radius:12px;max-width:440px;width:100%;max-height:78vh;overflow-y:auto;padding:18px;box-shadow:0 10px 40px rgba(0,0,0,0.6);';
     let html = '<div style="font-size:1.05rem;font-weight:600;margin-bottom:6px;">' + escapeHtml(opts.title||'') + '</div>';
     if(opts.desc) html += '<div style="font-size:0.82rem;color:#b0bec5;margin-bottom:12px;line-height:1.5;">' + escapeHtml(opts.desc) + '</div>';
     html += '<div style="display:flex;flex-direction:column;gap:8px;">';
@@ -835,7 +835,7 @@
       // 第一步：选目标项目（A 当前 / B 新建 / C 现有）
       const projItems = [{label:'📌 当前项目'+(curName?'（'+curName+'）':'（无）'), value:'A'}];
       projItems.push({label:'➕ 新建项目', value:'B'});
-      existing.forEach((n,i)=> projItems.push({label:'📂 现有项目：'+n, value:'C'+i}));
+      existing.forEach((n,i)=> projItems.push({label:'📂 现有项目：'+(n&&n.name?n.name:n), value:'C'+i}));
       recChoice({
         title:'🃏 导入到手牌 — 选择项目',
         desc:'把这 ' + heroes.length + ' 张识别到的英雄卡导入到哪个项目？',
