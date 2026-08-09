@@ -807,101 +807,125 @@
         return true;
       };
 
-      const doImport = (projName)=>{
-        recChoice({
-          title:'🃏 导入到手牌 — 选择位置',
-          desc:'把这 ' + heroes.length + ' 张识别到的英雄卡导入到？',
-          items:[
-            {label:'🃏 我的手牌', value:'my'},
-            {label:'🤝 队友手牌', value:'teammate'}
-          ],
-          onPick:(type)=>{
-            let added=0, dup=0, missing=0;
-            heroes.forEach(h=>{
-              const before=(type==='my'?myHandCards:teammateHandCards).length;
-              const ok=addToHandByName(h,type);
-              const after=(type==='my'?myHandCards:teammateHandCards).length;
-              if(ok) added++; else if(after===before) dup++; else missing++;
-            });
-            if(typeof updateHandDisplay==='function') updateHandDisplay(type);
-            if(typeof saveCurrentProject==='function') saveCurrentProject();
-            let msg='已导入 '+added+' 张到'+(type==='my'?'我的':'队友')+'手牌'+(projName?'（项目：'+projName+'）':'');
-            if(dup>0) msg+='；'+dup+' 张因重复已跳过';
-            if(missing>0) msg+='；'+missing+' 张卡池未找到（请确认卡池含该英雄）';
-            if(skipped>0) msg+='；'+skipped+' 张未通过 100 库校验已忽略（识别不到的请手动修改）';
-            recToast(msg);
-            $('recStatus').textContent = msg;
-          },
-          onCancel: ()=>{}
+      const doImport = (projName, type)=>{
+        if(!type) type='my';
+        let added=0, dup=0, missing=0;
+        heroes.forEach(h=>{
+          const before=(type==='my'?myHandCards:teammateHandCards).length;
+          const ok=addToHandByName(h,type);
+          const after=(type==='my'?myHandCards:teammateHandCards).length;
+          if(ok) added++; else if(after===before) dup++; else missing++;
         });
+        if(typeof updateHandDisplay==='function') updateHandDisplay(type);
+        if(typeof saveCurrentProject==='function') saveCurrentProject();
+        let msg='已导入 '+added+' 张到'+(type==='my'?'我的':'队友')+'手牌'+(projName?'（项目：'+projName+'）':'');
+        if(dup>0) msg+='；'+dup+' 张因重复已跳过';
+        if(missing>0) msg+='；'+missing+' 张卡池未找到（请确认卡池含该英雄）';
+        if(skipped>0) msg+='；'+skipped+' 张未通过 100 库校验已忽略（识别不到的请手动修改）';
+        recToast(msg);
+        $('recStatus').textContent = msg;
       };
 
-      // 第一步：先选「分类」（分类数通常很少），再在第二步选该分类下的具体项目，
-      // 避免一次性把全部现有项目列出来撑爆选框
+      // 选择目标：用「分类 + 项目」两个下拉框（跟项目原生选择器一致，更直观），
+      // 项目下拉随分类过滤，选「➕ 新建项目」则弹名，选「📌 当前项目」直接走当前项目
       const cats = [];
       existing.forEach(n=>{ const c=(n&&n.category)||'默认分类'; if(cats.indexOf(c)<0) cats.push(c); });
-      const catItems = [];
-      if(curName) catItems.push({label:'📌 当前项目（'+curName+'）', value:'A'});
-      catItems.push({label:'➕ 新建项目', value:'B'});
-      cats.forEach(c=> catItems.push({label:'📁 '+c, value:'CAT:'+c}));
+      // 当前项目所在分类（没有则默认第一个分类，再没有则「默认分类」）
+      const curCat = (curName && existing.find(n=>n.name===curName)) ? ((existing.find(n=>n.name===curName).category)||'默认分类') : (cats[0]||'默认分类');
+      const byCat = (cat)=> existing.map((n,i)=>({name:(n&&n.name?n.name:n), idx:i, cat:(n&&n.category)||'默认分类'})).filter(p=>p.cat===cat);
 
-      const pickCategory = ()=>{
-        recChoice({
-          title:'🃏 导入到手牌 — 选择分类',
-          desc:'先把这 '+heroes.length+' 张英雄卡导入到哪个分类？',
-          maxHeight:'64vh',
-          items: catItems,
-          onPick:(val)=>{
-            if(val==='A'){
-              if(!curName){ recToast('当前没有项目，请选「新建项目」或某个分类'); return; }
-              doImport(curName);
-            } else if(val==='B'){
-              recInput({
-                title:'新建项目名称',
-                placeholder:'输入新项目名称',
-                def:'新阵容',
-                onOk:(nm)=>{
-                  const safe=(nm||'').trim();
-                  if(!safe){ recToast('项目名不能为空'); return; }
-                  const cat=(typeof currentCat!=='undefined'&&currentCat)?currentCat:'默认分类';
-                  const emptyData={ myHandCards:[], teammateHandCards:[], myPlacedCards:[], teammatePlacedCards:[], cardLevels:{}, cardSkins:{}, fusionSkins:{}, myDeckInfo:'', teammateDeckInfo:'', notepad:'', txtFiles:[], referenceImages:[] };
-                  if(typeof saveProjectToDB==='function' && typeof loadProjectFromDB==='function'){
-                    saveProjectToDB(safe, cat, emptyData).then(()=> loadProjectFromDB(safe)).then(()=>{
-                      if(typeof refreshProjectSelectors==='function') refreshProjectSelectors();
-                      doImport(safe);
-                    }).catch(e=> recToast('创建项目失败：' + (e&&e.message||e)));
-                  } else { doImport(safe); }
-                }
-              });
-            } else if(val.indexOf('CAT:')===0){
-              const cat = val.slice(4);
-              const inCat = [];
-              existing.forEach((n,i)=>{ if(((n&&n.category)||'默认分类')===cat) inCat.push({name:(n&&n.name?n.name:n), idx:i}); });
-              if(!inCat.length){ recToast('该分类下暂无项目'); return; }
-              const projItems = inCat.map(p=>({label:'📂 '+p.name, value:'P'+p.idx}));
-              // 第二步：列出该分类下的具体项目
-              recChoice({
-                title:'🃏 选择项目（'+cat+'）',
-                desc:'导入到「'+cat+'」下的哪个项目？',
-                maxHeight:'64vh',
-                items: projItems,
-                onPick:(pv)=>{
-                  const idx=parseInt(pv.slice(1),10);
-                  if(isNaN(idx)||idx<0||idx>=existing.length){ recToast('无效选项'); return; }
-                  if(typeof requestSwitchProject==='function'){
-                    requestSwitchProject(existing[idx]);
-                    setTimeout(()=> doImport(existing[idx]), 450); // 切换是异步，稍后再写入
-                  } else { doImport(existing[idx]); }
-                },
-                onBack: ()=> pickCategory(),
-                onCancel: ()=>{}
-              });
-            }
-          },
-          onCancel: ()=>{}
+      const openPicker = ()=>{
+        const m = document.createElement('div');
+        m.id = 'recImportModal'; recCloseModal('recImportModal');
+        m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:20000;display:flex;align-items:center;justify-content:center;padding:18px;';
+        const box = document.createElement('div');
+        box.style.cssText = 'background:#1b1f2a;color:#eee;border-radius:12px;max-width:420px;width:100%;max-height:80vh;overflow-y:auto;padding:18px;box-shadow:0 10px 40px rgba(0,0,0,0.6);';
+        box.innerHTML =
+          '<div style="font-size:1.05rem;font-weight:600;margin-bottom:4px;">🃏 导入到手牌 — 选择项目</div>' +
+          '<div style="font-size:0.82rem;color:#b0bec5;margin-bottom:14px;line-height:1.5;">把这 '+heroes.length+' 张英雄卡导入到？（先选分类，再选项目）</div>' +
+          '<label style="font-size:0.8rem;color:#90caf9;display:block;margin-bottom:6px;">📁 分类</label>' +
+          '<select id="recImpCat" style="width:100%;box-sizing:border-box;background:#2a2a4a;color:#fff;padding:9px 12px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);font-size:0.9rem;cursor:pointer;margin-bottom:14px;"></select>' +
+          '<label style="font-size:0.8rem;color:#90caf9;display:block;margin-bottom:6px;">📂 项目</label>' +
+          '<select id="recImpProj" style="width:100%;box-sizing:border-box;background:#2a2a4a;color:#fff;padding:9px 12px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);font-size:0.9rem;cursor:pointer;margin-bottom:16px;"></select>' +
+          '<div style="font-size:0.8rem;color:#90caf9;margin-bottom:6px;">导入到哪个手牌？</div>' +
+          '<div style="display:flex;gap:8px;margin-bottom:16px;">' +
+            '<button data-type="my" style="flex:1;background:linear-gradient(135deg,#42a5f5,#1565c0);color:#fff;border:none;padding:10px;border-radius:8px;cursor:pointer;font-weight:600;">🃏 我的手牌</button>' +
+            '<button data-type="teammate" style="flex:1;background:linear-gradient(135deg,#66bb6a,#2e7d32);color:#fff;border:none;padding:10px;border-radius:8px;cursor:pointer;font-weight:600;">🤝 队友手牌</button>' +
+          '</div>' +
+          '<div style="display:flex;gap:8px;">' +
+            '<button id="recImpCancel" style="flex:1;background:rgba(255,255,255,0.08);color:#fff;border:1px solid rgba(255,255,255,0.2);padding:9px;border-radius:8px;cursor:pointer;">取消</button>' +
+            '<button id="recImpOk" style="flex:1;background:linear-gradient(135deg,#ffd700,#ff6b6b);color:#1a1a2e;border:none;padding:9px;border-radius:8px;cursor:pointer;font-weight:600;">✅ 确认导入</button>' +
+          '</div>';
+        m.appendChild(box); document.body.appendChild(m);
+
+        const catSel = box.querySelector('#recImpCat');
+        const projSel = box.querySelector('#recImpProj');
+        const fillCats = ()=>{
+          catSel.innerHTML = '';
+          cats.forEach(c=>{ const o=document.createElement('option'); o.value=c; o.textContent='📁 '+c; catSel.appendChild(o); });
+          // 当前项目选项（若存在）
+          if(curName){ const o=document.createElement('option'); o.value='__CUR__'; o.textContent='📌 当前项目（'+curName+'）'; catSel.appendChild(o); }
+          catSel.value = curName ? '__CUR__' : (cats.indexOf(curCat)>=0?curCat:cats[0]||'默认分类');
+          fillProjs();
+        };
+        const fillProjs = ()=>{
+          projSel.innerHTML = '';
+          const c = catSel.value;
+          let list = [];
+          if(c==='__CUR__'){ list = byCat(curCat); }
+          else { list = byCat(c); }
+          list.forEach(p=>{ const o=document.createElement('option'); o.value=String(p.idx); o.textContent='📂 '+p.name; projSel.appendChild(o); });
+          const o2=document.createElement('option'); o2.value='__NEW__'; o2.textContent='➕ 新建项目…'; projSel.appendChild(o2);
+          if(!list.length && !curName){ projSel.value='__NEW__'; }
+        };
+        catSel.onchange = fillProjs;
+        fillCats();
+
+        const close = ()=> recCloseModal('recImportModal');
+        box.querySelector('#recImpCancel').onclick = ()=> close();
+        m.onclick = (e)=>{ if(e.target===m) close(); };
+        box.querySelector('#recImpOk').onclick = ()=>{
+          const pval = projSel.value;
+          const type = box.querySelector('button[data-type].sel') ? box.querySelector('button[data-type].sel').getAttribute('data-type') : null;
+          if(!type){ recToast('请先选择导入到「我的手牌」还是「队友手牌」'); return; }
+          if(pval==='__NEW__'){
+            close();
+            recInput({
+              title:'新建项目名称',
+              placeholder:'输入新项目名称',
+              def:'新阵容',
+              onOk:(nm)=>{
+                const safe=(nm||'').trim();
+                if(!safe){ recToast('项目名不能为空'); return; }
+                const cat = (catSel.value==='__CUR__') ? curCat : (catSel.value||'默认分类');
+                const emptyData={ myHandCards:[], teammateHandCards:[], myPlacedCards:[], teammatePlacedCards:[], cardLevels:{}, cardSkins:{}, fusionSkins:{}, myDeckInfo:'', teammateDeckInfo:'', notepad:'', txtFiles:[], referenceImages:[] };
+                if(typeof saveProjectToDB==='function' && typeof loadProjectFromDB==='function'){
+                  saveProjectToDB(safe, cat, emptyData).then(()=> loadProjectFromDB(safe)).then(()=>{
+                    if(typeof refreshProjectSelectors==='function') refreshProjectSelectors();
+                    doImport(safe, type);
+                  }).catch(e=> recToast('创建项目失败：' + (e&&e.message||e)));
+                } else { doImport(safe, type); }
+              }
+            });
+            return;
+          }
+          const idx = parseInt(pval,10);
+          if(isNaN(idx)||idx<0||idx>=existing.length){ recToast('请选择一个项目'); return; }
+          close();
+          if(typeof requestSwitchProject==='function'){
+            requestSwitchProject(existing[idx]);
+            setTimeout(()=> doImport(existing[idx], type), 450); // 切换是异步，稍后再写入
+          } else { doImport(existing[idx], type); }
+        };
+        // 手牌位置按钮高亮切换
+        box.querySelectorAll('button[data-type]').forEach(b=>{
+          b.onclick = ()=>{
+            box.querySelectorAll('button[data-type]').forEach(x=>{ x.classList.remove('sel'); x.style.outline='none'; });
+            b.classList.add('sel'); b.style.outline='3px solid #ffd700';
+          };
         });
       };
-      pickCategory();
+      openPicker();
     };
     // 常驻“启动识别引擎”按钮：关掉 Umi-OCR 后随时重新打开（显示窗口，用户可见）
     $('recLaunch').onclick = async ()=>{
