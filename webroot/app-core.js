@@ -14438,7 +14438,8 @@ function hasGistToken() {
 
             if (!BOSS_RED_SECTIONS.includes(bossRedActiveSection)) bossRedActiveSection = '寒冰';
 
-            let html = `<div style="display:flex;gap:4px;margin-bottom:12px;">` + BOSS_RED_SECTIONS.map(s => `<button onclick="bossRedShowSection('${s}')" id="bossRedSec_${s}" style="flex:1;padding:7px;border:none;border-radius:6px;cursor:pointer;font-size:0.8rem;${bossRedActiveSection === s ? 'background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;' : 'background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);'}">${s}</button>`).join('') + `</div>`;
+            let html = `<div style="margin-bottom:12px;"><button onclick="switchCalcTopTab('new')" style="background:rgba(79,195,247,0.14);color:#4fc3f7;border:1px solid rgba(79,195,247,0.35);padding:7px 12px;border-radius:8px;cursor:pointer;font-weight:600;font-size:0.82rem;">← 返回计算器</button></div>`;
+            html += `<div style="display:flex;gap:4px;margin-bottom:12px;">` + BOSS_RED_SECTIONS.map(s => `<button onclick="bossRedShowSection('${s}')" id="bossRedSec_${s}" style="flex:1;padding:7px;border:none;border-radius:6px;cursor:pointer;font-size:0.8rem;${bossRedActiveSection === s ? 'background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;' : 'background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);'}">${s}</button>`).join('') + `</div>`;
 
             html += `<div id="bossRedSectionBody"></div>`;
 
