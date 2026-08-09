@@ -573,7 +573,8 @@
     ov.id = id;
     ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:20000;display:flex;align-items:center;justify-content:center;padding:18px;';
     const box = document.createElement('div');
-    box.style.cssText = 'background:#1b1f2a;color:#eee;border-radius:12px;max-width:440px;width:100%;max-height:78vh;overflow-y:auto;padding:18px;box-shadow:0 10px 40px rgba(0,0,0,0.6);';
+    const _mh = opts.maxHeight || '78vh';
+    box.style.cssText = 'background:#1b1f2a;color:#eee;border-radius:12px;max-width:440px;width:100%;max-height:'+_mh+';overflow-y:auto;padding:16px;box-shadow:0 10px 40px rgba(0,0,0,0.6);';
     let html = '<div style="font-size:1.05rem;font-weight:600;margin-bottom:6px;">' + escapeHtml(opts.title||'') + '</div>';
     if(opts.desc) html += '<div style="font-size:0.82rem;color:#b0bec5;margin-bottom:12px;line-height:1.5;">' + escapeHtml(opts.desc) + '</div>';
     html += '<div style="display:flex;flex-direction:column;gap:8px;">';
@@ -833,47 +834,71 @@
         });
       };
 
-      // 第一步：选目标项目（A 当前 / B 新建 / C 现有）
-      const projItems = [{label:'📌 当前项目'+(curName?'（'+curName+'）':'（无）'), value:'A'}];
-      projItems.push({label:'➕ 新建项目', value:'B'});
-      existing.forEach((n,i)=> projItems.push({label:'📂 现有项目：'+(n&&n.name?n.name:n), value:'C'+i}));
-      recChoice({
-        title:'🃏 导入到手牌 — 选择项目',
-        desc:'把这 ' + heroes.length + ' 张识别到的英雄卡导入到哪个项目？',
-        items: projItems,
-        onPick:(val)=>{
-          if(val==='A'){
-            if(!curName){ recToast('当前没有项目，请选「新建项目」或「现有项目」'); return; }
-            doImport(curName);
-          } else if(val==='B'){
-            recInput({
-              title:'新建项目名称',
-              placeholder:'输入新项目名称',
-              def:'新阵容',
-              onOk:(nm)=>{
-                const safe=(nm||'').trim();
-                if(!safe){ recToast('项目名不能为空'); return; }
-                const cat=(typeof currentCat!=='undefined'&&currentCat)?currentCat:'默认';
-                const emptyData={ myHandCards:[], teammateHandCards:[], myPlacedCards:[], teammatePlacedCards:[], cardLevels:{}, cardSkins:{}, fusionSkins:{}, myDeckInfo:'', teammateDeckInfo:'', notepad:'', txtFiles:[], referenceImages:[] };
-                if(typeof saveProjectToDB==='function' && typeof loadProjectFromDB==='function'){
-                  saveProjectToDB(safe, cat, emptyData).then(()=> loadProjectFromDB(safe)).then(()=>{
-                    if(typeof refreshProjectSelectors==='function') refreshProjectSelectors();
-                    doImport(safe);
-                  }).catch(e=> recToast('创建项目失败：' + (e&&e.message||e)));
-                } else { doImport(safe); }
-              }
-            });
-          } else if(val.indexOf('C')===0){
-            const idx=parseInt(val.slice(1),10);
-            if(isNaN(idx)||idx<0||idx>=existing.length){ recToast('无效选项'); return; }
-            if(typeof requestSwitchProject==='function'){
-              requestSwitchProject(existing[idx]);
-              setTimeout(()=> doImport(existing[idx]), 450); // 切换是异步，稍后再写入
-            } else { doImport(existing[idx]); }
-          }
-        },
-        onCancel: ()=>{}
-      });
+      // 第一步：先选「分类」（分类数通常很少），再在第二步选该分类下的具体项目，
+      // 避免一次性把全部现有项目列出来撑爆选框
+      const cats = [];
+      existing.forEach(n=>{ const c=(n&&n.category)||'默认分类'; if(cats.indexOf(c)<0) cats.push(c); });
+      const catItems = [];
+      if(curName) catItems.push({label:'📌 当前项目（'+curName+'）', value:'A'});
+      catItems.push({label:'➕ 新建项目', value:'B'});
+      cats.forEach(c=> catItems.push({label:'📁 '+c, value:'CAT:'+c}));
+
+      const pickCategory = ()=>{
+        recChoice({
+          title:'🃏 导入到手牌 — 选择分类',
+          desc:'先把这 '+heroes.length+' 张英雄卡导入到哪个分类？',
+          maxHeight:'64vh',
+          items: catItems,
+          onPick:(val)=>{
+            if(val==='A'){
+              if(!curName){ recToast('当前没有项目，请选「新建项目」或某个分类'); return; }
+              doImport(curName);
+            } else if(val==='B'){
+              recInput({
+                title:'新建项目名称',
+                placeholder:'输入新项目名称',
+                def:'新阵容',
+                onOk:(nm)=>{
+                  const safe=(nm||'').trim();
+                  if(!safe){ recToast('项目名不能为空'); return; }
+                  const cat=(typeof currentCat!=='undefined'&&currentCat)?currentCat:'默认分类';
+                  const emptyData={ myHandCards:[], teammateHandCards:[], myPlacedCards:[], teammatePlacedCards:[], cardLevels:{}, cardSkins:{}, fusionSkins:{}, myDeckInfo:'', teammateDeckInfo:'', notepad:'', txtFiles:[], referenceImages:[] };
+                  if(typeof saveProjectToDB==='function' && typeof loadProjectFromDB==='function'){
+                    saveProjectToDB(safe, cat, emptyData).then(()=> loadProjectFromDB(safe)).then(()=>{
+                      if(typeof refreshProjectSelectors==='function') refreshProjectSelectors();
+                      doImport(safe);
+                    }).catch(e=> recToast('创建项目失败：' + (e&&e.message||e)));
+                  } else { doImport(safe); }
+                }
+              });
+            } else if(val.indexOf('CAT:')===0){
+              const cat = val.slice(4);
+              const inCat = [];
+              existing.forEach((n,i)=>{ if(((n&&n.category)||'默认分类')===cat) inCat.push({name:(n&&n.name?n.name:n), idx:i}); });
+              if(!inCat.length){ recToast('该分类下暂无项目'); return; }
+              const projItems = inCat.map(p=>({label:'📂 '+p.name, value:'P'+p.idx}));
+              // 第二步：列出该分类下的具体项目
+              recChoice({
+                title:'🃏 选择项目（'+cat+'）',
+                desc:'导入到「'+cat+'」下的哪个项目？',
+                maxHeight:'64vh',
+                items: projItems,
+                onPick:(pv)=>{
+                  const idx=parseInt(pv.slice(1),10);
+                  if(isNaN(idx)||idx<0||idx>=existing.length){ recToast('无效选项'); return; }
+                  if(typeof requestSwitchProject==='function'){
+                    requestSwitchProject(existing[idx]);
+                    setTimeout(()=> doImport(existing[idx]), 450); // 切换是异步，稍后再写入
+                  } else { doImport(existing[idx]); }
+                },
+                onCancel: ()=>{}
+              });
+            }
+          },
+          onCancel: ()=>{}
+        });
+      };
+      pickCategory();
     };
     // 常驻“启动识别引擎”按钮：关掉 Umi-OCR 后随时重新打开（显示窗口，用户可见）
     $('recLaunch').onclick = async ()=>{
