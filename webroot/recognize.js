@@ -198,18 +198,24 @@
   async function autoStartUmiOcr(){
     const p = await getStoredUmiPath();
     if(!p) return false;
+    const tip = $('recUmiTip');
+    const say = (t)=>{ if(tip) tip.innerHTML = t; };
     // 0) 先确保托盘图标已设为隐藏（写入配置，下次启动即生效）
     await ensureUmiTrayHidden();
-    // 1) 无感隐藏启动
-    try{ await tauriInvoke('start_umi_ocr', { exe_path: p, hidden: true }); }catch(e){}
-    for(let i=0;i<40;i++){            // 最多 ~28s 等引擎就绪
-      await sleep(700);
+    // Umi-OCR(Paddle) 首次冷启动要加载引擎，端口 1224 往往几十秒后才就绪
+    // （本机实测约 60s 才进入 LISTENING）。之前 ~45s 的等待预算太短，会误报“启动失败”。
+    // 这里放宽到 ~100s 并实时提示，避免被误判成卡死。
+    try{ await tauriInvoke('start_umi_ocr', { exePath: p, hidden: true }); }catch(e){}
+    say('已发送启动指令，Umi-OCR 引擎加载中（首次约需 1 分钟，请稍候，勿关闭助手）…');
+    for(let i=0;i<100;i++){            // 最多 ~100s 等引擎就绪
+      await sleep(1000);
       if(await probeUmiReady()) return true;
+      if(i % 10 === 9) say('引擎加载中…（已等待 ' + (i+1) + 's，Umi-OCR 首次启动较慢属正常）');
     }
     // 2) 回退：显示窗口启动（Umi-OCR 已运行时再调一次会唤出已隐藏的窗口）
-    try{ await tauriInvoke('start_umi_ocr', { exe_path: p, hidden: false }); }catch(e){}
-    for(let i=0;i<25;i++){
-      await sleep(700);
+    try{ await tauriInvoke('start_umi_ocr', { exePath: p, hidden: false }); }catch(e){}
+    for(let i=0;i<40;i++){
+      await sleep(1000);
       if(await probeUmiReady()) return true;
     }
     return false;
@@ -294,7 +300,7 @@
     const bar = '<div id="recDLWrap" style="margin:8px 0 2px;height:10px;border-radius:6px;background:rgba(255,255,255,0.12);overflow:hidden;">'
       + '<div id="recDLBar" style="height:100%;width:2%;border-radius:6px;background:linear-gradient(90deg,#26c6da,#00838f);transition:width .25s;"></div></div>'
       + '<div id="recDLPct" style="font-size:0.72rem;color:#b2ebf2;margin-top:2px;">准备下载…</div>';
-    if(tip) tip.innerHTML = '正在从官网下载 Umi-OCR（约 130MB，请耐心等待，勿关闭助手）…' + bar;
+    if(tip) tip.innerHTML = '正在从 Gitee 国内加速下载 Umi-OCR（约 130MB，分 2 卷，请耐心等待，勿关闭助手）…' + bar;
     if(st) st.textContent = '下载安装中…';
     let path = null;
     let unlisten = null;
@@ -564,6 +570,7 @@
     const btn = document.createElement('div');
     btn.textContent = '📷 阵容识别';
     btn.title = '粘贴/选择战斗截图，自动识别 10 张英雄卡';
+    btn.setAttribute('data-tip', '阵容识别：粘贴或选择战斗截图，自动识别 10 张英雄卡（依赖本机 Umi-OCR 离线引擎）');
     Object.assign(btn.style, {
       position:'fixed', bottom:'52px', right:'10px', zIndex:'9999',
       background:'linear-gradient(135deg,#4caf50,#2e7d32)', color:'#fff',
@@ -604,11 +611,12 @@
             <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
               <button id="recAuto" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;border:none;padding:9px 14px;border-radius:8px;cursor:pointer;font-weight:600;">⚡ 自动识别(无需对齐)</button>
               <button id="recFill" style="background:linear-gradient(135deg,#42a5f5,#1565c0);color:#fff;border:none;padding:9px 14px;border-radius:8px;cursor:pointer;">➡ 填入脚本生成</button>
+              <button id="recImportHand" style="background:linear-gradient(135deg,#66bb6a,#2e7d32);color:#fff;border:none;padding:9px 14px;border-radius:8px;cursor:pointer;font-weight:600;">🃏 导入到手牌</button>
               <button id="recLaunch" style="background:linear-gradient(135deg,#ff9800,#e65100);color:#fff;border:none;padding:9px 14px;border-radius:8px;cursor:pointer;font-weight:600;" title="关掉 Umi-OCR 后，点此重新打开它">🚀 启动识别引擎</button>
               <button id="recFind" style="background:linear-gradient(135deg,#ab47bc,#6a1b9a);color:#fff;border:none;padding:9px 14px;border-radius:8px;cursor:pointer;font-weight:600;" title="本机找不到 Umi-OCR 装哪了？点此自动扫描常见位置">🔍 自动查找</button>
               <button id="recInstall" style="background:linear-gradient(135deg,#26c6da,#00838f);color:#fff;border:none;padding:9px 14px;border-radius:8px;cursor:pointer;font-weight:600;" title="一键把 Umi-OCR 下载安装到咱们的数据目录">⬇ 下载安装</button>
             </div>
-            <div style="font-size:0.72rem;color:#789;margin-top:6px;">识别只认 100 个精确英雄卡名（皮肤不参与）；不在 100 库内即判“疑似识别错”。</div>
+            <div style="font-size:0.72rem;color:#789;margin-top:6px;">识别只认 100 个精确英雄卡名（皮肤不参与）；不在 100 库内即判“疑似识别错”。识别不到的请手动修改。</div>
           </div>
           <div style="flex:1;min-width:280px;overflow:auto;max-height:60vh;">
             <div id="recWarn" style="display:none;font-size:0.78rem;color:#ffb74d;background:rgba(255,167,38,0.15);padding:6px 10px;border-radius:8px;margin-bottom:8px;line-height:1.5;"></div>
@@ -710,6 +718,89 @@
       if(p && p.style.display === 'none' && typeof toggleTxtFilesPanel === 'function') toggleTxtFilesPanel();
       setTimeout(()=>{ overlay.style.display='none'; }, 600);
     };
+
+    // 🃏 导入到手牌：弹选框(当前/新建/现有项目) → 选我的/队友手牌 → 逐张加入
+    $('recImportHand').onclick = ()=>{
+      const all = overlay._results || [];
+      const results = all.filter(r=>!r._deleted);
+      if(!results.length){ alert('请先识别（或别把卡都删光了）'); return; }
+      // 仅取通过 100 库校验的英雄（疑似识别错/未通过者一律跳过）
+      const heroes = results.filter(r=>r.valid && r.valid.ok && r.hero).map(r=>r.hero);
+      const skipped = results.length - heroes.length;
+      if(!heroes.length){ alert('没有通过校验的英雄（100 精确英雄卡名）可导入手牌。\n识别不到的请手动修改。'); return; }
+
+      // 第一步：选目标项目（A 当前 / B 新建 / C 现有）
+      const curName = (typeof currentProjectName !== 'undefined' && currentProjectName) ? currentProjectName : '';
+      const existing = (typeof loadProjectListFromDB === 'function') ? (loadProjectListFromDB() || []) : [];
+      let menu = '请选择要导入到的项目：\n';
+      menu += '[A] 当前项目' + (curName ? '（' + curName + '）' : '（无）') + '\n';
+      menu += '[B] 新建项目\n';
+      existing.forEach((n,i)=> menu += '[C' + i + '] 现有项目：' + n + '\n');
+      const pick = prompt(menu, 'A');
+      if(pick === null) return;
+      const pk = pick.trim().toUpperCase();
+
+      const addToHandByName = (name, type)=>{
+        const cardEl = document.querySelector('.card-item[data-name="' + name + '"]');
+        if(!cardEl) return false;
+        const target = type === 'teammate' ? teammateHandCards : myHandCards;
+        const id = cardEl.dataset.id;
+        const isEng = cardEl.dataset.engineering === 'true';
+        const prof = cardEl.dataset.profession;
+        const ctype = cardEl.dataset.type;
+        if(target.some(c=>c.id===id) || (typeof handHasIdentity==='function' && handHasIdentity(target, name))) return false;
+        if(target.length >= MAX_HAND_CARDS) return false;
+        target.push({ id:id, name:name, placed:null, isEngineering:isEng, profession:prof, type:ctype });
+        return true;
+      };
+
+      const proceed = (projName)=>{
+        // 第二步：选我的手牌 / 队友手牌
+        const side = prompt('导入到：\n[M] 我的手牌\n[T] 队友手牌', 'M');
+        if(side === null) return;
+        const s = side.trim().toUpperCase();
+        const type = (s === 'T') ? 'teammate' : 'my';
+        let added = 0, dup = 0, missing = 0;
+        heroes.forEach(h=>{
+          const before = (type==='my'?myHandCards:teammateHandCards).length;
+          const ok = addToHandByName(h, type);
+          const after = (type==='my'?myHandCards:teammateHandCards).length;
+          if(ok) added++; else if(after===before) dup++; else missing++;
+        });
+        if(typeof updateHandDisplay==='function') updateHandDisplay(type);
+        if(typeof saveCurrentProject==='function') saveCurrentProject();
+        let msg = '已导入 ' + added + ' 张到' + (type==='my'?'我的':'队友') + '手牌' + (projName?'（项目：'+projName+'）':'');
+        if(dup>0) msg += '；' + dup + ' 张因重复已跳过';
+        if(missing>0) msg += '；' + missing + ' 张卡池未找到（请确认卡池含该英雄）';
+        if(skipped>0) msg += '；' + skipped + ' 张未通过 100 库校验已忽略（识别不到的请手动修改）';
+        if(typeof showToast==='function') showToast(msg); else alert(msg);
+        $('recStatus').textContent = msg;
+      };
+
+      if(pk === 'A'){
+        if(!curName){ alert('当前没有项目，请选 B 新建或 C 现有项目'); return; }
+        proceed(curName);
+      } else if(pk === 'B'){
+        const nm = prompt('请输入新项目名称：', '新阵容');
+        if(!nm || !nm.trim()){ alert('项目名不能为空'); return; }
+        const safeName = nm.trim();
+        const cat = (typeof currentCat !== 'undefined' && currentCat) ? currentCat : '默认';
+        const emptyData = { myHandCards:[], teammateHandCards:[], myPlacedCards:[], teammatePlacedCards:[], cardLevels:{}, cardSkins:{}, fusionSkins:{}, myDeckInfo:'', teammateDeckInfo:'', notepad:'', txtFiles:[], referenceImages:[] };
+        if(typeof saveProjectToDB==='function' && typeof loadProjectFromDB==='function'){
+          saveProjectToDB(safeName, cat, emptyData).then(()=> loadProjectFromDB(safeName)).then(()=>{
+            if(typeof refreshProjectSelectors==='function') refreshProjectSelectors();
+            proceed(safeName);
+          }).catch(e=> alert('创建项目失败：' + e));
+        } else { proceed(safeName); }
+      } else if(pk.indexOf('C') === 0){
+        const idx = parseInt(pk.slice(1), 10);
+        if(isNaN(idx) || idx < 0 || idx >= existing.length){ alert('无效选项'); return; }
+        if(typeof requestSwitchProject==='function'){
+          requestSwitchProject(existing[idx]);
+          setTimeout(()=> proceed(existing[idx]), 450); // 切换是异步，稍后再写入
+        } else { proceed(existing[idx]); }
+      } else { alert('无效选项，请输入 A / B / C0…'); }
+    };
     // 常驻“启动识别引擎”按钮：关掉 Umi-OCR 后随时重新打开（显示窗口，用户可见）
     $('recLaunch').onclick = async ()=>{
       const st = $('recStatus');
@@ -719,7 +810,7 @@
       if(await checkUmiOcrAvailable() === true){
         // 已运行：尝试唤出窗口（无害），并给出明确反馈（不再静默 return 让人以为没反应）
         const p = await getStoredUmiPath();
-        if(p){ try{ await tauriInvoke('start_umi_ocr', { exe_path: p, hidden: false }); }catch(e){} }
+        if(p){ try{ await tauriInvoke('start_umi_ocr', { exePath: p, hidden: false }); }catch(e){} }
         st.textContent = '✅ Umi-OCR 已在运行（已尝试唤出窗口）';
         return;
       }
@@ -733,7 +824,7 @@
       st.textContent = '正在启动 Umi-OCR（显示窗口）…';
       const tryStart = async (exe)=>{
         await ensureUmiTrayHidden(); // 先确保托盘图标隐藏
-        await tauriInvoke('start_umi_ocr', { exe_path: exe, hidden: false });
+        await tauriInvoke('start_umi_ocr', { exePath: exe, hidden: false });
         for(let i=0;i<25;i++){ await sleep(800); if(await checkUmiOcrAvailable() === true) return true; }
         return false;
       };
