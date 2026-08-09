@@ -583,11 +583,13 @@
       html += '<button data-v="' + escapeHtml(String(it.value)) + '" style="' + st + 'padding:10px 14px;border-radius:8px;cursor:pointer;font-size:0.9rem;font-weight:600;text-align:left;">' + escapeHtml(it.label) + '</button>';
     });
     html += '</div>';
-    if(opts.onCancel) html += '<button data-cancel style="margin-top:10px;width:100%;background:rgba(255,255,255,0.08);color:#fff;border:1px solid rgba(255,255,255,0.2);padding:8px;border-radius:8px;cursor:pointer;">取消</button>';
+    if(opts.onBack) html += '<button data-back style="margin-top:10px;width:100%;background:rgba(79,195,247,0.14);color:#4fc3f7;border:1px solid rgba(79,195,247,0.35);padding:8px;border-radius:8px;cursor:pointer;font-weight:600;">← 返回上一步</button>';
+    if(opts.onCancel) html += '<button data-cancel style="margin-top:8px;width:100%;background:rgba(255,255,255,0.08);color:#fff;border:1px solid rgba(255,255,255,0.2);padding:8px;border-radius:8px;cursor:pointer;">取消</button>';
     box.innerHTML = html;
     ov.appendChild(box); document.body.appendChild(ov);
     const close = ()=> recCloseModal(id);
     box.querySelectorAll('button[data-v]').forEach(b=>{ b.onclick = ()=>{ const v=b.getAttribute('data-v'); close(); opts.onPick && opts.onPick(v); }; });
+    if(opts.onBack) box.querySelector('button[data-back]').onclick = ()=>{ close(); opts.onBack(); };
     if(opts.onCancel) box.querySelector('button[data-cancel]').onclick = ()=>{ close(); opts.onCancel(); };
     ov.onclick = (e)=>{ if(e.target===ov && opts.onCancel) { close(); opts.onCancel(); } };
   }
@@ -891,6 +893,7 @@
                     setTimeout(()=> doImport(existing[idx]), 450); // 切换是异步，稍后再写入
                   } else { doImport(existing[idx]); }
                 },
+                onBack: ()=> pickCategory(),
                 onCancel: ()=>{}
               });
             }
