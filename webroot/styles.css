@@ -123,6 +123,24 @@
             display: block;
         }
 
+        /* 登录前隐藏所有浮层（这些浮层是 #mainContent 的后续兄弟节点）。
+           历史上它们被误嵌在未闭合的 #mainContent 内，靠父级隐藏而"碰巧"生效；
+           结构闭合后改由此处的兄弟选择器显式控制，登录后规则自动失效、不干预各自显示逻辑。 */
+        #mainContent:not(.visible) ~ #messageWall,
+        #mainContent:not(.visible) ~ #messageWallMin,
+        #mainContent:not(.visible) ~ #reputationPanel,
+        #mainContent:not(.visible) ~ #contributionCard,
+        #mainContent:not(.visible) ~ #chatRoomEntryModal,
+        #mainContent:not(.visible) ~ #nickSetupModal,
+        #mainContent:not(.visible) ~ #chatRoomPanel,
+        #mainContent:not(.visible) ~ #statsBar,
+        #mainContent:not(.visible) ~ #floatConsole,
+        #mainContent:not(.visible) ~ #floatConsoleToggle,
+        #mainContent:not(.visible) ~ #adminPageWallBackup,
+        #mainContent:not(.visible) ~ #adminPageWallGist {
+            display: none !important;
+        }
+
         /* 密码验证层 */
         .password-overlay {
             position: fixed;
