@@ -504,6 +504,10 @@
                         window.fusionSkins = project.fusionSkins || {}; // 副卡皮肤按项目独立保存，不污染全局
                         cardMoHua = project.cardMoHua || {};
                         saveCardSkins();
+                        // 捕获「已保存」皮肤快照（供放弃修改时回滚到切换前状态）
+                        _savedCardSkinsSnapshot = JSON.parse(JSON.stringify(cardSkins || {}));
+                        _savedFusionSkinsSnapshot = JSON.parse(JSON.stringify(window.fusionSkins || {}));
+                        _savedCardMoHuaSnapshot = JSON.parse(JSON.stringify(cardMoHua || {}));
                         
                         if (document.getElementById('myDeckInfo')) {
                             document.getElementById('myDeckInfo').value = project.myDeckInfo || '';
@@ -977,11 +981,24 @@
                 const cat = (typeof currentProjectCategory !== 'undefined' ? currentProjectCategory : '默认分类');
                 saveProjectToDB(currentProjectName, cat, cur).then(() => {
                     window.__tfjlProjectDirty = false;
+                    if (typeof updateSkinSnapshot === 'function') updateSkinSnapshot();
                     if (typeof updateSaveIndicator === 'function') updateSaveIndicator();
                     close(); doLoad();
                 }).catch(() => { close(); doLoad(); });
             };
-            document.getElementById('__scDiscard').onclick = () => { close(); doLoad(); };
+            document.getElementById('__scDiscard').onclick = () => {
+                // 放弃修改：setCardSkin 已即时落盘，故需把皮肤同时回滚到切换前的内存快照与 DB 记录
+                if (typeof _savedCardSkinsSnapshot !== 'undefined' && _savedCardSkinsSnapshot) {
+                    cardSkins = JSON.parse(JSON.stringify(_savedCardSkinsSnapshot));
+                    window.fusionSkins = JSON.parse(JSON.stringify(_savedFusionSkinsSnapshot || {}));
+                    cardMoHua = JSON.parse(JSON.stringify(_savedCardMoHuaSnapshot || {}));
+                    saveCardSkins();
+                    if (typeof revertCurrentProjectSkinsToSnapshot === 'function') revertCurrentProjectSkinsToSnapshot();
+                }
+                window.__tfjlProjectDirty = false;
+                if (typeof updateSaveIndicator === 'function') updateSaveIndicator();
+                close(); doLoad();
+            };
             document.getElementById('__scCancel').onclick = () => {
                 close();
                 const sel = document.getElementById('projectSelector1');
@@ -4669,6 +4686,7 @@
                 const targetName = name.trim();
                 saveProjectToDB(targetName, currentProjectCategory || '默认分类', currentData).then(() => {
                     window.__tfjlProjectDirty = false; updateSaveIndicator();
+                    if (typeof updateSkinSnapshot === 'function') updateSkinSnapshot();
                     alert(`✅ 项目"${targetName}"保存成功！`);
                 }).catch(e => alert('❌ 保存失败：' + e));
                 return;
@@ -4679,6 +4697,7 @@
                 const cat = (existing && existing.category) || currentProjectCategory || '默认分类';
                 saveProjectToDB(currentProjectName, cat, currentData).then(() => {
                     window.__tfjlProjectDirty = false; updateSaveIndicator();
+                    if (typeof updateSkinSnapshot === 'function') updateSkinSnapshot();
                     alert(`✅ 项目"${currentProjectName}"已保存`);
                 }).catch(e => alert('❌ 保存失败：' + e));
             });
@@ -4752,6 +4771,10 @@
         window.fusionSkins = window.fusionSkins || {};
         let defaultCardSkins = {}; // 全局默认皮肤（英雄级，卡池常用皮，跨项目保留）{ "47": "太平乐·火灵", ... }
         let cardMoHua = {}; // 每张卡的魔化开关 { "my_47": true, ... }
+        // 🔁 当前项目「已保存」皮肤快照：setCardSkin 会即时落盘，故「放弃修改」需主动把卡牌/副卡皮肤回滚到切换前状态
+        let _savedCardSkinsSnapshot = null;
+        let _savedFusionSkinsSnapshot = null;
+        let _savedCardMoHuaSnapshot = null;
         let professionOrder = [];
         const MAX_HAND_CARDS = 10;
         const MAX_PLACED_CARDS = 7;
@@ -6720,6 +6743,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             cardSkins[key] = skin;
             saveCardSkins();
             if (typeof persistProjectSkins === 'function') persistProjectSkins();
+            // 标记未保存：让纯换皮肤也触发切项目时的「保存/放弃」提示（否则连提示都不弹，皮肤会被静默落盘）
+            if (typeof autoSaveProject === 'function') autoSaveProject();
 
             // 同步刷新该卡牌所有相关位置（手牌 + 战斗槽）
             try {
@@ -6762,6 +6787,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             if (typeof window.fusionSkins === 'undefined') window.fusionSkins = {};
             window.fusionSkins[fusedHero] = skin; // '' = 关闭副卡显示
             if (typeof persistFusionSkins === 'function') await persistFusionSkins();
+            if (typeof autoSaveProject === 'function') autoSaveProject();
         }
         // 立即把副卡皮肤偏好落盘到当前项目记录（与 persistProjectSkins 对称）
         async function persistFusionSkins() {
@@ -6884,6 +6910,40 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 });
                 if (typeof persistProjectsToDisk === 'function') persistProjectsToDisk();
             } catch (e) { console.warn('[SKIN] persistProjectSkins failed:', e); }
+        }
+
+        // 把当前项目皮肤回滚到「已保存」快照（供放弃修改使用）。因 setCardSkin 已即时落盘，必须主动把 DB 记录写回旧值。
+        async function revertCurrentProjectSkinsToSnapshot() {
+            if (!db || !currentProjectName) return;
+            if (!_savedCardSkinsSnapshot) return;
+            try {
+                await new Promise((resolve) => {
+                    const t = db.transaction([STORE_NAME], 'readwrite');
+                    const s = t.objectStore(STORE_NAME);
+                    const req = s.get(currentProjectName);
+                    req.onsuccess = () => {
+                        const p = req.result;
+                        if (p) {
+                            p.cardSkins = JSON.parse(JSON.stringify(_savedCardSkinsSnapshot));
+                            p.fusionSkins = JSON.parse(JSON.stringify(_savedFusionSkinsSnapshot || {}));
+                            p.cardMoHua = JSON.parse(JSON.stringify(_savedCardMoHuaSnapshot || {}));
+                            s.put(p);
+                        }
+                        resolve();
+                    };
+                    req.onerror = () => resolve();
+                    t.oncomplete = () => resolve();
+                    t.onerror = () => resolve();
+                });
+                if (typeof persistProjectsToDisk === 'function') persistProjectsToDisk();
+            } catch (e) { console.warn('[SKIN] revert snapshot failed:', e); }
+        }
+
+        // 保存成功后刷新「已保存」快照，使后续放弃修改以本次保存为基准
+        function updateSkinSnapshot() {
+            _savedCardSkinsSnapshot = JSON.parse(JSON.stringify(cardSkins || {}));
+            _savedFusionSkinsSnapshot = JSON.parse(JSON.stringify(window.fusionSkins || {}));
+            _savedCardMoHuaSnapshot = JSON.parse(JSON.stringify(cardMoHua || {}));
         }
 
         // 设置全局默认皮肤（英雄级，跨项目/跨上阵记住；队友卡未单独设时自动同步）
