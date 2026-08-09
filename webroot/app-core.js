@@ -14539,13 +14539,13 @@ function hasGistToken() {
 
             tip.style.display = 'block';
 
-            let x = e.clientX + 14, y = e.clientY + 14;
-
+            // 跟随鼠标，但偏移加大（OFF）避免紧贴光标遮挡；靠近屏幕右/下边缘时翻转到另一侧
+            const OFF = 26;
             const r = tip.getBoundingClientRect();
-
-            if (x + r.width > window.innerWidth) x = e.clientX - r.width - 14;
-
-            if (y + r.height > window.innerHeight) y = e.clientY - r.height - 14;
+            let x = e.clientX + OFF, y = e.clientY + OFF;
+            if (x + r.width > window.innerWidth - 4) x = e.clientX - r.width - OFF; // 右侧放不下→翻到左侧
+            if (y + r.height > window.innerHeight - 4) y = e.clientY - r.height - OFF; // 下方放不下→翻到上方
+            if (x < 4) x = 4; if (y < 4) y = 4; // 兜底不跑出视口
 
             tip.style.left = x + 'px'; tip.style.top = y + 'px';
 
