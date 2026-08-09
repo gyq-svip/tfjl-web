@@ -828,7 +828,8 @@
             if(skipped>0) msg+='；'+skipped+' 张未通过 100 库校验已忽略（识别不到的请手动修改）';
             recToast(msg);
             $('recStatus').textContent = msg;
-          }
+          },
+          onCancel: ()=>{}
         });
       };
 
@@ -870,7 +871,8 @@
               setTimeout(()=> doImport(existing[idx]), 450); // 切换是异步，稍后再写入
             } else { doImport(existing[idx]); }
           }
-        }
+        },
+        onCancel: ()=>{}
       });
     };
     // 常驻“启动识别引擎”按钮：关掉 Umi-OCR 后随时重新打开（显示窗口，用户可见）
