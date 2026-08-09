@@ -565,6 +565,61 @@
     return '<span style="color:#c62828;font-weight:600;">✗ '+v.reason+'</span>';
   }
 
+  // ====================== 自定义弹窗（替代 window.prompt/confirm，Tauri 下原生 prompt 不工作） ======================
+  function recCloseModal(id){ const d=document.getElementById(id); if(d) d.remove(); }
+  function recChoice(opts){
+    const id = 'recChoiceModal'; recCloseModal(id);
+    const ov = document.createElement('div');
+    ov.id = id;
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:20000;display:flex;align-items:center;justify-content:center;padding:18px;';
+    const box = document.createElement('div');
+    box.style.cssText = 'background:#1b1f2a;color:#eee;border-radius:12px;max-width:440px;width:100%;padding:18px;box-shadow:0 10px 40px rgba(0,0,0,0.6);';
+    let html = '<div style="font-size:1.05rem;font-weight:600;margin-bottom:6px;">' + escapeHtml(opts.title||'') + '</div>';
+    if(opts.desc) html += '<div style="font-size:0.82rem;color:#b0bec5;margin-bottom:12px;line-height:1.5;">' + escapeHtml(opts.desc) + '</div>';
+    html += '<div style="display:flex;flex-direction:column;gap:8px;">';
+    (opts.items||[]).forEach(it=>{
+      const st = it.style || 'background:linear-gradient(135deg,#42a5f5,#1565c0);color:#fff;border:none;';
+      html += '<button data-v="' + escapeHtml(String(it.value)) + '" style="' + st + 'padding:10px 14px;border-radius:8px;cursor:pointer;font-size:0.9rem;font-weight:600;text-align:left;">' + escapeHtml(it.label) + '</button>';
+    });
+    html += '</div>';
+    if(opts.onCancel) html += '<button data-cancel style="margin-top:10px;width:100%;background:rgba(255,255,255,0.08);color:#fff;border:1px solid rgba(255,255,255,0.2);padding:8px;border-radius:8px;cursor:pointer;">取消</button>';
+    box.innerHTML = html;
+    ov.appendChild(box); document.body.appendChild(ov);
+    const close = ()=> recCloseModal(id);
+    box.querySelectorAll('button[data-v]').forEach(b=>{ b.onclick = ()=>{ const v=b.getAttribute('data-v'); close(); opts.onPick && opts.onPick(v); }; });
+    if(opts.onCancel) box.querySelector('button[data-cancel]').onclick = ()=>{ close(); opts.onCancel(); };
+    ov.onclick = (e)=>{ if(e.target===ov && opts.onCancel) { close(); opts.onCancel(); } };
+  }
+  function recInput(opts){
+    const id = 'recInputModal'; recCloseModal(id);
+    const ov = document.createElement('div');
+    ov.id = id;
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:20000;display:flex;align-items:center;justify-content:center;padding:18px;';
+    const box = document.createElement('div');
+    box.style.cssText = 'background:#1b1f2a;color:#eee;border-radius:12px;max-width:420px;width:100%;padding:18px;box-shadow:0 10px 40px rgba(0,0,0,0.6);';
+    box.innerHTML = '<div style="font-size:1.05rem;font-weight:600;margin-bottom:10px;">' + escapeHtml(opts.title||'') + '</div>'
+      + '<input id="recInputBox" style="width:100%;box-sizing:border-box;padding:10px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.3);color:#fff;font-size:0.9rem;" placeholder="' + escapeHtml(opts.placeholder||'') + '" value="' + escapeHtml(opts.def||'') + '">'
+      + '<div style="display:flex;gap:8px;margin-top:12px;">'
+      + '<button id="recInputOk" style="flex:1;background:linear-gradient(135deg,#66bb6a,#2e7d32);color:#fff;border:none;padding:10px;border-radius:8px;cursor:pointer;font-weight:600;">确定</button>'
+      + '<button id="recInputCancel" style="flex:1;background:rgba(255,255,255,0.08);color:#fff;border:1px solid rgba(255,255,255,0.2);padding:10px;border-radius:8px;cursor:pointer;">取消</button>'
+      + '</div>';
+    ov.appendChild(box); document.body.appendChild(ov);
+    const inp = box.querySelector('#recInputBox');
+    const close = ()=> recCloseModal(id);
+    setTimeout(()=> inp.focus(), 30);
+    inp.addEventListener('keydown', e=>{ if(e.key==='Enter'){ close(); opts.onOk && opts.onOk(inp.value); } });
+    box.querySelector('#recInputOk').onclick = ()=>{ close(); opts.onOk && opts.onOk(inp.value); };
+    box.querySelector('#recInputCancel').onclick = ()=>{ close(); opts.onCancel && opts.onCancel(); };
+    ov.onclick = (e)=>{ if(e.target===ov){ close(); opts.onCancel && opts.onCancel(); } };
+  }
+  function recToast(msg){
+    if(typeof showToast === 'function'){ showToast(msg); return; }
+    const t = document.createElement('div');
+    t.style.cssText = 'position:fixed;left:50%;top:18%;transform:translateX(-50%);background:rgba(20,20,35,0.95);color:#fff;padding:12px 18px;border-radius:10px;font-size:0.86rem;z-index:30000;max-width:80%;box-shadow:0 6px 24px rgba(0,0,0,0.5);line-height:1.5;white-space:pre-line;';
+    t.textContent = msg; document.body.appendChild(t);
+    setTimeout(()=> t.remove(), 4000);
+  }
+
   // ====================== UI：浮窗按钮 + 弹窗 ======================
   function buildUI(){
     const btn = document.createElement('div');
@@ -719,26 +774,19 @@
       setTimeout(()=>{ overlay.style.display='none'; }, 600);
     };
 
-    // 🃏 导入到手牌：弹选框(当前/新建/现有项目) → 选我的/队友手牌 → 逐张加入
+    // 🃏 导入到手牌：选框(当前/新建/现有项目) → 选我的/队友手牌 → 逐张加入
+    // 注意：Tauri 桌面端 window.prompt 不工作，改用自定义 modal（recChoice/recInput/recToast）
     $('recImportHand').onclick = ()=>{
       const all = overlay._results || [];
       const results = all.filter(r=>!r._deleted);
-      if(!results.length){ alert('请先识别（或别把卡都删光了）'); return; }
+      if(!results.length){ recToast('请先识别（或别把卡都删光了）'); return; }
       // 仅取通过 100 库校验的英雄（疑似识别错/未通过者一律跳过）
       const heroes = results.filter(r=>r.valid && r.valid.ok && r.hero).map(r=>r.hero);
       const skipped = results.length - heroes.length;
-      if(!heroes.length){ alert('没有通过校验的英雄（100 精确英雄卡名）可导入手牌。\n识别不到的请手动修改。'); return; }
+      if(!heroes.length){ recToast('没有通过校验的英雄（100 精确英雄卡名）可导入手牌。\n识别不到的请手动修改。'); return; }
 
-      // 第一步：选目标项目（A 当前 / B 新建 / C 现有）
       const curName = (typeof currentProjectName !== 'undefined' && currentProjectName) ? currentProjectName : '';
       const existing = (typeof loadProjectListFromDB === 'function') ? (loadProjectListFromDB() || []) : [];
-      let menu = '请选择要导入到的项目：\n';
-      menu += '[A] 当前项目' + (curName ? '（' + curName + '）' : '（无）') + '\n';
-      menu += '[B] 新建项目\n';
-      existing.forEach((n,i)=> menu += '[C' + i + '] 现有项目：' + n + '\n');
-      const pick = prompt(menu, 'A');
-      if(pick === null) return;
-      const pk = pick.trim().toUpperCase();
 
       const addToHandByName = (name, type)=>{
         const cardEl = document.querySelector('.card-item[data-name="' + name + '"]');
@@ -754,52 +802,74 @@
         return true;
       };
 
-      const proceed = (projName)=>{
-        // 第二步：选我的手牌 / 队友手牌
-        const side = prompt('导入到：\n[M] 我的手牌\n[T] 队友手牌', 'M');
-        if(side === null) return;
-        const s = side.trim().toUpperCase();
-        const type = (s === 'T') ? 'teammate' : 'my';
-        let added = 0, dup = 0, missing = 0;
-        heroes.forEach(h=>{
-          const before = (type==='my'?myHandCards:teammateHandCards).length;
-          const ok = addToHandByName(h, type);
-          const after = (type==='my'?myHandCards:teammateHandCards).length;
-          if(ok) added++; else if(after===before) dup++; else missing++;
+      const doImport = (projName)=>{
+        recChoice({
+          title:'🃏 导入到手牌 — 选择位置',
+          desc:'把这 ' + heroes.length + ' 张识别到的英雄卡导入到？',
+          items:[
+            {label:'🃏 我的手牌', value:'my'},
+            {label:'🤝 队友手牌', value:'teammate'}
+          ],
+          onPick:(type)=>{
+            let added=0, dup=0, missing=0;
+            heroes.forEach(h=>{
+              const before=(type==='my'?myHandCards:teammateHandCards).length;
+              const ok=addToHandByName(h,type);
+              const after=(type==='my'?myHandCards:teammateHandCards).length;
+              if(ok) added++; else if(after===before) dup++; else missing++;
+            });
+            if(typeof updateHandDisplay==='function') updateHandDisplay(type);
+            if(typeof saveCurrentProject==='function') saveCurrentProject();
+            let msg='已导入 '+added+' 张到'+(type==='my'?'我的':'队友')+'手牌'+(projName?'（项目：'+projName+'）':'');
+            if(dup>0) msg+='；'+dup+' 张因重复已跳过';
+            if(missing>0) msg+='；'+missing+' 张卡池未找到（请确认卡池含该英雄）';
+            if(skipped>0) msg+='；'+skipped+' 张未通过 100 库校验已忽略（识别不到的请手动修改）';
+            recToast(msg);
+            $('recStatus').textContent = msg;
+          }
         });
-        if(typeof updateHandDisplay==='function') updateHandDisplay(type);
-        if(typeof saveCurrentProject==='function') saveCurrentProject();
-        let msg = '已导入 ' + added + ' 张到' + (type==='my'?'我的':'队友') + '手牌' + (projName?'（项目：'+projName+'）':'');
-        if(dup>0) msg += '；' + dup + ' 张因重复已跳过';
-        if(missing>0) msg += '；' + missing + ' 张卡池未找到（请确认卡池含该英雄）';
-        if(skipped>0) msg += '；' + skipped + ' 张未通过 100 库校验已忽略（识别不到的请手动修改）';
-        if(typeof showToast==='function') showToast(msg); else alert(msg);
-        $('recStatus').textContent = msg;
       };
 
-      if(pk === 'A'){
-        if(!curName){ alert('当前没有项目，请选 B 新建或 C 现有项目'); return; }
-        proceed(curName);
-      } else if(pk === 'B'){
-        const nm = prompt('请输入新项目名称：', '新阵容');
-        if(!nm || !nm.trim()){ alert('项目名不能为空'); return; }
-        const safeName = nm.trim();
-        const cat = (typeof currentCat !== 'undefined' && currentCat) ? currentCat : '默认';
-        const emptyData = { myHandCards:[], teammateHandCards:[], myPlacedCards:[], teammatePlacedCards:[], cardLevels:{}, cardSkins:{}, fusionSkins:{}, myDeckInfo:'', teammateDeckInfo:'', notepad:'', txtFiles:[], referenceImages:[] };
-        if(typeof saveProjectToDB==='function' && typeof loadProjectFromDB==='function'){
-          saveProjectToDB(safeName, cat, emptyData).then(()=> loadProjectFromDB(safeName)).then(()=>{
-            if(typeof refreshProjectSelectors==='function') refreshProjectSelectors();
-            proceed(safeName);
-          }).catch(e=> alert('创建项目失败：' + e));
-        } else { proceed(safeName); }
-      } else if(pk.indexOf('C') === 0){
-        const idx = parseInt(pk.slice(1), 10);
-        if(isNaN(idx) || idx < 0 || idx >= existing.length){ alert('无效选项'); return; }
-        if(typeof requestSwitchProject==='function'){
-          requestSwitchProject(existing[idx]);
-          setTimeout(()=> proceed(existing[idx]), 450); // 切换是异步，稍后再写入
-        } else { proceed(existing[idx]); }
-      } else { alert('无效选项，请输入 A / B / C0…'); }
+      // 第一步：选目标项目（A 当前 / B 新建 / C 现有）
+      const projItems = [{label:'📌 当前项目'+(curName?'（'+curName+'）':'（无）'), value:'A'}];
+      projItems.push({label:'➕ 新建项目', value:'B'});
+      existing.forEach((n,i)=> projItems.push({label:'📂 现有项目：'+n, value:'C'+i}));
+      recChoice({
+        title:'🃏 导入到手牌 — 选择项目',
+        desc:'把这 ' + heroes.length + ' 张识别到的英雄卡导入到哪个项目？',
+        items: projItems,
+        onPick:(val)=>{
+          if(val==='A'){
+            if(!curName){ recToast('当前没有项目，请选「新建项目」或「现有项目」'); return; }
+            doImport(curName);
+          } else if(val==='B'){
+            recInput({
+              title:'新建项目名称',
+              placeholder:'输入新项目名称',
+              def:'新阵容',
+              onOk:(nm)=>{
+                const safe=(nm||'').trim();
+                if(!safe){ recToast('项目名不能为空'); return; }
+                const cat=(typeof currentCat!=='undefined'&&currentCat)?currentCat:'默认';
+                const emptyData={ myHandCards:[], teammateHandCards:[], myPlacedCards:[], teammatePlacedCards:[], cardLevels:{}, cardSkins:{}, fusionSkins:{}, myDeckInfo:'', teammateDeckInfo:'', notepad:'', txtFiles:[], referenceImages:[] };
+                if(typeof saveProjectToDB==='function' && typeof loadProjectFromDB==='function'){
+                  saveProjectToDB(safe, cat, emptyData).then(()=> loadProjectFromDB(safe)).then(()=>{
+                    if(typeof refreshProjectSelectors==='function') refreshProjectSelectors();
+                    doImport(safe);
+                  }).catch(e=> recToast('创建项目失败：' + (e&&e.message||e)));
+                } else { doImport(safe); }
+              }
+            });
+          } else if(val.indexOf('C')===0){
+            const idx=parseInt(val.slice(1),10);
+            if(isNaN(idx)||idx<0||idx>=existing.length){ recToast('无效选项'); return; }
+            if(typeof requestSwitchProject==='function'){
+              requestSwitchProject(existing[idx]);
+              setTimeout(()=> doImport(existing[idx]), 450); // 切换是异步，稍后再写入
+            } else { doImport(existing[idx]); }
+          }
+        }
+      });
     };
     // 常驻“启动识别引擎”按钮：关掉 Umi-OCR 后随时重新打开（显示窗口，用户可见）
     $('recLaunch').onclick = async ()=>{
