@@ -200,6 +200,11 @@
                     const defaultCategories = ['默认分类', '暗月', '寒冰', '漩涡', '深海', '临时'];
                     if (request.result && request.result.length > 0) {
                         categories = request.result.map(c => c.name);
+                        // 兜底合并 localStorage 中的自建分类（防 IndexedDB 偶发漏存导致刷新丢失）
+                        try {
+                            const lc = JSON.parse(localStorage.getItem('tfjl_categories') || '[]');
+                            if (Array.isArray(lc)) lc.forEach(c => { if (!categories.includes(c)) categories.push(c); });
+                        } catch (e) {}
                         // 确保默认分类存在
                         defaultCategories.forEach(cat => {
                             if (!categories.includes(cat)) {
@@ -207,7 +212,12 @@
                             }
                         });
                     } else {
-                        categories = defaultCategories;
+                        categories = defaultCategories.slice();
+                        // 兜底：IndexedDB 无分类时，从 localStorage 恢复用户自建分类（防止刷新后丢失）
+                        try {
+                            const lc = JSON.parse(localStorage.getItem('tfjl_categories') || '[]');
+                            if (Array.isArray(lc)) lc.forEach(c => { if (!categories.includes(c)) categories.push(c); });
+                        } catch (e) {}
                         saveCategories();
                     }
                     window.categories = categories;
@@ -238,7 +248,11 @@
                     store.add({ name: catName });
                 });
 
-                transaction.oncomplete = () => resolve();
+                transaction.oncomplete = () => {
+                    // 兜底双写 localStorage，防止 IndexedDB 偶发未落盘导致刷新后自定义分类丢失
+                    try { localStorage.setItem('tfjl_categories', JSON.stringify(categories)); } catch (e) {}
+                    resolve();
+                };
                 transaction.onerror = () => reject(transaction.error);
             });
         }
