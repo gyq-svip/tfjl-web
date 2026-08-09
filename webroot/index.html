@@ -2206,6 +2206,27 @@
 
     </div> <!-- 主内容区域结束 -->
 
+    <!-- 免责声明 -->
+    <div style="position:relative;padding:20px;background:rgba(0,0,0,0.5);border-top:1px solid rgba(255,255,255,0.1);text-align:center;font-size:0.85rem;color:#888;margin-bottom:60px;">
+        <div style="max-width:800px;margin:0 auto;">
+            <h4 style="margin:0 0 10px 0;color:#aaa;">⚠️ 免责声明</h4>
+            <p style="margin:5px 0;line-height:1.6;">
+                本工具仅供学习交流使用，所有数据存储于用户本地设备。
+            </p>
+            <p style="margin:5px 0;line-height:1.6;">
+                开发者不对因使用本工具造成的任何损失承担责任，请合理使用。
+            </p>
+            <p style="margin:5px 0;line-height:1.6;">
+                游戏相关内容版权归官方所有，本工具与游戏官方无任何关联。
+            </p>
+        </div>
+    </div>
+
+        </div><!-- /.container（结构已闭合）-->
+    </div><!-- /#mainContent（结构已闭合）：以下浮层均为 <body> 直接子元素，
+         不再受 #mainContent 隐藏影响，也不再被 .container 的 z-index:1 层叠上下文束缚。
+         登录前的隐藏由 styles.css 的「#mainContent:not(.visible) ~ 浮层」兄弟选择器接管。-->
+
     <!-- 消息墙 -->
     
     <div id="messageWall" style="position:fixed;top:60px;left:20px;width:380px;height:480px;background:rgba(26,26,46,0.95);border:1px solid rgba(255,215,0,0.3);border-radius:12px;z-index:9980;box-shadow:0 4px 20px rgba(0,0,0,0.5);backdrop-filter:blur(10px);flex-direction:column;min-width:300px;min-height:350px;display:none;">
@@ -2381,24 +2402,8 @@
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">s20260808-056 · s1.0.56</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">s20260809-057 · s1.0.57</span>
             </div>
-        </div>
-    </div>
-
-    <!-- 免责声明 -->
-    <div style="position:relative;padding:20px;background:rgba(0,0,0,0.5);border-top:1px solid rgba(255,255,255,0.1);text-align:center;font-size:0.85rem;color:#888;margin-bottom:60px;">
-        <div style="max-width:800px;margin:0 auto;">
-            <h4 style="margin:0 0 10px 0;color:#aaa;">⚠️ 免责声明</h4>
-            <p style="margin:5px 0;line-height:1.6;">
-                本工具仅供学习交流使用，所有数据存储于用户本地设备。
-            </p>
-            <p style="margin:5px 0;line-height:1.6;">
-                开发者不对因使用本工具造成的任何损失承担责任，请合理使用。
-            </p>
-            <p style="margin:5px 0;line-height:1.6;">
-                游戏相关内容版权归官方所有，本工具与游戏官方无任何关联。
-            </p>
         </div>
     </div>
 
