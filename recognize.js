@@ -843,9 +843,9 @@
         box.innerHTML =
           '<div style="font-size:1.05rem;font-weight:600;margin-bottom:4px;">🃏 导入到手牌 — 选择项目</div>' +
           '<div style="font-size:0.82rem;color:#b0bec5;margin-bottom:14px;line-height:1.5;">把这 '+heroes.length+' 张英雄卡导入到？（先选分类，再选项目）</div>' +
-          '<label style="font-size:0.8rem;color:#90caf9;display:block;margin-bottom:6px;">📁 分类</label>' +
+          '<label style="font-size:0.8rem;color:#90caf9;display:block;margin-bottom:6px;">📁 分类（文件夹）</label>' +
           '<select id="recImpCat" style="width:100%;box-sizing:border-box;background:#2a2a4a;color:#fff;padding:9px 12px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);font-size:0.9rem;cursor:pointer;margin-bottom:14px;"></select>' +
-          '<label style="font-size:0.8rem;color:#90caf9;display:block;margin-bottom:6px;">📂 项目</label>' +
+          '<label style="font-size:0.8rem;color:#90caf9;display:block;margin-bottom:6px;">📄 项目（文件夹里的文件）</label>' +
           '<select id="recImpProj" style="width:100%;box-sizing:border-box;background:#2a2a4a;color:#fff;padding:9px 12px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);font-size:0.9rem;cursor:pointer;margin-bottom:16px;"></select>' +
           '<div style="font-size:0.8rem;color:#90caf9;margin-bottom:6px;">导入到哪个手牌？</div>' +
           '<div style="display:flex;gap:8px;margin-bottom:16px;">' +
@@ -874,8 +874,8 @@
           let list = [];
           if(c==='__CUR__'){ list = byCat(curCat); }
           else { list = byCat(c); }
-          list.forEach(p=>{ const o=document.createElement('option'); o.value=String(p.idx); o.textContent='📂 '+p.name; projSel.appendChild(o); });
-          const o2=document.createElement('option'); o2.value='__NEW__'; o2.textContent='➕ 新建项目…'; projSel.appendChild(o2);
+          list.forEach(p=>{ const o=document.createElement('option'); o.value=String(p.idx); o.textContent='📄 '+p.name; projSel.appendChild(o); });
+          const o2=document.createElement('option'); o2.value='__NEW__'; o2.textContent='📄 新建项目…'; projSel.appendChild(o2);
           if(!list.length && !curName){ projSel.value='__NEW__'; }
         };
         catSel.onchange = fillProjs;
@@ -901,8 +901,11 @@
                 const emptyData={ myHandCards:[], teammateHandCards:[], myPlacedCards:[], teammatePlacedCards:[], cardLevels:{}, cardSkins:{}, fusionSkins:{}, myDeckInfo:'', teammateDeckInfo:'', notepad:'', txtFiles:[], referenceImages:[] };
                 if(typeof saveProjectToDB==='function' && typeof loadProjectFromDB==='function'){
                   saveProjectToDB(safe, cat, emptyData).then(()=> loadProjectFromDB(safe)).then(()=>{
+                    // 导入后直接打开这个项目（主界面选中并刷新）
+                    const pn = safe;
                     if(typeof refreshProjectSelectors==='function') refreshProjectSelectors();
-                    doImport(safe, type);
+                    const sp = document.getElementById('projectSelector1'); if(sp) sp.value = pn;
+                    doImport(pn, type);
                   }).catch(e=> recToast('创建项目失败：' + (e&&e.message||e)));
                 } else { doImport(safe, type); }
               }
@@ -912,10 +915,18 @@
           const idx = parseInt(pval,10);
           if(isNaN(idx)||idx<0||idx>=existing.length){ recToast('请选择一个项目'); return; }
           close();
-          if(typeof requestSwitchProject==='function'){
-            requestSwitchProject(existing[idx]);
-            setTimeout(()=> doImport(existing[idx], type), 450); // 切换是异步，稍后再写入
-          } else { doImport(existing[idx], type); }
+          // 清掉当前项目脏标记，避免 requestSwitchProject 弹「未保存修改」框打断导入
+          if(typeof window.__tfjlProjectDirty !== 'undefined') window.__tfjlProjectDirty = false;
+          const targetName = (existing[idx] && existing[idx].name) ? existing[idx].name : null;
+          if(typeof requestSwitchProject==='function' && targetName){
+            requestSwitchProject(targetName);
+            setTimeout(()=>{
+              doImport(targetName, type);
+              // 导入完成后确保主界面打开的是目标项目
+              if(typeof refreshProjectSelectors==='function') refreshProjectSelectors();
+              const sp = document.getElementById('projectSelector1'); if(sp && targetName) sp.value = targetName;
+            }, 500); // 切换是异步，稍后再写入并打开
+          } else { doImport(targetName, type); }
         };
         // 手牌位置按钮高亮切换
         box.querySelectorAll('button[data-type]').forEach(b=>{
