@@ -12860,6 +12860,31 @@ function hasGistToken() {
             data.daily_stats[date].web_visits = w;
         }
 
+        // 累计总访问按设备汇总（与每日访问同思路，避免多端 Math.max 低估）
+        function mergeDeviceVisits(target, src) {
+            if (!src || !src.device_visits) return;
+            if (!target.device_visits || typeof target.device_visits !== 'object') target.device_visits = {};
+            for (const id in src.device_visits) {
+                const s = src.device_visits[id] || 0;
+                if ((target.device_visits[id] || 0) < s) target.device_visits[id] = s;
+            }
+        }
+        function recomputeTotalVisits(data) {
+            if (!data) return;
+            if (!data.device_visits || typeof data.device_visits !== 'object') data.device_visits = {};
+            let sum = 0;
+            for (const id in data.device_visits) sum += (data.device_visits[id] || 0);
+            data.total_visits = sum;
+        }
+        // 历史数据无 device_visits 时，用既有 total_visits 作基线(_legacy)，避免累计数变小
+        function ensureDeviceVisitsBaseline(data) {
+            if (!data) return;
+            if (!data.device_visits || typeof data.device_visits !== 'object') data.device_visits = {};
+            if (Object.keys(data.device_visits).length === 0 && (data.total_visits || 0) > 0) {
+                data.device_visits['_legacy'] = data.total_visits;
+            }
+        }
+
         // 在线用户条目统一为对象 { t: 最后活跃时间戳, nick: 昵称, src: 'app'|'web' }（旧数据可能为纯数字时间戳，需兼容）
         function _olTs(v) { return (v && typeof v === 'object') ? (v.t || 0) : (typeof v === 'number' ? v : 0); }
         function _olRec(nick, src) { return { t: Date.now(), nick: (nick || '').toString().slice(0, 24), src: src === 'app' ? 'app' : 'web' }; }
@@ -12918,7 +12943,8 @@ function hasGistToken() {
         function mergeCounters(target, src) {
             if (!target || typeof target !== 'object') target = {};
             if (!src || typeof src !== 'object') return target;
-            target.total_visits = Math.max(target.total_visits || 0, src.total_visits || 0);
+            // 🔴 累计总访问按设备汇总（求和），避免多端 Math.max 把跨设备访问数压成单端最大值
+            mergeDeviceVisits(target, src); ensureDeviceVisitsBaseline(target); recomputeTotalVisits(target);
             target.total_downloads = Math.max(target.total_downloads || 0, src.total_downloads || 0);
             target.total_users = Math.max(target.total_users || 0, src.total_users || 0);
             // unique_users / active_today_users：取并集
@@ -13006,6 +13032,7 @@ function hasGistToken() {
             const today = getTodayString();
             return {
                 total_visits: 0,
+                device_visits: {},  // { [deviceId]: 累计访问数 }，用于跨设备求和累计总访问（避免 Math.max 低估）
                 total_users: 0,
                 unique_users: [],
                 total_downloads: 0,
@@ -13108,6 +13135,7 @@ function hasGistToken() {
                             if (parsed.total_users === undefined) parsed.total_users = parsed.unique_users.length;
                             if (parsed.active_today === undefined) parsed.active_today = parsed.active_today_users.length;
                             if (parsed.total_visits === undefined) parsed.total_visits = 0;
+                            ensureDeviceVisitsBaseline(parsed); recomputeTotalVisits(parsed);
                             if (parsed.total_downloads === undefined) parsed.total_downloads = 0;
                             if (!parsed.online_users) parsed.online_users = {};
                             if (!parsed.online_timeout || parsed.online_timeout === 3600000 || parsed.online_timeout === 7200000) parsed.online_timeout = 300000;
@@ -13245,7 +13273,7 @@ function hasGistToken() {
                                     });
                                 }
                                 // 取最大访问数和下载数（防止数据回退）
-                                fresh.total_visits = Math.max(fresh.total_visits || 0, localData.total_visits || 0);
+                                mergeDeviceVisits(fresh, localData); ensureDeviceVisitsBaseline(fresh); recomputeTotalVisits(fresh);
                                 fresh.total_users = Math.max(fresh.total_users || 0, fresh.unique_users.length);
                                 fresh.total_downloads = Math.max(fresh.total_downloads || 0, localData.total_downloads || 0);
                                 fresh.active_today = fresh.active_today_users.length;
@@ -13470,7 +13498,11 @@ function hasGistToken() {
                 switch (type) {
                     case 'visit':
                         const isApp = !!(window.__TAURI__);
-                        counterData.total_visits++;
+                        // 🔴 累计总访问按设备记录（避免多端 Math.max 低估）
+                        if (!counterData.device_visits) counterData.device_visits = {};
+                        ensureDeviceVisitsBaseline(counterData);
+                        counterData.device_visits[deviceId] = (counterData.device_visits[deviceId] || 0) + 1;
+                        recomputeTotalVisits(counterData);
                         // 🔴 按设备记录各自访问数：每个设备只更新自己的明细，合并时求和，避免 Math.max 把多端访问数压成单端最大值
                         if (!counterData.daily_device_visits) counterData.daily_device_visits = {};
                         if (!counterData.daily_device_visits[today]) counterData.daily_device_visits[today] = {};
@@ -13659,7 +13691,10 @@ function hasGistToken() {
                     // 更新统计
                     switch (item.type) {
                         case 'visit':
-                            remoteData.total_visits++;
+                            if (!remoteData.device_visits) remoteData.device_visits = {};
+                ensureDeviceVisitsBaseline(remoteData);
+                remoteData.device_visits[deviceId] = (remoteData.device_visits[deviceId] || 0) + 1;
+                recomputeTotalVisits(remoteData);
                             remoteData.daily_stats[syncDate].visits++;
                             hasVisit = true;
                             break;
@@ -13821,7 +13856,7 @@ function hasGistToken() {
                                                 try {
                                                     const existingData = JSON.parse(existDataJson.files['counter.json'].content);
                                                     if (existingData) {
-                                                        data.total_visits = Math.max(data.total_visits || 0, existingData.total_visits || 0);
+                                                        mergeDeviceVisits(data, existingData); ensureDeviceVisitsBaseline(data); recomputeTotalVisits(data);
                                                         data.total_downloads = Math.max(data.total_downloads || 0, existingData.total_downloads || 0);
                                                         if (existingData.unique_users && Array.isArray(existingData.unique_users)) {
                                                             existingData.unique_users.forEach(id => {
@@ -14066,7 +14101,7 @@ function hasGistToken() {
                                                     const existingData = JSON.parse(existDataJson.files['counter.json'].content);
                                                     // 合并已有数据到当前数据（取最大值，防止数据回退）
                                                     if (existingData) {
-                                                        counterData.total_visits = Math.max(counterData.total_visits || 0, existingData.total_visits || 0);
+                                                        mergeDeviceVisits(counterData, existingData); ensureDeviceVisitsBaseline(counterData); recomputeTotalVisits(counterData);
                                                         counterData.total_downloads = Math.max(counterData.total_downloads || 0, existingData.total_downloads || 0);
                                                         if (existingData.unique_users && Array.isArray(existingData.unique_users)) {
                                                             existingData.unique_users.forEach(id => {
