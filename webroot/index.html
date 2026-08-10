@@ -509,7 +509,7 @@
                         </select>
                     </div>
                     <textarea id="cgmHeroDesc" placeholder="卡牌描述（可选，悬停卡牌可见）" style="width:100%;height:54px;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:#2a2a4a;color:#fff;font-size:0.85rem;box-sizing:border-box;margin-bottom:8px;resize:vertical;"></textarea>
-                    <textarea id="cgmHeroSkinDesc" placeholder="皮肤/立绘说明（可选）" style="width:100%;height:46px;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:#2a2a4a;color:#fff;font-size:0.85rem;box-sizing:border-box;margin-bottom:8px;resize:vertical;"></textarea>
+                    <textarea id="cgmHeroMohuaDesc" placeholder="魔化描述（可选）：填了即给该卡新增/更新【魔化】属性，卡牌属性 tooltip 显示。现有卡没魔化的也能在此补上。" style="width:100%;height:54px;padding:8px;border-radius:8px;border:1px solid rgba(255,165,0,0.4);background:#2a2a4a;color:#fff;font-size:0.85rem;box-sizing:border-box;margin-bottom:8px;resize:vertical;"></textarea>
                     <button onclick="cgmAddNewHeroCard()" style="padding:8px 16px;border:none;border-radius:8px;background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;cursor:pointer;font-size:0.85rem;">✓ 写入</button>
                     <div style="font-size:0.72rem;color:rgba(255,255,255,0.45);margin-top:6px;">写入后立即可在下方「已添加英雄」列表与卡池中看到；仅本地生效，需 🚀 推送才对线上可见。</div>
                     <div id="cgmHeroStatus" style="font-size:0.78rem;white-space:pre-wrap;margin-top:8px;min-height:16px;"></div>
@@ -554,8 +554,9 @@
                 <div style="color:#ffd700;font-size:0.85rem;margin-bottom:6px;">入库信息（先填好，再下载 / 保存 / 推送）</div>
                 <div style="display:flex;flex-direction:column;gap:8px;max-width:520px;">
                   <input id="smHero" placeholder="英雄名（必填，如 天使 / 死神）" style="padding:9px 12px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.4);color:#fff;font-size:0.85rem;">
-                  <input id="smLabel" placeholder="皮肤标签（必填，如 风清扬 / 一指名医）" style="padding:9px 12px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.4);color:#fff;font-size:0.85rem;">
+                  <input id="smLabel" placeholder="皮肤标签（选填，如 风清扬 / 一指名医；留空=该英雄默认皮肤）" style="padding:9px 12px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.4);color:#fff;font-size:0.85rem;">
                   <div style="color:rgba(255,255,255,0.5);font-size:0.72rem;">将生成：<span id="smNamePreview" style="color:#ffd700;">皮肤标签·英雄名.png</span></div>
+                  <div style="color:#4ade80;font-size:0.72rem;line-height:1.5;">✅ <b style="color:#ffd700;">给旧卡 / 现有英雄加新皮肤</b>：选好图片后填「英雄名（已有或新都行）+ 皮肤标签」，点「💾 保存并登记」即可入库（自动写 registry.json，推送到线上后所有客户端可见）。标签留空 = 默认皮肤。</div>
                   <input id="smBasePath" value="D:\tfjl-web\skins" style="padding:9px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:#fff;font-size:0.78rem;">
                   <textarea id="smAttr" placeholder="皮肤属性（可选，如：技能/被动描述，支持多行）" style="padding:9px 12px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.4);color:#fff;font-size:0.82rem;resize:vertical;box-sizing:border-box;min-height:64px;"></textarea>
                   <div style="color:rgba(255,255,255,0.5);font-size:0.72rem;line-height:1.5;">💡 <b style="color:#ffd700;">给老皮肤补属性</b>：不用选图，填好「英雄名 + 皮肤标签 + 皮肤属性」直接点保存即可（只写属性，不动图片）。</div>
@@ -2410,7 +2411,7 @@
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">s20260811-088 · s1.0.88</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">s20260811-089 · s1.0.89</span>
             </div>
         </div>
     </div>
