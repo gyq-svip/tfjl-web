@@ -5541,8 +5541,16 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 if (typeof renderCloudCardsToPool === 'function') renderCloudCardsToPool();
                 cgmRefreshHeroList();
                 status.style.color = '#4ade80';
-                status.textContent = '✓ 已写入 d:\\tfjl-web\\skins\\cards.json\n请在本机终端运行：\n  cd d:\\tfjl-web\n  git add skins/cards.json\n  git commit -m "hero: ' + name + '"\n  git push origin main\n  git -c http.proxy= -c https.proxy= push gitee';
+                status.textContent = '✓ 已写入 d:\\tfjl-web\\skins\\cards.json（本机即时生效）\n正在自动推送到 GitHub / Gitee…';
                 document.getElementById('cgmHeroName').value = '';
+                // 自动推送（cards.json 在 skins/ 下，git_push_skins 会一并 git add skins/ 并 bump 版本）
+                try {
+                    const pushRes = await _cgmInvoke('git_push_skins');
+                    status.textContent = '✓ 已写入并推送上线：\n' + (pushRes || '成功') + '\n描述将在刷新后对所有用户可见（卡牌悬停显示「📝 …」）';
+                } catch (pe) {
+                    status.style.color = '#ff9e80';
+                    status.textContent = '⚠️ 本机已写入，但自动推送失败：' + (pe && pe.message || pe) + '\n可手动 cd d:\\tfjl-web && git add skins/cards.json && git commit -m "hero" && git push origin main';
+                }
             } catch (e) {
                 status.style.color = '#ff9e80';
                 status.textContent = '✗ 写入失败：' + e.message;
