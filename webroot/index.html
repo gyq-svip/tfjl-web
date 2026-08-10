@@ -566,6 +566,7 @@
                 <button id="smDownload" style="flex:1 1 200px;min-width:180px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:10px;padding:12px;cursor:pointer;font-size:0.9rem;font-weight:600;">⬇️ 下载 PNG</button>
                 <button onclick="smSaveShareImage()" style="flex:1 1 220px;min-width:200px;background:rgba(79,195,247,0.15);border:1px solid rgba(79,195,247,0.45);color:#4fc3f7;border-radius:10px;padding:12px;cursor:pointer;font-size:0.9rem;font-weight:600;">🏷️ 复制分享图(带水印)</button>
                 <button id="smSave" style="flex:1 1 220px;min-width:200px;background:linear-gradient(135deg,#ffd700,#ff9800);border:none;color:#1a1a2e;border-radius:10px;padding:12px;cursor:pointer;font-size:0.9rem;font-weight:600;">💾 保存并登记到 skins 目录</button>
+                <button onclick="smCreateDefaultSkin()" style="flex:1 1 220px;min-width:200px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.3);color:#fff;border-radius:10px;padding:12px;cursor:pointer;font-size:0.9rem;font-weight:600;">➕ 新建英雄默认皮肤</button>
                 <button id="smPush" style="flex:1 1 220px;min-width:200px;background:linear-gradient(135deg,#4caf50,#2e7d32);border:none;color:#fff;border-radius:10px;padding:12px;cursor:pointer;font-size:0.9rem;font-weight:600;">🚀 一键推送到 GitHub / Gitee</button>
                 <div id="smStatus" style="flex:2 1 300px;min-width:240px;font-size:0.78rem;color:rgba(255,255,255,0.7);line-height:1.5;white-space:pre-line;"></div>
               </div>
@@ -2409,7 +2410,7 @@
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">s20260810-084 · s1.0.84</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">s20260810-085 · s1.0.85</span>
             </div>
         </div>
     </div>
