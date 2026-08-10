@@ -5531,10 +5531,13 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             try {
                 let pushed = false;
                 let cardSummary = '';
-                // —— 判定：是否为基础卡（硬编码卡池，非 cards.json 添加的自定义英雄）——
-                // 基础卡本就在卡池渲染，若再写 cards.json 会新增一张重复卡（s1.0.92 水人事故），故卡片信息改存皮肤属性
+                // —— 判定：该名字是否已是卡池里某张现有卡（基础卡 / 已渲染卡）——
+                // 现有卡本就在卡池渲染，若再写 cards.json 会新增一张重复卡（s1.0.92 水人事故），故卡片信息改存皮肤属性
+                // 用 getAllHeroNames()（含 DOM 渲染卡 + 默认皮肤表 + 属性表 + cloudCards）判定最可靠，避免漏判水人等基础卡
                 const existingInCloud = !!(window.cloudCards && window.cloudCards[name]);
-                const isBuiltinBase = !existingInCloud && !!(DEFAULT_CARD_SKINS[name] || SKIN_ATTRIBUTES[name]);
+                const heroSet = (typeof getAllHeroNames === 'function') ? getAllHeroNames() : null;
+                const isExistingCard = heroSet ? heroSet.has(name) : false;
+                const isBuiltinBase = !existingInCloud && isExistingCard;
                 // —— 1) cards.json（卡牌描述/职业/品质）：基础卡跳过，避免重复卡 ——
                 const rec = {};
                 if (quality) rec.quality = quality;
