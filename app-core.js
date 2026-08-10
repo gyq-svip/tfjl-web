@@ -5513,40 +5513,62 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 addBtn.disabled = true; addBtn.style.opacity = 0.5;
             }
         }
-        // 添加新英雄（基础卡）：写入 skins/cards.json，云端生效无需发版
+        // 添加新英雄（基础卡）：写入 skins/cards.json（卡牌描述/皮肤说明），魔化描述写入 skins/skin-attributes.json（英雄/魔化）
+        // 该界面同时支持：给新英雄加魔化，以及给任何现有卡（含之前无魔化的基础卡）补/改魔化
         async function cgmAddNewHeroCard() {
             if (!_cgmIsTauri()) { alert('❌ 仅桌面端可用（网页版无上传通道）'); return; }
             const name = (document.getElementById('cgmHeroName').value || '').trim();
             const prof = document.getElementById('cgmHeroProf').value;
             const quality = document.getElementById('cgmHeroQuality').value;
             const desc = (document.getElementById('cgmHeroDesc').value || '').trim();
-            const skinDesc = (document.getElementById('cgmHeroSkinDesc').value || '').trim();
+            const mohuaDesc = (document.getElementById('cgmHeroMohuaDesc').value || '').trim();
             const status = document.getElementById('cgmHeroStatus');
             if (!name) { status.style.color = '#ff9e80'; status.textContent = '请输入英雄名'; return; }
+            if (!prof && !quality && !desc && !mohuaDesc) { status.style.color = '#ff9e80'; status.textContent = '至少填写一项（职业/品质/描述/魔化）再写入'; return; }
             try {
-                let base = { cards: {} };
-                const local = await _cgmReadRepoFile('skins/cards.json');
-                if (local) { try { const p = JSON.parse(local); if (p && p.cards) base = p; else if (p) { base.cards = p; } } catch (e) { base = { cards: {} }; } }
-                if (!base.cards) base.cards = {};
+                let pushed = false;
+                let cardSummary = '';
+                // —— 1) cards.json（卡牌描述/皮肤说明/职业/品质）：仅当任一字段非空才更新，避免覆盖现有配置 ——
                 const rec = {};
                 if (quality) rec.quality = quality;
                 if (prof) rec.profession = prof;
                 if (desc) rec.desc = desc;
-                if (skinDesc) rec.skinDesc = skinDesc;
-                base.cards[name] = rec;
-                base.updated = new Date().toISOString();
-                const content = JSON.stringify(base, null, 2);
-                await _cgmWriteRepoFile('skins/cards.json', content);
-                window.cloudCards = base.cards;
-                if (typeof renderCloudCardsToPool === 'function') renderCloudCardsToPool();
+                if (Object.keys(rec).length) {
+                    let base = { cards: {} };
+                    const local = await _cgmReadRepoFile('skins/cards.json');
+                    if (local) { try { const p = JSON.parse(local); if (p && p.cards) base = p; else if (p) { base.cards = p; } } catch (e) { base = { cards: {} }; } }
+                    if (!base.cards) base.cards = {};
+                    base.cards[name] = rec;
+                    base.updated = new Date().toISOString();
+                    await _cgmWriteRepoFile('skins/cards.json', JSON.stringify(base, null, 2));
+                    window.cloudCards = base.cards;
+                    if (typeof renderCloudCardsToPool === 'function') renderCloudCardsToPool();
+                    cardSummary = 'cards.json（卡牌描述）';
+                }
+                // —— 2) skin-attributes.json：魔化描述写入 英雄/"魔化"（与 默认/皮肤名 同级），支持新增/更新现有卡 ——
+                let attrSummary = '';
+                if (mohuaDesc) {
+                    let attr = {};
+                    const al = await _cgmReadRepoFile('skins/skin-attributes.json');
+                    if (al) { try { attr = JSON.parse(al); } catch (e) { attr = {}; } }
+                    if (!attr || typeof attr !== 'object') attr = {};
+                    if (!attr[name]) attr[name] = {};
+                    attr[name]['魔化'] = { desc: mohuaDesc };
+                    await _cgmWriteRepoFile('skins/skin-attributes.json', JSON.stringify(attr, null, 2));
+                    if (window.skinAttributesCloud) { window.skinAttributesCloud = attr; }
+                    attrSummary = 'skin-attributes.json（魔化）';
+                }
                 cgmRefreshHeroList();
-                status.style.color = '#4ade80';
-                status.textContent = '✓ 已写入 d:\\tfjl-web\\skins\\cards.json（本机即时生效）\n正在自动推送到 GitHub / Gitee…';
                 document.getElementById('cgmHeroName').value = '';
-                // 自动推送（cards.json 在 skins/ 下，git_push_skins 会一并 git add skins/ 并 bump 版本）
+                const parts = [cardSummary, attrSummary].filter(Boolean);
+                if (!parts.length) { status.style.color = '#ff9e80'; status.textContent = '未写入任何内容'; return; }
+                status.style.color = '#4ade80';
+                status.textContent = '✓ 已写入本机（' + parts.join(' + ') + '）\n正在自动推送到 GitHub / Gitee…';
+                // —— 自动推送（skins/ 下文件，git_push_skins 会一并 git add 并 bump 版本）——
                 try {
                     const pushRes = await _cgmInvoke('git_push_skins');
-                    status.textContent = '✓ 已写入并推送上线：\n' + (pushRes || '成功') + '\n描述将在刷新后对所有用户可见（卡牌悬停显示「📝 …」）';
+                    status.textContent = '✓ 已写入并推送上线：\n' + (pushRes || '成功') + '\n刷新后可见（卡牌属性 tooltip 的【魔化】一节）';
+                    pushed = true;
                 } catch (pe) {
                     status.style.color = '#ff9e80';
                     status.textContent = '⚠️ 本机已写入，但自动推送失败：' + (pe && pe.message || pe) + '\n可手动 cd d:\\tfjl-web && git add skins/cards.json && git commit -m "hero" && git push origin main';
