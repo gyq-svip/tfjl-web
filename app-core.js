@@ -4841,13 +4841,16 @@
             return allSkins;
         }
         
-        // 检查卡牌是否有魔化数据
+        // 检查卡牌是否有魔化数据（须与 getSkinAttribute 一致：合并 本地硬编码 / 自定义 / 云端 三处来源）
         function hasMoHuaData(cardName) {
             const mainCardName = getMainCardName(cardName);
             // 精灵卡不支持魔化，直接返回false
             const jingLingNames = ['冰精灵', '光精灵', '魔精灵', '木精灵', '土精灵', '雷精灵', '暗精灵', '幻精灵', '魂精灵', '彩精灵'];
             if (jingLingNames.some(jl => mainCardName.includes(jl))) return false;
-            return SKIN_ATTRIBUTES[mainCardName] && SKIN_ATTRIBUTES[mainCardName]['魔化'];
+            const cloud = (typeof window !== 'undefined' && window.skinAttributesCloud) ? window.skinAttributesCloud : null;
+            return !!(SKIN_ATTRIBUTES[mainCardName] && SKIN_ATTRIBUTES[mainCardName]['魔化'])
+                || (customSkinAttributes[mainCardName] && customSkinAttributes[mainCardName]['魔化'])
+                || (cloud && cloud[mainCardName] && cloud[mainCardName]['魔化']);
         }
         
         // 所有基础英雄名集合（优先取卡牌选择网格，兜底用皮肤/属性表；含术士1字英雄）
