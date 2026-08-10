@@ -12826,6 +12826,40 @@ function hasGistToken() {
             return data;
         }
 
+        // ==================== 按设备记录每日访问明细（修复多端访问数被 Math.max 低估） ====================
+        // 每个设备只更新自己的条目；合并时按设备取最大值（幂等、可重复合并）；当日访问总数 = 各设备之和
+        function mergeDailyDeviceVisits(data, src) {
+            if (!src || !src.daily_device_visits) return;
+            if (!data.daily_device_visits) data.daily_device_visits = {};
+            for (const date in src.daily_device_visits) {
+                if (!data.daily_device_visits[date]) data.daily_device_visits[date] = {};
+                const sm = src.daily_device_visits[date];
+                for (const id in sm) {
+                    const s = sm[id] || {};
+                    const t = data.daily_device_visits[date][id] || { v: 0, a: 0, w: 0 };
+                    t.v = Math.max(t.v, s.v || 0);
+                    t.a = Math.max(t.a, s.a || 0);
+                    t.w = Math.max(t.w, s.w || 0);
+                    data.daily_device_visits[date][id] = t;
+                }
+            }
+            for (const date in data.daily_device_visits) {
+                recomputeDailyVisitsOn(data, date);
+            }
+        }
+        // 由设备明细重算某日访问总数（跨设备求和）；无明细的日期保持原值不动（兼容历史数据）
+        function recomputeDailyVisitsOn(data, date) {
+            const map = data.daily_device_visits && data.daily_device_visits[date];
+            if (!map) return;
+            let v = 0, a = 0, w = 0;
+            for (const id in map) { v += map[id].v || 0; a += map[id].a || 0; w += map[id].w || 0; }
+            if (!data.daily_stats) data.daily_stats = {};
+            if (!data.daily_stats[date]) data.daily_stats[date] = { visits: 0, app_visits: 0, web_visits: 0, downloads: 0, new_users: 0, new_app_users: 0, new_web_users: 0, hourly_visits: new Array(24).fill(0) };
+            data.daily_stats[date].visits = v;
+            data.daily_stats[date].app_visits = a;
+            data.daily_stats[date].web_visits = w;
+        }
+
         function saveCounterToCache(data) {
             // 保存前先清理异常数据
             data = sanitizeCounterData(data);
@@ -12913,6 +12947,8 @@ function hasGistToken() {
                     }
                 }
             }
+            // 🔴 合并按设备的每日访问明细，并由明细重算当日访问总数（求和，避免 Math.max 低估）
+            mergeDailyDeviceVisits(target, src);
             return target;
         }
 
@@ -12970,6 +13006,7 @@ function hasGistToken() {
                     }
                 },
                 script_downloads: {},  // { "脚本名": 次数, ... }
+                daily_device_visits: {},  // { [date]: { [deviceId]: { v: 访问数, a: APP访问, w: 网页访问 } } }，用于跨设备访问数求和
                 last_updated: getCurrentTimeString()
             };
         }
@@ -13408,15 +13445,22 @@ function hasGistToken() {
                     case 'visit':
                         const isApp = !!(window.__TAURI__);
                         counterData.total_visits++;
-                        counterData.daily_stats[today].visits++;
-                        // 记录来源（APP/网页）
-                        if (isApp) {
-                            counterData.sources.app_visits++;
-                            counterData.daily_stats[today].app_visits++;
-                        } else {
-                            counterData.sources.web_visits++;
-                            counterData.daily_stats[today].web_visits++;
+                        // 🔴 按设备记录各自访问数：每个设备只更新自己的明细，合并时求和，避免 Math.max 把多端访问数压成单端最大值
+                        if (!counterData.daily_device_visits) counterData.daily_device_visits = {};
+                        if (!counterData.daily_device_visits[today]) counterData.daily_device_visits[today] = {};
+                        if (!counterData.daily_device_visits[today][deviceId]) {
+                            // 首次：用本机已累计的当日访问数作为自身贡献基值，避免升级前计数丢失
+                            const cur = counterData.daily_stats[today] || {};
+                            counterData.daily_device_visits[today][deviceId] = { v: cur.visits || 0, a: cur.app_visits || 0, w: cur.web_visits || 0 };
                         }
+                        const _myEnt = counterData.daily_device_visits[today][deviceId];
+                        _myEnt.v++;
+                        if (isApp) _myEnt.a++; else _myEnt.w++;
+                        // 累计来源口径（用于"累计 APP/网页 访问"，该指标仍取最大值合并，保持历史累计语义）
+                        if (!counterData.sources) counterData.sources = { app_visits: 0, web_visits: 0 };
+                        if (isApp) counterData.sources.app_visits++; else counterData.sources.web_visits++;
+                        // 由设备明细重算当日访问总数（跨设备求和）
+                        recomputeDailyVisitsOn(counterData, today);
                         // 记录访问时段
                         const hour = new Date().getHours();
                         if (counterData.daily_stats[today].hourly_visits) {
