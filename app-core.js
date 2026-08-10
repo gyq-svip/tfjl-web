@@ -13449,9 +13449,8 @@ function hasGistToken() {
                         if (!counterData.daily_device_visits) counterData.daily_device_visits = {};
                         if (!counterData.daily_device_visits[today]) counterData.daily_device_visits[today] = {};
                         if (!counterData.daily_device_visits[today][deviceId]) {
-                            // 首次：用本机已累计的当日访问数作为自身贡献基值，避免升级前计数丢失
-                            const cur = counterData.daily_stats[today] || {};
-                            counterData.daily_device_visits[today][deviceId] = { v: cur.visits || 0, a: cur.app_visits || 0, w: cur.web_visits || 0 };
+                            // 首次：以 0 为基值（不沿用升级前的聚合值，否则每个升级设备都会把"已含他人的累计值"当自身基值，造成雪崩式重复计数）
+                            counterData.daily_device_visits[today][deviceId] = { v: 0, a: 0, w: 0 };
                         }
                         const _myEnt = counterData.daily_device_visits[today][deviceId];
                         _myEnt.v++;
