@@ -12860,6 +12860,19 @@ function hasGistToken() {
             data.daily_stats[date].web_visits = w;
         }
 
+        // 合并在线用户：按设备取"最新活跃时间戳"的并集（解决多设备同步互相覆盖、在线数漏算）
+        function mergeOnlineUsers(target, src) {
+            if (!src || !src.online_users) return;
+            if (!target.online_users || typeof target.online_users !== 'object') target.online_users = {};
+            for (const id in src.online_users) {
+                const ts = src.online_users[id];
+                if (typeof ts !== 'number') continue;
+                if (!target.online_users[id] || ts > target.online_users[id]) {
+                    target.online_users[id] = ts;
+                }
+            }
+        }
+
         function saveCounterToCache(data) {
             // 保存前先清理异常数据
             data = sanitizeCounterData(data);
@@ -13945,6 +13958,8 @@ function hasGistToken() {
                                             remoteOk = true;
                                             // 合并远程数据到本地（全字段最大值，含 script_downloads，防止数据回退/丢失）
                                             mergeCounters(counterData, remoteData);
+                                            // 🔴 合并在线用户（按设备取最新时间戳并集），避免同步时互相覆盖导致在线数漏算
+                                            mergeOnlineUsers(counterData, remoteData);
                                             lastGoodCounter = JSON.parse(JSON.stringify(counterData));
                                         }
                                 } catch (parseErr) {
@@ -14162,6 +14177,41 @@ function hasGistToken() {
             }
         }
         
+        // 在线保活：刷新本机在线时间戳并同步到 Gist，同时由 syncCounterToGist 合并其他设备在线状态
+        // （解决"在线数量不变/不准"：之前只在加载时上报一次，无心跳；且多设备同步互相覆盖）
+        async function refreshOnlinePresence() {
+            try {
+                if (!counterData) return;
+                if (!counterData.online_users) counterData.online_users = {};
+                const deviceId = getDeviceId();
+                counterData.online_users[deviceId] = Date.now();
+                // 本地先清过期，避免显示残留
+                const now = Date.now();
+                const timeout = counterData.online_timeout || 3600000;
+                for (const id in counterData.online_users) {
+                    if (now - counterData.online_users[id] > timeout) delete counterData.online_users[id];
+                }
+                if (isOnline()) await syncCounterToGist();   // 写回自身 + 合并远程在线
+                updateStatsBar();
+                if (typeof updateFloatConsole === 'function') { try { updateFloatConsole(); } catch (e) {} }
+            } catch (e) { console.warn('在线保活失败:', e); }
+        }
+
+        // 仅本地轻量保活（不联网）：保持本机"在线"并刷新显示，避免隔 60s 才更新的卡顿感
+        function keepSelfOnlineLocal() {
+            try {
+                if (!counterData) return;
+                if (!counterData.online_users) counterData.online_users = {};
+                counterData.online_users[getDeviceId()] = Date.now();
+                const now = Date.now();
+                const timeout = counterData.online_timeout || 3600000;
+                for (const id in counterData.online_users) {
+                    if (now - counterData.online_users[id] > timeout) delete counterData.online_users[id];
+                }
+                updateStatsBar();
+            } catch (e) {}
+        }
+
         // 监听网络状态变化
         function setupNetworkListener() {
             // 网络恢复时自动同步
@@ -14180,12 +14230,15 @@ function hasGistToken() {
                 }
             }, 5000);
             
-            // 定期刷新数据（每60秒），确保多设备同步
+            // 定期刷新数据（每60秒）：拉取最新统计 + 在线保活（同步自身在线并合并他人在线）
             setInterval(() => {
                 if (isOnline()) {
+                    refreshOnlinePresence();
                     refreshCounterData();
                 }
             }, 60000);
+            // 本地轻量保活（每30秒）：仅刷新本机在线时间戳与显示，不联网
+            setInterval(() => { keepSelfOnlineLocal(); }, 30000);
         }
         
         // 刷新统计数据（从Gist获取最新）
@@ -20737,7 +20790,14 @@ ${maSection}
             const totalUsers = (data.unique_users || []).length;
             const todayStats = dailyStats[today] || { visits: 0, downloads: 0, new_users: 0, hourly_visits: new Array(24).fill(0) };
             const activeToday = (data.active_today_users || []).length;
-            const onlineCount = Object.keys(data.online_users || {}).length;
+            const _onNow = Date.now();
+            const _onTo = data.online_timeout || 3600000;
+            let onlineCount = 0;
+            if (data.online_users) {
+                for (const _oid in data.online_users) {
+                    if (_onNow - data.online_users[_oid] <= _onTo) onlineCount++;
+                }
+            }
 
             // 计算最近7天和30天的访问量、新用户数
             let last7Visits = 0, last7NewUsers = 0;
