@@ -12860,15 +12860,28 @@ function hasGistToken() {
             data.daily_stats[date].web_visits = w;
         }
 
-        // 合并在线用户：按设备取"最新活跃时间戳"的并集（解决多设备同步互相覆盖、在线数漏算）
+        // 在线用户条目统一为对象 { t: 最后活跃时间戳, nick: 昵称, src: 'app'|'web' }（旧数据可能为纯数字时间戳，需兼容）
+        function _olTs(v) { return (v && typeof v === 'object') ? (v.t || 0) : (typeof v === 'number' ? v : 0); }
+        function _olRec(nick, src) { return { t: Date.now(), nick: (nick || '').toString().slice(0, 24), src: src === 'app' ? 'app' : 'web' }; }
+        function _myNick() { return (localStorage.getItem('TFJL_UserName') || '').trim(); }
+        // 合并在线用户：按设备取"最新活跃时间戳"的并集（解决多设备同步互相覆盖、在线数漏算），并保留昵称/来源
         function mergeOnlineUsers(target, src) {
             if (!src || !src.online_users) return;
             if (!target.online_users || typeof target.online_users !== 'object') target.online_users = {};
             for (const id in src.online_users) {
-                const ts = src.online_users[id];
-                if (typeof ts !== 'number') continue;
-                if (!target.online_users[id] || ts > target.online_users[id]) {
-                    target.online_users[id] = ts;
+                const s = src.online_users[id];
+                const ts = _olTs(s);
+                if (ts === 0) continue;
+                const tgt = target.online_users[id];
+                const exTs = _olTs(tgt);
+                if (!tgt || ts >= exTs) {
+                    const sRec = (s && typeof s === 'object') ? s : null;
+                    const tRec = (tgt && typeof tgt === 'object') ? tgt : null;
+                    target.online_users[id] = {
+                        t: ts,
+                        nick: (sRec && sRec.nick) || (tRec && tRec.nick) || '',
+                        src: (sRec && sRec.src) || (tRec && tRec.src) || ''
+                    };
                 }
             }
         }
@@ -13004,7 +13017,7 @@ function hasGistToken() {
                 active_today_web_users: [],
                 active_date: today,
                 online_users: {},
-                online_timeout: 3600000,
+                online_timeout: 300000,
                 sources: { app_visits: 0, web_visits: 0, new_app_users: 0, new_web_users: 0, app_users: 0, web_users: 0 },
                 user_sources: {},  // 每个用户的注册平台：{ deviceId: 'app' | 'web' }
                 daily_stats: {
@@ -13097,7 +13110,7 @@ function hasGistToken() {
                             if (parsed.total_visits === undefined) parsed.total_visits = 0;
                             if (parsed.total_downloads === undefined) parsed.total_downloads = 0;
                             if (!parsed.online_users) parsed.online_users = {};
-                            if (!parsed.online_timeout) parsed.online_timeout = 3600000;
+                            if (!parsed.online_timeout || parsed.online_timeout === 3600000 || parsed.online_timeout === 7200000) parsed.online_timeout = 300000;
                             if (!parsed.sources) parsed.sources = { app_visits: 0, web_visits: 0 };
                             if (parsed.sources.new_app_users === undefined) parsed.sources.new_app_users = 0;
                             if (parsed.sources.new_web_users === undefined) parsed.sources.new_web_users = 0;
@@ -13438,17 +13451,17 @@ function hasGistToken() {
                 
                 // 确保在线用户对象存在
                 if (!counterData.online_users) counterData.online_users = {};
-                // 强制更新在线时间为60分钟（兼容旧数据）
-                if (!counterData.online_timeout || counterData.online_timeout === 7200000) counterData.online_timeout = 3600000;
-                
-                // 记录用户最后活跃时间（用于计算在线用户）
-                counterData.online_users[deviceId] = Date.now();
-                
+                // 缩短在线判定窗口到 5 分钟，避免关掉标签页后仍长时间显示"在线"（提升在线数准确性）
+                if (!counterData.online_timeout || counterData.online_timeout === 7200000 || counterData.online_timeout === 3600000) counterData.online_timeout = 300000;
+
+                // 记录用户最后活跃时间 + 昵称/来源（用于计算在线用户 & 管理员"谁在线"日志）
+                counterData.online_users[deviceId] = _olRec(_myNick(), isApp ? 'app' : 'web');
+
                 // 清理超过时间窗口的用户
                 const now = Date.now();
                 const timeout = counterData.online_timeout;
                 for (const id in counterData.online_users) {
-                    if (now - counterData.online_users[id] > timeout) {
+                    if (now - _olTs(counterData.online_users[id]) > timeout) {
                         delete counterData.online_users[id];
                     }
                 }
@@ -13596,7 +13609,7 @@ function hasGistToken() {
                 if (!remoteData.total_users) remoteData.total_users = remoteData.unique_users.length;
                 if (!remoteData.active_today) remoteData.active_today = remoteData.active_today_users.length;
                 if (!remoteData.online_users) remoteData.online_users = {};
-                if (!remoteData.online_timeout) remoteData.online_timeout = 3600000;
+                if (!remoteData.online_timeout || remoteData.online_timeout === 3600000 || remoteData.online_timeout === 7200000) remoteData.online_timeout = 300000;
                 if (!remoteData.total_visits) remoteData.total_visits = 0;
                 if (!remoteData.total_downloads) remoteData.total_downloads = 0;
                 
@@ -13623,13 +13636,13 @@ function hasGistToken() {
                 const now = Date.now();
                 const timeout = remoteData.online_timeout;
                 for (const id in remoteData.online_users) {
-                    if (now - remoteData.online_users[id] > timeout) {
+                    if (now - _olTs(remoteData.online_users[id]) > timeout) {
                         delete remoteData.online_users[id];
                     }
                 }
                 
-                // 更新当前设备在线状态
-                remoteData.online_users[deviceId] = Date.now();
+                // 更新当前设备在线状态（含昵称/来源）
+                remoteData.online_users[deviceId] = _olRec(_myNick(), !!(window.__TAURI__) ? 'app' : 'web');
                 
                 let hasVisit = false;
                 queue.forEach(item => {
@@ -14184,12 +14197,13 @@ function hasGistToken() {
                 if (!counterData) return;
                 if (!counterData.online_users) counterData.online_users = {};
                 const deviceId = getDeviceId();
-                counterData.online_users[deviceId] = Date.now();
+                const isApp = !!(window.__TAURI__);
+                counterData.online_users[deviceId] = _olRec(_myNick(), isApp ? 'app' : 'web');
                 // 本地先清过期，避免显示残留
                 const now = Date.now();
-                const timeout = counterData.online_timeout || 3600000;
+                const timeout = counterData.online_timeout || 300000;
                 for (const id in counterData.online_users) {
-                    if (now - counterData.online_users[id] > timeout) delete counterData.online_users[id];
+                    if (now - _olTs(counterData.online_users[id]) > timeout) delete counterData.online_users[id];
                 }
                 if (isOnline()) await syncCounterToGist();   // 写回自身 + 合并远程在线
                 updateStatsBar();
@@ -14202,11 +14216,12 @@ function hasGistToken() {
             try {
                 if (!counterData) return;
                 if (!counterData.online_users) counterData.online_users = {};
-                counterData.online_users[getDeviceId()] = Date.now();
+                const isApp = !!(window.__TAURI__);
+                counterData.online_users[getDeviceId()] = _olRec(_myNick(), isApp ? 'app' : 'web');
                 const now = Date.now();
-                const timeout = counterData.online_timeout || 3600000;
+                const timeout = counterData.online_timeout || 300000;
                 for (const id in counterData.online_users) {
-                    if (now - counterData.online_users[id] > timeout) delete counterData.online_users[id];
+                    if (now - _olTs(counterData.online_users[id]) > timeout) delete counterData.online_users[id];
                 }
                 updateStatsBar();
             } catch (e) {}
@@ -14269,9 +14284,9 @@ function hasGistToken() {
             let onlineCount = 0;
             if (counterData.online_users) {
                 const now = Date.now();
-                const timeout = counterData.online_timeout || 3600000;
+                const timeout = counterData.online_timeout || 300000;
                 for (const id in counterData.online_users) {
-                    if (now - counterData.online_users[id] <= timeout) {
+                    if (now - _olTs(counterData.online_users[id]) <= timeout) {
                         onlineCount++;
                     }
                 }
@@ -18791,9 +18806,9 @@ ${maSection}
             let onlineCount = 0;
             if (counterData.online_users) {
                 const now = Date.now();
-                const timeout = counterData.online_timeout || 3600000;
+                const timeout = counterData.online_timeout || 300000;
                 for (const id in counterData.online_users) {
-                    if (now - counterData.online_users[id] <= timeout) {
+                    if (now - _olTs(counterData.online_users[id]) <= timeout) {
                         onlineCount++;
                     }
                 }
@@ -20806,11 +20821,11 @@ ${maSection}
             const todayStats = dailyStats[today] || { visits: 0, downloads: 0, new_users: 0, hourly_visits: new Array(24).fill(0) };
             const activeToday = (data.active_today_users || []).length;
             const _onNow = Date.now();
-            const _onTo = data.online_timeout || 3600000;
+            const _onTo = data.online_timeout || 300000;
             let onlineCount = 0;
             if (data.online_users) {
                 for (const _oid in data.online_users) {
-                    if (_onNow - data.online_users[_oid] <= _onTo) onlineCount++;
+                    if (_onNow - _olTs(data.online_users[_oid]) <= _onTo) onlineCount++;
                 }
             }
 
@@ -21046,6 +21061,54 @@ ${maSection}
                 html += `</div></div>`;
             }
 
+            // ===== 访问 / 在线日志（直接读 GitHub Gist 计数器，与后台同源）=====
+            html += `<div style="background:rgba(255,255,255,0.05);border-radius:10px;padding:15px;margin-bottom:20px;">`;
+            html += `<div style="color:#4ecdc4;font-size:0.9rem;margin-bottom:10px;">📡 在线 / 访问日志（数据源：GitHub Gist 计数器）</div>`;
+            // 当前在线列表（含昵称/来源/最后活跃）
+            const _onTo2 = data.online_timeout || 300000;
+            const _now2 = Date.now();
+            const _onlineList = [];
+            if (data.online_users) {
+                for (const _oid in data.online_users) {
+                    const _rec = data.online_users[_oid];
+                    const _ts = _olTs(_rec);
+                    if (_now2 - _ts <= _onTo2) {
+                        const _r = (_rec && typeof _rec === 'object') ? _rec : {};
+                        _onlineList.push({ id: _oid, t: _ts, nick: _r.nick || '匿名', src: _r.src || 'web' });
+                    }
+                }
+            }
+            _onlineList.sort((a, b) => b.t - a.t);
+            html += `<div style="color:rgba(255,255,255,0.6);font-size:0.8rem;margin-bottom:6px;">当前在线（${_onlineList.length}）· 判定窗口 ${Math.round(_onTo2 / 60000)} 分钟</div>`;
+            if (_onlineList.length) {
+                html += `<div style="display:flex;flex-direction:column;gap:4px;margin-bottom:14px;max-height:200px;overflow:auto;">` + _onlineList.map(o => {
+                    const ago = Math.max(0, Math.round((_now2 - o.t) / 1000));
+                    const agoStr = ago < 60 ? ago + '秒前' : (ago < 3600 ? Math.round(ago / 60) + '分前' : Math.round(ago / 3600) + '时前');
+                    const shortId = o.id.length > 16 ? o.id.slice(0, 10) + '…' : o.id;
+                    return `<div style="display:flex;justify-content:space-between;align-items:center;font-size:0.78rem;background:rgba(255,255,255,0.04);border-radius:6px;padding:5px 8px;">
+                        <span><span style="color:#4ade80;">●</span> ${escapeHtml(o.nick)} <span style="color:rgba(255,255,255,0.35);font-size:0.7rem;">@${escapeHtml(shortId)}</span></span>
+                        <span style="color:rgba(255,255,255,0.5);">${o.src === 'app' ? '📱' : '🌐'} ${agoStr}</span>
+                    </div>`;
+                }).join('') + `</div>`;
+            } else {
+                html += `<div style="color:rgba(255,255,255,0.4);font-size:0.8rem;margin-bottom:14px;">当前无在线用户</div>`;
+            }
+            // 每日访问日志（最近30天）
+            html += `<div style="color:rgba(255,255,255,0.6);font-size:0.8rem;margin-bottom:6px;">每日访问日志（最近 ${recentDates.length} 天）</div>`;
+            html += `<div style="display:flex;flex-direction:column;gap:3px;max-height:260px;overflow:auto;">`;
+            recentDates.slice().reverse().forEach(d => {
+                const s = dailyStats[d] || {};
+                const v = s.visits || 0, au = s.active_users || 0;
+                let ph = -1, pv = 0;
+                if (s.hourly_visits) for (let h = 0; h < 24; h++) { if ((s.hourly_visits[h] || 0) > pv) { pv = s.hourly_visits[h]; ph = h; } }
+                html += `<div style="display:flex;justify-content:space-between;font-size:0.76rem;background:rgba(255,255,255,0.03);border-radius:5px;padding:4px 8px;">
+                    <span style="color:#ffd700;">${d}</span>
+                    <span>访问 <b>${v}</b> · 活跃 <b>${au}</b>${ph >= 0 ? ` · 峰值 ${ph}:00` : ''}</span>
+                </div>`;
+            });
+            html += `</div>`;
+            html += `</div>`;
+
             // 数据更新时间
             html += `<div style="color:rgba(255,255,255,0.3);font-size:0.8rem;text-align:center;padding:10px;">最后更新: ${data.last_updated || '未知'}</div>`;
 
@@ -21078,9 +21141,9 @@ ${maSection}
             let onlineCount = 0;
             if (counterData.online_users) {
                 const now = Date.now();
-                const timeout = counterData.online_timeout || 3600000;
+                const timeout = counterData.online_timeout || 300000;
                 for (const id in counterData.online_users) {
-                    if (now - counterData.online_users[id] <= timeout) {
+                    if (now - _olTs(counterData.online_users[id]) <= timeout) {
                         onlineCount++;
                     }
                 }
