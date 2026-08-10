@@ -7587,10 +7587,18 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const skinAttr = getSkinAttribute(cardName, skin, hasMoHua);
             const mainCardName = getMainCardName(cardName);
             const displayCardName = mainCardName !== cardName ? `${cardName} (${mainCardName})` : cardName;
+            // 云端卡（cards.json）的卡牌描述：整合进统一 tooltip，避免去掉 native title 后描述丢失
+            const cloudDesc = (window.cloudCards && window.cloudCards[mainCardName || cardName] && window.cloudCards[mainCardName || cardName].desc) || '';
             
             createSkinTooltip();
             
-            const formattedDesc = skinAttr.desc.replace(/\n/g, '<br>');
+            let baseDesc = skinAttr.desc;
+            if (cloudDesc && baseDesc && baseDesc !== '无特殊属性' && !baseDesc.includes(cloudDesc)) {
+                baseDesc = cloudDesc + '\n\n' + baseDesc;
+            } else if (cloudDesc) {
+                baseDesc = cloudDesc;
+            }
+            const formattedDesc = baseDesc.replace(/\n/g, '<br>');
             
             let infoLines = '';
             infoLines += `<div style="margin-bottom:6px;"><span style="color:#4ecdc4;">皮肤：</span><span style="color:#fff;">${skin}</span></div>`;
@@ -8686,12 +8694,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 if (profKey === 'engineering') card.dataset.engineering = 'true';
                 card.setAttribute('draggable', 'false');
                 card.style.cursor = 'pointer';
-                // 描述（悬停可见）
-                const tipParts = [];
-                if (def.desc) tipParts.push('📝 ' + def.desc);
-                if (def.skinDesc) tipParts.push('🖼️ ' + def.skinDesc);
-                card.title = tipParts.length ? name + '\n' + tipParts.join('\n') : name;
-                // 皮肤图：有则显示，无则默认背景占位 + 角标提示
+                // 悬停描述统一交给自定义皮肤 tooltip（showSkinTooltip 会把 cards.json 的 desc 一并显示），
+                // 不再设 card.title，避免云端卡同时弹 native title + 自定义 tooltip 两个框（s1.0.95 水人双框修复）
                 const heroSkins = (window.skinRegistry && window.skinRegistry[name]) || [];
                 let inner = '<span class="card-name">' + name + '</span>';
                 if (heroSkins.length) {
