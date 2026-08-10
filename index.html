@@ -511,7 +511,7 @@
                     <textarea id="cgmHeroDesc" placeholder="卡牌描述（可选，悬停卡牌可见）" style="width:100%;height:54px;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:#2a2a4a;color:#fff;font-size:0.85rem;box-sizing:border-box;margin-bottom:8px;resize:vertical;"></textarea>
                     <textarea id="cgmHeroMohuaDesc" placeholder="魔化描述（可选）：填了即给该卡新增/更新【魔化】属性，卡牌属性 tooltip 显示。现有卡没魔化的也能在此补上。" style="width:100%;height:54px;padding:8px;border-radius:8px;border:1px solid rgba(255,165,0,0.4);background:#2a2a4a;color:#fff;font-size:0.85rem;box-sizing:border-box;margin-bottom:8px;resize:vertical;"></textarea>
                     <button onclick="cgmAddNewHeroCard()" style="padding:8px 16px;border:none;border-radius:8px;background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;cursor:pointer;font-size:0.85rem;">✓ 写入</button>
-                    <div style="font-size:0.72rem;color:rgba(255,255,255,0.45);margin-top:6px;">写入后立即可在下方「已添加英雄」列表与卡池中看到；仅本地生效，需 🚀 推送才对线上可见。</div>
+                    <div style="font-size:0.72rem;color:rgba(255,255,255,0.45);margin-top:6px;">写入后自动推送到 GitHub / Gitee，刷新后所有端立即可见（无需手动推送）。</div>
                     <div id="cgmHeroStatus" style="font-size:0.78rem;white-space:pre-wrap;margin-top:8px;min-height:16px;"></div>
                     <div style="margin-top:12px;padding-top:10px;border-top:1px dashed rgba(255,255,255,0.15);">
                         <div style="font-size:0.82rem;color:rgba(255,255,255,0.8);margin-bottom:6px;">已添加英雄（<span id="cgmHeroCount">0</span>）：</div>
@@ -1877,8 +1877,8 @@
                             </ul>
                             <p><strong>② 添加新基础卡（新英雄）：</strong></p>
                             <ul style="margin:5px 0;padding-left:20px;">
-                                <li>卡组管理 →「🆕 添加新英雄」页签 → 填英雄名 + 选职业 + 选品质(金/紫) → 可填「卡牌描述」「皮肤/立绘说明」(均可选，悬停卡牌可见) → 确认写入 cards.json</li>
-                                <li>写入后需 <code>git push origin main</code>（融合卡的一键推送只推 fusions.json，不含 cards.json）</li>
+                                <li>卡组管理 →「🆕 添加新英雄」页签 → 填英雄名 + 选职业 + 选品质(金/紫) → 可填「卡牌描述」「魔化描述」(均可选，悬停卡牌可见) → 确认写入 cards.json</li>
+                                <li>写入后自动推送到 GitHub / Gitee，刷新后所有端立即可见（无需手动 git push）</li>
                                 <li>用户 App 重启 + 硬刷新，新英雄自动出现在对应金/紫卡类职业子分类</li>
                                 <li>没皮肤图时卡池该英雄用【默认背景占位图】并显示「皮肤未配置」角标，不影响使用；面板内已内置「如何放皮肤 + 同步」一步教程</li>
                             </ul>
@@ -2411,7 +2411,7 @@
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">s20260811-089 · s1.0.89</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">s20260811-090 · s1.0.90</span>
             </div>
         </div>
     </div>
