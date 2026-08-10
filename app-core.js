@@ -15850,6 +15850,16 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                                   .replace(/https?:\/\/gist\.github\.com\S+/gi, '')
                                   .replace(/https?:\/\/github\.com\S+/gi, '');
         }
+        // 取分享消息在全局脚本下载统计中的下载次数（下载按钮 recordDownload 写入 counterData.script_downloads，按文件名索引）
+        function _globalDlForMsg(m) {
+            if (!m.scriptUrl || !counterData || !counterData.script_downloads) return 0;
+            let last;
+            try { const u = new URL(m.scriptUrl); last = u.pathname.split('/').pop(); }
+            catch (e) { last = m.scriptUrl.split('/').pop(); }
+            if (!last || last === 'raw') return 0;
+            last = decodeURIComponent(last);
+            return counterData.script_downloads[last] || 0;
+        }
         // 聚合所有分享者为声望榜（客户端计算，零存储）
         function computeReputation() {
             const ANON = ['匿名用户', '匿名', 'anonymous', ''];
@@ -15858,8 +15868,10 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 if (!isShareMsg(m)) continue;
                 const a = msgAuthor(m); if (!a) continue;
                 if (ANON.includes(a) || a.toLowerCase() === '匿名用户') continue; // 排除无昵称的匿名用户
-                if (!map[a]) map[a] = { rep: 0, shares: 0, copies: 0, likes: 0, previews: 0, firstShare: msgTime(m) };
+                if (!map[a]) map[a] = { rep: 0, shares: 0, copies: 0, likes: 0, previews: 0, downloads: 0, firstShare: msgTime(m) };
                 const e = map[a];
+                // 下载 = 站内复制（用户视角的“下载”）+ 实际下载按钮次数（含下载到老马）；复制与下载同义，合并计为下载
+                e.downloads += (m.copyCount || 0) + _globalDlForMsg(m);
                 e.shares++; e.copies += (m.copyCount || 0); e.likes += (m.likes || 0); e.previews += (m.previewCount || 0);
                 e.firstShare = Math.min(e.firstShare, msgTime(m));
             }
@@ -15954,6 +15966,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             else if (_repTab === 'copy') list = arr.slice().sort((a, b) => b.copies - a.copies);
             else if (_repTab === 'like') list = arr.slice().sort((a, b) => b.likes - a.likes);
             else if (_repTab === 'preview') list = arr.slice().sort((a, b) => b.previews - a.previews);
+            else if (_repTab === 'download') list = arr.slice().sort((a, b) => b.downloads - a.downloads);
             else if (_repTab === 'week') { const w = Date.now() - 7 * 864e5; list = arr.filter(a => a.firstShare >= w).sort((a, b) => b.rep - a.rep); }
             else if (_repTab === 'newcomer') { const w = Date.now() - 7 * 864e5; list = arr.filter(a => a.firstShare >= w).sort((a, b) => b.shares - a.shares); }
             else if (_repTab === 'badge') {
@@ -15964,7 +15977,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             }
             const top = list.slice(0, 30);
             const medal = i => i === 0 ? '👑' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1) + '.';
-            const valOf = a => _repTab === 'share' ? a.shares + ' 分享' : _repTab === 'copy' ? a.copies + ' 被复制' : _repTab === 'like' ? a.likes + ' 赞' : _repTab === 'preview' ? a.previews + ' 预览' : a.rep + ' 声望';
+            const valOf = a => _repTab === 'share' ? a.shares + ' 分享' : _repTab === 'copy' ? a.copies + ' 被复制' : _repTab === 'like' ? a.likes + ' 赞' : _repTab === 'preview' ? a.previews + ' 预览' : _repTab === 'download' ? a.downloads + ' 下载' : a.rep + ' 声望';
             const el = document.getElementById('reputationList');
             if (!el) return;
             if (_repTab === 'badge') {
@@ -16136,7 +16149,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
         function openContributionCard(nickEnc) {
             const nick = decodeURIComponent(nickEnc);
             const repMap = computeReputation();
-            const e = repMap[nick] || { rep: 0, shares: 0, copies: 0, likes: 0, firstShare: 0 };
+            const e = repMap[nick] || { rep: 0, shares: 0, copies: 0, likes: 0, downloads: 0, firstShare: 0 };
             const t = getTitle(e.rep);
             const allShares = wallMessages.filter(m => isShareMsg(m) && msgAuthor(m) === nick);
             window._contribData = { nick, shares: allShares.map(m => ({ content: stripAllUrls(msgContent(m)), scriptUrl: m.scriptUrl || '', isEncrypted: !!m.isEncrypted, passwordHash: m.passwordHash || '', copyCount: m.copyCount || 0, likes: m.likes || 0 })) };
@@ -16145,12 +16158,13 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             const shareItems = allShares.map((m, i) => {
                 const c = stripAllUrls(msgContent(m));
                 const dlBtn = m.scriptUrl ? `<a href="javascript:void(0)" onclick="downloadScript('${m.scriptUrl}'${m.isEncrypted ? `,true,'${(m.passwordHash || '').replace(/'/g, "\\'")}'` : ',false,\'\''})" style="color:#4fc3f7;text-decoration:none;cursor:pointer;background:rgba(79,195,247,0.1);padding:2px 8px;border-radius:5px;font-size:0.72rem;">📥</a>` : '';
+                const dlCnt = (m.copyCount || 0) + _globalDlForMsg(m);
                 return `<div style="padding:7px 9px;border-radius:6px;background:rgba(255,255,255,0.04);margin-bottom:6px;font-size:0.76rem;color:#fff;word-break:break-all;line-height:1.4;">
                     <div style="margin-bottom:4px;">${escapeHtml(c) || '（分享脚本）'}</div>
                     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
                         <a href="javascript:void(0)" onclick="contribCopyContent(${i})" style="color:#4fc3f7;text-decoration:none;cursor:pointer;background:rgba(79,195,247,0.1);padding:2px 8px;border-radius:5px;font-size:0.72rem;">📋 复制</a>
                         ${dlBtn}
-                        <span style="color:rgba(255,215,0,0.6);font-size:0.7rem;">📥 ${m.copyCount || 0}</span>
+                        <span style="color:rgba(255,215,0,0.6);font-size:0.7rem;">📥 ${dlCnt}</span>
                         <span style="color:rgba(255,107,107,0.6);font-size:0.7rem;">👍 ${m.likes || 0}</span>
                     </div>
                 </div>`;
@@ -16176,6 +16190,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 <div style="display:flex;gap:8px;margin-bottom:12px;">
                     <div style="flex:1;text-align:center;background:rgba(79,195,247,0.1);border-radius:8px;padding:8px 4px;"><div style="color:#4fc3f7;font-size:1.1rem;font-weight:bold;">${e.shares}</div><div style="font-size:0.68rem;color:rgba(255,255,255,0.6);">分享</div></div>
                     <div style="flex:1;text-align:center;background:rgba(255,215,0,0.1);border-radius:8px;padding:8px 4px;"><div style="color:#ffd700;font-size:1.1rem;font-weight:bold;">${e.copies}</div><div style="font-size:0.68rem;color:rgba(255,255,255,0.6);">被复制</div></div>
+                    <div style="flex:1;text-align:center;background:rgba(255,193,7,0.1);border-radius:8px;padding:8px 4px;"><div style="color:#ffc107;font-size:1.1rem;font-weight:bold;">${e.downloads}</div><div style="font-size:0.68rem;color:rgba(255,255,255,0.6);">下载</div></div>
                     <div style="flex:1;text-align:center;background:rgba(255,107,107,0.1);border-radius:8px;padding:8px 4px;"><div style="color:#ff6b6b;font-size:1.1rem;font-weight:bold;">${e.likes}</div><div style="font-size:0.68rem;color:rgba(255,255,255,0.6);">获赞</div></div>
                 </div>
                 <div id="contribProfileEdit" style="background:rgba(255,255,255,0.04);border-radius:8px;padding:10px 12px;margin-bottom:12px;"></div>
