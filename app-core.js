@@ -12911,6 +12911,71 @@ function hasGistToken() {
             }
         }
 
+        // 最后离线记录（s1.0.84）：用户从在线名单过期/主动隐藏时，记入 offline_history（仅管理员可见，30天自动清除，绝不公开给普通用户）
+        let _windowHidden = false; // 桌面端隐藏到托盘时为 true，期间自身不计入在线
+        const OFFLINE_KEEP_DAYS = 30;
+        const OFFLINE_MAX = 500;
+        function _offlineCutoff() { return Date.now() - OFFLINE_KEEP_DAYS * 86400000; }
+        function recordOffline(id, rec) {
+            try {
+                if (!counterData || !counterData.online_users) return;
+                if (!counterData.offline_history) counterData.offline_history = [];
+                const ts = _olTs(rec);
+                if (ts === 0) return;
+                const r = (rec && typeof rec === 'object') ? rec : null;
+                const arr = counterData.offline_history.filter(e => e.id !== id);
+                arr.push({ id: id, nick: (r && r.nick) || '', src: (r && r.src) === 'app' ? 'app' : 'web', lastSeen: ts, offlineAt: Date.now() });
+                counterData.offline_history = arr.filter(e => e.offlineAt >= _offlineCutoff()).slice(-OFFLINE_MAX);
+            } catch (e) {}
+        }
+        function pruneExpiredOnline(record) {
+            if (!counterData || !counterData.online_users) return;
+            const now = Date.now();
+            const timeout = counterData.online_timeout || 300000;
+            for (const id in counterData.online_users) {
+                if (now - _olTs(counterData.online_users[id]) > timeout) {
+                    if (record) recordOffline(id, counterData.online_users[id]);
+                    delete counterData.online_users[id];
+                }
+            }
+        }
+        function cleanupOfflineHistory() {
+            try {
+                if (!counterData || !counterData.offline_history) return;
+                counterData.offline_history = counterData.offline_history.filter(e => e.offlineAt >= _offlineCutoff()).slice(-OFFLINE_MAX);
+            } catch (e) {}
+        }
+        function mergeOfflineHistory(target, src) {
+            if (!src || !Array.isArray(src.offline_history)) return;
+            if (!target.offline_history) target.offline_history = [];
+            const map = {};
+            target.offline_history.forEach(e => { if (e && e.id) map[e.id] = e; });
+            src.offline_history.forEach(e => {
+                if (!e || !e.id) return;
+                const cur = map[e.id];
+                if (!cur || (e.offlineAt || 0) >= (cur.offlineAt || 0)) map[e.id] = e;
+            });
+            const arr = Object.values(map).filter(e => e.offlineAt >= _offlineCutoff()).slice(-OFFLINE_MAX);
+            arr.sort((a, b) => b.offlineAt - a.offlineAt);
+            target.offline_history = arr;
+        }
+        // 桌面端：窗口隐藏（隐藏到托盘）立即自身下线；网页端切标签不视为下线
+        function setupWindowHiddenDetection() {
+            if (!window.__TAURI__) return;
+            document.addEventListener('visibilitychange', function () {
+                _windowHidden = (document.visibilityState === 'hidden');
+                if (_windowHidden) {
+                    if (counterData && counterData.online_users) {
+                        const id = getDeviceId();
+                        if (counterData.online_users[id]) { recordOffline(id, counterData.online_users[id]); delete counterData.online_users[id]; }
+                    }
+                    if (isOnline()) syncCounterToGist();
+                } else {
+                    keepSelfOnlineLocal();
+                }
+            });
+        }
+
         function saveCounterToCache(data) {
             // 保存前先清理异常数据
             data = sanitizeCounterData(data);
@@ -13001,6 +13066,8 @@ function hasGistToken() {
             }
             // 🔴 合并按设备的每日访问明细，并由明细重算当日访问总数（求和，避免 Math.max 低估）
             mergeDailyDeviceVisits(target, src);
+            // 离线记录：按设备取较新离线时间并集，30天自动清除
+            mergeOfflineHistory(target, src);
             return target;
         }
 
@@ -13045,6 +13112,7 @@ function hasGistToken() {
                 active_date: today,
                 online_users: {},
                 online_timeout: 300000,
+                offline_history: [],  // 最近离线记录（仅管理员可见，30天自动清除，绝不公开给普通用户）
                 sources: { app_visits: 0, web_visits: 0, new_app_users: 0, new_web_users: 0, app_users: 0, web_users: 0 },
                 user_sources: {},  // 每个用户的注册平台：{ deviceId: 'app' | 'web' }
                 daily_stats: {
@@ -14233,13 +14301,15 @@ function hasGistToken() {
                 if (!counterData.online_users) counterData.online_users = {};
                 const deviceId = getDeviceId();
                 const isApp = !!(window.__TAURI__);
-                counterData.online_users[deviceId] = _olRec(_myNick(), isApp ? 'app' : 'web');
-                // 本地先清过期，避免显示残留
-                const now = Date.now();
-                const timeout = counterData.online_timeout || 300000;
-                for (const id in counterData.online_users) {
-                    if (now - _olTs(counterData.online_users[id]) > timeout) delete counterData.online_users[id];
+                if (!_windowHidden) {
+                    counterData.online_users[deviceId] = _olRec(_myNick(), isApp ? 'app' : 'web');
+                } else if (counterData.online_users[deviceId]) {
+                    recordOffline(deviceId, counterData.online_users[deviceId]);
+                    delete counterData.online_users[deviceId];
                 }
+                // 清过期并记入离线历史
+                pruneExpiredOnline(true);
+                cleanupOfflineHistory();
                 if (isOnline()) await syncCounterToGist();   // 写回自身 + 合并远程在线
                 updateStatsBar();
                 if (typeof updateFloatConsole === 'function') { try { updateFloatConsole(); } catch (e) {} }
@@ -14252,12 +14322,14 @@ function hasGistToken() {
                 if (!counterData) return;
                 if (!counterData.online_users) counterData.online_users = {};
                 const isApp = !!(window.__TAURI__);
-                counterData.online_users[getDeviceId()] = _olRec(_myNick(), isApp ? 'app' : 'web');
-                const now = Date.now();
-                const timeout = counterData.online_timeout || 300000;
-                for (const id in counterData.online_users) {
-                    if (now - _olTs(counterData.online_users[id]) > timeout) delete counterData.online_users[id];
+                if (!_windowHidden) {
+                    counterData.online_users[getDeviceId()] = _olRec(_myNick(), isApp ? 'app' : 'web');
+                } else if (counterData.online_users[getDeviceId()]) {
+                    recordOffline(getDeviceId(), counterData.online_users[getDeviceId()]);
+                    delete counterData.online_users[getDeviceId()];
                 }
+                // 仅清过期（记录离线统一由联网的 refreshOnlinePresence 负责，避免本地重复写）
+                pruneExpiredOnline(false);
                 updateStatsBar();
             } catch (e) {}
         }
@@ -14289,6 +14361,8 @@ function hasGistToken() {
             }, 60000);
             // 本地轻量保活（每30秒）：仅刷新本机在线时间戳与显示，不联网
             setInterval(() => { keepSelfOnlineLocal(); }, 30000);
+            // 桌面端：隐藏到托盘即自身下线（网页端切标签不视为下线）
+            setupWindowHiddenDetection();
         }
         
         // 刷新统计数据（从Gist获取最新）
@@ -21153,6 +21227,25 @@ ${maSection}
                 }).join('') + `</div>`;
             } else {
                 html += `<div style="color:rgba(255,255,255,0.4);font-size:0.8rem;margin-bottom:14px;">当前无在线用户</div>`;
+            }
+            // 最近离线记录（仅管理员可见，30天自动清除，绝不公开给普通用户）
+            const _offHist = (data.offline_history || []).filter(e => e.offlineAt >= _offlineCutoff());
+            _offHist.sort((a, b) => b.offlineAt - a.offlineAt);
+            html += `<div style="color:rgba(255,255,255,0.6);font-size:0.8rem;margin-bottom:6px;">最近离线（${_offHist.length} 条 · 仅管理员可见 · 30天自动清除）</div>`;
+            if (_offHist.length) {
+                html += `<div style="display:flex;flex-direction:column;gap:3px;margin-bottom:14px;max-height:220px;overflow:auto;">` + _offHist.slice(0, 100).map(o => {
+                    const offAgo = Math.max(0, Math.round((Date.now() - (o.offlineAt || 0)) / 60000));
+                    const offStr = offAgo < 60 ? offAgo + '分前' : (offAgo < 1440 ? Math.round(offAgo / 60) + '时前' : Math.round(offAgo / 1440) + '天前');
+                    const lastAgo = Math.max(0, Math.round((Date.now() - (o.lastSeen || 0)) / 60000));
+                    const lastStr = lastAgo < 60 ? lastAgo + '分前' : (lastAgo < 1440 ? Math.round(lastAgo / 60) + '时前' : Math.round(lastAgo / 1440) + '天前');
+                    const shortId = (o.id || '').length > 16 ? o.id.slice(0, 10) + '…' : (o.id || '');
+                    return `<div style="display:flex;justify-content:space-between;align-items:center;font-size:0.76rem;background:rgba(255,255,255,0.03);border-radius:5px;padding:4px 8px;">
+                        <span><span style="color:rgba(255,255,255,0.6);">●</span> ${escapeHtml(o.nick || '匿名')} <span style="color:rgba(255,255,255,0.35);font-size:0.7rem;">@${escapeHtml(shortId)}</span></span>
+                        <span style="color:rgba(255,255,255,0.5);">${o.src === 'app' ? '📱' : '🌐'} 离线 ${offStr} · 最后在线 ${lastStr}</span>
+                    </div>`;
+                }).join('') + `</div>`;
+            } else {
+                html += `<div style="color:rgba(255,255,255,0.4);font-size:0.8rem;margin-bottom:14px;">暂无离线记录</div>`;
             }
             // 每日访问日志（最近30天）
             html += `<div style="color:rgba(255,255,255,0.6);font-size:0.8rem;margin-bottom:6px;">每日访问日志（最近 ${recentDates.length} 天）</div>`;
