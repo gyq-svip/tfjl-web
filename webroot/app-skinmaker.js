@@ -200,16 +200,19 @@
     function smSave(){
       var hero=document.getElementById('smHero').value.trim();
       var label=document.getElementById('smLabel').value.trim();
-      if(!hero||!label){ smStatus('请填写英雄名和皮肤标签',true); return; }
+      if(!hero){ smStatus('请填写英雄名',true); return; }
       var base=document.getElementById('smBasePath').value.trim().replace(/[\\/]$/,'');
-      // 没选图但填了属性 → 走「仅补属性」，用于给以前没写属性的老皮肤补资料
+      // 没选图但填了属性 → 走「仅补属性」（标签留空=给默认皮肤补属性，已支持新英雄）
       if(!smImg){
         var a0=document.getElementById('smAttr').value.trim();
-        if(!a0){ smStatus('未选择图片。若想给已有皮肤补属性，请填好英雄名+皮肤标签+「皮肤属性」再点保存',true); return; }
+        if(!a0){ smStatus('未选择图片。若想给已有/新英雄补属性，请填好英雄名（标签留空=默认皮肤）+「皮肤属性」再点保存',true); return; }
         smSaveAttrOnly(hero,label,a0,base);
         return;
       }
-      var name=label+'·'+hero, file=name+'.png';
+      // 标签留空 = 制作该英雄的「默认皮肤」（name=英雄名本身）；填了标签 = 变体皮肤（标签·英雄）
+      var isDefault = !label;
+      var name = isDefault ? hero : (label+'·'+hero);
+      var file = name + '.skin';
       smStatus('保存中…');
       smInvoke('write_binary_file',{filePath:base+'\\'+hero+'\\'+file, contentBase64:smExportDataURL().split(',')[1]})
         .then(function(){
@@ -235,14 +238,15 @@
             .then(function(at){
               var obj=at?JSON.parse(at):{};
               if(!obj[hero]) obj[hero]={};
-              obj[hero][name]={desc:attrVal};
+              // 默认皮肤属性统一写在 "默认" key（与 smSaveAttrOnly / 前端 getSkinAttribute 读取一致）
+              obj[hero][isDefault ? '默认' : name]={desc:attrVal};
               var ab=btoa(unescape(encodeURIComponent(JSON.stringify(obj,null,2))));
               return smInvoke('write_binary_file',{filePath:base+'\\skin-attributes.json', contentBase64:ab});
             });
         })
         .then(function(){
           var attrVal=document.getElementById('smAttr').value.trim();
-          smStatus('✅ 已保存 '+base+'\\'+hero+'\\'+file+' 并登记 registry.json'+(attrVal?' 及皮肤属性':'')+'（告诉我推送即可上线）');
+          smStatus('✅ 已保存 '+base+'\\'+hero+'\\'+file+' 并登记 registry.json'+(attrVal?' 及皮肤属性':'')+(isDefault?'（默认皮肤）':'')+'（告诉我推送即可上线）');
         })
         .catch(function(err){
           smStatus('保存失败：'+smErrMsg(err)+'（若不在桌面App内，可用"下载PNG"拿到图片后交给我）',true);
