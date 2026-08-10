@@ -5531,43 +5531,42 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             try {
                 let pushed = false;
                 let cardSummary = '';
-                // —— 判定：该名字是否已是卡池里某张现有卡（基础卡 / 已渲染卡）——
-                // 现有卡本就在卡池渲染，若再写 cards.json 会新增一张重复卡（s1.0.92 水人事故），故卡片信息改存皮肤属性
-                // 用 getAllHeroNames()（含 DOM 渲染卡 + 默认皮肤表 + 属性表 + cloudCards）判定最可靠，避免漏判水人等基础卡
-                const existingInCloud = !!(window.cloudCards && window.cloudCards[name]);
+                // —— 判定：该名字当前是否已注册在 cards.json 文件里（以磁盘文件为准，不用缓存/云变量，避免刷新前后误判）——
+                // 已注册 → 更新该条目（合并，不删不重复）；未注册但属于硬编码基础卡表 → 跳过 cards.json 改存皮肤属性（防重复卡）；全新名字 → 新建。
+                let base = { cards: {} };
+                const localCards = await _cgmReadRepoFile('skins/cards.json');
+                if (localCards) { try { const p = JSON.parse(localCards); if (p && p.cards) base = p; else if (p) { base.cards = p; } } catch (e) { base = { cards: {} }; } }
+                if (!base.cards) base.cards = {};
+                const alreadyInCards = !!base.cards[name];
                 const heroSet = (typeof getAllHeroNames === 'function') ? getAllHeroNames() : null;
-                const isExistingCard = heroSet ? heroSet.has(name) : false;
-                const isBuiltinBase = !existingInCloud && isExistingCard;
-                // —— 1) cards.json（卡牌描述/职业/品质）：基础卡跳过，避免重复卡 ——
+                const isHardcodedBase = heroSet ? heroSet.has(name) : false;
+                // 仅在「未注册进 cards.json」且「属于硬编码基础卡表」时才跳过 cards.json（防重复卡）
+                const skipCardsJson = !alreadyInCards && isHardcodedBase;
+                // —— 1) cards.json（卡牌描述/职业/品质）：未注册且非硬编码基础卡才写入/更新 ——
                 const rec = {};
                 if (quality) rec.quality = quality;
                 if (prof) rec.profession = prof;
                 if (desc) rec.desc = desc;
-                if (Object.keys(rec).length && !isBuiltinBase) {
-                    let base = { cards: {} };
-                    const local = await _cgmReadRepoFile('skins/cards.json');
-                    if (local) { try { const p = JSON.parse(local); if (p && p.cards) base = p; else if (p) { base.cards = p; } } catch (e) { base = { cards: {} }; } }
-                    if (!base.cards) base.cards = {};
-                    base.cards[name] = rec;
+                if (Object.keys(rec).length && !skipCardsJson) {
+                    base.cards[name] = Object.assign({}, base.cards[name] || {}, rec); // 合并已有字段，不覆盖
                     base.updated = new Date().toISOString();
                     await _cgmWriteRepoFile('skins/cards.json', JSON.stringify(base, null, 2));
                     window.cloudCards = base.cards;
                     if (typeof renderCloudCardsToPool === 'function') renderCloudCardsToPool();
-                    cardSummary = 'cards.json（卡牌信息）';
-                } else if (Object.keys(rec).length && isBuiltinBase) {
-                    cardSummary = '（基础卡，卡片信息已并入皮肤属性，未重复建卡）';
+                    cardSummary = alreadyInCards ? 'cards.json（更新现有卡信息）' : 'cards.json（新增英雄）';
+                } else if (Object.keys(rec).length && skipCardsJson) {
+                    cardSummary = '（硬编码基础卡，卡片信息已并入皮肤属性，未重复建卡）';
                 }
-                // —— 2) skin-attributes.json：魔化描述 + 基础卡的卡牌描述（默认属性）——
-                // 支持新增/更新现有卡（含基础卡），避免把基础卡写进 cards.json 造成重复卡
+                // —— 2) skin-attributes.json：魔化描述 + 硬编码基础卡的卡牌描述（默认属性）——
                 let attrSummary = '';
-                if (mohuaDesc || (isBuiltinBase && desc)) {
+                if (mohuaDesc || (skipCardsJson && desc)) {
                     let attr = {};
                     const al = await _cgmReadRepoFile('skins/skin-attributes.json');
                     if (al) { try { attr = JSON.parse(al); } catch (e) { attr = {}; } }
                     if (!attr || typeof attr !== 'object') attr = {};
                     if (!attr[name]) attr[name] = {};
                     if (mohuaDesc) attr[name]['魔化'] = { desc: mohuaDesc };
-                    if (isBuiltinBase && desc) attr[name]['默认'] = { desc: desc };
+                    if (skipCardsJson && desc) attr[name]['默认'] = { desc: desc };
                     await _cgmWriteRepoFile('skins/skin-attributes.json', JSON.stringify(attr, null, 2));
                     if (window.skinAttributesCloud) { window.skinAttributesCloud = attr; }
                     attrSummary = 'skin-attributes.json（魔化/默认属性）';
@@ -5576,7 +5575,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 document.getElementById('cgmHeroName').value = '';
                 const parts = [cardSummary, attrSummary].filter(Boolean);
                 if (!parts.length) { status.style.color = '#ff9e80'; status.textContent = '未写入任何内容'; return; }
-                const isOverlay = isBuiltinBase ? ('（已叠加到现有卡「' + name + '」，未重复建卡）') : '';
+                const isOverlay = skipCardsJson ? ('（已叠加到现有卡「' + name + '」，未重复建卡）') : '';
                 status.style.color = '#4ade80';
                 status.textContent = '✓ 已写入本机（' + parts.join(' + ') + '）' + isOverlay + '\n正在自动推送到 GitHub / Gitee…';
                 // —— 自动推送（skins/ 下文件，git_push_skins 会一并 git add 并 bump 版本）——
