@@ -163,32 +163,36 @@
       var a=document.createElement('a'); a.href=c.toDataURL('image/png'); a.download='皮肤分享_'+Date.now()+'.png'; a.click();
       smStatus('已保存带网址水印的分享图到下载目录（剪贴板不可用，已改为下载）', true);
     }
-    // 仅补属性模式：不选图，只给【已存在于 registry 的旧皮肤】补写属性到 skin-attributes.json
+    // 仅补属性模式：不选图，给【英雄】补写皮肤/默认属性到 skin-attributes.json
+    // 关键修复：标签留空 = 给「默认皮肤」补属性（key="默认"），不再因找不到皮肤而报错；
+    // 新英雄（registry 里尚无条目）也能直接补默认属性。
     function smSaveAttrOnly(hero,label,attrVal,base){
       smStatus('补充属性中…');
+      var skinName = label ? (label+'·'+hero) : '默认';
       smInvoke('read_text_file_auto',{filePath:base+'\\registry.json'}).catch(function(){ return null; })
         .then(function(regText){
-          if(!regText) throw new Error('registry.json 读取失败');
-          var reg=JSON.parse(regText);
-          var list=(reg.heroes&&reg.heroes[hero])||[];
-          if(!list.length) throw new Error('registry 里没有英雄「'+hero+'」，请检查英雄名是否写对');
-          var full=label+'·'+hero;
-          // 皮肤名两种形态：带标签的「标签·英雄」，或默认皮肤直接叫「英雄」
-          var hit=null;
-          if(list.some(function(s){return s.name===full;})) hit=full;
-          else if(list.some(function(s){return s.name===label;})) hit=label;
-          if(!hit) throw new Error('「'+hero+'」下找不到皮肤「'+full+'」。现有皮肤：'+list.map(function(s){return s.name;}).join('、'));
-          return hit;
+          // registry 不存在/无该英雄都允许：新英雄先补默认属性，皮肤可稍后加
+          var reg = regText ? JSON.parse(regText) : { heroes:{} };
+          if(!reg.heroes) reg.heroes={};
+          // 若填了标签，校验该皮肤是否已在 registry（避免属性写到不存在的皮肤名）
+          if(label){
+            var list=reg.heroes[hero]||[];
+            var full=label+'·'+hero;
+            var hit = list.some(function(s){return s.name===full;}) ? full
+                    : list.some(function(s){return s.name===label;}) ? label : null;
+            if(!hit) throw new Error('「'+hero+'」下找不到皮肤「'+full+'」。请先「下载PNG」生成该皮肤，或用「默认」（标签留空）给英雄基础属性补资料。现有皮肤：'+(list.map(function(s){return s.name;}).join('、')||'（无）'));
+          }
+          return skinName;
         })
-        .then(function(skinName){
+        .then(function(name){
           return smInvoke('read_text_file_auto',{filePath:base+'\\skin-attributes.json'}).catch(function(){ return null; })
             .then(function(at){
               var obj=at?JSON.parse(at):{};
               if(!obj[hero]) obj[hero]={};
-              obj[hero][skinName]={desc:attrVal};
+              obj[hero][name]={desc:attrVal};
               var ab=btoa(unescape(encodeURIComponent(JSON.stringify(obj,null,2))));
               return smInvoke('write_binary_file',{filePath:base+'\\skin-attributes.json', contentBase64:ab})
-                .then(function(){ smStatus('✅ 已为「'+skinName+'」写入属性（未改图片、未动 registry）\n点「🚀 一键推送」即可上线给所有人'); });
+                .then(function(){ smStatus('✅ 已为「'+name+'」写入属性（未改图片、未动 registry）\n点「🚀 一键推送」即可上线给所有人'+(label?'':'（默认皮肤属性）')); });
             });
         })
         .catch(function(err){ smStatus('补属性失败：'+smErrMsg(err),true); });
@@ -243,6 +247,42 @@
         .catch(function(err){
           smStatus('保存失败：'+smErrMsg(err)+'（若不在桌面App内，可用"下载PNG"拿到图片后交给我）',true);
         });
+    }
+    // 新建英雄默认皮肤：生成纯色占位 .skin（内容即 PNG）并登记 registry，使新英雄在 UI 出现
+    function smCreateDefaultSkin(){
+      var hero=document.getElementById('smHero').value.trim();
+      if(!hero){ smStatus('请先填写「英雄名」再新建默认皮肤',true); return; }
+      var base=document.getElementById('smBasePath').value.trim().replace(/[\\/]$/,'');
+      smStatus('生成默认皮肤中…');
+      var cv=document.createElement('canvas'); cv.width=206; cv.height=200;
+      var ctx=cv.getContext('2d');
+      ctx.fillStyle='#2a2a4a'; ctx.fillRect(0,0,206,200);
+      ctx.fillStyle='rgba(255,255,255,0.85)'; ctx.font='bold 16px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(hero, 103, 100);
+      ctx.font='11px sans-serif'; ctx.fillStyle='rgba(255,255,255,0.5)';
+      ctx.fillText('默认皮肤占位', 103, 124);
+      cv.toBlob(function(blob){
+        if(!blob){ smStatus('生成失败：浏览器不支持 toBlob',true); return; }
+        var fr=new FileReader();
+        fr.onload=function(){
+          var b64=(fr.result.split(',')[1]);
+          var fn=smGetInvoke();
+          if(!fn){ smStatus('当前环境无法写文件（需在桌面App内）。可手动在 skins/'+hero+'/ 放一张 '+hero+'.skin',true); return; }
+          fn('write_binary_file',{filePath:base+'\\'+hero+'\\'+hero+'.skin', contentBase64:b64})
+            .then(function(){ return smInvoke('read_text_file_auto',{filePath:base+'\\registry.json'}).catch(function(){ return null; }); })
+            .then(function(regText){
+              var reg=regText?JSON.parse(regText):{heroes:{}};
+              if(!reg.heroes) reg.heroes={};
+              if(!reg.heroes[hero]) reg.heroes[hero]=[];
+              if(!reg.heroes[hero].some(function(s){return s.name===hero;})){ reg.heroes[hero].push({name:hero, file:hero+'.skin'}); reg.updated=new Date().toISOString(); }
+              var regB64=btoa(unescape(encodeURIComponent(JSON.stringify(reg,null,2))));
+              return smInvoke('write_binary_file',{filePath:base+'\\registry.json', contentBase64:regB64});
+            })
+            .then(function(){ smStatus('✅ 已为「'+hero+'」生成默认皮肤占位并登记 registry\n点「🚀 一键推送」即可上线，之后可再上传正式皮肤图'); })
+            .catch(function(err){ smStatus('新建默认皮肤失败：'+smErrMsg(err),true); });
+        };
+        fr.readAsDataURL(blob);
+      },'image/png');
     }
     function smPush(){
       var fn=smGetInvoke();
