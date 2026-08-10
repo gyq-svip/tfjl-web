@@ -143,6 +143,15 @@
       var a=document.createElement('a'); a.href=smExportDataURL(); a.download=name+'.png'; a.click();
       smStatus('已下载到浏览器默认下载目录（'+name+'.png）。请手动移到 D:\\tfjl-web\\skins\\'+hero+'\\ ，再让我入库', true);
     }
+    // 保存「分享图」（带网址水印），与皮肤素材下载分离，避免污染游戏内素材
+    function smSaveShareImage(){
+      if(!smImg){ smStatus('请先选择图片',true); return; }
+      var c=document.createElement('canvas'); c.width=SM_W; c.height=SM_H;
+      var ctx=c.getContext('2d'); smRender(ctx,1);
+      if(window.stampWatermark) window.stampWatermark(ctx, SM_W, SM_H);
+      var a=document.createElement('a'); a.href=c.toDataURL('image/png'); a.download='皮肤分享_'+Date.now()+'.png'; a.click();
+      smStatus('已保存带网址水印的分享图（皮肤素材未受影响）', true);
+    }
     // 仅补属性模式：不选图，只给【已存在于 registry 的旧皮肤】补写属性到 skin-attributes.json
     function smSaveAttrOnly(hero,label,attrVal,base){
       smStatus('补充属性中…');
