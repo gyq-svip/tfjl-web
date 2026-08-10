@@ -18918,6 +18918,78 @@ ${maSection}
             updateCounter('download', scriptName);
         }
 
+        // ==================== 截图水印（s1.0.82）====================
+        // 想关闭水印：把 WATERMARK_ENABLED 改为 false（或删本段），重新推送即生效。
+        (function(){
+          window.WATERMARK_ENABLED = true;
+          window.WATERMARK_TEXT = '塔防精灵助手 · github.io/tfjl-web';
+          // 在 canvas 右下角盖半透明网址水印（用于导出/截图分享图）
+          window.stampWatermark = function(ctx, w, h, opts){
+            if(!window.WATERMARK_ENABLED) return;
+            try {
+              opts = opts || {};
+              var text = opts.text || window.WATERMARK_TEXT;
+              var fontSize = Math.max(12, Math.round(Math.min(w, h) * 0.045));
+              ctx.save();
+              ctx.font = 'bold ' + fontSize + 'px sans-serif';
+              ctx.textBaseline = 'alphabetic';
+              var pad = Math.round(fontSize * 0.5);
+              var tw = ctx.measureText(text).width;
+              ctx.globalAlpha = 0.5; ctx.fillStyle = '#000';
+              var bh = Math.round(fontSize * 1.5);
+              ctx.fillRect(w - tw - pad*2, h - bh, tw + pad*2, bh);
+              ctx.globalAlpha = 1; ctx.fillStyle = '#fff';
+              ctx.fillText(text, w - tw - pad, h - pad);
+              ctx.restore();
+            } catch(e){}
+          };
+          // 动态加载 html2canvas（优先本地 vendor，失败回退 CDN）
+          function ensureHtml2canvas(cb){
+            if(window.html2canvas) return cb();
+            var s = document.createElement('script');
+            s.src = 'vendor/html2canvas.min.js';
+            s.onload = cb;
+            s.onerror = function(){
+              var s2 = document.createElement('script');
+              s2.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+              s2.onload = cb;
+              s2.onerror = function(){ alert('截图组件加载失败，请检查网络后重试'); };
+              document.head.appendChild(s2);
+            };
+            document.head.appendChild(s);
+          }
+          // 一键截图当前主界面并带水印下载
+          function doScreenshot(){
+            ensureHtml2canvas(function(){
+              var el = document.getElementById('app') || document.body;
+              if(!window.html2canvas){ alert('截图组件加载失败'); return; }
+              window.html2canvas(el, { backgroundColor:'#0f172a', scale:2, useCORS:true, logging:false }).then(function(canvas){
+                var ctx = canvas.getContext('2d');
+                if(window.stampWatermark) window.stampWatermark(ctx, canvas.width, canvas.height);
+                var a = document.createElement('a');
+                a.href = canvas.toDataURL('image/png');
+                a.download = '塔防精灵助手_' + new Date().toISOString().slice(0,10) + '.png';
+                a.click();
+              }).catch(function(e){ alert('截图失败：' + (e && e.message || e)); });
+            });
+          }
+          // 注入右下角悬浮截图按钮
+          function injectScreenshotButton(){
+            try {
+              if(document.getElementById('tfjlShotBtn')) return;
+              var b = document.createElement('button');
+              b.id = 'tfjlShotBtn'; b.innerHTML = '📷';
+              b.title = '截图当前界面（自动带网址水印，方便分享推广）';
+              b.style.cssText = 'position:fixed;right:14px;bottom:14px;z-index:99999;width:46px;height:46px;border-radius:50%;border:none;background:linear-gradient(135deg,#4fc3f7,#0288d1);color:#fff;font-size:20px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,0.4);';
+              b.onclick = function(){ doScreenshot(); };
+              document.body.appendChild(b);
+            } catch(e){}
+          }
+          window.doScreenshot = doScreenshot;
+          if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', injectScreenshotButton);
+          else injectScreenshotButton();
+        })();
+
         // ==================== 管理员面板 ====================
         const ADMIN_VERIFY_KEY = 'TFJL_Admin_Verified';
         const ADMIN_VERIFY_HASH = 'v2$jkYsjc997BlgafRUyLlagKL62W1iBYfvH2fq1cJBbDs=';
