@@ -5531,12 +5531,16 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             try {
                 let pushed = false;
                 let cardSummary = '';
-                // —— 1) cards.json（卡牌描述/皮肤说明/职业/品质）：仅当任一字段非空才更新，避免覆盖现有配置 ——
+                // —— 判定：是否为基础卡（硬编码卡池，非 cards.json 添加的自定义英雄）——
+                // 基础卡本就在卡池渲染，若再写 cards.json 会新增一张重复卡（s1.0.92 水人事故），故卡片信息改存皮肤属性
+                const existingInCloud = !!(window.cloudCards && window.cloudCards[name]);
+                const isBuiltinBase = !existingInCloud && !!(DEFAULT_CARD_SKINS[name] || SKIN_ATTRIBUTES[name]);
+                // —— 1) cards.json（卡牌描述/职业/品质）：基础卡跳过，避免重复卡 ——
                 const rec = {};
                 if (quality) rec.quality = quality;
                 if (prof) rec.profession = prof;
                 if (desc) rec.desc = desc;
-                if (Object.keys(rec).length) {
+                if (Object.keys(rec).length && !isBuiltinBase) {
                     let base = { cards: {} };
                     const local = await _cgmReadRepoFile('skins/cards.json');
                     if (local) { try { const p = JSON.parse(local); if (p && p.cards) base = p; else if (p) { base.cards = p; } } catch (e) { base = { cards: {} }; } }
@@ -5546,35 +5550,40 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     await _cgmWriteRepoFile('skins/cards.json', JSON.stringify(base, null, 2));
                     window.cloudCards = base.cards;
                     if (typeof renderCloudCardsToPool === 'function') renderCloudCardsToPool();
-                    cardSummary = 'cards.json（卡牌描述）';
+                    cardSummary = 'cards.json（卡牌信息）';
+                } else if (Object.keys(rec).length && isBuiltinBase) {
+                    cardSummary = '（基础卡，卡片信息已并入皮肤属性，未重复建卡）';
                 }
-                // —— 2) skin-attributes.json：魔化描述写入 英雄/"魔化"（与 默认/皮肤名 同级），支持新增/更新现有卡 ——
+                // —— 2) skin-attributes.json：魔化描述 + 基础卡的卡牌描述（默认属性）——
+                // 支持新增/更新现有卡（含基础卡），避免把基础卡写进 cards.json 造成重复卡
                 let attrSummary = '';
-                if (mohuaDesc) {
+                if (mohuaDesc || (isBuiltinBase && desc)) {
                     let attr = {};
                     const al = await _cgmReadRepoFile('skins/skin-attributes.json');
                     if (al) { try { attr = JSON.parse(al); } catch (e) { attr = {}; } }
                     if (!attr || typeof attr !== 'object') attr = {};
                     if (!attr[name]) attr[name] = {};
-                    attr[name]['魔化'] = { desc: mohuaDesc };
+                    if (mohuaDesc) attr[name]['魔化'] = { desc: mohuaDesc };
+                    if (isBuiltinBase && desc) attr[name]['默认'] = { desc: desc };
                     await _cgmWriteRepoFile('skins/skin-attributes.json', JSON.stringify(attr, null, 2));
                     if (window.skinAttributesCloud) { window.skinAttributesCloud = attr; }
-                    attrSummary = 'skin-attributes.json（魔化）';
+                    attrSummary = 'skin-attributes.json（魔化/默认属性）';
                 }
                 cgmRefreshHeroList();
                 document.getElementById('cgmHeroName').value = '';
                 const parts = [cardSummary, attrSummary].filter(Boolean);
                 if (!parts.length) { status.style.color = '#ff9e80'; status.textContent = '未写入任何内容'; return; }
+                const isOverlay = isBuiltinBase ? ('（已叠加到现有卡「' + name + '」，未重复建卡）') : '';
                 status.style.color = '#4ade80';
-                status.textContent = '✓ 已写入本机（' + parts.join(' + ') + '）\n正在自动推送到 GitHub / Gitee…';
+                status.textContent = '✓ 已写入本机（' + parts.join(' + ') + '）' + isOverlay + '\n正在自动推送到 GitHub / Gitee…';
                 // —— 自动推送（skins/ 下文件，git_push_skins 会一并 git add 并 bump 版本）——
                 try {
                     const pushRes = await _cgmInvoke('git_push_skins');
-                    status.textContent = '✓ 已写入并推送上线：\n' + (pushRes || '成功') + '\n刷新后可见（卡牌属性 tooltip 的【魔化】一节）';
+                    status.textContent = '✓ 已写入并推送上线：\n' + (pushRes || '成功') + '\n刷新后可见（卡牌属性 tooltip 的【魔化】一节）' + isOverlay;
                     pushed = true;
                 } catch (pe) {
                     status.style.color = '#ff9e80';
-                    status.textContent = '⚠️ 本机已写入，但自动推送失败：' + (pe && pe.message || pe) + '\n可手动 cd d:\\tfjl-web && git add skins/cards.json && git commit -m "hero" && git push origin main';
+                    status.textContent = '⚠️ 本机已写入，但自动推送失败：' + (pe && pe.message || pe) + '\n可手动 cd d:\\tfjl-web && git add skins/cards.json skins/skin-attributes.json && git commit -m "hero" && git push origin main';
                 }
             } catch (e) {
                 status.style.color = '#ff9e80';

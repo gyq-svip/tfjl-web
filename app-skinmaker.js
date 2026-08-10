@@ -201,6 +201,11 @@
       var hero=document.getElementById('smHero').value.trim();
       var label=document.getElementById('smLabel').value.trim();
       if(!hero){ smStatus('请填写英雄名',true); return; }
+      // 识别是否为现有英雄：填已有英雄名即在其下叠加新皮/属性，不会新建英雄
+      var allHeroes = (typeof getAllHeroNames === 'function') ? getAllHeroNames() : null;
+      if(allHeroes && allHeroes.has(hero)){
+        smStatus('ℹ️ 「'+hero+'」已是现有英雄 → 将直接在其下叠加'+(label?('皮肤「'+label+'」'):'默认皮肤')+'，不新建英雄');
+      }
       var base=document.getElementById('smBasePath').value.trim().replace(/[\\/]$/,'');
       // 没选图但填了属性 → 走「仅补属性」（标签留空=给默认皮肤补属性，已支持新英雄）
       if(!smImg){
