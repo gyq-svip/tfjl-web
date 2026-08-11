@@ -12963,7 +12963,7 @@ function hasGistToken() {
         // 网页端仍用 5 分钟窗口，保持"关掉标签就下线"的准确性。
         const APP_ONLINE_GRACE = 900000;
         function _olIsApp(v) { return !!(v && typeof v === 'object' && v.src === 'app'); }
-        function _olTimeoutFor(rec, base) { const b = base || 300000; return _olIsApp(rec) ? Math.max(b, APP_ONLINE_GRACE) : b; }
+        function _olTimeoutFor(rec, base) { const b = base || 1800000; return _olIsApp(rec) ? Math.max(b, APP_ONLINE_GRACE) : b; }
         function _olAlive(rec, base, now) { const ts = _olTs(rec); if (!ts) return false; return ((now || Date.now()) - ts) <= _olTimeoutFor(rec, base); }
         // 合并在线用户：按设备取"最新活跃时间戳"的并集（解决多设备同步互相覆盖、在线数漏算），并保留昵称/来源
         function mergeOnlineUsers(target, src) {
@@ -13009,7 +13009,7 @@ function hasGistToken() {
         function pruneExpiredOnline(record) {
             if (!counterData || !counterData.online_users) return;
             const now = Date.now();
-            const timeout = counterData.online_timeout || 300000;
+            const timeout = counterData.online_timeout || 1800000;
             for (const id in counterData.online_users) {
                 if (!_olAlive(counterData.online_users[id], timeout, now)) {
                     if (record) recordOffline(id, counterData.online_users[id]);
@@ -13183,7 +13183,7 @@ function hasGistToken() {
                 active_today_web_users: [],
                 active_date: today,
                 online_users: {},
-                online_timeout: 300000,
+                online_timeout: 1800000,
                 offline_history: [],  // 最近离线记录（仅管理员可见，30天自动清除，绝不公开给普通用户）
                 sources: { app_visits: 0, web_visits: 0, new_app_users: 0, new_web_users: 0, app_users: 0, web_users: 0 },
                 user_sources: {},  // 每个用户的注册平台：{ deviceId: 'app' | 'web' }
@@ -13278,7 +13278,7 @@ function hasGistToken() {
                             ensureDeviceVisitsBaseline(parsed); recomputeTotalVisits(parsed);
                             if (parsed.total_downloads === undefined) parsed.total_downloads = 0;
                             if (!parsed.online_users) parsed.online_users = {};
-                            if (!parsed.online_timeout || parsed.online_timeout === 3600000 || parsed.online_timeout === 7200000) parsed.online_timeout = 300000;
+                            if (!parsed.online_timeout || parsed.online_timeout === 3600000 || parsed.online_timeout === 7200000) parsed.online_timeout = 1800000;
                             if (!parsed.sources) parsed.sources = { app_visits: 0, web_visits: 0 };
                             if (parsed.sources.new_app_users === undefined) parsed.sources.new_app_users = 0;
                             if (parsed.sources.new_web_users === undefined) parsed.sources.new_web_users = 0;
@@ -13620,7 +13620,7 @@ function hasGistToken() {
                 // 确保在线用户对象存在
                 if (!counterData.online_users) counterData.online_users = {};
                 // 缩短在线判定窗口到 5 分钟，避免关掉标签页后仍长时间显示"在线"（提升在线数准确性）
-                if (!counterData.online_timeout || counterData.online_timeout === 7200000 || counterData.online_timeout === 3600000) counterData.online_timeout = 300000;
+                if (!counterData.online_timeout || counterData.online_timeout === 7200000 || counterData.online_timeout === 3600000) counterData.online_timeout = 1800000;
 
                 // 记录用户最后活跃时间 + 昵称/来源（用于计算在线用户 & 管理员"谁在线"日志）
                 counterData.online_users[deviceId] = _olRec(_myNick(), isApp ? 'app' : 'web');
@@ -13781,7 +13781,7 @@ function hasGistToken() {
                 if (!remoteData.total_users) remoteData.total_users = remoteData.unique_users.length;
                 if (!remoteData.active_today) remoteData.active_today = remoteData.active_today_users.length;
                 if (!remoteData.online_users) remoteData.online_users = {};
-                if (!remoteData.online_timeout || remoteData.online_timeout === 3600000 || remoteData.online_timeout === 7200000) remoteData.online_timeout = 300000;
+                if (!remoteData.online_timeout || remoteData.online_timeout === 3600000 || remoteData.online_timeout === 7200000) remoteData.online_timeout = 1800000;
                 if (!remoteData.total_visits) remoteData.total_visits = 0;
                 if (!remoteData.total_downloads) remoteData.total_downloads = 0;
                 
@@ -14416,15 +14416,17 @@ function hasGistToken() {
                 }
             }, 5000);
             
-            // 定期刷新数据（每60秒）：拉取最新统计 + 在线保活（同步自身在线并合并他人在线）
+            // 定期刷新数据（每30分钟）：拉取最新统计 + 在线保活（同步自身在线并合并他人在线）
+            // s1.0.112：心跳从 60s 降到 30min，大幅减少 GitHub API 调用（限流主因之一）；
+            // 在线数准确性不再强求（数据分析另有记录），故同步把 online_timeout 放宽到 30min 保持一致。
             setInterval(() => {
                 if (isOnline()) {
                     refreshOnlinePresence();
                     refreshCounterData();
                 }
-            }, 60000);
-            // 本地轻量保活（每30秒）：仅刷新本机在线时间戳与显示，不联网
-            setInterval(() => { keepSelfOnlineLocal(); }, 30000);
+            }, 1800000);
+            // 本地轻量保活（每30分钟）：仅刷新本机在线时间戳与显示，不联网
+            setInterval(() => { keepSelfOnlineLocal(); }, 1800000);
             // 桌面端：隐藏到托盘即自身下线（网页端切标签不视为下线）
             setupWindowHiddenDetection();
         }
@@ -14467,7 +14469,7 @@ function hasGistToken() {
             let onlineCount = 0;
             if (counterData.online_users) {
                 const now = Date.now();
-                const timeout = counterData.online_timeout || 300000;
+                const timeout = counterData.online_timeout || 1800000;
                 for (const id in counterData.online_users) {
                     if (_olAlive(counterData.online_users[id], timeout, now)) {
                         onlineCount++;
@@ -18995,7 +18997,7 @@ ${maSection}
             let onlineCount = 0;
             if (counterData.online_users) {
                 const now = Date.now();
-                const timeout = counterData.online_timeout || 300000;
+                const timeout = counterData.online_timeout || 1800000;
                 for (const id in counterData.online_users) {
                     if (_olAlive(counterData.online_users[id], timeout, now)) {
                         onlineCount++;
@@ -21070,7 +21072,7 @@ ${maSection}
             const todayStats = dailyStats[today] || { visits: 0, downloads: 0, new_users: 0, hourly_visits: new Array(24).fill(0) };
             const activeToday = (data.active_today_users || []).length;
             const _onNow = Date.now();
-            const _onTo = data.online_timeout || 300000;
+            const _onTo = data.online_timeout || 1800000;
             let onlineCount = 0;
             if (data.online_users) {
                 for (const _oid in data.online_users) {
@@ -21314,7 +21316,7 @@ ${maSection}
             html += `<div style="background:rgba(255,255,255,0.05);border-radius:10px;padding:15px;margin-bottom:20px;">`;
             html += `<div style="color:#4ecdc4;font-size:0.9rem;margin-bottom:10px;">📡 在线 / 访问日志（数据源：GitHub Gist 计数器）</div>`;
             // 当前在线列表（含昵称/来源/最后活跃）
-            const _onTo2 = data.online_timeout || 300000;
+            const _onTo2 = data.online_timeout || 1800000;
             const _now2 = Date.now();
             const _onlineList = [];
             if (data.online_users) {
@@ -21409,7 +21411,7 @@ ${maSection}
             let onlineCount = 0;
             if (counterData.online_users) {
                 const now = Date.now();
-                const timeout = counterData.online_timeout || 300000;
+                const timeout = counterData.online_timeout || 1800000;
                 for (const id in counterData.online_users) {
                     if (_olAlive(counterData.online_users[id], timeout, now)) {
                         onlineCount++;
