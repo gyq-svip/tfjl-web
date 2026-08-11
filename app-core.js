@@ -12956,8 +12956,15 @@ function hasGistToken() {
 
         // 在线用户条目统一为对象 { t: 最后活跃时间戳, nick: 昵称, src: 'app'|'web' }（旧数据可能为纯数字时间戳，需兼容）
         function _olTs(v) { return (v && typeof v === 'object') ? (v.t || 0) : (typeof v === 'number' ? v : 0); }
-        function _olRec(nick, src) { return { t: Date.now(), nick: (nick || '').toString().slice(0, 24), src: src === 'app' ? 'app' : 'web' }; }
+        function _olRec(nick, src, bg) { const r = { t: Date.now(), nick: (nick || '').toString().slice(0, 24), src: src === 'app' ? 'app' : 'web' }; if (bg) r.bg = 1; return r; }
         function _myNick() { return (localStorage.getItem('TFJL_UserName') || '').trim(); }
+        // s1.0.107：桌面 App（含最小化到托盘）持续心跳，也应算在线。
+        // 窗口隐藏后 WebView 会节流定时器（最低约 1 次/分钟），故 src==='app' 的条目判定窗口放宽到 15 分钟；
+        // 网页端仍用 5 分钟窗口，保持"关掉标签就下线"的准确性。
+        const APP_ONLINE_GRACE = 900000;
+        function _olIsApp(v) { return !!(v && typeof v === 'object' && v.src === 'app'); }
+        function _olTimeoutFor(rec, base) { const b = base || 300000; return _olIsApp(rec) ? Math.max(b, APP_ONLINE_GRACE) : b; }
+        function _olAlive(rec, base, now) { const ts = _olTs(rec); if (!ts) return false; return ((now || Date.now()) - ts) <= _olTimeoutFor(rec, base); }
         // 合并在线用户：按设备取"最新活跃时间戳"的并集（解决多设备同步互相覆盖、在线数漏算），并保留昵称/来源
         function mergeOnlineUsers(target, src) {
             if (!src || !src.online_users) return;
@@ -12971,17 +12978,19 @@ function hasGistToken() {
                 if (!tgt || ts >= exTs) {
                     const sRec = (s && typeof s === 'object') ? s : null;
                     const tRec = (tgt && typeof tgt === 'object') ? tgt : null;
-                    target.online_users[id] = {
+                    const _mRec = {
                         t: ts,
                         nick: (sRec && sRec.nick) || (tRec && tRec.nick) || '',
                         src: (sRec && sRec.src) || (tRec && tRec.src) || ''
                     };
+                    if (sRec && sRec.bg) _mRec.bg = 1;
+                    target.online_users[id] = _mRec;
                 }
             }
         }
 
         // 最后离线记录（s1.0.84）：用户从在线名单过期/主动隐藏时，记入 offline_history（仅管理员可见，30天自动清除，绝不公开给普通用户）
-        let _windowHidden = false; // 桌面端隐藏到托盘时为 true，期间自身不计入在线
+        let _windowHidden = false; // 桌面端隐藏到托盘时为 true（s1.0.107 起仍持续心跳、仍算在线，仅作"后台运行"标记）
         const OFFLINE_KEEP_DAYS = 30;
         const OFFLINE_MAX = 500;
         function _offlineCutoff() { return Date.now() - OFFLINE_KEEP_DAYS * 86400000; }
@@ -13002,7 +13011,7 @@ function hasGistToken() {
             const now = Date.now();
             const timeout = counterData.online_timeout || 300000;
             for (const id in counterData.online_users) {
-                if (now - _olTs(counterData.online_users[id]) > timeout) {
+                if (!_olAlive(counterData.online_users[id], timeout, now)) {
                     if (record) recordOffline(id, counterData.online_users[id]);
                     delete counterData.online_users[id];
                 }
@@ -13028,20 +13037,14 @@ function hasGistToken() {
             arr.sort((a, b) => b.offlineAt - a.offlineAt);
             target.offline_history = arr;
         }
-        // 桌面端：窗口隐藏（隐藏到托盘）立即自身下线；网页端切标签不视为下线
+        // 桌面端：窗口隐藏（最小化到托盘）不再视为下线——托盘挂机仍在后台跑心跳，仍计入在线（s1.0.107）
         function setupWindowHiddenDetection() {
             if (!window.__TAURI__) return;
             document.addEventListener('visibilitychange', function () {
                 _windowHidden = (document.visibilityState === 'hidden');
-                if (_windowHidden) {
-                    if (counterData && counterData.online_users) {
-                        const id = getDeviceId();
-                        if (counterData.online_users[id]) { recordOffline(id, counterData.online_users[id]); delete counterData.online_users[id]; }
-                    }
-                    if (isOnline()) syncCounterToGist();
-                } else {
-                    keepSelfOnlineLocal();
-                }
+                // 隐藏/恢复瞬间都补一次心跳并同步：托盘期间定时器会被 WebView 节流，先把最新时间戳写上去
+                keepSelfOnlineLocal();
+                if (isOnline()) syncCounterToGist();
             });
         }
 
@@ -13356,7 +13359,7 @@ function hasGistToken() {
                             const now = Date.now();
                             const timeout = parsed.online_timeout;
                             for (const id in parsed.online_users) {
-                                if (now - parsed.online_users[id] > timeout) {
+                                if (!_olAlive(parsed.online_users[id], timeout, now)) {
                                     delete parsed.online_users[id];
                                 }
                             }
@@ -13626,7 +13629,7 @@ function hasGistToken() {
                 const now = Date.now();
                 const timeout = counterData.online_timeout;
                 for (const id in counterData.online_users) {
-                    if (now - _olTs(counterData.online_users[id]) > timeout) {
+                    if (!_olAlive(counterData.online_users[id], timeout, now)) {
                         delete counterData.online_users[id];
                     }
                 }
@@ -13805,13 +13808,13 @@ function hasGistToken() {
                 const now = Date.now();
                 const timeout = remoteData.online_timeout;
                 for (const id in remoteData.online_users) {
-                    if (now - _olTs(remoteData.online_users[id]) > timeout) {
+                    if (!_olAlive(remoteData.online_users[id], timeout, now)) {
                         delete remoteData.online_users[id];
                     }
                 }
                 
                 // 更新当前设备在线状态（含昵称/来源）
-                remoteData.online_users[deviceId] = _olRec(_myNick(), !!(window.__TAURI__) ? 'app' : 'web');
+                remoteData.online_users[deviceId] = _olRec(_myNick(), !!(window.__TAURI__) ? 'app' : 'web', _windowHidden);
                 
                 let hasVisit = false;
                 queue.forEach(item => {
@@ -14370,12 +14373,8 @@ function hasGistToken() {
                 if (!counterData.online_users) counterData.online_users = {};
                 const deviceId = getDeviceId();
                 const isApp = !!(window.__TAURI__);
-                if (!_windowHidden) {
-                    counterData.online_users[deviceId] = _olRec(_myNick(), isApp ? 'app' : 'web');
-                } else if (counterData.online_users[deviceId]) {
-                    recordOffline(deviceId, counterData.online_users[deviceId]);
-                    delete counterData.online_users[deviceId];
-                }
+                // s1.0.107：隐藏到托盘也照常上报心跳（bg=后台运行标记），不再把自己踢下线
+                counterData.online_users[deviceId] = _olRec(_myNick(), isApp ? 'app' : 'web', _windowHidden);
                 // 清过期并记入离线历史
                 pruneExpiredOnline(true);
                 cleanupOfflineHistory();
@@ -14391,12 +14390,8 @@ function hasGistToken() {
                 if (!counterData) return;
                 if (!counterData.online_users) counterData.online_users = {};
                 const isApp = !!(window.__TAURI__);
-                if (!_windowHidden) {
-                    counterData.online_users[getDeviceId()] = _olRec(_myNick(), isApp ? 'app' : 'web');
-                } else if (counterData.online_users[getDeviceId()]) {
-                    recordOffline(getDeviceId(), counterData.online_users[getDeviceId()]);
-                    delete counterData.online_users[getDeviceId()];
-                }
+                // s1.0.107：托盘挂机同样保活，只有真正超时才由 pruneExpiredOnline 判离线
+                counterData.online_users[getDeviceId()] = _olRec(_myNick(), isApp ? 'app' : 'web', _windowHidden);
                 // 仅清过期（记录离线统一由联网的 refreshOnlinePresence 负责，避免本地重复写）
                 pruneExpiredOnline(false);
                 updateStatsBar();
@@ -14440,6 +14435,9 @@ function hasGistToken() {
                 const fresh = await fetchCounterFromGist();
                 if (fresh) {
                     counterData = fresh;
+                    // s1.0.107：远程数据会整体覆盖本地，若 Gist 有 CDN 缓存/尚未收到本机心跳，
+                    // 自己就会从在线名单消失，出现"0 人在线"。覆盖后立刻把自己补回来。
+                    keepSelfOnlineLocal();
                     saveCounterToCache(counterData);
                     updateStatsBar();
                 }
@@ -14464,7 +14462,7 @@ function hasGistToken() {
                 const now = Date.now();
                 const timeout = counterData.online_timeout || 300000;
                 for (const id in counterData.online_users) {
-                    if (now - _olTs(counterData.online_users[id]) <= timeout) {
+                    if (_olAlive(counterData.online_users[id], timeout, now)) {
                         onlineCount++;
                     }
                 }
@@ -18986,7 +18984,7 @@ ${maSection}
                 const now = Date.now();
                 const timeout = counterData.online_timeout || 300000;
                 for (const id in counterData.online_users) {
-                    if (now - _olTs(counterData.online_users[id]) <= timeout) {
+                    if (_olAlive(counterData.online_users[id], timeout, now)) {
                         onlineCount++;
                     }
                 }
@@ -21029,7 +21027,7 @@ ${maSection}
             let onlineCount = 0;
             if (data.online_users) {
                 for (const _oid in data.online_users) {
-                    if (_onNow - _olTs(data.online_users[_oid]) <= _onTo) onlineCount++;
+                    if (_olAlive(data.online_users[_oid], _onTo, _onNow)) onlineCount++;
                 }
             }
 
@@ -21276,14 +21274,14 @@ ${maSection}
                 for (const _oid in data.online_users) {
                     const _rec = data.online_users[_oid];
                     const _ts = _olTs(_rec);
-                    if (_now2 - _ts <= _onTo2) {
+                    if (_olAlive(_rec, _onTo2, _now2)) {
                         const _r = (_rec && typeof _rec === 'object') ? _rec : {};
-                        _onlineList.push({ id: _oid, t: _ts, nick: _r.nick || '匿名', src: _r.src || 'web' });
+                        _onlineList.push({ id: _oid, t: _ts, nick: _r.nick || '匿名', src: _r.src || 'web', bg: !!_r.bg });
                     }
                 }
             }
             _onlineList.sort((a, b) => b.t - a.t);
-            html += `<div style="color:rgba(255,255,255,0.6);font-size:0.8rem;margin-bottom:6px;">当前在线（${_onlineList.length}）· 判定窗口 ${Math.round(_onTo2 / 60000)} 分钟</div>`;
+            html += `<div style="color:rgba(255,255,255,0.6);font-size:0.8rem;margin-bottom:6px;">当前在线（${_onlineList.length}）· 判定窗口 网页 ${Math.round(_onTo2 / 60000)} 分钟 / APP ${Math.round(Math.max(_onTo2, APP_ONLINE_GRACE) / 60000)} 分钟（含托盘）</div>`;
             if (_onlineList.length) {
                 html += `<div style="display:flex;flex-direction:column;gap:4px;margin-bottom:14px;max-height:200px;overflow:auto;">` + _onlineList.map(o => {
                     const ago = Math.max(0, Math.round((_now2 - o.t) / 1000));
@@ -21291,7 +21289,7 @@ ${maSection}
                     const shortId = o.id.length > 16 ? o.id.slice(0, 10) + '…' : o.id;
                     return `<div style="display:flex;justify-content:space-between;align-items:center;font-size:0.78rem;background:rgba(255,255,255,0.04);border-radius:6px;padding:5px 8px;">
                         <span><span style="color:#4ade80;">●</span> ${escapeHtml(o.nick)} <span style="color:rgba(255,255,255,0.35);font-size:0.7rem;">@${escapeHtml(shortId)}</span></span>
-                        <span style="color:rgba(255,255,255,0.5);">${o.src === 'app' ? '📱' : '🌐'} ${agoStr}</span>
+                        <span style="color:rgba(255,255,255,0.5);">${o.src === 'app' ? '📱' : '🌐'}${o.bg ? '<span style="color:#ffb74d;" title="最小化到托盘后台运行">·托盘</span>' : ''} ${agoStr}</span>
                     </div>`;
                 }).join('') + `</div>`;
             } else {
@@ -21366,7 +21364,7 @@ ${maSection}
                 const now = Date.now();
                 const timeout = counterData.online_timeout || 300000;
                 for (const id in counterData.online_users) {
-                    if (now - _olTs(counterData.online_users[id]) <= timeout) {
+                    if (_olAlive(counterData.online_users[id], timeout, now)) {
                         onlineCount++;
                     }
                 }
