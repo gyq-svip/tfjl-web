@@ -241,15 +241,20 @@
         }
       }
       if (addedCount > 0) console.log('[SKIN-WEB] added', addedCount, 'remote skins');
-      // 🔴 s1.0.101 关键修正：预热「绝不 await」——注册表索引就绪即代表 sync 完成，
-      // 首屏渲染（resolveHeroSkinInfo）只依赖索引，不再被 410 张全量预热拖死。
-      // 全量预热改为后台 fire-and-forget；可见卡片预热立刻触发（优先填充当前屏幕）。
+      // 🔴 s1.0.101/103 关键修正：预热「绝不 await」+「绝不挤占首屏 HTTP 连接池」
+      // - 注册表索引就绪即代表 sync 完成，首屏渲染只依赖索引，不再被预热拖死。
+      // - 全量预热改用 requestIdleCallback 启动 + 并发降为 2（Chrome 同源并发上限 6，预热占太多会阻塞首屏 fetch 排队，
+      //   这就是 s1.0.102 卡 "0/1" 一直不动的真因——浏览器 HTTP 连接池被 410 张预热占满）。
+      // - 可见卡片预热立即触发（用 setTimeout(0)，并发 4），让首屏皮肤更快有缓存（不阻塞首屏 fetch）。
       setTimeout(function () {
-        try {
-          _preheatVisibleSkins();                                   // 先补当前可见英雄
-          _preheatSkins(registry.heroes, { concurrency: 3 });        // 再低压后台补全量缓存
-        } catch (e) {}
+        try { _preheatVisibleSkins(); } catch (e) {}
       }, 0);
+      var _idleStart = (typeof window.requestIdleCallback === 'function')
+        ? function (fn) { window.requestIdleCallback(fn, { timeout: 5000 }); }
+        : function (fn) { setTimeout(fn, 1500); }; // 不支持 idle 时延后启动，给首屏足够时间
+      _idleStart(function () {
+        try { _preheatSkins(registry.heroes, { concurrency: 2 }); } catch (e) {}
+      });
       // 拉取融合卡定义（云端 fusions.json，管理员维护）
       try {
         var fResp = await _fetchJsonWithFallback('/fusions.json');

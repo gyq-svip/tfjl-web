@@ -8971,8 +8971,18 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     const name = getSlotCardName(slot);
                     if (!name) { if (prog) prog.step(); return; }
                     tasks.push((async () => {
+                        // 🔴 s1.0.103 单卡超时兜底：applySkinBgToSlot 内部可能因 fetch/索引 await 死等，
+                        // 超时 10 秒后强制 step 推进，避免进度条永远卡在 0/Y（任何深层死锁都不能阻塞 UI 反馈）。
+                        let stepped = false;
+                        let watchdog = setTimeout(function () {
+                            if (stepped) return;
+                            stepped = true;
+                            console.warn('[SKIN] 单卡皮肤加载超时 10s，强制推进:', name);
+                            if (prog) prog.step();
+                        }, 10000);
                         try { await applySkinBgToSlot(slot, name); } catch (e) {}
-                        if (prog) prog.step(); // 无论成功失败都推进，避免卡在 99%
+                        clearTimeout(watchdog);
+                        if (!stepped && prog) { stepped = true; prog.step(); }
                     })());
                 });
             });
