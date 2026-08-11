@@ -271,9 +271,8 @@
             // 监听 SW 通知：后台已拉到新版本
             navigator.serviceWorker.addEventListener('message', function(event) {
                 if (event.data && event.data.type === 'NEW_VERSION_READY') {
-                    // 标记「已有新版本」→ 版本号变绿（更新提示统一用 app-core.js 左下角彩色气泡）
-                    window.__tfjlHasNewVersion = true;
-                    _markNewVersionAvailable();
+                    // 收到"有新版本"信号后先核实远端版本，避免刚强刷完（SW激活广播）误报
+                    _verifyNewVersion();
                 }
                 // SW 回报的缓存版本号（如 tfjl-v62）→ 显示在右下角版本标签，便于核对缓存是否更新
                 if (event.data && event.data.type === 'SW_VERSION') {
@@ -295,6 +294,27 @@
                     dot.style.cssText = 'color:#4caf50;';
                     tag.appendChild(dot);
                 }
+            }
+            // 核实是否真有新版本：比对远端 versionTag 主版本号与当前，避免刚强刷完即误报"有新版本"
+            async function _verifyNewVersion() {
+                try {
+                    const tag = document.getElementById('versionTag');
+                    const cur = tag ? tag.textContent.replace('●', '').split(' · ')[0].trim() : '';
+                    const remote = await _checkRemoteFrontVerAsync();
+                    const remoteBase = remote ? remote.split(' · ')[0].trim() : '';
+                    if (remoteBase) {
+                        if (remoteBase !== cur) {
+                            window.__tfjlHasNewVersion = true;
+                            _markNewVersionAvailable();
+                        } else {
+                            window.__tfjlHasNewVersion = false;
+                            if (tag) { tag.style.color = ''; tag.title = '前端标记号（点我看版本详情 / 强制刷新）'; }
+                            const d = document.getElementById('__verNewDot'); if (d) d.remove();
+                        }
+                    } else {
+                        window.__tfjlHasNewVersion = true; _markNewVersionAvailable();
+                    }
+                } catch (e) { window.__tfjlHasNewVersion = true; _markNewVersionAvailable(); }
             }
             // 把 SW 缓存版本号显示到右下角版本标签（如 "v260727-57 · sw-v62"）
             function updateCacheVersionDisplay(swVersion) {
@@ -466,9 +486,17 @@
             // 异步拉远端 versionTag 比较：不依赖 SW，Tauri WebView 下也能正确检测新前端
             try {
                 const remoteVer = await _checkRemoteFrontVerAsync();
-                if (remoteVer && remoteVer !== frontVer && !window.__tfjlHasNewVersion) {
-                    window.__tfjlHasNewVersion = true;
-                    _fillVersionPopupBody(frontVer, swVer, appVer, true, box);  // 刷新为「强制刷新」状态
+                const remoteBase = remoteVer ? remoteVer.split(' · ')[0].trim() : '';
+                if (remoteBase) {
+                    if (remoteBase !== frontVer) {
+                        window.__tfjlHasNewVersion = true;
+                        _fillVersionPopupBody(frontVer, swVer, appVer, true, box);  // 刷新为「强制刷新」状态
+                    } else {
+                        // 远端确认与当前一致 → 清除可能的残留"新版本"标记（修复强刷后仍误报）
+                        window.__tfjlHasNewVersion = false;
+                        const t = document.getElementById('versionTag'); if (t) { t.style.color = ''; const d = document.getElementById('__verNewDot'); if (d) d.remove(); }
+                        _fillVersionPopupBody(frontVer, swVer, appVer, false, box);
+                    }
                 }
             } catch (e) {}
             const close = document.createElement('div');
