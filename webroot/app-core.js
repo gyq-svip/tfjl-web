@@ -14434,12 +14434,19 @@ function hasGistToken() {
             try {
                 const fresh = await fetchCounterFromGist();
                 if (fresh) {
+                    // s1.0.108：绝不能裸覆盖！每 60 秒轮询若直接 `counterData = fresh`，
+                    // 会把本机刚记录的"今日访问/下载增量"冲掉（s1.0.107 只补了在线，漏了访问增量）。
+                    // 必须先合并本地缓存（含本机会话已记录的今日时段/访问数），再覆盖。
+                    const localData = loadCounterFromCache();
+                    if (localData) mergeCounters(fresh, localData);
                     counterData = fresh;
                     // s1.0.107：远程数据会整体覆盖本地，若 Gist 有 CDN 缓存/尚未收到本机心跳，
                     // 自己就会从在线名单消失，出现"0 人在线"。覆盖后立刻把自己补回来。
                     keepSelfOnlineLocal();
                     saveCounterToCache(counterData);
                     updateStatsBar();
+                    // s1.0.108：刷新成功说明网络/限流恢复，趁此把之前失败的待同步增量（含今日访问）补写 Gist
+                    if (isOnline()) syncPendingQueue();
                 }
             } catch (error) {
                 console.warn('刷新统计数据失败:', error);
