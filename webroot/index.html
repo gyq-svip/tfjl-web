@@ -2418,7 +2418,7 @@
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">s20260811-116 · s1.0.116</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">s20260811-117 · s1.0.117</span>
             </div>
         </div>
     </div>
@@ -2449,12 +2449,19 @@
                     <h3 style="color:#ffd700;margin:0;font-size:1rem;">💾 需求墙备份中心</h3>
                     <button onclick="document.getElementById('adminPageWallBackup').style.display='none';document.getElementById('adminMenu').style.display='grid';" style="background:none;border:none;color:#fff;font-size:1.4rem;cursor:pointer;">✕</button>
                 </div>
-                <div style="color:#4ade80;font-size:0.8rem;margin-bottom:10px;">✅ 定期备份存独立私有Gist，含消息+个人资料+脚本内容。还原可「合并」(保留新消息)或「覆盖」。</div>
-                <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+                <div style="color:#4ade80;font-size:0.8rem;margin-bottom:8px;">✅ 本备份存独立私有Gist，含<b>消息+个人资料+脚本真实内容</b>（自包含：源文件被删也能还原）。还原可「合并」(保留新消息)或「覆盖」。</div>
+                <div style="background:rgba(74,222,128,0.08);border-left:3px solid #4ade80;border-radius:6px;padding:8px 10px;margin-bottom:12px;font-size:0.72rem;color:rgba(255,255,255,0.6);line-height:1.55;">
+📖 <b style="color:#4ade80;">和拍卖备份的关系</b>：两处<b>互不越界</b>——拍卖数据只有「拍卖备份」能救，需求墙帖子只有「本备份」能救；<b>脚本是共享池</b>，任一备份都能还原脚本。需求墙就认准这一个中心即可。
+                </div>
+                <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
                     <button onclick="wallBackupAll()" style="background:linear-gradient(135deg,#4ade80,#22c55e);color:#fff;border:none;padding:10px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;">💾 立即备份</button>
                     <button onclick="wallLoadBackupList()" style="background:rgba(255,255,255,0.1);color:#fff;border:none;padding:10px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;">🔍 刷新备份列表</button>
+                    <label style="display:flex;align-items:center;gap:6px;color:rgba(255,255,255,0.7);font-size:0.78rem;cursor:pointer;user-select:none;">
+                        <input type="checkbox" id="wallAutoBackupChk" onchange="wallToggleAutoBackup(this.checked)"> 每日自动备份
+                    </label>
                 </div>
-                <div id="wallBackupListContainer" style="background:rgba(0,0,0,0.3);border-radius:6px;padding:12px;font-size:0.85rem;max-height:230px;overflow-y:auto;margin-bottom:10px;"></div>
+                <div id="wallBackupListContainer" style="background:rgba(0,0,0,0.3);border-radius:6px;padding:12px;font-size:0.85rem;max-height:230px;overflow-y:auto;margin-bottom:6px;"></div>
+                <div style="color:rgba(255,255,255,0.4);font-size:0.7rem;margin-bottom:8px;line-height:1.4;">💡 备份越多 Gist 体积越大，建议定期在列表里「删除」旧备份以免超上限（单文件约 1MB，消息已自动分片）。</div>
                 <div id="wallBackupStatus"></div>
                 <div style="margin-top:18px;border-top:1px solid rgba(255,255,255,0.12);padding-top:14px;">
                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
