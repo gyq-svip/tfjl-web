@@ -765,6 +765,12 @@ if (isTauriApp) {
                         <label style="color:#ffd700;font-size:0.9rem;">📋 扫描到的脚本文件</label>
                         <button onclick="scanAllFiles(true)" style="background:linear-gradient(135deg,#ff9800,#e65100);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">🔄 刷新扫描</button>
                     </div>
+                    <!-- 工具栏（搜索框+分类）独立容器，不参与每次重绘，避免中文输入法 composition 被打断打不出中文 -->
+                    <div id="scannedFileToolbar" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,0.1);">
+                        <input type="text" id="scannedFileSearchInput" value="" placeholder="🔍 搜索文件名…" oninput="setScannedFilterKeyword(this.value)" style="flex:1;min-width:120px;padding:6px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:rgba(0,0,0,0.3);color:#fff;font-size:0.8rem;box-sizing:border-box;">
+                        <div id="scannedFileCats" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;"></div>
+                        <button id="scannedShareModeBtn" onclick="toggleScannedShareMode()" title="分享模式：快速分享到需求墙" style="background:linear-gradient(135deg,#7c4dff,#b388ff);color:#fff;border:none;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:0.75rem;font-weight:bold;white-space:nowrap;">📢 分享模式</button>
+                    </div>
                     <div id="scannedFileList" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:8px;min-height:60px;max-height:250px;overflow:auto;">
                         <div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">扫描中...</div>
                     </div>
@@ -986,16 +992,40 @@ if (isTauriApp) {
         renderScannedFiles();
     }
 
+    // 渲染工具栏（搜索框除外，搜索框在独立稳定容器 scannedFileToolbar，不参与重绘，
+    // 否则每次输入重绘会打断中文输入法 composition，导致中文打不出来/只能复制粘贴）
+    function renderScannedToolbar() {
+        const catsEl = document.getElementById('scannedFileCats');
+        if (!catsEl) return;
+        const cats = ['全部', '寒冰', '暗月', '漩涡', '合作', '深海', '活动', '日志', '临时', '其他'];
+        const colorMap = getScannedCategoryColor ? null : null; // 占位，避免未定义告警
+        const cmap = {
+            '全部': '#ffffff', '寒冰': '#64b5f6', '暗月': '#ce93d8', '漩涡': '#4fc3f7',
+            '合作': '#ffd54f', '深海': '#4db6ac', '活动': '#ff8a65', '日志': '#ef5350', '临时': '#a5d6a7', '其他': '#bdbdbd'
+        };
+        let h = '';
+        cats.forEach(cat => {
+            const active = _scannedFilterCategory === cat;
+            const color = cmap[cat] || '#bdbdbd';
+            const count = cat === '全部' ? scannedFiles.length : scannedFiles.filter(f => (f.category || '其他') === cat).length;
+            h += `<button onclick="setScannedFilterCategory('${cat}')" style="background:${active ? color : 'rgba(255,255,255,0.06)'};color:${active ? '#000' : color};border:1px solid ${active ? color : 'rgba(255,255,255,0.12)'};padding:3px 10px;border-radius:14px;cursor:pointer;font-size:0.7rem;transition:all 0.15s;" title="${cat} ${count}个">${cat}${cat !== '全部' && count > 0 ? ' (' + count + ')' : ''}</button>`;
+        });
+        catsEl.innerHTML = h;
+        const shareBtn = document.getElementById('scannedShareModeBtn');
+        if (shareBtn) {
+            shareBtn.textContent = _shareModeScanned ? '📢 退出分享' : '📢 分享模式';
+            shareBtn.style.background = _shareModeScanned ? 'linear-gradient(135deg,#ff6b6b,#ff9e80)' : 'linear-gradient(135deg,#7c4dff,#b388ff)';
+            shareBtn.title = _shareModeScanned ? '退出分享模式' : '分享模式：快速分享到需求墙';
+        }
+    }
+
     function renderScannedFiles() {
         const listEl = document.getElementById('scannedFileList');
         const statsEl = document.getElementById('fuzzyStatsArea');
         if (!listEl) return;
 
-        // 记录焦点与光标位置，渲染后恢复（避免搜索框每输入一个字母就丢焦点、需重新点）
-        const _active = document.activeElement;
-        const _prevId = _active && _active.id;
-        const _prevStart = (_active && typeof _active.selectionStart === 'number') ? _active.selectionStart : null;
-        const _prevEnd = (_active && typeof _active.selectionEnd === 'number') ? _active.selectionEnd : null;
+        // 工具栏（搜索框/分类/分享）只在有必要时重渲染，且搜索框本身在稳定容器不被重建
+        renderScannedToolbar();
 
         // 筛选处理
         let displayFiles = scannedFiles;
@@ -1009,29 +1039,12 @@ if (isTauriApp) {
 
         const isEmpty = displayFiles.length === 0;
 
-        const cats = ['全部', '寒冰', '暗月', '漩涡', '合作', '深海', '活动', '日志', '临时', '其他'];
         const colorMap = {
             '全部': '#ffffff', '寒冰': '#64b5f6', '暗月': '#ce93d8', '漩涡': '#4fc3f7',
             '合作': '#ffd54f', '深海': '#4db6ac', '活动': '#ff8a65', '日志': '#ef5350', '临时': '#a5d6a7', '其他': '#bdbdbd'
         };
 
-        // 顶部工具栏
-        let html = '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,0.1);">';
-        html += '<input type="text" id="scannedFileSearchInput" value="' + _scannedFilterKeyword.replace(/"/g, '&quot;') + '" placeholder="🔍 搜索文件名…" oninput="setScannedFilterKeyword(this.value)" style="flex:1;min-width:120px;padding:6px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:rgba(0,0,0,0.3);color:#fff;font-size:0.8rem;box-sizing:border-box;">';
-        html += '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;">';
-        cats.forEach(cat => {
-            const active = _scannedFilterCategory === cat;
-            const color = colorMap[cat] || '#bdbdbd';
-            const count = cat === '全部' ? scannedFiles.length : scannedFiles.filter(f => (f.category || '其他') === cat).length;
-            html += `<button onclick="setScannedFilterCategory('${cat}')" style="background:${active ? color : 'rgba(255,255,255,0.06)'};color:${active ? '#000' : color};border:1px solid ${active ? color : 'rgba(255,255,255,0.12)'};padding:3px 10px;border-radius:14px;cursor:pointer;font-size:0.7rem;transition:all 0.15s;" title="${cat} ${count}个">${cat}${cat !== '全部' && count > 0 ? ' (' + count + ')' : ''}</button>`;
-        });
-        html += '</div>';
-        html += `<button id="scannedShareModeBtn" onclick="toggleScannedShareMode()" title="${_shareModeScanned ? '退出分享模式' : '分享模式：快速分享到需求墙'}" style="background:${_shareModeScanned ? 'linear-gradient(135deg,#ff6b6b,#ff9e80)' : 'linear-gradient(135deg,#7c4dff,#b388ff)'};color:#fff;border:none;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:0.75rem;font-weight:bold;white-space:nowrap;">${_shareModeScanned ? '📢 退出分享' : '📢 分享模式'}</button>`;
-        if (_shareModeScanned) {
-            html += '<button id="batchScannedShareFromMainBtn" onclick="doBatchShareScannedFromMain()" style="background:linear-gradient(135deg,#ff6b6b,#ff9e80);color:#fff;border:none;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:0.75rem;font-weight:bold;opacity:0.5;white-space:nowrap;">📢 批量分享</button>';
-        }
-        html += '</div>';
-
+        let html = '';
         if (isEmpty) {
             html += '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">未找到 txt/json 文件</div>';
         } else if (_shareModeScanned) {
@@ -1087,13 +1100,6 @@ if (isTauriApp) {
         }
         listEl.innerHTML = html;
         window.scannedFiles = scannedFiles;
-        // 恢复搜索框焦点与光标（关键修复：输入时不丢焦点，无需每输一个字母再点一次）
-        if (_prevId) {
-            const _el = document.getElementById(_prevId);
-            if (_el) {
-                try { _el.focus(); if (_prevStart != null) _el.setSelectionRange(_prevStart, _prevEnd); } catch (e) {}
-            }
-        }
         refreshBatchScannedShareBtnFromMain();
 
         // 显示模糊分类统计
