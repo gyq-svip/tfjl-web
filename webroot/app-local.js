@@ -3415,7 +3415,7 @@ if (isTauriApp) {
         try {
             const div = document.createElement('div');
             div.style.cssText = 'position:fixed;left:16px;bottom:16px;z-index:100002;background:rgba(26,26,46,0.94);color:#fff;padding:11px 14px;border-radius:10px;font-size:0.8rem;max-width:300px;box-shadow:0 4px 16px rgba(0,0,0,0.45);border:1px solid rgba(79,195,247,0.45);cursor:pointer;line-height:1.4;';
-            div.textContent = '🆕 后台已拉取 ' + count + ' 张新皮肤并缓存，点击刷新后即可使用';
+            div.textContent = '🆕 后台已拉取 ' + count + ' 张新皮肤并缓存，已自动应用（点击可强制刷新）';
             div.title = '点击强制刷新';
             div.onclick = function () { try { location.reload(); } catch (e) {} };
             document.body.appendChild(div);
@@ -3575,6 +3575,7 @@ if (isTauriApp) {
     // 后台下载远程皮肤到本地磁盘（Tauri 环境下，写入 .skin 二进制文件，内容仍是 png）
     // 统一用 .skin 非图片后缀，避免 .b64 文本缓存（体积 +33% 且是可读文本，别人能直接看）
     let _remoteSkinDownloadStarted = false;
+    let _skinUpdateToastShown = false;
     async function _downloadRemoteSkinsToLocal(heroes) {
         if (!isTauriApp || _remoteSkinDownloadStarted) return;
         _remoteSkinDownloadStarted = true;
@@ -3591,9 +3592,10 @@ if (isTauriApp) {
                 const file = s.file || (s.name + '.skin');
                 const skinPath = base + '\\' + heroName + '\\' + file;
                 // 已存在则跳过（本地已有 .skin，可能来自 Gitee zip 或之前下载）
+                // 用自定义 path_exists 判断（已授权、跨 Tauri 版本稳定），避免 read_file 误判"不存在"导致每次重新下载
                 try {
-                    const exists = await invokeFn('plugin:fs|read_file', { path: skinPath, options: undefined });
-                    if (exists && (exists.byteLength ?? exists.length) > 100) { skipped++; continue; }
+                    const exists = await invokeFn('path_exists', { path: skinPath });
+                    if (exists === true) { skipped++; continue; }
                 } catch(e) { /* 不存在，继续下载 */ }
                 try {
                     const url = REMOTE_SKIN_BASE + '/' + encodeURIComponent(heroName) + '/' + encodeURIComponent(file);
@@ -3601,14 +3603,20 @@ if (isTauriApp) {
                     if (!resp.ok) continue;
                     const blob = await resp.blob();
                     const arr = new Uint8Array(await blob.arrayBuffer());
-                    // 写 .skin 二进制（内容 png）：优先 Tauri fs 插件，回退自定义命令 write_binary_file
-                    try {
-                        await invokeFn('plugin:fs|write_file', { path: skinPath, contents: arr });
-                    } catch (e1) {
-                        const b64 = (await _blobToBase64(blob)).split(',')[1];
-                        if (b64) await invokeFn('write_binary_file', { file_path: skinPath, content_base64: b64 }).catch(() => {});
+                    const b64 = (await _blobToBase64(blob)).split(',')[1];
+                    let wrote = false;
+                    // 主：base64 字符串写（自定义命令 write_binary_file，跨 Tauri 版本稳定，不依赖二进制 IPC 序列化）
+                    if (b64) {
+                        try { await invokeFn('write_binary_file', { file_path: skinPath, content_base64: b64 }); wrote = true; }
+                        catch (e1) { console.warn('[SKIN] write_binary_file 失败，回退 plugin:fs|write_file:', heroName, file, e1); }
                     }
-                    downloaded++;
+                    // 备：Tauri v2 fs 插件写（注意 options.contents 结构）
+                    if (!wrote) {
+                        try { await invokeFn('plugin:fs|write_file', { path: skinPath, options: { contents: arr } }); wrote = true; }
+                        catch (e2) { console.warn('[SKIN] 皮肤写盘失败:', heroName, file, e2); }
+                    }
+                    // 只有真正写盘成功才计入"新下载"，避免写失败却误报"有新皮肤"反复弹提示
+                    if (wrote) downloaded++;
                 } catch(e) {
                     console.warn('[SKIN] 下载皮肤失败:', heroName, file, e.message || e);
                 }
@@ -3618,8 +3626,9 @@ if (isTauriApp) {
         if (downloaded > 0 || skipped > 0) {
             console.log('[SKIN] 磁盘缓存: 新下载', downloaded, '跳过', skipped);
         }
-        // 后台拉到新皮肤 → 左下角弹更新提示，并重刷一次皮肤让新皮尽快可见
-        if (downloaded > 0) {
+        // 后台拉到新皮肤 → 左下角弹更新提示（同一会话最多一次），并重刷一次皮肤让新皮尽快可见
+        if (downloaded > 0 && !_skinUpdateToastShown) {
+            _skinUpdateToastShown = true;
             _showSkinUpdateToast(downloaded);
             try { if (typeof window.reapplyAllSkins === 'function') window.reapplyAllSkins(); } catch (e) {}
         }
