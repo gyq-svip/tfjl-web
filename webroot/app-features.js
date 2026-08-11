@@ -6158,7 +6158,7 @@
 
             // 卡牌分类
             const jingLingNames = ['冰精灵', '光精灵', '魔精灵', '木精灵', '土精灵', '雷精灵', '暗精灵', '幻精灵', '魂精灵', '彩精灵'];
-            const gongChengNames = ['火炮', '咬人娃娃', '潜艇'];
+            const gongChengNames = ['火炮', '咬人娃娃', '潜艇', '射线', '宝库'];
 
             const hasSheNv = heroNames.some(name => name.includes('蛇女'));
             const hasHuoLing = heroNames.some(name => name.includes('火灵'));
@@ -6179,7 +6179,6 @@
             // 过滤精灵和射线/宝库
             const filteredCards = heroNames.filter(name => {
                 if (jingLingNames.some(jl => name.includes(jl))) return false;
-                if (name.includes('射线') || name.includes('宝库')) return false;
                 return true;
             });
 
@@ -6223,19 +6222,14 @@
                 arrangedCards.push(...top2);       // 第4-5位：优先级最高2张
                 arrangedCards.push(...sheNvCards); // 第6位：蛇女
             } else {
-                // 无蛇女：工程卡也排在前面
-                arrangedCards.push(...gongChengCards);
+                // 无蛇女：工程卡单独放 gongChengOrder（最上面），非工程卡正常排
                 const otherCards = filteredCards.filter(name =>
                     !gongChengNames.some(gc => name.includes(gc)) &&
                     !name.includes('射线') && !name.includes('宝库') &&
                     !name.includes('蛇女')
                 );
                 arrangedCards.push(...otherCards);
-                if (hasFengLing) arrangedCards.push(...filteredCards.filter(name => name.includes('风灵')));
-                if (hasHuoLing) arrangedCards.push(...filteredCards.filter(name => name.includes('火灵')));
-                if (hasHuGong) arrangedCards.push(...filteredCards.filter(name => name.includes('虎弓')));
-                if (hasTianShi) arrangedCards.push(...filteredCards.filter(name => name.includes('天使')));
-                if (hasSheNv) arrangedCards.push(...sheNvCards);
+                // 注意：风灵/火灵/虎弓/天使/蛇女 已包含在 otherCards 中，切勿重复 push，否则重复占位置导致少上一张卡
             }
 
             // 有蛇女时，工程卡单独放最前面，不参与强制顺序
@@ -6247,7 +6241,12 @@
                 );
                 arrangedCards = arrangedCards.slice(0, 6);
             } else {
-                arrangedCards = arrangedCards.slice(0, hasGongCheng ? 7 : 6);
+                // 无蛇女：工程卡单独算（gongChengOrder），非工程卡固定取前6张；
+                // 有工程卡时总上卡数 = 6张非工程 + 1张工程 = 7张，无工程卡时 = 6张
+                gongChengOrder = [...gongChengCards];
+                arrangedCards = arrangedCards.filter(name =>
+                    !gongChengNames.some(gc => name.includes(gc)) && !name.includes('射线') && !name.includes('宝库') && !name.includes('蛇女')
+                ).slice(0, 6);
             }
 
             // 构建输出
@@ -6298,7 +6297,10 @@
                     line1Parts.push('上' + name);
                 });
             } else {
-                // 没有蛇女：全部满
+                // 没有蛇女：工程卡先上（满），然后非工程卡全部满
+                gongChengOrder.forEach(name => {
+                    line1Parts.push('上' + name + '满');
+                });
                 arrangedCards.forEach(name => {
                     line1Parts.push('上' + name + '满');
                 });
