@@ -9837,6 +9837,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                             </div>
                             <div style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-top:8px;">💡 「主战车」算我方卡组，「副战车」算队友卡组。每张表独立保存。</div>
                             <div style="color:#ff9800;font-size:0.85rem;margin:10px 0 6px;padding:5px;background:rgba(255,152,0,0.1);border-radius:4px;">⚡ 共享技能减伤（小野/酋长/宝库 — 被动技能，卡在场上有就算；与上方「卡的洗炼」无关，数值填在这一栏）</div>
+                            <div style="color:rgba(255,152,0,0.8);font-size:0.72rem;margin-bottom:8px;line-height:1.5;">⚠️ 这里填的是<b>被动技能</b>减伤（如小野被动90）。小野的<b>自身占卜洗炼</b>是另一笔，请在上方「牧师类→小野 <span style="color:#ff9800;">(自身洗炼)</span>」那一行填。两笔都会相加：总减伤 = 自身洗炼 + 被动技能。</div>
                             <div style="display:flex;flex-wrap:wrap;gap:12px;">
                                 <div style="display:flex;align-items:center;gap:6px;">
                                     <span style="color:#fff;font-size:0.85rem;">小野:</span>
@@ -9896,17 +9897,18 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 
                 cards.forEach(cardName => {
                     const value = currentData[cardName] || 0;
+                    const isSpecial = ['小野', '酋长', '宝库'].includes(cardName);
                     html += `
-                        <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:rgba(255,255,255,0.05);border-radius:6px;">
-                            <span style="color:#fff;font-size:0.85rem;">${cardName}</span>
+                        <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border-radius:6px;${isSpecial ? 'background:rgba(255,152,0,0.12);border:1px solid rgba(255,152,0,0.45);' : 'background:rgba(255,255,255,0.05);'}">
+                            <span style="color:#fff;font-size:0.85rem;">${cardName}${isSpecial ? ' <span style="color:#ff9800;font-size:0.7rem;">(自身洗炼)</span>' : ''}</span>
                             <input type="number" 
                                    data-card="${cardName}" 
                                    value="${value}" 
                                    min="0" 
                                    max="100"
                                    step="0.1"
-                                   style="width:60px;background:rgba(255,255,255,0.1);border:1px solid rgba(78,205,196,0.3);color:#4ecdc4;padding:4px 8px;border-radius:4px;text-align:center;font-size:0.85rem;"
-                                   onchange="this.style.color='#4ecdc4'">
+                                   style="width:60px;background:rgba(255,255,255,0.1);border:1px solid ${isSpecial ? 'rgba(255,152,0,0.5)' : 'rgba(78,205,196,0.3)'};color:${isSpecial ? '#ff9800' : '#4ecdc4'};padding:4px 8px;border-radius:4px;text-align:center;font-size:0.85rem;"
+                                   onchange="this.style.color='${isSpecial ? '#ff9800' : '#4ecdc4'}'">
                         </div>
                     `;
                 });
