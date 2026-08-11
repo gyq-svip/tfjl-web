@@ -12646,10 +12646,10 @@ function hasGistToken() {
                     } catch (e) { /* 忽略 */ }
                 }
                 updateStatsBar();
+                // 🔴 修复：等统计数据（counterData）从 Gist 初始化完成后再记录访问，
+                // 避免页面刚加载时 isOnline() 尚未判定为 true 而把访问丢进待同步队列（旧版队列不记时段分布）
+                await recordVisit().catch((error) => { console.error('❌ 记录访问失败:', error); });
             })();
-
-            // 记录访问
-            recordVisit().catch((error) => { console.error('❌ 记录访问失败:', error); });
 
             // 启动图片清理定时任务
             startImageCleanup();
@@ -13672,9 +13672,8 @@ function hasGistToken() {
                         recomputeDailyVisitsOn(counterData, today);
                         // 记录访问时段
                         const hour = new Date().getHours();
-                        if (counterData.daily_stats[today].hourly_visits) {
-                            counterData.daily_stats[today].hourly_visits[hour]++;
-                        }
+                        if (!counterData.daily_stats[today].hourly_visits) counterData.daily_stats[today].hourly_visits = new Array(24).fill(0);
+                        counterData.daily_stats[today].hourly_visits[hour]++;
                         
                         // 记录新用户（含来源/平台归属）
                         if (!counterData.unique_users.includes(deviceId)) {
@@ -13848,6 +13847,10 @@ function hasGistToken() {
                 remoteData.device_visits[deviceId] = (remoteData.device_visits[deviceId] || 0) + 1;
                 recomputeTotalVisits(remoteData);
                             remoteData.daily_stats[syncDate].visits++;
+                            // 🔴 修复：待同步队列的访问也必须记录时段分布，否则离线期间的访问不会计入"今日访问时间分布"图
+                            if (!remoteData.daily_stats[syncDate].hourly_visits) remoteData.daily_stats[syncDate].hourly_visits = new Array(24).fill(0);
+                            const _qh = new Date().getHours();
+                            remoteData.daily_stats[syncDate].hourly_visits[_qh]++;
                             hasVisit = true;
                             break;
                         case 'download':
