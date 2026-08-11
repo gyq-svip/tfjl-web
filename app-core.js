@@ -8949,42 +8949,36 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         }
 
         // 远程皮肤注册表加载完成后，为已上阵/手牌刷新皮肤
+        // 🔴 s1.0.104：进度条统一挂在主站手牌选卡区（.hands-area，即"我的手牌/队友手牌"🔍选卡按钮附近），
+        // 不再挂到出站战斗槽容器（.battle-slots-container）——那里因布局错位且用户看不到。
         async function refreshAllBattleSlotSkins() {
             const slots = document.querySelectorAll('.battle-slot.filled');
             if (slots.length === 0) return;
-            // 按所属容器分两组，各自驱动一个进度条（我方 / 队友）
-            const groups = {};
-            slots.forEach(slot => {
-                const container = slot.closest('.battle-slots-container');
-                const key = container ? (container.id || 'grp') : 'grp';
-                (groups[key] = groups[key] || []).push(slot);
-            });
+            // 进度条容器 = 主站手牌选卡区（.hands-area 顶部），贴合"选着"那 4 个字附近，不窜位
+            const handsArea = document.querySelector('.hands-area');
+            const container = handsArea || slots[0].closest('.battle-slots-container');
+            let prog = null;
+            if (typeof window.showSkinLoadProgress === 'function') {
+                prog = window.showSkinLoadProgress(container, slots.length, '🎨 皮肤加载中');
+            }
             const tasks = [];
-            Object.keys(groups).forEach(function (key) {
-                const grpSlots = groups[key];
-                const container = grpSlots[0].closest('.battle-slots-container');
-                let prog = null;
-                if (typeof window.showSkinLoadProgress === 'function') {
-                    prog = window.showSkinLoadProgress(container, grpSlots.length, '🎨 出站皮肤加载中');
-                }
-                grpSlots.forEach(slot => {
-                    const name = getSlotCardName(slot);
-                    if (!name) { if (prog) prog.step(); return; }
-                    tasks.push((async () => {
-                        // 🔴 s1.0.103 单卡超时兜底：applySkinBgToSlot 内部可能因 fetch/索引 await 死等，
-                        // 超时 10 秒后强制 step 推进，避免进度条永远卡在 0/Y（任何深层死锁都不能阻塞 UI 反馈）。
-                        let stepped = false;
-                        let watchdog = setTimeout(function () {
-                            if (stepped) return;
-                            stepped = true;
-                            console.warn('[SKIN] 单卡皮肤加载超时 10s，强制推进:', name);
-                            if (prog) prog.step();
-                        }, 10000);
-                        try { await applySkinBgToSlot(slot, name); } catch (e) {}
-                        clearTimeout(watchdog);
-                        if (!stepped && prog) { stepped = true; prog.step(); }
-                    })());
-                });
+            slots.forEach(slot => {
+                const name = getSlotCardName(slot);
+                if (!name) { if (prog) prog.step(); return; }
+                tasks.push((async () => {
+                    // 🔴 s1.0.103 单卡超时兜底：applySkinBgToSlot 内部可能因 fetch/索引 await 死等，
+                    // 超时 10 秒后强制 step 推进，避免进度条永远卡在 0/Y（任何深层死锁都不能阻塞 UI 反馈）。
+                    let stepped = false;
+                    let watchdog = setTimeout(function () {
+                        if (stepped) return;
+                        stepped = true;
+                        console.warn('[SKIN] 单卡皮肤加载超时 10s，强制推进:', name);
+                        if (prog) prog.step();
+                    }, 10000);
+                    try { await applySkinBgToSlot(slot, name); } catch (e) {}
+                    clearTimeout(watchdog);
+                    if (!stepped && prog) { stepped = true; prog.step(); }
+                })());
             });
             await Promise.all(tasks);
         }
