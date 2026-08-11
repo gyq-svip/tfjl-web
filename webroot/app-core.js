@@ -19324,8 +19324,29 @@ ${maSection}
 
 
         // ==================== 拍卖管理入口 + GitHub API 用量（s1.0.110）====================
+        // s1.0.113：改用全屏 iframe 覆盖层加载 auction.html?admin=1，
+        // 规避 APP(Tauri WebView) 下 window.open 被吞导致"打不开"的问题；网页端同样适用。
         function openAuctionAdmin() {
-            window.open('auction.html?admin=1', '_blank');
+            let ov = document.getElementById('auctionAdminOverlay');
+            if (!ov) {
+                ov = document.createElement('div');
+                ov.id = 'auctionAdminOverlay';
+                ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.92);display:none;';
+                const close = document.createElement('button');
+                close.textContent = '×';
+                close.title = '关闭拍卖管理员';
+                close.style.cssText = 'position:absolute;top:12px;right:18px;background:transparent;border:none;color:#ff6b6b;font-size:2.2rem;cursor:pointer;z-index:2;line-height:1;';
+                close.onclick = () => { ov.style.display = 'none'; };
+                const frame = document.createElement('iframe');
+                frame.id = 'auctionAdminFrame';
+                frame.style.cssText = 'width:100%;height:100%;border:none;background:#1a1a2e;';
+                ov.appendChild(close);
+                ov.appendChild(frame);
+                document.body.appendChild(ov);
+            }
+            const f = document.getElementById('auctionAdminFrame');
+            if (f) f.src = 'auction.html?admin=1';
+            ov.style.display = 'flex';
         }
         window.openAuctionAdmin = openAuctionAdmin;
 
