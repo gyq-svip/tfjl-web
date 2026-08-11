@@ -309,45 +309,116 @@
 
         // 龙珠升星增幅表
         const DRAGON_STAR_DATA = [
-            { name: '绿色', color: '#4caf50', values: [0.2, 0.4, 0.6, 0.8, 1] },
-            { name: '蓝色', color: '#2196f3', values: [0.3, 0.6, 0.9, 1.2, 1.5] },
-            { name: '紫色', color: '#9c27b0', values: [0.6, 1.2, 1.8, 2.4, 3] },
-            { name: '金色', color: '#ffd700', values: [1.5, 3, 4.5, 6, 7.5] },
-            { name: '红色', color: '#ef4444', values: [3, 6, 9, 12, 15] }
+            { name: '绿色', color: '#4caf50', values: [0.2, 0.4, 0.6, 0.8, 1], initCost: '—', fullCost: '—', topCalc: 5, attrRange: '6.8~14' },
+            { name: '蓝色', color: '#2196f3', values: [0.3, 0.6, 0.9, 1.2, 1.5], initCost: '10~30 块', fullCost: '100~300', topCalc: 10, attrRange: '13~23.5' },
+            { name: '紫色', color: '#9c27b0', values: [0.6, 1.2, 1.8, 2.4, 3], initCost: '50~200 块', fullCost: '500~2000', topCalc: 20, attrRange: '25.4~47' },
+            { name: '金色', color: '#ffd700', values: [1.5, 3, 4.5, 6, 7.5], initCost: '300~1000 块', fullCost: '3000~10000', topCalc: 30, attrRange: '43.5~97.5' },
+            { name: '红色', color: '#ef4444', values: [3, 6, 9, 12, 15], initCost: '800~5000 块', fullCost: '8000~15000', topCalc: 50, attrRange: '87~185' }
         ];
+        // 5 档品质辅助色（普通→至臻）
+        const DRAGON_TIER_COLORS = ['#9e9e9e', '#8bc34a', '#2196f3', '#9c27b0', '#ffd700'];
 
         function renderDragonStarTable() {
             const c = document.getElementById('calcDragonContainer');
             if (!c) return;
             let html = '';
-            html += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
-                <span style="font-size:1.3rem;">🐉</span>
-                <span style="color:#ffd700;font-weight:bold;font-size:1rem;">龙珠升星增幅表</span>
+
+            // 标题区
+            html += `<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;padding:12px 14px;background:linear-gradient(135deg,rgba(255,107,107,0.15),rgba(255,215,0,0.15));border-radius:10px;border:1px solid rgba(255,215,0,0.25);box-shadow:0 2px 8px rgba(255,107,107,0.1);">
+                <div style="font-size:2rem;line-height:1;">🐉</div>
+                <div style="flex:1;">
+                    <div style="color:#ffd700;font-weight:bold;font-size:1.05rem;line-height:1.3;">龙珠升星增幅表</div>
+                    <div style="color:rgba(255,255,255,0.6);font-size:0.7rem;margin-top:4px;">不同品质龙珠的 5 档品质增幅 / 升星成本 / 属性区间</div>
+                </div>
             </div>`;
-            html += `<div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:12px;overflow-x:auto;">`;
-            html += `<table style="width:100%;border-collapse:collapse;font-size:0.82rem;color:rgba(255,255,255,0.85);">`;
-            html += `<tr style="border-bottom:1px solid rgba(255,255,255,0.15);">
-                <th style="text-align:left;padding:8px 6px;color:rgba(255,255,255,0.6);font-weight:600;">品质</th>
-                <th style="text-align:center;padding:8px 6px;color:rgba(255,255,255,0.6);font-weight:600;">1★</th>
-                <th style="text-align:center;padding:8px 6px;color:rgba(255,255,255,0.6);font-weight:600;">2★</th>
-                <th style="text-align:center;padding:8px 6px;color:rgba(255,255,255,0.6);font-weight:600;">3★</th>
-                <th style="text-align:center;padding:8px 6px;color:rgba(255,255,255,0.6);font-weight:600;">4★</th>
-                <th style="text-align:center;padding:8px 6px;color:rgba(255,255,255,0.6);font-weight:600;">5★</th>
-            </tr>`;
+
+            // 表格容器（横向滚动）
+            html += `<div style="overflow-x:auto;background:rgba(0,0,0,0.3);border-radius:10px;padding:5px;border:1px solid rgba(255,255,255,0.08);">`;
+            html += `<table style="width:100%;border-collapse:separate;border-spacing:0;font-size:0.78rem;min-width:620px;">`;
+
+            // 表头第一行（colspan 分组）
+            html += `<tr>`;
+            html += `<th rowspan="2" style="background:linear-gradient(180deg,#ffd70040,#ffd70015);padding:10px 6px;color:#ffd700;font-weight:700;font-size:0.85rem;border-right:2px solid rgba(255,215,0,0.4);border-bottom:2px solid rgba(255,215,0,0.4);">品质</th>`;
+            html += `<th colspan="5" style="background:linear-gradient(135deg,#ff6b6b30,#feca5730);padding:8px 4px;color:#fff;font-weight:700;font-size:0.82rem;border-bottom:2px solid rgba(255,107,107,0.4);border-right:1px solid rgba(255,255,255,0.1);">📈 增幅值</th>`;
+            html += `<th colspan="2" style="background:linear-gradient(135deg,#4caf5030,#2196f330);padding:8px 4px;color:#fff;font-weight:700;font-size:0.82rem;border-bottom:2px solid rgba(76,175,80,0.4);border-right:1px solid rgba(255,255,255,0.1);">💰 初始成本</th>`;
+            html += `<th colspan="2" style="background:linear-gradient(135deg,#9c27b030,#e91e6330);padding:8px 4px;color:#fff;font-weight:700;font-size:0.82rem;border-bottom:2px solid rgba(156,39,176,0.4);border-right:1px solid rgba(255,255,255,0.1);">💎 满星成本</th>`;
+            html += `<th rowspan="2" style="background:linear-gradient(180deg,#2196f340,#9c27b040);padding:10px 6px;color:#fff;font-weight:700;font-size:0.72rem;border-bottom:2px solid rgba(33,150,243,0.4);border-right:1px solid rgba(255,255,255,0.1);line-height:1.3;">⚡ 按顶<br>1星级</th>`;
+            html += `<th rowspan="2" style="background:linear-gradient(180deg,#ffd70040,#ef444440);padding:10px 6px;color:#fff;font-weight:700;font-size:0.72rem;border-bottom:2px solid rgba(255,215,0,0.4);line-height:1.3;">📊 区间<br>10星级</th>`;
+            html += `</tr>`;
+
+            // 表头第二行（子表头）
+            html += `<tr>`;
+            const tierNames = ['普通', '优良', '稀有', '完美', '至臻'];
+            tierNames.forEach(function (name, i) {
+                const bg = i === 4 ? 'background:rgba(255,215,0,0.18);' : 'background:rgba(255,255,255,0.05);';
+                html += `<th style="${bg}padding:6px 4px;color:${DRAGON_TIER_COLORS[i]};font-weight:${i === 4 ? '700' : '600'};font-size:0.74rem;border-right:1px solid rgba(255,255,255,0.08);">${name}</th>`;
+            });
+            html += `<th style="background:rgba(76,175,80,0.12);padding:6px 4px;color:rgba(255,255,255,0.8);font-weight:600;font-size:0.72rem;">1星</th>`;
+            html += `<th style="background:rgba(76,175,80,0.12);padding:6px 4px;color:rgba(255,255,255,0.8);font-weight:600;font-size:0.72rem;border-right:1px solid rgba(255,255,255,0.1);">5级</th>`;
+            html += `<th style="background:rgba(156,39,176,0.12);padding:6px 4px;color:rgba(255,255,255,0.8);font-weight:600;font-size:0.72rem;">10星</th>`;
+            html += `<th style="background:rgba(156,39,176,0.12);padding:6px 4px;color:rgba(255,255,255,0.8);font-weight:600;font-size:0.72rem;border-right:1px solid rgba(255,255,255,0.1);">50级</th>`;
+            html += `</tr>`;
+
+            // 数据行
             DRAGON_STAR_DATA.forEach(function (row, idx) {
-                const bg = idx % 2 === 0 ? 'rgba(255,255,255,0.03)' : 'transparent';
-                html += `<tr style="border-bottom:1px solid rgba(255,255,255,0.08);background:${bg};">
-                    <td style="padding:8px 6px;font-weight:bold;color:${row.color};white-space:nowrap;">● ${row.name}</td>`;
-                row.values.forEach(function (v) {
-                    html += `<td style="text-align:center;padding:8px 6px;color:#fff;font-weight:600;">${v}</td>`;
+                const rowBg = idx % 2 === 0 ? `${row.color}0d` : 'transparent';
+                const hoverBg = `${row.color}26`;
+                html += `<tr style="background:${rowBg};transition:background 0.2s;" onmouseover="this.style.background='${hoverBg}';" onmouseout="this.style.background='${rowBg}';">`;
+
+                // 品质列
+                html += `<td style="padding:8px 6px;text-align:center;border-right:2px solid ${row.color};border-bottom:1px solid rgba(255,255,255,0.05);background:${row.color}1a;">
+                    <div style="display:inline-flex;align-items:center;gap:6px;font-weight:bold;color:${row.color};font-size:0.88rem;padding:3px 6px;border-radius:6px;">
+                        <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${row.color};box-shadow:0 0 8px ${row.color};"></span>
+                        ${row.name}
+                    </div>
+                </td>`;
+
+                // 5 档品质数值
+                row.values.forEach(function (v, i) {
+                    const isMax = i === 4;
+                    const cellBg = isMax ? `background:linear-gradient(135deg,${row.color}40,${row.color}80);` : '';
+                    const border = isMax ? `border:1px solid ${row.color};border-radius:6px;` : '';
+                    html += `<td style="padding:7px 4px;text-align:center;color:${isMax ? row.color : '#fff'};font-weight:${isMax ? 'bold' : '600'};font-size:${isMax ? '0.95' : '0.84'}rem;${cellBg}${border}border-right:1px solid rgba(255,255,255,0.05);border-bottom:1px solid rgba(255,255,255,0.05);">
+                        ${v}
+                    </td>`;
                 });
+
+                // 初始成本（合并 1星 + 5级）
+                html += `<td colspan="2" style="padding:8px 4px;text-align:center;color:#ffd700;font-weight:600;font-size:0.8rem;border-right:1px solid rgba(255,255,255,0.1);border-bottom:1px solid rgba(255,255,255,0.05);background:rgba(255,215,0,0.06);">
+                    ${row.initCost}
+                </td>`;
+
+                // 满星成本（合并 10星 + 50级）
+                html += `<td colspan="2" style="padding:8px 4px;text-align:center;color:#ffd700;font-weight:600;font-size:0.8rem;border-right:1px solid rgba(255,255,255,0.1);border-bottom:1px solid rgba(255,255,255,0.05);background:rgba(255,215,0,0.09);">
+                    ${row.fullCost}
+                </td>`;
+
+                // 1星级标识
+                html += `<td style="padding:8px 4px;text-align:center;color:${row.color};font-weight:bold;font-size:1rem;border-right:1px solid rgba(255,255,255,0.05);border-bottom:1px solid rgba(255,255,255,0.05);background:rgba(255,255,255,0.04);">
+                    ${row.topCalc}
+                </td>`;
+
+                // 10星级区间
+                html += `<td style="padding:8px 4px;text-align:center;color:#fff;font-weight:600;font-size:0.8rem;border-bottom:1px solid rgba(255,255,255,0.05);background:rgba(255,255,255,0.04);">
+                    ${row.attrRange}
+                </td>`;
+
                 html += `</tr>`;
             });
+
             html += `</table></div>`;
-            html += `<div style="margin-top:10px;color:rgba(255,255,255,0.5);font-size:0.72rem;line-height:1.5;">
-                📌 数值为该品质龙珠在对应星级的增幅量。表格数据为静态参考，后续若游戏调整数值请反馈更新。<br>
-                🧑‍🏫 数据由 大佬：bi锋 提供，仅供计算参考。
+
+            // 底部说明卡片
+            html += `<div style="margin-top:14px;padding:12px 14px;background:linear-gradient(135deg,rgba(255,215,0,0.08),rgba(255,107,107,0.08));border-left:3px solid #ffd700;border-radius:8px;color:rgba(255,255,255,0.7);font-size:0.72rem;line-height:1.85;">
+                <div style="color:#ffd700;font-weight:bold;font-size:0.8rem;margin-bottom:6px;">📖 表格说明</div>
+                · <b>增幅值</b>：5 档品质（普通→至臻）对应数值，<span style="color:#ffd700;">至臻为该品质顶档</span><br>
+                · <b>初始成本</b>：升到 <span style="color:#4caf50;">1星 / 5级</span> 所需资源区间<br>
+                · <b>满星成本</b>：升到 <span style="color:#9c27b0;">10星 / 50级</span> 所需资源区间<br>
+                · <b>按顶计算</b>：1 星级状态下按顶档（至臻）计算的属性标识<br>
+                · <b>属性区间</b>：10 星级标识下的属性浮动区间（升星随机性）<br>
+                <span style="display:inline-block;margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.08);width:100%;">🧑‍🏫 数据由 <b style="color:#ffd700;">大佬：bi锋</b> 提供，仅供计算参考</span>
             </div>`;
+
             c.innerHTML = html;
         }
 
