@@ -14,8 +14,14 @@
   }
   console.log('[SKIN-WEB] 网页版皮肤系统初始化');
 
-  var REMOTE_SKIN_BASE = 'https://gyq-svip.github.io/tfjl-web/skins';
-  var REMOTE_SKIN_BASE_FALLBACK = 'https://gyq-svip.github.io/tfjl-web/skins';
+  // 多源皮肤加载（国内快）：jsDelivr(CDN，镜像 GitHub 仓库，无需 token，国内有节点) 优先，GitHub Pages 兜底。
+  // 网页端不能带 Gitee token（会泄露），故只用公开源；任一失败自动切下一个。
+  // 想加 Gitee raw 兜底：在数组追加 'https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/raw/<分支>/skins'
+  var SKIN_SOURCES = [
+    'https://cdn.jsdelivr.net/gh/gyq-svip/tfjl-web@main/skins',
+    'https://gyq-svip.github.io/tfjl-web/skins'
+  ];
+  var REMOTE_SKIN_BASE = SKIN_SOURCES[0];
   var REMOTE_SKIN_REGISTRY_URL = REMOTE_SKIN_BASE + '/registry.json';
   var REMOTE_SKIN_FUSIONS_URL = REMOTE_SKIN_BASE + '/fusions.json';
 
@@ -79,57 +85,84 @@
     } catch (e) { return false; }
   }
 
-  // 获取皮肤 blob URL（网页版：IndexedDB 优先，未命中则 fetch 并回写）
+  // 获取皮肤 blob URL（网页版：IndexedDB 优先，源无关缓存；未命中则按多源顺序 fetch 并回写）
   async function _getCachedSkinUrl(remoteUrl) {
     if (!remoteUrl) return null;
     if (!/^https?:\/\//i.test(remoteUrl)) return remoteUrl;
-    var key = 'skin:' + remoteUrl;
+    // 从 URL 解析 hero/file（与源无关），保证切换皮肤源后缓存仍命中、不重复下载
+    var m = remoteUrl.match(/\/skins\/([^/]+?)\/([^/]+)$/);
+    if (!m) return remoteUrl; // 非标准皮肤 URL，原样返回
+    var hero = decodeURIComponent(m[1]);
+    var file = decodeURIComponent(m[2]);
+    var key = 'skin:' + hero + '/' + file;
     var cached = await _idbGet(key);
     if (cached && cached.blob) {
       try { return URL.createObjectURL(cached.blob); }
       catch (e) { console.warn('[SKIN-WEB] createObjectURL failed:', e); }
     }
-    try {
-      var ctrl = new AbortController();
-      var _timer = setTimeout(function () { ctrl.abort(); }, 10000);
-      var resp;
-      try { resp = await fetch(remoteUrl, { cache: 'force-cache', signal: ctrl.signal }); }
-      catch (e) { clearTimeout(_timer); return remoteUrl; }
-      clearTimeout(_timer);
-      if (!resp.ok) return remoteUrl;
-      var blob = await resp.blob();
-      _idbPut(key, blob);
-      return URL.createObjectURL(blob);
-    } catch (e) {
-      console.warn('[SKIN-WEB] fetch skin failed:', remoteUrl, e);
-      return remoteUrl;
+    // 未命中：按 SKIN_SOURCES 顺序逐个尝试（jsDelivr → GitHub Pages），首个成功即缓存返回
+    for (var si = 0; si < SKIN_SOURCES.length; si++) {
+      var url = SKIN_SOURCES[si] + '/' + encodeURIComponent(hero) + '/' + encodeURIComponent(file);
+      try {
+        var ctrl = new AbortController();
+        var _timer = setTimeout(function () { ctrl.abort(); }, 12000);
+        var resp;
+        try { resp = await fetch(url, { cache: 'force-cache', signal: ctrl.signal }); }
+        catch (e) { clearTimeout(_timer); continue; }
+        clearTimeout(_timer);
+        if (!resp.ok) continue;
+        var blob = await resp.blob();
+        _idbPut(key, blob);
+        return URL.createObjectURL(blob);
+      } catch (e) {
+        console.warn('[SKIN-WEB] 皮肤源加载失败，尝试下一个:', url, e);
+      }
     }
+    return remoteUrl; // 全部源失败：退回原 URL，由浏览器自行处理
   }
 
-  // 后台批量预热（网页版：下载到 IndexedDB）
+  // 多源拉取 JSON（registry/fusions/attributes），任一源成功即返回 Response，全失败返回 null
+  async function _fetchJsonWithFallback(relPath) {
+    for (var si = 0; si < SKIN_SOURCES.length; si++) {
+      try {
+        var resp = await fetch(SKIN_SOURCES[si] + relPath, { cache: 'no-cache' });
+        if (resp.ok) return resp;
+      } catch (e) { /* 尝试下一个源 */ }
+    }
+    return null;
+  }
+
+  // 后台批量预热（网页版：下载到 IndexedDB）；并发上限 6，避免一次性几百请求砸源站
   var _preheatStarted = false;
   async function _preheatSkins(heroes) {
     if (_preheatStarted) return;
     _preheatStarted = true;
-    var count = 0;
     var heroNames = Object.keys(heroes || {});
     // 王城低配版英雄排前面优先预热
     heroNames.sort(function (a, b) {
       return (PRIORITY_HEROES.has(a) ? 0 : 1) - (PRIORITY_HEROES.has(b) ? 0 : 1);
     });
-    for (var hi = 0; hi < heroNames.length; hi++) {
-      var heroName = heroNames[hi];
+    var queue = [];
+    heroNames.forEach(function (heroName) {
       var skinList = heroes[heroName];
-      if (!Array.isArray(skinList)) continue;
-      for (var i = 0; i < skinList.length; i++) {
-        var s = skinList[i];
-        var url = REMOTE_SKIN_BASE + '/' + encodeURIComponent(heroName) + '/' + encodeURIComponent(s.file || (s.name + '.skin'));
-        _getCachedSkinUrl(url).catch(function () {});
-        count++;
-        if (count % 20 === 0) await new Promise(function (r) { setTimeout(r, 30); });
+      if (!Array.isArray(skinList)) return;
+      skinList.forEach(function (s) {
+        queue.push({ hero: heroName, file: s.file || (s.name + '.skin') });
+      });
+    });
+    var CONCURRENCY = 6;
+    var idx = 0;
+    async function worker() {
+      while (idx < queue.length) {
+        var item = queue[idx++];
+        var url = REMOTE_SKIN_BASE + '/' + encodeURIComponent(item.hero) + '/' + encodeURIComponent(item.file);
+        try { await _getCachedSkinUrl(url); } catch (e) {}
       }
     }
-    console.log('[SKIN-WEB] Preheat queued:', count, 'skins');
+    var workers = [];
+    for (var i = 0; i < CONCURRENCY; i++) workers.push(worker());
+    await Promise.all(workers);
+    console.log('[SKIN-WEB] Preheat done:', queue.length, 'skins (cache-first, concurrency=' + CONCURRENCY + ')');
   }
 
   // 从 GitHub Pages 拉取远程皮肤注册表
@@ -145,9 +178,9 @@
     _remoteSkinSynced = true;
     console.log('[SKIN-WEB] syncRemoteSkins() fetching registry from:', REMOTE_SKIN_REGISTRY_URL);
     try {
-      var resp = await fetch(REMOTE_SKIN_REGISTRY_URL, { cache: 'no-cache' });
-      if (!resp.ok) {
-        console.warn('[SKIN-WEB] Remote registry not found (HTTP ' + resp.status + '), skins disabled');
+      var resp = await _fetchJsonWithFallback('/registry.json');
+      if (!resp) {
+        console.warn('[SKIN-WEB] Remote registry 拉取失败（所有源均不可用），skins disabled');
         return;
       }
       var registry = await resp.json();
@@ -181,8 +214,8 @@
       if (addedCount > 0) console.log('[SKIN-WEB] added', addedCount, 'remote skins');
       // 拉取融合卡定义（云端 fusions.json，管理员维护）
       try {
-        var fResp = await fetch(REMOTE_SKIN_FUSIONS_URL, { cache: 'no-cache' });
-        if (fResp.ok) {
+        var fResp = await _fetchJsonWithFallback('/fusions.json');
+        if (fResp && fResp.ok) {
           var fData = await fResp.json();
           if (fData && fData.fusions) {
             window.cloudFusions = fData.fusions;
@@ -192,8 +225,8 @@
       } catch (fe) { console.warn('[SKIN-WEB] load fusions.json failed:', fe); }
       // 拉取皮肤属性表（云端 skin-attributes.json，管理员维护，随 git_push_skins 推送）
       try {
-        var aResp = await fetch(REMOTE_SKIN_BASE + '/skin-attributes.json', { cache: 'no-cache' });
-        if (aResp.ok) {
+        var aResp = await _fetchJsonWithFallback('/skin-attributes.json');
+        if (aResp && aResp.ok) {
           var aData = await aResp.json();
           window.skinAttributesCloud = aData || {};
           console.log('[SKIN-WEB] skin-attributes.json loaded, heroes:', Object.keys(aData || {}).length);
