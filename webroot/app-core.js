@@ -13092,9 +13092,19 @@ function hasGistToken() {
                 src.unique_users.forEach(id => { if (!target.unique_users.includes(id)) target.unique_users.push(id); });
             }
             target.total_users = target.unique_users ? target.unique_users.length : (target.total_users || 0);
+            // 🔴 今日活跃用户：同天取并集；跨天则以后写入的一方（active_date 较新）整组覆盖，
+            // 绝不可把"昨天"的活跃设备并入"今天"，否则每日重置失效、数值永久累积（表现为一直卡在某个数，且今日 visits=0 却显示几十个活跃用户）
             if (Array.isArray(src.active_today_users)) {
                 if (!Array.isArray(target.active_today_users)) target.active_today_users = [];
-                src.active_today_users.forEach(id => { if (!target.active_today_users.includes(id)) target.active_today_users.push(id); });
+                const _td = target.active_date, _sd = src.active_date;
+                if (_td && _sd && _td !== _sd) {
+                    const _srcNewer = _sd > _td;
+                    const _win = _srcNewer ? src : target;
+                    target.active_today_users = Array.isArray(_win.active_today_users) ? _win.active_today_users.slice() : [];
+                    target.active_date = _win.active_date;
+                } else {
+                    src.active_today_users.forEach(id => { if (!target.active_today_users.includes(id)) target.active_today_users.push(id); });
+                }
             }
             target.active_today = target.active_today_users ? target.active_today_users.length : (target.active_today || 0);
             // 🔴 script_downloads：并集 key + 每 key 取最大值（之前漏合并，是脚本下载统计莫名变空的真凶）
@@ -21128,7 +21138,13 @@ ${maSection}
             const totalVisits = data.total_visits || 0;
             const totalUsers = (data.unique_users || []).length;
             const todayStats = dailyStats[today] || { visits: 0, downloads: 0, new_users: 0, hourly_visits: new Array(24).fill(0) };
-            const activeToday = (data.active_today_users || []).length;
+            // 今日活跃用户：Gist 与本地实时取"同天并集"；若 Gist 的 active_date 不是今天（陈旧），
+            // 则直接以本地实时为准，避免展示被跨天并集污染/冻结的旧数据（如一直显示 97）
+            const _gistActive = (data && data.active_date === today && Array.isArray(data.active_today_users)) ? data.active_today_users : [];
+            const _localActive = (counterData && Array.isArray(counterData.active_today_users)) ? counterData.active_today_users : [];
+            const _activeSet = new Set(_gistActive);
+            _localActive.forEach(id => _activeSet.add(id));
+            const activeToday = _activeSet.size;
             const _onNow = Date.now();
             const _onTo = data.online_timeout || 1800000;
             let onlineCount = 0;
