@@ -8951,15 +8951,32 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         // 远程皮肤注册表加载完成后，为已上阵/手牌刷新皮肤
         async function refreshAllBattleSlotSkins() {
             const slots = document.querySelectorAll('.battle-slot.filled');
-            const jobs = [];
+            if (slots.length === 0) return;
+            // 按所属容器分两组，各自驱动一个进度条（我方 / 队友）
+            const groups = {};
             slots.forEach(slot => {
-                const name = getSlotCardName(slot);
-                if (!name) return;
-                jobs.push((async () => {
-                    try { await applySkinBgToSlot(slot, name); } catch (e) {}
-                })());
+                const container = slot.closest('.battle-slots-container');
+                const key = container ? (container.id || 'grp') : 'grp';
+                (groups[key] = groups[key] || []).push(slot);
             });
-            await Promise.all(jobs);
+            const tasks = [];
+            Object.keys(groups).forEach(function (key) {
+                const grpSlots = groups[key];
+                const container = grpSlots[0].closest('.battle-slots-container');
+                let prog = null;
+                if (typeof window.showSkinLoadProgress === 'function') {
+                    prog = window.showSkinLoadProgress(container, grpSlots.length, '🎨 出站皮肤加载中');
+                }
+                grpSlots.forEach(slot => {
+                    const name = getSlotCardName(slot);
+                    if (!name) { if (prog) prog.step(); return; }
+                    tasks.push((async () => {
+                        try { await applySkinBgToSlot(slot, name); } catch (e) {}
+                        if (prog) prog.step(); // 无论成功失败都推进，避免卡在 99%
+                    })());
+                });
+            });
+            await Promise.all(tasks);
         }
 
         window.reapplyAllSkins = async function() {
