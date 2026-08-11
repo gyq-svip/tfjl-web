@@ -19248,6 +19248,7 @@ ${maSection}
             const logStatsAdminPage2 = document.getElementById('adminPageLogStats');
             if (logStatsAdminPage2) logStatsAdminPage2.style.display = 'none';
             updateBroadcastToggleStatus();
+            adminRenderApiUsage();
         }
 
         function adminShowPage(page) {
@@ -19318,6 +19319,39 @@ ${maSection}
                 }
             }
         }
+
+
+        // ==================== 拍卖管理入口 + GitHub API 用量（s1.0.110）====================
+        function openAuctionAdmin() {
+            window.open('auction.html', '_blank');
+        }
+        window.openAuctionAdmin = openAuctionAdmin;
+
+        // 用 /rate_limit 端点（豁免配额，即使被限流也能查）实时显示 gyq-svip 账户 API 剩余量
+        async function adminRenderApiUsage() {
+            const valEl = document.getElementById('adminApiUsageVal');
+            const detailEl = document.getElementById('adminApiUsageDetail');
+            if (!valEl || !detailEl) return;
+            try {
+                const token = getGistToken();
+                const headers = { 'Accept': 'application/vnd.github.v3+json' };
+                if (token) headers['Authorization'] = 'token ' + token;
+                const resp = await fetch('https://api.github.com/rate_limit', { headers });
+                if (!resp.ok) { detailEl.textContent = '获取失败(' + resp.status + ')'; return; }
+                const data = await resp.json();
+                const core = data.resources && data.resources.core;
+                if (!core) { detailEl.textContent = '无数据'; return; }
+                const pct = core.limit ? Math.round(core.remaining / core.limit * 100) : 0;
+                const color = pct <= 10 ? '#ff6b6b' : (pct <= 30 ? '#ff9800' : '#4caf50');
+                valEl.innerHTML = '<span style="color:' + color + ';">' + core.remaining + ' / ' + core.limit + '</span>';
+                const resetMin = core.reset ? Math.max(0, Math.ceil((core.reset * 1000 - Date.now()) / 60000)) : 0;
+                const used = (core.used != null) ? core.used : (core.limit - core.remaining);
+                detailEl.textContent = '剩余 ' + pct + '% · 约 ' + resetMin + ' 分钟后重置 · 已用 ' + used + '（该查询不计配额）';
+            } catch (e) {
+                detailEl.textContent = '获取异常: ' + e.message;
+            }
+        }
+        window.adminRenderApiUsage = adminRenderApiUsage;
 
 
         // ==================== 对战日志诊断（管理员菜单） ====================
