@@ -19323,7 +19323,7 @@ ${maSection}
 
         // ==================== 拍卖管理入口 + GitHub API 用量（s1.0.110）====================
         function openAuctionAdmin() {
-            window.open('auction.html', '_blank');
+            window.open('auction.html?admin=1', '_blank');
         }
         window.openAuctionAdmin = openAuctionAdmin;
 

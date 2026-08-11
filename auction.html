@@ -8739,6 +8739,15 @@
             loadInitialData();
         }
 
+        // 从主站「拍卖管理员」入口带 ?admin=1 直达：跳过访问密码层，自动弹出管理员面板
+        const _adminDirect = new URLSearchParams(location.search).get('admin') === '1';
+        if (_adminDirect) {
+            document.getElementById('passwordOverlay').style.display = 'none';
+            document.getElementById('mainContent').classList.add('visible');
+            if (typeof loadInitialData === 'function') loadInitialData();
+            if (typeof openAdminPanel === 'function') openAdminPanel();
+        }
+
         // 设置管理员面板触发（长按标题）
         setupAdminTrigger();
 
