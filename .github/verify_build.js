@@ -21,6 +21,41 @@ let ok = true;
 const FAIL = (m) => { console.log('FAIL: ' + m); ok = false; };
 const PASS = (m) => console.log('PASS: ' + m);
 
+// ---------- 0) 临时脚本每日自动清理（铁律配套）----------
+// 规则：AI 新建的一次性脚本必须放 tfjl_temp/ 且命名 `YYYY-MM-DD_描述.ext`。
+// 每天第一次跑本校验时，自动删掉「日期早于今天」的那些文件，之后当天不再重复扫描。
+// 🔴 安全底线：只删带日期前缀的文件，不带前缀的历史文件/密钥/子目录一律不动。
+// 清理过程任何异常都不得影响校验结果（绝不因清理失败而 FAIL）。
+function dailyCleanTemp() {
+    try {
+        const dir = P('tfjl_temp');
+        if (!fs.existsSync(dir)) return; // CI 环境无此目录，直接跳过
+        const d = new Date();
+        const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        const stamp = path.join(dir, '.last-clean');
+        // 当天已清理过 → 跳过（实现"每天第一次打开清一次"）
+        if (fs.existsSync(stamp) && fs.readFileSync(stamp, 'utf8').trim() === today) return;
+
+        const DATED = /^(\d{4}-\d{2}-\d{2})[_-]/;
+        let removed = 0, legacy = 0;
+        for (const name of fs.readdirSync(dir)) {
+            if (name === '.last-clean') continue;
+            const full = path.join(dir, name);
+            let st;
+            try { st = fs.statSync(full); } catch (e) { continue; }
+            if (st.isDirectory()) continue;            // 子目录不动
+            const m = name.match(DATED);
+            if (!m) { legacy++; continue; }             // 无日期前缀 = 历史/用户文件，绝不删
+            if (m[1] >= today) continue;                // 今天及以后的保留
+            try { fs.unlinkSync(full); removed++; } catch (e) {}
+        }
+        fs.writeFileSync(stamp, today, 'utf8');
+        if (removed) console.log(`CLEAN: 已自动清理 ${removed} 个过期临时脚本（${today} 之前，tfjl_temp/）`);
+        if (legacy) console.log(`NOTE : tfjl_temp/ 还有 ${legacy} 个无日期前缀的历史文件未动（含密钥/草稿，需手动确认后再删）`);
+    } catch (e) { /* 清理失败绝不影响校验 */ }
+}
+dailyCleanTemp();
+
 // ---------- 1) HTML <div> 配对 ----------
 function checkDivPair(file) {
     if (!fs.existsSync(file)) { FAIL('缺少文件 ' + file); return; }
