@@ -383,6 +383,44 @@
   window.syncRemoteSkins = syncRemoteSkins;
   window._ensureSynced = _ensureSynced; // 供默认项目加载后兜底重刷融合皮肤（await 皮肤索引就绪）
 
+  // 🔴 皮肤加载进度条（s1.0.102）：让用户直观看到"已加载 X / 共 Y，剩余 Z"，判断是卡住还是正常加载中
+  // 用法：var p = window.showSkinLoadProgress(containerEl, total, '🎨 皮肤加载中');
+  //       p.step(); // 每完成一张调一次；自动更新文字与进度条，done===total 时淡出
+  //       p.fail(); // 异常时也能正确收尾
+  window.showSkinLoadProgress = function (containerEl, total, label) {
+    label = label || '🎨 皮肤加载中';
+    if (!containerEl) return { step: function () {}, fail: function () {} };
+    var bar = containerEl.querySelector(':scope > .skin-load-bar');
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.className = 'skin-load-bar';
+      bar.innerHTML = '<div class="skin-load-track"><div class="skin-load-fill"></div></div>' +
+                      '<div class="skin-load-text"></div>';
+      containerEl.insertBefore(bar, containerEl.firstChild);
+    }
+    var fill = bar.querySelector('.skin-load-fill');
+    var text = bar.querySelector('.skin-load-text');
+    var done = 0;
+    var finished = false;
+    function render() {
+      var pct = total > 0 ? Math.round((done / total) * 100) : 100;
+      fill.style.width = pct + '%';
+      var remain = Math.max(0, total - done);
+      text.textContent = label + ' ' + done + ' / ' + total + '（剩余 ' + remain + '）';
+      if (done >= total && !finished) {
+        finished = true;
+        text.textContent = '✅ 皮肤已就绪 ' + total + ' / ' + total;
+        setTimeout(function () { bar.classList.add('skin-load-hidden'); }, 600);
+      }
+    }
+    render();
+    return {
+      step: function () { done++; render(); },
+      fail: function () { done++; render(); }, // 失败也推进，避免进度卡死在 99%
+      setTotal: function (t) { total = t; render(); }
+    };
+  };
+
   // 启动：恢复已选皮肤并拉取远程皮肤注册表
   loadSkinSelections();
   _ensureSynced();

@@ -465,6 +465,38 @@
             width: 150px;
         }
 
+        /* 皮肤加载进度条（s1.0.102）：贴在槽位容器顶部，直观显示"已加载 X / 共 Y，剩余 Z" */
+        .skin-load-bar {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            margin-bottom: 4px;
+            transition: opacity .5s ease;
+        }
+        .skin-load-bar.skin-load-hidden { opacity: 0; pointer-events: none; }
+        .skin-load-track {
+            width: 100%;
+            height: 6px;
+            border-radius: 4px;
+            background: rgba(255,255,255,0.12);
+            overflow: hidden;
+        }
+        .skin-load-fill {
+            height: 100%;
+            width: 0%;
+            border-radius: 4px;
+            background: linear-gradient(90deg, #4fc3f7, #29b6f6);
+            transition: width .25s ease;
+        }
+        .skin-load-text {
+            font-size: 0.68rem;
+            line-height: 1.1;
+            color: rgba(255,255,255,0.75);
+            text-align: center;
+            white-space: nowrap;
+        }
+
         .battle-slots-container .engineering-slot {
             width: 72px;
             box-sizing: border-box;
