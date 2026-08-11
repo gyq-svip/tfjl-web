@@ -257,41 +257,70 @@
           smStatus('保存失败：'+smErrMsg(err)+'（若不在桌面App内，可用"下载PNG"拿到图片后交给我）',true);
         });
     }
-    // 新建英雄默认皮肤：生成纯色占位 .skin（内容即 PNG）并登记 registry，使新英雄在 UI 出现
+    // 新建英雄默认皮肤：s1.0.105 改为「兜底」策略——
+    //   ① 画布已上传真实立绘 → 直接保存为真实默认皮肤（标签留空=默认皮肤），绝不碰纯色占位；
+    //   ② 未上传立绘 且 该英雄已存在皮肤 → 不生成纯色占位，引导去上传真实立绘；
+    //   ③ 未上传立绘 且 该英雄一张皮肤都没有 → 才生成极简纯色块兜底占位（仅保证 UI 有占位）。
+    function smHasHeroSkin(hero, base){
+      return smInvoke('read_text_file_auto',{filePath:base+'\\registry.json'}).then(function(regText){
+        if(!regText) return false;
+        try{ var reg=JSON.parse(regText); return !!(reg&&reg.heroes&&reg.heroes[hero]&&reg.heroes[hero].length); }
+        catch(e){ return false; }
+      }).catch(function(){
+        // 读不到本地文件 → 回退内存 skinRegistry
+        return !!(window.skinRegistry && window.skinRegistry[hero] && window.skinRegistry[hero].length);
+      });
+    }
     function smCreateDefaultSkin(){
       var hero=document.getElementById('smHero').value.trim();
       if(!hero){ smStatus('请先填写「英雄名」再新建默认皮肤',true); return; }
       var base=document.getElementById('smBasePath').value.trim().replace(/[\\/]$/,'');
-      smStatus('生成默认皮肤中…');
-      var cv=document.createElement('canvas'); cv.width=206; cv.height=200;
-      var ctx=cv.getContext('2d');
-      ctx.fillStyle='#2a2a4a'; ctx.fillRect(0,0,206,200);
-      ctx.fillStyle='rgba(255,255,255,0.85)'; ctx.font='bold 16px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
-      ctx.fillText(hero, 103, 100);
-      ctx.font='11px sans-serif'; ctx.fillStyle='rgba(255,255,255,0.5)';
-      ctx.fillText('默认皮肤占位', 103, 124);
-      cv.toBlob(function(blob){
-        if(!blob){ smStatus('生成失败：浏览器不支持 toBlob',true); return; }
-        var fr=new FileReader();
-        fr.onload=function(){
-          var b64=(fr.result.split(',')[1]);
-          var fn=smGetInvoke();
-          if(!fn){ smStatus('当前环境无法写文件（需在桌面App内）。可手动在 skins/'+hero+'/ 放一张 '+hero+'.skin',true); return; }
-          fn('write_binary_file',{filePath:base+'\\'+hero+'\\'+hero+'.skin', contentBase64:b64})
-            .then(function(){ return smInvoke('read_text_file_auto',{filePath:base+'\\registry.json'}).catch(function(){ return null; }); })
-            .then(function(regText){
-              var reg=regText?JSON.parse(regText):{heroes:{}};
-              if(!reg.heroes) reg.heroes={};
-              if(!reg.heroes[hero]) reg.heroes[hero]=[];
-              if(!reg.heroes[hero].some(function(s){return s.name===hero;})){ reg.heroes[hero].push({name:hero, file:hero+'.skin'}); reg.updated=new Date().toISOString(); }
-              var regB64=btoa(unescape(encodeURIComponent(JSON.stringify(reg,null,2))));
-              return smInvoke('write_binary_file',{filePath:base+'\\registry.json', contentBase64:regB64});
-            })
-            .then(function(){ smStatus('✅ 已为「'+hero+'」生成默认皮肤占位并登记 registry\n点「🚀 一键推送」即可上线，之后可再上传正式皮肤图'); })
-            .catch(function(err){ smStatus('新建默认皮肤失败：'+smErrMsg(err),true); });
-        };
-        fr.readAsDataURL(blob);
-      },'image/png');
+      // ① 画布已加载真实立绘：直接当真实默认皮肤保存（标签留空=默认皮肤），不走纯色占位
+      if(smImg){
+        var lblEl=document.getElementById('smLabel');
+        var savedLbl=lblEl?lblEl.value:'';
+        if(lblEl) lblEl.value=''; // 临时置空=默认皮肤
+        smStatus('画布检测到真实立绘，直接保存为「'+hero+'」默认皮肤（真实图，非占位）…');
+        smSave();
+        if(lblEl) lblEl.value=savedLbl;
+        return;
+      }
+      // ②/③ 判断该英雄是否已在 registry 登记过皮肤（本地文件为准，回退内存）
+      smHasHeroSkin(hero, base).then(function(has){
+        if(has){
+          smStatus('⚠️ 「'+hero+'」已有默认/其他皮肤，无需纯色占位。请先选好透明立绘（滚轮缩放/拖拽），再点「💾 保存并登记」（标签留空=默认皮肤）上传真实图即可覆盖。',true);
+          return;
+        }
+        // ③ 真正一张都没有 → 极简纯色块兜底占位（仅保证 UI 有占位，不追求美观）
+        smStatus('生成默认皮肤占位中（极简纯色块，仅兜底）…');
+        var cv=document.createElement('canvas'); cv.width=206; cv.height=200;
+        var ctx=cv.getContext('2d');
+        ctx.fillStyle='#2a2a4a'; ctx.fillRect(0,0,206,200);
+        ctx.fillStyle='rgba(255,255,255,0.85)'; ctx.font='bold 16px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.fillText(hero, 103, 100);
+        cv.toBlob(function(blob){
+          if(!blob){ smStatus('生成失败：浏览器不支持 toBlob',true); return; }
+          var fr=new FileReader();
+          fr.onload=function(){
+            var b64=(fr.result.split(',')[1]);
+            var fn=smGetInvoke();
+            if(!fn){ smStatus('当前环境无法写文件（需在桌面App内）。可手动在 skins/'+hero+'/ 放一张 '+hero+'.skin',true); return; }
+            fn('write_binary_file',{filePath:base+'\\'+hero+'\\'+hero+'.skin', contentBase64:b64})
+              .then(function(){ return smInvoke('read_text_file_auto',{filePath:base+'\\registry.json'}).catch(function(){ return null; }); })
+              .then(function(regText){
+                var reg=regText?JSON.parse(regText):{heroes:{}};
+                if(!reg.heroes) reg.heroes={};
+                if(!reg.heroes[hero]) reg.heroes[hero]=[];
+                if(!reg.heroes[hero].some(function(s){return s.name===hero;})){ reg.heroes[hero].push({name:hero, file:hero+'.skin'}); reg.updated=new Date().toISOString(); }
+                var regB64=btoa(unescape(encodeURIComponent(JSON.stringify(reg,null,2))));
+                return smInvoke('write_binary_file',{filePath:base+'\\registry.json', contentBase64:regB64});
+              })
+              .then(function(){ smStatus('✅ 已为「'+hero+'」生成极简纯色兜底占位并登记 registry\n（建议随后上传真实立绘，用「💾 保存并登记」覆盖此占位）'); })
+              .catch(function(err){ smStatus('新建默认皮肤失败：'+smErrMsg(err),true); });
+          };
+          fr.readAsDataURL(blob);
+        },'image/png');
+      });
     }
     function smPush(){
       var fn=smGetInvoke();
