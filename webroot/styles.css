@@ -356,6 +356,7 @@
 
         .hands-area {
             display: flex;
+            flex-wrap: wrap;
             justify-content: center;
             align-items: flex-start;
             gap: 30px;
@@ -364,6 +365,12 @@
             max-width: 950px;
             margin-left: auto;
             margin-right: auto;
+        }
+        /* 🔴 s1.0.104：皮肤进度条挂在 .hands-area 顶部，独占整行（不挤占手牌列、不窜位） */
+        .hands-area > .skin-load-bar {
+            flex: 0 0 100%;
+            max-width: 920px;
+            margin: 0 auto 2px;
         }
 
         .battle-column {
