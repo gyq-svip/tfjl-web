@@ -310,10 +310,10 @@
         // 龙珠升星增幅表
         const DRAGON_STAR_DATA = [
             { name: '绿色', color: '#4caf50', values: [0.2, 0.4, 0.6, 0.8, 1], initCost: '—', fullCost: '—', topCalc: 5, attrRange: '6.8~14' },
-            { name: '蓝色', color: '#2196f3', values: [0.3, 0.6, 0.9, 1.2, 1.5], initCost: '10~30 块', fullCost: '100~300', topCalc: 10, attrRange: '13~23.5' },
-            { name: '紫色', color: '#9c27b0', values: [0.6, 1.2, 1.8, 2.4, 3], initCost: '50~200 块', fullCost: '500~2000', topCalc: 20, attrRange: '25.4~47' },
-            { name: '金色', color: '#ffd700', values: [1.5, 3, 4.5, 6, 7.5], initCost: '300~1000 块', fullCost: '3000~10000', topCalc: 30, attrRange: '43.5~97.5' },
-            { name: '红色', color: '#ef4444', values: [3, 6, 9, 12, 15], initCost: '800~5000 块', fullCost: '8000~15000', topCalc: 50, attrRange: '87~185' }
+            { name: '蓝色', color: '#2196f3', values: [0.3, 0.6, 0.9, 1.2, 1.5], initCost: '10~30 元', fullCost: '100~300 元', topCalc: 10, attrRange: '13~23.5' },
+            { name: '紫色', color: '#9c27b0', values: [0.6, 1.2, 1.8, 2.4, 3], initCost: '50~200 元', fullCost: '500~2000 元', topCalc: 20, attrRange: '25.4~47' },
+            { name: '金色', color: '#ffd700', values: [1.5, 3, 4.5, 6, 7.5], initCost: '300~1000 元', fullCost: '3000~10000 元', topCalc: 30, attrRange: '43.5~97.5' },
+            { name: '红色', color: '#ef4444', values: [3, 6, 9, 12, 15], initCost: '800~5000 元', fullCost: '8000~15000 元', topCalc: 50, attrRange: '87~185' }
         ];
         // 5 档品质辅助色（普通→至臻）
         const DRAGON_TIER_COLORS = ['#9e9e9e', '#8bc34a', '#2196f3', '#9c27b0', '#ffd700'];
@@ -354,9 +354,9 @@
                 html += `<th style="${bg}padding:6px 4px;color:${DRAGON_TIER_COLORS[i]};font-weight:${i === 4 ? '700' : '600'};font-size:0.74rem;border-right:1px solid rgba(255,255,255,0.08);">${name}</th>`;
             });
             html += `<th style="background:rgba(76,175,80,0.12);padding:6px 4px;color:rgba(255,255,255,0.8);font-weight:600;font-size:0.72rem;">1星</th>`;
-            html += `<th style="background:rgba(76,175,80,0.12);padding:6px 4px;color:rgba(255,255,255,0.8);font-weight:600;font-size:0.72rem;border-right:1px solid rgba(255,255,255,0.1);">5级</th>`;
+            html += `<th style="background:rgba(76,175,80,0.12);padding:6px 4px;color:rgba(255,255,255,0.8);font-weight:600;font-size:0.72rem;border-right:1px solid rgba(255,255,255,0.1);">5元</th>`;
             html += `<th style="background:rgba(156,39,176,0.12);padding:6px 4px;color:rgba(255,255,255,0.8);font-weight:600;font-size:0.72rem;">10星</th>`;
-            html += `<th style="background:rgba(156,39,176,0.12);padding:6px 4px;color:rgba(255,255,255,0.8);font-weight:600;font-size:0.72rem;border-right:1px solid rgba(255,255,255,0.1);">50级</th>`;
+            html += `<th style="background:rgba(156,39,176,0.12);padding:6px 4px;color:rgba(255,255,255,0.8);font-weight:600;font-size:0.72rem;border-right:1px solid rgba(255,255,255,0.1);">50元</th>`;
             html += `</tr>`;
 
             // 数据行
@@ -412,8 +412,8 @@
             html += `<div style="margin-top:14px;padding:12px 14px;background:linear-gradient(135deg,rgba(255,215,0,0.08),rgba(255,107,107,0.08));border-left:3px solid #ffd700;border-radius:8px;color:rgba(255,255,255,0.7);font-size:0.72rem;line-height:1.85;">
                 <div style="color:#ffd700;font-weight:bold;font-size:0.8rem;margin-bottom:6px;">📖 表格说明</div>
                 · <b>增幅值</b>：5 档品质（普通→至臻）对应数值，<span style="color:#ffd700;">至臻为该品质顶档</span><br>
-                · <b>初始成本</b>：升到 <span style="color:#4caf50;">1星 / 5级</span> 所需资源区间<br>
-                · <b>满星成本</b>：升到 <span style="color:#9c27b0;">10星 / 50级</span> 所需资源区间<br>
+                · <b>初始成本</b>：升到 <span style="color:#4caf50;">1星 / 5元</span> 所需资源区间<br>
+                · <b>满星成本</b>：升到 <span style="color:#9c27b0;">10星 / 50元</span> 所需资源区间<br>
                 · <b>按顶计算</b>：1 星级状态下按顶档（至臻）计算的属性标识<br>
                 · <b>属性区间</b>：10 星级标识下的属性浮动区间（升星随机性）<br>
                 <span style="display:inline-block;margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.08);width:100%;">🧑‍🏫 数据由 <b style="color:#ffd700;">大佬：bi锋</b> 提供，仅供计算参考</span>
