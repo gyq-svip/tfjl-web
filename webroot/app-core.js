@@ -15527,6 +15527,14 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             const info = { type: 'unknown', typeLabel: '⚪ 未知', typeColor: '#999', status: 'unknown', statusLabel: '⚪ 未知', statusColor: '#999', fileName: '', fileSize: 0, description: gist.description || '' };
             const files = Object.keys(gist.files || {}); if (files.length) { info.fileName = files[0]; info.fileSize = gist.files[files[0]].size || 0; }
             const desc = gist.description || '';
+            // 🔴 s1.0.109：备份类最高优先级、且永不判孤儿。备份是有用数据（需求墙数据备份），
+            // 不能因 description 里夹带「脚本分享/需求墙消息」等字样而误判成脚本/消息孤儿被误删。
+            // 命中条件：description 含「需求墙数据备份」或「备份」字样即归为 backup，强制 active。
+            if (desc.includes('需求墙数据备份') || desc.includes('备份')) {
+                info.type = 'backup'; info.typeLabel = '💾 备份'; info.typeColor = '#a78bfa';
+                info.status = 'active'; info.statusLabel = '🟢 备份'; info.statusColor = '#4caf50';
+                return info;
+            }
             if (desc.includes('脚本分享')) {
                 info.type = 'script'; info.typeLabel = '📜 脚本'; info.typeColor = '#ff9800';
                 const m = desc.match(/脚本分享:\s*(.+)/); if (m) info.fileName = m[1].trim();
@@ -15535,8 +15543,6 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             } else if (desc.includes('需求墙消息')) {
                 info.type = 'message'; info.typeLabel = '📢 消息'; info.typeColor = '#2196f3';
                 if (currentMsgId && gist.id === currentMsgId) { info.status = 'current'; info.statusLabel = '🟢 当前使用'; info.statusColor = '#4caf50'; } else { info.status = 'orphan'; info.statusLabel = '🔴 孤儿'; info.statusColor = '#ff6b6b'; }
-            } else if (desc.includes('需求墙数据备份')) {
-                info.type = 'backup'; info.typeLabel = '💾 备份'; info.typeColor = '#a78bfa'; info.status = 'active'; info.statusLabel = '🟢 备份'; info.statusColor = '#4caf50';
             } else if (desc.includes('拍卖图片')) {
                 info.type = 'image'; info.typeLabel = '🖼️ 图片'; info.typeColor = '#9c27b0'; info.status = 'unknown'; info.statusLabel = '⚪ 图片'; info.statusColor = '#999';
             }
