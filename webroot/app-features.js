@@ -245,9 +245,9 @@
             }
         }
 
-        // 顶层 Tab：新活动 / 旧活动 / Boss减伤
+        // 顶层 Tab：新活动 / 旧活动 / Boss减伤 / 龙珠升星
         function switchCalcTopTab(tab) {
-            const isNew = tab === 'new', isOld = tab === 'old', isBoss = tab === 'boss';
+            const isNew = tab === 'new', isOld = tab === 'old', isBoss = tab === 'boss', isDragon = tab === 'dragon';
             const body = document.getElementById('calcPanelBody');
             // 始终显示 calcPanelBody（内含顶层 Tab 按钮栏），否则切到 Boss 后切换按钮也被隐藏，无法返回
             if (body) body.style.display = 'block';
@@ -255,7 +255,9 @@
             if (boss) boss.style.display = isBoss ? 'block' : 'none';
             document.getElementById('calcNewContainer').style.display = isNew ? 'block' : 'none';
             document.getElementById('calcOldContainer').style.display = isOld ? 'block' : 'none';
-            const defs = [['calcTopNew', isNew], ['calcTopOld', isOld], ['calcTopBoss', isBoss]];
+            const dragon = document.getElementById('calcDragonContainer');
+            if (dragon) dragon.style.display = isDragon ? 'block' : 'none';
+            const defs = [['calcTopNew', isNew], ['calcTopOld', isOld], ['calcTopBoss', isBoss], ['calcTopDragon', isDragon]];
             defs.forEach(function (d) {
                 const b = document.getElementById(d[0]); if (!b) return;
                 if (d[1]) { b.style.background = 'linear-gradient(135deg,#4caf50,#2e7d32)'; b.style.color = 'white'; }
@@ -264,6 +266,7 @@
             if (isNew) { switchNewCalcTab('target'); }
             else if (isOld) { renderCalcSkins(); updateCalcSummary(); switchOldCalcTab('skins'); }
             else if (isBoss) { if (window.renderBossRed) renderBossRed(); }
+            else if (isDragon) { renderDragonStarTable(); }
         }
 
 
@@ -302,6 +305,50 @@
                     btn.style.color = 'rgba(255,255,255,0.7)';
                 }
             });
+        }
+
+        // 龙珠升星增幅表
+        const DRAGON_STAR_DATA = [
+            { name: '绿色', color: '#4caf50', values: [0.2, 0.4, 0.6, 0.8, 1] },
+            { name: '蓝色', color: '#2196f3', values: [0.3, 0.6, 0.9, 1.2, 1.5] },
+            { name: '紫色', color: '#9c27b0', values: [0.6, 1.2, 1.8, 2.4, 3] },
+            { name: '金色', color: '#ffd700', values: [1.5, 3, 4.5, 6, 7.5] },
+            { name: '红色', color: '#ef4444', values: [3, 6, 9, 12, 15] }
+        ];
+
+        function renderDragonStarTable() {
+            const c = document.getElementById('calcDragonContainer');
+            if (!c) return;
+            let html = '';
+            html += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+                <span style="font-size:1.3rem;">🐉</span>
+                <span style="color:#ffd700;font-weight:bold;font-size:1rem;">龙珠升星增幅表</span>
+            </div>`;
+            html += `<div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:12px;overflow-x:auto;">`;
+            html += `<table style="width:100%;border-collapse:collapse;font-size:0.82rem;color:rgba(255,255,255,0.85);">`;
+            html += `<tr style="border-bottom:1px solid rgba(255,255,255,0.15);">
+                <th style="text-align:left;padding:8px 6px;color:rgba(255,255,255,0.6);font-weight:600;">品质</th>
+                <th style="text-align:center;padding:8px 6px;color:rgba(255,255,255,0.6);font-weight:600;">1★</th>
+                <th style="text-align:center;padding:8px 6px;color:rgba(255,255,255,0.6);font-weight:600;">2★</th>
+                <th style="text-align:center;padding:8px 6px;color:rgba(255,255,255,0.6);font-weight:600;">3★</th>
+                <th style="text-align:center;padding:8px 6px;color:rgba(255,255,255,0.6);font-weight:600;">4★</th>
+                <th style="text-align:center;padding:8px 6px;color:rgba(255,255,255,0.6);font-weight:600;">5★</th>
+            </tr>`;
+            DRAGON_STAR_DATA.forEach(function (row, idx) {
+                const bg = idx % 2 === 0 ? 'rgba(255,255,255,0.03)' : 'transparent';
+                html += `<tr style="border-bottom:1px solid rgba(255,255,255,0.08);background:${bg};">
+                    <td style="padding:8px 6px;font-weight:bold;color:${row.color};white-space:nowrap;">● ${row.name}</td>`;
+                row.values.forEach(function (v) {
+                    html += `<td style="text-align:center;padding:8px 6px;color:#fff;font-weight:600;">${v}</td>`;
+                });
+                html += `</tr>`;
+            });
+            html += `</table></div>`;
+            html += `<div style="margin-top:10px;color:rgba(255,255,255,0.5);font-size:0.72rem;line-height:1.5;">
+                📌 数值为该品质龙珠在对应星级的增幅量。表格数据为静态参考，后续若游戏调整数值请反馈更新。<br>
+                🧑‍🏫 数据由 大佬：bi锋 提供，仅供计算参考。
+            </div>`;
+            c.innerHTML = html;
         }
 
         function renderCalcSkins() {
