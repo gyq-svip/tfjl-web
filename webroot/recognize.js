@@ -661,9 +661,11 @@
         <div id="recUmiTip" style="display:none;font-size:0.78rem;margin-bottom:10px;padding:7px 10px;border-radius:8px;line-height:1.5;"></div>
         <div style="display:flex;gap:14px;flex-wrap:wrap;">
           <div style="flex:1;min-width:280px;">
-            <div style="margin-bottom:8px;">
-              <input type="file" id="recFile" accept="image/*" style="color:#ccc;font-size:0.8rem;">
-              <span style="font-size:0.75rem;color:#90a4ae;"> 也可直接 Ctrl+V 粘贴截图</span>
+            <div style="margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <input type="file" id="recFile" accept="image/*" style="display:none;">
+              <button id="recPickFile" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.28);color:#fff;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:0.8rem;">📁 选择阵容图片</button>
+              <span id="recFileName" style="font-size:0.78rem;color:#90a4ae;">未选择阵容图片</span>
+              <span style="font-size:0.75rem;color:#90a4ae;">｜也可直接 Ctrl+V 粘贴截图</span>
             </div>
             <canvas id="recCanvas" style="width:100%;max-height:46vh;background:#000;border-radius:8px;display:block;"></canvas>
             <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
@@ -678,6 +680,18 @@
           </div>
           <div style="flex:1;min-width:280px;overflow:auto;max-height:60vh;">
             <div id="recWarn" style="display:none;font-size:0.78rem;color:#ffb74d;background:rgba(255,167,38,0.15);padding:6px 10px;border-radius:8px;margin-bottom:8px;line-height:1.5;"></div>
+            <div id="recIntro" style="font-size:0.82rem;line-height:1.75;color:#cfd8dc;background:rgba(66,165,245,0.10);border:1px solid rgba(66,165,245,0.28);border-radius:10px;padding:12px 14px;">
+              <div style="font-weight:700;color:#90caf9;margin-bottom:8px;font-size:0.9rem;">📖 使用说明（识别结果会显示在这里）</div>
+              <div style="margin-bottom:4px;"><b style="color:#fff;">① 取图</b>：游戏里截下<b>卡组阵容图</b>，直接 <b style="color:#ffd54f;">Ctrl+V 粘贴</b>到左侧黑框内，或点「📁 选择阵容图片」。</div>
+              <div style="margin-bottom:4px;"><b style="color:#fff;">② 识别</b>：点绿色「⚡ 自动识别(无需对齐)」，稍等片刻，10 张英雄卡会逐行列在此处。</div>
+              <div style="margin-bottom:4px;"><b style="color:#fff;">③ 用结果（任选其一，或都用）</b>：</div>
+              <div style="padding-left:14px;margin-bottom:2px;">• 「➡ 填入脚本生成」→ 直接生成上阵脚本；</div>
+              <div style="padding-left:14px;margin-bottom:8px;">• 「🃏 导入到手牌」→ 放进阵容手牌（可选我的/队友、指定项目）。</div>
+              <div style="color:#9fb3c8;">识别错/多出来的行，点该行「✕ 删」去掉再使用即可。</div>
+              <div style="margin-top:10px;padding-top:9px;border-top:1px dashed rgba(255,255,255,0.18);color:#ffb74d;">
+                ⏳ <b>第一次打开会自动安装识别引擎，稍慢一些，仅此一次</b>；每台电脑性能不同，快慢有差异，请耐心等待，装好后以后打开就快了。
+              </div>
+            </div>
             <table style="width:100%;border-collapse:collapse;font-size:0.8rem;">
               <thead><tr style="text-align:left;color:#90caf9;">
                 <th style="padding:4px;">#</th><th>OCR原文</th><th>英雄</th><th>校验(100库)</th><th>操作</th>
@@ -707,11 +721,16 @@
       };
       fr.readAsDataURL(file);
     };
-    $('recFile').onchange = (e)=>{ if(e.target.files[0]) loadImg(e.target.files[0]); };
+    const recPickBtn = $('recPickFile');
+    if(recPickBtn) recPickBtn.onclick = ()=> $('recFile').click();
+    $('recFile').onchange = (e)=>{
+      const f = e.target.files[0];
+      if(f){ loadImg(f); const n=$('recFileName'); if(n){ n.textContent = '已选：'+f.name; n.style.color = '#81c784'; } }
+    };
     document.addEventListener('paste', (e)=>{
       if(overlay.style.display==='none') return;
       const it = e.clipboardData && e.clipboardData.items && [...e.clipboardData.items].find(i=>i.type&&i.type.startsWith('image/'));
-      if(it){ const f=it.getAsFile(); if(f){ e.preventDefault(); loadImg(f); } }
+      if(it){ const f=it.getAsFile(); if(f){ e.preventDefault(); loadImg(f); const n=$('recFileName'); if(n){ n.textContent='已粘贴截图'; n.style.color='#81c784'; } } }
     });
     // 超量识别（>10）提示：有人把卡组名叫英雄名会多识别，需手动删多余卡
     function updateRecWarn(results){
@@ -729,6 +748,7 @@
     $('recAuto').onclick = ()=>{
       autoRecognize(currentImg, $('recCanvas'), $('recStatus'), (results, source, rowCount)=>{
         $('recSrc').textContent = '来源: '+source;
+        const intro = $('recIntro'); if(intro && results && results.length) intro.style.display = 'none';
         const tb = $('recBody'); tb.innerHTML='';
         results.forEach(r=>{
           r._deleted = false;
@@ -996,7 +1016,13 @@
     if(recInstallBtn) recInstallBtn.onclick = ()=> downloadAndInstallUmi($('recUmiTip'));
   }
 
-  function openModal(){ const o=$('recognizeOverlay'); if(o) o.style.display='flex'; initUmiOnOpen(); }
+  function openModal(){
+    const o=$('recognizeOverlay'); if(o) o.style.display='flex';
+    // 结果区还没内容时，始终显示使用说明（很多人不会用）
+    const tb=$('recBody'), intro=$('recIntro');
+    if(intro && (!tb || !tb.children.length)) intro.style.display='block';
+    initUmiOnOpen();
+  }
 
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', buildUI);
   else buildUI();
