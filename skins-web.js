@@ -132,11 +132,16 @@
     return null;
   }
 
-  // 后台批量预热（网页版：下载到 IndexedDB）；并发上限 6，避免一次性几百请求砸源站
+  // 后台批量预热（网页版：仅下载到 IndexedDB 缓存，绝不参与首屏渲染阻塞）
+  // 设计原则（s1.0.101 修正「越改越慢」回归）：
+  //  - 全量 410 张预热改为「低并发(3)、可被打断、fire-and-forget」，注册表同步后异步启动，不 await；
+  //  - 首屏渲染只依赖「注册表索引」就绪（_ensureSynced 不等预热），卡片取皮走缓存/按需拉单张；
+  //  - 真正阻塞首屏的是「预热洪流挤占源站带宽」——故预热必须低压、可让路。
   var _preheatStarted = false;
-  async function _preheatSkins(heroes) {
-    if (_preheatStarted) return;
-    _preheatStarted = true;
+  var _preheatAbort = false;
+  async function _preheatSkins(heroes, opts) {
+    opts = opts || {};
+    var concurrency = opts.concurrency || 3;
     var heroNames = Object.keys(heroes || {});
     // 王城低配版英雄排前面优先预热
     heroNames.sort(function (a, b) {
@@ -150,19 +155,43 @@
         queue.push({ hero: heroName, file: s.file || (s.name + '.skin') });
       });
     });
-    var CONCURRENCY = 6;
     var idx = 0;
     async function worker() {
       while (idx < queue.length) {
+        if (_preheatAbort) return; // 用户关页/重刷：立即放弃，不再占用源站
         var item = queue[idx++];
         var url = REMOTE_SKIN_BASE + '/' + encodeURIComponent(item.hero) + '/' + encodeURIComponent(item.file);
         try { await _getCachedSkinUrl(url); } catch (e) {}
       }
     }
     var workers = [];
-    for (var i = 0; i < CONCURRENCY; i++) workers.push(worker());
+    for (var i = 0; i < concurrency; i++) workers.push(worker());
     await Promise.all(workers);
-    console.log('[SKIN-WEB] Preheat done:', queue.length, 'skins (cache-first, concurrency=' + CONCURRENCY + ')');
+    console.log('[SKIN-WEB] Preheat done:', queue.length, 'skins (cache-first, concurrency=' + concurrency + ')');
+  }
+
+  // 首屏可见卡片优先预热（只拉当前项目/手牌/槽位实际用到的英雄皮肤，不等全量）
+  var _preheatVisibleStarted = false;
+  function _preheatVisibleSkins() {
+    if (_preheatVisibleStarted) return;
+    _preheatVisibleStarted = true;
+    try {
+      var heroes = {};
+      // 收集当前所有可见英雄（卡池 + 手牌 + 槽位）
+      var names = {};
+      document.querySelectorAll('.card-item, .selected-card, .battle-slot').forEach(function (el) {
+        var n = el.dataset && (el.dataset.name || el.dataset.hero);
+        if (!n) return;
+        var base = getBaseHeroName(n).heroName || n;
+        if (base) names[base] = true;
+      });
+      Object.keys(names).forEach(function (hn) {
+        var list = window.skinRegistry[hn];
+        if (Array.isArray(list)) heroes[hn] = list;
+      });
+      if (Object.keys(heroes).length === 0) return;
+      _preheatSkins(heroes, { concurrency: 4 }); // 可见优先，稍高并发
+    } catch (e) { console.warn('[SKIN-WEB] preheat visible failed:', e); }
   }
 
   // 从 GitHub Pages 拉取远程皮肤注册表
@@ -212,6 +241,15 @@
         }
       }
       if (addedCount > 0) console.log('[SKIN-WEB] added', addedCount, 'remote skins');
+      // 🔴 s1.0.101 关键修正：预热「绝不 await」——注册表索引就绪即代表 sync 完成，
+      // 首屏渲染（resolveHeroSkinInfo）只依赖索引，不再被 410 张全量预热拖死。
+      // 全量预热改为后台 fire-and-forget；可见卡片预热立刻触发（优先填充当前屏幕）。
+      setTimeout(function () {
+        try {
+          _preheatVisibleSkins();                                   // 先补当前可见英雄
+          _preheatSkins(registry.heroes, { concurrency: 3 });        // 再低压后台补全量缓存
+        } catch (e) {}
+      }, 0);
       // 拉取融合卡定义（云端 fusions.json，管理员维护）
       try {
         var fResp = await _fetchJsonWithFallback('/fusions.json');
@@ -353,6 +391,7 @@
     window.addEventListener('load', function () {
       setTimeout(function () {
         try { if (typeof window.reapplyAllSkins === 'function') window.reapplyAllSkins(); } catch (e) {}
+        try { _preheatVisibleSkins(); } catch (e) {} // 首屏渲染完，补当前可见英雄皮肤缓存
       }, 1200);
     });
   }
