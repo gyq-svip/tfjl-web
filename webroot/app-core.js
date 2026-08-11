@@ -14561,8 +14561,8 @@ function hasGistToken() {
                 } catch (e) { resolve(); }
             });
         }
-        // 云端备份 Gist（与主 Gist 独立，主 Gist 被删时重建先从此恢复）。初始为空，运行时首个已登录用户保存即创建并记录到 localStorage
-        const MESSAGES_BACKUP_GIST_ID = '36a871e70faf95cd86641a7080952192';
+        // 云端备份 Gist（与主 Gist 独立，主 Gist 被删时重建先从此恢复）。真实固定 id 见 room_index.json 的 backup 字段（s1.0.113 重建：原 36a871e7 已消失）
+        const MESSAGES_BACKUP_GIST_ID = 'f13f1f2a054e96bdcaaa418264b92174';
         async function backupWallMessages(arr) {
             try {
                 const token = getGistToken();
