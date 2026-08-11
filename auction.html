@@ -1142,7 +1142,6 @@
                         <button onclick="auctionRestoreBackup('all')" style="flex:1;min-width:120px;padding:10px;border-radius:6px;border:none;background:linear-gradient(135deg,#f97316,#ea580c);color:white;cursor:pointer;font-size:0.85rem;">🔄 还原全部</button>
                         <button onclick="auctionRestoreBackup('index')" style="flex:1;min-width:120px;padding:10px;border-radius:6px;border:none;background:linear-gradient(135deg,#f97316,#ea580c);color:white;cursor:pointer;font-size:0.85rem;">📋 还原索引</button>
                         <button onclick="auctionRestoreBackup('messages')" style="flex:1;min-width:120px;padding:10px;border-radius:6px;border:none;background:linear-gradient(135deg,#f97316,#ea580c);color:white;cursor:pointer;font-size:0.85rem;">📢 还原消息</button>
-                        <button onclick="auctionRestoreBackup('scripts')" style="flex:1;min-width:120px;padding:10px;border-radius:6px;border:none;background:linear-gradient(135deg,#f97316,#ea580c);color:white;cursor:pointer;font-size:0.85rem;">📜 还原脚本</button>
                         <button onclick="auctionRestoreBackup('stats')" style="flex:1;min-width:120px;padding:10px;border-radius:6px;border:none;background:linear-gradient(135deg,#f97316,#ea580c);color:white;cursor:pointer;font-size:0.85rem;">📊 还原统计</button>
                     </div>
                 </div>
@@ -5541,22 +5540,9 @@
                     backupFiles[`content_stats_${ts}.json`] = { content: JSON.stringify(statsData, null, 2) };
                 }
 
-                // 5. 脚本文件（每个脚本单独一个文件）
-                auctionShowBackupStatus('⏳ 正在备份脚本文件...', 'loading');
-                const scripts = await auctionFetchScriptsForBackup();
-                const scriptsRef = [];
-                for (const script of scripts) {
-                    const safeName = script.fileName.replace(/[^a-zA-Z0-9_\-.]/g, '_');
-                    backupFiles[`content_script_${safeName}_${ts}.js`] = { content: script.content };
-                    scriptsRef.push({
-                        gistId: script.gistId,
-                        description: script.description,
-                        fileName: script.fileName,
-                        backupFile: `content_script_${safeName}_${ts}.js`
-                    });
-                }
+                // 注：脚本为需求墙与拍卖共享池，统一由「需求墙备份中心」备份/还原，拍卖备份只管拍卖自身数据。
 
-                // 6. 主索引文件（轻量，只存引用）
+                // 5. 主索引文件（轻量，只存引用）
                 const mainBackup = {
                     timestamp: ts,
                     date: new Date().toLocaleString('zh-CN'),
@@ -5565,7 +5551,6 @@
                     counterGistId: COUNTER_GIST_ID,
                     rooms: roomsRef,
                     messagesGistId: messagesData ? messagesData.gistId : null,
-                    scripts: scriptsRef,
                     contentFiles: {
                         index: indexContent ? `content_index_${ts}.json` : null,
                         messages: messagesData ? `content_messages_${ts}.json` : null,
@@ -5586,7 +5571,7 @@
 
                 if (!resp.ok) throw new Error('保存备份失败');
 
-                const summary = `房间:${Object.keys(roomsRef).length} 脚本:${scripts.length} ${messagesData ? '消息:✓' : '消息:✗'}`;
+                const summary = `房间:${Object.keys(roomsRef).length} ${messagesData ? '消息:✓' : '消息:✗'} ${Object.keys(statsData).length ? '统计:✓' : '统计:✗'}`;
                 auctionShowBackupStatus(`✅ 全部数据备份成功！${summary}`, 'success');
                 auctionLoadBackupList();
             } catch (e) {
@@ -6009,33 +5994,6 @@
                                     headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` },
                                     body: JSON.stringify({ files: { 'counter.json': { content: statsContent } } })
                                 });
-                            }
-                        }
-                    }
-
-                    if (type === 'all' || type === 'scripts') {
-                        if (backupData.scripts && backupData.scripts.length > 0) {
-                            auctionShowBackupStatus('⏳ 正在还原脚本文件...', 'loading');
-                            for (const scriptRef of backupData.scripts) {
-                                const scriptContent = await auctionReadBackupFile(backupGistId, scriptRef.backupFile, token);
-                                if (scriptContent) {
-                                    const checkResp = await fetch(`https://api.github.com/gists/${scriptRef.gistId}`, {
-                                        headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` }
-                                    });
-                                    if (checkResp.ok) {
-                                        await fetch(`https://api.github.com/gists/${scriptRef.gistId}`, {
-                                            method: 'PATCH',
-                                            headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` },
-                                            body: JSON.stringify({ files: { [scriptRef.fileName]: { content: scriptContent } } })
-                                        });
-                                    } else {
-                                        await fetch('https://api.github.com/gists', {
-                                            method: 'POST',
-                                            headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` },
-                                            body: JSON.stringify({ description: scriptRef.description, public: false, files: { [scriptRef.fileName]: { content: scriptContent } } })
-                                        });
-                                    }
-                                }
                             }
                         }
                     }

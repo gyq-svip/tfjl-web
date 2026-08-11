@@ -15382,9 +15382,20 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 const resp = await fetch(`https://api.github.com/gists/${backupId}`, { method: 'PATCH', headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` }, body: JSON.stringify({ files }) });
                 if (!resp.ok) throw new Error('保存备份失败');
                 wallShowBackupStatus(`✅ 备份成功！消息:${main.messageCount} 脚本:${main.scriptCount}`, 'success');
+                try { localStorage.setItem('wall_last_backup_ts', String(Date.now())); } catch (e) {}
                 wallLoadBackupList();
             } catch (e) { wallShowBackupStatus(`❌ 备份失败：${e.message}`, 'error'); }
         }
+
+        function wallToggleAutoBackup(on) { try { localStorage.setItem('wall_auto_backup', on ? '1' : '0'); } catch (e) {} }
+        function wallCheckAutoBackup() {
+            try {
+                if (localStorage.getItem('wall_auto_backup') !== '1') return;
+                const last = parseInt(localStorage.getItem('wall_last_backup_ts') || '0', 10);
+                if (Date.now() - last > 24 * 3600 * 1000) { setTimeout(function () { try { wallBackupAll(); } catch (e) {} }, 8000); }
+            } catch (e) {}
+        }
+        try { setInterval(wallCheckAutoBackup, 60 * 60 * 1000); wallCheckAutoBackup(); } catch (e) {}
 
         async function wallLoadBackupList() {
             const c = document.getElementById('wallBackupListContainer');
@@ -15404,7 +15415,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                     html += `<div style="background:rgba(255,255,255,0.05);border-radius:6px;padding:8px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
                         <span><span style="color:#ffd700;">📦 全量</span><span style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-left:8px;">${disp}</span></span>
                         <div style="display:flex;gap:4px;">
-                            <button onclick="wallViewBackupDetail('${fn}')" style="background:rgba(255,255,255,0.1);border:none;color:#4ade80;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:0.75rem;">查看</button>
+                            <button onclick="wallViewBackupDetail('${fn}')" style="background:rgba(249,115,22,0.18);border:none;color:#fb923c;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:0.75rem;">🔄还原</button>
                             <button onclick="wallExportBackup('${fn}')" style="background:rgba(255,255,255,0.1);border:none;color:#4fc3f7;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:0.75rem;">导出</button>
                             <button onclick="wallDeleteBackup('${fn}')" style="background:rgba(239,68,68,0.2);border:none;color:#ef4444;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:0.75rem;">删除</button>
                         </div></div>`;
@@ -15519,7 +15530,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 if (resp.ok) { wallShowBackupStatus('✅ 已删除', 'success'); wallLoadBackupList(); } else throw new Error('删除失败');
             } catch (e) { wallShowBackupStatus(`❌ 删除失败：${e.message}`, 'error'); }
         }
-        function wallAdminShowBackup() { const p = document.getElementById('adminPageWallBackup'); if (p) p.style.display = 'block'; const o = document.getElementById('adminPageWallGist'); if (o) o.style.display = 'none'; const adm = document.getElementById('adminMenu'); if (adm) adm.style.display = 'none'; }
+        function wallAdminShowBackup() { const p = document.getElementById('adminPageWallBackup'); if (p) p.style.display = 'block'; const o = document.getElementById('adminPageWallGist'); if (o) o.style.display = 'none'; const adm = document.getElementById('adminMenu'); if (adm) adm.style.display = 'none'; try { const c = document.getElementById('wallAutoBackupChk'); if (c) c.checked = localStorage.getItem('wall_auto_backup') === '1'; } catch (e) {} wallLoadBackupList(); }
 
         // ==================== 需求墙 Gist 文件管理（孤儿扫描+清理，移植自拍卖精细管理）====================
         let _wallGistList = [];
