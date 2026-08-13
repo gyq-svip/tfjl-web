@@ -21131,6 +21131,26 @@ ${maSection}
             if (!data) data = counterData || getDefaultCounter();
 
             const today = getTodayString();
+            // 🔴 修复：今日指标优先合并本地实时统计（counterData）。
+            // 当 Gist 因无 token/限流未能同步时，自己当天的访问在本地已记录，必须可见，否则永远显示 0。
+            const _todayLocal = (counterData && counterData.daily_stats && counterData.daily_stats[today]) ? counterData.daily_stats[today] : null;
+            if (_todayLocal) {
+                if (!data.daily_stats) data.daily_stats = {};
+                data.daily_stats[today] = Object.assign({}, data.daily_stats[today] || {}, _todayLocal);
+            }
+            // 今日活跃用户：本地实时 ∪ Gist（同天并集）
+            const _localActiveArr = (counterData && Array.isArray(counterData.active_today_users)) ? counterData.active_today_users : [];
+            if (_localActiveArr.length) {
+                if (!Array.isArray(data.active_today_users)) data.active_today_users = [];
+                _localActiveArr.forEach(id => { if (!data.active_today_users.includes(id)) data.active_today_users.push(id); });
+                data.active_date = today;
+            }
+            // 当前在线：合并本地 online_users（自己本机在线状态）
+            if (counterData && counterData.online_users) {
+                if (!data.online_users) data.online_users = {};
+                for (const _oid in counterData.online_users) data.online_users[_oid] = counterData.online_users[_oid];
+            }
+
             const dailyStats = data.daily_stats || {};
             const sortedDates = Object.keys(dailyStats).sort();
 
