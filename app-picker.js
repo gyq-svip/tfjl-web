@@ -342,8 +342,10 @@
                         var newWorker = registration.installing;
                         if (newWorker) {
                             newWorker.addEventListener('statechange', function() {
+                                // 🔴 新 SW 安装完成（waiting 状态）即表示"有新版待更新"，立即弹气泡。
+                                // 页面侧兜底，不依赖 SW→页面 message 通道（规避 Tauri WebView 通道不可靠导致收不到 NEW_VERSION_READY）。
                                 if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                    console.log('[PWA] 新 Service Worker 已安装，等待激活');
+                                    if (typeof showSwUpdateBanner === 'function') showSwUpdateBanner();
                                 }
                             });
                         }
