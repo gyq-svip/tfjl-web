@@ -13949,11 +13949,15 @@ function hasGistToken() {
                         console.warn('syncCounterDataToGist 读取远程数据失败:', fetchErr);
                     }
 
-                    // 🔴 防御（v260805-266）：读不到远程就绝不写 Gist，避免覆盖导致统计全丢
+                    // 🔴 修复（s1.0.127）：读不到远程时不再 return 放弃，用本地快照兜底合并后写回，保住本地增量
                     if (!remoteOk) {
-                        console.warn('⚠️ 未能确认远程统计状态，跳过本次写入（保留待同步）');
-                        addToPendingSync('counter');
-                        return false;
+                        console.warn('⚠️ 读取远程统计失败（限流/网络），改用本地快照兜底合并后写回');
+                        if (lastGoodCounter && typeof lastGoodCounter === 'object') {
+                            mergeCounters(data, lastGoodCounter);
+                        } else {
+                            const localSnap = loadCounterFromCache();
+                            if (localSnap) mergeCounters(data, localSnap);
+                        }
                     }
 
                     let content = JSON.stringify(data, null, 2);
@@ -14183,11 +14187,19 @@ function hasGistToken() {
                         console.warn('读取远程数据失败（网络/被墙），本次不覆盖远程统计:', fetchErr);
                     }
 
-                    // 🔴 防御（v260805-266）：读不到远程（限流403/网络错误）就绝不写 Gist，避免把本地空/旧数据顶掉导致统计全丢
+                    // 🔴 修复（s1.0.127）：读不到远程（限流403/无token/网络错误）时，旧逻辑直接 return 放弃写入，
+                    // 导致本地累加的访问增量永远写不回 Gist，远程永久卡在旧值（如 total_visits 停在 3237）。
+                    // 改为：读失败时用"上次成功快照 lastGoodCounter"或"本地缓存"兜底合并，仍尝试 PATCH 写回，
+                    // 写操作限额比读宽松，至少该试一次；绝不因读失败而丢弃本地增量。
                     if (!remoteOk) {
-                        console.warn('⚠️ 未能确认远程统计状态，跳过本次 Gist 写入（保留待同步）');
-                        addToPendingSync('counter');
-                        return;
+                        console.warn('⚠️ 读取远程统计失败（限流/网络），改用本地快照兜底合并后写回');
+                        // 用上次成功合并的快照做基准（保底不会比之前小），再叠加本机已累加的增量
+                        if (lastGoodCounter && typeof lastGoodCounter === 'object') {
+                            mergeCounters(counterData, lastGoodCounter);
+                        } else {
+                            const localSnap = loadCounterFromCache();
+                            if (localSnap) mergeCounters(counterData, localSnap);
+                        }
                     }
 
                     let content = JSON.stringify(counterData, null, 2);
@@ -14213,6 +14225,7 @@ function hasGistToken() {
                         if (patchResponse.ok) {
                             saveCounterToCache(counterData);
                             clearPendingSync();
+                            lastGoodCounter = JSON.parse(JSON.stringify(counterData));
                             updateStatsBar();
                             return;
                         }
@@ -14221,11 +14234,14 @@ function hasGistToken() {
                         if (patchResponse.status === 404 || patchResponse.status === 403) {
                             localStorage.removeItem('counter_gist_id');
                             counterGistId = null;
+                        } else {
+                            // 其它错误（含 403 限流写）：进待同步队列稍后重试，但不丢弃本地增量
+                            console.warn('⚠️ PATCH 写入未成功(' + patchResponse.status + ')，转入待同步队列重试');
+                            addToPendingSync('counter');
                         }
                     } catch (e) {
-                        console.warn('PATCH 异常，清除缓存重新创建:', e);
-                        localStorage.removeItem('counter_gist_id');
-                        counterGistId = null;
+                        console.warn('PATCH 异常，转入待同步队列重试:', e);
+                        addToPendingSync('counter');
                     }
                 }
                 
