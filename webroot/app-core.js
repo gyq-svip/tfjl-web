@@ -13636,6 +13636,9 @@ function hasGistToken() {
                 // 缩短在线判定窗口到 5 分钟，避免关掉标签页后仍长时间显示"在线"（提升在线数准确性）
                 if (!counterData.online_timeout || counterData.online_timeout === 7200000 || counterData.online_timeout === 3600000) counterData.online_timeout = 1800000;
 
+                // 平台判定（提前到 switch 之前：13640 行写入 online_users 时就要用，case 'visit' 内 13654 行的旧声明会被此行屏蔽并导致 ReferenceError）
+                const isApp = !!(window.__TAURI__);
+
                 // 记录用户最后活跃时间 + 昵称/来源（用于计算在线用户 & 管理员"谁在线"日志）
                 counterData.online_users[deviceId] = _olRec(_myNick(), isApp ? 'app' : 'web');
 
@@ -13651,7 +13654,6 @@ function hasGistToken() {
                 // 更新对应统计
                 switch (type) {
                     case 'visit':
-                        const isApp = !!(window.__TAURI__);
                         // 🔴 累计总访问按设备记录（避免多端 Math.max 低估）
                         if (!counterData.device_visits) counterData.device_visits = {};
                         ensureDeviceVisitsBaseline(counterData);
@@ -19121,7 +19123,7 @@ ${maSection}
         
         // 页面加载时记录访问
         async function recordVisit() {
-            console.log('[TFJL app-core] recordVisit 触发 · 内置统计 v s1.0.128 · deviceId=', getDeviceId(), '· isApp=', !!(window.__TAURI__));
+            console.log('[TFJL app-core] recordVisit 触发 · 内置统计 v s1.0.135 · deviceId=', getDeviceId(), '· isApp=', !!(window.__TAURI__));
             await updateCounter('visit');
         }
         
