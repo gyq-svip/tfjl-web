@@ -1679,6 +1679,10 @@
                         <span class="mi-emoji">🛡️</span>
                         <div class="mi-text"><div class="mi-title">Boss减伤管理</div><div class="mi-sub">寒冰/暗月/漩涡/深海</div></div>
                     </div>
+                    <div class="admin-menu-item" onclick="adminShowPage('apiMonitor')">
+                        <span class="mi-emoji">📡</span>
+                        <div class="mi-text"><div class="mi-title">API监控</div><div class="mi-sub">Token写入 / 限额</div></div>
+                    </div>
                     <div class="admin-menu-item" onclick="openAuctionAdmin()">
                         <span class="mi-emoji">🏪</span>
                         <div class="mi-text"><div class="mi-title">拍卖管理员</div><div class="mi-sub">直达拍卖管理员菜单</div></div>
@@ -1990,6 +1994,17 @@
                     <div style="text-align:right;">
                         <button class="admin-btn admin-btn-primary" onclick="adminSaveTitle()">保存标题</button>
                     </div>
+                </div>
+            </div>
+
+            <div id="adminPageApiMonitor" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
+                    <button class="admin-btn admin-btn-secondary" onclick="adminShowMenu()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
+                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">📡 API监控</h3>
+                    <button onclick="refreshApiMonitor()" style="margin-left:auto;padding:6px 12px;border-radius:6px;border:none;background:linear-gradient(135deg,#4ecdc4,#44a08d);color:white;cursor:pointer;font-size:0.8rem;">刷新</button>
+                </div>
+                <div id="apiMonitorContent" style="background:rgba(0,0,0,0.2);border-radius:8px;padding:15px;">
+                    <div style="text-align:center;color:rgba(255,255,255,0.4);padding:10px;">点击下方「刷新」开始检测</div>
                 </div>
             </div>
 
@@ -2418,7 +2433,7 @@
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">s20260813-10 · s1.0.128</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">s20260813-11 · s1.0.129</span>
             </div>
         </div>
     </div>
