@@ -19709,12 +19709,15 @@ ${maSection}
             refreshFloatConsole();
         }
 
+        // 最小化状态（独立于管理员"开关"）：记住用户是否收起了浮动日志窗，刷新后保持
+        const CONSOLE_MINIMIZED_KEY = 'tdjl_consoleMinimized';
         function toggleFloatConsole() {
             const con = document.getElementById('floatConsole');
             const toggle = document.getElementById('floatConsoleToggle');
             floatConsoleVisible = !floatConsoleVisible;
             con.style.display = floatConsoleVisible ? 'flex' : 'none';
             if (toggle) toggle.style.display = floatConsoleVisible ? 'none' : 'flex';
+            try { localStorage.setItem(CONSOLE_MINIMIZED_KEY, floatConsoleVisible ? '0' : '1'); } catch (_) {}
             if (floatConsoleVisible) {
                 refreshFloatConsole();
                 if (floatConsoleRefreshTimer) clearInterval(floatConsoleRefreshTimer);
@@ -19730,13 +19733,20 @@ ${maSection}
             const con = document.getElementById('floatConsole');
             if (!con) return;
             const toggle = document.getElementById('floatConsoleToggle');
-            floatConsoleVisible = true;
-            con.style.display = 'flex';
-            if (toggle) toggle.style.display = 'none';
+            // 读取最小化记忆：上次收起则保持收起（显示小圆按钮），否则展开
+            let minimized = false;
+            try { minimized = localStorage.getItem(CONSOLE_MINIMIZED_KEY) === '1'; } catch (_) {}
+            floatConsoleVisible = !minimized;
+            con.style.display = floatConsoleVisible ? 'flex' : 'none';
+            if (toggle) toggle.style.display = floatConsoleVisible ? 'none' : 'flex';
             refreshFloatConsole();
             applyFloatZoom();
             if (floatConsoleRefreshTimer) clearInterval(floatConsoleRefreshTimer);
-            floatConsoleRefreshTimer = setInterval(refreshFloatConsole, 500);
+            if (floatConsoleVisible) {
+                floatConsoleRefreshTimer = setInterval(refreshFloatConsole, 500);
+            } else {
+                floatConsoleRefreshTimer = null;
+            }
         })();
 
         // 管理员开关：浮动控制台入口按钮显示/隐藏
@@ -19754,12 +19764,16 @@ ${maSection}
             const btn = document.getElementById('floatConsoleToggle');
             const status = document.getElementById('consoleToggleStatus');
             // 开关控制浮窗显示/隐藏（可见性由 initFloatConsoleOnLoad 保证默认显示，此处负责开关真正生效）
-            if (btn) btn.style.display = visible ? 'flex' : 'none';
             if (status) status.textContent = visible ? '已开启' : '已关闭';
             const con = document.getElementById('floatConsole');
-            if (con) con.style.display = visible ? 'flex' : 'none';
-            floatConsoleVisible = visible;
-            if (visible) {
+            if (!con) return;
+            // 开启开关时尊重"最小化记忆"（若上次收起则仍收起，显示小圆按钮），而非强制展开
+            let minimized = false;
+            try { minimized = localStorage.getItem(CONSOLE_MINIMIZED_KEY) === '1'; } catch (_) {}
+            floatConsoleVisible = visible && !minimized;
+            con.style.display = floatConsoleVisible ? 'flex' : 'none';
+            if (btn) btn.style.display = floatConsoleVisible ? 'none' : 'flex';
+            if (floatConsoleVisible) {
                 refreshFloatConsole();
                 if (floatConsoleRefreshTimer) clearInterval(floatConsoleRefreshTimer);
                 floatConsoleRefreshTimer = setInterval(refreshFloatConsole, 500);
