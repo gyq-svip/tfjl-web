@@ -2442,7 +2442,7 @@
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">s20260813-15 · s1.0.133</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">s20260813-16 · s1.0.134</span>
             </div>
         </div>
     </div>
@@ -2455,6 +2455,9 @@
         <div id="floatConsoleTitle" style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;cursor:move;background:linear-gradient(135deg,#00838f,#006064);color:#fff;flex-shrink:0;">
             <span style="font-size:0.78rem;font-weight:600;">💻 调试日志<span id="floatConsoleBadge" style="display:none;margin-left:6px;background:#00bcd4;color:#000;border-radius:10px;padding:0 6px;font-size:0.65rem;"></span></span>
             <span>
+                <button id="floatFilterAll" onclick="floatSetLevelFilter('all')" data-level="all" title="全部" style="background:rgba(255,255,255,0.25);color:#fff;border:none;padding:2px 6px;border-radius:4px;cursor:pointer;font-size:0.62rem;margin-right:2px;">全</button>
+                <button id="floatFilterError" onclick="floatSetLevelFilter('error')" data-level="error" title="只看错误" style="background:rgba(244,67,54,0.18);color:#ff8a80;border:1px solid rgba(244,67,54,0.5);padding:2px 6px;border-radius:4px;cursor:pointer;font-size:0.62rem;margin-right:2px;">错</button>
+                <button id="floatFilterWarn" onclick="floatSetLevelFilter('warn')" data-level="warn" title="只看警告" style="background:rgba(255,152,0,0.18);color:#ffcc80;border:1px solid rgba(255,152,0,0.5);padding:2px 6px;border-radius:4px;cursor:pointer;font-size:0.62rem;margin-right:3px;">警</button>
                 <button onclick="floatZoomOut()" title="缩小字体" style="background:rgba(255,255,255,0.15);color:#fff;border:none;padding:2px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;margin-right:3px;">A−</button>
                 <button id="floatZoomResetBtn" onclick="floatZoomReset()" title="重置缩放" style="background:rgba(255,255,255,0.15);color:#fff;border:none;padding:2px 6px;border-radius:4px;cursor:pointer;font-size:0.65rem;margin-right:3px;">100%</button>
                 <button onclick="floatZoomIn()" title="放大字体" style="background:rgba(255,255,255,0.15);color:#fff;border:none;padding:2px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;margin-right:4px;">A+</button>
