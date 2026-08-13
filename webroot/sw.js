@@ -5,7 +5,7 @@
 //      提升 CACHE_VERSION 触发 activate 清空所有 tfjl- 缓存，确保拿到最新前端（含分享密码框）
 // ============================================================
 
-const CACHE_VERSION = 's1.0.125';
+const CACHE_VERSION = 's1.0.126';
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
@@ -23,6 +23,21 @@ const NEVER_CACHE = [
 // ============================================================
 self.addEventListener('install', (event) => {
     // 故意不调用 skipWaiting()，新 SW 安装后处于 waiting 状态，等用户点更新再激活
+    // 🔴 修复更新气泡滞后一个版本：原逻辑把 NEW_VERSION_READY 放在 activate（用户点更新之后）才发，
+    // 导致"有新版待更新"的提示永远在更新完成之后才弹。改为 install 完成时即通知现有页面，
+    // 且仅当存在已激活的旧 SW（self.registration.active）才提示，避免首次安装误弹。
+    event.waitUntil(
+        Promise.resolve().then(() => {
+            if (self.registration && self.registration.active) {
+                return self.clients.matchAll({ includeUncontrolled: true }).then(clients => {
+                    clients.forEach(client => {
+                        client.postMessage({ type: 'NEW_VERSION_READY' });
+                        client.postMessage({ type: 'SW_VERSION', version: CACHE_VERSION });
+                    });
+                });
+            }
+        })
+    );
 });
 
 // ============================================================
@@ -37,16 +52,8 @@ self.addEventListener('activate', (event) => {
                     .map((name) => caches.delete(name))
             );
         }).then(() => {
-            // 拿下所有页面控制权
+            // 拿下所有页面控制权（NEW_VERSION_READY 已在 install 阶段发给现有页面，这里不再重复发，避免更新后重复弹气泡）
             return self.clients.claim();
-        }).then(() => {
-            // 通知所有已打开的页面有新版本，并报告自身缓存版本号（供页面在右下角显示，便于核对缓存是否更新）
-            return self.clients.matchAll().then(clients => {
-                clients.forEach(client => {
-                    client.postMessage({ type: 'NEW_VERSION_READY' });
-                    client.postMessage({ type: 'SW_VERSION', version: CACHE_VERSION });
-                });
-            });
         })
     );
 });
