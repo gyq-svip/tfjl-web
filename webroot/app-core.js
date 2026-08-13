@@ -19600,6 +19600,7 @@ ${maSection}
         function adminRefreshConsoleLog() {
             const panel = document.getElementById('consoleLogPanel');
             if (!panel) return;
+            applyAdminLogZoom();
             const logs = window.__consoleLogs;
             if (!logs || logs.length === 0) {
                 panel.innerHTML = '<div style="color:rgba(255,255,255,0.3);text-align:center;padding:30px;font-size:0.85rem;">暂无日志输出</div>';
@@ -19608,7 +19609,7 @@ ${maSection}
             const levelColors = { error: '#f44336', warn: '#ff9800', info: '#00bcd4', log: 'rgba(255,255,255,0.75)' };
             const items = logs.map((l, i) => {
                 const color = levelColors[l.level] || 'rgba(255,255,255,0.6)';
-                return `<div style="color:${color};font-size:0.7rem;padding:2px 4px;border-bottom:1px solid rgba(255,255,255,0.03);line-height:1.4;">
+                return `<div style="color:${color};padding:2px 4px;border-bottom:1px solid rgba(255,255,255,0.03);line-height:1.4;">
                     <span style="color:rgba(255,255,255,0.3);margin-right:6px;">${i + 1}</span>
                     <span style="color:rgba(255,255,255,0.25);margin-right:6px;">${l.time}</span>
                     <span style="font-weight:500;margin-right:4px;">[${l.level.toUpperCase()}]</span>
@@ -19619,12 +19620,29 @@ ${maSection}
             panel.scrollTop = 0;
         }
 
+        let adminLogZoom = parseFloat(localStorage.getItem('tdjl_adminlogZoom') || '1') || 1;
+        function applyAdminLogZoom() {
+            const p = document.getElementById('consoleLogPanel');
+            if (p) p.style.fontSize = (0.7 * adminLogZoom) + 'rem';
+        }
+        function adminLogZoomIn() { adminLogZoom = Math.min(2.5, +(adminLogZoom + 0.15).toFixed(2)); localStorage.setItem('tdjl_adminlogZoom', String(adminLogZoom)); applyAdminLogZoom(); adminRefreshConsoleLog(); }
+        function adminLogZoomOut() { adminLogZoom = Math.max(0.5, +(adminLogZoom - 0.15).toFixed(2)); localStorage.setItem('tdjl_adminlogZoom', String(adminLogZoom)); applyAdminLogZoom(); adminRefreshConsoleLog(); }
+        function adminLogZoomReset() { adminLogZoom = 1; localStorage.setItem('tdjl_adminlogZoom', '1'); applyAdminLogZoom(); adminRefreshConsoleLog(); }
+
         // ==================== 浮动控制台窗口 ====================
         let floatConsoleVisible = false;
         let floatAutoScroll = true;
         let floatConsoleRefreshTimer = null;
         let floatDragState = null;
         let floatFilter = '';
+        let floatZoom = parseFloat(localStorage.getItem('tdjl_consoleZoom') || '1') || 1;
+        function applyFloatZoom() {
+            const c = document.getElementById('floatConsoleContent');
+            if (c) c.style.fontSize = (0.68 * floatZoom) + 'rem';
+        }
+        function floatZoomIn() { floatZoom = Math.min(2.5, +(floatZoom + 0.15).toFixed(2)); localStorage.setItem('tdjl_consoleZoom', String(floatZoom)); applyFloatZoom(); refreshFloatConsole(); }
+        function floatZoomOut() { floatZoom = Math.max(0.5, +(floatZoom - 0.15).toFixed(2)); localStorage.setItem('tdjl_consoleZoom', String(floatZoom)); applyFloatZoom(); refreshFloatConsole(); }
+        function floatZoomReset() { floatZoom = 1; localStorage.setItem('tdjl_consoleZoom', '1'); applyFloatZoom(); refreshFloatConsole(); }
 
         function setFloatConsoleFilter(v) {
             floatFilter = (v || '').trim();
@@ -19662,6 +19680,7 @@ ${maSection}
             con.style.display = 'flex';
             if (toggle) toggle.style.display = 'none';
             refreshFloatConsole();
+            applyFloatZoom();
             if (floatConsoleRefreshTimer) clearInterval(floatConsoleRefreshTimer);
             floatConsoleRefreshTimer = setInterval(refreshFloatConsole, 500);
         })();
@@ -19771,7 +19790,7 @@ ${maSection}
             // 最新日志在底部（logs 为时间顺序，直接顺序渲染），不再 reverse
             const items = logs.map((l, i) => {
                 const color = levelColors[l.level] || 'rgba(255,255,255,0.6)';
-                return '<div style="color:' + color + ';font-size:0.68rem;padding:1px 4px;border-bottom:1px solid rgba(255,255,255,0.02);line-height:1.35;">' +
+                return '<div style="color:' + color + ';padding:1px 4px;border-bottom:1px solid rgba(255,255,255,0.02);line-height:1.35;">' +
                     '<span style="color:rgba(255,255,255,0.2);margin-right:5px;">' + (i + 1) + '</span>' +
                     '<span style="color:rgba(255,255,255,0.22);margin-right:5px;">' + l.time + '</span>' +
                     '<span style="font-weight:500;margin-right:3px;">[' + l.level.toUpperCase() + ']</span>' +

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=3.0, user-scalable=yes">
     <title>塔防阵容卡搭配专用</title>
-    <link rel="stylesheet" href="styles.css?v=1">
+    <link rel="stylesheet" href="styles.css?v=s1.0.130">
 </head>
 <body>
     <!-- 启动加载动画（网页加载完成后自动消失） -->
@@ -77,7 +77,7 @@
         }, true);
     })();
     </script>
-    <script defer src="app-boot.js?v=1"></script>
+    <script defer src="app-boot.js?v=s1.0.130"></script>
 
     <!-- 密码验证层（默认隐藏；启动逻辑确认"未登录"后才显示，避免已登录用户闪一下登录界面） -->
     <div id="passwordOverlay" class="password-overlay" style="display:none;">
@@ -891,7 +891,7 @@
         <!-- Boss减伤悬浮提示 -->
         <div id="bossRedTooltip" style="display:none;position:fixed;z-index:99999;max-width:300px;background:rgba(20,20,40,0.97);border:1px solid rgba(255,215,0,0.4);border-radius:8px;padding:10px;color:#fff;pointer-events:none;box-shadow:0 4px 16px rgba(0,0,0,0.5);"></div>
 
-        <script defer src="app-effects.js?v=1"></script>
+        <script defer src="app-effects.js?v=s1.0.130"></script>
 
         <!-- 固定在右上角的按钮 -->
         <div class="sticky-buttons" style="position:fixed;top:12px;right:12px;z-index:9999;display:flex;gap:5px;">
@@ -943,7 +943,7 @@
             </div>
         </div>
 
-        <script defer src="app-features.js?v=1"></script>
+        <script defer src="app-features.js?v=s1.0.130"></script>
 
         <!-- 项目操作菜单（折叠） -->
         <div id="projectMenu" style="display:none;position:fixed;z-index:9998;background:rgba(40,40,70,0.98);border:1px solid rgba(255,215,0,0.3);border-radius:10px;padding:10px;min-width:200px;max-height:85vh;overflow-y:auto;box-shadow:0 4px 15px rgba(0,0,0,0.4);">
@@ -968,7 +968,7 @@
         <!-- 网页版皮肤系统（仅非 Tauri 浏览器执行；Tauri 由 app-local.js 负责，文件内部自动跳过） -->
         <script defer src="skins-web.js?v=2"></script>
 
-        <script defer src="app-picker.js?v=1"></script>
+        <script defer src="app-picker.js?v=s1.0.130"></script>
 
         <!-- 记事本悬浮面板 -->
         <div id="notepadPanel" style="display:none;position:fixed;top:80px;right:20px;width:400px;height:350px;z-index:9997;background:rgba(30,30,60,0.95);border:2px solid rgba(255,215,0,0.5);border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.5);overflow:auto;resize:both;min-width:280px;min-height:250px;">
@@ -1542,7 +1542,7 @@
             </div>
         </div>
 
-    <script defer src="app-core.js?v=1"></script>
+    <script defer src="app-core.js?v=s1.0.130"></script>
 
     <!-- 模态框：创建分类 -->
     <div id="createCategoryModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;justify-content:center;align-items:center;">
@@ -1954,6 +1954,9 @@
                     <div style="display:flex;align-items:center;justify-content:space-between;">
                         <div style="color:#00bcd4;font-size:0.85rem;font-weight:500;">💻 控制台日志（实时）</div>
                         <div>
+                            <button onclick="adminLogZoomOut()" title="缩小字体" style="background:rgba(255,255,255,0.12);color:#fff;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:0.75rem;margin-right:4px;">A−</button>
+                            <button onclick="adminLogZoomReset()" title="重置缩放" style="background:rgba(255,255,255,0.12);color:#fff;border:none;padding:5px 8px;border-radius:6px;cursor:pointer;font-size:0.7rem;margin-right:4px;">100%</button>
+                            <button onclick="adminLogZoomIn()" title="放大字体" style="background:rgba(255,255,255,0.12);color:#fff;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:0.75rem;margin-right:6px;">A+</button>
                             <button onclick="adminRefreshConsoleLog()" style="background:linear-gradient(135deg,#00bcd4,#0097a7);color:white;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.8rem;margin-right:6px;">🔄 刷新</button>
                             <button onclick="window.__consoleLogs=[];adminRefreshConsoleLog();" style="background:linear-gradient(135deg,#ef4444,#dc2626);color:white;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.8rem;">🗑 清空</button>
                         </div>
@@ -1962,7 +1965,7 @@
                         捕获所有 console.log/warn/error/info 输出（最多500条）。Tauri APP 无法 F12 调试时可用此面板排查。
                     </div>
                 </div>
-                <div id="consoleLogPanel" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:10px;min-height:150px;max-height:400px;overflow-y:auto;font-family:monospace;margin-bottom:20px;">
+                <div id="consoleLogPanel" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:10px;min-height:150px;max-height:400px;overflow-y:auto;font-family:monospace;font-size:0.7rem;margin-bottom:20px;">
                     <div style="color:rgba(255,255,255,0.3);text-align:center;padding:30px;font-size:0.85rem;">点击「刷新」查看日志</div>
                 </div>
 
@@ -2433,19 +2436,22 @@
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">s20260813-11 · s1.0.129</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">s20260813-12 · s1.0.130</span>
             </div>
         </div>
     </div>
 
   <!-- 皮肤制作工具改为按需懒加载：首次打开皮肤 Tab 时由 loader.js 拉取 app-skinmaker.js -->
-  <script src="loader.js?v=1"></script>
+  <script src="loader.js?v=s1.0.130"></script>
 
     <!-- 调试日志浮动控制台（默认显示于右下角，可拖动；Tauri APP 无法 F12 时查看 [SKIN] 等日志） -->
     <div id="floatConsole" style="position:fixed;right:12px;bottom:12px;width:380px;max-height:42vh;display:flex;flex-direction:column;background:rgba(0,0,0,0.82);border:1px solid rgba(0,188,212,0.5);border-radius:8px;z-index:99999;box-shadow:0 4px 20px rgba(0,0,0,0.5);font-family:monospace;overflow:hidden;">
         <div id="floatConsoleTitle" style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;cursor:move;background:linear-gradient(135deg,#00838f,#006064);color:#fff;flex-shrink:0;">
             <span style="font-size:0.78rem;font-weight:600;">💻 调试日志<span id="floatConsoleBadge" style="display:none;margin-left:6px;background:#00bcd4;color:#000;border-radius:10px;padding:0 6px;font-size:0.65rem;"></span></span>
             <span>
+                <button onclick="floatZoomOut()" title="缩小字体" style="background:rgba(255,255,255,0.15);color:#fff;border:none;padding:2px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;margin-right:3px;">A−</button>
+                <button onclick="floatZoomReset()" title="重置缩放" style="background:rgba(255,255,255,0.15);color:#fff;border:none;padding:2px 6px;border-radius:4px;cursor:pointer;font-size:0.65rem;margin-right:3px;">100%</button>
+                <button onclick="floatZoomIn()" title="放大字体" style="background:rgba(255,255,255,0.15);color:#fff;border:none;padding:2px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;margin-right:4px;">A+</button>
                 <button onclick="floatConsoleClear()" style="background:rgba(255,255,255,0.15);color:#fff;border:none;padding:2px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;margin-right:4px;">清空</button>
                 <button onclick="toggleFloatConsole()" style="background:rgba(255,255,255,0.15);color:#fff;border:none;padding:2px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;">收起</button>
             </span>
