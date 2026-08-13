@@ -965,7 +965,7 @@
         </div>
 
         <!-- APP本地功能脚本（网页版不会执行任何代码，isTauriApp判断在文件内部） -->
-        <script defer src="app-local.js?v=31"></script>
+        <script defer src="app-local.js?v=s1.0.137"></script>
         <!-- 阵容识别模块（独立入口 + 灌入脚本生成） -->
         
         <!-- 网页版皮肤系统（仅非 Tauri 浏览器执行；Tauri 由 app-local.js 负责，文件内部自动跳过） -->
@@ -1545,7 +1545,7 @@
             </div>
         </div>
 
-    <script defer src="app-core.js?v=s1.0.130"></script>
+    <script defer src="app-core.js?v=s1.0.137"></script>
 
     <!-- 模态框：创建分类 -->
     <div id="createCategoryModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;justify-content:center;align-items:center;">
@@ -2442,7 +2442,7 @@
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">s20260813-18 · s1.0.136</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">s20260813-19 · s1.0.137</span>
             </div>
         </div>
     </div>
@@ -2458,6 +2458,8 @@
                 <button id="floatFilterAll" onclick="floatSetLevelFilter('all')" data-level="all" title="全部" style="background:rgba(255,255,255,0.25);color:#fff;border:none;padding:2px 6px;border-radius:4px;cursor:pointer;font-size:0.62rem;margin-right:2px;">全</button>
                 <button id="floatFilterError" onclick="floatSetLevelFilter('error')" data-level="error" title="只看错误" style="background:rgba(244,67,54,0.18);color:#ff8a80;border:1px solid rgba(244,67,54,0.5);padding:2px 6px;border-radius:4px;cursor:pointer;font-size:0.62rem;margin-right:2px;">错</button>
                 <button id="floatFilterWarn" onclick="floatSetLevelFilter('warn')" data-level="warn" title="只看警告" style="background:rgba(255,152,0,0.18);color:#ffcc80;border:1px solid rgba(255,152,0,0.5);padding:2px 6px;border-radius:4px;cursor:pointer;font-size:0.62rem;margin-right:3px;">警</button>
+                <button onclick="floatConsoleCopy()" title="复制日志（框选后只复制选中段，否则复制全部）" style="background:rgba(255,255,255,0.15);color:#fff;border:none;padding:2px 8px;border-radius:4px;cursor:pointer;font-size:0.62rem;margin-right:3px;">复制</button>
+                <button id="floatAutoScrollBtn" onclick="toggleFloatAutoScroll()" title="自动滚动：开则始终显示最新日志，关则停在当前位置方便查看/复制" style="background:rgba(255,255,255,0.15);color:#fff;border:none;padding:2px 8px;border-radius:4px;cursor:pointer;font-size:0.62rem;margin-right:3px;">⬇自动</button>
                 <button onclick="floatZoomOut()" title="缩小字体" style="background:rgba(255,255,255,0.15);color:#fff;border:none;padding:2px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;margin-right:3px;">A−</button>
                 <button id="floatZoomResetBtn" onclick="floatZoomReset()" title="重置缩放" style="background:rgba(255,255,255,0.15);color:#fff;border:none;padding:2px 6px;border-radius:4px;cursor:pointer;font-size:0.65rem;margin-right:3px;">100%</button>
                 <button onclick="floatZoomIn()" title="放大字体" style="background:rgba(255,255,255,0.15);color:#fff;border:none;padding:2px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;margin-right:4px;">A+</button>
@@ -2469,7 +2471,7 @@
             <input id="floatConsoleFilter" type="text" placeholder="🔍 输入关键字过滤…" oninput="setFloatConsoleFilter(this.value)" style="flex:1;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);color:#fff;border-radius:4px;padding:3px 8px;font-size:0.7rem;outline:none;">
             <button onclick="clearFloatConsoleFilter()" style="background:rgba(255,255,255,0.12);color:#fff;border:none;padding:2px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;">✕</button>
         </div>
-        <div id="floatConsoleContent" style="flex:1;overflow-y:auto;padding:6px 8px;font-size:0.68rem;line-height:1.35;color:rgba(255,255,255,0.75);"></div>
+        <div id="floatConsoleContent" style="flex:1;overflow-y:auto;padding:6px 8px;font-size:0.68rem;line-height:1.35;color:rgba(255,255,255,0.75);user-select:text;"></div>
         <div id="floatConsoleResize" title="拖拽调整窗口大小" style="position:absolute;right:0;bottom:0;width:18px;height:18px;cursor:nwse-resize;background:linear-gradient(135deg,transparent 50%,rgba(0,188,212,0.8) 50%);border-bottom-right-radius:8px;z-index:2;"></div>
     </div>
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" style="position:fixed;right:12px;bottom:12px;z-index:99998;display:none;align-items:center;gap:4px;background:linear-gradient(135deg,#00838f,#006064);color:#fff;border:none;padding:6px 12px;border-radius:20px;cursor:pointer;font-size:0.75rem;box-shadow:0 2px 8px rgba(0,0,0,0.4);">💻日志</button>

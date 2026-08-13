@@ -3616,9 +3616,9 @@ if (isTauriApp) {
                         try { await invokeFn('write_binary_file', { file_path: skinPath, content_base64: b64 }); wrote = true; }
                         catch (e1) { console.warn('[SKIN] write_binary_file 失败，回退 plugin:fs|write_file:', heroName, file, e1); }
                     }
-                    // 备：Tauri v2 fs 插件写（注意 options.contents 结构）
+                    // 备：Tauri v2 fs 插件写（注意 contents 必须是 string，不能传 Uint8Array，否则 Tauri v2 ACL 会拒）
                     if (!wrote) {
-                        try { await invokeFn('plugin:fs|write_file', { path: skinPath, options: { contents: arr } }); wrote = true; }
+                        try { await invokeFn('plugin:fs|write_file', { path: skinPath, contents: b64 }); wrote = true; }
                         catch (e2) { console.warn('[SKIN] 皮肤写盘失败:', heroName, file, e2); }
                     }
                     // 只有真正写盘成功才计入"新下载"，避免写失败却误报"有新皮肤"反复弹提示
