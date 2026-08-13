@@ -19645,9 +19645,14 @@ ${maSection}
         }
 
         let adminLogZoom = parseFloat(localStorage.getItem('tdjl_adminlogZoom') || '1') || 1;
+        function updateAdminLogZoomLabel() {
+            const btn = document.getElementById('adminLogZoomResetBtn');
+            if (btn) btn.textContent = Math.round(adminLogZoom * 100) + '%';
+        }
         function applyAdminLogZoom() {
             const p = document.getElementById('consoleLogPanel');
             if (p) p.style.fontSize = (0.7 * adminLogZoom) + 'rem';
+            updateAdminLogZoomLabel();
         }
         function adminLogZoomIn() { adminLogZoom = Math.min(2.5, +(adminLogZoom + 0.15).toFixed(2)); localStorage.setItem('tdjl_adminlogZoom', String(adminLogZoom)); applyAdminLogZoom(); adminRefreshConsoleLog(); }
         function adminLogZoomOut() { adminLogZoom = Math.max(0.5, +(adminLogZoom - 0.15).toFixed(2)); localStorage.setItem('tdjl_adminlogZoom', String(adminLogZoom)); applyAdminLogZoom(); adminRefreshConsoleLog(); }
@@ -19660,9 +19665,14 @@ ${maSection}
         let floatDragState = null;
         let floatFilter = '';
         let floatZoom = parseFloat(localStorage.getItem('tdjl_consoleZoom') || '1') || 1;
+        function updateFloatZoomLabel() {
+            const btn = document.getElementById('floatZoomResetBtn');
+            if (btn) btn.textContent = Math.round(floatZoom * 100) + '%';
+        }
         function applyFloatZoom() {
             const c = document.getElementById('floatConsoleContent');
             if (c) c.style.fontSize = (0.68 * floatZoom) + 'rem';
+            updateFloatZoomLabel();
         }
         function floatZoomIn() { floatZoom = Math.min(2.5, +(floatZoom + 0.15).toFixed(2)); localStorage.setItem('tdjl_consoleZoom', String(floatZoom)); applyFloatZoom(); refreshFloatConsole(); }
         function floatZoomOut() { floatZoom = Math.max(0.5, +(floatZoom - 0.15).toFixed(2)); localStorage.setItem('tdjl_consoleZoom', String(floatZoom)); applyFloatZoom(); refreshFloatConsole(); }
@@ -19879,6 +19889,12 @@ ${maSection}
             const handle = document.getElementById('floatConsoleResize');
             const con = document.getElementById('floatConsole');
             if (!handle || !con) return;
+            try {
+                const w = parseFloat(localStorage.getItem('tdjl_consoleW'));
+                const h = parseFloat(localStorage.getItem('tdjl_consoleH'));
+                if (w > 0) con.style.width = w + 'px';
+                if (h > 0) con.style.maxHeight = h + 'px';
+            } catch (_) {}
             let resizeState = null;
             const onStart = (cx, cy) => {
                 resizeState = { startX: cx, startY: cy, startW: con.offsetWidth, startH: con.offsetHeight };
@@ -19895,6 +19911,7 @@ ${maSection}
                 if (resizeState) {
                     resizeState = null;
                     con.classList.remove('resizing');
+                    try { localStorage.setItem('tdjl_consoleW', String(con.offsetWidth)); localStorage.setItem('tdjl_consoleH', String(con.offsetHeight)); } catch (_) {}
                     try { if (document.releaseCapture) document.releaseCapture(); } catch (_) {}
                 }
             };
