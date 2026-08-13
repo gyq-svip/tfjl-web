@@ -19733,10 +19733,15 @@ ${maSection}
             const con = document.getElementById('floatConsole');
             if (!con) return;
             const toggle = document.getElementById('floatConsoleToggle');
-            // 读取最小化记忆：上次收起则保持收起（显示小圆按钮），否则展开
+            // 管理员开关（tdjl_consoleVisible）：未设置(null)即默认关闭，满足"默认全关"需求
+            let consoleEnabled = false;
+            try { consoleEnabled = localStorage.getItem('tdjl_consoleVisible') === '1'; } catch (_) {}
+            // 读取最小化记忆：上次收起则保持收起（显示小圆按钮）
             let minimized = false;
             try { minimized = localStorage.getItem(CONSOLE_MINIMIZED_KEY) === '1'; } catch (_) {}
-            floatConsoleVisible = !minimized;
+            // 修复：之前硬编码 !minimized 无视管理员开关，导致开关"不管用"且默认强制展开；
+            // 现在 = 管理员开关开启 且 未收起 才显示
+            floatConsoleVisible = consoleEnabled && !minimized;
             con.style.display = floatConsoleVisible ? 'flex' : 'none';
             if (toggle) toggle.style.display = floatConsoleVisible ? 'none' : 'flex';
             refreshFloatConsole();
