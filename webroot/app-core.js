@@ -14202,6 +14202,7 @@ function hasGistToken() {
                         }
                     }
 
+                    console.log('[TFJL app-core] 准备写回统计 Gist · device_visits=', JSON.stringify(counterData.device_visits), '· total_visits=', counterData.total_visits, '· remoteOk=', remoteOk);
                     let content = JSON.stringify(counterData, null, 2);
                     try {
                         // 使用 PATCH 更新现有 Gist
@@ -19120,6 +19121,7 @@ ${maSection}
         
         // 页面加载时记录访问
         async function recordVisit() {
+            console.log('[TFJL app-core] recordVisit 触发 · 内置统计 v s1.0.128 · deviceId=', getDeviceId(), '· isApp=', !!(window.__TAURI__));
             await updateCounter('visit');
         }
         
