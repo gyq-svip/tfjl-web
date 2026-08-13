@@ -3648,7 +3648,8 @@ if (isTauriApp) {
                     if (b64 && b64.length > 0) {
                         for (let attempt = 1; attempt <= 2 && !wrote; attempt++) {
                             try {
-                                await invokeFn('write_binary_file', { file_path: skinPath, content_base64: b64 });
+                                // ⚠️ Tauri v2 IPC 序列化：Rust 参数名 file_path → JS 端必须用 filePath(驼峰)，否则报 missing required key `filePath`
+                                await invokeFn('write_binary_file', { filePath: skinPath, contentBase64: b64 });
                                 wrote = true;
                             } catch (e1) {
                                 const e1Info = e1 ? (e1.message || e1.name || JSON.stringify(e1) || String(e1)) : 'unknown';
@@ -3761,7 +3762,8 @@ if (isTauriApp) {
                     if (b64 && b64.length > 0) {
                         for (let attempt = 1; attempt <= 2 && !wrote; attempt++) {
                             try {
-                                await invokeFn('write_binary_file', { file_path: skinPath, content_base64: b64 });
+                                // ⚠️ Tauri v2 IPC 序列化：Rust 参数名 file_path → JS 端必须用 filePath(驼峰)
+                                await invokeFn('write_binary_file', { filePath: skinPath, contentBase64: b64 });
                                 wrote = true;
                             } catch (eW) {
                                 const eWInfo = eW ? (eW.message || eW.name || JSON.stringify(eW) || String(eW)) : 'unknown';
