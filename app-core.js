@@ -19664,6 +19664,24 @@ ${maSection}
         let floatConsoleRefreshTimer = null;
         let floatDragState = null;
         let floatFilter = '';
+        let floatLevelFilter = 'all';
+        function floatSetLevelFilter(level) {
+            floatLevelFilter = (level === 'all') ? 'all' : (level || 'all');
+            ['all', 'error', 'warn'].forEach(f => {
+                const btn = document.getElementById('floatFilter' + f.charAt(0).toUpperCase() + f.slice(1));
+                if (!btn) return;
+                if (f === floatLevelFilter) {
+                    btn.style.background = (f === 'error') ? 'rgba(244,67,54,0.55)' : (f === 'warn') ? 'rgba(255,152,0,0.55)' : 'rgba(255,255,255,0.4)';
+                    btn.style.color = '#fff';
+                    btn.style.border = (f === 'error') ? '1px solid #ff8a80' : (f === 'warn') ? '1px solid #ffcc80' : 'none';
+                } else {
+                    btn.style.background = (f === 'error') ? 'rgba(244,67,54,0.18)' : (f === 'warn') ? 'rgba(255,152,0,0.18)' : 'rgba(255,255,255,0.15)';
+                    btn.style.color = (f === 'error') ? '#ff8a80' : (f === 'warn') ? '#ffcc80' : '#fff';
+                    btn.style.border = (f === 'error') ? '1px solid rgba(244,67,54,0.5)' : (f === 'warn') ? '1px solid rgba(255,152,0,0.5)' : 'none';
+                }
+            });
+            refreshFloatConsole();
+        }
         let floatZoom = parseFloat(localStorage.getItem('tdjl_consoleZoom') || '1') || 1;
         function updateFloatZoomLabel() {
             const btn = document.getElementById('floatZoomResetBtn');
@@ -19806,6 +19824,9 @@ ${maSection}
                 // 关键字同时匹配日志级别(error/warn/info)与内容，输入 error/err 即可过滤错误日志
                 logs = logs.filter(l => (l.level && l.level.toLowerCase().indexOf(kw) !== -1) || (l.msg || '').toLowerCase().indexOf(kw) !== -1);
             }
+            if (floatLevelFilter && floatLevelFilter !== 'all') {
+                logs = logs.filter(l => l.level === floatLevelFilter);
+            }
             const badge = document.getElementById('floatConsoleBadge');
             const errCount = logs ? logs.filter(l => l.level === 'error').length : 0;
             if (badge) {
@@ -19905,6 +19926,7 @@ ${maSection}
                 const dw = cx - resizeState.startX;
                 const dh = cy - resizeState.startY;
                 con.style.width = Math.max(320, Math.min(window.innerWidth - 20, resizeState.startW + dw)) + 'px';
+                con.style.maxHeight = 'none';
                 con.style.height = Math.max(200, Math.min(window.innerHeight - 30, resizeState.startH + dh)) + 'px';
             };
             const onEnd = () => {
