@@ -19714,9 +19714,13 @@ ${maSection}
         function toggleFloatConsole() {
             const con = document.getElementById('floatConsole');
             const toggle = document.getElementById('floatConsoleToggle');
+            // 守卫：管理员总开关未开启时禁止打开（避免绕过开关的小圆按钮直接显示浮窗）
+            let consoleEnabled = false;
+            try { consoleEnabled = localStorage.getItem('tdjl_consoleVisible') === '1'; } catch (_) {}
+            if (!consoleEnabled && !floatConsoleVisible) return;
             floatConsoleVisible = !floatConsoleVisible;
             con.style.display = floatConsoleVisible ? 'flex' : 'none';
-            if (toggle) toggle.style.display = floatConsoleVisible ? 'none' : 'flex';
+            if (toggle) toggle.style.display = (consoleEnabled && !floatConsoleVisible) ? 'flex' : 'none';
             try { localStorage.setItem(CONSOLE_MINIMIZED_KEY, floatConsoleVisible ? '0' : '1'); } catch (_) {}
             if (floatConsoleVisible) {
                 refreshFloatConsole();
@@ -19743,7 +19747,7 @@ ${maSection}
             // 现在 = 管理员开关开启 且 未收起 才显示
             floatConsoleVisible = consoleEnabled && !minimized;
             con.style.display = floatConsoleVisible ? 'flex' : 'none';
-            if (toggle) toggle.style.display = floatConsoleVisible ? 'none' : 'flex';
+            if (toggle) toggle.style.display = (consoleEnabled && !floatConsoleVisible) ? 'flex' : 'none';
             refreshFloatConsole();
             applyFloatZoom();
             initFloatAutoScrollBtn();
@@ -19778,7 +19782,7 @@ ${maSection}
             try { minimized = localStorage.getItem(CONSOLE_MINIMIZED_KEY) === '1'; } catch (_) {}
             floatConsoleVisible = visible && !minimized;
             con.style.display = floatConsoleVisible ? 'flex' : 'none';
-            if (btn) btn.style.display = floatConsoleVisible ? 'none' : 'flex';
+            if (btn) btn.style.display = (visible && !floatConsoleVisible) ? 'flex' : 'none';
             if (floatConsoleVisible) {
                 refreshFloatConsole();
                 if (floatConsoleRefreshTimer) clearInterval(floatConsoleRefreshTimer);
