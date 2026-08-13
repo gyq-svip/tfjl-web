@@ -57,6 +57,16 @@ jobs:
           echo "=== top-level entries ==="
           ls -la _site
 
+      - name: Bump asset version (cache-bust per deploy)
+        run: |
+          VER="b$(date +%Y%m%d%H%M%S)"
+          echo "Cache-bust version: $VER"
+          # 把 _site/index.html 里所有脚本 src 的 ?v= 查询参数替换为部署时间戳，
+          # 确保 Service Worker(staleWhileRevalidate) 每次部署都按新 URL 拉到最新 JS，不再跑旧缓存。
+          sed -i -E 's/(<script[^>]*src="[^"]*)\?v=[^"]*(")/\1?v='"$VER"'\2/g' _site/index.html
+          echo "--- script tags after bump ---"
+          grep -nE '<script[^>]*src="[^"]*\.js' _site/index.html || true
+
       - name: Inject Token (optional)
         run: |
           TOKEN="${{ secrets.GIST_TOKEN }}"
