@@ -19326,6 +19326,8 @@ ${maSection}
             if (analyticsPage) analyticsPage.style.display = 'none';
             const logStatsAdminPage2 = document.getElementById('adminPageLogStats');
             if (logStatsAdminPage2) logStatsAdminPage2.style.display = 'none';
+            const apiMonPage = document.getElementById('adminPageApiMonitor');
+            if (apiMonPage) apiMonPage.style.display = 'none';
             updateBroadcastToggleStatus();
             adminRenderApiUsage();
         }
@@ -19396,6 +19398,12 @@ ${maSection}
                     adminRefreshDebugLog();
                     adminRefreshConsoleLog();
                 }
+            } else if (page === 'apiMonitor') {
+                const pageEl = document.getElementById('adminPageApiMonitor');
+                if (pageEl) {
+                    pageEl.style.display = 'block';
+                    refreshApiMonitor();
+                }
             }
         }
 
@@ -19453,6 +19461,125 @@ ${maSection}
         }
         window.adminRenderApiUsage = adminRenderApiUsage;
 
+        // ==================== API监控（主管理员面板；移植自拍卖页 refreshApiMonitor，并新增计数器Gist写回测试）====================
+        // 让管理员一处即可确认：① GitHub API 限额；② Token 是否含 gist 权限；③ 能否真正写入(创建+删除临时Gist)；
+        // ④ 三大关键 Gist(索引/消息/计数器)是否可读可写；其中计数器 Gist 额外做"读→刷新last_updated→写回"验证，
+        // 这正是统计"写入是否正常"的权威判定（此前 s1.0.125~128 反复误判权限，现管理员可一键自证）。
+        async function refreshApiMonitor() {
+            const content = document.getElementById('apiMonitorContent');
+            if (!content) return;
+            content.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,0.4);padding:10px;">查询中...</div>';
+            try {
+                const token = getGistToken();
+                if (!token) {
+                    content.innerHTML = '<div style="color:#ef4444;font-size:0.85rem;text-align:center;padding:10px;">⚠️ 未检测到 Token（自动注入或 localStorage 均空），以下写测试将不可用。请检查 deploy.yml 的 GIST_TOKEN 或本地配置。</div>';
+                }
+
+                // 1. GitHub API 限额（rate_limit 端点豁免配额）
+                const rlResp = await fetch('https://api.github.com/rate_limit', {
+                    headers: { 'Accept': 'application/vnd.github.v3+json', ...(token && { 'Authorization': `token ${token}` }) }
+                });
+                const rl = await rlResp.json();
+                const core = rl.resources && rl.resources.core;
+                const coreHtml = core
+                    ? `剩余 <b style="color:${core.remaining <= 50 ? '#ff6b6b' : '#4ade80'}">${core.remaining}</b> / ${core.limit}（已用 ${core.used != null ? core.used : core.limit - core.remaining}）`
+                    : '无数据';
+
+                // 2. Token 权限 + 真实写入测试（创建临时 Gist 再删除）
+                let scopeText = '未知', gistWriteOk = false, writeDetail = '未测试';
+                if (token) {
+                    const sh = rlResp.headers.get('X-OAuth-Scopes') || '';
+                    scopeText = sh || 'Fine-grained PAT（无 X-OAuth-Scopes 头）';
+                    gistWriteOk = /gist/.test(sh);
+                    if (!gistWriteOk && sh) scopeText += ' ⚠️ 无 gist 权限';
+                    try {
+                        const t = await fetch('https://api.github.com/gists', {
+                            method: 'POST',
+                            headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` },
+                            body: JSON.stringify({ description: 'TFJL API write test (auto-delete)', public: false, files: { '_tfjl_test_.txt': { content: 'test_' + Date.now() } } })
+                        });
+                        if (t.ok) {
+                            const d = await t.json();
+                            await fetch(`https://api.github.com/gists/${d.id}`, { method: 'DELETE', headers: { 'Authorization': `token ${token}` } });
+                            writeDetail = '✅ 创建+删除测试 Gist 成功';
+                            gistWriteOk = true;
+                        } else {
+                            const e = await t.json().catch(() => ({}));
+                            writeDetail = `❌ 创建失败(${t.status}): ${e.message || '未知'}`;
+                            gistWriteOk = false;
+                        }
+                    } catch (e) {
+                        writeDetail = '❌ 请求失败: ' + e.message;
+                        gistWriteOk = false;
+                    }
+                }
+
+                // 3. 关键 Gist 可读 + 计数器 Gist 写回测试
+                const msgId = localStorage.getItem('messages_gist_id') || MESSAGES_GIST_ID;
+                const gistChecks = [
+                    { name: '索引 Gist', id: GIST_ID },
+                    { name: '消息 Gist', id: msgId },
+                    { name: '计数器 Gist', id: COUNTER_GIST_ID }
+                ];
+                let gistHtml = '';
+                for (const gc of gistChecks) {
+                    if (!gc.id) {
+                        gistHtml += `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:0.78rem;"><span style="color:rgba(255,255,255,0.6);">${gc.name}</span><span style="color:#fbbf24;">⚠️ 未配置</span></div>`;
+                        continue;
+                    }
+                    try {
+                        const r = await fetch(`https://api.github.com/gists/${gc.id}`, {
+                            headers: { 'Accept': 'application/vnd.github.v3+json', ...(token && { 'Authorization': `token ${token}` }) }
+                        });
+                        const icon = r.ok ? '✅' : (r.status === 404 ? '❌ 404' : r.status === 403 ? '🔒 403' : `⚠️ ${r.status}`);
+                        const color = r.ok ? '#4ade80' : '#ef4444';
+                        gistHtml += `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:0.78rem;"><span style="color:rgba(255,255,255,0.6);">${gc.name}</span><span style="color:${color};">${icon} ${gc.id.substring(0, 8)}...</span></div>`;
+                        // 计数器 Gist 额外做写回测试：读→刷新 last_updated→写回（last_updated 本就是时间戳，零数据风险），验证统计写入通道
+                        if (gc.name === '计数器 Gist' && r.ok && token) {
+                            try {
+                                const gj = await r.json();
+                                const obj = JSON.parse(gj.files['counter.json'].content);
+                                obj.last_updated = getCurrentTimeString();
+                                const pr = await fetch(`https://api.github.com/gists/${gc.id}`, {
+                                    method: 'PATCH',
+                                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` },
+                                    body: JSON.stringify({ files: { 'counter.json': { content: JSON.stringify(obj, null, 2) } } })
+                                });
+                                gistHtml += `<div style="display:flex;justify-content:space-between;padding:4px 0 8px;font-size:0.78rem;"><span style="color:rgba(255,255,255,0.6);">↳ 计数器写回测试</span><span style="color:${pr.ok ? '#4ade80' : '#ef4444'};">${pr.ok ? '✅ 写回成功（写入通道正常）' : '❌ 写回失败(' + pr.status + ')'}</span></div>`;
+                            } catch (e) {
+                                gistHtml += `<div style="padding:4px 0 8px;font-size:0.78rem;color:#ef4444;">↳ 写回异常: ${e.message}</div>`;
+                            }
+                        }
+                    } catch (e) {
+                        gistHtml += `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:0.78rem;"><span style="color:rgba(255,255,255,0.6);">${gc.name}</span><span style="color:#ef4444;">❌ 请求失败</span></div>`;
+                    }
+                }
+
+                // 4. 渲染
+                content.innerHTML = `
+                    <div style="margin-bottom:12px;">
+                        <div style="color:#a78bfa;font-size:0.85rem;margin-bottom:6px;">📊 GitHub API 限额</div>
+                        <div style="font-size:0.85rem;">${coreHtml}</div>
+                    </div>
+                    <div style="margin-bottom:12px;">
+                        <div style="color:#a78bfa;font-size:0.85rem;margin-bottom:6px;">🔑 Token 状态</div>
+                        <div style="font-size:0.8rem;line-height:1.7;">
+                            <div>配置：${token ? '<span style="color:#4ade80;">✅ 已配置</span>' : '<span style="color:#ef4444;">⚠️ 未配置</span>'}</div>
+                            <div>权限范围：${scopeText}</div>
+                            <div>gist 写入：${gistWriteOk ? '<span style="color:#4ade80;">✅ 可写</span>' : '<span style="color:#ef4444;">❌ 不可写</span>'}（${writeDetail}）</div>
+                        </div>
+                    </div>
+                    <div>
+                        <div style="color:#a78bfa;font-size:0.85rem;margin-bottom:6px;">📁 关键 Gist 可访问性</div>
+                        ${gistHtml}
+                    </div>
+                    <div style="margin-top:12px;color:rgba(255,255,255,0.4);font-size:0.7rem;">检测时间：${new Date().toLocaleString('zh-CN')}</div>
+                `;
+            } catch (e) {
+                content.innerHTML = '<div style="color:#ef4444;font-size:0.85rem;padding:10px;">检测异常: ' + (e.message || e) + '</div>';
+            }
+        }
+        window.refreshApiMonitor = refreshApiMonitor;
 
         // ==================== 对战日志诊断（管理员菜单） ====================
         function adminRefreshDebugLog() {
