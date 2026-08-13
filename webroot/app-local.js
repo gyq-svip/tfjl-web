@@ -3599,9 +3599,19 @@ if (isTauriApp) {
                 const skinPath = base + '\\' + heroName + '\\' + file;
                 // 已存在则跳过（本地已有 .skin，可能来自 Gitee zip 或之前下载）
                 // 用自定义 path_exists 判断（已授权、跨 Tauri 版本稳定），避免 read_file 误判"不存在"导致每次重新下载
+                // 但旧版本曾写出过 0 字节/损坏文件 → path_exists 误判"已存在"而永久跳过。这里额外校验文件大小，
+                // 文件过小(<=64B)视为无效，强制删除后重新下载，打破"目录建好却写不进"的死循环。
                 try {
                     const exists = await invokeFn('path_exists', { path: skinPath });
-                    if (exists === true) { skipped++; continue; }
+                    if (exists === true) {
+                        let valid = true;
+                        try {
+                            const bytes = await invokeFn('plugin:fs|read_file', { path: skinPath, options: undefined });
+                            const len = bytes ? (bytes.byteLength ?? bytes.length ?? 0) : 0;
+                            if (len <= 64) { valid = false; await invokeFn('plugin:fs|remove', { path: skinPath }); }
+                        } catch (eSize) { valid = false; }
+                        if (valid) { skipped++; continue; }
+                    }
                 } catch(e) { /* 不存在，继续下载 */ }
                 try {
                     const url = REMOTE_SKIN_BASE + '/' + encodeURIComponent(heroName) + '/' + encodeURIComponent(file);
