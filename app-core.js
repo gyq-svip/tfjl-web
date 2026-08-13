@@ -12920,15 +12920,17 @@ function hasGistToken() {
         }
         // 由设备明细重算某日访问总数（跨设备求和）；无明细的日期保持原值不动（兼容历史数据）
         function recomputeDailyVisitsOn(data, date) {
+            if (!data.daily_stats) data.daily_stats = {};
+            if (!data.daily_stats[date]) data.daily_stats[date] = { visits: 0, app_visits: 0, web_visits: 0, downloads: 0, new_users: 0, new_app_users: 0, new_web_users: 0, hourly_visits: new Array(24).fill(0) };
             const map = data.daily_device_visits && data.daily_device_visits[date];
+            // 🔴 无明细（合并/待同步路径未写入 daily_device_visits）时，保留已直接累计的 visits，绝不归零
             if (!map) return;
             let v = 0, a = 0, w = 0;
             for (const id in map) { v += map[id].v || 0; a += map[id].a || 0; w += map[id].w || 0; }
-            if (!data.daily_stats) data.daily_stats = {};
-            if (!data.daily_stats[date]) data.daily_stats[date] = { visits: 0, app_visits: 0, web_visits: 0, downloads: 0, new_users: 0, new_app_users: 0, new_web_users: 0, hourly_visits: new Array(24).fill(0) };
-            data.daily_stats[date].visits = v;
-            data.daily_stats[date].app_visits = a;
-            data.daily_stats[date].web_visits = w;
+            // 🔴 用 Math.max 而非覆盖：既保留跨设备求和结果，又不会把已直接累加的访问数压低
+            data.daily_stats[date].visits = Math.max(data.daily_stats[date].visits || 0, v);
+            data.daily_stats[date].app_visits = Math.max(data.daily_stats[date].app_visits || 0, a);
+            data.daily_stats[date].web_visits = Math.max(data.daily_stats[date].web_visits || 0, w);
         }
 
         // 累计总访问按设备汇总（与每日访问同思路，避免多端 Math.max 低估）
@@ -13668,6 +13670,11 @@ function hasGistToken() {
                         // 累计来源口径（用于"累计 APP/网页 访问"，该指标仍取最大值合并，保持历史累计语义）
                         if (!counterData.sources) counterData.sources = { app_visits: 0, web_visits: 0 };
                         if (isApp) counterData.sources.app_visits++; else counterData.sources.web_visits++;
+                        // 🔴 直接累计当日 visits 作为真理存储（不再只依赖 daily_device_visits 反算，
+                        // 避免该明细在合并/待同步路径丢失时今日访问被算成 0）；随后 recompute 用 Math.max 兜底，跨设备求和仍正确
+                        counterData.daily_stats[today].visits = (counterData.daily_stats[today].visits || 0) + 1;
+                        if (isApp) counterData.daily_stats[today].app_visits = (counterData.daily_stats[today].app_visits || 0) + 1;
+                        else counterData.daily_stats[today].web_visits = (counterData.daily_stats[today].web_visits || 0) + 1;
                         // 由设备明细重算当日访问总数（跨设备求和）
                         recomputeDailyVisitsOn(counterData, today);
                         // 记录访问时段
@@ -13744,11 +13751,13 @@ function hasGistToken() {
                 // 更新底部统计栏显示
                 updateStatsBar();
                 
-                // 如果网络在线，直接同步到Gist
-                if (isOnline()) {
+                // 🔴 不再用 isOnline() 卡死写入：页面刚加载时在线标记常未就绪，会把访问永远丢进待同步队列而写不进 Gist。
+                // 改为直接尝试写 Gist（照需求墙 saveMessagesToGist 的方式：try 真实网络，失败/限流时函数内部自动进待同步队列），
+                // 写不写得出去由真实结果决定，而非一个可能尚未就绪的在线标记。
+                try {
                     await syncCounterToGist();
-                } else {
-                    // 网络离线，加入待同步队列
+                } catch (syncErr) {
+                    console.warn('⚠️ 统计同步失败，转入待同步队列:', syncErr);
                     addToPendingSync(type);
                 }
                 
