@@ -19597,13 +19597,37 @@ ${maSection}
             panel.innerHTML = items;
         }
 
+        let adminLogFilter = 'all';
+        function adminLogSetFilter(level) {
+            adminLogFilter = (level === 'all') ? 'all' : (level || 'all');
+            ['all', 'error', 'warn'].forEach(f => {
+                const btn = document.getElementById('adminLogFilter' + f.charAt(0).toUpperCase() + f.slice(1));
+                if (!btn) return;
+                if (f === adminLogFilter) {
+                    btn.style.background = (f === 'error') ? 'rgba(244,67,54,0.45)' : (f === 'warn') ? 'rgba(255,152,0,0.45)' : 'rgba(255,255,255,0.4)';
+                    btn.style.color = '#fff';
+                    btn.style.border = '1px solid rgba(255,255,255,0.6)';
+                } else {
+                    btn.style.background = (f === 'error') ? 'rgba(244,67,54,0.18)' : (f === 'warn') ? 'rgba(255,152,0,0.18)' : 'rgba(255,255,255,0.12)';
+                    btn.style.color = (f === 'error') ? '#ff8a80' : (f === 'warn') ? '#ffcc80' : '#fff';
+                    btn.style.border = (f === 'error') ? '1px solid rgba(244,67,54,0.5)' : (f === 'warn') ? '1px solid rgba(255,152,0,0.5)' : 'none';
+                }
+            });
+            adminRefreshConsoleLog();
+        }
+
         function adminRefreshConsoleLog() {
             const panel = document.getElementById('consoleLogPanel');
             if (!panel) return;
             applyAdminLogZoom();
-            const logs = window.__consoleLogs;
-            if (!logs || logs.length === 0) {
+            const allLogs = window.__consoleLogs;
+            if (!allLogs || allLogs.length === 0) {
                 panel.innerHTML = '<div style="color:rgba(255,255,255,0.3);text-align:center;padding:30px;font-size:0.85rem;">暂无日志输出</div>';
+                return;
+            }
+            const logs = (adminLogFilter === 'all') ? allLogs : allLogs.filter(l => l.level === adminLogFilter);
+            if (logs.length === 0) {
+                panel.innerHTML = '<div style="color:rgba(255,255,255,0.3);text-align:center;padding:30px;font-size:0.85rem;">当前筛选（' + adminLogFilter + '）下没有日志</div>';
                 return;
             }
             const levelColors = { error: '#f44336', warn: '#ff9800', info: '#00bcd4', log: 'rgba(255,255,255,0.75)' };
