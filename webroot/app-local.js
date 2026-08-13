@@ -3550,17 +3550,38 @@ if (isTauriApp) {
     }
 
     // blob / ArrayBuffer → base64 字符串（用于写磁盘文本文件）
+    // 改用 arrayBuffer + btoa 分块编码，绕开 Tauri WebView2 中 FileReader.readAsDataURL 对大二进制 blob
+    // 返回 reader.result 为空字符串的已知 bug（导致 s1.0.139 仍报 b64.len=0）；FileReader 仅作兜底
     function _blobToBase64(blob) {
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
+            // 主路径：arrayBuffer + btoa（稳定可靠）
+            blob.arrayBuffer().then(ab => {
+                try {
+                    const bytes = new Uint8Array(ab);
+                    const len = bytes.byteLength;
+                    if (len === 0) { _b64Fallback(blob, resolve); return; }
+                    let bin = '';
+                    const CHUNK = 0x8000;
+                    for (let i = 0; i < len; i += CHUNK) {
+                        bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+                    }
+                    resolve(btoa(bin));
+                } catch (e) { _b64Fallback(blob, resolve); }
+            }).catch(() => _b64Fallback(blob, resolve));
+        });
+    }
+    function _b64Fallback(blob, resolve) {
+        try {
             const reader = new FileReader();
             reader.onloadend = () => {
-                const dataUrl = reader.result; // "data:image/png;base64,xxxxx"
-                const b64 = dataUrl.split(',')[1];
-                resolve(b64 || '');
+                const url = reader.result || '';
+                const idx = String(url).indexOf(',');
+                resolve(idx >= 0 ? url.substring(idx + 1) : '');
             };
-            reader.onerror = reject;
+            reader.onerror = () => resolve('');
+            reader.onabort = () => resolve('');
             reader.readAsDataURL(blob);
-        });
+        } catch (e) { resolve(''); }
     }
 
     // base64 字符串 → Uint8Array（用于创建 Blob URL）
@@ -3618,13 +3639,13 @@ if (isTauriApp) {
                     const resp = await _fetchWithTimeout(url, 8000);
                     if (!resp.ok) { console.warn('[SKIN] 远程皮肤 HTTP', resp.status, heroName, file); continue; }
                     const blob = await resp.blob();
-                    const b64 = (await _blobToBase64(blob)).split(',')[1];
+                    const b64 = await _blobToBase64(blob);
                     let wrote = false;
                     // 写盘前诊断日志（首次写盘失败时方便定位：是网络b64坏/路径权限/IPC序列化哪个环节出问题）
-                    console.log('[SKIN] 写盘', heroName, file, 'b64.len=', b64 ? b64.length : 0, 'path=', skinPath);
+                    console.log('[SKIN] 写盘', heroName, file, 'b64.len=', b64 ? b64.length : 0, 'blob.size=', blob.size, 'blob.type=', blob.type, 'content-type=', resp.headers.get('content-type'), 'content-length=', resp.headers.get('content-length'), 'path=', skinPath);
                     // 主：base64 字符串写（自定义命令 write_binary_file，跨 Tauri 版本稳定，不依赖二进制 IPC 序列化）
                     // 失败时重试 1 次（应对偶发 IPC 失败），并打印完整错误对象（message/name/code/stringified）便于诊断
-                    if (b64) {
+                    if (b64 && b64.length > 0) {
                         for (let attempt = 1; attempt <= 2 && !wrote; attempt++) {
                             try {
                                 await invokeFn('write_binary_file', { file_path: skinPath, content_base64: b64 });
@@ -3634,9 +3655,11 @@ if (isTauriApp) {
                                 if (attempt === 2) console.warn('[SKIN] write_binary_file 彻底失败(已重试1次)，回退 fs 插件:', heroName, file, e1Info);
                             }
                         }
+                    } else {
+                        console.warn('[SKIN] 跳过写盘(b64 为空)，上方诊断行已说明网络/解析问题:', heroName, file);
                     }
                     // 备：Tauri v2 fs 插件写（contents 必须是 string，不能传 Uint8Array，否则 Tauri v2 ACL 会拒）
-                    if (!wrote) {
+                    if (!wrote && b64 && b64.length > 0) {
                         try { await invokeFn('plugin:fs|write_file', { path: skinPath, contents: b64 }); wrote = true; }
                         catch (e2) { console.warn('[SKIN] 皮肤写盘失败(plugin:fs|write_file 也不允许 base64):', heroName, file, e2 && (e2.message || JSON.stringify(e2) || String(e2))); }
                     }
@@ -3730,12 +3753,12 @@ if (isTauriApp) {
                     const resp = await _fetchWithTimeout(remoteUrl, 10000);
                     if (!resp.ok) { console.warn('[SKIN] 单皮肤远程 HTTP', resp.status, parsed.hero, parsed.file, remoteUrl); return remoteUrl; }
                     const blob = await resp.blob();
-                    const b64 = (await _blobToBase64(blob)).split(',')[1];
+                    const b64 = await _blobToBase64(blob);
                     let wrote = false;
-                    console.log('[SKIN] 写盘', parsed.hero, parsed.file, 'b64.len=', b64 ? b64.length : 0, 'path=', skinPath);
+                    console.log('[SKIN] 写盘', parsed.hero, parsed.file, 'b64.len=', b64 ? b64.length : 0, 'blob.size=', blob.size, 'blob.type=', blob.type, 'content-type=', resp.headers.get('content-type'), 'content-length=', resp.headers.get('content-length'), 'path=', skinPath);
                     // 主：自定义 Rust 命令 write_binary_file（已授权、支持二进制、跨 Tauri 版本稳定）
                     // 失败时重试 1 次（应对偶发 IPC 失败），并打印完整错误对象（message/name/code/stringified）便于诊断
-                    if (b64) {
+                    if (b64 && b64.length > 0) {
                         for (let attempt = 1; attempt <= 2 && !wrote; attempt++) {
                             try {
                                 await invokeFn('write_binary_file', { file_path: skinPath, content_base64: b64 });
@@ -3745,9 +3768,11 @@ if (isTauriApp) {
                                 if (attempt === 2) console.warn('[SKIN] write_binary_file 彻底失败(已重试1次)，回退 fs 插件:', parsed.hero, parsed.file, eWInfo);
                             }
                         }
+                    } else {
+                        console.warn('[SKIN] 跳过写盘(b64 为空)，上方诊断行已说明网络/解析问题:', parsed.hero, parsed.file);
                     }
                     // 备：fs 插件写 base64 字符串（注意 contents 必须是 string，不能传 Uint8Array，Tauri v2 ACL 会拒）
-                    if (!wrote) {
+                    if (!wrote && b64 && b64.length > 0) {
                         try { await invokeFn('plugin:fs|write_file', { path: skinPath, contents: b64 }); wrote = true; }
                         catch (eF) { console.warn('[SKIN] 皮肤写盘失败(plugin:fs|write_file 也不允许 base64):', parsed.hero, parsed.file, eF && (eF.message || JSON.stringify(eF) || String(eF))); }
                     }
