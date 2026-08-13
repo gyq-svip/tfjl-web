@@ -631,6 +631,7 @@
                     <button onclick="switchCalcTopTab('new')" id="calcTopNew" style="flex:1;padding:8px;border:none;border-radius:6px;cursor:pointer;font-size:0.85rem;background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;">🆕 新活动·封神杯襄</button>
                     <button onclick="switchCalcTopTab('old')" id="calcTopOld" style="flex:1;padding:8px;border:none;border-radius:6px;cursor:pointer;font-size:0.85rem;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);">📦 旧活动·轮回</button>
                     <button onclick="switchCalcTopTab('boss')" id="calcTopBoss" style="flex:1;padding:8px;border:none;border-radius:6px;cursor:pointer;font-size:0.85rem;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);">🛡️ Boss减伤</button>
+                    <button onclick="switchCalcTopTab('dragon')" id="calcTopDragon" style="flex:1;padding:8px;border:none;border-radius:6px;cursor:pointer;font-size:0.85rem;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);">🐉 龙珠升星</button>
                 </div>
 
                 <!-- ============ 新活动容器 ============ -->
@@ -823,6 +824,8 @@
         </div>
         <!-- ============ Boss减伤容器（顶层 Tab） ============ -->
         <div id="calcBossContainer" style="display:none;padding:15px;"></div>
+        <!-- ============ 龙珠升星增幅表（顶层 Tab） ============ -->
+        <div id="calcDragonContainer" style="display:none;padding:15px;"></div>
         </div><!-- /activityCalcPanel -->
 
 
@@ -1958,7 +1961,7 @@
                             <button id="adminLogFilterError" onclick="adminLogSetFilter('error')" data-filter="error" style="background:rgba(244,67,54,0.18);color:#ff8a80;border:1px solid rgba(244,67,54,0.5);padding:5px 10px;border-radius:6px;cursor:pointer;font-size:0.72rem;margin-right:3px;">⚠ 错误</button>
                             <button id="adminLogFilterWarn" onclick="adminLogSetFilter('warn')" data-filter="warn" style="background:rgba(255,152,0,0.18);color:#ffcc80;border:1px solid rgba(255,152,0,0.5);padding:5px 10px;border-radius:6px;cursor:pointer;font-size:0.72rem;margin-right:6px;">⚡ 警告</button>
                             <button onclick="adminLogZoomOut()" title="缩小字体" style="background:rgba(255,255,255,0.12);color:#fff;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:0.75rem;margin-right:4px;">A−</button>
-                            <button onclick="adminLogZoomReset()" title="重置缩放" style="background:rgba(255,255,255,0.12);color:#fff;border:none;padding:5px 8px;border-radius:6px;cursor:pointer;font-size:0.7rem;margin-right:4px;">100%</button>
+                            <button id="adminLogZoomResetBtn" onclick="adminLogZoomReset()" title="重置缩放" style="background:rgba(255,255,255,0.12);color:#fff;border:none;padding:5px 8px;border-radius:6px;cursor:pointer;font-size:0.7rem;margin-right:4px;">100%</button>
                             <button onclick="adminLogZoomIn()" title="放大字体" style="background:rgba(255,255,255,0.12);color:#fff;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:0.75rem;margin-right:6px;">A+</button>
                             <button onclick="adminRefreshConsoleLog()" style="background:linear-gradient(135deg,#00bcd4,#0097a7);color:white;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.8rem;margin-right:6px;">🔄 刷新</button>
                             <button onclick="window.__consoleLogs=[];adminRefreshConsoleLog();" style="background:linear-gradient(135deg,#ef4444,#dc2626);color:white;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.8rem;">🗑 清空</button>
@@ -2439,7 +2442,7 @@
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">s20260813-14 · s1.0.132</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">s20260813-15 · s1.0.133</span>
             </div>
         </div>
     </div>
@@ -2453,7 +2456,7 @@
             <span style="font-size:0.78rem;font-weight:600;">💻 调试日志<span id="floatConsoleBadge" style="display:none;margin-left:6px;background:#00bcd4;color:#000;border-radius:10px;padding:0 6px;font-size:0.65rem;"></span></span>
             <span>
                 <button onclick="floatZoomOut()" title="缩小字体" style="background:rgba(255,255,255,0.15);color:#fff;border:none;padding:2px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;margin-right:3px;">A−</button>
-                <button onclick="floatZoomReset()" title="重置缩放" style="background:rgba(255,255,255,0.15);color:#fff;border:none;padding:2px 6px;border-radius:4px;cursor:pointer;font-size:0.65rem;margin-right:3px;">100%</button>
+                <button id="floatZoomResetBtn" onclick="floatZoomReset()" title="重置缩放" style="background:rgba(255,255,255,0.15);color:#fff;border:none;padding:2px 6px;border-radius:4px;cursor:pointer;font-size:0.65rem;margin-right:3px;">100%</button>
                 <button onclick="floatZoomIn()" title="放大字体" style="background:rgba(255,255,255,0.15);color:#fff;border:none;padding:2px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;margin-right:4px;">A+</button>
                 <button onclick="floatConsoleClear()" style="background:rgba(255,255,255,0.15);color:#fff;border:none;padding:2px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;margin-right:4px;">清空</button>
                 <button onclick="toggleFloatConsole()" style="background:rgba(255,255,255,0.15);color:#fff;border:none;padding:2px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;">收起</button>
@@ -2464,6 +2467,7 @@
             <button onclick="clearFloatConsoleFilter()" style="background:rgba(255,255,255,0.12);color:#fff;border:none;padding:2px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;">✕</button>
         </div>
         <div id="floatConsoleContent" style="flex:1;overflow-y:auto;padding:6px 8px;font-size:0.68rem;line-height:1.35;color:rgba(255,255,255,0.75);"></div>
+        <div id="floatConsoleResize" title="拖拽调整窗口大小" style="position:absolute;right:0;bottom:0;width:18px;height:18px;cursor:nwse-resize;background:linear-gradient(135deg,transparent 50%,rgba(0,188,212,0.8) 50%);border-bottom-right-radius:8px;z-index:2;"></div>
     </div>
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" style="position:fixed;right:12px;bottom:12px;z-index:99998;display:none;align-items:center;gap:4px;background:linear-gradient(135deg,#00838f,#006064);color:#fff;border:none;padding:6px 12px;border-radius:20px;cursor:pointer;font-size:0.75rem;box-shadow:0 2px 8px rgba(0,0,0,0.4);">💻日志</button>
         <!-- 需求墙备份中心（合并：定期备份 + 还原 + 紧急救回） -->
