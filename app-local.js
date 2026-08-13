@@ -3711,12 +3711,17 @@ if (isTauriApp) {
                     const resp = await _fetchWithTimeout(remoteUrl, 10000);
                     if (!resp.ok) return remoteUrl;
                     const blob = await resp.blob();
-                    try {
-                        const arr = new Uint8Array(await blob.arrayBuffer());
-                        await invokeFn('plugin:fs|write_file', { path: skinPath, contents: arr });
-                    } catch (e1) {
-                        const b64 = (await _blobToBase64(blob)).split(',')[1];
-                        if (b64) await invokeFn('write_binary_file', { file_path: skinPath, content_base64: b64 }).catch(() => {});
+                    const b64 = (await _blobToBase64(blob)).split(',')[1];
+                    let wrote = false;
+                    // 主：自定义 Rust 命令 write_binary_file（已授权、支持二进制、跨 Tauri 版本稳定）
+                    if (b64) {
+                        try { await invokeFn('write_binary_file', { file_path: skinPath, content_base64: b64 }); wrote = true; }
+                        catch (eW) { console.warn('[SKIN] write_binary_file 失败，回退 fs 插件:', eW && eW.message); }
+                    }
+                    // 备：fs 插件写 base64 字符串（注意 contents 必须是 string，不能传 Uint8Array，Tauri v2 ACL 会拒）
+                    if (!wrote) {
+                        try { await invokeFn('plugin:fs|write_file', { path: skinPath, contents: b64 }); wrote = true; }
+                        catch (eF) { console.warn('[SKIN] 皮肤写盘失败(plugin:fs|write_file 也不允许 base64):', parsed.hero, parsed.file, eF && eF.message); }
                     }
                     return URL.createObjectURL(blob);
                 } catch(e) {
