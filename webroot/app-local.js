@@ -765,12 +765,11 @@ if (isTauriApp) {
                         <label style="color:#ffd700;font-size:0.9rem;">📋 扫描到的脚本文件</label>
                         <button onclick="scanAllFiles(true)" style="background:linear-gradient(135deg,#ff9800,#e65100);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">🔄 刷新扫描</button>
                     </div>
-                    <!-- 工具栏（搜索框+分类+分享+批量）独立容器，不参与每次重绘，避免中文输入法 composition 被打断打不出中文 -->
+                    <!-- 工具栏（搜索框+分类）独立容器，不参与每次重绘，避免中文输入法 composition 被打断打不出中文 -->
                     <div id="scannedFileToolbar" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,0.1);">
                         <input type="text" id="scannedFileSearchInput" value="" placeholder="🔍 搜索文件名…" oninput="setScannedFilterKeyword(this.value)" style="flex:1;min-width:120px;padding:6px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:rgba(0,0,0,0.3);color:#fff;font-size:0.8rem;box-sizing:border-box;">
                         <div id="scannedFileCats" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;"></div>
                         <button id="scannedShareModeBtn" onclick="toggleScannedShareMode()" title="分享模式：快速分享到需求墙" style="background:linear-gradient(135deg,#7c4dff,#b388ff);color:#fff;border:none;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:0.75rem;font-weight:bold;white-space:nowrap;">📢 分享模式</button>
-                        <button id="scannedBatchShareBtn" onclick="doBatchShareScannedFromMain()" title="批量分享到需求墙" style="background:linear-gradient(135deg,#ff6b6b,#ff9e80);color:#fff;border:none;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:0.75rem;font-weight:bold;opacity:0.5;white-space:nowrap;display:none;">📢 批量分享</button>
                     </div>
                     <div id="scannedFileList" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:8px;min-height:60px;max-height:250px;overflow:auto;">
                         <div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">扫描中...</div>
@@ -997,31 +996,26 @@ if (isTauriApp) {
     // 否则每次输入重绘会打断中文输入法 composition，导致中文打不出来/只能复制粘贴）
     function renderScannedToolbar() {
         const catsEl = document.getElementById('scannedFileCats');
-        if (catsEl) {
-            const cats = ['全部', '寒冰', '暗月', '漩涡', '合作', '深海', '活动', '日志', '临时', '其他'];
-            const cmap = {
-                '全部': '#ffffff', '寒冰': '#64b5f6', '暗月': '#ce93d8', '漩涡': '#4fc3f7',
-                '合作': '#ffd54f', '深海': '#4db6ac', '活动': '#ff8a65', '日志': '#ef5350', '临时': '#a5d6a7', '其他': '#bdbdbd'
-            };
-            let h = '';
-            cats.forEach(cat => {
-                const active = _scannedFilterCategory === cat;
-                const color = cmap[cat] || '#bdbdbd';
-                const count = cat === '全部' ? scannedFiles.length : scannedFiles.filter(f => (f.category || '其他') === cat).length;
-                h += `<button onclick="setScannedFilterCategory('${cat}')" style="background:${active ? color : 'rgba(255,255,255,0.06)'};color:${active ? '#000' : color};border:1px solid ${active ? color : 'rgba(255,255,255,0.12)'};padding:3px 10px;border-radius:14px;cursor:pointer;font-size:0.7rem;transition:all 0.15s;" title="${cat} ${count}个">${cat}${cat !== '全部' && count > 0 ? ' (' + count + ')' : ''}</button>`;
-            });
-            catsEl.innerHTML = h;
-        }
+        if (!catsEl) return;
+        const cats = ['全部', '寒冰', '暗月', '漩涡', '合作', '深海', '活动', '日志', '临时', '其他'];
+        const colorMap = getScannedCategoryColor ? null : null; // 占位，避免未定义告警
+        const cmap = {
+            '全部': '#ffffff', '寒冰': '#64b5f6', '暗月': '#ce93d8', '漩涡': '#4fc3f7',
+            '合作': '#ffd54f', '深海': '#4db6ac', '活动': '#ff8a65', '日志': '#ef5350', '临时': '#a5d6a7', '其他': '#bdbdbd'
+        };
+        let h = '';
+        cats.forEach(cat => {
+            const active = _scannedFilterCategory === cat;
+            const color = cmap[cat] || '#bdbdbd';
+            const count = cat === '全部' ? scannedFiles.length : scannedFiles.filter(f => (f.category || '其他') === cat).length;
+            h += `<button onclick="setScannedFilterCategory('${cat}')" style="background:${active ? color : 'rgba(255,255,255,0.06)'};color:${active ? '#000' : color};border:1px solid ${active ? color : 'rgba(255,255,255,0.12)'};padding:3px 10px;border-radius:14px;cursor:pointer;font-size:0.7rem;transition:all 0.15s;" title="${cat} ${count}个">${cat}${cat !== '全部' && count > 0 ? ' (' + count + ')' : ''}</button>`;
+        });
+        catsEl.innerHTML = h;
         const shareBtn = document.getElementById('scannedShareModeBtn');
         if (shareBtn) {
             shareBtn.textContent = _shareModeScanned ? '📢 退出分享' : '📢 分享模式';
             shareBtn.style.background = _shareModeScanned ? 'linear-gradient(135deg,#ff6b6b,#ff9e80)' : 'linear-gradient(135deg,#7c4dff,#b388ff)';
             shareBtn.title = _shareModeScanned ? '退出分享模式' : '分享模式：快速分享到需求墙';
-        }
-        const batchBtn = document.getElementById('scannedBatchShareBtn');
-        if (batchBtn) {
-            batchBtn.style.display = _shareModeScanned ? '' : 'none';
-            refreshBatchScannedShareBtnFromMain();
         }
     }
 
@@ -1030,8 +1024,7 @@ if (isTauriApp) {
         const statsEl = document.getElementById('fuzzyStatsArea');
         if (!listEl) return;
 
-        // 工具栏（搜索框/分类/分享/批量）在独立稳定容器 scannedFileToolbar，不参与列表重绘，
-        // 否则每次输入重绘会打断中文输入法 composition，导致中文打不出来/只能复制粘贴
+        // 工具栏（搜索框/分类/分享）只在有必要时重渲染，且搜索框本身在稳定容器不被重建
         renderScannedToolbar();
 
         // 筛选处理
@@ -1046,15 +1039,12 @@ if (isTauriApp) {
 
         const isEmpty = displayFiles.length === 0;
 
-        const cats = ['全部', '寒冰', '暗月', '漩涡', '合作', '深海', '活动', '日志', '临时', '其他'];
         const colorMap = {
             '全部': '#ffffff', '寒冰': '#64b5f6', '暗月': '#ce93d8', '漩涡': '#4fc3f7',
             '合作': '#ffd54f', '深海': '#4db6ac', '活动': '#ff8a65', '日志': '#ef5350', '临时': '#a5d6a7', '其他': '#bdbdbd'
         };
 
-        // 列表区域（工具栏已单独渲染，这里只渲染文件列表，避免中文输入法被打断）
         let html = '';
-
         if (isEmpty) {
             html += '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">未找到 txt/json 文件</div>';
         } else if (_shareModeScanned) {
@@ -1181,7 +1171,7 @@ if (isTauriApp) {
     }
 
     function refreshBatchScannedShareBtnFromMain() {
-        const btn = document.getElementById('scannedBatchShareBtn');
+        const btn = document.getElementById('batchScannedShareFromMainBtn');
         if (!btn) return;
         const n = _selScannedSharePaths.size;
         btn.textContent = n > 0 ? `📢 批量分享 (${n})` : '📢 批量分享';
@@ -3721,12 +3711,17 @@ if (isTauriApp) {
                     const resp = await _fetchWithTimeout(remoteUrl, 10000);
                     if (!resp.ok) return remoteUrl;
                     const blob = await resp.blob();
-                    try {
-                        const arr = new Uint8Array(await blob.arrayBuffer());
-                        await invokeFn('plugin:fs|write_file', { path: skinPath, contents: arr });
-                    } catch (e1) {
-                        const b64 = (await _blobToBase64(blob)).split(',')[1];
-                        if (b64) await invokeFn('write_binary_file', { file_path: skinPath, content_base64: b64 }).catch(() => {});
+                    const b64 = (await _blobToBase64(blob)).split(',')[1];
+                    let wrote = false;
+                    // 主：自定义 Rust 命令 write_binary_file（已授权、支持二进制、跨 Tauri 版本稳定）
+                    if (b64) {
+                        try { await invokeFn('write_binary_file', { file_path: skinPath, content_base64: b64 }); wrote = true; }
+                        catch (eW) { console.warn('[SKIN] write_binary_file 失败，回退 fs 插件:', eW && eW.message); }
+                    }
+                    // 备：fs 插件写 base64 字符串（注意 contents 必须是 string，不能传 Uint8Array，Tauri v2 ACL 会拒）
+                    if (!wrote) {
+                        try { await invokeFn('plugin:fs|write_file', { path: skinPath, contents: b64 }); wrote = true; }
+                        catch (eF) { console.warn('[SKIN] 皮肤写盘失败(plugin:fs|write_file 也不允许 base64):', parsed.hero, parsed.file, eF && eF.message); }
                     }
                     return URL.createObjectURL(blob);
                 } catch(e) {
