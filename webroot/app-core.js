@@ -19662,7 +19662,7 @@ ${maSection}
 
         // ==================== 浮动控制台窗口 ====================
         let floatConsoleVisible = false;
-        let floatAutoScroll = true;
+        let floatAutoScroll = localStorage.getItem('tdjl_consoleAutoScroll') !== '0';
         let floatConsoleRefreshTimer = null;
         let floatDragState = null;
         let floatFilter = '';
@@ -19741,6 +19741,7 @@ ${maSection}
             if (toggle) toggle.style.display = floatConsoleVisible ? 'none' : 'flex';
             refreshFloatConsole();
             applyFloatZoom();
+            initFloatAutoScrollBtn();
             if (floatConsoleRefreshTimer) clearInterval(floatConsoleRefreshTimer);
             if (floatConsoleVisible) {
                 floatConsoleRefreshTimer = setInterval(refreshFloatConsole, 500);
@@ -19789,14 +19790,35 @@ ${maSection}
         }
 
         function floatConsoleCopy() {
+            // 优先复制用户已框选的片段（选区非空且位于日志窗内时），否则复制全部
+            let selText = '';
+            try {
+                const sel = window.getSelection();
+                if (sel && !sel.isCollapsed) {
+                    const content = document.getElementById('floatConsoleContent');
+                    if (content && content.contains(sel.anchorNode)) selText = sel.toString();
+                }
+            } catch (_) {}
             const logs = window.__consoleLogs || [];
-            const text = logs.map(l => `[${l.time}] [${l.level.toUpperCase()}] ${l.msg.replace(/\n/g,'\\n')}`).join('\n');
+            const allText = logs.map(l => `[${l.time}] [${l.level.toUpperCase()}] ${l.msg.replace(/\n/g,'\\n')}`).join('\n');
+            const text = (selText && selText.trim()) ? selText : allText;
             if (!text) { alert('日志为空'); return; }
-            navigator.clipboard.writeText(text).then(() => {
-                console.log('[CONSOLE] 复制日志到剪贴板成功:', logs.length, '条');
-            }).catch(e => {
-                alert('复制失败: ' + e.message);
-            });
+            const done = () => console.log('[CONSOLE] 复制日志到剪贴板成功:', logs.length, '条');
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text));
+            } else {
+                fallbackCopy(text);
+            }
+        }
+        function fallbackCopy(text) {
+            try {
+                const ta = document.createElement('textarea');
+                ta.value = text; ta.style.position = 'fixed'; ta.style.top = '-9999px'; ta.style.opacity = '0';
+                document.body.appendChild(ta); ta.focus(); ta.select();
+                try { document.execCommand('copy'); } catch (_) {}
+                ta.remove();
+                console.log('[CONSOLE] 复制日志(降级 execCommand)成功');
+            } catch (e) { alert('复制失败: ' + (e && e.message ? e.message : e)); }
         }
 
         function floatConsoleExport() {
@@ -19826,9 +19848,15 @@ ${maSection}
             floatAutoScroll = !floatAutoScroll;
             const btn = document.getElementById('floatAutoScrollBtn');
             const content = document.getElementById('floatConsoleContent');
-            btn.textContent = floatAutoScroll ? '⬇' : '⏸';
-            if (floatAutoScroll) { content.classList.add('auto-scroll'); }
-            else { content.classList.remove('auto-scroll'); }
+            if (btn) btn.textContent = floatAutoScroll ? '⬇自动' : '⏸暂停';
+            if (content) { if (floatAutoScroll) content.classList.add('auto-scroll'); else content.classList.remove('auto-scroll'); }
+            try { localStorage.setItem('tdjl_consoleAutoScroll', floatAutoScroll ? '1' : '0'); } catch (_) {}
+        }
+        function initFloatAutoScrollBtn() {
+            const btn = document.getElementById('floatAutoScrollBtn');
+            const content = document.getElementById('floatConsoleContent');
+            if (btn) btn.textContent = floatAutoScroll ? '⬇自动' : '⏸暂停';
+            if (content) { if (floatAutoScroll) content.classList.add('auto-scroll'); else content.classList.remove('auto-scroll'); }
         }
 
         function refreshFloatConsole() {
@@ -19867,6 +19895,11 @@ ${maSection}
                     '<span style="font-weight:500;margin-right:3px;">[' + l.level.toUpperCase() + ']</span>' +
                     l.msg.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>';
             }).join('');
+            // 用户正在日志窗内框选文本（鼠标拖选或键盘 Shift 选）时不重绘，避免 500ms 轮询清空选区导致无法复制某一段
+            try {
+                const sel = window.getSelection();
+                if (sel && !sel.isCollapsed && content.contains(sel.anchorNode)) return;
+            } catch (_) {}
             content.innerHTML = items;
             if (floatAutoScroll && wasAtBottom) content.scrollTop = content.scrollHeight;
             else if (floatAutoScroll && prevScrollTop > 0) content.scrollTop = prevScrollTop;
