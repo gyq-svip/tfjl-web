@@ -16120,8 +16120,12 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             const disCls = myVote === 'dislike' ? 'color:#ff6b6b;' : 'color:rgba(255,255,255,0.5);';
             const copyLabel = m.isEncrypted ? '📋 复制明文' : '📋 复制';
             const copyTitle = m.isEncrypted ? '该分享已加密，点击输入密码后复制明文' : '复制分享内容（主人将获得声望）';
+            // 项目分享：卡片内容区只提供「智能导入」，此处隐藏通用"复制"按钮（不允许复制项目 JSON 全文）
+            const copyBtn = (m.shareType === 'project')
+                ? ''
+                : `<a href="javascript:void(0)" onclick="onShareCopy('${b64}')" title="${copyTitle}" style="color:#4fc3f7;text-decoration:none;cursor:pointer;background:rgba(79,195,247,0.12);padding:3px 10px;border-radius:5px;">${copyLabel}</a>`;
             return `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;font-size:0.78rem;align-items:center;">
-                <a href="javascript:void(0)" onclick="onShareCopy('${b64}')" title="${copyTitle}" style="color:#4fc3f7;text-decoration:none;cursor:pointer;background:rgba(79,195,247,0.12);padding:3px 10px;border-radius:5px;">${copyLabel}</a>
+                ${copyBtn}
                 <a href="javascript:void(0)" onclick="onShareLike('${b64}')" style="${likeCls}text-decoration:none;cursor:pointer;background:rgba(255,215,0,0.1);padding:3px 10px;border-radius:5px;">👍 ${m.likes || 0}</a>
                 <a href="javascript:void(0)" onclick="onShareDislike('${b64}')" style="${disCls}text-decoration:none;cursor:pointer;background:rgba(255,107,107,0.1);padding:3px 10px;border-radius:5px;">👎 ${m.dislikes || 0}</a>
                 <span style="color:rgba(255,255,255,0.4);">📥 被复制 ${m.copyCount || 0}</span>
@@ -16538,12 +16542,12 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                     const encInfo2 = msg.isEncrypted ? `,true,'${(msg.passwordHash || '').replace(/'/g,"\\'")}'` : `,false,''`;
                     
                     if (msg.shareType === 'project') {
-                        // 阵容项目分享：整项目 JSON，只支持「智能导入」+「下载」，不支持预览/导入到老马
+                        // 阵容项目分享：整项目 JSON，只允许「智能导入」，不允许预览/下载/复制/导入到老马
+                        // （项目 JSON 直接智能导入最干净，避免下载后版本错乱或被外传）
                         contentHtml = contentHtml.replace(
                             msg.scriptUrl,
                             `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
                                 <a href="javascript:void(0)" onclick="importScriptToTxtFiles('${msg.scriptUrl}'${encInfo2})" style="color:#4caf50;text-decoration:underline;cursor:pointer;background:rgba(76,175,80,0.1);padding:4px 10px;border-radius:5px;font-size:0.8rem;">📄 智能导入</a>
-                                <a href="javascript:void(0)" onclick="downloadScript('${msg.scriptUrl}'${encInfo2})" style="color:#4fc3f7;text-decoration:underline;cursor:pointer;background:rgba(79,195,247,0.1);padding:4px 10px;border-radius:5px;font-size:0.8rem;">📥 下载</a>
                             </div>`
                         );
                     } else if (isBackup) {
