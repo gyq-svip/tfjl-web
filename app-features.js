@@ -4625,16 +4625,6 @@
             window.open(helpUrl, '_blank');
         }
 
-        // 打开「功能导览」思维导图
-        function openMindmap() {
-            const url = 'https://gyq-svip.github.io/tfjl-web/mindmap.html';
-            if (window.__TAURI__) {
-                window.location.href = url;
-                return;
-            }
-            window.open(url, '_blank');
-        }
-
         // 帮助模态框
         function showHelpModal() {
             const modal = document.createElement('div');
