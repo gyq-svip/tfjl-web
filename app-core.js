@@ -16068,7 +16068,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 try {
                     let raw = await fetchScriptPlainText(m.scriptUrl);
                     if (m.isEncrypted) {
-                        const pwd = prompt('该分享已加密，请输入密码以复制明文：');
+                        const pwd = await askDecryptPasswordAsync('该分享已加密，请输入密码以复制明文：');
                         if (!pwd) { showFloatToast('🔒 需密码才能复制明文', 'rgba(255,193,7,0.9)'); return; }
                         const dec = await decryptContent(raw, pwd);
                         if (dec === null) { alert('❌ 解密失败，可能是密码不正确或文件已损坏'); return; }
@@ -16613,7 +16613,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             // 加密文件先提示输入密码
             let decryptPassword = '';
             if (isEncrypted) {
-                decryptPassword = prompt('该文件已加密，请输入密码或恢复密钥：');
+                decryptPassword = await askDecryptPasswordAsync('该文件已加密，请输入密码或恢复密钥：');
                 if (!decryptPassword) return;
             }
 
@@ -16842,7 +16842,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             // 加密文件先提示输入密码
             let decryptPassword = '';
             if (isEncrypted) {
-                decryptPassword = prompt('该文件已加密，请输入密码或恢复密钥：');
+                decryptPassword = await askDecryptPasswordAsync('该文件已加密，请输入密码或恢复密钥：');
                 if (!decryptPassword) return;
             }
 
@@ -17325,7 +17325,7 @@ ${maSection}
             // 先核对密码，再弹任何界面：避免取消密码后"正在导入"提示卡死不消失
             let verifiedPwd = null;
             if (isEncrypted) {
-                const decPwd = prompt('该文件已加密，请输入密码或恢复密钥：');
+                const decPwd = await askDecryptPasswordAsync('该文件已加密，请输入密码或恢复密钥：');
                 if (!decPwd) return; // 用户取消，不显示任何提示，直接退出
                 verifiedPwd = decPwd;
             }
@@ -17831,12 +17831,18 @@ ${maSection}
                 // 先核对密码，再弹"选择保存位置"（导出设置信息）：
                 // 避免取消密码后界面卡在"正在获取脚本"一直不消失
                 if (isEncrypted) {
-                    const decPwd = prompt('该文件已加密，请输入密码或恢复密钥：');
-                    if (!decPwd) return; // 用户取消，不弹任何界面，直接退出
-                    _laoMaVerifiedPwd = decPwd;
+                    // 自定义 modal 替代 window.prompt（Tauri 桌面端 prompt 返回 null 导致密码框失效）
+                    askLaoMaPassword(function(decPwd) {
+                        if (!decPwd) return; // 用户取消，不弹任何界面，直接退出
+                        _laoMaVerifiedPwd = decPwd;
+                        _afterLaoMaPwdChecked();
+                    });
+                    return;
                 } else {
                     _laoMaVerifiedPwd = null;
+                    _afterLaoMaPwdChecked();
                 }
+                const _afterLaoMaPwdChecked = function() {
                 const dirKeys = ['coop', 'activity', 'battle', 'battleMax', 'screenshot', 'temp'];
                 const hasConfig = dirKeys.some(k => {
                     try { return window.maDirs && window.maDirs[k]; } catch(e) { return false; }
@@ -17853,9 +17859,76 @@ ${maSection}
                 }
                 // 显示目录选择弹窗
                 showLaoMaDirPicker(scriptUrl, scriptName, isEncrypted, passwordHash);
+                };
             } catch (e) {
                 alert('操作失败: ' + e.message);
             }
+        }
+
+        // 加密分享导入老马时的密码输入弹窗（替代 window.prompt：桌面端返回 null 导致密码框失效）
+        function askLaoMaPassword(onConfirm) {
+            const m = document.createElement('div');
+            m.id = 'laoMaPwdModal';
+            m.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:100003;display:flex;align-items:center;justify-content:center;padding:20px;';
+            m.onclick = function(e) { if (e.target === m) m.remove(); };
+            m.innerHTML = `
+                <div style="background:#1a1a2e;border:2px solid rgba(255,152,0,0.5);border-radius:16px;padding:28px;max-width:440px;width:100%;">
+                    <h3 style="margin:0 0 16px 0;color:#ff9800;text-align:center;">🔒 该文件已加密</h3>
+                    <label style="color:#fff;display:block;margin-bottom:8px;font-size:0.92rem;">请输入密码或恢复密钥：</label>
+                    <input id="laoMaPwdInput" type="text" style="width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,152,0,0.3);background:#2a2a4a;color:#fff;box-sizing:border-box;font-size:1rem;">
+                    <div style="display:flex;gap:10px;margin-top:20px;">
+                        <button id="laoMaPwdOk" style="flex:1;padding:12px;background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;border-radius:8px;cursor:pointer;font-size:1rem;">确认</button>
+                        <button id="laoMaPwdCancel" style="flex:1;padding:12px;background:#666;color:white;border:none;border-radius:8px;cursor:pointer;font-size:1rem;">取消</button>
+                    </div>
+                </div>`;
+            document.body.appendChild(m);
+            const inp = document.getElementById('laoMaPwdInput');
+            inp.focus();
+            document.getElementById('laoMaPwdOk').onclick = function() {
+                const v = (inp.value || '').trim();
+                if (!v) { alert('密码不能为空'); return; }
+                m.remove();
+                onConfirm(v);
+            };
+            document.getElementById('laoMaPwdCancel').onclick = function() { m.remove(); };
+            inp.addEventListener('keydown', function(e) { if (e.key === 'Enter') document.getElementById('laoMaPwdOk').click(); });
+        }
+
+        // 通用密码输入弹窗（替代 window.prompt：Tauri 桌面端 prompt 返回 null 导致密码框失效）
+        // onConfirm(pwd)：确认后回调；取消不回调
+        function askDecryptPassword(msg, onConfirm) {
+            const m = document.createElement('div');
+            m.id = 'decryptPwdModal';
+            m.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:100004;display:flex;align-items:center;justify-content:center;padding:20px;';
+            m.onclick = function(e) { if (e.target === m) m.remove(); };
+            m.innerHTML = `
+                <div style="background:#1a1a2e;border:2px solid rgba(255,152,0,0.5);border-radius:16px;padding:28px;max-width:440px;width:100%;">
+                    <h3 style="margin:0 0 16px 0;color:#ff9800;text-align:center;">🔒 需要密码</h3>
+                    <label style="color:#fff;display:block;margin-bottom:8px;font-size:0.9rem;">${escapeHtml(msg)}</label>
+                    <input id="decryptPwdInput" type="text" style="width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,152,0,0.3);background:#2a2a4a;color:#fff;box-sizing:border-box;font-size:1rem;">
+                    <div style="display:flex;gap:10px;margin-top:20px;">
+                        <button id="decryptPwdOk" style="flex:1;padding:12px;background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;border-radius:8px;cursor:pointer;font-size:1rem;">确认</button>
+                        <button id="decryptPwdCancel" style="flex:1;padding:12px;background:#666;color:white;border:none;border-radius:8px;cursor:pointer;font-size:1rem;">取消</button>
+                    </div>
+                </div>`;
+            document.body.appendChild(m);
+            const inp = document.getElementById('decryptPwdInput');
+            inp.focus();
+            document.getElementById('decryptPwdOk').onclick = function() {
+                const v = (inp.value || '').trim();
+                if (!v) { alert('密码不能为空'); return; }
+                m.remove();
+                onConfirm(v);
+            };
+            document.getElementById('decryptPwdCancel').onclick = function() { m.remove(); };
+            inp.addEventListener('keydown', function(e) { if (e.key === 'Enter') document.getElementById('decryptPwdOk').click(); });
+        }
+
+        // Promise 版密码输入（供 async 函数直接 await 使用）；取消返回 null
+        function askDecryptPasswordAsync(msg) {
+            return new Promise(function(resolve) {
+                askDecryptPassword(msg, function(pwd) { resolve(pwd || null); });
+            });
         }
 
         // 显示老马目录选择弹窗
@@ -18357,7 +18430,7 @@ ${maSection}
                 }
                 
                 if (isEncrypted) {
-                    const decPwd = prompt('该备份已加密，请输入密码或恢复密钥：');
+                    const decPwd = await askDecryptPasswordAsync('该备份已加密，请输入密码或恢复密钥：');
                     if (!decPwd) return;
                     const decrypted = await decryptContent(backupContent, decPwd);
                     if (decrypted === null) { alert('❌ 解密失败，可能密码/密钥不正确或文件已损坏'); return; }
