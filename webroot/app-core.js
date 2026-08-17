@@ -16771,11 +16771,23 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             wallMessages.splice(index, 1);
             renderMessages();
 
-            try {
-                await saveMessagesToGist(true); // 强制保存，跳过合并逻辑
-            } catch (error) {
-                console.error('删除消息失败:', error);
-                alert('删除失败，请稍后重试');
+            // 强制保存（带重试）：删除必须可靠同步到远程，否则会出现
+            // "本地删了、其他客户端仍可见、导入失败"的脏状态（分享的 Gist 文件已删、记录却残留）
+            let saved = false;
+            let lastErr = null;
+            for (let attempt = 1; attempt <= 3 && !saved; attempt++) {
+                try {
+                    await saveMessagesToGist(true); // 强制保存，跳过合并逻辑
+                    saved = true;
+                } catch (error) {
+                    lastErr = error;
+                    console.error(`删除消息保存失败(第${attempt}次):`, error);
+                    if (attempt < 3) await new Promise(r => setTimeout(r, 800 * attempt));
+                }
+            }
+            if (!saved) {
+                console.error('删除消息最终失败:', lastErr);
+                alert('⚠️ 删除未完全同步到服务器（可能网络波动或接口限流）。\n\n本地已移除，但其他客户端可能仍可见、导入可能失败。\n请稍后刷新页面重试删除，或等限流恢复。');
             }
         }
         
@@ -17375,6 +17387,10 @@ ${maSection}
                 }
                 
                 if (!response.ok) {
+                    if (response.status === 404) {
+                        // 分享的 Gist 文件已被作者删除 → 记录与内容不一致，给清晰提示而非 cryptic 报错
+                        throw new Error('该分享已失效（作者可能已删除该分享内容），无法导入。\n如需求墙仍显示此条，可点该条右上角 🗑️ 删除记录。');
+                    }
                     const errorText = await response.text();
                     console.error('响应错误:', errorText);
                     throw new Error(`获取内容失败 (${response.status})`);
