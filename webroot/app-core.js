@@ -17542,7 +17542,15 @@ ${maSection}
                                         let msg = `✅ 成功恢复 ${imported} 个项目！`;
                                         if (renamed > 0) msg += `\n重命名 ${renamed} 个同名项目`;
                                         if (skipped > 0) msg += `\n跳过 ${skipped} 个同名项目`;
-                                        
+                                        const _cat = (projectsToImport[0] && projectsToImport[0].category) || '默认分类';
+                                        msg += `\n已导入到分类：【${_cat}】`;
+
+                                        // 醒目弹窗：明确告知导入到了哪个分类（用户核心诉求，需求墙智能导入整项目路径）
+                                        if (typeof showImportSuccessModal === 'function') {
+                                            const _pname = imported > 1 ? (imported + '个项目') : (projectsToImport[0] ? projectsToImport[0].name : '项目');
+                                            showImportSuccessModal(_pname, _cat);
+                                        }
+
                                         const successToast = document.createElement('div');
                                         successToast.style.cssText = `
                                             position: fixed;
@@ -17615,9 +17623,12 @@ ${maSection}
                                         currentProjectName = result.projectName;
                                         refreshProjectSelectors();
                                         loadProjectFromDB(result.projectName);
+                                        if (typeof showImportSuccessModal === 'function') {
+                                            showImportSuccessModal(result.projectName, result.category);
+                                        }
                                         const successToast = document.createElement('div');
-                                        successToast.style.cssText = `position:fixed;top:20px;right:20px;background:linear-gradient(135deg,#4CAF50,#45a049);color:white;padding:12px 24px;border-radius:8px;z-index:10000;`;
-                                        successToast.textContent = `✅ 已创建新项目"${result.projectName}"！`;
+                                        successToast.style.cssText = `position:fixed;top:20px;right:20px;background:linear-gradient(135deg,#4CAF50,#45a049);color:white;padding:12px 24px;border-radius:8px;z-index:10000;white-space:pre-line;`;
+                                        successToast.textContent = `✅ 已创建新项目"${result.projectName}"\n已导入到分类：【${result.category}】`;
                                         document.body.appendChild(successToast);
                                         setTimeout(() => successToast.remove(), 3000);
                                     };
