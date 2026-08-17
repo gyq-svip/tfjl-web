@@ -31,8 +31,9 @@
             const floating = !!opts.floating; // 悬浮窗模式：无全屏背景，可拖拽/缩放，多个可并存
             const floatWidth = opts.floatWidth || 'min(300px,82vw)'; // 悬浮窗默认小框
             const noBackdrop = !!opts.noBackdrop;
-            // 不同手牌的 picker 给独立 id，避免「点另一个放大镜先点的消失」
+            // 不同手牌的 picker 给独立 id，避免「点另一个放大镜先点的消失」（未指定时用单次随机后缀）
             const overlayId = opts.overlayId || ('tfjlGenericPicker_' + Date.now() + '_' + Math.floor(Math.random() * 1e6));
+            // 同 id 仍然先 remove 旧实例（更新式打开）；但手牌侧放大镜各自生成独立 id 故可并存
             const old = document.getElementById(overlayId);
             if (old && opts.overlayId) old.remove();
             // 职业分类集合（多选 toggle）；有收藏卡则追加「收藏」
@@ -42,9 +43,11 @@
             const profs = Array.from(profSet);
             const overlay = document.createElement('div');
             overlay.id = overlayId;
+            // 双侧并排的子 picker 嵌到父容器：parent/noBackdrop 决定样式
             const parent = opts.parent || document.body;
             const box = document.createElement('div');
             if (floating) {
+                // 悬浮窗：透明全屏容器不挡页面操作；box 固定定位在左/右侧，可拖拽、可缩放
                 overlay.style.cssText = 'position:fixed;inset:0;z-index:100015;pointer-events:none;';
                 const fLeft = (align === 'right') ? 'auto' : '12px';
                 const fRight = (align === 'right') ? '12px' : 'auto';
@@ -94,7 +97,7 @@
                 head.style.cursor = 'move';
                 let drag = null;
                 head.addEventListener('mousedown', function(e) {
-                    if (e.target === closeBtn) return;
+                    if (e.target === closeBtn) return; // 点关闭不触发拖拽
                     drag = { x: e.clientX, y: e.clientY, l: box.offsetLeft, t: box.offsetTop };
                     e.preventDefault();
                 });
@@ -104,7 +107,7 @@
                     const ny = Math.max(0, Math.min(window.innerHeight - 40, drag.t + (e.clientY - drag.y)));
                     box.style.left = nx + 'px';
                     box.style.top = ny + 'px';
-                    box.style.right = 'auto';
+                    box.style.right = 'auto'; // 拖拽后转 left 定位
                 });
                 document.addEventListener('mouseup', function() { drag = null; if (box._saveFloatRect) box._saveFloatRect(); });
                 const rz = document.createElement('div');
@@ -141,6 +144,7 @@
                     const on = (selectedProf === val);
                     b.style.cssText = 'padding:3px 10px;border-radius:12px;border:1px solid rgba(255,255,255,0.2);background:' + (on ? 'rgba(255,215,0,0.25)' : 'rgba(255,255,255,0.06)') + ';color:#fff;font-size:0.72rem;cursor:pointer;' + (on ? 'border-color:rgba(255,215,0,0.5);' : '');
                     b.onclick = function() {
+                        // 单选：点同一项→回到全部；点别的→切换
                         selectedProf = (selectedProf === val) ? '' : val;
                         profBar.querySelectorAll('button').forEach(function(x) {
                             const v = x.dataset.val;
@@ -252,6 +256,7 @@
             }
             inp.oninput = function() { render(inp.value); };
             render('');
+            // 点击外面关闭：仅普通主 picker（fixed backdrop）启用；悬浮窗/双排子 picker 不自关
             if (!noBackdrop && !floating) {
                 overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
             }
@@ -394,6 +399,7 @@
             }
             // ===== 皮肤修正已移入右上角菜单「重置皮肤」（一键全部重置，无需逐英雄选择）=====
         }
+
         // 改/恢复皮肤后即时刷新所有槽位 + 手牌皮肤（出问题的用户点完立刻看到效果）
         async function _refreshAllHeroSkins() {
             try {
@@ -806,6 +812,7 @@
                     loadCategoriesFromDB();
                     updateCategorySelector();
                     refreshProjectSelectors();
+                    showImportSuccessModal(newName, category);
                     // 刷新下拉后把选中切到刚导入的项目，并自动加载到工作区，避免"重启才出来"
                     setTimeout(() => {
                         const sel = document.getElementById('projectSelector1');
@@ -825,6 +832,23 @@
 
                 closeImportModal();
             });
+        }
+
+        // 导入成功后的醒目提示：明确告知导入到了哪个分类
+        function showImportSuccessModal(name, category) {
+            const m = document.createElement('div');
+            m.id = 'importSuccessModal';
+            m.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.82);z-index:10002;display:flex;align-items:center;justify-content:center;padding:20px;';
+            m.onclick = function(e) { if (e.target === m) m.remove(); };
+            m.innerHTML = `
+                <div style="background:linear-gradient(135deg,#16213e,#1a1a2e);border:3px solid #4caf50;border-radius:18px;padding:34px 30px;max-width:460px;width:100%;text-align:center;box-shadow:0 0 45px rgba(76,175,80,0.55);">
+                    <div style="font-size:3.2rem;line-height:1;margin-bottom:8px;">✅</div>
+                    <h2 style="margin:0 0 16px;color:#4caf50;font-size:1.55rem;">导入成功！</h2>
+                    <p style="margin:0 0 6px;color:#fff;font-size:1.05rem;">项目「<b style="color:#ffd700;">${escapeHtml(name)}</b>」</p>
+                    <p style="margin:0 0 24px;color:#fff;font-size:1.05rem;">已导入到分类：<b style="color:#ffd700;font-size:1.3rem;">【${escapeHtml(category)}】</b></p>
+                    <button onclick="document.getElementById('importSuccessModal').remove()" style="padding:12px 40px;background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;border:none;border-radius:10px;cursor:pointer;font-size:1.05rem;font-weight:bold;">知道了</button>
+                </div>`;
+            document.body.appendChild(m);
         }
 
         // 直接保存项目数据到数据库（不依赖全局变量）

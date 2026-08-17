@@ -812,6 +812,7 @@
                     loadCategoriesFromDB();
                     updateCategorySelector();
                     refreshProjectSelectors();
+                    showImportSuccessModal(newName, category);
                     // 刷新下拉后把选中切到刚导入的项目，并自动加载到工作区，避免"重启才出来"
                     setTimeout(() => {
                         const sel = document.getElementById('projectSelector1');
@@ -831,6 +832,23 @@
 
                 closeImportModal();
             });
+        }
+
+        // 导入成功后的醒目提示：明确告知导入到了哪个分类
+        function showImportSuccessModal(name, category) {
+            const m = document.createElement('div');
+            m.id = 'importSuccessModal';
+            m.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.82);z-index:10002;display:flex;align-items:center;justify-content:center;padding:20px;';
+            m.onclick = function(e) { if (e.target === m) m.remove(); };
+            m.innerHTML = `
+                <div style="background:linear-gradient(135deg,#16213e,#1a1a2e);border:3px solid #4caf50;border-radius:18px;padding:34px 30px;max-width:460px;width:100%;text-align:center;box-shadow:0 0 45px rgba(76,175,80,0.55);">
+                    <div style="font-size:3.2rem;line-height:1;margin-bottom:8px;">✅</div>
+                    <h2 style="margin:0 0 16px;color:#4caf50;font-size:1.55rem;">导入成功！</h2>
+                    <p style="margin:0 0 6px;color:#fff;font-size:1.05rem;">项目「<b style="color:#ffd700;">${escapeHtml(name)}</b>」</p>
+                    <p style="margin:0 0 24px;color:#fff;font-size:1.05rem;">已导入到分类：<b style="color:#ffd700;font-size:1.3rem;">【${escapeHtml(category)}】</b></p>
+                    <button onclick="document.getElementById('importSuccessModal').remove()" style="padding:12px 40px;background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;border:none;border-radius:10px;cursor:pointer;font-size:1.05rem;font-weight:bold;">知道了</button>
+                </div>`;
+            document.body.appendChild(m);
         }
 
         // 直接保存项目数据到数据库（不依赖全局变量）
