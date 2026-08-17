@@ -1993,10 +1993,12 @@
             // Tauri App：调用原生保存（可选保存到老马目录）
             if (window.__TAURI__ || window.__TAURI_INTERNALS__) {
                 _downloadScriptTauri(name, file.content);
+                recordDownload(name); // 统计脚本下载次数
                 return;
             }
 
             downloadTxtFileBlob(file.content, name);
+            recordDownload(name); // 统计脚本下载次数
         }
 
         function downloadTxtFileBlob(content, name) {
@@ -2026,6 +2028,7 @@
             } else {
                 downloadTxtFileBlob(content, name);
             }
+            recordDownload(name); // 统计脚本下载次数
         }
 
         // 删除TXT文件
@@ -3977,6 +3980,7 @@
             } else {
                 _downloadScriptBlob(name, content);
             }
+            recordDownload(name); // 统计脚本下载次数
         }
 
         async function renameScannedFile(filePath, fileName) {
