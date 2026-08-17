@@ -355,13 +355,13 @@
         }
 
         // 重命名分类（弹出模态框）
-        function renameCategory() {
+        async function renameCategory() {
             if (categories.length <= 1) {
                 alert('只有一个分类，无法重命名！');
                 return;
             }
 
-            const selected = prompt(`请选择要重命名的分类：\n\n${categories.map((c,i) => `${i+1}. ${c}`).join('\n')}\n\n请输入分类前的数字：`);
+            const selected = await askTextInputAsync({ title: '重命名分类', label: `请选择要重命名的分类：\n\n${categories.map((c,i) => `${i+1}. ${c}`).join('\n')}\n\n请输入分类前的数字：`, defaultValue: '' });
 
             if (!selected) return;
 
@@ -371,7 +371,7 @@
                 return;
             }
 
-            const newName = prompt('请输入新分类名称：', categories[idx]);
+            const newName = await askTextInputAsync({ title: '重命名分类', label: '请输入新分类名称：', defaultValue: categories[idx] });
             if (newName && newName.trim()) {
                 const trimmed = newName.trim();
                 if (categories.includes(trimmed)) {
@@ -843,7 +843,7 @@
         }
 
         // 根据下拉菜单选择加载项目
-        function loadProjectByName(name) {
+        async function loadProjectByName(name) {
             if (!name) return;
             if (name === '-- 选择项目 --' || name === '') return;
             // 已是当前项目：不重载，避免丢失未保存修改
@@ -853,7 +853,7 @@
             if (name === '__NEW__') {
                 // 获取当前选中的分类
                 const currentCat = document.getElementById('categorySelector1').value || '默认分类';
-                const newProjectName = prompt('请输入新项目名称：', '');
+                const newProjectName = await askTextInputAsync({ title: '新建项目', label: '请输入新项目名称：', defaultValue: '' });
                 if (!newProjectName || !newProjectName.trim()) {
                     // 用户取消，恢复下拉框选中状态
                     const sel = document.getElementById('projectSelector1');
@@ -3973,7 +3973,7 @@
                 return;
             }
 
-            const newName = prompt('请输入新文件名：', realName);
+            const newName = await askTextInputAsync({ title: '重命名文件', label: '请输入新文件名：', defaultValue: realName });
             if (!newName || newName === realName) return;
 
             // 构建新路径（在同一目录下）
@@ -4036,7 +4036,7 @@
             if (!shareFileName) {
                 const now = new Date();
                 const defaultName = realName.replace(/\.\w+$/, '') + '_' + now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0') + '_' + String(now.getHours()).padStart(2, '0') + String(now.getMinutes()).padStart(2, '0');
-                const inputName = prompt('请输入分享文件名（不含扩展名）：', defaultName);
+                const inputName = await askTextInputAsync({ title: '分享文件', label: '请输入分享文件名（不含扩展名）：', defaultValue: defaultName });
                 if (!inputName) return false;
                 shareFileName = inputName.endsWith('.txt') ? inputName : inputName + '.txt';
             }
@@ -4126,7 +4126,7 @@
             if (!getGistToken()) { alert('离线版暂不支持发送，请检查网络连接'); return; }
             const now = new Date();
             const suffix = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0') + '_' + String(now.getHours()).padStart(2, '0') + String(now.getMinutes()).padStart(2, '0');
-            const baseName = prompt('请输入批量分享文件名前缀（留空则每个用原文件名）：', '');
+            const baseName = await askTextInputAsync({ title: '批量分享', label: '文件名前缀（留空则每个用原文件名）：', defaultValue: '' });
             if (baseName === null) return;
             // 批量统一选择分享选项
             const opts = await new Promise(function(resolve) { showShareOptionsDialog(function(e, p, rk) { resolve([e, p, rk]); }); });
@@ -4300,11 +4300,11 @@
         }
 
         // 重命名文件
-        function renameTxtFile(index) {
+        async function renameTxtFile(index) {
             if (!txtFiles[index]) return;
             
             const oldName = txtFiles[index].name;
-            const newName = prompt('请输入新的文件名：', oldName);
+            const newName = await askTextInputAsync({ title: '重命名文件', label: '请输入新的文件名：', defaultValue: oldName });
             
             if (!newName || newName.trim() === '') return;
             
@@ -4365,7 +4365,7 @@
 
         // 删除当前选中的项目
         // 重命名项目
-        function renameProject() {
+        async function renameProject() {
             const selector = document.getElementById('projectSelector1');
             if (!selector || !selector.value) {
                 alert('请先选择一个项目');
@@ -4373,7 +4373,7 @@
             }
 
             const oldName = selector.value;
-            const newName = prompt(`请输入新项目名称（当前：${oldName}）：`, oldName);
+            const newName = await askTextInputAsync({ title: '重命名项目', label: `请输入新项目名称（当前：${oldName}）：`, defaultValue: oldName });
             
             if (!newName || !newName.trim()) {
                 return;
@@ -4673,7 +4673,7 @@
         // 保存当前项目（弹出模态框选择分类）
         let pendingSaveProjectName = '';
 
-        function saveCurrentProject() {
+        async function saveCurrentProject() {
             const _skinCfg = (typeof materializeProjectSkinConfig === 'function')
                 ? materializeProjectSkinConfig({ cardSkins: cardSkins, fusionSkins: window.fusionSkins, myHandCards: myHandCards, teammateHandCards: teammateHandCards, myPlacedCards: myPlacedCards, teammatePlacedCards: teammatePlacedCards })
                 : { cardSkins: cardSkins, fusionSkins: window.fusionSkins || {} };
@@ -4695,7 +4695,7 @@
             const isOpen = currentProjectName && currentProjectName !== '默认项目';
             if (!isOpen) {
                 // 未打开具体项目：仍需输入名称
-                const name = prompt('请输入项目名称：', '');
+                const name = await askTextInputAsync({ title: '保存项目', label: '请输入项目名称：', defaultValue: '' });
                 if (!name || !name.trim()) return;
                 const targetName = name.trim();
                 saveProjectToDB(targetName, currentProjectCategory || '默认分类', currentData).then(() => {
@@ -10042,8 +10042,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             window.drSelectedTables = window.drTableOrder.filter(n => set.has(n));
             renderDrTableChips();
         }
-        function drAddTable() {
-            const name = prompt('给新减伤表起个名字：', '方案' + (window.drTableOrder.length + 1));
+        async function drAddTable() {
+            const name = await askTextInputAsync({ title: '新建减伤表', label: '给新减伤表起个名字：', defaultValue: '方案' + (window.drTableOrder.length + 1) });
             if (!name) return;
             const trimmed = name.trim();
             if (!trimmed) return;
@@ -10055,9 +10055,9 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             saveDamageReductionData();
             refreshDamageReductionDialogContent();
         }
-        function drRenameActiveTable() {
+        async function drRenameActiveTable() {
             const old = window.drActiveTable;
-            const name = prompt('把「' + old + '」改名为：', old);
+            const name = await askTextInputAsync({ title: '重命名减伤表', label: '把「' + old + '」改名为：', defaultValue: old });
             if (!name) return;
             const trimmed = name.trim();
             if (!trimmed || trimmed === old) return;
@@ -10642,9 +10642,9 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         }
 
         // 导入减伤记录从TXT文件（弹窗选择导入到哪张表）
-        function importDamageReductionFromTxt() {
+        async function importDamageReductionFromTxt() {
             const options = window.drTableOrder.map(n => `${n}:导入到「${n}」表`).join('\n');
-            const choice = prompt(`要把 TXT 减伤导入到哪张表？\n当前激活（选中）的表是：「${window.drActiveTable}」\n\n可用表名：\n${options}\n\n直接回车 = 导入到当前激活的表「${window.drActiveTable}」；\n也可输入其它已存在的表名导入到那张表。`, window.drActiveTable || '');
+            const choice = await askTextInputAsync({ title: '导入减伤', label: `要把 TXT 减伤导入到哪张表？\n当前激活（选中）的表是：「${window.drActiveTable}」\n\n可用表名：\n${options}\n\n直接回车 = 导入到当前激活的表「${window.drActiveTable}」；\n也可输入其它已存在的表名导入到那张表。`, defaultValue: window.drActiveTable || '' });
             let target = (choice || '').trim();
             if (!target) target = window.drActiveTable || '我的';
             if (!window.drTables[target]) {
@@ -17164,9 +17164,9 @@ ${maSection}
                 document.body.appendChild(modal);
                 
                 // 监听新建分类选择
-                document.getElementById('newProjectCategory').onchange = function() {
+                document.getElementById('newProjectCategory').onchange = async function() {
                     if (this.value === '新分类') {
-                        const newCat = prompt('请输入新分类名称：');
+                        const newCat = await askTextInputAsync({ title: '新建分类', label: '请输入新分类名称：' });
                         if (newCat && newCat.trim()) {
                             const trimmed = newCat.trim();
                             if (!categories.includes(trimmed)) {
@@ -17929,6 +17929,47 @@ ${maSection}
             return new Promise(function(resolve) {
                 askDecryptPassword(msg, function(pwd) { resolve(pwd || null); });
             });
+        }
+
+        // 通用文本输入弹窗（替代 window.prompt：Tauri 桌面端 prompt 返回 null 失效）
+        // opts: { title, label, defaultValue, selectBase=true(选中文件名主体), type='text'|'password' }
+        // onConfirm(value|null)：确认回传输入值（可能空串），取消回传 null（与原 prompt 语义一致）
+        function askTextInput(opts, onConfirm) {
+            opts = opts || {};
+            const title = opts.title || '请输入';
+            const label = opts.label || '';
+            const def = (opts.defaultValue != null) ? String(opts.defaultValue) : '';
+            const type = (opts.type === 'password') ? 'password' : 'text';
+            const m = document.createElement('div');
+            m.id = 'textInputModal';
+            m.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:100005;display:flex;align-items:center;justify-content:center;padding:20px;';
+            m.onclick = function(e) { if (e.target === m) m.remove(); };
+            m.innerHTML = `
+                <div style="background:#1a1a2e;border:2px solid rgba(255,215,0,0.5);border-radius:16px;padding:28px;max-width:480px;width:100%;">
+                    <h3 style="margin:0 0 14px 0;color:#ffd700;text-align:center;">${escapeHtml(title)}</h3>
+                    ${label ? `<label style="color:#fff;display:block;margin-bottom:8px;font-size:0.9rem;">${escapeHtml(label)}</label>` : ''}
+                    <input id="textInputField" type="${type}" value="${escapeHtml(def)}" style="width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);background:#2a2a4a;color:#fff;box-sizing:border-box;font-size:1rem;">
+                    <div style="display:flex;gap:10px;margin-top:18px;">
+                        <button id="textInputOk" style="flex:1;padding:12px;background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;border-radius:8px;cursor:pointer;font-size:1rem;">确认</button>
+                        <button id="textInputCancel" style="flex:1;padding:12px;background:#666;color:white;border:none;border-radius:8px;cursor:pointer;font-size:1rem;">取消</button>
+                    </div>
+                </div>`;
+            document.body.appendChild(m);
+            const inp = document.getElementById('textInputField');
+            inp.focus();
+            if (opts.selectBase && def) {
+                const dot = def.lastIndexOf('.');
+                if (dot > 0) inp.setSelectionRange(0, dot); else inp.select();
+            }
+            const done = function(v) { m.remove(); if (onConfirm) onConfirm(v); };
+            document.getElementById('textInputOk').onclick = function() { done(inp.value); };
+            document.getElementById('textInputCancel').onclick = function() { done(null); };
+            inp.addEventListener('keydown', function(e) { if (e.key === 'Enter') document.getElementById('textInputOk').click(); });
+            return m;
+        }
+        // Promise 版文本输入；取消返回 null
+        function askTextInputAsync(opts) {
+            return new Promise(function(resolve) { askTextInput(opts, function(v) { resolve(v); }); });
         }
 
         // 显示老马目录选择弹窗
@@ -20800,7 +20841,7 @@ ${maSection}
 
         // 管理员新增用户（保留昵称，防止他人注册）
         async function adminAddUser() {
-            const v = prompt('新增昵称（将保留该昵称，他人不可注册）：');
+            const v = await askTextInputAsync({ title: '新增用户', label: '昵称（将保留该昵称，他人不可注册）：' });
             if (!v) return;
             const name = v.trim();
             if (name.length < 2) { alert('昵称至少 2 个字'); return; }
@@ -20823,7 +20864,7 @@ ${maSection}
             const full = await getUsedNicks();
             const idx = full.indexOf(oldName);
             if (idx < 0) return;
-            const newName = prompt('将昵称重命名为：', oldName);
+            const newName = await askTextInputAsync({ title: '重命名昵称', label: '将昵称重命名为：', defaultValue: oldName });
             if (!newName) return;
             const v = newName.trim();
             if (v.length < 2) { alert('昵称至少 2 个字'); return; }
@@ -20894,7 +20935,7 @@ ${maSection}
         }
 
         async function editPassword(index) {
-            const newPwd = prompt('请输入新密码：', '');
+            const newPwd = await askTextInputAsync({ title: '修改密码', label: '请输入新密码：', type: 'password' });
             if (!newPwd || newPwd.trim() === '') {
                 showAdminStatus('密码不能为空！', 'error');
                 return;
