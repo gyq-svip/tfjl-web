@@ -556,6 +556,37 @@
             }
         });
 
+        // 导出项目前自定义文件名（替代 window.prompt：Tauri 桌面端 prompt 返回 null）
+        function showExportRenameDialog(defaultName, onConfirm) {
+            const m = document.createElement('div');
+            m.id = 'exportRenameModal';
+            m.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:10001;display:flex;align-items:center;justify-content:center;padding:20px;';
+            m.onclick = function(e) { if (e.target === m) m.remove(); };
+            m.innerHTML = `
+                <div style="background:#1a1a2e;border:2px solid rgba(255,215,0,0.5);border-radius:16px;padding:28px;max-width:480px;width:100%;">
+                    <h3 style="margin:0 0 16px 0;color:#ffd700;text-align:center;">💾 导出项目文件</h3>
+                    <label style="color:#fff;display:block;margin-bottom:8px;font-size:0.95rem;">文件名（可修改，扩展名 .json 自动补）：</label>
+                    <input id="exportRenameInput" value="${escapeHtml(defaultName)}" style="width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);background:#2a2a4a;color:#fff;box-sizing:border-box;font-size:1rem;">
+                    <div style="display:flex;gap:10px;margin-top:20px;">
+                        <button id="exportRenameOk" style="flex:1;padding:12px;background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;border-radius:8px;cursor:pointer;font-size:1rem;">确认导出</button>
+                        <button id="exportRenameCancel" style="flex:1;padding:12px;background:#666;color:white;border:none;border-radius:8px;cursor:pointer;font-size:1rem;">取消</button>
+                    </div>
+                </div>`;
+            document.body.appendChild(m);
+            const inp = document.getElementById('exportRenameInput');
+            inp.focus();
+            const dot = inp.value.lastIndexOf('.');
+            if (dot > 0) inp.setSelectionRange(0, dot); else inp.select();
+            document.getElementById('exportRenameOk').onclick = function() {
+                let v = inp.value.trim();
+                if (!v) { alert('文件名不能为空'); return; }
+                v = v.replace(/[\\/:*?"<>|]/g, '_').replace(/\.json$/i, '') + '.json';
+                m.remove();
+                onConfirm(v);
+            };
+            document.getElementById('exportRenameCancel').onclick = function() { m.remove(); };
+        }
+
         // 导出当前项目
         function exportCurrentProject() {
             if (!requireLogin()) return;
@@ -585,21 +616,24 @@
                 };
 
                 const jsonStr = JSON.stringify(exportData, null, 2);
-                const fileName = `塔防阵容_${projectName}_${new Date().toLocaleDateString().replace(/\//g, '-')}.json`;
-                const isTauri = !!(window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke);
-                const finish = function() {
-                    if (typeof showToast === 'function') showToast('✅ 已备份项目「' + projectName + '」为 JSON 文件（可分享给他人导入）');
-                    document.getElementById('projectMenu').style.display = 'none';
+                const defaultName = `塔防阵容_${projectName}_${new Date().toLocaleDateString().replace(/\//g, '-')}.json`;
+                const doExport = function(fileName) {
+                    const isTauri = !!(window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke);
+                    const finish = function() {
+                        if (typeof showToast === 'function') showToast('✅ 已备份项目「' + projectName + '」为 JSON 文件（可分享给他人导入）');
+                        document.getElementById('projectMenu').style.display = 'none';
+                    };
+                    if (isTauri) {
+                        // 先让用户选目的地，saved=true 才提示成功；取消不误报
+                        _downloadScriptTauri(fileName, jsonStr).then(function(saved) {
+                            if (saved) finish(); else document.getElementById('projectMenu').style.display = 'none';
+                        });
+                    } else {
+                        _downloadScriptBlob(fileName, jsonStr);
+                        finish();
+                    }
                 };
-                if (isTauri) {
-                    // 先让用户选目的地，saved=true 才提示成功；取消不误报
-                    _downloadScriptTauri(fileName, jsonStr).then(function(saved) {
-                        if (saved) finish(); else document.getElementById('projectMenu').style.display = 'none';
-                    });
-                } else {
-                    _downloadScriptBlob(fileName, jsonStr);
-                    finish();
-                }
+                showExportRenameDialog(defaultName, doExport);
             });
         }
 
