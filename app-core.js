@@ -23,6 +23,23 @@
         })();
         window.__consoleLogs.push({ time: new Date().toTimeString().slice(0, 8), level: 'info', msg: '控制台日志捕获已启动' });
 
+        // 全局错误兜底：未捕获异常 / Promise rejection 也写进 __consoleLogs，
+        // 确保调试浮窗能看到"全部错误信息"（含 TDZ、async 抛错等本会被静默吞掉或只走 alert 的错误）
+        function _pushConsole(level, msg) {
+            try {
+                window.__consoleLogs.push({ time: new Date().toTimeString().slice(0, 8), level: level, msg: String(msg) });
+                if (window.__consoleLogs.length > MAX_CONSOLE_LOGS) window.__consoleLogs.splice(0, 100);
+            } catch (_) {}
+        }
+        window.addEventListener('error', function(e) {
+            const detail = e && e.error ? (e.error.stack || e.error.message) : (e && e.message) || '未知错误';
+            _pushConsole('error', '【全局未捕获错误】' + detail + (e && e.filename ? (' @ ' + e.filename + ':' + e.lineno) : ''));
+        });
+        window.addEventListener('unhandledrejection', function(e) {
+            const r = e && e.reason;
+            _pushConsole('error', '【未处理的 Promise 拒绝】' + (r && r.stack ? r.stack : (r && r.message ? r.message : String(r))));
+        });
+
         // ==================== IndexedDB 项目管理 ====================
         let currentProjectName = '默认项目';
         let currentProjectCategory = '默认分类';
@@ -17832,6 +17849,26 @@ ${maSection}
         let _laoMaVerifiedPwd = null;
 
         async function importToLaoMaFromWall(scriptUrl, scriptName, isEncrypted = false, passwordHash = '') {
+            // 密码核对后继续的逻辑（提前声明为 let 绑定，避免块级函数声明暂时性死区导致
+            // "Cannot access '...' before initialization"）
+            const _afterLaoMaPwdChecked = function() {
+                const dirKeys = ['coop', 'activity', 'battle', 'battleMax', 'screenshot', 'temp'];
+                const hasConfig = dirKeys.some(k => {
+                    try { return window.maDirs && window.maDirs[k]; } catch(e) { return false; }
+                });
+                if (!hasConfig) {
+                    if (confirm('尚未配置老马目录，是否现在去配置？')) {
+                        if (window.openAppLocalSettings) {
+                            window.openAppLocalSettings();
+                        } else {
+                            alert('请在右上角 📁 APP本地设置 中配置老马目录');
+                        }
+                    }
+                    return;
+                }
+                // 显示目录选择弹窗
+                showLaoMaDirPicker(scriptUrl, scriptName, isEncrypted, passwordHash);
+            };
             try {
                 if (typeof window.__TAURI_INTERNALS__ === 'undefined') {
                     alert('此功能仅限桌面版 App 使用');
@@ -17851,25 +17888,8 @@ ${maSection}
                     _laoMaVerifiedPwd = null;
                     _afterLaoMaPwdChecked();
                 }
-                const _afterLaoMaPwdChecked = function() {
-                const dirKeys = ['coop', 'activity', 'battle', 'battleMax', 'screenshot', 'temp'];
-                const hasConfig = dirKeys.some(k => {
-                    try { return window.maDirs && window.maDirs[k]; } catch(e) { return false; }
-                });
-                if (!hasConfig) {
-                    if (confirm('尚未配置老马目录，是否现在去配置？')) {
-                        if (window.openAppLocalSettings) {
-                            window.openAppLocalSettings();
-                        } else {
-                            alert('请在右上角 📁 APP本地设置 中配置老马目录');
-                        }
-                    }
-                    return;
-                }
-                // 显示目录选择弹窗
-                showLaoMaDirPicker(scriptUrl, scriptName, isEncrypted, passwordHash);
-                };
             } catch (e) {
+                console.error('导入到老马失败:', e);
                 alert('操作失败: ' + e.message);
             }
         }
