@@ -278,12 +278,12 @@
             catSel.appendChild(newCatOpt);
         }
 
-        function handleCategoryChange() {
+        async function handleCategoryChange() {
             const catSel = document.getElementById('categorySelector1');
             const selectedValue = catSel.value;
             
             if (selectedValue === '__NEW_CAT__') {
-                const newCategoryName = prompt('请输入新分类名称：', '');
+                const newCategoryName = await askTextInputAsync({ title: '新建分类', label: '请输入新分类名称：' });
                 if (!newCategoryName || !newCategoryName.trim()) {
                     // 用户取消，恢复之前的选中状态
                     if (currentProjectCategory) {

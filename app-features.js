@@ -6046,7 +6046,7 @@
             if (!content) { alert('没有可保存的脚本内容'); return; }
             if (!window.saveScriptToMaDir) { alert('此功能仅在桌面应用中可用\n\n需要先配置老马目录（左上角"APP本地设置"）'); return; }
             const defaultName = '活动脚本_' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '.txt';
-            const fileName = prompt('请输入脚本文件名（含扩展名）：', defaultName);
+            const fileName = await askTextInputAsync({ title: '保存到老马', label: '脚本文件名（含扩展名）：', defaultValue: defaultName });
             if (!fileName) return;
             await window.saveScriptToMaDir('activity', fileName, content);
         }
@@ -6057,7 +6057,7 @@
             if (!content) { alert('没有可保存的脚本内容'); return; }
             if (!window.saveScriptToMaDir) { alert('此功能仅在桌面应用中可用\n\n需要先配置老马目录（左上角"APP本地设置"）'); return; }
             const defaultName = '深海脚本_' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '.txt';
-            const fileName = prompt('请输入脚本文件名（含扩展名）：', defaultName);
+            const fileName = await askTextInputAsync({ title: '保存到老马', label: '脚本文件名（含扩展名）：', defaultValue: defaultName });
             if (!fileName) return;
             await window.saveScriptToMaDir('coop', fileName, content);
         }
@@ -6855,7 +6855,7 @@
 
             const now = new Date();
             const defaultName = `${scriptType}_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
-            const inputName = prompt(`请输入分享文件名（不含扩展名）：`, defaultName);
+            const inputName = await askTextInputAsync({ title: '分享脚本', label: '分享文件名（不含扩展名）：', defaultValue: defaultName });
             if (!inputName) return;
             const fileName = inputName.endsWith('.txt') ? inputName : inputName + '.txt';
 
@@ -6953,7 +6953,7 @@
             if (!shareFileName) {
                 const now = new Date();
                 const defaultName = `${file.name.replace(/\.txt$/,'')}_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
-                const inputName = prompt(`请输入分享文件名（不含扩展名）：`, defaultName);
+                const inputName = await askTextInputAsync({ title: '分享脚本', label: '分享文件名（不含扩展名）：', defaultValue: defaultName });
                 if (!inputName) return;
                 shareFileName = inputName.endsWith('.txt') ? inputName : inputName + '.txt';
             }
@@ -7043,7 +7043,7 @@
             if (!getGistToken()) { alert('离线版暂不支持发送，请检查网络连接'); return; }
             const now = new Date();
             const suffix = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
-            const baseName = prompt('请输入批量分享文件名前缀（留空则每个用原文件名）：', '');
+            const baseName = await askTextInputAsync({ title: '批量分享', label: '文件名前缀（留空则每个用原文件名）：', defaultValue: '' });
             if (baseName === null) return;
             // 批量统一选择分享选项
             const opts = await new Promise(function(resolve) { showShareOptionsDialog(function(e, p, rk) { resolve([e, p, rk]); }); });

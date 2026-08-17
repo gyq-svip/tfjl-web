@@ -666,7 +666,7 @@
 
             const now = new Date();
             const defaultName = `塔防阵容_${projectName}_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
-            const inputName = prompt('请输入分享阵容文件名（不含扩展名）：', defaultName);
+            const inputName = await askTextInputAsync({ title: '分享阵容', label: '分享阵容文件名（不含扩展名）：', defaultValue: defaultName });
             if (!inputName) return;
             const fileName = inputName.endsWith('.json') ? inputName : inputName + '.json';
 

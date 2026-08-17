@@ -1848,7 +1848,7 @@ if (isTauriApp) {
         // 让用户输入第二个文件路径 or 从已扫描文件中选择
         const allFiles = window.scannedFiles || [];
         if (allFiles.length === 0) {
-            const path = prompt('请输入第二个文件的完整路径：');
+            const path = await askTextInputAsync({ title: '双文件对比', label: '请输入第二个文件的完整路径：' });
             if (!path) return;
             try {
                 const content = await readTextFile(path);

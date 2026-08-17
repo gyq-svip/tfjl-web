@@ -1963,56 +1963,51 @@
         }
 
         // 下载TXT文件
-        function downloadTxtFile(index) {
+        // 下载项目脚本文件（先弹改名框，再保存/下载）
+        async function downloadTxtFile(index) {
             const file = txtFiles[index];
             if (!file) { alert('文件不存在'); return; }
             if (!file.content) { alert('文件内容为空，无法下载'); return; }
 
-            // Tauri App：使用原生文件保存（避免webview中Blob下载被静默阻止）
+            // 先让用户重命名（替代原 window.prompt：桌面端 prompt 返回 null 失效）
+            const name = await askTextInputAsync({ title: '下载脚本文件', label: '文件名（含扩展名）：', defaultValue: file.name });
+            if (!name) return; // 用户取消
+
+            // Tauri App：调用原生保存（可选保存到老马目录）
             if (window.__TAURI__ || window.__TAURI_INTERNALS__) {
-                downloadTxtFileApp(file);
+                _downloadScriptTauri(name, file.content);
                 return;
             }
 
-            downloadTxtFileBlob(file);
+            downloadTxtFileBlob(file.content, name);
         }
 
-        function downloadTxtFileBlob(file) {
-            const blob = new Blob([file.content], {type: 'text/plain;charset=utf-8'});
+        function downloadTxtFileBlob(content, name) {
+            const blob = new Blob([content], {type: 'text/plain;charset=utf-8'});
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = file.name;
+            a.download = name;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
         }
 
-        async function downloadTxtFileApp(file) {
-            // 复用 _downloadScriptTauri 的保存逻辑
-            _downloadScriptTauri(file.name, file.content);
-        }
-
         // 下载统一浮窗(openScriptNotebook)当前内容（用于远程/预览内容，fileIndex<0 无法回写本地）
-        function downloadNotebookContent(windowId) {
+        // 下载记事本/脚本内容（先弹改名框）
+        async function downloadNotebookContent(windowId) {
             const ta = document.getElementById(windowId + '_content');
             if (!ta) return;
             const win = txtFileWindows.find(w => w.id === windowId);
-            const name = (win && win.name) ? win.name : 'script.txt';
+            const defName = (win && win.name) ? win.name : 'script.txt';
+            const name = await askTextInputAsync({ title: '下载脚本文件', label: '文件名（含扩展名）：', defaultValue: defName });
+            if (!name) return; // 用户取消
             const content = ta.value;
             if (window.__TAURI__ || window.__TAURI_INTERNALS__) {
                 _downloadScriptTauri(name, content);
             } else {
-                const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = name;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
+                downloadTxtFileBlob(content, name);
             }
         }
 
@@ -3955,12 +3950,15 @@
             if (!textarea) return;
             const win = localFileWindows.find(w => w.id === windowId);
             if (!win) return;
+            const defName = win.fileName || 'script.txt';
+            const name = await askTextInputAsync({ title: '下载文件', label: '文件名（含扩展名）：', defaultValue: defName });
+            if (!name) return;
             const content = textarea.value;
             const isTauri = !!(window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke);
             if (isTauri) {
-                await _downloadScriptTauri(win.fileName, content);
+                await _downloadScriptTauri(name, content);
             } else {
-                _downloadScriptBlob(win.fileName, content);
+                _downloadScriptBlob(name, content);
             }
         }
 
