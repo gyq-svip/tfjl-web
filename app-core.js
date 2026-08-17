@@ -17912,17 +17912,69 @@ ${maSection}
             document.body.appendChild(modal);
         }
 
+        // 由原始脚本名生成友好默认名：去掉常见的日期前缀（YYYY-MM-DD_ / YYYYMMDD_ 等），
+        // 保留主体与扩展名，导入老马后更易查找。原完整名作为副标题展示。
+        function _friendlyLaoMaName(rawName) {
+            let s = rawName || 'script';
+            try { s = decodeURIComponent(s); } catch(e) {}
+            const dot = s.lastIndexOf('.');
+            const ext = dot > 0 ? s.slice(dot) : '';
+            let base = dot > 0 ? s.slice(0, dot) : s;
+            // 去掉开头日期前缀：2026-08-17_ / 20260817_ / 2026_08_17 等
+            base = base.replace(/^\s*\d{4}[-_]?\d{2}[-_]?\d{2}[_-]?/, '').trim();
+            if (!base) base = 'script';
+            return base + ext;
+        }
+
+        // 重命名弹窗（替代 window.prompt：Tauri 桌面端 prompt 返回 null 导致无法改名）
+        function askLaoMaFileName(rawName, originalName, onConfirm) {
+            const friendly = _friendlyLaoMaName(rawName);
+            const m = document.createElement('div');
+            m.id = 'laoMaRenameModal';
+            m.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:100002;display:flex;align-items:center;justify-content:center;padding:20px;';
+            m.onclick = function(e) { if (e.target === m) m.remove(); };
+            m.innerHTML = `
+                <div style="background:#1a1a2e;border:2px solid rgba(255,152,0,0.5);border-radius:16px;padding:28px;max-width:480px;width:100%;">
+                    <h3 style="margin:0 0 6px 0;color:#ff9800;text-align:center;">📁 导入到老马 - 重命名</h3>
+                    <div style="color:rgba(255,255,255,0.45);font-size:0.78rem;text-align:center;margin-bottom:16px;word-break:break-all;">原文件名：${escapeHtml(originalName)}</div>
+                    <label style="color:#fff;display:block;margin-bottom:8px;font-size:0.92rem;">保存到老马的文件名（已去除日期前缀，可修改）：</label>
+                    <input id="laoMaRenameInput" value="${escapeHtml(friendly)}" style="width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,152,0,0.3);background:#2a2a4a;color:#fff;box-sizing:border-box;font-size:1rem;">
+                    <div style="display:flex;gap:10px;margin-top:20px;">
+                        <button id="laoMaRenameOk" style="flex:1;padding:12px;background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;border-radius:8px;cursor:pointer;font-size:1rem;">确认保存</button>
+                        <button id="laoMaRenameCancel" style="flex:1;padding:12px;background:#666;color:white;border:none;border-radius:8px;cursor:pointer;font-size:1rem;">取消</button>
+                    </div>
+                </div>`;
+            document.body.appendChild(m);
+            const inp = document.getElementById('laoMaRenameInput');
+            inp.focus();
+            const dot = inp.value.lastIndexOf('.');
+            if (dot > 0) inp.setSelectionRange(0, dot); else inp.select();
+            document.getElementById('laoMaRenameOk').onclick = function() {
+                let v = (inp.value || '').trim();
+                if (!v) { alert('文件名不能为空'); return; }
+                // 保留原扩展名：若用户删了扩展名，从友好默认名补回
+                if (!/\.[a-z0-9]+$/i.test(v) && friendly.indexOf('.') > 0) {
+                    v += friendly.slice(friendly.lastIndexOf('.'));
+                }
+                v = v.replace(/[\\/:*?"<>|]/g, '_');
+                m.remove();
+                onConfirm(v);
+            };
+            document.getElementById('laoMaRenameCancel').onclick = function() { m.remove(); };
+        }
+
         // 执行导入到老马
         async function doImportToLaoMaDir(dirKey, scriptUrl, scriptName, isEncrypted = false, passwordHash = '') {
             const modal = document.getElementById('laoMaDirPickerModal');
             if (modal) modal.remove();
 
-            // 自动解码 URL 编码的中文文件名（Gist 存储的中文文件名会被编码为 %XX%XX），
-            // 并让用户确认/修改，解决导入老马后文件名乱码问题。
+            // 自动解码 URL 编码的中文文件名（Gist 存储的中文文件名会被编码为 %XX%XX）
             let decodedName = scriptName;
             try { decodedName = decodeURIComponent(scriptName); } catch(e) {}
-            const finalName = prompt('请输入脚本文件名（含扩展名）：', decodedName);
-            if (!finalName) return; // 用户取消保存
+
+            // 弹重命名窗（替代 prompt），确认后再继续保存
+            askLaoMaFileName(decodedName, decodedName, async function(finalName) {
+                if (!finalName) return; // 用户取消保存
 
             const toast = document.createElement('div');
             toast.style.cssText = `position:fixed;top:20px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.85);color:#fff;padding:10px 20px;border-radius:8px;z-index:100000;font-size:0.85rem;`;
@@ -17977,6 +18029,8 @@ ${maSection}
                 toast.style.background = 'linear-gradient(135deg,#f44336,#d32f2f)';
             }
             setTimeout(() => toast.remove(), 3000);
+            });
+
         }
 
         // 打开本地文件选择器（选择扫描文件发布到需求墙）
