@@ -894,7 +894,7 @@
         <!-- Boss减伤悬浮提示 -->
         <div id="bossRedTooltip" style="display:none;position:fixed;z-index:99999;max-width:300px;background:rgba(20,20,40,0.97);border:1px solid rgba(255,215,0,0.4);border-radius:8px;padding:10px;color:#fff;pointer-events:none;box-shadow:0 4px 16px rgba(0,0,0,0.5);"></div>
 
-        <script defer src="app-effects.js?v=s1.0.130"></script>
+        <script defer src="app-effects.js?v=s1.0.152"></script>
 
         <!-- 固定在右上角的按钮 -->
         <div class="sticky-buttons" style="position:fixed;top:12px;right:12px;z-index:9999;display:flex;gap:5px;">
@@ -945,7 +945,7 @@
             </div>
         </div>
 
-        <script defer src="app-features.js?v=s1.0.130"></script>
+        <script defer src="app-features.js?v=s1.0.152"></script>
 
         <!-- 项目操作菜单（折叠） -->
         <div id="projectMenu" style="display:none;position:fixed;z-index:9998;background:rgba(40,40,70,0.98);border:1px solid rgba(255,215,0,0.3);border-radius:10px;padding:10px;min-width:200px;max-height:85vh;overflow-y:auto;box-shadow:0 4px 15px rgba(0,0,0,0.4);">
@@ -964,13 +964,13 @@
         </div>
 
         <!-- APP本地功能脚本（网页版不会执行任何代码，isTauriApp判断在文件内部） -->
-        <script defer src="app-local.js?v=s1.0.141"></script>
+        <script defer src="app-local.js?v=s1.0.152"></script>
         <!-- 阵容识别模块（独立入口 + 灌入脚本生成） -->
         
         <!-- 网页版皮肤系统（仅非 Tauri 浏览器执行；Tauri 由 app-local.js 负责，文件内部自动跳过） -->
         <script defer src="skins-web.js?v=2"></script>
 
-        <script defer src="app-picker.js?v=s1.0.147"></script>
+        <script defer src="app-picker.js?v=s1.0.152"></script>
 
         <!-- 记事本悬浮面板 -->
         <div id="notepadPanel" style="display:none;position:fixed;top:80px;right:20px;width:400px;height:350px;z-index:9997;background:rgba(30,30,60,0.95);border:2px solid rgba(255,215,0,0.5);border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.5);overflow:auto;resize:both;min-width:280px;min-height:250px;">
@@ -2441,7 +2441,7 @@
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">s20260817-08 · s1.0.151</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">s20260817-09 · s1.0.152</span>
             </div>
         </div>
     </div>
