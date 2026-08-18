@@ -11990,6 +11990,15 @@ function hasGistToken() {
                         newsItems = [...DEFAULT_NEWS];
                     }
                 }
+            } else {
+                // 🔴 s1.0.158 修复:新闻列表按"每天一次"节流,但标题由管理员低频修改,
+                // 不应被新闻节流挡住——否则 24h 内冷启动永远显示旧标题,只能手动点标题才刷新。
+                // 故缓存有效时也轻量拉一次(仅副作用更新 currentConfig.title,不覆盖新闻列表缓存)。
+                try {
+                    await fetchNewsFromGitHub();
+                } catch (e) {
+                    console.warn('📢 冷启动刷新标题失败(沿用缓存/默认):', e);
+                }
             }
             
             initMarquee();

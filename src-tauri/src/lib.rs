@@ -298,8 +298,8 @@ fn git_push_skins() -> Result<String, String> {
 
 /// 自增 index.html 的 versionTag 与 sw.js 的 CACHE_VERSION
 fn bump_skin_versions(repo: &str) -> Result<(), String> {
-    bump_in_file(&format!("{}\\index.html", repo), "id=\"versionTag\"", ">v", '<')?;
-    bump_in_file(&format!("{}\\sw.js", repo), "CACHE_VERSION = 'tfjl-v", "tfjl-v", '\'')?;
+    bump_in_file(&format!("{}\\index.html", repo), "id=\"versionTag\"", ">s", '<')?;
+    bump_in_file(&format!("{}\\sw.js", repo), "CACHE_VERSION = 's1.0.", "s1.0.", '\'')?;
     Ok(())
 }
 
