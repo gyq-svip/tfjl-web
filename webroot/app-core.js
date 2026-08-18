@@ -7211,10 +7211,13 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 const item = document.createElement('div');
                 item.className = 'level-dropdown-item' + (level === currentLevel ? ' selected' : '');
                 item.textContent = level;
+                item.setAttribute('data-group', 'level');
                 item.onclick = (e) => {
                     e.stopPropagation();
                     setCardLevel(cardId, level, cardType, handType);
-                    dropdown.remove();
+                    // 保持弹窗打开（可继续设置魔化/皮肤），仅更新选中高亮
+                    dropdown.querySelectorAll('[data-group="level"]').forEach(el => el.classList.remove('selected'));
+                    item.classList.add('selected');
                     updateAllCardLevelBadges();
                 };
                 dropdown.appendChild(item);
@@ -7231,11 +7234,18 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 item.className = 'level-dropdown-item' + (skin === currentSkin ? ' selected' : '');
                 item.textContent = skin;
                 item.style.color = skin === currentSkin ? '#ff9800' : '#fff';
+                item.setAttribute('data-group', 'skin');
+                item.setAttribute('data-skin-name', skin);
                 item.onclick = (e) => {
                     e.stopPropagation();
                     if (isProjectScope) setCardSkin(cardId, skin, handType);
                     else setDefaultCardSkin(cardId, skin);
-                    dropdown.remove();
+                    // 保持弹窗打开，仅更新选中高亮与颜色
+                    dropdown.querySelectorAll('[data-group="skin"]').forEach(el => {
+                        const sel = el.getAttribute('data-skin-name') === skin;
+                        el.classList.toggle('selected', sel);
+                        el.style.color = sel ? '#ff9800' : '#fff';
+                    });
                     updateAllCardLevelBadges();
                 };
                 dropdown.appendChild(item);
@@ -7268,8 +7278,12 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 mohuaItem.onmouseleave = () => mohuaItem.style.background = 'transparent';
                 mohuaItem.onclick = (e) => {
                     e.stopPropagation();
-                    setCardMoHua(cardId, !currentMoHua, handType);
-                    dropdown.remove();
+                    const moHuaOn = !getCardMoHua(cardId, handType); // 实时读取当前状态，支持连续切换
+                    setCardMoHua(cardId, moHuaOn, handType);
+                    // 保持弹窗打开，仅更新文本/颜色/高亮
+                    mohuaItem.textContent = moHuaOn ? '✅ 魔化已开启' : '魔化未开启';
+                    mohuaItem.style.color = moHuaOn ? '#a855f7' : '#fff';
+                    mohuaItem.classList.toggle('selected', moHuaOn);
                     updateAllCardLevelBadges();
                 };
                 dropdown.appendChild(mohuaItem);
