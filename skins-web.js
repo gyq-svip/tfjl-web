@@ -14,16 +14,17 @@
   }
   console.log('[SKIN-WEB] 网页版皮肤系统初始化');
 
-  // 多源皮肤加载（国内快）：jsDelivr(CDN，镜像 GitHub 仓库，无需 token，国内有节点) 优先，GitHub Pages 兜底。
-  // 网页端不能带 Gitee token（会泄露），故只用公开源；任一失败自动切下一个。
-  // 想加 Gitee raw 兜底：在数组追加 'https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/raw/<分支>/skins'
-  var SKIN_SOURCES = [
-    'https://cdn.jsdelivr.net/gh/gyq-svip/tfjl-web@main/skins',
-    'https://gyq-svip.github.io/tfjl-web/skins'
-  ];
-  var REMOTE_SKIN_BASE = SKIN_SOURCES[0];
-  var REMOTE_SKIN_REGISTRY_URL = REMOTE_SKIN_BASE + '/registry.json';
-  var REMOTE_SKIN_FUSIONS_URL = REMOTE_SKIN_BASE + '/fusions.json';
+  // 🔴 方案 C（2026-08-18）：网页版皮肤走同源 GitHub Pages 静态资源 ./skins/，彻底移除 jsDelivr CDN。
+  // 理由：jsDelivr 国内限流/超时是「刷新后皮肤不稳定」最大因素；皮肤文件已随仓库部署到
+  // https://gyq-svip.github.io/tfjl-web/skins/，与页面同域，无 CORS、可进 SW/IndexedDB 缓存，更快更稳。
+  var SKIN_BASE = (function () {
+    try { return new URL('./skins/', location.href).href.replace(/\/$/, ''); }
+    catch (e) { return 'skins'; }
+  })();
+  var SKIN_SOURCES = [SKIN_BASE]; // 仅同源，不再依赖任何 CDN
+  var REMOTE_SKIN_BASE = SKIN_BASE;
+  var REMOTE_SKIN_REGISTRY_URL = SKIN_BASE + '/registry.json';
+  var REMOTE_SKIN_FUSIONS_URL = SKIN_BASE + '/fusions.json';
 
   window.skinRegistry = {};       // { 英雄名: [{ name, url, path }] }
   window.heroSkinSelections = {};  // { 英雄名: 皮肤名 }
@@ -85,51 +86,63 @@
     } catch (e) { return false; }
   }
 
-  // 获取皮肤 blob URL（网页版：IndexedDB 优先，源无关缓存；未命中则按多源顺序 fetch 并回写）
+  // 获取皮肤 blob URL（网页版：IndexedDB 优先；未命中则同源 fetch .skin + 单飞去重 + 超时重试）
+  var _skinInflight = {}; // key -> 进行中的 fetch promise（避免并发重复拉同一张图挤占连接池）
   async function _getCachedSkinUrl(remoteUrl) {
     if (!remoteUrl) return null;
     if (!/^https?:\/\//i.test(remoteUrl)) return remoteUrl;
-    // 从 URL 解析 hero/file（与源无关），保证切换皮肤源后缓存仍命中、不重复下载
+    // 从 URL 解析 hero/file（与源无关），保证缓存 key 稳定、切换源后仍命中
     var m = remoteUrl.match(/\/skins\/([^/]+?)\/([^/]+)$/);
-    if (!m) return remoteUrl; // 非标准皮肤 URL，原样返回
+    if (!m) return null; // 非标准皮肤 URL：不再裸退回（同源 .skin 直接作 img src 不可靠）
     var hero = decodeURIComponent(m[1]);
     var file = decodeURIComponent(m[2]);
     var key = 'skin:' + hero + '/' + file;
+    // 1) IndexedDB 命中即返回（毫秒级，离线/弱网也能显示已缓存皮肤）
     var cached = await _idbGet(key);
     if (cached && cached.blob) {
       try { return URL.createObjectURL(cached.blob); }
       catch (e) { console.warn('[SKIN-WEB] createObjectURL failed:', e); }
     }
-    // 未命中：按 SKIN_SOURCES 顺序逐个尝试（jsDelivr → GitHub Pages），首个成功即缓存返回
-    for (var si = 0; si < SKIN_SOURCES.length; si++) {
-      var url = SKIN_SOURCES[si] + '/' + encodeURIComponent(hero) + '/' + encodeURIComponent(file);
+    // 2) 单飞：同一张图正在拉取，复用同一 promise，避免 N 张同英雄并发 N 次 fetch
+    if (_skinInflight[key]) return _skinInflight[key];
+    var p = (async function () {
+      var url = SKIN_BASE + '/' + encodeURIComponent(hero) + '/' + encodeURIComponent(file);
       try {
-        var ctrl = new AbortController();
-        var _timer = setTimeout(function () { ctrl.abort(); }, 12000);
-        var resp;
-        try { resp = await fetch(url, { cache: 'force-cache', signal: ctrl.signal }); }
-        catch (e) { clearTimeout(_timer); continue; }
-        clearTimeout(_timer);
-        if (!resp.ok) continue;
-        var blob = await resp.blob();
-        _idbPut(key, blob);
-        return URL.createObjectURL(blob);
-      } catch (e) {
-        console.warn('[SKIN-WEB] 皮肤源加载失败，尝试下一个:', url, e);
-      }
-    }
-    return remoteUrl; // 全部源失败：退回原 URL，由浏览器自行处理
+        var resp = await _fetchWithRetry(url, 10000, 2); // 同源 GitHub Pages，超时 10s + 重试 2 次
+        if (resp && resp.ok) {
+          var blob = await resp.blob();
+          _idbPut(key, blob); // 回写缓存，下次刷新即稳定
+          return URL.createObjectURL(blob);
+        }
+      } catch (e) { console.warn('[SKIN-WEB] 皮肤加载失败:', url, e); }
+      return null; // 全部失败：返回 null（已有 IndexedDB 兜底，多数情况命中）
+    })();
+    _skinInflight[key] = p;
+    try { return await p; } finally { delete _skinInflight[key]; }
   }
 
-  // 多源拉取 JSON（registry/fusions/attributes），任一源成功即返回 Response，全失败返回 null
-  async function _fetchJsonWithFallback(relPath) {
-    for (var si = 0; si < SKIN_SOURCES.length; si++) {
+  function _sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  // fetch + 超时 + 重试（指数退避），单一同源即可（GitHub Pages 已相当稳定）
+  async function _fetchWithRetry(url, ms, retries) {
+    retries = retries || 2;
+    var lastErr;
+    for (var i = 0; i <= retries; i++) {
+      var ctrl = null, timer = null;
       try {
-        var resp = await fetch(SKIN_SOURCES[si] + relPath, { cache: 'no-cache' });
+        ctrl = new AbortController();
+        timer = setTimeout(function () { ctrl.abort(); }, ms || 8000);
+        var resp = await fetch(url, { cache: 'no-cache', signal: ctrl.signal });
+        clearTimeout(timer);
         if (resp.ok) return resp;
-      } catch (e) { /* 尝试下一个源 */ }
+        lastErr = new Error('HTTP ' + resp.status);
+      } catch (e) { lastErr = e; if (timer) clearTimeout(timer); }
+      if (i < retries) await _sleep((i + 1) * 400); // 退避后重试
     }
     return null;
+  }
+  // 拉取 JSON（registry/fusions/attributes），同源 + 超时 + 重试（最多 3 次）
+  async function _fetchJsonWithFallback(relPath) {
+    return _fetchWithRetry(SKIN_BASE + relPath, 8000, 3);
   }
 
   // 后台批量预热（网页版：仅下载到 IndexedDB 缓存，绝不参与首屏渲染阻塞）
@@ -194,94 +207,111 @@
     } catch (e) { console.warn('[SKIN-WEB] preheat visible failed:', e); }
   }
 
-  // 从 GitHub Pages 拉取远程皮肤注册表
-  var _remoteSkinSynced = false;
+  // 从同源皮肤注册表合并到 window.skinRegistry（url 用同源路径）
+  function _applyRegistry(heroesObj) {
+    if (!heroesObj) return 0;
+    var addedCount = 0;
+    for (var hn in heroesObj) {
+      if (!Object.prototype.hasOwnProperty.call(heroesObj, hn)) continue;
+      var skinList = heroesObj[hn];
+      if (!Array.isArray(skinList)) continue;
+      if (!window.skinRegistry[hn]) window.skinRegistry[hn] = [];
+      var localSkins = window.skinRegistry[hn];
+      var localNames = {};
+      for (var k = 0; k < localSkins.length; k++) localNames[localSkins[k].name] = true;
+      for (var j = 0; j < skinList.length; j++) {
+        var remoteSkin = skinList[j];
+        var skinName = remoteSkin.name;
+        if (!skinName) continue;
+        var url = REMOTE_SKIN_BASE + '/' + encodeURIComponent(hn) + '/' + encodeURIComponent(remoteSkin.file || (skinName + '.skin'));
+        if (localNames[skinName]) {
+          var local = null;
+          for (var m = 0; m < localSkins.length; m++) { if (localSkins[m].name === skinName) { local = localSkins[m]; break; } }
+          if (local && !local.url && !local.path) local.url = url;
+        } else {
+          localSkins.push({ name: skinName, url: url, path: null, loaded: true, remote: true });
+          addedCount++;
+        }
+      }
+    }
+    return addedCount;
+  }
+
+  // 拉取同源注册表 + 融合/属性表；成功后缓存 registry 到 IndexedDB（下次刷新即使全挂也能显示）
+  async function _syncRemoteRegistry() {
+    console.log('[SKIN-WEB] 拉取皮肤注册表(同源):', REMOTE_SKIN_REGISTRY_URL);
+    var resp = await _fetchJsonWithFallback('/registry.json');
+    if (!resp) { console.warn('[SKIN-WEB] 同源注册表拉取失败（保留 IndexedDB/旧缓存兜底）'); return false; }
+    var registry = await resp.json();
+    if (!registry || !registry.heroes) return false;
+    var added = _applyRegistry(registry.heroes);
+    if (added > 0) console.log('[SKIN-WEB] 合并', added, '个皮肤');
+    // 存 IndexedDB，供离线/弱网刷新兜底（registry 拉不到也能用上次清单 + 已缓存皮肤图）
+    try { await _idbPut('skin:registry', new Blob([JSON.stringify(registry)], { type: 'application/json' })); } catch (e) {}
+    // 🔴 预热「绝不 await」「绝不挤占首屏」：可见卡片立即触发；全量 low 并发 idle 启动
+    setTimeout(function () { try { _preheatVisibleSkins(); } catch (e) {} }, 0);
+    var _idleStart = (typeof window.requestIdleCallback === 'function')
+      ? function (fn) { window.requestIdleCallback(fn, { timeout: 5000 }); }
+      : function (fn) { setTimeout(fn, 1500); }; // 不支持 idle 时延后启动，给首屏足够时间
+    _idleStart(function () { try { _preheatSkins(window.skinRegistry, { concurrency: 2 }); } catch (e) {} });
+    // 拉取融合卡定义（云端 fusions.json，管理员维护）
+    try {
+      var fResp = await _fetchJsonWithFallback('/fusions.json');
+      if (fResp && fResp.ok) {
+        var fData = await fResp.json();
+        if (fData && fData.fusions) {
+          window.cloudFusions = fData.fusions;
+          console.log('[SKIN-WEB] cloud fusions loaded:', Object.keys(fData.fusions).length);
+        }
+      }
+    } catch (fe) { console.warn('[SKIN-WEB] load fusions.json failed:', fe); }
+    // 拉取皮肤属性表（云端 skin-attributes.json，管理员维护）
+    try {
+      var aResp = await _fetchJsonWithFallback('/skin-attributes.json');
+      if (aResp && aResp.ok) {
+        var aData = await aResp.json();
+        window.skinAttributesCloud = aData || {};
+        console.log('[SKIN-WEB] skin-attributes.json loaded, heroes:', Object.keys(aData || {}).length);
+      }
+    } catch (ae) { console.warn('[SKIN-WEB] load skin-attributes.json failed:', ae); }
+    return true;
+  }
+
+  // 缓存 sync 的 promise，让 resolve* 调用可 await 注册表就绪（解决首屏皮肤不显示的时序问题）
+  var _syncInFlight = false;
   var _syncPromise = null;
-  // 缓存 syncRemoteSkins 的 promise，让 resolve* 调用可 await 注册表就绪（解决首屏皮肤不显示的时序问题）
   function _ensureSynced() {
-    if (!_syncPromise) _syncPromise = syncRemoteSkins();
+    // 已有 registry（含 IndexedDB 恢复来的）→ 立即就绪，绝不阻塞首屏
+    if (window.skinRegistry && Object.keys(window.skinRegistry).length) return Promise.resolve();
+    if (_syncInFlight) return _syncPromise;
+    return _startSync();
+  }
+  async function _startSync() {
+    if (_syncInFlight) return _syncPromise;
+    _syncInFlight = true;
+    _syncPromise = (async function () {
+      try {
+        var ok = await _syncRemoteRegistry();
+        if (!ok) {
+          // 🔴 失败不永久锁定：清空 promise，下次调用（或用户刷新）可重试 —— 修复「一次失败整轮刷新全不显示」
+          _syncInFlight = false;
+          _syncPromise = null;
+        }
+      } catch (e) {
+        console.warn('[SKIN-WEB] syncRemoteRegistry() failed:', String(e).slice(0, 200));
+        _syncInFlight = false;
+        _syncPromise = null;
+      } finally {
+        // 无论成功失败都重刷一次：修复「远端失败时皮肤不重刷导致加载卡住不显示」的概率问题
+        try { if (typeof window.reapplyAllSkins === 'function') await window.reapplyAllSkins(); } catch (e2) {}
+      }
+    })();
     return _syncPromise;
   }
+  // 兼容旧接口（app-core.js 可能直接调 window.syncRemoteSkins）
   async function syncRemoteSkins(force) {
-    if (_remoteSkinSynced && !force) return;
-    _remoteSkinSynced = true;
-    console.log('[SKIN-WEB] syncRemoteSkins() fetching registry from:', REMOTE_SKIN_REGISTRY_URL);
-    try {
-      var resp = await _fetchJsonWithFallback('/registry.json');
-      if (!resp) {
-        console.warn('[SKIN-WEB] Remote registry 拉取失败（所有源均不可用），skins disabled');
-        return;
-      }
-      var registry = await resp.json();
-      console.log('[SKIN-WEB] Remote registry loaded, version:', registry.version, 'heroes:', Object.keys(registry.heroes || {}).length);
-      if (!registry.heroes) return;
-
-      var addedCount = 0;
-      for (var hn in registry.heroes) {
-        if (!Object.prototype.hasOwnProperty.call(registry.heroes, hn)) continue;
-        var skinList = registry.heroes[hn];
-        if (!Array.isArray(skinList)) continue;
-        if (!window.skinRegistry[hn]) window.skinRegistry[hn] = [];
-        var localSkins = window.skinRegistry[hn];
-        var localNames = {};
-        for (var k = 0; k < localSkins.length; k++) localNames[localSkins[k].name] = true;
-        for (var j = 0; j < skinList.length; j++) {
-          var remoteSkin = skinList[j];
-          var skinName = remoteSkin.name;
-          if (!skinName) continue;
-          var remoteUrl = REMOTE_SKIN_BASE + '/' + encodeURIComponent(hn) + '/' + encodeURIComponent(remoteSkin.file || (skinName + '.skin'));
-          if (localNames[skinName]) {
-            var local = null;
-            for (var m = 0; m < localSkins.length; m++) { if (localSkins[m].name === skinName) { local = localSkins[m]; break; } }
-            if (local && !local.url && !local.path) local.url = remoteUrl;
-          } else {
-            localSkins.push({ name: skinName, url: remoteUrl, path: null, loaded: true, remote: true });
-            addedCount++;
-          }
-        }
-      }
-      if (addedCount > 0) console.log('[SKIN-WEB] added', addedCount, 'remote skins');
-      // 🔴 s1.0.101/103 关键修正：预热「绝不 await」+「绝不挤占首屏 HTTP 连接池」
-      // - 注册表索引就绪即代表 sync 完成，首屏渲染只依赖索引，不再被预热拖死。
-      // - 全量预热改用 requestIdleCallback 启动 + 并发降为 2（Chrome 同源并发上限 6，预热占太多会阻塞首屏 fetch 排队，
-      //   这就是 s1.0.102 卡 "0/1" 一直不动的真因——浏览器 HTTP 连接池被 410 张预热占满）。
-      // - 可见卡片预热立即触发（用 setTimeout(0)，并发 4），让首屏皮肤更快有缓存（不阻塞首屏 fetch）。
-      setTimeout(function () {
-        try { _preheatVisibleSkins(); } catch (e) {}
-      }, 0);
-      var _idleStart = (typeof window.requestIdleCallback === 'function')
-        ? function (fn) { window.requestIdleCallback(fn, { timeout: 5000 }); }
-        : function (fn) { setTimeout(fn, 1500); }; // 不支持 idle 时延后启动，给首屏足够时间
-      _idleStart(function () {
-        try { _preheatSkins(registry.heroes, { concurrency: 2 }); } catch (e) {}
-      });
-      // 拉取融合卡定义（云端 fusions.json，管理员维护）
-      try {
-        var fResp = await _fetchJsonWithFallback('/fusions.json');
-        if (fResp && fResp.ok) {
-          var fData = await fResp.json();
-          if (fData && fData.fusions) {
-            window.cloudFusions = fData.fusions;
-            console.log('[SKIN-WEB] cloud fusions loaded:', Object.keys(fData.fusions).length);
-          }
-        }
-      } catch (fe) { console.warn('[SKIN-WEB] load fusions.json failed:', fe); }
-      // 拉取皮肤属性表（云端 skin-attributes.json，管理员维护，随 git_push_skins 推送）
-      try {
-        var aResp = await _fetchJsonWithFallback('/skin-attributes.json');
-        if (aResp && aResp.ok) {
-          var aData = await aResp.json();
-          window.skinAttributesCloud = aData || {};
-          console.log('[SKIN-WEB] skin-attributes.json loaded, heroes:', Object.keys(aData || {}).length);
-        }
-      } catch (ae) { console.warn('[SKIN-WEB] load skin-attributes.json failed:', ae); }
-      _preheatSkins(registry.heroes);
-    } catch (e) {
-      console.warn('[SKIN-WEB] syncRemoteSkins() failed:', String(e).slice(0, 200));
-    } finally {
-      // 无论远端是否拉取成功都重刷一次：修复「远端失败时皮肤不重刷导致加载卡住不显示」的概率问题
-      try { if (typeof window.reapplyAllSkins === 'function') await window.reapplyAllSkins(); } catch(e2) {}
-    }
+    if (force) { _syncInFlight = false; _syncPromise = null; }
+    return _ensureSynced();
   }
 
   function getHeroSkinUrl(heroName, skinName) {
@@ -426,8 +456,22 @@
     };
   };
 
-  // 启动：恢复已选皮肤并拉取远程皮肤注册表
+  // 启动：恢复已选皮肤 + 从 IndexedDB 恢复上次缓存的皮肤清单（弱网/离线也能立即渲染）
   loadSkinSelections();
+  (async function _restoreRegistryCache() {
+    try {
+      var cached = await _idbGet('skin:registry');
+      if (cached && cached.blob) {
+        var text = await cached.blob.text();
+        var data = JSON.parse(text);
+        if (data && data.heroes) {
+          _applyRegistry(data.heroes);
+          console.log('[SKIN-WEB] 已从 IndexedDB 恢复皮肤清单:', Object.keys(window.skinRegistry).length, '英雄（弱网/离线兜底）');
+          try { if (typeof window.reapplyAllSkins === 'function') window.reapplyAllSkins(); } catch (e) {}
+        }
+      }
+    } catch (e) {}
+  })();
   _ensureSynced();
   // 兜底：页面 load 后再触发一次皮肤重刷，确保异步渲染出来的卡片也能补上皮肤
   if (typeof window.addEventListener === 'function') {
