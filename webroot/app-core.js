@@ -2847,8 +2847,8 @@
                         <button id="${windowId}_paletteBtn" onclick="toggleNotebookColorPicker('${windowId}')" title="取色器：选中文字→给选中上色；未选中→整篇换色" style="background:rgba(255,255,255,0.08);border:none;color:#fff;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:0.9rem;">🎨</button>
                         <div id="${windowId}_colorPopup" onmousedown="event.stopPropagation()" style="display:none;position:absolute;top:118%;right:0;z-index:20;width:158px;background:linear-gradient(160deg,rgba(40,40,68,0.98),rgba(26,26,48,0.98));border:1px solid rgba(255,215,0,0.35);border-radius:12px;padding:10px 12px;box-shadow:0 8px 30px rgba(0,0,0,0.6);">
                             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                                <span id="${windowId}_popTitle" style="font-size:0.76rem;font-weight:bold;color:#ffd700;white-space:nowrap;">🎨 字体颜色（整篇）</span>
-                                <button type="button" onclick="nbTogglePopupMode('${windowId}')" title="切换：选中上色 ⇄ 整篇换色" style="background:rgba(255,215,0,0.15);border:1px solid rgba(255,215,0,0.4);color:#ffd700;padding:1px 7px;border-radius:5px;cursor:pointer;font-size:0.72rem;flex-shrink:0;">⇄</button>
+                                <span id="${windowId}_popTitle" style="font-size:0.76rem;font-weight:bold;color:#ffd700;white-space:nowrap;">🎨 整篇颜色</span>
+                                <button type="button" onclick="nbCloseColorPopup('${windowId}')" title="关闭色板" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.25);color:#c9c9dd;padding:1px 7px;border-radius:5px;cursor:pointer;font-size:0.72rem;flex-shrink:0;line-height:1.3;">✕</button>
                             </div>
                             <div style="position:relative;width:132px;height:132px;margin:0 auto 9px;">
                                 <canvas id="${windowId}_wheel" style="width:132px;height:132px;border-radius:50%;display:block;cursor:crosshair;box-shadow:0 0 0 1px rgba(255,255,255,0.28),0 4px 14px rgba(0,0,0,0.55);"></canvas>
@@ -3270,7 +3270,8 @@
                 + '50%{text-shadow:0 0 4px currentColor,0 0 14px currentColor;filter:brightness(1.4);}}'
                 + '.nb-overlay{pointer-events:none;overflow:hidden;color:transparent;background:transparent;}'
                 + '.nb-overlay-inner{white-space:pre-wrap;word-break:break-word;margin:0;will-change:transform;}'
-                + '.nb-glow{animation:nbBreathe 2.4s ease-in-out infinite;}';
+                + '.nb-glow{animation:nbBreathe 2.4s ease-in-out infinite;}'
+                + '#notepadEditable::selection,[id$="_content"]::selection{background:rgba(255,255,255,0.22);}';
             document.head.appendChild(st);
         }
 
@@ -3290,7 +3291,8 @@
             if (!ta || !inner) return;
             const value = ta.value;
             const win = txtFileWindows.find(w => w.id === windowId);
-            const marks = win && win.marks ? anchorNotebookMarks(value, win.marks) : [];
+            let marks = win && win.marks ? anchorNotebookMarks(value, win.marks) : [];
+            if (win && win._previewMark) marks = nbMergePreviewMark(value, marks, win._previewMark);
             let html = '', cursor = 0;
             for (const m of marks) {
                 if (m.start < cursor) continue;
@@ -3346,7 +3348,7 @@
             renderNotebookOverlay(windowId);
         }
 
-        // ========== 取色器双模式（选中上色 ⇄ 整篇换色，一个按钮自动识别） ==========
+        // ========== 取色器双模式（选中上色 ⇄ 整篇换色，一个按钮纯自动识别，无切换） ==========
         const nbPopupMode = {};   // windowId -> 'sel' | 'all'
 
         function nbHasSelection(windowId) {
@@ -3360,9 +3362,46 @@
             return !!(win && typeof win._selS === 'number' && win._selS !== win._selE);
         }
 
+        // 预览色段：把 [s,e) 区间从已有 marks 中裁掉再插入临时段（拖色轮实时预览用，不落盘）
+        function nbMergePreviewMark(value, marks, pv) {
+            if (!pv || pv.s >= pv.e) return marks;
+            const clipped = marks.filter(m => (m.start + (m.text || '').length) <= pv.s || m.start >= pv.e);
+            clipped.push({ text: value.substring(pv.s, pv.e), color: pv.color, glow: !!pv.glow, start: pv.s });
+            return clipped.sort((a, b) => a.start - b.start);
+        }
+
+        // 拖动色轮：选中模式下给选区实时预览颜色（跟整篇色一样的跟手体验）
+        function nbPreviewSelColor(windowId, hex) {
+            const glow = !!document.getElementById(windowId + '_glowChk')?.checked;
+            if (windowId === 'notebook_main') {
+                if (nbMainSel.s === nbMainSel.e) return;
+                nbPreviewMark = { s: nbMainSel.s, e: nbMainSel.e, color: hex, glow: glow };
+                renderNotepadEditable();
+            } else {
+                const ta = document.getElementById(windowId + '_content');
+                const win = txtFileWindows.find(w => w.id === windowId);
+                if (!ta || !win) return;
+                const s = (typeof win._selS === 'number') ? win._selS : ta.selectionStart;
+                const e = (typeof win._selE === 'number') ? win._selE : ta.selectionEnd;
+                if (s >= e) return;
+                win._previewMark = { s: s, e: e, color: hex, glow: glow };
+                renderNotebookOverlay(windowId);
+            }
+        }
+
+        function nbClearSelPreview(windowId) {
+            if (windowId === 'notebook_main') {
+                if (nbPreviewMark) { nbPreviewMark = null; renderNotepadEditable(); }
+            } else {
+                const win = txtFileWindows.find(w => w.id === windowId);
+                if (win && win._previewMark) { win._previewMark = null; renderNotebookOverlay(windowId); }
+            }
+        }
+
         function nbApplyPopupColor(windowId, hex) {
             if (nbPopupMode[windowId] === 'sel') {
                 const glow = document.getElementById(windowId + '_glowChk')?.checked;
+                nbClearSelPreview(windowId);
                 if (windowId === 'notebook_main') applyNotebookMainColor(hex, !!glow);
                 else applyNotebookSelectionColor(windowId, hex, !!glow);
             } else {
@@ -3373,18 +3412,50 @@
         function nbUpdateColorPopupMode(windowId) {
             const selMode = nbPopupMode[windowId] === 'sel';
             const t = document.getElementById(windowId + '_popTitle');
-            if (t) t.textContent = selMode ? '🖌 选中文字上色' : '🎨 字体颜色（整篇）';
+            if (t) t.textContent = selMode ? '🖌 选中文字上色' : '🎨 整篇颜色';
             const glowRow = document.getElementById(windowId + '_glowRow');
             if (glowRow) glowRow.style.display = selMode ? 'flex' : 'none';
             const clearRow = document.getElementById(windowId + '_clearRow');
             if (clearRow) clearRow.style.display = selMode ? 'block' : 'none';
             const hint = document.getElementById(windowId + '_popHint');
-            if (hint) hint.textContent = selMode ? '松手即上色到选中文字' : '全部记事本统一 · 自动保存';
+            if (hint) hint.textContent = selMode ? '拖动实时预览 · 松手上色' : '拖动实时预览 · 松手应用（全部记事本统一）';
         }
 
-        function nbTogglePopupMode(windowId) {
-            nbPopupMode[windowId] = nbPopupMode[windowId] === 'sel' ? 'all' : 'sel';
-            nbUpdateColorPopupMode(windowId);
+        function nbCloseColorPopup(windowId) {
+            const pop = document.getElementById(windowId + '_colorPopup');
+            if (pop) pop.style.display = 'none';
+            nbClearSelPreview(windowId);
+        }
+
+        // 色板常开期间实时重判模式：选了字→选中上色；取消选择→整篇换色（无需任何按钮）
+        function nbReevalMode(windowId) {
+            const pop = document.getElementById(windowId + '_colorPopup');
+            if (!pop || pop.style.display !== 'block') return;
+            if (windowId !== 'notebook_main') {
+                const ta = document.getElementById(windowId + '_content');
+                const win = txtFileWindows.find(w => w.id === windowId);
+                if (ta && win && document.activeElement === ta) { win._selS = ta.selectionStart; win._selE = ta.selectionEnd; }
+            }
+            const m = nbHasSelection(windowId) ? 'sel' : 'all';
+            if (m !== nbPopupMode[windowId]) {
+                nbPopupMode[windowId] = m;
+                nbClearSelPreview(windowId);
+                nbUpdateColorPopupMode(windowId);
+            }
+        }
+
+        let nbSelWatchInited = false;
+        function nbEnsureGlobalSelWatch() {
+            if (nbSelWatchInited) return;
+            nbSelWatchInited = true;
+            const reeval = () => {
+                document.querySelectorAll('[id$="_colorPopup"]').forEach(p => {
+                    if (p.style.display === 'block') nbReevalMode(p.id.replace(/_colorPopup$/, ''));
+                });
+            };
+            document.addEventListener('mouseup', reeval);
+            document.addEventListener('keyup', reeval);
+            document.addEventListener('selectionchange', reeval);
         }
 
         // ========== 主界面「项目记事本」单字上色：contenteditable 富文本显示层 + 隐藏 textarea(#notepad) 数据源 ==========
@@ -3392,6 +3463,7 @@
         // 单一渲染层由浏览器原生排版 → 永不错位；逐字标记用 <span style="color:..."> 渲染并持久化到 marks。
         const NOTEBOOK_MAIN_KEY = 'notebook-main';
         const nbMainSel = { s: 0, e: 0 };   // 记录 contenteditable 选区（字符偏移）
+        let nbPreviewMark = null;          // 主记事本拖色轮时的临时预览色段（不落盘）
         function getNotebookMainMarks() {
             if (notebookMarksStore[NOTEBOOK_MAIN_KEY]) return notebookMarksStore[NOTEBOOK_MAIN_KEY];
             try { const s = localStorage.getItem(LS_NOTEBOOK_MARKS); if (s) { const all = JSON.parse(s) || {}; if (all[NOTEBOOK_MAIN_KEY]) return all[NOTEBOOK_MAIN_KEY]; } } catch (e) {}
@@ -3417,7 +3489,8 @@
             const ta = document.getElementById('notepad');
             if (!ed || !ta) return;
             const value = ta.value;
-            const marks = anchorNotebookMarks(value, getNotebookMainMarks());
+            let marks = anchorNotebookMarks(value, getNotebookMainMarks());
+            if (nbPreviewMark) marks = nbMergePreviewMark(value, marks, nbPreviewMark);
             let html = '', cursor = 0;
             for (const m of marks) {
                 if (m.start < cursor) continue;
@@ -3703,12 +3776,18 @@
             bindDrag(bar, pickFromBar);
         }
 
-        // 标题栏 🎨 取色器：一个按钮双模式——有选中文字→选中上色，无选中→整篇换色（⇄ 可手动切换）
+        // 标题栏 🎨 取色器：一个按钮纯自动双模式——选中文字→给选区上色；未选中→整篇换色。
+        // 色板打开期间可在记事本里自由选字（不关闭），点记事本面板以外才收起，也可点 ✕ 关闭。
         function toggleNotebookColorPicker(windowId) {
             const pop = document.getElementById(windowId + '_colorPopup');
             if (!pop) return;
             const show = pop.style.display === 'none';
-            document.querySelectorAll('[id$="_colorPopup"]').forEach(p => p.style.display = 'none');
+            document.querySelectorAll('[id$="_colorPopup"]').forEach(p => {
+                if (p.style.display === 'block') {
+                    p.style.display = 'none';
+                    nbClearSelPreview(p.id.replace(/_colorPopup$/, ''));
+                }
+            });
             pop.style.display = show ? 'block' : 'none';
             if (show) {
                 nbPopupMode[windowId] = nbHasSelection(windowId) ? 'sel' : 'all';
@@ -3716,14 +3795,22 @@
                 renderNotebookColorSwatches(windowId);
                 setupNotebookColorWheel(windowId,
                     (hex) => nbApplyPopupColor(windowId, hex),
-                    (hex) => { if (nbPopupMode[windowId] !== 'sel') previewNotebookColorLive(hex); });
+                    (hex) => {
+                        if (nbPopupMode[windowId] === 'sel') nbPreviewSelColor(windowId, hex);
+                        else previewNotebookColorLive(hex);
+                    });
                 syncNotebookWheelUI(windowId, notebookColorCfg.color);
+                nbEnsureGlobalSelWatch();
+                const scopeEl = windowId === 'notebook_main'
+                    ? document.getElementById('notepadPanel')
+                    : (txtFileWindows.find(w => w.id === windowId) || {}).element;
                 setTimeout(() => {
                     const docClose = (e) => {
-                        if (!pop.contains(e.target) && e.target.id !== windowId + '_paletteBtn') {
-                            pop.style.display = 'none';
-                            document.removeEventListener('mousedown', docClose, true);
-                        }
+                        if (pop.contains(e.target) || e.target.id === windowId + '_paletteBtn') return;
+                        if (scopeEl && scopeEl.contains(e.target)) return;   // 在本记事本内选字/编辑：保持色板常开
+                        pop.style.display = 'none';
+                        nbClearSelPreview(windowId);
+                        document.removeEventListener('mousedown', docClose, true);
                     };
                     document.addEventListener('mousedown', docClose, true);
                 }, 0);
