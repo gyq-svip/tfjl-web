@@ -5536,7 +5536,8 @@
             const cardId = slot.dataset.cardId;
             const hc = handCards.find(c => c.id === cardId);
             if (hc) hc.name = newName;
-            const pc = placedArray.find(c => c.id === cardId);
+            // 旧项目数据可能缺 id 字段，用 slot 兜底确保 name 一定更新（否则减伤算的还是旧卡名）
+            const pc = placedArray.find(c => c.id === cardId) || placedArray.find(c => c.slot === slotId);
             if (pc) pc.name = newName;
             const nameSpan = slot.querySelector('.card-name');
             if (nameSpan) { nameSpan.dataset.fullName = newName; nameSpan.textContent = getFusionDisplayName(newName); }
@@ -5546,6 +5547,8 @@
             try { await applySkinBgToSlot(slot, newName); } catch (e) {}
             updateHandDisplay(isUserSlot ? 'my' : 'teammate');
             refreshSlotFusionControl(slot);
+            // 融合切换后立即刷新减伤显示（否则停留在切换前数字，副卡被动技能看起来"没算上"）
+            if (typeof updateDamageReductionDisplay === 'function') updateDamageReductionDisplay();
             if (typeof autoSaveProject === 'function') autoSaveProject();
         }
 
