@@ -2873,6 +2873,7 @@
                             </div>
                             <label style="display:flex;align-items:center;gap:6px;font-size:0.74rem;color:#c9c9dd;margin-bottom:10px;cursor:pointer;"><input type="checkbox" id="${windowId}_glowChk" checked> 动态呼吸发光</label>
                             <button onclick="clearNotebookSelectionColor('${windowId}')" style="width:100%;background:rgba(244,67,54,0.18);border:1px solid rgba(244,67,54,0.35);color:#f44336;padding:6px;border-radius:6px;cursor:pointer;font-size:0.74rem;">🧹 清除选中颜色</button>
+                            <button onclick="clearAllNotebookSelectionColor('${windowId}')" style="width:100%;margin-top:6px;background:rgba(244,67,54,0.28);border:1px solid rgba(244,67,54,0.5);color:#ff8a80;padding:6px;border-radius:6px;cursor:pointer;font-size:0.74rem;">🗑️ 清除全部颜色</button>
                             <div style="font-size:0.6rem;color:#9a9ab0;margin-top:8px;text-align:center;">先在记事本里用鼠标选中要上色的字</div>
                         </div>
                     </div>
@@ -3299,14 +3300,18 @@
         function applyNotebookSelectionColor(windowId, color, glow) {
             const ta = document.getElementById(windowId + '_content');
             const win = txtFileWindows.find(w => w.id === windowId);
-            if (!ta || !win || !win.marks) return;
+            if (!ta || !win) return;
             const s = (typeof win._selS === 'number') ? win._selS : ta.selectionStart;
             const e = (typeof win._selE === 'number') ? win._selE : ta.selectionEnd;
             if (s === e) { if (window.showToast) showToast('请先用鼠标选中要上色的文字'); else alert('请先选中文字'); return; }
-            const text = ta.value.substring(s, e);
+            const value = ta.value;
+            const text = value.substring(s, e);
             if (!text) return;
-            win.marks = (win.marks || []).filter(m => (m.start + (m.text || '').length) <= s || m.start >= e);
-            win.marks.push({ text: text, color: color, glow: !!glow, start: s });
+            // 先按当前文本重新锚定（编辑后坐标会变），保证过滤/落盘坐标一致
+            const anchored = anchorNotebookMarks(value, win.marks || []);
+            const filtered = anchored.filter(m => (m.start + (m.text || '').length) <= s || m.start >= e);
+            filtered.push({ text: text, color: color, glow: !!glow, start: s });
+            win.marks = filtered;
             persistNotebookMarks(win.marksKey, win.marks);
             renderNotebookOverlay(windowId);
         }
@@ -3314,11 +3319,21 @@
         function clearNotebookSelectionColor(windowId) {
             const ta = document.getElementById(windowId + '_content');
             const win = txtFileWindows.find(w => w.id === windowId);
-            if (!ta || !win || !win.marks) return;
+            if (!ta || !win) return;
             const s = (typeof win._selS === 'number') ? win._selS : ta.selectionStart;
             const e = (typeof win._selE === 'number') ? win._selE : ta.selectionEnd;
             if (s === e) { if (window.showToast) showToast('请先用鼠标选中要清除颜色的文字'); else alert('请先选中文字'); return; }
-            win.marks = win.marks.filter(m => (m.start + (m.text || '').length) <= s || m.start >= e);
+            const value = ta.value;
+            const anchored = anchorNotebookMarks(value, win.marks || []);
+            win.marks = anchored.filter(m => (m.start + (m.text || '').length) <= s || m.start >= e);
+            persistNotebookMarks(win.marksKey, win.marks);
+            renderNotebookOverlay(windowId);
+        }
+
+        function clearAllNotebookSelectionColor(windowId) {
+            const win = txtFileWindows.find(w => w.id === windowId);
+            if (!win) return;
+            win.marks = [];
             persistNotebookMarks(win.marksKey, win.marks);
             renderNotebookOverlay(windowId);
         }
@@ -3406,11 +3421,13 @@
             if (!ta) return;
             const s = notebookMainSel.s, e = notebookMainSel.e;
             if (s === e) { if (window.showToast) showToast('请先用鼠标选中要上色的文字'); else alert('请先选中文字'); return; }
-            const text = ta.value.substring(s, e);
+            const value = ta.value;
+            const text = value.substring(s, e);
             if (!text) return;
-            let marks = getNotebookMainMarks().filter(m => (m.start + (m.text || '').length) <= s || m.start >= e);
-            marks.push({ text: text, color: color, glow: !!glow, start: s });
-            persistNotebookMainMarks(marks);
+            const anchored = anchorNotebookMarks(value, getNotebookMainMarks());
+            const filtered = anchored.filter(m => (m.start + (m.text || '').length) <= s || m.start >= e);
+            filtered.push({ text: text, color: color, glow: !!glow, start: s });
+            persistNotebookMainMarks(filtered);
             renderMainNotebookOverlay();
         }
         function clearNotebookMainColor() {
@@ -3418,8 +3435,14 @@
             if (!ta) return;
             const s = notebookMainSel.s, e = notebookMainSel.e;
             if (s === e) { if (window.showToast) showToast('请先用鼠标选中要清除颜色的文字'); else alert('请先选中文字'); return; }
-            let marks = getNotebookMainMarks().filter(m => (m.start + (m.text || '').length) <= s || m.start >= e);
-            persistNotebookMainMarks(marks);
+            const value = ta.value;
+            const anchored = anchorNotebookMarks(value, getNotebookMainMarks());
+            const filtered = anchored.filter(m => (m.start + (m.text || '').length) <= s || m.start >= e);
+            persistNotebookMainMarks(filtered);
+            renderMainNotebookOverlay();
+        }
+        function clearAllNotebookMainColor() {
+            persistNotebookMainMarks([]);
             renderMainNotebookOverlay();
         }
 
