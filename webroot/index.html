@@ -998,15 +998,25 @@
                         <div style="font-size:0.58rem;color:#9a9ab0;margin-top:7px;text-align:center;white-space:nowrap;">全部记事本统一 · 自动保存</div>
                     </div>
                     <button id="notebook_main_selColorBtn" onclick="toggleSelColorPopup('notebook_main')" title="选中文字上色" style="background:rgba(255,255,255,0.2);color:#fff;border:none;padding:3px 9px;border-radius:4px;cursor:pointer;font-size:0.85rem;">🖌</button>
-                    <div id="notebook_main_selColorPopup" onmousedown="event.stopPropagation()" style="display:none;position:absolute;top:46px;right:10px;z-index:30;width:212px;background:linear-gradient(160deg,rgba(40,40,68,0.98),rgba(26,26,48,0.98));border:1px solid rgba(121,134,203,0.5);border-radius:12px;padding:12px;box-shadow:0 8px 30px rgba(0,0,0,0.6);">
-                        <div style="font-size:0.76rem;font-weight:bold;color:#ffd700;margin-bottom:8px;">🖌 选中文字上色</div>
-                        <div id="notebook_main_swatches" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;"></div>
-                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-                            <input type="color" id="notebook_main_customColor" value="#ffeb3b" style="width:34px;height:28px;border:none;background:none;cursor:pointer;padding:0;">
-                            <button onclick="applyNotebookSelectionColor('notebook_main', document.getElementById('notebook_main_customColor').value, document.getElementById('notebook_main_glowChk').checked)" style="flex:1;background:rgba(121,134,203,0.22);border:1px solid rgba(121,134,203,0.5);color:#c5cae9;padding:5px;border-radius:6px;cursor:pointer;font-size:0.74rem;">应用自定义色</button>
+                    <div id="notebook_main_selColorPopup" onmousedown="event.stopPropagation()" style="display:none;position:absolute;top:46px;right:10px;z-index:30;width:158px;background:linear-gradient(160deg,rgba(40,40,68,0.98),rgba(26,26,48,0.98));border:1px solid rgba(121,134,203,0.5);border-radius:12px;padding:10px 12px;box-shadow:0 8px 30px rgba(0,0,0,0.6);">
+                        <div style="font-size:0.76rem;font-weight:bold;color:#ffd700;margin-bottom:8px;white-space:nowrap;">🖌 选中文字上色</div>
+                        <div style="position:relative;width:132px;height:132px;margin:0 auto 9px;">
+                            <canvas id="notebook_main_sel_wheel" style="width:132px;height:132px;border-radius:50%;display:block;cursor:crosshair;box-shadow:0 0 0 1px rgba(255,255,255,0.28),0 4px 14px rgba(0,0,0,0.55);"></canvas>
+                            <div id="notebook_main_sel_wheelDot" style="position:absolute;left:66px;top:66px;width:14px;height:14px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 5px rgba(0,0,0,0.9);transform:translate(-50%,-50%);pointer-events:none;"></div>
                         </div>
-                        <label style="display:flex;align-items:center;gap:6px;font-size:0.74rem;color:#c9c9dd;margin-bottom:10px;cursor:pointer;"><input type="checkbox" id="notebook_main_glowChk" checked> 动态呼吸发光</label>
-                        <button onclick="clearNotebookSelectionColor('notebook_main')" style="width:100%;background:rgba(244,67,54,0.18);border:1px solid rgba(244,67,54,0.35);color:#f44336;padding:6px;border-radius:6px;cursor:pointer;font-size:0.74rem;">🧹 清除选中颜色</button>
+                        <div style="display:flex;align-items:center;gap:6px;margin-bottom:9px;">
+                            <span style="font-size:0.58rem;color:#9a9ab0;flex-shrink:0;">亮度</span>
+                            <div id="notebook_main_sel_vBar" style="position:relative;flex:1;height:12px;border-radius:6px;cursor:pointer;border:1px solid rgba(255,255,255,0.25);background:linear-gradient(to right,#000,#fff);">
+                                <div id="notebook_main_sel_vDot" style="position:absolute;left:100%;top:50%;width:14px;height:14px;border-radius:50%;background:#fff;border:2px solid rgba(0,0,0,0.5);box-shadow:0 1px 4px rgba(0,0,0,0.7);transform:translate(-50%,-50%);pointer-events:none;"></div>
+                            </div>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:7px;margin-bottom:8px;">
+                            <span id="notebook_main_sel_preview" style="width:20px;height:20px;border-radius:50%;background:#e0e0e0;border:1px solid rgba(255,255,255,0.6);flex-shrink:0;"></span>
+                            <span id="notebook_main_sel_hexTxt" style="font-size:0.66rem;color:#c9c9dd;font-family:Consolas,monospace;">#e0e0e0</span>
+                        </div>
+                        <button onclick="applyNotebookMainColor(nbGetWheelHex('notebook_main_sel'), document.getElementById('notebook_main_glowChk').checked)" style="width:100%;background:rgba(121,134,203,0.22);border:1px solid rgba(121,134,203,0.5);color:#c5cae9;padding:5px;border-radius:6px;cursor:pointer;font-size:0.74rem;margin-bottom:8px;">✓ 应用到选中文字</button>
+                        <label style="display:flex;align-items:center;gap:6px;font-size:0.74rem;color:#c9c9dd;margin-bottom:8px;cursor:pointer;"><input type="checkbox" id="notebook_main_glowChk" checked> 动态呼吸发光</label>
+                        <button onclick="clearNotebookMainColor()" style="width:100%;background:rgba(244,67,54,0.18);border:1px solid rgba(244,67,54,0.35);color:#f44336;padding:6px;border-radius:6px;cursor:pointer;font-size:0.74rem;">🧹 清除选中颜色</button>
                         <button onclick="clearAllNotebookMainColor()" style="width:100%;margin-top:6px;background:rgba(244,67,54,0.28);border:1px solid rgba(244,67,54,0.5);color:#ff8a80;padding:6px;border-radius:6px;cursor:pointer;font-size:0.74rem;">🗑️ 清除全部颜色</button>
                         <div style="font-size:0.6rem;color:#9a9ab0;margin-top:8px;text-align:center;">先在记事本里用鼠标选中要上色的字</div>
                     </div>
@@ -2479,7 +2489,7 @@
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">s20260819-21 · s1.0.164</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">s20260819-22 · s1.0.165</span>
             </div>
         </div>
     </div>
