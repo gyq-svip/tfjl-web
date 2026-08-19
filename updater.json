@@ -1,7 +1,7 @@
 {
     "version":  "2.0.5",
     "notes":  "auto update v2.0.5",
-    "pub_date":  "2026-08-19T03:44:49Z",
+    "pub_date":  "2026-08-19T03:46:03Z",
     "platforms":  {
                       "windows-x86_64":  {
                                              "url":  "https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/releases/download/v2.0.5/tfjl-assistant_2.0.5_x64-setup.exe",
