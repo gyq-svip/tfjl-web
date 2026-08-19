@@ -23,6 +23,46 @@
         })();
         window.__consoleLogs.push({ time: new Date().toTimeString().slice(0, 8), level: 'info', msg: '控制台日志捕获已启动' });
 
+        // ==================== Gist GET 304 缓存（省 GitHub API 配额） ====================
+        // 只对“静态内容型”Gist 做 304 缓存：命中时 GitHub 返回 304（不计入 5000 配额）。
+        // 共享可变的 Gist（消息墙 / 计数器·含在线状态）一律透传，避免 304 返回旧缓存
+        // 导致多人并发改写互相覆盖、丢数据。拍卖行轮询等保持原样（用户决定暂不降速）。
+        (function installGist304Cache() {
+            const _origFetch = window.fetch ? window.fetch.bind(window) : null;
+            if (!_origFetch) return;
+            const _gistEtag = new Map(); // url -> { etag, body }
+            const MUTABLE = [
+                'b02794a8d5c43874b76286185f7b1f7f', // MESSAGES_GIST_ID 消息墙（多人追加）
+                'e1bd9a5139e1c4e011bfea707e917d61'  // COUNTER_GIST_ID 计数器·在线状态（多人读写）
+            ];
+            const isGistGet = (m, u) => m === 'GET' && typeof u === 'string' && u.indexOf('api.github.com/gists/') !== -1;
+            const isMutable = (u) => MUTABLE.some(id => u.indexOf(id) !== -1);
+            window.fetch = async function (input, init) {
+                init = init || {};
+                const method = (init.method || (input && input.method) || 'GET').toUpperCase();
+                const url = typeof input === 'string' ? input : (input && input.url) || '';
+                if (!isGistGet(method, url) || isMutable(url)) return _origFetch(input, init);
+                const cached = _gistEtag.get(url);
+                const headers = Object.assign({}, init.headers);
+                if (cached && cached.etag) headers['If-None-Match'] = cached.etag;
+                const r = await _origFetch(input, Object.assign({}, init, { headers }));
+                if (r.status === 304 && cached) {
+                    return new Response(cached.body, { status: 200, statusText: 'OK', headers: { 'content-type': 'application/json' } });
+                }
+                if (r.ok) {
+                    const etag = r.headers.get('ETag');
+                    if (etag) {
+                        try {
+                            const text = await r.text();
+                            _gistEtag.set(url, { etag, body: text });
+                            return new Response(text, { status: r.status, statusText: r.statusText, headers: { 'content-type': 'application/json' } });
+                        } catch (e) {}
+                    }
+                }
+                return r;
+            };
+        })();
+
         // 全局错误兜底：未捕获异常 / Promise rejection 也写进 __consoleLogs，
         // 确保调试浮窗能看到"全部错误信息"（含 TDZ、async 抛错等本会被静默吞掉或只走 alert 的错误）
         function _pushConsole(level, msg) {
@@ -12702,7 +12742,7 @@ function hasGistToken() {
                 catch (error) { console.error('❌ 加载配置和新闻失败:', error); }
                 // 独立拉取全网拍卖快讯开关（绕过每日新闻缓存，确保管理员当天切换即时生效）
                 fetchAuctionNewsSwitch().catch(() => {});
-                setInterval(() => { fetchAuctionNewsSwitch().catch(() => {}); }, 30000);
+                setInterval(() => { if (document.hidden) return; fetchAuctionNewsSwitch().catch(() => {}); }, 30000);
             })();
 
             // 从Gist加载拍卖快讯（先确保开关状态已加载，避免竞态导致关闭后仍显示）
@@ -12726,7 +12766,7 @@ function hasGistToken() {
 
             // 声望变化检测（在线实时"声望上涨"浮条，近似实时：每 30s 比对）
             try { checkReputationGain(); } catch (e) {}
-            setInterval(() => { try { checkReputationGain(); } catch (e) {} }, 30000);
+            setInterval(() => { if (document.hidden) return; try { checkReputationGain(); } catch (e) {} }, 30000);
 
             // 检查登录状态
             if (localStorage.getItem('TFJL_LoggedIn') === 'true') {
