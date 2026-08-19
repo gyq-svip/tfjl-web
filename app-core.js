@@ -498,6 +498,7 @@
                     myDeckInfo: (currentData && currentData.myDeckInfo !== undefined) ? currentData.myDeckInfo : safeMyDeckInfo,
                     teammateDeckInfo: (currentData && currentData.teammateDeckInfo !== undefined) ? currentData.teammateDeckInfo : safeTeammateDeckInfo,
                     notepad: (currentData && currentData.notepad !== undefined) ? currentData.notepad : safeNotepad,
+                    notebookColor: (currentData && currentData.notebookColor !== undefined) ? currentData.notebookColor : (notebookColorCfg.color || DEFAULT_NOTEBOOK_COLOR),
                     txtFiles: currentData?.txtFiles || (typeof txtFiles !== 'undefined' ? txtFiles : []),
                     referenceImages: currentData?.referenceImages || (typeof referenceImages !== 'undefined' ? referenceImages : [])
                 };
@@ -590,8 +591,13 @@
                         const notepad = document.getElementById('notepad');
                         if (notepad) {
                             notepad.value = project.notepad || '';
-                            notepad.style.color = notebookColorCfg.color; // 整篇颜色跟随全局配置
-                            refreshNotepadEditable(); // 同步富文本显示层
+                            // 整篇颜色按项目独立恢复
+                            const projColor = project.notebookColor || DEFAULT_NOTEBOOK_COLOR;
+                            notebookColorCfg.color = projColor;
+                            notepad.style.color = projColor;
+                            const ed0 = getNotepadEditable();
+                            if (ed0) ed0.style.color = projColor;
+                            refreshNotepadEditable(); // 同步富文本显示层（含逐字标记，按项目 marks key 重新加载）
                         }
                         
                         loadTxtFilesFromProject(project);
@@ -1009,6 +1015,7 @@
                 myDeckInfo: (document.getElementById('myDeckInfo') ? document.getElementById('myDeckInfo').value : ''),
                 teammateDeckInfo: (document.getElementById('teammateDeckInfo') ? document.getElementById('teammateDeckInfo').value : ''),
                 notepad: (document.getElementById('notepad') ? document.getElementById('notepad').value : ''),
+                notebookColor: notebookColorCfg.color || DEFAULT_NOTEBOOK_COLOR,
                 txtFiles: (typeof txtFiles !== 'undefined') ? txtFiles : [],
                 referenceImages: (typeof referenceImages !== 'undefined') ? referenceImages : []
             };
@@ -1152,6 +1159,7 @@
                     myDeckInfo: document.getElementById('myDeckInfo')?.value || '',
                     teammateDeckInfo: document.getElementById('teammateDeckInfo')?.value || '',
                     notepad: document.getElementById('notepad')?.value || '',
+                    notebookColor: notebookColorCfg.color || DEFAULT_NOTEBOOK_COLOR,
                     txtFiles: typeof txtFiles !== 'undefined' ? txtFiles : [],
                     referenceImages: typeof referenceImages !== 'undefined' ? referenceImages : []
                 };
@@ -3113,8 +3121,12 @@
             const nbKey = getNotebookMarksKey(opts);
             let nbMarks = loadNotebookMarks(nbKey);
             if (!nbMarks.length && nbKey[0] === 'f') {
-                const fi = parseInt(nbKey.slice(1), 10);
-                if (txtFiles[fi] && txtFiles[fi].marks) nbMarks = txtFiles[fi].marks;
+                // key format: 'f' + projectName + ':' + fileIndex
+                const colonIdx = nbKey.lastIndexOf(':');
+                if (colonIdx > 1) {
+                    const fi = parseInt(nbKey.slice(colonIdx + 1), 10);
+                    if (txtFiles[fi] && txtFiles[fi].marks) nbMarks = txtFiles[fi].marks;
+                }
             }
             notebookMarksStore[nbKey] = nbMarks;
             const nbWin = txtFileWindows.find(w => w.id === windowId);
@@ -3196,11 +3208,12 @@
             return 'h' + (h >>> 0).toString(36);
         }
 
-        // 根据记事本身份算一个稳定 key（用于存取彩色标记）
+        // 根据记事本身份算一个稳定 key（用于存取彩色标记）；含项目名确保每个项目独立
         function getNotebookMarksKey(opts) {
-            if (typeof opts.fileIndex === 'number' && opts.fileIndex >= 0) return 'f' + opts.fileIndex;
-            if (opts.localPath) return 'p' + simpleHashStr(opts.localPath);
-            let base = opts.name || '';
+            const proj = currentProjectName || '默认项目';
+            if (typeof opts.fileIndex === 'number' && opts.fileIndex >= 0) return 'f' + proj + ':' + opts.fileIndex;
+            if (opts.localPath) return 'p' + simpleHashStr(proj + '|' + opts.localPath);
+            let base = proj + '|' + (opts.name || '');
             try { base += '|' + (opts.content || '').slice(0, 40); } catch (e) {}
             return 'r' + simpleHashStr(base);
         }
@@ -3218,8 +3231,12 @@
             notebookMarksStore[key] = marks || [];
             try { localStorage.setItem(LS_NOTEBOOK_MARKS, JSON.stringify(notebookMarksStore)); } catch (e) {}
             if (key[0] === 'f') {
-                const idx = parseInt(key.slice(1), 10);
-                if (txtFiles[idx]) txtFiles[idx].marks = marks || [];
+                // key format: 'f' + projectName + ':' + fileIndex
+                const colonIdx = key.lastIndexOf(':');
+                if (colonIdx > 1) {
+                    const idx = parseInt(key.slice(colonIdx + 1), 10);
+                    if (txtFiles[idx]) txtFiles[idx].marks = marks || [];
+                }
             }
         }
 
@@ -3414,16 +3431,21 @@
         // ========== 主界面「项目记事本」单字上色：contenteditable 富文本显示层 + 隐藏 textarea(#notepad) 数据源 ==========
         // 思路：所有旧逻辑仍读写 #notepad 的 .value（隐藏 textarea），显示/编辑交给 #notepadEditable(contenteditable)，
         // 单一渲染层由浏览器原生排版 → 永不错位；逐字标记用 <span style="color:..."> 渲染并持久化到 marks。
-        const NOTEBOOK_MAIN_KEY = 'notebook-main';
         const nbMainSel = { s: 0, e: 0 };   // 记录 contenteditable 选区（字符偏移）
         let nbPreviewMark = null;          // 主记事本拖色轮时的临时预览色段（不落盘）
+        function getNotebookMainMarksKey() {
+            return 'nb-main-' + (currentProjectName || '默认项目');
+        }
+        // NOTEBOOK_MAIN_KEY removed - now per-project via getNotebookMainMarksKey()
         function getNotebookMainMarks() {
-            if (notebookMarksStore[NOTEBOOK_MAIN_KEY]) return notebookMarksStore[NOTEBOOK_MAIN_KEY];
-            try { const s = localStorage.getItem(LS_NOTEBOOK_MARKS); if (s) { const all = JSON.parse(s) || {}; if (all[NOTEBOOK_MAIN_KEY]) return all[NOTEBOOK_MAIN_KEY]; } } catch (e) {}
+            const key = getNotebookMainMarksKey();
+            if (notebookMarksStore[key]) return notebookMarksStore[key];
+            try { const s = localStorage.getItem(LS_NOTEBOOK_MARKS); if (s) { const all = JSON.parse(s) || {}; if (all[key]) return all[key]; } } catch (e) {}
             return [];
         }
         function persistNotebookMainMarks(marks) {
-            notebookMarksStore[NOTEBOOK_MAIN_KEY] = marks || [];
+            const key = getNotebookMainMarksKey();
+            notebookMarksStore[key] = marks || [];
             try { localStorage.setItem(LS_NOTEBOOK_MARKS, JSON.stringify(notebookMarksStore)); } catch (e) {}
         }
         function getNotepadEditable() { return document.getElementById('notepadEditable'); }
