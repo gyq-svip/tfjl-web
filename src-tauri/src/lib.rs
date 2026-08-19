@@ -15,8 +15,115 @@ use base64::{Engine as _, engine::general_purpose::STANDARD as B64};
 // ==================== 应用级状态 ====================
 // 记录「本助手自己拉起」的 Umi-OCR 进程 PID，App 退出时一并关闭，避免残留后台。
 // 不记录用户手动打开的 Umi-OCR，退出时只杀我们拉起的那一个。
+// ==================== 托盘常驻心跳（修复最小化到托盘后 WebView 冻结、心跳死掉） ====================
+// WebView 窗口被隐藏（window.hide）后，Chromium 会把页面冻结，setInterval 定时器不再触发，
+// 导致 30 分钟一次的心跳停发、超过超时后被判离线。Rust 进程不休眠，故用独立线程定时直接写 Gist，
+// 与窗口是否可见无关，根治“挂机最小化后心跳死掉”。
+#[derive(Clone)]
+struct HeartbeatCtx {
+    device_id: String,
+    nick: String,
+    token: String,
+    counter_gist_id: String,
+}
+
 struct AppState {
     umi_pid: std::sync::Mutex<Option<u32>>,
+    heartbeat: std::sync::Mutex<Option<HeartbeatCtx>>,
+}
+
+// 前端启动（或设置 token）时把心跳所需身份注册给 Rust；Rust 线程据此独立保活。
+#[tauri::command]
+fn register_heartbeat(
+    device_id: String,
+    nick: String,
+    token: String,
+    counter_gist_id: String,
+    state: tauri::State<AppState>,
+) {
+    let mut hb = state.heartbeat.lock().unwrap();
+    *hb = Some(HeartbeatCtx { device_id, nick, token, counter_gist_id });
+    println!("[heartbeat] registered device={} gist={}", hb.as_ref().unwrap().device_id, hb.as_ref().unwrap().counter_gist_id);
+}
+
+// 只更新 counter Gist 中「本设备」的 online_users 条目，保留其它字段/其它设备，避免覆盖丢数据。
+async fn do_gist_heartbeat(ctx: &HeartbeatCtx) -> Result<(), String> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .map_err(|e| format!("client build: {}", e))?;
+    let url = format!("https://api.github.com/gists/{}", ctx.counter_gist_id);
+    let auth = format!("token {}", ctx.token);
+
+    // —— GET 当前 counter.json ——
+    let get_resp = client
+        .get(&url)
+        .header(reqwest::header::ACCEPT, "application/vnd.github.v3+json")
+        .header(reqwest::header::USER_AGENT, "TFJL-App-Heartbeat/1.0")
+        .header(reqwest::header::AUTHORIZATION, &auth)
+        .send()
+        .await
+        .map_err(|e| format!("GET: {}", e))?;
+    if !get_resp.status().is_success() {
+        return Err(format!("GET status {}", get_resp.status()));
+    }
+    let gist: serde_json::Value = get_resp.json().await.map_err(|e| format!("GET json: {}", e))?;
+    let content = gist
+        .get("files")
+        .and_then(|f| f.get("counter.json"))
+        .and_then(|c| c.get("content"))
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "counter.json not found in gist".to_string())?;
+
+    let mut counter: serde_json::Value = serde_json::from_str(content)
+        .map_err(|e| format!("parse counter: {}", e))?;
+    if !counter.is_object() {
+        counter = serde_json::json!({});
+    }
+    // 确保 online_users 对象存在
+    if counter.get("online_users").is_none() || !counter["online_users"].is_object() {
+        counter["online_users"] = serde_json::json!({});
+    }
+    let online = counter["online_users"].as_object_mut().unwrap();
+
+    // 保留已有 nick（首次则由注册时传入的 nick 兜底），避免覆盖 JS 写的正确昵称
+    let existing_nick = online
+        .get(&ctx.device_id)
+        .and_then(|v| v.get("nick"))
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+    let nick = if existing_nick.as_deref().map(|n| n.is_empty()).unwrap_or(true) {
+        ctx.nick.clone()
+    } else {
+        existing_nick.unwrap()
+    };
+
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0);
+    online.insert(
+        ctx.device_id.clone(),
+        serde_json::json!({ "t": now_ms, "nick": nick, "src": "app", "bg": 1 }),
+    );
+
+    let new_content = serde_json::to_string(&counter).map_err(|e| format!("serialize: {}", e))?;
+    let patch_body = serde_json::json!({ "files": { "counter.json": { "content": new_content } } });
+
+    // —— PATCH 回去（只列 counter.json，其它 gist 文件不受影响）——
+    let patch_resp = client
+        .patch(&url)
+        .header(reqwest::header::ACCEPT, "application/vnd.github.v3+json")
+        .header(reqwest::header::USER_AGENT, "TFJL-App-Heartbeat/1.0")
+        .header(reqwest::header::AUTHORIZATION, &auth)
+        .json(&patch_body)
+        .send()
+        .await
+        .map_err(|e| format!("PATCH: {}", e))?;
+    if !patch_resp.status().is_success() {
+        return Err(format!("PATCH status {}", patch_resp.status()));
+    }
+    Ok(())
 }
 
 // 托盘图标闪动（需求墙新未读提醒）：保存托盘句柄 + 闪动开关 + 是否已启动闪动任务
@@ -953,6 +1060,7 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
+            register_heartbeat,
             open_directory_dialog,
             read_directory,
             read_text_file_auto,
@@ -976,7 +1084,7 @@ pub fn run() {
             download_umi_ocr,
             download_skins,
         ])
-        .manage(AppState { umi_pid: std::sync::Mutex::new(None) })
+        .manage(AppState { umi_pid: std::sync::Mutex::new(None), heartbeat: std::sync::Mutex::new(None) })
         .setup(|app| {
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.eval("window.__TAURI_APP__ = true; console.log('[Tauri] APP标记已注入');");
@@ -1036,6 +1144,26 @@ pub fn run() {
                         .level(log::LevelFilter::Info)
                         .build(),
                 )?;
+            }
+            // ============ 托盘常驻心跳线程（每 5 分钟独立保活，不受 WebView 冻结影响） ============
+            // 窗口最小化到托盘后 WebView 被冻结、JS 定时器停摆，这里用 Rust 进程级线程直接写 Gist，
+            // 保证 24h 挂机最小化也持续在线。仅当已注册身份（前端启动/填 token 后）才生效。
+            {
+                let hb_app = app.handle().clone();
+                std::thread::spawn(move || {
+                    loop {
+                        std::thread::sleep(std::time::Duration::from_secs(300));
+                        let st = hb_app.state::<AppState>();
+                        let ctx_opt = st.heartbeat.lock().unwrap().clone();
+                        if let Some(ctx) = ctx_opt {
+                            if !ctx.token.is_empty() && !ctx.counter_gist_id.is_empty() {
+                                if let Err(e) = tauri::async_runtime::block_on(do_gist_heartbeat(&ctx)) {
+                                    eprintln!("[heartbeat] tick failed: {}", e);
+                                }
+                            }
+                        }
+                    }
+                });
             }
             Ok(())
         })
