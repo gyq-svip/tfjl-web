@@ -588,6 +588,10 @@
                             document.getElementById('teammateDeckInfo').value = project.teammateDeckInfo || '';
                         }
                         
+                        // 先切项目名，再加载记事本/脚本标记（marks key 依赖 currentProjectName，顺序错会串成上个项目的颜色）
+                        currentProjectName = projectName;
+                        currentProjectCategory = project.category || '默认分类';
+
                         const notepad = document.getElementById('notepad');
                         if (notepad) {
                             notepad.value = project.notepad || '';
@@ -602,8 +606,6 @@
                         
                         loadTxtFilesFromProject(project);
 
-                        currentProjectName = projectName;
-                        currentProjectCategory = project.category || '默认分类';
                         // 刚加载的项目是干净的，清除"未保存"标记
                         window.__tfjlProjectDirty = false;
                         if (typeof updateSaveIndicator === 'function') updateSaveIndicator();
