@@ -3329,6 +3329,9 @@
                 if (ta) { notebookMainSel.s = ta.selectionStart; notebookMainSel.e = ta.selectionEnd; }
                 const pop = document.getElementById('notebook_main_selColorPopup');
                 if (pop) pop.style.display = (pop.style.display === 'block') ? 'none' : 'block';
+                // 打开上色弹窗时收起整篇色盘，避免两个浮层重叠
+                const cp = document.getElementById('notebook_main_colorPopup');
+                if (cp) cp.style.display = 'none';
                 return;
             }
             const ta = document.getElementById(windowId + '_content');
@@ -3388,6 +3391,15 @@
             ta.addEventListener('keyup', rec);
             ta.addEventListener('select', rec);
             renderMainNotebookOverlay();
+            // 恢复整篇字体颜色（全局统一色，先秒显本地缓存，再异步用磁盘值校正）
+            (async () => {
+                try {
+                    ta.style.color = notebookColorCfg.color;
+                    const color = await getNotebookColorAsync();
+                    const nb = document.getElementById('notepad');
+                    if (nb) nb.style.color = color;
+                } catch (e) {}
+            })();
         }
         function applyNotebookMainColor(color, glow) {
             const ta = document.getElementById('notepad');
@@ -3418,6 +3430,9 @@
                 const ta = document.getElementById(w.id + '_content');
                 if (ta) ta.style.color = hex;
             });
+            // 主界面「项目记事本」(#notepad) 也跟随整篇色（不在 txtFileWindows 里）
+            const nb = document.getElementById('notepad');
+            if (nb) nb.style.color = hex;
         }
 
         // 换色：所有已打开记事本同步生效并持久化；remember=true 时把颜色存进 2 个自选槽
