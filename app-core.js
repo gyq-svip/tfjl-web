@@ -2844,9 +2844,12 @@
                 </span>
                 <div style="display: flex; gap: 8px; align-items: center;">
                     <div style="position: relative;">
-                        <button id="${windowId}_paletteBtn" onclick="toggleNotebookColorPicker('${windowId}')" title="字体颜色" style="background:rgba(255,255,255,0.08);border:none;color:#fff;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:0.9rem;">🎨</button>
+                        <button id="${windowId}_paletteBtn" onclick="toggleNotebookColorPicker('${windowId}')" title="取色器：选中文字→给选中上色；未选中→整篇换色" style="background:rgba(255,255,255,0.08);border:none;color:#fff;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:0.9rem;">🎨</button>
                         <div id="${windowId}_colorPopup" onmousedown="event.stopPropagation()" style="display:none;position:absolute;top:118%;right:0;z-index:20;width:158px;background:linear-gradient(160deg,rgba(40,40,68,0.98),rgba(26,26,48,0.98));border:1px solid rgba(255,215,0,0.35);border-radius:12px;padding:10px 12px;box-shadow:0 8px 30px rgba(0,0,0,0.6);">
-                            <div style="font-size:0.76rem;font-weight:bold;color:#ffd700;margin-bottom:8px;white-space:nowrap;">🎨 字体颜色</div>
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                                <span id="${windowId}_popTitle" style="font-size:0.76rem;font-weight:bold;color:#ffd700;white-space:nowrap;">🎨 字体颜色（整篇）</span>
+                                <button type="button" onclick="nbTogglePopupMode('${windowId}')" title="切换：选中上色 ⇄ 整篇换色" style="background:rgba(255,215,0,0.15);border:1px solid rgba(255,215,0,0.4);color:#ffd700;padding:1px 7px;border-radius:5px;cursor:pointer;font-size:0.72rem;flex-shrink:0;">⇄</button>
+                            </div>
                             <div style="position:relative;width:132px;height:132px;margin:0 auto 9px;">
                                 <canvas id="${windowId}_wheel" style="width:132px;height:132px;border-radius:50%;display:block;cursor:crosshair;box-shadow:0 0 0 1px rgba(255,255,255,0.28),0 4px 14px rgba(0,0,0,0.55);"></canvas>
                                 <div id="${windowId}_wheelDot" style="position:absolute;left:66px;top:66px;width:14px;height:14px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 5px rgba(0,0,0,0.9);transform:translate(-50%,-50%);pointer-events:none;"></div>
@@ -2862,32 +2865,12 @@
                                 <span id="${windowId}_hexTxt" style="font-size:0.66rem;color:#c9c9dd;font-family:Consolas,monospace;">#e0e0e0</span>
                             </div>
                             <div id="${windowId}_colorSlots" style="display:flex;align-items:center;gap:10px;justify-content:center;border-top:1px solid rgba(255,255,255,0.12);padding-top:8px;"></div>
-                            <div style="font-size:0.58rem;color:#9a9ab0;margin-top:7px;text-align:center;white-space:nowrap;">全部记事本统一 · 自动保存</div>
-                        </div>
-                    </div>
-                    <div style="position: relative;">
-                        <button id="${windowId}_selColorBtn" onclick="toggleSelColorPopup('${windowId}')" title="选中文字上色" style="background:rgba(255,255,255,0.08);border:none;color:#fff;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:0.9rem;">🖌</button>
-                        <div id="${windowId}_selColorPopup" onmousedown="event.stopPropagation()" style="display:none;position:absolute;top:118%;right:0;z-index:20;width:158px;background:linear-gradient(160deg,rgba(40,40,68,0.98),rgba(26,26,48,0.98));border:1px solid rgba(255,215,0,0.35);border-radius:12px;padding:10px 12px;box-shadow:0 8px 30px rgba(0,0,0,0.6);">
-                            <div style="font-size:0.76rem;font-weight:bold;color:#ffd700;margin-bottom:8px;white-space:nowrap;">🖌 选中文字上色</div>
-                            <div style="position:relative;width:132px;height:132px;margin:0 auto 9px;">
-                                <canvas id="${windowId}_sel_wheel" style="width:132px;height:132px;border-radius:50%;display:block;cursor:crosshair;box-shadow:0 0 0 1px rgba(255,255,255,0.28),0 4px 14px rgba(0,0,0,0.55);"></canvas>
-                                <div id="${windowId}_sel_wheelDot" style="position:absolute;left:66px;top:66px;width:14px;height:14px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 5px rgba(0,0,0,0.9);transform:translate(-50%,-50%);pointer-events:none;"></div>
+                            <label id="${windowId}_glowRow" style="display:none;align-items:center;gap:6px;font-size:0.74rem;color:#c9c9dd;margin-top:8px;cursor:pointer;"><input type="checkbox" id="${windowId}_glowChk" checked> 动态呼吸发光</label>
+                            <div id="${windowId}_clearRow" style="display:none;margin-top:8px;">
+                                <button onclick="clearNotebookSelectionColor('${windowId}')" style="width:100%;background:rgba(244,67,54,0.18);border:1px solid rgba(244,67,54,0.35);color:#f44336;padding:6px;border-radius:6px;cursor:pointer;font-size:0.74rem;">🧹 清除选中颜色</button>
+                                <button onclick="clearAllNotebookSelectionColor('${windowId}')" style="width:100%;margin-top:6px;background:rgba(244,67,54,0.28);border:1px solid rgba(244,67,54,0.5);color:#ff8a80;padding:6px;border-radius:6px;cursor:pointer;font-size:0.74rem;">🗑️ 清除全部颜色</button>
                             </div>
-                            <div style="display:flex;align-items:center;gap:6px;margin-bottom:9px;">
-                                <span style="font-size:0.58rem;color:#9a9ab0;flex-shrink:0;">亮度</span>
-                                <div id="${windowId}_sel_vBar" style="position:relative;flex:1;height:12px;border-radius:6px;cursor:pointer;border:1px solid rgba(255,255,255,0.25);background:linear-gradient(to right,#000,#fff);">
-                                    <div id="${windowId}_sel_vDot" style="position:absolute;left:100%;top:50%;width:14px;height:14px;border-radius:50%;background:#fff;border:2px solid rgba(0,0,0,0.5);box-shadow:0 1px 4px rgba(0,0,0,0.7);transform:translate(-50%,-50%);pointer-events:none;"></div>
-                                </div>
-                            </div>
-                            <div style="display:flex;align-items:center;gap:7px;margin-bottom:8px;">
-                                <span id="${windowId}_sel_preview" style="width:20px;height:20px;border-radius:50%;background:#e0e0e0;border:1px solid rgba(255,255,255,0.6);flex-shrink:0;"></span>
-                                <span id="${windowId}_sel_hexTxt" style="font-size:0.66rem;color:#c9c9dd;font-family:Consolas,monospace;">#e0e0e0</span>
-                            </div>
-                            <button onclick="applyNotebookSelectionColor('${windowId}', nbGetWheelHex('${windowId}_sel'), document.getElementById('${windowId}_glowChk').checked)" style="width:100%;background:rgba(255,215,0,0.18);border:1px solid rgba(255,215,0,0.35);color:#ffd700;padding:5px;border-radius:6px;cursor:pointer;font-size:0.74rem;margin-bottom:8px;">✓ 应用到选中文字</button>
-                            <label style="display:flex;align-items:center;gap:6px;font-size:0.74rem;color:#c9c9dd;margin-bottom:8px;cursor:pointer;"><input type="checkbox" id="${windowId}_glowChk" checked> 动态呼吸发光</label>
-                            <button onclick="clearNotebookSelectionColor('${windowId}')" style="width:100%;background:rgba(244,67,54,0.18);border:1px solid rgba(244,67,54,0.35);color:#f44336;padding:6px;border-radius:6px;cursor:pointer;font-size:0.74rem;">🧹 清除选中颜色</button>
-                            <button onclick="clearAllNotebookSelectionColor('${windowId}')" style="width:100%;margin-top:6px;background:rgba(244,67,54,0.28);border:1px solid rgba(244,67,54,0.5);color:#ff8a80;padding:6px;border-radius:6px;cursor:pointer;font-size:0.74rem;">🗑️ 清除全部颜色</button>
-                            <div style="font-size:0.6rem;color:#9a9ab0;margin-top:8px;text-align:center;">先在记事本里用鼠标选中要上色的字</div>
+                            <div id="${windowId}_popHint" style="font-size:0.58rem;color:#9a9ab0;margin-top:7px;text-align:center;white-space:nowrap;">全部记事本统一 · 自动保存</div>
                         </div>
                     </div>
                     <button onclick="minimizeTxtWindow('${windowId}')" style="background:rgba(255,193,7,0.2);border:none;color:#ffc107;padding:4px 8px;border-radius:4px;cursor:pointer;">−</button>
@@ -3363,37 +3346,45 @@
             renderNotebookOverlay(windowId);
         }
 
-        function toggleSelColorPopup(windowId) {
-            if (windowId === 'notebook_main') {
-                const o = getEditableSelection(getNotepadEditable());
-                nbMainSel.s = o.s; nbMainSel.e = o.e;
-                const pop = document.getElementById('notebook_main_selColorPopup');
-                if (pop) pop.style.display = (pop.style.display === 'block') ? 'none' : 'block';
-                // 打开上色弹窗时收起整篇色盘，避免两个浮层重叠
-                const cp = document.getElementById('notebook_main_colorPopup');
-                if (cp) cp.style.display = 'none';
-                // 懒初始化选中专用色轮：松手即自动应用到选中文字（不需再点按钮）
-                if (pop && pop.style.display === 'block') {
-                    setupNotebookColorWheel('notebook_main_sel', (hex) => {
-                        const glow = document.getElementById('notebook_main_glowChk')?.checked;
-                        applyNotebookMainColor(hex, !!glow);
-                    });
-                    syncNotebookWheelUI('notebook_main_sel', notebookColorCfg.color);
-                }
-                return;
-            }
+        // ========== 取色器双模式（选中上色 ⇄ 整篇换色，一个按钮自动识别） ==========
+        const nbPopupMode = {};   // windowId -> 'sel' | 'all'
+
+        function nbHasSelection(windowId) {
+            if (windowId === 'notebook_main') return nbMainSel.s !== nbMainSel.e;
             const ta = document.getElementById(windowId + '_content');
             const win = txtFileWindows.find(w => w.id === windowId);
-            if (win && ta) { win._selS = ta.selectionStart; win._selE = ta.selectionEnd; }
-            const pop = document.getElementById(windowId + '_selColorPopup');
-            if (pop) pop.style.display = (pop.style.display === 'block') ? 'none' : 'block';
-            if (pop && pop.style.display === 'block') {
-                setupNotebookColorWheel(windowId + '_sel', (hex) => {
-                    const glow = document.getElementById(windowId + '_glowChk')?.checked;
-                    applyNotebookSelectionColor(windowId, hex, !!glow);
-                });
-                syncNotebookWheelUI(windowId + '_sel', notebookColorCfg.color);
+            if (ta && ta.selectionStart !== ta.selectionEnd) {
+                if (win) { win._selS = ta.selectionStart; win._selE = ta.selectionEnd; }
+                return true;
             }
+            return !!(win && typeof win._selS === 'number' && win._selS !== win._selE);
+        }
+
+        function nbApplyPopupColor(windowId, hex) {
+            if (nbPopupMode[windowId] === 'sel') {
+                const glow = document.getElementById(windowId + '_glowChk')?.checked;
+                if (windowId === 'notebook_main') applyNotebookMainColor(hex, !!glow);
+                else applyNotebookSelectionColor(windowId, hex, !!glow);
+            } else {
+                applyNotebookColor(windowId, hex, true);
+            }
+        }
+
+        function nbUpdateColorPopupMode(windowId) {
+            const selMode = nbPopupMode[windowId] === 'sel';
+            const t = document.getElementById(windowId + '_popTitle');
+            if (t) t.textContent = selMode ? '🖌 选中文字上色' : '🎨 字体颜色（整篇）';
+            const glowRow = document.getElementById(windowId + '_glowRow');
+            if (glowRow) glowRow.style.display = selMode ? 'flex' : 'none';
+            const clearRow = document.getElementById(windowId + '_clearRow');
+            if (clearRow) clearRow.style.display = selMode ? 'block' : 'none';
+            const hint = document.getElementById(windowId + '_popHint');
+            if (hint) hint.textContent = selMode ? '松手即上色到选中文字' : '全部记事本统一 · 自动保存';
+        }
+
+        function nbTogglePopupMode(windowId) {
+            nbPopupMode[windowId] = nbPopupMode[windowId] === 'sel' ? 'all' : 'sel';
+            nbUpdateColorPopupMode(windowId);
         }
 
         // ========== 主界面「项目记事本」单字上色：contenteditable 富文本显示层 + 隐藏 textarea(#notepad) 数据源 ==========
@@ -3636,12 +3627,6 @@
             if (tx) tx.textContent = hex;
         }
 
-        // 读取某取色盘当前选中的颜色（供「应用」按钮取用）
-        function nbGetWheelHex(prefix) {
-            const s = nbWheelState[prefix] || { h: 0, s: 0, v: 0.88 };
-            return nbHsvToHex(s.h, s.s, s.v);
-        }
-
         // 渲染色块：默认色 + 2 个自选色（空槽显示虚线圆占位）
         function renderNotebookColorSwatches(windowId) {
             const box = document.getElementById(windowId + '_colorSlots');
@@ -3650,7 +3635,7 @@
             const list = [DEFAULT_NOTEBOOK_COLOR].concat(notebookColorCfg.slots);
             let html = list.map((c, i) => {
                 const on = (c === cur);
-                return `<button type="button" onclick="applyNotebookColor('${windowId}','${c}')" title="${i === 0 ? '默认色' : '自选色'} ${c}" style="width:26px;height:26px;border-radius:50%;background:${c};border:2px solid ${on ? '#ffd700' : 'rgba(255,255,255,0.55)'};cursor:pointer;padding:0;box-shadow:0 2px 6px rgba(0,0,0,0.45);"></button>`;
+                return `<button type="button" onclick="nbApplyPopupColor('${windowId}','${c}')" title="${i === 0 ? '默认色' : '自选色'} ${c}" style="width:26px;height:26px;border-radius:50%;background:${c};border:2px solid ${on ? '#ffd700' : 'rgba(255,255,255,0.55)'};cursor:pointer;padding:0;box-shadow:0 2px 6px rgba(0,0,0,0.45);"></button>`;
             }).join('');
             for (let i = list.length; i < 3; i++) {
                 html += `<span title="用右侧调色盘选个颜色，会自动存到这里" style="width:26px;height:26px;border-radius:50%;border:1px dashed rgba(255,255,255,0.3);display:inline-block;"></span>`;
@@ -3718,7 +3703,7 @@
             bindDrag(bar, pickFromBar);
         }
 
-        // 标题栏 🎨 颜料盘：展开/收起颜色浮层（点其他处自动关闭）
+        // 标题栏 🎨 取色器：一个按钮双模式——有选中文字→选中上色，无选中→整篇换色（⇄ 可手动切换）
         function toggleNotebookColorPicker(windowId) {
             const pop = document.getElementById(windowId + '_colorPopup');
             if (!pop) return;
@@ -3726,8 +3711,12 @@
             document.querySelectorAll('[id$="_colorPopup"]').forEach(p => p.style.display = 'none');
             pop.style.display = show ? 'block' : 'none';
             if (show) {
+                nbPopupMode[windowId] = nbHasSelection(windowId) ? 'sel' : 'all';
+                nbUpdateColorPopupMode(windowId);
                 renderNotebookColorSwatches(windowId);
-                setupNotebookColorWheel(windowId, (hex) => applyNotebookColor(windowId, hex, true), (hex) => previewNotebookColorLive(hex));
+                setupNotebookColorWheel(windowId,
+                    (hex) => nbApplyPopupColor(windowId, hex),
+                    (hex) => { if (nbPopupMode[windowId] !== 'sel') previewNotebookColorLive(hex); });
                 syncNotebookWheelUI(windowId, notebookColorCfg.color);
                 setTimeout(() => {
                     const docClose = (e) => {
