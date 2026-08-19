@@ -74,14 +74,21 @@ Write-Host "Key cleaned, length: $($clean.Length)" -ForegroundColor Green
 
 # ---- 2. Find exe to sign ----
 if ($ExeName -eq "") {
-    $exes = @(Get-ChildItem "$NsisDir\*x64-setup.exe" -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending)
-    if ($exes.Count -eq 0) {
-        Write-Host "No *x64-setup.exe found:" -ForegroundColor Red
+    # 自动定位最新中文构建产物（用通配避开 PowerShell 中文文件名编码坑），
+    # 复制为根目录英文包名 tfjl-assistant_{ver}_x64-setup.exe（publish_update.ps1 需要此名），
+    # 随后直接对英文包签名，一步产出 exe + .sig。
+    $cnExes = @(Get-ChildItem "$NsisDir\*_x64-setup.exe" -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike "tfjl-sign-temp.exe" } | Sort-Object LastWriteTime -Descending)
+    if ($cnExes.Count -eq 0) {
+        Write-Host "No *_x64-setup.exe found in $NsisDir" -ForegroundColor Red
         Get-ChildItem "$NsisDir\*.exe" | Select-Object Name, LastWriteTime
         exit 1
     }
-    $SrcExe = $exes[0].FullName
-    Write-Host "Auto-selected: $($exes[0].Name) ($($exes[0].LastWriteTime))" -ForegroundColor Cyan
+    try { $ver = ([System.IO.File]::ReadAllText($ConfPath, [System.Text.Encoding]::UTF8) | ConvertFrom-Json).version }
+    catch { Write-Host "无法读取版本号: $ConfPath" -ForegroundColor Red; exit 1 }
+    $EngExe = Join-Path $RootDir "tfjl-assistant_$($ver)_x64-setup.exe"
+    Copy-Item $cnExes[0].FullName $EngExe -Force
+    Write-Host "Auto: $($cnExes[0].Name) -> $(Split-Path $EngExe -Leaf) (v$ver)" -ForegroundColor Cyan
+    $SrcExe = $EngExe
 } else {
     $SrcExe = if (Test-Path $ExeName) { (Resolve-Path $ExeName).Path } else { Join-Path $NsisDir $ExeName }
     if (!(Test-Path $SrcExe)) {
