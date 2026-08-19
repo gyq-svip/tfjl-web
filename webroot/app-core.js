@@ -9864,11 +9864,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         }
         
         // ==================== 减伤记录功能（多减伤表 v260805-267）====================
-        // 支持多张自定义命名的「减伤表」，每张含自己的洗炼减伤 + 战车特殊减伤。
-        // 小野/酋长/宝库 仍共享（specialDamageReduction）。
+        // 支持多张自定义命名的「减伤表」，每张含自己的洗炼减伤 + 战车特殊减伤 + 技能减伤（小野/酋长/宝库）。
         // 默认两张：「我的」「队友」，按 side 自动选用；可在编辑弹窗里 + 新建 / 重命名 / 删除。
         // 老数据自动迁移：旧的 damageReductionData（localStorage / D盘）会被合入「我的」表。
-        let specialDamageReduction = { // 共享：特殊减伤参数（技能减伤，与洗炼不冲突）
+        let specialDamageReduction = { // 仅作旧数据迁移兼容；技能减伤已改为每张表独立（drTables[name]）
             "我的战车": 0,
             "队友战车": 0,
             "小野": 0,
@@ -9876,8 +9875,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             "宝库": 0
         };
         window.drTables = {
-            '我的': { 洗炼: {}, 我的战车: 0, 队友战车: 0 },
-            '队友': { 洗炼: {}, 我的战车: 0, 队友战车: 0 }
+            '我的': { 洗炼: {}, 我的战车: 0, 队友战车: 0, 小野: 0, 酋长: 0, 宝库: 0 },
+            '队友': { 洗炼: {}, 我的战车: 0, 队友战车: 0, 小野: 0, 酋长: 0, 宝库: 0 }
         };
         window.drTableOrder = ['我的', '队友'];        // 渲染顺序
         window.drActiveTable = '我的';                  // 弹窗当前编辑对象
@@ -9963,6 +9962,14 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             }
             if (data.special && typeof data.special === 'object') {
                 specialDamageReduction = Object.assign({ "我的战车": 0, "队友战车": 0, "小野": 0, "酋长": 0, "宝库": 0 }, data.special);
+                // 迁移旧共享技能到「我的」表（技能改为每张表独立后，旧共享值归入「我的」表）
+                if (window.drTables['我的']) {
+                    ['小野', '酋长', '宝库'].forEach(k => {
+                        if (specialDamageReduction[k] && window.drTables['我的'][k] === undefined) {
+                            window.drTables['我的'][k] = specialDamageReduction[k];
+                        }
+                    });
+                }
             }
             // 同步兼容旧字段
             damageReductionData = window.drTables['我的'].洗炼;
@@ -9972,7 +9979,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         function getDrTable(name) {
             name = name || window.drActiveTable;
             if (!window.drTables[name]) {
-                window.drTables[name] = { 洗炼: {}, 我的战车: 0, 队友战车: 0 };
+                window.drTables[name] = { 洗炼: {}, 我的战车: 0, 队友战车: 0, 小野: 0, 酋长: 0, 宝库: 0 };
                 if (!window.drTableOrder.includes(name)) window.drTableOrder.push(name);
             }
             return window.drTables[name];
@@ -10266,7 +10273,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                             <button onclick="clearActiveDrTable()" style="background:rgba(239,68,68,0.2);border:1px solid rgba(239,68,68,0.4);color:#ef4444;padding:8px 12px;border-radius:6px;">清空当前表</button>
                         </div>
                         <div style="background:rgba(255,152,0,0.1);border-radius:8px;padding:12px;margin-bottom:15px;">
-                            <div style="color:#ff9800;font-size:0.85rem;margin-bottom:8px;padding:5px;background:rgba(255,152,0,0.1);border-radius:4px;">⚡ 当前表战车减伤 <span style="color:#888">（小野/酋长/宝库共享，编辑在下方）</span></div>
+                            <div style="color:#ff9800;font-size:0.85rem;margin-bottom:8px;padding:5px;background:rgba(255,152,0,0.1);border-radius:4px;">⚡ 当前表战车减伤 <span style="color:#888">（小野/酋长/宝库技能减伤每张表独立，编辑在下方）</span></div>
                             <div style="display:flex;flex-wrap:wrap;gap:12px;">
                                 <div style="display:flex;align-items:center;gap:6px;">
                                     <span style="color:#fff;font-size:0.85rem;">主战车:</span>
@@ -10278,20 +10285,20 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                                 </div>
                             </div>
                             <div style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-top:8px;">💡 「主战车」算我方卡组，「副战车」算队友卡组。每张表独立保存。</div>
-                            <div style="color:#ff9800;font-size:0.85rem;margin:10px 0 6px;padding:5px;background:rgba(255,152,0,0.1);border-radius:4px;">⚡ 共享技能减伤（小野/酋长/宝库 — 被动技能，卡在场上有就算；与上方「卡的洗炼」无关，数值填在这一栏）</div>
+                            <div style="color:#ff9800;font-size:0.85rem;margin:10px 0 6px;padding:5px;background:rgba(255,152,0,0.1);border-radius:4px;">⚡ 技能减伤（小野/酋长/宝库 — 被动技能，卡在场上有就算；与上方「卡的洗炼」无关，数值填在这一栏，每张表独立）</div>
                             <div style="color:rgba(255,152,0,0.8);font-size:0.72rem;margin-bottom:8px;line-height:1.5;">⚠️ 这里填的是<b>被动技能</b>减伤（如小野被动90）。小野的<b>自身占卜洗炼</b>是另一笔，请在上方「牧师类→小野 <span style="color:#ff9800;">(自身洗炼)</span>」那一行填。两笔都会相加：总减伤 = 自身洗炼 + 被动技能。</div>
                             <div style="display:flex;flex-wrap:wrap;gap:12px;">
                                 <div style="display:flex;align-items:center;gap:6px;">
                                     <span style="color:#fff;font-size:0.85rem;">小野:</span>
-                                    <input type="number" data-shared="小野" value="${specialDamageReduction['小野'] || 0}" min="0" max="100" step="0.1" style="width:50px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,152,0,0.4);color:#ff9800;padding:4px 6px;border-radius:4px;text-align:center;font-size:0.8rem;">
+                                    <input type="number" data-special="小野" value="${(window.drTables[window.drActiveTable] && window.drTables[window.drActiveTable]['小野']) || 0}" min="0" max="100" step="0.1" style="width:50px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,152,0,0.4);color:#ff9800;padding:4px 6px;border-radius:4px;text-align:center;font-size:0.8rem;">
                                 </div>
                                 <div style="display:flex;align-items:center;gap:6px;">
                                     <span style="color:#fff;font-size:0.85rem;">酋长:</span>
-                                    <input type="number" data-shared="酋长" value="${specialDamageReduction['酋长'] || 0}" min="0" max="100" step="0.1" style="width:50px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,152,0,0.4);color:#ff9800;padding:4px 6px;border-radius:4px;text-align:center;font-size:0.8rem;">
+                                    <input type="number" data-special="酋长" value="${(window.drTables[window.drActiveTable] && window.drTables[window.drActiveTable]['酋长']) || 0}" min="0" max="100" step="0.1" style="width:50px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,152,0,0.4);color:#ff9800;padding:4px 6px;border-radius:4px;text-align:center;font-size:0.8rem;">
                                 </div>
                                 <div style="display:flex;align-items:center;gap:6px;">
                                     <span style="color:#fff;font-size:0.85rem;">宝库:</span>
-                                    <input type="number" data-shared="宝库" value="${specialDamageReduction['宝库'] || 0}" min="0" max="100" step="0.1" style="width:50px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,152,0,0.4);color:#ff9800;padding:4px 6px;border-radius:4px;text-align:center;font-size:0.8rem;">
+                                    <input type="number" data-special="宝库" value="${(window.drTables[window.drActiveTable] && window.drTables[window.drActiveTable]['宝库']) || 0}" min="0" max="100" step="0.1" style="width:50px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,152,0,0.4);color:#ff9800;padding:4px 6px;border-radius:4px;text-align:center;font-size:0.8rem;">
                                 </div>
                             </div>
                         </div>
@@ -10413,12 +10420,6 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 t[key] = parseFloat(input.value) || 0;
             });
 
-            const sharedInputs = document.querySelectorAll('#damageReductionModal input[data-shared]');
-            sharedInputs.forEach(input => {
-                const key = input.dataset.shared;
-                specialDamageReduction[key] = parseFloat(input.value) || 0;
-            });
-
             // 兼容别名：当前激活表若为「我的」，同步给 damageReductionData（兼容旧读取点）
             if (window.drActiveTable === '我的') damageReductionData = t.洗炼;
 
@@ -10433,6 +10434,9 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             t.洗炼 = {};
             t['我的战车'] = 0;
             t['队友战车'] = 0;
+            t['小野'] = 0;
+            t['酋长'] = 0;
+            t['宝库'] = 0;
             damageReductionData = window.drTables['我的'].洗炼;
             saveDamageReductionData();
             // 局部刷新弹窗列表（不关弹窗）
@@ -10634,16 +10638,15 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         }
                     }
 
-                    // 特殊技能减伤（小野、酋长、宝库 — 仅上阵时计算，共享表）
+                    // 特殊技能减伤（小野、酋长、宝库 — 仅上阵时计算，读当前表）
                     ['小野', '酋长', '宝库'].forEach(special => {
                         const isMatch = parts.some(part => part.includes(special));
                         if (isMatch) {
                             const seenKey = '_special_' + special;
                             if (!seenCards.has(seenKey)) {
                                 seenCards.add(seenKey);
-                                if (specialDamageReduction[special] && specialDamageReduction[special] > 0) {
-                                    total += specialDamageReduction[special];
-                                }
+                                const specialVal = (table && typeof table[special] === 'number') ? table[special] : 0;
+                                if (specialVal > 0) total += specialVal;
                             }
                         }
                     });
@@ -10827,16 +10830,15 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         }
                     }
 
-                    // 特殊技能减伤（小野、酋长、宝库 — 仅上阵时计算，共享表）
+                    // 特殊技能减伤（小野、酋长、宝库 — 仅上阵时计算，读当前表）
                     ['小野', '酋长', '宝库'].forEach(special => {
                         const isMatch = parts.some(part => part.includes(special));
                         if (isMatch) {
                             const seenKey = '_special_' + special;
                             if (!seenCards.has(seenKey)) {
                                 seenCards.add(seenKey);
-                                if (specialDamageReduction[special] && specialDamageReduction[special] > 0) {
-                                    total += specialDamageReduction[special];
-                                }
+                                const specialVal = (table && typeof table[special] === 'number') ? table[special] : 0;
+                                if (specialVal > 0) total += specialVal;
                             }
                         }
                     });
@@ -11050,7 +11052,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             content += `# 表名：${window.drActiveTable}\n`;
             content += '# 格式：卡牌名=减伤数值（支持小数，如 10.5）\n';
             content += '# 战车：我的战车（主）、队友战车（副） — 写入当前表\n';
-            content += '# 共享技能：小野 / 酋长 / 宝库 — 全局共享\n';
+            content += '# 技能：小野 / 酋长 / 宝库 — 写入当前表\n';
             content += '# 示例：水灵=10.5\n';
             content += '# 精灵卡不参与减伤计算\n';
             content += '# 导出时间：' + new Date().toLocaleString('zh-CN') + '\n\n';
@@ -11060,11 +11062,11 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             content += `我的战车=${t['我的战车'] || 0}\n`;
             content += `队友战车=${t['队友战车'] || 0}\n`;
 
-            // 导出共享技能减伤
-            content += '\n===== 共享 技能减伤 =====\n';
+            // 导出技能减伤（当前表）
+            content += '\n===== 技能减伤（当前表） =====\n';
             const sharedKeys = ['小野', '酋长', '宝库'];
             sharedKeys.forEach(key => {
-                content += `${key}=${specialDamageReduction[key] || 0}\n`;
+                content += `${key}=${t[key] || 0}\n`;
             });
 
             // 导出洗炼减伤数据
@@ -11114,7 +11116,6 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const t = getDrTable(targetTable);
             const lines = content.split('\n');
             const newData = {};
-            const newSpecial = { 我的战车: 0, 队友战车: 0, 小野: 0, 酋长: 0, 宝库: 0 };
             const chariotKeys = ['我的战车', '队友战车'];
             const sharedKeys = ['小野', '酋长', '宝库'];
 
@@ -11127,11 +11128,9 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     const value = parseFloat(match[2]);
                     if (cardName === '战车') cardName = '我的战车';
                     if (!cardName || isNaN(value)) return;
-                    if (chariotKeys.includes(cardName)) {
-                        // 当前表的战车
+                    if (chariotKeys.includes(cardName) || sharedKeys.includes(cardName)) {
+                        // 战车 + 技能都写入当前表
                         t[cardName] = value;
-                    } else if (sharedKeys.includes(cardName)) {
-                        newSpecial[cardName] = value;
                     } else {
                         newData[cardName] = value;
                     }
@@ -11140,8 +11139,6 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 
             // 合并（不清空已有数据，覆盖同名键；想清空请用「清空当前表」）
             Object.assign(t.洗炼, newData);
-            // 共享：覆盖小野/酋长/宝库（保留我的战车/队友战车共享值不动，避免误覆盖）
-            Object.assign(specialDamageReduction, newSpecial);
 
             // 兼容别名
             if (targetTable === '我的') damageReductionData = t.洗炼;
@@ -11157,19 +11154,14 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 const key = inp.dataset.special;
                 inp.value = (typeof t[key] === 'number') ? t[key] : 0;
             });
-            const sharedInputs = document.querySelectorAll('#damageReductionModal input[data-shared]');
-            sharedInputs.forEach(inp => {
-                const key = inp.dataset.shared;
-                inp.value = specialDamageReduction[key] || 0;
-            });
 
             const count = Object.keys(newData).length;
-            const specialCount = sharedKeys.filter(k => newSpecial[k] > 0).length;
+            const specialCount = sharedKeys.filter(k => t[k] > 0).length;
             const chariotCount = chariotKeys.filter(k => t[k] > 0).length;
             const msg = [];
             if (count) msg.push(`洗炼${count}条`);
             if (chariotCount) msg.push(`战车${chariotCount}条`);
-            if (specialCount) msg.push(`共享技能${specialCount}条`);
+            if (specialCount) msg.push(`技能${specialCount}条`);
             if (msg.length) {
                 alert(`已导入到「${targetTable}」表：${msg.join('，')}`);
             } else {
