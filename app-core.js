@@ -591,6 +591,7 @@
                         if (notepad) {
                             notepad.value = project.notepad || '';
                             notepad.style.color = notebookColorCfg.color; // 整篇颜色跟随全局配置
+                            refreshNotepadEditable(); // 同步富文本显示层
                         }
                         
                         loadTxtFilesFromProject(project);
@@ -677,7 +678,7 @@
 
             // 【修复】清空记事本（textarea 内容 + 内存回写 + 清草稿缓存，避免跨项目残留）
             const notepadEl = document.getElementById('notepad');
-            if (notepadEl) notepadEl.value = '';
+            if (notepadEl) { notepadEl.value = ''; refreshNotepadEditable(); }
             try { localStorage.removeItem('tdjl_notepad_temp'); } catch (e) {}
 
             // 【修复】清空脚本文件（全局变量 + 列表 UI）
@@ -1183,6 +1184,8 @@
             if (selector && notepad) {
                 const size = selector.value;
                 notepad.style.fontSize = size;
+                const ed = getNotepadEditable();
+                if (ed) ed.style.fontSize = size;
                 saveFontSizeSetting(size);
             }
         }
@@ -3361,6 +3364,21 @@
         }
 
         function toggleSelColorPopup(windowId) {
+            if (windowId === 'notebook_main') {
+                const o = getEditableSelection(getNotepadEditable());
+                nbMainSel.s = o.s; nbMainSel.e = o.e;
+                const pop = document.getElementById('notebook_main_selColorPopup');
+                if (pop) pop.style.display = (pop.style.display === 'block') ? 'none' : 'block';
+                // 打开上色弹窗时收起整篇色盘，避免两个浮层重叠
+                const cp = document.getElementById('notebook_main_colorPopup');
+                if (cp) cp.style.display = 'none';
+                // 懒初始化选中专用色轮
+                if (pop && pop.style.display === 'block') {
+                    setupNotebookColorWheel('notebook_main_sel', null);
+                    syncNotebookWheelUI('notebook_main_sel', notebookColorCfg.color);
+                }
+                return;
+            }
             const ta = document.getElementById(windowId + '_content');
             const win = txtFileWindows.find(w => w.id === windowId);
             if (win && ta) { win._selS = ta.selectionStart; win._selE = ta.selectionEnd; }
@@ -3372,19 +3390,128 @@
             }
         }
 
-        // ========== 主界面「项目记事本」(#notepad) 颜色：整篇统一换色（无 overlay，用 textarea 自身字体色，绝不错位）==========
+        // ========== 主界面「项目记事本」单字上色：contenteditable 富文本显示层 + 隐藏 textarea(#notepad) 数据源 ==========
+        // 思路：所有旧逻辑仍读写 #notepad 的 .value（隐藏 textarea），显示/编辑交给 #notepadEditable(contenteditable)，
+        // 单一渲染层由浏览器原生排版 → 永不错位；逐字标记用 <span style="color:..."> 渲染并持久化到 marks。
+        const NOTEBOOK_MAIN_KEY = 'notebook-main';
+        const nbMainSel = { s: 0, e: 0 };   // 记录 contenteditable 选区（字符偏移）
+        function getNotebookMainMarks() {
+            if (notebookMarksStore[NOTEBOOK_MAIN_KEY]) return notebookMarksStore[NOTEBOOK_MAIN_KEY];
+            try { const s = localStorage.getItem(LS_NOTEBOOK_MARKS); if (s) { const all = JSON.parse(s) || {}; if (all[NOTEBOOK_MAIN_KEY]) return all[NOTEBOOK_MAIN_KEY]; } } catch (e) {}
+            return [];
+        }
+        function persistNotebookMainMarks(marks) {
+            notebookMarksStore[NOTEBOOK_MAIN_KEY] = marks || [];
+            try { localStorage.setItem(LS_NOTEBOOK_MARKS, JSON.stringify(notebookMarksStore)); } catch (e) {}
+        }
+        function getNotepadEditable() { return document.getElementById('notepadEditable'); }
+
+        // 同步：隐藏 textarea.value ← contenteditable 文本（保留换行），并触发自动保存
+        function syncNotepadValueFromEditable() {
+            const ed = getNotepadEditable();
+            const ta = document.getElementById('notepad');
+            if (!ed || !ta) return;
+            ta.value = ed.innerText || '';
+            autoSaveNotepad();
+        }
+        // 同步：contenteditable ← 隐藏 textarea.value + 彩色标记（重渲染富文本）
+        function renderNotepadEditable() {
+            const ed = getNotepadEditable();
+            const ta = document.getElementById('notepad');
+            if (!ed || !ta) return;
+            const value = ta.value;
+            const marks = anchorNotebookMarks(value, getNotebookMainMarks());
+            let html = '', cursor = 0;
+            for (const m of marks) {
+                if (m.start < cursor) continue;
+                html += escapeHtml(value.slice(cursor, m.start));
+                const cls = 'nb-mark' + (m.glow ? ' nb-glow' : '');
+                html += '<span class="' + cls + '" style="color:' + m.color + '">' + escapeHtml(value.slice(m.start, m.start + m.text.length)) + '</span>';
+                cursor = m.start + m.text.length;
+            }
+            html += escapeHtml(value.slice(cursor));
+            ed.innerHTML = html;
+            ed.style.color = notebookColorCfg.color;   // 未标记文字显示整篇色
+        }
+        // 程序改动了 #notepad.value（加载/清空/恢复草稿）后调用，让显示层跟着变
+        function refreshNotepadEditable() { renderNotepadEditable(); }
+
+        // 获取 contenteditable 内当前选区对应的字符偏移 [start,end]
+        function getEditableSelection(ed) {
+            if (!ed) return { s: 0, e: 0 };
+            const sel = window.getSelection && window.getSelection();
+            if (!sel || !sel.rangeCount) return { s: 0, e: 0 };
+            const range = sel.getRangeAt(0);
+            const pre = document.createRange();
+            pre.selectNodeContents(ed);
+            pre.setEnd(range.startContainer, range.startOffset);
+            const s = pre.toString().length;
+            const pre2 = document.createRange();
+            pre2.selectNodeContents(ed);
+            pre2.setEnd(range.endContainer, range.endOffset);
+            const e = pre2.toString().length;
+            return { s: s, e: e };
+        }
+        function applyNotebookMainColor(color, glow) {
+            const ed = getNotepadEditable();
+            const ta = document.getElementById('notepad');
+            if (!ed || !ta) return;
+            const s = nbMainSel.s, e = nbMainSel.e;
+            if (s === e) { if (window.showToast) showToast('请先用鼠标选中要上色的文字'); else alert('请先选中文字'); return; }
+            const value = ta.value;
+            const text = value.substring(s, e);
+            if (!text) return;
+            const anchored = anchorNotebookMarks(value, getNotebookMainMarks());
+            const filtered = anchored.filter(m => (m.start + (m.text || '').length) <= s || m.start >= e);
+            filtered.push({ text: text, color: color, glow: !!glow, start: s });
+            persistNotebookMainMarks(filtered);
+            renderNotepadEditable();
+        }
+        function clearNotebookMainColor() {
+            const ed = getNotepadEditable();
+            const ta = document.getElementById('notepad');
+            if (!ed || !ta) return;
+            const s = nbMainSel.s, e = nbMainSel.e;
+            if (s === e) { if (window.showToast) showToast('请先用鼠标选中要清除颜色的文字'); else alert('请先选中文字'); return; }
+            const value = ta.value;
+            const anchored = anchorNotebookMarks(value, getNotebookMainMarks());
+            const filtered = anchored.filter(m => (m.start + (m.text || '').length) <= s || m.start >= e);
+            persistNotebookMainMarks(filtered);
+            renderNotepadEditable();
+        }
+        function clearAllNotebookMainColor() {
+            persistNotebookMainMarks([]);
+            renderNotepadEditable();
+        }
         function initMainNotebookColor() {
             const ta = document.getElementById('notepad');
-            if (!ta) return;
+            const ed = getNotepadEditable();
+            if (!ta || !ed) return;
+            ensureNotebookColorStyles();
+            // contenteditable 输入 → 同步隐藏 textarea + 自动保存（不重绘富文本，避免丢光标）
+            ed.addEventListener('input', syncNotepadValueFromEditable);
+            // 粘贴强制纯文本，避免带进富文本样式破坏标记渲染
+            ed.addEventListener('paste', (ev) => {
+                ev.preventDefault();
+                const txt = (ev.clipboardData || window.clipboardData).getData('text/plain');
+                document.execCommand('insertText', false, txt);
+            });
+            // 记录选区（内容变化后偏移可能漂移，输入后重置为光标处）
+            const rec = () => { const o = getEditableSelection(ed); nbMainSel.s = o.s; nbMainSel.e = o.e; };
+            ed.addEventListener('mouseup', rec);
+            ed.addEventListener('keyup', rec);
+            ed.addEventListener('select', rec);
+            ed.addEventListener('input', rec);
             // 恢复整篇字体颜色（全局统一色，先秒显本地缓存，再异步用磁盘值校正）
             (async () => {
                 try {
-                    ta.style.color = notebookColorCfg.color;
+                    ed.style.color = notebookColorCfg.color;
                     const color = await getNotebookColorAsync();
-                    const nb = document.getElementById('notepad');
-                    if (nb) nb.style.color = color;
+                    const ed2 = getNotepadEditable();
+                    if (ed2) ed2.style.color = color;
                 } catch (e) {}
             })();
+            renderNotepadEditable();
         }
 
         // 只改显示（拖动色轮时高频调用，不落盘）
@@ -3394,9 +3521,9 @@
                 const ta = document.getElementById(w.id + '_content');
                 if (ta) ta.style.color = hex;
             });
-            // 主界面「项目记事本」(#notepad) 也跟随整篇色（不在 txtFileWindows 里）
-            const nb = document.getElementById('notepad');
-            if (nb) nb.style.color = hex;
+            // 主界面「项目记事本」：整篇色作用于未标记文字
+            const ed = getNotepadEditable();
+            if (ed) ed.style.color = hex;
         }
 
         // 换色：所有已打开记事本同步生效并持久化；remember=true 时把颜色存进 2 个自选槽
@@ -11651,6 +11778,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 const notepad = document.getElementById('notepad');
                 if (notepad && tempNotepad) {
                     notepad.value = tempNotepad;
+                    refreshNotepadEditable();
                 }
             }
             
