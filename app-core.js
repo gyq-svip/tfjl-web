@@ -3018,6 +3018,7 @@
                 <div style="display:flex;gap:4px;align-items:center;margin-bottom:5px;">
                     <input id="${windowId}_findInput" placeholder="查找..." oninput="webFind('${windowId}','count')" onkeydown="if(event.key==='Enter')webFind('${windowId}','next')" style="width:150px;flex-shrink:0;background:rgba(0,0,0,0.4);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:4px 8px;font-size:0.78rem;">
                     <span id="${windowId}_findCount" style="color:rgba(255,255,255,0.55);font-size:0.72rem;min-width:80px;text-align:center;white-space:nowrap;">0个匹配</span>
+                    <button onclick="webColorAllMatches('${windowId}')" style="background:rgba(255,215,0,0.18);color:#ffd700;border:1px solid rgba(255,215,0,0.3);padding:5px 10px;border-radius:4px;cursor:pointer;font-size:0.78rem;white-space:nowrap;" title="把当前查找的所有匹配用色板颜色标色（先点🎨选色，颜色会保存）">🎨 全部标色</button>
                     <button onclick="webFind('${windowId}','prev')" style="background:rgba(255,255,255,0.12);color:#fff;border:1px solid rgba(255,255,255,0.15);padding:5px 10px;border-radius:4px;cursor:pointer;font-size:0.82rem;white-space:nowrap;" title="上一个 (Shift+Enter)">◀ 上一个</button>
                     <button onclick="webFind('${windowId}','next')" style="background:rgba(255,255,255,0.12);color:#fff;border:1px solid rgba(255,255,255,0.15);padding:5px 10px;border-radius:4px;cursor:pointer;font-size:0.82rem;white-space:nowrap;" title="下一个 (Enter)">下一个 ▶</button>
                     <span id="${windowId}_cycleHint" style="display:none;color:#ffeb3b;font-size:0.65rem;white-space:nowrap;animation:fadeOut 2s forwards;">↻ 已循环</span>
@@ -3159,29 +3160,12 @@
             return {};
         })();
 
-        // 任意颜色字符串 → #rrggbb（input[type=color] 只认 hex）
-        function toHexColor(c) {
-            if (!c) return '';
-            c = String(c).trim();
-            if (/^#[0-9a-fA-F]{6}$/.test(c)) return c.toLowerCase();
-            if (/^#[0-9a-fA-F]{3}$/.test(c)) return ('#' + c[1] + c[1] + c[2] + c[2] + c[3] + c[3]).toLowerCase();
-            const m = c.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-            if (m) return '#' + [m[1], m[2], m[3]].map(x => (+x).toString(16).padStart(2, '0')).join('');
-            return '';
-        }
+        // 任意颜色字符串 → #rrggbb（input[type=color] 只认 hex）→ 复用通用组件 color-picker.js
+        function toHexColor(c) { return NBPC.toHex(c); }
 
-        function normalizeNotebookColorCfg(o) {
-            const color = (o && toHexColor(o.color)) || DEFAULT_NOTEBOOK_COLOR;
-            let slots = (o && Array.isArray(o.slots)) ? o.slots.map(toHexColor).filter(Boolean) : [];
-            slots = slots.filter((c, i) => c !== DEFAULT_NOTEBOOK_COLOR && slots.indexOf(c) === i).slice(0, 2);
-            return { color: color, slots: slots };
-        }
+        function normalizeNotebookColorCfg(o) { return NBPC.normalizeCfg(o); }
 
-        // 当前配置（同步可用，先从 localStorage 秒读，磁盘值异步校正）
-        let notebookColorCfg = (function () {
-            try { const s = localStorage.getItem(LS_NOTEBOOK_COLORS); if (s) return normalizeNotebookColorCfg(JSON.parse(s)); } catch (e) {}
-            return { color: DEFAULT_NOTEBOOK_COLOR, slots: [] };
-        })();
+        const notebookColorCfg = NBPC.cfg;   // 与通用组件 color-picker.js 共享同一配置对象（整篇色）
 
         let _nbColorDiskLoaded = false;
         async function getNotebookColorAsync() {
@@ -3190,23 +3174,17 @@
                 if (window.readTextFile) {
                     try {
                         const s = await window.readTextFile(NOTEBOOK_COLOR_FILE);
-                        if (s) {
-                            const o = JSON.parse(s);
-                            if (o && typeof o === 'object') {
-                                notebookColorCfg = normalizeNotebookColorCfg(o);
-                                try { localStorage.setItem(LS_NOTEBOOK_COLORS, JSON.stringify(notebookColorCfg)); } catch (e) {}
-                            }
-                        }
+                        if (s) { const o = JSON.parse(s); if (o && typeof o === 'object') NBPC.applyExternalCfg(o); }
                     } catch (e) {}
                 }
             }
-            return notebookColorCfg.color;
+            return NBPC.cfg.color;
         }
 
         async function saveNotebookColorCfg() {
-            try { localStorage.setItem(LS_NOTEBOOK_COLORS, JSON.stringify(notebookColorCfg)); } catch (e) {}
+            NBPC.saveCfg();
             if (window.writeTextFile) {
-                try { await window.writeTextFile(NOTEBOOK_COLOR_FILE, JSON.stringify(notebookColorCfg, null, 2)); } catch (e) {}
+                try { await window.writeTextFile(NOTEBOOK_COLOR_FILE, JSON.stringify(NBPC.cfg, null, 2)); } catch (e) {}
             }
         }
 
@@ -3245,34 +3223,12 @@
             }
         }
 
-        // 把标记按当前文本重新锚定（文本被编辑后仍能尽量贴合；原文消失则丢弃该标记）
         function anchorNotebookMarks(value, marks) {
-            const out = [];
-            let cursor = 0;
-            const sorted = (marks || []).slice().sort((a, b) => (a.start || 0) - (b.start || 0));
-            for (const m of sorted) {
-                if (!m || !m.text) continue;
-                let idx = value.indexOf(m.text, cursor);
-                if (idx < 0) idx = value.indexOf(m.text);
-                if (idx < 0) continue;
-                out.push({ start: idx, text: m.text, color: m.color, glow: !!m.glow });
-                cursor = idx + m.text.length;
-            }
-            return out;
+            return NBPC.Marks.anchor(value, marks);
         }
 
         function ensureNotebookColorStyles() {
-            if (document.getElementById('nbColorStyles')) return;
-            const st = document.createElement('style');
-            st.id = 'nbColorStyles';
-            st.textContent = ''
-                + '@keyframes nbBreathe{0%,100%{text-shadow:0 0 2px currentColor,0 0 6px currentColor;filter:brightness(1);}'
-                + '50%{text-shadow:0 0 4px currentColor,0 0 14px currentColor;filter:brightness(1.4);}}'
-                + '.nb-overlay{pointer-events:none;overflow:hidden;color:transparent;background:transparent;}'
-                + '.nb-overlay-inner{white-space:pre-wrap;word-break:break-word;margin:0;will-change:transform;}'
-                + '.nb-glow{animation:nbBreathe 2.4s ease-in-out infinite;}'
-                + '#notepadEditable::selection,[id$="_content"]::selection{background:rgba(255,255,255,0.22);}';
-            document.head.appendChild(st);
+            NBPC.Wheel.injectStyles();
         }
 
         // 让 overlay 右边距 = 12px + 文本区滚动条宽度，保证出现滚动条时彩色层与 textarea 文字宽度一致（否则越往后越错位）
@@ -3362,12 +3318,9 @@
             return !!(win && typeof win._selS === 'number' && win._selS !== win._selE);
         }
 
-        // 预览色段：把 [s,e) 区间从已有 marks 中裁掉再插入临时段（拖色轮实时预览用，不落盘）
+        // 预览色段：把 [s,e) 区间从已有 marks 中裁掉再插入临时段（拖色轮实时预览用，不落盘）→ 复用 NBPC.Marks
         function nbMergePreviewMark(value, marks, pv) {
-            if (!pv || pv.s >= pv.e) return marks;
-            const clipped = marks.filter(m => (m.start + (m.text || '').length) <= pv.s || m.start >= pv.e);
-            clipped.push({ text: value.substring(pv.s, pv.e), color: pv.color, glow: !!pv.glow, start: pv.s });
-            return clipped.sort((a, b) => a.start - b.start);
+            return NBPC.Marks.clipInsert(value, marks, pv);
         }
 
         // 拖动色轮：选中模式下给选区实时预览颜色（跟整篇色一样的跟手体验）
@@ -3598,13 +3551,7 @@
 
         // 换色：所有已打开记事本同步生效并持久化；remember=true 时把颜色存进 2 个自选槽
         function applyNotebookColor(windowId, color, remember) {
-            const hex = toHexColor(color) || DEFAULT_NOTEBOOK_COLOR;
-            notebookColorCfg.color = hex;
-            if (remember && hex !== DEFAULT_NOTEBOOK_COLOR) {
-                const slots = notebookColorCfg.slots.filter(c => c !== hex);
-                slots.unshift(hex);
-                notebookColorCfg.slots = slots.slice(0, 2);
-            }
+            const hex = NBPC.setGlobalColor(color, remember);   // 更新全局色 + 可选存槽（复用通用组件）
             saveNotebookColorCfg();
             previewNotebookColorLive(hex);
             document.querySelectorAll('[id$="_colorSlots"]').forEach(box => {
@@ -3617,163 +3564,26 @@
             });
         }
 
-        // ---------- HSV 圆盘取色器（角度=色相，半径=饱和度，下方滑条=亮度）----------
-        const nbWheelState = {};   // windowId -> {h(0-360), s(0-1), v(0-1)}
+        // ---------- HSV 圆盘取色器：逻辑统一在通用组件 color-picker.js（NBPC.Wheel），宿主只做薄转发 ----------
 
-        function nbHsvToRgb(h, s, v) {
-            h = ((h % 360) + 360) % 360;
-            const c = v * s, x = c * (1 - Math.abs(((h / 60) % 2) - 1)), m = v - c;
-            let r = 0, g = 0, b = 0;
-            if (h < 60) { r = c; g = x; } else if (h < 120) { r = x; g = c; }
-            else if (h < 180) { g = c; b = x; } else if (h < 240) { g = x; b = c; }
-            else if (h < 300) { r = x; b = c; } else { r = c; b = x; }
-            return [Math.round((r + m) * 255), Math.round((g + m) * 255), Math.round((b + m) * 255)];
-        }
-
-        function nbHsvToHex(h, s, v) {
-            return '#' + nbHsvToRgb(h, s, v).map(x => x.toString(16).padStart(2, '0')).join('');
-        }
-
-        function nbHexToHsv(hex) {
-            const c = toHexColor(hex) || DEFAULT_NOTEBOOK_COLOR;
-            const r = parseInt(c.slice(1, 3), 16) / 255, g = parseInt(c.slice(3, 5), 16) / 255, b = parseInt(c.slice(5, 7), 16) / 255;
-            const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
-            let h = 0;
-            if (d !== 0) {
-                if (mx === r) h = 60 * (((g - b) / d) % 6);
-                else if (mx === g) h = 60 * ((b - r) / d + 2);
-                else h = 60 * ((r - g) / d + 4);
-            }
-            if (h < 0) h += 360;
-            return [h, mx === 0 ? 0 : d / mx, mx];
-        }
-
-        // 绘制色轮（按满亮度画，这样亮度调低时仍能看清各色相）
-        function drawNotebookWheel(canvas) {
-            const ctx = canvas.getContext('2d');
-            const w = canvas.width, hgt = canvas.height, R = w / 2;
-            const img = ctx.createImageData(w, hgt);
-            const d = img.data;
-            for (let y = 0; y < hgt; y++) {
-                for (let x = 0; x < w; x++) {
-                    const dx = x - R + 0.5, dy = y - R + 0.5;
-                    const dist = Math.sqrt(dx * dx + dy * dy);
-                    const i = (y * w + x) * 4;
-                    if (dist > R) { d[i + 3] = 0; continue; }
-                    let deg = Math.atan2(dy, dx) * 180 / Math.PI;
-                    if (deg < 0) deg += 360;
-                    const rgb = nbHsvToRgb(deg, Math.min(1, dist / R), 1);
-                    d[i] = rgb[0]; d[i + 1] = rgb[1]; d[i + 2] = rgb[2];
-                    d[i + 3] = dist > R - 1.5 ? Math.max(0, Math.round(255 * (R - dist) / 1.5)) : 255;
-                }
-            }
-            ctx.putImageData(img, 0, 0);
-        }
-
-        // 把 hex 同步到色轮 UI（指针位置 / 亮度条 / 预览 / hex 文本）。prefix 为该取色盘的 id 前缀
+        // 同步色轮 UI（指针/亮度条/预览/hex）→ 复用组件
         function syncNotebookWheelUI(prefix, hex) {
-            const canvas = document.getElementById(prefix + '_wheel');
-            if (!canvas || canvas.dataset.inited !== '1') return;
-            const hsv = nbHexToHsv(hex);
-            // 纯黑/纯灰反推不出色相饱和，沿用上一次的，避免亮度拉到 0 再拉回来色相丢失
-            const prev = nbWheelState[prefix];
-            if (prev) {
-                if (hsv[2] === 0) { hsv[0] = prev.h; hsv[1] = prev.s; }
-                else if (hsv[1] === 0) { hsv[0] = prev.h; }
-            }
-            nbWheelState[prefix] = { h: hsv[0], s: hsv[1], v: hsv[2] };
-            const R = (canvas.clientWidth || 132) / 2;
-            const dot = document.getElementById(prefix + '_wheelDot');
-            if (dot) {
-                const rad = hsv[0] * Math.PI / 180;
-                dot.style.left = (R + Math.cos(rad) * hsv[1] * R) + 'px';
-                dot.style.top = (R + Math.sin(rad) * hsv[1] * R) + 'px';
-                dot.style.background = hex;
-            }
-            const bar = document.getElementById(prefix + '_vBar');
-            if (bar) bar.style.background = 'linear-gradient(to right,#000,' + nbHsvToHex(hsv[0], hsv[1], 1) + ')';
-            const vDot = document.getElementById(prefix + '_vDot');
-            if (vDot) { vDot.style.left = (hsv[2] * 100) + '%'; vDot.style.background = hex; }
-            const pv = document.getElementById(prefix + '_preview');
-            if (pv) pv.style.background = hex;
-            const tx = document.getElementById(prefix + '_hexTxt');
-            if (tx) tx.textContent = hex;
+            NBPC.Wheel.sync(prefix, hex);
         }
 
-        // 渲染色块：默认色 + 2 个自选色（空槽显示虚线圆占位）
+        // 渲染色块：默认色 + 2 个自选色；点击回传按当前模式分发 → 复用组件
         function renderNotebookColorSwatches(windowId) {
-            const box = document.getElementById(windowId + '_colorSlots');
-            if (!box) return;
-            const cur = notebookColorCfg.color;
-            const list = [DEFAULT_NOTEBOOK_COLOR].concat(notebookColorCfg.slots);
-            let html = list.map((c, i) => {
-                const on = (c === cur);
-                return `<button type="button" onclick="nbApplyPopupColor('${windowId}','${c}')" title="${i === 0 ? '默认色' : '自选色'} ${c}" style="width:26px;height:26px;border-radius:50%;background:${c};border:2px solid ${on ? '#ffd700' : 'rgba(255,255,255,0.55)'};cursor:pointer;padding:0;box-shadow:0 2px 6px rgba(0,0,0,0.45);"></button>`;
-            }).join('');
-            for (let i = list.length; i < 3; i++) {
-                html += `<span title="用右侧调色盘选个颜色，会自动存到这里" style="width:26px;height:26px;border-radius:50%;border:1px dashed rgba(255,255,255,0.3);display:inline-block;"></span>`;
-            }
-            box.innerHTML = html;
+            NBPC.Wheel.swatches(windowId, notebookColorCfg.color, notebookColorCfg.slots,
+                (hex) => nbApplyPopupColor(windowId, hex));
         }
 
-        // 首次展开时初始化色轮（canvas 尺寸 + 点击/拖动事件）。onApply(hex,remember) 在松手时调用（整体换色用；选中上色可不传）
+        // 初始化色轮（绘制 + 点击/拖动绑定）；onPreview 拖动实时、onApply 松手应用 → 复用组件
         function setupNotebookColorWheel(prefix, onApply, onPreview) {
-            const canvas = document.getElementById(prefix + '_wheel');
-            const bar = document.getElementById(prefix + '_vBar');
-            if (!canvas || canvas.dataset.inited === '1') return;
-            canvas.dataset.inited = '1';
-            const SIZE = 132, dpr = Math.min(2, window.devicePixelRatio || 1);
-            canvas.width = Math.round(SIZE * dpr);
-            canvas.height = Math.round(SIZE * dpr);
-            drawNotebookWheel(canvas);
-
-            const st = () => (nbWheelState[prefix] = nbWheelState[prefix] || { h: 0, s: 0, v: 0.88 });
-
-            // 色轮：点任意位置 / 按住拖动（超出圆边则贴边取满饱和度）
-            const pickFromWheel = (e) => {
-                const rect = canvas.getBoundingClientRect();
-                const nx = (e.clientX - rect.left) / rect.width * 2 - 1;
-                const ny = (e.clientY - rect.top) / rect.height * 2 - 1;
-                let deg = Math.atan2(ny, nx) * 180 / Math.PI;
-                if (deg < 0) deg += 360;
-                const s = st();
-                s.h = deg;
-                s.s = Math.min(1, Math.sqrt(nx * nx + ny * ny));
-                if (s.v < 0.15) s.v = 1;   // 亮度太低时点色轮看不出变化，自动提亮
-                const hex = nbHsvToHex(s.h, s.s, s.v);
-                if (onPreview) onPreview(hex);   // 拖动时的实时预览（整篇色才需要）
-                syncNotebookWheelUI(prefix, hex);
-                return hex;
-            };
-            // 亮度条：点 / 拖
-            const pickFromBar = (e) => {
-                const rect = bar.getBoundingClientRect();
-                const s = st();
-                s.v = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-                const hex = nbHsvToHex(s.h, s.s, s.v);
-                if (onPreview) onPreview(hex);
-                syncNotebookWheelUI(prefix, hex);
-                return hex;
-            };
-
-            const bindDrag = (el, picker) => {
-                if (!el) return;
-                el.addEventListener('mousedown', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();   // 关键：不让标题栏 makeWindowDraggable 抢走，否则变成拖窗口
-                    let hex = picker(e);
-                    const onMove = (ev) => { ev.preventDefault(); hex = picker(ev); };
-                    const onUp = () => {
-                        document.removeEventListener('mousemove', onMove, true);
-                        document.removeEventListener('mouseup', onUp, true);
-                        if (onApply) onApply(hex);   // 松手即应用（整篇色落盘 / 选中上色自动应用）
-                    };
-                    document.addEventListener('mousemove', onMove, true);
-                    document.addEventListener('mouseup', onUp, true);
-                });
-            };
-            bindDrag(canvas, pickFromWheel);
-            bindDrag(bar, pickFromBar);
+            NBPC.Wheel.init(prefix, {
+                onApply: onApply,
+                onPreview: onPreview,
+                onPick: (hex) => nbApplyPopupColor(prefix, hex)
+            });
         }
 
         // 标题栏 🎨 取色器：一个按钮纯自动双模式——选中文字→给选区上色；未选中→整篇换色。
@@ -3855,6 +3665,38 @@
                     webFind(windowId, 'count');
                 }
             }
+        }
+
+        // 把当前查找的所有匹配用色板颜色标色（复用通用组件 NBPC.Marks，落盘 + overlay 渲染）
+        function webColorAllMatches(windowId) {
+            const ta = document.getElementById(windowId + '_content');
+            const input = document.getElementById(windowId + '_findInput');
+            if (!ta || !input || !input.value) return;
+            const caseSensitive = document.getElementById(windowId + '_caseSensitive')?.checked || false;
+            const text = ta.value;
+            const found = NBPC.Marks.matches(text, input.value, caseSensitive);
+            if (found.length === 0) {
+                const countEl = document.getElementById(windowId + '_findCount');
+                if (countEl) countEl.textContent = '无匹配';
+                if (window.showToast) showToast('无匹配项，无法标色');
+                return;
+            }
+            const win = txtFileWindows.find(w => w.id === windowId);
+            if (!win) return;
+            getNotebookColorAsync().then(color => {
+                if (!win.marks) win.marks = [];
+                const glow = !!document.getElementById(windowId + '_glowChk')?.checked;
+                let marks = win.marks;
+                found.forEach(m => {
+                    marks = NBPC.Marks.clipInsert(text, marks, { s: m.start, e: m.end, color: color, glow: glow });
+                });
+                win.marks = marks;
+                persistNotebookMarks(win.marksKey, marks);
+                renderNotebookOverlay(windowId);
+                const countEl = document.getElementById(windowId + '_findCount');
+                if (countEl) countEl.textContent = '已标色 ' + found.length + ' 处';
+                if (window.showToast) showToast('已将 ' + found.length + ' 处匹配标色');
+            });
         }
 
         function webFind(windowId, direction) {
