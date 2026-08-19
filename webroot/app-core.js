@@ -2861,6 +2861,20 @@
                             <div style="font-size:0.58rem;color:#9a9ab0;margin-top:7px;text-align:center;white-space:nowrap;">全部记事本统一 · 自动保存</div>
                         </div>
                     </div>
+                    <div style="position: relative;">
+                        <button id="${windowId}_selColorBtn" onclick="toggleSelColorPopup('${windowId}')" title="选中文字上色" style="background:rgba(255,255,255,0.08);border:none;color:#fff;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:0.9rem;">🖌</button>
+                        <div id="${windowId}_selColorPopup" onmousedown="event.stopPropagation()" style="display:none;position:absolute;top:118%;right:0;z-index:20;width:212px;background:linear-gradient(160deg,rgba(40,40,68,0.98),rgba(26,26,48,0.98));border:1px solid rgba(255,215,0,0.35);border-radius:12px;padding:12px;box-shadow:0 8px 30px rgba(0,0,0,0.6);">
+                            <div style="font-size:0.76rem;font-weight:bold;color:#ffd700;margin-bottom:8px;">🖌 选中文字上色</div>
+                            <div id="${windowId}_swatches" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;"></div>
+                            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+                                <input type="color" id="${windowId}_customColor" value="#ffeb3b" style="width:34px;height:28px;border:none;background:none;cursor:pointer;padding:0;">
+                                <button onclick="applyNotebookSelectionColor('${windowId}', document.getElementById('${windowId}_customColor').value, document.getElementById('${windowId}_glowChk').checked)" style="flex:1;background:rgba(255,215,0,0.18);border:1px solid rgba(255,215,0,0.35);color:#ffd700;padding:5px;border-radius:6px;cursor:pointer;font-size:0.74rem;">应用自定义色</button>
+                            </div>
+                            <label style="display:flex;align-items:center;gap:6px;font-size:0.74rem;color:#c9c9dd;margin-bottom:10px;cursor:pointer;"><input type="checkbox" id="${windowId}_glowChk" checked> 动态呼吸发光</label>
+                            <button onclick="clearNotebookSelectionColor('${windowId}')" style="width:100%;background:rgba(244,67,54,0.18);border:1px solid rgba(244,67,54,0.35);color:#f44336;padding:6px;border-radius:6px;cursor:pointer;font-size:0.74rem;">🧹 清除选中颜色</button>
+                            <div style="font-size:0.6rem;color:#9a9ab0;margin-top:8px;text-align:center;">先在记事本里用鼠标选中要上色的字</div>
+                        </div>
+                    </div>
                     <button onclick="minimizeTxtWindow('${windowId}')" style="background:rgba(255,193,7,0.2);border:none;color:#ffc107;padding:4px 8px;border-radius:4px;cursor:pointer;">−</button>
                     <button onclick="closeTxtWindow('${windowId}', ${fileIndex})" style="background:rgba(244,67,54,0.2);border:none;color:#f44336;padding:4px 8px;border-radius:4px;cursor:pointer;">×</button>
                 </div>
@@ -2897,11 +2911,16 @@
                 } catch (e) { /* 减伤表尚未初始化则跳过 */ }
             }
             
+            // 编辑区外壳（相对定位，承载 textarea + 彩色 overlay）
+            const editorWrap = document.createElement('div');
+            editorWrap.style.cssText = 'position: relative; flex: 1; min-height: 0; display: flex; overflow: hidden;';
+
             const textarea = document.createElement('textarea');
             textarea.id = `${windowId}_content`;
             textarea.style.cssText = `
                 width: 100%;
                 flex: 1;
+                box-sizing: border-box;
                 background: rgba(0,0,0,0.3);
                 border: 1px solid rgba(255,215,0,0.2);
                 border-radius: 8px;
@@ -2915,13 +2934,55 @@
             `;
             textarea.value = content;
             textarea.spellcheck = false;
+
+            // 彩色 overlay：覆盖在 textarea 之上，仅渲染「选中上色」的字，不拦截输入/选择
+            const overlay = document.createElement('div');
+            overlay.id = `${windowId}_overlay`;
+            overlay.className = 'nb-overlay';
+            overlay.style.cssText = `
+                position: absolute;
+                inset: 0;
+                box-sizing: border-box;
+                border: 1px solid transparent;
+                border-radius: 8px;
+                padding: 12px;
+                overflow: hidden;
+                pointer-events: none;
+                color: transparent;
+                background: transparent;
+                font-family: 'Consolas', 'Monaco', monospace;
+                font-size: 14px;
+                line-height: 1.5;
+                z-index: 2;
+            `;
+            const overlayInner = document.createElement('div');
+            overlayInner.id = `${windowId}_overlayInner`;
+            overlayInner.className = 'nb-overlay-inner';
+            overlay.appendChild(overlayInner);
+            editorWrap.appendChild(textarea);
+            editorWrap.appendChild(overlay);
             // 实时减伤计算
+            const onNbInput = () => {
+                updateEditorDamageReduction(windowId);
+                updateWindowTitleDr(windowId, textarea.value);
+                renderNotebookOverlay(windowId);
+            };
             if (!readonly) {
-                textarea.addEventListener('input', () => {
-                    updateEditorDamageReduction(windowId);
-                    updateWindowTitleDr(windowId, textarea.value);
-                });
+                textarea.addEventListener('input', onNbInput);
             }
+            // overlay 跟随 textarea 滚动
+            textarea.addEventListener('scroll', () => {
+                const inner = document.getElementById(windowId + '_overlayInner');
+                if (inner) inner.style.transform = 'translateY(' + (-textarea.scrollTop) + 'px)';
+            });
+            // 实时记录选区（点击🖌会让 textarea 失焦、选区丢失，故提前缓存）
+            const recordNbSel = () => {
+                const w = txtFileWindows.find(x => x.id === windowId);
+                if (w) { w._selS = textarea.selectionStart; w._selE = textarea.selectionEnd; }
+            };
+            textarea.addEventListener('mouseup', recordNbSel);
+            textarea.addEventListener('keyup', recordNbSel);
+            textarea.addEventListener('select', recordNbSel);
             // 初始计算（如果有内容）
             if (content && content.trim()) {
                 setTimeout(() => updateEditorDamageReduction(windowId), 300);
@@ -2999,7 +3060,7 @@
                 ? `<button onclick="saveTxtWindowContent('${windowId}', ${fileIndex})" style="background:linear-gradient(135deg,#4CAF50,#45a049);border:none;color:white;padding:8px 20px;border-radius:6px;cursor:pointer;font-weight:bold;">💾 保存</button>`
                 : (isScan
                     ? `<button onclick="saveNotebookLocalFile('${windowId}')" style="background:linear-gradient(135deg,#4CAF50,#45a049);border:none;color:white;padding:8px 20px;border-radius:6px;cursor:pointer;font-weight:bold;">💾 保存</button>`
-                    : `<button onclick="(function(){try{window.__notebookSaveContent=window.__notebookSaveContent||{};window.__notebookSaveContent['${windowId}']=document.getElementById('${windowId}_content').value;window.__notebookSaveName=window.__notebookSaveName||{};var _sw=document.getElementById('${windowId}');window.__notebookSaveName['${windowId}']=_sw?_sw.dataset.saveName:'';showSaveScriptDialog(null, null, '${windowId}');}catch(e){console.error('保存副本失败:',e);showToast('❌ 打开保存失败：'+(e&&e.message||e));}})()" style="background:linear-gradient(135deg,#4CAF50,#45a049);border:none;color:white;padding:8px 20px;border-radius:6px;cursor:pointer;font-weight:bold;">💾 保存副本</button>`);
+                    : `<button onclick="(function(){try{window.__notebookSaveContent=window.__notebookSaveContent||{};window.__notebookSaveContent['${windowId}']=document.getElementById('${windowId}_content').value;window.__notebookSaveName=window.__notebookSaveName||{};var _sw=document.getElementById('${windowId}');window.__notebookSaveName['${windowId}']=_sw?_sw.dataset.saveName:'';var _win=txtFileWindows.find(function(w){return w.id==='${windowId}';});window.__notebookSaveMarks=window.__notebookSaveMarks||{};window.__notebookSaveMarks['${windowId}']=_win?_win.marks:[];showSaveScriptDialog(null, null, '${windowId}');}catch(e){console.error('保存副本失败:',e);showToast('❌ 打开保存失败：'+(e&&e.message||e));}})()" style="background:linear-gradient(135deg,#4CAF50,#45a049);border:none;color:white;padding:8px 20px;border-radius:6px;cursor:pointer;font-weight:bold;">💾 保存副本</button>`);
             buttonBar.innerHTML = `
                 <div style="display:flex;gap:8px;align-items:center;">
                     <select id="${windowId}_target" style="padding:6px 10px;border-radius:6px;border:1px solid rgba(255,215,0,0.3);background:#2a2a4a;color:#fff;font-size:0.85rem;cursor:pointer;">
@@ -3016,7 +3077,7 @@
                 </div>
             `;
             
-            contentArea.appendChild(textarea);
+            contentArea.appendChild(editorWrap);
             contentArea.appendChild(findReplaceBar);
             contentArea.appendChild(parseResult);
             contentArea.appendChild(buttonBar);
@@ -3048,6 +3109,31 @@
                 isTop: isTop
             });
 
+            // 逐字彩色标记初始化（持久化 overlay）
+            const nbKey = getNotebookMarksKey(opts);
+            let nbMarks = loadNotebookMarks(nbKey);
+            if (!nbMarks.length && nbKey[0] === 'f') {
+                const fi = parseInt(nbKey.slice(1), 10);
+                if (txtFiles[fi] && txtFiles[fi].marks) nbMarks = txtFiles[fi].marks;
+            }
+            notebookMarksStore[nbKey] = nbMarks;
+            const nbWin = txtFileWindows.find(w => w.id === windowId);
+            if (nbWin) { nbWin.marksKey = nbKey; nbWin.marks = nbMarks; }
+
+            // 填充预设色板
+            const nbSwatches = document.getElementById(windowId + '_swatches');
+            if (nbSwatches) {
+                ['#ff5252', '#ff9800', '#ffeb3b', '#4caf50', '#4dd0e1', '#2196f3', '#b388ff', '#ff80ab', '#ffffff'].forEach(c => {
+                    const b = document.createElement('button');
+                    b.style.cssText = 'width:26px;height:26px;border-radius:6px;border:1px solid rgba(255,255,255,0.3);background:' + c + ';cursor:pointer;';
+                    b.title = c;
+                    b.onclick = () => applyNotebookSelectionColor(windowId, c, document.getElementById(windowId + '_glowChk').checked);
+                    nbSwatches.appendChild(b);
+                });
+            }
+            ensureNotebookColorStyles();
+            renderNotebookOverlay(windowId);
+
             // 恢复记忆的字体颜色（全局统一，一处改处处生效）
             (async () => {
                 try {
@@ -3066,6 +3152,13 @@
         const NOTEBOOK_COLOR_FILE = 'D:\\withfriends\\塔防精灵助手数据\\notebookColors.json';
         const LS_NOTEBOOK_COLORS = 'tfjl_notebook_colors';
         const DEFAULT_NOTEBOOK_COLOR = '#e0e0e0';        // 啥都没设时的默认色
+
+        // 记事本逐字彩色标记持久化（key -> [{text,color,glow,start}]）
+        const LS_NOTEBOOK_MARKS = 'tfjl_notebook_marks';
+        let notebookMarksStore = (function () {
+            try { const s = localStorage.getItem(LS_NOTEBOOK_MARKS); if (s) return JSON.parse(s) || {}; } catch (e) {}
+            return {};
+        })();
 
         // 任意颜色字符串 → #rrggbb（input[type=color] 只认 hex）
         function toHexColor(c) {
@@ -3116,6 +3209,125 @@
             if (window.writeTextFile) {
                 try { await window.writeTextFile(NOTEBOOK_COLOR_FILE, JSON.stringify(notebookColorCfg, null, 2)); } catch (e) {}
             }
+        }
+
+        // ========== 记事本逐字彩色标记（选中上色 + 柔和呼吸发光，持久化 overlay）==========
+        function simpleHashStr(str) {
+            let h = 0;
+            str = String(str);
+            for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0;
+            return 'h' + (h >>> 0).toString(36);
+        }
+
+        // 根据记事本身份算一个稳定 key（用于存取彩色标记）
+        function getNotebookMarksKey(opts) {
+            if (typeof opts.fileIndex === 'number' && opts.fileIndex >= 0) return 'f' + opts.fileIndex;
+            if (opts.localPath) return 'p' + simpleHashStr(opts.localPath);
+            let base = opts.name || '';
+            try { base += '|' + (opts.content || '').slice(0, 40); } catch (e) {}
+            return 'r' + simpleHashStr(base);
+        }
+
+        function loadNotebookMarks(key) {
+            if (notebookMarksStore[key] && notebookMarksStore[key].length) return notebookMarksStore[key];
+            try {
+                const s = localStorage.getItem(LS_NOTEBOOK_MARKS);
+                if (s) { const all = JSON.parse(s) || {}; if (all[key] && all[key].length) return all[key]; }
+            } catch (e) {}
+            return [];
+        }
+
+        function persistNotebookMarks(key, marks) {
+            notebookMarksStore[key] = marks || [];
+            try { localStorage.setItem(LS_NOTEBOOK_MARKS, JSON.stringify(notebookMarksStore)); } catch (e) {}
+            if (key[0] === 'f') {
+                const idx = parseInt(key.slice(1), 10);
+                if (txtFiles[idx]) txtFiles[idx].marks = marks || [];
+            }
+        }
+
+        // 把标记按当前文本重新锚定（文本被编辑后仍能尽量贴合；原文消失则丢弃该标记）
+        function anchorNotebookMarks(value, marks) {
+            const out = [];
+            let cursor = 0;
+            const sorted = (marks || []).slice().sort((a, b) => (a.start || 0) - (b.start || 0));
+            for (const m of sorted) {
+                if (!m || !m.text) continue;
+                let idx = value.indexOf(m.text, cursor);
+                if (idx < 0) idx = value.indexOf(m.text);
+                if (idx < 0) continue;
+                out.push({ start: idx, text: m.text, color: m.color, glow: !!m.glow });
+                cursor = idx + m.text.length;
+            }
+            return out;
+        }
+
+        function ensureNotebookColorStyles() {
+            if (document.getElementById('nbColorStyles')) return;
+            const st = document.createElement('style');
+            st.id = 'nbColorStyles';
+            st.textContent = ''
+                + '@keyframes nbBreathe{0%,100%{text-shadow:0 0 2px currentColor,0 0 6px currentColor;filter:brightness(1);}'
+                + '50%{text-shadow:0 0 4px currentColor,0 0 14px currentColor;filter:brightness(1.4);}}'
+                + '.nb-overlay{pointer-events:none;overflow:hidden;color:transparent;background:transparent;}'
+                + '.nb-overlay-inner{white-space:pre-wrap;word-break:break-word;margin:0;will-change:transform;}'
+                + '.nb-glow{animation:nbBreathe 2.4s ease-in-out infinite;}';
+            document.head.appendChild(st);
+        }
+
+        function renderNotebookOverlay(windowId) {
+            const ta = document.getElementById(windowId + '_content');
+            const inner = document.getElementById(windowId + '_overlayInner');
+            if (!ta || !inner) return;
+            const value = ta.value;
+            const win = txtFileWindows.find(w => w.id === windowId);
+            const marks = win && win.marks ? anchorNotebookMarks(value, win.marks) : [];
+            let html = '', cursor = 0;
+            for (const m of marks) {
+                if (m.start < cursor) continue;
+                html += escapeHtml(value.slice(cursor, m.start));
+                const cls = 'nb-mark' + (m.glow ? ' nb-glow' : '');
+                html += '<span class="' + cls + '" style="color:' + m.color + '">' + escapeHtml(value.slice(m.start, m.start + m.text.length)) + '</span>';
+                cursor = m.start + m.text.length;
+            }
+            html += escapeHtml(value.slice(cursor));
+            inner.innerHTML = html;
+            inner.style.transform = 'translateY(' + (-ta.scrollTop) + 'px)';
+        }
+
+        function applyNotebookSelectionColor(windowId, color, glow) {
+            const ta = document.getElementById(windowId + '_content');
+            const win = txtFileWindows.find(w => w.id === windowId);
+            if (!ta || !win || !win.marks) return;
+            const s = (typeof win._selS === 'number') ? win._selS : ta.selectionStart;
+            const e = (typeof win._selE === 'number') ? win._selE : ta.selectionEnd;
+            if (s === e) { if (window.showToast) showToast('请先用鼠标选中要上色的文字'); else alert('请先选中文字'); return; }
+            const text = ta.value.substring(s, e);
+            if (!text) return;
+            win.marks = (win.marks || []).filter(m => (m.start + (m.text || '').length) <= s || m.start >= e);
+            win.marks.push({ text: text, color: color, glow: !!glow, start: s });
+            persistNotebookMarks(win.marksKey, win.marks);
+            renderNotebookOverlay(windowId);
+        }
+
+        function clearNotebookSelectionColor(windowId) {
+            const ta = document.getElementById(windowId + '_content');
+            const win = txtFileWindows.find(w => w.id === windowId);
+            if (!ta || !win || !win.marks) return;
+            const s = (typeof win._selS === 'number') ? win._selS : ta.selectionStart;
+            const e = (typeof win._selE === 'number') ? win._selE : ta.selectionEnd;
+            if (s === e) { if (window.showToast) showToast('请先用鼠标选中要清除颜色的文字'); else alert('请先选中文字'); return; }
+            win.marks = win.marks.filter(m => (m.start + (m.text || '').length) <= s || m.start >= e);
+            persistNotebookMarks(win.marksKey, win.marks);
+            renderNotebookOverlay(windowId);
+        }
+
+        function toggleSelColorPopup(windowId) {
+            const ta = document.getElementById(windowId + '_content');
+            const win = txtFileWindows.find(w => w.id === windowId);
+            if (win && ta) { win._selS = ta.selectionStart; win._selE = ta.selectionEnd; }
+            const pop = document.getElementById(windowId + '_selColorPopup');
+            if (pop) pop.style.display = (pop.style.display === 'block') ? 'none' : 'block';
         }
 
         // 只改显示（拖动色轮时高频调用，不落盘）
@@ -4313,8 +4525,11 @@
         function saveTxtWindowContent(windowId, fileIndex) {
             const textarea = document.getElementById(`${windowId}_content`);
             if (!textarea || !txtFiles[fileIndex]) return;
-            
+
             txtFiles[fileIndex].content = textarea.value;
+            // 同步逐字彩色标记
+            const win = txtFileWindows.find(w => w.id === windowId);
+            if (win && win.marksKey) txtFiles[fileIndex].marks = win.marks;
             updateTxtFilesList();
             autoSaveProject();
             
