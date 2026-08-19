@@ -979,7 +979,7 @@
                 <div style="display:flex;align-items:center;gap:8px;">
                     <button id="notebook_main_paletteBtn" onclick="toggleNotebookColorPicker('notebook_main')" title="取色器：选中文字→给选中上色；未选中→整篇换色" style="background:rgba(255,255,255,0.2);color:#fff;border:none;padding:3px 9px;border-radius:4px;cursor:pointer;font-size:0.85rem;">🎨</button>
                     <div id="notebook_main_colorPopup" onmousedown="event.stopPropagation()" style="display:none;position:absolute;top:46px;right:10px;z-index:30;width:158px;background:linear-gradient(160deg,rgba(40,40,68,0.98),rgba(26,26,48,0.98));border:1px solid rgba(121,134,203,0.5);border-radius:12px;padding:10px 12px;box-shadow:0 8px 30px rgba(0,0,0,0.6);">
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                        <div id="notebook_main_colorHdr" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;cursor:move;">
                             <span id="notebook_main_popTitle" style="font-size:0.76rem;font-weight:bold;color:#ffd700;white-space:nowrap;">🎨 整篇颜色</span>
                             <button type="button" onclick="nbCloseColorPopup('notebook_main')" title="关闭色板" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.25);color:#c9c9dd;padding:1px 7px;border-radius:5px;cursor:pointer;font-size:0.72rem;flex-shrink:0;line-height:1.3;">✕</button>
                         </div>
@@ -1578,8 +1578,8 @@
             </div>
         </div>
 
-    <script defer src="color-picker.js?v=s1.0.171"></script>
-    <script defer src="app-core.js?v=s1.0.171"></script>
+    <script defer src="color-picker.js?v=s1.0.172"></script>
+    <script defer src="app-core.js?v=s1.0.172"></script>
 
     <!-- 模态框：创建分类 -->
     <div id="createCategoryModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;justify-content:center;align-items:center;">
@@ -2476,7 +2476,7 @@
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:0.1;display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">s20260820-28 · s1.0.171</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;" onclick="onVersionTagClick()" title="前端标记号（点我看版本详情 / 强制刷新）">s20260820-29 · s1.0.172</span>
             </div>
         </div>
     </div>

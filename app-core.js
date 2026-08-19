@@ -2846,7 +2846,7 @@
                     <div style="position: relative;">
                         <button id="${windowId}_paletteBtn" onclick="toggleNotebookColorPicker('${windowId}')" title="取色器：选中文字→给选中上色；未选中→整篇换色" style="background:rgba(255,255,255,0.08);border:none;color:#fff;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:0.9rem;">🎨</button>
                         <div id="${windowId}_colorPopup" onmousedown="event.stopPropagation()" style="display:none;position:absolute;top:118%;right:0;z-index:20;width:158px;background:linear-gradient(160deg,rgba(40,40,68,0.98),rgba(26,26,48,0.98));border:1px solid rgba(255,215,0,0.35);border-radius:12px;padding:10px 12px;box-shadow:0 8px 30px rgba(0,0,0,0.6);">
-                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                            <div id="${windowId}_colorHdr" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;cursor:move;">
                                 <span id="${windowId}_popTitle" style="font-size:0.76rem;font-weight:bold;color:#ffd700;white-space:nowrap;">🎨 整篇颜色</span>
                                 <button type="button" onclick="nbCloseColorPopup('${windowId}')" title="关闭色板" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.25);color:#c9c9dd;padding:1px 7px;border-radius:5px;cursor:pointer;font-size:0.72rem;flex-shrink:0;line-height:1.3;">✕</button>
                             </div>
@@ -3588,6 +3588,39 @@
 
         // 标题栏 🎨 取色器：一个按钮纯自动双模式——选中文字→给选区上色；未选中→整篇换色。
         // 色板打开期间可在记事本里自由选字（不关闭），点记事本面板以外才收起，也可点 ✕ 关闭。
+        // 色板弹窗按标题行拖动（转固定定位自由浮动，随拖随放，比计算器弹窗更灵活）
+        function setupColorPopupDraggable(windowId) {
+            const pop = document.getElementById(windowId + '_colorPopup');
+            const hdr = document.getElementById(windowId + '_colorHdr');
+            if (!pop || !hdr || pop.dataset.dragReady) return;
+            pop.dataset.dragReady = '1';
+            hdr.style.cursor = 'move';
+            let isDrag = false, sx = 0, sy = 0, sl = 0, st = 0;
+            hdr.addEventListener('mousedown', (e) => {
+                if (e.button !== 0) return;
+                if (e.target.closest && e.target.closest('button')) return;   // ✕ 关闭按钮不触发拖动
+                const r = pop.getBoundingClientRect();
+                if (getComputedStyle(pop).position !== 'fixed') {
+                    // 保持原位把锚定定位转成屏幕固定，取色板即可脱离 🎨 按钮自由拖动
+                    pop.style.position = 'fixed';
+                    pop.style.left = r.left + 'px';
+                    pop.style.top = r.top + 'px';
+                    pop.style.right = 'auto';
+                }
+                sl = parseInt(pop.style.left, 10) || 0;
+                st = parseInt(pop.style.top, 10) || 0;
+                sx = e.clientX; sy = e.clientY;
+                isDrag = true;
+                e.preventDefault();
+            });
+            document.addEventListener('mousemove', (e) => {
+                if (!isDrag) return;
+                pop.style.left = (sl + e.clientX - sx) + 'px';
+                pop.style.top = (st + e.clientY - sy) + 'px';
+            });
+            document.addEventListener('mouseup', () => { isDrag = false; });
+        }
+
         function toggleNotebookColorPicker(windowId) {
             const pop = document.getElementById(windowId + '_colorPopup');
             if (!pop) return;
@@ -3600,6 +3633,7 @@
             });
             pop.style.display = show ? 'block' : 'none';
             if (show) {
+                setupColorPopupDraggable(windowId);
                 nbPopupMode[windowId] = nbHasSelection(windowId) ? 'sel' : 'all';
                 nbUpdateColorPopupMode(windowId);
                 renderNotebookColorSwatches(windowId);
