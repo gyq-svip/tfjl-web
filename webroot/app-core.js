@@ -11752,6 +11752,24 @@ function getGistToken() {
 }
 function setGistToken(token) {
     localStorage.setItem(GIST_TOKEN_KEY, token);
+    // token 变化后重新注册给 Rust 心跳线程，确保托盘常驻心跳能拿到最新 token
+    registerHeartbeatWithRust();
+}
+// 把心跳身份注册给 Rust（桌面版专用）：Rust 线程在窗口隐藏/冻结时仍能独立发心跳。
+// 仅桌面 App 走此逻辑（window.__TAURI__ 存在），网页版忽略。
+function registerHeartbeatWithRust() {
+    try {
+        if (!(window.__TAURI__ || window.__TAURI_INTERNALS__)) return;
+        const token = getGistToken();
+        const gid = COUNTER_GIST_ID || localStorage.getItem('counter_gist_id') || '';
+        if (!token || !gid) return;
+        _statsInvoke('register_heartbeat', {
+            deviceId: getDeviceId(),
+            nick: _myNick(),
+            token: token,
+            counterGistId: gid
+        }).catch(() => {});
+    } catch (e) {}
 }
 function hasGistToken() {
     return !!getGistToken();
@@ -12686,6 +12704,8 @@ function hasGistToken() {
             // 初始化消息墙 & 网络监听（非阻塞，不拖慢首屏）
             initMessageWall();
             setupNetworkListener();
+            // 注册托盘常驻心跳到 Rust（桌面版；窗口隐藏后 WebView 冻结也能持续在线）
+            registerHeartbeatWithRust();
 
             // —— 首屏核心：尽早加载王城低配版，不排队等待下面的网络统计请求 ——
             try {
