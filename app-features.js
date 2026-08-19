@@ -7207,7 +7207,7 @@
                     myDeckInfo: '',
                     teammateDeckInfo: '',
                     notepad: '',
-                    txtFiles: [{ name: fileName, content: scriptContent }],
+                    txtFiles: [{ name: fileName, content: scriptContent, marks: (window.__notebookSaveMarks && window.__notebookSaveMarks[windowId]) ? window.__notebookSaveMarks[windowId] : [] }],
                     referenceImages: []
                 };
 
@@ -7248,8 +7248,9 @@
                     if (existIdx !== -1) {
                         if (!confirm(`项目"${projectName}"中已存在"${fileName}"，是否覆盖？`)) return;
                         projectTxtFiles[existIdx].content = scriptContent;
+                        if (window.__notebookSaveMarks && window.__notebookSaveMarks[windowId]) projectTxtFiles[existIdx].marks = window.__notebookSaveMarks[windowId];
                     } else {
-                        projectTxtFiles.push({ name: fileName, content: scriptContent });
+                        projectTxtFiles.push({ name: fileName, content: scriptContent, marks: (window.__notebookSaveMarks && window.__notebookSaveMarks[windowId]) ? window.__notebookSaveMarks[windowId] : [] });
                     }
 
                     // 更新项目数据中的txtFiles
@@ -7267,8 +7268,9 @@
                         const existIdx = txtFiles.findIndex(f => f.name === fileName);
                         if (existIdx !== -1) {
                             txtFiles[existIdx].content = scriptContent;
+                            if (window.__notebookSaveMarks && window.__notebookSaveMarks[windowId]) txtFiles[existIdx].marks = window.__notebookSaveMarks[windowId];
                         } else {
-                            txtFiles.push({ name: fileName, content: scriptContent });
+                            txtFiles.push({ name: fileName, content: scriptContent, marks: (window.__notebookSaveMarks && window.__notebookSaveMarks[windowId]) ? window.__notebookSaveMarks[windowId] : [] });
                         }
                         updateTxtFilesList();
                     }
