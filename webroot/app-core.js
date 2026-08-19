@@ -590,7 +590,7 @@
                         const notepad = document.getElementById('notepad');
                         if (notepad) {
                             notepad.value = project.notepad || '';
-                            renderMainNotebookOverlay();
+                            notepad.style.color = notebookColorCfg.color; // 整篇颜色跟随全局配置
                         }
                         
                         loadTxtFilesFromProject(project);
@@ -3361,21 +3361,6 @@
         }
 
         function toggleSelColorPopup(windowId) {
-            if (windowId === 'notebook_main') {
-                const ta = document.getElementById('notepad');
-                if (ta) { notebookMainSel.s = ta.selectionStart; notebookMainSel.e = ta.selectionEnd; }
-                const pop = document.getElementById('notebook_main_selColorPopup');
-                if (pop) pop.style.display = (pop.style.display === 'block') ? 'none' : 'block';
-                // 打开上色弹窗时收起整篇色盘，避免两个浮层重叠
-                const cp = document.getElementById('notebook_main_colorPopup');
-                if (cp) cp.style.display = 'none';
-                // 懒初始化选中专用色轮
-                if (pop && pop.style.display === 'block') {
-                    setupNotebookColorWheel('notebook_main_sel', null);
-                    syncNotebookWheelUI('notebook_main_sel', notebookColorCfg.color);
-                }
-                return;
-            }
             const ta = document.getElementById(windowId + '_content');
             const win = txtFileWindows.find(w => w.id === windowId);
             if (win && ta) { win._selS = ta.selectionStart; win._selE = ta.selectionEnd; }
@@ -3387,57 +3372,10 @@
             }
         }
 
-        // ========== 主界面「项目记事本」(#notepad) 的逐字彩色接入 ==========
-        const notebookMainSel = { s: 0, e: 0 };
-        const NOTEBOOK_MAIN_KEY = 'notebook-main';
-        function getNotebookMainMarks() {
-            if (notebookMarksStore[NOTEBOOK_MAIN_KEY]) return notebookMarksStore[NOTEBOOK_MAIN_KEY];
-            try { const s = localStorage.getItem(LS_NOTEBOOK_MARKS); if (s) { const all = JSON.parse(s) || {}; if (all[NOTEBOOK_MAIN_KEY]) return all[NOTEBOOK_MAIN_KEY]; } } catch (e) {}
-            return [];
-        }
-        function renderMainNotebookOverlay() {
-            const ta = document.getElementById('notepad');
-            const inner = document.getElementById('notepad_overlayInner');
-            if (!ta || !inner) return;
-            const value = ta.value;
-            const marks = anchorNotebookMarks(value, getNotebookMainMarks());
-            let html = '', cursor = 0;
-            for (const m of marks) {
-                if (m.start < cursor) continue;
-                html += escapeHtml(value.slice(cursor, m.start));
-                const cls = 'nb-mark' + (m.glow ? ' nb-glow' : '');
-                html += '<span class="' + cls + '" style="color:' + m.color + '">' + escapeHtml(value.slice(m.start, m.start + m.text.length)) + '</span>';
-                cursor = m.start + m.text.length;
-            }
-            html += escapeHtml(value.slice(cursor));
-            inner.innerHTML = html;
-            inner.style.transform = 'translateY(' + (-ta.scrollTop) + 'px)';
-            nbSyncOverlayGutter(ta, document.getElementById('notepad_overlay'));
-        }
-        function persistNotebookMainMarks(marks) {
-            notebookMarksStore[NOTEBOOK_MAIN_KEY] = marks || [];
-            try { localStorage.setItem(LS_NOTEBOOK_MARKS, JSON.stringify(notebookMarksStore)); } catch (e) {}
-        }
+        // ========== 主界面「项目记事本」(#notepad) 颜色：整篇统一换色（无 overlay，用 textarea 自身字体色，绝不错位）==========
         function initMainNotebookColor() {
             const ta = document.getElementById('notepad');
             if (!ta) return;
-            ensureNotebookColorStyles();
-            const sw = document.getElementById('notebook_main_swatches');
-            if (sw && !sw.childElementCount) {
-                ['#ff5252', '#ff9800', '#ffeb3b', '#4caf50', '#4dd0e1', '#2196f3', '#b388ff', '#ff80ab', '#ffffff'].forEach(c => {
-                    const b = document.createElement('button');
-                    b.style.cssText = 'width:26px;height:26px;border-radius:6px;border:1px solid rgba(255,255,255,0.3);background:' + c + ';cursor:pointer;';
-                    b.title = c;
-                    b.onclick = () => applyNotebookMainColor(c, document.getElementById('notebook_main_glowChk').checked);
-                    sw.appendChild(b);
-                });
-            }
-            ta.addEventListener('scroll', () => { const inner = document.getElementById('notepad_overlayInner'); if (inner) inner.style.transform = 'translateY(' + (-ta.scrollTop) + 'px)'; nbSyncOverlayGutter(ta, document.getElementById('notepad_overlay')); });
-            const rec = () => { notebookMainSel.s = ta.selectionStart; notebookMainSel.e = ta.selectionEnd; };
-            ta.addEventListener('mouseup', rec);
-            ta.addEventListener('keyup', rec);
-            ta.addEventListener('select', rec);
-            renderMainNotebookOverlay();
             // 恢复整篇字体颜色（全局统一色，先秒显本地缓存，再异步用磁盘值校正）
             (async () => {
                 try {
@@ -3447,35 +3385,6 @@
                     if (nb) nb.style.color = color;
                 } catch (e) {}
             })();
-        }
-        function applyNotebookMainColor(color, glow) {
-            const ta = document.getElementById('notepad');
-            if (!ta) return;
-            const s = notebookMainSel.s, e = notebookMainSel.e;
-            if (s === e) { if (window.showToast) showToast('请先用鼠标选中要上色的文字'); else alert('请先选中文字'); return; }
-            const value = ta.value;
-            const text = value.substring(s, e);
-            if (!text) return;
-            const anchored = anchorNotebookMarks(value, getNotebookMainMarks());
-            const filtered = anchored.filter(m => (m.start + (m.text || '').length) <= s || m.start >= e);
-            filtered.push({ text: text, color: color, glow: !!glow, start: s });
-            persistNotebookMainMarks(filtered);
-            renderMainNotebookOverlay();
-        }
-        function clearNotebookMainColor() {
-            const ta = document.getElementById('notepad');
-            if (!ta) return;
-            const s = notebookMainSel.s, e = notebookMainSel.e;
-            if (s === e) { if (window.showToast) showToast('请先用鼠标选中要清除颜色的文字'); else alert('请先选中文字'); return; }
-            const value = ta.value;
-            const anchored = anchorNotebookMarks(value, getNotebookMainMarks());
-            const filtered = anchored.filter(m => (m.start + (m.text || '').length) <= s || m.start >= e);
-            persistNotebookMainMarks(filtered);
-            renderMainNotebookOverlay();
-        }
-        function clearAllNotebookMainColor() {
-            persistNotebookMainMarks([]);
-            renderMainNotebookOverlay();
         }
 
         // 只改显示（拖动色轮时高频调用，不落盘）
