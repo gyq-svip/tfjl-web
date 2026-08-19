@@ -590,6 +590,7 @@
                         const notepad = document.getElementById('notepad');
                         if (notepad) {
                             notepad.value = project.notepad || '';
+                            renderMainNotebookOverlay();
                         }
                         
                         loadTxtFilesFromProject(project);
@@ -3323,11 +3324,91 @@
         }
 
         function toggleSelColorPopup(windowId) {
+            if (windowId === 'notebook_main') {
+                const ta = document.getElementById('notepad');
+                if (ta) { notebookMainSel.s = ta.selectionStart; notebookMainSel.e = ta.selectionEnd; }
+                const pop = document.getElementById('notebook_main_selColorPopup');
+                if (pop) pop.style.display = (pop.style.display === 'block') ? 'none' : 'block';
+                return;
+            }
             const ta = document.getElementById(windowId + '_content');
             const win = txtFileWindows.find(w => w.id === windowId);
             if (win && ta) { win._selS = ta.selectionStart; win._selE = ta.selectionEnd; }
             const pop = document.getElementById(windowId + '_selColorPopup');
             if (pop) pop.style.display = (pop.style.display === 'block') ? 'none' : 'block';
+        }
+
+        // ========== 主界面「项目记事本」(#notepad) 的逐字彩色接入 ==========
+        const notebookMainSel = { s: 0, e: 0 };
+        const NOTEBOOK_MAIN_KEY = 'notebook-main';
+        function getNotebookMainMarks() {
+            if (notebookMarksStore[NOTEBOOK_MAIN_KEY]) return notebookMarksStore[NOTEBOOK_MAIN_KEY];
+            try { const s = localStorage.getItem(LS_NOTEBOOK_MARKS); if (s) { const all = JSON.parse(s) || {}; if (all[NOTEBOOK_MAIN_KEY]) return all[NOTEBOOK_MAIN_KEY]; } } catch (e) {}
+            return [];
+        }
+        function renderMainNotebookOverlay() {
+            const ta = document.getElementById('notepad');
+            const inner = document.getElementById('notepad_overlayInner');
+            if (!ta || !inner) return;
+            const value = ta.value;
+            const marks = anchorNotebookMarks(value, getNotebookMainMarks());
+            let html = '', cursor = 0;
+            for (const m of marks) {
+                if (m.start < cursor) continue;
+                html += escapeHtml(value.slice(cursor, m.start));
+                const cls = 'nb-mark' + (m.glow ? ' nb-glow' : '');
+                html += '<span class="' + cls + '" style="color:' + m.color + '">' + escapeHtml(value.slice(m.start, m.start + m.text.length)) + '</span>';
+                cursor = m.start + m.text.length;
+            }
+            html += escapeHtml(value.slice(cursor));
+            inner.innerHTML = html;
+            inner.style.transform = 'translateY(' + (-ta.scrollTop) + 'px)';
+        }
+        function persistNotebookMainMarks(marks) {
+            notebookMarksStore[NOTEBOOK_MAIN_KEY] = marks || [];
+            try { localStorage.setItem(LS_NOTEBOOK_MARKS, JSON.stringify(notebookMarksStore)); } catch (e) {}
+        }
+        function initMainNotebookColor() {
+            const ta = document.getElementById('notepad');
+            if (!ta) return;
+            ensureNotebookColorStyles();
+            const sw = document.getElementById('notebook_main_swatches');
+            if (sw && !sw.childElementCount) {
+                ['#ff5252', '#ff9800', '#ffeb3b', '#4caf50', '#4dd0e1', '#2196f3', '#b388ff', '#ff80ab', '#ffffff'].forEach(c => {
+                    const b = document.createElement('button');
+                    b.style.cssText = 'width:26px;height:26px;border-radius:6px;border:1px solid rgba(255,255,255,0.3);background:' + c + ';cursor:pointer;';
+                    b.title = c;
+                    b.onclick = () => applyNotebookMainColor(c, document.getElementById('notebook_main_glowChk').checked);
+                    sw.appendChild(b);
+                });
+            }
+            ta.addEventListener('scroll', () => { const inner = document.getElementById('notepad_overlayInner'); if (inner) inner.style.transform = 'translateY(' + (-ta.scrollTop) + 'px)'; });
+            const rec = () => { notebookMainSel.s = ta.selectionStart; notebookMainSel.e = ta.selectionEnd; };
+            ta.addEventListener('mouseup', rec);
+            ta.addEventListener('keyup', rec);
+            ta.addEventListener('select', rec);
+            renderMainNotebookOverlay();
+        }
+        function applyNotebookMainColor(color, glow) {
+            const ta = document.getElementById('notepad');
+            if (!ta) return;
+            const s = notebookMainSel.s, e = notebookMainSel.e;
+            if (s === e) { if (window.showToast) showToast('请先用鼠标选中要上色的文字'); else alert('请先选中文字'); return; }
+            const text = ta.value.substring(s, e);
+            if (!text) return;
+            let marks = getNotebookMainMarks().filter(m => (m.start + (m.text || '').length) <= s || m.start >= e);
+            marks.push({ text: text, color: color, glow: !!glow, start: s });
+            persistNotebookMainMarks(marks);
+            renderMainNotebookOverlay();
+        }
+        function clearNotebookMainColor() {
+            const ta = document.getElementById('notepad');
+            if (!ta) return;
+            const s = notebookMainSel.s, e = notebookMainSel.e;
+            if (s === e) { if (window.showToast) showToast('请先用鼠标选中要清除颜色的文字'); else alert('请先选中文字'); return; }
+            let marks = getNotebookMainMarks().filter(m => (m.start + (m.text || '').length) <= s || m.start >= e);
+            persistNotebookMainMarks(marks);
+            renderMainNotebookOverlay();
         }
 
         // 只改显示（拖动色轮时高频调用，不落盘）
@@ -11541,6 +11622,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             setupCardSortDrag();
             updateTxtFilesList();
             loadFontSizeSetting();
+            initMainNotebookColor();
             
             // 加载卡牌顺序
             loadCardOrder();
