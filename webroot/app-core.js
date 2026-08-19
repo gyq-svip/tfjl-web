@@ -3372,9 +3372,12 @@
                 // 打开上色弹窗时收起整篇色盘，避免两个浮层重叠
                 const cp = document.getElementById('notebook_main_colorPopup');
                 if (cp) cp.style.display = 'none';
-                // 懒初始化选中专用色轮
+                // 懒初始化选中专用色轮：松手即自动应用到选中文字（不需再点按钮）
                 if (pop && pop.style.display === 'block') {
-                    setupNotebookColorWheel('notebook_main_sel', null);
+                    setupNotebookColorWheel('notebook_main_sel', (hex) => {
+                        const glow = document.getElementById('notebook_main_glowChk')?.checked;
+                        applyNotebookMainColor(hex, !!glow);
+                    });
                     syncNotebookWheelUI('notebook_main_sel', notebookColorCfg.color);
                 }
                 return;
@@ -3385,7 +3388,10 @@
             const pop = document.getElementById(windowId + '_selColorPopup');
             if (pop) pop.style.display = (pop.style.display === 'block') ? 'none' : 'block';
             if (pop && pop.style.display === 'block') {
-                setupNotebookColorWheel(windowId + '_sel', null);
+                setupNotebookColorWheel(windowId + '_sel', (hex) => {
+                    const glow = document.getElementById(windowId + '_glowChk')?.checked;
+                    applyNotebookSelectionColor(windowId, hex, !!glow);
+                });
                 syncNotebookWheelUI(windowId + '_sel', notebookColorCfg.color);
             }
         }
@@ -3653,7 +3659,7 @@
         }
 
         // 首次展开时初始化色轮（canvas 尺寸 + 点击/拖动事件）。onApply(hex,remember) 在松手时调用（整体换色用；选中上色可不传）
-        function setupNotebookColorWheel(prefix, onApply) {
+        function setupNotebookColorWheel(prefix, onApply, onPreview) {
             const canvas = document.getElementById(prefix + '_wheel');
             const bar = document.getElementById(prefix + '_vBar');
             if (!canvas || canvas.dataset.inited === '1') return;
@@ -3677,7 +3683,7 @@
                 s.s = Math.min(1, Math.sqrt(nx * nx + ny * ny));
                 if (s.v < 0.15) s.v = 1;   // 亮度太低时点色轮看不出变化，自动提亮
                 const hex = nbHsvToHex(s.h, s.s, s.v);
-                if (onApply) previewNotebookColorLive(hex);
+                if (onPreview) onPreview(hex);   // 拖动时的实时预览（整篇色才需要）
                 syncNotebookWheelUI(prefix, hex);
                 return hex;
             };
@@ -3687,7 +3693,7 @@
                 const s = st();
                 s.v = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
                 const hex = nbHsvToHex(s.h, s.s, s.v);
-                if (onApply) previewNotebookColorLive(hex);
+                if (onPreview) onPreview(hex);
                 syncNotebookWheelUI(prefix, hex);
                 return hex;
             };
@@ -3702,7 +3708,7 @@
                     const onUp = () => {
                         document.removeEventListener('mousemove', onMove, true);
                         document.removeEventListener('mouseup', onUp, true);
-                        if (onApply) onApply(hex, true);   // 松手才落盘 + 记进自选色
+                        if (onApply) onApply(hex);   // 松手即应用（整篇色落盘 / 选中上色自动应用）
                     };
                     document.addEventListener('mousemove', onMove, true);
                     document.addEventListener('mouseup', onUp, true);
@@ -3721,7 +3727,7 @@
             pop.style.display = show ? 'block' : 'none';
             if (show) {
                 renderNotebookColorSwatches(windowId);
-                setupNotebookColorWheel(windowId, (hex, remember) => applyNotebookColor(windowId, hex, remember));
+                setupNotebookColorWheel(windowId, (hex) => applyNotebookColor(windowId, hex, true), (hex) => previewNotebookColorLive(hex));
                 syncNotebookWheelUI(windowId, notebookColorCfg.color);
                 setTimeout(() => {
                     const docClose = (e) => {
