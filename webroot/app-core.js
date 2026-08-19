@@ -2864,14 +2864,24 @@
                     </div>
                     <div style="position: relative;">
                         <button id="${windowId}_selColorBtn" onclick="toggleSelColorPopup('${windowId}')" title="选中文字上色" style="background:rgba(255,255,255,0.08);border:none;color:#fff;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:0.9rem;">🖌</button>
-                        <div id="${windowId}_selColorPopup" onmousedown="event.stopPropagation()" style="display:none;position:absolute;top:118%;right:0;z-index:20;width:212px;background:linear-gradient(160deg,rgba(40,40,68,0.98),rgba(26,26,48,0.98));border:1px solid rgba(255,215,0,0.35);border-radius:12px;padding:12px;box-shadow:0 8px 30px rgba(0,0,0,0.6);">
-                            <div style="font-size:0.76rem;font-weight:bold;color:#ffd700;margin-bottom:8px;">🖌 选中文字上色</div>
-                            <div id="${windowId}_swatches" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;"></div>
-                            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-                                <input type="color" id="${windowId}_customColor" value="#ffeb3b" style="width:34px;height:28px;border:none;background:none;cursor:pointer;padding:0;">
-                                <button onclick="applyNotebookSelectionColor('${windowId}', document.getElementById('${windowId}_customColor').value, document.getElementById('${windowId}_glowChk').checked)" style="flex:1;background:rgba(255,215,0,0.18);border:1px solid rgba(255,215,0,0.35);color:#ffd700;padding:5px;border-radius:6px;cursor:pointer;font-size:0.74rem;">应用自定义色</button>
+                        <div id="${windowId}_selColorPopup" onmousedown="event.stopPropagation()" style="display:none;position:absolute;top:118%;right:0;z-index:20;width:158px;background:linear-gradient(160deg,rgba(40,40,68,0.98),rgba(26,26,48,0.98));border:1px solid rgba(255,215,0,0.35);border-radius:12px;padding:10px 12px;box-shadow:0 8px 30px rgba(0,0,0,0.6);">
+                            <div style="font-size:0.76rem;font-weight:bold;color:#ffd700;margin-bottom:8px;white-space:nowrap;">🖌 选中文字上色</div>
+                            <div style="position:relative;width:132px;height:132px;margin:0 auto 9px;">
+                                <canvas id="${windowId}_sel_wheel" style="width:132px;height:132px;border-radius:50%;display:block;cursor:crosshair;box-shadow:0 0 0 1px rgba(255,255,255,0.28),0 4px 14px rgba(0,0,0,0.55);"></canvas>
+                                <div id="${windowId}_sel_wheelDot" style="position:absolute;left:66px;top:66px;width:14px;height:14px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 5px rgba(0,0,0,0.9);transform:translate(-50%,-50%);pointer-events:none;"></div>
                             </div>
-                            <label style="display:flex;align-items:center;gap:6px;font-size:0.74rem;color:#c9c9dd;margin-bottom:10px;cursor:pointer;"><input type="checkbox" id="${windowId}_glowChk" checked> 动态呼吸发光</label>
+                            <div style="display:flex;align-items:center;gap:6px;margin-bottom:9px;">
+                                <span style="font-size:0.58rem;color:#9a9ab0;flex-shrink:0;">亮度</span>
+                                <div id="${windowId}_sel_vBar" style="position:relative;flex:1;height:12px;border-radius:6px;cursor:pointer;border:1px solid rgba(255,255,255,0.25);background:linear-gradient(to right,#000,#fff);">
+                                    <div id="${windowId}_sel_vDot" style="position:absolute;left:100%;top:50%;width:14px;height:14px;border-radius:50%;background:#fff;border:2px solid rgba(0,0,0,0.5);box-shadow:0 1px 4px rgba(0,0,0,0.7);transform:translate(-50%,-50%);pointer-events:none;"></div>
+                                </div>
+                            </div>
+                            <div style="display:flex;align-items:center;gap:7px;margin-bottom:8px;">
+                                <span id="${windowId}_sel_preview" style="width:20px;height:20px;border-radius:50%;background:#e0e0e0;border:1px solid rgba(255,255,255,0.6);flex-shrink:0;"></span>
+                                <span id="${windowId}_sel_hexTxt" style="font-size:0.66rem;color:#c9c9dd;font-family:Consolas,monospace;">#e0e0e0</span>
+                            </div>
+                            <button onclick="applyNotebookSelectionColor('${windowId}', nbGetWheelHex('${windowId}_sel'), document.getElementById('${windowId}_glowChk').checked)" style="width:100%;background:rgba(255,215,0,0.18);border:1px solid rgba(255,215,0,0.35);color:#ffd700;padding:5px;border-radius:6px;cursor:pointer;font-size:0.74rem;margin-bottom:8px;">✓ 应用到选中文字</button>
+                            <label style="display:flex;align-items:center;gap:6px;font-size:0.74rem;color:#c9c9dd;margin-bottom:8px;cursor:pointer;"><input type="checkbox" id="${windowId}_glowChk" checked> 动态呼吸发光</label>
                             <button onclick="clearNotebookSelectionColor('${windowId}')" style="width:100%;background:rgba(244,67,54,0.18);border:1px solid rgba(244,67,54,0.35);color:#f44336;padding:6px;border-radius:6px;cursor:pointer;font-size:0.74rem;">🧹 清除选中颜色</button>
                             <button onclick="clearAllNotebookSelectionColor('${windowId}')" style="width:100%;margin-top:6px;background:rgba(244,67,54,0.28);border:1px solid rgba(244,67,54,0.5);color:#ff8a80;padding:6px;border-radius:6px;cursor:pointer;font-size:0.74rem;">🗑️ 清除全部颜色</button>
                             <div style="font-size:0.6rem;color:#9a9ab0;margin-top:8px;text-align:center;">先在记事本里用鼠标选中要上色的字</div>
@@ -2976,6 +2986,7 @@
             textarea.addEventListener('scroll', () => {
                 const inner = document.getElementById(windowId + '_overlayInner');
                 if (inner) inner.style.transform = 'translateY(' + (-textarea.scrollTop) + 'px)';
+                nbSyncOverlayGutterById(windowId); // 滚动条出现/消失时宽度会变，需重新对齐
             });
             // 实时记录选区（点击🖌会让 textarea 失焦、选区丢失，故提前缓存）
             const recordNbSel = () => {
@@ -3277,6 +3288,16 @@
             document.head.appendChild(st);
         }
 
+        // 让 overlay 右边距 = 12px + 文本区滚动条宽度，保证出现滚动条时彩色层与 textarea 文字宽度一致（否则越往后越错位）
+        function nbSyncOverlayGutter(ta, overlayEl) {
+            if (!ta || !overlayEl) return;
+            const sbw = ta.offsetWidth - ta.clientWidth; // 滚动条占用宽度（无滚动条为 0）
+            overlayEl.style.paddingRight = (12 + sbw) + 'px';
+        }
+        function nbSyncOverlayGutterById(windowId) {
+            nbSyncOverlayGutter(document.getElementById(windowId + '_content'), document.getElementById(windowId + '_overlay'));
+        }
+
         function renderNotebookOverlay(windowId) {
             const ta = document.getElementById(windowId + '_content');
             const inner = document.getElementById(windowId + '_overlayInner');
@@ -3295,6 +3316,7 @@
             html += escapeHtml(value.slice(cursor));
             inner.innerHTML = html;
             inner.style.transform = 'translateY(' + (-ta.scrollTop) + 'px)';
+            nbSyncOverlayGutterById(windowId);
         }
 
         function applyNotebookSelectionColor(windowId, color, glow) {
@@ -3347,6 +3369,11 @@
                 // 打开上色弹窗时收起整篇色盘，避免两个浮层重叠
                 const cp = document.getElementById('notebook_main_colorPopup');
                 if (cp) cp.style.display = 'none';
+                // 懒初始化选中专用色轮
+                if (pop && pop.style.display === 'block') {
+                    setupNotebookColorWheel('notebook_main_sel', null);
+                    syncNotebookWheelUI('notebook_main_sel', notebookColorCfg.color);
+                }
                 return;
             }
             const ta = document.getElementById(windowId + '_content');
@@ -3354,6 +3381,10 @@
             if (win && ta) { win._selS = ta.selectionStart; win._selE = ta.selectionEnd; }
             const pop = document.getElementById(windowId + '_selColorPopup');
             if (pop) pop.style.display = (pop.style.display === 'block') ? 'none' : 'block';
+            if (pop && pop.style.display === 'block') {
+                setupNotebookColorWheel(windowId + '_sel', null);
+                syncNotebookWheelUI(windowId + '_sel', notebookColorCfg.color);
+            }
         }
 
         // ========== 主界面「项目记事本」(#notepad) 的逐字彩色接入 ==========
@@ -3381,6 +3412,7 @@
             html += escapeHtml(value.slice(cursor));
             inner.innerHTML = html;
             inner.style.transform = 'translateY(' + (-ta.scrollTop) + 'px)';
+            nbSyncOverlayGutter(ta, document.getElementById('notepad_overlay'));
         }
         function persistNotebookMainMarks(marks) {
             notebookMarksStore[NOTEBOOK_MAIN_KEY] = marks || [];
@@ -3400,7 +3432,7 @@
                     sw.appendChild(b);
                 });
             }
-            ta.addEventListener('scroll', () => { const inner = document.getElementById('notepad_overlayInner'); if (inner) inner.style.transform = 'translateY(' + (-ta.scrollTop) + 'px)'; });
+            ta.addEventListener('scroll', () => { const inner = document.getElementById('notepad_overlayInner'); if (inner) inner.style.transform = 'translateY(' + (-ta.scrollTop) + 'px)'; nbSyncOverlayGutter(ta, document.getElementById('notepad_overlay')); });
             const rec = () => { notebookMainSel.s = ta.selectionStart; notebookMainSel.e = ta.selectionEnd; };
             ta.addEventListener('mouseup', rec);
             ta.addEventListener('keyup', rec);
@@ -3532,34 +3564,40 @@
             ctx.putImageData(img, 0, 0);
         }
 
-        // 把 hex 同步到色轮 UI（指针位置 / 亮度条 / 预览 / hex 文本）
-        function syncNotebookWheelUI(windowId, hex) {
-            const canvas = document.getElementById(windowId + '_wheel');
+        // 把 hex 同步到色轮 UI（指针位置 / 亮度条 / 预览 / hex 文本）。prefix 为该取色盘的 id 前缀
+        function syncNotebookWheelUI(prefix, hex) {
+            const canvas = document.getElementById(prefix + '_wheel');
             if (!canvas || canvas.dataset.inited !== '1') return;
             const hsv = nbHexToHsv(hex);
             // 纯黑/纯灰反推不出色相饱和，沿用上一次的，避免亮度拉到 0 再拉回来色相丢失
-            const prev = nbWheelState[windowId];
+            const prev = nbWheelState[prefix];
             if (prev) {
                 if (hsv[2] === 0) { hsv[0] = prev.h; hsv[1] = prev.s; }
                 else if (hsv[1] === 0) { hsv[0] = prev.h; }
             }
-            nbWheelState[windowId] = { h: hsv[0], s: hsv[1], v: hsv[2] };
+            nbWheelState[prefix] = { h: hsv[0], s: hsv[1], v: hsv[2] };
             const R = (canvas.clientWidth || 132) / 2;
-            const dot = document.getElementById(windowId + '_wheelDot');
+            const dot = document.getElementById(prefix + '_wheelDot');
             if (dot) {
                 const rad = hsv[0] * Math.PI / 180;
                 dot.style.left = (R + Math.cos(rad) * hsv[1] * R) + 'px';
                 dot.style.top = (R + Math.sin(rad) * hsv[1] * R) + 'px';
                 dot.style.background = hex;
             }
-            const bar = document.getElementById(windowId + '_vBar');
+            const bar = document.getElementById(prefix + '_vBar');
             if (bar) bar.style.background = 'linear-gradient(to right,#000,' + nbHsvToHex(hsv[0], hsv[1], 1) + ')';
-            const vDot = document.getElementById(windowId + '_vDot');
+            const vDot = document.getElementById(prefix + '_vDot');
             if (vDot) { vDot.style.left = (hsv[2] * 100) + '%'; vDot.style.background = hex; }
-            const pv = document.getElementById(windowId + '_preview');
+            const pv = document.getElementById(prefix + '_preview');
             if (pv) pv.style.background = hex;
-            const tx = document.getElementById(windowId + '_hexTxt');
+            const tx = document.getElementById(prefix + '_hexTxt');
             if (tx) tx.textContent = hex;
+        }
+
+        // 读取某取色盘当前选中的颜色（供「应用」按钮取用）
+        function nbGetWheelHex(prefix) {
+            const s = nbWheelState[prefix] || { h: 0, s: 0, v: 0.88 };
+            return nbHsvToHex(s.h, s.s, s.v);
         }
 
         // 渲染色块：默认色 + 2 个自选色（空槽显示虚线圆占位）
@@ -3578,10 +3616,10 @@
             box.innerHTML = html;
         }
 
-        // 首次展开时初始化色轮（canvas 尺寸 + 点击/拖动事件）
-        function setupNotebookColorWheel(windowId) {
-            const canvas = document.getElementById(windowId + '_wheel');
-            const bar = document.getElementById(windowId + '_vBar');
+        // 首次展开时初始化色轮（canvas 尺寸 + 点击/拖动事件）。onApply(hex,remember) 在松手时调用（整体换色用；选中上色可不传）
+        function setupNotebookColorWheel(prefix, onApply) {
+            const canvas = document.getElementById(prefix + '_wheel');
+            const bar = document.getElementById(prefix + '_vBar');
             if (!canvas || canvas.dataset.inited === '1') return;
             canvas.dataset.inited = '1';
             const SIZE = 132, dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -3589,7 +3627,7 @@
             canvas.height = Math.round(SIZE * dpr);
             drawNotebookWheel(canvas);
 
-            const st = () => (nbWheelState[windowId] = nbWheelState[windowId] || { h: 0, s: 0, v: 0.88 });
+            const st = () => (nbWheelState[prefix] = nbWheelState[prefix] || { h: 0, s: 0, v: 0.88 });
 
             // 色轮：点任意位置 / 按住拖动（超出圆边则贴边取满饱和度）
             const pickFromWheel = (e) => {
@@ -3603,8 +3641,8 @@
                 s.s = Math.min(1, Math.sqrt(nx * nx + ny * ny));
                 if (s.v < 0.15) s.v = 1;   // 亮度太低时点色轮看不出变化，自动提亮
                 const hex = nbHsvToHex(s.h, s.s, s.v);
-                previewNotebookColorLive(hex);
-                syncNotebookWheelUI(windowId, hex);
+                if (onApply) previewNotebookColorLive(hex);
+                syncNotebookWheelUI(prefix, hex);
                 return hex;
             };
             // 亮度条：点 / 拖
@@ -3613,8 +3651,8 @@
                 const s = st();
                 s.v = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
                 const hex = nbHsvToHex(s.h, s.s, s.v);
-                previewNotebookColorLive(hex);
-                syncNotebookWheelUI(windowId, hex);
+                if (onApply) previewNotebookColorLive(hex);
+                syncNotebookWheelUI(prefix, hex);
                 return hex;
             };
 
@@ -3628,7 +3666,7 @@
                     const onUp = () => {
                         document.removeEventListener('mousemove', onMove, true);
                         document.removeEventListener('mouseup', onUp, true);
-                        applyNotebookColor(windowId, hex, true);   // 松手才落盘 + 记进自选色
+                        if (onApply) onApply(hex, true);   // 松手才落盘 + 记进自选色
                     };
                     document.addEventListener('mousemove', onMove, true);
                     document.addEventListener('mouseup', onUp, true);
@@ -3647,7 +3685,7 @@
             pop.style.display = show ? 'block' : 'none';
             if (show) {
                 renderNotebookColorSwatches(windowId);
-                setupNotebookColorWheel(windowId);
+                setupNotebookColorWheel(windowId, (hex, remember) => applyNotebookColor(windowId, hex, remember));
                 syncNotebookWheelUI(windowId, notebookColorCfg.color);
                 setTimeout(() => {
                     const docClose = (e) => {
