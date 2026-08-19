@@ -122,3 +122,18 @@ $ErrorActionPreference = $prevEAP
 if ($po -ne 0) { Write-Host "ERROR: git push origin 失败 (exit=$po)" -ForegroundColor Red; exit 1 }
 Write-Host "Published: v$ver (updater.json->Pages; installer->Gitee release only)" -ForegroundColor Green
 Write-Host "NOTE: exe 已上传 Gitee 发行版 v$ver（主,免登录）；旧根用户仍需手动重装一次。" -ForegroundColor Yellow
+
+# ============ 自动测试：验证 Gitee 下载直链可达（自动更新可用性自检） ============
+# ⚠️ 用 Invoke-WebRequest（Gitee 放行），绝不用 curl.exe（会被 WAF 拦成 400 假象）。
+Write-Host "--- 自动测试下载直链 ---" -ForegroundColor Cyan
+try {
+    $dlUrl = "https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/releases/download/v$ver/tfjl-assistant_$($ver)_x64-setup.exe"
+    $r = Invoke-WebRequest -Uri $dlUrl -Method Head -TimeoutSec 30 -ErrorAction Stop
+    if ($r.StatusCode -eq 200) {
+        Write-Host "✅ 自动更新可用：下载直链 HTTP 200，大小 $([int]($r.Headers['Content-Length'])/1MB) MB" -ForegroundColor Green
+    } else {
+        Write-Host "⚠️ 下载直链返回状态码 $($r.StatusCode)，请手动核查。" -ForegroundColor Yellow
+    }
+} catch {
+    Write-Host "⚠️ 下载直链自检失败：$($_.Exception.Message)（发布可能仍成功，请手动打开 App 点检查更新确认）" -ForegroundColor Yellow
+}
