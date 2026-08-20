@@ -5,7 +5,7 @@
 //      提升 CACHE_VERSION 触发 activate 清空所有 tfjl- 缓存，确保拿到最新前端（含分享密码框）
 // ============================================================
 
-const CACHE_VERSION = 's1.0.187';
+const CACHE_VERSION = 's1.0.188';
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
@@ -69,6 +69,13 @@ self.addEventListener('fetch', (event) => {
 
     // 不缓存 API 请求
     if (NEVER_CACHE.some(pattern => url.hostname.includes(pattern))) {
+        return;
+    }
+
+    // 皮肤元数据 JSON（cards/fusions/skin-attributes/registry 等）随时随版本变动，
+    // 且 github.io 偶发不可达时 networkFirst 会回退到旧缓存 → 导致「英雄卡消失」（如 水人）。
+    // 故这些 JSON 永远直连拿最新，不走 SW 缓存；图片 .skin/.png 仍走 SWR 离线可用。
+    if (url.hostname.includes('github.io') && url.pathname.includes('/skins/') && url.pathname.endsWith('.json')) {
         return;
     }
 
