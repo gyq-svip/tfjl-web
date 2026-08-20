@@ -16972,32 +16972,18 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
         }
         window.recordLoginEvent = recordLoginEvent;
 
-        // ---- 公共 Gist 汇总：首次使用懒创建登录 Gist，并把其 id 登记进 INDEX gist 跨设备共享 ----
-        let _loginGistId = '';                       // 运行时缓存
+        // ---- 公共 Gist 汇总：登录打卡记录写入固定的公共 Gist（id 已写死，不再运行时动态创建） ----
+        let _loginGistId = '';                       // 运行时缓存（兼容旧逻辑，实际直接用常量）
         const LOGIN_GIST_FILENAME = 'login-log.json';
         const LOGIN_INDEX_FILENAME = 'login_index.json';
-        const LOGIN_INDEX_GIST_ID = GIST_ID;         // 复用 INDEX gist 登记 loginGistId
+        const LOGIN_INDEX_GIST_ID = GIST_ID;         // 复用 INDEX gist 登记 loginGistId（兜底用）
+        // ⚠️ 写死固定 ID：登录打卡汇总公共 Gist（首次部署后自动创建，已确认存在且有人打卡；
+        //    用户已在 GitHub 后台可见，固定后不再运行时动态创建，避免多设备竞态/依赖 INDEX gist）
+        const LOGIN_GIST_ID = '51e7030023fa57de40aaf59bc48e9969';
 
         async function getLoginGistId() {
-            if (_loginGistId) return _loginGistId;
-            const local = localStorage.getItem('TFJL_LOGIN_GIST_ID');
-            if (local) { _loginGistId = local; return local; }
-            try {
-                const idx = await fetch('https://api.github.com/gists/' + LOGIN_INDEX_GIST_ID, { headers: { 'Accept': 'application/vnd.github.v3+json' } });
-                if (idx.ok) {
-                    const data = await idx.json();
-                    const f = data.files && data.files[LOGIN_INDEX_FILENAME];
-                    if (f && f.content) {
-                        const obj = JSON.parse(f.content);
-                        if (obj.loginGistId) {
-                            _loginGistId = obj.loginGistId;
-                            localStorage.setItem('TFJL_LOGIN_GIST_ID', _loginGistId);
-                            return _loginGistId;
-                        }
-                    }
-                }
-            } catch (e) { /* 忽略 */ }
-            return await createLoginGist();
+            // 直接使用固定 Gist ID（GitHub 后台 gyq-svip 账号可见：描述「TFJL 登录打卡汇总(跨设备)」）
+            return LOGIN_GIST_ID;
         }
 
         async function createLoginGist() {
