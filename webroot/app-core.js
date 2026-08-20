@@ -12176,6 +12176,29 @@ function registerHeartbeatWithRust() {
 function hasGistToken() {
     return !!getGistToken();
 }
+// 管理员「心跳自检」按钮：重新注册并打印醒目诊断（排查 P3 等 App 掉线）
+function runHeartbeatSelfCheck() {
+    const isTauri = !!(window.__TAURI__ || window.__TAURI_INTERNALS__);
+    const token = getGistToken();
+    const gid = COUNTER_GIST_ID || localStorage.getItem('counter_gist_id') || '';
+    const push = (level, msg) => { try { window.__consoleLogs.push({ time: new Date().toTimeString().slice(0, 8), level, msg }); if (window.__consoleLogs.length > 1000) window.__consoleLogs.splice(0, 100); } catch (e) {} };
+    push('info', '════════ ❤️ 心跳自检开始 ════════');
+    push(isTauri ? 'info' : 'error', '[心跳自检] Tauri 环境 = ' + isTauri + (isTauri ? '（App，应有 Rust 心跳）' : '（网页版，无 Rust 心跳，靠 JS 定时器）'));
+    push(token ? 'info' : 'error', '[心跳自检] getGistToken = ' + (token ? ('有(' + token.length + '字符, 前缀' + token.slice(0, 6) + ')') : '空！'));
+    push(gid ? 'info' : 'error', '[心跳自检] counterGistId = ' + (gid || '空！'));
+    if (!isTauri) { push('warn', '[心跳自检] 非桌面 App，Rust 心跳不适用，网页版靠 JS 30min 定时器（后台/锁屏会节流，易掉线）'); }
+    if (isTauri && (!token || !gid)) { push('error', '[心跳自检] 缺 token 或 gistId，Rust 心跳无法注册——这就是掉线根因！去管理员设置填 Token'); }
+    if (isTauri && token && gid) {
+        push('info', '[心跳自检] 正在调用 register_heartbeat…');
+        _statsInvoke('register_heartbeat', { deviceId: getDeviceId(), nick: _myNick(), token: token, counterGistId: gid })
+            .then(() => { push('info', '[心跳自检] ✅ register_heartbeat 成功！Rust 心跳已注册，托盘挂机将每5分钟保活'); if (typeof adminRefreshConsoleLog === 'function') adminRefreshConsoleLog(); })
+            .catch((e) => { push('error', '[心跳自检] ❌ register_heartbeat 失败：' + e + '（可能缺 capabilities 权限 allow-register-heartbeat，需重打包）'); if (typeof adminRefreshConsoleLog === 'function') adminRefreshConsoleLog(); });
+    }
+    push('info', '════════ 心跳自检输出结束（看上面 ✅/❌）════════');
+    if (typeof adminRefreshConsoleLog === 'function') adminRefreshConsoleLog();
+    if (typeof adminLogSetFilter === 'function') adminLogSetFilter('all'); // 自检结果混在 info/error，切「全部」最稳
+}
+window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
 
         // 当前统计数据
         let counterData = null;

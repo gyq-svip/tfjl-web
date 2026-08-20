@@ -2009,6 +2009,7 @@
                             <button id="adminLogZoomResetBtn" onclick="adminLogZoomReset()" title="重置缩放" style="background:rgba(255,255,255,0.12);color:#fff;border:none;padding:5px 8px;border-radius:6px;cursor:pointer;font-size:0.7rem;margin-right:4px;">100%</button>
                             <button onclick="adminLogZoomIn()" title="放大字体" style="background:rgba(255,255,255,0.12);color:#fff;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:0.75rem;margin-right:6px;">A+</button>
                             <button onclick="adminRefreshConsoleLog()" style="background:linear-gradient(135deg,#00bcd4,#0097a7);color:white;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.8rem;margin-right:6px;">🔄 刷新</button>
+                            <button onclick="runHeartbeatSelfCheck()" title="重新注册 Rust 心跳并打印诊断结果（排查 P3 掉线）" style="background:linear-gradient(135deg,#ec4899,#be185d);color:white;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.8rem;margin-right:6px;">❤️ 心跳自检</button>
                             <button onclick="window.__consoleLogs=[];adminRefreshConsoleLog();" style="background:linear-gradient(135deg,#ef4444,#dc2626);color:white;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.8rem;">🗑 清空</button>
                         </div>
                     </div>
@@ -2507,7 +2508,7 @@
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;opacity:0.1;" ondblclick="onVersionTagForceRefresh()">s20260821-47 · s1.0.190</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;opacity:0.1;" ondblclick="onVersionTagForceRefresh()">s20260821-48 · s1.0.191</span>
                 <div class="version-tooltip">版本 s20260820-41 · s1.0.184（双击强制刷新）</div>
             </div>
             <script>/* 悬浮提示自动跟随版本号，避免 bump 时漏改 tooltip */
