@@ -11658,6 +11658,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     main.classList.add('visible');
                     // 进入主界面后强制要求设置昵称（启动即弹；未设过才弹，老用户已设过不弹）
                     if (typeof ensureNickname === 'function') ensureNickname(true);
+                    // 已设过昵称的用户在此补记登录打卡（首设用户由 ensureNickname 保存后记录）
+                    if (localStorage.getItem('TFJL_UserName')) {
+                        if (typeof recordLoginEvent === 'function') recordLoginEvent();
+                    }
                 };
                 const showLogin = () => { overlay.style.display = 'flex'; };
                 // 已登录（localStorage 或磁盘 auth_state.json）→ 直接进入，完全不显示密码门
@@ -16949,6 +16953,80 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             el.textContent = nick;
         }
         window.refreshProfileLabel = refreshProfileLabel;
+
+        // ========== 登录打卡记录（按昵称，本地 localStorage） ==========
+        // 每次成功进入主界面记录一次：{ nick, ts }
+        function recordLoginEvent() {
+            try {
+                const nick = localStorage.getItem('TFJL_UserName') || '匿名用户';
+                const ts = Date.now();
+                let log = [];
+                try { log = JSON.parse(localStorage.getItem('TFJL_LoginLog') || '[]'); } catch (e) { log = []; }
+                if (!Array.isArray(log)) log = [];
+                log.push({ nick, ts });
+                if (log.length > 5000) log = log.slice(-5000); // 防无限制增长
+                localStorage.setItem('TFJL_LoginLog', JSON.stringify(log));
+            } catch (e) { /* 忽略存储异常 */ }
+        }
+        window.recordLoginEvent = recordLoginEvent;
+
+        // 打开登录记录面板（管理员菜单入口）
+        function openLoginStats() {
+            const box = document.getElementById('loginStatsContent');
+            if (box) box.innerHTML = buildLoginStatsHTML();
+            const modal = document.getElementById('loginStatsModal');
+            if (modal) modal.style.display = 'flex';
+        }
+        window.openLoginStats = openLoginStats;
+
+        function buildLoginStatsHTML() {
+            let log = [];
+            try { log = JSON.parse(localStorage.getItem('TFJL_LoginLog') || '[]'); } catch (e) { log = []; }
+            if (!Array.isArray(log)) log = [];
+            const fmt = (ts) => {
+                const d = new Date(ts);
+                const p = (n) => String(n).padStart(2, '0');
+                return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+            };
+            // 按昵称聚合
+            const byNick = {};
+            for (const r of log) {
+                const n = r.nick || '匿名用户';
+                if (!byNick[n]) byNick[n] = { count: 0, first: r.ts, last: r.ts, daily: {} };
+                const s = byNick[n];
+                s.count++;
+                if (r.ts < s.first) s.first = r.ts;
+                if (r.ts > s.last) s.last = r.ts;
+                const day = fmt(r.ts).slice(0, 10);
+                if (!s.daily[day]) s.daily[day] = [];
+                s.daily[day].push(r.ts);
+            }
+            const nicks = Object.keys(byNick).sort((a, b) => byNick[b].last - byNick[a].last);
+            let html = '';
+            html += `<div style="margin-bottom:10px;color:#ffd700;font-size:0.95rem;">总计登录 <strong>${log.length}</strong> 次 · 不同昵称 <strong>${nicks.length}</strong> 个</div>`;
+            if (nicks.length === 0) {
+                html += `<div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;">暂无登录记录</div>`;
+            } else {
+                for (const n of nicks) {
+                    const s = byNick[n];
+                    const days = Object.keys(s.daily).sort().reverse();
+                    let dailyHTML = '';
+                    for (const d of days) {
+                        const times = s.daily[d].slice().sort((a, b) => a - b).map(t => fmt(t).slice(11)).join('、');
+                        dailyHTML += `<div style="margin:2px 0;color:#c5cae9;"><span style="color:#80deea;">${d}</span>：${times}</div>`;
+                    }
+                    html += `<div style="border:1px solid rgba(255,215,0,0.25);border-radius:10px;padding:10px 12px;margin-bottom:8px;background:rgba(255,255,255,0.03);">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                            <strong style="color:#ffd700;">👤 ${escapeHtml(n)}</strong>
+                            <span style="color:#a5d6a7;font-size:0.85rem;">共 ${s.count} 次</span>
+                        </div>
+                        <div style="font-size:0.78rem;color:rgba(255,255,255,0.55);margin-bottom:6px;">首次 ${fmt(s.first)} · 最近 ${fmt(s.last)}</div>
+                        <div style="max-height:160px;overflow:auto;">${dailyHTML}</div>
+                    </div>`;
+                }
+            }
+            return html;
+        }
         function openContributionCard(nickEnc) {
             const nick = decodeURIComponent(nickEnc);
             const repMap = computeReputation();
