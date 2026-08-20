@@ -1586,6 +1586,7 @@
         </div>
 
     <script defer src="color-picker.js?v=s1.0.180"></script>
+    <script defer src="app-damagecalc.js?v=s1.0.192"></script>
     <script defer src="app-core.js?v=s1.0.180"></script>
 
     <!-- 模态框：创建分类 -->
@@ -1730,6 +1731,10 @@
                     <div class="admin-menu-item" onclick="adminShowPage('apiMonitor')">
                         <span class="mi-emoji">📡</span>
                         <div class="mi-text"><div class="mi-title">API监控</div><div class="mi-sub">Token写入 / 限额</div></div>
+                    </div>
+                    <div class="admin-menu-item" onclick="adminShowPage('damageCalc')">
+                        <span class="mi-emoji">🧮</span>
+                        <div class="mi-text"><div class="mi-title">伤害测算</div><div class="mi-sub">火灵/鱼人/天使/法师</div></div>
                     </div>
                     <div class="admin-menu-item" onclick="openAuctionAdmin()">
                         <span class="mi-emoji">🏪</span>
@@ -2173,6 +2178,14 @@
                 </div>
             </div>
 
+            <div id="adminPageDamageCalc" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
+                    <button class="admin-btn admin-btn-secondary" onclick="adminShowMenu()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
+                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">🧮 伤害测算计算器</h3>
+                </div>
+                <div class="admin-section" id="damageCalcContent" style="max-height:62vh;overflow:auto;"></div>
+            </div>
+
             <div id="adminPageAnalytics" style="display:none;">
                 <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
                     <button class="admin-btn admin-btn-secondary" onclick="adminShowMenu()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
@@ -2508,7 +2521,7 @@
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;opacity:0.1;" ondblclick="onVersionTagForceRefresh()">s20260821-48 · s1.0.191</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;opacity:0.1;" ondblclick="onVersionTagForceRefresh()">s20260821-49 · s1.0.192</span>
                 <div class="version-tooltip">版本 s20260820-41 · s1.0.184（双击强制刷新）</div>
             </div>
             <script>/* 悬浮提示自动跟随版本号，避免 bump 时漏改 tooltip */
