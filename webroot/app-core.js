@@ -20282,6 +20282,8 @@ ${maSection}
             if (logStatsAdminPage2) logStatsAdminPage2.style.display = 'none';
             const apiMonPage = document.getElementById('adminPageApiMonitor');
             if (apiMonPage) apiMonPage.style.display = 'none';
+            const damageCalcPage2 = document.getElementById('adminPageDamageCalc');
+            if (damageCalcPage2) damageCalcPage2.style.display = 'none';
             updateBroadcastToggleStatus();
             adminRenderApiUsage();
         }
@@ -20306,6 +20308,8 @@ ${maSection}
             if (logStatsAdminPage3) logStatsAdminPage3.style.display = 'none';
             const loginStatsAdminPage = document.getElementById('adminPageLoginStats');
             if (loginStatsAdminPage) loginStatsAdminPage.style.display = 'none';
+            const damageCalcPage = document.getElementById('adminPageDamageCalc');
+            if (damageCalcPage) damageCalcPage.style.display = 'none';
 
             if (page === 'help') {
                 if (helpPage) helpPage.style.display = 'block';
@@ -20365,6 +20369,12 @@ ${maSection}
                 if (pageEl) {
                     pageEl.style.display = 'block';
                     refreshApiMonitor();
+                }
+            } else if (page === 'damageCalc') {
+                const pageEl = document.getElementById('adminPageDamageCalc');
+                if (pageEl) {
+                    pageEl.style.display = 'block';
+                    if (typeof renderDamageCalc === 'function') renderDamageCalc();
                 }
             }
         }
