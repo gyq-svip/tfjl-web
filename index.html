@@ -2162,8 +2162,8 @@
                     <div style="background:rgba(77,208,225,0.1);border-left:3px solid #4dd0e1;border-radius:6px;padding:12px;margin-bottom:15px;">
                         <div style="color:#4dd0e1;font-size:0.85rem;font-weight:500;">💡 说明</div>
                         <div style="color:rgba(255,255,255,0.6);font-size:0.75rem;margin-top:5px;">
-                            每次打开页面并登录即静默记录「昵称 + 时间戳」（客户端无感，普通用户不可见）。<br>
-                            以下按昵称汇总：今日登录名单、本周各人登录次数、累计登录排行榜。
+                            每次打开页面并登录即静默记录「昵称 + 时间戳」，汇总到<b>公共 Gist</b>（跨所有设备，客户端无感，普通用户不可见）。<br>
+                            以下按昵称汇总：今日登录名单、本周各人登录次数、累计登录排行榜（数据来源：全网汇总）。
                         </div>
                     </div>
                     <div id="adminLoginStatsContent">
@@ -2507,7 +2507,7 @@
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;opacity:0.1;" ondblclick="onVersionTagForceRefresh()">s20260820-44 · s1.0.187</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;opacity:0.1;" ondblclick="onVersionTagForceRefresh()">s20260821-45 · s1.0.188</span>
                 <div class="version-tooltip">版本 s20260820-41 · s1.0.184（双击强制刷新）</div>
             </div>
             <script>/* 悬浮提示自动跟随版本号，避免 bump 时漏改 tooltip */

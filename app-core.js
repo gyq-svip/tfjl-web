@@ -16954,7 +16954,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
         }
         window.refreshProfileLabel = refreshProfileLabel;
 
-        // ========== 登录打卡记录（按昵称，本地 localStorage） ==========
+        // ========== 登录打卡记录（本地 localStorage + 公共 Gist 跨设备汇总） ==========
         // 每次成功进入主界面记录一次：{ nick, ts }
         function recordLoginEvent() {
             try {
@@ -16967,20 +16967,124 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 if (log.length > 5000) log = log.slice(-5000); // 防无限制增长
                 localStorage.setItem('TFJL_LoginLog', JSON.stringify(log));
             } catch (e) { /* 忽略存储异常 */ }
+            // 异步汇总到公共 Gist（跨设备），失败静默忽略，不阻塞登录
+            if (typeof pushLoginEventToGist === 'function') pushLoginEventToGist();
         }
         window.recordLoginEvent = recordLoginEvent;
 
-        // 管理员面板「登录打卡」：渲染按昵称汇总的统计（今日名单/本周次数/累计排行）
-        function adminLoadLoginStats() {
+        // ---- 公共 Gist 汇总：首次使用懒创建登录 Gist，并把其 id 登记进 INDEX gist 跨设备共享 ----
+        let _loginGistId = '';                       // 运行时缓存
+        const LOGIN_GIST_FILENAME = 'login-log.json';
+        const LOGIN_INDEX_FILENAME = 'login_index.json';
+        const LOGIN_INDEX_GIST_ID = GIST_ID;         // 复用 INDEX gist 登记 loginGistId
+
+        async function getLoginGistId() {
+            if (_loginGistId) return _loginGistId;
+            const local = localStorage.getItem('TFJL_LOGIN_GIST_ID');
+            if (local) { _loginGistId = local; return local; }
+            try {
+                const idx = await fetch('https://api.github.com/gists/' + LOGIN_INDEX_GIST_ID, { headers: { 'Accept': 'application/vnd.github.v3+json' } });
+                if (idx.ok) {
+                    const data = await idx.json();
+                    const f = data.files && data.files[LOGIN_INDEX_FILENAME];
+                    if (f && f.content) {
+                        const obj = JSON.parse(f.content);
+                        if (obj.loginGistId) {
+                            _loginGistId = obj.loginGistId;
+                            localStorage.setItem('TFJL_LOGIN_GIST_ID', _loginGistId);
+                            return _loginGistId;
+                        }
+                    }
+                }
+            } catch (e) { /* 忽略 */ }
+            return await createLoginGist();
+        }
+
+        async function createLoginGist() {
+            const token = getGistToken();
+            if (!token) return '';
+            try {
+                const resp = await fetch('https://api.github.com/gists', {
+                    method: 'POST',
+                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': 'token ' + token },
+                    body: JSON.stringify({ description: 'TFJL 登录打卡汇总(跨设备)', public: true, files: { [LOGIN_GIST_FILENAME]: { content: '[]' } } })
+                });
+                if (!resp.ok) return '';
+                const data = await resp.json();
+                _loginGistId = data.id;
+                localStorage.setItem('TFJL_LOGIN_GIST_ID', _loginGistId);
+                // 把 id 登记进 INDEX gist，供其他设备发现（共享同一份汇总）
+                try {
+                    await fetch('https://api.github.com/gists/' + LOGIN_INDEX_GIST_ID, {
+                        method: 'PATCH',
+                        headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': 'token ' + token },
+                        body: JSON.stringify({ files: { [LOGIN_INDEX_FILENAME]: { content: JSON.stringify({ loginGistId: _loginGistId, createdAt: Date.now() }) } } })
+                    });
+                } catch (e) { /* 登记失败不影响本机写入 */ }
+                return _loginGistId;
+            } catch (e) { return ''; }
+        }
+
+        // 读取汇总日志（公共 Gist 优先；Gist 不可用则回退本地 localStorage）
+        async function fetchLoginLog() {
+            const id = await getLoginGistId();
+            if (id) {
+                try {
+                    const r = await fetch('https://api.github.com/gists/' + id, { headers: { 'Accept': 'application/vnd.github.v3+json' } });
+                    if (r.ok) {
+                        const data = await r.json();
+                        const f = data.files && data.files[LOGIN_GIST_FILENAME];
+                        if (f && f.content) {
+                            const arr = JSON.parse(f.content);
+                            if (Array.isArray(arr) && arr.length) return arr;
+                        }
+                    }
+                } catch (e) { /* 回退本地 */ }
+            }
+            // 回退：本地
+            try { const l = JSON.parse(localStorage.getItem('TFJL_LoginLog') || '[]'); if (Array.isArray(l)) return l; } catch (e) {}
+            return [];
+        }
+        window.fetchLoginLog = fetchLoginLog;
+
+        async function pushLoginEventToGist() {
+            try {
+                const id = await getLoginGistId();
+                if (!id) return;
+                const token = getGistToken();
+                if (!token) return;
+                // 读现有
+                const r = await fetch('https://api.github.com/gists/' + id, { headers: { 'Accept': 'application/vnd.github.v3+json' } });
+                if (!r.ok) return;
+                const data = await r.json();
+                let arr = [];
+                const f = data.files && data.files[LOGIN_GIST_FILENAME];
+                if (f && f.content) { try { arr = JSON.parse(f.content) || []; } catch (e) { arr = []; } }
+                if (!Array.isArray(arr)) arr = [];
+                arr.push({ nick: localStorage.getItem('TFJL_UserName') || '匿名用户', ts: Date.now() });
+                if (arr.length > 20000) arr = arr.slice(-20000);
+                await fetch('https://api.github.com/gists/' + id, {
+                    method: 'PATCH',
+                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': 'token ' + token },
+                    body: JSON.stringify({ files: { [LOGIN_GIST_FILENAME]: { content: JSON.stringify(arr) } } })
+                });
+            } catch (e) { /* 忽略 */ }
+        }
+        window.pushLoginEventToGist = pushLoginEventToGist;
+        window.recordLoginEvent = recordLoginEvent;
+
+        // 管理员面板「登录打卡」：从公共 Gist（跨设备汇总）读取并渲染（本地作兜底）
+        async function adminLoadLoginStats() {
             const box = document.getElementById('adminLoginStatsContent');
-            if (box) box.innerHTML = adminBuildLoginStatsHTML();
+            if (box) box.innerHTML = '<div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;">正在从公共 Gist 汇总…</div>';
+            let log = [];
+            try { log = await fetchLoginLog(); } catch (e) { log = []; }
+            if (box) box.innerHTML = adminBuildLoginStatsHTML(log);
         }
         window.adminLoadLoginStats = adminLoadLoginStats;
 
-        function adminBuildLoginStatsHTML() {
-            let log = [];
-            try { log = JSON.parse(localStorage.getItem('TFJL_LoginLog') || '[]'); } catch (e) { log = []; }
-            if (!Array.isArray(log)) log = [];
+        function adminBuildLoginStatsHTML(log) {
+            log = Array.isArray(log) ? log : [];
             const fmt = (ts) => {
                 const d = new Date(ts);
                 const p = (n) => String(n).padStart(2, '0');
