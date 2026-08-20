@@ -1210,6 +1210,7 @@
                     localStorage.setItem('TFJL_HasSetNick', 'true');
                     persistNicknameToDisk(); // 同步写入本地磁盘（重装不丢）
                     if (window.refreshProfileLabel) window.refreshProfileLabel(); // 同步右上角个人中心昵称
+                    if (typeof recordLoginEvent === 'function') recordLoginEvent(); // 首设昵称即记一次登录打卡
                     if (window.refreshWallNickname) window.refreshWallNickname(); // 同步刷新需求墙昵称框
                     used.push(v);
                     await saveUsedNicks(used);
