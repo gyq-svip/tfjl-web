@@ -40,10 +40,11 @@ fn register_heartbeat(
     token: String,
     counter_gist_id: String,
     state: tauri::State<AppState>,
-) {
+) -> Result<(), String> {
     let mut hb = state.heartbeat.lock().unwrap();
     *hb = Some(HeartbeatCtx { device_id, nick, token, counter_gist_id });
     println!("[heartbeat] registered device={} gist={}", hb.as_ref().unwrap().device_id, hb.as_ref().unwrap().counter_gist_id);
+    Ok(())
 }
 
 // 只更新 counter Gist 中「本设备」的 online_users 条目，保留其它字段/其它设备，避免覆盖丢数据。

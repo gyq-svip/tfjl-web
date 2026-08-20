@@ -107,3 +107,8 @@ commands.allow = ["download_umi_ocr"]
 identifier = "allow-download-skins"
 description = "Allow downloading skin pack from Gitee release and extracting to local data dir"
 commands.allow = ["download_skins"]
+
+[[permission]]
+identifier = "allow-register-heartbeat"
+description = "Allow frontend to register per-device Rust heartbeat ctx so tray/dormant App keeps online presence (s1.0.190 fix for P3 drop-off)"
+commands.allow = ["register_heartbeat"]
