@@ -1780,7 +1780,7 @@
         }
 
         // ==================== 拍卖快讯 ====================
-        let _globalBroadcastEnabled = true; // 默认开启
+        let _globalBroadcastEnabled = false; // 默认关闭：只有管理员手动开启后才全网显示
 
         // 全局拍卖快讯公告开关（存索引文件）
         async function toggleAuctionBroadcastInMarquee() {
@@ -1839,7 +1839,7 @@
                 const data = await response.json();
                 if (data.files && data.files['room_index.json'] && data.files['room_index.json'].content) {
                     const index = JSON.parse(data.files['room_index.json'].content);
-                    _globalBroadcastEnabled = index.broadcastEnabled !== false;
+                    _globalBroadcastEnabled = index.broadcastEnabled === true;
                 }
             } catch (e) {
                 console.warn('读取全局开关状态失败:', e);

@@ -12007,7 +12007,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             game: '九区-龙行',
             notice: '',
             open: true,
-            auctionNews: true,
+            auctionNews: false, // 默认关闭：拍卖快讯显示仅在管理员手动开启后为 true
             title: '【工具数据本地化储存】【新增PC客户端】【新增老马脚本一键密文分享】【导出 导入 分享 分类管理】【部分副本支持卡组截图识别一键脚本】'
         };
 
@@ -12528,8 +12528,9 @@ function hasGistToken() {
         }
 
         // 拍卖快讯显示开关（全网云端 config）：关闭后全网公告弹窗只显示普通公告+需求咨询，隐藏拍卖快讯
+        // 默认关闭：仅当云端明确配置 auctionNews===true（管理员手动开启）时才显示
         function _getAuctionNewsVisible() {
-            return currentConfig.auctionNews !== false;
+            return currentConfig.auctionNews === true;
         }
         async function toggleAuctionNewsVisibility() {
             const next = !_getAuctionNewsVisible();
