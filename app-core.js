@@ -22409,10 +22409,17 @@ ${maSection}
                 _localActiveArr.forEach(id => { if (!data.active_today_users.includes(id)) data.active_today_users.push(id); });
                 data.active_date = today;
             }
-            // 当前在线：合并本地 online_users（自己本机在线状态）
-            if (counterData && counterData.online_users) {
-                if (!data.online_users) data.online_users = {};
-                for (const _oid in counterData.online_users) data.online_users[_oid] = counterData.online_users[_oid];
+            // 当前在线：Gist 最新拉取的 online_users 为主，本地(counterData)为辅做补充并集
+            // 🔴 修复(s1.0.193)：原先只用本地在线状态 merge，而网页端本地 online_users 仅含本机、
+            // App 写入的是 App 自己的 localStorage，两者不互通 → 导致 Gist 上真实在线的设备被漏算、显示 0。
+            // 现改为 Gist 最新拉取的 online_users 直接作为主数据源，本地仅补充本机自身这一条。
+            {
+                const _src = (data && data.online_users) ? data.online_users : {};
+                const _local = (counterData && counterData.online_users) ? counterData.online_users : {};
+                const _merged = {};
+                for (const _oid in _src) _merged[_oid] = _src[_oid];
+                for (const _oid in _local) { if (!_merged[_oid]) _merged[_oid] = _local[_oid]; }
+                data.online_users = _merged;
             }
 
             const dailyStats = data.daily_stats || {};
