@@ -24,6 +24,7 @@
     "allow-git-push-fusions",
     "allow-git-push-skins",
     "allow-flash-tray-icon",
+    "allow-register-heartbeat",
     "allow-delete-file",
     "allow-path-exists",
     "allow-create-dir",
