@@ -12157,17 +12157,21 @@ function setGistToken(token) {
 // 仅桌面 App 走此逻辑（window.__TAURI__ 存在），网页版忽略。
 function registerHeartbeatWithRust() {
     try {
-        if (!(window.__TAURI__ || window.__TAURI_INTERNALS__)) return;
+        const isTauri = !!(window.__TAURI__ || window.__TAURI_INTERNALS__);
+        if (!isTauri) { console.log('[heartbeat] 非 Tauri 环境，跳过 Rust 心跳注册'); return; }
         const token = getGistToken();
         const gid = COUNTER_GIST_ID || localStorage.getItem('counter_gist_id') || '';
-        if (!token || !gid) return;
+        if (!token) { console.warn('[heartbeat] getGistToken() 为空，Rust 心跳未注册（P3掉线根因排查点1）'); return; }
+        if (!gid) { console.warn('[heartbeat] counterGistId 为空，Rust 心跳未注册'); return; }
+        console.log('[heartbeat] 准备注册 Rust 心跳：device=' + getDeviceId() + ' nick=' + _myNick() + ' gist=' + gid + ' token长度=' + token.length);
         _statsInvoke('register_heartbeat', {
             deviceId: getDeviceId(),
             nick: _myNick(),
             token: token,
             counterGistId: gid
-        }).catch(() => {});
-    } catch (e) {}
+        }).then(() => { console.log('[heartbeat] Rust 心跳注册成功，托盘挂机将每5分钟独立保活'); })
+          .catch((e) => { console.error('[heartbeat] register_heartbeat 调用失败（P3掉线根因排查点2，可能缺少 capabilities 权限 allow-register-heartbeat）：' + e); });
+    } catch (e) { console.error('[heartbeat] 注册异常：' + e); }
 }
 function hasGistToken() {
     return !!getGistToken();
