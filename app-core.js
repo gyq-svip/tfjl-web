@@ -10778,7 +10778,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         // 计算指定卡牌列表的总减伤（用于脚本解析 / 实时显示）
         // side: 'my' 我方 / 'teammate' 队友，tableName: 显式指定用哪张表
         // 约定：side='my' → 「我的」表；side='teammate' → 「队友」表；显式 tableName 优先。
-        function calculateDamageReductionForCards(cardNames, side, tableName) {
+        function calculateDamageReductionForCards(cardNames, side, tableName, skipChariot) {
             if (!side) side = 'my';
             // 选表
             if (!tableName) {
@@ -10799,9 +10799,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 
             // 战车特殊减伤（每张表自带 我的战车/队友战车；side 决定取哪一项）
             // 这样「我的」表里既能配自己的战车也能配队友战车的减伤，方便对比。
+            // 注意：skipChariot=true 用于「单卡明细」，战车减伤只应计入总和一次，不能摊到每张卡。
             const chariotKey = (side === 'teammate') ? '队友战车' : '我的战车';
             const chariotVal = (table && typeof table[chariotKey] === 'number') ? table[chariotKey] : 0;
-            if (chariotVal > 0) total += chariotVal;
+            if (chariotVal > 0 && !skipChariot) total += chariotVal;
 
             if (Array.isArray(cardNames)) {
                 cardNames.forEach(name => {
@@ -10943,9 +10944,9 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             else if (allDr < 130) allEl.style.color = '#ffd700';
             else allEl.style.color = '#4ecdc4';
             
-            // 每张卡的减伤明细
+            // 每张卡的减伤明细（skipChariot=true：单卡只显示该卡洗炼值，战车减伤不摊进来）
             const details = battleCards.slice(0, 15).map(name => {
-                const dr = calculateDamageReductionForCards([name], 'my', parserTable);
+                const dr = calculateDamageReductionForCards([name], 'my', parserTable, true);
                 return `${name}:<b style="color:${dr < 30 ? '#ff6b6b' : dr < 50 ? '#ffd700' : '#4ecdc4'}">${dr}%</b>`;
             });
             detailEl.innerHTML = '📋 单卡减伤：' + details.join(' | ');
