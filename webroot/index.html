@@ -375,6 +375,11 @@
         <!-- 固定头部：标题 + 公告栏 -->
         <div id="fixedHeader" style="position:sticky;top:0;z-index:100;background:linear-gradient(135deg,#0f0f23 0%,#1a1a2e 50%,#16213e 100%);padding-bottom:5px;">
         <h1><span id="mainHeader" style="cursor:default;">🛡️</span> 塔防助手</h1>
+        <!-- 右上角个人中心：显示「欢迎 XXX」，点击打开个人贡献主页（可编辑个性资料） -->
+        <div id="profileCenter" title="个人中心（点击查看 / 编辑你的资料）" onclick="openMyProfile()" style="position:absolute;right:12px;top:8px;display:flex;align-items:center;gap:6px;cursor:pointer;background:rgba(255,255,255,0.07);border:1px solid rgba(255,215,0,0.35);border-radius:16px;padding:4px 12px;color:#ffd700;font-size:0.9rem;z-index:101;" onmouseover="this.style.background='rgba(255,215,0,0.15)'" onmouseout="this.style.background='rgba(255,255,255,0.07)'">
+            <span style="font-size:1rem;">👤</span>
+            <span>欢迎 <strong id="profileNickLabel" style="color:#ffd700;">游客</strong></span>
+        </div>
         <p id="mainTitle" class="instructions glowing-text" style="cursor:pointer;" onclick="refreshNewsAndTitle()" title="点击刷新公告和标题"> 【工具数据本地化储存】【新增PC客户端】【新增老马脚本一键密文分享】【导出 导入 分享 分类管理】【部分副本支持卡组截图识别一键脚本】  </p>
         
         <!-- 滚动公告栏 -->
@@ -2476,7 +2481,7 @@
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;opacity:0.1;" ondblclick="onVersionTagForceRefresh()">s20260820-41 · s1.0.184</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;opacity:0.1;" ondblclick="onVersionTagForceRefresh()">s20260820-42 · s1.0.185</span>
                 <div class="version-tooltip">版本 s20260820-41 · s1.0.184（双击强制刷新）</div>
             </div>
             <script>/* 悬浮提示自动跟随版本号，避免 bump 时漏改 tooltip */

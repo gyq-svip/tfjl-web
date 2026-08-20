@@ -11653,7 +11653,12 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             (async () => {
                 const overlay = document.getElementById('passwordOverlay');
                 const main = document.getElementById('mainContent');
-                const enter = () => { overlay.style.display = 'none'; main.classList.add('visible'); };
+                const enter = () => {
+                    overlay.style.display = 'none';
+                    main.classList.add('visible');
+                    // 进入主界面后强制要求设置昵称（启动即弹；未设过才弹，老用户已设过不弹）
+                    if (typeof ensureNickname === 'function') ensureNickname(true);
+                };
                 const showLogin = () => { overlay.style.display = 'flex'; };
                 // 已登录（localStorage 或磁盘 auth_state.json）→ 直接进入，完全不显示密码门
                 const diskLoggedIn = await isLoggedInFromDisk();
@@ -11713,6 +11718,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             updateTxtFilesList();
             loadFontSizeSetting();
             initMainNotebookColor();
+            if (typeof refreshProfileLabel === 'function') refreshProfileLabel(); // 同步右上角个人中心昵称
             
             // 加载卡牌顺序
             loadCardOrder();
@@ -16925,6 +16931,24 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
         window.contribDownloadAll = contribDownloadAll;
         window.contribToggleEditProfile = contribToggleEditProfile;
         window.renderContribProfile = renderContribProfile;
+
+        // ========== 右上角个人中心：点开即本人贡献主页（可编辑个性资料） ==========
+        function openMyProfile() {
+            const nick = localStorage.getItem('TFJL_UserName') || '匿名用户';
+            if (typeof openContributionCard === 'function') openContributionCard(encodeURIComponent(nick));
+            else if (window.openContributionCard) window.openContributionCard(encodeURIComponent(nick));
+            else alert('个人资料功能尚未就绪');
+        }
+        window.openMyProfile = openMyProfile;
+
+        // 同步右上角个人中心昵称标签
+        function refreshProfileLabel() {
+            const el = document.getElementById('profileNickLabel');
+            if (!el) return;
+            const nick = localStorage.getItem('TFJL_UserName') || '游客';
+            el.textContent = nick;
+        }
+        window.refreshProfileLabel = refreshProfileLabel;
         function openContributionCard(nickEnc) {
             const nick = decodeURIComponent(nickEnc);
             const repMap = computeReputation();

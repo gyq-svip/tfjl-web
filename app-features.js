@@ -1174,7 +1174,8 @@
         }
 
         // 确保已设置昵称：已设置直接返回；未设置弹窗强制设置（全局唯一）。取消返回 null。
-        function ensureNickname() {
+        // force=true：真·必须（隐藏取消按钮，不设进不去），用于启动强制设置门槛。
+        function ensureNickname(force) {
             return new Promise((resolve) => {
                 const existing = localStorage.getItem('TFJL_UserName');
                 const hasSet = localStorage.getItem('TFJL_HasSetNick') === 'true';
@@ -1189,6 +1190,7 @@
                 errEl.textContent = '';
                 modal.style.display = 'flex';
                 setTimeout(() => input.focus(), 50);
+                if (force) cancelBtn.style.display = 'none'; // 真·必须：隐藏取消，不设进不去
 
                 const cleanup = () => {
                     modal.style.display = 'none';
@@ -1197,7 +1199,7 @@
                     input.onkeydown = null;
                 };
 
-                cancelBtn.onclick = () => { cleanup(); resolve(null); };
+                cancelBtn.onclick = force ? () => {} : () => { cleanup(); resolve(null); };
                 input.onkeydown = (e) => { if (e.key === 'Enter') saveBtn.click(); };
                 saveBtn.onclick = async () => {
                     const v = input.value.trim();
@@ -1207,6 +1209,7 @@
                     localStorage.setItem('TFJL_UserName', v);
                     localStorage.setItem('TFJL_HasSetNick', 'true');
                     persistNicknameToDisk(); // 同步写入本地磁盘（重装不丢）
+                    if (window.refreshProfileLabel) window.refreshProfileLabel(); // 同步右上角个人中心昵称
                     if (window.refreshWallNickname) window.refreshWallNickname(); // 同步刷新需求墙昵称框
                     used.push(v);
                     await saveUsedNicks(used);
