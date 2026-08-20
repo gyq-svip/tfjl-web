@@ -16970,16 +16970,14 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
         }
         window.recordLoginEvent = recordLoginEvent;
 
-        // 打开登录记录面板（管理员菜单入口）
-        function openLoginStats() {
-            const box = document.getElementById('loginStatsContent');
-            if (box) box.innerHTML = buildLoginStatsHTML();
-            const modal = document.getElementById('loginStatsModal');
-            if (modal) modal.style.display = 'flex';
+        // 管理员面板「登录打卡」：渲染按昵称汇总的统计（今日名单/本周次数/累计排行）
+        function adminLoadLoginStats() {
+            const box = document.getElementById('adminLoginStatsContent');
+            if (box) box.innerHTML = adminBuildLoginStatsHTML();
         }
-        window.openLoginStats = openLoginStats;
+        window.adminLoadLoginStats = adminLoadLoginStats;
 
-        function buildLoginStatsHTML() {
+        function adminBuildLoginStatsHTML() {
             let log = [];
             try { log = JSON.parse(localStorage.getItem('TFJL_LoginLog') || '[]'); } catch (e) { log = []; }
             if (!Array.isArray(log)) log = [];
@@ -16988,6 +16986,8 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 const p = (n) => String(n).padStart(2, '0');
                 return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
             };
+            const dayKey = (ts) => fmt(ts).slice(0, 10);
+
             // 按昵称聚合
             const byNick = {};
             for (const r of log) {
@@ -16997,36 +16997,76 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 s.count++;
                 if (r.ts < s.first) s.first = r.ts;
                 if (r.ts > s.last) s.last = r.ts;
-                const day = fmt(r.ts).slice(0, 10);
-                if (!s.daily[day]) s.daily[day] = [];
-                s.daily[day].push(r.ts);
+                const d = dayKey(r.ts);
+                if (!s.daily[d]) s.daily[d] = [];
+                s.daily[d].push(r.ts);
             }
-            const nicks = Object.keys(byNick).sort((a, b) => byNick[b].last - byNick[a].last);
+            const nicks = Object.keys(byNick);
             let html = '';
-            html += `<div style="margin-bottom:10px;color:#ffd700;font-size:0.95rem;">总计登录 <strong>${log.length}</strong> 次 · 不同昵称 <strong>${nicks.length}</strong> 个</div>`;
+            html += `<div style="margin-bottom:12px;color:#ffd700;font-size:0.95rem;">总计登录 <strong>${log.length}</strong> 次 · 不同昵称 <strong>${nicks.length}</strong> 个</div>`;
             if (nicks.length === 0) {
                 html += `<div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;">暂无登录记录</div>`;
-            } else {
-                for (const n of nicks) {
-                    const s = byNick[n];
-                    const days = Object.keys(s.daily).sort().reverse();
-                    let dailyHTML = '';
-                    for (const d of days) {
-                        const times = s.daily[d].slice().sort((a, b) => a - b).map(t => fmt(t).slice(11)).join('、');
-                        dailyHTML += `<div style="margin:2px 0;color:#c5cae9;"><span style="color:#80deea;">${d}</span>：${times}</div>`;
-                    }
-                    html += `<div style="border:1px solid rgba(255,215,0,0.25);border-radius:10px;padding:10px 12px;margin-bottom:8px;background:rgba(255,255,255,0.03);">
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-                            <strong style="color:#ffd700;">👤 ${escapeHtml(n)}</strong>
-                            <span style="color:#a5d6a7;font-size:0.85rem;">共 ${s.count} 次</span>
-                        </div>
-                        <div style="font-size:0.78rem;color:rgba(255,255,255,0.55);margin-bottom:6px;">首次 ${fmt(s.first)} · 最近 ${fmt(s.last)}</div>
-                        <div style="max-height:160px;overflow:auto;">${dailyHTML}</div>
-                    </div>`;
-                }
+                return html;
             }
+
+            // 今日登录名单（谁 + 几点）
+            const todayKey = dayKey(Date.now());
+            const todayList = log.filter(r => dayKey(r.ts) === todayKey).sort((a, b) => b.ts - a.ts);
+            const todayNicks = [...new Set(todayList.map(r => r.nick || '匿名用户'))];
+            html += `<div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,215,0,0.25);border-radius:10px;padding:10px 12px;margin-bottom:12px;">
+                <div style="color:#ffd700;font-size:0.9rem;margin-bottom:6px;">📅 今日（${todayKey}）登录 <strong>${todayNicks.length}</strong> 人 · 共 ${todayList.length} 次</div>`;
+            if (todayList.length === 0) {
+                html += `<div style="color:rgba(255,255,255,0.45);font-size:0.82rem;">今天还没有人登录</div>`;
+            } else {
+                html += `<div style="font-size:0.82rem;color:#c5cae9;">`;
+                for (const r of todayList) {
+                    html += `<div style="margin:2px 0;"><span style="color:#80deea;">${fmt(r.ts).slice(11)}</span> · ${escapeHtml(r.nick || '匿名用户')}</div>`;
+                }
+                html += `</div>`;
+            }
+            html += `</div>`;
+
+            // 近 7 天各人登录次数
+            const weekAgo = Date.now() - 7 * 24 * 3600 * 1000;
+            const weekly = nicks.map(n => {
+                const s = byNick[n];
+                let w = 0;
+                for (const d of Object.keys(s.daily)) {
+                    const dayEnd = new Date(d + 'T00:00:00').getTime() + 24 * 3600 * 1000;
+                    if (dayEnd > weekAgo) w += s.daily[d].length;
+                }
+                return { nick: n, week: w };
+            }).sort((a, b) => b.week - a.week);
+            html += `<div style="background:rgba(255,255,255,0.04);border:1px solid rgba(77,208,225,0.25);border-radius:10px;padding:10px 12px;margin-bottom:12px;">
+                <div style="color:#4dd0e1;font-size:0.9rem;margin-bottom:6px;">🗓️ 近 7 天登录次数</div>
+                <div style="font-size:0.82rem;">`;
+            for (const w of weekly) {
+                html += `<div style="display:flex;justify-content:space-between;margin:2px 0;"><span>${escapeHtml(w.nick)}</span><span style="color:#a5d6a7;">${w.week} 次</span></div>`;
+            }
+            html += `</div></div>`;
+
+            // 累计登录排行榜
+            const ranked = nicks.map(n => ({ nick: n, total: byNick[n].count })).sort((a, b) => b.total - a.total);
+            const max = ranked.length ? ranked[0].total : 1;
+            html += `<div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,215,0,0.3);border-radius:10px;padding:10px 12px;">
+                <div style="color:#ffd700;font-size:0.9rem;margin-bottom:8px;">🏆 累计登录排行榜</div>`;
+            ranked.forEach((r, i) => {
+                const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1) + '.';
+                const pct = max ? Math.round(r.total / max * 100) : 0;
+                html += `<div style="margin:5px 0;">
+                    <div style="display:flex;justify-content:space-between;font-size:0.85rem;margin-bottom:2px;">
+                        <span>${medal} ${escapeHtml(r.nick)}</span>
+                        <span style="color:#a5d6a7;">${r.total} 次</span>
+                    </div>
+                    <div style="height:6px;background:rgba(255,255,255,0.1);border-radius:3px;overflow:hidden;">
+                        <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#ffd700,#ff9800);"></div>
+                    </div>
+                </div>`;
+            });
+            html += `</div>`;
             return html;
         }
+        window.adminBuildLoginStatsHTML = adminBuildLoginStatsHTML;
         function openContributionCard(nickEnc) {
             const nick = decodeURIComponent(nickEnc);
             const repMap = computeReputation();
@@ -20147,6 +20187,8 @@ ${maSection}
             if (analyticsPage) analyticsPage.style.display = 'none';
             const logStatsAdminPage3 = document.getElementById('adminPageLogStats');
             if (logStatsAdminPage3) logStatsAdminPage3.style.display = 'none';
+            const loginStatsAdminPage = document.getElementById('adminPageLoginStats');
+            if (loginStatsAdminPage) loginStatsAdminPage.style.display = 'none';
 
             if (page === 'help') {
                 if (helpPage) helpPage.style.display = 'block';
@@ -20194,6 +20236,12 @@ ${maSection}
                     pageEl.style.display = 'block';
                     adminRefreshDebugLog();
                     adminRefreshConsoleLog();
+                }
+            } else if (page === 'loginStats') {
+                const pageEl = document.getElementById('adminPageLoginStats');
+                if (pageEl) {
+                    pageEl.style.display = 'block';
+                    adminLoadLoginStats();
                 }
             } else if (page === 'apiMonitor') {
                 const pageEl = document.getElementById('adminPageApiMonitor');

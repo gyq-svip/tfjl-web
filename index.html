@@ -376,14 +376,6 @@
         <div id="fixedHeader" style="position:sticky;top:0;z-index:100;background:linear-gradient(135deg,#0f0f23 0%,#1a1a2e 50%,#16213e 100%);padding-bottom:5px;">
         <h1><span id="mainHeader" style="cursor:default;">🛡️</span> 塔防助手</h1>
         <p id="mainTitle" class="instructions glowing-text" style="cursor:pointer;" onclick="refreshNewsAndTitle()" title="点击刷新公告和标题"> 【工具数据本地化储存】【新增PC客户端】【新增老马脚本一键密文分享】【导出 导入 分享 分类管理】【部分副本支持卡组截图识别一键脚本】  </p>
-        <!-- 个人中心：显示「欢迎 XXX」，点击打开个人贡献主页（可编辑个性资料）。
-             改为标题下方右对齐独立一行，避开右上角固定的 需求墙/菜单/APP本地设置 按钮，避免重叠 -->
-        <div style="text-align:right;margin:2px 0 4px;">
-            <span id="profileCenter" title="个人中心（点击查看 / 编辑你的资料）" onclick="openMyProfile()" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;background:rgba(255,255,255,0.07);border:1px solid rgba(255,215,0,0.35);border-radius:16px;padding:4px 12px;color:#ffd700;font-size:0.9rem;" onmouseover="this.style.background='rgba(255,215,0,0.15)'" onmouseout="this.style.background='rgba(255,255,255,0.07)'">
-                <span style="font-size:1rem;">👤</span>
-                <span>欢迎 <strong id="profileNickLabel" style="color:#ffd700;">游客</strong></span>
-            </span>
-        </div>
         
         <!-- 滚动公告栏 -->
         <div id="newsMarqueeContainer" style="background:rgba(255,255,255,0.05);border:2px solid rgba(255,215,0,0.3);border-radius:10px;padding:15px;margin-bottom:5px;text-align:center;overflow:hidden;position:relative;cursor:pointer;" onclick="showNewsListModal()" title="点击查看全部公告">
@@ -400,15 +392,6 @@
             </div>
             <div style="position:absolute;bottom:3px;right:10px;color:rgba(255,255,255,0.25);font-size:0.65rem;pointer-events:none;">点击查看全部公告</div>
         </div>
-        </div>
-        <!-- 登录打卡记录面板 -->
-        <div id="loginStatsModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);z-index:10003;align-items:center;justify-content:center;">
-            <div style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);border:2px solid rgba(77,208,225,0.4);border-radius:16px;padding:20px 24px;width:95%;max-width:640px;max-height:88vh;overflow-y:auto;position:relative;box-shadow:0 10px 50px rgba(0,0,0,0.6);">
-                <button onclick="document.getElementById('loginStatsModal').style.display='none'" style="position:absolute;top:12px;right:16px;background:none;border:none;color:rgba(255,255,255,0.5);font-size:1.5rem;cursor:pointer;transition:color 0.2s;" onmouseover="this.style.color='white'" onmouseout="this.style.color='rgba(255,255,255,0.5)'">&times;</button>
-                <h2 style="color:#4dd0e1;text-align:center;margin:0 0 16px 0;font-size:1.15rem;">📊 登录打卡记录</h2>
-                <div id="loginStatsContent" style="font-size:0.85rem;"></div>
-                <div style="text-align:center;color:rgba(255,255,255,0.35);font-size:0.68rem;margin-top:12px;">记录保存在本机浏览器（按昵称），仅统计当前设备上的登录行为</div>
-            </div>
         </div>
 
         <!-- 可滚动内容区域 -->
@@ -915,7 +898,7 @@
         <script defer src="app-effects.js?v=s1.0.152"></script>
 
         <!-- 固定在右上角的按钮 -->
-        <div class="sticky-buttons" style="position:fixed;top:12px;right:12px;z-index:9999;display:flex;gap:5px;">
+        <div class="sticky-buttons" style="position:fixed;top:12px;right:12px;z-index:9999;display:flex;flex-direction:column;align-items:flex-end;gap:5px;"><div style="display:flex;gap:5px;">
             <!-- APP版本地设置按钮（仅在Tauri APP中显示） -->
             <button id="appLocalSettingsBtn" onclick="openAppLocalSettings()" title="APP本地设置" style="display:none;background:rgba(156,39,176,0.85);color:white;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 2px 10px rgba(0,0,0,0.3);display:none;align-items:center;justify-content:center;">📁</button>
             <!-- 版本切换按钮（动态显示） -->
@@ -933,10 +916,15 @@
                     <div onclick="window.location.href='auction.html';document.getElementById('backupMenu').style.display='none';" style="display:none;padding:8px 15px;cursor:pointer;color:#fff;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">🏪 进入拍卖系统</div>
                     <div onclick="openHelpPage();document.getElementById('backupMenu').style.display='none';" title="打开帮助页面，查看使用说明" style="padding:8px 15px;cursor:pointer;color:#4fc3f7;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📖 帮助</div>
                     <div onclick="logoutToLogin();document.getElementById('backupMenu').style.display='none';" title="退出当前登录，返回密码登录页" style="padding:8px 15px;cursor:pointer;color:#ff6b6b;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,107,107,0.1)'" onmouseout="this.style.background='transparent'">🔙 退出登录</div>
-                    <div onclick="openLoginStats();document.getElementById('backupMenu').style.display='none';" title="查看登录打卡记录（按昵称统计：谁何时登录、总次数、每日登录时间）" style="padding:8px 15px;cursor:pointer;color:#4dd0e1;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📊 登录记录</div>
                 </div>
             </div>
             <input type="file" id="importFileInput" accept=".json" style="display:none;" onchange="handleImportFile(this)">
+            </div>
+            <!-- 个人中心：欢迎 XXX，点击打开贡献主页；置于右上角图标下方，不占标题行 -->
+            <span id="profileCenter" title="个人中心（点击查看 / 编辑你的资料）" onclick="openMyProfile()" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;background:rgba(255,255,255,0.07);border:1px solid rgba(255,215,0,0.35);border-radius:16px;padding:4px 12px;color:#ffd700;font-size:0.9rem;" onmouseover="this.style.background='rgba(255,215,0,0.15)'" onmouseout="this.style.background='rgba(255,255,255,0.07)'">
+                <span style="font-size:1rem;">👤</span>
+                <span>欢迎 <strong id="profileNickLabel" style="color:#ffd700;">游客</strong></span>
+            </span>
         </div>
 
         <!-- 参考图片悬浮面板 -->
@@ -1675,6 +1663,10 @@
                         <span class="mi-emoji">📊</span>
                         <div class="mi-text"><div class="mi-title">访问统计</div></div>
                     </div>
+                    <div class="admin-menu-item" onclick="adminShowPage('loginStats')">
+                        <span class="mi-emoji">🕐</span>
+                        <div class="mi-text"><div class="mi-title">登录打卡</div><div class="mi-sub">谁登录/排行/每周</div></div>
+                    </div>
                     <div class="admin-menu-item" onclick="openCardGroupManager()">
                         <span class="mi-emoji">🃏</span>
                         <div class="mi-text"><div class="mi-title">卡组管理</div><div class="mi-sub">融合卡 / 融合皮肤</div></div>
@@ -2160,6 +2152,26 @@
                 <div id="adminStatsContent"></div>
             </div>
 
+            <div id="adminPageLoginStats" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
+                    <button class="admin-btn admin-btn-secondary" onclick="adminShowMenu()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
+                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">🕐 登录打卡记录</h3>
+                    <button class="admin-btn admin-btn-secondary" onclick="adminLoadLoginStats()" style="margin-left:auto;font-size:0.8rem;">🔄 刷新</button>
+                </div>
+                <div class="admin-section">
+                    <div style="background:rgba(77,208,225,0.1);border-left:3px solid #4dd0e1;border-radius:6px;padding:12px;margin-bottom:15px;">
+                        <div style="color:#4dd0e1;font-size:0.85rem;font-weight:500;">💡 说明</div>
+                        <div style="color:rgba(255,255,255,0.6);font-size:0.75rem;margin-top:5px;">
+                            每次打开页面并登录即静默记录「昵称 + 时间戳」（客户端无感，普通用户不可见）。<br>
+                            以下按昵称汇总：今日登录名单、本周各人登录次数、累计登录排行榜。
+                        </div>
+                    </div>
+                    <div id="adminLoginStatsContent">
+                        <div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;">点击刷新加载</div>
+                    </div>
+                </div>
+            </div>
+
             <div id="adminPageAnalytics" style="display:none;">
                 <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
                     <button class="admin-btn admin-btn-secondary" onclick="adminShowMenu()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
@@ -2495,7 +2507,7 @@
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;opacity:0.1;" ondblclick="onVersionTagForceRefresh()">s20260820-43 · s1.0.186</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;opacity:0.1;" ondblclick="onVersionTagForceRefresh()">s20260820-44 · s1.0.187</span>
                 <div class="version-tooltip">版本 s20260820-41 · s1.0.184（双击强制刷新）</div>
             </div>
             <script>/* 悬浮提示自动跟随版本号，避免 bump 时漏改 tooltip */
