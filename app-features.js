@@ -3303,18 +3303,40 @@
                     const names = await caches.keys();
                     await Promise.all(names.map((n) => caches.delete(n)));
                 }
+                // 2.5 🔴 关键修复：sw.js 改为"安装后 waiting 不自动激活"，
+                // 仅删缓存+reload 不足以让新 SW 接管（旧 SW 仍按旧 CACHE_VERSION 重新缓存旧文件 → 永远拿不到新版）。
+                // 必须显式让处于 waiting 的新 SW 立即激活(skipWaiting)，否则强制刷新后仍是旧版。
+                if ('serviceWorker' in navigator) {
+                    try {
+                        const reg = await navigator.serviceWorker.getRegistration();
+                        if (reg && reg.waiting) {
+                            reg.waiting.postMessage('SKIP_WAITING');
+                        }
+                        // 也尝试直接给当前 controller 发（兼容某些状态）
+                        if (navigator.serviceWorker.controller) {
+                            navigator.serviceWorker.controller.postMessage('SKIP_WAITING');
+                        }
+                    } catch (e) {}
+                }
                 // 3. 清除 localStorage 标记 + 启动动画标记
                 try {
                     localStorage.removeItem('TFJL_NotFirst');
                     localStorage.removeItem('TFJL_CachedHTML');
                 } catch(e) {}
-                // 4. 强制注销当前 SW（让下次注册时拉全新 SW）
+                // 4. 仅当"没有 waiting 新 SW"时才强制注销当前 SW 兜底（避免与上面的 SKIP_WAITING 自相矛盾：
+                // 刚让新 SW 激活又注销它，会导致 reload 后重新装回旧 SW 缓存）
                 if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+                    let hasWaiting = false;
                     try {
-                        navigator.serviceWorker.getRegistrations().then(regs => {
+                        const reg = await navigator.serviceWorker.getRegistration();
+                        hasWaiting = !!(reg && reg.waiting);
+                    } catch (e) {}
+                    if (!hasWaiting) {
+                        try {
+                            const regs = await navigator.serviceWorker.getRegistrations();
                             regs.forEach(r => r.unregister());
-                        });
-                    } catch(e) {}
+                        } catch (e) {}
+                    }
                 }
             } catch (e) { /* 清理阶段出错不阻塞，继续强刷 */ }
             // 强刷：带时间戳 URL + hard reload，彻底绕过各级缓存
