@@ -7443,4 +7443,176 @@
             else verdict = '✅ 全部检查通过，非数据丢失问题；若仍异常多为网络/远端服务波动，可稍后重试';
             summary.textContent = verdict;
         };
+
+        // ==================== ① 清理缓存 / 重建索引 ====================
+        // 温和清理：仅清 SW/CacheStorage + 皮肤缓存，不动 localStorage/tfjl.dat，然后重预热皮肤。
+        window.clearCacheAndReindex = async function () {
+            if (!confirm('🔄 清理缓存并重建索引？\n\n将清除：\n• Service Worker 缓存\n• CacheStorage 全部缓存\n• 皮肤缓存（浏览器/App本地图缓存）\n\n不会动你的设置/项目/昵称（这些走 tfjl.dat 落盘）。\n清完后重新加载皮肤，首次略慢。')) return;
+            try {
+                // 1. 通知 SW + 清 CacheStorage
+                if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+                    try { navigator.serviceWorker.controller.postMessage('CLEAR_CACHE'); } catch (e) {}
+                }
+                if (window.caches) {
+                    const names = await caches.keys();
+                    await Promise.all(names.map(n => caches.delete(n)));
+                }
+                // 2. 皮肤缓存/重拉（复用现有修复逻辑）
+                if (typeof window.repairSkins === 'function') await window.repairSkins();
+                // 3. 重新预热皮肤（若存在）
+                if (typeof window._preheatSkins === 'function') {
+                    try { await window._preheatSkins(); } catch (e) {}
+                }
+                alert('✅ 缓存清理完成，皮肤已重新加载。如需彻底绕过缓存可刷新页面。');
+            } catch (e) {
+                alert('⚠️ 清理异常：' + String(e && e.message || e));
+            }
+        };
+
+        // ==================== ② 数据备份 / 导出 + 恢复 ====================
+        window.backupDataExport = async function () {
+            try {
+                const api = window.__tfjlDiagApi;
+                // 收集 localStorage（排除易变/敏感）
+                const skip = new Set(['TFJL_Password', 'TFJL_LoggedIn', '__tfjl_diag_probe__']);
+                const ls = {};
+                for (let i = 0; i < localStorage.length; i++) {
+                    const k = localStorage.key(i);
+                    if (skip.has(k)) continue;
+                    ls[k] = localStorage.getItem(k);
+                }
+                // 收集 App 统一存储 tfjl.dat
+                let appStore = null;
+                if (api && api.getStoreMap) {
+                    try { appStore = JSON.stringify([...api.getStoreMap().entries()]); } catch (e) {}
+                }
+                // 收集 IndexedDB 项目
+                let projects = [];
+                try {
+                    if (typeof window.__tfjlLoadProjectList === 'function') projects = await window.__tfjlLoadProjectList();
+                } catch (e) {}
+
+                const payload = {
+                    __tfjl_backup__: true,
+                    version: 's1.0.199',
+                    exportedAt: new Date().toISOString(),
+                    appStore,
+                    projects,
+                    localStorage: ls,
+                };
+                const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+                const ts = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = 'tfjl-backup-' + ts + '.json';
+                document.body.appendChild(a); a.click(); a.remove();
+                setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+                alert('✅ 备份已导出：tfjl-backup-' + ts + '.json\n\n包含：设置/昵称(tfjl.dat) + 项目(IndexedDB) + 浏览器缓存项。\n换机或清缓存后，用本菜单「💾 恢复备份」选此文件即可还原。');
+            } catch (e) {
+                alert('⚠️ 备份失败：' + String(e && e.message || e));
+            }
+        };
+
+        window.backupDataRestore = async function () {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'application/json,.json';
+            input.onchange = async () => {
+                const file = input.files && input.files[0];
+                if (!file) return;
+                if (!confirm('💾 恢复备份？\n\n将用备份文件覆盖当前：\n• 设置/昵称（写回 tfjl.dat）\n• 项目（写回 IndexedDB + App磁盘）\n• 浏览器缓存项\n\n当前未备份的数据会被覆盖，确认继续？')) return;
+                try {
+                    const text = await file.text();
+                    const data = JSON.parse(text);
+                    if (!data.__tfjl_backup__) throw new Error('不是有效的 tfjl 备份文件');
+                    const api = window.__tfjlDiagApi;
+                    // 1. localStorage 回灌
+                    if (data.localStorage) {
+                        for (const k in data.localStorage) localStorage.setItem(k, data.localStorage[k]);
+                    }
+                    // 2. 项目写回 IndexedDB + App 磁盘
+                    if (Array.isArray(data.projects) && data.projects.length) {
+                        if (typeof window.__tfjlSaveAllProjects === 'function') await window.__tfjlSaveAllProjects(data.projects);
+                    }
+                    // 3. App 统一存储写回并落盘
+                    if (data.appStore && api && api.getStoreMap) {
+                        try {
+                            const entries = JSON.parse(data.appStore);
+                            const map = api.getStoreMap();
+                            entries.forEach(([k, v]) => map.set(k, v));
+                            if (api.syncAllNow) await api.syncAllNow();
+                        } catch (e) { console.warn('appStore 恢复失败:', e); }
+                    }
+                    alert('✅ 恢复完成！部分变更（如皮肤/英雄缓存）需刷新页面后完全生效。建议刷新。');
+                } catch (e) {
+                    alert('⚠️ 恢复失败：' + String(e && e.message || e));
+                }
+            };
+            input.click();
+        };
+
+        // ==================== ③ 存储占用统计 ====================
+        window.showStorageStats = async function () {
+            const api = window.__tfjlDiagApi;
+            const isApp = !!(api && api.isTauriApp);
+            let lines = [];
+            const fmt = (b) => (b >= 1048576 ? (b / 1048576).toFixed(2) + ' MB' : b >= 1024 ? (b / 1024).toFixed(1) + ' KB' : b + ' B');
+
+            // localStorage
+            let lsBytes = 0;
+            for (let i = 0; i < localStorage.length; i++) {
+                const k = localStorage.key(i);
+                lsBytes += (k.length + (localStorage.getItem(k) || '').length) * 2;
+            }
+            lines.push(['浏览器缓存 localStorage', localStorage.length + ' 项', fmt(lsBytes)]);
+
+            // tfjl.dat（App）
+            if (isApp && api.getSyncDir) {
+                try {
+                    const raw = await api.readTextFile(api.getDatPath(api.getSyncDir()));
+                    lines.push(['统一存储 tfjl.dat (App)', raw ? '存在' : '空', fmt(raw ? raw.length * 2 : 0)]);
+                } catch (e) { lines.push(['统一存储 tfjl.dat (App)', '读取失败', '—']); }
+            } else {
+                lines.push(['统一存储 tfjl.dat', '仅限App版', '—']);
+            }
+
+            // 项目
+            let projCount = 0, projBytes = 0;
+            try {
+                if (typeof window.__tfjlLoadProjectList === 'function') {
+                    const pj = await window.__tfjlLoadProjectList();
+                    projCount = Array.isArray(pj) ? pj.length : 0;
+                    projBytes = JSON.stringify(pj).length * 2;
+                }
+            } catch (e) {}
+            lines.push(['项目数据 (IndexedDB)', projCount + ' 个', fmt(projBytes)]);
+
+            // CacheStorage
+            let cacheBytes = 0, cacheN = 0;
+            if (window.caches) {
+                const names = await caches.keys();
+                cacheN = names.length;
+                for (const n of names) {
+                    const c = await caches.open(n);
+                    const reqs = await c.keys();
+                    for (const r of reqs) { try { const res = await c.match(r); if (res) cacheBytes += (res.headers.get('content-length') | 0); } catch (e) {} }
+                }
+            }
+            lines.push(['资源缓存 CacheStorage', cacheN + ' 个缓存', fmt(cacheBytes)]);
+
+            const html = lines.map(([n, c, s]) =>
+                '<div style="display:flex;justify-content:space-between;padding:7px 2px;border-bottom:1px solid rgba(255,255,255,0.06);font-size:0.82rem;">' +
+                '<span style="color:rgba(255,255,255,0.8);">' + n + '</span>' +
+                '<span style="color:#ffd54f;">' + c + '</span>' +
+                '<span style="color:rgba(255,255,255,0.6);">' + s + '</span></div>'
+            ).join('');
+            const modal = document.createElement('div');
+            modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;align-items:center;justify-content:center;';
+            modal.innerHTML = '<div style="background:#1a1f2e;border:1px solid rgba(255,255,255,0.15);border-radius:14px;max-width:480px;width:90%;padding:20px;box-shadow:0 20px 60px rgba(0,0,0,0.6);">' +
+                '<div style="font-size:1.05rem;font-weight:600;color:#ffd54f;margin-bottom:12px;">📊 存储占用统计</div>' +
+                html +
+                '<div style="margin-top:16px;text-align:right;"><button onclick="this.closest(\'div\').parentElement.remove()" style="background:#ffd54f;color:#1a1f2e;border:none;padding:6px 16px;border-radius:6px;cursor:pointer;font-weight:600;">关闭</button></div>' +
+                '</div>';
+            document.body.appendChild(modal);
+        };
         
