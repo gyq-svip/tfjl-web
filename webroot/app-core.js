@@ -16219,12 +16219,11 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                     const a = document.createElement('a'); a.href = url; a.download = dl; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
                     wallShowBackupStatus(`✅ 已下载到默认下载目录（${msgPart} · 脚本 ${scripts.length} 个）：${dl}`, 'success');
                 };
-                // App：复用需求墙脚本下载同款精美保存弹窗（浏览文件夹选位置；不显示脚本专属老马目录卡片）
+                // App：复用统一下载保存弹窗（与脚本下载同款：已配置目录卡片一键存 + 浏览文件夹自定义位置）
                 const invokeFn = (window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke) || (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke);
                 if (invokeFn && typeof _downloadScriptTauri === 'function') {
                     const saved = await _downloadScriptTauri(dl, text, {
                         title: '📥 保存需求墙备份',
-                        dirs: null,
                         onSaved: (p) => wallShowBackupStatus(`✅ 已保存：${p}（${msgPart} · 脚本 ${scripts.length} 个）`, 'success'),
                         fallback: () => { webSave(); }
                     });
