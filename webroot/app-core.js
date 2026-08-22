@@ -15907,6 +15907,28 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             return out;
         }
 
+        // 列出账号下全部「脚本分享」Gist（不抓内容，轻量）：[{id, description, fileName}]
+        // 供导入/还原时按「描述」匹配现有脚本——Gist 地址变了也能对上（列表扫描本来就按描述发现脚本）
+        async function wallListScriptGists(token) {
+            const out = [];
+            try {
+                let page = 1;
+                while (page <= 5) {
+                    const resp = await fetch(`https://api.github.com/gists?per_page=100&page=${page}`, { headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` } });
+                    if (!resp.ok) break;
+                    const gists = await resp.json();
+                    if (!Array.isArray(gists) || gists.length === 0) break;
+                    for (const g of gists) {
+                        if (g.description && g.description.includes('脚本分享')) out.push({ id: g.id, description: g.description, fileName: Object.keys(g.files || {})[0] || '' });
+                    }
+                    if (gists.length < 100) break;
+                    page++;
+                }
+            } catch (e) {}
+            return out;
+        }
+        window.wallListScriptGists = wallListScriptGists;
+
         async function wallBackupAll() {
             wallShowBackupStatus('⏳ 正在备份需求墙全部数据...', 'loading');
             try {
@@ -15945,7 +15967,9 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 for (const s of scripts) {
                     const safe = s.backupFileName.replace(/[^a-zA-Z0-9_\-.]/g, '_');
                     const ext = s.backupFileName.includes('.') ? s.backupFileName.split('.').pop() : 'js';
-                    const bf = `content_script_${safe}_${ts}.${ext}`;
+                    // 🔴 防撞名（2026-08-22 实测旧逻辑 69 脚本丢 15 个内容）：中文全洗成下划线后不同脚本能洗出同名文件互相覆盖，
+                    //    追加 gistId（每脚本唯一）杜绝覆盖；还原/导入按引用定位不受文件名影响。
+                    const bf = `content_script_${safe}_${s.gistId}_${ts}.${ext}`;
                     const scBytes = (typeof TextEncoder !== 'undefined') ? new TextEncoder().encode(s.content).length : s.content.length * 2;
                     if (scBytes > 900000) { console.warn('[备份] 脚本', safe, '约', (scBytes / 1024 / 1024).toFixed(1), 'MB，可能超 Gist 单文件限制'); }
                     files[bf] = { content: s.content };
@@ -16046,14 +16070,21 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 }
                 if (main.scripts && main.scripts.length) {
                     wallShowBackupStatus('⏳ 还原脚本内容...', 'loading');
+                    let _descMap = null;
+                    const hdr = { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` };
                     for (const ref of main.scripts) {
                         const sc = await wallGetBackupFile(backupId, ref.backupFile, token);
                         if (!sc) continue;
-                        const hdr = { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` };
                         const chk = await fetch(`https://api.github.com/gists/${ref.gistId}`, { headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` } });
-                        const body = JSON.stringify({ files: { [ref.fileName]: { content: sc } } });
-                        if (chk.ok) { await fetch(`https://api.github.com/gists/${ref.gistId}`, { method: 'PATCH', headers: hdr, body }); }
-                        else { await fetch('https://api.github.com/gists', { method: 'POST', headers: hdr, body: JSON.stringify({ description: ref.description, public: false, files: { [ref.fileName]: { content: sc } } }) }); }
+                        if (chk.ok) {
+                            await fetch(`https://api.github.com/gists/${ref.gistId}`, { method: 'PATCH', headers: hdr, body: JSON.stringify({ files: { [ref.fileName]: { content: sc } } }) });
+                        } else {
+                            // 原 Gist 已删/地址失效：先按描述匹配现有 Gist（防重复建），再没有才重建
+                            if (!_descMap) { _descMap = {}; (await wallListScriptGists(token)).forEach(g => { _descMap[g.description] = g; }); }
+                            const g = _descMap[ref.description];
+                            if (g) await fetch(`https://api.github.com/gists/${g.id}`, { method: 'PATCH', headers: hdr, body: JSON.stringify({ files: { [g.fileName || ref.fileName]: { content: sc } } }) });
+                            else await fetch('https://api.github.com/gists', { method: 'POST', headers: hdr, body: JSON.stringify({ description: ref.description, public: false, files: { [ref.fileName]: { content: sc } } }) });
+                        }
                     }
                 }
                 wallShowBackupStatus('✅ 还原成功！建议刷新页面查看', 'success');
@@ -16084,17 +16115,140 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 document.body.insertAdjacentHTML('beforeend', html);
             } catch (e) { alert('查看失败：' + e.message); }
         }
+        // 导出：打包全部真实内容（消息+个人资料+脚本内容）为一个自包含本地 json——
+        // 不含任何"必须原 Gist 地址存在"的依赖，之后经「导入本地备份」可完整还原（按描述重新匹配地址）。
         async function wallExportBackup(fileName) {
+            wallShowBackupStatus('⏳ 正在打包全部内容（消息+资料+脚本）...', 'loading');
             try {
-                const token = getGistToken();
+                const token = getGistToken(); if (!token) throw new Error('无Token');
                 const backupId = localStorage.getItem(WALL_BACKUP_GIST_KEY);
                 const content = await wallGetBackupFile(backupId, fileName, token);
-                if (!content) { alert('读取失败'); return; }
-                const blob = new Blob([content], { type: 'application/json' });
+                if (!content) throw new Error('备份文件不存在');
+                const main = JSON.parse(content);
+                const cf = main.files || {};
+                // 消息（分片合并为完整数组）
+                const msgFileList = Array.isArray(cf.messages) ? cf.messages : (cf.messages ? [cf.messages] : []);
+                let messages = [];
+                for (const mf of msgFileList) {
+                    const mc = await wallGetBackupFile(backupId, mf, token);
+                    if (mc) { try { messages = messages.concat((JSON.parse(mc).messages) || []); } catch (e) {} }
+                }
+                // 个人资料（原样字符串保留）
+                let profiles = null;
+                if (cf.profiles) profiles = await wallGetBackupFile(backupId, cf.profiles, token);
+                // 脚本内容（含撞名修复前旧备份的已知局限：撞名文件只含最后写入的一份）
+                const scripts = [];
+                for (const ref of (main.scripts || [])) {
+                    const sc = await wallGetBackupFile(backupId, ref.backupFile, token);
+                    if (sc !== null) scripts.push({ description: ref.description, fileName: ref.fileName, gistId: ref.gistId, bytes: ref.bytes, content: sc });
+                }
+                const bundle = { __tfjl_wall_export__: 2, exportedAt: Date.now(), sourceBackup: fileName, sourceDate: main.date || '', messageCount: messages.length, scriptCount: scripts.length, messages, profiles, scripts };
+                const dt = new Date(); const p2 = (n) => String(n).padStart(2, '0');
+                const dl = `wall-backup-full-${dt.getFullYear()}${p2(dt.getMonth() + 1)}${p2(dt.getDate())}-${p2(dt.getHours())}${p2(dt.getMinutes())}${p2(dt.getSeconds())}.json`;
+                const blob = new Blob([JSON.stringify(bundle)], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
-                const a = document.createElement('a'); a.href = url; a.download = fileName; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-            } catch (e) { alert('导出失败：' + e.message); }
+                const a = document.createElement('a'); a.href = url; a.download = dl; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+                wallShowBackupStatus(`✅ 已导出全量包：消息 ${messages.length} 条 · 脚本 ${scripts.length} 个（${dl}）`, 'success');
+            } catch (e) { wallShowBackupStatus(`❌ 导出失败：${e.message}`, 'error'); }
         }
+
+        // 导入本地全量备份：选文件 → 摘要确认 → 合并/覆盖写入。
+        // 地址无关性：脚本按「描述」匹配现有 Gist（对上→原文件名覆盖写回；原 Gist 已删→自动重建）；
+        // 消息写入"当前"消息 Gist（wallResolveMessagesGistId 经索引指针实时解析，不依赖备份里的旧 id）。
+        function wallImportOnFile(input) {
+            const f = input.files && input.files[0];
+            try { input.value = ''; } catch (e) {}
+            if (!f) return;
+            const reader = new FileReader();
+            reader.onload = () => {
+                try {
+                    const bundle = JSON.parse(reader.result);
+                    if (!bundle || bundle.__tfjl_wall_export__ !== 2) { alert('不是有效的「需求墙全量备份」文件（缺 __tfjl_wall_export__ 标记）'); return; }
+                    window.__wallImportBundle = bundle;
+                    const mOld = document.getElementById('wallBackupDetailModal'); if (mOld) mOld.remove();
+                    const html = `<div id="wallBackupDetailModal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:99999;display:flex;justify-content:center;align-items:center;">
+                        <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:12px;padding:20px;max-width:600px;width:90%;max-height:80vh;overflow-y:auto;">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;"><h3 style="color:#ffd700;margin:0;">📥 导入本地备份</h3><button onclick="document.getElementById('wallBackupDetailModal').remove()" style="background:none;border:none;color:#fff;font-size:1.5rem;cursor:pointer;">✕</button></div>
+                            <div style="background:rgba(0,0,0,0.3);border-radius:8px;padding:12px;font-size:0.85rem;margin-bottom:12px;">
+                                <div style="color:#4ade80;">来源备份时间：${escapeHtml(String(bundle.sourceDate || ''))}</div>
+                                <div style="color:rgba(255,255,255,0.8);margin-top:6px;">消息 ${(bundle.messages || []).length} 条 · 脚本 ${(bundle.scripts || []).length} 个${bundle.profiles ? ' · 含个人资料' : ''}</div>
+                                <div style="color:rgba(255,255,255,0.55);font-size:0.75rem;margin-top:6px;">脚本按「描述」重新匹配：对得上→写回内容；原 Gist 已删→自动重建（脚本列表会重新发现，不依赖旧地址）。</div>
+                            </div>
+                            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                                <button onclick="wallApplyImport(true)" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:0.82rem;">🔄 合并导入（保留现有，补缺失）</button>
+                                <button onclick="wallApplyImport(false)" style="background:linear-gradient(135deg,#f97316,#ea580c);color:white;border:none;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:0.82rem;">⚠️ 覆盖导入（消息完全替换）</button>
+                                <button onclick="document.getElementById('wallBackupDetailModal').remove()" style="background:rgba(255,255,255,0.1);color:white;border:none;padding:8px 14px;border-radius:6px;cursor:pointer;">取消</button>
+                            </div>
+                        </div></div>`;
+                    document.body.insertAdjacentHTML('beforeend', html);
+                } catch (e) { alert('读取失败：' + e.message); }
+            };
+            reader.readAsText(f, 'utf-8');
+        }
+        window.wallImportOnFile = wallImportOnFile;
+
+        async function wallApplyImport(merge) {
+            const bundle = window.__wallImportBundle;
+            const mEl = document.getElementById('wallBackupDetailModal'); if (mEl) mEl.remove();
+            if (!bundle) return;
+            if (!confirm(`⏳ 确定导入该本地备份吗？\n模式：${merge ? '合并（保留当前新消息，补回缺失的）' : '覆盖（用备份完全替换消息）'}\n脚本：按描述匹配写回，缺失的自动重建\n\n⚠️ 这将影响全部用户的需求墙！`)) return;
+            wallShowBackupStatus('⏳ 正在导入...', 'loading');
+            try {
+                const token = getGistToken(); if (!token) throw new Error('无Token');
+                // 1) 消息 → 写入"当前"消息 Gist
+                if (Array.isArray(bundle.messages) && bundle.messages.length) {
+                    wallShowBackupStatus('⏳ 写入消息...', 'loading');
+                    const msgGistId = await wallResolveMessagesGistId();
+                    if (!msgGistId) throw new Error('找不到消息 Gist');
+                    let finalMsgs;
+                    if (merge) {
+                        const seen = new Set((wallMessages || []).map(x => x.time + '_' + x.author + '_' + (x.content || '').substring(0, 30)));
+                        finalMsgs = (wallMessages || []).slice();
+                        let added = 0;
+                        bundle.messages.forEach(x => { const k = x.time + '_' + x.author + '_' + (x.content || '').substring(0, 30); if (!seen.has(k)) { finalMsgs.push(x); seen.add(k); added++; } });
+                        finalMsgs.sort((a, b) => b.time - a.time);
+                        wallShowBackupStatus(`⏳ 合并：补回 ${added} 条，共 ${finalMsgs.length} 条...`, 'loading');
+                    } else {
+                        finalMsgs = bundle.messages.slice().sort((a, b) => b.time - a.time);
+                    }
+                    finalMsgs = finalMsgs.slice(0, MAX_MESSAGES);
+                    const resp = await fetch(`https://api.github.com/gists/${msgGistId}`, { method: 'PATCH', headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` }, body: JSON.stringify({ files: { 'messages.json': { content: JSON.stringify({ messages: finalMsgs }, null, 2) } } }) });
+                    if (!resp.ok) throw new Error('消息写入失败');
+                }
+                // 2) 个人资料
+                if (bundle.profiles) {
+                    wallShowBackupStatus('⏳ 写入个人资料...', 'loading');
+                    const profGistId = await wallResolveMessagesGistId();
+                    try { await fetch(`https://api.github.com/gists/${profGistId}`, { method: 'PATCH', headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` }, body: JSON.stringify({ files: { 'profiles.json': { content: bundle.profiles } } }) }); } catch (e) {}
+                }
+                // 3) 脚本：按描述匹配现有 Gist → 原文件名覆盖写回；没有 → 重建新 Gist
+                let patched = 0, created = 0, skipped = 0;
+                if (Array.isArray(bundle.scripts) && bundle.scripts.length) {
+                    wallShowBackupStatus('⏳ 匹配脚本 Gist（按描述）...', 'loading');
+                    const existing = await wallListScriptGists(token);
+                    const byDesc = {}; existing.forEach(g => { byDesc[g.description] = g; });
+                    const hdr = { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` };
+                    for (const s of bundle.scripts) {
+                        if (s.content == null) { skipped++; continue; }
+                        const g = byDesc[s.description];
+                        // 命中：用该 Gist 现有文件名覆盖（避免新增多余文件）；未命中：用备份里的原名重建
+                        const fn = (g && g.fileName) || s.fileName || 'script.txt';
+                        let okWrite = false;
+                        if (g) {
+                            const r = await fetch(`https://api.github.com/gists/${g.id}`, { method: 'PATCH', headers: hdr, body: JSON.stringify({ files: { [fn]: { content: s.content } } }) });
+                            if (r.ok) { patched++; okWrite = true; }
+                        }
+                        if (!okWrite) {
+                            const r2 = await fetch('https://api.github.com/gists', { method: 'POST', headers: hdr, body: JSON.stringify({ description: s.description || ('脚本分享: ' + fn), public: false, files: { [fn]: { content: s.content } } }) });
+                            if (r2.ok) created++; else skipped++;
+                        }
+                    }
+                }
+                wallShowBackupStatus(`✅ 导入完成！消息${merge ? '合并' : '覆盖'} · 脚本写回 ${patched} · 重建 ${created}${skipped ? ' · 跳过 ' + skipped : ''}，建议刷新页面`, 'success');
+                if (typeof fetchMessages === 'function') fetchMessages();
+            } catch (e) { wallShowBackupStatus(`❌ 导入失败：${e.message}`, 'error'); }
+        }
+        window.wallApplyImport = wallApplyImport;
         async function wallDeleteBackup(fileName) {
             if (!confirm('⚠️ 确定删除该备份？不可恢复！')) return;
             try {
