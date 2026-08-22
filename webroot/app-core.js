@@ -12214,8 +12214,9 @@ function registerHeartbeatWithRust() {
             deviceId: getDeviceId(),
             nick: _myNick(),
             token: token,
-            counterGistId: gid
-        }).then(() => { console.log('[heartbeat] Rust 心跳注册成功，托盘挂机将每5分钟独立保活'); })
+            counterGistId: gid,
+            tzOffsetMin: new Date().getTimezoneOffset()   // 供 Rust 判"每自然天第一次心跳打卡"的本地 0 点（中国 -480，Rust 侧取反）
+        }).then(() => { console.log('[heartbeat] Rust 心跳注册成功，托盘挂机将每5分钟独立保活+每日打卡'); })
           .catch((e) => { console.error('[heartbeat] register_heartbeat 调用失败（P3掉线根因排查点2，可能缺少 capabilities 权限 allow-register-heartbeat）：' + e); });
     } catch (e) { console.error('[heartbeat] 注册异常：' + e); }
 }

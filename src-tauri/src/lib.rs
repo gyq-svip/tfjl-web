@@ -25,11 +25,16 @@ struct HeartbeatCtx {
     nick: String,
     token: String,
     counter_gist_id: String,
+    // UTC→本地的分钟偏移（中国 +480），用于"每自然天第一次心跳打卡"判断 0 点换天。
+    // JS 传 getTimezoneOffset()（符号相反，中国 -480）；旧版前端不传则按 +8 小时兜底。
+    tz_offset_min: i64,
 }
 
 struct AppState {
     umi_pid: std::sync::Mutex<Option<u32>>,
     heartbeat: std::sync::Mutex<Option<HeartbeatCtx>>,
+    // 已打卡的自然天索引（内存标志：同一天内不再碰登录 Gist；天级真正去重看 Gist 内容）
+    checkin_day: std::sync::Mutex<Option<u64>>,
 }
 
 // 前端启动（或设置 token）时把心跳所需身份注册给 Rust；Rust 线程据此独立保活。
@@ -39,11 +44,14 @@ fn register_heartbeat(
     nick: String,
     token: String,
     counter_gist_id: String,
+    tz_offset_min: Option<i32>,
     state: tauri::State<AppState>,
 ) -> Result<(), String> {
+    // JS getTimezoneOffset() 返回"本地落后 UTC 多少分钟"（UTC+8 为 -480），取反即 UTC→本地
+    let tz = tz_offset_min.map(|v| -(v as i64)).unwrap_or(480);
     let mut hb = state.heartbeat.lock().unwrap();
-    *hb = Some(HeartbeatCtx { device_id, nick, token, counter_gist_id });
-    println!("[heartbeat] registered device={} gist={}", hb.as_ref().unwrap().device_id, hb.as_ref().unwrap().counter_gist_id);
+    *hb = Some(HeartbeatCtx { device_id, nick, token, counter_gist_id, tz_offset_min: tz });
+    println!("[heartbeat] registered device={} gist={} tz=+{}min", hb.as_ref().unwrap().device_id, hb.as_ref().unwrap().counter_gist_id, tz);
     Ok(())
 }
 
@@ -125,6 +133,92 @@ async fn do_gist_heartbeat(ctx: &HeartbeatCtx) -> Result<(), String> {
         return Err(format!("PATCH status {}", patch_resp.status()));
     }
     Ok(())
+}
+
+// ==================== 托盘挂机每日打卡 ====================
+// 背景：登录打卡只在前端页面加载时触发（recordLoginEvent），窗口最小化到托盘后 WebView 冻结、
+// 页面不重新加载 → 常驻托盘的设备（如挂机的 P3）永远不打卡。这里让 Rust 心跳线程在
+// 每自然天第一次心跳时往登录打卡汇总 Gist 记一笔，与 app-core.js 的 LOGIN_GIST_ID/LOGIN_GIST_FILENAME 一致。
+const LOGIN_GIST_ID: &str = "51e7030023fa57de40aaf59bc48e9969";
+const LOGIN_GIST_FILE: &str = "login-log.json";
+
+// 本地自然天索引（本地 0 点换天）：offset_min 为 UTC→本地分钟偏移
+fn local_day_index(unix_ms: u64, offset_min: i64) -> u64 {
+    ((unix_ms as i64 + offset_min * 60_000).max(0) as u64) / 86_400_000
+}
+
+// 往登录打卡汇总 Gist 记一笔 {nick, ts}；今天已打过（Gist 里最后一条同昵称记录在今天）则跳过。
+// 返回 Ok(true)=本次写入，Ok(false)=今天已打过；Err=网络/接口失败（下个心跳 tick 重试）。
+async fn do_daily_checkin(ctx: &HeartbeatCtx, today: u64) -> Result<bool, String> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .map_err(|e| format!("client build: {}", e))?;
+    let url = format!("https://api.github.com/gists/{}", LOGIN_GIST_ID);
+    let auth = format!("token {}", ctx.token);
+
+    let get_resp = client
+        .get(&url)
+        .header(reqwest::header::ACCEPT, "application/vnd.github.v3+json")
+        .header(reqwest::header::USER_AGENT, "TFJL-App-Heartbeat/1.0")
+        .header(reqwest::header::AUTHORIZATION, &auth)
+        .send()
+        .await
+        .map_err(|e| format!("GET: {}", e))?;
+    if !get_resp.status().is_success() {
+        return Err(format!("GET status {}", get_resp.status()));
+    }
+    let gist: serde_json::Value = get_resp.json().await.map_err(|e| format!("GET json: {}", e))?;
+    let content = gist
+        .get("files")
+        .and_then(|f| f.get(LOGIN_GIST_FILE))
+        .and_then(|c| c.get("content"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("[]");
+
+    let mut arr: serde_json::Value = serde_json::from_str(content).unwrap_or_else(|_| serde_json::json!([]));
+    if !arr.is_array() {
+        arr = serde_json::json!([]);
+    }
+
+    // 天级去重看 Gist 内容：最后一条同昵称记录若已落在今天（本地时区），本设备今天不再记
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0);
+    if let Some(items) = arr.as_array() {
+        for entry in items.iter().rev() {
+            let n = entry.get("nick").and_then(|v| v.as_str()).unwrap_or("");
+            let ts = entry.get("ts").and_then(|v| v.as_u64()).unwrap_or(0);
+            if n == ctx.nick && ts > 0 && local_day_index(ts, ctx.tz_offset_min) == today {
+                return Ok(false);
+            }
+        }
+    }
+
+    if let Some(items) = arr.as_array_mut() {
+        items.push(serde_json::json!({ "nick": ctx.nick, "ts": now_ms }));
+        // 与前端 pushLoginEventToGist 相同上限，防无限增长
+        while items.len() > 20000 {
+            items.remove(0);
+        }
+    }
+    let new_content = serde_json::to_string(&arr).map_err(|e| format!("serialize: {}", e))?;
+    let patch_body = serde_json::json!({ "files": { LOGIN_GIST_FILE: { "content": new_content } } });
+    let patch_resp = client
+        .patch(&url)
+        .header(reqwest::header::ACCEPT, "application/vnd.github.v3+json")
+        .header(reqwest::header::USER_AGENT, "TFJL-App-Heartbeat/1.0")
+        .header(reqwest::header::AUTHORIZATION, &auth)
+        .json(&patch_body)
+        .send()
+        .await
+        .map_err(|e| format!("PATCH: {}", e))?;
+    if !patch_resp.status().is_success() {
+        return Err(format!("PATCH status {}", patch_resp.status()));
+    }
+    println!("[heartbeat] daily checkin written nick={} day={}", ctx.nick, today);
+    Ok(true)
 }
 
 // 托盘图标闪动（需求墙新未读提醒）：保存托盘句柄 + 闪动开关 + 是否已启动闪动任务
@@ -1085,7 +1179,7 @@ pub fn run() {
             download_umi_ocr,
             download_skins,
         ])
-        .manage(AppState { umi_pid: std::sync::Mutex::new(None), heartbeat: std::sync::Mutex::new(None) })
+        .manage(AppState { umi_pid: std::sync::Mutex::new(None), heartbeat: std::sync::Mutex::new(None), checkin_day: std::sync::Mutex::new(None) })
         .setup(|app| {
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.eval("window.__TAURI_APP__ = true; console.log('[Tauri] APP标记已注入');");
@@ -1160,6 +1254,22 @@ pub fn run() {
                             if !ctx.token.is_empty() && !ctx.counter_gist_id.is_empty() {
                                 if let Err(e) = tauri::async_runtime::block_on(do_gist_heartbeat(&ctx)) {
                                     eprintln!("[heartbeat] tick failed: {}", e);
+                                }
+                            }
+                            // 每自然天第一次心跳补一笔登录打卡（托盘挂机设备页面永不重载、原本永远不打卡）。
+                            // 内存 day 标志同一天只查一次 Gist；真正去重以 Gist 内容为准（进程重启也不会重复记）。
+                            if !ctx.token.is_empty() && !ctx.nick.is_empty() {
+                                let now_ms = std::time::SystemTime::now()
+                                    .duration_since(std::time::UNIX_EPOCH)
+                                    .map(|d| d.as_millis() as u64)
+                                    .unwrap_or(0);
+                                let today = local_day_index(now_ms, ctx.tz_offset_min);
+                                let mut day = st.checkin_day.lock().unwrap();
+                                if *day != Some(today) {
+                                    match tauri::async_runtime::block_on(do_daily_checkin(&ctx, today)) {
+                                        Ok(_) => { *day = Some(today); }
+                                        Err(e) => eprintln!("[heartbeat] daily checkin failed: {}", e), // 下个 tick 自动重试
+                                    }
                                 }
                             }
                         }
