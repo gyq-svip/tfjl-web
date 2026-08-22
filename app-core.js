@@ -17266,8 +17266,22 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                             ${nicks.map(n => `<span style="font-size:0.72rem;color:rgba(255,255,255,0.6);background:rgba(255,255,255,0.06);border-radius:8px;padding:1px 7px;">${escapeHtml(n)}</span>`).join('')}
                         </div>`;
                     if (open) {
-                        html += `<div style="padding:6px 10px;font-size:0.8rem;">`;
-                        for (const r of list) html += `<div style="margin:2px 0;"><span style="color:#80deea;">${fmt(r.ts).slice(11, 16)}</span> · ${escapeHtml(r.nick || '匿名用户')}</div>`;
+                        // 明细按人合并：每人一行（昵称+次数），该人当日各时间点做成小徽章流式排列，占不下自动换行
+                        const byN = {};
+                        for (const r of list) {
+                            const n = r.nick || '匿名用户';
+                            if (!byN[n]) byN[n] = [];
+                            byN[n].push(r.ts);
+                        }
+                        const order = Object.keys(byN).sort((a, b) => byN[b].length - byN[a].length || Math.min.apply(null, byN[a]) - Math.min.apply(null, byN[b]));
+                        html += `<div style="padding:6px 10px;">`;
+                        for (const n of order) {
+                            const ts = byN[n].slice().sort((a, b) => a - b);
+                            html += `<div style="display:flex;gap:6px;margin:4px 0 6px;align-items:flex-start;flex-wrap:wrap;">
+                                <span style="min-width:80px;font-size:0.8rem;color:#e0f7fa;">${escapeHtml(n)}<span style="color:rgba(255,255,255,0.45);"> ${ts.length}次</span></span>
+                                ${ts.map(t => `<span style="font-size:0.75rem;color:#80deea;background:rgba(128,222,234,0.1);border:1px solid rgba(128,222,234,0.25);border-radius:8px;padding:1px 6px;white-space:nowrap;">${fmt(t).slice(11, 16)}</span>`).join('')}
+                            </div>`;
+                        }
                         html += `</div>`;
                     }
                     html += `</div>`;
