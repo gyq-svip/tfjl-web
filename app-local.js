@@ -4066,125 +4066,18 @@ if (isTauriApp) {
     window.loadSkinSelections = loadSkinSelections;
     window.exportConsoleLogsToFile = exportConsoleLogsToFile;
 
-    // ==================== 异常诊断（菜单「🔧 异常诊断」）====================
-    // 全面自查：运行环境 / 文件 / 插件 / 昵称 / 项目 / 写盘 / 读远端延迟，异常项给出分析与兜底联系方式。
-    async function _pingUrl(url, timeoutMs = 8000) {
-        const t0 = performance.now();
-        try {
-            const ctrl = new AbortController();
-            const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-            const resp = await fetch(url, { method: 'HEAD', mode: 'no-cors', cache: 'no-store', signal: ctrl.signal });
-            clearTimeout(timer);
-            const ms = Math.round(performance.now() - t0);
-            return { ok: true, ms };
-        } catch (e) {
-            const ms = Math.round(performance.now() - t0);
-            return { ok: false, ms, err: String(e && e.message || e) };
-        }
-    }
-
-    async function runDiagnostics() {
-        const items = [];
-        const push = (name, status, detail, advice) =>
-            items.push({ name, status, detail: detail || '', advice: advice || '' });
-        const WX = 'wx：gyqsvip';
-
-        // 1) 运行环境
-        push('运行环境', isTauriApp ? 'ok' : 'info',
-            isTauriApp ? '桌面 App（Tauri），数据走本地磁盘落盘' : '网页版（浏览器），数据走浏览器缓存，清缓存会丢');
-
-        // 2) Tauri 插件 / 核心命令是否可用（"插件纯不存在"自查）
-        const hasInvoke = !!(window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke);
-        if (isTauriApp) {
-            if (hasInvoke) {
-                // 探测一个核心写盘命令是否真的能被调用（ACL/权限/插件缺失都会在调用时报错）
-                try {
-                    await window.__TAURI_INTERNALS__.invoke('write_text_file', { filePath: _getDatPath(_getSyncDir()) + '.diag_probe', content: '1' });
-                    push('Tauri 插件/写盘命令', 'ok', 'invoke 可用，核心命令 write_text_file 可调用');
-                } catch (e) {
-                    push('Tauri 插件/写盘命令', 'error',
-                        'invoke 存在但调用失败：' + String(e && e.message || e),
-                        '很可能是插件/ACL 权限缺失或 Rust 未重打包。请先重打包桌面版；仍异常联系我 ' + WX);
-                }
-            } else {
-                push('Tauri 插件/写盘命令', 'error',
-                    '未找到 invoke 函数（__TAURI_INTERNALS__ 缺失），插件未加载',
-                    'App 运行环境异常，建议重装/重打包桌面版；仍异常联系我 ' + WX);
-            }
-        }
-
-        // 3) 数据目录 / tfjl.dat 文件
-        const datDir = _getSyncDir();
-        if (!datDir) {
-            push('数据目录', 'error', '未配置软件数据目录', '请在「App本地设置」中指定数据目录后重试');
-        } else {
-            const datPath = _getDatPath(datDir);
-            let dirExists = false, fileExists = false;
-            try { dirExists = !!(await readDir(datDir)); } catch (e) {}
-            try { fileExists = !!(await readTextFile(datPath)); } catch (e) {}
-            push('数据目录', dirExists ? 'ok' : 'warn',
-                dirExists ? ('存在：' + datDir) : ('不存在：' + datDir),
-                dirExists ? '' : '目录不存在，写入时会自动创建；若写入仍失败多为权限/磁盘问题');
-            push('统一存储文件 tfjl.dat', fileExists ? 'ok' : 'warn',
-                fileExists ? ('存在 (' + datPath + ')') : ('尚未生成：' + datPath),
-                fileExists ? '' : '首次启动后保存任意设置即会生成，若长期为空请手动操作一次保存');
-        }
-
-        // 4) 写盘测试（临时键写入再读回，验证磁盘真正可写）
-        try {
-            const probeKey = '__tfjl_diag_probe__';
-            localStorage.setItem(probeKey, String(Date.now()));
-            await syncAllNow();
-            // 重新从磁盘读回验证
-            await _ensureStoreLoaded(_getSyncDir());
-            const back = _storeMap.get(probeKey);
-            localStorage.removeItem(probeKey);
-            await syncAllNow();
-            push('写盘验证', back ? 'ok' : 'error',
-                back ? '临时数据已成功写入并读回 tfjl.dat' : '写入后无法从磁盘读回（落盘失败）',
-                back ? '' : '磁盘写入异常，检查目录权限/磁盘空间；仍异常联系我 ' + WX);
-        } catch (e) {
-            push('写盘验证', 'error', '写盘测试异常：' + String(e && e.message || e),
-                '磁盘写入异常，检查目录权限/磁盘空间；仍异常联系我 ' + WX);
-        }
-
-        // 5) 昵称
-        const nick = (localStorage.getItem('TFJL_UserName') || '').trim();
-        if (nick && nick !== '匿名用户') {
-            push('昵称', 'ok', '当前昵称：' + nick);
-        } else {
-            push('昵称', 'warn', '未设置昵称或仍为「匿名用户」',
-                '匿名用户无法区分身份，请在进入系统后按提示设置昵称');
-        }
-
-        // 6) 项目数据
-        let projOk = false, projDetail = '';
-        try {
-            const pj = await tfjlRestoreAllProjects();
-            if (Array.isArray(pj) && pj.length > 0) { projOk = true; projDetail = ('共 ' + pj.length + ' 个项目'); }
-            else projDetail = '无项目（空）';
-        } catch (e) { projDetail = '读取异常：' + String(e && e.message || e); }
-        push('项目数据', projOk ? 'ok' : 'warn', projDetail,
-            projOk ? '' : '若你创建过项目却为空，说明此前落盘丢失，已用本次加固修复；新项目请确认退出前已保存');
-
-        // 7) 网络 / 远端资源延迟
-        push('网络检查', 'running', '正在测速…');
-        const targets = [
-            { label: 'GitHub（代码/皮肤源）', url: 'https://raw.githubusercontent.com/gyq-svip/tfjl-web/main/index.html' },
-            { label: 'Gitee（安装包/下载源）', url: 'https://gitee.com/gyq-svip/tfjl-web' },
-        ];
-        const netResults = [];
-        for (const tg of targets) {
-            const r = await _pingUrl(tg.url);
-            netResults.push(tg.label + '：' + (r.ok ? (r.ms + 'ms') : ('不可达(' + (r.err || '超时') + ')')));
-            push('网络·' + tg.label, r.ok ? (r.ms < 1500 ? 'ok' : 'warn') : 'error',
-                r.ok ? ('延迟 ' + r.ms + 'ms') : ('不可达：' + (r.err || '超时')),
-                r.ok ? (r.ms >= 1500 ? '延迟偏高，打开在线资源可能较慢' : '') : '网络不通，在线功能（皮肤同步/更新）会失败，可稍后重试或检查代理');
-        }
-
-        return items;
-    }
-    window.runDiagnostics = runDiagnostics;   // 菜单「异常诊断」调用
+    // 暴露诊断所需的内部依赖给全局（供文件末尾的全局 runDiagnostics 在网页版也能调用）
+    window.__tfjlDiagApi = {
+        isTauriApp: isTauriApp,
+        getSyncDir: _getSyncDir,
+        getDatPath: _getDatPath,
+        readDir: readDir,
+        readTextFile: readTextFile,
+        ensureStoreLoaded: _ensureStoreLoaded,
+        getStoreMap: () => _storeMap,
+        syncAllNow: syncAllNow,
+        restoreAllProjects: tfjlRestoreAllProjects,
+    };
 
     // 确保 DOMContentLoaded 后初始化（处理竞态：script 加载时事件可能已触发）
     if (document.readyState === 'loading') {
@@ -4194,3 +4087,131 @@ if (isTauriApp) {
     }
     console.log('[APP] app-local.js 已加载 (IPC模式)');
 }
+
+// ==================== 异常诊断（全局，网页版/App版通用）====================
+// 放在 IIFE 外，保证网页版也能加载 window.runDiagnostics（菜单「🔧 异常诊断」）
+// Tauri 专属检查项在网页版自动标 info 跳过，其余（运行环境/昵称/项目/网络）通用。
+async function _pingUrl(url, timeoutMs = 8000) {
+    const t0 = performance.now();
+    try {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+        await fetch(url, { method: 'HEAD', mode: 'no-cors', cache: 'no-store', signal: ctrl.signal });
+        clearTimeout(timer);
+        const ms = Math.round(performance.now() - t0);
+        return { ok: true, ms };
+    } catch (e) {
+        const ms = Math.round(performance.now() - t0);
+        return { ok: false, ms, err: String(e && e.message || e) };
+    }
+}
+
+async function runDiagnostics() {
+    const api = window.__tfjlDiagApi;
+    const isApp = !!(api && api.isTauriApp);
+    const items = [];
+    const push = (name, status, detail, advice) =>
+        items.push({ name, status, detail: detail || '', advice: advice || '' });
+    const WX = 'wx：gyqsvip';
+
+    // 1) 运行环境
+    push('运行环境', isApp ? 'ok' : 'info',
+        isApp ? '桌面 App（Tauri），数据走本地磁盘落盘' : '网页版（浏览器），数据走浏览器缓存，清缓存会丢');
+
+    // 2) Tauri 插件 / 核心命令（仅 App 版检查；网页版跳过）
+    if (isApp) {
+        const hasInvoke = !!(window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke);
+        if (hasInvoke) {
+            try {
+                await window.__TAURI_INTERNALS__.invoke('write_text_file', { filePath: api.getDatPath(api.getSyncDir()) + '.diag_probe', content: '1' });
+                push('Tauri 插件/写盘命令', 'ok', 'invoke 可用，核心命令 write_text_file 可调用');
+            } catch (e) {
+                push('Tauri 插件/写盘命令', 'error',
+                    'invoke 存在但调用失败：' + String(e && e.message || e),
+                    '很可能是插件/ACL 权限缺失或 Rust 未重打包。请先重打包桌面版；仍异常联系我 ' + WX);
+            }
+        } else {
+            push('Tauri 插件/写盘命令', 'error',
+                '未找到 invoke 函数（__TAURI_INTERNALS__ 缺失），插件未加载',
+                'App 运行环境异常，建议重装/重打包桌面版；仍异常联系我 ' + WX);
+        }
+    } else {
+        push('Tauri 插件/写盘命令', 'info', '网页版不依赖 Tauri 插件，跳过此项');
+    }
+
+    // 3) 数据目录 / tfjl.dat 文件（仅 App 版）
+    if (isApp) {
+        const datDir = api.getSyncDir();
+        if (!datDir) {
+            push('数据目录', 'error', '未配置软件数据目录', '请在「App本地设置」中指定数据目录后重试');
+        } else {
+            const datPath = api.getDatPath(datDir);
+            let dirExists = false, fileExists = false;
+            try { dirExists = !!(await api.readDir(datDir)); } catch (e) {}
+            try { fileExists = !!(await api.readTextFile(datPath)); } catch (e) {}
+            push('数据目录', dirExists ? 'ok' : 'warn',
+                dirExists ? ('存在：' + datDir) : ('不存在：' + datDir),
+                dirExists ? '' : '目录不存在，写入时会自动创建；若写入仍失败多为权限/磁盘问题');
+            push('统一存储文件 tfjl.dat', fileExists ? 'ok' : 'warn',
+                fileExists ? ('存在 (' + datPath + ')') : ('尚未生成：' + datPath),
+                fileExists ? '' : '首次启动后保存任意设置即会生成，若长期为空请手动操作一次保存');
+        }
+    } else {
+        push('数据目录', 'info', '网页版数据存于浏览器缓存，无本地 tfjl.dat');
+    }
+
+    // 4) 写盘测试（仅 App 版）
+    if (isApp) {
+        try {
+            const probeKey = '__tfjl_diag_probe__';
+            localStorage.setItem(probeKey, String(Date.now()));
+            await api.syncAllNow();
+            await api.ensureStoreLoaded(api.getSyncDir());
+            const back = api.getStoreMap().get(probeKey);
+            localStorage.removeItem(probeKey);
+            await api.syncAllNow();
+            push('写盘验证', back ? 'ok' : 'error',
+                back ? '临时数据已成功写入并读回 tfjl.dat' : '写入后无法从磁盘读回（落盘失败）',
+                back ? '' : '磁盘写入异常，检查目录权限/磁盘空间；仍异常联系我 ' + WX);
+        } catch (e) {
+            push('写盘验证', 'error', '写盘测试异常：' + String(e && e.message || e),
+                '磁盘写入异常，检查目录权限/磁盘空间；仍异常联系我 ' + WX);
+        }
+    } else {
+        push('写盘验证', 'info', '网页版无本地磁盘写盘，跳过');
+    }
+
+    // 5) 昵称（通用）
+    const nick = (localStorage.getItem('TFJL_UserName') || '').trim();
+    if (nick && nick !== '匿名用户') {
+        push('昵称', 'ok', '当前昵称：' + nick);
+    } else {
+        push('昵称', 'warn', '未设置昵称或仍为「匿名用户」',
+            '匿名用户无法区分身份，请在进入系统后按提示设置昵称');
+    }
+
+    // 6) 项目数据（通用，App 走磁盘/网页走 localStorage）
+    let projOk = false, projDetail = '';
+    try {
+        const pj = api ? await api.restoreAllProjects() : JSON.parse(localStorage.getItem('TFJL_PROJECTS') || '[]');
+        if (Array.isArray(pj) && pj.length > 0) { projOk = true; projDetail = ('共 ' + pj.length + ' 个项目'); }
+        else projDetail = '无项目（空）';
+    } catch (e) { projDetail = '读取异常：' + String(e && e.message || e); }
+    push('项目数据', projOk ? 'ok' : 'warn', projDetail,
+        projOk ? '' : '若你创建过项目却为空，说明此前落盘丢失，已用本次加固修复；新项目请确认退出前已保存');
+
+    // 7) 网络 / 远端资源延迟（通用）
+    const targets = [
+        { label: 'GitHub（代码/皮肤源）', url: 'https://raw.githubusercontent.com/gyq-svip/tfjl-web/main/index.html' },
+        { label: 'Gitee（安装包/下载源）', url: 'https://gitee.com/gyq-svip/tfjl-web' },
+    ];
+    for (const tg of targets) {
+        const r = await _pingUrl(tg.url);
+        push('网络·' + tg.label, r.ok ? (r.ms < 1500 ? 'ok' : 'warn') : 'error',
+            r.ok ? ('延迟 ' + r.ms + 'ms') : ('不可达：' + (r.err || '超时')),
+            r.ok ? (r.ms >= 1500 ? '延迟偏高，打开在线资源可能较慢' : '') : '网络不通，在线功能（皮肤同步/更新）会失败，可稍后重试或检查代理');
+    }
+
+    return items;
+}
+window.runDiagnostics = runDiagnostics;   // 菜单「异常诊断」调用
