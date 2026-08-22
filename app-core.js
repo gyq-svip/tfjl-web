@@ -16051,6 +16051,33 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
         }
         window.wallLoadAutoStatus = wallLoadAutoStatus;
 
+        // ===== 孤儿残留检测（纯函数，可单测）：没有被任何现存主索引声明的 content_* 文件 =====
+        // 历史遗留：旧版"删除备份"只删主索引不删关联文件，测试期多次备份/删除后 Gist 里积了大量
+        // 无主 content_* 残留（恢复入口只认主索引，没主索引的 content 文件永远用不上，纯脏数据）。
+        // 安全规则：任一主索引声明过的文件（消息分片/资料/脚本）一律保留；
+        //           任一主索引 JSON 损坏解析失败 → 整体放弃（返回空，宁可不清也不误删）；
+        //           只清 content_ 前缀且未被声明的；其它文件名（backup_status 等）一概不碰。
+        function wallSelectOrphanBackupFiles(filesObj) {
+            const MAIN_RE = /^backup_wall_all_\d{13}\.json$/;
+            const names = Object.keys(filesObj || {});
+            const declared = new Set();
+            for (const n of names) {
+                if (!MAIN_RE.test(n)) continue;
+                let main;
+                try { main = JSON.parse(filesObj[n]); } catch (e) { return []; }   // 主索引损坏 → 保守放弃
+                if (!main || typeof main !== 'object') return [];
+                const cf = main.files || {};
+                (Array.isArray(cf.messages) ? cf.messages : (cf.messages ? [cf.messages] : [])).forEach(function (x) { declared.add(x); });
+                if (cf.profiles) declared.add(cf.profiles);
+                (main.scripts || []).forEach(function (s) { if (s && s.backupFile) declared.add(s.backupFile); });
+            }
+            const out = [];
+            for (const n of names) {
+                if (n.indexOf('content_') === 0 && !declared.has(n)) out.push(n);
+            }
+            return out;
+        }
+
         // 清理超龄备份：dryRun=true 只返回将删除的文件名列表，不做任何写操作
         async function wallCleanupOldBackups(keepDays, dryRun) {
             const token = getGistToken(); if (!token) throw new Error('无Token');
@@ -16058,26 +16085,33 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             const resp = await fetch(`https://api.github.com/gists/${backupId}`, { headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` } });
             if (!resp.ok) throw new Error('读取备份Gist失败 HTTP ' + resp.status);
             const d = await resp.json();
-            const sel = wallSelectExpiredBackupFiles(Object.keys(d.files || {}), Date.now(), keepDays || 10, 3);
-            if (dryRun || !sel.length) return sel;
+            const filesObj = {};
+            Object.keys(d.files || {}).forEach(function (n) { filesObj[n] = (d.files[n] && d.files[n].content) || ''; });
+            const sel = wallSelectExpiredBackupFiles(Object.keys(filesObj), Date.now(), keepDays || 10, 3);
+            const orphans = wallSelectOrphanBackupFiles(filesObj);
+            const all = sel.concat(orphans);
+            if (dryRun || !all.length) return { expired: sel, orphans: orphans };
             const files = {};
-            sel.forEach(function (n) { files[n] = null; });
+            all.forEach(function (n) { files[n] = null; });
             const pr = await fetch(`https://api.github.com/gists/${backupId}`, { method: 'PATCH', headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` }, body: JSON.stringify({ files: files }) });
             if (!pr.ok) throw new Error('清理写入失败 HTTP ' + pr.status);
-            return sel;
+            return { expired: sel, orphans: orphans };
         }
         async function wallPreviewCleanup() {
             try {
-                wallShowBackupStatus('⏳ 正在扫描超龄备份（仅预览，不删除）...', 'loading');
-                const sel = await wallCleanupOldBackups(10, true);
-                if (!sel.length) { wallShowBackupStatus('✅ 没有需要清理的备份（均在保留期内或不足最少保留份数）', 'success'); return; }
-                const mains = sel.filter(function (n) { return n.indexOf('backup_wall_all_') === 0; }).length;
-                if (confirm(`🧹 预览：发现 ${mains} 个超龄备份，共 ${sel.length} 个文件（含消息分片/脚本内容）。\n\n点「确定」立即清理，点「取消」只看不删。`)) {
+                wallShowBackupStatus('⏳ 正在扫描超龄备份与孤儿残留（仅预览，不删除）...', 'loading');
+                const r = await wallCleanupOldBackups(10, true);
+                const mains = r.expired.filter(function (n) { return n.indexOf('backup_wall_all_') === 0; }).length;
+                if (!r.expired.length && !r.orphans.length) { wallShowBackupStatus('✅ 很干净：无超龄备份、无孤儿残留', 'success'); return; }
+                const parts = [];
+                if (mains) parts.push(`${mains} 个超龄备份（${r.expired.length} 个文件，含消息分片/脚本内容）`);
+                if (r.orphans.length) parts.push(`${r.orphans.length} 个孤儿残留文件（旧版删除只删索引留下的无主数据）`);
+                if (confirm(`🧹 预览发现：${parts.join('；')}。\n\n点「确定」立即清理，点「取消」只看不删。`)) {
                     const done = await wallCleanupOldBackups(10, false);
-                    wallShowBackupStatus(`✅ 已清理 ${done.length} 个文件（最少保留 3 份）`, 'success');
+                    wallShowBackupStatus(`✅ 已清理：超龄 ${done.expired.length} 个文件 + 孤儿 ${done.orphans.length} 个（最少保留 3 份备份）`, 'success');
                     wallLoadBackupList();
                 } else {
-                    wallShowBackupStatus(`👁️ 预览：${sel.length} 个超龄文件待清理（本次未删除）`, 'success');
+                    wallShowBackupStatus(`👁️ 预览：超龄 ${r.expired.length} + 孤儿 ${r.orphans.length} 个文件待清理（本次未删除）`, 'success');
                 }
             } catch (e) { wallShowBackupStatus('❌ 清理预览失败：' + e.message, 'error'); }
         }
@@ -16152,7 +16186,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                             if (lastFp && lastFp === fp) {
                                 try { localStorage.setItem('wall_last_backup_ts', String(Date.now())); } catch (e) {}
                                 let cleanedSkip = 0;
-                                try { const sel = await wallCleanupOldBackups(10, false); cleanedSkip = sel.length; } catch (e) {}
+                                try { const r2 = await wallCleanupOldBackups(10, false); cleanedSkip = r2.expired.length + r2.orphans.length; } catch (e) {}
                                 wallWriteBackupStatus({ mode: 'web', ok: true, result: 'skip', messageCount: msgCount, scriptCount: scripts.length, cleaned: cleanedSkip });
                                 wallShowBackupStatus(`✅ 数据无变化，跳过备份（指纹一致）${cleanedSkip ? ' · 顺带清理了 ' + cleanedSkip + ' 个超龄文件' : ''}`, 'success');
                                 wallLoadBackupList();
@@ -16180,7 +16214,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 let cleanMsg = '';
                 // 备份成功后自动清理超龄备份（保留 10 天，最少保留 3 份）；清理失败不影响备份结果
                 let cleanedN = 0;
-                try { const sel = await wallCleanupOldBackups(10, false); cleanedN = sel.length; if (cleanedN) cleanMsg = ` · 已自动清理 ${cleanedN} 个超龄文件`; } catch (e) { console.warn('[备份] 自动清理失败:', e); }
+                try { const r3 = await wallCleanupOldBackups(10, false); cleanedN = r3.expired.length + r3.orphans.length; if (cleanedN) cleanMsg = ` · 已自动清理 ${cleanedN} 个超龄/孤儿文件`; } catch (e) { console.warn('[备份] 自动清理失败:', e); }
                 wallWriteBackupStatus({ mode: 'web', ok: true, result: 'backup', messageCount: main.messageCount, scriptCount: main.scriptCount, cleaned: cleanedN });
                 wallShowBackupStatus(`✅ 备份成功！消息:${main.messageCount} 脚本:${main.scriptCount}${cleanMsg}`, 'success');
                 try { localStorage.setItem('wall_last_backup_ts', String(Date.now())); } catch (e) {}

@@ -115,6 +115,26 @@ async function scanScripts() {
     return out;
 }
 
+// ===== 孤儿残留检测（与网页端 wallSelectOrphanBackupFiles 同一规则，导出供单测） =====
+// 旧版"删除备份"只删主索引不删关联文件，历史残留的 content_* 无主文件在此清掉；
+// 任一主索引 JSON 损坏 → 保守放弃（返回空，宁可不清也不误删）。
+export function selectOrphanBackupFiles(filesObj) {
+    const MAIN_RE = /^backup_wall_all_\d{13}\.json$/;
+    const names = Object.keys(filesObj || {});
+    const declared = new Set();
+    for (const n of names) {
+        if (!MAIN_RE.test(n)) continue;
+        let main;
+        try { main = JSON.parse(filesObj[n]); } catch (e) { return []; }
+        if (!main || typeof main !== 'object') return [];
+        const cf = main.files || {};
+        (Array.isArray(cf.messages) ? cf.messages : (cf.messages ? [cf.messages] : [])).forEach(x => declared.add(x));
+        if (cf.profiles) declared.add(cf.profiles);
+        (main.scripts || []).forEach(s => { if (s && s.backupFile) declared.add(s.backupFile); });
+    }
+    return names.filter(n => n.startsWith('content_') && !declared.has(n));
+}
+
 // 备份状态文件（与网页端 wallWriteBackupStatus 同一文件名/结构），供备份中心"上次自动备份"栏展示
 let _stBackupId = '';
 async function writeStatus(st) {
@@ -216,20 +236,24 @@ async function main() {
                 log(`✅ 备份完成：消息 ${msgCount} · 脚本 ${scripts.length} · 共 ${Object.keys(files).length} 个文件`);
             }
         }
-        // 5. 清理超龄备份（最少保留 KEEP_MIN 份；DRY_RUN 只列不删）
+        // 5. 清理超龄备份（最少保留 KEEP_MIN 份）+ 孤儿残留（旧版删除bug留下的无主 content_*）
         let cleanedN = 0;
         const g = await getGist(backupId);
-        const sel = selectExpiredBackupFiles(Object.keys(g.files || {}), Date.now(), KEEP_DAYS, KEEP_MIN);
-        if (!sel.length) {
-            log(`✅ 无超龄备份需要清理（保留 ${KEEP_DAYS} 天 · 最少 ${KEEP_MIN} 份）`);
+        const filesObj = {};
+        for (const [n, f] of Object.entries(g.files || {})) filesObj[n] = f.content || '';
+        const sel = selectExpiredBackupFiles(Object.keys(filesObj), Date.now(), KEEP_DAYS, KEEP_MIN);
+        const orphans = selectOrphanBackupFiles(filesObj);
+        const all = [...sel, ...orphans];
+        if (!all.length) {
+            log(`✅ 无超龄备份、无孤儿残留（保留 ${KEEP_DAYS} 天 · 最少 ${KEEP_MIN} 份）`);
         } else if (DRY_RUN) {
-            log(`DRY_RUN：将清理 ${sel.length} 个超龄文件（${sel.filter(n => n.startsWith('backup_wall_all_')).length} 个备份）`);
+            log(`DRY_RUN：将清理超龄 ${sel.length} 个文件 + 孤儿 ${orphans.length} 个`);
         } else {
             const files = {};
-            sel.forEach(n => { files[n] = null; });
+            all.forEach(n => { files[n] = null; });
             await patchGist(backupId, { files });
-            cleanedN = sel.length;
-            log(`🧹 已清理 ${sel.length} 个超龄文件（${sel.filter(n => n.startsWith('backup_wall_all_')).length} 个备份整套）`);
+            cleanedN = all.length;
+            log(`🧹 已清理：超龄 ${sel.length} 个文件（${sel.filter(n => n.startsWith('backup_wall_all_')).length} 个备份整套）+ 孤儿 ${orphans.length} 个`);
         }
         const remaining = (await getGist(backupId)).files ? Object.keys((await getGist(backupId)).files).length : 0;
         log(`备份 Gist 当前共 ${remaining} 个文件`);
