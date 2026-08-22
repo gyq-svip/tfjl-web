@@ -17105,7 +17105,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
         let _loginOpenDays = {};                       // 动态页已展开的日期（默认全折叠，点开看当日明细）
         async function adminLoadLoginStats() {
             const box = document.getElementById('adminLoginStatsContent');
-            if (box) box.innerHTML = '<div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;">正在从公共 Gist 汇总…</div>';
+            if (box) box.innerHTML = '<div style="color:rgba(255,255,255,0.5);text-align:center;min-height:280px;display:flex;align-items:center;justify-content:center;">正在从公共 Gist 汇总…</div>';
             try { _lastLoginLog = await fetchLoginLog(); } catch (e) { _lastLoginLog = []; }
             _renderLoginStats();
         }
@@ -17175,9 +17175,9 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 return { nick: n, total: s.count, first: s.first, last: s.last, daily: s.daily, w7, w30, today: t.length, todayFirst: t.length ? Math.min.apply(null, t) : 0, streak: streak(s.daily) };
             }).sort((a, b) => b.total - a.total);
 
-            // ---- 顶部：数据源徽标（拉取失败会明确标出，不再静默回退）+ 刷新 ----
+            // ---- 顶部（固定不滚动）：数据源徽标 + 刷新 + Tab 栏 ----
             const srcGist = _loginLogSource === 'gist';
-            let html = `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+            let head = `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
                 <span style="font-size:0.85rem;${srcGist ? 'color:#a5d6a7;' : 'color:#ffab91;'}">${srcGist
                 ? '🌐 公共汇总 · ' + log.length + ' 条 · ' + stats.length + ' 人'
                 : '⚠️ 拉取失败' + (_loginLogError ? '（' + escapeHtml(_loginLogError) + '）' : '') + '，显示本机缓存 ' + log.length + ' 条'}</span>
@@ -17187,17 +17187,15 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
 
             // ---- Tab 栏 ----
             const TABS = [['heat', '📅 热力图'], ['today', '✅ 今日签到'], ['feed', '🕒 动态'], ['table', '📊 总表']];
-            html += `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">` + TABS.map(t =>
+            head += `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;">` + TABS.map(t =>
                 `<span onclick="__setLoginTab('${t[0]}')" style="padding:5px 12px;border-radius:14px;cursor:pointer;font-size:0.8rem;${_loginTab === t[0]
                 ? 'background:linear-gradient(90deg,#ffd700,#ff9800);color:#1a1a2e;font-weight:600;'
                 : 'background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.7);'}">${t[1]}</span>`).join('') + `</div>`;
 
+            let html = '';
             if (stats.length === 0) {
                 html += `<div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;">暂无登录记录</div>`;
-                return html;
-            }
-
-            if (_loginTab === 'heat') {
+            } else if (_loginTab === 'heat') {
                 // ---- 近 28 天打卡热力图（GitHub 贡献图风格：颜色越绿=当天登录越多） ----
                 const DAYS = 28;
                 const start = new Date(); start.setHours(0, 0, 0, 0); start.setDate(start.getDate() - (DAYS - 1));
@@ -17277,9 +17275,10 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                         html += `<div style="padding:6px 10px;">`;
                         for (const n of order) {
                             const ts = byN[n].slice().sort((a, b) => a - b);
-                            html += `<div style="display:flex;gap:6px;margin:4px 0 6px;align-items:flex-start;flex-wrap:wrap;">
-                                <span style="min-width:80px;font-size:0.8rem;color:#e0f7fa;">${escapeHtml(n)}<span style="color:rgba(255,255,255,0.45);"> ${ts.length}次</span></span>
-                                ${ts.map(t => `<span style="font-size:0.75rem;color:#80deea;background:rgba(128,222,234,0.1);border:1px solid rgba(128,222,234,0.25);border-radius:8px;padding:1px 6px;white-space:nowrap;">${fmt(t).slice(11, 16)}</span>`).join('')}
+                            // 名字固定宽度左列 + 徽章显示区右列（各行起点对齐；徽章排不下自动换行）
+                            html += `<div style="display:flex;align-items:flex-start;gap:8px;margin:4px 0 7px;">
+                                <span style="flex:0 0 96px;max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:0.8rem;color:#e0f7fa;padding-top:2px;" title="${escapeHtml(n)} ${ts.length}次">${escapeHtml(n)} <span style="color:rgba(255,255,255,0.45);">${ts.length}次</span></span>
+                                <span style="flex:1;display:flex;flex-wrap:wrap;gap:4px;">${ts.map(t => `<span style="font-size:0.75rem;color:#80deea;background:rgba(128,222,234,0.1);border:1px solid rgba(128,222,234,0.25);border-radius:8px;padding:1px 6px;white-space:nowrap;">${fmt(t).slice(11, 16)}</span>`).join('')}</span>
                             </div>`;
                         }
                         html += `</div>`;
@@ -17307,7 +17306,11 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                     <td style="padding:5px 8px;text-align:center;border-bottom:1px solid rgba(255,255,255,0.06);color:#80deea;">${rel(s.last)}</td></tr>`;
                 html += `</table></div>`;
             }
-            return html;
+            // 整体固定高度（四个 Tab 统一，杜绝窗口忽大忽小）：顶部徽标+Tab 固定，内容区内部滚动（可拖动/滚轮）
+            return `<div style="display:flex;flex-direction:column;height:min(62vh,480px);min-height:280px;">
+                ${head}
+                <div style="flex:1;overflow-y:auto;overscroll-behavior:contain;padding:6px 6px 4px 0;">${html}</div>
+            </div>`;
         }
         window.adminBuildLoginStatsHTML = adminBuildLoginStatsHTML;
         function openContributionCard(nickEnc) {
