@@ -2527,7 +2527,7 @@
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;opacity:0.1;" ondblclick="onVersionTagForceRefresh()">s20260822-66 · s1.0.209</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;opacity:0.1;" ondblclick="onVersionTagForceRefresh()">s20260822-67 · s1.0.210</span>
                 <div class="version-tooltip">版本 s20260820-41 · s1.0.184（双击强制刷新）</div>
             </div>
             <script>/* 悬浮提示自动跟随版本号，避免 bump 时漏改 tooltip */
@@ -2578,6 +2578,8 @@
                 <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
                     <button onclick="wallBackupAll()" style="background:linear-gradient(135deg,#4ade80,#22c55e);color:#fff;border:none;padding:10px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;">💾 立即备份</button>
                     <button onclick="wallLoadBackupList()" style="background:rgba(255,255,255,0.1);color:#fff;border:none;padding:10px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;">🔍 刷新备份列表</button>
+                    <button onclick="document.getElementById('wallImportFile').click()" style="background:linear-gradient(135deg,#38bdf8,#0284c7);color:#fff;border:none;padding:10px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;">📥 导入本地备份</button>
+                    <input type="file" id="wallImportFile" accept=".json,application/json" style="display:none;" onchange="wallImportOnFile(this)">
                     <label style="display:flex;align-items:center;gap:6px;color:rgba(255,255,255,0.7);font-size:0.78rem;cursor:pointer;user-select:none;">
                         <input type="checkbox" id="wallAutoBackupChk" onchange="wallToggleAutoBackup(this.checked)"> 每日自动备份
                     </label>
