@@ -1,6 +1,6 @@
 [package]
 name = "tfjl"
-version = "2.0.7"
+version = "2.0.8"
 description = "塔防精灵 - 阵容卡搭配桌面版"
 authors = ["gyq"]
 license = "MIT"
