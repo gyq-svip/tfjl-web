@@ -1179,7 +1179,9 @@
             return new Promise((resolve) => {
                 const existing = localStorage.getItem('TFJL_UserName');
                 const hasSet = localStorage.getItem('TFJL_HasSetNick') === 'true';
-                if (hasSet && existing) { resolve(existing); return; }
+                // 视为"已设"的条件：hasSet 标记为真 且 昵称非空 且 不是兜底字面量「匿名用户」
+                const reallySet = hasSet && existing && existing.trim() && existing.trim() !== '匿名用户';
+                if (reallySet) { resolve(existing); return; }
 
                 const modal = document.getElementById('nickSetupModal');
                 const input = document.getElementById('nickSetupInput');
@@ -1190,10 +1192,18 @@
                 errEl.textContent = '';
                 modal.style.display = 'flex';
                 setTimeout(() => input.focus(), 50);
-                if (force) cancelBtn.style.display = 'none'; // 真·必须：隐藏取消，不设进不去
+                // force 模式：真·必须（隐藏取消、禁用遮罩关闭/ESC，不设进不去）
+                if (force) {
+                    cancelBtn.style.display = 'none';
+                    modal.onclick = (e) => { if (e.target === modal) { /* 强制模式禁止点遮罩关闭 */ } };
+                    document.addEventListener('keydown', forceEscBlocker, true);
+                }
+                function forceEscBlocker(e) { if (e.key === 'Escape') e.stopPropagation(); }
 
                 const cleanup = () => {
                     modal.style.display = 'none';
+                    modal.onclick = null;
+                    document.removeEventListener('keydown', forceEscBlocker, true);
                     saveBtn.onclick = null;
                     cancelBtn.onclick = null;
                     input.onkeydown = null;

@@ -231,7 +231,12 @@
             // 进入归档系统（完整功能）
             document.getElementById('passwordOverlay').style.display = 'none';
             document.getElementById('mainContent').classList.add('visible');
-
+            // 进入主界面后强制要求设置昵称（与 enter() 一致：未设过才弹，老用户已设过不弹）
+            if (typeof ensureNickname === 'function') ensureNickname(true);
+            // 已设过昵称的用户在此补记登录打卡（首设用户由 ensureNickname 保存后记录）
+            if (localStorage.getItem('TFJL_UserName')) {
+                if (typeof recordLoginEvent === 'function') recordLoginEvent();
+            }
         }
 
         function updateProjectList1() {
