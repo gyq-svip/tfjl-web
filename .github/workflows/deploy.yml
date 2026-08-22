@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       # 只把「网页真正需要的文件」拷进 _site 后再上传。
       # 历史问题：原先 upload-pages-artifact 用 path: '.'，会把整个仓库
