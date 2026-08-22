@@ -7,6 +7,9 @@
 //  1) HTML 的 <div> 开闭配对（少闭合/多闭合即报错）—— 用户最关心的低级错误
 //  2) 对所有核心/改动 .js 跑 `node --check`（权威语法+括号校验）
 //  3) index.html 内联脚本可编译（抽取 <script> 块 vm.Script）
+//  4) 运行时冒烟测试（DOM 桩）：管理员全部页面入口 + 登录打卡 4 视图渲染
+//     背景：s1.0.206 事故——删 const 声明后 show 分支仍引用 → ReferenceError，
+//     node --check 语法级检查抓不住，只有运行时才能暴露。凡改共享入口函数必被此项拦截。
 // 任一项 FAIL（退出码非 0）必须修复到全绿，再提交/合并。
 
 const fs = require('fs');
@@ -106,6 +109,87 @@ function checkInlineScripts(file) {
     if (!fail) PASS(`${path.relative(ROOT, file)} 内联脚本编译通过 (${idx} 块)`);
 }
 [P('index.html'), P('webroot', 'index.html')].forEach(checkInlineScripts);
+
+// ---------- 4) 运行时冒烟测试（DOM 桩）----------
+// 4a) 管理员页面入口：adminHideAllPages / adminShowMenu / adminShowPage 全部页面参数逐一调用，断言不抛错。
+// 4b) 登录打卡面板：adminBuildLoginStatsHTML 四视图（热力图/今日签到/动态含展开/总表）渲染，断言产出 HTML 且无 "NaN"。
+// 提取正则若因函数改名/挪位失配 → FAIL 提示同步更新本段（作为提交闸门宁可误报不可漏检）。
+function smokeRuntime() {
+    let src;
+    try { src = fs.readFileSync(P('app-core.js'), 'utf8'); }
+    catch (e) { FAIL('冒烟测试: 读不到 app-core.js'); return; }
+
+    const SEGS = [
+        ['adminHideAllPages',    /function adminHideAllPages[\s\S]*?window\.adminHideAllPages = adminHideAllPages;/],
+        ['adminShowMenu',        /function adminShowMenu[\s\S]*?\n        \}/],
+        ['adminShowPage',        /function adminShowPage\(page\) \{[\s\S]*?\n        \}/],
+        ['adminBuildLoginStatsHTML', /function adminBuildLoginStatsHTML[\s\S]*?\n\s*window\.adminBuildLoginStatsHTML = adminBuildLoginStatsHTML;/]
+    ];
+    let code = '';
+    for (const [name, re] of SEGS) {
+        const m = src.match(re);
+        if (!m) { FAIL(`冒烟测试: 无法定位 ${name}（函数被改名/挪位？请同步更新 verify_build.js 冒烟段正则）`); return; }
+        code += m[0] + '\n';
+    }
+
+    // DOM/环境桩：getElementById 返回可复用元素对象，querySelectorAll 返回空表（adminPage* 全部"存在"于桩外）
+    const els = {};
+    const noop = () => {};
+    const ctx = {
+        console, Date, Math, JSON, Array, Object, String, Number, isFinite, parseInt, parseFloat,
+        document: {
+            getElementById: (id) => els[id] || (els[id] = { style: {}, value: '' }),
+            querySelectorAll: () => []
+        },
+        localStorage: { getItem: () => null, setItem: noop, removeItem: noop },
+        currentConfig: {},
+        INDEX_GIST_ID_KEY: 'TFJL_INDEX_GIST_ID', GIST_ID: 'smoke',
+        escapeHtml: (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])),
+        _loginTab: 'heat', _loginSort: { key: 'total', desc: true }, _loginLogSource: 'gist', _loginLogError: '', _loginOpenDays: {},
+        // adminShowPage 各分支依赖的加载函数全部 no-op
+        adminRefreshNews: noop, adminLoadStats: noop, adminLoadAnalytics: noop, adminLoadScriptStats: noop,
+        updateAdminTokenStatus: noop, loadCurrentNick: noop, renderNickRegistry: noop, loadPasswordList: noop,
+        adminRefreshDebugLog: noop, adminRefreshConsoleLog: noop, adminLoadLoginStats: noop, refreshApiMonitor: noop,
+        renderDamageCalc: noop, updateBroadcastToggleStatus: noop, adminRenderApiUsage: noop
+    };
+    ctx.window = ctx;
+    vm.createContext(ctx);
+
+    // 4a) 管理员页面入口
+    const PAGES = ['help', 'title', 'news', 'stats', 'analytics', 'scriptStats', 'settings', 'nickManage',
+        'passwordManage', 'cacheManage', 'logStats', 'loginStats', 'apiMonitor', 'damageCalc'];
+    let bad = 0;
+    try {
+        vm.runInContext(code, ctx);
+        for (const p of PAGES) {
+            try { ctx.adminShowPage(p); }
+            catch (e) { FAIL(`冒烟测试: adminShowPage('${p}') 抛错 → ${e.message}`); bad++; }
+        }
+        try { ctx.adminShowMenu(); }
+        catch (e) { FAIL('冒烟测试: adminShowMenu() 抛错 → ' + e.message); bad++; }
+    } catch (e) {
+        FAIL('冒烟测试: 提取代码无法在桩环境执行 → ' + e.message); return;
+    }
+    if (!bad) PASS(`管理员页面入口冒烟 ${PAGES.length + 1} 项（adminShowPage×${PAGES.length} + menu）全通过`);
+
+    // 4b) 登录打卡 4 视图渲染（含动态展开当天）
+    const d = new Date();
+    const tk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const mk = (nick, h, m) => ({ nick, ts: new Date(new Date().setHours(h, m, 0, 0)).getTime() });
+    const fixture = [mk('冒烟A', 8, 5), mk('冒烟A', 12, 30), mk('冒烟B', 9, 15), mk('冒烟B', 18, 40), mk('冒烟C', 23, 1)];
+    let bad2 = 0;
+    for (const tab of ['heat', 'today', 'feed', 'table']) {
+        ctx._loginTab = tab;
+        ctx._loginOpenDays = tab === 'feed' ? { [tk]: 1 } : {};
+        try {
+            const html = ctx.adminBuildLoginStatsHTML(fixture);
+            if (typeof html !== 'string' || html.length < 200) { FAIL(`冒烟测试: 登录打卡视图 ${tab} 产出异常`); bad2++; }
+            else if (/NaN/.test(html)) { FAIL(`冒烟测试: 登录打卡视图 ${tab} 输出含 NaN`); bad2++; }
+        } catch (e) { FAIL(`冒烟测试: 登录打卡视图 ${tab} 渲染抛错 → ${e.message}`); bad2++; }
+    }
+    if (!bad2) PASS('登录打卡 4 视图渲染冒烟通过（热力图/今日签到/动态展开/总表，无 NaN）');
+}
+smokeRuntime();
 
 console.log(ok ? '\n==== 全部校验通过 ✅ ====' : '\n==== 存在 FAIL，必须修复后再提交/合并 ❌ ====');
 process.exit(ok ? 0 : 1);
