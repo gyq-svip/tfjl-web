@@ -15876,23 +15876,45 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
         async function wallGetOrCreateBackupGist() {
             const token = getGistToken();
             if (!token) throw new Error('无Token');
-            // s1.0.115：优先从索引 room_index.json 的 wall_backup 字段取固定指针（跨设备/清缓存也能找到备份），
-            // localStorage 仅作本机缓存，二者任一存在即复用，避免重复建 Gist。
-            let id = localStorage.getItem(WALL_BACKUP_GIST_KEY);
-            if (!id) {
-                try {
-                    const idxResp = await fetch(`https://api.github.com/gists/${GIST_ID}`, { headers: { 'Accept': 'application/vnd.github.v3+json' } });
-                    if (idxResp.ok) {
-                        const idxData = await idxResp.json();
-                        const ri = idxData.files && idxData.files['room_index.json'];
-                        if (ri && ri.content) { const idx = JSON.parse(ri.content); if (idx.wall_backup) { id = idx.wall_backup; localStorage.setItem(WALL_BACKUP_GIST_KEY, id); } }
-                    }
-                } catch (e) {}
-            }
+            // 优先取索引 room_index.json 的 wall_backup 固定指针（跨设备唯一真相源）。
+            // 🔴 修复（2026-08-23 实测踩坑）：早期版本只把备份 Gist ID 存 localStorage，老设备在指针机制
+            // 出现前各自创建过不同的备份 Gist → "App 备份了网页看不见、Actions 备份了 App 看不见"。
+            // 现在指针优先，所有设备（含 GitHub Actions 定时备份）统一读写同一个 Gist；
+            // 指针缺失/失效时才回退本机 localStorage，最后才创建新的并写回指针。
+            let id = '';
+            let fromPointer = false;
+            try {
+                const idxResp = await fetch(`https://api.github.com/gists/${GIST_ID}`, { headers: { 'Accept': 'application/vnd.github.v3+json' } });
+                if (idxResp.ok) {
+                    const idxData = await idxResp.json();
+                    const ri = idxData.files && idxData.files['room_index.json'];
+                    if (ri && ri.content) { const idx = JSON.parse(ri.content); if (idx.wall_backup) { id = idx.wall_backup; fromPointer = true; } }
+                }
+            } catch (e) {}
+            if (!id) id = localStorage.getItem(WALL_BACKUP_GIST_KEY) || '';
             if (id) {
                 const r = await fetch(`https://api.github.com/gists/${id}`, { headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` } });
-                if (r.ok) return id;
-                localStorage.removeItem(WALL_BACKUP_GIST_KEY); id = null;
+                if (r.ok) {
+                    // 本机缓存与统一指针不一致时同步成指针（老设备自动归一）
+                    if (localStorage.getItem(WALL_BACKUP_GIST_KEY) !== id) { try { localStorage.setItem(WALL_BACKUP_GIST_KEY, id); } catch (e) {} }
+                    // 指针缺失/失效但本机这份有效 → 写回统一指针，防止各设备再次各用各的
+                    if (!fromPointer) {
+                        try {
+                            const idxResp2 = await fetch(`https://api.github.com/gists/${GIST_ID}`, { headers: { 'Accept': 'application/vnd.github.v3+json' } });
+                            if (idxResp2.ok) {
+                                const idxData2 = await idxResp2.json();
+                                const ri2 = idxData2.files && idxData2.files['room_index.json'];
+                                const idx2 = ri2 && ri2.content ? JSON.parse(ri2.content) : {};
+                                if (idx2.wall_backup !== id) {
+                                    idx2.wall_backup = id;
+                                    await fetch(`https://api.github.com/gists/${GIST_ID}`, { method: 'PATCH', headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` }, body: JSON.stringify({ files: { 'room_index.json': { content: JSON.stringify(idx2, null, 2) } } }) });
+                                }
+                            }
+                        } catch (e) {}
+                    }
+                    return id;
+                }
+                localStorage.removeItem(WALL_BACKUP_GIST_KEY); id = '';
             }
             const c = await fetch('https://api.github.com/gists', { method: 'POST', headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` }, body: JSON.stringify({ description: WALL_BACKUP_DESC, public: false, files: { 'backup_info.json': { content: JSON.stringify({ created: Date.now(), type: 'wall_backup' }, null, 2) } } }) });
             if (!c.ok) throw new Error('创建备份Gist失败');
