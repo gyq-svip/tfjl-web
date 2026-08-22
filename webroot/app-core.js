@@ -20358,70 +20358,32 @@ ${maSection}
                 adminShowMenu();
             } else {
                 document.getElementById('adminVerifySection').style.display = 'block';
+                adminHideAllPages();
                 document.getElementById('adminMenuSection').style.display = 'none';
-                document.getElementById('adminPageTitle').style.display = 'none';
-                document.getElementById('adminPageNews').style.display = 'none';
-                document.getElementById('adminPageStats').style.display = 'none';
-                document.getElementById('adminPageSettings').style.display = 'none';
-                document.getElementById('adminPageNickManage').style.display = 'none';
-                document.getElementById('adminPagePasswordManage').style.display = 'none';
-                const scriptStatsPage = document.getElementById('adminPageScriptStats');
-                if (scriptStatsPage) scriptStatsPage.style.display = 'none';
-                const logStatsAdminPage = document.getElementById('adminPageLogStats');
-                if (logStatsAdminPage) logStatsAdminPage.style.display = 'none';
                 document.getElementById('adminVerifyCode').value = '';
                 document.getElementById('adminVerifyCode').focus();
             }
         }
 
+        // 统一隐藏所有管理员子页：自动扫描 id 以 adminPage 开头的容器（含 adminPageTitle）。
+        // 🔴 历史坑：此前隐藏清单在 adminShowPage/adminShowMenu/管理员验证分支三处各写一份，
+        //    新增页面漏登记任意一处 → "打开后关闭不消失"（登录打卡/API监控/BossRed/WallGist 均中过招）。
+        //    改自动扫描后，新增页面只要容器 id 以 adminPage 开头即自动纳入隐藏，无需登记。
+        function adminHideAllPages() {
+            document.querySelectorAll('[id^="adminPage"]').forEach(el => { el.style.display = 'none'; });
+        }
+        window.adminHideAllPages = adminHideAllPages;
+
         function adminShowMenu() {
+            adminHideAllPages();
             document.getElementById('adminMenuSection').style.display = 'block';
-            document.getElementById('adminPageTitle').style.display = 'none';
-            document.getElementById('adminPageNews').style.display = 'none';
-            document.getElementById('adminPageStats').style.display = 'none';
-            document.getElementById('adminPageSettings').style.display = 'none';
-            document.getElementById('adminPageNickManage').style.display = 'none';
-            document.getElementById('adminPagePasswordManage').style.display = 'none';
-            const helpPage = document.getElementById('adminPageHelp');
-            if (helpPage) helpPage.style.display = 'none';
-            const cachePage = document.getElementById('adminPageCacheManage');
-            if (cachePage) cachePage.style.display = 'none';
-            const scriptStatsPage = document.getElementById('adminPageScriptStats');
-            if (scriptStatsPage) scriptStatsPage.style.display = 'none';
-            const analyticsPage = document.getElementById('adminPageAnalytics');
-            if (analyticsPage) analyticsPage.style.display = 'none';
-            const logStatsAdminPage2 = document.getElementById('adminPageLogStats');
-            if (logStatsAdminPage2) logStatsAdminPage2.style.display = 'none';
-            const apiMonPage = document.getElementById('adminPageApiMonitor');
-            if (apiMonPage) apiMonPage.style.display = 'none';
-            const damageCalcPage2 = document.getElementById('adminPageDamageCalc');
-            if (damageCalcPage2) damageCalcPage2.style.display = 'none';
             updateBroadcastToggleStatus();
             adminRenderApiUsage();
         }
 
         function adminShowPage(page) {
+            adminHideAllPages();
             document.getElementById('adminMenuSection').style.display = 'none';
-            document.getElementById('adminPageTitle').style.display = 'none';
-            document.getElementById('adminPageNews').style.display = 'none';
-            document.getElementById('adminPageStats').style.display = 'none';
-            document.getElementById('adminPageSettings').style.display = 'none';
-            document.getElementById('adminPageNickManage').style.display = 'none';
-            document.getElementById('adminPagePasswordManage').style.display = 'none';
-            const helpPage = document.getElementById('adminPageHelp');
-            if (helpPage) helpPage.style.display = 'none';
-            const cachePage = document.getElementById('adminPageCacheManage');
-            if (cachePage) cachePage.style.display = 'none';
-            const scriptStatsPage = document.getElementById('adminPageScriptStats');
-            if (scriptStatsPage) scriptStatsPage.style.display = 'none';
-            const analyticsPage = document.getElementById('adminPageAnalytics');
-            if (analyticsPage) analyticsPage.style.display = 'none';
-            const logStatsAdminPage3 = document.getElementById('adminPageLogStats');
-            if (logStatsAdminPage3) logStatsAdminPage3.style.display = 'none';
-            const loginStatsAdminPage = document.getElementById('adminPageLoginStats');
-            if (loginStatsAdminPage) loginStatsAdminPage.style.display = 'none';
-            const damageCalcPage = document.getElementById('adminPageDamageCalc');
-            if (damageCalcPage) damageCalcPage.style.display = 'none';
 
             if (page === 'help') {
                 if (helpPage) helpPage.style.display = 'block';
