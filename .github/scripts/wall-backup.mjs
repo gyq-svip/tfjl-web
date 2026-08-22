@@ -13,6 +13,7 @@ import { createHash } from 'node:crypto';
 
 const TOKEN = (process.env.GIST_TOKEN || '').trim();
 const KEEP_DAYS = parseInt(process.env.KEEP_DAYS || '10', 10) || 10;
+const KEEP_MIN = parseInt(process.env.KEEP_MIN || '3', 10) || 3;   // 最少保留份数（防单份损坏无法恢复）
 const DRY_RUN = process.env.DRY_RUN === '1';
 const FORCE = process.env.FORCE === '1';
 
@@ -57,9 +58,10 @@ async function readGistFile(gist, fileName) {
 }
 
 // ===== 超龄备份文件选择（与网页端 wallSelectExpiredBackupFiles 同一规则，导出供单测） =====
-// 安全规则：只认 backup_wall_all_<13位ts>.json 为主索引；最新一份永不删；
+// 安全规则：只认 backup_wall_all_<13位ts>.json 为主索引；最新 keepMin 份（默认3）永不删；
 //           content_ 前缀且能严格解析出同一 13 位时间戳的文件成套删除；其它文件名一概不碰。
-export function selectExpiredBackupFiles(names, nowMs, keepDays) {
+export function selectExpiredBackupFiles(names, nowMs, keepDays, keepMin = 3) {
+    const MIN_KEEP = Math.max(1, keepMin || 3);
     const MAIN_RE = /^backup_wall_all_(\d{13})\.json$/;
     const CONTENT_RE = /^(backup_wall_all_|content_)[A-Za-z0-9_.\-]*_(\d{13})(\.[A-Za-z0-9]+)?$/;
     const list = (names || []).filter(n => n && typeof n === 'string');
@@ -72,7 +74,7 @@ export function selectExpiredBackupFiles(names, nowMs, keepDays) {
     mains.sort((a, b) => b.ts - a.ts);
     const cutoff = nowMs - (keepDays || 10) * 86400 * 1000;
     const doomed = new Set();
-    for (let i = 1; i < mains.length; i++) { if (mains[i].ts < cutoff) doomed.add(mains[i].ts); }
+    for (let i = MIN_KEEP; i < mains.length; i++) { if (mains[i].ts < cutoff) doomed.add(mains[i].ts); }
     if (!doomed.size) return [];
     const out = [];
     for (const n of list) {
@@ -113,9 +115,18 @@ async function scanScripts() {
     return out;
 }
 
+// 备份状态文件（与网页端 wallWriteBackupStatus 同一文件名/结构），供备份中心"上次自动备份"栏展示
+let _stBackupId = '';
+async function writeStatus(st) {
+    if (!_stBackupId || DRY_RUN) return;
+    try {
+        await patchGist(_stBackupId, { files: { 'backup_status.json': { content: JSON.stringify(Object.assign({ ts: Date.now(), mode: 'actions' }, st), null, 2) } } });
+    } catch (e) { log('状态写入失败(不影响备份):', e.message); }
+}
+
 async function main() {
     if (!TOKEN) throw new Error('缺少 GIST_TOKEN 环境变量（仓库 secret）');
-    log(`配置：保留 ${KEEP_DAYS} 天${DRY_RUN ? ' · DRY_RUN 只读' : ''}${FORCE ? ' · FORCE 强制备份' : ''}`);
+    log(`配置：保留 ${KEEP_DAYS} 天 · 最少 ${KEEP_MIN} 份${DRY_RUN ? ' · DRY_RUN 只读' : ''}${FORCE ? ' · FORCE 强制备份' : ''}`);
 
     // 1. 索引 gist → 消息/备份指针
     const indexGist = await getGist(INDEX_GIST_ID);
@@ -155,12 +166,15 @@ async function main() {
     }
 
     if (backupId) {
+        _stBackupId = backupId;
         const backupGist = await getGist(backupId);
         const mainNames = Object.keys(backupGist.files || {}).filter(n => /^backup_wall_all_\d{13}\.json$/.test(n)).sort();
         const lastMain = mainNames.length ? backupGist.files[mainNames[mainNames.length - 1]] : null;
         let lastFp = '';
         if (lastMain && lastMain.content) { try { lastFp = JSON.parse(lastMain.content).fp || ''; } catch (e) {} }
+        let runResult = 'none';
         if (!FORCE && lastFp && lastFp === fp) {
+            runResult = 'skip';
             log('✅ 数据无变化（指纹一致），跳过备份');
         } else {
             const ts = Date.now();
@@ -198,32 +212,37 @@ async function main() {
                 log(`DRY_RUN：将写入 ${Object.keys(files).length} 个文件（含主索引），实际运行时才落盘`);
             } else {
                 await patchGist(backupId, { files });
+                runResult = 'backup';
                 log(`✅ 备份完成：消息 ${msgCount} · 脚本 ${scripts.length} · 共 ${Object.keys(files).length} 个文件`);
             }
         }
-    }
-
-    // 5. 清理超龄备份（最新一份永不删；DRY_RUN 只列不删）
-    if (backupId) {
+        // 5. 清理超龄备份（最少保留 KEEP_MIN 份；DRY_RUN 只列不删）
+        let cleanedN = 0;
         const g = await getGist(backupId);
-        const sel = selectExpiredBackupFiles(Object.keys(g.files || {}), Date.now(), KEEP_DAYS);
+        const sel = selectExpiredBackupFiles(Object.keys(g.files || {}), Date.now(), KEEP_DAYS, KEEP_MIN);
         if (!sel.length) {
-            log(`✅ 无超龄备份需要清理（保留 ${KEEP_DAYS} 天，最新一份永不删）`);
+            log(`✅ 无超龄备份需要清理（保留 ${KEEP_DAYS} 天 · 最少 ${KEEP_MIN} 份）`);
         } else if (DRY_RUN) {
             log(`DRY_RUN：将清理 ${sel.length} 个超龄文件（${sel.filter(n => n.startsWith('backup_wall_all_')).length} 个备份）`);
         } else {
             const files = {};
             sel.forEach(n => { files[n] = null; });
             await patchGist(backupId, { files });
+            cleanedN = sel.length;
             log(`🧹 已清理 ${sel.length} 个超龄文件（${sel.filter(n => n.startsWith('backup_wall_all_')).length} 个备份整套）`);
         }
         const remaining = (await getGist(backupId)).files ? Object.keys((await getGist(backupId)).files).length : 0;
         log(`备份 Gist 当前共 ${remaining} 个文件`);
+        await writeStatus({ ok: true, result: runResult, messageCount: msgCount, scriptCount: scripts.length, cleaned: cleanedN });
     }
     log('结束');
 }
 
-// 直接运行（非被 import 测试）时执行主流程
+// 直接运行（非被 import 测试）时执行主流程；失败也尽力写一条失败状态，备份中心能看到红字
 if (process.argv[1] && process.argv[1].endsWith('wall-backup.mjs')) {
-    main().catch(e => { console.error('[wall-backup] ❌ 失败:', e.message); process.exit(1); });
+    main().catch(async e => {
+        console.error('[wall-backup] ❌ 失败:', e.message);
+        try { await writeStatus({ ok: false, result: 'error', error: e.message }); } catch (e2) {}
+        process.exit(1);
+    });
 }
