@@ -17235,6 +17235,10 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 let log = [];
                 try { log = JSON.parse(localStorage.getItem('TFJL_LoginLog') || '[]'); } catch (e) { log = []; }
                 if (!Array.isArray(log)) log = [];
+                // 同昵称 60 秒内只记一笔：刷新页面/新版本强刷/关闭马上重开都会重新加载页面各触发一次，
+                // 属于同一次使用被重复计数（曾出现同分钟 2 笔）；真正隔 60 秒以上的再次打开照常记录
+                const lastLocal = log.length ? log[log.length - 1] : null;
+                if (lastLocal && lastLocal.nick === nick && (ts - (lastLocal.ts || 0)) < 60000) return;
                 log.push({ nick, ts });
                 if (log.length > 5000) log = log.slice(-5000); // 防无限制增长
                 localStorage.setItem('TFJL_LoginLog', JSON.stringify(log));
@@ -17328,7 +17332,12 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 const f = data.files && data.files[LOGIN_GIST_FILENAME];
                 if (f && f.content) { try { arr = JSON.parse(f.content) || []; } catch (e) { arr = []; } }
                 if (!Array.isArray(arr)) arr = [];
-                arr.push({ nick: localStorage.getItem('TFJL_UserName') || '匿名用户', ts: Date.now() });
+                // Gist 层同样 60 秒去重：本机记录被清过/多设备同昵称同分钟各开一次时，
+                // 只让第一笔进汇总，避免同分钟双写
+                const myNick = localStorage.getItem('TFJL_UserName') || '匿名用户';
+                const lastGist = arr.length ? arr[arr.length - 1] : null;
+                if (lastGist && lastGist.nick === myNick && (Date.now() - (lastGist.ts || 0)) < 60000) return;
+                arr.push({ nick: myNick, ts: Date.now() });
                 if (arr.length > 20000) arr = arr.slice(-20000);
                 await fetch('https://api.github.com/gists/' + id, {
                     method: 'PATCH',
