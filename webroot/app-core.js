@@ -17102,6 +17102,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
         let _loginTab = 'heat';                        // 当前 Tab
         let _loginSort = { key: 'total', desc: true }; // 总表排序
         let _lastLoginLog = [];                        // 缓存本次拉取，切 Tab 不重复请求
+        let _loginOpenDays = {};                       // 动态页已展开的日期（默认全折叠，点开看当日明细）
         async function adminLoadLoginStats() {
             const box = document.getElementById('adminLoginStatsContent');
             if (box) box.innerHTML = '<div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;">正在从公共 Gist 汇总…</div>';
@@ -17114,6 +17115,10 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             if (_loginSort.key === k) _loginSort.desc = !_loginSort.desc;
             else { _loginSort.key = k; _loginSort.desc = true; }
             _loginTab = 'table'; _renderLoginStats();
+        };
+        window.__toggleLoginDay = function (k) {
+            if (_loginOpenDays[k]) delete _loginOpenDays[k]; else _loginOpenDays[k] = 1;
+            _renderLoginStats();
         };
         function _renderLoginStats() {
             const box = document.getElementById('adminLoginStatsContent');
@@ -17236,21 +17241,37 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 }
                 html += `<div style="font-size:0.82rem;color:rgba(255,255,255,0.6);">😴 今日未签到：${outs.length ? outs.map(s => escapeHtml(s.nick) + '<span style="color:rgba(255,255,255,0.4);">（上次 ' + rel(s.last) + '）</span>').join(' · ') : '无（全员到齐 🎉）'}</div>`;
             } else if (_loginTab === 'feed') {
-                // ---- 最近登录动态流（时间倒序，按天分组） ----
+                // ---- 最近登录动态：按天手风琴（默认全折叠；点日期行展开当日"几点几分·谁"明细） ----
                 const recent = log.slice().sort((a, b) => b.ts - a.ts).slice(0, 60);
-                html += `<div style="font-size:0.9rem;color:#4dd0e1;margin-bottom:8px;">🕒 最近登录动态（最新 ${recent.length} 条）</div><div style="font-size:0.82rem;">`;
-                let lastDay = '';
-                const yKey = dayKey(now - 864e5);
+                const days = []; const dayMap = {};
                 for (const r of recent) {
                     const k = dayKey(r.ts);
-                    if (k !== lastDay) {
-                        const label = k === todayKey ? '今天' : (k === yKey ? '昨天' : k.slice(5));
-                        html += `<div style="color:rgba(255,255,255,0.45);margin:8px 0 3px;font-size:0.75rem;">── ${label} ──</div>`;
-                        lastDay = k;
-                    }
-                    html += `<div style="margin:2px 0;"><span style="color:#80deea;">${fmt(r.ts).slice(11, 16)}</span> · ${escapeHtml(r.nick || '匿名用户')}</div>`;
+                    if (!dayMap[k]) { dayMap[k] = []; days.push(k); }
+                    dayMap[k].push(r);
                 }
-                html += `</div>`;
+                const yKey = dayKey(now - 864e5);
+                const wd = ['日', '一', '二', '三', '四', '五', '六'];
+                html += `<div style="font-size:0.9rem;color:#4dd0e1;margin-bottom:8px;">🕒 最近登录动态（最新 ${recent.length} 条 · 点日期展开/收起）</div>`;
+                for (const k of days) {
+                    const list = dayMap[k];
+                    const nicks = [...new Set(list.map(r => r.nick || '匿名用户'))];
+                    const open = !!_loginOpenDays[k];
+                    const d = new Date(k + 'T00:00:00');
+                    const label = k === todayKey ? '今天' : (k === yKey ? '昨天' : k.slice(5).replace('-', '/') + ' 周' + wd[d.getDay()]);
+                    html += `<div style="margin-bottom:6px;border:1px solid rgba(77,208,225,${open ? '0.35' : '0.15'});border-radius:10px;overflow:hidden;">
+                        <div onclick="__toggleLoginDay('${k}')" style="display:flex;align-items:center;gap:8px;padding:7px 10px;cursor:pointer;background:rgba(77,208,225,${open ? '0.12' : '0.05'});flex-wrap:wrap;">
+                            <span style="color:#4dd0e1;font-size:0.8rem;">${open ? '▾' : '▸'}</span>
+                            <span style="font-size:0.85rem;color:#e0f7fa;font-weight:600;">${label}</span>
+                            <span style="font-size:0.75rem;color:rgba(255,255,255,0.5);">${nicks.length} 人 · ${list.length} 次</span>
+                            ${nicks.map(n => `<span style="font-size:0.72rem;color:rgba(255,255,255,0.6);background:rgba(255,255,255,0.06);border-radius:8px;padding:1px 7px;">${escapeHtml(n)}</span>`).join('')}
+                        </div>`;
+                    if (open) {
+                        html += `<div style="padding:6px 10px;font-size:0.8rem;">`;
+                        for (const r of list) html += `<div style="margin:2px 0;"><span style="color:#80deea;">${fmt(r.ts).slice(11, 16)}</span> · ${escapeHtml(r.nick || '匿名用户')}</div>`;
+                        html += `</div>`;
+                    }
+                    html += `</div>`;
+                }
             } else {
                 // ---- 指标总表（点列头排序） ----
                 const COLS = [['nick', '昵称'], ['today', '今日'], ['streak', '连续'], ['w7', '近7天'], ['w30', '近30天'], ['total', '累计'], ['last', '最后在线']];
