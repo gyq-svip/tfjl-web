@@ -915,6 +915,7 @@
                     <div onclick="if(window.repairSkins){window.repairSkins();}document.getElementById('backupMenu').style.display='none';" title="皮肤异常修复：清除皮肤缓存并重新扫描本地、强制重新拉取远程皮肤、重新渲染。用于解决「加载时皮肤卡着不显示/显示异常」等问题（保留你已选的默认皮肤）。" style="padding:8px 15px;cursor:pointer;color:#ffb74d;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">🛠 皮肤异常修复</div>
                     <div onclick="window.location.href='auction.html';document.getElementById('backupMenu').style.display='none';" style="display:none;padding:8px 15px;cursor:pointer;color:#fff;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">🏪 进入拍卖系统</div>
                     <div onclick="openHelpPage();document.getElementById('backupMenu').style.display='none';" title="打开帮助页面，查看使用说明" style="padding:8px 15px;cursor:pointer;color:#4fc3f7;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📖 帮助</div>
+                    <div onclick="if(window.openDiagnosticsModal){window.openDiagnosticsModal();}document.getElementById('backupMenu').style.display='none';" title="异常诊断：全面检查文件/插件/昵称/项目/写盘/网络等，异常项标红并给出分析" style="padding:8px 15px;cursor:pointer;color:#ffd54f;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">🔧 异常诊断</div>
                     <div onclick="logoutToLogin();document.getElementById('backupMenu').style.display='none';" title="退出当前登录，返回密码登录页" style="padding:8px 15px;cursor:pointer;color:#ff6b6b;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,107,107,0.1)'" onmouseout="this.style.background='transparent'">🔙 退出登录</div>
                 </div>
             </div>
@@ -952,7 +953,7 @@
             </div>
         </div>
 
-        <script defer src="app-features.js?v=s1.0.152"></script>
+        <script defer src="app-features.js?v=s1.0.197"></script>
 
         <!-- 项目操作菜单（折叠） -->
         <div id="projectMenu" style="display:none;position:fixed;z-index:9998;background:rgba(40,40,70,0.98);border:1px solid rgba(255,215,0,0.3);border-radius:10px;padding:10px;min-width:200px;max-height:85vh;overflow-y:auto;box-shadow:0 4px 15px rgba(0,0,0,0.4);">
@@ -971,7 +972,7 @@
         </div>
 
         <!-- APP本地功能脚本（网页版不会执行任何代码，isTauriApp判断在文件内部） -->
-        <script defer src="app-local.js?v=s1.0.152"></script>
+        <script defer src="app-local.js?v=s1.0.197"></script>
         <!-- 阵容识别模块（独立入口 + 灌入脚本生成） -->
         
         <!-- 网页版皮肤系统（仅非 Tauri 浏览器执行；Tauri 由 app-local.js 负责，文件内部自动跳过） -->
@@ -2522,7 +2523,7 @@
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;opacity:0.1;" ondblclick="onVersionTagForceRefresh()">s20260822-53 · s1.0.196</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;opacity:0.1;" ondblclick="onVersionTagForceRefresh()">s20260822-54 · s1.0.197</span>
                 <div class="version-tooltip">版本 s20260820-41 · s1.0.184（双击强制刷新）</div>
             </div>
             <script>/* 悬浮提示自动跟随版本号，避免 bump 时漏改 tooltip */
@@ -2611,6 +2612,22 @@
                 <div id="wallGistCount" style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-bottom:8px;"></div>
                 <div id="wallGistListContainer" style="background:rgba(0,0,0,0.3);border-radius:6px;padding:12px;max-height:320px;overflow-y:auto;"></div>
                 <div id="wallGistStatus"></div>
+            </div>
+        </div>
+
+        <!-- 🔧 异常诊断弹窗 -->
+        <div id="diagModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:99999;align-items:center;justify-content:center;">
+            <div style="background:#1a1f2e;border:1px solid rgba(255,255,255,0.15);border-radius:14px;max-width:640px;width:92%;max-height:84vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.6);">
+                <div style="padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:space-between;">
+                    <div style="font-size:1.05rem;font-weight:600;color:#ffd54f;">🔧 异常诊断</div>
+                    <div onclick="document.getElementById('diagModal').style.display='none'" style="cursor:pointer;color:rgba(255,255,255,0.6);font-size:1.4rem;line-height:1;">✕</div>
+                </div>
+                <div id="diagSummary" style="padding:10px 20px;font-size:0.8rem;color:rgba(255,255,255,0.6);border-bottom:1px solid rgba(255,255,255,0.06);"></div>
+                <div id="diagList" style="padding:14px 20px;overflow-y:auto;flex:1;font-size:0.85rem;"></div>
+                <div style="padding:12px 20px;border-top:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center;font-size:0.72rem;color:rgba(255,255,255,0.4);">
+                    <span>异常项标红并附分析与兜底联系方式；全部通过则非数据丢失问题</span>
+                    <button onclick="if(window.openDiagnosticsModal){window.openDiagnosticsModal(true);}" style="background:#ffd54f;color:#1a1f2e;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-weight:600;">↻ 重新检查</button>
+                </div>
             </div>
         </div>
 </body>
