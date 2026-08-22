@@ -120,7 +120,8 @@
       var label=document.getElementById('smLabel').value.trim();
       // 必填校验：缺任一项会让路径退化成 skins\skin.png 这种野文件，且会被一键推送带上线
       if(!hero||!label){ smStatus('请先填写「英雄名」和「皮肤标签」再下载（否则会生成无法识别的 skin.png 垃圾文件）',true); return; }
-      var name=label+'·'+hero;
+      // 防呆：标签与英雄名相同（如英雄=水人、标签=水人）时，按默认皮肤处理，避免生成「水人·水人.png」自重复命名
+      var name = (label === hero) ? hero : (label+'·'+hero);
       var fn=smGetInvoke();
       if(fn){
         var base=document.getElementById('smBasePath').value.trim().replace(/[\\/]$/,'');
