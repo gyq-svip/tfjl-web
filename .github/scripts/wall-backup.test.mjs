@@ -148,4 +148,56 @@ for (const [name, input] of cases) {
 }
 
 console.log(fails === 0 ? '\n全部通过 ✅' : `\n${fails} 项失败 ❌`);
+
+// ==================== 孤儿残留检测用例（旧版删除bug留下的无主 content_*） ====================
+const appCore2 = readFileSync(join(here, '..', '..', 'app-core.js'), 'utf8');
+const webOrphanSrc = (() => {
+    const start = appCore2.indexOf('function wallSelectOrphanBackupFiles(');
+    if (start < 0) throw new Error('app-core.js 里找不到 wallSelectOrphanBackupFiles');
+    let i = appCore2.indexOf('{', start), depth = 0, end = -1;
+    for (; i < appCore2.length; i++) {
+        if (appCore2[i] === '{') depth++;
+        else if (appCore2[i] === '}') { depth--; if (depth === 0) { end = i + 1; break; } }
+    }
+    return appCore2.slice(start, end);
+})();
+const { selectOrphanBackupFiles } = await import('./wall-backup.mjs');
+const webOrphan = new Function(`${webOrphanSrc}; return wallSelectOrphanBackupFiles;`)();
+console.log('\n已提取网页版孤儿检测函数，开始孤儿用例：');
+
+const TS1 = 1787400000000, TS2 = 1787500000000;
+const main1 = JSON.stringify({ files: { messages: [`content_messages_0_${TS1}.json`, `content_messages_1_${TS1}.json`], profiles: `content_profiles_${TS1}.json` }, scripts: [{ backupFile: `content_script_a_1111111111111111_${TS1}.js` }] });
+const main2 = JSON.stringify({ files: { messages: `content_messages_0_${TS2}.json` }, scripts: [] });
+const orphanCases = [
+    ['常规-未声明content即孤儿', {
+        [`backup_wall_all_${TS1}.json`]: main1,
+        [`content_messages_0_${TS1}.json`]: 'x', [`content_messages_1_${TS1}.json`]: 'x',
+        [`content_profiles_${TS1}.json`]: 'x', [`content_script_a_1111111111111111_${TS1}.js`]: 'x',
+        [`backup_wall_all_${TS2}.json`]: main2,
+        [`content_messages_0_${TS2}.json`]: 'x',
+        [`content_script_orphan_4444444444444_${TS1}.js`]: 'x',   // 没有任何主索引声明 → 孤儿
+        [`content_messages_0_1777000000000.json`]: 'x',           // 旧版删索引留下的残留 → 孤儿
+        'backup_status.json': 'x', 'backup_info.json': 'x',
+    }, [
+        `content_script_orphan_4444444444444_${TS1}.js`,
+        `content_messages_0_1777000000000.json`,
+    ]],
+    ['主索引损坏-保守放弃', {
+        [`backup_wall_all_${TS1}.json`]: '{broken json',
+        [`content_messages_0_${TS1}.json`]: 'x',
+    }, []],
+    ['无主索引-全部content算孤儿', {
+        [`content_messages_0_${TS1}.json`]: 'x',
+        [`content_script_b_5555555555555_${TS2}.js`]: 'x',
+    }, [
+        `content_messages_0_${TS1}.json`,
+        `content_script_b_5555555555555_${TS2}.js`,
+    ]],
+];
+for (const [name, input, expected] of orphanCases) {
+    check(`[Node孤儿] ${name}`, selectOrphanBackupFiles(input), expected);
+    check(`[Web孤儿] ${name}`, webOrphan(input), expected);
+}
+
+console.log(fails === 0 ? '\n（含孤儿用例）全部通过 ✅' : `\n共 ${fails} 项失败 ❌`);
 process.exit(fails === 0 ? 0 : 1);
