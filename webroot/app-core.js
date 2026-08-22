@@ -20403,7 +20403,8 @@ ${maSection}
             document.getElementById('adminMenuSection').style.display = 'none';
 
             if (page === 'help') {
-                if (helpPage) helpPage.style.display = 'block';
+                const el = document.getElementById('adminPageHelp');
+                if (el) el.style.display = 'block';
             } else if (page === 'title') {
                 document.getElementById('adminPageTitle').style.display = 'block';
                 document.getElementById('adminTitleText').value = currentConfig.title || '';
@@ -20414,13 +20415,15 @@ ${maSection}
                 document.getElementById('adminPageStats').style.display = 'block';
                 adminLoadStats();
             } else if (page === 'analytics') {
-                if (analyticsPage) {
-                    analyticsPage.style.display = 'block';
+                const el = document.getElementById('adminPageAnalytics');
+                if (el) {
+                    el.style.display = 'block';
                     adminLoadAnalytics();
                 }
             } else if (page === 'scriptStats') {
-                if (scriptStatsPage) {
-                    scriptStatsPage.style.display = 'block';
+                const el = document.getElementById('adminPageScriptStats');
+                if (el) {
+                    el.style.display = 'block';
                     adminLoadScriptStats();
                 }
             } else if (page === 'settings') {
@@ -20439,9 +20442,8 @@ ${maSection}
                 document.getElementById('adminPagePasswordManage').style.display = 'block';
                 loadPasswordList();
             } else if (page === 'cacheManage') {
-                if (cachePage) {
-                    cachePage.style.display = 'block';
-                }
+                const el = document.getElementById('adminPageCacheManage');
+                if (el) el.style.display = 'block';
             } else if (page === 'logStats') {
                 const pageEl = document.getElementById('adminPageLogStats');
                 if (pageEl) {
