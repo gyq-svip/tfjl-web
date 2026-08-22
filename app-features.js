@@ -7552,67 +7552,86 @@
         };
 
         // ==================== ③ 存储占用统计 ====================
-        window.showStorageStats = async function () {
+        window.showStorageStats = function () {
             const api = window.__tfjlDiagApi;
             const isApp = !!(api && api.isTauriApp);
-            let lines = [];
             const fmt = (b) => (b >= 1048576 ? (b / 1048576).toFixed(2) + ' MB' : b >= 1024 ? (b / 1024).toFixed(1) + ' KB' : b + ' B');
 
-            // localStorage
-            let lsBytes = 0;
-            for (let i = 0; i < localStorage.length; i++) {
-                const k = localStorage.key(i);
-                lsBytes += (k.length + (localStorage.getItem(k) || '').length) * 2;
-            }
-            lines.push(['浏览器缓存 localStorage', localStorage.length + ' 项', fmt(lsBytes)]);
-
-            // tfjl.dat（App）
-            if (isApp && api.getSyncDir) {
-                try {
-                    const raw = await api.readTextFile(api.getDatPath(api.getSyncDir()));
-                    lines.push(['统一存储 tfjl.dat (App)', raw ? '存在' : '空', fmt(raw ? raw.length * 2 : 0)]);
-                } catch (e) { lines.push(['统一存储 tfjl.dat (App)', '读取失败', '—']); }
-            } else {
-                lines.push(['统一存储 tfjl.dat', '仅限App版', '—']);
-            }
-
-            // 项目
-            let projCount = 0, projBytes = 0;
-            try {
-                if (typeof window.__tfjlLoadProjectList === 'function') {
-                    const pj = await window.__tfjlLoadProjectList();
-                    projCount = Array.isArray(pj) ? pj.length : 0;
-                    projBytes = JSON.stringify(pj).length * 2;
-                }
-            } catch (e) {}
-            lines.push(['项目数据 (IndexedDB)', projCount + ' 个', fmt(projBytes)]);
-
-            // CacheStorage
-            let cacheBytes = 0, cacheN = 0;
-            if (window.caches) {
-                const names = await caches.keys();
-                cacheN = names.length;
-                for (const n of names) {
-                    const c = await caches.open(n);
-                    const reqs = await c.keys();
-                    for (const r of reqs) { try { const res = await c.match(r); if (res) cacheBytes += (res.headers.get('content-length') | 0); } catch (e) {} }
-                }
-            }
-            lines.push(['资源缓存 CacheStorage', cacheN + ' 个缓存', fmt(cacheBytes)]);
-
-            const html = lines.map(([n, c, s]) =>
-                '<div style="display:flex;justify-content:space-between;padding:7px 2px;border-bottom:1px solid rgba(255,255,255,0.06);font-size:0.82rem;">' +
-                '<span style="color:rgba(255,255,255,0.8);">' + n + '</span>' +
-                '<span style="color:#ffd54f;">' + c + '</span>' +
-                '<span style="color:rgba(255,255,255,0.6);">' + s + '</span></div>'
-            ).join('');
+            // 🔴 先建好 modal 并绑好关闭事件（同步、在任何 await 之前），
+            // 否则一旦后面 await 抛错，事件没绑上→遮罩残留→全屏点不动必须刷新。
             const modal = document.createElement('div');
             modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;align-items:center;justify-content:center;';
             modal.innerHTML = '<div style="background:#1a1f2e;border:1px solid rgba(255,255,255,0.15);border-radius:14px;max-width:480px;width:90%;padding:20px;box-shadow:0 20px 60px rgba(0,0,0,0.6);">' +
                 '<div style="font-size:1.05rem;font-weight:600;color:#ffd54f;margin-bottom:12px;">📊 存储占用统计</div>' +
-                html +
-                '<div style="margin-top:16px;text-align:right;"><button onclick="this.closest(\'div\').parentElement.remove()" style="background:#ffd54f;color:#1a1f2e;border:none;padding:6px 16px;border-radius:6px;cursor:pointer;font-weight:600;">关闭</button></div>' +
+                '<div id="__ssBody" style="min-height:60px;color:rgba(255,255,255,0.6);font-size:0.82rem;">⏳ 统计中…</div>' +
+                '<div style="margin-top:16px;text-align:right;"><button id="__ssCloseBtn" style="background:#ffd54f;color:#1a1f2e;border:none;padding:6px 16px;border-radius:6px;cursor:pointer;font-weight:600;">关闭</button></div>' +
                 '</div>';
             document.body.appendChild(modal);
+            const closeFn = () => { if (modal && modal.parentNode) modal.parentNode.removeChild(modal); };
+            const closeBtn = modal.querySelector('#__ssCloseBtn');
+            if (closeBtn) closeBtn.addEventListener('click', closeFn);
+            modal.addEventListener('click', (e) => { if (e.target === modal) closeFn(); });
+
+            // 异步填充数据（失败也不影响关闭）
+            (async () => {
+                const lines = [];
+                try {
+                    // localStorage
+                    let lsBytes = 0;
+                    for (let i = 0; i < localStorage.length; i++) {
+                        const k = localStorage.key(i);
+                        lsBytes += (k.length + (localStorage.getItem(k) || '').length) * 2;
+                    }
+                    lines.push(['浏览器缓存 localStorage', localStorage.length + ' 项', fmt(lsBytes)]);
+
+                    // tfjl.dat（App）
+                    if (isApp && api.getSyncDir) {
+                        try {
+                            const raw = await api.readTextFile(api.getDatPath(api.getSyncDir()));
+                            lines.push(['统一存储 tfjl.dat (App)', raw ? '存在' : '空', fmt(raw ? raw.length * 2 : 0)]);
+                        } catch (e) { lines.push(['统一存储 tfjl.dat (App)', '读取失败', '—']); }
+                    } else {
+                        lines.push(['统一存储 tfjl.dat', '仅限App版', '—']);
+                    }
+
+                    // 项目
+                    let projCount = 0, projBytes = 0;
+                    try {
+                        if (typeof window.__tfjlLoadProjectList === 'function') {
+                            const pj = await window.__tfjlLoadProjectList();
+                            projCount = Array.isArray(pj) ? pj.length : 0;
+                            projBytes = JSON.stringify(pj).length * 2;
+                        }
+                    } catch (e) {}
+                    lines.push(['项目数据 (IndexedDB)', projCount + ' 个', fmt(projBytes)]);
+
+                    // CacheStorage
+                    let cacheBytes = 0, cacheN = 0;
+                    if (window.caches) {
+                        try {
+                            const names = await caches.keys();
+                            cacheN = names.length;
+                            for (const n of names) {
+                                const c = await caches.open(n);
+                                const reqs = await c.keys();
+                                for (const r of reqs) { try { const res = await c.match(r); if (res) cacheBytes += (res.headers.get('content-length') | 0); } catch (e) {} }
+                            }
+                        } catch (e) {}
+                    }
+                    lines.push(['资源缓存 CacheStorage', cacheN + ' 个缓存', fmt(cacheBytes)]);
+
+                    const html = lines.map(([n, c, s]) =>
+                        '<div style="display:flex;justify-content:space-between;padding:7px 2px;border-bottom:1px solid rgba(255,255,255,0.06);font-size:0.82rem;">' +
+                        '<span style="color:rgba(255,255,255,0.8);">' + n + '</span>' +
+                        '<span style="color:#ffd54f;">' + c + '</span>' +
+                        '<span style="color:rgba(255,255,255,0.6);">' + s + '</span></div>'
+                    ).join('');
+                    const body = modal.querySelector('#__ssBody');
+                    if (body) body.innerHTML = html;
+                } catch (e) {
+                    const body = modal.querySelector('#__ssBody');
+                    if (body) body.innerHTML = '❌ 统计出错：' + String(e && e.message || e);
+                }
+            })();
         };
         
