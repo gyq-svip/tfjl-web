@@ -753,6 +753,9 @@
             } catch (e) { console.warn('[项目磁盘持久化] 失败:', e); }
         }
 
+        // 暴露给异常诊断（window.runDiagnostics）读取项目列表（网页版/App版通用 IndexedDB）
+        window.__tfjlLoadProjectList = loadProjectListFromDB;
+
         async function restoreCategoriesFromLocalStorage() {
             if (!db) return;
             const stored = await new Promise((res) => {
