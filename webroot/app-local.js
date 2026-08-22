@@ -4157,7 +4157,7 @@ async function runDiagnostics() {
                 fileExists ? '' : '首次启动后保存任意设置即会生成，若长期为空请手动操作一次保存');
         }
     } else {
-        push('数据目录', 'info', '网页版数据存于浏览器缓存，无本地 tfjl.dat');
+        push('数据目录', 'info', '仅限App版（本地数据目录 + tfjl.dat 落盘）：当前为网页版，此功能不适用', '网页版数据存于浏览器缓存，无需本地目录');
     }
 
     // 4) 写盘测试（仅 App 版）
@@ -4190,10 +4190,13 @@ async function runDiagnostics() {
             '匿名用户无法区分身份，请在进入系统后按提示设置昵称');
     }
 
-    // 6) 项目数据（通用，App 走磁盘/网页走 localStorage）
+    // 6) 项目数据（通用，网页版与 App 版均存于 IndexedDB）
     let projOk = false, projDetail = '';
     try {
-        const pj = api ? await api.restoreAllProjects() : JSON.parse(localStorage.getItem('TFJL_PROJECTS') || '[]');
+        const loader = (window.__tfjlLoadProjectList)
+            ? window.__tfjlLoadProjectList
+            : (api ? api.restoreAllProjects : null);
+        const pj = loader ? await loader() : [];
         if (Array.isArray(pj) && pj.length > 0) { projOk = true; projDetail = ('共 ' + pj.length + ' 个项目'); }
         else projDetail = '无项目（空）';
     } catch (e) { projDetail = '读取异常：' + String(e && e.message || e); }
@@ -4210,6 +4213,30 @@ async function runDiagnostics() {
         push('网络·' + tg.label, r.ok ? (r.ms < 1500 ? 'ok' : 'warn') : 'error',
             r.ok ? ('延迟 ' + r.ms + 'ms') : ('不可达：' + (r.err || '超时')),
             r.ok ? (r.ms >= 1500 ? '延迟偏高，打开在线资源可能较慢' : '') : '网络不通，在线功能（皮肤同步/更新）会失败，可稍后重试或检查代理');
+    }
+
+    // 8) 阵容识别（Umi-OCR 本地引擎，仅限App版）
+    if (isApp) {
+        const hasInvoke = !!(window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke);
+        if (!hasInvoke) {
+            push('阵容识别（Umi-OCR）', 'error', '未找到 invoke，Tauri 环境异常',
+                'App 运行环境异常，建议重装/重打包桌面版；仍异常联系我 ' + WX);
+        } else {
+            try {
+                // 用 1x1 透明 png 探测本地 OCR 服务（127.0.0.1:1224）是否就绪
+                const TINY = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+                await window.__TAURI_INTERNALS__.invoke('umi_ocr', { base64: TINY, options: {} });
+                push('阵容识别（Umi-OCR）', 'ok', '本机 OCR 引擎已就绪，可离线识别阵容');
+            } catch (e) {
+                const msg = String(e && e.message || e);
+                push('阵容识别（Umi-OCR）', 'warn',
+                    'OCR 引擎未就绪（' + msg.slice(0, 80) + '）',
+                    '请打开「阵容识别」面板，点「🚀 启动识别引擎 / 下载安装」拉起本机 Umi-OCR；识别功能依赖本地 Umi-OCR.exe，未启动则无法识别');
+            }
+        }
+    } else {
+        push('阵容识别（Umi-OCR）', 'info', '仅限App版（依赖本机 Umi-OCR 离线引擎）：当前为网页版，此功能不适用',
+            '网页版无法调用本地 OCR 程序，阵容识别需在桌面 App 内使用');
     }
 
     return items;
