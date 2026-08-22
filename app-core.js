@@ -16147,32 +16147,34 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 const dl = `wall-backup-full-${dt.getFullYear()}${p2(dt.getMonth() + 1)}${p2(dt.getDate())}-${p2(dt.getHours())}${p2(dt.getMinutes())}${p2(dt.getSeconds())}.json`;
                 const text = JSON.stringify(bundle);
                 const blob = new Blob([text], { type: 'application/json' });
-                // 套用站内下载模板：优先让用户选保存位置——App 原生目录对话框 / 网页 showSaveFilePicker / 兜底默认下载
-                const invokeFn = (window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke) || (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke);
-                if (invokeFn) {
-                    try {
-                        const folder = await invokeFn('open_directory_dialog');
-                        if (folder) {
-                            const savePath = folder.replace(/[\\/]+$/, '') + '\\' + dl;
-                            await invokeFn('write_text_file', { filePath: savePath, content: text });
-                            wallShowBackupStatus(`✅ 已保存到您选择的位置：${savePath}（消息 ${messages.length} 条 · 脚本 ${scripts.length} 个）`, 'success');
+                // 网页版保存：showSaveFilePicker 选位置 → 兜底默认下载
+                const webSave = async () => {
+                    if (window.showSaveFilePicker) {
+                        try {
+                            const handle = await window.showSaveFilePicker({ suggestedName: dl, types: [{ description: 'JSON 备份文件', accept: { 'application/json': ['.json'] } }] });
+                            const w = await handle.createWritable(); await w.write(blob); await w.close();
+                            wallShowBackupStatus(`✅ 已保存到您选择的位置（消息 ${messages.length} 条 · 脚本 ${scripts.length} 个）`, 'success');
                             return;
-                        }
-                        wallShowBackupStatus('已取消保存（未选择目录）');
-                        return;
-                    } catch (e) { /* 目录对话框失败 → 降级网页流程 */ }
+                        } catch (e) { if (e && e.name === 'AbortError') { wallShowBackupStatus('已取消保存'); return; } }
+                    }
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a'); a.href = url; a.download = dl; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+                    wallShowBackupStatus(`✅ 已下载到默认下载目录（消息 ${messages.length} 条 · 脚本 ${scripts.length} 个）：${dl}`, 'success');
+                };
+                // App：复用需求墙脚本下载同款精美保存弹窗（浏览文件夹选位置；不显示脚本专属老马目录卡片）
+                const invokeFn = (window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke) || (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke);
+                if (invokeFn && typeof _downloadScriptTauri === 'function') {
+                    const saved = await _downloadScriptTauri(dl, text, {
+                        title: '📥 保存需求墙备份',
+                        dirs: null,
+                        onSaved: (p) => wallShowBackupStatus(`✅ 已保存：${p}（消息 ${messages.length} 条 · 脚本 ${scripts.length} 个）`, 'success'),
+                        fallback: () => { webSave(); }
+                    });
+                    if (saved) return;
+                    wallShowBackupStatus('已取消保存');
+                    return;
                 }
-                if (window.showSaveFilePicker) {
-                    try {
-                        const handle = await window.showSaveFilePicker({ suggestedName: dl, types: [{ description: 'JSON 备份文件', accept: { 'application/json': ['.json'] } }] });
-                        const w = await handle.createWritable(); await w.write(blob); await w.close();
-                        wallShowBackupStatus(`✅ 已保存到您选择的位置（消息 ${messages.length} 条 · 脚本 ${scripts.length} 个）`, 'success');
-                        return;
-                    } catch (e) { if (e && e.name === 'AbortError') { wallShowBackupStatus('已取消保存'); return; } }
-                }
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a'); a.href = url; a.download = dl; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-                wallShowBackupStatus(`✅ 已下载到默认下载目录（消息 ${messages.length} 条 · 脚本 ${scripts.length} 个）：${dl}`, 'success');
+                await webSave();
             } catch (e) { wallShowBackupStatus(`❌ 导出失败：${e.message}`, 'error'); }
         }
 
@@ -17988,12 +17990,14 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
         }
 
         // Tauri APP 原生下载：精美弹窗 → 老马目录（一键）或 自定义文件夹（浏览）
-        async function _downloadScriptTauri(fileName, content) {
+        // opts 可选：{ title: 弹窗标题, dirs: 目录卡片配置（null=不显示预置卡片，如备份保存）, onSaved(savePath), fallback(fileName, content) }
+        async function _downloadScriptTauri(fileName, content, opts) {
+            opts = opts || {};
             const invokeFn = window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke;
             if (!invokeFn) { _downloadScriptBlob(fileName, content); return; }
 
             const fileSizeKB = (content.length / 1024).toFixed(1);
-            const dirLabels = {
+            const dirLabels = (opts.dirs === null) ? null : (opts.dirs || {
                 coop:       { label: '合作脚本', icon: '🤝' },
                 activity:   { label: '活动',     icon: '🎉' },
                 battle:     { label: '对战JSON', icon: '⚔️' },
@@ -18001,14 +18005,14 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 screenshot: { label: '截图',     icon: '📸' },
                 logs:       { label: '日志',     icon: '📋' },
                 temp:       { label: '临时脚本', icon: '📝' }
-            };
+            });
 
             return new Promise((resolve) => {
                 // —— 构建老马目录卡片 ——
                 let dirCardsHtml = '';
                 let hasAnyDir = false;
                 const dirSavePaths = {};
-                for (const [key, info] of Object.entries(dirLabels)) {
+                if (dirLabels) for (const [key, info] of Object.entries(dirLabels)) {
                     const dirPath = (window.maDirs && window.maDirs[key]) || '';
                     if (!dirPath) continue;
                     hasAnyDir = true;
@@ -18026,10 +18030,10 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 </div>`;
                 }
 
-                const maSection = hasAnyDir ? `
+                const maSection = !dirLabels ? '' : (hasAnyDir ? `
                 <div style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-bottom:8px;">📁 保存到老马目录（点击即保存）：</div>
                 <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px;">${dirCardsHtml}</div>` : `
-                <div style="color:rgba(255,255,255,0.3);font-size:0.8rem;text-align:center;margin-bottom:12px;padding:12px;background:rgba(255,152,0,0.08);border-radius:8px;">⚠️ 未配置老马目录，请先在APP本地设置中配置</div>`;
+                <div style="color:rgba(255,255,255,0.3);font-size:0.8rem;text-align:center;margin-bottom:12px;padding:12px;background:rgba(255,152,0,0.08);border-radius:8px;">⚠️ 未配置老马目录，请先在APP本地设置中配置</div>`);
 
                 const modal = document.createElement('div');
                 modal.id = 'downloadSaveModal';
@@ -18038,7 +18042,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(255,152,0,0.5);border-radius:16px;padding:24px;max-width:480px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.5);max-height:85vh;overflow-y:auto;">
                 <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:16px;">
                     <div>
-                        <span style="color:#ff9800;font-size:1.1rem;font-weight:bold;">📥 保存脚本</span>
+                        <span style="color:#ff9800;font-size:1.1rem;font-weight:bold;">${escapeHtml(opts.title || '📥 保存脚本')}</span>
                         <div style="color:#fff;font-size:0.9rem;margin-top:4px;word-break:break-all;">${escapeHtml(fileName)}</div>
                         <div style="color:rgba(255,255,255,0.35);font-size:0.7rem;">${fileSizeKB} KB</div>
                     </div>
@@ -18082,11 +18086,13 @@ ${maSection}
                     modal.remove();
                     try {
                         await invokeFn('write_text_file', { filePath: savePath, content: content });
-                        showToast('✅ 已保存: ' + fileName);
+                        if (typeof opts.onSaved === 'function') opts.onSaved(savePath);
+                        else showToast('✅ 已保存: ' + fileName);
                         resolve(true);
                     } catch (e) {
                         console.warn('Tauri保存失败，降级到浏览器下载:', e);
-                        _downloadScriptBlob(fileName, content);
+                        if (typeof opts.fallback === 'function') opts.fallback(fileName, content);
+                        else _downloadScriptBlob(fileName, content);
                         resolve(true);
                     }
                 }
