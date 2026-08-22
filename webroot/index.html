@@ -2461,9 +2461,10 @@
     <!-- 设置昵称（强制，仅用于发言/分享脚本展示） -->
     <div id="nickSetupModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.65);z-index:99999;align-items:center;justify-content:center;">
         <div style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);border:2px solid rgba(255,215,0,0.4);border-radius:16px;padding:24px;width:90%;max-width:380px;box-shadow:0 10px 50px rgba(0,0,0,0.6);">
-            <h3 style="color:#ffd700;margin:0 0 8px 0;font-size:1.05rem;">👤 设置昵称（必填）</h3>
-            <p style="color:rgba(255,255,255,0.6);font-size:0.76rem;line-height:1.6;margin:0 0 16px;">
-                昵称<strong style="color:#4fc3f7;">仅用于发言与分享脚本时的展示</strong>，设置后无法自行修改（需联系管理员）。全局唯一，他人不可重复使用。
+            <h3 style="color:#ffd700;margin:0 0 8px 0;font-size:1.05rem;">👤 首次使用 · 请设置昵称（必填）</h3>
+            <p style="color:rgba(255,255,255,0.6);font-size:0.76rem;line-height:1.7;margin:0 0 16px;">
+                昵称<strong style="color:#4fc3f7;">随便起一个就行</strong>，仅用于在需求墙、聊天室、分享脚本时<strong style="color:#4fc3f7;">标识「这是谁发的」</strong>，方便大家分辨不同的人，不会暴露真实身份。<br>
+                设置后不可自行修改（如需更改请联系管理员）。昵称全局唯一，他人不可重复使用。
             </p>
             <input type="text" id="nickSetupInput" maxlength="12" placeholder="输入昵称（2-12字）" style="width:100%;box-sizing:border-box;padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.25);background:rgba(0,0,0,0.4);color:white;font-size:0.9rem;outline:none;">
             <div id="nickSetupErr" style="color:#ff8a80;font-size:0.74rem;margin-top:8px;min-height:18px;"></div>
@@ -2521,7 +2522,7 @@
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;opacity:0.1;" ondblclick="onVersionTagForceRefresh()">s20260822-52 · s1.0.195</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;opacity:0.1;" ondblclick="onVersionTagForceRefresh()">s20260822-53 · s1.0.196</span>
                 <div class="version-tooltip">版本 s20260820-41 · s1.0.184（双击强制刷新）</div>
             </div>
             <script>/* 悬浮提示自动跟随版本号，避免 bump 时漏改 tooltip */
