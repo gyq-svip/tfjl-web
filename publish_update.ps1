@@ -27,7 +27,17 @@ function Publish-GiteeRelease($ver, $exePath) {
     $rel = $list | Where-Object { $_.tag_name -eq $tag }
     if (-not $rel) {
         $body = @{ tag_name=$tag; target_commitish="main"; name=$tag; body="auto update $tag"; prerelease=$false } | ConvertTo-Json -Compress
-        try { $rel = Invoke-RestMethod -Uri ("https://gitee.com/api/v5/repos/$owner/$repo/releases?access_token=$tok") -Method Post -ContentType "application/json; charset=utf-8" -Body $body } catch { Write-Host "WARN: 创建 Gitee release 失败: $($_.Exception.Message)" -ForegroundColor Yellow; return }
+        # 🔴 Gitee WAF 偶发把 POST /releases 拦成 400 假象（同版本 release 已存在也会 400）。
+        # 先重试一次；若仍失败，再查一次 release 列表（可能其实已建好，只是返回被 WAF 干扰），
+        # 仍查不到才放弃上传并告警，绝不直接 return 导致 exe 漏传。
+        try { $rel = Invoke-RestMethod -Uri ("https://gitee.com/api/v5/repos/$owner/$repo/releases?access_token=$tok") -Method Post -ContentType "application/json; charset=utf-8" -Body $body } catch {
+            Write-Host "WARN: 创建 Gitee release 首次失败: $($_.Exception.Message)，重试一次…" -ForegroundColor Yellow
+            try { $rel = Invoke-RestMethod -Uri ("https://gitee.com/api/v5/repos/$owner/$repo/releases?access_token=$tok") -Method Post -ContentType "application/json; charset=utf-8" -Body $body } catch { $rel = $null }
+            if (-not $rel) {
+                try { $relist = Invoke-RestMethod -Uri ("https://gitee.com/api/v5/repos/$owner/$repo/releases?access_token=$tok") -Method Get; $rel = $relist | Where-Object { $_.tag_name -eq $tag } } catch {}
+            }
+            if (-not $rel) { Write-Host "ERROR: 创建 Gitee release 失败（已重试），exe 未能上传，请手动传 $fname 到发行版 v$ver" -ForegroundColor Red; return }
+        }
     }
     $rid = $rel.id
     if ($rel.assets -and ($rel.assets | Where-Object { $_.name -eq $fname })) {
@@ -130,7 +140,15 @@ try {
     $dlUrl = "https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/releases/download/v$ver/tfjl-assistant_$($ver)_x64-setup.exe"
     $r = Invoke-WebRequest -Uri $dlUrl -Method Head -TimeoutSec 30 -ErrorAction Stop
     if ($r.StatusCode -eq 200) {
-        Write-Host "✅ 自动更新可用：下载直链 HTTP 200，大小 $([int]($r.Headers['Content-Length'])/1MB) MB" -ForegroundColor Green
+        $remoteSize = [int64]$r.Headers['Content-Length']
+        $localSize = (Get-Item $ExePath).Length
+        $remoteMB = [math]::Round($remoteSize/1MB, 2)
+        # 🔴 200 只代表直链存在，不代表是本版新包：用本地 exe 字节数比对，不一致则明确标红告警。
+        if ($remoteSize -eq $localSize) {
+            Write-Host "✅ 自动更新可用：下载直链 HTTP 200，大小 ${remoteMB} MB，与本地签名包一致" -ForegroundColor Green
+        } else {
+            Write-Host "❌ 直链可达(HTTP 200)但大小不一致！远程 ${remoteMB} MB / 本地 $([math]::Round($localSize/1MB,2)) MB —— 很可能 Gitee 上是旧版本文件，请手动核查发行版 v$ver 附件" -ForegroundColor Red
+        }
     } else {
         Write-Host "⚠️ 下载直链返回状态码 $($r.StatusCode)，请手动核查。" -ForegroundColor Yellow
     }
