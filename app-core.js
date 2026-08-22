@@ -498,6 +498,9 @@
                     myDeckInfo: (currentData && currentData.myDeckInfo !== undefined) ? currentData.myDeckInfo : safeMyDeckInfo,
                     teammateDeckInfo: (currentData && currentData.teammateDeckInfo !== undefined) ? currentData.teammateDeckInfo : safeTeammateDeckInfo,
                     notepad: (currentData && currentData.notepad !== undefined) ? currentData.notepad : safeNotepad,
+                    // 逐字颜色标记随项目落盘：此前只存 localStorage，WebView2 缓存被清理后文本还在、颜色全丢
+                    notepadMarks: (currentData && Array.isArray(currentData.notepadMarks)) ? currentData.notepadMarks
+                        : (typeof getNotebookMainMarks === 'function' ? (getNotebookMainMarks() || []) : []),
                     notebookColor: (currentData && currentData.notebookColor !== undefined) ? currentData.notebookColor : (notebookColorCfg.color || DEFAULT_NOTEBOOK_COLOR),
                     txtFiles: currentData?.txtFiles || (typeof txtFiles !== 'undefined' ? txtFiles : []),
                     referenceImages: currentData?.referenceImages || (typeof referenceImages !== 'undefined' ? referenceImages : [])
@@ -601,6 +604,13 @@
                             notepad.style.color = projColor;
                             const ed0 = getNotepadEditable();
                             if (ed0) ed0.style.color = projColor;
+                            // 逐字颜色标记回填：localStorage 丢失（缓存清理/换机）时从项目记录恢复，
+                            // 颜色随项目（IndexedDB + D盘备份）持久化，不再单点依赖 localStorage
+                            try {
+                                if (!getNotebookMainMarks().length && Array.isArray(project.notepadMarks) && project.notepadMarks.length) {
+                                    persistNotebookMainMarks(project.notepadMarks);
+                                }
+                            } catch (e) {}
                             refreshNotepadEditable(); // 同步富文本显示层（含逐字标记，按项目 marks key 重新加载）
                         }
                         
@@ -1164,6 +1174,7 @@
                     myDeckInfo: document.getElementById('myDeckInfo')?.value || '',
                     teammateDeckInfo: document.getElementById('teammateDeckInfo')?.value || '',
                     notepad: document.getElementById('notepad')?.value || '',
+                    notepadMarks: (typeof getNotebookMainMarks === 'function' ? (getNotebookMainMarks() || []) : []),
                     notebookColor: notebookColorCfg.color || DEFAULT_NOTEBOOK_COLOR,
                     txtFiles: typeof txtFiles !== 'undefined' ? txtFiles : [],
                     referenceImages: typeof referenceImages !== 'undefined' ? referenceImages : []
@@ -3124,13 +3135,20 @@
 
             // 逐字彩色标记初始化（持久化 overlay）
             const nbKey = getNotebookMarksKey(opts);
-            let nbMarks = loadNotebookMarks(nbKey);
-            if (!nbMarks.length && nbKey[0] === 'f') {
-                // key format: 'f' + projectName + ':' + fileIndex
-                const colonIdx = nbKey.lastIndexOf(':');
-                if (colonIdx > 1) {
-                    const fi = parseInt(nbKey.slice(colonIdx + 1), 10);
-                    if (txtFiles[fi] && txtFiles[fi].marks) nbMarks = txtFiles[fi].marks;
+            let nbMarks = [];
+            // 首选跟随文件本身的 marks（随项目保存、随文件走）。localStorage 键按 fileIndex 存，
+            // 文件删除/新增/重排后索引错位，会把颜色串到别的文件或读到旧键——表现为"部分颜色丢失/错乱"，
+            // 且各项目文件变动情况不同，所以"有的项目丢、有的不丢"。
+            if (typeof opts.fileIndex === 'number' && opts.fileIndex >= 0 && txtFiles[opts.fileIndex] && Array.isArray(txtFiles[opts.fileIndex].marks)) {
+                nbMarks = txtFiles[opts.fileIndex].marks;
+            }
+            // 回退：localStorage（本地路径文件 / 老数据未带 marks 的项目文件）
+            if (!nbMarks.length) {
+                nbMarks = loadNotebookMarks(nbKey);
+                // 老数据按索引存 localStorage，可能是文件增删后串位的旧标记：
+                // 用当前内容锚定过滤一遍，文本对不上的直接丢，避免给无关文字上色
+                if (nbMarks.length && typeof opts.content === 'string' && opts.content.length) {
+                    nbMarks = anchorNotebookMarks(opts.content, nbMarks);
                 }
             }
             notebookMarksStore[nbKey] = nbMarks;
@@ -3452,6 +3470,8 @@
             const key = getNotebookMainMarksKey();
             notebookMarksStore[key] = marks || [];
             try { localStorage.setItem(LS_NOTEBOOK_MARKS, JSON.stringify(notebookMarksStore)); } catch (e) {}
+            // 颜色也是项目数据：借记事本防抖自动保存把 notepadMarks 一并落进项目（IndexedDB + D盘备份）
+            try { if (typeof autoSaveNotepad === 'function') autoSaveNotepad(); } catch (e) {}
         }
         function getNotepadEditable() { return document.getElementById('notepadEditable'); }
 
@@ -3486,20 +3506,27 @@
         // 程序改动了 #notepad.value（加载/清空/恢复草稿）后调用，让显示层跟着变
         function refreshNotepadEditable() { renderNotepadEditable(); }
 
+        // 计算「编辑区起点 → 选区边界」的长度，坐标系与 #notepad.value（innerText 语义）一致。
+        // Range.toString() 只拼接文本节点，用户敲回车产生的 <div> 块边界不计数；
+        // 多行笔记里选字上色时偏移整体左移，会给错误的文字上色（重则标记文本与内容对不上，重开即"丢色"）。
+        function editableEdgeOffset(ed, container, offset) {
+            const pre = document.createRange();
+            pre.selectNodeContents(ed);
+            try { pre.setEnd(container, offset); } catch (e) { return pre.toString().length; }
+            const frag = pre.cloneContents();
+            let extra = 0;
+            frag.querySelectorAll('br').forEach(() => extra++);                    // <br> 每个计 1 个换行
+            frag.querySelectorAll('div,p').forEach(el => { if (el.previousSibling) extra++; }); // 块级元素前有内容则计 1 个换行
+            return frag.textContent.length + extra;
+        }
         // 获取 contenteditable 内当前选区对应的字符偏移 [start,end]
         function getEditableSelection(ed) {
             if (!ed) return { s: 0, e: 0 };
             const sel = window.getSelection && window.getSelection();
             if (!sel || !sel.rangeCount) return { s: 0, e: 0 };
             const range = sel.getRangeAt(0);
-            const pre = document.createRange();
-            pre.selectNodeContents(ed);
-            pre.setEnd(range.startContainer, range.startOffset);
-            const s = pre.toString().length;
-            const pre2 = document.createRange();
-            pre2.selectNodeContents(ed);
-            pre2.setEnd(range.endContainer, range.endOffset);
-            const e = pre2.toString().length;
+            const s = editableEdgeOffset(ed, range.startContainer, range.startOffset);
+            const e = editableEdgeOffset(ed, range.endContainer, range.endOffset);
             return { s: s, e: e };
         }
         function applyNotebookMainColor(color, glow) {
@@ -5141,6 +5168,7 @@
                 myDeckInfo: document.getElementById('myDeckInfo')?.value || '',
                 teammateDeckInfo: document.getElementById('teammateDeckInfo')?.value || '',
                 notepad: document.getElementById('notepad')?.value || '',
+                notepadMarks: (typeof getNotebookMainMarks === 'function' ? (getNotebookMainMarks() || []) : []),
                 txtFiles: typeof txtFiles !== 'undefined' ? txtFiles : [],
                 referenceImages: typeof referenceImages !== 'undefined' ? referenceImages : []
             };
@@ -10521,7 +10549,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const trimmed = name.trim();
             if (!trimmed) return;
             if (window.drTables[trimmed]) { alert('表名已存在'); return; }
-            window.drTables[trimmed] = { 洗炼: {}, 我的战车: 0, 队友战车: 0 };
+            window.drTables[trimmed] = { 洗炼: {}, 我的战车: 0, 队友战车: 0, 小野: 0, 酋长: 0, 宝库: 0 };
             if (!window.drTableOrder.includes(trimmed)) window.drTableOrder.push(trimmed);
             if (!window.drSelectedTables.includes(trimmed)) window.drSelectedTables.push(trimmed);
             window.drActiveTable = trimmed;
@@ -11146,18 +11174,35 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const newData = {};
             const chariotKeys = ['我的战车', '队友战车'];
             const sharedKeys = ['小野', '酋长', '宝库'];
+            // 分区感知：导出文件分「战车 / 技能 / 洗炼」三段，同名行含义不同——
+            // 洗炼段的"小野=10.5"是小野自身占卜洗炼，技能段的"小野=90"才是被动技能减伤。
+            // 旧逻辑不看分段、只按名字路由，洗炼段的行会把技能段刚导入的值覆盖（技能减伤被洗炼覆盖）。
+            let section = '';
 
-            lines.forEach(line => {
+            lines.forEach(rawLine => {
+                const line = rawLine.replace(/\r+$/, '');   // 兼容 Windows 记事本保存的 CRLF 行尾
                 if (line.startsWith('#') || line.trim() === '') return;
-                if (line.includes('=====')) return;
+                if (line.includes('=====')) {
+                    if (line.includes('洗炼')) section = 'refine';
+                    else if (line.includes('技能')) section = 'skill';
+                    else if (line.includes('战车')) section = 'chariot';
+                    return;
+                }
                 const match = line.match(/^([^=]+)=(\d+(?:\.\d+)?)$/);
                 if (match) {
                     let cardName = match[1].trim();
                     const value = parseFloat(match[2]);
                     if (cardName === '战车') cardName = '我的战车';
                     if (!cardName || isNaN(value)) return;
-                    if (chariotKeys.includes(cardName) || sharedKeys.includes(cardName)) {
-                        // 战车 + 技能都写入当前表
+                    if (section === 'refine') {
+                        // 洗炼段：即使叫"小野/酋长/宝库"也只写洗炼，不碰技能减伤
+                        newData[cardName] = value;
+                    } else if (section === 'skill') {
+                        if (sharedKeys.includes(cardName)) t[cardName] = value; else newData[cardName] = value;
+                    } else if (section === 'chariot') {
+                        if (chariotKeys.includes(cardName)) t[cardName] = value; else newData[cardName] = value;
+                    } else if (chariotKeys.includes(cardName) || sharedKeys.includes(cardName)) {
+                        // 无分段头的老文件：维持旧的名字路由
                         t[cardName] = value;
                     } else {
                         newData[cardName] = value;
@@ -11174,14 +11219,12 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             saveDamageReductionData();
             updateDamageReductionDisplay();
 
-            // 刷新弹窗当前列表
-            const listContainer = document.getElementById('damageReductionCardsList');
-            if (listContainer) listContainer.innerHTML = buildDamageReductionCardsList('all', window._damageReductionCardsByProfession, t.洗炼);
-            const chariotInputs = document.querySelectorAll('#damageReductionModal input[data-special]');
-            chariotInputs.forEach(inp => {
-                const key = inp.dataset.special;
-                inp.value = (typeof t[key] === 'number') ? t[key] : 0;
-            });
+            // 导入到哪张表，弹窗就切换到那张表编辑：否则弹窗仍停在旧表，
+            // 输入框却被刷成新表的值，用户随手一改会把导入的值误写进旧表
+            window.drActiveTable = targetTable;
+            renderDrTableChips();
+            updateDrActiveEditLabel();
+            refreshDamageReductionDialogContent();
 
             const count = Object.keys(newData).length;
             const specialCount = sharedKeys.filter(k => t[k] > 0).length;
@@ -15137,6 +15180,15 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
         }
         // 云端备份 Gist（与主 Gist 独立，主 Gist 被删时重建先从此恢复）。真实固定 id 见 room_index.json 的 backup 字段（s1.0.113 重建：原 36a871e7 已消失）
         const MESSAGES_BACKUP_GIST_ID = 'f13f1f2a054e96bdcaaa418264b92174';
+        // 过期统计（判定与 renderMessages 过滤器一致）：仅 expireDays>0 且已到期的算过期——
+        // 过期只是前端不显示，还原/导入仍照常写回数据；提示里注明条数，避免"还原了却看不见"的误判
+        function wallCountExpiredMsgs(arr) {
+            const now = Date.now();
+            let n = 0;
+            (arr || []).forEach(m => { if (m && m.expireDays > 0 && (now - (m.time || 0)) >= m.expireDays * 24 * 3600 * 1000) n++; });
+            return n;
+        }
+
         async function backupWallMessages(arr) {
             try {
                 const token = getGistToken();
@@ -15241,7 +15293,8 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
                 localStorage.removeItem('messages_gist_id');
                 await saveWallToDB(finalMsgs);
                 await fetchMessages();
-                showToast('✅ 已还原：合并 ' + added + ' 条备用消息，共 ' + finalMsgs.length + ' 条');
+                const expN = wallCountExpiredMsgs(finalMsgs);
+                showToast('✅ 已还原：合并 ' + added + ' 条备用消息，共 ' + finalMsgs.length + ' 条' + (expN ? '（其中 ' + expN + ' 条已过期不显示）' : ''));
             } catch (e) { showToast('❌ 还原出错：' + (e.message || e)); }
         }
 
@@ -16037,6 +16090,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 if (!mainContent) throw new Error('备份文件不存在');
                 const main = JSON.parse(mainContent);
                 const cf = main.files || {};
+                let msgStat = '';
                 if (cf.messages && main.messagesGistId) {
                     wallShowBackupStatus('⏳ 还原消息...', 'loading');
                     // 兼容：分片备份时 cf.messages 为文件名数组，旧单文件时为字符串
@@ -16059,6 +16113,8 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                             finalMsgs = bkMsgs.slice();
                         }
                         finalMsgs = finalMsgs.slice(0, MAX_MESSAGES);
+                        const expN = wallCountExpiredMsgs(finalMsgs);
+                        msgStat = `共 ${finalMsgs.length} 条` + (expN ? `（其中 ${expN} 条已过期不显示）` : '');
                         const resp = await fetch(`https://api.github.com/gists/${main.messagesGistId}`, { method: 'PATCH', headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` }, body: JSON.stringify({ files: { 'messages.json': { content: JSON.stringify({ messages: finalMsgs }, null, 2) } } }) });
                         if (!resp.ok) throw new Error('消息还原写入失败');
                     }
@@ -16087,7 +16143,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                         }
                     }
                 }
-                wallShowBackupStatus('✅ 还原成功！建议刷新页面查看', 'success');
+                wallShowBackupStatus('✅ 还原成功！' + (msgStat ? msgStat + ' · ' : '') + '建议刷新页面查看', 'success');
                 if (typeof fetchMessages === 'function') fetchMessages();
             } catch (e) { wallShowBackupStatus(`❌ 还原失败：${e.message}`, 'error'); }
         }
@@ -16144,6 +16200,8 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 }
                 const bundle = { __tfjl_wall_export__: 2, exportedAt: Date.now(), sourceBackup: fileName, sourceDate: main.date || '', messageCount: messages.length, scriptCount: scripts.length, messages, profiles, scripts };
                 const dt = new Date(); const p2 = (n) => String(n).padStart(2, '0');
+                const expN = wallCountExpiredMsgs(messages);
+                const msgPart = `消息 ${messages.length} 条${expN ? `（其中 ${expN} 条已过期）` : ''}`;
                 const dl = `wall-backup-full-${dt.getFullYear()}${p2(dt.getMonth() + 1)}${p2(dt.getDate())}-${p2(dt.getHours())}${p2(dt.getMinutes())}${p2(dt.getSeconds())}.json`;
                 const text = JSON.stringify(bundle);
                 const blob = new Blob([text], { type: 'application/json' });
@@ -16153,13 +16211,13 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                         try {
                             const handle = await window.showSaveFilePicker({ suggestedName: dl, types: [{ description: 'JSON 备份文件', accept: { 'application/json': ['.json'] } }] });
                             const w = await handle.createWritable(); await w.write(blob); await w.close();
-                            wallShowBackupStatus(`✅ 已保存到您选择的位置（消息 ${messages.length} 条 · 脚本 ${scripts.length} 个）`, 'success');
+                            wallShowBackupStatus(`✅ 已保存到您选择的位置（${msgPart} · 脚本 ${scripts.length} 个）`, 'success');
                             return;
                         } catch (e) { if (e && e.name === 'AbortError') { wallShowBackupStatus('已取消保存'); return; } }
                     }
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a'); a.href = url; a.download = dl; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-                    wallShowBackupStatus(`✅ 已下载到默认下载目录（消息 ${messages.length} 条 · 脚本 ${scripts.length} 个）：${dl}`, 'success');
+                    wallShowBackupStatus(`✅ 已下载到默认下载目录（${msgPart} · 脚本 ${scripts.length} 个）：${dl}`, 'success');
                 };
                 // App：复用需求墙脚本下载同款精美保存弹窗（浏览文件夹选位置；不显示脚本专属老马目录卡片）
                 const invokeFn = (window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke) || (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke);
@@ -16167,7 +16225,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                     const saved = await _downloadScriptTauri(dl, text, {
                         title: '📥 保存需求墙备份',
                         dirs: null,
-                        onSaved: (p) => wallShowBackupStatus(`✅ 已保存：${p}（消息 ${messages.length} 条 · 脚本 ${scripts.length} 个）`, 'success'),
+                        onSaved: (p) => wallShowBackupStatus(`✅ 已保存：${p}（${msgPart} · 脚本 ${scripts.length} 个）`, 'success'),
                         fallback: () => { webSave(); }
                     });
                     if (saved) return;
@@ -16192,12 +16250,14 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                     if (!bundle || bundle.__tfjl_wall_export__ !== 2) { alert('不是有效的「需求墙全量备份」文件（缺 __tfjl_wall_export__ 标记）'); return; }
                     window.__wallImportBundle = bundle;
                     const mOld = document.getElementById('wallBackupDetailModal'); if (mOld) mOld.remove();
+                    const expPre = wallCountExpiredMsgs(bundle.messages);
                     const html = `<div id="wallBackupDetailModal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:99999;display:flex;justify-content:center;align-items:center;">
                         <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:12px;padding:20px;max-width:600px;width:90%;max-height:80vh;overflow-y:auto;">
                             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;"><h3 style="color:#ffd700;margin:0;">📥 导入本地备份</h3><button onclick="document.getElementById('wallBackupDetailModal').remove()" style="background:none;border:none;color:#fff;font-size:1.5rem;cursor:pointer;">✕</button></div>
                             <div style="background:rgba(0,0,0,0.3);border-radius:8px;padding:12px;font-size:0.85rem;margin-bottom:12px;">
                                 <div style="color:#4ade80;">来源备份时间：${escapeHtml(String(bundle.sourceDate || ''))}</div>
                                 <div style="color:rgba(255,255,255,0.8);margin-top:6px;">消息 ${(bundle.messages || []).length} 条 · 脚本 ${(bundle.scripts || []).length} 个${bundle.profiles ? ' · 含个人资料' : ''}</div>
+                                ${expPre ? `<div style="color:#ff9800;font-size:0.75rem;margin-top:4px;">⏳ 其中 ${expPre} 条消息已过期：数据照常写回，但需求墙不显示</div>` : ''}
                                 <div style="color:rgba(255,255,255,0.55);font-size:0.75rem;margin-top:6px;">脚本按「描述」重新匹配：对得上→写回内容；原 Gist 已删→自动重建（脚本列表会重新发现，不依赖旧地址）。</div>
                             </div>
                             <div style="display:flex;gap:10px;flex-wrap:wrap;">
@@ -16222,6 +16282,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             try {
                 const token = getGistToken(); if (!token) throw new Error('无Token');
                 // 1) 消息 → 写入"当前"消息 Gist
+                let msgStat = '';
                 if (Array.isArray(bundle.messages) && bundle.messages.length) {
                     wallShowBackupStatus('⏳ 写入消息...', 'loading');
                     const msgGistId = await wallResolveMessagesGistId();
@@ -16238,6 +16299,8 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                         finalMsgs = bundle.messages.slice().sort((a, b) => b.time - a.time);
                     }
                     finalMsgs = finalMsgs.slice(0, MAX_MESSAGES);
+                    const expN = wallCountExpiredMsgs(finalMsgs);
+                    msgStat = `共 ${finalMsgs.length} 条` + (expN ? `（其中 ${expN} 条已过期不显示）` : '');
                     const resp = await fetch(`https://api.github.com/gists/${msgGistId}`, { method: 'PATCH', headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` }, body: JSON.stringify({ files: { 'messages.json': { content: JSON.stringify({ messages: finalMsgs }, null, 2) } } }) });
                     if (!resp.ok) throw new Error('消息写入失败');
                 }
@@ -16270,7 +16333,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                         }
                     }
                 }
-                wallShowBackupStatus(`✅ 导入完成！消息${merge ? '合并' : '覆盖'} · 脚本写回 ${patched} · 重建 ${created}${skipped ? ' · 跳过 ' + skipped : ''}，建议刷新页面`, 'success');
+                wallShowBackupStatus(`✅ 导入完成！消息${merge ? '合并' : '覆盖'}${msgStat ? '：' + msgStat : ''} · 脚本写回 ${patched} · 重建 ${created}${skipped ? ' · 跳过 ' + skipped : ''}，建议刷新页面`, 'success');
                 if (typeof fetchMessages === 'function') fetchMessages();
             } catch (e) { wallShowBackupStatus(`❌ 导入失败：${e.message}`, 'error'); }
         }
