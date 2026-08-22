@@ -16145,10 +16145,34 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 const bundle = { __tfjl_wall_export__: 2, exportedAt: Date.now(), sourceBackup: fileName, sourceDate: main.date || '', messageCount: messages.length, scriptCount: scripts.length, messages, profiles, scripts };
                 const dt = new Date(); const p2 = (n) => String(n).padStart(2, '0');
                 const dl = `wall-backup-full-${dt.getFullYear()}${p2(dt.getMonth() + 1)}${p2(dt.getDate())}-${p2(dt.getHours())}${p2(dt.getMinutes())}${p2(dt.getSeconds())}.json`;
-                const blob = new Blob([JSON.stringify(bundle)], { type: 'application/json' });
+                const text = JSON.stringify(bundle);
+                const blob = new Blob([text], { type: 'application/json' });
+                // 套用站内下载模板：优先让用户选保存位置——App 原生目录对话框 / 网页 showSaveFilePicker / 兜底默认下载
+                const invokeFn = (window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke) || (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke);
+                if (invokeFn) {
+                    try {
+                        const folder = await invokeFn('open_directory_dialog');
+                        if (folder) {
+                            const savePath = folder.replace(/[\\/]+$/, '') + '\\' + dl;
+                            await invokeFn('write_text_file', { filePath: savePath, content: text });
+                            wallShowBackupStatus(`✅ 已保存到您选择的位置：${savePath}（消息 ${messages.length} 条 · 脚本 ${scripts.length} 个）`, 'success');
+                            return;
+                        }
+                        wallShowBackupStatus('已取消保存（未选择目录）');
+                        return;
+                    } catch (e) { /* 目录对话框失败 → 降级网页流程 */ }
+                }
+                if (window.showSaveFilePicker) {
+                    try {
+                        const handle = await window.showSaveFilePicker({ suggestedName: dl, types: [{ description: 'JSON 备份文件', accept: { 'application/json': ['.json'] } }] });
+                        const w = await handle.createWritable(); await w.write(blob); await w.close();
+                        wallShowBackupStatus(`✅ 已保存到您选择的位置（消息 ${messages.length} 条 · 脚本 ${scripts.length} 个）`, 'success');
+                        return;
+                    } catch (e) { if (e && e.name === 'AbortError') { wallShowBackupStatus('已取消保存'); return; } }
+                }
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a'); a.href = url; a.download = dl; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-                wallShowBackupStatus(`✅ 已导出全量包：消息 ${messages.length} 条 · 脚本 ${scripts.length} 个（${dl}）`, 'success');
+                wallShowBackupStatus(`✅ 已下载到默认下载目录（消息 ${messages.length} 条 · 脚本 ${scripts.length} 个）：${dl}`, 'success');
             } catch (e) { wallShowBackupStatus(`❌ 导出失败：${e.message}`, 'error'); }
         }
 
