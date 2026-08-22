@@ -21472,7 +21472,12 @@ ${maSection}
 
         function logoutToLogin() {
             if (!confirm('确定要退出登录吗？')) return;
-            
+
+            // 退出前立即把最新数据落盘（秒写，避免"最后保存后退出来不及写盘"导致设置/项目丢失）
+            if (typeof window.syncAllNow === 'function') {
+                try { window.syncAllNow().catch(() => {}); } catch (e) {}
+            }
+
             // 清除所有登录相关状态（但保留记住的密码用于下次自动登录）
             localStorage.removeItem('TFJL_LoggedIn');
             localStorage.removeItem('TFJL_Mode');

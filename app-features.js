@@ -7397,4 +7397,50 @@
             header.addEventListener('mousedown', function(e) { startPanelDrag(e, panelId); });
             header.addEventListener('touchstart', function(e) { startPanelTouch(e, panelId); }, {passive: true});
         }
+
+        // ==================== 🔧 异常诊断 弹窗渲染 ====================
+        // 依赖 app-local.js 暴露的 window.runDiagnostics() 返回各检查项结果数组。
+        window.openDiagnosticsModal = async function (forceRerun) {
+            const modal = document.getElementById('diagModal');
+            const list = document.getElementById('diagList');
+            const summary = document.getElementById('diagSummary');
+            if (!modal || !list) { alert('诊断模块未加载（app-local.js 缺失？）'); return; }
+            modal.style.display = 'flex';
+            summary.textContent = '正在全面检查…';
+            list.innerHTML = '<div style="color:rgba(255,255,255,0.5);padding:10px 0;">⏳ 运行中，请稍候（含网络测速）…</div>';
+            if (typeof window.runDiagnostics !== 'function') {
+                list.innerHTML = '<div style="color:#ff6b6b;padding:10px 0;">❌ 诊断函数未加载（app-local.js 未就绪），请联系 wx：gyqsvip</div>';
+                summary.textContent = '诊断不可用';
+                return;
+            }
+            let items = [];
+            try {
+                items = await window.runDiagnostics();
+            } catch (e) {
+                list.innerHTML = '<div style="color:#ff6b6b;padding:10px 0;">❌ 诊断过程异常：' + String(e && e.message || e) + '，联系 wx：gyqsvip</div>';
+                summary.textContent = '诊断失败';
+                return;
+            }
+            const colorMap = { ok: '#4caf50', warn: '#ff9800', error: '#ff5252', info: '#4fc3f7', running: '#aaa' };
+            const iconMap = { ok: '✅', warn: '⚠️', error: '❌', info: 'ℹ️', running: '⏳' };
+            let errCount = 0, warnCount = 0;
+            const html = items.map(it => {
+                if (it.status === 'error') errCount++;
+                else if (it.status === 'warn') warnCount++;
+                const c = colorMap[it.status] || '#fff';
+                const ic = iconMap[it.status] || 'ℹ️';
+                const adv = it.advice ? ('<div style="margin-top:4px;color:#ffcc80;font-size:0.78rem;">↳ 分析：' + it.advice + '</div>') : '';
+                return '<div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.06);">' +
+                    '<div style="display:flex;gap:8px;align-items:baseline;"><span style="color:' + c + ';">' + ic + '</span>' +
+                    '<span style="font-weight:600;color:#fff;">' + it.name + '</span></div>' +
+                    (it.detail ? ('<div style="margin-top:3px;color:rgba(255,255,255,0.7);font-size:0.8rem;padding-left:22px;word-break:break-all;">' + it.detail + '</div>') : '') +
+                    adv + '</div>';
+            }).join('');
+            list.innerHTML = html;
+            let verdict;
+            if (errCount > 0) verdict = '❌ 发现 ' + errCount + ' 项异常（标红项请按分析处理，仍无法解决联系 wx：gyqsvip）';
+            else if (warnCount > 0) verdict = '⚠️ 检查完成，' + warnCount + ' 项提醒（多为非致命，可忽略或按提示优化）';
+            else verdict = '✅ 全部检查通过，非数据丢失问题；若仍异常多为网络/远端服务波动，可稍后重试';
+            summary.textContent = verdict;
+        };
         
