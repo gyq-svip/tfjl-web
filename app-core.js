@@ -15961,6 +15961,90 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             return out;
         }
 
+        // ===== 备份内容指纹（增量备份）：消息+资料+脚本内容任一变化指纹即变，无变化不重复备份 =====
+        // 与 .github/scripts/wall-backup.mjs 保持同一公式（sha256 串联），网页/Actions 两边判定一致
+        async function _wallSha256Hex(str) {
+            try {
+                if (window.crypto && window.crypto.subtle) {
+                    const buf = await window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(str || '')));
+                    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+                }
+            } catch (e) {}
+            let h = 0x811c9dc5;   // 兜底 FNV（仅判变化，非加密用途）
+            const s = String(str || '');
+            for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = (h * 0x01000193) >>> 0; }
+            return 'fnv' + h.toString(16);
+        }
+        async function wallComputeBackupFingerprint(msgContent, profContent, scripts) {
+            const msgH = await _wallSha256Hex(msgContent || '');
+            const profH = await _wallSha256Hex(profContent || '');
+            const parts = [];
+            for (const s of (scripts || [])) parts.push(String(s.gistId || '') + ':' + (await _wallSha256Hex(s.content || '')));
+            parts.sort();
+            return await _wallSha256Hex('msg:' + msgH + '|prof:' + profH + '|scripts:' + parts.join(','));
+        }
+
+        // ===== 备份保留策略（纯函数，可单测）：从备份 Gist 全部文件名里挑出"超龄备份"的整套文件 =====
+        // 安全规则：
+        //  1) 只认 backup_wall_all_<13位时间戳>.json 作为备份主索引，最新一份【永不删】（数据无变化长期不备份时也至少留一份可还原）；
+        //  2) 其余超龄主索引的时间戳进"待删集合"，content_ 前缀且能严格解析出同一时间戳的分片/脚本文件一起删；
+        //  3) 其它任何文件名（backup_info.json 等）一概不碰。
+        function wallSelectExpiredBackupFiles(names, nowMs, keepDays) {
+            const MAIN_RE = /^backup_wall_all_(\d{13})\.json$/;
+            const CONTENT_RE = /^(backup_wall_all_|content_)[A-Za-z0-9_.\-]*_(\d{13})(\.[A-Za-z0-9]+)?$/;
+            const list = (names || []).filter(function (n) { return n && typeof n === 'string'; });
+            const mains = [];
+            for (const n of list) {
+                const m = n.match(MAIN_RE);
+                if (m) mains.push({ name: n, ts: parseInt(m[1], 10) });
+            }
+            if (!mains.length) return [];
+            mains.sort(function (a, b) { return b.ts - a.ts; });   // 新→旧，[0] 最新
+            const cutoff = nowMs - (keepDays || 10) * 86400 * 1000;
+            const doomed = new Set();
+            for (let i = 1; i < mains.length; i++) { if (mains[i].ts < cutoff) doomed.add(mains[i].ts); }
+            if (!doomed.size) return [];
+            const out = [];
+            for (const n of list) {
+                const mm = n.match(MAIN_RE);
+                if (mm) { if (doomed.has(parseInt(mm[1], 10))) out.push(n); continue; }
+                const cm = n.match(CONTENT_RE);
+                if (cm && doomed.has(parseInt(cm[2], 10))) out.push(n);   // 贪婪匹配取"最后一组13位数字"=真实备份时间戳
+            }
+            return out;
+        }
+
+        // 清理超龄备份：dryRun=true 只返回将删除的文件名列表，不做任何写操作
+        async function wallCleanupOldBackups(keepDays, dryRun) {
+            const token = getGistToken(); if (!token) throw new Error('无Token');
+            const backupId = await wallGetOrCreateBackupGist();
+            const resp = await fetch(`https://api.github.com/gists/${backupId}`, { headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` } });
+            if (!resp.ok) throw new Error('读取备份Gist失败 HTTP ' + resp.status);
+            const d = await resp.json();
+            const sel = wallSelectExpiredBackupFiles(Object.keys(d.files || {}), Date.now(), keepDays || 10);
+            if (dryRun || !sel.length) return sel;
+            const files = {};
+            sel.forEach(function (n) { files[n] = null; });
+            const pr = await fetch(`https://api.github.com/gists/${backupId}`, { method: 'PATCH', headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` }, body: JSON.stringify({ files: files }) });
+            if (!pr.ok) throw new Error('清理写入失败 HTTP ' + pr.status);
+            return sel;
+        }
+        async function wallPreviewCleanup() {
+            try {
+                wallShowBackupStatus('⏳ 正在扫描超龄备份（仅预览，不删除）...', 'loading');
+                const sel = await wallCleanupOldBackups(10, true);
+                if (!sel.length) { wallShowBackupStatus('✅ 没有需要清理的备份（均在保留期内或仅剩最新一份）', 'success'); return; }
+                const mains = sel.filter(function (n) { return n.indexOf('backup_wall_all_') === 0; }).length;
+                if (confirm(`🧹 预览：发现 ${mains} 个超龄备份，共 ${sel.length} 个文件（含消息分片/脚本内容）。\n\n点「确定」立即清理，点「取消」只看不删。`)) {
+                    const done = await wallCleanupOldBackups(10, false);
+                    wallShowBackupStatus(`✅ 已清理 ${done.length} 个文件（保留最新一份）`, 'success');
+                    wallLoadBackupList();
+                } else {
+                    wallShowBackupStatus(`👁️ 预览：${sel.length} 个超龄文件待清理（本次未删除）`, 'success');
+                }
+            } catch (e) { wallShowBackupStatus('❌ 清理预览失败：' + e.message, 'error'); }
+        }
+
         // 列出账号下全部「脚本分享」Gist（不抓内容，轻量）：[{id, description, fileName}]
         // 供导入/还原时按「描述」匹配现有脚本——Gist 地址变了也能对上（列表扫描本来就按描述发现脚本）
         async function wallListScriptGists(token) {
@@ -16017,6 +16101,27 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 if (profContent) files[`content_profiles_${ts}.json`] = { content: profContent };
                 wallShowBackupStatus('⏳ 备份脚本内容...', 'loading');
                 const scripts = await wallFetchScriptsForBackup(token);
+                // ===== 增量判断：内容指纹与最新一份备份一致 → 不重复备份（Gist 不无限膨胀） =====
+                const fp = await wallComputeBackupFingerprint(msgContent, profContent, scripts);
+                try {
+                    const curResp = await fetch(`https://api.github.com/gists/${backupId}`, { headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` } });
+                    if (curResp.ok) {
+                        const cur = await curResp.json();
+                        const allMains = Object.keys(cur.files || {}).filter(n => /^backup_wall_all_\d{13}\.json$/.test(n)).sort();
+                        const lastMain = allMains.length ? cur.files[allMains[allMains.length - 1]] : null;
+                        if (lastMain && lastMain.content) {
+                            let lastFp = '';
+                            try { lastFp = (JSON.parse(lastMain.content).fp) || ''; } catch (e) {}
+                            if (lastFp && lastFp === fp) {
+                                try { localStorage.setItem('wall_last_backup_ts', String(Date.now())); } catch (e) {}
+                                wallShowBackupStatus('✅ 数据无变化，跳过备份（指纹一致）· 已有备份仍完整保留', 'success');
+                                try { const sel = await wallCleanupOldBackups(10, false); if (sel.length) wallShowBackupStatus(`✅ 数据无变化跳过备份 · 顺带清理了 ${sel.length} 个超龄文件`, 'success'); } catch (e) {}
+                                wallLoadBackupList();
+                                return;
+                            }
+                        }
+                    }
+                } catch (e) { /* 指纹比对失败不阻断备份，照常全量写一份 */ }
                 const scriptsRef = [];
                 for (const s of scripts) {
                     const safe = s.backupFileName.replace(/[^a-zA-Z0-9_\-.]/g, '_');
@@ -16029,11 +16134,14 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                     files[bf] = { content: s.content };
                     scriptsRef.push({ gistId: s.gistId, description: s.description, fileName: s.fileName, backupFile: bf, bytes: scBytes });
                 }
-                const main = { timestamp: ts, date: new Date().toLocaleString('zh-CN'), type: 'wall_full_v1', messagesGistId: msgGistId, messageCount: msgContent ? (JSON.parse(msgContent).messages || []).length : 0, scriptCount: scripts.length, scripts: scriptsRef, files: { messages: msgFiles, profiles: profContent ? `content_profiles_${ts}.json` : null } };
+                const main = { timestamp: ts, date: new Date().toLocaleString('zh-CN'), type: 'wall_full_v1', fp: fp, messagesGistId: msgGistId, messageCount: msgContent ? (JSON.parse(msgContent).messages || []).length : 0, scriptCount: scripts.length, scripts: scriptsRef, files: { messages: msgFiles, profiles: profContent ? `content_profiles_${ts}.json` : null } };
                 files[`backup_wall_all_${ts}.json`] = { content: JSON.stringify(main, null, 2) };
                 const resp = await fetch(`https://api.github.com/gists/${backupId}`, { method: 'PATCH', headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` }, body: JSON.stringify({ files }) });
                 if (!resp.ok) throw new Error('保存备份失败');
-                wallShowBackupStatus(`✅ 备份成功！消息:${main.messageCount} 脚本:${main.scriptCount}`, 'success');
+                let cleanMsg = '';
+                // 备份成功后自动清理超龄备份（保留 10 天，最新一份永不删）；清理失败不影响备份结果
+                try { const sel = await wallCleanupOldBackups(10, false); if (sel.length) cleanMsg = ` · 已自动清理 ${sel.length} 个超龄文件`; } catch (e) { console.warn('[备份] 自动清理失败:', e); }
+                wallShowBackupStatus(`✅ 备份成功！消息:${main.messageCount} 脚本:${main.scriptCount}${cleanMsg}`, 'success');
                 try { localStorage.setItem('wall_last_backup_ts', String(Date.now())); } catch (e) {}
                 wallLoadBackupList();
             } catch (e) { wallShowBackupStatus(`❌ 备份失败：${e.message}`, 'error'); }
@@ -16339,12 +16447,31 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
         }
         window.wallApplyImport = wallApplyImport;
         async function wallDeleteBackup(fileName) {
-            if (!confirm('⚠️ 确定删除该备份？不可恢复！')) return;
             try {
                 const token = getGistToken(); if (!token) throw new Error('无Token');
                 const backupId = localStorage.getItem(WALL_BACKUP_GIST_KEY);
-                const resp = await fetch(`https://api.github.com/gists/${backupId}`, { method: 'PATCH', headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` }, body: JSON.stringify({ files: { [fileName]: null } }) });
-                if (resp.ok) { wallShowBackupStatus('✅ 已删除', 'success'); wallLoadBackupList(); } else throw new Error('删除失败');
+                // 🔴 修复：此前只删主索引 backup_wall_all_<ts>.json，消息分片/资料/脚本内容文件
+                //    （体积大头）永远留在 Gist 里，备份越多膨胀越快。现在按主索引声明一并删除。
+                const files = {};
+                files[fileName] = null;
+                const resp = await fetch(`https://api.github.com/gists/${backupId}`, { headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` } });
+                if (resp.ok) {
+                    const d = await resp.json();
+                    const f = d.files && d.files[fileName];
+                    if (f && f.content) {
+                        try {
+                            const main = JSON.parse(f.content);
+                            const cf = main.files || {};
+                            (Array.isArray(cf.messages) ? cf.messages : (cf.messages ? [cf.messages] : [])).forEach(n => { if (d.files[n]) files[n] = null; });
+                            if (cf.profiles && d.files[cf.profiles]) files[cf.profiles] = null;
+                            (main.scripts || []).forEach(s => { if (s.backupFile && d.files[s.backupFile]) files[s.backupFile] = null; });
+                        } catch (e) {}
+                    }
+                }
+                const total = Object.keys(files).length;
+                if (!confirm(`⚠️ 确定删除该备份？\n将删除主索引 + ${total - 1} 个关联内容文件（消息分片/脚本内容），不可恢复！`)) return;
+                const pr = await fetch(`https://api.github.com/gists/${backupId}`, { method: 'PATCH', headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` }, body: JSON.stringify({ files: files }) });
+                if (pr.ok) { wallShowBackupStatus(`✅ 已删除（共 ${total} 个文件）`, 'success'); wallLoadBackupList(); } else throw new Error('删除失败');
             } catch (e) { wallShowBackupStatus(`❌ 删除失败：${e.message}`, 'error'); }
         }
         function wallAdminShowBackup() { const p = document.getElementById('adminPageWallBackup'); if (p) p.style.display = 'block'; const o = document.getElementById('adminPageWallGist'); if (o) o.style.display = 'none'; const adm = document.getElementById('adminMenu'); if (adm) adm.style.display = 'none'; try { const c = document.getElementById('wallAutoBackupChk'); if (c) c.checked = localStorage.getItem('wall_auto_backup') === '1'; } catch (e) {} wallLoadBackupList(); }
