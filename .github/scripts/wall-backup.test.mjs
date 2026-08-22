@@ -39,34 +39,44 @@ const webFnSrc = extractWebFn(appCore, 'wallSelectExpiredBackupFiles');
 const webSelect = new Function(`${webFnSrc}; return wallSelectExpiredBackupFiles;`)();
 console.log('已从 app-core.js 提取网页版函数（' + webFnSrc.length + ' 字符）\n');
 
-// ---- 用例 ----
+// ---- 用例（新规则：最少保留 3 份 → 删除场景都配足 4 份主索引） ----
 const cases = [];
-// 1. 常规：3 份备份，1 新 2 旧 → 删两套旧的（主索引+各自 content 文件），保留最新
-cases.push(['常规-删两套旧的', [
+// 1. 常规：4 份备份，3 新 1 旧 → 只删最旧一套（主索引+content 文件），最新 3 份保留
+cases.push(['常规-删最旧一套', [
     'backup_info.json',
     `backup_wall_all_${ts(0)}.json`, `content_messages_0_${ts(0)}.json`, `content_script_a_1111111111111111_${ts(0)}.js`,
-    `backup_wall_all_${ts(12)}.json`, `content_messages_0_${ts(12)}.json`, `content_profiles_${ts(12)}.json`, `content_script_a_1111111111111111_${ts(12)}.js`,
+    `backup_wall_all_${ts(2)}.json`, `content_messages_0_${ts(2)}.json`,
+    `backup_wall_all_${ts(5)}.json`, `content_profiles_${ts(5)}.json`,
     `backup_wall_all_${ts(30)}.json`, `content_messages_0_${ts(30)}.json`, `content_messages_1_${ts(30)}.json`, `content_script_b_2222222222222222_${ts(30)}.js`,
 ], [
-    `backup_wall_all_${ts(12)}.json`, `content_messages_0_${ts(12)}.json`, `content_profiles_${ts(12)}.json`, `content_script_a_1111111111111111_${ts(12)}.js`,
     `backup_wall_all_${ts(30)}.json`, `content_messages_0_${ts(30)}.json`, `content_messages_1_${ts(30)}.json`, `content_script_b_2222222222222222_${ts(30)}.js`,
 ]]);
-// 2. 全部超龄 → 最新一份仍保留（floor）
-cases.push(['全部超龄-最新保留', [
+// 2. 全部超龄 → 仍保留最新 3 份（keepMin 兜底，防单份损坏无法恢复）
+cases.push(['全部超龄-最少3份兜底', [
     `backup_wall_all_${ts(15)}.json`, `content_messages_0_${ts(15)}.json`,
+    `backup_wall_all_${ts(20)}.json`, `content_messages_0_${ts(20)}.json`,
     `backup_wall_all_${ts(40)}.json`, `content_messages_0_${ts(40)}.json`,
+    `backup_wall_all_${ts(50)}.json`, `content_messages_0_${ts(50)}.json`,
 ], [
-    `backup_wall_all_${ts(40)}.json`, `content_messages_0_${ts(40)}.json`,
+    `backup_wall_all_${ts(50)}.json`, `content_messages_0_${ts(50)}.json`,
 ]]);
+// 2b. 超龄但只有 3 份 → 一份不删（min-3 兜底）
+cases.push(['超龄但仅3份全保留', [
+    `backup_wall_all_${ts(15)}.json`, `content_messages_0_${ts(15)}.json`,
+    `backup_wall_all_${ts(20)}.json`, `content_messages_0_${ts(20)}.json`,
+    `backup_wall_all_${ts(40)}.json`, `content_messages_0_${ts(40)}.json`,
+], []]);
 // 3. 保留期内（9.9 天）→ 一个不删
 cases.push(['保留期内不删', [
     `backup_wall_all_${ts(1)}.json`, `content_messages_0_${ts(1)}.json`,
     `backup_wall_all_${ts(9.9)}.json`, `content_messages_0_${ts(9.9)}.json`,
 ], []]);
-// 4. 无关文件永不删（backup_info / 其它前缀）——需有一份新鲜主索引，旧主索引才可删
+// 4. 无关文件永不删（backup_info / 其它前缀 / 状态文件）
 cases.push(['无关文件不碰', [
-    'backup_info.json', 'room_index.json', 'counter.json', `content_${'x'.repeat(20)}.txt`,
+    'backup_info.json', 'backup_status.json', 'room_index.json', 'counter.json', `content_${'x'.repeat(20)}.txt`,
     `backup_wall_all_${ts(0)}.json`,
+    `backup_wall_all_${ts(1)}.json`,
+    `backup_wall_all_${ts(2)}.json`,
     `backup_wall_all_${ts(30)}.json`,
 ], [
     `backup_wall_all_${ts(30)}.json`,
@@ -74,6 +84,8 @@ cases.push(['无关文件不碰', [
 // 5. 文件名中段嵌 13 位数字（脚本名自带时间戳样数字）→ 取最后一组 = 真实备份 ts
 cases.push(['中段嵌13位数字取末组', [
     `backup_wall_all_${ts(0)}.json`,
+    `backup_wall_all_${ts(1)}.json`,
+    `backup_wall_all_${ts(2)}.json`,
     `backup_wall_all_${ts(20)}.json`,
     `content_script_abc_1787000000000_3333333333333333_${ts(20)}.js`,
     `content_script_1787000000000_${ts(0)}.js`,
@@ -99,6 +111,8 @@ cases.push(['孤儿content保守留', [
 // 9. 无扩展名 content 文件仍按 ts 匹配
 cases.push(['无扩展名匹配', [
     `backup_wall_all_${ts(0)}.json`,
+    `backup_wall_all_${ts(1)}.json`,
+    `backup_wall_all_${ts(2)}.json`,
     `backup_wall_all_${ts(20)}.json`, `content_messages_0_${ts(20)}`,
 ], [
     `backup_wall_all_${ts(20)}.json`, `content_messages_0_${ts(20)}`,
@@ -107,6 +121,8 @@ cases.push(['无扩展名匹配', [
 cases.push(['乱序输入', [
     `content_script_z_9999999999999999_${ts(11)}.js`,
     `backup_wall_all_${ts(2)}.json`,
+    `backup_wall_all_${ts(3)}.json`,
+    `backup_wall_all_${ts(4)}.json`,
     `backup_wall_all_${ts(11)}.json`,
     `content_messages_0_${ts(11)}.json`,
     `content_messages_0_${ts(2)}.json`,
