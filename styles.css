@@ -2717,10 +2717,10 @@
         #refImagePreview .preview-body { padding:0 14px 14px; }
         #refImagePreview .preview-img { max-width:100%; border-radius:8px; }
 
-        /* 版本号自定义悬浮提示：显示在版本号正下方、窗口内（避免系统原生 tooltip 跑到窗口外） */
+        /* 版本号自定义悬浮提示：显示在版本号上方（今天前的原始位置） */
         .version-tooltip {
             position: absolute;
-            top: 130%;
+            bottom: 150%;
             right: 0;
             background: rgba(20,20,44,0.96);
             color: #fff;

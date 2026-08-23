@@ -2502,8 +2502,9 @@
                 <span style="color:#4fc3f7;">下载桌面版</span>
             </div>
             <!-- 前端部署时间标记（铁律要求，CI 自动注入部署时间）：statsBar 内绝对定位贴右、垂直居中 -->
-            <span id="versionTag" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;user-select:none;color:rgba(255,255,255,0.55);font-size:0.66rem;padding:1px 6px;" ondblclick="if(typeof forceRefreshLatest==='function'){forceRefreshLatest();}">s20260823-2137 · s1.0.230</span>
-            <div class="version-tooltip">s20260823-2137 · s1.0.230（双击刷新）</div>
+            <span id="versionTag" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;user-select:none;color:rgba(255,255,255,0.55);font-size:0.66rem;padding:1px 6px;opacity:0.6;" ondblclick="if(typeof forceRefreshLatest==='function'){forceRefreshLatest();}">s20260823-2137 · s1.0.230</span>
+            <div class="version-tooltip">版本 s20260823-2137 · s1.0.230（双击强制刷新）</div>
+            <script>(function(){var v=document.getElementById('versionTag');var t=document.querySelector('#versionTag + .version-tooltip');if(v&&t)t.textContent='版本 '+v.textContent+'（双击强制刷新）';})();</script>
         </div>
     </div>
 
