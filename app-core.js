@@ -16199,7 +16199,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 if (lastEntry && lastEntry.fp && lastEntry.fp === fp) {
                     try { localStorage.setItem('wall_last_backup_ts', String(Date.now())); } catch (e) {}
                     let cleanedSkip = 0;
-                    try { cleanedSkip = await wallCleanupOldBackups(10, false); } catch (e) {}
+                    try { const csr = await wallCleanupOldBackups(10, false); cleanedSkip = csr.deleted || 0; } catch (e) {}
                     wallWriteBackupStatus({ mode: 'web', ok: true, result: 'skip', messageCount: msgContent ? (JSON.parse(msgContent).messages || []).length : 0, scriptCount: scripts.length, cleaned: cleanedSkip });
                     wallShowBackupStatus(`✅ 数据无变化，跳过备份（指纹一致）${cleanedSkip ? ' · 顺带清理了 ' + cleanedSkip + ' 份超龄备份' : ''}`, 'success');
                     wallLoadBackupList();
@@ -16228,7 +16228,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 await wallSaveBackupIndex(indexArr, token);
                 let cleanMsg = '';
                 let cleanedN = 0;
-                try { cleanedN = await wallCleanupOldBackups(10, false); if (cleanedN) cleanMsg = ` · 已自动清理 ${cleanedN} 份超龄备份`; } catch (e) { console.warn('[备份] 自动清理失败:', e); }
+                try { const cr = await wallCleanupOldBackups(10, false); cleanedN = cr.deleted || 0; if (cleanedN) cleanMsg = ` · 已自动清理 ${cleanedN} 份超龄备份`; } catch (e) { console.warn('[备份] 自动清理失败:', e); }
                 wallWriteBackupStatus({ mode: 'web', ok: true, result: 'backup', messageCount: main.messageCount, scriptCount: main.scriptCount, cleaned: cleanedN });
                 wallShowBackupStatus(`✅ 备份成功！消息:${main.messageCount} 脚本:${main.scriptCount}${cleanMsg}`, 'success');
                 try { localStorage.setItem('wall_last_backup_ts', String(Date.now())); } catch (e) {}
