@@ -150,14 +150,14 @@ async function run() {
         row(tbody, '③ News Gist（公告）', '-', 'warn', '索引未指向 news gist → 公告无数据源');
     }
 
-    // ④ Counter Gist（在线状态/心跳）
+    // ④ Counter Gist（在线状态/心跳）—— 实际文件是 counter.json（不是 room_index.json，room_index 是索引 Gist 的专属文件）
     res = await fetchGist(cg, token);
     if (!res.ok) { fails++; row(tbody, '④ Counter Gist（在线状态/心跳）', cg, 'fail', `HTTP ${res.code}：${res.msg}`); }
     else {
         const cf = Object.keys(res.data.files || {});
-        const okf = cf.includes('room_index.json');
+        const okf = cf.includes('counter.json');
         row(tbody, '④ Counter Gist（在线状态/心跳）', cg, okf ? 'ok' : 'warn',
-            `文件：${cf.join(', ')} ${okf ? '✅' : '<br>⚠ 缺 room_index.json'}`);
+            `文件：${cf.join(', ')} ${okf ? '✅' : '<br>⚠ 缺 counter.json（在线状态/心跳数据）'}`);
         if (!okf) warns++;
     }
 
