@@ -7,9 +7,10 @@
 // v36: 升版本配合「API监控→部署日志+定时任务」克隆自拍卖行管理员。强制刷新后 SW_VERSION 应为 s1.0.227。
 // v37: 修「双击右下角版本号强制刷新无效」——改为直接调 forceRefreshLatest()。强制刷新后 SW_VERSION 应为 s1.0.228。
 // v38: forceRefreshLatest 无条件 unregister 所有 SW（破旧 SW 卡 225 困局）；版本号标签调亮；APP 端回填真实版本。SW_VERSION 应为 s1.0.229。
+// v39: 修点彩气泡后还是225——彩气泡点击改调forceRefreshLatest；sw.js install无条件回报SW_VERSION。SW_VERSION 应为 s1.0.230。
 // ============================================================
 
-const CACHE_VERSION = 's1.0.229';
+const CACHE_VERSION = 's1.0.230';
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
@@ -32,14 +33,15 @@ self.addEventListener('install', (event) => {
     // 且仅当存在已激活的旧 SW（self.registration.active）才提示，避免首次安装误弹。
     event.waitUntil(
         Promise.resolve().then(() => {
-            if (self.registration && self.registration.active) {
-                return self.clients.matchAll({ includeUncontrolled: true }).then(clients => {
-                    clients.forEach(client => {
+            return self.clients.matchAll({ includeUncontrolled: true }).then(clients => {
+                clients.forEach(client => {
+                    // 无条件回报缓存版本号（让页面任意 register 后都能回填版本标签，不被 "active 存在才发" 坑住）
+                    client.postMessage({ type: 'SW_VERSION', version: CACHE_VERSION });
+                    if (self.registration && self.registration.active) {
                         client.postMessage({ type: 'NEW_VERSION_READY' });
-                        client.postMessage({ type: 'SW_VERSION', version: CACHE_VERSION });
-                    });
+                    }
                 });
-            }
+            });
         })
     );
 });

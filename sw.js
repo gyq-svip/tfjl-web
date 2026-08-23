@@ -15,9 +15,13 @@
 //      页面永远显示 HTML 写死的 fallback "s1.0.225" 拿不到 228）。另：index.html 版本号标签 opacity 0.1→0.6 调亮；
 //      APP 端 initAppLocal 用 getAppVersion 回填真实版本（Tauri 无 SW，否则永远显示 225）。
 //      强制刷新后 SW_VERSION 应为 s1.0.229。
+// v39: 修「点彩气泡(发现新版本)后还是 225」——①彩气泡点击原只发 SKIP_WAITING + 废弃的 location.reload(true)，
+//      旧SW仍 controlling → 仍拿旧版；改为直接调 forceRefreshLatest()。②sw.js install 改为【无条件回报 SW_VERSION】
+//      （原仅"有 active 旧SW时"才发，forceRefreshLatest unregister 全部SW后 reload，新SW重新register时 active 为 null，
+//      不发 → 页面回退 HTML 写死 fallback 225）。强制刷新后 SW_VERSION 应为 s1.0.230。
 // ============================================================
 
-const CACHE_VERSION = 's1.0.229';
+const CACHE_VERSION = 's1.0.230';
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
@@ -40,14 +44,18 @@ self.addEventListener('install', (event) => {
     // 且仅当存在已激活的旧 SW（self.registration.active）才提示，避免首次安装误弹。
     event.waitUntil(
         Promise.resolve().then(() => {
-            if (self.registration && self.registration.active) {
-                return self.clients.matchAll({ includeUncontrolled: true }).then(clients => {
-                    clients.forEach(client => {
+            return self.clients.matchAll({ includeUncontrolled: true }).then(clients => {
+                clients.forEach(client => {
+                    // 无条件回报缓存版本号（让页面在任意 register 后都能回填版本标签，
+                    // 不被 "active 存在才发" 限制坑住——forceRefreshLatest unregister 全部 SW 后 reload，
+                    // 新 SW 重新 register 时 active 为 null，若不发则页面回退到 HTML 写死的 fallback 225）
+                    client.postMessage({ type: 'SW_VERSION', version: CACHE_VERSION });
+                    // NEW_VERSION_READY 仅在有旧 SW 运行时提示（避免首次安装误弹气泡）
+                    if (self.registration && self.registration.active) {
                         client.postMessage({ type: 'NEW_VERSION_READY' });
-                        client.postMessage({ type: 'SW_VERSION', version: CACHE_VERSION });
-                    });
+                    }
                 });
-            }
+            });
         })
     );
 });

@@ -21846,6 +21846,10 @@ ${maSection}
             banner.id = 'swUpdateBanner';
             banner.innerHTML = '<span class="sw-dot"></span>🎉 发现新版本，点我更新';
             banner.onclick = function () {
+                // 优先用 forceRefreshLatest（无条件 unregister 所有 SW + 清空 cache + 带时间戳 replace），
+                // 破旧 SW controlling / 新 SW waiting 导致 SKIP_WAITING 异步不生效、reload 后仍被旧 SW 接管、版本号卡 225 的困局。
+                if (typeof forceRefreshLatest === 'function') { forceRefreshLatest(); return; }
+                // 兜底（forceRefreshLatest 不存在时）
                 try { navigator.serviceWorker.ready.then(function(reg){ if(reg.waiting) reg.waiting.postMessage('SKIP_WAITING'); }); } catch(e){}
                 location.reload(true);
             };
