@@ -35,6 +35,7 @@
     "allow-find-umi-ocr",
     "allow-download-umi-ocr",
     "allow-download-skins",
+    "allow-get-app-version",
     "dialog:default",
     "dialog:allow-open",
     "dialog:allow-save",
