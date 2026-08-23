@@ -72,9 +72,13 @@ jobs:
 
       - name: Inject deploy marker (visible version tag)
         run: |
-          # 每次部署自动把页面右下角 #versionTag 更新为本次部署时间戳，
-          # 让用户一眼确认「看到的是不是最新部署版」（铁律要求：每次推送部署都要有新标记）。
-          MARKER="b$(date +%Y%m%d%H%M%S)"
+          # 每次部署自动把页面右下角 #versionTag 更新为「部署日期序号 · 当前 SW 版本号」，
+          # 与项目既有的 s1.0.xxx 语义版本风格一致（用户看得懂、可对照 SW 缓存/脚本 ?v= 判断最新）。
+          # 例：s20260824-01 · s1.0.230
+          DATEPART="s$(date +%Y%m%d)"
+          # 从 sw.js 读取当前 CACHE_VERSION（如 s1.0.230）
+          SWVER=$(grep -oE "CACHE_VERSION = '[^']+'" _site/sw.js 2>/dev/null | head -1 | sed -E "s/CACHE_VERSION = '([^']+)'/\1/" || echo "s1.0.0")
+          MARKER="$DATEPART-$(date +%H%M) · $SWVER"
           # 替换 <span id="versionTag" ...>旧的静态标记</span> 内的文本
           sed -i -E 's/(<span id="versionTag"[^>]*>)[^<]*(<\/span>)/\1'"$MARKER"'\2/' _site/index.html
           echo "Deploy marker injected: $MARKER"
