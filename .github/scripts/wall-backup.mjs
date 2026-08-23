@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 // ==================== TFJL 需求墙定时备份（GitHub Actions 专用，Node ≥18） ====================
-// 与网页端 app-core.js 的 wallBackupAll 保持同一文件结构、同一内容指纹公式、同一清理规则：
-//   有新数据 → 写一份全量备份（消息分片 + 资料 + 脚本内容）；
-//   无变化   → 跳过（指纹一致），Gist 不重复膨胀；
-//   每次运行 → 清理超龄备份（默认保留 10 天，最新一份永不删）。
+// 方案 B 架构（2026-08-23 根治 Gist 300 文件硬上限截断）：
+//   - 每份备份建【独立小 Gist】（主索引 + 该份 content 都在内，文件数少永不爆 300）
+//   - 索引 Gist（room_index.json）的 wall_backup_index 字段只存轻量数组 [{id,ts,date,messageCount,scriptCount,fp}]
+//     （仅1个文件不触发截断）；列表只读索引数组；清理=DELETE 整份超龄 Gist。
+//   - 备份状态写索引 Gist 的 wall_backup_status 字段（网页端/Actions 统一可读）
+// 与网页端 app-core.js 的 wallBackupAll 保持同一文件结构、同一内容指纹公式、同一清理规则。
 // 环境变量：
 //   GIST_TOKEN 必填——具 gist 权限的 PAT（仓库 secret，与 App 内使用的 token 同源即可）
 //   KEEP_DAYS  保留天数，默认 10
@@ -20,11 +22,11 @@ const FORCE = process.env.FORCE === '1';
 // 与 app-core.js 常量保持一致
 const INDEX_GIST_ID = 'a32a0628bd9275f3a4922cd12cf298c9';        // room_index.json 指针所在
 const MESSAGES_GIST_ID_FALLBACK = 'b02794a8d5c43874b76286185f7b1f7f';
-const BACKUP_GIST_DESC = 'TFJL 需求墙数据备份（私有）';
+const BACKUP_GIST_DESC_PREFIX = 'TFJL 需求墙数据备份 #';
 const CHUNK = 800000;                                             // 消息分片上限，与网页端一致
 
 const API = 'https://api.github.com';
-const H = { 'Accept': 'application/vnd.github.v3+json', 'User-Agent': 'TFJL-Wall-Backup/1.0', ...(TOKEN ? { 'Authorization': `token ${TOKEN}` } : {}) };
+const H = { 'Accept': 'application/vnd.github.v3+json', 'User-Agent': 'TFJL-Wall-Backup/2.0', ...(TOKEN ? { 'Authorization': `token ${TOKEN}` } : {}) };
 
 const log = (...a) => console.log('[wall-backup]', ...a);
 
@@ -45,6 +47,15 @@ async function patchGist(id, body) {
     if (!r.ok) throw new Error(`PATCH gist ${id} → HTTP ${r.status}: ${(await r.text()).slice(0, 300)}`);
     return r.json();
 }
+async function createGist(description, files) {
+    const r = await fetch(`${API}/gists`, { method: 'POST', headers: { ...H, 'Content-Type': 'application/json' }, body: JSON.stringify({ description, public: false, files }) });
+    if (!r.ok) throw new Error(`POST gist → HTTP ${r.status}: ${(await r.text()).slice(0, 300)}`);
+    return r.json();
+}
+async function deleteGist(id) {
+    const r = await fetch(`${API}/gists/${id}`, { method: 'DELETE', headers: H });
+    return r.ok || r.status === 404;
+}
 // 读 gist 内单文件内容（处理 truncated 走 raw_url）
 async function readGistFile(gist, fileName) {
     const f = gist.files && gist.files[fileName];
@@ -57,33 +68,29 @@ async function readGistFile(gist, fileName) {
     return content;
 }
 
-// ===== 超龄备份文件选择（与网页端 wallSelectExpiredBackupFiles 同一规则，导出供单测） =====
-// 安全规则：只认 backup_wall_all_<13位ts>.json 为主索引；最新 keepMin 份（默认3）永不删；
-//           content_ 前缀且能严格解析出同一 13 位时间戳的文件成套删除；其它文件名一概不碰。
-export function selectExpiredBackupFiles(names, nowMs, keepDays, keepMin = 3) {
-    const MIN_KEEP = Math.max(1, keepMin || 3);
-    const MAIN_RE = /^backup_wall_all_(\d{13})\.json$/;
-    const CONTENT_RE = /^(backup_wall_all_|content_)[A-Za-z0-9_.\-]*_(\d{13})(\.[A-Za-z0-9]+)?$/;
-    const list = (names || []).filter(n => n && typeof n === 'string');
-    const mains = [];
-    for (const n of list) {
-        const m = n.match(MAIN_RE);
-        if (m) mains.push({ name: n, ts: parseInt(m[1], 10) });
-    }
-    if (!mains.length) return [];
-    mains.sort((a, b) => b.ts - a.ts);
-    const cutoff = nowMs - (keepDays || 10) * 86400 * 1000;
-    const doomed = new Set();
-    for (let i = MIN_KEEP; i < mains.length; i++) { if (mains[i].ts < cutoff) doomed.add(mains[i].ts); }
-    if (!doomed.size) return [];
-    const out = [];
-    for (const n of list) {
-        const mm = n.match(MAIN_RE);
-        if (mm) { if (doomed.has(parseInt(mm[1], 10))) out.push(n); continue; }
-        const cm = n.match(CONTENT_RE);
-        if (cm && doomed.has(parseInt(cm[2], 10))) out.push(n);
-    }
-    return out;
+// 读/写索引数组（wall_backup_index）+ 状态（wall_backup_status），均在 room_index.json 内
+async function readIndex() {
+    try {
+        const g = await getGist(INDEX_GIST_ID);
+        const c = await readGistFile(g, 'room_index.json');
+        const obj = c ? JSON.parse(c || '{}') : {};
+        return { arr: Array.isArray(obj.wall_backup_index) ? obj.wall_backup_index : [], raw: obj };
+    } catch (e) { return { arr: [], raw: {} }; }
+}
+async function writeIndexArr(arr) {
+    if (DRY_RUN) return false;
+    const { raw } = await readIndex();
+    raw.wall_backup_index = arr;
+    await patchGist(INDEX_GIST_ID, { files: { 'room_index.json': { content: JSON.stringify(raw, null, 2) } } });
+    return true;
+}
+async function writeStatus(st) {
+    if (DRY_RUN) return;
+    try {
+        const { raw } = await readIndex();
+        raw.wall_backup_status = Object.assign({ ts: Date.now(), mode: 'actions' }, st);
+        await patchGist(INDEX_GIST_ID, { files: { 'room_index.json': { content: JSON.stringify(raw, null, 2) } } });
+    } catch (e) { log('状态写入失败(不影响备份):', e.message); }
 }
 
 // 扫描账号下全部「脚本分享」Gist（与网页端 wallFetchScriptsForBackup 一致）
@@ -115,40 +122,11 @@ async function scanScripts() {
     return out;
 }
 
-// ===== 孤儿残留检测（与网页端 wallSelectOrphanBackupFiles 同一规则，导出供单测） =====
-// 旧版"删除备份"只删主索引不删关联文件，历史残留的 content_* 无主文件在此清掉；
-// 任一主索引 JSON 损坏 → 保守放弃（返回空，宁可不清也不误删）。
-export function selectOrphanBackupFiles(filesObj) {
-    const MAIN_RE = /^backup_wall_all_\d{13}\.json$/;
-    const names = Object.keys(filesObj || {});
-    const declared = new Set();
-    for (const n of names) {
-        if (!MAIN_RE.test(n)) continue;
-        let main;
-        try { main = JSON.parse(filesObj[n]); } catch (e) { return []; }
-        if (!main || typeof main !== 'object') return [];
-        const cf = main.files || {};
-        (Array.isArray(cf.messages) ? cf.messages : (cf.messages ? [cf.messages] : [])).forEach(x => declared.add(x));
-        if (cf.profiles) declared.add(cf.profiles);
-        (main.scripts || []).forEach(s => { if (s && s.backupFile) declared.add(s.backupFile); });
-    }
-    return names.filter(n => n.startsWith('content_') && !declared.has(n));
-}
-
-// 备份状态文件（与网页端 wallWriteBackupStatus 同一文件名/结构），供备份中心"上次自动备份"栏展示
-let _stBackupId = '';
-async function writeStatus(st) {
-    if (!_stBackupId || DRY_RUN) return;
-    try {
-        await patchGist(_stBackupId, { files: { 'backup_status.json': { content: JSON.stringify(Object.assign({ ts: Date.now(), mode: 'actions' }, st), null, 2) } } });
-    } catch (e) { log('状态写入失败(不影响备份):', e.message); }
-}
-
 async function main() {
     if (!TOKEN) throw new Error('缺少 GIST_TOKEN 环境变量（仓库 secret）');
     log(`配置：保留 ${KEEP_DAYS} 天 · 最少 ${KEEP_MIN} 份${DRY_RUN ? ' · DRY_RUN 只读' : ''}${FORCE ? ' · FORCE 强制备份' : ''}`);
 
-    // 1. 索引 gist → 消息/备份指针
+    // 1. 索引 gist → 消息指针 + 备份索引数组
     const indexGist = await getGist(INDEX_GIST_ID);
     let roomIndex = {};
     try { roomIndex = JSON.parse((await readGistFile(indexGist, 'room_index.json')) || '{}'); } catch (e) {}
@@ -166,99 +144,77 @@ async function main() {
     const scripts = await scanScripts();
     log(`消息 ${msgCount} 条 · 资料 ${profContent ? '有' : '无'} · 脚本 ${scripts.length} 个`);
 
-    // 4. 指纹比对 → 增量判定
+    // 4. 指纹比对 → 增量判定（对比索引数组最后一条 fp）
     const fp = fingerprint(msgContent, profContent, scripts);
-    let backupId = roomIndex.wall_backup || '';
-    if (backupId) {
-        try { await getGist(backupId); } catch (e) { log('备份 Gist 失效，将重建:', e.message); backupId = ''; }
-    }
-    if (!backupId) {
-        if (DRY_RUN) { log('DRY_RUN：备份 Gist 不存在，实际运行时将创建'); backupId = ''; }
-        else {
-            const c = await fetch(`${API}/gists`, { method: 'POST', headers: { ...H, 'Content-Type': 'application/json' }, body: JSON.stringify({ description: BACKUP_GIST_DESC, public: false, files: { 'backup_info.json': { content: JSON.stringify({ created: Date.now(), type: 'wall_backup' }, null, 2) } } }) });
-            if (!c.ok) throw new Error('创建备份 Gist 失败 HTTP ' + c.status);
-            const d = await c.json();
-            backupId = d.id;
-            roomIndex.wall_backup = backupId;
-            await patchGist(INDEX_GIST_ID, { files: { 'room_index.json': { content: JSON.stringify(roomIndex, null, 2) } } });
-            log('已创建备份 Gist 并写回索引指针:', backupId);
+    let indexArr = (await readIndex()).arr;
+    const lastEntry = indexArr.length ? indexArr[indexArr.length - 1] : null;
+    let runResult = 'none';
+    if (!FORCE && lastEntry && lastEntry.fp && lastEntry.fp === fp) {
+        runResult = 'skip';
+        log('✅ 数据无变化（指纹一致），跳过备份');
+    } else {
+        const ts = Date.now();
+        const files = {};
+        // 消息分片（与网页端同规则：>800KB 切片）
+        let msgFiles = null;
+        if (msgContent) {
+            let allMsgs = [];
+            try { allMsgs = JSON.parse(msgContent).messages || []; } catch (e) {}
+            const bytes = Buffer.byteLength(msgContent, 'utf8');
+            const n = bytes > CHUNK ? Math.max(1, Math.ceil(bytes / CHUNK)) : 1;
+            const per = Math.ceil(allMsgs.length / n);
+            msgFiles = [];
+            for (let i = 0; i < n; i++) {
+                const fn = `content_messages_${i}_${ts}.json`;
+                files[fn] = { content: JSON.stringify({ messages: allMsgs.slice(i * per, (i + 1) * per) }, null, 2) };
+                msgFiles.push(fn);
+            }
+        }
+        if (profContent) files[`content_profiles_${ts}.json`] = { content: profContent };
+        const scriptsRef = [];
+        for (const s of scripts) {
+            const safe = s.backupFileName.replace(/[^a-zA-Z0-9_\-.]/g, '_');
+            const ext = s.backupFileName.includes('.') ? s.backupFileName.split('.').pop() : 'js';
+            const bf = `content_script_${safe}_${s.gistId}_${ts}.${ext}`;
+            const scBytes = Buffer.byteLength(s.content || '', 'utf8');
+            if (scBytes > 900000) log('⚠️ 脚本', safe, `约 ${(scBytes / 1048576).toFixed(1)}MB，可能超 Gist 单文件上限`);
+            files[bf] = { content: s.content };
+            scriptsRef.push({ gistId: s.gistId, description: s.description, fileName: s.fileName, backupFile: bf, bytes: scBytes });
+        }
+        const dt = new Date(Date.now() + 8 * 3600 * 1000).toISOString().replace('T', ' ').slice(0, 19) + ' (UTC+8)';
+        const main = { timestamp: ts, date: dt, type: 'wall_full_v1', fp, messagesGistId: msgGistId, messageCount: msgCount, scriptCount: scripts.length, scripts: scriptsRef, files: { messages: msgFiles, profiles: profContent ? `content_profiles_${ts}.json` : null } };
+        files[`backup_wall_all_${ts}.json`] = { content: JSON.stringify(main, null, 2) };
+        if (DRY_RUN) {
+            log(`DRY_RUN：将创建独立备份 Gist 并写入 ${Object.keys(files).length} 个文件（含主索引），实际运行时才落盘`);
+        } else {
+            // 方案 B：每份备份独立小 Gist（不再堆同一 Gist，根治 300 文件截断）
+            const cg = await createGist(BACKUP_GIST_DESC_PREFIX + ts, files);
+            indexArr.push({ id: cg.id, ts, date: dt, messageCount: msgCount, scriptCount: scripts.length, fp });
+            await writeIndexArr(indexArr);
+            runResult = 'backup';
+            log(`✅ 备份完成：消息 ${msgCount} · 脚本 ${scripts.length} · 独立 Gist ${cg.id} · 共 ${Object.keys(files).length} 个文件`);
         }
     }
 
-    if (backupId) {
-        _stBackupId = backupId;
-        const backupGist = await getGist(backupId);
-        const mainNames = Object.keys(backupGist.files || {}).filter(n => /^backup_wall_all_\d{13}\.json$/.test(n)).sort();
-        const lastMain = mainNames.length ? backupGist.files[mainNames[mainNames.length - 1]] : null;
-        let lastFp = '';
-        if (lastMain && lastMain.content) { try { lastFp = JSON.parse(lastMain.content).fp || ''; } catch (e) {} }
-        let runResult = 'none';
-        if (!FORCE && lastFp && lastFp === fp) {
-            runResult = 'skip';
-            log('✅ 数据无变化（指纹一致），跳过备份');
-        } else {
-            const ts = Date.now();
-            const files = {};
-            // 消息分片（与网页端同规则：>800KB 切片）
-            let msgFiles = null;
-            if (msgContent) {
-                let allMsgs = [];
-                try { allMsgs = JSON.parse(msgContent).messages || []; } catch (e) {}
-                const bytes = Buffer.byteLength(msgContent, 'utf8');
-                const n = bytes > CHUNK ? Math.max(1, Math.ceil(bytes / CHUNK)) : 1;
-                const per = Math.ceil(allMsgs.length / n);
-                msgFiles = [];
-                for (let i = 0; i < n; i++) {
-                    const fn = `content_messages_${i}_${ts}.json`;
-                    files[fn] = { content: JSON.stringify({ messages: allMsgs.slice(i * per, (i + 1) * per) }, null, 2) };
-                    msgFiles.push(fn);
-                }
-            }
-            if (profContent) files[`content_profiles_${ts}.json`] = { content: profContent };
-            const scriptsRef = [];
-            for (const s of scripts) {
-                const safe = s.backupFileName.replace(/[^a-zA-Z0-9_\-.]/g, '_');
-                const ext = s.backupFileName.includes('.') ? s.backupFileName.split('.').pop() : 'js';
-                const bf = `content_script_${safe}_${s.gistId}_${ts}.${ext}`;
-                const scBytes = Buffer.byteLength(s.content || '', 'utf8');
-                if (scBytes > 900000) log('⚠️ 脚本', safe, `约 ${(scBytes / 1048576).toFixed(1)}MB，可能超 Gist 单文件上限`);
-                files[bf] = { content: s.content };
-                scriptsRef.push({ gistId: s.gistId, description: s.description, fileName: s.fileName, backupFile: bf, bytes: scBytes });
-            }
-            const dt = new Date(Date.now() + 8 * 3600 * 1000).toISOString().replace('T', ' ').slice(0, 19) + ' (UTC+8)';
-            const main = { timestamp: ts, date: dt, type: 'wall_full_v1', fp, messagesGistId: msgGistId, messageCount: msgCount, scriptCount: scripts.length, scripts: scriptsRef, files: { messages: msgFiles, profiles: profContent ? `content_profiles_${ts}.json` : null } };
-            files[`backup_wall_all_${ts}.json`] = { content: JSON.stringify(main, null, 2) };
-            if (DRY_RUN) {
-                log(`DRY_RUN：将写入 ${Object.keys(files).length} 个文件（含主索引），实际运行时才落盘`);
-            } else {
-                await patchGist(backupId, { files });
-                runResult = 'backup';
-                log(`✅ 备份完成：消息 ${msgCount} · 脚本 ${scripts.length} · 共 ${Object.keys(files).length} 个文件`);
-            }
-        }
-        // 5. 清理超龄备份（最少保留 KEEP_MIN 份）+ 孤儿残留（旧版删除bug留下的无主 content_*）
-        let cleanedN = 0;
-        const g = await getGist(backupId);
-        const filesObj = {};
-        for (const [n, f] of Object.entries(g.files || {})) filesObj[n] = f.content || '';
-        const sel = selectExpiredBackupFiles(Object.keys(filesObj), Date.now(), KEEP_DAYS, KEEP_MIN);
-        const orphans = selectOrphanBackupFiles(filesObj);
-        const all = [...sel, ...orphans];
-        if (!all.length) {
-            log(`✅ 无超龄备份、无孤儿残留（保留 ${KEEP_DAYS} 天 · 最少 ${KEEP_MIN} 份）`);
-        } else if (DRY_RUN) {
-            log(`DRY_RUN：将清理超龄 ${sel.length} 个文件 + 孤儿 ${orphans.length} 个`);
-        } else {
-            const files = {};
-            all.forEach(n => { files[n] = null; });
-            await patchGist(backupId, { files });
-            cleanedN = all.length;
-            log(`🧹 已清理：超龄 ${sel.length} 个文件（${sel.filter(n => n.startsWith('backup_wall_all_')).length} 个备份整套）+ 孤儿 ${orphans.length} 个`);
-        }
-        const remaining = (await getGist(backupId)).files ? Object.keys((await getGist(backupId)).files).length : 0;
-        log(`备份 Gist 当前共 ${remaining} 个文件`);
-        await writeStatus({ ok: true, result: runResult, messageCount: msgCount, scriptCount: scripts.length, cleaned: cleanedN });
+    // 5. 清理超龄备份（方案 B：DELETE 整份超龄 Gist，最少保留 KEEP_MIN 份）
+    let cleanedN = 0;
+    const now = Date.now();
+    const keepMs = KEEP_DAYS * 86400 * 1000;
+    const sorted = indexArr.slice().sort((a, b) => a.ts - b.ts);
+    const keepIds = new Set(sorted.slice(Math.max(0, sorted.length - KEEP_MIN)).map(e => e.id));
+    const toDelete = sorted.filter(e => (now - e.ts > keepMs) && !keepIds.has(e.id));
+    if (!toDelete.length) {
+        log(`✅ 无超龄备份（保留 ${KEEP_DAYS} 天 · 最少 ${KEEP_MIN} 份）`);
+    } else if (DRY_RUN) {
+        log(`DRY_RUN：将删除 ${toDelete.length} 份超龄备份 Gist`);
+    } else {
+        for (const e of toDelete) { const ok = await deleteGist(e.id); if (ok) cleanedN++; }
+        indexArr = indexArr.filter(e => !toDelete.some(t => t.id === e.id));
+        await writeIndexArr(indexArr);
+        log(`🧹 已清理 ${cleanedN} 份超龄备份 Gist，索引剩 ${indexArr.length} 份`);
     }
+
+    await writeStatus({ ok: true, result: runResult, messageCount: msgCount, scriptCount: scripts.length, cleaned: cleanedN });
     log('结束');
 }
 
