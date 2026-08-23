@@ -30,7 +30,7 @@
   window.heroSkinSelections = {};  // { 英雄名: 皮肤名 }
 
   // 王城低配版阵容优先预热（用户主阵容，开项目秒开）：这些英雄皮肤先拉
-  var PRIORITY_HEROES = new Set(['水灵','萌萌','咕咕','钢鬃','木精灵','光精灵','幻精灵','火炮射线','小野酋长','死神海妖','火炮','风灵','死神','骨弓','电法','铁骑','悟空','魂精灵','魔精灵']);
+  var PRIORITY_HEROES = new Set(['水灵','水人','萌萌','咕咕','钢鬃','木精灵','光精灵','幻精灵','火炮射线','小野酋长','死神海妖','火炮','风灵','死神','骨弓','电法','铁骑','悟空','魂精灵','魔精灵']);
 
   // 解析 "皮肤名·英雄名" 格式，返回基础英雄名
   function getBaseHeroName(fullName) {
@@ -288,7 +288,13 @@
   var _syncPromise = null;
   function _ensureSynced() {
     // 已有 registry（含 IndexedDB 恢复来的）→ 立即就绪，绝不阻塞首屏
-    if (window.skinRegistry && Object.keys(window.skinRegistry).length) return Promise.resolve();
+    if (window.skinRegistry && Object.keys(window.skinRegistry).length) {
+      // 即使命中本地缓存，也异步补拉一次远端注册表：
+      // ① 修复「IndexedDB 缓存的 registry 是旧版（如不含新英雄水人）→ 首屏解析新英雄为 null → 显示诡异/刷新出问题」；
+      // ② 远端 sync 成功会把新英雄补进 registry 并触发 reapplyAllSkins 重绘，无需手动设置。
+      if (!_syncInFlight) { _startSync().catch(function () {}); }
+      return Promise.resolve();
+    }
     if (_syncInFlight) return _syncPromise;
     return _startSync();
   }

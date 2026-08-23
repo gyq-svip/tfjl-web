@@ -12040,6 +12040,11 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         if (typeof updateCardPoolSkins === 'function') updateCardPoolSkins().catch(() => {});
                         // 恢复卡池分区皮肤锁的显示状态
                         if (typeof applyPoolSkinLockUI === 'function') applyPoolSkinLockUI();
+
+                        // ✅ 兜底：1.5s/3s 后再各铺一次卡池皮肤，覆盖「水人」等新英雄 DOM 晚于首屏 updateCardPoolSkins
+                        //  触发的 race condition（用户卡池里的新英雄首屏紫底、右击才好即此原因）。
+                        setTimeout(function () { if (typeof updateCardPoolSkins === 'function') updateCardPoolSkins().catch(function () {}); }, 1500);
+                        setTimeout(function () { if (typeof updateCardPoolSkins === 'function') updateCardPoolSkins().catch(function () {}); }, 3000);
                     } catch (err) {
                         console.error('[SKIN] Re-scan skins error:', err);
                     }
