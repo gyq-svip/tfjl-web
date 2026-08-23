@@ -121,7 +121,7 @@
        - 拍卖出价函数：quickBid()、customQuickBid()，第 3000 行附近
 
     📌 管理员相关：
-       - 管理员面板：openAdminPanel() / 菜单 adminMenuSection（详见源码，入口与密码不在此注释说明）
+       - 管理员面板入口：openAdminPanel() / 菜单 adminMenuSection（细节见源码）
 
     📌 数据统计和GitHub：
        - 统计数据保存：saveCounterToGist()，第 9700 行附近
@@ -321,53 +321,6 @@
        修改难度：中等
        测试状态：已测试
 
-    7. 2026/05/26 - Gist Token 硬编码与设置菜单精简
-       修改人：Cline
-       修改原因：用户希望所有访问者都能使用 Gist 同步功能，无需手动设置 Token
-       
-       新增：Token 混淆保护，避免明文暴露
-       
-       修改内容：
-       a) 新增 HARDCODED_GIST_TOKEN 常量（5920行）：
-          - 功能：硬编码 GitHub Personal Access Token
-       
-       b) 修改 getGistToken（5924-5928行）：
-          - 修改前：只从 localStorage 读取
-          - 修改后：优先使用硬编码 Token，没有才用 localStorage
-       
-       c) 移除菜单中的「设置 Gist Token」按钮（2099-2100行）：
-          - 效果：菜单更简洁
-       
-       d) 移除 showGistSettings / closeGistSettings / saveGistToken 函数：
-          - 效果：代码更精简
-       
-       e) 修改测试连接功能 testConnections（6287-6358行）：
-          - 修改前：Gist 测试不带 Token
-          - 修改后：Gist 测试自动使用 Token
-          
-       修改后效果：
-       - 所有用户无需手动设置 Token 即可使用 Gist 同步
-       - 菜单更简洁
-       
-       修改文件：index.html
-       修改行数：5920-5928, 6287-6358, 2099-2100 等
-       修改类型：功能优化
-       修改难度：简单
-       测试状态：已测试
-
-    Gist 数据格式说明（2026/05/26 更新）：
-    {
-      "total_visits": 总访问次数,
-      "total_users": 总用户数,
-      "unique_users": [设备ID数组],
-      "total_downloads": 总下载次数,
-      "active_today": 今日活跃用户数,
-      "active_today_users": [今日活跃设备ID数组],
-      "daily_stats": {
-        "2026-05-26": { "visits": 今日访问, "downloads": 今日下载 }
-      },
-      "last_updated": "最后更新时间"
-    }
     -->
     <!-- ==================== 功能记录结束 ==================== -->
 
