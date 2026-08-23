@@ -70,6 +70,14 @@ jobs:
           echo "--- script tags after bump ---"
           grep -nE '<script[^>]*src="[^"]*\.js' _site/index.html || true
 
+          # 🔴 同步更新右下角版本号前半段「发布时间」为部署时的北京时间（避免一直显示旧的写死日期如 20260823）
+          # 用 Asia/Shanghai 时区，确保显示的日期与用户本地一致（runner 默认 UTC 会少一天）
+          DEPLOY_TAG="s$(TZ=Asia/Shanghai date +%Y%m%d-%H%M)"
+          echo "Deploy tag (Beijing): $DEPLOY_TAG"
+          sed -i -E "s/(id=\"versionTag\"[^>]*>)[s0-9-]{11,16}/\1${DEPLOY_TAG}/g" _site/index.html
+          sed -i -E "s/(<div class=\"version-tooltip\">版本 )[s0-9-]{11,16}/\1${DEPLOY_TAG}/g" _site/index.html
+          grep -nE 'id="versionTag"' _site/index.html || true
+
           # 🔴 修复「SW 版本号每次部署不变」：自增 sw.js 的 CACHE_VERSION（与桌面端 lib.rs 同逻辑 +1），
           # 让 SW 缓存命名空间每次部署都变 → 旧 SW 控制的缓存强制失效，浏览器拉到最新前端。
           # 直接改仓库根 sw.js（checkout 的工作区），稍后 commit-back 到 main，保证下次部署基于新值继续 +1（持续累加）。
