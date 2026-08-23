@@ -12041,24 +12041,6 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         // 恢复卡池分区皮肤锁的显示状态
                         if (typeof applyPoolSkinLockUI === 'function') applyPoolSkinLockUI();
 
-                        // ✅ 同步云端基础卡（cards.json），让「管理员新增的英雄」（如水人）在首屏卡池可见
-                        //   修复：网页端之前没有在启动时拉 cards.json，导致 window.cloudCards 永远是空，
-                        //   renderCloudCardsToPool 从未被首屏触发，新增英雄（水人）「直接没有」这张卡。
-                        try {
-                            if (!window.cloudCards || !Object.keys(window.cloudCards).length) {
-                                fetch('./skins/cards.json?_t=' + Date.now(), { cache: 'no-cache' })
-                                    .then(function (r) { return r && r.ok ? r.json() : null; })
-                                    .then(function (j) {
-                                        if (!j || !j.cards) return;
-                                        window.cloudCards = j.cards;
-                                        console.log('[CARD] 首屏拉取云端 cards.json，共', Object.keys(j.cards).length, '张卡');
-                                        if (typeof renderCloudCardsToPool === 'function') renderCloudCardsToPool();
-                                        if (typeof updateCardPoolSkins === 'function') updateCardPoolSkins().catch(function () {});
-                                    })
-                                    .catch(function (e) { console.warn('[CARD] 拉取 cards.json 失败:', e); });
-                            }
-                        } catch (e) {}
-
                         // ✅ 兜底：1.5s/3s 后再各铺一次卡池皮肤，覆盖「水人」等新英雄 DOM 晚于首屏 updateCardPoolSkins
                         //  触发的 race condition（首屏紫底、右击才好即此原因）。
                         setTimeout(function () { if (typeof updateCardPoolSkins === 'function') updateCardPoolSkins().catch(function () {}); }, 1500);
@@ -12067,8 +12049,30 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         console.error('[SKIN] Re-scan skins error:', err);
                     }
                 } else {
-                    console.warn('[SKIN] window.scanSkins not available');
+                    console.warn('[SKIN] window.scanSkins not available（网页端正常，APP 端才有 scanSkins）');
                 }
+
+                // ✅✅ 同步云端基础卡（cards.json），让「管理员新增的英雄」（如水人）在首屏卡池可见
+                //   【关键修复】原先包在 `if (window.scanSkins)` 分支内，网页端 window.scanSkins 不存在
+                //   （只在 APP 端 app-local.js 定义）导致整段被跳过 → 水人「直接没有」。移出分支独立执行。
+                setTimeout(function () {
+                    try {
+                        if (!window.cloudCards || !Object.keys(window.cloudCards).length) {
+                            fetch('./skins/cards.json?_t=' + Date.now(), { cache: 'no-cache' })
+                                .then(function (r) { return r && r.ok ? r.json() : null; })
+                                .then(function (j) {
+                                    if (!j || !j.cards) return;
+                                    window.cloudCards = j.cards;
+                                    console.log('[CARD] 首屏拉取云端 cards.json，共', Object.keys(j.cards).length, '张卡');
+                                    if (typeof renderCloudCardsToPool === 'function') renderCloudCardsToPool();
+                                    if (typeof updateCardPoolSkins === 'function') updateCardPoolSkins().catch(function () {});
+                                })
+                                .catch(function (e) { console.warn('[CARD] 拉取 cards.json 失败:', e); });
+                        } else if (typeof renderCloudCardsToPool === 'function') {
+                            renderCloudCardsToPool();
+                        }
+                    } catch (e) {}
+                }, 800);
             }, 500);
         });
         
