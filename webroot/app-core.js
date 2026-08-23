@@ -21122,7 +21122,24 @@ ${maSection}
                 }
 
                 // 3. 关键 Gist 可读 + 计数器 Gist 写回测试
-                const msgId = localStorage.getItem('messages_gist_id') || MESSAGES_GIST_ID;
+                // 🔴 修「消息 Gist 误报 404」：监控面板原本只看 localStorage.messages_gist_id，
+                // 死常量 b02794a8... 早已被删 → localStorage 为空时 fallback 到死常量 → 误报 404。
+                // 现在改为：优先 localStorage → 查总表 room_index.json.messages（和 fetchMessages 同套逻辑） → 最后兜底死常量。
+                let msgId = localStorage.getItem('messages_gist_id') || '';
+                if (!msgId) {
+                    try {
+                        const idxR = await fetch(`https://api.github.com/gists/${GIST_ID}`, { headers: { 'Accept': 'application/vnd.github.v3+json', ...(token && { 'Authorization': `token ${token}` }) } });
+                        if (idxR.ok) {
+                            const idxD = await idxR.json();
+                            const ri = idxD.files && idxD.files['room_index.json'];
+                            if (ri && ri.content) {
+                                const idx = JSON.parse(ri.content);
+                                if (idx.messages) { msgId = idx.messages; localStorage.setItem('messages_gist_id', msgId); }
+                            }
+                        }
+                    } catch (e) {}
+                }
+                if (!msgId) msgId = MESSAGES_GIST_ID;
                 const gistChecks = [
                     { name: '索引 Gist', id: GIST_ID },
                     { name: '消息 Gist', id: msgId },
@@ -21140,7 +21157,7 @@ ${maSection}
                         });
                         const icon = r.ok ? '✅' : (r.status === 404 ? '❌ 404' : r.status === 403 ? '🔒 403' : `⚠️ ${r.status}`);
                         const color = r.ok ? '#4ade80' : '#ef4444';
-                        gistHtml += `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:0.78rem;"><span style="color:rgba(255,255,255,0.6);">${gc.name}</span><span style="color:${color};">${icon} ${gc.id.substring(0, 8)}...</span></div>`;
+                        gistHtml += `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:0.78rem;" title="${gc.id}"><span style="color:rgba(255,255,255,0.6);">${gc.name}</span><span style="color:${color};">${icon} ${gc.id.substring(0, 8)}...</span></div>`;
                         // 计数器 Gist 额外做写回测试：读→刷新 last_updated→写回（last_updated 本就是时间戳，零数据风险），验证统计写入通道
                         if (gc.name === '计数器 Gist' && r.ok && token) {
                             try {
