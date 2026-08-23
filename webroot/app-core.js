@@ -12040,6 +12040,29 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         if (typeof updateCardPoolSkins === 'function') updateCardPoolSkins().catch(() => {});
                         // 恢复卡池分区皮肤锁的显示状态
                         if (typeof applyPoolSkinLockUI === 'function') applyPoolSkinLockUI();
+
+                        // ✅ 同步云端基础卡（cards.json），让「管理员新增的英雄」（如水人）在首屏卡池可见
+                        //   修复：网页端之前没有在启动时拉 cards.json，导致 window.cloudCards 永远是空，
+                        //   renderCloudCardsToPool 从未被首屏触发，新增英雄（水人）「直接没有」这张卡。
+                        try {
+                            if (!window.cloudCards || !Object.keys(window.cloudCards).length) {
+                                fetch('./skins/cards.json?_t=' + Date.now(), { cache: 'no-cache' })
+                                    .then(function (r) { return r && r.ok ? r.json() : null; })
+                                    .then(function (j) {
+                                        if (!j || !j.cards) return;
+                                        window.cloudCards = j.cards;
+                                        console.log('[CARD] 首屏拉取云端 cards.json，共', Object.keys(j.cards).length, '张卡');
+                                        if (typeof renderCloudCardsToPool === 'function') renderCloudCardsToPool();
+                                        if (typeof updateCardPoolSkins === 'function') updateCardPoolSkins().catch(function () {});
+                                    })
+                                    .catch(function (e) { console.warn('[CARD] 拉取 cards.json 失败:', e); });
+                            }
+                        } catch (e) {}
+
+                        // ✅ 兜底：1.5s/3s 后再各铺一次卡池皮肤，覆盖「水人」等新英雄 DOM 晚于首屏 updateCardPoolSkins
+                        //  触发的 race condition（首屏紫底、右击才好即此原因）。
+                        setTimeout(function () { if (typeof updateCardPoolSkins === 'function') updateCardPoolSkins().catch(function () {}); }, 1500);
+                        setTimeout(function () { if (typeof updateCardPoolSkins === 'function') updateCardPoolSkins().catch(function () {}); }, 3000);
                     } catch (err) {
                         console.error('[SKIN] Re-scan skins error:', err);
                     }
@@ -16570,7 +16593,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 wallLoadBackupList();
             } catch (e) { wallShowBackupStatus(`❌ 删除失败：${e.message}`, 'error'); }
         }
-        function wallAdminShowBackup() { const p = document.getElementById('adminPageWallBackup'); if (p) p.style.display = 'block'; const o = document.getElementById('adminPageWallGist'); if (o) o.style.display = 'none'; const adm = document.getElementById('adminMenu'); if (adm) adm.style.display = 'none'; try { const c = document.getElementById('wallAutoBackupChk'); if (c) c.checked = localStorage.getItem('wall_auto_backup') === '1'; } catch (e) {} wallLoadBackupList(); }
+        function wallAdminShowBackup() { const p = document.getElementById('adminPageWallBackup'); if (p) p.style.display = 'block'; const o = document.getElementById('adminPageWallGist'); if (o) o.style.display = 'none'; const adm = document.getElementById('adminMenuSection'); if (adm) adm.style.display = 'none'; try { const c = document.getElementById('wallAutoBackupChk'); if (c) c.checked = localStorage.getItem('wall_auto_backup') === '1'; } catch (e) {} wallLoadBackupList(); }
 
         // ==================== 需求墙 Gist 文件管理（孤儿扫描+清理，移植自拍卖精细管理）====================
         let _wallGistList = [];
@@ -16719,7 +16742,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             await wallLoadGistManager();
         }
         function wallShowGistStatus(msg) { const el = document.getElementById('wallGistStatus'); if (el) { el.innerHTML = `<div style="color:#ffa500;font-size:0.85rem;text-align:center;padding:10px;">${msg}</div>`; setTimeout(() => { if (el) el.innerHTML = ''; }, 5000); } }
-        function wallAdminShowGist() { const p = document.getElementById('adminPageWallGist'); if (p) p.style.display = 'block'; const o = document.getElementById('adminPageWallBackup'); if (o) o.style.display = 'none'; const adm = document.getElementById('adminMenu'); if (adm) adm.style.display = 'none'; }
+        function wallAdminShowGist() { const p = document.getElementById('adminPageWallGist'); if (p) p.style.display = 'block'; const o = document.getElementById('adminPageWallBackup'); if (o) o.style.display = 'none'; const adm = document.getElementById('adminMenuSection'); if (adm) adm.style.display = 'none'; }
 
         window.wallBackupAll = wallBackupAll;
         window.wallLoadBackupList = wallLoadBackupList;

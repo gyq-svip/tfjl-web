@@ -2569,7 +2569,7 @@
             <div style="max-width:680px;margin:40px auto;background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:12px;padding:20px;">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
                     <h3 style="color:#ffd700;margin:0;font-size:1rem;">💾 需求墙备份中心</h3>
-                    <button onclick="document.getElementById('adminPageWallBackup').style.display='none';document.getElementById('adminMenu').style.display='grid';" style="background:none;border:none;color:#fff;font-size:1.4rem;cursor:pointer;">✕</button>
+                    <button onclick="document.getElementById('adminPageWallBackup').style.display='none';var m=document.getElementById('adminMenuSection');if(m)m.style.display='block';" style="background:none;border:none;color:#fff;font-size:1.4rem;cursor:pointer;">✕</button>
                 </div>
                 <div style="color:#4ade80;font-size:0.8rem;margin-bottom:8px;">✅ 本备份存独立私有Gist，含<b>消息+个人资料+脚本真实内容</b>（自包含：源文件被删也能还原）。还原可「合并」(保留新消息)或「覆盖」。</div>
                 <div style="background:rgba(74,222,128,0.08);border-left:3px solid #4ade80;border-radius:6px;padding:8px 10px;margin-bottom:12px;font-size:0.72rem;color:rgba(255,255,255,0.6);line-height:1.55;">
@@ -2604,7 +2604,7 @@
             <div style="max-width:680px;margin:40px auto;background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:12px;padding:20px;">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
                     <h3 style="color:#ffd700;margin:0;font-size:1rem;">🗂️ 需求墙 Gist 文件管理</h3>
-                    <button onclick="document.getElementById('adminPageWallGist').style.display='none';document.getElementById('adminMenu').style.display='grid';" style="background:none;border:none;color:#fff;font-size:1.4rem;cursor:pointer;">✕</button>
+                    <button onclick="document.getElementById('adminPageWallGist').style.display='none';var m=document.getElementById('adminMenuSection');if(m)m.style.display='block';" style="background:none;border:none;color:#fff;font-size:1.4rem;cursor:pointer;">✕</button>
                 </div>
                 <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
                     <button onclick="wallLoadGistManager()" style="background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;">🔄 扫描Gist</button>
