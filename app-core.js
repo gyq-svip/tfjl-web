@@ -16570,7 +16570,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 wallLoadBackupList();
             } catch (e) { wallShowBackupStatus(`❌ 删除失败：${e.message}`, 'error'); }
         }
-        function wallAdminShowBackup() { const p = document.getElementById('adminPageWallBackup'); if (p) p.style.display = 'block'; const o = document.getElementById('adminPageWallGist'); if (o) o.style.display = 'none'; const adm = document.getElementById('adminMenu'); if (adm) adm.style.display = 'none'; try { const c = document.getElementById('wallAutoBackupChk'); if (c) c.checked = localStorage.getItem('wall_auto_backup') === '1'; } catch (e) {} wallLoadBackupList(); }
+        function wallAdminShowBackup() { const p = document.getElementById('adminPageWallBackup'); if (p) p.style.display = 'block'; const o = document.getElementById('adminPageWallGist'); if (o) o.style.display = 'none'; const adm = document.getElementById('adminMenuSection'); if (adm) adm.style.display = 'none'; try { const c = document.getElementById('wallAutoBackupChk'); if (c) c.checked = localStorage.getItem('wall_auto_backup') === '1'; } catch (e) {} wallLoadBackupList(); }
 
         // ==================== 需求墙 Gist 文件管理（孤儿扫描+清理，移植自拍卖精细管理）====================
         let _wallGistList = [];
@@ -16719,7 +16719,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             await wallLoadGistManager();
         }
         function wallShowGistStatus(msg) { const el = document.getElementById('wallGistStatus'); if (el) { el.innerHTML = `<div style="color:#ffa500;font-size:0.85rem;text-align:center;padding:10px;">${msg}</div>`; setTimeout(() => { if (el) el.innerHTML = ''; }, 5000); } }
-        function wallAdminShowGist() { const p = document.getElementById('adminPageWallGist'); if (p) p.style.display = 'block'; const o = document.getElementById('adminPageWallBackup'); if (o) o.style.display = 'none'; const adm = document.getElementById('adminMenu'); if (adm) adm.style.display = 'none'; }
+        function wallAdminShowGist() { const p = document.getElementById('adminPageWallGist'); if (p) p.style.display = 'block'; const o = document.getElementById('adminPageWallBackup'); if (o) o.style.display = 'none'; const adm = document.getElementById('adminMenuSection'); if (adm) adm.style.display = 'none'; }
 
         window.wallBackupAll = wallBackupAll;
         window.wallLoadBackupList = wallLoadBackupList;
