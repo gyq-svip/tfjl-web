@@ -13835,8 +13835,8 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
             try {
                 const token = getGistToken();
                 
-                // 优先使用硬编码的 COUNTER_GIST_ID
-                let counterGistId = COUNTER_GIST_ID || localStorage.getItem('counter_gist_id');
+                // 强制只用硬编码的 COUNTER_GIST_ID（铁律：counter Gist 必须归 gyq-svip 且硬编码，禁止从 localStorage/索引自动发现陌生 Gist）
+                const counterGistId = COUNTER_GIST_ID;
                 
                 // 如果都没有，尝试从索引文件获取
                 if (!counterGistId) {
@@ -14525,8 +14525,8 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
                 let content = JSON.stringify(data, null, 2);
                 const token = getGistToken();
                 
-                // 优先使用硬编码的 COUNTER_GIST_ID
-                let counterGistId = COUNTER_GIST_ID || localStorage.getItem('counter_gist_id');
+                // 强制只用硬编码的 COUNTER_GIST_ID（铁律：counter Gist 必须归 gyq-svip 且硬编码，禁止从 localStorage/索引自动发现陌生 Gist）
+                const counterGistId = COUNTER_GIST_ID;
                 
                 if (counterGistId) {
                     // PATCH之前先读取远程数据，合并后再写入，防止本地小数据覆盖远程大数据
@@ -14595,9 +14595,9 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
                     }
                     // 如果 PATCH 失败，按状态码处理
                     if (response.status === 404 || response.status === 403) {
-                        // Gist 不存在或无权访问：清除本地 id，后续尝试从索引重建
-                        localStorage.removeItem('counter_gist_id');
-                        counterGistId = null;
+                        // Gist 不存在或无权限（铁律：永远不清除硬编码 COUNTER_GIST_ID 引用，也不自动创建陌生 Gist）
+                        console.warn('[统计] counter Gist 读写失败 status=' + response.status + '，请检查 Gist 是否存在/Token 权限；暂停同步');
+                        return false;
                     } else if (response.status === 401) {
                         // Token 无效/过期/无权限：停止本次同步，避免反复 401 与创建新 Gist 也失败
                         console.warn('[统计] GitHub Token 无效(401)，暂停统计同步，请检查 Token 是否有效/具备 gist 写权限');
@@ -14605,8 +14605,7 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
                     }
                 }
                 
-                // 如果不存在或 PATCH 失败，创建新的 Gist
-                // 【双重检查】创建前先从索引文件确认是否已有counter
+                // 铁律：counter Gist 已硬编码为 COUNTER_GIST_ID，以下创建/发现分支已被短路（counterGistId 恒等于 COUNTER_GIST_ID），不会触发；保留旧逻辑不影响。
                 if (!counterGistId && token) {
                     try {
                         const indexUrl = `https://api.github.com/gists/${GIST_ID}`;
@@ -14765,8 +14764,8 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
 
                 const token = getGistToken();
 
-                // 优先使用硬编码的 COUNTER_GIST_ID
-                let counterGistId = COUNTER_GIST_ID || localStorage.getItem('counter_gist_id');
+                // 强制只用硬编码的 COUNTER_GIST_ID（铁律：counter Gist 必须归 gyq-svip 且硬编码，禁止从 localStorage/索引自动发现陌生 Gist）
+                const counterGistId = COUNTER_GIST_ID;
                 
                 if (counterGistId) {
                     // PATCH之前先读取远程数据，合并后再写入，防止本地小数据覆盖远程大数据
