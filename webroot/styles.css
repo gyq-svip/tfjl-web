@@ -2717,10 +2717,10 @@
         #refImagePreview .preview-body { padding:0 14px 14px; }
         #refImagePreview .preview-img { max-width:100%; border-radius:8px; }
 
-        /* 版本号自定义悬浮提示：显示在版本号上方（今天前的原始位置） */
+        /* 版本号自定义悬浮提示：显示在版本号下方（避免被上方阵容识别等遮挡） */
         .version-tooltip {
             position: absolute;
-            bottom: 150%;
+            top: 130%;
             right: 0;
             background: rgba(20,20,44,0.96);
             color: #fff;
