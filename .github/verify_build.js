@@ -191,5 +191,57 @@ function smokeRuntime() {
 }
 smokeRuntime();
 
+// ---------- 5) Tauri v2 自定义命令授权三处一致性（2026-08-24 加，防「打包后才发现 not allowed by ACL」）----------
+// 铁律：每新增 `#[tauri::command]` 必须三处同步，缺一即运行时弹原生错误对话框 → 必须重新打包 → 浪费一次打包。
+//  ① lib.rs 函数（用 Result<T,String> 返回，Tauri 宏才会生成 ACL 权限）
+//  ② src-tauri/permissions/allow-custom-commands.toml 追加 [[permission]] commands.allow=["命令名"]
+//  ③ src-tauri/capabilities/default.json 声明 "allow-命令名"
+// 本项自动检查：invoke_handler 注册的每个命令，是否②③④都有对应授权；缺 → FAIL（提交闸门拦下，不必等到打包）。
+function checkTauriCommandAuth() {
+    const lib = P('src-tauri', 'src', 'lib.rs');
+    const toml = P('src-tauri', 'permissions', 'allow-custom-commands.toml');
+    const cap = P('src-tauri', 'capabilities', 'default.json');
+    if (!fs.existsSync(lib) || !fs.existsSync(toml) || !fs.existsSync(cap)) {
+        PASS('Tauri 命令授权检查: 文件不全（CI 无 Rust 环境），跳过'); return;
+    }
+    const libSrc = fs.readFileSync(lib, 'utf8');
+    const tomlSrc = fs.readFileSync(toml, 'utf8');
+    const capSrc = fs.readFileSync(cap, 'utf8');
+
+    // 取 invoke_handler!([ a, b, ... ]) 内注册的所有命令名
+    const regM = libSrc.match(/invoke_handler\s*\(\s*tauri::generate_handler!\s*\[([\s\S]*?)\]\s*\)/);
+    if (!regM) { PASS('Tauri 命令授权检查: 未找到 invoke_handler，跳过'); return; }
+    const registered = regM[1].split(',').map(s => s.trim()).filter(Boolean);
+
+    // toml 里所有被 allow 的命令
+    const tomlAllowed = new Set();
+    const tomlRe = /commands\.allow\s*=\s*\[([^\]]*)\]/g;
+    let tm;
+    while ((tm = tomlRe.exec(tomlSrc))) {
+        tm[1].split(',').map(s => s.trim().replace(/^"|"$/g, '')).filter(Boolean).forEach(c => tomlAllowed.add(c));
+    }
+    // capabilities 里所有 "allow-命令名"
+    const capAllowed = new Set();
+    const capRe = /"allow-([a-z0-9_-]+)"/g;
+    let cm;
+    while ((cm = capRe.exec(capSrc))) capAllowed.add(cm[1]);
+
+    let miss = 0;
+    for (const cmd of registered) {
+        // Tauri ACL 标识符用小写连字符（foo_bar → foo-bar），而 Rust 函数名下划线。
+        // capabilities/default.json 用连字符版，allow-custom-commands.toml 用下划线版。
+        const cmdHyphen = cmd.replace(/_/g, '-');
+        const aHyphen = `allow-${cmdHyphen}`;
+        const inToml = tomlAllowed.has(cmd);
+        const inCap = capAllowed.has(cmdHyphen);
+        if (!inToml || !inCap) {
+            FAIL(`Tauri 命令授权缺失 [${cmd}]：${inToml ? '✓toml' : '✗toml缺'} ${inCap ? '✓capability' : '✗capability缺 "' + aHyphen + '"'}\n     → 运行时必弹「${cmd} not allowed by ACL」，须补 src-tauri/permissions/allow-custom-commands.toml + capabilities/default.json 后重新打包`);
+            miss++;
+        }
+    }
+    if (!miss) PASS(`Tauri 命令授权检查 ${registered.length} 个命令三处一致（lib.rs / toml / capability）`);
+}
+checkTauriCommandAuth();
+
 console.log(ok ? '\n==== 全部校验通过 ✅ ====' : '\n==== 存在 FAIL，必须修复后再提交/合并 ❌ ====');
 process.exit(ok ? 0 : 1);
