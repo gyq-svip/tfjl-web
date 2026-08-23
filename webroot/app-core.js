@@ -15880,10 +15880,15 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
         //    的 wall_backup_index 字段只存轻量数组 [{id,ts,date,messageCount,scriptCount,fp}]（仅1文件不截断）。
         //    列表只读索引数组；还原/查看/导出/删除按 id 去对应 Gist 取；清理=DELETE 整份超龄 Gist。
 
-        // 读索引数组（跨设备唯一真相源；不存在/损坏返回空数组）。token 可选（索引 Gist 需授权才能 PATCH，但 GET 公开文件可匿名）
+        // 读索引数组（跨设备唯一真相源；不存在/损坏返回空数组）。
+        // 🔴 必须带 token！Gist ID 复用的是「总表 Gist」，匿名 GET 走 60次/小时 公共限流，
+        //    房间页面+备份页面共用这 Gist，一天刷新几次就触发 429 速率限制 → 索引读不出 → "暂无备份"。
+        //    带 token 后走 5000次/小时 认证限流，问题消失。
         async function wallGetBackupIndex() {
             try {
-                const idxResp = await fetch(`https://api.github.com/gists/${GIST_ID}`, { headers: { 'Accept': 'application/vnd.github.v3+json' } });
+                const token = getGistToken();
+                const idxResp = await fetch(`https://api.github.com/gists/${GIST_ID}`, { headers: { 'Accept': 'application/vnd.github.v3+json', ...(token && { 'Authorization': `token ${token}` }) } });
+                if (idxResp.status === 429) { console.warn('[备份索引] GitHub 速率限制 429，备份列表暂不可读，请稍后再试'); return []; }
                 if (!idxResp.ok) return [];
                 const idxData = await idxResp.json();
                 const ri = idxData.files && idxData.files['room_index.json'];
@@ -15921,7 +15926,8 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             let id = (!gistDeleted && MESSAGES_GIST_ID) ? MESSAGES_GIST_ID : (localStorage.getItem('messages_gist_id') || '');
             if (!gistDeleted) {
                 try {
-                    const idxResp = await fetch(`https://api.github.com/gists/${GIST_ID}`, { headers: { 'Accept': 'application/vnd.github.v3+json' } });
+                    const token = getGistToken();
+                    const idxResp = await fetch(`https://api.github.com/gists/${GIST_ID}`, { headers: { 'Accept': 'application/vnd.github.v3+json', ...(token && { 'Authorization': `token ${token}` }) } });
                     if (idxResp.ok) { const idxData = await idxResp.json(); const ri = idxData.files && idxData.files['room_index.json']; if (ri && ri.content) { const idx = JSON.parse(ri.content); if (idx.messages) { id = idx.messages; localStorage.setItem('messages_gist_id', id); } } }
                 } catch (e) {}
             }
