@@ -21178,28 +21178,27 @@ ${maSection}
                     ? `剩余 <b style="color:${core.remaining <= 50 ? '#ff6b6b' : '#4ade80'}">${core.remaining}</b> / ${core.limit}（已用 ${core.used != null ? core.used : core.limit - core.remaining}）`
                     : '无数据';
 
-                // 2. Token 权限 + 真实写入测试（创建临时 Gist 再删除）
+                // 2. Token 权限（只读验证，不再创建/删除测试 Gist，避免任何写副作用与数据风险）
                 let scopeText = '未知', gistWriteOk = false, writeDetail = '未测试';
                 if (token) {
                     const sh = rlResp.headers.get('X-OAuth-Scopes') || '';
                     scopeText = sh || 'Fine-grained PAT（无 X-OAuth-Scopes 头）';
                     gistWriteOk = /gist/.test(sh);
                     if (!gistWriteOk && sh) scopeText += ' ⚠️ 无 gist 权限';
+                    // 只读验证 token 有效：用 /user 端点（带 token 才返回，匿名 401），不创建任何 Gist
                     try {
-                        const t = await fetch('https://api.github.com/gists', {
-                            method: 'POST',
-                            headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` },
-                            body: JSON.stringify({ description: 'TFJL API write test (auto-delete)', public: false, files: { '_tfjl_test_.txt': { content: 'test_' + Date.now() } } })
+                        const u = await fetch('https://api.github.com/user', {
+                            headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` }
                         });
-                        if (t.ok) {
-                            const d = await t.json();
-                            await fetch(`https://api.github.com/gists/${d.id}`, { method: 'DELETE', headers: { 'Authorization': `token ${token}` } });
-                            writeDetail = '✅ 创建+删除测试 Gist 成功';
+                        if (u.ok) {
+                            const ud = await u.json().catch(() => ({}));
+                            writeDetail = `✅ Token 有效（账号 @${ud.login || '?'}）`;
                             gistWriteOk = true;
-                        } else {
-                            const e = await t.json().catch(() => ({}));
-                            writeDetail = `❌ 创建失败(${t.status}): ${e.message || '未知'}`;
+                        } else if (u.status === 401) {
+                            writeDetail = '❌ Token 无效(401)';
                             gistWriteOk = false;
+                        } else {
+                            writeDetail = `⚠️ Token 校验返回 ${u.status}（可读性未知）`;
                         }
                     } catch (e) {
                         writeDetail = '❌ 请求失败: ' + e.message;
@@ -21260,19 +21259,12 @@ ${maSection}
                             const okColor = (gc.level === 'critical' && fileBad) ? '#ef4444' : (fileBad ? '#fbbf24' : '#4ade80');
                             const okIcon = (gc.level === 'critical' && fileBad) ? '❌' : (fileBad ? '⚠️' : '✅');
                             gistHtml += `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:0.78rem;" title="${gc.id}"><span style="color:rgba(255,255,255,0.6);">${gc.name}</span><span style="color:${okColor};">${okIcon} ${gc.id.substring(0, 8)}...${fileNote}</span></div>`;
-                            if (gc.name.indexOf('计数器') === 0 && token) {
-                                try {
-                                    const obj = JSON.parse(gj.files['counter.json'].content);
-                                    obj.last_updated = getCurrentTimeString();
-                                    const pr = await fetch(`https://api.github.com/gists/${gc.id}`, {
-                                        method: 'PATCH',
-                                        headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` },
-                                        body: JSON.stringify({ files: { 'counter.json': { content: JSON.stringify(obj, null, 2) } } })
-                                    });
-                                    gistHtml += `<div style="display:flex;justify-content:space-between;padding:4px 0 8px;font-size:0.78rem;"><span style="color:rgba(255,255,255,0.6);">↳ 计数器写回测试</span><span style="color:${pr.ok ? '#4ade80' : '#fbbf24'};">${pr.ok ? '✅ 写回成功（写入通道正常）' : '⚠️ 写回失败(' + pr.status + ')，在线状态暂不更新'}</span></div>`;
-                                } catch (e) {
-                                    gistHtml += `<div style="padding:4px 0 8px;font-size:0.78rem;color:#fbbf24;">↳ 写回异常(警告): ${e.message}</div>`;
-                                }
+                            // 计数器 Gist：只读诊断（不再做 PATCH 写回测试）
+                            // 原因：① 写回有副作用，用户担心数据丢失；② 计数器 gist 由特定 token 拥有，
+                            // 监控用 token 通常只读 → PATCH 必 403，误报"失败"让人误以为坏了。
+                            // 仅检查可读 + counter.json 存在即可（上面已检查 need:'counter.json'）。
+                            if (gc.name.indexOf('计数器') === 0) {
+                                gistHtml += `<div style="display:flex;justify-content:space-between;padding:4px 0 8px;font-size:0.78rem;"><span style="color:rgba(255,255,255,0.6);">↳ 只读诊断</span><span style="color:#4ade80;">✅ 可读（在线状态数据正常）</span></div>`;
                             }
                         } else {
                             const icon = r.status === 404 ? '❌ 404(已删?)' : r.status === 403 ? '🔒 403' : `⚠️ ${r.status}`;
@@ -21296,7 +21288,7 @@ ${maSection}
                         <div style="font-size:0.8rem;line-height:1.7;">
                             <div>配置：${token ? '<span style="color:#4ade80;">✅ 已配置</span>' : '<span style="color:#ef4444;">⚠️ 未配置</span>'}</div>
                             <div>权限范围：${scopeText}</div>
-                            <div>gist 写入：${gistWriteOk ? '<span style="color:#4ade80;">✅ 可写</span>' : '<span style="color:#ef4444;">❌ 不可写</span>'}（${writeDetail}）</div>
+                            <div>Token 有效性：${gistWriteOk ? '<span style="color:#4ade80;">✅ 有效</span>' : '<span style="color:#ef4444;">❌ 无效</span>'}（${writeDetail}）<br><span style="color:rgba(255,255,255,0.4);font-size:0.72rem;">注：监控面板仅做只读检查，不会写入/删除任何 Gist，避免数据风险</span></div>
                         </div>
                     </div>
                     <div>
