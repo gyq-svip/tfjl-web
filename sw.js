@@ -3,9 +3,11 @@
 // 策略：StaleWhileRevalidate（先用缓存秒开，后台静默更新）
 // v34: 再次强制刷新缓存——修复"分享加密密码框不显示"（旧 SW 用 cacheFirst 缓存旧 index.html 不更新）；
 //      提升 CACHE_VERSION 触发 activate 清空所有 tfjl- 缓存，确保拿到最新前端（含分享密码框）
+// v35: 升版本配合 app-core.js 水人首屏渲染修复（commit 5c4338c，把云端卡渲染移出 scanSkins 分支，
+//      网页端此前因无 scanSkins 整段被跳过，导致水人「直接没有」）。强制刷新后浮动控制台 SW_VERSION 应为 s1.0.226。
 // ============================================================
 
-const CACHE_VERSION = 's1.0.225';
+const CACHE_VERSION = 's1.0.226';
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
