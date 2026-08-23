@@ -286,7 +286,7 @@
                 if (!tag) return;
                 tag.style.color = '#4caf50';
                 tag.style.opacity = '1';
-                tag.title = '有新版本，点击强制刷新';
+                // 不使用原生 title，避免提示框跑出窗口；新版本提示由 tooltip 文案体现
                 if (!document.getElementById('__verNewDot')) {
                     const dot = document.createElement('span');
                     dot.id = '__verNewDot';
@@ -308,7 +308,7 @@
                             _markNewVersionAvailable();
                         } else {
                             window.__tfjlHasNewVersion = false;
-                            if (tag) { tag.style.color = ''; tag.title = '点击查看版本详情 · 双击强制刷新'; }
+                            if (tag) { tag.style.color = ''; /* 不使用原生 title，tooltip 由 CSS + JS 同步 */ }
                             const d = document.getElementById('__verNewDot'); if (d) d.remove();
                         }
                     } else {
@@ -323,8 +323,11 @@
                 const short = swVersion.indexOf('tfjl-') === 0 ? swVersion.slice('tfjl-'.length) : swVersion;
                 const base = tag.textContent.split(' · ')[0];
                 tag.textContent = base + ' · ' + short;
-                // hover 提示：版本号 + 双击刷新（用户明确要求）
-                tag.title = base + ' · ' + short + '\n双击刷新';
+                // 同步更新相邻 .version-tooltip（自定义提示框，显示在窗口内，不跑出窗口）
+                const tip = tag.nextElementSibling;
+                if (tip && tip.classList.contains('version-tooltip')) {
+                    tip.textContent = base + ' · ' + short + '（双击刷新）';
+                }
                 // 同步打印到控制台（浮动调试窗会捕获，便于强制刷新后一眼确认是否刷到最新版）
                 console.log('[VERSION] 当前缓存版本:', swVersion, '（强制刷新后应为 s1.0.230 才算最新）');
             }
