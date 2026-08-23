@@ -7,9 +7,12 @@
 //      网页端此前因无 scanSkins 整段被跳过，导致水人「直接没有」）。强制刷新后浮动控制台 SW_VERSION 应为 s1.0.226。
 // v36: 升版本配合「API监控→部署日志+定时任务」克隆自拍卖行管理员（index.html/api-core.js 新增 loadActionsLogs/loadRunLog、
 //      refreshApiMonitor 补部署日志区块、index.html 增加部署日志+触发方式面板）。强制刷新后 SW_VERSION 应为 s1.0.227。
+// v37: 修「双击右下角版本号强制刷新无效」——原绑定 onVersionTagForceRefresh 只弹 confirm + 用废弃的 location.reload(true)
+//      （现代浏览器不强制跳缓存）导致刷不到最新。改为直接调 forceRefreshLatest()（清SW缓存+skipWaiting+带时间戳replace）。
+//      强制刷新后 SW_VERSION 应为 s1.0.228。
 // ============================================================
 
-const CACHE_VERSION = 's1.0.227';
+const CACHE_VERSION = 's1.0.228';
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
