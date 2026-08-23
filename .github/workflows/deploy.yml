@@ -79,12 +79,10 @@ jobs:
           # 从 sw.js 读取当前 CACHE_VERSION（如 s1.0.230）
           SWVER=$(grep -oE "CACHE_VERSION = '[^']+'" _site/sw.js 2>/dev/null | head -1 | sed -E "s/CACHE_VERSION = '([^']+)'/\1/" || echo "s1.0.0")
           MARKER="$DATEPART-$(date +%H%M) · $SWVER"
-          # 替换 <span id="versionTag" ...>旧的静态标记</span> 内的文本
+          # 替换 <span id="versionTag" ...>旧的静态标记</span> 内的文本（页面只显示这一个调暗标记，无悬浮框）
           sed -i -E 's/(<span id="versionTag"[^>]*>)[^<]*(<\/span>)/\1'"$MARKER"'\2/' _site/index.html
-          # 同步相邻兄弟 .version-tooltip 的文本（页面内悬浮提示，避免残留旧值）
-          sed -i -E 's/(<div class="version-tooltip">)[^<]*(<\/div>)/\1'"$MARKER"'\2/' _site/index.html
           echo "Deploy marker injected: $MARKER"
-          grep -nE 'id="versionTag"|class="version-tooltip"' _site/index.html || true
+          grep -nE 'id="versionTag"' _site/index.html || true
 
       - name: Inject Token (optional)
         run: |
