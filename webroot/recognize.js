@@ -630,7 +630,7 @@
     btn.title = '粘贴/选择战斗截图，自动识别 10 张英雄卡';
     btn.setAttribute('data-tip', '阵容识别：粘贴或选择战斗截图，自动识别 10 张英雄卡（依赖本机 Umi-OCR 离线引擎）');
     Object.assign(btn.style, {
-      position:'fixed', bottom:'69px', right:'10px', zIndex:'9999',
+      position:'fixed', bottom:'72px', right:'10px', zIndex:'9999',
       background:'linear-gradient(135deg,#4caf50,#2e7d32)', color:'#fff',
       padding:'8px 12px', borderRadius:'20px', cursor:'pointer', fontSize:'0.8rem',
       boxShadow:'0 4px 12px rgba(0,0,0,0.4)', userSelect:'none'
