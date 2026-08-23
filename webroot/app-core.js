@@ -12204,9 +12204,36 @@ const GIST_URL = `https://api.github.com/gists/${GIST_ID}`;
 const BROADCASTS_GIST_URL = `https://api.github.com/gists/${MESSAGES_GIST_ID}`;
 
 // 动态获取消息Gist URL（考虑Gist可能被删除重建的情况）
+// 🔴 修「消息 Gist 误报 404」：与监控面板(约21175行)同套逻辑，优先顺序：
+//   ① localStorage.messages_gist_id  → ② 查索引Gist room_index.json.messages  → ③ 兜底死常量(已删的 b02794a8...)
+// 之前 ② 缺失，localStorage为空时直接打到已删死常量 → 404 刷屏（只读加载，不会丢数据，但留坑）。
 function getMessagesGistUrl() {
     const gistDeleted = localStorage.getItem('messages_gist_deleted') === 'true';
-    const gistId = (!gistDeleted && MESSAGES_GIST_ID) ? MESSAGES_GIST_ID : (localStorage.getItem('messages_gist_id') || MESSAGES_GIST_ID);
+    let gistId = (!gistDeleted && MESSAGES_GIST_ID) ? MESSAGES_GIST_ID : (localStorage.getItem('messages_gist_id') || MESSAGES_GIST_ID);
+    // 若退化为死常量（已删除），尝试从索引Gist找回真实 messages gist 并写回 localStorage，避免后续继续 404
+    if (gistId === MESSAGES_GIST_ID && gistId) {
+        try {
+            const idxR = fetch(`https://api.github.com/gists/${GIST_ID}`, {
+                headers: { 'Accept': 'application/vnd.github.v3+json', ...(getGistToken() && { 'Authorization': `token ${getGistToken()}` }) }
+            });
+            idxR.then(function (r) {
+                if (!r.ok) return;
+                return r.json();
+            }).then(function (idxD) {
+                if (!idxD) return;
+                const ri = idxD.files && idxD.files['room_index.json'];
+                if (ri && ri.content) {
+                    try {
+                        const idx = JSON.parse(ri.content);
+                        if (idx.messages) {
+                            localStorage.setItem('messages_gist_id', idx.messages);
+                            console.log('[GIST] 已从索引恢复真实消息Gist:', idx.messages);
+                        }
+                    } catch (e) {}
+                }
+            }).catch(function () {});
+        } catch (e) {}
+    }
     return `https://api.github.com/gists/${gistId}`;
 }
 
