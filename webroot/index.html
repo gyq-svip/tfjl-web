@@ -1668,10 +1668,6 @@
                         <span class="mi-emoji">🗂️</span>
                         <div class="mi-text"><div class="mi-title">Gist文件管理</div><div class="mi-sub">孤儿扫描清理</div></div>
                     </div>
-                    <div class="admin-menu-item" onclick="toggleConsoleVisibility()">
-                        <span class="mi-emoji">🖥️</span>
-                        <div class="mi-text"><div class="mi-title">浮动控制台</div><div id="consoleToggleStatus" class="mi-sub">已关闭</div></div>
-                    </div>
                     <div class="admin-menu-item" onclick="toggleAuctionNewsVisibility()">
                         <span class="mi-emoji">🛒</span>
                         <div class="mi-text"><div class="mi-title">拍卖快讯显示</div><div id="auctionNewsToggleStatus" class="mi-sub">全网开启</div></div>
@@ -1973,13 +1969,14 @@
                             <button onclick="adminLogZoomOut()" title="缩小字体" style="background:rgba(255,255,255,0.12);color:#fff;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:0.75rem;margin-right:4px;">A−</button>
                             <button id="adminLogZoomResetBtn" onclick="adminLogZoomReset()" title="重置缩放" style="background:rgba(255,255,255,0.12);color:#fff;border:none;padding:5px 8px;border-radius:6px;cursor:pointer;font-size:0.7rem;margin-right:4px;">100%</button>
                             <button onclick="adminLogZoomIn()" title="放大字体" style="background:rgba(255,255,255,0.12);color:#fff;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:0.75rem;margin-right:6px;">A+</button>
+                            <button id="adminFloatConsoleToggleBtn" onclick="toggleConsoleVisibility()" style="background:rgba(255,255,255,0.12);color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.8rem;margin-right:6px;">🖥 浮窗：关</button>
                             <button onclick="adminRefreshConsoleLog()" style="background:linear-gradient(135deg,#00bcd4,#0097a7);color:white;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.8rem;margin-right:6px;">🔄 刷新</button>
                             <button onclick="runHeartbeatSelfCheck()" title="重新注册 Rust 心跳并打印诊断结果（排查 P3 掉线）" style="background:linear-gradient(135deg,#ec4899,#be185d);color:white;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.8rem;margin-right:6px;">❤️ 心跳自检</button>
                             <button onclick="window.__consoleLogs=[];adminRefreshConsoleLog();" style="background:linear-gradient(135deg,#ef4444,#dc2626);color:white;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.8rem;">🗑 清空</button>
                         </div>
                     </div>
                     <div style="color:rgba(255,255,255,0.5);font-size:0.7rem;margin-top:4px;">
-                        捕获所有 console.log/warn/error/info 输出（最多500条）。Tauri APP 无法 F12 调试时可用此面板排查。
+                        全量捕获 console.log/warn/error/info，以及 window.onerror 未捕获异常、unhandledrejection（与 F12 Console 一致，最多500条）。「🖥 浮窗」开关即原管理员菜单里的浮动控制台，开启后右下角常驻悬浮窗。
                     </div>
                 </div>
                 <div id="consoleLogPanel" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:10px;min-height:150px;max-height:400px;overflow-y:auto;font-family:monospace;font-size:0.7rem;margin-bottom:20px;">
