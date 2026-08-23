@@ -70,6 +70,16 @@ jobs:
           echo "--- script tags after bump ---"
           grep -nE '<script[^>]*src="[^"]*\.js' _site/index.html || true
 
+      - name: Inject deploy marker (visible version tag)
+        run: |
+          # 每次部署自动把页面右下角 #versionTag 更新为本次部署时间戳，
+          # 让用户一眼确认「看到的是不是最新部署版」（铁律要求：每次推送部署都要有新标记）。
+          MARKER="b$(date +%Y%m%d%H%M%S)"
+          # 替换 <span id="versionTag" ...>旧的静态标记</span> 内的文本
+          sed -i -E 's/(<span id="versionTag"[^>]*>)[^<]*(<\/span>)/\1'"$MARKER"'\2/' _site/index.html
+          echo "Deploy marker injected: $MARKER"
+          grep -nE 'id="versionTag"' _site/index.html || true
+
       - name: Inject Token (optional)
         run: |
           TOKEN="${{ secrets.GIST_TOKEN }}"
