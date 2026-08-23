@@ -16559,12 +16559,41 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
         // ==================== 需求墙 Gist 文件管理（孤儿扫描+清理，移植自拍卖精细管理）====================
         let _wallGistList = [];
         let _wallScriptUrls = new Set();
+        let _wallAuctionsMap = new Map();
+        // 构建 auctionId→拍卖 映射（和拍卖行 buildAuctionsMap 同源：总表 room_index.json → 各房间 chatrooms_*.json）
+        async function wallBuildAuctionsMap(token) {
+            _wallAuctionsMap = new Map();
+            try {
+                const idxResp = await fetch(`https://api.github.com/gists/${GIST_ID}`, { headers: { 'Accept': 'application/vnd.github.v3+json', ...(token && { 'Authorization': `token ${token}` }) } });
+                if (!idxResp.ok) return;
+                const idxData = await idxResp.json();
+                if (!idxData.files || !idxData.files['room_index.json']) return;
+                const index = JSON.parse(idxData.files['room_index.json'].content);
+                const roomIds = Object.keys(index).filter(k => typeof index[k] === 'string' && index[k].length > 10 && k !== 'messagesGistId' && k !== 'messages');
+                for (const roomId of roomIds) {
+                    const roomGistId = index[roomId];
+                    try {
+                        const rResp = await fetch(`https://api.github.com/gists/${roomGistId}`, { headers: { 'Accept': 'application/vnd.github.v3+json', ...(token && { 'Authorization': `token ${token}` }) } });
+                        if (!rResp.ok) continue;
+                        const rData = await rResp.json();
+                        const content = rData.files[`chatrooms_${roomId}.json`]?.content;
+                        if (!content) continue;
+                        const parsed = JSON.parse(content);
+                        let auctions = [];
+                        if (parsed.rooms && parsed.rooms[roomId]) auctions = parsed.rooms[roomId].auctions || [];
+                        else if (parsed.auctions) auctions = parsed.auctions || [];
+                        for (const a of auctions) _wallAuctionsMap.set(String(a.id), { ...a, _roomId: roomId });
+                    } catch (e) { console.warn('读取房间拍卖失败:', roomId, e); }
+                }
+            } catch (e) { console.warn('构建拍卖映射失败:', e); }
+        }
         async function wallLoadGistManager() {
             const c = document.getElementById('wallGistListContainer'); const cnt = document.getElementById('wallGistCount');
             const token = getGistToken();
             if (!token) { if (c) c.innerHTML = '<div style="color:#ff6b6b;text-align:center;padding:20px;">请先设置Token</div>'; return; }
             if (c) c.innerHTML = '<div style="color:#4ade80;text-align:center;padding:20px;">⏳ 扫描所有Gist...</div>';
             try {
+                await wallBuildAuctionsMap(token);
                 _wallGistList = []; let page = 1;
                 while (page <= 5) {
                     const resp = await fetch(`https://api.github.com/gists?per_page=100&page=${page}`, { headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` } });
@@ -16605,7 +16634,17 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 info.type = 'message'; info.typeLabel = '📢 消息'; info.typeColor = '#2196f3';
                 if (currentMsgId && gist.id === currentMsgId) { info.status = 'current'; info.statusLabel = '🟢 当前使用'; info.statusColor = '#4caf50'; } else { info.status = 'orphan'; info.statusLabel = '🔴 孤儿'; info.statusColor = '#ff6b6b'; }
             } else if (desc.includes('拍卖图片')) {
-                info.type = 'image'; info.typeLabel = '🖼️ 图片'; info.typeColor = '#9c27b0'; info.status = 'unknown'; info.statusLabel = '⚪ 图片'; info.statusColor = '#999';
+                info.type = 'image'; info.typeLabel = '🖼️ 图片'; info.typeColor = '#9c27b0';
+                const dm = desc.match(/拍卖图片:\s*(\S+)\s*\(房间:\s*(\S+)\)/);
+                if (dm) { info.auctionId = dm[1]; info.roomId = dm[2]; }
+                const auction = info.auctionId && _wallAuctionsMap.get(String(info.auctionId));
+                if (!auction) { info.status = 'orphan'; info.statusLabel = '🔴 孤儿'; info.statusColor = '#ff6b6b'; }
+                else {
+                    const now = Date.now();
+                    const ended = auction.status === 'ended' || (auction.endTime && now >= auction.endTime);
+                    if (ended) { info.status = 'ended'; info.statusLabel = '🟡 已结束'; info.statusColor = '#ffb300'; }
+                    else { info.status = 'active'; info.statusLabel = '🟢 在售'; info.statusColor = '#4caf50'; }
+                }
             }
             return info;
         }
@@ -16616,10 +16655,10 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             let filtered = _wallGistList;
             if (typeF && typeF.value !== 'all') filtered = filtered.filter(g => g._info.type === typeF.value);
             if (statusF && statusF.value !== 'all') filtered = filtered.filter(g => g._info.status === statusF.value);
-            const stats = { script: _wallGistList.filter(g => g._info.type === 'script').length, message: _wallGistList.filter(g => g._info.type === 'message').length, orphan: _wallGistList.filter(g => g._info.status === 'orphan').length, active: _wallGistList.filter(g => g._info.status === 'active' || g._info.status === 'current').length };
-            if (cnt) cnt.textContent = `(脚本${stats.script} 消息${stats.message} | 孤儿${stats.orphan} 在用${stats.active} | 显示${filtered.length})`;
+            const stats = { script: _wallGistList.filter(g => g._info.type === 'script').length, message: _wallGistList.filter(g => g._info.type === 'message').length, image: _wallGistList.filter(g => g._info.type === 'image').length, orphan: _wallGistList.filter(g => g._info.status === 'orphan').length, active: _wallGistList.filter(g => g._info.status === 'active' || g._info.status === 'current').length, ended: _wallGistList.filter(g => g._info.status === 'ended').length };
+            if (cnt) cnt.textContent = `(脚本${stats.script} 消息${stats.message} 图片${stats.image} | 孤儿${stats.orphan} 在用${stats.active} 已结束${stats.ended} | 显示${filtered.length})`;
             if (!filtered.length) { c.innerHTML = '<div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;">无符合条件的Gist</div>'; return; }
-            const order = { orphan: 0, unknown: 1, active: 2, current: 3 };
+            const order = { orphan: 0, unknown: 1, active: 2, current: 3, ended: 4 };
             filtered.sort((a, b) => order[a._info.status] - order[b._info.status]);
             let html = '';
             for (const g of filtered) {
