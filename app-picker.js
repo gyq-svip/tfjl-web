@@ -323,8 +323,10 @@
                 const short = swVersion.indexOf('tfjl-') === 0 ? swVersion.slice('tfjl-'.length) : swVersion;
                 const base = tag.textContent.split(' · ')[0];
                 tag.textContent = base + ' · ' + short;
+                // 同步更新 title 悬浮提示（避免悬停还显示 HTML 写死的旧版本号，误让人以为没刷到最新版）
+                tag.title = '当前缓存版本: ' + swVersion + '\n双击：强制刷新获取最新版（清缓存+跳过SW等待）';
                 // 同步打印到控制台（浮动调试窗会捕获，便于强制刷新后一眼确认是否刷到最新版）
-                console.log('[VERSION] 当前缓存版本:', swVersion, '（强制刷新后应为 s1.0.226 才算最新）');
+                console.log('[VERSION] 当前缓存版本:', swVersion, '（强制刷新后应为 s1.0.230 才算最新）');
             }
             window.addEventListener('load', function() {
                 navigator.serviceWorker.register('./sw.js', { scope: './', updateViaCache: 'none' }).then(function(registration) {
