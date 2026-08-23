@@ -2477,11 +2477,8 @@
                 <span style="color:#4ecdc4;">📥</span>
                 <span style="color:#4fc3f7;">下载桌面版</span>
             </div>
-            <!-- 前端标记号：statsBar 内绝对定位贴右、垂直居中，悬浮显示提示框，双击刷新 -->
-            <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.55);font-size:0.66rem;padding:1px 6px;" ondblclick="if(typeof forceRefreshLatest==='function'){forceRefreshLatest();}">s20260823-82 · s1.0.230</span>
-                <div class="version-tooltip">s20260823-82 · s1.0.230（双击刷新）</div>
-            </div>
+            <!-- 前端标记号：statsBar 内绝对定位贴右、垂直居中，只显示文字，双击刷新，不弹悬浮框 -->
+            <span id="versionTag" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;user-select:none;color:rgba(255,255,255,0.55);font-size:0.66rem;padding:1px 6px;" ondblclick="if(typeof forceRefreshLatest==='function'){forceRefreshLatest();}">s20260823-82 · s1.0.230</span>
         </div>
     </div>
 
