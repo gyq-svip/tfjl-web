@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>tfjl-web Gist 健康检查</title>
+<style>
+  body { font-family: -apple-system, "Microsoft YaHei", sans-serif; background: #0f1419; color: #e6e6e6; margin: 0; padding: 24px; }
+  h1 { font-size: 20px; }
+  .hint { color: #8b98a5; font-size: 13px; margin-bottom: 16px; }
+  button { background: #1f6feb; color: #fff; border: 0; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; }
+  button:disabled { opacity: .5; cursor: default; }
+  table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #2a3138; vertical-align: top; }
+  th { color: #8b98a5; font-weight: 600; }
+  .ok { color: #3fb950; }
+  .fail { color: #f85149; }
+  .warn { color: #d29922; }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; }
+  .pill.ok { background: #122c1a; }
+  .pill.fail { background: #2d1416; }
+  .pill.warn { background: #2d2410; }
+  pre { background: #161b22; padding: 8px; border-radius: 6px; overflow-x: auto; font-size: 12px; margin: 4px 0 0; }
+  #summary { margin-top: 14px; font-size: 14px; }
+</style>
+</head>
+<body>
+<h1>tfjl-web · Gist 基础设施健康检查</h1>
+<div class="hint">只读工具：逐个实测功能用到的共享 Gist 是否存在 / token 是否可访问 / 关键文件是否齐全。不会修改任何 Gist。</div>
+<button id="run">开始检查</button>
+<div id="summary"></div>
+<table id="result" style="display:none">
+  <thead><tr><th>功能</th><th>Gist ID</th><th>状态</th><th>详情</th></tr></thead>
+  <tbody></tbody>
+</table>
+
+<script>
+// 🔴 与 app-core.js 同款 token 解析（部署注入 / localStorage / iframe 父窗口兜底）
+function getGistToken() {
+    const HARDCODED_TOKEN = 'YOUR_GITHUB_TOKEN_HERE';
+    if (HARDCODED_TOKEN && HARDCODED_TOKEN.length > 20 && HARDCODED_TOKEN.startsWith('ghp_')) return HARDCODED_TOKEN;
+    try { const ls = localStorage.getItem('TFJL_Gist_Token'); if (ls) return ls; } catch (e) {}
+    try {
+        if (window.parent && window.parent !== window && typeof window.parent.getGistToken === 'function') {
+            const pt = window.parent.getGistToken();
+            if (pt && pt.length > 10 && !pt.startsWith('YOUR_')) return pt;
+        }
+    } catch (e) {}
+    return '';
+}
+
+// 共享 Gist 常量（与 app-core.js 保持一致）
+const GIST_ID = 'a32a0628bd9275f3a4922cd12cf298c9';          // 索引 Gist
+const COUNTER_GIST_ID = 'e1bd9a5139e1c4e011bfea707e917d61';  // 在线状态/心跳
+const MESSAGES_GIST_ID = 'b02794a8d5c43874b76286185f7b1f7f'; // 消息墙（死常量，可能已删）
+
+async function fetchGist(gid, token) {
+    const url = 'https://api.github.com/gists/' + gid;
+    const headers = { 'Accept': 'application/vnd.github.v3+json' };
+    if (token) headers['Authorization'] = 'token ' + token;
+    try {
+        const r = await fetch(url, { headers });
+        if (!r.ok) {
+            let msg = r.status;
+            try { const j = await r.json(); msg = r.status + ' ' + (j.message || ''); } catch (e) {}
+            return { ok: false, code: r.status, msg };
+        }
+        const d = await r.json();
+        return { ok: true, data: d };
+    } catch (e) {
+        return { ok: false, code: 0, msg: String(e) };
+    }
+}
+
+function row(tbody, name, gid, status, detailHtml) {
+    const tr = document.createElement('tr');
+    const cls = status === 'ok' ? 'ok' : (status === 'fail' ? 'fail' : 'warn');
+    const pill = status === 'ok' ? 'ok' : (status === 'fail' ? 'fail' : 'warn');
+    const label = status === 'ok' ? '存在' : (status === 'fail' ? '异常' : '警告');
+    tr.innerHTML = `<td>${name}</td><td><code>${gid}</code></td>` +
+        `<td><span class="pill ${pill}">${label}</span></td><td>${detailHtml}</td>`;
+    tbody.appendChild(tr);
+}
+
+async function run() {
+    const btn = document.getElementById('run');
+    const tbody = document.querySelector('#result tbody');
+    const summary = document.getElementById('summary');
+    btn.disabled = true;
+    tbody.innerHTML = '';
+    document.getElementById('result').style.display = 'table';
+    summary.textContent = '检查中...';
+
+    const token = getGistToken();
+    let fails = 0, warns = 0;
+    const tokenInfo = token ? ('有，' + token.length + ' 字符，前缀 ' + token.slice(0, 6)) : '无（匿名，限速 60/min，可能 403）';
+    row(tbody, 'Token 状态', '-', token ? 'ok' : 'warn', `部署 token：${tokenInfo}`);
+
+    // ① 索引 Gist
+    let idxData = null;
+    let res = await fetchGist(GIST_ID, token);
+    if (!res.ok) {
+        fails++;
+        let d = `HTTP ${res.code}：${res.msg}`;
+        if (res.code === 404) d += '<br><b>索引 Gist 已删除！</b> 消息墙/公告/计数器全部失效，需紧急重建。';
+        else if (res.code === 403) d += '<br>可能限速或无权限，带 token 重试。';
+        row(tbody, '① 索引 Gist（room_index.json）', GIST_ID, 'fail', d);
+        summary.innerHTML = '<span class="fail">索引 Gist 异常，功能大面积失效！</span>';
+        btn.disabled = false;
+        return;
+    }
+    const files = Object.keys(res.data.files || {});
+    const hasIdx = files.includes('room_index.json');
+    if (!hasIdx) { fails++; row(tbody, '① 索引 Gist', GIST_ID, 'fail', `文件缺失 room_index.json（实际：${files.join(', ')}）`); }
+    else { row(tbody, '① 索引 Gist', GIST_ID, 'ok', `含 room_index.json ✅ 文件数=${files.length}`); }
+    idxData = res.data;
+
+    // 解析 room_index.json
+    let roomIndex = {};
+    try { roomIndex = JSON.parse(idxData.files['room_index.json'].content); } catch (e) {}
+    const mg = roomIndex.messages, ng = roomIndex.news, cg = roomIndex.counter || COUNTER_GIST_ID;
+    const idxPreview = `<pre>${JSON.stringify(roomIndex, null, 2)}</pre>`;
+    row(tbody, '　└ 索引内容', '-', 'ok', idxPreview);
+
+    // ② Messages Gist（优先用索引指向的真实 id）
+    if (mg) {
+        res = await fetchGist(mg, token);
+        if (!res.ok) { fails++; row(tbody, '② Messages Gist（索引指向）', mg, 'fail', `HTTP ${res.code}：${res.msg}`); }
+        else {
+            const mf = Object.keys(res.data.files || {});
+            const okf = mf.includes('messages.json');
+            row(tbody, '② Messages Gist（索引指向）', mg, okf ? 'ok' : 'warn',
+                `文件：${mf.join(', ')} ${okf ? '✅' : '<br>⚠ 缺 messages.json'}`);
+            if (!okf) warns++;
+        }
+    } else {
+        warns++;
+        row(tbody, '② Messages Gist', MESSAGES_GIST_ID, 'warn', '索引未指向 messages，回退检查死常量（可能已删）');
+        res = await fetchGist(MESSAGES_GIST_ID, token);
+        if (!res.ok) { fails++; row(tbody, '　└ 死常量 MESSAGES_GIST_ID', MESSAGES_GIST_ID, 'fail', `HTTP ${res.code}：${res.msg}（已删，需从索引重建）`); }
+    }
+
+    // ③ News Gist（公告）
+    if (ng) {
+        res = await fetchGist(ng, token);
+        if (!res.ok) { fails++; row(tbody, '③ News Gist（公告）', ng, 'fail', `HTTP ${res.code}：${res.msg}`); }
+        else { row(tbody, '③ News Gist（公告）', ng, 'ok', `存在 ✅ 文件数=${Object.keys(res.data.files||{}).length}`); }
+    } else {
+        warns++;
+        row(tbody, '③ News Gist（公告）', '-', 'warn', '索引未指向 news gist → 公告无数据源');
+    }
+
+    // ④ Counter Gist（在线状态/心跳）
+    res = await fetchGist(cg, token);
+    if (!res.ok) { fails++; row(tbody, '④ Counter Gist（在线状态/心跳）', cg, 'fail', `HTTP ${res.code}：${res.msg}`); }
+    else {
+        const cf = Object.keys(res.data.files || {});
+        const okf = cf.includes('room_index.json');
+        row(tbody, '④ Counter Gist（在线状态/心跳）', cg, okf ? 'ok' : 'warn',
+            `文件：${cf.join(', ')} ${okf ? '✅' : '<br>⚠ 缺 room_index.json'}`);
+        if (!okf) warns++;
+    }
+
+    if (fails === 0 && warns === 0) summary.innerHTML = '<span class="ok">全部正常 ✅ 所有功能 Gist 可用</span>';
+    else if (fails === 0) summary.innerHTML = `<span class="warn">有 ${warns} 个警告，但无致命错误</span>`;
+    else summary.innerHTML = `<span class="fail">有 ${fails} 个致命异常，需修复！</span>`;
+    btn.disabled = false;
+}
+document.getElementById('run').addEventListener('click', run);
+</script>
+</body>
+</html>
