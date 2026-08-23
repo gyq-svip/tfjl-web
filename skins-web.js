@@ -229,7 +229,10 @@
         if (localNames[skinName]) {
           var local = null;
           for (var m = 0; m < localSkins.length; m++) { if (localSkins[m].name === skinName) { local = localSkins[m]; break; } }
-          if (local && !local.url && !local.path) local.url = url;
+          // 远端 registry 是事实来源：始终用远端 URL 覆盖本地（含 IndexedDB 旧缓存里 url 错/缺失的情况）。
+          // 修复：水人等「英雄名==皮肤名」的默认皮肤，旧缓存若带错误/缺失 url，会导致 entry.url 为 undefined
+          // → resolveHeroSkinInfo 返回 null → 渲染层 fallback 成品质色填充（看不到皮肤图）。
+          if (local) { local.url = url; local.path = null; local.remote = true; }
         } else {
           localSkins.push({ name: skinName, url: url, path: null, loaded: true, remote: true });
           addedCount++;
