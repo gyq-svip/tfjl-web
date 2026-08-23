@@ -5096,7 +5096,7 @@
                         // 🔴 白名单恢复 localStorage（项目相关前缀），跳过登录态/token/admin哈希/设备ID等敏感键
                         // 历史教训：原版根本漏备份 localStorage，恢复后所有配置全空
                         if (importData.localStorage && typeof importData.localStorage === 'object') {
-                            const SENSITIVE_KEYS = /^(TFJL_LoggedIn|TFJL_Admin_SavedPwd|TFJL_Pending_Sync|TFJL_Device_ID|HARDCODED_TOKEN|messages_gist_deleted|messages_backup_gist_id|tfjl_admin$)/;
+                            const SENSITIVE_KEYS = /^(TFJL_LoggedIn|TFJL_Admin_SavedPwd|TFJL_Pending_Sync|TFJL_Device_ID|messages_gist_deleted|messages_backup_gist_id|tfjl_admin$)/;
                             let lsRestored = 0;
                             Object.keys(importData.localStorage).forEach(k => {
                                 if (!/^(tdjl_|tfjl_|TFJL_)/.test(k)) return;
@@ -12129,7 +12129,7 @@ async function getIndexGistUrl() {
         return `https://api.github.com/gists/${indexGistId}`;
     }
     
-    // 使用硬编码的 GIST_ID（必须所有设备使用同一个！）
+    // 使用固定的 GIST_ID 索引（所有设备共享同一份）
     if (GIST_ID && GIST_ID !== 'YOUR_GIST_ID_HERE') {
         const testUrl = `https://api.github.com/gists/${GIST_ID}`;
         const response = await fetch(testUrl, {
@@ -12200,22 +12200,14 @@ function getMessagesGistUrl() {
 // Gist Token 管理 - 优先从环境变量读取（GitHub Actions），其次从localStorage读取
 const GIST_TOKEN_KEY = 'TFJL_Gist_Token';
 function getGistToken() {
-    // 优先使用硬编码Token（GitHub Actions部署时会替换为实际的Token）
-    const HARDCODED_TOKEN = 'YOUR_GITHUB_TOKEN_HERE';
-
-    // 如果Token不是占位符，就使用它
-    if (HARDCODED_TOKEN && HARDCODED_TOKEN.length > 20 && HARDCODED_TOKEN.startsWith('ghp_')) {
-        return HARDCODED_TOKEN;
-    }
-
-    // 其次从localStorage读取（本地开发/用户手动填写时使用，iframe 同域共享）
+    // 从 localStorage 读取（用户手动填写/环境变量注入），其次复用父窗口注入
     try { const ls = localStorage.getItem(GIST_TOKEN_KEY); if (ls) return ls; } catch (e) {}
 
     // iframe 内嵌时，复用父窗口（首页）已注入的真实 token（兜底，避免子页 token 为空）
     try {
         if (window.parent && window.parent !== window && typeof window.parent.getGistToken === 'function') {
             const pt = window.parent.getGistToken();
-            if (pt && pt !== 'YOUR_GITHUB_TOKEN_HERE' && pt.length > 10) return pt;
+            if (pt && pt.length > 10 && !pt.startsWith('YOUR_')) return pt;
         }
     } catch (e) {}
 
@@ -13121,8 +13113,8 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
         }
         
         function checkIfOnlineVersion() {
-            const HARDCODED_TOKEN = 'YOUR_GITHUB_TOKEN_HERE';
-            return HARDCODED_TOKEN && HARDCODED_TOKEN.length > 20 && HARDCODED_TOKEN.startsWith('ghp_');
+            // 在线版本检测已改为基于 SW 缓存版本号（见 askSwVersion/controllerchange），无需硬编码 token 判断
+            return false;
         }
         
         async function checkOnlineVersionAvailability() {

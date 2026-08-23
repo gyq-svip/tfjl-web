@@ -1193,10 +1193,6 @@
         // Token管理
         const GIST_TOKEN_KEY = 'TFJL_Gist_Token';
         function getGistToken() {
-            const HARDCODED_TOKEN = 'YOUR_GITHUB_TOKEN_HERE';
-            if (HARDCODED_TOKEN && HARDCODED_TOKEN.length > 20 && HARDCODED_TOKEN.startsWith('ghp_')) {
-                return HARDCODED_TOKEN;
-            }
             return localStorage.getItem(GIST_TOKEN_KEY) || '';
         }
         function setGistToken(token) {

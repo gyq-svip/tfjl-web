@@ -43,15 +43,11 @@ window.TFJL_DEEPSEA_PLAYER_GIST_ID = '';
 // 这里提供一份一致的实现。优先用已存在的全局函数。
 if (typeof window.getGistToken !== 'function') {
     window.getGistToken = function () {
-        const HARDCODED_TOKEN = 'YOUR_GITHUB_TOKEN_HERE';
-        if (HARDCODED_TOKEN && HARDCODED_TOKEN.length > 20 && HARDCODED_TOKEN.startsWith('ghp_')) {
-            return HARDCODED_TOKEN;
-        }
-        // 子页经 iframe 内嵌时，复用父窗口（index.html）运行时注入的真实 token（避免占位符空 token）
+        // 子页经 iframe 内嵌时，复用父窗口（index.html）运行时注入的真实 token
         try {
             if (window.parent && window.parent !== window && typeof window.parent.getGistToken === 'function') {
                 const pt = window.parent.getGistToken();
-                if (pt && pt !== 'YOUR_GITHUB_TOKEN_HERE' && pt.length > 10) return pt;
+                if (pt && pt.length > 10 && !pt.startsWith('YOUR_')) return pt;
             }
         } catch (e) {}
         try { const ls = localStorage.getItem('TFJL_Gist_Token'); if (ls) return ls; } catch (e) {}
