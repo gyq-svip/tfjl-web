@@ -476,7 +476,9 @@ if (isTauriApp) {
         try {
             return await tauriInvoke('get_app_version', {});
         } catch (e) {
-            console.error('获取版本失败:', e);
+            // 降级为 warn（之前 console.error 在 ACL 拦截时会让 Tauri runtime 同时弹系统级错误对话框污染体验）。
+            // 若 capability 缺授权，错误信息会带 "not allowed by ACL"，便于定位是哪个命令未授权。
+            console.warn('[APP] 获取版本失败 get_app_version:', (e && e.message) || e);
             return null;
         }
     }
