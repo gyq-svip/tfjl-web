@@ -13172,8 +13172,9 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
         }
         
         function checkIfOnlineVersion() {
-            // 在线版本检测已改为基于 SW 缓存版本号（见 askSwVersion/controllerchange），无需硬编码 token 判断
-            return false;
+            // 在线版本判断：部署时 HARDCODED_TOKEN 占位符会被替换为真实 token（ghp_ 前缀），有则视为在线版
+            const HARDCODED_TOKEN = 'YOUR_GITHUB_TOKEN_HERE';
+            return HARDCODED_TOKEN && HARDCODED_TOKEN.length > 20 && HARDCODED_TOKEN.startsWith('ghp_');
         }
         
         async function checkOnlineVersionAvailability() {
