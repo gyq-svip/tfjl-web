@@ -21214,57 +21214,84 @@ ${maSection}
                 // 🔴 修「消息 Gist 误报 404」：监控面板原本只看 localStorage.messages_gist_id，
                 // 死常量 b02794a8... 早已被删 → localStorage 为空时 fallback 到死常量 → 误报 404。
                 // 现在改为：优先 localStorage → 查总表 room_index.json.messages（和 fetchMessages 同套逻辑） → 最后兜底死常量。
+                // 同时扩展为 4 项检查：索引 Gist / 消息 Gist / News Gist(公告) / 计数器 Gist(在线状态)。
+                // 严重级别：索引·消息 = 致命(红，丢了全玩完)；News·计数器 = 警告(黄，非核心数据)。
                 let msgId = localStorage.getItem('messages_gist_id') || '';
-                if (!msgId) {
+                let newsId = localStorage.getItem('news_gist_id') || '';
+                let roomIndex = null;
+                if (!msgId || !newsId) {
                     try {
                         const idxR = await fetch(`https://api.github.com/gists/${GIST_ID}`, { headers: { 'Accept': 'application/vnd.github.v3+json', ...(token && { 'Authorization': `token ${token}` }) } });
                         if (idxR.ok) {
                             const idxD = await idxR.json();
                             const ri = idxD.files && idxD.files['room_index.json'];
                             if (ri && ri.content) {
-                                const idx = JSON.parse(ri.content);
-                                if (idx.messages) { msgId = idx.messages; localStorage.setItem('messages_gist_id', msgId); }
+                                roomIndex = JSON.parse(ri.content);
+                                if (roomIndex.messages) { msgId = roomIndex.messages; localStorage.setItem('messages_gist_id', msgId); }
+                                if (roomIndex.news) { newsId = roomIndex.news; localStorage.setItem('news_gist_id', newsId); }
                             }
                         }
                     } catch (e) {}
                 }
                 if (!msgId) msgId = MESSAGES_GIST_ID;
+                // critical=致命(红)，warn=警告(黄)。索引与消息是核心数据通道，缺了全玩完；News/计数器是非核心。
                 const gistChecks = [
-                    { name: '索引 Gist', id: GIST_ID },
-                    { name: '消息 Gist', id: msgId },
-                    { name: '计数器 Gist', id: COUNTER_GIST_ID }
+                    { name: '索引 Gist', id: GIST_ID, level: 'critical', need: 'room_index.json' },
+                    { name: '消息 Gist', id: msgId, level: 'critical', need: 'messages.json' },
+                    { name: 'News Gist(公告)', id: newsId, level: 'warn', need: null },
+                    { name: '计数器 Gist(在线状态)', id: COUNTER_GIST_ID, level: 'warn', need: 'counter.json' }
                 ];
                 let gistHtml = '';
                 for (const gc of gistChecks) {
                     if (!gc.id) {
-                        gistHtml += `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:0.78rem;"><span style="color:rgba(255,255,255,0.6);">${gc.name}</span><span style="color:#fbbf24;">⚠️ 未配置</span></div>`;
+                        // News 未配置属于警告级（公告无数据源，不影响核心）
+                        const c = gc.level === 'critical' ? '#ef4444' : '#fbbf24';
+                        const txt = gc.level === 'critical' ? '❌ 未配置' : '⚠️ 未配置(无数据源)';
+                        gistHtml += `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:0.78rem;"><span style="color:rgba(255,255,255,0.6);">${gc.name}</span><span style="color:${c};">${txt}</span></div>`;
                         continue;
                     }
                     try {
                         const r = await fetch(`https://api.github.com/gists/${gc.id}`, {
                             headers: { 'Accept': 'application/vnd.github.v3+json', ...(token && { 'Authorization': `token ${token}` }) }
                         });
-                        const icon = r.ok ? '✅' : (r.status === 404 ? '❌ 404' : r.status === 403 ? '🔒 403' : `⚠️ ${r.status}`);
-                        const color = r.ok ? '#4ade80' : '#ef4444';
-                        gistHtml += `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:0.78rem;" title="${gc.id}"><span style="color:rgba(255,255,255,0.6);">${gc.name}</span><span style="color:${color};">${icon} ${gc.id.substring(0, 8)}...</span></div>`;
-                        // 计数器 Gist 额外做写回测试：读→刷新 last_updated→写回（last_updated 本就是时间戳，零数据风险），验证统计写入通道
-                        if (gc.name === '计数器 Gist' && r.ok && token) {
-                            try {
-                                const gj = await r.json();
-                                const obj = JSON.parse(gj.files['counter.json'].content);
-                                obj.last_updated = getCurrentTimeString();
-                                const pr = await fetch(`https://api.github.com/gists/${gc.id}`, {
-                                    method: 'PATCH',
-                                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` },
-                                    body: JSON.stringify({ files: { 'counter.json': { content: JSON.stringify(obj, null, 2) } } })
-                                });
-                                gistHtml += `<div style="display:flex;justify-content:space-between;padding:4px 0 8px;font-size:0.78rem;"><span style="color:rgba(255,255,255,0.6);">↳ 计数器写回测试</span><span style="color:${pr.ok ? '#4ade80' : '#ef4444'};">${pr.ok ? '✅ 写回成功（写入通道正常）' : '❌ 写回失败(' + pr.status + ')'}</span></div>`;
-                            } catch (e) {
-                                gistHtml += `<div style="padding:4px 0 8px;font-size:0.78rem;color:#ef4444;">↳ 写回异常: ${e.message}</div>`;
+                        if (r.ok) {
+                            const gj = await r.json();
+                            const files = Object.keys(gj.files || {});
+                            // 文件齐全性检查
+                            let fileNote = '', fileBad = false;
+                            if (gc.need && !files.includes(gc.need)) {
+                                fileBad = true;
+                                fileNote = ` ⚠️ 缺 ${gc.need}`;
                             }
+                            // 致命级缺文件 = 红；警告级缺文件 = 黄
+                            const okColor = (gc.level === 'critical' && fileBad) ? '#ef4444' : (fileBad ? '#fbbf24' : '#4ade80');
+                            const okIcon = (gc.level === 'critical' && fileBad) ? '❌' : (fileBad ? '⚠️' : '✅');
+                            gistHtml += `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:0.78rem;" title="${gc.id}"><span style="color:rgba(255,255,255,0.6);">${gc.name}</span><span style="color:${okColor};">${okIcon} ${gc.id.substring(0, 8)}...${fileNote}</span></div>`;
+                            // 计数器 Gist 额外做写回测试：读→刷新 last_updated→写回（零数据风险），验证统计写入通道
+                            if (gc.name.indexOf('计数器') === 0 && token) {
+                                try {
+                                    const obj = JSON.parse(gj.files['counter.json'].content);
+                                    obj.last_updated = getCurrentTimeString();
+                                    const pr = await fetch(`https://api.github.com/gists/${gc.id}`, {
+                                        method: 'PATCH',
+                                        headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` },
+                                        body: JSON.stringify({ files: { 'counter.json': { content: JSON.stringify(obj, null, 2) } } })
+                                    });
+                                    // 写回失败属警告级（在线状态非核心数据）
+                                    gistHtml += `<div style="display:flex;justify-content:space-between;padding:4px 0 8px;font-size:0.78rem;"><span style="color:rgba(255,255,255,0.6);">↳ 计数器写回测试</span><span style="color:${pr.ok ? '#4ade80' : '#fbbf24'};">${pr.ok ? '✅ 写回成功（写入通道正常）' : '⚠️ 写回失败(' + pr.status + ')，在线状态暂不更新'}</span></div>`;
+                                } catch (e) {
+                                    gistHtml += `<div style="padding:4px 0 8px;font-size:0.78rem;color:#fbbf24;">↳ 写回异常(警告): ${e.message}</div>`;
+                                }
+                            }
+                        } else {
+                            // 404/403/其它 → 致命级红，警告级黄
+                            const icon = r.status === 404 ? '❌ 404(已删?)' : r.status === 403 ? '🔒 403' : `⚠️ ${r.status}`;
+                            const color = gc.level === 'critical' ? '#ef4444' : '#fbbf24';
+                            gistHtml += `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:0.78rem;" title="${gc.id}"><span style="color:rgba(255,255,255,0.6);">${gc.name}</span><span style="color:${color};">${icon} ${gc.id.substring(0, 8)}...</span></div>`;
                         }
                     } catch (e) {
-                        gistHtml += `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:0.78rem;"><span style="color:rgba(255,255,255,0.6);">${gc.name}</span><span style="color:#ef4444;">❌ 请求失败</span></div>`;
+                        const color = gc.level === 'critical' ? '#ef4444' : '#fbbf24';
+                        gistHtml += `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:0.78rem;"><span style="color:rgba(255,255,255,0.6);">${gc.name}</span><span style="color:${color};">❌ 请求失败</span></div>`;
                     }
                 }
 
