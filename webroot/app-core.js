@@ -12241,6 +12241,7 @@ function getMessagesGistUrl() {
 // 其次 localStorage（用户手动填写/本地开发）；最后复用父窗口注入（iframe 内嵌）。
 // 安全说明：git 仓库内只有占位符 'YOUR_GITHUB_TOKEN_HERE'，真实 Token 由 deploy.yml 注入到 _site/，不进版本库。
 const GIST_TOKEN_KEY = 'TFJL_Gist_Token';
+var _tokenDiagShown = false;
 function getGistToken() {
     // 优先使用部署注入的硬编码 Token（deploy.yml 的 Inject Token 步骤会把下方占位符替换为 secrets.GIST_TOKEN）
     const HARDCODED_TOKEN = 'YOUR_GITHUB_TOKEN_HERE';
@@ -12258,6 +12259,16 @@ function getGistToken() {
             if (pt && pt.length > 10 && !pt.startsWith('YOUR_')) return pt;
         }
     } catch (e) {}
+
+    // 🔴 诊断：部署注入的 HARDCODED_TOKEN 仍是占位符 → 多为「浏览器缓存了旧版 app-core.js」或「部署未注入 secret」。
+    if (!_tokenDiagShown) {
+        _tokenDiagShown = true;
+        if (HARDCODED_TOKEN.indexOf('YOUR_') === 0) {
+            console.error('[GIST] 未读到 Token：当前 app-core.js 仍是部署占位符版（HARDCODED_TOKEN 未注入）。' +
+                '通常是浏览器缓存了旧版本，请 Ctrl+F5 强刷；若强刷后仍如此，检查仓库 Secrets.GIST_TOKEN 是否已设置。' +
+                '（注意：本地数据仍在 localStorage，不会因无 Token 而丢失）');
+        }
+    }
 
     return '';
 }
