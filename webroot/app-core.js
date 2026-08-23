@@ -14508,6 +14508,8 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
         // 同步统计数据到Gist（带成功返回）
         async function syncCounterDataToGist(data) {
             try {
+                // 确保 content 始终有值：默认用本地聚合数据，避免 401/合并失败路径下引用未定义变量
+                let content = JSON.stringify(data, null, 2);
                 const token = getGistToken();
                 
                 // 优先使用硬编码的 COUNTER_GIST_ID
@@ -14578,10 +14580,15 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
                     if (response.ok) {
                         return true;
                     }
-                    // 如果 PATCH 失败（404 或 403），清除 localStorage，尝试从索引获取
+                    // 如果 PATCH 失败，按状态码处理
                     if (response.status === 404 || response.status === 403) {
+                        // Gist 不存在或无权访问：清除本地 id，后续尝试从索引重建
                         localStorage.removeItem('counter_gist_id');
                         counterGistId = null;
+                    } else if (response.status === 401) {
+                        // Token 无效/过期/无权限：停止本次同步，避免反复 401 与创建新 Gist 也失败
+                        console.warn('[统计] GitHub Token 无效(401)，暂停统计同步，请检查 Token 是否有效/具备 gist 写权限');
+                        return false;
                     }
                 }
                 
