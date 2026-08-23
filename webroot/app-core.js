@@ -21259,12 +21259,37 @@ ${maSection}
                             const okColor = (gc.level === 'critical' && fileBad) ? '#ef4444' : (fileBad ? '#fbbf24' : '#4ade80');
                             const okIcon = (gc.level === 'critical' && fileBad) ? '❌' : (fileBad ? '⚠️' : '✅');
                             gistHtml += `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:0.78rem;" title="${gc.id}"><span style="color:rgba(255,255,255,0.6);">${gc.name}</span><span style="color:${okColor};">${okIcon} ${gc.id.substring(0, 8)}...${fileNote}</span></div>`;
-                            // 计数器 Gist：只读诊断（不再做 PATCH 写回测试）
-                            // 原因：① 写回有副作用，用户担心数据丢失；② 计数器 gist 由特定 token 拥有，
-                            // 监控用 token 通常只读 → PATCH 必 403，误报"失败"让人误以为坏了。
-                            // 仅检查可读 + counter.json 存在即可（上面已检查 need:'counter.json'）。
+                            // 计数器 Gist：写回测试（权威判定"统计写入通道是否正常"）
+                            // 业务代码 syncCounterDataToGist 已用同一 token 写此 gist 数千次成功，
+                            // 故本测试 PATCH 应成功；若 403 说明此刻 token 异常（过期/占位符/旧 localStorage），
+                            // 这是真实告警信号，应保留而非删除。
                             if (gc.name.indexOf('计数器') === 0) {
-                                gistHtml += `<div style="display:flex;justify-content:space-between;padding:4px 0 8px;font-size:0.78rem;"><span style="color:rgba(255,255,255,0.6);">↳ 只读诊断</span><span style="color:#4ade80;">✅ 可读（在线状态数据正常）</span></div>`;
+                                const writeTok = getGistToken();  // 重新取最新 token（不依赖闭包外的旧 token）
+                                if (!writeTok) {
+                                    gistHtml += `<div style="display:flex;justify-content:space-between;padding:4px 0 8px;font-size:0.78rem;"><span style="color:rgba(255,255,255,0.6);">↳ 写回测试</span><span style="color:#fbbf24;">⚠️ 跳过：当前未取到 Token（强刷或检查 Secrets.GIST_TOKEN）</span></div>`;
+                                } else {
+                                    try {
+                                        const obj = JSON.parse(gj.files['counter.json'].content);
+                                        obj._monitor_probe = getCurrentTimeString();
+                                        const pr = await fetch(`https://api.github.com/gists/${gc.id}`, {
+                                            method: 'PATCH',
+                                            headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${writeTok}` },
+                                            body: JSON.stringify({ files: { 'counter.json': { content: JSON.stringify(obj, null, 2) } } })
+                                        });
+                                        // 探针字段回滚，避免污染真实统计（不影响线上：silent 失败也无害）
+                                        try {
+                                            delete obj._monitor_probe;
+                                            await fetch(`https://api.github.com/gists/${gc.id}`, {
+                                                method: 'PATCH',
+                                                headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${writeTok}` },
+                                                body: JSON.stringify({ files: { 'counter.json': { content: JSON.stringify(obj, null, 2) } } })
+                                            });
+                                        } catch (rb) {}
+                                        gistHtml += `<div style="display:flex;justify-content:space-between;padding:4px 0 8px;font-size:0.78rem;"><span style="color:rgba(255,255,255,0.6);">↳ 写回测试</span><span style="color:${pr.ok ? '#4ade80' : '#ef4444'};">${pr.ok ? '✅ 写入通道正常（' + (obj.script_downloads || 0) + ' 次访问）' : '❌ 写回失败(' + pr.status + ')：Token 异常，统计可能未写入'}</span></div>`;
+                                    } catch (e) {
+                                        gistHtml += `<div style="padding:4px 0 8px;font-size:0.78rem;color:#ef4444;">↳ 写回异常: ${e.message}</div>`;
+                                    }
+                                }
                             }
                         } else {
                             const icon = r.status === 404 ? '❌ 404(已删?)' : r.status === 403 ? '🔒 403' : `⚠️ ${r.status}`;
@@ -21288,7 +21313,7 @@ ${maSection}
                         <div style="font-size:0.8rem;line-height:1.7;">
                             <div>配置：${token ? '<span style="color:#4ade80;">✅ 已配置</span>' : '<span style="color:#ef4444;">⚠️ 未配置</span>'}</div>
                             <div>权限范围：${scopeText}</div>
-                            <div>Token 有效性：${gistWriteOk ? '<span style="color:#4ade80;">✅ 有效</span>' : '<span style="color:#ef4444;">❌ 无效</span>'}（${writeDetail}）<br><span style="color:rgba(255,255,255,0.4);font-size:0.72rem;">注：监控面板仅做只读检查，不会写入/删除任何 Gist，避免数据风险</span></div>
+                            <div>Token 有效性：${gistWriteOk ? '<span style="color:#4ade80;">✅ 有效</span>' : '<span style="color:#ef4444;">❌ 无效</span>'}（${writeDetail}）<br><span style="color:rgba(255,255,255,0.4);font-size:0.72rem;">注：写入通道由下方「计数器 Gist 写回测试」权威判定</span></div>
                         </div>
                     </div>
                     <div>
