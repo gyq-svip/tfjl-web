@@ -2717,10 +2717,10 @@
         #refImagePreview .preview-body { padding:0 14px 14px; }
         #refImagePreview .preview-img { max-width:100%; border-radius:8px; }
 
-        /* 版本号自定义悬浮提示：在原上方位置基础上略微下移一点点，避开阵容识别遮挡 */
+        /* 版本号自定义悬浮提示：再下移一点点，完全避开阵容识别遮挡 */
         .version-tooltip {
             position: absolute;
-            bottom: 115%;
+            bottom: 105%;
             right: 0;
             background: rgba(20,20,44,0.96);
             color: #fff;
