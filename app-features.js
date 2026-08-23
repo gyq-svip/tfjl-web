@@ -3292,7 +3292,8 @@
         // 菜单「刷新最新资源」：清理所有缓存并强制重新加载，确保拿到最新前端
         // 核心优化：用时间戳 URL 强刷，彻底绕过浏览器/SW/WebView 各级缓存
         async function forceRefreshLatest() {
-            const t = showLoadingToast('♻️ 正在获取最新资源...');
+            // 不弹"清理缓存/跳过SW"提示框（用户要求静默强刷）
+            const t = { success() {} };
             try {
                 // 1. 通知 Service Worker 清缓存
                 if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {

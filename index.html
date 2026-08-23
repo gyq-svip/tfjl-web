@@ -1969,14 +1969,13 @@
                             <button onclick="adminLogZoomOut()" title="缩小字体" style="background:rgba(255,255,255,0.12);color:#fff;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:0.75rem;margin-right:4px;">A−</button>
                             <button id="adminLogZoomResetBtn" onclick="adminLogZoomReset()" title="重置缩放" style="background:rgba(255,255,255,0.12);color:#fff;border:none;padding:5px 8px;border-radius:6px;cursor:pointer;font-size:0.7rem;margin-right:4px;">100%</button>
                             <button onclick="adminLogZoomIn()" title="放大字体" style="background:rgba(255,255,255,0.12);color:#fff;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:0.75rem;margin-right:6px;">A+</button>
-                            <button id="adminFloatConsoleToggleBtn" onclick="toggleConsoleVisibility()" style="background:rgba(255,255,255,0.12);color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.8rem;margin-right:6px;">🖥 浮窗：关</button>
                             <button onclick="adminRefreshConsoleLog()" style="background:linear-gradient(135deg,#00bcd4,#0097a7);color:white;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.8rem;margin-right:6px;">🔄 刷新</button>
                             <button onclick="runHeartbeatSelfCheck()" title="重新注册 Rust 心跳并打印诊断结果（排查 P3 掉线）" style="background:linear-gradient(135deg,#ec4899,#be185d);color:white;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.8rem;margin-right:6px;">❤️ 心跳自检</button>
                             <button onclick="window.__consoleLogs=[];adminRefreshConsoleLog();" style="background:linear-gradient(135deg,#ef4444,#dc2626);color:white;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.8rem;">🗑 清空</button>
                         </div>
                     </div>
                     <div style="color:rgba(255,255,255,0.5);font-size:0.7rem;margin-top:4px;">
-                        全量捕获 console.log/warn/error/info，以及 window.onerror 未捕获异常、unhandledrejection（与 F12 Console 一致，最多500条）。「🖥 浮窗」开关即原管理员菜单里的浮动控制台，开启后右下角常驻悬浮窗。
+                        全量捕获 console.log/warn/error/info，以及 window.onerror 未捕获异常、unhandledrejection（与 F12 Console 一致，最多500条）。日志仅在管理员面板「调试日志」页查看。
                     </div>
                 </div>
                 <div id="consoleLogPanel" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:10px;min-height:150px;max-height:400px;overflow-y:auto;font-family:monospace;font-size:0.7rem;margin-bottom:20px;">
@@ -2503,7 +2502,7 @@
             </div>
             <!-- 前端标记号：用昨天那套位置（statsBar 内绝对定位贴右、垂直居中） -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.5);font-size:0.66rem;padding:1px 6px;opacity:0.6;" ondblclick="if(typeof forceRefreshLatest==='function'){forceRefreshLatest();}">s20260823-82 · s1.0.230</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.18);font-size:0.66rem;padding:1px 6px;opacity:0.18;" ondblclick="if(typeof forceRefreshLatest==='function'){forceRefreshLatest();}">s20260823-82 · s1.0.230</span>
                 <div class="version-tooltip">s20260823-82 · s1.0.230（双击刷新）</div>
             </div>
         </div>
@@ -2512,31 +2511,6 @@
   <!-- 皮肤制作工具改为按需懒加载：首次打开皮肤 Tab 时由 loader.js 拉取 app-skinmaker.js -->
   <script src="loader.js?v=s1.0.130"></script>
 
-    <!-- 调试日志浮动控制台（默认显示于右下角，可拖动；Tauri APP 无法 F12 时查看 [SKIN] 等日志） -->
-    <div id="floatConsole" style="position:fixed;right:12px;bottom:12px;width:380px;max-height:42vh;display:flex;flex-direction:column;background:rgba(0,0,0,0.82);border:1px solid rgba(0,188,212,0.5);border-radius:8px;z-index:99999;box-shadow:0 4px 20px rgba(0,0,0,0.5);font-family:monospace;overflow:hidden;">
-        <div id="floatConsoleTitle" style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;cursor:move;background:linear-gradient(135deg,#00838f,#006064);color:#fff;flex-shrink:0;">
-            <span style="font-size:0.78rem;font-weight:600;">💻 调试日志<span id="floatConsoleBadge" style="display:none;margin-left:6px;background:#00bcd4;color:#000;border-radius:10px;padding:0 6px;font-size:0.65rem;"></span></span>
-            <span>
-                <button id="floatFilterAll" onclick="floatSetLevelFilter('all')" data-level="all" title="全部" style="background:rgba(255,255,255,0.25);color:#fff;border:none;padding:2px 6px;border-radius:4px;cursor:pointer;font-size:0.62rem;margin-right:2px;">全</button>
-                <button id="floatFilterError" onclick="floatSetLevelFilter('error')" data-level="error" title="只看错误" style="background:rgba(244,67,54,0.18);color:#ff8a80;border:1px solid rgba(244,67,54,0.5);padding:2px 6px;border-radius:4px;cursor:pointer;font-size:0.62rem;margin-right:2px;">错</button>
-                <button id="floatFilterWarn" onclick="floatSetLevelFilter('warn')" data-level="warn" title="只看警告" style="background:rgba(255,152,0,0.18);color:#ffcc80;border:1px solid rgba(255,152,0,0.5);padding:2px 6px;border-radius:4px;cursor:pointer;font-size:0.62rem;margin-right:3px;">警</button>
-                <button onclick="floatConsoleCopy()" title="复制日志（框选后只复制选中段，否则复制全部）" style="background:rgba(255,255,255,0.15);color:#fff;border:none;padding:2px 8px;border-radius:4px;cursor:pointer;font-size:0.62rem;margin-right:3px;">复制</button>
-                <button id="floatAutoScrollBtn" onclick="toggleFloatAutoScroll()" title="自动滚动：开则始终显示最新日志，关则停在当前位置方便查看/复制" style="background:rgba(255,255,255,0.15);color:#fff;border:none;padding:2px 8px;border-radius:4px;cursor:pointer;font-size:0.62rem;margin-right:3px;">⬇自动</button>
-                <button onclick="floatZoomOut()" title="缩小字体" style="background:rgba(255,255,255,0.15);color:#fff;border:none;padding:2px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;margin-right:3px;">A−</button>
-                <button id="floatZoomResetBtn" onclick="floatZoomReset()" title="重置缩放" style="background:rgba(255,255,255,0.15);color:#fff;border:none;padding:2px 6px;border-radius:4px;cursor:pointer;font-size:0.65rem;margin-right:3px;">100%</button>
-                <button onclick="floatZoomIn()" title="放大字体" style="background:rgba(255,255,255,0.15);color:#fff;border:none;padding:2px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;margin-right:4px;">A+</button>
-                <button onclick="floatConsoleClear()" style="background:rgba(255,255,255,0.15);color:#fff;border:none;padding:2px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;margin-right:4px;">清空</button>
-                <button onclick="toggleFloatConsole()" style="background:rgba(255,255,255,0.15);color:#fff;border:none;padding:2px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;">收起</button>
-            </span>
-        </div>
-        <div style="display:flex;align-items:center;gap:4px;padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.08);flex-shrink:0;">
-            <input id="floatConsoleFilter" type="text" placeholder="🔍 输入关键字过滤…" oninput="setFloatConsoleFilter(this.value)" style="flex:1;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);color:#fff;border-radius:4px;padding:3px 8px;font-size:0.7rem;outline:none;">
-            <button onclick="clearFloatConsoleFilter()" style="background:rgba(255,255,255,0.12);color:#fff;border:none;padding:2px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;">✕</button>
-        </div>
-        <div id="floatConsoleContent" style="flex:1;overflow-y:auto;padding:6px 8px;font-size:0.68rem;line-height:1.35;color:rgba(255,255,255,0.75);user-select:text;"></div>
-        <div id="floatConsoleResize" title="拖拽调整窗口大小" style="position:absolute;right:0;bottom:0;width:18px;height:18px;cursor:nwse-resize;background:linear-gradient(135deg,transparent 50%,rgba(0,188,212,0.8) 50%);border-bottom-right-radius:8px;z-index:2;"></div>
-    </div>
-    <button id="floatConsoleToggle" onclick="toggleFloatConsole()" style="position:fixed;right:12px;bottom:12px;z-index:99998;display:none;align-items:center;gap:4px;background:linear-gradient(135deg,#00838f,#006064);color:#fff;border:none;padding:6px 12px;border-radius:20px;cursor:pointer;font-size:0.75rem;box-shadow:0 2px 8px rgba(0,0,0,0.4);">💻日志</button>
         <!-- 需求墙备份中心（合并：定期备份 + 还原 + 紧急救回） -->
         <div id="adminPageWallBackup" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:99990;overflow-y:auto;">
             <div style="max-width:680px;margin:40px auto;background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:12px;padding:20px;">
