@@ -68,8 +68,12 @@ async function readGistFile(gist, fileName) {
     return content;
 }
 
-// 找当前消息 Gist（自愈）：优先总表 messages 字段；否则扫账号下 description 含「需求墙消息」且创建时间最新的 Gist
-// （解决硬编码 MESSAGES_GIST_ID_FALLBACK 指向已删除 Gist 导致 404 的问题——网页端切换/删除消息 Gist 后 Actions 也能自动找到）
+// 找当前消息数据源（自愈）：
+// 优先级：① 总表 room_index.messages（网页端写回的标准消息 Gist）
+//         ② 扫账号下 description 含「需求墙消息」且创建时间最新的 Gist（标准格式）
+//         ③ 扫「TFJL 需求墙数据备份 #」Gist，找含 content_messages_*.json 的最新一份（真实数据源，历史消息都在这里）
+//         ④ 硬编码兜底（已删，基本不会命中）
+// 注意：标准消息 Gist（b02794a8...）早被删除，真实消息现在在「需求墙数据备份」Gist 里（content_messages_*.json）。
 async function resolveMessagesGistId() {
     try {
         const idx = await getGist(INDEX_GIST_ID);
@@ -77,22 +81,36 @@ async function resolveMessagesGistId() {
         const obj = c ? JSON.parse(c || '{}') : {};
         if (obj.messages) { log('消息 Gist（来自总表 room_index.messages）:', obj.messages); return obj.messages; }
     } catch (e) { log('读总表 messages 失败:', e.message); }
-    // 总表无指针 → 扫全部 Gist 找最近的「需求墙消息」
+
+    // 总表无指针 → 扫全部 Gist 自愈
     log('总表无 messages 指针，扫描账号 Gist 自愈…');
     try {
-        let best = null;
-        for (let page = 1; page <= 5; page++) {
+        let stdBest = null;     // 标准消息 Gist（含 messages.json）
+        let backupBest = null;  // 备份 Gist（含 content_messages_*.json）
+        for (let page = 1; page <= 10; page++) {
             const r = await fetch(`${API}/gists?per_page=100&page=${page}`, { headers: H });
             if (!r.ok) break;
             const gists = await r.json();
             if (!Array.isArray(gists) || gists.length === 0) break;
             for (const g of gists) {
-                if (!(g.description || '').includes('需求墙消息')) continue;
-                if (!best || new Date(g.created_at).getTime() > new Date(best.created_at).getTime()) best = g;
+                const desc = g.description || '';
+                const files = g.files ? Object.keys(g.files) : [];
+                if (desc.includes('需求墙消息') && files.includes('messages.json')) {
+                    if (!stdBest || new Date(g.updated_at).getTime() > new Date(stdBest.updated_at).getTime()) stdBest = g;
+                }
+                if (desc.startsWith('TFJL 需求墙数据备份') && files.some(f => f.startsWith('content_messages_'))) {
+                    if (!backupBest || new Date(g.updated_at).getTime() > new Date(backupBest.updated_at).getTime()) backupBest = g;
+                }
             }
             if (gists.length < 100) break;
         }
-        if (best) { log('自愈找到消息 Gist（最近创建）:', best.id); return best.id; }
+        if (stdBest) { log('自愈找到标准消息 Gist（最近更新）:', stdBest.id); return stdBest.id; }
+        if (backupBest) {
+            log('自愈找到需求墙数据备份 Gist（含真实消息，最近更新）:', backupBest.id);
+            // 标记：这是备份格式，后续读取需特殊处理
+            backupBest.__isBackup = true;
+            return backupBest.id;
+        }
     } catch (e) { log('扫描自愈失败:', e.message); }
     // 最后兜底常量
     log('自愈失败，使用硬编码兜底:', MESSAGES_GIST_ID_FALLBACK);
@@ -118,8 +136,13 @@ async function writeIndexArr(arr) {
 async function writeStatus(st) {
     if (DRY_RUN) return;
     try {
-        const { raw } = await readIndex();
+        const { raw, arr } = await readIndex();
         raw.wall_backup_status = Object.assign({ ts: Date.now(), mode: 'actions' }, st);
+        // 同步写回 messages 指针：让下次 Actions 直接读总表，不再依赖扫描自愈
+        if (st.messagesGistId && raw.messages !== st.messagesGistId) {
+            raw.messages = st.messagesGistId;
+            log('已写回总表 messages 指针:', st.messagesGistId);
+        }
         await patchGist(INDEX_GIST_ID, { files: { 'room_index.json': { content: JSON.stringify(raw, null, 2) } } });
     } catch (e) { log('状态写入失败(不影响备份):', e.message); }
 }
@@ -166,8 +189,24 @@ async function main() {
 
     // 2. 消息 + 资料
     const msgGist = await getGist(msgGistId);
-    const msgContent = await readGistFile(msgGist, 'messages.json');
-    const profContent = await readGistFile(msgGist, 'profiles.json');
+    let msgContent = await readGistFile(msgGist, 'messages.json');
+    let profContent = await readGistFile(msgGist, 'profiles.json');
+    // 兼容「需求墙数据备份」格式：消息在 content_messages_*.json 分片里
+    if (!msgContent) {
+        try {
+            const files = msgGist.files ? Object.keys(msgGist.files) : [];
+            const msgFiles = files.filter(f => f.startsWith('content_messages_')).sort();
+            if (msgFiles.length) {
+                let all = [];
+                for (const f of msgFiles) {
+                    const c = await readGistFile(msgGist, f);
+                    if (c) { try { const arr = JSON.parse(c).messages || []; all = all.concat(arr); } catch (e) {} }
+                }
+                msgContent = JSON.stringify({ messages: all });
+                log(`从备份分片合并消息 ${all.length} 条（${msgFiles.length} 个分片）`);
+            }
+        } catch (e) { log('读取备份分片失败:', e.message); }
+    }
     let msgCount = 0;
     try { msgCount = msgContent ? (JSON.parse(msgContent).messages || []).length : 0; } catch (e) {}
 
@@ -245,7 +284,7 @@ async function main() {
         log(`🧹 已清理 ${cleanedN} 份超龄备份 Gist，索引剩 ${indexArr.length} 份`);
     }
 
-    await writeStatus({ ok: true, result: runResult, messageCount: msgCount, scriptCount: scripts.length, cleaned: cleanedN });
+    await writeStatus({ ok: true, result: runResult, messageCount: msgCount, scriptCount: scripts.length, cleaned: cleanedN, messagesGistId: msgGistId });
     log('结束');
 }
 
