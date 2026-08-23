@@ -2717,10 +2717,10 @@
         #refImagePreview .preview-body { padding:0 14px 14px; }
         #refImagePreview .preview-img { max-width:100%; border-radius:8px; }
 
-        /* 版本号自定义悬浮提示：显示在版本号下方（避免被上方阵容识别等遮挡） */
+        /* 版本号自定义悬浮提示：在原上方位置基础上略微下移一点点，避开阵容识别遮挡 */
         .version-tooltip {
             position: absolute;
-            top: 130%;
+            bottom: 115%;
             right: 0;
             background: rgba(20,20,44,0.96);
             color: #fff;
@@ -2739,10 +2739,10 @@
         .version-tooltip::after {
             content: '';
             position: absolute;
-            bottom: 100%;
+            top: 100%;
             right: 12px;
             border: 5px solid transparent;
-            border-bottom-color: rgba(20,20,44,0.96);
+            border-top-color: rgba(20,20,44,0.96);
         }
         #versionTag:hover + .version-tooltip {
             opacity: 1;
