@@ -7,7 +7,7 @@
     "frontendDist": "webroot",
     "devUrl": "http://localhost:1420",
     "beforeDevCommand": "npx http-server . -p 1420 --cors",
-    "beforeBuildCommand": ""
+    "beforeBuildCommand": "node ../.github/verify_build.js"
   },
   "app": {
     "withGlobalTauri": true,
