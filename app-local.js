@@ -626,7 +626,8 @@ if (isTauriApp) {
             const tag = document.getElementById('versionTag');
             if (tag) {
                 const av = (typeof getAppVersion === 'function') ? await getAppVersion() : '?';
-                const base = (tag.textContent.split(' · ')[0] || '').trim() || 'App';
+                const base = (typeof window.__DEPLOY_TAG === 'string' && window.__DEPLOY_TAG) ? window.__DEPLOY_TAG
+                         : ((tag.textContent.split(' · ')[0] || '').trim() || 'App');
                 tag.textContent = base + ' · App v' + (av || '?');
             }
         } catch (e) {}

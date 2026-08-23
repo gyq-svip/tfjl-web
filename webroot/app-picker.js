@@ -321,7 +321,11 @@
                 const tag = document.getElementById('versionTag');
                 if (!tag || !swVersion) return;
                 const short = swVersion.indexOf('tfjl-') === 0 ? swVersion.slice('tfjl-'.length) : swVersion;
-                const base = tag.textContent.split(' · ')[0];
+                // base(日期部分)优先用部署注入的 window.__DEPLOY_TAG（确定性来源），
+                // 避免依赖 HTML 文本 split 在极端情况下取到空（如旧缓存 HTML 文本异常）。
+                let base = (typeof window.__DEPLOY_TAG === 'string' && window.__DEPLOY_TAG) ? window.__DEPLOY_TAG
+                         : (tag.textContent.split(' · ')[0] || '').trim();
+                if (!base || !/^s\d{8}/.test(base)) base = 's?????';  // 兜底，确保日期段不为空
                 tag.textContent = base + ' · ' + short;
                 // 同步更新相邻 .version-tooltip（自定义提示框，显示在窗口内，不跑出窗口）
                 const tip = tag.nextElementSibling;

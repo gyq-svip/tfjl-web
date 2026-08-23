@@ -112,6 +112,9 @@ jobs:
           MARKER="$DEPLOY_TAG · $SWVER"
           # 替换右下角版本号 <span id="versionTag" ...>旧的静态标记</span> 内的文本
           sed -i -E 's/(<span id="versionTag"[^>]*>)[^<]*(<\/span>)/\1'"$MARKER"'\2/' _site/index.html
+          # 注入确定性部署日期到 window.__DEPLOY_TAG（页面运行时优先用它回填版本号日期段，
+          # 避免依赖 HTML versionTag 文本 split 在旧缓存 HTML 下取到空导致「日期消失」）
+          sed -i -E "s#(</head>)#<script>window.__DEPLOY_TAG='$DEPLOY_TAG';</script>\n\1#" _site/index.html
           echo "Deploy marker injected: $MARKER"
           grep -nE 'id="versionTag"' _site/index.html || true
 
