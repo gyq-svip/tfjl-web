@@ -1592,7 +1592,7 @@
 
     <script defer src="color-picker.js?v=s1.0.180"></script>
     <script defer src="app-damagecalc.js?v=s1.0.192"></script>
-    <script defer src="app-core.js?v=s1.0.221"></script>
+    <script defer src="app-core.js?v=s1.0.222"></script>
 
     <!-- 模态框：创建分类 -->
     <div id="createCategoryModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;justify-content:center;align-items:center;">
@@ -2527,7 +2527,7 @@
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;opacity:0.1;" ondblclick="onVersionTagForceRefresh()">s20260823-78 · s1.0.221</span>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.45);font-size:0.68rem;padding:1px 6px;opacity:0.1;" ondblclick="onVersionTagForceRefresh()">s20260823-79 · s1.0.222</span>
                 <div class="version-tooltip">版本 s20260820-41 · s1.0.184（双击强制刷新）</div>
             </div>
             <script>/* 悬浮提示自动跟随版本号，避免 bump 时漏改 tooltip */
@@ -2578,14 +2578,16 @@
                 <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
                     <button onclick="wallBackupAll()" style="background:linear-gradient(135deg,#4ade80,#22c55e);color:#fff;border:none;padding:10px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;">💾 立即备份</button>
                     <button onclick="wallLoadBackupList()" style="background:rgba(255,255,255,0.1);color:#fff;border:none;padding:10px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;">🔍 刷新备份列表</button>
+                    <button onclick="wallPreviewCleanup()" title="预览并清理 10 天前的旧备份（最新一份永不删）" style="background:rgba(255,152,0,0.15);border:1px solid rgba(255,152,0,0.4);color:#ff9800;padding:10px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;">🧹 清理预览</button>
                     <button onclick="document.getElementById('wallImportFile').click()" style="background:linear-gradient(135deg,#38bdf8,#0284c7);color:#fff;border:none;padding:10px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;">📥 导入本地备份</button>
                     <input type="file" id="wallImportFile" accept=".json,application/json" style="display:none;" onchange="wallImportOnFile(this)">
                     <label style="display:flex;align-items:center;gap:6px;color:rgba(255,255,255,0.7);font-size:0.78rem;cursor:pointer;user-select:none;">
                         <input type="checkbox" id="wallAutoBackupChk" onchange="wallToggleAutoBackup(this.checked)"> 每日自动备份
                     </label>
                 </div>
+                <div id="wallAutoStatus" style="margin-bottom:8px;"></div>
                 <div id="wallBackupListContainer" style="background:rgba(0,0,0,0.3);border-radius:6px;padding:12px;font-size:0.85rem;max-height:230px;overflow-y:auto;margin-bottom:6px;"></div>
-                <div style="color:rgba(255,255,255,0.4);font-size:0.7rem;margin-bottom:8px;line-height:1.4;">💡 备份越多 Gist 体积越大，建议定期在列表里「删除」旧备份以免超上限（单文件约 1MB，消息已自动分片）。</div>
+                <div style="color:rgba(255,255,255,0.4);font-size:0.7rem;margin-bottom:8px;line-height:1.4;">💡 备份已智能化：内容无变化不重复备份（指纹比对）；自动清理 10 天前的旧备份且<b>最少保留 3 份</b>，Gist 不会无限膨胀。Actions 每天 04:00 定时备份 + 网页端自动备份互为兜底，运行结果见上方状态栏，点列表「导出」可随时导出本地冷备份。「删除」也会连同消息分片/脚本内容文件一起删净。</div>
                 <div id="wallBackupStatus"></div>
                 <div style="margin-top:18px;border-top:1px solid rgba(255,255,255,0.12);padding-top:14px;">
                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
