@@ -33,6 +33,8 @@ jobs:
 
           # 页面
           cp -v *.html _site/ 2>/dev/null || true
+          # 禁用 Jekyll 处理（否则含特殊字符 · 的文件名在 Pages CDN 上间歇 404）
+          touch _site/.nojekyll
 
           # 模块化脚本 + 样式 + Service Worker
           cp -v app-*.js _site/ 2>/dev/null || true
