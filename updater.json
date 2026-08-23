@@ -1,11 +1,11 @@
 {
-    "version":  "2.0.7",
-    "notes":  "auto update v2.0.7",
-    "pub_date":  "2026-08-22T08:39:41Z",
+    "version":  "2.0.9",
+    "notes":  "auto update v2.0.9",
+    "pub_date":  "2026-08-23T17:15:47Z",
     "platforms":  {
                       "windows-x86_64":  {
-                                             "url":  "https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/releases/download/v2.0.7/tfjl-assistant_2.0.7_x64-setup.exe",
-                                             "signature":  "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRUHNUVWtSKzlCZjl3d0pqS2s4c0xxUnBrRE5KSUJ6d3hsckZLbEhDSzNlZEpoZUxCaVViNm1sOFM2VDlZKzM4K2ZsbUhUbVkwZHhIUldhdW5hNGRMS0xJLzNuQXlSemc4PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg3Mzg3OTgxCWZpbGU6dGZqbC1zaWduLXRlbXAuZXhlClNONGUyK2VVZ3c0RmtFQzEvbWIvVGFRWW1ubUh5YzZXcEY3WHZyVFpTZXovR1VEaDliQ1oyTE5SQ0oyeXBHbCtQRjFndGVyLzJKMUJDelJRSVVKaENBPT0K"
+                                             "url":  "https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/releases/download/v2.0.9/tfjl-assistant_2.0.9_x64-setup.exe",
+                                             "signature":  "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRUHNUVWtSKzlCZjJneXRVMWdidEFVaUV2NThqb1BBenpUSmFKTmI1emVicnk4N1VTek5mS2k0UWVJS3plbm9DMnlIakxZYnlaMkhuSUpWdHNsbUNWa1JkUHhzUVpzMGdzPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg3NTA1MzQxCWZpbGU6dGZqbC1zaWduLXRlbXAuZXhlClZqTkpVRmYxVThZT3c3aE96cXdubXQzR2c3b1R0MlQxMkQzNHhLN0RCeUFKRVhTaWk0YzhwS014NjBaRnhFYUF6UUxObXFuc3VXRW9xRi8zT3lkM0JBPT0K"
                                          }
                   }
 }
