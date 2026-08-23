@@ -12210,10 +12210,18 @@ function getMessagesGistUrl() {
     return `https://api.github.com/gists/${gistId}`;
 }
 
-// Gist Token 管理 - 优先从环境变量读取（GitHub Actions），其次从localStorage读取
+// Gist Token 管理 - 优先部署注入的硬编码 Token（GitHub Actions 部署时把占位符替换为真实 Token）；
+// 其次 localStorage（用户手动填写/本地开发）；最后复用父窗口注入（iframe 内嵌）。
+// 安全说明：git 仓库内只有占位符 'YOUR_GITHUB_TOKEN_HERE'，真实 Token 由 deploy.yml 注入到 _site/，不进版本库。
 const GIST_TOKEN_KEY = 'TFJL_Gist_Token';
 function getGistToken() {
-    // 从 localStorage 读取（用户手动填写/环境变量注入），其次复用父窗口注入
+    // 优先使用部署注入的硬编码 Token（deploy.yml 的 Inject Token 步骤会把下方占位符替换为 secrets.GIST_TOKEN）
+    const HARDCODED_TOKEN = 'YOUR_GITHUB_TOKEN_HERE';
+    if (HARDCODED_TOKEN && HARDCODED_TOKEN.length > 20 && HARDCODED_TOKEN.startsWith('ghp_')) {
+        return HARDCODED_TOKEN;
+    }
+
+    // 其次从 localStorage 读取（本地开发/用户手动填写时使用，iframe 同域共享）
     try { const ls = localStorage.getItem(GIST_TOKEN_KEY); if (ls) return ls; } catch (e) {}
 
     // iframe 内嵌时，复用父窗口（首页）已注入的真实 token（兜底，避免子页 token 为空）
