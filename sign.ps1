@@ -97,6 +97,24 @@ if ($ExeName -eq "") {
     }
 }
 
+# ---- 2.5 Pre-sign gate: 打包产物已就绪，签名前跑全套校验（含 Tauri 命令授权三处一致性）。
+# 任一 FAIL → 脚本 exit 1 → 签名中止 → 你可知晓并修复后重打包（3-4 分钟成本可接受），
+# 绝不会带着权限漏授权/低级错误上线。verify_build.js 同时被 pre-commit 钩子调用，这里做发布前最后兜底。
+# （注：Tauri build 已验证 capability 语法合法；本门额外查"语义漏授权"——命令注册了但 capability 未声明。）
+$VerifyJs = Join-Path $RootDir ".github\verify_build.js"
+if (Test-Path $VerifyJs) {
+    Write-Host "Running pre-sign verify_build.js gate ..." -ForegroundColor Cyan
+    & node $VerifyJs
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "ERROR: verify_build.js 校验未通过（见上方 FAIL），已中止签名。" -ForegroundColor Red
+        Write-Host "       请修复问题后重新 npx tauri build 出包，再跑 .\sign.ps1。" -ForegroundColor Red
+        exit 1
+    }
+    Write-Host "Pre-sign verify_build.js gate OK" -ForegroundColor Green
+} else {
+    Write-Host "WARN: verify_build.js not found, skip pre-sign gate" -ForegroundColor Yellow
+}
+
 # ---- 3. Copy to plain-ASCII temp file (avoid Chinese path/filename issues) ----
 $TempExe = Join-Path $NsisDir "tfjl-sign-temp.exe"
 Copy-Item $SrcExe $TempExe -Force
