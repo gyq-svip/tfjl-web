@@ -1193,7 +1193,21 @@
         // Token管理
         const GIST_TOKEN_KEY = 'TFJL_Gist_Token';
         function getGistToken() {
-            return localStorage.getItem(GIST_TOKEN_KEY) || '';
+            // 🔴 部署注入分支：deploy.yml 的 Inject Token 步骤会把下方占位符替换为 secrets.GIST_TOKEN
+            const HARDCODED_TOKEN = 'YOUR_GITHUB_TOKEN_HERE';
+            if (HARDCODED_TOKEN && HARDCODED_TOKEN.length > 20 && HARDCODED_TOKEN.startsWith('ghp_')) {
+                return HARDCODED_TOKEN;
+            }
+            // 其次从 localStorage 读取（本地开发/用户手动填写时使用，iframe 同域共享）
+            try { const ls = localStorage.getItem(GIST_TOKEN_KEY); if (ls) return ls; } catch (e) {}
+            // iframe 内嵌时，复用父窗口（首页）已注入的真实 token（兜底）
+            try {
+                if (window.parent && window.parent !== window && typeof window.parent.getGistToken === 'function') {
+                    const pt = window.parent.getGistToken();
+                    if (pt && pt.length > 10 && !pt.startsWith('YOUR_')) return pt;
+                }
+            } catch (e) {}
+            return '';
         }
         function setGistToken(token) {
             localStorage.setItem(GIST_TOKEN_KEY, token);
