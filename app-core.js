@@ -20,8 +20,21 @@
             console.warn = (...args) => addLog('warn', args);
             console.error = (...args) => addLog('error', args);
             console.info = (...args) => addLog('info', args);
+
+            // 捕获 F12 Console 里那些“未进 console.error”的运行时报错，让它们也进调试日志
+            // 1) 未捕获的 JS 异常（window.onerror）——如 ReferenceError: content is not defined
+            window.addEventListener('error', (e) => {
+                const where = e.filename ? ` @ ${e.filename.split('/').pop()}:${e.lineno}:${e.colno}` : '';
+                addLog('error', [ (e.message || 'Error') + where + (e.error && e.error.stack ? '\n' + e.error.stack : '') ]);
+            });
+            // 2) 未处理的 Promise rejection
+            window.addEventListener('unhandledrejection', (e) => {
+                const r = e.reason;
+                const txt = r && (r.stack || r.message) ? (r.stack || r.message) : String(r);
+                addLog('error', [ 'Unhandled Promise Rejection: ' + txt ]);
+            });
         })();
-        window.__consoleLogs.push({ time: new Date().toTimeString().slice(0, 8), level: 'info', msg: '控制台日志捕获已启动' });
+        window.__consoleLogs.push({ time: new Date().toTimeString().slice(0, 8), level: 'info', msg: '控制台日志捕获已启动（含 error/unhandledrejection 全量收集）' });
 
         // ==================== Gist GET 304 缓存（省 GitHub API 配额） ====================
         // 只对“静态内容型”Gist 做 304 缓存：命中时 GitHub 返回 304（不计入 5000 配额）。
@@ -21019,6 +21032,7 @@ ${maSection}
                     pageEl.style.display = 'block';
                     adminRefreshDebugLog();
                     adminRefreshConsoleLog();
+                    if (typeof refreshFloatConsoleToggleBtn === 'function') refreshFloatConsoleToggleBtn();
                 }
             } else if (page === 'loginStats') {
                 const pageEl = document.getElementById('adminPageLoginStats');
@@ -21606,9 +21620,17 @@ ${maSection}
             const next = !current;
             localStorage.setItem(CONSOLE_VISIBILITY_KEY, next ? '1' : '0');
             applyConsoleVisibility(next);
-            // 关闭面板，给用户反馈
-            closeAdminPanel();
+            // 同步调试日志面板内的浮窗开关按钮状态（若面板开着）
+            if (typeof refreshFloatConsoleToggleBtn === 'function') refreshFloatConsoleToggleBtn();
             console.log('[ADMIN] 浮动控制台已' + (next ? '开启' : '关闭'));
+        }
+        // 刷新调试日志面板里的“浮窗显示”开关按钮文案（由 toggleConsoleVisibility / 面板打开时调用）
+        function refreshFloatConsoleToggleBtn() {
+            const btn = document.getElementById('adminFloatConsoleToggleBtn');
+            if (!btn) return;
+            const visible = localStorage.getItem(CONSOLE_VISIBILITY_KEY) === '1';
+            btn.textContent = visible ? '🖥 浮窗：开' : '🖥 浮窗：关';
+            btn.style.background = visible ? 'linear-gradient(135deg,#00bcd4,#0097a7)' : 'rgba(255,255,255,0.12)';
         }
         function applyConsoleVisibility(visible) {
             const btn = document.getElementById('floatConsoleToggle');
