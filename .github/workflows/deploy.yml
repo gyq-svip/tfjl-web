@@ -70,6 +70,29 @@ jobs:
           echo "--- script tags after bump ---"
           grep -nE '<script[^>]*src="[^"]*\.js' _site/index.html || true
 
+          # 🔴 修复「SW 版本号每次部署不变」：自增 sw.js 的 CACHE_VERSION（与桌面端 lib.rs 同逻辑 +1），
+          # 让 SW 缓存命名空间每次部署都变 → 旧 SW 控制的缓存强制失效，浏览器拉到最新前端。
+          # 直接改仓库根 sw.js（checkout 的工作区），稍后 commit-back 到 main，保证下次部署基于新值继续 +1（持续累加）。
+          python3 - <<'PY'
+          import re
+          for p in ['sw.js', '_site/sw.js']:
+              try:
+                  s = open(p, encoding='utf-8').read()
+              except FileNotFoundError:
+                  continue
+              def inc(m):
+                  return m.group(1) + str(int(m.group(2)) + 1) + m.group(3)
+              s2 = re.sub(r"(CACHE_VERSION = 's1\.0\.)(\d+)(')", inc, s)
+              open(p, 'w', encoding='utf-8').write(s2)
+              print('bumped CACHE_VERSION in', p)
+          PY
+
+          # 给 SW 注册 URL 也加 ?v= 时间戳（sw.js 文件本身不在脚本 ?v= 列表里，靠注册 URL 变化强制更新）
+          # 注册代码在 app-picker.js（外部文件），改 _site 与仓库根两处保持一致
+          sed -i -E "s#(navigator\.serviceWorker\.register\(\s*')\./sw\.js(')#\1./sw.js?v=$VER\2#g" _site/app-picker.js || true
+          sed -i -E "s#(navigator\.serviceWorker\.register\(\s*')\./sw\.js(')#\1./sw.js?v=$VER\2#g" app-picker.js || true
+          grep -nE "register\('\.?/?sw\.js" _site/app-picker.js || true
+
       - name: Inject deploy marker (visible version tag)
         run: |
           # 每次部署自动把页面右下角 #versionTag 更新为「部署日期序号 · 当前 SW 版本号」，
@@ -134,3 +157,19 @@ jobs:
 
       - name: Deploy to GitHub Pages
         uses: actions/deploy-pages@v4
+
+      - name: Commit back bumped sw.js CACHE_VERSION (so next deploy continues +1)
+        if: success()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # 仅提交 sw.js 的 CACHE_VERSION 自增 + app-picker.js 的 SW 注册 ?v= 时间戳（保持源码与部署一致）
+          git add sw.js app-picker.js
+          if git diff --cached --quiet; then
+            echo "sw.js 无变化，跳过提交"
+            exit 0
+          fi
+          git commit -m "chore(ci): bump sw.js CACHE_VERSION [skip ci]"
+          git push origin HEAD:main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
