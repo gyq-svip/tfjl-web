@@ -21218,6 +21218,7 @@ ${maSection}
                 let msgId = localStorage.getItem('messages_gist_id') || '';
                 let newsId = localStorage.getItem('news_gist_id') || '';
                 let roomIndex = null;
+                let indexHasNewsJson = false;  // 索引 Gist 是否含 news.json（公告的兜底数据源）
                 if (!msgId || !newsId) {
                     try {
                         const idxR = await fetch(`https://api.github.com/gists/${GIST_ID}`, { headers: { 'Accept': 'application/vnd.github.v3+json', ...(token && { 'Authorization': `token ${token}` }) } });
@@ -21229,6 +21230,10 @@ ${maSection}
                                 if (roomIndex.messages) { msgId = roomIndex.messages; localStorage.setItem('messages_gist_id', msgId); }
                                 if (roomIndex.news) { newsId = roomIndex.news; localStorage.setItem('news_gist_id', newsId); }
                             }
+                            // 公告兜底数据源：索引 Gist 内含 news.json（fetchNewsFromGitHub 的二级回退）
+                            if (idxD.files && idxD.files['news.json'] && idxD.files['news.json'].content) {
+                                indexHasNewsJson = true;
+                            }
                         }
                     } catch (e) {}
                 }
@@ -21237,12 +21242,17 @@ ${maSection}
                 const gistChecks = [
                     { name: '索引 Gist', id: GIST_ID, level: 'critical', need: 'room_index.json' },
                     { name: '消息 Gist', id: msgId, level: 'critical', need: 'messages.json' },
-                    { name: 'News Gist(公告)', id: newsId, level: 'warn', need: null },
+                    { name: 'News Gist(公告)', id: newsId, level: 'warn', need: null, fallbackNewsJson: indexHasNewsJson },
                     { name: '计数器 Gist(在线状态)', id: COUNTER_GIST_ID, level: 'warn', need: 'counter.json' }
                 ];
                 let gistHtml = '';
                 for (const gc of gistChecks) {
                     if (!gc.id) {
+                        // News：无独立 gist id，但若索引 Gist 含 news.json(公告实际数据源)则视为已配置
+                        if (gc.fallbackNewsJson) {
+                            gistHtml += `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:0.78rem;"><span style="color:rgba(255,255,255,0.6);">${gc.name}</span><span style="color:#4ade80;">✅ 已配置（数据源：索引 Gist 的 news.json）</span></div>`;
+                            continue;
+                        }
                         // News 未配置属于警告级（公告无数据源，不影响核心）
                         const c = gc.level === 'critical' ? '#ef4444' : '#fbbf24';
                         const txt = gc.level === 'critical' ? '❌ 未配置' : '⚠️ 未配置(无数据源)';
