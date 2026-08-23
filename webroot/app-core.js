@@ -16906,7 +16906,31 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                         }
                     } catch (e) { console.warn('[消息] 索引解析失败，用硬编码兜底:', e); }
                 }
-                
+
+                // ★ 根治 Actions 备份 404：把当前确定的消息 Gist ID 写回总表 room_index.json.messages，
+                // 保证 wall-backup.mjs 能直接读到指针（不依赖扫 Gist 匹配）。仅在指针缺失/变化时写回，避免无谓 API。
+                if (token && messagesGistId && !gistDeleted) {
+                    try {
+                        const idxResp = await fetch(`https://api.github.com/gists/${GIST_ID}`, { headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` } });
+                        if (idxResp.ok) {
+                            const idxData = await idxResp.json();
+                            const ri = idxData.files && idxData.files['room_index.json'];
+                            if (ri && ri.content) {
+                                let idxObj = JSON.parse(ri.content);
+                                if (idxObj.messages !== messagesGistId) {
+                                    idxObj.messages = messagesGistId;
+                                    await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+                                        method: 'PATCH',
+                                        headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` },
+                                        body: JSON.stringify({ files: { 'room_index.json': { content: JSON.stringify(idxObj, null, 2) } } })
+                                    });
+                                    console.log('[消息] 已写回总表 messages 指针:', messagesGistId);
+                                }
+                            }
+                        }
+                    } catch (e) { console.warn('[消息] 写回总表 messages 指针失败:', e); }
+                }
+
                 // 如果都没有，从索引文件获取
                 if (!messagesGistId) {
                     try {
