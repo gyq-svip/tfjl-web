@@ -618,6 +618,16 @@ if (isTauriApp) {
         scanSkins().then(() => syncRemoteSkins());
         // 兜底：启动 1.5s 后再重刷一次皮肤，确保即使首屏渲染早于皮肤索引就绪也能补上（修复概率性卡住不显示）
         setTimeout(() => { try { if (typeof window.reapplyAllSkins === 'function') window.reapplyAllSkins(); } catch (e) {} }, 1500);
+        // APP 端版本号回填：Tauri 无 Service Worker，#versionTag 不会被 SW_VERSION 消息更新，
+        // 否则永远显示 index.html 写死的 fallback "s1.0.225"。这里用真实 APP 版本回填。
+        try {
+            const tag = document.getElementById('versionTag');
+            if (tag) {
+                const av = (typeof getAppVersion === 'function') ? await getAppVersion() : '?';
+                const base = (tag.textContent.split(' · ')[0] || '').trim() || 'App';
+                tag.textContent = base + ' · App v' + (av || '?');
+            }
+        } catch (e) {}
         console.log('[APP] APP本地功能已初始化, isTauriApp:', isTauriApp);
     }
 

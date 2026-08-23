@@ -10,9 +10,14 @@
 // v37: 修「双击右下角版本号强制刷新无效」——原绑定 onVersionTagForceRefresh 只弹 confirm + 用废弃的 location.reload(true)
 //      （现代浏览器不强制跳缓存）导致刷不到最新。改为直接调 forceRefreshLatest()（清SW缓存+skipWaiting+带时间戳replace）。
 //      强制刷新后 SW_VERSION 应为 s1.0.228。
+// v38: forceRefreshLatest 改为【无条件 unregister 所有 SW】+ 清空 cache（之前仅"无 waiting 时"才 unregister，
+//      导致旧 SW(225) 一直 controlling、新 SW(228) 处于 waiting 时 skipWaiting 异步未生效 → 强刷后仍被旧 SW 接管，
+//      页面永远显示 HTML 写死的 fallback "s1.0.225" 拿不到 228）。另：index.html 版本号标签 opacity 0.1→0.6 调亮；
+//      APP 端 initAppLocal 用 getAppVersion 回填真实版本（Tauri 无 SW，否则永远显示 225）。
+//      强制刷新后 SW_VERSION 应为 s1.0.229。
 // ============================================================
 
-const CACHE_VERSION = 's1.0.228';
+const CACHE_VERSION = 's1.0.229';
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
