@@ -15925,11 +15925,27 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             const gistDeleted = localStorage.getItem('messages_gist_deleted') === 'true';
             let id = (!gistDeleted && MESSAGES_GIST_ID) ? MESSAGES_GIST_ID : (localStorage.getItem('messages_gist_id') || '');
             if (!gistDeleted) {
+                let resolvedFromIndex = false;
                 try {
                     const token = getGistToken();
                     const idxResp = await fetch(`https://api.github.com/gists/${GIST_ID}`, { headers: { 'Accept': 'application/vnd.github.v3+json', ...(token && { 'Authorization': `token ${token}` }) } });
-                    if (idxResp.ok) { const idxData = await idxResp.json(); const ri = idxData.files && idxData.files['room_index.json']; if (ri && ri.content) { const idx = JSON.parse(ri.content); if (idx.messages) { id = idx.messages; localStorage.setItem('messages_gist_id', id); } } }
+                    if (idxResp.ok) { const idxData = await idxResp.json(); const ri = idxData.files && idxData.files['room_index.json']; if (ri && ri.content) { const idx = JSON.parse(ri.content); if (idx.messages) { id = idx.messages; localStorage.setItem('messages_gist_id', id); resolvedFromIndex = true; } } }
                 } catch (e) {}
+                // 自愈：索引/常量都失效 → 扫账号下最近创建的「需求墙消息」Gist
+                if (!resolvedFromIndex && (!id || id === MESSAGES_GIST_ID)) {
+                    try {
+                        const token = getGistToken();
+                        let best = null;
+                        for (let pg = 1; pg <= 5; pg++) {
+                            const r = await fetch(`https://api.github.com/gists?per_page=100&page=${pg}`, { headers: { 'Accept': 'application/vnd.github.v3+json', ...(token && { 'Authorization': `token ${token}` }) } });
+                            if (!r.ok) break;
+                            const gs = await r.json(); if (!Array.isArray(gs) || !gs.length) break;
+                            for (const g of gs) { if ((g.description || '').includes('需求墙消息')) { if (!best || new Date(g.created_at).getTime() > new Date(best.created_at).getTime()) best = g; } }
+                            if (gs.length < 100) break;
+                        }
+                        if (best) { id = best.id; localStorage.setItem('messages_gist_id', id); }
+                    } catch (e) { console.warn('[消息Gist自愈] 失败:', e); }
+                }
             }
             return id;
         }
