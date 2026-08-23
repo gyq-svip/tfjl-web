@@ -286,7 +286,7 @@
                 if (!tag) return;
                 tag.style.color = '#4caf50';
                 tag.style.opacity = '1';
-                tag.title = '有新版本可用，点击查看 / 强制刷新';
+                // 不设置 title，避免浏览器原生 tooltip 弹出
                 if (!document.getElementById('__verNewDot')) {
                     const dot = document.createElement('span');
                     dot.id = '__verNewDot';
@@ -308,7 +308,7 @@
                             _markNewVersionAvailable();
                         } else {
                             window.__tfjlHasNewVersion = false;
-                            if (tag) { tag.style.color = ''; tag.title = '前端标记号（点我看版本详情 / 强制刷新）'; }
+                            if (tag) { tag.style.color = ''; /* 不设置 title */ }
                             const d = document.getElementById('__verNewDot'); if (d) d.remove();
                         }
                     } else {
@@ -323,8 +323,7 @@
                 const short = swVersion.indexOf('tfjl-') === 0 ? swVersion.slice('tfjl-'.length) : swVersion;
                 const base = tag.textContent.split(' · ')[0];
                 tag.textContent = base + ' · ' + short;
-                // 同步更新 title 悬浮提示（避免悬停还显示 HTML 写死的旧版本号，误让人以为没刷到最新版）
-                tag.title = '当前缓存版本: ' + swVersion + '\n双击：强制刷新获取最新版（清缓存+跳过SW等待）';
+                // 不再设置 title，避免浏览器原生 tooltip 弹出「当前缓存版本...强制刷新」干扰用户
                 // 同步打印到控制台（浮动调试窗会捕获，便于强制刷新后一眼确认是否刷到最新版）
                 console.log('[VERSION] 当前缓存版本:', swVersion, '（强制刷新后应为 s1.0.230 才算最新）');
             }

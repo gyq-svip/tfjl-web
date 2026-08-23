@@ -2477,6 +2477,8 @@
                 <span style="color:#4ecdc4;">📥</span>
                 <span style="color:#4fc3f7;">下载桌面版</span>
             </div>
+            <!-- 前端部署时间标记（铁律要求，CI 自动注入部署时间）：statsBar 内绝对定位贴右、垂直居中，无 hover/title 提示 -->
+            <span id="versionTag" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;user-select:none;color:rgba(255,255,255,0.55);font-size:0.66rem;padding:1px 6px;" ondblclick="if(typeof forceRefreshLatest==='function'){forceRefreshLatest();}">s20260823-2137 · s1.0.230</span>
         </div>
     </div>
 
