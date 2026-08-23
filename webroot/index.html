@@ -2479,12 +2479,8 @@
             </div>
             <!-- 前端标记号：普通人只看「版本」即可，此处极淡隐藏（贴状态栏右下角、不在最左），仅开发者可点击核对/强制刷新 -->
             <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);display:flex;align-items:center;">
-                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.55);font-size:0.68rem;padding:1px 6px;opacity:0.6;" ondblclick="if(typeof forceRefreshLatest==='function'){forceRefreshLatest();}" title="双击：强制刷新获取最新版（清缓存+跳过SW等待）">s20260823-82 · s1.0.230</span>
-                <div class="version-tooltip">版本 s20260820-41 · s1.0.184（双击强制刷新）</div>
+                <span id="versionTag" style="cursor:pointer;user-select:none;color:rgba(255,255,255,0.18);font-size:0.66rem;padding:1px 6px;opacity:0.18;" ondblclick="if(typeof forceRefreshLatest==='function'){forceRefreshLatest();}" title="s20260823-82 · s1.0.230">s20260823-82 · s1.0.230</span>
             </div>
-            <script>/* 悬浮提示自动跟随版本号，避免 bump 时漏改 tooltip */
-                (function(){var v=document.getElementById('versionTag');var t=document.querySelector('#versionTag + .version-tooltip');if(v&&t)t.textContent='版本 '+v.textContent+'（双击强制刷新）';})();
-            </script>
         </div>
     </div>
 
