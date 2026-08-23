@@ -12055,7 +12055,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         if (typeof applyPoolSkinLockUI === 'function') applyPoolSkinLockUI();
 
                         // ✅ 兜底：1.5s/3s 后再各铺一次卡池皮肤，覆盖「水人」等新英雄 DOM 晚于首屏 updateCardPoolSkins
-                        //  触发的 race condition（首屏紫底、右击才好即此原因）。
+                        //  触发的 race condition（用户卡池里的新英雄首屏紫底、右击才好即此原因）。
                         setTimeout(function () { if (typeof updateCardPoolSkins === 'function') updateCardPoolSkins().catch(function () {}); }, 1500);
                         setTimeout(function () { if (typeof updateCardPoolSkins === 'function') updateCardPoolSkins().catch(function () {}); }, 3000);
                     } catch (err) {
@@ -12066,8 +12066,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 }
 
                 // ✅✅ 同步云端基础卡（cards.json），让「管理员新增的英雄」（如水人）在首屏卡池可见
-                //   【关键修复】原先包在 `if (window.scanSkins)` 分支内，网页端 window.scanSkins 不存在
-                //   （只在 APP 端 app-local.js 定义）导致整段被跳过 → 水人「直接没有」。移出分支独立执行。
+                //   【关键修复】这段代码原先被包在 `if (window.scanSkins)` 分支内，但网页端 window.scanSkins
+                //   永远不存在（它只在 APP 端的 app-local.js 定义），导致整段被跳过 → 水人「直接没有」。
+                //   现移出该分支，独立执行，网页端 / APP 端首屏都能渲染云端卡。
+                //   延迟 800ms，确保卡池 DOM（.collapsible-section.gold 等）已构建完成再渲染。
                 setTimeout(function () {
                     try {
                         if (!window.cloudCards || !Object.keys(window.cloudCards).length) {
@@ -12261,6 +12263,7 @@ function getGistToken() {
     } catch (e) {}
 
     // 🔴 诊断：部署注入的 HARDCODED_TOKEN 仍是占位符 → 多为「浏览器缓存了旧版 app-core.js」或「部署未注入 secret」。
+    // 提示用户强刷，避免误以为代码 bug 而焦虑数据丢失（实际本地 localStorage 仍兜底，不会丢）。
     if (!_tokenDiagShown) {
         _tokenDiagShown = true;
         if (HARDCODED_TOKEN.indexOf('YOUR_') === 0) {
@@ -14572,7 +14575,7 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
                 let content = JSON.stringify(data, null, 2);
                 const token = getGistToken();
                 
-                // 强制只用硬编码的 COUNTER_GIST_ID（铁律：counter Gist 必须归 gyq-svip 且硬编码，禁止从 localStorage/索引自动发现陌生 Gist）
+                // 铁律：counter Gist 必须归 gyq-svip 且硬编码，禁止从 localStorage/索引自动发现陌生 Gist
                 const counterGistId = COUNTER_GIST_ID;
                 
                 if (counterGistId) {
@@ -14642,7 +14645,7 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
                     }
                     // 如果 PATCH 失败，按状态码处理
                     if (response.status === 404 || response.status === 403) {
-                        // Gist 不存在或无权限（铁律：永远不清除硬编码 COUNTER_GIST_ID 引用，也不自动创建陌生 Gist）
+                        // 铁律：永远不清除硬编码 COUNTER_GIST_ID 引用，也不自动创建陌生 Gist；明确提示并暂停
                         console.warn('[统计] counter Gist 读写失败 status=' + response.status + '，请检查 Gist 是否存在/Token 权限；暂停同步');
                         return false;
                     } else if (response.status === 401) {
@@ -14652,7 +14655,8 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
                     }
                 }
                 
-                // 铁律：counter Gist 已硬编码为 COUNTER_GIST_ID，以下创建/发现分支已被短路（counterGistId 恒等于 COUNTER_GIST_ID），不会触发；保留旧逻辑不影响。
+                // 如果不存在或 PATCH 失败，创建新的 Gist
+                // 【双重检查】创建前先从索引文件确认是否已有counter
                 if (!counterGistId && token) {
                     try {
                         const indexUrl = `https://api.github.com/gists/${GIST_ID}`;
@@ -16992,8 +16996,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                     } catch (e) { console.warn('[消息] 索引解析失败，用硬编码兜底:', e); }
                 }
 
-                // ★ 根治 Actions 备份 404：把当前确定的消息 Gist ID 写回总表 room_index.json.messages，
-                // 保证 wall-backup.mjs 能直接读到指针（不依赖扫 Gist 匹配）。仅在指针缺失/变化时写回，避免无谓 API。
+                // ★ 根治 Actions 备份 404：把当前确定的消息 Gist ID 写回总表 room_index.json.messages
                 if (token && messagesGistId && !gistDeleted) {
                     try {
                         const idxResp = await fetch(`https://api.github.com/gists/${GIST_ID}`, { headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` } });
@@ -21210,7 +21213,8 @@ ${maSection}
                 // 🔴 修「消息 Gist 误报 404」：监控面板原本只看 localStorage.messages_gist_id，
                 // 死常量 b02794a8... 早已被删 → localStorage 为空时 fallback 到死常量 → 误报 404。
                 // 现在改为：优先 localStorage → 查总表 room_index.json.messages（和 fetchMessages 同套逻辑） → 最后兜底死常量。
-                // 扩展为 4 项检查：索引/消息(致命红) + News/计数器(警告黄)。
+                // 同时扩展为 4 项检查：索引 Gist / 消息 Gist / News Gist(公告) / 计数器 Gist(在线状态)。
+                // 严重级别：索引·消息 = 致命(红，丢了全玩完)；News·计数器 = 警告(黄，非核心数据)。
                 let msgId = localStorage.getItem('messages_gist_id') || '';
                 let newsId = localStorage.getItem('news_gist_id') || '';
                 let roomIndex = null;
@@ -21234,7 +21238,7 @@ ${maSection}
                     } catch (e) {}
                 }
                 if (!msgId) msgId = MESSAGES_GIST_ID;
-                // critical=致命(红，丢了全玩完)；warn=警告(黄，非核心数据)。
+                // critical=致命(红)，warn=警告(黄)。索引与消息是核心数据通道，缺了全玩完；News/计数器是非核心。
                 const gistChecks = [
                     { name: '索引 Gist', id: GIST_ID, level: 'critical', need: 'room_index.json' },
                     { name: '消息 Gist', id: msgId, level: 'critical', need: 'messages.json' },
@@ -21249,6 +21253,7 @@ ${maSection}
                             gistHtml += `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:0.78rem;"><span style="color:rgba(255,255,255,0.6);">${gc.name}</span><span style="color:#4ade80;">✅ 已配置（数据源：索引 Gist 的 news.json）</span></div>`;
                             continue;
                         }
+                        // News 未配置属于警告级（公告无数据源，不影响核心）
                         const c = gc.level === 'critical' ? '#ef4444' : '#fbbf24';
                         const txt = gc.level === 'critical' ? '❌ 未配置' : '⚠️ 未配置(无数据源)';
                         gistHtml += `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:0.78rem;"><span style="color:rgba(255,255,255,0.6);">${gc.name}</span><span style="color:${c};">${txt}</span></div>`;
@@ -21261,11 +21266,13 @@ ${maSection}
                         if (r.ok) {
                             const gj = await r.json();
                             const files = Object.keys(gj.files || {});
+                            // 文件齐全性检查
                             let fileNote = '', fileBad = false;
                             if (gc.need && !files.includes(gc.need)) {
                                 fileBad = true;
                                 fileNote = ` ⚠️ 缺 ${gc.need}`;
                             }
+                            // 致命级缺文件 = 红；警告级缺文件 = 黄
                             const okColor = (gc.level === 'critical' && fileBad) ? '#ef4444' : (fileBad ? '#fbbf24' : '#4ade80');
                             const okIcon = (gc.level === 'critical' && fileBad) ? '❌' : (fileBad ? '⚠️' : '✅');
                             gistHtml += `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:0.78rem;" title="${gc.id}"><span style="color:rgba(255,255,255,0.6);">${gc.name}</span><span style="color:${okColor};">${okIcon} ${gc.id.substring(0, 8)}...${fileNote}</span></div>`;
@@ -21302,6 +21309,7 @@ ${maSection}
                                 }
                             }
                         } else {
+                            // 404/403/其它 → 致命级红，警告级黄
                             const icon = r.status === 404 ? '❌ 404(已删?)' : r.status === 403 ? '🔒 403' : `⚠️ ${r.status}`;
                             const color = gc.level === 'critical' ? '#ef4444' : '#fbbf24';
                             gistHtml += `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:0.78rem;" title="${gc.id}"><span style="color:rgba(255,255,255,0.6);">${gc.name}</span><span style="color:${color};">${icon} ${gc.id.substring(0, 8)}...</span></div>`;
@@ -21330,6 +21338,13 @@ ${maSection}
                         <div style="color:#a78bfa;font-size:0.85rem;margin-bottom:6px;">📁 关键 Gist 可访问性</div>
                         ${gistHtml}
                     </div>
+                    <div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:12px;margin-top:12px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                            <div style="color:rgba(255,255,255,0.6);font-size:0.8rem;">📋 部署日志（GitHub Actions · deploy.yml）</div>
+                            <button onclick="loadActionsLogs()" style="padding:3px 10px;border-radius:4px;border:1px solid rgba(78,205,196,0.3);background:rgba(78,205,196,0.1);color:#4ecdc4;cursor:pointer;font-size:0.7rem;">查看日志</button>
+                        </div>
+                        <div id="actionsStatusSummary" style="font-size:0.75rem;color:rgba(255,255,255,0.5);">点击「查看日志」加载最近 10 次部署运行记录</div>
+                    </div>
                     <div style="margin-top:12px;color:rgba(255,255,255,0.4);font-size:0.7rem;">检测时间：${new Date().toLocaleString('zh-CN')}</div>
                 `;
             } catch (e) {
@@ -21337,6 +21352,190 @@ ${maSection}
             }
         }
         window.refreshApiMonitor = refreshApiMonitor;
+
+        // ==================== 部署日志（克隆自拍卖行管理员 API 监控） ====================
+        // 加载 GitHub Actions deploy.yml 运行记录（最近10次）+ 成功/失败统计 + 单次日志展开
+        async function loadActionsLogs() {
+            const summary = document.getElementById('actionsStatusSummary');
+            if (!summary) return;
+            await _loadActionsLogsInternal(summary);
+        }
+
+        // 内部实现：加载 Actions 日志到指定容器
+        async function _loadActionsLogsInternal(summary) {
+            summary.innerHTML = '<span style="color:rgba(255,255,255,0.4);">加载中...</span>';
+
+            const token = (typeof getGistToken === 'function') ? getGistToken() : localStorage.getItem('gistToken') || '';
+            const REPO = 'gyq-svip/tfjl-web';
+            const WORKFLOW_ID = 'deploy.yml';
+
+            try {
+                // 1. 获取 workflow 运行记录（最近 10 次）
+                const runsResp = await fetch(`https://api.github.com/repos/${REPO}/actions/workflows/${WORKFLOW_ID}/runs?per_page=10`, {
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        ...(token && { 'Authorization': `token ${token}` })
+                    }
+                });
+
+                if (!runsResp.ok) {
+                    summary.innerHTML = `<span style="color:#ef4444;">❌ 获取失败(${runsResp.status}): ${runsResp.status === 404 ? '仓库或工作流不存在' : '请检查 Token 权限'}</span>`;
+                    return;
+                }
+
+                const runsData = await runsResp.json();
+                const runs = runsData.workflow_runs || [];
+
+                if (runs.length === 0) {
+                    summary.innerHTML = '<span style="color:#fbbf24;">⚠️ 暂无运行记录（可能还未触发过）</span>';
+                    return;
+                }
+
+                // 2. 显示运行记录列表
+                let html = '<div style="max-height:300px;overflow-y:auto;border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:8px;background:rgba(0,0,0,0.2);">';
+
+                for (const run of runs) {
+                    const status = run.status; // queued, in_progress, completed
+                    const conclusion = run.conclusion; // success, failure, cancelled, null(进行中)
+                    const time = new Date(run.created_at).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
+
+                    let statusIcon = '⏳';
+                    let statusColor = '#fbbf24';
+                    if (status === 'completed') {
+                        if (conclusion === 'success') { statusIcon = '✅'; statusColor = '#4ade80'; }
+                        else if (conclusion === 'failure') { statusIcon = '❌'; statusColor = '#ef4444'; }
+                        else if (conclusion === 'cancelled') { statusIcon = '⚪'; statusColor = 'rgba(255,255,255,0.4)'; }
+                    } else if (status === 'in_progress') {
+                        statusIcon = '🔄'; statusColor = '#4ecdc4';
+                    }
+
+                    html += `
+                        <div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.05);">
+                            <div style="display:flex;justify-content:space-between;align-items:center;">
+                                <span style="color:${statusColor};font-size:0.75rem;">${statusIcon} ${conclusion || status}</span>
+                                <span style="color:rgba(255,255,255,0.4);font-size:0.7rem;">${time}</span>
+                            </div>
+                            <div style="color:rgba(255,255,255,0.6);font-size:0.7rem;margin-top:2px;">${run.display_title || run.name || '运行'}</div>
+                            <div style="margin-top:4px;">
+                                <button onclick="loadRunLog('${run.id}')" style="padding:2px 8px;border-radius:3px;border:1px solid rgba(78,205,196,0.3);background:rgba(78,205,196,0.1);color:#4ecdc4;cursor:pointer;font-size:0.65rem;">查看日志</button>
+                            </div>
+                            <div id="runLog_${run.id}" style="display:none;margin-top:6px;background:rgba(0,0,0,0.4);border-radius:4px;padding:8px;font-family:monospace;font-size:0.7rem;color:#4ade80;max-height:200px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;"></div>
+                        </div>
+                    `;
+                }
+                html += '</div>';
+
+                // 3. 显示统计
+                const successCount = runs.filter(r => r.conclusion === 'success').length;
+                const failCount = runs.filter(r => r.conclusion === 'failure').length;
+                const lastRun = runs[0];
+                const lastTime = new Date(lastRun.created_at).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
+
+                html = `
+                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px;">
+                        <div style="background:rgba(0,0,0,0.2);border-radius:6px;padding:6px;text-align:center;">
+                            <div style="color:rgba(255,255,255,0.4);font-size:0.65rem;">最近运行</div>
+                            <div style="color:#4ecdc4;font-size:0.75rem;font-weight:600;">${lastTime.split(' ')[1] || lastTime}</div>
+                        </div>
+                        <div style="background:rgba(0,0,0,0.2);border-radius:6px;padding:6px;text-align:center;">
+                            <div style="color:rgba(255,255,255,0.4);font-size:0.65rem;">成功</div>
+                            <div style="color:#4ade80;font-size:0.75rem;font-weight:600;">${successCount}/${runs.length}</div>
+                        </div>
+                        <div style="background:rgba(0,0,0,0.2);border-radius:6px;padding:6px;text-align:center;">
+                            <div style="color:rgba(255,255,255,0.4);font-size:0.65rem;">失败</div>
+                            <div style="color:${failCount > 0 ? '#ef4444' : 'rgba(255,255,255,0.4)'};font-size:0.75rem;font-weight:600;">${failCount}</div>
+                        </div>
+                    </div>
+                ` + html;
+
+                summary.innerHTML = html;
+
+            } catch (e) {
+                summary.innerHTML = `<span style="color:#ef4444;">❌ 加载失败: ${e.message}</span>`;
+            }
+        }
+
+        // 加载单次运行的日志
+        async function loadRunLog(runId) {
+            const logDiv = document.getElementById(`runLog_${runId}`);
+            if (!logDiv) return;
+
+            // 切换显示/隐藏
+            if (logDiv.style.display === 'block') {
+                logDiv.style.display = 'none';
+                return;
+            }
+
+            logDiv.style.display = 'block';
+            logDiv.innerHTML = '<span style="color:rgba(255,255,255,0.4);">加载日志中...</span>';
+
+            const token = (typeof getGistToken === 'function') ? getGistToken() : localStorage.getItem('gistToken') || '';
+            const REPO = 'gyq-svip/tfjl-web';
+
+            try {
+                // 获取运行的 jobs
+                const jobsResp = await fetch(`https://api.github.com/repos/${REPO}/actions/runs/${runId}/jobs`, {
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        ...(token && { 'Authorization': `token ${token}` })
+                    }
+                });
+
+                if (!jobsResp.ok) {
+                    logDiv.innerHTML = `<span style="color:#ef4444;">❌ 获取日志失败(${jobsResp.status})</span>`;
+                    return;
+                }
+
+                const jobsData = await jobsResp.json();
+                const jobs = jobsData.jobs || [];
+
+                if (jobs.length === 0) {
+                    logDiv.innerHTML = '<span style="color:rgba(255,255,255,0.4);">无日志</span>';
+                    return;
+                }
+
+                let logText = '';
+                for (const job of jobs) {
+                    logText += `=== ${job.name} (${job.status}/${job.conclusion || '...'}) ===\n`;
+                    for (const step of (job.steps || [])) {
+                        const stepStatus = step.conclusion === 'success' ? '✅' : step.conclusion === 'failure' ? '❌' : '⏳';
+                        logText += `${stepStatus} ${step.name}\n`;
+                        // 只显示「运行消息整理脚本」步骤的日志
+                        if (step.name && step.name.includes('整理')) {
+                            try {
+                                const logResp = await fetch(`https://api.github.com/repos/${REPO}/actions/jobs/${job.id}/logs`, {
+                                    headers: {
+                                        'Accept': 'application/vnd.github.v3+json',
+                                        ...(token && { 'Authorization': `token ${token}` })
+                                    }
+                                });
+                                if (logResp.ok) {
+                                    const logContent = await logResp.text();
+                                    const lines = logContent.split('\n').filter(l =>
+                                        l.includes('整理') || l.includes('房间') || l.includes('消息') ||
+                                        l.includes('✅') || l.includes('❌') || l.includes('📊') ||
+                                        l.includes('🚀') || l.includes('✨') || l.includes('🗑️')
+                                    );
+                                    if (lines.length > 0) {
+                                        logText += lines.map(l => '  ' + l.replace(/^\d{4}-\d{2}-\d{2}T[\d:.Z+\-]+\s*/, '').trim()).join('\n') + '\n';
+                                    }
+                                }
+                            } catch (e) {
+                                logText += `  (日志获取失败: ${e.message})\n`;
+                            }
+                        }
+                    }
+                    logText += '\n';
+                }
+
+                logDiv.textContent = logText || '无日志内容';
+
+            } catch (e) {
+                logDiv.innerHTML = `<span style="color:#ef4444;">❌ 加载日志失败: ${e.message}</span>`;
+            }
+        }
+        window.loadActionsLogs = loadActionsLogs;
+        window.loadRunLog = loadRunLog;
 
         // ==================== 对战日志诊断（管理员菜单） ====================
         function adminRefreshDebugLog() {

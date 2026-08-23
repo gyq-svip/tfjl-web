@@ -114,9 +114,7 @@
           _idbPut(key, blob); // 回写缓存，下次刷新即稳定
           return URL.createObjectURL(blob);
         }
-        // 🔴 404/410 不算「失败」而是「不存在」：静默处理（浏览器原生 GET 404 已经会显示在 Network/Console），
-        // 不重复打 console.warn 干扰用户。只有真正网络异常才 warn。
-      } catch (e) { console.warn('[SKIN-WEB] 皮肤加载异常:', url, e); }
+      } catch (e) { console.warn('[SKIN-WEB] 皮肤加载失败:', url, e); }
       return null; // 全部失败：返回 null（已有 IndexedDB 兜底，多数情况命中）
     })();
     _skinInflight[key] = p;
@@ -125,8 +123,6 @@
 
   function _sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
   // fetch + 超时 + 重试（指数退避），单一同源即可（GitHub Pages 已相当稳定）
-  // 🔴 修复「控制台 404 刷屏」：404/410 直接返回，不再重试（重试也无意义，文件不存在）。
-  // 之前每个失效 URL 会触发 3 次 404（重试 2 次），控制台被刷屏误以为报错。
   async function _fetchWithRetry(url, ms, retries) {
     retries = retries || 2;
     var lastErr;
@@ -138,8 +134,8 @@
         var resp = await fetch(url, { cache: 'no-cache', signal: ctrl.signal });
         clearTimeout(timer);
         if (resp.ok) return resp;
-        // 404/410 文件不存在 → 直接放弃，避免无谓重试刷屏
-        if (resp.status === 404 || resp.status === 410) return resp;
+        // 铁律：404 = 资源不存在（如用户自定义融合皮肤 .skin 文件缺失），重试无意义，直接放弃避免刷屏
+        if (resp.status === 404) { console.warn('[skins-web] 404 资源不存在，跳过重试:', url); return null; }
         lastErr = new Error('HTTP ' + resp.status);
       } catch (e) { lastErr = e; if (timer) clearTimeout(timer); }
       if (i < retries) await _sleep((i + 1) * 400); // 退避后重试
@@ -171,6 +167,8 @@
       var skinList = heroes[heroName];
       if (!Array.isArray(skinList)) return;
       skinList.forEach(function (s) {
+        // 🔴 跳过 IndexedDB 旧缓存恢复的 stale 皮肤：线上可能已删除/改名，发起请求必 404 刷屏
+        if (s.stale) return;
         queue.push({ hero: heroName, file: s.file || (s.name + '.skin') });
       });
     });
@@ -217,7 +215,8 @@
   }
 
   // 从同源皮肤注册表合并到 window.skinRegistry（url 用同源路径）
-  function _applyRegistry(heroesObj) {
+  function _applyRegistry(heroesObj, opts) {
+    opts = opts || {};
     if (!heroesObj) return 0;
     var addedCount = 0;
     for (var hn in heroesObj) {
@@ -239,14 +238,38 @@
           // 远端 registry 是事实来源：始终用远端 URL 覆盖本地（含 IndexedDB 旧缓存里 url 错/缺失的情况）。
           // 修复：水人等「英雄名==皮肤名」的默认皮肤，旧缓存若带错误/缺失 url，会导致 entry.url 为 undefined
           // → resolveHeroSkinInfo 返回 null → 渲染层 fallback 成品质色填充（看不到皮肤图）。
-          if (local) { local.url = url; local.path = null; local.remote = true; }
+          if (local) { local.url = url; local.path = null; local.remote = true; if (opts.stale) local.stale = true; }
         } else {
-          localSkins.push({ name: skinName, url: url, path: null, loaded: true, remote: true });
+          localSkins.push({ name: skinName, url: url, path: null, loaded: true, remote: true, stale: !!opts.stale });
           addedCount++;
         }
       }
     }
     return addedCount;
+  }
+  // 从 IndexedDB 旧缓存恢复（弱网/离线兜底用）：标记为 stale，不参与预热请求，避免对线上已删除的旧皮肤发起 404 请求
+  function _applyRegistryStale(heroesObj) {
+    return _applyRegistry(heroesObj, { stale: true });
+  }
+  // 远端注册表同步成功后，剔除「纯 stale 孤儿」：某英雄在远端 registry 中不存在、且当前皮肤列表全部来自旧缓存(stale)，
+  // 说明该英雄线上已删除/改名 → 直接整组移除，避免渲染层对不存在的 .skin 发起 404 请求。
+  function _purgeStaleOrphans(remoteHeroes) {
+    try {
+      var remoteKeys = remoteHeroes ? Object.keys(remoteHeroes) : [];
+      var remoteSet = {}; remoteKeys.forEach(function (k) { remoteSet[k] = true; });
+      for (var hn in window.skinRegistry) {
+        if (!Object.prototype.hasOwnProperty.call(window.skinRegistry, hn)) continue;
+        var list = window.skinRegistry[hn];
+        if (!Array.isArray(list) || !list.length) { delete window.skinRegistry[hn]; continue; }
+        if (remoteSet[hn]) continue; // 远端有该英雄（不会全是孤儿，保留）
+        // 远端无此英雄：若整组都是 stale（来自旧缓存），判定为孤儿，移除
+        var allStale = list.every(function (s) { return !!s.stale; });
+        if (allStale) {
+          console.log('[SKIN-WEB] 剔除已下线的旧缓存英雄:', hn, '(' + list.length + ' 个皮肤)');
+          delete window.skinRegistry[hn];
+        }
+      }
+    } catch (e) { console.warn('[SKIN-WEB] purge stale orphans failed:', e); }
   }
 
   // 拉取同源注册表 + 融合/属性表；成功后缓存 registry 到 IndexedDB（下次刷新即使全挂也能显示）
@@ -258,6 +281,9 @@
     if (!registry || !registry.heroes) return false;
     var added = _applyRegistry(registry.heroes);
     if (added > 0) console.log('[SKIN-WEB] 合并', added, '个皮肤');
+    // 🔴 远端注册表是事实来源：登录后清除 IndexedDB 旧缓存恢复的「纯 stale 孤儿」
+    // （如已删除/改名的「融合仓库」等线上不存在的英雄），避免残留 stale 条目在渲染时仍发起 404 请求。
+    _purgeStaleOrphans(registry.heroes);
     // 存 IndexedDB，供离线/弱网刷新兜底（registry 拉不到也能用上次清单 + 已缓存皮肤图）
     try { await _idbPut('skin:registry', new Blob([JSON.stringify(registry)], { type: 'application/json' })); } catch (e) {}
     // 🔴 预热「绝不 await」「绝不挤占首屏」：可见卡片立即触发；全量 low 并发 idle 启动
@@ -483,7 +509,7 @@
         var text = await cached.blob.text();
         var data = JSON.parse(text);
         if (data && data.heroes) {
-          _applyRegistry(data.heroes);
+          _applyRegistryStale(data.heroes);
           console.log('[SKIN-WEB] 已从 IndexedDB 恢复皮肤清单:', Object.keys(window.skinRegistry).length, '英雄（弱网/离线兜底）');
           try { if (typeof window.reapplyAllSkins === 'function') window.reapplyAllSkins(); } catch (e) {}
         }

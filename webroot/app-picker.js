@@ -286,7 +286,7 @@
                 if (!tag) return;
                 tag.style.color = '#4caf50';
                 tag.style.opacity = '1';
-                // 不使用原生 title，避免提示框跑出窗口
+                // 不使用原生 title，避免提示框跑出窗口；新版本提示由 tooltip 文案体现
                 if (!document.getElementById('__verNewDot')) {
                     const dot = document.createElement('span');
                     dot.id = '__verNewDot';
@@ -329,10 +329,10 @@
                     tip.textContent = base + ' · ' + short + '（双击刷新）';
                 }
                 // 同步打印到控制台（浮动调试窗会捕获，便于强制刷新后一眼确认是否刷到最新版）
-                console.log('[VERSION] 当前缓存版本:', swVersion, '（强制刷新后应为 s1.0.226 才算最新）');
+                console.log('[VERSION] 当前缓存版本:', swVersion, '（强制刷新后应为 s1.0.230 才算最新）');
             }
             window.addEventListener('load', function() {
-                navigator.serviceWorker.register('./sw.js', { scope: './', updateViaCache: 'none' }).then(function(registration) {
+                navigator.serviceWorker.register('./sw.js?v=b20260823230841', { scope: './', updateViaCache: 'none' }).then(function(registration) {
                     console.log('[PWA] Service Worker 注册成功，scope:', registration.scope);
                     // 每次打开 APP 主动检查 SW 更新（绕过 Tauri WebView 的 SW 更新检测问题）
                     registration.update().catch(function() {});
