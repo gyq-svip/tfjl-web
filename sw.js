@@ -5,9 +5,11 @@
 //      提升 CACHE_VERSION 触发 activate 清空所有 tfjl- 缓存，确保拿到最新前端（含分享密码框）
 // v35: 升版本配合 app-core.js 水人首屏渲染修复（commit 5c4338c，把云端卡渲染移出 scanSkins 分支，
 //      网页端此前因无 scanSkins 整段被跳过，导致水人「直接没有」）。强制刷新后浮动控制台 SW_VERSION 应为 s1.0.226。
+// v36: 升版本配合「API监控→部署日志+定时任务」克隆自拍卖行管理员（index.html/api-core.js 新增 loadActionsLogs/loadRunLog、
+//      refreshApiMonitor 补部署日志区块、index.html 增加部署日志+触发方式面板）。强制刷新后 SW_VERSION 应为 s1.0.227。
 // ============================================================
 
-const CACHE_VERSION = 's1.0.226';
+const CACHE_VERSION = 's1.0.227';
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）

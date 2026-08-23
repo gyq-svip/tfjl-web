@@ -4,9 +4,10 @@
 // v34: 再次强制刷新缓存——修复"分享加密密码框不显示"（旧 SW 用 cacheFirst 缓存旧 index.html 不更新）；
 //      提升 CACHE_VERSION 触发 activate 清空所有 tfjl- 缓存，确保拿到最新前端（含分享密码框）
 // v35: 升版本配合 app-core.js 水人首屏渲染修复（commit 5c4338c）。强制刷新后 SW_VERSION 应为 s1.0.226。
+// v36: 升版本配合「API监控→部署日志+定时任务」克隆自拍卖行管理员。强制刷新后 SW_VERSION 应为 s1.0.227。
 // ============================================================
 
-const CACHE_VERSION = 's1.0.226';
+const CACHE_VERSION = 's1.0.227';
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
