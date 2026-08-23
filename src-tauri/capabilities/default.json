@@ -18,7 +18,7 @@
     "allow-open-url",
     "allow-write-binary-file",
     "allow-read-directory",
-    "allow-read-text-file-auto",
+    "allow-read-text-file",
     "allow-detect-file-encoding",
     "allow-write-text-file",
     "allow-git-push-fusions",

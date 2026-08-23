@@ -213,29 +213,29 @@ function checkTauriCommandAuth() {
     if (!regM) { PASS('Tauri 命令授权检查: 未找到 invoke_handler，跳过'); return; }
     const registered = regM[1].split(',').map(s => s.trim()).filter(Boolean);
 
-    // toml 里所有被 allow 的命令
-    const tomlAllowed = new Set();
-    const tomlRe = /commands\.allow\s*=\s*\[([^\]]*)\]/g;
-    let tm;
-    while ((tm = tomlRe.exec(tomlSrc))) {
-        tm[1].split(',').map(s => s.trim().replace(/^"|"$/g, '')).filter(Boolean).forEach(c => tomlAllowed.add(c));
+    // 解析 toml 的 [[permission]] 块：identifier（真实权限标识符，如 allow-read-text-file）
+    // + commands.allow（Rust 命令名数组，如 ["read_text_file_auto"]）。
+    // 关键：capability 里声明的是 identifier，不是 Rust 命令名（read_text_file_auto → identifier 是 allow-read-text-file）。
+    const cmdToIdent = new Map();   // Rust 命令名 → identifier
+    const identRe = /\[\[permission\]\][\s\S]*?identifier\s*=\s*"([^"]+)"[\s\S]*?commands\.allow\s*=\s*\[([^\]]*)\]/g;
+    let im;
+    while ((im = identRe.exec(tomlSrc))) {
+        const ident = im[1];
+        im[2].split(',').map(s => s.trim().replace(/^"|"$/g, '')).filter(Boolean).forEach(c => cmdToIdent.set(c, ident));
     }
-    // capabilities 里所有 "allow-命令名"
+    // capabilities 里所有 "allow-xxx" 标识符（存纯命令部分，如 read-text-file，便于和 ident 去前缀后比对）
     const capAllowed = new Set();
     const capRe = /"allow-([a-z0-9_-]+)"/g;
     let cm;
-    while ((cm = capRe.exec(capSrc))) capAllowed.add(cm[1]);
+    while ((cm = capRe.exec(capSrc))) capAllowed.add(cm[1].replace(/^allow-/, ''));
 
     let miss = 0;
     for (const cmd of registered) {
-        // Tauri ACL 标识符用小写连字符（foo_bar → foo-bar），而 Rust 函数名下划线。
-        // capabilities/default.json 用连字符版，allow-custom-commands.toml 用下划线版。
-        const cmdHyphen = cmd.replace(/_/g, '-');
-        const aHyphen = `allow-${cmdHyphen}`;
-        const inToml = tomlAllowed.has(cmd);
-        const inCap = capAllowed.has(cmdHyphen);
+        const ident = cmdToIdent.get(cmd);
+        const inToml = !!ident;                       // toml 是否声明了该命令的 permission 块
+        const inCap = ident ? capAllowed.has(ident.replace(/^allow-/, '')) : false; // capability 是否声明了对应 identifier
         if (!inToml || !inCap) {
-            FAIL(`Tauri 命令授权缺失 [${cmd}]：${inToml ? '✓toml' : '✗toml缺'} ${inCap ? '✓capability' : '✗capability缺 "' + aHyphen + '"'}\n     → 运行时必弹「${cmd} not allowed by ACL」，须补 src-tauri/permissions/allow-custom-commands.toml + capabilities/default.json 后重新打包`);
+            FAIL(`Tauri 命令授权缺失 [${cmd}]：toml ${inToml ? '✓(' + ident + ')' : '✗缺 [[permission]] 块'} / capability ${inCap ? '✓' : '✗缺 "' + (ident || ('allow-' + cmd.replace(/_/g, '-'))) + '"'}\n     → 运行时必弹「${cmd} not allowed by ACL」，须补 src-tauri/permissions/allow-custom-commands.toml 的 [[permission]] + capabilities/default.json 后重新打包`);
             miss++;
         }
     }
