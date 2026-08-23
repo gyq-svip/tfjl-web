@@ -114,7 +114,9 @@
           _idbPut(key, blob); // 回写缓存，下次刷新即稳定
           return URL.createObjectURL(blob);
         }
-      } catch (e) { console.warn('[SKIN-WEB] 皮肤加载失败:', url, e); }
+        // 🔴 404/410 不算「失败」而是「不存在」：静默处理（浏览器原生 GET 404 已经会显示在 Network/Console），
+        // 不重复打 console.warn 干扰用户。只有真正网络异常才 warn。
+      } catch (e) { console.warn('[SKIN-WEB] 皮肤加载异常:', url, e); }
       return null; // 全部失败：返回 null（已有 IndexedDB 兜底，多数情况命中）
     })();
     _skinInflight[key] = p;
@@ -123,6 +125,8 @@
 
   function _sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
   // fetch + 超时 + 重试（指数退避），单一同源即可（GitHub Pages 已相当稳定）
+  // 🔴 修复「控制台 404 刷屏」：404/410 直接返回，不再重试（重试也无意义，文件不存在）。
+  // 之前每个失效 URL 会触发 3 次 404（重试 2 次），控制台被刷屏误以为报错。
   async function _fetchWithRetry(url, ms, retries) {
     retries = retries || 2;
     var lastErr;
@@ -134,6 +138,8 @@
         var resp = await fetch(url, { cache: 'no-cache', signal: ctrl.signal });
         clearTimeout(timer);
         if (resp.ok) return resp;
+        // 404/410 文件不存在 → 直接放弃，避免无谓重试刷屏
+        if (resp.status === 404 || resp.status === 410) return resp;
         lastErr = new Error('HTTP ' + resp.status);
       } catch (e) { lastErr = e; if (timer) clearTimeout(timer); }
       if (i < retries) await _sleep((i + 1) * 400); // 退避后重试
