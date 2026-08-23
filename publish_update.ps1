@@ -97,11 +97,13 @@ $updater = [ordered]@{
         }
     }
 }
+$exeSize = if (Test-Path $ExePath) { (Get-Item $ExePath).Length } else { 0 }
 $versionJson = [ordered]@{
     version     = $ver
     notes       = "auto update v$ver"
     pub_date    = $pubDate
     downloadUrl = $rawUrl
+    size        = $exeSize
 }
 
 $updaterPath = Join-Path $RootDir "updater.json"

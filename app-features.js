@@ -2974,6 +2974,7 @@
                             body: '',
                             htmlUrl: data.page || GITHUB_RELEASES_PAGE,
                             downloadUrl: data.downloadUrl || '',
+                            size: typeof data.size === 'number' ? data.size : 0,
                             assets: []
                         };
                     }
@@ -3020,6 +3021,17 @@
             }
             if (latestInfo) {
                 latestInfo.innerHTML = '<span style="color:#888;">最新版本: </span><span style="color:#4fc3f7;font-weight:bold;">v' + release.version + '</span>';
+            }
+
+            // 动态填充软件大小（来自 version.json 的 size 字段，无则回退静态文案）
+            const sizeEl = document.getElementById('dlSizeInfo');
+            if (sizeEl) {
+                if (release.size && release.size > 0) {
+                    const mb = (release.size / (1024 * 1024));
+                    const sizeTxt = mb >= 1 ? mb.toFixed(1) + ' MB' : Math.round(release.size / 1024) + ' KB';
+                    sizeEl.innerHTML = '💾 软件大小：约 <b>' + sizeTxt + '</b>（轻量安装包，下载秒完成）';
+                }
+                // 无 size 字段时保持 HTML 默认静态文案（约 4.5 MB）
             }
 
             if (isNewerVersion(release.version, CURRENT_VERSION)) {
