@@ -187,10 +187,13 @@
 
   // 首屏可见卡片优先预热（只拉当前项目/手牌/槽位实际用到的英雄皮肤，不等全量）
   var _preheatVisibleStarted = false;
-  function _preheatVisibleSkins() {
+  async function _preheatVisibleSkins() {
     if (_preheatVisibleStarted) return;
     _preheatVisibleStarted = true;
     try {
+      // 🔴 必须先等远端 registry 合并完成：否则会用 IndexedDB 旧缓存里过期/改名前的文件名
+      //   （如融合卡早期格式「青城掌门·萨满.skin」）发起请求 → 线上 404 刷屏。
+      await _ensureSynced();
       var heroes = {};
       // 收集当前所有可见英雄（卡池 + 手牌 + 槽位）
       var names = {};
