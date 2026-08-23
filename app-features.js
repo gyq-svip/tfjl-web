@@ -3323,20 +3323,16 @@
                     localStorage.removeItem('TFJL_NotFirst');
                     localStorage.removeItem('TFJL_CachedHTML');
                 } catch(e) {}
-                // 4. 仅当"没有 waiting 新 SW"时才强制注销当前 SW 兜底（避免与上面的 SKIP_WAITING 自相矛盾：
-                // 刚让新 SW 激活又注销它，会导致 reload 后重新装回旧 SW 缓存）
-                if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-                    let hasWaiting = false;
+                // 4. 🔴 强制注销当前所有 SW 注册（无条件）。
+                // 之前只在"无 waiting SW"时才 unregister，但线上已部署新 SW(228)、旧 SW(225) 仍
+                // controlling + 新 SW 处于 waiting 时，skipWaiting 异步未生效 → reload 后仍被旧 SW 接管，
+                // 页面一直显示 HTML 写死的 fallback "s1.0.225" 拿不到 228。
+                // 直接 unregister 全部 + 清空 cache，reload 后浏览器重新 install 最新 228 SW，干净彻底。
+                if ('serviceWorker' in navigator) {
                     try {
-                        const reg = await navigator.serviceWorker.getRegistration();
-                        hasWaiting = !!(reg && reg.waiting);
+                        const regs = await navigator.serviceWorker.getRegistrations();
+                        await Promise.all(regs.map(r => r.unregister()));
                     } catch (e) {}
-                    if (!hasWaiting) {
-                        try {
-                            const regs = await navigator.serviceWorker.getRegistrations();
-                            regs.forEach(r => r.unregister());
-                        } catch (e) {}
-                    }
                 }
             } catch (e) { /* 清理阶段出错不阻塞，继续强刷 */ }
             // 强刷：带时间戳 URL + hard reload，彻底绕过各级缓存

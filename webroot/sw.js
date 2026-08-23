@@ -6,9 +6,10 @@
 // v35: 升版本配合 app-core.js 水人首屏渲染修复（commit 5c4338c）。强制刷新后 SW_VERSION 应为 s1.0.226。
 // v36: 升版本配合「API监控→部署日志+定时任务」克隆自拍卖行管理员。强制刷新后 SW_VERSION 应为 s1.0.227。
 // v37: 修「双击右下角版本号强制刷新无效」——改为直接调 forceRefreshLatest()。强制刷新后 SW_VERSION 应为 s1.0.228。
+// v38: forceRefreshLatest 无条件 unregister 所有 SW（破旧 SW 卡 225 困局）；版本号标签调亮；APP 端回填真实版本。SW_VERSION 应为 s1.0.229。
 // ============================================================
 
-const CACHE_VERSION = 's1.0.228';
+const CACHE_VERSION = 's1.0.229';
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
