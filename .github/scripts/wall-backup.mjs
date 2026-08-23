@@ -68,6 +68,37 @@ async function readGistFile(gist, fileName) {
     return content;
 }
 
+// 找当前消息 Gist（自愈）：优先总表 messages 字段；否则扫账号下 description 含「需求墙消息」且创建时间最新的 Gist
+// （解决硬编码 MESSAGES_GIST_ID_FALLBACK 指向已删除 Gist 导致 404 的问题——网页端切换/删除消息 Gist 后 Actions 也能自动找到）
+async function resolveMessagesGistId() {
+    try {
+        const idx = await getGist(INDEX_GIST_ID);
+        const c = await readGistFile(idx, 'room_index.json');
+        const obj = c ? JSON.parse(c || '{}') : {};
+        if (obj.messages) { log('消息 Gist（来自总表 room_index.messages）:', obj.messages); return obj.messages; }
+    } catch (e) { log('读总表 messages 失败:', e.message); }
+    // 总表无指针 → 扫全部 Gist 找最近的「需求墙消息」
+    log('总表无 messages 指针，扫描账号 Gist 自愈…');
+    try {
+        let best = null;
+        for (let page = 1; page <= 5; page++) {
+            const r = await fetch(`${API}/gists?per_page=100&page=${page}`, { headers: H });
+            if (!r.ok) break;
+            const gists = await r.json();
+            if (!Array.isArray(gists) || gists.length === 0) break;
+            for (const g of gists) {
+                if (!(g.description || '').includes('需求墙消息')) continue;
+                if (!best || new Date(g.created_at).getTime() > new Date(best.created_at).getTime()) best = g;
+            }
+            if (gists.length < 100) break;
+        }
+        if (best) { log('自愈找到消息 Gist（最近创建）:', best.id); return best.id; }
+    } catch (e) { log('扫描自愈失败:', e.message); }
+    // 最后兜底常量
+    log('自愈失败，使用硬编码兜底:', MESSAGES_GIST_ID_FALLBACK);
+    return MESSAGES_GIST_ID_FALLBACK;
+}
+
 // 读/写索引数组（wall_backup_index）+ 状态（wall_backup_status），均在 room_index.json 内
 async function readIndex() {
     try {
@@ -130,7 +161,7 @@ async function main() {
     const indexGist = await getGist(INDEX_GIST_ID);
     let roomIndex = {};
     try { roomIndex = JSON.parse((await readGistFile(indexGist, 'room_index.json')) || '{}'); } catch (e) {}
-    const msgGistId = roomIndex.messages || MESSAGES_GIST_ID_FALLBACK;
+    const msgGistId = await resolveMessagesGistId();
     log('消息 Gist:', msgGistId);
 
     // 2. 消息 + 资料
