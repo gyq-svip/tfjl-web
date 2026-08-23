@@ -332,7 +332,7 @@
                 console.log('[VERSION] 当前缓存版本:', swVersion, '（强制刷新后应为 s1.0.230 才算最新）');
             }
             window.addEventListener('load', function() {
-                navigator.serviceWorker.register('./sw.js', { scope: './', updateViaCache: 'none' }).then(function(registration) {
+                navigator.serviceWorker.register('./sw.js?v=b20260823230841', { scope: './', updateViaCache: 'none' }).then(function(registration) {
                     console.log('[PWA] Service Worker 注册成功，scope:', registration.scope);
                     // 每次打开 APP 主动检查 SW 更新（绕过 Tauri WebView 的 SW 更新检测问题）
                     registration.update().catch(function() {});
