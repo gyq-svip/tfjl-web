@@ -276,7 +276,7 @@
                 }
                 // SW 回报的缓存版本号（如 tfjl-v62）→ 显示在右下角版本标签，便于核对缓存是否更新
                 if (event.data && event.data.type === 'SW_VERSION') {
-                    updateCacheVersionDisplay(event.data.version);
+                    updateCacheVersionDisplay(event.data.version, event.data.deployTag);
                 }
             });
             // 标记有新版本可用：版本号变绿高亮 + 加个绿点，无需用户去猜
@@ -317,14 +317,17 @@
                 } catch (e) { window.__tfjlHasNewVersion = true; _markNewVersionAvailable(); }
             }
             // 把 SW 缓存版本号显示到右下角版本标签（如 "v260727-57 · sw-v62"）
-            function updateCacheVersionDisplay(swVersion) {
+            function updateCacheVersionDisplay(swVersion, deployTag) {
                 const tag = document.getElementById('versionTag');
                 if (!tag || !swVersion) return;
                 const short = swVersion.indexOf('tfjl-') === 0 ? swVersion.slice('tfjl-'.length) : swVersion;
-                // base(日期部分)优先用部署注入的 window.__DEPLOY_TAG（确定性来源），
-                // 避免依赖 HTML 文本 split 在极端情况下取到空（如旧缓存 HTML 文本异常）。
-                let base = (typeof window.__DEPLOY_TAG === 'string' && window.__DEPLOY_TAG) ? window.__DEPLOY_TAG
-                         : (tag.textContent.split(' · ')[0] || '').trim();
+                // base(日期部分)优先级：① SW消息携带的 deployTag（最可靠，部署时注入 sw.js 常量）
+                // ② window.__DEPLOY_TAG（部署注入 HTML 的 script）
+                // ③ HTML versionTag 文本 split（兜底，可能因 CDN/旧缓存失效）
+                let base = '';
+                if (typeof deployTag === 'string' && /^s\d{8}/.test(deployTag)) base = deployTag;
+                else if (typeof window.__DEPLOY_TAG === 'string' && /^s\d{8}/.test(window.__DEPLOY_TAG)) base = window.__DEPLOY_TAG;
+                else base = (tag.textContent.split(' · ')[0] || '').trim();
                 if (!base || !/^s\d{8}/.test(base)) base = 's?????';  // 兜底，确保日期段不为空
                 tag.textContent = base + ' · ' + short;
                 // 同步更新相邻 .version-tooltip（自定义提示框，显示在窗口内，不跑出窗口）
