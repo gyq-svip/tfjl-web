@@ -22,6 +22,7 @@
 // ============================================================
 
 const CACHE_VERSION = 's1.0.238';
+const DEPLOY_TAG = 's?????';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
@@ -49,7 +50,7 @@ self.addEventListener('install', (event) => {
                     // 无条件回报缓存版本号（让页面在任意 register 后都能回填版本标签，
                     // 不被 "active 存在才发" 限制坑住——forceRefreshLatest unregister 全部 SW 后 reload，
                     // 新 SW 重新 register 时 active 为 null，若不发则页面回退到 HTML 写死的 fallback 225）
-                    client.postMessage({ type: 'SW_VERSION', version: CACHE_VERSION });
+                    client.postMessage({ type: 'SW_VERSION', version: CACHE_VERSION, deployTag: DEPLOY_TAG });
                     // NEW_VERSION_READY 仅在有旧 SW 运行时提示（避免首次安装误弹气泡）
                     if (self.registration && self.registration.active) {
                         client.postMessage({ type: 'NEW_VERSION_READY' });
@@ -210,6 +211,6 @@ self.addEventListener('message', (event) => {
     }
     // 页面主动询问当前 SW 缓存版本号（页面加载/controllerchange 时调用）
     if (event.data && event.data.type === 'GET_SW_VERSION') {
-        if (event.source) event.source.postMessage({ type: 'SW_VERSION', version: CACHE_VERSION });
+        if (event.source) event.source.postMessage({ type: 'SW_VERSION', version: CACHE_VERSION, deployTag: DEPLOY_TAG });
     }
 });
