@@ -286,7 +286,7 @@
                 if (!tag) return;
                 tag.style.color = '#4caf50';
                 tag.style.opacity = '1';
-                tag.title = '有新版本可用，点击查看 / 强制刷新';
+                // 不设置 title，避免浏览器原生 tooltip 弹出
                 if (!document.getElementById('__verNewDot')) {
                     const dot = document.createElement('span');
                     dot.id = '__verNewDot';
@@ -308,7 +308,7 @@
                             _markNewVersionAvailable();
                         } else {
                             window.__tfjlHasNewVersion = false;
-                            if (tag) { tag.style.color = ''; tag.title = '前端标记号（点我看版本详情 / 强制刷新）'; }
+                            if (tag) { tag.style.color = ''; /* 不设置 title */ }
                             const d = document.getElementById('__verNewDot'); if (d) d.remove();
                         }
                     } else {
