@@ -21583,6 +21583,14 @@ ${maSection}
                     if (!r.ok) { box.innerHTML = '<div style="color:#f87171;">拉取失败：HTTP ' + r.status + '</div>'; return; }
                     const d = await r.json();
                     try { window.__diagEnabled = !!(d.files && d.files['diag_config.json'] && d.files['diag_config.json'].content && JSON.parse(d.files['diag_config.json'].content).enabled); } catch (e) { window.__diagEnabled = false; }
+                    let cfg = {};
+                    try { cfg = JSON.parse((d.files && d.files['diag_config.json'] && d.files['diag_config.json'].content) || '{}') || {}; } catch (e) {}
+                    const C = {
+                        periodDays: cfg.periodDays || 3,
+                        allowImmediate: cfg.allowImmediate !== false,
+                        openDelayMin: cfg.openDelayMin || 5, openDelayMax: cfg.openDelayMax || 10,
+                        immediateDelayMin: cfg.immediateDelayMin || 1, immediateDelayMax: cfg.immediateDelayMax || 20
+                    };
                     const diagFiles = Object.keys(d.files || {}).filter(fn => fn.startsWith('diag-') && fn.endsWith('.json'));
                     // 总闸按钮始终显示（无论有无上报文件，否则无数据时看不到开关无法开启 → 死循环）
                     let head = '<div style="border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:12px;margin-bottom:14px;">';
@@ -21590,7 +21598,19 @@ ${maSection}
                     head += '<span style="color:#fbbf24;font-size:0.82rem;">🟢 全网诊断上报总闸（仅管理员）：</span>';
                     head += '<button id="diagToggleBtn" onclick="adminToggleDiagEnabled()" style="background:' + (window.__diagEnabled ? 'linear-gradient(135deg,#10b981,#059669)' : 'rgba(255,255,255,0.1)') + ';color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.82rem;">' + (window.__diagEnabled ? '已开启（客户端正在上报）' : '已关闭') + '</button>';
                     head += '<span id="diagToggleHint" style="color:#94a3b8;font-size:0.72rem;">' + (window.__diagEnabled ? '关闭后客户端停止上报' : '开启后所有客户端自动上报写操作（用户无感）') + '</span>';
-                    head += '</div></div>';
+                    head += '</div>';
+                    // 上报策略配置区
+                    head += '<div style="margin-top:12px;border-top:1px dashed rgba(255,255,255,0.12);padding-top:10px;">';
+                    head += '<div style="color:#ffd700;font-size:0.82rem;margin-bottom:8px;">⚙️ 上报策略配置（秒级=分钟，随机错峰避免同时写入）</div>';
+                    head += '<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;font-size:0.76rem;color:#cbd5e1;">';
+                    head += '<label><input type="checkbox" id="cfgAllowImmediate" ' + (C.allowImmediate ? 'checked' : '') + '> 允许立即上报</label>';
+                    head += '<label>立即上报延迟(分): <input type="number" id="cfgImmMin" value="' + C.immediateDelayMin + '" min="0" style="width:42px;background:#16213e;color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:3px;"> ~ <input type="number" id="cfgImmMax" value="' + C.immediateDelayMax + '" min="0" style="width:42px;background:#16213e;color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:3px;"></label>';
+                    head += '<label>周期上报延迟(分): <input type="number" id="cfgOpenMin" value="' + C.openDelayMin + '" min="1" style="width:42px;background:#16213e;color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:3px;"> ~ <input type="number" id="cfgOpenMax" value="' + C.openDelayMax + '" min="1" style="width:42px;background:#16213e;color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:3px;"></label>';
+                    head += '<label>上报文件保留(天): <input type="number" id="cfgPeriod" value="' + C.periodDays + '" min="1" style="width:42px;background:#16213e;color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:3px;"></label>';
+                    head += '</div>';
+                    head += '<div style="margin-top:8px;"><button onclick="adminSaveDiagCfg()" style="background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.82rem;">💾 保存配置</button><span id="diagCfgStatus" style="color:#94a3b8;font-size:0.72rem;margin-left:8px;"></span></div>';
+                    head += '</div>';
+                    head += '</div>';
                     if (diagFiles.length === 0) {
                         box.innerHTML = head + '<div style="color:#4ade80;">✅ 暂无上报文件（总闸未开 / 没有客户端在写 / 或已优化完毕）。<br><span style="color:#94a3b8;font-size:0.75rem;">→ 先点上方「全网诊断上报总闸」开启，等客户端上报一会儿再刷新本页即可看到 TOP 归因。</span></div>';
                     } else {
@@ -21698,6 +21718,33 @@ ${maSection}
                 if (pr.ok) { window.__diagEnabled = cfg.enabled; adminLoadDiag(); }
                 else alert('写入失败 HTTP ' + pr.status);
             } catch (e) { alert('异常：' + (e && e.message ? e.message : e)); }
+        };
+        // 管理员保存诊断上报策略配置（写 diag_config.json）
+        window.adminSaveDiagCfg = async function () {
+            const status = document.getElementById('diagCfgStatus');
+            const num = (id, def) => { const v = parseInt(document.getElementById(id).value, 10); return isNaN(v) ? def : v; };
+            const gid = localStorage.getItem(DIAG_GIST_KEY) || (await _ensureDiagGist());
+            if (!gid) { if (status) status.textContent = '诊断 Gist 未初始化'; return; }
+            const token = getGistToken();
+            if (!token) { if (status) status.textContent = '无 token'; return; }
+            const allowImmediate = document.getElementById('cfgAllowImmediate').checked;
+            const cfg = {
+                enabled: window.__diagEnabled || false,
+                periodDays: num('cfgPeriod', 3),
+                allowImmediate: allowImmediate,
+                openDelayMin: Math.max(1, num('cfgOpenMin', 5)), openDelayMax: Math.max(1, num('cfgOpenMax', 10)),
+                immediateDelayMin: Math.max(0, num('cfgImmMin', 1)), immediateDelayMax: Math.max(0, num('cfgImmMax', 20))
+            };
+            if (status) status.textContent = '⏳ 保存中…';
+            try {
+                const pr = await fetch('https://api.github.com/gists/' + gid, {
+                    method: 'PATCH',
+                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': 'token ' + token },
+                    body: JSON.stringify({ files: { 'diag_config.json': { content: JSON.stringify(cfg, null, 2) } } })
+                });
+                if (pr.ok) { if (status) status.textContent = '✅ 已保存（客户端下次上报时生效）'; }
+                else if (status) status.textContent = '保存失败 HTTP ' + pr.status;
+            } catch (e) { if (status) status.textContent = '异常：' + (e && e.message ? e.message : e); }
         };
         // 管理员手动初始化诊断 Gist（当自动创建未触发时）
         window.adminInitDiagGist = async function () {
