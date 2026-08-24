@@ -2744,13 +2744,21 @@
             border: 5px solid transparent;
             border-top-color: rgba(20,20,44,0.96);
         }
+        /* 平时完全隐藏；鼠标悬停才显示版本号 + 提示气泡 */
+        #versionTag:hover {
+            opacity: 0.5 !important;
+        }
         #versionTag:hover + .version-tooltip {
-            opacity: 0.08;
+            opacity: 1;
             visibility: visible;
         }
-        /* 有新版本：亮绿脉冲，明确表达"可更新"，区别于普通绿色按钮 */
+        /* 有新版本：亮绿脉冲，明确表达"可更新"，区别于普通绿色按钮（仅悬停时可见） */
         #versionTag.version-new {
             animation: versionNewPulse 1.4s ease-in-out infinite;
+        }
+        #versionTag.version-new:hover {
+            color: #5cff8f !important;
+            text-shadow: 0 0 6px rgba(92,255,143,0.8);
         }
         @keyframes versionNewPulse {
             0%   { opacity: 0.55; }

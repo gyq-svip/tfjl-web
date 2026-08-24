@@ -285,9 +285,9 @@
                 const tag = document.getElementById('versionTag');
                 if (!tag) return;
                 // 亮绿 + 发光 + 脉冲动画（.version-new 在 styles.css 定义），明确表达"可更新"
+                // 平时完全隐藏，仅鼠标悬停时显示（ opacity 由 CSS hover 控制，此处不设内联 opacity）
                 tag.classList.add('version-new');
                 tag.style.color = '#5cff8f';
-                tag.style.opacity = '1';
                 tag.style.textShadow = '0 0 6px rgba(92,255,143,0.8)';
                 // 不使用原生 title，避免提示框跑出窗口；新版本提示由 tooltip 文案体现
                 if (!document.getElementById('__verNewDot')) {
@@ -319,7 +319,6 @@
                             if (tag) {
                                 tag.classList.remove('version-new');
                                 tag.style.color = '';
-                                tag.style.opacity = '';
                                 tag.style.textShadow = '';
                                 const tip = tag.nextElementSibling;
                                 if (tip && tip.classList.contains('version-tooltip')) {
