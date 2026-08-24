@@ -14609,15 +14609,8 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
                         }
                         addToPendingSync(flushType);
                     }
-                    try {
-                        await syncCounterDataToGist();
-                    } catch (e2) {
-                        if (e2 && (e2.message || '').includes('rate limit')) {
-                            _gistWriteBackoffUntil = Date.now() + 30000;
-                        } else {
-                            addToPendingSync(flushType);
-                        }
-                    }
+                    // 🔴 省一次 Gist 写：syncCounterToGist 已把 counter.json（含 online_users 在线状态）合并写回，
+                    // 这里不再重复打一次 syncCounterDataToGist，访客刷新写入频率直接减半，缓解 gist 写限流。
                 }, wait || interval);
             });
         }
@@ -16662,14 +16655,11 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                     finalMsgs = finalMsgs.slice(0, MAX_MESSAGES);
                     const expN = wallCountExpiredMsgs(finalMsgs);
                     msgStat = `共 ${finalMsgs.length} 条` + (expN ? `（其中 ${expN} 条已过期不显示）` : '');
-                    const resp = await fetch(`https://api.github.com/gists/${msgGistId}`, { method: 'PATCH', headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` }, body: JSON.stringify({ files: { 'messages.json': { content: JSON.stringify({ messages: finalMsgs }, null, 2) } } }) });
+                    // 🔴 合并写入：messages.json 与 profiles.json 写同一个 Gist，合并成一次 PATCH（省一次 Gist 写）
+                    const patchFiles = { 'messages.json': { content: JSON.stringify({ messages: finalMsgs }, null, 2) } };
+                    if (bundle.profiles) patchFiles['profiles.json'] = { content: bundle.profiles };
+                    const resp = await fetch(`https://api.github.com/gists/${msgGistId}`, { method: 'PATCH', headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` }, body: JSON.stringify({ files: patchFiles }) });
                     if (!resp.ok) throw new Error('消息写入失败');
-                }
-                // 2) 个人资料
-                if (bundle.profiles) {
-                    wallShowBackupStatus('⏳ 写入个人资料...', 'loading');
-                    const profGistId = await wallResolveMessagesGistId();
-                    try { await fetch(`https://api.github.com/gists/${profGistId}`, { method: 'PATCH', headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` }, body: JSON.stringify({ files: { 'profiles.json': { content: bundle.profiles } } }) }); } catch (e) {}
                 }
                 // 3) 脚本：按描述匹配现有 Gist → 原文件名覆盖写回；没有 → 重建新 Gist
                 let patched = 0, created = 0, skipped = 0;
