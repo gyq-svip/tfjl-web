@@ -205,12 +205,39 @@
             if (method === 'POST' && url.indexOf('/gists') !== -1 && url.indexOf('/gists/') === -1) return 'createGist';
             return 'otherGist';
         }
-        // 读取诊断配置（本地缓存 4h，超时重新拉）
+        // 诊断配置拉取间隔（用户可设置）：默认 15 分钟；下限 1 分钟避免过于频繁打 GitHub API
+        function _getDiagCfgTtl() {
+            let min = 15;
+            try { const v = parseInt(localStorage.getItem('tdjl_diagCfgTtlMin') || '', 10); if (!isNaN(v) && v >= 1 && v <= 1440) min = v; } catch (e) {}
+            return min * 60 * 1000;
+        }
+        // 管理员手动立即拉取诊断配置（绕过缓存 TTL，便于人少时快速让在线客户端拿到新策略）
+        async function adminForceRefreshDiagConfig() {
+            try { localStorage.removeItem(DIAG_CONFIG_CACHE); } catch (e) {}
+            const cfg = await _getDiagConfig(true);
+            const box = document.getElementById('diagCfgPullInfo');
+            if (box) box.textContent = '已立即拉取 ✓ enabled=' + cfg.enabled + '，TTL=' + (_getDiagCfgTtl() / 60000) + '分钟';
+            return cfg;
+        }
+        // 用户设置配置拉取间隔（分钟）：存 localStorage，下次 _getDiagConfig 即用新值
+        function adminSetDiagPullTtl() {
+            const inp = document.getElementById('cfgPullTtl');
+            const box = document.getElementById('diagCfgPullInfo');
+            let min = 15;
+            try { min = parseInt(inp ? inp.value : '', 10); } catch (e) {}
+            if (isNaN(min) || min < 1) min = 1;
+            if (min > 1440) min = 1440;
+            try { localStorage.setItem('tdjl_diagCfgTtlMin', String(min)); } catch (e) {}
+            if (box) box.textContent = '已应用：每 ' + min + ' 分钟拉取一次（下次拉取生效，或点"立即拉取"马上生效）';
+        }
+        // 读取诊断配置（本地缓存按用户设置间隔，超时重新拉）
         async function _getDiagConfig(force) {
             const def = { enabled: true, periodDays: 3, allowImmediate: true, openDelayMin: 5, openDelayMax: 10, immediateDelayMin: 1, immediateDelayMax: 20, diagGistId: '' };
+            // 配置拉取间隔可由用户设置（tdjl_diagCfgTtlMin），默认 15 分钟；设为更小值可让人少时更快拿到新策略
+            const ttl = _getDiagCfgTtl();
             try {
                 const cached = JSON.parse(localStorage.getItem(DIAG_CONFIG_CACHE) || 'null');
-                if (cached && cached.ts && (Date.now() - cached.ts) < DIAG_CONFIG_TTL && !force) return Object.assign({}, def, cached.cfg);
+                if (cached && cached.ts && (Date.now() - cached.ts) < ttl && !force) return Object.assign({}, def, cached.cfg);
             } catch (e) {}
             // 重新拉取：先确定诊断 Gist
             const gid = await _ensureDiagGist();
@@ -21608,6 +21635,13 @@ ${maSection}
                     head += '<label>上报文件保留(天): <input type="number" id="cfgPeriod" value="' + C.periodDays + '" min="1" style="width:42px;background:#16213e;color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:3px;"></label>';
                     head += '</div>';
                     head += '<div style="margin-top:8px;"><button onclick="adminSaveDiagCfg()" style="background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.82rem;">💾 保存配置</button><span id="diagCfgStatus" style="color:#94a3b8;font-size:0.72rem;margin-left:8px;"></span></div>';
+                    // 配置拉取间隔（客户端侧）：默认 15 分钟，可改小让在线客户端更快拿到新策略；立即拉取绕过缓存
+                    head += '<div style="margin-top:10px;border-top:1px dashed rgba(255,255,255,0.12);padding-top:8px;display:flex;gap:14px;flex-wrap:wrap;align-items:center;font-size:0.76rem;color:#cbd5e1;">';
+                    head += '<label>配置拉取间隔(分): <input type="number" id="cfgPullTtl" value="' + (_getDiagCfgTtl() / 60000) + '" min="1" max="1440" style="width:52px;background:#16213e;color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:3px;"></label>';
+                    head += '<button onclick="adminSetDiagPullTtl()" style="background:linear-gradient(135deg,#8b5cf6,#7c3aed);color:#fff;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.78rem;">📥 应用间隔</button>';
+                    head += '<button onclick="adminForceRefreshDiagConfig()" style="background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.78rem;">⚡ 立即拉取配置</button>';
+                    head += '<span id="diagCfgPullInfo" style="color:#94a3b8;font-size:0.72rem;"></span>';
+                    head += '</div>';
                     head += '</div>';
                     head += '</div>';
                     if (diagFiles.length === 0) {
