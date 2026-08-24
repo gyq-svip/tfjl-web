@@ -66,6 +66,8 @@
         window._loadingHidden = function () { return hidden; };
         // ① 正常路径：页面 load 完成
         window.addEventListener('load', function () { hide('load'); });
+        // ①-b 更快路径：DOM 解析完即可隐藏（不等图片/外部资源 load，避免线上慢时 loading 屏长时间转圈）
+        document.addEventListener('DOMContentLoaded', function () { hide('domready'); });
         // ② 硬超时兜底：无论外部 JS 是否加载成功，最多 8 秒必定放行，杜绝永久卡屏
         setTimeout(function () { hide('8秒超时兜底'); }, HARD_MS);
         // ③ 关键脚本加载失败也放行（script 的 error 不冒泡，必须用捕获阶段监听）
@@ -2531,7 +2533,7 @@
                 <span style="color:#4fc3f7;">下载桌面版</span>
             </div>
             <!-- 前端部署时间标记（铁律要求，CI 自动注入部署时间）：statsBar 内绝对定位贴右、垂直居中 -->
-            <span id="versionTag" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;user-select:none;color:rgba(255,255,255,0.28);font-size:0.66rem;padding:1px 6px;opacity:0.5;" ondblclick="if(typeof forceRefreshLatest==='function'){forceRefreshLatest();}">s20260824-0000 · s1.0.232</span>
+            <span id="versionTag" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;user-select:none;color:rgba(255,255,255,0.1);font-size:0.66rem;padding:1px 6px;opacity:0.5;" ondblclick="if(typeof forceRefreshLatest==='function'){forceRefreshLatest();}">s20260824-0000 · s1.0.232</span>
             <div class="version-tooltip">版本 s20260824-0000 · s1.0.232（双击强制刷新）</div>
             <script>(function(){var v=document.getElementById('versionTag');var t=document.querySelector('#versionTag + .version-tooltip');if(v&&t)t.textContent='版本 '+v.textContent+'（双击强制刷新）';})();</script>
         </div>

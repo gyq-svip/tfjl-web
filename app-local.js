@@ -4094,6 +4094,7 @@ if (isTauriApp) {
         readTextFile: readTextFile,
         ensureStoreLoaded: _ensureStoreLoaded,
         getStoreMap: () => _storeMap,
+        flushStore: () => _flushStore(),
         syncAllNow: syncAllNow,
         restoreAllProjects: tfjlRestoreAllProjects,
     };
@@ -4182,13 +4183,13 @@ async function runDiagnostics() {
     // 4) 写盘测试（仅 App 版）
     if (isApp) {
         try {
+            // 修正：探针写入统一存储(store),落盘 tfjl.dat 后读回验证（不触发 syncAllNow 全量 Gist 写回，避免诊断本身制造限流）
             const probeKey = '__tfjl_diag_probe__';
-            localStorage.setItem(probeKey, String(Date.now()));
-            await api.syncAllNow();
+            api.getStoreMap().set(probeKey, String(Date.now()));
+            await api.flushStore();
             await api.ensureStoreLoaded(api.getSyncDir());
             const back = api.getStoreMap().get(probeKey);
-            localStorage.removeItem(probeKey);
-            await api.syncAllNow();
+            if (back) { api.getStoreMap().delete(probeKey); await api.flushStore(); }
             push('写盘验证', back ? 'ok' : 'error',
                 back ? '临时数据已成功写入并读回 tfjl.dat' : '写入后无法从磁盘读回（落盘失败）',
                 back ? '' : '磁盘写入异常，检查目录权限/磁盘空间；仍异常联系我 ' + WX);
