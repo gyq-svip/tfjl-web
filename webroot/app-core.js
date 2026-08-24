@@ -21274,7 +21274,7 @@ ${maSection}
                             <span id="ftRangeVal_${t.key}" style="font-size:0.82rem;color:#4fc3f7;font-weight:700;">${curVal}${unit}</span>
                         </div>
                         <div style="font-size:0.72rem;color:rgba(255,255,255,0.5);margin-top:3px;">${t.desc}</div>
-                        <input type="range" min="${min}" max="${max}" step="${step}" value="${curVal}" oninput="setFeatureRange('${t.key}', this.value)" style="width:100%;margin-top:10px;accent-color:#4fc3f7;cursor:pointer;">
+                        <input type="range" min="${min}" max="${max}" step="${step}" value="${curVal}" oninput="setFeatureRangePreview('${t.key}', this.value)" onchange="setFeatureRange('${t.key}', this.value)" style="width:100%;margin-top:10px;accent-color:#4fc3f7;cursor:pointer;">
                         <div style="display:flex;justify-content:space-between;font-size:0.62rem;color:rgba(255,255,255,0.3);margin-top:2px;"><span>${min}${unit}</span><span>${max}${unit}</span></div>
                     </div>`;
                     continue;
@@ -21320,6 +21320,17 @@ ${maSection}
         }
         window.toggleFeature = toggleFeature;
 
+        // 拖动中预览(只更新显示,不写 Gist)
+        function setFeatureRangePreview(key, val) {
+            const t = FEATURE_TOGGLES.find(x => x.key === key);
+            if (!t) return;
+            const n = Math.max(t.min ?? 10, Math.min(t.max ?? 600, parseInt(val, 10) || t.default));
+            const valEl = document.getElementById('ftRangeVal_' + key);
+            if (valEl) valEl.textContent = n + (t.unit || '');
+        }
+        window.setFeatureRangePreview = setFeatureRangePreview;
+
+        // 松开滑块才真正保存(每次拖动只写 1 次,避免连发 PATCH 触发限流)
         async function setFeatureRange(key, val) {
             const t = FEATURE_TOGGLES.find(x => x.key === key);
             if (!t || t.type !== 'range') return;
