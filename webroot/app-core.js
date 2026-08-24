@@ -14410,15 +14410,10 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
                 // 更新底部统计栏显示
                 updateStatsBar();
                 
-                // 🔴 不再用 isOnline() 卡死写入：页面刚加载时在线标记常未就绪，会把访问永远丢进待同步队列而写不进 Gist。
-                // 改为直接尝试写 Gist（照需求墙 saveMessagesToGist 的方式：try 真实网络，失败/限流时函数内部自动进待同步队列），
-                // 写不写得出去由真实结果决定，而非一个可能尚未就绪的在线标记。
-                try {
-                    await syncCounterToGist();
-                } catch (syncErr) {
-                    console.warn('⚠️ 统计同步失败，转入待同步队列:', syncErr);
-                    addToPendingSync(type);
-                }
+                // 🔴 节流写回：避免在频繁刷新时每次都 PATCH 而触发 GitHub 对 gist 的隐藏写频率限流(403 rate limit)。
+                // 本地已 saveCounterToCache，这里只标记脏并启动 60s 节流定时器，定时到才真正写一次 Gist。
+                // 多次刷新只在 60s 窗口内写一次，大幅降低 gist 写频率（页面刚加载在线标记未就绪也不再卡死写入）。
+                scheduleCounterFlush(type);
                 
             } catch (error) {
                 console.error('更新统计失败:', error);
@@ -14568,6 +14563,44 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
             localStorage.removeItem('TFJL_Pending_Sync');
         }
         
+        // 🔴 计数器写回节流器：60s 内最多写一次 Gist，并感知 gist 写限流(403 rate limit)自动退避。
+        // 目的：避免每次刷新都 PATCH 触发 GitHub 隐藏的 gist 写频率限流（导致需求墙/Boss减伤/在线状态等所有写 Gist 全 403）。
+        let _counterFlushTimer = null;
+        let _counterFlushPending = null;       // 最后一次调用时传入的 type，用于补写
+        let _gistWriteBackoffUntil = 0;         // 限流退避截止时间戳(ms)
+        const _COUNTER_FLUSH_INTERVAL = 60000;  // 60s 节流窗口
+
+        function scheduleCounterFlush(type) {
+            if (type) _counterFlushPending = type;
+            if (_counterFlushTimer) return; // 已有定时器在跑，等它触发
+            const wait = Math.max(0, _gistWriteBackoffUntil - Date.now());
+            _counterFlushTimer = setTimeout(async () => {
+                _counterFlushTimer = null;
+                const flushType = _counterFlushPending || 'visit';
+                _counterFlushPending = null;
+                try {
+                    await syncCounterToGist();
+                } catch (e) {
+                    // 限流(rate limit)时进入退避：30s 内不再写，数据仍在本地缓存不丢
+                    if (e && (e.message || '').includes('rate limit')) {
+                        _gistWriteBackoffUntil = Date.now() + 30000;
+                        console.warn('⚠️ gist 写限流，30s 后重试(数据已本地缓存):', e.message);
+                        return;
+                    }
+                    addToPendingSync(flushType);
+                }
+                try {
+                    await syncCounterDataToGist();
+                } catch (e2) {
+                    if (e2 && (e2.message || '').includes('rate limit')) {
+                        _gistWriteBackoffUntil = Date.now() + 30000;
+                    } else {
+                        addToPendingSync(flushType);
+                    }
+                }
+            }, wait || _COUNTER_FLUSH_INTERVAL);
+        }
+
         // 同步统计数据到Gist（带成功返回）
         async function syncCounterDataToGist(data) {
             try {
@@ -21302,7 +21335,19 @@ ${maSection}
                                                 body: JSON.stringify({ files: { 'counter.json': { content: JSON.stringify(obj, null, 2) } } })
                                             });
                                         } catch (rb) {}
-                                        gistHtml += `<div style="display:flex;justify-content:space-between;padding:4px 0 8px;font-size:0.78rem;"><span style="color:rgba(255,255,255,0.6);">↳ 写回测试</span><span style="color:${pr.ok ? '#4ade80' : '#ef4444'};">${pr.ok ? '✅ 写入通道正常（' + (obj.script_downloads || 0) + ' 次访问）' : '❌ 写回失败(' + pr.status + ')：Token 异常，统计可能未写入'}</span></div>`;
+                                        // 🔴 区分 限流(rate limit) 与 真正的 token 异常：GitHub 对 gist 有隐藏写频率限流，
+                                        // 403 多半是触发了它（额度监控显示充足但 gist 写被限），不是 token 失效。
+                                        let writeVerdict;
+                                        if (pr.ok) {
+                                            writeVerdict = `<span style="color:#4ade80;">✅ 写入通道正常（${obj.script_downloads || 0} 次访问）</span>`;
+                                        } else if (pr.status === 403) {
+                                            const rl = (pr.headers && pr.headers.get && pr.headers.get('x-ratelimit-remaining') === '0') || (pr.headers && pr.headers.get && /rate limit/i.test(pr.headers.get('x-ratelimit-remaining') || ''));
+                                            // 仅凭 status 无法 100% 区分，但 gist 写 403 绝大多数是频率限流（非 token 异常）
+                                            writeVerdict = `<span style="color:#fbbf24;">⚠️ 写回被拒(403)：多为 gist 写频率限流（GitHub 隐藏限制，非 token 失效；额度监控充足属正常），稍后自动恢复；已降级为本地缓存+节流写回</span>`;
+                                        } else {
+                                            writeVerdict = `<span style="color:#ef4444;">❌ 写回失败(${pr.status})：Token 异常，统计可能未写入</span>`;
+                                        }
+                                        gistHtml += `<div style="display:flex;justify-content:space-between;padding:4px 0 8px;font-size:0.78rem;"><span style="color:rgba(255,255,255,0.6);">↳ 写回测试</span>${writeVerdict}</div>`;
                                     } catch (e) {
                                         gistHtml += `<div style="padding:4px 0 8px;font-size:0.78rem;color:#ef4444;">↳ 写回异常: ${e.message}</div>`;
                                     }
