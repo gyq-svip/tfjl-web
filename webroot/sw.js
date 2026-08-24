@@ -100,12 +100,10 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // HTML 页面：StaleWhileRevalidate（先用缓存秒开，后台静默更新并检测新版本）
-    // 改回 SWR 的原因：原 networkFirst 每次启动都走网络拉 index.html（cache:'no-store'），
-    // 导致 Tauri 桌面端每次冷启动都要等远程 Pages 下载，黑屏久、达不到秒开。
-    // SWR 先返回 SW 缓存的 index.html 即刻渲染，后台 fetch 比较内容，有新版本才提示刷新。
+    // HTML 页面：NetworkFirst（网络优先，保证永远先拿最新 index.html，避免旧缓存不带新菜单项）
+    // 仅在网络彻底不可达时回退缓存（离线可用）。修复“诊断菜单项加进 index.html 后用户一直看到旧版”的问题。
     if (request.mode === 'navigate' || request.destination === 'document') {
-        event.respondWith(staleWhileRevalidate(request, CACHE_RUNTIME));
+        event.respondWith(networkFirst(request, CACHE_RUNTIME));
         return;
     }
     // JS/CSS 同样 SWR：首次用缓存秒开，后台更新；内容变化自动提示刷新（保留"永不跑旧 JS"安全性）
