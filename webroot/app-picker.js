@@ -279,24 +279,12 @@
                     updateCacheVersionDisplay(event.data.version, event.data.deployTag);
                 }
             });
-            // 标记有新版本可用：版本号亮绿脉冲高亮 + 明确提示文案，无需用户去猜
+            // 标记有新版本可用：版本号始终保持暗色常显（不额外高亮/脉冲），仅更新 tooltip 文案提示
             function _markNewVersionAvailable() {
                 window.__tfjlHasNewVersion = true;
                 const tag = document.getElementById('versionTag');
                 if (!tag) return;
-                // 亮绿 + 发光 + 脉冲动画（.version-new 在 styles.css 定义），明确表达"可更新"
-                // 平时完全隐藏，仅鼠标悬停时显示（ opacity 由 CSS hover 控制，此处不设内联 opacity）
-                tag.classList.add('version-new');
-                tag.style.color = '#5cff8f';
-                tag.style.textShadow = '0 0 6px rgba(92,255,143,0.8)';
-                // 不使用原生 title，避免提示框跑出窗口；新版本提示由 tooltip 文案体现
-                if (!document.getElementById('__verNewDot')) {
-                    const dot = document.createElement('span');
-                    dot.id = '__verNewDot';
-                    dot.textContent = ' ●';
-                    dot.style.cssText = 'color:#5cff8f;';
-                    tag.appendChild(dot);
-                }
+                // 不修改版本号颜色/透明度，保持暗色；仅 tooltip 体现"有新版本"
                 const tip = tag.nextElementSibling;
                 if (tip && tip.classList.contains('version-tooltip')) {
                     tip.textContent = '发现新版本 · 双击立即更新';
@@ -317,9 +305,6 @@
                         } else {
                             window.__tfjlHasNewVersion = false;
                             if (tag) {
-                                tag.classList.remove('version-new');
-                                tag.style.color = '';
-                                tag.style.textShadow = '';
                                 const tip = tag.nextElementSibling;
                                 if (tip && tip.classList.contains('version-tooltip')) {
                                     tip.textContent = '版本 ' + tag.textContent.replace('●','').trim() + '（双击强制刷新）';
