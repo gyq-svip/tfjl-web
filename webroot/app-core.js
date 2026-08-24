@@ -13308,6 +13308,8 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
                 // 🔴 修复：等统计数据（counterData）从 Gist 初始化完成后再记录访问，
                 // 避免页面刚加载时 isOnline() 尚未判定为 true 而把访问丢进待同步队列（旧版队列不记时段分布）
                 await recordVisit().catch((error) => { console.error('❌ 记录访问失败:', error); });
+                // 🔴 启动计数器周期性自调度保活（带随机抖动，错开全网相位，缓解 Gist 写限流）
+                startCounterSelfKeepalive();
             })();
 
             // 启动图片清理定时任务
@@ -14571,6 +14573,7 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
         let _counterFlushPending = null;       // 最后一次调用时传入的 type，用于补写
         let _gistWriteBackoffUntil = 0;         // 限流退避截止时间戳(ms)
         let _lastWallPostTs = 0;                // 上一次需求墙发言时间戳(ms)，用于 30s 连续发言节流
+        let _counterSelfTimer = null;           // 周期性自调度保活定时器（带随机抖动，错开全网相位）
         // 🔴 计数器写回间隔：全网生效(读索引 Gist 的 counterFlushSec,单位秒),默认 60s,范围 10~600。
         // 本机 localStorage 设了非 0 值则强制覆盖(便于临时测试,不影响全网)。
         async function _getCounterFlushInterval() {
@@ -14588,12 +14591,38 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
             } catch (e) {}
             return v;
         }
+        // 🔴 随机抖动上限：把"整点对齐"的并发写打散到 interval~(interval+jitterCap) 随机相位，
+        // 避免全网客户端在同一秒同时 PATCH 触发 Gist 写限流（导致需求墙/Boss减伤/在线状态全 403）。
+        // 全网生效(读索引 Gist 的 counterJitterSec,单位秒),默认 600s(10分钟),范围 0~1800。
+        // 0 = 关闭抖动(保持原整点对齐行为)。本机 tdjl_counterJitterSec 可强制覆盖(调试用)。仅影响统计/在线类后台写入。
+        async function _getJitterCap() {
+            let v = 600000; // 默认 10 分钟
+            try {
+                const local = localStorage.getItem('tdjl_counterJitterSec');
+                if (local != null) { const ln = parseInt(local, 10); if (!isNaN(ln) && ln >= 0) { v = ln * 1000; return v; } }
+            } catch (e) {}
+            try {
+                const cfg = await getRoomIndexConfig();
+                if (typeof cfg.counterJitterSec === 'number') {
+                    const n = cfg.counterJitterSec;
+                    if (n >= 0 && n * 1000 <= 1800000) v = n * 1000;
+                }
+            } catch (e) {}
+            return v;
+        }
+        function _randomJitter(cap) {
+            if (!cap || cap <= 0) return 0;
+            return Math.floor(Math.random() * cap);
+        }
 
         function scheduleCounterFlush(type) {
             if (type) _counterFlushPending = type;
             if (_counterFlushTimer) return; // 已有定时器在跑，等它触发
             const wait = Math.max(0, _gistWriteBackoffUntil - Date.now());
-            _getCounterFlushInterval().then(interval => {
+            Promise.all([_getCounterFlushInterval(), _getJitterCap()]).then(([interval, jitterCap]) => {
+                const jitter = _randomJitter(jitterCap);
+                const total = (wait || interval) + jitter;
+                console.log('[计数器写回] 安排下次写入: 基础=' + (wait || interval) + 'ms, 抖动=' + jitter + 'ms, 合计=' + total + 'ms');
                 _counterFlushTimer = setTimeout(async () => {
                     _counterFlushTimer = null;
                     const flushType = _counterFlushPending || 'visit';
@@ -14611,9 +14640,36 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
                     }
                     // 🔴 省一次 Gist 写：syncCounterToGist 已把 counter.json（含 online_users 在线状态）合并写回，
                     // 这里不再重复打一次 syncCounterDataToGist，访客刷新写入频率直接减半，缓解 gist 写限流。
-                }, wait || interval);
+                }, total);
             });
         }
+
+        // 🔴 周期性自调度保活：写成功后自动安排下一次统计/在线状态写入（带随机抖动相位），
+        // 让在线数持续保活不依赖外部事件，且全网相位随机分散，避免整点对齐并发撞限流。
+        // 仅在非隐藏、有 token、计数器已就绪时运行；被退避/节流暂停时由 scheduleCounterFlush 在事件触发时续上。
+        async function startCounterSelfKeepalive() {
+            if (_counterSelfTimer) return;
+            const loop = async () => {
+                const interval = await _getCounterFlushInterval();
+                const jitterCap = await _getJitterCap();
+                const jitter = _randomJitter(jitterCap);
+                const total = interval + jitter;
+                _counterSelfTimer = setTimeout(async () => {
+                    _counterSelfTimer = null;
+                    if (document.hidden) { return loop(); } // 隐藏页不写，但继续错峰循环
+                    if (!getGistToken() || !counterData) { return loop(); }
+                    if (_gistWriteBackoffUntil > Date.now()) { return loop(); } // 限流退避中，跳过本轮
+                    try { await syncCounterToGist(); }
+                    catch (e) { if (e && (e.message || '').includes('rate limit')) _gistWriteBackoffUntil = Date.now() + 30000; }
+                    return loop();
+                }, total);
+            };
+            loop();
+        }
+        // 页面重新可见/恢复时重启一次保活循环（防止隐藏期定时器被清后不再续）
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden && !_counterSelfTimer) { startCounterSelfKeepalive(); }
+        });
 
         // 同步统计数据到Gist（带成功返回）
         async function syncCounterDataToGist(data) {
