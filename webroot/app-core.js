@@ -170,6 +170,7 @@
         }
         function _saveDiagBuffer(b) {
             try {
+                // 环形：超过上限丢弃最旧（按时间戳排序后截尾）
                 const keys = Object.keys(b);
                 if (keys.length > DIAG_BUFFER_CAP) {
                     keys.sort((a, b2) => (b[a] ? b[a].last : 0) - (b[b2] ? b[b2].last : 0));
@@ -211,6 +212,7 @@
                 const cached = JSON.parse(localStorage.getItem(DIAG_CONFIG_CACHE) || 'null');
                 if (cached && cached.ts && (Date.now() - cached.ts) < DIAG_CONFIG_TTL && !force) return Object.assign({}, def, cached.cfg);
             } catch (e) {}
+            // 重新拉取：先确定诊断 Gist
             const gid = await _ensureDiagGist();
             if (!gid) return Object.assign({}, def, { diagGistId: '' });
             try {
@@ -253,9 +255,9 @@
         // 上报本地缓冲到 diag-<匿名ID>.json（合并，不覆盖他人）
         async function _pushDiagReport() {
             const optIn = localStorage.getItem(DIAG_OPTIN_KEY);
-            if (optIn === '0') return;
+            if (optIn === '0') return; // 本机用户关闭上报
             const cfg = await _getDiagConfig(false);
-            if (!cfg.enabled) return;
+            if (!cfg.enabled) return; // 全网配置关闭
             const gid = cfg.diagGistId || await _ensureDiagGist();
             if (!gid) return;
             const b = _loadDiagBuffer();
@@ -271,6 +273,7 @@
             const token = getGistToken();
             if (!token) return;
             try {
+                // 读取现有文件合并（保留他人文件，只改自己这份）
                 const cur = await fetch(`https://api.github.com/gists/${gid}`, { headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': 'token ' + token } });
                 const files = {};
                 if (cur.ok) {
@@ -286,6 +289,7 @@
                     body: JSON.stringify({ files })
                 });
                 if (r.ok) {
+                    // 清空已上报缓冲
                     localStorage.removeItem(DIAG_LOCAL_BUFFER);
                     console.log('[DIAG] 上报成功, 共 ' + entries.length + ' 条聚合记录');
                 }
@@ -304,8 +308,9 @@
                 const delay = (delayMin * 60000) + Math.random() * ((delayMax - delayMin) * 60000);
                 _diagTimer = setTimeout(() => {
                     _pushDiagReport().then(() => {
+                        // 周期续排：periodDays ± 随机
                         const period = (cfg.periodDays || 3) * 86400000;
-                        const jitter = Math.random() * 86400000;
+                        const jitter = Math.random() * 86400000; // 0~1 天随机错峰
                         _diagTimer = setTimeout(() => _scheduleDiagUpload('period'), period + jitter);
                     });
                 }, delay);
@@ -313,11 +318,12 @@
         }
         // 启动：页面加载后安排「打开后延迟首次上报」
         (function _initDiagReporter() {
+            // 本地记录始终运行（在 fetch 代理里已调用 _recordDiagWrite）；上报仅在开关开启时调度
             setTimeout(() => {
                 _getDiagConfig(false).then(cfg => {
                     if (cfg.enabled && localStorage.getItem(DIAG_OPTIN_KEY) !== '0') _scheduleDiagUpload('open');
                 });
-            }, 3000);
+            }, 3000); // 启动 3s 后才去读配置，避免阻塞首屏
         })();
         // 联网恢复（online 事件）→ 立即上报（1~20 分钟随机延迟）
         window.addEventListener('online', () => {
@@ -9484,6 +9490,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 card.style.cursor = 'pointer';
                 // 悬停描述统一交给自定义皮肤 tooltip（showSkinTooltip 会把 cards.json 的 desc 一并显示），
                 // 不再设 card.title，避免云端卡同时弹 native title + 自定义 tooltip 两个框（s1.0.95 水人双框修复）
+                // 🔴 云端卡与其他卡统一：① 生成等级徽章（与其他卡一致，新卡自动带上无需手动调）；② 名字不加黑底背景（纯文字，与其他卡一致）
                 const heroSkins = (window.skinRegistry && window.skinRegistry[name]) || [];
                 const cardTypeForBadge = quality;
                 const levelBadge = createLevelBadgeHTML(card.dataset.id, cardTypeForBadge, 'my', name);
@@ -14880,7 +14887,7 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
         let _lastWallPostTs = 0;                // 上一次需求墙发言时间戳(ms)，用于 30s 连续发言节流
         let _counterSelfTimer = null;           // 周期性自调度保活定时器（带随机抖动，错开全网相位）
         // 🔴 计数器写回间隔：采用与 Rust 托盘心跳一致的"递增错峰"策略——
-        // 第1次≈1h、第2次≈2h、第3次≈3h、第4次起≈4h，再叠加 0~30 分随机。
+        // 第1次≈1h、第2次≈2h、第3次≈3h、第4次起≈4h，再叠加 _getJitterCap() 的随机抖动(默认0~30分)。
         // 间隔从页面/进程启动时刻起算，登录时间不同的客户端天然错开相位，避免挂机用户批量并发触发限流。
         // 本机 localStorage 设了 tdjl_counterFlushSec(非0) 仍可强制固定间隔(调试用)。
         let _hbTick = 0; // 第几次心跳(进程内累计)
@@ -15802,7 +15809,7 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
 
         const BOSS_RED_SECTIONS = ['寒冰', '暗月', '漩涡', '深海'];
 
-        const BOSS_RED_WAVE_MAX = { '寒冰': 210, '暗月': 210, '漩涡': 130, '深海': 210 };
+        const BOSS_RED_WAVE_MAX = { '寒冰': 210, '暗月': 210, '漩涡': 210, '深海': 210 };
 
         let bossRedCurrent = { '寒冰': {}, '暗月': {}, '漩涡': {}, '深海': {} };
 
@@ -17017,7 +17024,6 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                     const resp = await fetch(`https://api.github.com/gists/${msgGistId}`, { method: 'PATCH', headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` }, body: JSON.stringify({ files: patchFiles }) });
                     if (!resp.ok) throw new Error('消息写入失败');
                 }
-                // 2) 个人资料（合并到上方一次 PATCH，省一次 Gist 写）
                 // 3) 脚本：按描述匹配现有 Gist → 原文件名覆盖写回；没有 → 重建新 Gist
                 let patched = 0, created = 0, skipped = 0;
                 if (Array.isArray(bundle.scripts) && bundle.scripts.length) {
@@ -18101,7 +18107,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 try { const lpCfg = await getRoomIndexConfig(); if (typeof lpCfg.loginPunchEnabled === 'boolean') loginPunchOn = lpCfg.loginPunchEnabled; } catch (e) {}
                 if (!loginPunchOn) {
                     const todayStr = new Date().toISOString().slice(0, 10);
-                    if (localStorage.getItem('__loginPunchedDate') === todayStr) return;
+                    if (localStorage.getItem('__loginPunchedDate') === todayStr) return; // 今天已打过，跳过
                 }
                 const id = await getLoginGistId();
                 if (!id) return;
@@ -21549,6 +21555,7 @@ ${maSection}
             const box = document.getElementById('diagContent');
             if (!box) return;
             box.innerHTML = '<div style="color:#fbbf24;">⏳ 正在拉取诊断 Gist…</div>';
+            // 确保诊断 Gist 存在（管理员私下进行，使用注入 token 自动创建；用户无感）
             _ensureDiagGist().then(async (gid) => {
                 if (!gid) {
                     const tk = getGistToken();
@@ -21580,12 +21587,14 @@ ${maSection}
                         immediateDelayMin: cfg.immediateDelayMin || 1, immediateDelayMax: cfg.immediateDelayMax || 20
                     };
                     const diagFiles = Object.keys(d.files || {}).filter(fn => fn.startsWith('diag-') && fn.endsWith('.json'));
+                    // 总闸按钮始终显示（无论有无上报文件，否则无数据时看不到开关无法开启 → 死循环）
                     let head = '<div style="border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:12px;margin-bottom:14px;">';
                     head += '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">';
                     head += '<span style="color:#fbbf24;font-size:0.82rem;">🟢 全网诊断上报总闸（仅管理员）：</span>';
                     head += '<button id="diagToggleBtn" onclick="adminToggleDiagEnabled()" style="background:' + (window.__diagEnabled ? 'linear-gradient(135deg,#10b981,#059669)' : 'rgba(255,255,255,0.1)') + ';color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.82rem;">' + (window.__diagEnabled ? '已开启（客户端正在上报）' : '已关闭') + '</button>';
                     head += '<span id="diagToggleHint" style="color:#94a3b8;font-size:0.72rem;">' + (window.__diagEnabled ? '关闭后客户端停止上报' : '开启后所有客户端自动上报写操作（用户无感）') + '</span>';
                     head += '</div>';
+                    // 上报策略配置区
                     head += '<div style="margin-top:12px;border-top:1px dashed rgba(255,255,255,0.12);padding-top:10px;">';
                     head += '<div style="color:#ffd700;font-size:0.82rem;margin-bottom:8px;">⚙️ 上报策略配置（秒级=分钟，随机错峰避免同时写入）</div>';
                     head += '<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;font-size:0.76rem;color:#cbd5e1;">';
@@ -21600,11 +21609,15 @@ ${maSection}
                     if (diagFiles.length === 0) {
                         box.innerHTML = head + '<div style="color:#4ade80;">✅ 暂无上报文件（总闸未开 / 没有客户端在写 / 或已优化完毕）。<br><span style="color:#94a3b8;font-size:0.75rem;">→ 先点上方「全网诊断上报总闸」开启，等客户端上报一会儿再刷新本页即可看到 TOP 归因。</span></div>';
                     } else {
+                        // 聚合
                         const perUser = {}, perGist = {}, perFn = {};
                         let totalWrites = 0;
+                        const fileMetas = [];
                         diagFiles.forEach(fn => {
                             let p; try { p = JSON.parse(d.files[fn].content); } catch (e) { return; }
                             const who = (p.nick ? p.nick + '(' + p.anonId + ')' : p.anonId);
+                            const last = p.lastUpload || 0;
+                            fileMetas.push({ fn, who, last, count: (p.entries || []).reduce((s, e) => s + (e.count || 0), 0) });
                             perUser[who] = (perUser[who] || 0);
                             (p.entries || []).forEach(e => {
                                 perUser[who] += e.count; totalWrites += e.count;
@@ -21627,6 +21640,7 @@ ${maSection}
                         html += '<div style="margin-bottom:16px;"><div style="color:#ffd700;margin-bottom:4px;">⚙️ 按 Gist×功能 TOP</div>';
                         fTop.forEach(x => html += '<div>' + bar(x.v, fMax) + ' ' + x.v + '　' + x.k + '</div>');
                         html += '</div>';
+                        // 清理区
                         html += '<div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:12px;margin-top:8px;">';
                         html += '<div style="color:#ffd700;margin-bottom:6px;">🧹 清理上报文件（按时间）</div>';
                         html += '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px;">';
@@ -21643,6 +21657,7 @@ ${maSection}
                 }
             });
         }
+        // 按时间一键删除上报文件（保留 diag_config.json）
         window.adminDeleteDiagFiles = async function () {
             const sel = document.getElementById('diagDelRange');
             const status = document.getElementById('diagDelStatus');
@@ -21744,6 +21759,8 @@ ${maSection}
         };
 
         // ==================== 功能开关面板（数据驱动，便于后续新增开关）====================
+        // 每个开关：{ key, label, desc, scope:'remote'|'local', remoteField?, localKey?, default?, apply(value) }
+        // remote: 存索引 Gist room_index.json 的字段（全网生效）；local: 存 localStorage（本机生效）
         const FEATURE_TOGGLES = [
             {
                 key: 'loginPunch',
@@ -21752,7 +21769,7 @@ ${maSection}
                 scope: 'remote',
                 remoteField: 'loginPunchEnabled',
                 default: false,
-                apply: (v) => { }
+                apply: (v) => { /* 实际拦截在 pushLoginEventToGist 内读取 */ }
             },
             {
                 key: 'counterFlush',
@@ -21794,6 +21811,7 @@ ${maSection}
             }
         ];
 
+        // 读取索引 Gist 的 room_index.json 当前值（带缓存）
         async function getRoomIndexConfig() {
             try {
                 const url = await getIndexGistUrl();
@@ -21807,6 +21825,7 @@ ${maSection}
             return {};
         }
 
+        // 写入索引 Gist 的 room_index.json 某个字段（远程开关用）
         async function setRoomIndexConfigField(field, value) {
             const token = getGistToken();
             if (!token) throw new Error('无Token');
@@ -21826,6 +21845,7 @@ ${maSection}
             const box = document.getElementById('featureTogglesContent');
             if (!box) return;
             box.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,0.4);padding:10px;">正在加载开关状态…</div>';
+            // 远程开关值
             let remoteCfg = {};
             try { remoteCfg = await getRoomIndexConfig(); } catch (e) { remoteCfg = {}; }
             let html = '';
@@ -21886,7 +21906,7 @@ ${maSection}
                     const next = !curVal;
                     localStorage.setItem(t.localKey, next ? '0' : '1');
                 }
-                if (typeof t.apply === 'function') t.apply(t.scope === 'remote' ? (await getRoomIndexConfig())[t.remoteField] : (localStorage.getItem(t.localKey) !== '1'));
+                if (typeof t.apply === 'function') t.apply(t.scope === 'remote' ? (await getRoomIndexConfig())[t.remoteField] : (localStorage.getItem(t.localKey) !== '1') /* 显示 */);
                 renderFeatureToggles();
             } catch (e) {
                 alert('切换失败：' + (e && e.message ? e.message : e));
@@ -22568,10 +22588,13 @@ ${maSection}
             if (status) status.textContent = visible ? '已开启' : '已关闭';
             const con = document.getElementById('floatConsole');
             if (!con) return;
-            // 开启开关时尊重"最小化记忆"（若上次收起则仍收起，显示小圆按钮），而非强制展开
-            let minimized = false;
-            try { minimized = localStorage.getItem(CONSOLE_MINIMIZED_KEY) === '1'; } catch (_) {}
-            floatConsoleVisible = visible && !minimized;
+            // 关键修复：管理员开关"开启"时强制展开浮窗，清空"最小化记忆"，
+            // 避免上次收起状态(tdjl_consoleMinimized='1')把开关绑架成"只显示小圆按钮"导致"打不开"。
+            // 仅"用户手动点浮窗内收起按钮"才记 minimized，且从开关再开时会被清掉重新展开。
+            if (visible) {
+                try { localStorage.setItem(CONSOLE_MINIMIZED_KEY, '0'); } catch (_) {}
+            }
+            floatConsoleVisible = visible;
             con.style.display = floatConsoleVisible ? 'flex' : 'none';
             if (btn) btn.style.display = (visible && !floatConsoleVisible) ? 'flex' : 'none';
             if (floatConsoleVisible) {

@@ -22588,10 +22588,13 @@ ${maSection}
             if (status) status.textContent = visible ? '已开启' : '已关闭';
             const con = document.getElementById('floatConsole');
             if (!con) return;
-            // 开启开关时尊重"最小化记忆"（若上次收起则仍收起，显示小圆按钮），而非强制展开
-            let minimized = false;
-            try { minimized = localStorage.getItem(CONSOLE_MINIMIZED_KEY) === '1'; } catch (_) {}
-            floatConsoleVisible = visible && !minimized;
+            // 关键修复：管理员开关"开启"时强制展开浮窗，清空"最小化记忆"，
+            // 避免上次收起状态(tdjl_consoleMinimized='1')把开关绑架成"只显示小圆按钮"导致"打不开"。
+            // 仅"用户手动点浮窗内收起按钮"才记 minimized，且从开关再开时会被清掉重新展开。
+            if (visible) {
+                try { localStorage.setItem(CONSOLE_MINIMIZED_KEY, '0'); } catch (_) {}
+            }
+            floatConsoleVisible = visible;
             con.style.display = floatConsoleVisible ? 'flex' : 'none';
             if (btn) btn.style.display = (visible && !floatConsoleVisible) ? 'flex' : 'none';
             if (floatConsoleVisible) {
