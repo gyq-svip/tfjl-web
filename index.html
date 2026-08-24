@@ -1692,6 +1692,10 @@
                         <span class="mi-emoji">📡</span>
                         <div class="mi-text"><div class="mi-title">API监控</div><div class="mi-sub">Token写入 / 限额</div></div>
                     </div>
+                    <div class="admin-menu-item" onclick="adminShowPage('diag')">
+                        <span class="mi-emoji">📊</span>
+                        <div class="mi-text"><div class="mi-title">写操作诊断</div><div class="mi-sub">限流归因 / 清理</div></div>
+                    </div>
                     <div class="admin-menu-item" onclick="adminShowPage('damageCalc')">
                         <span class="mi-emoji">🧮</span>
                         <div class="mi-text"><div class="mi-title">伤害测算</div><div class="mi-sub">火灵/鱼人/天使/法师</div></div>
@@ -2015,6 +2019,16 @@
                     <div style="text-align:right;">
                         <button class="admin-btn admin-btn-primary" onclick="adminSaveTitle()">保存标题</button>
                     </div>
+                </div>
+            </div>
+
+            <div id="adminPageDiag" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:99990;overflow-y:auto;">
+                <div style="max-width:760px;margin:40px auto;background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:12px;padding:20px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                        <h3 style="color:#ffd700;margin:0;font-size:1rem;">📊 写操作诊断分析</h3>
+                        <button onclick="document.getElementById('adminPageDiag').style.display='none';var m=document.getElementById('adminMenuSection');if(m)m.style.display='block';" style="background:none;border:none;color:#fff;font-size:1.4rem;cursor:pointer;">✕</button>
+                    </div>
+                    <div id="diagContent" style="font-size:0.8rem;color:rgba(255,255,255,0.85);line-height:1.6;"></div>
                 </div>
             </div>
 

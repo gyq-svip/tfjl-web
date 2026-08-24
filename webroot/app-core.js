@@ -21539,8 +21539,145 @@ ${maSection}
                     pageEl.style.display = 'block';
                     renderFeatureToggles();
                 }
+            } else if (page === 'diag') {
+                const pageEl = document.getElementById('adminPageDiag');
+                if (pageEl) {
+                    pageEl.style.display = 'block';
+                    adminLoadDiag();
+                }
             }
         }
+
+        // ==================== 写操作诊断可视化面板 ====================
+        function adminLoadDiag() {
+            const box = document.getElementById('diagContent');
+            if (!box) return;
+            box.innerHTML = '<div style="color:#fbbf24;">⏳ 正在拉取诊断 Gist…</div>';
+            _ensureDiagGist().then(async (gid) => {
+                if (!gid) {
+                    box.innerHTML = '<div style="color:#f87171;">⚠️ 诊断 Gist 未初始化（缺少注入 token）。</div>';
+                    return;
+                }
+                const token = getGistToken();
+                if (!token) {
+                    box.innerHTML = '<div style="color:#f87171;">⚠️ 无可用 token，无法读取诊断数据。</div>';
+                    return;
+                }
+                try {
+                    const r = await fetch('https://api.github.com/gists/' + gid, {
+                        headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': 'token ' + token }
+                    });
+                    if (!r.ok) { box.innerHTML = '<div style="color:#f87171;">拉取失败：HTTP ' + r.status + '</div>'; return; }
+                    const d = await r.json();
+                    try { window.__diagEnabled = !!(d.files && d.files['diag_config.json'] && d.files['diag_config.json'].content && JSON.parse(d.files['diag_config.json'].content).enabled); } catch (e) { window.__diagEnabled = false; }
+                    const diagFiles = Object.keys(d.files || {}).filter(fn => fn.startsWith('diag-') && fn.endsWith('.json'));
+                    if (diagFiles.length === 0) {
+                        box.innerHTML = '<div style="color:#4ade80;">✅ 暂无上报文件（没有客户端在写，或已优化完毕）。</div>';
+                    } else {
+                        const perUser = {}, perGist = {}, perFn = {};
+                        let totalWrites = 0;
+                        diagFiles.forEach(fn => {
+                            let p; try { p = JSON.parse(d.files[fn].content); } catch (e) { return; }
+                            const who = (p.nick ? p.nick + '(' + p.anonId + ')' : p.anonId);
+                            perUser[who] = (perUser[who] || 0);
+                            (p.entries || []).forEach(e => {
+                                perUser[who] += e.count; totalWrites += e.count;
+                                perGist[e.gistId] = (perGist[e.gistId] || 0) + e.count;
+                                perFn[e.gistId + '|' + e.fn] = (perFn[e.gistId + '|' + e.fn] || 0) + e.count;
+                            });
+                        });
+                        const sortBy = (o) => Object.keys(o).map(k => ({ k, v: o[k] })).sort((a, b) => b.v - a.v);
+                        const bar = (v, max) => { const n = max ? Math.round((v / max) * 30) : 0; return '▇'.repeat(Math.min(n, 30)); };
+                        const uTop = sortBy(perUser).slice(0, 10), gTop = sortBy(perGist).slice(0, 10), fTop = sortBy(perFn).slice(0, 10);
+                        const uMax = uTop.length ? uTop[0].v : 1, gMax = gTop.length ? gTop[0].v : 1, fMax = fTop.length ? fTop[0].v : 1;
+                        let html = '<div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:8px 12px;margin-bottom:12px;">';
+                        html += '📁 诊断 Gist: <code style="color:#60a5fa;">' + gid + '</code> ｜ 上报文件数: <b>' + diagFiles.length + '</b> ｜ 累计写入: <b>' + totalWrites + '</b> 次</div>';
+                        html += '<div style="margin-bottom:16px;"><div style="color:#ffd700;margin-bottom:4px;">👤 按用户 TOP</div>';
+                        uTop.forEach(x => html += '<div>' + bar(x.v, uMax) + ' ' + x.v + '　' + x.k + '</div>');
+                        html += '</div>';
+                        html += '<div style="margin-bottom:16px;"><div style="color:#ffd700;margin-bottom:4px;">📄 按 Gist 文件 TOP</div>';
+                        gTop.forEach(x => html += '<div>' + bar(x.v, gMax) + ' ' + x.v + '　' + x.k + '</div>');
+                        html += '</div>';
+                        html += '<div style="margin-bottom:16px;"><div style="color:#ffd700;margin-bottom:4px;">⚙️ 按 Gist×功能 TOP</div>';
+                        fTop.forEach(x => html += '<div>' + bar(x.v, fMax) + ' ' + x.v + '　' + x.k + '</div>');
+                        html += '</div>';
+                        html += '<div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:12px;margin-top:8px;">';
+                        html += '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">';
+                        html += '<span style="color:#fbbf24;font-size:0.78rem;">🟢 全网诊断上报总闸（仅管理员）：</span>';
+                        html += '<button id="diagToggleBtn" onclick="adminToggleDiagEnabled()" style="background:' + (window.__diagEnabled ? 'linear-gradient(135deg,#10b981,#059669)' : 'rgba(255,255,255,0.1)') + ';color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.82rem;">' + (window.__diagEnabled ? '已开启' : '已关闭') + '</button>';
+                        html += '<span id="diagToggleHint" style="color:#94a3b8;font-size:0.72rem;">开启后所有客户端自动上报写操作（用户无感）</span>';
+                        html += '</div>';
+                        html += '<div style="color:#ffd700;margin-bottom:6px;">🧹 清理上报文件（按时间）</div>';
+                        html += '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px;">';
+                        html += '<label>删除 <select id="diagDelRange" style="background:#16213e;color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:4px;"><option value="1">1天前</option><option value="3">3天前</option><option value="7">7天前</option><option value="30">30天前</option><option value="0">全部</option></select> 的上报文件</label>';
+                        html += '<button onclick="adminDeleteDiagFiles()" style="background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.82rem;">🗑️ 一键删除</button>';
+                        html += '<button onclick="adminLoadDiag()" style="background:rgba(255,255,255,0.1);color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.82rem;">🔄 刷新</button>';
+                        html += '</div>';
+                        html += '<div id="diagDelStatus" style="color:#94a3b8;font-size:0.75rem;"></div>';
+                        html += '</div>';
+                        box.innerHTML = html;
+                    }
+                } catch (e) {
+                    box.innerHTML = '<div style="color:#f87171;">拉取异常：' + (e && e.message ? e.message : e) + '</div>';
+                }
+            });
+        }
+        window.adminDeleteDiagFiles = async function () {
+            const sel = document.getElementById('diagDelRange');
+            const status = document.getElementById('diagDelStatus');
+            if (!sel || !status) return;
+            const days = parseInt(sel.value, 10);
+            const beforeTs = days === 0 ? Date.now() + 1 : Date.now() - days * 86400000;
+            const gid = localStorage.getItem(DIAG_GIST_KEY) || (await _ensureDiagGist());
+            if (!gid) { status.textContent = '诊断 Gist 未初始化'; return; }
+            const token = getGistToken();
+            if (!token) { status.textContent = '无 token'; return; }
+            status.textContent = '⏳ 正在读取…';
+            try {
+                const r = await fetch('https://api.github.com/gists/' + gid, { headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': 'token ' + token } });
+                if (!r.ok) { status.textContent = '读取失败 HTTP ' + r.status; return; }
+                const d = await r.json();
+                const toDelete = Object.keys(d.files || {}).filter(fn => fn.startsWith('diag-') && fn.endsWith('.json') && (days === 0 ? true : (function () { try { return (JSON.parse(d.files[fn].content).lastUpload || 0) < beforeTs; } catch (e) { return false; } })()));
+                if (toDelete.length === 0) { status.textContent = '✅ 没有符合条件的文件'; return; }
+                const files = {};
+                toDelete.forEach(fn => { files[fn] = null; });
+                const pr = await fetch('https://api.github.com/gists/' + gid, {
+                    method: 'PATCH',
+                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': 'token ' + token },
+                    body: JSON.stringify({ files })
+                });
+                if (pr.ok) status.textContent = '✅ 已删除 ' + toDelete.length + ' 个上报文件';
+                else status.textContent = '删除失败 HTTP ' + pr.status;
+            } catch (e) {
+                status.textContent = '异常：' + (e && e.message ? e.message : e);
+            }
+        };
+        // 管理员专用：切换诊断上报总闸（写 diag_config.json 的 enabled）
+        window.adminToggleDiagEnabled = async function () {
+            const gid = localStorage.getItem(DIAG_GIST_KEY) || (await _ensureDiagGist());
+            if (!gid) { alert('诊断 Gist 未初始化'); return; }
+            const token = getGistToken();
+            if (!token) { alert('无 token'); return; }
+            try {
+                const r = await fetch('https://api.github.com/gists/' + gid, { headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': 'token ' + token } });
+                if (!r.ok) { alert('读取失败 HTTP ' + r.status); return; }
+                const d = await r.json();
+                let cfg = {};
+                try { cfg = JSON.parse((d.files && d.files['diag_config.json'] && d.files['diag_config.json'].content) || '{}') || {}; } catch (e) {}
+                cfg.enabled = !cfg.enabled;
+                cfg.periodDays = cfg.periodDays || 3;
+                cfg.allowImmediate = cfg.allowImmediate !== false;
+                cfg.openDelayMin = cfg.openDelayMin || 5; cfg.openDelayMax = cfg.openDelayMax || 10;
+                cfg.immediateDelayMin = cfg.immediateDelayMin || 1; cfg.immediateDelayMax = cfg.immediateDelayMax || 20;
+                const pr = await fetch('https://api.github.com/gists/' + gid, {
+                    method: 'PATCH',
+                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': 'token ' + token },
+                    body: JSON.stringify({ files: { 'diag_config.json': { content: JSON.stringify(cfg, null, 2) } } })
+                });
+                if (pr.ok) { window.__diagEnabled = cfg.enabled; adminLoadDiag(); }
+                else alert('写入失败 HTTP ' + pr.status);
+            } catch (e) { alert('异常：' + (e && e.message ? e.message : e)); }
+        };
 
         // ==================== 功能开关面板（数据驱动，便于后续新增开关）====================
         const FEATURE_TOGGLES = [
@@ -21588,20 +21725,6 @@ ${maSection}
                         applyConsoleVisibility(!!v);
                     } else if (typeof toggleConsoleVisibility === 'function') {
                         toggleConsoleVisibility();
-                    }
-                }
-            },
-            {
-                key: 'diagReport',
-                label: '参与写操作诊断上报',
-                desc: '默认关闭：本地始终记录 Gist 写操作，但仅当管理员开启全网诊断(索引 Gist 的 diag_config.json enabled=true)时才上报。开启本开关=你自愿参与上报(匿名ID+昵称)。',
-                scope: 'local',
-                localKey: 'tdjl_diagOptIn',
-                default: false,
-                apply: (v) => {
-                    try { localStorage.setItem('tdjl_diagOptIn', v ? '1' : '0'); } catch (e) {}
-                    if (v && typeof _scheduleDiagUpload === 'function') {
-                        setTimeout(() => _scheduleDiagUpload('open'), 3000);
                     }
                 }
             }
