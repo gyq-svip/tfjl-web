@@ -113,10 +113,16 @@ if (isTauriApp) {
         return [n & 0xff, (n >>> 8) & 0xff, (n >>> 16) & 0xff, (n >>> 24) & 0xff];
     }
     function _bytesToBase64(bytes) {
+        // 注意：不能用 String.fromCharCode.apply(null, hugeArray)，部分 webview 对 apply 的参数个数
+        // 有上限（远低于 0x8000*... 累积），会抛 Maximum call stack size exceeded，导致写盘彻底失败。
+        // 改用逐字节拼接（按块循环但块内手动拼，避免超长参数列表）。
         let s = '';
         const chunk = 0x8000;
         for (let i = 0; i < bytes.length; i += chunk) {
-            s += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+            const end = Math.min(i + chunk, bytes.length);
+            let part = '';
+            for (let j = i; j < end; j++) part += String.fromCharCode(bytes[j]);
+            s += part;
         }
         return btoa(s);
     }
