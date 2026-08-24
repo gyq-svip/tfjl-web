@@ -14879,22 +14879,19 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
         let _gistWriteBackoffUntil = 0;         // 限流退避截止时间戳(ms)
         let _lastWallPostTs = 0;                // 上一次需求墙发言时间戳(ms)，用于 30s 连续发言节流
         let _counterSelfTimer = null;           // 周期性自调度保活定时器（带随机抖动，错开全网相位）
-        // 🔴 计数器写回间隔：全网生效(读索引 Gist 的 counterFlushSec,单位秒),默认 60s,范围 10~600。
-        // 本机 localStorage 设了非 0 值则强制覆盖(便于临时测试,不影响全网)。
+        // 🔴 计数器写回间隔：采用与 Rust 托盘心跳一致的"递增错峰"策略——
+        // 第1次≈1h、第2次≈2h、第3次≈3h、第4次起≈4h，再叠加 0~30 分随机。
+        // 间隔从页面/进程启动时刻起算，登录时间不同的客户端天然错开相位，避免挂机用户批量并发触发限流。
+        // 本机 localStorage 设了 tdjl_counterFlushSec(非0) 仍可强制固定间隔(调试用)。
+        let _hbTick = 0; // 第几次心跳(进程内累计)
         async function _getCounterFlushInterval() {
-            let v = 60000;
             try {
                 const local = localStorage.getItem('tdjl_counterFlushSec');
-                if (local != null) { const ln = parseInt(local, 10); if (!isNaN(ln) && ln > 0) { v = ln * 1000; return v; } }
+                if (local != null) { const ln = parseInt(local, 10); if (!isNaN(ln) && ln > 0) { return ln * 1000; } }
             } catch (e) {}
-            try {
-                const cfg = await getRoomIndexConfig();
-                if (typeof cfg.counterFlushSec === 'number') {
-                    const n = cfg.counterFlushSec;
-                    if (n <= 0) v = 0; else if (n * 1000 >= 10000 && n * 1000 <= 600000) v = n * 1000;
-                }
-            } catch (e) {}
-            return v;
+            const baseMin = [60, 120, 180, 240][Math.min(_hbTick, 3)]; // 1h/2h/3h/4h
+            const jitter = Math.floor(Math.random() * 31) * 60000; // 0~30 分钟随机
+            return baseMin * 60000 + jitter;
         }
         // 🔴 随机抖动上限：把"整点对齐"的并发写打散到 interval~(interval+jitterCap) 随机相位，
         // 避免全网客户端在同一秒同时 PATCH 触发 Gist 写限流（导致需求墙/Boss减伤/在线状态全 403）。
@@ -14924,18 +14921,19 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
             if (type) _counterFlushPending = type;
             if (_counterFlushTimer) return; // 已有定时器在跑，等它触发
             const wait = Math.max(0, _gistWriteBackoffUntil - Date.now());
-            Promise.all([_getCounterFlushInterval(), _getJitterCap()]).then(([interval, jitterCap]) => {
-                const jitter = _randomJitter(jitterCap);
-                const total = (wait || interval) + jitter;
-                console.log('[计数器写回] 安排下次写入: 基础=' + (wait || interval) + 'ms, 抖动=' + jitter + 'ms, 合计=' + total + 'ms');
+            // 间隔自带随机错峰(_getCounterFlushInterval 已含 0~30 分抖动)，不再额外叠加 _getJitterCap
+            _getCounterFlushInterval().then((interval) => {
+                const total = wait || interval;
+                console.log('[计数器写回] 安排下次写入(第' + (_hbTick + 1) + '次): 间隔=' + interval + 'ms' + (wait ? ' (含退避' + wait + 'ms)' : ''));
                 _counterFlushTimer = setTimeout(async () => {
                     _counterFlushTimer = null;
                     const flushType = _counterFlushPending || 'visit';
                     _counterFlushPending = null;
                     try {
                         await syncCounterToGist();
+                        _hbTick = Math.min(_hbTick + 1, 999999); // 成功写回后才推进递增相位
                     } catch (e) {
-                        // 限流(rate limit)时进入退避：30s 内不再写，数据仍在本地缓存不丢
+                        // 限流(rate limit/403)时进入退避：30s 内不再写，数据仍在本地缓存不丢
                         if (e && (e.message || '').includes('rate limit')) {
                             _gistWriteBackoffUntil = Date.now() + 30000;
                             console.warn('⚠️ gist 写限流，30s 后重试(数据已本地缓存):', e.message);
@@ -14955,19 +14953,16 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
         async function startCounterSelfKeepalive() {
             if (_counterSelfTimer) return;
             const loop = async () => {
-                const interval = await _getCounterFlushInterval();
-                const jitterCap = await _getJitterCap();
-                const jitter = _randomJitter(jitterCap);
-                const total = interval + jitter;
+                const interval = await _getCounterFlushInterval(); // 已含递增基础值 + 0~30分随机
                 _counterSelfTimer = setTimeout(async () => {
                     _counterSelfTimer = null;
                     if (document.hidden) { return loop(); } // 隐藏页不写，但继续错峰循环
                     if (!getGistToken() || !counterData) { return loop(); }
                     if (_gistWriteBackoffUntil > Date.now()) { return loop(); } // 限流退避中，跳过本轮
-                    try { await syncCounterToGist(); }
+                    try { await syncCounterToGist(); _hbTick = Math.min(_hbTick + 1, 999999); }
                     catch (e) { if (e && (e.message || '').includes('rate limit')) _gistWriteBackoffUntil = Date.now() + 30000; }
                     return loop();
-                }, total);
+                }, interval);
             };
             loop();
         }
