@@ -311,6 +311,16 @@ if (isTauriApp) {
         }
     }
 
+    // 强制从磁盘重读 tfjl.dat（重置内部缓存状态后再次加载），用于诊断写盘验证等需要真实比对磁盘的场景
+    async function _forceReloadStore() {
+        _storeLoaded = false;
+        _storeMap = new Map();
+        _projectsCache = null;
+        const dir = _getSyncDir();
+        if (!dir) return;
+        await _ensureStoreLoaded(dir);
+    }
+
     function saveScanCache(files) {
         const cache = { date: getTodayStr(), files: files, savedAt: Date.now() };
         _deferredSetItem(getScanCacheKey(), cache);
@@ -4093,6 +4103,7 @@ if (isTauriApp) {
         readDir: readDir,
         readTextFile: readTextFile,
         ensureStoreLoaded: _ensureStoreLoaded,
+        forceReloadStore: _forceReloadStore,
         getStoreMap: () => _storeMap,
         flushStore: () => _flushStore(),
         syncAllNow: syncAllNow,
@@ -4184,10 +4195,11 @@ async function runDiagnostics() {
     if (isApp) {
         try {
             // 修正：探针写入统一存储(store),落盘 tfjl.dat 后读回验证（不触发 syncAllNow 全量 Gist 写回，避免诊断本身制造限流）
+            // 关键：必须强制从磁盘重读，不能走 ensureStoreLoaded 缓存路径（启动后 _storeLoaded=true 会直接 return，导致误报"落盘失败"）
             const probeKey = '__tfjl_diag_probe__';
             api.getStoreMap().set(probeKey, String(Date.now()));
             await api.flushStore();
-            await api.ensureStoreLoaded(api.getSyncDir());
+            await api.forceReloadStore();
             const back = api.getStoreMap().get(probeKey);
             if (back) { api.getStoreMap().delete(probeKey); await api.flushStore(); }
             push('写盘验证', back ? 'ok' : 'error',
