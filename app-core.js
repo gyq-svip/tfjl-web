@@ -21799,11 +21799,13 @@ ${maSection}
                 localKey: 'tdjl_consoleVisible',
                 default: false,
                 apply: (v) => {
-                    // 驱动管理员"总开关"(tdjl_consoleVisible)，走统一状态机 applyConsoleVisibility，
-                    // 避免直接改 display 污染"最小化记忆"(tdjl_consoleMinimized)，导致收起按钮失效。
+                    // 关键修复：不再直接信任传入的 v（易被 FEATURE_TOGGLES 的反转存储逻辑污染导致状态错乱），
+                    // 改为直接读真实开关状态驱动浮窗，保证"开关开=浮窗显示"始终成立。
+                    // 仍负责把开关意图写回 tdjl_consoleVisible，但显示完全按真实存储走。
                     try { localStorage.setItem('tdjl_consoleVisible', v ? '1' : '0'); } catch (e) {}
+                    const realOn = localStorage.getItem('tdjl_consoleVisible') === '1';
                     if (typeof applyConsoleVisibility === 'function') {
-                        applyConsoleVisibility(!!v);
+                        applyConsoleVisibility(realOn);
                     } else if (typeof toggleConsoleVisibility === 'function') {
                         toggleConsoleVisibility();
                     }
@@ -21855,8 +21857,9 @@ ${maSection}
                     on = remoteCfg[t.remoteField];
                     if (typeof on !== 'boolean') on = t.default;
                 } else {
+                    // 修正：本机开关正向存储（'1'=开），与 toggleFeature 写入、apply 读取保持一致
                     const lv = localStorage.getItem(t.localKey);
-                    on = lv === null ? t.default : (lv === '1' ? false : lv === '0' ? true : t.default);
+                    on = lv === null ? (t.default ? true : false) : (lv === '1' ? true : lv === '0' ? false : false);
                 }
                 if (t.type === 'range') {
                     const curVal = (typeof remoteCfg[t.remoteField] === 'number') ? remoteCfg[t.remoteField] : t.default;
@@ -21901,12 +21904,14 @@ ${maSection}
                     const next = !curVal;
                     await setRoomIndexConfigField(t.remoteField, next);
                 } else {
+                    // 修正：本机开关改为正向存储（'1'=开，'0'=关），与 applyConsoleVisibility / initFloatConsoleOnLoad
+                    // 读取约定（tdjl_consoleVisible==='1' 即开启）保持一致，避免反向存储导致浮窗状态错乱。
                     const lv = localStorage.getItem(t.localKey);
-                    const curVal = lv === null ? t.default : (lv === '1' ? false : lv === '0' ? true : t.default);
+                    const curVal = lv === null ? (t.default ? true : false) : (lv === '1' ? true : lv === '0' ? false : false);
                     const next = !curVal;
-                    localStorage.setItem(t.localKey, next ? '0' : '1');
+                    localStorage.setItem(t.localKey, next ? '1' : '0');
                 }
-                if (typeof t.apply === 'function') t.apply(t.scope === 'remote' ? (await getRoomIndexConfig())[t.remoteField] : (localStorage.getItem(t.localKey) !== '1') /* 显示 */);
+                if (typeof t.apply === 'function') t.apply(t.scope === 'remote' ? (await getRoomIndexConfig())[t.remoteField] : (localStorage.getItem(t.localKey) === '1') /* 显示 */);
                 renderFeatureToggles();
             } catch (e) {
                 alert('切换失败：' + (e && e.message ? e.message : e));
@@ -22543,12 +22548,11 @@ ${maSection}
             // 管理员开关（tdjl_consoleVisible）：未设置(null)即默认关闭，满足"默认全关"需求
             let consoleEnabled = false;
             try { consoleEnabled = localStorage.getItem('tdjl_consoleVisible') === '1'; } catch (_) {}
-            // 读取最小化记忆：上次收起则保持收起（显示小圆按钮）
-            let minimized = false;
-            try { minimized = localStorage.getItem(CONSOLE_MINIMIZED_KEY) === '1'; } catch (_) {}
-            // 修复：之前硬编码 !minimized 无视管理员开关，导致开关"不管用"且默认强制展开；
-            // 现在 = 管理员开关开启 且 未收起 才显示
-            floatConsoleVisible = consoleEnabled && !minimized;
+            // 关键修复：页面加载时只认管理员总开关，不再读"最小化记忆"(tdjl_consoleMinimized)。
+            // 旧逻辑 floatConsoleVisible = consoleEnabled && !minimized 会让"上次收起"状态在刷新后
+            // 把浮窗永久藏起来（只留小圆按钮），造成"开关开启但浮窗打不开"。
+            // 现在：开关开 → 浮窗直接显示；开关关 → 隐藏。收起记忆仅作用于"运行时手动收起"，不持久化到加载。
+            floatConsoleVisible = consoleEnabled;
             con.style.display = floatConsoleVisible ? 'flex' : 'none';
             if (toggle) toggle.style.display = (consoleEnabled && !floatConsoleVisible) ? 'flex' : 'none';
             refreshFloatConsole();
