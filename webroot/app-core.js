@@ -10726,26 +10726,53 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             return parseFloat(total.toFixed(1));
         }
 
-        // 减伤显示：我的卡组用「我的」表、队友卡组用「队友」表；额外渲染勾选表的对比汇总
+        // 减伤显示：我的卡组/队友卡组各可独立切换减伤表查看（下拉选择，默认「我的」/「队友」）
         function updateDamageReductionDisplay() {
             loadDamageReductionData();
 
-            // 计算我的卡组减伤（用「我的」表）
-            const myTotal = calculateTotalDamageReduction(myPlacedCards, 'my', '我的');
+            // 当前查看的减伤表（用户可下拉切换；默认「我的」/「队友」）
+            if (!window._myDrTable || !window.drTables[window._myDrTable]) window._myDrTable = '我的';
+            if (!window._teammateDrTable || !window.drTables[window._teammateDrTable]) window._teammateDrTable = '队友';
+
+            // 计算我的卡组减伤（用所选表）
+            const myTotal = calculateTotalDamageReduction(myPlacedCards, 'my', window._myDrTable);
             const myEl = document.getElementById('myDamageReduction');
             if (myEl) {
                 myEl.textContent = `总减伤:${myTotal}`;
             }
 
-            // 计算队友卡组减伤（用「队友」表）
-            const teammateTotal = calculateTotalDamageReduction(teammatePlacedCards, 'teammate', '队友');
+            // 计算队友卡组减伤（用所选表）
+            const teammateTotal = calculateTotalDamageReduction(teammatePlacedCards, 'teammate', window._teammateDrTable);
             const teammateEl = document.getElementById('teammateDamageReduction');
             if (teammateEl) {
                 teammateEl.textContent = `总减伤:${teammateTotal}`;
             }
 
+            // 填充两个减伤表切换下拉
+            const mySel = document.getElementById('myDrTableSel');
+            if (mySel) { mySel.innerHTML = drTableSelectOptions(window._myDrTable); }
+            const tmSel = document.getElementById('teammateDrTableSel');
+            if (tmSel) { tmSel.innerHTML = drTableSelectOptions(window._teammateDrTable); }
+
             // 对比区：展示每张被勾选的表在我方/队友侧的减伤汇总
             renderDrComparisonPanel();
+        }
+
+        // 主界面减伤表切换：side='my'|'teammate'，tableName 为选中的减伤表名
+        function switchDrTable(side, tableName) {
+            if (!tableName || !window.drTables[tableName]) return;
+            if (side === 'teammate') window._teammateDrTable = tableName;
+            else window._myDrTable = tableName;
+            // 只重算对应一侧，避免整页重排
+            if (side === 'teammate') {
+                const t = calculateTotalDamageReduction(teammatePlacedCards, 'teammate', tableName);
+                const el = document.getElementById('teammateDamageReduction');
+                if (el) el.textContent = `总减伤:${t}`;
+            } else {
+                const t = calculateTotalDamageReduction(myPlacedCards, 'my', tableName);
+                const el = document.getElementById('myDamageReduction');
+                if (el) el.textContent = `总减伤:${t}`;
+            }
         }
 
         // 减伤表下拉选项（供各显示处复用）
