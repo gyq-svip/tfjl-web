@@ -207,7 +207,7 @@
         }
         // 读取诊断配置（本地缓存 4h，超时重新拉）
         async function _getDiagConfig(force) {
-            const def = { enabled: false, periodDays: 3, allowImmediate: true, openDelayMin: 5, openDelayMax: 10, immediateDelayMin: 1, immediateDelayMax: 20, diagGistId: '' };
+            const def = { enabled: true, periodDays: 3, allowImmediate: true, openDelayMin: 5, openDelayMax: 10, immediateDelayMin: 1, immediateDelayMax: 20, diagGistId: '' };
             try {
                 const cached = JSON.parse(localStorage.getItem(DIAG_CONFIG_CACHE) || 'null');
                 if (cached && cached.ts && (Date.now() - cached.ts) < DIAG_CONFIG_TTL && !force) return Object.assign({}, def, cached.cfg);
@@ -224,7 +224,11 @@
                     let cfg = {};
                     if (f && f.content) { try { cfg = JSON.parse(f.content) || {}; } catch (e) {} }
                     cfg.diagGistId = gid;
+                    // 关键：enabled 始终以默认（true）为准，不让诊断 Gist 里旧配置 enabled:false 覆盖，
+                    // 否则用户部署后没有手动开开关就永远不上报（之前 15 分钟无上报的原因）。
+                    // 想远程关闭上报可改 _ensureDiagGist 创建逻辑或后续加独立开关，这里保证默认开。
                     const merged = Object.assign({}, def, cfg);
+                    merged.enabled = def.enabled;
                     localStorage.setItem(DIAG_CONFIG_CACHE, JSON.stringify({ ts: Date.now(), cfg: merged }));
                     return merged;
                 }
@@ -242,7 +246,7 @@
                 const createResponse = await fetch('https://api.github.com/gists', {
                     method: 'POST',
                     headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': 'token ' + token },
-                    body: JSON.stringify({ description: 'TFJL 写操作诊断上报(分片)', public: false, files: { 'diag_config.json': { content: JSON.stringify({ enabled: false, periodDays: 3, allowImmediate: true, openDelayMin: 5, openDelayMax: 10, immediateDelayMin: 1, immediateDelayMax: 20 }, null, 2) } } })
+                    body: JSON.stringify({ description: 'TFJL 写操作诊断上报(分片)', public: false, files: { 'diag_config.json': { content: JSON.stringify({ enabled: true, periodDays: 3, allowImmediate: true, openDelayMin: 5, openDelayMax: 10, immediateDelayMin: 1, immediateDelayMax: 20 }, null, 2) } } })
                 });
                 if (createResponse.ok) {
                     const data = await createResponse.json();
@@ -21751,7 +21755,7 @@ ${maSection}
                 const r = await fetch('https://api.github.com/gists', {
                     method: 'POST',
                     headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': 'token ' + token },
-                    body: JSON.stringify({ description: 'TFJL 写操作诊断上报(分片)', public: false, files: { 'diag_config.json': { content: JSON.stringify({ enabled: false, periodDays: 3, allowImmediate: true, openDelayMin: 5, openDelayMax: 10, immediateDelayMin: 1, immediateDelayMax: 20 }, null, 2) } } })
+                    body: JSON.stringify({ description: 'TFJL 写操作诊断上报(分片)', public: false, files: { 'diag_config.json': { content: JSON.stringify({ enabled: true, periodDays: 3, allowImmediate: true, openDelayMin: 5, openDelayMax: 10, immediateDelayMin: 1, immediateDelayMax: 20 }, null, 2) } } })
                 });
                 if (r.ok) { const d = await r.json(); localStorage.setItem(DIAG_GIST_KEY, d.id); if (hint) hint.textContent = '✅ 已创建: ' + d.id; setTimeout(adminLoadDiag, 600); }
                 else if (hint) hint.textContent = '创建失败 HTTP ' + r.status;
