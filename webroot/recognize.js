@@ -698,6 +698,7 @@
               </tr></thead>
               <tbody id="recBody"></tbody>
             </table>
+            <div id="recDrCard" style="display:none;margin-top:12px;padding:12px 14px;background:rgba(78,205,196,0.10);border:1px solid rgba(78,205,196,0.3);border-radius:10px;"></div>
           </div>
         </div>
       </div>`;
@@ -745,6 +746,36 @@
       }
     }
 
+    // 识别结果减伤展示（与脚本解析面板的减伤计算一致：前7 + 全 + 单卡明细，默认用「我的」表）
+    function renderRecDr(results){
+      const card = $('recDrCard');
+      if(!card) return;
+      if(typeof window.calculateDamageReductionForCards !== 'function'){ card.style.display = 'none'; return; }
+      if(window.loadDamageReductionData) window.loadDamageReductionData();
+      const heroes = (results||[]).filter(r=>!r._deleted && r.valid && r.valid.ok).map(r=>r.hero);
+      const isSpirit = (n)=> n.includes('精灵') || n==='幻球' || n==='冰球';
+      const battle = heroes.filter(c=>!isSpirit(c));
+      if(battle.length === 0){ card.style.display = 'none'; return; }
+      const tbl = (window.drActiveTable) || '我的';
+      const allDr = window.calculateDamageReductionForCards(battle, 'my', tbl);
+      const first7 = battle.slice(0,7);
+      const first7Dr = window.calculateDamageReductionForCards(first7, 'my', tbl);
+      let c1 = first7Dr<100?'#ff6b6b':first7Dr<130?'#ffd700':'#4ecdc4';
+      let c2 = allDr<100?'#ff6b6b':allDr<130?'#ffd700':'#4ecdc4';
+      const details = battle.slice(0,15).map(n=>{
+        const d = window.calculateDamageReductionForCards([n],'my',tbl,true);
+        const c = d<30?'#ff6b6b':d<50?'#ffd700':'#4ecdc4';
+        return `${n}:<b style="color:${c}">${d}%</b>`;
+      });
+      card.style.display = 'block';
+      card.innerHTML = `<div style="font-size:0.78rem;color:#4ecdc4;font-weight:700;margin-bottom:6px;">🛡️ 识别到的卡 · 减伤（表：${tbl}）</div>
+        <div style="display:flex;gap:14px;font-size:0.92rem;margin-bottom:6px;">
+          <span>前7张：<b style="color:${c1}">${first7Dr}%</b></span>
+          <span>全部：<b style="color:${c2}">${allDr}%</b></span>
+        </div>
+        <div style="font-size:0.74rem;color:rgba(255,255,255,0.75);line-height:1.6;">📋 单卡：${details.join(' ｜ ')}</div>`;
+    }
+
     $('recAuto').onclick = ()=>{
       autoRecognize(currentImg, $('recCanvas'), $('recStatus'), (results, source, rowCount)=>{
         $('recSrc').textContent = '来源: '+source;
@@ -770,11 +801,13 @@
             const tr = b.closest('tr');
             if(tr){ tr.style.opacity='0.35'; tr.style.textDecoration='line-through'; }
             updateRecWarn(results);
+            renderRecDr(results); // 删除后刷新减伤
           };
         });
         overlay._results = results;
         updateRecWarn(results);
         $('recStatus').textContent = `识别完成：${results.length} 个英雄（${rowCount} 行）`;
+        renderRecDr(results); // 识别完立即算并展示减伤
       });
     };
     $('recFill').onclick = ()=>{
