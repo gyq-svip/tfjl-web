@@ -86,6 +86,8 @@
                         s.count++; s.sample = stack;
                         console.warn('[GIST-IO] ⚠️ 403 限流 @ ' + (g.label || id) + '  触发栈: ' + key);
                     }
+                    // 全网写操作诊断：本地记录明细（外部诊断模块挂 window.__recordDiagWrite）
+                    if (typeof window.__recordDiagWrite === 'function') window.__recordDiagWrite(method, url, status);
                 } catch (e) {}
             }
             window.getGistIOReport = function () {
@@ -141,6 +143,221 @@
                 return r;
             };
         })();
+
+        // ==================== 全网 Gist 写操作诊断上报 ====================
+        // 设计：本地始终记录所有 Gist 写明细（零成本），按管理员开关/配置决定是否上报。
+        // 上报：每用户一个独立文件 diag-<匿名ID>.json 在「诊断 Gist」内（天然分片，体积小不撑爆）。
+        // 节奏：打开后 5~10 分钟随机延迟才允许首次上报；周期上报默认 3 天；立即上报 1~20 分钟随机。
+        // 配置：诊断 Gist 内 diag_config.json，本地缓存 4 小时刷新一次，所有上报行为读它执行。
+        const DIAG_GIST_KEY = 'tdjl_diagGistId';
+        const DIAG_LOCAL_BUFFER = 'tdjl_diagBuffer';
+        const DIAG_CONFIG_CACHE = 'tdjl_diagCfgCache';
+        const DIAG_ANON_ID_KEY = 'tdjl_diagAnonId';
+        const DIAG_OPTIN_KEY = 'tdjl_diagOptIn';          // 本机用户是否参与上报（默认参与，可关）
+        const DIAG_CONFIG_TTL = 4 * 3600 * 1000;          // 配置本地缓存 4 小时
+        const DIAG_BUFFER_CAP = 2000;                     // 本地缓冲上限（条）
+        const DIAG_UPLOAD_DELAY_MAX = 15000;              // 上报后随机退避上限（避免并发）
+        function _getDiagAnonId() {
+            try {
+                let id = localStorage.getItem(DIAG_ANON_ID_KEY);
+                if (!id) { id = 'u' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4); localStorage.setItem(DIAG_ANON_ID_KEY, id); }
+                return id;
+            } catch (e) { return 'anon'; }
+        }
+        function _loadDiagBuffer() {
+            try { const b = JSON.parse(localStorage.getItem(DIAG_LOCAL_BUFFER) || '{}'); return b && typeof b === 'object' ? b : {}; }
+            catch (e) { return {}; }
+        }
+        function _saveDiagBuffer(b) {
+            try {
+                // 环形：超过上限丢弃最旧（按时间戳排序后截尾）
+                const keys = Object.keys(b);
+                if (keys.length > DIAG_BUFFER_CAP) {
+                    keys.sort((a, b2) => (b[a] ? b[a].last : 0) - (b[b2] ? b[b2].last : 0));
+                    keys.slice(0, keys.length - DIAG_BUFFER_CAP).forEach(k => delete b[k]);
+                }
+                localStorage.setItem(DIAG_LOCAL_BUFFER, JSON.stringify(b));
+            } catch (e) {}
+        }
+        // 每次 Gist 写操作累加（由 IIFE 内 _recordGistIO 调用 window.__recordDiagWrite）：gistId × 功能标签 × 方法 → 计数 + 采样时间戳
+        window.__recordDiagWrite = function _recordDiagWrite(gistId, fn, method) {
+            try {
+                if (!gistId || gistId.length < 8) return;
+                const b = _loadDiagBuffer();
+                const key = gistId + '|' + (fn || 'unknown') + '|' + (method || 'WRITE');
+                const now = Date.now();
+                if (!b[key]) b[key] = { gistId, fn: fn || 'unknown', method: method || 'WRITE', count: 0, first: now, last: now, samples: [] };
+                b[key].count++;
+                b[key].last = now;
+                if (b[key].samples.length < 5) b[key].samples.push(now);
+                _saveDiagBuffer(b);
+            } catch (e) {}
+        }
+        // 从 URL 推断功能标签（粗粒度，足够定位）
+        const DIAG_MESSAGES_GIST = 'b02794a8d5c43874b76286185f7b1f7f';
+        const DIAG_INDEX_GIST = 'a32a0628bd9275f3a4922cd12cf298c9';
+        function _inferDiagFn(url, method) {
+            if (!url) return 'unknown';
+            if (url.indexOf('/gists/' + DIAG_MESSAGES_GIST) !== -1) return 'saveMessagesToGist';
+            const counterGid = (function(){ try { return localStorage.getItem('counter_gist_id') || 'e1bd9a5139e1c4e011bfea707e917d61'; } catch(e){ return 'e1bd9a5139e1c4e011bfea707e917d61'; } })();
+            if (url.indexOf('/gists/' + counterGid) !== -1) return 'syncCounterToGist';
+            if (url.indexOf('/gists/' + DIAG_INDEX_GIST) !== -1) return 'indexGist(' + (url.indexOf('room_index') !== -1 ? 'room_index' : (url.indexOf('counter') !== -1 ? 'counter' : (url.indexOf('diag') !== -1 ? 'diag' : 'other'))) + ')';
+            if (method === 'POST' && url.indexOf('/gists') !== -1 && url.indexOf('/gists/') === -1) return 'createGist';
+            return 'otherGist';
+        }
+        // 读取诊断配置（本地缓存 4h，超时重新拉）
+        async function _getDiagConfig(force) {
+            const def = { enabled: false, periodDays: 3, allowImmediate: true, openDelayMin: 5, openDelayMax: 10, immediateDelayMin: 1, immediateDelayMax: 20, diagGistId: '' };
+            try {
+                const cached = JSON.parse(localStorage.getItem(DIAG_CONFIG_CACHE) || 'null');
+                if (cached && cached.ts && (Date.now() - cached.ts) < DIAG_CONFIG_TTL && !force) return Object.assign({}, def, cached.cfg);
+            } catch (e) {}
+            // 重新拉取：先确定诊断 Gist
+            const gid = await _ensureDiagGist();
+            if (!gid) return Object.assign({}, def, { diagGistId: '' });
+            try {
+                const token = getGistToken();
+                const r = await fetch(`https://api.github.com/gists/${gid}`, { headers: { 'Accept': 'application/vnd.github.v3+json', ...(token ? { 'Authorization': 'token ' + token } : {}) } });
+                if (r.ok) {
+                    const d = await r.json();
+                    const f = d.files && d.files['diag_config.json'];
+                    let cfg = {};
+                    if (f && f.content) { try { cfg = JSON.parse(f.content) || {}; } catch (e) {} }
+                    cfg.diagGistId = gid;
+                    const merged = Object.assign({}, def, cfg);
+                    localStorage.setItem(DIAG_CONFIG_CACHE, JSON.stringify({ ts: Date.now(), cfg: merged }));
+                    return merged;
+                }
+            } catch (e) {}
+            return Object.assign({}, def, { diagGistId: gid });
+        }
+        // 确保诊断 Gist 存在（不存在则创建，ID 存 localStorage）
+        async function _ensureDiagGist() {
+            try {
+                let gid = localStorage.getItem(DIAG_GIST_KEY);
+                if (gid) return gid;
+                const token = getGistToken();
+                if (!token) return '';
+                const createResponse = await fetch('https://api.github.com/gists', {
+                    method: 'POST',
+                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': 'token ' + token },
+                    body: JSON.stringify({ description: 'TFJL 写操作诊断上报(分片)', public: false, files: { 'diag_config.json': { content: JSON.stringify({ enabled: false, periodDays: 3, allowImmediate: true, openDelayMin: 5, openDelayMax: 10, immediateDelayMin: 1, immediateDelayMax: 20 }, null, 2) } } })
+                });
+                if (createResponse.ok) {
+                    const data = await createResponse.json();
+                    localStorage.setItem(DIAG_GIST_KEY, data.id);
+                    return data.id;
+                }
+            } catch (e) {}
+            return '';
+        }
+        // 上报本地缓冲到 diag-<匿名ID>.json（合并，不覆盖他人）
+        async function _pushDiagReport() {
+            const optIn = localStorage.getItem(DIAG_OPTIN_KEY);
+            if (optIn === '0') return; // 本机用户关闭上报
+            const cfg = await _getDiagConfig(false);
+            if (!cfg.enabled) return; // 全网配置关闭
+            const gid = cfg.diagGistId || await _ensureDiagGist();
+            if (!gid) return;
+            const b = _loadDiagBuffer();
+            const entries = Object.keys(b).map(k => b[k]);
+            if (entries.length === 0) return;
+            const nickname = (window.__currentNickname) || (typeof getLoginNick === 'function' ? getLoginNick() : '') || '';
+            const payload = {
+                anonId: _getDiagAnonId(),
+                nick: nickname,
+                lastUpload: Date.now(),
+                entries: entries
+            };
+            const token = getGistToken();
+            if (!token) return;
+            try {
+                // 读取现有文件合并（保留他人文件，只改自己这份）
+                const cur = await fetch(`https://api.github.com/gists/${gid}`, { headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': 'token ' + token } });
+                const files = {};
+                if (cur.ok) {
+                    const cd = await cur.json();
+                    Object.keys(cd.files || {}).forEach(fn => {
+                        if (fn !== ('diag-' + _getDiagAnonId() + '.json')) files[fn] = { content: cd.files[fn].content };
+                    });
+                }
+                files['diag-' + _getDiagAnonId() + '.json'] = { content: JSON.stringify(payload, null, 2) };
+                const r = await fetch(`https://api.github.com/gists/${gid}`, {
+                    method: 'PATCH',
+                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': 'token ' + token },
+                    body: JSON.stringify({ files })
+                });
+                if (r.ok) {
+                    // 清空已上报缓冲
+                    localStorage.removeItem(DIAG_LOCAL_BUFFER);
+                    console.log('[DIAG] 上报成功, 共 ' + entries.length + ' 条聚合记录');
+                }
+            } catch (e) {}
+        }
+        // 调度上报（避免打开即上报）
+        let _diagTimer = null;
+        function _scheduleDiagUpload(kind) {
+            clearTimeout(_diagTimer);
+            _getDiagConfig(false).then(cfg => {
+                if (!cfg.enabled) return;
+                if (localStorage.getItem(DIAG_OPTIN_KEY) === '0') return;
+                let delayMin, delayMax;
+                if (kind === 'immediate') { delayMin = cfg.immediateDelayMin || 1; delayMax = cfg.immediateDelayMax || 20; }
+                else { delayMin = cfg.openDelayMin || 5; delayMax = cfg.openDelayMax || 10; }
+                const delay = (delayMin * 60000) + Math.random() * ((delayMax - delayMin) * 60000);
+                _diagTimer = setTimeout(() => {
+                    _pushDiagReport().then(() => {
+                        // 周期续排：periodDays ± 随机
+                        const period = (cfg.periodDays || 3) * 86400000;
+                        const jitter = Math.random() * 86400000; // 0~1 天随机错峰
+                        _diagTimer = setTimeout(() => _scheduleDiagUpload('period'), period + jitter);
+                    });
+                }, delay);
+            });
+        }
+        // 启动：页面加载后安排「打开后延迟首次上报」
+        (function _initDiagReporter() {
+            // 本地记录始终运行（在 fetch 代理里已调用 _recordDiagWrite）；上报仅在开关开启时调度
+            setTimeout(() => {
+                _getDiagConfig(false).then(cfg => {
+                    if (cfg.enabled && localStorage.getItem(DIAG_OPTIN_KEY) !== '0') _scheduleDiagUpload('open');
+                });
+            }, 3000); // 启动 3s 后才去读配置，避免阻塞首屏
+        })();
+        // 联网恢复（online 事件）→ 立即上报（1~20 分钟随机延迟）
+        window.addEventListener('online', () => {
+            _getDiagConfig(false).then(cfg => {
+                if (cfg.enabled && cfg.allowImmediate && localStorage.getItem(DIAG_OPTIN_KEY) !== '0') _scheduleDiagUpload('immediate');
+            });
+        });
+        // 管理员：拉取所有 diag-*.json 聚合分析
+        window.getDiagAnalysisReport = async function () {
+            const gid = localStorage.getItem(DIAG_GIST_KEY) || (await _ensureDiagGist());
+            if (!gid) { console.log('[DIAG] 诊断 Gist 未初始化'); return null; }
+            const token = getGistToken();
+            const r = await fetch(`https://api.github.com/gists/${gid}`, { headers: { 'Accept': 'application/vnd.github.v3+json', ...(token ? { 'Authorization': 'token ' + token } : {}) } });
+            if (!r.ok) { console.log('[DIAG] 读取失败', r.status); return null; }
+            const d = await r.json();
+            const perUser = {}, perGist = {}, perFn = {};
+            Object.keys(d.files || {}).forEach(fn => {
+                if (!fn.startsWith('diag-') || !fn.endsWith('.json')) return;
+                let p; try { p = JSON.parse(d.files[fn].content); } catch (e) { return; }
+                const who = (p.nick ? p.nick + '(' + p.anonId + ')' : p.anonId);
+                perUser[who] = (perUser[who] || 0);
+                (p.entries || []).forEach(e => {
+                    perUser[who] += e.count;
+                    perGist[e.gistId] = (perGist[e.gistId] || 0) + e.count;
+                    const fk = e.gistId + '|' + e.fn;
+                    perFn[fk] = (perFn[fk] || 0) + e.count;
+                });
+            });
+            const sortBy = (o) => Object.keys(o).map(k => ({ k, v: o[k] })).sort((a, b) => b.v - a.v);
+            console.log('══════ [DIAG] 全网写操作分析报告 ══════');
+            console.log('── 按用户(昵称/匿名) TOP ──'); sortBy(perUser).slice(0, 10).forEach(x => console.log(`  ${x.v}  ${x.k}`));
+            console.log('── 按 Gist 文件 TOP ──'); sortBy(perGist).slice(0, 10).forEach(x => console.log(`  ${x.v}  ${x.k}`));
+            console.log('── 按 Gist×功能 TOP ──'); sortBy(perFn).slice(0, 10).forEach(x => console.log(`  ${x.v}  ${x.k}`));
+            return { perUser: sortBy(perUser), perGist: sortBy(perGist), perFn: sortBy(perFn) };
+        };
 
         // 全局错误兜底：未捕获异常 / Promise rejection 也写进 __consoleLogs，
         // 确保调试浮窗能看到"全部错误信息"（含 TDZ、async 抛错等本会被静默吞掉或只走 alert 的错误）
@@ -21379,6 +21596,20 @@ ${maSection}
                         applyConsoleVisibility(!!v);
                     } else if (typeof toggleConsoleVisibility === 'function') {
                         toggleConsoleVisibility();
+                    }
+                }
+            },
+            {
+                key: 'diagReport',
+                label: '参与写操作诊断上报',
+                desc: '默认关闭：本地始终记录 Gist 写操作，但仅当管理员开启全网诊断(索引 Gist 的 diag_config.json enabled=true)时才上报。开启本开关=你自愿参与上报(匿名ID+昵称)。',
+                scope: 'local',
+                localKey: 'tdjl_diagOptIn',
+                default: false,
+                apply: (v) => {
+                    try { localStorage.setItem('tdjl_diagOptIn', v ? '1' : '0'); } catch (e) {}
+                    if (v && typeof _scheduleDiagUpload === 'function') {
+                        setTimeout(() => _scheduleDiagUpload('open'), 3000);
                     }
                 }
             }
