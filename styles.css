@@ -2748,4 +2748,13 @@
             opacity: 1;
             visibility: visible;
         }
+        /* 有新版本：亮绿脉冲，明确表达"可更新"，区别于普通绿色按钮 */
+        #versionTag.version-new {
+            animation: versionNewPulse 1.4s ease-in-out infinite;
+        }
+        @keyframes versionNewPulse {
+            0%   { opacity: 0.55; }
+            50%  { opacity: 1; }
+            100% { opacity: 0.55; }
+        }
     
