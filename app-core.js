@@ -9206,12 +9206,15 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 card.style.cursor = 'pointer';
                 // 悬停描述统一交给自定义皮肤 tooltip（showSkinTooltip 会把 cards.json 的 desc 一并显示），
                 // 不再设 card.title，避免云端卡同时弹 native title + 自定义 tooltip 两个框（s1.0.95 水人双框修复）
+                // 🔴 云端卡与其他卡统一：① 生成等级徽章（与其他卡一致，新卡自动带上无需手动调）；② 名字不加黑底背景（纯文字，与其他卡一致）
                 const heroSkins = (window.skinRegistry && window.skinRegistry[name]) || [];
-                let inner = '<span class="card-name">' + name + '</span>';
+                const cardTypeForBadge = quality;
+                const levelBadge = createLevelBadgeHTML(card.dataset.id, cardTypeForBadge, 'my', name);
+                let inner = levelBadge + '<span class="card-name">' + name + '</span>';
                 if (heroSkins.length) {
                     const s0 = heroSkins[0];
                     const imgUrl = s0.url || (s0.path ? 'file://' + s0.path : '');
-                    if (imgUrl) inner = '<img src="' + imgUrl + '" style="width:100%;height:100%;object-fit:cover;border-radius:6px;" onerror="this.outerHTML=\'<span class=&quot;card-name&quot;>' + name + '</span>\'"><span class="card-name" style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.6);font-size:0.6rem;padding:1px 2px;">' + name + '</span>';
+                    if (imgUrl) inner = levelBadge + '<img src="' + imgUrl + '" style="width:100%;height:100%;object-fit:cover;border-radius:6px;" onerror="this.outerHTML=\'<span class=&quot;card-name&quot;>' + name + '</span>\'"><span class="card-name" style="position:absolute;bottom:0;left:0;right:0;font-size:0.6rem;padding:1px 2px;text-shadow:0 1px 2px rgba(0,0,0,0.9);">' + name + '</span>';
                 } else {
                     inner += '<span style="position:absolute;top:2px;right:2px;font-size:0.55rem;background:rgba(255,165,0,0.85);color:#000;padding:0 3px;border-radius:3px;line-height:1.3;">皮肤未配置</span>';
                 }
