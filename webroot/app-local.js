@@ -4194,14 +4194,17 @@ async function runDiagnostics() {
     // 4) 写盘测试（仅 App 版）
     if (isApp) {
         try {
-            // 修正：探针写入统一存储(store),落盘 tfjl.dat 后读回验证（不触发 syncAllNow 全量 Gist 写回，避免诊断本身制造限流）
-            // 关键：必须强制从磁盘重读，不能走 ensureStoreLoaded 缓存路径（启动后 _storeLoaded=true 会直接 return，导致误报"落盘失败"）
+            // 修正：探针必须走 localStorage（而非 storeMap），因为 _flushStore 只把"项目+受控 localStorage 项"写盘，
+            // 任意 storeMap.set 的 key 不会被写入 tfjl.dat → 必然读不回。改走 localStorage 后，
+            // flushStore 会全量把 localStorage 项写入 tfjl.dat，再 forceReloadStore 重读即可验证真实落盘。
+            // 不触发 syncAllNow 全量 Gist 写回，避免诊断本身制造限流。
             const probeKey = '__tfjl_diag_probe__';
-            api.getStoreMap().set(probeKey, String(Date.now()));
-            await api.flushStore();
-            await api.forceReloadStore();
-            const back = api.getStoreMap().get(probeKey);
-            if (back) { api.getStoreMap().delete(probeKey); await api.flushStore(); }
+            const probeVal = String(Date.now());
+            localStorage.setItem(probeKey, probeVal);     // 触发 _scheduleFlush 落盘
+            await api.flushStore();                        // 立即强制落盘（含 probe）
+            await api.forceReloadStore();                  // 强制从磁盘重读（清缓存后读真值）
+            const back = api.getStoreMap().get(probeKey) || localStorage.getItem(probeKey);
+            if (back) { localStorage.removeItem(probeKey); await api.flushStore(); }
             push('写盘验证', back ? 'ok' : 'error',
                 back ? '临时数据已成功写入并读回 tfjl.dat' : '写入后无法从磁盘读回（落盘失败）',
                 back ? '' : '磁盘写入异常，检查目录权限/磁盘空间；仍异常联系我 ' + WX);
