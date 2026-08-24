@@ -14571,6 +14571,7 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
         let _counterFlushTimer = null;
         let _counterFlushPending = null;       // 最后一次调用时传入的 type，用于补写
         let _gistWriteBackoffUntil = 0;         // 限流退避截止时间戳(ms)
+        let _lastWallPostTs = 0;                // 上一次需求墙发言时间戳(ms)，用于 30s 连续发言节流
         // 🔴 计数器写回间隔：全网生效(读索引 Gist 的 counterFlushSec,单位秒),默认 60s,范围 10~600。
         // 本机 localStorage 设了非 0 值则强制覆盖(便于临时测试,不影响全网)。
         async function _getCounterFlushInterval() {
@@ -20342,6 +20343,22 @@ ${maSection}
                 return;
             }
 
+            // 🔴 需求墙发言节流：连续发言间隔 ≥ 30s，避免高频写入触发 Gist 写限流（导致所有写 Gist 全 403）。
+            // 处于全局 Gist 限流退避期（_gistWriteBackoffUntil）也直接提示，不让用户反复撞墙。
+            const now = Date.now();
+            if (_gistWriteBackoffUntil && _gistWriteBackoffUntil > now) {
+                const left = Math.ceil((_gistWriteBackoffUntil - now) / 1000);
+                alert('🌐 需求墙正在同步中（约 ' + left + ' 秒），请稍后重试。\n\n为避免写入过于频繁被云端限流，消息已为你保留，稍等片刻再点发送即可。');
+                return;
+            }
+            if (typeof _lastWallPostTs === 'undefined') _lastWallPostTs = 0;
+            const sinceLast = now - _lastWallPostTs;
+            if (sinceLast < 30000) {
+                const wait = Math.ceil((30000 - sinceLast) / 1000);
+                alert('💬 发言间隔稍短啦～\n\n为让需求墙云端同步更顺畅，两次发言之间请间隔约 30 秒（还差 ' + wait + ' 秒）。\n\n你的内容已保留在输入框，稍后再发即可。');
+                return;
+            }
+
             // 强需求：发言前必须设置昵称（仅用于展示，全局唯一，取消则不发布）
             const nick = await ensureNickname();
             if (!nick) { alert('发布消息需要先设置昵称（昵称仅用于发言/分享脚本展示，设置后不可自行修改）'); return; }
@@ -20454,6 +20471,7 @@ ${maSection}
                 renderMessages();
 
                 await saveMessagesToGist();
+                _lastWallPostTs = Date.now();   // 发言成功，记录时间戳用于 30s 节流
 
                 // 若脚本已加密，弹出密码/恢复密钥提示（与「分享到需求墙」一致），方便分享者记住
                 if (pendingScriptEnc && pendingScriptEnc.isEncrypted && typeof showPasswordReminder === 'function') {
@@ -20689,6 +20707,7 @@ ${maSection}
                     } else if (response.status === 403) {
                         localStorage.removeItem('messages_gist_id');
                         messagesGistId = null;
+                        _gistWriteBackoffUntil = Date.now() + 30000; // 限流退避：30s 内发言会被提示稍后重试
                     } else {
                         const errData = await response.json().catch(() => ({}));
                         throw new Error(errData.message || '保存失败');
@@ -20701,6 +20720,7 @@ ${maSection}
                     } else if (e.message.includes('403')) {
                         localStorage.removeItem('messages_gist_id');
                         messagesGistId = null;
+                        _gistWriteBackoffUntil = Date.now() + 30000; // 限流退避：30s 内发言会被提示稍后重试
                     } else {
                         throw e;
                     }
