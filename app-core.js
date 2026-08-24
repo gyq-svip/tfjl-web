@@ -17728,6 +17728,13 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
 
         async function pushLoginEventToGist() {
             try {
+                // 🔴 登录打卡远程开关：关闭后当天每用户仅打卡一次（减少 gist 写频率）
+                let loginPunchOn = true;
+                try { const lpCfg = await getRoomIndexConfig(); if (typeof lpCfg.loginPunchEnabled === 'boolean') loginPunchOn = lpCfg.loginPunchEnabled; } catch (e) {}
+                if (!loginPunchOn) {
+                    const todayStr = new Date().toISOString().slice(0, 10);
+                    if (localStorage.getItem('__loginPunchedDate') === todayStr) return; // 今天已打过，跳过
+                }
                 const id = await getLoginGistId();
                 if (!id) return;
                 const token = getGistToken();
@@ -17747,6 +17754,8 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 if (lastGist && lastGist.nick === myNick && (Date.now() - (lastGist.ts || 0)) < 60000) return;
                 arr.push({ nick: myNick, ts: Date.now() });
                 if (arr.length > 20000) arr = arr.slice(-20000);
+                // 打卡成功：记录今天已打（供远程开关关闭时去重）
+                try { localStorage.setItem('__loginPunchedDate', new Date().toISOString().slice(0, 10)); } catch (e) {}
                 await fetch('https://api.github.com/gists/' + id, {
                     method: 'PATCH',
                     headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': 'token ' + token },
@@ -21133,8 +21142,145 @@ ${maSection}
                     pageEl.style.display = 'block';
                     if (typeof renderDamageCalc === 'function') renderDamageCalc();
                 }
+            } else if (page === 'featureToggles') {
+                const pageEl = document.getElementById('adminPageFeatureToggles');
+                if (pageEl) {
+                    pageEl.style.display = 'block';
+                    renderFeatureToggles();
+                }
             }
         }
+
+        // ==================== 功能开关面板（数据驱动，便于后续新增开关）====================
+        // 每个开关：{ key, label, desc, scope:'remote'|'local', remoteField?, localKey?, default?, apply(value) }
+        // remote: 存索引 Gist room_index.json 的字段（全网生效）；local: 存 localStorage（本机生效）
+        const FEATURE_TOGGLES = [
+            {
+                key: 'loginPunch',
+                label: '登录打卡',
+                desc: '开启：每次登录/打开都打卡；关闭：当天每用户仅打卡一次（减少 gist 写频率）',
+                scope: 'remote',
+                remoteField: 'loginPunchEnabled',
+                default: true,
+                apply: (v) => { /* 实际拦截在 pushLoginEventToGist 内读取 */ }
+            },
+            {
+                key: 'auctionNews',
+                label: '拍卖快讯显示',
+                desc: '是否在跑马灯/公告区显示拍卖快讯（全网生效）',
+                scope: 'remote',
+                remoteField: 'broadcastEnabled',
+                default: true,
+                apply: (v) => { if (typeof setAuctionBroadcastEnabled === 'function') setAuctionBroadcastEnabled(v); }
+            },
+            {
+                key: 'debugConsole',
+                label: '调试日志悬浮窗',
+                desc: '显示/隐藏右下角调试日志悬浮窗（本机生效）',
+                scope: 'local',
+                localKey: 'tdjl_consoleMinimized',
+                default: true,
+                apply: (v) => {
+                    // v=true 表示显示悬浮窗；复用现有 toggleFloatConsole 控制显隐
+                    try { localStorage.setItem('tdjl_consoleMinimized', v ? '0' : '1'); } catch (e) {}
+                    if (typeof toggleFloatConsole === 'function') {
+                        // 直接设置显隐而不依赖当前状态：读取 localStorage 后强制同步
+                        const con = document.getElementById('floatConsole');
+                        if (con) {
+                            con.style.display = v ? 'flex' : 'none';
+                            if (v && typeof refreshFloatConsole === 'function') refreshFloatConsole();
+                        }
+                    }
+                }
+            }
+        ];
+
+        // 读取索引 Gist 的 room_index.json 当前值（带缓存）
+        async function getRoomIndexConfig() {
+            try {
+                const url = await getIndexGistUrl();
+                const token = getGistToken();
+                const r = await fetch(url, { headers: { 'Accept': 'application/vnd.github.v3+json', ...(token ? { 'Authorization': 'token ' + token } : {}) } });
+                if (!r.ok) return {};
+                const d = await r.json();
+                const f = d.files && d.files['room_index.json'];
+                if (f && f.content) { try { return JSON.parse(f.content) || {}; } catch (e) { return {}; } }
+            } catch (e) {}
+            return {};
+        }
+
+        // 写入索引 Gist 的 room_index.json 某个字段（远程开关用）
+        async function setRoomIndexConfigField(field, value) {
+            const token = getGistToken();
+            if (!token) throw new Error('无Token');
+            const url = await getIndexGistUrl();
+            const cur = await getRoomIndexConfig();
+            cur[field] = value;
+            const r = await fetch(url, {
+                method: 'PATCH',
+                headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': 'token ' + token },
+                body: JSON.stringify({ files: { 'room_index.json': { content: JSON.stringify(cur, null, 2) } } })
+            });
+            if (!r.ok) throw new Error('写回失败(' + r.status + ')');
+            return cur;
+        }
+
+        async function renderFeatureToggles() {
+            const box = document.getElementById('featureTogglesContent');
+            if (!box) return;
+            box.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,0.4);padding:10px;">正在加载开关状态…</div>';
+            // 远程开关值
+            let remoteCfg = {};
+            try { remoteCfg = await getRoomIndexConfig(); } catch (e) { remoteCfg = {}; }
+            let html = '';
+            for (const t of FEATURE_TOGGLES) {
+                let on;
+                if (t.scope === 'remote') {
+                    on = remoteCfg[t.remoteField];
+                    if (typeof on !== 'boolean') on = t.default;
+                } else {
+                    const lv = localStorage.getItem(t.localKey);
+                    on = lv === null ? t.default : (lv === '1' ? false : lv === '0' ? true : t.default);
+                }
+                const color = on ? '#4ade80' : '#ef4444';
+                const stateTxt = on ? '开启' : '关闭';
+                html += `
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.08);">
+                    <div style="flex:1;">
+                        <div style="font-size:0.9rem;color:#fff;font-weight:600;">${t.label}</div>
+                        <div style="font-size:0.72rem;color:rgba(255,255,255,0.5);margin-top:3px;">${t.desc}</div>
+                        <div style="font-size:0.68rem;color:rgba(255,255,255,0.35);margin-top:2px;">${t.scope === 'remote' ? '🌐 全网生效' : '🖥️ 本机生效'}</div>
+                    </div>
+                    <button onclick="toggleFeature('${t.key}')" style="margin-left:14px;padding:8px 18px;border-radius:20px;border:none;cursor:pointer;font-size:0.8rem;font-weight:600;color:#fff;background:${color};min-width:64px;">${stateTxt}</button>
+                </div>`;
+            }
+            html += '<div style="font-size:0.7rem;color:rgba(255,255,255,0.4);margin-top:12px;line-height:1.6;">远程开关存于索引 Gist（全网生效），本机开关仅影响当前设备。新增开关只须在 FEATURE_TOGGLES 追加一条配置。</div>';
+            box.innerHTML = html;
+        }
+        window.renderFeatureToggles = renderFeatureToggles;
+
+        async function toggleFeature(key) {
+            const t = FEATURE_TOGGLES.find(x => x.key === key);
+            if (!t) return;
+            try {
+                if (t.scope === 'remote') {
+                    const cur = await getRoomIndexConfig();
+                    const curVal = (typeof cur[t.remoteField] === 'boolean') ? cur[t.remoteField] : t.default;
+                    const next = !curVal;
+                    await setRoomIndexConfigField(t.remoteField, next);
+                } else {
+                    const lv = localStorage.getItem(t.localKey);
+                    const curVal = lv === null ? t.default : (lv === '1' ? false : lv === '0' ? true : t.default);
+                    const next = !curVal;
+                    localStorage.setItem(t.localKey, next ? '0' : '1');
+                }
+                if (typeof t.apply === 'function') t.apply(t.scope === 'remote' ? (await getRoomIndexConfig())[t.remoteField] : (localStorage.getItem(t.localKey) !== '1') /* 显示 */);
+                renderFeatureToggles();
+            } catch (e) {
+                alert('切换失败：' + (e && e.message ? e.message : e));
+            }
+        }
+        window.toggleFeature = toggleFeature;
 
 
         // ==================== 拍卖管理入口 + GitHub API 用量（s1.0.110）====================
