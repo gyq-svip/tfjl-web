@@ -21,8 +21,8 @@
 //      不发 → 页面回退 HTML 写死 fallback 225）。强制刷新后 SW_VERSION 应为 s1.0.230。
 // ============================================================
 
-const CACHE_VERSION = 's1.0.271';
-const DEPLOY_TAG = 's20260824-2237';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
+const CACHE_VERSION = 's1.0.272';
+const DEPLOY_TAG = 's20260824-2239';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
@@ -126,46 +126,58 @@ self.addEventListener('fetch', (event) => {
 // ============================================================
 // StaleWhileRevalidate：先返回缓存（秒开），后台拉新
 // ============================================================
+// 网络请求超时保护：超过 TIMEOUT 毫秒放弃线上，避免 SW 被慢网络卡死（之前无超时 → 缓存清空后无限等线上 → 白屏/卡死）
+const NET_TIMEOUT = 8000;
+function _timeoutFetch(request) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), NET_TIMEOUT);
+    return fetch(request, { cache: 'no-store', signal: ctrl.signal })
+        .finally(() => clearTimeout(timer));
+}
+
 function staleWhileRevalidate(request, cacheName) {
     return caches.open(cacheName).then((cache) => {
         return cache.match(request).then((cachedResponse) => {
-            const fetchPromise = fetch(request, { cache: 'no-store' }).then(async (networkResponse) => {
-                if (networkResponse && networkResponse.status === 200) {
-                    const cachedClone = cachedResponse ? cachedResponse.clone() : null;
-                    const cachedText = cachedClone ? await cachedClone.text() : '';
-                    const networkClone = networkResponse.clone();
-                    const networkText = await networkClone.text();
-                    if (cachedText !== networkText) {
-                        cache.put(request, new Response(networkText, {
-                            status: networkResponse.status,
-                            statusText: networkResponse.statusText,
-                            headers: networkResponse.headers
-                        }));
-                        if (cachedResponse) {
+            // 有缓存：立即返回秒开，后台静默更新（不阻塞页面）
+            if (cachedResponse) {
+                _timeoutFetch(request).then(async (networkResponse) => {
+                    if (networkResponse && networkResponse.status === 200) {
+                        const cachedClone = cachedResponse.clone();
+                        const cachedText = await cachedClone.text();
+                        const networkClone = networkResponse.clone();
+                        const networkText = await networkClone.text();
+                        if (cachedText !== networkText) {
+                            cache.put(request, new Response(networkText, {
+                                status: networkResponse.status,
+                                statusText: networkResponse.statusText,
+                                headers: networkResponse.headers
+                            }));
                             self.clients.matchAll().then(clients => {
-                                clients.forEach(client => {
-                                    client.postMessage({ type: 'NEW_VERSION_READY' });
-                                });
+                                clients.forEach(client => client.postMessage({ type: 'NEW_VERSION_READY' }));
                             });
                         }
                     }
+                }).catch(() => { /* 超时/失败：保留旧缓存，不影响页面 */ });
+                return cachedResponse;
+            }
+            // 无缓存：带超时拉线上，超时则回退（不无限等待）
+            return _timeoutFetch(request).then((networkResponse) => {
+                if (networkResponse && networkResponse.status === 200) {
+                    cache.put(request, networkResponse.clone());
                 }
                 return networkResponse;
-            }).catch(() => {});
-
-            return cachedResponse || fetchPromise;
+            }).catch(() => cache.match(request));
         });
     });
 }
 
 // ============================================================
-// NetworkFirst：优先网络（保证永远拿到最新脚本），失败回退缓存
+// NetworkFirst：优先网络（保证永远拿到最新脚本），失败/超时回退缓存
 // 并在“网络内容 ≠ 缓存内容”时通知页面有新版本（触发自动刷新）
 // ============================================================
 function networkFirst(request, cacheName) {
     return caches.open(cacheName).then((cache) => {
-        // cache:'no-store' 强制绕过浏览器/webview 的 HTTP 磁盘缓存，杜绝 GitHub Pages 静态资源 304 返回旧版
-        return fetch(request, { cache: 'no-store' }).then((networkResponse) => {
+        return _timeoutFetch(request).then((networkResponse) => {
             if (networkResponse && networkResponse.status === 200) {
                 // 比较缓存与网络内容，决定是否通知页面“有新版本”
                 cache.match(request).then((cachedResponse) => {
@@ -190,6 +202,7 @@ function networkFirst(request, cacheName) {
             }
             return networkResponse;
         }).catch(() => {
+            // 超时/网络失败：立即回退缓存，不让页面白屏干等
             return cache.match(request);
         });
     });
