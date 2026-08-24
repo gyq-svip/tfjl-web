@@ -279,20 +279,27 @@
                     updateCacheVersionDisplay(event.data.version, event.data.deployTag);
                 }
             });
-            // 标记有新版本可用：版本号变绿高亮 + 加个绿点，无需用户去猜
+            // 标记有新版本可用：版本号亮绿脉冲高亮 + 明确提示文案，无需用户去猜
             function _markNewVersionAvailable() {
                 window.__tfjlHasNewVersion = true;
                 const tag = document.getElementById('versionTag');
                 if (!tag) return;
-                tag.style.color = '#4caf50';
+                // 亮绿 + 发光 + 脉冲动画（.version-new 在 styles.css 定义），明确表达"可更新"
+                tag.classList.add('version-new');
+                tag.style.color = '#5cff8f';
                 tag.style.opacity = '1';
+                tag.style.textShadow = '0 0 6px rgba(92,255,143,0.8)';
                 // 不使用原生 title，避免提示框跑出窗口；新版本提示由 tooltip 文案体现
                 if (!document.getElementById('__verNewDot')) {
                     const dot = document.createElement('span');
                     dot.id = '__verNewDot';
                     dot.textContent = ' ●';
-                    dot.style.cssText = 'color:#4caf50;';
+                    dot.style.cssText = 'color:#5cff8f;';
                     tag.appendChild(dot);
+                }
+                const tip = tag.nextElementSibling;
+                if (tip && tip.classList.contains('version-tooltip')) {
+                    tip.textContent = '发现新版本 · 双击立即更新';
                 }
             }
             // 核实是否真有新版本：比对远端 versionTag 主版本号与当前，避免刚强刷完即误报"有新版本"
@@ -309,7 +316,16 @@
                             if (typeof notifyNewVersion === 'function') notifyNewVersion();
                         } else {
                             window.__tfjlHasNewVersion = false;
-                            if (tag) { tag.style.color = ''; /* 不使用原生 title，tooltip 由 CSS + JS 同步 */ }
+                            if (tag) {
+                                tag.classList.remove('version-new');
+                                tag.style.color = '';
+                                tag.style.opacity = '';
+                                tag.style.textShadow = '';
+                                const tip = tag.nextElementSibling;
+                                if (tip && tip.classList.contains('version-tooltip')) {
+                                    tip.textContent = '版本 ' + tag.textContent.replace('●','').trim() + '（双击强制刷新）';
+                                }
+                            }
                             const d = document.getElementById('__verNewDot'); if (d) d.remove();
                         }
                     } else {
