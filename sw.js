@@ -100,10 +100,11 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // HTML 页面：NetworkFirst（网络优先，保证永远先拿最新 index.html，避免旧缓存不带新菜单项）
-    // 仅在网络彻底不可达时回退缓存（离线可用）。修复“诊断菜单项加进 index.html 后用户一直看到旧版”的问题。
+    // HTML 页面：StaleWhileRevalidate（缓存优先秒开，后台静默拉新）
+    // 以前用 NetworkFirst 导致每次打开/刷新都先等线上首页，线上慢时 loading 屏长时间转圈 → 启动卡顿。
+    // 改缓存优先后打开秒进，新首页靠后台拉取+下次打开生效；双击右下角版本号可强制立即刷新。
     if (request.mode === 'navigate' || request.destination === 'document') {
-        event.respondWith(networkFirst(request, CACHE_RUNTIME));
+        event.respondWith(staleWhileRevalidate(request, CACHE_RUNTIME));
         return;
     }
     // JS/CSS 改回 StaleWhileRevalidate（缓存优先秒开 + 后台静默更新）：

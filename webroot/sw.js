@@ -21,8 +21,8 @@
 //      不发 → 页面回退 HTML 写死 fallback 225）。强制刷新后 SW_VERSION 应为 s1.0.230。
 // ============================================================
 
-const CACHE_VERSION = 's1.0.272';
-const DEPLOY_TAG = 's20260824-2239';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
+const CACHE_VERSION = 's1.0.274';
+const DEPLOY_TAG = 's20260824-2327';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
@@ -100,10 +100,11 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // HTML 页面：NetworkFirst（网络优先，保证永远先拿最新 index.html，避免旧缓存不带新菜单项）
-    // 仅在网络彻底不可达时回退缓存（离线可用）。修复“诊断菜单项加进 index.html 后用户一直看到旧版”的问题。
+    // HTML 页面：StaleWhileRevalidate（缓存优先秒开，后台静默拉新）
+    // 以前用 NetworkFirst 导致每次打开/刷新都先等线上首页，线上慢时 loading 屏长时间转圈 → 启动卡顿。
+    // 改缓存优先后打开秒进，新首页靠后台拉取+下次打开生效；双击右下角版本号可强制立即刷新。
     if (request.mode === 'navigate' || request.destination === 'document') {
-        event.respondWith(networkFirst(request, CACHE_RUNTIME));
+        event.respondWith(staleWhileRevalidate(request, CACHE_RUNTIME));
         return;
     }
     // JS/CSS 改回 StaleWhileRevalidate（缓存优先秒开 + 后台静默更新）：
