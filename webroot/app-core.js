@@ -154,6 +154,7 @@
         const DIAG_CONFIG_CACHE = 'tdjl_diagCfgCache';
         const DIAG_ANON_ID_KEY = 'tdjl_diagAnonId';
         const DIAG_OPTIN_KEY = 'tdjl_diagOptIn';          // 本机用户是否参与上报（默认参与，可关）
+        const DIAG_HEARTBEAT_KEY = 'tdjl_diagHeartbeat';   // 最近一次写盘健康探测结果（供心跳上报/面板展示）
         const DIAG_CONFIG_TTL = 15 * 60 * 1000;          // 配置本地缓存 15 分钟（GET 读取不限流，可频繁拉取以快速同步策略）
         const DIAG_BUFFER_CAP = 2000;                     // 本地缓冲上限（条）
         const DIAG_UPLOAD_DELAY_MAX = 15000;              // 上报后随机退避上限（避免并发）
@@ -163,6 +164,27 @@
                 if (!id) { id = 'u' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4); localStorage.setItem(DIAG_ANON_ID_KEY, id); }
                 return id;
             } catch (e) { return 'anon'; }
+        }
+        // 实时写盘健康探测（心跳用）：localStorage 写探针 → 强制从磁盘重读 → 比对，返回 {ok, ts}
+        // 与异常诊断"写盘验证"同源逻辑，但自包含、不依赖诊断面板 UI
+        async function _runDiagWriteProbe() {
+            try {
+                const probeKey = '__tfjl_hb_probe__';
+                const probeVal = String(Date.now());
+                localStorage.setItem(probeKey, probeVal);
+                const api = (typeof window.__tfjlDiagApi === 'object' && window.__tfjlDiagApi) || null;
+                if (api && typeof api.flushStore === 'function') await api.flushStore();
+                if (api && typeof api.forceReloadStore === 'function') await api.forceReloadStore();
+                const back = (api && api.getStoreMap ? api.getStoreMap().get(probeKey) : null) || localStorage.getItem(probeKey);
+                if (back) { localStorage.removeItem(probeKey); if (api && typeof api.flushStore === 'function') await api.flushStore(); }
+                const res = { ok: !!back, ts: Date.now() };
+                try { localStorage.setItem(DIAG_HEARTBEAT_KEY, JSON.stringify(res)); } catch (e) {}
+                return res;
+            } catch (e) {
+                const res = { ok: false, ts: Date.now(), err: String(e && e.message || e) };
+                try { localStorage.setItem(DIAG_HEARTBEAT_KEY, JSON.stringify(res)); } catch (_) {}
+                return res;
+            }
         }
         function _loadDiagBuffer() {
             try { const b = JSON.parse(localStorage.getItem(DIAG_LOCAL_BUFFER) || '{}'); return b && typeof b === 'object' ? b : {}; }
@@ -293,15 +315,25 @@
             if (!gid) return;
             const b = _loadDiagBuffer();
             const entries = Object.keys(b).map(k => b[k]);
-            if (entries.length === 0) return;
+            // 即使没有 Gist 写操作缓冲（entries 为空），也定期上报"存活+写盘健康"心跳，
+            // 否则用户只本地落盘不写 Gist 时 buffer 永远空 → 永远不上报（之前"一个都没有"的根因）
+            const probe = await _runDiagWriteProbe();
+            if (entries.length === 0) {
+                const hb = { ok: probe.ok, ts: probe.ts, err: probe.err || null, appVersion: (typeof window.__APP_VERSION === 'string' ? window.__APP_VERSION : ''), platform: (navigator.userAgent.indexOf('Tauri') !== -1 ? 'app' : 'web') };
+                try { localStorage.setItem(DIAG_HEARTBEAT_KEY, JSON.stringify(hb)); } catch (e) {}
+                console.log('[DIAG] 缓冲为空，改发心跳上报（写盘健康=' + probe.ok + '）');
+            }
             const nickname = (window.__currentNickname) || (typeof getLoginNick === 'function' ? getLoginNick() : '') || '';
             const payload = {
                 anonId: _getDiagAnonId(),
                 nick: nickname,
                 lastUpload: Date.now(),
+                heartbeat: entries.length === 0,
+                writeOk: probe.ok,
+                appVersion: (typeof window.__APP_VERSION === 'string' ? window.__APP_VERSION : ''),
+                platform: (navigator.userAgent.indexOf('Tauri') !== -1 ? 'app' : 'web'),
                 entries: entries
-            };
-            const token = getGistToken();
+            };            const token = getGistToken();
             if (!token) return;
             try {
                 // 读取现有文件合并（保留他人文件，只改自己这份）
@@ -21655,7 +21687,7 @@ ${maSection}
                             let p; try { p = JSON.parse(d.files[fn].content); } catch (e) { return; }
                             const who = (p.nick ? p.nick + '(' + p.anonId + ')' : p.anonId);
                             const last = p.lastUpload || 0;
-                            fileMetas.push({ fn, who, last, count: (p.entries || []).reduce((s, e) => s + (e.count || 0), 0) });
+                            fileMetas.push({ fn, who, last, count: (p.entries || []).reduce((s, e) => s + (e.count || 0), 0), heartbeat: !!p.heartbeat, writeOk: (p.writeOk === true), ver: p.appVersion || '', plat: p.platform || '' });
                             perUser[who] = (perUser[who] || 0);
                             (p.entries || []).forEach(e => {
                                 perUser[who] += e.count; totalWrites += e.count;
@@ -21663,12 +21695,23 @@ ${maSection}
                                 perFn[e.gistId + '|' + e.fn] = (perFn[e.gistId + '|' + e.fn] || 0) + e.count;
                             });
                         });
+                        // 存活统计：最近 20 分钟内有上报算"在线"；写盘健康按最新一次上报判定
+                        const ALIVE_MS = 20 * 60 * 1000;
+                        const nowTs = Date.now();
+                        let aliveCount = 0, writeOkCount = 0, aliveUsers = [];
+                        fileMetas.forEach(m => {
+                            if (nowTs - m.last <= ALIVE_MS) { aliveCount++; aliveUsers.push(m.who + (m.heartbeat ? '(心跳)' : '') + (m.writeOk ? '✓盘' : (m.writeOk === false ? '✗盘' : ''))); if (m.writeOk) writeOkCount++; }
+                        });
                         const sortBy = (o) => Object.keys(o).map(k => ({ k, v: o[k] })).sort((a, b) => b.v - a.v);
                         const bar = (v, max) => { const n = max ? Math.round((v / max) * 30) : 0; return '▇'.repeat(Math.min(n, 30)); };
                         const uTop = sortBy(perUser).slice(0, 10), gTop = sortBy(perGist).slice(0, 10), fTop = sortBy(perFn).slice(0, 10);
                         const uMax = uTop.length ? uTop[0].v : 1, gMax = gTop.length ? gTop[0].v : 1, fMax = fTop.length ? fTop[0].v : 1;
                         let html = '<div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:8px 12px;margin-bottom:12px;">';
                         html += '📁 诊断 Gist: <code style="color:#60a5fa;">' + gid + '</code> ｜ 上报文件数: <b>' + diagFiles.length + '</b> ｜ 累计写入: <b>' + totalWrites + '</b> 次</div>';
+                        html += '<div style="background:rgba(16,185,129,0.1);border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:0.82rem;color:#cbd5e1;">';
+                        html += '🟢 存活客户端(20分钟内): <b style="color:#4ade80;">' + aliveCount + '</b> ｜ 其中写盘健康✓: <b style="color:#4ade80;">' + writeOkCount + '</b>';
+                        if (aliveUsers.length) html += '<br><span style="color:#94a3b8;font-size:0.74rem;">' + aliveUsers.join('，') + '</span>';
+                        html += '</div>';
                         html += '<div style="margin-bottom:16px;"><div style="color:#ffd700;margin-bottom:4px;">👤 按用户 TOP</div>';
                         uTop.forEach(x => html += '<div>' + bar(x.v, uMax) + ' ' + x.v + '　' + x.k + '</div>');
                         html += '</div>';
