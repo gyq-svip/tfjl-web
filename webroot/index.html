@@ -1191,7 +1191,9 @@
             
             <div class="battle-field">
                 <div class="battle-column user-column">
-                    <h4>👤 我的卡组（7格）<span id="myDamageReduction" style="color:#4ecdc4;font-size:0.85rem;margin-left:8px;">洗炼总减伤:0</span></h4>
+                    <h4>👤 我的卡组（7格）<span id="myDamageReduction" style="color:#4ecdc4;font-size:0.85rem;margin-left:8px;">洗炼总减伤:0</span>
+                        <select id="myDrTableSel" onchange="switchDrTable('my', this.value)" title="切换减伤表" style="margin-left:8px;font-size:0.72rem;background:rgba(0,0,0,0.35);border:1px solid rgba(78,205,196,0.4);color:#4ecdc4;padding:2px 6px;border-radius:6px;cursor:pointer;"></select>
+                    </h4>
                     <div id="myFusionLockRow" onclick="toggleMyFusionLock()" style="margin:2px 0 6px;font-size:0.72rem;color:rgba(255,255,255,0.7);display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;">
                         <span id="myFusionLockIcon" style="font-size:0.95rem;">🔓</span>
                         <span id="myFusionLockText">融合编辑中（右键开/切融合）</span>
@@ -1212,7 +1214,9 @@
                     </div>
                 </div>
                 <div class="battle-column teammate-column">
-                    <h4>👥 队友卡组（7格）<span id="teammateDamageReduction" style="color:#4ecdc4;font-size:0.85rem;margin-left:8px;">洗炼总减伤:0</span></h4>
+                    <h4>👥 队友卡组（7格）<span id="teammateDamageReduction" style="color:#4ecdc4;font-size:0.85rem;margin-left:8px;">洗炼总减伤:0</span>
+                        <select id="teammateDrTableSel" onchange="switchDrTable('teammate', this.value)" title="切换减伤表" style="margin-left:8px;font-size:0.72rem;background:rgba(0,0,0,0.35);border:1px solid rgba(78,205,196,0.4);color:#4ecdc4;padding:2px 6px;border-radius:6px;cursor:pointer;"></select>
+                    </h4>
                     <div id="teammateFusionLockRow" onclick="toggleTeammateFusionLock()" style="margin:2px 0 6px;font-size:0.72rem;color:rgba(255,255,255,0.7);display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;">
                         <span id="teammateFusionLockIcon" style="font-size:0.95rem;">🔓</span>
                         <span id="teammateFusionLockText">融合编辑中（右键开/切融合）</span>
