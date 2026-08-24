@@ -14568,37 +14568,55 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
         let _counterFlushTimer = null;
         let _counterFlushPending = null;       // 最后一次调用时传入的 type，用于补写
         let _gistWriteBackoffUntil = 0;         // 限流退避截止时间戳(ms)
-        const _COUNTER_FLUSH_INTERVAL = 60000;  // 60s 节流窗口
+        // 🔴 计数器写回间隔：全网生效(读索引 Gist 的 counterFlushSec,单位秒),默认 60s,范围 10~600。
+        // 本机 localStorage 设了非 0 值则强制覆盖(便于临时测试,不影响全网)。
+        async function _getCounterFlushInterval() {
+            let v = 60000;
+            try {
+                const local = localStorage.getItem('tdjl_counterFlushSec');
+                if (local != null) { const ln = parseInt(local, 10); if (!isNaN(ln) && ln > 0) { v = ln * 1000; return v; } }
+            } catch (e) {}
+            try {
+                const cfg = await getRoomIndexConfig();
+                if (typeof cfg.counterFlushSec === 'number') {
+                    const n = cfg.counterFlushSec;
+                    if (n <= 0) v = 0; else if (n * 1000 >= 10000 && n * 1000 <= 600000) v = n * 1000;
+                }
+            } catch (e) {}
+            return v;
+        }
 
         function scheduleCounterFlush(type) {
             if (type) _counterFlushPending = type;
             if (_counterFlushTimer) return; // 已有定时器在跑，等它触发
             const wait = Math.max(0, _gistWriteBackoffUntil - Date.now());
-            _counterFlushTimer = setTimeout(async () => {
-                _counterFlushTimer = null;
-                const flushType = _counterFlushPending || 'visit';
-                _counterFlushPending = null;
-                try {
-                    await syncCounterToGist();
-                } catch (e) {
-                    // 限流(rate limit)时进入退避：30s 内不再写，数据仍在本地缓存不丢
-                    if (e && (e.message || '').includes('rate limit')) {
-                        _gistWriteBackoffUntil = Date.now() + 30000;
-                        console.warn('⚠️ gist 写限流，30s 后重试(数据已本地缓存):', e.message);
-                        return;
-                    }
-                    addToPendingSync(flushType);
-                }
-                try {
-                    await syncCounterDataToGist();
-                } catch (e2) {
-                    if (e2 && (e2.message || '').includes('rate limit')) {
-                        _gistWriteBackoffUntil = Date.now() + 30000;
-                    } else {
+            _getCounterFlushInterval().then(interval => {
+                _counterFlushTimer = setTimeout(async () => {
+                    _counterFlushTimer = null;
+                    const flushType = _counterFlushPending || 'visit';
+                    _counterFlushPending = null;
+                    try {
+                        await syncCounterToGist();
+                    } catch (e) {
+                        // 限流(rate limit)时进入退避：30s 内不再写，数据仍在本地缓存不丢
+                        if (e && (e.message || '').includes('rate limit')) {
+                            _gistWriteBackoffUntil = Date.now() + 30000;
+                            console.warn('⚠️ gist 写限流，30s 后重试(数据已本地缓存):', e.message);
+                            return;
+                        }
                         addToPendingSync(flushType);
                     }
-                }
-            }, wait || _COUNTER_FLUSH_INTERVAL);
+                    try {
+                        await syncCounterDataToGist();
+                    } catch (e2) {
+                        if (e2 && (e2.message || '').includes('rate limit')) {
+                            _gistWriteBackoffUntil = Date.now() + 30000;
+                        } else {
+                            addToPendingSync(flushType);
+                        }
+                    }
+                }, wait || interval);
+            });
         }
 
         // 同步统计数据到Gist（带成功返回）
@@ -21163,6 +21181,17 @@ ${maSection}
                 apply: (v) => { }
             },
             {
+                key: 'counterFlush',
+                label: '计数写回间隔',
+                desc: '在线状态/计数写 Gist 的节流间隔（秒）。越大写频率越低、越不易触发限流；全网所有用户统一跟随此值',
+                scope: 'remote',
+                remoteField: 'counterFlushSec',
+                type: 'range',
+                min: 10, max: 600, step: 10, unit: '秒',
+                default: 60,
+                apply: (v) => { /* 实际读取在 _getCounterFlushInterval() 内 */ }
+            },
+            {
                 key: 'auctionNews',
                 label: '拍卖快讯显示',
                 desc: '是否在跑马灯/公告区显示拍卖快讯（全网生效）',
@@ -21235,6 +21264,21 @@ ${maSection}
                     const lv = localStorage.getItem(t.localKey);
                     on = lv === null ? t.default : (lv === '1' ? false : lv === '0' ? true : t.default);
                 }
+                if (t.type === 'range') {
+                    const curVal = (typeof remoteCfg[t.remoteField] === 'number') ? remoteCfg[t.remoteField] : t.default;
+                    const min = t.min ?? 10, max = t.max ?? 600, step = t.step ?? 10, unit = t.unit ?? '';
+                    html += `
+                    <div style="padding:14px 0;border-bottom:1px solid rgba(255,255,255,0.08);">
+                        <div style="display:flex;align-items:center;justify-content:space-between;">
+                            <div style="font-size:0.9rem;color:#fff;font-weight:600;">${t.label}</div>
+                            <span id="ftRangeVal_${t.key}" style="font-size:0.82rem;color:#4fc3f7;font-weight:700;">${curVal}${unit}</span>
+                        </div>
+                        <div style="font-size:0.72rem;color:rgba(255,255,255,0.5);margin-top:3px;">${t.desc}</div>
+                        <input type="range" min="${min}" max="${max}" step="${step}" value="${curVal}" oninput="setFeatureRange('${t.key}', this.value)" style="width:100%;margin-top:10px;accent-color:#4fc3f7;cursor:pointer;">
+                        <div style="display:flex;justify-content:space-between;font-size:0.62rem;color:rgba(255,255,255,0.3);margin-top:2px;"><span>${min}${unit}</span><span>${max}${unit}</span></div>
+                    </div>`;
+                    continue;
+                }
                 const color = on ? '#4ade80' : '#ef4444';
                 const stateTxt = on ? '开启' : '关闭';
                 html += `
@@ -21255,6 +21299,7 @@ ${maSection}
         async function toggleFeature(key) {
             const t = FEATURE_TOGGLES.find(x => x.key === key);
             if (!t) return;
+            if (t.type === 'range') return; // 滑块类型用 setFeatureRange
             try {
                 if (t.scope === 'remote') {
                     const cur = await getRoomIndexConfig();
@@ -21274,6 +21319,21 @@ ${maSection}
             }
         }
         window.toggleFeature = toggleFeature;
+
+        async function setFeatureRange(key, val) {
+            const t = FEATURE_TOGGLES.find(x => x.key === key);
+            if (!t || t.type !== 'range') return;
+            const n = Math.max(t.min ?? 10, Math.min(t.max ?? 600, parseInt(val, 10) || t.default));
+            const valEl = document.getElementById('ftRangeVal_' + key);
+            if (valEl) valEl.textContent = n + (t.unit || '');
+            try {
+                await setRoomIndexConfigField(t.remoteField, n);
+                if (typeof t.apply === 'function') t.apply(n);
+            } catch (e) {
+                alert('保存失败：' + (e && e.message ? e.message : e));
+            }
+        }
+        window.setFeatureRange = setFeatureRange;
 
 
         // ==================== 拍卖管理入口 + GitHub API 用量（s1.0.110）====================
