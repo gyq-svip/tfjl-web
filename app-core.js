@@ -15399,7 +15399,7 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
 
         const BOSS_RED_SECTIONS = ['寒冰', '暗月', '漩涡', '深海'];
 
-        const BOSS_RED_WAVE_MAX = { '寒冰': 210, '暗月': 210, '漩涡': 130, '深海': 210 };
+        const BOSS_RED_WAVE_MAX = { '寒冰': 210, '暗月': 210, '漩涡': 210, '深海': 210 };
 
         let bossRedCurrent = { '寒冰': {}, '暗月': {}, '漩涡': {}, '深海': {} };
 
