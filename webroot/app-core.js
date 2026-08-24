@@ -17728,8 +17728,8 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
 
         async function pushLoginEventToGist() {
             try {
-                // 🔴 登录打卡远程开关：关闭后当天每用户仅打卡一次（减少 gist 写频率）
-                let loginPunchOn = true;
+                // 🔴 登录打卡远程开关：默认关（每人每天仅打卡一次）；面板显式开启后才每次打卡
+                let loginPunchOn = false;
                 try { const lpCfg = await getRoomIndexConfig(); if (typeof lpCfg.loginPunchEnabled === 'boolean') loginPunchOn = lpCfg.loginPunchEnabled; } catch (e) {}
                 if (!loginPunchOn) {
                     const todayStr = new Date().toISOString().slice(0, 10);
@@ -21159,7 +21159,7 @@ ${maSection}
                 desc: '开启：每次登录/打开都打卡；关闭：当天每用户仅打卡一次（减少 gist 写频率）',
                 scope: 'remote',
                 remoteField: 'loginPunchEnabled',
-                default: true,
+                default: false,
                 apply: (v) => { }
             },
             {
