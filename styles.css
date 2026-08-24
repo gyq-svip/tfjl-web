@@ -2745,7 +2745,7 @@
             border-top-color: rgba(20,20,44,0.96);
         }
         #versionTag:hover + .version-tooltip {
-            opacity: 1;
+            opacity: 0.08;
             visibility: visible;
         }
     
