@@ -237,7 +237,8 @@
                 let gid = localStorage.getItem(DIAG_GIST_KEY);
                 if (gid) return gid;
                 const token = getGistToken();
-                if (!token) return '';
+                // 占位符(未部署/未注入)视为无 token，避免拿 YOUR_GITHUB_TOKEN_HERE 去请求 GitHub 导致无谓 401
+                if (!token || token === 'YOUR_GITHUB_TOKEN_HERE') return '';
                 const createResponse = await fetch('https://api.github.com/gists', {
                     method: 'POST',
                     headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': 'token ' + token },
@@ -21562,7 +21563,12 @@ ${maSection}
             // 确保诊断 Gist 存在（管理员私下进行，使用注入 token 自动创建；用户无感）
             _ensureDiagGist().then(async (gid) => {
                 if (!gid) {
-                    box.innerHTML = '<div style="color:#f87171;">⚠️ 诊断 Gist 未初始化（缺少注入 token）。</div>';
+                    const tk = getGistToken();
+                    if (!tk || tk === 'YOUR_GITHUB_TOKEN_HERE') {
+                        box.innerHTML = '<div style="color:#f87171;background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.3);border-radius:8px;padding:12px;line-height:1.8;">⚠️ <b>当前环境没有有效的注入 token</b><br>诊断 Gist 需要管理员账号(gyq-svip)的 GIST_TOKEN 才能创建。<br><br>• 如果你是<b>本地打开 index.html</b>:此功能需部署到线上(注入 token 后)才能用。<br>• 如果是<b>线上版本</b>:请确认部署时 GIST_TOKEN 已正确注入(deploy.yml)。<br><br>👉 上报设置位于本面板顶部的「<b>全网诊断上报总闸</b>」按钮(需先初始化诊断 Gist)。</div>';
+                    } else {
+                        box.innerHTML = '<div style="color:#fbbf24;line-height:1.8;">诊断 Gist 尚未创建。点击下方按钮以管理员身份创建:<br><br><button onclick="adminInitDiagGist()" style="background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;">➕ 初始化诊断 Gist</button><br><br><span id="diagInitHint" style="color:#94a3b8;font-size:0.72rem;"></span></div>';
+                    }
                     return;
                 }
                 const token = getGistToken();
@@ -21690,6 +21696,22 @@ ${maSection}
                 if (pr.ok) { window.__diagEnabled = cfg.enabled; adminLoadDiag(); }
                 else alert('写入失败 HTTP ' + pr.status);
             } catch (e) { alert('异常：' + (e && e.message ? e.message : e)); }
+        };
+        // 管理员手动初始化诊断 Gist（当自动创建未触发时）
+        window.adminInitDiagGist = async function () {
+            const hint = document.getElementById('diagInitHint');
+            const token = getGistToken();
+            if (!token || token === 'YOUR_GITHUB_TOKEN_HERE') { if (hint) hint.textContent = '无有效 token'; return; }
+            if (hint) hint.textContent = '⏳ 正在创建…';
+            try {
+                const r = await fetch('https://api.github.com/gists', {
+                    method: 'POST',
+                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': 'token ' + token },
+                    body: JSON.stringify({ description: 'TFJL 写操作诊断上报(分片)', public: false, files: { 'diag_config.json': { content: JSON.stringify({ enabled: false, periodDays: 3, allowImmediate: true, openDelayMin: 5, openDelayMax: 10, immediateDelayMin: 1, immediateDelayMax: 20 }, null, 2) } } })
+                });
+                if (r.ok) { const d = await r.json(); localStorage.setItem(DIAG_GIST_KEY, d.id); if (hint) hint.textContent = '✅ 已创建: ' + d.id; setTimeout(adminLoadDiag, 600); }
+                else if (hint) hint.textContent = '创建失败 HTTP ' + r.status;
+            } catch (e) { if (hint) hint.textContent = '异常：' + (e && e.message ? e.message : e); }
         };
 
         // ==================== 功能开关面板（数据驱动，便于后续新增开关）====================
