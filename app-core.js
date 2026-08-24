@@ -50,15 +50,81 @@
             ];
             const isGistGet = (m, u) => m === 'GET' && typeof u === 'string' && u.indexOf('api.github.com/gists/') !== -1;
             const isMutable = (u) => MUTABLE.some(id => u.indexOf(id) !== -1);
+
+            // 🔍 Gist 读写频次埋点：记录每个 gist 文件的 读(GET)/写(POST/PATCH/DELETE) 次数与时间戳，
+            // 并在 403 限流时捕获调用堆栈，用于"顺藤摸瓜"定位是哪个功能触发了限流。
+            // 纯观察，不影响任何限流逻辑。报告：`getGistIOReport()`（控制台调用），或看 console 的 [GIST-IO] 日志。
+            window.__gistIOMetrics = { byGist: {}, byStack: {}, last403: null, total: 0 };
+            (function _resetGistIOMetricsAlias() {
+                window.resetGistIOMetrics = () => { window.__gistIOMetrics = { byGist: {}, byStack: {}, last403: null, total: 0 }; console.log('[GIST-IO] 计数器已重置'); };
+            })();
+            function _gistIdOf(url) {
+                const m = typeof url === 'string' ? url.match(/gists\/([a-f0-9]{8,})/) : null;
+                return m ? m[1] : (typeof url === 'string' ? url.slice(0, 60) : 'unknown');
+            }
+            function _recordGistIO(method, url, status) {
+                try {
+                    const id = _gistIdOf(url);
+                    const isWrite = method !== 'GET';
+                    window.__gistIOMetrics.total++;
+                    const g = window.__gistIOMetrics.byGist[id] || (window.__gistIOMetrics.byGist[id] = { reads: 0, writes: 0, last: [], label: '' });
+                    if (isWrite) g.writes++; else g.reads++;
+                    const t = Date.now();
+                    g.last.push({ t, method, status });
+                    if (g.last.length > 20) g.last.shift();
+                    // 给已知 gist 打标，方便读报告
+                    if (id === 'b02794a8d5c43874b76286185f7b1f7f') g.label = '消息墙MESSAGES';
+                    else if (id === 'e1bd9a5139e1c4e011bfea707e917d61') g.label = '计数器COUNTER(在线状态)';
+                    else if (id === 'a32a0628bd9275f3a4922cd12cf298c9') g.label = '索引INDEX(配置/房间/需求墙)';
+                    // 403 限流：记堆栈，定位触发功能
+                    if (status === 403) {
+                        const stack = new Error().stack || '';
+                        window.__gistIOMetrics.last403 = { t, id, label: g.label, url, stack };
+                        // 按堆栈首行聚合，看哪个功能最多撞限流
+                        const key = (stack.split('\n')[2] || stack.split('\n')[1] || 'unknown').trim().slice(0, 120);
+                        const s = window.__gistIOMetrics.byStack[key] || (window.__gistIOMetrics.byStack[key] = { count: 0, sample: '' });
+                        s.count++; s.sample = stack;
+                        console.warn('[GIST-IO] ⚠️ 403 限流 @ ' + (g.label || id) + '  触发栈: ' + key);
+                    }
+                } catch (e) {}
+            }
+            window.getGistIOReport = function () {
+                const m = window.__gistIOMetrics;
+                const rows = Object.keys(m.byGist).map(id => {
+                    const g = m.byGist[id];
+                    return { id, label: g.label || '(未标注)', reads: g.reads, writes: g.writes, total: g.reads + g.writes };
+                }).sort((a, b) => b.total - a.total);
+                console.log('════════ [GIST-IO] 读写频次报告 ════════');
+                rows.forEach(r => console.log(`  ${r.label.padEnd(22)} 读${r.reads} 写${r.writes} 合计${r.total}`));
+                const stacks = Object.keys(m.byStack).map(k => ({ key: k, count: m.byStack[k].count, sample: m.byStack[k].sample })).sort((a, b) => b.count - a.count);
+                if (stacks.length) {
+                    console.log('── 403 限流触发栈 TOP ──');
+                    stacks.slice(0, 5).forEach(s => console.log(`  ×${s.count}  ${s.key}`));
+                }
+                if (m.last403) console.log('── 最近一次 403 ──\n' + m.last403.stack);
+                return { byGist: rows, byStack: stacks, last403: m.last403, total: m.total };
+            };
             window.fetch = async function (input, init) {
                 init = init || {};
                 const method = (init.method || (input && input.method) || 'GET').toUpperCase();
                 const url = typeof input === 'string' ? input : (input && input.url) || '';
-                if (!isGistGet(method, url) || isMutable(url)) return _origFetch(input, init);
+                const isGist = typeof url === 'string' && url.indexOf('api.github.com/gists/') !== -1;
+                if (!isGistGet(method, url) || isMutable(url)) {
+                    if (isGist) _recordGistIO(method, url, null); // 先记请求，status 随后补
+                    const r = await _origFetch(input, init);
+                    if (isGist) {
+                        // 回填 status 到最近一条记录
+                        const g = window.__gistIOMetrics.byGist[_gistIdOf(url)];
+                        if (g && g.last.length) g.last[g.last.length - 1].status = r.status;
+                        if (r.status === 403) _recordGistIO(method, url, 403);
+                    }
+                    return r;
+                }
                 const cached = _gistEtag.get(url);
                 const headers = Object.assign({}, init.headers);
                 if (cached && cached.etag) headers['If-None-Match'] = cached.etag;
                 const r = await _origFetch(input, Object.assign({}, init, { headers }));
+                _recordGistIO(method, url, r.status);
                 if (r.status === 304 && cached) {
                     return new Response(cached.body, { status: 200, statusText: 'OK', headers: { 'content-type': 'application/json' } });
                 }
