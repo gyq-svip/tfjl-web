@@ -306,6 +306,7 @@
                         if (remoteBase !== cur) {
                             window.__tfjlHasNewVersion = true;
                             _markNewVersionAvailable();
+                            if (typeof notifyNewVersion === 'function') notifyNewVersion(); // 隐藏(托盘)时静默更，前台仅标记
                         } else {
                             window.__tfjlHasNewVersion = false;
                             if (tag) { tag.style.color = ''; /* 不使用原生 title，tooltip 由 CSS + JS 同步 */ }
@@ -313,8 +314,9 @@
                         }
                     } else {
                         window.__tfjlHasNewVersion = true; _markNewVersionAvailable();
+                        if (typeof notifyNewVersion === 'function') notifyNewVersion();
                     }
-                } catch (e) { window.__tfjlHasNewVersion = true; _markNewVersionAvailable(); }
+                } catch (e) { window.__tfjlHasNewVersion = true; _markNewVersionAvailable(); if (typeof notifyNewVersion === 'function') notifyNewVersion(); }
             }
             // 把 SW 缓存版本号显示到右下角版本标签（如 "v260727-57 · sw-v62"）
             function updateCacheVersionDisplay(swVersion, deployTag) {
@@ -359,7 +361,8 @@
                                 // 🔴 新 SW 安装完成（waiting 状态）即表示"有新版待更新"，立即弹气泡。
                                 // 页面侧兜底，不依赖 SW→页面 message 通道（规避 Tauri WebView 通道不可靠导致收不到 NEW_VERSION_READY）。
                                 if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                    if (typeof showSwUpdateBanner === 'function') showSwUpdateBanner();
+                                    if (typeof notifyNewVersion === 'function') notifyNewVersion();
+                                    else if (typeof showSwUpdateBanner === 'function') showSwUpdateBanner();
                                 }
                             });
                         }

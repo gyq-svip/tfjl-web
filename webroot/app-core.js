@@ -22963,10 +22963,24 @@ ${maSection}
             navigator.serviceWorker.addEventListener('message', function (event) {
                 const data = event.data;
                 if (data && data.type === 'NEW_VERSION_READY') {
-                    showSwUpdateBanner();
+                    notifyNewVersion();
                 }
             });
         })();
+
+        // 统一的新版本处理：窗口显示时禁止自动更新（避免丢失未保存内容，仅弹气泡让用户手动点）；
+        // 进入托盘/页面隐藏时静默强制更新（forceRefreshLatest），此时无未保存数据风险。
+        function notifyNewVersion() {
+            if (document.hidden) {
+                console.log('[更新] 页面隐藏(托盘)，静默强制更新到新版本');
+                if (typeof forceRefreshLatest === 'function') { forceRefreshLatest(); return; }
+                location.reload(true);
+                return;
+            }
+            // 前台：弹气泡，由用户点击更新（不打断操作、不丢未保存资料）
+            showSwUpdateBanner();
+        }
+        window.notifyNewVersion = notifyNewVersion;
 
         function showSwUpdateBanner() {
             if (document.getElementById('swUpdateBanner')) return;
