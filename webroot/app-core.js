@@ -21367,16 +21367,16 @@ ${maSection}
                 label: '调试日志悬浮窗',
                 desc: '显示/隐藏右下角调试日志悬浮窗（本机生效）',
                 scope: 'local',
-                localKey: 'tdjl_consoleMinimized',
-                default: true,
+                localKey: 'tdjl_consoleVisible',
+                default: false,
                 apply: (v) => {
-                    try { localStorage.setItem('tdjl_consoleMinimized', v ? '0' : '1'); } catch (e) {}
-                    if (typeof toggleFloatConsole === 'function') {
-                        const con = document.getElementById('floatConsole');
-                        if (con) {
-                            con.style.display = v ? 'flex' : 'none';
-                            if (v && typeof refreshFloatConsole === 'function') refreshFloatConsole();
-                        }
+                    // 驱动管理员"总开关"(tdjl_consoleVisible)，走统一状态机 applyConsoleVisibility，
+                    // 避免直接改 display 污染"最小化记忆"(tdjl_consoleMinimized)，导致收起按钮失效。
+                    try { localStorage.setItem('tdjl_consoleVisible', v ? '1' : '0'); } catch (e) {}
+                    if (typeof applyConsoleVisibility === 'function') {
+                        applyConsoleVisibility(!!v);
+                    } else if (typeof toggleConsoleVisibility === 'function') {
+                        toggleConsoleVisibility();
                     }
                 }
             }
