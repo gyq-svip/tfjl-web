@@ -108,9 +108,11 @@ self.addEventListener('fetch', (event) => {
         event.respondWith(staleWhileRevalidate(request, CACHE_RUNTIME));
         return;
     }
-    // JS/CSS 同样 SWR：首次用缓存秒开，后台更新；内容变化自动提示刷新（保留"永不跑旧 JS"安全性）
+    // JS/CSS 改为 NetworkFirst（网络优先）：保证永远先拿最新 app-core.js/app-local.js 等脚本，
+    // 避免旧 SW 缓存里的占位符 token 版本导致 GitHub API PATCH 403（SW 缓存旧 JS 卡死问题）。
+    // 仅当网络彻底不可达时才回退旧缓存，保证离线可用。速度差异极小（GitHub Pages CDN 几十 ms）。
     if (['script', 'style'].includes(request.destination)) {
-        event.respondWith(staleWhileRevalidate(request, CACHE_RUNTIME));
+        event.respondWith(networkFirst(request, CACHE_RUNTIME));
         return;
     }
     // 图片/字体等静态资源：StaleWhileRevalidate（缓存秒开 + 后台更新）
