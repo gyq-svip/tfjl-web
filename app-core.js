@@ -21584,8 +21584,15 @@ ${maSection}
                     const d = await r.json();
                     try { window.__diagEnabled = !!(d.files && d.files['diag_config.json'] && d.files['diag_config.json'].content && JSON.parse(d.files['diag_config.json'].content).enabled); } catch (e) { window.__diagEnabled = false; }
                     const diagFiles = Object.keys(d.files || {}).filter(fn => fn.startsWith('diag-') && fn.endsWith('.json'));
+                    // 总闸按钮始终显示（无论有无上报文件，否则无数据时看不到开关无法开启 → 死循环）
+                    let head = '<div style="border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:12px;margin-bottom:14px;">';
+                    head += '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">';
+                    head += '<span style="color:#fbbf24;font-size:0.82rem;">🟢 全网诊断上报总闸（仅管理员）：</span>';
+                    head += '<button id="diagToggleBtn" onclick="adminToggleDiagEnabled()" style="background:' + (window.__diagEnabled ? 'linear-gradient(135deg,#10b981,#059669)' : 'rgba(255,255,255,0.1)') + ';color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.82rem;">' + (window.__diagEnabled ? '已开启（客户端正在上报）' : '已关闭') + '</button>';
+                    head += '<span id="diagToggleHint" style="color:#94a3b8;font-size:0.72rem;">' + (window.__diagEnabled ? '关闭后客户端停止上报' : '开启后所有客户端自动上报写操作（用户无感）') + '</span>';
+                    head += '</div></div>';
                     if (diagFiles.length === 0) {
-                        box.innerHTML = '<div style="color:#4ade80;">✅ 暂无上报文件（没有客户端在写，或已优化完毕）。</div>';
+                        box.innerHTML = head + '<div style="color:#4ade80;">✅ 暂无上报文件（总闸未开 / 没有客户端在写 / 或已优化完毕）。<br><span style="color:#94a3b8;font-size:0.75rem;">→ 先点上方「全网诊断上报总闸」开启，等客户端上报一会儿再刷新本页即可看到 TOP 归因。</span></div>';
                     } else {
                         // 聚合
                         const perUser = {}, perGist = {}, perFn = {};
@@ -21620,11 +21627,6 @@ ${maSection}
                         html += '</div>';
                         // 清理区
                         html += '<div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:12px;margin-top:8px;">';
-                        html += '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">';
-                        html += '<span style="color:#fbbf24;font-size:0.78rem;">🟢 全网诊断上报总闸（仅管理员）：</span>';
-                        html += '<button id="diagToggleBtn" onclick="adminToggleDiagEnabled()" style="background:' + (window.__diagEnabled ? 'linear-gradient(135deg,#10b981,#059669)' : 'rgba(255,255,255,0.1)') + ';color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.82rem;">' + (window.__diagEnabled ? '已开启' : '已关闭') + '</button>';
-                        html += '<span id="diagToggleHint" style="color:#94a3b8;font-size:0.72rem;">开启后所有客户端自动上报写操作（用户无感）</span>';
-                        html += '</div>';
                         html += '<div style="color:#ffd700;margin-bottom:6px;">🧹 清理上报文件（按时间）</div>';
                         html += '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px;">';
                         html += '<label>删除 <select id="diagDelRange" style="background:#16213e;color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:4px;"><option value="1">1天前</option><option value="3">3天前</option><option value="7">7天前</option><option value="30">30天前</option><option value="0">全部</option></select> 的上报文件</label>';
