@@ -106,11 +106,11 @@ self.addEventListener('fetch', (event) => {
         event.respondWith(networkFirst(request, CACHE_RUNTIME));
         return;
     }
-    // JS/CSS 改为 NetworkFirst（网络优先）：保证永远先拿最新 app-core.js/app-local.js 等脚本，
-    // 避免旧 SW 缓存里的占位符 token 版本导致 GitHub API PATCH 403（SW 缓存旧 JS 卡死问题）。
-    // 仅当网络彻底不可达时才回退旧缓存，保证离线可用。速度差异极小（GitHub Pages CDN 几十 ms）。
+    // JS/CSS 改回 StaleWhileRevalidate（缓存优先秒开 + 后台静默更新）：
+    // 之前为修 403 临时用 NetworkFirst，代价是每次打开都等网络拉 JS/CSS，本地到 GitHub Pages 慢时打开卡顿。
+    // 现恢复缓存优先（打开秒开），新版靠后台拉取+下次打开生效；用户可双击右下角版本号强制立即刷新。
     if (['script', 'style'].includes(request.destination)) {
-        event.respondWith(networkFirst(request, CACHE_RUNTIME));
+        event.respondWith(staleWhileRevalidate(request, CACHE_RUNTIME));
         return;
     }
     // 图片/字体等静态资源：StaleWhileRevalidate（缓存秒开 + 后台更新）

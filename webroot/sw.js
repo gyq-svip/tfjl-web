@@ -21,8 +21,8 @@
 //      不发 → 页面回退 HTML 写死 fallback 225）。强制刷新后 SW_VERSION 应为 s1.0.230。
 // ============================================================
 
-const CACHE_VERSION = 's1.0.238';
-const DEPLOY_TAG = 's?????';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
+const CACHE_VERSION = 's1.0.271';
+const DEPLOY_TAG = 's20260824-2237';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
@@ -106,7 +106,9 @@ self.addEventListener('fetch', (event) => {
         event.respondWith(networkFirst(request, CACHE_RUNTIME));
         return;
     }
-    // JS/CSS 同样 SWR：首次用缓存秒开，后台更新；内容变化自动提示刷新（保留"永不跑旧 JS"安全性）
+    // JS/CSS 改回 StaleWhileRevalidate（缓存优先秒开 + 后台静默更新）：
+    // 之前为修 403 临时用 NetworkFirst，代价是每次打开都等网络拉 JS/CSS，本地到 GitHub Pages 慢时打开卡顿。
+    // 现恢复缓存优先（打开秒开），新版靠后台拉取+下次打开生效；用户可双击右下角版本号强制立即刷新。
     if (['script', 'style'].includes(request.destination)) {
         event.respondWith(staleWhileRevalidate(request, CACHE_RUNTIME));
         return;
