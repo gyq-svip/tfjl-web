@@ -73,8 +73,13 @@ async fn do_gist_heartbeat(ctx: &HeartbeatCtx) -> Result<(), String> {
         .send()
         .await
         .map_err(|e| format!("GET: {}", e))?;
-    if !get_resp.status().is_success() {
-        return Err(format!("GET status {}", get_resp.status()));
+    let get_status = get_resp.status();
+    if !get_status.is_success() {
+        // 403 多为限流：本次心跳跳过，下个 tick 再试（不刷 error 日志，避免限流期间刷屏）
+        if get_status.as_u16() == 403 {
+            return Ok(());
+        }
+        return Err(format!("GET status {}", get_status));
     }
     let gist: serde_json::Value = get_resp.json().await.map_err(|e| format!("GET json: {}", e))?;
     let content = gist
@@ -129,8 +134,13 @@ async fn do_gist_heartbeat(ctx: &HeartbeatCtx) -> Result<(), String> {
         .send()
         .await
         .map_err(|e| format!("PATCH: {}", e))?;
-    if !patch_resp.status().is_success() {
-        return Err(format!("PATCH status {}", patch_resp.status()));
+    let patch_status = patch_resp.status();
+    if !patch_status.is_success() {
+        // 403 多为限流：本次心跳跳过，下个 tick 再试（不刷 error 日志）
+        if patch_status.as_u16() == 403 {
+            return Ok(());
+        }
+        return Err(format!("PATCH status {}", patch_status));
     }
     Ok(())
 }
@@ -1246,8 +1256,20 @@ pub fn run() {
             {
                 let hb_app = app.handle().clone();
                 std::thread::spawn(move || {
+                    // 递增错峰心跳：第1次≈1h、第2次≈2h、第3次≈3h、第4次起≈4h，每次再叠加 0–30 分钟随机抖动。
+                    // 间隔从本进程启动(登录)时刻起算，只要用户登录时间不同，心跳相位天然错开，避免挂机用户批量并发触发限流。
+                    let mut tick: u32 = 0;
                     loop {
-                        std::thread::sleep(std::time::Duration::from_secs(300));
+                        let base_min: u64 = match tick { 0 => 60, 1 => 120, 2 => 180, _ => 240 };
+                        // 用当前时间纳秒做伪随机种子（避免引入 rand 依赖），取 0–30 分钟抖动
+                        let ns = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .map(|d| d.subsec_nanos() as u64)
+                            .unwrap_or(0);
+                        let jitter_min: u64 = ns % 31; // 0..30
+                        let next_secs = (base_min + jitter_min) * 60;
+                        std::thread::sleep(std::time::Duration::from_secs(next_secs));
+                        tick = tick.saturating_add(1);
                         let st = hb_app.state::<AppState>();
                         let ctx_opt = st.heartbeat.lock().unwrap().clone();
                         if let Some(ctx) = ctx_opt {
