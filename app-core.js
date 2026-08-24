@@ -154,7 +154,7 @@
         const DIAG_CONFIG_CACHE = 'tdjl_diagCfgCache';
         const DIAG_ANON_ID_KEY = 'tdjl_diagAnonId';
         const DIAG_OPTIN_KEY = 'tdjl_diagOptIn';          // 本机用户是否参与上报（默认参与，可关）
-        const DIAG_CONFIG_TTL = 4 * 3600 * 1000;          // 配置本地缓存 4 小时
+        const DIAG_CONFIG_TTL = 15 * 60 * 1000;          // 配置本地缓存 15 分钟（GET 读取不限流，可频繁拉取以快速同步策略）
         const DIAG_BUFFER_CAP = 2000;                     // 本地缓冲上限（条）
         const DIAG_UPLOAD_DELAY_MAX = 15000;              // 上报后随机退避上限（避免并发）
         function _getDiagAnonId() {
