@@ -932,6 +932,32 @@
             }
         }
 
+        // 供功能开关面板调用：设置拍卖快讯全开关的具体值（而非 toggle）
+        async function setAuctionBroadcastEnabled(v) {
+            try {
+                const token = getGistToken();
+                if (!token) { alert('❌ 需要管理员Token才能修改全局设置'); return; }
+                const indexUrl = `https://api.github.com/gists/${GIST_ID}`;
+                const response = await fetch(indexUrl, { headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` } });
+                if (!response.ok) throw new Error('获取索引失败');
+                const data = await response.json();
+                const index = JSON.parse(data.files['room_index.json'].content);
+                index.broadcastEnabled = !!v;
+                const patchResp = await fetch(indexUrl, {
+                    method: 'PATCH',
+                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` },
+                    body: JSON.stringify({ files: { 'room_index.json': { content: JSON.stringify(index, null, 2) } } })
+                });
+                if (!patchResp.ok) throw new Error('更新失败');
+                _globalBroadcastEnabled = !!v;
+                updateBroadcastToggleStatus();
+                updateMarqueeWithBroadcast();
+            } catch (e) {
+                alert('❌ 操作失败: ' + e.message);
+            }
+        }
+        window.setAuctionBroadcastEnabled = setAuctionBroadcastEnabled;
+
         function updateBroadcastToggleStatus() {
             const btn = document.getElementById('broadcastToggleBtn');
             if (btn) {

@@ -1668,9 +1668,9 @@
                         <span class="mi-emoji">🗂️</span>
                         <div class="mi-text"><div class="mi-title">Gist文件管理</div><div class="mi-sub">孤儿扫描清理</div></div>
                     </div>
-                    <div class="admin-menu-item" onclick="toggleAuctionNewsVisibility()">
-                        <span class="mi-emoji">🛒</span>
-                        <div class="mi-text"><div class="mi-title">拍卖快讯显示</div><div id="auctionNewsToggleStatus" class="mi-sub">全网开启</div></div>
+                    <div class="admin-menu-item" onclick="adminShowPage('featureToggles')">
+                        <span class="mi-emoji">🎛️</span>
+                        <div class="mi-text"><div class="mi-title">功能开关</div><div class="mi-sub">登录打卡 / 拍卖快讯 / 调试窗</div></div>
                     </div>
                     <div class="admin-menu-item" onclick="openDeepseaStats()">
                         <span class="mi-emoji">🌊</span>
@@ -2033,7 +2033,7 @@
                 <div style="background:rgba(0,0,0,0.2);border-radius:8px;padding:15px;margin-top:12px;">
                     <div style="color:rgba(255,255,255,0.6);font-size:0.8rem;margin-bottom:8px;">📅 部署触发方式 & 定时任务</div>
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-                        <div style="background:rgba(0,0,0,0.2);border-radius:6px;padding:8px;text-align:center;">
+                            <div style="background:rgba(0,0,0,0.2);border-radius:6px;padding:8px;text-align:center;">
                             <div style="color:rgba(255,255,255,0.4);font-size:0.7rem;">触发方式</div>
                             <div style="color:#4ecdc4;font-size:0.8rem;font-weight:600;">push → main</div>
                         </div>
@@ -2046,6 +2046,17 @@
                             <div style="color:#fbbf24;font-size:0.8rem;font-weight:600;">⚠️ 当前 deploy.yml 无定时任务（仅 push main 或手动触发）</div>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <div id="adminPageFeatureToggles" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
+                    <button class="admin-btn admin-btn-secondary" onclick="adminShowMenu()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
+                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">🎛️ 功能开关</h3>
+                    <button onclick="renderFeatureToggles()" style="margin-left:auto;padding:6px 12px;border-radius:6px;border:none;background:linear-gradient(135deg,#4ecdc4,#44a08d);color:white;cursor:pointer;font-size:0.8rem;">刷新状态</button>
+                </div>
+                <div id="featureTogglesContent" style="background:rgba(0,0,0,0.2);border-radius:8px;padding:15px;">
+                    <div style="text-align:center;color:rgba(255,255,255,0.4);padding:10px;">正在加载开关状态…</div>
                 </div>
             </div>
 
