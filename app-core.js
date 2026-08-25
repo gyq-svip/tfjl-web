@@ -86,8 +86,9 @@
                         s.count++; s.sample = stack;
                         console.warn('[GIST-IO] ⚠️ 403 限流 @ ' + (g.label || id) + '  触发栈: ' + key);
                     }
-                    // 全网写操作诊断：本地记录明细（外部诊断模块挂 window.__recordDiagWrite）
-                    if (typeof window.__recordDiagWrite === 'function') window.__recordDiagWrite(method, url, status);
+                    // 全网写操作诊断：本地记录明细（外部诊断模块挂 window.__recordDiagWrite(gistId, ..., method)）
+                    // 注意参数顺序：gistId 从 url 解析、fn 用 url 标识触发、method 区分读写
+                    if (typeof window.__recordDiagWrite === 'function') window.__recordDiagWrite(_gistIdOf(url), url, method);
                 } catch (e) {}
             }
             window.getGistIOReport = function () {
@@ -21849,9 +21850,11 @@ ${maSection}
                                 perGist[e.gistId] = (perGist[e.gistId] || 0) + e.count;
                                 detailByGist[e.gistId] = detailByGist[e.gistId] || [];
                                 detailByGist[e.gistId].push({ file: fileMetas[fileMetas.length - 1], entry: e });
+                                const isWrite = (e.method || 'WRITE') === 'WRITE' && e.gistId !== 'feature';
+                                const tagKey = (isWrite ? 'WRITE|' : 'USE|') + e.gistId + '|' + e.fn;
                                 perFn[e.gistId + '|' + e.fn] = (perFn[e.gistId + '|' + e.fn] || 0) + e.count;
-                                detailByFn[e.gistId + '|' + e.fn] = detailByFn[e.gistId + '|' + e.fn] || [];
-                                detailByFn[e.gistId + '|' + e.fn].push({ file: fileMetas[fileMetas.length - 1], entry: e });
+                                detailByFn[tagKey] = detailByFn[tagKey] || [];
+                                detailByFn[tagKey].push({ file: fileMetas[fileMetas.length - 1], entry: e, isWrite });
                             });
                         });
                         // 存活统计：最近 60 分钟内有上报算"在线"（心跳周期45分钟±10抖动，60分钟阈值留足余量）；写盘健康按最新一次上报判定
@@ -21887,7 +21890,9 @@ ${maSection}
                                     html += '<table style="border-collapse:collapse;margin-top:4px;font-size:0.72rem;width:100%;">';
                                     html += '<tr style="color:#94a3b8;"><th style="text-align:left;padding:2px 6px;">功能</th><th style="text-align:right;padding:2px 6px;">次数</th><th style="text-align:left;padding:2px 6px;">最近 Gist</th><th style="text-align:left;padding:2px 6px;">最近文件名</th></tr>';
                                     m.payload.entries.forEach(e => {
-                                        html += '<tr style="border-top:1px dashed rgba(255,255,255,0.1);"><td style="padding:2px 6px;">' + (e.fn || '?') + '</td><td style="text-align:right;padding:2px 6px;color:#ffd700;">' + (e.count || 0) + '</td><td style="padding:2px 6px;color:#94a3b8;">' + (e.gistId ? e.gistId.substring(0, 12) + '…' : '?') + '</td><td style="padding:2px 6px;">' + (e.fn || '?') + '</td></tr>';
+                                        const isWrite = (e.method || 'WRITE') === 'WRITE' && e.gistId !== 'feature';
+                                        const badge = isWrite ? ' <span style="color:#f87171;">✍️写Gist</span>' : ' <span style="color:#94a3b8;">📊仅埋点</span>';
+                                        html += '<tr style="border-top:1px dashed rgba(255,255,255,0.1);"><td style="padding:2px 6px;">' + (e.fn || '?') + badge + '</td><td style="text-align:right;padding:2px 6px;color:' + (isWrite ? '#f87171' : '#ffd700') + ';">' + (e.count || 0) + '</td><td style="padding:2px 6px;color:#94a3b8;">' + (e.gistId ? e.gistId.substring(0, 12) + '…' : '?') + '</td><td style="padding:2px 6px;">' + (e.fn || '?') + '</td></tr>';
                                     });
                                     html += '</table>';
                                 } else {
@@ -21921,19 +21926,51 @@ ${maSection}
                             html += '</div>';
                         });
                         html += '</div>';
-                        html += '<div style="margin-bottom:16px;"><div style="color:#ffd700;margin-bottom:4px;">⚙️ 按 Gist×功能 TOP <span style="color:#94a3b8;font-size:0.7rem;">（点行展开）</span></div>';
-                        fTop.forEach((x, i) => {
-                            const id = 'fDetail_' + i;
+                        // 按 Gist×功能 TOP 拆成两组：🟥 真实写 Gist 操作 / ⚪ 功能使用埋点（不写 Gist）
+                        const fnKeys = Object.keys(detailByFn);
+                        const writeKeys = fnKeys.filter(k => k.indexOf('WRITE|') === 0);
+                        const useKeys = fnKeys.filter(k => k.indexOf('USE|') === 0);
+                        const writeAgg = {}, useAgg = {};
+                        writeKeys.forEach(k => { const base = k.substring(6); writeAgg[base] = (writeAgg[base] || 0) + detailByFn[k].reduce((s, r) => s + r.entry.count, 0); });
+                        useKeys.forEach(k => { const base = k.substring(4); useAgg[base] = (useAgg[base] || 0) + detailByFn[k].reduce((s, r) => s + r.entry.count, 0); });
+                        const wTop = sortBy(writeAgg).slice(0, 10), uTop2 = sortBy(useAgg).slice(0, 10);
+                        const wMax = wTop.length ? wTop[0].v : 1, uMax2 = uTop2.length ? uTop2[0].v : 1;
+                        // 组1：🟥 真实写 Gist
+                        html += '<div style="margin-bottom:16px;"><div style="color:#f87171;margin-bottom:4px;">⚙️🟥 真实写 Gist 操作 TOP <span style="color:#94a3b8;font-size:0.7rem;">（PATCH/POST 到 Gist，消耗 API 配额）</span></div>';
+                        if (!wTop.length) html += '<div style="color:#94a3b8;font-size:0.74rem;">暂无写 Gist 记录</div>';
+                        wTop.forEach((x, i) => {
+                            const id = 'wDetail_' + i;
                             const fn = x.k.split('|')[1] || x.k;
                             const rawGid = x.k.split('|')[0] || '?';
-                            // 功能埋点用 gistId='feature' 标识，渲染时友好显示
                             const gidShort = (rawGid === 'feature') ? '功能使用' : (rawGid.substring(0, 12) + '…');
-                            html += '<div style="cursor:pointer;color:#cbd5e1;" onclick="var d=document.getElementById(\'' + id + '\');if(d.style.display===\'none\'){d.style.display=\'block\';}else{d.style.display=\'none\';}">' + bar(x.v, fMax) + ' ' + x.v + '　' + gidShort + ' / ' + fn + ' <span style="color:#60a5fa;font-size:0.7rem;">▶</span></div>';
-                            html += '<div id="' + id + '" style="display:none;background:rgba(0,0,0,0.25);border-left:2px solid #60a5fa;padding:6px 10px;margin:4px 0 8px 12px;font-size:0.75rem;">';
-                            (detailByFn[x.k] || []).forEach(row => {
-                                const m = row.file, e = row.entry;
-                                const ts = m.last ? new Date(m.last).toLocaleString('zh-CN') : '?';
-                                html += '<div style="margin-bottom:4px;">' + m.who + ' ×<b style="color:#ffd700;">' + (e.count || 0) + '</b> <span style="color:#94a3b8;">[' + ts + ']</span></div>';
+                            html += '<div style="cursor:pointer;color:#fca5a5;" onclick="var d=document.getElementById(\'' + id + '\');if(d.style.display===\'none\'){d.style.display=\'block\';}else{d.style.display=\'none\';}">' + bar(x.v, wMax) + ' ' + x.v + '　✍️ ' + gidShort + ' / ' + fn + ' <span style="color:#60a5fa;font-size:0.7rem;">▶</span></div>';
+                            html += '<div id="' + id + '" style="display:none;background:rgba(0,0,0,0.25);border-left:2px solid #f87171;padding:6px 10px;margin:4px 0 8px 12px;font-size:0.75rem;">';
+                            writeKeys.filter(k => k.substring(6) === x.k).forEach(k => {
+                                (detailByFn[k] || []).forEach(row => {
+                                    const m = row.file, e = row.entry;
+                                    const ts = m.last ? new Date(m.last).toLocaleString('zh-CN') : '?';
+                                    html += '<div style="margin-bottom:4px;">' + m.who + ' ×<b style="color:#f87171;">' + (e.count || 0) + '</b> <span style="color:#94a3b8;">[' + ts + ']</span></div>';
+                                });
+                            });
+                            html += '</div>';
+                        });
+                        html += '</div>';
+                        // 组2：⚪ 功能使用埋点（不写 Gist）
+                        html += '<div style="margin-bottom:16px;"><div style="color:#94a3b8;margin-bottom:4px;">⚙️⚪ 功能使用 TOP <span style="color:#94a3b8;font-size:0.7rem;">（仅埋点统计，不写 Gist）</span></div>';
+                        if (!uTop2.length) html += '<div style="color:#94a3b8;font-size:0.74rem;">暂无功能使用记录</div>';
+                        uTop2.forEach((x, i) => {
+                            const id = 'u2Detail_' + i;
+                            const fn = x.k.split('|')[1] || x.k;
+                            const rawGid = x.k.split('|')[0] || '?';
+                            const gidShort = (rawGid === 'feature') ? '功能使用' : (rawGid.substring(0, 12) + '…');
+                            html += '<div style="cursor:pointer;color:#cbd5e1;" onclick="var d=document.getElementById(\'' + id + '\');if(d.style.display===\'none\'){d.style.display=\'block\';}else{d.style.display=\'none\';}">' + bar(x.v, uMax2) + ' ' + x.v + '　📊 ' + gidShort + ' / ' + fn + ' <span style="color:#60a5fa;font-size:0.7rem;">▶</span></div>';
+                            html += '<div id="' + id + '" style="display:none;background:rgba(0,0,0,0.25);border-left:2px solid #94a3b8;padding:6px 10px;margin:4px 0 8px 12px;font-size:0.75rem;">';
+                            useKeys.filter(k => k.substring(4) === x.k).forEach(k => {
+                                (detailByFn[k] || []).forEach(row => {
+                                    const m = row.file, e = row.entry;
+                                    const ts = m.last ? new Date(m.last).toLocaleString('zh-CN') : '?';
+                                    html += '<div style="margin-bottom:4px;">' + m.who + ' ×<b style="color:#ffd700;">' + (e.count || 0) + '</b> <span style="color:#94a3b8;">[' + ts + ']</span></div>';
+                                });
                             });
                             html += '</div>';
                         });
