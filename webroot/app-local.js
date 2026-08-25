@@ -699,6 +699,7 @@ if (isTauriApp) {
     }
 
     function closeAppLocalSettings() {
+        if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('APP设置关闭');
         const modal = document.getElementById('appLocalSettingsModal');
         if (modal) modal.remove();
     }
@@ -1011,6 +1012,7 @@ if (isTauriApp) {
     async function scanAllFiles(force = false) {
         const listEl = document.getElementById('scannedFileList');
         const statsEl = document.getElementById('fuzzyStatsArea');
+        if (force === true && typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('APP刷新扫描');
         if (!listEl) return;
 
         const dirLabels = { coop: '合作', activity: '活动', battle: '对战', battleMax: '对战MAX', screenshot: '截图', logs: '日志', temp: '临时' };
@@ -1219,18 +1221,21 @@ if (isTauriApp) {
 
     function toggleScannedShareMode() {
         _shareModeScanned = !_shareModeScanned;
+        if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('APP扫描分享模式');
         _selScannedSharePaths.clear();
         renderScannedFiles();
     }
 
     function setScannedFilterKeyword(val) {
         _scannedFilterKeyword = (val || '').trim();
+        if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('APP扫描搜索文件');
         _selScannedSharePaths.clear();
         renderScannedFiles();
     }
 
     function setScannedFilterCategory(cat) {
         _scannedFilterCategory = cat || '全部';
+        if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('APP扫描分类筛选');
         _selScannedSharePaths.clear();
         renderScannedFiles();
     }
@@ -1529,6 +1534,7 @@ if (isTauriApp) {
     }
 
     function saveSettingsAndClose() {
+        if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('APP设置保存');
         saveConfig();
         closeAppLocalSettings();
     }
@@ -1536,6 +1542,7 @@ if (isTauriApp) {
     // 恢复默认老马目录（解决用户改错路径导致“扫描中”卡死）
     function restoreDefaultMaDirs() {
         if (!confirm('确定把6个老马目录恢复为默认路径？\n（用于修复目录改错导致扫描卡死）\n当前自定义路径将被覆盖。')) return;
+        if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('APP恢复默认老马目录');
         maDirs = Object.assign({}, DEFAULT_MA_DIRS);
         saveConfig();
         if (typeof fillSettingsForm === 'function') fillSettingsForm();
@@ -2200,6 +2207,7 @@ if (isTauriApp) {
 
     async function calcScreenshotStats(force = false) {
         const statsEl = document.getElementById('screenshotStats');
+        if (force === true && typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('APP车主副本统计(刷新)');
         if (!statsEl) return;
 
         const screenshotDir = maDirs.screenshot;
@@ -2605,6 +2613,7 @@ if (isTauriApp) {
     }
 
     function clearLogBattleCache() {
+        if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('APP清除对战缓存');
         try {
             localStorage.removeItem('TFJL_LogBattleV2');
             // 同时清除所有结果缓存（跳过扫描的日缓存）
@@ -2977,6 +2986,7 @@ if (isTauriApp) {
         const force = forceParam === true;
         const id = targetId || 'logBattleStats';
         const statsEl = document.getElementById(id);
+        if (force === true && typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('APP对战统计(刷新)');
         if (!statsEl) return;
 
         if (!maDirs.logs) {
