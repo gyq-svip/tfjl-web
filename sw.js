@@ -28,8 +28,8 @@
 // v42: 纯版本号升级 s1.0.308（无功能改动），用于端到端验证「强制更新总开关开 + 最小化托盘 → 自动静默升 308」链路。SW_VERSION 应为 s1.0.308。
 // ============================================================
 
-const CACHE_VERSION = 's1.0.308';
-const DEPLOY_TAG = 's20260826-0321';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
+const CACHE_VERSION = 's1.0.309';
+const DEPLOY_TAG = 's20260826-0338';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
