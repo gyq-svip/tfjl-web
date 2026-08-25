@@ -35,8 +35,8 @@
 //      短哈希前 8 位用蓝色下划线链接包裹，点击直达 Gist。截图里那种 `51e7030023fa…` 乱码已消失。SW_VERSION 应为 s1.0.313。
 // ============================================================
 
-const CACHE_VERSION = 's1.0.315';
-const DEPLOY_TAG = 's20260826-0500';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
+const CACHE_VERSION = 's1.0.316';
+const DEPLOY_TAG = 's20260826-0510';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
