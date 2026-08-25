@@ -25,10 +25,11 @@
 // v41: 强制更新开关下沉到 SW 层（_maybeForceReload）：SW install 时读索引 Gist 的 forceReloadEnabled，开关开则主动 skipWaiting()
 //      让新 SW 立即接管 + 发 FORCE_RELOAD 消息（app-core.js 复用 notifyNewVersion，仍在隐藏/闲置时才静默强刷，不打断用户）。
 //      解决老设备（app-core.js 不认识 window.__diagForceReload）也能被推着自动升级。默认关，风险可控。SW_VERSION 应为 s1.0.307。
+// v42: 纯版本号升级 s1.0.308（无功能改动），用于端到端验证「强制更新总开关开 + 最小化托盘 → 自动静默升 308」链路。SW_VERSION 应为 s1.0.308。
 // ============================================================
 
-const CACHE_VERSION = 's1.0.307';
-const DEPLOY_TAG = 's20260826-0216';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
+const CACHE_VERSION = 's1.0.308';
+const DEPLOY_TAG = 's20260826-0321';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
