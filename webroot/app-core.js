@@ -329,7 +329,7 @@
                 try { localStorage.setItem(DIAG_HEARTBEAT_KEY, JSON.stringify(hb)); } catch (e) {}
                 console.log('[DIAG] 缓冲为空，改发心跳上报（写盘健康=' + probe.ok + '）');
             }
-            const nickname = (window.__currentNickname) || (typeof getLoginNick === 'function' ? getLoginNick() : '') || '';
+            const nickname = (typeof _myNick === 'function' ? _myNick() : '') || localStorage.getItem('TFJL_UserName') || (window.__currentNickname) || '';
             const payload = {
                 anonId: _getDiagAnonId(),
                 nick: nickname,
