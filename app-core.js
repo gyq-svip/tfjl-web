@@ -293,6 +293,11 @@
         // 确保诊断 Gist 存在（不存在则创建，ID 存 localStorage）
         async function _ensureDiagGist() {
             try {
+                // 优先使用全局固定的诊断 Gist ID（所有设备/客户端共享，避免浏览器/App 各自新建导致互不可见）
+                if (DIAG_GIST_ID) {
+                    try { localStorage.setItem(DIAG_GIST_KEY, DIAG_GIST_ID); } catch (e) {}
+                    return DIAG_GIST_ID;
+                }
                 let gid = localStorage.getItem(DIAG_GIST_KEY);
                 if (gid) return gid;
                 const token = getGistToken();
@@ -412,7 +417,7 @@
         });
         // 管理员：拉取所有 diag-*.json 聚合分析
         window.getDiagAnalysisReport = async function () {
-            const gid = localStorage.getItem(DIAG_GIST_KEY) || (await _ensureDiagGist());
+            const gid = DIAG_GIST_ID || localStorage.getItem(DIAG_GIST_KEY) || (await _ensureDiagGist());
             if (!gid) { console.log('[DIAG] 诊断 Gist 未初始化'); return null; }
             const token = getGistToken();
             const r = await fetch(`https://api.github.com/gists/${gid}`, { headers: { 'Accept': 'application/vnd.github.v3+json', ...(token ? { 'Authorization': 'token ' + token } : {}) } });
@@ -12522,6 +12527,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 const GIST_ID = 'a32a0628bd9275f3a4922cd12cf298c9';
 const COUNTER_GIST_ID = 'e1bd9a5139e1c4e011bfea707e917d61';
 const MESSAGES_GIST_ID = 'b02794a8d5c43874b76286185f7b1f7f';
+// ⚠️ 写死固定 ID：诊断 Gist（写操作诊断上报分片）。所有设备/客户端必须使用同一个，
+// 否则浏览器端、App 端各建各的 Gist，管理员在任一端都看不到另一端的上报。
+// 首次从 App 端自动创建后确认存在，固定为下方 ID（不再依赖 localStorage 动态创建，避免多设备竞态）。
+const DIAG_GIST_ID = 'deb09eba308f044c3b78935507972717';
 const INDEX_GIST_ID_KEY = 'TFJL_Index_Gist_ID';
 const COUNTER_CACHE_KEY = 'TFJL_Counter_Cache';
 const COUNTER_CACHE_TIME_KEY = 'TFJL_Counter_Cache_Time';
