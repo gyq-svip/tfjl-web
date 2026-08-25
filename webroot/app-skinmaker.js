@@ -199,6 +199,7 @@
         .catch(function(err){ smStatus('补属性失败：'+smErrMsg(err),true); });
     }
     function smSave(){
+      if(typeof window.__recordFeatureUse==='function') window.__recordFeatureUse('皮肤制作');
       var hero=document.getElementById('smHero').value.trim();
       var label=document.getElementById('smLabel').value.trim();
       if(!hero){ smStatus('请填写英雄名',true); return; }
