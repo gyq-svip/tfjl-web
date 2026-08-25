@@ -301,7 +301,7 @@
                         if (remoteBase !== cur) {
                             window.__tfjlHasNewVersion = true;
                             _markNewVersionAvailable();
-                            if (typeof notifyNewVersion === 'function') notifyNewVersion();
+                            if (typeof notifyNewVersion === 'function') notifyNewVersion(); // 隐藏(托盘)时静默更，前台仅标记
                         } else {
                             window.__tfjlHasNewVersion = false;
                             if (tag) {
@@ -341,8 +341,18 @@
                 console.log('[VERSION] 当前缓存版本:', swVersion, '（强制刷新后应为 s1.0.230 才算最新）');
             }
             window.addEventListener('load', function() {
-                navigator.serviceWorker.register('./sw.js?v=b20260823230841', { scope: './', updateViaCache: 'none' }).then(function(registration) {
-                    console.log('[PWA] Service Worker 注册成功，scope:', registration.scope);
+                // sw.js 的 cachebust 必须跟随版本号（之前写死 b20260823230841 导致浏览器一直用旧 SW 文件，根本收不到新版本更新 —— P3 卡在旧版的根因）。
+                // 优先级与 329-332 一致：① #versionTag 文本 split 的 base（部署脚本必改字段，最稳）② window.__DEPLOY_TAG ③ window.__APP_VERSION ④ fallback v1。
+                let swCachebust = 'v1';
+                try {
+                    const tag = document.getElementById('versionTag');
+                    const base = tag && tag.textContent ? tag.textContent.replace('●', '').split(' · ')[0].trim() : '';
+                    if (/^s\d{8}/.test(base)) swCachebust = base;
+                    else if (typeof window.__DEPLOY_TAG === 'string' && /^s\d{8}/.test(window.__DEPLOY_TAG)) swCachebust = window.__DEPLOY_TAG;
+                    else if (typeof window.__APP_VERSION === 'string' && window.__APP_VERSION) swCachebust = window.__APP_VERSION;
+                } catch (e) {}
+                navigator.serviceWorker.register('./sw.js?v=' + encodeURIComponent(swCachebust), { scope: './', updateViaCache: 'none' }).then(function(registration) {
+                    console.log('[PWA] Service Worker 注册成功，scope:', registration.scope, 'sw cachebust:', swCachebust);
                     // 每次打开 APP 主动检查 SW 更新（绕过 Tauri WebView 的 SW 更新检测问题）
                     registration.update().catch(function() {});
                     // 向当前 SW 询问缓存版本号并显示到版本标签（controller 未就绪时稍后 controllerchange 再问）
