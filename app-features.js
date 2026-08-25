@@ -241,6 +241,7 @@
             const panel = document.getElementById('activityCalcPanel');
             panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
             if (panel.style.display === 'block') {
+                if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('计算器');
                 switchCalcTopTab('new');
             }
         }
@@ -619,6 +620,7 @@
             const panel = document.getElementById('referencePanel');
             panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
             if (panel.style.display === 'block') {
+                if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('参考图片');
                 loadReferenceImages();
             }
         }
@@ -4893,6 +4895,7 @@
         function toggleNotepadPanel() {
             const panel = document.getElementById('notepadPanel');
             panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+            if (panel.style.display === 'block') { if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('记事本'); }
         }
 
         // 脚本文件面板切换
@@ -4900,6 +4903,7 @@
             const panel = document.getElementById('txtFilesPanel');
             panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
             if (panel.style.display === 'block') {
+                if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('脚本管理');
                 // 默认显示「脚本文件」tab（直接看到当前项目的脚本列表）
                 switchTxtPanelTab('files');
                 applyTxtPanelTipBar();
@@ -4993,6 +4997,7 @@
             if (panel) {
                 panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
                 if (panel.style.display === 'flex') {
+                    if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('项目搜索');
                     setTimeout(() => document.getElementById('projectSearchInput')?.focus(), 100);
                 }
                 return;
@@ -5573,6 +5578,7 @@
             const input = document.getElementById('parserInput').value.trim();
             const target = document.getElementById('parserHandTarget').value;
             const resultEl = document.getElementById('parserResult');
+            if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('解析并添加手牌');
 
             if (!input) {
                 resultEl.innerHTML = '<span style="color:#f44336;">请输入文本！</span>';
@@ -5734,6 +5740,7 @@
 
         function parseActivityScript(includeChengShang) {
             if (typeof includeChengShang === 'undefined') includeChengShang = true;
+            if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse(includeChengShang ? '活动脚本生成' : '隐藏榜脚本生成');
             const input = document.getElementById('parserInput').value.trim();
             const resultEl = document.getElementById('parserResult');
 
@@ -6137,6 +6144,7 @@
         function parseDungeonScript() {
             const input = document.getElementById('parserInput').value.trim();
             const resultEl = document.getElementById('parserResult');
+            if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('深海脚本生成');
 
             if (!input) {
                 resultEl.innerHTML = '<span style="color:#f44336;">请输入文本！</span>';
