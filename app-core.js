@@ -447,12 +447,8 @@
                 else { delayMin = cfg.openDelayMin || 5; delayMax = cfg.openDelayMax || 10; }
                 const delay = (delayMin * 60000) + Math.random() * ((delayMax - delayMin) * 60000);
                 _diagTimer = setTimeout(() => {
-                    _pushDiagReport().then(() => {
-                        // 周期续排：periodDays ± 随机
-                        const period = (cfg.periodDays || 3) * 86400000;
-                        const jitter = Math.random() * 86400000; // 0~1 天随机错峰
-                        _diagTimer = setTimeout(() => _scheduleDiagUpload('period'), period + jitter);
-                    });
+                    _pushDiagReport().catch(() => {});
+                    // 规律心跳由 _initDiagReporter 里的 setInterval(15分钟) 接管续排，这里不再单独续排，避免双重调度
                 }, delay);
             });
         }
@@ -464,6 +460,14 @@
                     if (cfg.enabled && localStorage.getItem(DIAG_OPTIN_KEY) !== '0') _scheduleDiagUpload('open');
                 });
             }, 3000); // 启动 3s 后才去读配置，避免阻塞首屏
+            // 规律心跳：每 15 分钟上报一次（写盘健康 + 缓冲合并），面板离线阈值 20 分钟，
+            // 兼顾"存活监控"与"省 API"（10 人≈40 次 API/小时，远低于之前的零散/频繁调用）。
+            // 用 setInterval 持续触发；首次在启动 3s 后由 _scheduleDiagUpload('open') 兜底。
+            setInterval(() => {
+                _getDiagConfig(false).then(cfg => {
+                    if (cfg.enabled && localStorage.getItem(DIAG_OPTIN_KEY) !== '0') _pushDiagReport().catch(() => {});
+                });
+            }, 15 * 60 * 1000);
         })();
         // 联网恢复（online 事件）→ 立即上报（1~20 分钟随机延迟）
         window.addEventListener('online', () => {
