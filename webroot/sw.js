@@ -22,10 +22,13 @@
 // v40: 强制更新总开关从诊断面板迁移到「功能开关」面板（FEATURE_TOGGLES 的 forceReload 项，权威来源改为索引 Gist room_index.json.forceReloadEnabled），
 //      删除诊断面板独立按钮 + adminToggleForceReload 函数；运行时读 window.__diagForceReload（由 initForceReloadFromIndex 启动 + apply 时设置）。
 //      强制刷新后 SW_VERSION 应为 s1.0.306。
+// v41: 强制更新开关下沉到 SW 层（_maybeForceReload）：SW install 时读索引 Gist 的 forceReloadEnabled，开关开则主动 skipWaiting()
+//      让新 SW 立即接管 + 发 FORCE_RELOAD 消息（app-core.js 复用 notifyNewVersion，仍在隐藏/闲置时才静默强刷，不打断用户）。
+//      解决老设备（app-core.js 不认识 window.__diagForceReload）也能被推着自动升级。默认关，风险可控。SW_VERSION 应为 s1.0.307。
 // ============================================================
 
-const CACHE_VERSION = 's1.0.306';
-const DEPLOY_TAG = 's20260826-0212';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
+const CACHE_VERSION = 's1.0.307';
+const DEPLOY_TAG = 's20260826-0216';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
@@ -61,8 +64,36 @@ self.addEventListener('install', (event) => {
                 });
             });
         })
+        // 🔴 强制更新总开关下沉到 SW 层（功能开关面板 forceReloadEnabled）：
+        // 老设备 app-core.js 不认识 window.__diagForceReload，但仍能被 SW 推着升级。
+        // 开关开 → 主动 skipWaiting() 让新 SW 立即接管，并通知页面强刷（页面 notifyNewVersion 仍只在
+        // 隐藏/闲置时才真正 reload，不打断正在改项目的用户）。开关关 → 退化为原行为（等用户手动点）。
+        .then(() => _maybeForceReload())
+        .catch(() => {})
     );
 });
+
+// 读索引 Gist 的 forceReloadEnabled（公开 raw，无需 token），开关开则主动激活新 SW + 发 FORCE_RELOAD
+async function _maybeForceReload() {
+    if (!(self.registration && self.registration.active)) return; // 首次安装不强制
+    let enabled = false;
+    try {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 6000);
+        const r = await fetch('https://gist.githubusercontent.com/a32a0628bd9275f3a4922cd12cf298c9/raw/room_index.json', { cache: 'no-store', signal: ctrl.signal });
+        clearTimeout(t);
+        if (r.ok) {
+            const idx = await r.json().catch(() => ({}));
+            enabled = !!idx.forceReloadEnabled;
+        }
+    } catch (e) { enabled = false; }
+    if (!enabled) return;
+    // 开关开：让新 SW 立即接管（原 waiting → active）
+    self.skipWaiting();
+    // 通知所有页面（页面 notifyNewVersion 决定何时真正刷新，避免打断操作）
+    const clients = await self.clients.matchAll({ includeUncontrolled: true });
+    clients.forEach(client => client.postMessage({ type: 'FORCE_RELOAD' }));
+}
 
 // ============================================================
 // 激活事件：只删除"旧版本"运行时缓存，保留当前版本缓存（避免 reload 时空窗蓝屏）

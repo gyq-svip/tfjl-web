@@ -23433,7 +23433,7 @@ ${maSection}
             if (!('serviceWorker' in navigator)) return;
             navigator.serviceWorker.addEventListener('message', function (event) {
                 const data = event.data;
-                if (data && data.type === 'NEW_VERSION_READY') {
+                if (data && (data.type === 'NEW_VERSION_READY' || data.type === 'FORCE_RELOAD')) {
                     window.__pendingUpdate = true; // 记下有待更新版本（即便用户不点气泡，闲置时也可自动强刷）
                     notifyNewVersion();
                 }
