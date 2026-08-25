@@ -37,6 +37,7 @@
 //      新增 _pollLatestVersion()：activate 后每 5 分钟 fetch 线上 sw.js 提取 CACHE_VERSION，发现更新且功能开关 forceReloadEnabled 开，
 //      则 skipWaiting() + 发 FORCE_RELOAD（页面在隐藏态静默强刷）。开关关则退化为等用户手动点。NEVER_CACHE 加 gyq-svip.github.io 放行轮询 fetch。
 //      SW_VERSION 应为 s1.0.314（CI 部署 +1）。
+// v47: 自动升级验证用空提交（轮询/静默强刷逻辑已在 v46 落地）。CACHE_VERSION 保持 s1.0.313 由 CI 自动 +1 → 线上 318。
 // ============================================================
 
 const CACHE_VERSION = 's1.0.313';
