@@ -332,6 +332,27 @@
             } catch (e) {}
             return '';
         }
+        // 合并两份 entries（按 gistId|fn|method key 累加）：count 相加、first 取小、last 取大、samples 合并去重保留前 5
+        function _mergeDiagEntries(oldArr, newArr) {
+            const map = {};
+            const push = (e) => {
+                if (!e || !e.gistId) return;
+                const key = e.gistId + '|' + (e.fn || 'unknown') + '|' + (e.method || 'USE');
+                if (!map[key]) {
+                    map[key] = { gistId: e.gistId, fn: e.fn || 'unknown', method: e.method || 'USE', count: 0, first: e.first || e.last || Date.now(), last: e.last || Date.now(), samples: [] };
+                }
+                const t = map[key];
+                t.count += (e.count || 0);
+                t.first = Math.min(t.first || e.first, e.first || t.first);
+                t.last = Math.max(t.last || e.last, e.last || t.last);
+                if (Array.isArray(e.samples)) {
+                    e.samples.forEach(s => { if (t.samples.indexOf(s) === -1 && t.samples.length < 5) t.samples.push(s); });
+                }
+            };
+            (oldArr || []).forEach(push);
+            (newArr || []).forEach(push);
+            return Object.keys(map).map(k => map[k]);
+        }
         // 上报本地缓冲到 diag-<匿名ID>.json（合并，不覆盖他人）
         async function _pushDiagReport() {
             const optIn = localStorage.getItem(DIAG_OPTIN_KEY);
@@ -372,26 +393,45 @@
                 entries: entries
             };            const token = getGistToken();
             if (!token) return;
+            const myFile = 'diag-' + _getDiagAnonId() + '.json';
             try {
-                // 读取现有文件合并（保留他人文件，只改自己这份）
+                // 读取现有文件：保留他人文件，自己的文件则把旧 entries 与本次合并（累加，不覆盖历史）
                 const cur = await fetch(`https://api.github.com/gists/${gid}`, { headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': 'token ' + token } });
                 const files = {};
+                let oldEntries = [];
                 if (cur.ok) {
                     const cd = await cur.json();
                     Object.keys(cd.files || {}).forEach(fn => {
-                        if (fn !== ('diag-' + _getDiagAnonId() + '.json')) files[fn] = { content: cd.files[fn].content };
+                        if (fn === myFile) {
+                            try { const old = JSON.parse(cd.files[fn].content || '{}'); if (Array.isArray(old.entries)) oldEntries = old.entries; } catch (e) {}
+                        } else {
+                            files[fn] = { content: cd.files[fn].content };
+                        }
                     });
                 }
-                files['diag-' + _getDiagAnonId() + '.json'] = { content: JSON.stringify(payload, null, 2) };
+                // 本次上报 = 旧 entries（历史累加） + 本次 buffer 的新 entries
+                const mergedEntries = _mergeDiagEntries(oldEntries, entries);
+                // 上报历史：保留每次上报的时间戳，便于按时间查询多次上报
+                let oldHistory = [];
+                try { const od = (cd.files && cd.files[myFile]) ? JSON.parse(cd.files[myFile].content || '{}') : {}; if (Array.isArray(od.reportHistory)) oldHistory = od.reportHistory; } catch (e) {}
+                const reportHistory = oldHistory.concat([{ t: Date.now(), n: entries.length }]);
+                if (reportHistory.length > 50) reportHistory = reportHistory.slice(-50);
+                const mergedPayload = Object.assign({}, payload, { entries: mergedEntries, reportCount: (payload.reportCount || 0) + 1, reportHistory });
+                files[myFile] = { content: JSON.stringify(mergedPayload, null, 2) };
                 const r = await fetch(`https://api.github.com/gists/${gid}`, {
                     method: 'PATCH',
                     headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': 'token ' + token },
                     body: JSON.stringify({ files })
                 });
                 if (r.ok) {
-                    // 清空已上报缓冲
-                    localStorage.removeItem(DIAG_LOCAL_BUFFER);
-                    console.log('[DIAG] 上报成功, 共 ' + entries.length + ' 条聚合记录');
+                    // 只删除已成功上报的 key（保留尚未产生的新条目，避免重复/丢失）；
+                    // 心跳上报（无 entries）时不删 buffer，因为 buffer 里可能还有未上报的功能埋点
+                    if (entries.length > 0) {
+                        const b = _loadDiagBuffer();
+                        entries.forEach(e => { const k = (e.gistId || '') + '|' + (e.fn || 'unknown') + '|' + (e.method || 'USE'); delete b[k]; });
+                        _saveDiagBuffer(b);
+                    }
+                    console.log('[DIAG] 上报成功, 本次 ' + entries.length + ' 条, 合并后共 ' + mergedEntries.length + ' 条聚合记录');
                 }
             } catch (e) {}
         }
@@ -17429,6 +17469,8 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                     rp.style.display = repShouldOpen ? 'flex' : 'none';
                     if (repShouldOpen) { renderReputation(); if (window.syncReputationToWall) window.syncReputationToWall(); }
                 }
+                // 打开需求墙埋点（记录功能使用频次）
+                if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('打开需求墙');
                 // 按本地记忆决定是否启动自动滚动（默认开启）
                 syncWallScrollBtn();   // 先同步滚动状态到 wallScrollUserPaused + 按钮图标
                 const autoScroll = localStorage.getItem('TFJL_WallAutoScroll');
@@ -21830,7 +21872,8 @@ ${maSection}
                                 const ts = m.last ? new Date(m.last).toLocaleString('zh-CN') : '?';
                                 const min = m.last ? Math.max(0, Math.round((Date.now() - m.last) / 60000)) : -1;
                                 const flag = (m.heartbeat ? '🟢心跳' : '📦缓冲') + '｜' + (m.writeOk ? '✓盘' : (m.writeOk === false ? '✗盘' : '?盘')) + '｜v' + (m.ver || '?') + '｜' + (m.plat || '?');
-                                html += '<div style="margin-bottom:6px;"><b>' + m.who + '</b> <span style="color:#94a3b8;">[' + ts + '  ' + min + '分钟前]</span><br><span style="color:#94a3b8;">' + flag + '</span>';
+                                const rc = m.payload && m.payload.reportCount ? ('｜累计上报 ' + m.payload.reportCount + ' 次') : '';
+                                html += '<div style="margin-bottom:6px;"><b>' + m.who + '</b> <span style="color:#94a3b8;">[' + ts + '  ' + min + '分钟前]</span><br><span style="color:#94a3b8;">' + flag + rc + '</span>';
                                 if (m.err) html += '<br><span style="color:#f87171;">err: ' + m.err + '</span>';
                                 if (m.payload && m.payload.entries && m.payload.entries.length) {
                                     html += '<table style="border-collapse:collapse;margin-top:4px;font-size:0.72rem;width:100%;">';
@@ -21841,6 +21884,16 @@ ${maSection}
                                     html += '</table>';
                                 } else {
                                     html += '<br><span style="color:#94a3b8;">（无 entries，仅心跳）</span>';
+                                }
+                                // 上报历史（按时间查询多次上报）：显示每次上报的时间 + 本次条数
+                                if (m.payload && Array.isArray(m.payload.reportHistory) && m.payload.reportHistory.length) {
+                                    html += '<div style="margin-top:4px;font-size:0.68rem;color:#94a3b8;">📅 上报历史(' + m.payload.reportHistory.length + '次): ';
+                                    html += m.payload.reportHistory.slice(-10).map(h => {
+                                        const d = new Date(h.t);
+                                        const hh = ('0' + d.getHours()).slice(-2), mm = ('0' + d.getMinutes()).slice(-2);
+                                        return hh + ':' + mm + '(' + (h.n || 0) + '条)';
+                                    }).join(' ');
+                                    html += '</div>';
                                 }
                                 html += '</div>';
                             });
