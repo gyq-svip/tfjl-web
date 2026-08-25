@@ -104,11 +104,13 @@ jobs:
               print('bumped CACHE_VERSION + DEPLOY_TAG in', p, '→', deploy_tag)
           PY
 
-          # 给 SW 注册 URL 也加 ?v= 时间戳（sw.js 文件本身不在脚本 ?v= 列表里，靠注册 URL 变化强制更新）
-          # 注册代码在 app-picker.js（外部文件），改 _site 与仓库根两处保持一致
-          sed -i -E "s#(navigator\.serviceWorker\.register\(\s*')\./sw\.js(')#\1./sw.js?v=$VER\2#g" _site/app-picker.js || true
-          sed -i -E "s#(navigator\.serviceWorker\.register\(\s*')\./sw\.js(')#\1./sw.js?v=$VER\2#g" app-picker.js || true
-          grep -nE "register\('\.?/?sw\.js" _site/app-picker.js || true
+          # 🔴 2026-08-26 已废弃：原逻辑用 sed 把 register('./sw.js') 改成 register('./sw.js?v=b时间戳')，
+          # 但 app-picker.js 已改为 register('./sw.js?v=' + #versionTag base)（跟随部署版本，更稳），
+          # 字面 './sw.js' 不再存在 → sed 匹配不到 → 这两行现在是死代码。保留注释备查，避免以后误解。
+          # sed -i -E "s#(navigator\.serviceWorker\.register\(\s*')\./sw\.js(')#\1./sw.js?v=$VER\2#g" _site/app-picker.js || true
+          # sed -i -E "s#(navigator\.serviceWorker\.register\(\s*')\./sw\.js(')#\1./sw.js?v=$VER\2#g" app-picker.js || true
+          # grep -nE "register\('\.?/?sw\.js" _site/app-picker.js || true
+          echo "SW register cachebust 已由 app-picker.js 跟随 #versionTag 处理，CI sed 已废弃（跳过）"
 
       - name: Inject deploy marker (visible version tag)
         run: |

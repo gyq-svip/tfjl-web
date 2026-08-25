@@ -29,10 +29,12 @@
 // v43: 修 P3 卡旧 SW 的根因——app-picker.js 的 sw.js cachebust 之前写死 b20260823230841，每次部署浏览器都认成同一个文件，根本不拉新 sw.js。
 //      改为跟随 #versionTag 文本 base（部署脚本必改字段），保证每次部署都被认作新 SW 文件，触发 install + _maybeForceReload。
 //      同时移除兜底 window.__DEPLOY_TAG（index.html 没注入这个变量，留着误导）。SW_VERSION 应为 s1.0.309。
+// v44: 纯版本号升级 s1.0.311（无功能改动）。CI 部署会自动 +1 → 实际线上为 s1.0.312。用于验证「已升 310 的客户端 + 功能开关开 → 发 312 时自动静默升」。
+//      deploy.yml 中已废弃的 SW register ?v= sed 已注释（app-picker.js 自己跟随 #versionTag）。
 // ============================================================
 
-const CACHE_VERSION = 's1.0.309';
-const DEPLOY_TAG = 's20260826-0338';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
+const CACHE_VERSION = 's1.0.311';
+const DEPLOY_TAG = 's20260826-0348';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
