@@ -282,6 +282,19 @@ if (isTauriApp) {
         if (document.visibilityState === 'hidden') {
             if (_flushTimer) { clearTimeout(_flushTimer); _flushTimer = null; }
             _flushStore().catch((e) => console.error('[数据存储] 隐藏时刷盘失败:', e));
+            // App 端：最小化/进托盘后延迟 15 秒静默刷新，从线上拉取最新前端资源
+            // （Tauri 无 Service Worker，隐藏态 reload 用户无感，下次点开窗口即最新版；
+            //  reload 前已先 _flushStore 落盘，且 reload 本身还会触发 pagehide 再刷一次）
+            if (isTauriApp) {
+                setTimeout(() => {
+                    // 二次确认仍在隐藏态才刷新，避免用户已切回前台时误 reload 打断操作
+                    if (document.visibilityState === 'hidden') {
+                        _flushStore().catch(() => {});  // 更新前再保存一次当前页面数据
+                        console.log('[更新] 隐藏态延迟刷新，拉取最新前端资源');
+                        location.reload(true);
+                    }
+                }, 15000);
+            }
         }
     });
     // 2) pagehide：窗口关闭/卸载时最后再尝试一次（进程可能随时终止，尽力而为）
