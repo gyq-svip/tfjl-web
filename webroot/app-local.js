@@ -671,6 +671,7 @@ if (isTauriApp) {
         fillSettingsForm();
         // 扫描文件列表总是执行（轻量）
         scanAllFiles();
+        if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('打开APP设置');
         // 自动加载统计：根据开关决定
         if (settingsConfig.autoLoadScreenshotStats) calcScreenshotStats();
         if (settingsConfig.autoLoadBattleStats) calcLogBattleStats();
@@ -686,6 +687,7 @@ if (isTauriApp) {
             updateToggleUI('battle', settingsConfig.autoLoadBattleStats);
         }
         saveConfig();
+        if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('APP设置开关:' + type);
     }
 
     function updateToggleUI(type, on) {
@@ -909,6 +911,7 @@ if (isTauriApp) {
         if (selected) {
             maDirs[key] = selected;
             document.getElementById('maDir_' + key).value = selected;
+            if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('配置老马目录:' + key);
             scanAllFiles(true); // 目录变化强制重新扫描
         }
     }
@@ -1356,6 +1359,7 @@ if (isTauriApp) {
 
     async function backupAllData() {
         if (!softwareDataDir) { alert('请先设置 💾 软件数据目录'); return; }
+        if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('APP数据备份');
 
         // 收集所有 localStorage 数据
         const localStorageData = {};
@@ -1418,6 +1422,7 @@ if (isTauriApp) {
 
     async function loadBackupList() {
         if (!softwareDataDir) { alert('请先设置 💾 软件数据目录'); return; }
+        if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('APP查看备份');
         const dir = softwareDataDir.replace(/[\\/]+$/, '');
         let entries;
         try { entries = await readDir(dir); }

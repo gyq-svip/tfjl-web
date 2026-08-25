@@ -6422,6 +6422,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 }
             }
             if (tab === 'hero') { try { cgmRefreshHeroList(); } catch (e) {} }
+        if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('皮肤制作Tab:' + tab);
         }
         // 添加融合卡：校验"必须正好是100张基础卡里的2张"
         let _cgmValidParts = null;
@@ -17973,7 +17974,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             p.style.display = willOpen ? 'flex' : 'none';
             // 记住声望榜开关状态（本地，他人默认开启）
             try { localStorage.setItem('TFJL_RepPanelOpen', willOpen ? '1' : '0'); } catch (e) {}
-            if (willOpen) { renderReputation(); if (window.syncReputationToWall) window.syncReputationToWall(); }
+            if (willOpen) { if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('声望查询'); renderReputation(); if (window.syncReputationToWall) window.syncReputationToWall(); }
         }
         // 需求墙自动滚动开关（本地记忆；默认开启，关闭后一直关闭，可自由切换）
         function toggleWallAutoScroll() {
