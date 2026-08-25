@@ -282,10 +282,7 @@
                 // 隐藏/托盘态 → 直接静默强刷（不打断）；前台可见 → 仅标记提示，等用户点（避免刷新打断正在进行的操作）。
                 if (event.data && event.data.type === 'FORCE_RELOAD') {
                     if (document.hidden) {
-                        // 静默自动升级：托盘/最小化态不打断用户，仅极短暂提示一闪即刷
-                        const tag = document.getElementById('versionTag');
-                        if (tag) { const tip = tag.nextElementSibling; if (tip && tip.classList.contains('version-tooltip')) tip.textContent = '🔄 自动升级中…'; }
-                        console.log('[SW轮询] 检测到新版本，隐藏态静默自动升级', event.data.latest || '');
+                        // 静默自动升级：托盘/最小化态不打断用户，任何提示都不显示，直接静默强刷
                         if (typeof forceRefreshLatest === 'function') forceRefreshLatest();
                         else location.reload(true);
                     } else {
