@@ -31,8 +31,8 @@
 //      同时移除兜底 window.__DEPLOY_TAG（index.html 没注入这个变量，留着误导）。SW_VERSION 应为 s1.0.309。
 // ============================================================
 
-const CACHE_VERSION = 's1.0.309';
-const DEPLOY_TAG = 's20260826-0338';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
+const CACHE_VERSION = 's1.0.310';
+const DEPLOY_TAG = 's20260826-0348';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
