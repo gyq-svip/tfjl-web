@@ -323,9 +323,19 @@
             const entries = Object.keys(b).map(k => b[k]);
             // 即使没有 Gist 写操作缓冲（entries 为空），也定期上报"存活+写盘健康"心跳，
             // 否则用户只本地落盘不写 Gist 时 buffer 永远空 → 永远不上报（之前"一个都没有"的根因）
+            // 平台判定与 app-local.js 保持一致：优先 __TAURI_INTERNALS__ / __TAURI__ 全局变量（Tauri v2 UA 可能不含 "Tauri" 字符串），再回退 UA 匹配
+            const _isTauri = (typeof window.__TAURI_INTERNALS__ !== 'undefined') || (typeof window.__TAURI__ !== 'undefined') || (navigator.userAgent || '').indexOf('Tauri') !== -1;
+            // 版本号取真实来源：运行期注入的 #versionTag（如 s20260825-1251 · s1.0.xxx），回退 window.__APP_VERSION，再回退 sw.js 的 CACHE_VERSION
+            let _appVer = '';
+            try {
+                const vt = document.getElementById('versionTag');
+                if (vt && vt.textContent) _appVer = vt.textContent.trim();
+            } catch (e) {}
+            if (!_appVer && typeof window.__APP_VERSION === 'string') _appVer = window.__APP_VERSION;
+            if (!_appVer) { try { _appVer = (CACHE_VERSION || ''); } catch (e) {} }
             const probe = await _runDiagWriteProbe();
             if (entries.length === 0) {
-                const hb = { ok: probe.ok, ts: probe.ts, err: probe.err || null, appVersion: (typeof window.__APP_VERSION === 'string' ? window.__APP_VERSION : ''), platform: (navigator.userAgent.indexOf('Tauri') !== -1 ? 'app' : 'web') };
+                const hb = { ok: probe.ok, ts: probe.ts, err: probe.err || null, appVersion: _appVer, platform: (_isTauri ? 'app' : 'web') };
                 try { localStorage.setItem(DIAG_HEARTBEAT_KEY, JSON.stringify(hb)); } catch (e) {}
                 console.log('[DIAG] 缓冲为空，改发心跳上报（写盘健康=' + probe.ok + '）');
             }
@@ -336,8 +346,8 @@
                 lastUpload: Date.now(),
                 heartbeat: entries.length === 0,
                 writeOk: probe.ok,
-                appVersion: (typeof window.__APP_VERSION === 'string' ? window.__APP_VERSION : ''),
-                platform: (navigator.userAgent.indexOf('Tauri') !== -1 ? 'app' : 'web'),
+                appVersion: _appVer,
+                platform: (_isTauri ? 'app' : 'web'),
                 entries: entries
             };            const token = getGistToken();
             if (!token) return;
