@@ -21,8 +21,8 @@
 //      不发 → 页面回退 HTML 写死 fallback 225）。强制刷新后 SW_VERSION 应为 s1.0.230。
 // ============================================================
 
-const CACHE_VERSION = 's1.0.294';
-const DEPLOY_TAG = 's20260825-1518';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
+const CACHE_VERSION = 's1.0.295';
+const DEPLOY_TAG = 's20260825-1534';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
