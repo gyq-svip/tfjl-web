@@ -238,9 +238,13 @@
             try { localStorage.removeItem(DIAG_CONFIG_CACHE); } catch (e) {}
             const cfg = await _getDiagConfig(true);
             const box = document.getElementById('diagCfgPullInfo');
-            if (box) box.textContent = '已立即拉取 ✓ enabled=' + cfg.enabled + '，TTL=' + (_getDiagCfgTtl() / 60000) + '分钟；本机正在补报心跳…';
-            // 管理员点"立即拉取"后，本机立即补一次心跳上报（绕过随机延迟），便于马上在面板看到自己在线
-            if (typeof _scheduleDiagUpload === 'function') _scheduleDiagUpload('immediate');
+            if (box) box.textContent = '已立即拉取 ✓ enabled=' + cfg.enabled + '，TTL=' + (_getDiagCfgTtl() / 60000) + '分钟；本机正在立即补报心跳…';
+            // 管理员点"立即拉取"后本机**真正立即**触发一次心跳上报（不走 _scheduleDiagUpload 排队 1~20 分钟随机延迟），
+            // 完成后更新状态文案，便于管理员几秒后点"刷新"就能在面板看到自己在线
+            if (typeof _pushDiagReport === 'function') {
+                try { await _pushDiagReport(); if (box) box.textContent = '已立即拉取 ✓ 心跳已补报 ✓（点"刷新"查看）'; }
+                catch (e) { if (box) box.textContent = '已立即拉取 ✓ 但心跳补报失败：' + (e && e.message || e); }
+            }
             return cfg;
         }
         // 用户设置配置拉取间隔（分钟）：存 localStorage，下次 _getDiagConfig 即用新值
