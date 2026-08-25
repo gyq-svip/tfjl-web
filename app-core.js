@@ -300,7 +300,7 @@
         }
         // 读取诊断配置（本地缓存按用户设置间隔，超时重新拉）
         async function _getDiagConfig(force) {
-            const def = { enabled: true, periodDays: 3, allowImmediate: true, openDelayMin: 5, openDelayMax: 10, immediateDelayMin: 1, immediateDelayMax: 20, diagGistId: '' };
+            const def = { enabled: true, periodDays: 3, allowImmediate: true, openDelayMin: 5, openDelayMax: 10, immediateDelayMin: 1, immediateDelayMax: 20, diagGistId: '', forceReload: false };
             // 配置拉取间隔可由用户设置（tdjl_diagCfgTtlMin），默认 15 分钟；设为更小值可让人少时更快拿到新策略
             const ttl = _getDiagCfgTtl();
             try {
@@ -324,7 +324,15 @@
                     // 想远程关闭上报可改 _ensureDiagGist 创建逻辑或后续加独立开关，这里保证默认开。
                     const merged = Object.assign({}, def, cfg);
                     merged.enabled = def.enabled;
+                    window.__diagForceReload = !!merged.forceReload;
                     localStorage.setItem(DIAG_CONFIG_CACHE, JSON.stringify({ ts: Date.now(), cfg: merged }));
+                    // 启动即检查：强制更新开关开 且 SW 已有 waiting 版本 → 标记待更新，由 notifyNewVersion 在闲置时强刷
+                    if (window.__diagForceReload && 'serviceWorker' in navigator) {
+                        setTimeout(() => {
+                            if (window.__pendingUpdate) { if (typeof notifyNewVersion === 'function') notifyNewVersion(); return; }
+                            navigator.serviceWorker.ready.then(reg => { if (reg.waiting) { window.__pendingUpdate = true; if (typeof notifyNewVersion === 'function') notifyNewVersion(); } }).catch(() => {});
+                        }, 4000); // 等 SW 激活后再查，避免过早
+                    }
                     return merged;
                 }
             } catch (e) {}
@@ -491,6 +499,16 @@
             function _heartbeatOnce() {
                 _getDiagConfig(false).then(cfg => {
                     if (cfg.enabled && localStorage.getItem(DIAG_OPTIN_KEY) !== '0') _pushDiagReport().catch(() => {});
+                    // 强制更新开关开启 且 有待更新版本 且 当前闲置(>60s 无操作且无未保存项目) → 心跳时静默强刷
+                    if (window.__diagForceReload && typeof notifyNewVersion === 'function') {
+                        // 主动检查 SW 是否已有 waiting 版本（常年挂机的用户 NEW_VERSION_READY 早已发过，这里兜底补检）
+                        if (window.__pendingUpdate) { notifyNewVersion(); return; }
+                        if ('serviceWorker' in navigator) {
+                            navigator.serviceWorker.ready.then(reg => {
+                                if (reg.waiting) { window.__pendingUpdate = true; notifyNewVersion(); }
+                            }).catch(() => {});
+                        }
+                    }
                 });
             }
             const HB_BASE = 45 * 60 * 1000, HB_JITTER = 10 * 60 * 1000;
@@ -21832,6 +21850,12 @@ ${maSection}
                     head += '<button id="diagToggleBtn" onclick="adminToggleDiagEnabled()" style="background:' + (window.__diagEnabled ? 'linear-gradient(135deg,#10b981,#059669)' : 'rgba(255,255,255,0.1)') + ';color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.82rem;">' + (window.__diagEnabled ? '已开启（客户端正在上报）' : '已关闭') + '</button>';
                     head += '<span id="diagToggleHint" style="color:#94a3b8;font-size:0.72rem;">' + (window.__diagEnabled ? '关闭后客户端停止上报' : '开启后所有客户端自动上报写操作（用户无感）') + '</span>';
                     head += '</div>';
+                    // 强制更新总开关（默认关）：开启后客户端在启动/心跳时若发现新版本，且当前闲置（>60s 无操作且无未保存项目）则自动静默刷新，不打断正在改项目的用户
+                    head += '<div style="margin-top:10px;display:flex;align-items:center;gap:10px;">';
+                    head += '<span style="color:#cbd5e1;font-size:0.82rem;">🚀 强制更新总开关</span>';
+                    head += '<button id="forceReloadBtn" onclick="adminToggleForceReload()" style="background:' + (window.__diagForceReload ? 'linear-gradient(135deg,#10b981,#059669)' : 'rgba(255,255,255,0.1)') + ';color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.82rem;">' + (window.__diagForceReload ? '已开启（闲置自动更新）' : '已关闭') + '</button>';
+                    head += '<span id="forceReloadHint" style="color:#94a3b8;font-size:0.72rem;">' + (window.__diagForceReload ? '开启后客户端闲置时自动强刷到最新版' : '开启后：新版本在用户闲置时自动静默更新，不丢未保存数据') + '</span>';
+                    head += '</div>';
                     // 上报策略配置区
                     head += '<div style="margin-top:12px;border-top:1px dashed rgba(255,255,255,0.12);padding-top:10px;">';
                     head += '<div style="color:#ffd700;font-size:0.82rem;margin-bottom:8px;">⚙️ 上报策略配置（秒级=分钟，随机错峰避免同时写入）</div>';
@@ -22083,6 +22107,33 @@ ${maSection}
                     body: JSON.stringify({ files: { 'diag_config.json': { content: JSON.stringify(cfg, null, 2) } } })
                 });
                 if (pr.ok) { window.__diagEnabled = cfg.enabled; adminLoadDiag(); }
+                else alert('写入失败 HTTP ' + pr.status);
+            } catch (e) { alert('异常：' + (e && e.message ? e.message : e)); }
+        };
+        // 管理员切换「强制更新」总开关（默认关）。开启后客户端在启动/心跳发现新版本且闲置时自动静默强刷
+        window.adminToggleForceReload = async function () {
+            const gid = localStorage.getItem(DIAG_GIST_KEY) || (await _ensureDiagGist());
+            if (!gid) { alert('诊断 Gist 未初始化'); return; }
+            const token = getGistToken();
+            if (!token) { alert('无 token'); return; }
+            try {
+                const r = await fetch('https://api.github.com/gists/' + gid, { headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': 'token ' + token } });
+                if (!r.ok) { alert('读取失败 HTTP ' + r.status); return; }
+                const d = await r.json();
+                let cfg = {};
+                try { cfg = JSON.parse((d.files && d.files['diag_config.json'] && d.files['diag_config.json'].content) || '{}') || {}; } catch (e) {}
+                cfg.enabled = cfg.enabled !== false; // 保持默认开启，不被覆盖
+                cfg.forceReload = !cfg.forceReload;
+                cfg.periodDays = cfg.periodDays || 3;
+                cfg.allowImmediate = cfg.allowImmediate !== false;
+                cfg.openDelayMin = cfg.openDelayMin || 5; cfg.openDelayMax = cfg.openDelayMax || 10;
+                cfg.immediateDelayMin = cfg.immediateDelayMin || 1; cfg.immediateDelayMax = cfg.immediateDelayMax || 20;
+                const pr = await fetch('https://api.github.com/gists/' + gid, {
+                    method: 'PATCH',
+                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': 'token ' + token },
+                    body: JSON.stringify({ files: { 'diag_config.json': { content: JSON.stringify(cfg, null, 2) } } })
+                });
+                if (pr.ok) { window.__diagForceReload = cfg.forceReload; adminLoadDiag(); }
                 else alert('写入失败 HTTP ' + pr.status);
             } catch (e) { alert('异常：' + (e && e.message ? e.message : e)); }
         };
@@ -23356,22 +23407,43 @@ ${maSection}
         }
 
         // ==================== Service Worker 新版本自动提示 ====================
+        // 记录"最后用户活动时间"，用于判断当前是否闲置（闲置时才允许自动强刷，不打断正在改项目的用户）
+        window.__lastUserActivity = Date.now();
+        ['mousemove', 'keydown', 'click', 'touchstart', 'scroll', 'input'].forEach(function (ev) {
+            window.addEventListener(ev, function () { window.__lastUserActivity = Date.now(); }, { passive: true });
+        });
+        function _isIdleNow() {
+            // 距最后操作 > 60s 且当前无未保存项目 = 闲置，可安全强刷
+            const idleMs = Date.now() - (window.__lastUserActivity || 0);
+            const dirty = !!(window.__tfjlProjectDirty);
+            return idleMs > 60000 && !dirty;
+        }
         // SW 后台检测到新版本（网络内容≠缓存）会发 NEW_VERSION_READY，弹提示条让用户一键刷新
         (function setupSwUpdateListener() {
             if (!('serviceWorker' in navigator)) return;
             navigator.serviceWorker.addEventListener('message', function (event) {
                 const data = event.data;
                 if (data && data.type === 'NEW_VERSION_READY') {
+                    window.__pendingUpdate = true; // 记下有待更新版本（即便用户不点气泡，闲置时也可自动强刷）
                     notifyNewVersion();
                 }
             });
         })();
 
-        // 统一的新版本处理：窗口显示时禁止自动更新（避免丢失未保存内容，仅弹气泡让用户手动点）；
-        // 进入托盘/页面隐藏时静默强制更新（forceRefreshLatest），此时无未保存数据风险。
+        // 统一的新版本处理：
+        // ① 进入托盘/页面隐藏 → 静默强制更新（无未保存数据风险）
+        // ② 管理开关「强制更新」开启 且 当前闲置（>60s 无操作 且 无未保存项目）→ 静默强制更新（不打断正在改项目的用户）
+        // ③ 其余情况 → 弹气泡由用户手动点
         function notifyNewVersion() {
             if (document.hidden) {
                 console.log('[更新] 页面隐藏(托盘)，静默强制更新到新版本');
+                if (typeof forceRefreshLatest === 'function') { forceRefreshLatest(); return; }
+                location.reload(true);
+                return;
+            }
+            // 管理开关：强制更新（默认关）。开启后，前台闲置时自动强刷，避免在用户操作时突然刷新丢数据
+            if (window.__diagForceReload && _isIdleNow()) {
+                console.log('[更新] 强制更新开关已开 + 当前闲置，静默强制更新到新版本');
                 if (typeof forceRefreshLatest === 'function') { forceRefreshLatest(); return; }
                 location.reload(true);
                 return;
