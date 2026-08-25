@@ -496,6 +496,7 @@
 
   // ====================== 自动识别主流程 ======================
   function autoRecognize(img, canvas, statusEl, onDone){
+    if(typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('阵容识别');
     if(!img){ alert('请先粘贴或选择一张截图'); return; }
     const _bar = document.getElementById('recProgressBar');
     const _stage = document.getElementById('recStage');

@@ -6902,6 +6902,7 @@
 
         // 分享生成的脚本到需求墙
         async function shareScriptToWall(type) {
+            if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('分享脚本到墙');
             const scriptContent = type === 'activity' ? window._activityScriptOutput : window._dungeonScriptOutput;
             const scriptType = type === 'activity' ? '活动脚本' : '副本脚本';
             if (!scriptContent) {

@@ -215,6 +215,22 @@
                 _saveDiagBuffer(b);
             } catch (e) {}
         }
+        // 功能使用埋点：记录用户主动使用了哪个功能（如保存项目/发需求/分享脚本/识别阵容等）。
+        // 与 Gist 写操作共用同一 buffer（gistId 固定为 'feature'），随心跳/周期上报，
+        // 让管理员能在「按 Gist×功能 TOP」看到大家最常使用哪些功能，便于优化。
+        window.__recordFeatureUse = function _recordFeatureUse(fn) {
+            try {
+                if (!fn || typeof fn !== 'string') return;
+                const b = _loadDiagBuffer();
+                const key = 'feature|' + fn + '|USE';
+                const now = Date.now();
+                if (!b[key]) b[key] = { gistId: 'feature', fn: fn, method: 'USE', count: 0, first: now, last: now, samples: [] };
+                b[key].count++;
+                b[key].last = now;
+                if (b[key].samples.length < 5) b[key].samples.push(now);
+                _saveDiagBuffer(b);
+            } catch (e) {}
+        };
         // 从 URL 推断功能标签（粗粒度，足够定位）
         const DIAG_MESSAGES_GIST = 'b02794a8d5c43874b76286185f7b1f7f';
         const DIAG_INDEX_GIST = 'a32a0628bd9275f3a4922cd12cf298c9';
@@ -846,6 +862,7 @@
 
         // 保存项目到IndexedDB
         function saveProjectToDB(projectName, category, currentData) {
+            if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('保存项目');
             return new Promise((resolve, reject) => {
                 if (!db) {
                     alert('数据库未初始化');
@@ -1305,6 +1322,7 @@
 
         // 根据下拉菜单选择加载项目
         async function loadProjectByName(name) {
+            if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('打开/切换项目');
             if (!name) return;
             if (name === '-- 选择项目 --' || name === '') return;
             // 已是当前项目：不重载，避免丢失未保存修改
@@ -5394,6 +5412,7 @@
 
         // 导出所有数据为JSON文件
         function exportAllData() {
+            if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('导出数据');
             if (!requireLogin()) return;
             // 🔴 白名单备份 localStorage（项目相关前缀），不导出登录态/token/admin哈希等敏感键
             // 历史教训：原版只备份 projects+categories，所有卡皮肤/减伤/收藏/默认皮肤等全丢了
@@ -5441,6 +5460,7 @@
 
         // 导入所有数据
         function importAllData() {
+            if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('导入数据');
             if (!requireLogin()) return;
             document.getElementById('importFileInput').click();
         }
@@ -16211,6 +16231,7 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
 
 
         async function bossRedSaveEntry() {
+            if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('Boss减伤计算');
 
             const wave = parseInt((document.getElementById('bossRedWave').value || ''), 10);
 
@@ -18140,6 +18161,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
         // ========== 登录打卡记录（本地 localStorage + 公共 Gist 跨设备汇总） ==========
         // 每次成功进入主界面记录一次：{ nick, ts }
         function recordLoginEvent() {
+            if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('登录打卡');
             try {
                 const nick = localStorage.getItem('TFJL_UserName') || '匿名用户';
                 const ts = Date.now();
@@ -20827,6 +20849,7 @@ ${maSection}
         }
         window.toggleEmojiPicker = toggleEmojiPicker;
         async function postMessage() {
+            if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('发需求墙消息');
             const input = document.getElementById('messageInput');
             const nicknameInput = document.getElementById('messageNickname');
             const expireDaysSelect = document.getElementById('expireDays');
@@ -21832,7 +21855,9 @@ ${maSection}
                         fTop.forEach((x, i) => {
                             const id = 'fDetail_' + i;
                             const fn = x.k.split('|')[1] || x.k;
-                            const gidShort = x.k.split('|')[0] ? x.k.split('|')[0].substring(0, 12) + '…' : '?';
+                            const rawGid = x.k.split('|')[0] || '?';
+                            // 功能埋点用 gistId='feature' 标识，渲染时友好显示
+                            const gidShort = (rawGid === 'feature') ? '功能使用' : (rawGid.substring(0, 12) + '…');
                             html += '<div style="cursor:pointer;color:#cbd5e1;" onclick="var d=document.getElementById(\'' + id + '\');if(d.style.display===\'none\'){d.style.display=\'block\';}else{d.style.display=\'none\';}">' + bar(x.v, fMax) + ' ' + x.v + '　' + gidShort + ' / ' + fn + ' <span style="color:#60a5fa;font-size:0.7rem;">▶</span></div>';
                             html += '<div id="' + id + '" style="display:none;background:rgba(0,0,0,0.25);border-left:2px solid #60a5fa;padding:6px 10px;margin:4px 0 8px 12px;font-size:0.75rem;">';
                             (detailByFn[x.k] || []).forEach(row => {
