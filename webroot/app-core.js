@@ -256,8 +256,16 @@
             const counterGid = (function(){ try { return localStorage.getItem('counter_gist_id') || 'e1bd9a5139e1c4e011bfea707e917d61'; } catch(e){ return 'e1bd9a5139e1c4e011bfea707e917d61'; } })();
             if (url.indexOf('/gists/' + counterGid) !== -1) return 'syncCounterToGist';
             if (url.indexOf('/gists/' + DIAG_INDEX_GIST) !== -1) return 'indexGist(' + (url.indexOf('room_index') !== -1 ? 'room_index' : (url.indexOf('counter') !== -1 ? 'counter' : (url.indexOf('diag') !== -1 ? 'diag' : 'other'))) + ')';
+            if (url.indexOf('/gists/' + MESSAGES_BACKUP_GIST_ID) !== -1) return 'backupWallMessages';
+            if (url.indexOf('/gists/' + BOSS_RED_GIST_ID) !== -1) return 'saveBossToGist';
+            if (url.indexOf('/gists/' + DIAG_GIST_ID) !== -1) return 'diagUpload';
             if (method === 'POST' && url.indexOf('/gists') !== -1 && url.indexOf('/gists/') === -1) return 'createGist';
-            return 'otherGist';
+            // 动态 Gist（房间数据 / 脚本分享 / 其他）：提取 Gist ID 前 8 位，便于区分不同房间/脚本
+            var m = /\/gists\/([a-f0-9]{8})[a-f0-9]*/.exec(url);
+            var gid = m ? m[1] : '?';
+            if (url.indexOf('/scripts') !== -1) return 'uploadScript(' + gid + ')';
+            if (method === 'DELETE') return 'deleteGist(' + gid + ')';
+            return 'saveRoomOrOtherGist(' + gid + ')';
         }
         // 诊断配置拉取间隔（用户可设置）：默认 15 分钟；下限 1 分钟避免过于频繁打 GitHub API
         function _getDiagCfgTtl() {
@@ -21865,7 +21873,7 @@ ${maSection}
                                 perGist[e.gistId] = (perGist[e.gistId] || 0) + e.count;
                                 detailByGist[e.gistId] = detailByGist[e.gistId] || [];
                                 detailByGist[e.gistId].push({ file: fileMetas[fileMetas.length - 1], entry: e });
-                                const isWrite = (e.method || 'WRITE') === 'WRITE' && e.gistId !== 'feature';
+                                const isWrite = e.gistId !== 'feature' && e.method !== 'GET' && e.method !== 'USE' && e.method !== 'unknown';
                                 const tagKey = (isWrite ? 'WRITE|' : 'USE|') + e.gistId + '|' + e.fn;
                                 perFn[e.gistId + '|' + e.fn] = (perFn[e.gistId + '|' + e.fn] || 0) + e.count;
                                 detailByFn[tagKey] = detailByFn[tagKey] || [];
@@ -21905,7 +21913,7 @@ ${maSection}
                                     html += '<table style="border-collapse:collapse;margin-top:4px;font-size:0.72rem;width:100%;">';
                                     html += '<tr style="color:#94a3b8;"><th style="text-align:left;padding:2px 6px;">功能</th><th style="text-align:right;padding:2px 6px;">次数</th><th style="text-align:left;padding:2px 6px;">最近 Gist</th><th style="text-align:left;padding:2px 6px;">最近文件名</th></tr>';
                                     m.payload.entries.forEach(e => {
-                                        const isWrite = (e.method || 'WRITE') === 'WRITE' && e.gistId !== 'feature';
+                                        const isWrite = e.gistId !== 'feature' && e.method !== 'GET' && e.method !== 'USE' && e.method !== 'unknown';
                                         const badge = isWrite ? ' <span style="color:#f87171;">✍️写Gist</span>' : ' <span style="color:#94a3b8;">📊仅埋点</span>';
                                         html += '<tr style="border-top:1px dashed rgba(255,255,255,0.1);"><td style="padding:2px 6px;">' + (e.fn || '?') + badge + '</td><td style="text-align:right;padding:2px 6px;color:' + (isWrite ? '#f87171' : '#ffd700') + ';">' + (e.count || 0) + '</td><td style="padding:2px 6px;color:#94a3b8;">' + (e.gistId ? e.gistId.substring(0, 12) + '…' : '?') + '</td><td style="padding:2px 6px;">' + (e.fn || '?') + '</td></tr>';
                                     });
