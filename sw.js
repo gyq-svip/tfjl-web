@@ -31,9 +31,11 @@
 //      同时移除兜底 window.__DEPLOY_TAG（index.html 没注入这个变量，留着误导）。SW_VERSION 应为 s1.0.309。
 // v44: 纯版本号升级 s1.0.311（无功能改动）。CI 部署会自动 +1 → 实际线上为 s1.0.312。用于验证「已升 310 的客户端 + 功能开关开 → 发 312 时自动静默升」。
 //      deploy.yml 中已废弃的 SW register ?v= sed 已注释（app-picker.js 自己跟随 #versionTag）。
+// v45: 诊断面板「🟥真实写 Gist」与「⚪功能使用」改中文标签。把 32 位 Gist ID 用 _gistLabel() 翻译成 emoji+中文用途（消息墙/计数器/索引/房间等），
+//      短哈希前 8 位用蓝色下划线链接包裹，点击直达 Gist。截图里那种 `51e7030023fa…` 乱码已消失。SW_VERSION 应为 s1.0.313。
 // ============================================================
 
-const CACHE_VERSION = 's1.0.312';
+const CACHE_VERSION = 's1.0.313';
 const DEPLOY_TAG = 's20260826-0401';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 

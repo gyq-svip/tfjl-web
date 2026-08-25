@@ -267,6 +267,38 @@
             if (method === 'DELETE') return 'deleteGist(' + gid + ')';
             return 'saveRoomOrOtherGist(' + gid + ')';
         }
+        // 把 32 位 Gist ID 翻译成「人类可读的中文用途标签」+ 用途 emoji（诊断面板用，全网 Gist 都覆盖到）
+        // 优先级：① 硬编码已知 Gist ② 计数器 Gist（localStorage 缓存，可能是用户自建）③ 房间 Gist（动态，从 INDEX 取房间名）④ 脚本分享 Gist（动态，从 INDEX 取脚本名）⑤ 其他 → 显示「其他 Gist」
+        function _gistLabel(gid) {
+            if (!gid) return { emoji: '📦', label: '未知 Gist', url: '' };
+            const short = gid.substring(0, 8);
+            const KNOWN = {
+                'a32a0628bd9275f3a4922cd12cf298c9': { emoji: '📑', label: '索引 Gist' },          // INDEX
+                'e1bd9a5139e1c4e011bfea707e917d61': { emoji: '🔢', label: '计数器 Gist' },        // COUNTER（默认）
+                'deb09eba308f044c3b78935507972717': { emoji: '🩺', label: '诊断 Gist' }           // DIAG
+            };
+            if (KNOWN[gid]) return Object.assign({ url: 'https://gist.github.com/' + gid }, KNOWN[gid]);
+            // 兜底：用常量匹配（避免写错 hash）
+            if (gid === DIAG_INDEX_GIST) return { emoji: '📑', label: '索引 Gist', url: 'https://gist.github.com/' + gid };
+            if (gid === (function(){ try { return localStorage.getItem('counter_gist_id') || ''; } catch(e){ return ''; } })() && gid) return { emoji: '🔢', label: '计数器 Gist', url: 'https://gist.github.com/' + gid };
+            if (gid === DIAG_MESSAGES_GIST) return { emoji: '💬', label: '消息墙 Gist', url: 'https://gist.github.com/' + gid };
+            if (gid === DIAG_GIST_ID) return { emoji: '🩺', label: '诊断 Gist', url: 'https://gist.github.com/' + gid };
+            if (gid === MESSAGES_BACKUP_GIST_ID) return { emoji: '💾', label: '消息备份 Gist', url: 'https://gist.github.com/' + gid };
+            if (gid === BOSS_RED_GIST_ID) return { emoji: '🛡️', label: 'Boss减伤 Gist', url: 'https://gist.github.com/' + gid };
+            // 动态 Gist：从房间/脚本索引查名称
+            try {
+                const idx = window.__roomIndexCache;
+                if (idx && idx.rooms) {
+                    const r = idx.rooms.find(x => x.gistId === gid);
+                    if (r) return { emoji: '🏠', label: '房间「' + (r.name || short) + '」', url: 'https://gist.github.com/' + gid };
+                }
+                if (idx && idx.scripts) {
+                    const s = idx.scripts.find(x => x.gistId === gid);
+                    if (s) return { emoji: '📜', label: '脚本「' + (s.name || short) + '」', url: 'https://gist.github.com/' + gid };
+                }
+            } catch (e) {}
+            return { emoji: '📦', label: '其他 Gist', url: 'https://gist.github.com/' + gid };
+        }
         // 诊断配置拉取间隔（用户可设置）：默认 15 分钟；下限 1 分钟避免过于频繁打 GitHub API
         function _getDiagCfgTtl() {
             let min = 15;
@@ -22017,8 +22049,17 @@ ${maSection}
                             const id = 'wDetail_' + i;
                             const fn = x.k.split('|')[1] || x.k;
                             const rawGid = x.k.split('|')[0] || '?';
-                            const gidShort = (rawGid === 'feature') ? '功能使用' : (rawGid.substring(0, 12) + '…');
-                            html += '<div style="cursor:pointer;color:#fca5a5;" onclick="var d=document.getElementById(\'' + id + '\');if(d.style.display===\'none\'){d.style.display=\'block\';}else{d.style.display=\'none\';}">' + bar(x.v, wMax) + ' ' + x.v + '　✍️ ' + gidShort + ' / ' + fn + ' <span style="color:#60a5fa;font-size:0.7rem;">▶</span></div>';
+                            // 把 32 位 Gist ID 翻译成中文标签（_gistLabel 已知则给中文，否则显示「其他 Gist」+ 短哈希）；短哈希可点击跳转到 Gist
+                            let labelHtml;
+                            if (rawGid === 'feature') {
+                                labelHtml = '<span style="color:#cbd5e1;">功能使用</span>';
+                            } else {
+                                const info = _gistLabel(rawGid);
+                                const short8 = rawGid.substring(0, 8);
+                                const linkHtml = info.url ? '<a href="' + info.url + '" target="_blank" rel="noopener" style="color:#60a5fa;text-decoration:underline;font-size:0.68rem;margin-left:6px;" title="' + info.url + '">' + short8 + '</a>' : short8;
+                                labelHtml = info.emoji + ' <b style="color:#fca5a5;">' + info.label + '</b> ' + linkHtml;
+                            }
+                            html += '<div style="cursor:pointer;color:#fca5a5;" onclick="var d=document.getElementById(\'' + id + '\');if(d.style.display===\'none\'){d.style.display=\'block\';}else{d.style.display=\'none\';}">' + bar(x.v, wMax) + ' ' + x.v + '　✍️ ' + labelHtml + ' <span style="color:#94a3b8;font-size:0.68rem;">/ ' + fn + '</span> <span style="color:#60a5fa;font-size:0.7rem;">▶</span></div>';
                             html += '<div id="' + id + '" style="display:none;background:rgba(0,0,0,0.25);border-left:2px solid #f87171;padding:6px 10px;margin:4px 0 8px 12px;font-size:0.75rem;">';
                             writeKeys.filter(k => k.substring(6) === x.k).forEach(k => {
                                 (detailByFn[k] || []).forEach(row => {
@@ -22037,8 +22078,17 @@ ${maSection}
                             const id = 'u2Detail_' + i;
                             const fn = x.k.split('|')[1] || x.k;
                             const rawGid = x.k.split('|')[0] || '?';
-                            const gidShort = (rawGid === 'feature') ? '功能使用' : (rawGid.substring(0, 12) + '…');
-                            html += '<div style="cursor:pointer;color:#cbd5e1;" onclick="var d=document.getElementById(\'' + id + '\');if(d.style.display===\'none\'){d.style.display=\'block\';}else{d.style.display=\'none\';}">' + bar(x.v, uMax2) + ' ' + x.v + '　📊 ' + gidShort + ' / ' + fn + ' <span style="color:#60a5fa;font-size:0.7rem;">▶</span></div>';
+                            // 把 32 位 Gist ID 翻译成中文标签（与写 Gist 面板一致）；短哈希可点击跳转
+                            let labelHtml;
+                            if (rawGid === 'feature') {
+                                labelHtml = '<span style="color:#cbd5e1;">功能使用</span>';
+                            } else {
+                                const info = _gistLabel(rawGid);
+                                const short8 = rawGid.substring(0, 8);
+                                const linkHtml = info.url ? '<a href="' + info.url + '" target="_blank" rel="noopener" style="color:#60a5fa;text-decoration:underline;font-size:0.68rem;margin-left:6px;" title="' + info.url + '">' + short8 + '</a>' : short8;
+                                labelHtml = info.emoji + ' <b style="color:#cbd5e1;">' + info.label + '</b> ' + linkHtml;
+                            }
+                            html += '<div style="cursor:pointer;color:#cbd5e1;" onclick="var d=document.getElementById(\'' + id + '\');if(d.style.display===\'none\'){d.style.display=\'block\';}else{d.style.display=\'none\';}">' + bar(x.v, uMax2) + ' ' + x.v + '　📊 ' + labelHtml + ' <span style="color:#94a3b8;font-size:0.68rem;">/ ' + fn + '</span> <span style="color:#60a5fa;font-size:0.7rem;">▶</span></div>';
                             html += '<div id="' + id + '" style="display:none;background:rgba(0,0,0,0.25);border-left:2px solid #94a3b8;padding:6px 10px;margin:4px 0 8px 12px;font-size:0.75rem;">';
                             useKeys.filter(k => k.substring(4) === x.k).forEach(k => {
                                 (detailByFn[k] || []).forEach(row => {
