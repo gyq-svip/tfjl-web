@@ -86,9 +86,12 @@
                         s.count++; s.sample = stack;
                         console.warn('[GIST-IO] ⚠️ 403 限流 @ ' + (g.label || id) + '  触发栈: ' + key);
                     }
-                    // 全网写操作诊断：本地记录明细（外部诊断模块挂 window.__recordDiagWrite(gistId, ..., method)）
-                    // 注意参数顺序：gistId 从 url 解析、fn 用 url 标识触发、method 区分读写
-                    if (typeof window.__recordDiagWrite === 'function') window.__recordDiagWrite(_gistIdOf(url), url, method);
+                    // 全网写操作诊断：本地记录明细（外部诊断模块挂 window.__recordDiagWrite(gistId, fn, method)）
+                    // 用 _inferDiagFn 从 url 推断功能名（如 saveMessagesToGist / indexGist(room_index) 等），
+                    // 便于面板按 gistId|功能 聚合；method 区分 WRITE/READ。
+                    if (typeof window.__recordDiagWrite === 'function') {
+                        try { window.__recordDiagWrite(_gistIdOf(url), _inferDiagFn(url, method), method); } catch (e) {}
+                    }
                 } catch (e) {}
             }
             window.getGistIOReport = function () {
@@ -188,13 +191,23 @@
             }
         }
         function _loadDiagBuffer() {
-            try { const b = JSON.parse(localStorage.getItem(DIAG_LOCAL_BUFFER) || '{}'); return b && typeof b === 'object' ? b : {}; }
-            catch (e) { return {}; }
+            try {
+                const b = JSON.parse(localStorage.getItem(DIAG_LOCAL_BUFFER) || '{}');
+                if (!b || typeof b !== 'object') return {};
+                // v2 升级：旧版 key 是 gistId+整条url+method（fn 字段是 url），导致面板显示整条 URL；
+                // 检测到旧数据自动清空，全网重新按功能名（_inferDiagFn）统计。
+                if (b.__v !== 2) {
+                    try { localStorage.removeItem(DIAG_LOCAL_BUFFER); } catch (e) {}
+                    return {};
+                }
+                return b;
+            } catch (e) { return {}; }
         }
         function _saveDiagBuffer(b) {
             try {
-                // 环形：超过上限丢弃最旧（按时间戳排序后截尾）
-                const keys = Object.keys(b);
+                b.__v = 2;
+                // 环形：超过上限丢弃最旧（按时间戳排序后截尾；排除 __v 版本字段）
+                const keys = Object.keys(b).filter(k => k !== '__v');
                 if (keys.length > DIAG_BUFFER_CAP) {
                     keys.sort((a, b2) => (b[a] ? b[a].last : 0) - (b[b2] ? b[b2].last : 0));
                     keys.slice(0, keys.length - DIAG_BUFFER_CAP).forEach(k => delete b[k]);
@@ -404,7 +417,7 @@
                     const cd = await cur.json();
                     Object.keys(cd.files || {}).forEach(fn => {
                         if (fn === myFile) {
-                            try { const old = JSON.parse(cd.files[fn].content || '{}'); if (Array.isArray(old.entries)) oldEntries = old.entries; } catch (e) {}
+                            try { const old = JSON.parse(cd.files[fn].content || '{}'); if (Array.isArray(old.entries)) oldEntries = old.entries.filter(e => !(e && typeof e.fn === 'string' && e.fn.indexOf('http') === 0)); } catch (e) {}
                         } else {
                             files[fn] = { content: cd.files[fn].content };
                         }
