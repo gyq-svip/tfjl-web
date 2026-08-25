@@ -27,8 +27,8 @@
 //      解决老设备（app-core.js 不认识 window.__diagForceReload）也能被推着自动升级。默认关，风险可控。SW_VERSION 应为 s1.0.307。
 // ============================================================
 
-const CACHE_VERSION = 's1.0.307';
-const DEPLOY_TAG = 's20260826-0216';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
+const CACHE_VERSION = 's1.0.308';
+const DEPLOY_TAG = 's20260826-0321';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
