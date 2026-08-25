@@ -19,10 +19,13 @@
 //      旧SW仍 controlling → 仍拿旧版；改为直接调 forceRefreshLatest()。②sw.js install 改为【无条件回报 SW_VERSION】
 //      （原仅"有 active 旧SW时"才发，forceRefreshLatest unregister 全部SW后 reload，新SW重新register时 active 为 null，
 //      不发 → 页面回退 HTML 写死 fallback 225）。强制刷新后 SW_VERSION 应为 s1.0.230。
+// v40: 强制更新总开关从诊断面板迁移到「功能开关」面板（FEATURE_TOGGLES 的 forceReload 项，权威来源改为索引 Gist room_index.json.forceReloadEnabled），
+//      删除诊断面板独立按钮 + adminToggleForceReload 函数；运行时读 window.__diagForceReload（由 initForceReloadFromIndex 启动 + apply 时设置）。
+//      强制刷新后 SW_VERSION 应为 s1.0.306。
 // ============================================================
 
-const CACHE_VERSION = 's1.0.274';
-const DEPLOY_TAG = 's20260824-2327';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
+const CACHE_VERSION = 's1.0.306';
+const DEPLOY_TAG = 's20260826-0212';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
