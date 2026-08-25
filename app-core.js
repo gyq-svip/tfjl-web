@@ -365,10 +365,31 @@
             return '';
         }
         // 合并两份 entries（按 gistId|fn|method key 累加）：count 相加、first 取小、last 取大、samples 合并去重保留前 5
+        // 已知 Gist ID → 功能名（用于把旧版 fn='otherGist' 条目升级为可识别的具体功能名）
+        function _upgradeFnForGist(gistId, method) {
+            if (!gistId) return null;
+            const gid8 = String(gistId).slice(0, 8);
+            // 已知常量 Gist
+            if (gistId === DIAG_MESSAGES_GIST) return 'saveMessagesToGist';
+            const counterGid = (function(){ try { return localStorage.getItem('counter_gist_id') || 'e1bd9a5139e1c4e011bfea707e917d61'; } catch(e){ return 'e1bd9a5139e1c4e011bfea707e917d61'; } })();
+            if (gistId === counterGid) return 'syncCounterToGist';
+            if (gistId === DIAG_INDEX_GIST) return 'indexGist(other)';
+            if (gistId === MESSAGES_BACKUP_GIST_ID) return 'backupWallMessages';
+            if (gistId === BOSS_RED_GIST_ID) return 'saveBossToGist';
+            if (gistId === DIAG_GIST_ID) return 'diagUpload';
+            // 动态 Gist（房间数据/脚本分享/其他）：以 ID 前 8 位分类
+            if (method === 'DELETE') return 'deleteGist(' + gid8 + ')';
+            return 'saveRoomOrOtherGist(' + gid8 + ')';
+        }
         function _mergeDiagEntries(oldArr, newArr) {
             const map = {};
             const push = (e) => {
                 if (!e || !e.gistId) return;
+                // 升级旧版脏数据：fn === 'otherGist' 字面值 → 按 gistId 反查真实功能名
+                if (e.fn === 'otherGist') {
+                    const up = _upgradeFnForGist(e.gistId, e.method);
+                    if (up) e = Object.assign({}, e, { fn: up });
+                }
                 const key = e.gistId + '|' + (e.fn || 'unknown') + '|' + (e.method || 'USE');
                 if (!map[key]) {
                     map[key] = { gistId: e.gistId, fn: e.fn || 'unknown', method: e.method || 'USE', count: 0, first: e.first || e.last || Date.now(), last: e.last || Date.now(), samples: [] };
@@ -21893,15 +21914,21 @@ ${maSection}
                             detailByUser[who] = detailByUser[who] || [];
                             detailByUser[who].push(fileMetas[fileMetas.length - 1]);
                             (p.entries || []).forEach(e => {
+                                // 面板渲染前把旧版 fn='otherGist' 字面值按 gistId 反查升级成具体功能名（不污染原 payload）
+                                let displayFn = e.fn;
+                                if (e.fn === 'otherGist') {
+                                    const up = _upgradeFnForGist(e.gistId, e.method);
+                                    if (up) displayFn = up;
+                                }
                                 perUser[who] += e.count; totalWrites += e.count;
                                 perGist[e.gistId] = (perGist[e.gistId] || 0) + e.count;
                                 detailByGist[e.gistId] = detailByGist[e.gistId] || [];
                                 detailByGist[e.gistId].push({ file: fileMetas[fileMetas.length - 1], entry: e });
                                 const isWrite = e.gistId !== 'feature' && e.method !== 'GET' && e.method !== 'USE' && e.method !== 'unknown';
-                                const tagKey = (isWrite ? 'WRITE|' : 'USE|') + e.gistId + '|' + e.fn;
-                                perFn[e.gistId + '|' + e.fn] = (perFn[e.gistId + '|' + e.fn] || 0) + e.count;
+                                const tagKey = (isWrite ? 'WRITE|' : 'USE|') + e.gistId + '|' + displayFn;
+                                perFn[e.gistId + '|' + displayFn] = (perFn[e.gistId + '|' + displayFn] || 0) + e.count;
                                 detailByFn[tagKey] = detailByFn[tagKey] || [];
-                                detailByFn[tagKey].push({ file: fileMetas[fileMetas.length - 1], entry: e, isWrite });
+                                detailByFn[tagKey].push({ file: fileMetas[fileMetas.length - 1], entry: e, isWrite, displayFn: displayFn });
                             });
                         });
                         // 存活统计：最近 60 分钟内有上报算"在线"（心跳周期45分钟±10抖动，60分钟阈值留足余量）；写盘健康按最新一次上报判定
