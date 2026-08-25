@@ -88,8 +88,8 @@
                     }
                     // 全网写操作诊断：本地记录明细（外部诊断模块挂 window.__recordDiagWrite(gistId, fn, method)）
                     // 用 _inferDiagFn 从 url 推断功能名（如 saveMessagesToGist / indexGist(room_index) 等），
-                    // 便于面板按 gistId|功能 聚合；method 区分 WRITE/READ。
-                    if (typeof window.__recordDiagWrite === 'function') {
+                    // 便于面板按 gistId|功能 聚合；只统计真正的写操作（PATCH/POST/DELETE），GET 不记。
+                    if (method !== 'GET' && typeof window.__recordDiagWrite === 'function') {
                         try { window.__recordDiagWrite(_gistIdOf(url), _inferDiagFn(url, method), method); } catch (e) {}
                     }
                 } catch (e) {}
@@ -219,6 +219,8 @@
         window.__recordDiagWrite = function _recordDiagWrite(gistId, fn, method) {
             try {
                 if (!gistId || gistId.length < 8) return;
+                // 只统计真正写操作；GET 一律忽略（即使被错误传入）
+                if (method === 'GET') return;
                 const b = _loadDiagBuffer();
                 const key = gistId + '|' + (fn || 'unknown') + '|' + (method || 'WRITE');
                 const now = Date.now();
