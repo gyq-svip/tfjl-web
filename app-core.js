@@ -238,7 +238,9 @@
             try { localStorage.removeItem(DIAG_CONFIG_CACHE); } catch (e) {}
             const cfg = await _getDiagConfig(true);
             const box = document.getElementById('diagCfgPullInfo');
-            if (box) box.textContent = '已立即拉取 ✓ enabled=' + cfg.enabled + '，TTL=' + (_getDiagCfgTtl() / 60000) + '分钟';
+            if (box) box.textContent = '已立即拉取 ✓ enabled=' + cfg.enabled + '，TTL=' + (_getDiagCfgTtl() / 60000) + '分钟；本机正在补报心跳…';
+            // 管理员点"立即拉取"后，本机立即补一次心跳上报（绕过随机延迟），便于马上在面板看到自己在线
+            if (typeof _scheduleDiagUpload === 'function') _scheduleDiagUpload('immediate');
             return cfg;
         }
         // 用户设置配置拉取间隔（分钟）：存 localStorage，下次 _getDiagConfig 即用新值
@@ -21731,7 +21733,7 @@ ${maSection}
                         html += '</div>';
                         html += '<div id="diagDelStatus" style="color:#94a3b8;font-size:0.75rem;"></div>';
                         html += '</div>';
-                        box.innerHTML = html;
+                        box.innerHTML = head + html;   // 关键修复：聚合视图必须带上 head（总闸+策略配置+拉取间隔+立即拉取按钮），否则有上报文件时开关全部消失
                     }
                 } catch (e) {
                     box.innerHTML = '<div style="color:#f87171;">拉取异常：' + (e && e.message ? e.message : e) + '</div>';
