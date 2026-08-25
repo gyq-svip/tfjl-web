@@ -21689,16 +21689,24 @@ ${maSection}
                         const perUser = {}, perGist = {}, perFn = {};
                         let totalWrites = 0;
                         const fileMetas = [];
+                        // 详情抽屉（按维度展开）
+                        const detailByUser = {}, detailByGist = {}, detailByFn = {};
                         diagFiles.forEach(fn => {
                             let p; try { p = JSON.parse(d.files[fn].content); } catch (e) { return; }
                             const who = (p.nick ? p.nick + '(' + p.anonId + ')' : p.anonId);
                             const last = p.lastUpload || 0;
-                            fileMetas.push({ fn, who, last, count: (p.entries || []).reduce((s, e) => s + (e.count || 0), 0), heartbeat: !!p.heartbeat, writeOk: (p.writeOk === true), ver: p.appVersion || '', plat: p.platform || '' });
+                            fileMetas.push({ fn, who, anonId: p.anonId || '', nick: p.nick || '', last, count: (p.entries || []).reduce((s, e) => s + (e.count || 0), 0), heartbeat: !!p.heartbeat, writeOk: (p.writeOk === true), ver: p.appVersion || '', plat: p.platform || '', err: p.err || '', payload: p });
                             perUser[who] = (perUser[who] || 0);
+                            detailByUser[who] = detailByUser[who] || [];
+                            detailByUser[who].push(fileMetas[fileMetas.length - 1]);
                             (p.entries || []).forEach(e => {
                                 perUser[who] += e.count; totalWrites += e.count;
                                 perGist[e.gistId] = (perGist[e.gistId] || 0) + e.count;
+                                detailByGist[e.gistId] = detailByGist[e.gistId] || [];
+                                detailByGist[e.gistId].push({ file: fileMetas[fileMetas.length - 1], entry: e });
                                 perFn[e.gistId + '|' + e.fn] = (perFn[e.gistId + '|' + e.fn] || 0) + e.count;
+                                detailByFn[e.gistId + '|' + e.fn] = detailByFn[e.gistId + '|' + e.fn] || [];
+                                detailByFn[e.gistId + '|' + e.fn].push({ file: fileMetas[fileMetas.length - 1], entry: e });
                             });
                         });
                         // 存活统计：最近 20 分钟内有上报算"在线"；写盘健康按最新一次上报判定
@@ -21718,14 +21726,73 @@ ${maSection}
                         html += '🟢 存活客户端(20分钟内): <b style="color:#4ade80;">' + aliveCount + '</b> ｜ 其中写盘健康✓: <b style="color:#4ade80;">' + writeOkCount + '</b>';
                         if (aliveUsers.length) html += '<br><span style="color:#94a3b8;font-size:0.74rem;">' + aliveUsers.join('，') + '</span>';
                         html += '</div>';
-                        html += '<div style="margin-bottom:16px;"><div style="color:#ffd700;margin-bottom:4px;">👤 按用户 TOP</div>';
-                        uTop.forEach(x => html += '<div>' + bar(x.v, uMax) + ' ' + x.v + '　' + x.k + '</div>');
+                        html += '<div style="margin-bottom:16px;"><div style="color:#ffd700;margin-bottom:4px;">👤 按用户 TOP <span style="color:#94a3b8;font-size:0.7rem;">（点行展开该用户的上报详情）</span></div>';
+                        uTop.forEach((x, i) => {
+                            const id = 'uDetail_' + i;
+                            html += '<div style="cursor:pointer;color:#cbd5e1;" onclick="var d=document.getElementById(\'' + id + '\');if(d.style.display===\'none\'){d.style.display=\'block\';}else{d.style.display=\'none\';}">' + bar(x.v, uMax) + ' ' + x.v + '　' + x.k + ' <span style="color:#60a5fa;font-size:0.7rem;">▶</span></div>';
+                            html += '<div id="' + id + '" style="display:none;background:rgba(0,0,0,0.25);border-left:2px solid #60a5fa;padding:6px 10px;margin:4px 0 8px 12px;font-size:0.75rem;">';
+                            (detailByUser[x.k] || []).forEach(m => {
+                                const ts = m.last ? new Date(m.last).toLocaleString('zh-CN') : '?';
+                                const min = m.last ? Math.max(0, Math.round((Date.now() - m.last) / 60000)) : -1;
+                                const flag = (m.heartbeat ? '🟢心跳' : '📦缓冲') + '｜' + (m.writeOk ? '✓盘' : (m.writeOk === false ? '✗盘' : '?盘')) + '｜v' + (m.ver || '?') + '｜' + (m.plat || '?');
+                                html += '<div style="margin-bottom:6px;"><b>' + m.who + '</b> <span style="color:#94a3b8;">[' + ts + '  ' + min + '分钟前]</span><br><span style="color:#94a3b8;">' + flag + '</span>';
+                                if (m.err) html += '<br><span style="color:#f87171;">err: ' + m.err + '</span>';
+                                if (m.payload && m.payload.entries && m.payload.entries.length) {
+                                    html += '<table style="border-collapse:collapse;margin-top:4px;font-size:0.72rem;width:100%;">';
+                                    html += '<tr style="color:#94a3b8;"><th style="text-align:left;padding:2px 6px;">功能</th><th style="text-align:right;padding:2px 6px;">次数</th><th style="text-align:left;padding:2px 6px;">最近 Gist</th><th style="text-align:left;padding:2px 6px;">最近文件名</th></tr>';
+                                    m.payload.entries.forEach(e => {
+                                        html += '<tr style="border-top:1px dashed rgba(255,255,255,0.1);"><td style="padding:2px 6px;">' + (e.fn || '?') + '</td><td style="text-align:right;padding:2px 6px;color:#ffd700;">' + (e.count || 0) + '</td><td style="padding:2px 6px;color:#94a3b8;">' + (e.gistId ? e.gistId.substring(0, 12) + '…' : '?') + '</td><td style="padding:2px 6px;">' + (e.fn || '?') + '</td></tr>';
+                                    });
+                                    html += '</table>';
+                                } else {
+                                    html += '<br><span style="color:#94a3b8;">（无 entries，仅心跳）</span>';
+                                }
+                                html += '</div>';
+                            });
+                            html += '</div>';
+                        });
                         html += '</div>';
-                        html += '<div style="margin-bottom:16px;"><div style="color:#ffd700;margin-bottom:4px;">📄 按 Gist 文件 TOP</div>';
-                        gTop.forEach(x => html += '<div>' + bar(x.v, gMax) + ' ' + x.v + '　' + x.k + '</div>');
+                        html += '<div style="margin-bottom:16px;"><div style="color:#ffd700;margin-bottom:4px;">📄 按 Gist 文件 TOP <span style="color:#94a3b8;font-size:0.7rem;">（点行展开）</span></div>';
+                        gTop.forEach((x, i) => {
+                            const id = 'gDetail_' + i;
+                            html += '<div style="cursor:pointer;color:#cbd5e1;" onclick="var d=document.getElementById(\'' + id + '\');if(d.style.display===\'none\'){d.style.display=\'block\';}else{d.style.display=\'none\';}">' + bar(x.v, gMax) + ' ' + x.v + '　' + (x.k.substring(0, 16) + '…') + ' <span style="color:#60a5fa;font-size:0.7rem;">▶</span></div>';
+                            html += '<div id="' + id + '" style="display:none;background:rgba(0,0,0,0.25);border-left:2px solid #60a5fa;padding:6px 10px;margin:4px 0 8px 12px;font-size:0.75rem;">';
+                            (detailByGist[x.k] || []).forEach(row => {
+                                const m = row.file, e = row.entry;
+                                const ts = m.last ? new Date(m.last).toLocaleString('zh-CN') : '?';
+                                html += '<div style="margin-bottom:4px;">' + m.who + ' → <b>' + (e.fn || '?') + '</b> ×<b style="color:#ffd700;">' + (e.count || 0) + '</b> <span style="color:#94a3b8;">[' + ts + ']</span></div>';
+                            });
+                            html += '</div>';
+                        });
                         html += '</div>';
-                        html += '<div style="margin-bottom:16px;"><div style="color:#ffd700;margin-bottom:4px;">⚙️ 按 Gist×功能 TOP</div>';
-                        fTop.forEach(x => html += '<div>' + bar(x.v, fMax) + ' ' + x.v + '　' + x.k + '</div>');
+                        html += '<div style="margin-bottom:16px;"><div style="color:#ffd700;margin-bottom:4px;">⚙️ 按 Gist×功能 TOP <span style="color:#94a3b8;font-size:0.7rem;">（点行展开）</span></div>';
+                        fTop.forEach((x, i) => {
+                            const id = 'fDetail_' + i;
+                            const fn = x.k.split('|')[1] || x.k;
+                            const gidShort = x.k.split('|')[0] ? x.k.split('|')[0].substring(0, 12) + '…' : '?';
+                            html += '<div style="cursor:pointer;color:#cbd5e1;" onclick="var d=document.getElementById(\'' + id + '\');if(d.style.display===\'none\'){d.style.display=\'block\';}else{d.style.display=\'none\';}">' + bar(x.v, fMax) + ' ' + x.v + '　' + gidShort + ' / ' + fn + ' <span style="color:#60a5fa;font-size:0.7rem;">▶</span></div>';
+                            html += '<div id="' + id + '" style="display:none;background:rgba(0,0,0,0.25);border-left:2px solid #60a5fa;padding:6px 10px;margin:4px 0 8px 12px;font-size:0.75rem;">';
+                            (detailByFn[x.k] || []).forEach(row => {
+                                const m = row.file, e = row.entry;
+                                const ts = m.last ? new Date(m.last).toLocaleString('zh-CN') : '?';
+                                html += '<div style="margin-bottom:4px;">' + m.who + ' ×<b style="color:#ffd700;">' + (e.count || 0) + '</b> <span style="color:#94a3b8;">[' + ts + ']</span></div>';
+                            });
+                            html += '</div>';
+                        });
+                        html += '</div>';
+                        // 全量上报文件列表（按最后上报时间倒序）
+                        const sortedFiles = fileMetas.slice().sort((a, b) => b.last - a.last);
+                        html += '<div style="margin-bottom:16px;"><div style="color:#ffd700;margin-bottom:4px;">📋 全量上报文件 <span style="color:#94a3b8;font-size:0.7rem;">（按最后上报时间倒序）</span></div>';
+                        sortedFiles.forEach(m => {
+                            const ts = m.last ? new Date(m.last).toLocaleString('zh-CN') : '?';
+                            const min = m.last ? Math.max(0, Math.round((Date.now() - m.last) / 60000)) : -1;
+                            const flag = (m.heartbeat ? '🟢心跳' : '📦缓冲') + '｜' + (m.writeOk ? '✓盘' : (m.writeOk === false ? '✗盘' : '?盘')) + '｜v' + (m.ver || '?') + '｜' + (m.plat || '?') + '｜' + m.count + '写';
+                            html += '<div style="font-size:0.74rem;color:#cbd5e1;padding:3px 0;border-bottom:1px dashed rgba(255,255,255,0.06);">';
+                            html += '<b style="color:#60a5fa;">' + m.fn + '</b><br>';
+                            html += m.who + ' ｜ ' + flag + ' ｜ <span style="color:#94a3b8;">' + ts + ' (' + min + '分钟前)</span>';
+                            if (m.err) html += '<br><span style="color:#f87171;">err: ' + m.err + '</span>';
+                            html += '</div>';
+                        });
                         html += '</div>';
                         // 清理区
                         html += '<div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:12px;margin-top:8px;">';
