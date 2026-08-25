@@ -324,19 +324,25 @@
                     // 想远程关闭上报可改 _ensureDiagGist 创建逻辑或后续加独立开关，这里保证默认开。
                     const merged = Object.assign({}, def, cfg);
                     merged.enabled = def.enabled;
-                    window.__diagForceReload = !!merged.forceReload;
                     localStorage.setItem(DIAG_CONFIG_CACHE, JSON.stringify({ ts: Date.now(), cfg: merged }));
-                    // 启动即检查：强制更新开关开 且 SW 已有 waiting 版本 → 标记待更新，由 notifyNewVersion 在闲置时强刷
-                    if (window.__diagForceReload && 'serviceWorker' in navigator) {
-                        setTimeout(() => {
-                            if (window.__pendingUpdate) { if (typeof notifyNewVersion === 'function') notifyNewVersion(); return; }
-                            navigator.serviceWorker.ready.then(reg => { if (reg.waiting) { window.__pendingUpdate = true; if (typeof notifyNewVersion === 'function') notifyNewVersion(); } }).catch(() => {});
-                        }, 4000); // 等 SW 激活后再查，避免过早
-                    }
                     return merged;
                 }
             } catch (e) {}
             return Object.assign({}, def, { diagGistId: gid });
+        }
+        // 从索引 Gist 读取「强制更新」总开关（功能开关面板的权威来源为 room_index.json 的 forceReloadEnabled 字段），
+        // 设置 window.__diagForceReload 并触发一次启动期版本检查（仅在开关开 + SW 已有 waiting 版本时，由 notifyNewVersion 在闲置时静默强刷）。
+        async function initForceReloadFromIndex() {
+            try {
+                const idx = await getRoomIndexConfig();
+                window.__diagForceReload = !!idx.forceReloadEnabled;
+                if (window.__diagForceReload && 'serviceWorker' in navigator) {
+                    setTimeout(() => {
+                        if (window.__pendingUpdate) { if (typeof notifyNewVersion === 'function') notifyNewVersion(); return; }
+                        navigator.serviceWorker.ready.then(reg => { if (reg.waiting) { window.__pendingUpdate = true; if (typeof notifyNewVersion === 'function') notifyNewVersion(); } }).catch(() => {});
+                    }, 4000); // 等 SW 激活后再查，避免过早
+                }
+            } catch (e) { window.__diagForceReload = false; }
         }
         // 确保诊断 Gist 存在（不存在则创建，ID 存 localStorage）
         async function _ensureDiagGist() {
@@ -512,6 +518,7 @@
                 _getDiagConfig(false).then(cfg => {
                     if (cfg.enabled && localStorage.getItem(DIAG_OPTIN_KEY) !== '0') _scheduleDiagUpload('open');
                 });
+                initForceReloadFromIndex(); // 从索引 Gist 读「强制更新」开关（功能开关面板权威来源）
             }, 3000); // 启动 3s 后才去读配置，避免阻塞首屏
             // 规律心跳：每 45 分钟上报一次（写盘健康 + 缓冲合并），面板离线阈值 60 分钟。
             // 从"打开 App 那一刻"开始计时，每人打开时刻不同 → 天然错峰（不会卡正点同时触发）。
@@ -21871,12 +21878,6 @@ ${maSection}
                     head += '<button id="diagToggleBtn" onclick="adminToggleDiagEnabled()" style="background:' + (window.__diagEnabled ? 'linear-gradient(135deg,#10b981,#059669)' : 'rgba(255,255,255,0.1)') + ';color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.82rem;">' + (window.__diagEnabled ? '已开启（客户端正在上报）' : '已关闭') + '</button>';
                     head += '<span id="diagToggleHint" style="color:#94a3b8;font-size:0.72rem;">' + (window.__diagEnabled ? '关闭后客户端停止上报' : '开启后所有客户端自动上报写操作（用户无感）') + '</span>';
                     head += '</div>';
-                    // 强制更新总开关（默认关）：开启后客户端在启动/心跳时若发现新版本，且当前闲置（>60s 无操作且无未保存项目）则自动静默刷新，不打断正在改项目的用户
-                    head += '<div style="margin-top:10px;display:flex;align-items:center;gap:10px;">';
-                    head += '<span style="color:#cbd5e1;font-size:0.82rem;">🚀 强制更新总开关</span>';
-                    head += '<button id="forceReloadBtn" onclick="adminToggleForceReload()" style="background:' + (window.__diagForceReload ? 'linear-gradient(135deg,#10b981,#059669)' : 'rgba(255,255,255,0.1)') + ';color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.82rem;">' + (window.__diagForceReload ? '已开启（闲置自动更新）' : '已关闭') + '</button>';
-                    head += '<span id="forceReloadHint" style="color:#94a3b8;font-size:0.72rem;">' + (window.__diagForceReload ? '开启后客户端闲置时自动强刷到最新版' : '开启后：新版本在用户闲置时自动静默更新，不丢未保存数据') + '</span>';
-                    head += '</div>';
                     // 上报策略配置区
                     head += '<div style="margin-top:12px;border-top:1px dashed rgba(255,255,255,0.12);padding-top:10px;">';
                     head += '<div style="color:#ffd700;font-size:0.82rem;margin-bottom:8px;">⚙️ 上报策略配置（秒级=分钟，随机错峰避免同时写入）</div>';
@@ -22137,33 +22138,6 @@ ${maSection}
                 else alert('写入失败 HTTP ' + pr.status);
             } catch (e) { alert('异常：' + (e && e.message ? e.message : e)); }
         };
-        // 管理员切换「强制更新」总开关（默认关）。开启后客户端在启动/心跳发现新版本且闲置时自动静默强刷
-        window.adminToggleForceReload = async function () {
-            const gid = localStorage.getItem(DIAG_GIST_KEY) || (await _ensureDiagGist());
-            if (!gid) { alert('诊断 Gist 未初始化'); return; }
-            const token = getGistToken();
-            if (!token) { alert('无 token'); return; }
-            try {
-                const r = await fetch('https://api.github.com/gists/' + gid, { headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': 'token ' + token } });
-                if (!r.ok) { alert('读取失败 HTTP ' + r.status); return; }
-                const d = await r.json();
-                let cfg = {};
-                try { cfg = JSON.parse((d.files && d.files['diag_config.json'] && d.files['diag_config.json'].content) || '{}') || {}; } catch (e) {}
-                cfg.enabled = cfg.enabled !== false; // 保持默认开启，不被覆盖
-                cfg.forceReload = !cfg.forceReload;
-                cfg.periodDays = cfg.periodDays || 3;
-                cfg.allowImmediate = cfg.allowImmediate !== false;
-                cfg.openDelayMin = cfg.openDelayMin || 5; cfg.openDelayMax = cfg.openDelayMax || 10;
-                cfg.immediateDelayMin = cfg.immediateDelayMin || 1; cfg.immediateDelayMax = cfg.immediateDelayMax || 20;
-                const pr = await fetch('https://api.github.com/gists/' + gid, {
-                    method: 'PATCH',
-                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': 'token ' + token },
-                    body: JSON.stringify({ files: { 'diag_config.json': { content: JSON.stringify(cfg, null, 2) } } })
-                });
-                if (pr.ok) { window.__diagForceReload = cfg.forceReload; adminLoadDiag(); }
-                else alert('写入失败 HTTP ' + pr.status);
-            } catch (e) { alert('异常：' + (e && e.message ? e.message : e)); }
-        };
         // 管理员保存诊断上报策略配置（写 diag_config.json）
         window.adminSaveDiagCfg = async function () {
             const status = document.getElementById('diagCfgStatus');
@@ -22260,6 +22234,15 @@ ${maSection}
                         toggleConsoleVisibility();
                     }
                 }
+            },
+            {
+                key: 'forceReload',
+                label: '🚀 强制更新总开关',
+                desc: '开启：客户端在启动/心跳时发现新版本且当前闲置（>60s 无操作且无未保存项目）时自动静默强刷，不打断正在改项目的用户。关闭：仅用户手动点更新气泡才刷新（默认关，避免误伤线上用户）。',
+                scope: 'remote',
+                remoteField: 'forceReloadEnabled',
+                default: false,
+                apply: (v) => { window.__diagForceReload = !!v; }
             }
         ];
 
