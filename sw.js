@@ -33,8 +33,8 @@
 //      deploy.yml 中已废弃的 SW register ?v= sed 已注释（app-picker.js 自己跟随 #versionTag）。
 // ============================================================
 
-const CACHE_VERSION = 's1.0.311';
-const DEPLOY_TAG = 's20260826-0348';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
+const CACHE_VERSION = 's1.0.312';
+const DEPLOY_TAG = 's20260826-0401';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
