@@ -2277,6 +2277,15 @@
         function autoSaveProject() {
             window.__tfjlProjectDirty = true;
             if (typeof updateSaveIndicator === 'function') updateSaveIndicator();
+            // 项目数据变更埋点（防抖：同一项目 5 秒内只记一次，避免 input 频繁触发暴增）
+            // 注意：autoSaveProject 只标记 dirty 不落盘，但语义上"项目被修改"应计入功能使用
+            if (typeof window.__recordFeatureUse === 'function') {
+                const now = Date.now();
+                if (!autoSaveProject._last || now - autoSaveProject._last > 5000) {
+                    autoSaveProject._last = now;
+                    window.__recordFeatureUse('修改项目数据');
+                }
+            }
         }
         function updateSaveIndicator() {
             const dot = document.getElementById('saveDirtyDot');
