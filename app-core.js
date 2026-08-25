@@ -460,14 +460,17 @@
                     if (cfg.enabled && localStorage.getItem(DIAG_OPTIN_KEY) !== '0') _scheduleDiagUpload('open');
                 });
             }, 3000); // 启动 3s 后才去读配置，避免阻塞首屏
-            // 规律心跳：每 15 分钟上报一次（写盘健康 + 缓冲合并），面板离线阈值 20 分钟，
-            // 兼顾"存活监控"与"省 API"（10 人≈40 次 API/小时，远低于之前的零散/频繁调用）。
-            // 用 setInterval 持续触发；首次在启动 3s 后由 _scheduleDiagUpload('open') 兜底。
-            setInterval(() => {
+            // 规律心跳：每 45 分钟上报一次（写盘健康 + 缓冲合并），面板离线阈值 60 分钟。
+            // 从"打开 App 那一刻"开始计时，每人打开时刻不同 → 天然错峰（不会卡正点同时触发）。
+            // 额外加 ±10 分钟随机抖动，避免长期运行后多客户端周期逐渐对齐导致并发打 Gist。
+            // 10 人在线 ≈ 每 45 分钟 10 次 ×(1读1写) ≈ 13 次 API/小时，极省。
+            function _heartbeatOnce() {
                 _getDiagConfig(false).then(cfg => {
                     if (cfg.enabled && localStorage.getItem(DIAG_OPTIN_KEY) !== '0') _pushDiagReport().catch(() => {});
                 });
-            }, 15 * 60 * 1000);
+            }
+            const HB_BASE = 45 * 60 * 1000, HB_JITTER = 10 * 60 * 1000;
+            setInterval(_heartbeatOnce, HB_BASE + Math.random() * HB_JITTER);
         })();
         // 联网恢复（online 事件）→ 立即上报（1~20 分钟随机延迟）
         window.addEventListener('online', () => {
@@ -21851,8 +21854,8 @@ ${maSection}
                                 detailByFn[e.gistId + '|' + e.fn].push({ file: fileMetas[fileMetas.length - 1], entry: e });
                             });
                         });
-                        // 存活统计：最近 20 分钟内有上报算"在线"；写盘健康按最新一次上报判定
-                        const ALIVE_MS = 20 * 60 * 1000;
+                        // 存活统计：最近 60 分钟内有上报算"在线"（心跳周期45分钟±10抖动，60分钟阈值留足余量）；写盘健康按最新一次上报判定
+                        const ALIVE_MS = 60 * 60 * 1000;
                         const nowTs = Date.now();
                         let aliveCount = 0, writeOkCount = 0, aliveUsers = [];
                         fileMetas.forEach(m => {
@@ -21865,7 +21868,7 @@ ${maSection}
                         let html = '<div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:8px 12px;margin-bottom:12px;">';
                         html += '📁 诊断 Gist: <code style="color:#60a5fa;">' + gid + '</code> ｜ 上报文件数: <b>' + diagFiles.length + '</b> ｜ 累计写入: <b>' + totalWrites + '</b> 次</div>';
                         html += '<div style="background:rgba(16,185,129,0.1);border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:0.82rem;color:#cbd5e1;">';
-                        html += '🟢 存活客户端(20分钟内): <b style="color:#4ade80;">' + aliveCount + '</b> ｜ 其中写盘健康✓: <b style="color:#4ade80;">' + writeOkCount + '</b>';
+                        html += '🟢 存活客户端(60分钟内): <b style="color:#4ade80;">' + aliveCount + '</b> ｜ 其中写盘健康✓: <b style="color:#4ade80;">' + writeOkCount + '</b>';
                         if (aliveUsers.length) html += '<br><span style="color:#94a3b8;font-size:0.74rem;">' + aliveUsers.join('，') + '</span>';
                         html += '</div>';
                         html += '<div style="margin-bottom:16px;"><div style="color:#ffd700;margin-bottom:4px;">👤 按用户 TOP <span style="color:#94a3b8;font-size:0.7rem;">（点行展开该用户的上报详情）</span></div>';
