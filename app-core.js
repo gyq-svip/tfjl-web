@@ -17378,11 +17378,22 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 wallLastSeenTime = Date.now();
                 localStorage.setItem('TFJL_WallLastSeen', String(wallLastSeenTime));
                 updateWallAttention();   // 打开即清除未读提醒
-                if (wallMessages.length === 0) fetchMessages();
+                fetchMessages();         // 每次打开需求墙都拉取最新消息
                 initMessageWallDrag();
-                // 打开需求墙默认同时弹出右侧贡献排行榜
+                // 打开需求墙时，按本地记忆决定是否同时弹出右侧贡献排行榜
+                // （默认开启；用户若曾关闭，则下次开墙也保持关闭——本地记忆，他人默认开启）
                 const rp = document.getElementById('reputationPanel');
-                if (rp) { rp.style.display = 'flex'; renderReputation(); if (window.syncReputationToWall) window.syncReputationToWall(); }
+                const repOpen = localStorage.getItem('TFJL_RepPanelOpen');
+                const repShouldOpen = (repOpen === null) ? true : (repOpen === '1');
+                if (rp) {
+                    rp.style.display = repShouldOpen ? 'flex' : 'none';
+                    if (repShouldOpen) { renderReputation(); if (window.syncReputationToWall) window.syncReputationToWall(); }
+                }
+                // 按本地记忆决定是否启动自动滚动（默认开启）
+                const autoScroll = localStorage.getItem('TFJL_WallAutoScroll');
+                const shouldScroll = (autoScroll === null) ? true : (autoScroll === '1');
+                if (shouldScroll) startMessageScroll(); else pauseMessageScroll();
+                syncWallScrollBtn();   // 同步滚动按钮图标到记忆状态
             }
         }
         
@@ -17417,7 +17428,12 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             toggle.style.display = 'flex';
             if (chatToggle) chatToggle.style.left = '68px';
             messageWallOpen = false;
-            const rp = document.getElementById('reputationPanel'); if (rp) rp.style.display = 'none'; // 墙关闭时收起贴附的声望榜
+            const rp = document.getElementById('reputationPanel');
+            if (rp) {
+                // 关闭墙时记住声望榜当前是否开着，下次开墙保持一致
+                try { localStorage.setItem('TFJL_RepPanelOpen', (rp.style.display === 'flex') ? '1' : '0'); } catch (e) {}
+                rp.style.display = 'none'; // 墙关闭时收起贴附的声望榜
+            }
             updateWallAttention();
         }
         
@@ -17871,8 +17887,30 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
         function toggleReputationPanel() {
             const p = document.getElementById('reputationPanel');
             if (!p) return;
-            p.style.display = (p.style.display === 'flex') ? 'none' : 'flex';
-            if (p.style.display === 'flex') { renderReputation(); if (window.syncReputationToWall) window.syncReputationToWall(); }
+            const willOpen = (p.style.display !== 'flex');
+            p.style.display = willOpen ? 'flex' : 'none';
+            // 记住声望榜开关状态（本地，他人默认开启）
+            try { localStorage.setItem('TFJL_RepPanelOpen', willOpen ? '1' : '0'); } catch (e) {}
+            if (willOpen) { renderReputation(); if (window.syncReputationToWall) window.syncReputationToWall(); }
+        }
+        // 需求墙自动滚动开关（本地记忆；默认开启，关闭后一直关闭）
+        function toggleWallAutoScroll() {
+            const btn = document.getElementById('wallScrollToggleBtn');
+            const cur = localStorage.getItem('TFJL_WallAutoScroll');
+            const on = !((cur === null) ? true : (cur === '1'));   // 翻转
+            try { localStorage.setItem('TFJL_WallAutoScroll', on ? '1' : '0'); } catch (e) {}
+            if (btn) btn.textContent = on ? '🔄' : '⏸';
+            if (btn) btn.style.color = on ? '#4fc3f7' : '#94a3b8';
+            if (on) startMessageScroll(); else pauseMessageScroll();
+        }
+        // 打开墙时同步滚动按钮图标到本地记忆状态
+        function syncWallScrollBtn() {
+            const btn = document.getElementById('wallScrollToggleBtn');
+            if (!btn) return;
+            const cur = localStorage.getItem('TFJL_WallAutoScroll');
+            const on = (cur === null) ? true : (cur === '1');
+            btn.textContent = on ? '🔄' : '⏸';
+            btn.style.color = on ? '#4fc3f7' : '#94a3b8';
         }
         function setRepTab(tab) {
             _repTab = tab;
