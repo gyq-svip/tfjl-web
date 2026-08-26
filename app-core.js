@@ -506,6 +506,7 @@
             const nickname = (typeof _myNick === 'function' ? _myNick() : '') || localStorage.getItem('TFJL_UserName') || (window.__currentNickname) || '';
             const payload = {
                 anonId: _getDiagAnonId(),
+                deviceId: (typeof getDeviceId === 'function' ? getDeviceId() : ''),
                 nick: nickname,
                 lastUpload: Date.now(),
                 heartbeat: entries.length === 0,
@@ -577,6 +578,14 @@
         // 启动：页面加载后安排「打开后延迟首次上报」
         (function _initDiagReporter() {
             let _cfg = null; // 缓存最新配置，供心跳间隔读取（远程可调 heartbeatMin）
+            // 🚨 URL 参数强刷：?forcereload=1 / ?force-refresh=1 / ?fr=1 打开即无条件拉取最新版（救场/发给他人链接用）
+            try {
+                const _u = new URL(location.href);
+                if (_u.searchParams.get('forcereload') === '1' || _u.searchParams.get('force-refresh') === '1' || _u.searchParams.get('fr') === '1') {
+                    console.log('[强制刷新] URL 参数触发，立即拉取最新版');
+                    setTimeout(() => { if (typeof forceRefreshLatest === 'function') forceRefreshLatest(); else location.reload(true); }, 600);
+                }
+            } catch (e) {}
             // 本地记录始终运行（在 fetch 代理里已调用 _recordDiagWrite）；上报仅在开关开启时调度
             setTimeout(() => {
                 _getDiagConfig(false).then(cfg => {
@@ -605,12 +614,59 @@
                 });
             }
             // 规律心跳基础间隔 + 随机抖动范围均从「索引配置」读取（功能开关矩阵管理，管理员可实时调），
-            // 默认值：间隔 45 分钟、抖动范围 10 分钟。两个值都放在功能开关面板，无需进诊断面板。
+            // 默认值：间隔 15 分钟（事故后收紧，保证远程强刷信号更快触达）、抖动范围 5 分钟。两个值都放在功能开关面板。
+            // ⚠️ 注意：_idxCfg 是异步拿到的，下面先用默认值立即启动心跳（保证第一拍不依赖网络）；
+            // 待 _idxCfg 到位后，若远程 interval 与当前不同，则清掉旧定时器、用新间隔重启，使远程调频真正生效。
             let _idxCfg = null;
-            getRoomIndexConfig().then(c => { _idxCfg = c || null; }).catch(() => { _idxCfg = null; });
-            const HB_BASE = ((_idxCfg && _idxCfg.heartbeatMin) ? _idxCfg.heartbeatMin : 45) * 60 * 1000;
-            const HB_JITTER = ((_idxCfg && _idxCfg.heartbeatJitterMin) ? _idxCfg.heartbeatJitterMin : 10) * 60 * 1000;
-            setInterval(_heartbeatOnce, HB_BASE + Math.random() * HB_JITTER);
+            let _hbTimer = null;
+            const _HB_DEF_BASE = 15, _HB_DEF_JITTER = 5; // 分钟（事故后默认 15/5，原 45/10）
+            function _startHeartbeat(baseMin, jitterMin) {
+                if (_hbTimer) clearInterval(_hbTimer);
+                const base = (baseMin > 0 ? baseMin : _HB_DEF_BASE) * 60 * 1000;
+                const jitter = (jitterMin >= 0 ? jitterMin : _HB_DEF_JITTER) * 60 * 1000;
+                _hbTimer = setInterval(_heartbeatOnce, base + Math.random() * jitter);
+            }
+            getRoomIndexConfig().then(c => {
+                _idxCfg = c || null;
+                // 远程调频生效：拿到配置后按远程值重启心跳（首次启动用默认值，这里对齐远程）
+                _startHeartbeat(
+                    (_idxCfg && _idxCfg.heartbeatMin) ? _idxCfg.heartbeatMin : _HB_DEF_BASE,
+                    (_idxCfg && _idxCfg.heartbeatJitterMin) ? _idxCfg.heartbeatJitterMin : _HB_DEF_JITTER
+                );
+            }).catch(() => { _idxCfg = null; _startHeartbeat(_HB_DEF_BASE, _HB_DEF_JITTER); });
+            // 先把心跳跑起来（默认 15±5 分钟），避免等网络期间完全不心跳
+            _startHeartbeat(_HB_DEF_BASE, _HB_DEF_JITTER);
+
+            // 🚨 远程强制刷新（管理员救命通道）：轮询 room_index.json 的 forceReloadNow 字段。
+            //   · 值 "*" / "all" / true  → 全部设备刷新
+            //   · 值 "device_xxx"（具体设备ID，来自心跳上报的 deviceId）→ 仅该台机器刷新
+            //   · 空 / 不存在                          → 不动作
+            // 命中后调用 forceRefreshLatest()（内部已升级前落盘，安全）。
+            // 用 localStorage 记录"已执行的信号快照"，避免同一指令被每轮重复触发。
+            const _FR_KEY = 'TFJL_ForceReload_Executed';
+            async function _checkForceReloadNow() {
+                try {
+                    const idx = await getRoomIndexConfig();
+                    const sig = idx && idx.forceReloadNow;
+                    if (!sig || sig === '0' || sig === 0) return;
+                    const sigStr = String(sig);
+                    let executed = '';
+                    try { executed = localStorage.getItem(_FR_KEY) || ''; } catch (e) {}
+                    if (executed === sigStr) return; // 同一指令已执行过，跳过
+                    const myDev = (typeof getDeviceId === 'function') ? getDeviceId() : '';
+                    const hitAll = (sigStr === '*' || sigStr === 'all' || sigStr === 'true');
+                    const hitMe = (!hitAll && myDev && sigStr === myDev);
+                    if (!hitAll && !hitMe) return; // 不是全部、也不是我这台
+                    try { localStorage.setItem(_FR_KEY, sigStr); } catch (e) {}
+                    console.log('[强制刷新] 收到远程指令(' + sigStr + ')，立即拉取最新版');
+                    if (typeof forceRefreshLatest === 'function') { forceRefreshLatest(); return; }
+                    location.reload(true);
+                } catch (e) { /* 读不到索引不影响心跳 */ }
+            }
+            // 每 60 秒检查一次远程强刷指令（独立于 15 分钟心跳，保证信号≤1分钟触达）
+            setInterval(_checkForceReloadNow, 60 * 1000);
+            // 启动后尽快检查一次（若管理员刚在事故后下发指令，用户打开即刷）
+            setTimeout(_checkForceReloadNow, 8000);
         })();
         // 联网恢复（online 事件）→ 立即上报（1~20 分钟随机延迟）
         window.addEventListener('online', () => {
@@ -22544,6 +22600,26 @@ ${maSection}
                 </div>
                 <span style="margin-left:10px;font-size:1.1rem;color:#4fc3f7;">→</span>
             </div>`;
+            // 🚨 远程强制刷新控制（管理员救命通道）：下发 forceReloadNow 到 room_index.json，
+            // 所有在线设备下一次心跳/60秒轮询即拉取最新版（forceRefreshLatest 内部已升级前落盘，安全）。
+            // 指令值带时间戳（all@ts / device_xxx@ts），保证可重复触发、且同一次不重复执行。
+            html += `
+            <div style="grid-column:1/-1;margin-top:14px;padding:14px;border:1px solid rgba(255,107,107,0.5);border-radius:12px;background:rgba(255,107,107,0.07);">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                    <span style="font-size:1.1rem;">🚨</span>
+                    <span style="font-size:0.92rem;color:#ff8a8a;font-weight:700;">远程强制刷新（救场通道）</span>
+                </div>
+                <div style="font-size:0.68rem;color:rgba(255,255,255,0.5);line-height:1.5;margin-bottom:10px;">
+                    下发后，所有在线设备将在 ≤1 分钟内（心跳/60秒轮询）无条件拉取最新版 Service Worker。可用于白屏/坏版本事故远程救场。设备 ID 见下方诊断面板的设备列表。
+                </div>
+                <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+                    <button onclick="adminForceReloadAll()" style="padding:8px 18px;border-radius:8px;border:none;cursor:pointer;font-weight:700;color:#fff;background:linear-gradient(90deg,#ff6b6b,#ff8e53);">🔄 刷新全部设备</button>
+                    <span style="font-size:0.78rem;color:rgba(255,255,255,0.6);">或指定单台：</span>
+                    <input id="frDeviceInput" placeholder="粘贴设备ID，如 device_xxx" style="flex:1;min-width:180px;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:#16213e;color:#fff;font-size:0.8rem;">
+                    <button onclick="adminForceReloadDevice(document.getElementById('frDeviceInput').value)" style="padding:8px 16px;border-radius:8px;border:1px solid rgba(255,255,255,0.25);cursor:pointer;font-weight:600;color:#fff;background:rgba(255,255,255,0.08);">🎯 精准刷新该设备</button>
+                </div>
+                <div id="frStatus" style="font-size:0.72rem;color:#ffd700;margin-top:8px;min-height:14px;"></div>
+            </div>`;
             html += '</div>';
             html += '<div style="font-size:0.7rem;color:rgba(255,255,255,0.4);margin-top:12px;line-height:1.6;">鼠标悬浮在每个开关上可查看详细说明。远程开关存于索引 Gist（全网生效），本机开关仅影响当前设备。新增开关只须在 FEATURE_TOGGLES 追加一条配置，矩阵会自动排版。</div>';
             box.innerHTML = html;
@@ -22575,6 +22651,29 @@ ${maSection}
             }
         }
         window.toggleFeature = toggleFeature;
+
+        // 🚨 远程强制刷新：管理员下发指令到 room_index.json 的 forceReloadNow 字段。
+        // 指令值带时间戳，保证可重复触发、同一次不重复执行。客户端轮询见 _initDiagReporter 内的 _checkForceReloadNow。
+        function _adminIssueForceReload(value, label) {
+            const st = document.getElementById('frStatus');
+            if (!getGistToken()) {
+                if (st) st.textContent = '⚠️ 未配置 Gist Token，无法下发远程指令（请在「Token」页填写）';
+                return;
+            }
+            if (!value) { if (st) st.textContent = '⚠️ 设备ID为空'; return; }
+            const sig = value + '@' + Date.now();
+            setRoomIndexConfigField('forceReloadNow', sig).then(() => {
+                if (st) st.textContent = '✅ 已下发「' + label + '」指令（' + sig + '），在线设备 ≤1 分钟内将拉取最新版';
+            }).catch(e => {
+                if (st) st.textContent = '❌ 下发失败：' + (e && e.message ? e.message : e);
+            });
+        }
+        window.adminForceReloadAll = function () { _adminIssueForceReload('all', '刷新全部设备'); };
+        window.adminForceReloadDevice = function (id) {
+            id = (id || '').toString().trim();
+            if (!id) { const st = document.getElementById('frStatus'); if (st) st.textContent = '⚠️ 请先粘贴设备ID'; return; }
+            _adminIssueForceReload(id, '精准刷新 ' + id);
+        };
 
         // 拖动中预览(只更新显示,不写 Gist)
         function setFeatureRangePreview(key, val) {
