@@ -3363,11 +3363,10 @@
                 try {
                     localStorage.removeItem('TFJL_NotFirst');
                     localStorage.removeItem('TFJL_CachedHTML');
-                    // 🔴 修复：静默强刷(小版本自动升级)后，消息红点/声望面板状态被重置的 bug。
-                    // 强刷前固化「用户已读」与「声望已关」状态，避免强刷后误弹红点 / 声望面板重新出现。
-                    // ① 消息墙红点：把已读基准推到「当前时刻」，强刷后重新拉取的旧消息 time 不会再 > 它 → 不误弹红点
-                    localStorage.setItem('TFJL_WallLastSeen', String(Date.now()));
-                    // ② 声望面板：把当前真实显示状态再固化一次（关=0 保持关，开=1 保持开），强刷后初始化读取不回退默认开启
+                    // 🔴 修复：静默强刷(小版本自动升级)后声望面板状态被重置的 bug。
+                    // 声望面板：把当前真实显示状态再固化一次（关=0 保持关，开=1 保持开），强刷后初始化读取不回退默认开启。
+                    // 注：消息墙红点已改为「已读指纹集合」(TFJL_WallReadKeys) 持久化，强刷自动保留，无需在此处理；
+                    //     此前基于时间戳(TFJL_WallLastSeen)的方案会因跨设备时钟不一致误判未读，已废弃。
                     try {
                         const rp = document.getElementById('reputationPanel');
                         if (rp) localStorage.setItem('TFJL_RepPanelOpen', (rp.style.display === 'flex') ? '1' : '0');

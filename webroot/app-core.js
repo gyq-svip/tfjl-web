@@ -15900,7 +15900,12 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
         // ==================== 消息墙功能 ====================
         let wallMessages = [];
         let messageWallOpen = false;
-        let wallLastSeenTime = Number(localStorage.getItem('TFJL_WallLastSeen') || 0);
+        // 🔴 已读基准改用「消息内容指纹集合」(time_author_content)，而非绝对时间戳——
+        // 消息墙跨设备共享(Gist)，各机本地时钟不一致会导致"未来消息"误判未读/红点。
+        // 指纹方案与合并去重一致，彻底规避跨设备时钟问题；且自动升级强刷不重置(见 forceRefreshLatest)。
+        let wallReadKeys = new Set();
+        try { const arr = JSON.parse(localStorage.getItem('TFJL_WallReadKeys') || '[]'); if (Array.isArray(arr)) wallReadKeys = new Set(arr); } catch (e) {}
+        function _wallMsgKey(m) { return (m.time || 0) + '_' + (m.author || '') + '_' + ((m.content || '').substring(0, 30)); }
         let messageScrollInterval = null;
         let messageFetchInterval = null;
         let msgRefreshCountdown = 30;
@@ -17565,8 +17570,9 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 // 需求墙打开时，拍卖行按钮回到原位置
                 if (chatToggle) chatToggle.style.left = '68px';
                 messageWallOpen = true;
-                wallLastSeenTime = Date.now();
-                localStorage.setItem('TFJL_WallLastSeen', String(wallLastSeenTime));
+                // 打开墙 = 标记当前所有消息为已读（加入指纹集合并持久化），而非用时间戳
+                wallMessages.forEach(m => wallReadKeys.add(_wallMsgKey(m)));
+                try { localStorage.setItem('TFJL_WallReadKeys', JSON.stringify([...wallReadKeys])); } catch (e) {}
                 updateWallAttention();   // 打开即清除未读提醒
                 fetchMessages();         // 每次打开需求墙都拉取最新消息
                 initMessageWallDrag();
@@ -17600,7 +17606,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 flashTray(false);   // 墙已开 → 停托盘闪动
                 return;
             }
-            const newCount = wallMessages.filter(m => m.time > wallLastSeenTime).length;
+            const newCount = wallMessages.filter(m => !wallReadKeys.has(_wallMsgKey(m))).length;
             if (newCount > 0) {
                 toggle.classList.add('wall-attention');
                 if (dot) { dot.style.display = 'block'; dot.textContent = newCount > 99 ? '99+' : String(newCount); }
