@@ -265,7 +265,8 @@
         }
         window.openGenericPicker = openGenericPicker;
         // ==================== Tauri 窗口托盘状态（用于判断 APP 是否已挂后台） ====================
-        // 点 X 最小化到托盘 → window-hide → __tfjlInTray=true（此时才可静默升级）
+        // 点 X 关闭 → 拦下并藏进托盘 → window-hide/close-requested → __tfjlInTray=true（可静默升级）
+        // 点「-」最小化 → 仅缩到任务栏（任务栏仍留小图标），但用户已"离开前台" → 同样视为可静默升级
         // 重新打开到前台 → window-show → __tfjlInTray=false（前台坚决不自动升级）
         (function setupTrayState() {
             try {
@@ -280,6 +281,8 @@
                         listen('tauri://window-hide', () => { window.__tfjlInTray = true; });
                         listen('tauri://window-show', () => { window.__tfjlInTray = false; });
                         listen('tauri://close-requested', () => { window.__tfjlInTray = true; });
+                        // 🔴 点「-」最小化到任务栏：也视为离开前台（与 X 同规则允许静默升级），但窗口仍在任务栏可见
+                        listen('tauri://window-minimize', () => { window.__tfjlInTray = true; });
                     }).catch(() => {});
                 }
             } catch (e) {}
