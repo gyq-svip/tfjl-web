@@ -51,7 +51,7 @@
 //      版本号采用 CI 的 `s1.0.337` + `s20260826-1804`。线上立刻能看到「前台只弹气泡，挂托盘才静默升」正确行为。
 // ============================================================
 
-const CACHE_VERSION = 's1.0.348';
+const CACHE_VERSION = 's1.0.349';
 const DEPLOY_TAG = 's20260827-0434';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
@@ -124,7 +124,14 @@ async function _pollLatestVersion() {
     self.skipWaiting();
     const clients = await self.clients.matchAll({ includeUncontrolled: true });
     clients.forEach(client => {
-        try { client.postMessage({ type: 'FORCE_RELOAD', latest: latest, silent: true }); } catch (e) {}
+        try {
+            client.postMessage({ type: 'FORCE_RELOAD', latest: latest, silent: true });
+            // 🔴 P0 白屏紧急恢复：旧 SW 自己在轮询发现新版本时，直接对受控客户端 navigate 硬重载，
+            // 不依赖新 SW install 分支的 claim 时序。白屏页已卡死、收不到消息，唯有硬 navigate 才能拉回。
+            if (typeof client.navigate === 'function' && client.url) {
+                client.navigate(client.url).catch(() => {});
+            }
+        } catch (e) {}
     });
 }
 
