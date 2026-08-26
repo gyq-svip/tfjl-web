@@ -295,10 +295,20 @@
                         if (typeof forceRefreshLatest === 'function') forceRefreshLatest();
                         else location.reload(true);
                     } else {
-                        // 网页版前台可见 → 仅标记提示，等用户点（避免刷新打断操作）
+                        // 网页版前台可见 → 不弹气泡（用户要求静默），仅标记「有新版本」，
+                        // 等页面切到后台/最小化（visibilitychange → hidden）时再静默升级，避免打断当前操作。
                         window.__tfjlHasNewVersion = true;
                         _markNewVersionAvailable();
-                        if (typeof notifyNewVersion === 'function') notifyNewVersion();
+                        if (!window.__tfjlHideUpgradeBound) {
+                            window.__tfjlHideUpgradeBound = true;
+                            document.addEventListener('visibilitychange', () => {
+                                if (document.hidden && window.__tfjlHasNewVersion) {
+                                    window.__tfjlHasNewVersion = false;
+                                    if (typeof forceRefreshLatest === 'function') forceRefreshLatest();
+                                    else location.reload(true);
+                                }
+                            });
+                        }
                     }
                 }
             });
