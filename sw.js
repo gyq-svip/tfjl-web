@@ -91,8 +91,8 @@ async function _isForceReloadEnabled() {
             }
         }
     } catch (e) {}
-    // 读取失败 → 默认「开」，避免开关读不到就卡死不升级
-    return true;
+    // 读取失败 → 默认「关」，避免开关读不到就误推升级（前台铁律：不主动升级，必须用户点/重开）
+    return false;
 }
 
 // SW 主动轮询线上 sw.js 的最新版本号：发现比当前 CACHE_VERSION 新、且功能开关开，
@@ -235,7 +235,9 @@ self.addEventListener('activate', (event) => {
         caches.keys().then((cacheNames) => {
             return Promise.all(
                 cacheNames
-                    .filter((name) => name.endsWith('-runtime') && name !== CACHE_RUNTIME)
+                    // 🔴 P0（2026-08-27 白屏）：删除【所有】runtime 缓存（含当前版本），
+                    // 强制新 SW 首次请求走网络拿正确文件，不再复用可能损坏的旧缓存 app-core.js。
+                    .filter((name) => name.endsWith('-runtime'))
                     .map((name) => caches.delete(name))
             );
         }).then(() => {
@@ -280,18 +282,15 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // HTML 页面：StaleWhileRevalidate（缓存优先秒开，后台静默拉新）
-    // 以前用 NetworkFirst 导致每次打开/刷新都先等线上首页，线上慢时 loading 屏长时间转圈 → 启动卡顿。
-    // 改缓存优先后打开秒进，新首页靠后台拉取+下次打开生效；双击右下角版本号可强制立即刷新。
+    // 🔴 P0 修复（2026-08-27 白屏事故）：HTML/JS/CSS 改为 networkFirst，
+    // 不再 staleWhileRevalidate 先返回可能损坏的旧缓存（旧缓存 app-core.js 缺失 HB_JITTER 导致白屏）。
+    // 网络优先 + 超时(8s)回退缓存，保证用户永远拿到线上正确文件。
     if (request.mode === 'navigate' || request.destination === 'document') {
-        event.respondWith(staleWhileRevalidate(request, CACHE_RUNTIME));
+        event.respondWith(networkFirst(request, CACHE_RUNTIME));
         return;
     }
-    // JS/CSS 改回 StaleWhileRevalidate（缓存优先秒开 + 后台静默更新）：
-    // 之前为修 403 临时用 NetworkFirst，代价是每次打开都等网络拉 JS/CSS，本地到 GitHub Pages 慢时打开卡顿。
-    // 现恢复缓存优先（打开秒开），新版靠后台拉取+下次打开生效；用户可双击右下角版本号强制立即刷新。
     if (['script', 'style'].includes(request.destination)) {
-        event.respondWith(staleWhileRevalidate(request, CACHE_RUNTIME));
+        event.respondWith(networkFirst(request, CACHE_RUNTIME));
         return;
     }
     // 图片/字体等静态资源：StaleWhileRevalidate（缓存秒开 + 后台更新）
