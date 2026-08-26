@@ -1,5 +1,6 @@
 // ============================================================
 // Service Worker v5 - 塔防助手 PWA 缓存策略
+// 测试触发 bump: 331 -> 332 (验证被全屏遮挡时前台不自动升级)
 // 策略：StaleWhileRevalidate（先用缓存秒开，后台静默更新）
 // v34: 再次强制刷新缓存——修复"分享加密密码框不显示"（旧 SW 用 cacheFirst 缓存旧 index.html 不更新）；
 //      提升 CACHE_VERSION 触发 activate 清空所有 tfjl- 缓存，确保拿到最新前端（含分享密码框）
@@ -42,8 +43,8 @@
 // v49: 自动升级闭环最终验证（开关 404 修复 + 气泡 bug 修复已上）。本次 CI +1 → 线上 325。
 // ============================================================
 
-const CACHE_VERSION = 's1.0.326';
-const DEPLOY_TAG = 's20260826-1646';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
+const CACHE_VERSION = 's1.0.330';
+const DEPLOY_TAG = 's20260826-1701';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
