@@ -91,9 +91,12 @@ async function main() {
     const entries = Array.isArray(p.entries) ? p.entries : [];
     let userSum = 0;
     for (const e of entries) {
+      // 跳过脏条目：gistId 是 URL 片段或非法格式（历史 _gistIdOf bug 产生），避免 TOP 出现链接字符串
+      const rawGid = typeof e.gistId === 'string' ? e.gistId : '';
+      if (!rawGid || rawGid === 'unknown' || rawGid.indexOf('http') === 0 || rawGid.indexOf('/') !== -1) continue;
       const c = e.count || 0;
       userSum += c; totalWrites += c;
-      const gid = e.gistId || '?';
+      const gid = e.gistId;
       perGist[gid] = (perGist[gid] || 0) + c;
       const key = gid + '|' + (e.fn || '?');
       perFn[key] = (perFn[key] || 0) + c;
