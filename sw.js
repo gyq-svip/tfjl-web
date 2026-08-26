@@ -155,7 +155,8 @@ self.addEventListener('install', (event) => {
                 self.skipWaiting();
                 return self.clients.claim().then(() =>
                     self.clients.matchAll({ includeUncontrolled: true }).then(cls => {
-                        cls.forEach(c => c.postMessage({ type: 'FORCE_RELOAD' }));
+                        // silent: true → 页面侧一律静默升级，绝不弹气泡（用户要求全自动静默）
+                        cls.forEach(c => c.postMessage({ type: 'FORCE_RELOAD', silent: true }));
                     })
                 );
             }
@@ -171,9 +172,9 @@ async function _maybeForceReload() {
     if (!enabled) return;
     // 开关开：让新 SW 立即接管（原 waiting → active）
     self.skipWaiting();
-    // 通知所有页面（页面 notifyNewVersion 决定何时真正刷新，避免打断操作）
+    // 通知所有页面（页面侧按静默规则升级，绝不弹气泡）
     const clients = await self.clients.matchAll({ includeUncontrolled: true });
-    clients.forEach(client => client.postMessage({ type: 'FORCE_RELOAD' }));
+    clients.forEach(client => client.postMessage({ type: 'FORCE_RELOAD', silent: true }));
 }
 
 // ============================================================
