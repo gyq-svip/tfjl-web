@@ -47,10 +47,12 @@
 //      三处 navigate 全删，只保留 `client.postMessage({type:'FORCE_RELOAD'})`。升级决策唯一交给 app-picker.js：
 //      前台只弹气泡、挂托盘才静默强刷（前置落盘）。老顽固客户端要升，需他们主动 reload/重开一次拿新 app-picker.js，
 //      之后才能进自动轨道。SW_VERSION 应为 s1.0.337（CI +1）。
+// v51: 手动冲突解决——本地 v50 退回提交 vs 远程 CI 自动 bump 到 337 冲突。保留 v50 退回的 SW 代码，
+//      版本号采用 CI 的 `s1.0.337` + `s20260826-1804`。线上立刻能看到「前台只弹气泡，挂托盘才静默升」正确行为。
 // ============================================================
 
-const CACHE_VERSION = 's1.0.333';
-const DEPLOY_TAG = 's20260826-1721';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
+const CACHE_VERSION = 's1.0.337';
+const DEPLOY_TAG = 's20260826-1804';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
