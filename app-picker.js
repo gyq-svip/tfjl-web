@@ -283,21 +283,13 @@
                     const isTauri = !!(window.__TAURI_INTERNALS__ || window.__TAURI__ || navigator.userAgent.indexOf('Tauri') >= 0);
                     if (isTauri) {
                         // 🔴 APP 场景（点 X 挂托盘，WebView 不销毁，document.hidden 不一定变 true）：
-                        // 收到强刷指令即代表"后台空闲可升级"。规则：
-                        //  - 正在编辑项目（有未保存改动 __tfjlProjectDirty）→ 先保存再静默升（不打断手上的活，存好再换）
-                        //  - 空闲（无编辑）→ 等 15 秒静默升级（对应「最小化托盘 15 秒后自动升级」）
+                        // 收到强刷指令即代表"已进托盘/后台"。统一规则：进托盘后 15 秒静默升级（无论是否编辑中）。
+                        // （编辑中的未保存改动由 forceRefreshLatest 前的 autoSave 兜底，这里不区分避免打断节奏）
                         const doSilentUpgrade = function () {
                             if (typeof forceRefreshLatest === 'function') forceRefreshLatest();
                             else location.reload(true);
                         };
-                        if (window.__tfjlProjectDirty) {
-                            // 正在编辑：先保存项目（存好手上的活），保存后立刻静默升（不额外等 15 秒）
-                            try { if (typeof saveCurrentProject === 'function') saveCurrentProject(); } catch (e) {}
-                            doSilentUpgrade();
-                        } else {
-                            // 空闲：最小化托盘 15 秒后静默升级
-                            setTimeout(doSilentUpgrade, 15000);
-                        }
+                        setTimeout(doSilentUpgrade, 15000);
                     } else if (document.hidden) {
                         // 网页版：最小化/隐藏态 → 直接静默强刷（不打断）
                         if (typeof forceRefreshLatest === 'function') forceRefreshLatest();

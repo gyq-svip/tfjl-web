@@ -3363,6 +3363,15 @@
                 try {
                     localStorage.removeItem('TFJL_NotFirst');
                     localStorage.removeItem('TFJL_CachedHTML');
+                    // 🔴 修复：静默强刷(小版本自动升级)后，消息红点/声望面板状态被重置的 bug。
+                    // 强刷前固化「用户已读」与「声望已关」状态，避免强刷后误弹红点 / 声望面板重新出现。
+                    // ① 消息墙红点：把已读基准推到「当前时刻」，强刷后重新拉取的旧消息 time 不会再 > 它 → 不误弹红点
+                    localStorage.setItem('TFJL_WallLastSeen', String(Date.now()));
+                    // ② 声望面板：把当前真实显示状态再固化一次（关=0 保持关，开=1 保持开），强刷后初始化读取不回退默认开启
+                    try {
+                        const rp = document.getElementById('reputationPanel');
+                        if (rp) localStorage.setItem('TFJL_RepPanelOpen', (rp.style.display === 'flex') ? '1' : '0');
+                    } catch (e) {}
                 } catch(e) {}
                 // 4. 🔴 强制注销当前所有 SW 注册（无条件）。
                 // 之前只在"无 waiting SW"时才 unregister，但线上已部署新 SW(228)、旧 SW(225) 仍
