@@ -22202,6 +22202,23 @@ ${maSection}
                         html += '<div id="diagDelStatus" style="color:#94a3b8;font-size:0.75rem;"></div>';
                         html += '</div>';
                         box.innerHTML = head + html;   // 关键修复：聚合视图必须带上 head（总闸+策略配置+拉取间隔+立即拉取按钮），否则有上报文件时开关全部消失
+                        // ==================== 聚合快照卡片（读取 diag-agg.json，由 diag-aggregate.yml 每10分钟自动生成，0 额外 API）====================
+                        try {
+                            const aggRaw = d.files && d.files['diag-agg.json'] && d.files['diag-agg.json'].content;
+                            if (aggRaw) {
+                                const agg = JSON.parse(aggRaw);
+                                const topList = (arr, render) => (Array.isArray(arr) ? arr : []).slice(0, 10).map((x, i) => '<div style="display:flex;justify-content:space-between;gap:10px;padding:2px 0;border-bottom:1px solid rgba(255,255,255,0.05);"><span style="color:#cbd5e1;">' + (i + 1) + '. ' + render(x.k) + '</span><span style="color:#fca5a5;font-weight:600;">' + x.v + '</span></div>').join('');
+                                const snap = '<div style="margin:14px 0;padding:14px;border:1px solid rgba(96,165,250,0.35);border-radius:10px;background:rgba(96,165,250,0.06);">' +
+                                    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><span style="color:#60a5fa;font-size:0.86rem;font-weight:600;">📊 聚合快照（自动每10分钟生成 · ' + (agg.generatedAt ? new Date(agg.generatedAt).toLocaleString('zh-CN') : '?') + '）</span>' +
+                                    '<span style="color:#94a3b8;font-size:0.72rem;">扫描 ' + (agg.fileCount || 0) + ' 文件 · 总写 ' + (agg.totalWrites || 0) + ' 次 · 在线 ' + (agg.onlineCount || 0) + ' 人</span></div>' +
+                                    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;">' +
+                                    '<div><div style="color:#fbbf24;font-size:0.76rem;margin-bottom:4px;">👤 谁吃 API 最多</div>' + topList(agg.perUser, (k) => k) + '</div>' +
+                                    '<div><div style="color:#fbbf24;font-size:0.76rem;margin-bottom:4px;">📦 按 Gist 写入 TOP</div>' + topList(agg.perGist, (k) => _gistLabel(k).label) + '</div>' +
+                                    '<div><div style="color:#fbbf24;font-size:0.76rem;margin-bottom:4px;">⚙️ 按功能写入 TOP</div>' + topList(agg.perFn, (k) => { const p = (k || '').split('|'); return _fnZh(p[0], p[1]); }) + '</div>' +
+                                    '</div></div>';
+                                box.insertAdjacentHTML('afterbegin', snap);
+                            }
+                        } catch (e) { /* 聚合快照失败不影响主视图 */ }
                     }
                 } catch (e) {
                     box.innerHTML = '<div style="color:#f87171;">拉取异常：' + (e && e.message ? e.message : e) + '</div>';
