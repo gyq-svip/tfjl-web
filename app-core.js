@@ -607,7 +607,7 @@
             // 规律心跳基础间隔 + 随机抖动范围均从「索引配置」读取（功能开关矩阵管理，管理员可实时调），
             // 默认值：间隔 45 分钟、抖动范围 10 分钟。两个值都放在功能开关面板，无需进诊断面板。
             let _idxCfg = null;
-            _getRoomIndexConfig().then(c => { _idxCfg = c || null; }).catch(() => { _idxCfg = null; });
+            getRoomIndexConfig().then(c => { _idxCfg = c || null; }).catch(() => { _idxCfg = null; });
             const HB_BASE = ((_idxCfg && _idxCfg.heartbeatMin) ? _idxCfg.heartbeatMin : 45) * 60 * 1000;
             const HB_JITTER = ((_idxCfg && _idxCfg.heartbeatJitterMin) ? _idxCfg.heartbeatJitterMin : 10) * 60 * 1000;
             setInterval(_heartbeatOnce, HB_BASE + Math.random() * HB_JITTER);
