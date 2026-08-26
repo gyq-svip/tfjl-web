@@ -23485,22 +23485,15 @@ ${maSection}
             return idleMs > 60000 && !dirty;
         }
         // SW 后台检测到新版本（网络内容≠缓存）会发 NEW_VERSION_READY / FORCE_RELOAD。
-        // 🔴 关键修复：收到新版本信号时【绝不弹气泡】，只记录待升级，按"静默 + 编辑保护"规则升级，
-        // 否则编辑一半突然弹气泡+强刷会丢未保存项目（用户明确要求：自动升级必须妥善处理，绝不能丢数据）。
+        // SW 新版本信号统一由 app-picker.js 的监听器决策（区分 APP/网页、前台/后台）。
+        // 此处仅记录 pending 状态，不自行触发升级/提示，避免与 app-picker 重复升级（双升）。
         (function setupSwUpdateListener() {
             if (!('serviceWorker' in navigator)) return;
             navigator.serviceWorker.addEventListener('message', function (event) {
                 const data = event.data;
                 if (data && (data.type === 'NEW_VERSION_READY' || data.type === 'FORCE_RELOAD')) {
                     window.__pendingUpdate = true;
-                    // 仅当页面隐藏（托盘/后台）才立即静默升级；前台一律不弹气泡、不主动强刷，
-                    // 等用户切到后台（visibilitychange）或编辑闲置后再静默升级。
-                    if (document.hidden) {
-                        console.log('[更新] 页面隐藏(托盘)，静默强制更新到新版本');
-                        if (typeof forceRefreshLatest === 'function') { forceRefreshLatest(); return; }
-                        location.reload(true);
-                    }
-                    // 前台：不做任何提示/强刷，仅依靠下方的 visibilitychange 闲置逻辑处理
+                    // 升级/提示的实际决策权交给 app-picker.js（它会按后台静默、前台仅提示的规则处理）
                 }
             });
         })();
