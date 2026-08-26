@@ -21933,6 +21933,16 @@ ${maSection}
                     head += '<button onclick="adminForceRefreshDiagConfig()" style="background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.78rem;">⚡ 立即拉取配置</button>';
                     head += '<span id="diagCfgPullInfo" style="color:#94a3b8;font-size:0.72rem;"></span>';
                     head += '</div>';
+                    // 上报时间规律说明（2026-08-26 补，避免日后忘记）
+                    head += '<div style="margin-top:10px;border-top:1px dashed rgba(255,255,255,0.12);padding-top:8px;font-size:0.74rem;line-height:1.7;color:#cbd5e1;">';
+                    head += '<span style="color:#ffd700;">📊 上报时间规律（客户端侧实际触发时机）：</span><br>';
+                    head += '① <b>打开延迟首报</b>：页面加载 3 秒后读配置，若总闸开则安排首报，延迟 ' + C.openDelayMin + '~' + C.openDelayMax + ' 分钟（随机错峰，避免一打开就全员正点报）。<br>';
+                    head += '② <b>规律心跳</b>：从打开起每 ' + C.openDelayMin + '~' + C.openDelayMax + ' 分钟 + 0~10 分钟随机抖动 自动上报一次（实际约 45~55 分钟一次），写盘健康 + 缓冲合并。离线阈值 60 分钟，故该频率不会误判离线。<br>';
+                    head += '③ <b>缓冲触发</b>：本地有写操作埋点进 buffer 时顺带排程，"立即类"延迟 ' + C.immediateDelayMin + '~' + C.immediateDelayMax + ' 分钟合批上报（省 API，可由「允许立即上报」关掉）。<br>';
+                    head += '④ <b>联网恢复</b>：online 事件立即补报（' + C.immediateDelayMin + '~' + C.immediateDelayMax + ' 分钟延迟）。<br>';
+                    head += '⑤ <b>手动</b>：本面板「立即拉取」按钮可补报。<br>';
+                    head += '👉 所以读写量大的客户端（如一直挂机的老顽固）心跳 + 频繁缓冲上报，频率远高于普通用户，面板上活跃度/写盘次数自然长期最高。延迟数值即上方配置框，可改（立即上报 1~20 分、周期 5~10 分）。';
+                    head += '</div>';
                     head += '</div>';
                     head += '</div>';
                     if (diagFiles.length === 0) {
