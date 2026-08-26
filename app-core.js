@@ -15209,11 +15209,22 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
         // 本机 localStorage 设了 tdjl_counterFlushSec(非0) 仍可强制固定间隔(调试用)。
         let _hbTick = 0; // 第几次心跳(进程内累计)
         async function _getCounterFlushInterval() {
+            // 优先级：本机调试 tdjl_counterFlushSec > 远程 counterFlushSec(功能开关面板) > 默认递增错峰
             try {
                 const local = localStorage.getItem('tdjl_counterFlushSec');
-                if (local != null) { const ln = parseInt(local, 10); if (!isNaN(ln) && ln > 0) { return ln * 1000; } }
+                if (local != null) { const ln = parseInt(local, 10); if (!isNaN(ln) && ln > 0) { return ln * 1000 + _randomJitter(await _getJitterCap()); } }
             } catch (e) {}
-            const baseMin = [60, 120, 180, 240][Math.min(_hbTick, 3)]; // 1h/2h/3h/4h
+            let remoteSec = null;
+            try {
+                const cfg = await getRoomIndexConfig();
+                if (typeof cfg.counterFlushSec === 'number' && cfg.counterFlushSec > 0) remoteSec = cfg.counterFlushSec;
+            } catch (e) {}
+            if (remoteSec != null) {
+                // 用户设的节流间隔(秒) + 随机抖动打散并发，避免全网同时写触发 Gist 限流
+                return remoteSec * 1000 + _randomJitter(await _getJitterCap());
+            }
+            // 兜底：递增错峰(1h/2h/3h/4h + 0~30 分钟随机)
+            const baseMin = [60, 120, 180, 240][Math.min(_hbTick, 3)];
             const jitter = Math.floor(Math.random() * 31) * 60000; // 0~30 分钟随机
             return baseMin * 60000 + jitter;
         }
@@ -15245,7 +15256,7 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
             if (type) _counterFlushPending = type;
             if (_counterFlushTimer) return; // 已有定时器在跑，等它触发
             const wait = Math.max(0, _gistWriteBackoffUntil - Date.now());
-            // 间隔自带随机错峰(_getCounterFlushInterval 已含 0~30 分抖动)，不再额外叠加 _getJitterCap
+            // interval 已由 _getCounterFlushInterval 计算（含 counterFlushSec 基础间隔 + 随机抖动打散并发）
             _getCounterFlushInterval().then((interval) => {
                 const total = wait || interval;
                 console.log('[计数器写回] 安排下次写入(第' + (_hbTick + 1) + '次): 间隔=' + interval + 'ms' + (wait ? ' (含退避' + wait + 'ms)' : ''));
@@ -22314,13 +22325,13 @@ ${maSection}
             {
                 key: 'counterFlush',
                 label: '计数写回间隔',
-                desc: '在线状态/计数写 Gist 的节流间隔（秒）。越大写频率越低、越不易触发限流；全网所有用户统一跟随此值',
+                desc: '在线状态/计数写 Gist 的节流间隔（秒）。越大写频率越低、越不易触发限流；全网所有用户统一跟随此值。范围 10~3600 秒（即最大 1 小时），到时自由调节。后台会在此基础上叠加随机抖动打散并发，避免全网同时写触发限流。',
                 scope: 'remote',
                 remoteField: 'counterFlushSec',
                 type: 'range',
-                min: 10, max: 600, step: 10, unit: '秒',
-                default: 60,
-                apply: (v) => { /* 实际读取在 _getCounterFlushInterval() 内 */ }
+                min: 10, max: 3600, step: 30, unit: '秒',
+                default: 3600,
+                apply: (v) => { /* 实际读取在 _getCounterFlushInterval() 内，已接入远程 counterFlushSec */ }
             },
             {
                 key: 'auctionNews',
