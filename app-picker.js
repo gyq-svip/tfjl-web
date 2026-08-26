@@ -284,7 +284,42 @@
                 }
             } catch (e) {}
         })();
-        // ==================== Service Worker 注册（PWA缓存） ====================
+        // ==================== 24h 兜底升级（仅挂托盘/失焦时，前台绝不触发） ====================
+        // 老顽固客户端若一直挂在前台、从不挂托盘，常规 FORCE_RELOAD 挂托盘逻辑碰不到它。
+        // 兜底：发现新版本满 24h 后，仅当它处于「挂托盘(__tfjlInTray) 或 网页版隐藏」才静默升级。
+        // 铁律：前台打开界面（APP visible 且未挂托盘 / 网页版前台）绝对不自动升级。
+        (function setup24hFallbackUpgrade() {
+            try {
+                if (typeof window.__tfjl24hFallbackStarted === 'function') return;
+                const started = {};
+                window.__tfjl24hFallbackStarted = started;
+                setInterval(() => {
+                    if (!window.__tfjlNewVerSince) return;
+                    const elapsed = Date.now() - window.__tfjlNewVerSince;
+                    if (elapsed < 24 * 60 * 60 * 1000) return; // 未满 24h 不兜底
+                    const isTauri = !!(window.__TAURI_INTERNALS__ || window.__TAURI__ || navigator.userAgent.indexOf('Tauri') >= 0);
+                    const safeToUpgrade = isTauri ? !!window.__tfjlInTray : document.hidden;
+                    if (!safeToUpgrade) return; // 前台使用中 → 绝不升级，继续等下次轮询
+                    console.log('[更新] 发现新版本已满 24h 且当前挂托盘/后台，执行兜底静默升级');
+                    const doSilentUpgrade = function () {
+                        if (typeof forceRefreshLatest === 'function') forceRefreshLatest();
+                        else location.reload(true);
+                    };
+                    const isEditing = function () {
+                        return !!(window.__tfjlProjectDirty) || (typeof window.__tfjlIsEditing === 'function' && window.__tfjlIsEditing());
+                    };
+                    if (isEditing()) {
+                        let waited = 0;
+                        const iv = setInterval(() => {
+                            waited += 3000;
+                            if (!isEditing() || waited >= 600000) { clearInterval(iv); doSilentUpgrade(); }
+                        }, 3000);
+                    } else {
+                        doSilentUpgrade();
+                    }
+                }, 5 * 60 * 1000); // 每 5 分钟检查一次
+            } catch (e) {}
+        })();
         // 首次访问缓存资源，后续打开用缓存秒开，后台静默更新
         // 关键体验：优先用缓存秒开（打开速度不受影响），后台拉到新资源后弹提示「新版本已就绪」
         if ('serviceWorker' in navigator) {
@@ -293,6 +328,8 @@
                 if (event.data && event.data.type === 'NEW_VERSION_READY') {
                     // 收到"有新版本"信号后先核实远端版本，避免刚强刷完（SW激活广播）误报
                     _verifyNewVersion();
+                    // 记录首次发现新版本时刻（用于 24h 兜底升级，仅挂托盘/失焦时才生效，绝不前台强刷）
+                    if (!window.__tfjlNewVerSince) window.__tfjlNewVerSince = Date.now();
                 }
                 // SW 回报的缓存版本号（如 tfjl-v62）→ 显示在右下角版本标签，便于核对缓存是否更新
                 if (event.data && event.data.type === 'SW_VERSION') {
