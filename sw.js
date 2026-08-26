@@ -42,10 +42,15 @@
 // v47: 自动升级验证用空提交（轮询/静默强刷逻辑已在 v46 落地）。CACHE_VERSION 保持 s1.0.313 由 CI 自动 +1 → 线上 318。
 // v48: 自动升级闭环验证（根目录部署源已含轮询，线上 319 验证通过）。本次 CI +1 → 线上 320。
 // v49: 自动升级闭环最终验证（开关 404 修复 + 气泡 bug 修复已上）。本次 CI +1 → 线上 325。
+// v50: 🔴 退回 SW 层 navigate 强推——之前霸道强推老顽固时把 `_pollLatestVersion`/install 兜底/`_maybeForceOnTraffic`
+//      三处都加了无条件 `client.navigate()`，导致 APP 前台也被强刷（用户硬要求「前台坚决不升级，挂托盘才静默升」）。
+//      三处 navigate 全删，只保留 `client.postMessage({type:'FORCE_RELOAD'})`。升级决策唯一交给 app-picker.js：
+//      前台只弹气泡、挂托盘才静默强刷（前置落盘）。老顽固客户端要升，需他们主动 reload/重开一次拿新 app-picker.js，
+//      之后才能进自动轨道。SW_VERSION 应为 s1.0.337（CI +1）。
 // ============================================================
 
-const CACHE_VERSION = 's1.0.336';
-const DEPLOY_TAG = 's20260826-1756';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
+const CACHE_VERSION = 's1.0.333';
+const DEPLOY_TAG = 's20260826-1721';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
@@ -109,22 +114,15 @@ async function _pollLatestVersion() {
     if (!latest) return;
     // 仅当线上版本号更新时才继续（避免每次轮询都打扰）
     if (_versionNum(latest) <= _versionNum(CACHE_VERSION)) return;
-    // 🔴 霸道强制升级：发现线上有新版本即主动接管并强推，【不再依赖功能开关】。
-    // 老顽固客户端（卡旧版、其 app-core.js 不认识 FORCE_RELOAD）靠 SW 直接 client.navigate() 拽页面刷新，
-    // 从而拿到最新 HTML/app-core 完成升级。这是解决"两个顽固客户端卡旧版"的终极手段。
-    console.log('[SW] 检测到线上新版本', latest, '当前', CACHE_VERSION, '→ 霸道强制接管并强推所有页面');
+    // 🔴 退回去：发现新版本只发 FORCE_RELOAD 消息，【不再 SW 层 navigate 强推】。
+    // 原因：之前霸道强推被用户否决——APP 前台被强制刷新会打断编辑、丢数据。
+    // 升级决策唯一交给 app-picker.js：前台只弹气泡、挂托盘才静默强刷。
+    // 老顽固客户端要升，需等他们主动 reload/重开一次（拿新 app-picker.js），之后才能进自动轨道。
+    console.log('[SW] 检测到线上新版本', latest, '当前', CACHE_VERSION, '→ 发 FORCE_RELOAD，由页面侧按前台/托盘判定');
     self.skipWaiting();
     const clients = await self.clients.matchAll({ includeUncontrolled: true });
     clients.forEach(client => {
         try { client.postMessage({ type: 'FORCE_RELOAD', latest: latest, silent: true }); } catch (e) {}
-        // 霸道兜底：即便旧页面不响应 message，也直接强制 navigate 刷新（SW 能力，无需页面配合）
-        try {
-            const raw = client.url || '/';
-            const m = raw.match(/__swforce=(\d+)/);
-            if (m && (Date.now() - Number(m[1]) < 10000)) return; // 防抖：10 秒内已强刷过则跳过
-            const u = (raw.indexOf('?') >= 0) ? raw.split('?')[0] : raw;
-            client.navigate(u + '?__swforce=' + Date.now());
-        } catch (e) {}
     });
 }
 
@@ -167,21 +165,11 @@ self.addEventListener('install', (event) => {
                 self.skipWaiting();
                 return self.clients.claim().then(() =>
                     self.clients.matchAll({ includeUncontrolled: true }).then(cls => {
-                        // 老顽固兜底接管：旧 SW 在跑（多半是卡旧版的客户端，其 app-core.js 不认识 FORCE_RELOAD）。
-                        // ① 先发 FORCE_RELOAD（新版页面会静默处理）
-                        // ② 再【无条件强制 navigate 刷新】所有 client —— 即使旧 app-core 不响应 message，
-                        //    SW 也能直接拽页面 reload，从而拿到最新 HTML/app-core 完成升级（真·霸道兜底）。
-                        //    仅当线上版本确实比本地新才执行（install 阶段 registration.active 存在即代表有旧 SW 被新 SW 取代，可确认需升级）。
+                        // 退回：只发 FORCE_RELOAD 消息，不再 navigate 强推。
+                        // 升级决策交给页面侧（app-picker.js）：前台只弹气泡，挂托盘才静默强刷。
+                        // SW 侧 navigate 会强制刷新 APP 前台页面 → 打断用户编辑 → 丢数据，违背用户硬要求。
                         cls.forEach(c => {
                             try { c.postMessage({ type: 'FORCE_RELOAD', silent: true }); } catch (e) {}
-                            try {
-                                const raw = c.url || '/';
-                                // 防抖：若 URL 已带 __swforce 且是 10 秒内刚强刷过的，跳过，避免连环 navigate
-                                const m = raw.match(/__swforce=(\d+)/);
-                                if (m && (Date.now() - Number(m[1]) < 10000)) return;
-                                const url = (raw.indexOf('?') >= 0) ? raw.split('?')[0] : raw;
-                                c.navigate(url + '?__swforce=' + Date.now());
-                            } catch (e) {}
                         });
                     })
                 );
@@ -229,18 +217,11 @@ async function _maybeForceOnTraffic() {
     } catch (e) { return; }
     if (!latest) return;
     if (_versionNum(latest) <= _versionNum(CACHE_VERSION)) return; // 无新版本不骚扰
-    console.log('[SW] 读写流量触发：检测到线上新版本', latest, '当前', CACHE_VERSION, '→ 强拽升级');
+    console.log('[SW] 读写流量触发：检测到线上新版本', latest, '当前', CACHE_VERSION, '→ 发 FORCE_RELOAD，由页面侧判定');
     self.skipWaiting();
     const clients = await self.clients.matchAll({ includeUncontrolled: true });
     clients.forEach(client => {
         try { client.postMessage({ type: 'FORCE_RELOAD', silent: true }); } catch (e) {}
-        try {
-            const raw = client.url || '/';
-            const m = raw.match(/__swforce=(\d+)/);
-            if (m && (Date.now() - Number(m[1]) < 10000)) return; // 防抖
-            const u = (raw.indexOf('?') >= 0) ? raw.split('?')[0] : raw;
-            client.navigate(u + '?__swforce=' + Date.now());
-        } catch (e) {}
     });
 }
 
