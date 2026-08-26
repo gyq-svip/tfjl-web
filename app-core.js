@@ -328,7 +328,8 @@
                 'feature': '功能使用'
             };
             if (MAP[fn]) return MAP[fn];
-            return fn; // 兜底保留原值
+            // 兜底：未匹配的内部 fn 不再裸露英文/ID，统一显示中文"未知操作"，避免面板出现模糊标识
+            return '未知操作';
         }
         // 诊断配置拉取间隔（用户可设置）：默认 15 分钟；下限 1 分钟避免过于频繁打 GitHub API
         function _getDiagCfgTtl() {
@@ -504,10 +505,19 @@
                 console.log('[DIAG] 缓冲为空，改发心跳上报（写盘健康=' + probe.ok + '）');
             }
             const nickname = (typeof _myNick === 'function' ? _myNick() : '') || localStorage.getItem('TFJL_UserName') || (window.__currentNickname) || '';
+            // 兜底昵称：未设置昵称时显示"游客+短标识"（deviceId 后4位/随机），避免诊断面板出现模糊 anonId/设备ID。
+            // 注意：仅影响上报的 nick 展示字段，anonId（文件名）保持原样不改动。
+            let _dispNick = nickname;
+            if (!_dispNick) {
+                let _suffix = '';
+                try { const dv = (typeof getDeviceId === 'function') ? getDeviceId() : ''; if (dv) _suffix = dv.slice(-4); } catch (e) {}
+                if (!_suffix) _suffix = Math.random().toString(36).slice(2, 6);
+                _dispNick = '游客' + _suffix;
+            }
             const payload = {
                 anonId: _getDiagAnonId(),
                 deviceId: (typeof getDeviceId === 'function' ? getDeviceId() : ''),
-                nick: nickname,
+                nick: _dispNick,
                 lastUpload: Date.now(),
                 heartbeat: entries.length === 0,
                 writeOk: probe.ok,
@@ -584,6 +594,26 @@
                 if (_u.searchParams.get('forcereload') === '1' || _u.searchParams.get('force-refresh') === '1' || _u.searchParams.get('fr') === '1') {
                     console.log('[强制刷新] URL 参数触发，立即拉取最新版');
                     setTimeout(() => { if (typeof forceRefreshLatest === 'function') forceRefreshLatest(); else location.reload(true); }, 600);
+                }
+            } catch (e) {}
+            // 🧪 调试参数（仅用于测试自动升级分支，2026-08-30 23:59 后自动失效）：
+            //   ?testSw=front → 模拟前台(应弹气泡，不静默升)
+            //   ?testSw=tray  → 模拟挂托盘(应静默升级)
+            //   ?testSw=hide  → 模拟网页隐藏(应静默升级)
+            // 不依赖真实新版本，直接调用 notifyNewVersion() 走对应分支，方便观测升级策略。
+            try {
+                const _expire = new Date('2026-08-30T23:59:59').getTime();
+                if (Date.now() < _expire) {
+                    const _tsw = new URL(location.href).searchParams.get('testSw');
+                    if (_tsw === 'front' || _tsw === 'tray' || _tsw === 'hide') {
+                        setTimeout(() => {
+                            if (_tsw === 'tray') window.__tfjlInTray = true;
+                            if (_tsw === 'hide' && !window.__TAURI__) { try { Object.defineProperty(document, 'hidden', { configurable: true, get: () => true }); } catch (e) {} }
+                            console.log('[调试] 模拟状态=' + _tsw + '，触发 notifyNewVersion()');
+                            if (typeof notifyNewVersion === 'function') notifyNewVersion();
+                            else if (typeof showSwUpdateBanner === 'function') showSwUpdateBanner();
+                        }, 1500);
+                    }
                 }
             } catch (e) {}
             // 本地记录始终运行（在 fetch 代理里已调用 _recordDiagWrite）；上报仅在开关开启时调度
@@ -22424,23 +22454,23 @@ ${maSection}
             {
                 key: 'heartbeatMin',
                 label: '💓 规律心跳间隔',
-                desc: '客户端定时上报诊断/心跳的基础间隔（分钟）。所有用户统一跟随此值：到点后客户端在自己当前时间 + 随机抖动范围内任选一刻上报，天然错峰，不会全网同时打 GitHub API。调大=写频更低更省配额；调小=数据更实时。范围 1~1440 分钟（即最大 24 小时）。改动后全网客户端下次心跳即生效。',
+                desc: '客户端定时上报诊断/心跳的基础间隔（分钟）。所有用户统一跟随此值：到点后客户端在自己当前时间 + 随机抖动范围内任选一刻上报，天然错峰，不会全网同时打 GitHub API。调大=写频更低更省配额；调小=数据更实时、远程强刷信号更快触达。范围 1~1440 分钟（即最大 24 小时）。改动后全网客户端下次心跳即生效（默认 15 分钟）。',
                 scope: 'remote',
                 remoteField: 'heartbeatMin',
                 type: 'range',
                 min: 1, max: 1440, step: 1, unit: '分',
-                default: 45,
+                default: 15,
                 apply: (v) => { /* 实际读取在 _initDiagReporter 的 HB_BASE，已接入远程 heartbeatMin */ }
             },
             {
                 key: 'heartbeatJitterMin',
                 label: '💓 心跳随机抖动范围',
-                desc: '每次心跳上报在「基础间隔」上额外叠加的随机提前/延后范围（分钟）。例如间隔 45 + 抖动 10，则每个客户端在 35~55 分钟之间随机一刻上报，彻底打散并发。范围 0~120 分钟。设 0 = 严格按基础间隔（可能正点并发，慎用）。',
+                desc: '每次心跳上报在「基础间隔」上额外叠加的随机提前/延后范围（分钟）。例如间隔 15 + 抖动 5，则每个客户端在 10~20 分钟之间随机一刻上报，彻底打散并发。范围 0~120 分钟。设 0 = 严格按基础间隔（可能正点并发，慎用）。',
                 scope: 'remote',
                 remoteField: 'heartbeatJitterMin',
                 type: 'range',
                 min: 0, max: 120, step: 1, unit: '分',
-                default: 10,
+                default: 5,
                 apply: (v) => { /* 实际读取在 _initDiagReporter 的 HB_JITTER，已接入远程 heartbeatJitterMin */ }
             },
             {
@@ -22531,19 +22561,6 @@ ${maSection}
         function _stripHtml(s) { return String(s || '').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').replace(/\n+/g, '\n').trim(); }
 
         // 功能开关矩阵 → 诊断面板「上报策略」跳转并高亮心跳输入框
-        function gotoDiagHeartbeat() {
-            try { if (typeof adminShowPage === 'function') adminShowPage('features'); } catch (e) {}
-            setTimeout(() => {
-                const el = document.getElementById('ftRangeVal_heartbeatMin');
-                if (el) {
-                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    const card = el.closest('div');
-                    if (card) { card.style.boxShadow = '0 0 0 3px #4fc3f7'; setTimeout(() => { card.style.boxShadow = ''; }, 2500); }
-                }
-            }, 350);
-        }
-        window.gotoDiagHeartbeat = gotoDiagHeartbeat;
-
         async function renderFeatureToggles() {
             const box = document.getElementById('featureTogglesContent');
             if (!box) return;
@@ -22591,15 +22608,6 @@ ${maSection}
                     <button onclick="toggleFeature('${t.key}')" style="margin-left:10px;padding:6px 16px;border-radius:20px;border:none;cursor:pointer;font-size:0.78rem;font-weight:600;color:#fff;background:${color};min-width:52px;">${stateTxt}</button>
                 </div>`;
             }
-            // 导航卡片：心跳间隔设置入口（心跳属于诊断上报策略，故从这里跳转定位到诊断面板对应输入）
-            html += `
-            <div title="规律心跳间隔（分钟）统一控制全网客户端的上报频率。当前在此矩阵中仅作入口，具体数值请在「诊断面板 → 上报策略」中设置，两端读取同一远程配置。" style="display:flex;align-items:center;justify-content:space-between;padding:12px;border:1px dashed rgba(79,195,247,0.5);border-radius:10px;background:rgba(79,195,247,0.06);cursor:pointer;" onclick="gotoDiagHeartbeat()">
-                <div style="flex:1;">
-                    <div style="font-size:0.86rem;color:#4fc3f7;font-weight:600;line-height:1.3;">💓 规律心跳间隔设置</div>
-                    <div style="font-size:0.64rem;color:rgba(255,255,255,0.5);margin-top:4px;">🌐 全网生效 · 点此前往诊断面板配置</div>
-                </div>
-                <span style="margin-left:10px;font-size:1.1rem;color:#4fc3f7;">→</span>
-            </div>`;
             // 🚨 远程强制刷新控制（管理员救命通道）：下发 forceReloadNow 到 room_index.json，
             // 所有在线设备下一次心跳/60秒轮询即拉取最新版（forceRefreshLatest 内部已升级前落盘，安全）。
             // 指令值带时间戳（all@ts / device_xxx@ts），保证可重复触发、且同一次不重复执行。
@@ -22615,9 +22623,14 @@ ${maSection}
                 <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
                     <button onclick="adminForceReloadAll()" style="padding:8px 18px;border-radius:8px;border:none;cursor:pointer;font-weight:700;color:#fff;background:linear-gradient(90deg,#ff6b6b,#ff8e53);">🔄 刷新全部设备</button>
                     <span style="font-size:0.78rem;color:rgba(255,255,255,0.6);">或指定单台：</span>
-                    <input id="frDeviceInput" placeholder="粘贴设备ID，如 device_xxx" style="flex:1;min-width:180px;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:#16213e;color:#fff;font-size:0.8rem;">
+                    <select id="frDeviceList" onchange="var v=this.value;if(v){document.getElementById('frDeviceInput').value=v;}" style="min-width:220px;max-width:320px;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:#16213e;color:#fff;font-size:0.78rem;">
+                        <option value="">— 在线设备列表（点刷新）—</option>
+                    </select>
+                    <button onclick="adminLoadDeviceList()" style="padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.25);cursor:pointer;font-weight:600;color:#fff;background:rgba(255,255,255,0.08);">🔃 刷新列表</button>
+                    <input id="frDeviceInput" placeholder="或手动粘贴设备ID" style="flex:1;min-width:160px;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:#16213e;color:#fff;font-size:0.8rem;">
                     <button onclick="adminForceReloadDevice(document.getElementById('frDeviceInput').value)" style="padding:8px 16px;border-radius:8px;border:1px solid rgba(255,255,255,0.25);cursor:pointer;font-weight:600;color:#fff;background:rgba(255,255,255,0.08);">🎯 精准刷新该设备</button>
                 </div>
+                <div style="font-size:0.66rem;color:rgba(255,255,255,0.4);margin-top:6px;">列表仅显示最近 30 分钟内有心跳的在线设备（昵称 · 版本 · 平台）。点列表项即自动填入设备ID。</div>
                 <div id="frStatus" style="font-size:0.72rem;color:#ffd700;margin-top:8px;min-height:14px;"></div>
             </div>`;
             html += '</div>';
@@ -22673,6 +22686,50 @@ ${maSection}
             id = (id || '').toString().trim();
             if (!id) { const st = document.getElementById('frStatus'); if (st) st.textContent = '⚠️ 请先粘贴设备ID'; return; }
             _adminIssueForceReload(id, '精准刷新 ' + id);
+        };
+
+        // 拉取在线设备列表（最近 30 分钟内有心跳的诊断上报视为在线），填充到强制刷新卡片的下拉框。
+        // 设备信息取自 diag-<anonId>.json 的顶层字段：deviceId / nick / appVersion / platform / lastUpload。
+        window.adminLoadDeviceList = async function () {
+            const sel = document.getElementById('frDeviceList');
+            if (!sel) return;
+            sel.innerHTML = '<option value="">⏳ 正在拉取设备列表…</option>';
+            try {
+                const gid = await _ensureDiagGist();
+                if (!gid) { sel.innerHTML = '<option value="">⚠️ 诊断 Gist 未初始化（先开上报总闸）</option>'; return; }
+                const token = getGistToken();
+                if (!token) { sel.innerHTML = '<option value="">⚠️ 无 Gist Token</option>'; return; }
+                const r = await fetch('https://api.github.com/gists/' + gid, { headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': 'token ' + token } });
+                if (!r.ok) { sel.innerHTML = '<option value="">拉取失败 HTTP ' + r.status + '</option>'; return; }
+                const d = await r.json();
+                const files = Object.keys(d.files || {}).filter(fn => fn.startsWith('diag-') && fn.endsWith('.json'));
+                const now = Date.now();
+                const ONLINE_MS = 30 * 60 * 1000; // 30 分钟内算在线
+                const list = [];
+                files.forEach(fn => {
+                    let p; try { p = JSON.parse(d.files[fn].content); } catch (e) { return; }
+                    const dev = p.deviceId || '';
+                    if (!dev) return;
+                    const last = p.lastUpload || 0;
+                    const online = (now - last) <= ONLINE_MS;
+                    const nick = (p.nick && p.nick !== '游客' && !/^device_/.test(p.nick)) ? p.nick : (dev.slice(0, 12));
+                    const plat = p.platform === 'app' ? 'APP' : (p.platform === 'web' ? '网页' : '?');
+                    const ver = p.appVersion || '未知';
+                    list.push({ dev, nick, ver, plat, last, online });
+                });
+                list.sort((a, b) => b.last - a.last);
+                if (list.length === 0) { sel.innerHTML = '<option value="">暂无设备（无上报）</option>'; return; }
+                let html = '<option value="">— 在线设备(' + list.filter(x => x.online).length + '/' + list.length + ') 点选 —</option>';
+                list.forEach(it => {
+                    const tm = new Date(it.last).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+                    const tag = it.online ? '🟢' : '⚪';
+                    const label = tag + ' ' + it.nick + ' · ' + it.ver + ' · ' + it.plat + ' · ' + tm;
+                    html += '<option value="' + it.dev + '">' + label + '</option>';
+                });
+                sel.innerHTML = html;
+            } catch (e) {
+                sel.innerHTML = '<option value="">拉取异常：' + (e && e.message ? e.message : e) + '</option>';
+            }
         };
 
         // 拖动中预览(只更新显示,不写 Gist)
