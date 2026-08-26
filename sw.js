@@ -42,8 +42,8 @@
 // v49: 自动升级闭环最终验证（开关 404 修复 + 气泡 bug 修复已上）。本次 CI +1 → 线上 325。
 // ============================================================
 
-const CACHE_VERSION = 's1.0.327';
-const DEPLOY_TAG = 's20260826-1650';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
+const CACHE_VERSION = 's1.0.328';
+const DEPLOY_TAG = 's20260826-1654';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
