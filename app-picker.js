@@ -279,13 +279,31 @@
                     updateCacheVersionDisplay(event.data.version, event.data.deployTag);
                 }
                 // 🔴 SW 主动强刷指令（来自 SW 主动轮询 _pollLatestVersion 或 _maybeForceReload，功能开关 forceReloadEnabled 开时发出）。
-                // 隐藏/托盘态 → 直接静默强刷（不打断）；前台可见 → 仅标记提示，等用户点（避免刷新打断正在进行的操作）。
                 if (event.data && event.data.type === 'FORCE_RELOAD') {
-                    if (document.hidden) {
-                        // 静默自动升级：托盘/最小化态不打断用户，任何提示都不显示，直接静默强刷
+                    const isTauri = !!(window.__TAURI_INTERNALS__ || window.__TAURI__ || navigator.userAgent.indexOf('Tauri') >= 0);
+                    if (isTauri) {
+                        // 🔴 APP 场景（点 X 挂托盘，WebView 不销毁，document.hidden 不一定变 true）：
+                        // 收到强刷指令即代表"后台空闲可升级"。规则：
+                        //  - 正在编辑项目（有未保存改动 __tfjlProjectDirty）→ 先保存再静默升（不打断手上的活，存好再换）
+                        //  - 空闲（无编辑）→ 等 15 秒静默升级（对应「最小化托盘 15 秒后自动升级」）
+                        const doSilentUpgrade = function () {
+                            if (typeof forceRefreshLatest === 'function') forceRefreshLatest();
+                            else location.reload(true);
+                        };
+                        if (window.__tfjlProjectDirty) {
+                            // 正在编辑：先保存项目（存好手上的活），保存后立刻静默升（不额外等 15 秒）
+                            try { if (typeof saveCurrentProject === 'function') saveCurrentProject(); } catch (e) {}
+                            doSilentUpgrade();
+                        } else {
+                            // 空闲：最小化托盘 15 秒后静默升级
+                            setTimeout(doSilentUpgrade, 15000);
+                        }
+                    } else if (document.hidden) {
+                        // 网页版：最小化/隐藏态 → 直接静默强刷（不打断）
                         if (typeof forceRefreshLatest === 'function') forceRefreshLatest();
                         else location.reload(true);
                     } else {
+                        // 网页版前台可见 → 仅标记提示，等用户点（避免刷新打断操作）
                         window.__tfjlHasNewVersion = true;
                         _markNewVersionAvailable();
                         if (typeof notifyNewVersion === 'function') notifyNewVersion();
