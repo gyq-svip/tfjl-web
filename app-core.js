@@ -299,6 +299,35 @@
             } catch (e) {}
             return { emoji: '📦', label: '其他 Gist', url: 'https://gist.github.com/' + gid };
         }
+        // 把埋点的英文 fn（内部函数名）翻译成中文标签，供诊断面板「按功能」维度展示（不污染原 payload）
+        // gid 用于配合 _gistLabel 拿到房间/脚本中文名，让「其他」归并成可读标签
+        function _fnZh(gid, fn) {
+            if (!fn) return '未知操作';
+            const lbl = (gid && gid !== 'feature') ? _gistLabel(gid).label : '';
+            if (fn.indexOf('saveRoomOrOtherGist') === 0) return (lbl || '其他Gist') + '写入';
+            if (fn.indexOf('uploadScript') === 0) return (lbl || '脚本分享') + '上传';
+            if (fn.indexOf('deleteGist') === 0) return '删除Gist(' + (gid ? gid.substring(0, 8) : '?') + ')';
+            if (fn.indexOf('indexGist') === 0) {
+                const t = /\(([^)]+)\)/.exec(fn);
+                return '索引Gist写入' + (t ? '(' + t[1] + ')' : '');
+            }
+            const MAP = {
+                'diagUpload': '诊断数据上传',
+                'saveMessagesToGist': '消息墙写入',
+                'saveBossToGist': 'Boss减伤写入',
+                'backupWallMessages': '消息墙备份',
+                'createGist': '新建Gist',
+                'chat': '聊天消息',
+                'image': '图片上传',
+                'otherGist': '其他Gist写入',
+                'other': '其他操作',
+                'pullDiag': '读取诊断',
+                'diag': '诊断操作',
+                'feature': '功能使用'
+            };
+            if (MAP[fn]) return MAP[fn];
+            return fn; // 兜底保留原值
+        }
         // 诊断配置拉取间隔（用户可设置）：默认 15 分钟；下限 1 分钟避免过于频繁打 GitHub API
         function _getDiagCfgTtl() {
             let min = 15;
@@ -14103,8 +14132,29 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
         
         // 获取当前时间字符串
         function getCurrentTimeString() {
-            const now = new Date();
-            return now.toLocaleString('zh-CN');
+            // 存 ISO（可解析，便于后续显示相对时间），展示交给 _relTime
+            return new Date().toISOString();
+        }
+        // 北京时间格式化（固定 GMT+8，不依赖用户机器时区，避免「时间对不上」困惑）
+        function _fmtBJTime(iso) {
+            const d = new Date(iso);
+            if (isNaN(d.getTime())) return iso;
+            try {
+                return new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(d) + ' (北京)';
+            } catch (e) {
+                return d.toLocaleString('zh-CN');
+            }
+        }
+        // 相对时间 + 绝对北京时间，如「3分钟前 · 2026-08-27 14:05:02 (北京)」
+        function _relTime(iso) {
+            const d = new Date(iso);
+            if (isNaN(d.getTime())) return iso; // 旧数据（非 ISO）兜底显示原串
+            const diff = Date.now() - d.getTime();
+            const abs = _fmtBJTime(iso);
+            if (diff < 60000) return '刚刚 · ' + abs;
+            if (diff < 3600000) return Math.floor(diff / 60000) + '分钟前 · ' + abs;
+            if (diff < 86400000) return Math.floor(diff / 3600000) + '小时前 · ' + abs;
+            return Math.floor(diff / 86400000) + '天前 · ' + abs;
         }
         
         // 从缓存加载统计数据
@@ -21574,7 +21624,7 @@ ${maSection}
                         <p>• 今日下载：${todayStats.downloads}</p>
                     </div>
                     
-                    <p style="color:#888;font-size:0.9rem;margin-top:20px;">最后更新：${counterData.last_updated}</p>
+                    <p style="color:#888;font-size:0.9rem;margin-top:20px;">最后更新：${_relTime(counterData.last_updated)}</p>
                 </div>
             `;
             
@@ -22075,7 +22125,7 @@ ${maSection}
                                 const linkHtml = info.url ? '<a href="' + info.url + '" target="_blank" rel="noopener" style="color:#60a5fa;text-decoration:underline;font-size:0.68rem;margin-left:6px;" title="' + info.url + '">' + short8 + '</a>' : short8;
                                 labelHtml = info.emoji + ' <b style="color:#fca5a5;">' + info.label + '</b> ' + linkHtml;
                             }
-                            html += '<div style="cursor:pointer;color:#fca5a5;" onclick="var d=document.getElementById(\'' + id + '\');if(d.style.display===\'none\'){d.style.display=\'block\';}else{d.style.display=\'none\';}">' + bar(x.v, wMax) + ' ' + x.v + '　✍️ ' + labelHtml + ' <span style="color:#94a3b8;font-size:0.68rem;">/ ' + fn + '</span> <span style="color:#60a5fa;font-size:0.7rem;">▶</span></div>';
+                            html += '<div style="cursor:pointer;color:#fca5a5;" onclick="var d=document.getElementById(\'' + id + '\');if(d.style.display===\'none\'){d.style.display=\'block\';}else{d.style.display=\'none\';}">' + bar(x.v, wMax) + ' ' + x.v + '　✍️ ' + labelHtml + ' <span style="color:#94a3b8;font-size:0.68rem;">/ ' + _fnZh(rawGid, fn) + '</span> <span style="color:#60a5fa;font-size:0.7rem;">▶</span></div>';
                             html += '<div id="' + id + '" style="display:none;background:rgba(0,0,0,0.25);border-left:2px solid #f87171;padding:6px 10px;margin:4px 0 8px 12px;font-size:0.75rem;">';
                             writeKeys.filter(k => k.substring(6) === x.k).forEach(k => {
                                 (detailByFn[k] || []).forEach(row => {
@@ -22104,7 +22154,7 @@ ${maSection}
                                 const linkHtml = info.url ? '<a href="' + info.url + '" target="_blank" rel="noopener" style="color:#60a5fa;text-decoration:underline;font-size:0.68rem;margin-left:6px;" title="' + info.url + '">' + short8 + '</a>' : short8;
                                 labelHtml = info.emoji + ' <b style="color:#cbd5e1;">' + info.label + '</b> ' + linkHtml;
                             }
-                            html += '<div style="cursor:pointer;color:#cbd5e1;" onclick="var d=document.getElementById(\'' + id + '\');if(d.style.display===\'none\'){d.style.display=\'block\';}else{d.style.display=\'none\';}">' + bar(x.v, uMax2) + ' ' + x.v + '　📊 ' + labelHtml + ' <span style="color:#94a3b8;font-size:0.68rem;">/ ' + fn + '</span> <span style="color:#60a5fa;font-size:0.7rem;">▶</span></div>';
+                            html += '<div style="cursor:pointer;color:#cbd5e1;" onclick="var d=document.getElementById(\'' + id + '\');if(d.style.display===\'none\'){d.style.display=\'block\';}else{d.style.display=\'none\';}">' + bar(x.v, uMax2) + ' ' + x.v + '　📊 ' + labelHtml + ' <span style="color:#94a3b8;font-size:0.68rem;">/ ' + _fnZh(rawGid, fn) + '</span> <span style="color:#60a5fa;font-size:0.7rem;">▶</span></div>';
                             html += '<div id="' + id + '" style="display:none;background:rgba(0,0,0,0.25);border-left:2px solid #94a3b8;padding:6px 10px;margin:4px 0 8px 12px;font-size:0.75rem;">';
                             useKeys.filter(k => k.substring(4) === x.k).forEach(k => {
                                 (detailByFn[k] || []).forEach(row => {
@@ -25155,7 +25205,7 @@ ${maSection}
             html += `</div>`;
 
             // 数据更新时间
-            html += `<div style="color:rgba(255,255,255,0.3);font-size:0.8rem;text-align:center;padding:10px;">最后更新: ${data.last_updated || '未知'}</div>`;
+            html += `<div style="color:rgba(255,255,255,0.3);font-size:0.8rem;text-align:center;padding:10px;">最后更新: ${_relTime(data.last_updated || '') || '未知'}</div>`;
 
             content.innerHTML = html;
         }
@@ -25242,7 +25292,7 @@ ${maSection}
                         <div>• 今日下载次数：<span style="color:#ffd700;">${todayStats.downloads}</span></div>
                     </div>
                 </div>
-                <div style="color:rgba(255,255,255,0.3);font-size:0.8rem;text-align:center;margin-top:10px;">最后更新：${counterData.last_updated || '未知'}</div>
+                <div style="color:rgba(255,255,255,0.3);font-size:0.8rem;text-align:center;margin-top:10px;">最后更新：${_relTime(counterData.last_updated || '') || '未知'}</div>
             `;
         }
 
@@ -25333,7 +25383,7 @@ ${maSection}
                     </tbody>
                 </table>
                 <div style="color:rgba(255,255,255,0.3);font-size:0.75rem;text-align:center;margin-top:15px;">
-                    最后更新：${counterData.last_updated || '未知'}
+                    最后更新：${_relTime(counterData.last_updated || '') || '未知'}
                 </div>
             `;
 
