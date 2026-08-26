@@ -281,32 +281,16 @@ function staleWhileRevalidate(request, cacheName) {
 
 // ============================================================
 // NetworkFirst：优先网络（保证永远拿到最新脚本），失败/超时回退缓存
-// 并在“网络内容 ≠ 缓存内容”时通知页面有新版本（触发自动刷新）
+// 注意：此处【不再】因「缓存文本 ≠ 网络文本」发 NEW_VERSION_READY 气泡——
+// 该比对在 SW 安装初期缓存尚未预热时必然不一致，导致每次升级后重复弹气泡（bug）。
+// 「发现新版本」气泡统一由 install 阶段（有旧 SW 时）与 _pollLatestVersion 轮询（受功能开关控制）负责。
 // ============================================================
 function networkFirst(request, cacheName) {
     return caches.open(cacheName).then((cache) => {
         return _timeoutFetch(request).then((networkResponse) => {
             if (networkResponse && networkResponse.status === 200) {
-                // 比较缓存与网络内容，决定是否通知页面“有新版本”
-                cache.match(request).then((cachedResponse) => {
-                    const cachedClone = cachedResponse ? cachedResponse.clone() : null;
-                    const networkClone = networkResponse.clone();
-                    Promise.all([
-                        cachedClone ? cachedClone.text() : Promise.resolve(''),
-                        networkClone.text()
-                    ]).then(([cachedText, networkText]) => {
-                        cache.put(request, new Response(networkText, {
-                            status: networkResponse.status,
-                            statusText: networkResponse.statusText,
-                            headers: networkResponse.headers
-                        }));
-                        if (cachedText !== networkText) {
-                            self.clients.matchAll().then(clients => {
-                                clients.forEach(client => client.postMessage({ type: 'NEW_VERSION_READY' }));
-                            });
-                        }
-                    }).catch(() => {});
-                }).catch(() => {});
+                // 仅更新缓存，不比较文本、不弹气泡
+                cache.put(request, networkResponse.clone()).catch(() => {});
             }
             return networkResponse;
         }).catch(() => {
