@@ -306,7 +306,12 @@
                 //   · 网页版前台 → 不弹气泡、不升级，切后台时静默升
                 if (event.data && event.data.type === 'FORCE_RELOAD') {
                     const isTauri = !!(window.__TAURI_INTERNALS__ || window.__TAURI__ || navigator.userAgent.indexOf('Tauri') >= 0);
-                    const inBackground = document.hidden || (isTauri && window.__tfjlInTray);
+                    // 🔴 APP 只有「真正挂托盘(点 X,__tfjlInTray=true)」才算后台可静默升级。
+                    // 仅仅被别的窗口全屏盖住 / 失焦 / 普通最小化(未挂托盘) → 一律视为前台，坚决不自动升级，
+                    // 最多弹气泡提示（符合用户要求：打开界面就坚决不升级，只有挂托盘才静默升）。
+                    // 注意：不能用 document.hidden 判断 APP 后台，否则「被全屏应用盖住」可能被误判为后台而强刷丢数据。
+                    const inTray = isTauri && window.__tfjlInTray;
+                    const inBackground = isTauri ? inTray : document.hidden;
 
                     if (inBackground) {
                         // 后台/托盘：静默升级，但编辑中延后
@@ -336,7 +341,8 @@
                         if (!window.__tfjlTrayUpgradeBound) {
                             window.__tfjlTrayUpgradeBound = true;
                             const trayUpgrade = function () {
-                                if (window.__tfjlInTray || document.hidden) {
+                                // 仅当真正挂托盘才升级（APP 场景不认 document.hidden，避免被全屏盖住误升）
+                                if (window.__tfjlInTray) {
                                     const doSilentUpgrade = function () {
                                         if (typeof forceRefreshLatest === 'function') forceRefreshLatest();
                                         else location.reload(true);
