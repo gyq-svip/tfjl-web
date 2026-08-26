@@ -363,7 +363,7 @@
         }
         // 读取诊断配置（本地缓存按用户设置间隔，超时重新拉）
         async function _getDiagConfig(force) {
-            const def = { enabled: true, periodDays: 3, allowImmediate: true, openDelayMin: 5, openDelayMax: 10, immediateDelayMin: 1, immediateDelayMax: 20, heartbeatMin: 45, diagGistId: '', forceReload: false };
+            const def = { enabled: true, periodDays: 3, allowImmediate: true, openDelayMin: 5, openDelayMax: 10, immediateDelayMin: 1, immediateDelayMax: 20, diagGistId: '', forceReload: false };
             // 配置拉取间隔可由用户设置（tdjl_diagCfgTtlMin），默认 15 分钟；设为更小值可让人少时更快拿到新策略
             const ttl = _getDiagCfgTtl();
             try {
@@ -423,7 +423,7 @@
                 const createResponse = await fetch('https://api.github.com/gists', {
                     method: 'POST',
                     headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': 'token ' + token },
-                    body: JSON.stringify({ description: 'TFJL 写操作诊断上报(分片)', public: false, files: { 'diag_config.json': { content: JSON.stringify({ enabled: true, periodDays: 3, allowImmediate: true, openDelayMin: 5, openDelayMax: 10, immediateDelayMin: 1, immediateDelayMax: 20, heartbeatMin: 45 }, null, 2) } } })
+                    body: JSON.stringify({ description: 'TFJL 写操作诊断上报(分片)', public: false, files: { 'diag_config.json': { content: JSON.stringify({ enabled: true, periodDays: 3, allowImmediate: true, openDelayMin: 5, openDelayMax: 10, immediateDelayMin: 1, immediateDelayMax: 20 }, null, 2) } } })
                 });
                 if (createResponse.ok) {
                     const data = await createResponse.json();
@@ -604,9 +604,12 @@
                     }
                 });
             }
-            // 规律心跳基础间隔从远程配置 heartbeatMin 读取（管理员可在面板调节，默认 45 分钟），
-            // 配合 ±10 分钟随机抖动错峰；仅启动那一刻计算一次，避免频繁读配置。
-            const HB_BASE = ((_cfg && _cfg.heartbeatMin) ? _cfg.heartbeatMin : 45) * 60 * 1000, HB_JITTER = 10 * 60 * 1000;
+            // 规律心跳基础间隔 + 随机抖动范围均从「索引配置」读取（功能开关矩阵管理，管理员可实时调），
+            // 默认值：间隔 45 分钟、抖动范围 10 分钟。两个值都放在功能开关面板，无需进诊断面板。
+            let _idxCfg = null;
+            _getRoomIndexConfig().then(c => { _idxCfg = c || null; }).catch(() => { _idxCfg = null; });
+            const HB_BASE = ((_idxCfg && _idxCfg.heartbeatMin) ? _idxCfg.heartbeatMin : 45) * 60 * 1000;
+            const HB_JITTER = ((_idxCfg && _idxCfg.heartbeatJitterMin) ? _idxCfg.heartbeatJitterMin : 10) * 60 * 1000;
             setInterval(_heartbeatOnce, HB_BASE + Math.random() * HB_JITTER);
         })();
         // 联网恢复（online 事件）→ 立即上报（1~20 分钟随机延迟）
@@ -21991,7 +21994,6 @@ ${maSection}
                     head += '<label>立即上报延迟(分): <input type="number" id="cfgImmMin" value="' + C.immediateDelayMin + '" min="0" style="width:42px;background:#16213e;color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:3px;"> ~ <input type="number" id="cfgImmMax" value="' + C.immediateDelayMax + '" min="0" style="width:42px;background:#16213e;color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:3px;"></label>';
                     head += '<label>周期上报延迟(分): <input type="number" id="cfgOpenMin" value="' + C.openDelayMin + '" min="1" style="width:42px;background:#16213e;color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:3px;"> ~ <input type="number" id="cfgOpenMax" value="' + C.openDelayMax + '" min="1" style="width:42px;background:#16213e;color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:3px;"></label>';
                     head += '<label>上报文件保留(天): <input type="number" id="cfgPeriod" value="' + C.periodDays + '" min="1" style="width:42px;background:#16213e;color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:3px;"></label>';
-                    head += '<label>规律心跳间隔(分): <input type="number" id="cfgHeartbeat" value="' + (C.heartbeatMin || 45) + '" min="1" max="1440" style="width:52px;background:#16213e;color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:3px;"> <span style="color:#94a3b8;">(统一心跳管理，所有客户端跟随)</span></label>';
                     head += '</div>';
                     head += '<div style="margin-top:8px;"><button onclick="adminSaveDiagCfg()" style="background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.82rem;">💾 保存配置</button><span id="diagCfgStatus" style="color:#94a3b8;font-size:0.72rem;margin-left:8px;"></span></div>';
                     // 配置拉取间隔（客户端侧）：默认 15 分钟，可改小让在线客户端更快拿到新策略；立即拉取绕过缓存
@@ -22005,7 +22007,7 @@ ${maSection}
                     head += '<div style="margin-top:10px;border-top:1px dashed rgba(255,255,255,0.12);padding-top:8px;font-size:0.74rem;line-height:1.7;color:#cbd5e1;">';
                     head += '<span style="color:#ffd700;">📊 上报时间规律（客户端侧实际触发时机）：</span><br>';
                     head += '① <b>打开延迟首报</b>：页面加载 3 秒后读配置，若总闸开则安排首报，延迟 ' + C.openDelayMin + '~' + C.openDelayMax + ' 分钟（随机错峰，避免一打开就全员正点报）。<br>';
-                    head += '② <b>规律心跳</b>：从打开起每 ' + (C.heartbeatMin || 45) + ' 分钟（可上方配置调节，全网统一跟随） + 0~10 分钟随机抖动 自动上报一次，写盘健康 + 缓冲合并。离线阈值 60 分钟，故该频率不会误判离线。<br>';
+                    head += '② <b>规律心跳</b>：从打开起每 45 分钟（基础间隔）+ 0~10 分钟（随机抖动）自动上报一次，写盘健康 + 缓冲合并。间隔与抖动均可在「功能开关面板」调节，全网统一跟随。离线阈值 60 分钟，故该频率不会误判离线。<br>';
                     head += '③ <b>缓冲触发</b>：本地有写操作埋点进 buffer 时顺带排程，"立即类"延迟 ' + C.immediateDelayMin + '~' + C.immediateDelayMax + ' 分钟合批上报（省 API，可由「允许立即上报」关掉）。<br>';
                     head += '④ <b>联网恢复</b>：online 事件立即补报（' + C.immediateDelayMin + '~' + C.immediateDelayMax + ' 分钟延迟）。<br>';
                     head += '⑤ <b>手动</b>：本面板「立即拉取」按钮可补报。<br>';
@@ -22286,7 +22288,6 @@ ${maSection}
                 cfg.allowImmediate = cfg.allowImmediate !== false;
                 cfg.openDelayMin = cfg.openDelayMin || 5; cfg.openDelayMax = cfg.openDelayMax || 10;
                 cfg.immediateDelayMin = cfg.immediateDelayMin || 1; cfg.immediateDelayMax = cfg.immediateDelayMax || 20;
-                cfg.heartbeatMin = cfg.heartbeatMin || 45;
                 const pr = await fetch('https://api.github.com/gists/' + gid, {
                     method: 'PATCH',
                     headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': 'token ' + token },
@@ -22310,8 +22311,7 @@ ${maSection}
                 periodDays: num('cfgPeriod', 3),
                 allowImmediate: allowImmediate,
                 openDelayMin: Math.max(1, num('cfgOpenMin', 5)), openDelayMax: Math.max(1, num('cfgOpenMax', 10)),
-                immediateDelayMin: Math.max(0, num('cfgImmMin', 1)), immediateDelayMax: Math.max(0, num('cfgImmMax', 20)),
-                heartbeatMin: Math.max(1, Math.min(1440, num('cfgHeartbeat', 45)))
+                immediateDelayMin: Math.max(0, num('cfgImmMin', 1)), immediateDelayMax: Math.max(0, num('cfgImmMax', 20))
             };
             if (status) status.textContent = '⏳ 保存中…';
             try {
@@ -22334,7 +22334,7 @@ ${maSection}
                 const r = await fetch('https://api.github.com/gists', {
                     method: 'POST',
                     headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': 'token ' + token },
-                    body: JSON.stringify({ description: 'TFJL 写操作诊断上报(分片)', public: false, files: { 'diag_config.json': { content: JSON.stringify({ enabled: true, periodDays: 3, allowImmediate: true, openDelayMin: 5, openDelayMax: 10, immediateDelayMin: 1, immediateDelayMax: 20, heartbeatMin: 45 }, null, 2) } } })
+                    body: JSON.stringify({ description: 'TFJL 写操作诊断上报(分片)', public: false, files: { 'diag_config.json': { content: JSON.stringify({ enabled: true, periodDays: 3, allowImmediate: true, openDelayMin: 5, openDelayMax: 10, immediateDelayMin: 1, immediateDelayMax: 20 }, null, 2) } } })
                 });
                 if (r.ok) { const d = await r.json(); localStorage.setItem(DIAG_GIST_KEY, d.id); if (hint) hint.textContent = '✅ 已创建: ' + d.id; setTimeout(adminLoadDiag, 600); }
                 else if (hint) hint.textContent = '创建失败 HTTP ' + r.status;
@@ -22364,6 +22364,28 @@ ${maSection}
                 min: 10, max: 3600, step: 30, unit: '秒',
                 default: 3600,
                 apply: (v) => { /* 实际读取在 _getCounterFlushInterval() 内，已接入远程 counterFlushSec */ }
+            },
+            {
+                key: 'heartbeatMin',
+                label: '💓 规律心跳间隔',
+                desc: '客户端定时上报诊断/心跳的基础间隔（分钟）。所有用户统一跟随此值：到点后客户端在自己当前时间 + 随机抖动范围内任选一刻上报，天然错峰，不会全网同时打 GitHub API。调大=写频更低更省配额；调小=数据更实时。范围 1~1440 分钟（即最大 24 小时）。改动后全网客户端下次心跳即生效。',
+                scope: 'remote',
+                remoteField: 'heartbeatMin',
+                type: 'range',
+                min: 1, max: 1440, step: 1, unit: '分',
+                default: 45,
+                apply: (v) => { /* 实际读取在 _initDiagReporter 的 HB_BASE，已接入远程 heartbeatMin */ }
+            },
+            {
+                key: 'heartbeatJitterMin',
+                label: '💓 心跳随机抖动范围',
+                desc: '每次心跳上报在「基础间隔」上额外叠加的随机提前/延后范围（分钟）。例如间隔 45 + 抖动 10，则每个客户端在 35~55 分钟之间随机一刻上报，彻底打散并发。范围 0~120 分钟。设 0 = 严格按基础间隔（可能正点并发，慎用）。',
+                scope: 'remote',
+                remoteField: 'heartbeatJitterMin',
+                type: 'range',
+                min: 0, max: 120, step: 1, unit: '分',
+                default: 10,
+                apply: (v) => { /* 实际读取在 _initDiagReporter 的 HB_JITTER，已接入远程 heartbeatJitterMin */ }
             },
             {
                 key: 'auctionNews',
@@ -22396,16 +22418,16 @@ ${maSection}
             },
             {
                 key: 'forceReload',
-                label: '🚀 强制更新总开关（网页版前台闲置自动刷）',
+                label: '🚀 强制更新总开关（后台/托盘自动升级）',
                 desc:
-                    '本开关只控制「网页版前台闲置时是否自动强刷」，默认关。<br>' +
+                    '本开关控制「后台/托盘场景是否允许静默自动升级」，默认关。<br>' +
                     '【整体自动升级规则（2026-08-26 定稿，全网生效，不依赖本开关）】<br>' +
                     '① APP 挂托盘（点 X 最小化到托盘，__tfjlInTray=true）：静默自动升级；若正在编辑则延后到编辑结束再升（最多等 10 分钟）；升级前强制落盘所有项目，绝不丢数据。<br>' +
                     '② APP 前台打开界面 / 被其他程序全屏遮挡：坚决不自动升级，最多弹气泡提示，用户手动点才升。<br>' +
                     '③ 网页版 隐藏/最小化：静默升级；网页版 前台：不升级，切到后台才静默升（前台也不弹气泡）。<br>' +
                     '④ 老顽固客户端（一直挂机、读写量极大、碰不到）：不搞 SW 层强制 navigate（会误伤前台用户）。老顽固若挂托盘/失焦（即不在前台使用时）才会静默升级；若 24 小时内始终挂在前台，则只弹气泡，不强制升级——遵循前台铁律，绝不影响正常使用的用户。<br>' +
                     '⑤ 升级前一律先落盘（forceRefreshLatest 内部 await __tfjlSaveAllProjects），编辑内容零丢失。<br>' +
-                    '【本开关开启的效果】额外允许「网页版前台 + 当前闲置(>60s 无操作且无未保存项目)」时也自动静默强刷（前台不打断正在改项目的用户）。关闭则前台只靠切后台才升。<br>' +
+                    '【本开关开启的效果】允许后台/托盘场景静默自动升级；关闭则即使后台也不自动升（仍弹气泡由用户手动点）。本开关绝不赋予前台任何自动升级权限。<br>' +
                     '【判定说明】APP 前后台只认「是否真正挂托盘(__tfjlInTray)」，绝不用 document.hidden 判断——避免被全屏盖住误判后台而强刷丢数据。<br>' +
                     '【🔴 前台不升级铁律（2026-08-26 用户硬要求，最高优先级，任何代码不得违反）】<br>' +
                     '· 前台打开界面（无论是否被其他程序全屏遮挡）= 绝对不自动升级，哪怕线上已更新 N 个版本、哪怕已挂机 24h+。<br>' +
@@ -22454,14 +22476,13 @@ ${maSection}
 
         // 功能开关矩阵 → 诊断面板「上报策略」跳转并高亮心跳输入框
         function gotoDiagHeartbeat() {
-            try { if (typeof adminShowPage === 'function') adminShowPage('diag'); } catch (e) {}
+            try { if (typeof adminShowPage === 'function') adminShowPage('features'); } catch (e) {}
             setTimeout(() => {
-                const el = document.getElementById('cfgHeartbeat');
+                const el = document.getElementById('ftRangeVal_heartbeatMin');
                 if (el) {
                     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    el.style.boxShadow = '0 0 0 3px #4fc3f7';
-                    el.focus();
-                    setTimeout(() => { el.style.boxShadow = ''; }, 2500);
+                    const card = el.closest('div');
+                    if (card) { card.style.boxShadow = '0 0 0 3px #4fc3f7'; setTimeout(() => { card.style.boxShadow = ''; }, 2500); }
                 }
             }, 350);
         }
