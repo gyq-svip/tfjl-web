@@ -40,8 +40,8 @@
 // v47: 自动升级验证用空提交（轮询/静默强刷逻辑已在 v46 落地）。CACHE_VERSION 保持 s1.0.313 由 CI 自动 +1 → 线上 318。
 // ============================================================
 
-const CACHE_VERSION = 's1.0.318';
-const DEPLOY_TAG = 's20260826-0526';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
+const CACHE_VERSION = 's1.0.319';
+const DEPLOY_TAG = 's20260826-1252';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
