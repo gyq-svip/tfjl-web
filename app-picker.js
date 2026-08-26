@@ -278,6 +278,19 @@
                 if (event.data && event.data.type === 'SW_VERSION') {
                     updateCacheVersionDisplay(event.data.version, event.data.deployTag);
                 }
+                // 🔴 SW 主动强刷指令（来自 SW 主动轮询 _pollLatestVersion 或 _maybeForceReload，功能开关 forceReloadEnabled 开时发出）。
+                // 隐藏/托盘态 → 直接静默强刷（不打断）；前台可见 → 仅标记提示，等用户点（避免刷新打断正在进行的操作）。
+                if (event.data && event.data.type === 'FORCE_RELOAD') {
+                    if (document.hidden) {
+                        // 静默自动升级：托盘/最小化态不打断用户，任何提示都不显示，直接静默强刷
+                        if (typeof forceRefreshLatest === 'function') forceRefreshLatest();
+                        else location.reload(true);
+                    } else {
+                        window.__tfjlHasNewVersion = true;
+                        _markNewVersionAvailable();
+                        if (typeof notifyNewVersion === 'function') notifyNewVersion();
+                    }
+                }
             });
             // 标记有新版本可用：版本号始终保持暗色常显（不额外高亮/脉冲），仅更新 tooltip 文案提示
             function _markNewVersionAvailable() {

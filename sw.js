@@ -33,10 +33,15 @@
 //      deploy.yml 中已废弃的 SW register ?v= sed 已注释（app-picker.js 自己跟随 #versionTag）。
 // v45: 诊断面板「🟥真实写 Gist」与「⚪功能使用」改中文标签。把 32 位 Gist ID 用 _gistLabel() 翻译成 emoji+中文用途（消息墙/计数器/索引/房间等），
 //      短哈希前 8 位用蓝色下划线链接包裹，点击直达 Gist。截图里那种 `51e7030023fa…` 乱码已消失。SW_VERSION 应为 s1.0.313。
+// v46: 🔴 SW 主动轮询自动升级——弥补「页面一直开着不 reload 就不自动升」的缺口（P3/最小化托盘场景）。
+//      新增 _pollLatestVersion()：activate 后每 5 分钟 fetch 线上 sw.js 提取 CACHE_VERSION，发现更新且功能开关 forceReloadEnabled 开，
+//      则 skipWaiting() + 发 FORCE_RELOAD（页面在隐藏态静默强刷）。开关关则退化为等用户手动点。NEVER_CACHE 加 gyq-svip.github.io 放行轮询 fetch。
+//      SW_VERSION 应为 s1.0.314（CI 部署 +1）。
+// v47: 自动升级验证用空提交（轮询/静默强刷逻辑已在 v46 落地）。CACHE_VERSION 保持 s1.0.313 由 CI 自动 +1 → 线上 318。
 // ============================================================
 
-const CACHE_VERSION = 's1.0.317';
-const DEPLOY_TAG = 's20260826-0514';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
+const CACHE_VERSION = 's1.0.313';
+const DEPLOY_TAG = 's20260826-0401';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
@@ -44,8 +49,64 @@ const NEVER_CACHE = [
     'api.github.com',
     'gist.githubusercontent.com',
     'raw.githubusercontent.com',
-    'avatars.githubusercontent.com'
+    'avatars.githubusercontent.com',
+    'gyq-svip.github.io'   // 放行线上 sw.js 自身的版本轮询 fetch（SW 主动探测最新版用）
 ];
+
+// 线上 sw.js 地址（与本站同源，仅主机不同）。SW 主动轮询它提取 CACHE_VERSION，
+// 实现「页面一直开着不 reload 也能自动升级」（弥补 register.update() 只在 load 时触发、开着不动不升的缺口）。
+const ONLINE_SW_URL = 'https://gyq-svip.github.io/tfjl-web/sw.js';
+
+// 从 CACHE_VERSION（形如 's1.0.314'）解析数字尾部，便于比较大小
+function _versionNum(v) {
+    const m = /(\d+)\s*$/.exec(v || '');
+    return m ? parseInt(m[1], 10) : -1;
+}
+
+// 读索引 Gist 的 forceReloadEnabled（公开 raw，无需 token），开关开则返回 true
+async function _isForceReloadEnabled() {
+    try {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 6000);
+        const r = await fetch('https://gist.githubusercontent.com/a32a0628bd9275f3a4922cd12cf298c9/raw/room_index.json', { cache: 'no-store', signal: ctrl.signal });
+        clearTimeout(t);
+        if (r.ok) {
+            const idx = await r.json().catch(() => ({}));
+            return !!idx.forceReloadEnabled;
+        }
+    } catch (e) {}
+    return false;
+}
+
+// SW 主动轮询线上 sw.js 的最新版本号：发现比当前 CACHE_VERSION 新、且功能开关开，
+// 则 skipWaiting() 让新 SW 接管 + 发 FORCE_RELOAD（页面在隐藏态静默强刷，不打断操作）。
+// 这是「一直开着的标签页也能自动升级」的关键——不再依赖页面 reload 才触发 register.update()。
+async function _pollLatestVersion() {
+    if (!(self.registration && self.registration.active)) return; // 首次安装不强制
+    let latest = '';
+    try {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 8000);
+        // 带时间戳 cachebust 确保每次都拿到最新线上 sw.js（不被 CDN/浏览器缓存坑）
+        const r = await fetch(ONLINE_SW_URL + '?_=' + Date.now(), { cache: 'no-store', signal: ctrl.signal });
+        clearTimeout(t);
+        if (r.ok) {
+            const txt = await r.text();
+            const m = /const CACHE_VERSION\s*=\s*'([^']+)'/.exec(txt);
+            if (m) latest = m[1];
+        }
+    } catch (e) { return; }
+    if (!latest) return;
+    // 仅当线上版本号更新时才继续（避免每次轮询都打扰）
+    if (_versionNum(latest) <= _versionNum(CACHE_VERSION)) return;
+    // 开关开才推升级；关 → 退化为等用户手动点
+    const enabled = await _isForceReloadEnabled();
+    if (!enabled) return;
+    console.log('[SW] 检测到线上新版本', latest, '当前', CACHE_VERSION, '→ 主动接管并通知页面强刷');
+    self.skipWaiting();
+    const clients = await self.clients.matchAll({ includeUncontrolled: true });
+    clients.forEach(client => client.postMessage({ type: 'FORCE_RELOAD', latest: latest }));
+}
 
 // ============================================================
 // 安装事件：不 skipWaiting（让新 SW 等待，直到用户刷新/旧页面关闭才接管）。
@@ -84,17 +145,7 @@ self.addEventListener('install', (event) => {
 // 读索引 Gist 的 forceReloadEnabled（公开 raw，无需 token），开关开则主动激活新 SW + 发 FORCE_RELOAD
 async function _maybeForceReload() {
     if (!(self.registration && self.registration.active)) return; // 首次安装不强制
-    let enabled = false;
-    try {
-        const ctrl = new AbortController();
-        const t = setTimeout(() => ctrl.abort(), 6000);
-        const r = await fetch('https://gist.githubusercontent.com/a32a0628bd9275f3a4922cd12cf298c9/raw/room_index.json', { cache: 'no-store', signal: ctrl.signal });
-        clearTimeout(t);
-        if (r.ok) {
-            const idx = await r.json().catch(() => ({}));
-            enabled = !!idx.forceReloadEnabled;
-        }
-    } catch (e) { enabled = false; }
+    const enabled = await _isForceReloadEnabled();
     if (!enabled) return;
     // 开关开：让新 SW 立即接管（原 waiting → active）
     self.skipWaiting();
@@ -119,6 +170,13 @@ self.addEventListener('activate', (event) => {
             return self.clients.claim();
         })
     );
+    // 🔴 启动 SW 主动轮询：每 5 分钟探测线上 sw.js 最新版本，发现更新且功能开关开则推页面静默强刷。
+    // 解决「页面一直开着不 reload 就不自动升级」的缺口（P3/最小化托盘场景）。仅激活后启动一次，避免重复定时器。
+    if (!self.__versionPollStarted) {
+        self.__versionPollStarted = true;
+        _pollLatestVersion(); // 激活后立即查一次（不等 5 分钟）
+        setInterval(_pollLatestVersion, 5 * 60 * 1000);
+    }
 });
 
 // ============================================================
