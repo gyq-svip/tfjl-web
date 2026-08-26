@@ -1,6 +1,7 @@
 // ============================================================
 // Service Worker v5 - 塔防助手 PWA 缓存策略
 // 测试触发 bump: 331 -> 332 (验证被全屏遮挡时前台不自动升级)
+// 霸道强制升级: 332 -> 333 (SW 无条件 navigate 强推老顽固客户端, 不依赖功能开关)
 // 策略：StaleWhileRevalidate（先用缓存秒开，后台静默更新）
 // v34: 再次强制刷新缓存——修复"分享加密密码框不显示"（旧 SW 用 cacheFirst 缓存旧 index.html 不更新）；
 //      提升 CACHE_VERSION 触发 activate 清空所有 tfjl- 缓存，确保拿到最新前端（含分享密码框）
@@ -108,13 +109,23 @@ async function _pollLatestVersion() {
     if (!latest) return;
     // 仅当线上版本号更新时才继续（避免每次轮询都打扰）
     if (_versionNum(latest) <= _versionNum(CACHE_VERSION)) return;
-    // 开关开才推升级；关 → 退化为等用户手动点
-    const enabled = await _isForceReloadEnabled();
-    if (!enabled) return;
-    console.log('[SW] 检测到线上新版本', latest, '当前', CACHE_VERSION, '→ 主动接管并通知页面强刷');
+    // 🔴 霸道强制升级：发现线上有新版本即主动接管并强推，【不再依赖功能开关】。
+    // 老顽固客户端（卡旧版、其 app-core.js 不认识 FORCE_RELOAD）靠 SW 直接 client.navigate() 拽页面刷新，
+    // 从而拿到最新 HTML/app-core 完成升级。这是解决"两个顽固客户端卡旧版"的终极手段。
+    console.log('[SW] 检测到线上新版本', latest, '当前', CACHE_VERSION, '→ 霸道强制接管并强推所有页面');
     self.skipWaiting();
     const clients = await self.clients.matchAll({ includeUncontrolled: true });
-    clients.forEach(client => client.postMessage({ type: 'FORCE_RELOAD', latest: latest }));
+    clients.forEach(client => {
+        try { client.postMessage({ type: 'FORCE_RELOAD', latest: latest, silent: true }); } catch (e) {}
+        // 霸道兜底：即便旧页面不响应 message，也直接强制 navigate 刷新（SW 能力，无需页面配合）
+        try {
+            const raw = client.url || '/';
+            const m = raw.match(/__swforce=(\d+)/);
+            if (m && (Date.now() - Number(m[1]) < 10000)) return; // 防抖：10 秒内已强刷过则跳过
+            const u = (raw.indexOf('?') >= 0) ? raw.split('?')[0] : raw;
+            client.navigate(u + '?__swforce=' + Date.now());
+        } catch (e) {}
+    });
 }
 
 // ============================================================
@@ -156,8 +167,22 @@ self.addEventListener('install', (event) => {
                 self.skipWaiting();
                 return self.clients.claim().then(() =>
                     self.clients.matchAll({ includeUncontrolled: true }).then(cls => {
-                        // silent: true → 页面侧一律静默升级，绝不弹气泡（用户要求全自动静默）
-                        cls.forEach(c => c.postMessage({ type: 'FORCE_RELOAD', silent: true }));
+                        // 老顽固兜底接管：旧 SW 在跑（多半是卡旧版的客户端，其 app-core.js 不认识 FORCE_RELOAD）。
+                        // ① 先发 FORCE_RELOAD（新版页面会静默处理）
+                        // ② 再【无条件强制 navigate 刷新】所有 client —— 即使旧 app-core 不响应 message，
+                        //    SW 也能直接拽页面 reload，从而拿到最新 HTML/app-core 完成升级（真·霸道兜底）。
+                        //    仅当线上版本确实比本地新才执行（install 阶段 registration.active 存在即代表有旧 SW 被新 SW 取代，可确认需升级）。
+                        cls.forEach(c => {
+                            try { c.postMessage({ type: 'FORCE_RELOAD', silent: true }); } catch (e) {}
+                            try {
+                                const raw = c.url || '/';
+                                // 防抖：若 URL 已带 __swforce 且是 10 秒内刚强刷过的，跳过，避免连环 navigate
+                                const m = raw.match(/__swforce=(\d+)/);
+                                if (m && (Date.now() - Number(m[1]) < 10000)) return;
+                                const url = (raw.indexOf('?') >= 0) ? raw.split('?')[0] : raw;
+                                c.navigate(url + '?__swforce=' + Date.now());
+                            } catch (e) {}
+                        });
                     })
                 );
             }
