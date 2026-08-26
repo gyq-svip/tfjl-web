@@ -23650,21 +23650,22 @@ ${maSection}
         // ② 前台 + 当前闲置（>60s 无操作 且 无未保存项目）→ 静默强制更新（不打断正在改项目的用户）
         // ③ 其余情况（前台且可能编辑中）→ 不弹气泡、不打断，等切后台或闲置再升
         function notifyNewVersion() {
-            if (document.hidden) {
-                console.log('[更新] 页面隐藏(托盘)，静默强制更新到新版本');
+            // 🔴 前台不升级铁律（最高优先级）：
+            //   · APP：只认 __tfjlInTray（点 X 真正挂托盘才 true），绝不用 document.hidden 判定 APP 前后台。
+            //     前台打开界面（无论是否被遮挡/闲置多久）= 绝对不自动升级，最多弹彩球提示。
+            //   · 网页：document.hidden（真正隐藏/最小化）才静默升级；前台绝不升级，弹彩球。
+            //   · forceReload 开关只控制“是否允许后台/托盘静默升”，绝不赋予前台自动升级权限。
+            const isTauri = !!(window.__TAURI_INTERNALS__ || window.__TAURI__);
+            const inTray = isTauri && window.__tfjlInTray === true;
+            const inBackground = isTauri ? inTray : document.hidden;
+            if (inBackground) {
+                console.log('[更新] 处于后台/托盘，静默强制更新到新版本');
                 if (typeof forceRefreshLatest === 'function') { forceRefreshLatest(); return; }
                 location.reload(true);
                 return;
             }
-            // 管理开关：强制更新（默认关）。开启后，前台闲置时自动强刷，避免在用户操作时突然刷新丢数据
-            if (window.__diagForceReload && _isIdleNow()) {
-                console.log('[更新] 强制更新开关已开 + 当前闲置，静默强制更新到新版本');
-                if (typeof forceRefreshLatest === 'function') { forceRefreshLatest(); return; }
-                location.reload(true);
-                return;
-            }
-            // 前台且可能编辑中：不弹气泡、不打断，仅保留 __pendingUpdate 等待后续静默升级。
-            // （showSwUpdateBanner 已被弃用，避免打断编辑导致丢数据）
+            // 前台（APP 前台 或 网页前台）：绝不自动升级，只弹彩球（用户手动点才升）
+            if (typeof showSwUpdateBanner === 'function') showSwUpdateBanner();
         }
         window.notifyNewVersion = notifyNewVersion;
 
