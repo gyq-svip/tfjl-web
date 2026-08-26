@@ -22449,6 +22449,24 @@ ${maSection}
             return cur;
         }
 
+        // 把 desc 里的 HTML 标签剥离为纯文本，供 title 悬浮说明使用（避免 <br> 等被当字面量显示）
+        function _stripHtml(s) { return String(s || '').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').replace(/\n+/g, '\n').trim(); }
+
+        // 功能开关矩阵 → 诊断面板「上报策略」跳转并高亮心跳输入框
+        function gotoDiagHeartbeat() {
+            try { if (typeof adminShowPage === 'function') adminShowPage('diag'); } catch (e) {}
+            setTimeout(() => {
+                const el = document.getElementById('cfgHeartbeat');
+                if (el) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    el.style.boxShadow = '0 0 0 3px #4fc3f7';
+                    el.focus();
+                    setTimeout(() => { el.style.boxShadow = ''; }, 2500);
+                }
+            }, 350);
+        }
+        window.gotoDiagHeartbeat = gotoDiagHeartbeat;
+
         async function renderFeatureToggles() {
             const box = document.getElementById('featureTogglesContent');
             if (!box) return;
@@ -22457,44 +22475,56 @@ ${maSection}
             let remoteCfg = {};
             try { remoteCfg = await getRoomIndexConfig(); } catch (e) { remoteCfg = {}; }
             let html = '';
+            // 矩阵布局：用 CSS Grid 多列排列，开关紧凑，说明放 title 悬浮显示，可容纳大量开关
+            html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;margin-top:6px;">';
             for (const t of FEATURE_TOGGLES) {
                 let on;
                 if (t.scope === 'remote') {
                     on = remoteCfg[t.remoteField];
                     if (typeof on !== 'boolean') on = t.default;
                 } else {
-                    // 修正：本机开关正向存储（'1'=开），与 toggleFeature 写入、apply 读取保持一致
                     const lv = localStorage.getItem(t.localKey);
                     on = lv === null ? (t.default ? true : false) : (lv === '1' ? true : lv === '0' ? false : false);
                 }
                 if (t.type === 'range') {
                     const curVal = (typeof remoteCfg[t.remoteField] === 'number') ? remoteCfg[t.remoteField] : t.default;
                     const min = t.min ?? 10, max = t.max ?? 600, step = t.step ?? 10, unit = t.unit ?? '';
+                    const tip = _stripHtml(t.desc);
                     html += `
-                    <div style="padding:14px 0;border-bottom:1px solid rgba(255,255,255,0.08);">
+                    <div title="${tip.replace(/"/g, '&quot;')}" style="padding:12px;border:1px solid rgba(255,255,255,0.1);border-radius:10px;background:rgba(255,255,255,0.03);cursor:help;">
                         <div style="display:flex;align-items:center;justify-content:space-between;">
-                            <div style="font-size:0.9rem;color:#fff;font-weight:600;">${t.label}</div>
+                            <div style="font-size:0.86rem;color:#fff;font-weight:600;line-height:1.3;">${t.label}</div>
                             <span id="ftRangeVal_${t.key}" style="font-size:0.82rem;color:#4fc3f7;font-weight:700;">${curVal}${unit}</span>
                         </div>
-                        <div style="font-size:0.72rem;color:rgba(255,255,255,0.5);margin-top:3px;">${t.desc}</div>
                         <input type="range" min="${min}" max="${max}" step="${step}" value="${curVal}" oninput="setFeatureRangePreview('${t.key}', this.value)" onchange="setFeatureRange('${t.key}', this.value)" style="width:100%;margin-top:10px;accent-color:#4fc3f7;cursor:pointer;">
                         <div style="display:flex;justify-content:space-between;font-size:0.62rem;color:rgba(255,255,255,0.3);margin-top:2px;"><span>${min}${unit}</span><span>${max}${unit}</span></div>
+                        <div style="font-size:0.64rem;color:${t.scope === 'remote' ? '#4fc3f7' : '#94a3b8'};margin-top:6px;">${t.scope === 'remote' ? '🌐 全网' : '🖥️ 本机'}</div>
                     </div>`;
                     continue;
                 }
                 const color = on ? '#4ade80' : '#ef4444';
-                const stateTxt = on ? '开启' : '关闭';
+                const stateTxt = on ? '开' : '关';
+                const tip = _stripHtml(t.desc);
                 html += `
-                <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.08);">
+                <div title="${tip.replace(/"/g, '&quot;')}" style="display:flex;align-items:center;justify-content:space-between;padding:12px;border:1px solid rgba(255,255,255,0.1);border-radius:10px;background:rgba(255,255,255,0.03);cursor:help;">
                     <div style="flex:1;">
-                        <div style="font-size:0.9rem;color:#fff;font-weight:600;">${t.label}</div>
-                        <div style="font-size:0.72rem;color:rgba(255,255,255,0.5);margin-top:3px;">${t.desc}</div>
-                        <div style="font-size:0.68rem;color:rgba(255,255,255,0.35);margin-top:2px;">${t.scope === 'remote' ? '🌐 全网生效' : '🖥️ 本机生效'}</div>
+                        <div style="font-size:0.86rem;color:#fff;font-weight:600;line-height:1.3;">${t.label}</div>
+                        <div style="font-size:0.64rem;color:${t.scope === 'remote' ? '#4fc3f7' : '#94a3b8'};margin-top:4px;">${t.scope === 'remote' ? '🌐 全网生效' : '🖥️ 本机生效'}</div>
                     </div>
-                    <button onclick="toggleFeature('${t.key}')" style="margin-left:14px;padding:8px 18px;border-radius:20px;border:none;cursor:pointer;font-size:0.8rem;font-weight:600;color:#fff;background:${color};min-width:64px;">${stateTxt}</button>
+                    <button onclick="toggleFeature('${t.key}')" style="margin-left:10px;padding:6px 16px;border-radius:20px;border:none;cursor:pointer;font-size:0.78rem;font-weight:600;color:#fff;background:${color};min-width:52px;">${stateTxt}</button>
                 </div>`;
             }
-            html += '<div style="font-size:0.7rem;color:rgba(255,255,255,0.4);margin-top:12px;line-height:1.6;">远程开关存于索引 Gist（全网生效），本机开关仅影响当前设备。新增开关只须在 FEATURE_TOGGLES 追加一条配置。</div>';
+            // 导航卡片：心跳间隔设置入口（心跳属于诊断上报策略，故从这里跳转定位到诊断面板对应输入）
+            html += `
+            <div title="规律心跳间隔（分钟）统一控制全网客户端的上报频率。当前在此矩阵中仅作入口，具体数值请在「诊断面板 → 上报策略」中设置，两端读取同一远程配置。" style="display:flex;align-items:center;justify-content:space-between;padding:12px;border:1px dashed rgba(79,195,247,0.5);border-radius:10px;background:rgba(79,195,247,0.06);cursor:pointer;" onclick="gotoDiagHeartbeat()">
+                <div style="flex:1;">
+                    <div style="font-size:0.86rem;color:#4fc3f7;font-weight:600;line-height:1.3;">💓 规律心跳间隔设置</div>
+                    <div style="font-size:0.64rem;color:rgba(255,255,255,0.5);margin-top:4px;">🌐 全网生效 · 点此前往诊断面板配置</div>
+                </div>
+                <span style="margin-left:10px;font-size:1.1rem;color:#4fc3f7;">→</span>
+            </div>`;
+            html += '</div>';
+            html += '<div style="font-size:0.7rem;color:rgba(255,255,255,0.4);margin-top:12px;line-height:1.6;">鼠标悬浮在每个开关上可查看详细说明。远程开关存于索引 Gist（全网生效），本机开关仅影响当前设备。新增开关只须在 FEATURE_TOGGLES 追加一条配置，矩阵会自动排版。</div>';
             box.innerHTML = html;
         }
         window.renderFeatureToggles = renderFeatureToggles;
