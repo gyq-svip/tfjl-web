@@ -3320,6 +3320,15 @@
         // 菜单「刷新最新资源」：清理所有缓存并强制重新加载，确保拿到最新前端
         // 核心优化：用时间戳 URL 强刷，彻底绕过浏览器/SW/WebView 各级缓存
         async function forceRefreshLatest() {
+            // 🔴 关键修复：升级/强刷前，先把当前编辑中的项目、记事本等数据落盘，
+            // 避免「编辑一半突然自动升级」导致未保存内容丢失（用户明确要求：自动升级绝不能丢数据）。
+            try {
+                if (typeof window.__tfjlSaveAllProjects === 'function') {
+                    const list = (typeof window.__tfjlLoadProjectList === 'function')
+                        ? await window.__tfjlLoadProjectList() : null;
+                    if (list) await window.__tfjlSaveAllProjects(list);
+                }
+            } catch (e) { console.warn('[升级前落盘] 失败（不阻塞升级）:', e); }
             // 不弹"清理缓存/跳过SW"提示框（用户要求静默强刷）
             const t = { success() {} };
             try {
