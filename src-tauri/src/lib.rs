@@ -1349,6 +1349,18 @@ pub fn run() {
                 let _ = w.hide();
             }
         }
+        // 🔴 修复：点窗口「-」最小化按钮 → 也隐藏到托盘（等同点 X 的挂托盘行为）。
+        // 原先仅 X 走 hide，最小化只缩到任务栏、__tfjlInTray 不置 true → 不静默升级（孤儿设备根因）。
+        // 现在最小化也 hide，Tauri 会向前端发 tauri://window-hide → __tfjlInTray=true → 可静默升级。
+        if let tauri::RunEvent::WindowEvent {
+            event: tauri::WindowEvent::Minimized { .. },
+            ..
+        } = event
+        {
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.hide();
+            }
+        }
         // 兜底：应用即将退出时也阻止（防止某些路径直接退出导致托盘残留）
         if let tauri::RunEvent::ExitRequested { api, .. } = event {
             api.prevent_exit();
