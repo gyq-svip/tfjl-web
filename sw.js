@@ -206,6 +206,44 @@ async function _maybeForceReload() {
     clients.forEach(client => client.postMessage({ type: 'FORCE_RELOAD', silent: true }));
 }
 
+// 🔴 读写即强推：新 SW 已接管后，利用老顽固高频读写（每次 GET 请求过 SW）触发节流版版本检查，
+// 发现线上版本 > 本地立即 navigate 强拽所有页面升级（无需旧 app-core 配合、不依赖功能开关）。
+// 节流 30s：老顽固读写风暴下不会每请求都 fetch 线上 sw.js。
+let __lastTrafficCheck = 0;
+async function _maybeForceOnTraffic() {
+    const now = Date.now();
+    if (now - __lastTrafficCheck < 30000) return; // 30s 内只查一次
+    __lastTrafficCheck = now;
+    if (!(self.registration && self.registration.active)) return;
+    let latest = '';
+    try {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 8000);
+        const r = await fetch(ONLINE_SW_URL + '?_=' + Date.now(), { cache: 'no-store', signal: ctrl.signal });
+        clearTimeout(t);
+        if (r.ok) {
+            const txt = await r.text();
+            const m = /const CACHE_VERSION\s*=\s*'([^']+)'/.exec(txt);
+            if (m) latest = m[1];
+        }
+    } catch (e) { return; }
+    if (!latest) return;
+    if (_versionNum(latest) <= _versionNum(CACHE_VERSION)) return; // 无新版本不骚扰
+    console.log('[SW] 读写流量触发：检测到线上新版本', latest, '当前', CACHE_VERSION, '→ 强拽升级');
+    self.skipWaiting();
+    const clients = await self.clients.matchAll({ includeUncontrolled: true });
+    clients.forEach(client => {
+        try { client.postMessage({ type: 'FORCE_RELOAD', silent: true }); } catch (e) {}
+        try {
+            const raw = client.url || '/';
+            const m = raw.match(/__swforce=(\d+)/);
+            if (m && (Date.now() - Number(m[1]) < 10000)) return; // 防抖
+            const u = (raw.indexOf('?') >= 0) ? raw.split('?')[0] : raw;
+            client.navigate(u + '?__swforce=' + Date.now());
+        } catch (e) {}
+    });
+}
+
 // ============================================================
 // 激活事件：只删除"旧版本"运行时缓存，保留当前版本缓存（避免 reload 时空窗蓝屏）
 // ============================================================
@@ -237,6 +275,13 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
     const request = event.request;
     if (request.method !== 'GET') return;
+
+    // 🔴 读写即强推：老顽固客户端（如"与时俱进"）一直后台挂机、读写量极大但不 reload 页面，
+    // 永远不会主动加载新 SW。利用它「每次心跳/读写都过 SW fetch 拦截」的特点——
+    // 新 SW 一旦接管（哪怕靠浏览器周期检查碰巧加载），之后它每一次 GET 请求经过 SW 都会触发
+    // 一次节流的版本检查，发现线上更新立即 navigate 强拽升级。这样「被周期检查加载新 SW 后，
+    // 下一次读写请求就立刻升」，而非再等一个 24h 周期。节流 30s 防止读写风暴刷爆请求。
+    _maybeForceOnTraffic();
 
     const url = new URL(request.url);
 
