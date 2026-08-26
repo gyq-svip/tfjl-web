@@ -60,7 +60,9 @@
             })();
             function _gistIdOf(url) {
                 const m = typeof url === 'string' ? url.match(/gists\/([a-f0-9]{8,})/) : null;
-                return m ? m[1] : (typeof url === 'string' ? url.slice(0, 60) : 'unknown');
+                // 不匹配标准 /gists/<id> 格式时返回 'unknown'，绝不能把原始 URL 片段塞进 gistId 字段
+                // （历史 bug：曾 return url.slice(0,60)，导致部分带缓存参数的写操作把 URL 存进诊断文件，面板翻译不了 → 显示英文/链接）
+                return m ? m[1] : 'unknown';
             }
             function _recordGistIO(method, url, status) {
                 try {
@@ -361,7 +363,7 @@
         }
         // 读取诊断配置（本地缓存按用户设置间隔，超时重新拉）
         async function _getDiagConfig(force) {
-            const def = { enabled: true, periodDays: 3, allowImmediate: true, openDelayMin: 5, openDelayMax: 10, immediateDelayMin: 1, immediateDelayMax: 20, diagGistId: '', forceReload: false };
+            const def = { enabled: true, periodDays: 3, allowImmediate: true, openDelayMin: 5, openDelayMax: 10, immediateDelayMin: 1, immediateDelayMax: 20, heartbeatMin: 45, diagGistId: '', forceReload: false };
             // 配置拉取间隔可由用户设置（tdjl_diagCfgTtlMin），默认 15 分钟；设为更小值可让人少时更快拿到新策略
             const ttl = _getDiagCfgTtl();
             try {
@@ -421,7 +423,7 @@
                 const createResponse = await fetch('https://api.github.com/gists', {
                     method: 'POST',
                     headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': 'token ' + token },
-                    body: JSON.stringify({ description: 'TFJL 写操作诊断上报(分片)', public: false, files: { 'diag_config.json': { content: JSON.stringify({ enabled: true, periodDays: 3, allowImmediate: true, openDelayMin: 5, openDelayMax: 10, immediateDelayMin: 1, immediateDelayMax: 20 }, null, 2) } } })
+                    body: JSON.stringify({ description: 'TFJL 写操作诊断上报(分片)', public: false, files: { 'diag_config.json': { content: JSON.stringify({ enabled: true, periodDays: 3, allowImmediate: true, openDelayMin: 5, openDelayMax: 10, immediateDelayMin: 1, immediateDelayMax: 20, heartbeatMin: 45 }, null, 2) } } })
                 });
                 if (createResponse.ok) {
                     const data = await createResponse.json();
@@ -523,7 +525,7 @@
                     const cd = await cur.json();
                     Object.keys(cd.files || {}).forEach(fn => {
                         if (fn === myFile) {
-                            try { const old = JSON.parse(cd.files[fn].content || '{}'); if (Array.isArray(old.entries)) oldEntries = old.entries.filter(e => !(e && typeof e.fn === 'string' && e.fn.indexOf('http') === 0)); } catch (e) {}
+                            try { const old = JSON.parse(cd.files[fn].content || '{}'); if (Array.isArray(old.entries)) oldEntries = old.entries.filter(e => (e && typeof e.fn === 'string' && e.fn.indexOf('http') === 0) ? false : !(e && typeof e.gistId === 'string' && (e.gistId.indexOf('http') === 0 || e.gistId.indexOf('/') !== -1 || e.gistId === 'unknown'))); } catch (e) {}
                         } else {
                             files[fn] = { content: cd.files[fn].content };
                         }
@@ -574,9 +576,11 @@
         }
         // 启动：页面加载后安排「打开后延迟首次上报」
         (function _initDiagReporter() {
+            let _cfg = null; // 缓存最新配置，供心跳间隔读取（远程可调 heartbeatMin）
             // 本地记录始终运行（在 fetch 代理里已调用 _recordDiagWrite）；上报仅在开关开启时调度
             setTimeout(() => {
                 _getDiagConfig(false).then(cfg => {
+                    _cfg = cfg;
                     if (cfg.enabled && localStorage.getItem(DIAG_OPTIN_KEY) !== '0') _scheduleDiagUpload('open');
                 });
                 initForceReloadFromIndex(); // 从索引 Gist 读「强制更新」开关（功能开关面板权威来源）
@@ -600,7 +604,9 @@
                     }
                 });
             }
-            const HB_BASE = 45 * 60 * 1000, HB_JITTER = 10 * 60 * 1000;
+            // 规律心跳基础间隔从远程配置 heartbeatMin 读取（管理员可在面板调节，默认 45 分钟），
+            // 配合 ±10 分钟随机抖动错峰；仅启动那一刻计算一次，避免频繁读配置。
+            const HB_BASE = ((_cfg && _cfg.heartbeatMin) ? _cfg.heartbeatMin : 45) * 60 * 1000, HB_JITTER = 10 * 60 * 1000;
             setInterval(_heartbeatOnce, HB_BASE + Math.random() * HB_JITTER);
         })();
         // 联网恢复（online 事件）→ 立即上报（1~20 分钟随机延迟）
@@ -21985,6 +21991,7 @@ ${maSection}
                     head += '<label>立即上报延迟(分): <input type="number" id="cfgImmMin" value="' + C.immediateDelayMin + '" min="0" style="width:42px;background:#16213e;color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:3px;"> ~ <input type="number" id="cfgImmMax" value="' + C.immediateDelayMax + '" min="0" style="width:42px;background:#16213e;color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:3px;"></label>';
                     head += '<label>周期上报延迟(分): <input type="number" id="cfgOpenMin" value="' + C.openDelayMin + '" min="1" style="width:42px;background:#16213e;color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:3px;"> ~ <input type="number" id="cfgOpenMax" value="' + C.openDelayMax + '" min="1" style="width:42px;background:#16213e;color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:3px;"></label>';
                     head += '<label>上报文件保留(天): <input type="number" id="cfgPeriod" value="' + C.periodDays + '" min="1" style="width:42px;background:#16213e;color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:3px;"></label>';
+                    head += '<label>规律心跳间隔(分): <input type="number" id="cfgHeartbeat" value="' + (C.heartbeatMin || 45) + '" min="1" max="1440" style="width:52px;background:#16213e;color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:3px;"> <span style="color:#94a3b8;">(统一心跳管理，所有客户端跟随)</span></label>';
                     head += '</div>';
                     head += '<div style="margin-top:8px;"><button onclick="adminSaveDiagCfg()" style="background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.82rem;">💾 保存配置</button><span id="diagCfgStatus" style="color:#94a3b8;font-size:0.72rem;margin-left:8px;"></span></div>';
                     // 配置拉取间隔（客户端侧）：默认 15 分钟，可改小让在线客户端更快拿到新策略；立即拉取绕过缓存
@@ -21998,7 +22005,7 @@ ${maSection}
                     head += '<div style="margin-top:10px;border-top:1px dashed rgba(255,255,255,0.12);padding-top:8px;font-size:0.74rem;line-height:1.7;color:#cbd5e1;">';
                     head += '<span style="color:#ffd700;">📊 上报时间规律（客户端侧实际触发时机）：</span><br>';
                     head += '① <b>打开延迟首报</b>：页面加载 3 秒后读配置，若总闸开则安排首报，延迟 ' + C.openDelayMin + '~' + C.openDelayMax + ' 分钟（随机错峰，避免一打开就全员正点报）。<br>';
-                    head += '② <b>规律心跳</b>：从打开起每 ' + C.openDelayMin + '~' + C.openDelayMax + ' 分钟 + 0~10 分钟随机抖动 自动上报一次（实际约 45~55 分钟一次），写盘健康 + 缓冲合并。离线阈值 60 分钟，故该频率不会误判离线。<br>';
+                    head += '② <b>规律心跳</b>：从打开起每 ' + (C.heartbeatMin || 45) + ' 分钟（可上方配置调节，全网统一跟随） + 0~10 分钟随机抖动 自动上报一次，写盘健康 + 缓冲合并。离线阈值 60 分钟，故该频率不会误判离线。<br>';
                     head += '③ <b>缓冲触发</b>：本地有写操作埋点进 buffer 时顺带排程，"立即类"延迟 ' + C.immediateDelayMin + '~' + C.immediateDelayMax + ' 分钟合批上报（省 API，可由「允许立即上报」关掉）。<br>';
                     head += '④ <b>联网恢复</b>：online 事件立即补报（' + C.immediateDelayMin + '~' + C.immediateDelayMax + ' 分钟延迟）。<br>';
                     head += '⑤ <b>手动</b>：本面板「立即拉取」按钮可补报。<br>';
@@ -22279,6 +22286,7 @@ ${maSection}
                 cfg.allowImmediate = cfg.allowImmediate !== false;
                 cfg.openDelayMin = cfg.openDelayMin || 5; cfg.openDelayMax = cfg.openDelayMax || 10;
                 cfg.immediateDelayMin = cfg.immediateDelayMin || 1; cfg.immediateDelayMax = cfg.immediateDelayMax || 20;
+                cfg.heartbeatMin = cfg.heartbeatMin || 45;
                 const pr = await fetch('https://api.github.com/gists/' + gid, {
                     method: 'PATCH',
                     headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': 'token ' + token },
@@ -22302,7 +22310,8 @@ ${maSection}
                 periodDays: num('cfgPeriod', 3),
                 allowImmediate: allowImmediate,
                 openDelayMin: Math.max(1, num('cfgOpenMin', 5)), openDelayMax: Math.max(1, num('cfgOpenMax', 10)),
-                immediateDelayMin: Math.max(0, num('cfgImmMin', 1)), immediateDelayMax: Math.max(0, num('cfgImmMax', 20))
+                immediateDelayMin: Math.max(0, num('cfgImmMin', 1)), immediateDelayMax: Math.max(0, num('cfgImmMax', 20)),
+                heartbeatMin: Math.max(1, Math.min(1440, num('cfgHeartbeat', 45)))
             };
             if (status) status.textContent = '⏳ 保存中…';
             try {
@@ -22325,7 +22334,7 @@ ${maSection}
                 const r = await fetch('https://api.github.com/gists', {
                     method: 'POST',
                     headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': 'token ' + token },
-                    body: JSON.stringify({ description: 'TFJL 写操作诊断上报(分片)', public: false, files: { 'diag_config.json': { content: JSON.stringify({ enabled: true, periodDays: 3, allowImmediate: true, openDelayMin: 5, openDelayMax: 10, immediateDelayMin: 1, immediateDelayMax: 20 }, null, 2) } } })
+                    body: JSON.stringify({ description: 'TFJL 写操作诊断上报(分片)', public: false, files: { 'diag_config.json': { content: JSON.stringify({ enabled: true, periodDays: 3, allowImmediate: true, openDelayMin: 5, openDelayMax: 10, immediateDelayMin: 1, immediateDelayMax: 20, heartbeatMin: 45 }, null, 2) } } })
                 });
                 if (r.ok) { const d = await r.json(); localStorage.setItem(DIAG_GIST_KEY, d.id); if (hint) hint.textContent = '✅ 已创建: ' + d.id; setTimeout(adminLoadDiag, 600); }
                 else if (hint) hint.textContent = '创建失败 HTTP ' + r.status;
