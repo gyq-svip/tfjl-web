@@ -264,6 +264,26 @@
             setTimeout(function() { try { inp.focus(); } catch (e) {} }, 50);
         }
         window.openGenericPicker = openGenericPicker;
+        // ==================== Tauri 窗口托盘状态（用于判断 APP 是否已挂后台） ====================
+        // 点 X 最小化到托盘 → window-hide → __tfjlInTray=true（此时才可静默升级）
+        // 重新打开到前台 → window-show → __tfjlInTray=false（前台坚决不自动升级）
+        (function setupTrayState() {
+            try {
+                const w = window;
+                if (w.__TAURI_INTERNALS__ && w.__TAURI_INTERNALS__.invoke) {
+                    Promise.all([
+                        import('@tauri-apps/api/event').then(m => m.listen).catch(() => null),
+                        w.__TAURI__ && w.__TAURI__.event ? Promise.resolve(w.__TAURI__.event.listen) : Promise.resolve(null)
+                    ]).then(([l1, l2]) => {
+                        const listen = l1 || l2;
+                        if (typeof listen !== 'function') return;
+                        listen('tauri://window-hide', () => { window.__tfjlInTray = true; });
+                        listen('tauri://window-show', () => { window.__tfjlInTray = false; });
+                        listen('tauri://close-requested', () => { window.__tfjlInTray = true; });
+                    }).catch(() => {});
+                }
+            } catch (e) {}
+        })();
         // ==================== Service Worker 注册（PWA缓存） ====================
         // 首次访问缓存资源，后续打开用缓存秒开，后台静默更新
         // 关键体验：优先用缓存秒开（打开速度不受影响），后台拉到新资源后弹提示「新版本已就绪」
@@ -279,13 +299,17 @@
                     updateCacheVersionDisplay(event.data.version, event.data.deployTag);
                 }
                 // 🔴 SW 主动强刷指令（来自 SW 主动轮询 _pollLatestVersion 或 _maybeForceReload，功能开关 forceReloadEnabled 开时发出）。
+                // 升级策略（用户硬性要求）：
+                //   · APP 已挂托盘/后台（__tfjlInTray 或 document.hidden）→ 静默升级（编辑中再延后，绝不打断）
+                //   · APP 前台打开界面 → 坚决不自动升级，最多弹气泡提示，由用户手动点
+                //   · 网页版隐藏/最小化 → 静默升级
+                //   · 网页版前台 → 不弹气泡、不升级，切后台时静默升
                 if (event.data && event.data.type === 'FORCE_RELOAD') {
                     const isTauri = !!(window.__TAURI_INTERNALS__ || window.__TAURI__ || navigator.userAgent.indexOf('Tauri') >= 0);
-                    if (isTauri) {
-                        // 🔴 APP 场景（点 X 挂托盘，WebView 不销毁，document.hidden 不一定变 true）：
-                        // 收到强刷指令即代表"已进托盘/后台"。统一规则：进托盘后静默升级，但【编辑中绝不等 15 秒就强刷】。
-                        // 若当前正在编辑（__tfjlProjectDirty，内存改动未稳定）→ 延迟到编辑停下（dirty 清除）再升，
-                        // 且升级前 forceRefreshLatest 内部会强制落盘，确保编辑内容不丢。
+                    const inBackground = document.hidden || (isTauri && window.__tfjlInTray);
+
+                    if (inBackground) {
+                        // 后台/托盘：静默升级，但编辑中延后
                         const doSilentUpgrade = function () {
                             if (typeof forceRefreshLatest === 'function') forceRefreshLatest();
                             else location.reload(true);
@@ -294,27 +318,49 @@
                             return !!(window.__tfjlProjectDirty) || (typeof window.__tfjlIsEditing === 'function' && window.__tfjlIsEditing());
                         };
                         if (isEditing()) {
-                            // 编辑中：挂起升级，轮询等待编辑结束（最多等 10 分钟，避免卡死），结束后静默升
-                            console.log('[更新] APP 编辑中，延后静默升级直到编辑结束');
+                            console.log('[更新] 后台且编辑中，延后静默升级直到编辑结束');
                             let waited = 0;
                             const iv = setInterval(() => {
                                 waited += 3000;
-                                if (!isEditing() || waited >= 600000) {
-                                    clearInterval(iv);
-                                    doSilentUpgrade();
-                                }
+                                if (!isEditing() || waited >= 600000) { clearInterval(iv); doSilentUpgrade(); }
                             }, 3000);
                         } else {
-                            // 非编辑中：进托盘 15 秒后静默升级（forceRefreshLatest 内部仍会先落盘）
                             setTimeout(doSilentUpgrade, 15000);
                         }
-                    } else if (document.hidden) {
-                        // 网页版：最小化/隐藏态 → 直接静默强刷（不打断）
-                        if (typeof forceRefreshLatest === 'function') forceRefreshLatest();
-                        else location.reload(true);
+                    } else if (isTauri) {
+                        // APP 前台打开界面：坚决不自动升级，仅弹气泡提示（用户手动点才升）
+                        console.log('[更新] APP 前台打开中，仅提示气泡，不自动升级');
+                        if (typeof showSwUpdateBanner === 'function') showSwUpdateBanner();
+                        else if (typeof notifyNewVersion === 'function') notifyNewVersion();
+                        // 兜底：前台弹了气泡但用户没点，之后进托盘/后台 → 自动静默升级（编辑中仍延后）
+                        if (!window.__tfjlTrayUpgradeBound) {
+                            window.__tfjlTrayUpgradeBound = true;
+                            const trayUpgrade = function () {
+                                if (window.__tfjlInTray || document.hidden) {
+                                    const doSilentUpgrade = function () {
+                                        if (typeof forceRefreshLatest === 'function') forceRefreshLatest();
+                                        else location.reload(true);
+                                    };
+                                    const isEditing = function () {
+                                        return !!(window.__tfjlProjectDirty) || (typeof window.__tfjlIsEditing === 'function' && window.__tfjlIsEditing());
+                                    };
+                                    if (isEditing()) {
+                                        let waited = 0;
+                                        const iv = setInterval(() => {
+                                            waited += 3000;
+                                            if (!isEditing() || waited >= 600000) { clearInterval(iv); doSilentUpgrade(); }
+                                        }, 3000);
+                                    } else { doSilentUpgrade(); }
+                                }
+                            };
+                            document.addEventListener('visibilitychange', trayUpgrade);
+                            if (typeof window.addEventListener === 'function') {
+                                // 轮询 __tfjlInTray 变化（Tauri 事件可能晚到）
+                                setInterval(trayUpgrade, 5000);
+                            }
+                        }
                     } else {
-                        // 网页版前台可见 → 不弹气泡（用户要求静默），仅标记「有新版本」，
-                        // 等页面切到后台/最小化（visibilitychange → hidden）时再静默升级，避免打断当前操作。
+                        // 网页版前台：不弹气泡、不升级，切后台时静默升
                         window.__tfjlHasNewVersion = true;
                         _markNewVersionAvailable();
                         if (!window.__tfjlHideUpgradeBound) {
