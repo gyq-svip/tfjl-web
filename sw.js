@@ -51,7 +51,7 @@
 //      版本号采用 CI 的 `s1.0.337` + `s20260826-1804`。线上立刻能看到「前台只弹气泡，挂托盘才静默升」正确行为。
 // ============================================================
 
-const CACHE_VERSION = 's1.0.345';
+const CACHE_VERSION = 's1.0.346';
 const DEPLOY_TAG = 's20260827-0354';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
@@ -167,11 +167,18 @@ self.addEventListener('install', (event) => {
                 self.skipWaiting();
                 return self.clients.claim().then(() =>
                     self.clients.matchAll({ includeUncontrolled: true }).then(cls => {
-                        // 退回：只发 FORCE_RELOAD 消息，不再 navigate 强推。
-                        // 升级决策交给页面侧（app-picker.js）：前台只弹气泡，挂托盘才静默强刷。
-                        // SW 侧 navigate 会强制刷新 APP 前台页面 → 打断用户编辑 → 丢数据，违背用户硬要求。
+                        // 🔴 P0 白屏紧急恢复（2026-08-27）：旧 SW 正在控制页面且用户可能已白屏，
+                        // 普通 FORCE_RELOAD 消息已无法被白屏页处理。直接对受控客户端 navigate 硬重载，
+                        // 由本 SW 的 networkFirst fetch 拿到线上正确 app-core.js，强制恢复白屏用户。
+                        // 白屏页本就卡死、无编辑可丢，强推 reload 纯收益。
+                        // 普通升级（非白屏恢复）仍交给页面侧判定，此处仅在"从旧 SW 接管"时触发一次。
                         cls.forEach(c => {
-                            try { c.postMessage({ type: 'FORCE_RELOAD', silent: true }); } catch (e) {}
+                            try {
+                                c.postMessage({ type: 'FORCE_RELOAD', silent: true });
+                                if (typeof c.navigate === 'function' && c.url) {
+                                    c.navigate(c.url).catch(() => {});
+                                }
+                            } catch (e) {}
                         });
                     })
                 );
