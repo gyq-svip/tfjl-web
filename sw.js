@@ -41,8 +41,8 @@
 // v48: 自动升级闭环验证（根目录部署源已含轮询，线上 319 验证通过）。本次 CI +1 → 线上 320。
 // ============================================================
 
-const CACHE_VERSION = 's1.0.323';
-const DEPLOY_TAG = 's20260826-1617';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
+const CACHE_VERSION = 's1.0.324';
+const DEPLOY_TAG = 's20260826-1625';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
