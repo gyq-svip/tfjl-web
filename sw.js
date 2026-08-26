@@ -126,11 +126,6 @@ async function _pollLatestVersion() {
     clients.forEach(client => {
         try {
             client.postMessage({ type: 'FORCE_RELOAD', latest: latest, silent: true });
-            // 🔴 P0 白屏紧急恢复：旧 SW 自己在轮询发现新版本时，直接对受控客户端 navigate 硬重载，
-            // 不依赖新 SW install 分支的 claim 时序。白屏页已卡死、收不到消息，唯有硬 navigate 才能拉回。
-            if (typeof client.navigate === 'function' && client.url) {
-                client.navigate(client.url).catch(() => {});
-            }
         } catch (e) {}
     });
 }
@@ -174,17 +169,11 @@ self.addEventListener('install', (event) => {
                 self.skipWaiting();
                 return self.clients.claim().then(() =>
                     self.clients.matchAll({ includeUncontrolled: true }).then(cls => {
-                        // 🔴 P0 白屏紧急恢复（2026-08-27）：旧 SW 正在控制页面且用户可能已白屏，
-                        // 普通 FORCE_RELOAD 消息已无法被白屏页处理。直接对受控客户端 navigate 硬重载，
-                        // 由本 SW 的 networkFirst fetch 拿到线上正确 app-core.js，强制恢复白屏用户。
-                        // 白屏页本就卡死、无编辑可丢，强推 reload 纯收益。
-                        // 普通升级（非白屏恢复）仍交给页面侧判定，此处仅在"从旧 SW 接管"时触发一次。
+                        // 接管老顽固页面：仅发 FORCE_RELOAD 消息，升级决策交页面侧
+                        // （前台弹气泡由用户确认、挂托盘才静默强刷，前置落盘不丢数据）。
                         cls.forEach(c => {
                             try {
                                 c.postMessage({ type: 'FORCE_RELOAD', silent: true });
-                                if (typeof c.navigate === 'function' && c.url) {
-                                    c.navigate(c.url).catch(() => {});
-                                }
                             } catch (e) {}
                         });
                     })
