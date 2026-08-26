@@ -38,10 +38,11 @@
 //      则 skipWaiting() + 发 FORCE_RELOAD（页面在隐藏态静默强刷）。开关关则退化为等用户手动点。NEVER_CACHE 加 gyq-svip.github.io 放行轮询 fetch。
 //      SW_VERSION 应为 s1.0.314（CI 部署 +1）。
 // v47: 自动升级验证用空提交（轮询/静默强刷逻辑已在 v46 落地）。CACHE_VERSION 保持 s1.0.313 由 CI 自动 +1 → 线上 318。
+// v48: 自动升级闭环验证（根目录部署源已含轮询，线上 319 验证通过）。本次 CI +1 → 线上 320。
 // ============================================================
 
-const CACHE_VERSION = 's1.0.313';
-const DEPLOY_TAG = 's20260826-0401';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
+const CACHE_VERSION = 's1.0.321';
+const DEPLOY_TAG = 's20260826-1532';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
@@ -63,19 +64,25 @@ function _versionNum(v) {
     return m ? parseInt(m[1], 10) : -1;
 }
 
-// 读索引 Gist 的 forceReloadEnabled（公开 raw，无需 token），开关开则返回 true
+// 读索引 Gist 的 forceReloadEnabled（用 api.github.com 读公开 gist，无需 token；raw gist.githubusercontent.com 路径易 404 导致误判开关关闭 → 永不升级）。
+// 开关开则返回 true，读取失败（网络/限流/404）一律回退为「开」（宁可误升也不卡死，符合用户「自动升级」诉求）。
 async function _isForceReloadEnabled() {
     try {
         const ctrl = new AbortController();
         const t = setTimeout(() => ctrl.abort(), 6000);
-        const r = await fetch('https://gist.githubusercontent.com/a32a0628bd9275f3a4922cd12cf298c9/raw/room_index.json', { cache: 'no-store', signal: ctrl.signal });
+        const r = await fetch('https://api.github.com/gists/a32a0628bd9275f3a4922cd12cf298c9', { cache: 'no-store', signal: ctrl.signal });
         clearTimeout(t);
         if (r.ok) {
-            const idx = await r.json().catch(() => ({}));
-            return !!idx.forceReloadEnabled;
+            const d = await r.json().catch(() => null);
+            const c = d && d.files && d.files['room_index.json'] && d.files['room_index.json'].content;
+            if (c) {
+                const idx = JSON.parse(c);
+                return !!idx.forceReloadEnabled;
+            }
         }
     } catch (e) {}
-    return false;
+    // 读取失败 → 默认「开」，避免开关读不到就卡死不升级
+    return true;
 }
 
 // SW 主动轮询线上 sw.js 的最新版本号：发现比当前 CACHE_VERSION 新、且功能开关开，
