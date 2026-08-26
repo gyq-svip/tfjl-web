@@ -42,8 +42,8 @@
 // v49: 自动升级闭环最终验证（开关 404 修复 + 气泡 bug 修复已上）。本次 CI +1 → 线上 325。
 // ============================================================
 
-const CACHE_VERSION = 's1.0.323';
-const DEPLOY_TAG = 's20260826-1617';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
+const CACHE_VERSION = 's1.0.325';
+const DEPLOY_TAG = 's20260826-1632';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
@@ -146,6 +146,20 @@ self.addEventListener('install', (event) => {
         // 开关开 → 主动 skipWaiting() 让新 SW 立即接管，并通知页面强刷（页面 notifyNewVersion 仍只在
         // 隐藏/闲置时才真正 reload，不打断正在改项目的用户）。开关关 → 退化为原行为（等用户手动点）。
         .then(() => _maybeForceReload())
+        // 🔴 老顽固兜底接管：当注册时已有旧 SW 在跑（registration.active 存在），说明页面被老版本 SW 控制。
+        // 老 SW 的 _isForceReloadEnabled 走已 404 的 raw URL，开关永远 false → 永远不升级 → 卡死在旧版本（如 s1.0.301）。
+        // 这种情况跳过开关判断，无条件 skipWaiting() + clients.claim() 接管老顽固页面并推 FORCE_RELOAD，
+        // 接管后由新 SW 的轮询/强刷逻辑把它们带上。挂托盘 WebView 暂停渲染时接管瞬用户无感，可接受。
+        .then(() => {
+            if (self.registration && self.registration.active) {
+                self.skipWaiting();
+                return self.clients.claim().then(() =>
+                    self.clients.matchAll({ includeUncontrolled: true }).then(cls => {
+                        cls.forEach(c => c.postMessage({ type: 'FORCE_RELOAD' }));
+                    })
+                );
+            }
+        })
         .catch(() => {})
     );
 });
