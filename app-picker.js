@@ -283,13 +283,31 @@
                     const isTauri = !!(window.__TAURI_INTERNALS__ || window.__TAURI__ || navigator.userAgent.indexOf('Tauri') >= 0);
                     if (isTauri) {
                         // 🔴 APP 场景（点 X 挂托盘，WebView 不销毁，document.hidden 不一定变 true）：
-                        // 收到强刷指令即代表"已进托盘/后台"。统一规则：进托盘后 15 秒静默升级（无论是否编辑中）。
-                        // （编辑中的未保存改动由 forceRefreshLatest 前的 autoSave 兜底，这里不区分避免打断节奏）
+                        // 收到强刷指令即代表"已进托盘/后台"。统一规则：进托盘后静默升级，但【编辑中绝不等 15 秒就强刷】。
+                        // 若当前正在编辑（__tfjlProjectDirty，内存改动未稳定）→ 延迟到编辑停下（dirty 清除）再升，
+                        // 且升级前 forceRefreshLatest 内部会强制落盘，确保编辑内容不丢。
                         const doSilentUpgrade = function () {
                             if (typeof forceRefreshLatest === 'function') forceRefreshLatest();
                             else location.reload(true);
                         };
-                        setTimeout(doSilentUpgrade, 15000);
+                        const isEditing = function () {
+                            return !!(window.__tfjlProjectDirty) || (typeof window.__tfjlIsEditing === 'function' && window.__tfjlIsEditing());
+                        };
+                        if (isEditing()) {
+                            // 编辑中：挂起升级，轮询等待编辑结束（最多等 10 分钟，避免卡死），结束后静默升
+                            console.log('[更新] APP 编辑中，延后静默升级直到编辑结束');
+                            let waited = 0;
+                            const iv = setInterval(() => {
+                                waited += 3000;
+                                if (!isEditing() || waited >= 600000) {
+                                    clearInterval(iv);
+                                    doSilentUpgrade();
+                                }
+                            }, 3000);
+                        } else {
+                            // 非编辑中：进托盘 15 秒后静默升级（forceRefreshLatest 内部仍会先落盘）
+                            setTimeout(doSilentUpgrade, 15000);
+                        }
                     } else if (document.hidden) {
                         // 网页版：最小化/隐藏态 → 直接静默强刷（不打断）
                         if (typeof forceRefreshLatest === 'function') forceRefreshLatest();

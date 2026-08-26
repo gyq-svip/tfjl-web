@@ -23484,22 +23484,31 @@ ${maSection}
             const dirty = !!(window.__tfjlProjectDirty);
             return idleMs > 60000 && !dirty;
         }
-        // SW 后台检测到新版本（网络内容≠缓存）会发 NEW_VERSION_READY，弹提示条让用户一键刷新
+        // SW 后台检测到新版本（网络内容≠缓存）会发 NEW_VERSION_READY / FORCE_RELOAD。
+        // 🔴 关键修复：收到新版本信号时【绝不弹气泡】，只记录待升级，按"静默 + 编辑保护"规则升级，
+        // 否则编辑一半突然弹气泡+强刷会丢未保存项目（用户明确要求：自动升级必须妥善处理，绝不能丢数据）。
         (function setupSwUpdateListener() {
             if (!('serviceWorker' in navigator)) return;
             navigator.serviceWorker.addEventListener('message', function (event) {
                 const data = event.data;
                 if (data && (data.type === 'NEW_VERSION_READY' || data.type === 'FORCE_RELOAD')) {
-                    window.__pendingUpdate = true; // 记下有待更新版本（即便用户不点气泡，闲置时也可自动强刷）
-                    notifyNewVersion();
+                    window.__pendingUpdate = true;
+                    // 仅当页面隐藏（托盘/后台）才立即静默升级；前台一律不弹气泡、不主动强刷，
+                    // 等用户切到后台（visibilitychange）或编辑闲置后再静默升级。
+                    if (document.hidden) {
+                        console.log('[更新] 页面隐藏(托盘)，静默强制更新到新版本');
+                        if (typeof forceRefreshLatest === 'function') { forceRefreshLatest(); return; }
+                        location.reload(true);
+                    }
+                    // 前台：不做任何提示/强刷，仅依靠下方的 visibilitychange 闲置逻辑处理
                 }
             });
         })();
 
-        // 统一的新版本处理：
+        // 统一的新版本处理（永不弹气泡）：
         // ① 进入托盘/页面隐藏 → 静默强制更新（无未保存数据风险）
-        // ② 管理开关「强制更新」开启 且 当前闲置（>60s 无操作 且 无未保存项目）→ 静默强制更新（不打断正在改项目的用户）
-        // ③ 其余情况 → 弹气泡由用户手动点
+        // ② 前台 + 当前闲置（>60s 无操作 且 无未保存项目）→ 静默强制更新（不打断正在改项目的用户）
+        // ③ 其余情况（前台且可能编辑中）→ 不弹气泡、不打断，等切后台或闲置再升
         function notifyNewVersion() {
             if (document.hidden) {
                 console.log('[更新] 页面隐藏(托盘)，静默强制更新到新版本');
@@ -23514,8 +23523,8 @@ ${maSection}
                 location.reload(true);
                 return;
             }
-            // 前台：弹气泡，由用户点击更新（不打断操作、不丢未保存资料）
-            showSwUpdateBanner();
+            // 前台且可能编辑中：不弹气泡、不打断，仅保留 __pendingUpdate 等待后续静默升级。
+            // （showSwUpdateBanner 已被弃用，避免打断编辑导致丢数据）
         }
         window.notifyNewVersion = notifyNewVersion;
 
