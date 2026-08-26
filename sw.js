@@ -187,6 +187,9 @@ self.addEventListener('install', (event) => {
                 );
             }
         })
+        // 兜底逻辑已在上方"registration.active 存在"分支完成（对有旧 SW 的客户端强推 navigate）。
+        // 注意："CACHE_VERSION < 基线" 这种判断在 SW 侧无意义——新 SW 文件里的 CACHE_VERSION 就是最新的，
+        // 老顽固加载新 SW 后本地 CACHE_VERSION 永远 >= 基线。真正的"基线强推"靠上方旧 SW 接管分支。
         .catch(() => {})
     );
 });

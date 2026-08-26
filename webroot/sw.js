@@ -44,8 +44,8 @@
 // v49: 自动升级闭环最终验证（开关 404 修复 + 气泡 bug 修复已上）。本次 CI +1 → 线上 325。
 // ============================================================
 
-const CACHE_VERSION = 's1.0.331';
-const DEPLOY_TAG = 's20260826-1704';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
+const CACHE_VERSION = 's1.0.332';
+const DEPLOY_TAG = 's20260826-1712';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
@@ -187,6 +187,9 @@ self.addEventListener('install', (event) => {
                 );
             }
         })
+        // 兜底逻辑已在上方"registration.active 存在"分支完成（对有旧 SW 的客户端强推 navigate）。
+        // 注意："CACHE_VERSION < 基线" 这种判断在 SW 侧无意义——新 SW 文件里的 CACHE_VERSION 就是最新的，
+        // 老顽固加载新 SW 后本地 CACHE_VERSION 永远 >= 基线。真正的"基线强推"靠上方旧 SW 接管分支。
         .catch(() => {})
     );
 });
