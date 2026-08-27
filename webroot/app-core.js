@@ -22066,6 +22066,7 @@ ${maSection}
                 catch (e) { devEl.textContent = '未知'; }
             }
             toolboxLoad();
+            toolboxLoadUsers();
         }
         window.toolboxCopyDevId = function () {
             const el = document.getElementById('toolboxDevId');
@@ -22192,6 +22193,68 @@ ${maSection}
             const box = document.getElementById('toolboxNickResult');
             if (box) box.innerHTML = '<span style="color:#4ade80;">✅ 已填入目标：' + _esc(dev) + '（去上方选类型下发）</span>';
         };
+        // 下拉选择目标用户：拉诊断 Gist 所有设备 → 填进 toolboxUserSelect
+        window.toolboxLoadUsers = async function () {
+            const sel = document.getElementById('toolboxUserSelect');
+            if (sel) { sel.innerHTML = '<option value="">⏳ 加载用户列表…</option>'; }
+            try {
+                const gid = (typeof DIAG_GIST_ID !== 'undefined' && DIAG_GIST_ID) ? DIAG_GIST_ID : (localStorage.getItem('tdjl_diagGistId') || '');
+                if (!gid) { if (sel) sel.innerHTML = '<option value="">诊断 Gist 未初始化</option>'; return; }
+                const g = await window.AllianceDB.ghGistGet(gid);
+                const files = (g && g.files) || {};
+                const users = [];
+                Object.keys(files).forEach(fn => {
+                    if (!fn.startsWith('diag-') || !fn.endsWith('.json')) return;
+                    let p; try { p = JSON.parse(files[fn].content); } catch (e) { return; }
+                    const payload = p.payload || p;
+                    const dev = payload.deviceId || '';
+                    if (!dev) return;
+                    users.push({
+                        nick: payload.nick || '游客',
+                        dev: dev,
+                        last: payload.lastUpload || 0,
+                        ver: payload.appVersion || '',
+                        plat: payload.platform || '',
+                        blacklisted: false
+                    });
+                });
+                // 标记被拉黑的（读指令 Gist）
+                try {
+                    const cg = await window.AllianceDB.ghGistGet(TOOLBOX_GIST_ID);
+                    const cf = cg && cg.files && cg.files[TOOLBOX_FILE];
+                    const cdata = cf && cf.content ? JSON.parse(cf.content) : {};
+                    const bl = cdata.blacklist || {};
+                    users.forEach(u => { if (bl[u.dev]) u.blacklisted = true; });
+                } catch (e) {}
+                if (!users.length) { if (sel) sel.innerHTML = '<option value="">无已上报用户</option>'; return; }
+                users.sort((a, b) => b.last - a.last);
+                if (sel) {
+                    sel.innerHTML = '<option value="">— 选择目标用户（' + users.length + ' 人在列）—</option>' +
+                        users.map(u => {
+                            const label = _esc(u.nick) + (u.blacklisted ? ' 🔒' : '') + ' · ' + (u.ver || '?') + ' · ' + (u.plat || '?') + ' · ' + (u.last ? _esc(_ago(u.last)) : '未知');
+                            return '<option value="' + _esc(u.dev) + '">' + label + '</option>';
+                        }).join('');
+                }
+            } catch (e) {
+                if (sel) sel.innerHTML = '<option value="">加载失败：' + _esc(e.message || e) + '</option>';
+            }
+        };
+        window.toolboxUserPicked = function () {
+            const sel = document.getElementById('toolboxUserSelect');
+            const t = document.getElementById('toolboxTarget');
+            if (sel && t && sel.value) {
+                t.value = sel.value;
+                const s = document.getElementById('toolboxStatus');
+                if (s) { s.style.color = '#4ade80'; s.textContent = '✅ 已选目标：' + sel.value; }
+            }
+        };
+        function _ago(ts) {
+            const d = Date.now() - ts;
+            if (d < 60000) return '刚刚';
+            if (d < 3600000) return Math.floor(d / 60000) + '分钟前';
+            if (d < 86400000) return Math.floor(d / 3600000) + '小时前';
+            return Math.floor(d / 86400000) + '天前';
+        }
         // 解除拉黑：列出 blacklist → 点解封移除
         window.toolboxLoadBlocked = async function () {
             const box = document.getElementById('toolboxBlockedList');
