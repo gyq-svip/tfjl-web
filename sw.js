@@ -131,12 +131,12 @@ async function _pollLatestVersion() {
     // 原因：之前霸道强推被用户否决——APP 前台被强制刷新会打断编辑、丢数据。
     // 升级决策唯一交给 app-picker.js：前台只弹气泡、挂托盘才静默强刷。
     // 老顽固客户端要升，需等他们主动 reload/重开一次（拿新 app-picker.js），之后才能进自动轨道。
-    console.log('[SW] 检测到线上新版本', latest, '当前', CACHE_VERSION, '→ 发 FORCE_RELOAD，由页面侧按前台/托盘判定');
+    console.log('[SW] 检测到线上新版本', latest, '当前', CACHE_VERSION, '→ 发 FORCE_RELOAD（auto=' + enabled + '），由页面侧按 auto 字段决定静默升或仅弹气泡');
     self.skipWaiting();
     const clients = await self.clients.matchAll({ includeUncontrolled: true });
     clients.forEach(client => {
         try {
-            client.postMessage({ type: 'FORCE_RELOAD', latest: latest, silent: true });
+            client.postMessage({ type: 'FORCE_RELOAD', latest: latest, silent: true, auto: enabled });
         } catch (e) {}
     });
 }
@@ -188,7 +188,7 @@ self.addEventListener('install', (event) => {
                             // （前台弹气泡由用户确认、挂托盘才静默强刷，前置落盘不丢数据）。
                             cls.forEach(c => {
                                 try {
-                                    c.postMessage({ type: 'FORCE_RELOAD', silent: true });
+                                    c.postMessage({ type: 'FORCE_RELOAD', silent: true, auto: true });
                                 } catch (e) {}
                             });
                         })
@@ -241,11 +241,11 @@ async function _maybeForceOnTraffic() {
     // 🔴 修复：读写流量触发的强刷也要受「强制更新总开关」控制（开关关则不强制，尊重用户关闭意图）。
     const enabled = await _isForceReloadEnabled();
     if (!enabled) return;
-    console.log('[SW] 读写流量触发：检测到线上新版本', latest, '当前', CACHE_VERSION, '→ 发 FORCE_RELOAD，由页面侧判定');
+    console.log('[SW] 读写流量触发：检测到线上新版本', latest, '当前', CACHE_VERSION, '→ 发 FORCE_RELOAD（auto=' + enabled + '），由页面侧判定');
     self.skipWaiting();
     const clients = await self.clients.matchAll({ includeUncontrolled: true });
     clients.forEach(client => {
-        try { client.postMessage({ type: 'FORCE_RELOAD', silent: true }); } catch (e) {}
+        try { client.postMessage({ type: 'FORCE_RELOAD', silent: true, auto: enabled }); } catch (e) {}
     });
 }
 
