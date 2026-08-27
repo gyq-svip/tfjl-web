@@ -308,27 +308,24 @@
                     if (window.__TAURI__?.invoke) return window.__TAURI__.invoke(cmd);
                     return Promise.reject('no invoke');
                 };
-                // 🔴 2026-08-27 整改：整包更新统一走 Gitee 下载通道（快），GitHub 仅兜底索引。
-                // badge 点击 → 调 menuCheckUpdate()（app-features.js 内，已改为读 updater.json(GitHub Pages 索引)
-                //   → Gitee 安装包整包下载写盘安装）。不再连 GitHub 原生 updater、不再 SW 强刷。
-                // 保留 app-update-available 监听（Rust 现在不发，留着无害）。
+                // 🔴 2026-08-27 v2.0.16 恢复：整包更新走 Tauri 原生 updater（endpoints 主 Gitee 备 GitHub Pages），
+                //   点一下后台静默装完自动重启（installMode=passive）。Rust check() 失敗静默不弹窗。
+                // 收到 Rust 'app-update-available' 事件 → 显示 badge（不带版本号）。
                 if (window.__TAURI_INTERNALS__?.event?.listen) {
                     window.__TAURI_INTERNALS__.event.listen('app-update-available', () => {
                         badge.style.display = 'inline-block';
                     });
                 }
-                // 点击 badge → 走 Gitee 整包下载更新（与手动「检查更新」同一通道）
+                // 点击 badge → 调原生 install_app_update（Rust 内部 download_and_install + restart，点一下就升）
                 badge.onclick = function () {
                     badge.textContent = '⏳ 升级中…';
-                    if (typeof menuCheckUpdate === 'function') {
-                        menuCheckUpdate().finally(() => { badge.textContent = '🟢 有新版本'; });
-                    } else {
-                        // 兜底：直接打开 Gitee 下载页
-                        openUrl(location.origin.includes('tauri') ? '' : 'https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/releases');
-                    }
+                    invoke('install_app_update').catch((e) => {
+                        console.warn('[更新] 整包升级失败或无需升级:', e);
+                        badge.textContent = '🟢 有新版本';
+                    });
                 };
-                // 启动不再调 check_app_update（Rust 已改为不连 GitHub，避免原生弹窗）；
-                // 新版本检测由 app-features.js 的 autoCheckUpdate() 走 Gitee 通道负责。
+                // 启动让 Rust 静默查一次（有更新才显示 badge，不干扰前台；失败静默）
+                invoke('check_app_update').catch(() => {});
             } catch (e) {}
         })();
 

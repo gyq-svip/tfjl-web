@@ -1,4 +1,5 @@
 use tauri_plugin_dialog::DialogExt;
+use tauri_plugin_updater::UpdaterExt;
 use tauri::Emitter;
 use tauri::Manager;
 use tauri::menu::{Menu, MenuItem};
@@ -631,28 +632,69 @@ fn get_app_version() -> String {
 //   · 不显示具体新版本号（不说 "2.0.14"），只提示"有版本升级"
 //   · 点击提示 → 立即检查并安装（点一下就查就升，不弹多余信息、不引导）
 //   · 绝不碰右下角 #versionTag（双击刷新那个），提示元素独立于它
-// 🔴 2026-08-27 修复：原实现用 app.updater() 连 GitHub Pages 的 updater.json 做整包升级，
-//   但用户环境对 GitHub 网络不稳（代理断着），导致启动时 check() 失败 → 触发 Tauri 原生
-//   "自动更新失败"系统弹窗（用户明确反感）。改为：整包升级统一走【已验证可用的 SW 网页更新通道】
-//   （和双击 #versionTag 刷新一致），Rust 不再连 GitHub，彻底消除原生弹窗。
-// 实现：Rust 仅作为"桥"——install_app_update 发 app-trigger-reload 事件，前端监听后走 SW 强刷；
-//       check_app_update 不再启动即连 GitHub（返回 Ok(false)，由前端 SW 自行检测新版本）。
+// 🔴 2026-08-27 修复（v2.0.16）：原实现用 app.updater() 连 GitHub Pages 的 updater.json，
+//   用户环境对 GitHub 网络不稳（代理断着）→ 启动 check() 失败 → 触发 Tauri 原生
+//   "自动更新失败"系统弹窗（用户明确反感）。改为：
+//     ① endpoints 主源改 Gitee 发行版直链（国内稳，与 exe 同域名），
+//        GitHub Pages 作兜底（双端主备，Tauri 按顺序试，第一个成功即用）；
+//     ② check() 失败静默处理（不弹系统窗），仅返回 false 让前端自行决定是否提示，
+//        彻底消除原生弹窗、同时恢复"点一下后台静默装"的体验。
+// 实现：Rust 静默 check，发现新大版本 → emit("app-update-available", ())（不带版本号）；
+//       前端在 #versionTag 旁显示独立 badge，点击 → invoke('install_app_update') 直接下载安装并重启。
 
-/// 静默检查大版本更新。
-/// 🔴 不再调用 app.updater()（避免连 GitHub 失败弹原生窗）。直接返回 false，
-/// 新版本检测交给前端 SW 通道（已验证可用）。保留命令签名以兼容前端调用。
+/// 静默检查大版本更新。发现新版本 → emit 事件给前端（不带版本号）；返回值仅用于前端点击时再确认。
+/// check 失败（网络/Gitee 不可达）静默返回 false，绝不触发 Tauri 原生"更新失败"系统弹窗。
 #[tauri::command]
-async fn check_app_update(_app: tauri::AppHandle) -> Result<bool, String> {
-    Ok(false)
+async fn check_app_update(app: tauri::AppHandle) -> Result<bool, String> {
+    let updater = match app.updater() {
+        Ok(u) => u,
+        Err(e) => {
+            // 插件未初始化等 fatal，静默
+            eprintln!("[updater] updater() 初始化失败（静默）: {}", e);
+            return Ok(false);
+        }
+    };
+    match updater.check().await {
+        Ok(Some(_update)) => {
+            // 有新版本：emit 事件（不带版本号，前端只显示"有版本升级"）
+            let _ = app.emit("app-update-available", ());
+            Ok(true)
+        }
+        Ok(None) => Ok(false),
+        Err(e) => {
+            // 🔴 网络失败静默，不弹系统窗（用户明确反感原生弹窗）
+            eprintln!("[updater] check() 失败（静默，前端将走 SW 兜底）: {}", e);
+            Ok(false)
+        }
+    }
 }
 
-/// 点击提示后调用：触发前端走 SW 网页更新通道（location.reload → SW 拉新版本，
-/// 与双击 #versionTag 刷新效果一致），不再连 GitHub、不再整包重装。
+/// 点击提示后调用：检查并立即下载安装（passive 模式后台装完提示重启）。
+/// 不显示版本号，不弹引导窗，点一下直接升。失败静默返回（不弹系统窗）。
 #[tauri::command]
 async fn install_app_update(app: tauri::AppHandle) -> Result<(), String> {
-    // 通知前端执行 SW 强刷（前端监听 app-trigger-reload 后 location.reload）
-    let _ = app.emit("app-trigger-reload", ());
-    Ok(())
+    let updater = match app.updater() {
+        Ok(u) => u,
+        Err(e) => {
+            eprintln!("[updater] install: updater() 失败（静默）: {}", e);
+            return Ok(());
+        }
+    };
+    let update = match updater.check().await {
+        Ok(Some(u)) => u,
+        Ok(None) => return Ok(()), // 无新版本，静默退出
+        Err(e) => {
+            eprintln!("[updater] install: check() 失败（静默）: {}", e);
+            return Ok(());
+        }
+    };
+    // 下载并安装（Windows installMode=passive → 后台安装，结束提示重启）
+    if let Err(e) = update.download_and_install(|_, _| {}, || {}).await {
+        eprintln!("[updater] 下载安装失败（静默）: {}", e);
+        return Ok(());
+    }
+    // 安装完成 → 重启生效（restart 后进程退出，下方不可达）
+    app.restart();
 }
 
 /// 读取图片文件并返回 base64 data URL（供皮肤系统使用）

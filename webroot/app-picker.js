@@ -308,13 +308,15 @@
                     if (window.__TAURI__?.invoke) return window.__TAURI__.invoke(cmd);
                     return Promise.reject('no invoke');
                 };
-                // 收到 Rust 的"有新版本"事件 → 显示 badge（不带版本号）
+                // 🔴 2026-08-27 v2.0.16 恢复：整包更新走 Tauri 原生 updater（endpoints 主 Gitee 备 GitHub Pages），
+                //   点一下后台静默装完自动重启（installMode=passive）。Rust check() 失敗静默不弹窗。
+                // 收到 Rust 'app-update-available' 事件 → 显示 badge（不带版本号）。
                 if (window.__TAURI_INTERNALS__?.event?.listen) {
                     window.__TAURI_INTERNALS__.event.listen('app-update-available', () => {
                         badge.style.display = 'inline-block';
                     });
                 }
-                // 点击 badge → 立即检查并安装（点一下就查就升，不显示版本号、不弹引导）
+                // 点击 badge → 调原生 install_app_update（Rust 内部 download_and_install + restart，点一下就升）
                 badge.onclick = function () {
                     badge.textContent = '⏳ 升级中…';
                     invoke('install_app_update').catch((e) => {
@@ -322,7 +324,7 @@
                         badge.textContent = '🟢 有新版本';
                     });
                 };
-                // 启动时让 Rust 静默查一次（有更新才显示 badge，不干扰前台）
+                // 启动让 Rust 静默查一次（有更新才显示 badge，不干扰前台；失败静默）
                 invoke('check_app_update').catch(() => {});
             } catch (e) {}
         })();
@@ -463,14 +465,23 @@
                 }
             });
             // 标记有新版本可用：版本号始终保持暗色常显（不额外高亮/脉冲），仅更新 tooltip 文案提示
+            // 🔴 2026-08-27 优化（用户诉求）：有新版本时也保留「当前版本」显示，并附「可升目标版本」，
+            //   方便用户双击刷新后再次 hover 对比是否真的升到了最新。
             function _markNewVersionAvailable() {
                 window.__tfjlHasNewVersion = true;
                 const tag = document.getElementById('versionTag');
                 if (!tag) return;
-                // 不修改版本号颜色/透明度，保持暗色；仅 tooltip 体现"有新版本"
-                const tip = tag.nextElementSibling;
+                // 🔴 修复：#versionTag 与 .version-tooltip 之间隔着 #appUpdateBadge，nextElementSibling 拿到的是 badge 而非 tooltip，
+                //   改用父级内 querySelector 精确命中 .version-tooltip。
+                const tip = tag.parentElement ? tag.parentElement.querySelector('.version-tooltip') : null;
                 if (tip && tip.classList.contains('version-tooltip')) {
-                    tip.textContent = '发现新版本 · 双击立即更新';
+                    const cur = tag.textContent.replace('●', '').trim();
+                    // 目标版本：优先取 APP 整包新版本（autoCheckUpdate/menuCheckUpdate 写入的全局 _updateVersion）
+                    const target = (typeof _updateVersion !== 'undefined' && _updateVersion) ? _updateVersion
+                        : (window.__tfjlTargetVer || '');
+                    tip.textContent = target
+                        ? ('当前 ' + cur + ' → 可升 v' + target + '（双击刷新）')
+                        : '发现新版本 · 双击立即更新';
                 }
             }
             // 核实是否真有新版本：比对远端 versionTag 主版本号与当前，避免刚强刷完即误报"有新版本"
@@ -488,7 +499,7 @@
                         } else {
                             window.__tfjlHasNewVersion = false;
                             if (tag) {
-                                const tip = tag.nextElementSibling;
+                                const tip = tag.parentElement ? tag.parentElement.querySelector('.version-tooltip') : null;
                                 if (tip && tip.classList.contains('version-tooltip')) {
                                     tip.textContent = '版本 ' + tag.textContent.replace('●','').trim() + '（双击强制刷新）';
                                 }
@@ -516,7 +527,8 @@
                 if (!base || !/^s\d{8}/.test(base)) base = 's?????';  // 兜底，确保日期段不为空
                 tag.textContent = base + ' · ' + short;
                 // 同步更新相邻 .version-tooltip（自定义提示框，显示在窗口内，不跑出窗口）
-                const tip = tag.nextElementSibling;
+                // 🔴 修复：用父级 querySelector 精确命中 .version-tooltip（#versionTag 与 tooltip 间隔着 #appUpdateBadge）。
+                const tip = tag.parentElement ? tag.parentElement.querySelector('.version-tooltip') : null;
                 if (tip && tip.classList.contains('version-tooltip')) {
                     tip.textContent = base + ' · ' + short + '（双击刷新）';
                 }
