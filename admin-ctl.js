@@ -147,15 +147,19 @@
       const expired = cmd.expire && Date.now() > cmd.expire;
       if (expired) { _markAck(cmd.id); continue; }
       if (_isAcked(cmd.id)) continue;
+      // 会话级防重：硬刷新偶发清 localStorage 的 ack 时，避免同 cmd 重弹气泡
+      if (_isRguard('tfjl_adminctl_nfguard@' + cmd.id)) continue;
       if (cmd.type === 'notify') {
         _showNotify(cmd);
-        _markAck(cmd.id);
+        _markAck(cmd.id); _setRguard('tfjl_adminctl_nfguard@' + cmd.id);
       }
     }
   }
 
   // —— 飘窗通知 UI ——
   function _showNotify(cmd) {
+    // 清掉上一次的自动消失计时器（避免重复弹时堆积）
+    if (window.__adminCtlNotifyTimer) { clearTimeout(window.__adminCtlNotifyTimer); window.__adminCtlNotifyTimer = null; }
     const level = cmd.level || 'info';
     // 浅底深字配色：高对比、清晰可读（文字/输入框都随 level 取色）
     const colors = {
@@ -204,6 +208,15 @@
         '</div>' +
       '</div>';
     box.style.display = 'block';
+    // 自动消失：8 秒后淡出移除（除非用户正在输入回复，避免误关丢消息）
+    const _autoHide = () => {
+      const inp = document.getElementById('adminCtlReply');
+      if (inp && inp.value && inp.value.trim()) return; // 正在输入则不关
+      box.style.transition = 'opacity .4s ease';
+      box.style.opacity = '0';
+      setTimeout(() => { if (box && box.parentNode) box.remove(); }, 420);
+    };
+    window.__adminCtlNotifyTimer = setTimeout(_autoHide, 8000);
   }
 
   // 点击「知道了」
