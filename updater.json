@@ -1,10 +1,10 @@
 {
-    "version":  "2.0.16",
-    "notes":  "auto update v2.0.16",
-    "pub_date":  "2026-08-27T10:14:16Z",
+    "version":  "2.0.17",
+    "notes":  "TEST badge only - no installer",
+    "pub_date":  "2026-08-27T10:30:00Z",
     "platforms":  {
                       "windows-x86_64":  {
-                                             "url":  "https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/releases/download/v2.0.16/tfjl-assistant_2.0.16_x64-setup.exe",
+                                             "url":  "https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/releases/download/v2.0.17/tfjl-assistant_2.0.17_x64-setup.exe",
                                              "signature":  "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRUHNUVWtSKzlCZjM4MjN6c0JEVUVSamV1WVJ2aWgxWmdLNmhnTXRFOGV5ZVZaNk80dlRFZ1FiVlU0eTdENVFhNVNhNmM2VnVEaUd3QUFWNHpXdDB5TWJYakxWK2ZCTVFjPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg3ODI1NjEzCWZpbGU6dGZqbC1zaWduLXRlbXAuZXhlCm01WlFYMGgzV2FLeWw5VTJONlpza3lDQkk5c2lIWlpHaDVDZmpXVmdvR09mZEd4TDIwZFE0TkFIVmlUTjFyd0Y3MC9KQUd6akhMOXNadjBueU0zR0JBPT0K"
                                          }
                   }
