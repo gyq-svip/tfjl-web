@@ -144,28 +144,32 @@
   // —— 飘窗通知 UI ——
   function _showNotify(cmd) {
     const level = cmd.level || 'info';
+    // 浅底深字配色：高对比、清晰可读（文字/输入框都随 level 取色）
     const colors = {
-      info:   { bg: 'linear-gradient(135deg,#3b82f6,#2563eb)', icon: 'ℹ️' },
-      warn:   { bg: 'linear-gradient(135deg,#f59e0b,#d97706)', icon: '⚠️' },
-      error:  { bg: 'linear-gradient(135deg,#ef4444,#dc2626)', icon: '⛔' }
-    }[level] || { bg: 'linear-gradient(135deg,#3b82f6,#2563eb)', icon: 'ℹ️' };
+      info:   { bg: 'linear-gradient(135deg,#eff6ff,#dbeafe)', icon: 'ℹ️', fg: '#1e3a8a', accent: '#2563eb', line: '#bfdbfe' },
+      warn:   { bg: 'linear-gradient(135deg,#fffbeb,#fef3c7)', icon: '⚠️', fg: '#92400e', accent: '#d97706', line: '#fde68a' },
+      error:  { bg: 'linear-gradient(135deg,#fef2f2,#fee2e2)', icon: '⛔', fg: '#991b1b', accent: '#dc2626', line: '#fecaca' }
+    }[level] || { bg: 'linear-gradient(135deg,#eff6ff,#dbeafe)', icon: 'ℹ️', fg: '#1e3a8a', accent: '#2563eb', line: '#bfdbfe' };
 
     let box = document.getElementById('adminCtlNotify');
     if (!box) {
       box = document.createElement('div');
       box.id = 'adminCtlNotify';
       box.style.cssText = 'position:fixed;right:18px;bottom:18px;z-index:99999;max-width:340px;' +
-        'background:' + colors.bg + ';color:#fff;border-radius:14px;padding:16px 18px;' +
-        'box-shadow:0 12px 40px rgba(0,0,0,0.45);font-family:system-ui,"Microsoft YaHei",sans-serif;' +
+        'background:' + colors.bg + ';color:' + colors.fg + ';border-radius:14px;padding:16px 18px;' +
+        'box-shadow:0 12px 40px rgba(0,0,0,0.25);font-family:system-ui,"Microsoft YaHei",sans-serif;' +
+        'border:1px solid ' + colors.line + ';' +
         'animation:adminCtlFloat 3s ease-in-out infinite;cursor:default;';
       box.innerHTML = '<style>@keyframes adminCtlFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}</style>';
       document.body.appendChild(box);
     }
     box.style.background = colors.bg;
+    box.style.color = colors.fg;
+    box.style.border = '1px solid ' + colors.line;
 
     // thread：历史的对话气泡（若指令带 thread 才显示）；回复框始终显示，方便用户随时回消息
     const threadHtml = (cmd.thread || []).map(t =>
-      '<div style="font-size:0.72rem;opacity:0.85;margin:4px 0;border-left:2px solid rgba(255,255,255,0.5);padding-left:6px;">' +
+      '<div style="font-size:0.72rem;opacity:0.9;margin:4px 0;border-left:2px solid ' + colors.accent + ';padding-left:6px;">' +
       '<b>' + (t.from === 'admin' ? '管理员' : '我') + ':</b> ' + _esc(t.text || '') + '</div>'
     ).join('');
     const hasThread = cmd.thread && cmd.thread.length > 0;
@@ -175,14 +179,14 @@
         '<div style="font-size:1.4rem;line-height:1;">' + colors.icon + '</div>' +
         '<div style="flex:1;min-width:0;">' +
           '<div style="font-weight:700;font-size:0.95rem;margin-bottom:4px;">' + _esc(cmd.title || '通知') + '</div>' +
-          '<div style="font-size:0.82rem;line-height:1.5;opacity:0.95;">' + _esc(cmd.body || '') + '</div>' +
+          '<div style="font-size:0.82rem;line-height:1.5;opacity:1;">' + _esc(cmd.body || '') + '</div>' +
           (hasThread ? '<div style="margin-top:8px;">' + threadHtml + '</div>' : '') +
           '<div style="margin-top:10px;display:flex;gap:8px;align-items:center;">' +
             (cmd.actions && cmd.actions.indexOf('ok') >= 0 ?
-              '<button onclick="window.__adminCtlAck(\'' + cmd.id + '\')" style="background:#fff;color:#1f2937;border:none;padding:5px 14px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600;">知道了</button>' : '') +
+              '<button onclick="window.__adminCtlAck(\'' + cmd.id + '\')" style="background:#fff;color:' + colors.fg + ';border:1px solid ' + colors.line + ';padding:5px 14px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600;">知道了</button>' : '') +
             // 回复框：始终显示，让每条通知都能回文字（无论是否带 thread）
-            '<input id="adminCtlReply" placeholder="回复管理员…" style="flex:1;min-width:0;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:#fff;border-radius:8px;padding:5px 8px;font-size:0.78rem;">' +
-            '<button onclick="window.__adminCtlReply(\'' + cmd.id + '\')" style="background:rgba(255,255,255,0.2);color:#fff;border:1px solid rgba(255,255,255,0.3);padding:5px 10px;border-radius:8px;cursor:pointer;font-size:0.78rem;">发送</button>' +
+            '<input id="adminCtlReply" placeholder="回复管理员…" style="flex:1;min-width:0;background:#fff;color:' + colors.fg + ';border:1px solid ' + colors.accent + ';border-radius:8px;padding:5px 8px;font-size:0.78rem;">' +
+            '<button onclick="window.__adminCtlReply(\'' + cmd.id + '\')" style="background:' + colors.accent + ';color:#fff;border:1px solid ' + colors.accent + ';padding:5px 10px;border-radius:8px;cursor:pointer;font-size:0.78rem;font-weight:600;">发送</button>' +
           '</div>' +
         '</div>' +
       '</div>';
