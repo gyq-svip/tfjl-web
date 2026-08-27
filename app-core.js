@@ -22130,7 +22130,7 @@ ${maSection}
             const s = document.getElementById('toolboxStatus');
             if (!raw) return;
             try {
-                const g = await window.AllianceDB.ghGistGet(TOOLBOX_GIST_ID);
+                const g = await _toolboxGistGet(TOOLBOX_GIST_ID);
                 const f = g && g.files && g.files[TOOLBOX_FILE];
                 raw.value = f && f.content ? f.content : '{}';
                 if (s) { s.style.color = '#4ade80'; s.textContent = '已拉取最新指令 Gist'; }
@@ -22146,7 +22146,7 @@ ${maSection}
             let parsed;
             try { parsed = JSON.parse(raw.value); } catch (e) { if (s) { s.style.color = '#f87171'; s.textContent = 'JSON 格式错误，未保存'; } return; }
             try {
-                await window.AllianceDB.ghGistPatch(TOOLBOX_GIST_ID, { [TOOLBOX_FILE]: { content: JSON.stringify(parsed, null, 2) } });
+                await _toolboxGistPatch(TOOLBOX_GIST_ID, { [TOOLBOX_FILE]: { content: JSON.stringify(parsed, null, 2) } });
                 if (s) { s.style.color = '#4ade80'; s.textContent = '✅ 已保存原始内容'; }
             } catch (e) {
                 if (s) { s.style.color = '#f87171'; s.textContent = '保存失败：' + (e.message || e); }
@@ -22164,7 +22164,7 @@ ${maSection}
                 return;
             }
             try {
-                const g = await window.AllianceDB.ghGistGet(TOOLBOX_GIST_ID);
+                const g = await _toolboxGistGet(TOOLBOX_GIST_ID);
                 const f = g && g.files && g.files[TOOLBOX_FILE];
                 const data = f && f.content ? JSON.parse(f.content) : {};
                 const ts = Date.now();
@@ -22185,7 +22185,7 @@ ${maSection}
                         thread: []
                     });
                 }
-                await window.AllianceDB.ghGistPatch(TOOLBOX_GIST_ID, { [TOOLBOX_FILE]: { content: JSON.stringify(data, null, 2) } });
+                await _toolboxGistPatch(TOOLBOX_GIST_ID, { [TOOLBOX_FILE]: { content: JSON.stringify(data, null, 2) } });
                 if (s) { s.style.color = '#4ade80'; s.textContent = '✅ 已下发，目标心跳最多 ' + (data.pollSec || 300) + 's 后生效'; }
                 toolboxLoad();
             } catch (e) {
@@ -22201,7 +22201,7 @@ ${maSection}
             try {
                 const gid = (typeof DIAG_GIST_ID !== 'undefined' && DIAG_GIST_ID) ? DIAG_GIST_ID : (localStorage.getItem('tdjl_diagGistId') || '');
                 if (!gid) { if (box) box.innerHTML = '<span style="color:#f87171;">诊断 Gist 未初始化</span>'; return; }
-                const g = await window.AllianceDB.ghGistGet(gid);
+                const g = await _toolboxGistGet(gid);
                 const files = (g && g.files) || {};
                 const hits = [];
                 Object.keys(files).forEach(fn => {
@@ -22240,7 +22240,7 @@ ${maSection}
             try {
                 const gid = (typeof DIAG_GIST_ID !== 'undefined' && DIAG_GIST_ID) ? DIAG_GIST_ID : (localStorage.getItem('tdjl_diagGistId') || '');
                 if (!gid) { if (sel) sel.innerHTML = '<option value="">诊断 Gist 未初始化</option>'; return; }
-                const g = await window.AllianceDB.ghGistGet(gid);
+                const g = await _toolboxGistGet(gid);
                 const files = (g && g.files) || {};
                 const users = [];
                 Object.keys(files).forEach(fn => {
@@ -22260,7 +22260,7 @@ ${maSection}
                 });
                 // 标记被拉黑的（读指令 Gist）
                 try {
-                    const cg = await window.AllianceDB.ghGistGet(TOOLBOX_GIST_ID);
+                    const cg = await _toolboxGistGet(TOOLBOX_GIST_ID);
                     const cf = cg && cg.files && cg.files[TOOLBOX_FILE];
                     const cdata = cf && cf.content ? JSON.parse(cf.content) : {};
                     const bl = cdata.blacklist || {};
@@ -22284,7 +22284,7 @@ ${maSection}
             } catch (e) {
                 let diag = (e && e.message) ? e.message : ('' + e);
                 try {
-                    const t = (window.AllianceDB && window.AllianceDB.ghToken) ? window.AllianceDB.ghToken() : '';
+                    const t = (typeof getGistToken === 'function') ? getGistToken() : '';
                     const tInfo = t ? ('token已注入(长度' + t.length + ')') : 'token缺失(未注入/占位符未替换)';
                     diag += ' ｜ ' + tInfo;
                 } catch (ee) {}
@@ -22307,12 +22307,33 @@ ${maSection}
             if (d < 86400000) return Math.floor(d / 3600000) + '小时前';
             return Math.floor(d / 86400000) + '天前';
         }
+        // 直接 fetch GitHub Gist（与"写操作诊断/其他开关"同一套 getGistToken()，不依赖 AllianceDB 独立脚本）
+        async function _toolboxGistGet(gid) {
+            const token = getGistToken();
+            if (!token) throw new Error('token缺失：getGistToken() 为空（请确认部署已注入，或工具箱填 ghp_ 保存）');
+            const r = await fetch(`https://api.github.com/gists/${gid}`, {
+                headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': 'token ' + token }
+            });
+            if (!r.ok) throw new Error('读取 Gist 失败 (' + r.status + ')');
+            return await r.json();
+        }
+        async function _toolboxGistPatch(gid, files) {
+            const token = getGistToken();
+            if (!token) throw new Error('token缺失：getGistToken() 为空（请确认部署已注入，或工具箱填 ghp_ 保存）');
+            const r = await fetch(`https://api.github.com/gists/${gid}`, {
+                method: 'PATCH',
+                headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': 'token ' + token },
+                body: JSON.stringify({ files: files })
+            });
+            if (!r.ok) throw new Error('写入 Gist 失败 (' + r.status + ')');
+            return await r.json();
+        }
         // 解除拉黑：列出 blacklist → 点解封移除
         window.toolboxLoadBlocked = async function () {
             const box = document.getElementById('toolboxBlockedList');
             if (box) box.innerHTML = '⏳ 加载中…';
             try {
-                const g = await window.AllianceDB.ghGistGet(TOOLBOX_GIST_ID);
+                const g = await _toolboxGistGet(TOOLBOX_GIST_ID);
                 const f = g && g.files && g.files[TOOLBOX_FILE];
                 const data = f && f.content ? JSON.parse(f.content) : {};
                 const bl = data.blacklist || {};
@@ -22329,12 +22350,12 @@ ${maSection}
         };
         window.toolboxUnblock = async function (dev) {
             try {
-                const g = await window.AllianceDB.ghGistGet(TOOLBOX_GIST_ID);
+                const g = await _toolboxGistGet(TOOLBOX_GIST_ID);
                 const f = g && g.files && g.files[TOOLBOX_FILE];
                 const data = f && f.content ? JSON.parse(f.content) : {};
                 if (!data.blacklist) data.blacklist = {};
                 delete data.blacklist[dev];
-                await window.AllianceDB.ghGistPatch(TOOLBOX_GIST_ID, { [TOOLBOX_FILE]: { content: JSON.stringify(data, null, 2) } });
+                await _toolboxGistPatch(TOOLBOX_GIST_ID, { [TOOLBOX_FILE]: { content: JSON.stringify(data, null, 2) } });
                 toolboxLoadBlocked();
             } catch (e) { alert('解封失败：' + (e.message || e)); }
         };
@@ -22343,7 +22364,7 @@ ${maSection}
             const box = document.getElementById('toolboxHistory');
             if (box) box.innerHTML = '⏳ 加载中…';
             try {
-                const g = await window.AllianceDB.ghGistGet(TOOLBOX_GIST_ID);
+                const g = await _toolboxGistGet(TOOLBOX_GIST_ID);
                 const f = g && g.files && g.files[TOOLBOX_FILE];
                 const data = f && f.content ? JSON.parse(f.content) : {};
                 const rows = [];
@@ -22374,7 +22395,7 @@ ${maSection}
                 // 指令 Gist 推荐的 latestSwVersion
                 let pushVer = '未设置';
                 try {
-                    const g = await window.AllianceDB.ghGistGet(TOOLBOX_GIST_ID);
+                    const g = await _toolboxGistGet(TOOLBOX_GIST_ID);
                     const f = g && g.files && g.files[TOOLBOX_FILE];
                     const data = f && f.content ? JSON.parse(f.content) : {};
                     if (data.latestSwVersion) pushVer = data.latestSwVersion;
@@ -22393,7 +22414,7 @@ ${maSection}
             try {
                 const gid = (typeof DIAG_GIST_ID !== 'undefined' && DIAG_GIST_ID) ? DIAG_GIST_ID : (localStorage.getItem('tdjl_diagGistId') || '');
                 if (!gid) { if (box) box.innerHTML = '<span style="color:#f87171;">诊断 Gist 未初始化</span>'; return; }
-                const g = await window.AllianceDB.ghGistGet(gid);
+                const g = await _toolboxGistGet(gid);
                 const files = (g && g.files) || {};
                 const items = [];
                 Object.keys(files).forEach(fn => {
