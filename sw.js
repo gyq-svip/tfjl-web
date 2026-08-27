@@ -170,18 +170,23 @@ self.addEventListener('install', (event) => {
         // 接管后由新 SW 的轮询/强刷逻辑把它们带上。挂托盘 WebView 暂停渲染时接管瞬用户无感，可接受。
         .then(() => {
             if (self.registration && self.registration.active) {
-                self.skipWaiting();
-                return self.clients.claim().then(() =>
-                    self.clients.matchAll({ includeUncontrolled: true }).then(cls => {
-                        // 接管老顽固页面：仅发 FORCE_RELOAD 消息，升级决策交页面侧
-                        // （前台弹气泡由用户确认、挂托盘才静默强刷，前置落盘不丢数据）。
-                        cls.forEach(c => {
-                            try {
-                                c.postMessage({ type: 'FORCE_RELOAD', silent: true });
-                            } catch (e) {}
-                        });
-                    })
-                );
+                // 🔴 修复：老顽固兜底接管也必须受「强制更新总开关」控制，否则开关关了仍被强制刷（2026-08-27 实测：关开关推 380 仍升）。
+                // 仅开关开时才无条件接管老顽固；关则退化为等用户手动点。
+                return _isForceReloadEnabled().then(enabled => {
+                    if (!enabled) return; // 开关关 → 不强制接管，尊重用户关闭意图
+                    self.skipWaiting();
+                    return self.clients.claim().then(() =>
+                        self.clients.matchAll({ includeUncontrolled: true }).then(cls => {
+                            // 接管老顽固页面：仅发 FORCE_RELOAD 消息，升级决策交页面侧
+                            // （前台弹气泡由用户确认、挂托盘才静默强刷，前置落盘不丢数据）。
+                            cls.forEach(c => {
+                                try {
+                                    c.postMessage({ type: 'FORCE_RELOAD', silent: true });
+                                } catch (e) {}
+                            });
+                        })
+                    );
+                });
             }
         })
         // 兜底逻辑已在上方"registration.active 存在"分支完成（对有旧 SW 的客户端强推 navigate）。
@@ -226,6 +231,9 @@ async function _maybeForceOnTraffic() {
     } catch (e) { return; }
     if (!latest) return;
     if (_versionNum(latest) <= _versionNum(CACHE_VERSION)) return; // 无新版本不骚扰
+    // 🔴 修复：读写流量触发的强刷也要受「强制更新总开关」控制（开关关则不强制，尊重用户关闭意图）。
+    const enabled = await _isForceReloadEnabled();
+    if (!enabled) return;
     console.log('[SW] 读写流量触发：检测到线上新版本', latest, '当前', CACHE_VERSION, '→ 发 FORCE_RELOAD，由页面侧判定');
     self.skipWaiting();
     const clients = await self.clients.matchAll({ includeUncontrolled: true });
