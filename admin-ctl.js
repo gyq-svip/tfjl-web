@@ -163,6 +163,7 @@
     }
     box.style.background = colors.bg;
 
+    // thread：历史的对话气泡（若指令带 thread 才显示）；回复框始终显示，方便用户随时回消息
     const threadHtml = (cmd.thread || []).map(t =>
       '<div style="font-size:0.72rem;opacity:0.85;margin:4px 0;border-left:2px solid rgba(255,255,255,0.5);padding-left:6px;">' +
       '<b>' + (t.from === 'admin' ? '管理员' : '我') + ':</b> ' + _esc(t.text || '') + '</div>'
@@ -179,9 +180,9 @@
           '<div style="margin-top:10px;display:flex;gap:8px;align-items:center;">' +
             (cmd.actions && cmd.actions.indexOf('ok') >= 0 ?
               '<button onclick="window.__adminCtlAck(\'' + cmd.id + '\')" style="background:#fff;color:#1f2937;border:none;padding:5px 14px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600;">知道了</button>' : '') +
-            (hasThread ?
-              '<input id="adminCtlReply" placeholder="回复管理员…" style="flex:1;min-width:0;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:#fff;border-radius:8px;padding:5px 8px;font-size:0.78rem;">' +
-              '<button onclick="window.__adminCtlReply(\'' + cmd.id + '\')" style="background:rgba(255,255,255,0.2);color:#fff;border:1px solid rgba(255,255,255,0.3);padding:5px 10px;border-radius:8px;cursor:pointer;font-size:0.78rem;">发送</button>' : '') +
+            // 回复框：始终显示，让每条通知都能回文字（无论是否带 thread）
+            '<input id="adminCtlReply" placeholder="回复管理员…" style="flex:1;min-width:0;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:#fff;border-radius:8px;padding:5px 8px;font-size:0.78rem;">' +
+            '<button onclick="window.__adminCtlReply(\'' + cmd.id + '\')" style="background:rgba(255,255,255,0.2);color:#fff;border:1px solid rgba(255,255,255,0.3);padding:5px 10px;border-radius:8px;cursor:pointer;font-size:0.78rem;">发送</button>' +
           '</div>' +
         '</div>' +
       '</div>';
