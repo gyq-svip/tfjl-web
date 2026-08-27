@@ -499,9 +499,18 @@
             } catch (e) {}
             if (!_appVer && typeof window.__APP_VERSION === 'string') _appVer = window.__APP_VERSION;
             if (!_appVer) { try { _appVer = (CACHE_VERSION || ''); } catch (e) {} }
+            // 🔴 2026-08-28 新增：大版本号（桌面 exe 2.0.x）。网页版取不到 → 留空。
+            //   与 #versionTag 的"小版本"分开存储：appVersion=SW 小版本、appExeVersion=桌面大版本。
+            //   这样诊断面板能一眼分清"网页挂机 vs 桌面挂机"以及"桌面跑哪个 exe"，避免大/小版本混淆。
+            let _appExeVer = '';
+            try {
+                if (_isTauri && typeof window.__APP_VERSION === 'string' && /^v?\d+\.\d+/.test(window.__APP_VERSION)) {
+                    _appExeVer = window.__APP_VERSION.replace(/^v/, '');
+                }
+            } catch (e) {}
             const probe = await _runDiagWriteProbe();
             if (entries.length === 0) {
-                const hb = { ok: probe.ok, ts: probe.ts, err: probe.err || null, appVersion: _appVer, platform: (_isTauri ? 'app' : 'web') };
+                const hb = { ok: probe.ok, ts: probe.ts, err: probe.err || null, appVersion: _appVer, appExeVersion: _appExeVer, platform: (_isTauri ? 'app' : 'web') };
                 try { localStorage.setItem(DIAG_HEARTBEAT_KEY, JSON.stringify(hb)); } catch (e) {}
                 console.log('[DIAG] 缓冲为空，改发心跳上报（写盘健康=' + probe.ok + '）');
             }
@@ -523,6 +532,7 @@
                 heartbeat: entries.length === 0,
                 writeOk: probe.ok,
                 appVersion: _appVer,
+                appExeVersion: _appExeVer,
                 platform: (_isTauri ? 'app' : 'web'),
                 entries: entries
             };            const token = getGistToken();
@@ -22162,17 +22172,20 @@ ${maSection}
                             (detailByUser[x.k] || []).forEach(m => {
                                 const ts = m.last ? new Date(m.last).toLocaleString('zh-CN') : '?';
                                 const min = m.last ? Math.max(0, Math.round((Date.now() - m.last) / 60000)) : -1;
-                                const flag = (m.heartbeat ? '🟢心跳' : '📦缓冲') + '｜' + (m.writeOk ? '✓盘' : (m.writeOk === false ? '✗盘' : '?盘')) + '｜v' + (m.ver || '?') + '｜' + (m.plat || '?');
+                                const flag = (m.heartbeat ? '🟢心跳' : '📦缓冲') + '｜' + (m.writeOk ? '✓盘' : (m.writeOk === false ? '✗盘' : '?盘')) + '｜前端v' + (m.ver || '?') + (m.payload && m.payload.appExeVersion ? '｜桌面v' + m.payload.appExeVersion : '') + '｜' + (m.plat || '?');
                                 const rc = m.payload && m.payload.reportCount ? ('｜累计上报 ' + m.payload.reportCount + ' 次') : '';
                                 html += '<div style="margin-bottom:6px;"><b>' + m.who + '</b> <span style="color:#94a3b8;">[' + ts + '  ' + min + '分钟前]</span><br><span style="color:#94a3b8;">' + flag + rc + '</span>';
                                 if (m.err) html += '<br><span style="color:#f87171;">err: ' + m.err + '</span>';
                                 if (m.payload && m.payload.entries && m.payload.entries.length) {
                                     html += '<table style="border-collapse:collapse;margin-top:4px;font-size:0.72rem;width:100%;">';
-                                    html += '<tr style="color:#94a3b8;"><th style="text-align:left;padding:2px 6px;">功能</th><th style="text-align:right;padding:2px 6px;">次数</th><th style="text-align:left;padding:2px 6px;">最近 Gist</th><th style="text-align:left;padding:2px 6px;">最近文件名</th></tr>';
+                                    html += '<tr style="color:#94a3b8;"><th style="text-align:left;padding:2px 6px;">功能</th><th style="text-align:right;padding:2px 6px;">次数</th><th style="text-align:left;padding:2px 6px;">最近 Gist</th><th style="text-align:left;padding:2px 6px;">Gist 用途</th></tr>';
                                     m.payload.entries.forEach(e => {
                                         const isWrite = e.gistId !== 'feature' && e.method !== 'GET' && e.method !== 'USE' && e.method !== 'unknown';
                                         const badge = isWrite ? ' <span style="color:#f87171;">✍️写Gist</span>' : ' <span style="color:#94a3b8;">📊仅埋点</span>';
-                                        html += '<tr style="border-top:1px dashed rgba(255,255,255,0.1);"><td style="padding:2px 6px;">' + (e.fn || '?') + badge + '</td><td style="text-align:right;padding:2px 6px;color:' + (isWrite ? '#f87171' : '#ffd700') + ';">' + (e.count || 0) + '</td><td style="padding:2px 6px;color:#94a3b8;">' + (e.gistId ? e.gistId.substring(0, 12) + '…' : '?') + '</td><td style="padding:2px 6px;">' + (e.fn || '?') + '</td></tr>';
+                                        // 🔴 2026-08-28 可读性修复：① 功能列用 _fnZh 翻译中文（不再裸英文 fn）② 第4列"最近文件名"原 bug 显示 e.fn 重复 → 改为 _gistLabel 中文用途
+                                        const fnZh = (typeof _fnZh === 'function') ? _fnZh(e.gistId, e.fn) : (e.fn || '?');
+                                        const gistZh = (typeof _gistLabel === 'function') ? _gistLabel(e.gistId).label : (e.gistId || '?');
+                                        html += '<tr style="border-top:1px dashed rgba(255,255,255,0.1);"><td style="padding:2px 6px;">' + fnZh + badge + '</td><td style="text-align:right;padding:2px 6px;color:' + (isWrite ? '#f87171' : '#ffd700') + ';">' + (e.count || 0) + '</td><td style="padding:2px 6px;color:#94a3b8;">' + (e.gistId ? e.gistId.substring(0, 12) + '…' : '?') + '</td><td style="padding:2px 6px;color:#cbd5e1;">' + gistZh + '</td></tr>';
                                     });
                                     html += '</table>';
                                 } else {
