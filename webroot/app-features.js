@@ -2886,7 +2886,16 @@
         const GITHUB_RELEASES_PAGE = 'https://gyq-svip.github.io/tfjl-web/';
         const VERSION_JSON_URL = 'https://gyq-svip.github.io/tfjl-web/version.json';
         // 更新文件（含安装包下载地址，每次发布都会更新 → 下载地址动态解析，无需手工维护渠道）
-        const UPDATER_JSON_URL = 'https://gyq-svip.github.io/tfjl-web/updater.json';
+        // 多源发现最新版本（按「Gitee 优先、GitHub 兜底」原则）：
+        // 1) Gitee Open API：直接拉 latest release，最稳（不依赖分支/raw 路径，与 publish_update.ps1 上传同一处）
+        // 2) GitHub Pages：updater.json 原生托管处（publish_update.ps1 的 git push origin 目标），WebView 拿不到时兜底
+        // —— 注：项目实际没用 Gitee raw / Gitee Pages 托管 updater.json，那两条死链已移除
+        const UPDATER_DISCOVERY_URLS = {
+            giteeApi: 'https://gitee.com/api/v5/repos/dragon-soars-across-the-world_0/tfjl-web/releases/latest',
+            github: 'https://gyq-svip.github.io/tfjl-web/updater.json'
+        };
+        // 兼容旧调用：保留单 URL 常量指向 GitHub Pages（不影响主流程）
+        const UPDATER_JSON_URL = UPDATER_DISCOVERY_URLS.github;
 
         // ========== 更新预下载状态管理 ==========
         // 启动时后台自动下载新版本，用户点「检查更新」时秒装
@@ -3463,20 +3472,67 @@
 
         // ========== 更新失败补救：弹窗 + 动态下载地址 + 选择保存位置 ==========
 
-        // 解析 updater.json，拿到当前最新安装包下载地址（Gitee 安装包，每次发布都会更新）
+        // 解析「最新版本安装包」下载地址，三通道按序尝试：
+        //   ① Gitee Open API 拉 latest release（最稳，不依赖分支/raw 路径，不依赖 updater.json 文件）
+        //   ② Gitee 仓库 raw 试 master/main 上的 updater.json
+        //   ③ GitHub Pages 兜底（你浏览器已验证可达，WebView 通常也行）
+        // 成功返回 { url, version, fileName, fallbackUrl, source }；全失败返回 null
         async function fetchInstallerInfo() {
+            // —— 通道 ①：Gitee Open API —— //
             try {
-                const resp = await fetch(UPDATER_JSON_URL, { cache: 'no-cache' });
-                if (!resp.ok) throw new Error('获取更新文件失败');
-                const data = await resp.json();
-                const url = data && data.platforms && data.platforms.windows && data.platforms.windows.url;
-                if (!url) throw new Error('更新文件缺少下载地址');
-                const fileName = decodeURIComponent(url.split('?')[0].split('/').pop()) || 'tfjl-assistant-setup.exe';
-                return { url: url, version: data.version || '', fileName: fileName };
+                const ctrl = new AbortController();
+                const tid = setTimeout(() => ctrl.abort(), 8000);
+                try {
+                    const resp = await fetch(UPDATER_DISCOVERY_URLS.giteeApi, { cache: 'no-cache', signal: ctrl.signal });
+                    if (resp.ok) {
+                        const rel = await resp.json();
+                        const asset = (rel.assets || []).find(a => /\.exe$/i.test(a.name || ''));
+                        if (asset && asset.browser_download_url) {
+                            const verRaw = (rel.tag_name || '').replace(/^v/i, '').trim();
+                            if (verRaw) {
+                                const fileName = asset.name || 'tfjl-assistant-setup.exe';
+                                // fallback 自动推导：gitee releases url → github releases 同 tag/同名
+                                let fallbackUrl = '';
+                                const m = asset.browser_download_url.match(/gitee\.com\/([^/]+)\/([^/]+)\/releases\/download\/([^/]+)\/(.+?)(?:\?|$)/);
+                                if (m) fallbackUrl = `https://github.com/${m[1]}/${m[2]}/releases/download/${m[3]}/${m[4]}`;
+                                console.log('[updater] 走 Gitee API 拿到:', verRaw, asset.browser_download_url);
+                                return { url: asset.browser_download_url, version: verRaw, fileName: fileName, fallbackUrl: fallbackUrl, source: 'gitee-api' };
+                            }
+                        }
+                    } else {
+                        console.warn('[updater] Gitee API HTTP', resp.status);
+                    }
+                } finally { clearTimeout(tid); }
             } catch (e) {
-                console.warn('[updater] 解析 updater.json 失败:', e);
-                return null;
+                console.warn('[updater] Gitee API 失败:', e && e.message);
             }
+
+            // —— 通道 ②：GitHub Pages 兜底（updater.json 原生托管处，WebView 拿不到时仍能回退）—— //
+            try {
+                const ctrl = new AbortController();
+                const tid = setTimeout(() => ctrl.abort(), 8000);
+                try {
+                    const resp = await fetch(UPDATER_DISCOVERY_URLS.github, { cache: 'no-cache', signal: ctrl.signal });
+                    if (resp.ok) {
+                        const data = await resp.json();
+                        const plat = data && data.platforms && (data.platforms.windows || data.platforms['windows-x86_64']);
+                        const url = plat && plat.url;
+                        if (url) {
+                            const fileName = decodeURIComponent(url.split('?')[0].split('/').pop()) || 'tfjl-assistant-setup.exe';
+                            let fallbackUrl = '';
+                            const m = url.match(/gitee\.com\/([^/]+)\/([^/]+)\/releases\/download\/([^/]+)\/(.+?)(?:\?|$)/);
+                            if (m) fallbackUrl = `https://github.com/${m[1]}/${m[2]}/releases/download/${m[3]}/${m[4]}`;
+                            console.log('[updater] 走 GitHub Pages 拿到:', UPDATER_DISCOVERY_URLS.github);
+                            return { url: url, version: data.version || '', fileName: fileName, fallbackUrl: fallbackUrl, source: 'github-pages' };
+                        }
+                    }
+                } finally { clearTimeout(tid); }
+            } catch (e) {
+                console.warn('[updater] GitHub Pages 失败:', e && e.message);
+            }
+
+            console.warn('[updater] 全部通道失败');
+            return null;
         }
 
         // ArrayBuffer -> base64（用于二进制安装包写盘）
