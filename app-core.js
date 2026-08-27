@@ -22846,7 +22846,7 @@ ${maSection}
                 desc: '在线状态/计数写 Gist 的节流间隔（秒）。越大写频率越低、越不易触发限流；全网所有用户统一跟随此值。范围 10~3600 秒（即最大 1 小时），到时自由调节。后台会在此基础上叠加随机抖动打散并发，避免全网同时写触发限流。',
                 scope: 'remote',
                 remoteField: 'counterFlushSec',
-                type: 'range',
+                type: 'number',
                 min: 10, max: 3600, step: 30, unit: '秒',
                 default: 3600,
                 apply: (v) => { /* 实际读取在 _getCounterFlushInterval() 内，已接入远程 counterFlushSec */ }
@@ -22857,7 +22857,7 @@ ${maSection}
                 desc: '客户端定时上报诊断/心跳的基础间隔（分钟）。所有用户统一跟随此值：到点后客户端在自己当前时间 + 随机抖动范围内任选一刻上报，天然错峰，不会全网同时打 GitHub API。调大=写频更低更省配额；调小=数据更实时、远程强刷信号更快触达。范围 1~1440 分钟（即最大 24 小时）。改动后全网客户端下次心跳即生效（默认 15 分钟）。',
                 scope: 'remote',
                 remoteField: 'heartbeatMin',
-                type: 'range',
+                type: 'number',
                 min: 1, max: 1440, step: 1, unit: '分',
                 default: 15,
                 apply: (v) => { /* 实际读取在 _initDiagReporter 的 HB_BASE，已接入远程 heartbeatMin */ }
@@ -22868,7 +22868,7 @@ ${maSection}
                 desc: '每次心跳上报在「基础间隔」上额外叠加的随机提前/延后范围（分钟）。例如间隔 15 + 抖动 5，则每个客户端在 10~20 分钟之间随机一刻上报，彻底打散并发。范围 0~120 分钟。设 0 = 严格按基础间隔（可能正点并发，慎用）。',
                 scope: 'remote',
                 remoteField: 'heartbeatJitterMin',
-                type: 'range',
+                type: 'number',
                 min: 0, max: 120, step: 1, unit: '分',
                 default: 5,
                 apply: (v) => { /* 实际读取在 _initDiagReporter 的 HB_JITTER，已接入远程 heartbeatJitterMin */ }
@@ -22980,18 +22980,22 @@ ${maSection}
                     const lv = localStorage.getItem(t.localKey);
                     on = lv === null ? (t.default ? true : false) : (lv === '1' ? true : lv === '0' ? false : false);
                 }
-                if (t.type === 'range') {
+                if (t.type === 'range' || t.type === 'number') {
                     const curVal = (typeof remoteCfg[t.remoteField] === 'number') ? remoteCfg[t.remoteField] : t.default;
                     const min = t.min ?? 10, max = t.max ?? 600, step = t.step ?? 10, unit = t.unit ?? '';
                     const tip = _stripHtml(t.desc);
+                    const isNum = t.type === 'number';
                     html += `
                     <div title="${tip.replace(/"/g, '&quot;')}" style="padding:12px;border:1px solid rgba(255,255,255,0.1);border-radius:10px;background:rgba(255,255,255,0.03);cursor:help;">
                         <div style="display:flex;align-items:center;justify-content:space-between;">
                             <div style="font-size:0.86rem;color:#fff;font-weight:600;line-height:1.3;">${t.label}</div>
                             <span id="ftRangeVal_${t.key}" style="font-size:0.82rem;color:#4fc3f7;font-weight:700;">${curVal}${unit}</span>
                         </div>
-                        <input type="range" min="${min}" max="${max}" step="${step}" value="${curVal}" oninput="setFeatureRangePreview('${t.key}', this.value)" onchange="setFeatureRange('${t.key}', this.value)" style="width:100%;margin-top:10px;accent-color:#4fc3f7;cursor:pointer;">
-                        <div style="display:flex;justify-content:space-between;font-size:0.62rem;color:rgba(255,255,255,0.3);margin-top:2px;"><span>${min}${unit}</span><span>${max}${unit}</span></div>
+                        ${isNum ?
+                            '<input type="number" id="ftNum_' + t.key + '" min="' + min + '" max="' + max + '" step="' + step + '" value="' + curVal + '" oninput="setFeatureRangePreview(\'' + t.key + '\', this.value)" onchange="setFeatureRange(\'' + t.key + '\', this.value)" style="width:100%;margin-top:10px;padding:7px 10px;border-radius:8px;border:1px solid rgba(79,195,247,0.5);background:#0f1b33;color:#fff;font-size:0.82rem;">' :
+                            '<input type="range" min="' + min + '" max="' + max + '" step="' + step + '" value="' + curVal + '" oninput="setFeatureRangePreview(\'' + t.key + '\', this.value)" onchange="setFeatureRange(\'' + t.key + '\', this.value)" style="width:100%;margin-top:10px;accent-color:#4fc3f7;cursor:pointer;">'
+                        }
+                        ${isNum ? '' : '<div style="display:flex;justify-content:space-between;font-size:0.62rem;color:rgba(255,255,255,0.3);margin-top:2px;"><span>' + min + unit + '</span><span>' + max + unit + '</span></div>'}
                         <div style="font-size:0.64rem;color:${t.scope === 'remote' ? '#4fc3f7' : '#94a3b8'};margin-top:6px;">${t.scope === 'remote' ? '🌐 全网' : '🖥️ 本机'}</div>
                     </div>`;
                     continue;
@@ -23145,7 +23149,7 @@ ${maSection}
         // 松开滑块才真正保存(每次拖动只写 1 次,避免连发 PATCH 触发限流)
         async function setFeatureRange(key, val) {
             const t = FEATURE_TOGGLES.find(x => x.key === key);
-            if (!t || t.type !== 'range') return;
+            if (!t || (t.type !== 'range' && t.type !== 'number')) return;
             const n = Math.max(t.min ?? 10, Math.min(t.max ?? 600, parseInt(val, 10) || t.default));
             const valEl = document.getElementById('ftRangeVal_' + key);
             if (valEl) valEl.textContent = n + (t.unit || '');
