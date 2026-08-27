@@ -1349,6 +1349,25 @@ pub fn run() {
                 let _ = w.hide();
             }
         }
+        // 🔴 点「-」最小化到任务栏：Tauri v2 的 WindowEvent 枚举没有 Minimized 变体（JS 端也无 window-minimize 事件），
+        // 但最小化时必触发 Focused(false)。这里在失焦时额外查询 is_minimized() 精确区分「真最小化」与「被其它窗口盖住失焦」
+        // （被盖住不能误判后台，否则会误强刷丢数据）。真最小化 → emit tfjl-minimized → 前端置 __tfjlInTray=true → 可静默升级
+        // （窗口仍留任务栏图标，符合用户"最小化到任务栏、非关闭"的要求）。重新聚焦 → emit tfjl-restored → 回到前台不升级。
+        if let tauri::RunEvent::WindowEvent {
+            event: tauri::WindowEvent::Focused(focused),
+            ..
+        } = event
+        {
+            if !focused {
+                if let Some(w) = app.get_webview_window("main") {
+                    if let Ok(true) = w.is_minimized() {
+                        let _ = app.emit("tfjl-minimized", ());
+                    }
+                }
+            } else {
+                let _ = app.emit("tfjl-restored", ());
+            }
+        }
         // 兜底：应用即将退出时也阻止（防止某些路径直接退出导致托盘残留）
         if let tauri::RunEvent::ExitRequested { api, .. } = event {
             api.prevent_exit();

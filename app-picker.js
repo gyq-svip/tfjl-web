@@ -281,8 +281,12 @@
                         listen('tauri://window-hide', () => { window.__tfjlInTray = true; });
                         listen('tauri://window-show', () => { window.__tfjlInTray = false; });
                         listen('tauri://close-requested', () => { window.__tfjlInTray = true; });
-                        // 🔴 点「-」最小化到任务栏：也视为离开前台（与 X 同规则允许静默升级），但窗口仍在任务栏可见
-                        listen('tauri://window-minimize', () => { window.__tfjlInTray = true; });
+                        // 🔴 点「-」最小化到任务栏：Tauri v2 不派发 window-minimize 全局事件，由 Rust 端在
+                        // Minimized 时 emit 自定义事件（见 lib.rs）。这里监听它 → 视为离开前台(可静默升级)，
+                        // 窗口仍留任务栏图标（用户要求"最小化到任务栏、非关闭"）。
+                        listen('tfjl-minimized', () => { window.__tfjlInTray = true; });
+                        // 从最小化恢复 → 回到前台，不再允许自动升级
+                        listen('tfjl-restored', () => { window.__tfjlInTray = false; });
                     }).catch(() => {});
                 }
             } catch (e) {}
