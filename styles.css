@@ -2745,7 +2745,10 @@
             border-top-color: rgba(20,20,44,0.96);
         }
         /* 版本号始终暗色常显；鼠标悬停显示提示气泡（有新版本也保持暗色，不额外高亮） */
-        #versionTag:hover + .version-tooltip {
+        /* 🔴 2026-08-27 修复：#versionTag 与 .version-tooltip 之间还隔着 #appUpdateBadge(span)，
+           原用紧邻兄弟选择器 `+` 永远匹配不到 → 鼠标悬停不显示版本气泡。改为通用兄弟 `~` 使其生效。
+           仅修正显示逻辑，未改动 #versionTag 本身的双击刷新功能（铁律）。 */
+        #versionTag:hover ~ .version-tooltip {
             opacity: 1;
             visibility: visible;
         }
