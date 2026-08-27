@@ -58,6 +58,26 @@ function Publish-GiteeRelease($ver, $exePath, $remoteName) {
         if ($curlExit -ne 0) { Write-Host "ERROR: 上传 exe 到 Gitee 失败 (curl exit=$curlExit)" -ForegroundColor Red; exit 1 }
         Write-Host "Uploaded $fname -> Gitee release $tag" -ForegroundColor Green
     }
+    # 🔴 2026-08-27 v2.0.16：原生 Tauri updater 的 endpoints 主源指向 Gitee 发行版里的 updater.json
+    # （与 exe 同 tag，国内稳）。这里把生成好的 updater.json 也作为附件上传，确保双端（Gitee 主 / GitHub Pages 备）都有。
+    $ujName = "updater.json"
+    $ujPath = Join-Path $RootDir $ujName
+    if (Test-Path $ujPath) {
+        if ($rel.assets -and ($rel.assets | Where-Object { $_.name -eq $ujName })) {
+            Write-Host "updater.json 已在 Gitee release $tag，跳过上传" -ForegroundColor Cyan
+        } else {
+            $upUj = "https://gitee.com/api/v5/repos/$owner/$repo/releases/$rid/attach_files?access_token=$tok"
+            $prevEAP = $ErrorActionPreference
+            $ErrorActionPreference = "Continue"
+            & curl.exe -X POST $upUj -F ("file=@" + $ujPath) 2>$null
+            $curlExitUj = $LASTEXITCODE
+            $ErrorActionPreference = $prevEAP
+            if ($curlExitUj -ne 0) { Write-Host "WARN: 上传 updater.json 到 Gitee 失败 (curl exit=$curlExitUj)，原生 updater 主源将缺失，但 GitHub Pages 兜底仍可用" -ForegroundColor Yellow }
+            else { Write-Host "Uploaded $ujName -> Gitee release $tag" -ForegroundColor Green }
+        }
+    } else {
+        Write-Host "WARN: 根目录未找到 updater.json，跳过上传（请先确保已生成）" -ForegroundColor Yellow
+    }
 }
 
 $confJson = [System.IO.File]::ReadAllText($ConfPath, [System.Text.Encoding]::UTF8) | ConvertFrom-Json

@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "塔防精灵助手",
-  "version": "2.0.15",
+  "version": "2.0.16",
   "identifier": "com.gyq.tfjl",
     "build": {
     "frontendDist": "webroot",
@@ -58,7 +58,10 @@
   },
   "plugins": {
     "updater": {
-      "endpoints": ["https://gyq-svip.github.io/tfjl-web/updater.json"],
+      "endpoints": [
+        "https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/releases/download/v{{current_version}}/updater.json",
+        "https://gyq-svip.github.io/tfjl-web/updater.json"
+      ],
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDdGNDFFRjQ3MjQzNUIxMEYKUldRUHNUVWtSKzlCZjZGUklrNllIc21TckFNYkg3ODZ5enZHcUpwZjRzWXRzalEraVI5WElOWmUK",
       "windows": {
         "installMode": "passive"

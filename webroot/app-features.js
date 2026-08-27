@@ -3135,209 +3135,49 @@
             };
         }
 
-        // 菜单「检查更新」：桌面版优先走 Tauri 自动更新器（分离下载/安装 + 进度显示）
-        // 启动时后台已预下载完成 → 秒装；下载中 → 显示进度；否则重新走一遍流程
+        // 菜单「检查更新」：走 Gitee 整包更新通道（快），GitHub 仅兜底索引。
+        // 🔴 2026-08-27 整改：彻底弃用 Tauri 原生 updater（window.__TAURI__.updater 连 GitHub，
+        //   网络不稳时弹原生「自动更新失败」窗，用户反感）。改为读 updater.json（GitHub Pages 小索引）
+        //   → 拿 Gitee 安装包地址 + 版本号，比对本机版本；有新版则走 showInstallerSaveDialog
+        //   把 Gitee 整包下载到本地并安装（覆盖升级、数据不丢）。
         async function menuCheckUpdate() {
             await fillCurrentVersion();
-
-    // —— 1. 启动时已后台预下载完成？秒装（但先重查最新，避免跨多版本只装到旧缓存）——
-    if (_currentUpdate && _downloadSucceeded && !_currentDownload) {
-        // 🔴 跨版本修复：点升级前再 check 一次，若线上已有更新版本（如缓存的是 2.0.11、线上已 2.0.12），
-        // 必须用最新 Update 对象下载安装，而非直接 install 旧缓存（Tauri update 对象绑定了 check 时的版本）。
-        let installTarget = _currentUpdate;
-        try {
-            if (window.__TAURI__ && window.__TAURI__.updater) {
-                const re = await window.__TAURI__.updater.checkUpdate();
-                const fresh = re && (re.update || re);
-                if (fresh && isNewerVersion(fresh.version, _updateVersion || '')) {
-                    installTarget = fresh;
-                    _updateVersion = fresh.version;
-                    _currentUpdate = fresh;
-                }
-            }
-        } catch (reErr) { /* 重查失败则用已缓存对象，不阻断升级 */ }
-
-        const t = showLoadingToast('⚡ 正在安装 v' + _updateVersion + '...');
-        try {
-            await new Promise(r => setTimeout(r, 300)); // 给 Tauri Rust 侧一点时间完成最终化
-            if (typeof installTarget.install === 'function') {
-                await installTarget.install();
-            }
-            t.success('✅ 安装完成，即将重启...');
-            t.remove(1500);
-            setTimeout(() => {
-                try { window.__TAURI__.updater.relaunch(); } catch(e) {}
-            }, 800);
-            return;
-        } catch (e) {
-            console.warn('[updater] 安装已下载包失败，回退 downloadAndInstall:', e);
-            t.error('⚠️ 安装失败，重试中...');
-            t.remove(2000);
-            _resetUpdateState();
-            // 不 return，继续走下方完整流程
-        }
-    }
-
-            // —— 2. 启动时还在后台下载中？等待完成 ——
-            if (_currentDownload) {
-                const t = showLoadingToast('📥 后台下载中 ' + _downloadProgress + '%');
-                const start = Date.now();
-                let lastPct = _downloadProgress;
-                while (_currentDownload && Date.now() - start < 300000) {
-                    await new Promise(r => setTimeout(r, 500));
-                    if (_downloadProgress !== lastPct) {
-                        lastPct = _downloadProgress;
-                        t.update('📥 下载中 ' + lastPct + '%');
-                    }
-                }
-                if (!_currentDownload && _downloadSucceeded) {
-                    try {
-                        t.update('📦 正在安装 v' + _updateVersion + '...');
-                        if (_currentUpdate && typeof _currentUpdate.install === 'function') {
-                            await _currentUpdate.install();
-                        }
-                        t.success('✅ 安装完成，即将重启...');
-                        t.remove(1500);
-                        setTimeout(() => {
-                            try { window.__TAURI__.updater.relaunch(); } catch(e) {}
-                        }, 800);
-                        return;
-                    } catch (e) {
-                        t.error('⚠️ 安装失败，请重试');
-                        t.remove(2500);
-                        _resetUpdateState();
-                        return;
-                    }
-                }
-                // 等到的结果是失败，清空状态继续走下方完整流程重试
-                _resetUpdateState();
-            }
-
-            // —— 3. 正常流程：检查 → 下载（带进度） → 安装 ——
-            const t = showLoadingToast('🔍 正在检查更新...（点击可取消）');
+            const t = showLoadingToast('🔍 正在检查更新...');
             try {
-                if (window.__TAURI__ && window.__TAURI__.updater) {
-                    try {
-                        const updater = window.__TAURI__.updater;
-                        // 给 updater.checkUpdate() 加超时，避免网络/代理卡住导致永久 pending
-                        const _checkTimeout = (p, ms) => Promise.race([
-                            p,
-                            new Promise((_, rej) => setTimeout(() => rej(new Error('检查更新超时')), ms))
-                        ]);
-                        const result = await _checkTimeout(updater.checkUpdate(), 15000);
-                        const update = result && (result.update || result);
-                        if (update) {
-                            _updateVersion = update.version || CURRENT_VERSION;
-                            _currentUpdate = update;
-
-                            if (typeof update.download === 'function') {
-                                let downloadDone = false;
-                                let totalBytes = 0;
-                                let downloadedBytes = 0;
-                                _currentDownload = new Promise((resolve, reject) => {
-                                    update.download((event) => {
-                                        if (downloadDone) return;
-                                        if (event.event === 'Started') {
-                                            totalBytes = event.data && event.data.contentLength ? event.data.contentLength : 0;
-                                        } else if (event.event === 'Progress') {
-                                            downloadedBytes += event.data && event.data.chunkLength ? event.data.chunkLength : 0;
-                                            if (totalBytes > 0) {
-                                                _downloadProgress = Math.round((downloadedBytes / totalBytes) * 100);
-                                            }
-                                            t.update('📥 下载中 ' + _downloadProgress + '%');
-                                        } else if (event.event === 'Finished') {
-                                            _downloadProgress = 100;
-                                            downloadDone = true;
-                                            resolve();
-                                        }
-                                    }).then(() => {
-                                        if (!downloadDone) { _downloadProgress = 100; downloadDone = true; resolve(); }
-                                    }).catch(reject);
-                                });
-
-                                try {
-                                    await _currentDownload;
-                                    _markDownloadSuccess();
-                                    // 给 Tauri Rust 侧一点时间完成最终化（避免 install 抢跑）
-                                    await new Promise(r => setTimeout(r, 300));
-
-                                    t.update('📦 正在安装 v' + _updateVersion + '...');
-                                    await update.install();
-                                    t.success('✅ 安装完成，即将重启...');
-                                    t.remove(1500);
-                                    setTimeout(() => updater.relaunch(), 800);
-                                    return;
-                                } catch (installErr) {
-                                    // install 失败（最常见原因：代理阻塞下载没真正完成）
-                                    // 兜底：一次性 downloadAndInstall 让 Tauri 内部重试
-                                    console.warn('[updater] 分离式 install 失败，回退 downloadAndInstall:', installErr);
-                                    _resetUpdateState();
-                                    const t2 = showLoadingToast('📥 重新下载并安装 v' + _updateVersion + '...');
-                                    try {
-                                        await update.downloadAndInstall();
-                                        t2.success('✅ 更新完成，即将重启...');
-                                        t2.remove(1500);
-                                        setTimeout(() => updater.relaunch(), 800);
-                                        return;
-                                    } catch (fallbackErr) {
-                                        const errMsg = String(fallbackErr && (fallbackErr.message || fallbackErr) || '未知错误');
-                                        try { window.__tfjlUpdaterError = errMsg; } catch(e) {}
-                                        _resetUpdateState();
-                                        // 兜底仍失败 → 弹窗引导手动下载最新版（地址动态解析自 updater.json）
-                                        showUpdateFailedModal(errMsg, _updateVersion);
-                                    }
-                                }
-                            }
-
-                            // 旧版 updater 不支持 download()，用 downloadAndInstall 兜底
-                            t.update('📥 发现新版本 v' + _updateVersion + '，正在下载安装...');
-                            await update.downloadAndInstall();
-                            t.success('✅ 更新完成，即将重启...');
-                            t.remove(1500);
-                            setTimeout(() => updater.relaunch(), 800);
-                            return;
-                        }
-                        t.success('✅ 当前已是最新版本 v' + CURRENT_VERSION);
-                        t.remove(2500);
-                        return;
-                    } catch (e) {
-                        const errMsg = String(e && (e.message || e) || '未知错误');
-                        console.warn('[updater] 自动更新失败，回退手动检查:', e);
-                        _resetUpdateState();
-                        // 把真实错误暂存，fallback 时展示给用户，而不是一刀切说"代理"
-                        try { window.__tfjlUpdaterError = errMsg; } catch(e2) {}
-                    }
-                }
-                // 网页版 / updater 不可用时：检查 version.json
-                const release = await fetchLatestRelease();
-                if (!release) {
+                const info = await fetchInstallerInfo(); // {url(Gitee), version, fileName, fallbackUrl}
+                if (!info || !info.version) {
                     t.error('⚠️ 无法获取版本信息，请检查网络后重试');
                     t.remove(2800);
                     return;
                 }
-                if (isNewerVersion(release.version, CURRENT_VERSION)) {
-                    const badge = document.getElementById('updateBadgeFooter');
-                    if (badge) badge.style.display = 'inline-block';
-                    const isTauri = !!(window.__TAURI__ || window.__TAURI_INTERNALS__);
-                    if (isTauri) {
-                        // Tauri 自动更新器走到这里说明 updater 失败 → 弹窗引导手动下载（地址动态解析自 updater.json）
-                        const realErr = window.__tfjlUpdaterError || '';
-                        t.remove(0);
-                        showUpdateFailedModal(realErr, release.version);
-                    } else {
-                        t.success('🎉 发现新版本 v' + release.version + '，即将打开下载...');
-                        t.remove(1800);
-                        setTimeout(() => openDownloadModal(), 1300);
-                    }
-                } else {
+                const newVer = info.version;
+                if (!isNewerVersion(newVer, CURRENT_VERSION)) {
                     t.success('✅ 当前已是最新版本 v' + CURRENT_VERSION);
                     t.remove(2500);
+                    return;
                 }
+                // 有新版 → 记录 + 页脚 badge 常驻 + 闪动提示
+                _updateVersion = newVer;
+                try { window.__tfjlTargetVer = newVer; } catch(e) {} // 供右下角 tooltip 显示「可升目标版本」
+                _markVersionNew(newVer);
+                try { localStorage.setItem(LAST_NOTIFIED_VERSION_KEY, newVer); } catch(e) {}
+                const badge = document.getElementById('updateBadgeFooter');
+                if (badge) badge.style.display = 'inline-block';
+
+                t.success('🎉 发现新版本 v' + newVer + '，准备下载安装包...');
+                t.remove(1600);
+                // 走 Gitee 整包下载写盘（fetch Gitee → base64 → write_binary_file），用户选目录后安装
+                await showInstallerSaveDialog(info.url, newVer, info.fileName, info.fallbackUrl);
             } catch (e) {
                 console.warn('[updater] menuCheckUpdate 异常:', e);
-                _resetUpdateState();
-                t.error('⚠️ 检查失败，请稍后重试');
-                t.remove(2800);
+                try {
+                    // 兜底：弹出补救窗（含 Gitee 下载按钮）
+                    showUpdateFailedModal(String(e && (e.message || e) || e), _updateVersion);
+                } catch (e2) {
+                    _resetUpdateState();
+                    t.error('⚠️ 检查失败，请稍后重试');
+                    t.remove(2800);
+                }
             }
         }
 
@@ -3761,113 +3601,42 @@
             };
         }
 
-        // App 启动时后台自动检查更新 + 预下载（用户点「检查更新」时秒装）
-        // 注意：自动检测有去重逻辑（同一版本只通知一次），手动「检查更新」无去重（用户主动触发应如实反馈）
+        // App 启动时后台自动检查更新（仅检测 + 提示，不预下载整包）
+        // 🔴 2026-08-27 整改：更新包一律走 Gitee 下载通道（快），GitHub 仅作兜底索引。
+        //   原实现用 Tauri 原生 updater（window.__TAURI__.updater.checkUpdate() 连 GitHub）导致启动即弹
+        //   原生「自动更新失败」窗（用户反感）。现改为读 updater.json（GitHub Pages 索引，体积小能通）
+        //   → 拿 Gitee 安装包地址 + 版本号，比对本机版本，有新版则闪动提示 + 显示 badge，点击走 Gitee 整包下载。
         async function autoCheckUpdate() {
             const isTauri = !!(window.__TAURI__ || window.__TAURI_INTERNALS__);
             if (!isTauri) return;
 
-            // 先填充当前版本号（避免竞态：Tauri updater 失败时 fallback 依赖正确的 CURRENT_VERSION）
+            // 填充当前版本号（桌面版从 Tauri 取真实版本，在线版保持「网页版」）
             await fillCurrentVersion();
 
             try {
-                // —— 优先走 Tauri updater：后台静默下载 ——
-                if (window.__TAURI__ && window.__TAURI__.updater) {
+                // —— 走 Gitee 整包更新通道：读 updater.json（GitHub Pages 小索引）→ Gitee 安装包地址 + 版本 ——
+                const info = await fetchInstallerInfo();
+                if (!info || !info.version) return; // 索引获取失败，静默不提示（不影响使用）
+                const newVer = info.version;
+                // 已是最新 → 清掉旧通知痕迹
+                if (!isNewerVersion(newVer, CURRENT_VERSION)) {
                     try {
-                        const updater = window.__TAURI__.updater;
-                        const result = await updater.checkUpdate();
-                        const update = result && (result.update || result);
-                        if (!update) {
-                            // 确实已是最新 → 清除旧版本通知/下载记录（比如用户降级后又升级的场景）
-                            try {
-                                localStorage.removeItem(LAST_NOTIFIED_VERSION_KEY);
-                                localStorage.removeItem(DOWNLOADED_VERSION_KEY);
-                            } catch(e) {}
-                            return;
-                        }
-
-                        const newVer = update.version || 'latest';
-                        _updateVersion = newVer;
-                        _currentUpdate = update;
-                        _markVersionNew(newVer); // 版本号旁闪动提示升级
-
-                        // —— 去重：只控制「是否弹 toast」，【绝不能阻止下载】——
-                        // 旧逻辑曾把「已通知」误当「已下载」直接 return，导致下载被跳过、自动更新形同虚设。
-                        // 现在下载始终执行；用 DOWNLOADED_VERSION_KEY 记录真正下载过的版本，避免每次启动重复下载。
-                        const getLS = (k) => { try { return localStorage.getItem(k) || ''; } catch(e) { return ''; } };
-                        const lastNotified = getLS(LAST_NOTIFIED_VERSION_KEY);
-                        const downloadedVer = getLS(DOWNLOADED_VERSION_KEY);
-                        const isFirstDownload = (downloadedVer !== newVer); // 本版本尚未真正下载过
-
-                        if (typeof update.download === 'function') {
-                            // 已下载完成且已通知过 → 仅确保角标常驻，不重复下载/弹窗
-                            if (_downloadSucceeded && !isFirstDownload && lastNotified === newVer) {
-                                const badge = document.getElementById('updateBadgeFooter');
-                                if (badge) badge.style.display = 'inline-block';
-                                return;
-                            }
-
-                            // 后台静默下载（不弹 toast，不打扰用户）
-                            let downloadDone = false;
-                            let totalBytes = 0;
-                            let downloadedBytes = 0;
-                            _currentDownload = new Promise((resolve, reject) => {
-                                update.download((event) => {
-                                    if (downloadDone) return;
-                                    if (event.event === 'Started') {
-                                        totalBytes = event.data && event.data.contentLength ? event.data.contentLength : 0;
-                                    } else if (event.event === 'Progress') {
-                                        downloadedBytes += event.data && event.data.chunkLength ? event.data.chunkLength : 0;
-                                        if (totalBytes > 0) {
-                                            _downloadProgress = Math.round((downloadedBytes / totalBytes) * 100);
-                                        }
-                                    } else if (event.event === 'Finished') {
-                                        _downloadProgress = 100;
-                                        downloadDone = true;
-                                        resolve();
-                                    }
-                                }).then(() => {
-                                    if (!downloadDone) { _downloadProgress = 100; downloadDone = true; resolve(); }
-                                }).catch(reject);
-                            });
-
-                            await _currentDownload;
-                            _markDownloadSuccess();
-                            // 记录已下载版本（持久化，避免每次启动重复下载）
-                            try { localStorage.setItem(DOWNLOADED_VERSION_KEY, newVer); } catch(e) {}
-                            // 首下载（含脏数据场景：LAST_NOTIFIED 被旧 fallback 污染但从未真下载过）
-                            // 或尚未通知过 → 弹「已下载完成」提示；否则仅常驻角标
-                            if (isFirstDownload || lastNotified !== newVer) {
-                                try { localStorage.setItem(LAST_NOTIFIED_VERSION_KEY, newVer); } catch(e) {}
-                                _notifyPreDownloadReady();
-                            }
-                            return;
-                        }
-                        // 旧版 updater 无 download()，退回到仅提示
-                        if (lastNotified !== newVer) {
-                            try { localStorage.setItem(LAST_NOTIFIED_VERSION_KEY, newVer); } catch(e) {}
-                            _notifyNewVersion(newVer);
-                        }
-                        return;
-                    } catch (e) {
-                        const errMsg = String(e && (e.message || e) || '未知错误');
-                        console.warn('[auto-update] Tauri updater 后台预下载失败:', e);
-                        try { window.__tfjlUpdaterError = errMsg; } catch(e2) {}
-                        _resetUpdateState();
-                    }
+                        localStorage.removeItem(LAST_NOTIFIED_VERSION_KEY);
+                        localStorage.removeItem(DOWNLOADED_VERSION_KEY);
+                    } catch(e) {}
+                    return;
                 }
-
-                // —— 退回到 version.json 仅提示（网页版/旧版） ——
-                const result = await checkForUpdates();
-                if (result && result.hasUpdate) {
-                    const lastNotified = (function(){ try { return localStorage.getItem(LAST_NOTIFIED_VERSION_KEY) || ''; } catch(e) { return ''; } })();
-                    if (lastNotified !== result.version) {
-                        try { localStorage.setItem(LAST_NOTIFIED_VERSION_KEY, result.version); } catch(e) {}
-                        _notifyNewVersion(result.version);
-                    }
+                // 有新版 → 记录 + 版本号旁闪动 + 显示页脚 badge（点击走 Gitee 整包下载）
+                _updateVersion = newVer;
+                try { window.__tfjlTargetVer = newVer; } catch(e) {} // 供右下角 tooltip 显示「可升目标版本」
+                _markVersionNew(newVer);
+                const lastNotified = (function(){ try { return localStorage.getItem(LAST_NOTIFIED_VERSION_KEY) || ''; } catch(e) { return ''; } })();
+                if (lastNotified !== newVer) {
+                    try { localStorage.setItem(LAST_NOTIFIED_VERSION_KEY, newVer); } catch(e) {}
                 }
+                _notifyNewVersion(newVer);
             } catch (e) {
-                console.warn('自动检查更新失败:', e);
+                console.warn('[auto-update] Gitee 通道自动检测失败（不影响使用）:', e);
             }
         }
 
