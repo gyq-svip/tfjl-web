@@ -340,6 +340,8 @@
                 window.__tfjl24hFallbackStarted = started;
                 setInterval(() => {
                     if (!window.__tfjlNewVerSince) return;
+                    // 🔴 修复：24h 兜底升级也必须受「强制更新总开关」控制（2026-08-27 实测关开关仍自动升，根因在此段漏判开关）。
+                    if (!window.__diagForceReload) return; // 开关关 → 不兜底强刷，尊重用户关闭意图
                     const elapsed = Date.now() - window.__tfjlNewVerSince;
                     if (elapsed < 24 * 60 * 60 * 1000) return; // 未满 24h 不兜底
                     const isTauri = !!(window.__TAURI_INTERNALS__ || window.__TAURI__ || navigator.userAgent.indexOf('Tauri') >= 0);
@@ -387,6 +389,11 @@
                 //   · 网页版隐藏/最小化 → 静默升级
                 //   · 网页版前台 → 不弹气泡、不升级，切后台时静默升
                 if (event.data && event.data.type === 'FORCE_RELOAD') {
+                    // 🔴 修复：强制刷新指令也必须受「强制更新总开关」控制（2026-08-27 实测关开关仍升）。
+                    if (!window.__diagForceReload) {
+                        console.log('[更新] 收到 FORCE_RELOAD 但强制更新开关关 → 忽略，等用户手动点');
+                        return;
+                    }
                     const isTauri = !!(window.__TAURI_INTERNALS__ || window.__TAURI__ || navigator.userAgent.indexOf('Tauri') >= 0);
                     // 🔴 APP 只有「真正挂托盘(点 X,__tfjlInTray=true)」才算后台可静默升级。
                     // 仅仅被别的窗口全屏盖住 / 失焦 / 普通最小化(未挂托盘) → 一律视为前台，坚决不自动升级，
