@@ -112,3 +112,13 @@ commands.allow = ["download_skins"]
 identifier = "allow-register-heartbeat"
 description = "Allow frontend to register per-device Rust heartbeat ctx so tray/dormant App keeps online presence (s1.0.190 fix for P3 drop-off)"
 commands.allow = ["register_heartbeat"]
+
+[[permission]]
+identifier = "allow-check-app-update"
+description = "Allow silently checking for big-version (2.0.x) app update via Tauri updater"
+commands.allow = ["check_app_update"]
+
+[[permission]]
+identifier = "allow-install-app-update"
+description = "Allow clicking the update badge to immediately download+install big-version app update"
+commands.allow = ["install_app_update"]

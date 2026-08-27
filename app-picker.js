@@ -291,6 +291,42 @@
                 }
             } catch (e) {}
         })();
+        // ==================== 大版本整包升级提示（独立于右下角 #versionTag，绝不碰它） ====================
+        // 需求：不显示具体版本号，只提示"有新版本"；点击 → 立即检查并安装（点一下就升，不弹引导）。
+        // Rust 检测到新大版本会 emit('app-update-available')；前端在 #versionTag 旁显示独立 badge。
+        (function setupAppUpdateBadge() {
+            try {
+                const badge = document.getElementById('appUpdateBadge');
+                if (!badge) return;
+                // Tauri 环境下才启用（网页版无整包更新）
+                const isTauri = !!(window.__TAURI_INTERNALS__ || window.__TAURI__ || navigator.userAgent.indexOf('Tauri') >= 0);
+                if (!isTauri) return;
+                // 调用 Rust 命令（兼容 v1/v2 两种 invoke 写法）
+                const invoke = (cmd) => {
+                    if (window.__TAURI__?.core?.invoke) return window.__TAURI__.core.invoke(cmd);
+                    if (window.__TAURI_INTERNALS__?.invoke) return window.__TAURI_INTERNALS__.invoke(cmd);
+                    if (window.__TAURI__?.invoke) return window.__TAURI__.invoke(cmd);
+                    return Promise.reject('no invoke');
+                };
+                // 收到 Rust 的"有新版本"事件 → 显示 badge（不带版本号）
+                if (window.__TAURI_INTERNALS__?.event?.listen) {
+                    window.__TAURI_INTERNALS__.event.listen('app-update-available', () => {
+                        badge.style.display = 'inline-block';
+                    });
+                }
+                // 点击 badge → 立即检查并安装（点一下就查就升，不显示版本号、不弹引导）
+                badge.onclick = function () {
+                    badge.textContent = '⏳ 升级中…';
+                    invoke('install_app_update').catch((e) => {
+                        console.warn('[更新] 整包升级失败或无需升级:', e);
+                        badge.textContent = '🟢 有新版本';
+                    });
+                };
+                // 启动时让 Rust 静默查一次（有更新才显示 badge，不干扰前台）
+                invoke('check_app_update').catch(() => {});
+            } catch (e) {}
+        })();
+
         // ==================== 24h 兜底升级（仅挂托盘/失焦时，前台绝不触发） ====================
         // 老顽固客户端若一直挂在前台、从不挂托盘，常规 FORCE_RELOAD 挂托盘逻辑碰不到它。
         // 兜底：发现新版本满 24h 后，仅当它处于「挂托盘(__tfjlInTray) 或 网页版隐藏」才静默升级。
