@@ -1740,7 +1740,13 @@
                     <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:12px;margin-bottom:12px;">
                         <div style="color:rgba(255,255,255,0.7);font-size:0.75rem;margin-bottom:8px;">✉️ 快速下发指令</div>
                         <div style="display:flex;flex-direction:column;gap:8px;">
-                            <input id="toolboxTarget" placeholder="目标 deviceId（留空=all 全推）" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:6px;padding:7px 9px;font-size:0.8rem;">
+                            <div style="display:flex;gap:8px;align-items:center;">
+                                <select id="toolboxUserSelect" onchange="toolboxUserPicked()" style="flex:1;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:6px;padding:7px 9px;font-size:0.78rem;">
+                                    <option value="">— 选择目标用户（下拉）—</option>
+                                </select>
+                                <button onclick="toolboxLoadUsers()" style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:#fff;border-radius:6px;padding:7px 10px;cursor:pointer;font-size:0.72rem;white-space:nowrap;">刷新列表</button>
+                            </div>
+                            <input id="toolboxTarget" placeholder="目标 deviceId（留空=all 全推，或上方下拉选）" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:6px;padding:7px 9px;font-size:0.8rem;">
                             <select id="toolboxType" onchange="toolboxTypeChanged()" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:6px;padding:7px 9px;font-size:0.8rem;">
                                 <option value="notify">飘屏通知（notify）</option>
                                 <option value="block">拉黑锁机（block）</option>
