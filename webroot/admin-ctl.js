@@ -54,17 +54,23 @@
     } catch (e) { return ''; }
   }
 
-  // 拉取指令 Gist
+  // 拉取指令 Gist（与全站其他开关同源：getGistToken()+fetch，不依赖 AllianceDB 独立脚本）
   async function fetchAdminCtl() {
     const id = ADMIN_CTL_GIST_ID;
     if (!id || id.indexOf('REPLACE_') === 0) return null;
     try {
-      const g = await window.AllianceDB.ghGistGet(id);
+      const token = (typeof getGistToken === 'function') ? getGistToken() : '';
+      if (!token) { console.warn('[adminCtl] 无 token，跳过拉取'); return null; }
+      const r = await fetch(`https://api.github.com/gists/${id}`, {
+        headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': 'token ' + token }
+      });
+      if (!r.ok) { console.warn('[adminCtl] 拉取指令失败:', r.status); return null; }
+      const g = await r.json();
       const f = g && g.files && g.files[ADMIN_CTL_FILE];
       if (!f || !f.content) return null;
       return JSON.parse(f.content);
     } catch (e) {
-      console.warn('[adminCtl] 拉取指令失败:', e.message);
+      console.warn('[adminCtl] 拉取指令失败:', e && e.message);
       return null;
     }
   }
@@ -232,14 +238,20 @@
     return String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
 
-  // 启动：定时拉取（Web 版用 setInterval，APP 版由 Rust 心跳唤醒）
+  // 启动：定时拉取（Web 版用 setTimeout 自调度，APP 版由 Rust 心跳唤醒）
   let _pollTimer = null;
+  let _lastPollSec = 300; // 默认 5 分钟；管理员可在工具箱设 pollSec 远程调，读取后下次生效
   function startAdminCtlPoll() {
     if (_pollTimer) return;
     const loop = () => {
-      fetchAdminCtl().then(applyAdminCtl).catch(() => {});
-      const sec = 300; // 默认 5 分钟；管理员可通过 Gist 的 pollSec 远程调（读取后下次生效）
-      _pollTimer = setTimeout(loop, sec * 1000);
+      fetchAdminCtl().then(ctl => {
+        if (ctl && ctl.pollSec && ctl.pollSec >= 10 && ctl.pollSec !== _lastPollSec) {
+          _lastPollSec = ctl.pollSec; // 应用远程新间隔（≥10s 防抖，避免误设 0 把 GitHub 打爆）
+          console.log('[adminCtl] 心跳间隔已更新为 ' + _lastPollSec + 's');
+        }
+        applyAdminCtl(ctl);
+      }).catch(() => {});
+      _pollTimer = setTimeout(loop, _lastPollSec * 1000);
     };
     loop();
   }
