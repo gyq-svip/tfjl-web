@@ -1766,13 +1766,13 @@
                         </div>
                     </div>
                     <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:12px;margin-bottom:12px;">
-                        <div style="color:rgba(255,255,255,0.7);font-size:0.75rem;margin-bottom:8px;">💓 指令心跳间隔（pollSec，秒）：控制所有客户端拉取指令的频率</div>
+                        <div style="color:rgba(255,255,255,0.7);font-size:0.75rem;margin-bottom:8px;">🔄 指令轮询间隔（pollSec，秒）：控制所有客户端拉取 admin 指令（拉黑/通知/强刷）的频率，与上方"诊断心跳"无关</div>
                         <div style="display:flex;gap:8px;align-items:center;">
                             <input id="toolboxPollSec" type="number" min="10" max="3600" value="300" style="width:90px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:6px;padding:7px 9px;font-size:0.8rem;">
                             <span style="font-size:0.72rem;color:rgba(255,255,255,0.5);">秒（10~3600，默认300=5分钟）</span>
                             <button onclick="toolboxSetPollSec()" style="background:linear-gradient(135deg,#8b5cf6,#7c3aed);color:#fff;border:none;padding:7px 12px;border-radius:6px;cursor:pointer;font-size:0.78rem;white-space:nowrap;">应用到指令 Gist</button>
                         </div>
-                        <div id="toolboxPollSecStatus" style="font-size:0.72rem;color:rgba(255,255,255,0.55);margin-top:6px;">客户端下次心跳即按新间隔拉取；设小=指令更快触达，但更耗 GitHub API 额度</div>
+                        <div id="toolboxPollSecStatus" style="font-size:0.72rem;color:rgba(255,255,255,0.55);margin-top:6px;">客户端下次轮询即按新间隔拉取指令；设小=指令更快触达，但更耗 GitHub API 额度</div>
                     </div>
                     <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:12px;margin-bottom:12px;">
                         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
