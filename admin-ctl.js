@@ -135,6 +135,9 @@
       const until = bl.until;
       const expired = until && until !== 'forever' && Date.now() > until;
       if (!expired) { _showBlockOverlay(bl.reason || '请联系管理员'); return; }
+    } else {
+      // 已解封 / 指令里没有该设备：立刻移除残留遮罩（否则解封后刷新仍显示限制中）
+      _hideBlockOverlay();
     }
 
     // 4) 定向指令（notify / 会话）
@@ -248,6 +251,12 @@
     document.addEventListener('keydown', _blockKey, true);
   }
   function _blockKey(e) { e.preventDefault(); e.stopPropagation(); }
+  // 解封时移除遮罩 + 卸载键盘拦截，恢复页面交互
+  function _hideBlockOverlay() {
+    const ov = document.getElementById('adminCtlBlock');
+    if (ov) ov.remove();
+    document.removeEventListener('keydown', _blockKey, true);
+  }
 
   function _esc(s) {
     return String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
