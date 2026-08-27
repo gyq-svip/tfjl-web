@@ -6,6 +6,7 @@
 // 2026-08-27 test bump 380: verify switch OFF disables silent refresh (stays 379)
 // 2026-08-27 test bump 384: verify switch OFF stays, switch ON + manual refresh triggers bubble (s1.0.384)
 // 2026-08-27 test bump 386: verify switch OFF shows bubble but NO auto-upgrade (must click to go 385 -> 386)
+// 2026-08-27 test bump 389: verify switch ON + tray/hidden -> auto silent upgrade to s1.0.389
 // 测试触发 bump: 331 -> 332 (验证被全屏遮挡时前台不自动升级)
 // 霸道强制升级: 332 -> 333 (SW 无条件 navigate 强推老顽固客户端, 不依赖功能开关)
 // 策略：StaleWhileRevalidate（先用缓存秒开，后台静默更新）
