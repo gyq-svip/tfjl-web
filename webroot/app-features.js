@@ -3131,13 +3131,28 @@
         async function menuCheckUpdate() {
             await fillCurrentVersion();
 
-    // —— 1. 启动时已后台预下载完成？秒装 ——
+    // —— 1. 启动时已后台预下载完成？秒装（但先重查最新，避免跨多版本只装到旧缓存）——
     if (_currentUpdate && _downloadSucceeded && !_currentDownload) {
-        const t = showLoadingToast('⚡ 已缓存，正在安装 v' + _updateVersion + '...');
+        // 🔴 跨版本修复：点升级前再 check 一次，若线上已有更新版本（如缓存的是 2.0.11、线上已 2.0.12），
+        // 必须用最新 Update 对象下载安装，而非直接 install 旧缓存（Tauri update 对象绑定了 check 时的版本）。
+        let installTarget = _currentUpdate;
+        try {
+            if (window.__TAURI__ && window.__TAURI__.updater) {
+                const re = await window.__TAURI__.updater.check();
+                const fresh = re && (re.update || re);
+                if (fresh && isNewerVersion(fresh.version, _updateVersion || '')) {
+                    installTarget = fresh;
+                    _updateVersion = fresh.version;
+                    _currentUpdate = fresh;
+                }
+            }
+        } catch (reErr) { /* 重查失败则用已缓存对象，不阻断升级 */ }
+
+        const t = showLoadingToast('⚡ 正在安装 v' + _updateVersion + '...');
         try {
             await new Promise(r => setTimeout(r, 300)); // 给 Tauri Rust 侧一点时间完成最终化
-            if (typeof _currentUpdate.install === 'function') {
-                await _currentUpdate.install();
+            if (typeof installTarget.install === 'function') {
+                await installTarget.install();
             }
             t.success('✅ 安装完成，即将重启...');
             t.remove(1500);
