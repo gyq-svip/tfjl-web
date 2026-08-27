@@ -22090,6 +22090,12 @@ ${maSection}
                 const g = await _toolboxGistGet(TOOLBOX_GIST_ID);
                 const f = g && g.files && g.files[TOOLBOX_FILE];
                 raw.value = f && f.content ? f.content : '{}';
+                // 回填当前 pollSec 到输入框（否则每次进来都显示空/默认 300，误以为没保存）
+                try {
+                    const data = f && f.content ? JSON.parse(f.content) : {};
+                    const psInp = document.getElementById('toolboxPollSec');
+                    if (psInp && data.pollSec) psInp.value = data.pollSec;
+                } catch (e) {}
                 if (s) { s.style.color = '#4ade80'; s.textContent = '已拉取最新指令 Gist'; }
             } catch (e) {
                 if (s) { s.style.color = '#f87171'; s.textContent = '拉取失败：' + (e.message || e); }
