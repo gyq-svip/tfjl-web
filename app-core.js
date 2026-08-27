@@ -22149,6 +22149,27 @@ ${maSection}
                 if (s) { s.style.color = '#f87171'; s.textContent = '下发失败：' + (e.message || e); }
             }
         };
+        // 设置指令心跳间隔（pollSec）：写入 admin_ctl.json，客户端下次拉取即按新间隔轮询
+        window.toolboxSetPollSec = async function () {
+            const inp = document.getElementById('toolboxPollSec');
+            const st = document.getElementById('toolboxPollSecStatus');
+            let sec = 300;
+            try { sec = parseInt(inp ? inp.value : '', 10); } catch (e) {}
+            if (isNaN(sec) || sec < 10) sec = 10;
+            if (sec > 3600) sec = 3600;
+            if (inp) inp.value = sec;
+            try {
+                const g = await _toolboxGistGet(TOOLBOX_GIST_ID);
+                const f = g && g.files && g.files[TOOLBOX_FILE];
+                const data = f && f.content ? JSON.parse(f.content) : {};
+                data.pollSec = sec;
+                await _toolboxGistPatch(TOOLBOX_GIST_ID, { [TOOLBOX_FILE]: { content: JSON.stringify(data, null, 2) } });
+                if (st) { st.style.color = '#4ade80'; st.textContent = '✅ 已设置 pollSec=' + sec + 's，所有客户端下次心跳即按此间隔拉取指令'; }
+                toolboxLoad();
+            } catch (e) {
+                if (st) { st.style.color = '#f87171'; st.textContent = '设置失败：' + (e.message || e); }
+            }
+        };
         // 按昵称模糊匹配：拉诊断 Gist 所有 diag-*.json → 取 payload.nick + payload.deviceId → 命中填入 target
         window.toolboxFindByNick = async function () {
             const kw = (document.getElementById('toolboxNickKw').value || '').trim().toLowerCase();
