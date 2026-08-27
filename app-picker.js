@@ -393,7 +393,11 @@
                     //   · 开关开 → 后台/托盘静默升、前台弹气泡（原有逻辑）。
                     //   · 开关关 → 仍然弹气泡提示用户，但绝不自动升级（无论前后台，必须用户手动点）。
                     // 因此开关关时不再 return 忽略，而是走弹气泡分支。
-                    const forceAuto = !!window.__diagForceReload;
+                    // 🔴 优选 SW 消息携带的 auto 字段（SW 实时读 Gist 开关，比页面侧 window.__diagForceReload 更准更及时），
+                    //   缺省才退回页面本地开关状态（兼容老 SW 不发 auto 字段的情况）。收到消息即决策，不依赖页面开关是否就绪。
+                    const forceAuto = (event.data && typeof event.data.auto === 'boolean')
+                        ? event.data.auto
+                        : !!window.__diagForceReload;
                     const isTauri = !!(window.__TAURI_INTERNALS__ || window.__TAURI__ || navigator.userAgent.indexOf('Tauri') >= 0);
                     // 🔴 APP 只有「真正挂托盘(点 X,__tfjlInTray=true)」才算后台可静默升级。
                     // 仅仅被别的窗口全屏盖住 / 失焦 / 普通最小化(未挂托盘) → 一律视为前台，坚决不自动升级，
