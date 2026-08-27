@@ -389,11 +389,11 @@
                 //   · 网页版隐藏/最小化 → 静默升级
                 //   · 网页版前台 → 不弹气泡、不升级，切后台时静默升
                 if (event.data && event.data.type === 'FORCE_RELOAD') {
-                    // 🔴 修复：强制刷新指令也必须受「强制更新总开关」控制（2026-08-27 实测关开关仍升）。
-                    if (!window.__diagForceReload) {
-                        console.log('[更新] 收到 FORCE_RELOAD 但强制更新开关关 → 忽略，等用户手动点');
-                        return;
-                    }
+                    // 🔴 2026-08-27 改：强制更新总开关「只管自动升级，不管气泡」。
+                    //   · 开关开 → 后台/托盘静默升、前台弹气泡（原有逻辑）。
+                    //   · 开关关 → 仍然弹气泡提示用户，但绝不自动升级（无论前后台，必须用户手动点）。
+                    // 因此开关关时不再 return 忽略，而是走弹气泡分支。
+                    const forceAuto = !!window.__diagForceReload;
                     const isTauri = !!(window.__TAURI_INTERNALS__ || window.__TAURI__ || navigator.userAgent.indexOf('Tauri') >= 0);
                     // 🔴 APP 只有「真正挂托盘(点 X,__tfjlInTray=true)」才算后台可静默升级。
                     // 仅仅被别的窗口全屏盖住 / 失焦 / 普通最小化(未挂托盘) → 一律视为前台，坚决不自动升级，
@@ -401,6 +401,14 @@
                     // 注意：不能用 document.hidden 判断 APP 后台，否则「被全屏应用盖住」可能被误判为后台而强刷丢数据。
                     const inTray = isTauri && window.__tfjlInTray;
                     const inBackground = isTauri ? inTray : document.hidden;
+
+                    // 🔴 开关关 → 无论前后台都只弹气泡，绝不自动升级（用户手动点才升）
+                    if (!forceAuto) {
+                        console.log('[更新] 收到 FORCE_RELOAD 但强制更新开关关 → 仅弹气泡，不自动升级');
+                        if (typeof showSwUpdateBanner === 'function') showSwUpdateBanner();
+                        else if (typeof notifyNewVersion === 'function') notifyNewVersion();
+                        return;
+                    }
 
                     if (inBackground) {
                         // 后台/托盘：静默升级，但编辑中延后

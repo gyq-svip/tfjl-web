@@ -23836,13 +23836,14 @@ ${maSection}
             const isTauri = !!(window.__TAURI_INTERNALS__ || window.__TAURI__);
             const inTray = isTauri && window.__tfjlInTray === true;
             const inBackground = isTauri ? inTray : document.hidden;
-            if (inBackground) {
-                console.log('[更新] 处于后台/托盘，静默强制更新到新版本');
+            // 🔴 2026-08-27 改：强制更新总开关「只管自动升级」。开关关 → 无论前后台都只弹气泡，绝不自动升级。
+            if (inBackground && window.__diagForceReload) {
+                console.log('[更新] 处于后台/托盘且开关开，静默强制更新到新版本');
                 if (typeof forceRefreshLatest === 'function') { forceRefreshLatest(); return; }
                 location.reload(true);
                 return;
             }
-            // 前台（APP 前台 或 网页前台）：绝不自动升级，只弹彩球（用户手动点才升）
+            // 其余（前台 / 或开关关的后台）：绝不自动升级，只弹彩球（用户手动点才升）
             if (typeof showSwUpdateBanner === 'function') showSwUpdateBanner();
         }
         window.notifyNewVersion = notifyNewVersion;
