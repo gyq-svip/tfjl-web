@@ -434,7 +434,7 @@
                 // 不修改版本号颜色/透明度，保持暗色；仅 tooltip 体现"有新版本"
                 const tip = tag.nextElementSibling;
                 if (tip && tip.classList.contains('version-tooltip')) {
-                    tip.textContent = '点击检查更新';
+                    tip.textContent = '发现新版本 · 双击立即更新';
                 }
             }
             // 核实是否真有新版本：比对远端 versionTag 主版本号与当前，避免刚强刷完即误报"有新版本"
@@ -482,7 +482,7 @@
                 // 同步更新相邻 .version-tooltip（自定义提示框，显示在窗口内，不跑出窗口）
                 const tip = tag.nextElementSibling;
                 if (tip && tip.classList.contains('version-tooltip')) {
-                    tip.textContent = '点击检查更新';
+                    tip.textContent = base + ' · ' + short + '（双击刷新）';
                 }
                 // 同步打印到控制台（浮动调试窗会捕获，便于强制刷新后一眼确认是否刷到最新版）
                 console.log('[VERSION] 当前缓存版本:', swVersion, '（强制刷新后应为 s1.0.230 才算最新）');
@@ -621,58 +621,6 @@
         function onVersionTagForceRefresh() {
             if (typeof forceRefreshLatest === 'function') forceRefreshLatest();
             else location.reload(true);
-        }
-
-        // 点击右下角版本号 → 先去远端查最新版本，再决定是否升级（不预先显示"新版本"提示）。
-        // 用户要求：入口不显示新版本号，点击后才检查、有新版才升级。
-        async function onVersionTagCheck() {
-            const tag = document.getElementById('versionTag');
-            const cur = tag ? tag.textContent.replace('●', '').split(' · ')[0].trim() : '';
-            // 先给个"检查中"的中性反馈（不带新版本暗示）
-            const tip = tag ? tag.nextElementSibling : null;
-            const prevTip = tip && tip.classList.contains('version-tooltip') ? tip.textContent : '';
-            if (tip && tip.classList.contains('version-tooltip')) tip.textContent = '正在检查更新…';
-            let remote = null;
-            try { remote = await _checkRemoteFrontVerAsync(); } catch (e) { remote = null; }
-            const remoteBase = remote ? remote.split(' · ')[0].trim() : '';
-            if (remoteBase && remoteBase !== cur) {
-                // 确有新版 → 弹确认升级（不自动强刷，交给用户点按钮）
-                window.__tfjlHasNewVersion = true;
-                _showCheckUpdatePopup(true);
-            } else {
-                // 无新版（或查不到）→ 提示已是最新，并清除可能的残留新版本标记
-                window.__tfjlHasNewVersion = false;
-                const d = document.getElementById('__verNewDot'); if (d) d.remove();
-                if (tip && tip.classList.contains('version-tooltip')) tip.textContent = '已是最新版本';
-                else if (prevTip) tip.textContent = prevTip;
-                _showCheckUpdatePopup(false);
-            }
-        }
-
-        // 点击检查后的轻量弹窗：有新版给"立即升级"按钮，无新版给"已是最新"提示
-        function _showCheckUpdatePopup(hasNew) {
-            const old = document.getElementById('__verCheckPopup'); if (old) old.remove();
-            const overlay = document.createElement('div');
-            overlay.id = '__verCheckPopup';
-            overlay.style.cssText = 'position:fixed;inset:0;z-index:100003;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;';
-            overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
-            const box = document.createElement('div');
-            box.style.cssText = 'background:rgba(26,26,46,0.96);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);color:#fff;width:300px;max-width:90vw;border-radius:16px;padding:20px;box-shadow:0 12px 40px rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.12);font-family:inherit;text-align:center;';
-            box.innerHTML = '<div style="font-size:1rem;font-weight:600;margin-bottom:6px;">' + (hasNew ? '🔔 发现新版本' : '✅ 已是最新版本') + '</div>'
-                + '<div style="font-size:0.78rem;color:rgba(255,255,255,0.5);margin-bottom:16px;">' + (hasNew ? '点击按钮立即升级到最新版本' : '当前已是最新，无需更新') + '</div>';
-            const btn = document.createElement('button');
-            if (hasNew) {
-                btn.textContent = '♻️ 立即升级';
-                btn.style.cssText = 'width:100%;padding:11px;border:none;border-radius:10px;background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;font-size:0.9rem;font-weight:600;cursor:pointer;';
-                btn.onclick = function() { overlay.remove(); if (typeof forceRefreshLatest === 'function') forceRefreshLatest(); else location.reload(true); };
-            } else {
-                btn.textContent = '好的';
-                btn.style.cssText = 'width:100%;padding:11px;border:none;border-radius:10px;background:rgba(255,255,255,0.12);color:rgba(255,255,255,0.7);font-size:0.9rem;font-weight:600;cursor:pointer;';
-                btn.onclick = function() { overlay.remove(); };
-            }
-            box.appendChild(btn);
-            overlay.appendChild(box);
-            document.body.appendChild(overlay);
         }
 
         async function onVersionTagClick() {
