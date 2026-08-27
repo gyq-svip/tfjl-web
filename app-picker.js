@@ -434,7 +434,7 @@
                 // 不修改版本号颜色/透明度，保持暗色；仅 tooltip 体现"有新版本"
                 const tip = tag.nextElementSibling;
                 if (tip && tip.classList.contains('version-tooltip')) {
-                    tip.textContent = '有新版本可用，点击查看';
+                    tip.textContent = '发现新版本 · 双击立即更新';
                 }
             }
             // 核实是否真有新版本：比对远端 versionTag 主版本号与当前，避免刚强刷完即误报"有新版本"
@@ -454,7 +454,7 @@
                             if (tag) {
                                 const tip = tag.nextElementSibling;
                                 if (tip && tip.classList.contains('version-tooltip')) {
-                                    tip.textContent = '点击检查更新';
+                                    tip.textContent = '版本 ' + tag.textContent.replace('●','').trim() + '（双击强制刷新）';
                                 }
                             }
                             const d = document.getElementById('__verNewDot'); if (d) d.remove();
@@ -482,7 +482,7 @@
                 // 同步更新相邻 .version-tooltip（自定义提示框，显示在窗口内，不跑出窗口）
                 const tip = tag.nextElementSibling;
                 if (tip && tip.classList.contains('version-tooltip')) {
-                    tip.textContent = '点击检查更新';
+                    tip.textContent = base + ' · ' + short + '（双击刷新）';
                 }
                 // 同步打印到控制台（浮动调试窗会捕获，便于强制刷新后一眼确认是否刷到最新版）
                 console.log('[VERSION] 当前缓存版本:', swVersion, '（强制刷新后应为 s1.0.230 才算最新）');
