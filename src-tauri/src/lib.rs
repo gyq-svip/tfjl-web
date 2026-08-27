@@ -1,4 +1,5 @@
 use tauri_plugin_dialog::DialogExt;
+use tauri_plugin_updater::UpdaterExt;
 use tauri::Emitter;
 use tauri::Manager;
 use tauri::menu::{Menu, MenuItem};
@@ -626,6 +627,50 @@ fn get_app_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
 }
 
+// ====================== 大版本整包升级（2.0.13 → 2.0.14/15/16 ...） ======================
+// 需求（2026-08-27 用户定）：
+//   · 不显示具体新版本号（不说 "2.0.14"），只提示"有版本升级"
+//   · 点击提示 → 立即检查并安装（点一下就查就升，不弹多余信息、不引导）
+//   · 绝不碰右下角 #versionTag（双击刷新那个），提示元素独立于它
+// 实现：Rust 静默 check，发现新大版本 → emit("app-update-available", ())（不带版本号）；
+//       前端在 #versionTag 旁显示独立 badge，点击 → invoke('install_app_update') 直接下载安装并重启。
+
+/// 静默检查大版本更新。发现新版本 → emit 事件给前端（不带版本号）；返回值仅用于前端点击时再确认。
+#[tauri::command]
+async fn check_app_update(app: tauri::AppHandle) -> Result<bool, String> {
+    let updater = app.updater().map_err(|e| e.to_string())?;
+    match updater.check().await {
+        Ok(Some(update)) => {
+            // 有新版本：emit 事件（不带版本号，前端只显示"有版本升级"）
+            let _ = app.emit("app-update-available", ());
+            // 记住当前更新对象供安装使用（简单起见，每次检查到就重新 check）
+            let _ = update;
+            Ok(true)
+        }
+        Ok(None) => Ok(false),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
+/// 点击提示后调用：检查并立即下载安装（passive 模式后台装完提示重启）。
+/// 不显示版本号，不弹引导窗，点一下直接升。
+#[tauri::command]
+async fn install_app_update(app: tauri::AppHandle) -> Result<(), String> {
+    let updater = app.updater().map_err(|e| e.to_string())?;
+    let update = match updater.check().await {
+        Ok(Some(u)) => u,
+        Ok(None) => return Ok(()), // 无新版本，静默退出
+        Err(e) => return Err(e.to_string()),
+    };
+    // 下载并安装（Windows installMode=passive → 后台安装，结束提示重启）
+    update
+        .download_and_install(|_, _| {}, || {})
+        .await
+        .map_err(|e| e.to_string())?;
+    // 安装完成 → 重启生效（restart 后进程退出，下方不可达）
+    app.restart();
+}
+
 /// 读取图片文件并返回 base64 data URL（供皮肤系统使用）
 #[tauri::command]
 fn read_image_base64(file_path: String) -> Result<String, String> {
@@ -1179,6 +1224,8 @@ pub fn run() {
             rename_file,
             read_image_base64,
             get_app_version,
+            check_app_update,
+            install_app_update,
             path_exists,
             create_dir,
             umi_ocr,
