@@ -22242,7 +22242,13 @@ ${maSection}
                         }).join('');
                 }
             } catch (e) {
-                if (sel) sel.innerHTML = '<option value="">加载失败：' + _esc(e.message || e) + '</option>';
+                let diag = (e && e.message) ? e.message : ('' + e);
+                try {
+                    const t = (window.AllianceDB && window.AllianceDB.ghToken) ? window.AllianceDB.ghToken() : '';
+                    const tInfo = t ? ('token已注入(长度' + t.length + ')') : 'token缺失(未注入/占位符未替换)';
+                    diag += ' ｜ ' + tInfo;
+                } catch (ee) {}
+                if (sel) sel.innerHTML = '<option value="">加载失败：' + _esc(diag) + '</option>';
             }
         };
         window.toolboxUserPicked = function () {
