@@ -504,7 +504,9 @@
             //   这样诊断面板能一眼分清"网页挂机 vs 桌面挂机"以及"桌面跑哪个 exe"，避免大/小版本混淆。
             let _appExeVer = '';
             try {
-                if (_isTauri && typeof window.__APP_VERSION === 'string' && /^v?\d+\.\d+/.test(window.__APP_VERSION)) {
+                // 桌面大版本号：优先取 Tauri 注入的 window.__APP_VERSION（如 "2.0.16"）。
+                // 不再强依赖 _isTauri 判定，只要该全局变量存在且格式像版本号即采用（避免 UA/全局变量判定偏差导致漏取）。
+                if (typeof window.__APP_VERSION === 'string' && /^v?\d+\.\d+/.test(window.__APP_VERSION)) {
                     _appExeVer = window.__APP_VERSION.replace(/^v/, '');
                 }
             } catch (e) {}
@@ -22160,6 +22162,21 @@ ${maSection}
                         const uMax = uTop.length ? uTop[0].v : 1, gMax = gTop.length ? gTop[0].v : 1, fMax = fTop.length ? fTop[0].v : 1;
                         let html = '<div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:8px 12px;margin-bottom:12px;">';
                         html += '📁 诊断 Gist: <code style="color:#60a5fa;">' + gid + '</code> ｜ 上报文件数: <b>' + diagFiles.length + '</b> ｜ 累计写入: <b>' + totalWrites + '</b> 次</div>';
+                        // 🔴 2026-08-28 新增：本程序 Gist 写入点全清单（静态，所有写入点一目了然，杜绝"未知操作"）
+                        html += '<div style="background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.3);border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:0.76rem;color:#cbd5e1;">';
+                        html += '<div style="color:#a5b4fc;font-weight:700;margin-bottom:6px;">🗂️ 本程序 Gist 写入点全清单（共 7 类，全部显式标记）</div>';
+                        html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;">';
+                        html += '<div>① 🔢 <b>计数器 Gist</b>（counter.json）<br><span style="color:#94a3b8;font-size:0.7rem;">在线保活/计数器同步 · 前端+Rust心跳</span></div>';
+                        html += '<div>② 📅 <b>登录打卡 Gist</b>（login-log.json）<br><span style="color:#94a3b8;font-size:0.7rem;">每日登录打卡 · 前端+Rust心跳</span></div>';
+                        html += '<div>③ 🩺 <b>诊断 Gist</b>（diag-*.json）<br><span style="color:#94a3b8;font-size:0.7rem;">诊断上报/存活心跳 · 前端</span></div>';
+                        html += '<div>④ 💬 <b>消息墙 Gist</b><br><span style="color:#94a3b8;font-size:0.7rem;">需求墙发言/备份 · 前端</span></div>';
+                        html += '<div>⑤ 🛡️ <b>Boss减伤 Gist</b><br><span style="color:#94a3b8;font-size:0.7rem;">Boss减伤数据保存 · 前端</span></div>';
+                        html += '<div>⑥ 🏠 <b>房间/脚本/其他 Gist</b><br><span style="color:#94a3b8;font-size:0.7rem;">房间数据/脚本分享/新建 · 前端</span></div>';
+                        html += '<div>⑦ 📑 <b>索引 Gist</b>（room_index）<br><span style="color:#94a3b8;font-size:0.7rem;">房间/脚本索引维护 · 前端</span></div>';
+                        html += '<div>🛠️ <b>管理员指令 Gist</b>（admin_ctl.json）<br><span style="color:#94a3b8;font-size:0.7rem;">仅读取·管理员手工写·定向下发指令</span></div>';
+                        html += '</div>';
+                        html += '<div style="margin-top:6px;color:#94a3b8;font-size:0.7rem;">说明：①②③ 由 Rust 心跳线程直写（不受窗口冻结影响）；③④⑤⑥⑦ 由前端写。所有写操作均在诊断埋点中标记中文用途，不再出现未知 Gist 写入。</div>';
+                        html += '</div>';
                         html += '<div style="background:rgba(16,185,129,0.1);border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:0.82rem;color:#cbd5e1;">';
                         html += '🟢 存活客户端(60分钟内): <b style="color:#4ade80;">' + aliveCount + '</b> ｜ 其中写盘健康✓: <b style="color:#4ade80;">' + writeOkCount + '</b>';
                         if (aliveUsers.length) html += '<br><span style="color:#94a3b8;font-size:0.74rem;">' + aliveUsers.join('，') + '</span>';
