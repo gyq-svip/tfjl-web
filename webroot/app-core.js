@@ -22227,12 +22227,18 @@ ${maSection}
                     users.forEach(u => { if (bl[u.dev]) u.blacklisted = true; });
                 } catch (e) {}
                 if (!users.length) { if (sel) sel.innerHTML = '<option value="">无已上报用户</option>'; return; }
-                users.sort((a, b) => b.last - a.last);
+                // 在线定义：24小时内上报过；离线也保留可下发（指令存Gist等其下次心跳拉取）。在线排前、离线排后，离线灰显。
+                const ONLINE_MS = 24 * 3600 * 1000;
+                users.forEach(u => { u.online = (Date.now() - (u.last || 0)) < ONLINE_MS; });
+                users.sort((a, b) => (b.online - a.online) || (b.last - a.last));
                 if (sel) {
-                    sel.innerHTML = '<option value="">— 选择目标用户（' + users.length + ' 人在列）—</option>' +
+                    sel.innerHTML = '<option value="">— 选择目标用户（' + users.length + ' 人在列，含离线）—</option>' +
                         users.map(u => {
-                            const label = _esc(u.nick) + (u.blacklisted ? ' 🔒' : '') + ' · ' + (u.ver || '?') + ' · ' + (u.plat || '?') + ' · ' + (u.last ? _esc(_ago(u.last)) : '未知');
-                            return '<option value="' + _esc(u.dev) + '">' + label + '</option>';
+                            const ago = u.last ? _ago(u.last) : '未知';
+                            const tag = u.online ? '' : ' · 离线';
+                            const dim = u.online ? '' : ' style="color:#8a8a8a;"';
+                            const label = _esc(u.nick) + (u.blacklisted ? ' 🔒' : '') + ' · ' + (u.ver || '?') + ' · ' + (u.plat || '?') + ' · ' + _esc(ago) + tag;
+                            return '<option value="' + _esc(u.dev) + '"' + dim + '>' + label + '</option>';
                         }).join('');
                 }
             } catch (e) {
