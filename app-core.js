@@ -22062,52 +22062,9 @@ ${maSection}
                 try { devEl.textContent = (typeof getDeviceId === 'function') ? getDeviceId() : (localStorage.getItem('TFJL_Device_ID') || '未知'); }
                 catch (e) { devEl.textContent = '未知'; }
             }
-            toolboxRefreshTokenStatus();
             toolboxLoad();
             toolboxLoadUsers();
         }
-        // 探测/显示当前 Gist Token 来源与长度（开页时调用，失败时也能看到缺哪一环）
-        function toolboxRefreshTokenStatus() {
-            const st = document.getElementById('toolboxTokenStatus');
-            if (!st) return;
-            try {
-                let src = '缺失', len = 0, head = '';
-                if (typeof getGistToken === 'function') {
-                    const t = getGistToken();
-                    if (t) { len = t.length; head = t.slice(0, 6) + '…' + t.slice(-4); src = '硬编码注入'; }
-                }
-                if (!len) { const ls = localStorage.getItem('TFJL_Gist_Token'); if (ls) { len = ls.length; head = ls.slice(0, 6) + '…' + ls.slice(-4); src = 'localStorage'; } }
-                st.textContent = len > 0 ? ('当前来源：' + src + '（长度 ' + len + '，' + head + '）') : '当前来源：缺失（强刷仍报"token缺失"时在上方输入 ghp_… 保存）';
-                st.style.color = len > 0 ? 'rgba(74,222,128,0.8)' : 'rgba(248,113,113,0.85)';
-            } catch (e) { st.textContent = '探测失败：' + (e.message || e); }
-        }
-        window.toolboxSaveToken = function () {
-            const inp = document.getElementById('toolboxTokenInput');
-            const st = document.getElementById('toolboxTokenStatus');
-            if (!inp) return;
-            const v = (inp.value || '').trim();
-            if (!v) { if (st) { st.textContent = '未填 token'; st.style.color = 'rgba(248,113,113,0.85)'; } return; }
-            if (v.indexOf('ghp_') !== 0 && v.indexOf('github_pat_') !== 0) {
-                if (st) { st.textContent = '格式异常：应 ghp_… 或 github_pat_… 开头'; st.style.color = 'rgba(251,191,36,0.9)'; }
-                return;
-            }
-            try {
-                localStorage.setItem('TFJL_Gist_Token', v);
-                inp.value = '';
-                toolboxRefreshTokenStatus();
-                if (st) { st.textContent = '✅ 已保存到 localStorage，刷新列表/拉取即可生效'; st.style.color = '#4ade80'; }
-            } catch (e) {
-                if (st) { st.textContent = '保存失败：' + (e.message || e); st.style.color = 'rgba(248,113,113,0.85)'; }
-            }
-        };
-        window.toolboxClearToken = function () {
-            try { localStorage.removeItem('TFJL_Gist_Token'); } catch (e) {}
-            const inp = document.getElementById('toolboxTokenInput');
-            if (inp) inp.value = '';
-            toolboxRefreshTokenStatus();
-            const st = document.getElementById('toolboxTokenStatus');
-            if (st) { st.textContent = '已清空 localStorage token（将回退到部署注入/父窗口）'; st.style.color = 'rgba(255,255,255,0.7)'; }
-        };
         window.toolboxCopyDevId = function () {
             const el = document.getElementById('toolboxDevId');
             if (el && el.textContent) {
