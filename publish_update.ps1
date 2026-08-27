@@ -5,6 +5,9 @@
     Usage: .\publish_update.ps1
 #>
 $ErrorActionPreference = "Stop"
+# 发布层小版本号（可选）。热修小版本叠在大版本上，如 2.0.13.4。留空则用 build 版本。
+# 用法： .\publish_update.ps1 -PublishVer 2.0.13.4
+$PublishVer = if ($args -match '^-PublishVer$') { $args[($args.IndexOf('-PublishVer'))+1] } else { $env:TFJL_PUBLISH_VER }
 $RootDir = (Get-Location).Path
 $ConfPath = (Get-ChildItem -Path "src-tauri" -Filter "tauri.conf.json" -Recurse)[0].FullName
 
@@ -19,10 +22,10 @@ function Get-Keynum($b64) {
     return $sb.ToString()
 }
 
-function Publish-GiteeRelease($ver, $exePath) {
+function Publish-GiteeRelease($ver, $exePath, $remoteName) {
     $tok = [Environment]::GetEnvironmentVariable("GITEE_TOKEN", "User")
     if (-not $tok) { Write-Host "WARN: GITEE_TOKEN 未设置，跳过 Gitee 发行版上传（请手动上传 exe 到发行版 v$ver）" -ForegroundColor Yellow; return }
-    $owner = "dragon-soars-across-the-world_0"; $repo = "tfjl-web"; $tag = "v$ver"; $fname = Split-Path $exePath -Leaf
+    $owner = "dragon-soars-across-the-world_0"; $repo = "tfjl-web"; $tag = "v$ver"; $fname = if ($remoteName) { $remoteName } else { Split-Path $exePath -Leaf }
     try { $list = Invoke-RestMethod -Uri ("https://gitee.com/api/v5/repos/$owner/$repo/releases?access_token=$tok") -Method Get } catch { Write-Host "WARN: 查 Gitee releases 失败: $($_.Exception.Message)" -ForegroundColor Yellow; return }
     $rel = $list | Where-Object { $_.tag_name -eq $tag }
     if (-not $rel) {
@@ -58,20 +61,27 @@ function Publish-GiteeRelease($ver, $exePath) {
 }
 
 $confJson = [System.IO.File]::ReadAllText($ConfPath, [System.Text.Encoding]::UTF8) | ConvertFrom-Json
-$ver = $confJson.version
+# build 版本(Cargo/Tauri 不支持四段式，用 2.0.13)；发布层小版本号可在调用时覆盖，
+# 例如叠在 2.0.13 上的热修小版本 2.0.13.4： .\publish_update.ps1 -PublishVer 2.0.13.4
+$buildVer = $confJson.version
+$ver = if ($PublishVer) { $PublishVer } else { $buildVer }
+Write-Host "build version=$buildVer  publish version=$ver" -ForegroundColor Cyan
 $confPubB64 = $confJson.plugins.updater.pubkey
 $kConf = Get-Keynum $confPubB64
 Write-Host "Version: $ver  trust-root keynum=$kConf" -ForegroundColor Cyan
 
+# 本地 exe 名始终用 build 版本(buildVer)，因为 sign.ps1 按 build 版本产出；
+# 但远端 tag / url / json version 用发布层 $ver(PublishVer，如 2.0.13.4)。
+$LocalExeName = "tfjl-assistant_$($buildVer)_x64-setup.exe"
 $ExeName = "tfjl-assistant_$($ver)_x64-setup.exe"
-$ExePath = Join-Path $RootDir $ExeName
+$ExePath = Join-Path $RootDir $LocalExeName
 $SigPath = "$ExePath.sig"
 if (-not (Test-Path $ExePath)) {
-    Write-Host "ERROR: $ExeName not found in repo root. Build + copy english exe first." -ForegroundColor Red
+    Write-Host "ERROR: $LocalExeName not found in repo root. Build + copy english exe first." -ForegroundColor Red
     exit 1
 }
 if (-not (Test-Path $SigPath)) {
-    Write-Host "ERROR: $ExeName.sig not found. Run .\sign.ps1 $ExeName first." -ForegroundColor Red
+    Write-Host "ERROR: $LocalExeName.sig not found. Run .\sign.ps1 first." -ForegroundColor Red
     exit 1
 }
 
@@ -118,7 +128,7 @@ Set-Location $RootDir
 # 导致 1.3.7~1.3.12 共 6 个安装包（约 27MB）堆积在仓库里，
 # 使 GitHub Pages 部署的 artifact 过大、Set up job 阶段超时失败，
 # 线上页面从 2026-08-06 起一直卡在旧版本无法更新。
-Publish-GiteeRelease $ver $ExePath
+Publish-GiteeRelease $ver $ExePath $ExeName
 git add updater.json version.json
 git commit -m "release v$ver (updater+pages; installer on gitee release only)"
 # git push 的远程提示（如 "remote: Powered by GITEE.COM"）走 stderr，
