@@ -3045,10 +3045,10 @@
             if (githubLink) {
                 // 优先使用直连下载地址（GitHub Pages 国内更快）
                 githubLink.href = release.downloadUrl || release.htmlUrl;
-                githubLink.textContent = release.downloadUrl ? '📥 直接下载 v' + release.version : 'GitHub Releases 下载';
+                githubLink.textContent = release.downloadUrl ? '📥 直接下载' : 'GitHub Releases 下载';
             }
             if (latestInfo) {
-                latestInfo.innerHTML = '<span style="color:#888;">最新版本: </span><span style="color:#4fc3f7;font-weight:bold;">v' + release.version + '</span>';
+                latestInfo.innerHTML = '<span style="color:#888;">最新版本: </span><span style="color:#4fc3f7;font-weight:bold;">有新版本可更新</span>';
             }
 
             // 动态填充软件大小（来自 version.json 的 size 字段，无则回退静态文案）
@@ -3063,7 +3063,7 @@
             }
 
             if (isNewerVersion(release.version, CURRENT_VERSION)) {
-                if (statusEl) statusEl.innerHTML = '<span style="color:#81c784;">🔄 发现新版本 v' + release.version + '！点击下方按钮直接下载</span>';
+                if (statusEl) statusEl.innerHTML = '<span style="color:#81c784;">🔄 发现新版本！点击下方按钮直接下载</span>';
                 // 在下载弹窗中高亮
                 const versionBox = document.getElementById('downloadVersionInfo');
                 if (versionBox) versionBox.style.borderColor = 'rgba(76,175,80,0.6)';
@@ -3138,7 +3138,7 @@
         let installTarget = _currentUpdate;
         try {
             if (window.__TAURI__ && window.__TAURI__.updater) {
-                const re = await window.__TAURI__.updater.check();
+                const re = await window.__TAURI__.updater.checkUpdate();
                 const fresh = re && (re.update || re);
                 if (fresh && isNewerVersion(fresh.version, _updateVersion || '')) {
                     installTarget = fresh;
@@ -3210,12 +3210,12 @@
                 if (window.__TAURI__ && window.__TAURI__.updater) {
                     try {
                         const updater = window.__TAURI__.updater;
-                        // 给 updater.check() 加超时，避免网络/代理卡住导致永久 pending
+                        // 给 updater.checkUpdate() 加超时，避免网络/代理卡住导致永久 pending
                         const _checkTimeout = (p, ms) => Promise.race([
                             p,
                             new Promise((_, rej) => setTimeout(() => rej(new Error('检查更新超时')), ms))
                         ]);
-                        const result = await _checkTimeout(updater.check(), 15000);
+                        const result = await _checkTimeout(updater.checkUpdate(), 15000);
                         const update = result && (result.update || result);
                         if (update) {
                             _updateVersion = update.version || CURRENT_VERSION;
@@ -3252,7 +3252,7 @@
                                     // 给 Tauri Rust 侧一点时间完成最终化（避免 install 抢跑）
                                     await new Promise(r => setTimeout(r, 300));
 
-                                    t.update('📦 正在安装...');
+                                    t.update('📦 正在安装 v' + _updateVersion + '...');
                                     await update.install();
                                     t.success('✅ 安装完成，即将重启...');
                                     t.remove(1500);
@@ -3618,7 +3618,7 @@
                     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;">
                         <div>
                             <span style="color:#ff9800;font-size:1.1rem;font-weight:bold;">📥 保存安装包</span>
-                            <div style="color:rgba(255,255,255,0.4);font-size:0.72rem;margin-top:4px;">${safeName}${version ? ('  ·  v' + version) : ''}</div>
+                            <div style="color:rgba(255,255,255,0.4);font-size:0.72rem;margin-top:4px;">${safeName}</div>
                         </div>
                         <span onclick="document.getElementById('installerSaveModal').remove()" style="cursor:pointer;color:rgba(255,255,255,0.4);font-size:1.5rem;line-height:1;">×</span>
                     </div>
@@ -3719,7 +3719,7 @@
                 if (window.__TAURI__ && window.__TAURI__.updater) {
                     try {
                         const updater = window.__TAURI__.updater;
-                        const result = await updater.check();
+                        const result = await updater.checkUpdate();
                         const update = result && (result.update || result);
                         if (!update) {
                             // 确实已是最新 → 清除旧版本通知/下载记录（比如用户降级后又升级的场景）
