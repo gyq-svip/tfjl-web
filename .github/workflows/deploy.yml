@@ -38,6 +38,7 @@ jobs:
 
           # 模块化脚本 + 样式 + Service Worker
           cp -v app-*.js _site/ 2>/dev/null || true
+          cp -v admin-ctl.js _site/ 2>/dev/null || true
           cp -v color-picker.js _site/ 2>/dev/null || true
           cp -v recognize.js skins-web.js gh-gist.js github-config.js _site/ 2>/dev/null || true
           cp -v styles.css sw.js _site/ 2>/dev/null || true

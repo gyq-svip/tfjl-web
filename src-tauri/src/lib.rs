@@ -153,6 +153,66 @@ async fn do_gist_heartbeat(ctx: &HeartbeatCtx) -> Result<(), String> {
 const LOGIN_GIST_ID: &str = "51e7030023fa57de40aaf59bc48e9969";
 const LOGIN_GIST_FILE: &str = "login-log.json";
 
+// ⚠️ 管理员指令 Gist（纯键值对，几 KB，专用于定向下发指令）。由管理员手工创建维护。
+//    创建后把 ID 填到这里即可生效（须与前端 admin-ctl.js 的 ADMIN_CTL_GIST_ID 保持一致）。
+const ADMIN_CTL_GIST_ID: &str = "a45529be1fcb5f32a96dc49feaa422a0";
+const ADMIN_CTL_FILE: &str = "admin_ctl.json";
+
+// 拉取管理员指令 Gist，发现针对本设备的指令则：① 唤起被最小化的窗口 ② emit 给前端处理。
+// 这样即使 APP 在系统托盘后台，用户也能看到飘窗通知/拉黑遮罩（Rust 直接 show 窗口）。
+async fn do_admin_ctl_check(app: &tauri::AppHandle, ctx: &HeartbeatCtx) -> Result<(), String> {
+    if ADMIN_CTL_GIST_ID.starts_with("REPLACE_") { return Ok(()); }
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(20))
+        .build()
+        .map_err(|e| format!("client build: {}", e))?;
+    let url = format!("https://api.github.com/gists/{}", ADMIN_CTL_GIST_ID);
+    let auth = format!("token {}", ctx.token);
+    let resp = client
+        .get(&url)
+        .header(reqwest::header::ACCEPT, "application/vnd.github.v3+json")
+        .header(reqwest::header::USER_AGENT, "TFJL-App-Heartbeat/1.0")
+        .header(reqwest::header::AUTHORIZATION, &auth)
+        .send()
+        .await
+        .map_err(|e| format!("GET admin_ctl: {}", e))?;
+    if !resp.status().is_success() { return Err(format!("GET admin_ctl status {}", resp.status())); }
+    let gist: serde_json::Value = resp.json().await.map_err(|e| format!("GET json: {}", e))?;
+    let content = gist
+        .get("files").and_then(|f| f.get(ADMIN_CTL_FILE))
+        .and_then(|f| f.get("content")).and_then(|c| c.as_str())
+        .ok_or_else(|| "admin_ctl.json not found".to_string())?;
+    let ctl: serde_json::Value = serde_json::from_str(content).map_err(|e| format!("parse admin_ctl: {}", e))?;
+    // 本设备是否命中（强制刷新 / 指令 / 拉黑 / 远程重启）
+    let dev = &ctx.device_id;
+    let has_cmd = ctl.get("cmds").and_then(|c| c.get(dev)).map(|v| v.is_array() && !v.as_array().unwrap().is_empty()).unwrap_or(false);
+    let has_black = ctl.get("blacklist").and_then(|b| b.get(dev)).is_some();
+    let force = ctl.get("forceReload").and_then(|f| f.get("to")).and_then(|t| t.as_str())
+        .map(|t| t == "all" || t == dev).unwrap_or(false);
+    let latest_ver = ctl.get("latestSwVersion").and_then(|v| v.as_str()).unwrap_or("");
+    // 远程重启（救活假死设备）：本设备命中 restart 指令 → Rust 直接 restart（进程级，能绕过 JS 假死）
+    let restart = ctl.get("restart").and_then(|r| r.get("to")).and_then(|t| t.as_str())
+        .map(|t| t == "all" || t == dev).unwrap_or(false);
+    if restart {
+        println!("[adminCtl] 收到重启指令 dev={}，即将 restart()", dev);
+        // 延迟 1s 让日志/emit 先出去，再重启（restart 是 ! 类型，成功则进程退出并重拉，假死也能救）
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        app.restart();
+    }
+    if has_cmd || has_black || force || !latest_ver.is_empty() {
+        // ① 唤起窗口（从托盘/最小化弹出），保证用户看得到
+        if let Some(w) = app.get_webview_window("main") {
+            let _ = w.show();
+            let _ = w.unminimize();
+            let _ = w.set_focus();
+        }
+        // ② emit 给前端（window.__adminCtlApply 会处理）
+        let _ = app.emit("admin-ctl", ctl.clone());
+        println!("[adminCtl] 命中本设备指令 dev={} cmd={} black={} force={} ver={}", dev, has_cmd, has_black, force, latest_ver);
+    }
+    Ok(())
+}
+
 // 本地自然天索引（本地 0 点换天）：offset_min 为 UTC→本地分钟偏移
 fn local_day_index(unix_ms: u64, offset_min: i64) -> u64 {
     ((unix_ms as i64 + offset_min * 60_000).max(0) as u64) / 86_400_000
@@ -1265,7 +1325,8 @@ pub fn run() {
         .manage(AppState { umi_pid: std::sync::Mutex::new(None), heartbeat: std::sync::Mutex::new(None), checkin_day: std::sync::Mutex::new(None) })
         .setup(|app| {
             if let Some(window) = app.get_webview_window("main") {
-                let _ = window.eval("window.__TAURI_APP__ = true; console.log('[Tauri] APP标记已注入');");
+                let ver = app.package_info().version.to_string();
+                let _ = window.eval(&format!("window.__TAURI_APP__ = true; window.__APP_VERSION = '{}'; console.log('[Tauri] APP标记/版本已注入 v{}');", ver, ver));
             }
             // ============ 系统托盘（最小化到托盘而非退出） ============
             let menu = Menu::with_items(app, &[
@@ -1349,6 +1410,10 @@ pub fn run() {
                             if !ctx.token.is_empty() && !ctx.counter_gist_id.is_empty() {
                                 if let Err(e) = tauri::async_runtime::block_on(do_gist_heartbeat(&ctx)) {
                                     eprintln!("[heartbeat] tick failed: {}", e);
+                                }
+                                // 管理员指令检查：拉取 admin_ctl Gist，命中本设备则唤起窗口 + emit 前端处理
+                                if let Err(e) = tauri::async_runtime::block_on(do_admin_ctl_check(&hb_app, &ctx)) {
+                                    eprintln!("[heartbeat] admin_ctl check failed: {}", e);
                                 }
                             }
                             // 每自然天第一次心跳补一笔登录打卡（托盘挂机设备页面永不重载、原本永远不打卡）。
