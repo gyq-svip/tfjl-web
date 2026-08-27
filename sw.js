@@ -120,6 +120,12 @@ async function _pollLatestVersion() {
     if (!latest) return;
     // 仅当线上版本号更新时才继续（避免每次轮询都打扰）
     if (_versionNum(latest) <= _versionNum(CACHE_VERSION)) return;
+    // 🔴 修复：轮询发现新版本也必须受「强制更新总开关」控制（2026-08-27 实测关开关仍升，根因在此段漏判开关）。
+    const enabled = await _isForceReloadEnabled();
+    if (!enabled) {
+        console.log('[SW] 检测到线上新版本', latest, '但强制更新开关关 → 不自动强刷，等用户手动点');
+        return;
+    }
     // 🔴 退回去：发现新版本只发 FORCE_RELOAD 消息，【不再 SW 层 navigate 强推】。
     // 原因：之前霸道强推被用户否决——APP 前台被强制刷新会打断编辑、丢数据。
     // 升级决策唯一交给 app-picker.js：前台只弹气泡、挂托盘才静默强刷。
