@@ -208,10 +208,14 @@ self.addEventListener('install', (event) => {
 async function _maybeForceReload() {
     if (!(self.registration && self.registration.active)) return; // 首次安装不强制
     const enabled = await _isForceReloadEnabled();
-    if (!enabled) return;
-    // 开关开：让新 SW 立即接管（原 waiting → active）
+    // 🔴 2026-08-27 修复：开关关时也要让新 SW 接管（skipWaiting），否则新 SW 一直 waiting 不 activate，
+    //   → 轮询 _pollLatestVersion 不跑 → 开关关时永远不自动弹气泡（需手动刷新才行）。
+    //   接管页面本身安全（升级决策在页面侧且升级前落盘）；开关只控制"是否自动升"，不影响"是否接管+轮询"。
+    //   开关关 → 接管但不发 FORCE_RELOAD（发消息交给轮询，带正确的 auto=false 让页面仅弹气泡不升）。
+    //   开关开 → 接管并立即发 FORCE_RELOAD（auto=true，页面侧按静默规则升）。
     self.skipWaiting();
-    // 通知所有页面（页面侧按静默规则升级，绝不弹气泡）
+    if (!enabled) return;
+    // 开关开：立即通知所有页面（页面侧按静默规则升级，绝不弹气泡）
     const clients = await self.clients.matchAll({ includeUncontrolled: true });
     clients.forEach(client => client.postMessage({ type: 'FORCE_RELOAD', silent: true }));
 }
