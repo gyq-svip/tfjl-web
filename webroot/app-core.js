@@ -536,8 +536,13 @@
                 appVersion: _appVer,
                 appExeVersion: _appExeVer,
                 platform: (_isTauri ? 'app' : 'web'),
-                entries: entries
-            };            const token = getGistToken();
+                entries: entries,
+                // 管理员工具箱：用户对本机 notify 的「知道了」+ 会话回复，回带到诊断 Gist 供管理员在回复信箱查看
+                adminCtlReplies: (function () {
+                    try { const r = JSON.parse(localStorage.getItem('tfjl_adminctl_reply') || '{}'); return Object.keys(r).length ? r : undefined; } catch (e) { return undefined; }
+                })()
+            };
+            const token = getGistToken();
             if (!token) return;
             const myFile = 'diag-' + _getDiagAnonId() + '.json';
             try {
@@ -22038,8 +22043,264 @@ ${maSection}
                     pageEl.style.display = 'block';
                     adminLoadDiag();
                 }
+            } else if (page === 'toolbox') {
+                const pageEl = document.getElementById('adminPageToolbox');
+                if (pageEl) {
+                    pageEl.style.display = 'block';
+                    adminShowToolbox();
+                }
             }
         }
+
+        // ==================== 管理员工具箱（定向指令 Gist 编辑）====================
+        const TOOLBOX_GIST_ID = 'a45529be1fcb5f32a96dc49feaa422a0';
+        const TOOLBOX_FILE = 'admin_ctl.json';
+        function _esc(s) {
+            return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
+        function adminShowToolbox() {
+            // 显示本机 deviceId
+            const devEl = document.getElementById('toolboxDevId');
+            if (devEl) {
+                try { devEl.textContent = (typeof getDeviceId === 'function') ? getDeviceId() : (localStorage.getItem('TFJL_Device_ID') || '未知'); }
+                catch (e) { devEl.textContent = '未知'; }
+            }
+            toolboxLoad();
+        }
+        window.toolboxCopyDevId = function () {
+            const el = document.getElementById('toolboxDevId');
+            if (el && el.textContent) {
+                try { navigator.clipboard.writeText(el.textContent); } catch (e) {}
+                const s = document.getElementById('toolboxStatus');
+                if (s) { s.style.color = '#4ade80'; s.textContent = '已复制 deviceId'; }
+            }
+        };
+        window.toolboxTypeChanged = function () {
+            const t = document.getElementById('toolboxType');
+            const titleEl = document.getElementById('toolboxTitle');
+            const bodyEl = document.getElementById('toolboxBody');
+            if (!t) return;
+            const isNotify = t.value === 'notify';
+            if (titleEl) titleEl.style.display = isNotify ? '' : 'none';
+            if (bodyEl) bodyEl.placeholder = (t.value === 'block') ? '拉黑原因（如：请联系管理员解除限制）' : (t.value === 'notify' ? '通知正文' : '（该类型无需内容）');
+        };
+        window.toolboxLoad = async function () {
+            const raw = document.getElementById('toolboxRaw');
+            const s = document.getElementById('toolboxStatus');
+            if (!raw) return;
+            try {
+                const g = await window.AllianceDB.ghGistGet(TOOLBOX_GIST_ID);
+                const f = g && g.files && g.files[TOOLBOX_FILE];
+                raw.value = f && f.content ? f.content : '{}';
+                if (s) { s.style.color = '#4ade80'; s.textContent = '已拉取最新指令 Gist'; }
+            } catch (e) {
+                if (s) { s.style.color = '#f87171'; s.textContent = '拉取失败：' + (e.message || e); }
+                raw.value = '{}';
+            }
+        };
+        window.toolboxSaveRaw = async function () {
+            const raw = document.getElementById('toolboxRaw');
+            const s = document.getElementById('toolboxStatus');
+            if (!raw) return;
+            let parsed;
+            try { parsed = JSON.parse(raw.value); } catch (e) { if (s) { s.style.color = '#f87171'; s.textContent = 'JSON 格式错误，未保存'; } return; }
+            try {
+                await window.AllianceDB.ghGistPatch(TOOLBOX_GIST_ID, { [TOOLBOX_FILE]: { content: JSON.stringify(parsed, null, 2) } });
+                if (s) { s.style.color = '#4ade80'; s.textContent = '✅ 已保存原始内容'; }
+            } catch (e) {
+                if (s) { s.style.color = '#f87171'; s.textContent = '保存失败：' + (e.message || e); }
+            }
+        };
+        window.toolboxSend = async function () {
+            const s = document.getElementById('toolboxStatus');
+            const target = (document.getElementById('toolboxTarget').value || '').trim();
+            const type = document.getElementById('toolboxType').value;
+            const title = (document.getElementById('toolboxTitle').value || '').trim();
+            const body = (document.getElementById('toolboxBody').value || '').trim();
+            const level = document.getElementById('toolboxLevel').value;
+            if (!target && type !== 'forceReload' && type !== 'restart') {
+                if (s) { s.style.color = '#f87171'; s.textContent = '请填写目标 deviceId（forceReload/restart 可留空=全推）'; }
+                return;
+            }
+            try {
+                const g = await window.AllianceDB.ghGistGet(TOOLBOX_GIST_ID);
+                const f = g && g.files && g.files[TOOLBOX_FILE];
+                const data = f && f.content ? JSON.parse(f.content) : {};
+                const ts = Date.now();
+                if (type === 'forceReload') {
+                    data.forceReload = { to: target || 'all', ts: ts };
+                } else if (type === 'restart') {
+                    data.restart = { to: target || 'all', ts: ts };
+                } else if (type === 'block') {
+                    data.blacklist = data.blacklist || {};
+                    data.blacklist[target] = { reason: body || '请联系管理员', until: 'forever' };
+                } else if (type === 'notify') {
+                    data.cmds = data.cmds || {};
+                    data.cmds[target] = data.cmds[target] || [];
+                    data.cmds[target].push({
+                        id: 'c' + ts, type: 'notify',
+                        title: title || '通知', body: body, level: level,
+                        actions: ['ok'], expire: ts + 7 * 24 * 3600 * 1000,
+                        thread: []
+                    });
+                }
+                await window.AllianceDB.ghGistPatch(TOOLBOX_GIST_ID, { [TOOLBOX_FILE]: { content: JSON.stringify(data, null, 2) } });
+                if (s) { s.style.color = '#4ade80'; s.textContent = '✅ 已下发，目标心跳最多 ' + (data.pollSec || 300) + 's 后生效'; }
+                toolboxLoad();
+            } catch (e) {
+                if (s) { s.style.color = '#f87171'; s.textContent = '下发失败：' + (e.message || e); }
+            }
+        };
+        // 按昵称模糊匹配：拉诊断 Gist 所有 diag-*.json → 取 payload.nick + payload.deviceId → 命中填入 target
+        window.toolboxFindByNick = async function () {
+            const kw = (document.getElementById('toolboxNickKw').value || '').trim().toLowerCase();
+            const box = document.getElementById('toolboxNickResult');
+            if (!kw) { if (box) box.innerHTML = '<span style="color:#f87171;">请输入昵称关键字</span>'; return; }
+            if (box) box.innerHTML = '⏳ 查找中…';
+            try {
+                const gid = (typeof DIAG_GIST_ID !== 'undefined' && DIAG_GIST_ID) ? DIAG_GIST_ID : (localStorage.getItem('tdjl_diagGistId') || '');
+                if (!gid) { if (box) box.innerHTML = '<span style="color:#f87171;">诊断 Gist 未初始化</span>'; return; }
+                const g = await window.AllianceDB.ghGistGet(gid);
+                const files = (g && g.files) || {};
+                const hits = [];
+                Object.keys(files).forEach(fn => {
+                    if (!fn.startsWith('diag-') || !fn.endsWith('.json')) return;
+                    let p; try { p = JSON.parse(files[fn].content); } catch (e) { return; }
+                    const payload = p.payload || p;
+                    const nick = (payload.nick || '') + '';
+                    const dev = payload.deviceId || '';
+                    if (nick.toLowerCase().indexOf(kw) >= 0 && dev) {
+                        hits.push({ nick: nick, dev: dev, last: payload.lastUpload || 0, ver: payload.appVersion || '', plat: payload.platform || '' });
+                    }
+                });
+                if (!hits.length) { if (box) box.innerHTML = '<span style="color:#fbbf24;">未找到匹配昵称（该用户可能未上报诊断）</span>'; return; }
+                hits.sort((a, b) => b.last - a.last);
+                if (box) box.innerHTML = hits.map((h, i) =>
+                    '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;border:1px solid rgba(255,255,255,0.12);border-radius:6px;margin-bottom:6px;background:rgba(0,0,0,0.2);">' +
+                        '<div style="min-width:0;flex:1;"><div style="color:#fff;font-size:0.78rem;">' + _esc(h.nick) + '</div>' +
+                        '<div style="color:rgba(255,255,255,0.5);font-size:0.68rem;word-break:break-all;">' + _esc(h.dev) + (h.ver ? ' · ' + _esc(h.ver) : '') + (h.plat ? ' · ' + _esc(h.plat) : '') + '</div></div>' +
+                        '<button onclick="toolboxPickDev(\'' + _esc(h.dev) + '\')" style="background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:0.72rem;white-space:nowrap;">选TA</button>' +
+                    '</div>'
+                ).join('');
+            } catch (e) {
+                if (box) box.innerHTML = '<span style="color:#f87171;">查找失败：' + _esc(e.message || e) + '</span>';
+            }
+        };
+        window.toolboxPickDev = function (dev) {
+            const t = document.getElementById('toolboxTarget');
+            if (t) t.value = dev;
+            const box = document.getElementById('toolboxNickResult');
+            if (box) box.innerHTML = '<span style="color:#4ade80;">✅ 已填入目标：' + _esc(dev) + '（去上方选类型下发）</span>';
+        };
+        // 解除拉黑：列出 blacklist → 点解封移除
+        window.toolboxLoadBlocked = async function () {
+            const box = document.getElementById('toolboxBlockedList');
+            if (box) box.innerHTML = '⏳ 加载中…';
+            try {
+                const g = await window.AllianceDB.ghGistGet(TOOLBOX_GIST_ID);
+                const f = g && g.files && g.files[TOOLBOX_FILE];
+                const data = f && f.content ? JSON.parse(f.content) : {};
+                const bl = data.blacklist || {};
+                const keys = Object.keys(bl);
+                if (!keys.length) { if (box) box.innerHTML = '<span style="color:#fbbf24;">当前无被拉黑设备</span>'; return; }
+                if (box) box.innerHTML = keys.map(dev =>
+                    '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;border:1px solid rgba(255,255,255,0.12);border-radius:6px;margin-bottom:6px;background:rgba(0,0,0,0.2);">' +
+                        '<div style="min-width:0;flex:1;"><div style="color:#f87171;font-size:0.75rem;word-break:break-all;">' + _esc(dev) + '</div>' +
+                        '<div style="color:rgba(255,255,255,0.5);font-size:0.66rem;">' + _esc(bl[dev].reason || '') + (bl[dev].until && bl[dev].until !== 'forever' ? ' · 至 ' + new Date(bl[dev].until).toLocaleString() : '') + '</div></div>' +
+                        '<button onclick="toolboxUnblock(\'' + _esc(dev) + '\')" style="background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:0.72rem;white-space:nowrap;">解封</button>' +
+                    '</div>'
+                ).join('');
+            } catch (e) { if (box) box.innerHTML = '<span style="color:#f87171;">加载失败：' + _esc(e.message || e) + '</span>'; }
+        };
+        window.toolboxUnblock = async function (dev) {
+            try {
+                const g = await window.AllianceDB.ghGistGet(TOOLBOX_GIST_ID);
+                const f = g && g.files && g.files[TOOLBOX_FILE];
+                const data = f && f.content ? JSON.parse(f.content) : {};
+                if (!data.blacklist) data.blacklist = {};
+                delete data.blacklist[dev];
+                await window.AllianceDB.ghGistPatch(TOOLBOX_GIST_ID, { [TOOLBOX_FILE]: { content: JSON.stringify(data, null, 2) } });
+                toolboxLoadBlocked();
+            } catch (e) { alert('解封失败：' + (e.message || e)); }
+        };
+        // 下发历史：列出指令 Gist 已生效指令
+        window.toolboxLoadHistory = async function () {
+            const box = document.getElementById('toolboxHistory');
+            if (box) box.innerHTML = '⏳ 加载中…';
+            try {
+                const g = await window.AllianceDB.ghGistGet(TOOLBOX_GIST_ID);
+                const f = g && g.files && g.files[TOOLBOX_FILE];
+                const data = f && f.content ? JSON.parse(f.content) : {};
+                const rows = [];
+                if (data.forceReload) rows.push('🔄 强制刷新 → ' + _esc(data.forceReload.to || 'all') + ' @' + new Date(data.forceReload.ts).toLocaleString());
+                if (data.restart) rows.push('♻️ 重启 → ' + _esc(data.restart.to || 'all') + ' @' + new Date(data.restart.ts).toLocaleString());
+                const bl = data.blacklist || {};
+                Object.keys(bl).forEach(dev => rows.push('🔒 拉黑 → ' + _esc(dev) + '：' + _esc(bl[dev].reason || '')));
+                const cmds = data.cmds || {};
+                Object.keys(cmds).forEach(dev => (cmds[dev] || []).forEach(c => rows.push('✉️ 通知[' + _esc(c.level || 'info') + '] → ' + _esc(dev) + '：' + _esc(c.title || '') + '｜' + _esc(c.body || '') + (c.expire ? '（过期 ' + new Date(c.expire).toLocaleString() + '）' : ''))));
+                if (!rows.length) { if (box) box.innerHTML = '<span style="color:#fbbf24;">当前无已下发指令</span>'; return; }
+                if (box) box.innerHTML = rows.map(r => '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.08);">' + r + '</div>').join('');
+            } catch (e) { if (box) box.innerHTML = '<span style="color:#f87171;">加载失败：' + _esc(e.message || e) + '</span>'; }
+        };
+        // 版本推送状态：latestSwVersion + 本机 versionTag + 线上 CACHE_VERSION
+        window.toolboxLoadVer = async function () {
+            const box = document.getElementById('toolboxVer');
+            if (box) box.innerHTML = '⏳ 加载中…';
+            try {
+                const localVer = (document.getElementById('versionTag') || {}).textContent || '未知';
+                let onlineVer = '未知';
+                try {
+                    const txt = await (await fetch('sw.js?_cb=' + Date.now())).text();
+                    const m = /const CACHE_VERSION\s*=\s*'([^']+)'/.exec(txt);
+                    if (m) onlineVer = m[1];
+                } catch (e) {}
+                let pushVer = '未设置';
+                try {
+                    const g = await window.AllianceDB.ghGistGet(TOOLBOX_GIST_ID);
+                    const f = g && g.files && g.files[TOOLBOX_FILE];
+                    const data = f && f.content ? JSON.parse(f.content) : {};
+                    if (data.latestSwVersion) pushVer = data.latestSwVersion;
+                } catch (e) {}
+                if (box) box.innerHTML =
+                    '🖥️ 本机版本（versionTag）：<b style="color:#4ade80;">' + _esc(localVer) + '</b><br>' +
+                    '🌐 线上最新（sw.js）：<b style="color:#60a5fa;">' + _esc(onlineVer) + '</b><br>' +
+                    '📌 指令 Gist 推荐推送：<b style="color:#fbbf24;">' + _esc(pushVer) + '</b><br>' +
+                    '<span style="color:rgba(255,255,255,0.5);font-size:0.68rem;">（本机 < 线上：用户需升级；指令 Gist 设了 latestSwVersion 且 < 线上时，设备会自动比版本升级）</span>';
+            } catch (e) { if (box) box.innerHTML = '<span style="color:#f87171;">加载失败：' + _esc(e.message || e) + '</span>'; }
+        };
+        // 回复信箱：拉诊断 Gist 所有 diag-*.json → 收集 payload.adminCtlReplies
+        window.toolboxLoadReplies = async function () {
+            const box = document.getElementById('toolboxReplies');
+            if (box) box.innerHTML = '⏳ 拉取中…';
+            try {
+                const gid = (typeof DIAG_GIST_ID !== 'undefined' && DIAG_GIST_ID) ? DIAG_GIST_ID : (localStorage.getItem('tdjl_diagGistId') || '');
+                if (!gid) { if (box) box.innerHTML = '<span style="color:#f87171;">诊断 Gist 未初始化</span>'; return; }
+                const g = await window.AllianceDB.ghGistGet(gid);
+                const files = (g && g.files) || {};
+                const items = [];
+                Object.keys(files).forEach(fn => {
+                    if (!fn.startsWith('diag-') || !fn.endsWith('.json')) return;
+                    let p; try { p = JSON.parse(files[fn].content); } catch (e) { return; }
+                    const payload = p.payload || p;
+                    const replies = payload.adminCtlReplies;
+                    if (replies && typeof replies === 'object') {
+                        Object.keys(replies).forEach(cid => {
+                            const r = replies[cid];
+                            items.push({ nick: payload.nick || '游客', dev: payload.deviceId || '', cid: cid, ts: r.ts || 0, text: r.text || '', mynick: r.nick || '' });
+                        });
+                    }
+                });
+                if (!items.length) { if (box) box.innerHTML = '<span style="color:#fbbf24;">暂无用户回复（用户需点通知「知道了」或回复，且已上报诊断）</span>'; return; }
+                items.sort((a, b) => b.ts - a.ts);
+                if (box) box.innerHTML = items.map(it =>
+                    '<div style="padding:8px;border:1px solid rgba(255,255,255,0.12);border-radius:6px;margin-bottom:6px;background:rgba(0,0,0,0.2);">' +
+                        '<div style="color:#fff;font-size:0.76rem;"><b>' + _esc(it.nick) + '</b> <span style="color:rgba(255,255,255,0.5);font-size:0.66rem;">(' + _esc(it.dev) + ')</span></div>' +
+                        '<div style="color:rgba(255,255,255,0.85);font-size:0.78rem;margin-top:3px;">💬 ' + _esc(it.text) + '</div>' +
+                        '<div style="color:rgba(255,255,255,0.4);font-size:0.64rem;margin-top:3px;">指令 ' + _esc(it.cid) + ' · ' + new Date(it.ts).toLocaleString() + '</div>' +
+                    '</div>'
+                ).join('');
+            } catch (e) { if (box) box.innerHTML = '<span style="color:#f87171;">拉取失败：' + _esc(e.message || e) + '</span>'; }
+        };
 
         // ==================== 写操作诊断可视化面板 ====================
         function adminLoadDiag() {

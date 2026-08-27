@@ -163,8 +163,6 @@
     ).join('');
     const hasThread = cmd.thread && cmd.thread.length > 0;
 
-    box.innerHTML += '';
-    box.querySelector('#adminCtlNotify') ; // noop
     box.innerHTML =
       '<div style="display:flex;align-items:flex-start;gap:8px;">' +
         '<div style="font-size:1.4rem;line-height:1;">' + colors.icon + '</div>' +

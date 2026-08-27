@@ -1707,9 +1707,94 @@
                         <span class="mi-emoji">🏪</span>
                         <div class="mi-text"><div class="mi-title">拍卖管理员</div><div class="mi-sub">直达拍卖管理员菜单</div></div>
                     </div>
+                    <div class="admin-menu-item" onclick="adminShowPage('toolbox')">
+                        <span class="mi-emoji">🛠️</span>
+                        <div class="mi-text"><div class="mi-title">管理员工具箱</div><div class="mi-sub">定向通知 / 拉黑 / 重启</div></div>
+                    </div>
 
                 </div>
                 <button class="admin-btn" onclick="logoutToLogin()" style="width:100%;margin-top:10px;background:linear-gradient(135deg,#ef4444,#dc2626);color:white;">🔙 退出登录</button>
+            </div>
+
+            <div id="adminPageToolbox" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+                    <button class="admin-btn admin-btn-secondary" onclick="adminShowMenu()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
+                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">🛠️ 管理员工具箱（定向指令）</h3>
+                </div>
+                <div style="max-height:70vh;overflow-y:auto;font-size:0.85rem;">
+                    <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:12px;margin-bottom:12px;">
+                        <div style="color:rgba(255,255,255,0.7);font-size:0.75rem;margin-bottom:6px;">📱 本机设备 ID（目标填这个才能定向推给自己/他人）</div>
+                        <div style="display:flex;gap:8px;align-items:center;">
+                            <code id="toolboxDevId" style="flex:1;background:rgba(0,0,0,0.3);padding:6px 8px;border-radius:6px;font-size:0.78rem;word-break:break-all;color:#4ade80;">加载中…</code>
+                            <button onclick="toolboxCopyDevId()" style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:#fff;border-radius:6px;padding:6px 10px;cursor:pointer;font-size:0.75rem;">复制</button>
+                        </div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:12px;margin-bottom:12px;">
+                        <div style="color:rgba(255,255,255,0.7);font-size:0.75rem;margin-bottom:8px;">🔍 按昵称查找（免记 deviceId）</div>
+                        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+                            <input id="toolboxNickKw" placeholder="输入昵称关键字，如：与时俱进" style="flex:1;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:6px;padding:7px 9px;font-size:0.8rem;">
+                            <button onclick="toolboxFindByNick()" style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:#fff;border-radius:6px;padding:7px 12px;cursor:pointer;font-size:0.75rem;">查找</button>
+                        </div>
+                        <div id="toolboxNickResult" style="font-size:0.75rem;color:rgba(255,255,255,0.6);"></div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:12px;margin-bottom:12px;">
+                        <div style="color:rgba(255,255,255,0.7);font-size:0.75rem;margin-bottom:8px;">✉️ 快速下发指令</div>
+                        <div style="display:flex;flex-direction:column;gap:8px;">
+                            <input id="toolboxTarget" placeholder="目标 deviceId（留空=all 全推）" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:6px;padding:7px 9px;font-size:0.8rem;">
+                            <select id="toolboxType" onchange="toolboxTypeChanged()" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:6px;padding:7px 9px;font-size:0.8rem;">
+                                <option value="notify">飘屏通知（notify）</option>
+                                <option value="block">拉黑锁机（block）</option>
+                                <option value="restart">远程重启（restart）</option>
+                                <option value="forceReload">强制刷新（forceReload）</option>
+                            </select>
+                            <input id="toolboxTitle" placeholder="标题（notify 用）" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:6px;padding:7px 9px;font-size:0.8rem;">
+                            <textarea id="toolboxBody" placeholder="内容（notify 正文 / block 原因）" rows="3" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:6px;padding:7px 9px;font-size:0.8rem;resize:vertical;"></textarea>
+                            <select id="toolboxLevel" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:6px;padding:7px 9px;font-size:0.8rem;">
+                                <option value="info">info（蓝）</option>
+                                <option value="warn">warn（橙）</option>
+                                <option value="error">error（红）</option>
+                            </select>
+                            <button onclick="toolboxSend()" style="background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;border:none;padding:9px;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:600;">📤 保存到指令 Gist</button>
+                            <div id="toolboxStatus" style="font-size:0.75rem;min-height:1em;"></div>
+                        </div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:12px;margin-bottom:12px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                            <span style="color:rgba(255,255,255,0.7);font-size:0.75rem;">🔓 解除拉黑（从 blacklist 移除）</span>
+                            <button onclick="toolboxLoadBlocked()" style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:#fff;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:0.72rem;">刷新列表</button>
+                        </div>
+                        <div id="toolboxBlockedList" style="font-size:0.75rem;color:rgba(255,255,255,0.6);">点「刷新列表」查看当前被拉黑设备</div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:12px;margin-bottom:12px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                            <span style="color:rgba(255,255,255,0.7);font-size:0.75rem;">📋 下发历史（当前指令 Gist 已生效指令）</span>
+                            <button onclick="toolboxLoadHistory()" style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:#fff;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:0.72rem;">刷新</button>
+                        </div>
+                        <div id="toolboxHistory" style="font-size:0.75rem;color:rgba(255,255,255,0.6);">点「刷新」查看已下发指令</div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:12px;margin-bottom:12px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                            <span style="color:rgba(255,255,255,0.7);font-size:0.75rem;">🔢 版本推送状态</span>
+                            <button onclick="toolboxLoadVer()" style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:#fff;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:0.72rem;">刷新</button>
+                        </div>
+                        <div id="toolboxVer" style="font-size:0.75rem;color:rgba(255,255,255,0.6);line-height:1.7;">点「刷新」查看版本推送状态</div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:12px;margin-bottom:12px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                            <span style="color:rgba(255,255,255,0.7);font-size:0.75rem;">📨 回复信箱（用户对本机通知的回复）</span>
+                            <button onclick="toolboxLoadReplies()" style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:#fff;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:0.72rem;">拉取</button>
+                        </div>
+                        <div id="toolboxReplies" style="font-size:0.75rem;color:rgba(255,255,255,0.6);">点「拉取」收集各设备回复（需用户已上报诊断）</div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:12px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                            <span style="color:rgba(255,255,255,0.7);font-size:0.75rem;">📝 当前指令 Gist 原始内容（可手动改后保存）</span>
+                            <button onclick="toolboxLoad()" style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:#fff;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:0.72rem;">拉取</button>
+                        </div>
+                        <textarea id="toolboxRaw" placeholder="点「拉取」查看当前 admin_ctl.json" rows="10" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:6px;padding:8px;font-size:0.75rem;font-family:monospace;resize:vertical;"></textarea>
+                        <button onclick="toolboxSaveRaw()" style="margin-top:8px;width:100%;background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none;padding:8px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600;">💾 保存原始内容</button>
+                    </div>
+                </div>
             </div>
 
             <div id="adminPageHelp" style="display:none;">
