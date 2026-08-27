@@ -45,6 +45,10 @@
     try { const a = _loadAck(); a[id] = Date.now(); localStorage.setItem(ACK_KEY, JSON.stringify(a)); } catch (e) {}
   }
   function _isAcked(id) { return !!_loadAck()[id]; }
+  // 会话级防重（sessionStorage）：reload 后本会话仍记得「已为某 ts 触发过 reload」，
+  // 防止硬刷新偶发清掉 localStorage 的 ack 后再次进入 reload 死循环。
+  function _isRguard(key) { try { return !!sessionStorage.getItem(key); } catch (e) { return false; } }
+  function _setRguard(key) { try { sessionStorage.setItem(key, String(Date.now())); } catch (e) {} }
 
   // 设备身份
   function _devId() { try { return (typeof getDeviceId === 'function') ? getDeviceId() : ''; } catch (e) { return ''; } }
@@ -84,8 +88,11 @@
     // 0) 远程重启（APP 版主路径由 Rust 心跳处理 app.restart；这里仅前端兜底 reload）
     if (ctl.restart && ctl.restart.to) {
       const tgt = ctl.restart.to;
-      if ((tgt === 'all' || tgt === dev) && !_isAcked('restart@' + (ctl.restart.ts || '1'))) {
-        _markAck('restart@' + (ctl.restart.ts || '1'));
+      const rAck = 'restart@' + (ctl.restart.ts || '1');
+      // 防循环：localStorage 去重 + sessionStorage 防本会话重复 reload（硬刷新偶发清 localStorage 时不至于死循环）
+      const rGuard = 'tfjl_adminctl_rguard@' + rAck;
+      if ((tgt === 'all' || tgt === dev) && !_isAcked(rAck) && !_isRguard(rGuard)) {
+        _markAck(rAck); _setRguard(rGuard);
         console.log('[adminCtl] 收到重启指令，前端兜底 reload（APP 版由 Rust restart 生效）');
         setTimeout(() => location.reload(), 600);
       }
@@ -94,8 +101,11 @@
     // 1) 全局强制刷新
     if (ctl.forceReload && ctl.forceReload.ts) {
       const tgt = ctl.forceReload.to;
-      if ((tgt === 'all' || tgt === dev) && !_isAcked('forceReload@' + ctl.forceReload.ts)) {
-        _markAck('forceReload@' + ctl.forceReload.ts);
+      const fAck = 'forceReload@' + ctl.forceReload.ts;
+      // 强制刷新必须带 expire（已过时不再刷），否则只在首跳生效一次；双重去重防死循环
+      const expired = ctl.forceReload.expire && Date.now() > ctl.forceReload.expire;
+      if (!expired && (tgt === 'all' || tgt === dev) && !_isAcked(fAck) && !_isRguard('tfjl_adminctl_rguard@' + fAck)) {
+        _markAck(fAck); _setRguard('tfjl_adminctl_rguard@' + fAck);
         // 复用现有强制刷新逻辑（如有），否则直接 reload
         if (typeof window.__tfjlForceRefresh === 'function') {
           window.__tfjlForceRefresh('管理员强制刷新');
