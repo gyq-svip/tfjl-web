@@ -3,6 +3,7 @@
 // 2026-08-27 test bump: trigger CI auto-bump s1.0.376 -> s1.0.377
 // 2026-08-27 test bump 378: verify force-reload switch + X/- silent sw refresh
 // 2026-08-27 test bump 379: verify both X and - auto silent refresh to s1.0.379
+// 2026-08-27 test bump 380: verify switch OFF disables silent refresh (stays 379)
 // 测试触发 bump: 331 -> 332 (验证被全屏遮挡时前台不自动升级)
 // 霸道强制升级: 332 -> 333 (SW 无条件 navigate 强推老顽固客户端, 不依赖功能开关)
 // 策略：StaleWhileRevalidate（先用缓存秒开，后台静默更新）
