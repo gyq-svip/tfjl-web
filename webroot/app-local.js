@@ -10,7 +10,7 @@ function _isTauriRuntime() {
            (typeof window.__TAURI__ !== 'undefined') ||
            navigator.userAgent.includes('Tauri');
 }
-const isTauriApp = _isTauriRuntime();
+var isTauriApp = _isTauriRuntime();
 
 // 始终进入块（函数定义/全局导出无条件执行）；App 与网页的行为差异用 _isTauriRuntime() 在运行时区分
 if (true) {
