@@ -508,7 +508,36 @@
                     _appExeVer = window.__APP_VERSION.replace(/^v/, '');
                 }
             } catch (e) {}
-            // 🔴 2026-08-29 终端探针：打印 exe 版本号解析全过程（用户开终端即可一眼看出为何上报了 2.0.16 而非 2.0.19）
+            // 🔴 2026-08-29 冲突对账：尝试从 Tauri API（tauri.conf.json 的 version）再取一个数，与 Rust 注入对比，不一致则用"较新"的并打冲突日志
+            try {
+                if (_isTauri && window.__TAURI__ && window.__TAURI__.app && typeof window.__TAURI__.app.getVersion === 'function') {
+                    window.__TAURI__.app.getVersion().then(tauriVer => {
+                        const tNorm = (typeof tauriVer === 'string') ? tauriVer.replace(/^v/, '') : '';
+                        const aNorm = _appExeVer || '';
+                        if (tNorm && aNorm && tNorm !== aNorm) {
+                            // 比对：parseFloat 简单比大小（2.0.16 vs 2.0.19 vs 2.0.20）
+                            const tNum = parseFloat(tNorm);
+                            const aNum = parseFloat(aNorm);
+                            const newer = (tNum > aNum) ? tNorm : aNorm;
+                            console.warn('[DIAG-VER-冲突] Rust 注入 __APP_VERSION=' + aNorm + ' ≠ Tauri API getVersion()=' + tNorm + ' → 采用 ' + newer + ' 写入下一次心跳 payload');
+                            // 写一个本地修正标志：下次心跳读取时优先用 newer
+                            try { localStorage.setItem('__tfjl_ver_override', newer); } catch (e) {}
+                        } else {
+                            console.log('[DIAG-VER-对账] Rust=' + aNorm + ' / Tauri=' + tNorm + ' ✅一致');
+                            try { localStorage.removeItem('__tfjl_ver_override'); } catch (e) {}
+                        }
+                    }).catch(e => { console.log('[DIAG-VER-对账] Tauri getVersion 失败: ' + e.message); });
+                }
+            } catch (e) {}
+            // 🔴 2026-08-29 优先用"对账结果修正"覆盖 _appExeVer（如果冲突已检测到新值）
+            try {
+                const _ovr = localStorage.getItem('__tfjl_ver_override');
+                if (_ovr && /^v?\d+\.\d+/.test(_ovr) && _appExeVer && _ovr !== _appExeVer && parseFloat(_ovr) > parseFloat(_appExeVer)) {
+                    console.log('[DIAG-VER] 用对账新值覆盖 _appExeVer: ' + _appExeVer + ' → ' + _ovr);
+                    _appExeVer = _ovr;
+                }
+            } catch (e) {}
+            // 🔴 2026-08-29 终端探针：打印 exe 版本号解析全过程
             try {
                 console.log('[DIAG-VER] isTauri=' + _isTauri + ' window.__APP_VERSION=' + JSON.stringify((typeof window.__APP_VERSION === 'string' ? window.__APP_VERSION : null)) + '  → _appExeVer=' + JSON.stringify(_appExeVer) + '  appVer=' + JSON.stringify(_appVer));
             } catch (e) {}
@@ -24118,18 +24147,38 @@ ${maSection}
             let _appVer = '';
             try { const vt = document.getElementById('versionTag'); if (vt) _appVer = vt.textContent.trim(); } catch (e) {}
             if (!_appVer && typeof window.__APP_VERSION === 'string') _appVer = window.__APP_VERSION;
+            // 🔴 2026-08-29 升级：多源版本对账（解决"底部显示 2.0.19 但上报 App v2.0.16"冲突）
+            const _tauriAppVer = (function () {
+                try {
+                    if (window.__TAURI__ && window.__TAURI__.app && typeof window.__TAURI__.app.getVersion === 'function') {
+                        // 注意：getVersion 是 async，但这是同步探针，仅看是否能取到（实际取值在心跳已做 async）
+                        return '<async API,见心跳对账>';
+                    }
+                } catch (e) {}
+                return '<不可用>';
+            })();
+            const _bottomVer = (function () { try { const el = document.getElementById('currentVersionText'); return el ? el.textContent.trim() : '<不存在>'; } catch (e) { return '<异常>'; } })();
             const probe = {
                 '是不是 Tauri 环境 (isTauri)': isTauri,
                 'Rust 注入的 window.__APP_VERSION（编译时从 Cargo.toml 读）': (typeof window.__APP_VERSION === 'string' ? window.__APP_VERSION : '<未注入，看是网页版或旧包>'),
-                '正则 /^v?\\d+\\.\\d+/ 是否匹配': (typeof window.__APP_VERSION === 'string' ? /^v?\d+\.\d+/.test(window.__APP_VERSION) : false),
+                'Tauri API 提供的 getVersion()（来自 tauri.conf.json 的 version）': _tauriAppVer,
+                '底部"版本:"显示文本 (currentVersionText)': _bottomVer,
+                '正则 /^v?\\d+\\.\\d+/ 是否匹配 __APP_VERSION': (typeof window.__APP_VERSION === 'string' ? /^v?\d+\.\d+/.test(window.__APP_VERSION) : false),
                 '解析后真正要上报的 appExeVersion（_appExeVer）': (_appVer && /^v?\d+\.\d+/.test(_appVer)) ? _appVer.replace(/^v/, '') : '',
-                '诊断面板读到的 #versionTag 文本（页脚显示）': (() => { try { const vt = document.getElementById('versionTag'); return vt ? vt.textContent.trim() : '<不存在>'; } catch (e) { return '<异常>'; } })(),
+                '诊断面板读到的 #versionTag 文本（小版本）': (() => { try { const vt = document.getElementById('versionTag'); return vt ? vt.textContent.trim() : '<不存在>'; } catch (e) { return '<异常>'; } })(),
                 '本机最近一次心跳 hb（localStorage DIAG_HEARTBEAT_KEY）': (() => { try { return JSON.parse(localStorage.getItem('tfjl_diag_heartbeat') || localStorage.getItem('DIAG_HEARTBEAT_KEY') || 'null'); } catch (e) { return '<解析失败>'; } })(),
                 'CACHE_VERSION (sw.js)': (typeof CACHE_VERSION !== 'undefined' ? CACHE_VERSION : '<未定义>'),
                 '判断: appExeVersion 上报什么值': (() => {
                     if (typeof window.__APP_VERSION !== 'string' || !/^v?\d+\.\d+/.test(window.__APP_VERSION)) return '⚠️ 上报空字符串（不是 Tauri 或没注入）';
                     const v = window.__APP_VERSION.replace(/^v/, '');
                     return '✅ 上报 ' + v;
+                })(),
+                '三方对账(应一致)': (() => {
+                    const ta = (typeof window.__APP_VERSION === 'string') ? window.__APP_VERSION.replace(/^v/, '') : null;
+                    const bo = _bottomVer && /^v?\d+\.\d+/.test(_bottomVer) ? _bottomVer.replace(/^v/, '') : null;
+                    if (!ta || !bo) return '⚠️ 缺一源：__APP_VERSION=' + ta + ' bottomVer=' + bo;
+                    if (ta === bo) return '✅ 一致 = ' + ta;
+                    return '❌ 不一致！__APP_VERSION=' + ta + '  bottomVer=' + bo + ' → 你这台 exe 里 Rust 注入版本和 tauri.conf.json 的 version 不一致（旧包只重打了部分配置？）';
                 })()
             };
             console.log('=== 版本号探针 verProbe() ===');
