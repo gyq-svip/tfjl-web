@@ -509,6 +509,13 @@
                 if (typeof window.__APP_VERSION === 'string' && /^v?\d+\.\d+/.test(window.__APP_VERSION)) {
                     _appExeVer = window.__APP_VERSION.replace(/^v/, '');
                 }
+                // 🔴 兜底：部分旧包未注入 __APP_VERSION（lib.rs 注入为后续新增），但界面 #currentVersionText
+                // 已显示真实大版本（如 "2.0.19"，来自 Tauri getVersion）。从这里回读，避免上报 appExeVersion 恒为 undefined。
+                if (!_appExeVer) {
+                    const cv = (document.getElementById('currentVersionText') || {}).textContent || '';
+                    const m = cv.match(/(\d+\.\d+(?:\.\d+)?)/);
+                    if (m) _appExeVer = m[1];
+                }
             } catch (e) {}
             const probe = await _runDiagWriteProbe();
             if (entries.length === 0) {
@@ -17751,11 +17758,11 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 // 需求墙打开时，拍卖行按钮回到原位置
                 if (chatToggle) chatToggle.style.left = '68px';
                 messageWallOpen = true;
-                // 打开墙 = 标记当前所有消息为已读（加入指纹集合并持久化），而非用时间戳
-                wallMessages.forEach(m => wallReadKeys.add(_wallMsgKey(m)));
-                try { localStorage.setItem('TFJL_WallReadKeys', JSON.stringify([...wallReadKeys])); } catch (e) {}
-                updateWallAttention();   // 打开即清除未读提醒
-                fetchMessages();         // 每次打开需求墙都拉取最新消息
+                // 🔴 修复红点刷新重现：不在打开瞬间标记已读（此时 wallMessages 还是旧缓存/空，
+                //   新消息由 fetchMessages 异步拉回，若先标记会把"还没看到的新消息"漏标 → 关闭/刷新后红点重现）。
+                //   改为 fetchMessages 拉到最新消息、renderMessages 之后，若墙仍开着再统一标记已读（见 fetchMessages 的 markRead 参数）。
+                updateWallAttention();   // 打开即先按当前已知消息评估（新消息拉回后会再次纠正）
+                fetchMessages(true);     // 每次打开需求墙都拉取最新消息，拉回后标记已读
                 initMessageWallDrag();
                 // 打开需求墙时，按本地记忆决定是否同时弹出右侧贡献排行榜
                 // （默认开启；用户若曾关闭，则下次开墙也保持关闭——本地记忆，他人默认开启）
@@ -17847,7 +17854,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
         function initMessageWallDrag() {
         }
         
-        async function fetchMessages() {
+        async function fetchMessages(markRead) {
             try {
                 const token = getGistToken();
                 
@@ -17984,8 +17991,14 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                                     
                                     await saveWallToDB(wallMessages);
                                     renderMessages();
+                                    // 🔴 修复红点刷新重现：若本次是"打开墙"触发的拉取（markRead=true）且墙仍开着，
+                                    // 在用户实际看到最新消息后再统一把当前所有消息标记为已读，避免漏标新消息。
+                                    if (markRead && messageWallOpen) {
+                                        wallMessages.forEach(m => wallReadKeys.add(_wallMsgKey(m)));
+                                        try { localStorage.setItem('TFJL_WallReadKeys', JSON.stringify([...wallReadKeys])); } catch (e) {}
+                                    }
                                     updateWallAttention();
-                                    console.log('[消息加载] 成功加载', wallMessages.length, '条消息');
+                                    console.log('[消息加载] 成功加载', wallMessages.length, '条消息' + (markRead && messageWallOpen ? '（已标记已读）' : ''));
                                     return;
                                 } catch (e) { console.warn('解析消息 JSON 失败:', e); }
                             }
