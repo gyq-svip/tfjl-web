@@ -64,7 +64,7 @@
       ],
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDdGNDFFRjQ3MjQzNUIxMEYKUldRUHNUVWtSKzlCZjZGUklrNllIc21TckFNYkg3ODZ5enZHcUpwZjRzWXRzalEraVI5WElOWmUK",
       "windows": {
-        "installMode": "passive"
+        "installMode": "quiet"
       }
     }
   }

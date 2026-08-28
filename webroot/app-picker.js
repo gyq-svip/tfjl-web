@@ -319,9 +319,18 @@
                 // 点击 badge → 调原生 install_app_update（Rust 内部 download_and_install + restart，点一下就升）
                 badge.onclick = function () {
                     badge.textContent = '⏳ 升级中…';
+                    // 🔴 2026-08-29：Rust 现在会把失败原因返回来（之前静默 Ok，用户只看到文字变回去、不知为何）。
+                    // 成功路径走 app.restart()，进程直接退出，下方 then 通常不可达。
                     invoke('install_app_update').catch((e) => {
-                        console.warn('[更新] 整包升级失败或无需升级:', e);
+                        console.warn('[更新] 整包升级失败:', e);
                         badge.textContent = '🟢 有新版本';
+                        const msg = (typeof e === 'string') ? e : ((e && e.message) ? e.message : '');
+                        if (msg) {
+                            try {
+                                if (typeof showToast === 'function') showToast('⚠️ 升级失败：' + msg);
+                                else if (typeof window.showToast === 'function') window.showToast('⚠️ 升级失败：' + msg);
+                            } catch (_) {}
+                        }
                     });
                 };
                 // 启动让 Rust 静默查一次（有更新才显示 badge，不干扰前台；失败静默）
