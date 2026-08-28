@@ -22305,20 +22305,25 @@ ${maSection}
                         sel.innerHTML = '<option value="">— 选择目标用户（' + list.length + '/' + users.length + ' 人在列，含离线）—</option>' +
                             list.map(u => {
                                 const ago = u.last ? _ago(u.last) : '未知';
-                                const tag = u.online ? '' : ' · 离线';
-                                const dim = u.online ? '' : ' style="color:#8a8a8a;"';
+                                const tag = u.online ? '' : ' · ⏸离线';
+                                const dim = u.online ? '' : ' style="color:#fbbf24;"';  // 离线用 黄色 警示色，比灰色更易识别，且确认可选
                                 const label = _esc(u.nick) + (u.blacklisted ? ' 🔒' : '') + ' · ' + (u.ver || '?') + ' · ' + (u.plat || '?') + ' · ' + _esc(ago) + tag;
                                 return '<option value="' + _esc(u.dev) + '"' + dim + '>' + label + '</option>';
                             }).join('');
+                        // 🔴 2026-08-29 兜底：Tauri WebView 在 innerHTML 重置 select 时偶尔会丢 onchange；重绑一次
+                        sel.onchange = window.toolboxUserPicked;
                     }
                 };
                 window.__renderUserOptions = _renderUserOptions;
                 const fbar = document.getElementById('toolboxUserFilterBar');
                 if (fbar) {
-                    fbar.innerHTML = '<button onclick="__setToolboxFilter(\'all\')" style="background:#2563eb;color:#fff;border:none;padding:4px 10px;border-radius:5px;cursor:pointer;font-size:0.72rem;">全部</button>' +
-                        '<button onclick="__setToolboxFilter(\'online\')" style="background:#16a34a;color:#fff;border:none;padding:4px 10px;border-radius:5px;cursor:pointer;font-size:0.72rem;">在线</button>' +
-                        '<button onclick="__setToolboxFilter(\'offline\')" style="background:#64748b;color:#fff;border:none;padding:4px 10px;border-radius:5px;cursor:pointer;font-size:0.72rem;">离线</button>' +
-                        '<input id="toolboxUserSearch" oninput="__renderUserOptions(__toolboxCurFilter)" placeholder="搜昵称/设备" style="width:110px;background:#16213e;color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:4px;font-size:0.72rem;">';
+                    fbar.innerHTML =
+                        '<button id="__tf_all"    onclick="__setToolboxFilter(\'all\')"    style="background:#2563eb;color:#fff;border:none;padding:5px 12px;border-radius:5px;cursor:pointer;font-size:0.74rem;font-weight:600;margin-right:4px;">全部</button>' +
+                        '<button id="__tf_online" onclick="__setToolboxFilter(\'online\')" style="background:#16a34a;color:#fff;border:none;padding:5px 12px;border-radius:5px;cursor:pointer;font-size:0.74rem;font-weight:600;margin-right:4px;">在线</button>' +
+                        '<button id="__tf_offline" onclick="__setToolboxFilter(\'offline\')" style="background:#64748b;color:#fff;border:none;padding:5px 12px;border-radius:5px;cursor:pointer;font-size:0.74rem;font-weight:600;margin-right:8px;">离线</button>' +
+                        '<input id="toolboxUserSearch" oninput="__renderUserOptions(__toolboxCurFilter)" placeholder="搜昵称/设备" style="width:120px;background:#16213e;color:#fff;border:1px solid rgba(255,255,255,0.25);border-radius:4px;padding:5px;font-size:0.74rem;">';
+                    // 默认高亮 全部
+                    if (typeof __setToolboxFilter === 'function') __setToolboxFilter('all');
                 }
                 _renderUserOptions('all');
             } catch (e) {
@@ -22342,9 +22347,25 @@ ${maSection}
         };
         // 🔴 2026-08-29 下发指令用户筛选(全部/在线/离线)全局切换
         window.__toolboxCurFilter = 'all';
+        // 按钮配色（默认/激活）
+        const _TF_C = { all: '#2563eb', online: '#16a34a', offline: '#64748b' };
         window.__setToolboxFilter = function (f) {
             window.__toolboxCurFilter = f;
             if (typeof window.__renderUserOptions === 'function') window.__renderUserOptions(f);
+            // 同步按钮高亮态
+            ['all', 'online', 'offline'].forEach(k => {
+                const b = document.getElementById('__tf_' + k);
+                if (!b) return;
+                if (k === f) {
+                    b.style.background = _TF_C[k];
+                    b.style.boxShadow = '0 0 0 2px #fbbf24, 0 0 8px ' + _TF_C[k];
+                    b.style.opacity = '1';
+                } else {
+                    b.style.background = 'transparent';
+                    b.style.boxShadow = 'none';
+                    b.style.opacity = '0.55';
+                }
+            });
         };
         function _ago(ts) {
             const d = Date.now() - ts;
