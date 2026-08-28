@@ -22269,16 +22269,36 @@ ${maSection}
                 const ONLINE_MS = 24 * 3600 * 1000;
                 users.forEach(u => { u.online = (Date.now() - (u.last || 0)) < ONLINE_MS; });
                 users.sort((a, b) => (b.online - a.online) || (b.last - a.last));
-                if (sel) {
-                    sel.innerHTML = '<option value="">— 选择目标用户（' + users.length + ' 人在列，含离线）—</option>' +
-                        users.map(u => {
-                            const ago = u.last ? _ago(u.last) : '未知';
-                            const tag = u.online ? '' : ' · 离线';
-                            const dim = u.online ? '' : ' style="color:#8a8a8a;"';
-                            const label = _esc(u.nick) + (u.blacklisted ? ' 🔒' : '') + ' · ' + (u.ver || '?') + ' · ' + (u.plat || '?') + ' · ' + _esc(ago) + tag;
-                            return '<option value="' + _esc(u.dev) + '"' + dim + '>' + label + '</option>';
-                        }).join('');
+                // 🔴 2026-08-29 新增：筛选(全部/在线/离线) + 昵称/设备搜索，便于从大量上报用户中快速定位目标
+                window.__toolboxUsers = users;   // 缓存全量，供筛选复用
+                const _renderUserOptions = (filter) => {
+                    const kw = (document.getElementById('toolboxUserSearch') && document.getElementById('toolboxUserSearch').value || '').trim().toLowerCase();
+                    const list = users.filter(u => {
+                        if (filter === 'online' && !u.online) return false;
+                        if (filter === 'offline' && u.online) return false;
+                        if (kw) { const hay = (u.nick + ' ' + u.dev + ' ' + (u.ver || '')).toLowerCase(); if (hay.indexOf(kw) === -1) return false; }
+                        return true;
+                    });
+                    if (sel) {
+                        sel.innerHTML = '<option value="">— 选择目标用户（' + list.length + '/' + users.length + ' 人在列，含离线）—</option>' +
+                            list.map(u => {
+                                const ago = u.last ? _ago(u.last) : '未知';
+                                const tag = u.online ? '' : ' · 离线';
+                                const dim = u.online ? '' : ' style="color:#8a8a8a;"';
+                                const label = _esc(u.nick) + (u.blacklisted ? ' 🔒' : '') + ' · ' + (u.ver || '?') + ' · ' + (u.plat || '?') + ' · ' + _esc(ago) + tag;
+                                return '<option value="' + _esc(u.dev) + '"' + dim + '>' + label + '</option>';
+                            }).join('');
+                    }
+                };
+                window.__renderUserOptions = _renderUserOptions;
+                const fbar = document.getElementById('toolboxUserFilterBar');
+                if (fbar) {
+                    fbar.innerHTML = '<button onclick="__setToolboxFilter(\'all\')" style="background:#2563eb;color:#fff;border:none;padding:4px 10px;border-radius:5px;cursor:pointer;font-size:0.72rem;">全部</button>' +
+                        '<button onclick="__setToolboxFilter(\'online\')" style="background:#16a34a;color:#fff;border:none;padding:4px 10px;border-radius:5px;cursor:pointer;font-size:0.72rem;">在线</button>' +
+                        '<button onclick="__setToolboxFilter(\'offline\')" style="background:#64748b;color:#fff;border:none;padding:4px 10px;border-radius:5px;cursor:pointer;font-size:0.72rem;">离线</button>' +
+                        '<input id="toolboxUserSearch" oninput="__renderUserOptions(__toolboxCurFilter)" placeholder="搜昵称/设备" style="width:110px;background:#16213e;color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:4px;font-size:0.72rem;">';
                 }
+                _renderUserOptions('all');
             } catch (e) {
                 let diag = (e && e.message) ? e.message : ('' + e);
                 try {
@@ -22297,6 +22317,12 @@ ${maSection}
                 const s = document.getElementById('toolboxStatus');
                 if (s) { s.style.color = '#4ade80'; s.textContent = '✅ 已选目标：' + sel.value; }
             }
+        };
+        // 🔴 2026-08-29 下发指令用户筛选(全部/在线/离线)全局切换
+        window.__toolboxCurFilter = 'all';
+        window.__setToolboxFilter = function (f) {
+            window.__toolboxCurFilter = f;
+            if (typeof window.__renderUserOptions === 'function') window.__renderUserOptions(f);
         };
         function _ago(ts) {
             const d = Date.now() - ts;
@@ -22561,10 +22587,10 @@ ${maSection}
                         let html = '<div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:8px 12px;margin-bottom:12px;">';
                         html += '📁 诊断 Gist: <code style="color:#60a5fa;">' + gid + '</code> ｜ 上报文件数: <b>' + diagFiles.length + '</b> ｜ 累计写入: <b>' + totalWrites + '</b> 次</div>';
                         html += '<div style="background:rgba(16,185,129,0.1);border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:0.82rem;color:#cbd5e1;">';
-                        html += '🟢 存活客户端(60分钟内): <b style="color:#4ade80;">' + aliveCount + '</b> ｜ 其中写盘健康✓: <b style="color:#4ade80;">' + writeOkCount + '</b>';
+                        html += '🟢 <span style="color:#67e8f9;">存活客户端(60分钟内)</span>: <b style="color:#4ade80;">' + aliveCount + '</b> ｜ <span style="color:#67e8f9;">写盘健康✓</span>: <b style="color:#4ade80;">' + writeOkCount + '</b>';
                         if (aliveUsers.length) html += '<br><span style="color:#94a3b8;font-size:0.74rem;">' + aliveUsers.join('，') + '</span>';
                         html += '</div>';
-                        html += '<div style="margin-bottom:16px;"><div style="color:#ffd700;margin-bottom:4px;">👤 按用户 TOP <span style="color:#94a3b8;font-size:0.7rem;">（点行展开该用户的上报详情）</span></div>';
+                        html += '<div style="margin-bottom:16px;"><div style="color:#4ade80;margin-bottom:4px;font-weight:700;">👤 按用户 TOP <span style="color:#94a3b8;font-size:0.7rem;font-weight:400;">（点行展开该用户的上报详情）</span></div>';
                         uTop.forEach((x, i) => {
                             const id = 'uDetail_' + i;
                             html += '<div style="cursor:pointer;color:#cbd5e1;" onclick="var d=document.getElementById(\'' + id + '\');if(d.style.display===\'none\'){d.style.display=\'block\';}else{d.style.display=\'none\';}">' + bar(x.v, uMax) + ' ' + x.v + '　' + x.k + ' <span style="color:#60a5fa;font-size:0.7rem;">▶</span></div>';
@@ -22584,14 +22610,14 @@ ${maSection}
                                 if (m.err) html += '<br><span style="color:#f87171;">err: ' + m.err + '</span>';
                                 if (m.payload && m.payload.entries && m.payload.entries.length) {
                                     html += '<table style="border-collapse:collapse;margin-top:4px;font-size:0.72rem;width:100%;">';
-                                    html += '<tr style="color:#94a3b8;"><th style="text-align:left;padding:2px 6px;">功能</th><th style="text-align:right;padding:2px 6px;">次数</th><th style="text-align:left;padding:2px 6px;">最近 Gist</th><th style="text-align:left;padding:2px 6px;">Gist 用途</th></tr>';
+                                    html += '<tr style="font-size:0.68rem;"><th style="text-align:left;padding:2px 6px;color:#a78bfa;background:rgba(167,139,250,0.12);">功能</th><th style="text-align:right;padding:2px 6px;color:#fbbf24;background:rgba(251,191,36,0.12);">次数</th><th style="text-align:left;padding:2px 6px;color:#60a5fa;background:rgba(96,165,250,0.12);">最近 Gist</th><th style="text-align:left;padding:2px 6px;color:#4ade80;background:rgba(74,222,128,0.12);">Gist 用途</th></tr>';
                                     m.payload.entries.forEach(e => {
                                         const isWrite = e.gistId !== 'feature' && e.method !== 'GET' && e.method !== 'USE' && e.method !== 'unknown';
                                         const badge = isWrite ? ' <span style="color:#f87171;">✍️写Gist</span>' : ' <span style="color:#94a3b8;">📊仅埋点</span>';
                                         // 🔴 2026-08-28 可读性修复：① 功能列用 _fnZh 翻译中文（不再裸英文 fn）② 第4列"最近文件名"原 bug 显示 e.fn 重复 → 改为 _gistLabel 中文用途
                                         const fnZh = (typeof _fnZh === 'function') ? _fnZh(e.gistId, e.fn) : (e.fn || '?');
                                         const gistZh = (typeof _gistLabel === 'function') ? _gistLabel(e.gistId).label : (e.gistId || '?');
-                                        html += '<tr style="border-top:1px dashed rgba(255,255,255,0.1);"><td style="padding:2px 6px;">' + fnZh + badge + '</td><td style="text-align:right;padding:2px 6px;color:' + (isWrite ? '#f87171' : '#ffd700') + ';">' + (e.count || 0) + '</td><td style="padding:2px 6px;color:#94a3b8;">' + (e.gistId ? e.gistId.substring(0, 12) + '…' : '?') + '</td><td style="padding:2px 6px;color:#cbd5e1;">' + gistZh + '</td></tr>';
+                                        html += '<tr style="border-top:1px dashed rgba(255,255,255,0.1);"><td style="padding:2px 6px;color:#c4b5fd;">' + fnZh + badge + '</td><td style="text-align:right;padding:2px 6px;color:' + (isWrite ? '#f87171' : '#fbbf24') + ';font-weight:700;">' + (e.count || 0) + '</td><td style="padding:2px 6px;color:#60a5fa;font-family:monospace;">' + (e.gistId ? e.gistId.substring(0, 12) + '…' : '?') + '</td><td style="padding:2px 6px;color:#4ade80;">' + gistZh + '</td></tr>';
                                     });
                                     html += '</table>';
                                 } else {
@@ -22612,7 +22638,7 @@ ${maSection}
                             html += '</div>';
                         });
                         html += '</div>';
-                        html += '<div style="margin-bottom:16px;"><div style="color:#ffd700;margin-bottom:4px;">📄 按 Gist 文件 TOP <span style="color:#94a3b8;font-size:0.7rem;">（点行展开）</span></div>';
+                        html += '<div style="margin-bottom:16px;"><div style="color:#60a5fa;margin-bottom:4px;font-weight:700;">📄 按 Gist 文件 TOP <span style="color:#94a3b8;font-size:0.7rem;font-weight:400;">（点行展开）</span></div>';
                         gTop.forEach((x, i) => {
                             const id = 'gDetail_' + i;
                             html += '<div style="cursor:pointer;color:#cbd5e1;" onclick="var d=document.getElementById(\'' + id + '\');if(d.style.display===\'none\'){d.style.display=\'block\';}else{d.style.display=\'none\';}">' + bar(x.v, gMax) + ' ' + x.v + '　' + (x.k.substring(0, 16) + '…') + ' <span style="color:#60a5fa;font-size:0.7rem;">▶</span></div>';
@@ -22635,7 +22661,7 @@ ${maSection}
                         const wTop = sortBy(writeAgg).slice(0, 10), uTop2 = sortBy(useAgg).slice(0, 10);
                         const wMax = wTop.length ? wTop[0].v : 1, uMax2 = uTop2.length ? uTop2[0].v : 1;
                         // 组1：🟥 真实写 Gist
-                        html += '<div style="margin-bottom:16px;"><div style="color:#f87171;margin-bottom:4px;">⚙️🟥 真实写 Gist 操作 TOP <span style="color:#94a3b8;font-size:0.7rem;">（PATCH/POST 到 Gist，消耗 API 配额）</span></div>';
+                        html += '<div style="margin-bottom:16px;"><div style="color:#f87171;margin-bottom:4px;font-weight:700;">⚙️🟥 真实写 Gist 操作 TOP <span style="color:#fca5a5;font-size:0.7rem;font-weight:400;">（PATCH/POST 到 Gist，消耗 API 配额）</span></div>';
                         if (!wTop.length) html += '<div style="color:#94a3b8;font-size:0.74rem;">暂无写 Gist 记录</div>';
                         wTop.forEach((x, i) => {
                             const id = 'wDetail_' + i;
@@ -22664,7 +22690,7 @@ ${maSection}
                         });
                         html += '</div>';
                         // 组2：⚪ 功能使用埋点（不写 Gist）
-                        html += '<div style="margin-bottom:16px;"><div style="color:#94a3b8;margin-bottom:4px;">⚙️⚪ 功能使用 TOP <span style="color:#94a3b8;font-size:0.7rem;">（仅埋点统计，不写 Gist）</span></div>';
+                        html += '<div style="margin-bottom:16px;"><div style="color:#a78bfa;margin-bottom:4px;font-weight:700;">⚙️⚪ 功能使用 TOP <span style="color:#c4b5fd;font-size:0.7rem;font-weight:400;">（仅埋点统计，不写 Gist）</span></div>';
                         if (!uTop2.length) html += '<div style="color:#94a3b8;font-size:0.74rem;">暂无功能使用记录</div>';
                         uTop2.forEach((x, i) => {
                             const id = 'u2Detail_' + i;
