@@ -3,13 +3,17 @@
 // 通过 Tauri IPC invoke 调用 Rust 命令（支持远程URL）
 // ============================================================
 
-// 检测是否在Tauri APP中运行
+// 检测是否在Tauri APP中运行（运行时判定，避免 defer 脚本执行早于 Tauri 全局注入导致误判）
 // Tauri注入了 window.__TAURI_INTERNALS__（含invoke），以及我们注入的 __TAURI_APP__ 标记
-const isTauriApp = (typeof window.__TAURI_INTERNALS__ !== 'undefined') ||
-                    (typeof window.__TAURI__ !== 'undefined') ||
-                    navigator.userAgent.includes('Tauri');
+function _isTauriRuntime() {
+    return (typeof window.__TAURI_INTERNALS__ !== 'undefined') ||
+           (typeof window.__TAURI__ !== 'undefined') ||
+           navigator.userAgent.includes('Tauri');
+}
+const isTauriApp = _isTauriRuntime();
 
-if (isTauriApp) {
+// 始终进入块（函数定义/全局导出无条件执行）；App 与网页的行为差异用 _isTauriRuntime() 在运行时区分
+if (true) {
     // 老马6个固定目录配置（默认值，用户可在设置面板修改）
     const DEFAULT_MA_DIRS = {
         coop:       'D:\\withfriends\\塔防老马助手\\合作脚本存档',   // 合作脚本目录
@@ -738,7 +742,7 @@ if (isTauriApp) {
     // 【磁盘优先】App 端一律用磁盘值覆盖 webview 缓存（彻底分离 App 与网页，避免清缓存丢设置/项目）；
     // 仅当磁盘也无该 key 时，把 webview 现有值反写回磁盘，保证不丢。
     async function restoreLocalFromDisk() {
-        if (!isTauriApp) return;
+        if (!_isTauriRuntime()) return;
         _restoreLock = true;   // 加锁：恢复期间禁止 flush 覆盖
         try {
             const dir = await _resolveRealDataDir();
@@ -813,7 +817,7 @@ if (isTauriApp) {
 
     async function initAppLocal() {
         const btn = document.getElementById('appLocalSettingsBtn');
-        if (btn) btn.style.display = 'flex';
+        if (btn && _isTauriRuntime()) btn.style.display = 'flex';
         await restoreLocalFromDisk();  // 先恢复磁盘配置（重装/清缓存后复原）
         loadConfig();
         initDataSync();  // 启动 localStorage → 用户数据目录自动同步
@@ -839,7 +843,7 @@ if (isTauriApp) {
     // ==================== 设置面板 ====================
 
     function openAppLocalSettings() {
-        if (!isTauriApp) return;
+        if (!_isTauriRuntime()) return;
         showSettingsModal();
         fillSettingsForm();
         // 扫描文件列表总是执行（轻量）
@@ -4375,7 +4379,7 @@ if (isTauriApp) {
 
     // 暴露诊断所需的内部依赖给全局（供文件末尾的全局 runDiagnostics 在网页版也能调用）
     window.__tfjlDiagApi = {
-        isTauriApp: isTauriApp,
+        isTauriApp: _isTauriRuntime(),
         getSyncDir: _getSyncDir,
         getDatPath: _getDatPath,
         readDir: readDir,
