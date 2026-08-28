@@ -736,22 +736,24 @@ async fn install_app_update(app: tauri::AppHandle) -> Result<(), String> {
     let updater = match app.updater() {
         Ok(u) => u,
         Err(e) => {
-            eprintln!("[updater] install: updater() 失败（静默）: {}", e);
-            return Ok(());
+            eprintln!("[updater] install: updater() 失败: {}", e);
+            // 🔴 2026-08-29 改为返回 Err：让前端能给用户明确提示（之前静默 Ok 导致"点了没反应"）。
+            // 注意：这里返回 Err 给前端，前端自行轻提示，**不会**触发 Tauri 原生系统弹窗（用户明确反感）。
+            return Err(format!("更新组件初始化失败: {}", e));
         }
     };
     let update = match updater.check().await {
         Ok(Some(u)) => u,
-        Ok(None) => return Ok(()), // 无新版本，静默退出
+        Ok(None) => return Ok(()), // 无新版本，静默退出（正常情况，不报错）
         Err(e) => {
-            eprintln!("[updater] install: check() 失败（静默）: {}", e);
-            return Ok(());
+            eprintln!("[updater] install: check() 失败: {}", e);
+            return Err(format!("检查更新失败（网络不通？）: {}", e));
         }
     };
-    // 下载并安装（Windows installMode=passive → 后台安装，结束提示重启）
+    // 下载并安装（Windows installMode=quiet → 完全后台静默，装完由下方 restart 生效，全程无窗口）
     if let Err(e) = update.download_and_install(|_, _| {}, || {}).await {
-        eprintln!("[updater] 下载安装失败（静默）: {}", e);
-        return Ok(());
+        eprintln!("[updater] 下载安装失败: {}", e);
+        return Err(format!("下载或安装失败: {}", e));
     }
     // 安装完成 → 重启生效（restart 后进程退出，下方不可达）
     app.restart();
