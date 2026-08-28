@@ -22582,7 +22582,11 @@ ${maSection}
                         html += '<div style="margin-bottom:16px;"><div style="color:#ffd700;margin-bottom:4px;">👤 按用户 TOP <span style="color:#94a3b8;font-size:0.7rem;">（点行展开该用户的上报详情）</span></div>';
                         uTop.forEach((x, i) => {
                             const id = 'uDetail_' + i;
-                            html += '<div style="cursor:pointer;color:#cbd5e1;" onclick="var d=document.getElementById(\'' + id + '\');if(d.style.display===\'none\'){d.style.display=\'block\';}else{d.style.display=\'none\';}">' + bar(x.v, uMax) + ' ' + x.v + '　' + x.k + ' <span style="color:#60a5fa;font-size:0.7rem;">▶</span></div>';
+                            const _uVer = (detailByUser[x.k] && detailByUser[x.k][0] && detailByUser[x.k][0].payload && detailByUser[x.k][0].payload.appExeVersion)
+                                ? '｜桌面v' + detailByUser[x.k][0].payload.appExeVersion
+                                : ((detailByUser[x.k] && detailByUser[x.k][0] && detailByUser[x.k][0].plat === 'app') ? '｜桌面v<span style="color:#f97316;">未知(旧包)</span>' : '');
+                            const _uPlat = (detailByUser[x.k] && detailByUser[x.k][0] && detailByUser[x.k][0].plat) ? '｜' + detailByUser[x.k][0].plat : '';
+                            html += '<div style="cursor:pointer;color:#cbd5e1;" onclick="var d=document.getElementById(\'' + id + '\');if(d.style.display===\'none\'){d.style.display=\'block\';}else{d.style.display=\'none\';}">' + bar(x.v, uMax) + ' ' + x.v + '　' + x.k + _uPlat + _uVer + ' <span style="color:#60a5fa;font-size:0.7rem;">▶</span></div>';
                             html += '<div id="' + id + '" style="display:none;background:rgba(0,0,0,0.25);border-left:2px solid #60a5fa;padding:6px 10px;margin:4px 0 8px 12px;font-size:0.75rem;">';
                             (detailByUser[x.k] || []).forEach(m => {
                                 const ts = m.last ? new Date(m.last).toLocaleString('zh-CN') : '?';
