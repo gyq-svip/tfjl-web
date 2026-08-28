@@ -150,6 +150,7 @@ function smokeRuntime() {
         adminRefreshNews: noop, adminLoadStats: noop, adminLoadAnalytics: noop, adminLoadScriptStats: noop,
         updateAdminTokenStatus: noop, loadCurrentNick: noop, renderNickRegistry: noop, loadPasswordList: noop,
         adminRefreshDebugLog: noop, adminRefreshConsoleLog: noop, adminLoadLoginStats: noop, refreshApiMonitor: noop,
+        adminRefreshTerminal: noop, refreshFloatConsoleToggleBtn: noop,    // logStats 分支依赖（"终端"重命名后新增；改名时若忘加 typeof 防护也不会再 FAIL）
         renderDamageCalc: noop, updateBroadcastToggleStatus: noop, adminRenderApiUsage: noop
     };
     ctx.window = ctx;
