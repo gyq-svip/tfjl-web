@@ -9265,7 +9265,23 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 if (url) skinInfo = { url };
             }
             console.log('[SKIN] skinInfo:', skinInfo ? (skinInfo.url ? skinInfo.url.substring(0, 80) : 'no url') : 'NULL');
-            if (!skinInfo || !skinInfo.url) { console.warn('[SKIN] No skin for', heroName); return; }
+            if (!skinInfo || !skinInfo.url) {
+                // 🔴 2026-08-29 降噪：融合组合名（死神海妖/小野酋长/咕咕萨满等）在远程皮肤未加载完时
+                // 必然查不到，但 syncRemoteSkins 完成后会自动重绘成功 → 不必刷 WARN 刷屏。
+                // 仅当 heroName 自身是"真单英雄且确实无皮肤"才 WARN；能拆出已知主英雄的组合名静默跳过。
+                let _isFusionCombo = false;
+                try {
+                    const _main = (typeof getMainCardName === 'function') ? getMainCardName(heroName) : heroName;
+                    const _heroSet = (typeof getAllHeroNames === 'function') ? getAllHeroNames() : null;
+                    _isFusionCombo = (_main && _main !== heroName) || (_heroSet && !_heroSet.has(heroName) && /[·\s]/.test(heroName) === false && heroName.length >= 3);
+                } catch (e) {}
+                if (_isFusionCombo) {
+                    console.log('[SKIN] skin 待远程加载(组合名), 跳过 WARN:', heroName);
+                } else {
+                    console.warn('[SKIN] No skin for', heroName);
+                }
+                return;
+            }
 
             const skinUrl = skinInfo.url;
             const isDataOrBlob = skinUrl.startsWith('data:') || skinUrl.startsWith('blob:');
@@ -22271,14 +22287,18 @@ ${maSection}
                     _diagAllDiagFiles.push(fn);
                     let p; try { p = JSON.parse(files[fn].content); } catch (e) { _diagSkipped.push({ fn, reason: 'JSON 解析失败: ' + e.message }); return; }
                     const payload = p.payload || p;
-                    const dev = payload.deviceId || '';
+                    // 🔴 2026-08-29 修复：deviceId 缺失时用 anonId 兜底，避免老版本上报用户被整条丢弃（之前 10 文件只 8 用户）
+                    const anonId = (p.anonId || (fn.startsWith('diag-') && fn.endsWith('.json') ? fn.slice(5, -5) : '')) || '';
+                    const dev = payload.deviceId || anonId || '';
                     if (!dev) {
-                        _diagSkipped.push({ fn, reason: 'deviceId 缺失（payload 字段空）。' + (payload.nick ? ' nick=' + payload.nick : '') + ' 这个 diag 可能是老版本/不同字段名上报的' });
+                        _diagSkipped.push({ fn, reason: 'deviceId 与 anonId 均缺失。' + (payload.nick ? ' nick=' + payload.nick : '') });
                         return;
                     }
+                    const _legacy = !payload.deviceId && !!anonId;  // 老版本：无 deviceId，用 anonId 兜底
                     users.push({
                         nick: payload.nick || '游客',
                         dev: dev,
+                        legacy: _legacy,
                         last: payload.lastUpload || 0,
                         ver: payload.appVersion || '',
                         plat: payload.platform || '',
@@ -22324,8 +22344,9 @@ ${maSection}
                             list.map(u => {
                                 const ago = u.last ? _ago(u.last) : '未知';
                                 const tag = u.online ? '' : ' · ⏸离线';
+                                const legacy = u.legacy ? ' ⚠️旧版' : '';
                                 const dim = u.online ? '' : ' style="color:#fbbf24;"';  // 离线用 黄色 警示色，比灰色更易识别，且确认可选
-                                const label = _esc(u.nick) + (u.blacklisted ? ' 🔒' : '') + ' · ' + (u.ver || '?') + ' · ' + (u.plat || '?') + ' · ' + _esc(ago) + tag;
+                                const label = _esc(u.nick) + (u.blacklisted ? ' 🔒' : '') + legacy + ' · ' + (u.ver || '?') + ' · ' + (u.plat || '?') + ' · ' + _esc(ago) + tag;
                                 return '<option value="' + _esc(u.dev) + '"' + dim + '>' + label + '</option>';
                             }).join('');
                         // 🔴 2026-08-29 兜底：Tauri WebView 在 innerHTML 重置 select 时偶尔会丢 onchange；重绑一次
@@ -24072,9 +24093,11 @@ ${maSection}
             all.forEach(fn => {
                 let p; try { p = JSON.parse(files[fn].content); } catch (e) { skipped.push({ fn, reason: 'JSON 解析失败: ' + e.message }); return; }
                 const payload = p.payload || p;
-                const dev = payload.deviceId || payload.device_id || payload.deviceID || '';
-                if (!dev) { skipped.push({ fn, reason: 'deviceId 缺失（payload 字段空）。' + (payload.nick ? ' nick=' + payload.nick : '') + ' 老版本/不同字段名上报' }); return; }
-                users.push({ nick: payload.nick || '游客', dev, last: payload.lastUpload || 0 });
+                const anonId = (p.anonId || (fn.startsWith('diag-') && fn.endsWith('.json') ? fn.slice(5, -5) : '')) || '';
+                const dev = payload.deviceId || payload.device_id || payload.deviceID || anonId || '';
+                if (!dev) { skipped.push({ fn, reason: 'deviceId/anonId 均缺失。' + (payload.nick ? ' nick=' + payload.nick : '') }); return; }
+                const _legacy = !payload.deviceId && !!anonId;
+                users.push({ nick: payload.nick || '游客', dev, legacy: _legacy, last: payload.lastUpload || 0 });
             });
             const report = {
                 'Gist 中 diag 文件总数': all.length,
