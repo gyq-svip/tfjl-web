@@ -22263,12 +22263,19 @@ ${maSection}
                 const g = await _toolboxGistGet(gid);
                 const files = (g && g.files) || {};
                 const users = [];
+                // 🔴 2026-08-29 诊断：统计哪些 diag 文件被跳过及原因（用户发现 10 个文件但只 8 个用户）
+                const _diagSkipped = [];   // [{fn, reason}]
+                const _diagAllDiagFiles = [];
                 Object.keys(files).forEach(fn => {
                     if (!fn.startsWith('diag-') || !fn.endsWith('.json')) return;
-                    let p; try { p = JSON.parse(files[fn].content); } catch (e) { return; }
+                    _diagAllDiagFiles.push(fn);
+                    let p; try { p = JSON.parse(files[fn].content); } catch (e) { _diagSkipped.push({ fn, reason: 'JSON 解析失败: ' + e.message }); return; }
                     const payload = p.payload || p;
                     const dev = payload.deviceId || '';
-                    if (!dev) return;
+                    if (!dev) {
+                        _diagSkipped.push({ fn, reason: 'deviceId 缺失（payload 字段空）。' + (payload.nick ? ' nick=' + payload.nick : '') + ' 这个 diag 可能是老版本/不同字段名上报的' });
+                        return;
+                    }
                     users.push({
                         nick: payload.nick || '游客',
                         dev: dev,
@@ -22278,6 +22285,12 @@ ${maSection}
                         blacklisted: false
                     });
                 });
+                window.__diagSkipped = _diagSkipped;  // 终端可读
+                window.__diagAllDiagFiles = _diagAllDiagFiles;
+                if (_diagAllDiagFiles.length !== users.length) {
+                    console.warn('[TOOLBOX] diag 文件共 ' + _diagAllDiagFiles.length + ' 个，有效用户 ' + users.length + ' 个，' + (_diagAllDiagFiles.length - users.length) + ' 个被跳过：');
+                    _diagSkipped.forEach(s => console.warn('  - ' + s.fn + ' → ' + s.reason));
+                }
                 // 标记被拉黑的（读指令 Gist）
                 try {
                     const cg = await _toolboxGistGet(TOOLBOX_GIST_ID);
@@ -22286,7 +22299,10 @@ ${maSection}
                     const bl = cdata.blacklist || {};
                     users.forEach(u => { if (bl[u.dev]) u.blacklisted = true; });
                 } catch (e) {}
-                if (!users.length) { if (sel) sel.innerHTML = '<option value="">无已上报用户</option>'; return; }
+                if (!users.length) {
+                    if (sel) sel.innerHTML = '<option value="">无已上报用户（diag 文件 ' + _diagAllDiagFiles.length + ' 个，全被跳过，终端看 __diagSkipped）</option>';
+                    return;
+                }
                 // 在线定义：24小时内上报过；离线也保留可下发（指令存Gist等其下次心跳拉取）。在线排前、离线排后，离线灰显。
                 const ONLINE_MS = 24 * 3600 * 1000;
                 users.forEach(u => { u.online = (Date.now() - (u.last || 0)) < ONLINE_MS; });
@@ -22302,7 +22318,9 @@ ${maSection}
                         return true;
                     });
                     if (sel) {
-                        sel.innerHTML = '<option value="">— 选择目标用户（' + list.length + '/' + users.length + ' 人在列，含离线）—</option>' +
+                        const _diff = _diagAllDiagFiles.length - users.length;
+                        const _diffTxt = _diff > 0 ? (' · 漏 ' + _diff + ' 个看终端') : '';
+                        sel.innerHTML = '<option value="">— 选择目标用户（' + list.length + '/' + users.length + ' 人在列，共 ' + _diagAllDiagFiles.length + ' 个 diag 文件' + _diffTxt + '）—</option>' +
                             list.map(u => {
                                 const ago = u.last ? _ago(u.last) : '未知';
                                 const tag = u.online ? '' : ' · ⏸离线';
@@ -24024,6 +24042,7 @@ ${maSection}
                 else if (code === 'checkAppLocal()') result = window.checkAppLocal();
                 else if (code === 'appLocalStatus()') result = window.appLocalStatus();
                 else if (code === 'verProbe()') result = window.__tfjlVerProbe();
+                else if (code === 'toolboxDiag()') result = window.__tfjlToolboxDiag();
                 else result = (function () { return eval(code); })();
                 if (result !== undefined) console.log('[CMD] = ' + (typeof result === 'object' ? JSON.stringify(result).slice(0, 500) : result));
             } catch (e) {
@@ -24031,6 +24050,25 @@ ${maSection}
             }
             inp.value = '';
             inp.focus();
+        };
+        // 🔴 2026-08-29 工具箱加载诊断（终端输入 toolboxDiag() 即出"被跳过的文件"清单）
+        // 解决"全量上报 10 个文件但工具箱只有 8 个用户"问题
+        window.__tfjlToolboxDiag = function () {
+            const all = window.__diagAllDiagFiles || [];
+            const skipped = window.__diagSkipped || [];
+            const users = window.__toolboxUsers || [];
+            const report = {
+                'Gist 中 diag 文件总数': all.length,
+                '工具箱有效用户数': users.length,
+                '被跳过的文件数': skipped.length,
+                '被跳过的文件+原因': skipped.length ? skipped : '（无，全部解析成功）',
+                '所有用户 nickname': users.map(u => u.nick + ' (' + (u.dev ? u.dev.slice(-6) : '?') + ')'),
+                '判断: 是不是因为 deviceId 缺失': skipped.some(s => /deviceId 缺失/.test(s.reason)) ? '⚠️ 是！那些 diag 用了老 payload 结构 / 不同字段名' : '否，其他原因'
+            };
+            console.log('=== 工具箱用户加载诊断 toolboxDiag() ===');
+            for (const k in report) console.log('  ' + k + ': ' + (typeof report[k] === 'object' ? JSON.stringify(report[k]) : report[k]));
+            console.log('=== 诊断结束（重新加载工具箱会刷新本报告）===');
+            return report;
         };
         // 🔴 2026-08-29 新增：版本号探针（终端输入 verProbe() 即出全量报告）
         // 用法：诊断面板里发现某个用户上报了 v2.0.16 而你以为是 2.0.19 时，开终端 → 输 verProbe() → 看真相
