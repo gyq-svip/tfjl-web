@@ -830,13 +830,26 @@ if (true) {
         setTimeout(() => { try { if (typeof window.reapplyAllSkins === 'function') window.reapplyAllSkins(); } catch (e) {} }, 1500);
         // APP 端版本号回填：Tauri 无 Service Worker，#versionTag 不会被 SW_VERSION 消息更新，
         // 否则永远显示 index.html 写死的 fallback "s1.0.225"。这里用真实 APP 版本回填。
+        // 🔴 关键：必须保留小版本号（s1.0.xxx）+ 大版本号（App v2.0.x）同时显示，缺一不可。
+        //   格式：<部署标签> · s1.0.xxx · App v2.0.x
         try {
             const tag = document.getElementById('versionTag');
             if (tag) {
                 const av = (typeof getAppVersion === 'function') ? await getAppVersion() : '?';
+                // ① 部署标签（如 s20260829-0237）：优先 __DEPLOY_TAG，否则取原文本第一段
                 const base = (typeof window.__DEPLOY_TAG === 'string' && window.__DEPLOY_TAG) ? window.__DEPLOY_TAG
-                         : ((tag.textContent.split(' · ')[0] || '').trim() || 'App');
-                tag.textContent = base + ' · App v' + (av || '?');
+                             : ((tag.textContent.split(' · ')[0] || '').trim() || 'App');
+                // ② 小版本号（s1.0.xxx）：优先 window.__SW_VER（SW 缓存版本），否则从原文本里抠出 s1.0.xxx 段，再兜底 sw.js 的 CACHE_VERSION
+                let swVer = '';
+                if (typeof window.__SW_VER === 'string' && /^s1\.0\.\d+/.test(window.__SW_VER)) swVer = window.__SW_VER;
+                else {
+                    const m = (tag.textContent || '').match(/s1\.0\.\d+/);
+                    if (m) swVer = m[0];
+                    else if (typeof CACHE_VERSION === 'string' && /^s1\.0\.\d+/.test(CACHE_VERSION)) swVer = CACHE_VERSION;
+                }
+                // ③ 大版本号（App v2.0.x）：来自 getAppVersion（Cargo.toml 2.0.19）
+                const appVer = av ? ('App v' + av) : '';
+                tag.textContent = base + (swVer ? (' · ' + swVer) : '') + (appVer ? (' · ' + appVer) : '');
             }
         } catch (e) {}
         console.log('[APP] APP本地功能已初始化, isTauriApp:', isTauriApp);
