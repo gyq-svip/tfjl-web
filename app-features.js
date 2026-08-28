@@ -3306,6 +3306,9 @@
                     const names = await caches.keys();
                     await Promise.all(names.map((n) => caches.delete(n)));
                 }
+                // 🔴 2026-08-29 标记：双击刷新/强制刷新后 30 秒内抑制需求墙红点闪烁
+                // reload 后 scheduleWallAttention 会读到 sessionStorage 标记, 30 秒内强制清空红点
+                try { sessionStorage.setItem('TFJL_ReloadRedDotSuppress', String(Date.now())); } catch (e) {}
                 // 2.5 🔴 关键修复：sw.js 改为"安装后 waiting 不自动激活"，
                 // 仅删缓存+reload 不足以让新 SW 接管（旧 SW 仍按旧 CACHE_VERSION 重新缓存旧文件 → 永远拿不到新版）。
                 // 必须显式让处于 waiting 的新 SW 立即激活(skipWaiting)，否则强制刷新后仍是旧版。
