@@ -22574,7 +22574,13 @@ ${maSection}
                             (detailByUser[x.k] || []).forEach(m => {
                                 const ts = m.last ? new Date(m.last).toLocaleString('zh-CN') : '?';
                                 const min = m.last ? Math.max(0, Math.round((Date.now() - m.last) / 60000)) : -1;
-                                const flag = (m.heartbeat ? '🟢心跳' : '📦缓冲') + '｜' + (m.writeOk ? '✓盘' : (m.writeOk === false ? '✗盘' : '?盘')) + '｜前端v' + (m.ver || '?') + (m.payload && m.payload.appExeVersion ? '｜桌面v' + m.payload.appExeVersion : '') + '｜' + (m.plat || '?');
+                                // 大版本号（桌面 exe）：有则显示，桌面版但取不到 → 标"未知(旧包)"。
+                                // 取不到的唯一原因是该用户装的 exe 早于 Rust 注入 window.__APP_VERSION 的版本（lib.rs），
+                                // 标出来才能让管理员一眼分清"老包待更新"和"新包已带版本号"。
+                                const _exeVer = (m.payload && m.payload.appExeVersion)
+                                    ? '｜桌面v' + m.payload.appExeVersion
+                                    : ((m.plat === 'app') ? '｜桌面v<span style="color:#f97316;">未知(旧包)</span>' : '');
+                                const flag = (m.heartbeat ? '🟢心跳' : '📦缓冲') + '｜' + (m.writeOk ? '✓盘' : (m.writeOk === false ? '✗盘' : '?盘')) + '｜前端v' + (m.ver || '?') + _exeVer + '｜' + (m.plat || '?');
                                 const rc = m.payload && m.payload.reportCount ? ('｜累计上报 ' + m.payload.reportCount + ' 次') : '';
                                 html += '<div style="margin-bottom:6px;"><b>' + m.who + '</b> <span style="color:#94a3b8;">[' + ts + '  ' + min + '分钟前]</span><br><span style="color:#94a3b8;">' + flag + rc + '</span>';
                                 if (m.err) html += '<br><span style="color:#f87171;">err: ' + m.err + '</span>';
