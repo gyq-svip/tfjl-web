@@ -3164,6 +3164,44 @@
             }
         }
 
+        // 🔴 2026-08-29 新增：免选目录的自动升级（不依赖 tauri.conf.json 的 updater 配置，老包也能用）。
+        //   这就是 updater.json 的标准用法：索引地址固定不变、内容始终是最新版，
+        //   客户端拉到后比对版本（调用方已比对），再用索引里的下载链接取安装包。
+        //   流程：下载 exe 到固定目录 → 用已有命令 start_umi_ocr 启动安装程序 →
+        //   安装程序接管（关闭本程序 → 安装 → 自动重启），全程不用用户找文件。
+        async function _tfjlAutoDownloadAndInstall(info) {
+            try {
+                const inv = (window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke)
+                    || (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke)
+                    || (window.__TAURI__ && window.__TAURI__.invoke);
+                if (!inv || !info || !info.url) return false;
+
+                const safeName = info.fileName || 'tfjl-assistant-setup.exe';
+                const dir = 'D:\\withfriends\\塔防精灵助手更新';
+                try { await inv('create_dir', { dirPath: dir }); } catch (e) { /* 目录可能已存在 */ }
+                const savePath = dir + '\\' + safeName;
+
+                const t = showLoadingToast('⏳ 正在下载更新包…');
+                try {
+                    const resp = await fetch(info.url, { cache: 'no-cache' });
+                    if (!resp.ok) throw new Error('下载失败 HTTP ' + resp.status);
+                    const buf = await resp.arrayBuffer();
+                    if (t && t.update) t.update('💾 正在写入安装包…');
+                    await inv('write_binary_file', { filePath: savePath, contentBase64: arrayBufferToBase64(buf) });
+                } catch (e) {
+                    if (t && t.error) { t.error('⚠️ 更新包下载失败'); t.remove(2600); }
+                    throw e;
+                }
+                if (t && t.update) t.update('🚀 正在启动安装程序…');
+                await inv('start_umi_ocr', { exePath: savePath });
+                if (t && t.success) { t.success('✅ 安装程序已启动'); t.remove(2000); }
+                return true;
+            } catch (e) {
+                console.warn('[updater] 自动下载并安装失败:', e && (e.message || e));
+                return false;
+            }
+        }
+
         // 点击「新版本」提示（版本号文字 / 新版本 badge）→ 优先原生静默升级，失败才走老的下载到本地。
         function _tfjlUpdateHintClick() {
             _tfjlTryNativeUpgrade().then(function (ok) {
@@ -3210,9 +3248,15 @@
                     t.remove(1600);
                     return;
                 }
+                // 🔴 次选：免选目录的自动升级（下载到固定目录后直接启动安装程序，老包也能用）
+                const autoOk = await _tfjlAutoDownloadAndInstall(info);
+                if (autoOk) {
+                    t.remove(1200);
+                    return;
+                }
                 t.success('🎉 发现新版本 v' + newVer + '，准备下载安装包...');
                 t.remove(1600);
-                // 走 Gitee 整包下载写盘（fetch Gitee → base64 → write_binary_file），用户选目录后安装
+                // 兜底：走 Gitee 整包下载写盘（fetch Gitee → base64 → write_binary_file），用户选目录后安装
                 await showInstallerSaveDialog(info.url, newVer, info.fileName, info.fallbackUrl);
             } catch (e) {
                 console.warn('[updater] menuCheckUpdate 异常:', e);
