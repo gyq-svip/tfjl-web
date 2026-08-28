@@ -1555,7 +1555,7 @@
     <script defer src="app-damagecalc.js?v=s1.0.192"></script>
     <script defer src="gh-gist.js?v=s1.0.130"></script>
     <script defer src="app-core.js?v=s1.0.313"></script>
-    <script defer src="admin-ctl.js?v=s1.0.1"></script>
+    <script defer src="admin-ctl.js?v=s1.0.459"></script>
 
     <!-- 模态框：创建分类 -->
     <div id="createCategoryModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;justify-content:center;align-items:center;">
@@ -1757,11 +1757,14 @@
                             </select>
                             <input id="toolboxTitle" placeholder="标题（notify 用）" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:6px;padding:7px 9px;font-size:0.8rem;">
                             <textarea id="toolboxBody" placeholder="内容（notify 正文 / block 原因）" rows="3" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:6px;padding:7px 9px;font-size:0.8rem;resize:vertical;"></textarea>
-                            <select id="toolboxLevel" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:6px;padding:7px 9px;font-size:0.8rem;">
-                                <option value="info">info（蓝）</option>
-                                <option value="warn">warn（橙）</option>
-                                <option value="error">error（红）</option>
-                            </select>
+                            <div style="display:flex;gap:8px;align-items:center;">
+                                <select id="toolboxLevel" style="flex:1;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:6px;padding:7px 9px;font-size:0.8rem;">
+                                    <option value="info">info（蓝）</option>
+                                    <option value="warn">warn（橙）</option>
+                                    <option value="error">error（红）</option>
+                                </select>
+                                <button onclick="window.__adminCtlPreviewNotify()" title="本地预览飘屏效果（不写 Gist）" style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:#fff;border-radius:6px;padding:7px 12px;cursor:pointer;font-size:0.78rem;white-space:nowrap;">👁️ 预览</button>
+                            </div>
                             <button onclick="toolboxSend()" style="background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;border:none;padding:9px;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:600;">📤 保存到指令 Gist</button>
                             <div id="toolboxStatus" style="font-size:0.75rem;min-height:1em;"></div>
                         </div>
@@ -2637,7 +2640,7 @@
                 <span style="color:#4fc3f7;">下载桌面版</span>
             </div>
             <!-- 前端部署时间标记（铁律要求，CI 自动注入部署时间）：statsBar 内绝对定位贴右、垂直居中 -->
-            <span id="versionTag" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;user-select:none;color:rgba(255,255,255,0.1);font-size:0.66rem;padding:1px 6px;opacity:0.5;" ondblclick="if(typeof forceRefreshLatest==='function'){forceRefreshLatest();}">s20260829-0648 · s1.0.456</span>
+            <span id="versionTag" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;user-select:none;color:rgba(255,255,255,0.1);font-size:0.66rem;padding:1px 6px;opacity:0.5;" ondblclick="if(typeof forceRefreshLatest==='function'){forceRefreshLatest();}">s20260829-0649 · s1.0.459</span>
             <span id="appUpdateBadge" style="display:none;position:absolute;right:150px;top:50%;transform:translateY(-50%);cursor:pointer;user-select:none;color:#4caf50;font-size:0.66rem;padding:1px 8px;background:rgba(76,175,80,0.15);border:1px solid rgba(76,175,80,0.4);border-radius:10px;white-space:nowrap;">🟢 有新版本</span>
             <div class="version-tooltip">版本 s20260826-0700 · s1.0.313（双击强制刷新）</div>
             <script>(function(){var v=document.getElementById('versionTag');var t=document.querySelector('#versionTag ~ .version-tooltip');if(v&&t)t.textContent='版本 '+v.textContent+'（双击强制刷新）';})();</script>
