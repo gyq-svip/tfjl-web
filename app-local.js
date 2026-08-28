@@ -245,8 +245,11 @@ if (isTauriApp) {
         }
         _storeMap = map;
         const ok = await _writeStoreFile(_syncDir, map);
-        if (ok) console.log('[数据存储] 已写入统一存储 tfjl.dat (' + map.size + ' 项)');
-        else console.error('[数据存储] ❌ tfjl.dat 写入失败（目录可能不可写/权限不足）: ' + _getDatPath(_syncDir));
+        if (ok) {
+            console.log('[数据存储] 已写入统一存储 tfjl.dat (' + map.size + ' 项)');
+            // 数据落盘后触发自动增量备份（内容变化才写，带防抖，不阻塞主流程）
+            _scheduleAutoBackup(_syncDir).catch(() => {});
+        } else console.error('[数据存储] ❌ tfjl.dat 写入失败（目录可能不可写/权限不足）: ' + _getDatPath(_syncDir));
     }
 
     function _scheduleFlush() {
@@ -301,6 +304,8 @@ if (isTauriApp) {
     window.addEventListener('pagehide', () => {
         if (_flushTimer) { clearTimeout(_flushTimer); _flushTimer = null; }
         _flushStore().catch((e) => console.error('[数据存储] 卸载时刷盘失败:', e));
+        // 关闭前立即补一份自动备份（防"连续保存后马上关窗"丢 8 秒窗口内的变更）
+        _autoBackupNow(_syncDir).catch(() => {});
     });
 
     async function initDataSync() {
@@ -317,6 +322,7 @@ if (isTauriApp) {
             await _ensureStoreLoaded(dir);   // 加载现有 tfjl.dat 或迁移旧文件
             _syncOk = true;
             await _flushStore();             // 立即写一次，验证目录可写
+            _startAutoBackupTimer();         // 启动定时整备（每 30 分钟兜底快照）
             console.log('[数据存储] ✅ 已启用单一文件存储: ' + _getDatPath(dir));
         } catch (e) {
             _syncOk = false;
@@ -515,7 +521,148 @@ if (isTauriApp) {
     // ==================== 配置管理 ====================
 
     // 自动加载开关：默认全部开启，用户卡顿可关闭
-    const settingsConfig = { autoLoadScreenshotStats: true, autoLoadBattleStats: true };
+    const settingsConfig = { autoLoadScreenshotStats: true, autoLoadBattleStats: true, autoBackup: true, autoBackupKeep: AUTO_BACKUP_DEFAULT_KEEP, autoBackupTimer: true, autoBackupIntervalMin: 30 };
+
+    // 自动备份配置也镜像进 localStorage（设置面板与 _autoBackupEnabled/_autoBackupKeep 共用）
+    function _syncAutoBackupConfig() {
+        localStorage.setItem(AUTO_BACKUP_KEY, settingsConfig.autoBackup ? '1' : '0');
+        localStorage.setItem(AUTO_BACKUP_KEEP_KEY, String(settingsConfig.autoBackupKeep || AUTO_BACKUP_DEFAULT_KEEP));
+    }
+
+    // 自动增量备份：每次数据变更（tfjl.dat 内容真正变化）后，自动写一份带时间戳的备份，
+    // 并只保留最近 N 份（N 用户可配），避免忘记手动备份时数据全丢。
+    const AUTO_BACKUP_KEY = 'tfjl_auto_backup';                 // 配置开关（也镜像进 settingsConfig）
+    const AUTO_BACKUP_KEEP_KEY = 'tfjl_auto_backup_keep';       // 保留份数
+    const AUTO_BACKUP_HASH_KEY = 'tfjl_auto_backup_last_hash';  // 上次已备份的内容 hash（增量判定）
+    const AUTO_BACKUP_PREFIX = 'tfjl-auto-backup-';             // 自动备份文件前缀（区别于手动 tfjl-full-backup-）
+    const AUTO_BACKUP_DEFAULT_KEEP = 20;
+
+    function _autoBackupEnabled() {
+        // 优先用 settingsConfig（与设置面板一致），并实时同步 localStorage 镜像
+        if (typeof settingsConfig.autoBackup === 'boolean') return settingsConfig.autoBackup;
+        const v = localStorage.getItem(AUTO_BACKUP_KEY);
+        return v === null ? true : v === '1'; // 默认开启
+    }
+    function _autoBackupKeep() {
+        const v = parseInt(localStorage.getItem(AUTO_BACKUP_KEEP_KEY), 10);
+        return (v >= 1 && v <= 999) ? v : AUTO_BACKUP_DEFAULT_KEEP;
+    }
+    // 轻量 hash（仅用于增量判定，无需加密强度）：FNV-1a，字符串输入
+    function _fnv1a(str) {
+        let h = 0x811c9dc5;
+        for (let i = 0; i < str.length; i++) {
+            h ^= str.charCodeAt(i);
+            h = Math.imul(h, 0x01000193);
+        }
+        return (h >>> 0).toString(16);
+    }
+
+    let _autoBackupTimer = null;          // 日常防抖定时器（变更后 8 秒）
+    let _autoBackupRunning = false;       // 正在写盘标志（防并发叠加）
+    let _autoBackupInterval = null;       // 定时整备定时器（每 30 分钟兜底）
+    const AUTO_BACKUP_INTERVAL_MS = 30 * 60 * 1000; // 30 分钟
+
+    async function _scheduleAutoBackup(dir) {
+        if (!_autoBackupEnabled() || !dir) return;
+        if (_autoBackupTimer) clearTimeout(_autoBackupTimer);
+        // 防抖：数据高频变更时，等 8 秒静默期再备份，避免狂写；只留最终态
+        _autoBackupTimer = setTimeout(() => _doAutoBackup(dir).catch(e => console.error('[自动备份] 失败:', e)), 8000);
+    }
+
+    // 立即备份（跳过防抖，供关窗/隐藏/定时整备调用）；仍走 hash 增量判定，避免无变更时重复写
+    async function _autoBackupNow(dir) {
+        if (!_autoBackupEnabled() || !dir) return;
+        await _doAutoBackup(dir).catch(e => console.error('[自动备份] 兜底失败:', e));
+    }
+
+    async function _doAutoBackup(dir) {
+        if (!dir) return;
+        const syncDir = dir.replace(/[\\/]+$/, '');
+        // 1) 取当前 tfjl.dat 内容（与落盘一致），算 hash（锁外做，无变更直接跳过，不加锁）
+        let rawDat = '';
+        try { rawDat = await readTextFile(_getDatPath(syncDir)) || ''; } catch (e) { return; }
+        if (!rawDat) return;
+        const hash = _fnv1a(rawDat);
+        const lastHash = localStorage.getItem(AUTO_BACKUP_HASH_KEY);
+        if (lastHash === hash) return; // 内容没变，跳过（增量核心）
+
+        // 2) 真正写盘前再加锁，正在写则放弃本次（防并发叠加，避免"一直很忙"）
+        if (_autoBackupRunning) return;
+        _autoBackupRunning = true;
+        try {
+            // 组装与手动备份同格式的备份对象（保证能被 restoreFromBackup 还原）
+            const localStorageData = {};
+            for (let i = 0; i < localStorage.length; i++) {
+                const k = localStorage.key(i);
+                if (k) localStorageData[k] = localStorage.getItem(k);
+            }
+            let projects = [], dbCategories = [];
+            try {
+                if (window.db) {
+                    projects = await new Promise((res, rej) => {
+                        const tx = window.db.transaction(['projects'], 'readonly');
+                        const req = tx.objectStore('projects').getAll();
+                        req.onsuccess = () => res(req.result || []);
+                        req.onerror = () => rej(req.error);
+                    });
+                }
+                dbCategories = window.categories || [];
+            } catch (e) {}
+            const backup = {
+                type: 'tfjl-full-backup',
+                auto: true,                              // 标记为自动备份
+                version: '1.0',
+                backupDate: new Date().toISOString(),
+                localStorage: localStorageData,
+                indexedDB: { projects, categories: dbCategories }
+            };
+
+            const d = new Date();
+            const ts = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' +
+                String(d.getDate()).padStart(2, '0') + '_' +
+                String(d.getHours()).padStart(2, '0') + String(d.getMinutes()).padStart(2, '0') +
+                String(d.getSeconds()).padStart(2, '0');
+            const fileName = AUTO_BACKUP_PREFIX + ts + '.json';
+            const filePath = syncDir + '\\' + fileName;
+            const result = await writeTextFileWithError(filePath, JSON.stringify(backup, null, 2));
+            if (!result.success) { console.error('[自动备份] 写文件失败:', result.error); return; }
+
+            localStorage.setItem(AUTO_BACKUP_HASH_KEY, hash); // 记录已备份内容，下次变更才再备
+            console.log('[自动备份] ✅ 已生成: ' + fileName + '（项目 ' + projects.length + ' 个）');
+
+            // 3) 清理超出保留数量的旧自动备份（保留最新的 N 份）
+            try {
+                const entries = await readDir(syncDir);
+                const autos = entries
+                    .filter(e => e.is_file && e.name.startsWith(AUTO_BACKUP_PREFIX) && e.name.endsWith('.json'))
+                    .sort((a, b) => b.name.localeCompare(a)); // 最新在前
+                const keep = _autoBackupKeep();
+                const excess = autos.slice(keep);
+                for (const f of excess) {
+                    try { await deleteFile(syncDir + '\\' + f.name); } catch (e) {}
+                }
+                if (excess.length) console.log('[自动备份] 已清理 ' + excess.length + ' 份过期备份，保留最新 ' + keep + ' 份');
+            } catch (e) {}
+        } finally {
+            _autoBackupRunning = false; // 无论如何释放锁
+        }
+    }
+
+    // 定时整备：按用户设定间隔（默认 30 分钟，可配）扫一次，若期间数据变过（hash 不同）则补一份快照
+    // （兜底网，防全天高频打断导致一份都没生成）。开关 autoBackupTimer 关则不启动。
+    function _startAutoBackupTimer() {
+        _stopAutoBackupTimer(); // 先清旧的，避免重复 interval
+        if (!_autoBackupEnabled() || !settingsConfig.autoBackupTimer) return;
+        const min = (settingsConfig.autoBackupIntervalMin >= 1 && settingsConfig.autoBackupIntervalMin <= 1440)
+            ? settingsConfig.autoBackupIntervalMin : 30;
+        const ms = min * 60 * 1000;
+        _autoBackupInterval = setInterval(() => {
+            _autoBackupNow(_syncDir).catch(() => {});
+        }, ms);
+    }
+    function _stopAutoBackupTimer() {
+        if (_autoBackupInterval) { clearInterval(_autoBackupInterval); _autoBackupInterval = null; }
+    }
 
     function loadConfig() {
         try {
@@ -532,6 +679,11 @@ if (isTauriApp) {
                 // 恢复开关状态
                 if (typeof parsed.autoLoadScreenshotStats === 'boolean') settingsConfig.autoLoadScreenshotStats = parsed.autoLoadScreenshotStats;
                 if (typeof parsed.autoLoadBattleStats === 'boolean') settingsConfig.autoLoadBattleStats = parsed.autoLoadBattleStats;
+                // 恢复自动备份配置
+                if (typeof parsed.autoBackup === 'boolean') settingsConfig.autoBackup = parsed.autoBackup;
+                if (parsed.autoBackupKeep) { const k = parseInt(parsed.autoBackupKeep, 10); if (k >= 1 && k <= 999) settingsConfig.autoBackupKeep = k; }
+                if (typeof parsed.autoBackupTimer === 'boolean') settingsConfig.autoBackupTimer = parsed.autoBackupTimer;
+                if (parsed.autoBackupIntervalMin) { const m = parseInt(parsed.autoBackupIntervalMin, 10); if (m >= 1 && m <= 1440) settingsConfig.autoBackupIntervalMin = m; }
             }
         } catch (e) {}
         // 确保 window.maDirs 总是有值（包括默认值）
@@ -548,8 +700,13 @@ if (isTauriApp) {
             maDirs,
             softwareDataDir,
             autoLoadScreenshotStats: settingsConfig.autoLoadScreenshotStats,
-            autoLoadBattleStats: settingsConfig.autoLoadBattleStats
+            autoLoadBattleStats: settingsConfig.autoLoadBattleStats,
+            autoBackup: settingsConfig.autoBackup,
+            autoBackupKeep: settingsConfig.autoBackupKeep,
+            autoBackupTimer: settingsConfig.autoBackupTimer,
+            autoBackupIntervalMin: settingsConfig.autoBackupIntervalMin
         }));
+        _syncAutoBackupConfig();
         // 保存配置时全量同步所有数据到本地目录（不等防抖，立即写入）
         syncAllNow().catch(() => {});
     }
@@ -629,13 +786,29 @@ if (isTauriApp) {
 
     async function tfjlRestoreAllProjects() {
         if (!isTauriApp) return [];
-        if (_projectsCache !== null) return _projectsCache;
-        // 兜底：store 尚未加载则现加载
-        const dir = await _resolveRealDataDir();
-        await _ensureStoreLoaded(dir);
+        // 🔴 修复：不再用 `_projectsCache !== null` 短路——空数组 [] 也 !== null，会屏蔽"现读 tfjl.dat"，
+        // 导致重装/清缓存后即使 D 盘 tfjl.dat 有项目也恢复失败（项目栏空白）。
+        // 改为：内存缓存、tfjl.dat 两来源合并去重，任一有数据都返回，确保 D 盘权威源始终被读取。
+        let fromCache = (_projectsCache && Array.isArray(_projectsCache)) ? _projectsCache : null;
+        // 兜底：store 尚未加载则现加载（确保 _storeMap 反映 tfjl.dat 最新内容）
+        if (!_storeLoaded) {
+            try { const dir = await _resolveRealDataDir(); await _ensureStoreLoaded(dir); } catch (e) {}
+        }
+        let fromDisk = null;
         const pj = _storeMap.get(PROJECTS_KEY);
-        if (pj) { try { _projectsCache = JSON.parse(pj); } catch (e) {} }
-        return _projectsCache || [];
+        if (pj) { try { fromDisk = JSON.parse(pj); } catch (e) {} }
+        if (!Array.isArray(fromDisk)) fromDisk = null;
+        // 合并：以 tfjl.dat(D盘) 为权威，内存缓存补充（去重按 name+category）
+        const merged = new Map();
+        const pushAll = (arr) => {
+            if (!Array.isArray(arr)) return;
+            arr.forEach(p => { if (p && p.name) merged.set(p.name + '\u0000' + (p.category || '默认分类'), p); });
+        };
+        pushAll(fromDisk);   // D盘优先
+        pushAll(fromCache);  // 内存补充
+        const result = Array.from(merged.values());
+        if (result.length > 0) _projectsCache = result;  // 有数据才回填，避免用 [] 污染
+        return result;
     }
 
     async function initAppLocal() {
@@ -690,8 +863,38 @@ if (isTauriApp) {
         if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('APP设置开关:' + type);
     }
 
+    function toggleAutoBackup() {
+        settingsConfig.autoBackup = !settingsConfig.autoBackup;
+        updateToggleUI('autoBackup', settingsConfig.autoBackup);
+        _syncAutoBackupConfig();
+        if (settingsConfig.autoBackup && typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('APP设置开关:autoBackup');
+    }
+
+    function onAutoBackupKeepInput(val) {
+        const n = parseInt(val, 10);
+        settingsConfig.autoBackupKeep = (n >= 1 && n <= 999) ? n : AUTO_BACKUP_DEFAULT_KEEP;
+        localStorage.setItem(AUTO_BACKUP_KEEP_KEY, String(settingsConfig.autoBackupKeep));
+    }
+
+    function toggleAutoBackupTimer() {
+        settingsConfig.autoBackupTimer = !settingsConfig.autoBackupTimer;
+        updateToggleUI('autoBackupTimer', settingsConfig.autoBackupTimer);
+        if (settingsConfig.autoBackupTimer) _startAutoBackupTimer(); // 开了就立即按新间隔启动
+        else _stopAutoBackupTimer();                                 // 关了就停掉定时
+        if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('APP设置开关:autoBackupTimer');
+    }
+
+    function onAutoBackupIntervalInput(val) {
+        const m = parseInt(val, 10);
+        settingsConfig.autoBackupIntervalMin = (m >= 1 && m <= 1440) ? m : 30;
+        localStorage.setItem(AUTO_BACKUP_KEEP_KEY, String(settingsConfig.autoBackupKeep)); // 仅占位，主存 maDirsConfig
+        // 若定时开关开着，按新间隔重启
+        if (settingsConfig.autoBackupTimer) _startAutoBackupTimer();
+    }
+
     function updateToggleUI(type, on) {
-        const tgl = document.getElementById('tglAuto' + (type === 'screenshot' ? 'Screenshot' : 'Battle'));
+        const suffix = (type === 'screenshot') ? 'Screenshot' : (type === 'battle') ? 'Battle' : (type === 'autoBackup' ? 'Backup' : 'BackupTimer');
+        const tgl = document.getElementById('tglAuto' + suffix);
         if (!tgl) return;
         tgl.style.background = on ? '#4caf50' : 'rgba(255,255,255,0.15)';
         const knob = tgl.querySelector('span');
@@ -821,6 +1024,39 @@ if (isTauriApp) {
                         <span style="color:rgba(255,255,255,0.3);font-size:0.68rem;">选择一个备份 → 点「还原」即可一键恢复全部数据</span>
                     </div>
                     <div id="backupFileList" style="margin-top:8px;max-height:180px;overflow:auto;display:none;"></div>
+
+                    <div style="margin-top:12px;padding:10px 12px;background:rgba(76,175,80,0.06);border:1px solid rgba(76,175,80,0.2);border-radius:8px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <div style="color:rgba(255,255,255,0.8);font-size:0.8rem;font-weight:bold;">🤖 自动增量备份</div>
+                            <label id="lblAutoBackup" style="display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;" onclick="toggleAutoBackup()">
+                                <span id="tglAutoBackup" style="display:inline-block;width:36px;height:20px;border-radius:10px;background:#4caf50;position:relative;transition:background 0.2s;">
+                                    <span style="display:inline-block;width:16px;height:16px;border-radius:50%;background:#fff;position:absolute;top:2px;left:18px;transition:left 0.2s;"></span>
+                                </span>
+                            </label>
+                        </div>
+                        <div style="color:rgba(255,255,255,0.4);font-size:0.68rem;margin:6px 0 8px;line-height:1.4;">每次数据变动后自动存一份备份（内容不变不备份），最多保留最近 N 份，旧自动覆盖删除。可随时在上方列表「还原」。</div>
+                        <div style="display:flex;align-items:center;gap:8px;">
+                            <span style="color:rgba(255,255,255,0.6);font-size:0.75rem;white-space:nowrap;">保留份数：</span>
+                            <input type="number" id="autoBackupKeepInput" min="1" max="999" value="20" oninput="onAutoBackupKeepInput(this.value)" style="width:70px;padding:5px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:rgba(0,0,0,0.3);color:#fff;font-size:0.8rem;box-sizing:border-box;">
+                            <span style="color:rgba(255,255,255,0.35);font-size:0.68rem;">份（默认 20）</span>
+                        </div>
+                        <div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.08);">
+                            <div style="display:flex;justify-content:space-between;align-items:center;">
+                                <div style="color:rgba(255,255,255,0.75);font-size:0.76rem;font-weight:bold;">⏰ 定时整备备份</div>
+                                <label id="lblAutoBackupTimer" style="display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;" onclick="toggleAutoBackupTimer()">
+                                    <span id="tglAutoBackupTimer" style="display:inline-block;width:36px;height:20px;border-radius:10px;background:#4caf50;position:relative;transition:background 0.2s;">
+                                        <span style="display:inline-block;width:16px;height:16px;border-radius:50%;background:#fff;position:absolute;top:2px;left:18px;transition:left 0.2s;"></span>
+                                    </span>
+                                </label>
+                            </div>
+                            <div style="color:rgba(255,255,255,0.4);font-size:0.66rem;margin:6px 0 8px;line-height:1.4;">兜底网：即使一直高频操作没停过 8 秒，也按下面间隔自动留一份快照，防全天一份都没生成。关窗时也会立即补一份。</div>
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <span style="color:rgba(255,255,255,0.6);font-size:0.75rem;white-space:nowrap;">间隔：</span>
+                                <input type="number" id="autoBackupIntervalInput" min="1" max="1440" value="30" oninput="onAutoBackupIntervalInput(this.value)" style="width:70px;padding:5px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:rgba(0,0,0,0.3);color:#fff;font-size:0.8rem;box-sizing:border-box;">
+                                <span style="color:rgba(255,255,255,0.35);font-size:0.68rem;">分钟（1~1440，默认 30）</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div style="margin-bottom:16px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:12px 14px;">
@@ -905,6 +1141,14 @@ if (isTauriApp) {
         // 恢复自动加载开关 UI 状态
         updateToggleUI('screenshot', settingsConfig.autoLoadScreenshotStats);
         updateToggleUI('battle', settingsConfig.autoLoadBattleStats);
+        // 恢复自动备份开关与保留份数
+        updateToggleUI('autoBackup', settingsConfig.autoBackup);
+        const keepInput = document.getElementById('autoBackupKeepInput');
+        if (keepInput) keepInput.value = settingsConfig.autoBackupKeep || AUTO_BACKUP_DEFAULT_KEEP;
+        // 恢复定时整备开关与间隔
+        updateToggleUI('autoBackupTimer', settingsConfig.autoBackupTimer);
+        const intervalInput = document.getElementById('autoBackupIntervalInput');
+        if (intervalInput) intervalInput.value = settingsConfig.autoBackupIntervalMin || 30;
     }
 
     async function selectMaDir(key) {
@@ -1434,7 +1678,8 @@ if (isTauriApp) {
         catch (e) { alert('无法读取数据目录'); return; }
 
         const backupFiles = entries
-            .filter(e => e.is_file && e.name.startsWith('tfjl-full-backup-') && e.name.endsWith('.json'))
+            .filter(e => e.is_file && e.name.endsWith('.json') &&
+                (e.name.startsWith('tfjl-full-backup-') || e.name.startsWith(AUTO_BACKUP_PREFIX)))
             .sort((a, b) => b.name.localeCompare(a.name)); // 最新在前
 
         const listDiv = document.getElementById('backupFileList');
@@ -1447,11 +1692,12 @@ if (isTauriApp) {
         }
 
         listDiv.innerHTML = backupFiles.map(f => {
-            const displayTs = f.name.replace('tfjl-full-backup-', '').replace('.json', '');
+            const isAuto = f.name.startsWith(AUTO_BACKUP_PREFIX);
+            const displayTs = f.name.replace(isAuto ? AUTO_BACKUP_PREFIX : 'tfjl-full-backup-', '').replace('.json', '');
             const parts = displayTs.split('_');
-            const displayName = parts[0] + ' ' + (parts[1] ? parts[1].slice(0, 2) + ':' + parts[1].slice(2) : '');
+            const displayName = parts[0] + ' ' + (parts[1] ? parts[1].slice(0, 2) + ':' + parts[1].slice(2) + ':' + parts[1].slice(4, 6) : '');
             return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;margin-bottom:4px;background:rgba(255,255,255,0.04);border-radius:6px;">' +
-                '<span style="color:#fff;font-size:0.78rem;">📦 ' + displayName + '</span>' +
+                '<span style="color:#fff;font-size:0.78rem;">' + (isAuto ? '🤖 ' : '📦 ') + displayName + (isAuto ? ' <span style="color:#4caf50;font-size:0.65rem;">[自动]</span>' : '') + '</span>' +
                 '<div style="display:flex;gap:6px;">' +
                 '<button class="_restoreBackupBtn" data-filename="' + f.name + '" style="background:linear-gradient(135deg,#2196f3,#1565c0);color:white;border:none;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:0.7rem;">还原</button>' +
                 '<button class="_deleteBackupBtn" data-filename="' + f.name + '" style="background:rgba(244,67,54,0.3);color:#ef5350;border:1px solid rgba(244,67,54,0.3);padding:4px 12px;border-radius:4px;cursor:pointer;font-size:0.7rem;">删除</button>' +
@@ -4071,6 +4317,10 @@ if (isTauriApp) {
     window.shareScannedFileFromMain = shareScannedFileFromMain;
     window.saveSettingsAndClose = saveSettingsAndClose;
     window.toggleAutoLoadSetting = toggleAutoLoadSetting;
+    window.toggleAutoBackup = toggleAutoBackup;
+    window.onAutoBackupKeepInput = onAutoBackupKeepInput;
+    window.toggleAutoBackupTimer = toggleAutoBackupTimer;
+    window.onAutoBackupIntervalInput = onAutoBackupIntervalInput;
     window.viewFile = viewFile;
     window.loadFileToHand = loadFileToHand;
     window.saveFileContent = saveFileContent;
