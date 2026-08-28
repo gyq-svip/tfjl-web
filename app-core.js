@@ -503,11 +503,23 @@
             //   与 #versionTag 的"小版本"分开存储：appVersion=SW 小版本、appExeVersion=桌面大版本。
             //   这样诊断面板能一眼分清"网页挂机 vs 桌面挂机"以及"桌面跑哪个 exe"，避免大/小版本混淆。
             let _appExeVer = '';
+            // 🔴 2026-08-29 修复：window.__APP_VERSION 实际未注入（null），get_app_version 命令返回的是 Cargo.toml 旧值(2.0.16)
+            // 而 tauri.conf.json 才是正确版本(2.0.19)。优先用 __TAURI__.app.getVersion()（=tauri.conf.json），回退才用旧值。
             try {
                 if (_isTauri && typeof window.__APP_VERSION === 'string' && /^v?\d+\.\d+/.test(window.__APP_VERSION)) {
                     _appExeVer = window.__APP_VERSION.replace(/^v/, '');
                 }
             } catch (e) {}
+            // 同步优先取 getVersion()（正确的 tauri.conf.json 版本），异步覆盖
+            if (_isTauri && window.__TAURI__ && window.__TAURI__.app && typeof window.__TAURI__.app.getVersion === 'function') {
+                try {
+                    const _tv = await window.__TAURI__.app.getVersion();
+                    if (_tv && /^v?\d+\.\d+/.test(_tv)) { _appExeVer = _tv.replace(/^v/, ''); }
+                } catch (e) {}
+            }
+            if (!_appExeVer) {
+                try { const gv = (typeof getAppVersion === 'function') ? await getAppVersion() : ''; if (gv && /^v?\d+\.\d+/.test(gv)) _appExeVer = gv.replace(/^v/, ''); } catch (e) {}
+            }
             // 🔴 2026-08-29 冲突对账：尝试从 Tauri API（tauri.conf.json 的 version）再取一个数，与 Rust 注入对比，不一致则用"较新"的并打冲突日志
             try {
                 if (_isTauri && window.__TAURI__ && window.__TAURI__.app && typeof window.__TAURI__.app.getVersion === 'function') {
