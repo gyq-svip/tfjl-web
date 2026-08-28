@@ -53,10 +53,7 @@
     try { if (sessionStorage.getItem('tfjl_adminctl_ackguard@' + id)) return true; } catch (e) {}
     return !!_loadAck()[id];
   }
-  // 会话级防重（sessionStorage）：reload 后本会话仍记得「已为某 ts 触发过 reload」，
-  // 防止硬刷新偶发清掉 localStorage 的 ack 后再次进入 reload 死循环。
-  function _isRguard(key) { try { return !!sessionStorage.getItem(key); } catch (e) { return false; } }
-  function _setRguard(key) { try { sessionStorage.setItem(key, String(Date.now())); } catch (e) {} }
+  // 会话级防重已统一由 _markAck（写 sessionStorage）+ _isAcked（读 sessionStorage）负责，_setRguard/_isRguard 废弃删除。
 
   // 设备身份
   function _devId() { try { return (typeof getDeviceId === 'function') ? getDeviceId() : ''; } catch (e) { return ''; } }
@@ -98,9 +95,8 @@
       const tgt = ctl.restart.to;
       const rAck = 'restart@' + (ctl.restart.ts || '1');
       // 防循环：localStorage 去重 + sessionStorage 防本会话重复 reload（硬刷新偶发清 localStorage 时不至于死循环）
-      const rGuard = 'tfjl_adminctl_rguard@' + rAck;
-      if ((tgt === 'all' || tgt === dev) && !_isAcked(rAck) && !_isRguard(rGuard)) {
-        _markAck(rAck); _setRguard(rGuard);
+      if ((tgt === 'all' || tgt === dev) && !_isAcked(rAck)) {
+        _markAck(rAck);
         console.log('[adminCtl] 收到重启指令，前端兜底 reload（APP 版由 Rust restart 生效）');
         setTimeout(() => location.reload(), 600);
       }
@@ -153,11 +149,9 @@
       const expired = cmd.expire && Date.now() > cmd.expire;
       if (expired) { _markAck(cmd.id); continue; }
       if (_isAcked(cmd.id)) continue;
-      // 会话级防重：硬刷新偶发清 localStorage 的 ack 时，避免同 cmd 重弹气泡
-      if (_isRguard('tfjl_adminctl_nfguard@' + cmd.id)) continue;
       if (cmd.type === 'notify') {
         _showNotify(cmd);
-        _markAck(cmd.id); _setRguard('tfjl_adminctl_nfguard@' + cmd.id);
+        _markAck(cmd.id);
       }
     }
   }
