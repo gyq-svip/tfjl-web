@@ -3773,29 +3773,9 @@
             }, 2000);
         }
 
-        // 在「版本：X」文字旁闪动提示有新版本（用户要求：版本号处直观提示升级）
+        // 2026-08-29：用户要求版本号处只显示版本号，不提示"发现新版本"。_markVersionNew 不再写任何提示/闪动/title。
         function _markVersionNew(version) {
-            // 注入闪动动画样式（仅一次）
-            if (!document.getElementById('__verFlashStyle')) {
-                const s = document.createElement('style');
-                s.id = '__verFlashStyle';
-                s.textContent = '@keyframes verNewFlash{0%,100%{color:#ffd700;opacity:1;}50%{color:#4caf50;opacity:0.45;}}'
-                    + '.ver-new-flash{animation:verNewFlash 1.1s ease-in-out infinite;}';
-                document.head.appendChild(s);
-            }
-            const el = document.getElementById('currentVersionText');
-            if (el) {
-                el.classList.add('ver-new-flash');
-                el.style.cursor = 'pointer';
-                el.title = '发现新版本 v' + version + '，点击立即更新';
-                el.onclick = function() { _tfjlUpdateHintClick(); };
-            }
-            const hint = document.getElementById('versionUpdateHint');
-            if (hint) {
-                hint.textContent = '🔔 新版本 v' + version;
-                hint.style.display = 'inline-flex';
-                hint.onclick = function() { _tfjlUpdateHintClick(); };
-            }
+            // 保留空函数：调用方（云同步检测）仍会调它标记有新版本，但不再改变任何 UI 展示。
         }
 
         // 显示拍卖操作提示

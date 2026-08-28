@@ -506,7 +506,7 @@
                             if (tag) {
                                 const tip = tag.parentElement ? tag.parentElement.querySelector('.version-tooltip') : null;
                                 if (tip && tip.classList.contains('version-tooltip')) {
-                                    tip.textContent = '版本 ' + tag.textContent.replace('●','').trim() + '（双击强制刷新）';
+                                    // 不写 tooltip，保持 CI 注入的小版本号原样（2026-08-29 用户诉求）
                                 }
                             }
                             const d = document.getElementById('__verNewDot'); if (d) d.remove();
@@ -535,7 +535,7 @@
                 // 🔴 修复：用父级 querySelector 精确命中 .version-tooltip（#versionTag 与 tooltip 间隔着 #appUpdateBadge）。
                 const tip = tag.parentElement ? tag.parentElement.querySelector('.version-tooltip') : null;
                 if (tip && tip.classList.contains('version-tooltip')) {
-                    tip.textContent = base + ' · ' + short + '（双击刷新）';
+                    tip.textContent = base + ' · ' + short;
                 }
                 // 同步打印到控制台（浮动调试窗会捕获，便于强制刷新后一眼确认是否刷到最新版）
                 console.log('[VERSION] 当前缓存版本:', swVersion, '（强制刷新后应为 s1.0.230 才算最新）');
