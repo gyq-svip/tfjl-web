@@ -17749,11 +17749,12 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 // 需求墙打开时，拍卖行按钮回到原位置
                 if (chatToggle) chatToggle.style.left = '68px';
                 messageWallOpen = true;
-                // 打开墙 = 标记当前所有消息为已读（加入指纹集合并持久化），而非用时间戳
+                updateWallAttention();   // 打开即清除未读提醒(墙已开, 先隐藏红点)
+                await fetchMessages();   // 先拉取最新消息, 避免竞态
+                // 打开墙 = 标记(最新)所有消息为已读(加入指纹集合并持久化), 必须基于 fetch 后的最新列表
                 wallMessages.forEach(m => wallReadKeys.add(_wallMsgKey(m)));
                 try { localStorage.setItem('TFJL_WallReadKeys', JSON.stringify([...wallReadKeys])); } catch (e) {}
-                updateWallAttention();   // 打开即清除未读提醒
-                fetchMessages();         // 每次打开需求墙都拉取最新消息
+                updateWallAttention();   // 重新评估, 确保新拉到的消息也标记为已读
                 initMessageWallDrag();
                 // 打开需求墙时，按本地记忆决定是否同时弹出右侧贡献排行榜
                 // （默认开启；用户若曾关闭，则下次开墙也保持关闭——本地记忆，他人默认开启）
@@ -17774,6 +17775,12 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             }
         }
         
+        // 未读提醒防抖：被动触发(fetch/升级检查)时延迟评估, 避免刚刷新/升级就立刻闪红点, 给用户缓冲
+        let _wallAttnTimer = null;
+        function scheduleWallAttention(delayMs) {
+            if (_wallAttnTimer) clearTimeout(_wallAttnTimer);
+            _wallAttnTimer = setTimeout(() => { _wallAttnTimer = null; updateWallAttention(); }, delayMs || 3000);
+        }
         // 未读提醒：墙关闭状态下，若自上次打开后出现了新留言 → 图标 QQ 式闪动 + 红点(未读数)；打开墙即清除
         function updateWallAttention() {
             const toggle = document.getElementById('messageWallToggle');
@@ -17854,7 +17861,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 if (wallMessages.length === 0) {
                     try {
                         const dbCache = await loadWallFromDB();
-                        if (dbCache && dbCache.length) { wallMessages = dbCache; renderMessages(); updateWallAttention(); console.log('[消息] 本地缓存兜底显示', dbCache.length, '条'); }
+                        if (dbCache && dbCache.length) { wallMessages = dbCache; renderMessages(); scheduleWallAttention(3500); console.log('[消息] 本地缓存兜底显示', dbCache.length, '条'); }
                     } catch (e) {}
                 }
 
@@ -17982,7 +17989,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                                     
                                     await saveWallToDB(wallMessages);
                                     renderMessages();
-                                    updateWallAttention();
+                                    scheduleWallAttention(3500);   // 拉取后延迟评估红点, 避免刚刷新/升级就闪红点
                                     console.log('[消息加载] 成功加载', wallMessages.length, '条消息');
                                     return;
                                 } catch (e) { console.warn('解析消息 JSON 失败:', e); }
