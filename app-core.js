@@ -875,25 +875,32 @@
                 r.onerror = () => res([]);
             });
 
-            if (projects.length === 0) {
-                // 重装/清缓存后：优先从磁盘恢复项目（APP 数据恢复，保留）
-                let restored = [];
-                if (typeof window.__tfjlRestoreAllProjects === 'function') {
-                    try { restored = await window.__tfjlRestoreAllProjects(); } catch (e) { console.warn('[项目恢复] 失败:', e); }
-                }
-                if (restored && restored.length > 0) {
-                    console.log('[项目恢复] 从磁盘恢复', restored.length, '个项目');
+            // 🔴 修复：不再仅"IndexedDB 空才恢复"，改为每次启动都从 D 盘 tfjl.dat 补灌缺失项目，
+            // 保证重装/清缓存/卸载后重装都能自动从磁盘恢复（D盘 tfjl.dat 为可靠权威源）。
+            let restored = [];
+            if (typeof window.__tfjlRestoreAllProjects === 'function') {
+                try { restored = await window.__tfjlRestoreAllProjects(); } catch (e) { console.error('[项目恢复] 从磁盘读取失败:', e); }
+            }
+            if (restored && restored.length > 0) {
+                // 以 D 盘为准，补齐 IndexedDB 中缺失的项目（不删本地已有，避免误伤）
+                const existingNames = new Set(projects.map(p => (p.name || '') + '\u0000' + (p.category || '默认分类')));
+                const missing = restored.filter(p => p && p.name && !existingNames.has(p.name + '\u0000' + (p.category || '默认分类')));
+                if (missing.length > 0) {
+                    console.log('[项目恢复] 从磁盘补灌', missing.length, '个缺失项目（共 ' + restored.length + ' 个）');
                     await new Promise((res) => {
                         const t = db.transaction([STORE_NAME], 'readwrite');
                         const s = t.objectStore(STORE_NAME);
-                        restored.forEach(p => { try { s.put(p); } catch (e) {} });
+                        missing.forEach(p => { try { s.put(p); } catch (e) {} });
                         t.oncomplete = res; t.onerror = res; t.onabort = res;
                     });
-                    await restoreCategoriesFromLocalStorage();
-                    await loadCategories();
+                } else {
+                    console.log('[项目恢复] IndexedDB 已含全部 ' + restored.length + ' 个项目，无需补灌');
                 }
-                // 不再自动注入内置「南门公主」默认项目：默认启动项目统一由 ensureDefaultProjectLoaded 加载「王城低配版」
-                return;
+                await restoreCategoriesFromLocalStorage();
+                await loadCategories();
+            } else if (projects.length === 0) {
+                // 无任何项目可恢复（D盘也无）→ 不注入默认项目，空白展示
+                console.warn('[项目恢复] D盘 tfjl.dat 无项目数据，无法自动恢复');
             }
 
             // 注意：不再自动注入、也不再强制删除任何历史项目（含「南门公主」）。

@@ -555,6 +555,19 @@
                 console.log('[VERSION] 当前缓存版本:', swVersion, '（强制刷新后应为 s1.0.230 才算最新）');
             }
             window.addEventListener('load', function() {
+                // dev 模式（localhost/127.0.0.1）跳过 SW 注册：dev 用 http-server 服务 webroot，SW 的 scope='./' 会缓存 dev 前端，
+                // 且会接管之前生产 exe 注册的旧 SW，导致前端初始化卡死、按钮全失效。生产（github.io）才注册 SW。
+                const isDev = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\//.test(location.href);
+                if (isDev) {
+                    console.log('[PWA] 开发模式跳过 Service Worker 注册（避免缓存污染导致按钮失效）');
+                    // 顺手清掉可能残留的旧 SW（比如之前生产 exe 注册的），让 dev 永远用最新未缓存前端
+                    if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+                        navigator.serviceWorker.getRegistrations().then(function(regs) {
+                            regs.forEach(function(r) { r.unregister().catch(function() {}); });
+                        }).catch(function() {});
+                    }
+                    return;
+                }
                 // sw.js 的 cachebust 必须跟随版本号（之前写死 b20260823230841 导致浏览器一直用旧 SW 文件，根本收不到新版本更新 —— P3 卡在旧版的根因）。
                 // 优先级与 329-332 一致：① #versionTag 文本 split 的 base（部署脚本必改字段，最稳）② window.__DEPLOY_TAG ③ window.__APP_VERSION ④ fallback v1。
                 let swCachebust = 'v1';
