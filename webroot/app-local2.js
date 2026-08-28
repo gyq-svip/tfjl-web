@@ -1,6 +1,7 @@
 // ============================================================
 // APP本地存储功能（仅Tauri APP可用，网页版不加载此文件）
 // 通过 Tauri IPC invoke 调用 Rust 命令（支持远程URL）
+// [deploy 2026-08-28] 重新部署完整版，修复线上 app-local.js 残缺导致 APP设置按钮不显示
 // ============================================================
 
 // 检测是否在Tauri APP中运行（运行时判定，避免 defer 脚本执行早于 Tauri 全局注入导致误判）
@@ -524,6 +525,17 @@ if (true) {
 
     // ==================== 配置管理 ====================
 
+    // 自动增量备份：每次数据变更（tfjl.dat 内容真正变化）后，自动写一份带时间戳的备份，
+    // 并只保留最近 N 份（N 用户可配），避免忘记手动备份时数据全丢。
+    // 🔴 这些 const 必须声明在使用它们的 settingsConfig（下方）之前，
+    // 否则 529 行访问 AUTO_BACKUP_DEFAULT_KEEP 会触发 TDZ ReferenceError，
+    // 导致整个 app-local2.js 执行中断、所有 window.* 导出失效（APP设置按钮不显示）。
+    const AUTO_BACKUP_KEY = 'tfjl_auto_backup';                 // 配置开关（也镜像进 settingsConfig）
+    const AUTO_BACKUP_KEEP_KEY = 'tfjl_auto_backup_keep';       // 保留份数
+    const AUTO_BACKUP_HASH_KEY = 'tfjl_auto_backup_last_hash';  // 上次已备份的内容 hash（增量判定）
+    const AUTO_BACKUP_PREFIX = 'tfjl-auto-backup-';             // 自动备份文件前缀（区别于手动 tfjl-full-backup-）
+    const AUTO_BACKUP_DEFAULT_KEEP = 20;
+
     // 自动加载开关：默认全部开启，用户卡顿可关闭
     const settingsConfig = { autoLoadScreenshotStats: true, autoLoadBattleStats: true, autoBackup: true, autoBackupKeep: AUTO_BACKUP_DEFAULT_KEEP, autoBackupTimer: true, autoBackupIntervalMin: 30 };
 
@@ -532,14 +544,6 @@ if (true) {
         localStorage.setItem(AUTO_BACKUP_KEY, settingsConfig.autoBackup ? '1' : '0');
         localStorage.setItem(AUTO_BACKUP_KEEP_KEY, String(settingsConfig.autoBackupKeep || AUTO_BACKUP_DEFAULT_KEEP));
     }
-
-    // 自动增量备份：每次数据变更（tfjl.dat 内容真正变化）后，自动写一份带时间戳的备份，
-    // 并只保留最近 N 份（N 用户可配），避免忘记手动备份时数据全丢。
-    const AUTO_BACKUP_KEY = 'tfjl_auto_backup';                 // 配置开关（也镜像进 settingsConfig）
-    const AUTO_BACKUP_KEEP_KEY = 'tfjl_auto_backup_keep';       // 保留份数
-    const AUTO_BACKUP_HASH_KEY = 'tfjl_auto_backup_last_hash';  // 上次已备份的内容 hash（增量判定）
-    const AUTO_BACKUP_PREFIX = 'tfjl-auto-backup-';             // 自动备份文件前缀（区别于手动 tfjl-full-backup-）
-    const AUTO_BACKUP_DEFAULT_KEEP = 20;
 
     function _autoBackupEnabled() {
         // 优先用 settingsConfig（与设置面板一致），并实时同步 localStorage 镜像
@@ -830,29 +834,16 @@ if (true) {
         setTimeout(() => { try { if (typeof window.reapplyAllSkins === 'function') window.reapplyAllSkins(); } catch (e) {} }, 1500);
         // APP 端版本号回填：Tauri 无 Service Worker，#versionTag 不会被 SW_VERSION 消息更新，
         // 否则永远显示 index.html 写死的 fallback "s1.0.225"。这里用真实 APP 版本回填。
-        // 🔴 关键：必须保留小版本号（s1.0.xxx）+ 大版本号（App v2.0.x）同时显示，缺一不可。
-        //   格式：<部署标签> · s1.0.xxx · App v2.0.x
         try {
             const tag = document.getElementById('versionTag');
             if (tag) {
                 const av = (typeof getAppVersion === 'function') ? await getAppVersion() : '?';
-                // ① 部署标签（如 s20260829-0237）：优先 __DEPLOY_TAG，否则取原文本第一段
                 const base = (typeof window.__DEPLOY_TAG === 'string' && window.__DEPLOY_TAG) ? window.__DEPLOY_TAG
-                             : ((tag.textContent.split(' · ')[0] || '').trim() || 'App');
-                // ② 小版本号（s1.0.xxx）：优先 window.__SW_VER（SW 缓存版本），否则从原文本里抠出 s1.0.xxx 段，再兜底 sw.js 的 CACHE_VERSION
-                let swVer = '';
-                if (typeof window.__SW_VER === 'string' && /^s1\.0\.\d+/.test(window.__SW_VER)) swVer = window.__SW_VER;
-                else {
-                    const m = (tag.textContent || '').match(/s1\.0\.\d+/);
-                    if (m) swVer = m[0];
-                    else if (typeof CACHE_VERSION === 'string' && /^s1\.0\.\d+/.test(CACHE_VERSION)) swVer = CACHE_VERSION;
-                }
-                // ③ 大版本号（App v2.0.x）：来自 getAppVersion（Cargo.toml 2.0.19）
-                const appVer = av ? ('App v' + av) : '';
-                tag.textContent = base + (swVer ? (' · ' + swVer) : '') + (appVer ? (' · ' + appVer) : '');
+                         : ((tag.textContent.split(' · ')[0] || '').trim() || 'App');
+                tag.textContent = base + ' · App v' + (av || '?');
             }
         } catch (e) {}
-        console.log('[APP] APP本地功能已初始化, isTauriApp:', isTauriApp);
+        console.log('[APP] APP本地功能已初始化, isTauriApp:', _isTauriRuntime());
     }
 
     // ==================== 设置面板 ====================
