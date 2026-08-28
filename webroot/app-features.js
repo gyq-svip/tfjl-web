@@ -3135,11 +3135,36 @@
             };
         }
 
+        // 🔴 2026-08-29 新增：调 Rust 原生升级命令 install_app_update（updater 插件 download_and_install + restart）。
+        //   成功 → 后台静默装完自动重启（返回 true）；不可用/失败 → 返回 false 让调用方回退老流程。
+        //   注意：Rust 侧对网络失败是"返回 Err 而非弹原生窗"，所以这里不会弹出用户反感的原生更新窗。
+        async function _tfjlTryNativeUpgrade() {
+            try {
+                const inv = (window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke)
+                    || (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke)
+                    || (window.__TAURI__ && window.__TAURI__.invoke);
+                if (!inv) return false;
+                await inv('install_app_update');
+                return true; // 正常会先 restart，通常走不到这里
+            } catch (e) {
+                console.warn('[updater] 原生静默升级不可用，回退手动下载:', e);
+                return false;
+            }
+        }
+
+        // 点击「新版本」提示（版本号文字 / 新版本 badge）→ 优先原生静默升级，失败才走老的下载到本地。
+        function _tfjlUpdateHintClick() {
+            _tfjlTryNativeUpgrade().then(function (ok) {
+                if (!ok && typeof menuCheckUpdate === 'function') menuCheckUpdate();
+            });
+        }
+
         // 菜单「检查更新」：走 Gitee 整包更新通道（快），GitHub 仅兜底索引。
         // 🔴 2026-08-27 整改：彻底弃用 Tauri 原生 updater（window.__TAURI__.updater 连 GitHub，
         //   网络不稳时弹原生「自动更新失败」窗，用户反感）。改为读 updater.json（GitHub Pages 小索引）
         //   → 拿 Gitee 安装包地址 + 版本号，比对本机版本；有新版则走 showInstallerSaveDialog
         //   把 Gitee 整包下载到本地并安装（覆盖升级、数据不丢）。
+        // 🔴 2026-08-29：发现新版后先尝试 _tfjlTryNativeUpgrade()，不行才回退 showInstallerSaveDialog。
         async function menuCheckUpdate() {
             await fillCurrentVersion();
             const t = showLoadingToast('🔍 正在检查更新...');
@@ -3164,6 +3189,15 @@
                 const badge = document.getElementById('updateBadgeFooter');
                 if (badge) badge.style.display = 'inline-block';
 
+                // 🔴 2026-08-29：优先走 Rust 原生静默升级（download_and_install + restart），
+                //   点一下后台装完自动重启 = 2.0.10 那种体验。只有原生通道不可用（老包无该命令 / 非 Tauri / 失败）
+                //   才回退到老的"下载整包到本地、用户自己装"流程（showInstallerSaveDialog）。
+                const natOk = await _tfjlTryNativeUpgrade();
+                if (natOk) {
+                    t.success('🎉 发现新版本 v' + newVer + '，正在后台静默升级…');
+                    t.remove(1600);
+                    return;
+                }
                 t.success('🎉 发现新版本 v' + newVer + '，准备下载安装包...');
                 t.remove(1600);
                 // 走 Gitee 整包下载写盘（fetch Gitee → base64 → write_binary_file），用户选目录后安装
@@ -3651,7 +3685,7 @@
                 toast.textContent = '✅ v' + _updateVersion + ' 已下载完成，点击立即更新';
                 toast.addEventListener('mouseenter', () => { toast.style.transform = 'translateX(-50%) scale(1.05)'; });
                 toast.addEventListener('mouseleave', () => { toast.style.transform = 'translateX(-50%) scale(1)'; });
-                toast.onclick = function() { menuCheckUpdate(); toast.remove(); };
+                toast.onclick = function() { _tfjlUpdateHintClick(); toast.remove(); };
                 document.body.appendChild(toast);
                 setTimeout(() => { if (toast.parentNode) toast.remove(); }, 15000);
             }, 2000);
@@ -3671,7 +3705,8 @@
                     ? '🔄 有新版本 v' + version + '！点击立即更新'
                     : '🔄 有新版本 v' + version + ' 可下载！点击查看';
                 toast.onclick = function() {
-                    if (isTauri) { menuCheckUpdate(); }
+                    // 🔴 2026-08-29：Tauri 内优先原生静默升级（点一下后台装完自动重启）
+                    if (isTauri) { _tfjlUpdateHintClick(); }
                     else { openDownloadModal(); }
                     toast.remove();
                 };
@@ -3695,12 +3730,13 @@
                 el.classList.add('ver-new-flash');
                 el.style.cursor = 'pointer';
                 el.title = '发现新版本 v' + version + '，点击立即更新';
-                el.onclick = function() { if (typeof menuCheckUpdate === 'function') menuCheckUpdate(); };
+                el.onclick = function() { _tfjlUpdateHintClick(); };
             }
             const hint = document.getElementById('versionUpdateHint');
             if (hint) {
                 hint.textContent = '🔔 新版本 v' + version;
                 hint.style.display = 'inline-flex';
+                hint.onclick = function() { _tfjlUpdateHintClick(); };
             }
         }
 
