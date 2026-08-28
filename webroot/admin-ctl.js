@@ -42,9 +42,17 @@
     try { return JSON.parse(localStorage.getItem(ACK_KEY) || '{}'); } catch (e) { return {}; }
   }
   function _markAck(id) {
-    try { const a = _loadAck(); a[id] = Date.now(); localStorage.setItem(ACK_KEY, JSON.stringify(a)); } catch (e) {}
+    try {
+      const a = _loadAck();
+      a[id] = Date.now();
+      localStorage.setItem(ACK_KEY, JSON.stringify(a));
+      try { sessionStorage.setItem('tfjl_adminctl_ackguard@' + id, '1'); } catch (e) {}
+    } catch (e) {}
   }
-  function _isAcked(id) { return !!_loadAck()[id]; }
+  function _isAcked(id) {
+    try { if (sessionStorage.getItem('tfjl_adminctl_ackguard@' + id)) return true; } catch (e) {}
+    return !!_loadAck()[id];
+  }
   // 会话级防重（sessionStorage）：reload 后本会话仍记得「已为某 ts 触发过 reload」，
   // 防止硬刷新偶发清掉 localStorage 的 ack 后再次进入 reload 死循环。
   function _isRguard(key) { try { return !!sessionStorage.getItem(key); } catch (e) { return false; } }
@@ -102,11 +110,9 @@
     if (ctl.forceReload && ctl.forceReload.ts) {
       const tgt = ctl.forceReload.to;
       const fAck = 'forceReload@' + ctl.forceReload.ts;
-      // 强制刷新必须带 expire（已过时不再刷），否则只在首跳生效一次；双重去重防死循环
       const expired = ctl.forceReload.expire && Date.now() > ctl.forceReload.expire;
-      if (!expired && (tgt === 'all' || tgt === dev) && !_isAcked(fAck) && !_isRguard('tfjl_adminctl_rguard@' + fAck)) {
-        _markAck(fAck); _setRguard('tfjl_adminctl_rguard@' + fAck);
-        // 复用现有强制刷新逻辑（如有），否则直接 reload
+      if (!expired && (tgt === 'all' || tgt === dev) && !_isAcked(fAck)) {
+        _markAck(fAck);
         if (typeof window.__tfjlForceRefresh === 'function') {
           window.__tfjlForceRefresh('管理员强制刷新');
         } else {
@@ -301,13 +307,10 @@
   window.__tfjlForceRefresh = function (reason) {
     console.log('[adminCtl] 强制刷新:', reason);
     try {
-      if (navigator.serviceWorker && navigator.serviceWorker.controller) {
-        navigator.serviceWorker.getRegistration().then(reg => {
-          if (reg && reg.waiting) { reg.waiting.postMessage({ type: 'SKIP_WAITING' }); }
-          setTimeout(() => location.reload(true), 600);
-        }).catch(() => location.reload(true));
-      } else { location.reload(true); }
-    } catch (e) { location.reload(true); }
+      const ack = JSON.parse(localStorage.getItem(ACK_KEY) || '{}');
+      Object.keys(ack).forEach(k => { try { sessionStorage.setItem('tfjl_adminctl_ackguard@' + k, '1'); } catch (e) {} });
+    } catch (e) {}
+    try { location.reload(true); } catch (e) { location.reload(); }
   };
   //  - 立即诊断上报：复用 app-core 的 _pushDiagReport（若已定义），否则标记待上报由下次心跳带出。
   window.__tfjlForceDiagPush = function () {

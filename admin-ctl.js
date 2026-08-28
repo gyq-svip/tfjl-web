@@ -42,9 +42,19 @@
     try { return JSON.parse(localStorage.getItem(ACK_KEY) || '{}'); } catch (e) { return {}; }
   }
   function _markAck(id) {
-    try { const a = _loadAck(); a[id] = Date.now(); localStorage.setItem(ACK_KEY, JSON.stringify(a)); } catch (e) {}
+    try {
+      const a = _loadAck();
+      a[id] = Date.now();
+      localStorage.setItem(ACK_KEY, JSON.stringify(a));
+      // 兜底：sessionStorage 跨 reload 保留，防止 localStorage 在 reload 边界丢失导致防重失效（刷新风暴根因）
+      try { sessionStorage.setItem('tfjl_adminctl_ackguard@' + id, '1'); } catch (e) {}
+    } catch (e) {}
   }
-  function _isAcked(id) { return !!_loadAck()[id]; }
+  function _isAcked(id) {
+    // 双重判定：sessionStorage 优先（reload 后仍存活），localStorage 兜底
+    try { if (sessionStorage.getItem('tfjl_adminctl_ackguard@' + id)) return true; } catch (e) {}
+    return !!_loadAck()[id];
+  }
   // 会话级防重（sessionStorage）：reload 后本会话仍记得「已为某 ts 触发过 reload」，
   // 防止硬刷新偶发清掉 localStorage 的 ack 后再次进入 reload 死循环。
   function _isRguard(key) { try { return !!sessionStorage.getItem(key); } catch (e) { return false; } }
@@ -102,10 +112,11 @@
     if (ctl.forceReload && ctl.forceReload.ts) {
       const tgt = ctl.forceReload.to;
       const fAck = 'forceReload@' + ctl.forceReload.ts;
-      // 强制刷新必须带 expire（已过时不再刷），否则只在首跳生效一次；双重去重防死循环
+      // expire 为可选：管理员工具箱生成指令时自动加 24h 有效期（见 toolboxSendForceReload）。
+      // 缺 expire 时退化为「无限有效」，但下方 _isAcked 双检（sessionStorage+localStorage）保证同一设备只刷一次，不会连环刷。
       const expired = ctl.forceReload.expire && Date.now() > ctl.forceReload.expire;
-      if (!expired && (tgt === 'all' || tgt === dev) && !_isAcked(fAck) && !_isRguard('tfjl_adminctl_rguard@' + fAck)) {
-        _markAck(fAck); _setRguard('tfjl_adminctl_rguard@' + fAck);
+      if (!expired && (tgt === 'all' || tgt === dev) && !_isAcked(fAck)) {
+        _markAck(fAck);
         // 复用现有强制刷新逻辑（如有），否则直接 reload
         if (typeof window.__tfjlForceRefresh === 'function') {
           window.__tfjlForceRefresh('管理员强制刷新');
@@ -300,14 +311,13 @@
   //  - 强制刷新：触发 SW 升级 / 硬刷新。优先走 SW 的 skipWaiting 路径（若暴露），否则直接 reload。
   window.__tfjlForceRefresh = function (reason) {
     console.log('[adminCtl] 强制刷新:', reason);
+    // 兜底：reload 前把 localStorage ack 同步镜像到 sessionStorage，杜绝 reload 边界丢失导致的刷新风暴
     try {
-      if (navigator.serviceWorker && navigator.serviceWorker.controller) {
-        navigator.serviceWorker.getRegistration().then(reg => {
-          if (reg && reg.waiting) { reg.waiting.postMessage({ type: 'SKIP_WAITING' }); }
-          setTimeout(() => location.reload(true), 600);
-        }).catch(() => location.reload(true));
-      } else { location.reload(true); }
-    } catch (e) { location.reload(true); }
+      const ack = JSON.parse(localStorage.getItem(ACK_KEY) || '{}');
+      Object.keys(ack).forEach(k => { try { sessionStorage.setItem('tfjl_adminctl_ackguard@' + k, '1'); } catch (e) {} });
+    } catch (e) {}
+    // 直接 reload，不走 SW postMessage（SW 无新版本时 waiting 为 null，多此一举且引入 600ms 异步竞态）
+    try { location.reload(true); } catch (e) { location.reload(); }
   };
   //  - 立即诊断上报：复用 app-core 的 _pushDiagReport（若已定义），否则标记待上报由下次心跳带出。
   window.__tfjlForceDiagPush = function () {

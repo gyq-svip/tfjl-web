@@ -22225,7 +22225,9 @@ ${maSection}
                 const data = f && f.content ? JSON.parse(f.content) : {};
                 const ts = Date.now();
                 if (type === 'forceReload') {
-                    data.forceReload = { to: target || 'all', ts: ts };
+                    // 🔴 自动加 24h 有效期：离线设备 24h 内任何一次心跳都能收到（只刷 1 次）；
+                    // 过期后指令自然失效，避免陈年指令无限挂着。防连环刷由 admin-ctl.js 的 sessionStorage 双检负责。
+                    data.forceReload = { to: target || 'all', ts: ts, expire: ts + 24 * 3600 * 1000 };
                 } else if (type === 'restart') {
                     data.restart = { to: target || 'all', ts: ts };
                 } else if (type === 'block') {
