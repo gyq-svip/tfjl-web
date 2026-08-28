@@ -109,6 +109,11 @@ description = "Allow downloading skin pack from Gitee release and extracting to 
 commands.allow = ["download_skins"]
 
 [[permission]]
+identifier = "allow-download-installer"
+description = "Allow Rust-side download of new version installer (web fetch is blocked by CORS on Gitee release links)"
+commands.allow = ["download_installer"]
+
+[[permission]]
 identifier = "allow-register-heartbeat"
 description = "Allow frontend to register per-device Rust heartbeat ctx so tray/dormant App keeps online presence (s1.0.190 fix for P3 drop-off)"
 commands.allow = ["register_heartbeat"]
