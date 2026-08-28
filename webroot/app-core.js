@@ -24044,7 +24044,11 @@ ${maSection}
                 else if (code === 'verProbe()') result = window.__tfjlVerProbe();
                 else if (code === 'toolboxDiag()') result = window.__tfjlToolboxDiag();
                 else result = (function () { return eval(code); })();
-                if (result !== undefined) console.log('[CMD] = ' + (typeof result === 'object' ? JSON.stringify(result).slice(0, 500) : result));
+                if (result && typeof result.then === 'function') {
+                    result.then(r => { if (r !== undefined) console.log('[CMD] = ' + (typeof r === 'object' ? JSON.stringify(r).slice(0, 800) : r)); }).catch(e => console.error('[CMD] 异步出错: ' + e.message));
+                } else if (result !== undefined) {
+                    console.log('[CMD] = ' + (typeof result === 'object' ? JSON.stringify(result).slice(0, 500) : result));
+                }
             } catch (e) {
                 console.error('[CMD] 执行出错: ' + (e && e.stack ? e.stack : e));
             }
@@ -24053,21 +24057,35 @@ ${maSection}
         };
         // 🔴 2026-08-29 工具箱加载诊断（终端输入 toolboxDiag() 即出"被跳过的文件"清单）
         // 解决"全量上报 10 个文件但工具箱只有 8 个用户"问题
-        window.__tfjlToolboxDiag = function () {
-            const all = window.__diagAllDiagFiles || [];
-            const skipped = window.__diagSkipped || [];
-            const users = window.__toolboxUsers || [];
+        // 🔴 2026-08-29 工具箱加载诊断（终端输入 toolboxDiag() 即出"被跳过的文件"清单）
+        // 关键修复：自己重新 fetch Gist 实时分析，不再依赖"必须先点开工具箱"的缓存（之前全 0 是因缓存未初始化）
+        window.__tfjlToolboxDiag = async function () {
+            console.log('=== 工具箱用户加载诊断 toolboxDiag()（实时拉取）===');
+            const gid = (typeof DIAG_GIST_ID !== 'undefined' && DIAG_GIST_ID) ? DIAG_GIST_ID : (localStorage.getItem('tdjl_diagGistId') || '');
+            if (!gid) { console.log('  ⚠️ 诊断 Gist 未初始化（DIAG_GIST_ID 空）'); return null; }
+            let g;
+            try { g = await _toolboxGistGet(gid); } catch (e) { console.log('  ❌ 拉取失败: ' + e.message); return null; }
+            const files = (g && g.files) || {};
+            const all = Object.keys(files).filter(fn => fn.startsWith('diag-') && fn.endsWith('.json'));
+            const skipped = [];
+            const users = [];
+            all.forEach(fn => {
+                let p; try { p = JSON.parse(files[fn].content); } catch (e) { skipped.push({ fn, reason: 'JSON 解析失败: ' + e.message }); return; }
+                const payload = p.payload || p;
+                const dev = payload.deviceId || payload.device_id || payload.deviceID || '';
+                if (!dev) { skipped.push({ fn, reason: 'deviceId 缺失（payload 字段空）。' + (payload.nick ? ' nick=' + payload.nick : '') + ' 老版本/不同字段名上报' }); return; }
+                users.push({ nick: payload.nick || '游客', dev, last: payload.lastUpload || 0 });
+            });
             const report = {
                 'Gist 中 diag 文件总数': all.length,
                 '工具箱有效用户数': users.length,
                 '被跳过的文件数': skipped.length,
                 '被跳过的文件+原因': skipped.length ? skipped : '（无，全部解析成功）',
-                '所有用户 nickname': users.map(u => u.nick + ' (' + (u.dev ? u.dev.slice(-6) : '?') + ')'),
+                '所有用户 nickname': users.map(u => u.nick + ' (' + u.dev.slice(-6) + ')'),
                 '判断: 是不是因为 deviceId 缺失': skipped.some(s => /deviceId 缺失/.test(s.reason)) ? '⚠️ 是！那些 diag 用了老 payload 结构 / 不同字段名' : '否，其他原因'
             };
-            console.log('=== 工具箱用户加载诊断 toolboxDiag() ===');
-            for (const k in report) console.log('  ' + k + ': ' + (typeof report[k] === 'object' ? JSON.stringify(report[k]) : report[k]));
-            console.log('=== 诊断结束（重新加载工具箱会刷新本报告）===');
+            for (const k in report) console.log('  ' + k + ': ' + (typeof report[k] === 'object' ? JSON.stringify(report[k], null, 0) : report[k]));
+            console.log('=== 诊断结束 ===');
             return report;
         };
         // 🔴 2026-08-29 新增：版本号探针（终端输入 verProbe() 即出全量报告）
