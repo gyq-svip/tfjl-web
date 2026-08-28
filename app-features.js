@@ -3144,10 +3144,22 @@
                     || (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke)
                     || (window.__TAURI__ && window.__TAURI__.invoke);
                 if (!inv) return false;
-                await inv('install_app_update');
-                return true; // 正常会先 restart，通常走不到这里
+                // 🔴 第一步：先 check。老包（2.0.16/2.0.17）的 check_app_update 在
+                //   网络失败/Gitee 403 时返回 false（不抛错），据此即可判定原生通道不可用 → 回退。
+                let hasUpdate = false;
+                try { hasUpdate = await inv('check_app_update'); } catch (e) { hasUpdate = false; }
+                if (!hasUpdate) {
+                    console.warn('[updater] 原生通道 check 无更新或不可用，回退手动下载');
+                    return false;
+                }
+                // 🔴 第二步：真的有更新才 install，并加超时兜底——
+                //   老包的 install_app_update 失败是「静默 Ok」，页面不会重启，
+                //   若 25s 内进程没重启（本页还活着），判定失败并回退，避免"点了没反应"卡死。
+                const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('no-restart-timeout')), 25000));
+                await Promise.race([inv('install_app_update'), timeout]);
+                return true;
             } catch (e) {
-                console.warn('[updater] 原生静默升级不可用，回退手动下载:', e);
+                console.warn('[updater] 原生静默升级失败，回退手动下载:', e && (e.message || e));
                 return false;
             }
         }
