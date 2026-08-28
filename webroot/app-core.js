@@ -22855,9 +22855,10 @@ ${maSection}
                             const _hb = m.heartbeat ? '<span style="color:' + C_OK + ';">🟢心跳</span>' : '<span style="color:' + C_BUF + ';">📦缓冲</span>';
                             const _wk = m.writeOk ? '<span style="color:' + C_OK + ';">✓盘</span>' : (m.writeOk === false ? '<span style="color:' + C_BAD + ';">✗盘</span>' : '<span style="color:' + C_TIME + ';">?盘</span>');
                             const _fv = '<span style="color:' + C_FRONTV + ';">v' + (m.ver || '?') + '</span>';
+                            const _ev = m.payload && m.payload.appExeVersion ? '<span style="color:' + C_DESKV + ';">桌面v' + m.payload.appExeVersion + '</span>' : ((m.plat === 'app') ? '<span style="color:#f97316;">桌面v未知(旧包)</span>' : '');
                             const _pt = '<span style="color:' + C_TIME + ';">' + (m.plat || '?') + '</span>';
                             const _cnt = '<span style="color:' + C_NUM + ';">' + m.count + '写</span>';
-                            const _flagColored = _hb + '｜' + _wk + '｜' + _fv + '｜' + _pt + '｜' + _cnt;
+                            const _flagColored = _hb + '｜' + _wk + '｜' + _fv + _ev + '｜' + _pt + '｜' + _cnt;
                             html += '<div style="font-size:0.74rem;color:#cbd5e1;padding:3px 0;border-bottom:1px dashed rgba(255,255,255,0.06);">';
                             html += '<b style="color:' + C_FRONTV + ';">' + m.fn + '</b><br>';
                             html += _colorWho(m.who) + ' ｜ ' + _flagColored + ' ｜ <span style="color:' + C_TIME + ';">' + ts + ' (' + min + '分钟前)</span>';
