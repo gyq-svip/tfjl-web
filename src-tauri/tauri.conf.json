@@ -59,7 +59,6 @@
   "plugins": {
     "updater": {
       "endpoints": [
-        "https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/releases/download/v{{current_version}}/updater.json",
         "https://gyq-svip.github.io/tfjl-web/updater.json"
       ],
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDdGNDFFRjQ3MjQzNUIxMEYKUldRUHNUVWtSKzlCZjZGUklrNllIc21TckFNYkg3ODZ5enZHcUpwZjRzWXRzalEraVI5WElOWmUK",
