@@ -1238,6 +1238,36 @@ async fn download_skins(app: tauri::AppHandle) -> Result<String, String> {
     Ok(format!("皮肤包已解压到 {}", base))
 }
 
+/// 下载新版安装包到本机固定目录（返回保存路径）。
+/// 🔴 2026-08-29 新增：网页里的 fetch 拉 Gitee 发行版直链会被 CORS/重定向拦掉（报 "Failed to fetch"），
+///    所以下载必须由 Rust 侧用 reqwest 完成（无跨域限制、走 Gitee 国内快）。
+///    下载完由前端调 start_umi_ocr 启动安装，安装程序接管：关闭本程序 → 安装 → 自动重启。
+#[tauri::command]
+async fn download_installer(app: tauri::AppHandle, url: String, file_name: String) -> Result<String, String> {
+    let base = r"D:\withfriends\塔防精灵助手更新";
+    std::fs::create_dir_all(base).map_err(|e| format!("创建更新目录失败: {}", e))?;
+    let safe_name = if file_name.is_empty() { "tfjl-assistant-setup.exe".to_string() } else { file_name };
+    let save_path = format!("{}\\{}", base, safe_name);
+
+    let client = reqwest::Client::builder()
+        .no_proxy()
+        .connect_timeout(std::time::Duration::from_secs(20))
+        .timeout(std::time::Duration::from_secs(600))
+        .build()
+        .map_err(|e| format!("创建下载客户端失败: {}", e))?;
+
+    let _ = app.emit("installer-download-progress", serde_json::json!({"stage":"start","url":url}));
+    let data = fetch_to_vec(&client, &url, &app, 0, 0, "installer").await
+        .map_err(|e| format!("下载安装包失败: {}。请检查网络或稍后重试", e))?;
+    if data.len() < 1024 * 100 {
+        return Err(format!("下载内容异常（仅 {} 字节），可能拿到错误页面，已中止", data.len()));
+    }
+
+    tokio::fs::write(&save_path, &data).await.map_err(|e| format!("写入安装包失败: {}", e))?;
+    let _ = app.emit("installer-download-progress", serde_json::json!({"stage":"done","path":save_path}));
+    Ok(save_path)
+}
+
 /// 弹出系统文件选择框，让用户选择本机 Umi-OCR.exe（返回完整路径，WebView 无法直接拿本地路径）
 #[tauri::command]
 async fn pick_umi_ocr_exe(app: tauri::AppHandle) -> Result<Option<String>, String> {
@@ -1323,6 +1353,7 @@ pub fn run() {
             find_umi_ocr,
             download_umi_ocr,
             download_skins,
+            download_installer,
         ])
         .manage(AppState { umi_pid: std::sync::Mutex::new(None), heartbeat: std::sync::Mutex::new(None), checkin_day: std::sync::Mutex::new(None) })
         .setup(|app| {

@@ -3182,18 +3182,17 @@
                 const savePath = dir + '\\' + safeName;
 
                 const t = showLoadingToast('⏳ 正在下载更新包…');
+                let finalPath = savePath;
+                // 🔴 下载必须由 Rust 侧完成：网页里 fetch Gitee 发行版直链会被 CORS/重定向拦掉
+                //    （实测报 "Failed to fetch"），Rust 用 reqwest 无此限制。
                 try {
-                    const resp = await fetch(info.url, { cache: 'no-cache' });
-                    if (!resp.ok) throw new Error('下载失败 HTTP ' + resp.status);
-                    const buf = await resp.arrayBuffer();
-                    if (t && t.update) t.update('💾 正在写入安装包…');
-                    await inv('write_binary_file', { filePath: savePath, contentBase64: arrayBufferToBase64(buf) });
+                    finalPath = await inv('download_installer', { url: info.url, fileName: safeName });
                 } catch (e) {
                     if (t && t.error) { t.error('⚠️ 更新包下载失败'); t.remove(2600); }
                     throw e;
                 }
                 if (t && t.update) t.update('🚀 正在启动安装程序…');
-                await inv('start_umi_ocr', { exePath: savePath });
+                await inv('start_umi_ocr', { exePath: finalPath });
                 if (t && t.success) { t.success('✅ 安装程序已启动'); t.remove(2000); }
                 return true;
             } catch (e) {
