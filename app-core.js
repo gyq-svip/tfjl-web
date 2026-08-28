@@ -22600,18 +22600,21 @@ ${maSection}
                         });
                         const sortBy = (o) => Object.keys(o).map(k => ({ k, v: o[k] })).sort((a, b) => b.v - a.v);
                         const bar = (v, max) => { const n = max ? Math.round((v / max) * 30) : 0; return '▇'.repeat(Math.min(n, 30)); };
+                        // 🔴 2026-08-29 诊断面板统一配色常量（同类参数同色，便于一眼分辨）
+                        const C_NICK = '#4ade80', C_ID = '#64748b', C_TIME = '#94a3b8', C_NUM = '#fbbf24', C_FRONTV = '#60a5fa', C_DESKV = '#a78bfa', C_OK = '#4ade80', C_BAD = '#f87171', C_BUF = '#a78bfa';
+                        const _colorWho = (who) => who.replace(/^([^(（]+)[(（]([^)）]+)[)）]?$/, '<b style="color:' + C_NICK + ';">$1</b><span style="color:' + C_ID + ';">($2)</span>');
                         const uTop = sortBy(perUser).slice(0, 10), gTop = sortBy(perGist).slice(0, 10), fTop = sortBy(perFn).slice(0, 10);
                         const uMax = uTop.length ? uTop[0].v : 1, gMax = gTop.length ? gTop[0].v : 1, fMax = fTop.length ? fTop[0].v : 1;
                         let html = '<div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:8px 12px;margin-bottom:12px;">';
                         html += '📁 诊断 Gist: <code style="color:#60a5fa;">' + gid + '</code> ｜ 上报文件数: <b>' + diagFiles.length + '</b> ｜ 累计写入: <b>' + totalWrites + '</b> 次</div>';
                         html += '<div style="background:rgba(16,185,129,0.1);border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:0.82rem;color:#cbd5e1;">';
                         html += '🟢 <span style="color:#67e8f9;">存活客户端(60分钟内)</span>: <b style="color:#4ade80;">' + aliveCount + '</b> ｜ <span style="color:#67e8f9;">写盘健康✓</span>: <b style="color:#4ade80;">' + writeOkCount + '</b>';
-                        if (aliveUsers.length) html += '<br><span style="color:#94a3b8;font-size:0.74rem;">' + aliveUsers.join('，') + '</span>';
+                        if (aliveUsers.length) html += '<br><span style="font-size:0.74rem;">' + aliveUsers.map(u => u.replace(/^([^(\n]+)(\(.+\))?(✓盘|✗盘)?$/, '<b style="color:' + C_NICK + ';">$1</b>' + (u.indexOf('(心跳)') >= 0 ? '<span style="color:' + C_OK + ';">(心跳)</span>' : '') + (u.indexOf('✓盘') >= 0 ? '<span style="color:' + C_OK + ';">✓盘</span>' : (u.indexOf('✗盘') >= 0 ? '<span style="color:' + C_BAD + ';">✗盘</span>' : '')))).join('<span style="color:' + C_ID + ';">，</span>') + '</span>';
                         html += '</div>';
                         html += '<div style="margin-bottom:16px;"><div style="color:#4ade80;margin-bottom:4px;font-weight:700;">👤 按用户 TOP <span style="color:#94a3b8;font-size:0.7rem;font-weight:400;">（点行展开该用户的上报详情）</span></div>';
                         uTop.forEach((x, i) => {
                             const id = 'uDetail_' + i;
-                            html += '<div style="cursor:pointer;color:#cbd5e1;" onclick="var d=document.getElementById(\'' + id + '\');if(d.style.display===\'none\'){d.style.display=\'block\';}else{d.style.display=\'none\';}">' + bar(x.v, uMax) + ' ' + x.v + '　' + x.k + ' <span style="color:#60a5fa;font-size:0.7rem;">▶</span></div>';
+                            html += '<div style="cursor:pointer;color:#cbd5e1;" onclick="var d=document.getElementById(\'' + id + '\');if(d.style.display===\'none\'){d.style.display=\'block\';}else{d.style.display=\'none\';}">' + bar(x.v, uMax) + ' <b style="color:' + C_NUM + ';">' + x.v + '</b>　<b style="color:' + C_NICK + ';">' + x.k + '</b> <span style="color:#60a5fa;font-size:0.7rem;">▶</span></div>';
                             html += '<div id="' + id + '" style="display:none;background:rgba(0,0,0,0.25);border-left:2px solid #60a5fa;padding:6px 10px;margin:4px 0 8px 12px;font-size:0.75rem;">';
                             (detailByUser[x.k] || []).forEach(m => {
                                 const ts = m.last ? new Date(m.last).toLocaleString('zh-CN') : '?';
@@ -22622,9 +22625,15 @@ ${maSection}
                                 const _exeVer = (m.payload && m.payload.appExeVersion)
                                     ? '｜桌面v' + m.payload.appExeVersion
                                     : ((m.plat === 'app') ? '｜桌面v<span style="color:#f97316;">未知(旧包)</span>' : '');
-                                const flag = (m.heartbeat ? '🟢心跳' : '📦缓冲') + '｜' + (m.writeOk ? '✓盘' : (m.writeOk === false ? '✗盘' : '?盘')) + '｜前端v' + (m.ver || '?') + _exeVer + '｜' + (m.plat || '?');
-                                const rc = m.payload && m.payload.reportCount ? ('｜累计上报 ' + m.payload.reportCount + ' 次') : '';
-                                html += '<div style="margin-bottom:6px;"><b>' + m.who + '</b> <span style="color:#94a3b8;">[' + ts + '  ' + min + '分钟前]</span><br><span style="color:#94a3b8;">' + flag + rc + '</span>';
+                                // 🔴 2026-08-29 flag 各段分色：心跳/缓冲/盘状态/前后端版本/平台
+                                const _hb = m.heartbeat ? '<span style="color:' + C_OK + ';">🟢心跳</span>' : '<span style="color:' + C_BUF + ';">📦缓冲</span>';
+                                const _wk = m.writeOk ? '<span style="color:' + C_OK + ';">✓盘</span>' : (m.writeOk === false ? '<span style="color:' + C_BAD + ';">✗盘</span>' : '<span style="color:' + C_TIME + ';">?盘</span>');
+                                const _fv = '<span style="color:' + C_FRONTV + ';">前端v' + (m.ver || '?') + '</span>';
+                                const _ev = m.payload && m.payload.appExeVersion ? '<span style="color:' + C_DESKV + ';">桌面v' + m.payload.appExeVersion + '</span>' : ((m.plat === 'app') ? '<span style="color:#f97316;">桌面v未知(旧包)</span>' : '');
+                                const _pt = '<span style="color:' + C_TIME + ';">' + (m.plat || '?') + '</span>';
+                                const flag = _hb + '｜' + _wk + '｜' + _fv + _exeVer + '｜' + _ev + '｜' + _pt;
+                                const rc = m.payload && m.payload.reportCount ? ('｜<span style="color:' + C_NUM + ';">累计上报 ' + m.payload.reportCount + ' 次</span>') : '';
+                                html += '<div style="margin-bottom:6px;">' + _colorWho(m.who) + ' <span style="color:' + C_TIME + ';">[' + ts + '  ' + min + '分钟前]</span><br><span>' + flag + rc + '</span>';
                                 if (m.err) html += '<br><span style="color:#f87171;">err: ' + m.err + '</span>';
                                 if (m.payload && m.payload.entries && m.payload.entries.length) {
                                     html += '<table style="border-collapse:collapse;margin-top:4px;font-size:0.72rem;width:100%;">';
@@ -22664,7 +22673,7 @@ ${maSection}
                             (detailByGist[x.k] || []).forEach(row => {
                                 const m = row.file, e = row.entry;
                                 const ts = m.last ? new Date(m.last).toLocaleString('zh-CN') : '?';
-                                html += '<div style="margin-bottom:4px;">' + m.who + ' → <b>' + (e.fn || '?') + '</b> ×<b style="color:#ffd700;">' + (e.count || 0) + '</b> <span style="color:#94a3b8;">[' + ts + ']</span></div>';
+                                html += '<div style="margin-bottom:4px;">' + _colorWho(m.who) + ' → <b style="color:' + C_FRONTV + ';">' + (e.fn || '?') + '</b> ×<b style="color:' + C_NUM + ';">' + (e.count || 0) + '</b> <span style="color:' + C_TIME + ';">[' + ts + ']</span></div>';
                             });
                             html += '</div>';
                         });
@@ -22695,13 +22704,13 @@ ${maSection}
                                 const linkHtml = info.url ? '<a href="' + info.url + '" target="_blank" rel="noopener" style="color:#60a5fa;text-decoration:underline;font-size:0.68rem;margin-left:6px;" title="' + info.url + '">' + short8 + '</a>' : short8;
                                 labelHtml = info.emoji + ' <b style="color:#fca5a5;">' + info.label + '</b> ' + linkHtml;
                             }
-                            html += '<div style="cursor:pointer;color:#fca5a5;" onclick="var d=document.getElementById(\'' + id + '\');if(d.style.display===\'none\'){d.style.display=\'block\';}else{d.style.display=\'none\';}">' + bar(x.v, wMax) + ' ' + x.v + '　✍️ ' + labelHtml + ' <span style="color:#94a3b8;font-size:0.68rem;">/ ' + _fnZh(rawGid, fn) + '</span> <span style="color:#60a5fa;font-size:0.7rem;">▶</span></div>';
+                            html += '<div style="cursor:pointer;color:#fca5a5;" onclick="var d=document.getElementById(\'' + id + '\');if(d.style.display===\'none\'){d.style.display=\'block\';}else{d.style.display=\'none\';}">' + bar(x.v, wMax) + ' <b style="color:' + C_NUM + ';">' + x.v + '</b>　✍️ ' + labelHtml + ' <span style="color:' + C_TIME + ';font-size:0.68rem;">/ ' + _fnZh(rawGid, fn) + '</span> <span style="color:#60a5fa;font-size:0.7rem;">▶</span></div>';
                             html += '<div id="' + id + '" style="display:none;background:rgba(0,0,0,0.25);border-left:2px solid #f87171;padding:6px 10px;margin:4px 0 8px 12px;font-size:0.75rem;">';
                             writeKeys.filter(k => k.substring(6) === x.k).forEach(k => {
                                 (detailByFn[k] || []).forEach(row => {
                                     const m = row.file, e = row.entry;
                                     const ts = m.last ? new Date(m.last).toLocaleString('zh-CN') : '?';
-                                    html += '<div style="margin-bottom:4px;">' + m.who + ' ×<b style="color:#f87171;">' + (e.count || 0) + '</b> <span style="color:#94a3b8;">[' + ts + ']</span></div>';
+                                    html += '<div style="margin-bottom:4px;">' + _colorWho(m.who) + ' ×<b style="color:#f87171;">' + (e.count || 0) + '</b> <span style="color:' + C_TIME + ';">[' + ts + ']</span></div>';
                                 });
                             });
                             html += '</div>';
@@ -22724,13 +22733,13 @@ ${maSection}
                                 const linkHtml = info.url ? '<a href="' + info.url + '" target="_blank" rel="noopener" style="color:#60a5fa;text-decoration:underline;font-size:0.68rem;margin-left:6px;" title="' + info.url + '">' + short8 + '</a>' : short8;
                                 labelHtml = info.emoji + ' <b style="color:#cbd5e1;">' + info.label + '</b> ' + linkHtml;
                             }
-                            html += '<div style="cursor:pointer;color:#cbd5e1;" onclick="var d=document.getElementById(\'' + id + '\');if(d.style.display===\'none\'){d.style.display=\'block\';}else{d.style.display=\'none\';}">' + bar(x.v, uMax2) + ' ' + x.v + '　📊 ' + labelHtml + ' <span style="color:#94a3b8;font-size:0.68rem;">/ ' + _fnZh(rawGid, fn) + '</span> <span style="color:#60a5fa;font-size:0.7rem;">▶</span></div>';
+                            html += '<div style="cursor:pointer;color:#cbd5e1;" onclick="var d=document.getElementById(\'' + id + '\');if(d.style.display===\'none\'){d.style.display=\'block\';}else{d.style.display=\'none\';}">' + bar(x.v, uMax2) + ' <b style="color:' + C_NUM + ';">' + x.v + '</b>　📊 ' + labelHtml + ' <span style="color:' + C_TIME + ';font-size:0.68rem;">/ ' + _fnZh(rawGid, fn) + '</span> <span style="color:#60a5fa;font-size:0.7rem;">▶</span></div>';
                             html += '<div id="' + id + '" style="display:none;background:rgba(0,0,0,0.25);border-left:2px solid #94a3b8;padding:6px 10px;margin:4px 0 8px 12px;font-size:0.75rem;">';
                             useKeys.filter(k => k.substring(4) === x.k).forEach(k => {
                                 (detailByFn[k] || []).forEach(row => {
                                     const m = row.file, e = row.entry;
                                     const ts = m.last ? new Date(m.last).toLocaleString('zh-CN') : '?';
-                                    html += '<div style="margin-bottom:4px;">' + m.who + ' ×<b style="color:#ffd700;">' + (e.count || 0) + '</b> <span style="color:#94a3b8;">[' + ts + ']</span></div>';
+                                    html += '<div style="margin-bottom:4px;">' + _colorWho(m.who) + ' ×<b style="color:' + C_NUM + ';">' + (e.count || 0) + '</b> <span style="color:' + C_TIME + ';">[' + ts + ']</span></div>';
                                 });
                             });
                             html += '</div>';
@@ -22742,17 +22751,16 @@ ${maSection}
                         sortedFiles.forEach(m => {
                             const ts = m.last ? new Date(m.last).toLocaleString('zh-CN') : '?';
                             const min = m.last ? Math.max(0, Math.round((Date.now() - m.last) / 60000)) : -1;
-                            const flag = (m.heartbeat ? '🟢心跳' : '📦缓冲') + '｜' + (m.writeOk ? '✓盘' : (m.writeOk === false ? '✗盘' : '?盘')) + '｜v' + (m.ver || '?') + '｜' + (m.plat || '?') + '｜' + m.count + '写';
-                            // 🔴 2026-08-29 可读性修复：昵称绿色提亮、anonId 暗灰、flag 各分色便于一眼分辨
-                            const _whoColored = m.who.replace(/^([^(（]+)[(（]([^)）]+)[)）]?$/, '<b style="color:#4ade80;">$1</b><span style="color:#64748b;">($2)</span>');
-                            const _flagColored = flag
-                                .replace(/^([^｜]+)｜/, '<span style="color:' + (m.heartbeat ? '#4ade80' : '#a78bfa') + ';">$1</span>｜')
-                                .replace(/([^｜]+)｜/, '<span style="color:' + (m.writeOk ? '#4ade80' : (m.writeOk === false ? '#f87171' : '#94a3b8')) + ';">$1</span>｜')
-                                .replace(/v([^｜]+)｜/, '<span style="color:#60a5fa;">v$1</span>｜')
-                                .replace(/([^｜]+)｜$/, '<span style="color:#fbbf24;">$1</span>｜$');
+                            // 🔴 2026-08-29 可读性修复：统一配色常量（与上方各区块一致）
+                            const _hb = m.heartbeat ? '<span style="color:' + C_OK + ';">🟢心跳</span>' : '<span style="color:' + C_BUF + ';">📦缓冲</span>';
+                            const _wk = m.writeOk ? '<span style="color:' + C_OK + ';">✓盘</span>' : (m.writeOk === false ? '<span style="color:' + C_BAD + ';">✗盘</span>' : '<span style="color:' + C_TIME + ';">?盘</span>');
+                            const _fv = '<span style="color:' + C_FRONTV + ';">v' + (m.ver || '?') + '</span>';
+                            const _pt = '<span style="color:' + C_TIME + ';">' + (m.plat || '?') + '</span>';
+                            const _cnt = '<span style="color:' + C_NUM + ';">' + m.count + '写</span>';
+                            const _flagColored = _hb + '｜' + _wk + '｜' + _fv + '｜' + _pt + '｜' + _cnt;
                             html += '<div style="font-size:0.74rem;color:#cbd5e1;padding:3px 0;border-bottom:1px dashed rgba(255,255,255,0.06);">';
-                            html += '<b style="color:#60a5fa;">' + m.fn + '</b><br>';
-                            html += _whoColored + ' ｜ ' + _flagColored + ' ｜ <span style="color:#94a3b8;">' + ts + ' (' + min + '分钟前)</span>';
+                            html += '<b style="color:' + C_FRONTV + ';">' + m.fn + '</b><br>';
+                            html += _colorWho(m.who) + ' ｜ ' + _flagColored + ' ｜ <span style="color:' + C_TIME + ';">' + ts + ' (' + min + '分钟前)</span>';
                             if (m.err) html += '<br><span style="color:#f87171;">err: ' + m.err + '</span>';
                             html += '</div>';
                         });
