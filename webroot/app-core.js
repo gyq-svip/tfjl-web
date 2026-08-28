@@ -23919,6 +23919,78 @@ ${maSection}
             if (content) { if (floatAutoScroll) content.classList.add('auto-scroll'); else content.classList.remove('auto-scroll'); }
         }
 
+        // ==================== 调试命令输入框（替代 F12，App 内直接执行 JS）====================
+        // 浮动窗底部输入框回车/点执行 → 跑一段 JS，结果打印到调试日志。
+        // 内置快捷命令（直接输函数名即可）：clearSWCache() / showAppBtn() / checkAppLocal() / appLocalStatus()
+        window.floatConsoleExec = function () {
+            const inp = document.getElementById('floatConsoleCmd');
+            if (!inp) return;
+            const code = inp.value.trim();
+            if (!code) return;
+            console.log('[CMD] › ' + code);
+            try {
+                // 支持「函数名()」快捷写法（无需 console.log）：先试内置命令
+                let result;
+                if (code === 'clearSWCache()') result = window.clearSWCache();
+                else if (code === 'showAppBtn()') result = window.showAppBtn();
+                else if (code === 'checkAppLocal()') result = window.checkAppLocal();
+                else if (code === 'appLocalStatus()') result = window.appLocalStatus();
+                else result = (function () { return eval(code); })();
+                if (result !== undefined) console.log('[CMD] = ' + (typeof result === 'object' ? JSON.stringify(result).slice(0, 500) : result));
+            } catch (e) {
+                console.error('[CMD] 执行出错: ' + (e && e.stack ? e.stack : e));
+            }
+            inp.value = '';
+            inp.focus();
+        };
+        // 绑定 window（onkeydown 里用到的 floatConsoleExec 需全局可见）
+        window.floatConsoleExec = window.floatConsoleExec;
+
+        // 快捷：清空 Service Worker 缓存（强刷前端）
+        window.clearSWCache = function () {
+            return new Promise((resolve) => {
+                if (!('serviceWorker' in navigator)) { console.log('[clearSWCache] 无 SW'); return resolve('no-sw'); }
+                caches.keys().then(keys => {
+                    Promise.all(keys.map(k => caches.delete(k))).then(() => {
+                        console.log('[clearSWCache] 已删除 ' + keys.length + ' 个缓存: ' + keys.join(', '));
+                        if (navigator.serviceWorker.controller) navigator.serviceWorker.controller.postMessage('CLEAR_CACHE');
+                        console.log('[clearSWCache] 2 秒后自动刷新页面…');
+                        setTimeout(() => location.reload(), 2000);
+                        resolve('cleared:' + keys.length);
+                    });
+                }).catch(e => { console.error('[clearSWCache] 失败 ' + e); resolve('err'); });
+            });
+        };
+        // 快捷：手动显示 APP设置按钮（绕过 initAppLocal 判定）
+        window.showAppBtn = function () {
+            const b = document.getElementById('appLocalSettingsBtn');
+            if (!b) { console.log('[showAppBtn] 找不到 #appLocalSettingsBtn 元素'); return 'no-element'; }
+            b.style.display = 'flex';
+            console.log('[showAppBtn] 已强制 display:flex（isTauriApp=' + (typeof isTauriApp !== 'undefined' ? isTauriApp : 'undefined') + '）');
+            return 'shown';
+        };
+        // 快捷：诊断 app-local.js 加载状态（核心排查）
+        window.checkAppLocal = function () {
+            const info = {
+                isTauriApp: typeof isTauriApp !== 'undefined' ? isTauriApp : 'undefined',
+                hasTAURI_INTERNALS: typeof window.__TAURI_INTERNALS__ !== 'undefined',
+                hasTAURI: typeof window.__TAURI__ !== 'undefined',
+                openAppLocalSettings: typeof window.openAppLocalSettings,
+                scanSkins: typeof window.scanSkins,
+                runDiagnostics: typeof window.runDiagnostics,
+                btnExists: !!document.getElementById('appLocalSettingsBtn'),
+                btnDisplay: (document.getElementById('appLocalSettingsBtn') || {}).style ? document.getElementById('appLocalSettingsBtn').style.display : 'n/a'
+            };
+            console.log('[checkAppLocal] ' + JSON.stringify(info));
+            return info;
+        };
+        // 快捷：打印 app-local.js 网络请求结果（是否被 SW 返回残缺）
+        window.appLocalStatus = function () {
+            const entries = performance.getEntriesByName('https://gyq-svip.github.io/tfjl-web/app-local.js').map(e => ({ name: e.name, type: e.type, size: e.encodedBodySize, dur: Math.round(e.duration) }));
+            console.log('[appLocalStatus] app-local.js 请求记录: ' + JSON.stringify(entries));
+            return entries;
+        };
+
         function refreshFloatConsole() {
             const content = document.getElementById('floatConsoleContent');
             if (!content) return;
