@@ -24591,8 +24591,10 @@ ${maSection}
                 location.reload(true);
                 return;
             }
-            // 其余（前台 / 或开关关的后台）：绝不自动升级，只弹彩球（用户手动点才升）
-            if (typeof showSwUpdateBanner === 'function') showSwUpdateBanner();
+            // 其余（前台 / 或开关关的后台）：绝不自动升级，也绝不弹任何"发现新版本"气泡。
+            // 用户只在 #versionTag 的 tooltip 看小版本号，自己双击升级（铁律第 1 条）。
+            // 2026-08-29：应要求移除所有新版本提示气泡，避免干扰。
+            return;
         }
         window.notifyNewVersion = notifyNewVersion;
 
