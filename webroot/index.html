@@ -1666,7 +1666,7 @@
                     </div>
                     <div class="admin-menu-item" onclick="adminShowPage('logStats')">
                         <span class="mi-emoji">🔍</span>
-                        <div class="mi-text"><div class="mi-title">调试日志</div></div>
+                        <div class="mi-text"><div class="mi-title">终端</div></div>
                     </div>
                     <div class="admin-menu-item" onclick="wallAdminShowBackup()">
                         <span class="mi-emoji">💾</span>
@@ -2068,7 +2068,7 @@
             <div id="adminPageLogStats" style="display:none;">
                 <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
                     <button class="admin-btn admin-btn-secondary" onclick="adminShowMenu()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
-                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">🔍 调试日志</h3>
+                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">🔍 终端</h3>
                 </div>
 
                 <!-- 控制台日志 -->
@@ -2106,8 +2106,8 @@
                         先在本地设置中配置日志目录并点击统计，再回来看诊断。
                     </div>
                 </div>
-                <button onclick="adminRefreshDebugLog()" style="background:linear-gradient(135deg,#607d8b,#455a64);color:white;border:none;padding:8px 20px;border-radius:8px;cursor:pointer;font-size:0.9rem;margin-bottom:10px;">🔄 刷新</button>
-                <div id="logDebugPanel" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:10px;min-height:120px;">
+                <button onclick="adminRefreshTerminal()" style="background:linear-gradient(135deg,#607d8b,#455a64);color:white;border:none;padding:8px 20px;border-radius:8px;cursor:pointer;font-size:0.9rem;margin-bottom:10px;">🔄 刷新</button>
+                <div id="logTerminalPanel" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:10px;min-height:120px;">
                     <div style="color:rgba(255,255,255,0.4);text-align:center;padding:30px;font-size:0.85rem;">暂无诊断数据<br><span style="font-size:0.7rem;">先去「本地设置→对战日志统计」点一次统计</span></div>
                 </div>
             </div>
@@ -2644,10 +2644,10 @@
         </div>
     </div>
 
-    <!-- 调试日志浮动控制台（位于阵容识别 Tab 正上方，浮窗中心对齐按钮，可拖动） -->
+    <!-- 终端浮动控制台（位于阵容识别 Tab 正上方，浮窗中心对齐按钮，可拖动） -->
     <div id="floatConsole" style="position:fixed;right:30px;bottom:113px;width:380px;max-height:42vh;display:flex;flex-direction:column;background:rgba(0,0,0,0.82);border:1px solid rgba(0,188,212,0.5);border-radius:8px;z-index:99999;box-shadow:0 4px 20px rgba(0,0,0,0.5);font-family:monospace;overflow:hidden;">
         <div id="floatConsoleTitle" style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;cursor:move;background:linear-gradient(135deg,#00838f,#006064);color:#fff;flex-shrink:0;">
-            <span style="font-size:0.78rem;font-weight:600;">💻 调试日志<span id="floatConsoleBadge" style="display:none;margin-left:6px;background:#00bcd4;color:#000;border-radius:10px;padding:0 6px;font-size:0.65rem;"></span></span>
+            <span style="font-size:0.78rem;font-weight:600;">💻 终端<span id="floatTerminalBadge" style="display:none;margin-left:6px;background:#00bcd4;color:#000;border-radius:10px;padding:0 6px;font-size:0.65rem;"></span></span>
             <span>
                 <button id="floatFilterAll" onclick="floatSetLevelFilter('all')" data-level="all" title="全部" style="background:rgba(255,255,255,0.25);color:#fff;border:none;padding:2px 6px;border-radius:4px;cursor:pointer;font-size:0.62rem;margin-right:2px;">全</button>
                 <button id="floatFilterError" onclick="floatSetLevelFilter('error')" data-level="error" title="只看错误" style="background:rgba(244,67,54,0.18);color:#ff8a80;border:1px solid rgba(244,67,54,0.5);padding:2px 6px;border-radius:4px;cursor:pointer;font-size:0.62rem;margin-right:2px;">错</button>
