@@ -46,10 +46,12 @@
       const a = _loadAck();
       a[id] = Date.now();
       localStorage.setItem(ACK_KEY, JSON.stringify(a));
+      // 兜底：sessionStorage 跨 reload 保留，防止 localStorage 在 reload 边界丢失导致防重失效（刷新风暴根因）
       try { sessionStorage.setItem('tfjl_adminctl_ackguard@' + id, '1'); } catch (e) {}
     } catch (e) {}
   }
   function _isAcked(id) {
+    // 双重判定：sessionStorage 优先（reload 后仍存活），localStorage 兜底
     try { if (sessionStorage.getItem('tfjl_adminctl_ackguard@' + id)) return true; } catch (e) {}
     return !!_loadAck()[id];
   }
@@ -94,7 +96,7 @@
     if (ctl.restart && ctl.restart.to) {
       const tgt = ctl.restart.to;
       const rAck = 'restart@' + (ctl.restart.ts || '1');
-      // 防循环：localStorage 去重 + sessionStorage 防本会话重复 reload（硬刷新偶发清 localStorage 时不至于死循环）
+      // 防重：_isAcked 已含 sessionStorage 双检（reload 后仍生效），同一 ts 只执行 1 次
       if ((tgt === 'all' || tgt === dev) && !_isAcked(rAck)) {
         _markAck(rAck);
         console.log('[adminCtl] 收到重启指令，前端兜底 reload（APP 版由 Rust restart 生效）');
@@ -106,9 +108,12 @@
     if (ctl.forceReload && ctl.forceReload.ts) {
       const tgt = ctl.forceReload.to;
       const fAck = 'forceReload@' + ctl.forceReload.ts;
+      // expire 为可选：管理员工具箱生成指令时自动加 24h 有效期（见 toolboxSendForceReload）。
+      // 缺 expire 时退化为「无限有效」，但下方 _isAcked 双检（sessionStorage+localStorage）保证同一设备只刷一次，不会连环刷。
       const expired = ctl.forceReload.expire && Date.now() > ctl.forceReload.expire;
       if (!expired && (tgt === 'all' || tgt === dev) && !_isAcked(fAck)) {
         _markAck(fAck);
+        // 复用现有强制刷新逻辑（如有），否则直接 reload
         if (typeof window.__tfjlForceRefresh === 'function') {
           window.__tfjlForceRefresh('管理员强制刷新');
         } else {
@@ -148,6 +153,7 @@
       if (!cmd || !cmd.id) continue;
       const expired = cmd.expire && Date.now() > cmd.expire;
       if (expired) { _markAck(cmd.id); continue; }
+      // 防重：_isAcked 含 sessionStorage 双检，同一 cmd.id 只弹 1 次（reload 后仍生效）
       if (_isAcked(cmd.id)) continue;
       if (cmd.type === 'notify') {
         _showNotify(cmd);
@@ -156,10 +162,16 @@
     }
   }
 
-  // —— 飘窗通知 UI ——
+  // —— 飘屏通知 UI（弹幕式：屏幕内随机方向匀速飘动，碰到边缘反弹）——
+  // 交互：鼠标悬停 / 输入框聚焦 / 拖动时自动暂停飘动（否则点不到按钮、打不了字）；
+  //       可拖动到任意位置，松手后换随机方向继续飘；右上角 ✕ 关闭。
   function _showNotify(cmd) {
-    // 清掉上一次的自动消失计时器（避免重复弹时堆积）
+    // 清理上一次：计时器 + 动画帧 + 残留 DOM + 全局监听（避免多次下发时堆叠/多重监听）
     if (window.__adminCtlNotifyTimer) { clearTimeout(window.__adminCtlNotifyTimer); window.__adminCtlNotifyTimer = null; }
+    _unbindNotifyDrag();
+    const old = document.getElementById('adminCtlNotify');
+    if (old && old.parentNode) old.remove();
+
     const level = cmd.level || 'info';
     // 浅底深字配色：高对比、清晰可读（文字/输入框都随 level 取色）
     const colors = {
@@ -168,23 +180,15 @@
       error:  { bg: 'linear-gradient(135deg,#fef2f2,#fee2e2)', icon: '⛔', fg: '#991b1b', accent: '#dc2626', line: '#fecaca' }
     }[level] || { bg: 'linear-gradient(135deg,#eff6ff,#dbeafe)', icon: 'ℹ️', fg: '#1e3a8a', accent: '#2563eb', line: '#bfdbfe' };
 
-    let box = document.getElementById('adminCtlNotify');
-    if (!box) {
-      box = document.createElement('div');
-      box.id = 'adminCtlNotify';
-      box.style.cssText = 'position:fixed;right:18px;bottom:18px;z-index:99999;max-width:340px;' +
-        'background:' + colors.bg + ';color:' + colors.fg + ';border-radius:14px;padding:16px 18px;' +
-        'box-shadow:0 12px 40px rgba(0,0,0,0.25);font-family:system-ui,"Microsoft YaHei",sans-serif;' +
-        'border:1px solid ' + colors.line + ';' +
-        'animation:adminCtlFloat 3s ease-in-out infinite;cursor:default;';
-      box.innerHTML = '<style>@keyframes adminCtlFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}</style>';
-      document.body.appendChild(box);
-    }
-    box.style.background = colors.bg;
-    box.style.color = colors.fg;
-    box.style.border = '1px solid ' + colors.line;
+    const box = document.createElement('div');
+    box.id = 'adminCtlNotify';
+    box.style.cssText = 'position:fixed;z-index:99999;max-width:330px;left:0;top:0;' +
+      'background:' + colors.bg + ';color:' + colors.fg + ';border-radius:14px;padding:14px 16px;' +
+      'box-shadow:0 12px 40px rgba(0,0,0,0.25);font-family:system-ui,"Microsoft YaHei",sans-serif;' +
+      'border:1px solid ' + colors.line + ';cursor:grab;user-select:none;' +
+      'transition:box-shadow .2s ease,opacity .4s ease;';
 
-    // thread：历史的对话气泡（若指令带 thread 才显示）；回复框始终显示，方便用户随时回消息
+    // thread：历史对话气泡（指令带 thread 才显示）
     const threadHtml = (cmd.thread || []).map(t =>
       '<div style="font-size:0.72rem;opacity:0.9;margin:4px 0;border-left:2px solid ' + colors.accent + ';padding-left:6px;">' +
       '<b>' + (t.from === 'admin' ? '管理员' : '我') + ':</b> ' + _esc(t.text || '') + '</div>'
@@ -193,37 +197,169 @@
 
     box.innerHTML =
       '<div style="display:flex;align-items:flex-start;gap:8px;">' +
-        '<div style="font-size:1.4rem;line-height:1;">' + colors.icon + '</div>' +
+        '<div style="font-size:1.3rem;line-height:1;">' + colors.icon + '</div>' +
         '<div style="flex:1;min-width:0;">' +
-          '<div style="font-weight:700;font-size:0.95rem;margin-bottom:4px;">' + _esc(cmd.title || '通知') + '</div>' +
-          '<div style="font-size:0.82rem;line-height:1.5;opacity:1;">' + _esc(cmd.body || '') + '</div>' +
+          '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">' +
+            '<div style="font-weight:700;font-size:0.95rem;flex:1;min-width:0;">' + _esc(cmd.title || '通知') + '</div>' +
+            '<button onclick="window.__adminCtlClose()" title="关闭" style="background:transparent;border:none;color:' + colors.fg + ';opacity:.5;cursor:pointer;font-size:1rem;line-height:1;padding:0 2px;">✕</button>' +
+          '</div>' +
+          '<div style="font-size:0.82rem;line-height:1.5;">' + _esc(cmd.body || '') + '</div>' +
           (hasThread ? '<div style="margin-top:8px;">' + threadHtml + '</div>' : '') +
           '<div style="margin-top:10px;display:flex;gap:8px;align-items:center;">' +
             (cmd.actions && cmd.actions.indexOf('ok') >= 0 ?
               '<button onclick="window.__adminCtlAck(\'' + cmd.id + '\')" style="background:#fff;color:' + colors.fg + ';border:1px solid ' + colors.line + ';padding:5px 14px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600;">知道了</button>' : '') +
             // 回复框：始终显示，让每条通知都能回文字（无论是否带 thread）
-            '<input id="adminCtlReply" placeholder="回复管理员…" style="flex:1;min-width:0;background:#fff;color:' + colors.fg + ';border:1px solid ' + colors.accent + ';border-radius:8px;padding:5px 8px;font-size:0.78rem;">' +
+            '<input id="adminCtlReply" placeholder="回复管理员…" style="flex:1;min-width:0;background:#fff;color:' + colors.fg + ';border:1px solid ' + colors.accent + ';border-radius:8px;padding:5px 8px;font-size:0.78rem;user-select:text;">' +
             '<button onclick="window.__adminCtlReply(\'' + cmd.id + '\')" style="background:' + colors.accent + ';color:#fff;border:1px solid ' + colors.accent + ';padding:5px 10px;border-radius:8px;cursor:pointer;font-size:0.78rem;font-weight:600;">发送</button>' +
           '</div>' +
         '</div>' +
-      '</div>';
-    box.style.display = 'block';
-    // 自动消失：8 秒后淡出移除（除非用户正在输入回复，避免误关丢消息）
+      '</div>' +
+      '<div style="margin-top:8px;font-size:0.64rem;opacity:.5;text-align:center;">悬停/输入时暂停飘动 · 可拖动</div>';
+    document.body.appendChild(box);
+
+    // ===== 弹幕运动：随机初始位置 + 随机方向匀速飘，撞到视口边缘反弹 =====
+    const SPEED = 52; // px/s（柔和，不晃眼）
+    let x = 0, y = 0, vx = 0, vy = 0, lastTs = 0;
+    let paused = false, dragging = false, dragOffX = 0, dragOffY = 0;
+
+    function _clampPos(nx, ny) {
+      const w = box.offsetWidth, h = box.offsetHeight;
+      return {
+        x: Math.max(0, Math.min(Math.max(0, window.innerWidth  - w - 6), nx)),
+        y: Math.max(0, Math.min(Math.max(0, window.innerHeight - h - 6), ny))
+      };
+    }
+    function _randomDir() {
+      // 随机角度；避免过于水平/垂直，视觉上更"飘"
+      const ang = Math.random() * Math.PI * 2;
+      vx = Math.cos(ang) * SPEED;
+      vy = Math.sin(ang) * SPEED;
+      if (Math.abs(vx) < SPEED * 0.28) vx = (vx < 0 ? -1 : 1) * SPEED * 0.28;
+      if (Math.abs(vy) < SPEED * 0.28) vy = (vy < 0 ? -1 : 1) * SPEED * 0.28;
+    }
+    // 初始位置：随机落在视口内
+    const p0 = _clampPos(Math.random() * Math.max(1, window.innerWidth  - box.offsetWidth  - 6),
+                         Math.random() * Math.max(1, window.innerHeight - box.offsetHeight - 6));
+    x = p0.x; y = p0.y;
+    _randomDir();
+    box.style.left = x + 'px';
+    box.style.top  = y + 'px';
+
+    function tick(ts) {
+      if (!lastTs) lastTs = ts;
+      const dt = Math.min(64, ts - lastTs) / 1000; // 限幅：切后台回来不跳飞
+      lastTs = ts;
+      if (!paused && !dragging && box.parentNode) {
+        x += vx * dt;
+        y += vy * dt;
+        const w = box.offsetWidth, h = box.offsetHeight;
+        const maxX = Math.max(0, window.innerWidth  - w - 6);
+        const maxY = Math.max(0, window.innerHeight - h - 6);
+        // 撞墙反弹
+        if (x <= 0)    { x = 0;    vx =  Math.abs(vx); }
+        if (x >= maxX) { x = maxX; vx = -Math.abs(vx); }
+        if (y <= 0)    { y = 0;    vy =  Math.abs(vy); }
+        if (y >= maxY) { y = maxY; vy = -Math.abs(vy); }
+        box.style.left = x + 'px';
+        box.style.top  = y + 'px';
+      }
+      window.__adminCtlNotifyRaf = requestAnimationFrame(tick);
+    }
+    window.__adminCtlNotifyRaf = requestAnimationFrame(tick);
+
+    // ===== 交互：悬停 / 输入 / 拖动 时暂停，拖动可移位 =====
+    box.addEventListener('mouseenter', () => { paused = true; box.style.boxShadow = '0 16px 46px rgba(0,0,0,0.34)'; });
+    box.addEventListener('mouseleave', () => { if (!dragging) { paused = false; box.style.boxShadow = '0 12px 40px rgba(0,0,0,0.25)'; } });
+    // 输入框聚焦时暂停（鼠标移开去打字也不会飘走）
+    box.addEventListener('focusin',  (e) => { if (e.target && e.target.id === 'adminCtlReply') paused = true; });
+    box.addEventListener('focusout', (e) => { if (e.target && e.target.id === 'adminCtlReply' && !dragging) paused = false; });
+
+    const onDown = (e) => {
+      if (e.target && /^(BUTTON|INPUT|TEXTAREA)$/.test(e.target.tagName)) return; // 点控件不拖
+      dragging = true;
+      dragOffX = e.clientX - x;
+      dragOffY = e.clientY - y;
+      box.style.cursor = 'grabbing';
+      e.preventDefault();
+    };
+    const onMove = (e) => {
+      if (!dragging) return;
+      const p = _clampPos(e.clientX - dragOffX, e.clientY - dragOffY);
+      x = p.x; y = p.y;
+      box.style.left = x + 'px';
+      box.style.top  = y + 'px';
+    };
+    const onUp = () => {
+      if (!dragging) return;
+      dragging = false;
+      box.style.cursor = 'grab';
+      _randomDir(); // 松手换个随机方向继续飘
+      paused = false;
+    };
+    const onResize = () => {
+      const p = _clampPos(x, y);
+      x = p.x; y = p.y;
+      box.style.left = x + 'px'; box.style.top = y + 'px';
+    };
+    box.addEventListener('mousedown', onDown);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    window.addEventListener('resize', onResize);
+    window.__adminCtlNotifyDragUnbind = function () {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      window.removeEventListener('resize', onResize);
+      if (window.__adminCtlNotifyRaf) { cancelAnimationFrame(window.__adminCtlNotifyRaf); window.__adminCtlNotifyRaf = null; }
+    };
+
+    // 自动消失：30s 后淡出；若用户正在看（悬停/输入/拖动）则延后重试，避免误关丢消息
     const _autoHide = () => {
       const inp = document.getElementById('adminCtlReply');
-      if (inp && inp.value && inp.value.trim()) return; // 正在输入则不关
-      box.style.transition = 'opacity .4s ease';
+      const typing = inp && inp.value && inp.value.trim();
+      if (paused || dragging || typing) { window.__adminCtlNotifyTimer = setTimeout(_autoHide, 8000); return; }
       box.style.opacity = '0';
-      setTimeout(() => { if (box && box.parentNode) box.remove(); }, 420);
+      setTimeout(() => { if (box && box.parentNode) box.remove(); _unbindNotifyDrag(); }, 420);
     };
-    window.__adminCtlNotifyTimer = setTimeout(_autoHide, 8000);
+    window.__adminCtlNotifyTimer = setTimeout(_autoHide, 30000);
   }
 
-  // 点击「知道了」
+  // 解绑飘屏的全局监听 + 停掉 rAF（关闭/失效时必须调用，否则动画空转）
+  function _unbindNotifyDrag() {
+    if (typeof window.__adminCtlNotifyDragUnbind === 'function') {
+      try { window.__adminCtlNotifyDragUnbind(); } catch (e) {}
+    }
+    window.__adminCtlNotifyDragUnbind = null;
+  }
+  // 右上角 ✕ 关闭
+  window.__adminCtlClose = function () {
+    const box = document.getElementById('adminCtlNotify');
+    if (box) { box.style.opacity = '0'; setTimeout(() => { if (box && box.parentNode) box.remove(); }, 420); }
+    _unbindNotifyDrag();
+  };
+
+  // 预览飘屏效果：读取管理员工具箱里填的标题/正文/级别，本地弹一次看看效果。
+  // 纯本地预览，不写 Gist、不记 ack，不会影响真实下发。
+  window.__adminCtlPreviewNotify = function () {
+    const t = document.getElementById('toolboxTitle');
+    const b = document.getElementById('toolboxBody');
+    const l = document.getElementById('toolboxLevel');
+    _showNotify({
+      id: '__preview__' + Date.now(),
+      type: 'notify',
+      title: (t && t.value.trim()) || '通知标题示例',
+      body: (b && b.value.trim()) || '这里是通知正文，会像弹幕一样在屏幕上飘动，撞到边缘自动反弹。',
+      level: (l && l.value) || 'info',
+      actions: ['ok'],
+      thread: []
+    });
+  };
+
+  // 点击「知道了」（淡出后真正移除 DOM 并解绑监听，避免 rAF 空转）
   window.__adminCtlAck = function (id) {
     _markAck(id);
     const box = document.getElementById('adminCtlNotify');
-    if (box) box.style.display = 'none';
+    if (box) { box.style.opacity = '0'; setTimeout(() => { if (box && box.parentNode) box.remove(); }, 420); }
+    _unbindNotifyDrag();
   };
   // 会话回复（回写设备本地 ack + 标记待上报，下次心跳带上）
   window.__adminCtlReply = function (id) {
@@ -237,7 +373,8 @@
     } catch (e) {}
     _markAck(id);
     const box = document.getElementById('adminCtlNotify');
-    if (box) box.style.display = 'none';
+    if (box) { box.style.opacity = '0'; setTimeout(() => { if (box && box.parentNode) box.remove(); }, 420); }
+    _unbindNotifyDrag();
     // 触发一次诊断上报，把回复带回（诊断 Gist 会带上 pending replies）
     if (typeof window.__tfjlForceDiagPush === 'function') window.__tfjlForceDiagPush();
   };
@@ -300,10 +437,12 @@
   //  - 强制刷新：触发 SW 升级 / 硬刷新。优先走 SW 的 skipWaiting 路径（若暴露），否则直接 reload。
   window.__tfjlForceRefresh = function (reason) {
     console.log('[adminCtl] 强制刷新:', reason);
+    // 兜底：reload 前把 localStorage ack 同步镜像到 sessionStorage，杜绝 reload 边界丢失导致的刷新风暴
     try {
       const ack = JSON.parse(localStorage.getItem(ACK_KEY) || '{}');
       Object.keys(ack).forEach(k => { try { sessionStorage.setItem('tfjl_adminctl_ackguard@' + k, '1'); } catch (e) {} });
     } catch (e) {}
+    // 直接 reload，不走 SW postMessage（SW 无新版本时 waiting 为 null，多此一举且引入 600ms 异步竞态）
     try { location.reload(true); } catch (e) { location.reload(); }
   };
   //  - 立即诊断上报：复用 app-core 的 _pushDiagReport（若已定义），否则标记待上报由下次心跳带出。
