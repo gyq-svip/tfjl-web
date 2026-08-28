@@ -22100,8 +22100,8 @@ ${maSection}
                 const pageEl = document.getElementById('adminPageLogStats');
                 if (pageEl) {
                     pageEl.style.display = 'block';
-                    adminRefreshTerminal();
-                    adminRefreshConsoleLog();
+                    if (typeof adminRefreshTerminal === 'function') adminRefreshTerminal();
+                    if (typeof adminRefreshConsoleLog === 'function') adminRefreshConsoleLog();
                     if (typeof refreshFloatConsoleToggleBtn === 'function') refreshFloatConsoleToggleBtn();
                 }
             } else if (page === 'loginStats') {
