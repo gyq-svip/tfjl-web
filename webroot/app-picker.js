@@ -483,14 +483,10 @@
                 // 🔴 修复：#versionTag 与 .version-tooltip 之间隔着 #appUpdateBadge，nextElementSibling 拿到的是 badge 而非 tooltip，
                 //   改用父级内 querySelector 精确命中 .version-tooltip。
                 const tip = tag.parentElement ? tag.parentElement.querySelector('.version-tooltip') : null;
+                // 🔴 2026-08-29：tooltip 永远只显示小版本号，不提示"发现新版本"（用户诉求）。
+                // 不动 .version-tooltip 文案，保持 CI 注入的「s日期-HHMM · s1.0.xxx」原样。
                 if (tip && tip.classList.contains('version-tooltip')) {
-                    const cur = tag.textContent.replace('●', '').trim();
-                    // 目标版本：优先取 APP 整包新版本（autoCheckUpdate/menuCheckUpdate 写入的全局 _updateVersion）
-                    const target = (typeof _updateVersion !== 'undefined' && _updateVersion) ? _updateVersion
-                        : (window.__tfjlTargetVer || '');
-                    tip.textContent = target
-                        ? ('当前 ' + cur + ' → 可升 v' + target + '（双击刷新）')
-                        : '发现新版本 · 双击立即更新';
+                    // 不修改 tip.textContent，保留原始小版本号显示
                 }
             }
             // 核实是否真有新版本：比对远端 versionTag 主版本号与当前，避免刚强刷完即误报"有新版本"
