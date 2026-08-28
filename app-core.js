@@ -22726,19 +22726,14 @@ ${maSection}
                             (detailByUser[x.k] || []).forEach(m => {
                                 const ts = m.last ? new Date(m.last).toLocaleString('zh-CN') : '?';
                                 const min = m.last ? Math.max(0, Math.round((Date.now() - m.last) / 60000)) : -1;
-                                // 大版本号（桌面 exe）：有则显示，桌面版但取不到 → 标"未知(旧包)"。
-                                // 取不到的唯一原因是该用户装的 exe 早于 Rust 注入 window.__APP_VERSION 的版本（lib.rs），
-                                // 标出来才能让管理员一眼分清"老包待更新"和"新包已带版本号"。
-                                const _exeVer = (m.payload && m.payload.appExeVersion)
-                                    ? '｜桌面v' + m.payload.appExeVersion
-                                    : ((m.plat === 'app') ? '｜桌面v<span style="color:#f97316;">未知(旧包)</span>' : '');
+                                // 大版本号（桌面 exe）：仅由下方 _ev 显示，避免与 _ev 重复显示桌面版本（2026-08-29 修复：原 _exeVer 与 _ev 重复导致"桌面v2.0.20"出现两遍）
                                 // 🔴 2026-08-29 flag 各段分色：心跳/缓冲/盘状态/前后端版本/平台
                                 const _hb = m.heartbeat ? '<span style="color:' + C_OK + ';">🟢心跳</span>' : '<span style="color:' + C_BUF + ';">📦缓冲</span>';
                                 const _wk = m.writeOk ? '<span style="color:' + C_OK + ';">✓盘</span>' : (m.writeOk === false ? '<span style="color:' + C_BAD + ';">✗盘</span>' : '<span style="color:' + C_TIME + ';">?盘</span>');
                                 const _fv = '<span style="color:' + C_FRONTV + ';">前端v' + (m.ver || '?') + '</span>';
                                 const _ev = m.payload && m.payload.appExeVersion ? '<span style="color:' + C_DESKV + ';">桌面v' + m.payload.appExeVersion + '</span>' : ((m.plat === 'app') ? '<span style="color:#f97316;">桌面v未知(旧包)</span>' : '');
                                 const _pt = '<span style="color:' + C_TIME + ';">' + (m.plat || '?') + '</span>';
-                                const flag = _hb + '｜' + _wk + '｜' + _fv + _exeVer + '｜' + _ev + '｜' + _pt;
+                                const flag = _hb + '｜' + _wk + '｜' + _fv + '｜' + _ev + '｜' + _pt;
                                 const rc = m.payload && m.payload.reportCount ? ('｜<span style="color:' + C_NUM + ';">累计上报 ' + m.payload.reportCount + ' 次</span>') : '';
                                 html += '<div style="margin-bottom:6px;">' + _colorWho(m.who) + ' <span style="color:' + C_TIME + ';">[' + ts + '  ' + min + '分钟前]</span><br><span>' + flag + rc + '</span>';
                                 if (m.err) html += '<br><span style="color:#f87171;">err: ' + m.err + '</span>';
