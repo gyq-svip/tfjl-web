@@ -17777,9 +17777,27 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
         
         // 未读提醒防抖：被动触发(fetch/升级检查)时延迟评估, 避免刚刷新/升级就立刻闪红点, 给用户缓冲
         let _wallAttnTimer = null;
+        // 🔴 2026-08-29 增强：双击刷新/强制刷新后 30 秒内彻底抑制红点(即便有未读也不闪), 30秒后才真评估
+        // sessionStorage 在 reload 时保留, perfect reload 抑制标记
         function scheduleWallAttention(delayMs) {
             if (_wallAttnTimer) clearTimeout(_wallAttnTimer);
-            _wallAttnTimer = setTimeout(() => { _wallAttnTimer = null; updateWallAttention(); }, delayMs || 3000);
+            _wallAttnTimer = setTimeout(() => {
+                _wallAttnTimer = null;
+                // 检查 reload 抑制标记
+                try {
+                    const ts = parseInt(sessionStorage.getItem('TFJL_ReloadRedDotSuppress') || '0', 10);
+                    if (ts && (Date.now() - ts) < 30000) {
+                        // 30秒内: 强制清空红点(用户刚刷新过, 给他缓冲, 不立刻闪)
+                        const dot = document.getElementById('wallUnreadDot');
+                        const toggle = document.getElementById('messageWallToggle');
+                        if (dot) { dot.style.display = 'none'; dot.textContent = ''; }
+                        if (toggle) toggle.classList.remove('wall-attention');
+                        flashTray(false);
+                        return;
+                    }
+                } catch (e) {}
+                updateWallAttention();
+            }, delayMs || 3000);
         }
         // 未读提醒：墙关闭状态下，若自上次打开后出现了新留言 → 图标 QQ 式闪动 + 红点(未读数)；打开墙即清除
         function updateWallAttention() {
@@ -22725,9 +22743,16 @@ ${maSection}
                             const ts = m.last ? new Date(m.last).toLocaleString('zh-CN') : '?';
                             const min = m.last ? Math.max(0, Math.round((Date.now() - m.last) / 60000)) : -1;
                             const flag = (m.heartbeat ? '🟢心跳' : '📦缓冲') + '｜' + (m.writeOk ? '✓盘' : (m.writeOk === false ? '✗盘' : '?盘')) + '｜v' + (m.ver || '?') + '｜' + (m.plat || '?') + '｜' + m.count + '写';
+                            // 🔴 2026-08-29 可读性修复：昵称绿色提亮、anonId 暗灰、flag 各分色便于一眼分辨
+                            const _whoColored = m.who.replace(/^([^(（]+)[(（]([^)）]+)[)）]?$/, '<b style="color:#4ade80;">$1</b><span style="color:#64748b;">($2)</span>');
+                            const _flagColored = flag
+                                .replace(/^([^｜]+)｜/, '<span style="color:' + (m.heartbeat ? '#4ade80' : '#a78bfa') + ';">$1</span>｜')
+                                .replace(/([^｜]+)｜/, '<span style="color:' + (m.writeOk ? '#4ade80' : (m.writeOk === false ? '#f87171' : '#94a3b8')) + ';">$1</span>｜')
+                                .replace(/v([^｜]+)｜/, '<span style="color:#60a5fa;">v$1</span>｜')
+                                .replace(/([^｜]+)｜$/, '<span style="color:#fbbf24;">$1</span>｜$');
                             html += '<div style="font-size:0.74rem;color:#cbd5e1;padding:3px 0;border-bottom:1px dashed rgba(255,255,255,0.06);">';
                             html += '<b style="color:#60a5fa;">' + m.fn + '</b><br>';
-                            html += m.who + ' ｜ ' + flag + ' ｜ <span style="color:#94a3b8;">' + ts + ' (' + min + '分钟前)</span>';
+                            html += _whoColored + ' ｜ ' + _flagColored + ' ｜ <span style="color:#94a3b8;">' + ts + ' (' + min + '分钟前)</span>';
                             if (m.err) html += '<br><span style="color:#f87171;">err: ' + m.err + '</span>';
                             html += '</div>';
                         });
