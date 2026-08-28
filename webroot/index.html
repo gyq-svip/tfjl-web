@@ -933,26 +933,7 @@
         </div>
 
         <!-- APP本地功能脚本（网页版不会执行任何代码，isTauriApp判断在文件内部） -->
-        <script defer src="app-local.js?v=s1.0.200"></script>
-        <!-- 独立兜底：无论 app-local.js 是否成功加载/初始化，Tauri 环境下都显示 APP设置按钮（0依赖、不动其他逻辑） -->
-        <script defer>
-          (function () {
-            function _showAppLocalBtn() {
-              try {
-                var isTauri = (typeof navigator !== 'undefined' && navigator.userAgent && navigator.userAgent.indexOf('Tauri') >= 0)
-                  || (typeof window !== 'undefined' && (window.__TAURI_INTERNALS__ || window.__TAURI__));
-                if (!isTauri) return;
-                var b = document.getElementById('appLocalSettingsBtn');
-                if (b) b.style.display = 'flex';
-              } catch (e) {}
-            }
-            if (document.readyState === 'loading') {
-              document.addEventListener('DOMContentLoaded', _showAppLocalBtn);
-            } else {
-              _showAppLocalBtn();
-            }
-          })();
-        </script>
+        <script defer src="app-local.js?v=s1.0.342"></script>
         <!-- 阵容识别模块（独立入口 + 灌入脚本生成） -->
         
         <!-- 网页版皮肤系统（仅非 Tauri 浏览器执行；Tauri 由 app-local.js 负责，文件内部自动跳过） -->
