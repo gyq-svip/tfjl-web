@@ -22,7 +22,7 @@
             console.error = (...args) => addLog('error', args);
             console.info = (...args) => addLog('info', args);
 
-            // 捕获 F12 Console 里那些“未进 console.error”的运行时报错，让它们也进调试日志
+            // 捕获 F12 Console 里那些“未进 console.error”的运行时报错，让它们也进终端
             // 1) 未捕获的 JS 异常（window.onerror）——如 ReferenceError: content is not defined
             window.addEventListener('error', (e) => {
                 const where = e.filename ? ` @ ${e.filename.split('/').pop()}:${e.lineno}:${e.colno}` : '';
@@ -507,6 +507,10 @@
                 if (_isTauri && typeof window.__APP_VERSION === 'string' && /^v?\d+\.\d+/.test(window.__APP_VERSION)) {
                     _appExeVer = window.__APP_VERSION.replace(/^v/, '');
                 }
+            } catch (e) {}
+            // 🔴 2026-08-29 终端探针：打印 exe 版本号解析全过程（用户开终端即可一眼看出为何上报了 2.0.16 而非 2.0.19）
+            try {
+                console.log('[DIAG-VER] isTauri=' + _isTauri + ' window.__APP_VERSION=' + JSON.stringify((typeof window.__APP_VERSION === 'string' ? window.__APP_VERSION : null)) + '  → _appExeVer=' + JSON.stringify(_appExeVer) + '  appVer=' + JSON.stringify(_appVer));
             } catch (e) {}
             const probe = await _runDiagWriteProbe();
             if (entries.length === 0) {
@@ -22039,7 +22043,7 @@ ${maSection}
                 const pageEl = document.getElementById('adminPageLogStats');
                 if (pageEl) {
                     pageEl.style.display = 'block';
-                    adminRefreshDebugLog();
+                    adminRefreshTerminal();
                     adminRefreshConsoleLog();
                     if (typeof refreshFloatConsoleToggleBtn === 'function') refreshFloatConsoleToggleBtn();
                 }
@@ -22962,9 +22966,9 @@ ${maSection}
                 apply: (v) => { if (typeof setAuctionBroadcastEnabled === 'function') setAuctionBroadcastEnabled(v); }
             },
             {
-                key: 'debugConsole',
-                label: '调试日志悬浮窗',
-                desc: '显示/隐藏右下角调试日志悬浮窗（本机生效）',
+                key: 'terminalConsole',
+                label: '终端悬浮窗',
+                desc: '显示/隐藏右下角终端悬浮窗（本机生效）',
                 scope: 'local',
                 localKey: 'tdjl_consoleVisible',
                 default: false,
@@ -23688,8 +23692,8 @@ ${maSection}
         window.loadRunLog = loadRunLog;
 
         // ==================== 对战日志诊断（管理员菜单） ====================
-        function adminRefreshDebugLog() {
-            const panel = document.getElementById('logDebugPanel');
+        function adminRefreshTerminal() {
+            const panel = document.getElementById('logTerminalPanel');
             if (!panel) return;
             const lines = window._lastLogDebugLines;
             if (!lines || lines.length === 0) {
@@ -23869,11 +23873,11 @@ ${maSection}
             const next = !current;
             localStorage.setItem(CONSOLE_VISIBILITY_KEY, next ? '1' : '0');
             applyConsoleVisibility(next);
-            // 同步调试日志面板内的浮窗开关按钮状态（若面板开着）
+            // 同步终端面板内的浮窗开关按钮状态（若面板开着）
             if (typeof refreshFloatConsoleToggleBtn === 'function') refreshFloatConsoleToggleBtn();
             console.log('[ADMIN] 浮动控制台已' + (next ? '开启' : '关闭'));
         }
-        // 刷新调试日志面板里的“浮窗显示”开关按钮文案（由 toggleConsoleVisibility / 面板打开时调用）
+        // 刷新终端面板里的“浮窗显示”开关按钮文案（由 toggleConsoleVisibility / 面板打开时调用）
         function refreshFloatConsoleToggleBtn() {
             const btn = document.getElementById('adminFloatConsoleToggleBtn');
             if (!btn) return;
@@ -23982,9 +23986,9 @@ ${maSection}
             if (content) { if (floatAutoScroll) content.classList.add('auto-scroll'); else content.classList.remove('auto-scroll'); }
         }
 
-        // ==================== 调试命令输入框（替代 F12，App 内直接执行 JS）====================
-        // 浮动窗底部输入框回车/点执行 → 跑一段 JS，结果打印到调试日志。
-        // 内置快捷命令（直接输函数名即可）：clearSWCache() / showAppBtn() / checkAppLocal() / appLocalStatus()
+        // ==================== 终端命令输入框（替代 F12，App 内直接执行 JS）====================
+        // 终端底部输入框回车/点执行 → 跑一段 JS，结果打印到终端。
+        // 内置快捷命令（直接输函数名即可）：clearSWCache() / showAppBtn() / checkAppLocal() / appLocalStatus() / verProbe()
         window.floatConsoleExec = function () {
             const inp = document.getElementById('floatConsoleCmd');
             if (!inp) return;
@@ -23998,6 +24002,7 @@ ${maSection}
                 else if (code === 'showAppBtn()') result = window.showAppBtn();
                 else if (code === 'checkAppLocal()') result = window.checkAppLocal();
                 else if (code === 'appLocalStatus()') result = window.appLocalStatus();
+                else if (code === 'verProbe()') result = window.__tfjlVerProbe();
                 else result = (function () { return eval(code); })();
                 if (result !== undefined) console.log('[CMD] = ' + (typeof result === 'object' ? JSON.stringify(result).slice(0, 500) : result));
             } catch (e) {
@@ -24005,6 +24010,32 @@ ${maSection}
             }
             inp.value = '';
             inp.focus();
+        };
+        // 🔴 2026-08-29 新增：版本号探针（终端输入 verProbe() 即出全量报告）
+        // 用法：诊断面板里发现某个用户上报了 v2.0.16 而你以为是 2.0.19 时，开终端 → 输 verProbe() → 看真相
+        window.__tfjlVerProbe = function () {
+            const isTauri = (typeof window.__TAURI_INTERNALS__ !== 'undefined') || (typeof window.__TAURI__ !== 'undefined') || (navigator.userAgent || '').indexOf('Tauri') !== -1;
+            let _appVer = '';
+            try { const vt = document.getElementById('versionTag'); if (vt) _appVer = vt.textContent.trim(); } catch (e) {}
+            if (!_appVer && typeof window.__APP_VERSION === 'string') _appVer = window.__APP_VERSION;
+            const probe = {
+                '是不是 Tauri 环境 (isTauri)': isTauri,
+                'Rust 注入的 window.__APP_VERSION（编译时从 Cargo.toml 读）': (typeof window.__APP_VERSION === 'string' ? window.__APP_VERSION : '<未注入，看是网页版或旧包>'),
+                '正则 /^v?\\d+\\.\\d+/ 是否匹配': (typeof window.__APP_VERSION === 'string' ? /^v?\d+\.\d+/.test(window.__APP_VERSION) : false),
+                '解析后真正要上报的 appExeVersion（_appExeVer）': (_appVer && /^v?\d+\.\d+/.test(_appVer)) ? _appVer.replace(/^v/, '') : '',
+                '诊断面板读到的 #versionTag 文本（页脚显示）': (() => { try { const vt = document.getElementById('versionTag'); return vt ? vt.textContent.trim() : '<不存在>'; } catch (e) { return '<异常>'; } })(),
+                '本机最近一次心跳 hb（localStorage DIAG_HEARTBEAT_KEY）': (() => { try { return JSON.parse(localStorage.getItem('tfjl_diag_heartbeat') || localStorage.getItem('DIAG_HEARTBEAT_KEY') || 'null'); } catch (e) { return '<解析失败>'; } })(),
+                'CACHE_VERSION (sw.js)': (typeof CACHE_VERSION !== 'undefined' ? CACHE_VERSION : '<未定义>'),
+                '判断: appExeVersion 上报什么值': (() => {
+                    if (typeof window.__APP_VERSION !== 'string' || !/^v?\d+\.\d+/.test(window.__APP_VERSION)) return '⚠️ 上报空字符串（不是 Tauri 或没注入）';
+                    const v = window.__APP_VERSION.replace(/^v/, '');
+                    return '✅ 上报 ' + v;
+                })()
+            };
+            console.log('=== 版本号探针 verProbe() ===');
+            for (const k in probe) console.log('  ' + k + ': ' + JSON.stringify(probe[k]));
+            console.log('=== 探针结束 ===');
+            return probe;
         };
         // 绑定 window（onkeydown 里用到的 floatConsoleExec 需全局可见）
         window.floatConsoleExec = window.floatConsoleExec;
@@ -24066,7 +24097,7 @@ ${maSection}
             if (floatLevelFilter && floatLevelFilter !== 'all') {
                 logs = logs.filter(l => l.level === floatLevelFilter);
             }
-            const badge = document.getElementById('floatConsoleBadge');
+            const badge = document.getElementById('floatTerminalBadge');
             const errCount = logs ? logs.filter(l => l.level === 'error').length : 0;
             if (badge) {
                 if (errCount > 0) { badge.style.display = 'flex'; badge.textContent = errCount; badge.style.background = '#f44336'; }
