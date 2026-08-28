@@ -525,6 +525,16 @@ if (true) {
 
     // ==================== 配置管理 ====================
 
+    // 自动增量备份：每次数据变更（tfjl.dat 内容真正变化）后，自动写一份带时间戳的备份，
+    // 并只保留最近 N 份（N 用户可配），避免忘记手动备份时数据全丢。
+    // 🔴 这些 const 必须声明在使用它们的 settingsConfig（下方）之前，避免 TDZ ReferenceError
+    // 导致整个文件执行中断、所有 window.* 导出失效（APP设置按钮不显示）。
+    const AUTO_BACKUP_KEY = 'tfjl_auto_backup';                 // 配置开关（也镜像进 settingsConfig）
+    const AUTO_BACKUP_KEEP_KEY = 'tfjl_auto_backup_keep';       // 保留份数
+    const AUTO_BACKUP_HASH_KEY = 'tfjl_auto_backup_last_hash';  // 上次已备份的内容 hash（增量判定）
+    const AUTO_BACKUP_PREFIX = 'tfjl-auto-backup-';             // 自动备份文件前缀（区别于手动 tfjl-full-backup-）
+    const AUTO_BACKUP_DEFAULT_KEEP = 20;
+
     // 自动加载开关：默认全部开启，用户卡顿可关闭
     const settingsConfig = { autoLoadScreenshotStats: true, autoLoadBattleStats: true, autoBackup: true, autoBackupKeep: AUTO_BACKUP_DEFAULT_KEEP, autoBackupTimer: true, autoBackupIntervalMin: 30 };
 
@@ -533,14 +543,6 @@ if (true) {
         localStorage.setItem(AUTO_BACKUP_KEY, settingsConfig.autoBackup ? '1' : '0');
         localStorage.setItem(AUTO_BACKUP_KEEP_KEY, String(settingsConfig.autoBackupKeep || AUTO_BACKUP_DEFAULT_KEEP));
     }
-
-    // 自动增量备份：每次数据变更（tfjl.dat 内容真正变化）后，自动写一份带时间戳的备份，
-    // 并只保留最近 N 份（N 用户可配），避免忘记手动备份时数据全丢。
-    const AUTO_BACKUP_KEY = 'tfjl_auto_backup';                 // 配置开关（也镜像进 settingsConfig）
-    const AUTO_BACKUP_KEEP_KEY = 'tfjl_auto_backup_keep';       // 保留份数
-    const AUTO_BACKUP_HASH_KEY = 'tfjl_auto_backup_last_hash';  // 上次已备份的内容 hash（增量判定）
-    const AUTO_BACKUP_PREFIX = 'tfjl-auto-backup-';             // 自动备份文件前缀（区别于手动 tfjl-full-backup-）
-    const AUTO_BACKUP_DEFAULT_KEEP = 20;
 
     function _autoBackupEnabled() {
         // 优先用 settingsConfig（与设置面板一致），并实时同步 localStorage 镜像
