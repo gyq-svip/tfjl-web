@@ -504,17 +504,8 @@
             //   这样诊断面板能一眼分清"网页挂机 vs 桌面挂机"以及"桌面跑哪个 exe"，避免大/小版本混淆。
             let _appExeVer = '';
             try {
-                // 桌面大版本号：优先取 Tauri 注入的 window.__APP_VERSION（如 "2.0.16"）。
-                // 不再强依赖 _isTauri 判定，只要该全局变量存在且格式像版本号即采用（避免 UA/全局变量判定偏差导致漏取）。
-                if (typeof window.__APP_VERSION === 'string' && /^v?\d+\.\d+/.test(window.__APP_VERSION)) {
+                if (_isTauri && typeof window.__APP_VERSION === 'string' && /^v?\d+\.\d+/.test(window.__APP_VERSION)) {
                     _appExeVer = window.__APP_VERSION.replace(/^v/, '');
-                }
-                // 🔴 兜底：部分旧包未注入 __APP_VERSION（lib.rs 注入为后续新增），但界面 #currentVersionText
-                // 已显示真实大版本（如 "2.0.19"，来自 Tauri getVersion）。从这里回读，避免上报 appExeVersion 恒为 undefined。
-                if (!_appExeVer) {
-                    const cv = (document.getElementById('currentVersionText') || {}).textContent || '';
-                    const m = cv.match(/(\d+\.\d+(?:\.\d+)?)/);
-                    if (m) _appExeVer = m[1];
                 }
             } catch (e) {}
             const probe = await _runDiagWriteProbe();
@@ -17758,11 +17749,11 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 // 需求墙打开时，拍卖行按钮回到原位置
                 if (chatToggle) chatToggle.style.left = '68px';
                 messageWallOpen = true;
-                // 🔴 修复红点刷新重现：不在打开瞬间标记已读（此时 wallMessages 还是旧缓存/空，
-                //   新消息由 fetchMessages 异步拉回，若先标记会把"还没看到的新消息"漏标 → 关闭/刷新后红点重现）。
-                //   改为 fetchMessages 拉到最新消息、renderMessages 之后，若墙仍开着再统一标记已读（见 fetchMessages 的 markRead 参数）。
-                updateWallAttention();   // 打开即先按当前已知消息评估（新消息拉回后会再次纠正）
-                fetchMessages(true);     // 每次打开需求墙都拉取最新消息，拉回后标记已读
+                // 打开墙 = 标记当前所有消息为已读（加入指纹集合并持久化），而非用时间戳
+                wallMessages.forEach(m => wallReadKeys.add(_wallMsgKey(m)));
+                try { localStorage.setItem('TFJL_WallReadKeys', JSON.stringify([...wallReadKeys])); } catch (e) {}
+                updateWallAttention();   // 打开即清除未读提醒
+                fetchMessages();         // 每次打开需求墙都拉取最新消息
                 initMessageWallDrag();
                 // 打开需求墙时，按本地记忆决定是否同时弹出右侧贡献排行榜
                 // （默认开启；用户若曾关闭，则下次开墙也保持关闭——本地记忆，他人默认开启）
@@ -17854,7 +17845,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
         function initMessageWallDrag() {
         }
         
-        async function fetchMessages(markRead) {
+        async function fetchMessages() {
             try {
                 const token = getGistToken();
                 
@@ -17991,14 +17982,8 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                                     
                                     await saveWallToDB(wallMessages);
                                     renderMessages();
-                                    // 🔴 修复红点刷新重现：若本次是"打开墙"触发的拉取（markRead=true）且墙仍开着，
-                                    // 在用户实际看到最新消息后再统一把当前所有消息标记为已读，避免漏标新消息。
-                                    if (markRead && messageWallOpen) {
-                                        wallMessages.forEach(m => wallReadKeys.add(_wallMsgKey(m)));
-                                        try { localStorage.setItem('TFJL_WallReadKeys', JSON.stringify([...wallReadKeys])); } catch (e) {}
-                                    }
                                     updateWallAttention();
-                                    console.log('[消息加载] 成功加载', wallMessages.length, '条消息' + (markRead && messageWallOpen ? '（已标记已读）' : ''));
+                                    console.log('[消息加载] 成功加载', wallMessages.length, '条消息');
                                     return;
                                 } catch (e) { console.warn('解析消息 JSON 失败:', e); }
                             }
@@ -22079,7 +22064,6 @@ ${maSection}
             return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
         }
         function adminShowToolbox() {
-            // 显示本机 deviceId
             const devEl = document.getElementById('toolboxDevId');
             if (devEl) {
                 try { devEl.textContent = (typeof getDeviceId === 'function') ? getDeviceId() : (localStorage.getItem('TFJL_Device_ID') || '未知'); }
@@ -22113,6 +22097,12 @@ ${maSection}
                 const g = await _toolboxGistGet(TOOLBOX_GIST_ID);
                 const f = g && g.files && g.files[TOOLBOX_FILE];
                 raw.value = f && f.content ? f.content : '{}';
+                // 回填当前 pollSec 到输入框（否则每次进来都显示空/默认 300，误以为没保存）
+                try {
+                    const data = f && f.content ? JSON.parse(f.content) : {};
+                    const psInp = document.getElementById('toolboxPollSec');
+                    if (psInp && data.pollSec) psInp.value = data.pollSec;
+                } catch (e) {}
                 if (s) { s.style.color = '#4ade80'; s.textContent = '已拉取最新指令 Gist'; }
             } catch (e) {
                 if (s) { s.style.color = '#f87171'; s.textContent = '拉取失败：' + (e.message || e); }
@@ -22384,13 +22374,16 @@ ${maSection}
             const box = document.getElementById('toolboxVer');
             if (box) box.innerHTML = '⏳ 加载中…';
             try {
+                // 本机版本（页面右下角）
                 const localVer = (document.getElementById('versionTag') || {}).textContent || '未知';
+                // 线上 sw.js 实际 CACHE_VERSION
                 let onlineVer = '未知';
                 try {
                     const txt = await (await fetch('sw.js?_cb=' + Date.now())).text();
                     const m = /const CACHE_VERSION\s*=\s*'([^']+)'/.exec(txt);
                     if (m) onlineVer = m[1];
                 } catch (e) {}
+                // 指令 Gist 推荐的 latestSwVersion
                 let pushVer = '未设置';
                 try {
                     const g = await _toolboxGistGet(TOOLBOX_GIST_ID);
@@ -22560,21 +22553,6 @@ ${maSection}
                         const uMax = uTop.length ? uTop[0].v : 1, gMax = gTop.length ? gTop[0].v : 1, fMax = fTop.length ? fTop[0].v : 1;
                         let html = '<div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:8px 12px;margin-bottom:12px;">';
                         html += '📁 诊断 Gist: <code style="color:#60a5fa;">' + gid + '</code> ｜ 上报文件数: <b>' + diagFiles.length + '</b> ｜ 累计写入: <b>' + totalWrites + '</b> 次</div>';
-                        // 🔴 2026-08-28 新增：本程序 Gist 写入点全清单（静态，所有写入点一目了然，杜绝"未知操作"）
-                        html += '<div style="background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.3);border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:0.76rem;color:#cbd5e1;">';
-                        html += '<div style="color:#a5b4fc;font-weight:700;margin-bottom:6px;">🗂️ 本程序 Gist 写入点全清单（共 7 类，全部显式标记）</div>';
-                        html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;">';
-                        html += '<div>① 🔢 <b>计数器 Gist</b>（counter.json）<br><span style="color:#94a3b8;font-size:0.7rem;">在线保活/计数器同步 · 前端+Rust心跳</span></div>';
-                        html += '<div>② 📅 <b>登录打卡 Gist</b>（login-log.json）<br><span style="color:#94a3b8;font-size:0.7rem;">每日登录打卡 · 前端+Rust心跳</span></div>';
-                        html += '<div>③ 🩺 <b>诊断 Gist</b>（diag-*.json）<br><span style="color:#94a3b8;font-size:0.7rem;">诊断上报/存活心跳 · 前端</span></div>';
-                        html += '<div>④ 💬 <b>消息墙 Gist</b><br><span style="color:#94a3b8;font-size:0.7rem;">需求墙发言/备份 · 前端</span></div>';
-                        html += '<div>⑤ 🛡️ <b>Boss减伤 Gist</b><br><span style="color:#94a3b8;font-size:0.7rem;">Boss减伤数据保存 · 前端</span></div>';
-                        html += '<div>⑥ 🏠 <b>房间/脚本/其他 Gist</b><br><span style="color:#94a3b8;font-size:0.7rem;">房间数据/脚本分享/新建 · 前端</span></div>';
-                        html += '<div>⑦ 📑 <b>索引 Gist</b>（room_index）<br><span style="color:#94a3b8;font-size:0.7rem;">房间/脚本索引维护 · 前端</span></div>';
-                        html += '<div>🛠️ <b>管理员指令 Gist</b>（admin_ctl.json）<br><span style="color:#94a3b8;font-size:0.7rem;">仅读取·管理员手工写·定向下发指令</span></div>';
-                        html += '</div>';
-                        html += '<div style="margin-top:6px;color:#94a3b8;font-size:0.7rem;">说明：①②③ 由 Rust 心跳线程直写（不受窗口冻结影响）；③④⑤⑥⑦ 由前端写。所有写操作均在诊断埋点中标记中文用途，不再出现未知 Gist 写入。</div>';
-                        html += '</div>';
                         html += '<div style="background:rgba(16,185,129,0.1);border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:0.82rem;color:#cbd5e1;">';
                         html += '🟢 存活客户端(60分钟内): <b style="color:#4ade80;">' + aliveCount + '</b> ｜ 其中写盘健康✓: <b style="color:#4ade80;">' + writeOkCount + '</b>';
                         if (aliveUsers.length) html += '<br><span style="color:#94a3b8;font-size:0.74rem;">' + aliveUsers.join('，') + '</span>';
@@ -22582,11 +22560,7 @@ ${maSection}
                         html += '<div style="margin-bottom:16px;"><div style="color:#ffd700;margin-bottom:4px;">👤 按用户 TOP <span style="color:#94a3b8;font-size:0.7rem;">（点行展开该用户的上报详情）</span></div>';
                         uTop.forEach((x, i) => {
                             const id = 'uDetail_' + i;
-                            const _uVer = (detailByUser[x.k] && detailByUser[x.k][0] && detailByUser[x.k][0].payload && detailByUser[x.k][0].payload.appExeVersion)
-                                ? '｜桌面v' + detailByUser[x.k][0].payload.appExeVersion
-                                : ((detailByUser[x.k] && detailByUser[x.k][0] && detailByUser[x.k][0].plat === 'app') ? '｜桌面v<span style="color:#f97316;">未知(旧包)</span>' : '');
-                            const _uPlat = (detailByUser[x.k] && detailByUser[x.k][0] && detailByUser[x.k][0].plat) ? '｜' + detailByUser[x.k][0].plat : '';
-                            html += '<div style="cursor:pointer;color:#cbd5e1;" onclick="var d=document.getElementById(\'' + id + '\');if(d.style.display===\'none\'){d.style.display=\'block\';}else{d.style.display=\'none\';}">' + bar(x.v, uMax) + ' ' + x.v + '　' + x.k + _uPlat + _uVer + ' <span style="color:#60a5fa;font-size:0.7rem;">▶</span></div>';
+                            html += '<div style="cursor:pointer;color:#cbd5e1;" onclick="var d=document.getElementById(\'' + id + '\');if(d.style.display===\'none\'){d.style.display=\'block\';}else{d.style.display=\'none\';}">' + bar(x.v, uMax) + ' ' + x.v + '　' + x.k + ' <span style="color:#60a5fa;font-size:0.7rem;">▶</span></div>';
                             html += '<div id="' + id + '" style="display:none;background:rgba(0,0,0,0.25);border-left:2px solid #60a5fa;padding:6px 10px;margin:4px 0 8px 12px;font-size:0.75rem;">';
                             (detailByUser[x.k] || []).forEach(m => {
                                 const ts = m.last ? new Date(m.last).toLocaleString('zh-CN') : '?';
@@ -24350,13 +24324,14 @@ ${maSection}
             const isTauri = !!(window.__TAURI_INTERNALS__ || window.__TAURI__);
             const inTray = isTauri && window.__tfjlInTray === true;
             const inBackground = isTauri ? inTray : document.hidden;
-            if (inBackground) {
-                console.log('[更新] 处于后台/托盘，静默强制更新到新版本');
+            // 🔴 2026-08-27 改：强制更新总开关「只管自动升级」。开关关 → 无论前后台都只弹气泡，绝不自动升级。
+            if (inBackground && window.__diagForceReload) {
+                console.log('[更新] 处于后台/托盘且开关开，静默强制更新到新版本');
                 if (typeof forceRefreshLatest === 'function') { forceRefreshLatest(); return; }
                 location.reload(true);
                 return;
             }
-            // 前台（APP 前台 或 网页前台）：绝不自动升级，只弹彩球（用户手动点才升）
+            // 其余（前台 / 或开关关的后台）：绝不自动升级，只弹彩球（用户手动点才升）
             if (typeof showSwUpdateBanner === 'function') showSwUpdateBanner();
         }
         window.notifyNewVersion = notifyNewVersion;
@@ -24371,7 +24346,8 @@ ${maSection}
                     '@keyframes swBg{0%{background-position:0% 50%}100%{background-position:300% 50%}}',
                     '@keyframes swFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}',
                     '@keyframes swGlow{0%,100%{box-shadow:0 0 14px #ff6b6b,0 0 26px #ffd700,0 0 38px #4ecdc4}50%{box-shadow:0 0 18px #4ecdc4,0 0 32px #a78bfa,0 0 46px #ff6b6b}}',
-                    '#swUpdateBanner{position:fixed;left:20px;bottom:20px;z-index:99999;display:flex;align-items:center;gap:7px;padding:12px 18px;border-radius:999px;cursor:pointer;color:#fff;font-size:0.85rem;font-weight:700;letter-spacing:0.5px;background:linear-gradient(90deg,#ff6b6b,#ffd700,#4ecdc4,#a78bfa,#ff6b6b);background-size:300% 100%;animation:swBg 6s linear infinite,swFloat 3s ease-in-out infinite,swGlow 2.4s ease-in-out infinite;user-select:none;}',
+                    // 位置固定左下角（右下角是双击刷新/版本号标签，不要挤）。
+                    '#swUpdateBanner{position:fixed;left:14px;bottom:70px;z-index:99999;display:flex;align-items:center;gap:7px;padding:10px 16px;border-radius:999px;cursor:pointer;color:#fff;font-size:0.82rem;font-weight:700;letter-spacing:0.5px;background:linear-gradient(90deg,#ff6b6b,#ffd700,#4ecdc4,#a78bfa,#ff6b6b);background-size:300% 100%;animation:swBg 6s linear infinite,swFloat 3s ease-in-out infinite,swGlow 2.4s ease-in-out infinite;user-select:none;}',
                     '#swUpdateBanner:hover{filter:brightness(1.12);}',
                     '#swUpdateBanner .sw-dot{width:8px;height:8px;border-radius:50%;background:#fff;box-shadow:0 0 8px #fff;}'
                 ].join('\n');
