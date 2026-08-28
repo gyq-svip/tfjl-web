@@ -836,7 +836,15 @@ if (true) {
         try {
             const tag = document.getElementById('versionTag');
             if (tag) {
-                const av = (typeof getAppVersion === 'function') ? await getAppVersion() : '?';
+                // 🔴 2026-08-29 修复：优先用 __TAURI__.app.getVersion()（=tauri.conf.json 正确版本 2.0.19），
+                // 回退才用 getAppVersion() 命令（=Cargo.toml 旧值 2.0.16，与 tauri.conf.json 未对齐时的脏值）
+                let av = '?';
+                try {
+                    if (window.__TAURI__ && window.__TAURI__.app && typeof window.__TAURI__.app.getVersion === 'function') {
+                        av = await window.__TAURI__.app.getVersion();
+                    }
+                } catch (e) {}
+                if ((!av || av === '?') && typeof getAppVersion === 'function') { try { av = await getAppVersion(); } catch (e) {} }
                 const base = (typeof window.__DEPLOY_TAG === 'string' && window.__DEPLOY_TAG) ? window.__DEPLOY_TAG
                          : ((tag.textContent.split(' · ')[0] || '').trim() || 'App');
                 tag.textContent = base + ' · App v' + (av || '?');
