@@ -818,7 +818,9 @@ if (true) {
 
     async function initAppLocal() {
         const btn = document.getElementById('appLocalSettingsBtn');
-        if (btn && _isTauriRuntime()) btn.style.display = 'flex';
+        // 按钮无条件显示（网页端/App端都显示）；真正的 Tauri 环境判断放在点击时（openAppLocalSettings 内）进行，
+        // 避免 Tauri 全局注入晚于本函数执行导致误判为 false 而不显示按钮
+        if (btn) btn.style.display = 'flex';
         await restoreLocalFromDisk();  // 先恢复磁盘配置（重装/清缓存后复原）
         loadConfig();
         initDataSync();  // 启动 localStorage → 用户数据目录自动同步
