@@ -9584,14 +9584,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             img.className = 'skin-layer';
             img.alt = '';
             img.src = finalSrc;
-            // 🔴 双保险：若 asset:// 加载失败（极端环境），回退到 Rust 读图 blob，避免变黑
-            img.onerror = async function() {
+            // 加载失败：仅记录并移除（asset:// 优先 + 双缓冲已保证正常环境顺畅，不再做异步回退以免引入竞态）
+            img.onerror = function() {
                 if (!img.isConnected) return;
-                console.error('[SKIN] 皮肤图加载失败, 尝试回退:', skinUrl.substring(0, 60));
-                try {
-                    const fb = await window.resolveHeroSkinInfo(skinHeroName, slotSkin);
-                    if (fb && fb.url && fb.url.indexOf('asset:') !== 0 && img.isConnected) { img.src = fb.url; return; }
-                } catch (e) {}
+                console.warn('[SKIN] 皮肤图加载失败:', (skinUrl || '').substring(0, 60));
                 if (img.isConnected) img.remove();
             };
             img.onload = function() {
@@ -10859,11 +10855,11 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const skins = window.getHeroSkins ? window.getHeroSkins(heroName) : [];
             /* [SKIN log muted] */ void (0) && console.log('[SKIN] getHeroSkins result:', skins.length, 'skins:', skins.map(s => s.name));
             if (!skins.length) { console.warn('[SKIN] No skins available, aborting cycle'); return; }
-            // 🔴 2026-08-30 修复「连续右击切不」：同一槽正在切时，把本次点击记为 pending（不并发），
-            // 上一次完成后自动再切一格 → 快速连点不丢点击、且不会因读到中间状态而跳不动。
+            // 🔴 简单防重入：同一槽正在切时忽略本次点击（现在 asset:// 原生切皮很快，不会卡，丢失一两次点击无妨）。
+            //    去掉之前的 pending 连点累加（递归复杂、且现环境已不需）。
             const _slotEl = document.querySelector('.battle-slot[data-slot="' + slotId + '"]');
             if (_slotEl) {
-                if (_slotEl._cycling) { _slotEl._pendingCycle = (_slotEl._pendingCycle || 0) + 1; return; }
+                if (_slotEl._cycling) return;
                 _slotEl._cycling = true;
             }
             try {
@@ -10909,11 +10905,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             }
             return nextSkin;
             } finally {
-                // 🔴 2026-08-30 解锁 + 处理 pending 累加的连点：若切皮期间又右击了，自动再切一格
-                if (_slotEl) {
-                    _slotEl._cycling = false;
-                    if (_slotEl._pendingCycle > 0) { _slotEl._pendingCycle -= 1; _slotEl._cycling = false; cycleHeroSkin(heroName, slotId); }
-                }
+                // 🔴 简单复位：解锁，下次右击即可再切
+                if (_slotEl) _slotEl._cycling = false;
             }
         }
 
