@@ -9571,7 +9571,17 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             img.className = 'skin-layer';
             img.alt = '';
             img.src = finalSrc;
-            img.onerror = function() { console.error('[SKIN] Failed to load skin image:', skinUrl.substring(0, 80)); img.remove(); };
+            // 🔴 2026-08-30 双保险：若当前 src 是原生 asset:// 且加载失败（CSP 拦截等），自动回退到 Rust 读图 blob，避免槽位变黑。
+            //    blob 优先路径下正常不会走到这里（仍加锁防极端）。
+            img.onerror = async function() {
+                if (!img.isConnected) return;
+                console.error('[SKIN] 皮肤图加载失败, 尝试回退:', skinUrl.substring(0, 60));
+                try {
+                    const fb = await window.resolveHeroSkinInfo(skinHeroName, slotSkin);
+                    if (fb && fb.url && fb.url.indexOf('asset:') !== 0 && img.isConnected) { img.src = fb.url; return; }
+                } catch (e) {}
+                if (img.isConnected) img.remove();
+            };
             img.onload = function() { /* [SKIN log muted] */ void (0) && console.log('[SKIN] Skin image loaded OK for slot', slot.dataset.slot); };
             slot.insertBefore(img, slot.firstChild);
             slot.classList.add('skin-bg');
