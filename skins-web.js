@@ -88,6 +88,12 @@
 
   // 获取皮肤 blob URL（网页版：IndexedDB 优先；未命中则同源 fetch .skin + 单飞去重 + 超时重试）
   var _skinInflight = {}; // key -> 进行中的 fetch promise（避免并发重复拉同一张图挤占连接池）
+  // 🔴 2026-08-29 内存修复：objectURL 复用缓存。
+  // 原实现每次取皮肤都 URL.createObjectURL(blob) 且从不 revokeObjectURL，
+  // 导致 reapplyAllSkins 重复执行 / 切项目 / 刷新时无限创建新的 blob URL，
+  // 旧 URL 引用的 Blob 与解码纹理无法 GC，长期挂机 → 任务管理器 1.7~3GB 暴涨。
+  // 改为按 key 复用一个永久 objectURL（进程生命周期内有效），每个皮肤只 createObjectURL 一次。
+  var _objectUrlCache = {}; // key -> 已创建的 objectURL（永不 revoke，复用）
   async function _getCachedSkinUrl(remoteUrl) {
     if (!remoteUrl) return null;
     if (!/^https?:\/\//i.test(remoteUrl)) return remoteUrl;
@@ -97,10 +103,16 @@
     var hero = decodeURIComponent(m[1]);
     var file = decodeURIComponent(m[2]);
     var key = 'skin:' + hero + '/' + file;
+    // 🔴 复用已创建的 objectURL，避免重复 createObjectURL 造成 Blob 泄漏
+    if (_objectUrlCache[key]) return _objectUrlCache[key];
     // 1) IndexedDB 命中即返回（毫秒级，离线/弱网也能显示已缓存皮肤）
     var cached = await _idbGet(key);
     if (cached && cached.blob) {
-      try { return URL.createObjectURL(cached.blob); }
+      try {
+        var u1 = URL.createObjectURL(cached.blob);
+        _objectUrlCache[key] = u1; // 缓存复用
+        return u1;
+      }
       catch (e) { console.warn('[SKIN-WEB] createObjectURL failed:', e); }
     }
     // 2) 单飞：同一张图正在拉取，复用同一 promise，避免 N 张同英雄并发 N 次 fetch
@@ -112,7 +124,9 @@
         if (resp && resp.ok) {
           var blob = await resp.blob();
           _idbPut(key, blob); // 回写缓存，下次刷新即稳定
-          return URL.createObjectURL(blob);
+          var u2 = URL.createObjectURL(blob);
+          _objectUrlCache[key] = u2; // 缓存复用，避免后续重复创建
+          return u2;
         }
       } catch (e) { console.warn('[SKIN-WEB] 皮肤加载失败:', url, e); }
       return null; // 全部失败：返回 null（已有 IndexedDB 兜底，多数情况命中）
