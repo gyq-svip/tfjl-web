@@ -39,6 +39,7 @@
     "allow-download-umi-ocr",
     "allow-download-skins",
     "allow-download-installer",
+    "allow-publish-skins",
     "allow-get-app-version",
     "allow-check-app-update",
     "allow-install-app-update",

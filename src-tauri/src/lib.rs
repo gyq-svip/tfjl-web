@@ -515,9 +515,12 @@ fn append_text_file(file_path: String, content: String) -> Result<(), String> {
 /// 返回诊断日志落盘目录（置于 OS 应用缓存目录内，避免污染软件数据根目录）。
 /// Windows: %LOCALAPPDATA%\<app-cache>\tfjl_diag\  ；macOS/Linux: 对应 cache dir 下 tfjl_diag\
 #[tauri::command]
-fn get_diag_log_dir() -> Result<String, String> {
-    let dir = tauri::api::path::app_cache_dir()
-        .ok_or_else(|| "无法获取应用缓存目录".to_string())?
+fn get_diag_log_dir(app: tauri::AppHandle) -> Result<String, String> {
+    // Tauri v2 移除了 tauri::api::path，统一走 app.path()（Manager trait 已在文件顶部导入）
+    let dir = app
+        .path()
+        .app_cache_dir()
+        .map_err(|e| format!("无法获取应用缓存目录: {}", e))?
         .join("tfjl_diag");
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     Ok(dir.to_string_lossy().to_string())
@@ -597,6 +600,43 @@ fn git_push_skins() -> Result<String, String> {
         Err(e) => { log.push_str("• gitee: 跳过（"); log.push_str(&e); log.push_str("）\n"); }
     }
     Ok(log)
+}
+
+/// 执行 PowerShell 脚本（在指定目录），返回合并后的 stdout+stderr；非零退出码返回错误文本
+fn run_ps(repo: &str, script: &str, extra: &[&str]) -> Result<String, String> {
+    let mut args: Vec<String> = vec![
+        "-NoProfile".into(),
+        "-ExecutionPolicy".into(),
+        "Bypass".into(),
+        "-File".into(),
+        script.into(),
+    ];
+    for e in extra { args.push((*e).into()); }
+    let out = Command::new("powershell")
+        .args(&args)
+        .current_dir(repo)
+        .output()
+        .map_err(|e| format!("执行 PowerShell 失败: {}", e))?;
+    let stdout = String::from_utf8_lossy(&out.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&out.stderr).to_string();
+    if !out.status.success() {
+        return Err(format!("{} 执行失败:\n{}\n{}", script, stdout, stderr));
+    }
+    Ok(format!("{}{}", stdout, stderr))
+}
+
+/// 一键打包皮肤并发布：皮肤包 -> Gitee 发行版（国内快），索引 skins-index.json -> GitHub Pages。
+/// 脚本内部保证「上传+校验成功后才更新索引」，任何一步失败都不会让用户断供。
+/// token 为空时脚本回退读取用户环境变量 GITEE_TOKEN。
+#[tauri::command]
+fn publish_skins(token: Option<String>) -> Result<String, String> {
+    let repo = "d:\\tfjl-web";
+    let tok = token.unwrap_or_default();
+    if tok.is_empty() {
+        run_ps(repo, "publish_skins.ps1", &[])
+    } else {
+        run_ps(repo, "publish_skins.ps1", &["-GiteeToken", &tok])
+    }
 }
 
 /// 自增 index.html 的 versionTag 与 sw.js 的 CACHE_VERSION
@@ -845,8 +885,8 @@ struct FileInfo {
 /// 将距 Unix epoch 的天数转为 (年, 月, 日)
 fn civil_from_days(days: i64) -> (i64, u32, u32) {
     let z = days as i64;
-    let mut era = if z >= 0 { z } else { z - 146096 } / 146097;
-    let mut doe = (z - era * 146097) as u32;
+    let era = if z >= 0 { z } else { z - 146096 } / 146097;
+    let doe = (z - era * 146097) as u32;
     let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
     let y = yoe as i64 + era * 400;
     let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
@@ -1220,14 +1260,14 @@ async fn download_umi_ocr(app: tauri::AppHandle) -> Result<String, String> {
 /// 皮肤包 skins.zip 由开发者预先打包仓库 skins/ 目录上传到 Gitee 发行版（tag v-skins），
 /// 解压到 D:\withfriends\塔防精灵助手数据\data\skin\，之后 scanSkins 直接读本地，秒开无网可用。
 #[tauri::command]
-async fn download_skins(app: tauri::AppHandle) -> Result<String, String> {
+async fn download_skins(app: tauri::AppHandle, force: Option<bool>) -> Result<String, String> {
     let base = r"D:\withfriends\塔防精灵助手数据\data\skin";
     let _ = std::fs::create_dir_all(base);
-    let zip_path = format!("{}\\skins_download_tmp.zip", base);
-
-    let gitee_tag = "v-skins";
-    let pkg = "skins.zip";
-    let url = format!("https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/releases/download/{}/{}", gitee_tag, pkg);
+    // 临时 zip 放在皮肤目录之外，避免"先删目录"时把自己删掉
+    let tmp_dir = r"D:\withfriends\塔防精灵助手数据\data";
+    let _ = std::fs::create_dir_all(tmp_dir);
+    let zip_path = format!("{}\\skins_download_tmp.zip", tmp_dir);
+    let installed_path = format!("{}\\skins_installed.json", tmp_dir);
 
     let client = reqwest::Client::builder()
         .no_proxy()
@@ -1236,15 +1276,57 @@ async fn download_skins(app: tauri::AppHandle) -> Result<String, String> {
         .build()
         .map_err(|e| format!("创建下载客户端失败: {}", e))?;
 
-    let _ = app.emit("skin-download-progress", serde_json::json!({"stage":"start","url":url}));
+    // ===== 1. 从 GitHub Pages 读索引（几 KB，秒开），拿到当前有效包名 =====
+    // 索引由 publish_skins.ps1 在"上传+校验成功后"才更新，因此永远指向一个可用的好包。
+    let index_url = "https://gyq-svip.github.io/tfjl-web/skins-index.json";
+    let idx_resp = client.get(index_url).send().await
+        .map_err(|e| format!("读取皮肤索引失败: {}（将回退到固定包名 skins.zip）", e))?;
+    let idx: serde_json::Value = if idx_resp.status().is_success() {
+        idx_resp.json().await.unwrap_or(serde_json::Value::Null)
+    } else {
+        serde_json::Value::Null
+    };
+    let pkg = idx.get("package").and_then(|v| v.as_str()).unwrap_or("skins.zip").to_string();
+    let remote_updated = idx.get("updated").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let remote_skins = idx.get("skins").and_then(|v| v.as_u64()).unwrap_or(0);
+    let remote_size = idx.get("size").and_then(|v| v.as_u64()).unwrap_or(0);
+
+    // ===== 2. 已装同版本且非强制 -> 直接跳过下载（省流量、秒开）=====
+    let installed_pkg = std::fs::read_to_string(&installed_path).unwrap_or_default();
+    if force != Some(true) && !installed_pkg.is_empty() {
+        if let Ok(v) = serde_json::from_str::<serde_json::Value>(&installed_pkg) {
+            let p = v.get("package").and_then(|x| x.as_str()).unwrap_or("");
+            if p == pkg && !pkg.is_empty() {
+                let _ = app.emit("skin-download-progress", serde_json::json!({"stage":"uptodate","package":pkg}));
+                return Ok(format!("皮肤已是最新（{}，{} 张），无需重新下载", pkg, remote_skins));
+            }
+        }
+    }
+
+    let gitee_tag = "v-skins";
+    let url = format!("https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/releases/download/{}/{}", gitee_tag, pkg);
+
+    let _ = app.emit("skin-download-progress", serde_json::json!({"stage":"start","url":url,"package":pkg}));
     let data = fetch_to_vec(&client, &url, &app, 0, 0, "skins").await
-        .map_err(|e| format!("下载皮肤包失败: {}。请检查网络或稍后重试", e))?;
+        .map_err(|e| format!("下载皮肤包失败: {}。本地皮肤保持原样未改动", e))?;
+
+    // ===== 3. 完整性校验：索引声明了大小就必须一致，防止拿到坏包/错误页面 =====
+    if remote_size > 0 && data.len() as u64 != remote_size {
+        return Err(format!(
+            "皮肤包大小不一致（下载 {} 字节，索引声明 {} 字节），已中止。本地皮肤未改动，请重试",
+            data.len(), remote_size
+        ));
+    }
+    if data.len() < 1024 {
+        return Err(format!("下载内容异常（仅 {} 字节），可能拿到错误页面，已中止", data.len()));
+    }
 
     tokio::fs::write(&zip_path, &data).await.map_err(|e| e.to_string())?;
-    // 先删除旧的皮肤目录，再解压新包，避免残留旧皮肤文件导致显示异常 / 更新后不刷新
+
+    // ===== 4. 下载+校验全部成功后，才清空旧目录并解压（失败时本地皮肤完好无损）=====
+    let _ = app.emit("skin-download-progress", serde_json::json!({"stage":"extract"}));
     let _ = std::fs::remove_dir_all(&base);
     let _ = std::fs::create_dir_all(&base);
-    let _ = app.emit("skin-download-progress", serde_json::json!({"stage":"extract"}));
 
     #[cfg(windows)] {
         use std::os::windows::process::CommandExt;
@@ -1256,16 +1338,28 @@ async fn download_skins(app: tauri::AppHandle) -> Result<String, String> {
             .map_err(|e| format!("解压失败: {}", e))?;
         if !out.status.success() {
             let msg = String::from_utf8_lossy(&out.stderr);
-            return Err(format!("解压皮肤包失败: {}。可手动下载 skins.zip 解压到 {}", msg, base));
+            return Err(format!("解压皮肤包失败: {}。本地皮肤目录已清空，请重试或手动解压 {}", msg, zip_path));
         }
     }
     #[cfg(not(windows))] {
         return Err("当前仅支持 Windows 解压皮肤包".into());
     }
 
+    // ===== 5. 记录已装版本，下次启动直接跳过下载 =====
+    let installed_at = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let rec = serde_json::json!({
+        "package": pkg,
+        "updated": remote_updated,
+        "skins": remote_skins,
+        "installedAt": installed_at,
+    });
+    let _ = std::fs::write(&installed_path, rec.to_string());
     let _ = std::fs::remove_file(&zip_path);
-    let _ = app.emit("skin-download-progress", serde_json::json!({"stage":"done"}));
-    Ok(format!("皮肤包已解压到 {}", base))
+    let _ = app.emit("skin-download-progress", serde_json::json!({"stage":"done","package":pkg,"skins":remote_skins}));
+    Ok(format!("皮肤包 {} 已解压到 {}（{} 张皮肤）", pkg, base, remote_skins))
 }
 
 /// 下载新版安装包到本机固定目录（返回保存路径）。
@@ -1386,6 +1480,7 @@ pub fn run() {
             download_umi_ocr,
             download_skins,
             download_installer,
+            publish_skins,
         ])
         .manage(AppState { umi_pid: std::sync::Mutex::new(None), heartbeat: std::sync::Mutex::new(None), checkin_day: std::sync::Mutex::new(None) })
         .setup(|app| {
