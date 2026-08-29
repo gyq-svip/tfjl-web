@@ -24087,7 +24087,7 @@ ${maSection}
 
         // ==================== 终端命令输入框（替代 F12，App 内直接执行 JS）====================
         // 终端底部输入框回车/点执行 → 跑一段 JS，结果打印到终端。
-        // 内置快捷命令（直接输函数名即可）：clearSWCache() / showAppBtn() / checkAppLocal() / appLocalStatus() / verProbe()
+        // 内置快捷命令（直接输函数名即可）：clearSWCache() / showAppBtn() / checkAppLocal() / appLocalStatus() / verProbe() / memoryReport() / freeMemory()
         window.floatConsoleExec = function () {
             const inp = document.getElementById('floatConsoleCmd');
             if (!inp) return;
@@ -24103,6 +24103,8 @@ ${maSection}
                 else if (code === 'appLocalStatus()') result = window.appLocalStatus();
                 else if (code === 'verProbe()') result = window.__tfjlVerProbe();
                 else if (code === 'toolboxDiag()') result = window.__tfjlToolboxDiag();
+                else if (code === 'memoryReport()') result = window.memoryReport();
+                else if (code === 'freeMemory()') result = window.freeMemory();
                 else result = (function () { return eval(code); })();
                 if (result && typeof result.then === 'function') {
                     result.then(r => { if (r !== undefined) console.log('[CMD] = ' + (typeof r === 'object' ? JSON.stringify(r).slice(0, 800) : r)); }).catch(e => console.error('[CMD] 异步出错: ' + e.message));
@@ -24199,6 +24201,88 @@ ${maSection}
         // 绑定 window（onkeydown 里用到的 floatConsoleExec 需全局可见）
         window.floatConsoleExec = window.floatConsoleExec;
 
+        // 🔴 2026-08-29 内存诊断：终端输入 memoryReport() 查看内存占用构成
+        // 用于定位"小小工具却吃掉 1.4G"到底是哪部分在涨（JS 堆 / DOM / 皮肤图缓存 / 日志）
+        window.memoryReport = function () {
+            const mb = (bytes) => bytes == null ? 'n/a' : (bytes / 1048576).toFixed(1) + ' MB';
+            const rep = {};
+            // ① V8 JS 堆（仅 Chromium/WebView2 提供；非精确值，但足以判断是不是 JS 泄漏）
+            const pm = (typeof performance !== 'undefined') ? performance.memory : null;
+            if (pm) {
+                rep['JS堆-已用'] = mb(pm.usedJSHeapSize);
+                rep['JS堆-当前总量'] = mb(pm.totalJSHeapSize);
+                rep['JS堆-上限'] = mb(pm.jsHeapSizeLimit);
+                rep['JS堆-占用上限比例'] = pm.jsHeapSizeLimit ? (pm.usedJSHeapSize / pm.jsHeapSizeLimit * 100).toFixed(1) + '%' : 'n/a';
+            } else {
+                rep['JS堆'] = '当前环境不支持 performance.memory';
+            }
+            // ② DOM 规模（节点过多会显著推高渲染进程内存）
+            try { rep['DOM节点总数'] = document.getElementsByTagName('*').length; } catch (e) { rep['DOM节点总数'] = '读取失败'; }
+            try { rep['IMG元素数'] = document.getElementsByTagName('img').length; } catch (e) { rep['IMG元素数'] = '读取失败'; }
+            // ③ 皮肤图 URL 缓存（app-local2.js 提供统计；这是本次内存优化的重点）
+            if (typeof window.skinCacheStats === 'function') {
+                try {
+                    const s = window.skinCacheStats();
+                    rep['皮肤URL缓存-条目数'] = s.size + ' / 上限 ' + s.max;
+                    rep['皮肤URL缓存-预估占用'] = mb(s.bytes);
+                } catch (e) { rep['皮肤URL缓存'] = '统计失败: ' + e.message; }
+            } else {
+                rep['皮肤URL缓存'] = 'app-local2.js 未提供 skinCacheStats()';
+            }
+            // ④ 控制台日志（超长 msg 会持续占着字符串内存）
+            try {
+                const logs = window.__consoleLogs || [];
+                let chars = 0;
+                for (let i = 0; i < logs.length; i++) chars += (logs[i] && logs[i].msg ? logs[i].msg.length : 0);
+                rep['控制台日志-条数'] = logs.length;
+                rep['控制台日志-字符数'] = chars + ' (~' + (chars / 1048576).toFixed(2) + ' MB 字符串)';
+            } catch (e) { rep['控制台日志'] = '读取失败'; }
+            // ⑤ localStorage 体量（存储层不常驻内存，但过大说明有可清理的冗余）
+            try {
+                let n = 0;
+                for (let i = 0; i < localStorage.length; i++) n += (localStorage.key(i) || '').length + (localStorage.getItem(localStorage.key(i)) || '').length;
+                rep['localStorage-项数'] = localStorage.length;
+                rep['localStorage-总量'] = (n / 1048576).toFixed(2) + ' MB';
+            } catch (e) { rep['localStorage'] = '读取失败'; }
+            // ⑥ 皮肤注册表规模
+            try {
+                const reg = window.skinRegistry || {};
+                let cnt = 0;
+                for (const k in reg) cnt += (reg[k] || []).length;
+                rep['皮肤注册表-英雄数'] = Object.keys(reg).length;
+                rep['皮肤注册表-皮肤总数'] = cnt;
+            } catch (e) { rep['皮肤注册表'] = '读取失败'; }
+
+            console.log('=== 内存报告 memoryReport() ===');
+            for (const k in rep) console.log('  ' + k + ': ' + rep[k]);
+            console.log('=== 报告结束（提示：freeMemory() 可主动释放皮肤缓存与日志） ===');
+            return rep;
+        };
+
+        // 🔴 2026-08-29 主动释放内存：清空皮肤 URL 缓存 + 控制台日志（不必重启 App 即可回收）
+        window.freeMemory = function () {
+            const before = (performance.memory ? performance.memory.usedJSHeapSize : 0);
+            let freedSkins = 0;
+            if (typeof window.clearSkinUrlCache === 'function') {
+                try { window.clearSkinUrlCache(); freedSkins = 1; } catch (e) {}
+            }
+            let logsBefore = 0;
+            try { logsBefore = (window.__consoleLogs || []).length; window.__consoleLogs = []; } catch (e) {}
+            // 温和提示 GC（仅当浏览器暴露该接口时）
+            try { if (typeof window.gc === 'function') window.gc(); } catch (e) {}
+            const after = performance.memory ? performance.memory.usedJSHeapSize : 0;
+            const res = {
+                '皮肤缓存已释放': freedSkins ? '是' : '否（app-local2.js 未加载该函数）',
+                '已清空日志条数': logsBefore,
+                '释放前JS堆': before ? (before / 1048576).toFixed(1) + ' MB' : 'n/a',
+                '释放后JS堆': after ? (after / 1048576).toFixed(1) + ' MB' : 'n/a'
+            };
+            console.log('=== freeMemory() 已执行 ===');
+            for (const k in res) console.log('  ' + k + ': ' + res[k]);
+            console.log('注：浏览器空闲时才真正回收，数值可能几秒后才下降。');
+            return res;
+        };
+
         // 快捷：清空 Service Worker 缓存（强刷前端）
         window.clearSWCache = function () {
             return new Promise((resolve) => {
@@ -24244,6 +24328,8 @@ ${maSection}
             return entries;
         };
 
+        // 🔴 2026-08-29 浮动控制台渲染状态：脏检查签名（避免 500ms 无变化时全量重建 DOM）
+        let _lastConsoleRenderSig = '';
         function refreshFloatConsole() {
             const content = document.getElementById('floatConsoleContent');
             if (!content) return;
@@ -24269,23 +24355,41 @@ ${maSection}
                 return;
             }
             const levelColors = { error: '#f44336', warn: '#ff9800', info: '#00bcd4', log: 'rgba(255,255,255,0.7)' };
+            // 🔴 2026-08-29 内存/性能优化（App 曾涨到 1.4G，此处是推手之一）：
+            //   ① 脏检查：500ms 轮询时若日志与过滤条件都没变，直接返回，不再重建 innerHTML
+            //      —— 原实现每 500ms 无条件重建上千个 div，产生大量待回收的 DOM 与字符串
+            //   ② 渲染上限：只渲染最后 300 条，避免日志多时生成海量 DOM 节点
+            const FLOAT_CONSOLE_MAX_RENDER = 300;
+            const lastLog = logs[logs.length - 1];
+            const renderSig = logs.length + '|' + floatFilter + '|' + floatLevelFilter + '|' +
+                (lastLog ? (lastLog.time + '#' + (lastLog.msg || '').length) : '');
+            if (renderSig === _lastConsoleRenderSig) return;
+            _lastConsoleRenderSig = renderSig;
+            const renderLogs = (logs.length > FLOAT_CONSOLE_MAX_RENDER) ? logs.slice(-FLOAT_CONSOLE_MAX_RENDER) : logs;
+            const offset = logs.length - renderLogs.length;
             const prevScrollTop = content.scrollTop;
             const wasAtBottom = content.scrollHeight - content.scrollTop - content.clientHeight < 50;
             // 最新日志在底部（logs 为时间顺序，直接顺序渲染），不再 reverse
-            const items = logs.map((l, i) => {
+            const items = renderLogs.map((l, i) => {
                 const color = levelColors[l.level] || 'rgba(255,255,255,0.6)';
                 return '<div style="color:' + color + ';padding:1px 4px;border-bottom:1px solid rgba(255,255,255,0.02);line-height:1.35;">' +
-                    '<span style="color:rgba(255,255,255,0.2);margin-right:5px;">' + (i + 1) + '</span>' +
+                    '<span style="color:rgba(255,255,255,0.2);margin-right:5px;">' + (offset + i + 1) + '</span>' +
                     '<span style="color:rgba(255,255,255,0.22);margin-right:5px;">' + l.time + '</span>' +
                     '<span style="font-weight:500;margin-right:3px;">[' + l.level.toUpperCase() + ']</span>' +
                     l.msg.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>';
             }).join('');
+            // 超出渲染上限时顶部补提示，避免误以为日志丢失（导出仍含全部）
+            const truncatedTip = (offset > 0)
+                ? '<div style="color:rgba(255,255,255,0.3);text-align:center;padding:4px;font-size:0.7rem;">（仅显示最后 ' +
+                  FLOAT_CONSOLE_MAX_RENDER + ' 条，共 ' + logs.length + ' 条；导出日志仍含全部）</div>'
+                : '';
             // 用户正在日志窗内框选文本（鼠标拖选或键盘 Shift 选）时不重绘，避免 500ms 轮询清空选区导致无法复制某一段
             try {
                 const sel = window.getSelection();
-                if (sel && !sel.isCollapsed && content.contains(sel.anchorNode)) return;
+                // 注意：此处需清空签名，否则本次跳过重建后，下次轮询因签名相同会永远不再刷新
+                if (sel && !sel.isCollapsed && content.contains(sel.anchorNode)) { _lastConsoleRenderSig = ''; return; }
             } catch (_) {}
-            content.innerHTML = items;
+            content.innerHTML = truncatedTip + items;
             if (floatAutoScroll && wasAtBottom) content.scrollTop = content.scrollHeight;
             else if (floatAutoScroll && prevScrollTop > 0) content.scrollTop = prevScrollTop;
         }
