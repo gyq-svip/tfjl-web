@@ -10521,12 +10521,11 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         var _reapplyTimer = null;
         var _reapplyPromise = null;
         function _doReapplyAllSkins() {
-            console.log('[SKIN] reapplyAllSkins start');
             return (async function () {
                 await refreshAllBattleSlotSkins();
                 updateHandDisplay('my');
                 updateHandDisplay('teammate');
-            })().then(function () { console.log('[SKIN] reapplyAllSkins done'); });
+            })();
         }
         window.reapplyAllSkins = async function() {
             // 若上一次重绘的 Promise 仍在进行，直接复用（避免并发重入重复重绘）
