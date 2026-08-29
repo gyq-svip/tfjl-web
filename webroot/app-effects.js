@@ -8,7 +8,24 @@
                 if (m.id !== 'backupMenu') m.style.display = 'none';
             });
             menu.style.display = menu.style.display === 'none' || menu.style.display === '' ? 'block' : 'none';
+            if (menu.style.display === 'block') {
+                updateEffectsVisibility();
+                updatePerfModeVisibility();
+            }
         }
+
+        // 性能模式菜单文案刷新（合并键：打开菜单时同步当前模式文案 + 高亮）
+        function updatePerfModeVisibility() {
+            let label = '⚡ 性能模式：高性能';
+            try { label = (window.getPerfModeLabel && window.getPerfModeLabel()) || label; } catch (e) {}
+            const el = document.getElementById('menuTogglePerfMode');
+            if (!el) return;
+            el.textContent = label;
+            el.style.background = 'rgba(255,215,0,0.18)';
+            el.style.color = '#ffd54f';
+            el.style.fontWeight = 'bold';
+        }
+        window.updatePerfModeVisibility = updatePerfModeVisibility;
 
         // 点击其他地方关闭菜单
         document.addEventListener('click', function(e) {
@@ -17,6 +34,59 @@
                 menu.style.display = 'none';
             }
         });
+
+        // 自定义悬浮提示：替代原生 title，定位在鼠标附近并限制在视口内（避免长文字溢出窗口）
+        (function () {
+            const tip = document.getElementById('customTooltip');
+            if (!tip) return;
+            function showTip(target, x, y) {
+                const text = target.getAttribute('title');
+                if (!text || !text.trim()) return;
+                target.setAttribute('data-title-cache', text);
+                target.removeAttribute('title'); // 隐藏原生 tooltip
+                tip.textContent = text;
+                tip.style.display = 'block';
+                const rect = tip.getBoundingClientRect();
+                let left = x + 14, top = y + 16;
+                if (left + rect.width > window.innerWidth - 8) left = x - rect.width - 14;
+                if (left < 8) left = 8;
+                if (top + rect.height > window.innerHeight - 8) top = y - rect.height - 16;
+                if (top < 8) top = 8;
+                tip.style.left = left + 'px';
+                tip.style.top = top + 'px';
+            }
+            function hideTip(target) {
+                tip.style.display = 'none';
+                if (target && target.getAttribute('data-title-cache')) {
+                    target.setAttribute('title', target.getAttribute('data-title-cache'));
+                    target.removeAttribute('data-title-cache');
+                }
+            }
+            document.addEventListener('mouseover', function (e) {
+                const t = e.target.closest('[title]');
+                if (!t) return;
+                showTip(t, e.clientX, e.clientY);
+            });
+            document.addEventListener('mousemove', function (e) {
+                if (tip.style.display !== 'block') return;
+                const t = e.target.closest('[title], [data-title-cache]');
+                if (!t) return;
+                const rect = tip.getBoundingClientRect();
+                let left = e.clientX + 14, top = e.clientY + 16;
+                if (left + rect.width > window.innerWidth - 8) left = e.clientX - rect.width - 14;
+                if (left < 8) left = 8;
+                if (top + rect.height > window.innerHeight - 8) top = e.clientY - rect.height - 16;
+                if (top < 8) top = 8;
+                tip.style.left = left + 'px';
+                tip.style.top = top + 'px';
+            });
+            document.addEventListener('mouseout', function (e) {
+                const t = e.target.closest('[title], [data-title-cache]');
+                if (!t) return;
+                if (e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest('[title], [data-title-cache]') === t) return;
+                hideTip(t);
+            });
+        })();
 
         // 全局拖拽防护：拖拽文件时阻止浏览器默认打开文件行为（不影响卡牌拖拽）
         window.addEventListener('dragover', function(e) {

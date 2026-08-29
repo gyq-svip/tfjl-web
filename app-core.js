@@ -18963,7 +18963,11 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 html += `<div style="font-size:0.82rem;color:rgba(255,255,255,0.6);">😴 今日未签到：${outs.length ? outs.map(s => escapeHtml(s.nick) + '<span style="color:rgba(255,255,255,0.4);">（上次 ' + rel(s.last) + '）</span>').join(' · ') : '无（全员到齐 🎉）'}</div>`;
             } else if (_loginTab === 'feed') {
                 // ---- 最近登录动态：按天手风琴（默认全折叠；点日期行展开当日"几点几分·谁"明细） ----
-                const recent = log.slice().sort((a, b) => b.ts - a.ts).slice(0, 60);
+                // 🔴 修复：原 slice(0,60) 在活跃时段一天就有几十次登录，60 条只够覆盖今天+昨天，
+                // 更早记录被截断 → 用户看到"最多到昨天"。改为「最近 14 天」过滤（兜底取最近 200 条）。
+                const _cutoff = Date.now() - 14 * 864e5;
+                let recent = log.filter(r => (r.ts || 0) >= _cutoff).sort((a, b) => b.ts - a.ts);
+                if (recent.length === 0) recent = log.slice().sort((a, b) => b.ts - a.ts).slice(0, 200);
                 const days = []; const dayMap = {};
                 for (const r of recent) {
                     const k = dayKey(r.ts);
