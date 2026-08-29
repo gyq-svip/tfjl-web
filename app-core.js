@@ -22,6 +22,40 @@
         const MAX_LOG_MSG_LEN = 2000;
         // 挂到 window：本文件的 runHeartbeatSelfCheck() 等在块作用域之外，无法直接访问该常量
         try { window.__MAX_LOG_MSG_LEN = MAX_LOG_MSG_LEN; } catch (e) {}
+
+        // 🔴 2026-08-29 诊断日志落盘：捕获的每条日志除了存内存，还可追加写本地文件（仅桌面端 Tauri 生效）。
+        //    默认关闭；终端跑 enableDiagLog() 开启，日志写到 数据目录/tfjl_diag/app-console-YYYY-MM-DD.log。
+        //    这样用户卡顿无法操作时，我可直接读取本地日志定位，无需用户来回手动测。
+        var _diagLogEnabled = false;
+        var _diagLogBuf = [];           // 待写缓冲
+        var _diagLogBaseDir = '';       // 数据目录（从 app-local2 注入，回退默认）
+        function _diagLogPath() {
+            var d = _diagLogBaseDir || 'D:\\withfriends\\塔防精灵助手数据';
+            var day = new Date().toISOString().slice(0, 10);
+            return d.replace(/[\\/]+$/, '') + '\\tfjl_diag\\app-console-' + day + '.log';
+        }
+        function _diagFlush() {
+            if (!_diagLogEnabled || _diagLogBuf.length === 0) return;
+            var batch = _diagLogBuf.join('');
+            _diagLogBuf = [];
+            try {
+                var fn = null;
+                if (window.__TAURI_INTERNALS__ && typeof window.__TAURI_INTERNALS__.invoke === 'function') fn = window.__TAURI_INTERNALS__.invoke.bind(window.__TAURI_INTERNALS__);
+                else if (window.__TAURI__ && window.__TAURI__.core && typeof window.__TAURI__.core.invoke === 'function') fn = window.__TAURI__.core.invoke.bind(window.__TAURI__.core);
+                if (fn) fn('append_text_file', { file_path: _diagLogPath(), content: batch }).catch(function(){});
+            } catch (e) {}
+        }
+        // 桌面端启动后由 app-local2 注入真实数据目录（与软件数据目录一致）
+        window.__setDiagLogDir = function (dir) { if (dir) _diagLogBaseDir = dir; };
+        window.enableDiagLog = function () {
+            _diagLogEnabled = true;
+            console.log('[DIAG-LOG] 已开启本地诊断日志落盘 → ' + _diagLogPath());
+        };
+        window.disableDiagLog = function () {
+            _diagLogEnabled = false;
+            console.log('[DIAG-LOG] 已关闭本地诊断日志落盘');
+        };
+
         (function captureConsole() {
             const orig = { log: console.log, warn: console.warn, error: console.error, info: console.info };
             function addLog(level, args) {
@@ -37,6 +71,11 @@
                 }
                 window.__consoleLogs.push({ time, level, msg });
                 if (window.__consoleLogs.length > MAX_CONSOLE_LOGS) window.__consoleLogs.splice(0, 100);
+                // 诊断落盘：攒进缓冲（含等级+时间，便于我直接读）
+                if (_diagLogEnabled) {
+                    _diagLogBuf.push(time + ' [' + level + '] ' + msg + '\n');
+                    if (_diagLogBuf.length >= 100) _diagFlush();
+                }
                 orig[level] && orig[level].apply(console, args);
             }
             console.log = (...args) => addLog('log', args);
@@ -58,6 +97,9 @@
             });
         })();
         window.__consoleLogs.push({ time: new Date().toTimeString().slice(0, 8), level: 'info', msg: '控制台日志捕获已启动（含 error/unhandledrejection 全量收集）' });
+        // 诊断日志定时刷盘（每 2s），并在卸载前强刷一次，避免卡死时缓冲丢失
+        setInterval(function () { try { _diagFlush(); } catch (e) {} }, 2000);
+        window.addEventListener('beforeunload', function () { try { _diagFlush(); } catch (e) {} });
 
         // ==================== Gist GET 304 缓存（省 GitHub API 配额） ====================
         // 只对“静态内容型”Gist 做 304 缓存：命中时 GitHub 返回 304（不计入 5000 配额）。
