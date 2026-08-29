@@ -562,7 +562,7 @@
                     if (!rv) { console.log('[VERSION] 当前缓存版本:', swVersion, '（无法获取远端版本）'); return; }
                     const cmp = _versionCompare(rv, swVersion);
                     if (cmp > 0) console.log('[VERSION] 当前缓存版本:', swVersion, '→ 线上最新为', rv, '（需刷新升级）');
-                    else if (cmp < 0) console.log('[VERSION] 当前缓存版本:', swVersion, '（高于线上', rv + '，本地为开发/预发布版）');
+                    else if (cmp < 0) console.log('[VERSION] 当前缓存版本:', swVersion, '（本地已领先线上', rv + '）');
                     else console.log('[VERSION] 当前缓存版本:', swVersion, '（已是最新 ✓）');
                 });
                 // 🔴 方案A：SW 回报真实版本后，立即核对远端是否有更新（不再依赖静态 html 自比）
