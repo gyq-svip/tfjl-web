@@ -8,7 +8,21 @@
                 if (m.id !== 'backupMenu') m.style.display = 'none';
             });
             menu.style.display = menu.style.display === 'none' || menu.style.display === '' ? 'block' : 'none';
+            if (menu.style.display === 'block') {
+                updateEffectsVisibility();
+                updatePerfModeVisibility();
+            }
         }
+
+        // 性能模式菜单文案同步（打开菜单时刷新，避免 localStorage 被其他页面改后不同步）
+        function updatePerfModeVisibility() {
+            const menuItem = document.getElementById('menuTogglePerfMode');
+            if (!menuItem) return;
+            let mode = 'high';
+            try { mode = localStorage.getItem('tdjl_perf_mode') || 'high'; } catch (e) {}
+            menuItem.textContent = (mode === 'optimized' ? '⚡ 性能模式：优化' : '⚡ 性能模式：高性能');
+        }
+        window.updatePerfModeVisibility = updatePerfModeVisibility;
 
         // 点击其他地方关闭菜单
         document.addEventListener('click', function(e) {
