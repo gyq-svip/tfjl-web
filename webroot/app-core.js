@@ -8644,6 +8644,9 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         // 未设置过皮肤（"默认"）的卡，也显示皮肤库里的默认皮肤图（与英雄同名那张）
         async function updateCardPoolSkins() {
             if (typeof window.resolveHeroSkinUrl !== 'function') return;
+            // 🔴 性能模式=优化：卡池/收藏区几百张卡是皮肤内存大头，优化版直接不铺皮肤（纯色卡面），
+            // 仅手牌+上阵阵容渲染皮肤，符合"只渲染活跃卡、省内存"的需求。
+            if (typeof window.isPerfOptimized === 'function' && window.isPerfOptimized()) return;
             // 含收藏区（#favoriteCardsGrid）：收藏的卡同样铺皮肤
             const cards = document.querySelectorAll('.collapsible-section .card-item');
             const tasks = [];
@@ -9249,6 +9252,52 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const fused = card.querySelector('.hand-skin-fused');
             if (fused) fused.remove();
         }
+
+        // ==================== 性能模式（用户菜单开关）====================
+        // 'high'   = 高性能版：预加载全量皮肤、卡池也铺皮，丝滑（默认）
+        // 'optimized' = 优化版：只渲染「手牌 + 上阵阵容」的卡面，卡池/收藏区不铺皮肤，省内存
+        const PERF_MODE_KEY = 'tdjl_perf_mode';
+        function getPerfMode() {
+            let v = 'high';
+            try { v = localStorage.getItem(PERF_MODE_KEY) || 'high'; } catch (_) {}
+            return v === 'optimized' ? 'optimized' : 'high';
+        }
+        // 供全局（含 app-effects.js / 卡池渲染守卫）调用的判优函数
+        window.isPerfOptimized = function () { return getPerfMode() === 'optimized'; };
+        function refreshPerfMenuLabel() {
+            const el = document.getElementById('menuTogglePerfMode');
+            if (!el) return;
+            const opt = getPerfMode() === 'optimized';
+            el.innerHTML = '⚡ 性能模式：' + (opt ? '优化(省内存)' : '高性能(丝滑)');
+            el.style.color = opt ? '#4dd0e1' : '#fff';
+        }
+        window.togglePerfMode = function () {
+            const next = getPerfMode() === 'optimized' ? 'high' : 'optimized';
+            try { localStorage.setItem(PERF_MODE_KEY, next); } catch (_) {}
+            refreshPerfMenuLabel();
+            const opt = next === 'optimized';
+            console.log('[PERF] 性能模式切换为：' + (opt ? '优化版（只渲染手牌+上阵卡面）' : '高性能版（全量预加载）'));
+            // 切换后即时重绘：优化→高性能 需补铺卡池皮肤；高性能→优化 需清掉卡池皮肤层
+            if (typeof updateCardPoolSkins === 'function') {
+                if (opt) {
+                    // 优化版：清掉卡池已铺的皮肤层，释放内存
+                    document.querySelectorAll('.collapsible-section .card-item').forEach(card => {
+                        card.classList.remove('skin-bg');
+                        card.style.backgroundImage = '';
+                        card.style.background = '';
+                        card.querySelectorAll('.card-skin-thumb, .card-skin-thumb-fused, .skin-layer-fused').forEach(e => e.remove());
+                    });
+                } else {
+                    // 高性能版：重新铺卡池皮肤
+                    updateCardPoolSkins().catch(() => {});
+                }
+            }
+            if (typeof showToast === 'function') {
+                showToast(opt ? '⚡ 已切换为优化版：仅渲染手牌+上阵卡面，卡池皮肤已释放' : '✨ 已切换为高性能版：全量皮肤预加载');
+            }
+        };
+        // 菜单打开时同步标签（首次进入也需校正）
+        refreshPerfMenuLabel();
 
         // 给战斗槽卡牌应用皮肤背景
         async function applySkinBgToSlot(slot, heroName, forceCardId, forceHandType, forceSkin) {
