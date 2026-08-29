@@ -9543,14 +9543,20 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 // 🔴 2026-08-29 降噪：融合组合名（死神海妖/小野酋长/咕咕萨满等）在远程皮肤未加载完时
                 // 必然查不到，但 syncRemoteSkins 完成后会自动重绘成功 → 不必刷 WARN 刷屏。
                 // 仅当 heroName 自身是"真单英雄且确实无皮肤"才 WARN；能拆出已知主英雄的组合名静默跳过。
+                // 用权威融合检测器 getFusionParts 判断，不再依赖「·/heroSet 启发式」。
+                // 旧判断在「融合组合名已进卡牌网格(heroSet.has 为真)」或「getMainCardName 原样返回」时失效，
+                // 导致死神海妖/小野酋长/咕咕萨满等融合卡刷屏 WARN。
                 let _isFusionCombo = false;
                 try {
-                    const _main = (typeof getMainCardName === 'function') ? getMainCardName(heroName) : heroName;
-                    const _heroSet = (typeof getAllHeroNames === 'function') ? getAllHeroNames() : null;
-                    _isFusionCombo = (_main && _main !== heroName) || (_heroSet && !_heroSet.has(heroName) && /[·\s]/.test(heroName) === false && heroName.length >= 3);
+                    const _parts = (typeof getFusionParts === 'function') ? getFusionParts(heroName) : null;
+                    _isFusionCombo = !!(_parts && _parts.length >= 2);
+                    if (!_isFusionCombo) {
+                        const _main = (typeof getMainCardName === 'function') ? getMainCardName(heroName) : heroName;
+                        _isFusionCombo = (_main && _main !== heroName) || (heroName && heroName.indexOf('·') >= 0);
+                    }
                 } catch (e) {}
                 if (_isFusionCombo) {
-                    console.log('[SKIN] skin 待远程加载(组合名), 跳过 WARN:', heroName);
+                    console.log('[SKIN] skin 待远程加载(组合名/融合), 跳过 WARN:', heroName);
                 } else {
                     console.warn('[SKIN] No skin for', heroName);
                 }
