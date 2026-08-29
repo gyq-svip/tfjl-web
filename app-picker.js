@@ -607,11 +607,14 @@
                         var newWorker = registration.installing;
                         if (newWorker) {
                             newWorker.addEventListener('statechange', function() {
-                                // 🔴 新 SW 安装完成（waiting 状态）即表示"有新版待更新"，立即弹气泡。
-                                // 页面侧兜底，不依赖 SW→页面 message 通道（规避 Tauri WebView 通道不可靠导致收不到 NEW_VERSION_READY）。
+                                // 🔴 修复（2026-08-30）：「新 SW 安装完成」≠「真有新版本」。
+                                // 旧逻辑只要 newWorker.state==='installed' 就无条件弹气泡，但 sw.js 每次部署都被 CI bump CACHE_VERSION，
+                                // 浏览器每次 refresh 都检测到"新" SW → 每次都弹，即使用户感知「功能没更新」。
+                                // 改为：先调 _verifyNewVersion() 比对远端版本号与当前版本号，只有真正不同才弹气泡
+                                // （与 NEW_VERSION_READY 路径共用同一套核实逻辑，避免两条路径行为不一致）。
                                 if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                    if (typeof notifyNewVersion === 'function') notifyNewVersion();
-                                    else if (typeof showSwUpdateBanner === 'function') showSwUpdateBanner();
+                                    if (typeof _verifyNewVersion === 'function') _verifyNewVersion();
+                                    else if (typeof notifyNewVersion === 'function') notifyNewVersion();
                                 }
                             });
                         }

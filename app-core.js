@@ -768,7 +768,7 @@
             //   ?testSw=hide  → 模拟网页隐藏(应静默升级)
             // 不依赖真实新版本，直接调用 notifyNewVersion() 走对应分支，方便观测升级策略。
             try {
-                const _expire = new Date('2026-08-30T23:59:59').getTime();
+                const _expire = new Date('2026-08-29T23:59:59').getTime(); // 2026-08-30 已过期：调试期结束，避免误弹气泡
                 if (Date.now() < _expire) {
                     const _tsw = new URL(location.href).searchParams.get('testSw');
                     if (_tsw === 'front' || _tsw === 'tray' || _tsw === 'hide') {
