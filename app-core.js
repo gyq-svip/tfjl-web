@@ -24215,7 +24215,7 @@ ${maSection}
                 else if (code === 'memoryReport()') result = window.memoryReport();
                 else if (code === 'freeMemory()') result = window.freeMemory();
                 else if (code === 'domBreakdown()') result = window.domBreakdown();
-                else result = (function () { return eval(code); })();
+                else result = window.eval(code);
                 if (result && typeof result.then === 'function') {
                     result.then(r => { if (r !== undefined) console.log('[CMD] = ' + (typeof r === 'object' ? JSON.stringify(r).slice(0, 800) : r)); }).catch(e => console.error('[CMD] 异步出错: ' + e.message));
                 } else if (result !== undefined) {
@@ -24226,6 +24226,12 @@ ${maSection}
             }
             inp.value = '';
             inp.focus();
+            // 立即刷新终端内容并滚动到底部（不依赖 500ms 轮询，确保执行结果立刻可见）
+            try { if (typeof refreshFloatConsole === 'function') refreshFloatConsole(); } catch (e) {}
+            try {
+                const c = document.getElementById('floatConsoleContent');
+                if (c) c.scrollTop = c.scrollHeight;
+            } catch (e) {}
         };
         // 🔴 2026-08-29 工具箱加载诊断（终端输入 toolboxDiag() 即出"被跳过的文件"清单）
         // 解决"全量上报 10 个文件但工具箱只有 8 个用户"问题
