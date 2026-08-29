@@ -24073,7 +24073,7 @@ ${maSection}
             if (floatConsoleVisible && (!window.__consoleLogs || window.__consoleLogs.length === 0)) {
                 try { window.__consoleLogs.push({ time: new Date().toTimeString().slice(0, 8), level: 'info', msg: '页面已刷新，日志重新开始累计（刷新前的内存日志不会保留）。' }); } catch (_) {}
             }
-            if (floatConsoleVisible) refreshFloatConsole();
+            if (floatConsoleVisible) { try { refreshFloatConsole(); } catch (e) { console.warn('[floatConsole] 初次渲染失败:', e); } }
             applyFloatZoom();
             initFloatAutoScrollBtn();
             if (floatConsoleRefreshTimer) clearInterval(floatConsoleRefreshTimer);
@@ -24469,7 +24469,10 @@ ${maSection}
         };
 
         // 🔴 2026-08-29 浮动控制台渲染状态：脏检查签名（避免 500ms 无变化时全量重建 DOM）
-        let _lastConsoleRenderSig = '';
+        //  注意：必须是 IIFE 级持久变量（函数外），否则每次调用 refreshFloatConsole 都会重新 let 初始化，
+        //  脏检查签名立刻丢失 → 优化完全失效 → 每 500ms 全量重建上千 div（App 曾因此内存暴涨）。
+        //  同时放在 initFloatConsoleOnLoad 调用之前，避免暂时性死区(TDZ)导致浮窗初始化中断。
+        var _lastConsoleRenderSig = '';
         function refreshFloatConsole() {
             const content = document.getElementById('floatConsoleContent');
             if (!content) return;
