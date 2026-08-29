@@ -3726,6 +3726,11 @@ if (true) {
     function clearSkinUrlCache() {
         try { skinImageUrlCache.forEach(function (u) { _skinUrlRelease(u); }); } catch (e) {}
         try { skinImageUrlCache.clear(); } catch (e) {}
+        // 同步释放远程皮肤 blob URL 缓存（LRU 改造后也需在此 revoke，否则切换项目/重扫时泄漏）
+        try {
+            _skinBlobUrlCache.forEach(function (u) { if (u && u.indexOf('blob:') === 0) { try { URL.revokeObjectURL(u); } catch (e) {} } });
+            _skinBlobUrlCache.clear();
+        } catch (e) {}
     }
     window.clearSkinUrlCache = clearSkinUrlCache;
 
@@ -3740,6 +3745,9 @@ if (true) {
                 }
             });
         } catch (e) {}
+        // 远程皮肤 blob 缓存（LRU 上限 _SKIN_BLOB_CACHE_MAX，挂机主要泄漏源）
+        let remoteBlob = 0;
+        try { _skinBlobUrlCache.forEach(function (u) { if (u && u.indexOf('blob:') === 0) remoteBlob++; }); } catch (e) {}
         // blob: URL 字符串本身极短，无法据此估算真实位图内存；改为按「缩放后解码尺寸」估算：
         // 缩放到 ≤256px 的 PNG 解码位图约 256×256×4 ≈ 262KB/张（GPU 纹理另计，约再 ×1.5）。
         const estDecodeMB = (blobCount + dataCount) * 256 * 256 * 4 / 1048576;
@@ -3748,7 +3756,8 @@ if (true) {
             max: SKIN_URL_CACHE_MAX,
             blob: blobCount,
             data: dataCount,
-            estDecodeMB: estDecodeMB.toFixed(1)
+            estDecodeMB: estDecodeMB.toFixed(1),
+            remoteBlobCache: remoteBlob + ' / 上限 ' + _SKIN_BLOB_CACHE_MAX
         };
     };
 
@@ -4311,13 +4320,35 @@ if (true) {
     // 网页版：优先 IndexedDB；未命中则网络下载 → 写 IndexedDB
     // 🔴 内存泄漏修复（s1.0.472）：已为某 remoteUrl 生成的 blobUrl 用 Map 缓存复用，
     //    避免每次 reapplyAllSkins 都重新 fetch + 生成新 blob（旧的从不释放 → 持续泄漏数百 MB）。
-    //    缓存的 blobUrl 页面级常驻、不主动 revoke（<img> 随时可能引用），页面关闭由浏览器自动回收。
+    //    缓存的 blobUrl 通过 LRU 上限管理：超过上限淘汰最旧的并 revokeObjectURL，避免挂机无限增长。
     const _skinBlobUrlCache = new Map();
+    const _SKIN_BLOB_CACHE_MAX = 400;
+    function _skinBlobCacheSet(url, blobUrl) {
+        if (!url || !blobUrl) return;
+        // 覆盖同名旧 blobUrl 时先 revoke，避免旧 blob 泄漏（IndexedDB 分支每次命中都会生成新 blob）
+        const prev = _skinBlobUrlCache.get(url);
+        if (prev && prev !== blobUrl && prev.indexOf('blob:') === 0) { try { URL.revokeObjectURL(prev); } catch (e) {} }
+        _skinBlobUrlCache.set(url, blobUrl);
+        // 超过上限 → 淘汰最旧（Map 迭代顺序=插入顺序，最旧在前面）
+        while (_skinBlobUrlCache.size > _SKIN_BLOB_CACHE_MAX) {
+            const oldestKey = _skinBlobUrlCache.keys().next().value;
+            if (oldestKey === undefined) break;
+            const oldUrl = _skinBlobUrlCache.get(oldestKey);
+            _skinBlobUrlCache.delete(oldestKey);
+            if (oldUrl && oldUrl.indexOf('blob:') === 0) { try { URL.revokeObjectURL(oldUrl); } catch (e) {} }
+        }
+    }
     async function _getCachedSkinUrl(remoteUrl) {
         if (!remoteUrl) return null;
         if (!/^https?:\/\//i.test(remoteUrl)) return remoteUrl;
         // 命中 blobUrl 缓存直接复用（关键修复：不再重复 fetch + 生成）
-        if (_skinBlobUrlCache.has(remoteUrl)) return _skinBlobUrlCache.get(remoteUrl);
+        // 命中后移到末尾，维持 LRU 顺序（最近使用的放最后，淘汰从最旧开始）
+        if (_skinBlobUrlCache.has(remoteUrl)) {
+            const cached = _skinBlobUrlCache.get(remoteUrl);
+            _skinBlobUrlCache.delete(remoteUrl);
+            _skinBlobUrlCache.set(remoteUrl, cached);
+            return cached;
+        }
 
         // === Tauri APP：磁盘优先 ===
         if (isTauriApp) {
@@ -4329,7 +4360,7 @@ if (true) {
                 try {
                     const bytes = await invokeFn('plugin:fs|read_file', { path: skinPath, options: undefined });
                     const blobUrl = bytesToBlobUrl(bytes, skinPath);
-                    if (blobUrl) { _skinBlobUrlCache.set(remoteUrl, blobUrl); return blobUrl; }
+                    if (blobUrl) { _skinBlobCacheSet(remoteUrl, blobUrl); return blobUrl; }
                 } catch(e) { /* 磁盘无缓存，走网络 */ }
                 // 2. 网络下载 → 写 .skin 二进制缓存
                 try {
@@ -4362,7 +4393,7 @@ if (true) {
                         catch (eF) { console.warn('[SKIN] 皮肤写盘失败(plugin:fs|write_file 也不允许 base64):', parsed.hero, parsed.file, eF && (eF.message || JSON.stringify(eF) || String(eF))); }
                     }
                     const blobUrl = URL.createObjectURL(blob);
-                    _skinBlobUrlCache.set(remoteUrl, blobUrl);
+                    _skinBlobCacheSet(remoteUrl, blobUrl);
                     return blobUrl;
                 } catch(e) {
                     console.warn('[SKIN] 网络兜底失败:', remoteUrl, e.message || e);
@@ -4374,7 +4405,7 @@ if (true) {
                 const resp = await _fetchWithTimeout(remoteUrl, 10000);
                 if (!resp.ok) return remoteUrl;
                 const blobUrl = URL.createObjectURL(await resp.blob());
-                _skinBlobUrlCache.set(remoteUrl, blobUrl);
+                _skinBlobCacheSet(remoteUrl, blobUrl);
                 return blobUrl;
             } catch(e) { return remoteUrl; }
         }
@@ -4385,7 +4416,7 @@ if (true) {
         if (cached && cached.blob) {
             try {
                 const blobUrl = URL.createObjectURL(cached.blob);
-                _skinBlobUrlCache.set(remoteUrl, blobUrl);
+                _skinBlobCacheSet(remoteUrl, blobUrl);
                 return blobUrl;
             }
             catch (e) { console.warn('[SKIN] createObjectURL failed:', e); }
@@ -4396,7 +4427,7 @@ if (true) {
             const blob = await resp.blob();
             _idbPut(key, blob);
             const blobUrl = URL.createObjectURL(blob);
-            _skinBlobUrlCache.set(remoteUrl, blobUrl);
+            _skinBlobCacheSet(remoteUrl, blobUrl);
             return blobUrl;
         } catch (e) {
             console.warn('[SKIN] fetch skin failed:', remoteUrl, e);
