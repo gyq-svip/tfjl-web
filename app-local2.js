@@ -139,16 +139,28 @@ if (true) {
     }
     function _packStore(map) {
         const enc = new TextEncoder();
-        const parts = [];
-        for (const b of STORE_MAGIC) parts.push(b);
-        parts.push(..._u32le(STORE_VERSION));
-        parts.push(..._u32le(map.size));
+        // 先算总字节数，再预分配一次性填充，避免 parts.push(...大数组) 展开触发 Maximum call stack
+        let total = STORE_MAGIC.length + 4 + 4; // magic + version + count
+        const entries = [];
         for (const [k, v] of map.entries()) {
             const kb = enc.encode(String(k));
             const vb = enc.encode(String(v));
-            parts.push(..._u32le(kb.length), ...kb, ..._u32le(vb.length), ...vb);
+            entries.push(kb, vb);
+            total += 4 + kb.length + 4 + vb.length;
         }
-        return new Uint8Array(parts);
+        const out = new Uint8Array(total);
+        let off = 0;
+        for (const b of STORE_MAGIC) out[off++] = b;
+        const ver = _u32le(STORE_VERSION); out[off++] = ver[0]; out[off++] = ver[1]; out[off++] = ver[2]; out[off++] = ver[3];
+        const cnt = _u32le(map.size); out[off++] = cnt[0]; out[off++] = cnt[1]; out[off++] = cnt[2]; out[off++] = cnt[3];
+        for (let i = 0; i < entries.length; i += 2) {
+            const kb = entries[i], vb = entries[i + 1];
+            const kl = _u32le(kb.length); out[off++] = kl[0]; out[off++] = kl[1]; out[off++] = kl[2]; out[off++] = kl[3];
+            out.set(kb, off); off += kb.length;
+            const vl = _u32le(vb.length); out[off++] = vl[0]; out[off++] = vl[1]; out[off++] = vl[2]; out[off++] = vl[3];
+            out.set(vb, off); off += vb.length;
+        }
+        return out;
     }
     function _unpackStore(bytes) {
         const map = new Map();
@@ -3631,9 +3643,13 @@ if (true) {
     }
 
     function _skinUrlEvictIfNeeded() {
+        // 🔴 关键修复：LRU 淘汰时【不再 revoke】blob URL。
+        // 原因：被淘汰的 blob 可能仍被页面 <img>（阵容槽/卡池）引用，revoke 后 <img> 加载失败 →
+        //       日志里反复出现 'Failed to load skin image: blob:'。淘汰只删除 Map 引用，blob 由 <img> 持有保持存活，
+        //       移除后浏览器自动回收。牺牲少量内存（最多 80 张未显示皮肤常驻）换皮肤不再坏。
+        // 只有 clearSkinUrlCache()（重新扫描/切换项目）才真正 revoke 全清。
         while (skinImageUrlCache.size > SKIN_URL_CACHE_MAX) {
             const oldestKey = skinImageUrlCache.keys().next().value; // 最早插入 = 最久未用
-            _skinUrlRelease(skinImageUrlCache.get(oldestKey));
             skinImageUrlCache.delete(oldestKey);
         }
     }
