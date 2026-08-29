@@ -578,15 +578,24 @@ if (true) {
     }
 
     let _autoBackupTimer = null;          // 日常防抖定时器（变更后 8 秒）
+    let _autoBackupDirty = false;         // 等待期间又产生变更标志（避免防抖被反复重置唤醒）
     let _autoBackupRunning = false;       // 正在写盘标志（防并发叠加）
     let _autoBackupInterval = null;       // 定时整备定时器（每 30 分钟兜底）
     const AUTO_BACKUP_INTERVAL_MS = 30 * 60 * 1000; // 30 分钟
 
     async function _scheduleAutoBackup(dir) {
         if (!_autoBackupEnabled() || !dir) return;
-        if (_autoBackupTimer) clearTimeout(_autoBackupTimer);
-        // 防抖：数据高频变更时，等 8 秒静默期再备份，避免狂写；只留最终态
-        _autoBackupTimer = setTimeout(() => _doAutoBackup(dir).catch(e => console.error('[自动备份] 失败:', e)), 8000);
+        // 🔴 防抖不重置：已在等待(8s)中就不清掉重设，否则启动阶段 tfjl.dat 被多次 flush 反复唤醒，
+        //    导致每 15~20s 就实备份一次（实测日志 19:14:38 / 19:14:54 两次间隔仅 16s，主线程 I/O 阻塞 → 卡顿）。
+        //    改为：仅在"尚无等待"时设一个 8s 定时器；等待期间再有变更只置脏标记，不重置计时。
+        if (_autoBackupTimer) { _autoBackupDirty = true; return; }
+        _autoBackupDirty = false;
+        _autoBackupTimer = setTimeout(async () => {
+            _autoBackupTimer = null;
+            try { await _doAutoBackup(dir); } catch (e) { console.error('[自动备份] 失败:', e); }
+            // 等待期间又产生过变更 → 再排一轮（仍走防抖，不会连续狂写）
+            if (_autoBackupDirty) _scheduleAutoBackup(dir);
+        }, 8000);
     }
 
     // 立即备份（跳过防抖，供关窗/隐藏/定时整备调用）；仍走 hash 增量判定，避免无变更时重复写
