@@ -266,8 +266,11 @@ if (true) {
         const ok = await _writeStoreFile(_syncDir, map);
         if (ok) {
             console.log('[数据存储] 已写入统一存储 tfjl.dat (' + map.size + ' 项)');
-            // 数据落盘后触发自动增量备份（内容变化才写，带防抖，不阻塞主流程）
-            _scheduleAutoBackup(_syncDir).catch(() => {});
+            // 数据落盘后置自动备份脏标记（_scheduleAutoBackup 仅置标、不返回 Promise，
+            // 由 6 小时定时整备 / 关窗兜底消费，避免"写盘→备份→再写盘"死循环）。
+            // 🔴 注意：绝不能写 .catch()，否则 undefined.catch 抛 TypeError 导致 _flushStore 失败、
+            //       initDataSync 的 await _flushStore() 被 catch 捕获 → 误报"初始化失败"且 _syncOk=false。
+            _scheduleAutoBackup(_syncDir);
         } else console.error('[数据存储] ❌ tfjl.dat 写入失败（目录可能不可写/权限不足）: ' + _getDatPath(_syncDir));
     }
 
