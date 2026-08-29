@@ -8639,11 +8639,48 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             if (typeof updateCardPoolSkins === 'function') updateCardPoolSkins().catch(() => {});
         }
 
+        // ==================== 性能模式（用户菜单开关）====================
+        // 'high'      = 高性能版：预加载全量皮肤、卡池/收藏也铺皮，丝滑（默认）
+        // 'optimized' = 优化版：只渲染「手牌 + 上阵阵容」卡面，卡池/收藏区不铺皮肤，省内存防卡顿
+        const PERF_MODE_KEY = 'tdjl_perf_mode';
+        function getPerfMode() {
+            try { const v = localStorage.getItem(PERF_MODE_KEY); if (v === 'optimized' || v === 'high') return v; } catch (e) {}
+            return 'high';
+        }
+        function isPerfOptimized() { return getPerfMode() === 'optimized'; }
+        function togglePerfMode() {
+            const next = isPerfOptimized() ? 'high' : 'optimized';
+            try { localStorage.setItem(PERF_MODE_KEY, next); } catch (e) {}
+            // 同步菜单文案
+            try {
+                const el = document.getElementById('menuTogglePerfMode');
+                if (el) el.textContent = (next === 'optimized' ? '⚡ 性能模式：优化' : '⚡ 性能模式：高性能');
+            } catch (e) {}
+            // 立即按新模式重渲染卡池皮肤
+            if (typeof updateCardPoolSkins === 'function') updateCardPoolSkins().catch(() => {});
+            if (typeof reapplyAllSkins === 'function') reapplyAllSkins().catch(() => {});
+            console.log('[性能模式] 已切换到: ' + (next === 'optimized' ? '优化（卡池/收藏不铺皮，省内存）' : '高性能（全量预加载）'));
+        }
+        // 暴露到全局，供 HTML 菜单 onclick="togglePerfMode()" 调用
+        window.togglePerfMode = togglePerfMode;
+        window.getPerfMode = getPerfMode;
+        window.isPerfOptimized = isPerfOptimized;
+
         // 卡池皮肤铺满：基础卡 / 融合卡主卡用 .skin-layer cover 铺满卡牌，融合卡副卡用 .skin-layer-fused 小图
         // 全部基于全局预设（defaultCardSkins / heroSkinSelections / cloudFusions），跨项目保留
         // 未设置过皮肤（"默认"）的卡，也显示皮肤库里的默认皮肤图（与英雄同名那张）
         async function updateCardPoolSkins() {
             if (typeof window.resolveHeroSkinUrl !== 'function') return;
+            // 🔴 优化模式：卡池/收藏区几百张卡是皮肤内存大头，直接跳过铺皮（仅清掉旧皮），保留手牌+上阵丝滑
+            if (isPerfOptimized()) {
+                document.querySelectorAll('.collapsible-section .card-item').forEach(card => {
+                    card.classList.remove('skin-bg');
+                    card.style.backgroundImage = '';
+                    card.style.background = '';
+                    card.querySelectorAll('.card-skin-thumb, .card-skin-thumb-fused, .skin-layer-fused').forEach(e => e.remove());
+                });
+                return;
+            }
             // 含收藏区（#favoriteCardsGrid）：收藏的卡同样铺皮肤
             const cards = document.querySelectorAll('.collapsible-section .card-item');
             const tasks = [];
