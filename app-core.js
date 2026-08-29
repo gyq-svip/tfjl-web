@@ -24248,7 +24248,7 @@ ${maSection}
             if (floatConsoleVisible) {
                 refreshFloatConsole();
                 if (floatConsoleRefreshTimer) clearInterval(floatConsoleRefreshTimer);
-                floatConsoleRefreshTimer = setInterval(refreshFloatConsole, 500);
+                floatConsoleRefreshTimer = setInterval(refreshFloatConsole, 2500);
             } else {
                 if (floatConsoleRefreshTimer) clearInterval(floatConsoleRefreshTimer);
                 floatConsoleRefreshTimer = null;
@@ -24286,7 +24286,7 @@ ${maSection}
             initFloatAutoScrollBtn();
             if (floatConsoleRefreshTimer) clearInterval(floatConsoleRefreshTimer);
             if (floatConsoleVisible) {
-                floatConsoleRefreshTimer = setInterval(refreshFloatConsole, 500);
+                floatConsoleRefreshTimer = setInterval(refreshFloatConsole, 2500);
             } else {
                 floatConsoleRefreshTimer = null;
             }
