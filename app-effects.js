@@ -14,13 +14,24 @@
             }
         }
 
-        // 性能模式菜单文案同步（打开菜单时刷新，避免 localStorage 被其他页面改后不同步）
+        // 性能模式菜单高亮当前选中项（打开菜单时刷新）
         function updatePerfModeVisibility() {
-            const menuItem = document.getElementById('menuTogglePerfMode');
-            if (!menuItem) return;
             let mode = 'high';
             try { mode = localStorage.getItem('tdjl_perf_mode') || 'high'; } catch (e) {}
-            menuItem.textContent = (mode === 'optimized' ? '⚡ 性能模式：优化' : '⚡ 性能模式：高性能');
+            const map = { high: 'menuPerfHigh', optimized: 'menuPerfOptimized', lite: 'menuPerfLite' };
+            ['menuPerfHigh', 'menuPerfOptimized', 'menuPerfLite'].forEach(id => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                if (id === map[mode]) {
+                    el.style.background = 'rgba(255,215,0,0.18)';
+                    el.style.color = '#ffd54f';
+                    el.style.fontWeight = 'bold';
+                } else {
+                    el.style.background = 'transparent';
+                    el.style.color = '#fff';
+                    el.style.fontWeight = 'normal';
+                }
+            });
         }
         window.updatePerfModeVisibility = updatePerfModeVisibility;
 

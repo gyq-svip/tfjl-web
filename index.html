@@ -852,7 +852,7 @@
         <!-- Boss减伤悬浮提示 -->
         <div id="bossRedTooltip" style="display:none;position:fixed;z-index:99999;max-width:300px;background:rgba(20,20,40,0.97);border:1px solid rgba(255,215,0,0.4);border-radius:8px;padding:10px;color:#fff;pointer-events:none;box-shadow:0 4px 16px rgba(0,0,0,0.5);"></div>
 
-        <script defer src="app-effects.js?v=s1.0.489"></script>
+        <script defer src="app-effects.js?v=s1.0.490"></script>
 
         <!-- 固定在右上角的按钮 -->
         <div class="sticky-buttons" style="position:fixed;top:12px;right:12px;z-index:9999;display:flex;flex-direction:column;align-items:flex-end;gap:5px;"><div style="display:flex;gap:5px;">
@@ -865,9 +865,12 @@
             <div style="position:relative;">
                 <button onclick="toggleBackupMenu(this)" title="菜单" style="background:rgba(255,87,34,0.8);color:white;border:none;width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:1rem;box-shadow:0 1px 6px rgba(0,0,0,0.15);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;">☰</button>
                 <div id="backupMenu" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:rgba(42,42,74,0.95);border:1px solid rgba(255,215,0,0.3);border-radius:8px;padding:8px 0;width:200px;z-index:1000;box-shadow:0 4px 15px rgba(0,0,0,0.4);backdrop-filter:blur(8px);">
-                    <div id="menuDownloadDesktop" onclick="openDownloadModal();document.getElementById('backupMenu').style.display='none';" title="下载塔防精灵助手桌面版（Tauri），体验更流畅的本地文件管理" style="padding:8px 15px;cursor:pointer;color:#4fc3f7;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📥 下载桌面版</div>
-                    <div id="menuToggleEffects" onclick="toggleVisualEffects();document.getElementById('backupMenu').style.display='none';" title="开关页面背景动画特效" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">✨ 背景特效：开</div>
-                    <div id="menuTogglePerfMode" onclick="togglePerfMode();document.getElementById('backupMenu').style.display='none';" title="性能模式：高性能=预加载全量皮肤丝滑；优化=只渲染手牌+上阵卡面，卡池/收藏不渲染皮肤，省内存但切阵容稍慢" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">⚡ 性能模式：高性能</div>
+                    <div id="menuDownloadDesktop" onclick="openDownloadModal();" title="下载塔防精灵助手桌面版（Tauri），体验更流畅的本地文件管理" style="padding:8px 15px;cursor:pointer;color:#4fc3f7;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📥 下载桌面版</div>
+                    <div id="menuToggleEffects" onclick="toggleVisualEffects();" title="开关页面背景动画特效" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">✨ 背景特效：开</div>
+                    <div style="padding:6px 15px 2px;color:#aaa;font-size:0.72rem;display:flex;align-items:center;gap:8px;">⚡ 性能模式</div>
+                    <div id="menuPerfHigh" onclick="setPerfMode('high');" title="高性能：预加载全量皮肤、卡池/收藏也铺皮，丝滑（默认）" style="padding:6px 15px 6px 28px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">🟢 高性能（全皮肤）</div>
+                    <div id="menuPerfOptimized" onclick="setPerfMode('optimized');" title="优化：只渲染手牌+上阵阵容卡面，卡池/收藏区不铺皮肤，省内存防卡顿" style="padding:6px 15px 6px 28px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">🟡 优化（仅手牌+上阵）</div>
+                    <div id="menuPerfLite" onclick="setPerfMode('lite');document.getElementById('backupMenu').style.display='none';" title="极速：完全不渲染任何皮肤（纯色卡面），内存最低，垃圾电脑可用" style="padding:6px 15px 6px 28px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">🔴 极速（纯色无皮肤）</div>
                     <div id="menuCheckUpdateItem" onclick="menuCheckUpdate();document.getElementById('backupMenu').style.display='none';" title="检查是否有新版本可更新（仅桌面端）" style="padding:8px 15px;cursor:pointer;color:#81c784;display:none;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">🔄 检查更新</div>
                     <div onclick="updateSkinsResource();document.getElementById('backupMenu').style.display='none';" title="更新皮肤资源：从 Gitee 下载皮肤包解压到本地（首次较慢，之后本地加载秒开）；本地化不可用时回退在线同步" style="padding:8px 15px;cursor:pointer;color:#ffd54f;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">🎨 更新皮肤资源</div>
                     <div onclick="if(window.repairSkins){window.repairSkins();}document.getElementById('backupMenu').style.display='none';" title="皮肤异常修复：清除皮肤缓存并重新扫描本地、强制重新拉取远程皮肤、重新渲染。用于解决「加载时皮肤卡着不显示/显示异常」等问题（保留你已选的默认皮肤）。" style="padding:8px 15px;cursor:pointer;color:#ffb74d;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">🛠 皮肤异常修复</div>
@@ -1555,7 +1558,7 @@
     <script defer src="color-picker.js?v=s1.0.180"></script>
     <script defer src="app-damagecalc.js?v=s1.0.192"></script>
     <script defer src="gh-gist.js?v=s1.0.130"></script>
-    <script defer src="app-core.js?v=s1.0.489"></script>
+    <script defer src="app-core.js?v=s1.0.490"></script>
     <script defer src="admin-ctl.js?v=s1.0.459"></script>
 
     <!-- 模态框：创建分类 -->
