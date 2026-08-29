@@ -914,7 +914,7 @@
             </div>
         </div>
 
-        <script defer src="app-features.js?v=s1.0.203"></script>
+        <script defer src="app-features.js?v=s1.0.204"></script>
 
         <!-- 项目操作菜单（折叠） -->
         <div id="projectMenu" style="display:none;position:fixed;z-index:9998;background:rgba(40,40,70,0.98);border:1px solid rgba(255,215,0,0.3);border-radius:10px;padding:10px;min-width:200px;max-height:85vh;overflow-y:auto;box-shadow:0 4px 15px rgba(0,0,0,0.4);">
@@ -933,13 +933,13 @@
         </div>
 
         <!-- APP本地功能脚本（网页版不会执行任何代码，isTauriApp判断在文件内部） -->
-        <script defer src="app-local2.js?v=s1.0.419"></script>
+        <script defer src="app-local2.js?v=s1.0.420"></script>
         <!-- 阵容识别模块（独立入口 + 灌入脚本生成） -->
         
         <!-- 网页版皮肤系统（仅非 Tauri 浏览器执行；Tauri 由 app-local.js 负责，文件内部自动跳过） -->
         <script defer src="skins-web.js?v=s1.0.157"></script>
 
-        <script defer src="app-picker.js?v=s1.0.152"></script>
+        <script defer src="app-picker.js?v=s1.0.153"></script>
 
         <!-- 记事本悬浮面板 -->
         <div id="notepadPanel" style="display:none;position:fixed;top:80px;right:20px;width:400px;height:350px;z-index:9997;background:rgba(30,30,60,0.95);border:2px solid rgba(121,134,203,0.6);border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.5);overflow:auto;resize:both;min-width:280px;min-height:250px;">
@@ -1554,7 +1554,7 @@
     <script defer src="color-picker.js?v=s1.0.180"></script>
     <script defer src="app-damagecalc.js?v=s1.0.192"></script>
     <script defer src="gh-gist.js?v=s1.0.130"></script>
-    <script defer src="app-core.js?v=s1.0.315"></script>
+    <script defer src="app-core.js?v=s1.0.316"></script>
     <script defer src="admin-ctl.js?v=s1.0.459"></script>
 
     <!-- 模态框：创建分类 -->
@@ -2640,7 +2640,7 @@
                 <span style="color:#4fc3f7;">下载桌面版</span>
             </div>
             <!-- 前端部署时间标记（铁律要求，CI 自动注入部署时间）：statsBar 内绝对定位贴右、垂直居中 -->
-            <span id="versionTag" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;user-select:none;color:rgba(255,255,255,0.1);font-size:0.66rem;padding:1px 6px;opacity:0.5;" ondblclick="if(typeof forceRefreshLatest==='function'){forceRefreshLatest();}">s20260829-1515 · s1.0.462</span>
+            <span id="versionTag" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;user-select:none;color:rgba(255,255,255,0.1);font-size:0.66rem;padding:1px 6px;opacity:0.5;" ondblclick="if(typeof forceRefreshLatest==='function'){forceRefreshLatest();}">s20260829-1604 · s1.0.463</span>
             <span id="appUpdateBadge" style="display:none;position:absolute;right:150px;top:50%;transform:translateY(-50%);cursor:pointer;user-select:none;color:#4caf50;font-size:0.66rem;padding:1px 8px;background:rgba(76,175,80,0.15);border:1px solid rgba(76,175,80,0.4);border-radius:10px;white-space:nowrap;">🟢 有新版本</span>
             <div class="version-tooltip">版本 s20260826-0700 · s1.0.313（双击强制刷新）</div>
             <script>(function(){var v=document.getElementById('versionTag');var t=document.querySelector('#versionTag ~ .version-tooltip');if(v&&t)t.textContent='版本 '+v.textContent+'（双击强制刷新）';})();</script>

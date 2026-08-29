@@ -17862,9 +17862,9 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 _wallAttnTimer = null;
                 // 检查 reload 抑制标记
                 try {
-                    const ts = parseInt(sessionStorage.getItem('TFJL_ReloadRedDotSuppress') || '0', 10);
-                    if (ts && (Date.now() - ts) < 30000) {
-                        // 30秒内: 强制清空红点(用户刚刷新过, 给他缓冲, 不立刻闪)
+                    const ts = parseInt(localStorage.getItem('TFJL_ReloadRedDotSuppress') || '0', 10);
+                    if (ts && (Date.now() - ts) < 60000) {
+                        // 60秒内: 强制清空红点(用户刚刷新过, 给他缓冲, 不立刻闪)
                         const dot = document.getElementById('wallUnreadDot');
                         const toggle = document.getElementById('messageWallToggle');
                         if (dot) { dot.style.display = 'none'; dot.textContent = ''; }
@@ -24121,6 +24121,7 @@ ${maSection}
                 else if (code === 'toolboxDiag()') result = window.__tfjlToolboxDiag();
                 else if (code === 'memoryReport()') result = window.memoryReport();
                 else if (code === 'freeMemory()') result = window.freeMemory();
+                else if (code === 'domBreakdown()') result = window.domBreakdown();
                 else result = (function () { return eval(code); })();
                 if (result && typeof result.then === 'function') {
                     result.then(r => { if (r !== undefined) console.log('[CMD] = ' + (typeof r === 'object' ? JSON.stringify(r).slice(0, 800) : r)); }).catch(e => console.error('[CMD] 异步出错: ' + e.message));
@@ -24240,7 +24241,8 @@ ${maSection}
                 try {
                     const s = window.skinCacheStats();
                     rep['皮肤URL缓存-条目数'] = s.size + ' / 上限 ' + s.max;
-                    rep['皮肤URL缓存-预估占用'] = mb(s.bytes);
+                    rep['皮肤URL缓存-blob/data'] = s.blob + ' / ' + s.data;
+                    rep['皮肤URL缓存-解码位图估算'] = s.estDecodeMB + ' MB (GPU纹理另计)';
                 } catch (e) { rep['皮肤URL缓存'] = '统计失败: ' + e.message; }
             } else {
                 rep['皮肤URL缓存'] = 'app-local2.js 未提供 skinCacheStats()';
@@ -24273,6 +24275,29 @@ ${maSection}
             for (const k in rep) console.log('  ' + k + ': ' + rep[k]);
             console.log('=== 报告结束（提示：freeMemory() 可主动释放皮肤缓存与日志） ===');
             return rep;
+        };
+
+        // 🔴 2026-08-29 DOM 节点分布诊断：定位"DOM节点总数"为何偏高（如 9000+）
+        window.domBreakdown = function () {
+            const all = document.getElementsByTagName('*');
+            const byTag = {};
+            const byClass = {};
+            for (let i = 0; i < all.length; i++) {
+                const el = all[i];
+                const tag = el.tagName || 'unknown';
+                byTag[tag] = (byTag[tag] || 0) + 1;
+                const cls = (typeof el.className === 'string' && el.className) ? el.className.trim().split(/\s+/) : [];
+                for (const c of cls) byClass[c] = (byClass[c] || 0) + 1;
+            }
+            const sortDesc = (o) => Object.entries(o).sort((a, b) => b[1] - a[1]);
+            const tagTop = sortDesc(byTag).slice(0, 15);
+            const classTop = sortDesc(byClass).slice(0, 20);
+            console.log('=== DOM 节点分布 domBreakdown() ===');
+            console.log('  DOM节点总数: ' + all.length);
+            console.log('  Top 标签: ' + tagTop.map(x => x[0] + '=' + x[1]).join('  '));
+            console.log('  Top Class: ' + classTop.map(x => x[0] + '=' + x[1]).join('  '));
+            console.log('=== 分布结束 ===');
+            return { total: all.length, topTag: tagTop, topClass: classTop };
         };
 
         // 🔴 2026-08-29 主动释放内存：清空皮肤 URL 缓存 + 控制台日志（不必重启 App 即可回收）
