@@ -3618,9 +3618,59 @@ if (true) {
         return null;
     }
     // 皮肤图片 URL 缓存（blob: URL，比 data: URL 更可靠，不会被 ?t= 参数污染）
-    const skinImageUrlCache = {};
+    // 🔴 2026-08-29 内存优化：改为「LRU 上限缓存 + 淘汰时 revokeObjectURL」。
+    //    原实现是无限增长的普通对象，且从不调用 revokeObjectURL —— 每看一张皮肤就常驻一份
+    //    解码位图，413 张皮刷一遍即累积数百 MB，是 App 内存飙到 1.4G 的主因之一。
+    const SKIN_URL_CACHE_MAX = 80; // 上限约 80 张，足够当前阵容(14槽)+卡池浏览，超出按最久未用淘汰
+    const skinImageUrlCache = new Map(); // filePath -> url（Map 保持插入顺序，天然支持 LRU）
+
+    function _skinUrlRelease(url) {
+        if (typeof url === 'string' && url.indexOf('blob:') === 0) {
+            try { URL.revokeObjectURL(url); } catch (e) {}
+        }
+    }
+
+    function _skinUrlEvictIfNeeded() {
+        while (skinImageUrlCache.size > SKIN_URL_CACHE_MAX) {
+            const oldestKey = skinImageUrlCache.keys().next().value; // 最早插入 = 最久未用
+            _skinUrlRelease(skinImageUrlCache.get(oldestKey));
+            skinImageUrlCache.delete(oldestKey);
+        }
+    }
+
+    function _skinUrlSet(filePath, url) {
+        if (skinImageUrlCache.has(filePath)) skinImageUrlCache.delete(filePath);
+        skinImageUrlCache.set(filePath, url);
+        _skinUrlEvictIfNeeded();
+    }
+
+    // 全清皮肤 URL 缓存（重新扫描/切换项目时调用），逐个 revoke 释放 blob，避免旧图滞留
+    function clearSkinUrlCache() {
+        try { skinImageUrlCache.forEach(function (u) { _skinUrlRelease(u); }); } catch (e) {}
+        try { skinImageUrlCache.clear(); } catch (e) {}
+    }
+    window.clearSkinUrlCache = clearSkinUrlCache;
+
+    // 供 app-core.js 的 memoryReport() 调用：报告皮肤 URL 缓存占用
+    window.skinCacheStats = function () {
+        let bytes = 0;
+        try {
+            skinImageUrlCache.forEach(function (u) {
+                // data: URL 按 base64 长度估算（4/3 解码后字节数）；blob: URL 只记 URL 本身长度
+                if (typeof u === 'string') bytes += u.length;
+            });
+        } catch (e) {}
+        return { size: skinImageUrlCache.size, max: SKIN_URL_CACHE_MAX, bytes: bytes };
+    };
+
     async function getSkinImageUrl(filePath) {
-        if (skinImageUrlCache[filePath]) return skinImageUrlCache[filePath];
+        if (skinImageUrlCache.has(filePath)) {
+            // 命中后移到末尾，维持 LRU 顺序
+            const hit = skinImageUrlCache.get(filePath);
+            skinImageUrlCache.delete(filePath);
+            skinImageUrlCache.set(filePath, hit);
+            return hit;
+        }
         const invokeFn = window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke;
         if (!invokeFn) return null;
 
@@ -3628,7 +3678,7 @@ if (true) {
         try {
             const dataUrl = await invokeFn('read_image_base64', { filePath });
             if (dataUrl) {
-                skinImageUrlCache[filePath] = dataUrl;
+                _skinUrlSet(filePath, dataUrl);
                 return dataUrl;
             }
         } catch(e) {
@@ -3639,11 +3689,9 @@ if (true) {
         // （read_image_base64 的 ACL 需 rebuild exe 才能解锁，fs:default 在旧 exe 中已编译）
         try {
             const bytes = await invokeFn('plugin:fs|read_file', { path: filePath, options: undefined });
-            console.log('[SKIN] read_file raw type:', filePath, bytes?.constructor?.name, 'len:', bytes?.byteLength ?? bytes?.length);
             const blobUrl = bytesToBlobUrl(bytes, filePath);
             if (blobUrl) {
-                skinImageUrlCache[filePath] = blobUrl;
-                console.log('[SKIN] blob URL via fs plugin OK:', filePath);
+                _skinUrlSet(filePath, blobUrl);
                 return blobUrl;
             }
         } catch(e) {
@@ -3695,8 +3743,20 @@ if (true) {
         return { heroName: fullName, skinName: null };
     }
 
+    // 🔴 2026-08-29 扫描防抖：启动阶段 app-local2 初始化、app-core 的 DOMContentLoaded 重扫、
+    //    远端同步回调会各自触发一次，实测 1 秒内全量扫 3~4 遍（每遍遍历 400+ 文件并重建注册表），
+    //    纯属浪费 IO/CPU 且放大内存峰值。3 秒内的重复调用直接复用已有结果。
+    let _lastSkinScanTs = 0;
+    const SKIN_SCAN_DEBOUNCE_MS = 3000;
     async function scanSkins() {
+        const _since = Date.now() - _lastSkinScanTs;
+        if (_since < SKIN_SCAN_DEBOUNCE_MS) {
+            console.log('[SKIN] scanSkins() 跳过：' + _since + 'ms 前刚扫描过（防重复全量扫描）');
+            return window.skinRegistry;
+        }
         console.log('[SKIN] scanSkins() START');
+        // 本轮扫描计数（汇总成一条日志，替代原先逐英雄打印）
+        let _scanHeroCount = 0, _scanSkinCount = 0;
         // 保留已有的远程皮肤条目，避免和 syncRemoteSkins 并行/重复调用时把远程条目冲掉
         const existingRemote = {};
         for (const [heroName, skins] of Object.entries(window.skinRegistry || {})) {
@@ -3704,7 +3764,9 @@ if (true) {
         }
         window.skinRegistry = {};
         // 清内存皮肤图缓存，避免重新扫描后仍命中旧 blob（更新/修复后拿不到新皮肤）
-        try { Object.keys(skinImageUrlCache).forEach(k => delete skinImageUrlCache[k]); } catch (e) {}
+        // 🔴 2026-08-29：改用 clearSkinUrlCache()，逐个 revokeObjectURL 真正释放内存
+        //    （原 Object.keys() 对 Map 无效，等于没清；且 delete 属性也不会释放 blob）
+        try { clearSkinUrlCache(); } catch (e) {}
         console.log('[SKIN] softwareDataDir:', softwareDataDir);
         if (!softwareDataDir) { console.warn('[SKIN] No softwareDataDir, aborting scanSkins'); return window.skinRegistry; }
         const skinRoot = getSkinRootDir();
@@ -3738,7 +3800,9 @@ if (true) {
                     // 统一存 raw path，由 resolveHeroSkinUrl 异步转 base64（convertFileSrc 对 Windows 含盘符路径无效）
                     skins.push({ name: skinName, url: null, path: filePath, loaded: false });
                 }
-                if (skins.length > 0) { window.skinRegistry[heroName] = skins; console.log('[SKIN] Hero:', heroName, 'skins:', skins.map(s => s.name).join(',')); }
+                // 🔴 2026-08-29：不再逐英雄打印皮肤列表（119 个英雄 × 每次扫描 = 几百条日志，
+                //    既刷屏挤掉有效日志，也让 __consoleLogs 常驻大量字符串）。改为末尾汇总一条。
+                if (skins.length > 0) { window.skinRegistry[heroName] = skins; _scanHeroCount++; _scanSkinCount += skins.length; }
             } catch(e) { console.warn('[SKIN] Error reading hero dir:', heroDir, e); }
         }
         // 把之前保留的远程皮肤条目合并回来（本地没有的才加）
@@ -3753,7 +3817,11 @@ if (true) {
             }
             if (localSkins.length > 0) window.skinRegistry[heroName] = localSkins;
         }
-        console.log('[SKIN] scanSkins() DONE, registry keys:', Object.keys(window.skinRegistry).join(',') || '(empty)');
+        // 🔴 2026-08-29：原先这里 join 出 119 个英雄名（一条超长日志），改为汇总计数；
+        //    需要完整清单时用终端命令 dumpSkinRegistry()。
+        console.log('[SKIN] scanSkins() DONE, 英雄数:' + Object.keys(window.skinRegistry).length +
+            ' 皮肤总数:' + _scanSkinCount + '（本轮本地扫描 ' + _scanHeroCount + ' 个英雄目录）');
+        _lastSkinScanTs = Date.now();
         // 扫描完本地皮肤后立刻重刷一次（不依赖远端同步，修复「加载时皮肤卡着不显示」概率问题）
         try { if (typeof window.reapplyAllSkins === 'function') await window.reapplyAllSkins(); } catch (e) {}
         return window.skinRegistry;
@@ -4378,6 +4446,18 @@ if (true) {
     window.batchImportFilesToProject = batchImportFilesToProject;
     // 英雄皮肤系统
     window.scanSkins = scanSkins;
+    // 🔴 2026-08-29 诊断用：终端输入 dumpSkinRegistry() 打印完整皮肤清单
+    // （scanSkins 的逐英雄日志已精简为汇总，需要明细时用它）
+    window.dumpSkinRegistry = function () {
+        const reg = window.skinRegistry || {};
+        const keys = Object.keys(reg);
+        console.log('=== 皮肤注册表 dumpSkinRegistry() ===');
+        keys.forEach(function (h) {
+            console.log('  ' + h + ' (' + (reg[h] || []).length + '): ' + (reg[h] || []).map(function (s) { return s.name; }).join(','));
+        });
+        console.log('共 ' + keys.length + ' 个英雄');
+        return { heroes: keys.length, detail: reg };
+    };
     window.syncRemoteSkins = syncRemoteSkins;
     window.getBaseHeroName = getBaseHeroName;
     window.getHeroSkinUrl = getHeroSkinUrl;
