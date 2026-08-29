@@ -159,7 +159,9 @@ $prevEAP = $ErrorActionPreference
 $ErrorActionPreference = "Continue"
 # 🔴 只推 origin(GitHub)。Gitee 代码树无人读取（网页/App 都跑 GitHub Pages），
 # Gitee 仅用于发行版附件下载，上面 Publish-GiteeRelease 已完成。
-git -c http.proxy= -c https.proxy= push origin main 2>$null; $po = $LASTEXITCODE
+# 🔴 2026-08-30：必须用仓库 .git/config 里写死的 127.0.0.1:7897 代理，
+#    绝不能加 `-c http.proxy= -c https.proxy=` 去清空它——清代理直连 github.com:443 已连续失败 22 次。
+git push origin main 2>$null; $po = $LASTEXITCODE
 $ErrorActionPreference = $prevEAP
 if ($po -ne 0) { Write-Host "ERROR: git push origin 失败 (exit=$po)" -ForegroundColor Red; exit 1 }
 Write-Host "Published: v$ver (updater.json->Pages; installer->Gitee release only)" -ForegroundColor Green
