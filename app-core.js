@@ -15883,7 +15883,14 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
                         }
                     }
 
-                    console.log('[TFJL app-core] 准备写回统计 Gist · device_visits=', JSON.stringify(counterData.device_visits), '· total_visits=', counterData.total_visits, '· remoteOk=', remoteOk);
+                    // 🔴 2026-08-29 内存修复：原先此处 JSON.stringify 整个 device_visits（可数 KB~数十 KB）写日志，
+                    // 每 5 分钟一次，长期挂机日志数组会常驻大量巨长字符串。改为只打印摘要。
+                    try {
+                        const dvCount = counterData.device_visits ? Object.keys(counterData.device_visits).length : 0;
+                        console.log('[TFJL app-core] 准备写回统计 Gist · device_visits 设备数=' + dvCount + ' · total_visits=' + counterData.total_visits + ' · remoteOk=' + remoteOk);
+                    } catch (e) {
+                        console.log('[TFJL app-core] 准备写回统计 Gist · total_visits=' + counterData.total_visits + ' · remoteOk=' + remoteOk);
+                    }
                     let content = JSON.stringify(counterData, null, 2);
                     try {
                         // 使用 PATCH 更新现有 Gist
@@ -24369,12 +24376,45 @@ ${maSection}
                 rep['皮肤注册表-英雄数'] = Object.keys(reg).length;
                 rep['皮肤注册表-皮肤总数'] = cnt;
             } catch (e) { rep['皮肤注册表'] = '读取失败'; }
+            // ⑦ Performance Resource Timing 缓冲（WebView2 常不强制 150 上限，每次网络请求累积一条，永不清除 → 可涨数 GB）
+            try {
+                const all = performance.getEntries().length;
+                const res = performance.getEntriesByType ? performance.getEntriesByType('resource').length : 'n/a';
+                rep['PerfTiming-总条数'] = all;
+                rep['PerfTiming-资源条数'] = res;
+                rep['PerfTiming-内存估算'] = res === 'n/a' ? 'n/a' : '~' + (res * 2 / 1024).toFixed(1) + ' MB (每条约2KB)';
+            } catch (e) { rep['PerfTiming'] = '读取失败'; }
+            // ⑧ 统计大对象 device_visits / daily_device_visits（每5分钟 JSON.stringify 整对象写日志，且随设备量增长常驻）
+            try {
+                const cd = (window.__counterData) || (window.counterData) || null;
+                if (cd) {
+                    const dv = cd.device_visits ? JSON.stringify(cd.device_visits).length : 0;
+                    const dd = cd.daily_device_visits ? JSON.stringify(cd.daily_device_visits).length : 0;
+                    rep['统计对象-device_visits'] = dv + ' 字符 (~' + (dv / 1048576).toFixed(2) + ' MB)';
+                    rep['统计对象-daily_device_visits'] = dd + ' 字符 (~' + (dd / 1048576).toFixed(2) + ' MB)';
+                } else {
+                    rep['统计对象'] = 'counterData 未在 window 暴露';
+                }
+            } catch (e) { rep['统计对象'] = '读取失败'; }
 
             console.log('=== 内存报告 memoryReport() ===');
             for (const k in rep) console.log('  ' + k + ': ' + rep[k]);
             console.log('=== 报告结束（提示：freeMemory() 可主动释放皮肤缓存与日志） ===');
             return rep;
         };
+
+        // 🔴 2026-08-29 内存修复：周期性清理 Performance Resource Timing 缓冲。
+        // WebView2 常不强制 150 条上限，每次网络请求（写盘 invoke / Gist / 皮肤同步）都会累积一条
+        // PerformanceResourceTiming 对象且永不回收，长期挂机可导致数 GB 内存泄漏（48MB/分钟级）。
+        // 标准做法：定时 clearResourceTimings() 释放已无用的计时条目，零副作用。
+        (function startResourceTimingSweeper() {
+            if (typeof performance === 'undefined' || !performance.clearResourceTimings) return;
+            try { performance.clearResourceTimings(); } catch (e) {}
+            setInterval(function () {
+                try { performance.clearResourceTimings(); } catch (e) {}
+            }, 60000);
+            console.log('[MEM] Resource Timing 清理定时器已启动（每60秒）');
+        })();
 
         // 🔴 2026-08-29 DOM 节点分布诊断：定位"DOM节点总数"为何偏高（如 9000+）
         window.domBreakdown = function () {
