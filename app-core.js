@@ -7209,6 +7209,14 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 
         // 单个手牌卡重铺皮肤（融合→对角切，非融合→原逻辑）
         async function reapplySingleHandCard(card, cid, ht) {
+            // 🔴 极速版：手牌也纯色，不铺任何皮肤
+            if (isPerfLite()) {
+                card.classList.remove('skin-bg');
+                card.style.backgroundImage = '';
+                card.style.background = '';
+                card.querySelectorAll('.skin-layer, .skin-layer-fused').forEach(e => e.remove());
+                return;
+            }
             const cardName = card.dataset.name;
             if (!cardName) return;
             // 刷新手牌卡名显示：融合关闭（副卡隐藏）时只显主卡名；完整名存 data-full-name 供逻辑读取
@@ -8642,29 +8650,44 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         // ==================== 性能模式（用户菜单开关）====================
         // 'high'      = 高性能版：预加载全量皮肤、卡池/收藏也铺皮，丝滑（默认）
         // 'optimized' = 优化版：只渲染「手牌 + 上阵阵容」卡面，卡池/收藏区不铺皮肤，省内存防卡顿
+        // 'lite'      = 极速版：完全不渲染任何皮肤（纯色卡面，回归最早版本体验），内存最低，垃圾电脑可用
         const PERF_MODE_KEY = 'tdjl_perf_mode';
         function getPerfMode() {
-            try { const v = localStorage.getItem(PERF_MODE_KEY); if (v === 'optimized' || v === 'high') return v; } catch (e) {}
+            try { const v = localStorage.getItem(PERF_MODE_KEY); if (v === 'optimized' || v === 'high' || v === 'lite') return v; } catch (e) {}
             return 'high';
         }
         function isPerfOptimized() { return getPerfMode() === 'optimized'; }
-        function togglePerfMode() {
-            const next = isPerfOptimized() ? 'high' : 'optimized';
+        function isPerfLite() { return getPerfMode() === 'lite'; }
+        // 极速版：卡池/收藏/手牌/上阵 全部不铺皮
+        function isSkinRenderingDisabled() { return isPerfLite(); }
+        function setPerfMode(next) {
             try { localStorage.setItem(PERF_MODE_KEY, next); } catch (e) {}
             // 同步菜单文案
             try {
                 const el = document.getElementById('menuTogglePerfMode');
-                if (el) el.textContent = (next === 'optimized' ? '⚡ 性能模式：优化' : '⚡ 性能模式：高性能');
+                if (el) el.textContent = getPerfModeLabel();
             } catch (e) {}
             // 立即按新模式重渲染卡池皮肤
             if (typeof updateCardPoolSkins === 'function') updateCardPoolSkins().catch(() => {});
             if (typeof reapplyAllSkins === 'function') reapplyAllSkins().catch(() => {});
-            console.log('[性能模式] 已切换到: ' + (next === 'optimized' ? '优化（卡池/收藏不铺皮，省内存）' : '高性能（全量预加载）'));
+            console.log('[性能模式] 已切换到: ' + (next === 'optimized' ? '优化（卡池/收藏不铺皮，省内存）' : (next === 'lite' ? '极速（纯色卡面，最低内存）' : '高性能（全量预加载）')));
         }
-        // 暴露到全局，供 HTML 菜单 onclick="togglePerfMode()" 调用
+        function getPerfModeLabel() {
+            const m = getPerfMode();
+            return m === 'optimized' ? '⚡ 性能模式：优化' : (m === 'lite' ? '⚡ 性能模式：极速' : '⚡ 性能模式：高性能');
+        }
+        function togglePerfMode() {
+            // 点击在「高性能 → 优化 → 极速 → 高性能」三态循环
+            const cycle = { high: 'optimized', optimized: 'lite', lite: 'high' };
+            setPerfMode(cycle[getPerfMode()] || 'high');
+        }
+        // 暴露到全局，供 HTML 菜单 onclick="togglePerfMode()" / 子菜单调用
         window.togglePerfMode = togglePerfMode;
+        window.setPerfMode = setPerfMode;
         window.getPerfMode = getPerfMode;
         window.isPerfOptimized = isPerfOptimized;
+        window.isPerfLite = isPerfLite;
+        window.getPerfModeLabel = getPerfModeLabel;
 
         // 卡池皮肤铺满：基础卡 / 融合卡主卡用 .skin-layer cover 铺满卡牌，融合卡副卡用 .skin-layer-fused 小图
         // 全部基于全局预设（defaultCardSkins / heroSkinSelections / cloudFusions），跨项目保留
@@ -8678,6 +8701,16 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     card.style.backgroundImage = '';
                     card.style.background = '';
                     card.querySelectorAll('.card-skin-thumb, .card-skin-thumb-fused, .skin-layer-fused').forEach(e => e.remove());
+                });
+                return;
+            }
+            // 🔴 极速版：完全不渲染任何皮肤（纯色卡面，最低内存），与最早版本体验一致
+            if (isPerfLite()) {
+                document.querySelectorAll('.collapsible-section .card-item').forEach(card => {
+                    card.classList.remove('skin-bg');
+                    card.style.backgroundImage = '';
+                    card.style.background = '';
+                    card.querySelectorAll('.card-skin-thumb, .card-skin-thumb-fused, .skin-layer-fused, .skin-layer').forEach(e => e.remove());
                 });
                 return;
             }
@@ -10273,6 +10306,16 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         // 🔴 s1.0.104：进度条统一挂在主站手牌选卡区（.hands-area，即"我的手牌/队友手牌"🔍选卡按钮附近），
         // 不再挂到出站战斗槽容器（.battle-slots-container）——那里因布局错位且用户看不到。
         async function refreshAllBattleSlotSkins() {
+            // 🔴 极速版：上阵阵容也不铺皮（纯色），与卡池/收藏一致
+            if (isPerfLite()) {
+                document.querySelectorAll('.battle-slot.filled').forEach(slot => {
+                    slot.classList.remove('skin-bg');
+                    slot.style.backgroundImage = '';
+                    slot.style.background = '';
+                    slot.querySelectorAll('.skin-layer, .skin-layer-fused').forEach(e => e.remove());
+                });
+                return;
+            }
             const slots = document.querySelectorAll('.battle-slot.filled');
             if (slots.length === 0) return;
             // 进度条容器 = 主站手牌选卡区（.hands-area 顶部），贴合"选着"那 4 个字附近，不窜位
