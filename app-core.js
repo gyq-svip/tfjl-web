@@ -46,15 +46,16 @@
             var day = new Date().toISOString().slice(0, 10);
             return d.replace(/[\\/]+$/, '') + '\\app-console-' + day + '.log';
         }
-        var _diagFileCache = '';   // 累积当天日志内容（上限 5MB，避免无限增长）；用 write_text_file 整体写回模拟追加
+        var _diagFileCache = '';   // 累积当天日志内容（上限 5MB，避免无限增长）
         function _diagFlush() {
             if (!_diagLogEnabled || _diagLogBuf.length === 0) return;
             _diagFileCache += _diagLogBuf.join('');
             _diagLogBuf = [];
-            // 🔴 2026-08-30 兼容性修复：旧 exe 不一定含新增的 append_text_file 命令（APP 窗口加载远程网页，
-            //    但 Rust exe 是更早打包的），直接调会 command not found 被吞。改用旧 exe 必有的 write_text_file
-            //    （统一存储 tfjl.dat 一直在用），整体写回即模拟追加。超过 5MB 截断保留尾部，防内存膨胀。
+            // 超过 5MB 截断保留尾部，防内存膨胀
             if (_diagFileCache.length > 5 * 1048576) _diagFileCache = _diagFileCache.slice(-2 * 1048576);
+            // 优先用 app-local2 提供的 writeDiagLogFile（内部复用已验证的 writeTextFileWithError，写到用户指定目录）
+            try { if (typeof window.__writeDiagLogFile === 'function') { window.__writeDiagLogFile(_diagFileCache); return; } } catch (e) {}
+            // 回退：自己调 write_text_file（旧 exe 必有的命令，统一存储 tfjl.dat 在用）
             try {
                 var fn = null;
                 if (window.__TAURI_INTERNALS__ && typeof window.__TAURI_INTERNALS__.invoke === 'function') fn = window.__TAURI_INTERNALS__.invoke.bind(window.__TAURI_INTERNALS__);
