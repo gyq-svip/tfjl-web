@@ -3963,17 +3963,38 @@ if (true) {
             try {
                 const fileEntries = await readDir(heroDir);
                 if (!fileEntries || !fileEntries.length) continue;
+                // 用 Map 按皮肤名去重：同名时 .skin 优先（.png 是格式统一前的历史残留），
+                // 避免"同一个皮肤既扫到 .png 又扫到 .skin"导致计数虚高（如 465 而非 413）。
                 const skins = [];
+                const _byName = new Map();
                 for (const fileEntry of fileEntries) {
                     const fileName = (typeof fileEntry === 'string') ? fileEntry : (fileEntry.name || '');
                     // 本地皮肤缓存支持 .skin 非图片后缀（从 .png 源构建的 skins.zip，见 Gitee v-skins），
                     // 同时保留 .png 兼容老用户本地已下载的缓存。解码按文件头 magic bytes，与后缀无关。
                     const m = fileName.match(/^(.+)\.(png|jpg|jpeg|gif|webp|skin)$/i);
                     if (!m) continue;
-                    const skinName = m[1];
+                    let skinName = m[1];
+                    // 🔴 2026-08-30 根治融合皮走远程：融合卡皮肤文件名形如「融合石头_石头.skin」，
+                    //    而 registry 登记的 name 是「石头」（不带「融合XX_」前缀）。
+                    //    若直接用全文件名当 name，两边对不上 → syncRemoteSkins 误判"本地没有"
+                    //    → 为每张融合皮添加一条 {url:远程, path:null} 条目 → 每次都从 GitHub 拉图
+                    //    （既刷屏 "Remote skin added"，又是内存持续增长的直接来源）。
+                    //    仅对「融合XX」目录下的文件剥掉前缀，普通皮肤命名不受影响。
+                    if (heroName.indexOf('融合') === 0) {
+                        const fm = skinName.match(/^融合[^_]+_(.+)$/);
+                        if (fm) skinName = fm[1];
+                    }
                     const filePath = heroDir + '\\' + fileName;
                     // 统一存 raw path，由 resolveHeroSkinUrl 异步转 base64（convertFileSrc 对 Windows 含盘符路径无效）
-                    skins.push({ name: skinName, url: null, path: filePath, loaded: false });
+                    const _isSkinExt = /\.skin$/i.test(fileName);
+                    const _prev = _byName.get(skinName);
+                    // 同名时 .skin 优先；尚无记录、或新的是 .skin 而旧的是 .png，则覆盖
+                    if (!_prev || (_isSkinExt && !_prev.isSkin)) {
+                        _byName.set(skinName, { name: skinName, url: null, path: filePath, loaded: false, isSkin: _isSkinExt });
+                    }
+                }
+                for (const _v of _byName.values()) {
+                    skins.push({ name: _v.name, url: null, path: _v.path, loaded: false });
                 }
                 // 🔴 2026-08-29：不再逐英雄打印皮肤列表（119 个英雄 × 每次扫描 = 几百条日志，
                 //    既刷屏挤掉有效日志，也让 __consoleLogs 常驻大量字符串）。改为末尾汇总一条。
