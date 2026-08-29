@@ -493,6 +493,25 @@ fn write_text_file(file_path: String, content: String) -> Result<(), String> {
     fs::write(&file_path, content).map_err(|e| e.to_string())
 }
 
+/// 追加文本到文件末尾（自动创建父目录）；用于诊断日志落盘，避免每次重写全量内容
+#[tauri::command]
+fn append_text_file(file_path: String, content: String) -> Result<(), String> {
+    use std::io::Write as _;
+    let path = Path::new(&file_path);
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() && !parent.exists() {
+            fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        }
+    }
+    let mut f = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&file_path)
+        .map_err(|e| e.to_string())?;
+    f.write_all(content.as_bytes()).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 /// 执行 git 命令（在指定仓库目录），返回 stdout；非零退出码返回 stderr 文本
 fn run_git(repo: &str, args: &[&str]) -> Result<String, String> {
     let out = Command::new("git")
@@ -1334,6 +1353,7 @@ pub fn run() {
             read_text_file_auto,
             detect_file_encoding,
             write_text_file,
+            append_text_file,
             git_push_fusions,
             git_push_skins,
             flash_tray_icon,

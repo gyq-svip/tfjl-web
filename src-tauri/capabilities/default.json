@@ -21,6 +21,7 @@
     "allow-read-text-file",
     "allow-detect-file-encoding",
     "allow-write-text-file",
+    "allow-append-text-file",
     "allow-git-push-fusions",
     "allow-git-push-skins",
     "allow-flash-tray-icon",

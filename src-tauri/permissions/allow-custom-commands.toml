@@ -24,6 +24,11 @@ description = "Allow writing text files"
 commands.allow = ["write_text_file"]
 
 [[permission]]
+identifier = "allow-append-text-file"
+description = "Allow appending text to files (diagnostic log sink)"
+commands.allow = ["append_text_file"]
+
+[[permission]]
 identifier = "allow-git-push-fusions"
 description = "Allow one-click git push of skins/fusions.json from 卡组管理"
 commands.allow = ["git_push_fusions"]
