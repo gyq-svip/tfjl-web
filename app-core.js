@@ -6297,11 +6297,16 @@
                 return [cardName.substring(0, 2), cardName.substring(2)];
             }
             const heroSet = getAllHeroNames();
+            // 🔴 2026-08-30 融合卡误判防御：名字能整体匹配「已知单卡」时，绝不硬拆成融合卡。
+            //    真单卡（如 咬人娃娃）整名已录入 DEFAULT_CARD_SKINS / cloudCards（二者都进 heroSet），
+            //    一旦在 heroSet 中即直接判单卡返回 null，避免 splitIntoHeroes 按前缀把它拆成 [咬人,娃娃] 误判融合。
+            //    即便某真单卡意外没进 heroSet，也显式再查一次 DEFAULT_CARD_SKINS / cloudCards 兜底拦截。
             if (heroSet.has(cardName)) return null;
+            if (DEFAULT_CARD_SKINS[cardName] || (window.cloudCards && window.cloudCards[cardName])) return null;
             const parts = splitIntoHeroes(cardName, heroSet);
             if (parts.length >= 2) return parts;
-            // 兜底：4字融合且前2字为已知英雄
-            if (cardName.length === 4 && !DEFAULT_CARD_SKINS[cardName] && heroSet.has(cardName.substring(0, 2))) {
+            // 兜底：4字融合且前2字为已知英雄（已排除整名是真单卡的情况）
+            if (cardName.length === 4 && !DEFAULT_CARD_SKINS[cardName] && !(window.cloudCards && window.cloudCards[cardName]) && heroSet.has(cardName.substring(0, 2))) {
                 return [cardName.substring(0, 2), cardName.substring(2)];
             }
             return null;
