@@ -29,8 +29,12 @@
         var _diagLogEnabled = false;
         var _diagLogBuf = [];           // 待写缓冲
         var _diagLogBaseDir = '';       // 缓存目录（从 app-local2 注入 get_diag_log_dir）
-        // 持久化：localStorage 记住开关，重启后自动恢复，无需每次手动开
-        try { if (localStorage.getItem('tdjl_diag_log') === '1') _diagLogEnabled = true; } catch (e) {}
+        // 🔴 2026-08-30 默认开启诊断日志落盘：用户一卡就来不及手动开，故默认开；仅当用户显式 disableDiagLog() 后才关。
+        //    localStorage 记忆：'1'=显式开（冗余，默认即开）、'0'=显式关。
+        try {
+            const _dl = localStorage.getItem('tdjl_diag_log');
+            _diagLogEnabled = (_dl !== '0'); // 默认 true，除非明确关过
+        } catch (e) { _diagLogEnabled = true; }
         function _diagLogPath() {
             // 优先用 get_diag_log_dir 返回的缓存目录（OS 管理，干净不污染数据根目录）
             var d = _diagLogBaseDir || '';
@@ -62,8 +66,8 @@
         };
         window.disableDiagLog = function () {
             _diagLogEnabled = false;
-            try { localStorage.removeItem('tdjl_diag_log'); } catch (e) {}
-            console.log('[DIAG-LOG] 已关闭本地诊断日志落盘（已清除记忆）');
+            try { localStorage.setItem('tdjl_diag_log', '0'); } catch (e) {} // 用 '0' 区分"显式关"与"未设置(默认开)"
+            console.log('[DIAG-LOG] 已关闭本地诊断日志落盘（已记忆，重启不再自动开）');
         };
 
         (function captureConsole() {
@@ -110,6 +114,27 @@
         // 诊断日志定时刷盘（每 2s），并在卸载前强刷一次，避免卡死时缓冲丢失
         setInterval(function () { try { _diagFlush(); } catch (e) {} }, 2000);
         window.addEventListener('beforeunload', function () { try { _diagFlush(); } catch (e) {} });
+        // 🔴 2026-08-30 内存/性能定时采样：每 15s 把关键指标写入诊断日志，用户一卡我直接看日志就能定位是哪块在涨
+        setInterval(function () {
+            if (!_diagLogEnabled) return;
+            try {
+                var pm = (typeof performance !== 'undefined') ? performance.memory : null;
+                var domN = (document && document.getElementsByTagName) ? document.getElementsByTagName('*').length : 0;
+                var imgN = (document && document.getElementsByTagName) ? document.getElementsByTagName('img').length : 0;
+                var sk = (typeof window.skinCacheStats === 'function') ? window.skinCacheStats() : null;
+                var line = '[SAMPLE] ';
+                if (pm) {
+                    line += 'JS堆=' + (pm.usedJSHeapSize / 1048576).toFixed(1) + 'MB/' + (pm.jsHeapSizeLimit / 1048576).toFixed(0) + 'MB上限';
+                    line += ' 占比=' + (pm.usedJSHeapSize / pm.jsHeapSizeLimit * 100).toFixed(1) + '%';
+                } else {
+                    line += 'JS堆=n/a';
+                }
+                line += ' DOM=' + domN + ' IMG=' + imgN;
+                if (sk) line += ' 皮肤缓存=' + (sk.urlCacheCount != null ? sk.urlCacheCount : '?') + '/' + (sk.registryCount != null ? sk.registryCount : '?');
+                line += ' 日志缓冲=' + window.__consoleLogs.length;
+                _diagLogBuf.push(new Date().toTimeString().slice(0, 8) + ' ' + line + '\n');
+            } catch (e) {}
+        }, 15000);
 
         // ==================== Gist GET 304 缓存（省 GitHub API 配额） ====================
         // 只对“静态内容型”Gist 做 304 缓存：命中时 GitHub 返回 304（不计入 5000 配额）。
