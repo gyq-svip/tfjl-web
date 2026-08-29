@@ -348,12 +348,12 @@
         if(tokEl) tokEl.focus();
         return;
       }
-      if(!confirm('确认打包 skins/ 全部已登记皮肤并发布到 Gitee 发行版？\n\n流程：打包 → 上传 → 校验直链 → 更新索引 → 推送 Pages\n约 20MB，请耐心等待。\n\n任一步失败都不会影响现有用户（索引仍指向上一个好包）。')) return;
+      if(!confirm('确认打包 skins/ 全部已登记皮肤并发布到 Gitee 发行版？\n\n流程：打包 → 上传 Gitee → 校验直链 → 更新索引 → 推送 Pages\n约 20MB，请耐心等待。\n\n⚠️ 本按钮只负责「客户端用的 Gitee 整包」。\n若新皮肤也要在网页版生效，请再点旁边的「🚀 一键推送到 GitHub / Gitee」——两条线独立，任一方失败可单独重试。\n\n任一步失败都不会影响现有用户（索引仍指向上一个好包）。')) return;
       smStatus('📦 打包并发布中（约 20MB，请稍候，勿关闭）…');
       fn('publish_skins',{token:tok}).then(function(res){
-        smStatus('✅ 发布完成：\n'+res);
+        smStatus('✅ 发布完成\n\n'+res+'\n\n客户端下次点「更新皮肤资源」即可拉取这批皮肤。');
       }).catch(function(err){
-        smStatus('❌ 发布失败：'+smErrMsg(err),true);
+        smStatus('❌ 发布未完成\n（不影响现有用户，他们仍在用上一个好包）\n\n'+smErrMsg(err)+'\n\n补救：按上面提示处理后，重新点一次本按钮即可。', true);
       });
     }
     function smInit(){
