@@ -273,7 +273,7 @@ if (true) {
     }
 
     let _lastFlushTs = 0;                       // 上次实际落盘时间（用于最短间隔节流）
-    const MIN_FLUSH_GAP_MS = 5 * 1000;          // 🔴 tfjl.dat 最短落盘间隔 5s：合并高频 setItem，杜绝每1秒写盘卡死
+    const MIN_FLUSH_GAP_MS = 30 * 1000;         // 🔴 tfjl.dat 最短落盘间隔 30s：合并高频 setItem，减少磁盘 I/O（切后台/关窗仍会立即刷盘保数据）
 
     function _scheduleFlush() {
         if (!_syncOk) return;
