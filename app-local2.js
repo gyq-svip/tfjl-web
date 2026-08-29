@@ -345,7 +345,8 @@ if (true) {
             await _ensureStoreLoaded(dir);   // 加载现有 tfjl.dat 或迁移旧文件
             _syncOk = true;
             await _flushStore();             // 立即写一次，验证目录可写
-            _startAutoBackupTimer();         // 启动定时整备（每 30 分钟兜底快照）
+            _migrateOldBackups(dir);         // 清理旧版散落在根目录的自动备份（死循环产生的垃圾）
+            _startAutoBackupTimer();         // 启动定时整备（每 6 小时兜底快照）
             console.log('[数据存储] ✅ 已启用单一文件存储: ' + _getDatPath(dir));
         } catch (e) {
             _syncOk = false;
@@ -555,7 +556,7 @@ if (true) {
     const AUTO_BACKUP_DEFAULT_KEEP = 20;
 
     // 自动加载开关：默认全部开启，用户卡顿可关闭
-    const settingsConfig = { autoLoadScreenshotStats: true, autoLoadBattleStats: true, autoBackup: true, autoBackupKeep: AUTO_BACKUP_DEFAULT_KEEP, autoBackupTimer: true, autoBackupIntervalMin: 30 };
+    const settingsConfig = { autoLoadScreenshotStats: true, autoLoadBattleStats: true, autoBackup: true, autoBackupKeep: AUTO_BACKUP_DEFAULT_KEEP, autoBackupTimer: true, autoBackupIntervalMin: 360 };
 
     // 自动备份配置也镜像进 localStorage（设置面板与 _autoBackupEnabled/_autoBackupKeep 共用）
     function _syncAutoBackupConfig() {
@@ -588,8 +589,8 @@ if (true) {
     let _autoBackupRunning = false;       // 正在写盘标志（防并发叠加）
     let _autoBackupInterval = null;       // 定时整备定时器（每 30 分钟兜底）
     let _lastRealBackupTs = 0;            // 上次"实际写盘"备份的时间戳（用于最小间隔节流）
-    const AUTO_BACKUP_INTERVAL_MS = 30 * 60 * 1000; // 30 分钟（定时整备默认间隔）
-    const AUTO_BACKUP_MIN_GAP_MS = 5 * 60 * 1000;   // 🔴 最小备份间隔 5 分钟：杜绝"持续备份/打开即备"卡死循环
+    const AUTO_BACKUP_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 小时（定时整备默认间隔，用户可配）
+    const AUTO_BACKUP_MIN_GAP_MS = 60 * 60 * 1000;   // 🔴 最小备份间隔 1 小时：杜绝"持续备份/打开即备"卡死循环
 
     // 由每次 tfjl.dat 落盘调用（第 268 行）。仅置"脏标记"，不直接触发备份，
     // 避免"写盘→8秒后备份→又写盘→又备份"的永续循环（实测日志每 6~14s 一次，主线程 I/O 卡死）。
@@ -624,6 +625,8 @@ if (true) {
     async function _doAutoBackup(dir) {
         if (!dir) return;
         const syncDir = dir.replace(/[\\/]+$/, '');
+        // 🔴 备份统一存放到 syncDir/backups/ 子目录，避免几十份散落在数据根目录里
+        const backupDir = syncDir + '\\backups';
         // 1) 取当前 tfjl.dat 内容（与落盘一致），算 hash（锁外做，无变更直接跳过，不加锁）
         let rawDat = '';
         try { rawDat = await readTextFile(_getDatPath(syncDir)) || ''; } catch (e) { return; }
@@ -663,30 +666,33 @@ if (true) {
                 indexedDB: { projects, categories: dbCategories }
             };
 
+            // 写盘前确保 backups/ 子目录存在
+            try { await createDir(backupDir); } catch (e) { console.warn('[自动备份] 创建子目录失败:', backupDir, e); }
+
             const d = new Date();
             const ts = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' +
                 String(d.getDate()).padStart(2, '0') + '_' +
                 String(d.getHours()).padStart(2, '0') + String(d.getMinutes()).padStart(2, '0') +
                 String(d.getSeconds()).padStart(2, '0');
             const fileName = AUTO_BACKUP_PREFIX + ts + '.json';
-            const filePath = syncDir + '\\' + fileName;
+            const filePath = backupDir + '\\' + fileName;
             const result = await writeTextFileWithError(filePath, JSON.stringify(backup, null, 2));
             if (!result.success) { console.error('[自动备份] 写文件失败:', result.error); return; }
 
             localStorage.setItem(AUTO_BACKUP_HASH_KEY, hash); // 记录已备份内容，下次变更才再备
             _lastRealBackupTs = Date.now();                  // 🔴 更新最小间隔基准，杜绝连续狂备
-            console.log('[自动备份] ✅ 已生成: ' + fileName + '（项目 ' + projects.length + ' 个）');
+            console.log('[自动备份] ✅ 已生成: ' + fileName + '（项目 ' + projects.length + ' 个，位于 backups/）');
 
-            // 3) 清理超出保留数量的旧自动备份（保留最新的 N 份）
+            // 3) 清理超出保留数量的旧自动备份（仅扫描 backups/ 子目录）
             try {
-                const entries = await readDir(syncDir);
+                const entries = await readDir(backupDir);
                 const autos = entries
                     .filter(e => e.is_file && e.name.startsWith(AUTO_BACKUP_PREFIX) && e.name.endsWith('.json'))
                     .sort((a, b) => b.name.localeCompare(a)); // 最新在前
                 const keep = _autoBackupKeep();
                 const excess = autos.slice(keep);
                 for (const f of excess) {
-                    try { await deleteFile(syncDir + '\\' + f.name); } catch (e) {}
+                    try { await deleteFile(backupDir + '\\' + f.name); } catch (e) {}
                 }
                 if (excess.length) console.log('[自动备份] 已清理 ' + excess.length + ' 份过期备份，保留最新 ' + keep + ' 份');
             } catch (e) {}
@@ -709,6 +715,25 @@ if (true) {
     }
     function _stopAutoBackupTimer() {
         if (_autoBackupInterval) { clearInterval(_autoBackupInterval); _autoBackupInterval = null; }
+    }
+
+    // 🔴 清理旧版散落在数据根目录的自动备份（s1.0.480 之前死循环产生的几十份垃圾文件）。
+    // 新版备份已全部写入 backups/ 子目录，仅在首次启用时跑一次，把根目录残留的旧文件迁移进 backups/。
+    async function _migrateOldBackups(dir) {
+        const syncDir = (dir || _syncDir || '').replace(/[\\/]+$/, '');
+        if (!syncDir) return;
+        try {
+            const entries = await readDir(syncDir);
+            const olds = entries.filter(e => e.is_file && e.name.startsWith(AUTO_BACKUP_PREFIX) && e.name.endsWith('.json'));
+            if (!olds.length) return;
+            const backupDir = syncDir + '\\backups';
+            try { await createDir(backupDir); } catch (e) {}
+            let moved = 0;
+            for (const f of olds) {
+                try { if (await renameLocalFile(syncDir + '\\' + f.name, backupDir + '\\' + f.name)) moved++; } catch (e) {}
+            }
+            if (moved) console.log('[自动备份] 已迁移 ' + moved + ' 份旧备份到 backups/ 子目录（新备份将统一存放于此）');
+        } catch (e) {}
     }
 
     function loadConfig() {
