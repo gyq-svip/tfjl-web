@@ -527,10 +527,13 @@
                             const d = document.getElementById('__verNewDot'); if (d) d.remove();
                         }
                     } else {
-                        window.__tfjlHasNewVersion = true; _markNewVersionAvailable();
-                        if (typeof notifyNewVersion === 'function') notifyNewVersion();
+                        // 远端版本号拉不到：网络不可靠，**默认无新版本**（绝不瞎弹气泡，避免"已是最新还弹"）
+                        window.__tfjlHasNewVersion = false;
                     }
-                } catch (e) { window.__tfjlHasNewVersion = true; _markNewVersionAvailable(); if (typeof notifyNewVersion === 'function') notifyNewVersion(); }
+                } catch (e) {
+                    // 🔴 2026-08-29 修复：网络/解析失败一律按"无新版本"处理，不弹气泡。
+                    window.__tfjlHasNewVersion = false;
+                }
             }
             // 把 SW 缓存版本号显示到右下角版本标签（如 "v260727-57 · sw-v62"）
             function updateCacheVersionDisplay(swVersion, deployTag) {

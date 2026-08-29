@@ -3653,14 +3653,25 @@ if (true) {
 
     // 供 app-core.js 的 memoryReport() 调用：报告皮肤 URL 缓存占用
     window.skinCacheStats = function () {
-        let bytes = 0;
+        let blobCount = 0, dataCount = 0;
         try {
             skinImageUrlCache.forEach(function (u) {
-                // data: URL 按 base64 长度估算（4/3 解码后字节数）；blob: URL 只记 URL 本身长度
-                if (typeof u === 'string') bytes += u.length;
+                if (typeof u === 'string') {
+                    if (u.indexOf('blob:') === 0) blobCount++;
+                    else dataCount++; // data: URL（未缩放兜底）
+                }
             });
         } catch (e) {}
-        return { size: skinImageUrlCache.size, max: SKIN_URL_CACHE_MAX, bytes: bytes };
+        // blob: URL 字符串本身极短，无法据此估算真实位图内存；改为按「缩放后解码尺寸」估算：
+        // 缩放到 ≤256px 的 PNG 解码位图约 256×256×4 ≈ 262KB/张（GPU 纹理另计，约再 ×1.5）。
+        const estDecodeMB = (blobCount + dataCount) * 256 * 256 * 4 / 1048576;
+        return {
+            size: skinImageUrlCache.size,
+            max: SKIN_URL_CACHE_MAX,
+            blob: blobCount,
+            data: dataCount,
+            estDecodeMB: estDecodeMB.toFixed(1)
+        };
     };
 
     async function getSkinImageUrl(filePath) {
@@ -3678,8 +3689,11 @@ if (true) {
         try {
             const dataUrl = await invokeFn('read_image_base64', { filePath });
             if (dataUrl) {
-                _skinUrlSet(filePath, dataUrl);
-                return dataUrl;
+                // data: URL → blob → 缩放 → 缓存 blob URL（缩放可大幅降低解码/GPU 内存）
+                const blob = await _dataUrlToBlob(dataUrl);
+                const finalUrl = blob ? await _downscaleBlobIfNeeded(blob) : dataUrl;
+                _skinUrlSet(filePath, finalUrl);
+                return finalUrl;
             }
         } catch(e) {
             console.log('[SKIN] read_image_base64 ACL blocked, trying fs plugin...', String(e).slice(0,80));
@@ -3691,8 +3705,17 @@ if (true) {
             const bytes = await invokeFn('plugin:fs|read_file', { path: filePath, options: undefined });
             const blobUrl = bytesToBlobUrl(bytes, filePath);
             if (blobUrl) {
-                _skinUrlSet(filePath, blobUrl);
-                return blobUrl;
+                // 把原生 blob URL 还原成 blob 再缩放，避免缩放时再读一遍文件
+                try {
+                    const blob = await (await fetch(blobUrl)).blob();
+                    const finalUrl = await _downscaleBlobIfNeeded(blob);
+                    _skinUrlRelease(blobUrl); // 释放未缩放的原始 blob URL
+                    _skinUrlSet(filePath, finalUrl);
+                    return finalUrl;
+                } catch(e) {
+                    _skinUrlSet(filePath, blobUrl); // 缩放失败则退回原 blob
+                    return blobUrl;
+                }
             }
         } catch(e) {
             console.warn('[SKIN] read_file also failed:', filePath, String(e).slice(0,160));
@@ -3700,6 +3723,46 @@ if (true) {
         return null;
     }
     window.getSkinImageUrl = getSkinImageUrl;
+
+    // data: URL → Blob
+    async function _dataUrlToBlob(dataUrl) {
+        try {
+            const res = await fetch(dataUrl);
+            return await res.blob();
+        } catch (e) { return null; }
+    }
+
+    // 🔴 2026-08-29 内存优化：把皮肤图缩放到最大边长 256px 再生成 blob。
+    // 原图多为 512~1024px 的大 PNG，解码后位图直接膨胀 4~16 倍、再上传 GPU 又 ×1.5~2，
+    // 400+ 张皮肤累积即数百 MB。缩到 256px 视觉几乎无差，但解码位图 + GPU 纹理内存可省 60%~80%。
+    const SKIN_MAX_EDGE = 256;
+    async function _downscaleBlobIfNeeded(blob) {
+        if (!blob || !blob.type || blob.type.indexOf('image/') !== 0) return URL.createObjectURL(blob);
+        try {
+            if (typeof createImageBitmap !== 'function') return URL.createObjectURL(blob);
+            const bmp = await createImageBitmap(blob);
+            const w = bmp.width, h = bmp.height;
+            const maxEdge = Math.max(w, h);
+            if (maxEdge <= SKIN_MAX_EDGE) {
+                bmp.close && bmp.close();
+                return URL.createObjectURL(blob); // 本身已够小，直接走原图
+            }
+            const scale = SKIN_MAX_EDGE / maxEdge;
+            const tw = Math.max(1, Math.round(w * scale));
+            const th = Math.max(1, Math.round(h * scale));
+            const canvas = document.createElement('canvas');
+            canvas.width = tw; canvas.height = th;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(bmp, 0, 0, tw, th);
+            bmp.close && bmp.close();
+            const outBlob = await new Promise(res => canvas.toBlob(res, 'image/png'));
+            if (outBlob) return URL.createObjectURL(outBlob);
+            return URL.createObjectURL(blob);
+        } catch (e) {
+            // 缩放失败（解码/画布异常）→ 退回原 blob，不影响功能
+            return URL.createObjectURL(blob);
+        }
+    }
 
     /// 将 ArrayBuffer/Uint8Array 转为 blob: URL（比 data: URL 更可靠，浏览器原生支持）
     function bytesToBlobUrl(bytes, filePath) {

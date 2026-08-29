@@ -3306,9 +3306,10 @@
                     const names = await caches.keys();
                     await Promise.all(names.map((n) => caches.delete(n)));
                 }
-                // 🔴 2026-08-29 标记：双击刷新/强制刷新后 30 秒内抑制需求墙红点闪烁
-                // reload 后 scheduleWallAttention 会读到 sessionStorage 标记, 30 秒内强制清空红点
-                try { sessionStorage.setItem('TFJL_ReloadRedDotSuppress', String(Date.now())); } catch (e) {}
+                // 🔴 2026-08-29 标记：双击刷新/强制刷新后 60 秒内抑制需求墙红点闪烁
+                // reload 后 scheduleWallAttention 会读到 localStorage 标记, 60 秒内强制清空红点
+                // （改 localStorage 而非 sessionStorage：Tauri WebView reload 时 sessionStorage 可能丢，导致刷新完立刻闪红点）
+                try { localStorage.setItem('TFJL_ReloadRedDotSuppress', String(Date.now())); } catch (e) {}
                 // 2.5 🔴 关键修复：sw.js 改为"安装后 waiting 不自动激活"，
                 // 仅删缓存+reload 不足以让新 SW 接管（旧 SW 仍按旧 CACHE_VERSION 重新缓存旧文件 → 永远拿不到新版）。
                 // 必须显式让处于 waiting 的新 SW 立即激活(skipWaiting)，否则强制刷新后仍是旧版。
@@ -3350,13 +3351,14 @@
                 }
             } catch (e) { /* 清理阶段出错不阻塞，继续强刷 */ }
             // 强刷：带时间戳 URL + hard reload，彻底绕过各级缓存
-            t.success('✅ 已获取最新，正在重新加载...');
+            try { if (typeof showToast === 'function') showToast('🔄 正在强制刷新获取最新版...'); } catch (e) {}
             setTimeout(() => {
                 const url = new URL(location.href);
-                url.searchParams.set('_t', Date.now());
-                // 用 location.replace 替换当前历史，避免回退到旧缓存版本
-                location.replace(url.toString());
-            }, 800);
+                url.search = url.search.replace(/[?&]_t=\d+/, '') + '&_t=' + Date.now();
+                // 🔴 改用 location.reload(true) 硬刷新：比 location.replace 更可靠，
+                // 不受 SW 重新注册的异步时序影响（Tauri WebView 下 replace 偶发"点了没反应"）。
+                try { window.location.href = url.toString(); } catch (e) { location.reload(true); }
+            }, 600);
         }
 
         // 菜单「更新皮肤资源」：优先从 Gitee 发行版下载皮肤包解压到本地（本地化，无网可用）；
