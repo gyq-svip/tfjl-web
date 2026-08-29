@@ -8913,6 +8913,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 
         // 右键循环切换皮肤：默认 → 皮肤1 → 皮肤2 → ... → 回到默认
         // 注意：getAvailableSkins 是同步函数且已含「默认」；setDefaultCardSkin 第一个参数是 cardId
+        let _poolSkinSyncT = null;  // 整池同步防抖定时器（连续右击期间不重渲整池）
         async function cyclePoolCardSkin(card) {
             const cardName = card.dataset.name || '';
             const cardId = card.dataset.id;
@@ -8934,8 +8935,19 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const next = seq[(idx + 1) % seq.length];
 
             await setDefaultCardSkin(cardId, next);
-            await updateCardPoolSkins();
+
+            // 🔴 2026-08-30 修复「连续右击切不」：不再每次整池重渲（updateCardPoolSkins 重建几百张卡 DOM，
+            // 连续右击时事件打在正在重建的元素上丢失 → 切不动）。改为只即时重绘当前这一张卡（不重建 DOM，
+            // 右击事件不丢），并防抖 250ms 后才整池同步一次（保证收藏区/Favorite 网格里同一张卡一致）。
+            try {
+                const u = await resolvePoolSkinUrl(cardName, next);
+                card.classList.toggle('skin-bg', !!u);
+                card.style.backgroundImage = u ? 'url("' + u + '")' : '';
+            } catch (e) {}
             showToast(`${cardName} → ${next}（${seq.indexOf(next) + 1}/${seq.length}）`);
+
+            if (_poolSkinSyncT) clearTimeout(_poolSkinSyncT);
+            _poolSkinSyncT = setTimeout(function () { _poolSkinSyncT = null; updateCardPoolSkins(); }, 250);
         }
 
         // 卡池取皮肤图：未设置 / "默认" → 回退到皮肤库里与英雄同名的默认图（再兜底第一张）
@@ -10841,9 +10853,17 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const skins = window.getHeroSkins ? window.getHeroSkins(heroName) : [];
             /* [SKIN log muted] */ void (0) && console.log('[SKIN] getHeroSkins result:', skins.length, 'skins:', skins.map(s => s.name));
             if (!skins.length) { console.warn('[SKIN] No skins available, aborting cycle'); return; }
+            // 🔴 2026-08-30 修复「连续右击切不」：同一槽正在切时，把本次点击记为 pending（不并发），
+            // 上一次完成后自动再切一格 → 快速连点不丢点击、且不会因读到中间状态而跳不动。
+            const _slotEl = document.querySelector('.battle-slot[data-slot="' + slotId + '"]');
+            if (_slotEl) {
+                if (_slotEl._cycling) { _slotEl._pendingCycle = (_slotEl._pendingCycle || 0) + 1; return; }
+                _slotEl._cycling = true;
+            }
+            try {
             const baseHero = (typeof getMainCardName === 'function') ? getMainCardName(heroName) : ((window.getBaseHeroName && window.getBaseHeroName(heroName).heroName) || heroName);
             // 先拿到槽位上的卡 id / 阵营，用于读取"当前项目内该卡皮肤"作为循环起点
-            const cycleSlot = document.querySelector('.battle-slot[data-slot="' + slotId + '"]');
+            const cycleSlot = _slotEl || document.querySelector('.battle-slot[data-slot="' + slotId + '"]');
             const cardId = cycleSlot && cycleSlot.dataset ? cycleSlot.dataset.cardId : null;
             const handType = (cycleSlot && cycleSlot.dataset && cycleSlot.dataset.handType) ? cycleSlot.dataset.handType : 'my';
             // 当前皮肤 = 当前项目该卡已设皮肤（cardSkins 优先）；无则读取全局默认（只读，不写全局）
@@ -10882,6 +10902,13 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 setTimeout(() => { if (skinLabel.parentNode) skinLabel.remove(); }, 1500);
             }
             return nextSkin;
+            } finally {
+                // 🔴 2026-08-30 解锁 + 处理 pending 累加的连点：若切皮期间又右击了，自动再切一格
+                if (_slotEl) {
+                    _slotEl._cycling = false;
+                    if (_slotEl._pendingCycle > 0) { _slotEl._pendingCycle -= 1; _slotEl._cycling = false; cycleHeroSkin(heroName, slotId); }
+                }
+            }
         }
 
         // 从槽位移除卡牌
