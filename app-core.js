@@ -9473,6 +9473,20 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             }
             if (!heroName) { console.log('[SKIN] No heroName, returning'); return; }
 
+            // 2026-08-30 回滚「复用同个 <img>」优化引发的两个回归：
+            //  ① 切皮不重绘 —— 旧代码对「src 相同」直接 return，但 resolveHeroSkinInfo 会把 data: 结果
+            //     缓存进 entry.url（app-local2.js:4584），导致同一槽位反复解析出完全相同的 data: 串，
+            //     看似「要切」实则被 src 相等判断吞掉，画面不动 → 用户体感「完全切不了」。
+            //  ② 融合槽残留旧叠加层 —— 非融合分支只碰 .skin-layer，从不删 .skin-layer-fused，
+            //     融合槽一旦变非融合，旧副卡小图残留在画面上 → 「融合皮也不行了」。
+            // 修复：每次渲染前先清掉两种旧皮肤层，下方融合/非融合分支按需重建（即优化前丝滑版本的行为）。
+            // 不再手动 revoke blob（避免误回收正在显示的图），纹理由浏览器 GC 回收；
+            // 内存暴涨的根因（_skinBlobUrlCache LRU 淘汰时 revoke 了正在用的 blob）已在 commit 84cd833 修复，与此处重建无关。
+            const _oldBase = slot.querySelector('.skin-layer');
+            if (_oldBase) _oldBase.remove();
+            const _oldFused = slot.querySelector('.skin-layer-fused');
+            if (_oldFused) _oldFused.remove();
+
             // 融合卡：主卡整皮(底层) + 被融合卡左上斜切半张(上层)
             if (fusionSkinSplitEnabled) {
                 const parts = getFusionParts(heroName);
@@ -9550,31 +9564,16 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             //    这里又会赋新 src。无论哪种情况，覆盖 img.src 前必须先 revoke 旧 blob，否则旧纹理常驻 GPU 永不回收。
             const finalSrc = skinUrl; // 直接用原始 URL（blob:/data:/https: 都不加时间戳，保证「src 未变」优化始终生效）
 
-            // 🔴 2026-08-29 内存修复：复用已有的 .skin-layer <img>，不要每次 reapply 都新建 + 重新解码。
-            // 旧逻辑每次都 createElement('img') + img.src=url → 旧 <img> 被 remove 后其 GPU 纹理异步回收、新 <img> 又解码一张，
-            // 频繁 reapply(启动6次/切项目/切皮)导致大量待回收纹理堆积 → 进程内存 3GB+ 暴涨。
-            // 改为：已存在则仅当 src 变化时才改 src(相同则完全跳过解码)；不存在才创建。
-            let img = slot.querySelector('.skin-layer');
-            if (img) {
-                if (img.getAttribute('src') === finalSrc) {
-                    slot.classList.add('skin-bg');
-                    return; // src 未变：跳过重建，避免重复解码纹理
-                }
-                // 覆盖前释放旧 blob（避免旧纹理泄漏）。data:/https: 调 revoke 无害（内部判断前缀跳过）。
-                const _oldSrc = img.getAttribute('src');
-                if (_oldSrc && _oldSrc.indexOf('blob:') === 0) { try { URL.revokeObjectURL(_oldSrc); } catch (e) {} }
-                img.src = finalSrc;
-            } else {
-                img = document.createElement('img');
-                img.className = 'skin-layer';
-                img.src = finalSrc;
-                slot.insertBefore(img, slot.firstChild);
-            }
+            // 2026-08-30 回滚「复用同个 <img>」优化：上方已 remove 旧 .skin-layer，这里每次重建新 <img>，
+            // 保证「切皮一定重绘」。不再手动 revoke（避免误回收正在显示的 blob），纹理由浏览器 GC 回收。
+            const img = document.createElement('img');
+            img.className = 'skin-layer';
             img.alt = '';
+            img.src = finalSrc;
             img.onerror = function() { console.error('[SKIN] Failed to load skin image:', skinUrl.substring(0, 80)); img.remove(); };
             img.onload = function() { console.log('[SKIN] Skin image loaded OK for slot', slot.dataset.slot); };
+            slot.insertBefore(img, slot.firstChild);
             slot.classList.add('skin-bg');
-
             console.log('[SKIN] Skin <img> updated for slot', slot.dataset.slot);
         }
 
