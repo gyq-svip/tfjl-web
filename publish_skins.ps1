@@ -27,34 +27,11 @@ $Tag       = "v-skins"
 
 function Write-Step($msg) { Write-Host "[SKIN-PUB] $msg" -ForegroundColor Cyan }
 
-# ---------------- 0. 先把 skins/ 改动推送到 GitHub（网页版源），实现真正"一键双端" ----------------
-# 网页版是从 GitHub Pages 的 skins/ 逐张加载 .skin 的；客户端是从 Gitee 拉 zip。
-# 两者都要更新，否则会出现"客户端有、网页版没有"。故打包前自动先推 GitHub，
-# 用户点一次按钮即可双端同步（失败不阻断，仅告警，Gitee 侧照常发布）。
-if (-not $SkipUpload) {
-    Write-Step "先推送 skins/ 改动到 GitHub（网页版源）..."
-    $prevEAP0 = $ErrorActionPreference
-    $ErrorActionPreference = "Continue"
-    & git -C $RootDir add skins 2>$null
-    # diff --cached --quiet：有暂存改动时返回 1，无改动返回 0（无改动时跳过 commit，避免报错）
-    & git -C $RootDir diff --cached --quiet 2>$null
-    $hasStaged = ($LASTEXITCODE -ne 0)
-    if ($hasStaged) {
-        & git -C $RootDir commit -m "chore: update skins (auto-commit before skin pack publish)" 2>$null
-        Write-Step "已提交 skins/ 改动"
-    } else {
-        Write-Step "skins/ 无改动，跳过 commit"
-    }
-    & git -C $RootDir pull --rebase origin main 2>$null
-    & git -C $RootDir push origin main 2>$null
-    $ghExit = $LASTEXITCODE
-    $ErrorActionPreference = $prevEAP0
-    if ($ghExit -ne 0) {
-        Write-Host "[SKIN-PUB] WARN: GitHub 推送失败（网页版稍后需手动推送），不阻断，继续打包上传 Gitee" -ForegroundColor Yellow
-    } else {
-        Write-Step "GitHub 推送完成（网页版源已同步）"
-    }
-}
+# 🔴 本脚本只负责「Gitee 皮肤包」，不碰 GitHub 代码推送。
+#    双端是两条独立的线，各自单独操作、互不影响，任一方失败可单独重试：
+#      ① 网页版源（GitHub Pages 的 skins/ 散文件）→ 用界面上的「🚀 一键推送到 GitHub / Gitee」按钮
+#      ② 客户端源（Gitee release 的 zip 整包）     → 用界面上的「📦 一键打包发布到 Gitee」按钮（本脚本）
+#    两者内容同源（都是 .skin），只是分发形态不同。
 
 # ---------------- 1. 收集 registry 登记的文件（只打登记过的，杜绝脏数据） ----------------
 Write-Step "读取 registry.json 并校验文件完整性..."
@@ -172,7 +149,9 @@ if ($rel.assets -and ($rel.assets | Where-Object { $_.name -eq $pkgName })) {
     $curlExit = $LASTEXITCODE
     $ErrorActionPreference = $prevEAP
     if ($curlExit -ne 0) {
-        Write-Host "[SKIN-PUB] ERROR: 上传失败 (curl exit=$curlExit)。索引未改动，用户仍用旧包。" -ForegroundColor Red
+        Write-Host "[SKIN-PUB] ❌ 上传失败 (curl exit=$curlExit)" -ForegroundColor Red
+        Write-Host "[SKIN-PUB]    影响范围：索引未改动，客户端仍用上一个好包，功能不受影响。" -ForegroundColor Red
+        Write-Host "[SKIN-PUB]    如何补救：检查网络后重新点一次「📦 一键打包发布到 Gitee」；若反复失败可检查 Gitee Token 是否有效。" -ForegroundColor Red
         exit 1
     }
     Write-Step "上传完成"
@@ -218,7 +197,14 @@ $ErrorActionPreference = "Continue"
 & git -C $RootDir push origin main 2>$null
 $gitExit = $LASTEXITCODE
 $ErrorActionPreference = $prevEAP
-if ($gitExit -ne 0) { Write-Host "[SKIN-PUB] WARN: git push 失败 (exit=$gitExit)，索引未上线，用户仍用旧包" -ForegroundColor Yellow; exit 1 }
+if ($gitExit -ne 0) {
+    # 这是唯一的"半成品"状态：包已在 Gitee、但索引没上线。必须说清影响与补救，避免用户以为发布坏了。
+    Write-Host "[SKIN-PUB] ⚠️ 皮肤包已成功上传到 Gitee，但索引推送 GitHub Pages 失败 (exit=$gitExit)" -ForegroundColor Yellow
+    Write-Host "[SKIN-PUB]    影响范围：客户端暂时仍在使用上一个好包，功能完全正常，只是拿不到这批新皮肤。" -ForegroundColor Yellow
+    Write-Host "[SKIN-PUB]    如何补救：网络恢复后重新点一次「📦 一键打包发布到 Gitee」即可（会重新打包并补推索引）。" -ForegroundColor Yellow
+    Write-Host "[SKIN-PUB]    已上传的包：$dlUrl" -ForegroundColor Yellow
+    exit 1
+}
 
 Write-Host "[SKIN-PUB] ✅ 发布完成：$pkgName（$skinCount 个皮肤，$( [math]::Round($zipSize/1MB,2) ) MB）" -ForegroundColor Green
 Write-Host "[SKIN-PUB]    索引: https://gyq-svip.github.io/tfjl-web/skins-index.json" -ForegroundColor Green
