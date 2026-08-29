@@ -9474,19 +9474,16 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             // 🔴 内存/性能修复：原每次调用都 console.log 一条（启动 3 遍 × 14 槽 = 42 条，切项目/切皮/融合反复打），
             //    高频触发 captureConsole 数组 splice 且驻留字符串。降级为仅 skinInfo 解析失败（异常路径）才打日志。
             // 正常路径静默，必要时用终端 dumpSkinRegistry() 查看。
-            // 移除旧皮肤层（含融合上层）和旧皮肤名；remove 前先 revoke blob，避免旧纹理泄漏
+            // 移除旧皮肤层（含融合上层）和旧皮肤名。
+            // 🔴 2026-08-30 修复：移除旧 <img> 前【绝不能 revoke 它的 blob】。
+            //   该 blob 仍被 skinImageUrlCache（按 filePath 缓存）持有，下次重绘会复用同一 blob URL；
+            //   若此处先 revoke，复用到的就是已失效的 blob → "Failed to load skin image" → 皮肤空白/切不开。
+            //   blob 生命周期交由缓存管理（clearSkinUrlCache 统一 revoke），移除 <img> 后浏览器自动回收纹理，不泄漏。
+            //   （与 commit 84cd833 修复 _skinBlobUrlCache 淘汰不 revoke 同源理念一致）
             const oldLayer = slot.querySelector('.skin-layer');
-            if (oldLayer) {
-                const _oldSrc = oldLayer.getAttribute('src');
-                if (_oldSrc && _oldSrc.indexOf('blob:') === 0) { try { URL.revokeObjectURL(_oldSrc); } catch (e) {} }
-                oldLayer.remove();
-            }
+            if (oldLayer) { oldLayer.remove(); }
             const oldFused = slot.querySelector('.skin-layer-fused');
-            if (oldFused) {
-                const _oldSrc = oldFused.getAttribute('src');
-                if (_oldSrc && _oldSrc.indexOf('blob:') === 0) { try { URL.revokeObjectURL(_oldSrc); } catch (e) {} }
-                oldFused.remove();
-            }
+            if (oldFused) { oldFused.remove(); }
             const oldSkinName = slot.querySelector('.skin-name');
             if (oldSkinName) oldSkinName.remove();
             slot.classList.remove('skin-bg');
