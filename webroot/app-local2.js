@@ -138,17 +138,31 @@ if (true) {
         return bytes;
     }
     function _packStore(map) {
+        // 🔴 修复：原先 parts.push(...kb) 展开整个大 Uint8Array，value 较大（项目 JSON 几十 KB）时
+        // 触发 "Maximum call stack size exceeded"，导致 tfjl.dat 写盘失败。
+        // 改为先算总长再一次性填充，避免展开超大数组。
         const enc = new TextEncoder();
-        const parts = [];
-        for (const b of STORE_MAGIC) parts.push(b);
-        parts.push(..._u32le(STORE_VERSION));
-        parts.push(..._u32le(map.size));
+        let total = STORE_MAGIC.length + 8; // magic + version(u32) + count(u32)
+        const kbs = [], vbs = [];
         for (const [k, v] of map.entries()) {
             const kb = enc.encode(String(k));
             const vb = enc.encode(String(v));
-            parts.push(..._u32le(kb.length), ...kb, ..._u32le(vb.length), ...vb);
+            kbs.push(kb); vbs.push(vb);
+            total += 8 + kb.length + vb.length; // kl(u32)+kb + vl(u32)+vb
         }
-        return new Uint8Array(parts);
+        const out = new Uint8Array(total);
+        let p = 0;
+        for (const b of STORE_MAGIC) out[p++] = b;
+        out.set(_u32le(STORE_VERSION), p); p += 4;
+        out.set(_u32le(map.size), p); p += 4;
+        for (let i = 0; i < kbs.length; i++) {
+            const kb = kbs[i], vb = vbs[i];
+            out.set(_u32le(kb.length), p); p += 4;
+            out.set(kb, p); p += kb.length;
+            out.set(_u32le(vb.length), p); p += 4;
+            out.set(vb, p); p += vb.length;
+        }
+        return out;
     }
     function _unpackStore(bytes) {
         const map = new Map();
@@ -3631,16 +3645,20 @@ if (true) {
     const SKIN_URL_CACHE_MAX = 80; // 上限约 80 张，足够当前阵容(14槽)+卡池浏览，超出按最久未用淘汰
     const skinImageUrlCache = new Map(); // filePath -> url（Map 保持插入顺序，天然支持 LRU）
 
-    function _skinUrlRelease(url) {
+    function _skinUrlRelease(url, force) {
+        // force=true（全清/重新扫描）时才真正 revoke；LRU 淘汰时**不** revoke，
+        // 否则会撤销仍在页面 <img> 上显示的 blob，导致「Failed to load skin image: blob:」。
+        if (!force) return;
         if (typeof url === 'string' && url.indexOf('blob:') === 0) {
             try { URL.revokeObjectURL(url); } catch (e) {}
         }
     }
 
     function _skinUrlEvictIfNeeded() {
+        // 🔴 修复：LRU 淘汰只从 Map 移除，**不** revoke，避免撤销正在显示的皮肤图。
+        // 被移除的 blob 仍由页面 <img> 引用保持存活，待 <img> 被替换/移除后由浏览器自动回收。
         while (skinImageUrlCache.size > SKIN_URL_CACHE_MAX) {
             const oldestKey = skinImageUrlCache.keys().next().value; // 最早插入 = 最久未用
-            _skinUrlRelease(skinImageUrlCache.get(oldestKey));
             skinImageUrlCache.delete(oldestKey);
         }
     }
@@ -4058,7 +4076,12 @@ if (true) {
                     let bin = '';
                     const CHUNK = 0x8000;
                     for (let i = 0; i < len; i += CHUNK) {
-                        bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+                        // 🔴 修复：不能用 String.fromCharCode.apply(null, 大数组)，
+                        // 参数过多会抛 "Maximum call stack size exceeded"，导致 b64 坏掉→blob 加载失败。
+                        // 改用 btoa 对 ArrayBuffer 分块后在循环内直接拼（apply 的单次参数上限只对 apply 生效，
+                        // 这里每 CHUNK 用 subarray + 普通循环拼，绕开 apply 限制）。
+                        const end = Math.min(i + CHUNK, len);
+                        for (let j = i; j < end; j++) bin += String.fromCharCode(bytes[j]);
                     }
                     resolve(btoa(bin));
                 } catch (e) { _b64Fallback(blob, resolve); }
