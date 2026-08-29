@@ -512,6 +512,17 @@ fn append_text_file(file_path: String, content: String) -> Result<(), String> {
     Ok(())
 }
 
+/// 返回诊断日志落盘目录（置于 OS 应用缓存目录内，避免污染软件数据根目录）。
+/// Windows: %LOCALAPPDATA%\<app-cache>\tfjl_diag\  ；macOS/Linux: 对应 cache dir 下 tfjl_diag\
+#[tauri::command]
+fn get_diag_log_dir() -> Result<String, String> {
+    let dir = tauri::api::path::app_cache_dir()
+        .ok_or_else(|| "无法获取应用缓存目录".to_string())?
+        .join("tfjl_diag");
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(dir.to_string_lossy().to_string())
+}
+
 /// 执行 git 命令（在指定仓库目录），返回 stdout；非零退出码返回 stderr 文本
 fn run_git(repo: &str, args: &[&str]) -> Result<String, String> {
     let out = Command::new("git")
@@ -1354,6 +1365,7 @@ pub fn run() {
             detect_file_encoding,
             write_text_file,
             append_text_file,
+            get_diag_log_dir,
             git_push_fusions,
             git_push_skins,
             flash_tray_icon,

@@ -29,6 +29,11 @@ description = "Allow appending text to files (diagnostic log sink)"
 commands.allow = ["append_text_file"]
 
 [[permission]]
+identifier = "allow-get-diag-log-dir"
+description = "Allow querying the diagnostic log directory (in OS cache dir)"
+commands.allow = ["get_diag_log_dir"]
+
+[[permission]]
 identifier = "allow-git-push-fusions"
 description = "Allow one-click git push of skins/fusions.json from 卡组管理"
 commands.allow = ["git_push_fusions"]

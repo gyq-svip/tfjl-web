@@ -887,8 +887,14 @@ if (true) {
         // 启动一律强制锁 'optimized'——跳过卡池/收藏区几百张皮肤背景图（GPU 内存大头），避免一开就爆 4G+ 卡死。
         // 直接写 localStorage 而非调 setPerfMode（避免初始化早期误触发重渲染）；后续记忆保险逻辑会按 optimized 重渲。
         try { localStorage.setItem('tdjl_perf_mode', 'optimized'); } catch (e) {}
-        // 把真实数据目录告诉 app-core 的诊断日志落盘（日志写到 数据目录/tfjl_diag/ 下）
-        try { if (typeof window.__setDiagLogDir === 'function') window.__setDiagLogDir(softwareDataDir); } catch (e) {}
+        // 把诊断日志目录指向 OS 缓存目录（get_diag_log_dir 返回的 .../tfjl_diag/），避免污染软件数据根目录
+        try {
+            if (typeof window.__setDiagLogDir === 'function') {
+                const dir = await tauriInvoke('get_diag_log_dir');
+                if (dir) window.__setDiagLogDir(dir);
+                else if (softwareDataDir) window.__setDiagLogDir(softwareDataDir.replace(/[\\/]+$/, '') + '\\tfjl_diag');
+            }
+        } catch (e) { if (softwareDataDir) try { window.__setDiagLogDir(softwareDataDir.replace(/[\\/]+$/, '') + '\\tfjl_diag'); } catch (_) {} }
         const btn = document.getElementById('appLocalSettingsBtn');
         // 按钮无条件显示（网页端/App端都显示）；真正的 Tauri 环境判断放在点击时（openAppLocalSettings 内）进行，
         // 避免 Tauri 全局注入晚于本函数执行导致误判为 false 而不显示按钮
