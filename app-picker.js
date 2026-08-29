@@ -559,7 +559,11 @@
                 }
                 // 同步打印到控制台（浮动调试窗会捕获，便于强制刷新后一眼确认是否刷到最新版）
                 _getRemoteVersionOnly().then(function(rv) {
-                    console.log('[VERSION] 当前缓存版本:', swVersion, rv ? ('（强制刷新后应为 ' + rv + ' 才算最新）') : '（无法获取远端版本）');
+                    if (!rv) { console.log('[VERSION] 当前缓存版本:', swVersion, '（无法获取远端版本）'); return; }
+                    const cmp = _versionCompare(rv, swVersion);
+                    if (cmp > 0) console.log('[VERSION] 当前缓存版本:', swVersion, '→ 线上最新为', rv, '（需刷新升级）');
+                    else if (cmp < 0) console.log('[VERSION] 当前缓存版本:', swVersion, '（高于线上', rv + '，本地为开发/预发布版）');
+                    else console.log('[VERSION] 当前缓存版本:', swVersion, '（已是最新 ✓）');
                 });
                 // 🔴 方案A：SW 回报真实版本后，立即核对远端是否有更新（不再依赖静态 html 自比）
                 _checkAndPromptUpdateIfNeeded();
@@ -580,15 +584,12 @@
                     }
                     return;
                 }
-                // 方案A：sw.js 注册 URL 携带"本地实际加载标识"，强制浏览器每次都重新请求 sw.js（彻底绕过 CDN/浏览器缓存旧 SW）。
-                // 🔴 优先级：① window.__DEPLOY_TAG（部署脚本注入 HTML，最稳，永远等于本次部署真实时间）
-                //         ② 本地实际加载时间戳 Date.now()（兜底，每次启动都唯一，保证 sw.js?v= 不命中任何缓存）
-                // 静态 #versionTag 文本现在是占位符 'dev'，不再作为 cachebust 依据（方案B）。
-                let swCachebust = String(Date.now());
-                try {
-                    if (typeof window.__DEPLOY_TAG === 'string' && /^s\d{8}/.test(window.__DEPLOY_TAG)) swCachebust = window.__DEPLOY_TAG;
-                    else if (typeof window.__APP_VERSION === 'string' && window.__APP_VERSION) swCachebust = window.__APP_VERSION;
-                } catch (e) {}
+                // 方案A：sw.js 注册 URL 携带「每次刷新都唯一的本地时间戳」，强制浏览器每次都重新请求 sw.js（彻底绕过 CDN/浏览器缓存旧 SW）。
+                // 🔴 不用 window.__DEPLOY_TAG / window.__APP_VERSION 作为 cachebust：
+                //    实测 __DEPLOY_TAG 会被注入成 App 版本号(如 2.0.20)而非前端部署时间，用它做 cachebust 平时刷新不变 → 仍命中旧 SW 缓存。
+                //    纯 Date.now() 每次启动都唯一，配合 updateViaCache:'none' + fetch no-store，任何情况下都拉最新 sw.js。
+                //    静态 #versionTag 文本现在是占位符 'dev'，绝不作为 cachebust 依据（方案B）。
+                const swCachebust = String(Date.now());
                 navigator.serviceWorker.register('./sw.js?v=' + encodeURIComponent(swCachebust), { scope: './', updateViaCache: 'none' }).then(function(registration) {
                     console.log('[PWA] Service Worker 注册成功，scope:', registration.scope, 'sw cachebust:', swCachebust);
                     // 每次打开 APP 主动检查 SW 更新（绕过 Tauri WebView 的 SW 更新检测问题）
