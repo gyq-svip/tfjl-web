@@ -1,9 +1,7 @@
 {
-    "version":  "2.0.20",
-    "notes":  "auto update v2.0.20",
-    "pub_date":  "2026-08-28T22:03:25Z",
-    "downloadUrl":  "https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/releases/download/v2.0.20/tfjl-assistant_2.0.20_x64-setup.exe",
-    "size":  4757555,
-    "frontVersion":  "s1.0.491",
-    "deployTag":  "s20260830-0118"
+    "version":  "2.0.21",
+    "notes":  "auto update v2.0.21",
+    "pub_date":  "2026-08-29T13:30:46Z",
+    "downloadUrl":  "https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/releases/download/v2.0.21/tfjl-assistant_2.0.21_x64-setup.exe",
+    "size":  4756092
 }
