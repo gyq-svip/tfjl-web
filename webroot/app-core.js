@@ -8644,9 +8644,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         // 未设置过皮肤（"默认"）的卡，也显示皮肤库里的默认皮肤图（与英雄同名那张）
         async function updateCardPoolSkins() {
             if (typeof window.resolveHeroSkinUrl !== 'function') return;
-            // 🔴 性能模式=优化：卡池/收藏区几百张卡是皮肤内存大头，优化版直接不铺皮肤（纯色卡面），
-            // 仅手牌+上阵阵容渲染皮肤，符合"只渲染活跃卡、省内存"的需求。
-            if (typeof window.isPerfOptimized === 'function' && window.isPerfOptimized()) return;
+            // 🔴 性能模式=优化：卡池/收藏区几百张卡是皮肤内存大头。
+            // 优化版只铺"常用卡"（智能学习 Top N）的皮肤，其余纯色卡面 —— 既省内存，又保证你常用的 16-20 张卡丝滑。
+            const optimized = (typeof window.isPerfOptimized === 'function') && window.isPerfOptimized();
+            const freqSet = optimized ? getFrequentCards() : null;
             // 含收藏区（#favoriteCardsGrid）：收藏的卡同样铺皮肤
             const cards = document.querySelectorAll('.collapsible-section .card-item');
             const tasks = [];
@@ -8657,6 +8658,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 card.querySelectorAll('.card-skin-thumb, .card-skin-thumb-fused, .skin-layer-fused').forEach(e => e.remove());
                 const cardName = card.dataset.name || '';
                 if (!cardName) continue;
+                // 优化版：只渲染常用卡皮肤，非常用卡保持纯色（省内存）
+                if (optimized && freqSet && freqSet.indexOf(cardName) === -1) continue;
                 if (card.dataset.fusion === 'true') {
                     const def = (window.cloudFusions && window.cloudFusions[cardName]) || {};
                     const comps = (def.components && def.components.length >= 2) ? def.components : null;
@@ -9234,6 +9237,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         // 为手牌应用皮肤背景
         function applySkinBgToHandCard(card, url) {
             if (!card || !url) return;
+            if (card.dataset && card.dataset.name) recordCardUsage(card.dataset.name);   // 🔴 学习：手牌渲染即记一次常用
             card.classList.add('skin-bg');
             let layer = card.querySelector('.hand-skin-layer');
             if (!layer) {
@@ -9277,30 +9281,91 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             refreshPerfMenuLabel();
             const opt = next === 'optimized';
             console.log('[PERF] 性能模式切换为：' + (opt ? '优化版（只渲染手牌+上阵卡面）' : '高性能版（全量预加载）'));
-            // 切换后即时重绘：优化→高性能 需补铺卡池皮肤；高性能→优化 需清掉卡池皮肤层
+            // 切换后即时重绘：统一交给 updateCardPoolSkins（内部按性能模式决定铺全部/只铺常用卡）
             if (typeof updateCardPoolSkins === 'function') {
-                if (opt) {
-                    // 优化版：清掉卡池已铺的皮肤层，释放内存
-                    document.querySelectorAll('.collapsible-section .card-item').forEach(card => {
-                        card.classList.remove('skin-bg');
-                        card.style.backgroundImage = '';
-                        card.style.background = '';
-                        card.querySelectorAll('.card-skin-thumb, .card-skin-thumb-fused, .skin-layer-fused').forEach(e => e.remove());
-                    });
-                } else {
-                    // 高性能版：重新铺卡池皮肤
-                    updateCardPoolSkins().catch(() => {});
-                }
+                updateCardPoolSkins().catch(() => {});
             }
             if (typeof showToast === 'function') {
-                showToast(opt ? '⚡ 已切换为优化版：仅渲染手牌+上阵卡面，卡池皮肤已释放' : '✨ 已切换为高性能版：全量皮肤预加载');
+                showToast(opt
+                    ? '⚡ 已切换为优化版：只渲染手牌+上阵+常用卡（其他卡纯色，省内存，常用卡仍丝滑）'
+                    : '✨ 已切换为高性能版：全量皮肤预加载');
             }
         };
         // 菜单打开时同步标签（首次进入也需校正）
         refreshPerfMenuLabel();
 
+        // ==================== 常用卡智能学习（优化版预渲染依据）====================
+        // 轻量"数据库"：localStorage 维护 {卡名: 使用次数}，皮肤被实际渲染即记一次"用过"。
+        // 优化版下：除当前手牌+上阵卡外，常用卡（Top N）也预渲染皮肤，切阵容时重叠卡已在内存，保持丝滑。
+        const CARD_USAGE_KEY = 'tdjl_card_usage';
+        const FREQ_TOP_N = 30;            // 预渲染常用卡上限（你只用约 16-20 张，30 足够覆盖重叠阵容）
+        const FREQ_MIN_COUNT = 2;        // 至少用过 2 次才算"常用"，避免偶发卡污染预渲染集
+        let _cardUsageCache = null;
+        function loadCardUsage() {
+            if (_cardUsageCache) return _cardUsageCache;
+            let obj = {};
+            try { obj = JSON.parse(localStorage.getItem(CARD_USAGE_KEY) || '{}'); } catch (_) { obj = {}; }
+            if (typeof obj !== 'object' || !obj) obj = {};
+            _cardUsageCache = obj;
+            return obj;
+        }
+        function recordCardUsage(cardName) {
+            if (!cardName) return;
+            const obj = loadCardUsage();
+            obj[cardName] = (obj[cardName] || 0) + 1;
+            // 控制体积：超过 200 个键时只保留 Top 100，避免无限膨胀
+            const keys = Object.keys(obj);
+            if (keys.length > 200) {
+                const top = keys.sort((a, b) => obj[b] - obj[a]).slice(0, 100);
+                const next = {};
+                top.forEach(k => next[k] = obj[k]);
+                obj = next; _cardUsageCache = obj;
+            }
+            try { localStorage.setItem(CARD_USAGE_KEY, JSON.stringify(obj)); } catch (_) {}
+        }
+        function getFrequentCards(topN) {
+            const obj = loadCardUsage();
+            return Object.keys(obj)
+                .filter(k => obj[k] >= FREQ_MIN_COUNT)
+                .sort((a, b) => obj[b] - obj[a])
+                .slice(0, topN || FREQ_TOP_N);
+        }
+        function isFrequentCard(cardName) {
+            if (!cardName) return false;
+            return getFrequentCards().indexOf(cardName) !== -1;
+        }
+        // 是否应在优化版下渲染该卡的皮肤（手牌/上阵=活跃必渲染；否则看是否常用卡）
+        function shouldRenderSkinOptimized(cardName) {
+            return isFrequentCard(cardName);
+        }
+        window.getFrequentCards = getFrequentCards;
+        window.recordCardUsage = recordCardUsage;
+        window.getCardUsageStats = function () {
+            const obj = loadCardUsage();
+            const arr = Object.keys(obj).map(k => ({ name: k, count: obj[k] })).sort((a, b) => b.count - a.count);
+            return { total: arr.length, top: arr.slice(0, FREQ_TOP_N), raw: obj };
+        };
+        // 终端命令：查看常用卡学习结果（Top N + 预渲染集大小）
+        window.cardUsage = function () {
+            const stats = window.getCardUsageStats();
+            console.log('=== 常用卡学习统计（性能模式·优化版预渲染依据）===');
+            console.log('已记录卡种数:', stats.total, '｜ 纳入预渲染的常用卡（≥' + FREQ_MIN_COUNT + '次）:', stats.top.length, '张');
+            stats.top.forEach((t, i) => console.log('  ' + (i + 1) + '. ' + t.name + '  ×' + t.count));
+            console.log('=== 统计结束（resetCardUsage() 可清空重学）===');
+            return stats;
+        };
+        // 终端命令：清空常用卡学习数据
+        window.resetCardUsage = function () {
+            try { localStorage.removeItem(CARD_USAGE_KEY); } catch (_) {}
+            _cardUsageCache = null;
+            console.log('[PERF] 常用卡学习数据已清空');
+            if (typeof updateCardPoolSkins === 'function') updateCardPoolSkins().catch(() => {});
+            return '已清空常用卡学习数据';
+        };
+
         // 给战斗槽卡牌应用皮肤背景
         async function applySkinBgToSlot(slot, heroName, forceCardId, forceHandType, forceSkin) {
+            if (heroName) recordCardUsage(heroName);   // 🔴 学习：上阵/渲染即记一次常用
             console.log('[SKIN] applySkinBgToSlot slot:', slot.dataset ? slot.dataset.slot : '?', 'heroName:', heroName);
             // 移除旧皮肤层（含融合上层）和旧皮肤名
             const oldLayer = slot.querySelector('.skin-layer');
