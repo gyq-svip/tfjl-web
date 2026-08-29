@@ -30,9 +30,15 @@
         var _diagLogBuf = [];           // 待写缓冲
         var _diagLogBaseDir = '';       // 数据目录（从 app-local2 注入，回退默认）
         function _diagLogPath() {
-            var d = _diagLogBaseDir || 'D:\\withfriends\\塔防精灵助手数据';
+            // 优先用 get_diag_log_dir 返回的缓存目录（OS 管理，干净不污染数据根目录）
+            var d = _diagLogBaseDir || '';
+            if (!d) {
+                // 回退：拿不到缓存目录时，落到系统临时目录，绝不放软件数据根目录
+                try { d = (window.__TAURI__ && window.__TAURI__.os && window.__TAURI__.os.tmpdirSync && window.__TAURI__.os.tmpdirSync()) || ''; } catch (e) {}
+                if (!d) d = 'C:\\Windows\\Temp';
+            }
             var day = new Date().toISOString().slice(0, 10);
-            return d.replace(/[\\/]+$/, '') + '\\tfjl_diag\\app-console-' + day + '.log';
+            return d.replace(/[\\/]+$/, '') + '\\app-console-' + day + '.log';
         }
         function _diagFlush() {
             if (!_diagLogEnabled || _diagLogBuf.length === 0) return;
