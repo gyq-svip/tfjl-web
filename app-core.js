@@ -2,6 +2,16 @@
         // ==================== 测试标记：370 自动升级验证（无功能影响，仅触发 CI 部署 +1） ====================
         // ==================== 控制台日志捕获（Tauri APP 无法 F12，在此捕获供管理员面板查看） ====================
         window.__consoleLogs = [];
+        // 🔴 2026-08-29 启动即打印版本（大版本 exe / 小版本 SW），无需双击版本号即可在终端一眼确认是否刷到新版
+        (function bootVersionPrint() {
+            try {
+                var _sw = (document.getElementById('versionTag') && document.getElementById('versionTag').textContent || '').trim();
+                var _exe = '网页版/未注入';
+                try { if (window.__TAURI__ && window.__TAURI__.app && typeof window.__TAURI__.app.getVersion === 'function') _exe = window.__TAURI__.app.getVersion(); } catch (e) {}
+                var _t = new Date().toTimeString().slice(0, 8);
+                console.log('[BOOT] 启动版本 · 大版本(exe)=' + _exe + ' · 小版本(SW)=' + (_sw || '未知') + ' · ' + _t);
+            } catch (e) {}
+        })();
         const MAX_CONSOLE_LOGS = 500;
         // 🔴 2026-08-29 内存优化：单条日志最大字符数。
         //    原实现只截断 object（JSON.stringify(a).slice(0,300)），**字符串参数完全不限制** ——
@@ -8654,7 +8664,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         const PERF_MODE_KEY = 'tdjl_perf_mode';
         function getPerfMode() {
             try { const v = localStorage.getItem(PERF_MODE_KEY); if (v === 'optimized' || v === 'high' || v === 'lite') return v; } catch (e) {}
-            return 'high';
+            // 🔴 2026-08-29 内存止血：默认从 'high'(全量铺皮,卡池几百张背景图直爆 GPU 4G+) 改为 'optimized'
+            // （跳过卡池/收藏区皮肤背景图,仅保留手牌+上阵槽皮肤,体验接近全量但内存可控）。
+            // 用户若需全量皮肤,可在菜单手动切回「高性能」。
+            return 'optimized';
         }
         function isPerfOptimized() { return getPerfMode() === 'optimized'; }
         function isPerfLite() { return getPerfMode() === 'lite'; }
