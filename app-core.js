@@ -6690,12 +6690,10 @@ function applyFusionSkinToHandCard(card, mainUrl, fusedUrl, fusedIsBadge) {
         const next = mainUrl;
         const curSrc = base.getAttribute('src');
         if (curSrc !== next) {
-            if (curSrc && curSrc.indexOf('blob:') === 0) { try { URL.revokeObjectURL(curSrc); } catch (e) {} }
+            // 🔴 2026-08-30 修复：不再 revoke 旧 blob URL，避免与缓存复用冲突导致皮肤空白
             base.src = next;
         }
     } else if (base) {
-        const _ob = base.getAttribute('src');
-        if (_ob && _ob.indexOf('blob:') === 0) { try { URL.revokeObjectURL(_ob); } catch (e) {} }
         base.remove();
     }
 
@@ -6712,12 +6710,10 @@ function applyFusionSkinToHandCard(card, mainUrl, fusedUrl, fusedIsBadge) {
             : 'position:absolute;left:2px;top:2px;width:' + FUSION_SIZE + ';height:auto;aspect-ratio:1/1;max-height:70%;object-fit:cover;box-sizing:border-box;border:3px solid #FFD700;clip-path:polygon(0 0,100% 0,100% 85%,85% 100%,0 100%);z-index:2;pointer-events:none;filter:drop-shadow(0 0 2px rgba(0,0,0,0.7));';
         const oldFusedSrc = overlay.getAttribute('src');
         if (oldFusedSrc !== fusedUrl) {
-            if (oldFusedSrc && oldFusedSrc.indexOf('blob:') === 0) { try { URL.revokeObjectURL(oldFusedSrc); } catch (e) {} }
+            // 🔴 同上：不 revoke 旧 blob
             overlay.src = fusedUrl;
         }
     } else if (overlay && overlay.parentNode) {
-        const _ob = overlay.getAttribute('src');
-        if (_ob && _ob.indexOf('blob:') === 0) { try { URL.revokeObjectURL(_ob); } catch (e) {} }
         overlay.remove();
     }
 }
@@ -6744,13 +6740,14 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         const next = mainUrl;
         const curSrc = base.getAttribute('src');
         if (curSrc !== next) {
-            if (curSrc && curSrc.indexOf('blob:') === 0) { try { URL.revokeObjectURL(curSrc); } catch (e) {} }
+            // 🔴 2026-08-30 修复：不再 revoke 旧 blob URL！该 blob 可能仍被缓存(skinImageUrlCache/_skinBlobUrlCache)持有，
+            // revoke 后下次重绘复用到已失效的 blob → "Failed to load skin image" → 皮肤空白/切不开。
+            // 纹理由浏览器 GC 回收（移除 <img> 后自动释放），不需要手动 revoke。
             base.src = next;
         }
         base.onerror = function () { /* 静默：与 applySkinBgToSlot 一致不报警 */ };
     } else if (base) {
-        const _ob = base.getAttribute('src');
-        if (_ob && _ob.indexOf('blob:') === 0) { try { URL.revokeObjectURL(_ob); } catch (e) {} }
+        // 同上：不 revoke 旧 blob，避免与缓存复用冲突
         base.remove();
     }
 
@@ -6787,13 +6784,11 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             ? 'position:absolute;inset:3px;width:calc(100% - 6px);height:calc(100% - 6px);object-fit:contain;border-radius:5px;z-index:1;pointer-events:none;'
             : 'position:absolute;left:3px;top:3px;width:' + FUSION_SIZE + ';height:auto;aspect-ratio:1/1;max-height:70%;object-fit:cover;box-sizing:border-box;border:3px solid #FFD700;clip-path:polygon(0 0,100% 0,100% 85%,85% 100%,0 100%);z-index:2;cursor:pointer;filter:drop-shadow(0 0 2px rgba(0,0,0,0.7));';
         if (overlay.src !== fusedUrl) {
-            const _of = overlay.getAttribute('src');
-            if (_of && _of.indexOf('blob:') === 0) { try { URL.revokeObjectURL(_of); } catch (e) {} }
+            // 🔴 2026-08-30 修复：不再 revoke 旧 blob URL（同主卡逻辑），避免与缓存复用冲突导致皮肤空白
             overlay.src = fusedUrl;
         }
     } else if (overlay && overlay.parentNode) {
-        const _of = overlay.getAttribute('src');
-        if (_of && _of.indexOf('blob:') === 0) { try { URL.revokeObjectURL(_of); } catch (e) {} }
+        // 同上：不 revoke 旧 blob
         overlay.remove();
     }
     if (mainUrl || fusedUrl) slot.classList.add('skin-bg');
@@ -9438,8 +9433,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 card.insertBefore(layer, card.firstChild);
             }
             if (layer.src !== url) {
-                const _old = layer.getAttribute('src');
-                if (_old && _old.indexOf('blob:') === 0) { try { URL.revokeObjectURL(_old); } catch (e) {} }
+                // 🔴 2026-08-30 修复：不再 revoke 旧 blob URL，避免与缓存复用冲突导致皮肤空白
                 layer.src = url;
             }
         }
