@@ -14174,6 +14174,15 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
             // 初始化版本号显示 & 自动检查更新（非阻塞）
             initVersionDisplay();
             autoCheckUpdate();
+
+            // 初始化在线判定离线时长：从 room_index.json.onlineTimeoutMin 同步到内存 override（功能开关生效）
+            try {
+                const _ric = await getRoomIndexConfig();
+                if (_ric && typeof _ric.onlineTimeoutMin === 'number') {
+                    const _m = _clampOnlineMin(_ric.onlineTimeoutMin);
+                    if (_m) _onlineTimeoutMinOverride = _m;
+                }
+            } catch (e) { /* 无 token/网络失败则用默认，不阻塞首屏 */ }
             
             // 初始化消息墙 & 网络监听（非阻塞，不拖慢首屏）
             initMessageWall();
@@ -14568,6 +14577,32 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
         function _olIsApp(v) { return !!(v && typeof v === 'object' && v.src === 'app'); }
         function _olTimeoutFor(rec, base) { const b = base || 1800000; return _olIsApp(rec) ? Math.max(b, APP_ONLINE_GRACE) : b; }
         function _olAlive(rec, base, now) { const ts = _olTs(rec); if (!ts) return false; return ((now || Date.now()) - ts) <= _olTimeoutFor(rec, base); }
+        // 🔴 在线判定超时（毫秒）：管理员功能开关 onlineTimeoutMin（分钟）控制，默认 30 分钟。
+        // 优先级：功能开关内存值 _onlineTimeoutMinOverride > 远程 room_index.onlineTimeoutMin > 本机调试 tdjl_onlineTimeoutMin > 默认 30 分。
+        const ONLINE_TIMEOUT_DEFAULT = 1800000; // 30 分钟
+        let _onlineTimeoutMinOverride = null;   // 由功能开关 onlineTimeoutMin 的 apply() 实时写入
+        function _clampOnlineMin(m) { m = parseInt(m, 10); return (isNaN(m) || m < 1) ? null : (m > 1440 ? 1440 : m); }
+        function getOnlineTimeoutMs() {
+            // 1) 功能开关内存值（开关切换即时生效）
+            if (_onlineTimeoutMinOverride != null) {
+                const m = _clampOnlineMin(_onlineTimeoutMinOverride);
+                if (m) return Math.round(m * 60000);
+            }
+            // 2) 远程 room_index 配置（功能开关面板持久化到 room_index.json.onlineTimeoutMin）
+            try {
+                if (window.__roomIndexCache && typeof window.__roomIndexCache.onlineTimeoutMin === 'number') {
+                    const m = _clampOnlineMin(window.__roomIndexCache.onlineTimeoutMin);
+                    if (m) return Math.round(m * 60000);
+                }
+            } catch (_) {}
+            // 3) 本机调试覆盖（tdjl_onlineTimeoutMin，分钟）
+            try {
+                const local = localStorage.getItem('tdjl_onlineTimeoutMin');
+                const lm = _clampOnlineMin(local);
+                if (lm) return lm * 60000;
+            } catch (_) {}
+            return ONLINE_TIMEOUT_DEFAULT;
+        }
         // 合并在线用户：按设备取"最新活跃时间戳"的并集（解决多设备同步互相覆盖、在线数漏算），并保留昵称/来源
         function mergeOnlineUsers(target, src) {
             if (!src || !src.online_users) return;
@@ -14612,7 +14647,7 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
         function pruneExpiredOnline(record) {
             if (!counterData || !counterData.online_users) return;
             const now = Date.now();
-            const timeout = counterData.online_timeout || 1800000;
+            const timeout = getOnlineTimeoutMs();
             for (const id in counterData.online_users) {
                 if (!_olAlive(counterData.online_users[id], timeout, now)) {
                     if (record) recordOffline(id, counterData.online_users[id]);
@@ -14891,7 +14926,8 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
                             ensureDeviceVisitsBaseline(parsed); recomputeTotalVisits(parsed);
                             if (parsed.total_downloads === undefined) parsed.total_downloads = 0;
                             if (!parsed.online_users) parsed.online_users = {};
-                            if (!parsed.online_timeout || parsed.online_timeout === 3600000 || parsed.online_timeout === 7200000) parsed.online_timeout = 1800000;
+                            // 🔴 在线超时统一由功能开关 onlineTimeoutMin 决定（getOnlineTimeoutMs），不再硬编码 1800000 覆盖
+                            parsed.online_timeout = getOnlineTimeoutMs();
                             if (!parsed.sources) parsed.sources = { app_visits: 0, web_visits: 0 };
                             if (parsed.sources.new_app_users === undefined) parsed.sources.new_app_users = 0;
                             if (parsed.sources.new_web_users === undefined) parsed.sources.new_web_users = 0;
@@ -15142,7 +15178,7 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
                             if (fresh.total_users === undefined || fresh.total_users === null) fresh.total_users = fresh.unique_users ? fresh.unique_users.length : 0;
                             if (fresh.total_downloads === undefined || fresh.total_downloads === null) fresh.total_downloads = 0;
                             if (fresh.active_today === undefined || fresh.active_today === null) fresh.active_today = fresh.active_today_users ? fresh.active_today_users.length : 0;
-                            if (!fresh.online_timeout) fresh.online_timeout = 3600000;
+                            if (!fresh.online_timeout) fresh.online_timeout = getOnlineTimeoutMs();
                             if (!fresh.active_date) fresh.active_date = getTodayString();
                             // 确保 unique_users 和 active_today_users 是数组
                             if (!Array.isArray(fresh.unique_users)) fresh.unique_users = [];
@@ -15232,8 +15268,8 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
                 
                 // 确保在线用户对象存在
                 if (!counterData.online_users) counterData.online_users = {};
-                // 缩短在线判定窗口到 5 分钟，避免关掉标签页后仍长时间显示"在线"（提升在线数准确性）
-                if (!counterData.online_timeout || counterData.online_timeout === 7200000 || counterData.online_timeout === 3600000) counterData.online_timeout = 1800000;
+                // 🔴 在线判定窗口由功能开关 onlineTimeoutMin 控制（默认 30 分钟），getOnlineTimeoutMs 统一出口
+                counterData.online_timeout = getOnlineTimeoutMs();
 
                 // 平台判定（提前到 switch 之前：13640 行写入 online_users 时就要用，case 'visit' 内 13654 行的旧声明会被此行屏蔽并导致 ReferenceError）
                 const isApp = !!(window.__TAURI__);
@@ -15397,7 +15433,8 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
                 if (!remoteData.total_users) remoteData.total_users = remoteData.unique_users.length;
                 if (!remoteData.active_today) remoteData.active_today = remoteData.active_today_users.length;
                 if (!remoteData.online_users) remoteData.online_users = {};
-                if (!remoteData.online_timeout || remoteData.online_timeout === 3600000 || remoteData.online_timeout === 7200000) remoteData.online_timeout = 1800000;
+                // 🔴 在线超时统一由功能开关 onlineTimeoutMin 决定
+                remoteData.online_timeout = getOnlineTimeoutMs();
                 if (!remoteData.total_visits) remoteData.total_visits = 0;
                 if (!remoteData.total_downloads) remoteData.total_downloads = 0;
                 
@@ -16223,7 +16260,7 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
             let onlineCount = 0;
             if (counterData.online_users) {
                 const now = Date.now();
-                const timeout = counterData.online_timeout || 1800000;
+                const timeout = getOnlineTimeoutMs();
                 for (const id in counterData.online_users) {
                     if (_olAlive(counterData.online_users[id], timeout, now)) {
                         onlineCount++;
@@ -21938,14 +21975,14 @@ ${maSection}
             let onlineCount = 0;
             if (counterData.online_users) {
                 const now = Date.now();
-                const timeout = counterData.online_timeout || 1800000;
+                const timeout = getOnlineTimeoutMs();
                 for (const id in counterData.online_users) {
                     if (_olAlive(counterData.online_users[id], timeout, now)) {
                         onlineCount++;
                     }
                 }
             }
-            const onlineTimeoutMinutes = Math.round((counterData.online_timeout || 3600000) / 60000);
+            const onlineTimeoutMinutes = Math.round(getOnlineTimeoutMs() / 60000);
             
             let statsHtml = `
                 <div style="text-align:left;line-height:1.8;">
@@ -23234,6 +23271,21 @@ ${maSection}
                 remoteField: 'forceReloadEnabled',
                 default: false,
                 apply: (v) => { window.__diagForceReload = !!v; }
+            },
+            {
+                key: 'onlineTimeoutMin',
+                label: '⏱ 在线判定离线时长',
+                desc: '判断用户"离线"的时间窗口（分钟）：超过该时长无任何活跃心跳即判定为离线、从在线名单移除。默认 30 分钟。调大=在线名单更"粘"（即使短暂离开仍显示在线，省得频繁掉线）；调小=在线状态更灵敏（关掉页面更快下线）。范围 1~1440 分钟（即最大 24 小时）。注意：APP 端（Tauri）隐藏到托盘仍持续心跳，该窗口自动放宽到至少 15 分钟，不受此项下限 1 分钟影响。全网所有用户统一跟随此值。',
+                scope: 'remote',
+                remoteField: 'onlineTimeoutMin',
+                type: 'number',
+                min: 1, max: 1440, step: 1, unit: '分',
+                default: 30,
+                apply: (v) => {
+                    // 开关切随时即时生效：写内存 override，下一次在线清理循环即用新窗口
+                    _onlineTimeoutMinOverride = (typeof v === 'number') ? v : parseInt(v, 10);
+                    try { if (typeof refreshOnlinePresence === 'function') refreshOnlinePresence(); } catch (e) {}
+                }
             }
         ];
 
@@ -26158,7 +26210,7 @@ ${maSection}
             _localActive.forEach(id => _activeSet.add(id));
             const activeToday = _activeSet.size;
             const _onNow = Date.now();
-            const _onTo = data.online_timeout || 1800000;
+            const _onTo = getOnlineTimeoutMs();
             let onlineCount = 0;
             if (data.online_users) {
                 for (const _oid in data.online_users) {
@@ -26402,7 +26454,7 @@ ${maSection}
             html += `<div style="background:rgba(255,255,255,0.05);border-radius:10px;padding:15px;margin-bottom:20px;">`;
             html += `<div style="color:#4ecdc4;font-size:0.9rem;margin-bottom:10px;">📡 在线 / 访问日志（数据源：GitHub Gist 计数器）</div>`;
             // 当前在线列表（含昵称/来源/最后活跃）
-            const _onTo2 = data.online_timeout || 1800000;
+            const _onTo2 = getOnlineTimeoutMs();
             const _now2 = Date.now();
             const _onlineList = [];
             if (data.online_users) {
@@ -26497,14 +26549,14 @@ ${maSection}
             let onlineCount = 0;
             if (counterData.online_users) {
                 const now = Date.now();
-                const timeout = counterData.online_timeout || 1800000;
+                const timeout = getOnlineTimeoutMs();
                 for (const id in counterData.online_users) {
                     if (_olAlive(counterData.online_users[id], timeout, now)) {
                         onlineCount++;
                     }
                 }
             }
-            const onlineTimeoutMinutes = Math.round((counterData.online_timeout || 3600000) / 60000);
+            const onlineTimeoutMinutes = Math.round(getOnlineTimeoutMs() / 60000);
 
             // 计算本周/本月新增用户
             const now = new Date();
