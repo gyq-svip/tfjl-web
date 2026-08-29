@@ -24280,10 +24280,10 @@ ${maSection}
             const con = document.getElementById('floatConsole');
             if (!con) return;
             const enabled = _isConsoleEnabled();
-            let open = false; // 默认收起（仅显示小圆按钮）；刷新后保持收起，除非用户主动展开过且已记忆
-            if (enabled) {
-                try { open = localStorage.getItem(CONSOLE_OPEN_KEY) === '1'; } catch (_) {}
-            }
+            // 🔴 2026-08-30：刷新后强制收起（不读 tdjl_consoleOpen 记忆自动展开），
+            // 避免"上次手动开过 → 每次启动自动展开 + 2.5s 轮询占主线程"。
+            // 功能启用状态(enabled)保留记忆，但默认收起（仅小圆按钮，零轮询）；要看日志手动点一次展开即可。
+            let open = false;
             floatConsoleVisible = enabled && open;
             con.style.display = floatConsoleVisible ? 'flex' : 'none';
             const toggle = document.getElementById('floatConsoleToggle');
