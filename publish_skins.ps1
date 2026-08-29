@@ -183,6 +183,9 @@ $prevEAP = $ErrorActionPreference
 $ErrorActionPreference = "Continue"
 & git -C $RootDir add skins-index.json 2>$null
 & git -C $RootDir commit -m "chore: publish skin pack $pkgName ($skinCount skins)" 2>$null
+# 🔴 必须先 pull --rebase 再 push：仓库的 CI 会在每次 push 后自动 bump sw.js 版本号并回推一个提交，
+#    导致本地 origin/main 引用必然落后，直接 push 会被 rejected (fetch first)。
+& git -C $RootDir pull --rebase origin main 2>$null
 & git -C $RootDir push origin main 2>$null
 $gitExit = $LASTEXITCODE
 $ErrorActionPreference = $prevEAP
