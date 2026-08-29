@@ -548,6 +548,9 @@
                 else if (typeof window.__DEPLOY_TAG === 'string' && /^s\d{8}/.test(window.__DEPLOY_TAG)) base = window.__DEPLOY_TAG;
                 else base = (tag.textContent.split(' · ')[0] || '').trim();
                 if (!base || !/^s\d{8}/.test(base)) base = 's?????';  // 兜底，确保日期段不为空
+                // 🔴 方案B：把 SW 回报的真实版本存入 dataset，供 _fillRealVersionTag / 版本比对使用（绝不依赖静态 html 文本）
+                tag.dataset.swVersion = short;
+                if (base && base !== 's?????') tag.dataset.deployTag = base;
                 tag.textContent = base + ' · ' + short;
                 // 同步更新相邻 .version-tooltip：只显示小版本号，不带任何"双击/发现新版本"提示（2026-08-29 用户诉求）
                 const tip = tag.parentElement ? tag.parentElement.querySelector('.version-tooltip') : null;
@@ -555,9 +558,15 @@
                     tip.textContent = base + ' · ' + short;
                 }
                 // 同步打印到控制台（浮动调试窗会捕获，便于强制刷新后一眼确认是否刷到最新版）
-                console.log('[VERSION] 当前缓存版本:', swVersion, '（强制刷新后应为 s1.0.230 才算最新）');
+                _getRemoteVersionOnly().then(function(rv) {
+                    console.log('[VERSION] 当前缓存版本:', swVersion, rv ? ('（强制刷新后应为 ' + rv + ' 才算最新）') : '（无法获取远端版本）');
+                });
+                // 🔴 方案A：SW 回报真实版本后，立即核对远端是否有更新（不再依赖静态 html 自比）
+                _checkAndPromptUpdateIfNeeded();
             }
             window.addEventListener('load', function() {
+                // 方案B：启动即用线上 version.json 真实版本号填充右下角标签（占位符 dev → 真实版本），绝不写死误导
+                _fillRealVersionTag().catch(function() {});
                 // dev 模式（localhost/127.0.0.1）跳过 SW 注册：dev 用 http-server 服务 webroot，SW 的 scope='./' 会缓存 dev 前端，
                 // 且会接管之前生产 exe 注册的旧 SW，导致前端初始化卡死、按钮全失效。生产（github.io）才注册 SW。
                 const isDev = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\//.test(location.href);
@@ -571,14 +580,13 @@
                     }
                     return;
                 }
-                // sw.js 的 cachebust 必须跟随版本号（之前写死 b20260823230841 导致浏览器一直用旧 SW 文件，根本收不到新版本更新 —— P3 卡在旧版的根因）。
-                // 优先级与 329-332 一致：① #versionTag 文本 split 的 base（部署脚本必改字段，最稳）② window.__DEPLOY_TAG ③ window.__APP_VERSION ④ fallback v1。
-                let swCachebust = 'v1';
+                // 方案A：sw.js 注册 URL 携带"本地实际加载标识"，强制浏览器每次都重新请求 sw.js（彻底绕过 CDN/浏览器缓存旧 SW）。
+                // 🔴 优先级：① window.__DEPLOY_TAG（部署脚本注入 HTML，最稳，永远等于本次部署真实时间）
+                //         ② 本地实际加载时间戳 Date.now()（兜底，每次启动都唯一，保证 sw.js?v= 不命中任何缓存）
+                // 静态 #versionTag 文本现在是占位符 'dev'，不再作为 cachebust 依据（方案B）。
+                let swCachebust = String(Date.now());
                 try {
-                    const tag = document.getElementById('versionTag');
-                    const base = tag && tag.textContent ? tag.textContent.replace('●', '').split(' · ')[0].trim() : '';
-                    if (/^s\d{8}/.test(base)) swCachebust = base;
-                    else if (typeof window.__DEPLOY_TAG === 'string' && /^s\d{8}/.test(window.__DEPLOY_TAG)) swCachebust = window.__DEPLOY_TAG;
+                    if (typeof window.__DEPLOY_TAG === 'string' && /^s\d{8}/.test(window.__DEPLOY_TAG)) swCachebust = window.__DEPLOY_TAG;
                     else if (typeof window.__APP_VERSION === 'string' && window.__APP_VERSION) swCachebust = window.__APP_VERSION;
                 } catch (e) {}
                 navigator.serviceWorker.register('./sw.js?v=' + encodeURIComponent(swCachebust), { scope: './', updateViaCache: 'none' }).then(function(registration) {
@@ -680,9 +688,24 @@
                 if (typeof refreshAllFusionSkins === 'function') refreshAllFusionSkins();
             } catch (e) { console.warn('刷新皮肤失败:', e); }
         }
-        // 拉远端 index.html 解析前端 versionTag —— 不依赖 Service Worker（Tauri WebView 下 SW message 通道不可靠，
-        // 导致 __tfjlHasNewVersion 永远收不到 NEW_VERSION_READY）。优先 raw.githubusercontent (CORS *)，失败回退同域 GitHub Pages。
+        // 拉远端「真实前端版本号」（方案A/B 核心）：
+        // 优先级：① 线上 version.json（专门存放前端版本号，最稳，避免解析 html 受 CDN 缓存坑）
+        //         ② 远端 index.html 解析 #versionTag 文本（兜底，raw.githubusercontent CORS * 优先，失败回退同域 Pages）
+        // 返回形如 's20260829-1706 · s1.0.470'（日期 · 版本），无则 null。
+        // 🔴 关键：静态 #versionTag 现在只是占位符 'dev'（方案B：绝不写死成"等于自己"），
+        //         所以"当前版本"必须以「本地实际加载的 SW CACHE_VERSION / 部署时间」为准，远端版本以 version.json 为准，
+        //         两者真实比对，不再靠静态 html 文本自比。
         async function _checkRemoteFrontVerAsync() {
+            // ① 线上 version.json（frontVersion 字段，部署脚本必改，CI 自动 bump）
+            try {
+                const vr = await fetch('https://gyq-svip.github.io/tfjl-web/version.json?t=' + Date.now(), { cache: 'no-store' });
+                if (vr.ok) {
+                    const j = await vr.json().catch(() => null);
+                    if (j && j.frontVersion && j.deployTag) return j.deployTag + ' · ' + j.frontVersion;
+                    if (j && j.frontVersion) return j.frontVersion;
+                }
+            } catch (e) { /* 试下一个源 */ }
+            // ② 远端 index.html 解析（兜底）
             const sources = [
                 'https://raw.githubusercontent.com/gyq-svip/tfjl-web/main/index.html?t=' + Date.now(),
                 'https://gyq-svip.github.io/tfjl-web/index.html?t=' + Date.now()
@@ -698,6 +721,74 @@
                 } catch (e) { /* 试下一个源 */ }
             }
             return null;
+        }
+        // 拉取线上 version.json 的真实前端版本号（frontVersion 字段，如 's1.0.470'），失败返回 null
+        async function _getRemoteVersionOnly() {
+            try {
+                const vr = await fetch('https://gyq-svip.github.io/tfjl-web/version.json?t=' + Date.now(), { cache: 'no-store' });
+                if (vr.ok) {
+                    const j = await vr.json().catch(() => null);
+                    if (j && j.frontVersion) return j.frontVersion;
+                }
+            } catch (e) {}
+            return null;
+        }
+        // 本地"实际已加载"的前端版本（来自 SW 回报，最可靠——代表现在页面跑的是哪个版本）
+        function _getLocalLoadedVersion() {
+            try {
+                const tag = document.getElementById('versionTag');
+                if (tag && tag.dataset.swVersion) return tag.dataset.swVersion; // 优先用 SW 回报的真实版本
+                const t = tag ? tag.textContent.replace('●', '').split(' · ') : [];
+                const v = (t[1] || t[0] || '').trim();
+                if (v && v !== 'dev') return v;
+            } catch (e) {}
+            return '';
+        }
+        // 方案B：用线上 version.json 的真实版本号填充右下角 #versionTag（占位符 dev → 真实版本），
+        // 让标签永远显示"当前实际跑的版本"，绝不写死误导。
+        async function _fillRealVersionTag() {
+            const tag = document.getElementById('versionTag');
+            if (!tag) return;
+            const remote = await _getRemoteVersionOnly();
+            // 本地实际版本（SW 回报或静态 fallback）
+            const local = _getLocalLoadedVersion();
+            const ver = local || remote || 'dev';
+            const base = (tag.dataset.deployTag) || (local ? (local.split(' · ')[0]) : '') || 's?????';
+            // 若 SW 已回报真实版本，显示「部署时间 · 版本」；否则先显示版本号，等 SW 回报再补时间
+            if (tag.dataset.swVersion) {
+                tag.textContent = (tag.dataset.deployTag || '') + ' · ' + tag.dataset.swVersion;
+            } else {
+                tag.textContent = (base && base !== 's?????' ? base + ' · ' : '') + ver;
+            }
+        }
+        // 方案A 核心：本地已加载版本 vs 线上 version.json 真实版本，不一致就立即触发 SW 更新 + 弹更新提示。
+        // 🔴 关键点：两边都是"真实版本"——本地来自 SW 回报的 CACHE_VERSION，远端来自 version.json，绝不靠静态 html 文本自比。
+        async function _checkAndPromptUpdateIfNeeded() {
+            try {
+                const localVer = _getLocalLoadedVersion();
+                const remoteVer = await _getRemoteVersionOnly(); // 线上真实版本号
+                if (!localVer || !remoteVer) return;
+                if (_versionCompare(remoteVer, localVer) > 0) {
+                    console.log('[VERSION] 检测到新版本：本地', localVer, '→ 线上', remoteVer, '，触发 SW 更新');
+                    // 主动让 SW 检查更新（绕过静态 swCachebust 不刷新的坑）
+                    if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+                        try { await navigator.serviceWorker.getRegistration().then(r => r && r.update()); } catch (e) {}
+                    }
+                    _showVersionPopup(remoteVer, localVer); // 弹"发现新版本"提示
+                }
+            } catch (e) {}
+        }
+        // 简单版本号比较：a>b 返回 1，a<b 返回 -1，相等 0。支持 's1.0.470' / 'v260729-1706' 这类
+        function _versionCompare(a, b) {
+            const pa = String(a).split(/[.\-vV]/).filter(x => /^\d+$/.test(x)).map(Number);
+            const pb = String(b).split(/[.\-vV]/).filter(x => /^\d+$/.test(x)).map(Number);
+            const n = Math.max(pa.length, pb.length);
+            for (let i = 0; i < n; i++) {
+                const x = pa[i] || 0, y = pb[i] || 0;
+                if (x > y) return 1;
+                if (x < y) return -1;
+            }
+            return 0;
         }
         // 双击右下角版本号 → 直接强制刷新（清 SW 缓存 + 重载，拿到最新前端）。
         // 不再弹版本详情弹窗：版本信息已由悬浮提示承担，弹窗多余；双击防误触（项目已取消自动保存，误刷新会丢未存改动）。

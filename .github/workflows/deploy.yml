@@ -103,6 +103,21 @@ jobs:
                   s2 = re.sub(r"(const CACHE_VERSION = '[^']+';)", r"\1\nconst DEPLOY_TAG = '" + deploy_tag + "';", s2, count=1)
               open(p, 'w', encoding='utf-8').write(s2)
               print('bumped CACHE_VERSION + DEPLOY_TAG in', p, '→', deploy_tag)
+          # 同步 version.json 的 frontVersion（方案B：前端真实版本源，供 app-picker.js 比对 + 标签填充）
+          # 必须和 sw.js CACHE_VERSION 同源自增，否则下次部署前端版本(471)与 version.json(470)对不上 → 比对失效。
+          import json
+          vj_path = 'version.json'
+          try:
+              vj = json.load(open(vj_path, encoding='utf-8'))
+          except Exception:
+              vj = {}
+          # 取 sw.js 已经自增后的 CACHE_VERSION 作为 frontVersion 基值
+          m = re.search(r"CACHE_VERSION = '(s1\.0\.\d+)'", open('sw.js', encoding='utf-8').read())
+          front_ver = m.group(1) if m else vj.get('frontVersion', 's1.0.470')
+          vj['frontVersion'] = front_ver
+          vj['deployTag'] = deploy_tag
+          json.dump(vj, open(vj_path, 'w', encoding='utf-8'), ensure_ascii=False, indent=2)
+          print('synced version.json frontVersion →', front_ver, 'deployTag →', deploy_tag)
           PY
 
           # 🔴 2026-08-26 已废弃：原逻辑用 sed 把 register('./sw.js') 改成 register('./sw.js?v=b时间戳')，
