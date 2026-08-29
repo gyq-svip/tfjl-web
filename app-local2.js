@@ -4240,8 +4240,10 @@ if (true) {
                     const blob = await resp.blob();
                     const b64 = await _blobToBase64(blob);
                     let wrote = false;
-                    // 写盘前诊断日志（首次写盘失败时方便定位：是网络b64坏/路径权限/IPC序列化哪个环节出问题）
-                    console.log('[SKIN] 写盘', heroName, file, 'b64.len=', b64 ? b64.length : 0, 'blob.size=', blob.size, 'blob.type=', blob.type, 'content-type=', resp.headers.get('content-type'), 'content-length=', resp.headers.get('content-length'), 'path=', skinPath);
+                    // 写盘前诊断日志仅在失败时打印（避免数百条成功日志刷屏；批量结果在末尾汇总）
+                    if (!b64 || b64.length === 0) {
+                        console.warn('[SKIN] 写盘跳过(b64 为空):', heroName, file, 'blob.size=', blob.size, 'blob.type=', blob.type, 'content-type=', resp.headers.get('content-type'), 'content-length=', resp.headers.get('content-length'), 'path=', skinPath);
+                    }
                     // 主：base64 字符串写（自定义命令 write_binary_file，跨 Tauri 版本稳定，不依赖二进制 IPC 序列化）
                     // 失败时重试 1 次（应对偶发 IPC 失败），并打印完整错误对象（message/name/code/stringified）便于诊断
                     if (b64 && b64.length > 0) {
@@ -4288,9 +4290,12 @@ if (true) {
             console.log('[SKIN] 磁盘缓存: 新下载', downloaded, '跳过', skipped);
         }
         // 后台拉到新皮肤 → 左下角弹更新提示（同一会话最多一次），并重刷一次皮肤让新皮尽快可见
-        if (downloaded > 0 && !_skinUpdateToastShown) {
-            _skinUpdateToastShown = true;
-            _showSkinUpdateToast(downloaded);
+        // 🔴 2026-08-30：只要本次有下载就重刷（不再受 _skinUpdateToastShown 限制），确保新皮 path 立即生效渲染走本地
+        if (downloaded > 0) {
+            if (!_skinUpdateToastShown) {
+                _skinUpdateToastShown = true;
+                _showSkinUpdateToast(downloaded);
+            }
             try { if (typeof window.reapplyAllSkins === 'function') window.reapplyAllSkins(); } catch (e) {}
         }
     }
@@ -4348,7 +4353,7 @@ if (true) {
     //    避免每次 reapplyAllSkins 都重新 fetch + 生成新 blob（旧的从不释放 → 持续泄漏数百 MB）。
     //    缓存的 blobUrl 通过 LRU 上限管理：超过上限淘汰最旧的并 revokeObjectURL，避免挂机无限增长。
     const _skinBlobUrlCache = new Map();
-    const _SKIN_BLOB_CACHE_MAX = 400;
+    const _SKIN_BLOB_CACHE_MAX = 200;
     function _skinBlobCacheSet(url, blobUrl) {
         if (!url || !blobUrl) return;
         // 覆盖同名旧 blobUrl 时先 revoke，避免旧 blob 泄漏（IndexedDB 分支每次命中都会生成新 blob）
@@ -4396,7 +4401,9 @@ if (true) {
                     const blob = await resp.blob();
                     const b64 = await _blobToBase64(blob);
                     let wrote = false;
-                    console.log('[SKIN] 写盘', parsed.hero, parsed.file, 'b64.len=', b64 ? b64.length : 0, 'blob.size=', blob.size, 'blob.type=', blob.type, 'content-type=', resp.headers.get('content-type'), 'content-length=', resp.headers.get('content-length'), 'path=', skinPath);
+                    if (!b64 || b64.length === 0) {
+                        console.warn('[SKIN] 写盘跳过(b64 为空):', parsed.hero, parsed.file, 'blob.size=', blob.size, 'blob.type=', blob.type, 'content-type=', resp.headers.get('content-type'), 'content-length=', resp.headers.get('content-length'), 'path=', skinPath);
+                    }
                     // 主：自定义 Rust 命令 write_binary_file（已授权、支持二进制、跨 Tauri 版本稳定）
                     // 失败时重试 1 次（应对偶发 IPC 失败），并打印完整错误对象（message/name/code/stringified）便于诊断
                     if (b64 && b64.length > 0) {
@@ -4502,12 +4509,16 @@ if (true) {
         if (skinName !== undefined && skinName !== null) {
             if (skinName === '') return null;
             const skin = skins.find(s => s.name === skinName);
-            return skin ? (skin.url || null) : null;
+            if (!skin) return null;
+            // 🔴 2026-08-30：本地 path 优先于远程 url（避免调用方拿到远程 url 触发 fetch+新 blob 泄漏）
+            return skin.path || skin.url || null;
         }
         if (userSel === '') return null; // 用户明确选择默认
         const target = userSel || parsed.skinName;
         const skin = target ? skins.find(s => s.name === target) : null;
-        return skin ? (skin.url || null) : (skins[0].url || null);
+        const finalSkin = skin || skins[0];
+        // 🔴 2026-08-30：本地 path 优先于远程 url
+        return finalSkin ? (finalSkin.path || finalSkin.url || null) : null;
     }
 
     // 获取皮肤信息（dataUrl + 名字），支持延迟 base64 加载
