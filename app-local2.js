@@ -3752,14 +3752,25 @@ if (true) {
     // 400+ 张皮肤累积即数百 MB。缩到 256px 视觉几乎无差，但解码位图 + GPU 纹理内存可省 60%~80%。
     const SKIN_MAX_EDGE = 256;
     async function _downscaleBlobIfNeeded(blob) {
-        if (!blob || !blob.type || blob.type.indexOf('image/') !== 0) return URL.createObjectURL(blob);
+        // 🔴 内存泄漏修复：入参 blob 是临时中间产物（来自 dataUrl 或 read_file 解码），
+        //    一旦生成出最终的 outBlob URL，源 blob 必须立即 revoke，否则每加载一张皮肤都泄漏一个
+        //    512~1024px 的解码源（含底层解码位图），400+ 张累积即数百 MB，且永不回收（无引用后浏览器也不及时 GC）。
+        //    revoke 源 blob 不影响已 createObjectURL 出来的 outBlob URL——两者是独立副本。
+        if (!blob || !blob.type || blob.type.indexOf('image/') !== 0) {
+            const u = URL.createObjectURL(blob);
+            return u; // data: 等非 image 类型直接透传（无源泄漏风险）
+        }
         try {
-            if (typeof createImageBitmap !== 'function') return URL.createObjectURL(blob);
+            if (typeof createImageBitmap !== 'function') {
+                const u = URL.createObjectURL(blob);
+                return u;
+            }
             const bmp = await createImageBitmap(blob);
             const w = bmp.width, h = bmp.height;
             const maxEdge = Math.max(w, h);
             if (maxEdge <= SKIN_MAX_EDGE) {
                 bmp.close && bmp.close();
+                _skinUrlRelease(blob); // 源 blob 不再需要，立即释放
                 return URL.createObjectURL(blob); // 本身已够小，直接走原图
             }
             const scale = SKIN_MAX_EDGE / maxEdge;
@@ -3771,6 +3782,7 @@ if (true) {
             ctx.drawImage(bmp, 0, 0, tw, th);
             bmp.close && bmp.close();
             const outBlob = await new Promise(res => canvas.toBlob(res, 'image/png'));
+            _skinUrlRelease(blob); // 源 blob 用完即释放（关键修复点）
             if (outBlob) return URL.createObjectURL(outBlob);
             return URL.createObjectURL(blob);
         } catch (e) {
@@ -4235,9 +4247,15 @@ if (true) {
     // 获取皮肤 blob URL
     // APP（Tauri）：优先读磁盘 .png.b64 文件（刷新不丢）；未命中则网络下载 → 写磁盘
     // 网页版：优先 IndexedDB；未命中则网络下载 → 写 IndexedDB
+    // 🔴 内存泄漏修复（s1.0.472）：已为某 remoteUrl 生成的 blobUrl 用 Map 缓存复用，
+    //    避免每次 reapplyAllSkins 都重新 fetch + 生成新 blob（旧的从不释放 → 持续泄漏数百 MB）。
+    //    缓存的 blobUrl 页面级常驻、不主动 revoke（<img> 随时可能引用），页面关闭由浏览器自动回收。
+    const _skinBlobUrlCache = new Map();
     async function _getCachedSkinUrl(remoteUrl) {
         if (!remoteUrl) return null;
         if (!/^https?:\/\//i.test(remoteUrl)) return remoteUrl;
+        // 命中 blobUrl 缓存直接复用（关键修复：不再重复 fetch + 生成）
+        if (_skinBlobUrlCache.has(remoteUrl)) return _skinBlobUrlCache.get(remoteUrl);
 
         // === Tauri APP：磁盘优先 ===
         if (isTauriApp) {
@@ -4249,7 +4267,7 @@ if (true) {
                 try {
                     const bytes = await invokeFn('plugin:fs|read_file', { path: skinPath, options: undefined });
                     const blobUrl = bytesToBlobUrl(bytes, skinPath);
-                    if (blobUrl) return blobUrl;
+                    if (blobUrl) { _skinBlobUrlCache.set(remoteUrl, blobUrl); return blobUrl; }
                 } catch(e) { /* 磁盘无缓存，走网络 */ }
                 // 2. 网络下载 → 写 .skin 二进制缓存
                 try {
@@ -4281,7 +4299,9 @@ if (true) {
                         try { await invokeFn('plugin:fs|write_file', { path: skinPath, contents: b64 }); wrote = true; }
                         catch (eF) { console.warn('[SKIN] 皮肤写盘失败(plugin:fs|write_file 也不允许 base64):', parsed.hero, parsed.file, eF && (eF.message || JSON.stringify(eF) || String(eF))); }
                     }
-                    return URL.createObjectURL(blob);
+                    const blobUrl = URL.createObjectURL(blob);
+                    _skinBlobUrlCache.set(remoteUrl, blobUrl);
+                    return blobUrl;
                 } catch(e) {
                     console.warn('[SKIN] 网络兜底失败:', remoteUrl, e.message || e);
                     return remoteUrl;
@@ -4291,7 +4311,9 @@ if (true) {
             try {
                 const resp = await _fetchWithTimeout(remoteUrl, 10000);
                 if (!resp.ok) return remoteUrl;
-                return URL.createObjectURL(await resp.blob());
+                const blobUrl = URL.createObjectURL(await resp.blob());
+                _skinBlobUrlCache.set(remoteUrl, blobUrl);
+                return blobUrl;
             } catch(e) { return remoteUrl; }
         }
 
@@ -4299,7 +4321,11 @@ if (true) {
         const key = 'skin:' + remoteUrl;
         const cached = await _idbGet(key);
         if (cached && cached.blob) {
-            try { return URL.createObjectURL(cached.blob); }
+            try {
+                const blobUrl = URL.createObjectURL(cached.blob);
+                _skinBlobUrlCache.set(remoteUrl, blobUrl);
+                return blobUrl;
+            }
             catch (e) { console.warn('[SKIN] createObjectURL failed:', e); }
         }
         try {
@@ -4307,7 +4333,9 @@ if (true) {
             if (!resp.ok) return remoteUrl;
             const blob = await resp.blob();
             _idbPut(key, blob);
-            return URL.createObjectURL(blob);
+            const blobUrl = URL.createObjectURL(blob);
+            _skinBlobUrlCache.set(remoteUrl, blobUrl);
+            return blobUrl;
         } catch (e) {
             console.warn('[SKIN] fetch skin failed:', remoteUrl, e);
             return remoteUrl;
@@ -4390,15 +4418,22 @@ if (true) {
         const skin = skins.find(s => s.name === target);
         const entry = skin || skins.find(s => s.name === baseHero) || skins[0];
         if (!entry) return null;
-        // 优先用 IndexedDB 缓存（毫秒级返回），否则走网络并回写
+        // 🔴 内存泄漏修复（s1.0.472）：App 端【本地 path 优先】于远程 url。
+        //    原逻辑 `if (entry.url) return` 会让 syncRemoteSkins 注入的远程 URL 覆盖本地 path，
+        //    导致每次 reapplyAllSkins 都走 _getCachedSkinUrl(entry.url) → fetch 远程图 → 生成新 blob 且不缓存不释放，
+        //    反复重刷即持续泄漏数百 MB（实测开一会飙到 4G）。
+        //    改为：有本地 path 就永远走本地磁盘读图（快、缓存进 skinImageUrlCache、无泄漏），远程 url 仅作兜底。
+        if (entry.path) {
+            const dataUrl = await getSkinImageUrl(entry.path);
+            if (dataUrl) {
+                entry.url = dataUrl; entry.loaded = true;
+                const cachedUrl = await _getCachedSkinUrl(dataUrl);
+                return { url: cachedUrl, name: entry.name, path: entry.path };
+            }
+        }
+        // 本地无 path（纯远程皮肤）→ 用远程 url 兜底（网页版 / 远程特有皮）
         if (entry.url) {
             const cachedUrl = await _getCachedSkinUrl(entry.url);
-            return { url: cachedUrl, name: entry.name, path: entry.path };
-        }
-        const dataUrl = await getSkinImageUrl(entry.path);
-        if (dataUrl) {
-            entry.url = dataUrl; entry.loaded = true;
-            const cachedUrl = await _getCachedSkinUrl(dataUrl);
             return { url: cachedUrl, name: entry.name, path: entry.path };
         }
         return null;

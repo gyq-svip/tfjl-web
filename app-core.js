@@ -9252,7 +9252,9 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 
         // 给战斗槽卡牌应用皮肤背景
         async function applySkinBgToSlot(slot, heroName, forceCardId, forceHandType, forceSkin) {
-            console.log('[SKIN] applySkinBgToSlot slot:', slot.dataset ? slot.dataset.slot : '?', 'heroName:', heroName);
+            // 🔴 内存/性能修复：原每次调用都 console.log 一条（启动 3 遍 × 14 槽 = 42 条，切项目/切皮/融合反复打），
+            //    高频触发 captureConsole 数组 splice 且驻留字符串。降级为仅 skinInfo 解析失败（异常路径）才打日志。
+            // 正常路径静默，必要时用终端 dumpSkinRegistry() 查看。
             // 移除旧皮肤层（含融合上层）和旧皮肤名
             const oldLayer = slot.querySelector('.skin-layer');
             if (oldLayer) oldLayer.remove();
