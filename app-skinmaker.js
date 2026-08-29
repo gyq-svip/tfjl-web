@@ -59,7 +59,7 @@
       var cv=document.getElementById('skinMakerCanvas'); if(cv) smRender(cv.getContext('2d'), SM_D);
       var pv=document.getElementById('skinMakerPreview'); if(pv) smRender(pv.getContext('2d'), 1);
       var h=document.getElementById('smHero'), l=document.getElementById('smLabel'), np=document.getElementById('smNamePreview');
-      if(h&&l&&np) np.textContent=((l.value.trim()&&h.value.trim())?(l.value.trim()+'·'+h.value.trim()):'皮肤标签·英雄名')+'.png';
+      if(h&&l&&np) np.textContent=((l.value.trim()&&h.value.trim())?(l.value.trim()+'·'+h.value.trim()):'皮肤标签·英雄名')+'.skin';
     }
     function smSetRarity(r){
       smRarity=r;
@@ -125,10 +125,12 @@
       var fn=smGetInvoke();
       if(fn){
         var base=document.getElementById('smBasePath').value.trim().replace(/[\\/]$/,'');
-        var pngPath=base+'\\'+hero+'\\'+name+'.png';
+        // 🔴 2026-08-30：统一写 .skin（内容与 png 完全一致，仅后缀不同）。
+        //    原写 .png 会在 skins/ 内产生永不登记的孤儿文件（脏数据源头，已清理过 53 个）。
+        var pngPath=base+'\\'+hero+'\\'+name+'.skin';
         smStatus('下载中（写入 '+pngPath+'）…');
         fn('write_binary_file',{filePath:pngPath, contentBase64:smExportDataURL().split(',')[1]})
-          .then(function(){ smStatus('✅ 已写入 '+pngPath+'（仅图片，未登记 registry；入库请用"保存并登记"）'); })
+          .then(function(){ smStatus('✅ 已写入 '+pngPath+'（.skin 格式；仅图片，未登记 registry；入库请用"保存并登记"）'); })
           .catch(function(err){ smStatus('写入失败：'+smErrMsg(err)+'（可改路径或检查权限）',true); });
         return;
       }
@@ -137,12 +139,12 @@
           var blob=await (await fetch(smExportDataURL())).blob();
           var handle=await window.showSaveFilePicker({suggestedName:name+'.png', types:[{description:'PNG 图片', accept:{'image/png':['.png']}}]});
           var w=await handle.createWritable(); await w.write(blob); await w.close();
-          smStatus('✅ 已保存到您选择的位置（'+name+'.png）。请存到 D:\\tfjl-web\\skins\\'+hero+'\\ 再让我入库', true);
+          smStatus('✅ 已保存到您选择的位置（'+name+'.png）。放入 D:\\tfjl-web\\skins\\'+hero+'\\ 前请重命名为 '+name+'.skin（统一 .skin 格式）再让我入库', true);
           return;
         }catch(e){ if(e&&e.name==='AbortError'){ smStatus('已取消保存'); return; } }
       }
       var a=document.createElement('a'); a.href=smExportDataURL(); a.download=name+'.png'; a.click();
-      smStatus('已下载到浏览器默认下载目录（'+name+'.png）。请手动移到 D:\\tfjl-web\\skins\\'+hero+'\\ ，再让我入库', true);
+      smStatus('已下载到浏览器默认下载目录（'+name+'.png）。请重命名为 '+name+'.skin 后移到 D:\\tfjl-web\\skins\\'+hero+'\\ ，再让我入库', true);
     }
     // 复制「分享图」（带网址水印）到剪贴板，与皮肤素材下载分离，避免污染游戏内素材
     function smSaveShareImage(){
