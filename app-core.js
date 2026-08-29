@@ -24,11 +24,13 @@
         try { window.__MAX_LOG_MSG_LEN = MAX_LOG_MSG_LEN; } catch (e) {}
 
         // 🔴 2026-08-29 诊断日志落盘：捕获的每条日志除了存内存，还可追加写本地文件（仅桌面端 Tauri 生效）。
-        //    默认关闭；终端跑 enableDiagLog() 开启，日志写到 数据目录/tfjl_diag/app-console-YYYY-MM-DD.log。
+        //    默认关闭；终端跑一次 enableDiagLog() 即永久开启（写 localStorage，重启后自动恢复），日志写到 OS 缓存目录/tfjl_diag/app-console-YYYY-MM-DD.log。
         //    这样用户卡顿无法操作时，我可直接读取本地日志定位，无需用户来回手动测。
         var _diagLogEnabled = false;
         var _diagLogBuf = [];           // 待写缓冲
-        var _diagLogBaseDir = '';       // 数据目录（从 app-local2 注入，回退默认）
+        var _diagLogBaseDir = '';       // 缓存目录（从 app-local2 注入 get_diag_log_dir）
+        // 持久化：localStorage 记住开关，重启后自动恢复，无需每次手动开
+        try { if (localStorage.getItem('tdjl_diag_log') === '1') _diagLogEnabled = true; } catch (e) {}
         function _diagLogPath() {
             // 优先用 get_diag_log_dir 返回的缓存目录（OS 管理，干净不污染数据根目录）
             var d = _diagLogBaseDir || '';
@@ -55,11 +57,13 @@
         window.__setDiagLogDir = function (dir) { if (dir) _diagLogBaseDir = dir; };
         window.enableDiagLog = function () {
             _diagLogEnabled = true;
-            console.log('[DIAG-LOG] 已开启本地诊断日志落盘 → ' + _diagLogPath());
+            try { localStorage.setItem('tdjl_diag_log', '1'); } catch (e) {}
+            console.log('[DIAG-LOG] 已开启本地诊断日志落盘（已记忆，重启后自动恢复）→ ' + _diagLogPath());
         };
         window.disableDiagLog = function () {
             _diagLogEnabled = false;
-            console.log('[DIAG-LOG] 已关闭本地诊断日志落盘');
+            try { localStorage.removeItem('tdjl_diag_log'); } catch (e) {}
+            console.log('[DIAG-LOG] 已关闭本地诊断日志落盘（已清除记忆）');
         };
 
         (function captureConsole() {
