@@ -9577,14 +9577,14 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             //    这里又会赋新 src。无论哪种情况，覆盖 img.src 前必须先 revoke 旧 blob，否则旧纹理常驻 GPU 永不回收。
             const finalSrc = skinUrl; // 直接用原始 URL（blob:/data:/https: 都不加时间戳，保证「src 未变」优化始终生效）
 
-            // 2026-08-30 回滚「复用同个 <img>」优化：上方已 remove 旧 .skin-layer，这里每次重建新 <img>，
-            // 保证「切皮一定重绘」。不再手动 revoke（避免误回收正在显示的 blob），纹理由浏览器 GC 回收。
+            // 2026-08-30 双缓冲切皮：先建新 <img>，等 onload 后再移除旧 .skin-layer（旧的仍显示直到新图就绪）→
+            // 杜绝「切换瞬间旧图已删、新图未解码」导致的黑闪；同时避免旧 img 堆积（之前每次 insert 不删旧，会重叠）。
+            // 不再手动 revoke blob（避免误回收正在显示的纹理），纹理由浏览器 GC 回收。
             const img = document.createElement('img');
             img.className = 'skin-layer';
             img.alt = '';
             img.src = finalSrc;
-            // 🔴 2026-08-30 双保险：若当前 src 是原生 asset:// 且加载失败（CSP 拦截等），自动回退到 Rust 读图 blob，避免槽位变黑。
-            //    blob 优先路径下正常不会走到这里（仍加锁防极端）。
+            // 🔴 双保险：若 asset:// 加载失败（极端环境），回退到 Rust 读图 blob，避免变黑
             img.onerror = async function() {
                 if (!img.isConnected) return;
                 console.error('[SKIN] 皮肤图加载失败, 尝试回退:', skinUrl.substring(0, 60));
@@ -9594,9 +9594,15 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 } catch (e) {}
                 if (img.isConnected) img.remove();
             };
-            img.onload = function() { /* [SKIN log muted] */ void (0) && console.log('[SKIN] Skin image loaded OK for slot', slot.dataset.slot); };
+            img.onload = function() {
+                // 新图就绪：移除 slot 内其余旧的 .skin-layer（只留当前这张），再标记 skin-bg
+                const olds = slot.querySelectorAll('.skin-layer');
+                olds.forEach(function (o) { if (o !== img && o.parentNode) o.parentNode.removeChild(o); });
+                slot.classList.add('skin-bg');
+            };
             slot.insertBefore(img, slot.firstChild);
-            slot.classList.add('skin-bg');
+            // 浏览器已缓存（asset:// 命中）时 img.complete 立即为真但 onload 可能不同步触发，手动兜底清理一次
+            if (img.complete && img.naturalWidth > 0) { img.onload(); }
             /* [SKIN log muted] */ void (0) && console.log('[SKIN] Skin <img> updated for slot', slot.dataset.slot);
         }
 

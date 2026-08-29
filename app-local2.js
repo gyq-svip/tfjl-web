@@ -4585,21 +4585,22 @@ if (true) {
         //    反复重刷即持续泄漏数百 MB（实测开一会飙到 4G）。
         //    改为：有本地 path 就永远走本地磁盘读图（快、缓存进 skinImageUrlCache、无泄漏），远程 url 仅作兜底。
         if (entry.path) {
-            // 🔴 2026-08-30 修复：之前改成「convertFileSrc(asset://) 优先」导致循环切卡变黑——
-            //    你的 Tauri 环境下 asset:// 协议被 CSP 拦截/加载失败，<img> 直接黑。
-            //    改回稳妥顺序：优先 Rust 读图（read_image_base64 → blob，已验证 loaded OK），
-            //    convertFileSrc 仅作兜底；两者都失败才返回 null。切皮仍每次重建 <img>（保留优化前重建行为，不卡）。
-            const dataUrl = await getSkinImageUrl(entry.path);
-            if (dataUrl) {
-                entry.url = dataUrl; entry.loaded = true;
-                const cachedUrl = await _getCachedSkinUrl(dataUrl);
-                return { url: cachedUrl, name: entry.name, path: entry.path };
-            }
-            // 兜底：Rust 读图命令不可用（旧 exe 未挂载 / ACL 受限）时，再试 Tauri 原生资源协议 asset://
+            // 🔴 2026-08-30 修复「切皮超级慢」：改回 Tauri 原生资源协议 asset://（convertFileSrc）优先。
+            //    配置 assetProtocol.enable=true + scope=["**"] 全放行、csp=null → 用户环境 asset:// 可用；
+            //    由 WebView 原生解码、浏览器按 URL 缓存，零 JS 缩放/解码开销 → 切皮丝滑不卡主线程。
+            //    之前误判"变黑"实为切换瞬间旧 img 已 remove、新 img 未 onload 的黑闪（非 asset:// 不可用），
+            //    已在 applySkinBgToSlot 用「双缓冲 onload 后移除旧图」根治。Rust 读图 blob 仅作兜底。
             const nativeUrl = (typeof convertFileSrc === 'function') ? convertFileSrc(entry.path) : null;
             if (nativeUrl) {
                 entry.url = nativeUrl; entry.loaded = true;
                 const cachedUrl = await _getCachedSkinUrl(nativeUrl);
+                return { url: cachedUrl, name: entry.name, path: entry.path };
+            }
+            // 兜底：asset:// 不可用（极旧 exe 未挂载全局 Tauri）时，走 Rust 读图（read_image_base64 → blob → 缩放）
+            const dataUrl = await getSkinImageUrl(entry.path);
+            if (dataUrl) {
+                entry.url = dataUrl; entry.loaded = true;
+                const cachedUrl = await _getCachedSkinUrl(dataUrl);
                 return { url: cachedUrl, name: entry.name, path: entry.path };
             }
         }
