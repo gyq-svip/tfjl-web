@@ -3,16 +3,28 @@
         // ==================== 控制台日志捕获（Tauri APP 无法 F12，在此捕获供管理员面板查看） ====================
         window.__consoleLogs = [];
         const MAX_CONSOLE_LOGS = 500;
+        // 🔴 2026-08-29 内存优化：单条日志最大字符数。
+        //    原实现只截断 object（JSON.stringify(a).slice(0,300)），**字符串参数完全不限制** ——
+        //    例如「device_visits= {...200+设备...}」这类日志一条就有几十 KB，500 条即可吃掉上百 MB
+        //    （实测 freeMemory() 清空 438 条日志即回收 135 MB，日志是大头之一）。
+        //    注意：截断只作用于存进 __consoleLogs 的内存副本；
+        //    F12 真实控制台仍输出完整内容（orig[level].apply(console, args) 用的是原始 args）。
+        const MAX_LOG_MSG_LEN = 2000;
+        // 挂到 window：本文件的 runHeartbeatSelfCheck() 等在块作用域之外，无法直接访问该常量
+        try { window.__MAX_LOG_MSG_LEN = MAX_LOG_MSG_LEN; } catch (e) {}
         (function captureConsole() {
             const orig = { log: console.log, warn: console.warn, error: console.error, info: console.info };
             function addLog(level, args) {
                 const now = new Date();
                 const time = now.toTimeString().slice(0, 8);
-                const msg = Array.from(args).map(a => {
+                let msg = Array.from(args).map(a => {
                     if (a instanceof Error) return a.stack || a.message;
                     if (typeof a === 'object') try { return JSON.stringify(a).slice(0, 300); } catch (e) { return String(a); }
                     return String(a);
                 }).join(' ');
+                if (msg.length > MAX_LOG_MSG_LEN) {
+                    msg = msg.slice(0, MAX_LOG_MSG_LEN) + ' …[超长已截断，原始 ' + msg.length + ' 字符]';
+                }
                 window.__consoleLogs.push({ time, level, msg });
                 if (window.__consoleLogs.length > MAX_CONSOLE_LOGS) window.__consoleLogs.splice(0, 100);
                 orig[level] && orig[level].apply(console, args);
@@ -798,7 +810,9 @@
         // 确保调试浮窗能看到"全部错误信息"（含 TDZ、async 抛错等本会被静默吞掉或只走 alert 的错误）
         function _pushConsole(level, msg) {
             try {
-                window.__consoleLogs.push({ time: new Date().toTimeString().slice(0, 8), level: level, msg: String(msg) });
+                let m = String(msg);
+                if (m.length > MAX_LOG_MSG_LEN) m = m.slice(0, MAX_LOG_MSG_LEN) + ' …[超长已截断，原始 ' + m.length + ' 字符]';
+                window.__consoleLogs.push({ time: new Date().toTimeString().slice(0, 8), level: level, msg: m });
                 if (window.__consoleLogs.length > MAX_CONSOLE_LOGS) window.__consoleLogs.splice(0, 100);
             } catch (_) {}
         }
@@ -13098,7 +13112,9 @@ function runHeartbeatSelfCheck() {
     const isTauri = !!(window.__TAURI__ || window.__TAURI_INTERNALS__);
     const token = getGistToken();
     const gid = COUNTER_GIST_ID || localStorage.getItem('counter_gist_id') || '';
-    const push = (level, msg) => { try { window.__consoleLogs.push({ time: new Date().toTimeString().slice(0, 8), level, msg }); if (window.__consoleLogs.length > 1000) window.__consoleLogs.splice(0, 100); } catch (e) {} };
+    // 🔴 2026-08-29 内存优化：心跳自检的日志同样限制单条长度（此处在块作用域外，走 window 上的常量）
+    const _hbLogMax = window.__MAX_LOG_MSG_LEN || 2000;
+    const push = (level, msg) => { try { let m = String(msg); if (m.length > _hbLogMax) m = m.slice(0, _hbLogMax) + ' …[超长已截断，原始 ' + m.length + ' 字符]'; window.__consoleLogs.push({ time: new Date().toTimeString().slice(0, 8), level, msg: m }); if (window.__consoleLogs.length > 1000) window.__consoleLogs.splice(0, 100); } catch (e) {} };
     push('info', '════════ ❤️ 心跳自检开始 ════════');
     push(isTauri ? 'info' : 'error', '[心跳自检] Tauri 环境 = ' + isTauri + (isTauri ? '（App，应有 Rust 心跳）' : '（网页版，无 Rust 心跳，靠 JS 定时器）'));
     push(token ? 'info' : 'error', '[心跳自检] getGistToken = ' + (token ? ('有(' + token.length + '字符, 前缀' + token.slice(0, 6) + ')') : '空！'));
