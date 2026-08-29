@@ -24592,6 +24592,31 @@ ${maSection}
             console.log('[MEM] Resource Timing 清理定时器已启动（每60秒）');
         })();
 
+        // 🔴 2026-08-30 后台内存采样：挂机时每 30 秒记录 JS 堆 + 关键指标，用于定位"慢慢涨"的泄漏源。
+        // 数据写入日志（memoryReport 同款 pushLog），挂一晚后复制日志即可看出增长曲线。
+        (function startMemorySampler() {
+            if (typeof performance === 'undefined' || !performance.memory) return;
+            function sample() {
+                try {
+                    const m = performance.memory;
+                    const imgs = document.querySelectorAll('img').length;
+                    const bgP = document.querySelectorAll('.bg-particle').length;
+                    const trail = document.querySelectorAll('.trail-particle').length;
+                    const rt = (typeof performance.getEntriesByType === 'function') ? performance.getEntriesByType('resource').length : -1;
+                    const line =
+                        '[MEM-SAMPLE] used=' + (m.usedJSHeapSize / 1048576).toFixed(1) + 'MB' +
+                        ' total=' + (m.totalJSHeapSize / 1048576).toFixed(1) + 'MB' +
+                        ' limit=' + (m.jsHeapSizeLimit / 1048576).toFixed(0) + 'MB' +
+                        ' img=' + imgs + ' bgP=' + bgP + ' trail=' + trail + ' rt=' + rt;
+                    console.log(line);
+                    if (typeof pushLog === 'function') pushLog('CONSOLE', line);
+                } catch (e) {}
+            }
+            setInterval(sample, 30000);
+            sample();
+            console.log('[MEM] 后台内存采样已启动（每30秒）');
+        })();
+
         // 🔴 2026-08-29 DOM 节点分布诊断：定位"DOM节点总数"为何偏高（如 9000+）
         window.domBreakdown = function () {
             const all = document.getElementsByTagName('*');
