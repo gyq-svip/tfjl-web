@@ -600,15 +600,6 @@ if (true) {
         _autoBackupPending = true;
     }
 
-    // 定时整备 调用：检查是否在最小间隔内，跳过则仅清脏标记
-    async function _autoBackupNow(dir) {
-        if (!_autoBackupEnabled() || !dir) return;
-        _autoBackupPending = false;
-        const now = Date.now();
-        if (now - _lastRealBackupTs < AUTO_BACKUP_MIN_GAP_MS) return; // 节流：距上次实备不足 5 分钟直接跳过
-        await _doAutoBackup(dir).catch(e => console.error('[自动备份] 兜底失败:', e));
-    }
-
     // 关窗兜底 调用：绕过最小间隔节流，确保关闭前一定留一份（pagehide 已先落盘 tfjl.dat，此处仅冗余备份）
     async function _autoBackupForceNow(dir) {
         if (!_autoBackupEnabled() || !dir) return;
@@ -619,6 +610,9 @@ if (true) {
     // 立即备份（跳过防抖，供关窗/隐藏/定时整备调用）；仍走 hash 增量判定，避免无变更时重复写
     async function _autoBackupNow(dir) {
         if (!_autoBackupEnabled() || !dir) return;
+        _autoBackupPending = false;
+        const now = Date.now();
+        if (now - _lastRealBackupTs < AUTO_BACKUP_MIN_GAP_MS) return; // 节流：距上次实备不足最小间隔直接跳过
         await _doAutoBackup(dir).catch(e => console.error('[自动备份] 兜底失败:', e));
     }
 

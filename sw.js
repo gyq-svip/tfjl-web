@@ -59,7 +59,7 @@
 // ============================================================
 
 const CACHE_VERSION = 's1.0.487';
-const DEPLOY_TAG = 's20260829-1933';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
+const DEPLOY_TAG = 's20260830-0010';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
