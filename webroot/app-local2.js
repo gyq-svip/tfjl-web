@@ -377,6 +377,11 @@ if (true) {
     // 通过 window.__TAURI_INTERNALS__.invoke 调用Rust命令
 
     async function tauriInvoke(cmd, args = {}) {
+        // 网页版直接跳过，避免弹窗阻塞初始化
+        if (!isTauriApp) {
+            console.log('[APP] 非 Tauri 环境，跳过 invoke:', cmd);
+            return null;
+        }
         try {
             // Tauri v2 的 invoke 在 __TAURI_INTERNALS__ 中
             let invokeFn = null;
@@ -386,16 +391,13 @@ if (true) {
                 invokeFn = window.__TAURI__.core.invoke.bind(window.__TAURI__.core);
             }
             if (!invokeFn) {
-                console.error('[APP] 未找到 invoke 函数。__TAURI_INTERNALS__:', !!window.__TAURI_INTERNALS__, 
+                console.error('[APP] 未找到 invoke 函数。__TAURI_INTERNALS__:', !!window.__TAURI_INTERNALS__,
                     'keys:', window.__TAURI_INTERNALS__ ? Object.keys(window.__TAURI_INTERNALS__) : 'N/A');
-                alert('[调试] 未找到Tauri invoke函数\n__TAURI_INTERNALS__存在: ' + !!window.__TAURI_INTERNALS__ + 
-                    '\nkeys: ' + (window.__TAURI_INTERNALS__ ? Object.keys(window.__TAURI_INTERNALS__).join(', ') : 'N/A'));
                 return null;
             }
             return await invokeFn(cmd, args);
         } catch (e) {
             console.error('[APP] invoke 失败:', cmd, e);
-            alert('[调试] invoke调用失败: ' + cmd + '\n错误: ' + (e.message || e));
             return null;
         }
     }
@@ -820,6 +822,11 @@ if (true) {
     }
 
     async function initAppLocal() {
+        // 网页版不初始化 APP 本地功能，避免调用 Tauri 命令弹窗
+        if (!isTauriApp) {
+            console.log('[APP] 非 Tauri 环境，跳过 initAppLocal');
+            return;
+        }
         const btn = document.getElementById('appLocalSettingsBtn');
         // 按钮无条件显示（网页端/App端都显示）；真正的 Tauri 环境判断放在点击时（openAppLocalSettings 内）进行，
         // 避免 Tauri 全局注入晚于本函数执行导致误判为 false 而不显示按钮
