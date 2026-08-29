@@ -478,6 +478,23 @@
                 </div>
                 <!-- 皮肤制作 -->
             <div id="cgmSkinPane" style="display:none;">
+              <!-- 📖 发布流程引导（管理员备忘：功能多了容易记混，这里固定说明） -->
+              <details open style="background:rgba(79,195,247,0.08);border:1px solid rgba(79,195,247,0.35);border-radius:10px;padding:10px 12px;margin-bottom:14px;">
+                <summary style="cursor:pointer;color:#4fc3f7;font-size:0.85rem;font-weight:600;">📖 皮肤制作与发布流程（点开/收起）</summary>
+                <div style="color:rgba(255,255,255,0.82);font-size:0.78rem;line-height:1.75;margin-top:8px;">
+                  <div><b style="color:#ffd700;">① 制作</b>：左侧上传原图 → 调参 → 点 <b>💾 保存并登记</b><br>
+                    <span style="color:rgba(255,255,255,0.55);">→ 写入 <code style="color:#4fc3f7;">skins/英雄名/皮肤名.skin</code> 并登记 registry.json（此时仅本机可见）</span></div>
+                  <div style="margin-top:6px;"><b style="color:#ffd700;">② 网页版生效</b>：点 <b>🚀 一键推送到 GitHub / Gitee</b><br>
+                    <span style="color:rgba(255,255,255,0.55);">→ 推 skins/ 散文件到 GitHub，网页端立即可见</span></div>
+                  <div style="margin-top:6px;"><b style="color:#ffd700;">③ 客户端生效</b>：点 <b>📦 一键打包发布到 Gitee</b><br>
+                    <span style="color:rgba(255,255,255,0.55);">→ 把整个 skins/ 重新打成新 zip 传 Gitee，用户点「更新皮肤资源」即可拉取</span></div>
+                  <div style="margin-top:8px;padding-top:7px;border-top:1px dashed rgba(255,255,255,0.18);color:rgba(255,255,255,0.6);">
+                    ⚠️ <b>②③ 互相独立</b>，各管一端，可分别执行、失败单独重试。<br>
+                    💡 <b>「📦 一键打包」不需要先从 Gitee 下载旧包</b>——本地 <code style="color:#4fc3f7;">skins/</code> 目录永远是完整源，直接整体重打一个新 zip 上传即可。<br>
+                    📄 <b>格式</b>：统一 <code style="color:#4fc3f7;">.skin</code>（内容即 PNG，仅后缀不同，零损失）。
+                  </div>
+                </div>
+              </details>
               <!-- 第一排：原图画布 + 成品预览 并排，调参实时看预览 -->
               <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start;margin-bottom:14px;">
                 <div style="flex:1 1 420px;min-width:320px;">
