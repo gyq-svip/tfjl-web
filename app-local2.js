@@ -888,8 +888,21 @@ if (true) {
         loadSkinSelections();  // 恢复皮肤选择记录
         // 先扫描本地，再同步远程；如果并行会导致 scanSkins 清空 registry 把远程条目冲掉
         scanSkins().then(() => syncRemoteSkins());
+        // 🔴 性能模式记忆保险：首屏加载后按 localStorage 里记录的档位主动重渲一次，
+        // 确保「刷新后保持上次设置的性能模式」（极速/优化/高性能）严格生效，不被默认 high 覆盖。
+        setTimeout(() => {
+            try {
+                const m = (typeof window.getPerfMode === 'function') ? window.getPerfMode() : 'high';
+                if (m !== 'high') {
+                    if (typeof window.updateCardPoolSkins === 'function') window.updateCardPoolSkins().catch(() => {});
+                    if (typeof window.reapplyAllSkins === 'function') window.reapplyAllSkins().catch(() => {});
+                }
+            } catch (e) {}
+        }, 1800);
         // 兜底：启动 1.5s 后再重刷一次皮肤，确保即使首屏渲染早于皮肤索引就绪也能补上（修复概率性卡住不显示）
         setTimeout(() => { try { if (typeof window.reapplyAllSkins === 'function') window.reapplyAllSkins(); } catch (e) {} }, 1500);
+        // 🔴 强制飘屏公告：打开软件后检查是否有未读公告，有则弹一次（点「我已阅读」关闭，本机记已读）
+        setTimeout(() => { try { if (typeof window.checkForceBroadcast === 'function') window.checkForceBroadcast(); } catch (e) {} }, 2500);
         // APP 端版本号回填：Tauri 无 Service Worker，#versionTag 不会被 SW_VERSION 消息更新，
         // 否则永远显示 index.html 写死的 fallback "s1.0.225"。这里用真实 APP 版本回填。
         try {

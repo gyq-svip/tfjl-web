@@ -24057,9 +24057,9 @@ ${maSection}
             const con = document.getElementById('floatConsole');
             if (!con) return;
             const enabled = _isConsoleEnabled();
-            let open = true; // 默认展开（开关开时）
+            let open = false; // 默认收起（仅显示小圆按钮）；刷新后保持收起，除非用户主动展开过且已记忆
             if (enabled) {
-                try { open = localStorage.getItem(CONSOLE_OPEN_KEY) !== '0'; } catch (_) {}
+                try { open = localStorage.getItem(CONSOLE_OPEN_KEY) === '1'; } catch (_) {}
             }
             floatConsoleVisible = enabled && open;
             con.style.display = floatConsoleVisible ? 'flex' : 'none';
@@ -25781,6 +25781,104 @@ ${maSection}
                 showAdminStatus('删除失败: ' + error.message, 'error');
             }
         }
+
+        // ==================== 强制飘屏公告（管理员发布，全员首次打开弹出一次）====================
+        // 存储：公告 Gist 内的独立文件 force_broadcast.json = { id, title, content, ts }
+        // 用户端打开软件时拉取，与本地已读 id（tdjl_read_broadcast）比对，未读则弹，点「我已阅读」写回 id。
+        const FB_GIST_FILE = 'force_broadcast.json';
+        const FB_READ_KEY = 'tdjl_read_broadcast';
+
+        async function _readForceBroadcast() {
+            try {
+                const token = getGistToken();
+                const url = await getNewsGistUrl();
+                const res = await fetch(url, { headers: { 'Accept': 'application/vnd.github.v3+json', ...(token && { 'Authorization': `token ${token}` }) } });
+                if (!res.ok) return null;
+                const data = await res.json();
+                const f = data.files && data.files[FB_GIST_FILE];
+                if (!f || !f.content) return null;
+                return JSON.parse(f.content);
+            } catch (e) { return null; }
+        }
+
+        async function adminPublishBroadcast() {
+            const title = (document.getElementById('adminBroadcastTitle').value || '').trim();
+            const content = (document.getElementById('adminBroadcastContent').value || '').trim();
+            const statusEl = document.getElementById('adminBroadcastStatus');
+            if (!title || !content) { if (statusEl) statusEl.textContent = '⚠️ 标题和内容都不能为空'; statusEl.style.color = '#ff6b6b'; return; }
+            try {
+                const token = getGistToken();
+                if (!token) throw new Error('未配置 GitHub Token');
+                const url = await getNewsGistUrl();
+                // 读取现有 Gist 全量文件，避免 PATCH 覆盖其它文件
+                const res = await fetch(url, { headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` } });
+                const gist = await res.json();
+                const files = {};
+                // 保留其它文件原样
+                for (const k in gist.files) { if (k !== FB_GIST_FILE) files[k] = { content: gist.files[k].content }; }
+                const payload = {
+                    id: 'fb_' + Date.now(),
+                    title: title,
+                    content: content,
+                    ts: new Date().toISOString()
+                };
+                files[FB_GIST_FILE] = { content: JSON.stringify(payload, null, 2) };
+                const pr = await fetch(url, {
+                    method: 'PATCH',
+                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ files })
+                });
+                if (!pr.ok) throw new Error('HTTP ' + pr.status);
+                if (statusEl) { statusEl.textContent = '✅ 飘屏公告已发布，用户打开软件即弹出（每人一次）'; statusEl.style.color = '#4ade80'; }
+                document.getElementById('adminBroadcastTitle').value = '';
+                document.getElementById('adminBroadcastContent').value = '';
+            } catch (e) {
+                if (statusEl) { statusEl.textContent = '❌ 发布失败: ' + (e && e.message ? e.message : e); statusEl.style.color = '#ff6b6b'; }
+            }
+        }
+
+        function adminPreviewBroadcast() {
+            const title = (document.getElementById('adminBroadcastTitle').value || '').trim() || '（无标题）';
+            const content = (document.getElementById('adminBroadcastContent').value || '').trim() || '（无内容）';
+            const t = document.getElementById('forceBroadcastTitle');
+            const c = document.getElementById('forceBroadcastContent');
+            const m = document.getElementById('forceBroadcastModal');
+            if (t) t.textContent = title;
+            if (c) c.textContent = content;
+            if (m) m.style.display = 'flex';
+        }
+
+        // 页面加载后检查是否有未读飘屏公告
+        async function checkForceBroadcast() {
+            try {
+                const data = await _readForceBroadcast();
+                if (!data || !data.id) return;
+                const readId = localStorage.getItem(FB_READ_KEY);
+                if (readId === data.id) return; // 已读，不弹
+                const t = document.getElementById('forceBroadcastTitle');
+                const c = document.getElementById('forceBroadcastContent');
+                const m = document.getElementById('forceBroadcastModal');
+                if (t) t.textContent = data.title || '公告';
+                if (c) c.textContent = data.content || '';
+                if (m) { m.dataset.bid = data.id; m.style.display = 'flex'; }  // 记录真实公告 id，关闭时写回已读
+            } catch (e) {}
+        }
+
+        function closeForceBroadcast() {
+            const m = document.getElementById('forceBroadcastModal');
+            if (m) m.style.display = 'none';
+            // 记录已读：仅当是真实公告（dataset.bid 存在）时才写回；预览弹窗无 bid 不写
+            try {
+                const realId = m && m.dataset.bid;
+                if (realId) localStorage.setItem(FB_READ_KEY, realId);
+            } catch (e) {}
+        }
+
+        // 暴露给全局，供 initAppLocal / DOMContentLoaded 调用
+        window.checkForceBroadcast = checkForceBroadcast;
+        window.closeForceBroadcast = closeForceBroadcast;
+        window.adminPublishBroadcast = adminPublishBroadcast;
+        window.adminPreviewBroadcast = adminPreviewBroadcast;
 
         // 管理员刷新拍卖快讯列表
         async function adminRefreshAuctionBroadcasts() {
