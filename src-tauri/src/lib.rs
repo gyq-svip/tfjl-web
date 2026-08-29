@@ -602,6 +602,27 @@ fn git_push_skins() -> Result<String, String> {
     Ok(log)
 }
 
+/// 判断皮肤目录里是否真的存在 .skin 文件（识别"目录被手动删空"的场景）。
+/// 只看两层：base/*.skin 与 base/<英雄>/*.skin。
+fn has_skin_files(base: &str) -> bool {
+    let Ok(entries) = std::fs::read_dir(base) else { return false };
+    for e in entries.flatten() {
+        let p = e.path();
+        if p.is_dir() {
+            if let Ok(sub) = std::fs::read_dir(&p) {
+                for f in sub.flatten() {
+                    if f.path().extension().and_then(|x| x.to_str()) == Some("skin") {
+                        return true;
+                    }
+                }
+            }
+        } else if p.extension().and_then(|x| x.to_str()) == Some("skin") {
+            return true;
+        }
+    }
+    false
+}
+
 /// 执行 PowerShell 脚本（在指定目录），返回合并后的 stdout+stderr；非零退出码返回错误文本
 fn run_ps(repo: &str, script: &str, extra: &[&str]) -> Result<String, String> {
     let mut args: Vec<String> = vec![
@@ -1291,9 +1312,12 @@ async fn download_skins(app: tauri::AppHandle, force: Option<bool>) -> Result<St
     let remote_skins = idx.get("skins").and_then(|v| v.as_u64()).unwrap_or(0);
     let remote_size = idx.get("size").and_then(|v| v.as_u64()).unwrap_or(0);
 
-    // ===== 2. 已装同版本且非强制 -> 直接跳过下载（省流量、秒开）=====
+    // ===== 2. 已装同版本 + 本地确实有图 + 非强制 -> 才跳过下载（省流量、秒开）=====
+    // 🔴 关键：本地皮肤被手动删空时，即使 installed 记录说"已装"也必须重下。
+    //    否则会出现「记录已装但磁盘没图」→ 界面一片空白且永远不自动恢复。
     let installed_pkg = std::fs::read_to_string(&installed_path).unwrap_or_default();
-    if force != Some(true) && !installed_pkg.is_empty() {
+    let local_has_skin = has_skin_files(base);
+    if force != Some(true) && local_has_skin && !installed_pkg.is_empty() {
         if let Ok(v) = serde_json::from_str::<serde_json::Value>(&installed_pkg) {
             let p = v.get("package").and_then(|x| x.as_str()).unwrap_or("");
             if p == pkg && !pkg.is_empty() {

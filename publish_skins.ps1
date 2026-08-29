@@ -27,6 +27,35 @@ $Tag       = "v-skins"
 
 function Write-Step($msg) { Write-Host "[SKIN-PUB] $msg" -ForegroundColor Cyan }
 
+# ---------------- 0. 先把 skins/ 改动推送到 GitHub（网页版源），实现真正"一键双端" ----------------
+# 网页版是从 GitHub Pages 的 skins/ 逐张加载 .skin 的；客户端是从 Gitee 拉 zip。
+# 两者都要更新，否则会出现"客户端有、网页版没有"。故打包前自动先推 GitHub，
+# 用户点一次按钮即可双端同步（失败不阻断，仅告警，Gitee 侧照常发布）。
+if (-not $SkipUpload) {
+    Write-Step "先推送 skins/ 改动到 GitHub（网页版源）..."
+    $prevEAP0 = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    & git -C $RootDir add skins 2>$null
+    # diff --cached --quiet：有暂存改动时返回 1，无改动返回 0（无改动时跳过 commit，避免报错）
+    & git -C $RootDir diff --cached --quiet 2>$null
+    $hasStaged = ($LASTEXITCODE -ne 0)
+    if ($hasStaged) {
+        & git -C $RootDir commit -m "chore: update skins (auto-commit before skin pack publish)" 2>$null
+        Write-Step "已提交 skins/ 改动"
+    } else {
+        Write-Step "skins/ 无改动，跳过 commit"
+    }
+    & git -C $RootDir pull --rebase origin main 2>$null
+    & git -C $RootDir push origin main 2>$null
+    $ghExit = $LASTEXITCODE
+    $ErrorActionPreference = $prevEAP0
+    if ($ghExit -ne 0) {
+        Write-Host "[SKIN-PUB] WARN: GitHub 推送失败（网页版稍后需手动推送），不阻断，继续打包上传 Gitee" -ForegroundColor Yellow
+    } else {
+        Write-Step "GitHub 推送完成（网页版源已同步）"
+    }
+}
+
 # ---------------- 1. 收集 registry 登记的文件（只打登记过的，杜绝脏数据） ----------------
 Write-Step "读取 registry.json 并校验文件完整性..."
 $regPath = Join-Path $SkinsDir "registry.json"
