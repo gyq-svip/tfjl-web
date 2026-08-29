@@ -4,7 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=3.0, user-scalable=yes">
     <title>塔防阵容卡搭配专用</title>
-    <link rel="stylesheet" href="styles.css?v=s1.0.180">
+    <!-- 🔴 部署时间戳：全站 cache-busting(?v=) 与右下角 versionTag 共用此值。
+         部署时只改这一处 + #versionTag 文本，所有脚本/样式的缓存键自动跟随更新，
+         彻底杜绝"文件内容已更新但 URL 没变 → 浏览器/CDN 一直给旧缓存"的历史坑（sw.js v43 同款教训）。 -->
+    <script>window.__DEPLOY_TAG = 's20260829-1604';</script>
+    <link rel="stylesheet" href="styles.css?v=__dt__">
 </head>
 <body>
     <!-- 启动加载动画（网页加载完成后自动消失） -->
@@ -79,7 +83,7 @@
         }, true);
     })();
     </script>
-    <script defer src="app-boot.js?v=s1.0.130"></script>
+    <script defer src="app-boot.js?v=__dt__"></script>
 
     <!-- 密码验证层（默认隐藏；启动逻辑确认"未登录"后才显示，避免已登录用户闪一下登录界面） -->
     <div id="passwordOverlay" class="password-overlay" style="display:none;">
@@ -852,7 +856,7 @@
         <!-- Boss减伤悬浮提示 -->
         <div id="bossRedTooltip" style="display:none;position:fixed;z-index:99999;max-width:300px;background:rgba(20,20,40,0.97);border:1px solid rgba(255,215,0,0.4);border-radius:8px;padding:10px;color:#fff;pointer-events:none;box-shadow:0 4px 16px rgba(0,0,0,0.5);"></div>
 
-        <script defer src="app-effects.js?v=s1.0.152"></script>
+        <script defer src="app-effects.js?v=__dt__"></script>
 
         <!-- 固定在右上角的按钮 -->
         <div class="sticky-buttons" style="position:fixed;top:12px;right:12px;z-index:9999;display:flex;flex-direction:column;align-items:flex-end;gap:5px;"><div style="display:flex;gap:5px;">
@@ -915,7 +919,7 @@
             </div>
         </div>
 
-        <script defer src="app-features.js?v=s1.0.204"></script>
+        <script defer src="app-features.js?v=__dt__"></script>
 
         <!-- 项目操作菜单（折叠） -->
         <div id="projectMenu" style="display:none;position:fixed;z-index:9998;background:rgba(40,40,70,0.98);border:1px solid rgba(255,215,0,0.3);border-radius:10px;padding:10px;min-width:200px;max-height:85vh;overflow-y:auto;box-shadow:0 4px 15px rgba(0,0,0,0.4);">
@@ -934,13 +938,13 @@
         </div>
 
         <!-- APP本地功能脚本（网页版不会执行任何代码，isTauriApp判断在文件内部） -->
-        <script defer src="app-local2.js?v=s1.0.420"></script>
+        <script defer src="app-local2.js?v=__dt__"></script>
         <!-- 阵容识别模块（独立入口 + 灌入脚本生成） -->
         
         <!-- 网页版皮肤系统（仅非 Tauri 浏览器执行；Tauri 由 app-local.js 负责，文件内部自动跳过） -->
-        <script defer src="skins-web.js?v=s1.0.157"></script>
+        <script defer src="skins-web.js?v=__dt__"></script>
 
-        <script defer src="app-picker.js?v=s1.0.153"></script>
+        <script defer src="app-picker.js?v=__dt__"></script>
 
         <!-- 记事本悬浮面板 -->
         <div id="notepadPanel" style="display:none;position:fixed;top:80px;right:20px;width:400px;height:350px;z-index:9997;background:rgba(30,30,60,0.95);border:2px solid rgba(121,134,203,0.6);border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.5);overflow:auto;resize:both;min-width:280px;min-height:250px;">
@@ -1552,11 +1556,11 @@
             </div>
         </div>
 
-    <script defer src="color-picker.js?v=s1.0.180"></script>
-    <script defer src="app-damagecalc.js?v=s1.0.192"></script>
-    <script defer src="gh-gist.js?v=s1.0.130"></script>
-    <script defer src="app-core.js?v=s1.0.466"></script>
-    <script defer src="admin-ctl.js?v=s1.0.459"></script>
+    <script defer src="color-picker.js?v=__dt__"></script>
+    <script defer src="app-damagecalc.js?v=__dt__"></script>
+    <script defer src="gh-gist.js?v=__dt__"></script>
+    <script defer src="app-core.js?v=__dt__"></script>
+    <script defer src="admin-ctl.js?v=__dt__"></script>
 
     <!-- 模态框：创建分类 -->
     <div id="createCategoryModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;justify-content:center;align-items:center;">
@@ -2642,6 +2646,18 @@
             </div>
             <!-- 前端部署时间标记（铁律要求，CI 自动注入部署时间）：statsBar 内绝对定位贴右、垂直居中 -->
             <span id="versionTag" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;user-select:none;color:rgba(255,255,255,0.1);font-size:0.66rem;padding:1px 6px;opacity:0.5;" ondblclick="if(typeof forceRefreshLatest==='function'){forceRefreshLatest();}">s20260829-1604 · s1.0.466</span>
+            <script>
+                // 🔴 版本标签跟随部署时间戳：避免与 __DEPLOY_TAG 不同步（CI 注入的小版本号 s1.0.xxx 保留原样）
+                (function () {
+                    try {
+                        var tag = document.getElementById('versionTag');
+                        if (tag && window.__DEPLOY_TAG) {
+                            var parts = tag.textContent.split(' · ');
+                            if (parts.length >= 1) tag.textContent = window.__DEPLOY_TAG + (parts[1] ? ' · ' + parts[1] : '');
+                        }
+                    } catch (e) {}
+                })();
+            </script>
             <span id="appUpdateBadge" style="display:none;position:absolute;right:150px;top:50%;transform:translateY(-50%);cursor:pointer;user-select:none;color:#4caf50;font-size:0.66rem;padding:1px 8px;background:rgba(76,175,80,0.15);border:1px solid rgba(76,175,80,0.4);border-radius:10px;white-space:nowrap;">🟢 有新版本</span>
             <div class="version-tooltip">版本 s20260826-0700 · s1.0.313（双击强制刷新）</div>
             <script>(function(){var v=document.getElementById('versionTag');var t=document.querySelector('#versionTag ~ .version-tooltip');if(v&&t)t.textContent='版本 '+v.textContent+'（双击强制刷新）';})();</script>
@@ -2680,7 +2696,7 @@
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" style="position:fixed;right:30px;bottom:113px;z-index:99998;display:none;align-items:center;gap:4px;background:linear-gradient(135deg,#00838f,#006064);color:#fff;border:none;padding:6px 12px;border-radius:20px;cursor:pointer;font-size:0.75rem;box-shadow:0 2px 8px rgba(0,0,0,0.4);">💻日志</button>
 
   <!-- 皮肤制作工具改为按需懒加载：首次打开皮肤 Tab 时由 loader.js 拉取 app-skinmaker.js -->
-  <script src="loader.js?v=s1.0.130"></script>
+  <script src="loader.js?v=__dt__"></script>
 
         <!-- 需求墙备份中心（合并：定期备份 + 还原 + 紧急救回） -->
         <div id="adminPageWallBackup" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:99990;overflow-y:auto;">
@@ -2756,5 +2772,19 @@
                 </div>
             </div>
         </div>
+    <!-- 🔴 部署时间戳回填：把全站 ?v=__dt__ 占位替换为真实 __DEPLOY_TAG，
+         保证每次部署（改 __DEPLOY_TAG 一处）所有脚本/样式缓存键自动失效、必拉新文件。
+         内联非-defer 脚本，在浏览器发起 defer 脚本请求前执行完毕，时机正确。 -->
+    <script>
+        (function () {
+            try {
+                var tag = window.__DEPLOY_TAG || 's20260829-1604';
+                document.querySelectorAll('script[src*="?v=__dt__"], link[href*="?v=__dt__"]').forEach(function (el) {
+                    if (el.src) el.src = el.src.replace('?v=__dt__', '?v=' + tag);
+                    else if (el.href) el.href = el.href.replace('?v=__dt__', '?v=' + tag);
+                });
+            } catch (e) { console.warn('[DEPLOY] cache-busting 回填失败:', e); }
+        })();
+    </script>
 </body>
 </html>
