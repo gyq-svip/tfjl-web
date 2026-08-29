@@ -58,8 +58,8 @@
 //      版本号采用 CI 的 `s1.0.337` + `s20260826-1804`。线上立刻能看到「前台只弹气泡，挂托盘才静默升」正确行为。
 // ============================================================
 
-const CACHE_VERSION = 's1.0.474';
-const DEPLOY_TAG = 's20260829-1900';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
+const CACHE_VERSION = 's1.0.475';
+const DEPLOY_TAG = 's20260829-1803';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」
 >>>>>>> 31eb436 (fix: 根治 App 内存暴涨到 4G 的多处泄漏)
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
