@@ -408,16 +408,13 @@ if (true) {
                 invokeFn = window.__TAURI__.core.invoke.bind(window.__TAURI__.core);
             }
             if (!invokeFn) {
-                console.error('[APP] 未找到 invoke 函数。__TAURI_INTERNALS__:', !!window.__TAURI_INTERNALS__, 
-                    'keys:', window.__TAURI_INTERNALS__ ? Object.keys(window.__TAURI_INTERNALS__) : 'N/A');
-                alert('[调试] 未找到Tauri invoke函数\n__TAURI_INTERNALS__存在: ' + !!window.__TAURI_INTERNALS__ + 
-                    '\nkeys: ' + (window.__TAURI_INTERNALS__ ? Object.keys(window.__TAURI_INTERNALS__).join(', ') : 'N/A'));
+                // 网页版无 Tauri 是预期行为，静默降级；桌面端若也找不到，看控制台排查
+                console.warn('[APP] 未找到 Tauri invoke 函数（网页版正常，桌面端异常）。__TAURI_INTERNALS__:', !!window.__TAURI_INTERNALS__);
                 return null;
             }
             return await invokeFn(cmd, args);
         } catch (e) {
             console.error('[APP] invoke 失败:', cmd, e);
-            alert('[调试] invoke调用失败: ' + cmd + '\n错误: ' + (e.message || e));
             return null;
         }
     }
