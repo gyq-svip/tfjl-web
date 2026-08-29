@@ -4476,6 +4476,9 @@ if (true) {
         const cached = await _idbGet(key);
         if (cached && cached.blob) {
             try {
+                // 🔴 2026-08-30 关键内存修复：原代码每次命中 IDB 都 createObjectURL 生成新 blob URL，
+                // 旧的从不 revoke → 每切一次皮泄漏一个 blob → 内存暴涨+GC 卡顿。
+                // 改为：先查 _skinBlobUrlCache（已缓存则直接复用），未命中才创建并缓存。
                 const blobUrl = URL.createObjectURL(cached.blob);
                 _skinBlobCacheSet(remoteUrl, blobUrl);
                 return blobUrl;
