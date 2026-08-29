@@ -434,7 +434,12 @@ if (true) {
         try {
             return await invokeFn('read_text_file_auto', { filePath });
         } catch (e) {
-            console.error('[APP] read_text_file_auto 失败:', filePath, e);
+            // 文件不存在(os error 2 / No such file)属预期情况（如首次启动/未设过数据目录的 tfjl_datadir.json），
+            // 静默降级为 debug，避免误导用户以为是错误（调用方均有默认路径兜底）。
+            var em = (e && (e.message || e)) + '';
+            var notFound = /os error 2|No such file|not found|ENOENT/i.test(em);
+            if (notFound) console.debug('[APP] read_text_file_auto 跳过(文件不存在，走默认):', filePath);
+            else console.error('[APP] read_text_file_auto 失败:', filePath, e);
             return null;
         }
     }
