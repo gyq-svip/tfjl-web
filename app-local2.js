@@ -4382,12 +4382,16 @@ if (true) {
         if (prev && prev !== blobUrl && prev.indexOf('blob:') === 0) { try { URL.revokeObjectURL(prev); } catch (e) {} }
         _skinBlobUrlCache.set(url, blobUrl);
         // 超过上限 → 淘汰最旧（Map 迭代顺序=插入顺序，最旧在前面）
+        // 🔴 2026-08-30 关键修复：淘汰时【不再 revoke】blob URL，与本地皮肤缓存
+        //    （_skinUrlEvictIfNeeded）保持一致。
+        //    原因：被淘汰的 blob 极可能仍被页面 <img>（阵容槽/卡池）引用，revoke 之后
+        //    <img> 加载失败 → 日志反复出现 'Failed to load skin image: blob:xxx'
+        //    （实测同一 blob 上一秒 loaded OK、下一秒 Failed，就是这个原因）。
+        //    淘汰只删 Map 引用，blob 由 <img> 持有保持存活；<img> 移除后浏览器自动回收。
         while (_skinBlobUrlCache.size > _SKIN_BLOB_CACHE_MAX) {
             const oldestKey = _skinBlobUrlCache.keys().next().value;
             if (oldestKey === undefined) break;
-            const oldUrl = _skinBlobUrlCache.get(oldestKey);
             _skinBlobUrlCache.delete(oldestKey);
-            if (oldUrl && oldUrl.indexOf('blob:') === 0) { try { URL.revokeObjectURL(oldUrl); } catch (e) {} }
         }
     }
     async function _getCachedSkinUrl(remoteUrl) {
