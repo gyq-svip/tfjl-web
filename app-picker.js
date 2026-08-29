@@ -398,20 +398,34 @@
                 //   · 网页版隐藏/最小化 → 静默升级
                 //   · 网页版前台 → 不弹气泡、不升级，切后台时静默升
                 if (event.data && event.data.type === 'FORCE_RELOAD') {
-                    // 🔴 2026-08-27 改：强制更新总开关「只管自动升级，不管气泡」。
-                    //   · 开关开 → 后台/托盘静默升、前台弹气泡（原有逻辑）。
-                    //   · 开关关 → 仍然弹气泡提示用户，但绝不自动升级（无论前后台，必须用户手动点）。
-                    // 因此开关关时不再 return 忽略，而是走弹气泡分支。
-                    // 🔴 优选 SW 消息携带的 auto 字段（SW 实时读 Gist 开关，比页面侧 window.__diagForceReload 更准更及时），
-                    //   缺省才退回页面本地开关状态（兼容老 SW 不发 auto 字段的情况）。收到消息即决策，不依赖页面开关是否就绪。
-                    const forceAuto = (event.data && typeof event.data.auto === 'boolean')
-                        ? event.data.auto
+                    // 🔴 2026-08-30 关键修复：FORCE_RELOAD 来自 SW 轮询，SW 自身 CACHE_VERSION 可能落后于页面实际版本
+                    //   （networkFirst 已让页面拿到最新 HTML/JS）。先核实远端版本号是否真比当前页面新，
+                    //   如果页面已是最新 → 直接忽略，不弹气泡、不升级。这是「已是最新版还反复弹气泡」的根因。
+                    const _latest = event.data.latest || '';
+                    const _tagEl = document.getElementById('versionTag');
+                    const _curTxt = _tagEl ? _tagEl.textContent.replace('●', '').trim() : '';
+                    const _curBase = _curTxt.split(' · ')[0].trim();
+                    // 先用 SW 消息携带的 latest 做快速比对（提取日期部分）
+                    if (_latest && _curBase) {
+                        // latest 格式如 s1.0.180，curBase 格式如 s20260820-37
+                        // 无法直接比，用远端版本核实函数异步确认；先同步拦截避免重复弹
+                    }
+                    // 异步核实远端版本，仅在确认有新版本时才走升级/弹气泡逻辑
+                    _verifyNewVersion().then(() => {
+                        if (!window.__tfjlHasNewVersion) {
+                            console.log('[更新] 收到 FORCE_RELOAD 但页面已是最新版 → 忽略');
+                            return;
+                        }
+                        _handleForceReload(event.data);
+                    });
+                    return;
+                }
+                // （原 FORCE_RELOAD 内联逻辑提取为函数，仅核实通过后调用）
+                function _handleForceReload(data) {
+                    const forceAuto = (data && typeof data.auto === 'boolean')
+                        ? data.auto
                         : !!window.__diagForceReload;
                     const isTauri = !!(window.__TAURI_INTERNALS__ || window.__TAURI__ || navigator.userAgent.indexOf('Tauri') >= 0);
-                    // 🔴 APP 只有「真正挂托盘(点 X,__tfjlInTray=true)」才算后台可静默升级。
-                    // 仅仅被别的窗口全屏盖住 / 失焦 / 普通最小化(未挂托盘) → 一律视为前台，坚决不自动升级，
-                    // 最多弹气泡提示（符合用户要求：打开界面就坚决不升级，只有挂托盘才静默升）。
-                    // 注意：不能用 document.hidden 判断 APP 后台，否则「被全屏应用盖住」可能被误判为后台而强刷丢数据。
                     const inTray = isTauri && window.__tfjlInTray;
                     const inBackground = isTauri ? inTray : document.hidden;
 

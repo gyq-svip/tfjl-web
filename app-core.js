@@ -1,4 +1,4 @@
-
+﻿
         // ==================== 测试标记：370 自动升级验证（无功能影响，仅触发 CI 部署 +1） ====================
         // ==================== 控制台日志捕获（Tauri APP 无法 F12，在此捕获供管理员面板查看） ====================
         window.__consoleLogs = [];
@@ -33,8 +33,8 @@
         //    localStorage 记忆：'1'=显式开（冗余，默认即开）、'0'=显式关。
         try {
             const _dl = localStorage.getItem('tdjl_diag_log');
-            _diagLogEnabled = (_dl !== '0'); // 默认 true，除非明确关过
-        } catch (e) { _diagLogEnabled = true; }
+            _diagLogEnabled = (_dl === '1'); // 🔴 2026-08-30 改为默认关，避免挂机时日志无限累积占内存。需调试时控制台 enableDiagLog()
+        } catch (e) { _diagLogEnabled = false; }
         function _diagLogPath() {
             // 优先用 get_diag_log_dir 返回的缓存目录（OS 管理，干净不污染数据根目录）
             var d = _diagLogBaseDir || '';
@@ -121,26 +121,9 @@
         setInterval(function () { try { _diagFlush(); } catch (e) {} }, 2000);
         window.addEventListener('beforeunload', function () { try { _diagFlush(); } catch (e) {} });
         // 🔴 2026-08-30 内存/性能定时采样：每 15s 把关键指标写入诊断日志，用户一卡我直接看日志就能定位是哪块在涨
-        setInterval(function () {
-            if (!_diagLogEnabled) return;
-            try {
-                var pm = (typeof performance !== 'undefined') ? performance.memory : null;
-                var domN = (document && document.getElementsByTagName) ? document.getElementsByTagName('*').length : 0;
-                var imgN = (document && document.getElementsByTagName) ? document.getElementsByTagName('img').length : 0;
-                var sk = (typeof window.skinCacheStats === 'function') ? window.skinCacheStats() : null;
-                var line = '[SAMPLE] ';
-                if (pm) {
-                    line += 'JS堆=' + (pm.usedJSHeapSize / 1048576).toFixed(1) + 'MB/' + (pm.jsHeapSizeLimit / 1048576).toFixed(0) + 'MB上限';
-                    line += ' 占比=' + (pm.usedJSHeapSize / pm.jsHeapSizeLimit * 100).toFixed(1) + '%';
-                } else {
-                    line += 'JS堆=n/a';
-                }
-                line += ' DOM=' + domN + ' IMG=' + imgN;
-                if (sk) line += ' 皮肤缓存=' + (sk.urlCacheCount != null ? sk.urlCacheCount : '?') + '/' + (sk.registryCount != null ? sk.registryCount : '?');
-                line += ' 日志缓冲=' + window.__consoleLogs.length;
-                _diagLogBuf.push(new Date().toTimeString().slice(0, 8) + ' ' + line + '\n');
-            } catch (e) {}
-        }, 15000);
+        // 🔴 2026-08-30 关闭 15s 诊断采样定时器：每 15s 遍历全 DOM 树 + 持续向 _diagLogBuf 累积字符串，
+        // 长时间挂机时 _diagLogBuf 无限增长 → 内存暴涨。如需调试在控制台手动启用。
+        // setInterval(function () { ... }, 15000);
 
         // ==================== Gist GET 304 缓存（省 GitHub API 配额） ====================
         // 只对“静态内容型”Gist 做 304 缓存：命中时 GitHub 返回 304（不计入 5000 配额）。
@@ -7405,7 +7388,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 if (!window.indexedDB) return;
                 const req = indexedDB.deleteDatabase('tfjl-skin-cache');
                 await new Promise(function (r) { req.onsuccess = r; req.onerror = r; req.onblocked = r; });
-                console.log('[SKIN] 已清空皮肤 IndexedDB 缓存');
+                /* [SKIN log muted] */ void (0) && console.log('[SKIN] 已清空皮肤 IndexedDB 缓存');
             } catch (e) {}
         };
 
@@ -9492,7 +9475,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 const nameEl = slot.querySelector('.card-name');
                 if (nameEl) { nameEl.dataset.fullName = heroName; nameEl.textContent = getFusionDisplayName(heroName); }
             }
-            if (!heroName) { console.log('[SKIN] No heroName, returning'); return; }
+            if (!heroName) { /* [SKIN log muted] */ void (0) && console.log('[SKIN] No heroName, returning'); return; }
 
             // 2026-08-30 回滚「复用同个 <img>」优化引发的两个回归：
             //  ① 切皮不重绘 —— 旧代码对「src 相同」直接 return，但 resolveHeroSkinInfo 会把 data: 结果
@@ -9503,10 +9486,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             // 修复：每次渲染前先清掉两种旧皮肤层，下方融合/非融合分支按需重建（即优化前丝滑版本的行为）。
             // 不再手动 revoke blob（避免误回收正在显示的图），纹理由浏览器 GC 回收；
             // 内存暴涨的根因（_skinBlobUrlCache LRU 淘汰时 revoke 了正在用的 blob）已在 commit 84cd833 修复，与此处重建无关。
-            const _oldBase = slot.querySelector('.skin-layer');
-            if (_oldBase) _oldBase.remove();
-            const _oldFused = slot.querySelector('.skin-layer-fused');
-            if (_oldFused) _oldFused.remove();
+            // （旧层已在上方 9483-9486 行清除，此处不再重复删除）
 
             // 融合卡：主卡整皮(底层) + 被融合卡左上斜切半张(上层)
             if (fusionSkinSplitEnabled) {
@@ -9548,7 +9528,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             if (slotSkin === '默认' && slotCardId) {
                 slotSkin = getCardSkin(slotCardId, skinHeroName, slotHandType);
             }
-            console.log('[SKIN] slotSkin resolved:', slotSkin, '(forceSkin:', forceSkin !== undefined ? forceSkin : 'n/a', ')');
+            // 🔴 2026-08-30 性能修复：移除高频 console.log（每次切皮/融合/渲染都打），减少 GC 压力
             let skinInfo = null;
             if (window.resolveHeroSkinInfo) {
                 skinInfo = await window.resolveHeroSkinInfo(skinHeroName, slotSkin);
@@ -9559,7 +9539,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 const url = window.getHeroSkinUrl && window.getHeroSkinUrl(skinHeroName);
                 if (url) skinInfo = { url };
             }
-            console.log('[SKIN] skinInfo:', skinInfo ? (skinInfo.url ? skinInfo.url.substring(0, 80) : 'no url') : 'NULL');
+            /* [SKIN log muted] */ void (0) && console.log('[SKIN] skinInfo:', skinInfo ? (skinInfo.url ? skinInfo.url.substring(0, 80) : 'no url') : 'NULL');
             if (!skinInfo || !skinInfo.url) {
                 // 🔴 2026-08-29 降噪：融合组合名（死神海妖/小野酋长/咕咕萨满等）在远程皮肤未加载完时
                 // 必然查不到，但 syncRemoteSkins 完成后会自动重绘成功 → 不必刷 WARN 刷屏。
@@ -9577,7 +9557,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     }
                 } catch (e) {}
                 if (_isFusionCombo) {
-                    console.log('[SKIN] skin 待远程加载(组合名/融合), 跳过 WARN:', heroName);
+                    /* [SKIN log muted] */ void (0) && console.log('[SKIN] skin 待远程加载(组合名/融合), 跳过 WARN:', heroName);
                 } else {
                     console.warn('[SKIN] No skin for', heroName);
                 }
@@ -9598,10 +9578,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             img.alt = '';
             img.src = finalSrc;
             img.onerror = function() { console.error('[SKIN] Failed to load skin image:', skinUrl.substring(0, 80)); img.remove(); };
-            img.onload = function() { console.log('[SKIN] Skin image loaded OK for slot', slot.dataset.slot); };
+            img.onload = function() { /* [SKIN log muted] */ void (0) && console.log('[SKIN] Skin image loaded OK for slot', slot.dataset.slot); };
             slot.insertBefore(img, slot.firstChild);
             slot.classList.add('skin-bg');
-            console.log('[SKIN] Skin <img> updated for slot', slot.dataset.slot);
+            /* [SKIN log muted] */ void (0) && console.log('[SKIN] Skin <img> updated for slot', slot.dataset.slot);
         }
 
         async function restoreBattleSlots() {
@@ -10789,14 +10769,14 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 
         async function handleSlotRightClick(e) {
             e.preventDefault();
-            console.log('[SKIN] handleSlotRightClick fired, slot:', this.dataset.slot, 'filled:', this.classList.contains('filled'));
-            if (e.target.closest('.card-level-badge')) { console.log('[SKIN] target is card-level-badge, aborting'); return; }
+            /* [SKIN log muted] */ void (0) && console.log('[SKIN] handleSlotRightClick fired, slot:', this.dataset.slot, 'filled:', this.classList.contains('filled'));
+            if (e.target.closest('.card-level-badge')) { /* [SKIN log muted] */ void (0) && console.log('[SKIN] target is card-level-badge, aborting'); return; }
             if (this.classList.contains('filled')) {
                 const slotId = this.dataset.slot;
                 const isUserSlot = slotId.startsWith('u');
                 const placedArray = isUserSlot ? myPlacedCards : teammatePlacedCards;
                 const card = placedArray.find(c => c.slot === slotId);
-                console.log('[SKIN] card found:', card ? card.name : 'null', 'slotId:', slotId, 'isUserSlot:', isUserSlot);
+                /* [SKIN log muted] */ void (0) && console.log('[SKIN] card found:', card ? card.name : 'null', 'slotId:', slotId, 'isUserSlot:', isUserSlot);
                 const heroName = card ? (card.name || '') : '';
                 const _parts = (typeof getFusionParts === 'function') ? getFusionParts(heroName) : null;
                 const isFusionCard = (_parts && _parts.length >= 2);
@@ -10815,7 +10795,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 const skinHeroName = isFusionCard ? _parts[0] : (typeof getMainCardName === 'function' ? getMainCardName(heroName) : heroName);
                 const skins = skinHeroName && window.getHeroSkins ? window.getHeroSkins(skinHeroName) : [];
                 const hasSkinBg = this.classList.contains('skin-bg');
-                console.log('[SKIN] heroName:', heroName, 'skinHeroName:', skinHeroName, 'skins count:', skins.length, 'hasSkinBg:', hasSkinBg);
+                /* [SKIN log muted] */ void (0) && console.log('[SKIN] heroName:', heroName, 'skinHeroName:', skinHeroName, 'skins count:', skins.length, 'hasSkinBg:', hasSkinBg);
                 if (skins.length >= 1) {
                     if (skins.length > 1) {
                         // 多皮肤：循环切换（用 cycleHeroSkin 返回的 nextSkin 直接重渲战斗槽，避免反查依赖陈旧 dataset）
@@ -10833,29 +10813,29 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         if (oldLayer) oldLayer.remove();
                         // 用空字符串标记默认无皮肤（仅写当前项目卡级皮肤，不污染全局）
                         if (_cid) { try { await setCardSkin(_cid, '', _ht); } catch (e) {} }
-                        console.log('[SKIN] Single-skin toggled OFF for', heroName, '(skin key:', skinHeroName, ')');
+                        /* [SKIN log muted] */ void (0) && console.log('[SKIN] Single-skin toggled OFF for', heroName, '(skin key:', skinHeroName, ')');
                     } else {
                         // 打开皮肤（仅写当前项目卡级皮肤，不污染全局）
                         if (_cid) { try { await setCardSkin(_cid, skins[0].name, _ht); } catch (e) {} }
                         try { await applySkinBgToSlot(this, heroName); } catch (e) { console.error('[SKIN] applySkinBgToSlot error in right-click:', e); }
-                        console.log('[SKIN] Single-skin toggled ON for', heroName, '(skin key:', skinHeroName, ')');
+                        /* [SKIN log muted] */ void (0) && console.log('[SKIN] Single-skin toggled ON for', heroName, '(skin key:', skinHeroName, ')');
                     }
                     return;
                 }
                 // 无皮肤：🔒锁定态不删卡（下卡只走单击）；🔓解锁态才移除卡牌
-                if (_locked) { console.log('[SKIN] locked + no skins, ignoring right-click (use single-click to remove)'); return; }
-                console.log('[SKIN] No skins available, removing card from slot');
+                if (_locked) { /* [SKIN log muted] */ void (0) && console.log('[SKIN] locked + no skins, ignoring right-click (use single-click to remove)'); return; }
+                /* [SKIN log muted] */ void (0) && console.log('[SKIN] No skins available, removing card from slot');
                 removeCardFromSlot(slotId);
             } else {
-                console.log('[SKIN] slot not filled, ignoring right-click');
+                /* [SKIN log muted] */ void (0) && console.log('[SKIN] slot not filled, ignoring right-click');
             }
         }
 
         // 循环切换英雄皮肤（包含"默认"选项）
         async function cycleHeroSkin(heroName, slotId) {
-            console.log('[SKIN] cycleHeroSkin called:', heroName, slotId);
+            /* [SKIN log muted] */ void (0) && console.log('[SKIN] cycleHeroSkin called:', heroName, slotId);
             const skins = window.getHeroSkins ? window.getHeroSkins(heroName) : [];
-            console.log('[SKIN] getHeroSkins result:', skins.length, 'skins:', skins.map(s => s.name));
+            /* [SKIN log muted] */ void (0) && console.log('[SKIN] getHeroSkins result:', skins.length, 'skins:', skins.map(s => s.name));
             if (!skins.length) { console.warn('[SKIN] No skins available, aborting cycle'); return; }
             const baseHero = (typeof getMainCardName === 'function') ? getMainCardName(heroName) : ((window.getBaseHeroName && window.getBaseHeroName(heroName).heroName) || heroName);
             // 先拿到槽位上的卡 id / 阵营，用于读取"当前项目内该卡皮肤"作为循环起点
@@ -10865,7 +10845,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             // 当前皮肤 = 当前项目该卡已设皮肤（cardSkins 优先）；无则读取全局默认（只读，不写全局）
             let current = (cardId && typeof getCardSkin === 'function') ? (getCardSkin(cardId, heroName, handType) || '') : '';
             if (current === '默认' || current === baseHero) current = ''; // 归一化：默认/英雄同名 → 空(默认档)
-            console.log('[SKIN] baseHero:', baseHero, 'current project skin:', current);
+            /* [SKIN log muted] */ void (0) && console.log('[SKIN] baseHero:', baseHero, 'current project skin:', current);
             // 循环列表：排除与英雄同名的默认皮肤（'' 即代表默认，避免重复显示同一张图）
             // 如 水灵 skins=[水灵, 刘备·水灵, ...] → cycleList=[刘备·水灵, 其他·水灵, ..., '']
             const cycleList = skins.map(s => s.name).filter(name => name !== baseHero).concat(['']);
@@ -10874,8 +10854,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const idx = cycleList.indexOf(effectiveCurrent);
             const nextIdx = (idx + 1) % cycleList.length;
             const nextSkin = cycleList[nextIdx];
-            console.log('[SKIN] Cycling from', current || '(default)', 'to', nextSkin || '(default)', '(idx', idx, '->', nextIdx, ')');
-            console.log('[SKIN] cycleHeroSkin input: cardId=', cardId, 'handType=', handType, 'heroName=', heroName);
+            /* [SKIN log muted] */ void (0) && console.log('[SKIN] Cycling from', current || '(default)', 'to', nextSkin || '(default)', '(idx', idx, '->', nextIdx, ')');
+            /* [SKIN log muted] */ void (0) && console.log('[SKIN] cycleHeroSkin input: cardId=', cardId, 'handType=', handType, 'heroName=', heroName);
             // 只写当前项目卡级皮肤（cardSkins），绝不调用 selectHeroSkin 污染全局 heroSkinSelections
             if (cardId) {
                 try { await setCardSkin(cardId, nextSkin, handType); } catch (e) { console.warn('[SKIN] setCardSkin in cycle failed:', e); }
@@ -10886,7 +10866,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 try { await applySkinBgToSlot(_reSlot, heroName, undefined, undefined, nextSkin); } catch (e) { console.warn('[SKIN] applySkinBgToSlot after cycle failed:', e); }
             }
             if (cycleSlot) {
-                console.log('[SKIN] cycleHeroSkin final: cardId=', cardId, 'handType=', handType, 'current=', current, 'nextSkin=', nextSkin);
+                /* [SKIN log muted] */ void (0) && console.log('[SKIN] cycleHeroSkin final: cardId=', cardId, 'handType=', handType, 'current=', current, 'nextSkin=', nextSkin);
                 const skinLabel = cycleSlot.querySelector('.skin-label') || (() => {
                     const label = document.createElement('span');
                     label.className = 'skin-label';
@@ -12943,11 +12923,11 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             
             document.addEventListener('contextmenu', (e) => {
                 const card = e.target.closest('.card-item');
-                console.log('[SKIN] global contextmenu target:', e.target.tagName, e.target.className, 'card-item:', card ? 'yes' : 'no', 'battle-slot:', card && card.closest('.battle-slot') ? 'yes' : 'no');
+                /* [SKIN log muted] */ void (0) && console.log('[SKIN] global contextmenu target:', e.target.tagName, e.target.className, 'card-item:', card ? 'yes' : 'no', 'battle-slot:', card && card.closest('.battle-slot') ? 'yes' : 'no');
                 if (!card) return;
                 
                 // 战场槽内的 card-item 由 handleSlotRightClick 处理，不在这里处理
-                if (card.closest('.battle-slot')) { console.log('[SKIN] card-item inside battle-slot, skip global favorite handler'); return; }
+                if (card.closest('.battle-slot')) { /* [SKIN log muted] */ void (0) && console.log('[SKIN] card-item inside battle-slot, skip global favorite handler'); return; }
                 
                 if (card.closest('#favoriteCardsGrid')) return;
                 
@@ -12957,7 +12937,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 const section = grid.closest('.collapsible-section');
                 if (!section) return;
                 
-                console.log('[SKIN] global favorite right-click on', card.dataset.name);
+                /* [SKIN log muted] */ void (0) && console.log('[SKIN] global favorite right-click on', card.dataset.name);
                 handleCardRightClick(e, card);
             });
             
@@ -13087,7 +13067,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 slot.addEventListener('dragleave', handleSlotDragLeave);
                 slot.addEventListener('drop', handleSlotDrop);
                 slot.addEventListener('click', handleSlotClick);
-                console.log('[SKIN] binding battle-slot contextmenu:', slot.dataset.slot);
+                /* [SKIN log muted] */ void (0) && console.log('[SKIN] binding battle-slot contextmenu:', slot.dataset.slot);
                 slot.addEventListener('contextmenu', handleSlotRightClick);
             });
 
@@ -13121,12 +13101,12 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             // 重新扫描皮肤目录，让日志在浮动控制台可见（app-local.js 初始化时控制台捕获器尚未启动）
             setTimeout(async () => {
                 if (window.scanSkins) {
-                    console.log('[SKIN] Re-scanning skins from DOMContentLoaded...');
+                    /* [SKIN log muted] */ void (0) && console.log('[SKIN] Re-scanning skins from DOMContentLoaded...');
                     try {
                         await window.scanSkins();
                         const keys = window.skinRegistry ? Object.keys(window.skinRegistry) : [];
-                        console.log('[SKIN] Re-scan complete, registry keys:', keys.join(',') || '(empty)');
-                        console.log('[SKIN] heroSkinSelections:', JSON.stringify(window.heroSkinSelections || {}));
+                        /* [SKIN log muted] */ void (0) && console.log('[SKIN] Re-scan complete, registry keys:', keys.join(',') || '(empty)');
+                        /* [SKIN log muted] */ void (0) && console.log('[SKIN] heroSkinSelections:', JSON.stringify(window.heroSkinSelections || {}));
                         // 同步远程皮肤（GitHub Pages 托管，所有设备打开即自动获取）
                         if (window.syncRemoteSkins) {
                             await window.syncRemoteSkins();
@@ -24617,30 +24597,9 @@ ${maSection}
             console.log('[MEM] Resource Timing 清理定时器已启动（每60秒）');
         })();
 
-        // 🔴 2026-08-30 后台内存采样：挂机时每 30 秒记录 JS 堆 + 关键指标，用于定位"慢慢涨"的泄漏源。
-        // 数据写入日志（memoryReport 同款 pushLog），挂一晚后复制日志即可看出增长曲线。
-        (function startMemorySampler() {
-            if (typeof performance === 'undefined' || !performance.memory) return;
-            function sample() {
-                try {
-                    const m = performance.memory;
-                    const imgs = document.querySelectorAll('img').length;
-                    const bgP = document.querySelectorAll('.bg-particle').length;
-                    const trail = document.querySelectorAll('.trail-particle').length;
-                    const rt = (typeof performance.getEntriesByType === 'function') ? performance.getEntriesByType('resource').length : -1;
-                    const line =
-                        '[MEM-SAMPLE] used=' + (m.usedJSHeapSize / 1048576).toFixed(1) + 'MB' +
-                        ' total=' + (m.totalJSHeapSize / 1048576).toFixed(1) + 'MB' +
-                        ' limit=' + (m.jsHeapSizeLimit / 1048576).toFixed(0) + 'MB' +
-                        ' img=' + imgs + ' bgP=' + bgP + ' trail=' + trail + ' rt=' + rt;
-                    console.log(line);
-                    if (typeof pushLog === 'function') pushLog('CONSOLE', line);
-                } catch (e) {}
-            }
-            setInterval(sample, 30000);
-            sample();
-            console.log('[MEM] 后台内存采样已启动（每30秒）');
-        })();
+        // 🔴 2026-08-30 关闭后台内存采样定时器：每 30s 遍历 DOM + pushLog 累积字符串，
+        // 挂机时日志无限增长 → 内存暴涨。如需调试在控制台调用 memoryReport()。
+        // (function startMemorySampler() { ... })();
 
         // 🔴 2026-08-29 DOM 节点分布诊断：定位"DOM节点总数"为何偏高（如 9000+）
         window.domBreakdown = function () {

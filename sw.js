@@ -162,6 +162,8 @@ self.addEventListener('install', (event) => {
                     // 新 SW 重新 register 时 active 为 null，若不发则页面回退到 HTML 写死的 fallback 225）
                     client.postMessage({ type: 'SW_VERSION', version: CACHE_VERSION, deployTag: DEPLOY_TAG });
                     // NEW_VERSION_READY 仅在有旧 SW 运行时提示（避免首次安装误弹气泡）
+                    // 🔴 2026-08-30 修复：不再无条件发 NEW_VERSION_READY，否则每次 SW 更新检查（即使同版本）
+                    //   都会弹气泡。页面侧 _verifyNewVersion 会核实远端版本号是否真比当前新。
                     if (self.registration && self.registration.active) {
                         client.postMessage({ type: 'NEW_VERSION_READY' });
                     }
@@ -360,9 +362,9 @@ function staleWhileRevalidate(request, cacheName) {
                                 statusText: networkResponse.statusText,
                                 headers: networkResponse.headers
                             }));
-                            self.clients.matchAll().then(clients => {
-                                clients.forEach(client => client.postMessage({ type: 'NEW_VERSION_READY' }));
-                            });
+                            // 🔴 2026-08-30 修复：图片/字体更新不再发 NEW_VERSION_READY，
+                            //   避免皮肤图片更新触发版本气泡反复弹出。只有 HTML/JS/CSS（networkFirst）
+                            //   的变化才需要提示用户刷新，图片静默更新即可。
                         }
                     }
                 }).catch(() => { /* 超时/失败：保留旧缓存，不影响页面 */ });
