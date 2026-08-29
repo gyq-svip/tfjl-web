@@ -269,13 +269,19 @@ if (true) {
         } else console.error('[数据存储] ❌ tfjl.dat 写入失败（目录可能不可写/权限不足）: ' + _getDatPath(_syncDir));
     }
 
+    let _lastFlushTs = 0;                       // 上次实际落盘时间（用于最短间隔节流）
+    const MIN_FLUSH_GAP_MS = 5 * 1000;          // 🔴 tfjl.dat 最短落盘间隔 5s：合并高频 setItem，杜绝每1秒写盘卡死
+
     function _scheduleFlush() {
         if (!_syncOk) return;
         // 恢复进行中：跳过本次排程，避免 flush 用"未恢复完的 _storeMap"覆盖磁盘真实数据；
         // 恢复结束后会主动补一次全量 flush，不会丢。
         if (_restoreLock) return;
         if (_flushTimer) clearTimeout(_flushTimer);
-        _flushTimer = setTimeout(() => _flushStore().catch(() => {}), 1000);
+        // 距上次落盘不足 5s → 拉到 5s 后再写（合并窗口内所有变更一次性落盘，减少 I/O）
+        const now = Date.now();
+        const delay = Math.max(1000, MIN_FLUSH_GAP_MS - (now - _lastFlushTs));
+        _flushTimer = setTimeout(() => { _lastFlushTs = Date.now(); _flushStore().catch(() => {}); }, delay);
     }
 
     // 拦截全局 Storage 写入——所有 localStorage 变更都触发统一存储刷新
@@ -321,8 +327,8 @@ if (true) {
     window.addEventListener('pagehide', () => {
         if (_flushTimer) { clearTimeout(_flushTimer); _flushTimer = null; }
         _flushStore().catch((e) => console.error('[数据存储] 卸载时刷盘失败:', e));
-        // 关闭前立即补一份自动备份（防"连续保存后马上关窗"丢 8 秒窗口内的变更）
-        _autoBackupNow(_syncDir).catch(() => {});
+        // 关闭前立即补一份自动备份（防"连续保存后马上关窗"丢窗口内的变更）；绕过节流，确保一定留一份
+        _autoBackupForceNow(_syncDir).catch(() => {});
     });
 
     async function initDataSync() {
@@ -577,25 +583,36 @@ if (true) {
         return (h >>> 0).toString(16);
     }
 
-    let _autoBackupTimer = null;          // 日常防抖定时器（变更后 8 秒）
-    let _autoBackupDirty = false;         // 等待期间又产生变更标志（避免防抖被反复重置唤醒）
+    let _autoBackupTimer = null;          // 预留（保留接口兼容，目前不再由 flush 驱动）
+    let _autoBackupPending = false;       // 数据已变更、待整备消费标志（消费后清除）
     let _autoBackupRunning = false;       // 正在写盘标志（防并发叠加）
     let _autoBackupInterval = null;       // 定时整备定时器（每 30 分钟兜底）
-    const AUTO_BACKUP_INTERVAL_MS = 30 * 60 * 1000; // 30 分钟
+    let _lastRealBackupTs = 0;            // 上次"实际写盘"备份的时间戳（用于最小间隔节流）
+    const AUTO_BACKUP_INTERVAL_MS = 30 * 60 * 1000; // 30 分钟（定时整备默认间隔）
+    const AUTO_BACKUP_MIN_GAP_MS = 5 * 60 * 1000;   // 🔴 最小备份间隔 5 分钟：杜绝"持续备份/打开即备"卡死循环
 
-    async function _scheduleAutoBackup(dir) {
+    // 由每次 tfjl.dat 落盘调用（第 268 行）。仅置"脏标记"，不直接触发备份，
+    // 避免"写盘→8秒后备份→又写盘→又备份"的永续循环（实测日志每 6~14s 一次，主线程 I/O 卡死）。
+    // 真正的备份由 30 分钟定时整备（_startAutoBackupTimer）或关窗兜底（pagehide）消费。
+    function _scheduleAutoBackup(dir) {
         if (!_autoBackupEnabled() || !dir) return;
-        // 🔴 防抖不重置：已在等待(8s)中就不清掉重设，否则启动阶段 tfjl.dat 被多次 flush 反复唤醒，
-        //    导致每 15~20s 就实备份一次（实测日志 19:14:38 / 19:14:54 两次间隔仅 16s，主线程 I/O 阻塞 → 卡顿）。
-        //    改为：仅在"尚无等待"时设一个 8s 定时器；等待期间再有变更只置脏标记，不重置计时。
-        if (_autoBackupTimer) { _autoBackupDirty = true; return; }
-        _autoBackupDirty = false;
-        _autoBackupTimer = setTimeout(async () => {
-            _autoBackupTimer = null;
-            try { await _doAutoBackup(dir); } catch (e) { console.error('[自动备份] 失败:', e); }
-            // 等待期间又产生过变更 → 再排一轮（仍走防抖，不会连续狂写）
-            if (_autoBackupDirty) _scheduleAutoBackup(dir);
-        }, 8000);
+        _autoBackupPending = true;
+    }
+
+    // 定时整备 调用：检查是否在最小间隔内，跳过则仅清脏标记
+    async function _autoBackupNow(dir) {
+        if (!_autoBackupEnabled() || !dir) return;
+        _autoBackupPending = false;
+        const now = Date.now();
+        if (now - _lastRealBackupTs < AUTO_BACKUP_MIN_GAP_MS) return; // 节流：距上次实备不足 5 分钟直接跳过
+        await _doAutoBackup(dir).catch(e => console.error('[自动备份] 兜底失败:', e));
+    }
+
+    // 关窗兜底 调用：绕过最小间隔节流，确保关闭前一定留一份（pagehide 已先落盘 tfjl.dat，此处仅冗余备份）
+    async function _autoBackupForceNow(dir) {
+        if (!_autoBackupEnabled() || !dir) return;
+        _autoBackupPending = false;
+        await _doAutoBackup(dir).catch(e => console.error('[自动备份] 关窗兜底失败:', e));
     }
 
     // 立即备份（跳过防抖，供关窗/隐藏/定时整备调用）；仍走 hash 增量判定，避免无变更时重复写
@@ -657,6 +674,7 @@ if (true) {
             if (!result.success) { console.error('[自动备份] 写文件失败:', result.error); return; }
 
             localStorage.setItem(AUTO_BACKUP_HASH_KEY, hash); // 记录已备份内容，下次变更才再备
+            _lastRealBackupTs = Date.now();                  // 🔴 更新最小间隔基准，杜绝连续狂备
             console.log('[自动备份] ✅ 已生成: ' + fileName + '（项目 ' + projects.length + ' 个）');
 
             // 3) 清理超出保留数量的旧自动备份（保留最新的 N 份）
