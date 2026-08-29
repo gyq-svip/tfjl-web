@@ -6678,11 +6678,12 @@ function applyFusionSkinToHandCard(card, mainUrl, fusedUrl, fusedIsBadge) {
             base.draggable = false;
             card.insertBefore(base, card.firstChild);
         }
-        const isDataOrBlob = mainUrl.startsWith('data:') || mainUrl.startsWith('blob:');
-        const next = isDataOrBlob ? mainUrl : (mainUrl + '?t=' + Date.now());
-        if (base.src !== next) {
-            const _ob = base.getAttribute('src');
-            if (_ob && _ob.indexOf('blob:') === 0) { try { URL.revokeObjectURL(_ob); } catch (e) {} }
+        // 🔴 2026-08-30 内存修复：禁止给 src 加 ?t= 时间戳。同一张皮肤 URL 必须保持不变，
+        //    让 WebView2 的「相同 src 不重复解码」优化生效，否则每次 reapply 都会生成新纹理堆积在 Renderer 进程。
+        const next = mainUrl;
+        const curSrc = base.getAttribute('src');
+        if (curSrc !== next) {
+            if (curSrc && curSrc.indexOf('blob:') === 0) { try { URL.revokeObjectURL(curSrc); } catch (e) {} }
             base.src = next;
         }
     } else if (base) {
@@ -6702,8 +6703,14 @@ function applyFusionSkinToHandCard(card, mainUrl, fusedUrl, fusedIsBadge) {
         overlay.style.cssText = fusedIsBadge
             ? 'position:absolute;inset:0;width:100%;height:100%;object-fit:contain;border-radius:inherit;z-index:1;pointer-events:none;'
             : 'position:absolute;left:2px;top:2px;width:' + FUSION_SIZE + ';height:auto;aspect-ratio:1/1;max-height:70%;object-fit:cover;box-sizing:border-box;border:3px solid #FFD700;clip-path:polygon(0 0,100% 0,100% 85%,85% 100%,0 100%);z-index:2;pointer-events:none;filter:drop-shadow(0 0 2px rgba(0,0,0,0.7));';
-        if (overlay.src !== fusedUrl) overlay.src = fusedUrl;
+        const oldFusedSrc = overlay.getAttribute('src');
+        if (oldFusedSrc !== fusedUrl) {
+            if (oldFusedSrc && oldFusedSrc.indexOf('blob:') === 0) { try { URL.revokeObjectURL(oldFusedSrc); } catch (e) {} }
+            overlay.src = fusedUrl;
+        }
     } else if (overlay && overlay.parentNode) {
+        const _ob = overlay.getAttribute('src');
+        if (_ob && _ob.indexOf('blob:') === 0) { try { URL.revokeObjectURL(_ob); } catch (e) {} }
         overlay.remove();
     }
 }
@@ -6726,11 +6733,17 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             base.alt = '';
             slot.insertBefore(base, slot.firstChild);
         }
-        const isDataOrBlob = mainUrl.startsWith('data:') || mainUrl.startsWith('blob:');
-        const next = isDataOrBlob ? mainUrl : (mainUrl + '?t=' + Date.now());
-        if (base.src !== next) base.src = next;
+        // 🔴 2026-08-30 内存修复：禁止给 src 加 ?t= 时间戳，避免同一张皮肤图被 WebView2 反复解码堆积纹理。
+        const next = mainUrl;
+        const curSrc = base.getAttribute('src');
+        if (curSrc !== next) {
+            if (curSrc && curSrc.indexOf('blob:') === 0) { try { URL.revokeObjectURL(curSrc); } catch (e) {} }
+            base.src = next;
+        }
         base.onerror = function () { /* 静默：与 applySkinBgToSlot 一致不报警 */ };
     } else if (base) {
+        const _ob = base.getAttribute('src');
+        if (_ob && _ob.indexOf('blob:') === 0) { try { URL.revokeObjectURL(_ob); } catch (e) {} }
         base.remove();
     }
 
@@ -9437,11 +9450,19 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             // 🔴 内存/性能修复：原每次调用都 console.log 一条（启动 3 遍 × 14 槽 = 42 条，切项目/切皮/融合反复打），
             //    高频触发 captureConsole 数组 splice 且驻留字符串。降级为仅 skinInfo 解析失败（异常路径）才打日志。
             // 正常路径静默，必要时用终端 dumpSkinRegistry() 查看。
-            // 移除旧皮肤层（含融合上层）和旧皮肤名
+            // 移除旧皮肤层（含融合上层）和旧皮肤名；remove 前先 revoke blob，避免旧纹理泄漏
             const oldLayer = slot.querySelector('.skin-layer');
-            if (oldLayer) oldLayer.remove();
+            if (oldLayer) {
+                const _oldSrc = oldLayer.getAttribute('src');
+                if (_oldSrc && _oldSrc.indexOf('blob:') === 0) { try { URL.revokeObjectURL(_oldSrc); } catch (e) {} }
+                oldLayer.remove();
+            }
             const oldFused = slot.querySelector('.skin-layer-fused');
-            if (oldFused) oldFused.remove();
+            if (oldFused) {
+                const _oldSrc = oldFused.getAttribute('src');
+                if (_oldSrc && _oldSrc.indexOf('blob:') === 0) { try { URL.revokeObjectURL(_oldSrc); } catch (e) {} }
+                oldFused.remove();
+            }
             const oldSkinName = slot.querySelector('.skin-name');
             if (oldSkinName) oldSkinName.remove();
             slot.classList.remove('skin-bg');

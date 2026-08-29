@@ -125,9 +125,13 @@
             }
         }
 
-        // 1️⃣ 跟随拖尾特效
+        // 1️⃣ 跟随拖尾特效（已节流：避免每次 mousemove 都创建 DOM，降低 GPU 合成层堆积）
         const trailColors = ['#ff0000', '#ff7f00', '#ffff00', '#00ff00', '#0000ff', '#4b0082', '#8b00ff'];
+        let _trailLastTime = 0;
         function handleTrailEffect(e) {
+            const now = Date.now();
+            if (now - _trailLastTime < 80) return; // 最多每 80ms 创建一个拖尾粒子
+            _trailLastTime = now;
             const particle = document.createElement('div');
             particle.className = 'trail-particle';
             particle.textContent = '♡';
@@ -155,7 +159,8 @@
             document.body.appendChild(backgroundContainer);
             document.body.classList.add('background-particle');
 
-            for (let i = 0; i < 30; i++) {
+            // 🔴 2026-08-30 内存/性能修复：背景粒子从 30 个降到 10 个，减少持续 GPU 合成层数量
+            for (let i = 0; i < 10; i++) {
                 const particle = document.createElement('div');
                 particle.className = 'bg-particle';
                 particle.textContent = '❤️';
