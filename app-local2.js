@@ -4585,20 +4585,21 @@ if (true) {
         //    反复重刷即持续泄漏数百 MB（实测开一会飙到 4G）。
         //    改为：有本地 path 就永远走本地磁盘读图（快、缓存进 skinImageUrlCache、无泄漏），远程 url 仅作兜底。
         if (entry.path) {
-            const dataUrl = await getSkinImageUrl(entry.path);
-            if (dataUrl) {
-                entry.url = dataUrl; entry.loaded = true;
-                const cachedUrl = await _getCachedSkinUrl(dataUrl);
-                return { url: cachedUrl, name: entry.name, path: entry.path };
-            }
-            // 🔴 兜底：本地图读取失败（Rust 读图命令 read_image_base64 未编译进当前 exe / fs ACL 受限
-            //    / .skin 解码异常等）时，回退 Tauri 原生资源协议 asset://，由 WebView 直接加载文件，
-            //    不依赖任何 Rust 读图命令。否则本地皮肤 resolve 恒为 null → 切皮不动、融合皮不显示。
-            //    这是「没优化之前切皮丝滑」的同源机制（旧版即用 convertFileSrc 直接给 <img> 赋 src）。
+            // 🔴 还原「优化前」切皮逻辑（用户明确要求）：优先用 Tauri 原生资源协议 asset://（convertFileSrc），
+            //    由 WebView 原生解码、浏览器按 URL 自动缓存，零 JS 解码/缩放开销 → 切皮丝滑（即优化前行为）。
+            //    Rust 读图（read_image_base64 → blob → 缩放）降为兜底，仅在 convertFileSrc 不可用（返回 null）时使用。
+            //    内存安全仍保留（blob 不 revoke 的修复 84cd833 / 4e5116d 不受影响，只是切皮主路径改回原生协议）。
             const nativeUrl = (typeof convertFileSrc === 'function') ? convertFileSrc(entry.path) : null;
             if (nativeUrl) {
                 entry.url = nativeUrl; entry.loaded = true;
                 const cachedUrl = await _getCachedSkinUrl(nativeUrl);
+                return { url: cachedUrl, name: entry.name, path: entry.path };
+            }
+            // 兜底：convertFileSrc 不可用（旧 exe 未挂载全局 Tauri / 协议受限）时，走 Rust 读图命令
+            const dataUrl = await getSkinImageUrl(entry.path);
+            if (dataUrl) {
+                entry.url = dataUrl; entry.loaded = true;
+                const cachedUrl = await _getCachedSkinUrl(dataUrl);
                 return { url: cachedUrl, name: entry.name, path: entry.path };
             }
         }
