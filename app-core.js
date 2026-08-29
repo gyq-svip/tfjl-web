@@ -9412,18 +9412,31 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 
             const skinUrl = skinInfo.url;
             const isDataOrBlob = skinUrl.startsWith('data:') || skinUrl.startsWith('blob:');
+            const finalSrc = isDataOrBlob ? skinUrl : (skinUrl + '?t=' + Date.now());
 
-            // 创建独立的 <img> 皮肤层
-            const img = document.createElement('img');
-            img.className = 'skin-layer';
-            img.src = isDataOrBlob ? skinUrl : (skinUrl + '?t=' + Date.now());
+            // 🔴 2026-08-29 内存修复：复用已有的 .skin-layer <img>，不要每次 reapply 都新建 + 重新解码。
+            // 旧逻辑每次都 createElement('img') + img.src=url → 旧 <img> 被 remove 后其 GPU 纹理异步回收、新 <img> 又解码一张，
+            // 频繁 reapply(启动6次/切项目/切皮)导致大量待回收纹理堆积 → 进程内存 3GB+ 暴涨。
+            // 改为：已存在则仅当 src 变化时才改 src(相同则完全跳过解码)；不存在才创建。
+            let img = slot.querySelector('.skin-layer');
+            if (img) {
+                if (img.getAttribute('src') === finalSrc) {
+                    slot.classList.add('skin-bg');
+                    return; // src 未变：跳过重建，避免重复解码纹理
+                }
+                img.src = finalSrc;
+            } else {
+                img = document.createElement('img');
+                img.className = 'skin-layer';
+                img.src = finalSrc;
+                slot.insertBefore(img, slot.firstChild);
+            }
             img.alt = '';
             img.onerror = function() { console.error('[SKIN] Failed to load skin image:', skinUrl.substring(0, 80)); img.remove(); };
             img.onload = function() { console.log('[SKIN] Skin image loaded OK for slot', slot.dataset.slot); };
-            slot.insertBefore(img, slot.firstChild);
             slot.classList.add('skin-bg');
 
-            console.log('[SKIN] Skin <img> inserted into slot', slot.dataset.slot);
+            console.log('[SKIN] Skin <img> updated for slot', slot.dataset.slot);
         }
 
         async function restoreBattleSlots() {
@@ -10347,12 +10360,36 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             await Promise.all(tasks);
         }
 
-        window.reapplyAllSkins = async function() {
+        // 🔴 2026-08-29 内存/性能修复：启动阶段 reapplyAllSkins 被调用多达 6 次（scanSkins/项目恢复/远端同步各触发），
+        // 每次都全量重绘 14 槽位 + 手牌。虽然 applySkinBgToSlot 已改为 src 相同跳过解码，但纯重绘本身仍有开销。
+        // 加 200ms 防抖：短时间内的多次调用合并成一次执行，复用同一个 Promise，调用方 await 仍能正确拿到结果。
+        var _reapplyTimer = null;
+        var _reapplyPromise = null;
+        function _doReapplyAllSkins() {
             console.log('[SKIN] reapplyAllSkins start');
-            await refreshAllBattleSlotSkins();
-            updateHandDisplay('my');
-            updateHandDisplay('teammate');
-            console.log('[SKIN] reapplyAllSkins done');
+            return (async function () {
+                await refreshAllBattleSlotSkins();
+                updateHandDisplay('my');
+                updateHandDisplay('teammate');
+            })().then(function () { console.log('[SKIN] reapplyAllSkins done'); });
+        }
+        window.reapplyAllSkins = async function() {
+            // 若上一次重绘的 Promise 仍在进行，直接复用（避免并发重入重复重绘）
+            if (_reapplyPromise) return _reapplyPromise;
+            if (_reapplyTimer) { clearTimeout(_reapplyTimer); }
+            _reapplyPromise = new Promise(function (resolve) {
+                _reapplyTimer = setTimeout(function () {
+                    _reapplyTimer = null;
+                    _doReapplyAllSkins().then(function () {
+                        _reapplyPromise = null;
+                        resolve();
+                    }, function () {
+                        _reapplyPromise = null;
+                        resolve();
+                    });
+                }, 200);
+            });
+            return _reapplyPromise;
         };
 
         // 战斗槽拖拽经过
