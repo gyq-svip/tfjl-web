@@ -887,18 +887,13 @@ if (true) {
         // 启动一律强制锁 'optimized'——跳过卡池/收藏区几百张皮肤背景图（GPU 内存大头），避免一开就爆 4G+ 卡死。
         // 直接写 localStorage 而非调 setPerfMode（避免初始化早期误触发重渲染）；后续记忆保险逻辑会按 optimized 重渲。
         try { localStorage.setItem('tdjl_perf_mode', 'optimized'); } catch (e) {}
-        // 把诊断日志目录指向 OS 缓存目录（get_diag_log_dir 返回的 .../tfjl_diag/），避免污染软件数据根目录。
-        // 回退：若 get_diag_log_dir 命令在旧 exe 不存在（APP 窗口加载远程网页但 Rust 未重打包），则落到系统 TEMP 目录，
-        // 绝不写回软件数据根目录（保持数据目录整洁）。
+        // 把诊断日志目录指向 D:\withfriends\塔防精灵助手数据\tfjl_temp\logs（用户指定，Tauri 已确认可正常读写）。
+        // 不再依赖 get_diag_log_dir 命令（旧 exe 可能未打包该命令）。
         try {
             if (typeof window.__setDiagLogDir === 'function') {
-                const dir = await tauriInvoke('get_diag_log_dir');
-                if (dir) window.__setDiagLogDir(dir);
+                window.__setDiagLogDir(softwareDataDir.replace(/[\\/]+$/, '') + '\\tfjl_temp\\logs');
             }
-        } catch (e) {
-            // 旧 exe 无此命令 → 用 TEMP 目录（app-core 的 _diagLogPath 默认回退即 TEMP）
-            if (typeof window.__setDiagLogDir === 'function') window.__setDiagLogDir('');
-        }
+        } catch (e) {}
         const btn = document.getElementById('appLocalSettingsBtn');
         // 按钮无条件显示（网页端/App端都显示）；真正的 Tauri 环境判断放在点击时（openAppLocalSettings 内）进行，
         // 避免 Tauri 全局注入晚于本函数执行导致误判为 false 而不显示按钮
@@ -4604,6 +4599,22 @@ if (true) {
             return 'ERR: ' + result.error;
         }
     }
+
+    // 🔴 2026-08-30 诊断日志落盘：由 app-core 的 _diagFlush 调用，把累积的日志内容整体写回当天文件。
+    //    写到 软件数据目录\tfjl_temp\logs\app-console-YYYY-MM-DD.log（用户指定目录，Tauri 已确认可写）。
+    //    复用已验证的 writeTextFileWithError（与 exportConsoleLogsToFile 同源），避免自己拼 invoke 参数名踩坑。
+    window.__writeDiagLogFile = function (content) {
+        if (!content) return;
+        if (!softwareDataDir) return;
+        const dir = softwareDataDir.replace(/[\\/]+$/, '') + '\\tfjl_temp\\logs';
+        const day = new Date().toISOString().slice(0, 10);
+        const filePath = dir + '\\app-console-' + day + '.log';
+        // 目录不存在则创建（writeTextFileWithError 内部可能不建目录，这里先确保）
+        try {
+            if (!pathExists(dir)) { const r = createDir(dir); if (!r || !r.success) return; }
+        } catch (e) {}
+        try { writeTextFileWithError(filePath, content); } catch (e) {}
+    };
 
     // ==================== 导出函数到全局 ====================
     window.maDirs = maDirs;
