@@ -3994,7 +3994,10 @@ if (true) {
                     }
                 }
                 for (const _v of _byName.values()) {
-                    skins.push({ name: _v.name, url: null, path: _v.path, loaded: false });
+                    // 本地扫描设 path（异步读图用）；同时给一个 Tauri 原生资源协议 url 兜底，
+                    // 万一 Rust 读图命令不可用也能直接显示，避免「切皮不动/融合皮不显示」。
+                    const _native = (typeof convertFileSrc === 'function') ? convertFileSrc(_v.path) : null;
+                    skins.push({ name: _v.name, url: _native, path: _v.path, loaded: false });
                 }
                 // 🔴 2026-08-29：不再逐英雄打印皮肤列表（119 个英雄 × 每次扫描 = 几百条日志，
                 //    既刷屏挤掉有效日志，也让 __consoleLogs 常驻大量字符串）。改为末尾汇总一条。
@@ -4583,6 +4586,16 @@ if (true) {
             if (dataUrl) {
                 entry.url = dataUrl; entry.loaded = true;
                 const cachedUrl = await _getCachedSkinUrl(dataUrl);
+                return { url: cachedUrl, name: entry.name, path: entry.path };
+            }
+            // 🔴 兜底：本地图读取失败（Rust 读图命令 read_image_base64 未编译进当前 exe / fs ACL 受限
+            //    / .skin 解码异常等）时，回退 Tauri 原生资源协议 asset://，由 WebView 直接加载文件，
+            //    不依赖任何 Rust 读图命令。否则本地皮肤 resolve 恒为 null → 切皮不动、融合皮不显示。
+            //    这是「没优化之前切皮丝滑」的同源机制（旧版即用 convertFileSrc 直接给 <img> 赋 src）。
+            const nativeUrl = (typeof convertFileSrc === 'function') ? convertFileSrc(entry.path) : null;
+            if (nativeUrl) {
+                entry.url = nativeUrl; entry.loaded = true;
+                const cachedUrl = await _getCachedSkinUrl(nativeUrl);
                 return { url: cachedUrl, name: entry.name, path: entry.path };
             }
         }
