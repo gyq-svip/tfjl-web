@@ -4604,8 +4604,30 @@ if (true) {
             const cachedUrl = await _getCachedSkinUrl(entry.url);
             return { url: cachedUrl, name: entry.name, path: entry.path };
         }
+        // 🔴 2026-08-30 诊断：皮肤 resolve 彻底失败，打印原因便于定位「没皮」根因
+        try {
+            const _native = (typeof convertFileSrc === 'function') ? convertFileSrc(entry.path) : 'convertFileSrc未定义';
+            console.warn('[SKIN] resolveHeroSkinInfo 失败 → hero=' + heroName + ' target=' + target
+                + ' | entry.path=' + (entry.path || '无')
+                + ' | entry.url=' + (entry.url || '无')
+                + ' | convertFileSrc尝试=' + _native);
+        } catch (e) {}
         return null;
     }
+    // 皮肤读取链路诊断（用户可在控制台执行：testSkin('火炮') 看某英雄皮肤能否正常 resolve）
+    window.testSkin = async function (hero) {
+        hero = hero || '火炮';
+        const reg = window.skinRegistry || {};
+        const names = Object.keys(reg);
+        console.log('[TEST] 皮肤库英雄数:', names.length, '| skinRoot:', (typeof getSkinRootDir === 'function') ? getSkinRootDir() : 'n/a');
+        const list = reg[hero];
+        if (!list) { console.warn('[TEST] 皮肤库里没有英雄「' + hero + '」，可用英雄示例:', names.slice(0, 10).join(', ')); return; }
+        console.log('[TEST] ' + hero + ' 皮肤列表(' + list.length + '):', list.map(s => s.name + (s.path ? '(有path)' : (s.url ? '(有url)' : '(空)'))).join(', '));
+        for (const s of list.slice(0, 3)) {
+            const info = await window.resolveHeroSkinInfo(hero, s.name);
+            console.log('[TEST] ' + hero + '/' + s.name + ' →', info ? (info.url ? info.url.substring(0, 60) + '...' : '有entry但url空') : 'NULL');
+        }
+    };
 
     async function resolveHeroSkinUrl(heroName, skinName) {
         const info = await resolveHeroSkinInfo(heroName, skinName);

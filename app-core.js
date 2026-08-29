@@ -846,6 +846,14 @@
                     const sig = idx && idx.forceReloadNow;
                     if (!sig || sig === '0' || sig === 0) return;
                     const sigStr = String(sig);
+                    // 🔴 2026-08-30 修复：指令值形如 "all@1767023456789"（带时间戳）。
+                    // 若指令下发超过 7 天仍残留在 gist（管理员未撤销），本地直接视作过期忽略，
+                    // 避免「gist 参数一直存在 → 每次启动都强制刷新/弹提示」。等于在客户端让该指令过期。
+                    const _tsMatch = sigStr.match(/@(\d+)$/);
+                    if (_tsMatch) {
+                        const _age = Date.now() - parseInt(_tsMatch[1], 10);
+                        if (_age > 7 * 24 * 3600 * 1000) { console.log('[强制刷新] 指令已超 7 天，本地忽略:', sigStr); return; }
+                    }
                     let executed = '';
                     try { executed = localStorage.getItem(_FR_KEY) || ''; } catch (e) {}
                     if (executed === sigStr) return; // 同一指令已执行过，跳过
@@ -859,6 +867,11 @@
                     location.reload(true);
                 } catch (e) { /* 读不到索引不影响心跳 */ }
             }
+            // 手动清除「强制刷新指令已执行」本地记录（若想重新接收某已过期/已忽略的指令可调用）
+            window.clearForceReloadAck = function () {
+                try { localStorage.removeItem(_FR_KEY); } catch (e) {}
+                console.log('[强制刷新] 已清除本地执行记录，下次轮询会重新评估');
+            };
             // 每 60 秒检查一次远程强刷指令（独立于 15 分钟心跳，保证信号≤1分钟触达）
             setInterval(_checkForceReloadNow, 60 * 1000);
             // 启动后尽快检查一次（若管理员刚在事故后下发指令，用户打开即刷）
