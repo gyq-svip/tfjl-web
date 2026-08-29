@@ -25095,7 +25095,23 @@ ${maSection}
         }
         window.notifyNewVersion = notifyNewVersion;
 
+        // 🔴 2026-08-30：版本更新彩球「本地静默开关」。用户被 NW_VERSION_READY / updatefound 高频弹彩球烦到，
+        // 加永久屏蔽（后台/托盘仍静默升级，不影响使用）。disableUpdateBanner() 关 / enableUpdateBanner() 开。
+        var _UPDATE_BANNER_KEY = 'tdjl_no_update_banner';
+        window.disableUpdateBanner = function () {
+            try { localStorage.setItem(_UPDATE_BANNER_KEY, '1'); } catch (e) {}
+            var b = document.getElementById('swUpdateBanner'); if (b) b.remove();
+            console.log('[更新] 版本彩球已永久关闭（后台仍静默升级）');
+        };
+        window.enableUpdateBanner = function () {
+            try { localStorage.removeItem(_UPDATE_BANNER_KEY); } catch (e) {}
+            console.log('[更新] 版本彩球已重新开启');
+        };
+        function _updateBannerBlocked() {
+            try { return localStorage.getItem(_UPDATE_BANNER_KEY) === '1'; } catch (e) { return false; }
+        }
         function showSwUpdateBanner() {
+            if (_updateBannerBlocked()) return; // 用户已永久关闭彩球
             if (document.getElementById('swUpdateBanner')) return;
             // 注入一次样式：左下角彩色光彩气泡（流动彩色 + 浮动 + 多层光晕呼吸），点击即更新
             if (!document.getElementById('swUpdateStyle')) {
