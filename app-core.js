@@ -6297,6 +6297,12 @@
                 return [cardName.substring(0, 2), cardName.substring(2)];
             }
             const heroSet = getAllHeroNames();
+            // 🔴 2026-08-30 加固：把「皮肤库已注册英雄名」也并入拆分用 heroSet。
+            //    原因：融合副英雄(海妖/萨满等)只要有皮肤就必然出现在 window.skinRegistry 的键里，
+            //    但未必都写进 DEFAULT_CARD_SKINS（卡牌描述表）。若只靠 getAllHeroNames，
+            //    这些副英雄缺失 → splitIntoHeroes 拆不出 2 段 → 融合卡被误判成单卡 →
+            //    既刷屏「No skin for 死神海妖」又导致对角融合皮不显示。并入皮肤库键即可根治。
+            try { if (window.skinRegistry) Object.keys(window.skinRegistry).forEach(function (n) { if (n) heroSet.add(n); }); } catch (e) {}
             // 🔴 2026-08-30 融合卡误判防御：名字能整体匹配「已知单卡」时，绝不硬拆成融合卡。
             //    真单卡（如 咬人娃娃）整名已录入 DEFAULT_CARD_SKINS / cloudCards（二者都进 heroSet），
             //    一旦在 heroSet 中即直接判单卡返回 null，避免 splitIntoHeroes 按前缀把它拆成 [咬人,娃娃] 误判融合。
