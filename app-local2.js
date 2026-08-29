@@ -4264,7 +4264,20 @@ if (true) {
                         catch (e2) { console.warn('[SKIN] 皮肤写盘失败(plugin:fs|write_file 也不允许 base64):', heroName, file, e2 && (e2.message || JSON.stringify(e2) || String(e2))); }
                     }
                     // 只有真正写盘成功才计入"新下载"，避免写失败却误报"有新皮肤"反复弹提示
-                    if (wrote) downloaded++;
+                    if (wrote) {
+                        downloaded++;
+                        // 🔴 2026-08-30：下载成功后立即更新 registry 的 path。
+                        //    否则 entry.path 始终为空，resolveHeroSkinInfo 会 fallback 到远程 url，
+                        //    导致每次 reapplyAllSkins 都走网络 fetch + 新 blob，内存持续增长。
+                        const regList = window.skinRegistry[heroName] || (window.skinRegistry[heroName] = []);
+                        const entry = regList.find(x => x.name === s.name);
+                        if (entry) {
+                            entry.path = skinPath;
+                            entry.loaded = true;
+                        } else {
+                            regList.push({ name: s.name, path: skinPath, url: url, loaded: true, remote: true });
+                        }
+                    }
                 } catch(e) {
                     console.warn('[SKIN] 下载皮肤失败:', heroName, file, e.message || e);
                 }
