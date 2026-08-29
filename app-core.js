@@ -6674,8 +6674,14 @@ function applyFusionSkinToHandCard(card, mainUrl, fusedUrl, fusedIsBadge) {
         }
         const isDataOrBlob = mainUrl.startsWith('data:') || mainUrl.startsWith('blob:');
         const next = isDataOrBlob ? mainUrl : (mainUrl + '?t=' + Date.now());
-        if (base.src !== next) base.src = next;
+        if (base.src !== next) {
+            const _ob = base.getAttribute('src');
+            if (_ob && _ob.indexOf('blob:') === 0) { try { URL.revokeObjectURL(_ob); } catch (e) {} }
+            base.src = next;
+        }
     } else if (base) {
+        const _ob = base.getAttribute('src');
+        if (_ob && _ob.indexOf('blob:') === 0) { try { URL.revokeObjectURL(_ob); } catch (e) {} }
         base.remove();
     }
 
@@ -6754,8 +6760,14 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         overlay.style.cssText = fusedIsBadge
             ? 'position:absolute;inset:3px;width:calc(100% - 6px);height:calc(100% - 6px);object-fit:contain;border-radius:5px;z-index:1;pointer-events:none;'
             : 'position:absolute;left:3px;top:3px;width:' + FUSION_SIZE + ';height:auto;aspect-ratio:1/1;max-height:70%;object-fit:cover;box-sizing:border-box;border:3px solid #FFD700;clip-path:polygon(0 0,100% 0,100% 85%,85% 100%,0 100%);z-index:2;cursor:pointer;filter:drop-shadow(0 0 2px rgba(0,0,0,0.7));';
-        if (overlay.src !== fusedUrl) overlay.src = fusedUrl;
+        if (overlay.src !== fusedUrl) {
+            const _of = overlay.getAttribute('src');
+            if (_of && _of.indexOf('blob:') === 0) { try { URL.revokeObjectURL(_of); } catch (e) {} }
+            overlay.src = fusedUrl;
+        }
     } else if (overlay && overlay.parentNode) {
+        const _of = overlay.getAttribute('src');
+        if (_of && _of.indexOf('blob:') === 0) { try { URL.revokeObjectURL(_of); } catch (e) {} }
         overlay.remove();
     }
     if (mainUrl || fusedUrl) slot.classList.add('skin-bg');
@@ -9399,7 +9411,11 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 layer.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit;z-index:0;pointer-events:none;';
                 card.insertBefore(layer, card.firstChild);
             }
-            if (layer.src !== url) layer.src = url;
+            if (layer.src !== url) {
+                const _old = layer.getAttribute('src');
+                if (_old && _old.indexOf('blob:') === 0) { try { URL.revokeObjectURL(_old); } catch (e) {} }
+                layer.src = url;
+            }
         }
         function removeSkinBgFromHandCard(card) {
             if (!card) return;
@@ -9502,7 +9518,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 
             const skinUrl = skinInfo.url;
             const isDataOrBlob = skinUrl.startsWith('data:') || skinUrl.startsWith('blob:');
-            const finalSrc = isDataOrBlob ? skinUrl : (skinUrl + '?t=' + Date.now());
+            // 🔴 2026-08-30 内存修复(根治 4.6G)：blob: URL 本身已是唯一标识，绝不能加 ?t= 时间戳！
+            //    旧逻辑给非 blob 的 data: 也加了 ?t=，但更关键的是：blob: 若每次 reapply 都重新生成（远程皮肤 LRU 淘汰后重新 fetch），
+            //    这里又会赋新 src。无论哪种情况，覆盖 img.src 前必须先 revoke 旧 blob，否则旧纹理常驻 GPU 永不回收。
+            const finalSrc = skinUrl; // 直接用原始 URL（blob:/data:/https: 都不加时间戳，保证「src 未变」优化始终生效）
 
             // 🔴 2026-08-29 内存修复：复用已有的 .skin-layer <img>，不要每次 reapply 都新建 + 重新解码。
             // 旧逻辑每次都 createElement('img') + img.src=url → 旧 <img> 被 remove 后其 GPU 纹理异步回收、新 <img> 又解码一张，
@@ -9514,6 +9533,9 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     slot.classList.add('skin-bg');
                     return; // src 未变：跳过重建，避免重复解码纹理
                 }
+                // 覆盖前释放旧 blob（避免旧纹理泄漏）。data:/https: 调 revoke 无害（内部判断前缀跳过）。
+                const _oldSrc = img.getAttribute('src');
+                if (_oldSrc && _oldSrc.indexOf('blob:') === 0) { try { URL.revokeObjectURL(_oldSrc); } catch (e) {} }
                 img.src = finalSrc;
             } else {
                 img = document.createElement('img');
