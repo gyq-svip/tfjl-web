@@ -124,6 +124,11 @@ description = "Allow Rust-side download of new version installer (web fetch is b
 commands.allow = ["download_installer"]
 
 [[permission]]
+identifier = "allow-publish-skins"
+description = "Allow packing skins/ and publishing the zip to Gitee release (admin one-click skin publish)"
+commands.allow = ["publish_skins"]
+
+[[permission]]
 identifier = "allow-register-heartbeat"
 description = "Allow frontend to register per-device Rust heartbeat ctx so tray/dormant App keeps online presence (s1.0.190 fix for P3 drop-off)"
 commands.allow = ["register_heartbeat"]

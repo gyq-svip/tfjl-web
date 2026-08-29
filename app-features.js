@@ -3371,7 +3371,9 @@
                 const invokeFn = window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke;
                 if (typeof invokeFn === 'function') {
                     try {
-                        await invokeFn('download_skins');
+                        // force=true：菜单主动点「更新皮肤资源」时强制重拉（跳过"已是最新"判断）
+                        const r = await invokeFn('download_skins', { force: true });
+                        if (r) console.log('[SKIN] ' + r);
                         if (typeof window.scanSkins === 'function') window.scanSkins();
                     } catch (e) {
                         console.warn('[SKIN] 本地下载失败，回退在线同步:', e);

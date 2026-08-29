@@ -527,6 +527,8 @@
                 <button id="smSave" style="flex:1 1 220px;min-width:200px;background:linear-gradient(135deg,#ffd700,#ff9800);border:none;color:#1a1a2e;border-radius:10px;padding:12px;cursor:pointer;font-size:0.9rem;font-weight:600;">💾 保存并登记到 skins 目录</button>
                 <button onclick="smCreateDefaultSkin()" title="兜底用：仅当该英雄一张皮肤都没有时才生成极简纯色块占位；若画布已上传真实立绘则直接存为默认皮肤；若已有皮肤会引导你去上传真实图，不再覆盖成纯色" style="flex:1 1 220px;min-width:200px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.3);color:#fff;border-radius:10px;padding:12px;cursor:pointer;font-size:0.9rem;font-weight:600;">➕ 新建英雄默认皮肤(兜底)</button>
                 <button id="smPush" style="flex:1 1 220px;min-width:200px;background:linear-gradient(135deg,#4caf50,#2e7d32);border:none;color:#fff;border-radius:10px;padding:12px;cursor:pointer;font-size:0.9rem;font-weight:600;">🚀 一键推送到 GitHub / Gitee</button>
+                <button id="smPublish" title="把 skins/ 内全部已登记皮肤打包上传到 Gitee 发行版（用户端从 Gitee 秒下，不走 GitHub 慢速源）；索引同步到 GitHub Pages。上传+校验成功后才更新索引，任一步失败都不影响现有用户" style="flex:1 1 240px;min-width:220px;background:linear-gradient(135deg,#9c27b0,#6a1b9a);border:none;color:#fff;border-radius:10px;padding:12px;cursor:pointer;font-size:0.9rem;font-weight:600;">📦 一键打包发布到 Gitee</button>
+                <input id="smGiteeToken" type="password" placeholder="Gitee Token（仅首次填，存本机不上传）" style="flex:1 1 200px;min-width:180px;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.25);background:rgba(255,255,255,0.08);color:#fff;font-size:0.82rem;">
                 <div id="smStatus" style="flex:2 1 300px;min-width:240px;font-size:0.78rem;color:rgba(255,255,255,0.7);line-height:1.5;white-space:pre-line;"></div>
               </div>
               <!-- 删除已入库皮肤（切错 / 切多的清理） -->

@@ -334,6 +334,28 @@
         smStatus('✅ 推送完成：\n'+res+'\n刷新 App 即可看到新皮肤。');
       }).catch(function(err){ smStatus('推送失败：'+smErrMsg(err),true); });
     }
+    // 一键打包发布：skins/ 全部已登记皮肤 -> Gitee 发行版（用户端秒下），索引 -> GitHub Pages
+    // 安全顺序由 publish_skins.ps1 保证：上传+校验成功后才更新索引，失败不影响现有用户
+    function smPublishSkins(){
+      var fn=smGetInvoke();
+      if(!fn){ smStatus('当前环境无法发布：需在桌面App内。',true); return; }
+      var tokEl=document.getElementById('smGiteeToken');
+      var tok=(tokEl&&tokEl.value?tokEl.value:'').trim();
+      if(tok){ try{ localStorage.setItem('tfjl_gitee_token', tok); }catch(e){} }
+      else { try{ tok=localStorage.getItem('tfjl_gitee_token')||''; }catch(e){} }
+      if(!tok){
+        smStatus('请先填写 Gitee Token（左侧密码框）。\n申请：Gitee → 设置 → 私人令牌 → 勾选 projects 权限。\n（也可改用系统环境变量 GITEE_TOKEN，脚本会自动读取）',true);
+        if(tokEl) tokEl.focus();
+        return;
+      }
+      if(!confirm('确认打包 skins/ 全部已登记皮肤并发布到 Gitee 发行版？\n\n流程：打包 → 上传 → 校验直链 → 更新索引 → 推送 Pages\n约 20MB，请耐心等待。\n\n任一步失败都不会影响现有用户（索引仍指向上一个好包）。')) return;
+      smStatus('📦 打包并发布中（约 20MB，请稍候，勿关闭）…');
+      fn('publish_skins',{token:tok}).then(function(res){
+        smStatus('✅ 发布完成：\n'+res);
+      }).catch(function(err){
+        smStatus('❌ 发布失败：'+smErrMsg(err),true);
+      });
+    }
     function smInit(){
       if(smInited) return; smInited=true;
       var cv=document.getElementById('skinMakerCanvas');
@@ -357,6 +379,9 @@
       var dl=document.getElementById('smDownload'); if(dl) dl.addEventListener('click', smDownload);
       var sv=document.getElementById('smSave'); if(sv) sv.addEventListener('click', smSave);
       var pb=document.getElementById('smPush'); if(pb) pb.addEventListener('click', function(){ smPush(); });
+      var pub=document.getElementById('smPublish'); if(pub) pub.addEventListener('click', function(){ smPublishSkins(); });
+      // 回填上次保存的 Gitee Token（仅存本机 localStorage，不上传、不入库）
+      try{ var tk=localStorage.getItem('tfjl_gitee_token'); if(tk){ var te=document.getElementById('smGiteeToken'); if(te) te.value=tk; } }catch(e){}
       var h=document.getElementById('smHero'), l=document.getElementById('smLabel');
       if(h) h.addEventListener('input', smRenderAll);
       if(l) l.addEventListener('input', smRenderAll);
