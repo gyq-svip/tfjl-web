@@ -3365,7 +3365,22 @@
         // 本地化命令不可用时回退在线同步（jsDelivr 主源，GitHub Pages 兜底），force=true 允许重复触发
         async function updateSkinsResource() {
             const t = showLoadingToast('🎨 正在更新皮肤资源...');
+            let unlisten = null;
             try {
+                // 监听 Rust 侧下载进度事件，实时反馈阶段（避免用户以为卡死）
+                try {
+                    const listenFn = window.__TAURI_INTERNALS__?.event?.listen || window.__TAURI__?.event?.listen;
+                    if (typeof listenFn === 'function') {
+                        unlisten = await listenFn('skin-download-progress', (ev) => {
+                            const p = (ev && ev.payload) || {};
+                            if (p.stage === 'start') t.update('📥 正在从 Gitee 下载皮肤包…');
+                            else if (p.stage === 'extract') t.update('📦 下载完成，正在解压到本地…');
+                            else if (p.stage === 'done') t.update('🔍 解压完成，正在扫描皮肤…');
+                            else if (p.stage === 'uptodate') t.update('✅ 皮肤已是最新，正在扫描…');
+                        });
+                    }
+                } catch (e) {}
+
                 // 先清旧皮肤缓存（删除旧皮肤再下载新包，避免残留旧皮肤导致不刷新/异常）
                 if (typeof window.clearSkinIdbCache === 'function') { try { await window.clearSkinIdbCache(); } catch (e) {} }
                 const invokeFn = window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke;
@@ -3374,20 +3389,29 @@
                         // force=true：菜单主动点「更新皮肤资源」时强制重拉（跳过"已是最新"判断）
                         const r = await invokeFn('download_skins', { force: true });
                         if (r) console.log('[SKIN] ' + r);
-                        if (typeof window.scanSkins === 'function') window.scanSkins();
+                        if (typeof window.scanSkins === 'function') await window.scanSkins();
                     } catch (e) {
                         console.warn('[SKIN] 本地下载失败，回退在线同步:', e);
+                        t.update('⚠️ 本地包下载失败，改用在线同步…');
                     }
                 }
                 if (typeof window.syncRemoteSkins === 'function') {
                     await window.syncRemoteSkins(true);
                 }
-                t.success('✅ 皮肤资源已更新');
+                // 统计实际扫描到的数量，让用户能确认皮肤是否拉全
+                let skinCount = 0, heroCount = 0;
+                try {
+                    const reg = window.skinRegistry || {};
+                    heroCount = Object.keys(reg).length;
+                    for (const k of Object.keys(reg)) skinCount += ((reg[k] || []).length || 0);
+                } catch (e) {}
+                t.success('✅ 皮肤更新完成：共 ' + skinCount + ' 张皮肤 / ' + heroCount + ' 个英雄');
             } catch (e) {
                 t.error('❌ 皮肤更新失败: ' + (e && e.message ? e.message : e));
             } finally {
                 // 修复：showLoadingToast 返回的对象只有 remove()，没有 close()，之前 t.close() 永远不执行导致 loading 不消失
-                if (t && t.remove) t.remove(2000);
+                if (typeof unlisten === 'function') { try { unlisten(); } catch (e) {} }
+                if (t && t.remove) t.remove(2500);
             }
         }
 
