@@ -107,6 +107,9 @@ jobs:
               print('bumped CACHE_VERSION + DEPLOY_TAG in', p, '→', deploy_tag)
           # 同步 version.json 的 frontVersion（方案B：前端真实版本源，供 app-picker.js 比对 + 标签填充）
           # 必须和 sw.js CACHE_VERSION 同源自增，否则下次部署前端版本(471)与 version.json(470)对不上 → 比对失效。
+          # 🔴 2026-08-30 关键修复：旧版只写仓库根目录 version.json，而第 50 行早已把【旧】version.json 拷进 _site/
+          #    → 线上部署的 version.json 永远没有 frontVersion/deployTag → 前端比对只能回退解析 HTML（不稳定）
+          #    → 升级气泡误报。现在【根目录 + _site】两份都写，线上版本源彻底可靠。
           import json
           vj_path = 'version.json'
           try:
@@ -118,8 +121,9 @@ jobs:
           front_ver = m.group(1) if m else vj.get('frontVersion', 's1.0.470')
           vj['frontVersion'] = front_ver
           vj['deployTag'] = deploy_tag
-          json.dump(vj, open(vj_path, 'w', encoding='utf-8'), ensure_ascii=False, indent=2)
-          print('synced version.json frontVersion →', front_ver, 'deployTag →', deploy_tag)
+          for p in ['version.json', '_site/version.json']:
+              json.dump(vj, open(p, 'w', encoding='utf-8'), ensure_ascii=False, indent=2)
+          print('synced version.json frontVersion →', front_ver, 'deployTag →', deploy_tag, '(root + _site)')
           PY
 
           # 🔴 2026-08-26 已废弃：原逻辑用 sed 把 register('./sw.js') 改成 register('./sw.js?v=b时间戳')，
@@ -204,7 +208,9 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           # 仅提交 sw.js 的 CACHE_VERSION 自增 + app-picker.js 的 SW 注册 ?v= 时间戳（保持源码与部署一致）
-          git add sw.js app-picker.js
+          # 🔴 2026-08-30：version.json 的 frontVersion 也要提交回来，否则下次部署基于旧值，
+          #    根目录 version.json 与线上脱节 → 远端版本比对永远对不上。
+          git add sw.js app-picker.js version.json
           if git diff --cached --quiet; then
             echo "sw.js 无变化，跳过提交"
             exit 0

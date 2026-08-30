@@ -669,13 +669,43 @@
                 if (!file.type.startsWith('image/')) return;
                 const reader = new FileReader();
                 reader.onload = function(e) {
-                    referenceImages.push({name: file.name, data: e.target.result, projectName: currentProjectName});
-                    renderReferenceImages();
-                    autoSaveProject();
+                    _addRefImage(file.name, e.target.result);
                 };
                 reader.readAsDataURL(file);
             });
             input.value = '';
+        }
+
+        // 🔴 2026-08-30 内存优化：参考图入项目前压缩（最大边 1920 + JPEG 0.85）。
+        //    旧版整张 base64 原图进项目 → 单项目几十 MB → getAll/stringify/base64 全链路放大 4 倍，
+        //    切项目加载 1G+ 的主要来源。压缩后单图 ~200-400KB（降 80%+），显示清晰度肉眼无差。
+        const REF_IMG_MAX_EDGE = 1920;
+        async function _compressRefImage(dataUrl) {
+            try {
+                if (typeof createImageBitmap !== 'function') return dataUrl;
+                const blob = await (await fetch(dataUrl)).blob();
+                const bmp = await createImageBitmap(blob);
+                const w = bmp.width, h = bmp.height;
+                const scale = Math.min(1, REF_IMG_MAX_EDGE / Math.max(w, h));
+                // 尺寸不超限 且 已是 JPEG 或体积不大（<300KB）→ 原图直存，不值得重编码
+                if (scale >= 1 && (blob.type === 'image/jpeg' || dataUrl.length < 300 * 1024)) {
+                    bmp.close && bmp.close();
+                    return dataUrl;
+                }
+                const tw = Math.max(1, Math.round(w * scale)), th = Math.max(1, Math.round(h * scale));
+                const canvas = document.createElement('canvas');
+                canvas.width = tw; canvas.height = th;
+                canvas.getContext('2d').drawImage(bmp, 0, 0, tw, th);
+                bmp.close && bmp.close();
+                const out = canvas.toDataURL('image/jpeg', 0.85);
+                return out.length < dataUrl.length ? out : dataUrl; // 压完反而更大（极端：小色块 PNG）则用原图
+            } catch (e) { return dataUrl; }
+        }
+        async function _addRefImage(name, dataUrl) {
+            const compressed = await _compressRefImage(dataUrl);
+            referenceImages.push({ name: name, data: compressed, projectName: currentProjectName });
+            renderReferenceImages();
+            autoSaveProject();
         }
 
         // 参考图片拖拽支持
@@ -703,9 +733,7 @@
                 if (!file.type.startsWith('image/')) return;
                 const reader = new FileReader();
                 reader.onload = function(e) {
-                    referenceImages.push({name: file.name, data: e.target.result, projectName: currentProjectName});
-                    renderReferenceImages();
-                    autoSaveProject();
+                    _addRefImage(file.name, e.target.result);
                     added++;
                 };
                 reader.readAsDataURL(file);
@@ -734,7 +762,7 @@
                     if (!file) continue;
 
                     const reader = new FileReader();
-                    reader.onload = function(e) {
+                    reader.onload = async function(e) {
                         const now = new Date();
                         const ts = now.getFullYear() +
                             String(now.getMonth() + 1).padStart(2, '0') +
@@ -742,9 +770,7 @@
                             String(now.getHours()).padStart(2, '0') +
                             String(now.getMinutes()).padStart(2, '0') +
                             String(now.getSeconds()).padStart(2, '0');
-                        referenceImages.push({name: `粘贴图片_${ts}.png`, data: e.target.result, projectName: currentProjectName});
-                        renderReferenceImages();
-                        autoSaveProject();
+                        await _addRefImage(`粘贴图片_${ts}.png`, e.target.result);
                     };
                     reader.readAsDataURL(file);
                     pasted = true;
