@@ -18171,7 +18171,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                     const resp = await fetch(`https://api.github.com/gists?per_page=100&page=${page}`, { headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` } });
                     if (!resp.ok) break;
                     const gists = await resp.json(); if (gists.length === 0) break;
-                    const target = gists.filter(g => g.description && (g.description.includes('脚本分享') || g.description.includes('需求墙消息') || g.description.includes('需求墙数据备份') || g.description.includes('拍卖图片')));
+                    const target = gists.filter(g => g.description && (g.description.includes('脚本分享') || g.description.includes('需求墙消息') || g.description.includes('需求墙数据备份') || g.description.includes('拍卖图片') || g.description.includes('TFJL分享') || g.description.includes('TFJL项目')));
                     _wallGistList = _wallGistList.concat(target);
                     if (gists.length < 100) break; page++;
                 }
@@ -18217,6 +18217,29 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                     if (ended) { info.status = 'ended'; info.statusLabel = '🟡 已结束'; info.statusColor = '#ffb300'; }
                     else { info.status = 'active'; info.statusLabel = '🟢 在售'; info.statusColor = '#4caf50'; }
                 }
+            } else if (desc.includes('TFJL分享') || desc.includes('TFJL项目')) {
+                // 🎫/📦 分享类 Gist（阵容分享 / 项目分享）：无引用概念，永不判孤儿（防止误删）。
+                // 过期判定：description 尾部「有效N天」+ gist 创建时间估算；没写天数=永久（旧分享兜底）。
+                const isProj = desc.includes('TFJL项目');
+                info.type = isProj ? 'projshare' : 'lineup';
+                info.typeLabel = isProj ? '📦 项目分享' : '🎫 阵容分享';
+                info.typeColor = isProj ? '#ab47bc' : '#00bcd4';
+                const cm = desc.match(isProj ? /TFJL项目\s+(\S+)/ : /TFJL分享\s+(\S+)/);
+                if (cm) info.shareCode = cm[1];
+                // 名称解析：剥离「前缀短码 / 尾部有效期 / 作者+日期段」，项目名内含「·」（无空格）不受影响
+                let nm = desc.replace(/^TFJL(?:分享|项目)\s+\S+\s·\s/, '');
+                nm = nm.replace(/\s·\s(有效\d+天|永久)(\s·\s加密)?$/, '');
+                if (/\d{4}-\d{2}-\d{2}/.test(nm)) nm = nm.replace(/\s·\s\S+\s\d{4}-\d{2}-\d{2}$/, '');
+                else nm = nm.split(' · ')[0];
+                info.shareName = nm.trim();
+                const dm = desc.match(/有效(\d+)天/);
+                if (dm) {
+                    info.days = parseInt(dm[1], 10);
+                    const expAt = new Date(gist.created).getTime() + info.days * 86400000;
+                    if (Date.now() > expAt) { info.status = 'expired'; info.statusLabel = '⏰ 已过期可清理'; info.statusColor = '#ff6b6b'; info.expired = true; }
+                    else { info.status = 'active'; info.statusLabel = '🟢 分享中·剩' + Math.max(1, Math.ceil((expAt - Date.now()) / 86400000)) + '天'; info.statusColor = '#4caf50'; }
+                } else { info.status = 'active'; info.statusLabel = '🟢 分享中·永久'; info.statusColor = '#4caf50'; }
+                info.encLock = desc.includes('加密');
             }
             return info;
         }
@@ -18227,15 +18250,35 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             let filtered = _wallGistList;
             if (typeF && typeF.value !== 'all') filtered = filtered.filter(g => g._info.type === typeF.value);
             if (statusF && statusF.value !== 'all') filtered = filtered.filter(g => g._info.status === statusF.value);
-            const stats = { script: _wallGistList.filter(g => g._info.type === 'script').length, message: _wallGistList.filter(g => g._info.type === 'message').length, image: _wallGistList.filter(g => g._info.type === 'image').length, orphan: _wallGistList.filter(g => g._info.status === 'orphan').length, active: _wallGistList.filter(g => g._info.status === 'active' || g._info.status === 'current').length, ended: _wallGistList.filter(g => g._info.status === 'ended').length };
-            if (cnt) cnt.textContent = `(脚本${stats.script} 消息${stats.message} 图片${stats.image} | 孤儿${stats.orphan} 在用${stats.active} 已结束${stats.ended} | 显示${filtered.length})`;
+            const stats = { script: 0, message: 0, image: 0, backup: 0, lineup: 0, projshare: 0, orphan: 0, active: 0, ended: 0, expired: 0 };
+            for (const g of _wallGistList) {
+                const t = g._info.type, s = g._info.status;
+                if (t === 'script') stats.script++; else if (t === 'message') stats.message++; else if (t === 'image') stats.image++; else if (t === 'backup') stats.backup++; else if (t === 'lineup') stats.lineup++; else if (t === 'projshare') stats.projshare++;
+                if (s === 'orphan') stats.orphan++; else if (s === 'expired') stats.expired++; else if (s === 'ended') stats.ended++; else if (s === 'active' || s === 'current') stats.active++;
+            }
+            if (cnt) cnt.textContent = `(脚本${stats.script} 消息${stats.message} 图片${stats.image} 备份${stats.backup} 阵容${stats.lineup} 项目${stats.projshare} | 孤儿${stats.orphan} 在用${stats.active} 已结束${stats.ended} 过期${stats.expired} | 显示${filtered.length})`;
+            // 下拉选项带数量（数量太多数不过来，选择分类时直接看到每类条数）
+            if (typeF) {
+                const tCounts = { all: _wallGistList.length, script: stats.script, message: stats.message, backup: stats.backup, image: stats.image, lineup: stats.lineup, projshare: stats.projshare };
+                const tLabels = { all: '全部类型', script: '📜 脚本', message: '📢 消息', backup: '💾 备份', image: '🖼️ 图片', lineup: '🎫 阵容分享', projshare: '📦 项目分享' };
+                Array.from(typeF.options).forEach(o => { const k = o.value; if (tCounts[k] !== undefined) o.textContent = `${tLabels[k]} (${tCounts[k]})`; });
+            }
+            if (statusF) {
+                const sCounts = { all: _wallGistList.length, orphan: stats.orphan, active: stats.active, current: _wallGistList.filter(g => g._info.status === 'current').length, ended: stats.ended, expired: stats.expired };
+                const sLabels = { all: '全部状态', orphan: '🔴 孤儿', active: '🟢 被引用/在售', current: '🟢 当前使用', ended: '🟡 已结束', expired: '⏰ 已过期' };
+                Array.from(statusF.options).forEach(o => { const k = o.value; if (sCounts[k] !== undefined) o.textContent = `${sLabels[k]} (${sCounts[k]})`; });
+            }
             if (!filtered.length) { c.innerHTML = '<div style="color:rgba(255,255,255,0.5);text-align:center;padding:20px;">无符合条件的Gist</div>'; return; }
-            const order = { orphan: 0, unknown: 1, active: 2, current: 3, ended: 4 };
+            const order = { orphan: 0, expired: 1, unknown: 2, active: 3, current: 4, ended: 5 };
             filtered.sort((a, b) => order[a._info.status] - order[b._info.status]);
             let html = '';
             for (const g of filtered) {
                 const i = g._info; const sizeKB = (i.fileSize / 1024).toFixed(1);
                 const date = new Date(g.created).toLocaleDateString('zh-CN');
+                const shareBadge = (i.type === 'lineup' || i.type === 'projshare') ?
+                    `<span style="color:#ffd700;font-size:0.75rem;font-family:monospace;background:rgba(255,215,0,0.12);border:1px solid rgba(255,215,0,0.35);border-radius:4px;padding:1px 6px;">${i.shareCode || ''}</span>` +
+                    (i.shareName ? `<span style="color:rgba(255,255,255,0.75);font-size:0.78rem;">${i.shareName}</span>` : '') +
+                    (i.encLock ? '<span style="font-size:0.75rem;" title="加密分享">🔒</span>' : '') : '';
                 html += `<div style="background:rgba(0,0,0,0.2);border-radius:8px;padding:10px;margin-bottom:8px;border-left:3px solid ${i.statusColor};">
                     <div style="display:flex;align-items:center;gap:10px;">
                         <input type="checkbox" class="wall-gist-checkbox" data-gist-id="${g.id}" style="flex-shrink:0;">
@@ -18245,6 +18288,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                                 <span style="color:${i.statusColor};font-weight:bold;font-size:0.85rem;">${i.statusLabel}</span>
                                 <span style="color:rgba(255,255,255,0.4);font-size:0.7rem;">${date}</span>
                                 <span style="color:rgba(255,255,255,0.4);font-size:0.7rem;">${sizeKB}KB</span>
+                                ${shareBadge}
                             </div>
                             <div style="color:rgba(255,255,255,0.3);font-size:0.7rem;font-family:monospace;">ID: ${g.id.substring(0,12)}… | ${(i.description || '').substring(0,40)}</div>
                         </div>
@@ -18257,14 +18301,14 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
         function wallSelectOrphanGists() {
             document.querySelectorAll('.wall-gist-checkbox').forEach(cb => {
                 const g = _wallGistList.find(x => x.id === cb.dataset.gistId);
-                cb.checked = !!(g && g._info.status === 'orphan');
+                cb.checked = !!(g && (g._info.status === 'orphan' || g._info.status === 'expired'));
             });
         }
         async function wallDeleteSelectedGists() {
             const cbs = document.querySelectorAll('.wall-gist-checkbox:checked');
             if (!cbs.length) { alert('请先选择要删除的Gist'); return; }
             const ids = Array.from(cbs).map(cb => cb.dataset.gistId);
-            if (!confirm(`⚠️ 将删除 ${ids.length} 个选中的Gist，删除后无法恢复！\n\n建议仅删除标记为「🔴 孤儿」的脚本Gist。`)) return;
+            if (!confirm(`⚠️ 将删除 ${ids.length} 个选中的Gist，删除后无法恢复！\n\n建议仅删除标记为「🔴 孤儿」或「⏰ 已过期」的Gist（阵容/项目分享不会被判孤儿，可放心按过期清理）。`)) return;
             const token = getGistToken(); if (!token) { alert('请先设置Token'); return; }
             let ok = 0, fail = 0;
             for (let k = 0; k < ids.length; k++) {
