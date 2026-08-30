@@ -5361,11 +5361,36 @@ if (true) {
         ctx.fillText('塔防精灵助手 ' + version + ' · 一键生成阵容分享图', W/2, footerY);
 
         _shareLineupCanvas = canvas;
-        showShareLineupModal(canvas, projectName);
+        showShareLineupModal(canvas, { projectName, category, myPlaced, teammatePlaced, myHand, teammateHand });
     }
 
-    // 显示分享预览弹窗
-    function showShareLineupModal(canvas, projectName) {
+    // 生成阵容纯文字版（发 QQ/微信群讨论用）
+    // u0/t0 是工程位：前置标注(工)；u1~u6/t1~t6 是上阵卡槽
+    function buildLineupShareText(d) {
+        const lines = [];
+        const header = (d.category ? '【' + d.category + '】' : '') + (d.projectName || '我的阵容');
+        lines.push(header);
+        const slotNames = (placed, prefix) => {
+            const parts = [];
+            for (let i = 0; i <= 6; i++) {
+                const c = placed.find(x => x && x.slot === prefix + i);
+                parts.push(c ? (i === 0 ? c.name + '(工)' : c.name) : '·');
+            }
+            return parts.join(' ');
+        };
+        if (d.myPlaced && d.myPlaced.length) lines.push('我方：' + slotNames(d.myPlaced, 'u'));
+        if (d.teammatePlaced && d.teammatePlaced.length) lines.push('队友：' + slotNames(d.teammatePlaced, 't'));
+        const handNames = (hand) => (hand || []).map(c => c && c.name).filter(Boolean).join('、');
+        if (d.myHand && d.myHand.length) lines.push('我手牌(' + d.myHand.length + ')：' + handNames(d.myHand));
+        if (d.teammateHand && d.teammateHand.length) lines.push('队友手牌(' + d.teammateHand.length + ')：' + handNames(d.teammateHand));
+        const v = (typeof getAppVersion === 'function') ? getAppVersion() : '';
+        if (v) lines.push('—— 塔防精灵助手 ' + v);
+        return lines.join('\n');
+    }
+
+    // 显示分享预览弹窗（data：projectName/category/myPlaced/teammatePlaced/myHand/teammateHand）
+    function showShareLineupModal(canvas, data) {
+        const projectName = data && data.projectName;
         // 移除旧的
         if (_shareLineupModal) {
             _shareLineupModal.remove();
@@ -5480,6 +5505,33 @@ if (true) {
             }
         };
 
+        // 复制文案按钮（文字版阵容，发群讨论用）
+        const textBtn = document.createElement('button');
+        textBtn.textContent = '📝 复制文案';
+        textBtn.style.cssText = 'background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#1a1a2e;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:bold;';
+        textBtn.onclick = async function() {
+            try {
+                const text = buildLineupShareText(data || {});
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    await navigator.clipboard.writeText(text);
+                } else {
+                    // 旧环境兜底：execCommand
+                    const ta = document.createElement('textarea');
+                    ta.value = text;
+                    ta.style.cssText = 'position:fixed;left:-9999px;';
+                    document.body.appendChild(ta);
+                    ta.select();
+                    document.execCommand('copy');
+                    ta.remove();
+                }
+                if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('阵容分享文案');
+                if (typeof showToast === 'function') showToast('文案已复制，粘贴到 QQ/微信即可', 'success');
+            } catch (e) {
+                console.error('复制文案失败:', e);
+                if (typeof showToast === 'function') showToast('复制失败：' + e.message, 'error');
+            }
+        };
+
         // 关闭按钮
         const closeBtn = document.createElement('button');
         closeBtn.textContent = '✕ 关闭';
@@ -5488,6 +5540,7 @@ if (true) {
 
         btnRow.appendChild(saveBtn);
         btnRow.appendChild(copyBtn);
+        btnRow.appendChild(textBtn);
         btnRow.appendChild(closeBtn);
 
         box.appendChild(title);
