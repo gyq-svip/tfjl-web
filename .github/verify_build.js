@@ -74,11 +74,10 @@ function checkDivPair(file) {
 [P('index.html'), P('webroot', 'index.html')].forEach(checkDivPair);
 
 // ---------- 2) node --check 所有核心/改动 JS ----------
+// webroot/ 已精简为单个占位跳转页（APP 运行时直连远端，见 tauri.conf.json windows.url），
+// 不再维护第二份 JS，故此处不再校验 webroot 下的脚本副本。
 const JS_FILES = [
-    'app-core.js', 'webroot/app-core.js',
-    'app-features.js', 'webroot/app-features.js',
-    'recognize.js', 'webroot/recognize.js',
-    'app-boot.js', 'webroot/app-boot.js',
+    'app-core.js', 'app-features.js', 'recognize.js', 'app-boot.js',
     'app-effects.js', 'app-picker.js',
     'app-skinmaker.js', 'app-deepsea.js'
 ];

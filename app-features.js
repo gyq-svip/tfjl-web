@@ -7955,7 +7955,8 @@
         }
 
         // 生成分享图 canvas（含标题/两行阵容/阵容码/品牌脚注）
-        async function _lineupBuildCanvas() {
+        // qrText：传入短链文本时在阵容码区右侧绘制二维码（扫码直达网页版并自动弹导入）
+        async function _lineupBuildCanvas(qrText) {
             const my = _lineupCollect('u');
             const tm = _lineupCollect('t');
             const filled = my.concat(tm).filter(Boolean).length;
@@ -7989,7 +7990,12 @@
             for (let i = 0; i < code.length && codeLines.length < 4; i += 66) codeLines.push(code.slice(i, i + 66));
             const codeTruncated = code.length > 4 * 66;
 
-            const H = 96 + 40 + 30 + SLOT_H + 26 + 30 + SLOT_H + 34 + 44 + codeLines.length * 20 + 16 + 56;
+            // 二维码区（短链版才有）：阵容码框右侧 180px + 下方说明
+            const QR_SIZE = 180;
+            const hasQr = !!(qrText && typeof window.qrcode === 'function');
+            const codeBoxH = hasQr ? Math.max(44 + codeLines.length * 20, QR_SIZE + 46) : (44 + codeLines.length * 20);
+
+            const H = 96 + 40 + 30 + SLOT_H + 26 + 30 + SLOT_H + 34 + codeBoxH + 16 + 56;
 
             const canvas = document.createElement('canvas');
             canvas.width = W; canvas.height = H;
@@ -8026,10 +8032,10 @@
             drawRow('👤 我方', my, myDr, '#4fc3f7');
             drawRow('👥 队友', tm, tmDr, '#81c784');
 
-            // 阵容码区
+            // 阵容码区（有二维码时右侧留出 QR 位）
             y += 8;
             ctx.fillStyle = 'rgba(255,255,255,0.05)';
-            _lineupRoundRect(ctx, PAD, y, W - PAD * 2, 44 + codeLines.length * 20, 10);
+            _lineupRoundRect(ctx, PAD, y, W - PAD * 2, codeBoxH, 10);
             ctx.fill();
             ctx.strokeStyle = 'rgba(255,215,0,0.35)';
             ctx.lineWidth = 1.5;
@@ -8037,13 +8043,37 @@
             ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
             ctx.fillStyle = '#ffd700';
             ctx.font = 'bold 17px "Microsoft YaHei", sans-serif';
-            ctx.fillText('📋 阵容码（复制后可在软件「从阵容码导入」一键复刻）', PAD + 16, y + 22);
+            ctx.fillText(hasQr ? '📋 阵容码（左复制右扫码，均可一键复刻）' : '📋 阵容码（复制后可在软件「从阵容码导入」一键复刻）', PAD + 16, y + 22);
             ctx.fillStyle = 'rgba(255,255,255,0.75)';
             ctx.font = '13px Consolas, "Courier New", monospace';
             codeLines.forEach(function (line, i) {
                 ctx.fillText(line + (codeTruncated && i === codeLines.length - 1 ? ' …' : ''), PAD + 16, y + 46 + i * 20);
             });
-            y += 44 + codeLines.length * 20 + 16;
+            // 二维码：右下角白底黑码 + 说明（短链内容，扫码直达网页版自动弹导入）
+            if (hasQr) {
+                const qx = W - PAD - 16 - QR_SIZE, qy = y + codeBoxH - QR_SIZE - 26;
+                try {
+                    const qr = window.qrcode(0, 'M');
+                    qr.addData(qrText);
+                    qr.make();
+                    const n = qr.getModuleCount();
+                    const cell = Math.floor((QR_SIZE - 12) / n);        // 四周留 6px 白边
+                    const off = (QR_SIZE - cell * n) / 2;
+                    ctx.fillStyle = '#fff';
+                    ctx.fillRect(qx, qy, QR_SIZE, QR_SIZE);
+                    ctx.fillStyle = '#111';
+                    for (let r = 0; r < n; r++) {
+                        for (let c = 0; c < n; c++) {
+                            if (qr.isDark(r, c)) ctx.fillRect(qx + off + c * cell, qy + off + r * cell, cell + 0.5, cell + 0.5);
+                        }
+                    }
+                } catch (e) { /* 码字超容量等异常：跳过 QR 只留阵容码 */ }
+                ctx.textAlign = 'center';
+                ctx.fillStyle = 'rgba(255,255,255,0.6)';
+                ctx.font = '15px "Microsoft YaHei", sans-serif';
+                ctx.fillText('📱 扫码一键导入', qx + QR_SIZE / 2, qy + QR_SIZE + 16);
+            }
+            y += codeBoxH + 16;
 
             // 脚注
             ctx.textAlign = 'center';
@@ -8054,7 +8084,86 @@
             return { canvas: canvas, filled: filled, code: code, payload: payload };
         }
 
+        // ---- 分享短链（功能5+6 闭环）：阵容 JSON 存公开 Gist → #lg=<gistId> 短链 → 图上二维码 ----
+        // 长链（#lineup=整码）自包含但 900+ 字符，二维码密到扫不出；短链约 80 字符，QR 小而清晰。
+        // Gist 公开可读：手机扫码（未登录网页版）也能拉取；有 token 则带上提高限额。
+        const LINEUP_SHARE_WEB_BASE = 'https://gyq-svip.github.io/tfjl-web/';
+        const LINEUP_LONG_LINK_BASE = LINEUP_SHARE_WEB_BASE + '#lineup=';
+        const LINEUP_SHORT_LINK_BASE = LINEUP_SHARE_WEB_BASE + '#lg=';
+
+        let _qrLibPromise = null;
+        function _lineupEnsureQrLib() {
+            if (typeof window.qrcode === 'function') return Promise.resolve();
+            if (_qrLibPromise) return _qrLibPromise;
+            _qrLibPromise = new Promise(function (resolve, reject) {
+                const s = document.createElement('script');
+                s.src = 'vendor/qrcode-generator.js';
+                s.onload = function () { (typeof window.qrcode === 'function') ? resolve() : reject(new Error('二维码库加载异常')); };
+                s.onerror = function () { _qrLibPromise = null; reject(new Error('二维码库加载失败（检查网络后重试）')); };
+                (document.head || document.documentElement).appendChild(s);
+            });
+            return _qrLibPromise;
+        }
+
+        function _lineupGistHeaders() {
+            const h = { 'Accept': 'application/vnd.github.v3+json' };
+            const token = (typeof getGistToken === 'function' ? getGistToken() : '') || '';
+            if (token) h['Authorization'] = 'token ' + token;
+            return h;
+        }
+
+        // 创建分享：写一个公开 Gist（lineup.json = 完整 payload），返回 gist id
+        async function _lineupCreateShortLink(payload) {
+            const ctrl = new AbortController();
+            const timer = setTimeout(function () { ctrl.abort(); }, 20000);
+            let res;
+            try {
+                res = await fetch('https://api.github.com/gists', {
+                    method: 'POST',
+                    headers: Object.assign({ 'Content-Type': 'application/json' }, _lineupGistHeaders()),
+                    signal: ctrl.signal,
+                    body: JSON.stringify({
+                        description: '塔防阵容分享 · ' + (payload.n || '阵容') + ' · ' + (payload.by || '匿名') + ' ' + (payload.d || ''),
+                        public: true,
+                        files: { 'lineup.json': { content: JSON.stringify(payload) } }
+                    })
+                });
+            } finally { clearTimeout(timer); }
+            if (!res.ok) {
+                let msg = '创建分享失败 (' + res.status + ')';
+                try { const j = await res.json(); if (j && j.message) msg += '：' + j.message; } catch (e) {}
+                throw new Error(msg);
+            }
+            const data = await res.json();
+            if (!data || !data.id) throw new Error('创建分享失败（未返回 gist id）');
+            return data.id;
+        }
+
+        // 拉取分享：按 gist id 读 lineup.json → 校验 → 转回阵容码（复用现有导入链路）
+        async function _lineupFetchShort(gistId) {
+            const ctrl = new AbortController();
+            const timer = setTimeout(function () { ctrl.abort(); }, 15000);
+            let res;
+            try {
+                res = await fetch('https://api.github.com/gists/' + encodeURIComponent(gistId), {
+                    headers: _lineupGistHeaders(), signal: ctrl.signal
+                });
+            } finally { clearTimeout(timer); }
+            if (!res.ok) throw new Error('读取分享失败 (' + res.status + (res.status === 404 ? '：分享可能已被删除' : '') + ')');
+            const g = await res.json();
+            const f = g && g.files && g.files['lineup.json'];
+            if (!f || !f.content) throw new Error('分享内容缺失（lineup.json 不存在）');
+            let payload;
+            try { payload = JSON.parse(f.content); } catch (e) { throw new Error('分享内容损坏（JSON 解析失败）'); }
+            if (!payload || payload.t !== 'TFJL' || !Array.isArray(payload.my) || !Array.isArray(payload.tm)) {
+                throw new Error('不是有效的阵容分享');
+            }
+            return _lineupEncode(payload);
+        }
+
         // 📸 分享阵容图：弹窗预览 + 下载/复制图片/复制码/复制链接
+        // 闭环：先画无码版 → 写公开 Gist 得短链 → 载二维码库 → 带二维码重画 → 弹窗。
+        // 短链/二维码任一环节失败自动降级（纯阵容码+长链），分享功能不受影响。
         async function shareLineupImage() {
             if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('分享阵容图');
             let result;
@@ -8067,6 +8176,27 @@
                 if (typeof showToast === 'function') showToast('当前阵容是空的（我方和队友都没有上阵卡），先摆好阵容再分享', 'error');
                 return;
             }
+            // 生成短链（写 Gist，可能数秒）：右上角浮条提示，断网/限额静默降级
+            let shortLink = '';
+            if (result.payload) {
+                const tip = document.createElement('div');
+                tip.style.cssText = 'position:fixed;top:14px;right:14px;z-index:' + (200000 + (window.topWinZIndex || 0)) + ';background:rgba(20,20,40,0.92);border:1px solid rgba(255,215,0,0.4);color:#ffd700;padding:8px 14px;border-radius:8px;font-size:0.82rem;box-shadow:0 4px 16px rgba(0,0,0,0.5);';
+                tip.textContent = '⏳ 正在生成分享链接…';
+                document.body.appendChild(tip);
+                try {
+                    const gistId = await _lineupCreateShortLink(result.payload);
+                    shortLink = LINEUP_SHORT_LINK_BASE + gistId;
+                } catch (e) { shortLink = ''; }
+                tip.remove();
+            }
+            // 短链成功且二维码库就绪 → 带二维码重画（右下角扫码直达导入）
+            if (shortLink) {
+                try {
+                    await _lineupEnsureQrLib();
+                    const r2 = await _lineupBuildCanvas(shortLink);
+                    if (r2 && r2.canvas) result = r2;
+                } catch (e) { /* 库加载失败：保留无码版，短链仍走「复制链接」 */ }
+            }
             let dataUrl = '';
             try { dataUrl = result.canvas.toDataURL('image/png'); }
             catch (e) {
@@ -8075,9 +8205,8 @@
                 return;
             }
             const code = result.code;
-            const link = (function () {
-                try { return location.origin + location.pathname + '#lineup=' + encodeURIComponent(code); } catch (e) { return ''; }
-            })();
+            // 链接优先短链（与二维码同款，~80字符）；降级用长链（整码自包含，可离线复刻）
+            const link = shortLink || (LINEUP_LONG_LINK_BASE + encodeURIComponent(code));
 
             const old = document.getElementById('lineupShareModal');
             if (old) old.remove();
@@ -8088,7 +8217,7 @@
                 '<div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(255,215,0,0.45);border-radius:16px;padding:18px 20px;max-width:860px;width:96%;max-height:92vh;overflow-y:auto;box-shadow:0 10px 40px rgba(0,0,0,0.6);">' +
                   '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
                     '<div><span style="color:#ffd700;font-size:1.1rem;font-weight:bold;">📸 阵容分享图</span>' +
-                    '<div style="color:rgba(255,255,255,0.45);font-size:0.74rem;margin-top:2px;">发到群里，对方保存图片即可看阵容；复制阵容码/链接可一键复刻</div></div>' +
+                    '<div style="color:rgba(255,255,255,0.45);font-size:0.74rem;margin-top:2px;">' + (shortLink ? '发到群里，对方<b style="color:#ffd54f;">扫码</b>或点链接即可一键复刻阵容' : '发到群里，对方保存图片即可看阵容；复制阵容码/链接可一键复刻') + '</div></div>' +
                     '<span id="lineupShareClose" style="cursor:pointer;color:rgba(255,255,255,0.4);font-size:1.5rem;">×</span>' +
                   '</div>' +
                   '<img id="lineupShareImg" style="width:100%;border-radius:10px;display:block;box-shadow:0 4px 18px rgba(0,0,0,0.5);" alt="阵容分享图">' +
@@ -8160,7 +8289,7 @@
                     '<span style="color:#4fc3f7;font-size:1.05rem;font-weight:bold;">📥 从阵容码导入</span>' +
                     '<span id="lineupImportClose" style="cursor:pointer;color:rgba(255,255,255,0.4);font-size:1.5rem;">×</span>' +
                   '</div>' +
-                  '<div style="color:rgba(255,255,255,0.55);font-size:0.78rem;margin-bottom:10px;line-height:1.5;">粘贴对方分享的阵容码（TFJL1. 开头，分享图片下方/分享链接里都有），将<b style="color:#ffb74d;">覆盖当前项目</b>的我方+队友上阵阵容（含等级/皮肤/魔化）。</div>' +
+                  '<div style="color:rgba(255,255,255,0.55);font-size:0.78rem;margin-bottom:10px;line-height:1.5;">粘贴对方分享的<b style="color:#ffb74d;">阵容码</b>或<b style="color:#ffb74d;">分享链接</b>（TFJL1. 开头 / 含 #lg= 的链接均可），将<b style="color:#ffb74d;">覆盖当前项目</b>的我方+队友上阵阵容（含等级/皮肤/魔化）。</div>' +
                   '<textarea id="lineupImportTa" placeholder="TFJL1.xxxxxx..." style="width:100%;box-sizing:border-box;height:110px;background:rgba(0,0,0,0.35);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:8px;padding:10px;font-size:0.8rem;font-family:Consolas,monospace;resize:none;"></textarea>' +
                   '<div id="lineupImportInfo" style="color:rgba(255,255,255,0.5);font-size:0.72rem;margin-top:6px;min-height:1em;"></div>' +
                   '<div style="display:flex;gap:10px;margin-top:12px;">' +
@@ -8177,9 +8306,23 @@
             modal.querySelector('#lineupImportCancel').onclick = close;
             modal.onclick = function (e) { if (e.target === modal) close(); };
             modal.querySelector('#lineupImportOk').onclick = async function () {
+                const raw = (ta.value || '').trim();
                 let data;
-                try { data = _lineupDecode(ta.value); }
-                catch (e) { info.style.color = '#ff8a80'; info.textContent = '❌ ' + (e && e.message || e); return; }
+                // 兼容直接粘贴分享链接：#lineup=整码直接解码；#lg=短链先拉 Gist 转回码
+                const mLong = /(?:^|[&#])lineup=([A-Za-z0-9+/=%._-]+)/.exec(raw);
+                const mShort = !mLong && /(?:^|[&#])lg=([A-Za-z0-9_-]+)/.exec(raw);
+                if (mLong || mShort) {
+                    info.style.color = '#ffd54f';
+                    info.textContent = '⏳ 正在解析分享链接…';
+                    try {
+                        const code = mLong ? decodeURIComponent(mLong[1]) : await _lineupFetchShort(mShort[1]);
+                        data = _lineupDecode(code);
+                        ta.value = code;   // 回填解析出的码，便于复看/转发
+                    } catch (e) { info.style.color = '#ff8a80'; info.textContent = '❌ ' + (e && e.message || e); return; }
+                } else {
+                    try { data = _lineupDecode(raw); }
+                    catch (e) { info.style.color = '#ff8a80'; info.textContent = '❌ ' + (e && e.message || e); return; }
+                }
                 const n = (data.my.length + data.tm.length);
                 info.style.color = '#ffd54f';
                 info.textContent = '✅ 识别成功：' + (data.n ? '「' + data.n + '」' : '') + '共 ' + n + ' 张卡（我方 ' + data.my.length + ' / 队友 ' + data.tm.length + '），点击导入将覆盖当前阵容';
@@ -8264,14 +8407,28 @@
             return { placed: placed, missing: missing };
         }
 
-        // 分享链接自动检测：#lineup=TFJL1.xxx → 自动弹导入（预填码）
+        // 分享链接自动检测：#lineup=整码 直接弹导入（预填码）；#lg=<gistId> 先拉取再弹导入
         (function _lineupHashCheck() {
-            function check() {
+            async function check() {
                 try {
-                    const m = (location.hash || '').match(/lineup=([A-Za-z0-9+/=%._-]+)/);
-                    if (m && m[1]) {
-                        importLineupCode(decodeURIComponent(m[1]));
+                    const hash = location.hash || '';
+                    const mLong = hash.match(/(?:^|[&#])lineup=([A-Za-z0-9+/=%._-]+)/);
+                    if (mLong && mLong[1]) {
                         history.replaceState(null, '', location.pathname + location.search);
+                        importLineupCode(decodeURIComponent(mLong[1]));
+                        return;
+                    }
+                    const mShort = hash.match(/(?:^|[&#])lg=([A-Za-z0-9_-]+)/);
+                    if (mShort && mShort[1]) {
+                        const gid = mShort[1];
+                        history.replaceState(null, '', location.pathname + location.search);
+                        if (typeof showToast === 'function') showToast('⏳ 正在拉取分享的阵容…', 'info');
+                        try {
+                            const code = await _lineupFetchShort(gid);
+                            importLineupCode(code);
+                        } catch (e) {
+                            if (typeof showToast === 'function') showToast('❌ 拉取分享失败：' + (e && e.message || e), 'error');
+                        }
                     }
                 } catch (e) {}
             }
