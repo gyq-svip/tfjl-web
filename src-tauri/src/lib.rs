@@ -1442,6 +1442,224 @@ async fn download_skins(app: tauri::AppHandle, force: Option<bool>) -> Result<St
     Ok(format!("皮肤包 {} 已解压到 {}（{} 张皮肤）", pkg, base, remote_skins))
 }
 
+// ==================== 游戏窗口监控（波数播报 / 自动截图识别底座） ====================
+// 三个原子命令：找窗口 → 截区域（BMP base64，可直送 umi_ocr）→ TTS 播报。
+// 监控循环在前端跑（3 秒一拍：截取 → OCR → 波数变化才播报），便于不打包迭代解析逻辑。
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GameWindowInfo {
+    pub hwnd: usize,
+    pub title: String,
+}
+
+/// 枚举本机可见的普通窗口（模拟器/游戏窗口），返回 [{hwnd, title}]
+/// 过滤：可见 + 有标题 + 非工具窗口 + 客户区 ≥ 300x200 + 非本助手进程的窗口
+#[tauri::command]
+fn find_game_windows() -> Result<Vec<GameWindowInfo>, String> {
+    #[cfg(windows)]
+    {
+        use winapi::shared::windef::{HWND, RECT};
+        use winapi::um::winuser::{
+            EnumWindows, GetWindowTextLengthW, GetWindowTextW, GetWindowRect, GetWindowThreadProcessId,
+            IsWindowVisible, GetWindowLongW, WS_EX_TOOLWINDOW, GWL_EXSTYLE,
+        };
+
+        struct Ctx {
+            items: Vec<GameWindowInfo>,
+            self_pid: u32,
+        }
+        unsafe extern "system" fn cb(hwnd: HWND, lparam: isize) -> i32 {
+            let ctx = &mut *(lparam as *mut Ctx);
+            if IsWindowVisible(hwnd) == 0 {
+                return 1;
+            }
+            // 排除工具窗口（悬浮球/输入法条等）
+            let ex_style = GetWindowLongW(hwnd, GWL_EXSTYLE);
+            if (ex_style as u32 & WS_EX_TOOLWINDOW) != 0 {
+                return 1;
+            }
+            let len = GetWindowTextLengthW(hwnd);
+            if len <= 0 {
+                return 1;
+            }
+            // 排除本助手自己进程的窗口（用户要选的是游戏窗口，不是助手）
+            let mut pid: u32 = 0;
+            GetWindowThreadProcessId(hwnd, &mut pid);
+            if pid == ctx.self_pid {
+                return 1;
+            }
+            let mut rect = RECT { left: 0, top: 0, right: 0, bottom: 0 };
+            if GetWindowRect(hwnd, &mut rect) == 0 {
+                return 1;
+            }
+            let (w, h) = (rect.right - rect.left, rect.bottom - rect.top);
+            if w < 300 || h < 200 {
+                return 1;
+            }
+            let mut buf = vec![0u16; (len + 1) as usize];
+            GetWindowTextW(hwnd, buf.as_mut_ptr(), len + 1);
+            let title = String::from_utf16_lossy(&buf[..len as usize]);
+            if title.trim().is_empty() {
+                return 1;
+            }
+            ctx.items.push(GameWindowInfo { hwnd: hwnd as usize, title });
+            1
+        }
+
+        let mut ctx = Ctx { items: Vec::new(), self_pid: std::process::id() };
+        unsafe {
+            EnumWindows(Some(cb), &mut ctx as *mut Ctx as isize);
+        }
+        // hwnd 降序：新启动的窗口（游戏）排前面，好找
+        ctx.items.sort_by(|a, b| b.hwnd.cmp(&a.hwnd));
+        Ok(ctx.items)
+    }
+    #[cfg(not(windows))]
+    {
+        Ok(Vec::new())
+    }
+}
+
+/// 截取窗口指定区域，返回 32 位 BMP 的 base64（Umi-OCR 可直接识别）
+/// 坐标系 = PrintWindow 整窗位图（左上角为窗口左上角，含标题栏），与 find 后前端预览图一致。
+/// full=true 时忽略 x/y/w/h 截整窗（用于配置区域时的预览大图）。
+#[tauri::command]
+fn capture_window_region(hwnd: usize, x: i32, y: i32, w: i32, h: i32, full: Option<bool>) -> Result<String, String> {
+    #[cfg(windows)]
+    {
+        use std::mem;
+        use winapi::shared::windef::{HWND, RECT, HGDIOBJ};
+        use winapi::um::wingdi::{
+            BITMAPINFO, BITMAPINFOHEADER, CreateCompatibleBitmap, CreateCompatibleDC, DeleteDC,
+            DeleteObject, GetDIBits, SelectObject, DIB_RGB_COLORS, BI_RGB,
+        };
+        use winapi::um::winuser::{GetDC, PrintWindow, ReleaseDC, GetWindowRect, PW_RENDERFULLCONTENT};
+
+        if w <= 0 || h <= 0 {
+            return Err(format!("区域尺寸非法：{}x{}", w, h));
+        }
+        let hwnd = hwnd as HWND;
+        unsafe {
+            // 整窗尺寸（PrintWindow 输出位图大小 = 窗口外框大小）
+            let mut win_rect = RECT { left: 0, top: 0, right: 0, bottom: 0 };
+            if GetWindowRect(hwnd, &mut win_rect) == 0 {
+                return Err("获取窗口尺寸失败（窗口可能已关闭）".into());
+            }
+            let win_w = win_rect.right - win_rect.left;
+            let win_h = win_rect.bottom - win_rect.top;
+            if win_w <= 0 || win_h <= 0 {
+                return Err("窗口尺寸非法".into());
+            }
+
+            // 1) PrintWindow 整窗到位图（PW_RENDERFULLCONTENT 支持采集 D3D/OpenGL 模拟器画面）
+            let hdc_screen = GetDC(hwnd);
+            if hdc_screen.is_null() {
+                return Err("获取窗口 DC 失败".into());
+            }
+            let hdc_mem = CreateCompatibleDC(hdc_screen);
+            let hbmp = CreateCompatibleBitmap(hdc_screen, win_w, win_h);
+            let old_bmp = SelectObject(hdc_mem, hbmp as HGDIOBJ);
+            // PW_RENDERFULLCONTENT = 2：Win8.1+，DirectX 渲染内容也能截到
+            let _ = PrintWindow(hwnd, hdc_mem, PW_RENDERFULLCONTENT); // 返回值部分驱动不可靠，继续取图
+
+            // 2) GetDIBits 整窗像素（top-down 32bpp BGRA）
+            let mut bmi: BITMAPINFO = mem::zeroed();
+            bmi.bmiHeader.biSize = mem::size_of::<BITMAPINFOHEADER>() as u32;
+            bmi.bmiHeader.biWidth = win_w;
+            bmi.bmiHeader.biHeight = -win_h; // 负高度 = top-down，位图行序与屏幕一致
+            bmi.bmiHeader.biPlanes = 1;
+            bmi.bmiHeader.biBitCount = 32;
+            bmi.bmiHeader.biCompression = BI_RGB;
+            let mut pixels: Vec<u8> = vec![0u8; (win_w as usize) * (win_h as usize) * 4];
+            let got = GetDIBits(hdc_mem, hbmp, 0, win_h as u32, pixels.as_mut_ptr() as *mut _, &mut bmi, DIB_RGB_COLORS);
+            if got == 0 {
+                SelectObject(hdc_mem, old_bmp);
+                DeleteObject(hbmp as HGDIOBJ);
+                DeleteDC(hdc_mem);
+                ReleaseDC(hwnd, hdc_screen);
+                return Err("读取窗口像素失败".into());
+            }
+            SelectObject(hdc_mem, old_bmp);
+            DeleteObject(hbmp as HGDIOBJ);
+            DeleteDC(hdc_mem);
+            ReleaseDC(hwnd, hdc_screen);
+
+            // 3) 内存裁剪目标区域
+            let (rx, ry, rw, rh): (i32, i32, i32, i32) = if full.unwrap_or(false) {
+                (0, 0, win_w, win_h)
+            } else {
+                (x, y, w, h)
+            };
+            // 越界钳制
+            let rx = rx.clamp(0, win_w - 1);
+            let ry = ry.clamp(0, win_h - 1);
+            let rw = rw.min(win_w - rx);
+            let rh = rh.min(win_h - ry);
+            if rw <= 0 || rh <= 0 {
+                return Err(format!("区域越界：窗口 {}x{}，请求 x={} y={} w={} h={}", win_w, win_h, rx, ry, rw, rh));
+            }
+            let row = win_w as usize * 4;
+            let mut out: Vec<u8> = Vec::with_capacity(rw as usize * rh as usize * 4);
+            for yy in 0..rh {
+                let start = ry as usize * row + rx as usize * 4 + yy as usize * row;
+                let end = start + rw as usize * 4;
+                out.extend_from_slice(&pixels[start..end]);
+            }
+
+            // 4) 构造 32 位 BMP（14 文件头 + 40 信息头 + BGRA 数据，top-down）
+            let data_len = out.len() as u32;
+            let file_len = 54 + data_len;
+            let mut bmp: Vec<u8> = Vec::with_capacity(54 + out.len());
+            bmp.extend_from_slice(b"BM");
+            bmp.extend_from_slice(&file_len.to_le_bytes());
+            bmp.extend_from_slice(&0u32.to_le_bytes());
+            bmp.extend_from_slice(&54u32.to_le_bytes());
+            let mut hdr = [0u8; 40];
+            hdr[0..4].copy_from_slice(&40u32.to_le_bytes());
+            hdr[4..8].copy_from_slice(&(rw as i32).to_le_bytes());
+            hdr[8..12].copy_from_slice(&(-(rh as i32)).to_le_bytes());
+            hdr[12..14].copy_from_slice(&1u16.to_le_bytes());
+            hdr[14..16].copy_from_slice(&32u16.to_le_bytes());
+            hdr[16..20].copy_from_slice(&(BI_RGB as u32).to_le_bytes());
+            hdr[20..24].copy_from_slice(&data_len.to_le_bytes());
+            bmp.extend_from_slice(&hdr);
+            bmp.extend_from_slice(&out);
+
+            Ok(B64.encode(bmp))
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        Err("仅支持 Windows".into())
+    }
+}
+
+/// TTS 语音播报（Windows 自带 System.Speech，无需联网/安装）
+/// 每次独立 spawn PowerShell（CREATE_NO_WINDOW 不闪黑框），短句播报延迟可接受
+#[tauri::command]
+fn speak_text(text: String) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        let t = text.replace('\'', "''");
+        let ps = format!(
+            "Add-Type -AssemblyName System.Speech; $s = New-Object System.Speech.Synthesis.SpeechSynthesizer; $s.Rate = 2; $s.Speak('{}')",
+            t
+        );
+        std::process::Command::new("powershell")
+            .args(["-NoProfile", "-WindowStyle", "Hidden", "-Command", &ps])
+            .creation_flags(0x08000000) // CREATE_NO_WINDOW
+            .spawn()
+            .map_err(|e| format!("语音播报启动失败: {}", e))?;
+        Ok(())
+    }
+    #[cfg(not(windows))]
+    {
+        Err("仅支持 Windows".into())
+    }
+}
+
 /// 下载新版安装包到本机固定目录（返回保存路径）。
 /// 🔴 2026-08-29 新增：网页里的 fetch 拉 Gitee 发行版直链会被 CORS/重定向拦掉（报 "Failed to fetch"），
 ///    所以下载必须由 Rust 侧用 reqwest 完成（无跨域限制、走 Gitee 国内快）。
@@ -1565,6 +1783,9 @@ pub fn run() {
             download_skins,
             download_installer,
             publish_skins,
+            find_game_windows,
+            capture_window_region,
+            speak_text,
         ])
         .manage(AppState { umi_pid: std::sync::Mutex::new(None), heartbeat: std::sync::Mutex::new(None), checkin_day: std::sync::Mutex::new(None) })
         .setup(|app| {

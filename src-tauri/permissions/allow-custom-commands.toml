@@ -147,3 +147,18 @@ commands.allow = ["check_app_update"]
 identifier = "allow-install-app-update"
 description = "Allow clicking the update badge to immediately download+install big-version app update"
 commands.allow = ["install_app_update"]
+
+[[permission]]
+identifier = "allow-find-game-windows"
+description = "Allow enumerating visible game/emulator windows (EnumWindows read-only) for wave monitor & auto-recognize"
+commands.allow = ["find_game_windows"]
+
+[[permission]]
+identifier = "allow-capture-window-region"
+description = "Allow capturing a region of a game window via PrintWindow (read-only, returns BMP base64)"
+commands.allow = ["capture_window_region"]
+
+[[permission]]
+identifier = "allow-speak-text"
+description = "Allow Windows TTS voice announcement via PowerShell System.Speech (wave broadcast)"
+commands.allow = ["speak_text"]
