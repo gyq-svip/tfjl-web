@@ -8343,7 +8343,14 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     t.oncomplete = () => resolve();
                     t.onerror = () => resolve();
                 });
-                if (typeof persistProjectsToDisk === 'function') persistProjectsToDisk();
+                // 🔴 2026-08-30 性能修复：全项目列表写盘（loadProjectListFromDB 全读 + 全部项目序列化写磁盘）
+                //    是换皮卡顿的主因之一——原实现每切一次皮就全量写一遍盘（Tauri 下 IPC+磁盘 IO 1-2 秒）。
+                //    改为 800ms 防抖：连续切皮只在停顿后合并写一次盘。IndexedDB 记录已在上方即时更新，数据不丢。
+                if (persistProjectSkins._diskTimer) clearTimeout(persistProjectSkins._diskTimer);
+                persistProjectSkins._diskTimer = setTimeout(function () {
+                    persistProjectSkins._diskTimer = null;
+                    if (typeof persistProjectsToDisk === 'function') persistProjectsToDisk();
+                }, 800);
             } catch (e) { console.warn('[SKIN] persistProjectSkins failed:', e); }
         }
 
@@ -9460,39 +9467,21 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 
         // 给战斗槽卡牌应用皮肤背景
         async function applySkinBgToSlot(slot, heroName, forceCardId, forceHandType, forceSkin) {
-            // 🔴 内存/性能修复：原每次调用都 console.log 一条（启动 3 遍 × 14 槽 = 42 条，切项目/切皮/融合反复打），
-            //    高频触发 captureConsole 数组 splice 且驻留字符串。降级为仅 skinInfo 解析失败（异常路径）才打日志。
-            // 正常路径静默，必要时用终端 dumpSkinRegistry() 查看。
-            // 移除旧皮肤层（含融合上层）和旧皮肤名。
-            // 🔴 2026-08-30 修复：移除旧 <img> 前【绝不能 revoke 它的 blob】。
-            //   该 blob 仍被 skinImageUrlCache（按 filePath 缓存）持有，下次重绘会复用同一 blob URL；
-            //   若此处先 revoke，复用到的就是已失效的 blob → "Failed to load skin image" → 皮肤空白/切不开。
-            //   blob 生命周期交由缓存管理（clearSkinUrlCache 统一 revoke），移除 <img> 后浏览器自动回收纹理，不泄漏。
-            //   （与 commit 84cd833 修复 _skinBlobUrlCache 淘汰不 revoke 同源理念一致）
-            const oldLayer = slot.querySelector('.skin-layer');
-            if (oldLayer) { oldLayer.remove(); }
-            const oldFused = slot.querySelector('.skin-layer-fused');
-            if (oldFused) { oldFused.remove(); }
+            // 🔴 2026-08-30 黑屏根治：原实现一进来就删除旧 .skin-layer / .skin-layer-fused，
+            //    然后 await resolveHeroSkinInfo（本地磁盘读图+canvas 缩放，几百 ms）。
+            //    等待期间槽位无任何皮肤层 → 黑窗；右键一次触发 3 个并发重绘（setCardSkin 的 forEach
+            //    + cycleHeroSkin + handleSlotRightClick），黑窗叠加 → 用户看到"变黑/1-2 秒才换"。
+            //    改为「先 resolve、后替换」：resolve 完成前完全不动 DOM，旧皮肤一直显示；
+            //    新图预加载 onload 后才原子替换（双缓冲）。切皮全程无黑窗。
+            // 移除旧皮肤名标签（名称替换无闪烁问题，可先做）
             const oldSkinName = slot.querySelector('.skin-name');
             if (oldSkinName) oldSkinName.remove();
-            slot.classList.remove('skin-bg');
             // 刷新卡面显示名：融合关闭（副卡隐藏）时只显主卡名；完整名存 data-full-name 供逻辑读取
             if (heroName) {
                 const nameEl = slot.querySelector('.card-name');
                 if (nameEl) { nameEl.dataset.fullName = heroName; nameEl.textContent = getFusionDisplayName(heroName); }
             }
             if (!heroName) { /* [SKIN log muted] */ void (0) && console.log('[SKIN] No heroName, returning'); return; }
-
-            // 2026-08-30 回滚「复用同个 <img>」优化引发的两个回归：
-            //  ① 切皮不重绘 —— 旧代码对「src 相同」直接 return，但 resolveHeroSkinInfo 会把 data: 结果
-            //     缓存进 entry.url（app-local2.js:4584），导致同一槽位反复解析出完全相同的 data: 串，
-            //     看似「要切」实则被 src 相等判断吞掉，画面不动 → 用户体感「完全切不了」。
-            //  ② 融合槽残留旧叠加层 —— 非融合分支只碰 .skin-layer，从不删 .skin-layer-fused，
-            //     融合槽一旦变非融合，旧副卡小图残留在画面上 → 「融合皮也不行了」。
-            // 修复：每次渲染前先清掉两种旧皮肤层，下方融合/非融合分支按需重建（即优化前丝滑版本的行为）。
-            // 不再手动 revoke blob（避免误回收正在显示的图），纹理由浏览器 GC 回收；
-            // 内存暴涨的根因（_skinBlobUrlCache LRU 淘汰时 revoke 了正在用的 blob）已在 commit 84cd833 修复，与此处重建无关。
-            // （旧层已在上方 9483-9486 行清除，此处不再重复删除）
 
             // 融合卡：主卡整皮(底层) + 被融合卡左上斜切半张(上层)
             if (fusionSkinSplitEnabled) {
@@ -9534,7 +9523,6 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             if (slotSkin === '默认' && slotCardId) {
                 slotSkin = getCardSkin(slotCardId, skinHeroName, slotHandType);
             }
-            // 🔴 2026-08-30 性能修复：移除高频 console.log（每次切皮/融合/渲染都打），减少 GC 压力
             let skinInfo = null;
             if (window.resolveHeroSkinInfo) {
                 skinInfo = await window.resolveHeroSkinInfo(skinHeroName, slotSkin);
@@ -9547,12 +9535,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             }
             /* [SKIN log muted] */ void (0) && console.log('[SKIN] skinInfo:', skinInfo ? (skinInfo.url ? skinInfo.url.substring(0, 80) : 'no url') : 'NULL');
             if (!skinInfo || !skinInfo.url) {
-                // 🔴 2026-08-29 降噪：融合组合名（死神海妖/小野酋长/咕咕萨满等）在远程皮肤未加载完时
-                // 必然查不到，但 syncRemoteSkins 完成后会自动重绘成功 → 不必刷 WARN 刷屏。
-                // 仅当 heroName 自身是"真单英雄且确实无皮肤"才 WARN；能拆出已知主英雄的组合名静默跳过。
-                // 用权威融合检测器 getFusionParts 判断，不再依赖「·/heroSet 启发式」。
-                // 旧判断在「融合组合名已进卡牌网格(heroSet.has 为真)」或「getMainCardName 原样返回」时失效，
-                // 导致死神海妖/小野酋长/咕咕萨满等融合卡刷屏 WARN。
+                // 🔴 resolve 失败（远程皮肤未加载完/该卡真无皮肤）：保持旧皮肤层不动（旧实现此处已删层 → 黑）。
+                //    远程皮肤 syncRemoteSkins 完成后会自动重绘补上。
                 let _isFusionCombo = false;
                 try {
                     const _parts = (typeof getFusionParts === 'function') ? getFusionParts(heroName) : null;
@@ -9571,15 +9555,15 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             }
 
             const skinUrl = skinInfo.url;
-            const isDataOrBlob = skinUrl.startsWith('data:') || skinUrl.startsWith('blob:');
-            // 🔴 2026-08-30 内存修复(根治 4.6G)：blob: URL 本身已是唯一标识，绝不能加 ?t= 时间戳！
-            //    旧逻辑给非 blob 的 data: 也加了 ?t=，但更关键的是：blob: 若每次 reapply 都重新生成（远程皮肤 LRU 淘汰后重新 fetch），
-            //    这里又会赋新 src。无论哪种情况，覆盖 img.src 前必须先 revoke 旧 blob，否则旧纹理常驻 GPU 永不回收。
-            const finalSrc = skinUrl; // 直接用原始 URL（blob:/data:/https: 都不加时间戳，保证「src 未变」优化始终生效）
+            // 🔴 直接用原始 URL（blob:/data:/https: 都不加时间戳，保证「src 未变」优化始终生效）
+            const finalSrc = skinUrl;
 
             // 2026-08-30 双缓冲切皮：先建新 <img>，等 onload 后再移除旧 .skin-layer（旧的仍显示直到新图就绪）→
-            // 杜绝「切换瞬间旧图已删、新图未解码」导致的黑闪；同时避免旧 img 堆积（之前每次 insert 不删旧，会重叠）。
+            // 杜绝「切换瞬间旧图已删、新图未解码」导致的黑闪；同时避免旧 img 堆积。
             // 不再手动 revoke blob（避免误回收正在显示的纹理），纹理由浏览器 GC 回收。
+            // 🔴 融转非融合的残留清理也移到这里（resolve 成功后才动 DOM）：删掉不再需要的副卡叠加层。
+            const staleFused = slot.querySelector('.skin-layer-fused');
+            if (staleFused) staleFused.remove();
             const img = document.createElement('img');
             img.className = 'skin-layer';
             img.alt = '';
@@ -10816,9 +10800,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 /* [SKIN log muted] */ void (0) && console.log('[SKIN] heroName:', heroName, 'skinHeroName:', skinHeroName, 'skins count:', skins.length, 'hasSkinBg:', hasSkinBg);
                 if (skins.length >= 1) {
                     if (skins.length > 1) {
-                        // 多皮肤：循环切换（用 cycleHeroSkin 返回的 nextSkin 直接重渲战斗槽，避免反查依赖陈旧 dataset）
-                        const ns = await cycleHeroSkin(skinHeroName, slotId);
-                        try { await applySkinBgToSlot(this, heroName, undefined, undefined, ns); } catch (e) { console.error('[SKIN] applySkinBgToSlot error in right-click:', e); }
+                        // 多皮肤：循环切换。cycleHeroSkin 内部已 await 重渲该槽（setCardSkin 的 forEach
+                        // 也会刷同卡槽位+手牌），此处不再重复调用 applySkinBgToSlot —— 旧实现同槽并发 3 次重绘，
+                        // 是「右键切皮变黑/慢 1-2 秒」的元凶之一。
+                        await cycleHeroSkin(skinHeroName, slotId);
                         return;
                     }
                     // 单皮肤：切换皮肤开/关
