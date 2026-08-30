@@ -3708,7 +3708,7 @@ if (true) {
     // 🔴 2026-08-29 内存优化：改为「LRU 上限缓存 + 淘汰时 revokeObjectURL」。
     //    原实现是无限增长的普通对象，且从不调用 revokeObjectURL —— 每看一张皮肤就常驻一份
     //    解码位图，413 张皮刷一遍即累积数百 MB，是 App 内存飙到 1.4G 的主因之一。
-    const SKIN_URL_CACHE_MAX = 80; // 上限约 80 张，足够当前阵容(14槽)+卡池浏览，超出按最久未用淘汰
+    const SKIN_URL_CACHE_MAX = 200; // 🔴 2026-08-30 80→200：413 张皮浏览一遍卡池就会把 14 槽缓存全挤掉，回来切皮又要重读盘+canvas 缩放（「本地反而慢」的来源）。与 _SKIN_BLOB_CACHE_MAX 对齐；blob 由 <img> 持有，Map 本身开销可忽略
     const skinImageUrlCache = new Map(); // filePath -> url（Map 保持插入顺序，天然支持 LRU）
 
     function _skinUrlRelease(url) {
@@ -4380,9 +4380,10 @@ if (true) {
     const _SKIN_BLOB_CACHE_MAX = 200;
     function _skinBlobCacheSet(url, blobUrl) {
         if (!url || !blobUrl) return;
-        // 覆盖同名旧 blobUrl 时先 revoke，避免旧 blob 泄漏（IndexedDB 分支每次命中都会生成新 blob）
-        const prev = _skinBlobUrlCache.get(url);
-        if (prev && prev !== blobUrl && prev.indexOf('blob:') === 0) { try { URL.revokeObjectURL(prev); } catch (e) {} }
+        // 🔴 2026-08-30 关键修复：覆盖同名旧 blobUrl 时【不再 revoke】。
+        //    右键切皮一次会并发触发多次 resolve，两个并发各自读盘生成 blobUrl1/blobUrl2，
+        //    后 set 的会把先 set、且正被 <img> 显示的 blobUrl1 revoke 掉 → 图变黑。
+        //    被覆盖的旧 blob 交给浏览器 GC（<img> 移除后自动回收），上限 200 的 LRU 已控制增长。
         _skinBlobUrlCache.set(url, blobUrl);
         // 超过上限 → 淘汰最旧（Map 迭代顺序=插入顺序，最旧在前面）
         // 🔴 2026-08-30 关键修复：淘汰时【不再 revoke】blob URL，与本地皮肤缓存

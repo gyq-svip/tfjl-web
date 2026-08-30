@@ -3708,7 +3708,7 @@ if (true) {
     // 🔴 2026-08-29 内存优化：改为「LRU 上限缓存 + 淘汰时 revokeObjectURL」。
     //    原实现是无限增长的普通对象，且从不调用 revokeObjectURL —— 每看一张皮肤就常驻一份
     //    解码位图，413 张皮刷一遍即累积数百 MB，是 App 内存飙到 1.4G 的主因之一。
-    const SKIN_URL_CACHE_MAX = 80; // 上限约 80 张，足够当前阵容(14槽)+卡池浏览，超出按最久未用淘汰
+    const SKIN_URL_CACHE_MAX = 200; // 🔴 2026-08-30 80→200：413 张皮浏览一遍卡池就会把 14 槽缓存全挤掉，回来切皮又要重读盘+canvas 缩放（「本地反而慢」的来源）。与 _SKIN_BLOB_CACHE_MAX 对齐；blob 由 <img> 持有，Map 本身开销可忽略
     const skinImageUrlCache = new Map(); // filePath -> url（Map 保持插入顺序，天然支持 LRU）
 
     function _skinUrlRelease(url) {
@@ -4380,9 +4380,10 @@ if (true) {
     const _SKIN_BLOB_CACHE_MAX = 200;
     function _skinBlobCacheSet(url, blobUrl) {
         if (!url || !blobUrl) return;
-        // 覆盖同名旧 blobUrl 时先 revoke，避免旧 blob 泄漏（IndexedDB 分支每次命中都会生成新 blob）
-        const prev = _skinBlobUrlCache.get(url);
-        if (prev && prev !== blobUrl && prev.indexOf('blob:') === 0) { try { URL.revokeObjectURL(prev); } catch (e) {} }
+        // 🔴 2026-08-30 关键修复：覆盖同名旧 blobUrl 时【不再 revoke】。
+        //    右键切皮一次会并发触发多次 resolve，两个并发各自读盘生成 blobUrl1/blobUrl2，
+        //    后 set 的会把先 set、且正被 <img> 显示的 blobUrl1 revoke 掉 → 图变黑。
+        //    被覆盖的旧 blob 交给浏览器 GC（<img> 移除后自动回收），上限 200 的 LRU 已控制增长。
         _skinBlobUrlCache.set(url, blobUrl);
         // 超过上限 → 淘汰最旧（Map 迭代顺序=插入顺序，最旧在前面）
         // 🔴 2026-08-30 关键修复：淘汰时【不再 revoke】blob URL，与本地皮肤缓存
@@ -4585,20 +4586,22 @@ if (true) {
         //    反复重刷即持续泄漏数百 MB（实测开一会飙到 4G）。
         //    改为：有本地 path 就永远走本地磁盘读图（快、缓存进 skinImageUrlCache、无泄漏），远程 url 仅作兜底。
         if (entry.path) {
-            const dataUrl = await getSkinImageUrl(entry.path);
-            if (dataUrl) {
-                entry.url = dataUrl; entry.loaded = true;
-                const cachedUrl = await _getCachedSkinUrl(dataUrl);
-                return { url: cachedUrl, name: entry.name, path: entry.path };
-            }
-            // 🔴 兜底：本地图读取失败（Rust 读图命令 read_image_base64 未编译进当前 exe / fs ACL 受限
-            //    / .skin 解码异常等）时，回退 Tauri 原生资源协议 asset://，由 WebView 直接加载文件，
-            //    不依赖任何 Rust 读图命令。否则本地皮肤 resolve 恒为 null → 切皮不动、融合皮不显示。
-            //    这是「没优化之前切皮丝滑」的同源机制（旧版即用 convertFileSrc 直接给 <img> 赋 src）。
+            // 🔴 2026-08-30 修复「切皮超级慢」：改回 Tauri 原生资源协议 asset://（convertFileSrc）优先。
+            //    配置 assetProtocol.enable=true + scope=["**"] 全放行、csp=null → 用户环境 asset:// 可用；
+            //    由 WebView 原生解码、浏览器按 URL 缓存，零 JS 缩放/解码开销 → 切皮丝滑不卡主线程。
+            //    之前误判"变黑"实为切换瞬间旧 img 已 remove、新 img 未 onload 的黑闪（非 asset:// 不可用），
+            //    已在 applySkinBgToSlot 用「双缓冲 onload 后移除旧图」根治。Rust 读图 blob 仅作兜底。
             const nativeUrl = (typeof convertFileSrc === 'function') ? convertFileSrc(entry.path) : null;
             if (nativeUrl) {
                 entry.url = nativeUrl; entry.loaded = true;
                 const cachedUrl = await _getCachedSkinUrl(nativeUrl);
+                return { url: cachedUrl, name: entry.name, path: entry.path };
+            }
+            // 兜底：asset:// 不可用（极旧 exe 未挂载全局 Tauri）时，走 Rust 读图（read_image_base64 → blob → 缩放）
+            const dataUrl = await getSkinImageUrl(entry.path);
+            if (dataUrl) {
+                entry.url = dataUrl; entry.loaded = true;
+                const cachedUrl = await _getCachedSkinUrl(dataUrl);
                 return { url: cachedUrl, name: entry.name, path: entry.path };
             }
         }
