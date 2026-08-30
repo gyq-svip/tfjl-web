@@ -64,6 +64,11 @@ description = "Allow creating directories"
 commands.allow = ["create_dir"]
 
 [[permission]]
+identifier = "allow-show-in-folder"
+description = "Allow revealing a file in the OS file manager (explorer /select)"
+commands.allow = ["show_in_folder"]
+
+[[permission]]
 identifier = "allow-rename-file"
 description = "Allow renaming files"
 commands.allow = ["rename_file"]

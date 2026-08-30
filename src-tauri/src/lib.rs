@@ -772,6 +772,37 @@ fn create_dir(dir_path: String) -> Result<(), String> {
     fs::create_dir_all(&dir_path).map_err(|e| e.to_string())
 }
 
+/// 在资源管理器中显示指定文件（选中状态）
+/// Windows: explorer /select,"path"
+#[tauri::command]
+fn show_in_folder(path: String) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        Command::new("explorer")
+            .args(["/select,", &path])
+            .spawn()
+            .map_err(|e| format!("启动 explorer 失败: {}", e))?;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        Command::new("open")
+            .args(["-R", &path])
+            .spawn()
+            .map_err(|e| format!("启动 Finder 失败: {}", e))?;
+    }
+    #[cfg(target_os = "linux")]
+    {
+        // Linux 兜底：用 xdg-open 打开父目录
+        let p = Path::new(&path);
+        let parent = p.parent().unwrap_or(Path::new("/"));
+        Command::new("xdg-open")
+            .arg(parent)
+            .spawn()
+            .map_err(|e| format!("启动文件管理器失败: {}", e))?;
+    }
+    Ok(())
+}
+
 /// 获取 App 版本号（编译时从 Cargo.toml 读取）
 #[tauri::command]
 fn get_app_version() -> String {
@@ -1390,9 +1421,12 @@ async fn download_skins(app: tauri::AppHandle, force: Option<bool>) -> Result<St
 /// 🔴 2026-08-29 新增：网页里的 fetch 拉 Gitee 发行版直链会被 CORS/重定向拦掉（报 "Failed to fetch"），
 ///    所以下载必须由 Rust 侧用 reqwest 完成（无跨域限制、走 Gitee 国内快）。
 ///    下载完由前端调 start_umi_ocr 启动安装，安装程序接管：关闭本程序 → 安装 → 自动重启。
+/// 🔴 2026-08-31 目录收编：更新包下载目录从 D:\withfriends\塔防精灵助手更新（独立目录）
+///    移到软件数据目录下（D:\withfriends\塔防精灵助手数据\update），与 data/skin、stats、
+///    backups 等子目录并列，数据目录成为唯一软件根。旧目录遗留的旧安装包可手动删除。
 #[tauri::command]
 async fn download_installer(app: tauri::AppHandle, url: String, file_name: String) -> Result<String, String> {
-    let base = r"D:\withfriends\塔防精灵助手更新";
+    let base = r"D:\withfriends\塔防精灵助手数据\update";
     std::fs::create_dir_all(base).map_err(|e| format!("创建更新目录失败: {}", e))?;
     let safe_name = if file_name.is_empty() { "tfjl-assistant-setup.exe".to_string() } else { file_name };
     let save_path = format!("{}\\{}", base, safe_name);
@@ -1496,6 +1530,7 @@ pub fn run() {
             install_app_update,
             path_exists,
             create_dir,
+            show_in_folder,
             umi_ocr,
             start_umi_ocr,
             pick_umi_ocr_exe,
