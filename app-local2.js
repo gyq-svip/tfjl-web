@@ -4012,6 +4012,15 @@ if (true) {
             console.log('[SKIN] scanSkins() 跳过：' + _since + 'ms 前刚扫描过（防重复全量扫描）');
             return window.skinRegistry;
         }
+        // 🔴 2026-08-30 网页版关键修复：网页版的皮肤注册表由 skins-web.js 管理（IndexedDB 缓存链路），
+        //    本函数是磁盘扫描（Tauri 专用）。旧代码在 softwareDataDir 判空前就执行
+        //    window.skinRegistry = {} —— 网页版每次启动（initAppLocal + DOMContentLoaded 两处调用）
+        //    都会把 skins-web 刚从 IndexedDB 恢复好的注册表清空 → 皮肤要等网络注册表拉完才回来，
+        //    弱网下「打开页面一片空白」。网页版直接原样返回，注册表交给 skins-web.js。
+        if (!isTauriApp) {
+            console.log('[SKIN] 网页版跳过磁盘扫描（注册表由 skins-web.js 管理）');
+            return window.skinRegistry;
+        }
         console.log('[SKIN] scanSkins() START');
         // 本轮扫描计数（汇总成一条日志，替代原先逐英雄打印）
         let _scanHeroCount = 0, _scanSkinCount = 0;
