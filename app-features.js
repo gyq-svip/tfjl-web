@@ -3789,19 +3789,34 @@
                     } catch(e) {}
                     return;
                 }
-                // 有新版 → 记录 + 版本号旁闪动 + 显示页脚 badge（点击走 Gitee 整包下载）
+                // 有新版 → 记录 + 底部版本号旁常驻「🔔 新版本」提示；toast 只在该版本首次发现时弹一次
                 _updateVersion = newVer;
                 try { window.__tfjlTargetVer = newVer; } catch(e) {} // 供右下角 tooltip 显示「可升目标版本」
                 _markVersionNew(newVer);
                 const lastNotified = (function(){ try { return localStorage.getItem(LAST_NOTIFIED_VERSION_KEY) || ''; } catch(e) { return ''; } })();
                 if (lastNotified !== newVer) {
                     try { localStorage.setItem(LAST_NOTIFIED_VERSION_KEY, newVer); } catch(e) {}
+                    _notifyNewVersion(newVer); // 首次发现该版本：顶部 toast + 常驻提示
                 }
-                _notifyNewVersion(newVer);
+                // 已通知过 → 仅常驻提示（下方运行中复查路径复用本函数，不重复弹 toast）
             } catch (e) {
                 console.warn('[auto-update] Gitee 通道自动检测失败（不影响使用）:', e);
             }
         }
+
+        // 🔴 2026-08-31 新增：大版本运行中复查（10 分钟节流），挂到 window 供 app-picker.js 联动。
+        //   根因：大版本检查只在启动跑一次（autoCheckUpdate + Rust check_app_update），
+        //   发版时 APP 正开着 → 提示永远弹不出来，用户只能重启 APP 才发现新版本。
+        //   修法：SW 确认「有新前端版本」时（= 刚发过版）联动复查大版本，长期挂着的 APP 也能弹提示。
+        window.__tfjlRecheckBigVersion = (function () {
+            let lastRun = 0;
+            return function () {
+                const now = Date.now();
+                if (now - lastRun < 600000) return; // 10 分钟节流，防 SW 反复触发
+                lastRun = now;
+                autoCheckUpdate();
+            };
+        })();
 
         // 下载完成提示（预下载成功，点击秒装）
         function _notifyPreDownloadReady() {
@@ -3844,9 +3859,16 @@
             }, 2000);
         }
 
-        // 2026-08-29：用户要求版本号处只显示版本号，不提示"发现新版本"。_markVersionNew 不再写任何提示/闪动/title。
+        // 2026-08-31 恢复：底部「版本: X」旁常驻「🔔 新版本 vX」绿色提示，点击立即静默升级。
+        // （2026-08-29 曾按当时诉求整体移除，用户 08-31 反馈大版本提示消失、只剩小版本气泡，故恢复；
+        //   版本号文字本身保持纯显示、不闪动，tooltip 仍只显示小版本号——两条历史诉求都不回退。）
         function _markVersionNew(version) {
-            // 保留空函数：调用方（云同步检测）仍会调它标记有新版本，但不再改变任何 UI 展示。
+            const hint = document.getElementById('versionUpdateHint');
+            if (!hint) return;
+            hint.textContent = '🔔 新版本 v' + version;
+            hint.style.display = 'inline-flex';
+            hint.title = '发现新版本 v' + version + '，点击立即更新';
+            hint.onclick = function () { _tfjlUpdateHintClick(); };
         }
 
         // 显示拍卖操作提示
