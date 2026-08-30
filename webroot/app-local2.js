@@ -1343,6 +1343,7 @@ if (true) {
     async function selectSoftwareDataDir() {
         const selected = await openFileDialog();
         if (selected) {
+            if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('APP设置数据目录');
             softwareDataDir = selected;
             document.getElementById('softwareDataDirInput').value = selected;
             // 在默认目录写引导标记，确保重装/清缓存后仍能定位到真实数据目录里的 tfjl.dat
@@ -1699,6 +1700,7 @@ if (true) {
     }
 
     function shareScannedFileFromMain(path, name) {
+        if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('APP扫描文件分享');
         if (window.shareScannedFileToWall) {
             window.shareScannedFileToWall(path, name);
         } else {
@@ -1711,6 +1713,7 @@ if (true) {
     async function computeFileDr(filePath, btnId) {
         const btn = document.getElementById(btnId);
         if (!btn) return;
+        if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('APP扫描减伤计算');
         btn.textContent = '...';
         btn.disabled = true;
 
@@ -1977,6 +1980,7 @@ if (true) {
     // ==================== 文件查看/编辑器 ====================
 
     async function detectFileEncoding(filePath) {
+        if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('APP扫描编码检测');
         try {
             // 优先调用 Rust 后端专用检测命令
             if (typeof window.__TAURI_INTERNALS__ !== 'undefined' && window.__TAURI_INTERNALS__.invoke) {
@@ -2005,6 +2009,7 @@ if (true) {
 
     async function viewFile(filePath) {
         // 套用统一新记事本框架 openScriptNotebook（与 txtFilesPanel 扫描文件一致：减伤栏/解析/查找替换/写回原文件/存项目）
+        if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('APP扫描文件查看');
         const fileName = filePath.split(/[\\/]/).pop();
         if (typeof openScannedInNotebook === 'function') {
             await openScannedInNotebook(filePath, fileName, false, true);  // zAboveSettings=true：浮窗层级高于设置面板(99999)，设置面板保留、可多开
@@ -2205,6 +2210,7 @@ if (true) {
     }
 
     async function loadFileToHand(filePath) {
+        if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('APP扫描文件加载手牌');
         await loadFileContentToHand(filePath);
     }
 
