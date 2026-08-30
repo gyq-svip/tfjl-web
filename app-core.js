@@ -8286,12 +8286,15 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 }
                 // 2. 刷新所有战斗槽里该卡牌的皮肤（我方+队友）—— 用已算好的 skin 直接重渲，与手牌对称
                 document.querySelectorAll('.battle-slot.filled').forEach(async (slot) => {
+                    // 🔴 2026-08-30 同卡皮肤独立：同卡 id 的槽可能分属我方/队友两侧，
+                    //    我方切皮只能刷我方槽（旧版不分阵营 → 队友同卡被用我方的皮重渲 =「主卡切皮副卡跟着变」）
                     if (slot.dataset.cardId !== cardId) return;
+                    if ((slot.dataset.handType || 'my') !== handType) return;
                     const slotCardName = getSlotCardName(slot)
                         || (handCard && handCard.dataset.name)
                         || '';
                     if (typeof applySkinBgToSlot === 'function') {
-                        try { await applySkinBgToSlot(slot, slotCardName, undefined, undefined, skin); } catch (e) {}
+                        try { await applySkinBgToSlot(slot, slotCardName, cardId, handType, skin); } catch (e) {}
                     }
                 });
                 // 3. ❌ 不刷新收藏区/卡池：项目内换皮只作用于卡槽+手牌，
@@ -10694,6 +10697,9 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             slot.innerHTML = '<span class="card-item" data-profession="' + prof + '">' + levelBadge + '<span class="card-name">' + cardName + '</span></span>';
             slot.classList.add('filled'); slot.classList.remove('empty');
             slot.dataset.cardId = cardId; slot.dataset.profession = prof;
+            // 🔴 2026-08-30 同卡皮肤独立：互换渲染也巩固 handType（槽若因历史路径缺失该值，
+            //    互换后渲染仍会兜底 'my' 读错皮肤 key）
+            slot.dataset.handType = handType;
             if (isEng) slot.dataset.engineering = 'true'; else delete slot.dataset.engineering;
             try { await applySkinBgToSlot(slot, cardName); } catch (e) {}
             refreshSlotFusionControl(slot);
@@ -10866,6 +10872,11 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     this.classList.add('filled');
                     this.classList.remove('empty');
                     this.dataset.cardId = cardId;
+                    // 🔴 2026-08-30 我方/队友同卡皮肤独立修复：手牌拖放上卡漏设 handType，
+                    //    槽位渲染（applySkinBgToSlot）读 dataset.handType → undefined → 兜底 'my'
+                    //    → 队友槽读到 cardSkins['my_卡id'] 的皮：我方切皮队友跟着变 / 队友切皮看似无效。
+                    //    （手牌点击上卡 10446、卡池拖放 10826、项目恢复 9757 均已设置，唯独此路径漏了）
+                    this.dataset.handType = handType;
                     this.dataset.profession = prof;
 
                     try { await applySkinBgToSlot(this, cardName); } catch (e) {}
