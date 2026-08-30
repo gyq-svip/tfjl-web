@@ -2282,42 +2282,6 @@
                 line-height: 1.6;
             }
 
-            /* ===== 方案C：悬浮提示 tooltip ===== */
-            .tfjl-tooltip {
-                position: fixed;
-                z-index: 100000;
-                max-width: 260px;
-                white-space: pre-line;
-                background: linear-gradient(135deg, #1a1a2e, #16213e);
-                color: #fff;
-                border: 1px solid rgba(79,195,247,0.6);
-                border-radius: 8px;
-                padding: 8px 12px;
-                font-size: 0.8rem;
-                line-height: 1.5;
-                box-shadow: 0 4px 18px rgba(0,0,0,0.5);
-                pointer-events: none;
-                opacity: 0;
-                transform: translateY(4px);
-                transition: opacity 0.15s ease, transform 0.15s ease;
-            }
-            .tfjl-tooltip.show { opacity: 1; transform: translateY(0); }
-            .tfjl-tooltip::after {
-                content: '';
-                position: absolute;
-                width: 8px; height: 8px;
-                background: inherit;
-                border-left: 1px solid rgba(79,195,247,0.6);
-                border-top: 1px solid rgba(79,195,247,0.6);
-            }
-            .tfjl-tooltip[data-pos="top"]::after { bottom: -5px; left: 14px; transform: rotate(225deg); }
-            .tfjl-tooltip[data-pos="bottom"]::after { top: -5px; left: 14px; transform: rotate(45deg); }
-            .tfjl-tooltip[data-pos="left"]::after { right: -5px; top: 12px; transform: rotate(135deg); }
-            .tfjl-tooltip[data-pos="right"]::after { left: -5px; top: 12px; transform: rotate(315deg); }
-
-
-            
-
             /* 记事本面板移动端适配 */
             #notepadPanelHeader {
                 padding: 8px 12px;
@@ -2753,4 +2717,40 @@
             opacity: 1;
             visibility: visible;
         }
-    
+
+        /* ===== 统一悬浮提示 tooltip（顶层，任何屏宽都生效） ===== */
+        /* 🔴 2026-08-30 修复「悬停一个都不显示」：这段 CSS 原先被误插进 @media (max-width: 768px)
+           块内（styles.css 2032 行开起的移动端适配区），桌面宽屏下整套规则不生效——
+           tooltip 无 position:fixed 无 z-index，div 渲染在 body 末尾的文档流里（视口外），
+           而 migrateTitle 又移除了原生 title → 结果什么都不显示。移出到顶层后恢复。 */
+        .tfjl-tooltip {
+            position: fixed;
+            z-index: 100000;
+            max-width: 260px;
+            white-space: pre-line;
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            color: #fff;
+            border: 1px solid rgba(79,195,247,0.6);
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 0.8rem;
+            line-height: 1.5;
+            box-shadow: 0 4px 18px rgba(0,0,0,0.5);
+            pointer-events: none;
+            opacity: 0;
+            transform: translateY(4px);
+            transition: opacity 0.15s ease, transform 0.15s ease;
+        }
+        .tfjl-tooltip.show { opacity: 1; transform: translateY(0); }
+        .tfjl-tooltip::after {
+            content: '';
+            position: absolute;
+            width: 8px; height: 8px;
+            background: inherit;
+            border-left: 1px solid rgba(79,195,247,0.6);
+            border-top: 1px solid rgba(79,195,247,0.6);
+        }
+        .tfjl-tooltip[data-pos="top"]::after { bottom: -5px; left: 14px; transform: rotate(225deg); }
+        .tfjl-tooltip[data-pos="bottom"]::after { top: -5px; left: 14px; transform: rotate(45deg); }
+        .tfjl-tooltip[data-pos="left"]::after { right: -5px; top: 12px; transform: rotate(135deg); }
+        .tfjl-tooltip[data-pos="right"]::after { left: -5px; top: 12px; transform: rotate(315deg); }
