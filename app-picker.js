@@ -540,6 +540,9 @@
                             window.__tfjlHasNewVersion = true;
                             _markNewVersionAvailable();
                             if (typeof notifyNewVersion === 'function') notifyNewVersion(); // 隐藏(托盘)时静默更，前台仅标记
+                            // 🔴 2026-08-31：确认刚发了新前端版本（= 有新部署）→ 联动复查大版本（APP 整包），
+                            //   修复「发版时 APP 已开着，大版本提示只在启动查过一次、之后永远不弹，必须重启 APP 才知道」。
+                            if (typeof window.__tfjlRecheckBigVersion === 'function') window.__tfjlRecheckBigVersion();
                         } else {
                             window.__tfjlHasNewVersion = false;
                             window.__pendingUpdate = false; // 已是最新：清掉 SW 事件残留的假"待更新"信号，防心跳反复重弹
