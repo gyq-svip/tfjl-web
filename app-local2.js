@@ -622,7 +622,9 @@ if (true) {
     const AUTO_BACKUP_PREFIX = 'tfjl-auto-backup-';             // 自动备份文件前缀（区别于手动 tfjl-full-backup-）
     const AUTO_BACKUP_DEFAULT_KEEP = 20;
 
-    // 自动加载开关：默认全部开启，用户卡顿可关闭
+    // 🔴 2026-08-31 开关恢复（用户确认不能删）：低配电脑开着统计扫盘会卡死，必须能手动关闭。
+    //    默认开启——正常电脑打开设置面板即自动显示两项统计（满足"默认显示"）；
+    //    关闭后不再自动扫盘，统计区显示明确关闭提示（而不是空白让人以为坏了），仍可手动强制刷新。
     const settingsConfig = { autoLoadScreenshotStats: true, autoLoadBattleStats: true, autoBackup: true, autoBackupKeep: AUTO_BACKUP_DEFAULT_KEEP, autoBackupTimer: true, autoBackupIntervalMin: 360 };
 
     // 自动备份配置也镜像进 localStorage（设置面板与 _autoBackupEnabled/_autoBackupKeep 共用）
@@ -809,10 +811,9 @@ if (true) {
                     }
                 }
                 softwareDataDir = parsed.softwareDataDir || '';
-                // 恢复开关状态
+                // 恢复统计自动加载开关 + 自动备份配置
                 if (typeof parsed.autoLoadScreenshotStats === 'boolean') settingsConfig.autoLoadScreenshotStats = parsed.autoLoadScreenshotStats;
                 if (typeof parsed.autoLoadBattleStats === 'boolean') settingsConfig.autoLoadBattleStats = parsed.autoLoadBattleStats;
-                // 恢复自动备份配置
                 if (typeof parsed.autoBackup === 'boolean') settingsConfig.autoBackup = parsed.autoBackup;
                 if (parsed.autoBackupKeep) { const k = parseInt(parsed.autoBackupKeep, 10); if (k >= 1 && k <= 999) settingsConfig.autoBackupKeep = k; }
                 if (typeof parsed.autoBackupTimer === 'boolean') settingsConfig.autoBackupTimer = parsed.autoBackupTimer;
@@ -972,7 +973,14 @@ if (true) {
         //    现在恢复平台门控：立即判定一次；若判定为否，用轮询兜底防「Tauri 全局注入晚于本函数」的极端时序
         //    （500ms×10 次共 5 秒，期间检测到立即显示，超时保持隐藏 = 网页版）。
         function _showAppBtnIfTauri() {
-            if (_isTauriRuntime()) { if (btn) btn.style.display = 'flex'; return true; }
+            if (_isTauriRuntime()) {
+                if (btn) btn.style.display = 'flex';
+                const pin = document.getElementById('alwaysOnTopBtn');
+                if (pin) pin.style.display = 'flex';
+                const clip = document.getElementById('clipboardImportBtn');
+                if (clip) clip.style.display = 'flex';
+                return true;
+            }
             return false;
         }
         if (!_showAppBtnIfTauri()) {
@@ -981,6 +989,8 @@ if (true) {
                 if (_showAppBtnIfTauri() || ++_btnTries >= 10) clearInterval(_btnTimer);
             }, 500);
         }
+        // 🔴 2026-08-31 APP专属·窗口置顶：启动时恢复上次的置顶状态（记在 localStorage）
+        _tryRestoreAlwaysOnTop();
         await restoreLocalFromDisk();  // 先恢复磁盘配置（重装/清缓存后复原）
         loadConfig();
         initDataSync();  // 启动 localStorage → 用户数据目录自动同步
@@ -1029,6 +1039,87 @@ if (true) {
 
     // ==================== 设置面板 ====================
 
+    // 🔴 2026-08-31 APP专属·窗口置顶（悬浮在游戏上方，边玩边查阵容/脚本）。
+    //    实现走 Tauri window 插件命令 plugin:window|set_always_on_top，
+    //    需 capabilities 里有 core:window:allow-set-always-on-top（2026-08-31 起打包内置）。
+    //    老版本 APP（≤2.0.22）无此权限 → invoke 报 "not allowed by ACL" → 提示升级，
+    //    状态不落库（防止误记「已置顶」但实际没置顶）。
+    const ALWAYS_ON_TOP_KEY = 'tfjl_alwaysOnTop';
+
+    async function _invokeWindowAlwaysOnTop(on) {
+        const inv = (window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke)
+                 || (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke);
+        if (!inv) throw new Error('非APP环境');
+        // 同时传 value/alwaysOnTop 两个键名兼容不同版本参数命名（多余键 serde 会忽略）
+        await inv('plugin:window|set_always_on_top', { label: 'main', value: !!on, alwaysOnTop: !!on });
+    }
+
+    function _updateAlwaysOnTopUI(on) {
+        const pin = document.getElementById('alwaysOnTopBtn');
+        if (!pin) return;
+        pin.style.background = on ? 'rgba(255,215,0,0.95)' : 'rgba(90,90,140,0.85)';
+        pin.style.color = on ? '#1a1a2e' : 'white';
+        pin.title = on ? '取消窗口置顶（恢复正常层级）' : '窗口置顶（悬浮在游戏上方，边玩边查）';
+    }
+
+    async function toggleAlwaysOnTop() {
+        const next = localStorage.getItem(ALWAYS_ON_TOP_KEY) !== '1';
+        try {
+            await _invokeWindowAlwaysOnTop(next);
+            if (next) localStorage.setItem(ALWAYS_ON_TOP_KEY, '1');
+            else localStorage.setItem(ALWAYS_ON_TOP_KEY, '0');
+            _updateAlwaysOnTopUI(next);
+            if (typeof showToast === 'function') showToast(next ? '📌 窗口已置顶：可悬浮在游戏上方使用' : '📌 已取消置顶', 'success');
+            if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('窗口置顶:' + (next ? '开' : '关'));
+        } catch (e) {
+            console.warn('[置顶] 调用失败（老版APP无权限）:', e && (e.message || e));
+            if (typeof showToast === 'function') showToast('📌 置顶功能需要更新到新版APP后使用', 'error');
+        }
+    }
+
+    async function _tryRestoreAlwaysOnTop() {
+        if (localStorage.getItem(ALWAYS_ON_TOP_KEY) !== '1') return;
+        try {
+            await _invokeWindowAlwaysOnTop(true);
+            _updateAlwaysOnTopUI(true);
+        } catch (e) { /* 老版APP无权限：静默，按钮仍可点（点了会提示升级） */ }
+    }
+
+    // 🔴 2026-08-31 APP专属·剪贴板导入脚本：在需求墙/群聊/论坛复制脚本内容 → 点 📋 一键导入项目。
+    //    复用 showSaveScriptDialog（两级选择：先分类再项目 + 新建项目），走 isCopy 副本路径，源内容只读不改。
+    async function importScriptFromClipboard() {
+        let text = '';
+        try {
+            if (!navigator.clipboard || !navigator.clipboard.readText) throw new Error('clipboard API 不可用');
+            text = await navigator.clipboard.readText();
+        } catch (e) {
+            console.warn('[剪贴板导入] 读取失败:', e && (e.message || e));
+            if (typeof showToast === 'function') showToast('❌ 无法读取剪贴板，请先复制脚本内容后再点', 'error');
+            return;
+        }
+        text = (text || '').replace(/\r\n/g, '\n').trim();
+        // 最基本的有效性判定：太短多半不是脚本（选中一句话/一个词的复制会误触）
+        if (!text || text.length < 20) {
+            if (typeof showToast === 'function') showToast('📋 剪贴板没有检测到脚本内容（先在需求墙/群聊里复制完整脚本）', 'error');
+            return;
+        }
+        if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('剪贴板导入脚本');
+        // 默认文件名：取第一行非空文本做名（截 24 字符防过长），非法字符清洗；识别不出则按日期命名
+        let fileName = '';
+        const firstLine = (text.split('\n').find(l => l.trim().length > 0) || '').trim();
+        if (firstLine && firstLine.length <= 40) {
+            fileName = firstLine.replace(/[\\/:*?"<>|]/g, '').trim().slice(0, 24);
+        }
+        if (!fileName) fileName = '剪贴板脚本_' + getTodayStr();
+        if (!/\.txt$/i.test(fileName)) fileName += '.txt';
+        if (typeof showSaveScriptDialog !== 'function') {
+            if (typeof showToast === 'function') showToast('❌ 导入组件未就绪，请稍后重试', 'error');
+            return;
+        }
+        // showSaveScriptDialog(名字, 内容)：名字作为 copyName（.txt 结尾直接做默认文件名）
+        showSaveScriptDialog(fileName, text);
+    }
+
     function openAppLocalSettings() {
         // 网页版按钮已隐藏，此分支只剩「其他入口误调」场景：给提示而非静默无反应
         if (!_isTauriRuntime()) {
@@ -1040,19 +1131,47 @@ if (true) {
         // 扫描文件列表总是执行（轻量）
         scanAllFiles();
         if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('打开APP设置');
-        // 自动加载统计：根据开关决定
-        if (settingsConfig.autoLoadScreenshotStats) calcScreenshotStats();
-        if (settingsConfig.autoLoadBattleStats) calcLogBattleStats();
+        // 🔴 2026-08-31 开关恢复：默认开启时打开面板即自动加载两项统计（默认显示）；
+        //    低配电脑关闭后不再自动扫盘（防卡死），统计区显示关闭提示，仍可手动强制刷新。
+        //    calcScreenshotStats/calcLogBattleStats 内部自带"缓存优先、无缓存才扫盘"的分级策略。
+        // 🔧 2026-08-31 修复：用 requestAnimationFrame 确保 DOM 完全挂载后再统计，
+        //    避免偶发的"元素找不到"导致的静默失败；同时包裹 try-catch 防止异常中断。
+        requestAnimationFrame(() => {
+            if (settingsConfig.autoLoadScreenshotStats) {
+                try { calcScreenshotStats(); }
+                catch (e) { console.error('[autoLoad] screenshot stats error:', e); }
+            } else {
+                _renderStatsOffHint('screenshotStats', '车主副本统计');
+            }
+            if (settingsConfig.autoLoadBattleStats) {
+                try { calcLogBattleStats(); }
+                catch (e) { console.error('[autoLoad] battle stats error:', e); }
+            } else {
+                _renderStatsOffHint('logBattleStats', '对战统计');
+            }
+        });
     }
 
-    // Toggle 开关切换
+    // 统计开关关闭时的占位提示：让用户明确知道"为什么没自动显示"（是关了，不是坏了）
+    function _renderStatsOffHint(containerId, name) {
+        const el = document.getElementById(containerId);
+        if (!el) return;
+        el.innerHTML = '<div style="color:rgba(255,255,255,0.35);text-align:center;padding:16px;font-size:0.8rem;line-height:1.6;">⏸ ' + name + '自动加载已关闭（低配电脑防卡死）<br>点上方「自动」开关恢复，或点「强制刷新」手动算一次</div>';
+    }
+
+    // Toggle 开关切换（车主副本统计 / 对战统计）
     function toggleAutoLoadSetting(type) {
         if (type === 'screenshot') {
             settingsConfig.autoLoadScreenshotStats = !settingsConfig.autoLoadScreenshotStats;
             updateToggleUI('screenshot', settingsConfig.autoLoadScreenshotStats);
+            // 开了立即加载一次；关了显示关闭提示
+            if (settingsConfig.autoLoadScreenshotStats) calcScreenshotStats();
+            else _renderStatsOffHint('screenshotStats', '车主副本统计');
         } else if (type === 'battle') {
             settingsConfig.autoLoadBattleStats = !settingsConfig.autoLoadBattleStats;
             updateToggleUI('battle', settingsConfig.autoLoadBattleStats);
+            if (settingsConfig.autoLoadBattleStats) calcLogBattleStats();
+            else _renderStatsOffHint('logBattleStats', '对战统计');
         }
         saveConfig();
         if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('APP设置开关:' + type);
@@ -1135,7 +1254,7 @@ if (true) {
                     <div onclick="toggleMaDirConfig()" style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;">
                         <span id="maDirToggleIcon" style="color:#00bcd4;font-size:0.75rem;transition:transform 0.2s;">▶</span>
                         <span style="color:#00bcd4;font-size:0.9rem;font-weight:600;">📂 老马脚本目录配置</span>
-                        <span id="maDirCollapsedHint" style="color:rgba(255,255,255,0.35);font-size:0.72rem;">— 点击展开，设置老马电脑上的脚本/对战/截图等目录路径</span>
+                        <span id="maDirCollapsedHint" style="color:rgba(255,255,255,0.35);font-size:0.72rem;">— 点击展开，设置脚本/对战/截图/临时/软件数据等目录路径</span>
                         <button onclick="event.stopPropagation();restoreDefaultMaDirs()" title="把6个目录恢复为默认路径（解决改错路径导致扫描卡死）" style="margin-left:auto;background:rgba(255,255,255,0.1);color:#ffd700;border:1px solid rgba(255,215,0,0.3);padding:4px 12px;border-radius:6px;cursor:pointer;font-size:0.75rem;white-space:nowrap;">↺ 恢复默认目录</button>
                     </div>
                     <div id="maDirConfigBody" style="display:none;margin-top:10px;">
@@ -1188,10 +1307,9 @@ if (true) {
                     </div>
                 </div>
 
-                    </div>
-                </div>
-
-                <div style="margin-bottom:12px;">
+                <!-- 🔴 2026-08-31 布局调整：临时脚本目录 + 软件数据目录收进「老马脚本目录配置」折叠区，
+                     顶层只留常用区（扫描脚本/统计/备份），面板更聚焦 -->
+                <div style="margin-bottom:12px;margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.1);">
                     <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;display:block;margin-bottom:4px;">📝 临时脚本目录（临时存放的文件）</label>
                     <div style="display:flex;gap:8px;">
                         <input type="text" id="maDir_temp" readonly placeholder="未设置" style="flex:1;background:rgba(0,0,0,0.3);color:#fff;border:1px solid rgba(255,255,255,0.2);padding:8px 12px;border-radius:6px;font-size:0.85rem;">
@@ -1199,8 +1317,8 @@ if (true) {
                     </div>
                 </div>
 
-                <div style="color:#4caf50;font-size:0.9rem;margin-bottom:12px;">💾 软件数据目录（项目存储位置）</div>
                 <div style="margin-bottom:12px;">
+                    <label style="color:#4caf50;font-size:0.85rem;display:block;margin-bottom:4px;">💾 软件数据目录（项目存储位置）</label>
                     <div style="display:flex;gap:8px;">
                         <input type="text" id="softwareDataDirInput" readonly placeholder="未设置，默认使用APP安装目录" style="flex:1;background:rgba(0,0,0,0.3);color:#fff;border:1px solid rgba(255,255,255,0.2);padding:8px 12px;border-radius:6px;font-size:0.85rem;">
                         <button onclick="selectSoftwareDataDir()" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;white-space:nowrap;">浏览...</button>
@@ -1208,6 +1326,70 @@ if (true) {
                     <div style="color:rgba(255,255,255,0.35);font-size:0.68rem;margin-top:4px;line-height:1.4;">📌 设置后所有APP数据自动以 <b>tfjl_*.json</b> 文件存到此目录，可直接备份、迁移、查看。</div>
                 </div>
 
+                    </div>
+                </div>
+
+                <!-- 🔴 2026-08-31 开关恢复（不能删：低配电脑开着会卡死）：开关内联进各统计标题行，
+                     与「强制刷新」并排；默认开启（打开面板即自动显示统计），关闭时统计区显示明确提示。 -->
+                <!-- 🔴 2026-08-31 布局调整：车主副本统计 + 对战统计 上移到「备份与还原」上方（用户指定顺序） -->
+
+                <div style="margin-bottom:20px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                        <label style="color:#ffd700;font-size:0.9rem;">📋 扫描到的脚本文件</label>
+                        <button onclick="scanAllFiles(true)" style="background:linear-gradient(135deg,#ff9800,#e65100);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">🔄 刷新扫描</button>
+                    </div>
+                    <!-- 工具栏（搜索框+分类）独立容器，不参与每次重绘，避免中文输入法 composition 被打断打不出中文 -->
+                    <div id="scannedFileToolbar" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,0.1);">
+                        <input type="text" id="scannedFileSearchInput" value="" placeholder="🔍 搜索文件名…" oninput="setScannedFilterKeyword(this.value)" style="flex:1;min-width:120px;padding:6px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:rgba(0,0,0,0.3);color:#fff;font-size:0.8rem;box-sizing:border-box;">
+                        <div id="scannedFileCats" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;"></div>
+                        <button id="scannedShareModeBtn" onclick="toggleScannedShareMode()" title="分享模式：快速分享到需求墙" style="background:linear-gradient(135deg,#7c4dff,#b388ff);color:#fff;border:none;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:0.75rem;font-weight:bold;white-space:nowrap;">📢 分享模式</button>
+                    </div>
+                    <div id="scannedFileList" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:8px;min-height:60px;max-height:250px;overflow:auto;">
+                        <div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">扫描中...</div>
+                    </div>
+                    <div id="fuzzyStatsArea" style="margin-top:8px;background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:8px;min-height:24px;"></div>
+                </div>
+
+                <div style="margin-bottom:20px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                        <label style="color:#e040fb;font-size:0.9rem;">🚗 车主副本开车统计（按截图数统计每天打多少局）</label>
+                        <div style="display:flex;gap:8px;align-items:center;">
+                            <label id="lblAutoScreenshot" title="打开面板卡/低配电脑时可关闭自动加载（防卡死），需要时再点强制刷新" style="display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;" onclick="toggleAutoLoadSetting('screenshot')">
+                                <span style="color:rgba(255,255,255,0.55);font-size:0.72rem;white-space:nowrap;">自动</span>
+                                <span id="tglAutoScreenshot" style="display:inline-block;width:36px;height:20px;border-radius:10px;background:#4caf50;position:relative;transition:background 0.2s;">
+                                    <span style="display:inline-block;width:16px;height:16px;border-radius:50%;background:#fff;position:absolute;top:2px;left:18px;transition:left 0.2s;"></span>
+                                </span>
+                            </label>
+                            <button onclick="calcScreenshotStats(true)" style="background:linear-gradient(135deg,#9c27b0,#6a1b9a);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">📊 强制刷新</button>
+                        </div>
+                    </div>
+                    <div id="screenshotStats" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:8px;min-height:60px;">
+                        <div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">配置截图目录后点击统计</div>
+                    </div>
+                </div>
+
+
+                <div style="margin-bottom:20px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                        <label style="color:#ff9800;font-size:0.9rem;">🏆 对战统计（只支持单开，无法区分多个账号的单独统计）</label>
+                        <div style="display:flex;gap:6px;align-items:center;">
+                            <label id="lblAutoBattle" title="打开面板卡/低配电脑时可关闭自动加载（防卡死），需要时再点强制刷新" style="display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;" onclick="toggleAutoLoadSetting('battle')">
+                                <span style="color:rgba(255,255,255,0.55);font-size:0.72rem;white-space:nowrap;">自动</span>
+                                <span id="tglAutoBattle" style="display:inline-block;width:36px;height:20px;border-radius:10px;background:#4caf50;position:relative;transition:background 0.2s;">
+                                    <span style="display:inline-block;width:16px;height:16px;border-radius:50%;background:#fff;position:absolute;top:2px;left:18px;transition:left 0.2s;"></span>
+                                </span>
+                            </label>
+                            <button onclick="clearLogBattleCache()" title="清除缓存后下次会重新扫描所有文件" style="background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.4);border:1px solid rgba(255,255,255,0.1);padding:5px 8px;border-radius:6px;cursor:pointer;font-size:0.7rem;">🗑️ 清除缓存</button>
+                            <button onclick="calcLogBattleStats(true)" style="background:linear-gradient(135deg,#ff9800,#e65100);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">📊 强制刷新</button>
+                        </div>
+                    </div>
+                    <div style="color:rgba(255,255,255,0.25);font-size:0.65rem;margin-bottom:6px;">⚠️ 第一次加载非常慢，建议日志目录只保留1天的文件，其他的移走/删除</div>
+                    <div id="logBattleStats" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:8px;min-height:60px;">
+                        <div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">配置日志目录后自动统计</div>
+                    </div>
+                </div>
+
+                <!-- 🔴 2026-08-31 布局调整：「备份与还原」从顶部移到统计下方（原在老马目录配置下方） -->
                 <div style="color:#ff9800;font-size:0.9rem;margin-bottom:12px;margin-top:16px;">📦 备份与还原</div>
                 <div style="margin-bottom:12px;background:rgba(255,152,0,0.06);border:1px solid rgba(255,152,0,0.2);border-radius:10px;padding:14px;">
                     <div style="display:flex;gap:8px;align-items:center;">
@@ -1254,66 +1436,6 @@ if (true) {
                     </div>
                 </div>
 
-                <div style="margin-bottom:16px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:12px 14px;">
-                    <div style="color:rgba(255,255,255,0.5);font-size:0.7rem;margin-bottom:8px;">💡 提示：如果打开设置面板或加载统计时感觉很卡，可尝试关闭以下自动加载功能</div>
-                    <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;">
-                        <label id="lblAutoScreenshot" style="display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;" onclick="toggleAutoLoadSetting('screenshot')">
-                            <span id="tglAutoScreenshot" style="display:inline-block;width:36px;height:20px;border-radius:10px;background:#4caf50;position:relative;transition:background 0.2s;">
-                                <span style="display:inline-block;width:16px;height:16px;border-radius:50%;background:#fff;position:absolute;top:2px;left:18px;transition:left 0.2s;"></span>
-                            </span>
-                            <span style="color:rgba(255,255,255,0.7);font-size:0.78rem;">🚗 车主副本统计</span>
-                        </label>
-                        <label id="lblAutoBattle" style="display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;" onclick="toggleAutoLoadSetting('battle')">
-                            <span id="tglAutoBattle" style="display:inline-block;width:36px;height:20px;border-radius:10px;background:#4caf50;position:relative;transition:background 0.2s;">
-                                <span style="display:inline-block;width:16px;height:16px;border-radius:50%;background:#fff;position:absolute;top:2px;left:18px;transition:left 0.2s;"></span>
-                            </span>
-                            <span style="color:rgba(255,255,255,0.7);font-size:0.78rem;">🏆 对战统计</span>
-                        </label>
-                    </div>
-                </div>
-
-                <div style="margin-bottom:20px;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                        <label style="color:#ffd700;font-size:0.9rem;">📋 扫描到的脚本文件</label>
-                        <button onclick="scanAllFiles(true)" style="background:linear-gradient(135deg,#ff9800,#e65100);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">🔄 刷新扫描</button>
-                    </div>
-                    <!-- 工具栏（搜索框+分类）独立容器，不参与每次重绘，避免中文输入法 composition 被打断打不出中文 -->
-                    <div id="scannedFileToolbar" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,0.1);">
-                        <input type="text" id="scannedFileSearchInput" value="" placeholder="🔍 搜索文件名…" oninput="setScannedFilterKeyword(this.value)" style="flex:1;min-width:120px;padding:6px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:rgba(0,0,0,0.3);color:#fff;font-size:0.8rem;box-sizing:border-box;">
-                        <div id="scannedFileCats" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;"></div>
-                        <button id="scannedShareModeBtn" onclick="toggleScannedShareMode()" title="分享模式：快速分享到需求墙" style="background:linear-gradient(135deg,#7c4dff,#b388ff);color:#fff;border:none;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:0.75rem;font-weight:bold;white-space:nowrap;">📢 分享模式</button>
-                    </div>
-                    <div id="scannedFileList" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:8px;min-height:60px;max-height:250px;overflow:auto;">
-                        <div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">扫描中...</div>
-                    </div>
-                    <div id="fuzzyStatsArea" style="margin-top:8px;background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:8px;min-height:24px;"></div>
-                </div>
-
-                <div style="margin-bottom:20px;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                        <label style="color:#e040fb;font-size:0.9rem;">🚗 车主副本开车统计（按截图数统计每天打多少局）</label>
-                        <button onclick="calcScreenshotStats(true)" style="background:linear-gradient(135deg,#9c27b0,#6a1b9a);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">📊 强制刷新</button>
-                    </div>
-                    <div id="screenshotStats" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:8px;min-height:60px;">
-                        <div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">配置截图目录后点击统计</div>
-                    </div>
-                </div>
-
-
-                <div style="margin-bottom:20px;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-                        <label style="color:#ff9800;font-size:0.9rem;">🏆 对战统计（只支持单开，无法区分多个账号的单独统计）</label>
-                        <div style="display:flex;gap:6px;align-items:center;">
-                            <button onclick="clearLogBattleCache()" title="清除缓存后下次会重新扫描所有文件" style="background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.4);border:1px solid rgba(255,255,255,0.1);padding:5px 8px;border-radius:6px;cursor:pointer;font-size:0.7rem;">🗑️ 清除缓存</button>
-                            <button onclick="calcLogBattleStats(true)" style="background:linear-gradient(135deg,#ff9800,#e65100);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">📊 强制刷新</button>
-                        </div>
-                    </div>
-                    <div style="color:rgba(255,255,255,0.25);font-size:0.65rem;margin-bottom:6px;">⚠️ 第一次加载非常慢，建议日志目录只保留1天的文件，其他的移走/删除</div>
-                    <div id="logBattleStats" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:8px;min-height:60px;">
-                        <div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">配置日志目录后自动统计</div>
-                    </div>
-                </div>
-
 
                 <div style="display:flex;gap:10px;justify-content:flex-end;">
                     <button onclick="saveSettingsAndClose()" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:10px 24px;border-radius:6px;cursor:pointer;font-size:0.9rem;">💾 保存设置</button>
@@ -1333,7 +1455,7 @@ if (true) {
         document.getElementById('maDir_logs').value = maDirs.logs || '';
         document.getElementById('maDir_temp').value = maDirs.temp || '';
         document.getElementById('softwareDataDirInput').value = softwareDataDir || '';
-        // 恢复自动加载开关 UI 状态
+        // 恢复统计自动加载开关（默认开；低配电脑可关）
         updateToggleUI('screenshot', settingsConfig.autoLoadScreenshotStats);
         updateToggleUI('battle', settingsConfig.autoLoadBattleStats);
         // 恢复自动备份开关与保留份数
@@ -4858,7 +4980,10 @@ if (true) {
     // ==================== 导出函数到全局 ====================
     window.maDirs = maDirs;
     window.openAppLocalSettings = openAppLocalSettings;
+    window.toggleAlwaysOnTop = toggleAlwaysOnTop;
+    window.importScriptFromClipboard = importScriptFromClipboard;
     window.closeAppLocalSettings = closeAppLocalSettings;
+    window.toggleAutoLoadSetting = toggleAutoLoadSetting;
     window.selectMaDir = selectMaDir;
     window.selectSoftwareDataDir = selectSoftwareDataDir;
     window.scanAllFiles = scanAllFiles;
@@ -4876,7 +5001,6 @@ if (true) {
     window.doBatchShareScannedFromMain = doBatchShareScannedFromMain;
     window.shareScannedFileFromMain = shareScannedFileFromMain;
     window.saveSettingsAndClose = saveSettingsAndClose;
-    window.toggleAutoLoadSetting = toggleAutoLoadSetting;
     window.toggleAutoBackup = toggleAutoBackup;
     window.onAutoBackupKeepInput = onAutoBackupKeepInput;
     window.toggleAutoBackupTimer = toggleAutoBackupTimer;
@@ -4945,6 +5069,441 @@ if (true) {
     window.convertFileSrc = convertFileSrc;
     window.loadSkinSelections = loadSkinSelections;
     window.exportConsoleLogsToFile = exportConsoleLogsToFile;
+    // 阵容分享图片
+    window.shareLineupAsImage = shareLineupAsImage;
+    window.closeShareLineupModal = closeShareLineupModal;
+
+    // ==================== 阵容一键分享为图片 ====================
+    // 生成一张精美的阵容分享图，包含双方卡组和手牌，可保存/复制/分享
+    let _shareLineupCanvas = null;
+    let _shareLineupModal = null;
+
+    async function shareLineupAsImage() {
+        if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('阵容分享图片');
+        // 收集当前阵容数据
+        const projectName = (typeof getCurrentProjectName === 'function') ? getCurrentProjectName() : '我的阵容';
+        const category = (typeof getCurrentCategory === 'function') ? getCurrentCategory() : '';
+        const myPlaced = (typeof myPlacedCards !== 'undefined') ? myPlacedCards : [];
+        const teammatePlaced = (typeof teammatePlacedCards !== 'undefined') ? teammatePlacedCards : [];
+        const myHand = (typeof myHandCards !== 'undefined') ? myHandCards : [];
+        const teammateHand = (typeof teammateHandCards !== 'undefined') ? teammateHandCards : [];
+
+        // 画布尺寸：宽 900，高根据内容动态计算
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const W = 900;
+        // 预估高度：标题区 + 卡组区(双方) + 手牌区(双方) + 底部水印
+        const headerH = 100;
+        const battleAreaH = 280;
+        const handAreaH = 180;
+        const footerH = 60;
+        const H = headerH + battleAreaH + handAreaH + footerH + 40;
+        canvas.width = W;
+        canvas.height = H;
+
+        // ========== 背景 ==========
+        const bgGrad = ctx.createLinearGradient(0, 0, 0, H);
+        bgGrad.addColorStop(0, '#1a1a2e');
+        bgGrad.addColorStop(0.5, '#16213e');
+        bgGrad.addColorStop(1, '#0f3460');
+        ctx.fillStyle = bgGrad;
+        ctx.fillRect(0, 0, W, H);
+
+        // 装饰：顶部光晕
+        const glowGrad = ctx.createRadialGradient(W/2, 0, 0, W/2, 0, 400);
+        glowGrad.addColorStop(0, 'rgba(78, 205, 196, 0.15)');
+        glowGrad.addColorStop(1, 'rgba(78, 205, 196, 0)');
+        ctx.fillStyle = glowGrad;
+        ctx.fillRect(0, 0, W, 300);
+
+        // ========== 标题区 ==========
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 32px "Microsoft YaHei", "PingFang SC", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(projectName, W/2, 55);
+
+        if (category) {
+            ctx.fillStyle = '#4ecdc4';
+            ctx.font = '16px "Microsoft YaHei", sans-serif';
+            ctx.fillText('「' + category + '」', W/2, 82);
+        }
+
+        // 分割线
+        ctx.strokeStyle = 'rgba(78, 205, 196, 0.3)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(60, 100);
+        ctx.lineTo(W - 60, 100);
+        ctx.stroke();
+
+        // ========== 卡组区 ==========
+        const battleY = headerH + 20;
+        const slotSize = 72;
+        const slotGap = 10;
+        const colWidth = (slotSize * 7 + slotGap * 6) / 2 + slotSize + slotGap; // 含工程位的总宽
+        const myBattleX = W/2 - colWidth - 20;
+        const teamBattleX = W/2 + 20;
+
+        // 我的卡组标签
+        ctx.fillStyle = '#4ecdc4';
+        ctx.font = 'bold 18px "Microsoft YaHei", sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText('👤 我的卡组', myBattleX, battleY + 5);
+
+        // 队友卡组标签
+        ctx.fillStyle = '#ffd93d';
+        ctx.fillText('👥 队友卡组', teamBattleX, battleY + 5);
+
+        // 绘制卡槽函数
+        async function drawSlot(x, y, card, isEngineering) {
+            // 槽位背景
+            const slotGrad = ctx.createLinearGradient(x, y, x, y + slotSize);
+            slotGrad.addColorStop(0, 'rgba(255,255,255,0.08)');
+            slotGrad.addColorStop(1, 'rgba(255,255,255,0.03)');
+            ctx.fillStyle = slotGrad;
+            ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+            ctx.lineWidth = 2;
+            roundRect(ctx, x, y, slotSize, slotSize, 10);
+            ctx.fill();
+            ctx.stroke();
+
+            if (isEngineering) {
+                ctx.fillStyle = 'rgba(255,255,255,0.4)';
+                ctx.font = '20px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('🔧', x + slotSize/2, y + slotSize/2 + 7);
+            }
+
+            if (card) {
+                // 尝试加载并绘制皮肤图
+                try {
+                    const skinUrl = (typeof resolveHeroSkinUrl === 'function')
+                        ? await resolveHeroSkinUrl(card.name, null)
+                        : null;
+                    if (skinUrl) {
+                        const img = await loadImage(skinUrl);
+                        // 保持比例绘制
+                        const imgRatio = img.width / img.height;
+                        const slotRatio = slotSize / slotSize;
+                        let drawW, drawH, drawX, drawY;
+                        if (imgRatio > slotRatio) {
+                            drawH = slotSize - 8;
+                            drawW = drawH * imgRatio;
+                            drawX = x + (slotSize - drawW) / 2;
+                            drawY = y + 4;
+                        } else {
+                            drawW = slotSize - 8;
+                            drawH = drawW / imgRatio;
+                            drawX = x + 4;
+                            drawY = y + (slotSize - drawH) / 2;
+                        }
+                        ctx.save();
+                        ctx.beginPath();
+                        roundRect(ctx, x + 2, y + 2, slotSize - 4, slotSize - 4, 8);
+                        ctx.clip();
+                        ctx.drawImage(img, drawX, drawY, drawW, drawH);
+                        ctx.restore();
+                    }
+                } catch (e) {
+                    // 图片加载失败， fallback 到文字
+                }
+
+                // 卡牌名（底部）
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 11px "Microsoft YaHei", sans-serif';
+                ctx.textAlign = 'center';
+                const name = card.name.length > 4 ? card.name.substring(0, 4) + '..' : card.name;
+                ctx.fillText(name, x + slotSize/2, y + slotSize - 4);
+            }
+        }
+
+        // 辅助：圆角矩形
+        function roundRect(ctx, x, y, w, h, r) {
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + w - r, y);
+            ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+            ctx.lineTo(x + w, y + h - r);
+            ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+            ctx.lineTo(x + r, y + h);
+            ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+            ctx.lineTo(x, y + r);
+            ctx.quadraticCurveTo(x, y, x + r, y);
+            ctx.closePath();
+        }
+
+        // 辅助：加载图片
+        function loadImage(src) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = () => resolve(img);
+                img.onerror = reject;
+                img.src = src;
+            });
+        }
+
+        // 绘制我的卡组（工程位 u0 + u1~u6）
+        const myBattleSlotY = battleY + 35;
+        const myEngCard = myPlaced.find(c => c.slot === 'u0') || null;
+        await drawSlot(myBattleX, myBattleSlotY, myEngCard, true);
+        for (let i = 1; i <= 6; i++) {
+            const card = myPlaced.find(c => c.slot === 'u' + i) || null;
+            const sx = myBattleX + slotSize + slotGap + (i - 1) * (slotSize + slotGap * 0.3);
+            await drawSlot(sx, myBattleSlotY, card, false);
+        }
+
+        // 绘制队友卡组（工程位 t0 + t1~t6）
+        const teamEngCard = teammatePlaced.find(c => c.slot === 't0') || null;
+        await drawSlot(teamBattleX, myBattleSlotY, teamEngCard, true);
+        for (let i = 1; i <= 6; i++) {
+            const card = teammatePlaced.find(c => c.slot === 't' + i) || null;
+            const sx = teamBattleX + slotSize + slotGap + (i - 1) * (slotSize + slotGap * 0.3);
+            await drawSlot(sx, myBattleSlotY, card, false);
+        }
+
+        // ========== 手牌区 ==========
+        const handY = battleY + battleAreaH;
+        const handCardW = 54;
+        const handCardH = 72;
+        const handGap = 6;
+
+        // 我的手牌
+        ctx.fillStyle = '#4ecdc4';
+        ctx.font = 'bold 16px "Microsoft YaHei", sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText('📋 我的手牌 (' + myHand.length + '/10)', myBattleX, handY + 5);
+
+        const myHandY = handY + 25;
+        for (let i = 0; i < Math.min(myHand.length, 10); i++) {
+            const card = myHand[i];
+            const hx = myBattleX + i * (handCardW + handGap);
+            // 卡背
+            const hGrad = ctx.createLinearGradient(hx, myHandY, hx, myHandY + handCardH);
+            hGrad.addColorStop(0, 'rgba(78, 205, 196, 0.15)');
+            hGrad.addColorStop(1, 'rgba(78, 205, 196, 0.05)');
+            ctx.fillStyle = hGrad;
+            ctx.strokeStyle = 'rgba(78, 205, 196, 0.4)';
+            ctx.lineWidth = 1.5;
+            roundRect(ctx, hx, myHandY, handCardW, handCardH, 6);
+            ctx.fill();
+            ctx.stroke();
+            // 卡图
+            try {
+                const skinUrl = (typeof resolveHeroSkinUrl === 'function')
+                    ? await resolveHeroSkinUrl(card.name, null) : null;
+                if (skinUrl) {
+                    const img = await loadImage(skinUrl);
+                    ctx.save();
+                    ctx.beginPath();
+                    roundRect(ctx, hx + 2, myHandY + 2, handCardW - 4, handCardH - 16, 4);
+                    ctx.clip();
+                    const ratio = img.width / img.height;
+                    const dw = handCardW - 4;
+                    const dh = dw / ratio;
+                    ctx.drawImage(img, hx + 2, myHandY + 2 + ((handCardH - 16) - dh) / 2, dw, dh);
+                    ctx.restore();
+                }
+            } catch (e) {}
+            // 卡名
+            ctx.fillStyle = '#fff';
+            ctx.font = '10px "Microsoft YaHei", sans-serif';
+            ctx.textAlign = 'center';
+            const hname = card.name.length > 3 ? card.name.substring(0, 3) : card.name;
+            ctx.fillText(hname, hx + handCardW/2, myHandY + handCardH - 4);
+        }
+
+        // 队友手牌
+        ctx.fillStyle = '#ffd93d';
+        ctx.fillText('📋 队友手牌 (' + teammateHand.length + '/10)', teamBattleX, handY + 5);
+
+        for (let i = 0; i < Math.min(teammateHand.length, 10); i++) {
+            const card = teammateHand[i];
+            const hx = teamBattleX + i * (handCardW + handGap);
+            const hGrad = ctx.createLinearGradient(hx, myHandY, hx, myHandY + handCardH);
+            hGrad.addColorStop(0, 'rgba(255, 217, 61, 0.15)');
+            hGrad.addColorStop(1, 'rgba(255, 217, 61, 0.05)');
+            ctx.fillStyle = hGrad;
+            ctx.strokeStyle = 'rgba(255, 217, 61, 0.4)';
+            ctx.lineWidth = 1.5;
+            roundRect(ctx, hx, myHandY, handCardW, handCardH, 6);
+            ctx.fill();
+            ctx.stroke();
+            try {
+                const skinUrl = (typeof resolveHeroSkinUrl === 'function')
+                    ? await resolveHeroSkinUrl(card.name, null) : null;
+                if (skinUrl) {
+                    const img = await loadImage(skinUrl);
+                    ctx.save();
+                    ctx.beginPath();
+                    roundRect(ctx, hx + 2, myHandY + 2, handCardW - 4, handCardH - 16, 4);
+                    ctx.clip();
+                    const ratio = img.width / img.height;
+                    const dw = handCardW - 4;
+                    const dh = dw / ratio;
+                    ctx.drawImage(img, hx + 2, myHandY + 2 + ((handCardH - 16) - dh) / 2, dw, dh);
+                    ctx.restore();
+                }
+            } catch (e) {}
+            ctx.fillStyle = '#fff';
+            ctx.font = '10px "Microsoft YaHei", sans-serif';
+            ctx.textAlign = 'center';
+            const hname = card.name.length > 3 ? card.name.substring(0, 3) : card.name;
+            ctx.fillText(hname, hx + handCardW/2, myHandY + handCardH - 4);
+        }
+
+        // ========== 底部水印 ==========
+        const footerY = H - 40;
+        ctx.fillStyle = 'rgba(255,255,255,0.3)';
+        ctx.font = '13px "Microsoft YaHei", sans-serif';
+        ctx.textAlign = 'center';
+        const version = (typeof getAppVersion === 'function') ? getAppVersion() : '';
+        ctx.fillText('塔防精灵助手 ' + version + ' · 一键生成阵容分享图', W/2, footerY);
+
+        _shareLineupCanvas = canvas;
+        showShareLineupModal(canvas, projectName);
+    }
+
+    // 显示分享预览弹窗
+    function showShareLineupModal(canvas, projectName) {
+        // 移除旧的
+        if (_shareLineupModal) {
+            _shareLineupModal.remove();
+            _shareLineupModal = null;
+        }
+
+        const modal = document.createElement('div');
+        modal.id = 'shareLineupModal';
+        modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:10000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(8px);';
+        modal.onclick = function(e) {
+            if (e.target === modal) closeShareLineupModal();
+        };
+
+        const box = document.createElement('div');
+        box.style.cssText = 'background:linear-gradient(180deg,#1e293b,#0f172a);border-radius:16px;padding:24px;max-width:95vw;max-height:90vh;display:flex;flex-direction:column;align-items:center;gap:16px;box-shadow:0 20px 60px rgba(0,0,0,0.5);border:1px solid rgba(78,205,196,0.2);';
+
+        const title = document.createElement('div');
+        title.textContent = '📸 阵容分享图';
+        title.style.cssText = 'color:#fff;font-size:20px;font-weight:bold;';
+
+        const imgContainer = document.createElement('div');
+        imgContainer.style.cssText = 'overflow:auto;max-height:60vh;border-radius:10px;';
+        const img = document.createElement('img');
+        img.src = canvas.toDataURL('image/png');
+        img.style.cssText = 'max-width:100%;height:auto;border-radius:10px;';
+        imgContainer.appendChild(img);
+
+        const btnRow = document.createElement('div');
+        btnRow.style.cssText = 'display:flex;gap:12px;flex-wrap:wrap;justify-content:center;';
+
+        // 保存到本地按钮
+        const saveBtn = document.createElement('button');
+        saveBtn.textContent = '💾 保存到本地';
+        saveBtn.style.cssText = 'background:linear-gradient(135deg,#4ecdc4,#44a08d);color:#fff;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:bold;';
+        saveBtn.onclick = async function() {
+            try {
+                const dataUrl = canvas.toDataURL('image/png');
+                const base64 = dataUrl.split(',')[1];
+                const fileName = '阵容_' + (projectName || '分享') + '_' + new Date().toISOString().slice(0,10) + '.png';
+
+                if (_isTauriRuntime() && softwareDataDir) {
+                    // 桌面端：保存到数据目录下的 share 文件夹
+                    const shareDir = softwareDataDir.replace(/[\\/]+$/, '') + '\\share';
+                    const exists = await pathExists(shareDir);
+                    if (!exists) await createDir(shareDir);
+                    const filePath = shareDir + '\\' + fileName;
+                    const result = await invoke('write_binary_file', { path: filePath, contents: base64 });
+                    if (result && result.success) {
+                        if (typeof showToast === 'function') showToast('已保存到：' + filePath, 'success');
+                        // 尝试打开目录
+                        try { await invoke('show_in_folder', { path: filePath }); } catch (e) {}
+                    } else {
+                        throw new Error(result?.error || '保存失败');
+                    }
+                } else {
+                    // 网页版：直接下载
+                    const a = document.createElement('a');
+                    a.href = dataUrl;
+                    a.download = fileName;
+                    a.click();
+                }
+            } catch (e) {
+                console.error('保存失败:', e);
+                if (typeof showToast === 'function') showToast('保存失败：' + e.message, 'error');
+            }
+        };
+
+        // 复制到剪贴板按钮
+        const copyBtn = document.createElement('button');
+        copyBtn.textContent = '📋 复制图片';
+        copyBtn.style.cssText = 'background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:bold;';
+        copyBtn.onclick = async function() {
+            try {
+                canvas.toBlob(async function(blob) {
+                    try {
+                        if (_isTauriRuntime()) {
+                            // Tauri 端：调用 Rust 复制图片到剪贴板
+                            const reader = new FileReader();
+                            reader.onload = async function() {
+                                const base64 = reader.result.split(',')[1];
+                                try {
+                                    const r = await invoke('copy_image_to_clipboard', { imageBase64: base64 });
+                                    if (r && r.success) {
+                                        if (typeof showToast === 'function') showToast('图片已复制到剪贴板', 'success');
+                                    } else {
+                                        throw new Error(r?.error || '复制失败');
+                                    }
+                                } catch (e) {
+                                    // 兜底：用 navigator.clipboard
+                                    if (navigator.clipboard && window.ClipboardItem) {
+                                        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+                                        if (typeof showToast === 'function') showToast('图片已复制到剪贴板', 'success');
+                                    } else {
+                                        throw e;
+                                    }
+                                }
+                            };
+                            reader.readAsDataURL(blob);
+                        } else if (navigator.clipboard && window.ClipboardItem) {
+                            await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+                            if (typeof showToast === 'function') showToast('图片已复制到剪贴板', 'success');
+                        } else {
+                            throw new Error('当前浏览器不支持复制图片');
+                        }
+                    } catch (e) {
+                        console.error('复制失败:', e);
+                        if (typeof showToast === 'function') showToast('复制失败：' + e.message, 'error');
+                    }
+                }, 'image/png');
+            } catch (e) {
+                if (typeof showToast === 'function') showToast('复制失败：' + e.message, 'error');
+            }
+        };
+
+        // 关闭按钮
+        const closeBtn = document.createElement('button');
+        closeBtn.textContent = '✕ 关闭';
+        closeBtn.style.cssText = 'background:rgba(255,255,255,0.1);color:#fff;border:1px solid rgba(255,255,255,0.2);padding:10px 20px;border-radius:8px;cursor:pointer;font-size:14px;';
+        closeBtn.onclick = closeShareLineupModal;
+
+        btnRow.appendChild(saveBtn);
+        btnRow.appendChild(copyBtn);
+        btnRow.appendChild(closeBtn);
+
+        box.appendChild(title);
+        box.appendChild(imgContainer);
+        box.appendChild(btnRow);
+        modal.appendChild(box);
+        document.body.appendChild(modal);
+        _shareLineupModal = modal;
+    }
+
+    function closeShareLineupModal() {
+        if (_shareLineupModal) {
+            _shareLineupModal.remove();
+            _shareLineupModal = null;
+        }
+    }
 
     // 暴露诊断所需的内部依赖给全局（供文件末尾的全局 runDiagnostics 在网页版也能调用）
     window.__tfjlDiagApi = {

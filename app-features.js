@@ -3204,7 +3204,10 @@
                 if (!inv || !info || !info.url) return false;
 
                 const safeName = info.fileName || 'tfjl-assistant-setup.exe';
-                const dir = 'D:\\withfriends\\塔防精灵助手更新';
+                // 🔴 2026-08-31 目录收编：更新包目录从独立的「塔防精灵助手更新」移到软件数据目录下（update 子目录）。
+                //    这里只负责预建目录；实际保存路径以 Rust download_installer 的返回值为准（老包 Rust
+                //    仍写旧目录，返回的旧路径照样能启动安装，互不影响；新包写入新目录）。
+                const dir = 'D:\\withfriends\\塔防精灵助手数据\\update';
                 try { await inv('create_dir', { dirPath: dir }); } catch (e) { /* 目录可能已存在 */ }
                 const savePath = dir + '\\' + safeName;
 
@@ -7768,4 +7771,513 @@
                 }
             })();
         };
-        
+
+        // ==================== 📸 阵容一键分享图 + 阵容码导入（2026-08-31） ====================
+        // 把当前上阵阵容（我方 7 格 + 队友 7 格）canvas 渲染成一张分享图：职业渐变底/皮肤图/等级徽章/
+        // 魔化🔮/融合副卡（左上金框斜切）/洗炼减伤，底部附「阵容码」（TFJL1.xxx）。
+        // 接收方两条路一键复刻：①菜单「📥 从阵容码导入」粘贴码 ②打开分享链接（#lineup=码）自动弹导入。
+        // 数据源直接读 DOM 槽位：所见即所得，皮肤层 <img> 已解码（blob:/asset: 同源无跨域），canvas 不污染。
+
+        // 职业渐变（与 styles.css .battle-slot.filled[data-profession] 保持一致，改 CSS 记得同步这里）
+        const LINEUP_PROF_COLORS = {
+            warrior: ['#dc2626', '#991b1b'], mage: ['#93c5fd', '#60a5fa'], archer: ['#3b82f6', '#1d4ed8'],
+            summoner: ['#a855f7', '#7c3aed'], priest: ['#4ade80', '#22c55e'], warlock: ['#374151', '#1f2937'],
+            panda: ['#fcd34d', '#f59e0b'], engineering: ['#14b8a6', '#0d9488'], pokeball: ['#ef4444', '#b91c1c']
+        };
+
+        // 读取一侧（u=我方 / t=队友）7 个槽位（u0/t0 是工程格）的展示数据；空槽返回 null 占位
+        function _lineupCollect(prefix) {
+            const out = [];
+            for (let i = 0; i <= 6; i++) {
+                const slot = document.querySelector('.battle-slot[data-slot="' + prefix + i + '"]');
+                if (!slot || !slot.classList.contains('filled')) { out.push(null); continue; }
+                const nameEl = slot.querySelector('.card-name');
+                const badge = slot.querySelector('.card-level-badge');
+                const badgeTxt = badge ? (badge.textContent || '') : '';
+                out.push({
+                    slot: prefix + i,
+                    name: (nameEl && nameEl.dataset && nameEl.dataset.fullName) || (nameEl ? nameEl.textContent : ''),
+                    display: nameEl ? nameEl.textContent : '',
+                    level: badgeTxt.replace('🔮', '').trim(),
+                    mohua: badgeTxt.indexOf('🔮') >= 0,
+                    skin: (badge && badge.dataset && badge.dataset.skin) || '',
+                    prof: slot.dataset.profession || '',
+                    eng: slot.dataset.type === 'engineering',
+                    mainImg: slot.querySelector('.skin-layer'),
+                    fusedImg: slot.querySelector('.skin-layer-fused')
+                });
+            }
+            return out;
+        }
+
+        // ---- 阵容码编解码（UTF-8 安全 Base64，前缀 TFJL1. 便于识别/容错） ----
+        function _lineupEncode(data) {
+            return 'TFJL1.' + btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+        }
+        function _lineupDecode(code) {
+            let s = String(code || '').trim();
+            const p = s.indexOf('TFJL1.');
+            if (p >= 0) s = s.slice(p + 6);              // 容忍「前面带说明文字」的整段粘贴
+            s = s.replace(/\s+/g, '');
+            if (!s) throw new Error('阵容码为空');
+            const m = /^[A-Za-z0-9+/=]+/.exec(s);        // 容忍「后面带说明文字」（聊天里整段复制）
+            if (!m || !m[0]) throw new Error('阵容码为空');
+            const json = decodeURIComponent(escape(atob(m[0])));
+            const data = JSON.parse(json);
+            if (!data || data.t !== 'TFJL' || !Array.isArray(data.my) || !Array.isArray(data.tm)) {
+                throw new Error('不是有效的阵容码（缺少我方/队友数据）');
+            }
+            return data;
+        }
+
+        // ---- canvas 绘图小工具 ----
+        function _lineupRoundRect(ctx, x, y, w, h, r) {
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.arcTo(x + w, y, x + w, y + h, r);
+            ctx.arcTo(x + w, y + h, x, y + h, r);
+            ctx.arcTo(x, y + h, x, y, r);
+            ctx.arcTo(x, y, x + w, y, r);
+            ctx.closePath();
+        }
+        function _lineupDrawCover(ctx, img, x, y, w, h) {
+            const iw = img.naturalWidth, ih = img.naturalHeight;
+            if (!iw || !ih) return;
+            const scale = Math.max(w / iw, h / ih);
+            const dw = iw * scale, dh = ih * scale;
+            ctx.drawImage(img, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
+        }
+
+        // 画一个槽位卡片（120×140）。card 为 null 时画空槽。
+        function _lineupDrawSlot(ctx, x, y, w, h, card) {
+            const r = 12;
+            if (!card) {
+                _lineupRoundRect(ctx, x, y, w, h, r);
+                ctx.fillStyle = 'rgba(255,255,255,0.05)';
+                ctx.fill();
+                ctx.setLineDash([6, 5]);
+                ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.fillStyle = 'rgba(255,255,255,0.3)';
+                ctx.font = '16px "Microsoft YaHei", sans-serif';
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText('空', x + w / 2, y + h / 2);
+                return;
+            }
+            const pair = LINEUP_PROF_COLORS[card.prof] || ['#5c6bc0', '#3949ab'];
+            const hasImg = !!(card.mainImg && card.mainImg.complete && card.mainImg.naturalWidth > 0);
+            // 底：无皮肤=职业渐变铺满；有皮肤=先铺渐变（边框外露），图 cover 裁切
+            _lineupRoundRect(ctx, x, y, w, h, r);
+            ctx.save();
+            ctx.clip();
+            const grad = ctx.createLinearGradient(x, y, x + w, y + h);
+            grad.addColorStop(0, pair[0]); grad.addColorStop(1, pair[1]);
+            ctx.fillStyle = grad;
+            ctx.fillRect(x, y, w, h);
+            if (hasImg) {
+                _lineupDrawCover(ctx, card.mainImg, x, y, w, h);
+            }
+            // 融合副卡：左上 40% 正方形 + 金色边框 + 右下切角（与 CSS .skin-layer-fused 一致）
+            if (card.fusedImg && card.fusedImg.complete && card.fusedImg.naturalWidth > 0) {
+                const fw = Math.round(w * 0.42), fh = fw;
+                ctx.save();
+                ctx.beginPath();
+                ctx.moveTo(x + 4, y + 4);
+                ctx.lineTo(x + 4 + fw, y + 4);
+                ctx.lineTo(x + 4 + fw, y + 4 + fh * 0.85);
+                ctx.lineTo(x + 4 + fw * 0.85, y + 4 + fh);
+                ctx.lineTo(x + 4, y + 4 + fh);
+                ctx.closePath();
+                ctx.clip();
+                _lineupDrawCover(ctx, card.fusedImg, x + 4, y + 4, fw, fh);
+                ctx.restore();
+                ctx.strokeStyle = '#FFD700';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(x + 4, y + 4);
+                ctx.lineTo(x + 4 + fw, y + 4);
+                ctx.lineTo(x + 4 + fw, y + 4 + fh * 0.85);
+                ctx.lineTo(x + 4 + fw * 0.85, y + 4 + fh);
+                ctx.lineTo(x + 4, y + 4 + fh);
+                ctx.closePath();
+                ctx.stroke();
+            }
+            ctx.restore();
+            // 卡名：底部贴边（有皮肤=半透明黑条；无皮肤=居中大字）
+            ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+            if (hasImg) {
+                const barH = 26;
+                ctx.fillStyle = 'rgba(0,0,0,0.55)';
+                ctx.fillRect(x, y + h - barH, w, barH);
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 15px "Microsoft YaHei", sans-serif';
+                ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 4;
+                ctx.fillText(card.display || card.name, x + w / 2, y + h - 8);
+                ctx.shadowBlur = 0;
+            } else {
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 17px "Microsoft YaHei", sans-serif';
+                ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4;
+                ctx.fillText(card.display || card.name, x + w / 2, y + h / 2 - 8);
+                ctx.shadowBlur = 0;
+            }
+            // 等级徽章：右上角（有皮肤=彩色渐变，与 UI has-skin 一致）
+            if (card.level) {
+                const txt = String(card.level) + (card.mohua ? '🔮' : '');
+                ctx.font = 'bold 14px "Microsoft YaHei", sans-serif';
+                const bw = Math.max(30, ctx.measureText(txt).width + 14);
+                const bx = x + w - bw - 5, by = y + 5, bh = 22;
+                _lineupRoundRect(ctx, bx, by, bw, bh, 6);
+                if (hasImg) {
+                    const bg = ctx.createLinearGradient(bx, by, bx + bw, by + bh);
+                    bg.addColorStop(0, '#ff6b6b'); bg.addColorStop(0.5, '#feca57'); bg.addColorStop(1, '#48dbfb');
+                    ctx.fillStyle = bg;
+                } else {
+                    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+                }
+                ctx.fill();
+                ctx.strokeStyle = card.mohua ? 'rgba(168,85,247,0.9)' : 'rgba(255,255,255,0.25)';
+                ctx.lineWidth = card.mohua ? 2 : 1;
+                ctx.stroke();
+                ctx.fillStyle = hasImg ? '#fff' : '#ffd700';
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(txt, bx + bw / 2, by + bh / 2 + 1);
+            }
+            // 工程格 🔧 标记
+            if (card.eng) {
+                ctx.font = '16px "Microsoft YaHei", sans-serif';
+                ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+                ctx.fillStyle = 'rgba(255,255,255,0.95)';
+                ctx.fillText('🔧', x + 6, y + 6);
+            }
+        }
+
+        // 生成分享图 canvas（含标题/两行阵容/阵容码/品牌脚注）
+        async function _lineupBuildCanvas() {
+            const my = _lineupCollect('u');
+            const tm = _lineupCollect('t');
+            const filled = my.concat(tm).filter(Boolean).length;
+            if (!filled) return { canvas: null, filled: 0 };
+
+            const W = 1080, PAD = 40;
+            const SLOT_W = 120, SLOT_H = 140, GAP = 14;
+            const gridW = 7 * SLOT_W + 6 * GAP;
+            const gridX = Math.round((W - gridW) / 2);
+
+            const now = new Date();
+            const dateStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+            const nick = (function () { try { return localStorage.getItem('TFJL_UserName') || '匿名'; } catch (e) { return '匿名'; } })();
+            const projName = (typeof currentProjectName !== 'undefined' && currentProjectName) ? currentProjectName : '';
+            const drTxt = function (id) { const el = document.getElementById(id); const m = el && /([\d.]+)/.exec(el.textContent || ''); return m ? m[1] : null; };
+            const myDr = drTxt('myDamageReduction'), tmDr = drTxt('teammateDamageReduction');
+
+            // 阵容码（导入方据此复刻：卡名/槽位/等级/皮肤/魔化）
+            const payload = { t: 'TFJL', v: 1, n: projName, by: nick, d: dateStr, my: [], tm: [] };
+            const pushCards = function (arr, target) {
+                arr.forEach(function (c) {
+                    if (!c) return;
+                    target.push({ s: c.slot, n: c.name, l: c.level, k: c.skin || '', m: c.mohua ? 1 : 0 });
+                });
+            };
+            pushCards(my, payload.my); pushCards(tm, payload.tm);
+            const code = _lineupEncode(payload);
+
+            // 高度按阵容码行数自适应（最多展示 4 行，超出省略，完整码在弹窗里复制）
+            const codeLines = [];
+            for (let i = 0; i < code.length && codeLines.length < 4; i += 66) codeLines.push(code.slice(i, i + 66));
+            const codeTruncated = code.length > 4 * 66;
+
+            const H = 96 + 40 + 30 + SLOT_H + 26 + 30 + SLOT_H + 34 + 44 + codeLines.length * 20 + 16 + 56;
+
+            const canvas = document.createElement('canvas');
+            canvas.width = W; canvas.height = H;
+            const ctx = canvas.getContext('2d');
+            // 背景
+            const bg = ctx.createLinearGradient(0, 0, W, H);
+            bg.addColorStop(0, '#1a1a2e'); bg.addColorStop(1, '#141426');
+            ctx.fillStyle = bg;
+            ctx.fillRect(0, 0, W, H);
+            // 标题
+            ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+            ctx.fillStyle = '#ffd700';
+            ctx.font = 'bold 40px "Microsoft YaHei", "PingFang SC", sans-serif';
+            ctx.fillText('塔防精灵 · 阵容分享', W / 2, 58);
+            ctx.fillStyle = 'rgba(255,255,255,0.65)';
+            ctx.font = '20px "Microsoft YaHei", sans-serif';
+            const subParts = [projName ? '项目：' + projName : '当前阵容', dateStr, 'by ' + nick];
+            ctx.fillText(subParts.join('　·　'), W / 2, 90);
+
+            // 两行阵容
+            let y = 96 + 40;
+            const drawRow = function (label, cards, drVal, labelColor) {
+                ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+                ctx.fillStyle = labelColor;
+                ctx.font = 'bold 22px "Microsoft YaHei", sans-serif';
+                const fullLabel = label + (drVal ? '　洗炼总减伤 ' + drVal : '');
+                ctx.fillText(fullLabel, gridX, y + 15);
+                y += 30;
+                cards.forEach(function (c, i) {
+                    _lineupDrawSlot(ctx, gridX + i * (SLOT_W + GAP), y, SLOT_W, SLOT_H, c);
+                });
+                y += SLOT_H + 26;
+            };
+            drawRow('👤 我方', my, myDr, '#4fc3f7');
+            drawRow('👥 队友', tm, tmDr, '#81c784');
+
+            // 阵容码区
+            y += 8;
+            ctx.fillStyle = 'rgba(255,255,255,0.05)';
+            _lineupRoundRect(ctx, PAD, y, W - PAD * 2, 44 + codeLines.length * 20, 10);
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(255,215,0,0.35)';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+            ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+            ctx.fillStyle = '#ffd700';
+            ctx.font = 'bold 17px "Microsoft YaHei", sans-serif';
+            ctx.fillText('📋 阵容码（复制后可在软件「从阵容码导入」一键复刻）', PAD + 16, y + 22);
+            ctx.fillStyle = 'rgba(255,255,255,0.75)';
+            ctx.font = '13px Consolas, "Courier New", monospace';
+            codeLines.forEach(function (line, i) {
+                ctx.fillText(line + (codeTruncated && i === codeLines.length - 1 ? ' …' : ''), PAD + 16, y + 46 + i * 20);
+            });
+            y += 44 + codeLines.length * 20 + 16;
+
+            // 脚注
+            ctx.textAlign = 'center';
+            ctx.fillStyle = 'rgba(255,255,255,0.4)';
+            ctx.font = '15px "Microsoft YaHei", sans-serif';
+            ctx.fillText('塔防精灵助手 生成于 ' + dateStr + ' ' + now.toTimeString().slice(0, 5), W / 2, H - 26);
+
+            return { canvas: canvas, filled: filled, code: code, payload: payload };
+        }
+
+        // 📸 分享阵容图：弹窗预览 + 下载/复制图片/复制码/复制链接
+        async function shareLineupImage() {
+            if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('分享阵容图');
+            let result;
+            try { result = await _lineupBuildCanvas(); }
+            catch (e) {
+                if (typeof showToast === 'function') showToast('❌ 生成阵容图失败：' + (e && e.message || e), 'error');
+                return;
+            }
+            if (!result || !result.canvas) {
+                if (typeof showToast === 'function') showToast('当前阵容是空的（我方和队友都没有上阵卡），先摆好阵容再分享', 'error');
+                return;
+            }
+            let dataUrl = '';
+            try { dataUrl = result.canvas.toDataURL('image/png'); }
+            catch (e) {
+                // canvas 被跨域皮肤图污染（理论不该发生，兜底提示）
+                if (typeof showToast === 'function') showToast('❌ 图片导出被浏览器安全策略拦截（皮肤图跨域），请截图分享', 'error');
+                return;
+            }
+            const code = result.code;
+            const link = (function () {
+                try { return location.origin + location.pathname + '#lineup=' + encodeURIComponent(code); } catch (e) { return ''; }
+            })();
+
+            const old = document.getElementById('lineupShareModal');
+            if (old) old.remove();
+            const modal = document.createElement('div');
+            modal.id = 'lineupShareModal';
+            modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.72);z-index:' + (200000 + (window.topWinZIndex || 0)) + ';display:flex;align-items:center;justify-content:center;padding:16px;';
+            modal.innerHTML =
+                '<div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(255,215,0,0.45);border-radius:16px;padding:18px 20px;max-width:860px;width:96%;max-height:92vh;overflow-y:auto;box-shadow:0 10px 40px rgba(0,0,0,0.6);">' +
+                  '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
+                    '<div><span style="color:#ffd700;font-size:1.1rem;font-weight:bold;">📸 阵容分享图</span>' +
+                    '<div style="color:rgba(255,255,255,0.45);font-size:0.74rem;margin-top:2px;">发到群里，对方保存图片即可看阵容；复制阵容码/链接可一键复刻</div></div>' +
+                    '<span id="lineupShareClose" style="cursor:pointer;color:rgba(255,255,255,0.4);font-size:1.5rem;">×</span>' +
+                  '</div>' +
+                  '<img id="lineupShareImg" style="width:100%;border-radius:10px;display:block;box-shadow:0 4px 18px rgba(0,0,0,0.5);" alt="阵容分享图">' +
+                  '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">' +
+                    '<button id="lineupShareDl" style="flex:1;min-width:120px;background:linear-gradient(135deg,#ffd700,#ff9800);color:#1a1a2e;border:none;padding:10px;border-radius:8px;cursor:pointer;font-size:0.9rem;font-weight:bold;">💾 下载图片</button>' +
+                    '<button id="lineupShareCopyImg" style="flex:1;min-width:120px;background:linear-gradient(135deg,#26a69a,#00796b);color:#fff;border:none;padding:10px;border-radius:8px;cursor:pointer;font-size:0.9rem;font-weight:bold;">📋 复制图片</button>' +
+                    '<button id="lineupShareCopyCode" style="flex:1;min-width:120px;background:linear-gradient(135deg,#42a5f5,#1565c0);color:#fff;border:none;padding:10px;border-radius:8px;cursor:pointer;font-size:0.9rem;font-weight:bold;">📃 复制阵容码</button>' +
+                    (link ? '<button id="lineupShareCopyLink" style="flex:1;min-width:120px;background:linear-gradient(135deg,#ab47bc,#6a1b9a);color:#fff;border:none;padding:10px;border-radius:8px;cursor:pointer;font-size:0.9rem;font-weight:bold;">🔗 复制链接</button>' : '') +
+                  '</div>' +
+                  '<div style="margin-top:10px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:8px 10px;">' +
+                    '<div style="color:rgba(255,255,255,0.45);font-size:0.72rem;margin-bottom:4px;">阵容码（对方在软件菜单「📥 从阵容码导入」粘贴）：</div>' +
+                    '<textarea id="lineupShareCodeTa" readonly style="width:100%;box-sizing:border-box;height:64px;background:rgba(0,0,0,0.35);color:#cfd8dc;border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:6px 8px;font-size:0.72rem;font-family:Consolas,monospace;resize:none;"></textarea>' +
+                  '</div>' +
+                '</div>';
+            document.body.appendChild(modal);
+            modal.querySelector('#lineupShareImg').src = dataUrl;
+            modal.querySelector('#lineupShareCodeTa').value = code;
+            const close = function () { modal.remove(); };
+            modal.querySelector('#lineupShareClose').onclick = close;
+            modal.onclick = function (e) { if (e.target === modal) close(); };
+
+            modal.querySelector('#lineupShareDl').onclick = function () {
+                const a = document.createElement('a');
+                a.href = dataUrl;
+                const pn = (typeof currentProjectName !== 'undefined' && currentProjectName) ? currentProjectName.replace(/[\\/:*?"<>|]/g, '') : '阵容';
+                a.download = '塔防阵容_' + pn + '_' + Date.now() + '.png';
+                document.body.appendChild(a); a.click(); a.remove();
+            };
+            modal.querySelector('#lineupShareCopyImg').onclick = async function () {
+                try {
+                    const blob = await new Promise(function (res, rej) { result.canvas.toBlob(function (b) { b ? res(b) : rej(new Error('toBlob 失败')); }, 'image/png'); });
+                    await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+                    if (typeof showToast === 'function') showToast('📋 图片已复制，可直接粘贴到微信/QQ', 'success');
+                } catch (e) {
+                    if (typeof showToast === 'function') showToast('❌ 当前环境不支持复制图片，请用「下载图片」', 'error');
+                }
+            };
+            const copyText = async function (text, okMsg) {
+                try {
+                    await navigator.clipboard.writeText(text);
+                    if (typeof showToast === 'function') showToast(okMsg, 'success');
+                } catch (e) {
+                    // 兜底：老 WebView 无 clipboard API，选中 textarea + execCommand
+                    try {
+                        const ta = document.createElement('textarea');
+                        ta.value = text; document.body.appendChild(ta); ta.select();
+                        document.execCommand('copy'); ta.remove();
+                        if (typeof showToast === 'function') showToast(okMsg, 'success');
+                    } catch (e2) {
+                        if (typeof showToast === 'function') showToast('❌ 复制失败，请手动从文本框复制', 'error');
+                    }
+                }
+            };
+            modal.querySelector('#lineupShareCopyCode').onclick = function () { copyText(code, '📃 阵容码已复制：发给对方，在软件菜单「从阵容码导入」粘贴'); };
+            const linkBtn = modal.querySelector('#lineupShareCopyLink');
+            if (linkBtn) linkBtn.onclick = function () { copyText(link, '🔗 分享链接已复制：对方浏览器/软件打开会自动弹导入'); };
+        }
+
+        // 📥 从阵容码导入：弹窗粘贴 → 复刻到我方/队友上阵（含等级/皮肤/魔化）
+        function importLineupCode(prefillCode) {
+            const old = document.getElementById('lineupImportModal');
+            if (old) old.remove();
+            const modal = document.createElement('div');
+            modal.id = 'lineupImportModal';
+            modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.72);z-index:' + (200000 + (window.topWinZIndex || 0)) + ';display:flex;align-items:center;justify-content:center;padding:16px;';
+            modal.innerHTML =
+                '<div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(79,195,247,0.45);border-radius:16px;padding:18px 20px;max-width:560px;width:96%;box-shadow:0 10px 40px rgba(0,0,0,0.6);">' +
+                  '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">' +
+                    '<span style="color:#4fc3f7;font-size:1.05rem;font-weight:bold;">📥 从阵容码导入</span>' +
+                    '<span id="lineupImportClose" style="cursor:pointer;color:rgba(255,255,255,0.4);font-size:1.5rem;">×</span>' +
+                  '</div>' +
+                  '<div style="color:rgba(255,255,255,0.55);font-size:0.78rem;margin-bottom:10px;line-height:1.5;">粘贴对方分享的阵容码（TFJL1. 开头，分享图片下方/分享链接里都有），将<b style="color:#ffb74d;">覆盖当前项目</b>的我方+队友上阵阵容（含等级/皮肤/魔化）。</div>' +
+                  '<textarea id="lineupImportTa" placeholder="TFJL1.xxxxxx..." style="width:100%;box-sizing:border-box;height:110px;background:rgba(0,0,0,0.35);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:8px;padding:10px;font-size:0.8rem;font-family:Consolas,monospace;resize:none;"></textarea>' +
+                  '<div id="lineupImportInfo" style="color:rgba(255,255,255,0.5);font-size:0.72rem;margin-top:6px;min-height:1em;"></div>' +
+                  '<div style="display:flex;gap:10px;margin-top:12px;">' +
+                    '<button id="lineupImportCancel" style="flex:1;background:rgba(255,255,255,0.08);color:#fff;border:1px solid rgba(255,255,255,0.2);padding:10px;border-radius:8px;cursor:pointer;">取消</button>' +
+                    '<button id="lineupImportOk" style="flex:1.6;background:linear-gradient(135deg,#66bb6a,#2e7d32);color:#fff;border:none;padding:10px;border-radius:8px;cursor:pointer;font-weight:bold;">✅ 导入阵容</button>' +
+                  '</div>' +
+                '</div>';
+            document.body.appendChild(modal);
+            const ta = modal.querySelector('#lineupImportTa');
+            const info = modal.querySelector('#lineupImportInfo');
+            if (prefillCode) ta.value = prefillCode;
+            const close = function () { modal.remove(); };
+            modal.querySelector('#lineupImportClose').onclick = close;
+            modal.querySelector('#lineupImportCancel').onclick = close;
+            modal.onclick = function (e) { if (e.target === modal) close(); };
+            modal.querySelector('#lineupImportOk').onclick = async function () {
+                let data;
+                try { data = _lineupDecode(ta.value); }
+                catch (e) { info.style.color = '#ff8a80'; info.textContent = '❌ ' + (e && e.message || e); return; }
+                const n = (data.my.length + data.tm.length);
+                info.style.color = '#ffd54f';
+                info.textContent = '✅ 识别成功：' + (data.n ? '「' + data.n + '」' : '') + '共 ' + n + ' 张卡（我方 ' + data.my.length + ' / 队友 ' + data.tm.length + '），点击导入将覆盖当前阵容';
+                if (!window.confirm('将覆盖当前项目的上阵阵容（我方+队友共清空重摆 ' + n + ' 张）。继续？')) return;
+                try {
+                    const r = await _lineupApply(data);
+                    close();
+                    if (typeof showToast === 'function') showToast('✅ 阵容已导入：成功 ' + r.placed + ' 张' + (r.missing.length ? '，' + r.missing.length + ' 张卡池未找到（' + r.missing.join('、') + '）' : ''), r.missing.length ? 'error' : 'success');
+                } catch (e) {
+                    info.style.color = '#ff8a80';
+                    info.textContent = '❌ 导入失败：' + (e && e.message || e);
+                }
+            };
+        }
+
+        // 阵容码落地：清空两侧上阵 → 逐张按码复刻（手牌补卡/等级/皮肤/魔化）→ restoreBattleSlots 重绘
+        async function _lineupApply(data) {
+            const clearSide = function (hand, placed, prefix) {
+                (hand || []).forEach(function (c) { c.placed = null; });
+                placed.length = 0;
+                for (let i = 0; i <= 6; i++) {
+                    const slot = document.querySelector('.battle-slot[data-slot="' + prefix + i + '"]');
+                    if (!slot) continue;
+                    if (typeof clearSlotVisual === 'function') { clearSlotVisual(slot); }
+                    else {
+                        slot.classList.remove('filled', 'skin-bg'); slot.classList.add('empty');
+                        slot.innerHTML = slot.dataset.type === 'engineering' ? '<span class="slot-label">🔧</span><span class="slot-empty">空</span>' : '空';
+                    }
+                }
+            };
+            clearSide(myHandCards, myPlacedCards, 'u');
+            clearSide(teammateHandCards, teammatePlacedCards, 't');
+
+            let placed = 0;
+            const missing = [];
+            const seenSlots = {};
+            const placeSide = async function (cards, isMy) {
+                const hand = isMy ? myHandCards : teammateHandCards;
+                const placedArr = isMy ? myPlacedCards : teammatePlacedCards;
+                const handType = isMy ? 'my' : 'teammate';
+                for (const c of cards) {
+                    if (!c || !c.n || !c.s) continue;
+                    if (!/^[ut][0-6]$/.test(c.s) || (isMy ? c.s[0] : c.s[0]) !== (isMy ? 'u' : 't')) { missing.push(c.n + '(槽位非法)'); continue; }
+                    if (seenSlots[c.s]) { missing.push(c.n + '(槽位重复)'); continue; }
+                    const el = document.querySelector('.card-item[data-name="' + (window.CSS && CSS.escape ? CSS.escape(c.n) : c.n) + '"]');
+                    if (!el) { missing.push(c.n); continue; }
+                    const id = el.dataset.id;
+                    const isEng = el.dataset.engineering === 'true';
+                    // 工程卡只能进工程格（u0/t0），反之亦然
+                    const isEngSlot = /0$/.test(c.s);
+                    if (isEng !== isEngSlot) { missing.push(c.n + '(工程格不匹配)'); continue; }
+                    seenSlots[c.s] = true;
+                    // 手牌：同身份已存在则复用（placed 置新槽），否则补进手牌
+                    let entry = (hand || []).find(function (h) { return h && h.id === id; });
+                    if (!entry) {
+                        entry = { id: id, name: c.n, placed: c.s, isEngineering: isEng, profession: el.dataset.profession, type: el.dataset.type };
+                        hand.push(entry);
+                    } else { entry.placed = c.s; }
+                    placedArr.push({ id: id, name: c.n, slot: c.s, isEngineering: isEng, profession: el.dataset.profession });
+                    // 等级/皮肤/魔化（值存在才写，等级越界交给角标下拉纠正）
+                    try {
+                        if (c.l !== undefined && c.l !== null && String(c.l) !== '' && typeof setCardLevel === 'function') {
+                            setCardLevel(id, parseInt(c.l, 10) || 1, el.dataset.type || 'gold', handType);
+                        }
+                        if (c.k !== undefined && c.k !== null && String(c.k) !== '' && typeof setCardSkin === 'function') {
+                            try { await setCardSkin(id, String(c.k), handType); } catch (e) {}
+                        }
+                        if (typeof c.m === 'number' && typeof setCardMoHua === 'function') {
+                            try { setCardMoHua(id, !!c.m, handType); } catch (e) {}
+                        }
+                    } catch (e) {}
+                    placed++;
+                }
+            };
+            await placeSide(data.my, true);
+            await placeSide(data.tm, false);
+
+            if (typeof restoreBattleSlots === 'function') { try { await restoreBattleSlots(); } catch (e) {} }
+            if (typeof updateHandDisplay === 'function') { updateHandDisplay('my'); updateHandDisplay('teammate'); }
+            if (typeof updateDamageReductionDisplay === 'function') { try { updateDamageReductionDisplay(); } catch (e) {} }
+            if (typeof autoSaveProject === 'function') { try { autoSaveProject(); } catch (e) {} }
+            return { placed: placed, missing: missing };
+        }
+
+        // 分享链接自动检测：#lineup=TFJL1.xxx → 自动弹导入（预填码）
+        (function _lineupHashCheck() {
+            function check() {
+                try {
+                    const m = (location.hash || '').match(/lineup=([A-Za-z0-9+/=%._-]+)/);
+                    if (m && m[1]) {
+                        importLineupCode(decodeURIComponent(m[1]));
+                        history.replaceState(null, '', location.pathname + location.search);
+                    }
+                } catch (e) {}
+            }
+            if (document.readyState === 'complete') setTimeout(check, 800);
+            else window.addEventListener('load', function () { setTimeout(check, 800); });
+        })();
+
+        window.shareLineupImage = shareLineupImage;
+        window.importLineupCode = importLineupCode;
