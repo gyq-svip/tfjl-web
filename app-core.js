@@ -10578,7 +10578,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             // 直接给每个卡牌元素添加事件监听器
             document.querySelectorAll('#' + container.id + ' .selected-card:not(.empty)').forEach(card => {
                 if (!card.classList.contains('placed')) {
-                    card.setAttribute('draggable', 'false');
+                    // 🔴 2026-08-30 手牌拖动恢复：旧代码写死 draggable='false'（2026-08-09 提交笔误），
+                    //    HTML 模板里的 draggable=!placed 被覆盖 → dragstart 永不触发 → 手牌拖不上卡槽。
+                    //    未上阵的卡必须可拖（与模板 draggable="' + (!card.placed) + '" 语义一致）。
+                    card.setAttribute('draggable', 'true');
                     card.addEventListener('dragstart', (e) => handleHandDragStart(e, handType));
                     card.addEventListener('click', (e) => handleHandCardClick(e, handType));
                 }
@@ -10768,9 +10771,15 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 const handCards = isUser ? myHandCards : teammateHandCards;
                 if (fromCard) { const h = handCards.find(c => c.id === fromCard.id); if (h) h.placed = slotId; }
                 if (toCard) { const h = handCards.find(c => c.id === toCard.id); if (h) h.placed = fromSlotId; }
-                await paintSlotCard(this, toCard, isUser);
+                // 🔴 2026-08-30 互换渲染修复：数据已交换（fromCard→本槽 / toCard→来源槽），
+                //    渲染必须跟着数据走：目标槽(this)画移过来的 fromCard，来源槽画换过去的 toCard。
+                //    旧代码两处参数传反（this 画 toCard、fromSlot 画 fromCard）→ 视觉停留在原位，
+                //    但数据已互换 → 视觉与数据脱节：右键切皮按槽位从 placedArray 找卡拿到的是另一张卡，
+                //    「原A位置切皮显示B的皮」即此因；拖到空槽时还因 paintSlotCard(this,undefined)
+                //    把目标槽清空，卡凭空消失。
+                await paintSlotCard(this, fromCard, isUser);
                 if (toCard) {
-                    await paintSlotCard(fromSlot, fromCard, isUser);
+                    await paintSlotCard(fromSlot, toCard, isUser);
                 } else {
                     clearSlotVisual(fromSlot);
                 }
