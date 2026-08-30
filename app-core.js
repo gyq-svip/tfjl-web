@@ -7465,11 +7465,24 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         // （替代原「重置皮肤」：用于解决「加载时皮肤卡着不显示 / 显示异常」等问题，保留用户已选默认皮肤）
         async function repairSkins() {
             try {
+                const _isWeb = !(window.__TAURI_INTERNALS__ || window.__TAURI__);
                 // 1. 清皮肤缓存（网页版 IndexedDB / APP 磁盘图缓存）
-                if (typeof window.clearSkinIdbCache === 'function') { try { await window.clearSkinIdbCache(); } catch (e) {} }
+                // 🔴 2026-08-30 网页版改用安全重置：先关旧连接再删库（deleteDatabase 被活跃连接
+                //    blocked 挂起 + _skinDbPromise 攥着旧连接 → 之后所有读取静默失败 → 皮肤永久消失）。
+                //    并 revoke 全部 objectURL，重渲染后统一走「新库 + 网络重拉」的干净路径。
+                if (_isWeb && typeof window._webSkinCacheReset === 'function') {
+                    try { await window._webSkinCacheReset(); } catch (e) {}
+                } else if (typeof window.clearSkinIdbCache === 'function') {
+                    try { await window.clearSkinIdbCache(); } catch (e) {}
+                }
                 // 2. 重新扫描本地皮肤 + 强制重新拉取远程注册表
                 if (typeof window.scanSkins === 'function') { try { await window.scanSkins(); } catch (e) {} }
                 if (typeof window.syncRemoteSkins === 'function') { try { await window.syncRemoteSkins(true); } catch (e) {} }
+                // 🔴 2026-08-30 网页版：缓存已清空，必须立即后台全量预热重建（先 20 个默认皮，再全量），
+                //    否则修复后皮肤只能靠懒加载一张张回来，用户以为越修越坏。
+                if (_isWeb && typeof window._webPreheatAll === 'function') {
+                    try { window._webPreheatAll(6); } catch (e) {}
+                }
                 // 3. 重渲染当前所有战斗槽位 + 融合卡 + 手牌
                 if (typeof window.reapplyAllSkins === 'function') { try { await window.reapplyAllSkins(); } catch (e) {} }
                 if (typeof restoreBattleSlots === 'function') { try { await restoreBattleSlots(); } catch (e) {} }

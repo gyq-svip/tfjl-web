@@ -228,6 +228,29 @@
     } catch (e) { console.warn('[SKIN-WEB] preheat visible failed:', e); }
   }
 
+  // 🔴 2026-08-30 优先默认皮秒开：每个常用英雄只拉「默认那张」皮肤（共 ~20 张，几百 KB），
+  //    注册表一就绪立即高并发拉取 —— 冷缓存首开也马上有一批醒目默认皮，页面不空白；
+  //    其余皮肤仍由「可见预热(4) + 空闲全量预热(2)」慢慢回填，互不冲突（_getCachedSkinUrl 单飞去重复用）。
+  //    默认皮判定与 resolveHeroSkinInfo 一致：与英雄同名的皮肤优先，无则取第一张。
+  var _priorityDefaultsStarted = false;
+  function _preheatPriorityDefaults() {
+    if (_priorityDefaultsStarted) return;
+    _priorityDefaultsStarted = true;
+    try {
+      var heroes = {};
+      PRIORITY_HEROES.forEach(function (hn) {
+        var list = window.skinRegistry[hn];
+        if (!Array.isArray(list) || !list.length) return;
+        var def = findSkin(list, hn) || list[0]; // 与渲染层默认皮判定一致
+        if (def && !def.stale) heroes[hn] = [def]; // 只拉默认一张；stale(旧缓存恢复)不发起请求防 404
+      });
+      var n = Object.keys(heroes).length;
+      if (!n) return;
+      console.log('[SKIN-WEB] 优先默认皮预热:', n, '个英雄');
+      _preheatSkins(heroes, { concurrency: 6 }); // 20 张短平快，高并发立即拉完
+    } catch (e) { console.warn('[SKIN-WEB] preheat priority defaults failed:', e); }
+  }
+
   // 从同源皮肤注册表合并到 window.skinRegistry（url 用同源路径）
   function _applyRegistry(heroesObj, opts) {
     opts = opts || {};
@@ -253,7 +276,10 @@
           // 仅当本地 url 无效（旧缓存 undefined / 空）时才用远端 URL 兜底（修复水人等「英雄名==皮肤名」默认皮缺失问题）。
           // 不再无条件用远端覆盖本地 → 本地 data/skin 已有皮肤启动 0 网络请求、不卡、内存不暴涨（配合 objectURL 复用修复）。
           if (local) {
-            if (opts.stale) local.stale = true;
+            // 🔴 2026-08-30 stale 修复：网络同步成功时必须清掉 stale 标记（IndexedDB 恢复时打的）。
+            //    否则本会话内该皮肤永远带着 stale → 优先默认皮/全量预热全部跳过它，
+            //    「网络已确认存在的皮肤」反而不进缓存。stale 仅在「IndexedDB 旧缓存恢复」场景为 true。
+            local.stale = !!opts.stale;
             if (!local.url) { local.url = url; local.path = null; local.remote = true; }
           }
         } else {
@@ -304,6 +330,9 @@
     // 存 IndexedDB，供离线/弱网刷新兜底（registry 拉不到也能用上次清单 + 已缓存皮肤图）
     try { await _idbPut('skin:registry', new Blob([JSON.stringify(registry)], { type: 'application/json' })); } catch (e) {}
     // 🔴 预热「绝不 await」「绝不挤占首屏」：可见卡片立即触发；全量 low 并发 idle 启动
+    // 🔴 2026-08-30 优先默认皮：网络注册表刚确认（stale 已清）→ 立即拉 20 个常用英雄默认皮（并发6），
+    //    冷缓存首开也秒有一批醒目皮肤；随后可见预热（并发4）+ 空闲全量预热（并发2）逐步铺满 27MB。
+    setTimeout(function () { try { _preheatPriorityDefaults(); } catch (e) {} }, 0);
     setTimeout(function () { try { _preheatVisibleSkins(); } catch (e) {} }, 0);
     var _idleStart = (typeof window.requestIdleCallback === 'function')
       ? function (fn) { window.requestIdleCallback(fn, { timeout: 5000 }); }
@@ -478,6 +507,36 @@
   window.loadSkinSelections = loadSkinSelections;
   window.syncRemoteSkins = syncRemoteSkins;
   window._ensureSynced = _ensureSynced; // 供默认项目加载后兜底重刷融合皮肤（await 皮肤索引就绪）
+
+  // 🔴 2026-08-30 网页版手动「更新皮肤资源」入口：全量重建缓存（优先英雄排前，后台进行不阻塞 UI）。
+  //    此前网页版点「更新皮肤资源」= 清光 IndexedDB + 只重拉 registry 索引 → 皮肤图全部丢失、
+  //    靠懒加载一张张回填，用户看到的就是「越更新皮肤越没了」。
+  window._webPreheatAll = function (concurrency) {
+    try {
+      _priorityDefaultsStarted = false; _preheatPriorityDefaults(); // 先秒拉 20 个默认皮
+      _preheatSkins(window.skinRegistry, { concurrency: concurrency || 6 }); // 再全量铺（优先英雄在前）
+    } catch (e) { console.warn('[SKIN-WEB] webPreheatAll failed:', e); }
+  };
+  // 🔴 2026-08-30 网页版皮肤缓存安全重置（供「皮肤修复」）：先关旧连接再删库，避免
+  //    deleteDatabase 被活跃连接 blocked 挂起（旧 clearSkinIdbCache 直删 → 库删不干净 +
+  //    _skinDbPromise 还攥着旧连接 → 之后所有 _idbGet 静默失败 → 皮肤永久消失直到刷新）。
+  //    同时 revoke 全部 objectURL，让 reapply 后全部走「新库 + 网络重拉」的干净路径。
+  window._webSkinCacheReset = async function () {
+    try {
+      for (var k in _objectUrlCache) { try { URL.revokeObjectURL(_objectUrlCache[k]); } catch (e) {} }
+      _objectUrlCache = {};
+      try { var db = await _openSkinDb(); if (db && db.close) db.close(); } catch (e) {}
+      _skinDbPromise = null; // 下次访问重新建库
+      if (window.indexedDB) {
+        await new Promise(function (r) {
+          var req = indexedDB.deleteDatabase(SKIN_DB_NAME);
+          req.onsuccess = r; req.onerror = r; req.onblocked = r;
+        });
+      }
+      console.log('[SKIN-WEB] 皮肤缓存已安全重置（关连接→删库→待重建）');
+      return true;
+    } catch (e) { console.warn('[SKIN-WEB] skin cache reset failed:', e); return false; }
+  };
 
   // 🔴 皮肤加载进度条（s1.0.102）：让用户直观看到"已加载 X / 共 Y，剩余 Z"，判断是卡住还是正常加载中
   // 用法：var p = window.showSkinLoadProgress(containerEl, total, '🎨 皮肤加载中');

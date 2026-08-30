@@ -3408,9 +3408,15 @@
                     }
                 } catch (e) {}
 
-                // 先清旧皮肤缓存（删除旧皮肤再下载新包，避免残留旧皮肤导致不刷新/异常）
-                if (typeof window.clearSkinIdbCache === 'function') { try { await window.clearSkinIdbCache(); } catch (e) {} }
                 const invokeFn = window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke;
+                const isTauriEnv = !!(window.__TAURI_INTERNALS__ || window.__TAURI__);
+                // 🔴 2026-08-30 网页版关键修复：清空 IndexedDB 皮肤缓存【只属于 Tauri 流程】
+                //    （下载 zip → 解压磁盘 → scanSkins 重建）。网页版没有整包下载通道：
+                //    先清光 27MB 缓存再只重拉 registry 索引 → 皮肤图全部丢失、只能靠懒加载一张张回填，
+                //    而且 deleteDatabase 还会被 skins-web 的活跃连接 blocked 挂起 → 后续读取静默失败
+                //    → 这就是「点更新皮肤资源后皮肤反而全没了」的元凶。网页版改为：不清缓存，
+                //    清单同步（远端为准，孤儿自动剔除）+ 后台全量预热重建。
+                if (isTauriEnv && typeof window.clearSkinIdbCache === 'function') { try { await window.clearSkinIdbCache(); } catch (e) {} }
                 if (typeof invokeFn === 'function') {
                     try {
                         // force=true：菜单主动点「更新皮肤资源」时强制重拉（跳过"已是最新"判断）
@@ -3421,9 +3427,16 @@
                         console.warn('[SKIN] 本地下载失败，回退在线同步:', e);
                         t.update('⚠️ 本地包下载失败，改用在线同步…');
                     }
+                } else if (!isTauriEnv) {
+                    t.update('🌐 网页版：正在同步最新皮肤清单…');
                 }
                 if (typeof window.syncRemoteSkins === 'function') {
                     await window.syncRemoteSkins(true);
+                }
+                // 🔴 2026-08-30 网页版：清单同步完立即后台全量预热（先秒拉 20 个常用默认皮，再全量铺），
+                //    新皮肤/未缓存皮肤自动灌进 IndexedDB（单飞去重，与首屏加载不重复下载）。
+                if (!isTauriEnv && typeof window._webPreheatAll === 'function') {
+                    try { window._webPreheatAll(6); } catch (e) {}
                 }
                 // 统计实际扫描到的数量，让用户能确认皮肤是否拉全
                 let skinCount = 0, heroCount = 0;
@@ -3432,7 +3445,7 @@
                     heroCount = Object.keys(reg).length;
                     for (const k of Object.keys(reg)) skinCount += ((reg[k] || []).length || 0);
                 } catch (e) {}
-                t.success('✅ 皮肤更新完成：共 ' + skinCount + ' 张皮肤 / ' + heroCount + ' 个英雄');
+                t.success('✅ 皮肤更新完成：共 ' + skinCount + ' 张皮肤 / ' + heroCount + ' 个英雄' + (isTauriEnv ? '' : '（图片后台缓存中，稍后全部就绪）'));
             } catch (e) {
                 t.error('❌ 皮肤更新失败: ' + (e && e.message ? e.message : e));
             } finally {
