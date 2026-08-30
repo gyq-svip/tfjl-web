@@ -1250,105 +1250,9 @@ if (true) {
                     <button onclick="closeAppLocalSettings()" style="background:rgba(255,255,255,0.1);color:#fff;border:none;width:30px;height:30px;border-radius:5px;cursor:pointer;font-size:1.2rem;">×</button>
                 </div>
 
-                <div style="background:rgba(0,188,212,0.06);border:1px solid rgba(0,188,212,0.15);border-radius:10px;padding:12px 14px;margin-bottom:12px;">
-                    <div onclick="toggleMaDirConfig()" style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;">
-                        <span id="maDirToggleIcon" style="color:#00bcd4;font-size:0.75rem;transition:transform 0.2s;">▶</span>
-                        <span style="color:#00bcd4;font-size:0.9rem;font-weight:600;">📂 老马脚本目录配置</span>
-                        <span id="maDirCollapsedHint" style="color:rgba(255,255,255,0.35);font-size:0.72rem;">— 点击展开，设置脚本/对战/截图/临时/软件数据等目录路径</span>
-                        <button onclick="event.stopPropagation();restoreDefaultMaDirs()" title="把6个目录恢复为默认路径（解决改错路径导致扫描卡死）" style="margin-left:auto;background:rgba(255,255,255,0.1);color:#ffd700;border:1px solid rgba(255,215,0,0.3);padding:4px 12px;border-radius:6px;cursor:pointer;font-size:0.75rem;white-space:nowrap;">↺ 恢复默认目录</button>
-                    </div>
-                    <div id="maDirConfigBody" style="display:none;margin-top:10px;">
-
-                <div style="margin-bottom:12px;">
-                    <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;display:block;margin-bottom:4px;">合作脚本目录（寒冰/暗月/合作/漩涡/深海）</label>
-                    <div style="display:flex;gap:8px;">
-                        <input type="text" id="maDir_coop" readonly placeholder="未设置" style="flex:1;background:rgba(0,0,0,0.3);color:#fff;border:1px solid rgba(255,255,255,0.2);padding:8px 12px;border-radius:6px;font-size:0.85rem;">
-                        <button onclick="selectMaDir('coop')" style="background:linear-gradient(135deg,#00bcd4,#00838f);color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;white-space:nowrap;">浏览...</button>
-                    </div>
-                </div>
-
-                <div style="margin-bottom:12px;">
-                    <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;display:block;margin-bottom:4px;">活动脚本目录（活动+隐藏榜）</label>
-                    <div style="display:flex;gap:8px;">
-                        <input type="text" id="maDir_activity" readonly placeholder="未设置" style="flex:1;background:rgba(0,0,0,0.3);color:#fff;border:1px solid rgba(255,255,255,0.2);padding:8px 12px;border-radius:6px;font-size:0.85rem;">
-                        <button onclick="selectMaDir('activity')" style="background:linear-gradient(135deg,#00bcd4,#00838f);color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;white-space:nowrap;">浏览...</button>
-                    </div>
-                </div>
-
-                <div style="margin-bottom:12px;">
-                    <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;display:block;margin-bottom:4px;">对战目录（JSON）</label>
-                    <div style="display:flex;gap:8px;">
-                        <input type="text" id="maDir_battle" readonly placeholder="未设置" style="flex:1;background:rgba(0,0,0,0.3);color:#fff;border:1px solid rgba(255,255,255,0.2);padding:8px 12px;border-radius:6px;font-size:0.85rem;">
-                        <button onclick="selectMaDir('battle')" style="background:linear-gradient(135deg,#00bcd4,#00838f);color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;white-space:nowrap;">浏览...</button>
-                    </div>
-                </div>
-
-                <div style="margin-bottom:12px;">
-                    <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;display:block;margin-bottom:4px;">对战MAX目录（TXT）</label>
-                    <div style="display:flex;gap:8px;">
-                        <input type="text" id="maDir_battleMax" readonly placeholder="未设置" style="flex:1;background:rgba(0,0,0,0.3);color:#fff;border:1px solid rgba(255,255,255,0.2);padding:8px 12px;border-radius:6px;font-size:0.85rem;">
-                        <button onclick="selectMaDir('battleMax')" style="background:linear-gradient(135deg,#00bcd4,#00838f);color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;white-space:nowrap;">浏览...</button>
-                    </div>
-                </div>
-
-                <div style="margin-bottom:12px;">
-                    <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;display:block;margin-bottom:4px;">截图目录（按日期子文件夹，统计每天打多少局）</label>
-                    <div style="display:flex;gap:8px;">
-                        <input type="text" id="maDir_screenshot" readonly placeholder="未设置" style="flex:1;background:rgba(0,0,0,0.3);color:#fff;border:1px solid rgba(255,255,255,0.2);padding:8px 12px;border-radius:6px;font-size:0.85rem;">
-                        <button onclick="selectMaDir('screenshot')" style="background:linear-gradient(135deg,#00bcd4,#00838f);color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;white-space:nowrap;">浏览...</button>
-                    </div>
-                </div>
-
-                <div>
-                    <label style="color:#ff9800;font-size:0.8rem;display:block;margin-bottom:4px;">🔍 对战日志目录（统计胜负等关键词检索）</label>
-                    <div style="display:flex;gap:8px;">
-                        <input type="text" id="maDir_logs" readonly placeholder="未设置" style="flex:1;background:rgba(0,0,0,0.3);color:#fff;border:1px solid rgba(255,152,0,0.3);padding:8px 12px;border-radius:6px;font-size:0.85rem;">
-                        <button onclick="selectMaDir('logs')" style="background:linear-gradient(135deg,#ff9800,#e65100);color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;white-space:nowrap;">浏览...</button>
-                    </div>
-                </div>
-
-                <!-- 🔴 2026-08-31 布局调整：临时脚本目录 + 软件数据目录收进「老马脚本目录配置」折叠区，
-                     顶层只留常用区（扫描脚本/统计/备份），面板更聚焦 -->
-                <div style="margin-bottom:12px;margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.1);">
-                    <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;display:block;margin-bottom:4px;">📝 临时脚本目录（临时存放的文件）</label>
-                    <div style="display:flex;gap:8px;">
-                        <input type="text" id="maDir_temp" readonly placeholder="未设置" style="flex:1;background:rgba(0,0,0,0.3);color:#fff;border:1px solid rgba(255,255,255,0.2);padding:8px 12px;border-radius:6px;font-size:0.85rem;">
-                        <button onclick="selectMaDir('temp')" style="background:linear-gradient(135deg,#00bcd4,#00838f);color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;white-space:nowrap;">浏览...</button>
-                    </div>
-                </div>
-
-                <div style="margin-bottom:12px;">
-                    <label style="color:#4caf50;font-size:0.85rem;display:block;margin-bottom:4px;">💾 软件数据目录（项目存储位置）</label>
-                    <div style="display:flex;gap:8px;">
-                        <input type="text" id="softwareDataDirInput" readonly placeholder="未设置，默认使用APP安装目录" style="flex:1;background:rgba(0,0,0,0.3);color:#fff;border:1px solid rgba(255,255,255,0.2);padding:8px 12px;border-radius:6px;font-size:0.85rem;">
-                        <button onclick="selectSoftwareDataDir()" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;white-space:nowrap;">浏览...</button>
-                    </div>
-                    <div style="color:rgba(255,255,255,0.35);font-size:0.68rem;margin-top:4px;line-height:1.4;">📌 设置后所有APP数据自动以 <b>tfjl_*.json</b> 文件存到此目录，可直接备份、迁移、查看。</div>
-                </div>
-
-                    </div>
-                </div>
-
                 <!-- 🔴 2026-08-31 开关恢复（不能删：低配电脑开着会卡死）：开关内联进各统计标题行，
                      与「强制刷新」并排；默认开启（打开面板即自动显示统计），关闭时统计区显示明确提示。 -->
-                <!-- 🔴 2026-08-31 布局调整：车主副本统计 + 对战统计 上移到「备份与还原」上方（用户指定顺序） -->
-
-                <div style="margin-bottom:20px;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                        <label style="color:#ffd700;font-size:0.9rem;">📋 扫描到的脚本文件</label>
-                        <button onclick="scanAllFiles(true)" style="background:linear-gradient(135deg,#ff9800,#e65100);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">🔄 刷新扫描</button>
-                    </div>
-                    <!-- 工具栏（搜索框+分类）独立容器，不参与每次重绘，避免中文输入法 composition 被打断打不出中文 -->
-                    <div id="scannedFileToolbar" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,0.1);">
-                        <input type="text" id="scannedFileSearchInput" value="" placeholder="🔍 搜索文件名…" oninput="setScannedFilterKeyword(this.value)" style="flex:1;min-width:120px;padding:6px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:rgba(0,0,0,0.3);color:#fff;font-size:0.8rem;box-sizing:border-box;">
-                        <div id="scannedFileCats" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;"></div>
-                        <button id="scannedShareModeBtn" onclick="toggleScannedShareMode()" title="分享模式：快速分享到需求墙" style="background:linear-gradient(135deg,#7c4dff,#b388ff);color:#fff;border:none;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:0.75rem;font-weight:bold;white-space:nowrap;">📢 分享模式</button>
-                    </div>
-                    <div id="scannedFileList" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:8px;min-height:60px;max-height:250px;overflow:auto;">
-                        <div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">扫描中...</div>
-                    </div>
-                    <div id="fuzzyStatsArea" style="margin-top:8px;background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:8px;min-height:24px;"></div>
-                </div>
+                <!-- 🔴 2026-08-31 布局 v2（用户指定顺序）：两项统计置顶 → 扫描到的脚本文件 → 备份与还原 → 老马脚本目录配置折叠区移至面板最底部 -->
 
                 <div style="margin-bottom:20px;">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
@@ -1389,7 +1293,24 @@ if (true) {
                     </div>
                 </div>
 
-                <!-- 🔴 2026-08-31 布局调整：「备份与还原」从顶部移到统计下方（原在老马目录配置下方） -->
+                <div style="margin-bottom:20px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                        <label style="color:#ffd700;font-size:0.9rem;">📋 扫描到的脚本文件</label>
+                        <button onclick="scanAllFiles(true)" style="background:linear-gradient(135deg,#ff9800,#e65100);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">🔄 刷新扫描</button>
+                    </div>
+                    <!-- 工具栏（搜索框+分类）独立容器，不参与每次重绘，避免中文输入法 composition 被打断打不出中文 -->
+                    <div id="scannedFileToolbar" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,0.1);">
+                        <input type="text" id="scannedFileSearchInput" value="" placeholder="🔍 搜索文件名…" oninput="setScannedFilterKeyword(this.value)" style="flex:1;min-width:120px;padding:6px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:rgba(0,0,0,0.3);color:#fff;font-size:0.8rem;box-sizing:border-box;">
+                        <div id="scannedFileCats" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;"></div>
+                        <button id="scannedShareModeBtn" onclick="toggleScannedShareMode()" title="分享模式：快速分享到需求墙" style="background:linear-gradient(135deg,#7c4dff,#b388ff);color:#fff;border:none;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:0.75rem;font-weight:bold;white-space:nowrap;">📢 分享模式</button>
+                    </div>
+                    <div id="scannedFileList" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:8px;min-height:60px;max-height:250px;overflow:auto;">
+                        <div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">扫描中...</div>
+                    </div>
+                    <div id="fuzzyStatsArea" style="margin-top:8px;background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:8px;min-height:24px;"></div>
+                </div>
+
+                <!-- 🔴 2026-08-31 布局 v2：备份与还原在「扫描到的脚本文件」下方；老马脚本目录配置整体移至面板最底部 -->
                 <div style="color:#ff9800;font-size:0.9rem;margin-bottom:12px;margin-top:16px;">📦 备份与还原</div>
                 <div style="margin-bottom:12px;background:rgba(255,152,0,0.06);border:1px solid rgba(255,152,0,0.2);border-radius:10px;padding:14px;">
                     <div style="display:flex;gap:8px;align-items:center;">
@@ -1436,6 +1357,85 @@ if (true) {
                     </div>
                 </div>
 
+
+                <!-- 🔴 2026-08-31 布局 v2：老马脚本目录配置整体移至面板最底部（默认折叠，点标题展开） -->
+                <div style="background:rgba(0,188,212,0.06);border:1px solid rgba(0,188,212,0.15);border-radius:10px;padding:12px 14px;margin-bottom:12px;margin-top:16px;">
+                    <div onclick="toggleMaDirConfig()" style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;">
+                        <span id="maDirToggleIcon" style="color:#00bcd4;font-size:0.75rem;transition:transform 0.2s;">▶</span>
+                        <span style="color:#00bcd4;font-size:0.9rem;font-weight:600;">📂 老马脚本目录配置</span>
+                        <span id="maDirCollapsedHint" style="color:rgba(255,255,255,0.35);font-size:0.72rem;">— 点击展开，设置脚本/对战/截图/临时/软件数据等目录路径</span>
+                        <button onclick="event.stopPropagation();restoreDefaultMaDirs()" title="把6个目录恢复为默认路径（解决改错路径导致扫描卡死）" style="margin-left:auto;background:rgba(255,255,255,0.1);color:#ffd700;border:1px solid rgba(255,215,0,0.3);padding:4px 12px;border-radius:6px;cursor:pointer;font-size:0.75rem;white-space:nowrap;">↺ 恢复默认目录</button>
+                    </div>
+                    <div id="maDirConfigBody" style="display:none;margin-top:10px;">
+
+                        <div style="margin-bottom:12px;">
+                            <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;display:block;margin-bottom:4px;">合作脚本目录（寒冰/暗月/合作/漩涡/深海）</label>
+                            <div style="display:flex;gap:8px;">
+                                <input type="text" id="maDir_coop" readonly placeholder="未设置" style="flex:1;background:rgba(0,0,0,0.3);color:#fff;border:1px solid rgba(255,255,255,0.2);padding:8px 12px;border-radius:6px;font-size:0.85rem;">
+                                <button onclick="selectMaDir('coop')" style="background:linear-gradient(135deg,#00bcd4,#00838f);color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;white-space:nowrap;">浏览...</button>
+                            </div>
+                        </div>
+
+                        <div style="margin-bottom:12px;">
+                            <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;display:block;margin-bottom:4px;">活动脚本目录（活动+隐藏榜）</label>
+                            <div style="display:flex;gap:8px;">
+                                <input type="text" id="maDir_activity" readonly placeholder="未设置" style="flex:1;background:rgba(0,0,0,0.3);color:#fff;border:1px solid rgba(255,255,255,0.2);padding:8px 12px;border-radius:6px;font-size:0.85rem;">
+                                <button onclick="selectMaDir('activity')" style="background:linear-gradient(135deg,#00bcd4,#00838f);color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;white-space:nowrap;">浏览...</button>
+                            </div>
+                        </div>
+
+                        <div style="margin-bottom:12px;">
+                            <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;display:block;margin-bottom:4px;">对战目录（JSON）</label>
+                            <div style="display:flex;gap:8px;">
+                                <input type="text" id="maDir_battle" readonly placeholder="未设置" style="flex:1;background:rgba(0,0,0,0.3);color:#fff;border:1px solid rgba(255,255,255,0.2);padding:8px 12px;border-radius:6px;font-size:0.85rem;">
+                                <button onclick="selectMaDir('battle')" style="background:linear-gradient(135deg,#00bcd4,#00838f);color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;white-space:nowrap;">浏览...</button>
+                            </div>
+                        </div>
+
+                        <div style="margin-bottom:12px;">
+                            <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;display:block;margin-bottom:4px;">对战MAX目录（TXT）</label>
+                            <div style="display:flex;gap:8px;">
+                                <input type="text" id="maDir_battleMax" readonly placeholder="未设置" style="flex:1;background:rgba(0,0,0,0.3);color:#fff;border:1px solid rgba(255,255,255,0.2);padding:8px 12px;border-radius:6px;font-size:0.85rem;">
+                                <button onclick="selectMaDir('battleMax')" style="background:linear-gradient(135deg,#00bcd4,#00838f);color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;white-space:nowrap;">浏览...</button>
+                            </div>
+                        </div>
+
+                        <div style="margin-bottom:12px;">
+                            <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;display:block;margin-bottom:4px;">截图目录（按日期子文件夹，统计每天打多少局）</label>
+                            <div style="display:flex;gap:8px;">
+                                <input type="text" id="maDir_screenshot" readonly placeholder="未设置" style="flex:1;background:rgba(0,0,0,0.3);color:#fff;border:1px solid rgba(255,255,255,0.2);padding:8px 12px;border-radius:6px;font-size:0.85rem;">
+                                <button onclick="selectMaDir('screenshot')" style="background:linear-gradient(135deg,#00bcd4,#00838f);color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;white-space:nowrap;">浏览...</button>
+                            </div>
+                        </div>
+
+                        <div style="margin-bottom:12px;">
+                            <label style="color:#ff9800;font-size:0.8rem;display:block;margin-bottom:4px;">🔍 对战日志目录（统计胜负等关键词检索）</label>
+                            <div style="display:flex;gap:8px;">
+                                <input type="text" id="maDir_logs" readonly placeholder="未设置" style="flex:1;background:rgba(0,0,0,0.3);color:#fff;border:1px solid rgba(255,152,0,0.3);padding:8px 12px;border-radius:6px;font-size:0.85rem;">
+                                <button onclick="selectMaDir('logs')" style="background:linear-gradient(135deg,#ff9800,#e65100);color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;white-space:nowrap;">浏览...</button>
+                            </div>
+                        </div>
+
+                        <!-- 临时脚本目录 + 软件数据目录：随本折叠区一起位于面板底部 -->
+                        <div style="margin-bottom:12px;margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.1);">
+                            <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;display:block;margin-bottom:4px;">📝 临时脚本目录（临时存放的文件）</label>
+                            <div style="display:flex;gap:8px;">
+                                <input type="text" id="maDir_temp" readonly placeholder="未设置" style="flex:1;background:rgba(0,0,0,0.3);color:#fff;border:1px solid rgba(255,255,255,0.2);padding:8px 12px;border-radius:6px;font-size:0.85rem;">
+                                <button onclick="selectMaDir('temp')" style="background:linear-gradient(135deg,#00bcd4,#00838f);color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;white-space:nowrap;">浏览...</button>
+                            </div>
+                        </div>
+
+                        <div style="margin-bottom:12px;">
+                            <label style="color:#4caf50;font-size:0.85rem;display:block;margin-bottom:4px;">💾 软件数据目录（项目存储位置）</label>
+                            <div style="display:flex;gap:8px;">
+                                <input type="text" id="softwareDataDirInput" readonly placeholder="未设置，默认使用APP安装目录" style="flex:1;background:rgba(0,0,0,0.3);color:#fff;border:1px solid rgba(255,255,255,0.2);padding:8px 12px;border-radius:6px;font-size:0.85rem;">
+                                <button onclick="selectSoftwareDataDir()" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;white-space:nowrap;">浏览...</button>
+                            </div>
+                            <div style="color:rgba(255,255,255,0.35);font-size:0.68rem;margin-top:4px;line-height:1.4;">📌 设置后所有APP数据自动以 <b>tfjl_*.json</b> 文件存到此目录，可直接备份、迁移、查看。</div>
+                        </div>
+
+                    </div>
+                </div>
 
                 <div style="display:flex;gap:10px;justify-content:flex-end;">
                     <button onclick="saveSettingsAndClose()" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:10px 24px;border-radius:6px;cursor:pointer;font-size:0.9rem;">💾 保存设置</button>
