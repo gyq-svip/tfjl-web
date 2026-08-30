@@ -974,7 +974,11 @@ if (true) {
         initDataSync();  // 启动 localStorage → 用户数据目录自动同步
         loadSkinSelections();  // 恢复皮肤选择记录
         // 先扫描本地，再同步远程；如果并行会导致 scanSkins 清空 registry 把远程条目冲掉
-        scanSkins().then(() => syncRemoteSkins());
+        // 🔴 链路兜底置位 _skinRegistryReady（syncRemoteSkins 内部 finally 也置一次，双保险）：
+        //    保证任何异常路径下注册表就绪标志最终都会置上，不会永久静默告警。
+        scanSkins().then(() => syncRemoteSkins())
+            .catch(e => console.warn('[SKIN] 启动皮肤链异常:', e))
+            .finally(() => { try { window._skinRegistryReady = true; } catch (_) {} });
         // 🔴 性能模式记忆保险：首屏加载后按 localStorage 里记录的档位主动重渲一次，
         // 确保「刷新后保持上次设置的性能模式」（极速/优化/高性能）严格生效，不被默认 high 覆盖。
         setTimeout(() => {
@@ -4214,6 +4218,10 @@ if (true) {
         } catch(e) {
             console.warn('[SKIN] syncRemoteSkins() failed:', String(e).slice(0, 200));
         } finally {
+            // 🔴 2026-08-30 皮肤注册表就绪标志：本地扫描+远程同步都结束后才置位。
+            //    applySkinBgToSlot 据此抑制启动期（注册表还空着）的「No skin for XXX」误报——
+            //    此处 finally 的 reapplyAllSkins 会补绘，真正缺皮的英雄此时才会告警（一次、且准确）。
+            try { window._skinRegistryReady = true; } catch (_) {}
             // 无论远端是否拉取成功都重刷一次：修复「远端失败时皮肤不重刷导致加载卡住不显示」的概率问题
             try { if (typeof window.reapplyAllSkins === 'function') await window.reapplyAllSkins(); } catch(e2) {}
         }

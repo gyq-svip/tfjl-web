@@ -96,8 +96,12 @@
     if (ctl.restart && ctl.restart.to) {
       const tgt = ctl.restart.to;
       const rAck = 'restart@' + (ctl.restart.ts || '1');
+      // 🔴 2026-08-30 补 expire 门控：新下发的 restart 自带 24h 有效期（工具箱 toolboxSend 自动加），
+      //    过期即失效。旧指令无 expire 时维持原行为（无限期，防重仍由 ack 双检兜住，只重启一次）。
+      //    若不过期检查，restart 会永远留在 Gist 里：任何清缓存/换新设备的用户上线都会中招一次。
+      const rExpired = ctl.restart.expire && Date.now() > ctl.restart.expire;
       // 防重：_isAcked 已含 sessionStorage 双检（reload 后仍生效），同一 ts 只执行 1 次
-      if ((tgt === 'all' || tgt === dev) && !_isAcked(rAck)) {
+      if (!rExpired && (tgt === 'all' || tgt === dev) && !_isAcked(rAck)) {
         _markAck(rAck);
         console.log('[adminCtl] 收到重启指令，前端兜底 reload（APP 版由 Rust restart 生效）');
         setTimeout(() => location.reload(), 600);

@@ -2287,6 +2287,7 @@
                 position: fixed;
                 z-index: 100000;
                 max-width: 260px;
+                white-space: pre-line;
                 background: linear-gradient(135deg, #1a1a2e, #16213e);
                 color: #fff;
                 border: 1px solid rgba(79,195,247,0.6);

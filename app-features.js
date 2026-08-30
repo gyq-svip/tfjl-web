@@ -4822,9 +4822,6 @@
             function showTip(el) {
                 const text = el.getAttribute('data-tip');
                 if (!text) return;
-                // 保底：把 data-tip 同步到原生 title。WebView2 下若自定义提示仍不弹，
-                // 至少原生 tooltip 能弹，杜绝"静默失效"（多次反馈的根因）。
-                if (!el.getAttribute('title')) { try { el.setAttribute('title', text); } catch (e2) {} }
                 const tip = getTip();
                 tip.textContent = text;
                 const r = el.getBoundingClientRect();
@@ -4870,6 +4867,35 @@
             window.addEventListener('scroll', hideTip, true);
             document.addEventListener('pointerleave', hideTip);
             window.addEventListener('blur', hideTip);
+
+            // 🔴 2026-08-30 统一悬停提示：把所有原生 title 迁移为自定义 data-tip 提示框，
+            //    避免"系统原生灰底小提示 + 自定义提示框"两套并存/样式不一致。
+            //    迁移 = 复制文本到 data-tip（已有 data-tip 的优先，不覆盖）+ 移除原生 title（不再弹原生样式）。
+            //    含动态创建的节点（MutationObserver 持续迁移），JS 各处 title="xxx" 写法无需逐个改。
+            function migrateTitle(root) {
+                try {
+                    const els = (root || document).querySelectorAll('[title]');
+                    for (let i = 0; i < els.length; i++) {
+                        const el = els[i];
+                        const t = el.getAttribute('title');
+                        if (!t) { el.removeAttribute('title'); continue; }
+                        if (!el.getAttribute('data-tip')) { try { el.setAttribute('data-tip', t); } catch (e2) {} }
+                        el.removeAttribute('title');
+                    }
+                } catch (e) {}
+            }
+            migrateTitle(document);
+            let _migTimer = null;
+            try {
+                const mo = new MutationObserver(function () {
+                    // 批量迁移去抖：一帧内的多次 DOM 变更只跑一遍
+                    if (_migTimer) return;
+                    _migTimer = setTimeout(function () { _migTimer = null; migrateTitle(document); }, 60);
+                });
+                // childList：动态插入的节点带 title；attributes+title：JS 里 xxx.title='..' 的属性赋值。
+                // （迁移移除 title 也会触发一次观察，但去抖后已无 title 可迁，自然停止，不构成死循环）
+                mo.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['title'] });
+            } catch (e) {}
         })();
 
 

@@ -580,13 +580,13 @@
         <div id="scheme1">
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:rgba(255,255,255,0.05);border-radius:10px;padding:12px;margin-bottom:10px;">
                 <span style="color:#ffd700;font-weight:bold;">📁</span>
-                <select id="categorySelector1" onchange="handleCategoryChange()" style="background:#2a2a4a;color:#fff;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);font-size:0.9rem;min-width:120px;cursor:pointer;">
+                <select id="categorySelector1" onchange="handleCategoryChange()" data-tip="项目分类：按分类筛选项目列表，新建项目时也可在此快速归类" style="background:#2a2a4a;color:#fff;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);font-size:0.9rem;min-width:120px;cursor:pointer;">
                     <option value="">-- 选择分类 --</option>
                 </select>
-                <select id="projectSelector1" onchange="loadProjectByName(this.value)" style="background:#2a2a4a;color:#fff;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);font-size:0.9rem;min-width:150px;cursor:pointer;">
+                <select id="projectSelector1" onchange="loadProjectByName(this.value)" data-tip="项目列表：切换到其他阵容项目（手牌/卡组/记事本/脚本/参考图都随项目走）" style="background:#2a2a4a;color:#fff;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);font-size:0.9rem;min-width:150px;cursor:pointer;">
                     <option value="">-- 选择项目 --</option>
                 </select>
-                <button onclick="toggleProjectMenu(this)" style="background:#444;color:white;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:1rem;line-height:1;">⋮</button>
+                <button onclick="toggleProjectMenu(this)" data-tip="项目菜单：新建项目 / 新建分类 / 重命名 / 删除项目等管理操作" style="background:#444;color:white;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:1rem;line-height:1;">⋮</button>
                 <button onclick="showProjectSearchPanel()" title="搜索项目" style="background:linear-gradient(135deg,#00bcd4,#00838f);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">🔍</button>
                 <button onclick="toggleNotepadPanel()" title="记事本" data-tip="记事本：记录当前项目的笔记（随项目走，不同项目互不干扰；自动保存仅在该项目已打开时生效）" style="background:linear-gradient(135deg,#ffd700,#ff6b6b);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">📝</button>
                 <button id="txtFilesToggleBtn" onclick="toggleTxtFilesPanel()" title="脚本管理" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">📄</button>
@@ -605,10 +605,10 @@
             <div id="calcPanelBody" style="padding:15px;">
                 <!-- 顶层 2 tabs：新活动 / 旧活动 -->
                 <div style="display:flex;gap:5px;margin-bottom:15px;">
-                    <button onclick="switchCalcTopTab('new')" id="calcTopNew" style="flex:1;padding:8px;border:none;border-radius:6px;cursor:pointer;font-size:0.85rem;background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;">🆕 新活动·封神杯襄</button>
-                    <button onclick="switchCalcTopTab('old')" id="calcTopOld" style="flex:1;padding:8px;border:none;border-radius:6px;cursor:pointer;font-size:0.85rem;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);">📦 旧活动·轮回</button>
-                    <button onclick="switchCalcTopTab('boss')" id="calcTopBoss" style="flex:1;padding:8px;border:none;border-radius:6px;cursor:pointer;font-size:0.85rem;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);">🛡️ Boss减伤</button>
-                    <button onclick="switchCalcTopTab('dragon')" id="calcTopDragon" style="flex:1;padding:8px;border:none;border-radius:6px;cursor:pointer;font-size:0.85rem;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);">🐉 龙珠升星</button>
+                    <button onclick="switchCalcTopTab('new')" id="calcTopNew" data-tip="封神杯襄活动计算器：选目标皮肤/战车 → 算出需要氪多少钱、攒多少天" style="flex:1;padding:8px;border:none;border-radius:6px;cursor:pointer;font-size:0.85rem;background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;">🆕 新活动·封神杯襄</button>
+                    <button onclick="switchCalcTopTab('old')" id="calcTopOld" data-tip="旧活动·轮回计算器：选目标 → 算性价比最优的氪金方案" style="flex:1;padding:8px;border:none;border-radius:6px;cursor:pointer;font-size:0.85rem;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);">📦 旧活动·轮回</button>
+                    <button onclick="switchCalcTopTab('boss')" id="calcTopBoss" data-tip="Boss减伤表：各Boss波次的减伤/血量数据（存云端 Gist，全员共享）" style="flex:1;padding:8px;border:none;border-radius:6px;cursor:pointer;font-size:0.85rem;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);">🛡️ Boss减伤</button>
+                    <button onclick="switchCalcTopTab('dragon')" id="calcTopDragon" data-tip="龙珠升星计算器：算龙珠升到指定星级所需的材料/花费" style="flex:1;padding:8px;border:none;border-radius:6px;cursor:pointer;font-size:0.85rem;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);">🐉 龙珠升星</button>
                 </div>
 
                 <!-- ============ 新活动容器 ============ -->
@@ -1208,20 +1208,20 @@
 
         <div class="selection-area">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-                <h2 style="margin:0;">⚔️ 出战选择</h2>
+                <h2 style="margin:0;display:flex;align-items:center;gap:8px;">⚔️ 出战选择<span style="font-size:0.65rem;color:rgba(255,255,255,0.45);font-weight:normal;">鼠标悬停有功能简介</span></h2>
                 <div style="display:flex;gap:8px;align-items:center;">
                     <label style="font-size:0.7rem;color:rgba(255,255,255,0.7);display:flex;align-items:center;gap:4px;cursor:pointer;user-select:none;">
                         <input type="checkbox" id="fusionSkinSplitToggle" checked onchange="toggleFusionSkinSplit(this.checked)" title="勾选：融合卡显示完整融合皮肤（主卡整皮 + 被融合卡右下角小图）；不勾：只显示主卡（单卡）整张皮肤。卡名始终按现状显示。"> 显示融合
                     </label>
                     <div style="position:relative;">
-                        <button onclick="toggleDamageReductionMenu(this)" style="background:rgba(78,205,196,0.2);border:1px solid rgba(78,205,196,0.4);color:#4ecdc4;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:0.75rem;">🛡️ 减伤</button>
+                        <button onclick="toggleDamageReductionMenu(this)" data-tip="减伤菜单：设置/导出/导入各卡组的洗炼减伤数据（用于计算实际承伤）" style="background:rgba(78,205,196,0.2);border:1px solid rgba(78,205,196,0.4);color:#4ecdc4;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:0.75rem;">🛡️ 减伤</button>
                         <div id="damageReductionMenu" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:rgba(42,42,74,0.95);border:1px solid rgba(78,205,196,0.3);border-radius:8px;padding:8px 0;min-width:140px;z-index:1000;box-shadow:0 4px 15px rgba(0,0,0,0.4);">
-                            <div onclick="showDamageReductionDialog();document.getElementById('damageReductionMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📝 设置减伤</div>
-                            <div onclick="exportDamageReductionToTxt();document.getElementById('damageReductionMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#4ade80;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(74,222,128,0.1)'" onmouseout="this.style.background='transparent'">📤 导出TXT</div>
-                            <div onclick="importDamageReductionFromTxt();document.getElementById('damageReductionMenu').style.display='none';" style="padding:8px 15px;cursor:pointer;color:#60a5fa;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(96,165,250,0.1)'" onmouseout="this.style.background='transparent'">📥 导入TXT</div>
+                            <div onclick="showDamageReductionDialog();document.getElementById('damageReductionMenu').style.display='none';" data-tip="打开减伤设置窗口：录入各卡位的洗炼减伤百分比，保存后卡组标题实时显示总减伤" style="padding:8px 15px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">📝 设置减伤</div>
+                            <div onclick="exportDamageReductionToTxt();document.getElementById('damageReductionMenu').style.display='none';" data-tip="把当前减伤数据导出为 TXT 文本，方便备份或发给队友" style="padding:8px 15px;cursor:pointer;color:#4ade80;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(74,222,128,0.1)'" onmouseout="this.style.background='transparent'">📤 导出TXT</div>
+                            <div onclick="importDamageReductionFromTxt();document.getElementById('damageReductionMenu').style.display='none';" data-tip="从之前导出的 TXT 文本恢复减伤数据（覆盖当前值）" style="padding:8px 15px;cursor:pointer;color:#60a5fa;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(96,165,250,0.1)'" onmouseout="this.style.background='transparent'">📥 导入TXT</div>
                         </div>
                     </div>
-                    <button onclick="resetAll()" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:0.75rem;">🔄 重置</button>
+                    <button onclick="resetAll()" data-tip="重置当前卡组：清空我方/队友全部卡槽（不删项目数据，手牌回到未上阵状态）" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:0.75rem;">🔄 重置</button>
                 </div>
             </div>
             
@@ -1821,7 +1821,7 @@
                     </div>
                     <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:12px;margin-bottom:12px;">
                         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                            <span style="color:rgba(255,255,255,0.7);font-size:0.75rem;">📋 下发历史（当前指令 Gist 已生效指令）</span>
+                            <span style="color:rgba(255,255,255,0.7);font-size:0.75rem;">📋 下发历史（每条可撤回：未送达的设备将不再执行）</span>
                             <button onclick="toolboxLoadHistory()" style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:#fff;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:0.72rem;">刷新</button>
                         </div>
                         <div id="toolboxHistory" style="font-size:0.75rem;color:rgba(255,255,255,0.6);">点「刷新」查看已下发指令</div>
@@ -2165,7 +2165,7 @@
             </div>
 
             <div id="adminPageDiag" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:99990;overflow-y:auto;">
-                <div style="max-width:760px;margin:40px auto;background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:12px;padding:20px;">
+                <div style="max-width:1100px;margin:40px auto;background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:12px;padding:20px;">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
                         <h3 style="color:#ffd700;margin:0;font-size:1rem;">📊 写操作诊断分析</h3>
                         <button onclick="document.getElementById('adminPageDiag').style.display='none';var m=document.getElementById('adminMenuSection');if(m)m.style.display='block';" style="background:none;border:none;color:#fff;font-size:1.4rem;cursor:pointer;">✕</button>
