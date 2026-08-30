@@ -3708,7 +3708,9 @@ if (true) {
     // 🔴 2026-08-29 内存优化：改为「LRU 上限缓存 + 淘汰时 revokeObjectURL」。
     //    原实现是无限增长的普通对象，且从不调用 revokeObjectURL —— 每看一张皮肤就常驻一份
     //    解码位图，413 张皮刷一遍即累积数百 MB，是 App 内存飙到 1.4G 的主因之一。
-    const SKIN_URL_CACHE_MAX = 200; // 🔴 2026-08-30 80→200：413 张皮浏览一遍卡池就会把 14 槽缓存全挤掉，回来切皮又要重读盘+canvas 缩放（「本地反而慢」的来源）。与 _SKIN_BLOB_CACHE_MAX 对齐；blob 由 <img> 持有，Map 本身开销可忽略
+    const SKIN_URL_CACHE_MAX = 500; // 🔴 2026-08-30 200→500：用户要求全部缓存。共 413 张皮全量常驻，
+    // blob URL 只持有编码后的 PNG 字节（413×~50KB≈20MB，可忽略）；解码位图仍只存在于正在显示的 <img>，
+    // 不随缓存增长。配合 _preheatLocalSkinUrls 启动预热，任何切皮零读盘零缩放、即点即换。
     const skinImageUrlCache = new Map(); // filePath -> url（Map 保持插入顺序，天然支持 LRU）
 
     function _skinUrlRelease(url) {
@@ -4023,6 +4025,8 @@ if (true) {
         _lastSkinScanTs = Date.now();
         // 扫描完本地皮肤后立刻重刷一次（不依赖远端同步，修复「加载时皮肤卡着不显示」概率问题）
         try { if (typeof window.reapplyAllSkins === 'function') await window.reapplyAllSkins(); } catch (e) {}
+        // 🔴 2026-08-30：后台全量预热本地皮肤 blob URL（主阵容英雄优先），之后切皮零读盘零缩放
+        _preheatLocalSkinUrls();
         return window.skinRegistry;
     }
 
@@ -4321,6 +4325,8 @@ if (true) {
                 _showSkinUpdateToast(downloaded);
             }
             try { if (typeof window.reapplyAllSkins === 'function') window.reapplyAllSkins(); } catch (e) {}
+            // 🔴 2026-08-30：刚落地的新皮肤 path 也预热进缓存（已缓存的自动跳过，只热新增）
+            _preheatLocalSkinUrls();
         }
     }
 
@@ -4528,6 +4534,39 @@ if (true) {
             }
         }
         console.log('[SKIN] Preheat queued:', count, 'skins');
+    }
+
+    // 🔴 2026-08-30 新增：本地皮肤 blob URL 全量预热（解决「切皮首次点击慢」的最后一环）。
+    //    getSkinImageUrl 首次命中要走 Tauri IPC 读盘 + createImageBitmap + canvas 缩放（几十~几百 ms），
+    //    之后才进 skinImageUrlCache。此前只有"用过才缓存"，导致每张皮第一次切都要现场读盘。
+    //    这里在启动后台把 registry 里所有本地 path 全部预热进缓存（主阵容英雄优先），
+    //    之后任何切皮/融合皮/卡池悬停都是缓存直出、零 IO。
+    let _localUrlPreheatRunning = false;
+    async function _preheatLocalSkinUrls() {
+        if (_localUrlPreheatRunning) return;
+        if (!isTauriApp) return;                 // 网页版本地无 path，走 _preheatSkins 的 IndexedDB 线
+        if (window.isPerfLite && window.isPerfLite()) return; // 极速模式不显示皮肤，不预热
+        _localUrlPreheatRunning = true;
+        try {
+            // 主阵容英雄优先，保证开局 1-2 秒内先热起来
+            const entries = Object.entries(window.skinRegistry || {})
+                .sort(([a], [b]) => (PRIORITY_HEROES.has(a) ? 0 : 1) - (PRIORITY_HEROES.has(b) ? 0 : 1));
+            let warmed = 0, skipped = 0;
+            for (const [heroName, skinList] of entries) {
+                if (!Array.isArray(skinList)) continue;
+                for (const s of skinList) {
+                    if (!s || !s.path) continue;
+                    if (skinImageUrlCache.has(s.path)) { skipped++; continue; }
+                    try { await getSkinImageUrl(s.path); warmed++; }
+                    catch (e) { /* 单张失败不影响整体 */ }
+                    // 每张之间让出主线程：createImageBitmap/drawImage 虽轻，413 张连跑也别抢占 UI
+                    await new Promise(r => setTimeout(r, 20));
+                }
+            }
+            if (warmed > 0) console.log('[SKIN] 本地皮肤预热完成: 新热 ' + warmed + ' 张 / 已缓存 ' + skipped + ' 张');
+        } finally {
+            _localUrlPreheatRunning = false;
+        }
     }
 
     function getHeroSkinUrl(heroName, skinName) {
