@@ -960,8 +960,10 @@
         <div id="projectMenu" style="display:none;position:fixed;z-index:9998;background:rgba(40,40,70,0.98);border:1px solid rgba(255,215,0,0.3);border-radius:10px;padding:10px;min-width:200px;max-height:85vh;overflow-y:auto;box-shadow:0 4px 15px rgba(0,0,0,0.4);">
             <button onclick="exportCurrentProject()" title="把当前项目导出为 JSON 文件，可分享给别人导入（含卡牌皮肤与魔化，不含全局皮肤设置）" style="display:block;width:100%;background:linear-gradient(135deg,#26a69a,#00796b);color:#fff;border:none;padding:7px 12px;border-radius:7px;cursor:pointer;font-size:0.82rem;margin-bottom:4px;">📤 备份此项目</button>
             <button onclick="shareProjectToWall()" title="把当前阵容项目分享到需求墙：对方只能智能导入或下载，不支持预览/导入到老马" style="display:block;width:100%;background:linear-gradient(135deg,#9c27b0,#7b1fa2);color:#fff;border:none;padding:7px 12px;border-radius:7px;cursor:pointer;font-size:0.82rem;margin-bottom:4px;">📢 分享阵容到需求墙</button>
-            <button onclick="shareLineupImage()" title="把当前上阵阵容（我方+队友）生成一张分享图：含皮肤/等级/魔化/融合副卡/减伤，底部带阵容码——发到群里对方看图就能抄，或用阵容码一键复刻" style="display:block;width:100%;background:linear-gradient(135deg,#00bcd4,#0097a7);color:#fff;border:none;padding:7px 12px;border-radius:7px;cursor:pointer;font-size:0.82rem;margin-bottom:4px;">📸 生成阵容分享图</button>
-            <button onclick="importLineupCode()" title="粘贴对方分享的阵容码（TFJL1.开头，分享图下方/分享链接里都有），一键复刻整个阵容（含等级/皮肤/魔化）到当前项目" style="display:block;width:100%;background:linear-gradient(135deg,#42a5f5,#1565c0);color:#fff;border:none;padding:7px 12px;border-radius:7px;cursor:pointer;font-size:0.82rem;margin-bottom:4px;">📥 从阵容码导入</button>
+            <button onclick="shareLineupImage()" title="把当前阵容（我方+队友，上阵7+手牌3每人最多10张）生成分享图：含皮肤/等级/魔化/融合副卡/减伤，可设有效期与密码——对方扫码、报 8 位短码或点链接即可一键复刻" style="display:block;width:100%;background:linear-gradient(135deg,#00bcd4,#0097a7);color:#fff;border:none;padding:7px 12px;border-radius:7px;cursor:pointer;font-size:0.82rem;margin-bottom:4px;">📸 生成阵容分享图</button>
+            <button onclick="shareProjectViaCode()" title="把当前项目整体打包分享（阵容+脚本+记事本+参考图全部带上）上传云端，生成 8 位短码和链接，可设有效期和密码——对方在软件里输短码或点链接即可导入成新项目（自选名称和分类，不影响你的当前项目）" style="display:block;width:100%;background:linear-gradient(135deg,#9c27b0,#6a1b9a);color:#fff;border:none;padding:7px 12px;border-radius:7px;cursor:pointer;font-size:0.82rem;margin-bottom:4px;">📦 分享整个项目</button>
+            <button onclick="importProjectViaCode()" title="输入对方分享的 8 位项目短码，或粘贴含 #pg= 的分享链接，把完整项目（阵容+脚本+记事本+参考图）导入为新项目——自选项目名称和分类，不会覆盖你当前打开的项目" style="display:block;width:100%;background:linear-gradient(135deg,#7e57c2,#4527a0);color:#fff;border:none;padding:7px 12px;border-radius:7px;cursor:pointer;font-size:0.82rem;margin-bottom:4px;">📥 从短码导入项目</button>
+            <button onclick="importLineupCode()" title="粘贴对方分享的阵容码/分享链接，或输入 8 位分享短码（TFJL1. 开头 / 含 #lg= 的链接 / 纯 8 位短码均可，输入项目短码会自动转项目导入），一键复刻整个阵容（含手牌、等级/皮肤/魔化）；导入前可选择写入当前项目、指定项目或新建项目" style="display:block;width:100%;background:linear-gradient(135deg,#42a5f5,#1565c0);color:#fff;border:none;padding:7px 12px;border-radius:7px;cursor:pointer;font-size:0.82rem;margin-bottom:4px;">📥 从阵容码导入</button>
             <button onclick="importSingleProject()" title="从 JSON 文件导入单个项目（别人分享给你的项目文件）" style="display:block;width:100%;background:linear-gradient(135deg,#66bb6a,#388e3c);color:#fff;border:none;padding:7px 12px;border-radius:7px;cursor:pointer;font-size:0.82rem;margin-bottom:4px;">📥 恢复项目</button>
             <button onclick="renameProject()" title="重命名当前项目" style="display:block;width:100%;background:linear-gradient(135deg,#ff9800,#f57c00);color:white;border:none;padding:7px 12px;border-radius:7px;cursor:pointer;font-size:0.82rem;margin-bottom:4px;">✏️ 重命名项目</button>
             <button onclick="deleteCurrentProject()" title="删除当前项目（不可恢复）" style="display:block;width:100%;background:linear-gradient(135deg,#f44336,#c62828);color:white;border:none;padding:7px 12px;border-radius:7px;cursor:pointer;font-size:0.82rem;margin-bottom:4px;">🗑️ 删除项目</button>
@@ -1230,7 +1232,7 @@
                         </div>
                     </div>
                     <button onclick="resetAll()" data-tip="重置当前卡组：清空我方/队友全部卡槽（不删项目数据，手牌回到未上阵状态）" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:0.75rem;">🔄 重置</button>
-                    <button onclick="if(typeof shareLineupImage==='function')shareLineupImage();else showToast('分享功能加载中，请稍候...','info');" data-tip="生成阵容分享图：1080px 完整双方卡组（职业渐变+真实皮肤+等级/魔化/融合副卡），底部带阵容码，对方贴码一键复刻；弹窗内可复制图片/阵容码/链接/文字文案" style="background:linear-gradient(135deg,#f093fb,#f5576c);border:none;color:#fff;padding:4px 12px;border-radius:6px;cursor:pointer;font-size:0.75rem;font-weight:bold;box-shadow:0 2px 8px rgba(240,147,251,0.3);">📸 分享</button>
+                    <button onclick="if(typeof shareLineupImage==='function')shareLineupImage();else showToast('分享功能加载中，请稍候...','info');" data-tip="生成阵容分享图：双方卡组+手牌（每人最多10张，职业渐变+真实皮肤+等级/魔化/融合副卡），可设有效期/密码，对方扫码、报 8 位短码或点链接一键复刻" style="background:linear-gradient(135deg,#f093fb,#f5576c);border:none;color:#fff;padding:4px 12px;border-radius:6px;cursor:pointer;font-size:0.75rem;font-weight:bold;box-shadow:0 2px 8px rgba(240,147,251,0.3);">📸 分享</button>
                 </div>
             </div>
             
@@ -1717,7 +1719,7 @@
                     </div>
                     <div class="admin-menu-item" onclick="wallAdminShowGist()">
                         <span class="mi-emoji">🗂️</span>
-                        <div class="mi-text"><div class="mi-title">Gist文件管理</div><div class="mi-sub">孤儿扫描清理</div></div>
+                        <div class="mi-text"><div class="mi-title">Gist文件管理</div><div class="mi-sub">孤儿/过期分享扫描清理</div></div>
                     </div>
                     <div class="admin-menu-item" onclick="adminShowPage('featureToggles')">
                         <span class="mi-emoji">🎛️</span>
@@ -2786,18 +2788,18 @@
         <div id="adminPageWallGist" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:99990;overflow-y:auto;">
             <div style="max-width:680px;margin:40px auto;background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:12px;padding:20px;">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">🗂️ 需求墙 Gist 文件管理</h3>
+                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">🗂️ Gist 文件管理（需求墙 + 分享）</h3>
                     <button onclick="document.getElementById('adminPageWallGist').style.display='none';var m=document.getElementById('adminMenuSection');if(m)m.style.display='block';" style="background:none;border:none;color:#fff;font-size:1.4rem;cursor:pointer;">✕</button>
                 </div>
                 <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
                     <button onclick="wallLoadGistManager()" style="background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;">🔄 扫描Gist</button>
-                    <button onclick="wallSelectOrphanGists()" style="background:rgba(255,255,255,0.1);color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;">🔴 全选孤儿</button>
+                    <button onclick="wallSelectOrphanGists()" title="选中所有孤儿 + 已过期的分享Gist" style="background:rgba(255,255,255,0.1);color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;">🔴 全选孤儿/过期</button>
                     <button onclick="wallDeleteSelectedGists()" style="background:#ff0000;color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;">🗑️ 删除选中</button>
                     <select id="wallGistTypeFilter" onchange="wallFilterGistList()" style="background:rgba(0,0,0,0.3);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:4px 8px;font-size:0.8rem;">
-                        <option value="all">全部类型</option><option value="script">📜 脚本</option><option value="message">📢 消息</option><option value="backup">💾 备份</option><option value="image">🖼️ 图片</option>
+                        <option value="all">全部类型</option><option value="script">📜 脚本</option><option value="message">📢 消息</option><option value="backup">💾 备份</option><option value="image">🖼️ 图片</option><option value="lineup">🎫 阵容分享</option><option value="projshare">📦 项目分享</option>
                     </select>
                     <select id="wallGistStatusFilter" onchange="wallFilterGistList()" style="background:rgba(0,0,0,0.3);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:4px 8px;font-size:0.8rem;">
-                        <option value="all">全部状态</option><option value="orphan">🔴 孤儿</option><option value="active">🟢 被引用/在售</option><option value="current">🟢 当前使用</option><option value="ended">🟡 已结束</option>
+                        <option value="all">全部状态</option><option value="orphan">🔴 孤儿</option><option value="active">🟢 被引用/在售</option><option value="current">🟢 当前使用</option><option value="ended">🟡 已结束</option><option value="expired">⏰ 已过期</option>
                     </select>
                 </div>
                 <div id="wallGistCount" style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-bottom:8px;"></div>
