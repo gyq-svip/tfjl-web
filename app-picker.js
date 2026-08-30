@@ -1035,9 +1035,13 @@
 
         // 分享当前阵容项目到需求墙（整项目 JSON，接收方只能智能导入/下载，不支持预览/导入到老马）
         // 复用与脚本分享一致的 Gist 上传 + 加密 + 需求墙消息机制
-        async function shareProjectToWall() {
+        // autoOpts.auto = true：静默自动模式（阵容/项目分享后自动同步需求墙，不弹任何输入框）
+        //   - 文件名自动生成；有效期取 autoOpts.days（默认 30 天）；不加密
+        //   - 失败只 toast 不 alert，绝不打断主分享流程；返回 true/false 供调用方提示
+        async function shareProjectToWall(autoOpts) {
+            const auto = !!(autoOpts && autoOpts.auto);
             const projectName = (document.getElementById('projectSelector1') && document.getElementById('projectSelector1').value) || currentProjectName;
-            if (!projectName) { alert('请先选择一个项目！'); return; }
+            if (!projectName) { if (auto) { showToast('⚠️ 未找到当前项目，跳过需求墙同步', 'info'); return false; } alert('请先选择一个项目！'); return false; }
 
             const cat = currentProjectCategory || '默认分类';
             let project = null;
@@ -1045,13 +1049,18 @@
                 const all = await loadProjectListFromDB();
                 project = all.find(p => p.name === projectName && (p.category || '默认分类') === cat) || all.find(p => p.name === projectName);
             } catch (e) { project = null; }
-            if (!project) { alert('未找到该项目：' + projectName); return; }
+            if (!project) { if (auto) { showToast('⚠️ 未找到该项目，跳过需求墙同步：' + projectName, 'info'); return false; } alert('未找到该项目：' + projectName); return false; }
 
-            // 强需求：分享前必须设置昵称
-            const nick = await ensureNickname();
-            if (!nick) { alert('分享阵容需要先设置昵称（昵称仅用于发言/分享展示，设置后不可自行修改）'); return; }
+            // 强需求：分享前必须设置昵称（自动模式没昵称就静默跳过，不打断主流程）
+            let nickname = localStorage.getItem('TFJL_UserName') || '';
+            if (!nickname) {
+                if (auto) { showToast('⚠️ 未设置昵称，跳过需求墙同步（设置昵称后可手动「分享阵容到需求墙」）', 'info'); return false; }
+                const nick = await ensureNickname();
+                if (!nick) { alert('分享阵容需要先设置昵称（昵称仅用于发言/分享展示，设置后不可自行修改）'); return false; }
+                nickname = nick;
+            }
 
-            if (!getGistToken()) { alert('离线版暂不支持发送，请检查网络连接'); return; }
+            if (!getGistToken()) { if (auto) { showToast('⚠️ 离线/网络受限，跳过需求墙同步', 'info'); return false; } alert('离线版暂不支持发送，请检查网络连接'); return false; }
 
             // 【关键安全】分享前先加载历史消息，避免覆盖
             if (wallMessages.length === 0) {
@@ -1060,16 +1069,23 @@
 
             const now = new Date();
             const defaultName = `塔防阵容_${projectName}_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
-            const inputName = await askTextInputAsync({ title: '分享阵容', label: '分享阵容文件名（不含扩展名）：', defaultValue: defaultName });
-            if (!inputName) return;
-            const fileName = inputName.endsWith('.json') ? inputName : inputName + '.json';
+            let fileName, expireMinutes, sharePassword, recoveryKey;
+            if (auto) {
+                fileName = defaultName + '.json';
+                expireMinutes = Math.max(1, (autoOpts.days || 30)) * 1440;
+                sharePassword = ''; recoveryKey = '';
+            } else {
+                const inputName = await askTextInputAsync({ title: '分享阵容', label: '分享阵容文件名（不含扩展名）：', defaultValue: defaultName });
+                if (!inputName) return false;
+                fileName = inputName.endsWith('.json') ? inputName : inputName + '.json';
 
-            // 分享选项弹窗（时长 + 密码），与脚本分享一致
-            const shareOpts = await new Promise(function(resolve) { showShareOptionsDialog(function(e, p, rk) { resolve([e, p, rk]); }); });
-            if (shareOpts === null || shareOpts[0] === null) return;
-            const expireMinutes = shareOpts[0];
-            const sharePassword = shareOpts[1];
-            const recoveryKey = shareOpts[2] || '';
+                // 分享选项弹窗（时长 + 密码），与脚本分享一致
+                const shareOpts = await new Promise(function(resolve) { showShareOptionsDialog(function(e, p, rk) { resolve([e, p, rk]); }); });
+                if (shareOpts === null || shareOpts[0] === null) return false;
+                expireMinutes = shareOpts[0];
+                sharePassword = shareOpts[1];
+                recoveryKey = shareOpts[2] || '';
+            }
 
             try {
                 const token = getGistToken();

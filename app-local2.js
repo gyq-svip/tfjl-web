@@ -1096,16 +1096,45 @@ if (true) {
             text = await navigator.clipboard.readText();
         } catch (e) {
             console.warn('[剪贴板导入] 读取失败:', e && (e.message || e));
-            if (typeof showToast === 'function') showToast('❌ 无法读取剪贴板，请先复制脚本内容后再点', 'error');
+            if (typeof showToast === 'function') showToast('❌ 无法读取剪贴板，请先复制内容后再点', 'error');
             return;
         }
         text = (text || '').replace(/\r\n/g, '\n').trim();
-        // 最基本的有效性判定：太短多半不是脚本（选中一句话/一个词的复制会误触）
-        if (!text || text.length < 20) {
-            if (typeof showToast === 'function') showToast('📋 剪贴板没有检测到脚本内容（先在需求墙/群聊里复制完整脚本）', 'error');
+        if (!text) {
+            if (typeof showToast === 'function') showToast('📋 剪贴板是空的（先复制脚本/短码/分享链接）', 'error');
             return;
         }
-        if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('剪贴板导入脚本');
+        if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('剪贴板多功能导入');
+        // ---- 智能识别内容类型，分发到对应导入（多功能合一）----
+        const raw = text;
+        // ① 分享链接：#pg=（项目）/ #lg= / #lineup=（阵容）
+        const mPg = /(?:^|[&#])pg=([A-Za-z0-9_-]+)/.exec(raw);
+        const mLong = /(?:^|[&#])lineup=([A-Za-z0-9+/=%._-]+)/.exec(raw);
+        const mShortLink = /(?:^|[&#])lg=([A-Za-z0-9_-]+)/.exec(raw);
+        if (mPg || mLong || mShortLink) {
+            const isProjLink = !!mPg;
+            if (typeof showToast === 'function') showToast(isProjLink ? '📋 检测到项目分享链接，正在打开项目导入…' : '📋 检测到阵容分享链接，正在打开阵容导入…', 'info');
+            (isProjLink ? window.importProjectViaCode : window.importLineupCode)(raw);
+            return;
+        }
+        // ② TFJL1. 阵容码（可能整段话里夹着码）
+        if (raw.indexOf('TFJL1.') >= 0) {
+            if (typeof showToast === 'function') showToast('📋 检测到阵容码，正在打开阵容导入…', 'info');
+            window.importLineupCode(raw);
+            return;
+        }
+        // ③ 纯 8 位短码（与生成端同字符集，排除易混淆 0O1lI）
+        const SC_RE = /^[ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789]{8}$/;
+        if (SC_RE.test(raw)) {
+            if (typeof showToast === 'function') showToast('📋 检测到分享短码 ' + raw + '，正在打开导入（项目/阵容自动识别）…', 'info');
+            window.importProjectViaCode(raw);
+            return;
+        }
+        // ④ 其余按脚本导入（需求墙/群聊复制的整段脚本）
+        if (text.length < 20) {
+            if (typeof showToast === 'function') showToast('📋 剪贴板内容太短：不是短码/链接/阵容码，也不像脚本（先复制完整脚本）', 'error');
+            return;
+        }
         // 默认文件名：取第一行非空文本做名（截 24 字符防过长），非法字符清洗；识别不出则按日期命名
         let fileName = '';
         const firstLine = (text.split('\n').find(l => l.trim().length > 0) || '').trim();
