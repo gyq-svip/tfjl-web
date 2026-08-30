@@ -665,6 +665,7 @@
             <div style="margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
               <input type="file" id="recFile" accept="image/*" style="display:none;">
               <button id="recPickFile" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.28);color:#fff;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:0.8rem;">📁 选择阵容图片</button>
+              <button id="recGameCapture" style="background:linear-gradient(135deg,#ff7043,#bf360c);color:#fff;border:none;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600;" title="自动找到游戏窗口→截取整窗画面→立刻识别，不用手动截图" data-tip="一键识别游戏画面：自动检测游戏窗口并截图识别（仅桌面 APP，全程只读不动游戏）">🎮 一键识别游戏画面</button>
               <span id="recFileName" style="font-size:0.78rem;color:#90a4ae;">未选择阵容图片</span>
               <span style="font-size:0.75rem;color:#90a4ae;">｜也可直接 Ctrl+V 粘贴截图</span>
             </div>
@@ -683,7 +684,7 @@
             <div id="recWarn" style="display:none;font-size:0.78rem;color:#ffb74d;background:rgba(255,167,38,0.15);padding:6px 10px;border-radius:8px;margin-bottom:8px;line-height:1.5;"></div>
             <div id="recIntro" style="font-size:0.82rem;line-height:1.75;color:#cfd8dc;background:rgba(66,165,245,0.10);border:1px solid rgba(66,165,245,0.28);border-radius:10px;padding:12px 14px;">
               <div style="font-weight:700;color:#90caf9;margin-bottom:8px;font-size:0.9rem;">📖 使用说明（识别结果会显示在这里）</div>
-              <div style="margin-bottom:4px;"><b style="color:#fff;">① 取图</b>：游戏里截下<b>卡组阵容图</b>，直接 <b style="color:#ffd54f;">Ctrl+V 粘贴</b>到左侧黑框内，或点「📁 选择阵容图片」。</div>
+              <div style="margin-bottom:4px;"><b style="color:#fff;">① 取图</b>：游戏开着时直接点 <b style="color:#ffab91;">🎮 一键识别游戏画面</b>（自动截图+识别）；或游戏里截下<b>卡组阵容图</b>，直接 <b style="color:#ffd54f;">Ctrl+V 粘贴</b>到左侧黑框内，或点「📁 选择阵容图片」。</div>
               <div style="margin-bottom:4px;"><b style="color:#fff;">② 识别</b>：点绿色「⚡ 自动识别(无需对齐)」，稍等片刻，10 张英雄卡会逐行列在此处。</div>
               <div style="margin-bottom:4px;"><b style="color:#fff;">③ 用结果（任选其一，或都用）</b>：</div>
               <div style="padding-left:14px;margin-bottom:2px;">• 「➡ 填入脚本生成」→ 直接生成上阵脚本；</div>
@@ -791,7 +792,8 @@
       if(overlay && overlay._results) renderRecDr(overlay._results);
     };
 
-    $('recAuto').onclick = ()=>{
+    // 识别执行体（「⚡ 自动识别」与「🎮 一键识别游戏画面」共用）
+    function runAuto(){
       autoRecognize(currentImg, $('recCanvas'), $('recStatus'), (results, source, rowCount)=>{
         $('recSrc').textContent = '来源: '+source;
         const intro = $('recIntro'); if(intro && results && results.length) intro.style.display = 'none';
@@ -824,7 +826,69 @@
         $('recStatus').textContent = `识别完成：${results.length} 个英雄（${rowCount} 行）`;
         renderRecDr(results); // 识别完立即算并展示减伤
       });
-    };
+    }
+    $('recAuto').onclick = runAuto;
+
+    // ====================== 🎮 一键识别游戏画面（功能10，搭游戏监控截图底座） ======================
+    // 链路：find_game_windows 找游戏窗口（优先复用波数监控记住的窗口）→ capture_window_region
+    // 截整窗（BMP base64）→ 灌入 currentImg → 自动触发 runAuto 识别。全程只读：不动游戏、不抢焦点。
+    const recGameBtn = $('recGameCapture');
+    if(recGameBtn){
+      if(!isTauri()) recGameBtn.style.display = 'none'; // 网页版无窗口截图能力，隐藏
+      recGameBtn.onclick = async ()=>{
+        if(typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('一键识别游戏画面');
+        const old = recGameBtn.textContent;
+        recGameBtn.disabled = true; recGameBtn.textContent = '⏳ 截图中…';
+        try{
+          const wins = await tauriInvoke('find_game_windows') || [];
+          if(!wins.length) throw new Error('未检测到游戏窗口，请先打开游戏/模拟器再试');
+          // 优先自动匹配上次用的窗口（与「游戏波数监控」共用记忆）
+          let win = null;
+          let lastTitle = null;
+          try { lastTitle = (JSON.parse(localStorage.getItem('tfjl_game_monitor_cfg')||'{}')||{}).winTitle || null; } catch(_){}
+          if(lastTitle) win = wins.find(w=> w.title && w.title.includes(lastTitle)) || null;
+          if(!win && wins.length === 1) win = wins[0];
+          if(!win){
+            // 多个窗口：让用户挑（不瞎猜）
+            win = await new Promise(resolve=>{
+              recChoice({
+                title: '🎮 选择游戏窗口',
+                desc: '检测到 '+wins.length+' 个可截图窗口，选一个进行识别：',
+                maxHeight: '70vh',
+                items: wins.map((w,i)=>({ label: (i+1)+'. '+(w.title.length>34 ? w.title.slice(0,34)+'…' : w.title), value: String(i) })),
+                onPick: v=> resolve(wins[parseInt(v,10)]),
+                onCancel: ()=> resolve(null)
+              });
+            });
+            if(!win) return; // 用户取消，finally 里恢复按钮
+          }
+          const bmpB64 = await tauriInvoke('capture_window_region', { hwnd: win.hwnd, x: 0, y: 0, w: 10, h: 10, full: true });
+          if(!bmpB64) throw new Error('截图失败（窗口可能已关闭或被最小化）');
+          const im = await new Promise((resolve, reject)=>{
+            const img = new Image();
+            img.onload = ()=> resolve(img);
+            img.onerror = ()=> reject(new Error('截图解码失败'));
+            img.src = 'data:image/bmp;base64,' + bmpB64;
+          });
+          currentImg = im;
+          const c = $('recCanvas');
+          c.width = im.naturalWidth; c.height = im.naturalHeight;
+          c.getContext('2d').drawImage(im, 0, 0);
+          const n = $('recFileName');
+          if(n){ n.textContent = '已截取游戏窗口：'+(win.title.length>22 ? win.title.slice(0,22)+'…' : win.title); n.style.color = '#ffab91'; }
+          const st = $('recStatus');
+          if(st) st.textContent = '已截取游戏画面，自动识别中…';
+          runAuto();
+        }catch(e){
+          const msg = (e && e.message) ? e.message : (typeof e === 'string' ? e : '未知错误');
+          recToast('❌ 一键识别失败：'+msg);
+          const st = $('recStatus');
+          if(st) st.textContent = '截图失败';
+        }finally{
+          recGameBtn.disabled = false; recGameBtn.textContent = old;
+        }
+      };
+    }
     $('recFill').onclick = ()=>{
       const all = overlay._results || [];
       const results = all.filter(r=>!r._deleted);
