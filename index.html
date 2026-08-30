@@ -1230,7 +1230,7 @@
                         </div>
                     </div>
                     <button onclick="resetAll()" data-tip="重置当前卡组：清空我方/队友全部卡槽（不删项目数据，手牌回到未上阵状态）" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:0.75rem;">🔄 重置</button>
-                    <button onclick="if(typeof shareLineupAsImage==='function')shareLineupAsImage();else showToast('分享功能加载中，请稍候...','info');" data-tip="一键生成阵容分享图：包含双方卡组和手牌，可保存图片或复制到剪贴板分享给队友" style="background:linear-gradient(135deg,#f093fb,#f5576c);border:none;color:#fff;padding:4px 12px;border-radius:6px;cursor:pointer;font-size:0.75rem;font-weight:bold;box-shadow:0 2px 8px rgba(240,147,251,0.3);">📸 分享</button>
+                    <button onclick="if(typeof shareLineupImage==='function')shareLineupImage();else showToast('分享功能加载中，请稍候...','info');" data-tip="生成阵容分享图：1080px 完整双方卡组（职业渐变+真实皮肤+等级/魔化/融合副卡），底部带阵容码，对方贴码一键复刻；弹窗内可复制图片/阵容码/链接/文字文案" style="background:linear-gradient(135deg,#f093fb,#f5576c);border:none;color:#fff;padding:4px 12px;border-radius:6px;cursor:pointer;font-size:0.75rem;font-weight:bold;box-shadow:0 2px 8px rgba(240,147,251,0.3);">📸 分享</button>
                 </div>
             </div>
             
