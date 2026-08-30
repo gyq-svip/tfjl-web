@@ -3083,7 +3083,8 @@
                 githubLink.textContent = release.downloadUrl ? '📥 直接下载' : 'GitHub Releases 下载';
             }
             if (latestInfo) {
-                latestInfo.innerHTML = '<span style="color:#888;">最新版本: </span><span style="color:#4fc3f7;font-weight:bold;">有新版本可更新</span>';
+                // 🔴 2026-08-30 用户要求：显示真实版本号（原先是「有新版本可更新」文案，不知道具体是哪个版本）
+                latestInfo.innerHTML = '<span style="color:#888;">最新版本: </span><span style="color:#4fc3f7;font-weight:bold;">v' + release.version + '</span>';
             }
 
             // 动态填充软件大小（来自 version.json 的 size 字段，无则回退静态文案）
