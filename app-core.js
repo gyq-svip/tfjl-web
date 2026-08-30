@@ -7169,42 +7169,51 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 try {
                     const subHero = (_cgmValidParts && _cgmValidParts[1]) || null;
                     if (subHero) {
-                        const skins = (window.skinRegistry && window.skinRegistry[subHero]) || [];
-                        if (skins.length) {
-                            const blobs = [];
-                            for (const s of skins) {
-                                try {
-                                    const url = window.resolveHeroSkinUrl ? await window.resolveHeroSkinUrl(subHero, s.name) : null;
-                                    if (!url) continue;
-                                    const blob = await (async () => { try { return await (await fetch(url)).blob(); } catch (e) { return null; } })();
-                                    if (blob) blobs.push({ name: s.name, blob });
-                                } catch (e) {}
-                            }
-                            if (blobs.length) {
-                                let registry = null;
-                                try { const local = await _cgmReadRepoFile('skins/registry.json'); if (local) registry = JSON.parse(local); } catch (e) {}
-                                if (!registry || !registry.heroes) registry = { version: 2, heroes: {} };
-                                registry.heroes['融合' + subHero] = await cgmWriteFusedHero(subHero, blobs);
-                                registry.updated = new Date().toISOString();
-                                await _cgmWriteRepoFile('skins/registry.json', JSON.stringify(registry, null, 2));
-                                cutMsg = '\n✓ 已自动切副卡「' + subHero + '」' + blobs.length + ' 张皮肤并入 skins/融合' + subHero + '\\（到「🎨 皮肤制作」Tab 点「🚀 一键推送」推上线即可）';
-                            } else {
-                                cutMsg = '\n⚠ 副卡「' + subHero + '」暂未加载到皮肤，可稍后点「🚀 一键全切所有融合卡副卡」补切';
-                            }
-                        } else {
-                            cutMsg = '\n⚠ 副卡「' + subHero + '」暂未加载到皮肤，可稍后点「🚀 一键全切所有融合卡副卡」补切';
-                        }
+                        const r = await cgmCutFusionSkins(subHero, false);
+                        cutMsg = '\n' + (r.ok ? (r.skipped ? '• ' : '✓ ') : '⚠ ') + r.msg;
                     }
                 } catch (e2) {
-                    cutMsg = '\n⚠ 自动切副卡皮失败：' + e2.message + '（可点「🚀 一键全切所有融合卡副卡」重试）';
+                    cutMsg = '\n⚠ 自动切副卡皮失败：' + e2.message + '（可点列表里该卡的「✂️ 切皮」重试）';
                 }
                 status.style.color = '#4ade80';
-                status.textContent = '✓ 已写入 d:\\tfjl-web\\skins\\fusions.json\n请在本机终端运行：\n  cd d:\\tfjl-web\n  git add skins/fusions.json skins/registry.json skins/融合*\n  git commit -m "fusion: ' + name + '"\n  git push origin main\n  git -c http.proxy= -c https.proxy= push gitee' + cutMsg;
+                status.textContent = '✓ 已写入 skins/fusions.json' + cutMsg + '\n👉 点上方「🚀 一键推送」即可全部上线（fusions.json + 融合皮肤一起推，推送失败会自动修复重试）';
                 if (_cgmEditFusionName) { const ab = document.getElementById('cgmFusionAddBtn'); if (ab) ab.textContent = '✓ 添加融合卡'; _cgmEditFusionName = null; }
             } catch (e) {
                 status.style.color = '#ff9e80';
                 status.textContent = '✗ 写入失败：' + e.message;
             }
+        }
+        // 单个副卡英雄切皮：加载其全部皮肤 → 生成 融合XX 整图皮 → 写入 registry 与 skins/融合XX/
+        // 已切过的默认跳过（force=true 强制重切，供列表单卡按钮用）。
+        // 返回 { ok, skipped, msg }。供「添加融合卡自动切」「列表单卡切」「一键全切增量」三处复用。
+        async function cgmCutFusionSkins(subHero, force = false) {
+            if (!subHero) return { ok: false, msg: '缺少副卡英雄' };
+            let registry = null;
+            try { const local = await _cgmReadRepoFile('skins/registry.json'); if (local) registry = JSON.parse(local); } catch (e) {}
+            if (!registry || !registry.heroes) registry = { version: 2, heroes: {} };
+            if (!force && registry.heroes['融合' + subHero]) {
+                return { ok: true, skipped: true, msg: '「融合' + subHero + '」已切过，本次跳过（要重切请在列表点该卡「✂️ 切皮」）' };
+            }
+            const skins = (window.skinRegistry && window.skinRegistry[subHero]) || [];
+            if (!skins.length) {
+                return { ok: false, msg: '副卡「' + subHero + '」暂未加载到皮肤（皮肤库为空，稍后重试或先点开该英雄皮肤触发加载）' };
+            }
+            const blobs = [];
+            for (const s of skins) {
+                try {
+                    const url = window.resolveHeroSkinUrl ? await window.resolveHeroSkinUrl(subHero, s.name) : null;
+                    if (!url) continue;
+                    const blob = await (async () => { try { return await (await fetch(url)).blob(); } catch (e) { return null; } })();
+                    if (blob) blobs.push({ name: s.name, blob });
+                } catch (e) {}
+            }
+            if (!blobs.length) {
+                return { ok: false, msg: '副卡「' + subHero + '」皮肤图全部加载失败' };
+            }
+            registry.heroes['融合' + subHero] = await cgmWriteFusedHero(subHero, blobs);
+            registry.updated = new Date().toISOString();
+            await _cgmWriteRepoFile('skins/registry.json', JSON.stringify(registry, null, 2));
+            return { ok: true, count: blobs.length, msg: '已切副卡「' + subHero + '」共 ' + blobs.length + ' 张皮并入 skins/融合' + subHero + '\\（记得点「🚀 一键推送」上线）' };
         }
         // 已添加融合卡列表（带删除）
         function cgmRefreshAllSlots() {
@@ -7250,7 +7259,25 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 edt.title = '修改「' + n + '」组成 / 属性（覆盖同名条目）';
                 edt.style.cssText = 'flex:none;padding:5px 10px;border-radius:6px;border:1px solid rgba(255,215,0,0.5);background:rgba(255,215,0,0.15);color:#ffd700;cursor:pointer;font-size:0.76rem;white-space:nowrap;';
                 edt.addEventListener('click', () => cgmEditFusionCard(n));
+                const cut = document.createElement('button');
+                const subHero = (c.length >= 2 ? c[1] : null);
+                cut.textContent = '✂️ 切皮';
+                cut.title = '单独切「' + (subHero || '?') + '」这张副卡的全部皮肤（强制重切，与一键全切互不影响）';
+                cut.style.cssText = 'flex:none;padding:5px 10px;border-radius:6px;border:1px solid rgba(74,222,128,0.5);background:rgba(74,222,128,0.12);color:#4ade80;cursor:pointer;font-size:0.76rem;white-space:nowrap;';
+                cut.addEventListener('click', async () => {
+                    if (!subHero) { if (typeof showToast === 'function') showToast('该融合卡缺少副卡组成', 'error'); return; }
+                    const st = document.getElementById('cgmFusionStatus');
+                    cut.disabled = true; cut.textContent = '⏳ 切皮中…';
+                    try {
+                        const r = await cgmCutFusionSkins(subHero, true);
+                        if (st) { st.style.color = r.ok ? '#4ade80' : '#ff9e80'; st.textContent = (r.ok ? '✓ ' : '✗ ') + r.msg + (r.ok ? '\n👉 点上方「🚀 一键推送」上线' : ''); }
+                        if (typeof showToast === 'function') showToast(r.ok ? '切皮完成' : '切皮失败：' + r.msg, r.ok ? 'success' : 'error');
+                    } catch (e) {
+                        if (st) { st.style.color = '#ff9e80'; st.textContent = '✗ 切皮失败：' + e.message; }
+                    } finally { cut.disabled = false; cut.textContent = '✂️ 切皮'; }
+                });
                 row.appendChild(info);
+                row.appendChild(cut);
                 row.appendChild(edt);
                 row.appendChild(del);
                 list.appendChild(row);
@@ -7368,7 +7395,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             window.skinRegistry[key] = blobs.map(b => ({ name: b.name, url: URL.createObjectURL(b.blob), path: null, loaded: true, remote: false }));
             return blobs.map(b => ({ name: b.name, file: key + '_' + (b.name === '默认' ? 'default' : b.name) + '.png' }));
         }
-        // 一键全切：遍历所有融合卡，取其副卡英雄（components[1]）一次性生成 融合XX 整图皮
+        // 一键全切（增量）：遍历所有融合卡副卡，已切过的自动跳过，只切新出的
+        // 想强制重切某一张 → 用列表里该卡的「✂️ 切皮」按钮
         async function cgmCutAllFusions() {
             const status = document.getElementById('cgmFusedStatus');
             const btn = document.getElementById('cgmCutAllBtn');
@@ -7389,39 +7417,27 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             if (progWrap) progWrap.style.display = 'block';
             if (progBar) progBar.style.width = '0%';
             if (progPct) progPct.textContent = '0%';
-            if (progText) progText.textContent = '批量切皮中：共 ' + subs.length + ' 个副卡英雄…';
-            status.style.color = '#4ecdc4'; status.textContent = '批量切皮中…（进度见上方进度条）';
-            let registry = null;
-            try { const local = await _cgmReadRepoFile('skins/registry.json'); if (local) registry = JSON.parse(local); } catch (e) {}
-            if (!registry || !registry.heroes) registry = { version: 2, heroes: {} };
-            let ok = 0, skip = 0;
+            if (progText) progText.textContent = '增量切皮中：共 ' + subs.length + ' 个副卡英雄（已切过的自动跳过）…';
+            status.style.color = '#4ecdc4'; status.textContent = '增量切皮中…（进度见上方进度条）';
+            let ok = 0, skip = 0, fail = 0;
             for (const hero of subs) {
-                const skins = (window.skinRegistry && window.skinRegistry[hero]) || [];
-                if (!skins.length) { skip++; continue; }
-                const blobs = [];
-                for (const s of skins) {
-                    try {
-                        const url = window.resolveHeroSkinUrl ? await window.resolveHeroSkinUrl(hero, s.name) : null;
-                        if (!url) continue;
-                        const blob = await (async () => { try { return await (await fetch(url)).blob(); } catch (e) { return null; } })();
-                        if (blob) blobs.push({ name: s.name, blob });
-                    } catch (e) {}
-                }
-                if (!blobs.length) { skip++; continue; }
-                registry.heroes['融合' + hero] = await cgmWriteFusedHero(hero, blobs);
-                ok++;
-                const pct = Math.round(ok / subs.length * 100);
+                const r = await cgmCutFusionSkins(hero, false);
+                if (r.ok && r.skipped) skip++;
+                else if (r.ok) ok++;
+                else fail++;
+                const done = ok + skip + fail;
+                const pct = Math.round(done / subs.length * 100);
                 if (progBar) progBar.style.width = pct + '%';
                 if (progPct) progPct.textContent = pct + '%';
-                if (progText) progText.textContent = '切皮中：' + ok + '/' + subs.length + '（' + hero + ' 完成）';
-                if (status) status.textContent = '切皮中：' + ok + '/' + subs.length + '（' + hero + ' 完成）';
+                if (progText) progText.textContent = '切皮中：' + done + '/' + subs.length + '（' + hero + ' ' + (r.ok && r.skipped ? '跳过' : (r.ok ? '新切' : '失败')) + '）';
+                if (status) status.textContent = '切皮中：' + done + '/' + subs.length + '（' + hero + ' ' + (r.ok && r.skipped ? '跳过' : (r.ok ? '新切' : '失败')) + '）';
             }
-            registry.updated = new Date().toISOString();
-            try { await _cgmWriteRepoFile('skins/registry.json', JSON.stringify(registry, null, 2)); } catch (e) {}
             btn.disabled = false; btn.textContent = old;
             if (progWrap) progWrap.style.display = 'none';
-            status.style.color = '#4ade80';
-            status.textContent = '✅ 全部切完！共切 ' + ok + ' 个副卡英雄（' + skip + ' 个无皮肤跳过）\n已写入 skins/registry.json 与各 skins/融合XX/ 目录\n👉 现在切到「🎨 皮肤制作」Tab，点 🚀 一键推送 把 skins/ 推上线（git_push_skins 会自动包含 skins/）';
+            status.style.color = fail ? '#ffd700' : '#4ade80';
+            status.textContent = '✅ 增量切完！新切 ' + ok + ' 个副卡英雄，' + skip + ' 个已切过自动跳过' + (fail ? '，' + fail + ' 个失败（皮肤库为空，稍后重试）' : '') +
+                '\n👉 点上方「🚀 一键推送」即可全部上线（fusions.json + registry.json + 融合皮肤一起推）' +
+                (skip ? '\n💡 想重切某一张：在列表里点该卡的「✂️ 切皮」按钮' : '');
         }
 
         function toggleFusionSkinSplit(on) {

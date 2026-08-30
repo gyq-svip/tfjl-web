@@ -539,6 +539,30 @@ fn run_git(repo: &str, args: &[&str]) -> Result<String, String> {
     Ok(String::from_utf8_lossy(&out.stdout).to_string())
 }
 
+/// push 失败自愈：远端有新提交（CI 自动 bump 等）与本地分叉时 push 被拒，
+/// 自动 pull --rebase --autostash 后重推一次，根治「一键推送偶发失败」。
+fn push_with_self_heal(repo: &str, push_args: &[&str]) -> Result<String, String> {
+    match run_git(repo, push_args) {
+        Ok(p) => return Ok(p),
+        Err(e1) => {
+            // autostash：保护工作区未提交改动，rebase 完自动恢复
+            match run_git(repo, &["-c", "rebase.autoStash=true", "pull", "--rebase", "origin", "main"]) {
+                Ok(_) => {}
+                Err(e2) => {
+                    return Err(format!(
+                        "push 失败: {}\n自动 rebase 修复失败: {}\n（多为网络/代理问题，稍后重试即可）",
+                        e1, e2
+                    ));
+                }
+            }
+            match run_git(repo, push_args) {
+                Ok(p) => Ok(format!("{}（已自动 rebase 远端新提交后重推成功）", p)),
+                Err(e3) => Err(format!("push 失败（已尝试自动 rebase）: {}", e3)),
+            }
+        }
+    }
+}
+
 /// 一键推送 skins/fusions.json 到 GitHub（及 Gitee 镜像）
 /// 仅桌面端「卡组管理」调用，免去手动命令行。
 /// 仓库级 .git/config 已为 github.com 配置代理；gitee 直连（清空代理）。
@@ -546,22 +570,23 @@ fn run_git(repo: &str, args: &[&str]) -> Result<String, String> {
 fn git_push_fusions() -> Result<String, String> {
     let repo = "d:\\tfjl-web";
     let mut log = String::new();
-    // 1. 仅当 fusions.json 有本地改动时才提交
-    let status = run_git(repo, &["status", "--porcelain", "skins/fusions.json"])?;
+    // 1. 有本地改动时提交（fusions.json + 自动切皮产物 registry.json 与 skins/融合XX/ 一起带上，
+    //    免去用户再手动去「皮肤制作」Tab 二次推送）
+    let status = run_git(repo, &["status", "--porcelain", "skins/fusions.json", "skins/registry.json", "skins/"])?;
     if !status.trim().is_empty() {
-        run_git(repo, &["add", "skins/fusions.json"])?;
+        run_git(repo, &["add", "skins/fusions.json", "skins/registry.json", "skins/"])?;
         run_git(repo, &["commit", "-m", "chore: 卡组管理一键推送 skins/fusions.json"])?;
-        log.push_str("✓ 已提交本地改动。\n");
+        log.push_str("✓ 已提交本地改动（含 fusions.json / registry.json / 融合皮肤）。\n");
     } else {
-        log.push_str("• fusions.json 无本地改动，跳过提交。\n");
+        log.push_str("• 无本地改动，跳过提交。\n");
     }
-    // 2. push origin main（走仓库默认代理）
-    match run_git(repo, &["push", "origin", "main"]) {
+    // 2. push origin main（失败自动 rebase 远端新提交后重试）
+    match push_with_self_heal(repo, &["push", "origin", "main"]) {
         Ok(p1) => { log.push_str("✓ origin/main: "); log.push_str(p1.trim()); log.push('\n'); }
         Err(e) => return Err(format!("push origin/main 失败: {}", e)),
     }
-    // 3. push gitee（直连，清空代理）
-    match run_git(repo, &["-c", "http.proxy=", "-c", "https.proxy=", "push", "gitee"]) {
+    // 3. push gitee（直连，清空代理；失败自愈后仍失败则跳过，不阻断）
+    match push_with_self_heal(repo, &["-c", "http.proxy=", "-c", "https.proxy=", "push", "gitee"]) {
         Ok(p2) => { log.push_str("✓ gitee: "); log.push_str(p2.trim()); log.push('\n'); }
         Err(e) => { log.push_str("• gitee: 跳过（"); log.push_str(&e); log.push_str("）\n"); }
     }
@@ -589,13 +614,13 @@ fn git_push_skins() -> Result<String, String> {
     // 4) 提交
     run_git(repo, &["commit", "-m", "feat: 皮肤制作一键推送（自动 bump 版本）"])?;
     log.push_str("✓ 已提交本地改动。\n");
-    // 5) push origin main（仓库默认代理）
-    match run_git(repo, &["push", "origin", "main"]) {
+    // 5) push origin main（失败自动 rebase 远端新提交后重试）
+    match push_with_self_heal(repo, &["push", "origin", "main"]) {
         Ok(p1) => { log.push_str("✓ origin/main: "); log.push_str(p1.trim()); log.push('\n'); }
         Err(e) => return Err(format!("push origin/main 失败: {}", e)),
     }
-    // 6) push gitee（直连，清空代理）
-    match run_git(repo, &["-c", "http.proxy=", "-c", "https.proxy=", "push", "gitee"]) {
+    // 6) push gitee（直连，清空代理；失败自愈后仍失败则跳过，不阻断）
+    match push_with_self_heal(repo, &["-c", "http.proxy=", "-c", "https.proxy=", "push", "gitee"]) {
         Ok(p2) => { log.push_str("✓ gitee: "); log.push_str(p2.trim()); log.push('\n'); }
         Err(e) => { log.push_str("• gitee: 跳过（"); log.push_str(&e); log.push_str("）\n"); }
     }
