@@ -979,6 +979,8 @@ if (true) {
                 if (pin) pin.style.display = 'flex';
                 const clip = document.getElementById('clipboardImportBtn');
                 if (clip) clip.style.display = 'flex';
+                const gm = document.getElementById('gameMonitorBtn');
+                if (gm) gm.style.display = 'flex';
                 return true;
             }
             return false;
@@ -1136,7 +1138,8 @@ if (true) {
         //    calcScreenshotStats/calcLogBattleStats 内部自带"缓存优先、无缓存才扫盘"的分级策略。
         // 🔧 2026-08-31 修复：用 requestAnimationFrame 确保 DOM 完全挂载后再统计，
         //    避免偶发的"元素找不到"导致的静默失败；同时包裹 try-catch 防止异常中断。
-        requestAnimationFrame(() => {
+        //    无 rAF 环境（Node 测试沙箱）降级为同步执行，保证可测试性。
+        (typeof requestAnimationFrame === 'function' ? requestAnimationFrame : (fn) => fn())(() => {
             if (settingsConfig.autoLoadScreenshotStats) {
                 try { calcScreenshotStats(); }
                 catch (e) { console.error('[autoLoad] screenshot stats error:', e); }
@@ -5437,13 +5440,13 @@ if (true) {
                     const exists = await pathExists(shareDir);
                     if (!exists) await createDir(shareDir);
                     const filePath = shareDir + '\\' + fileName;
-                    const result = await invoke('write_binary_file', { path: filePath, contents: base64 });
+                    const result = await tauriInvoke('write_binary_file', { path: filePath, contents: base64 });
                     if (result && result.success) {
                         if (typeof showToast === 'function') showToast('已保存到：' + filePath, 'success');
-                        // 尝试打开目录
-                        try { await invoke('show_in_folder', { path: filePath }); } catch (e) {}
+                        // 尝试打开目录（Rust show_in_folder 命令，需新版打包；旧版静默跳过）
+                        try { await tauriInvoke('show_in_folder', { path: filePath }); } catch (e) {}
                     } else {
-                        throw new Error(result?.error || '保存失败');
+                        throw new Error((result && result.error) || '保存失败（write_binary_file 无响应）');
                     }
                 } else {
                     // 网页版：直接下载
@@ -5466,34 +5469,12 @@ if (true) {
             try {
                 canvas.toBlob(async function(blob) {
                     try {
-                        if (_isTauriRuntime()) {
-                            // Tauri 端：调用 Rust 复制图片到剪贴板
-                            const reader = new FileReader();
-                            reader.onload = async function() {
-                                const base64 = reader.result.split(',')[1];
-                                try {
-                                    const r = await invoke('copy_image_to_clipboard', { imageBase64: base64 });
-                                    if (r && r.success) {
-                                        if (typeof showToast === 'function') showToast('图片已复制到剪贴板', 'success');
-                                    } else {
-                                        throw new Error(r?.error || '复制失败');
-                                    }
-                                } catch (e) {
-                                    // 兜底：用 navigator.clipboard
-                                    if (navigator.clipboard && window.ClipboardItem) {
-                                        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-                                        if (typeof showToast === 'function') showToast('图片已复制到剪贴板', 'success');
-                                    } else {
-                                        throw e;
-                                    }
-                                }
-                            };
-                            reader.readAsDataURL(blob);
-                        } else if (navigator.clipboard && window.ClipboardItem) {
+                        // APP 走线上 https 域名，navigator.clipboard 对图片可用（与网页版同路径）
+                        if (navigator.clipboard && window.ClipboardItem) {
                             await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
                             if (typeof showToast === 'function') showToast('图片已复制到剪贴板', 'success');
                         } else {
-                            throw new Error('当前浏览器不支持复制图片');
+                            throw new Error('当前环境不支持复制图片');
                         }
                     } catch (e) {
                         console.error('复制失败:', e);
@@ -5557,6 +5538,455 @@ if (true) {
             _shareLineupModal = null;
         }
     }
+
+    // ==================== 游戏波数监控（窗口检测 + OCR 识别 + TTS 播报） ====================
+    // 链路：find_game_windows 选窗口 → capture_window_region 截波数小区域（BMP→PNG）→ umi_ocr 识别
+    //      → 解析波数 → 变化时 speak_text 语音播报。全程只读不写：不动游戏窗口、不抢焦点、不发按键，
+    //      与脚本软件（锁输入控制权）互不冲突。
+    // 配置存 localStorage（tfjl_game_monitor_cfg）：窗口标题、区域比例坐标、间隔、播报开关。
+    const GM_CFG_KEY = 'tfjl_game_monitor_cfg';
+    let _gmRunning = false;
+    let _gmTimer = null;
+    let _gmLastWave = null;
+    let _gmEmptyCount = 0;   // 连续 OCR 空结果计数（黑屏/最小化提示用）
+    let _gmErrCount = 0;
+    let _gmWindows = [];     // find_game_windows 结果缓存
+
+    function _gmLoadCfg() {
+        try { return JSON.parse(localStorage.getItem(GM_CFG_KEY) || '{}') || {}; } catch (e) { return {}; }
+    }
+    function _gmSaveCfg(cfg) {
+        try { localStorage.setItem(GM_CFG_KEY, JSON.stringify(cfg)); } catch (e) {}
+    }
+
+    // 波数解析：优先「第X波」，退而求其次「X波」「W12」，最后仅当唯一数字时才信（防把别的数字当波数）
+    function _gmParseWave(texts) {
+        for (const t of texts) {
+            let m = t.match(/第\s*(\d+)\s*[波波泫渡]/) || t.match(/(\d+)\s*[波泫渡]/);
+            if (m) return parseInt(m[1], 10);
+            m = t.match(/^[Ww]\s*(\d+)$/);
+            if (m) return parseInt(m[1], 10);
+        }
+        // 逐条收集数字（不能 join 后去空格：『12』『34』会拼成『1234』误判唯一）
+        // 全部文本合起来只有一个数字时才采用（区域内只有波数时成立）
+        const nums = [];
+        for (const t of texts) {
+            const m = t.match(/\d+/g);
+            if (m) nums.push(...m);
+        }
+        if (nums.length === 1) return parseInt(nums[0], 10);
+        return null;
+    }
+
+    // BMP base64 → PNG dataURL（Umi-OCR 输入与 recognize.js 同构，兼容性最稳）
+    function _gmBmpToPng(bmpB64) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => {
+                const cv = document.createElement('canvas');
+                cv.width = img.naturalWidth; cv.height = img.naturalHeight;
+                cv.getContext('2d').drawImage(img, 0, 0);
+                resolve({ png: cv.toDataURL('image/png').split(',')[1], w: cv.width, h: cv.height });
+            };
+            img.onerror = () => reject(new Error('截图解码失败'));
+            img.src = 'data:image/bmp;base64,' + bmpB64;
+        });
+    }
+
+    // OCR 一次小图（Umi-OCR dict 格式，与 recognize.js 相同参数）
+    async function _gmOcr(pngB64) {
+        const j = await tauriInvoke('umi_ocr', {
+            base64: pngB64,
+            options: { data: { format: 'dict', outputDirName: '', outputFileName: '', outputFileFormat: [] }, ocr: { language: 'models/config_chinese.txt', cls: true } }
+        });
+        if (j && j.code === 100) return (j.data || []).map(it => (it && it.text) || '');
+        if (j && j.code === 101) return [];
+        throw new Error(typeof j === 'string' ? j : ((j && j.data) || 'Umi-OCR 返回异常'));
+    }
+
+    function openGameMonitor() {
+        if (!_isTauriRuntime()) {
+            if (typeof showToast === 'function') showToast('游戏监控仅在桌面 APP 中可用', 'error');
+            return;
+        }
+        if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('打开游戏监控');
+        const cfg = _gmLoadCfg();
+        const old = document.getElementById('gameMonitorModal');
+        if (old) old.remove();
+        const modal = document.createElement('div');
+        modal.id = 'gameMonitorModal';
+        modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;justify-content:center;align-items:center;';
+        modal.innerHTML = `
+            <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(255,152,0,0.5);border-radius:12px;padding:24px;width:560px;max-width:92vw;max-height:88vh;overflow:auto;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                    <h3 style="color:#fff;margin:0;font-size:1.15rem;">🎮 游戏波数监控</h3>
+                    <button onclick="closeGameMonitor()" style="background:rgba(255,255,255,0.1);color:#fff;border:none;width:30px;height:30px;border-radius:5px;cursor:pointer;font-size:1.2rem;">×</button>
+                </div>
+                <div style="color:rgba(255,255,255,0.45);font-size:0.72rem;margin-bottom:14px;line-height:1.5;">
+                    自动检测游戏窗口 → 定时识别波数 → 变化时语音播报「第X波」。<br>
+                    全程只读（不动窗口/不抢焦点/不发按键），与脚本软件互不冲突。需本机运行 Umi-OCR。
+                </div>
+
+                <div style="margin-bottom:14px;">
+                    <label style="color:rgba(255,255,255,0.75);font-size:0.82rem;display:block;margin-bottom:5px;">① 游戏窗口</label>
+                    <div style="display:flex;gap:8px;">
+                        <select id="gmWindowSelect" style="flex:1;background:rgba(0,0,0,0.3);color:#fff;border:1px solid rgba(255,255,255,0.2);padding:8px 10px;border-radius:6px;font-size:0.82rem;"></select>
+                        <button onclick="gmRefreshWindows()" style="background:linear-gradient(135deg,#00bcd4,#00838f);color:#fff;border:none;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:0.8rem;white-space:nowrap;">🔄 刷新</button>
+                    </div>
+                    <div id="gmWindowHint" style="color:rgba(255,255,255,0.35);font-size:0.68rem;margin-top:4px;">未检测到窗口时请先打开游戏/模拟器再刷新</div>
+                </div>
+
+                <div style="margin-bottom:14px;">
+                    <label style="color:rgba(255,255,255,0.75);font-size:0.82rem;display:block;margin-bottom:5px;">② 波数识别区域</label>
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        <button onclick="gmConfigRegion()" id="gmConfigBtn" style="background:linear-gradient(135deg,#ff9800,#e65100);color:#fff;border:none;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:0.8rem;white-space:nowrap;">📐 框选波数位置</button>
+                        <span id="gmRegionStatus" style="color:rgba(255,255,255,0.5);font-size:0.72rem;">未配置</span>
+                    </div>
+                    <div style="color:rgba(255,255,255,0.35);font-size:0.68rem;margin-top:4px;line-height:1.4;">点按钮截一张游戏窗口图，在图上拖框圈住波数数字（一次配置，记住位置）</div>
+                </div>
+
+                <div style="margin-bottom:14px;display:flex;gap:16px;flex-wrap:wrap;align-items:center;">
+                    <div>
+                        <label style="color:rgba(255,255,255,0.75);font-size:0.82rem;">③ 语音播报</label>
+                        <div style="display:flex;align-items:center;gap:8px;margin-top:5px;">
+                            <button id="gmSpeakBtn" onclick="gmToggleSpeak()" style="background:#4caf50;color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.78rem;">🔊 开</button>
+                            <button onclick="gmTestSpeak()" style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.2);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.75rem;">试听</button>
+                        </div>
+                    </div>
+                    <div>
+                        <label style="color:rgba(255,255,255,0.75);font-size:0.82rem;">④ 识别间隔</label>
+                        <div style="display:flex;align-items:center;gap:6px;margin-top:5px;">
+                            <input type="number" id="gmIntervalInput" min="1" max="30" value="3" style="width:60px;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:rgba(0,0,0,0.3);color:#fff;font-size:0.8rem;">
+                            <span style="color:rgba(255,255,255,0.5);font-size:0.72rem;">秒（默认 3，OCR 慢的机器可调大）</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="margin-bottom:14px;">
+                    <button id="gmStartBtn" onclick="gmToggleMonitor()" style="width:100%;padding:12px;border:none;border-radius:8px;background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;cursor:pointer;font-size:0.95rem;font-weight:bold;">▶ 开始监控</button>
+                </div>
+
+                <div style="display:flex;align-items:center;gap:14px;margin-bottom:10px;">
+                    <div style="color:rgba(255,255,255,0.55);font-size:0.8rem;white-space:nowrap;">当前波数：</div>
+                    <div id="gmWaveDisplay" style="color:#ffd700;font-size:2rem;font-weight:bold;min-width:60px;text-align:center;">—</div>
+                    <div id="gmWaveDelta" style="color:#4caf50;font-size:0.85rem;"></div>
+                </div>
+
+                <div id="gmStatus" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:10px;min-height:48px;max-height:150px;overflow:auto;color:rgba(255,255,255,0.6);font-size:0.72rem;line-height:1.6;">待启动。先选游戏窗口 → 框选波数位置 → 开始监控。</div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        // 恢复配置
+        const intervalInput = modal.querySelector('#gmIntervalInput');
+        if (cfg.interval && intervalInput) intervalInput.value = cfg.interval;
+        _gmUpdateSpeakUI(!!cfg.speak);
+        _gmUpdateRegionUI();
+        // 刷新窗口列表（自动匹配上次选的窗口）
+        gmRefreshWindows();
+    }
+
+    function closeGameMonitor() {
+        if (_gmRunning) gmToggleMonitor(); // 关面板自动停监控
+        const m = document.getElementById('gameMonitorModal');
+        if (m) m.remove();
+    }
+
+    async function gmRefreshWindows() {
+        const sel = document.getElementById('gmWindowSelect');
+        const hint = document.getElementById('gmWindowHint');
+        if (!sel) return;
+        sel.innerHTML = '<option value="">检测中…</option>';
+        const wins = await tauriInvoke('find_game_windows') || [];
+        _gmWindows = wins;
+        sel.innerHTML = '';
+        if (!wins.length) {
+            sel.innerHTML = '<option value="">未检测到窗口</option>';
+            if (hint) hint.textContent = '请先打开游戏/模拟器，再点刷新';
+            return;
+        }
+        const cfg = _gmLoadCfg();
+        let matched = -1;
+        wins.forEach((w, i) => {
+            const opt = document.createElement('option');
+            opt.value = String(w.hwnd);
+            opt.textContent = w.title.length > 40 ? w.title.slice(0, 40) + '…' : w.title;
+            sel.appendChild(opt);
+            if (cfg.winTitle && w.title.includes(cfg.winTitle)) matched = i;
+        });
+        if (matched >= 0) sel.selectedIndex = matched;
+        if (hint) hint.textContent = '共 ' + wins.length + ' 个窗口' + (matched >= 0 ? '，已自动选中上次的窗口' : '（新窗口排前面）');
+        _gmLog('已检测到 ' + wins.length + ' 个可监控窗口');
+    }
+
+    function _gmCurrentWindow() {
+        const sel = document.getElementById('gmWindowSelect');
+        if (!sel || !sel.value) return null;
+        const hwnd = parseInt(sel.value, 10);
+        const w = _gmWindows.find(x => x.hwnd === hwnd);
+        return w || { hwnd, title: '' };
+    }
+
+    function _gmUpdateRegionUI() {
+        const el = document.getElementById('gmRegionStatus');
+        if (!el) return;
+        const cfg = _gmLoadCfg();
+        if (cfg.region && cfg.region.w > 0) {
+            el.textContent = '✓ 已配置（比例 x:' + cfg.region.x.toFixed(2) + ' y:' + cfg.region.y.toFixed(2) + ' w:' + cfg.region.w.toFixed(2) + ' h:' + cfg.region.h.toFixed(2) + '）';
+            el.style.color = '#4ade80';
+        } else {
+            el.textContent = '未配置';
+            el.style.color = 'rgba(255,255,255,0.5)';
+        }
+    }
+
+    function _gmUpdateSpeakUI(on) {
+        const btn = document.getElementById('gmSpeakBtn');
+        if (!btn) return;
+        btn.textContent = on ? '🔊 开' : '🔇 关';
+        btn.style.background = on ? '#4caf50' : 'rgba(255,255,255,0.15)';
+    }
+
+    window.gmToggleSpeak = function () {
+        const cfg = _gmLoadCfg();
+        cfg.speak = !cfg.speak;
+        _gmSaveCfg(cfg);
+        _gmUpdateSpeakUI(!!cfg.speak);
+    };
+
+    window.gmTestSpeak = async function () {
+        await tauriInvoke('speak_text', { text: '波数播报测试，第12波' });
+    };
+
+    function _gmLog(msg, isErr) {
+        const el = document.getElementById('gmStatus');
+        if (!el) return;
+        const time = new Date().toTimeString().slice(0, 8);
+        const line = document.createElement('div');
+        line.textContent = '[' + time + '] ' + msg;
+        if (isErr) line.style.color = '#ff9e80';
+        el.appendChild(line);
+        while (el.childNodes.length > 30) el.removeChild(el.firstChild);
+        el.scrollTop = el.scrollHeight;
+    }
+
+    // 框选波数区域：截整窗图 → 弹出图上拖框 → 保存比例坐标
+    window.gmConfigRegion = async function () {
+        const win = _gmCurrentWindow();
+        if (!win) { _gmLog('请先选择游戏窗口', true); return; }
+        const btn = document.getElementById('gmConfigBtn');
+        if (btn) { btn.disabled = true; btn.textContent = '⏳ 截图中…'; }
+        try {
+            const bmpB64 = await tauriInvoke('capture_window_region', { hwnd: win.hwnd, x: 0, y: 0, w: 10, h: 10, full: true });
+            if (!bmpB64) throw new Error('截图失败（窗口可能已关闭或被最小化）');
+            const { png } = await _gmBmpToPng(bmpB64);
+            _gmShowRegionPicker(png, win);
+        } catch (e) {
+            _gmLog('配置失败：' + (e.message || e), true);
+        } finally {
+            if (btn) { btn.disabled = false; btn.textContent = '📐 框选波数位置'; }
+        }
+    };
+
+    // 在截图上拖框选区域
+    function _gmShowRegionPicker(pngB64, win) {
+        const old = document.getElementById('gmRegionPickerModal');
+        if (old) old.remove();
+        const modal = document.createElement('div');
+        modal.id = 'gmRegionPickerModal';
+        modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:100000;display:flex;justify-content:center;align-items:center;';
+        const box = document.createElement('div');
+        box.style.cssText = 'background:#16213e;border-radius:12px;padding:16px;max-width:95vw;max-height:92vh;display:flex;flex-direction:column;gap:10px;';
+        const tip = document.createElement('div');
+        tip.style.cssText = 'color:#ffd700;font-size:0.9rem;font-weight:bold;text-align:center;';
+        tip.textContent = '在图上拖动鼠标，框住波数数字（如「第12波」）';
+        const wrap = document.createElement('div');
+        wrap.style.cssText = 'position:relative;overflow:auto;max-height:70vh;cursor:crosshair;background:#000;border-radius:8px;';
+        const img = document.createElement('img');
+        img.src = 'data:image/png;base64,' + pngB64;
+        img.style.cssText = 'max-width:100%;display:block;user-select:none;-webkit-user-drag:none;';
+        wrap.appendChild(img);
+        // 拖框层
+        const rect = document.createElement('div');
+        rect.style.cssText = 'position:absolute;border:2px solid #ffd700;background:rgba(255,215,0,0.15);display:none;pointer-events:none;';
+        wrap.appendChild(rect);
+        let sx = 0, sy = 0, dragging = false, picked = null;
+        const posOf = (e) => {
+            const r = img.getBoundingClientRect();
+            return { x: (e.clientX - r.left) * (img.naturalWidth / r.width), y: (e.clientY - r.top) * (img.naturalHeight / r.height) };
+        };
+        wrap.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return;
+            e.preventDefault();
+            const p = posOf(e);
+            sx = p.x; sy = p.y; dragging = true;
+            rect.style.display = 'block';
+        });
+        wrap.addEventListener('mousemove', (e) => {
+            if (!dragging) return;
+            const p = posOf(e);
+            const x0 = Math.min(sx, p.x), y0 = Math.min(sy, p.y);
+            const w = Math.abs(p.x - sx), h = Math.abs(p.y - sy);
+            const r = img.getBoundingClientRect();
+            rect.style.left = (x0 * r.width / img.naturalWidth) + 'px';
+            rect.style.top = (y0 * r.height / img.naturalHeight) + 'px';
+            rect.style.width = (w * r.width / img.naturalWidth) + 'px';
+            rect.style.height = (h * r.height / img.naturalHeight) + 'px';
+        });
+        wrap.addEventListener('mouseup', (e) => {
+            if (!dragging) return;
+            dragging = false;
+            const p = posOf(e);
+            const x0 = Math.min(sx, p.x), y0 = Math.min(sy, p.y);
+            const w = Math.abs(p.x - sx), h = Math.abs(p.y - sy);
+            if (w < 8 || h < 8) { // 太小视为误触
+                rect.style.display = 'none';
+                picked = null;
+                return;
+            }
+            // 存比例坐标（相对整窗截图），窗口缩放后监控时按比例换算
+            picked = { x: x0 / img.naturalWidth, y: y0 / img.naturalHeight, w: w / img.naturalWidth, h: h / img.naturalHeight };
+        });
+        const btnRow = document.createElement('div');
+        btnRow.style.cssText = 'display:flex;gap:10px;justify-content:center;';
+        const okBtn = document.createElement('button');
+        okBtn.textContent = '✓ 保存区域';
+        okBtn.style.cssText = 'background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;border:none;padding:9px 22px;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:bold;';
+        okBtn.onclick = () => {
+            if (!picked) { tip.textContent = '请先在图上拖一个框圈住波数'; tip.style.color = '#ff9e80'; return; }
+            const cfg = _gmLoadCfg();
+            cfg.region = picked;
+            cfg.winTitle = win.title;
+            _gmSaveCfg(cfg);
+            _gmUpdateRegionUI();
+            _gmLog('识别区域已保存：比例 x=' + picked.x.toFixed(3) + ' y=' + picked.y.toFixed(3) + ' w=' + picked.w.toFixed(3) + ' h=' + picked.h.toFixed(3));
+            modal.remove();
+        };
+        const retryBtn = document.createElement('button');
+        retryBtn.textContent = '🔄 重新截图';
+        retryBtn.style.cssText = 'background:rgba(255,255,255,0.1);color:#fff;border:1px solid rgba(255,255,255,0.2);padding:9px 16px;border-radius:8px;cursor:pointer;font-size:0.8rem;';
+        retryBtn.onclick = () => { modal.remove(); window.gmConfigRegion(); };
+        const cancelBtn = document.createElement('button');
+        cancelBtn.textContent = '取消';
+        cancelBtn.style.cssText = 'background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.6);border:none;padding:9px 16px;border-radius:8px;cursor:pointer;font-size:0.8rem;';
+        cancelBtn.onclick = () => modal.remove();
+        btnRow.appendChild(okBtn);
+        btnRow.appendChild(retryBtn);
+        btnRow.appendChild(cancelBtn);
+        box.appendChild(tip);
+        box.appendChild(wrap);
+        box.appendChild(btnRow);
+        modal.appendChild(box);
+        document.body.appendChild(modal);
+    }
+
+    // 开始/停止监控
+    window.gmToggleMonitor = async function () {
+        if (_gmRunning) {
+            _gmRunning = false;
+            if (_gmTimer) { clearTimeout(_gmTimer); _gmTimer = null; }
+            const btn = document.getElementById('gmStartBtn');
+            if (btn) { btn.textContent = '▶ 开始监控'; btn.style.background = 'linear-gradient(135deg,#4caf50,#2e7d32)'; }
+            _gmLog('监控已停止');
+            return;
+        }
+        const win = _gmCurrentWindow();
+        if (!win) { _gmLog('请先选择游戏窗口', true); return; }
+        const cfg = _gmLoadCfg();
+        if (!cfg.region || cfg.region.w <= 0) { _gmLog('请先框选波数识别区域', true); return; }
+        // 保存当前选择
+        cfg.winTitle = win.title;
+        const intervalInput = document.getElementById('gmIntervalInput');
+        if (intervalInput) {
+            const n = parseInt(intervalInput.value, 10);
+            cfg.interval = (n >= 1 && n <= 30) ? n : 3;
+        }
+        _gmSaveCfg(cfg);
+        _gmRunning = true;
+        _gmLastWave = null;
+        _gmEmptyCount = 0;
+        _gmErrCount = 0;
+        const btn = document.getElementById('gmStartBtn');
+        if (btn) { btn.textContent = '⏹ 停止监控'; btn.style.background = 'linear-gradient(135deg,#f44336,#b71c1c)'; }
+        if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('游戏监控启动');
+        _gmLog('▶ 监控启动：每 ' + (cfg.interval || 3) + ' 秒识别一次，识别到波数变化即播报');
+        _gmTick();
+    };
+
+    // 单次监控（自循环，不重入）
+    async function _gmTick() {
+        if (!_gmRunning) return;
+        const cfg = _gmLoadCfg();
+        const win = _gmCurrentWindow();
+        const intervalMs = ((cfg.interval || 3) * 1000);
+        try {
+            if (!win) throw new Error('窗口选择丢失');
+            // 截整窗（区域坐标是比例，需要先知道当前整窗尺寸来换算像素）
+            const bmpB64 = await tauriInvoke('capture_window_region', { hwnd: win.hwnd, x: 0, y: 0, w: 10, h: 10, full: true });
+            if (!bmpB64) throw new Error('截图失败（窗口可能已关闭）');
+            const { png, w: fullW, h: fullH } = await _gmBmpToPng(bmpB64);
+            // 比例 → 当前像素
+            const r = cfg.region;
+            const rx = Math.max(0, Math.round(r.x * fullW));
+            const ry = Math.max(0, Math.round(r.y * fullH));
+            const rw = Math.max(8, Math.round(r.w * fullW));
+            const rh = Math.max(8, Math.round(r.h * fullH));
+            // 前端裁剪（避免再走一次 Rust）
+            const crop = await new Promise((resolve, reject) => {
+                const im = new Image();
+                im.onload = () => {
+                    const cv = document.createElement('canvas');
+                    cv.width = rw; cv.height = rh;
+                    const ctx = cv.getContext('2d');
+                    ctx.drawImage(im, rx, ry, rw, rh, 0, 0, rw, rh);
+                    resolve(cv.toDataURL('image/png').split(',')[1]);
+                };
+                im.onerror = () => reject(new Error('截图裁剪失败'));
+                im.src = 'data:image/png;base64,' + png;
+            });
+            const texts = await _gmOcr(crop);
+            if (!texts.length) {
+                _gmEmptyCount++;
+                if (_gmEmptyCount === 5) _gmLog('连续 5 次未识别到文字：游戏窗口可能被最小化（PrintWindow 黑图），或框选区域不对', true);
+            } else {
+                _gmEmptyCount = 0;
+                const wave = _gmParseWave(texts);
+                if (wave !== null) {
+                    const deltaEl = document.getElementById('gmWaveDelta');
+                    const dispEl = document.getElementById('gmWaveDisplay');
+                    if (dispEl) dispEl.textContent = String(wave);
+                    if (_gmLastWave === null) {
+                        if (deltaEl) deltaEl.textContent = '';
+                        _gmLog('识别到波数：第 ' + wave + ' 波');
+                        if (cfg.speak !== false) await tauriInvoke('speak_text', { text: '第' + wave + '波' });
+                    } else if (wave !== _gmLastWave) {
+                        if (deltaEl) deltaEl.textContent = wave > _gmLastWave ? ('↑ +' + (wave - _gmLastWave)) : '↺ 新一局';
+                        _gmLog('波数变化：' + _gmLastWave + ' → ' + wave + (wave < _gmLastWave ? '（新一局）' : ''));
+                        if (cfg.speak !== false) await tauriInvoke('speak_text', { text: '第' + wave + '波' });
+                    }
+                    _gmLastWave = wave;
+                    _gmErrCount = 0;
+                } else {
+                    _gmLog('识别到文字但未解析出波数：' + texts.join(' | ').slice(0, 60), true);
+                }
+            }
+        } catch (e) {
+            _gmErrCount++;
+            _gmLog('监控异常：' + ((e && e.message) || e), true);
+            if (_gmErrCount >= 3) {
+                _gmLog('连续 3 次异常，自动停止监控', true);
+                _gmRunning = false;
+                if (_gmTimer) { clearTimeout(_gmTimer); _gmTimer = null; }
+                const btn = document.getElementById('gmStartBtn');
+                if (btn) { btn.textContent = '▶ 开始监控'; btn.style.background = 'linear-gradient(135deg,#4caf50,#2e7d32)'; }
+                return;
+            }
+        }
+        if (_gmRunning) _gmTimer = setTimeout(_gmTick, intervalMs);
+    }
+
+    window.openGameMonitor = openGameMonitor;
+    window.closeGameMonitor = closeGameMonitor;
+    window.gmRefreshWindows = gmRefreshWindows;
 
     // 暴露诊断所需的内部依赖给全局（供文件末尾的全局 runDiagnostics 在网页版也能调用）
     window.__tfjlDiagApi = {

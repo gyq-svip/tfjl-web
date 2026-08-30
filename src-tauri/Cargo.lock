@@ -3887,6 +3887,7 @@ dependencies = [
  "tauri-plugin-updater",
  "tokio",
  "tokio-stream",
+ "winapi",
 ]
 
 [[package]]
