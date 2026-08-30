@@ -524,30 +524,48 @@
                 }
             }
             // 核实是否真有新版本：比对远端 versionTag 主版本号与当前，避免刚强刷完即误报"有新版本"
+            // 🔴 2026-08-30 重写（「没有最新版也弹气泡」根治）：
+            //    旧版比对【日期字符串】(remoteBase !== cur)——本地日期可能来自 SW 回报的 deployTag、
+            //    version.json 的 deployTag、HTML 文本三种来源，同一次部署在三个来源里的时间戳就可能不一致
+            //    （且兜底源 raw.githubusercontent 解析到仓库占位符 'dev'），字符串不等 → 误判有新版本 → 气泡乱弹。
+            //    改为只比对小版本号 s1.0.NNN 的数字大小：远端 NNN > 本地 NNN 才算有新版本。
             async function _verifyNewVersion() {
                 try {
-                    const tag = document.getElementById('versionTag');
-                    const cur = tag ? tag.textContent.replace('●', '').split(' · ')[0].trim() : '';
+                    const localVer = _getLocalLoadedVersion();
                     const remote = await _checkRemoteFrontVerAsync();
-                    const remoteBase = remote ? remote.split(' · ')[0].trim() : '';
-                    if (remoteBase) {
-                        if (remoteBase !== cur) {
+                    const remoteVer = _extractFrontVerNum(remote);
+                    const localNum = _extractFrontVerNum(localVer);
+                    if (remoteVer > 0 && localNum > 0) {
+                        if (remoteVer > localNum) {
                             window.__tfjlHasNewVersion = true;
                             _markNewVersionAvailable();
                             if (typeof notifyNewVersion === 'function') notifyNewVersion(); // 隐藏(托盘)时静默更，前台仅标记
                         } else {
                             window.__tfjlHasNewVersion = false;
-                            // 不写 tooltip，保持 CI 注入的小版本号原样（2026-08-29 用户诉求）
+                            window.__pendingUpdate = false; // 已是最新：清掉 SW 事件残留的假"待更新"信号，防心跳反复重弹
+                            // 已是最新：清掉可能残留的"新版本"标记与已弹出的气泡，绝不留假提示
                             const d = document.getElementById('__verNewDot'); if (d) d.remove();
+                            const b = document.getElementById('swUpdateBanner'); if (b) b.remove();
                         }
                     } else {
-                        // 远端版本号拉不到：网络不可靠，**默认无新版本**（绝不瞎弹气泡，避免"已是最新还弹"）
+                        // 远端版本号拉不到 / 本地版本解析不出：网络不可靠，**默认无新版本**
+                        // （绝不瞎弹气泡，避免"已是最新还弹"）
                         window.__tfjlHasNewVersion = false;
                     }
                 } catch (e) {
                     // 🔴 2026-08-29 修复：网络/解析失败一律按"无新版本"处理，不弹气泡。
                     window.__tfjlHasNewVersion = false;
                 }
+            }
+            // 暴露给 app-core.js 的心跳/兜底逻辑：凡是要触发 notifyNewVersion 的地方，
+            // 必须先调用本函数核实（远端小版本号 > 本地才允许弹气泡/静默升级）。
+            window.__verifyNewVersionAsync = _verifyNewVersion;
+            // 从任意版本串里提取小版本号 s1.0.NNN 的数字部分（如 's20260830-1543 · s1.0.553' → 553）。
+            // 解析不出（'dev'/空/日期串）返回 0，调用方据此判定"无法核实 → 不弹气泡"。
+            function _extractFrontVerNum(s) {
+                if (!s) return 0;
+                const m = String(s).match(/s?1\.0\.(\d+)/);
+                return m ? (parseInt(m[1], 10) || 0) : 0;
             }
             // 把 SW 缓存版本号显示到右下角版本标签（如 "v260727-57 · sw-v62"）
             function updateCacheVersionDisplay(swVersion, deployTag) {

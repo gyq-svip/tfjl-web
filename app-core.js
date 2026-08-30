@@ -29,8 +29,8 @@
         var _diagLogEnabled = false;
         var _diagLogBuf = [];           // 待写缓冲
         var _diagLogBaseDir = '';       // 缓存目录（从 app-local2 注入 get_diag_log_dir）
-        // 🔴 2026-08-30 默认开启诊断日志落盘：用户一卡就来不及手动开，故默认开；仅当用户显式 disableDiagLog() 后才关。
-        //    localStorage 记忆：'1'=显式开（冗余，默认即开）、'0'=显式关。
+        // 🔴 2026-08-30 诊断日志默认【关】（30秒卡顿根因已修复，无需常开挂机累积日志占内存）。
+        //    localStorage 记忆：'1'=显式开、'0'=显式关。需要排查问题时控制台跑 enableDiagLog()。
         try {
             const _dl = localStorage.getItem('tdjl_diag_log');
             _diagLogEnabled = (_dl === '1'); // 🔴 2026-08-30 改为默认关，避免挂机时日志无限累积占内存。需调试时控制台 enableDiagLog()
@@ -781,8 +781,22 @@
                 _getDiagConfig(false).then(cfg => {
                     if (cfg.enabled && localStorage.getItem(DIAG_OPTIN_KEY) !== '0') _pushDiagReport().catch(() => {});
                     // 强制更新开关开启 且 有待更新版本 且 当前闲置(>60s 无操作且无未保存项目) → 心跳时静默强刷
+                    // 🔴 2026-08-30 修复「没有新版也反复弹气泡」的残留根因：__pendingUpdate / reg.waiting
+                    //    只说明「存在一个处于 waiting 的 SW」——sw.js 每次部署都被 CI bump CACHE_VERSION，
+                    //    页面开着时新 SW install → waiting 常态化存在（页面本身可能早已是最新版）。
+                    //    旧逻辑直接 notifyNewVersion() 不核实 → 每 15 分钟心跳弹一次假气泡。
+                    //    现改为：一律先经 __verifyNewVersionAsync 核实「远端小版本号 > 本地」，
+                    //    核实通过才 notify；核实不通过则清 __pendingUpdate 假信号，此后不再重弹。
                     if (window.__diagForceReload && typeof notifyNewVersion === 'function') {
-                        // 主动检查 SW 是否已有 waiting 版本（常年挂机的用户 NEW_VERSION_READY 早已发过，这里兜底补检）
+                        const _verify = window.__verifyNewVersionAsync;
+                        if (typeof _verify === 'function') {
+                            _verify().then(() => {
+                                if (window.__tfjlHasNewVersion) notifyNewVersion();
+                                else window.__pendingUpdate = false; // 已是最新：清假信号
+                            }).catch(() => {});
+                            return;
+                        }
+                        // 降级（app-picker 未加载完等极端情况）：主动检查 SW 是否有 waiting 版本
                         if (window.__pendingUpdate) { notifyNewVersion(); return; }
                         if ('serviceWorker' in navigator) {
                             navigator.serviceWorker.ready.then(reg => {
@@ -1305,8 +1319,9 @@
         let currentCategoryFilter = '全部';
 
         // 保存项目到IndexedDB
-        function saveProjectToDB(projectName, category, currentData) {
-            if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('保存项目');
+        // persistNow=false：自动保存（记事本防抖）——IndexedDB 照常即时写，tfjl.dat 只做脏标记（5分钟安全网兜底）
+        function saveProjectToDB(projectName, category, currentData, persistNow) {
+            if (persistNow !== false && typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('保存项目');
             return new Promise((resolve, reject) => {
                 if (!db) {
                     alert('数据库未初始化');
@@ -1352,7 +1367,7 @@
                 const putRequest = store.put(projectData);
                 
                 putRequest.onsuccess = function() {
-                    persistProjectsToDisk();
+                    persistProjectsToDisk(persistNow);
                     currentProjectName = projectName;
                     currentProjectCategory = category || '默认分类';
                     try { localStorage.setItem('tdjl_lastProject', projectName); } catch(e) {}
@@ -1597,7 +1612,14 @@
         }
 
         // ==================== 项目磁盘持久化（重装/清缓存后不丢） ====================
-        async function persistProjectsToDisk() {
+        // persistNow=false（自动保存：记事本防抖/切皮/融合卡等）：零成本脏标记，不读 IndexedDB 不写盘。
+        //   数据已在 IndexedDB 里安全；tfjl.dat 备份由「手动保存 / 最小化切后台 / 关闭 / 5分钟安全网」触发，
+        //   届时 _flushStore 自动拉最新项目。这是「内存每秒涨落」的根治点（旧版每次自动保存都全量序列化34MB）。
+        async function persistProjectsToDisk(persistNow) {
+            if (persistNow === false) {
+                if (typeof window.__tfjlMarkProjectsDirty === 'function') window.__tfjlMarkProjectsDirty();
+                return;
+            }
             if (typeof window.__tfjlSaveAllProjects !== 'function') return;
             try {
                 const all = await loadProjectListFromDB();
@@ -2023,7 +2045,8 @@
                     referenceImages: typeof referenceImages !== 'undefined' ? referenceImages : []
                 };
                 const currentCat = currentProjectCategory || '默认分类';
-                saveProjectToDB(currentProjectName, currentCat, currentData).catch(e => console.error('记事本自动保存失败:', e));
+                // 🔴 自动保存走脏标记：IndexedDB 即时写保数据安全，tfjl.dat 不再每打一字停顿就全量序列化34MB
+                saveProjectToDB(currentProjectName, currentCat, currentData, false).catch(e => console.error('记事本自动保存失败:', e));
             }, 1000);
         }
 
@@ -6461,10 +6484,14 @@
             if (pc) pc.name = newName;
             const nameSpan = slot.querySelector('.card-name');
             if (nameSpan) { nameSpan.dataset.fullName = newName; nameSpan.textContent = getFusionDisplayName(newName); }
-            slot.classList.remove('skin-bg');
-            const oldBase = slot.querySelector('.skin-layer'); if (oldBase) oldBase.remove();
-            const oldFused = slot.querySelector('.skin-layer-fused'); if (oldFused) oldFused.remove();
+            // 🔴 2026-08-30 黑屏根治：不再先删旧皮肤层！旧实现「先删层 → 再 await resolve（磁盘读图+缩放）」，
+            //    等待期间槽位没有任何皮肤层 → 黑窗（.battle-slot .card-item 永远透明，卡身全靠皮肤层/职业渐变）。
+            //    改为旧层原样保留，applySkinBgToSlot 内部用双缓冲换 src（旧图显示到新图就绪），
+            //    resolve 失败时旧图也保持显示（宁可显示旧图也不黑屏）。
             try { await applySkinBgToSlot(slot, newName); } catch (e) {}
+            // 兜底：万一 apply 后槽内一个皮肤层都没有（极端：resolve 全失败且旧层也没了），去掉 skin-bg
+            //    恢复职业渐变背景，保证永远不黑屏
+            if (!slot.querySelector('.skin-layer')) slot.classList.remove('skin-bg');
             updateHandDisplay(isUserSlot ? 'my' : 'teammate');
             refreshSlotFusionControl(slot);
             // 融合切换后立即刷新减伤显示（否则停留在切换前数字，副卡被动技能看起来"没算上"）
@@ -6670,13 +6697,29 @@ const FUSION_SIZE = '40%';                                        // 副卡直�
 // 🔴 2026-08-30 双缓冲换图（右键切皮变黑的残留元凶）：直接改 <img>.src 会立刻废掉旧图，
 //    新图完成解码前 <img> 区域空白（黑窗）。改为先离屏预加载新图，onload 解码就绪后再换 src，
 //    旧图始终显示到新图可绘制，切皮全程无黑窗。加载失败则保持旧图不黑屏。
+// 🔴 2026-08-30 追加修复（槽位切融合卡后永久黑屏）：离屏 new Image() 是局部变量，函数返回后无人引用，
+//    WebView2 的 GC 若在解码完成前回收它，加载会被【静默取消】→ onload 永不触发 → src 永远不换 →
+//    槽位 skin-bg 类已加、图却空白 → 永久黑屏（手牌恰好在 GC 前完成故"看起来正常"）。
+//    现把预加载器放进全局池持有引用，加载结束才释放，杜绝中途被 GC。
+const _skinPreloadPool = new Set();
 function _swapSkinImgSrc(img, nextUrl) {
     if (!img || !nextUrl) return;
-    if (img.getAttribute('src') === nextUrl) return;
+    // 记录「最后一次请求的 URL」：并发多次切皮时，只有与最新意图一致的预加载才允许落 src，
+    // 防止先点的旧皮肤预加载后完成、覆盖掉后点的新皮肤（连续快速右键场景）。
+    img._desiredSrc = nextUrl;
+    const cur = img.getAttribute('src');
+    if (cur === nextUrl) return;
+    // 无旧图可保（新建的空 img）：直接设 src。留着空白 img 等 preload 反而制造「skin-bg+空图」黑窗
+    if (!cur) { img.src = nextUrl; return; }
     const pre = new Image();
-    const apply = function () { if (img.isConnected && img.getAttribute('src') !== nextUrl) img.src = nextUrl; };
+    _skinPreloadPool.add(pre);
+    const apply = function () {
+        _skinPreloadPool.delete(pre);
+        if (!img.isConnected || img._desiredSrc !== nextUrl) return;
+        if (img.getAttribute('src') !== nextUrl) img.src = nextUrl;
+    };
     pre.onload = apply;
-    pre.onerror = function () { /* 新图失败：保持旧图，不黑窗 */ };
+    pre.onerror = function () { _skinPreloadPool.delete(pre); /* 新图失败：保持旧图，不黑窗 */ };
     pre.src = nextUrl;
     if (pre.complete && pre.naturalWidth > 0) apply();
 }
@@ -8244,7 +8287,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     t.oncomplete = () => resolve();
                     t.onerror = () => resolve();
                 });
-                if (typeof persistProjectsToDisk === 'function') persistProjectsToDisk();
+                if (typeof persistProjectsToDisk === 'function') persistProjectsToDisk(false);
             } catch (e) { console.warn('[SKIN] persistFusionSkins failed:', e); }
         }
         
@@ -8345,13 +8388,12 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     t.oncomplete = () => resolve();
                     t.onerror = () => resolve();
                 });
-                // 🔴 2026-08-30 性能修复：全项目列表写盘（loadProjectListFromDB 全读 + 全部项目序列化写磁盘）
-                //    是换皮卡顿的主因之一——原实现每切一次皮就全量写一遍盘（Tauri 下 IPC+磁盘 IO 1-2 秒）。
-                //    改为 800ms 防抖：连续切皮只在停顿后合并写一次盘。IndexedDB 记录已在上方即时更新，数据不丢。
+                // 🔴 2026-08-30 性能修复：连续切皮不再全量写盘（34MB 序列化是卡顿+内存锯齿主因）。
+                //    IndexedDB 记录已在上方即时更新，数据不丢；tfjl.dat 靠脏标记 + 5分钟安全网/最小化/关闭兜底。
                 if (persistProjectSkins._diskTimer) clearTimeout(persistProjectSkins._diskTimer);
                 persistProjectSkins._diskTimer = setTimeout(function () {
                     persistProjectSkins._diskTimer = null;
-                    if (typeof persistProjectsToDisk === 'function') persistProjectsToDisk();
+                    if (typeof persistProjectsToDisk === 'function') persistProjectsToDisk(false);
                 }, 800);
             } catch (e) { console.warn('[SKIN] persistProjectSkins failed:', e); }
         }
@@ -8799,6 +8841,13 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 const el = document.getElementById('menuTogglePerfMode');
                 if (el) el.textContent = getPerfModeLabel();
             } catch (e) {}
+            // 切换反馈（用户点菜单后能明确知道当前档位，不再「点了没反应」）
+            try {
+                if (typeof showToast === 'function') {
+                    const desc = next === 'optimized' ? '卡池/收藏不铺皮，省内存' : (next === 'lite' ? '纯色卡面，内存最低' : '全量皮肤铺满，最丝滑');
+                    showToast('⚡ 性能模式：' + getPerfModeLabel().replace('⚡ 性能模式：', '') + '（' + desc + '）');
+                }
+            } catch (e) {}
             // 立即按新模式重渲染卡池皮肤
             if (typeof updateCardPoolSkins === 'function') updateCardPoolSkins().catch(() => {});
             if (typeof reapplyAllSkins === 'function') reapplyAllSkins().catch(() => {});
@@ -8820,6 +8869,18 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         window.isPerfOptimized = isPerfOptimized;
         window.isPerfLite = isPerfLite;
         window.getPerfModeLabel = getPerfModeLabel;
+        // 🔴 2026-08-30 修复：index.html 菜单文案写死「高性能」，用户上次选的优化/极速时
+        //    启动后菜单显示错档（点一下会切到错误的目标档）。启动时按 localStorage 实际档位同步一次。
+        (function _syncPerfMenuLabel() {
+            const sync = function () {
+                try {
+                    const el = document.getElementById('menuTogglePerfMode');
+                    if (el && typeof getPerfModeLabel === 'function') el.textContent = getPerfModeLabel();
+                } catch (e) {}
+            };
+            sync();
+            setTimeout(sync, 800);   // 菜单 DOM 为静态渲染，脚本先于 DOM 就绪时兜底再同步一次
+        })();
 
         // 卡池皮肤铺满：基础卡 / 融合卡主卡用 .skin-layer cover 铺满卡牌，融合卡副卡用 .skin-layer-fused 小图
         // 全部基于全局预设（defaultCardSkins / heroSkinSelections / cloudFusions），跨项目保留
@@ -9558,31 +9619,53 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             // 🔴 直接用原始 URL（blob:/data:/https: 都不加时间戳，保证「src 未变」优化始终生效）
             const finalSrc = skinUrl;
 
-            // 2026-08-30 双缓冲切皮：先建新 <img>，等 onload 后再移除旧 .skin-layer（旧的仍显示直到新图就绪）→
-            // 杜绝「切换瞬间旧图已删、新图未解码」导致的黑闪；同时避免旧 img 堆积。
-            // 不再手动 revoke blob（避免误回收正在显示的纹理），纹理由浏览器 GC 回收。
-            // 🔴 融转非融合的残留清理也移到这里（resolve 成功后才动 DOM）：删掉不再需要的副卡叠加层。
+            // 🔴 2026-08-30 槽位黑屏根治（与手牌 applySkinBgToHandCard 完全对称）：
+            //    旧实现每次 new 一个 <img> 并在各自 onload 里「删除其他所有 .skin-layer」。
+            //    右键一次会并发触发 2-3 个 applySkinBgToSlot（setCardSkin 的 forEach 刷新 +
+            //    cycleHeroSkin 自身 + refreshAllFusionSkins），两个 img 的 onload 都会执行：
+            //    后执行的那个把先显示的那张 img 也删掉 → 槽内无图层 + skin-bg 类仍在 → 黑屏
+            //    （症状：新皮闪现一下→变黑；手牌路径复用同一 img 只换 src 所以一直正常）。
+            //    现改为：复用已有 .skin-layer 元素 + _swapSkinImgSrc 双缓冲换 src，
+            //    旧图始终显示到新图解码就绪，且并发调用全部收敛到同一元素，无互删竞态。
             const staleFused = slot.querySelector('.skin-layer-fused');
             if (staleFused) staleFused.remove();
-            const img = document.createElement('img');
-            img.className = 'skin-layer';
-            img.alt = '';
-            img.src = finalSrc;
-            // 加载失败：仅记录并移除（asset:// 优先 + 双缓冲已保证正常环境顺畅，不再做异步回退以免引入竞态）
-            img.onerror = function() {
-                if (!img.isConnected) return;
-                console.warn('[SKIN] 皮肤图加载失败:', (skinUrl || '').substring(0, 60));
-                if (img.isConnected) img.remove();
-            };
-            img.onload = function() {
-                // 新图就绪：移除 slot 内其余旧的 .skin-layer（只留当前这张），再标记 skin-bg
-                const olds = slot.querySelectorAll('.skin-layer');
-                olds.forEach(function (o) { if (o !== img && o.parentNode) o.parentNode.removeChild(o); });
+            let img = slot.querySelector('.skin-layer');
+            // 清理旧版竞态可能残留的重复皮肤层（多张叠在一起，白耗内存）
+            {
+                const dupLayers = slot.querySelectorAll('.skin-layer');
+                if (dupLayers.length > 1) {
+                    for (let _i = 1; _i < dupLayers.length; _i++) { try { dupLayers[_i].remove(); } catch (e) {} }
+                    img = slot.querySelector('.skin-layer');
+                }
+            }
+            if (img && img.getAttribute('src') && !(img.complete && img.naturalWidth === 0)) {
+                // 已有皮肤（含加载中的）：双缓冲换 src，旧图保持显示；skin-bg 类立即加上
+                _swapSkinImgSrc(img, finalSrc);
                 slot.classList.add('skin-bg');
-            };
-            slot.insertBefore(img, slot.firstChild);
-            // 浏览器已缓存（asset:// 命中）时 img.complete 立即为真但 onload 可能不同步触发，手动兜底清理一次
-            if (img.complete && img.naturalWidth > 0) { img.onload(); }
+            } else {
+                // 首次铺皮（无旧图可保）：建新 img 设 src，onload 后才加 skin-bg
+                //（加载期间槽位保持职业渐变底色，不出现 transparent 黑窗）
+                if (img) img.remove();
+                img = document.createElement('img');
+                img.className = 'skin-layer';
+                img.alt = '';
+                // 加载失败：仅记录并移除（asset:// 优先 + 双缓冲已保证正常环境顺畅，不再做异步回退以免引入竞态）
+                img.onerror = function() {
+                    if (!img.isConnected) return;
+                    console.warn('[SKIN] 皮肤图加载失败:', (skinUrl || '').substring(0, 60));
+                    if (img.isConnected) img.remove();
+                };
+                img.onload = function() {
+                    // 新图就绪：移除 slot 内其余旧的 .skin-layer（只留当前这张），再标记 skin-bg
+                    const olds = slot.querySelectorAll('.skin-layer');
+                    olds.forEach(function (o) { if (o !== img && o.parentNode) o.parentNode.removeChild(o); });
+                    slot.classList.add('skin-bg');
+                };
+                slot.insertBefore(img, slot.firstChild);
+                img.src = finalSrc;
+                // 浏览器已缓存（asset:// 命中）时 img.complete 立即为真但 onload 可能不同步触发，手动兜底清理一次
+                if (img.complete && img.naturalWidth > 0) { img.onload(); }
+            }
             /* [SKIN log muted] */ void (0) && console.log('[SKIN] Skin <img> updated for slot', slot.dataset.slot);
         }
 
@@ -25114,10 +25197,11 @@ ${maSection}
             }
             const banner = document.createElement('div');
             banner.id = 'swUpdateBanner';
-            banner.innerHTML = '<span class="sw-dot"></span>🎉 发现新资源，点我跟新';
+            banner.innerHTML = '<span class="sw-dot"></span>🎉 发现新版本，点击升级';
             banner.onclick = function () {
-                // 优先用 forceRefreshLatest（无条件 unregister 所有 SW + 清空 cache + 带时间戳 replace），
-                // 破旧 SW controlling / 新 SW waiting 导致 SKIP_WAITING 异步不生效、reload 后仍被旧 SW 接管、版本号卡 225 的困局。
+                // 🔴 2026-08-30：气泡只在「核实过远端小版本号 > 本地」时才会出现（_verifyNewVersion 全链路把关），
+                // 所以这里点击 = 确定有新版可升。走 forceRefreshLatest（清 SW 缓存 + skipWaiting + 带时间戳重载），
+                // 这是验证过的唯一可靠升级通道（SKIP_WAITING 单独发会被旧 SW 接管，版本卡死的老坑）。
                 if (typeof forceRefreshLatest === 'function') { forceRefreshLatest(); return; }
                 // 兜底（forceRefreshLatest 不存在时）
                 try { navigator.serviceWorker.ready.then(function(reg){ if(reg.waiting) reg.waiting.postMessage('SKIP_WAITING'); }); } catch(e){}

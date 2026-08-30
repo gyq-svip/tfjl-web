@@ -105,11 +105,18 @@ if (true) {
     //    保证下次 flush 会重试，而不是被「跳过逻辑」吞掉（比旧版每 30s 盲目重写更安全）。
     let _lastFlushedMap = new Map();
     let _projectsCache = null;    // 当前项目数组（null=尚未写入过）
-    // 🔴 2026-08-30 卡顿优化：与 _projectsCache 引用配对的 JSON 缓存。
-    //    旧版每次落盘都对全部项目（25MB+）重新 JSON.stringify（几百 ms 主线程阻塞）；
-    //    现在仅当 _projectsCache 引用变化（真正保存过项目）才重新序列化。
-    let _projectsJsonCache = null; // { src, json }
+    // 🔴 2026-08-30 内存优化：项目整包 JSON 字符串（~25MB）按「缓存对象引用」复用。
+    //    _projectsCache 每次落盘都被整体替换（tfjlSaveAllProjects / tfjlRestoreAllProjects 均
+    //    赋新数组，无原地突变），引用没变就说明内容没变 → 直接复用上次的序列化字符串，
+    //    不再每次 flush 都 JSON.stringify 25MB（省 CPU + 避免「新旧两份 25MB 字符串同时常驻」）。
+    let _projectsJsonStr = null;
+    let _projectsJsonRef = null;
     let _storeLoaded = false;     // 是否已从磁盘加载过
+    // 🔴 2026-08-30 内存优化（配合「保存/最小化/关闭时写盘」策略）：
+    //    自动保存（记事本防抖/切皮等）不再走「getAll 全部项目(25MB对象图) + 全量落盘」，
+    //    只把此脏标志置 true。真正写盘（手动保存/切后台/关闭/5分钟安全网）时才从 IndexedDB 拉一次最新项目。
+    //    消除「记事本每打一个字停顿1秒 → 全量序列化34MB → GC回收」的每秒内存锯齿。
+    let _projectsCacheDirty = false;
     let _restoreLock = false;     // 恢复进行中锁（避免恢复期间 setItem 触发的 flush 覆盖未恢复完的数据）
     let _flushTimer = null;       // 防抖定时器
 
@@ -264,13 +271,23 @@ if (true) {
     // 构建当前最新存储内容（localStorage 全量 + 项目缓存），写盘
     async function _flushStore() {
         if (!_syncOk) return;
-        const map = new Map();
-        // 项目（优先用内存缓存，避免回退到旧值；JSON 结果按引用缓存，避免每次重序列化 25MB）
-        if (_projectsCache !== null) {
-            if (!_projectsJsonCache || _projectsJsonCache.src !== _projectsCache) {
-                _projectsJsonCache = { src: _projectsCache, json: JSON.stringify(_projectsCache) };
+        // 脏标记：写盘前才从 IndexedDB 拉一次最新项目（自动保存期间零 IO 零序列化的关键）
+        if (_projectsCacheDirty) {
+            _projectsCacheDirty = false;
+            if (typeof window.__tfjlLoadProjectList === 'function') {
+                try { _projectsCache = await window.__tfjlLoadProjectList(); } catch (e) {}
             }
-            map.set(PROJECTS_KEY, _projectsJsonCache.json);
+        }
+        const map = new Map();
+        // 项目（优先用内存缓存，避免回退到旧值）。
+        // 🔴 2026-08-30 内存优化：不再常驻缓存序列化结果（25MB 字符串白占内存）——
+        //    写盘现在只在「保存/切后台/关闭 + 5 分钟安全网」时发生，每次现序列化的成本可以接受。
+        if (_projectsCache !== null) {
+            if (_projectsJsonRef !== _projectsCache || _projectsJsonStr === null) {
+                _projectsJsonStr = JSON.stringify(_projectsCache);
+                _projectsJsonRef = _projectsCache;
+            }
+            map.set(PROJECTS_KEY, _projectsJsonStr);   // 引用未变 → 复用同一字符串（零拷贝零序列化）
         }
         else if (_storeMap.has(PROJECTS_KEY)) map.set(PROJECTS_KEY, _storeMap.get(PROJECTS_KEY));
         // localStorage 当前全部键值（已删除的键自然不会出现在 localStorage 里，故不再保留）
@@ -286,7 +303,9 @@ if (true) {
             for (const [k, v] of map) {
                 if (_lastFlushedMap.get(k) !== v) { _same = false; break; }
             }
-            if (_same) { _storeMap = map; return; }
+            // 内容与上次成功落盘完全一致：推进 _lastFlushedMap 到新 map（内容相同，引用互换无副作用），
+            // 让旧 map 及其中的字符串尽早变成垃圾 —— 否则新旧两份 25MB 项目字符串同时常驻。
+            if (_same) { _storeMap = map; _lastFlushedMap = map; return; }
         }
         _storeMap = map;
         const ok = await _writeStoreFile(_syncDir, map);
@@ -302,7 +321,11 @@ if (true) {
     }
 
     let _lastFlushTs = 0;                       // 上次实际落盘时间（用于最短间隔节流）
-    const MIN_FLUSH_GAP_MS = 30 * 1000;         // 🔴 tfjl.dat 最短落盘间隔 30s：合并高频 setItem，减少磁盘 I/O（切后台/关窗仍会立即刷盘保数据）
+    // 🔴 2026-08-30 落盘策略调整（用户明确要求）：tfjl.dat 只在「保存 / 最小化切后台 / 关闭窗口」时写，
+    //    外加一个 5 分钟的脏数据安全网——期间有 localStorage 小改动（记事本草稿、设置等）最多每 5 分钟补写一次，
+    //    防止进程被强杀时丢失超过 5 分钟的小改动。项目数据不在此列：每次保存项目都走 syncAllNow 立即落盘。
+    //    （此前的 30s 是"变更驱动的节流间隔"而非定时器；配合"内容未变整包跳过"，闲置时本来就零写盘。）
+    const MIN_FLUSH_GAP_MS = 5 * 60 * 1000;
 
     function _scheduleFlush() {
         if (!_syncOk) return;
@@ -310,7 +333,6 @@ if (true) {
         // 恢复结束后会主动补一次全量 flush，不会丢。
         if (_restoreLock) return;
         if (_flushTimer) clearTimeout(_flushTimer);
-        // 距上次落盘不足 5s → 拉到 5s 后再写（合并窗口内所有变更一次性落盘，减少 I/O）
         const now = Date.now();
         const delay = Math.max(1000, MIN_FLUSH_GAP_MS - (now - _lastFlushTs));
         _flushTimer = setTimeout(() => { _lastFlushTs = Date.now(); _flushStore().catch(() => {}); }, delay);
@@ -886,13 +908,22 @@ if (true) {
     }
 
     // 项目整体落盘：统一写进 tfjl.dat（不再单独 projects/projects.json）
+    // 仅「手动保存/新建/删除/重命名」等用户主动动作走这里（立即全量落盘）。
+    // 自动保存（记事本/切皮等）请走 _markProjectsDirty()——零 IO，写盘时自动拉最新。
     async function tfjlSaveAllProjects(projectsArray) {
         if (!isTauriApp) return false;
         _projectsCache = projectsArray || [];
+        _projectsCacheDirty = false;
         // 立即落盘：项目是重要数据，不能仅依赖防抖/pagehide（APP 关闭时异步写常丢失，导致重启后项目与默认项目丢失）
         if (_syncOk) { syncAllNow().catch(() => {}); }
         else { _scheduleFlush(); }
         return true;
+    }
+
+    // 零成本脏标记：自动保存（记事本/切皮/融合等）调用，不读 IndexedDB 不写盘。
+    // 下一次真正落盘（手动保存/切后台/关闭/5分钟安全网）时 _flushStore 会自动拉最新项目。
+    function _markProjectsDirty() {
+        _projectsCacheDirty = true;
     }
 
     async function tfjlRestoreAllProjects() {
@@ -923,10 +954,10 @@ if (true) {
     }
 
     async function initAppLocal() {
-        // 🔴 2026-08-29 内存止血（无需用户手动测试）：无论 localStorage 里是否存过 'high'/'lite'，
-        // 启动一律强制锁 'optimized'——跳过卡池/收藏区几百张皮肤背景图（GPU 内存大头），避免一开就爆 4G+ 卡死。
-        // 直接写 localStorage 而非调 setPerfMode（避免初始化早期误触发重渲染）；后续记忆保险逻辑会按 optimized 重渲。
-        try { localStorage.setItem('tdjl_perf_mode', 'optimized'); } catch (e) {}
+        // 🔴 2026-08-30 性能模式菜单修复：删除「启动一律强制锁 optimized」。
+        //    旧逻辑让菜单里的三档切换变成摆设——用户选了高性能/极速，下次启动又被强制改回优化。
+        //    现在恢复为「记住用户选择」：默认档 optimized（getPerfMode 未设置时的默认值），
+        //    内存安全性由皮肤 256px 缩放 + URL 缓存上限保障，不再需要硬锁。
         // 把诊断日志目录指向 D:\withfriends\塔防精灵助手数据\tfjl_temp\logs（用户指定，Tauri 已确认可正常读写）。
         // 不再依赖 get_diag_log_dir 命令（旧 exe 可能未打包该命令）。
         try {
@@ -4845,6 +4876,7 @@ if (true) {
         window.calcScreenshotStats = calcScreenshotStats;
         window.calcLogBattleStats = calcLogBattleStats;
         window.__tfjlSaveAllProjects = tfjlSaveAllProjects;
+        window.__tfjlMarkProjectsDirty = _markProjectsDirty;
         window.__tfjlRestoreAllProjects = tfjlRestoreAllProjects;
     window.clearLogBattleCache = clearLogBattleCache;
     window.importFileToProject = importFileToProject;
