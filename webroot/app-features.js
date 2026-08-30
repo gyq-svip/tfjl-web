@@ -5724,6 +5724,7 @@
         // 活动脚本生成功能
         // 读取手牌到脚本输入框：取「分配到手牌」所选那份，融合卡自动取主卡，只填不生成（生成由用户自行选择）
         function importHandToParser() {
+            if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('读取手牌到脚本框');
             const targetSel = document.getElementById('parserHandTarget');
             const target = targetSel ? (targetSel.value || 'my') : 'my';
             const isTeammate = (target === 'teammate');

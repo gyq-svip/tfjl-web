@@ -956,6 +956,7 @@
           const pval = projSel.value;
           const type = box.querySelector('button[data-type].sel') ? box.querySelector('button[data-type].sel').getAttribute('data-type') : null;
           if(!type){ recToast('请先选择导入到「我的手牌」还是「队友手牌」'); return; }
+          if(typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('阵容识别导入' + (type === 'teammate' ? '(队友)' : '(我方)'));
           if(pval==='__NEW__'){
             close();
             recInput({

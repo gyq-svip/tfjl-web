@@ -2725,7 +2725,8 @@
         // 处理TXT文件上传（支持多文件）
         function handleTxtFileUpload(input) {
             if (!input.files || input.files.length === 0) return;
-            
+            if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('脚本上传');
+
             const files = Array.from(input.files);
             let uploadedCount = 0;
             
@@ -2929,6 +2930,7 @@
         function saveTxtFileEdit(index) {
             const editArea = document.getElementById('txtEditArea');
             if (!editArea || !txtFiles[index]) return;
+            if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('脚本编辑保存');
 
             txtFiles[index].content = editArea.value;
             updateTxtFilesList();
@@ -2947,6 +2949,7 @@
             const file = txtFiles[index];
             if (!file) { alert('文件不存在'); return; }
             if (!file.content) { alert('文件内容为空，无法下载'); return; }
+            if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('脚本下载');
 
             // 先让用户重命名（替代原 window.prompt：桌面端 prompt 返回 null 失效）
             const name = await askTextInputAsync({ title: '下载脚本文件', label: '文件名（含扩展名）：', defaultValue: file.name });
@@ -2998,6 +3001,7 @@
             if (!txtFiles[index]) return;
             const fileName = txtFiles[index].name;
             if (!confirm(`确定要删除"${fileName}"吗？`)) return;
+            if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('脚本删除');
 
             txtFiles.splice(index, 1);
             updateTxtFilesList();
@@ -4612,6 +4616,7 @@
         // 兼容包装：脚本文件列表「✏️ 浮窗编辑」仍调用统一浮窗（本地文件，可保存/对比）
         function openTxtFileWindow(index) {
             if (!txtFiles[index]) return;
+            if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('脚本浮窗编辑');
             openScriptNotebook({ name: txtFiles[index].name, content: txtFiles[index].content, fileIndex: index });
         }
 
@@ -5675,11 +5680,12 @@
         // 重命名文件
         async function renameTxtFile(index) {
             if (!txtFiles[index]) return;
-            
+
             const oldName = txtFiles[index].name;
             const newName = await askTextInputAsync({ title: '重命名文件', label: '请输入新的文件名：', defaultValue: oldName });
-            
+
             if (!newName || newName.trim() === '') return;
+            if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('脚本重命名');
             
             const trimmedName = newName.trim();
             
@@ -26498,12 +26504,110 @@ ${maSection}
             try {
                 const realId = m && m.dataset.bid;
                 if (realId) localStorage.setItem(FB_READ_KEY, realId);
+                // 🔴 2026-08-30 已读回执：本机确认阅读后，把「谁读了」上传到公告 Gist 的
+                //    force_broadcast_reads.json，管理员面板可查看已读名单（谁还没读一清二楚）。
+                //    上传失败不影响本地已读（回执尽力而为），每设备每公告只传一次（本地防重键）。
+                if (realId) _uploadBroadcastReadReceipt(realId);
             } catch (e) {}
+        }
+
+        // 已读回执上传：force_broadcast_reads.json 结构 { "<公告id>": { "<设备id>": { nick, ts } } }
+        // 防重：tdjl_fb_receipt_<id> 存在则不再传（换设备/清缓存会重传一次，无害）。
+        async function _uploadBroadcastReadReceipt(bid) {
+            try {
+                const guardKey = 'tdjl_fb_receipt_' + bid;
+                if (localStorage.getItem(guardKey)) return;
+                const token = getGistToken();
+                if (!token) return; // 未登录无法上传，静默跳过
+                const url = await getNewsGistUrl();
+                // 读现文件（读-改-写，保留其它设备已上传的回执）
+                const res = await fetch(url, { headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` } });
+                if (!res.ok) return;
+                const gist = await res.json();
+                const f = gist.files && gist.files['force_broadcast_reads.json'];
+                let reads = {};
+                try { reads = f && f.content ? JSON.parse(f.content) : {}; } catch (e) { reads = {}; }
+                if (!reads[bid] || typeof reads[bid] !== 'object') reads[bid] = {};
+                // 收敛体积：单公告最多记 500 人（最早的挤掉），避免 Gist 文件无限膨胀
+                const devId = (typeof getDeviceId === 'function') ? getDeviceId() : '';
+                if (!devId) return;
+                const nick = (typeof _myNick === 'function' && _myNick()) || localStorage.getItem('TFJL_UserName') || window.__currentNickname || '未命名';
+                const entries = Object.keys(reads[bid]);
+                if (entries.length >= 500 && !reads[bid][devId]) {
+                    // 升序排（最早的在前），挤掉第一个 = 最早的
+                    const sorted = entries.sort((a, b) => (reads[bid][a].ts || 0) - (reads[bid][b].ts || 0));
+                    delete reads[bid][sorted[0]];
+                }
+                reads[bid][devId] = { nick: String(nick).slice(0, 30), ts: Date.now() };
+                // 清掉 30 天前的旧公告回执（防止多个公告累积）
+                const cutoff = Date.now() - 30 * 24 * 3600 * 1000;
+                for (const k in reads) {
+                    if (!Object.prototype.hasOwnProperty.call(reads, k)) continue;
+                    const anyTs = Object.values(reads[k]).reduce((mx, v) => Math.max(mx, v && v.ts || 0), 0);
+                    if (anyTs < cutoff) delete reads[k];
+                }
+                const files = {};
+                files['force_broadcast_reads.json'] = { content: JSON.stringify(reads) };
+                const pr = await fetch(url, {
+                    method: 'PATCH',
+                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ files })
+                });
+                if (pr.ok) { try { localStorage.setItem(guardKey, '1'); } catch (e) {} }
+            } catch (e) { /* 回执失败静默，不影响已读 */ }
+        }
+
+        // 管理员查看已读回执：列出当前公告谁读了、什么时候读的
+        async function adminViewBroadcastReads() {
+            const box = document.getElementById('adminBroadcastReads');
+            if (!box) return;
+            box.style.display = 'block';
+            box.innerHTML = '<div style="color:rgba(255,255,255,0.4);padding:8px;">⏳ 加载中…</div>';
+            try {
+                const token = getGistToken();
+                if (!token) throw new Error('未配置 GitHub Token');
+                const url = await getNewsGistUrl();
+                const [resReads, resCur] = await Promise.all([
+                    fetch(url, { headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `token ${token}` } }),
+                    _readForceBroadcast()
+                ]);
+                if (!resReads.ok) throw new Error('HTTP ' + resReads.status);
+                const gist = await resReads.json();
+                const f = gist.files && gist.files['force_broadcast_reads.json'];
+                const reads = f && f.content ? JSON.parse(f.content) : {};
+                if (!resCur || !resCur.id) {
+                    box.innerHTML = '<div style="color:#fbbf24;padding:8px;">当前没有生效中的飘屏公告</div>';
+                    return;
+                }
+                const cur = (reads[resCur.id]) || {};
+                const people = Object.keys(cur).map(dev => ({ dev, ...cur[dev] })).sort((a, b) => (a.ts || 0) - (b.ts || 0));
+                let html = '<div style="border-top:1px solid rgba(255,255,255,0.1);margin-top:10px;padding-top:10px;">';
+                html += '<div style="color:#4ade80;font-size:0.8rem;font-weight:700;margin-bottom:6px;">📊 已读回执：' + (resCur.title || resCur.id) + '</div>';
+                html += '<div style="color:rgba(255,255,255,0.55);font-size:0.72rem;margin-bottom:8px;">已读 <b style="color:#4ade80;">' + people.length + '</b> 人（每人点「我已阅读」时自动上报；发布于 ' + new Date(resCur.ts).toLocaleString('zh-CN') + '）</div>';
+                if (!people.length) {
+                    html += '<div style="color:rgba(255,255,255,0.4);font-size:0.75rem;padding:6px 0;">还没有人阅读（或旧版本用户尚未更新）</div>';
+                } else {
+                    html += '<div style="max-height:220px;overflow-y:auto;background:rgba(0,0,0,0.2);border-radius:6px;padding:6px 10px;">';
+                    people.forEach((p, i) => {
+                        html += '<div style="display:flex;gap:8px;font-size:0.72rem;color:rgba(255,255,255,0.7);padding:3px 0;border-bottom:1px dashed rgba(255,255,255,0.08);">' +
+                            '<span style="color:#4ade80;">' + (i + 1) + '.</span>' +
+                            '<span style="flex:1;">' + (p.nick || '未命名') + '</span>' +
+                            '<span style="color:rgba(255,255,255,0.35);">' + (p.ts ? new Date(p.ts).toLocaleString('zh-CN') : '') + '</span>' +
+                            '</div>';
+                    });
+                    html += '</div>';
+                }
+                html += '</div>';
+                box.innerHTML = html;
+            } catch (e) {
+                box.innerHTML = '<div style="color:#ff6b6b;padding:8px;">加载失败: ' + (e && e.message ? e.message : e) + '</div>';
+            }
         }
 
         // 暴露给全局，供 initAppLocal / DOMContentLoaded 调用
         window.checkForceBroadcast = checkForceBroadcast;
         window.closeForceBroadcast = closeForceBroadcast;
+        window.adminViewBroadcastReads = adminViewBroadcastReads;
         window.adminPublishBroadcast = adminPublishBroadcast;
         window.adminPreviewBroadcast = adminPreviewBroadcast;
 
