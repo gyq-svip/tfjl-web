@@ -7169,10 +7169,14 @@
         // type: 'activity' | 'dungeon' | 任意自定义标签（externalContent/windowId 提供时为通用"另存为副本"）
         function showSaveScriptDialog(type, externalContent, windowId) {
             let scriptContent = externalContent || '';
-            if (!scriptContent && windowId && window.__notebookSaveContent && window.__notebookSaveContent[windowId]) {
-                scriptContent = window.__notebookSaveContent[windowId];
+            // 🔴 2026-08-30 空内容防串：内容来自窗口 stash（hasOwnProperty 判定，含空字符串）时，
+            //    不再回退到 type 兜底（老 _activity/_dungeonScriptOutput 是上次生成器的残留，
+            //    空脚本误回退会把陈旧内容导入项目）。空内容直接走下方「没有可保存」拦截。
+            const _fromWindow = !!(windowId && window.__notebookSaveContent && Object.prototype.hasOwnProperty.call(window.__notebookSaveContent, windowId));
+            if (!scriptContent && _fromWindow) {
+                scriptContent = window.__notebookSaveContent[windowId] || '';
             }
-            if (!scriptContent) {
+            if (!scriptContent && !_fromWindow) {
                 scriptContent = (type === 'activity' ? window._activityScriptOutput : window._dungeonScriptOutput);
             }
             const isCopy = !!(externalContent || (windowId && window.__notebookSaveContent && window.__notebookSaveContent[windowId]));
@@ -7215,11 +7219,14 @@
                 // 创建对话框
                 const modal = document.createElement('div');
                 modal.id = 'saveScriptModal';
-                modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:10000;display:flex;align-items:center;justify-content:center;';
+                // 🔴 2026-08-30 层级修复：扫描文件查看窗（zAboveSettings）z-index 是 100000+，
+                //    固定 10000 的弹窗会被压在浮窗后面（点「📥 导入项目」看似没反应）。
+                //    动态取 200000+ 确保永远盖过所有浮窗（普通窗 windowZIndex 与顶置窗 100000+ 均不及）。
+                modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:' + (200000 + (window.topWinZIndex || 0)) + ';display:flex;align-items:center;justify-content:center;';
                 modal.innerHTML = `
                     <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(33,150,243,0.5);border-radius:12px;padding:20px;width:360px;max-width:90vw;">
-                        <div style="color:#fff;font-weight:bold;font-size:1.1rem;margin-bottom:8px;">💾 保存${scriptType}到项目</div>
-                        ${isCopy ? `<div style="color:rgba(255,255,255,0.55);font-size:0.78rem;margin-bottom:12px;line-height:1.4;">📌 另存为<b>副本</b>：仅写入所选项目的脚本列表，<b>需求墙源文件不会被修改</b></div>` : ''}
+                        <div style="color:#fff;font-weight:bold;font-size:1.1rem;margin-bottom:8px;">${isCopy ? '📥 导入脚本到项目' : '💾 保存' + scriptType + '到项目'}</div>
+                        ${isCopy ? `<div style="color:rgba(255,255,255,0.55);font-size:0.78rem;margin-bottom:12px;line-height:1.4;">📌 另存为<b>副本</b>：仅写入所选项目的脚本列表，<b>源文件不会被修改</b>（扫描文件 / 需求墙 / 原项目均不受影响）</div>` : ''}
                         <div style="margin-bottom:10px;">
                             <label style="color:rgba(255,255,255,0.7);font-size:0.85rem;display:block;margin-bottom:5px;">选择项目：</label>
                             <select id="saveScriptProjectSelect" onchange="toggleNewProjectInput()" style="width:100%;padding:8px;border-radius:6px;border:1px solid rgba(33,150,243,0.3);background:#2a2a4a;color:#fff;font-size:0.9rem;">${optionsHtml}</select>
@@ -7234,7 +7241,7 @@
                         </div>
                         <div style="margin-bottom:15px;">
                             <label style="color:rgba(255,255,255,0.7);font-size:0.85rem;display:block;margin-bottom:5px;">脚本文件名：</label>
-                            <input id="saveScriptFileName" type="text" value="${scriptType}_${new Date().toLocaleDateString('zh-CN').replace(/\//g, '')}.txt" style="width:100%;padding:8px;border-radius:6px;border:1px solid rgba(33,150,243,0.3);background:#2a2a4a;color:#fff;font-size:0.9rem;box-sizing:border-box;">
+                            <input id="saveScriptFileName" type="text" value="${(() => { try { return (isCopy && copyName && /\.txt$/i.test(copyName)) ? copyName : (scriptType + '_' + new Date().toLocaleDateString('zh-CN').replace(/\//g, '') + '.txt'); } catch (e) { return '脚本.txt'; } })().replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')}" style="width:100%;padding:8px;border-radius:6px;border:1px solid rgba(33,150,243,0.3);background:#2a2a4a;color:#fff;font-size:0.9rem;box-sizing:border-box;">
                         </div>
                         <div style="display:flex;gap:10px;justify-content:flex-end;">
                             <button onclick="document.getElementById('saveScriptModal').remove()" style="background:rgba(255,255,255,0.1);color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;">取消</button>
@@ -7367,7 +7374,7 @@
                     return saveProjectToDBDirect(project);
                 }).then(() => {
                     document.getElementById('saveScriptModal')?.remove();
-                    showToast(isCopy ? `✅ 已另存副本到项目"${projectName}"（需求墙源文件不变）` : `✅ 脚本已保存到项目"${projectName}"`);
+                    showToast(isCopy ? `✅ 已导入副本到项目"${projectName}"（源文件不变）` : `✅ 脚本已保存到项目"${projectName}"`);
 
                     // 如果保存到当前项目，刷新脚本文件列表
                     if (projectName === currentProjectName) {
