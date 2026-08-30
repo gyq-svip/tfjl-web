@@ -966,9 +966,21 @@ if (true) {
             }
         } catch (e) {}
         const btn = document.getElementById('appLocalSettingsBtn');
-        // 按钮无条件显示（网页端/App端都显示）；真正的 Tauri 环境判断放在点击时（openAppLocalSettings 内）进行，
-        // 避免 Tauri 全局注入晚于本函数执行导致误判为 false 而不显示按钮
-        if (btn) btn.style.display = 'flex';
+        // 🔴 2026-08-30 网页版按钮误显修复：按钮只应在 Tauri APP 显示（index.html 默认 display:none）。
+        //    旧逻辑「无条件 display:flex」是当初为绕过 Tauri WebView 旧缓存残缺 app-local.js 的临时测试手段
+        //    （commit a2abf7d），忘记改回 → 网页版右上角也出现 📁 图标、点击却无任何反应。
+        //    现在恢复平台门控：立即判定一次；若判定为否，用轮询兜底防「Tauri 全局注入晚于本函数」的极端时序
+        //    （500ms×10 次共 5 秒，期间检测到立即显示，超时保持隐藏 = 网页版）。
+        function _showAppBtnIfTauri() {
+            if (_isTauriRuntime()) { if (btn) btn.style.display = 'flex'; return true; }
+            return false;
+        }
+        if (!_showAppBtnIfTauri()) {
+            let _btnTries = 0;
+            const _btnTimer = setInterval(function () {
+                if (_showAppBtnIfTauri() || ++_btnTries >= 10) clearInterval(_btnTimer);
+            }, 500);
+        }
         await restoreLocalFromDisk();  // 先恢复磁盘配置（重装/清缓存后复原）
         loadConfig();
         initDataSync();  // 启动 localStorage → 用户数据目录自动同步
@@ -1018,7 +1030,11 @@ if (true) {
     // ==================== 设置面板 ====================
 
     function openAppLocalSettings() {
-        if (!_isTauriRuntime()) return;
+        // 网页版按钮已隐藏，此分支只剩「其他入口误调」场景：给提示而非静默无反应
+        if (!_isTauriRuntime()) {
+            try { if (typeof showToast === 'function') showToast('此功能仅在桌面应用中可用', 'error'); } catch (e) {}
+            return;
+        }
         showSettingsModal();
         fillSettingsForm();
         // 扫描文件列表总是执行（轻量）
