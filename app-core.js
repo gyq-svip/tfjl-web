@@ -6667,6 +6667,20 @@
 // 改大小只动 FUSION_SIZE 一处，CSS+三处 JS 全靠它。
 const FUSION_SIZE = '40%';                                        // 副卡直径，调大小改这里
 
+// 🔴 2026-08-30 双缓冲换图（右键切皮变黑的残留元凶）：直接改 <img>.src 会立刻废掉旧图，
+//    新图完成解码前 <img> 区域空白（黑窗）。改为先离屏预加载新图，onload 解码就绪后再换 src，
+//    旧图始终显示到新图可绘制，切皮全程无黑窗。加载失败则保持旧图不黑屏。
+function _swapSkinImgSrc(img, nextUrl) {
+    if (!img || !nextUrl) return;
+    if (img.getAttribute('src') === nextUrl) return;
+    const pre = new Image();
+    const apply = function () { if (img.isConnected && img.getAttribute('src') !== nextUrl) img.src = nextUrl; };
+    pre.onload = apply;
+    pre.onerror = function () { /* 新图失败：保持旧图，不黑窗 */ };
+    pre.src = nextUrl;
+    if (pre.complete && pre.naturalWidth > 0) apply();
+}
+
 // 手牌：主卡用独立 <img class="hand-skin-layer"> 满铺（与普通手牌一致）
 //   + 副卡 <img class="hand-skin-fused"> 右下角小圆角矩形（金色外框）
 // ⚠️ 早期用 card.style.backgroundImage 走背景图，但 .selected-card.card-item.skin-bg { background: transparent !important }
@@ -6688,11 +6702,9 @@ function applyFusionSkinToHandCard(card, mainUrl, fusedUrl, fusedIsBadge) {
         // 🔴 2026-08-30 内存修复：禁止给 src 加 ?t= 时间戳。同一张皮肤 URL 必须保持不变，
         //    让 WebView2 的「相同 src 不重复解码」优化生效，否则每次 reapply 都会生成新纹理堆积在 Renderer 进程。
         const next = mainUrl;
-        const curSrc = base.getAttribute('src');
-        if (curSrc !== next) {
-            // 🔴 2026-08-30 修复：不再 revoke 旧 blob URL，避免与缓存复用冲突导致皮肤空白
-            base.src = next;
-        }
+        // 🔴 2026-08-30 修复：不再 revoke 旧 blob URL，避免与缓存复用冲突导致皮肤空白；
+        //    双缓冲换图：预解码完成才换 src，旧图保持显示，消除黑窗
+        _swapSkinImgSrc(base, next);
     } else if (base) {
         base.remove();
     }
@@ -6708,11 +6720,8 @@ function applyFusionSkinToHandCard(card, mainUrl, fusedUrl, fusedIsBadge) {
         overlay.style.cssText = fusedIsBadge
             ? 'position:absolute;inset:0;width:100%;height:100%;object-fit:contain;border-radius:inherit;z-index:1;pointer-events:none;'
             : 'position:absolute;left:2px;top:2px;width:' + FUSION_SIZE + ';height:auto;aspect-ratio:1/1;max-height:70%;object-fit:cover;box-sizing:border-box;border:3px solid #FFD700;clip-path:polygon(0 0,100% 0,100% 85%,85% 100%,0 100%);z-index:2;pointer-events:none;filter:drop-shadow(0 0 2px rgba(0,0,0,0.7));';
-        const oldFusedSrc = overlay.getAttribute('src');
-        if (oldFusedSrc !== fusedUrl) {
-            // 🔴 同上：不 revoke 旧 blob
-            overlay.src = fusedUrl;
-        }
+        // 🔴 双缓冲换图：预解码完成才换 src（不 revoke 旧 blob），消除切换黑窗
+        _swapSkinImgSrc(overlay, fusedUrl);
     } else if (overlay && overlay.parentNode) {
         overlay.remove();
     }
@@ -6737,14 +6746,9 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             slot.insertBefore(base, slot.firstChild);
         }
         // 🔴 2026-08-30 内存修复：禁止给 src 加 ?t= 时间戳，避免同一张皮肤图被 WebView2 反复解码堆积纹理。
-        const next = mainUrl;
-        const curSrc = base.getAttribute('src');
-        if (curSrc !== next) {
-            // 🔴 2026-08-30 修复：不再 revoke 旧 blob URL！该 blob 可能仍被缓存(skinImageUrlCache/_skinBlobUrlCache)持有，
-            // revoke 后下次重绘复用到已失效的 blob → "Failed to load skin image" → 皮肤空白/切不开。
-            // 纹理由浏览器 GC 回收（移除 <img> 后自动释放），不需要手动 revoke。
-            base.src = next;
-        }
+        // 🔴 双缓冲换图（右键切融合卡变黑的残留元凶）：预解码完成才换 src，旧图保持显示到新图就绪；
+        //    不 revoke 旧 blob（可能仍被 skinImageUrlCache/_skinBlobUrlCache 持有，纹理由浏览器 GC 回收）。
+        _swapSkinImgSrc(base, mainUrl);
         base.onerror = function () { /* 静默：与 applySkinBgToSlot 一致不报警 */ };
     } else if (base) {
         // 同上：不 revoke 旧 blob，避免与缓存复用冲突
@@ -6783,10 +6787,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         overlay.style.cssText = fusedIsBadge
             ? 'position:absolute;inset:3px;width:calc(100% - 6px);height:calc(100% - 6px);object-fit:contain;border-radius:5px;z-index:1;pointer-events:none;'
             : 'position:absolute;left:3px;top:3px;width:' + FUSION_SIZE + ';height:auto;aspect-ratio:1/1;max-height:70%;object-fit:cover;box-sizing:border-box;border:3px solid #FFD700;clip-path:polygon(0 0,100% 0,100% 85%,85% 100%,0 100%);z-index:2;cursor:pointer;filter:drop-shadow(0 0 2px rgba(0,0,0,0.7));';
-        if (overlay.src !== fusedUrl) {
-            // 🔴 2026-08-30 修复：不再 revoke 旧 blob URL（同主卡逻辑），避免与缓存复用冲突导致皮肤空白
-            overlay.src = fusedUrl;
-        }
+        // 🔴 双缓冲换图：预解码完成才换 src（不 revoke 旧 blob），消除切换黑窗
+        _swapSkinImgSrc(overlay, fusedUrl);
     } else if (overlay && overlay.parentNode) {
         // 同上：不 revoke 旧 blob
         overlay.remove();
@@ -9451,10 +9453,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 layer.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit;z-index:0;pointer-events:none;';
                 card.insertBefore(layer, card.firstChild);
             }
-            if (layer.src !== url) {
-                // 🔴 2026-08-30 修复：不再 revoke 旧 blob URL，避免与缓存复用冲突导致皮肤空白
-                layer.src = url;
-            }
+            // 🔴 双缓冲换图：预解码完成才换 src（不 revoke 旧 blob），消除右键切皮黑窗
+            _swapSkinImgSrc(layer, url);
         }
         function removeSkinBgFromHandCard(card) {
             if (!card) return;

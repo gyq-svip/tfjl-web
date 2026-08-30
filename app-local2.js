@@ -100,7 +100,15 @@ if (true) {
     let _syncDir = '';            // 存储目标目录
     let _syncOk = false;          // 存储是否可用
     let _storeMap = new Map();    // 磁盘上的全部键值（localStorage 镜像 + 项目）
+    // 🔴 2026-08-30 最近一次【成功落盘】的内容快照：_flushStore 据此判断「无变化则跳过写盘」。
+    //    只在写盘成功后推进——写盘失败（目录被杀软短暂锁定/磁盘满等）不推进，
+    //    保证下次 flush 会重试，而不是被「跳过逻辑」吞掉（比旧版每 30s 盲目重写更安全）。
+    let _lastFlushedMap = new Map();
     let _projectsCache = null;    // 当前项目数组（null=尚未写入过）
+    // 🔴 2026-08-30 卡顿优化：与 _projectsCache 引用配对的 JSON 缓存。
+    //    旧版每次落盘都对全部项目（25MB+）重新 JSON.stringify（几百 ms 主线程阻塞）；
+    //    现在仅当 _projectsCache 引用变化（真正保存过项目）才重新序列化。
+    let _projectsJsonCache = null; // { src, json }
     let _storeLoaded = false;     // 是否已从磁盘加载过
     let _restoreLock = false;     // 恢复进行中锁（避免恢复期间 setItem 触发的 flush 覆盖未恢复完的数据）
     let _flushTimer = null;       // 防抖定时器
@@ -118,16 +126,20 @@ if (true) {
         return [n & 0xff, (n >>> 8) & 0xff, (n >>> 16) & 0xff, (n >>> 24) & 0xff];
     }
     function _bytesToBase64(bytes) {
-        // 注意：不能用 String.fromCharCode.apply(null, hugeArray)，部分 webview 对 apply 的参数个数
-        // 有上限（远低于 0x8000*... 累积），会抛 Maximum call stack size exceeded，导致写盘彻底失败。
-        // 改用逐字节拼接（按块循环但块内手动拼，避免超长参数列表）。
+        // 注意：不能用一次性的 String.fromCharCode.apply(null, 全部字节)，参数个数超栈会彻底写盘失败。
+        // 🔴 2026-08-30 卡顿根治：旧版「块内逐字节 += 拼接」对 34MB 的 tfjl.dat 是 3400 万次字符串
+        //    连接 ≈ 2 秒主线程阻塞（界面冻结、按钮失效）。改为 0x8000 块 apply（原生解码，快 10-30 倍），
+        //    块内万一抛栈溢出再退回逐字节拼接兜底。
         let s = '';
         const chunk = 0x8000;
         for (let i = 0; i < bytes.length; i += chunk) {
-            const end = Math.min(i + chunk, bytes.length);
-            let part = '';
-            for (let j = i; j < end; j++) part += String.fromCharCode(bytes[j]);
-            s += part;
+            const sub = bytes.subarray(i, Math.min(i + chunk, bytes.length));
+            try { s += String.fromCharCode.apply(null, sub); }
+            catch (e) {
+                let part = '';
+                for (let j = 0; j < sub.length; j++) part += String.fromCharCode(sub[j]);
+                s += part;
+            }
         }
         return btoa(s);
     }
@@ -191,6 +203,7 @@ if (true) {
         if (raw) {
             try {
                 _storeMap = _unpackStore(_base64ToBytes(raw.trim()));
+                _lastFlushedMap = new Map(_storeMap);   // 磁盘真实内容 = 跳过比对的基准
                 _storeLoaded = true;   // 加载成功后才置位
                 console.log('[数据存储] 已加载统一存储: ' + path + ' (' + _storeMap.size + ' 项)');
                 return;
@@ -202,6 +215,7 @@ if (true) {
         _storeMap = await _importLegacyFiles(dir);
         // 迁移后立刻写一份新的统一存储
         await _writeStoreFile(dir, _storeMap);
+        _lastFlushedMap = new Map(_storeMap);
     }
 
     async function _importLegacyFiles(dir) {
@@ -251,8 +265,13 @@ if (true) {
     async function _flushStore() {
         if (!_syncOk) return;
         const map = new Map();
-        // 项目（优先用内存缓存，避免回退到旧值）
-        if (_projectsCache !== null) map.set(PROJECTS_KEY, JSON.stringify(_projectsCache));
+        // 项目（优先用内存缓存，避免回退到旧值；JSON 结果按引用缓存，避免每次重序列化 25MB）
+        if (_projectsCache !== null) {
+            if (!_projectsJsonCache || _projectsJsonCache.src !== _projectsCache) {
+                _projectsJsonCache = { src: _projectsCache, json: JSON.stringify(_projectsCache) };
+            }
+            map.set(PROJECTS_KEY, _projectsJsonCache.json);
+        }
         else if (_storeMap.has(PROJECTS_KEY)) map.set(PROJECTS_KEY, _storeMap.get(PROJECTS_KEY));
         // localStorage 当前全部键值（已删除的键自然不会出现在 localStorage 里，故不再保留）
         for (let i = 0; i < localStorage.length; i++) {
@@ -260,9 +279,19 @@ if (true) {
             if (RESERVED_KEYS.has(k)) continue;
             map.set(k, localStorage.getItem(k));
         }
+        // 🔴 2026-08-30 卡顿根治·兜底：与上次【成功落盘】的内容逐键比对，完全一致则直接跳过写盘
+        //    （省掉 34MB 整包「序列化 + 打包 + base64 + IPC」的全部成本）。磁盘文件保持不动。
+        if (map.size === _lastFlushedMap.size) {
+            let _same = true;
+            for (const [k, v] of map) {
+                if (_lastFlushedMap.get(k) !== v) { _same = false; break; }
+            }
+            if (_same) { _storeMap = map; return; }
+        }
         _storeMap = map;
         const ok = await _writeStoreFile(_syncDir, map);
         if (ok) {
+            _lastFlushedMap = map;   // 写盘成功才推进快照（失败则下次重试）
             console.log('[数据存储] 已写入统一存储 tfjl.dat (' + map.size + ' 项)');
             // 数据落盘后置自动备份脏标记（_scheduleAutoBackup 仅置标、不返回 Promise，
             // 由 6 小时定时整备 / 关窗兜底消费，避免"写盘→备份→再写盘"死循环）。
@@ -288,14 +317,25 @@ if (true) {
     }
 
     // 拦截全局 Storage 写入——所有 localStorage 变更都触发统一存储刷新
+    // 🔴 2026-08-30 30秒规律卡顿根治：旧版任何 setItem（哪怕写入完全相同的值，例如每 30s 一次的
+    //    tfjl_my_rep_last / tdjl_auctionNews_cfg）都会调度落盘 → 每 30 秒把 ~34MB 的 tfjl.dat
+    //    整包「序列化+打包+base64+IPC」重写一遍，主线程阻塞 2-3 秒（界面冻结、按钮失效、
+    //    hover 高亮不跟手）。现改为：写入前先取旧值，值相同则照常写入但【不触发落盘调度】，
+    //    从源头做到「有变化才写盘」。
     const _nativeSetItem = Storage.prototype.setItem;
     Storage.prototype.setItem = function (key, value) {
+        let _prev = null, _has = false;
+        try { _prev = this.getItem(key); _has = true; } catch (e) {}
         _nativeSetItem.call(this, key, value);
+        if (_has && _prev === value) return;   // 值没变：只写不调度
         _scheduleFlush();
     };
     const _nativeRemoveItem = Storage.prototype.removeItem;
     Storage.prototype.removeItem = function (key) {
+        let _exists = true;
+        try { _exists = this.getItem(key) !== null; } catch (e) {}
         _nativeRemoveItem.call(this, key);
+        if (!_exists) return;                  // 键本来就不存在：不调度
         _scheduleFlush();
     };
 
