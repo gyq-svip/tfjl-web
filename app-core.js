@@ -1985,10 +1985,49 @@
             };
         }
 
+        // 🔴 2026-08-31 下拉框悬停滚轮切换：鼠标停在 select 上滚动滚轮即可换选项（免点开列表）。
+        //    安全规则：跳过占位项（value 为空）与特殊项（__ 开头：➕新建项目/__NEW_CAT__ 创建分类等），
+        //    避免滚轮一滚误触「新建项目/创建分类」弹窗；到列表边界即停（不循环）。
+        //    幂等：同一元素重复绑定只生效一次（__wheelBound 守卫），选项重建（innerHTML）不影响监听。
+        function attachSelectWheel(sel) {
+            if (!sel || sel.__wheelBound) return;
+            sel.__wheelBound = true;
+            sel.addEventListener('wheel', (e) => {
+                if (sel.disabled) return;
+                e.preventDefault();
+                const dir = e.deltaY > 0 ? 1 : -1;
+                const opts = sel.options;
+                if (!opts || !opts.length) return;
+                const allowed = [];
+                for (let i = 0; i < opts.length; i++) {
+                    const v = opts[i].value || '';
+                    if (v === '' || v.startsWith('__') || opts[i].disabled) continue;
+                    allowed.push(i);
+                }
+                if (!allowed.length) return;
+                const cur = allowed.indexOf(sel.selectedIndex);
+                let nextIdx;
+                if (cur === -1) {
+                    // 当前停在占位/特殊项：向下滚进列表头，向上滚到列表尾
+                    nextIdx = dir > 0 ? allowed[0] : allowed[allowed.length - 1];
+                } else {
+                    nextIdx = allowed[Math.min(allowed.length - 1, Math.max(0, cur + dir))];
+                }
+                if (nextIdx !== sel.selectedIndex) {
+                    sel.selectedIndex = nextIdx;
+                    sel.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            }, { passive: false });
+        }
+
         function refreshProjectSelectors() {
             // 先加载项目列表
             loadProjectListFromDB().then(allProjects => {
                 window.projects = allProjects;
+
+                // 🔴 2026-08-31 滚轮切换：悬停在下拉框上滚动滚轮即可换选项（幂等绑定，重建选项不影响）
+                attachSelectWheel(document.getElementById('categorySelector1'));
+                attachSelectWheel(document.getElementById('projectSelector1'));
 
                 // 刷新分类下拉框
                 const catSel = document.getElementById('categorySelector1');
@@ -10591,10 +10630,13 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             // 直接给每个卡牌元素添加事件监听器
             document.querySelectorAll('#' + container.id + ' .selected-card:not(.empty)').forEach(card => {
                 if (!card.classList.contains('placed')) {
-                    // 🔴 2026-08-30 手牌拖动恢复：旧代码写死 draggable='false'（2026-08-09 提交笔误），
-                    //    HTML 模板里的 draggable=!placed 被覆盖 → dragstart 永不触发 → 手牌拖不上卡槽。
-                    //    未上阵的卡必须可拖（与模板 draggable="' + (!card.placed) + '" 语义一致）。
-                    card.setAttribute('draggable', 'true');
+                    // 🔴 2026-08-31 APP(WebView2) 手牌拖拽修复：Tauri 默认 dragDropEnabled=true 会拦截
+                    //    WebView2 的 HTML5 DnD drop——原生 drag「启动了但落不了地」，且 drag 一启动就
+                    //    pointercancel 掉 Pointer 事件流 → 原生/兜底两层全断（网页版正常、APP 拖不动的原因）。
+                    //    APP 环境禁用原生 draggable，全走 Pointer 兜底层（与卡池卡同路径，该层不依赖原生 DnD）；
+                    //    网页版保留原生 DnD 优先（系统级拖拽体验更好，Pointer 层兜底仍在）。
+                    //    另 tauri.conf.json 已补 dragDropEnabled:false（下一个 APP 版本双保险恢复原生 DnD 能力）。
+                    card.setAttribute('draggable', (window.__TAURI__ || window.__TAURI_INTERNALS__) ? 'false' : 'true');
                     card.addEventListener('dragstart', (e) => handleHandDragStart(e, handType));
                     card.addEventListener('click', (e) => handleHandCardClick(e, handType));
                 }
