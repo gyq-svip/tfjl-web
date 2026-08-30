@@ -7200,21 +7200,29 @@
                     });
                 }
 
-                // 构建分类选项HTML
-                const categoryOptionsHtml = categories.map((cat, i) =>
-                    `<option value="${cat}" ${i === 0 ? 'selected' : ''}>${cat}</option>`
-                ).join('');
+                // 🔴 2026-08-31 两级选择（与主界面顶部一致）：先选分类，再选该分类下的项目。
+                //    分类全集 = 现有 categories ∪ 项目数据里出现过的分类（项目可能带未登记进分类表的分类）。
+                const allCats = Array.from(new Set([...(categories || []), ...Object.keys(grouped)])).sort();
+                // 默认分类 = 当前项目所在分类；无当前项目（或不在列表）时取第一个分类
+                let defCat = allCats[0] || '默认分类';
+                if (currentProjectName && projects && projects.length) {
+                    const cp = projects.find(p => p.name === currentProjectName);
+                    if (cp && cp.category) defCat = cp.category;
+                }
+                const catOptionsHtml = allCats.map(c => `<option value="${c}" ${c === defCat ? 'selected' : ''}>${c}</option>`).join('');
+                // 新建项目时的分类下拉默认跟随外层选中分类（联动时同步刷新）
+                const newCatOptionsHtml = allCats.map(c => `<option value="${c}" ${c === defCat ? 'selected' : ''}>${c}</option>`).join('');
 
-                // 构建选项HTML（添加"新建项目"选项）
-                let optionsHtml = '<option value="__NEW__" style="color:#4ade80;font-weight:bold;">➕ 新建项目</option>';
-                Object.keys(grouped).sort().forEach(cat => {
-                    optionsHtml += `<optgroup label="${cat}">`;
-                    grouped[cat].forEach(p => {
-                        const selected = p.name === currentProjectName ? ' selected' : '';
-                        optionsHtml += `<option value="${p.name}"${selected}>${p.name}</option>`;
+                // 项目下拉选项 = ➕新建项目 + 该分类下的项目（当前项目在该分类时默认选中）
+                const buildProjectOptions = (cat) => {
+                    let oh = '<option value="__NEW__" style="color:#4ade80;font-weight:bold;">➕ 新建项目</option>';
+                    (grouped[cat] || []).forEach(p => {
+                        oh += `<option value="${p.name}"${p.name === currentProjectName ? ' selected' : ''}>${p.name}</option>`;
                     });
-                    optionsHtml += '</optgroup>';
-                });
+                    return oh;
+                };
+                // 供联动函数 saveScriptCategoryChange 读取
+                window.__saveScriptGrouped = grouped;
 
                 // 创建对话框
                 const modal = document.createElement('div');
@@ -7228,16 +7236,20 @@
                         <div style="color:#fff;font-weight:bold;font-size:1.1rem;margin-bottom:8px;">${isCopy ? '📥 导入脚本到项目' : '💾 保存' + scriptType + '到项目'}</div>
                         ${isCopy ? `<div style="color:rgba(255,255,255,0.55);font-size:0.78rem;margin-bottom:12px;line-height:1.4;">📌 另存为<b>副本</b>：仅写入所选项目的脚本列表，<b>源文件不会被修改</b>（扫描文件 / 需求墙 / 原项目均不受影响）</div>` : ''}
                         <div style="margin-bottom:10px;">
+                            <label style="color:rgba(255,255,255,0.7);font-size:0.85rem;display:block;margin-bottom:5px;">选择分类：</label>
+                            <select id="saveScriptCategorySelect" onchange="saveScriptCategoryChange()" title="先选分类，下面只列该分类的项目" style="width:100%;padding:8px;border-radius:6px;border:1px solid rgba(33,150,243,0.3);background:#2a2a4a;color:#fff;font-size:0.9rem;">${catOptionsHtml}</select>
+                        </div>
+                        <div style="margin-bottom:10px;">
                             <label style="color:rgba(255,255,255,0.7);font-size:0.85rem;display:block;margin-bottom:5px;">选择项目：</label>
-                            <select id="saveScriptProjectSelect" onchange="toggleNewProjectInput()" style="width:100%;padding:8px;border-radius:6px;border:1px solid rgba(33,150,243,0.3);background:#2a2a4a;color:#fff;font-size:0.9rem;">${optionsHtml}</select>
+                            <select id="saveScriptProjectSelect" onchange="toggleNewProjectInput()" style="width:100%;padding:8px;border-radius:6px;border:1px solid rgba(33,150,243,0.3);background:#2a2a4a;color:#fff;font-size:0.9rem;">${buildProjectOptions(defCat)}</select>
                         </div>
                         <div id="newProjectInputRow" style="display:none;margin-bottom:10px;">
                             <label style="color:rgba(255,255,255,0.7);font-size:0.85rem;display:block;margin-bottom:5px;">新项目名称：</label>
                             <input id="newProjectNameInput" type="text" placeholder="输入新项目名称" style="width:100%;padding:8px;border-radius:6px;border:1px solid rgba(33,150,243,0.3);background:#2a2a4a;color:#fff;font-size:0.9rem;box-sizing:border-box;">
                         </div>
                         <div id="newProjectCategoryRow" style="display:none;margin-bottom:10px;">
-                            <label style="color:rgba(255,255,255,0.7);font-size:0.85rem;display:block;margin-bottom:5px;">选择分类：</label>
-                            <select id="newProjectCategorySelect" style="width:100%;padding:8px;border-radius:6px;border:1px solid rgba(33,150,243,0.3);background:#2a2a4a;color:#fff;font-size:0.9rem;">${categoryOptionsHtml}</select>
+                            <label style="color:rgba(255,255,255,0.7);font-size:0.85rem;display:block;margin-bottom:5px;">新项目分类：</label>
+                            <select id="newProjectCategorySelect" style="width:100%;padding:8px;border-radius:6px;border:1px solid rgba(33,150,243,0.3);background:#2a2a4a;color:#fff;font-size:0.9rem;">${newCatOptionsHtml}</select>
                         </div>
                         <div style="margin-bottom:15px;">
                             <label style="color:rgba(255,255,255,0.7);font-size:0.85rem;display:block;margin-bottom:5px;">脚本文件名：</label>
@@ -7250,6 +7262,10 @@
                     </div>
                 `;
                 document.body.appendChild(modal);
+                // 🔴 2026-08-31 滚轮切换：弹窗内三个下拉悬停滚轮即可换选项（跳过「➕ 新建项目」防误触）
+                ['saveScriptCategorySelect', 'saveScriptProjectSelect', 'newProjectCategorySelect'].forEach(id => {
+                    if (typeof attachSelectWheel === 'function') attachSelectWheel(document.getElementById(id));
+                });
             };
             loadProjectListFromDB().then(projects => {
                 renderSaveModal(projects);
@@ -7258,6 +7274,25 @@
                 showToast('⚠️ 项目列表读取失败，仅可新建项目保存副本');
                 renderSaveModal([]);
             });
+        }
+
+        // 🔴 2026-08-31 导入弹窗分类联动：切分类 → 项目下拉只列该分类的项目，
+        //    新建项目行的分类下拉同步跟随（新建时默认就是当前选的分类）。
+        function saveScriptCategoryChange() {
+            const catSel = document.getElementById('saveScriptCategorySelect');
+            const projSel = document.getElementById('saveScriptProjectSelect');
+            if (!catSel || !projSel) return;
+            const cat = catSel.value;
+            const grouped = window.__saveScriptGrouped || {};
+            let oh = '<option value="__NEW__" style="color:#4ade80;font-weight:bold;">➕ 新建项目</option>';
+            (grouped[cat] || []).forEach(p => { oh += `<option value="${p.name}">${p.name}</option>`; });
+            projSel.innerHTML = oh;
+            // 该分类下有项目默认选第一个，没有则停在「➕ 新建项目」
+            if (projSel.options.length > 1) projSel.selectedIndex = 1;
+            // 新建项目分类下拉同步跟随当前分类
+            const nc = document.getElementById('newProjectCategorySelect');
+            if (nc) { for (const o of nc.options) { if (o.value === cat) { nc.value = cat; break; } } }
+            toggleNewProjectInput();
         }
 
         // 切换新项目输入框显示

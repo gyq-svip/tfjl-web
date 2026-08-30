@@ -21,6 +21,7 @@
         "minHeight": 500,
         "resizable": true,
         "fullscreen": false,
+        "dragDropEnabled": false,
         "center": true,
         "devtools": true
       }
