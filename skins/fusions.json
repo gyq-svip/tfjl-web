@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated": "2026-08-04T14:25:48.331Z",
+  "updated": "2026-08-30T18:22:18.820Z",
   "note": "融合卡定义：components 为参与融合的2张基础卡。",
   "fusions": {
     "火炮射线": {
@@ -209,6 +209,14 @@
         "宝库"
       ],
       "profession": "工程",
+      "quality": "金"
+    },
+    "霸王孤星": {
+      "components": [
+        "霸王",
+        "孤星"
+      ],
+      "profession": "战士",
       "quality": "金"
     }
   }
