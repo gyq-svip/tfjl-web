@@ -3977,6 +3977,15 @@
             `;
             const isLocal = fileIndex >= 0;
             const isScan = !!localPath && !isLocal;
+            // 🔴 2026-08-30 脚本导入项目（统一模板一处实现，处处可用）：
+            //    扫描文件（APP本地设置）/ 项目文件 都加「📥 导入项目」按钮——把当前脚本内容（含标色 marks）
+            //    另存副本到指定项目的脚本文件里，弹出项目选择框（分类分组+新建项目），源文件不动。
+            //    需求墙远程脚本已有同款「💾 保存副本」按钮，不重复加。
+            //    实现：stash 内容到 window.__notebookSaveContent[windowId]（doSaveScriptToProject 读取），
+            //    复用 showSaveScriptDialog 的项目选择弹窗与入库逻辑。
+            const importBtn = (isScan || isLocal)
+                ? `<button onclick="(function(){try{if(typeof window.__recordFeatureUse==='function')window.__recordFeatureUse('脚本导入项目');window.__notebookSaveContent=window.__notebookSaveContent||{};window.__notebookSaveContent['${windowId}']=document.getElementById('${windowId}_content').value;window.__notebookSaveName=window.__notebookSaveName||{};var _sw=document.getElementById('${windowId}');window.__notebookSaveName['${windowId}']=_sw?_sw.dataset.saveName:'';var _win=txtFileWindows.find(function(w){return w.id==='${windowId}';});window.__notebookSaveMarks=window.__notebookSaveMarks||{};window.__notebookSaveMarks['${windowId}']=_win?_win.marks:[];showSaveScriptDialog(null, null, '${windowId}');}catch(e){console.error('导入项目失败:',e);showToast('❌ 打开导入失败：'+(e&&e.message||e));}})()" title="把当前脚本内容导入到指定项目的脚本文件里（另存副本，源文件不变）" style="background:linear-gradient(135deg,#ff9800,#e65100);border:none;color:white;padding:8px 16px;border-radius:6px;cursor:pointer;">📥 导入项目</button>`
+                : '';
             // 保存按钮：本地项目→存回txtFiles；扫描文件→写回原磁盘路径；远程→保存副本到项目
             const saveBtn = isLocal
                 ? `<button onclick="saveTxtWindowContent('${windowId}', ${fileIndex})" style="background:linear-gradient(135deg,#4CAF50,#45a049);border:none;color:white;padding:8px 20px;border-radius:6px;cursor:pointer;font-weight:bold;">💾 保存</button>`
@@ -3995,6 +4004,7 @@
                     <button onclick="webToggleFindReplace('${windowId}')" style="background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.15);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">🔍 查找替换</button>
                     ${isLocal ? `<button onclick="webStartCompare(${fileIndex})" style="background:rgba(233,30,99,0.2);color:#e91e63;border:1px solid rgba(233,30,99,0.3);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">📊 对比</button>` : ''}
                     <button onclick="${isLocal ? `downloadTxtFile(${fileIndex})` : `downloadNotebookContent('${windowId}')`}" style="background:linear-gradient(135deg,#2196f3,#1565c0);border:none;color:white;padding:8px 16px;border-radius:6px;cursor:pointer;">📥 下载</button>
+                    ${importBtn}
                     ${saveBtn}
                 </div>
             `;
@@ -13164,6 +13174,11 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 window.__pd = null; window.__ghost = null; window.__suppressClick = false; window.__nativeDrag = false;
                 document.addEventListener('pointerdown', (e) => {
                     if (e.button !== undefined && e.button !== 0) return;
+                    // 🔴 2026-08-30 拖拽自愈：pointerdown = 一次全新交互开始，清除可能滞留的 __nativeDrag。
+                    //    滞留场景：合成/异常取消的 dragstart 不会有 dragend 兜底（dragend 只在真实拖拽结束时触发），
+                    //    __nativeDrag 卡在 true → pointerup 首行 if (__nativeDrag) return → Pointer 兜底层整个会话永久失效。
+                    //    安全性：真实原生拖拽进行中浏览器会吞掉 pointerdown，不存在误清。
+                    window.__nativeDrag = false;
                     const card = e.target.closest('.selected-card:not(.empty), .battle-slot.filled .card-item');
                     if (!card || card.closest('#favoriteCardsGrid')) return;
                     if (e.target.closest('.card-level-badge')) return; // 等级徽章不触发拖拽
