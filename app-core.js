@@ -376,16 +376,29 @@
             if (gid === DIAG_GIST_ID) return { emoji: '🩺', label: '诊断 Gist', url: 'https://gist.github.com/' + gid };
             if (gid === MESSAGES_BACKUP_GIST_ID) return { emoji: '💾', label: '消息备份 Gist', url: 'https://gist.github.com/' + gid };
             if (gid === BOSS_RED_GIST_ID) return { emoji: '🛡️', label: 'Boss减伤 Gist', url: 'https://gist.github.com/' + gid };
-            // 动态 Gist：从房间/脚本索引查名称
+            // 动态 Gist：从房间索引反查名称
+            // 🔴 2026-08-30 修复：room_index.json 的真实结构是顶层键值对 <roomId>:<gistId>
+            //    （另有 broadcastEnabled/allowedRooms/blockedRooms/usedNicks 等元数据字段），
+            //    旧代码按 {rooms:[{gistId}]} 数组结构查找 → 永远找不到 → 全部兜底「其他 Gist」。
             try {
                 const idx = window.__roomIndexCache;
-                if (idx && idx.rooms) {
-                    const r = idx.rooms.find(x => x.gistId === gid);
-                    if (r) return { emoji: '🏠', label: '房间「' + (r.name || short) + '」', url: 'https://gist.github.com/' + gid };
-                }
-                if (idx && idx.scripts) {
-                    const s = idx.scripts.find(x => x.gistId === gid);
-                    if (s) return { emoji: '📜', label: '脚本「' + (s.name || short) + '」', url: 'https://gist.github.com/' + gid };
+                if (idx && typeof idx === 'object') {
+                    // 真实结构：顶层 <房间名>:<gistId> 反查（跳过元数据字段与原型键）
+                    const META = ['broadcastEnabled', 'allowedRooms', 'blockedRooms', 'usedNicks'];
+                    for (const k in idx) {
+                        if (!Object.prototype.hasOwnProperty.call(idx, k)) continue;
+                        if (META.indexOf(k) >= 0) continue;
+                        if (idx[k] === gid) return { emoji: '🏠', label: '房间「' + k + '」', url: 'https://gist.github.com/' + gid };
+                    }
+                    // 兼容数组结构写法（若未来索引改成 rooms/scripts 列表）
+                    if (Array.isArray(idx.rooms)) {
+                        const r = idx.rooms.find(x => x.gistId === gid);
+                        if (r) return { emoji: '🏠', label: '房间「' + (r.name || short) + '」', url: 'https://gist.github.com/' + gid };
+                    }
+                    if (Array.isArray(idx.scripts)) {
+                        const s = idx.scripts.find(x => x.gistId === gid);
+                        if (s) return { emoji: '📜', label: '脚本「' + (s.name || short) + '」', url: 'https://gist.github.com/' + gid };
+                    }
                 }
             } catch (e) {}
             return { emoji: '📦', label: '其他 Gist', url: 'https://gist.github.com/' + gid };
@@ -394,6 +407,11 @@
         // gid 用于配合 _gistLabel 拿到房间/脚本中文名，让「其他」归并成可读标签
         function _fnZh(gid, fn) {
             if (!fn) return '未知操作';
+            // 🔴 2026-08-30 修复「功能使用 TOP 全是未知操作」：__recordFeatureUse 记录的 fn 本身就是
+            //    人类可读的中文功能名（如「计算器」「记事本」「保存项目」「APP设置开关:autoBackup」），
+            //    不在下方英文内部函数名 MAP 里 → 此前全部落入兜底被显示成「未知操作」。
+            //    中文（含中英混排）fn 直接原样显示即可，只有纯英文内部名才需要 MAP 翻译。
+            if (/[\u4e00-\u9fff]/.test(fn)) return fn;
             const lbl = (gid && gid !== 'feature') ? _gistLabel(gid).label : '';
             if (fn.indexOf('saveRoomOrOtherGist') === 0) return (lbl || '其他Gist') + '写入';
             if (fn.indexOf('uploadScript') === 0) return (lbl || '脚本分享') + '上传';
@@ -1811,6 +1829,7 @@
                 }
                 pendingSaveProjectName = newProjectName.trim();
                 const safeName = pendingSaveProjectName;
+                if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('新建项目');
                 // 直接使用当前分类创建新项目（空数据）
                 const emptyData = {
                     myHandCards: [],
@@ -5775,6 +5794,7 @@
             }
 
             const name = selector.value;
+            if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('删除项目');
             let projects = [];
             try { projects = loadProjectListSync(); } catch(e) {}
             const remaining = projects.filter(p => p.name !== name);
@@ -6451,12 +6471,14 @@
             myFusionLocked = !myFusionLocked;
             try { localStorage.setItem('tfjl_my_fusion_locked', myFusionLocked ? '1' : '0'); } catch (e) {}
             refreshFusionLockIcons();
+            if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('融合锁定切换');
             if (typeof autoSaveProject === 'function') autoSaveProject();
         }
         function toggleTeammateFusionLock() {
             teammateFusionLocked = !teammateFusionLocked;
             try { localStorage.setItem('tfjl_teammate_fusion_locked', teammateFusionLocked ? '1' : '0'); } catch (e) {}
             refreshFusionLockIcons();
+            if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('融合锁定切换');
             if (typeof autoSaveProject === 'function') autoSaveProject();
         }
         // 弹出融合变体选择菜单（第一项=原卡不融合）
@@ -6858,6 +6880,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         }
         function openCardGroupManager(tab) {
             if (!_cgmIsTauri()) { alert('❌ 卡组管理仅桌面端可用（网页版不提供上传通道）'); return; }
+            if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('卡组管理');
             const modal = document.getElementById('cardGroupMgrModal');
             if (modal) modal.style.display = 'flex';
             const t = tab || 'fusion';
@@ -8860,6 +8883,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         function togglePerfMode() {
             // 点击在「高性能 → 优化 → 极速 → 高性能」三态循环
             const cycle = { high: 'optimized', optimized: 'lite', lite: 'high' };
+            if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('性能模式切换');
             setPerfMode(cycle[getPerfMode()] || 'high');
         }
         // 暴露到全局，供 HTML 菜单 onclick="togglePerfMode()" / 子菜单调用
@@ -9609,6 +9633,11 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 } catch (e) {}
                 if (_isFusionCombo) {
                     /* [SKIN log muted] */ void (0) && console.log('[SKIN] skin 待远程加载(组合名/融合), 跳过 WARN:', heroName);
+                } else if (!window._skinRegistryReady) {
+                    // 🔴 2026-08-30 启动期注册表未就绪（本地扫描/远程同步还没跑完）：
+                    //    此时 resolve 失败不代表真缺皮，scanSkins/syncRemoteSkins 完成后的
+                    //    reapplyAllSkins 会补绘（真正缺皮的英雄届时才告警）。不再刷屏误报 WARN。
+                    /* [SKIN log muted] */ void (0) && console.log('[SKIN] 注册表未就绪, 跳过 WARN(稍后补绘):', heroName);
                 } else {
                     console.warn('[SKIN] No skin for', heroName);
                 }
@@ -10931,6 +10960,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 _slotEl._cycling = true;
             }
             try {
+            if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('切换皮肤');
             const baseHero = (typeof getMainCardName === 'function') ? getMainCardName(heroName) : ((window.getBaseHeroName && window.getBaseHeroName(heroName).heroName) || heroName);
             // 先拿到槽位上的卡 id / 阵营，用于读取"当前项目内该卡皮肤"作为循环起点
             const cycleSlot = _slotEl || document.querySelector('.battle-slot[data-slot="' + slotId + '"]');
@@ -10955,9 +10985,23 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 try { await setCardSkin(cardId, nextSkin, handType); } catch (e) { console.warn('[SKIN] setCardSkin in cycle failed:', e); }
             }
             // 🔴 关键：写完 cardSkins 后必须立即重渲该卡槽皮肤层（融合路径就是这么做的，单卡漏了导致切皮不渲染）
+            // 🔴 2026-08-30 融合卡锁定切皮回归修复：此处必须传「槽内卡的完整名」（如 死神海妖），
+            //    而不是主卡英雄名（死神）。旧实现传 heroName=主卡名 → applySkinBgToSlot 走单卡路径：
+            //    ① 移除 .skin-layer-fused 副卡层 ② 把卡名覆写成主卡名（dataset.fullName 也被污染）。
+            //    锁定态右键切一圈皮后融合「自动关闭」即此因（且污染后 refreshAllFusionSkins 也认不出融合卡，无法自愈）。
             const _reSlot = cycleSlot || document.querySelector('.battle-slot[data-slot="' + slotId + '"]');
             if (_reSlot) {
-                try { await applySkinBgToSlot(_reSlot, heroName, undefined, undefined, nextSkin); } catch (e) { console.warn('[SKIN] applySkinBgToSlot after cycle failed:', e); }
+                // 完整卡名优先取数据源（placedArray）——旧版本曾把 dataset.fullName 污染成主卡名，需能自愈
+                let _reFullName = '';
+                try {
+                    const _isU = slotId && slotId.charAt(0) === 'u';
+                    const _arr = _isU ? myPlacedCards : teammatePlacedCards;
+                    const _c = _arr.find(x => x && x.slot === slotId);
+                    if (_c && _c.name) _reFullName = _c.name;
+                } catch (e) {}
+                if (!_reFullName && typeof getSlotCardName === 'function') _reFullName = getSlotCardName(_reSlot) || '';
+                if (!_reFullName) _reFullName = heroName;
+                try { await applySkinBgToSlot(_reSlot, _reFullName, undefined, undefined, nextSkin); } catch (e) { console.warn('[SKIN] applySkinBgToSlot after cycle failed:', e); }
             }
             if (cycleSlot) {
                 /* [SKIN log muted] */ void (0) && console.log('[SKIN] cycleHeroSkin final: cardId=', cardId, 'handType=', handType, 'current=', current, 'nextSkin=', nextSkin);
@@ -11034,7 +11078,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         // 重置所有选择
         function resetAll() {
             if (!confirm('确定要重置所有选择吗？')) return;
-            
+            if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('重置卡组');
+
             myHandCards = [];
             teammateHandCards = [];
             myPlacedCards = [];
@@ -11232,6 +11277,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         
         // 显示减伤记录弹窗
         function showDamageReductionDialog() {
+            if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('减伤设置');
             loadDamageReductionData();
             
             // 获取所有职业分类（排除精灵类 pokeball）
@@ -12272,6 +12318,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 
         // 导出减伤记录为TXT文件（导出当前激活表；战车导出表内的两个值，小野/酋长/宝库导出共享）
         function exportDamageReductionToTxt() {
+            if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('减伤导出TXT');
             loadDamageReductionData();
             const t = getDrTable(window.drActiveTable);
             const tableData = t.洗炼;
@@ -12316,6 +12363,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 
         // 导入减伤记录从TXT文件（弹窗选择导入到哪张表）
         async function importDamageReductionFromTxt() {
+            if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('减伤导入TXT');
             const options = window.drTableOrder.map(n => `${n}:导入到「${n}」表`).join('\n');
             const choice = await askTextInputAsync({ title: '导入减伤', label: `要把 TXT 减伤导入到哪张表？\n当前激活（选中）的表是：「${window.drActiveTable}」\n\n可用表名：\n${options}\n\n直接回车 = 导入到当前激活的表「${window.drActiveTable}」；\n也可输入其它已存在的表名导入到那张表。`, defaultValue: window.drActiveTable || '' });
             let target = (choice || '').trim();
@@ -14414,8 +14462,10 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
             await restoreNicknameFromDisk();
 
             // 应用管理员对浮动控制台可见性的设置（默认隐藏）
+            // 🔴 forceOpen=false：启动恢复按 tdjl_consoleOpen 记忆还原上次展开/收起，
+            //    修复「收起后刷新/重启又自动展开」（此前无条件 applyConsoleVisibility(true) 顶掉收起态）。
             try {
-                applyConsoleVisibility(localStorage.getItem(CONSOLE_VISIBILITY_KEY) === '1');
+                applyConsoleVisibility(localStorage.getItem(CONSOLE_VISIBILITY_KEY) === '1', false);
             } catch (e) {}
             
             // 初始化版本号显示 & 自动检查更新（非阻塞）
@@ -22617,7 +22667,9 @@ ${maSection}
                     // 过期后指令自然失效，避免陈年指令无限挂着。防连环刷由 admin-ctl.js 的 sessionStorage 双检负责。
                     data.forceReload = { to: target || 'all', ts: ts, expire: ts + 24 * 3600 * 1000 };
                 } else if (type === 'restart') {
-                    data.restart = { to: target || 'all', ts: ts };
+                    // 🔴 2026-08-30 restart 也自动加 24h 有效期：此前无 expire，指令永远留在 Gist 里，
+                    //    任何清缓存/换新设备的人上线都会被重启一次（永久地雷）。过期即失效 + 工具箱可撤回。
+                    data.restart = { to: target || 'all', ts: ts, expire: ts + 24 * 3600 * 1000 };
                 } else if (type === 'block') {
                     data.blacklist = data.blacklist || {};
                     data.blacklist[target] = { reason: body || '请联系管理员', until: 'forever' };
@@ -22896,7 +22948,7 @@ ${maSection}
                 toolboxLoadBlocked();
             } catch (e) { alert('解封失败：' + (e.message || e)); }
         };
-        // 下发历史：列出指令 Gist 已生效指令
+        // 下发历史：列出指令 Gist 已生效指令（🔴 2026-08-30 每条带「撤回」按钮）
         window.toolboxLoadHistory = async function () {
             const box = document.getElementById('toolboxHistory');
             if (box) box.innerHTML = '⏳ 加载中…';
@@ -22904,16 +22956,100 @@ ${maSection}
                 const g = await _toolboxGistGet(TOOLBOX_GIST_ID);
                 const f = g && g.files && g.files[TOOLBOX_FILE];
                 const data = f && f.content ? JSON.parse(f.content) : {};
+                const now = Date.now();
                 const rows = [];
-                if (data.forceReload) rows.push('🔄 强制刷新 → ' + _esc(data.forceReload.to || 'all') + ' @' + new Date(data.forceReload.ts).toLocaleString());
-                if (data.restart) rows.push('♻️ 重启 → ' + _esc(data.restart.to || 'all') + ' @' + new Date(data.restart.ts).toLocaleString());
+                // 行渲染辅助：kind（forceReload/restart/notify/block）+ 定位参数 + 文案 + 是否已过期
+                const _row = (kind, p1, p2, html, expired) => {
+                    rows.push(
+                        '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.08);' + (expired ? 'opacity:0.45;' : '') + '">' +
+                            '<div style="min-width:0;flex:1;word-break:break-all;">' + html + (expired ? ' <span style="color:#fbbf24;">[已过期·等清理]</span>' : '') + '</div>' +
+                            '<button onclick="toolboxRevoke(\'' + kind + '\',\'' + _esc(p1 || '') + '\',\'' + _esc(p2 || '') + '\')" ' +
+                            'style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:0.7rem;white-space:nowrap;">撤回</button>' +
+                        '</div>'
+                    );
+                };
+                if (data.forceReload) {
+                    const e = data.forceReload.expire && now > data.forceReload.expire;
+                    _row('forceReload', '', '', '🔄 强制刷新 → ' + _esc(data.forceReload.to || 'all') + ' @' + new Date(data.forceReload.ts).toLocaleString(), e);
+                }
+                if (data.restart) {
+                    const e = data.restart.expire && now > data.restart.expire;
+                    _row('restart', '', '', '♻️ 重启 → ' + _esc(data.restart.to || 'all') + ' @' + new Date(data.restart.ts).toLocaleString(), e);
+                }
                 const bl = data.blacklist || {};
-                Object.keys(bl).forEach(dev => rows.push('🔒 拉黑 → ' + _esc(dev) + '：' + _esc(bl[dev].reason || '')));
+                Object.keys(bl).forEach(dev => _row('block', dev, '', '🔒 拉黑 → ' + _esc(dev) + '：' + _esc(bl[dev].reason || ''), false));
                 const cmds = data.cmds || {};
-                Object.keys(cmds).forEach(dev => (cmds[dev] || []).forEach(c => rows.push('✉️ 通知[' + _esc(c.level || 'info') + '] → ' + _esc(dev) + '：' + _esc(c.title || '') + '｜' + _esc(c.body || '') + (c.expire ? '（过期 ' + new Date(c.expire).toLocaleString() + '）' : ''))));
+                let _expiredNotify = 0;
+                Object.keys(cmds).forEach(dev => (cmds[dev] || []).forEach(c => {
+                    const e = c.expire && now > c.expire;
+                    if (e) _expiredNotify++;
+                    _row('notify', dev, c.id, '✉️ 通知[' + _esc(c.level || 'info') + '] → ' + _esc(dev) + '：' + _esc(c.title || '') + '｜' + _esc(c.body || ''), e);
+                }));
                 if (!rows.length) { if (box) box.innerHTML = '<span style="color:#fbbf24;">当前无已下发指令</span>'; return; }
-                if (box) box.innerHTML = rows.map(r => '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.08);">' + r + '</div>').join('');
+                // 顶部统计 + 一键清理过期通知
+                if (box) box.innerHTML =
+                    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:8px;flex-wrap:wrap;">' +
+                        '<span style="font-size:0.7rem;color:rgba(255,255,255,0.5);">共 ' + rows.length + ' 条在册' + (_expiredNotify ? '（含 ' + _expiredNotify + ' 条已过期通知）' : '') + ' · 撤回=从 Gist 删除，未送达的设备将不再执行</span>' +
+                        '<button onclick="toolboxCleanupExpired()" style="background:rgba(239,68,68,0.25);border:1px solid rgba(239,68,68,0.5);color:#f87171;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:0.7rem;white-space:nowrap;">🧹 清理全部过期指令</button>' +
+                    '</div>' + rows.join('');
             } catch (e) { if (box) box.innerHTML = '<span style="color:#f87171;">加载失败：' + _esc(e.message || e) + '</span>'; }
+        };
+        // 🔴 2026-08-30 撤回指令：从指令 Gist 删除指定条目（未拉取到的设备将不再执行；已执行的无法回滚）
+        //    kind: 'forceReload' | 'restart' | 'notify' | 'block'；notify 需 dev+cmdId，block 需 dev
+        window.toolboxRevoke = async function (kind, dev, cmdId) {
+            const s = document.getElementById('toolboxStatus');
+            if (!confirm('确认撤回该指令？\n· 已收到的设备不受影响（撤不回）\n· 尚未拉取的设备将不再执行')) return;
+            try {
+                const g = await _toolboxGistGet(TOOLBOX_GIST_ID);
+                const f = g && g.files && g.files[TOOLBOX_FILE];
+                const data = f && f.content ? JSON.parse(f.content) : {};
+                if (kind === 'forceReload') {
+                    delete data.forceReload;
+                } else if (kind === 'restart') {
+                    delete data.restart;
+                } else if (kind === 'block') {
+                    if (data.blacklist) delete data.blacklist[dev];
+                } else if (kind === 'notify') {
+                    if (data.cmds && Array.isArray(data.cmds[dev])) {
+                        data.cmds[dev] = data.cmds[dev].filter(c => c && c.id !== cmdId);
+                        if (!data.cmds[dev].length) delete data.cmds[dev]; // 删空顺手清键，避免 cmds 无限膨胀
+                    }
+                }
+                await _toolboxGistPatch(TOOLBOX_GIST_ID, { [TOOLBOX_FILE]: { content: JSON.stringify(data, null, 2) } });
+                if (s) { s.style.color = '#4ade80'; s.textContent = '✅ 已撤回（' + kind + '），客户端下次心跳生效'; }
+                toolboxLoadHistory();
+                toolboxLoadBlocked();
+            } catch (e) {
+                if (s) { s.style.color = '#f87171'; s.textContent = '撤回失败：' + (e.message || e); }
+            }
+        };
+        // 🔴 2026-08-30 一键清理：删除全部已过期的指令（过期 forceReload/restart + 过期通知 + 空cmds键），
+        //    防止 Gist 文件越堆越大（每条过期通知几百字节，长期不清理会拖慢所有客户端心跳解析）
+        window.toolboxCleanupExpired = async function () {
+            const s = document.getElementById('toolboxStatus');
+            try {
+                const g = await _toolboxGistGet(TOOLBOX_GIST_ID);
+                const f = g && g.files && g.files[TOOLBOX_FILE];
+                const data = f && f.content ? JSON.parse(f.content) : {};
+                const now = Date.now();
+                let n = 0;
+                if (data.forceReload && data.forceReload.expire && now > data.forceReload.expire) { delete data.forceReload; n++; }
+                if (data.restart && data.restart.expire && now > data.restart.expire) { delete data.restart; n++; }
+                if (data.cmds) {
+                    Object.keys(data.cmds).forEach(dev => {
+                        const before = (data.cmds[dev] || []).length;
+                        data.cmds[dev] = (data.cmds[dev] || []).filter(c => c && !(c.expire && now > c.expire));
+                        n += before - data.cmds[dev].length;
+                        if (!data.cmds[dev].length) delete data.cmds[dev];
+                    });
+                }
+                if (!n) { if (s) { s.style.color = '#fbbf24'; s.textContent = '没有可清理的过期指令'; } return; }
+                await _toolboxGistPatch(TOOLBOX_GIST_ID, { [TOOLBOX_FILE]: { content: JSON.stringify(data, null, 2) } });
+                if (s) { s.style.color = '#4ade80'; s.textContent = '✅ 已清理 ' + n + ' 条过期指令'; }
+                toolboxLoadHistory();
+            } catch (e) {
+                if (s) { s.style.color = '#f87171'; s.textContent = '清理失败：' + (e.message || e); }
+            }
         };
         // 版本推送状态：latestSwVersion + 本机 versionTag + 线上 CACHE_VERSION
         window.toolboxLoadVer = async function () {
@@ -22999,6 +23135,32 @@ ${maSection}
                     box.innerHTML = '<div style="color:#f87171;">⚠️ 无可用 token，无法读取诊断数据。</div>';
                     return;
                 }
+                // 🔴 2026-08-30 修复「按用户TOP 全是其他 Gist」：_gistLabel 依赖 window.__roomIndexCache
+                //    把房间/脚本的动态 Gist ID 翻译成中文名，但该缓存此前从未被赋值过 → 全部兜底显示
+                //    「其他 Gist」。渲染前先拉一次索引 Gist 填充缓存（8s 超时，失败不阻塞面板渲染）。
+                try {
+                    if (!window.__roomIndexCache) {
+                        const idxGid = localStorage.getItem(INDEX_GIST_ID_KEY) || GIST_ID;
+                        if (idxGid) {
+                            const ctrl = new AbortController();
+                            const tmer = setTimeout(() => ctrl.abort(), 8000);
+                            const ir = await fetch('https://api.github.com/gists/' + idxGid, {
+                                headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': 'token ' + token },
+                                signal: ctrl.signal
+                            });
+                            clearTimeout(tmer);
+                            if (ir.ok) {
+                                const idata = await ir.json();
+                                const c = idata.files && idata.files['room_index.json'] && idata.files['room_index.json'].content;
+                                if (c) {
+                                    // 存原始索引对象：顶层 <房间名>:<gistId> 键值对 + 元数据字段
+                                    // （_gistLabel 按该真实结构反查房间名）
+                                    window.__roomIndexCache = JSON.parse(c);
+                                }
+                            }
+                        }
+                    }
+                } catch (e) { console.warn('[DIAG] 拉取索引 Gist 填充 __roomIndexCache 失败(不影响面板):', e); }
                 try {
                     const r = await fetch('https://api.github.com/gists/' + gid, {
                         headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': 'token ' + token }
@@ -23256,6 +23418,109 @@ ${maSection}
                             html += '</div>';
                         });
                         html += '</div>';
+                        // ==================== 📈 API 消耗分析与趋势预判（2026-08-30 新增） =====================
+                        // 数据源全部来自各上报文件的 entries（first/last/samples 均为真实发生时间戳，
+                        // count 为该操作累计次数）。目的：看清 API 配额到底被哪些操作吃掉、趋势是升是降、
+                        // 哪个 Gist 写入过于集中（二级限流风险），给上报策略调整提供依据。
+                        try {
+                            let _minTs = Infinity, _maxTs = 0, _wCount = 0;
+                            const _perFnAgg = {}, _perGistRate = {}, _tsAll = [];
+                            fileMetas.forEach(m => {
+                                ((m.payload && m.payload.entries) || []).forEach(e => {
+                                    const isWrite = e.gistId !== 'feature' && e.method !== 'GET' && e.method !== 'USE' && e.method !== 'unknown';
+                                    if (!isWrite) return;
+                                    const cnt = e.count || 0;
+                                    _wCount += cnt;
+                                    if (e.first) { _minTs = Math.min(_minTs, e.first); _tsAll.push(e.first); }
+                                    if (e.last) { _maxTs = Math.max(_maxTs, e.last); _tsAll.push(e.last); }
+                                    (e.samples || []).forEach(s => { if (s) _tsAll.push(s); });
+                                    const lbl = _fnZh(e.gistId, e.fn);
+                                    if (!_perFnAgg[lbl]) _perFnAgg[lbl] = { count: 0, first: e.first || 0, last: e.last || 0 };
+                                    _perFnAgg[lbl].count += cnt;
+                                    if (e.first) _perFnAgg[lbl].first = _perFnAgg[lbl].first ? Math.min(_perFnAgg[lbl].first, e.first) : e.first;
+                                    if (e.last) _perFnAgg[lbl].last = Math.max(_perFnAgg[lbl].last, e.last);
+                                    // 按 Gist 聚合写入速率（用于识别二级限流风险点）
+                                    if (!_perGistRate[e.gistId]) _perGistRate[e.gistId] = { count: 0, first: e.first || 0, last: e.last || 0 };
+                                    _perGistRate[e.gistId].count += cnt;
+                                    if (e.first) _perGistRate[e.gistId].first = _perGistRate[e.gistId].first ? Math.min(_perGistRate[e.gistId].first, e.first) : e.first;
+                                    if (e.last) _perGistRate[e.gistId].last = Math.max(_perGistRate[e.gistId].last, e.last);
+                                });
+                            });
+                            if (_wCount > 0 && isFinite(_minTs) && _maxTs > _minTs) {
+                                const _winH = Math.max(0.5, (_maxTs - _minTs) / 3600000);
+                                const _rateH = _wCount / _winH;
+                                const _rateD = _rateH * 24;
+                                // 趋势：后半窗口 vs 前半窗口的真实打点数（时间戳都在 _tsAll 里）
+                                const _mid = (_minTs + _maxTs) / 2;
+                                let _oldN = 0, _newN = 0;
+                                _tsAll.forEach(t => { if (t >= _mid) _newN++; else _oldN++; });
+                                let _trendTxt, _trendColor;
+                                if (_oldN === 0 && _newN === 0) { _trendTxt = '数据不足'; _trendColor = '#94a3b8'; }
+                                else if (_oldN === 0) { _trendTxt = '🆕 新增为主（前半窗口无打点）'; _trendColor = '#4ade80'; }
+                                else {
+                                    const _pct = Math.round(((_newN - _oldN) / _oldN) * 100);
+                                    if (_pct >= 20) { _trendTxt = '📈 上升 ' + _pct + '%（后半窗口打点比前半多）'; _trendColor = '#f87171'; }
+                                    else if (_pct <= -20) { _trendTxt = '📉 下降 ' + Math.abs(_pct) + '%（消耗在回落）'; _trendColor = '#4ade80'; }
+                                    else { _trendTxt = '➡️ 持平（波动 ±' + Math.abs(_pct) + '%）'; _trendColor = '#fbbf24'; }
+                                }
+                                // 近 7 天真实打点直方图（按天分桶）
+                                const _dayBuckets = {};
+                                _tsAll.forEach(t => {
+                                    const d = new Date(t); const dk = (d.getMonth() + 1) + '/' + d.getDate();
+                                    _dayBuckets[dk] = (_dayBuckets[dk] || 0) + 1;
+                                });
+                                const _dayKeys = Object.keys(_dayBuckets).slice(-7);
+                                const _dayMax = Math.max(1, ..._dayKeys.map(k => _dayBuckets[k]));
+                                // 写入 TOP5 功能占比
+                                const _fnArr = Object.keys(_perFnAgg).map(k => ({ k, v: _perFnAgg[k].count })).sort((a, b) => b.v - a.v).slice(0, 5);
+                                // 二级限流风险：单 Gist 写入速率 > 50/小时 标红
+                                const _hotGists = Object.keys(_perGistRate).map(g => {
+                                    const r = _perGistRate[g];
+                                    const h = Math.max(0.5, (r.last - r.first) / 3600000);
+                                    return { g, rate: r.count / h, count: r.count };
+                                }).filter(x => x.rate > 50).sort((a, b) => b.rate - a.rate);
+
+                                html += '<div style="margin-bottom:16px;border-top:1px solid rgba(96,165,250,0.25);padding-top:12px;">';
+                                html += '<div style="color:#60a5fa;margin-bottom:6px;font-weight:700;">📈 API 消耗分析与趋势预判</div>';
+                                html += '<div style="background:rgba(96,165,250,0.06);border:1px solid rgba(96,165,250,0.2);border-radius:8px;padding:10px 12px;font-size:0.78rem;line-height:1.9;">';
+                                html += '⏱️ 观察窗口：<b style="color:' + C_NUM + ';">' + _winH.toFixed(1) + ' 小时</b>（' + new Date(_minTs).toLocaleString('zh-CN') + ' → ' + new Date(_maxTs).toLocaleString('zh-CN') + '）<br>';
+                                html += '✍️ 窗口内真实写 Gist：<b style="color:' + C_NUM + ';">' + _wCount + '</b> 次 ｜ 平均 <b style="color:' + C_NUM + ';">' + _rateH.toFixed(1) + ' 次/小时</b> ｜ 折算 <b style="color:' + C_NUM + ';">' + Math.round(_rateD) + ' 次/天</b><br>';
+                                html += '🎯 趋势预判：<b style="color:' + _trendColor + ';">' + _trendTxt + '</b><br>';
+                                // GitHub 认证限额 5000 req/h：写操作占比
+                                const _quotaPct = Math.min(100, Math.round((_rateH / 5000) * 100));
+                                html += '⛽ 配额占用（认证 token 5000 次/小时）：<b style="color:' + (_quotaPct < 10 ? C_OK : (_quotaPct < 40 ? '#fbbf24' : '#f87171')) + ';">' + _quotaPct + '%</b>';
+                                if (_quotaPct >= 40) html += ' <span style="color:#f87171;">⚠️ 接近限额，建议上调上报延迟/下调心跳频率</span>';
+                                html += '<br>';
+                                // 写入 TOP5 占比
+                                if (_fnArr.length) {
+                                    html += '🏆 写入 TOP5（吃 API 大户）：<br>';
+                                    _fnArr.forEach((x, i) => {
+                                        const pct = _wCount ? Math.round((x.v / _wCount) * 100) : 0;
+                                        html += '<span style="color:#cbd5e1;">' + (i + 1) + '. ' + x.k + '</span> <b style="color:' + C_NUM + ';">' + x.v + '</b> 次（' + pct + '%）' + (pct >= 30 ? ' <span style="color:#f87171;">← 主要消耗源</span>' : '') + '<br>';
+                                    });
+                                }
+                                // 单 Gist 高频风险
+                                if (_hotGists.length) {
+                                    html += '⚠️ 单 Gist 高频写入（>50 次/小时，二级限流风险）：<br>';
+                                    _hotGists.slice(0, 5).forEach(x => {
+                                        const info = _gistLabel(x.g);
+                                        html += '<span style="color:#f87171;">' + info.emoji + ' ' + info.label + '（' + x.rate.toFixed(0) + ' 次/小时 · ' + x.count + ' 次）</span><br>';
+                                    });
+                                    html += '<span style="color:#94a3b8;font-size:0.72rem;">→ 建议：对应功能的写入做本地合并/降频（如计数器本地攒批、心跳拉长间隔）</span><br>';
+                                }
+                                // 近 7 天直方图
+                                if (_dayKeys.length) {
+                                    html += '📅 近 7 天真实打点分布（真实时间戳计数）：<br><span style="font-family:monospace;font-size:0.72rem;color:#94a3b8;">';
+                                    _dayKeys.forEach(k => {
+                                        const n = _dayBuckets[k];
+                                        const w = Math.min(20, Math.round((n / _dayMax) * 20));
+                                        html += k + ' ' + '▇'.repeat(w) + ' ' + n + '<br>';
+                                    });
+                                    html += '</span>';
+                                }
+                                html += '</div></div>';
+                            }
+                        } catch (e) { console.warn('[DIAG] API 消耗分析渲染失败:', e); }
                         // 清理区
                         html += '<div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:12px;margin-top:8px;">';
                         html += '<div style="color:#ffd700;margin-bottom:6px;">🧹 清理上报文件（按时间）</div>';
@@ -24347,10 +24612,12 @@ ${maSection}
             const con = document.getElementById('floatConsole');
             if (!con) return;
             const enabled = _isConsoleEnabled();
-            // 🔴 2026-08-30：刷新后强制收起（不读 tdjl_consoleOpen 记忆自动展开），
-            // 避免"上次手动开过 → 每次启动自动展开 + 2.5s 轮询占主线程"。
-            // 功能启用状态(enabled)保留记忆，但默认收起（仅小圆按钮，零轮询）；要看日志手动点一次展开即可。
+            // 🔴 2026-08-30 修复「收起后刷新又自动展开」：恢复读取 tdjl_consoleOpen 记忆
+            //    （上次展开就展开、上次收起就收起）。此前强制 open=false 收起，与用户预期不符；
+            //    之前真正的问题是 window.onload 里 applyConsoleVisibility(true) 无条件展开顶开了收起状态，
+            //    已同步修复（见 applyConsoleVisibility）。
             let open = false;
+            try { open = localStorage.getItem(CONSOLE_OPEN_KEY) === '1'; } catch (e) {}
             floatConsoleVisible = enabled && open;
             con.style.display = floatConsoleVisible ? 'flex' : 'none';
             const toggle = document.getElementById('floatConsoleToggle');
@@ -24375,6 +24642,7 @@ ${maSection}
             const current = localStorage.getItem(CONSOLE_VISIBILITY_KEY) === '1';
             const next = !current;
             localStorage.setItem(CONSOLE_VISIBILITY_KEY, next ? '1' : '0');
+            if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('悬浮终端开关');
             applyConsoleVisibility(next);
             // 同步终端面板内的浮窗开关按钮状态（若面板开着）
             if (typeof refreshFloatConsoleToggleBtn === 'function') refreshFloatConsoleToggleBtn();
@@ -24388,12 +24656,18 @@ ${maSection}
             btn.textContent = visible ? '🖥 浮窗：开' : '🖥 浮窗：关';
             btn.style.background = visible ? 'linear-gradient(135deg,#00bcd4,#0097a7)' : 'rgba(255,255,255,0.12)';
         }
-        function applyConsoleVisibility(visible) {
+        // forceOpen：面板/远程开关操作传 true（开=立刻展开，给即时反馈）；
+        // 页面启动恢复传 false（按 tdjl_consoleOpen 记忆还原上次展开/收起，避免顶掉收起状态）。
+        function applyConsoleVisibility(visible, forceOpen = true) {
             const status = document.getElementById('consoleToggleStatus');
             if (status) status.textContent = visible ? '已开启' : '已关闭';
             // 开关开启 → 展开浮窗（并记 open=1）；开关关闭 → 收起浮窗 + 隐藏小圆按钮
             if (visible) {
-                _setFloatConsole(true);
+                let open = true;
+                if (!forceOpen) {
+                    try { open = localStorage.getItem(CONSOLE_OPEN_KEY) === '1'; } catch (_) {}
+                }
+                _setFloatConsole(open);
             } else {
                 floatConsoleVisible = false;
                 const con = document.getElementById('floatConsole');
