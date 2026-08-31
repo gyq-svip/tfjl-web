@@ -5567,16 +5567,18 @@
             let expireMinutes = 0;
             let sharePassword = '';
             let recoveryKey = '';
+            let category = shareOpts ? (shareOpts.category || '未分类') : '未分类';
             if (shareOpts) {
                 expireMinutes = shareOpts.expireMinutes;
                 sharePassword = shareOpts.password;
                 recoveryKey = shareOpts.recoveryKey || '';
             } else {
-                const opts = await new Promise(function(resolve) { showShareOptionsDialog(function(e, p, rk) { resolve([e, p, rk]); }); });
+                const opts = await new Promise(function(resolve) { showShareOptionsDialog(function(e, p, rk, cat) { resolve([e, p, rk, cat]); }); });
                 if (opts === null || opts[0] === null) return false;
                 expireMinutes = opts[0];
                 sharePassword = opts[1];
                 recoveryKey = opts[2] || '';
+                category = opts[3] || '未分类';
             }
 
             try {
@@ -5615,7 +5617,8 @@
                     time: Date.now(),
                     scriptUrl: scriptUrl,
                     expireMinutes: expireMinutes > 0 ? expireMinutes : null,
-                    isEncrypted: !!willEncrypt
+                    isEncrypted: !!willEncrypt,
+                    category: category || '未分类'
                 };
                 if (passwordHash) newMsg.passwordHash = passwordHash;
                 if (recoveryKey) newMsg.encScheme = 'B';
@@ -5651,7 +5654,7 @@
             const baseName = await askTextInputAsync({ title: '批量分享', label: '文件名前缀（留空则每个用原文件名）：', defaultValue: '' });
             if (baseName === null) return;
             // 批量统一选择分享选项
-            const opts = await new Promise(function(resolve) { showShareOptionsDialog(function(e, p, rk) { resolve([e, p, rk]); }); });
+            const opts = await new Promise(function(resolve) { showShareOptionsDialog(function(e, p, rk, cat) { resolve([e, p, rk, cat]); }); });
             if (opts === null || opts[0] === null) return;
             const shareOpts = { expireMinutes: opts[0], password: opts[1], recoveryKey: opts[2] || '' };
             let success = 0, fail = 0;
@@ -19232,6 +19235,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
         const WORKS_GIST_ID = MESSAGES_GIST_ID;
         const WORKS_FILE = 'works.json';
         window.WORK_CATEGORIES = ['未分类', '寒冰', '暗月', '漩涡', '深海', '对战'];
+        window.WALL_CATEGORIES = window.WORK_CATEGORIES;
         async function fetchWorksGist() {
             try {
                 const token = getGistToken();
@@ -19971,14 +19975,30 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 return true; // 没有设置过期时间的消息永久保存
             });
 
-            if (validMessages.length === 0) {
-                scroller.innerHTML = '<div style="color:rgba(255,255,255,0.5);font-size:0.85rem;text-align:center;padding:20px;">暂无消息，快来发布第一条吧！</div>';
+            // 分类筛选（发布时携带的标签）
+            const _wallCat = window._wallCatFilter || '全部';
+            const shownMessages = _wallCat === '全部' ? validMessages : validMessages.filter(m => (m.category || '未分类') === _wallCat);
+
+            // 顶部分类筛选条
+            const _cats = ['全部'].concat(window.WALL_CATEGORIES || ['未分类']);
+            const filterBar = '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;padding:8px;background:rgba(255,255,255,0.04);border-radius:10px;position:sticky;top:0;z-index:5;">'
+                + _cats.map(c => {
+                    const on = c === _wallCat;
+                    const st = on ? 'background:linear-gradient(135deg,#ffd700,#ff9800);color:#1a1a2e;border:1px solid rgba(255,152,0,0.8);' : 'background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.14);';
+                    return '<span onclick="setWallCatFilter(\'' + c + '\')" style="cursor:pointer;padding:3px 12px;border-radius:14px;font-size:0.74rem;' + st + '">' + escapeHtml(c) + '</span>';
+                }).join('')
+                + '</div>';
+
+            if (shownMessages.length === 0) {
+                scroller.innerHTML = filterBar + '<div style="color:rgba(255,255,255,0.5);font-size:0.85rem;text-align:center;padding:20px;">该分类下暂无消息</div>';
                 return;
             }
             
             const repMap = computeReputation();
-            const html = validMessages.map((msg, index) => {
+            const html = shownMessages.map((msg, index) => {
                 const timeAgo = formatMessageTime(msg.time);
+                const realIndex = wallMessages.indexOf(msg);
+                const catBadge = (msg.category && msg.category !== '未分类') ? '<span style="color:#ffd700;font-size:0.66rem;background:rgba(255,215,0,0.14);padding:1px 6px;border-radius:8px;">🏷️' + escapeHtml(msg.category) + '</span>' : '';
                 let contentHtml = escapeHtml(msg.content);
                 // 非分享消息：可见文本里若有 GitHub 地址一律剥离，不引导用户去 GitHub
                 if (!msg.scriptUrl) contentHtml = stripGithubUrls(contentHtml);
@@ -20026,13 +20046,13 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                                 <a href="javascript:void(0)" onclick="previewScriptFile('${msg.scriptUrl}'${encInfo})" style="color:#e0e0e0;text-decoration:underline;cursor:pointer;background:rgba(224,224,224,0.1);padding:4px 10px;border-radius:5px;font-size:0.8rem;">👁️ 预览</a>
                                 <a href="javascript:void(0)" onclick="downloadScript('${msg.scriptUrl}'${encInfo})" style="color:#4fc3f7;text-decoration:underline;cursor:pointer;background:rgba(79,195,247,0.1);padding:4px 10px;border-radius:5px;font-size:0.8rem;">📥 下载</a>
                                 <a href="javascript:void(0)" onclick="importScriptToTxtFiles('${msg.scriptUrl}'${encInfo})" style="color:#4caf50;text-decoration:underline;cursor:pointer;background:rgba(76,175,80,0.1);padding:4px 10px;border-radius:5px;font-size:0.8rem;">📄 智能导入</a>
-                                <a href="javascript:void(0)" onclick="importToLaoMaFromWall('${msg.scriptUrl}','${urlFileName2.replace(/'/g,"\\'")}'${encInfo})" style="color:#ff9800;text-decoration:underline;cursor:pointer;background:rgba(255,152,0,0.1);padding:4px 10px;border-radius:5px;font-size:0.8rem;" id="laoLaoImportBtn_${index}">📁 导入到老马</a>
+                                <a href="javascript:void(0)" onclick="importToLaoMaFromWall('${msg.scriptUrl}','${urlFileName2.replace(/'/g,"\\'")}'${encInfo})" style="color:#ff9800;text-decoration:underline;cursor:pointer;background:rgba(255,152,0,0.1);padding:4px 10px;border-radius:5px;font-size:0.8rem;" id="laoLaoImportBtn_${realIndex}">📁 导入到老马</a>
                             </div>`
                         );
                     }
                 }
                 
-                const deleteBtn = canDelete ? `<a href="javascript:void(0)" onclick="deleteMessage(${index})" style="color:#ff6b6b;cursor:pointer;margin-left:10px;font-size:0.7rem;" title="${isOwner ? '删除我的消息' : '管理员删除'}">🗑️</a>` : '';
+                const deleteBtn = canDelete ? `<a href="javascript:void(0)" onclick="deleteMessage(${realIndex})" style="color:#ff6b6b;cursor:pointer;margin-left:10px;font-size:0.7rem;" title="${isOwner ? '删除我的消息' : '管理员删除'}">🗑️</a>` : '';
                 
                 // 分享类消息：附加 复制/赞/踩 操作条（声望系统）
                 if (isShareMsg(msg)) {
@@ -20052,7 +20072,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                     <span style="flex-shrink:0;width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#ffd700,#ff6b6b);color:#1a1a2e;font-size:0.85rem;font-weight:bold;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,0.3);">${escapeHtml(_avatar)}</span>
                     <span style="color:#ffd700;font-weight:bold;font-size:0.9rem;text-decoration:underline;">${escapeHtml(msgAuthor(msg))}</span>
                     <span style="color:rgba(255,215,0,0.7);font-size:0.68rem;background:rgba(255,215,0,0.12);padding:1px 7px;border-radius:10px;">${_aTitle}</span>
-                    <span style="margin-left:auto;color:rgba(255,255,255,0.4);font-size:0.68rem;display:flex;align-items:center;gap:4px;">${timeAgo}${expireLabel}${encryptedLabel}${deleteBtn}</span>
+                    <span style="margin-left:auto;color:rgba(255,255,255,0.4);font-size:0.68rem;display:flex;align-items:center;gap:4px;">${catBadge}${timeAgo}${expireLabel}${encryptedLabel}${deleteBtn}</span>
                 </div>`;
                 return `<div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:10px 12px 8px;font-size:0.85rem;">
                     <div style="margin-bottom:8px;">${_whoHtml}</div>
@@ -20063,6 +20083,12 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             scroller.innerHTML = html;
             startMessageScroll();
         }
+
+        function setWallCatFilter(cat) {
+            window._wallCatFilter = cat;
+            renderMessages();
+        }
+        window.setWallCatFilter = setWallCatFilter;
 
         // 预览需求墙分享的脚本文件
         // isEncrypted: 是否加密, passwordHash: v2 PBKDF2 哈希(或旧 SHA-256/fnv) 用于验证密码
@@ -21736,7 +21762,7 @@ ${maSection}
             if (modal) modal.remove();
 
             // 分享选项弹窗（时长 + 密码，批量统一）
-            const opts = await new Promise(function(resolve) { showShareOptionsDialog(function(e, p, rk) { resolve([e, p, rk]); }); });
+            const opts = await new Promise(function(resolve) { showShareOptionsDialog(function(e, p, rk, cat) { resolve([e, p, rk, cat]); }); });
             if (opts === null || opts[0] === null) return;
             const expireMinutes = opts[0];
             const sharePassword = opts[1];
@@ -22297,12 +22323,13 @@ ${maSection}
             let scriptUrl = null;
             let pendingScriptEnc = null;
             let scriptExpireMinutes = null;
+            let category = '未分类';
 
             try {
                 if (pendingScriptFile) {
                     // 弹出分享选项（加密方式 / 查看密码 / 有效期），与「分享到需求墙」一致
                     const shareOpts = await new Promise(function(resolve) {
-                        showShareOptionsDialog(function(e, p, rk) { resolve([e, p, rk]); });
+                        showShareOptionsDialog(function(e, p, rk, cat) { resolve([e, p, rk, cat]); });
                     });
                     if (shareOpts === null || shareOpts[0] === null) {
                         // 用户取消 → 中止发布，保留已选文件供再次发布
@@ -22312,6 +22339,7 @@ ${maSection}
                     const scriptExpire = shareOpts[0];
                     const scriptPassword = shareOpts[1];
                     const scriptRecoveryKey = shareOpts[2] || '';
+                    category = shareOpts[3] || '未分类';
                     const fileContent = await readFileAsText(pendingScriptFile);
                     const willEncrypt = !!(scriptPassword || scriptRecoveryKey);
                     let uploadContent = fileContent;
