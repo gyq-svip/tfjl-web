@@ -19308,8 +19308,15 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             all[norm] = { works: mine.filter(w => w.id !== workId), updatedAt: Date.now() };
             await saveWorksToGist(all);
             showFloatToast('🗑 已删除');
-            renderContribWorks(nick);
+            renderContribWorksTab(nick, '全部');
         }
+        function _contribImportBtn(url, isEnc, ph, labelScript, labelProj) {
+            const isP = /\.json($|\?|#)/i.test(url || '');
+            const fn = isP ? 'importBackupFromWall' : 'importScriptToTxtFiles';
+            const ext = (isEnc ? ",true,'" + (ph || '').replace(/'/g, "\\'") + "'" : '');
+            return '<a href="javascript:void(0)" onclick="' + fn + "('" + url + "'" + ext + ')" style="color:#4caf50;text-decoration:none;cursor:pointer;background:rgba(76,175,80,0.1);padding:2px 8px;border-radius:5px;font-size:0.72rem;">' + (isP ? (labelProj || '📦 导入项目') : (labelScript || '📄 导入')) + '</a>';
+        }
+        window._contribImportBtn = _contribImportBtn;
         async function renderContribWorksTab(nick, cat) {
             const listBox = document.getElementById('worksList');
             const filterBox = document.getElementById('worksFilter');
@@ -19342,7 +19349,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                         + '<div style="margin-bottom:4px;display:flex;gap:6px;align-items:center;"><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml((s.content || '分享脚本').slice(0,40)) + '</span><span style="color:rgba(255,255,255,0.45);font-size:0.68rem;background:rgba(255,255,255,0.08);padding:1px 6px;border-radius:4px;">需求墙</span>' + (s.isEncrypted ? '<span title="密码保护">🔒</span>' : '') + '</div>'
                         + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
                         + '<a href="javascript:void(0)" onclick="contribCopyContent(' + it.idx + ')" style="color:#4fc3f7;text-decoration:none;cursor:pointer;background:rgba(79,195,247,0.1);padding:2px 8px;border-radius:5px;font-size:0.72rem;">📋 复制</a>'
-                        + (s.scriptUrl ? '<a href="javascript:void(0)" onclick="importScriptToTxtFiles(\'' + s.scriptUrl + '\')" style="color:#4caf50;text-decoration:none;cursor:pointer;background:rgba(76,175,80,0.1);padding:2px 8px;border-radius:5px;font-size:0.72rem;">📄 导入</a>' : '')
+                        + (s.scriptUrl ? _contribImportBtn(s.scriptUrl, s.isEncrypted, s.passwordHash, '📄 导入', '📦 导入项目') : '')
                         + '<a href="javascript:void(0)" onclick="collectContribShare(' + it.idx + ')" style="color:#ba68c8;text-decoration:none;cursor:pointer;background:rgba(186,104,200,0.12);padding:2px 8px;border-radius:5px;font-size:0.72rem;">📥 收录</a>'
                         + '<span style="color:rgba(255,215,0,0.6);font-size:0.7rem;">📥 ' + (s.copyCount || 0) + '</span>'
                         + '<span style="color:rgba(255,107,107,0.6);font-size:0.7rem;">👍 ' + (s.likes || 0) + '</span>'
@@ -19360,7 +19367,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                         + (w.isEncrypted ? '<span title="密码保护">🔒</span>' : '')
                         + '</div>'
                         + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
-                        + '<a href="javascript:void(0)" onclick="importScriptToTxtFiles(\'' + w.scriptUrl + '\'' + encArg + ')" style="color:#4caf50;text-decoration:none;cursor:pointer;background:rgba(76,175,80,0.1);padding:2px 8px;border-radius:5px;font-size:0.72rem;">📄 导入到我的项目</a>'
+                        + _contribImportBtn(w.scriptUrl, w.isEncrypted, w.passwordHash, '📄 导入到我的项目', '📦 导入项目')
                         + delBtn
                         + '</div></div>';
                 }
