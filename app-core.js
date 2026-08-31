@@ -19980,7 +19980,10 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             const shownMessages = _wallCat === '全部' ? validMessages : validMessages.filter(m => (m.category || '未分类') === _wallCat);
 
             // 顶部分类筛选条
-            const _cats = ['全部'].concat(window.WALL_CATEGORIES || ['未分类']);
+            const _knownCats = {};
+            (window.WALL_CATEGORIES || ['未分类']).forEach(function(c){ _knownCats[c] = 1; });
+            validMessages.forEach(function(m){ _knownCats[(m.category || '未分类')] = 1; });
+            const _cats = ['全部'].concat(Object.keys(_knownCats));
             const filterBar = '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;padding:8px;background:rgba(255,255,255,0.04);border-radius:10px;position:sticky;top:0;z-index:5;">'
                 + _cats.map(c => {
                     const on = c === _wallCat;

@@ -7129,10 +7129,11 @@
                     </div>
 
                     <div style="margin-bottom:16px;">
-                        <label style="color:rgba(255,255,255,0.8);font-size:0.85rem;display:block;margin-bottom:6px;">🏷️ 分类标签（发布后可在需求墙按分类筛选）</label>
-                        <select id="shareCategory" style="width:100%;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:white;font-size:0.85rem;outline:none;cursor:pointer;">
-                            ${(window.WALL_CATEGORIES || ['未分类']).map(function(c){ return '<option value="'+c+'" style="background:#1a1a2e;">'+c+'</option>'; }).join('')}
-                        </select>
+                        <label style="color:rgba(255,255,255,0.8);font-size:0.85rem;display:block;margin-bottom:6px;">🏷️ 分类标签（下拉选择预设，或输入自定义分类）</label>
+                        <input id="shareCategory" list="wallCatList" placeholder="选分类或输入自定义" autocomplete="off" style="width:100%;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:white;font-size:0.85rem;outline:none;box-sizing:border-box;" />
+                        <datalist id="wallCatList">
+                            ${(window.WALL_CATEGORIES || ['未分类']).map(function(c){ return '<option value="'+c+'"></option>'; }).join('')}
+                        </datalist>
                     </div>
 
                     <div style="display:flex;gap:10px;">
@@ -7175,8 +7176,9 @@
                 const expireMinutes = parseInt(expireSelect.value) || 0;
                 const password = passwordInput.value.trim();
                 const rk = (selectedScheme === 'B') ? (document.getElementById('recoveryKeyInput').value || recoveryKey) : '';
+                const category = ((document.getElementById('shareCategory') || {}).value || '').trim() || '未分类';
                 modal.remove();
-                callback(expireMinutes, password, rk);
+                callback(expireMinutes, password, rk, category);
             };
             cancelBtn.onclick = function() {
                 modal.remove();
