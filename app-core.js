@@ -22909,50 +22909,45 @@ ${maSection}
         document.addEventListener('DOMContentLoaded', () => {
             // 管理员还原按钮：仅 URL ?admin=1 或已激活时才显示
             showAdminRestoreBtnIfAllowed();
-            // 🔧 长按整条标题栏 2 秒进入管理员面板（隐蔽手势，普通用户无感知，唯一的入口）
-            // 🔴 2026-08-31 修复「长按没反应」：旧版用 mouseleave 取消，APP(WebView)长按期间
-            //   微小移动/触摸合成事件会误触发 mouseleave → timer 被清 → openAdminPanel 不弹。
-            //   改用 Pointer Events 统一鼠标+触摸，仅在松手/取消时清除，加移动阈值容忍抖动。
-            const adminLongPressEl = document.querySelector('h1');
-            if (adminLongPressEl) {
-                let lpTimer = null;
-                let lpStartXY = null;
-                const LP_MS = 2000;
-                const LP_MOVE_TOL = 15; // 移动超过 15px 视为取消（允许微小抖动）
-                const startLP = (x, y) => {
-                    lpStartXY = { x: x, y: y };
-                    if (lpTimer) clearTimeout(lpTimer);
-                    lpTimer = setTimeout(() => { lpTimer = null; lpStartXY = null; openAdminPanel(); }, LP_MS);
-                };
-                const cancelLP = () => { if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; } lpStartXY = null; };
-                const onMove = (x, y) => {
-                    if (!lpStartXY) return;
-                    if (Math.abs(x - lpStartXY.x) > LP_MOVE_TOL || Math.abs(y - lpStartXY.y) > LP_MOVE_TOL) cancelLP();
-                };
-                if (window.PointerEvent) {
-                    // 优先 Pointer Events（统一鼠标/触摸/笔，WebView2 支持良好）
-                    adminLongPressEl.addEventListener('pointerdown', (e) => { e.preventDefault(); startLP(e.clientX, e.clientY); });
-                    adminLongPressEl.addEventListener('pointerup', cancelLP);
-                    adminLongPressEl.addEventListener('pointercancel', cancelLP);
-                    adminLongPressEl.addEventListener('pointermove', (e) => onMove(e.clientX, e.clientY));
-                } else {
-                    // 回退：老浏览器/无 PointerEvent 环境
-                    adminLongPressEl.addEventListener('mousedown', (e) => { e.preventDefault(); startLP(e.clientX, e.clientY); });
-                    adminLongPressEl.addEventListener('mouseup', cancelLP);
-                    adminLongPressEl.addEventListener('mousemove', (e) => onMove(e.clientX, e.clientY));
-                    adminLongPressEl.addEventListener('touchstart', (e) => { const t = e.touches[0]; if (t) startLP(t.clientX, t.clientY); }, { passive: true });
-                    adminLongPressEl.addEventListener('touchend', cancelLP);
-                    adminLongPressEl.addEventListener('touchcancel', cancelLP);
-                    adminLongPressEl.addEventListener('touchmove', (e) => { const t = e.touches[0]; if (t) onMove(t.clientX, t.clientY); }, { passive: true });
-                }
-            }
 
-            // 隐藏触发：三击标题强制清缓存+硬刷新（防缓存死循环）
-            let titleClickCount = 0;
-            let titleClickTimer = null;
-            const titleEl = document.querySelector('h1');
-            if (titleEl) {
-                titleEl.addEventListener('click', () => {
+            // 🛡️ 管理员入口（2026-09-01 彻底重写，解决长按/双击不稳定问题）
+            // 绑定到 🛡️ 图标 #mainHeader（而非整个 h1 文字），三种触发方式并存：
+            //   A. 长按 🛡️ 2 秒（主入口，兼容老用户3个月习惯）
+            //   B. 双击 🛡️（备用入口，长按被系统中断时使用）
+            //   C. Ctrl+Shift+L 键盘快捷键（终极备用，APP/网页通吃）
+            // 🔴 历史教训（2026-08-31~09-01）：
+            //   • Pointer Events 的 pointercancel 在 WebView2 长按时被系统 contextmenu 触发 → timer 被清
+            //   • pointerdown.preventDefault() 又会阻断 dblclick 事件链 → 双击也失效
+            //   • mouseleave 在微小移动时误清 timer（旧版问题）
+            //   方案：回到 mousedown/touchstart 启动 timer，不 preventDefault、不监听
+            //   pointercancel/pointermove，仅在 mouseup/touchend/mouseleave 清除，让 timer 自然超时。
+            const adminEntryEl = document.getElementById('mainHeader') || document.querySelector('h1');
+            if (adminEntryEl) {
+                // --- A. 长按入口（主入口）---
+                let lpTimer = null;
+                const LP_MS = 2000;
+                const startLP = () => {
+                    if (lpTimer) clearTimeout(lpTimer);
+                    lpTimer = setTimeout(() => {
+                        lpTimer = null;
+                        try { if (typeof openAdminPanel === 'function') openAdminPanel(); else console.error('[admin] openAdminPanel 未定义'); }
+                        catch (e) { console.error('[admin] openAdminPanel 报错:', e); }
+                    }, LP_MS);
+                };
+                const cancelLP = () => { if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; } };
+                // 鼠标：mousedown 启动，mouseup/mouseleave 清除（不监听 pointermove 避免误清）
+                adminEntryEl.addEventListener('mousedown', startLP);
+                adminEntryEl.addEventListener('mouseup', cancelLP);
+                adminEntryEl.addEventListener('mouseleave', cancelLP);
+                // 触摸：touchstart 启动，touchend/touchcancel 清除
+                adminEntryEl.addEventListener('touchstart', startLP, { passive: true });
+                adminEntryEl.addEventListener('touchend', cancelLP);
+                adminEntryEl.addEventListener('touchcancel', cancelLP);
+
+                // --- B. 三击清缓存 + 双击进管理员 ---
+                let titleClickCount = 0;
+                let titleClickTimer = null;
+                adminEntryEl.addEventListener('click', () => {
                     titleClickCount++;
                     if (titleClickCount >= 3) {
                         titleClickCount = 0;
@@ -22965,22 +22960,29 @@ ${maSection}
                         titleClickTimer = setTimeout(() => { titleClickCount = 0; }, 1500);
                     }
                 });
+                // 双击入口（备用）：dblclick 延迟 250ms，若期间第 3 次 click 来（三击）则让路给清缓存
+                if (!adminEntryEl.dataset.adminDbl) {
+                    adminEntryEl.dataset.adminDbl = '1';
+                    adminEntryEl.addEventListener('dblclick', () => {
+                        setTimeout(() => {
+                            if (titleClickCount >= 3) return; // 三击清缓存已触发，让路
+                            cancelLP(); // 取消可能正在运行的长按 timer，避免重复弹
+                            try {
+                                if (typeof openAdminPanel === 'function') openAdminPanel();
+                                else console.error('[admin] openAdminPanel 未定义');
+                            } catch (e) { console.error('[admin] openAdminPanel 报错:', e); }
+                        }, 250);
+                    });
+                }
             }
 
-            // 🔧 2026-08-31 双击标题进管理员面板（比长按更易用，避开 WebView 长按2秒被 contextmenu/文本选择打断）
-            //   与三击清缓存协调：dblclick 延迟 250ms，若期间第 3 次 click 来（三击）则让路给清缓存
-            if (titleEl && !titleEl.dataset.adminDbl) {
-                titleEl.dataset.adminDbl = '1';
-                titleEl.addEventListener('dblclick', () => {
-                    setTimeout(() => {
-                        if (titleClickCount >= 3) return; // 三击清缓存已触发，让路
-                        try {
-                            if (typeof openAdminPanel === 'function') openAdminPanel();
-                            else console.error('[admin] openAdminPanel 未定义');
-                        } catch (e) { console.error('[admin] openAdminPanel 报错:', e); }
-                    }, 250);
-                });
-            }
+            // --- C. 键盘快捷键 Ctrl+Shift+L（终极备用入口）---
+            document.addEventListener('keydown', (e) => {
+                if (e.ctrlKey && e.shiftKey && (e.key === 'L' || e.key === 'l')) {
+                    e.preventDefault();
+                    try { if (typeof openAdminPanel === 'function') openAdminPanel(); } catch (err) { console.error('[admin] openAdminPanel 报错:', err); }
+                }
+            });
 
             document.getElementById('adminVerifyCode').addEventListener('keydown', (e) => {
                 if (e.key === 'Enter') verifyAdmin();
