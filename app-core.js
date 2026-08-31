@@ -22928,6 +22928,9 @@ ${maSection}
             // 🔴 修复「长按管理员菜单没反应」：#mainHeader 实际是 <h1> 里只包住 🛡️ 的小 <span>，
             // 长按整条标题栏根本命中不了它。改绑整个 <h1> 标题栏，长按 2 秒即可触发。
             const header = document.querySelector('h1') || document.getElementById('mainHeader');
+            // 🔴 明显入口：标题栏 🔧 按钮点击直接开管理员面板（长按 2 秒的兜底，避免长按难触发）
+            const adminEntryBtn = document.getElementById('adminEntryBtn');
+            if (adminEntryBtn) adminEntryBtn.addEventListener('click', () => openAdminPanel());
             header.addEventListener('mousedown', (e) => {
                 e.preventDefault();
                 adminLongPressTriggered = false;
