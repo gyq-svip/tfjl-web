@@ -8079,9 +8079,10 @@
         }
 
         // 生成分享图 canvas（含标题/两行阵容+手牌/8位项目短码/品牌脚注）
-        // qrText：传入项目短链（#pg=）时在码区右侧绘制二维码（扫码直达网页版并自动弹导入）
+        // qrText：传入项目短链（#pg=）时右下角绘制二维码（扫码直达网页版并自动弹导入）
         // shortCode：8 位项目分享短码（整个项目已上传 Gist，导入方输码即得完整项目）
-        async function _lineupBuildCanvas(qrText, shortCode) {
+        // customMsg：用户自定义留言（绘制在二维码左侧、推广语上方，随分享图一起发出去）
+        async function _lineupBuildCanvas(qrText, shortCode, customMsg) {
             const my = _lineupCollect('u');
             const tm = _lineupCollect('t');
             // 手牌（每人最多10张：上阵7 + 手牌3）：未上阵的卡一并分享，导入方完整复刻
@@ -8103,17 +8104,22 @@
             const drTxt = function (id) { const el = document.getElementById(id); const m = el && /([\d.]+)/.exec(el.textContent || ''); return m ? m[1] : null; };
             const myDr = drTxt('myDamageReduction'), tmDr = drTxt('teammateDamageReduction');
 
-            // 二维码区（项目短链版才有）：短码框右侧 132px + 下方说明
+            // 底部区（项目短链版才有二维码）：右下角 132px 二维码；左列 = 短码 + 自定义留言 + 推广语 + 生成信息（底边与二维码对齐）
             const QR_SIZE = 132;
             const hasQr = !!(qrText && typeof window.qrcode === 'function');
             const codeOnlyH = 92;
-            const codeBoxH = hasQr ? Math.max(codeOnlyH, QR_SIZE + 40) : codeOnlyH;
+            const msgH = 26;                                      // 自定义留言行（用户自由编写，空则不占位）
+            const hasMsg = !!(customMsg && String(customMsg).trim());
+            // 有码：底部区 = 左列(短码92+留言26+推广/生成62) 与 右列(QR132+说明22) 取高；无码：短码 + 居中脚注64
+            const bottomH = hasQr
+                ? Math.max(codeOnlyH + (hasMsg ? msgH : 0) + 62, QR_SIZE + 34)
+                : codeOnlyH + 64;
 
-            // 高度公式（与下方绘制严格对应）：头部 + 两行阵容 + 手牌行 + 码区 + 推广语脚注（64：大字推广语 19px + 生成信息 14px）
+            // 高度公式（与下方绘制严格对应）：头部 + 两行阵容 + 手牌行 + 底部区
             const HEAD_H = 78;
             const rowH = 24 + SLOT_H + 16;                       // 上阵行：标签24 + 卡 + 底距16
             const handRowH = function (n) { return n > 0 ? 22 + SLOT_H + 12 : 0; };  // 手牌行更紧凑
-            const H = HEAD_H + rowH * 2 + handRowH(myHand.length) + handRowH(tmHand.length) + 8 + codeBoxH + 12 + 64;
+            const H = HEAD_H + rowH * 2 + handRowH(myHand.length) + handRowH(tmHand.length) + 8 + bottomH + 12;
 
             const canvas = document.createElement('canvas');
             canvas.width = W; canvas.height = H;
@@ -8193,10 +8199,11 @@
             drawRow('👥 队友', tm, tmDr, '#81c784');
             drawHandRow('🃏 队友手牌', tmHand, '#81c784');
 
-            // 短码区（8 位大字；上传失败无码时给重试提示）；有二维码时右侧留出 QR 位
+            // ---- 底部区：整框背景（短码 + 留言/推广/生成信息 + 右下二维码）----
             y += 8;
+            const boxBottom = y + bottomH;
             ctx.fillStyle = 'rgba(255,255,255,0.05)';
-            _lineupRoundRect(ctx, PAD, y, W - PAD * 2, codeBoxH, 10);
+            _lineupRoundRect(ctx, PAD, y, W - PAD * 2, bottomH, 10);
             ctx.fill();
             ctx.strokeStyle = 'rgba(255,215,0,0.35)';
             ctx.lineWidth = 1.5;
@@ -8217,9 +8224,36 @@
                 ctx.font = 'bold 16px "Microsoft YaHei", sans-serif';
                 ctx.fillText('⚠️ 分享短码生成失败（网络/限额），图片仅供查看，请重新分享', PAD + 14, y + 48);
             }
-            // 二维码：右下角白底黑码 + 说明（短链内容，扫码直达网页版自动弹导入）
+
+            // 推广脚注文案：主句米黄 + 「如果觉得有用请分享！」红色（用户指定红字落位）
+            const FOOT_MAIN = '📦 塔防精灵助手：脚本 · 皮肤 · 记事本 · 站位 · 一键还原 —— ';
+            const FOOT_RED = '如果觉得有用请分享！';
+            const GEN_LINE = '塔防精灵助手 生成于 ' + dateStr + ' ' + now.toTimeString().slice(0, 5);
+            const drawFootTwo = function (cx, footBaseY, genBaseY) {   // 两行脚注（居中坐标）
+                ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+                ctx.font = 'bold 19px "Microsoft YaHei", sans-serif';
+                let fw = ctx.measureText(FOOT_MAIN).width + ctx.measureText(FOOT_RED).width;
+                if (fw > W - PAD * 2) { // 超宽兜底：缩一档保证完整可读
+                    ctx.font = 'bold 17px "Microsoft YaHei", sans-serif';
+                }
+                fw = ctx.measureText(FOOT_MAIN).width + ctx.measureText(FOOT_RED).width;
+                let fx = Math.round((W - fw) / 2);
+                ctx.textAlign = 'left';
+                ctx.fillStyle = '#ffe082';
+                ctx.fillText(FOOT_MAIN, fx, footBaseY);
+                fx += ctx.measureText(FOOT_MAIN).width;
+                ctx.fillStyle = '#ff5252';
+                ctx.fillText(FOOT_RED, fx, footBaseY);
+                ctx.textAlign = 'center';
+                ctx.fillStyle = 'rgba(255,255,255,0.45)';
+                ctx.font = '14px "Microsoft YaHei", sans-serif';
+                ctx.fillText(GEN_LINE, cx, genBaseY);
+            };
+
+            // 二维码：右下角白底黑码 + 下方说明（短链内容，扫码直达网页版自动弹导入）
             if (hasQr) {
-                const qx = W - PAD - 14 - QR_SIZE, qy = y + codeBoxH - QR_SIZE - 22;
+                const qx = W - PAD - 14 - QR_SIZE;
+                const qy = boxBottom - 22 - QR_SIZE;
                 try {
                     const qr = window.qrcode(0, 'M');
                     qr.addData(qrText);
@@ -8236,35 +8270,49 @@
                         }
                     }
                 } catch (e) { /* 码字超容量等异常：跳过 QR 只留短码 */ }
-                ctx.textAlign = 'center';
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
                 ctx.fillStyle = 'rgba(255,255,255,0.6)';
                 ctx.font = '14px "Microsoft YaHei", sans-serif';
                 ctx.fillText('📱 扫码一键导入', qx + QR_SIZE / 2, qy + QR_SIZE + 15);
-            }
-            y += codeBoxH + 12;
 
-            // 脚注：推广语（19px 大字提脚本引兴趣，末句红色强调）+ 生成信息
-            ctx.textAlign = 'center';
-            // 分段绘制：主句米黄 + 「如果觉得有用请分享！」红色（用户指定红字落位）
-            ctx.font = 'bold 19px "Microsoft YaHei", sans-serif';
-            const FOOT_MAIN = '📦 塔防精灵助手：脚本 · 皮肤 · 记事本 · 站位 · 一键还原 —— ';
-            const FOOT_RED = '如果觉得有用请分享！';
-            const footW = ctx.measureText(FOOT_MAIN).width + ctx.measureText(FOOT_RED).width;
-            if (footW > W - PAD * 2) { // 超宽兜底：缩一档保证完整可读
-                ctx.font = 'bold 17px "Microsoft YaHei", sans-serif';
+                // 左列（二维码左侧）：自定义留言在上，推广语+生成信息贴齐二维码底边
+                const colL = PAD + 14, colR = qx - 14;
+                const colW = colR - colL;
+                if (hasMsg) {
+                    let mt = String(customMsg).trim();
+                    ctx.font = 'bold 17px "Microsoft YaHei", sans-serif';
+                    if (ctx.measureText(mt).width > colW) {           // 超宽兜底：缩一档，仍超则截断
+                        ctx.font = 'bold 15px "Microsoft YaHei", sans-serif';
+                        while (mt.length > 4 && ctx.measureText(mt + '…').width > colW) mt = mt.slice(0, -1);
+                        mt += '…';
+                    }
+                    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+                    ctx.fillStyle = '#80deea';
+                    ctx.fillText('💬 ' + mt, colL, y + codeOnlyH + msgH / 2 - 2);
+                }
+                const qrBottom = qy + QR_SIZE;
+                ctx.textBaseline = 'alphabetic';
+                // 推广语 + 生成信息：贴齐二维码底边（生成信息在最下，与码底基本重合）
+                ctx.textAlign = 'left';
+                ctx.font = 'bold 19px "Microsoft YaHei", sans-serif';
+                let fw2 = ctx.measureText(FOOT_MAIN).width + ctx.measureText(FOOT_RED).width;
+                if (fw2 > colW) ctx.font = 'bold 17px "Microsoft YaHei", sans-serif';
+                fw2 = ctx.measureText(FOOT_MAIN).width + ctx.measureText(FOOT_RED).width;
+                let fx2 = colL;
+                ctx.fillStyle = '#ffe082';
+                ctx.fillText(FOOT_MAIN, fx2, qrBottom - 24);
+                fx2 += ctx.measureText(FOOT_MAIN).width;
+                ctx.fillStyle = '#ff5252';
+                ctx.fillText(FOOT_RED, fx2, qrBottom - 24);
+                ctx.textAlign = 'left';
+                ctx.fillStyle = 'rgba(255,255,255,0.45)';
+                ctx.font = '14px "Microsoft YaHei", sans-serif';
+                ctx.fillText(GEN_LINE, colL, qrBottom - 2);
+            } else {
+                // 无二维码：脚注整幅居中（推广语 + 生成信息）
+                drawFootTwo(W / 2, boxBottom - 30, boxBottom - 10);
             }
-            const footW2 = ctx.measureText(FOOT_MAIN).width + ctx.measureText(FOOT_RED).width;
-            let footX = Math.round((W - footW2) / 2);
-            ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
-            ctx.fillStyle = '#ffe082';
-            ctx.fillText(FOOT_MAIN, footX, H - 34);
-            footX += ctx.measureText(FOOT_MAIN).width;
-            ctx.fillStyle = '#ff5252';
-            ctx.fillText(FOOT_RED, footX, H - 34);
-            ctx.textAlign = 'center';
-            ctx.fillStyle = 'rgba(255,255,255,0.45)';
-            ctx.font = '14px "Microsoft YaHei", sans-serif';
-            ctx.fillText('塔防精灵助手 生成于 ' + dateStr + ' ' + now.toTimeString().slice(0, 5), W / 2, H - 12);
+            y = boxBottom + 12;
 
             return { canvas: canvas, filled: filled };
         }
@@ -8315,7 +8363,7 @@
             const opts = await _lineupShareOptionsDialog();
             if (!opts) return;
             let result;
-            try { result = await _lineupBuildCanvas(); }
+            try { result = await _lineupBuildCanvas('', '', opts.msg); }
             catch (e) {
                 if (typeof showToast === 'function') showToast('❌ 生成阵容图失败：' + (e && e.message || e), 'error');
                 return;
@@ -8346,7 +8394,7 @@
             if (shortLink) {
                 try {
                     await _lineupEnsureQrLib();
-                    const r2 = await _lineupBuildCanvas(shortLink, shortCode);
+                    const r2 = await _lineupBuildCanvas(shortLink, shortCode, opts.msg);
                     if (r2 && r2.canvas) result = r2;
                 } catch (e) { /* 库加载失败：保留无码版，短链仍走「复制链接」 */ }
             }
@@ -8480,6 +8528,8 @@
                         '<option value="90">90 天</option>' +
                         '<option value="0">永久有效</option>' +
                       '</select>' +
+                      '<div style="color:rgba(255,255,255,0.65);font-size:0.78rem;margin:12px 0 5px;">✍️ 自定义留言（印在分享图二维码左侧，可留空）</div>' +
+                      '<input id="lineupShareMsg" type="text" maxlength="60" placeholder="如：深海车队招人 / 稳过25波 / 联系方式…" style="width:100%;box-sizing:border-box;background:rgba(0,0,0,0.35);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:8px;padding:9px 10px;font-size:0.84rem;">' +
                       '<div style="display:flex;align-items:center;gap:8px;margin-top:12px;">' +
                         '<input id="lineupSharePwChk" type="checkbox" style="accent-color:#ffd700;width:16px;height:16px;cursor:pointer;">' +
                         '<label for="lineupSharePwChk" style="color:rgba(255,255,255,0.75);font-size:0.8rem;cursor:pointer;">🔒 密码保护（对方需输入密码才能导入）</label>' +
@@ -8498,10 +8548,13 @@
                 const pwChk = modal.querySelector('#lineupSharePwChk');
                 const pwInput = modal.querySelector('#lineupSharePw');
                 const wallChk = modal.querySelector('#lineupShareWallChk');
+                const msgInput = modal.querySelector('#lineupShareMsg');
                 // 默认开 + 记住上次的选择（私密分享关过一次，下次默认还是关）
                 let wallDefault = true;
                 try { wallDefault = localStorage.getItem('TFJL_ShareWallSync') !== '0'; } catch (e) {}
                 if (wallChk) wallChk.checked = wallDefault;
+                // 自定义留言：记住上次写的内容（每换一条不用重打）
+                try { msgInput.value = localStorage.getItem('TFJL_ShareMsg') || ''; } catch (e) {}
                 pwChk.onchange = function () { pwInput.style.display = pwChk.checked ? 'block' : 'none'; if (pwChk.checked) pwInput.focus(); };
                 const finish = function (val) { modal.remove(); resolve(val); };
                 modal.querySelector('#lineupShareOptsCancel').onclick = function () { finish(null); };
@@ -8515,7 +8568,9 @@
                         pwInput.style.borderColor = '';
                     }
                     if (wallChk) { try { localStorage.setItem('TFJL_ShareWallSync', wallChk.checked ? '1' : '0'); } catch (e) {} }
-                    finish({ days: days, pw: pw, wall: !!(wallChk && wallChk.checked) });
+                    const msg = (msgInput.value || '').trim();
+                    try { localStorage.setItem('TFJL_ShareMsg', msg); } catch (e) {}
+                    finish({ days: days, pw: pw, wall: !!(wallChk && wallChk.checked), msg: msg });
                 };
             });
         }
