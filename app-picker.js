@@ -1073,7 +1073,8 @@
             if (auto) {
                 fileName = defaultName + '.json';
                 expireMinutes = Math.max(1, (autoOpts.days || 30)) * 1440;
-                sharePassword = ''; recoveryKey = '';
+                // 上游分享若勾了密码保护，上墙副本同密码加密（防止私密分享被公开放明文）
+                sharePassword = autoOpts.pw || ''; recoveryKey = '';
             } else {
                 const inputName = await askTextInputAsync({ title: '分享阵容', label: '分享阵容文件名（不含扩展名）：', defaultValue: defaultName });
                 if (!inputName) return false;
@@ -1189,84 +1190,181 @@
         }
 
         // 显示导入时的分类选择对话框
+        // 🔴 2026-08-31 统一导入规范（所有导入入口同款流程）：
+        //    ① 先选分类（含「➕ 新建分类…」，下拉里直接建，默认选分享自带的分类）
+        //    ② 再选导入目标：「➕ 新建项目（命名导入）」置顶 / 该分类下现有项目（覆盖导入，二次确认）
+        //    覆盖入口：文件导入 / 项目短码·#pg= 分享链接 / 需求墙一键导入 —— 全部走这一个弹窗
         function showImportCategoryDialog(data) {
-            const modal = document.createElement('div');
-            modal.id = 'importCategoryModal';
-            modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:10001;display:flex;align-items:center;justify-content:center;padding:20px;';
-
-            let categoryOptions = categories.map(c => `<option value="${c}">${c}</option>`).join('');
-            modal.innerHTML = `
-                <div style="background:#1a1a2e;border:2px solid rgba(255,215,0,0.5);border-radius:16px;padding:30px;max-width:500px;width:100%;">
-                    <h3 style="margin:0 0 20px 0;color:#ffd700;text-align:center;">📥 导入项目</h3>
-                    <div style="margin-bottom:15px;">
-                        <label style="color:#fff;display:block;margin-bottom:8px;">项目名称：</label>
-                        <input id="importProjectName" value="${data.project.name}" style="width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);background:#2a2a4a;color:#fff;box-sizing:border-box;font-size:1rem;">
-                    </div>
-                    <div style="margin-bottom:15px;">
-                        <label style="color:#fff;display:block;margin-bottom:8px;">选择分类：</label>
-                        <select id="importCategorySelect" style="width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);background:#2a2a4a;color:#fff;font-size:1rem;">
-                            ${categoryOptions}
-                        </select>
-                    </div>
-                    <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:12px;margin-bottom:15px;font-size:0.85rem;color:rgba(255,255,255,0.7);">
-                        <p style="margin:0 0 5px 0;">📋 项目信息：</p>
-                        <p style="margin:0 0 3px 0;">• 我的手牌：${data.project.myHandCards?.length || 0} 张</p>
-                        <p style="margin:0 0 3px 0;">• 队友手牌：${data.project.teammateHandCards?.length || 0} 张</p>
-                        <p style="margin:0 0 3px 0;">• 参考图片：${data.project.referenceImages?.length || 0} 张</p>
-                        <p style="margin:0;">• 脚本文件：${data.project.txtFiles?.length || 0} 个</p>
-                    </div>
-                    <div style="display:flex;gap:10px;">
-                        <button onclick="confirmImport()" style="flex:1;padding:12px;background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;border-radius:8px;cursor:pointer;font-size:1rem;">确认导入</button>
-                        <button onclick="closeImportModal()" style="flex:1;padding:12px;background:#666;color:white;border:none;border-radius:8px;cursor:pointer;font-size:1rem;">取消</button>
-                    </div>
-                </div>
-            `;
-
+            const old = document.getElementById('importCategoryModal');
+            if (old) old.remove();
             window.pendingImportData = data;
-            document.body.appendChild(modal);
+
+            loadProjectListFromDB().then(projects => {
+                const allProjects = projects || [];
+                // 分类全集 = 已建分类 ∪ 本地项目出现过的分类 ∪ 分享自带分类（自带分类默认选中，导入即归位）
+                const catSet = new Set(categories || []);
+                allProjects.forEach(p => { if (p && p.category) catSet.add(p.category); });
+                const projCat = (data.project && data.project.category) || '';
+                if (projCat) catSet.add(projCat);
+                const catList = Array.from(catSet).sort((a, b) => a.localeCompare(b, 'zh'));
+                const defCat = projCat || catList[0] || '默认分类';
+
+                const grouped = {};
+                allProjects.forEach(p => {
+                    const c = (p && p.category) || '默认分类';
+                    if (!grouped[c]) grouped[c] = [];
+                    grouped[c].push(p.name);
+                });
+                window.__importCatGrouped = grouped;
+
+                const modal = document.createElement('div');
+                modal.id = 'importCategoryModal';
+                modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:10001;display:flex;align-items:center;justify-content:center;padding:20px;';
+
+                const catOptionsHtml = catList.map(c => `<option value="${escapeHtml(c)}"${c === defCat ? ' selected' : ''}>${escapeHtml(c)}</option>`).join('')
+                    + '<option value="__NEWCAT__">➕ 新建分类…</option>';
+                modal.innerHTML = `
+                    <div style="background:#1a1a2e;border:2px solid rgba(255,215,0,0.5);border-radius:16px;padding:26px;max-width:500px;width:100%;">
+                        <h3 style="margin:0 0 18px 0;color:#ffd700;text-align:center;">📥 导入项目</h3>
+                        <div style="margin-bottom:13px;">
+                            <label style="color:#fff;display:block;margin-bottom:7px;">① 项目分类：</label>
+                            <select id="importCategorySelect" onchange="importCategoryChange()" title="先选分类；没有合适的可在下拉里直接新建" style="width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);background:#2a2a4a;color:#fff;font-size:1rem;">
+                                ${catOptionsHtml}
+                            </select>
+                        </div>
+                        <div style="margin-bottom:13px;">
+                            <label style="color:#fff;display:block;margin-bottom:7px;">② 导入到：</label>
+                            <select id="importProjectSelect" onchange="importTargetChange()" title="新建项目（命名导入）置顶；选现有项目=覆盖导入" style="width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);background:#2a2a4a;color:#fff;font-size:1rem;">
+                            </select>
+                        </div>
+                        <div id="importNameRow" style="margin-bottom:13px;">
+                            <label style="color:#fff;display:block;margin-bottom:7px;">新项目名称：</label>
+                            <input id="importProjectName" value="${escapeHtml(data.project.name || '')}" style="width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);background:#2a2a4a;color:#fff;box-sizing:border-box;font-size:1rem;">
+                        </div>
+                        <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:12px;margin-bottom:15px;font-size:0.85rem;color:rgba(255,255,255,0.7);">
+                            <p style="margin:0 0 5px 0;">📋 项目信息：</p>
+                            <p style="margin:0 0 3px 0;">• 我的手牌：${data.project.myHandCards?.length || 0} 张</p>
+                            <p style="margin:0 0 3px 0;">• 队友手牌：${data.project.teammateHandCards?.length || 0} 张</p>
+                            <p style="margin:0 0 3px 0;">• 参考图片：${data.project.referenceImages?.length || 0} 张</p>
+                            <p style="margin:0;">• 脚本文件：${data.project.txtFiles?.length || 0} 个</p>
+                        </div>
+                        <div style="display:flex;gap:10px;">
+                            <button onclick="confirmImport()" style="flex:1;padding:12px;background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;border-radius:8px;cursor:pointer;font-size:1rem;">确认导入</button>
+                            <button onclick="closeImportModal()" style="flex:1;padding:12px;background:#666;color:white;border:none;border-radius:8px;cursor:pointer;font-size:1rem;">取消</button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+                if (typeof attachSelectWheel === 'function') {
+                    ['importCategorySelect', 'importProjectSelect'].forEach(id => attachSelectWheel(document.getElementById(id)));
+                }
+                rebuildImportProjectOptions(defCat);
+                importTargetChange();
+            }).catch(err => {
+                console.error('加载项目列表失败:', err);
+                alert('加载项目列表失败：' + (err && err.message || err));
+            });
+        }
+
+        // 重建「② 导入到」下拉：➕ 新建项目置顶，其余为该分类下现有项目（选中=覆盖导入）
+        function rebuildImportProjectOptions(cat) {
+            const sel = document.getElementById('importProjectSelect');
+            if (!sel) return;
+            const grouped = window.__importCatGrouped || {};
+            let html = '<option value="__NEW__" style="color:#4ade80;font-weight:bold;">➕ 新建项目（命名导入）</option>';
+            (grouped[cat] || []).slice().sort((a, b) => a.localeCompare(b, 'zh')).forEach(n => {
+                html += `<option value="${escapeHtml(n)}">${escapeHtml(n)}（覆盖导入）</option>`;
+            });
+            sel.innerHTML = html;
+        }
+
+        // ① 分类联动：切分类重建项目列表；选「➕ 新建分类…」弹输入框，创建后自动选中
+        function importCategoryChange() {
+            const sel = document.getElementById('importCategorySelect');
+            if (!sel) return;
+            if (sel.value === '__NEWCAT__') {
+                const name = (typeof _importPromptNewCategory === 'function') ? _importPromptNewCategory() : null;
+                if (!name) {
+                    sel.value = sel.dataset.prevCat || (sel.options[0] && sel.options[0].value) || '';
+                } else {
+                    let exists = false;
+                    for (const o of sel.options) { if (o.value === name) { exists = true; break; } }
+                    if (!exists) {
+                        const opt = document.createElement('option');
+                        opt.value = name; opt.textContent = name;
+                        sel.insertBefore(opt, sel.querySelector('option[value="__NEWCAT__"]'));
+                    }
+                    sel.value = name;
+                }
+            }
+            sel.dataset.prevCat = sel.value;
+            rebuildImportProjectOptions(sel.value);
+            importTargetChange();
+        }
+
+        // ② 目标联动：选「新建项目」显示命名框；选现有项目收起命名框（覆盖前有二次确认）
+        function importTargetChange() {
+            const sel = document.getElementById('importProjectSelect');
+            const row = document.getElementById('importNameRow');
+            if (!sel || !row) return;
+            row.style.display = (sel.value === '__NEW__') ? 'block' : 'none';
         }
 
         function confirmImport() {
             const data = window.pendingImportData;
             if (!data) return;
 
-            const newName = document.getElementById('importProjectName').value.trim();
-            const category = document.getElementById('importCategorySelect').value;
+            const catSel = document.getElementById('importCategorySelect');
+            const projSel = document.getElementById('importProjectSelect');
+            const nameInput = document.getElementById('importProjectName');
+            if (!catSel || !projSel || !nameInput) return;
 
-            if (!newName) {
-                alert('项目名称不能为空！');
+            const category = catSel.value;
+            const target = projSel.value;
+            const newName = nameInput.value.trim();
+
+            if (target === '__NEW__' && !newName) {
+                alert('请填写新项目名称！');
+                nameInput.focus();
                 return;
             }
 
-            // 检查是否已存在同名项目
+            // 覆盖现有项目：二次确认（该项目全部数据会被分享内容替换）
+            if (target !== '__NEW__') {
+                if (!confirm('将把分享内容覆盖导入到项目「' + target + '」（分类：' + category + '）。\n该项目的阵容/脚本/记事本/参考图都会被替换！确定继续？')) return;
+            }
+
+            const finalName = (target === '__NEW__') ? newName : target;
+
+            // 检查是否已存在同名项目（仅新建路径需要，覆盖路径上面已确认）
             loadProjectListFromDB().then(allProjects => {
-                const exists = allProjects.find(p => p.name === newName && p.category === category);
-                if (exists) {
-                    if (!confirm('已存在同名项目，是否覆盖？')) return;
-                    deleteProjectFromDB(newName, category);
+                const exists = allProjects.find(p => p.name === finalName && (p.category || '默认分类') === category);
+                if (exists && target === '__NEW__') {
+                    if (!confirm('分类「' + category + '」下已存在同名项目「' + finalName + '」，是否覆盖？')) return;
+                    deleteProjectFromDB(finalName, category);
                 }
 
                 // 更新项目名称和分类
-                data.project.name = newName;
+                data.project.name = finalName;
                 data.project.category = category;
 
                 // 直接保存项目数据（包含参考图片和脚本文件）
-                if (typeof showToast === 'function') showToast('⏳ 正在恢复项目「' + newName + '」…');
+                if (typeof showToast === 'function') showToast('⏳ 正在恢复项目「' + finalName + '」…');
                 saveProjectToDBDirect(data.project).then(() => {
                     loadCategoriesFromDB();
                     updateCategorySelector();
                     refreshProjectSelectors();
-                    showImportSuccessModal(newName, category);
+                    showImportSuccessModal(finalName, category);
                     // 刷新下拉后把选中切到刚导入的项目，并自动加载到工作区，避免"重启才出来"
                     setTimeout(() => {
                         const sel = document.getElementById('projectSelector1');
-                        if (sel) sel.value = newName;
+                        if (sel) sel.value = finalName;
                         const csel = document.getElementById('categorySelector1');
                         if (csel && category) csel.value = category;
-                        loadProjectFromDB(newName).then(() => {
-                            if (typeof showToast === 'function') showToast('✅ 已恢复并打开项目「' + newName + '」');
+                        loadProjectFromDB(finalName).then(() => {
+                            if (typeof showToast === 'function') showToast('✅ 已恢复并打开项目「' + finalName + '」');
                         }).catch(err => {
-                            if (typeof showToast === 'function') showToast('✅ 项目已保存「' + newName + '」，请在下拉选择打开');
+                            if (typeof showToast === 'function') showToast('✅ 项目已保存「' + finalName + '」，请在下拉选择打开');
                         });
                     }, 150);
                 }).catch(err => {
