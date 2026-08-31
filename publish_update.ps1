@@ -11,6 +11,10 @@ $PublishVer = if ($args -match '^-PublishVer$') { $args[($args.IndexOf('-Publish
 $RootDir = (Get-Location).Path
 $ConfPath = (Get-ChildItem -Path "src-tauri" -Filter "tauri.conf.json" -Recurse)[0].FullName
 
+# 🔴 强制升级门禁：桌面端最低可用版本。低于此版本的桌面端启动即被拦截（网页版不受影响）。
+#    改这里即可调整拦截线；若发布版本低于它，下面的「发版前自检」会直接中止发布。
+$MinSupportedVersion = "2.0.25"
+
 function Get-Keynum($b64) {
     $text = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($b64.Trim()))
     $inner = ($text.Trim() -split "`n")[1].Trim()
@@ -86,6 +90,39 @@ $confJson = [System.IO.File]::ReadAllText($ConfPath, [System.Text.Encoding]::UTF
 $buildVer = $confJson.version
 $ver = if ($PublishVer) { $PublishVer } else { $buildVer }
 Write-Host "build version=$buildVer  publish version=$ver" -ForegroundColor Cyan
+
+# ============ 发版前自检：强制升级门禁一致性 ============
+# 语义化版本比较：a>b 返回 1，a<b 返回 -1，相等返回 0（支持 2.0.13 / 2.0.13.4 这类多段版本）
+function Compare-Version($a, $b) {
+    $pa = ($a -split '\.') | ForEach-Object { [int]($_ -replace '\D', '') }
+    $pb = ($b -split '\.') | ForEach-Object { [int]($_ -replace '\D', '') }
+    $n = [Math]::Max($pa.Count, $pb.Count)
+    for ($i = 0; $i -lt $n; $i++) {
+        $x = if ($i -lt $pa.Count) { $pa[$i] } else { 0 }
+        $y = if ($i -lt $pb.Count) { $pb[$i] } else { 0 }
+        if ($x -gt $y) { return 1 }
+        if ($x -lt $y) { return -1 }
+    }
+    return 0
+}
+
+Write-Host "--- 发版前自检（强制升级门禁）---" -ForegroundColor Cyan
+$gateCmp = Compare-Version $ver $MinSupportedVersion
+if ($gateCmp -lt 0) {
+    Write-Host "ERROR: 本次发布版本 v$ver 低于最低要求 v$MinSupportedVersion，已中止发布！" -ForegroundColor Red
+    Write-Host "  若强行发布，用户装完 v$ver 仍会被门禁拦截（要求 >= v$MinSupportedVersion），" -ForegroundColor Red
+    Write-Host "  将陷入「装完又被拦、装完又被拦」的死循环。" -ForegroundColor Red
+    Write-Host "  处理：把 src-tauri/tauri.conf.json 的 version 提升到 >= $MinSupportedVersion，" -ForegroundColor Red
+    Write-Host "        或用 .\publish_update.ps1 -PublishVer <更高版本> 指定发布版本。" -ForegroundColor Red
+    exit 1
+}
+if ($gateCmp -eq 0) {
+    Write-Host "⚠️ 发布版本 v$ver 与最低要求相同：该版本本身不会被拦，用户装完可正常使用，安全。" -ForegroundColor Yellow
+} else {
+    Write-Host "✅ 发布版本 v$ver > 最低要求 v$MinSupportedVersion" -ForegroundColor Green
+}
+Write-Host "✅ 门禁阈值 minVersion=$MinSupportedVersion 将写入 version.json" -ForegroundColor Green
+
 $confPubB64 = $confJson.plugins.updater.pubkey
 $kConf = Get-Keynum $confPubB64
 Write-Host "Version: $ver  trust-root keynum=$kConf" -ForegroundColor Cyan
