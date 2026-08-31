@@ -503,10 +503,20 @@
         }
         // 从索引 Gist 读取「强制更新」总开关（功能开关面板的权威来源为 room_index.json 的 forceReloadEnabled 字段），
         // 设置 window.__diagForceReload 并触发一次启动期版本检查（仅在开关开 + SW 已有 waiting 版本时，由 notifyNewVersion 在闲置时静默强刷）。
+        // 🔴 2026-08-31 离线判定阈值：管理员「功能开关面板→离线判定阈值」可调（room_index.json.onlineTimeoutMin，分钟），
+        //    启动时读一次缓存到 window.__tfjlOnlineTimeoutMs（0=未配置），由 _applyOnlineTimeoutCfg 覆盖到计数器数据全网生效。
+        function _applyOnlineTimeoutCfg(data) {
+            try {
+                if (window.__tfjlOnlineTimeoutMs && data && typeof data === 'object') data.online_timeout = window.__tfjlOnlineTimeoutMs;
+            } catch (e) {}
+        }
+        window._applyOnlineTimeoutCfg = _applyOnlineTimeoutCfg;
         async function initForceReloadFromIndex() {
             try {
                 const idx = await getRoomIndexConfig();
                 window.__diagForceReload = !!idx.forceReloadEnabled;
+                const _otm = Number(idx.onlineTimeoutMin);
+                window.__tfjlOnlineTimeoutMs = (_otm >= 1 && _otm <= 1440) ? Math.round(_otm * 60000) : 0;
                 if (window.__diagForceReload && 'serviceWorker' in navigator) {
                     setTimeout(() => {
                         if (window.__pendingUpdate) { if (typeof notifyNewVersion === 'function') notifyNewVersion(); return; }
@@ -15349,6 +15359,7 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
                             if (parsed.total_downloads === undefined) parsed.total_downloads = 0;
                             if (!parsed.online_users) parsed.online_users = {};
                             if (!parsed.online_timeout || parsed.online_timeout === 3600000 || parsed.online_timeout === 7200000) parsed.online_timeout = 1800000;
+                            if (window._applyOnlineTimeoutCfg) window._applyOnlineTimeoutCfg(parsed); // 🔴 管理员离线阈值覆盖（功能开关面板 onlineTimeoutMin）
                             if (!parsed.sources) parsed.sources = { app_visits: 0, web_visits: 0 };
                             if (parsed.sources.new_app_users === undefined) parsed.sources.new_app_users = 0;
                             if (parsed.sources.new_web_users === undefined) parsed.sources.new_web_users = 0;
@@ -15600,6 +15611,7 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
                             if (fresh.total_downloads === undefined || fresh.total_downloads === null) fresh.total_downloads = 0;
                             if (fresh.active_today === undefined || fresh.active_today === null) fresh.active_today = fresh.active_today_users ? fresh.active_today_users.length : 0;
                             if (!fresh.online_timeout) fresh.online_timeout = 3600000;
+                            if (window._applyOnlineTimeoutCfg) window._applyOnlineTimeoutCfg(fresh); // 🔴 管理员离线阈值覆盖
                             if (!fresh.active_date) fresh.active_date = getTodayString();
                             // 确保 unique_users 和 active_today_users 是数组
                             if (!Array.isArray(fresh.unique_users)) fresh.unique_users = [];
@@ -15691,6 +15703,7 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
                 if (!counterData.online_users) counterData.online_users = {};
                 // 缩短在线判定窗口到 5 分钟，避免关掉标签页后仍长时间显示"在线"（提升在线数准确性）
                 if (!counterData.online_timeout || counterData.online_timeout === 7200000 || counterData.online_timeout === 3600000) counterData.online_timeout = 1800000;
+                if (window._applyOnlineTimeoutCfg) window._applyOnlineTimeoutCfg(counterData); // 🔴 管理员离线阈值覆盖（功能开关面板 onlineTimeoutMin）
 
                 // 平台判定（提前到 switch 之前：13640 行写入 online_users 时就要用，case 'visit' 内 13654 行的旧声明会被此行屏蔽并导致 ReferenceError）
                 const isApp = !!(window.__TAURI__);
@@ -15855,6 +15868,7 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
                 if (!remoteData.active_today) remoteData.active_today = remoteData.active_today_users.length;
                 if (!remoteData.online_users) remoteData.online_users = {};
                 if (!remoteData.online_timeout || remoteData.online_timeout === 3600000 || remoteData.online_timeout === 7200000) remoteData.online_timeout = 1800000;
+                if (window._applyOnlineTimeoutCfg) window._applyOnlineTimeoutCfg(remoteData); // 🔴 管理员离线阈值覆盖
                 if (!remoteData.total_visits) remoteData.total_visits = 0;
                 if (!remoteData.total_downloads) remoteData.total_downloads = 0;
                 
@@ -23409,7 +23423,7 @@ ${maSection}
                     head += '<div style="margin-top:10px;border-top:1px dashed rgba(255,255,255,0.12);padding-top:8px;font-size:0.74rem;line-height:1.7;color:#cbd5e1;">';
                     head += '<span style="color:#ffd700;">📊 上报时间规律（客户端侧实际触发时机）：</span><br>';
                     head += '① <b>打开延迟首报</b>：页面加载 3 秒后读配置，若总闸开则安排首报，延迟 ' + C.openDelayMin + '~' + C.openDelayMax + ' 分钟（随机错峰，避免一打开就全员正点报）。<br>';
-                    head += '② <b>规律心跳</b>：从打开起每 45 分钟（基础间隔）+ 0~10 分钟（随机抖动）自动上报一次，写盘健康 + 缓冲合并。间隔与抖动均可在「功能开关面板」调节，全网统一跟随。离线阈值 60 分钟，故该频率不会误判离线。<br>';
+                    head += '② <b>规律心跳</b>：从打开起每 45 分钟（基础间隔）+ 0~10 分钟（随机抖动）自动上报一次，写盘健康 + 缓冲合并。间隔与抖动均可在「功能开关面板」调节，全网统一跟随。离线阈值由「功能开关面板→离线判定阈值」控制（默认30分钟）。<br>';
                     head += '③ <b>缓冲触发</b>：本地有写操作埋点进 buffer 时顺带排程，"立即类"延迟 ' + C.immediateDelayMin + '~' + C.immediateDelayMax + ' 分钟合批上报（省 API，可由「允许立即上报」关掉）。<br>';
                     head += '④ <b>联网恢复</b>：online 事件立即补报（' + C.immediateDelayMin + '~' + C.immediateDelayMax + ' 分钟延迟）。<br>';
                     head += '⑤ <b>手动</b>：本面板「立即拉取」按钮可补报。<br>';
@@ -23911,6 +23925,22 @@ ${maSection}
                 min: 0, max: 120, step: 1, unit: '分',
                 default: 5,
                 apply: (v) => { /* 实际读取在 _initDiagReporter 的 HB_JITTER，已接入远程 heartbeatJitterMin */ }
+            },
+            {
+                key: 'onlineTimeoutMin',
+                label: '🟢 离线判定阈值',
+                desc: '【在线状态】多久没有心跳上报就算「离线」（分钟）。全网所有用户的在线状态展示统一跟随此值：超过该时长未上报的用户会从在线列表移除并计入离线记录。默认 30 分钟。调小=在线数更严格更实时；调大=挂机不易掉线。范围 1~1440 分钟。⚠️ 建议至少设为「诊断心跳间隔+抖动」的 2 倍，否则正常用户会被误判离线。',
+                scope: 'remote',
+                remoteField: 'onlineTimeoutMin',
+                type: 'number',
+                min: 1, max: 1440, step: 1, unit: '分',
+                default: 30,
+                apply: (v) => {
+                    // 管理员改完立即生效：更新全局缓存 + 覆盖当前内存里的计数器数据
+                    const m = Number(v);
+                    window.__tfjlOnlineTimeoutMs = (m >= 1 && m <= 1440) ? Math.round(m * 60000) : 0;
+                    try { if (window._applyOnlineTimeoutCfg && typeof counterData !== 'undefined' && counterData) window._applyOnlineTimeoutCfg(counterData); } catch (e) {}
+                }
             },
             {
                 key: 'auctionNews',
