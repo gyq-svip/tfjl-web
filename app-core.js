@@ -18856,7 +18856,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             try {
                 const s = decodeURIComponent(escape(atob(b64)));
                 const p = s.split('|'); const id = p[0], t = Number(p[1]), a = p.slice(2).join('|');
-                for (const m of wallMessages) { if ((m.id && m.id === id) || (msgTime(m) === t && msgAuthor(m) === a)) return m; }
+                for (const m of wallMessages) { if ((m.id && m.id === id) || (msgTime(m) === t && _normNick(msgAuthor(m)) === _normNick(a))) return m; }
             } catch (e) {}
             return null;
         }
@@ -19038,7 +19038,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             // 连续分享天数：求该昵称所有分享消息的去重日期数（跨天即累计）
             if (!e.activeDays) {
                 const days = new Set();
-                for (const m of wallMessages) { if (isShareMsg(m) && msgAuthor(m) === nick) { const d = new Date(msgTime(m)); days.add(d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate()); } }
+                for (const m of wallMessages) { if (isShareMsg(m) && _normNick(msgAuthor(m)) === _normNick(nick)) { const d = new Date(msgTime(m)); days.add(d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate()); } }
                 e.activeDays = days.size;
             }
             // 周榜第一判定
@@ -19681,7 +19681,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             const repMap = computeReputation();
             const e = repMap[nick] || { rep: 0, shares: 0, copies: 0, likes: 0, downloads: 0, firstShare: 0 };
             const t = getTitle(e.rep);
-            const allShares = wallMessages.filter(m => isShareMsg(m) && msgAuthor(m) === nick);
+            const allShares = wallMessages.filter(m => isShareMsg(m) && _normNick(msgAuthor(m)) === _normNick(nick));
             window._contribData = { nick, shares: allShares.map(m => ({ content: stripAllUrls(msgContent(m)), scriptUrl: m.scriptUrl || '', isEncrypted: !!m.isEncrypted, passwordHash: m.passwordHash || '', copyCount: m.copyCount || 0, likes: m.likes || 0 })) };
             const scriptCount = allShares.filter(m => m.scriptUrl).length;
             const pct = Math.round(t.progress * 100);
@@ -20577,6 +20577,12 @@ ${maSection}
                 const decPwd = await askDecryptPasswordAsync('该文件已加密，请输入密码或恢复密钥：');
                 if (!decPwd) return; // 用户取消，不显示任何提示，直接退出
                 verifiedPwd = decPwd;
+            }
+            // 预检：只接受 Gist 链接，避免旧版"离线本地化字符串"分享/失效链接把 JSON 解析搞崩或卡死
+            if (!url || !/gist(\.githubusercontent)?\.com/i.test(url)) {
+                const _msg = '⚠️ 该分享链接无效或已失效（可能是旧版离线格式，已不再支持）。请找作者重新发布在线分享。';
+                if (typeof showToast === 'function') showToast(_msg); else alert(_msg);
+                return;
             }
             try {
                 // 显示加载提示
