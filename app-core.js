@@ -25724,6 +25724,22 @@ ${maSection}
         function showSwUpdateBanner() {
             if (_updateBannerBlocked()) return; // 用户已永久关闭彩球
             if (document.getElementById('swUpdateBanner')) return;
+            // 🔴 2026-08-31 根治「已是最新版还反复弹彩球」：
+            //   SW 每 5 分钟 _pollLatestVersion 发现线上 > 本地SW 就发 FORCE_RELOAD，页面 _verifyNewVersion
+            //   核实「远端 > 本地SW」也判有新版 → 弹彩球。但 APP 前台不自动升级（铁律），用户关掉彩球而非点升级，
+            //   SW 仍停在旧版 → 下一轮轮询又发信号 → 又弹彩球 → "不定时莫名其妙弹"。
+            //   修复：会话内同一目标版本只弹一次彩球，不再反复骚扰。刷新/重启后会话重置，可再弹一次提醒。
+            //   根因真相：右下角显示的版本号被 _fillRealVersionTag 用【远端 version.json】填充（显示线上最新），
+            //   但 _getLocalLoadedVersion 取的是【SW 回报的真实版本】，两者不一致 → 用户以为"已是最新"实则 SW 滞后。
+            const _targetVer = window.__tfjlNewVersionTarget || 0;
+            if (_targetVer) {
+                if (!window.__bannerShownVersions) window.__bannerShownVersions = {};
+                if (window.__bannerShownVersions[_targetVer]) {
+                    console.log('[更新] 彩球已为目标版本', _targetVer, '弹过，本会话不再重复弹（避免 SW 轮询反复骚扰）');
+                    return;
+                }
+                window.__bannerShownVersions[_targetVer] = true;
+            }
             // 注入一次样式：左下角彩色光彩气泡（流动彩色 + 浮动 + 多层光晕呼吸），点击即更新
             if (!document.getElementById('swUpdateStyle')) {
                 const st = document.createElement('style');
