@@ -1107,32 +1107,23 @@ if (true) {
         if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('剪贴板多功能导入');
         // ---- 智能识别内容类型，分发到对应导入（多功能合一）----
         const raw = text;
-        // ① 分享链接：#pg=（项目）/ #lg= / #lineup=（阵容）
+        // ① 项目分享链接：#pg=（唯一分享链路，2026-08-31 统一）
         const mPg = /(?:^|[&#])pg=([A-Za-z0-9_-]+)/.exec(raw);
-        const mLong = /(?:^|[&#])lineup=([A-Za-z0-9+/=%._-]+)/.exec(raw);
-        const mShortLink = /(?:^|[&#])lg=([A-Za-z0-9_-]+)/.exec(raw);
-        if (mPg || mLong || mShortLink) {
-            const isProjLink = !!mPg;
-            if (typeof showToast === 'function') showToast(isProjLink ? '📋 检测到项目分享链接，正在打开项目导入…' : '📋 检测到阵容分享链接，正在打开阵容导入…', 'info');
-            (isProjLink ? window.importProjectViaCode : window.importLineupCode)(raw);
-            return;
-        }
-        // ② TFJL1. 阵容码（可能整段话里夹着码）
-        if (raw.indexOf('TFJL1.') >= 0) {
-            if (typeof showToast === 'function') showToast('📋 检测到阵容码，正在打开阵容导入…', 'info');
-            window.importLineupCode(raw);
-            return;
-        }
-        // ③ 纯 8 位短码（与生成端同字符集，排除易混淆 0O1lI）
-        const SC_RE = /^[ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789]{8}$/;
-        if (SC_RE.test(raw)) {
-            if (typeof showToast === 'function') showToast('📋 检测到分享短码 ' + raw + '，正在打开导入（项目/阵容自动识别）…', 'info');
+        if (mPg) {
+            if (typeof showToast === 'function') showToast('📋 检测到项目分享链接，正在打开项目导入…', 'info');
             window.importProjectViaCode(raw);
             return;
         }
-        // ④ 其余按脚本导入（需求墙/群聊复制的整段脚本）
+        // ② 纯 8 位短码（与生成端同字符集，排除易混淆 0O1lI）
+        const SC_RE = /^[ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789]{8}$/;
+        if (SC_RE.test(raw)) {
+            if (typeof showToast === 'function') showToast('📋 检测到分享短码 ' + raw + '，正在打开项目导入…', 'info');
+            window.importProjectViaCode(raw);
+            return;
+        }
+        // ③ 其余按脚本导入（需求墙/群聊复制的整段脚本）
         if (text.length < 20) {
-            if (typeof showToast === 'function') showToast('📋 剪贴板内容太短：不是短码/链接/阵容码，也不像脚本（先复制完整脚本）', 'error');
+            if (typeof showToast === 'function') showToast('📋 剪贴板内容太短：不是短码/分享链接，也不像脚本（先复制完整脚本）', 'error');
             return;
         }
         // 默认文件名：取第一行非空文本做名（截 24 字符防过长），非法字符清洗；识别不出则按日期命名
@@ -5102,8 +5093,8 @@ if (true) {
     window.loadSkinSelections = loadSkinSelections;
     window.exportConsoleLogsToFile = exportConsoleLogsToFile;
     // ==================== 阵容分享（2026-08-31 重构：统一入口） ====================
-    // 图片版已统一为 app-features.js 的 shareLineupImage()：1080px 宽完整两行（我方/队友各 7 槽不裁切）、
-    // 职业渐变底 + 真实皮肤图 + 等级/魔化徽章 + 融合副卡 + 底部阵容码（TFJL1.xxx）+ 分享链接，
+    // 图片版已统一为 app-features.js 的 shareLineupImage()：960px 宽完整两行（我方/队友各 7 槽不裁切）、
+    // 职业渐变底 + 真实皮肤图 + 等级/魔化徽章 + 融合副卡 + 底部 8 位项目短码 + 二维码，
     // 出战选择区「📸 分享」按钮与项目菜单共用同一实现；旧的手绘 900px 版因两侧卡组溢出裁切
     // 且样式简陋已删除。此处保留文字版（复制文案）生成函数，供分享弹窗「📝 复制文案」按钮调用。
     window.buildLineupShareText = buildLineupShareText;
