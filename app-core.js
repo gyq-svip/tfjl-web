@@ -505,6 +505,7 @@
         // 设置 window.__diagForceReload 并触发一次启动期版本检查（仅在开关开 + SW 已有 waiting 版本时，由 notifyNewVersion 在闲置时静默强刷）。
         // 🔴 2026-08-31 离线判定阈值：管理员「功能开关面板→离线判定阈值」可调（room_index.json.onlineTimeoutMin，分钟），
         //    启动时读一次缓存到 window.__tfjlOnlineTimeoutMs（0=未配置），由 _applyOnlineTimeoutCfg 覆盖到计数器数据全网生效。
+        window.__tfjlOnlineTimeoutMs = 0; // 🔴 先声明默认未配置态：即使启动配置请求慢/失败也是明确的 0（与 undefined 行为等价，但语义清晰、便于诊断）
         function _applyOnlineTimeoutCfg(data) {
             try {
                 if (window.__tfjlOnlineTimeoutMs && data && typeof data === 'object') data.online_timeout = window.__tfjlOnlineTimeoutMs;
