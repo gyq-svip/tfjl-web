@@ -2996,6 +2996,94 @@
             if (cu) cu.style.display = (window.__TAURI__ ? 'flex' : 'none');
         }
 
+        // ============ 强制升级门禁（低于 minVersion 必须升级） ============
+        // 仅拦截桌面端（Tauri）；网页版跳过。断网 / manifest 缺字段 / 解析异常 → 放行（fail-open）。
+        let _gateTimerStarted = false;
+        async function checkVersionGate() {
+            const isTauri = !!(window.__TAURI__ || window.__TAURI_INTERNALS__);
+            if (!isTauri) return false; // 网页版不拦截
+            if (!_gateTimerStarted) {
+                _gateTimerStarted = true;
+                // 后台常开的旧版：每 5 分钟复查一次门禁，推送 manifest 后即被拦（仅启动门禁拦不到）
+                setInterval(() => { checkVersionGate().catch(() => {}); }, 5 * 60 * 1000);
+            }
+
+            // 取真实安装版本（网页版 CURRENT_VERSION 为「网页版」，直接放行）
+            await fillCurrentVersion();
+            const cur = (typeof CURRENT_VERSION !== 'undefined' && CURRENT_VERSION && CURRENT_VERSION !== '网页版') ? CURRENT_VERSION : '';
+            if (!cur) return false;
+
+            // 读取门禁配置（复用 GitHub Pages 上的 version.json，与自动更新同源）
+            let data = null;
+            try {
+                const ctrl = new AbortController();
+                const tid = setTimeout(() => ctrl.abort(), 8000);
+                try {
+                    const resp = await fetch(VERSION_JSON_URL, { cache: 'no-cache', signal: ctrl.signal });
+                    if (resp.ok) data = await resp.json();
+                } finally { clearTimeout(tid); }
+            } catch (e) {
+                console.warn('[gate] 门禁配置拉取失败，放行:', e && e.message);
+                return false;
+            }
+            if (!data || !data.minVersion || !data.forceUpdate) return false; // 无门禁配置 → 不拦
+
+            // 当前版本 < minVersion → 命中，必须升级
+            if (!isNewerVersion(data.minVersion, cur)) return false;
+
+            showForceUpdateOverlay(data, cur);
+            return true;
+        }
+
+        // 全屏不可关闭拦截页 + 下载按钮（复用安装包保存逻辑）
+        function showForceUpdateOverlay(data, cur) {
+            if (document.getElementById('forceUpdateOverlay')) return; // 已有拦截页，避免重复叠加
+            // 先藏掉启动加载层，避免挡在拦截页前面
+            try { if (window._hideLoadingScreen) window._hideLoadingScreen('版本门禁'); } catch (e) {}
+            const ls = document.getElementById('appLoadingScreen');
+            if (ls) ls.style.display = 'none';
+
+            const overlay = document.createElement('div');
+            overlay.id = 'forceUpdateOverlay';
+            overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:linear-gradient(135deg,#1a1a2e,#16213e);display:flex;align-items:center;justify-content:center;padding:20px;font-family:system-ui,-apple-system,"Microsoft YaHei",sans-serif;';
+            const reason = (data.deprecatedMessage || '当前版本已无法继续使用，请更新到最新版。');
+            overlay.innerHTML = `
+                <div style="max-width:460px;width:100%;background:rgba(255,255,255,0.04);border:1px solid rgba(255,152,0,0.5);border-radius:16px;padding:28px 24px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
+                    <div style="font-size:2.2rem;margin-bottom:6px;">🔄</div>
+                    <div style="color:#ff9800;font-size:1.15rem;font-weight:bold;margin-bottom:14px;">请更新到最新版</div>
+                    <div style="color:rgba(255,255,255,0.80);font-size:0.9rem;line-height:1.7;margin-bottom:16px;">${reason}</div>
+                    <div style="background:rgba(129,199,132,0.10);border:1px solid rgba(129,199,132,0.35);border-radius:10px;padding:12px 14px;text-align:left;margin-bottom:8px;">
+                        <div style="color:rgba(255,255,255,0.78);font-size:0.82rem;line-height:1.7;">✅ <b style="color:#81c784;">直接覆盖安装，本地数据不会丢失</b>。</div>
+                        <div style="color:rgba(255,255,255,0.78);font-size:0.82rem;line-height:1.7;">⚠️ 安装时会先弹出「卸载旧版」提示，<b style="color:#81c784;">只要不勾选「删除用户数据」</b>即可无缝升级。</div>
+                    </div>
+                    <div style="color:rgba(255,255,255,0.40);font-size:0.72rem;margin:14px 0 16px;">当前版本：v${cur} ｜ 最低要求：v${data.minVersion}</div>
+                    <button id="_forceDlBtn" style="width:100%;background:linear-gradient(135deg,#ff9800,#f57c00);color:#fff;border:none;padding:13px;border-radius:10px;cursor:pointer;font-size:0.98rem;font-weight:bold;">📥 下载最新版</button>
+                    <div style="color:rgba(255,255,255,0.30);font-size:0.68rem;text-align:center;margin-top:12px;">下载地址随每次发布自动更新</div>
+                </div>`;
+            document.body.appendChild(overlay);
+
+            const btn = document.getElementById('_forceDlBtn');
+            if (btn) btn.onclick = async () => {
+                btn.disabled = true; btn.style.opacity = '0.65'; btn.style.pointerEvents = 'none';
+                btn.innerHTML = '⏳ 正在获取下载地址...';
+                const info = await fetchInstallerInfo();
+                const url = (info && info.url) ? info.url : (data.downloadUrl || '');
+                const ver = (info && info.version) ? info.version : '';
+                const name = (info && info.fileName) ? info.fileName : 'tfjl-assistant-setup.exe';
+                if (url) {
+                    showInstallerSaveDialog(url, ver, name);
+                    btn.innerHTML = '📥 下载最新版';
+                    btn.disabled = false; btn.style.opacity = ''; btn.style.pointerEvents = '';
+                } else if (data.downloadUrl) {
+                    try { navigator.clipboard.writeText(data.downloadUrl); if (typeof showToast === 'function') showToast('已复制下载地址，请粘贴到浏览器下载'); } catch (e2) {}
+                    btn.innerHTML = '📋 地址已复制';
+                } else {
+                    btn.innerHTML = '⚠️ 获取失败，请稍后重试';
+                    btn.disabled = false; btn.style.opacity = ''; btn.style.pointerEvents = '';
+                }
+            };
+        }
+
         // 初始化版本号显示（异步填充，不阻塞）
         function initVersionDisplay() {
             fillCurrentVersion();
@@ -3841,6 +3929,8 @@
                 const now = Date.now();
                 if (now - lastRun < 600000) return; // 10 分钟节流，防 SW 反复触发
                 lastRun = now;
+                // 🔴 强制升级门禁：运行中复查也评估（SW 感知到新前端版本时，顺带逼后台常开的旧版）
+                checkVersionGate().catch(() => {});
                 autoCheckUpdate();
             };
         })();
