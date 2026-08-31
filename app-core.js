@@ -22919,45 +22919,12 @@ ${maSection}
         // ==================== 管理员面板 ====================
         const ADMIN_VERIFY_KEY = 'TFJL_Admin_Verified';
         const ADMIN_VERIFY_HASH = 'v2$jkYsjc997BlgafRUyLlagKL62W1iBYfvH2fq1cJBbDs=';
-        let adminLongPressTimer = null;
-        let adminLongPressTriggered = false;
-
         document.addEventListener('DOMContentLoaded', () => {
             // 管理员还原按钮：仅 URL ?admin=1 或已激活时才显示
             showAdminRestoreBtnIfAllowed();
-            // 🔴 修复「长按管理员菜单没反应」：#mainHeader 实际是 <h1> 里只包住 🛡️ 的小 <span>，
-            // 长按整条标题栏根本命中不了它。改绑整个 <h1> 标题栏，长按 2 秒即可触发。
-            const header = document.querySelector('h1') || document.getElementById('mainHeader');
-            // 🔴 明显入口：标题栏 🔧 按钮点击直接开管理员面板（长按 2 秒的兜底，避免长按难触发）
+            // 🔧 管理员面板入口：标题栏 🔧 按钮点击直接开（已移除长按触发，避免普通用户误触/歧义）
             const adminEntryBtn = document.getElementById('adminEntryBtn');
             if (adminEntryBtn) adminEntryBtn.addEventListener('click', () => openAdminPanel());
-            header.addEventListener('mousedown', (e) => {
-                e.preventDefault();
-                adminLongPressTriggered = false;
-                adminLongPressTimer = setTimeout(() => {
-                    adminLongPressTriggered = true;
-                    openAdminPanel();
-                }, 2000);
-            });
-            header.addEventListener('mouseup', () => {
-                clearTimeout(adminLongPressTimer);
-            });
-            header.addEventListener('mouseleave', () => {
-                clearTimeout(adminLongPressTimer);
-            });
-            header.addEventListener('touchstart', (e) => {
-                adminLongPressTriggered = false;
-                adminLongPressTimer = setTimeout(() => {
-                    adminLongPressTriggered = true;
-                    openAdminPanel();
-                }, 2000);
-            }, { passive: true });
-            header.addEventListener('touchend', () => {
-                clearTimeout(adminLongPressTimer);
-            });
-            header.addEventListener('touchcancel', () => {
-                clearTimeout(adminLongPressTimer);
-            });
 
             // 隐藏触发：三击标题强制清缓存+硬刷新（防缓存死循环）
             let titleClickCount = 0;
