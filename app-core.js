@@ -20083,7 +20083,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 </div>`;
             }).join('');
             
-            scroller.innerHTML = html;
+            scroller.innerHTML = filterBar + html;
             startMessageScroll();
         }
 
