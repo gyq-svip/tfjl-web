@@ -22925,7 +22925,9 @@ ${maSection}
         document.addEventListener('DOMContentLoaded', () => {
             // 管理员还原按钮：仅 URL ?admin=1 或已激活时才显示
             showAdminRestoreBtnIfAllowed();
-            const header = document.getElementById('mainHeader');
+            // 🔴 修复「长按管理员菜单没反应」：#mainHeader 实际是 <h1> 里只包住 🛡️ 的小 <span>，
+            // 长按整条标题栏根本命中不了它。改绑整个 <h1> 标题栏，长按 2 秒即可触发。
+            const header = document.querySelector('h1') || document.getElementById('mainHeader');
             header.addEventListener('mousedown', (e) => {
                 e.preventDefault();
                 adminLongPressTriggered = false;
