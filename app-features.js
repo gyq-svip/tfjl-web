@@ -7888,10 +7888,11 @@
             })();
         };
 
-        // ==================== 📸 阵容一键分享图 + 阵容码导入（2026-08-31） ====================
+        // ==================== 📸 阵容一键分享图（2026-08-31） ====================
         // 把当前上阵阵容（我方 7 格 + 队友 7 格）canvas 渲染成一张分享图：职业渐变底/皮肤图/等级徽章/
-        // 魔化🔮/融合副卡（左上金框斜切）/洗炼减伤，底部附「阵容码」（TFJL1.xxx）。
-        // 接收方两条路一键复刻：①菜单「📥 从短码导入」粘贴码 ②打开分享链接（#lineup=码）自动弹导入。
+        // 魔化🔮/融合副卡（左上金框斜切）/洗炼减伤，底部附 8 位项目短码 + 二维码。
+        // 分享即整个项目上传 Gist（阵容+脚本+记事本），接收方报短码 / 扫码 / 点 #pg= 链接 →
+        // 与「分享整个项目」同款导入（完整项目），不再有独立的阵容码/离线码链路。
         // 数据源直接读 DOM 槽位：所见即所得，皮肤层 <img> 已解码（blob:/asset: 同源无跨域），canvas 不污染。
 
         // 职业渐变（与 styles.css .battle-slot.filled[data-profession] 保持一致，改 CSS 记得同步这里）
@@ -7952,26 +7953,6 @@
                 });
             });
             return out;
-        }
-
-        // ---- 阵容码编解码（UTF-8 安全 Base64，前缀 TFJL1. 便于识别/容错） ----
-        function _lineupEncode(data) {
-            return 'TFJL1.' + btoa(unescape(encodeURIComponent(JSON.stringify(data))));
-        }
-        function _lineupDecode(code) {
-            let s = String(code || '').trim();
-            const p = s.indexOf('TFJL1.');
-            if (p >= 0) s = s.slice(p + 6);              // 容忍「前面带说明文字」的整段粘贴
-            s = s.replace(/\s+/g, '');
-            if (!s) throw new Error('阵容码为空');
-            const m = /^[A-Za-z0-9+/=]+/.exec(s);        // 容忍「后面带说明文字」（聊天里整段复制）
-            if (!m || !m[0]) throw new Error('阵容码为空');
-            const json = decodeURIComponent(escape(atob(m[0])));
-            const data = JSON.parse(json);
-            if (!data || data.t !== 'TFJL' || !Array.isArray(data.my) || !Array.isArray(data.tm)) {
-                throw new Error('不是有效的阵容码（缺少我方/队友数据）');
-            }
-            return data;
         }
 
         // ---- canvas 绘图小工具 ----
@@ -8097,9 +8078,9 @@
             }
         }
 
-        // 生成分享图 canvas（含标题/两行阵容+手牌/短码或阵容码/品牌脚注）
-        // qrText：传入短链文本时在码区右侧绘制二维码（扫码直达网页版并自动弹导入）
-        // shortCode：传入 8 位分享短码时码区用大字短码替代 4 行长码（长码曾因截断抄错）
+        // 生成分享图 canvas（含标题/两行阵容+手牌/8位项目短码/品牌脚注）
+        // qrText：传入项目短链（#pg=）时在码区右侧绘制二维码（扫码直达网页版并自动弹导入）
+        // shortCode：8 位项目分享短码（整个项目已上传 Gist，导入方输码即得完整项目）
         async function _lineupBuildCanvas(qrText, shortCode) {
             const my = _lineupCollect('u');
             const tm = _lineupCollect('t');
@@ -8122,27 +8103,10 @@
             const drTxt = function (id) { const el = document.getElementById(id); const m = el && /([\d.]+)/.exec(el.textContent || ''); return m ? m[1] : null; };
             const myDr = drTxt('myDamageReduction'), tmDr = drTxt('teammateDamageReduction');
 
-            // 阵容码（导入方据此复刻：卡名/槽位/等级/皮肤/魔化；s='h' 为手牌未上阵）
-            const payload = { t: 'TFJL', v: 2, n: projName, by: nick, d: dateStr, my: [], tm: [] };
-            const pushCards = function (arr, target) {
-                arr.forEach(function (c) {
-                    if (!c) return;
-                    target.push({ s: c.slot, n: c.name, l: c.level, k: c.skin || '', m: c.mohua ? 1 : 0 });
-                });
-            };
-            pushCards(my, payload.my); pushCards(tm, payload.tm);
-            pushCards(myHand, payload.my); pushCards(tmHand, payload.tm);
-            const code = _lineupEncode(payload);
-
-            // 高度按阵容码行数自适应（最多展示 3 行，超出省略，完整码在弹窗里复制）
-            const codeLines = [];
-            for (let i = 0; i < code.length && codeLines.length < 3; i += 70) codeLines.push(code.slice(i, i + 70));
-            const codeTruncated = code.length > 3 * 70;
-
-            // 二维码区（短链版才有）：短码/阵容码框右侧 132px + 下方说明
+            // 二维码区（项目短链版才有）：短码框右侧 132px + 下方说明
             const QR_SIZE = 132;
             const hasQr = !!(qrText && typeof window.qrcode === 'function');
-            const codeOnlyH = shortCode ? 92 : (36 + codeLines.length * 18);
+            const codeOnlyH = 92;
             const codeBoxH = hasQr ? Math.max(codeOnlyH, QR_SIZE + 40) : codeOnlyH;
 
             // 高度公式（与下方绘制严格对应）：头部 + 两行阵容 + 手牌行 + 码区 + 推广语脚注（64：大字推广语 19px + 生成信息 14px）
@@ -8229,7 +8193,7 @@
             drawRow('👥 队友', tm, tmDr, '#81c784');
             drawHandRow('🃏 队友手牌', tmHand, '#81c784');
 
-            // 短码区（首选，8 位大字）或长码区（降级）；有二维码时右侧留出 QR 位
+            // 短码区（8 位大字；上传失败无码时给重试提示）；有二维码时右侧留出 QR 位
             y += 8;
             ctx.fillStyle = 'rgba(255,255,255,0.05)';
             _lineupRoundRect(ctx, PAD, y, W - PAD * 2, codeBoxH, 10);
@@ -8239,25 +8203,19 @@
             ctx.stroke();
             ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
             if (shortCode) {
-                // 短码大字：8 位一屏放得下，替代 3 行长码（长码曾因截断抄错）
                 ctx.fillStyle = '#ffd700';
                 ctx.font = 'bold 16px "Microsoft YaHei", sans-serif';
-                ctx.fillText(hasQr ? '🎫 分享短码（右扫码 / 软件内输码，均可一键复刻）' : '🎫 分享短码（在软件「📥 从短码导入」输入即可复刻）', PAD + 14, y + 20);
+                ctx.fillText(hasQr ? '🎫 项目分享短码（右扫码 / 软件内输码，导入完整项目）' : '🎫 项目分享短码（在软件「📥 从短码导入」输入即可）', PAD + 14, y + 20);
                 ctx.fillStyle = '#ffd700';
                 ctx.font = 'bold 32px Consolas, "Courier New", monospace';
                 ctx.fillText(shortCode, PAD + 14, y + 56);
                 ctx.fillStyle = 'rgba(255,255,255,0.55)';
                 ctx.font = '13px "Microsoft YaHei", sans-serif';
-                ctx.fillText('👆 8 位短码，在软件菜单「📥 从短码导入」输入 → 一键复刻（含手牌）', PAD + 14, y + 82);
+                ctx.fillText('👆 8 位短码，在软件菜单「📥 从短码导入」输入 → 导入完整项目（阵容+脚本+记事本）', PAD + 14, y + 82);
             } else {
-                ctx.fillStyle = '#ffd700';
+                ctx.fillStyle = '#ff8a80';
                 ctx.font = 'bold 16px "Microsoft YaHei", sans-serif';
-                ctx.fillText(hasQr ? '📋 阵容码（左复制右扫码，均可一键复刻）' : '📋 阵容码（复制后可在软件「📥 从短码导入」一键复刻）', PAD + 14, y + 19);
-                ctx.fillStyle = 'rgba(255,255,255,0.75)';
-                ctx.font = '13px Consolas, "Courier New", monospace';
-                codeLines.forEach(function (line, i) {
-                    ctx.fillText(line + (codeTruncated && i === codeLines.length - 1 ? ' …' : ''), PAD + 14, y + 38 + i * 18);
-                });
+                ctx.fillText('⚠️ 分享短码生成失败（网络/限额），图片仅供查看，请重新分享', PAD + 14, y + 48);
             }
             // 二维码：右下角白底黑码 + 说明（短链内容，扫码直达网页版自动弹导入）
             if (hasQr) {
@@ -8277,7 +8235,7 @@
                             if (qr.isDark(r, c)) ctx.fillRect(qx + off + c * cell, qy + off + r * cell, cell + 0.5, cell + 0.5);
                         }
                     }
-                } catch (e) { /* 码字超容量等异常：跳过 QR 只留阵容码 */ }
+                } catch (e) { /* 码字超容量等异常：跳过 QR 只留短码 */ }
                 ctx.textAlign = 'center';
                 ctx.fillStyle = 'rgba(255,255,255,0.6)';
                 ctx.font = '14px "Microsoft YaHei", sans-serif';
@@ -8308,15 +8266,12 @@
             ctx.font = '14px "Microsoft YaHei", sans-serif';
             ctx.fillText('塔防精灵助手 生成于 ' + dateStr + ' ' + now.toTimeString().slice(0, 5), W / 2, H - 12);
 
-            return { canvas: canvas, filled: filled, code: code, payload: payload };
+            return { canvas: canvas, filled: filled };
         }
 
-        // ---- 分享短链（功能5+6 闭环）：阵容 JSON 存公开 Gist → #lg=<gistId> 短链 → 图上二维码 ----
-        // 长链（#lineup=整码）自包含但 900+ 字符，二维码密到扫不出；短链约 80 字符，QR 小而清晰。
+        // ---- 分享短链：整个项目上传公开 Gist → #pg=<gistId> 短链 → 图上二维码 ----
         // Gist 公开可读：手机扫码（未登录网页版）也能拉取；有 token 则带上提高限额。
         const LINEUP_SHARE_WEB_BASE = 'https://gyq-svip.github.io/tfjl-web/';
-        const LINEUP_LONG_LINK_BASE = LINEUP_SHARE_WEB_BASE + '#lineup=';
-        const LINEUP_SHORT_LINK_BASE = LINEUP_SHARE_WEB_BASE + '#lg=';
 
         let _qrLibPromise = null;
         function _lineupEnsureQrLib() {
@@ -8339,45 +8294,7 @@
             return h;
         }
 
-        // 创建分享：写一个公开 Gist（lineup.json = payload 或加密包装），返回 { id, code }
-        // opts = { days: 有效期天数（0=永久）, pw: 加密密码（''=不加密） }
-        // 🔴 短码（8字符）写进 description：共享 token 下 GET /gists 列表可按描述检索，无需额外索引
-        async function _lineupCreateShortLink(payload, opts) {
-            opts = opts || {};
-            const sc = _lineupShortCodeGen();
-            const body = Object.assign({}, payload, { sc: sc });
-            if (opts.days > 0) body.exp = Date.now() + opts.days * 86400000;
-            let content = body;
-            if (opts.pw) {
-                if (typeof encryptContent !== 'function') throw new Error('加密模块不可用');
-                content = { t: 'TFJL', e: 1, sc: sc, exp: body.exp || 0, x: await encryptContent(JSON.stringify(body), opts.pw) };
-            }
-            const ctrl = new AbortController();
-            const timer = setTimeout(function () { ctrl.abort(); }, 20000);
-            let res;
-            try {
-                res = await fetch('https://api.github.com/gists', {
-                    method: 'POST',
-                    headers: Object.assign({ 'Content-Type': 'application/json' }, _lineupGistHeaders()),
-                    signal: ctrl.signal,
-                    body: JSON.stringify({
-                        description: 'TFJL分享 ' + sc + ' · ' + (payload.n || '阵容') + ' · ' + (payload.by || '匿名') + ' ' + (payload.d || '') + ' · ' + (opts.days > 0 ? '有效' + opts.days + '天' : '永久') + (opts.pw ? ' · 加密' : ''),
-                        public: true,
-                        files: { 'lineup.json': { content: JSON.stringify(content) } }
-                    })
-                });
-            } finally { clearTimeout(timer); }
-            if (!res.ok) {
-                let msg = '创建分享失败 (' + res.status + ')';
-                try { const j = await res.json(); if (j && j.message) msg += '：' + j.message; } catch (e) {}
-                throw new Error(msg);
-            }
-            const data = await res.json();
-            if (!data || !data.id) throw new Error('创建分享失败（未返回 gist id）');
-            return { id: data.id, code: sc };
-        }
-
-        // 8 字符短码（大小写字母+数字，去易混淆 0O1lI）
+        // 8 字符短码（大小写字母+数字，去易混淆 0O1lI）——项目分享 Gist 的 description 检索 key
         function _lineupShortCodeGen() {
             const ALPHA = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
             const bytes = (window.crypto && crypto.getRandomValues) ? crypto.getRandomValues(new Uint8Array(8)) : null;
@@ -8389,72 +8306,9 @@
             return s;
         }
 
-        // 拉取分享：按 gist id 读 lineup.json → 解密/校验/有效期 → 转回阵容码（复用现有导入链路）
-        async function _lineupFetchShort(gistId) {
-            const ctrl = new AbortController();
-            const timer = setTimeout(function () { ctrl.abort(); }, 15000);
-            let res;
-            try {
-                res = await fetch('https://api.github.com/gists/' + encodeURIComponent(gistId), {
-                    headers: _lineupGistHeaders(), signal: ctrl.signal
-                });
-            } finally { clearTimeout(timer); }
-            if (!res.ok) throw new Error('读取分享失败 (' + res.status + (res.status === 404 ? '：分享可能已被删除' : '') + ')');
-            const g = await res.json();
-            const f = g && g.files && g.files['lineup.json'];
-            if (!f || !f.content) throw new Error('分享内容缺失（lineup.json 不存在）');
-            return await _lineupResolveShareContent(f.content);
-        }
-
-        // 短码 → 阵容码：GET /gists（共享 token 认证列表）按 description「TFJL分享 <code> 」翻页匹配
-        async function _lineupFetchByShortCode(code) {
-            code = String(code || '').trim();
-            if (!code) throw new Error('短码为空');
-            const marker = 'TFJL分享 ' + code + ' ';
-            for (let page = 1; page <= 5; page++) {
-                const ctrl = new AbortController();
-                const timer = setTimeout(function () { ctrl.abort(); }, 15000);
-                let res;
-                try {
-                    res = await fetch('https://api.github.com/gists?per_page=100&page=' + page, {
-                        headers: _lineupGistHeaders(), signal: ctrl.signal
-                    });
-                } finally { clearTimeout(timer); }
-                if (!res.ok) throw new Error('查询分享失败 (' + res.status + ')');
-                const list = await res.json();
-                if (!Array.isArray(list) || !list.length) break;
-                const hit = list.find(function (g) { return g && typeof g.description === 'string' && g.description.indexOf(marker) === 0; });
-                if (hit && hit.id) return await _lineupFetchShort(hit.id);
-                if (list.length < 100) break;
-            }
-            throw new Error('没有找到短码 ' + code + ' 的分享（可能已删除或输错了）');
-        }
-
-        // gist 内容 → 校验/解密/有效期 → TFJL1. 阵容码
-        async function _lineupResolveShareContent(raw) {
-            let payload;
-            try { payload = JSON.parse(raw); } catch (e) { throw new Error('分享内容损坏（JSON 解析失败）'); }
-            // 加密版：弹密码解密（需求墙同款 PBKDF2+AES-GCM）
-            if (payload && payload.t === 'TFJL' && payload.e === 1 && typeof payload.x === 'string') {
-                const pw = window.prompt('这份阵容分享已加密 🔒\n请输入分享者设置的密码：', '');
-                if (pw === null) { const e0 = new Error('已取消'); e0.cancelled = true; throw e0; }
-                if (typeof decryptContent !== 'function') throw new Error('解密模块不可用');
-                let json;
-                try { json = await decryptContent(payload.x, pw); }
-                catch (e) { throw new Error('密码错误或内容损坏'); }
-                try { payload = JSON.parse(json); } catch (e) { throw new Error('密码错误或内容损坏'); }
-            }
-            if (!payload || payload.t !== 'TFJL' || !Array.isArray(payload.my) || !Array.isArray(payload.tm)) {
-                throw new Error('不是有效的阵容分享');
-            }
-            if (payload.exp && Date.now() > payload.exp) {
-                throw new Error('⏰ 这份阵容分享已过期，请联系分享者重新分享');
-            }
-            return _lineupEncode(payload);
-        }
-
-        // 📸 分享阵容图：先选有效期/密码 → 生成图+Gist短码 → 弹窗预览（短码大字）+ 下载/复制
-        // 短链/二维码任一环节失败自动降级（纯阵容码+长链），分享功能不受影响。
+        // 📸 分享阵容图：先选有效期/密码 → 整个项目上传 Gist（含脚本/记事本/参考图）→ 生成图+短码 → 弹窗预览
+        // 对方扫码 / 报短码 / 点链接 → 与「分享整个项目」同款导入（完整项目，非纯阵容）。
+        // 上传失败自动降级为纯图片（无短码，图上有重试提示），分享功能不受影响。
         async function shareLineupImage() {
             if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('分享阵容图');
             // 1) 分享选项：有效期 + 可选密码（需求墙同款 PBKDF2+AES-GCM 加密）
@@ -8470,21 +8324,25 @@
                 if (typeof showToast === 'function') showToast('当前阵容是空的（我方和队友都没有上阵卡），先摆好阵容再分享', 'error');
                 return;
             }
-            // 生成分享（写 Gist，可能数秒）：右上角浮条提示，断网/限额静默降级
+            // 整个项目上传 Gist（与「分享整个项目」同一条链路）：右上角浮条提示，断网/限额静默降级
             let shortLink = '', shortCode = '';
-            if (result.payload) {
+            {
                 const tip = document.createElement('div');
                 tip.style.cssText = 'position:fixed;top:14px;right:14px;z-index:' + (200000 + (window.topWinZIndex || 0)) + ';background:rgba(20,20,40,0.92);border:1px solid rgba(255,215,0,0.4);color:#ffd700;padding:8px 14px;border-radius:8px;font-size:0.82rem;box-shadow:0 4px 16px rgba(0,0,0,0.5);';
-                tip.textContent = opts.pw ? '⏳ 正在加密并生成分享…' : '⏳ 正在生成分享短码…';
+                tip.textContent = opts.pw ? '⏳ 正在加密并上传项目…' : '⏳ 正在上传项目生成短码…';
                 document.body.appendChild(tip);
                 try {
-                    const r = await _lineupCreateShortLink(result.payload, opts);
-                    shortLink = LINEUP_SHORT_LINK_BASE + r.id;
+                    opts.by = (function () { try { return localStorage.getItem('TFJL_UserName') || '匿名'; } catch (e) { return '匿名'; } })();
+                    const r = await _projShareCreate(_projShareBuildPayload(), opts);
+                    shortLink = PROJECT_SHARE_LINK_BASE + r.id;
                     shortCode = r.code;
-                } catch (e) { shortLink = ''; shortCode = ''; }
+                } catch (e) {
+                    shortLink = ''; shortCode = '';
+                    if (typeof showToast === 'function') showToast('❌ 项目上传失败（' + (e && e.message || e) + '），图片无短码', 'error');
+                }
                 tip.remove();
             }
-            // 短链成功且二维码库就绪 → 带二维码+短码重画（右下角扫码直达导入）
+            // 上传成功且二维码库就绪 → 带二维码+短码重画（右下角扫码直达项目导入）
             if (shortLink) {
                 try {
                     await _lineupEnsureQrLib();
@@ -8499,9 +8357,8 @@
                 if (typeof showToast === 'function') showToast('❌ 图片导出被浏览器安全策略拦截（皮肤图跨域），请截图分享', 'error');
                 return;
             }
-            const code = result.code;
-            // 链接优先短链（与二维码同款，~80字符）；降级用长链（整码自包含，可离线复刻）
-            const link = shortLink || (LINEUP_LONG_LINK_BASE + encodeURIComponent(code));
+            // 短链（#pg= 项目短链，~80字符，与二维码同款）；上传失败则无链接按钮
+            const link = shortLink;
 
             const old = document.getElementById('lineupShareModal');
             if (old) old.remove();
@@ -8512,7 +8369,7 @@
                 '<div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(255,215,0,0.45);border-radius:16px;padding:18px 20px;max-width:860px;width:96%;max-height:92vh;overflow-y:auto;box-shadow:0 10px 40px rgba(0,0,0,0.6);">' +
                   '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
                     '<div><span style="color:#ffd700;font-size:1.1rem;font-weight:bold;">📸 阵容分享图</span>' +
-                    '<div style="color:rgba(255,255,255,0.45);font-size:0.74rem;margin-top:2px;">' + (shortCode ? '发到群里，对方<b style="color:#ffd54f;">报短码</b>、<b style="color:#ffd54f;">扫码</b>或点链接即可一键复刻阵容' : '发到群里，对方保存图片即可看阵容；复制阵容码/链接可一键复刻') + '</div></div>' +
+                    '<div style="color:rgba(255,255,255,0.45);font-size:0.74rem;margin-top:2px;">' + (shortCode ? '整个项目已上传云端（阵容+脚本+记事本），对方<b style="color:#ffd54f;">报短码</b>、<b style="color:#ffd54f;">扫码</b>或点链接即可导入完整项目' : '项目上传失败，图片仅供查看，请重新分享') + '</div></div>' +
                     '<span id="lineupShareClose" style="cursor:pointer;color:rgba(255,255,255,0.4);font-size:1.5rem;">×</span>' +
                   '</div>' +
                   '<img id="lineupShareImg" style="width:100%;border-radius:10px;display:block;box-shadow:0 4px 18px rgba(0,0,0,0.5);" alt="阵容分享图">' +
@@ -8530,14 +8387,9 @@
                     '<button id="lineupShareCopyImg" style="flex:1;min-width:120px;background:linear-gradient(135deg,#26a69a,#00796b);color:#fff;border:none;padding:10px;border-radius:8px;cursor:pointer;font-size:0.9rem;font-weight:bold;">📋 复制图片</button>' +
                     (link ? '<button id="lineupShareCopyLink" style="flex:1;min-width:120px;background:linear-gradient(135deg,#ab47bc,#6a1b9a);color:#fff;border:none;padding:10px;border-radius:8px;cursor:pointer;font-size:0.9rem;font-weight:bold;">🔗 复制链接</button>' : '') +
                   '</div>' +
-                  '<div style="margin-top:10px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:8px 10px;">' +
-                    '<div style="color:rgba(255,255,255,0.45);font-size:0.72rem;margin-bottom:4px;">完整阵容码（离线兜底，对方在软件菜单「📥 从短码导入」粘贴）：</div>' +
-                    '<textarea id="lineupShareCodeTa" readonly style="width:100%;box-sizing:border-box;height:64px;background:rgba(0,0,0,0.35);color:#cfd8dc;border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:6px 8px;font-size:0.72rem;font-family:Consolas,monospace;resize:none;"></textarea>' +
-                  '</div>' +
                 '</div>';
             document.body.appendChild(modal);
             modal.querySelector('#lineupShareImg').src = dataUrl;
-            modal.querySelector('#lineupShareCodeTa').value = code;
             const close = function () { modal.remove(); };
             modal.querySelector('#lineupShareClose').onclick = close;
             modal.onclick = function (e) { if (e.target === modal) close(); };
@@ -8595,8 +8447,6 @@
             };
             const shortBtn = modal.querySelector('#lineupShareCopyShort');
             if (shortBtn) shortBtn.onclick = function () { copyText(shortCode, '📋 短码 ' + shortCode + ' 已复制：发给对方，在软件「从短码导入」输入即可', shortBtn); };
-            const codeTa = modal.querySelector('#lineupShareCodeTa');
-            if (codeTa) codeTa.onclick = function () { codeTa.select(); };
             const linkBtn = modal.querySelector('#lineupShareCopyLink');
             if (linkBtn) linkBtn.onclick = function () { copyText(link, '🔗 分享链接已复制：对方浏览器/软件打开会自动弹导入', linkBtn); };
 
@@ -8622,7 +8472,7 @@
                 modal.innerHTML =
                     '<div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(255,215,0,0.45);border-radius:14px;padding:18px 20px;max-width:460px;width:94%;box-shadow:0 10px 40px rgba(0,0,0,0.6);">' +
                       '<div style="color:' + (isProj ? '#ce93d8' : '#ffd700') + ';font-size:1.05rem;font-weight:bold;margin-bottom:4px;">' + (isProj ? '📤 分享项目设置' : '📤 分享阵容设置') + '</div>' +
-                      '<div style="color:rgba(255,255,255,0.5);font-size:0.74rem;margin-bottom:12px;">' + (isProj ? '整个项目（阵容+脚本+记事本+参考图）打包上传云端，生成 8 位短码，对方报短码 / 点链接即可导入成新项目' : '生成分享图 + 8 位短码，对方扫码 / 报短码 / 点链接均可一键复刻（含手牌）') + '</div>' +
+                      '<div style="color:rgba(255,255,255,0.5);font-size:0.74rem;margin-bottom:12px;">' + (isProj ? '整个项目（阵容+脚本+记事本+参考图）打包上传云端，生成 8 位短码，对方报短码 / 点链接即可导入成新项目' : '整个项目（阵容+脚本+记事本）上传云端生成分享图 + 8 位短码，对方扫码 / 报短码 / 点链接导入完整项目') + '</div>' +
                       '<div style="color:rgba(255,255,255,0.65);font-size:0.78rem;margin-bottom:5px;">有效期</div>' +
                       '<select id="lineupShareDays" style="width:100%;box-sizing:border-box;background:rgba(0,0,0,0.35);color:#fff;border:1px solid rgba(255,255,255,0.25);border-radius:8px;padding:9px 10px;font-size:0.84rem;cursor:pointer;">' +
                         '<option value="30" selected>30 天（推荐）</option>' +
@@ -8691,519 +8541,21 @@
         }
         window._importPromptNewCategory = _importPromptNewCategory;
 
-        // 📥 从短码导入：弹窗粘贴 → 复刻到我方/队友上阵（含等级/皮肤/魔化）
-        function importLineupCode(prefillCode) {
-            const old = document.getElementById('lineupImportModal');
-            if (old) old.remove();
-            const modal = document.createElement('div');
-            modal.id = 'lineupImportModal';
-            modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.72);z-index:' + (200000 + (window.topWinZIndex || 0)) + ';display:flex;align-items:center;justify-content:center;padding:16px;';
-            modal.innerHTML =
-                '<div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(79,195,247,0.45);border-radius:16px;padding:18px 20px;max-width:560px;width:96%;box-shadow:0 10px 40px rgba(0,0,0,0.6);">' +
-                  '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">' +
-                    '<span style="color:#4fc3f7;font-size:1.05rem;font-weight:bold;">📥 从短码导入</span>' +
-                    '<span id="lineupImportClose" style="cursor:pointer;color:rgba(255,255,255,0.4);font-size:1.5rem;">×</span>' +
-                  '</div>' +
-                  '<div style="color:rgba(255,255,255,0.55);font-size:0.78rem;margin-bottom:10px;line-height:1.5;">粘贴对方分享的<b style="color:#ffb74d;">阵容码 / 分享链接</b>，或直接输入 8 位<b style="color:#ffd700;">分享短码</b>（TFJL1. 开头 / 含 #lg= 的链接 / 纯 8 位短码均可），一键复刻整个阵容（<b style="color:#ffd54f;">上阵7+手牌3</b> 每人最多10张，含等级/皮肤/魔化）。</div>' +
-                  '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">' +
-                    '<span style="color:rgba(255,255,255,0.65);font-size:0.78rem;flex-shrink:0;">项目分类：</span>' +
-                    '<select id="lineupImportCat" title="选择要导入到哪个分类（默认当前分类）；下拉里可直接新建" style="flex:1;background:rgba(0,0,0,0.35);color:#fff;border:1px solid rgba(255,255,255,0.25);border-radius:6px;padding:6px 8px;font-size:0.8rem;cursor:pointer;">' +
-                      '<option value="__NEWCAT__">➕ 新建分类…</option>' +
-                    '</select>' +
-                  '</div>' +
-                  '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">' +
-                    '<span style="color:rgba(255,255,255,0.65);font-size:0.78rem;flex-shrink:0;">选择项目：</span>' +
-                    '<select id="lineupImportTarget" title="新建项目（命名导入）置顶；选现有项目=覆盖该项目的阵容；当前项目排最前" style="flex:1;background:rgba(0,0,0,0.35);color:#fff;border:1px solid rgba(255,255,255,0.25);border-radius:6px;padding:6px 8px;font-size:0.8rem;cursor:pointer;">' +
-                      '<option value="__NEW__">➕ 新建项目…</option>' +
-                    '</select>' +
-                  '</div>' +
-                  '<textarea id="lineupImportTa" placeholder="TFJL1.xxxxxx..." style="width:100%;box-sizing:border-box;height:110px;background:rgba(0,0,0,0.35);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:8px;padding:10px;font-size:0.8rem;font-family:Consolas,monospace;resize:none;"></textarea>' +
-                  '<div id="lineupImportInfo" style="color:rgba(255,255,255,0.5);font-size:0.72rem;margin-top:6px;min-height:1em;"></div>' +
-                  '<div style="display:flex;gap:10px;margin-top:12px;">' +
-                    '<button id="lineupImportCancel" style="flex:1;background:rgba(255,255,255,0.08);color:#fff;border:1px solid rgba(255,255,255,0.2);padding:10px;border-radius:8px;cursor:pointer;">取消</button>' +
-                    '<button id="lineupImportOk" style="flex:1.6;background:linear-gradient(135deg,#66bb6a,#2e7d32);color:#fff;border:none;padding:10px;border-radius:8px;cursor:pointer;font-weight:bold;">✅ 导入阵容</button>' +
-                  '</div>' +
-                '</div>';
-            document.body.appendChild(modal);
-            const ta = modal.querySelector('#lineupImportTa');
-            const info = modal.querySelector('#lineupImportInfo');
-            const targetSel = modal.querySelector('#lineupImportTarget');
-            if (prefillCode) ta.value = prefillCode;
-            // 异步填充「分类 + 项目」：对齐主界面顶部选择器——分类下拉默认选中当前项目
-            // 所在分类（直接列出所有分类，不做跨分类汇总）；项目下拉 = ➕新建置顶 +
-            // 该分类下项目（当前项目排最前并标注「当前」）
-            (async function () {
-                let full = [];
-                try { full = await (typeof loadProjectListFromDB === 'function' ? loadProjectListFromDB() : (window.__tfjlLoadProjectList ? window.__tfjlLoadProjectList() : [])); } catch (e) { full = []; }
-                const catSel = modal.querySelector('#lineupImportCat');
-                if (!catSel || !targetSel) return;
-                const cur = (typeof currentProjectName !== 'undefined') ? currentProjectName : '';
-                const curCat = (typeof currentProjectCategory !== 'undefined' && currentProjectCategory) ? String(currentProjectCategory) : '';
-                const catSet = new Set();
-                try { if (typeof categories !== 'undefined' && Array.isArray(categories)) categories.forEach(c => catSet.add(c)); } catch (e) {}
-                full.forEach(function (p) { if (p.category) catSet.add(p.category); });
-                const cats = Array.from(catSet).sort(function (a, b) { return a.localeCompare(b, 'zh'); });
-                cats.forEach(function (c) {
-                    const o = document.createElement('option');
-                    o.value = c; o.textContent = '📁 ' + c;
-                    catSel.appendChild(o);
-                });
-                const defCat = (curCat && cats.indexOf(curCat) >= 0) ? curCat : cats[0];
-                if (defCat) catSel.value = defCat;
-                // 目标列表重建：固定项只留「➕ 新建项目…」置顶，其余 = 该分类下项目
-                const rebuild = function () {
-                    while (targetSel.options.length > 1) targetSel.remove(1);
-                    const cat = catSel.value;
-                    if (!cat || cat === '__NEWCAT__') return;
-                    full.filter(function (p) { return p.category === cat; })
-                        .sort(function (a, b) { return a.name.localeCompare(b.name, 'zh'); })
-                        .forEach(function (p) {
-                            const o = document.createElement('option');
-                            o.value = p.name;
-                            o.textContent = p.name + (p.name === cur ? '（当前）' : '');
-                            // 当前项目排到最前（选它=覆盖当前打开的项目并刷新工作区）
-                            if (p.name === cur) targetSel.insertBefore(o, targetSel.options[1]);
-                            else targetSel.appendChild(o);
-                        });
-                };
-                // 🔴 2026-08-31 分类下拉含「➕ 新建分类…」：选它弹输入框创建（共用 _importPromptNewCategory），
-                //    取消回退上一个分类；创建成功插入选项并选中，项目列表随之过滤（新分类下=空→只剩新建置顶）
-                catSel._prevCat = defCat || '';
-                catSel.onchange = function () {
-                    if (catSel.value === '__NEWCAT__') {
-                        const nm = (typeof window._importPromptNewCategory === 'function') ? window._importPromptNewCategory() : null;
-                        if (!nm) {
-                            catSel.value = catSel._prevCat || (catSel.options[0] && catSel.options[0].value !== '__NEWCAT__' ? catSel.options[0].value : '');
-                        } else {
-                            let has = false;
-                            for (let i = 0; i < catSel.options.length; i++) { if (catSel.options[i].value === nm) { has = true; break; } }
-                            if (!has) {
-                                const o = document.createElement('option');
-                                o.value = nm; o.textContent = '📁 ' + nm;
-                                catSel.insertBefore(o, catSel.querySelector('option[value="__NEWCAT__"]'));
-                            }
-                            catSel.value = nm;
-                        }
-                    }
-                    catSel._prevCat = catSel.value;
-                    rebuild();
-                };
-                rebuild();
-            })();
-            const close = function () { modal.remove(); };
-            modal.querySelector('#lineupImportClose').onclick = close;
-            modal.querySelector('#lineupImportCancel').onclick = close;
-            modal.onclick = function (e) { if (e.target === modal) close(); };
-            modal.querySelector('#lineupImportOk').onclick = async function () {
-                const raw = (ta.value || '').trim();
-                let data;
-                // 项目分享链接直接转项目导入（#pg= 是项目短链，不是阵容）
-                const mProj = /(?:^|[&#])pg=([A-Za-z0-9_-]+)/.exec(raw);
-                if (mProj) {
-                    info.style.color = '#ffd54f';
-                    info.textContent = '⏳ 这是项目分享链接，正在拉取…';
-                    try {
-                        const body = await _projShareFetchById(mProj[1]);
-                        close();
-                        if (typeof showToast === 'function') showToast('✅ 已拉取项目「' + ((body.project && body.project.name) || '') + '」，选择名称和分类后导入', 'success');
-                        _projShareImportBody(body);
-                    } catch (e) {
-                        if (e && e.cancelled) { info.style.color = 'rgba(255,255,255,0.5)'; info.textContent = '已取消'; return; }
-                        info.style.color = '#ff8a80'; info.textContent = '❌ ' + (e && e.message || e);
-                    }
-                    return;
-                }
-                // 输入识别优先级：#lineup=/#lg= 链接 > 8位分享短码 > TFJL1. 整码
-                const mLong = /(?:^|[&#])lineup=([A-Za-z0-9+/=%._-]+)/.exec(raw);
-                const mShort = !mLong && /(?:^|[&#])lg=([A-Za-z0-9_-]+)/.exec(raw);
-                const isShortCode = !mLong && !mShort && raw.indexOf('TFJL1.') !== 0 && /^[A-Za-z0-9]{6,10}$/.test(raw);
-                if (mLong || mShort || isShortCode) {
-                    info.style.color = '#ffd54f';
-                    info.textContent = isShortCode ? '⏳ 正在查询短码 ' + raw + ' …' : '⏳ 正在解析分享链接…';
-                    try {
-                        const code = mLong ? decodeURIComponent(mLong[1]) : (mShort ? await _lineupFetchShort(mShort[1]) : await _lineupFetchByShortCode(raw));
-                        data = _lineupDecode(code);
-                        ta.value = code;   // 回填解析出的码，便于复看/转发
-                    } catch (e) {
-                        if (e && e.cancelled) { info.style.color = 'rgba(255,255,255,0.5)'; info.textContent = '已取消'; return; }
-                        // 8 位短码查不到阵容 → 自动按项目分享再查一次，命中则转项目导入
-                        if (isShortCode && /没有找到短码/.test(e && e.message || '')) {
-                            info.textContent = '⏳ 不是阵容短码，尝试按项目分享查询…';
-                            try {
-                                const body = await _projShareFetchByCode(raw);
-                                close();
-                                if (typeof showToast === 'function') showToast('✅ 这是完整项目分享，已为你切换到项目导入', 'success');
-                                _projShareImportBody(body);
-                            } catch (e2) {
-                                if (e2 && e2.cancelled) { info.style.color = 'rgba(255,255,255,0.5)'; info.textContent = '已取消'; return; }
-                                info.style.color = '#ff8a80'; info.textContent = '❌ ' + (e2 && e2.message || e2);
-                            }
-                            return;
-                        }
-                        info.style.color = '#ff8a80'; info.textContent = '❌ ' + (e && e.message || e); return;
-                    }
-                } else {
-                    try { data = _lineupDecode(raw); }
-                    catch (e) { info.style.color = '#ff8a80'; info.textContent = '❌ ' + (e && e.message || e); return; }
-                }
-                const n = (data.my.length + data.tm.length);
-                const target = targetSel.value;
-                const handNote = '（含手牌，每人最多10张）';
-                // 选中当前项目（列表里标注「当前」的那项）= 覆盖当前打开的项目并刷新工作区
-                const curName = (typeof currentProjectName !== 'undefined' && currentProjectName) ? currentProjectName : '';
-                if (target === curName) {
-                    info.style.color = '#ffd54f';
-                    info.textContent = '✅ 识别成功：' + (data.n ? '「' + data.n + '」' : '') + '共 ' + n + ' 张卡' + handNote + '，将覆盖「' + curName + '」的阵容';
-                    if (!window.confirm('将覆盖当前项目「' + curName + '」的阵容（我方+队友共 ' + n + ' 张' + handNote + '）。继续？')) return;
-                    try {
-                        const r = await _lineupApply(data);
-                        close();
-                        if (typeof showToast === 'function') showToast('✅ 阵容已导入「' + curName + '」：成功 ' + r.placed + ' 张' + (r.missing.length ? '，' + r.missing.length + ' 张卡池未找到（' + r.missing.join('、') + '）' : ''), r.missing.length ? 'error' : 'success');
-                    } catch (e) {
-                        info.style.color = '#ff8a80';
-                        info.textContent = '❌ 导入失败：' + (e && e.message || e);
-                    }
-                    return;
-                }
-                // 非当前项目：不切工作区、不动当前界面，直接把阵容写进目标项目
-                try {
-                    // 新建项目时带上外层已选分类（含刚新建的），新建小窗默认落在这个分类，不再重复问一遍
-                    const catS = document.getElementById('lineupImportCat');
-                    const presetCat = (catS && catS.value && catS.value !== '__NEWCAT__') ? catS.value : '';
-                    const r = (target === '__NEW__')
-                        ? await _lineupImportToNewProject(data, presetCat)
-                        : await _lineupImportToProject(target, data);
-                    close();
-                    if (r && r.missing && r.missing.length) {
-                        if (typeof showToast === 'function') showToast('✅ 已导入「' + r.target + '」：成功 ' + r.placed + ' 张，' + r.missing.length + ' 张卡池未找到（' + r.missing.join('、') + '）', 'error');
-                    } else {
-                        if (typeof showToast === 'function') showToast('✅ 阵容已导入「' + (r && r.target || '') + '」：成功 ' + (r ? r.placed : 0) + ' 张' + (r && r.opened ? '，已为你打开该项目' : '，在项目下拉切换即可查看'), 'success');
-                    }
-                } catch (e) {
-                    if (e && e.cancelled) { info.style.color = 'rgba(255,255,255,0.5)'; info.textContent = '已取消'; return; }
-                    info.style.color = '#ff8a80';
-                    info.textContent = '❌ 导入失败：' + (e && e.message || e);
-                }
-            };
-        }
-
-        // IndexedDB 读取项目原始数据（不动当前工作区）
-        function _lineupGetProject(name) {
-            return new Promise(function (resolve, reject) {
-                try {
-                    if (typeof db === 'undefined' || !db) { reject(new Error('数据库未就绪')); return; }
-                    const tx = db.transaction([STORE_NAME], 'readonly');
-                    const req = tx.objectStore(STORE_NAME).get(name);
-                    req.onsuccess = function () { resolve(req.result || null); };
-                    req.onerror = function (ev) { reject(ev.target.error || new Error('读取失败')); };
-                } catch (e) { reject(e); }
-            });
-        }
-
-        // IndexedDB 全部项目名
-        function _lineupProjectList() {
-            return new Promise(function (resolve) {
-                try {
-                    if (typeof db === 'undefined' || !db) { resolve([]); return; }
-                    const tx = db.transaction([STORE_NAME], 'readonly');
-                    const req = tx.objectStore(STORE_NAME).getAll();
-                    req.onsuccess = function () {
-                        const list = (req.result || []).map(function (p) { return p && p.name; }).filter(Boolean);
-                        resolve(list);
-                    };
-                    req.onerror = function () { resolve([]); };
-                } catch (e) { resolve([]); }
-            });
-        }
-
-        // 阵容 payload → 纯项目卡组数据（查卡池 DOM 拿 id/type/职业；不依赖当前工作区状态）
-        function _lineupPayloadToProjectData(data) {
-            const out = {
-                myHandCards: [], teammateHandCards: [],
-                myPlacedCards: [], teammatePlacedCards: [],
-                cardSkins: {}, cardMoHua: {}
-            };
-            const missing = [];
-            let placed = 0;
-            const doSide = function (cards, isMy) {
-                const handType = isMy ? 'my' : 'teammate';
-                const hand = isMy ? out.myHandCards : out.teammateHandCards;
-                const placedArr = isMy ? out.myPlacedCards : out.teammatePlacedCards;
-                const seen = {};
-                (cards || []).forEach(function (c) {
-                    if (!c || !c.n) return;
-                    const el = document.querySelector('.card-item[data-name="' + (window.CSS && CSS.escape ? CSS.escape(c.n) : c.n) + '"]');
-                    if (!el) { missing.push(c.n); return; }
-                    const id = el.dataset.id;
-                    const isEng = el.dataset.engineering === 'true';
-                    const isHand = (c.s === 'h');
-                    if (!isHand) {
-                        if (!/^[ut][0-6]$/.test(c.s) || c.s[0] !== (isMy ? 'u' : 't')) { missing.push(c.n + '(槽位非法)'); return; }
-                        if (seen[c.s]) { missing.push(c.n + '(槽位重复)'); return; }
-                        if (isEng !== /0$/.test(c.s)) { missing.push(c.n + '(工程格不匹配)'); return; }
-                        seen[c.s] = true;
-                    }
-                    let entry = hand.find(function (h) { return h && h.id === id; });
-                    if (!entry) {
-                        entry = { id: id, name: c.n, placed: isHand ? null : c.s, isEngineering: isEng, profession: el.dataset.profession, type: el.dataset.type };
-                        hand.push(entry);
-                    } else { entry.placed = isHand ? null : c.s; }
-                    if (!isHand) placedArr.push({ id: id, name: c.n, slot: c.s, isEngineering: isEng, profession: el.dataset.profession });
-                    if (c.l !== undefined && c.l !== null && String(c.l) !== '') {
-                        if (typeof individualCardLevels !== 'undefined') individualCardLevels[handType + '_' + id] = parseInt(c.l, 10) || 1;
-                        if (typeof saveIndividualCardLevels === 'function') { try { saveIndividualCardLevels(); } catch (e) {} }
-                    }
-                    if (c.k !== undefined && c.k !== null && String(c.k) !== '') out.cardSkins[handType + '_' + id] = String(c.k);
-                    if (typeof c.m === 'number' && c.m) {
-                        out.cardMoHua[handType + '_' + id] = true;
-                        if (typeof cardMoHua !== 'undefined') { cardMoHua[handType + '_' + id] = true; }
-                        if (typeof saveCardMoHua === 'function') { try { saveCardMoHua(); } catch (e) {} }
-                    }
-                    placed++;
-                });
-            };
-            doSide(data.my, true);
-            doSide(data.tm, false);
-            return { data: out, placed: placed, missing: missing };
-        }
-
-        // 写入已有项目：读原项目 → 只替换卡组字段（记事本/参考图/脚本原样保留）→ 落库。不切换工作区。
-        // 🔴 saveProjectToDB 的 onsuccess 会把 currentProjectName/lastProject 改成本次写入的名字，
-        //    写「别的项目」时必须捕获并还原，否则界面还停在旧项目、全局名字却变成新项目（串号）。
-        async function _lineupImportToProject(name, lineup) {
-            const proj = await _lineupGetProject(name);
-            if (!proj) throw new Error('项目「' + name + '」不存在（可能已被删除，请重开导入框刷新列表）');
-            const r = _lineupPayloadToProjectData(lineup);
-            const merged = Object.assign({}, proj, r.data, {
-                myDeckInfo: proj.myDeckInfo || '',
-                teammateDeckInfo: proj.teammateDeckInfo || '',
-                cardLevels: proj.cardLevels || {},                 // 保留目标项目原值，不串入当前项目等级
-                fusionSkins: proj.fusionSkins || {},               // 同上：副卡皮肤
-                notepadMarks: Array.isArray(proj.notepadMarks) ? proj.notepadMarks : [],
-                notebookColor: proj.notebookColor || (typeof DEFAULT_NOTEBOOK_COLOR !== 'undefined' ? DEFAULT_NOTEBOOK_COLOR : '#e0e0e0'),
-                txtFiles: Array.isArray(proj.txtFiles) ? proj.txtFiles : [],
-                referenceImages: Array.isArray(proj.referenceImages) ? proj.referenceImages : []
-            });
-            if (typeof saveProjectToDB !== 'function') throw new Error('存储不可用');
-            await _lineupSaveProjectKeepCurrent(name, proj.category || '默认分类', merged);
-            return { target: name, placed: r.placed, missing: r.missing, opened: false };
-        }
-
-        // saveProjectToDB 包装：写完把 currentProjectName/Category/lastProject 还原为保存前的值
-        async function _lineupSaveProjectKeepCurrent(name, category, data) {
-            const keepName = (typeof currentProjectName !== 'undefined') ? currentProjectName : '';
-            const keepCat = (typeof currentProjectCategory !== 'undefined') ? currentProjectCategory : '';
-            let keepLast = null;
-            try { keepLast = localStorage.getItem('tdjl_lastProject'); } catch (e) {}
-            await saveProjectToDB(name, category, data, true);
-            if (typeof currentProjectName !== 'undefined') currentProjectName = keepName;
-            if (typeof currentProjectCategory !== 'undefined') currentProjectCategory = keepCat;
-            try {
-                if (keepLast === null) localStorage.removeItem('tdjl_lastProject');
-                else if (keepLast) localStorage.setItem('tdjl_lastProject', keepLast);
-            } catch (e) {}
-        }
-
-        // 新建项目并写入阵容：弹「项目名 + 分类」小窗（分类可下拉选择，符合项目分类习惯）→ 空白模板 + 卡组 → 落库
-        // presetCat：外层导入弹窗已选的分类（含刚新建的），小窗默认选中它，避免重复选
-        async function _lineupImportToNewProject(lineup, presetCat) {
-            const dlg = await _lineupNewProjectDialog(presetCat);
-            if (!dlg) { const e = new Error('已取消'); e.cancelled = true; throw e; }
-            const r = _lineupPayloadToProjectData(lineup);
-            const empty = {
-                myHandCards: r.data.myHandCards, teammateHandCards: r.data.teammateHandCards,
-                myPlacedCards: r.data.myPlacedCards, teammatePlacedCards: r.data.teammatePlacedCards,
-                cardLevels: {}, cardSkins: r.data.cardSkins, fusionSkins: {}, cardMoHua: r.data.cardMoHua,
-                myDeckInfo: '', teammateDeckInfo: '',
-                notepad: '', notepadMarks: [], txtFiles: [], referenceImages: []
-            };
-            if (typeof saveProjectToDB !== 'function') throw new Error('存储不可用');
-            await _lineupSaveProjectKeepCurrent(dlg.name, dlg.category, empty);
-            let opened = false;
-            if (window.confirm('✅ 新项目「' + dlg.name + '」已创建并导入阵容（分类：' + dlg.category + '）。\n\n要立即打开这个项目吗？')) {
-                try {
-                    await loadProjectFromDB(dlg.name);
-                    if (typeof refreshProjectSelectors === 'function') refreshProjectSelectors();
-                    opened = true;
-                } catch (e) {}
-            }
-            return { target: dlg.name, placed: r.placed, missing: r.missing, opened: opened };
-        }
-
-        // 新建项目小窗：项目名 + 分类下拉（含「➕ 新建分类…」，符合"分类在下拉里创建"的习惯）
-        // presetCat：优先默认选中的分类（外层导入弹窗已选/已新建的）
-        function _lineupNewProjectDialog(presetCat) {
-            return new Promise(function (resolve) {
-                const old = document.getElementById('lineupNewProjModal');
-                if (old) old.remove();
-                const cats = (typeof categories !== 'undefined' && Array.isArray(categories) && categories.length) ? categories.slice() : ['默认分类'];
-                let defCat = (typeof currentProjectCategory !== 'undefined' && currentProjectCategory && cats.indexOf(currentProjectCategory) >= 0) ? currentProjectCategory : cats[0];
-                if (presetCat) { defCat = presetCat; if (cats.indexOf(presetCat) < 0) cats.push(presetCat); }   // 外层已选分类优先（兜底：没登记也补进下拉）
-                const modal = document.createElement('div');
-                modal.id = 'lineupNewProjModal';
-                modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.72);z-index:' + (200001 + (window.topWinZIndex || 0)) + ';display:flex;align-items:center;justify-content:center;padding:16px;';
-                modal.innerHTML =
-                    '<div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(102,187,250,0.45);border-radius:14px;padding:18px 20px;max-width:420px;width:94%;box-shadow:0 10px 40px rgba(0,0,0,0.6);">' +
-                      '<div style="color:#66bb6a;font-size:1.02rem;font-weight:bold;margin-bottom:10px;">➕ 新建项目并导入阵容</div>' +
-                      '<div style="color:rgba(255,255,255,0.6);font-size:0.76rem;margin-bottom:4px;">项目名称</div>' +
-                      '<input id="lineupNewProjName" type="text" placeholder="如：深海-大佬阵容" style="width:100%;box-sizing:border-box;background:rgba(0,0,0,0.35);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:8px;padding:9px 10px;font-size:0.85rem;">' +
-                      '<div style="color:rgba(255,255,255,0.6);font-size:0.76rem;margin:10px 0 4px;">分类</div>' +
-                      '<select id="lineupNewProjCat" style="width:100%;box-sizing:border-box;background:rgba(0,0,0,0.35);color:#fff;border:1px solid rgba(255,255,255,0.25);border-radius:8px;padding:9px 10px;font-size:0.82rem;cursor:pointer;">' +
-                        cats.map(function (c) { return '<option value="' + c + '"' + (c === defCat ? ' selected' : '') + '>' + c + '</option>'; }).join('') +
-                        '<option value="__NEWCAT__">➕ 新建分类…</option>' +
-                      '</select>' +
-                      '<div style="display:flex;gap:10px;margin-top:14px;">' +
-                        '<button id="lineupNewProjCancel" style="flex:1;background:rgba(255,255,255,0.08);color:#fff;border:1px solid rgba(255,255,255,0.2);padding:9px;border-radius:8px;cursor:pointer;">取消</button>' +
-                        '<button id="lineupNewProjOk" style="flex:1.6;background:linear-gradient(135deg,#66bb6a,#2e7d32);color:#fff;border:none;padding:9px;border-radius:8px;cursor:pointer;font-weight:bold;">✅ 创建并导入</button>' +
-                      '</div>' +
-                    '</div>';
-                document.body.appendChild(modal);
-                const nameInput = modal.querySelector('#lineupNewProjName');
-                const catSel = modal.querySelector('#lineupNewProjCat');
-                nameInput.focus();
-                const finish = function (val) { modal.remove(); resolve(val); };
-                modal.querySelector('#lineupNewProjCancel').onclick = function () { finish(null); };
-                modal.onclick = function (e) { if (e.target === modal) finish(null); };
-                modal.querySelector('#lineupNewProjOk').onclick = async function () {
-                    const nm = (nameInput.value || '').trim();
-                    if (!nm) { nameInput.style.borderColor = '#ff8a80'; nameInput.placeholder = '请输入项目名称'; nameInput.focus(); return; }
-                    let cat = catSel.value;
-                    if (cat === '__NEWCAT__') {
-                        cat = window.prompt('请输入新分类名称：', '');
-                        if (cat === null) return; // 取消→留在小窗继续选
-                        cat = (cat || '').trim();
-                        if (!cat) return;
-                    }
-                    // 重名检查（新建项目不能与已有项目同名）
-                    try {
-                        const list = await _lineupProjectList();
-                        if (list.indexOf(nm) >= 0) { nameInput.style.borderColor = '#ff8a80'; window.alert('❌ 已存在同名项目「' + nm + '」，请换个名字'); return; }
-                    } catch (e) {}
-                    finish({ name: nm, category: cat });
-                };
-                nameInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') modal.querySelector('#lineupNewProjOk').click(); });
-            });
-        }
-
-        // 阵容码落地：清空两侧上阵 → 逐张按码复刻（手牌补卡/等级/皮肤/魔化）→ restoreBattleSlots 重绘
-        async function _lineupApply(data) {
-            const clearSide = function (hand, placed, prefix) {
-                (hand || []).forEach(function (c) { c.placed = null; });
-                placed.length = 0;
-                for (let i = 0; i <= 6; i++) {
-                    const slot = document.querySelector('.battle-slot[data-slot="' + prefix + i + '"]');
-                    if (!slot) continue;
-                    if (typeof clearSlotVisual === 'function') { clearSlotVisual(slot); }
-                    else {
-                        slot.classList.remove('filled', 'skin-bg'); slot.classList.add('empty');
-                        slot.innerHTML = slot.dataset.type === 'engineering' ? '<span class="slot-label">🔧</span><span class="slot-empty">空</span>' : '空';
-                    }
-                }
-            };
-            clearSide(myHandCards, myPlacedCards, 'u');
-            clearSide(teammateHandCards, teammatePlacedCards, 't');
-
-            let placed = 0;
-            const missing = [];
-            const seenSlots = {};
-            const placeSide = async function (cards, isMy) {
-                const hand = isMy ? myHandCards : teammateHandCards;
-                const placedArr = isMy ? myPlacedCards : teammatePlacedCards;
-                const handType = isMy ? 'my' : 'teammate';
-                for (const c of cards) {
-                    if (!c || !c.n || !c.s) continue;
-                    const el = document.querySelector('.card-item[data-name="' + (window.CSS && CSS.escape ? CSS.escape(c.n) : c.n) + '"]');
-                    if (!el) { missing.push(c.n); continue; }
-                    const id = el.dataset.id;
-                    const isEng = el.dataset.engineering === 'true';
-                    // 手牌条目（s='h'）：进手牌不上槽，不占槽位去重
-                    if (c.s === 'h') {
-                        let entry = (hand || []).find(function (h) { return h && h.id === id; });
-                        if (!entry) {
-                            entry = { id: id, name: c.n, placed: null, isEngineering: isEng, profession: el.dataset.profession, type: el.dataset.type };
-                            hand.push(entry);
-                        } else { entry.placed = null; }
-                        await _lineupReplayCardMeta(c, id, el, handType);
-                        placed++;
-                        continue;
-                    }
-                    if (!/^[ut][0-6]$/.test(c.s) || (isMy ? c.s[0] : c.s[0]) !== (isMy ? 'u' : 't')) { missing.push(c.n + '(槽位非法)'); continue; }
-                    if (seenSlots[c.s]) { missing.push(c.n + '(槽位重复)'); continue; }
-                    // 工程卡只能进工程格（u0/t0），反之亦然
-                    const isEngSlot = /0$/.test(c.s);
-                    if (isEng !== isEngSlot) { missing.push(c.n + '(工程格不匹配)'); continue; }
-                    seenSlots[c.s] = true;
-                    // 手牌：同身份已存在则复用（placed 置新槽），否则补进手牌
-                    let entry = (hand || []).find(function (h) { return h && h.id === id; });
-                    if (!entry) {
-                        entry = { id: id, name: c.n, placed: c.s, isEngineering: isEng, profession: el.dataset.profession, type: el.dataset.type };
-                        hand.push(entry);
-                    } else { entry.placed = c.s; }
-                    placedArr.push({ id: id, name: c.n, slot: c.s, isEngineering: isEng, profession: el.dataset.profession });
-                    await _lineupReplayCardMeta(c, id, el, handType);
-                    placed++;
-                }
-            };
-            await placeSide(data.my, true);
-            await placeSide(data.tm, false);
-
-            if (typeof restoreBattleSlots === 'function') { try { await restoreBattleSlots(); } catch (e) {} }
-            if (typeof updateHandDisplay === 'function') { updateHandDisplay('my'); updateHandDisplay('teammate'); }
-            if (typeof updateDamageReductionDisplay === 'function') { try { updateDamageReductionDisplay(); } catch (e) {} }
-            if (typeof autoSaveProject === 'function') { try { autoSaveProject(); } catch (e) {} }
-            return { placed: placed, missing: missing };
-        }
-
-        // 按码回放一张卡的等级/皮肤/魔化（上阵与手牌共用；值存在才写，等级越界交给角标下拉纠正）
-        async function _lineupReplayCardMeta(c, id, el, handType) {
-            try {
-                if (c.l !== undefined && c.l !== null && String(c.l) !== '' && typeof setCardLevel === 'function') {
-                    setCardLevel(id, parseInt(c.l, 10) || 1, el.dataset.type || 'gold', handType);
-                }
-                if (c.k !== undefined && c.k !== null && String(c.k) !== '' && typeof setCardSkin === 'function') {
-                    try { await setCardSkin(id, String(c.k), handType); } catch (e) {}
-                }
-                if (typeof c.m === 'number' && typeof setCardMoHua === 'function') {
-                    try { setCardMoHua(id, !!c.m, handType); } catch (e) {}
-                }
-            } catch (e) {}
-        }
-
-        // 分享链接自动检测：#lineup=整码 直接弹导入（预填码）；#pg=<gistId> 项目分享拉取后弹项目导入；#lg=<gistId> 先拉取再弹导入
+        // 分享链接自动检测：#pg=<gistId> 项目分享拉取后弹项目导入（唯一入口，2026-08-31 统一）
         (function _lineupHashCheck() {
             async function check() {
                 try {
                     const hash = location.hash || '';
-                    const mLong = hash.match(/(?:^|[&#])lineup=([A-Za-z0-9+/=%._-]+)/);
-                    if (mLong && mLong[1]) {
-                        history.replaceState(null, '', location.pathname + location.search);
-                        importLineupCode(decodeURIComponent(mLong[1]));
-                        return;
-                    }
                     const mProj = hash.match(/(?:^|[&#])pg=([A-Za-z0-9_-]+)/);
                     if (mProj && mProj[1]) {
-                        const gid = mProj[1];
                         history.replaceState(null, '', location.pathname + location.search);
                         if (typeof showToast === 'function') showToast('⏳ 正在拉取分享的项目…', 'info');
                         try {
-                            const body = await _projShareFetchById(gid);
+                            const body = await _projShareFetchById(mProj[1]);
                             if (typeof showToast === 'function') showToast('✅ 已拉取项目「' + ((body.project && body.project.name) || '') + '」，选择名称和分类后导入', 'success');
                             _projShareImportBody(body);
                         } catch (e) {
                             if (typeof showToast === 'function') showToast('❌ 拉取项目分享失败：' + (e && e.message || e), 'error');
-                        }
-                        return;
-                    }
-                    const mShort = hash.match(/(?:^|[&#])lg=([A-Za-z0-9_-]+)/);
-                    if (mShort && mShort[1]) {
-                        const gid = mShort[1];
-                        history.replaceState(null, '', location.pathname + location.search);
-                        if (typeof showToast === 'function') showToast('⏳ 正在拉取分享的阵容…', 'info');
-                        try {
-                            const code = await _lineupFetchShort(gid);
-                            importLineupCode(code);
-                        } catch (e) {
-                            if (typeof showToast === 'function') showToast('❌ 拉取分享失败：' + (e && e.message || e), 'error');
                         }
                     }
                 } catch (e) {}
@@ -9213,7 +8565,6 @@
         })();
 
         window.shareLineupImage = shareLineupImage;
-        window.importLineupCode = importLineupCode;
 
         // ==================== 整项目分享（短码闭环，2026-08-31）====================
         // 项目全量（卡组/等级/皮肤/魔化/融合副卡/卡组说明/记事本+颜色+逐字标记/脚本文件/参考图）
@@ -9528,28 +8879,7 @@
                 const raw = (ta.value || '').trim();
                 if (!raw) { info.style.color = '#ff8a80'; info.textContent = '❌ 请先输入 8 位短码或分享链接'; return; }
                 const mPg = /(?:^|[&#])pg=([A-Za-z0-9_-]+)/.exec(raw);
-                const mLong = /(?:^|[&#])lineup=([A-Za-z0-9+/=%._-]+)/.exec(raw);
-                const mShort = /(?:^|[&#])lg=([A-Za-z0-9_-]+)/.exec(raw);
-                const isLineupCode = raw.indexOf('TFJL1.') === 0;
-                const isShort = !mPg && !mLong && !mShort && !isLineupCode && /^[A-Za-z0-9]{6,10}$/.test(raw);
-                if (!mPg && !mLong && !mShort && !isLineupCode && !isShort) { info.style.color = '#ff8a80'; info.textContent = '❌ 只支持 8 位短码（项目/阵容均可）或分享链接（#pg= / #lg= / #lineup=）或 TFJL1. 阵容码'; return; }
-                // 阵容类输入直接转阵容导入（那边有完整的「导入到」目标选择）
-                if (mLong || mShort || isLineupCode) {
-                    let pre = isLineupCode ? raw : (mLong ? decodeURIComponent(mLong[1]) : '');
-                    if (mShort) {
-                        info.style.color = '#ffd54f';
-                        info.textContent = '⏳ 正在解析阵容分享链接…';
-                        try { pre = await _lineupFetchShort(mShort[1]); }
-                        catch (e) {
-                            if (e && e.cancelled) { info.style.color = 'rgba(255,255,255,0.5)'; info.textContent = '已取消'; return; }
-                            info.style.color = '#ff8a80'; info.textContent = '❌ ' + (e && e.message || e); return;
-                        }
-                    }
-                    close();
-                    if (typeof showToast === 'function') showToast('这是阵容分享，已为你切换到阵容导入', 'info');
-                    importLineupCode(pre);
-                    return;
-                }
+                if (!mPg && !/^[A-Za-z0-9]{6,10}$/.test(raw)) { info.style.color = '#ff8a80'; info.textContent = '❌ 只支持 8 位项目短码或含 #pg= 的分享链接'; return; }
                 info.style.color = '#ffd54f';
                 info.textContent = mPg ? '⏳ 正在拉取分享的项目…' : '⏳ 正在查询短码 ' + raw + ' …';
                 let body;
@@ -9557,21 +8887,6 @@
                     body = mPg ? await _projShareFetchById(mPg[1]) : await _projShareFetchByCode(raw);
                 } catch (e) {
                     if (e && e.cancelled) { info.style.color = 'rgba(255,255,255,0.5)'; info.textContent = '已取消'; return; }
-                    // 8 位短码查不到项目 → 按阵容分享再查一次（同一入口两种码，防输错位置白跑）
-                    if (isShort && /没有找到短码/.test(e && e.message || '')) {
-                        info.textContent = '⏳ 不是项目短码，尝试按阵容分享查询…';
-                        try {
-                            const luCode = await _lineupFetchByShortCode(raw);
-                            close();
-                            if (typeof showToast === 'function') showToast('这是阵容分享（只含阵容不含脚本），已为你切换到阵容导入', 'success');
-                            importLineupCode(luCode);
-                        } catch (e2) {
-                            if (e2 && e2.cancelled) { info.style.color = 'rgba(255,255,255,0.5)'; info.textContent = '已取消'; return; }
-                            info.style.color = '#ff8a80';
-                            info.textContent = '❌ ' + (e2 && e2.message || e2);
-                        }
-                        return;
-                    }
                     info.style.color = '#ff8a80';
                     info.textContent = '❌ ' + (e && e.message || e);
                     return;
