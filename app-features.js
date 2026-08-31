@@ -8118,11 +8118,11 @@
             const codeOnlyH = shortCode ? 92 : (36 + codeLines.length * 18);
             const codeBoxH = hasQr ? Math.max(codeOnlyH, QR_SIZE + 40) : codeOnlyH;
 
-            // 高度公式（与下方绘制严格对应）：头部 + 两行阵容 + 手牌行 + 码区 + 推广语脚注（54）
+            // 高度公式（与下方绘制严格对应）：头部 + 两行阵容 + 手牌行 + 码区 + 推广语脚注（64：大字推广语 19px + 生成信息 14px）
             const HEAD_H = 78;
             const rowH = 24 + SLOT_H + 16;                       // 上阵行：标签24 + 卡 + 底距16
             const handRowH = function (n) { return n > 0 ? 22 + SLOT_H + 12 : 0; };  // 手牌行更紧凑
-            const H = HEAD_H + rowH * 2 + handRowH(myHand.length) + handRowH(tmHand.length) + 8 + codeBoxH + 12 + 54;
+            const H = HEAD_H + rowH * 2 + handRowH(myHand.length) + handRowH(tmHand.length) + 8 + codeBoxH + 12 + 64;
 
             const canvas = document.createElement('canvas');
             canvas.width = W; canvas.height = H;
@@ -8258,13 +8258,27 @@
             }
             y += codeBoxH + 12;
 
-            // 脚注：推广语（大字，提脚本引兴趣）+ 生成信息（小字）
+            // 脚注：推广语（19px 大字提脚本引兴趣，末句红色强调）+ 生成信息
             ctx.textAlign = 'center';
+            // 分段绘制：主句米黄 + 「如果觉得有用请分享！」红色（用户指定红字落位）
+            ctx.font = 'bold 19px "Microsoft YaHei", sans-serif';
+            const FOOT_MAIN = '📦 塔防精灵助手：脚本 · 皮肤 · 记事本 · 站位 · 一键还原 —— ';
+            const FOOT_RED = '如果觉得有用请分享！';
+            const footW = ctx.measureText(FOOT_MAIN).width + ctx.measureText(FOOT_RED).width;
+            if (footW > W - PAD * 2) { // 超宽兜底：缩一档保证完整可读
+                ctx.font = 'bold 17px "Microsoft YaHei", sans-serif';
+            }
+            const footW2 = ctx.measureText(FOOT_MAIN).width + ctx.measureText(FOOT_RED).width;
+            let footX = Math.round((W - footW2) / 2);
+            ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
             ctx.fillStyle = '#ffe082';
-            ctx.font = 'bold 16px "Microsoft YaHei", sans-serif';
-            ctx.fillText('📦 塔防精灵助手：脚本 · 皮肤 · 记事本 · 站位 · 一键还原 —— 如果觉得有用请分享！', W / 2, H - 33);
-            ctx.fillStyle = 'rgba(255,255,255,0.4)';
-            ctx.font = '13px "Microsoft YaHei", sans-serif';
+            ctx.fillText(FOOT_MAIN, footX, H - 34);
+            footX += ctx.measureText(FOOT_MAIN).width;
+            ctx.fillStyle = '#ff5252';
+            ctx.fillText(FOOT_RED, footX, H - 34);
+            ctx.textAlign = 'center';
+            ctx.fillStyle = 'rgba(255,255,255,0.45)';
+            ctx.font = '14px "Microsoft YaHei", sans-serif';
             ctx.fillText('塔防精灵助手 生成于 ' + dateStr + ' ' + now.toTimeString().slice(0, 5), W / 2, H - 12);
 
             return { canvas: canvas, filled: filled, code: code, payload: payload };

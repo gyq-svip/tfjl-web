@@ -5132,18 +5132,17 @@ if (true) {
         return lines.join('\n');
     }
 
-    // ==================== 游戏波数监控（窗口检测 + OCR 识别 + TTS 播报） ====================
-    // 链路：find_game_windows 选窗口 → capture_window_region 截波数小区域（BMP→PNG）→ umi_ocr 识别
-    //      → 解析波数 → 变化时 speak_text 语音播报。全程只读不写：不动游戏窗口、不抢焦点、不发按键，
-    //      与脚本软件（锁输入控制权）互不冲突。
-    // 配置存 localStorage（tfjl_game_monitor_cfg）：窗口标题、区域比例坐标、间隔、播报开关。
+    // ==================== 游戏波数监控（Rust 后台线程版：多窗口 + OCR + TTS + 托盘角标） ====================
+    // 2026-08-31 升级：监控循环整体下沉 Rust 独立线程 —— 最小化/隐藏到托盘后 WebView 被冻结也照常播报；
+    // 每拍只截「波数小区域」（几十 KB BMP 直传 Umi-OCR），不再整窗截图+前端 canvas 二次转码，内存大幅下降。
+    // 支持：多窗口同拍监控（多开全播）/ 自定义播报前后缀 / 仅关键波数播报（防连播噪音）/ 托盘角标显示波数。
+    // 前端职责：配置 → game_monitor_start 下发；面板开着时经 gm-wave / gm-log / gm-state 事件实时刷新。
+    // 关闭面板只解除 UI 监听，Rust 线程继续监控（用户重点需求：关窗/最小化也持续播报）。
+    // 配置存 localStorage（tfjl_game_monitor_cfg）。全程只读：不动游戏窗口、不抢焦点、不发按键。
     const GM_CFG_KEY = 'tfjl_game_monitor_cfg';
-    let _gmRunning = false;
-    let _gmTimer = null;
-    let _gmLastWave = null;
-    let _gmEmptyCount = 0;   // 连续 OCR 空结果计数（黑屏/最小化提示用）
-    let _gmErrCount = 0;
-    let _gmWindows = [];     // find_game_windows 结果缓存
+    let _gmWindows = [];      // find_game_windows 结果缓存
+    let _gmRunning = false;   // 面板按钮显示的运行态（真实循环在 Rust 线程）
+    let _gmUnlisten = [];     // Tauri 事件解绑句柄（关面板解除监听，Rust 监控不受影响）
 
     function _gmLoadCfg() {
         try { return JSON.parse(localStorage.getItem(GM_CFG_KEY) || '{}') || {}; } catch (e) { return {}; }
@@ -5152,26 +5151,7 @@ if (true) {
         try { localStorage.setItem(GM_CFG_KEY, JSON.stringify(cfg)); } catch (e) {}
     }
 
-    // 波数解析：优先「第X波」，退而求其次「X波」「W12」，最后仅当唯一数字时才信（防把别的数字当波数）
-    function _gmParseWave(texts) {
-        for (const t of texts) {
-            let m = t.match(/第\s*(\d+)\s*[波波泫渡]/) || t.match(/(\d+)\s*[波泫渡]/);
-            if (m) return parseInt(m[1], 10);
-            m = t.match(/^[Ww]\s*(\d+)$/);
-            if (m) return parseInt(m[1], 10);
-        }
-        // 逐条收集数字（不能 join 后去空格：『12』『34』会拼成『1234』误判唯一）
-        // 全部文本合起来只有一个数字时才采用（区域内只有波数时成立）
-        const nums = [];
-        for (const t of texts) {
-            const m = t.match(/\d+/g);
-            if (m) nums.push(...m);
-        }
-        if (nums.length === 1) return parseInt(nums[0], 10);
-        return null;
-    }
-
-    // BMP base64 → PNG dataURL（Umi-OCR 输入与 recognize.js 同构，兼容性最稳）
+    // BMP base64 → PNG dataURL（框选区域预览用，一次性配置行为）
     function _gmBmpToPng(bmpB64) {
         return new Promise((resolve, reject) => {
             const img = new Image();
@@ -5186,15 +5166,11 @@ if (true) {
         });
     }
 
-    // OCR 一次小图（Umi-OCR dict 格式，与 recognize.js 相同参数）
-    async function _gmOcr(pngB64) {
-        const j = await tauriInvoke('umi_ocr', {
-            base64: pngB64,
-            options: { data: { format: 'dict', outputDirName: '', outputFileName: '', outputFileFormat: [] }, ocr: { language: 'models/config_chinese.txt', cls: true } }
-        });
-        if (j && j.code === 100) return (j.data || []).map(it => (it && it.text) || '');
-        if (j && j.code === 101) return [];
-        throw new Error(typeof j === 'string' ? j : ((j && j.data) || 'Umi-OCR 返回异常'));
+    // 勾选窗口在缓存里的标题（日志里显示「N号窗·标题前缀」，多开好分辨）
+    function _gmHwndTitle(hwnd) {
+        const w = _gmWindows.find(x => x.hwnd === hwnd);
+        if (w && w.title) return w.title.length > 16 ? w.title.slice(0, 16) + '…' : w.title;
+        return '';
     }
 
     function openGameMonitor() {
@@ -5210,113 +5186,173 @@ if (true) {
         modal.id = 'gameMonitorModal';
         modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;justify-content:center;align-items:center;';
         modal.innerHTML = `
-            <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(255,152,0,0.5);border-radius:12px;padding:24px;width:560px;max-width:92vw;max-height:88vh;overflow:auto;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(255,152,0,0.5);border-radius:12px;padding:22px;width:640px;max-width:94vw;max-height:88vh;overflow:auto;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
                     <h3 style="color:#fff;margin:0;font-size:1.15rem;">🎮 游戏波数监控</h3>
                     <button onclick="closeGameMonitor()" style="background:rgba(255,255,255,0.1);color:#fff;border:none;width:30px;height:30px;border-radius:5px;cursor:pointer;font-size:1.2rem;">×</button>
                 </div>
-                <div style="color:rgba(255,255,255,0.45);font-size:0.72rem;margin-bottom:14px;line-height:1.5;">
-                    自动检测游戏窗口 → 定时识别波数 → 变化时语音播报「第X波」。<br>
+                <div style="color:rgba(255,255,255,0.45);font-size:0.72rem;margin-bottom:12px;line-height:1.5;">
+                    多选游戏窗口 → 定时识别波数 → 变化时语音播报。<b style="color:#ffd700;">开始后可关闭/最小化本窗口，后台持续播报，托盘角标直接显示波数</b>。<br>
                     全程只读（不动窗口/不抢焦点/不发按键），与脚本软件互不冲突。需本机运行 Umi-OCR。
                 </div>
 
-                <div style="margin-bottom:14px;">
-                    <label style="color:rgba(255,255,255,0.75);font-size:0.82rem;display:block;margin-bottom:5px;">① 游戏窗口</label>
-                    <div style="display:flex;gap:8px;">
-                        <select id="gmWindowSelect" style="flex:1;background:rgba(0,0,0,0.3);color:#fff;border:1px solid rgba(255,255,255,0.2);padding:8px 10px;border-radius:6px;font-size:0.82rem;"></select>
-                        <button onclick="gmRefreshWindows()" style="background:linear-gradient(135deg,#00bcd4,#00838f);color:#fff;border:none;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:0.8rem;white-space:nowrap;">🔄 刷新</button>
+                <div style="margin-bottom:12px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+                        <label style="color:rgba(255,255,255,0.75);font-size:0.82rem;">① 游戏窗口（可多选，多开一起监控）</label>
+                        <button onclick="gmRefreshWindows()" style="background:linear-gradient(135deg,#00bcd4,#00838f);color:#fff;border:none;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:0.75rem;">🔄 刷新</button>
                     </div>
-                    <div id="gmWindowHint" style="color:rgba(255,255,255,0.35);font-size:0.68rem;margin-top:4px;">未检测到窗口时请先打开游戏/模拟器再刷新</div>
+                    <div id="gmWinList" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:8px 10px;max-height:130px;overflow:auto;color:#fff;font-size:0.78rem;">检测中…</div>
+                    <div id="gmWindowHint" style="color:rgba(255,255,255,0.35);font-size:0.68rem;margin-top:4px;">多窗口时播报自动加「N号窗」前缀区分（1号窗 = 列表第 1 个）</div>
                 </div>
 
-                <div style="margin-bottom:14px;">
+                <div style="margin-bottom:12px;">
                     <label style="color:rgba(255,255,255,0.75);font-size:0.82rem;display:block;margin-bottom:5px;">② 波数识别区域</label>
                     <div style="display:flex;gap:8px;align-items:center;">
                         <button onclick="gmConfigRegion()" id="gmConfigBtn" style="background:linear-gradient(135deg,#ff9800,#e65100);color:#fff;border:none;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:0.8rem;white-space:nowrap;">📐 框选波数位置</button>
                         <span id="gmRegionStatus" style="color:rgba(255,255,255,0.5);font-size:0.72rem;">未配置</span>
                     </div>
-                    <div style="color:rgba(255,255,255,0.35);font-size:0.68rem;margin-top:4px;line-height:1.4;">点按钮截一张游戏窗口图，在图上拖框圈住波数数字（一次配置，记住位置）</div>
+                    <div style="color:rgba(255,255,255,0.35);font-size:0.68rem;margin-top:4px;line-height:1.4;">点按钮截一张游戏窗口图，在图上拖框圈住波数数字（一次配置，记住位置）。多开同分辨率共用此区域</div>
                 </div>
 
-                <div style="margin-bottom:14px;display:flex;gap:16px;flex-wrap:wrap;align-items:center;">
-                    <div>
-                        <label style="color:rgba(255,255,255,0.75);font-size:0.82rem;">③ 语音播报</label>
-                        <div style="display:flex;align-items:center;gap:8px;margin-top:5px;">
-                            <button id="gmSpeakBtn" onclick="gmToggleSpeak()" style="background:#4caf50;color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.78rem;">🔊 开</button>
-                            <button onclick="gmTestSpeak()" style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.2);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.75rem;">试听</button>
+                <div style="margin-bottom:12px;">
+                    <label style="color:rgba(255,255,255,0.75);font-size:0.82rem;display:block;margin-bottom:5px;">③ 语音播报</label>
+                    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                        <button id="gmSpeakBtn" onclick="gmToggleSpeak()" style="background:#4caf50;color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.78rem;">🔊 开</button>
+                        <button onclick="gmTestSpeak()" style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.2);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.75rem;">试听</button>
+                        <span id="gmSpeakPreview" style="color:#ffd700;font-size:0.72rem;"></span>
+                    </div>
+                    <div style="display:flex;gap:8px;margin-top:7px;flex-wrap:wrap;">
+                        <div style="display:flex;align-items:center;gap:5px;">
+                            <span style="color:rgba(255,255,255,0.55);font-size:0.72rem;white-space:nowrap;">前缀</span>
+                            <input type="text" id="gmPrefixInput" placeholder="如：马上到" maxlength="12" style="width:110px;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:rgba(0,0,0,0.3);color:#fff;font-size:0.78rem;">
+                        </div>
+                        <span style="color:rgba(255,255,255,0.5);font-size:0.75rem;">第X波</span>
+                        <div style="display:flex;align-items:center;gap:5px;">
+                            <span style="color:rgba(255,255,255,0.55);font-size:0.72rem;white-space:nowrap;">后缀</span>
+                            <input type="text" id="gmSuffixInput" placeholder="如：了，请注意上卡" maxlength="20" style="width:170px;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:rgba(0,0,0,0.3);color:#fff;font-size:0.78rem;">
                         </div>
                     </div>
+                </div>
+
+                <div style="margin-bottom:12px;display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start;">
                     <div>
-                        <label style="color:rgba(255,255,255,0.75);font-size:0.82rem;">④ 识别间隔</label>
-                        <div style="display:flex;align-items:center;gap:6px;margin-top:5px;">
+                        <label style="color:rgba(255,255,255,0.75);font-size:0.82rem;display:block;margin-bottom:5px;">④ 关键波数（可选）</label>
+                        <div style="display:flex;align-items:center;gap:6px;">
+                            <input type="text" id="gmKeyWavesInput" placeholder="如：10,20,25,30" style="width:150px;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:rgba(0,0,0,0.3);color:#fff;font-size:0.78rem;">
+                            <span style="color:rgba(255,255,255,0.5);font-size:0.7rem;">留空 = 每波都播</span>
+                        </div>
+                        <div style="color:rgba(255,255,255,0.35);font-size:0.68rem;margin-top:4px;">填了 = 只播这些波（如卡怪波次），防连播变噪音</div>
+                    </div>
+                    <div>
+                        <label style="color:rgba(255,255,255,0.75);font-size:0.82rem;display:block;margin-bottom:5px;">⑤ 识别间隔</label>
+                        <div style="display:flex;align-items:center;gap:6px;">
                             <input type="number" id="gmIntervalInput" min="1" max="30" value="3" style="width:60px;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:rgba(0,0,0,0.3);color:#fff;font-size:0.8rem;">
-                            <span style="color:rgba(255,255,255,0.5);font-size:0.72rem;">秒（默认 3，OCR 慢的机器可调大）</span>
+                            <span style="color:rgba(255,255,255,0.5);font-size:0.72rem;">秒（OCR 慢可调大）</span>
                         </div>
                     </div>
                 </div>
 
-                <div style="margin-bottom:14px;">
+                <div style="margin-bottom:10px;">
                     <button id="gmStartBtn" onclick="gmToggleMonitor()" style="width:100%;padding:12px;border:none;border-radius:8px;background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;cursor:pointer;font-size:0.95rem;font-weight:bold;">▶ 开始监控</button>
+                    <div id="gmRunHint" style="display:none;color:#4fc3f7;font-size:0.7rem;margin-top:5px;text-align:center;line-height:1.5;">后台运行中：关闭/最小化本窗口不影响播报，看任务栏托盘角标即知当前波数</div>
                 </div>
 
-                <div style="display:flex;align-items:center;gap:14px;margin-bottom:10px;">
-                    <div style="color:rgba(255,255,255,0.55);font-size:0.8rem;white-space:nowrap;">当前波数：</div>
-                    <div id="gmWaveDisplay" style="color:#ffd700;font-size:2rem;font-weight:bold;min-width:60px;text-align:center;">—</div>
-                    <div id="gmWaveDelta" style="color:#4caf50;font-size:0.85rem;"></div>
-                </div>
+                <div id="gmWaves" style="background:rgba(0,0,0,0.25);border:1px solid rgba(255,215,0,0.2);border-radius:6px;padding:8px 12px;margin-bottom:10px;color:rgba(255,255,255,0.45);font-size:0.75rem;line-height:1.8;">各窗口波数：开始监控后显示</div>
 
-                <div id="gmStatus" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:10px;min-height:48px;max-height:150px;overflow:auto;color:rgba(255,255,255,0.6);font-size:0.72rem;line-height:1.6;">待启动。先选游戏窗口 → 框选波数位置 → 开始监控。</div>
+                <div id="gmStatus" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:10px;min-height:48px;max-height:130px;overflow:auto;color:rgba(255,255,255,0.6);font-size:0.72rem;line-height:1.6;">待启动。勾选游戏窗口 → 框选波数位置 → 开始监控。</div>
+
+                <div style="margin-top:14px;padding:10px;border-radius:8px;border:1px dashed rgba(255,215,0,0.35);background:rgba(255,152,0,0.08);text-align:center;">
+                    <span style="color:#ffd700;font-size:0.78rem;font-weight:bold;">✨ 到波自动执行操作 · 鼠标联动 · 分组播报…（其他功能尽情期待）</span>
+                </div>
             </div>
         `;
         document.body.appendChild(modal);
         // 恢复配置
         const intervalInput = modal.querySelector('#gmIntervalInput');
         if (cfg.interval && intervalInput) intervalInput.value = cfg.interval;
+        const prefixInput = modal.querySelector('#gmPrefixInput');
+        const suffixInput = modal.querySelector('#gmSuffixInput');
+        if (prefixInput) prefixInput.value = cfg.speakPrefix || '';
+        if (suffixInput) suffixInput.value = cfg.speakSuffix || '';
+        const kwInput = modal.querySelector('#gmKeyWavesInput');
+        if (kwInput && Array.isArray(cfg.keyWaves)) kwInput.value = cfg.keyWaves.join(',');
         _gmUpdateSpeakUI(!!cfg.speak);
         _gmUpdateRegionUI();
-        // 刷新窗口列表（自动匹配上次选的窗口）
+        _gmUpdateSpeakPreview();
+        // 刷新窗口列表（按上次的窗口标题自动勾选）
         gmRefreshWindows();
+        // Rust 线程可能在面板外继续跑：恢复按钮状态 + 绑实时事件
+        _gmRestoreState();
     }
 
+    // 🔴 关面板不停监控（用户重点需求）：只解绑 UI 事件，Rust 后台线程继续播报+托盘角标。
     function closeGameMonitor() {
-        if (_gmRunning) gmToggleMonitor(); // 关面板自动停监控
+        _gmUnbindEvents();
         const m = document.getElementById('gameMonitorModal');
         if (m) m.remove();
+        if (_gmRunning && typeof showToast === 'function') {
+            showToast('监控仍在后台运行：关闭/最小化窗口不影响播报，托盘角标显示波数；下次打开面板可停止', 'info');
+        }
     }
 
     async function gmRefreshWindows() {
-        const sel = document.getElementById('gmWindowSelect');
+        const list = document.getElementById('gmWinList');
         const hint = document.getElementById('gmWindowHint');
-        if (!sel) return;
-        sel.innerHTML = '<option value="">检测中…</option>';
+        if (!list) return;
+        list.innerHTML = '<span style="color:rgba(255,255,255,0.45);">检测中…</span>';
         const wins = await tauriInvoke('find_game_windows') || [];
         _gmWindows = wins;
-        sel.innerHTML = '';
         if (!wins.length) {
-            sel.innerHTML = '<option value="">未检测到窗口</option>';
-            if (hint) hint.textContent = '请先打开游戏/模拟器，再点刷新';
+            list.innerHTML = '<span style="color:rgba(255,255,255,0.45);">未检测到窗口，请先打开游戏/模拟器再点刷新</span>';
+            if (hint) hint.textContent = '未检测到窗口时请先打开游戏/模拟器再刷新';
             return;
         }
         const cfg = _gmLoadCfg();
-        let matched = -1;
+        const savedTitles = Array.isArray(cfg.winTitles) ? cfg.winTitles : [];
+        list.innerHTML = '';
         wins.forEach((w, i) => {
-            const opt = document.createElement('option');
-            opt.value = String(w.hwnd);
-            opt.textContent = w.title.length > 40 ? w.title.slice(0, 40) + '…' : w.title;
-            sel.appendChild(opt);
-            if (cfg.winTitle && w.title.includes(cfg.winTitle)) matched = i;
+            const row = document.createElement('label');
+            row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:4px 2px;cursor:pointer;';
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.value = String(w.hwnd);
+            cb.dataset.idx = String(i);
+            cb.className = 'gm-win-cb';
+            // 上次勾选过的窗口标题自动恢复勾选
+            if (savedTitles.some(t => w.title.includes(t) || t.includes(w.title.slice(0, 20)))) cb.checked = true;
+            cb.onchange = () => { if (list.querySelectorAll('.gm-win-cb:checked').length === 0) cb.checked = true; };
+            const num = document.createElement('span');
+            num.textContent = (i + 1) + '号';
+            num.style.cssText = 'color:#ffd700;font-weight:bold;min-width:30px;';
+            const title = document.createElement('span');
+            title.textContent = w.title.length > 36 ? w.title.slice(0, 36) + '…' : w.title;
+            title.style.cssText = 'color:rgba(255,255,255,0.85);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+            row.appendChild(cb);
+            row.appendChild(num);
+            row.appendChild(title);
+            list.appendChild(row);
         });
-        if (matched >= 0) sel.selectedIndex = matched;
-        if (hint) hint.textContent = '共 ' + wins.length + ' 个窗口' + (matched >= 0 ? '，已自动选中上次的窗口' : '（新窗口排前面）');
+        // 全没匹配上时默认勾第一个，避免空选择
+        if (!list.querySelector('.gm-win-cb:checked')) {
+            const first = list.querySelector('.gm-win-cb');
+            if (first) first.checked = true;
+        }
+        if (hint) hint.textContent = '共 ' + wins.length + ' 个窗口，多窗口时播报自动加「N号窗」前缀区分（1号窗 = 列表第 1 个）';
         _gmLog('已检测到 ' + wins.length + ' 个可监控窗口');
     }
 
-    function _gmCurrentWindow() {
-        const sel = document.getElementById('gmWindowSelect');
-        if (!sel || !sel.value) return null;
-        const hwnd = parseInt(sel.value, 10);
-        const w = _gmWindows.find(x => x.hwnd === hwnd);
-        return w || { hwnd, title: '' };
+    // 收集勾选的窗口（按列表顺序，编号即 Rust 端播报里的「N号窗」）
+    function _gmSelectedWindows() {
+        const list = document.getElementById('gmWinList');
+        if (!list) return [];
+        const out = [];
+        list.querySelectorAll('.gm-win-cb').forEach(cb => {
+            if (!cb.checked) return;
+            const hwnd = parseInt(cb.value, 10);
+            const w = _gmWindows.find(x => x.hwnd === hwnd);
+            out.push({ hwnd, title: w ? w.title : '' });
+        });
+        return out;
     }
 
     function _gmUpdateRegionUI() {
@@ -5339,6 +5375,17 @@ if (true) {
         btn.style.background = on ? '#4caf50' : 'rgba(255,255,255,0.15)';
     }
 
+    // 播报词预览：前缀 + 第12波 + 后缀，用户改输入框即时看到实际播什么
+    function _gmUpdateSpeakPreview() {
+        const el = document.getElementById('gmSpeakPreview');
+        if (!el) return;
+        const p = document.getElementById('gmPrefixInput');
+        const s = document.getElementById('gmSuffixInput');
+        const pre = p ? (p.value || '').trim() : '';
+        const suf = s ? (s.value || '').trim() : '';
+        el.textContent = '→ 「' + pre + '第12波' + suf + '」';
+    }
+
     window.gmToggleSpeak = function () {
         const cfg = _gmLoadCfg();
         cfg.speak = !cfg.speak;
@@ -5347,7 +5394,12 @@ if (true) {
     };
 
     window.gmTestSpeak = async function () {
-        await tauriInvoke('speak_text', { text: '波数播报测试，第12波' });
+        const cfg = _gmLoadCfg();
+        const p = document.getElementById('gmPrefixInput');
+        const s = document.getElementById('gmSuffixInput');
+        if (p) cfg.speakPrefix = (p.value || '').trim();
+        if (s) cfg.speakSuffix = (s.value || '').trim();
+        await tauriInvoke('speak_text', { text: (cfg.speakPrefix || '') + '第12波' + (cfg.speakSuffix || '') });
     };
 
     function _gmLog(msg, isErr) {
@@ -5362,10 +5414,11 @@ if (true) {
         el.scrollTop = el.scrollHeight;
     }
 
-    // 框选波数区域：截整窗图 → 弹出图上拖框 → 保存比例坐标
+    // 框选波数区域：截整窗图 → 弹出图上拖框 → 保存比例坐标（多开共用：按比例坐标在每窗口各自换算）
     window.gmConfigRegion = async function () {
-        const win = _gmCurrentWindow();
-        if (!win) { _gmLog('请先选择游戏窗口', true); return; }
+        const sel = _gmSelectedWindows();
+        const win = sel[0];
+        if (!win) { _gmLog('请先勾选游戏窗口', true); return; }
         const btn = document.getElementById('gmConfigBtn');
         if (btn) { btn.disabled = true; btn.textContent = '⏳ 截图中…'; }
         try {
@@ -5472,109 +5525,145 @@ if (true) {
         document.body.appendChild(modal);
     }
 
-    // 开始/停止监控
+    // 开始/停止监控（Rust 后台线程：循环在 lib.rs gm_monitor_loop，前端只下发配置/收事件）
     window.gmToggleMonitor = async function () {
         if (_gmRunning) {
-            _gmRunning = false;
-            if (_gmTimer) { clearTimeout(_gmTimer); _gmTimer = null; }
-            const btn = document.getElementById('gmStartBtn');
-            if (btn) { btn.textContent = '▶ 开始监控'; btn.style.background = 'linear-gradient(135deg,#4caf50,#2e7d32)'; }
-            _gmLog('监控已停止');
+            await tauriInvoke('game_monitor_stop');
+            _gmApplyRunning(false); // gm-state 事件也会来，这里兜底（事件在面板关闭时收不到）
+            _gmLog('监控已停止，托盘图标已恢复');
             return;
         }
-        const win = _gmCurrentWindow();
-        if (!win) { _gmLog('请先选择游戏窗口', true); return; }
+        const sel = _gmSelectedWindows();
+        if (!sel.length) { _gmLog('请先勾选游戏窗口', true); return; }
         const cfg = _gmLoadCfg();
         if (!cfg.region || cfg.region.w <= 0) { _gmLog('请先框选波数识别区域', true); return; }
-        // 保存当前选择
-        cfg.winTitle = win.title;
+        // 收集面板当前配置并持久化
         const intervalInput = document.getElementById('gmIntervalInput');
-        if (intervalInput) {
-            const n = parseInt(intervalInput.value, 10);
-            cfg.interval = (n >= 1 && n <= 30) ? n : 3;
-        }
+        const n = intervalInput ? parseInt(intervalInput.value, 10) : 3;
+        cfg.interval = (n >= 1 && n <= 30) ? n : 3;
+        const p = document.getElementById('gmPrefixInput');
+        const s = document.getElementById('gmSuffixInput');
+        if (p) cfg.speakPrefix = (p.value || '').trim();
+        if (s) cfg.speakSuffix = (s.value || '').trim();
+        const kwEl = document.getElementById('gmKeyWavesInput');
+        cfg.keyWaves = kwEl ? (kwEl.value || '').split(/[,，\s]+/).map(x => parseInt(x, 10)).filter(x => x > 0) : [];
+        cfg.winTitles = sel.map(w => w.title);
         _gmSaveCfg(cfg);
-        _gmRunning = true;
-        _gmLastWave = null;
-        _gmEmptyCount = 0;
-        _gmErrCount = 0;
-        const btn = document.getElementById('gmStartBtn');
-        if (btn) { btn.textContent = '⏹ 停止监控'; btn.style.background = 'linear-gradient(135deg,#f44336,#b71c1c)'; }
+        const r = await tauriInvoke('game_monitor_start', {
+            cfg: {
+                windows: sel.map(w => ({ hwnd: w.hwnd, title: w.title })),
+                region: [cfg.region.x, cfg.region.y, cfg.region.w, cfg.region.h],
+                intervalSec: cfg.interval,
+                speak: cfg.speak !== false,
+                speakPrefix: cfg.speakPrefix || '',
+                speakSuffix: cfg.speakSuffix || '',
+                keyWaves: cfg.keyWaves || []
+            }
+        });
+        // tauriInvoke 失败会吞错返回 null：以 status 实测为准（防止「看着启动了其实没起」）
+        const ok = (typeof r === 'string' && r.indexOf('监控已启动') === 0) || await tauriInvoke('game_monitor_status') === true;
+        if (!ok) {
+            _gmLog('启动失败：请确认 Umi-OCR 已在本机运行', true);
+            return;
+        }
+        _gmApplyRunning(true);
         if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('游戏监控启动');
-        _gmLog('▶ 监控启动：每 ' + (cfg.interval || 3) + ' 秒识别一次，识别到波数变化即播报');
-        _gmTick();
+        const speakDesc = cfg.keyWaves && cfg.keyWaves.length
+            ? '仅关键波数 [' + cfg.keyWaves.join(',') + '] 播报'
+            : '每波变化都播报';
+        _gmLog('▶ 监控启动：' + sel.length + ' 个窗口，每 ' + cfg.interval + ' 秒识别一次，' + speakDesc);
+        _gmResetWaves(sel);
     };
 
-    // 单次监控（自循环，不重入）
-    async function _gmTick() {
-        if (!_gmRunning) return;
-        const cfg = _gmLoadCfg();
-        const win = _gmCurrentWindow();
-        const intervalMs = ((cfg.interval || 3) * 1000);
-        try {
-            if (!win) throw new Error('窗口选择丢失');
-            // 截整窗（区域坐标是比例，需要先知道当前整窗尺寸来换算像素）
-            const bmpB64 = await tauriInvoke('capture_window_region', { hwnd: win.hwnd, x: 0, y: 0, w: 10, h: 10, full: true });
-            if (!bmpB64) throw new Error('截图失败（窗口可能已关闭）');
-            const { png, w: fullW, h: fullH } = await _gmBmpToPng(bmpB64);
-            // 比例 → 当前像素
-            const r = cfg.region;
-            const rx = Math.max(0, Math.round(r.x * fullW));
-            const ry = Math.max(0, Math.round(r.y * fullH));
-            const rw = Math.max(8, Math.round(r.w * fullW));
-            const rh = Math.max(8, Math.round(r.h * fullH));
-            // 前端裁剪（避免再走一次 Rust）
-            const crop = await new Promise((resolve, reject) => {
-                const im = new Image();
-                im.onload = () => {
-                    const cv = document.createElement('canvas');
-                    cv.width = rw; cv.height = rh;
-                    const ctx = cv.getContext('2d');
-                    ctx.drawImage(im, rx, ry, rw, rh, 0, 0, rw, rh);
-                    resolve(cv.toDataURL('image/png').split(',')[1]);
-                };
-                im.onerror = () => reject(new Error('截图裁剪失败'));
-                im.src = 'data:image/png;base64,' + png;
-            });
-            const texts = await _gmOcr(crop);
-            if (!texts.length) {
-                _gmEmptyCount++;
-                if (_gmEmptyCount === 5) _gmLog('连续 5 次未识别到文字：游戏窗口可能被最小化（PrintWindow 黑图），或框选区域不对', true);
-            } else {
-                _gmEmptyCount = 0;
-                const wave = _gmParseWave(texts);
-                if (wave !== null) {
-                    const deltaEl = document.getElementById('gmWaveDelta');
-                    const dispEl = document.getElementById('gmWaveDisplay');
-                    if (dispEl) dispEl.textContent = String(wave);
-                    if (_gmLastWave === null) {
-                        if (deltaEl) deltaEl.textContent = '';
-                        _gmLog('识别到波数：第 ' + wave + ' 波');
-                        if (cfg.speak !== false) await tauriInvoke('speak_text', { text: '第' + wave + '波' });
-                    } else if (wave !== _gmLastWave) {
-                        if (deltaEl) deltaEl.textContent = wave > _gmLastWave ? ('↑ +' + (wave - _gmLastWave)) : '↺ 新一局';
-                        _gmLog('波数变化：' + _gmLastWave + ' → ' + wave + (wave < _gmLastWave ? '（新一局）' : ''));
-                        if (cfg.speak !== false) await tauriInvoke('speak_text', { text: '第' + wave + '波' });
-                    }
-                    _gmLastWave = wave;
-                    _gmErrCount = 0;
-                } else {
-                    _gmLog('识别到文字但未解析出波数：' + texts.join(' | ').slice(0, 60), true);
-                }
-            }
-        } catch (e) {
-            _gmErrCount++;
-            _gmLog('监控异常：' + ((e && e.message) || e), true);
-            if (_gmErrCount >= 3) {
-                _gmLog('连续 3 次异常，自动停止监控', true);
-                _gmRunning = false;
-                if (_gmTimer) { clearTimeout(_gmTimer); _gmTimer = null; }
-                const btn = document.getElementById('gmStartBtn');
-                if (btn) { btn.textContent = '▶ 开始监控'; btn.style.background = 'linear-gradient(135deg,#4caf50,#2e7d32)'; }
-                return;
-            }
+    // 按钮运行态切换（gm-state 事件兜底 + 直接调用双路）
+    function _gmApplyRunning(running) {
+        _gmRunning = running;
+        const btn = document.getElementById('gmStartBtn');
+        if (btn) {
+            btn.textContent = running ? '⏹ 停止监控' : '▶ 开始监控';
+            btn.style.background = running ? 'linear-gradient(135deg,#f44336,#b71c1c)' : 'linear-gradient(135deg,#4caf50,#2e7d32)';
         }
-        if (_gmRunning) _gmTimer = setTimeout(_gmTick, intervalMs);
+        const hint = document.getElementById('gmRunHint');
+        if (hint) hint.style.display = running ? 'block' : 'none';
+        if (!running) _gmResetWaves(null);
+    }
+
+    // 波数列表：每勾选窗口一行，gm-wave 事件带 idx 定位更新
+    function _gmResetWaves(sel) {
+        const el = document.getElementById('gmWaves');
+        if (!el) return;
+        if (!sel) { el.innerHTML = '各窗口波数：开始监控后显示'; el.style.color = 'rgba(255,255,255,0.45)'; return; }
+        el.innerHTML = '';
+        sel.forEach((w, i) => {
+            const row = document.createElement('div');
+            row.dataset.gmIdx = String(i);
+            row.style.color = 'rgba(255,255,255,0.8)';
+            row.innerHTML = '<span style="color:#ffd700;font-weight:bold;">' + (i + 1) + '号窗</span> '
+                + '<span style="color:rgba(255,255,255,0.55);">' + (w.title.length > 20 ? w.title.slice(0, 20) + '…' : w.title) + '</span>'
+                + ' → <span data-role="wave" style="color:#ffd700;font-size:1.1rem;font-weight:bold;">—</span>'
+                + ' <span data-role="delta" style="color:#4caf50;font-size:0.7rem;"></span>';
+            el.appendChild(row);
+        });
+    }
+
+    function _gmOnWave(p) {
+        const el = document.getElementById('gmWaves');
+        if (!el) return;
+        let row = el.querySelector('[data-gm-idx="' + p.idx + '"]');
+        if (!row) { // 面板重开后列表按勾选顺序重建，兜底按 idx 增行
+            row = document.createElement('div');
+            row.dataset.gmIdx = String(p.idx);
+            row.innerHTML = '<span style="color:#ffd700;font-weight:bold;">' + (p.idx + 1) + '号窗</span> '
+                + ' <span data-role="wave" style="color:#ffd700;font-size:1.1rem;font-weight:bold;">—</span>'
+                + ' <span data-role="delta" style="color:#4caf50;font-size:0.7rem;"></span>';
+            el.appendChild(row);
+        }
+        const waveEl = row.querySelector('[data-role="wave"]');
+        const deltaEl = row.querySelector('[data-role="delta"]');
+        if (waveEl) waveEl.textContent = String(p.wave);
+        if (deltaEl) deltaEl.textContent = p.prev == null ? '' : (p.isUp ? ('↑ +' + (p.wave - p.prev)) : '↺ 新一局');
+        row.style.color = 'rgba(255,255,255,0.95)';
+    }
+
+    // 面板开着才绑：Rust emit gm-wave / gm-log / gm-state → 实时刷新；关面板解绑（监控照跑）
+    function _gmBindEvents() {
+        const L = window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.event && window.__TAURI_INTERNALS__.event.listen;
+        const listen = (typeof L === 'function') ? L : (window.__TAURI__ && window.__TAURI__.event && window.__TAURI__.event.listen);
+        if (typeof listen !== 'function') return;
+        const p = document.getElementById('gmPrefixInput');
+        const s = document.getElementById('gmSuffixInput');
+        if (p) p.addEventListener('input', _gmUpdateSpeakPreview);
+        if (s) s.addEventListener('input', _gmUpdateSpeakPreview);
+        _gmUnlisten = [
+            listen('gm-wave', (ev) => { _gmOnWave(ev.payload || {}); }),
+            listen('gm-log', (ev) => {
+                const d = ev.payload || {};
+                const tag = _gmHwndTitle(d.hwnd);
+                _gmLog((tag ? '「' + tag + '」' : '') + (d.msg || ''), !!d.isErr);
+            }),
+            listen('gm-state', (ev) => { _gmApplyRunning(!!((ev.payload || {}).running)); })
+        ];
+    }
+
+    function _gmUnbindEvents() {
+        (_gmUnlisten || []).forEach(u => { try { if (u && typeof u === 'function') u(); } catch (e) {} });
+        _gmUnlisten = [];
+        const p = document.getElementById('gmPrefixInput');
+        const s = document.getElementById('gmSuffixInput');
+        if (p) p.removeEventListener('input', _gmUpdateSpeakPreview);
+        if (s) s.removeEventListener('input', _gmUpdateSpeakPreview);
+    }
+
+    // 打开面板时：查询 Rust 线程真实运行态（上次开着监控关面板再打开的场景）+ 绑事件
+    async function _gmRestoreState() {
+        _gmBindEvents();
+        try {
+            const running = await tauriInvoke('game_monitor_status');
+            if (running === true) {
+                _gmApplyRunning(true);
+                _gmLog('监控正在后台运行中（关闭/最小化窗口不影响）');
+            }
+        } catch (e) {}
     }
 
     window.openGameMonitor = openGameMonitor;

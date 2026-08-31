@@ -162,3 +162,18 @@ commands.allow = ["capture_window_region"]
 identifier = "allow-speak-text"
 description = "Allow Windows TTS voice announcement via PowerShell System.Speech (wave broadcast)"
 commands.allow = ["speak_text"]
+
+[[permission]]
+identifier = "allow-game-monitor-start"
+description = "Allow starting the Rust background wave monitor thread (multi-window OCR + TTS + tray badge)"
+commands.allow = ["game_monitor_start"]
+
+[[permission]]
+identifier = "allow-game-monitor-stop"
+description = "Allow stopping the background wave monitor thread and restoring the tray icon"
+commands.allow = ["game_monitor_stop"]
+
+[[permission]]
+identifier = "allow-game-monitor-status"
+description = "Allow querying whether the background wave monitor thread is running"
+commands.allow = ["game_monitor_status"]

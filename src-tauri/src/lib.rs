@@ -296,6 +296,11 @@ async fn do_daily_checkin(ctx: &HeartbeatCtx, today: u64) -> Result<bool, String
 static TRAY: OnceLock<TrayIcon> = OnceLock::new();
 static FLASH_ON: AtomicBool = AtomicBool::new(false);
 
+// 波数监控（Rust 后台线程）运行开关 + 世代计数：
+// 世代计数用于「重启监控」——旧线程不必被强杀，发现世代不匹配即自然退出，避免双线程同时播报。
+static GM_RUN: AtomicBool = AtomicBool::new(false);
+static GM_GEN: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
 /// 退出时关闭本助手拉起的 Umi-OCR 进程树（/t 同时杀掉其 Paddle 引擎等子进程）
 #[allow(unused_variables)]
 fn kill_umi_ocr(pid: Option<u32>) {
@@ -994,8 +999,8 @@ fn clear_proxy_env() {
 // ====================== Umi-OCR 本地服务桥接 ======================
 // 让 https 远程页能调用本机 Umi-OCR（127.0.0.1:1224），绕过浏览器混合内容限制。
 // OCR 引擎本体（Umi-OCR 程序）不打包进安装包，由用户本机独立运行；APP 仅按需转发。
-#[tauri::command]
-async fn umi_ocr(base64: String, options: serde_json::Value) -> Result<serde_json::Value, String> {
+/// Umi-OCR HTTP 请求核心（命令与波数监控后台线程共用）
+async fn umi_ocr_http(base64: String, options: serde_json::Value) -> Result<serde_json::Value, String> {
     // 关键：Umi-OCR 在 127.0.0.1:1224（本机），必须绕过系统代理。
     // reqwest 默认会读取 HTTP_PROXY/HTTPS_PROXY 环境变量，把本机请求转发给代理
     // （如 127.0.0.1:7897），代理转发本地地址会失败/返回非 JSON → “error decoding response body”。
@@ -1022,6 +1027,11 @@ async fn umi_ocr(base64: String, options: serde_json::Value) -> Result<serde_jso
         return Err(format!("Umi-OCR 返回状态 {}: {}", status, json));
     }
     Ok(json)
+}
+
+#[tauri::command]
+async fn umi_ocr(base64: String, options: serde_json::Value) -> Result<serde_json::Value, String> {
+    umi_ocr_http(base64, options).await
 }
 
 /// 自动启动本机 Umi-OCR（后台常驻，自动开 127.0.0.1:1224 HTTP 服务）
@@ -1521,11 +1531,10 @@ fn find_game_windows() -> Result<Vec<GameWindowInfo>, String> {
     }
 }
 
-/// 截取窗口指定区域，返回 32 位 BMP 的 base64（Umi-OCR 可直接识别）
+/// 截取窗口指定区域，返回 32 位 BMP 的原始字节（供命令 base64 返回 / 波数监控线程直接送 OCR）
 /// 坐标系 = PrintWindow 整窗位图（左上角为窗口左上角，含标题栏），与 find 后前端预览图一致。
 /// full=true 时忽略 x/y/w/h 截整窗（用于配置区域时的预览大图）。
-#[tauri::command]
-fn capture_window_region(hwnd: usize, x: i32, y: i32, w: i32, h: i32, full: Option<bool>) -> Result<String, String> {
+fn capture_region_bmp(hwnd: usize, x: i32, y: i32, w: i32, h: i32, full: bool) -> Result<Vec<u8>, String> {
     #[cfg(windows)]
     {
         use std::mem;
@@ -1586,7 +1595,7 @@ fn capture_window_region(hwnd: usize, x: i32, y: i32, w: i32, h: i32, full: Opti
             ReleaseDC(hwnd, hdc_screen);
 
             // 3) 内存裁剪目标区域
-            let (rx, ry, rw, rh): (i32, i32, i32, i32) = if full.unwrap_or(false) {
+            let (rx, ry, rw, rh): (i32, i32, i32, i32) = if full {
                 (0, 0, win_w, win_h)
             } else {
                 (x, y, w, h)
@@ -1626,7 +1635,7 @@ fn capture_window_region(hwnd: usize, x: i32, y: i32, w: i32, h: i32, full: Opti
             bmp.extend_from_slice(&hdr);
             bmp.extend_from_slice(&out);
 
-            Ok(B64.encode(bmp))
+            Ok(bmp)
         }
     }
     #[cfg(not(windows))]
@@ -1635,10 +1644,14 @@ fn capture_window_region(hwnd: usize, x: i32, y: i32, w: i32, h: i32, full: Opti
     }
 }
 
-/// TTS 语音播报（Windows 自带 System.Speech，无需联网/安装）
-/// 每次独立 spawn PowerShell（CREATE_NO_WINDOW 不闪黑框），短句播报延迟可接受
+/// Tauri 命令封装：截图区域 → BMP base64（与旧版返回格式完全一致，前端无需改动）
 #[tauri::command]
-fn speak_text(text: String) -> Result<(), String> {
+fn capture_window_region(hwnd: usize, x: i32, y: i32, w: i32, h: i32, full: Option<bool>) -> Result<String, String> {
+    Ok(B64.encode(capture_region_bmp(hwnd, x, y, w, h, full.unwrap_or(false))?))
+}
+
+/// TTS 语音播报核心（命令与波数监控线程共用）
+fn speak_sync(text: &str) -> Result<(), String> {
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
@@ -1656,8 +1669,370 @@ fn speak_text(text: String) -> Result<(), String> {
     }
     #[cfg(not(windows))]
     {
+        let _ = text;
         Err("仅支持 Windows".into())
     }
+}
+
+/// TTS 语音播报（Windows 自带 System.Speech，无需联网/安装）
+/// 每次独立 spawn PowerShell（CREATE_NO_WINDOW 不闪黑框），短句播报延迟可接受
+#[tauri::command]
+fn speak_text(text: String) -> Result<(), String> {
+    speak_sync(&text)
+}
+
+// ==================== 游戏波数监控 · Rust 后台线程（2026-08-31 全面升级） ====================
+// 旧版监控循环跑在前端 JS：窗口最小化/隐藏到托盘后 WebView 被冻结、定时器停摆 → 后台播报失效；
+// 且每拍截「整窗 BMP」+ 前端 canvas 二次解码裁剪，内存/CPU 浪费大（用户实测内存偏高）。
+// 现整体下沉 Rust 独立线程（与窗口可见性无关）：
+//   多窗口同拍 → 每窗口只截「波数小区域」（几十 KB BMP 直传 OCR，不再整窗+前端转码）
+//   → 波数解析 → 变化时 TTS 播报（自定义前后缀 / 仅关键波数防噪音）→ 托盘角标数字 + tooltip 汇总
+//   → emit gm-wave/gm-log/gm-state 事件刷新前端面板（面板开着才刷新，关了不影响监控）。
+// 全程只读：PrintWindow 截图，不动游戏窗口、不抢焦点、不发按键，与脚本软件互不冲突。
+
+#[derive(serde::Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct GmWin {
+    hwnd: usize,
+    title: String,
+}
+
+#[derive(serde::Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct GmCfg {
+    windows: Vec<GmWin>,
+    region: [f64; 4],      // 比例坐标 x,y,w,h（0..1，换分辨率不失效）
+    interval_sec: u64,     // 识别间隔（秒）
+    speak: bool,           // 语音播报开关
+    speak_prefix: String,  // 播报前缀，如「马上到」→「马上到第12波」
+    speak_suffix: String,  // 播报后缀，如「了，请注意上卡」→「第12波了，请注意上卡」
+    key_waves: Vec<u32>,   // 关键波数（空 = 每波都播；非空 = 命中才播，防连播噪音）
+}
+
+/// 提取字符串中所有 ASCII 数字组（多字节 UTF-8 的续字节均 ≥0x80，不会与数字字节混淆，切片安全）
+fn gm_digit_groups(s: &str) -> Vec<&str> {
+    let b = s.as_bytes();
+    let mut out: Vec<&str> = Vec::new();
+    let mut i = 0;
+    while i < b.len() {
+        if b[i].is_ascii_digit() {
+            let mut j = i;
+            while j < b.len() && b[j].is_ascii_digit() { j += 1; }
+            out.push(&s[i..j]);
+            i = j;
+        } else {
+            i += 1;
+        }
+    }
+    out
+}
+
+/// 波数解析（与前端旧版 _gmParseWave 同构）：
+/// ① 数字后（可隔空格）紧跟「波/泫/渡」→ 取该数字（含「第X波」）；
+/// ② ^W12$ → 12；③ 全部文本只出现一个数字时兜底采用；多个数字歧义 → 拒绝（防把别的数字当波数）。
+fn gm_parse_wave(texts: &[String]) -> Option<u32> {
+    for t in texts {
+        let b = t.as_bytes();
+        let mut i = 0;
+        while i < b.len() {
+            if b[i].is_ascii_digit() {
+                let mut j = i;
+                while j < b.len() && b[j].is_ascii_digit() { j += 1; }
+                let num = &t[i..j];
+                let mut k = j;
+                while let Some(c) = t[k..].chars().next() {
+                    if c == ' ' || c == '\u{a0}' { k += c.len_utf8(); } else { break; }
+                }
+                if let Some(c) = t[k..].chars().next() {
+                    if c == '波' || c == '泫' || c == '渡' {
+                        if let Ok(v) = num.parse::<u32>() { return Some(v); }
+                    }
+                }
+                i = j;
+            } else {
+                i += 1;
+            }
+        }
+        let tr = t.trim();
+        let tb = tr.as_bytes();
+        if tb.len() >= 2 && (tb[0] == b'W' || tb[0] == b'w') {
+            let rest = tr[1..].trim();
+            if !rest.is_empty() && rest.bytes().all(|c| c.is_ascii_digit()) {
+                if let Ok(v) = rest.parse::<u32>() { return Some(v); }
+            }
+        }
+    }
+    let mut nums: Vec<&str> = Vec::new();
+    for t in texts { nums.extend(gm_digit_groups(t)); }
+    if nums.len() == 1 { nums[0].parse::<u32>().ok() } else { None }
+}
+
+/// 3x5 像素数字字库（每行 3 位 × 5 行，'1' = 亮）
+const GM_FONT: [&str; 10] = [
+    "111101101101111",
+    "010110010010111",
+    "111001111100111",
+    "111001111001111",
+    "101101111001001",
+    "111100111001111",
+    "111100111101111",
+    "111001001001001",
+    "111101111101111",
+    "111101111001111",
+];
+
+/// 托盘角标背景像素：金色描边圆角方块 + 深蓝底（64x64，系统自动缩放到托盘实际尺寸）
+fn gm_badge_bg(x: i32, y: i32, s: i32) -> (u8, u8, u8, u8) {
+    let r = 14;
+    let half = s / 2;
+    let dx = (x - half).abs();
+    let dy = (y - half).abs();
+    let in_corner = dx > half - r && dy > half - r;
+    let dist2 = (dx - (half - r)).pow(2) + (dy - (half - r)).pow(2);
+    if in_corner && dist2 > r * r { return (0, 0, 0, 0); } // 圆角外透明
+    let ir = r - 4;
+    let in_corner2 = dx > half - ir && dy > half - ir;
+    let dist2i = (dx - (half - ir)).pow(2) + (dy - (half - ir)).pow(2);
+    let inner = !in_corner2 || dist2i <= ir * ir;
+    let is_border = !inner || x < 3 || y < 3 || x >= s - 3 || y >= s - 3;
+    if is_border { (0xFF, 0xD7, 0x00, 0xFF) } else { (0x1A, 0x1A, 0x2E, 0xFF) }
+}
+
+/// 托盘角标图标：深蓝底金字波数数字（监控期间托盘直接显示最新波数，用户看角标即知战况）
+fn gm_badge_image(wave: u32) -> tauri::image::Image<'static> {
+    let s: i32 = 64;
+    let digits: Vec<u8> = wave.min(999).to_string().bytes().map(|b| b - b'0').collect();
+    let n = digits.len() as i32;
+    let scale = match n { 1 => 9, 2 => 7, _ => 5 };
+    let dw = 3 * scale;
+    let dh = 5 * scale;
+    let gap = scale;
+    let total_w = n * dw + (n - 1) * gap;
+    let ox = ((s - total_w) / 2).max(1);
+    let oy = ((s - dh) / 2).max(1);
+    let mut rgba: Vec<u8> = vec![0u8; (s * s * 4) as usize];
+    for y in 0..s {
+        for x in 0..s {
+            let (r, g, bl, a) = gm_badge_bg(x, y, s);
+            let i = ((y * s + x) * 4) as usize;
+            rgba[i] = r; rgba[i + 1] = g; rgba[i + 2] = bl; rgba[i + 3] = a;
+        }
+    }
+    for (di, &d) in digits.iter().enumerate() {
+        let glyph = GM_FONT[d as usize].as_bytes();
+        for gy in 0..5 {
+            for gx in 0..3 {
+                if glyph[(gy * 3 + gx) as usize] == b'1' {
+                    for sy in 0..scale {
+                        for sx in 0..scale {
+                            let px = ox + di as i32 * (dw + gap) + gx * scale + sx;
+                            let py = oy + gy * scale + sy;
+                            if px >= 0 && px < s && py >= 0 && py < s {
+                                let i = ((py * s + px) * 4) as usize;
+                                rgba[i] = 0xFF; rgba[i + 1] = 0xD7; rgba[i + 2] = 0x00; rgba[i + 3] = 0xFF;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    tauri::image::Image::new_owned(rgba, s as u32, s as u32)
+}
+
+/// 恢复托盘默认状态（停止监控时）：默认图标 + 原始 tooltip
+fn gm_restore_tray(app: &tauri::AppHandle) {
+    if let Some(tray) = TRAY.get() {
+        let _ = tray.set_tooltip(Some("塔防精灵助手"));
+        if let Some(def) = app.default_window_icon() {
+            let _ = tray.set_icon(Some(def.clone()));
+        }
+    }
+}
+
+/// 单窗口单拍：按比例坐标只截「波数小区域」→ Umi-OCR（BMP 直传几十 KB，内存占用极小）
+/// Ok(None) = 识别无文字（code 101，可能黑屏/最小化）；Err = 截图/网络级异常。
+fn gm_tick_window(win: &GmWin, region: &[f64; 4]) -> Result<Option<Vec<String>>, String> {
+    #[cfg(windows)]
+    {
+        use winapi::shared::windef::{HWND, RECT};
+        use winapi::um::winuser::GetWindowRect;
+        let hwnd = win.hwnd as HWND;
+        unsafe {
+            let mut wr = RECT { left: 0, top: 0, right: 0, bottom: 0 };
+            if GetWindowRect(hwnd, &mut wr) == 0 {
+                return Err("获取窗口尺寸失败（窗口可能已关闭）".into());
+            }
+            let (ww, wh) = (wr.right - wr.left, wr.bottom - wr.top);
+            if ww <= 0 || wh <= 0 { return Err("窗口尺寸非法".into()); }
+            let rx = ((region[0] * ww as f64) as i32).clamp(0, ww - 1);
+            let ry = ((region[1] * wh as f64) as i32).clamp(0, wh - 1);
+            let rw = (((region[2] * ww as f64) as i32).max(8)).min(ww - rx);
+            let rh = (((region[3] * wh as f64) as i32).max(8)).min(wh - ry);
+            if rw <= 0 || rh <= 0 { return Err("识别区域越界".into()); }
+            let bmp = capture_region_bmp(win.hwnd, rx, ry, rw, rh, false)?;
+            let b64 = B64.encode(&bmp);
+            let opts = serde_json::json!({
+                "data": { "format": "dict", "outputDirName": "", "outputFileName": "", "outputFileFormat": [] },
+                "ocr": { "language": "models/config_chinese.txt", "cls": true }
+            });
+            let j = tauri::async_runtime::block_on(umi_ocr_http(b64, opts))?;
+            let code = j.get("code").and_then(|c| c.as_i64()).unwrap_or(-1);
+            if code == 100 {
+                let texts = j.get("data").and_then(|d| d.as_array()).map(|arr| {
+                    arr.iter()
+                        .filter_map(|it| it.get("text").and_then(|t| t.as_str()))
+                        .map(|s| s.to_string())
+                        .collect()
+                }).unwrap_or_default();
+                Ok(Some(texts))
+            } else if code == 101 {
+                Ok(None)
+            } else {
+                Err(format!("Umi-OCR 返回异常: {}", j.get("data").and_then(|d| d.as_str()).unwrap_or("?")))
+            }
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (win, region);
+        Err("仅支持 Windows".into())
+    }
+}
+
+/// 监控主循环（独立线程）：与窗口是否可见无关，最小化/隐藏到托盘照常播报
+fn gm_monitor_loop(app: tauri::AppHandle, cfg: GmCfg, gen: u64, interval_sec: u64) {
+    let interval_ms = interval_sec * 1000;
+    let multi = cfg.windows.len() > 1;
+    let mut last: Vec<Option<u32>> = vec![None; cfg.windows.len()];
+    let mut empty_cnt: Vec<u32> = vec![0; cfg.windows.len()];
+    let mut err_cnt: Vec<u32> = vec![0; cfg.windows.len()];
+    let mut warned_empty: Vec<bool> = vec![false; cfg.windows.len()];
+    let mut warned_dead: Vec<bool> = vec![false; cfg.windows.len()];
+    let alive = |gen: u64| GM_RUN.load(Ordering::SeqCst) && GM_GEN.load(Ordering::SeqCst) == gen;
+    loop {
+        if !alive(gen) { break; }
+        for (idx, win) in cfg.windows.iter().enumerate() {
+            if !alive(gen) { break; }
+            match gm_tick_window(win, &cfg.region) {
+                Ok(Some(texts)) => {
+                    empty_cnt[idx] = 0;
+                    warned_empty[idx] = false;
+                    match gm_parse_wave(&texts) {
+                        Some(wave) => {
+                            err_cnt[idx] = 0;
+                            let prev = last[idx];
+                            last[idx] = Some(wave);
+                            if prev.map_or(true, |p| p != wave) {
+                                let is_up = prev.map_or(true, |p| wave > p);
+                                let key_hit = cfg.key_waves.is_empty() || cfg.key_waves.contains(&wave);
+                                let spoken = cfg.speak && key_hit;
+                                if spoken {
+                                    // 多窗口时加「N号窗」前缀区分（多开场景用户分得清哪号窗口是哪局）
+                                    let tag = if multi { format!("{}号窗 ", idx + 1) } else { String::new() };
+                                    let _ = speak_sync(&format!("{}{}第{}波{}", tag, cfg.speak_prefix, wave, cfg.speak_suffix));
+                                }
+                                // 托盘角标：显示最新变化波数；tooltip 汇总全部监控窗口战况
+                                if let Some(tray) = TRAY.get() {
+                                    let _ = tray.set_icon(Some(gm_badge_image(wave)));
+                                    let tip = if multi {
+                                        let summary: Vec<String> = last.iter().enumerate()
+                                            .filter_map(|(i, l)| l.map(|w| format!("{}号窗:第{}波", i + 1, w)))
+                                            .collect();
+                                        format!("塔防精灵助手 — 监控中 | {}", summary.join(" | "))
+                                    } else {
+                                        format!("塔防精灵助手 — 监控中：第{}波", wave)
+                                    };
+                                    let _ = tray.set_tooltip(Some(&tip));
+                                }
+                                let _ = app.emit("gm-wave", serde_json::json!({
+                                    "hwnd": win.hwnd, "title": win.title, "idx": idx,
+                                    "wave": wave, "prev": prev, "isUp": is_up,
+                                    "spoken": spoken, "keyHit": key_hit,
+                                }));
+                            }
+                        }
+                        None => {
+                            let _ = app.emit("gm-log", serde_json::json!({
+                                "hwnd": win.hwnd,
+                                "msg": format!("识别到文字但未解析出波数：{}", texts.join(" | ")),
+                                "isErr": true,
+                            }));
+                        }
+                    }
+                }
+                Ok(None) => {
+                    empty_cnt[idx] += 1;
+                    if empty_cnt[idx] >= 5 && !warned_empty[idx] {
+                        warned_empty[idx] = true;
+                        let _ = app.emit("gm-log", serde_json::json!({
+                            "hwnd": win.hwnd,
+                            "msg": "连续多次未识别到文字：游戏窗口可能被最小化（黑图）或框选区域不对",
+                            "isErr": true,
+                        }));
+                    }
+                }
+                Err(e) => {
+                    err_cnt[idx] += 1;
+                    if err_cnt[idx] == 1 || err_cnt[idx] % 10 == 0 {
+                        let _ = app.emit("gm-log", serde_json::json!({
+                            "hwnd": win.hwnd, "msg": format!("监控异常：{}", e), "isErr": true,
+                        }));
+                    }
+                    if err_cnt[idx] >= 8 && !warned_dead[idx] {
+                        warned_dead[idx] = true;
+                        let _ = app.emit("gm-log", serde_json::json!({
+                            "hwnd": win.hwnd,
+                            "msg": "该窗口连续失败（可能已关闭或 Umi-OCR 未运行）；其余窗口继续监控，重新开始监控可重绑窗口",
+                            "isErr": true,
+                        }));
+                    }
+                }
+            }
+        }
+        // 按 100ms 粒度睡眠（停止/重启指令即时生效，不必等满整拍）
+        let mut slept = 0u64;
+        while slept < interval_ms {
+            if !alive(gen) { break; }
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            slept += 100;
+        }
+    }
+}
+
+/// 启动波数监控（Rust 后台线程）：命令立即返回，运行状态经 gm-wave / gm-log / gm-state 事件推送前端。
+/// 重复调用 = 重启监控（世代计数让旧线程自然退出，避免双线程同时播报）。
+#[tauri::command]
+fn game_monitor_start(cfg: GmCfg, app: tauri::AppHandle) -> Result<String, String> {
+    if cfg.windows.is_empty() { return Err("未选择监控窗口".into()); }
+    if cfg.region[2] <= 0.0 || cfg.region[3] <= 0.0 { return Err("未配置波数识别区域".into()); }
+    let interval = cfg.interval_sec.clamp(1, 30);
+    let nwin = cfg.windows.len();
+    let gen = GM_GEN.fetch_add(1, Ordering::SeqCst) + 1;
+    GM_RUN.store(true, Ordering::SeqCst);
+    let app_h = app.clone();
+    std::thread::spawn(move || gm_monitor_loop(app_h, cfg, gen, interval));
+    // 托盘先行亮「监控中」提示（识别到首个波数后自动换成角标数字）
+    if let Some(tray) = TRAY.get() {
+        let _ = tray.set_tooltip(Some("塔防精灵助手 — 波数监控运行中…"));
+    }
+    let _ = app.emit("gm-state", serde_json::json!({ "running": true }));
+    Ok(format!("监控已启动：{} 个窗口，每 {} 秒识别一次（最小化/关闭窗口也持续播报）", nwin, interval))
+}
+
+/// 停止波数监控：线程在 100ms 内感知退出，托盘恢复默认图标
+#[tauri::command]
+fn game_monitor_stop(app: tauri::AppHandle) -> Result<(), String> {
+    GM_RUN.store(false, Ordering::SeqCst);
+    gm_restore_tray(&app);
+    let _ = app.emit("gm-state", serde_json::json!({ "running": false }));
+    Ok(())
+}
+
+/// 查询监控是否运行中（前端打开面板时恢复按钮状态用）
+#[tauri::command]
+fn game_monitor_status() -> bool {
+    GM_RUN.load(Ordering::SeqCst)
 }
 
 /// 下载新版安装包到本机固定目录（返回保存路径）。
@@ -1786,6 +2161,9 @@ pub fn run() {
             find_game_windows,
             capture_window_region,
             speak_text,
+            game_monitor_start,
+            game_monitor_stop,
+            game_monitor_status,
         ])
         .manage(AppState { umi_pid: std::sync::Mutex::new(None), heartbeat: std::sync::Mutex::new(None), checkin_day: std::sync::Mutex::new(None) })
         .setup(|app| {
