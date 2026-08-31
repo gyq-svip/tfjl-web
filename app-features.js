@@ -8698,17 +8698,15 @@
                   '</div>' +
                   '<div style="color:rgba(255,255,255,0.55);font-size:0.78rem;margin-bottom:10px;line-height:1.5;">粘贴对方分享的<b style="color:#ffb74d;">阵容码 / 分享链接</b>，或直接输入 8 位<b style="color:#ffd700;">分享短码</b>（TFJL1. 开头 / 含 #lg= 的链接 / 纯 8 位短码均可），一键复刻整个阵容（<b style="color:#ffd54f;">上阵7+手牌3</b> 每人最多10张，含等级/皮肤/魔化）。</div>' +
                   '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">' +
-                    '<span style="color:rgba(255,255,255,0.65);font-size:0.78rem;flex-shrink:0;">分类筛选：</span>' +
-                    '<select id="lineupImportCat" style="flex:1;background:rgba(0,0,0,0.35);color:#fff;border:1px solid rgba(255,255,255,0.25);border-radius:6px;padding:6px 8px;font-size:0.8rem;cursor:pointer;">' +
-                      '<option value="__ALL__">📁 全部分类</option>' +
+                    '<span style="color:rgba(255,255,255,0.65);font-size:0.78rem;flex-shrink:0;">项目分类：</span>' +
+                    '<select id="lineupImportCat" title="选择要导入到哪个分类（默认当前分类）；下拉里可直接新建" style="flex:1;background:rgba(0,0,0,0.35);color:#fff;border:1px solid rgba(255,255,255,0.25);border-radius:6px;padding:6px 8px;font-size:0.8rem;cursor:pointer;">' +
                       '<option value="__NEWCAT__">➕ 新建分类…</option>' +
                     '</select>' +
                   '</div>' +
                   '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">' +
-                    '<span style="color:rgba(255,255,255,0.65);font-size:0.78rem;flex-shrink:0;">导入到：</span>' +
-                    '<select id="lineupImportTarget" style="flex:1;background:rgba(0,0,0,0.35);color:#fff;border:1px solid rgba(255,255,255,0.25);border-radius:6px;padding:6px 8px;font-size:0.8rem;cursor:pointer;">' +
+                    '<span style="color:rgba(255,255,255,0.65);font-size:0.78rem;flex-shrink:0;">选择项目：</span>' +
+                    '<select id="lineupImportTarget" title="新建项目（命名导入）置顶；选现有项目=覆盖该项目的阵容；当前项目排最前" style="flex:1;background:rgba(0,0,0,0.35);color:#fff;border:1px solid rgba(255,255,255,0.25);border-radius:6px;padding:6px 8px;font-size:0.8rem;cursor:pointer;">' +
                       '<option value="__NEW__">➕ 新建项目…</option>' +
-                      '<option value="__CURRENT__">当前项目' + ((typeof currentProjectName !== 'undefined' && currentProjectName) ? '（' + currentProjectName + '）' : '') + '</option>' +
                     '</select>' +
                   '</div>' +
                   '<textarea id="lineupImportTa" placeholder="TFJL1.xxxxxx..." style="width:100%;box-sizing:border-box;height:110px;background:rgba(0,0,0,0.35);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:8px;padding:10px;font-size:0.8rem;font-family:Consolas,monospace;resize:none;"></textarea>' +
@@ -8723,13 +8721,16 @@
             const info = modal.querySelector('#lineupImportInfo');
             const targetSel = modal.querySelector('#lineupImportTarget');
             if (prefillCode) ta.value = prefillCode;
-            // 异步填充「分类筛选 + 导入目标」：新建置顶，项目按分类分组、随分类下拉过滤（项目多也不蒙）
+            // 异步填充「分类 + 项目」：对齐主界面顶部选择器——分类下拉默认选中当前项目
+            // 所在分类（直接列出所有分类，不做跨分类汇总）；项目下拉 = ➕新建置顶 +
+            // 该分类下项目（当前项目排最前并标注「当前」）
             (async function () {
                 let full = [];
                 try { full = await _lineupProjectListFull(); } catch (e) { full = []; }
                 const catSel = modal.querySelector('#lineupImportCat');
                 if (!catSel || !targetSel) return;
                 const cur = (typeof currentProjectName !== 'undefined') ? currentProjectName : '';
+                const curCat = (typeof currentProjectCategory !== 'undefined' && currentProjectCategory) ? String(currentProjectCategory) : '';
                 const cats = [];
                 full.forEach(function (p) { if (p.category && cats.indexOf(p.category) < 0) cats.push(p.category); });
                 cats.forEach(function (c) {
@@ -8737,26 +8738,32 @@
                     o.value = c; o.textContent = '📁 ' + c;
                     catSel.appendChild(o);
                 });
-                // 目标列表重建：保留前两个固定项（新建置顶 + 当前项目），其余按分类过滤/分组追加
+                const defCat = (curCat && cats.indexOf(curCat) >= 0) ? curCat : cats[0];
+                if (defCat) catSel.value = defCat;
+                // 目标列表重建：固定项只留「➕ 新建项目…」置顶，其余 = 该分类下项目
                 const rebuild = function () {
-                    while (targetSel.options.length > 2) targetSel.remove(2);
+                    while (targetSel.options.length > 1) targetSel.remove(1);
                     const cat = catSel.value;
-                    full.filter(function (p) { return p.name !== cur && (cat === '__ALL__' || p.category === cat); })
-                        .sort(function (a, b) { return a.category === b.category ? a.name.localeCompare(b.name, 'zh') : a.category.localeCompare(b.category, 'zh'); })
+                    if (!cat || cat === '__NEWCAT__') return;
+                    full.filter(function (p) { return p.category === cat; })
+                        .sort(function (a, b) { return a.name.localeCompare(b.name, 'zh'); })
                         .forEach(function (p) {
                             const o = document.createElement('option');
-                            o.value = p.name; o.textContent = p.name + '（' + p.category + '）';
-                            targetSel.appendChild(o);
+                            o.value = p.name;
+                            o.textContent = p.name + (p.name === cur ? '（当前）' : '');
+                            // 当前项目排到最前（选它=覆盖当前打开的项目并刷新工作区）
+                            if (p.name === cur) targetSel.insertBefore(o, targetSel.options[1]);
+                            else targetSel.appendChild(o);
                         });
                 };
                 // 🔴 2026-08-31 分类下拉含「➕ 新建分类…」：选它弹输入框创建（共用 _importPromptNewCategory），
                 //    取消回退上一个分类；创建成功插入选项并选中，项目列表随之过滤（新分类下=空→只剩新建置顶）
-                catSel._prevCat = '__ALL__';
+                catSel._prevCat = defCat || '';
                 catSel.onchange = function () {
                     if (catSel.value === '__NEWCAT__') {
                         const nm = (typeof window._importPromptNewCategory === 'function') ? window._importPromptNewCategory() : null;
                         if (!nm) {
-                            catSel.value = catSel._prevCat || '__ALL__';
+                            catSel.value = catSel._prevCat || (catSel.options[0] && catSel.options[0].value !== '__NEWCAT__' ? catSel.options[0].value : '');
                         } else {
                             let has = false;
                             for (let i = 0; i < catSel.options.length; i++) { if (catSel.options[i].value === nm) { has = true; break; } }
@@ -8832,15 +8839,16 @@
                 const n = (data.my.length + data.tm.length);
                 const target = targetSel.value;
                 const handNote = '（含手牌，每人最多10张）';
-                if (target === '__CURRENT__') {
-                    const cur = (typeof currentProjectName !== 'undefined' && currentProjectName) ? currentProjectName : '当前项目';
+                // 选中当前项目（列表里标注「当前」的那项）= 覆盖当前打开的项目并刷新工作区
+                const curName = (typeof currentProjectName !== 'undefined' && currentProjectName) ? currentProjectName : '';
+                if (target === curName) {
                     info.style.color = '#ffd54f';
-                    info.textContent = '✅ 识别成功：' + (data.n ? '「' + data.n + '」' : '') + '共 ' + n + ' 张卡' + handNote + '，将覆盖「' + cur + '」的阵容';
-                    if (!window.confirm('将覆盖当前项目「' + cur + '」的阵容（我方+队友共 ' + n + ' 张' + handNote + '）。继续？')) return;
+                    info.textContent = '✅ 识别成功：' + (data.n ? '「' + data.n + '」' : '') + '共 ' + n + ' 张卡' + handNote + '，将覆盖「' + curName + '」的阵容';
+                    if (!window.confirm('将覆盖当前项目「' + curName + '」的阵容（我方+队友共 ' + n + ' 张' + handNote + '）。继续？')) return;
                     try {
                         const r = await _lineupApply(data);
                         close();
-                        if (typeof showToast === 'function') showToast('✅ 阵容已导入「' + cur + '」：成功 ' + r.placed + ' 张' + (r.missing.length ? '，' + r.missing.length + ' 张卡池未找到（' + r.missing.join('、') + '）' : ''), r.missing.length ? 'error' : 'success');
+                        if (typeof showToast === 'function') showToast('✅ 阵容已导入「' + curName + '」：成功 ' + r.placed + ' 张' + (r.missing.length ? '，' + r.missing.length + ' 张卡池未找到（' + r.missing.join('、') + '）' : ''), r.missing.length ? 'error' : 'success');
                     } catch (e) {
                         info.style.color = '#ff8a80';
                         info.textContent = '❌ 导入失败：' + (e && e.message || e);
@@ -8851,7 +8859,7 @@
                 try {
                     // 新建项目时带上外层已选分类（含刚新建的），新建小窗默认落在这个分类，不再重复问一遍
                     const catS = document.getElementById('lineupImportCat');
-                    const presetCat = (catS && catS.value && catS.value !== '__ALL__' && catS.value !== '__NEWCAT__') ? catS.value : '';
+                    const presetCat = (catS && catS.value && catS.value !== '__NEWCAT__') ? catS.value : '';
                     const r = (target === '__NEW__')
                         ? await _lineupImportToNewProject(data, presetCat)
                         : await _lineupImportToProject(target, data);
