@@ -22967,6 +22967,21 @@ ${maSection}
                 });
             }
 
+            // 🔧 2026-08-31 双击标题进管理员面板（比长按更易用，避开 WebView 长按2秒被 contextmenu/文本选择打断）
+            //   与三击清缓存协调：dblclick 延迟 250ms，若期间第 3 次 click 来（三击）则让路给清缓存
+            if (titleEl && !titleEl.dataset.adminDbl) {
+                titleEl.dataset.adminDbl = '1';
+                titleEl.addEventListener('dblclick', () => {
+                    setTimeout(() => {
+                        if (titleClickCount >= 3) return; // 三击清缓存已触发，让路
+                        try {
+                            if (typeof openAdminPanel === 'function') openAdminPanel();
+                            else console.error('[admin] openAdminPanel 未定义');
+                        } catch (e) { console.error('[admin] openAdminPanel 报错:', e); }
+                    }, 250);
+                });
+            }
+
             document.getElementById('adminVerifyCode').addEventListener('keydown', (e) => {
                 if (e.key === 'Enter') verifyAdmin();
             });
