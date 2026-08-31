@@ -3057,31 +3057,108 @@
                         <div style="color:rgba(255,255,255,0.78);font-size:0.82rem;line-height:1.7;">⚠️ 安装时会先弹出「卸载旧版」提示，<b style="color:#81c784;">只要不勾选「删除用户数据」</b>即可无缝升级。</div>
                     </div>
                     <div style="color:rgba(255,255,255,0.40);font-size:0.72rem;margin:14px 0 16px;">当前版本：v${cur} ｜ 最低要求：v${data.minVersion}</div>
-                    <button id="_forceDlBtn" style="width:100%;background:linear-gradient(135deg,#ff9800,#f57c00);color:#fff;border:none;padding:13px;border-radius:10px;cursor:pointer;font-size:0.98rem;font-weight:bold;">📥 下载最新版</button>
-                    <div style="color:rgba(255,255,255,0.30);font-size:0.68rem;text-align:center;margin-top:12px;">下载地址随每次发布自动更新</div>
+                    <button id="_forceUpdBtn" style="width:100%;background:linear-gradient(135deg,#ff9800,#f57c00);color:#fff;border:none;padding:13px;border-radius:10px;cursor:pointer;font-size:0.98rem;font-weight:bold;">🚀 立即更新</button>
+                    <div id="_forceUpdTip" style="color:rgba(255,255,255,0.55);font-size:0.72rem;text-align:center;margin-top:10px;min-height:1.1em;line-height:1.5;"></div>
+                    <div style="margin-top:14px;border-top:1px solid rgba(255,255,255,0.10);padding-top:12px;">
+                        <div style="color:rgba(255,255,255,0.45);font-size:0.7rem;margin-bottom:9px;">若上方按钮无反应，任选以下渠道（用系统浏览器打开，APP 内也能正常下载）</div>
+                        <div style="display:flex;flex-direction:column;gap:7px;">
+                            <button class="_forceChBtn" data-ch="gitee-direct" style="width:100%;background:rgba(255,255,255,0.08);color:#cfd8ff;border:1px solid rgba(255,255,255,0.16);padding:10px 12px;border-radius:9px;cursor:pointer;font-size:0.82rem;text-align:left;">📦 Gitee 直连安装包 <span style="color:#81c784;font-size:0.7rem;">（推荐 · 国内最快）</span></button>
+                            <button class="_forceChBtn" data-ch="gitee-page" style="width:100%;background:rgba(255,255,255,0.08);color:#cfd8ff;border:1px solid rgba(255,255,255,0.16);padding:10px 12px;border-radius:9px;cursor:pointer;font-size:0.82rem;text-align:left;">🌐 Gitee 发布页 <span style="color:rgba(255,255,255,0.45);font-size:0.7rem;">（可查看历史版本）</span></button>
+                            <button class="_forceChBtn" data-ch="github-page" style="width:100%;background:rgba(255,255,255,0.08);color:#cfd8ff;border:1px solid rgba(255,255,255,0.16);padding:10px 12px;border-radius:9px;cursor:pointer;font-size:0.82rem;text-align:left;">🐙 官网备用渠道 <span style="color:rgba(255,255,255,0.45);font-size:0.7rem;">（GitHub Pages）</span></button>
+                        </div>
+                    </div>
                 </div>`;
             document.body.appendChild(overlay);
 
-            const btn = document.getElementById('_forceDlBtn');
+            const GITEE_RELEASES_PAGE = 'https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/releases';
+            const tipEl = document.getElementById('_forceUpdTip');
+            const setTip = (s, c) => { if (tipEl) { tipEl.textContent = s || ''; tipEl.style.color = c || 'rgba(255,255,255,0.55)'; } };
+
+            // 🔴 用系统浏览器打开外链：APP 内 window.open 会被 WebView 吞掉（"下载点不了"的根因），
+            //    必须走 Rust 的 open_url 命令；失败则复制地址兜底。
+            const openChannel = async (url, label) => {
+                if (!url) { setTip('⚠️ 未获取到该渠道地址', '#ff9800'); return false; }
+                setTip('⏳ 正在用系统浏览器打开…');
+                const ok = await openUrl(url);
+                if (ok) {
+                    setTip('✅ 已在浏览器打开' + (label || '') + '，下载后覆盖安装即可（数据不会丢失）', '#81c784');
+                    return true;
+                }
+                try {
+                    await navigator.clipboard.writeText(url);
+                    setTip('📋 无法自动打开，地址已复制，请粘贴到浏览器下载', '#ff9800');
+                } catch (e) {
+                    setTip('⚠️ 打开失败，请手动访问：' + url, '#ff9800');
+                }
+                return false;
+            };
+
+            const btn = document.getElementById('_forceUpdBtn');
             if (btn) btn.onclick = async () => {
+                const isTauri = !!(window.__TAURI__ || window.__TAURI_INTERNALS__);
                 btn.disabled = true; btn.style.opacity = '0.65'; btn.style.pointerEvents = 'none';
-                btn.innerHTML = '⏳ 正在获取下载地址...';
-                const info = await fetchInstallerInfo();
-                const url = (info && info.url) ? info.url : (data.downloadUrl || '');
-                const ver = (info && info.version) ? info.version : '';
-                const name = (info && info.fileName) ? info.fileName : 'tfjl-assistant-setup.exe';
-                if (url) {
-                    showInstallerSaveDialog(url, ver, name);
-                    btn.innerHTML = '📥 下载最新版';
-                    btn.disabled = false; btn.style.opacity = ''; btn.style.pointerEvents = '';
-                } else if (data.downloadUrl) {
-                    try { navigator.clipboard.writeText(data.downloadUrl); if (typeof showToast === 'function') showToast('已复制下载地址，请粘贴到浏览器下载'); } catch (e2) {}
-                    btn.innerHTML = '📋 地址已复制';
-                } else {
-                    btn.innerHTML = '⚠️ 获取失败，请稍后重试';
-                    btn.disabled = false; btn.style.opacity = ''; btn.style.pointerEvents = '';
+                const reset = (txt) => { btn.innerHTML = txt; btn.disabled = false; btn.style.opacity = ''; btn.style.pointerEvents = ''; };
+                setTip('');
+                if (!isTauri) {
+                    btn.innerHTML = '⏳ 正在打开下载页...';
+                    await openChannel(GITEE_RELEASES_PAGE, '下载页');
+                    reset('🚀 立即更新');
+                    return;
+                }
+                // APP 内：① Rust 原生静默升级 → ② 免选目录自动升级 → ③ 提示改用下方渠道
+                try {
+                    btn.innerHTML = '⏳ 正在检查并后台下载…（约 5MB，请稍候）';
+                    const natOk = await _tfjlTryNativeUpgrade();
+                    if (natOk) { btn.innerHTML = '✅ 正在安装，完成后自动重启'; setTip('安装器将在后台完成，装完自动重启本软件', '#81c784'); return; }
+
+                    btn.innerHTML = '⏳ 正在下载安装包…';
+                    const info = await fetchInstallerInfo();
+                    const url = (info && info.url) ? info.url : (data.downloadUrl || '');
+                    if (!url) {
+                        setTip('⚠️ 未获取到安装包地址，请改用下方任一渠道', '#ff9800');
+                        reset('🚀 立即更新');
+                        return;
+                    }
+                    btn.innerHTML = '⏳ 正在下载并静默安装…';
+                    const autoOk = await _tfjlAutoDownloadAndInstall({
+                        url: url,
+                        version: (info && info.version) ? info.version : '',
+                        fileName: (info && info.fileName) ? info.fileName : 'tfjl-assistant-setup.exe'
+                    });
+                    if (autoOk) { btn.innerHTML = '✅ 正在安装，完成后自动重启'; setTip('安装器将在后台完成，装完自动重启本软件', '#81c784'); return; }
+                    setTip('⚠️ 自动安装未成功，请改用下方任一渠道', '#ff9800');
+                    reset('🚀 立即更新');
+                } catch (e) {
+                    console.warn('[gate] 立即更新失败:', e && (e.message || e));
+                    setTip('⚠️ 自动更新失败，请改用下方任一渠道', '#ff9800');
+                    reset('🚀 立即更新');
                 }
             };
+
+            // 多渠道下载按钮（全部走系统浏览器，APP 内也能正常下载）
+            Array.prototype.forEach.call(overlay.querySelectorAll('._forceChBtn'), (b) => {
+                b.onclick = async () => {
+                    const ch = b.getAttribute('data-ch');
+                    b.disabled = true; b.style.opacity = '0.6';
+                    try {
+                        if (ch === 'gitee-page') {
+                            await openChannel(GITEE_RELEASES_PAGE, 'Gitee 发布页');
+                        } else if (ch === 'github-page') {
+                            await openChannel(GITHUB_RELEASES_PAGE, '官网');
+                        } else {
+                            setTip('⏳ 正在解析直连地址…');
+                            let url = data.downloadUrl || '';
+                            if (!url) {
+                                const info = await fetchInstallerInfo();
+                                url = (info && info.url) ? info.url : '';
+                            }
+                            await openChannel(url, '直连下载');
+                        }
+                    } finally {
+                        b.disabled = false; b.style.opacity = '';
+                    }
+                };
+            });
         }
 
         // 初始化版本号显示（异步填充，不阻塞）
