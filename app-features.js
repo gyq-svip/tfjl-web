@@ -3235,12 +3235,20 @@
                 if (t && t.update) t.update('🚀 正在后台静默安装…');
                 // 🔴 2026-08-31 修复弹安装向导：改用专用静默命令（NSIS /S /R：无窗安装+装完自动重启）。
                 //   之前借用 start_umi_ocr 启动不带 /S，NSIS 直接弹安装向导界面。
-                //   老包（Rust 无此命令）兼容回退 start_umi_ocr，老包用户升上来后即走新链路。
+                //   老包（Rust 无此命令）兼容回退链：先写 .bat 带 /S /R → open_url 执行（ShellExecute 级，
+                //   能正确跑 .bat），再降级 start_umi_ocr（老包最终兜底，会弹窗但至少能装）。
                 try {
                     await inv('start_installer_silent', { exePath: finalPath });
                 } catch (e) {
-                    console.warn('[updater] 静默安装命令不可用（老包），回退直接启动:', e && (e.message || e));
-                    await inv('start_umi_ocr', { exePath: finalPath });
+                    console.warn('[updater] start_installer_silent 不可用（老包），尝试 .bat + open_url 静默安装:', e && (e.message || e));
+                    try {
+                        const batPath = finalPath.replace(/\.exe$/i, '_silent.bat');
+                        await inv('write_text_file', { filePath: batPath, content: '@echo off\r\n"' + finalPath + '" /S /R\r\ndel "%~f0"\r\n' });
+                        await inv('open_url', { url: batPath });
+                    } catch (e2) {
+                        console.warn('[updater] .bat 静默安装失败，最终回退 start_umi_ocr:', e2 && (e2.message || e2));
+                        await inv('start_umi_ocr', { exePath: finalPath });
+                    }
                 }
                 if (t && t.success) { t.success('✅ 正在静默安装，完成后自动重启'); t.remove(2000); }
                 return true;
@@ -8726,13 +8734,15 @@
             // 该分类下项目（当前项目排最前并标注「当前」）
             (async function () {
                 let full = [];
-                try { full = await _lineupProjectListFull(); } catch (e) { full = []; }
+                try { full = await (typeof loadProjectListFromDB === 'function' ? loadProjectListFromDB() : (window.__tfjlLoadProjectList ? window.__tfjlLoadProjectList() : [])); } catch (e) { full = []; }
                 const catSel = modal.querySelector('#lineupImportCat');
                 if (!catSel || !targetSel) return;
                 const cur = (typeof currentProjectName !== 'undefined') ? currentProjectName : '';
                 const curCat = (typeof currentProjectCategory !== 'undefined' && currentProjectCategory) ? String(currentProjectCategory) : '';
-                const cats = [];
-                full.forEach(function (p) { if (p.category && cats.indexOf(p.category) < 0) cats.push(p.category); });
+                const catSet = new Set();
+                try { if (typeof categories !== 'undefined' && Array.isArray(categories)) categories.forEach(c => catSet.add(c)); } catch (e) {}
+                full.forEach(function (p) { if (p.category) catSet.add(p.category); });
+                const cats = Array.from(catSet).sort(function (a, b) { return a.localeCompare(b, 'zh'); });
                 cats.forEach(function (c) {
                     const o = document.createElement('option');
                     o.value = c; o.textContent = '📁 ' + c;
