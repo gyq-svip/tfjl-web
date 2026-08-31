@@ -22910,17 +22910,41 @@ ${maSection}
             // 管理员还原按钮：仅 URL ?admin=1 或已激活时才显示
             showAdminRestoreBtnIfAllowed();
             // 🔧 长按整条标题栏 2 秒进入管理员面板（隐蔽手势，普通用户无感知，唯一的入口）
+            // 🔴 2026-08-31 修复「长按没反应」：旧版用 mouseleave 取消，APP(WebView)长按期间
+            //   微小移动/触摸合成事件会误触发 mouseleave → timer 被清 → openAdminPanel 不弹。
+            //   改用 Pointer Events 统一鼠标+触摸，仅在松手/取消时清除，加移动阈值容忍抖动。
             const adminLongPressEl = document.querySelector('h1');
             if (adminLongPressEl) {
                 let lpTimer = null;
-                const startLP = () => { lpTimer = setTimeout(() => openAdminPanel(), 2000); };
-                const cancelLP = () => { clearTimeout(lpTimer); };
-                adminLongPressEl.addEventListener('mousedown', (e) => { e.preventDefault(); startLP(); });
-                adminLongPressEl.addEventListener('mouseup', cancelLP);
-                adminLongPressEl.addEventListener('mouseleave', cancelLP);
-                adminLongPressEl.addEventListener('touchstart', startLP, { passive: true });
-                adminLongPressEl.addEventListener('touchend', cancelLP);
-                adminLongPressEl.addEventListener('touchcancel', cancelLP);
+                let lpStartXY = null;
+                const LP_MS = 2000;
+                const LP_MOVE_TOL = 15; // 移动超过 15px 视为取消（允许微小抖动）
+                const startLP = (x, y) => {
+                    lpStartXY = { x: x, y: y };
+                    if (lpTimer) clearTimeout(lpTimer);
+                    lpTimer = setTimeout(() => { lpTimer = null; lpStartXY = null; openAdminPanel(); }, LP_MS);
+                };
+                const cancelLP = () => { if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; } lpStartXY = null; };
+                const onMove = (x, y) => {
+                    if (!lpStartXY) return;
+                    if (Math.abs(x - lpStartXY.x) > LP_MOVE_TOL || Math.abs(y - lpStartXY.y) > LP_MOVE_TOL) cancelLP();
+                };
+                if (window.PointerEvent) {
+                    // 优先 Pointer Events（统一鼠标/触摸/笔，WebView2 支持良好）
+                    adminLongPressEl.addEventListener('pointerdown', (e) => { e.preventDefault(); startLP(e.clientX, e.clientY); });
+                    adminLongPressEl.addEventListener('pointerup', cancelLP);
+                    adminLongPressEl.addEventListener('pointercancel', cancelLP);
+                    adminLongPressEl.addEventListener('pointermove', (e) => onMove(e.clientX, e.clientY));
+                } else {
+                    // 回退：老浏览器/无 PointerEvent 环境
+                    adminLongPressEl.addEventListener('mousedown', (e) => { e.preventDefault(); startLP(e.clientX, e.clientY); });
+                    adminLongPressEl.addEventListener('mouseup', cancelLP);
+                    adminLongPressEl.addEventListener('mousemove', (e) => onMove(e.clientX, e.clientY));
+                    adminLongPressEl.addEventListener('touchstart', (e) => { const t = e.touches[0]; if (t) startLP(t.clientX, t.clientY); }, { passive: true });
+                    adminLongPressEl.addEventListener('touchend', cancelLP);
+                    adminLongPressEl.addEventListener('touchcancel', cancelLP);
+                    adminLongPressEl.addEventListener('touchmove', (e) => { const t = e.touches[0]; if (t) onMove(t.clientX, t.clientY); }, { passive: true });
+                }
             }
 
             // 隐藏触发：三击标题强制清缓存+硬刷新（防缓存死循环）
