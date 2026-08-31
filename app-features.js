@@ -3127,9 +3127,9 @@
                 try { info = await fetchInstallerInfo(); } catch (e) { console.warn('[gate] 解析安装包地址失败:', e && (e.message || e)); }
                 const giteeUrl = (info && info.url) || data.downloadUrl || '';
                 const list = [];
-                if (giteeUrl) list.push({ label: '下载1 · Gitee 直连安装包（国内首选）', url: giteeUrl });
-                if (info && info.fallbackUrl && info.fallbackUrl !== giteeUrl) list.push({ label: '下载2 · GitHub 直连（Gitee 慢就换这个）', url: info.fallbackUrl });
-                if (list.length < 2 && GITEE_RELEASES_PAGE) list.push({ label: '下载' + (list.length + 1) + ' · Gitee 发布页（全部历史版本）', url: GITEE_RELEASES_PAGE });
+                if (giteeUrl) list.push({ label: '下载1 · Gitee 直连安装包（国内首选，点 🌐 自动打开）', url: giteeUrl });
+                // 国内 GitHub 直连不稳定，已移除；统一用 Gitee 发布页作备用渠道（同为 Gitee，国内可达）
+                if (GITEE_RELEASES_PAGE) list.push({ label: '下载2 · Gitee 发布页（全部历史版本/更新日志）', url: GITEE_RELEASES_PAGE });
                 renderLinks(list.slice(0, 3));
             })();
 
