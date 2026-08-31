@@ -19979,21 +19979,8 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             const _wallCat = window._wallCatFilter || '全部';
             const shownMessages = _wallCat === '全部' ? validMessages : validMessages.filter(m => (m.category || '未分类') === _wallCat);
 
-            // 顶部分类筛选条
-            const _knownCats = {};
-            (window.WALL_CATEGORIES || ['未分类']).forEach(function(c){ _knownCats[c] = 1; });
-            validMessages.forEach(function(m){ _knownCats[(m.category || '未分类')] = 1; });
-            const _cats = ['全部'].concat(Object.keys(_knownCats));
-            const filterBar = '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;padding:8px;background:rgba(255,255,255,0.04);border-radius:10px;position:sticky;top:0;z-index:5;">'
-                + _cats.map(c => {
-                    const on = c === _wallCat;
-                    const st = on ? 'background:linear-gradient(135deg,#ffd700,#ff9800);color:#1a1a2e;border:1px solid rgba(255,152,0,0.8);' : 'background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.14);';
-                    return '<span onclick="setWallCatFilter(\'' + c + '\')" style="cursor:pointer;padding:3px 12px;border-radius:14px;font-size:0.74rem;' + st + '">' + escapeHtml(c) + '</span>';
-                }).join('')
-                + '</div>';
-
             if (shownMessages.length === 0) {
-                scroller.innerHTML = filterBar + '<div style="color:rgba(255,255,255,0.5);font-size:0.85rem;text-align:center;padding:20px;">该分类下暂无消息</div>';
+                scroller.innerHTML = '<div style="color:rgba(255,255,255,0.5);font-size:0.85rem;text-align:center;padding:20px;">该分类下暂无消息</div>';
                 return;
             }
             
@@ -20083,7 +20070,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 </div>`;
             }).join('');
             
-            scroller.innerHTML = filterBar + html;
+            scroller.innerHTML = html;
             startMessageScroll();
             // 同步「需求墙」标题旁的分类筛选下拉框：选项 = 全部 + 预设分类 + 墙里实际存在的自定义分类
             (function(){
