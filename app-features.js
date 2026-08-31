@@ -3128,8 +3128,8 @@
                 const giteeUrl = (info && info.url) || data.downloadUrl || '';
                 const list = [];
                 if (giteeUrl) list.push({ label: '下载1 · Gitee 直连安装包（国内首选，点 🌐 自动打开）', url: giteeUrl });
-                // 国内 GitHub 直连不稳定，已移除；统一用 Gitee 发布页作备用渠道（同为 Gitee，国内可达）
-                if (GITEE_RELEASES_PAGE) list.push({ label: '下载2 · Gitee 发布页（全部历史版本/更新日志）', url: GITEE_RELEASES_PAGE });
+                // 主站（GitHub Pages）作为补充入口：用户实测可访问，点开可找到下载/更新日志
+                list.push({ label: '主站 · GitHub Pages（含下载入口）', url: 'https://gyq-svip.github.io/tfjl-web/' });
                 renderLinks(list.slice(0, 3));
             })();
 
