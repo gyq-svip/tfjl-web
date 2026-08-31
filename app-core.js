@@ -22922,9 +22922,17 @@ ${maSection}
         document.addEventListener('DOMContentLoaded', () => {
             // 管理员还原按钮：仅 URL ?admin=1 或已激活时才显示
             showAdminRestoreBtnIfAllowed();
-            // 🔧 管理员面板入口：标题栏 🔧 按钮点击直接开（已移除长按触发，避免普通用户误触/歧义）
-            const adminEntryBtn = document.getElementById('adminEntryBtn');
-            if (adminEntryBtn) adminEntryBtn.addEventListener('click', () => openAdminPanel());
+            // 🔧 管理员面板入口：仅 URL 带 ?admin=1 或本机已验证过才显示"管理"链接，普通用户完全看不到任何入口
+            const adminEntryLink = document.getElementById('adminEntryLink');
+            if (adminEntryLink) {
+                const isAdmin = new URLSearchParams(location.search).get('admin') === '1' || localStorage.getItem('tfjl_admin') === '1';
+                if (isAdmin) {
+                    adminEntryLink.style.display = '';
+                    adminEntryLink.addEventListener('click', () => openAdminPanel());
+                } else {
+                    adminEntryLink.style.display = 'none';
+                }
+            }
 
             // 隐藏触发：三击标题强制清缓存+硬刷新（防缓存死循环）
             let titleClickCount = 0;
@@ -26463,6 +26471,7 @@ ${maSection}
             const code = document.getElementById('adminVerifyCode').value.trim();
             if (await verifyPassword(code, ADMIN_VERIFY_HASH)) {
                 sessionStorage.setItem(ADMIN_VERIFY_KEY, 'true');
+                localStorage.setItem('tfjl_admin', '1'); // 本机记住管理员身份，后续无需 ?admin=1 也能看到隐蔽入口
 
                 // 记住验证码：如果勾选了"记住验证码"，保存到 localStorage
                 const rememberCb = document.getElementById('adminRememberCode');
