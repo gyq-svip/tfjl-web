@@ -22934,6 +22934,20 @@ ${maSection}
                 }
             }
 
+            // 🔧 长按整条标题栏 2 秒进入管理员面板（隐蔽手势，普通用户无感知；?admin=1 链接作备用）
+            const adminLongPressEl = document.querySelector('h1');
+            if (adminLongPressEl) {
+                let lpTimer = null;
+                const startLP = () => { lpTimer = setTimeout(() => openAdminPanel(), 2000); };
+                const cancelLP = () => { clearTimeout(lpTimer); };
+                adminLongPressEl.addEventListener('mousedown', (e) => { e.preventDefault(); startLP(); });
+                adminLongPressEl.addEventListener('mouseup', cancelLP);
+                adminLongPressEl.addEventListener('mouseleave', cancelLP);
+                adminLongPressEl.addEventListener('touchstart', startLP, { passive: true });
+                adminLongPressEl.addEventListener('touchend', cancelLP);
+                adminLongPressEl.addEventListener('touchcancel', cancelLP);
+            }
+
             // 隐藏触发：三击标题强制清缓存+硬刷新（防缓存死循环）
             let titleClickCount = 0;
             let titleClickTimer = null;
