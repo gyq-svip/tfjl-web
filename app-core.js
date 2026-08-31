@@ -19891,9 +19891,12 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             }).join('');
             const body = document.getElementById('contributionCardBody');
             if (body) body.innerHTML = `
-                <div style="text-align:center;margin-bottom:12px;">
-                    <div style="color:#ffd700;font-size:1.3rem;font-weight:bold;">${escapeHtml(nick)}</div>
-                    <div style="color:rgba(255,255,255,0.7);font-size:0.9rem;margin-top:2px;">🎖 ${t.name}</div>
+                <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;background:linear-gradient(135deg,rgba(186,104,200,0.16),rgba(79,195,247,0.12));border-radius:12px;padding:12px;">
+                    <div style="width:54px;height:54px;border-radius:50%;background:linear-gradient(135deg,#ba68c8,#4fc3f7);display:flex;align-items:center;justify-content:center;font-size:1.7rem;font-weight:bold;color:#fff;flex-shrink:0;">${escapeHtml((nick||'?').slice(0,1))}</div>
+                    <div>
+                        <div style="color:#ffd700;font-size:1.25rem;font-weight:bold;">${escapeHtml(nick)}</div>
+                        <div style="color:rgba(255,255,255,0.7);font-size:0.85rem;margin-top:2px;">🎖 ${t.name}</div>
+                    </div>
                 </div>
                 ${renderBadgesHtml(nick, repMap)}
                 <div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:10px 12px;margin-bottom:10px;">
