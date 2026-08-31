@@ -18441,18 +18441,31 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             return !!nick;
         }
 
+        // 🔴 2026-08-31 修复「红点点了还在」：把当前消息列表全部标记已读并持久化。
+        // 开墙/关墙都调一次（双保险）；红点右键也调（逃生门，详见 messageWallToggle contextmenu）。
+        // 残留根因组合：①开墙时 ensureWallNickBeforeOpen 取消 → return 已读没标 ②localStorage 写入
+        // 静默失败(try吞错) 重启后集合回旧值 ③本地IndexedDB旧缓存指纹与远端不一致混入合并列表。
+        function _wallMarkAllRead() {
+            try {
+                wallMessages.forEach(m => wallReadKeys.add(_wallMsgKey(m)));
+                localStorage.setItem('TFJL_WallReadKeys', JSON.stringify([...wallReadKeys]));
+            } catch (e) {}
+        }
+        window._wallMarkAllRead = _wallMarkAllRead;
+
         async function toggleMessageWall() {
             const wall = document.getElementById('messageWall');
             const toggle = document.getElementById('messageWallToggle');
             const min = document.getElementById('messageWallMin');
             const chatToggle = document.getElementById('chatRoomToggle');
-            
+
             if (messageWallOpen) {
                 wall.style.display = 'none';
                 min.style.display = 'flex';
                 // 需求墙最小化时，拍卖行按钮右移
                 if (chatToggle) chatToggle.style.left = '160px';
                 messageWallOpen = false;
+                _wallMarkAllRead();       // 关墙=看完：双保险再标记一次已读（防开墙时标记失败残留红点）
                 updateWallAttention();   // 关闭后重新评估未读提醒
             } else {
                 const ok = await ensureWallNickBeforeOpen();
@@ -18466,8 +18479,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 updateWallAttention();   // 打开即清除未读提醒(墙已开, 先隐藏红点)
                 await fetchMessages();   // 先拉取最新消息, 避免竞态
                 // 打开墙 = 标记(最新)所有消息为已读(加入指纹集合并持久化), 必须基于 fetch 后的最新列表
-                wallMessages.forEach(m => wallReadKeys.add(_wallMsgKey(m)));
-                try { localStorage.setItem('TFJL_WallReadKeys', JSON.stringify([...wallReadKeys])); } catch (e) {}
+                _wallMarkAllRead();
                 updateWallAttention();   // 重新评估, 确保新拉到的消息也标记为已读
                 initMessageWallDrag();
                 // 打开需求墙时，按本地记忆决定是否同时弹出右侧贡献排行榜
@@ -18488,7 +18500,30 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 if (shouldScroll) startMessageScroll(); else pauseMessageScroll();
             }
         }
-        
+
+        // 🔴 2026-08-31 逃生门：右键「📢 需求墙」按钮 = 一键标记全部已读（清红点）。
+        // 红点残留的任何根因（标记失败/缓存指纹漂移/昵称弹窗取消没开成墙）都能靠它消掉。
+        (function _initWallReadCtx() {
+            const bind = function () {
+                const t = document.getElementById('messageWallToggle');
+                if (!t || t.dataset.readCtx) return;
+                t.dataset.readCtx = '1';
+                t.title = '左键：需求墙　右键：全部标记已读（清红点）';
+                t.addEventListener('contextmenu', function (e) {
+                    e.preventDefault();
+                    const doMark = function () { _wallMarkAllRead(); updateWallAttention(); };
+                    // 消息还没拉过（启动即右键）→ 先拉最新再标，否则标了个寂寞下次又亮
+                    if (wallMessages.length === 0 && typeof fetchMessages === 'function') {
+                        fetchMessages().then(doMark).catch(doMark);
+                    } else doMark();
+                    if (typeof showToast === 'function') showToast('✅ 已把当前消息全部标记为已读');
+                });
+            };
+            bind();
+            if (document.readyState !== 'complete') document.addEventListener('DOMContentLoaded', bind);
+        })();
+        window.toggleMessageWall = toggleMessageWall;
+
         // 未读提醒防抖：被动触发(fetch/升级检查)时延迟评估, 避免刚刷新/升级就立刻闪红点, 给用户缓冲
         let _wallAttnTimer = null;
         // 🔴 2026-08-29 增强：双击刷新/强制刷新后 30 秒内彻底抑制红点(即便有未读也不闪), 30秒后才真评估
