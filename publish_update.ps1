@@ -162,6 +162,33 @@ $ErrorActionPreference = "Continue"
 # 🔴 2026-08-30：必须用仓库 .git/config 里写死的 127.0.0.1:7897 代理，
 #    绝不能加 `-c http.proxy= -c https.proxy=` 去清空它——清代理直连 github.com:443 已连续失败 22 次。
 git push origin main 2>$null; $po = $LASTEXITCODE
+# 🔴 2026-08-31 自愈推送：打包耗时几分钟，期间 CI 会自动提交（bump sw.js CACHE_VERSION +
+#    往 version.json 注入 frontVersion/deployTag），与本地 release 提交分叉 → push 被拒（非快进）。
+#    自愈流程：stash 脏区 → pull --rebase → version.json 冲突时智能合并
+#    （发布字段取本次 $versionJson，frontVersion/deployTag 保留远端 CI 注入值）→ rebase --continue → 重推。
+if ($po -ne 0) {
+    Write-Host "WARN: git push 被拒（远端有新提交，多为 CI 自动提交），自动 rebase 自愈重推…" -ForegroundColor Yellow
+    $dirty = (git status --porcelain 2>$null | Out-String)
+    $stashed = $false
+    if ($dirty.Trim()) { git stash 2>$null | Out-Null; $stashed = $true }
+    git pull --rebase 2>$null | Out-Null; $pr = $LASTEXITCODE
+    if ($pr -ne 0) {
+        # version.json 冲突：远端(CI)版含 frontVersion/deployTag，本地版含新发布字段，两者都保留
+        $remoteVer = (git show "origin/main:version.json" 2>$null | Out-String)
+        $merged = [ordered]@{}
+        foreach ($k in @('version','notes','pub_date','downloadUrl','size')) { $merged[$k] = $versionJson[$k] }
+        foreach ($k in @('frontVersion','deployTag')) {
+            if ($remoteVer -match ('"' + $k + '"\s*:\s*"([^"]+)"')) { $merged[$k] = $Matches[1] }
+        }
+        [System.IO.File]::WriteAllText((Join-Path $RootDir "version.json"), ($merged | ConvertTo-Json -Depth 10), [System.Text.UTF8Encoding]::new($false))
+        Write-Host "version.json 冲突已智能合并：发布字段=v$ver，frontVersion/deployTag=CI 注入值" -ForegroundColor Cyan
+        git add version.json updater.json 2>$null | Out-Null
+        $env:GIT_EDITOR = "true"
+        git rebase --continue 2>$null | Out-Null
+    }
+    if ($stashed) { git stash pop 2>$null | Out-Null }
+    git push origin main 2>$null; $po = $LASTEXITCODE
+}
 $ErrorActionPreference = $prevEAP
 if ($po -ne 0) { Write-Host "ERROR: git push origin 失败 (exit=$po)" -ForegroundColor Red; exit 1 }
 Write-Host "Published: v$ver (updater.json->Pages; installer->Gitee release only)" -ForegroundColor Green
