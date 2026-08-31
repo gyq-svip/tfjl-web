@@ -1070,7 +1070,7 @@
 
             const now = new Date();
             const defaultName = `塔防阵容_${projectName}_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
-            let fileName, expireMinutes, sharePassword, recoveryKey;
+            let fileName, expireMinutes, sharePassword, recoveryKey, category = '未分类';
             if (auto) {
                 fileName = defaultName + '.json';
                 expireMinutes = Math.max(1, (autoOpts.days || 30)) * 1440;
@@ -1082,7 +1082,7 @@
                 fileName = inputName.endsWith('.json') ? inputName : inputName + '.json';
 
                 // 分享选项弹窗（时长 + 密码），与脚本分享一致
-                const shareOpts = await new Promise(function(resolve) { showShareOptionsDialog(function(e, p, rk) { resolve([e, p, rk]); }); });
+                const shareOpts = await new Promise(function(resolve) { showShareOptionsDialog(function(e, p, rk, cat) { resolve([e, p, rk, cat]); }); });
                 if (shareOpts === null || shareOpts[0] === null) return false;
                 expireMinutes = shareOpts[0];
                 sharePassword = shareOpts[1];
@@ -1130,7 +1130,8 @@
                     scriptUrl: scriptUrl,
                     expireMinutes: expireMinutes > 0 ? expireMinutes : null,
                     isEncrypted: !!willEncrypt,
-                    shareType: 'project'
+                    shareType: 'project',
+                    category: category || '未分类'
                 };
                 if (passwordHash) newMsg.passwordHash = passwordHash;
                 if (recoveryKey) newMsg.encScheme = 'B';

@@ -7128,6 +7128,13 @@
                         </select>
                     </div>
 
+                    <div style="margin-bottom:16px;">
+                        <label style="color:rgba(255,255,255,0.8);font-size:0.85rem;display:block;margin-bottom:6px;">🏷️ 分类标签（发布后可在需求墙按分类筛选）</label>
+                        <select id="shareCategory" style="width:100%;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:white;font-size:0.85rem;outline:none;cursor:pointer;">
+                            ${(window.WALL_CATEGORIES || ['未分类']).map(function(c){ return '<option value="'+c+'" style="background:#1a1a2e;">'+c+'</option>'; }).join('')}
+                        </select>
+                    </div>
+
                     <div style="display:flex;gap:10px;">
                         <button id="shareOptionsConfirmBtn" style="flex:2;background:linear-gradient(135deg,#ff9800,#f57c00);color:white;border:none;padding:10px;border-radius:8px;cursor:pointer;font-size:0.9rem;font-weight:bold;">确认分享</button>
                         <button id="shareOptionsCancelBtn" style="flex:1;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.6);border:1px solid rgba(255,255,255,0.2);padding:10px;border-radius:8px;cursor:pointer;font-size:0.85rem;">取消</button>
@@ -7173,7 +7180,7 @@
             };
             cancelBtn.onclick = function() {
                 modal.remove();
-                callback(null, '', '');
+                callback(null, '', '', '未分类');
             };
             passwordInput.onkeydown = function(e) {
                 if (e.key === 'Enter') confirmBtn.click();
@@ -7214,11 +7221,12 @@
             const fileName = inputName.endsWith('.txt') ? inputName : inputName + '.txt';
 
             // 分享选项弹窗（时长 + 密码）
-            const shareOpts = await new Promise(function(resolve) { showShareOptionsDialog(function(e, p, rk) { resolve([e, p, rk]); }); });
+            const shareOpts = await new Promise(function(resolve) { showShareOptionsDialog(function(e, p, rk, cat) { resolve([e, p, rk, cat]); }); });
             if (shareOpts === null || shareOpts[0] === null) return;
             const expireMinutes = shareOpts[0];
             const sharePassword = shareOpts[1];
             const recoveryKey = shareOpts[2] || '';
+            const category = shareOpts[3] || '未分类';
 
             try {
                 // 上传到Gist
@@ -7260,7 +7268,8 @@
                     time: Date.now(),
                     scriptUrl: scriptUrl,
                     expireMinutes: expireMinutes > 0 ? expireMinutes : null,
-                    isEncrypted: !!willEncrypt
+                    isEncrypted: !!willEncrypt,
+                    category: category || '未分类'
                 };
                 if (passwordHash) newMsg.passwordHash = passwordHash;
                 if (recoveryKey) newMsg.encScheme = 'B';
@@ -7316,16 +7325,18 @@
             let expireMinutes = 0;
             let sharePassword = '';
             let recoveryKey = '';
+            let category = shareOpts ? (shareOpts.category || '未分类') : '未分类';
             if (shareOpts) {
                 expireMinutes = shareOpts.expireMinutes;
                 sharePassword = shareOpts.password;
                 recoveryKey = shareOpts.recoveryKey || '';
             } else {
-                const opts = await new Promise(function(resolve) { showShareOptionsDialog(function(e, p, rk) { resolve([e, p, rk]); }); });
+                const opts = await new Promise(function(resolve) { showShareOptionsDialog(function(e, p, rk, cat) { resolve([e, p, rk, cat]); }); });
                 if (opts === null || opts[0] === null) return;
                 expireMinutes = opts[0];
                 sharePassword = opts[1];
                 recoveryKey = opts[2] || '';
+                category = opts[3] || '未分类';
             }
 
             try {
@@ -7366,7 +7377,8 @@
                     time: Date.now(),
                     scriptUrl: scriptUrl,
                     expireMinutes: expireMinutes > 0 ? expireMinutes : null,
-                    isEncrypted: !!willEncrypt
+                    isEncrypted: !!willEncrypt,
+                    category: category || '未分类'
                 };
                 if (passwordHash) newMsg.passwordHash = passwordHash;
                 if (recoveryKey) newMsg.encScheme = 'B';
@@ -7400,7 +7412,7 @@
             const baseName = await askTextInputAsync({ title: '批量分享', label: '文件名前缀（留空则每个用原文件名）：', defaultValue: '' });
             if (baseName === null) return;
             // 批量统一选择分享选项
-            const opts = await new Promise(function(resolve) { showShareOptionsDialog(function(e, p, rk) { resolve([e, p, rk]); }); });
+            const opts = await new Promise(function(resolve) { showShareOptionsDialog(function(e, p, rk, cat) { resolve([e, p, rk, cat]); }); });
             if (opts === null || opts[0] === null) return;
             const shareOpts = { expireMinutes: opts[0], password: opts[1], recoveryKey: opts[2] || '' };
             let success = 0, fail = 0;
