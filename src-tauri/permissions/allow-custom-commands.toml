@@ -149,6 +149,11 @@ description = "Allow clicking the update badge to immediately download+install b
 commands.allow = ["install_app_update"]
 
 [[permission]]
+identifier = "allow-start-installer-silent"
+description = "Allow launching the downloaded NSIS installer silently (/S /R: no wizard window, auto-restart after install)"
+commands.allow = ["start_installer_silent"]
+
+[[permission]]
 identifier = "allow-find-game-windows"
 description = "Allow enumerating visible game/emulator windows (EnumWindows read-only) for wave monitor & auto-recognize"
 commands.allow = ["find_game_windows"]

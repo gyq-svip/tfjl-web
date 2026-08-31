@@ -3181,8 +3181,10 @@
                 }
                 // 🔴 第二步：真的有更新才 install，并加超时兜底——
                 //   老包的 install_app_update 失败是「静默 Ok」，页面不会重启，
-                //   若 25s 内进程没重启（本页还活着），判定失败并回退，避免"点了没反应"卡死。
-                const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('no-restart-timeout')), 25000));
+                //   若时限内进程没重启（本页还活着），判定失败并回退，避免"点了没反应"卡死。
+                //   🔴 2026-08-31 25s→150s：原生链是 check→下载 4.8MB→静默安装→重启，
+                //   网络稍慢就超 25s，会误判失败触发回退双下载（甚至弹安装向导）。150s 覆盖慢网络。
+                const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('no-restart-timeout')), 150000));
                 await Promise.race([inv('install_app_update'), timeout]);
                 return true;
             } catch (e) {
@@ -3221,9 +3223,26 @@
                     if (t && t.error) { t.error('⚠️ 更新包下载失败'); t.remove(2600); }
                     throw e;
                 }
-                if (t && t.update) t.update('🚀 正在启动安装程序…');
-                await inv('start_umi_ocr', { exePath: finalPath });
-                if (t && t.success) { t.success('✅ 安装程序已启动'); t.remove(2000); }
+                if (t && t.update) t.update('💾 正在保存数据…');
+                // 安装器启动后 NSIS 会强杀本进程，先把编辑中的项目落盘（用户要求：自动升级绝不丢数据）
+                try {
+                    if (typeof window.__tfjlSaveAllProjects === 'function') {
+                        const list = (typeof window.__tfjlLoadProjectList === 'function')
+                            ? await window.__tfjlLoadProjectList() : null;
+                        if (list) await window.__tfjlSaveAllProjects(list);
+                    }
+                } catch (e) { console.warn('[升级前落盘] 失败（不阻塞升级）:', e); }
+                if (t && t.update) t.update('🚀 正在后台静默安装…');
+                // 🔴 2026-08-31 修复弹安装向导：改用专用静默命令（NSIS /S /R：无窗安装+装完自动重启）。
+                //   之前借用 start_umi_ocr 启动不带 /S，NSIS 直接弹安装向导界面。
+                //   老包（Rust 无此命令）兼容回退 start_umi_ocr，老包用户升上来后即走新链路。
+                try {
+                    await inv('start_installer_silent', { exePath: finalPath });
+                } catch (e) {
+                    console.warn('[updater] 静默安装命令不可用（老包），回退直接启动:', e && (e.message || e));
+                    await inv('start_umi_ocr', { exePath: finalPath });
+                }
+                if (t && t.success) { t.success('✅ 正在静默安装，完成后自动重启'); t.remove(2000); }
                 return true;
             } catch (e) {
                 console.warn('[updater] 自动下载并安装失败:', e && (e.message || e));
