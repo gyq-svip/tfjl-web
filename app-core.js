@@ -22922,19 +22922,7 @@ ${maSection}
         document.addEventListener('DOMContentLoaded', () => {
             // 管理员还原按钮：仅 URL ?admin=1 或已激活时才显示
             showAdminRestoreBtnIfAllowed();
-            // 🔧 管理员面板入口：仅 URL 带 ?admin=1 或本机已验证过才显示"管理"链接，普通用户完全看不到任何入口
-            const adminEntryLink = document.getElementById('adminEntryLink');
-            if (adminEntryLink) {
-                const isAdmin = new URLSearchParams(location.search).get('admin') === '1' || localStorage.getItem('tfjl_admin') === '1';
-                if (isAdmin) {
-                    adminEntryLink.style.display = '';
-                    adminEntryLink.addEventListener('click', () => openAdminPanel());
-                } else {
-                    adminEntryLink.style.display = 'none';
-                }
-            }
-
-            // 🔧 长按整条标题栏 2 秒进入管理员面板（隐蔽手势，普通用户无感知；?admin=1 链接作备用）
+            // 🔧 长按整条标题栏 2 秒进入管理员面板（隐蔽手势，普通用户无感知，唯一的入口）
             const adminLongPressEl = document.querySelector('h1');
             if (adminLongPressEl) {
                 let lpTimer = null;
