@@ -1351,8 +1351,12 @@
                 // 直接保存项目数据（包含参考图片和脚本文件）
                 if (typeof showToast === 'function') showToast('⏳ 正在恢复项目「' + finalName + '」…');
                 saveProjectToDBDirect(data.project).then(() => {
-                    loadCategoriesFromDB();
-                    updateCategorySelector();
+                    // 导入分类不在分类表（分享自带分类）时补录落库，主界面分类下拉才能选到
+                    if (category && Array.isArray(categories) && !categories.includes(category)) {
+                        categories.push(category);
+                        try { localStorage.setItem('tfjl_categories', JSON.stringify(categories)); } catch (e) {}
+                        saveCategories().catch(() => {});
+                    }
                     refreshProjectSelectors();
                     showImportSuccessModal(finalName, category);
                     // 刷新下拉后把选中切到刚导入的项目，并自动加载到工作区，避免"重启才出来"
