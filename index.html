@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=3.0, user-scalable=yes">
     <title>塔防阵容卡搭配专用</title>
-    <link rel="stylesheet" href="styles.css?v=s1.0.181">
+    <link rel="stylesheet" href="styles.css?v=s1.0.607">
 </head>
 <body>
     <!-- 启动加载动画（网页加载完成后自动消失） -->
@@ -79,7 +79,7 @@
         }, true);
     })();
     </script>
-    <script defer src="app-boot.js?v=s1.0.130"></script>
+    <script defer src="app-boot.js?v=s1.0.607"></script>
 
     <!-- 密码验证层（默认隐藏；启动逻辑确认"未登录"后才显示，避免已登录用户闪一下登录界面） -->
     <div id="passwordOverlay" class="password-overlay" style="display:none;">
@@ -871,7 +871,7 @@
         <!-- Boss减伤悬浮提示 -->
         <div id="bossRedTooltip" style="display:none;position:fixed;z-index:99999;max-width:300px;background:rgba(20,20,40,0.97);border:1px solid rgba(255,215,0,0.4);border-radius:8px;padding:10px;color:#fff;pointer-events:none;box-shadow:0 4px 16px rgba(0,0,0,0.5);"></div>
 
-        <script defer src="app-effects.js?v=s1.0.492"></script>
+        <script defer src="app-effects.js?v=s1.0.607"></script>
 
         <!-- 固定在右上角的按钮 -->
         <div class="sticky-buttons" style="position:fixed;top:12px;right:12px;z-index:9999;display:flex;flex-direction:column;align-items:flex-end;gap:5px;"><div style="display:flex;gap:5px;">
@@ -954,7 +954,7 @@
             </div>
         </div>
 
-        <script defer src="app-features.js?v=s1.0.203"></script>
+        <script defer src="app-features.js?v=s1.0.607"></script>
 
         <!-- 项目操作菜单（折叠） -->
         <div id="projectMenu" style="display:none;position:fixed;z-index:9998;background:rgba(40,40,70,0.98);border:1px solid rgba(255,215,0,0.3);border-radius:10px;padding:10px;min-width:200px;max-height:85vh;overflow-y:auto;box-shadow:0 4px 15px rgba(0,0,0,0.4);">
@@ -976,13 +976,13 @@
         </div>
 
         <!-- APP本地功能脚本（网页版不会执行任何代码，isTauriApp判断在文件内部） -->
-        <script defer src="app-local2.js?v=s1.0.493"></script>
+        <script defer src="app-local2.js?v=s1.0.607"></script>
         <!-- 阵容识别模块（独立入口 + 灌入脚本生成） -->
         
         <!-- 网页版皮肤系统（仅非 Tauri 浏览器执行；Tauri 由 app-local.js 负责，文件内部自动跳过） -->
-        <script defer src="skins-web.js?v=s1.0.157"></script>
+        <script defer src="skins-web.js?v=s1.0.607"></script>
 
-        <script defer src="app-picker.js?v=s1.0.489"></script>
+        <script defer src="app-picker.js?v=s1.0.607"></script>
 
         <!-- 记事本悬浮面板 -->
         <div id="notepadPanel" style="display:none;position:fixed;top:80px;right:20px;width:400px;height:350px;z-index:9997;background:rgba(30,30,60,0.95);border:2px solid rgba(121,134,203,0.6);border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.5);overflow:auto;resize:both;min-width:280px;min-height:250px;">
@@ -1595,11 +1595,11 @@
             </div>
         </div>
 
-    <script defer src="color-picker.js?v=s1.0.180"></script>
-    <script defer src="app-damagecalc.js?v=s1.0.192"></script>
-    <script defer src="gh-gist.js?v=s1.0.130"></script>
-    <script defer src="app-core.js?v=s1.0.492"></script>
-    <script defer src="admin-ctl.js?v=s1.0.459"></script>
+    <script defer src="color-picker.js?v=s1.0.607"></script>
+    <script defer src="app-damagecalc.js?v=s1.0.607"></script>
+    <script defer src="gh-gist.js?v=s1.0.607"></script>
+    <script defer src="app-core.js?v=s1.0.607"></script>
+    <script defer src="admin-ctl.js?v=s1.0.607"></script>
 
     <!-- 模态框：创建分类 -->
     <div id="createCategoryModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;justify-content:center;align-items:center;">
@@ -2758,7 +2758,7 @@
     <button id="floatConsoleToggle" onclick="toggleFloatConsole()" style="position:fixed;right:30px;bottom:113px;z-index:99998;display:none;align-items:center;gap:4px;background:linear-gradient(135deg,#00838f,#006064);color:#fff;border:none;padding:6px 12px;border-radius:20px;cursor:pointer;font-size:0.75rem;box-shadow:0 2px 8px rgba(0,0,0,0.4);">💻日志</button>
 
   <!-- 皮肤制作工具改为按需懒加载：首次打开皮肤 Tab 时由 loader.js 拉取 app-skinmaker.js -->
-  <script src="loader.js?v=s1.0.130"></script>
+  <script src="loader.js?v=s1.0.607"></script>
 
         <!-- 需求墙备份中心（合并：定期备份 + 还原 + 紧急救回） -->
         <div id="adminPageWallBackup" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:99990;overflow-y:auto;">
