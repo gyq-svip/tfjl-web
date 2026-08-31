@@ -3059,39 +3059,85 @@
                     <div style="color:rgba(255,255,255,0.40);font-size:0.72rem;margin:14px 0 16px;">当前版本：v${cur} ｜ 最低要求：v${data.minVersion}</div>
                     <button id="_forceUpdBtn" style="width:100%;background:linear-gradient(135deg,#ff9800,#f57c00);color:#fff;border:none;padding:13px;border-radius:10px;cursor:pointer;font-size:0.98rem;font-weight:bold;">🚀 立即更新</button>
                     <div id="_forceUpdTip" style="color:rgba(255,255,255,0.55);font-size:0.72rem;text-align:center;margin-top:10px;min-height:1.1em;line-height:1.5;"></div>
-                    <div style="margin-top:14px;border-top:1px solid rgba(255,255,255,0.10);padding-top:12px;">
-                        <div style="color:rgba(255,255,255,0.45);font-size:0.7rem;margin-bottom:9px;">若上方按钮无反应，任选以下渠道（用系统浏览器打开，APP 内也能正常下载）</div>
-                        <div style="display:flex;flex-direction:column;gap:7px;">
-                            <button class="_forceChBtn" data-ch="gitee-direct" style="width:100%;background:rgba(255,255,255,0.08);color:#cfd8ff;border:1px solid rgba(255,255,255,0.16);padding:10px 12px;border-radius:9px;cursor:pointer;font-size:0.82rem;text-align:left;">📦 Gitee 直连安装包 <span style="color:#81c784;font-size:0.7rem;">（推荐 · 国内最快）</span></button>
-                            <button class="_forceChBtn" data-ch="gitee-page" style="width:100%;background:rgba(255,255,255,0.08);color:#cfd8ff;border:1px solid rgba(255,255,255,0.16);padding:10px 12px;border-radius:9px;cursor:pointer;font-size:0.82rem;text-align:left;">🌐 Gitee 发布页 <span style="color:rgba(255,255,255,0.45);font-size:0.7rem;">（可查看历史版本）</span></button>
-                            <button class="_forceChBtn" data-ch="github-page" style="width:100%;background:rgba(255,255,255,0.08);color:#cfd8ff;border:1px solid rgba(255,255,255,0.16);padding:10px 12px;border-radius:9px;cursor:pointer;font-size:0.82rem;text-align:left;">🐙 官网备用渠道 <span style="color:rgba(255,255,255,0.45);font-size:0.7rem;">（GitHub Pages）</span></button>
-                        </div>
+                    <div id="_forceLinks" style="margin-top:14px;border-top:1px solid rgba(255,255,255,0.10);padding-top:12px;text-align:left;">
+                        <div style="color:rgba(255,255,255,0.5);font-size:0.72rem;">⏳ 正在获取下载链接…</div>
                     </div>
                 </div>`;
             document.body.appendChild(overlay);
 
             const GITEE_RELEASES_PAGE = 'https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/releases';
             const tipEl = document.getElementById('_forceUpdTip');
+            const linksBox = document.getElementById('_forceLinks');
             const setTip = (s, c) => { if (tipEl) { tipEl.textContent = s || ''; tipEl.style.color = c || 'rgba(255,255,255,0.55)'; } };
+            const esc = (s) => String(s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+            let _forceUrlList = [];
 
-            // 🔴 用系统浏览器打开外链：APP 内 window.open 会被 WebView 吞掉（"下载点不了"的根因），
-            //    必须走 Rust 的 open_url 命令；失败则复制地址兜底。
-            const openChannel = async (url, label) => {
-                if (!url) { setTip('⚠️ 未获取到该渠道地址', '#ff9800'); return false; }
-                setTip('⏳ 正在用系统浏览器打开…');
-                const ok = await openUrl(url);
-                if (ok) {
-                    setTip('✅ 已在浏览器打开' + (label || '') + '，下载后覆盖安装即可（数据不会丢失）', '#81c784');
-                    return true;
+            // 渲染「下载1 / 下载2」：每行 = 可复制的链接框 + 复制按钮 + 浏览器打开按钮。
+            // 链接直接可见（不是纯按钮），确保任何情况下用户都能手动选中复制。
+            const renderLinks = (list) => {
+                _forceUrlList = (list || []).filter(x => x && x.url);
+                if (!linksBox) return;
+                if (!_forceUrlList.length) {
+                    linksBox.innerHTML = '<div style="color:#ff9800;font-size:0.72rem;line-height:1.6;">⚠️ 未能自动获取下载链接，请手动访问 Gitee 发布页：<br><span style="color:#9fb3ff;font-family:Consolas,monospace;font-size:0.68rem;word-break:break-all;">' + esc(GITEE_RELEASES_PAGE) + '</span></div>';
+                    return;
                 }
-                try {
-                    await navigator.clipboard.writeText(url);
-                    setTip('📋 无法自动打开，地址已复制，请粘贴到浏览器下载', '#ff9800');
-                } catch (e) {
-                    setTip('⚠️ 打开失败，请手动访问：' + url, '#ff9800');
-                }
-                return false;
+                linksBox.innerHTML =
+                    '<div style="color:rgba(255,255,255,0.5);font-size:0.7rem;margin-bottom:9px;line-height:1.6;">自动更新慢或没反应？直接用下面的链接（可复制粘贴到浏览器下载，也可点 🌐 自动打开）</div>' +
+                    _forceUrlList.map((it, i) => (
+                        '<div style="margin-bottom:10px;">' +
+                            '<div style="color:rgba(255,255,255,0.62);font-size:0.74rem;margin-bottom:5px;">' + it.label + '</div>' +
+                            '<div style="display:flex;gap:6px;align-items:stretch;">' +
+                                '<input id="_forceLinkIn' + i + '" readonly value="' + esc(it.url) + '" onclick="this.select();" style="flex:1;min-width:0;background:rgba(0,0,0,0.35);color:#9fb3ff;border:1px solid rgba(255,255,255,0.15);border-radius:7px;padding:8px 9px;font-size:0.66rem;font-family:Consolas,monospace;">' +
+                                '<button class="_forceCopyBtn" data-idx="' + i + '" title="复制链接" style="background:rgba(79,195,247,0.15);color:#4fc3f7;border:1px solid rgba(79,195,247,0.35);border-radius:7px;padding:0 10px;cursor:pointer;font-size:0.72rem;white-space:nowrap;">📋 复制</button>' +
+                                '<button class="_forceOpenBtn" data-idx="' + i + '" title="用系统浏览器打开" style="background:rgba(76,175,80,0.15);color:#81c784;border:1px solid rgba(76,175,80,0.35);border-radius:7px;padding:0 10px;cursor:pointer;font-size:0.72rem;white-space:nowrap;">🌐 打开</button>' +
+                            '</div>' +
+                        '</div>'
+                    )).join('');
+
+                Array.prototype.forEach.call(linksBox.querySelectorAll('._forceCopyBtn'), (b) => {
+                    b.onclick = () => {
+                        const i = parseInt(b.getAttribute('data-idx'), 10);
+                        const inp = document.getElementById('_forceLinkIn' + i);
+                        const u = (_forceUrlList[i] && _forceUrlList[i].url) || '';
+                        if (!u) return;
+                        const done = () => setTip('📋 已复制下载链接，粘贴到浏览器地址栏回车即可下载', '#81c784');
+                        try {
+                            if (navigator.clipboard && navigator.clipboard.writeText) {
+                                navigator.clipboard.writeText(u).then(done, () => { if (inp) { inp.select(); document.execCommand('copy'); } done(); });
+                            } else { if (inp) { inp.select(); document.execCommand('copy'); } done(); }
+                        } catch (e) { if (inp) inp.select(); done(); }
+                    };
+                });
+                Array.prototype.forEach.call(linksBox.querySelectorAll('._forceOpenBtn'), (b) => {
+                    b.onclick = async () => {
+                        const i = parseInt(b.getAttribute('data-idx'), 10);
+                        const u = (_forceUrlList[i] && _forceUrlList[i].url) || '';
+                        if (!u) return;
+                        setTip('⏳ 正在用系统浏览器打开…');
+                        // APP 内 window.open 会被 WebView 吞掉，必须走 open_url（系统浏览器）
+                        const ok = await openUrl(u);
+                        setTip(ok ? '✅ 已在浏览器打开，下载后覆盖安装即可（数据不会丢失）' : '⚠️ 自动打开失败，请点「📋 复制」手动粘贴下载', ok ? '#81c784' : '#ff9800');
+                    };
+                });
             };
+
+            // 解析下载链接（Gitee 优先）：Gitee 直连 → GitHub 直连 → Gitee 发布页
+            (async () => {
+                let info = null;
+                try { info = await fetchInstallerInfo(); } catch (e) { console.warn('[gate] 解析安装包地址失败:', e && (e.message || e)); }
+                const giteeUrl = (info && info.url) || data.downloadUrl || '';
+                const list = [];
+                if (giteeUrl) list.push({ label: '下载1 · Gitee 直连安装包（国内首选）', url: giteeUrl });
+                if (info && info.fallbackUrl && info.fallbackUrl !== giteeUrl) list.push({ label: '下载2 · GitHub 直连（Gitee 慢就换这个）', url: info.fallbackUrl });
+                if (list.length < 2 && GITEE_RELEASES_PAGE) list.push({ label: '下载' + (list.length + 1) + ' · Gitee 发布页（全部历史版本）', url: GITEE_RELEASES_PAGE });
+                renderLinks(list.slice(0, 3));
+            })();
+
+            // 给耗时操作加外部超时上限，避免「一直后台下载、永远卡住」
+            const withTimeout = (p, ms, tag) => Promise.race([
+                Promise.resolve(p),
+                new Promise((_, rej) => setTimeout(() => rej(new Error(tag || 'timeout')), ms))
+            ]);
 
             const btn = document.getElementById('_forceUpdBtn');
             if (btn) btn.onclick = async () => {
@@ -3100,65 +3146,48 @@
                 const reset = (txt) => { btn.innerHTML = txt; btn.disabled = false; btn.style.opacity = ''; btn.style.pointerEvents = ''; };
                 setTip('');
                 if (!isTauri) {
-                    btn.innerHTML = '⏳ 正在打开下载页...';
-                    await openChannel(GITEE_RELEASES_PAGE, '下载页');
+                    const u = (_forceUrlList[0] && _forceUrlList[0].url) || GITEE_RELEASES_PAGE;
+                    setTip('⏳ 正在用系统浏览器打开…');
+                    const ok = await openUrl(u);
+                    setTip(ok ? '✅ 已在浏览器打开，下载后覆盖安装即可' : '⚠️ 打开失败，请用下方「📋 复制」手动下载', ok ? '#81c784' : '#ff9800');
                     reset('🚀 立即更新');
                     return;
                 }
-                // APP 内：① Rust 原生静默升级 → ② 免选目录自动升级 → ③ 提示改用下方渠道
+                // ① 原生静默升级（最多等 30 秒，超时立刻把控制权交还给用户）
                 try {
-                    btn.innerHTML = '⏳ 正在检查并后台下载…（约 5MB，请稍候）';
-                    const natOk = await _tfjlTryNativeUpgrade();
-                    if (natOk) { btn.innerHTML = '✅ 正在安装，完成后自动重启'; setTip('安装器将在后台完成，装完自动重启本软件', '#81c784'); return; }
-
-                    btn.innerHTML = '⏳ 正在下载安装包…';
-                    const info = await fetchInstallerInfo();
-                    const url = (info && info.url) ? info.url : (data.downloadUrl || '');
-                    if (!url) {
-                        setTip('⚠️ 未获取到安装包地址，请改用下方任一渠道', '#ff9800');
-                        reset('🚀 立即更新');
+                    btn.innerHTML = '⏳ 正在尝试自动更新…（最多 30 秒）';
+                    setTip('没动静就别等，直接用下方「📋 复制」在浏览器下载，更快', 'rgba(255,255,255,0.5)');
+                    const natOk = await withTimeout(_tfjlTryNativeUpgrade(), 30000, 'native-timeout');
+                    if (natOk) {
+                        btn.innerHTML = '✅ 更新已启动，完成后自动重启';
+                        setTip('安装器在后台运行，装完会自动重启本软件', '#81c784');
                         return;
                     }
-                    btn.innerHTML = '⏳ 正在下载并静默安装…';
-                    const autoOk = await _tfjlAutoDownloadAndInstall({
-                        url: url,
-                        version: (info && info.version) ? info.version : '',
-                        fileName: (info && info.fileName) ? info.fileName : 'tfjl-assistant-setup.exe'
-                    });
-                    if (autoOk) { btn.innerHTML = '✅ 正在安装，完成后自动重启'; setTip('安装器将在后台完成，装完自动重启本软件', '#81c784'); return; }
-                    setTip('⚠️ 自动安装未成功，请改用下方任一渠道', '#ff9800');
-                    reset('🚀 立即更新');
-                } catch (e) {
-                    console.warn('[gate] 立即更新失败:', e && (e.message || e));
-                    setTip('⚠️ 自动更新失败，请改用下方任一渠道', '#ff9800');
-                    reset('🚀 立即更新');
-                }
-            };
+                } catch (e) { console.warn('[gate] 原生更新超时/失败:', e && (e.message || e)); }
 
-            // 多渠道下载按钮（全部走系统浏览器，APP 内也能正常下载）
-            Array.prototype.forEach.call(overlay.querySelectorAll('._forceChBtn'), (b) => {
-                b.onclick = async () => {
-                    const ch = b.getAttribute('data-ch');
-                    b.disabled = true; b.style.opacity = '0.6';
-                    try {
-                        if (ch === 'gitee-page') {
-                            await openChannel(GITEE_RELEASES_PAGE, 'Gitee 发布页');
-                        } else if (ch === 'github-page') {
-                            await openChannel(GITHUB_RELEASES_PAGE, '官网');
-                        } else {
-                            setTip('⏳ 正在解析直连地址…');
-                            let url = data.downloadUrl || '';
-                            if (!url) {
-                                const info = await fetchInstallerInfo();
-                                url = (info && info.url) ? info.url : '';
-                            }
-                            await openChannel(url, '直连下载');
+                // ② 免选目录自动升级（最多等 90 秒）
+                try {
+                    const info = await fetchInstallerInfo();
+                    const url = (info && info.url) ? info.url : (data.downloadUrl || '');
+                    if (url) {
+                        btn.innerHTML = '⏳ 正在下载安装包…（最多 90 秒）';
+                        setTip('Gitee 下载慢的话，直接用下方链接更快', 'rgba(255,255,255,0.5)');
+                        const autoOk = await withTimeout(_tfjlAutoDownloadAndInstall({
+                            url: url,
+                            version: (info && info.version) ? info.version : '',
+                            fileName: (info && info.fileName) ? info.fileName : 'tfjl-assistant-setup.exe'
+                        }), 90000, 'auto-timeout');
+                        if (autoOk) {
+                            btn.innerHTML = '✅ 正在安装，完成后自动重启';
+                            setTip('安装器在后台运行，装完会自动重启本软件', '#81c784');
+                            return;
                         }
-                    } finally {
-                        b.disabled = false; b.style.opacity = '';
                     }
-                };
-            });
+                } catch (e) { console.warn('[gate] 自动下载安装超时/失败:', e && (e.message || e)); }
+
+                setTip('⚠️ 自动更新没成功，请用下方「📋 复制」把链接粘到浏览器下载安装', '#ff9800');
+                reset('🚀 立即更新');
+            };
         }
 
         // 初始化版本号显示（异步填充，不阻塞）
