@@ -14629,6 +14629,13 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
         // 页面加载时初始化
         window.onload = async function() {
 
+            // 🔴 强制升级门禁：低于最低版本的桌面端必须先升级（网页版不拦截；断网/缺配置放行）
+            try {
+                if (await checkVersionGate()) return; // 已弹拦截页，终止后续初始化（含 Gist 数据加载）
+            } catch (e) {
+                console.warn('[gate] 门禁检查异常，放行:', e);
+            }
+
             // 启动即从本地磁盘恢复昵称（独立于安装目录，重启/更新/卸载重装都不丢），须早于 initMessageWall 等读取逻辑
             await restoreNicknameFromDisk();
 

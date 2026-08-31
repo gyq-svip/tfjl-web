@@ -134,6 +134,11 @@ $versionJson = [ordered]@{
     pub_date    = $pubDate
     downloadUrl = $rawUrl
     size        = $exeSize
+    # 🔴 强制升级门禁：低于 minVersion 的桌面端启动即拦截（网页版不拦；断网/缺字段放行）
+    #   仅桌面端生效，CI 注入 frontVersion/deployTag 时会合并保留这些字段；Tauri 原生 updater.json 不动，避免破坏其 schema。
+    minVersion        = "2.0.25"
+    forceUpdate       = $true
+    deprecatedMessage = "我们已升级后台数据服务，旧版本无法连接新服务。请更新到最新版后继续使用。"
 }
 
 $updaterPath = Join-Path $RootDir "updater.json"
