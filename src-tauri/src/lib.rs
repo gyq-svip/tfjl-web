@@ -1718,18 +1718,18 @@ fn speak_text(text: String) -> Result<(), String> {
 struct GmWin {
     hwnd: usize,
     title: String,
+    region: [f64; 4],      // 比例坐标 x,y,w,h（0..1，换分辨率不失效）
+    speak: bool,           // 语音播报开关
+    speak_prefix: String,  // 播报前缀，如「马上到」→「马上到第12波」
+    speak_suffix: String,  // 播报后缀，如「了，请注意上卡」→「第12波了，请注意上卡」
+    key_waves: Vec<u32>,   // 关键波数（空 = 每波都播；非空 = 命中才播，防连播噪音）
 }
 
 #[derive(serde::Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 struct GmCfg {
     windows: Vec<GmWin>,
-    region: [f64; 4],      // 比例坐标 x,y,w,h（0..1，换分辨率不失效）
-    interval_sec: u64,     // 识别间隔（秒）
-    speak: bool,           // 语音播报开关
-    speak_prefix: String,  // 播报前缀，如「马上到」→「马上到第12波」
-    speak_suffix: String,  // 播报后缀，如「了，请注意上卡」→「第12波了，请注意上卡」
-    key_waves: Vec<u32>,   // 关键波数（空 = 每波都播；非空 = 命中才播，防连播噪音）
+    interval_sec: u64,     // 识别间隔（秒），各窗口共用同一拍速
 }
 
 /// 提取字符串中所有 ASCII 数字组（多字节 UTF-8 的续字节均 ≥0x80，不会与数字字节混淆，切片安全）
@@ -1937,7 +1937,7 @@ fn gm_monitor_loop(app: tauri::AppHandle, cfg: GmCfg, gen: u64, interval_sec: u6
         if !alive(gen) { break; }
         for (idx, win) in cfg.windows.iter().enumerate() {
             if !alive(gen) { break; }
-            match gm_tick_window(win, &cfg.region) {
+            match gm_tick_window(win, &win.region) {
                 Ok(Some(texts)) => {
                     empty_cnt[idx] = 0;
                     warned_empty[idx] = false;
@@ -1948,12 +1948,11 @@ fn gm_monitor_loop(app: tauri::AppHandle, cfg: GmCfg, gen: u64, interval_sec: u6
                             last[idx] = Some(wave);
                             if prev.map_or(true, |p| p != wave) {
                                 let is_up = prev.map_or(true, |p| wave > p);
-                                let key_hit = cfg.key_waves.is_empty() || cfg.key_waves.contains(&wave);
-                                let spoken = cfg.speak && key_hit;
+                                let key_hit = win.key_waves.is_empty() || win.key_waves.contains(&wave);
+                                let spoken = win.speak && key_hit;
                                 if spoken {
-                                    // 多窗口时加「N号窗」前缀区分（多开场景用户分得清哪号窗口是哪局）
                                     let tag = if multi { format!("{}号窗 ", idx + 1) } else { String::new() };
-                                    let _ = speak_sync(&format!("{}{}第{}波{}", tag, cfg.speak_prefix, wave, cfg.speak_suffix));
+                                    let _ = speak_sync(&format!("{}{}第{}波{}", tag, win.speak_prefix, wave, win.speak_suffix));
                                 }
                                 // 托盘角标：显示最新变化波数；tooltip 汇总全部监控窗口战况
                                 if let Some(tray) = TRAY.get() {
@@ -2028,7 +2027,11 @@ fn gm_monitor_loop(app: tauri::AppHandle, cfg: GmCfg, gen: u64, interval_sec: u6
 #[tauri::command]
 fn game_monitor_start(cfg: GmCfg, app: tauri::AppHandle) -> Result<String, String> {
     if cfg.windows.is_empty() { return Err("未选择监控窗口".into()); }
-    if cfg.region[2] <= 0.0 || cfg.region[3] <= 0.0 { return Err("未配置波数识别区域".into()); }
+    for (i, w) in cfg.windows.iter().enumerate() {
+        if w.region[2] <= 0.0 || w.region[3] <= 0.0 {
+            return Err(format!("第{}个窗口未配置波数识别区域", i + 1));
+        }
+    }
     let interval = cfg.interval_sec.clamp(1, 30);
     let nwin = cfg.windows.len();
     let gen = GM_GEN.fetch_add(1, Ordering::SeqCst) + 1;
