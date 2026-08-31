@@ -122,7 +122,10 @@ async function _pollLatestVersion() {
     } catch (e) { return; }
     if (!latest) return;
     // 仅当线上版本号更新时才继续（避免每次轮询都打扰）
-    if (_versionNum(latest) <= _versionNum(CACHE_VERSION)) return;
+    // 🔴 修复版本号倒挂死锁：旧逻辑 `线上 <= 本地 就跳过`，当用户浏览器残留了比线上更高的 SW 版本（如本地 dev / 历史 617）时，
+    // 轮询永远判定"无新版本" → 既不弹气泡也不拉新代码。改为仅「版本号完全相同」才跳过，其余（含线上 < 本地 的倒挂）一律触发接管更新，
+    // 让高版本残留 SW 也能被线上权威版本接管，根治"刷新也拿不到更新"。
+    if (_versionNum(latest) === _versionNum(CACHE_VERSION)) return;
     // 🔴 2026-08-27 改：开关「只管自动升级，不管气泡」。无论开关开/关都发 FORCE_RELOAD，
     //   页面侧自行判定：开关开→后台静默升、前台弹气泡；开关关→一律只弹气泡不自动升。
     const enabled = await _isForceReloadEnabled();
@@ -245,7 +248,10 @@ async function _maybeForceOnTraffic() {
         }
     } catch (e) { return; }
     if (!latest) return;
-    if (_versionNum(latest) <= _versionNum(CACHE_VERSION)) return; // 无新版本不骚扰
+    // 🔴 修复版本号倒挂死锁：旧逻辑 `线上 <= 本地 就跳过`，当用户浏览器残留了比线上更高的 SW 版本（如本地 dev / 历史 617）时，
+    // 轮询永远判定"无新版本" → 既不弹气泡也不拉新代码。改为仅「版本号完全相同」才跳过，其余（含线上 < 本地 的倒挂）一律触发接管更新，
+    // 让高版本残留 SW 也能被线上权威版本接管，根治"刷新也拿不到更新"。
+    if (_versionNum(latest) === _versionNum(CACHE_VERSION)) return; // 无新版本不骚扰
     // 🔴 修复：读写流量触发的强刷也要受「强制更新总开关」控制（开关关则不强制，尊重用户关闭意图）。
     const enabled = await _isForceReloadEnabled();
     if (!enabled) return;
