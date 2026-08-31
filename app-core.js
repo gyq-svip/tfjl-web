@@ -20085,6 +20085,19 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             
             scroller.innerHTML = filterBar + html;
             startMessageScroll();
+            // 同步「需求墙」标题旁的分类筛选下拉框：选项 = 全部 + 预设分类 + 墙里实际存在的自定义分类
+            (function(){
+                const sel = document.getElementById('wallCatFilterSelect');
+                if (!sel) return;
+                const known = {};
+                (window.WALL_CATEGORIES || ['未分类']).forEach(function(c){ known[c] = 1; });
+                (wallMessages || []).forEach(function(m){ known[(m.category || '未分类')] = 1; });
+                const cats = ['全部'].concat(Object.keys(known));
+                const cur = window._wallCatFilter || '全部';
+                sel.innerHTML = cats.map(function(c){
+                    return '<option value="' + c + '"' + (c === cur ? ' selected' : '') + '>' + escapeHtml(c) + '</option>';
+                }).join('');
+            })();
         }
 
         function setWallCatFilter(cat) {
