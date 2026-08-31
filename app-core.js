@@ -306,6 +306,29 @@
                 localStorage.setItem(DIAG_LOCAL_BUFFER, JSON.stringify(b));
             } catch (e) {}
         }
+        // ============ 按天诊断计数（2026-09-01 新增，支撑面板「按天统计」）============
+        // 本地维护"今天的上传/写入/操作次数"，跨天自动清零（date 不匹配即重置）。
+        // 因每个用户是覆盖式单文件 diag-<anonId>.json，累计值必须随 payload 上报才能留存，否则被覆盖丢失。
+        const DIAG_DAY_KEY = 'tdjl_diagDayStat';
+        const _todayStr = function () { return (typeof getTodayString === 'function') ? getTodayString() : new Date().toISOString().slice(0, 10); };
+        function _bumpDiagDay(fields) {
+            try {
+                const t = _todayStr();
+                let s; try { s = JSON.parse(localStorage.getItem(DIAG_DAY_KEY) || '{}'); } catch (e) { s = {}; }
+                if (s.date !== t) s = { date: t, uploads: 0, writes: 0, ops: 0 };
+                (Array.isArray(fields) ? fields : [fields]).forEach(function (f) { s[f] = (s[f] || 0) + 1; });
+                localStorage.setItem(DIAG_DAY_KEY, JSON.stringify(s));
+                return s;
+            } catch (e) { return null; }
+        }
+        function _getDiagDay() {
+            try {
+                const t = _todayStr();
+                let s; try { s = JSON.parse(localStorage.getItem(DIAG_DAY_KEY) || '{}'); } catch (e) { s = {}; }
+                if (s.date !== t) return { date: t, uploads: 0, writes: 0, ops: 0 };
+                return s;
+            } catch (e) { return { date: _todayStr(), uploads: 0, writes: 0, ops: 0 }; }
+        }
         // 每次 Gist 写操作累加（由 IIFE 内 _recordGistIO 调用 window.__recordDiagWrite）：gistId × 功能标签 × 方法 → 计数 + 采样时间戳
         window.__recordDiagWrite = function _recordDiagWrite(gistId, fn, method) {
             try {
@@ -318,6 +341,7 @@
                 if (!b[key]) b[key] = { gistId, fn: fn || 'unknown', method: method || 'WRITE', count: 0, first: now, last: now, samples: [] };
                 b[key].count++;
                 b[key].last = now;
+                _bumpDiagDay(['writes', 'ops']);
                 if (b[key].samples.length < 5) b[key].samples.push(now);
                 _saveDiagBuffer(b);
             } catch (e) {}
@@ -334,6 +358,7 @@
                 if (!b[key]) b[key] = { gistId: 'feature', fn: fn, method: 'USE', count: 0, first: now, last: now, samples: [] };
                 b[key].count++;
                 b[key].last = now;
+                _bumpDiagDay(['ops']);
                 if (b[key].samples.length < 5) b[key].samples.push(now);
                 _saveDiagBuffer(b);
             } catch (e) {}
@@ -686,6 +711,8 @@
                 if (!_suffix) _suffix = Math.random().toString(36).slice(2, 6);
                 _dispNick = '游客' + _suffix;
             }
+            // 按天计数：本次上报 = 今天上传次数 +1（写入/操作次数在 _recordDiagWrite/_recordFeatureUse 实时累加）
+            const _dayStat = _bumpDiagDay(['uploads']) || _getDiagDay();
             const payload = {
                 anonId: _getDiagAnonId(),
                 deviceId: (typeof getDeviceId === 'function' ? getDeviceId() : ''),
@@ -696,6 +723,11 @@
                 appVersion: _appVer,
                 appExeVersion: _appExeVer,
                 platform: (_isTauri ? 'app' : 'web'),
+                // 📅 按天统计字段（2026-09-01 新增）：当天上传/写入/操作次数 + 所属日期
+                day: _dayStat.date,
+                dayUploads: _dayStat.uploads,
+                dayWrites: _dayStat.writes,
+                dayOps: _dayStat.ops,
                 entries: entries,
                 // 管理员工具箱：用户对本机 notify 的「知道了」+ 会话回复，回带到诊断 Gist 供管理员在回复信箱查看
                 adminCtlReplies: (function () {
@@ -23529,6 +23561,61 @@ ${maSection}
                         html += '🟢 <span style="color:#67e8f9;">存活客户端(60分钟内)</span>: <b style="color:#4ade80;">' + aliveCount + '</b> ｜ <span style="color:#67e8f9;">写盘健康✓</span>: <b style="color:#4ade80;">' + writeOkCount + '</b>';
                         if (aliveUsers.length) html += '<br><span style="font-size:0.74rem;">' + aliveUsers.map(u => u.replace(/^([^(\n]+)(\(.+\))?(✓盘|✗盘)?$/, '<b style="color:' + C_NICK + ';">$1</b>' + (u.indexOf('(心跳)') >= 0 ? '<span style="color:' + C_OK + ';">(心跳)</span>' : '') + (u.indexOf('✓盘') >= 0 ? '<span style="color:' + C_OK + ';">✓盘</span>' : (u.indexOf('✗盘') >= 0 ? '<span style="color:' + C_BAD + ';">✗盘</span>' : '')))).join('<span style="color:' + C_ID + ';">，</span>') + '</span>';
                         html += '</div>';
+                        // ============ 📅 按天统计（2026-09-01 新增）============
+                        (function () {
+                            const _today = (typeof getTodayString === 'function') ? getTodayString() : new Date().toISOString().slice(0, 10);
+                            const _dayMap = {};
+                            fileMetas.forEach(function (m) {
+                                const p = m.payload || {};
+                                const d = p.day || (p.lastUpload ? new Date(p.lastUpload).toISOString().slice(0, 10) : _today);
+                                if (!_dayMap[d]) _dayMap[d] = {};
+                                const exist = _dayMap[d][m.anonId];
+                                // 同用户同一天可能多次上报（覆盖式单文件），取最后上报（last 最大）的当天累计值
+                                if (!exist || m.last > exist.last) {
+                                    _dayMap[d][m.anonId] = {
+                                        who: m.who, anonId: m.anonId, last: m.last,
+                                        uploads: p.dayUploads || 0, writes: p.dayWrites || 0, ops: p.dayOps || 0,
+                                        plat: p.platform || m.plat || '?',
+                                        fv: p.appVersion || m.ver || '',
+                                        ev: p.appExeVersion || ''
+                                    };
+                                }
+                            });
+                            const _days = Object.keys(_dayMap).sort().reverse();
+                            let dayHtml = '<div style="margin-bottom:16px;"><div style="color:#fbbf24;margin-bottom:6px;font-weight:700;">📅 按天统计 <span style="color:#94a3b8;font-size:0.7rem;font-weight:400;">（每天每人的上传/写入/操作次数 + 客户端 + 大小版本）</span></div>';
+                            if (!_days.length) {
+                                dayHtml += '<div style="color:#94a3b8;font-size:0.74rem;">暂无数据</div>';
+                            } else {
+                                _days.forEach(function (d) {
+                                    const users = Object.values(_dayMap[d]);
+                                    const totalUploads = users.reduce(function (s, u) { return s + u.uploads; }, 0);
+                                    const totalWrites = users.reduce(function (s, u) { return s + u.writes; }, 0);
+                                    const totalOps = users.reduce(function (s, u) { return s + u.ops; }, 0);
+                                    dayHtml += '<details' + (d === _today ? ' open' : '') + ' style="margin-bottom:8px;border:1px solid rgba(255,255,255,0.12);border-radius:8px;">';
+                                    dayHtml += '<summary style="cursor:pointer;background:rgba(251,191,36,0.08);padding:8px 12px;font-size:0.78rem;color:#cbd5e1;">';
+                                    dayHtml += '<span style="font-weight:700;color:#fbbf24;">📆 ' + d + (d === _today ? ' <span style="color:#4ade80;">(今天)</span>' : '') + '</span>';
+                                    dayHtml += ' ｜ 👥 上传 ' + users.length + ' 人 ｜ 📤 上传 ' + totalUploads + ' 次 ｜ ✍️ 写入 ' + totalWrites + ' 次 ｜ 🖱️ 操作 ' + totalOps + ' 次';
+                                    dayHtml += '</summary>';
+                                    dayHtml += '<div style="padding:8px 12px;"><table style="border-collapse:collapse;width:100%;font-size:0.74rem;">';
+                                    dayHtml += '<tr style="font-size:0.68rem;color:#94a3b8;"><th style="text-align:left;padding:3px 6px;">用户</th><th style="text-align:right;padding:3px 6px;color:#fbbf24;">上传次数</th><th style="text-align:right;padding:3px 6px;color:#f87171;">写入</th><th style="text-align:right;padding:3px 6px;color:#a78bfa;">操作</th><th style="text-align:left;padding:3px 6px;color:#60a5fa;">客户端</th><th style="text-align:left;padding:3px 6px;color:#4ade80;">版本(大/小)</th></tr>';
+                                    users.sort(function (a, b) { return b.uploads - a.uploads; }).forEach(function (u) {
+                                        const _fv = u.fv ? '<span style="color:' + C_FRONTV + ';">' + u.fv + '</span>' : '<span style="color:#94a3b8;">?</span>';
+                                        const _ev = u.ev ? '<span style="color:' + C_DESKV + ';">' + u.ev + '</span>' : ((u.plat === 'app') ? '<span style="color:#f97316;">桌面未知</span>' : '');
+                                        dayHtml += '<tr style="border-top:1px dashed rgba(255,255,255,0.08);">';
+                                        dayHtml += '<td style="padding:3px 6px;color:#cbd5e1;">' + _colorWho(u.who) + '</td>';
+                                        dayHtml += '<td style="text-align:right;padding:3px 6px;color:#fbbf24;font-weight:700;">' + u.uploads + '</td>';
+                                        dayHtml += '<td style="text-align:right;padding:3px 6px;color:#f87171;">' + u.writes + '</td>';
+                                        dayHtml += '<td style="text-align:right;padding:3px 6px;color:#a78bfa;">' + u.ops + '</td>';
+                                        dayHtml += '<td style="padding:3px 6px;">' + (u.plat === 'app' ? '🖥️ 桌面' : '🌐 网页') + '</td>';
+                                        dayHtml += '<td style="padding:3px 6px;">' + _ev + ' / ' + _fv + '</td>';
+                                        dayHtml += '</tr>';
+                                    });
+                                    dayHtml += '</table></div></details>';
+                                });
+                            }
+                            dayHtml += '</div>';
+                            html += dayHtml;
+                        })();
                         html += '<div style="margin-bottom:16px;"><div style="color:#4ade80;margin-bottom:4px;font-weight:700;">👤 按用户 TOP <span style="color:#94a3b8;font-size:0.7rem;font-weight:400;">（点行展开该用户的上报详情）</span></div>';
                         uTop.forEach((x, i) => {
                             const id = 'uDetail_' + i;
