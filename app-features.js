@@ -7234,9 +7234,10 @@
                     const cp = projects.find(p => p.name === currentProjectName);
                     if (cp && cp.category) defCat = cp.category;
                 }
-                const catOptionsHtml = allCats.map(c => `<option value="${c}" ${c === defCat ? 'selected' : ''}>${c}</option>`).join('');
+                // 🔴 2026-08-31 两个分类下拉都加「➕ 新建分类…」（统一导入规范：分类在下拉里直接建）
+                const catOptionsHtml = allCats.map(c => `<option value="${c}" ${c === defCat ? 'selected' : ''}>${c}</option>`).join('') + '<option value="__NEWCAT__">➕ 新建分类…</option>';
                 // 新建项目时的分类下拉默认跟随外层选中分类（联动时同步刷新）
-                const newCatOptionsHtml = allCats.map(c => `<option value="${c}" ${c === defCat ? 'selected' : ''}>${c}</option>`).join('');
+                const newCatOptionsHtml = allCats.map(c => `<option value="${c}" ${c === defCat ? 'selected' : ''}>${c}</option>`).join('') + '<option value="__NEWCAT__">➕ 新建分类…</option>';
 
                 // 项目下拉选项 = ➕新建项目 + 该分类下的项目（当前项目在该分类时默认选中）
                 const buildProjectOptions = (cat) => {
@@ -7274,7 +7275,7 @@
                         </div>
                         <div id="newProjectCategoryRow" style="display:none;margin-bottom:10px;">
                             <label style="color:rgba(255,255,255,0.7);font-size:0.85rem;display:block;margin-bottom:5px;">新项目分类：</label>
-                            <select id="newProjectCategorySelect" style="width:100%;padding:8px;border-radius:6px;border:1px solid rgba(33,150,243,0.3);background:#2a2a4a;color:#fff;font-size:0.9rem;">${newCatOptionsHtml}</select>
+                            <select id="newProjectCategorySelect" onchange="newProjectCategoryChange()" title="新建项目要归入的分类；没有合适的可下拉里直接新建" style="width:100%;padding:8px;border-radius:6px;border:1px solid rgba(33,150,243,0.3);background:#2a2a4a;color:#fff;font-size:0.9rem;">${newCatOptionsHtml}</select>
                         </div>
                         <div style="margin-bottom:15px;">
                             <label style="color:rgba(255,255,255,0.7);font-size:0.85rem;display:block;margin-bottom:5px;">脚本文件名：</label>
@@ -7303,10 +7304,38 @@
 
         // 🔴 2026-08-31 导入弹窗分类联动：切分类 → 项目下拉只列该分类的项目，
         //    新建项目行的分类下拉同步跟随（新建时默认就是当前选的分类）。
+        //    选「➕ 新建分类…」→ 共用 _importPromptNewCategory 创建，取消回退上一个分类。
         function saveScriptCategoryChange() {
             const catSel = document.getElementById('saveScriptCategorySelect');
             const projSel = document.getElementById('saveScriptProjectSelect');
             if (!catSel || !projSel) return;
+            if (catSel.value === '__NEWCAT__') {
+                const nm = (typeof _importPromptNewCategory === 'function') ? _importPromptNewCategory() : null;
+                if (!nm) {
+                    catSel.value = catSel.dataset.prevCat || (catSel.options[0] && catSel.options[0].value) || '';
+                } else {
+                    let has = false;
+                    for (const o of catSel.options) { if (o.value === nm) { has = true; break; } }
+                    if (!has) {
+                        const opt = document.createElement('option');
+                        opt.value = nm; opt.textContent = nm;
+                        catSel.insertBefore(opt, catSel.querySelector('option[value="__NEWCAT__"]'));
+                    }
+                    catSel.value = nm;
+                    // 新建项目分类下拉同步补上这个新分类（那边也用它）
+                    const nc0 = document.getElementById('newProjectCategorySelect');
+                    if (nc0) {
+                        let nh = false;
+                        for (const o of nc0.options) { if (o.value === nm) { nh = true; break; } }
+                        if (!nh) {
+                            const opt2 = document.createElement('option');
+                            opt2.value = nm; opt2.textContent = nm;
+                            nc0.insertBefore(opt2, nc0.querySelector('option[value="__NEWCAT__"]'));
+                        }
+                    }
+                }
+            }
+            catSel.dataset.prevCat = catSel.value;
             const cat = catSel.value;
             const grouped = window.__saveScriptGrouped || {};
             let oh = '<option value="__NEW__" style="color:#4ade80;font-weight:bold;">➕ 新建项目</option>';
@@ -7318,6 +7347,39 @@
             const nc = document.getElementById('newProjectCategorySelect');
             if (nc) { for (const o of nc.options) { if (o.value === cat) { nc.value = cat; break; } } }
             toggleNewProjectInput();
+        }
+
+        // 🔴 2026-08-31 新建项目分类下拉的「➕ 新建分类…」：prompt 创建后选中，取消回退
+        function newProjectCategoryChange() {
+            const nc = document.getElementById('newProjectCategorySelect');
+            if (!nc) return;
+            if (nc.value === '__NEWCAT__') {
+                const nm = (typeof _importPromptNewCategory === 'function') ? _importPromptNewCategory() : null;
+                if (!nm) {
+                    nc.value = nc.dataset.prevCat || (nc.options[0] && nc.options[0].value) || '';
+                } else {
+                    let has = false;
+                    for (const o of nc.options) { if (o.value === nm) { has = true; break; } }
+                    if (!has) {
+                        const opt = document.createElement('option');
+                        opt.value = nm; opt.textContent = nm;
+                        nc.insertBefore(opt, nc.querySelector('option[value="__NEWCAT__"]'));
+                    }
+                    nc.value = nm;
+                    // 外层分类下拉同步补上（两边共用一份分类）
+                    const catSel = document.getElementById('saveScriptCategorySelect');
+                    if (catSel) {
+                        let ch = false;
+                        for (const o of catSel.options) { if (o.value === nm) { ch = true; break; } }
+                        if (!ch) {
+                            const opt2 = document.createElement('option');
+                            opt2.value = nm; opt2.textContent = nm;
+                            catSel.insertBefore(opt2, catSel.querySelector('option[value="__NEWCAT__"]'));
+                        }
+                    }
+                }
+            }
+            nc.dataset.prevCat = nc.value;
         }
 
         // 切换新项目输入框显示
@@ -7359,10 +7421,15 @@
             if (selectValue === '__NEW__') {
                 // 新建项目
                 const newProjectName = document.getElementById('newProjectNameInput')?.value?.trim();
-                const newCategory = document.getElementById('newProjectCategorySelect')?.value || '默认分类';
+                let newCategory = document.getElementById('newProjectCategorySelect')?.value || '默认分类';
                 if (!newProjectName) {
                     alert('请输入新项目名称！');
                     return;
+                }
+                // 兜底：停在「➕ 新建分类…」没触发 change 时，在这里补建（正常路径已在下拉里创建好）
+                if (newCategory === '__NEWCAT__') {
+                    newCategory = (typeof _importPromptNewCategory === 'function') ? _importPromptNewCategory() : null;
+                    if (!newCategory) return;
                 }
 
                 // 创建新项目数据
@@ -8491,6 +8558,13 @@
             if (codeTa) codeTa.onclick = function () { codeTa.select(); };
             const linkBtn = modal.querySelector('#lineupShareCopyLink');
             if (linkBtn) linkBtn.onclick = function () { copyText(link, '🔗 分享链接已复制：对方浏览器/软件打开会自动弹导入', linkBtn); };
+
+            // 需求墙同步（选项窗开关，默认开）：后台静默发整个项目，不阻塞弹窗；密码保护时同密码加密上墙
+            if (opts.wall && typeof shareProjectToWall === 'function') {
+                Promise.resolve(shareProjectToWall({ auto: true, days: opts.days, pw: opts.pw })).then(function (ok) {
+                    if (ok && typeof showToast === 'function') showToast('📢 已同步到需求墙（整个项目，大家可浏览/导入）', 'success');
+                }).catch(function (e) { console.warn('[需求墙同步] 失败:', e); });
+            }
         }
 
         // 分享选项小窗：有效期下拉 + 可选密码加密（复用需求墙 PBKDF2+AES-GCM）
@@ -8520,6 +8594,10 @@
                         '<label for="lineupSharePwChk" style="color:rgba(255,255,255,0.75);font-size:0.8rem;cursor:pointer;">🔒 密码保护（对方需输入密码才能导入）</label>' +
                       '</div>' +
                       '<input id="lineupSharePw" type="text" placeholder="分享密码（勾选后填写，口头告诉对方）" style="width:100%;box-sizing:border-box;background:rgba(0,0,0,0.35);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:8px;padding:9px 10px;font-size:0.84rem;margin-top:8px;display:none;">' +
+                      '<div style="display:flex;align-items:center;gap:8px;margin-top:12px;background:rgba(77,182,172,0.08);border:1px solid rgba(77,182,172,0.25);border-radius:8px;padding:8px 10px;">' +
+                        '<input id="lineupShareWallChk" type="checkbox" style="accent-color:#4db6ac;width:16px;height:16px;cursor:pointer;flex-shrink:0;">' +
+                        '<label for="lineupShareWallChk" style="color:rgba(255,255,255,0.8);font-size:0.78rem;cursor:pointer;line-height:1.4;">📢 同步到需求墙（整个项目，大家都能浏览/一键导入；私密分享可取消勾选）</label>' +
+                      '</div>' +
                       '<div style="display:flex;gap:10px;margin-top:16px;">' +
                         '<button id="lineupShareOptsCancel" style="flex:1;background:rgba(255,255,255,0.08);color:#fff;border:1px solid rgba(255,255,255,0.2);padding:10px;border-radius:8px;cursor:pointer;">取消</button>' +
                         '<button id="lineupShareOptsOk" style="flex:1.8;background:linear-gradient(135deg,#ffd700,#ff9800);color:#1a1a2e;border:none;padding:10px;border-radius:8px;cursor:pointer;font-weight:bold;">📤 生成分享</button>' +
@@ -8528,6 +8606,11 @@
                 document.body.appendChild(modal);
                 const pwChk = modal.querySelector('#lineupSharePwChk');
                 const pwInput = modal.querySelector('#lineupSharePw');
+                const wallChk = modal.querySelector('#lineupShareWallChk');
+                // 默认开 + 记住上次的选择（私密分享关过一次，下次默认还是关）
+                let wallDefault = true;
+                try { wallDefault = localStorage.getItem('TFJL_ShareWallSync') !== '0'; } catch (e) {}
+                if (wallChk) wallChk.checked = wallDefault;
                 pwChk.onchange = function () { pwInput.style.display = pwChk.checked ? 'block' : 'none'; if (pwChk.checked) pwInput.focus(); };
                 const finish = function (val) { modal.remove(); resolve(val); };
                 modal.querySelector('#lineupShareOptsCancel').onclick = function () { finish(null); };
@@ -8540,10 +8623,32 @@
                         if (pw.length < 2) { pwInput.style.borderColor = '#ff8a80'; pwInput.placeholder = '密码至少 2 个字符'; pwInput.focus(); return; }
                         pwInput.style.borderColor = '';
                     }
-                    finish({ days: days, pw: pw });
+                    if (wallChk) { try { localStorage.setItem('TFJL_ShareWallSync', wallChk.checked ? '1' : '0'); } catch (e) {} }
+                    finish({ days: days, pw: pw, wall: !!(wallChk && wallChk.checked) });
                 };
             });
         }
+
+        // 🔴 2026-08-31 统一导入规范：所有导入弹窗（项目/阵容/脚本）的分类下拉共用「➕ 新建分类…」
+        //    prompt 输入 → push categories + 落库 → 刷新主界面分类下拉；返回分类名（取消/空返回 null，已存在返回原名）
+        function _importPromptNewCategory() {
+            const input = window.prompt('请输入新分类名称：', '');
+            if (input === null) return null;
+            const name = String(input || '').trim();
+            if (!name) return null;
+            try {
+                if (typeof categories !== 'undefined' && Array.isArray(categories)) {
+                    if (categories.indexOf(name) < 0) {
+                        categories.push(name);
+                        if (typeof saveCategories === 'function') { try { saveCategories().catch(function () {}); } catch (e) {} }
+                    }
+                    if (typeof refreshCategorySelector === 'function') { try { refreshCategorySelector(); } catch (e) {} }
+                    if (typeof updateCategorySelector === 'function') { try { updateCategorySelector(); } catch (e) {} }
+                }
+            } catch (e) {}
+            return name;
+        }
+        window._importPromptNewCategory = _importPromptNewCategory;
 
         // 📥 从短码导入：弹窗粘贴 → 复刻到我方/队友上阵（含等级/皮肤/魔化）
         function importLineupCode(prefillCode) {
@@ -8560,10 +8665,17 @@
                   '</div>' +
                   '<div style="color:rgba(255,255,255,0.55);font-size:0.78rem;margin-bottom:10px;line-height:1.5;">粘贴对方分享的<b style="color:#ffb74d;">阵容码 / 分享链接</b>，或直接输入 8 位<b style="color:#ffd700;">分享短码</b>（TFJL1. 开头 / 含 #lg= 的链接 / 纯 8 位短码均可），一键复刻整个阵容（<b style="color:#ffd54f;">上阵7+手牌3</b> 每人最多10张，含等级/皮肤/魔化）。</div>' +
                   '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">' +
+                    '<span style="color:rgba(255,255,255,0.65);font-size:0.78rem;flex-shrink:0;">分类筛选：</span>' +
+                    '<select id="lineupImportCat" style="flex:1;background:rgba(0,0,0,0.35);color:#fff;border:1px solid rgba(255,255,255,0.25);border-radius:6px;padding:6px 8px;font-size:0.8rem;cursor:pointer;">' +
+                      '<option value="__ALL__">📁 全部分类</option>' +
+                      '<option value="__NEWCAT__">➕ 新建分类…</option>' +
+                    '</select>' +
+                  '</div>' +
+                  '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">' +
                     '<span style="color:rgba(255,255,255,0.65);font-size:0.78rem;flex-shrink:0;">导入到：</span>' +
                     '<select id="lineupImportTarget" style="flex:1;background:rgba(0,0,0,0.35);color:#fff;border:1px solid rgba(255,255,255,0.25);border-radius:6px;padding:6px 8px;font-size:0.8rem;cursor:pointer;">' +
-                      '<option value="__CURRENT__">当前项目' + ((typeof currentProjectName !== 'undefined' && currentProjectName) ? '（' + currentProjectName + '）' : '') + '</option>' +
                       '<option value="__NEW__">➕ 新建项目…</option>' +
+                      '<option value="__CURRENT__">当前项目' + ((typeof currentProjectName !== 'undefined' && currentProjectName) ? '（' + currentProjectName + '）' : '') + '</option>' +
                     '</select>' +
                   '</div>' +
                   '<textarea id="lineupImportTa" placeholder="TFJL1.xxxxxx..." style="width:100%;box-sizing:border-box;height:110px;background:rgba(0,0,0,0.35);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:8px;padding:10px;font-size:0.8rem;font-family:Consolas,monospace;resize:none;"></textarea>' +
@@ -8578,18 +8690,55 @@
             const info = modal.querySelector('#lineupImportInfo');
             const targetSel = modal.querySelector('#lineupImportTarget');
             if (prefillCode) ta.value = prefillCode;
-            // 异步填充现有项目列表（当前项目之外的全部项目，插在「新建项目」之前）
+            // 异步填充「分类筛选 + 导入目标」：新建置顶，项目按分类分组、随分类下拉过滤（项目多也不蒙）
             (async function () {
-                try {
-                    const list = await _lineupProjectList();
-                    const cur = (typeof currentProjectName !== 'undefined') ? currentProjectName : '';
-                    const optNew = targetSel.querySelector('option[value="__NEW__"]');
-                    list.filter(function (n) { return n && n !== cur; }).forEach(function (n) {
-                        const o = document.createElement('option');
-                        o.value = n; o.textContent = n;
-                        targetSel.insertBefore(o, optNew);
-                    });
-                } catch (e) {}
+                let full = [];
+                try { full = await _lineupProjectListFull(); } catch (e) { full = []; }
+                const catSel = modal.querySelector('#lineupImportCat');
+                if (!catSel || !targetSel) return;
+                const cur = (typeof currentProjectName !== 'undefined') ? currentProjectName : '';
+                const cats = [];
+                full.forEach(function (p) { if (p.category && cats.indexOf(p.category) < 0) cats.push(p.category); });
+                cats.forEach(function (c) {
+                    const o = document.createElement('option');
+                    o.value = c; o.textContent = '📁 ' + c;
+                    catSel.appendChild(o);
+                });
+                // 目标列表重建：保留前两个固定项（新建置顶 + 当前项目），其余按分类过滤/分组追加
+                const rebuild = function () {
+                    while (targetSel.options.length > 2) targetSel.remove(2);
+                    const cat = catSel.value;
+                    full.filter(function (p) { return p.name !== cur && (cat === '__ALL__' || p.category === cat); })
+                        .sort(function (a, b) { return a.category === b.category ? a.name.localeCompare(b.name, 'zh') : a.category.localeCompare(b.category, 'zh'); })
+                        .forEach(function (p) {
+                            const o = document.createElement('option');
+                            o.value = p.name; o.textContent = p.name + '（' + p.category + '）';
+                            targetSel.appendChild(o);
+                        });
+                };
+                // 🔴 2026-08-31 分类下拉含「➕ 新建分类…」：选它弹输入框创建（共用 _importPromptNewCategory），
+                //    取消回退上一个分类；创建成功插入选项并选中，项目列表随之过滤（新分类下=空→只剩新建置顶）
+                catSel._prevCat = '__ALL__';
+                catSel.onchange = function () {
+                    if (catSel.value === '__NEWCAT__') {
+                        const nm = (typeof window._importPromptNewCategory === 'function') ? window._importPromptNewCategory() : null;
+                        if (!nm) {
+                            catSel.value = catSel._prevCat || '__ALL__';
+                        } else {
+                            let has = false;
+                            for (let i = 0; i < catSel.options.length; i++) { if (catSel.options[i].value === nm) { has = true; break; } }
+                            if (!has) {
+                                const o = document.createElement('option');
+                                o.value = nm; o.textContent = '📁 ' + nm;
+                                catSel.insertBefore(o, catSel.querySelector('option[value="__NEWCAT__"]'));
+                            }
+                            catSel.value = nm;
+                        }
+                    }
+                    catSel._prevCat = catSel.value;
+                    rebuild();
+                };
+                rebuild();
             })();
             const close = function () { modal.remove(); };
             modal.querySelector('#lineupImportClose').onclick = close;
@@ -8667,8 +8816,11 @@
                 }
                 // 非当前项目：不切工作区、不动当前界面，直接把阵容写进目标项目
                 try {
+                    // 新建项目时带上外层已选分类（含刚新建的），新建小窗默认落在这个分类，不再重复问一遍
+                    const catS = document.getElementById('lineupImportCat');
+                    const presetCat = (catS && catS.value && catS.value !== '__ALL__' && catS.value !== '__NEWCAT__') ? catS.value : '';
                     const r = (target === '__NEW__')
-                        ? await _lineupImportToNewProject(data)
+                        ? await _lineupImportToNewProject(data, presetCat)
                         : await _lineupImportToProject(target, data);
                     close();
                     if (r && r.missing && r.missing.length) {
@@ -8802,8 +8954,9 @@
         }
 
         // 新建项目并写入阵容：弹「项目名 + 分类」小窗（分类可下拉选择，符合项目分类习惯）→ 空白模板 + 卡组 → 落库
-        async function _lineupImportToNewProject(lineup) {
-            const dlg = await _lineupNewProjectDialog();
+        // presetCat：外层导入弹窗已选的分类（含刚新建的），小窗默认选中它，避免重复选
+        async function _lineupImportToNewProject(lineup, presetCat) {
+            const dlg = await _lineupNewProjectDialog(presetCat);
             if (!dlg) { const e = new Error('已取消'); e.cancelled = true; throw e; }
             const r = _lineupPayloadToProjectData(lineup);
             const empty = {
@@ -8827,12 +8980,14 @@
         }
 
         // 新建项目小窗：项目名 + 分类下拉（含「➕ 新建分类…」，符合"分类在下拉里创建"的习惯）
-        function _lineupNewProjectDialog() {
+        // presetCat：优先默认选中的分类（外层导入弹窗已选/已新建的）
+        function _lineupNewProjectDialog(presetCat) {
             return new Promise(function (resolve) {
                 const old = document.getElementById('lineupNewProjModal');
                 if (old) old.remove();
                 const cats = (typeof categories !== 'undefined' && Array.isArray(categories) && categories.length) ? categories.slice() : ['默认分类'];
-                const defCat = (typeof currentProjectCategory !== 'undefined' && currentProjectCategory && cats.indexOf(currentProjectCategory) >= 0) ? currentProjectCategory : cats[0];
+                let defCat = (typeof currentProjectCategory !== 'undefined' && currentProjectCategory && cats.indexOf(currentProjectCategory) >= 0) ? currentProjectCategory : cats[0];
+                if (presetCat) { defCat = presetCat; if (cats.indexOf(presetCat) < 0) cats.push(presetCat); }   // 外层已选分类优先（兜底：没登记也补进下拉）
                 const modal = document.createElement('div');
                 modal.id = 'lineupNewProjModal';
                 modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.72);z-index:' + (200001 + (window.topWinZIndex || 0)) + ';display:flex;align-items:center;justify-content:center;padding:16px;';
@@ -9278,6 +9433,13 @@
             modal.querySelector('#projShareCopyAll').onclick = function () { copyText(shareText, '📋 分享文案已复制（短码+链接+项目信息）'); };
             const linkTa = modal.querySelector('#projShareLinkTa');
             if (linkTa) linkTa.onclick = function () { linkTa.select(); };
+
+            // 需求墙同步（选项窗开关，默认开）：与阵容分享同款，密码保护时同密码加密上墙
+            if (opts.wall && typeof shareProjectToWall === 'function') {
+                Promise.resolve(shareProjectToWall({ auto: true, days: opts.days, pw: opts.pw })).then(function (ok) {
+                    if (ok && typeof showToast === 'function') showToast('📢 已同步到需求墙（整个项目，大家可浏览/导入）', 'success');
+                }).catch(function (e) { console.warn('[需求墙同步] 失败:', e); });
+            }
         }
 
         // 📥 从短码导入项目：输入 8 位短码 / #pg= 链接 → 拉取 → 恢复项目同款导入（选名称+分类）
