@@ -19310,37 +19310,107 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             showFloatToast('🗑 已删除');
             renderContribWorks(nick);
         }
-        async function renderContribWorks(nick) {
-            const box = document.getElementById('contribWorks');
-            if (!box) return;
+        async function renderContribWorksTab(nick, cat) {
+            const listBox = document.getElementById('worksList');
+            const filterBox = document.getElementById('worksFilter');
+            if (!listBox || !filterBox) return;
+            cat = cat || '全部';
             const norm = _normNick(nick);
+            const cats = ['全部'].concat(window.WORK_CATEGORIES || ['未分类']);
+            filterBox.innerHTML = cats.map(c => {
+                const on = c === cat;
+                const st = on ? 'background:rgba(186,104,200,0.3);color:#fff;border:1px solid rgba(186,104,200,0.6);' : 'background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.6);border:1px solid rgba(255,255,255,0.12);';
+                return '<span onclick="renderContribWorksTab(\'' + nick + '\',\'' + c + '\')" style="cursor:pointer;padding:3px 10px;border-radius:12px;font-size:0.72rem;' + st + '">' + escapeHtml(c) + '</span>';
+            }).join('');
+            // 来源①：需求墙分享（归类"未分类"）  来源②：本人收录的作品（带分类）
+            const wall = (window._contribData ? window._contribData.shares : []).map((s, i) => ({ src: 'wall', idx: i, cat: '未分类' }));
             const all = await fetchWorksGist();
-            const works = (all[norm] && all[norm].works) || [];
-            const curNick = _currentNick();
-            const isOwner = _normNick(curNick) === norm;
-            if (!works.length) {
-                box.innerHTML = '<div style="color:rgba(255,255,255,0.5);font-size:0.78rem;margin:10px 0;">还没有收录的作品（在需求墙或这里点 📥 收录）</div>';
+            const mine = (all[norm] && all[norm].works) || [];
+            let items = wall.concat(mine.map(w => ({ src: 'mine', w: w, cat: w.category || '未分类' })));
+            if (cat !== '全部') items = items.filter(it => it.cat === cat);
+            if (!items.length) {
+                listBox.innerHTML = '<div style="color:rgba(255,255,255,0.5);font-size:0.78rem;margin:10px 0;">该分类下还没有作品（在需求墙或这里点 📥 收录）</div>';
                 return;
             }
+            const curNick = _currentNick();
+            const isOwner = _normNick(curNick) === norm;
             let rows = '';
-            for (const w of works) {
-                const ph = (w.passwordHash || '').replace(/'/g, "\\'");
-                const encArg = w.isEncrypted ? (",true,'" + ph + "'") : '';
-                const delBtn = isOwner ? '<a href="javascript:void(0)" onclick="removeWorkFromMyPage(\'' + w.id + '\')" style="color:#ff6b6b;text-decoration:none;cursor:pointer;background:rgba(255,107,107,0.1);padding:2px 8px;border-radius:5px;font-size:0.72rem;">🗑 删除</a>' : '';
-                rows += '<div style="padding:7px 9px;border-radius:6px;background:rgba(186,104,200,0.08);margin-bottom:6px;font-size:0.76rem;color:#fff;word-break:break-all;line-height:1.4;">'
-                    + '<div style="margin-bottom:4px;display:flex;gap:6px;align-items:center;">'
-                    + '<span style="color:#ba68c8;">📦</span>'
-                    + '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(w.title || '未命名作品') + '</span>'
-                    + '<span style="color:rgba(255,255,255,0.45);font-size:0.68rem;background:rgba(255,255,255,0.08);padding:1px 6px;border-radius:4px;">' + (w.category || '未分类') + '</span>'
-                    + (w.isEncrypted ? '<span title="密码保护">🔒</span>' : '')
-                    + '</div>'
-                    + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
-                    + '<a href="javascript:void(0)" onclick="importScriptToTxtFiles(\'' + w.scriptUrl + '\'' + encArg + ')" style="color:#4caf50;text-decoration:none;cursor:pointer;background:rgba(76,175,80,0.1);padding:2px 8px;border-radius:5px;font-size:0.72rem;">📄 导入到我的项目</a>'
-                    + delBtn
-                    + '</div></div>';
+            for (const it of items) {
+                if (it.src === 'wall') {
+                    const s = window._contribData.shares[it.idx];
+                    rows += '<div style="padding:7px 9px;border-radius:6px;background:rgba(255,255,255,0.04);margin-bottom:6px;font-size:0.76rem;color:#fff;word-break:break-all;line-height:1.4;">'
+                        + '<div style="margin-bottom:4px;display:flex;gap:6px;align-items:center;"><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml((s.content || '分享脚本').slice(0,40)) + '</span><span style="color:rgba(255,255,255,0.45);font-size:0.68rem;background:rgba(255,255,255,0.08);padding:1px 6px;border-radius:4px;">需求墙</span>' + (s.isEncrypted ? '<span title="密码保护">🔒</span>' : '') + '</div>'
+                        + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
+                        + '<a href="javascript:void(0)" onclick="contribCopyContent(' + it.idx + ')" style="color:#4fc3f7;text-decoration:none;cursor:pointer;background:rgba(79,195,247,0.1);padding:2px 8px;border-radius:5px;font-size:0.72rem;">📋 复制</a>'
+                        + (s.scriptUrl ? '<a href="javascript:void(0)" onclick="importScriptToTxtFiles(\'' + s.scriptUrl + '\')" style="color:#4caf50;text-decoration:none;cursor:pointer;background:rgba(76,175,80,0.1);padding:2px 8px;border-radius:5px;font-size:0.72rem;">📄 导入</a>' : '')
+                        + '<a href="javascript:void(0)" onclick="collectContribShare(' + it.idx + ')" style="color:#ba68c8;text-decoration:none;cursor:pointer;background:rgba(186,104,200,0.12);padding:2px 8px;border-radius:5px;font-size:0.72rem;">📥 收录</a>'
+                        + '<span style="color:rgba(255,215,0,0.6);font-size:0.7rem;">📥 ' + (s.copyCount || 0) + '</span>'
+                        + '<span style="color:rgba(255,107,107,0.6);font-size:0.7rem;">👍 ' + (s.likes || 0) + '</span>'
+                        + '</div></div>';
+                } else {
+                    const w = it.w;
+                    const ph = (w.passwordHash || '').replace(/'/g, "\\'");
+                    const encArg = w.isEncrypted ? (",true,'" + ph + "'") : '';
+                    const delBtn = isOwner ? '<a href="javascript:void(0)" onclick="removeWorkFromMyPage(\'' + w.id + '\')" style="color:#ff6b6b;text-decoration:none;cursor:pointer;background:rgba(255,107,107,0.1);padding:2px 8px;border-radius:5px;font-size:0.72rem;">🗑 删除</a>' : '';
+                    rows += '<div style="padding:7px 9px;border-radius:6px;background:rgba(186,104,200,0.08);margin-bottom:6px;font-size:0.76rem;color:#fff;word-break:break-all;line-height:1.4;">'
+                        + '<div style="margin-bottom:4px;display:flex;gap:6px;align-items:center;">'
+                        + '<span style="color:#ba68c8;">📦</span>'
+                        + '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(w.title || '未命名作品') + '</span>'
+                        + '<span style="color:rgba(255,255,255,0.45);font-size:0.68rem;background:rgba(255,255,255,0.08);padding:1px 6px;border-radius:4px;">' + escapeHtml(w.category || '未分类') + '</span>'
+                        + (w.isEncrypted ? '<span title="密码保护">🔒</span>' : '')
+                        + '</div>'
+                        + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
+                        + '<a href="javascript:void(0)" onclick="importScriptToTxtFiles(\'' + w.scriptUrl + '\'' + encArg + ')" style="color:#4caf50;text-decoration:none;cursor:pointer;background:rgba(76,175,80,0.1);padding:2px 8px;border-radius:5px;font-size:0.72rem;">📄 导入到我的项目</a>'
+                        + delBtn
+                        + '</div></div>';
+                }
             }
-            box.innerHTML = '<div style="color:rgba(255,255,255,0.6);font-size:0.78rem;margin:10px 0 6px;">收录的作品（' + works.length + '）</div><div style="max-height:220px;overflow-y:auto;">' + rows + '</div>';
+            listBox.innerHTML = rows;
         }
+        window.renderContribWorksTab = renderContribWorksTab;
+        async function renderContribQr(nick) {
+            const box = document.getElementById('tabQr');
+            if (!box) return;
+            const url = 'https://gyq-svip.github.io/tfjl-web/#pu=' + encodeURIComponent(nick);
+            box.innerHTML = '<div style="color:rgba(255,255,255,0.7);font-size:0.8rem;line-height:1.6;padding:6px 0;text-align:center;">📱 扫码或复制链接，分享你的主页：<br><span style="color:#9fb3ff;font-family:Consolas,monospace;font-size:0.68rem;word-break:break-all;">' + escapeHtml(url) + '</span></div>'
+                + '<div id="contribQrCanvas" style="display:flex;justify-content:center;margin:12px 0;"></div>'
+                + '<div style="display:flex;gap:8px;justify-content:center;">'
+                + '<button onclick="navigator.clipboard.writeText(\'' + url + '\');if(typeof showFloatToast===\'function\')showFloatToast(\'🔗 主页链接已复制\')" style="background:rgba(79,195,247,0.15);color:#4fc3f7;border:1px solid rgba(79,195,247,0.35);border-radius:8px;padding:8px 14px;cursor:pointer;font-size:0.78rem;">📋 复制链接</button>'
+                + '</div>';
+            try {
+                if (typeof window.qrcode !== 'function') { box.innerHTML += '<div style="color:#ff9800;font-size:0.72rem;margin-top:8px;text-align:center;">（二维码库未加载，请用上方链接）</div>'; return; }
+                const qr = window.qrcode(0, 'M');
+                qr.addData(url); qr.make();
+                const n = qr.getModuleCount();
+                const size = 180, cell = Math.floor(size / n);
+                const cvs = document.createElement('canvas');
+                cvs.width = cvs.height = cell * n;
+                const ctx = cvs.getContext('2d');
+                ctx.fillStyle = '#fff'; ctx.fillRect(0,0,cvs.width,cvs.height);
+                ctx.fillStyle = '#111';
+                for (let r=0;r<n;r++) for (let c=0;c<n;c++) if (qr.isDark(r,c)) ctx.fillRect(c*cell, r*cell, cell+0.5, cell+0.5);
+                const holder = document.getElementById('contribQrCanvas');
+                if (holder) holder.appendChild(cvs);
+            } catch (e) { box.innerHTML += '<div style="color:#ff9800;font-size:0.72rem;margin-top:8px;text-align:center;">二维码生成失败，请用上方链接</div>'; }
+        }
+        window.renderContribQr = renderContribQr;
+        // #pu=<昵称> 路由：扫码/点链接直接打开对应主页（网页端只读浏览，APP 端完整可用）
+        function _contribOpenFromHash(nick) {
+            if (typeof wallMessages !== 'undefined' && wallMessages.length) {
+                if (typeof openContributionCard === 'function') openContributionCard(encodeURIComponent(nick));
+            } else {
+                setTimeout(function(){ _contribOpenFromHash(nick); }, 600);
+            }
+        }
+        function _contribHashRoute() {
+            try {
+                const h = location.hash || '';
+                const m = h.match(/(?:^|[&#])pu=([^&]+)/);
+                if (m && m[1]) _contribOpenFromHash(decodeURIComponent(m[1]));
+            } catch (e) {}
+        }
+        window.addEventListener('hashchange', _contribHashRoute);
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _contribHashRoute); else _contribHashRoute();
         window.collectWallShare = collectWallShare;
         window.collectContribShare = collectContribShare;
         window.collectShareToMyPage = collectShareToMyPage;
@@ -19819,13 +19889,6 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                     </div>
                 </div>`;
             }).join('');
-            const sharesHtml = allShares.length ? `
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-                    <span style="color:rgba(255,255,255,0.6);font-size:0.78rem;">全部分享（${allShares.length}）</span>
-                    ${scriptCount ? `<a href="javascript:void(0)" onclick="contribDownloadAll()" style="color:#4fc3f7;text-decoration:none;cursor:pointer;background:rgba(79,195,247,0.12);padding:3px 10px;border-radius:5px;font-size:0.74rem;">📥 下载全部脚本 (${scriptCount})</a>` : ''}
-                </div>
-                <div style="max-height:260px;overflow-y:auto;margin-bottom:10px;">${shareItems}</div>
-            ` : '<div style="color:rgba(255,255,255,0.5);font-size:0.78rem;margin-bottom:10px;">还没有分享记录</div>';
             const body = document.getElementById('contributionCardBody');
             if (body) body.innerHTML = `
                 <div style="text-align:center;margin-bottom:12px;">
@@ -19843,14 +19906,35 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                     <div style="flex:1;text-align:center;background:rgba(255,193,7,0.1);border-radius:8px;padding:8px 4px;"><div style="color:#ffc107;font-size:1.1rem;font-weight:bold;">${e.downloads}</div><div style="font-size:0.68rem;color:rgba(255,255,255,0.6);">下载</div></div>
                     <div style="flex:1;text-align:center;background:rgba(255,107,107,0.1);border-radius:8px;padding:8px 4px;"><div style="color:#ff6b6b;font-size:1.1rem;font-weight:bold;">${e.likes}</div><div style="font-size:0.68rem;color:rgba(255,255,255,0.6);">获赞</div></div>
                 </div>
-                <div id="contribProfileEdit" style="background:rgba(255,255,255,0.04);border-radius:8px;padding:10px 12px;margin-bottom:12px;"></div>
-                ${sharesHtml}
-                <div id="contribWorks" style="margin-bottom:10px;color:rgba(255,255,255,0.5);font-size:0.78rem;">⏳ 正在加载收录的作品…</div>`;
+                <div style="display:flex;gap:4px;margin:4px 0 10px;border-bottom:1px solid rgba(255,255,255,0.12);">
+                    <div id="tabBtn_works" onclick="switchContribTab('works')" style="flex:1;text-align:center;padding:9px 0;cursor:pointer;color:#ffd700;border-bottom:2px solid #ffd700;font-size:0.85rem;">📦 作品</div>
+                    <div id="tabBtn_profile" onclick="switchContribTab('profile')" style="flex:1;text-align:center;padding:9px 0;cursor:pointer;color:rgba(255,255,255,0.5);font-size:0.85rem;">📝 资料</div>
+                    <div id="tabBtn_qr" onclick="switchContribTab('qr')" style="flex:1;text-align:center;padding:9px 0;cursor:pointer;color:rgba(255,255,255,0.5);font-size:0.85rem;">🔳 二维码</div>
+                </div>
+                <div id="tabWorks">
+                    <div id="worksFilter" style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px;"></div>
+                    <div id="worksList" style="max-height:300px;overflow-y:auto;"></div>
+                </div>
+                <div id="tabProfile" style="display:none;"><div id="contribProfileEdit" style="background:rgba(255,255,255,0.04);border-radius:8px;padding:10px 12px;margin-bottom:12px;"></div></div>
+                <div id="tabQr" style="display:none;"></div>`;
             const card = document.getElementById('contributionCard');
             if (card) card.style.display = 'flex';
             renderContribProfile(nick);
-            renderContribWorks(nick);
+            renderContribWorksTab(nick, '全部');
+            renderContribQr(nick);
         }
+
+        // 主页 Tab 切换
+        function switchContribTab(tab) {
+            const panels = { works: 'tabWorks', profile: 'tabProfile', qr: 'tabQr' };
+            ['works', 'profile', 'qr'].forEach(k => {
+                const p = document.getElementById(panels[k]);
+                const b = document.getElementById('tabBtn_' + k);
+                if (p) p.style.display = (k === tab) ? 'block' : 'none';
+                if (b) { b.style.color = (k === tab) ? '#ffd700' : 'rgba(255,255,255,0.5)'; b.style.borderBottom = (k === tab) ? '2px solid #ffd700' : 'none'; }
+            });
+        }
+        window.switchContribTab = switchContribTab;
 
         function bumpPreviewCount(url) {
             try {
