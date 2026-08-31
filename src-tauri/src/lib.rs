@@ -1078,6 +1078,29 @@ fn start_umi_ocr(exe_path: String, hidden: Option<bool>, state: tauri::State<App
     Ok(())
 }
 
+/// 静默启动更新安装包：NSIS `/S` 全程无窗，`/R` 装完自动重启 APP（Tauri 模板
+/// .onInstSuccess 内建机制，与原生 updater 通道同款参数同款行为，无双开风险）。
+#[tauri::command]
+fn start_installer_silent(exe_path: String) -> Result<(), String> {
+    if !Path::new(&exe_path).exists() {
+        return Err(format!("安装包不存在: {}", exe_path));
+    }
+    #[cfg(windows)]
+    {
+        std::process::Command::new(&exe_path)
+            .args(["/S", "/R"])
+            .spawn()
+            .map_err(|e| format!("启动安装程序失败: {}", e))?;
+    }
+    #[cfg(not(windows))]
+    {
+        std::process::Command::new(&exe_path)
+            .spawn()
+            .map_err(|e| format!("启动安装程序失败: {}", e))?;
+    }
+    Ok(())
+}
+
 /// 用系统默认浏览器打开外部链接（绕过 Tauri WebView 对 target="_blank" 的拦截）
 #[tauri::command]
 fn open_url(url: String) {
@@ -2151,6 +2174,7 @@ pub fn run() {
             show_in_folder,
             umi_ocr,
             start_umi_ocr,
+            start_installer_silent,
             pick_umi_ocr_exe,
             open_url,
             find_umi_ocr,
