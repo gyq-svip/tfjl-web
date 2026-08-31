@@ -14331,6 +14331,7 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
                                     <a href="javascript:void(0)" onclick="previewScriptFile('${msg.scriptUrl}')" style="color:#e0e0e0;text-decoration:underline;cursor:pointer;background:rgba(224,224,224,0.1);padding:4px 10px;border-radius:5px;font-size:0.8rem;">👁️ 预览</a>
                                     <a href="javascript:void(0)" onclick="downloadScript('${msg.scriptUrl}')" style="color:#4fc3f7;text-decoration:underline;cursor:pointer;background:rgba(79,195,247,0.1);padding:4px 10px;border-radius:5px;font-size:0.8rem;">📥 下载</a>
                                     <a href="javascript:void(0)" onclick="importScriptToTxtFiles('${msg.scriptUrl}')" style="color:#4caf50;text-decoration:underline;cursor:pointer;background:rgba(76,175,80,0.1);padding:4px 10px;border-radius:5px;font-size:0.8rem;">📄 智能导入</a>
+                                    <a href="javascript:void(0)" onclick="collectWallShare(${wallMessages.indexOf(msg)})" style="color:#ba68c8;text-decoration:underline;cursor:pointer;background:rgba(186,104,200,0.12);padding:4px 10px;border-radius:5px;font-size:0.8rem;">📥 收录</a>
                                 </div>`
                             );
                         }
@@ -19227,6 +19228,124 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             }
         }
         window.saveProfile = saveProfile;
+        // ====== 个人主页·作品（P1：收录/发布，复用需求墙 Gist 独立文件 works.json）======
+        const WORKS_GIST_ID = MESSAGES_GIST_ID;
+        const WORKS_FILE = 'works.json';
+        window.WORK_CATEGORIES = ['未分类', '寒冰', '暗月', '漩涡', '深海', '对战'];
+        async function fetchWorksGist() {
+            try {
+                const token = getGistToken();
+                const resp = await fetch('https://api.github.com/gists/' + WORKS_GIST_ID, {
+                    headers: { 'Accept': 'application/vnd.github.v3+json', ...(token && { 'Authorization': 'token ' + token }) }
+                });
+                if (!resp.ok) return {};
+                const data = await resp.json();
+                const f = data.files && data.files[WORKS_FILE];
+                if (!f || !f.content) return {};
+                return JSON.parse(f.content) || {};
+            } catch (e) { return {}; }
+        }
+        async function saveWorksToGist(all) {
+            try {
+                const token = getGistToken();
+                if (!token) { showFloatToast('收录作品需先登录 Gist 账号'); return false; }
+                const bodyObj = {}; bodyObj[WORKS_FILE] = { content: JSON.stringify(all) };
+                const resp = await fetch('https://api.github.com/gists/' + WORKS_GIST_ID, {
+                    method: 'PATCH',
+                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', ...(token && { 'Authorization': 'token ' + token }) },
+                    body: JSON.stringify({ files: bodyObj })
+                });
+                return resp.ok;
+            } catch (e) { return false; }
+        }
+        function _currentNick() {
+            const el = document.getElementById('messageNickname');
+            return (el && el.value.trim()) || localStorage.getItem('TFJL_UserName') || '';
+        }
+        async function collectShareToMyPage(share) {
+            const nick = _currentNick();
+            if (!nick) { showFloatToast('请先设置昵称再收录'); return false; }
+            const norm = _normNick(nick);
+            const all = await fetchWorksGist();
+            const mine = (all[norm] && all[norm].works) || [];
+            if (share.scriptUrl && mine.some(w => w.scriptUrl === share.scriptUrl)) {
+                showFloatToast('该作品已在你的主页中'); return false;
+            }
+            const work = {
+                id: 'w_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+                title: (share.title || (share.content ? share.content.slice(0, 30) : '') || '未命名作品').trim(),
+                cover: share.cover || '',
+                category: share.category || '未分类',
+                visibility: share.visibility || 'public',
+                isEncrypted: !!share.isEncrypted,
+                passwordHash: share.passwordHash || '',
+                scriptUrl: share.scriptUrl || '',
+                scriptType: share.scriptType || 'share',
+                createdAt: Date.now(),
+                likes: 0
+            };
+            mine.push(work);
+            all[norm] = { works: mine, updatedAt: Date.now() };
+            const ok = await saveWorksToGist(all);
+            showFloatToast(ok ? '✅ 已收录到你的主页' : '❌ 收录失败（需 Gist 登录）');
+            return ok;
+        }
+        function collectWallShare(idx) {
+            const m = wallMessages[idx];
+            if (!m) return;
+            collectShareToMyPage({ scriptUrl: m.scriptUrl || '', content: stripAllUrls(msgContent(m)), isEncrypted: !!m.isEncrypted, passwordHash: m.passwordHash || '', scriptType: (m.shareType === 'project' ? 'project' : 'share') });
+        }
+        function collectContribShare(i) {
+            const item = _contribData && _contribData.shares[i];
+            if (!item) return;
+            collectShareToMyPage({ scriptUrl: item.scriptUrl, content: item.content, isEncrypted: item.isEncrypted, passwordHash: item.passwordHash, scriptType: 'share' });
+        }
+        async function removeWorkFromMyPage(workId) {
+            const nick = _currentNick(); if (!nick) return;
+            const norm = _normNick(nick);
+            const all = await fetchWorksGist();
+            const mine = (all[norm] && all[norm].works) || [];
+            all[norm] = { works: mine.filter(w => w.id !== workId), updatedAt: Date.now() };
+            await saveWorksToGist(all);
+            showFloatToast('🗑 已删除');
+            renderContribWorks(nick);
+        }
+        async function renderContribWorks(nick) {
+            const box = document.getElementById('contribWorks');
+            if (!box) return;
+            const norm = _normNick(nick);
+            const all = await fetchWorksGist();
+            const works = (all[norm] && all[norm].works) || [];
+            const curNick = _currentNick();
+            const isOwner = _normNick(curNick) === norm;
+            if (!works.length) {
+                box.innerHTML = '<div style="color:rgba(255,255,255,0.5);font-size:0.78rem;margin:10px 0;">还没有收录的作品（在需求墙或这里点 📥 收录）</div>';
+                return;
+            }
+            let rows = '';
+            for (const w of works) {
+                const ph = (w.passwordHash || '').replace(/'/g, "\\'");
+                const encArg = w.isEncrypted ? (",true,'" + ph + "'") : '';
+                const delBtn = isOwner ? '<a href="javascript:void(0)" onclick="removeWorkFromMyPage(\'' + w.id + '\')" style="color:#ff6b6b;text-decoration:none;cursor:pointer;background:rgba(255,107,107,0.1);padding:2px 8px;border-radius:5px;font-size:0.72rem;">🗑 删除</a>' : '';
+                rows += '<div style="padding:7px 9px;border-radius:6px;background:rgba(186,104,200,0.08);margin-bottom:6px;font-size:0.76rem;color:#fff;word-break:break-all;line-height:1.4;">'
+                    + '<div style="margin-bottom:4px;display:flex;gap:6px;align-items:center;">'
+                    + '<span style="color:#ba68c8;">📦</span>'
+                    + '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(w.title || '未命名作品') + '</span>'
+                    + '<span style="color:rgba(255,255,255,0.45);font-size:0.68rem;background:rgba(255,255,255,0.08);padding:1px 6px;border-radius:4px;">' + (w.category || '未分类') + '</span>'
+                    + (w.isEncrypted ? '<span title="密码保护">🔒</span>' : '')
+                    + '</div>'
+                    + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
+                    + '<a href="javascript:void(0)" onclick="importScriptToTxtFiles(\'' + w.scriptUrl + '\'' + encArg + ')" style="color:#4caf50;text-decoration:none;cursor:pointer;background:rgba(76,175,80,0.1);padding:2px 8px;border-radius:5px;font-size:0.72rem;">📄 导入到我的项目</a>'
+                    + delBtn
+                    + '</div></div>';
+            }
+            box.innerHTML = '<div style="color:rgba(255,255,255,0.6);font-size:0.78rem;margin:10px 0 6px;">收录的作品（' + works.length + '）</div><div style="max-height:220px;overflow-y:auto;">' + rows + '</div>';
+        }
+        window.collectWallShare = collectWallShare;
+        window.collectContribShare = collectContribShare;
+        window.collectShareToMyPage = collectShareToMyPage;
+        window.removeWorkFromMyPage = removeWorkFromMyPage;
+        window.renderContribWorks = renderContribWorks;
         // 复制某条分享的内容
         function contribCopyContent(i) {
             const item = _contribData && _contribData.shares[i]; if (!item) return;
@@ -19694,6 +19813,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
                         <a href="javascript:void(0)" onclick="contribCopyContent(${i})" style="color:#4fc3f7;text-decoration:none;cursor:pointer;background:rgba(79,195,247,0.1);padding:2px 8px;border-radius:5px;font-size:0.72rem;">📋 复制</a>
                         ${dlBtn}
+                        <a href="javascript:void(0)" onclick="collectContribShare(${i})" style="color:#ba68c8;text-decoration:none;cursor:pointer;background:rgba(186,104,200,0.12);padding:2px 8px;border-radius:5px;font-size:0.72rem;">📥 收录</a>
                         <span style="color:rgba(255,215,0,0.6);font-size:0.7rem;">📥 ${dlCnt}</span>
                         <span style="color:rgba(255,107,107,0.6);font-size:0.7rem;">👍 ${m.likes || 0}</span>
                     </div>
@@ -19724,10 +19844,12 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                     <div style="flex:1;text-align:center;background:rgba(255,107,107,0.1);border-radius:8px;padding:8px 4px;"><div style="color:#ff6b6b;font-size:1.1rem;font-weight:bold;">${e.likes}</div><div style="font-size:0.68rem;color:rgba(255,255,255,0.6);">获赞</div></div>
                 </div>
                 <div id="contribProfileEdit" style="background:rgba(255,255,255,0.04);border-radius:8px;padding:10px 12px;margin-bottom:12px;"></div>
-                ${sharesHtml}`;
+                ${sharesHtml}
+                <div id="contribWorks" style="margin-bottom:10px;color:rgba(255,255,255,0.5);font-size:0.78rem;">⏳ 正在加载收录的作品…</div>`;
             const card = document.getElementById('contributionCard');
             if (card) card.style.display = 'flex';
             renderContribProfile(nick);
+            renderContribWorks(nick);
         }
 
         function bumpPreviewCount(url) {
