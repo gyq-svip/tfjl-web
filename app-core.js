@@ -19315,6 +19315,16 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             renderContribWorksTab(nick, '全部');
         }
         function _contribImportBtn(url, isEnc, ph, labelScript, labelProj) {
+            // 🔴 2026-09-01 识别旧「本地化字符串」格式（非 http(s) URL 或 data: URI），自动过滤不显示导入按钮
+            //   旧格式是 base64 字符串或 data: URI，无法直接 fetch，需联系作者重新分享为线上 Gist 格式
+            if (!url || !/^https?:\/\//i.test(url) || /^data:/i.test(url)) {
+                return '<span style="color:rgba(255,152,0,0.55);font-size:0.7rem;background:rgba(255,152,0,0.08);padding:2px 8px;border-radius:5px;border:1px solid rgba(255,152,0,0.2);" title="该作品使用旧版离线格式，无法导入。请联系作者用新版重新分享">⚠️ 旧格式</span>';
+            }
+            // 🔴 2026-09-01 主页脚本/项目导入仅支持 APP 端（引导用户下载 APP，网页端只读浏览作品列表）
+            const isApp = !!(window.__TAURI__ || window.__TAURI_INTERNALS__);
+            if (!isApp) {
+                return '<a href="javascript:void(0)" onclick="if(typeof showFloatToast===\'function\')showFloatToast(\'📱 主页导入仅支持 APP 端，请下载 APP 后扫码进入主页导入\');else alert(\'📱 主页导入仅支持 APP 端，请下载 APP 后使用\')" style="color:#ff9800;text-decoration:none;cursor:pointer;background:rgba(255,152,0,0.1);padding:2px 8px;border-radius:5px;font-size:0.72rem;border:1px solid rgba(255,152,0,0.25);" title="网页端仅支持浏览，导入请下载 APP">📱 需 APP</a>';
+            }
             const isP = /\.json($|\?|#)/i.test(url || '');
             const fn = isP ? 'importBackupFromWall' : 'importScriptToTxtFiles';
             const ext = (isEnc ? ",true,'" + (ph || '').replace(/'/g, "\\'") + "'" : '');
@@ -19336,15 +19346,19 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             // 来源①：需求墙分享（归类"未分类"）  来源②：本人收录的作品（带分类）
             const wall = (window._contribData ? window._contribData.shares : []).map((s, i) => ({ src: 'wall', idx: i, cat: '未分类' }));
             const all = await fetchWorksGist();
-            const mine = (all[norm] && all[norm].works) || [];
+            let mine = (all[norm] && all[norm].works) || [];
+            // 🔴 2026-09-01 私有作品不在公开主页显示：非本人访问时过滤掉 visibility=private 的作品
+            const curNick = _currentNick();
+            const isOwner = _normNick(curNick) === norm;
+            if (!isOwner) {
+                mine = mine.filter(w => (w.visibility || 'public') === 'public');
+            }
             let items = wall.concat(mine.map(w => ({ src: 'mine', w: w, cat: w.category || '未分类' })));
             if (cat !== '全部') items = items.filter(it => it.cat === cat);
             if (!items.length) {
                 listBox.innerHTML = '<div style="color:rgba(255,255,255,0.5);font-size:0.78rem;margin:10px 0;">该分类下还没有作品（在需求墙或这里点 📥 收录）</div>';
                 return;
             }
-            const curNick = _currentNick();
-            const isOwner = _normNick(curNick) === norm;
             let rows = '';
             for (const it of items) {
                 if (it.src === 'wall') {
@@ -19354,24 +19368,27 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                         + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
                         + '<a href="javascript:void(0)" onclick="contribCopyContent(' + it.idx + ')" style="color:#4fc3f7;text-decoration:none;cursor:pointer;background:rgba(79,195,247,0.1);padding:2px 8px;border-radius:5px;font-size:0.72rem;">📋 复制</a>'
                         + (s.scriptUrl ? _contribImportBtn(s.scriptUrl, s.isEncrypted, s.passwordHash, '📄 导入', '📦 导入项目') : '')
+                        + (s.scriptUrl && /^https?:\/\//i.test(s.scriptUrl) ? '<a href="javascript:void(0)" onclick="shareWorkFromPage(\'' + (s.scriptUrl || '').replace(/'/g, "\\'") + '\',\'' + (s.content || '分享脚本').slice(0,40).replace(/'/g, "\\'") + '\')" style="color:#ffd700;text-decoration:none;cursor:pointer;background:rgba(255,215,0,0.12);padding:2px 8px;border-radius:5px;font-size:0.72rem;border:1px solid rgba(255,215,0,0.3);">🔗 分享</a>' : '')
                         + '<a href="javascript:void(0)" onclick="collectContribShare(' + it.idx + ')" style="color:#ba68c8;text-decoration:none;cursor:pointer;background:rgba(186,104,200,0.12);padding:2px 8px;border-radius:5px;font-size:0.72rem;">📥 收录</a>'
                         + '<span style="color:rgba(255,215,0,0.6);font-size:0.7rem;">📥 ' + (s.copyCount || 0) + '</span>'
                         + '<span style="color:rgba(255,107,107,0.6);font-size:0.7rem;">👍 ' + (s.likes || 0) + '</span>'
                         + '</div></div>';
                 } else {
                     const w = it.w;
-                    const ph = (w.passwordHash || '').replace(/'/g, "\\'");
-                    const encArg = w.isEncrypted ? (",true,'" + ph + "'") : '';
                     const delBtn = isOwner ? '<a href="javascript:void(0)" onclick="removeWorkFromMyPage(\'' + w.id + '\')" style="color:#ff6b6b;text-decoration:none;cursor:pointer;background:rgba(255,107,107,0.1);padding:2px 8px;border-radius:5px;font-size:0.72rem;">🗑 删除</a>' : '';
+                    const visTag = (w.visibility === 'private') ? '<span style="color:rgba(255,152,0,0.85);font-size:0.66rem;background:rgba(255,152,0,0.1);padding:1px 6px;border-radius:8px;border:1px solid rgba(255,152,0,0.25);">私有</span>' : '<span style="color:rgba(76,175,80,0.85);font-size:0.66rem;background:rgba(76,175,80,0.1);padding:1px 6px;border-radius:8px;border:1px solid rgba(76,175,80,0.25);">公开</span>';
+                    const shareBtn = (w.scriptUrl && /^https?:\/\//i.test(w.scriptUrl)) ? '<a href="javascript:void(0)" onclick="shareWorkFromPage(\'' + (w.scriptUrl || '').replace(/'/g, "\\'") + '\',\'' + (w.title || '未命名作品').replace(/'/g, "\\'") + '\')" style="color:#ffd700;text-decoration:none;cursor:pointer;background:rgba(255,215,0,0.12);padding:2px 8px;border-radius:5px;font-size:0.72rem;border:1px solid rgba(255,215,0,0.3);">🔗 分享</a>' : '';
                     rows += '<div style="padding:7px 9px;border-radius:6px;background:rgba(186,104,200,0.08);margin-bottom:6px;font-size:0.76rem;color:#fff;word-break:break-all;line-height:1.4;">'
                         + '<div style="margin-bottom:4px;display:flex;gap:6px;align-items:center;">'
                         + '<span style="color:#ba68c8;">📦</span>'
                         + '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(w.title || '未命名作品') + '</span>'
                         + '<span style="color:rgba(255,255,255,0.45);font-size:0.68rem;background:rgba(255,255,255,0.08);padding:1px 6px;border-radius:4px;">' + escapeHtml(w.category || '未分类') + '</span>'
+                        + visTag
                         + (w.isEncrypted ? '<span title="密码保护">🔒</span>' : '')
                         + '</div>'
                         + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
                         + _contribImportBtn(w.scriptUrl, w.isEncrypted, w.passwordHash, '📄 导入到我的项目', '📦 导入项目')
+                        + shareBtn
                         + delBtn
                         + '</div></div>';
                 }
@@ -19379,6 +19396,99 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             listBox.innerHTML = rows;
         }
         window.renderContribWorksTab = renderContribWorksTab;
+        // 🔴 2026-09-01 新增：分享个人主页单个作品（和阵容分享同款弹窗：链接+二维码+复制按钮）
+        //   从 scriptUrl（Gist raw_url）解析 Gist ID → 生成 #pg=<gistId> 分享链接 → 弹窗
+        async function shareWorkFromPage(rawUrl, title) {
+            if (!rawUrl || !/^https?:\/\//i.test(rawUrl)) {
+                if (typeof showFloatToast === 'function') showFloatToast('⚠️ 该作品使用旧版离线格式，无法生成分享链接');
+                else alert('⚠️ 该作品使用旧版离线格式，无法生成分享链接');
+                return;
+            }
+            // 从 Gist raw_url 解析 gistId：https://gist.githubusercontent.com/<user>/<gistId>/raw/<file>
+            //  或 https://api.github.com/gists/<gistId>  或  https://gist.github.com/<user>/<gistId>
+            let gistId = '';
+            let m = rawUrl.match(/gist\.githubusercontent\.com\/[^\/]+\/([a-f0-9]+)/i);
+            if (!m) m = rawUrl.match(/gist\.github\.com\/[^\/]+\/([a-f0-9]+)/i);
+            if (!m) m = rawUrl.match(/api\.github\.com\/gists\/([a-f0-9]+)/i);
+            if (m && m[1]) gistId = m[1];
+            if (!gistId) {
+                // 兜底：作为脚本 URL 直接分享（不进 #pg= 流程，对方点开链接下载）
+                if (typeof showFloatToast === 'function') showFloatToast('⚠️ 无法解析作品 Gist ID，请直接复制脚本链接分享');
+                else alert('⚠️ 无法解析作品 Gist ID');
+                return;
+            }
+            const link = 'https://gyq-svip.github.io/tfjl-web/#pg=' + gistId;
+            const shareText = '【塔防精灵作品分享】「' + (title || '未命名作品') + '」\n链接：' + link + '\n（在装了塔防精灵助手的电脑上点开链接会自动弹导入）';
+            const old = document.getElementById('workShareModal');
+            if (old) old.remove();
+            const modal = document.createElement('div');
+            modal.id = 'workShareModal';
+            modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.72);z-index:' + (200000 + (window.topWinZIndex || 0)) + ';display:flex;align-items:center;justify-content:center;padding:16px;';
+            modal.innerHTML =
+                '<div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(255,215,0,0.5);border-radius:16px;padding:18px 20px;max-width:520px;width:96%;box-shadow:0 10px 40px rgba(0,0,0,0.6);">' +
+                  '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">' +
+                    '<div><span style="color:#ffd700;font-size:1.1rem;font-weight:bold;">🔗 作品分享</span>' +
+                    '<div style="color:rgba(255,255,255,0.5);font-size:0.74rem;margin-top:2px;">' + escapeHtml(title || '未命名作品') + '</div></div>' +
+                    '<span id="workShareClose" style="cursor:pointer;color:rgba(255,255,255,0.4);font-size:1.5rem;">×</span>' +
+                  '</div>' +
+                  '<div style="background:linear-gradient(135deg,rgba(255,215,0,0.14),rgba(255,152,0,0.10));border:2px solid rgba(255,215,0,0.55);border-radius:12px;padding:14px 16px;display:flex;align-items:center;gap:14px;">' +
+                    '<div style="flex:1;min-width:0;">' +
+                      '<div style="color:rgba(255,255,255,0.55);font-size:0.74rem;">分享链接（对方在装了本软件的电脑上点开会自动弹导入）：</div>' +
+                      '<div style="color:#ffd700;font-size:0.86rem;font-weight:bold;word-break:break-all;font-family:Consolas,monospace;margin-top:4px;">' + escapeHtml(link) + '</div>' +
+                    '</div>' +
+                    '<button id="workShareCopyLink" style="flex-shrink:0;background:linear-gradient(135deg,#ffd700,#ff9800);color:#1a1a2e;border:none;padding:12px 18px;border-radius:10px;cursor:pointer;font-size:0.95rem;font-weight:bold;">📋 复制链接</button>' +
+                  '</div>' +
+                  '<div id="workShareQrCanvas" style="display:flex;justify-content:center;margin:14px 0;"></div>' +
+                  '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">' +
+                    '<button id="workShareCopyAll" style="flex:1;min-width:140px;background:linear-gradient(135deg,#26a69a,#00796b);color:#fff;border:none;padding:10px;border-radius:8px;cursor:pointer;font-size:0.9rem;font-weight:bold;">📋 复制分享文案</button>' +
+                    '<button id="workShareViewHome" style="flex:1;min-width:140px;background:linear-gradient(135deg,#ab47bc,#6a1b9a);color:#fff;border:none;padding:10px;border-radius:8px;cursor:pointer;font-size:0.9rem;font-weight:bold;">🏠 查看我的主页</button>' +
+                  '</div>' +
+                '</div>';
+            document.body.appendChild(modal);
+            const close = function () { modal.remove(); };
+            modal.querySelector('#workShareClose').onclick = close;
+            modal.onclick = function (e) { if (e.target === modal) close(); };
+            const copyText = async function (text, okMsg) {
+                try {
+                    await navigator.clipboard.writeText(text);
+                    if (typeof showToast === 'function') showToast(okMsg, 'success');
+                } catch (e) {
+                    try {
+                        const ta = document.createElement('textarea');
+                        ta.value = text; document.body.appendChild(ta); ta.select();
+                        document.execCommand('copy'); ta.remove();
+                        if (typeof showToast === 'function') showToast(okMsg, 'success');
+                    } catch (e2) {
+                        if (typeof showToast === 'function') showToast('❌ 复制失败，请手动复制', 'error');
+                    }
+                }
+            };
+            modal.querySelector('#workShareCopyLink').onclick = function () { copyText(link, '🔗 作品分享链接已复制：对方点开会自动弹导入'); };
+            modal.querySelector('#workShareCopyAll').onclick = function () { copyText(shareText, '📋 分享文案已复制（链接+作品名）'); };
+            modal.querySelector('#workShareViewHome').onclick = function () {
+                close();
+                const myNick = localStorage.getItem('TFJL_UserName') || '';
+                if (myNick && typeof openContributionCard === 'function') openContributionCard(encodeURIComponent(myNick));
+                else if (typeof showToast === 'function') showToast('请先设置昵称', 'info');
+            };
+            // 生成二维码（和阵容分享/贡献主页同款）
+            try {
+                if (typeof window.qrcode !== 'function') { /* 二维码库未加载，跳过 */ return; }
+                const qr = window.qrcode(0, 'M');
+                qr.addData(link); qr.make();
+                const n = qr.getModuleCount();
+                const size = 200, cell = Math.floor(size / n);
+                const cvs = document.createElement('canvas');
+                cvs.width = cvs.height = cell * n;
+                const ctx = cvs.getContext('2d');
+                ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cvs.width, cvs.height);
+                ctx.fillStyle = '#111';
+                for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (qr.isDark(r, c)) ctx.fillRect(c * cell, r * cell, cell + 0.5, cell + 0.5);
+                const holder = document.getElementById('workShareQrCanvas');
+                if (holder) holder.appendChild(cvs);
+            } catch (e) { /* 二维码生成失败，不影响主流程 */ }
+        }
+        window.shareWorkFromPage = shareWorkFromPage;
         async function renderContribQr(nick) {
             const box = document.getElementById('tabQr');
             if (!box) return;
