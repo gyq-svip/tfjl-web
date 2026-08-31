@@ -8644,6 +8644,7 @@
                     '<button id="lineupShareDl" style="flex:1;min-width:120px;background:linear-gradient(135deg,#ffd700,#ff9800);color:#1a1a2e;border:none;padding:10px;border-radius:8px;cursor:pointer;font-size:0.9rem;font-weight:bold;">💾 下载图片</button>' +
                     '<button id="lineupShareCopyImg" style="flex:1;min-width:120px;background:linear-gradient(135deg,#26a69a,#00796b);color:#fff;border:none;padding:10px;border-radius:8px;cursor:pointer;font-size:0.9rem;font-weight:bold;">📋 复制图片</button>' +
                     (link ? '<button id="lineupShareCopyLink" style="flex:1;min-width:120px;background:linear-gradient(135deg,#ab47bc,#6a1b9a);color:#fff;border:none;padding:10px;border-radius:8px;cursor:pointer;font-size:0.9rem;font-weight:bold;">🔗 复制链接</button>' : '') +
+                    '<button id="lineupShareViewHome" style="flex:1;min-width:140px;background:linear-gradient(135deg,#5c6bc0,#283593);color:#fff;border:none;padding:10px;border-radius:8px;cursor:pointer;font-size:0.9rem;font-weight:bold;" title="打开我的贡献主页，查看/分享我所有作品">🏠 查看我的主页</button>' +
                   '</div>' +
                 '</div>';
             document.body.appendChild(modal);
@@ -8707,6 +8708,15 @@
             if (shortBtn) shortBtn.onclick = function () { copyText(shortCode, '📋 短码 ' + shortCode + ' 已复制：发给对方，在软件「从短码导入」输入即可', shortBtn); };
             const linkBtn = modal.querySelector('#lineupShareCopyLink');
             if (linkBtn) linkBtn.onclick = function () { copyText(link, '🔗 分享链接已复制：对方浏览器/软件打开会自动弹导入', linkBtn); };
+            // 🏠 查看我的主页：关闭分享弹窗，打开当前用户贡献主页（让人看到所有作品，吸引关注）
+            const viewHomeBtn = modal.querySelector('#lineupShareViewHome');
+            if (viewHomeBtn) viewHomeBtn.onclick = function () {
+                const myNick = (function () { try { return localStorage.getItem('TFJL_UserName') || ''; } catch (e) { return ''; } })();
+                if (!myNick) { if (typeof showToast === 'function') showToast('请先设置昵称再查看主页', 'info'); return; }
+                close();
+                if (typeof openContributionCard === 'function') openContributionCard(encodeURIComponent(myNick));
+                else if (window.openContributionCard) window.openContributionCard(encodeURIComponent(myNick));
+            };
 
             // 需求墙同步（选项窗开关，默认开）：后台静默发整个项目，不阻塞弹窗；密码保护时同密码加密上墙
             if (opts.wall && typeof shareProjectToWall === 'function') {
@@ -9069,6 +9079,7 @@
                   '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">' +
                     '<button id="projShareCopyLink" style="flex:1;min-width:140px;background:linear-gradient(135deg,#ab47bc,#6a1b9a);color:#fff;border:none;padding:10px;border-radius:8px;cursor:pointer;font-size:0.9rem;font-weight:bold;">🔗 复制链接</button>' +
                     '<button id="projShareCopyAll" style="flex:1.4;min-width:140px;background:linear-gradient(135deg,#26a69a,#00796b);color:#fff;border:none;padding:10px;border-radius:8px;cursor:pointer;font-size:0.9rem;font-weight:bold;">📋 复制分享文案</button>' +
+                    '<button id="projShareViewHome" style="flex:1;min-width:140px;background:linear-gradient(135deg,#5c6bc0,#283593);color:#fff;border:none;padding:10px;border-radius:8px;cursor:pointer;font-size:0.9rem;font-weight:bold;" title="打开我的贡献主页，查看/分享我所有作品">🏠 查看我的主页</button>' +
                   '</div>' +
                   '<div style="margin-top:10px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:8px 10px;">' +
                     '<div style="color:rgba(255,255,255,0.45);font-size:0.72rem;margin-bottom:4px;">分享链接（微信/QQ 点开自动弹导入，需在装了本软件的电脑上打开）：</div>' +
@@ -9098,6 +9109,15 @@
             modal.querySelector('#projShareCopyShort').onclick = function () { copyText(r.code, '📋 短码 ' + r.code + ' 已复制：发给对方，在软件「从短码导入项目」输入即可'); };
             modal.querySelector('#projShareCopyLink').onclick = function () { copyText(link, '🔗 项目分享链接已复制：对方点开会自动弹导入'); };
             modal.querySelector('#projShareCopyAll').onclick = function () { copyText(shareText, '📋 分享文案已复制（短码+链接+项目信息）'); };
+            // 🏠 查看我的主页：关闭分享弹窗，打开当前用户贡献主页
+            const projViewHomeBtn = modal.querySelector('#projShareViewHome');
+            if (projViewHomeBtn) projViewHomeBtn.onclick = function () {
+                const myNick = (function () { try { return localStorage.getItem('TFJL_UserName') || ''; } catch (e) { return ''; } })();
+                if (!myNick) { if (typeof showToast === 'function') showToast('请先设置昵称再查看主页', 'info'); return; }
+                close();
+                if (typeof openContributionCard === 'function') openContributionCard(encodeURIComponent(myNick));
+                else if (window.openContributionCard) window.openContributionCard(encodeURIComponent(myNick));
+            };
             const linkTa = modal.querySelector('#projShareLinkTa');
             if (linkTa) linkTa.onclick = function () { linkTa.select(); };
 

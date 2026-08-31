@@ -19275,12 +19275,15 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             if (share.scriptUrl && mine.some(w => w.scriptUrl === share.scriptUrl)) {
                 showFloatToast('该作品已在你的主页中'); return false;
             }
+            // 🔴 2026-09-01 收录前让用户选分类+公开/私有（用户问"加公开和私有好不好执行"，这里实现）
+            const opts = await _askCollectOptions(share);
+            if (!opts) { showFloatToast('已取消收录'); return false; }
             const work = {
                 id: 'w_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
                 title: (share.title || (share.content ? share.content.slice(0, 30) : '') || '未命名作品').trim(),
                 cover: share.cover || '',
-                category: share.category || '未分类',
-                visibility: share.visibility || 'public',
+                category: opts.category,
+                visibility: opts.visibility,
                 isEncrypted: !!share.isEncrypted,
                 passwordHash: share.passwordHash || '',
                 scriptUrl: share.scriptUrl || '',
@@ -19291,9 +19294,58 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             mine.push(work);
             all[norm] = { works: mine, updatedAt: Date.now() };
             const ok = await saveWorksToGist(all);
-            showFloatToast(ok ? '✅ 已收录到你的主页' : '❌ 收录失败（需 Gist 登录）');
+            showFloatToast(ok ? ('✅ 已收录到你的主页（' + (opts.visibility === 'private' ? '私有' : '公开') + '·' + opts.category + '）') : '❌ 收录失败（需 Gist 登录）');
             return ok;
         }
+        // 收录选项弹窗：分类下拉 + 公开/私有单选 + 确认/取消
+        function _askCollectOptions(share) {
+            return new Promise((resolve) => {
+                const cats = window.WORK_CATEGORIES || ['未分类'];
+                const old = document.getElementById('collectOptsModal');
+                if (old) old.remove();
+                const modal = document.createElement('div');
+                modal.id = 'collectOptsModal';
+                modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.72);z-index:' + (200000 + (window.topWinZIndex || 0)) + ';display:flex;align-items:center;justify-content:center;padding:16px;';
+                const title = (share.title || (share.content ? share.content.slice(0, 30) : '') || '未命名作品').trim();
+                modal.innerHTML =
+                    '<div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(186,104,200,0.5);border-radius:14px;padding:18px 20px;max-width:460px;width:96%;box-shadow:0 10px 40px rgba(0,0,0,0.6);">' +
+                      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
+                        '<span style="color:#ba68c8;font-size:1.05rem;font-weight:bold;">📥 收录到我的主页</span>' +
+                        '<span id="collectOptsClose" style="cursor:pointer;color:rgba(255,255,255,0.4);font-size:1.5rem;">×</span>' +
+                      '</div>' +
+                      '<div style="color:rgba(255,255,255,0.7);font-size:0.8rem;margin-bottom:12px;line-height:1.5;">作品：<span style="color:#ffd700;">' + escapeHtml(title) + '</span></div>' +
+                      '<div style="margin-bottom:12px;">' +
+                        '<div style="color:rgba(255,255,255,0.6);font-size:0.78rem;margin-bottom:6px;">📂 分类</div>' +
+                        '<select id="collectOptsCat" style="width:100%;box-sizing:border-box;height:38px;background:rgba(0,0,0,0.35);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:8px;padding:0 10px;font-size:0.85rem;">' +
+                          cats.map(c => '<option value="' + escapeHtml(c) + '">' + escapeHtml(c) + '</option>').join('') +
+                        '</select>' +
+                      '</div>' +
+                      '<div style="margin-bottom:14px;">' +
+                        '<div style="color:rgba(255,255,255,0.6);font-size:0.78rem;margin-bottom:6px;">🔒 可见性</div>' +
+                        '<div style="display:flex;gap:8px;">' +
+                          '<label style="flex:1;display:flex;align-items:center;gap:6px;background:rgba(76,175,80,0.12);border:1px solid rgba(76,175,80,0.4);border-radius:8px;padding:8px 10px;cursor:pointer;font-size:0.82rem;color:#a5d6a7;"><input type="radio" name="collectVis" value="public" checked style="cursor:pointer;">🌍 公开（别人扫码能看）</label>' +
+                          '<label style="flex:1;display:flex;align-items:center;gap:6px;background:rgba(255,152,0,0.10);border:1px solid rgba(255,152,0,0.4);border-radius:8px;padding:8px 10px;cursor:pointer;font-size:0.82rem;color:#ffcc80;"><input type="radio" name="collectVis" value="private" style="cursor:pointer;">🔒 私有（仅自己可见）</label>' +
+                        '</div>' +
+                      '</div>' +
+                      '<div style="display:flex;gap:10px;">' +
+                        '<button id="collectOptsCancel" style="flex:1;background:rgba(255,255,255,0.08);color:#fff;border:1px solid rgba(255,255,255,0.2);padding:10px;border-radius:8px;cursor:pointer;">取消</button>' +
+                        '<button id="collectOptsOk" style="flex:1.6;background:linear-gradient(135deg,#ba68c8,#6a1b9a);color:#fff;border:none;padding:10px;border-radius:8px;cursor:pointer;font-weight:bold;">✅ 确认收录</button>' +
+                      '</div>' +
+                    '</div>';
+                document.body.appendChild(modal);
+                const close = function (val) { modal.remove(); resolve(val); };
+                modal.querySelector('#collectOptsClose').onclick = function () { close(null); };
+                modal.querySelector('#collectOptsCancel').onclick = function () { close(null); };
+                modal.onclick = function (e) { if (e.target === modal) close(null); };
+                modal.querySelector('#collectOptsOk').onclick = function () {
+                    const cat = modal.querySelector('#collectOptsCat').value;
+                    const visRadio = modal.querySelector('input[name="collectVis"]:checked');
+                    const vis = visRadio ? visRadio.value : 'public';
+                    close({ category: cat, visibility: vis });
+                };
+            });
+        }
+        window._askCollectOptions = _askCollectOptions;
         function collectWallShare(idx) {
             const m = wallMessages[idx];
             if (!m) return;
