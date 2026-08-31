@@ -633,14 +633,21 @@
             // 否则用户只本地落盘不写 Gist 时 buffer 永远空 → 永远不上报（之前"一个都没有"的根因）
             // 平台判定与 app-local.js 保持一致：优先 __TAURI_INTERNALS__ / __TAURI__ 全局变量（Tauri v2 UA 可能不含 "Tauri" 字符串），再回退 UA 匹配
             const _isTauri = (typeof window.__TAURI_INTERNALS__ !== 'undefined') || (typeof window.__TAURI__ !== 'undefined') || (navigator.userAgent || '').indexOf('Tauri') !== -1;
-            // 版本号取真实来源：运行期注入的 #versionTag（如 s20260825-1251 · s1.0.xxx），回退 window.__APP_VERSION，再回退 sw.js 的 CACHE_VERSION
+            // 版本号取真实来源：SW 回报的前端小版本（versionTag.dataset.swVersion）最权威，
+            // 其次 #versionTag 文本；绝不用 window.__APP_VERSION（那是桌面 exe 大版本 2.0.26，已由 _appExeVer 单独记录）
             let _appVer = '';
             try {
                 const vt = document.getElementById('versionTag');
-                if (vt && vt.textContent) _appVer = vt.textContent.trim();
+                if (vt) {
+                    if (vt.dataset && vt.dataset.swVersion) {
+                        _appVer = vt.dataset.swVersion;
+                    } else if (vt.textContent) {
+                        const t = vt.textContent.trim();
+                        // 过滤 app-local.js 写入的桌面大版本占位（"App v2.0.x" / 初始 "dev"）
+                        if (t && t !== 'dev' && !/^App\s+v?\d+\.\d+/.test(t)) _appVer = t;
+                    }
+                }
             } catch (e) {}
-            if (!_appVer && typeof window.__APP_VERSION === 'string') _appVer = window.__APP_VERSION;
-            if (!_appVer) { try { _appVer = (CACHE_VERSION || ''); } catch (e) {} }
             // 🔴 2026-08-28 新增：大版本号（桌面 exe 2.0.x）。网页版取不到 → 留空。
             //   与 #versionTag 的"小版本"分开存储：appVersion=SW 小版本、appExeVersion=桌面大版本。
             //   这样诊断面板能一眼分清"网页挂机 vs 桌面挂机"以及"桌面跑哪个 exe"，避免大/小版本混淆。
