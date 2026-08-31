@@ -1233,8 +1233,8 @@
                             </select>
                         </div>
                         <div style="margin-bottom:13px;">
-                            <label style="color:#fff;display:block;margin-bottom:7px;">② 导入到：</label>
-                            <select id="importProjectSelect" onchange="importTargetChange()" title="新建项目（命名导入）置顶；选现有项目=覆盖导入" style="width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);background:#2a2a4a;color:#fff;font-size:1rem;">
+                            <label style="color:#fff;display:block;margin-bottom:7px;">② 选择项目：</label>
+                            <select id="importProjectSelect" onchange="importTargetChange()" title="新建项目（命名导入）置顶；选现有项目=覆盖导入（有二次确认）" style="width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);background:#2a2a4a;color:#fff;font-size:1rem;">
                             </select>
                         </div>
                         <div id="importNameRow" style="margin-bottom:13px;">
@@ -1266,14 +1266,14 @@
             });
         }
 
-        // 重建「② 导入到」下拉：➕ 新建项目置顶，其余为该分类下现有项目（选中=覆盖导入）
+        // 重建「② 选择项目」下拉：➕ 新建项目置顶，其余为该分类下现有项目（选中=覆盖导入，有二次确认）
         function rebuildImportProjectOptions(cat) {
             const sel = document.getElementById('importProjectSelect');
             if (!sel) return;
             const grouped = window.__importCatGrouped || {};
-            let html = '<option value="__NEW__" style="color:#4ade80;font-weight:bold;">➕ 新建项目（命名导入）</option>';
+            let html = '<option value="__NEW__" style="color:#4ade80;font-weight:bold;">➕ 新建项目</option>';
             (grouped[cat] || []).slice().sort((a, b) => a.localeCompare(b, 'zh')).forEach(n => {
-                html += `<option value="${escapeHtml(n)}">${escapeHtml(n)}（覆盖导入）</option>`;
+                html += `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`;
             });
             sel.innerHTML = html;
         }
