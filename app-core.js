@@ -1,4 +1,4 @@
-﻿
+
         // ==================== 测试标记：370 自动升级验证（无功能影响，仅触发 CI 部署 +1） ====================
         // ==================== 控制台日志捕获（Tauri APP 无法 F12，在此捕获供管理员面板查看） ====================
         window.__consoleLogs = [];
@@ -1085,6 +1085,9 @@
 
             // 注意：不再自动注入、也不再强制删除任何历史项目（含「南门公主」）。
             // 用户手动保留的项目一律保留；默认启动项目由 ensureDefaultProjectLoaded 决定（王城低配版）。
+
+            // 幽灵分类自愈：项目挂着、分类表没有的分类补回（删不删用户定）
+            await _healGhostCategories();
         }
         
         // 保存默认项目到 IndexedDB
@@ -1267,10 +1270,34 @@
             if (confirm(`确定要删除分类"${toDelete}"吗？\n该分类下的项目将移至"默认分类"。`)) {
                 const idx = categories.indexOf(toDelete);
                 if (idx > -1) {
-                    categories.splice(idx, 1);
-                    saveCategories().then(() => {
-                        refreshProjectSelectors();
-                        alert('✅ 分类已删除！');
+                    // 🔴 修复（2026-08-31）：此前只删分类名——项目还挂在旧分类上（幽灵分类，
+                    // 导入弹窗能看到、主界面看不到）。现在先处理项目移动再删分类，取消同名覆盖时分类不删。
+                    loadProjectListFromDB().then(projects => {
+                        const all = projects || [];
+                        const affected = all.filter(p => p && p.category === toDelete);
+                        if (!affected.length) return 0;
+                        // 同名冲突提示：其他分类下已有同名项目，移动（put 同名键）会覆盖它们
+                        const otherNames = new Set(all.filter(p => p && p.category !== toDelete).map(p => p.name));
+                        const clashes = affected.filter(p => otherNames.has(p.name));
+                        if (clashes.length > 0 && !confirm(`「默认分类」下已存在同名项目（${clashes.map(p => p.name).join('、')}），移动后将被覆盖，确定继续？`)) return -1;
+                        // 单事务批量移动 + 一次性落盘（34MB 整包写盘只触发一次）
+                        return new Promise(res => {
+                            const t = db.transaction([STORE_NAME], 'readwrite');
+                            const s = t.objectStore(STORE_NAME);
+                            affected.forEach(p => { p.category = '默认分类'; try { s.put(p); } catch (e) {} });
+                            t.oncomplete = () => { persistProjectsToDisk().finally(() => res(affected.length)); };
+                            t.onerror = () => res(affected.length);
+                            t.onabort = () => res(affected.length);
+                        });
+                    }).then(n => {
+                        if (n === -1) { alert('已取消：分类未删除'); return; }
+                        categories.splice(idx, 1);
+                        saveCategories().then(() => {
+                            refreshProjectSelectors();
+                            alert('✅ 分类已删除！' + (n > 0 ? `该分类下 ${n} 个项目已移至「默认分类」。` : ''));
+                        }).catch(e => {
+                            alert('❌ 删除失败：' + e);
+                        });
                     }).catch(e => {
                         alert('❌ 删除失败：' + e);
                     });
@@ -1667,6 +1694,27 @@
                 t.oncomplete = res; t.onerror = res; t.onabort = res;
             });
             console.log('[分类恢复] 从 localStorage 恢复', localCats.length, '个分类');
+        }
+
+        // 🔴 2026-08-31 幽灵分类自愈：项目记录带着、分类表没有的分类（历史删分类未移项目导致）
+        // 补回分类表并落库 → 主界面分类下拉可见，删不删由用户决定（现在的删除会真把项目移走）
+        async function _healGhostCategories() {
+            try {
+                if (!db) return;
+                const projects = await loadProjectListFromDB();
+                const ghosts = [];
+                (projects || []).forEach(p => {
+                    const c = p && p.category;
+                    if (c && !categories.includes(c) && !ghosts.includes(c)) ghosts.push(c);
+                });
+                if (!ghosts.length) return;
+                ghosts.forEach(c => categories.push(c));
+                window.categories = categories;
+                try { localStorage.setItem('tfjl_categories', JSON.stringify(categories)); } catch (e) {}
+                await saveCategories();
+                console.log('[分类自愈] 补回幽灵分类:', ghosts.join('、'));
+                refreshProjectSelectors();
+            } catch (e) { console.warn('[分类自愈] 失败:', e); }
         }
 
         // 显示项目列表弹窗（点击项目名直接加载）
