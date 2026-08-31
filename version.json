@@ -7,6 +7,6 @@
   "minVersion": "2.0.25",
   "forceUpdate": true,
   "deprecatedMessage": "我们已升级后台数据服务，旧版本无法连接新服务。请更新到最新版后继续使用。",
-  "frontVersion": "s1.0.604",
-  "deployTag": "s20260901-0503"
+  "frontVersion": "s1.0.605",
+  "deployTag": "s20260901-0510"
 }
