@@ -5164,9 +5164,29 @@ if (true) {
         try { localStorage.setItem(GM_CFG_KEY, JSON.stringify(cfg)); } catch (e) {}
     }
     // 获取某窗口的配置（不存在则返回默认值）
+    // 🔴 2026-09-01 v2 迁移：点击组旧格式（顶层 x/y 单点位）自动升级为 points 多点位数组
     function _gmGetWinCfg(title) {
         const cfg = _gmLoadCfg();
-        return cfg.winConfigs[title] || { region: null, speak: true, speakPrefix: '', speakSuffix: '', keyWaves: [] };
+        const wc = cfg.winConfigs[title] || { region: null, speak: true, speakPrefix: '', speakSuffix: '', keyWaves: [] };
+        const hasOld = (wc.waveClicks || []).some(c => c.x != null && !c.points)
+            || (wc.textClicks || []).some(c => c.x != null && !c.points);
+        if (hasOld) {
+            (wc.waveClicks || []).forEach(c => {
+                if (c.x != null && !c.points) {
+                    c.points = [{ x: c.x, y: c.y, times: c.times || 1, gapMs: c.gapMs || 200 }];
+                    delete c.x; delete c.y; delete c.times; delete c.gapMs;
+                }
+            });
+            (wc.textClicks || []).forEach(c => {
+                if (c.x != null && !c.points) {
+                    c.points = [{ x: c.x, y: c.y, times: c.times || 1, gapMs: c.gapMs || 200 }];
+                    delete c.x; delete c.y; delete c.times; delete c.gapMs;
+                }
+            });
+            cfg.winConfigs[title] = wc;
+            _gmSaveCfg(cfg);
+        }
+        return wc;
     }
     // 保存某窗口的配置
     function _gmSaveWinCfg(title, winCfg) {
@@ -5302,8 +5322,8 @@ if (true) {
                         </div>
                         <div id="gmWaveClicks"></div>
                         <div style="color:rgba(255,255,255,0.35);font-size:0.68rem;margin-top:5px;line-height:1.5;">
-                            到达指定波数时，在窗口内指定位置自动点击（上卡/加速/合卡等）。每局都点（新一局自动重置）。<br>
-                            ⚠️ 用真实鼠标点击：窗口需<b style="color:#ff9e80;">可见、不最小化、不被遮挡</b>，多开请平铺不重叠
+                            到达指定波数时，<b style="color:#4dd0e1;">按顺序点击多个位置</b>（每组最多 10 个位置，点完一个等间隔再点下一个）。每局都点（新一局自动重置）。<br>
+                            ⚠️ 用真实鼠标点击：窗口需<b style="color:#ff9e80;">可见、不最小化、不被遮挡</b>，多开请平铺不重叠。配置完点「▶」可当场试点验证
                         </div>
                     </div>
 
@@ -5314,7 +5334,7 @@ if (true) {
                         </div>
                         <div id="gmTextClicks"></div>
                         <div style="color:rgba(255,255,255,0.35);font-size:0.68rem;margin-top:5px;line-height:1.5;">
-                            框选识别区域，OCR 到关键词（如「开始战斗」「再来一局」）→ 自动点击指定位置。冷却防连点。<br>
+                            框选识别区域，OCR 到关键词（如「开始战斗」「再来一局」）→ <b style="color:#ffb74d;">按顺序点击多个位置</b>。冷却防连点。<br>
                             适合：自动开下一局 / 自动点弹窗按钮（配合⑥实现全自动挂机）
                         </div>
                     </div>
@@ -5511,8 +5531,9 @@ if (true) {
         _gmRenderClickGroups(title);
     }
 
-    // ============ 到波自动点击 + 识别文字自动点击（多组配置，2026-09-01）============
-    const GM_MAX_CLICK_GROUPS = 8;
+    // ============ 到波自动点击 + 识别文字自动点击（多组×多点位，2026-09-01 v2）============
+    const GM_MAX_CLICK_GROUPS = 8;    // 每窗口最多组数
+    const GM_MAX_POINTS = 10;         // 每组最多点位数
 
     // 当前配置目标对应的窗口对象（勾选列表里找）
     function _gmFindCfgWin() {
@@ -5528,7 +5549,75 @@ if (true) {
         return png;
     }
 
-    // 渲染当前配置窗口的两组点击配置（⑥到波点击 / ⑦文字点击）
+    // 渲染一个点位行（idx=组号 pi=点位号 kind='wc'|'tc'）
+    function _gmPointRow(kind, idx, pi, pt, maxPoints) {
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;gap:5px;align-items:center;flex-wrap:wrap;padding:3px 4px;background:rgba(0,0,0,0.2);border-radius:5px;margin:2px 0 2px 14px;';
+        const lbl = (txt) => '<span style="color:rgba(255,255,255,0.45);font-size:0.68rem;white-space:nowrap;">' + txt + '</span>';
+        const num = document.createElement('span');
+        num.textContent = ['①','②','③','④','⑤','⑥','⑦','⑧','⑨','⑩'][pi] || (pi + 1);
+        num.style.cssText = 'color:#ffd700;font-size:0.7rem;font-weight:bold;';
+        row.appendChild(num);
+        const hasPos = pt.x != null;
+        const posBtn = document.createElement('button');
+        posBtn.textContent = hasPos ? '✓ (' + (pt.x != null ? pt.x.toFixed(2) + ',' + pt.y.toFixed(2) : '') + ')' : '🎯 选位置';
+        posBtn.style.cssText = 'padding:3px 8px;border-radius:5px;border:1px solid ' + (hasPos ? 'rgba(76,175,80,0.5);background:rgba(76,175,80,0.15);color:#4ade80' : 'rgba(255,255,255,0.2);background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.7)') + ';cursor:pointer;font-size:0.7rem;white-space:nowrap;';
+        posBtn.onclick = () => window['_gmPick' + (kind === 'wc' ? 'WaveClick' : 'TextClick') + 'Pos'](idx, pi);
+        row.appendChild(posBtn);
+        // ▶ 试点：当场真实点一下验证位置（走 gm_click 通用命令，前端驱动）
+        const testBtn = document.createElement('button');
+        testBtn.textContent = '▶';
+        testBtn.title = '试点一下（当场点击验证位置）';
+        testBtn.style.cssText = 'padding:3px 8px;border-radius:5px;border:1px solid rgba(255,215,0,0.5);background:rgba(255,215,0,0.12);color:#ffd700;cursor:pointer;font-size:0.7rem;';
+        testBtn.onclick = () => window.__gmTestClickPoint(kind, idx, pi);
+        row.appendChild(testBtn);
+        row.insertAdjacentHTML('beforeend',
+            lbl('×') + '<input type="number" data-kind="' + kind + '" data-role="pt-times" data-i="' + idx + '" data-p="' + pi + '" value="' + (pt.times || 1) + '" style="width:36px;padding:3px 5px;border-radius:5px;border:1px solid rgba(255,255,255,0.15);background:rgba(0,0,0,0.3);color:#fff;font-size:0.7rem;">'
+            + lbl('次 · 间隔') + '<input type="number" data-kind="' + kind + '" data-role="pt-gap" data-i="' + idx + '" data-p="' + pi + '" value="' + (pt.gapMs || 200) + '" style="width:50px;padding:3px 5px;border-radius:5px;border:1px solid rgba(255,255,255,0.15);background:rgba(0,0,0,0.3);color:#fff;font-size:0.7rem;">' + lbl('ms'));
+        const delBtn = document.createElement('button');
+        delBtn.textContent = '🗑';
+        delBtn.title = '删除这个位置';
+        delBtn.style.cssText = 'padding:3px 7px;border-radius:5px;border:1px solid rgba(244,67,54,0.4);background:rgba(244,67,54,0.12);color:#ff8a80;cursor:pointer;font-size:0.7rem;';
+        delBtn.onclick = () => _gmMutClicks(kind, idx, g => { const arr = _gmClicksOf(g, kind); if (arr[idx]) arr[idx].points.splice(pi, 1); });
+        row.appendChild(delBtn);
+        return row;
+    }
+
+    function _gmClicksOf(g, kind) { return kind === 'wc' ? g.waveClicks : g.textClicks; }
+
+    // 🎯 前端可控的通用点击原语（用户提议的架构）：Rust 只当「点击执行器」，
+    //    点哪里/怎么点/什么顺序全由前端决定——前端逻辑热更新免打包。
+    //    面板「试点击」/未来自定义联动（收到 gm-wave 事件后自行编排）都走这里。
+    window.gmClick = async function (hwnd, x, y, times, gapMs) {
+        return await tauriInvoke('gm_click', { hwnd: hwnd, x: x, y: y, times: times || 1, gapMs: gapMs || 200 });
+    };
+
+    // 「试点」按钮：当场点击该位置验证（前提：已选位置、窗口可见不遮挡）
+    async function _gmTestClickPoint(kind, i, pi) {
+        const win = _gmFindCfgWin();
+        if (!win) { _gmLog('请先勾选游戏窗口', true); return; }
+        const wc = _gmGetWinCfg(_gmCfgTarget);
+        const arr = _gmClicksOf(wc, kind) || [];
+        const pt = arr[i] && arr[i].points && arr[i].points[pi];
+        if (!pt || pt.x == null) { _gmLog('该位置还没选坐标，先点「🎯 选位置」', true); return; }
+        try {
+            await window.gmClick(win.hwnd, pt.x, pt.y, pt.times || 1, pt.gapMs || 200);
+            _gmLog('▶ 已试点：位置 ' + (pi + 1) + '（若没点到目标，检查窗口是否被遮挡）');
+        } catch (e) {
+            _gmLog('试点失败：' + (e.message || e), true);
+        }
+    }
+    window.__gmTestClickPoint = _gmTestClickPoint;
+
+    // 通用组级 mutator
+    function _gmMutClicks(kind, idx, fn) {
+        _gmMutClickGroups(g => {
+            const arr = _gmClicksOf(g, kind);
+            if (arr && arr[idx]) fn(g, arr[idx]);
+        });
+    }
+
+    // 渲染当前配置窗口的两组点击配置（⑥到波点击 / ⑦文字点击），每组内多点位
     function _gmRenderClickGroups(title) {
         const wcEl = document.getElementById('gmWaveClicks');
         const tcEl = document.getElementById('gmTextClicks');
@@ -5539,32 +5628,54 @@ if (true) {
         const wcl = wc.waveClicks || [];
         const tcl = wc.textClicks || [];
 
-        // ---- ⑥ 到波点击组 ----
+        // ---- ⑥ 到波点击组（每组 = 波数 + 多个位置按顺序连点）----
         if (!wcl.length) {
             wcEl.innerHTML = '<div style="color:rgba(255,255,255,0.35);font-size:0.7rem;padding:2px 0;">未添加（点「＋ 添加」新建一组）</div>';
         } else {
             wcEl.innerHTML = '';
             wcl.forEach((c, i) => {
-                const row = document.createElement('div');
-                row.style.cssText = 'display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:6px;background:rgba(0,0,0,0.25);border-radius:6px;margin-bottom:5px;';
-                const lbl = (txt) => '<span style="color:rgba(255,255,255,0.5);font-size:0.7rem;white-space:nowrap;">' + txt + '</span>';
-                const inp = (id, val, w) => '<input type="number" data-role="' + id + '" data-i="' + i + '" value="' + val + '" style="width:' + w + ';padding:4px 6px;border-radius:5px;border:1px solid rgba(255,255,255,0.15);background:rgba(0,0,0,0.3);color:#fff;font-size:0.75rem;">';
-                row.innerHTML = lbl('第') + inp('wc-wave', c.wave || 10, '48px') + lbl('波 → 点击')
-                    + '<button data-role="wc-pos" data-i="' + i + '" style="padding:4px 8px;border-radius:5px;border:1px solid ' + (c.x != null ? 'rgba(76,175,80,0.5);background:rgba(76,175,80,0.15);color:#4ade80' : 'rgba(255,255,255,0.2);background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.7)') + ';cursor:pointer;font-size:0.72rem;white-space:nowrap;">' + (c.x != null ? '✓ 已选位置' : '🎯 选位置') + '</button>'
-                    + lbl('×') + inp('wc-times', c.times || 1, '40px') + lbl('次 · 间隔')
-                    + inp('wc-gap', c.gapMs || 200, '56px') + lbl('ms')
-                    + '<button data-role="wc-del" data-i="' + i + '" title="删除这组" style="padding:4px 8px;border-radius:5px;border:1px solid rgba(244,67,54,0.4);background:rgba(244,67,54,0.12);color:#ff8a80;cursor:pointer;font-size:0.72rem;">🗑</button>';
-                wcEl.appendChild(row);
+                const box = document.createElement('div');
+                box.style.cssText = 'padding:6px;background:rgba(0,0,0,0.25);border-radius:6px;margin-bottom:5px;';
+                const head = document.createElement('div');
+                head.style.cssText = 'display:flex;gap:6px;align-items:center;flex-wrap:wrap;';
+                head.innerHTML = '<span style="color:rgba(255,255,255,0.6);font-size:0.72rem;">第</span>'
+                    + '<input type="number" data-role="wc-wave" data-i="' + i + '" value="' + (c.wave || 10) + '" style="width:48px;padding:4px 6px;border-radius:5px;border:1px solid rgba(255,255,255,0.15);background:rgba(0,0,0,0.3);color:#fff;font-size:0.75rem;">'
+                    + '<span style="color:rgba(255,255,255,0.6);font-size:0.72rem;">波时按顺序点击下列位置</span>';
+                const addPt = document.createElement('button');
+                addPt.textContent = '＋ 位置';
+                addPt.title = '添加一个点击位置（最多 ' + GM_MAX_POINTS + ' 个）';
+                addPt.style.cssText = 'padding:3px 9px;border-radius:5px;border:1px solid rgba(0,188,212,0.5);background:rgba(0,188,212,0.12);color:#4dd0e1;cursor:pointer;font-size:0.7rem;white-space:nowrap;';
+                addPt.onclick = () => _gmMutClicks('wc', i, g => {
+                    if (!g.waveClicks[i].points) g.waveClicks[i].points = [];
+                    if (g.waveClicks[i].points.length >= GM_MAX_POINTS) { _gmLog('每组最多 ' + GM_MAX_POINTS + ' 个位置', true); return; }
+                    g.waveClicks[i].points.push({ x: null, y: null, times: 1, gapMs: 200 });
+                });
+                head.appendChild(addPt);
+                const delG = document.createElement('button');
+                delG.textContent = '🗑 删除组';
+                delG.style.cssText = 'padding:3px 9px;border-radius:5px;border:1px solid rgba(244,67,54,0.4);background:rgba(244,67,54,0.12);color:#ff8a80;cursor:pointer;font-size:0.7rem;margin-left:auto;';
+                delG.onclick = () => _gmMutClickGroups(g => { g.waveClicks.splice(i, 1); });
+                head.appendChild(delG);
+                box.appendChild(head);
+                (c.points || []).forEach((pt, pi) => box.appendChild(_gmPointRow('wc', i, pi, pt)));
+                if (!(c.points || []).length) {
+                    box.insertAdjacentHTML('beforeend', '<div style="color:#ff9e80;font-size:0.68rem;padding:2px 14px;">还没有位置，点「＋ 位置」添加</div>');
+                }
+                wcEl.appendChild(box);
             });
-            // 绑定编辑事件（即时落库；数字用 change 避免输入过程重渲染打断）
-            wcEl.querySelectorAll('[data-role="wc-wave"]').forEach(el => el.onchange = () => _gmMutWaveClick(+el.dataset.i, c => { c.wave = Math.max(1, Math.min(999, parseInt(el.value, 10) || 1)); }));
-            wcEl.querySelectorAll('[data-role="wc-times"]').forEach(el => el.onchange = () => _gmMutWaveClick(+el.dataset.i, c => { c.times = Math.max(1, Math.min(10, parseInt(el.value, 10) || 1)); }));
-            wcEl.querySelectorAll('[data-role="wc-gap"]').forEach(el => el.onchange = () => _gmMutWaveClick(+el.dataset.i, c => { c.gapMs = Math.max(50, Math.min(5000, parseInt(el.value, 10) || 200)); }));
-            wcEl.querySelectorAll('[data-role="wc-pos"]').forEach(el => el.onclick = () => window._gmPickWaveClickPos(+el.dataset.i));
-            wcEl.querySelectorAll('[data-role="wc-del"]').forEach(el => el.onclick = () => {
-                _gmMutClickGroups(g => { g.waveClicks.splice(+el.dataset.i, 1); });
-            });
+            wcEl.querySelectorAll('[data-role="wc-wave"]').forEach(el => el.onchange = () => _gmMutClicks('wc', +el.dataset.i, g => { g.waveClicks[+el.dataset.i].wave = Math.max(1, Math.min(999, parseInt(el.value, 10) || 1)); }));
         }
+        // 点位数字输入（两组共用，按 data-kind 分流）
+        [wcEl, tcEl].forEach(root => {
+            root.querySelectorAll('[data-role="pt-times"]').forEach(el => el.onchange = () => {
+                const k = el.dataset.kind, i = +el.dataset.i, pi = +el.dataset.p;
+                _gmMutClicks(k, i, g => { const arr = _gmClicksOf(g, k); arr[i].points[pi].times = Math.max(1, Math.min(10, parseInt(el.value, 10) || 1)); });
+            });
+            root.querySelectorAll('[data-role="pt-gap"]').forEach(el => el.onchange = () => {
+                const k = el.dataset.kind, i = +el.dataset.i, pi = +el.dataset.p;
+                _gmMutClicks(k, i, g => { const arr = _gmClicksOf(g, k); arr[i].points[pi].gapMs = Math.max(50, Math.min(5000, parseInt(el.value, 10) || 200)); });
+            });
+        });
 
         // ---- ⑦ 文字点击组 ----
         if (!tcl.length) {
@@ -5572,27 +5683,48 @@ if (true) {
         } else {
             tcEl.innerHTML = '';
             tcl.forEach((c, i) => {
-                const row = document.createElement('div');
-                row.style.cssText = 'display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:6px;background:rgba(0,0,0,0.25);border-radius:6px;margin-bottom:5px;';
-                const lbl = (txt) => '<span style="color:rgba(255,255,255,0.5);font-size:0.7rem;white-space:nowrap;">' + txt + '</span>';
+                const box = document.createElement('div');
+                box.style.cssText = 'padding:6px;background:rgba(0,0,0,0.25);border-radius:6px;margin-bottom:5px;';
+                const head = document.createElement('div');
+                head.style.cssText = 'display:flex;gap:5px;align-items:center;flex-wrap:wrap;';
                 const hasRegion = !!(c.region && c.region.w > 0);
-                const hasPos = c.x != null;
-                row.innerHTML = '<button data-role="tc-region" data-i="' + i + '" style="padding:4px 8px;border-radius:5px;border:1px solid ' + (hasRegion ? 'rgba(76,175,80,0.5);background:rgba(76,175,80,0.15);color:#4ade80' : 'rgba(255,255,255,0.2);background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.7)') + ';cursor:pointer;font-size:0.72rem;white-space:nowrap;">' + (hasRegion ? '✓ 已选区域' : '📐 框选区域') + '</button>'
-                    + '<input type="text" data-role="tc-keyword" data-i="' + i + '" value="' + String(c.keyword || '').replace(/"/g, '&quot;') + '" placeholder="识别文字，如：开始战斗" style="width:120px;padding:4px 6px;border-radius:5px;border:1px solid rgba(255,255,255,0.15);background:rgba(0,0,0,0.3);color:#fff;font-size:0.75rem;">'
-                    + '<button data-role="tc-pos" data-i="' + i + '" style="padding:4px 8px;border-radius:5px;border:1px solid ' + (hasPos ? 'rgba(76,175,80,0.5);background:rgba(76,175,80,0.15);color:#4ade80' : 'rgba(255,255,255,0.2);background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.7)') + ';cursor:pointer;font-size:0.72rem;white-space:nowrap;">' + (hasPos ? '✓ 点击位置' : '🎯 选位置') + '</button>'
-                    + lbl('冷却') + '<input type="number" data-role="tc-cd" data-i="' + i + '" value="' + (c.cooldownSec || 3) + '" style="width:44px;padding:4px 6px;border-radius:5px;border:1px solid rgba(255,255,255,0.15);background:rgba(0,0,0,0.3);color:#fff;font-size:0.75rem;">' + lbl('秒')
-                    + '<label style="display:flex;align-items:center;gap:3px;color:rgba(255,255,255,0.55);font-size:0.7rem;cursor:pointer;"><input type="checkbox" data-role="tc-on" data-i="' + i + '"' + (c.enabled !== false ? ' checked' : '') + ' style="accent-color:#ff9800;cursor:pointer;">启用</label>'
-                    + '<button data-role="tc-del" data-i="' + i + '" title="删除这组" style="padding:4px 8px;border-radius:5px;border:1px solid rgba(244,67,54,0.4);background:rgba(244,67,54,0.12);color:#ff8a80;cursor:pointer;font-size:0.72rem;">🗑</button>';
-                tcEl.appendChild(row);
+                box.appendChild(head);
+                head.innerHTML = '<button data-role="tc-region" data-i="' + i + '" style="padding:4px 8px;border-radius:5px;border:1px solid ' + (hasRegion ? 'rgba(76,175,80,0.5);background:rgba(76,175,80,0.15);color:#4ade80' : 'rgba(255,255,255,0.2);background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.7)') + ';cursor:pointer;font-size:0.72rem;white-space:nowrap;">' + (hasRegion ? '✓ 已选区域' : '📐 框选区域') + '</button>'
+                    + '<input type="text" data-role="tc-keyword" data-i="' + i + '" value="' + String(c.keyword || '').replace(/"/g, '&quot;') + '" placeholder="识别文字，如：开始战斗" style="width:118px;padding:4px 6px;border-radius:5px;border:1px solid rgba(255,255,255,0.15);background:rgba(0,0,0,0.3);color:#fff;font-size:0.75rem;">'
+                    + '<span style="color:rgba(255,255,255,0.45);font-size:0.68rem;">→ 点击下列位置</span>';
+                const addPt = document.createElement('button');
+                addPt.textContent = '＋ 位置';
+                addPt.title = '添加一个点击位置（最多 ' + GM_MAX_POINTS + ' 个）';
+                addPt.style.cssText = 'padding:3px 9px;border-radius:5px;border:1px solid rgba(255,152,0,0.5);background:rgba(255,152,0,0.12);color:#ffb74d;cursor:pointer;font-size:0.7rem;white-space:nowrap;';
+                addPt.onclick = () => _gmMutClicks('tc', i, g => {
+                    if (!g.textClicks[i].points) g.textClicks[i].points = [];
+                    if (g.textClicks[i].points.length >= GM_MAX_POINTS) { _gmLog('每组最多 ' + GM_MAX_POINTS + ' 个位置', true); return; }
+                    g.textClicks[i].points.push({ x: null, y: null, times: 1, gapMs: 200 });
+                });
+                head.appendChild(addPt);
+                const tail = document.createElement('span');
+                tail.style.cssText = 'display:flex;gap:4px;align-items:center;margin-left:auto;';
+                tail.innerHTML = '<span style="color:rgba(255,255,255,0.45);font-size:0.68rem;">冷却</span>'
+                    + '<input type="number" data-role="tc-cd" data-i="' + i + '" value="' + (c.cooldownSec || 3) + '" style="width:42px;padding:3px 5px;border-radius:5px;border:1px solid rgba(255,255,255,0.15);background:rgba(0,0,0,0.3);color:#fff;font-size:0.7rem;">'
+                    + '<span style="color:rgba(255,255,255,0.45);font-size:0.68rem;">秒</span>'
+                    + '<label style="display:flex;align-items:center;gap:3px;color:rgba(255,255,255,0.55);font-size:0.7rem;cursor:pointer;"><input type="checkbox" data-role="tc-on" data-i="' + i + '"' + (c.enabled !== false ? ' checked' : '') + ' style="accent-color:#ff9800;cursor:pointer;">启用</label>';
+                head.appendChild(tail);
+                const delG = document.createElement('button');
+                delG.textContent = '🗑';
+                delG.title = '删除这组';
+                delG.style.cssText = 'padding:3px 8px;border-radius:5px;border:1px solid rgba(244,67,54,0.4);background:rgba(244,67,54,0.12);color:#ff8a80;cursor:pointer;font-size:0.7rem;';
+                delG.onclick = () => _gmMutClickGroups(g => { g.textClicks.splice(i, 1); });
+                head.appendChild(delG);
+                (c.points || []).forEach((pt, pi) => box.appendChild(_gmPointRow('tc', i, pi, pt)));
+                if (!(c.points || []).length) {
+                    box.insertAdjacentHTML('beforeend', '<div style="color:#ff9e80;font-size:0.68rem;padding:2px 14px;">还没有位置，点「＋ 位置」添加</div>');
+                }
+                tcEl.appendChild(box);
             });
-            tcEl.querySelectorAll('[data-role="tc-keyword"]').forEach(el => el.onchange = () => _gmMutTextClick(+el.dataset.i, c => { c.keyword = (el.value || '').trim(); }));
-            tcEl.querySelectorAll('[data-role="tc-cd"]').forEach(el => el.onchange = () => _gmMutTextClick(+el.dataset.i, c => { c.cooldownSec = Math.max(1, Math.min(600, parseInt(el.value, 10) || 3)); }));
-            tcEl.querySelectorAll('[data-role="tc-on"]').forEach(el => el.onchange = () => _gmMutTextClick(+el.dataset.i, c => { c.enabled = el.checked; }));
+            tcEl.querySelectorAll('[data-role="tc-keyword"]').forEach(el => el.onchange = () => _gmMutClicks('tc', +el.dataset.i, g => { g.textClicks[+el.dataset.i].keyword = (el.value || '').trim(); }));
+            tcEl.querySelectorAll('[data-role="tc-cd"]').forEach(el => el.onchange = () => _gmMutClicks('tc', +el.dataset.i, g => { g.textClicks[+el.dataset.i].cooldownSec = Math.max(1, Math.min(600, parseInt(el.value, 10) || 3)); }));
+            tcEl.querySelectorAll('[data-role="tc-on"]').forEach(el => el.onchange = () => _gmMutClicks('tc', +el.dataset.i, g => { g.textClicks[+el.dataset.i].enabled = el.checked; }));
             tcEl.querySelectorAll('[data-role="tc-region"]').forEach(el => el.onclick = () => window._gmPickTextClickRegion(+el.dataset.i));
-            tcEl.querySelectorAll('[data-role="tc-pos"]').forEach(el => el.onclick = () => window._gmPickTextClickPos(+el.dataset.i));
-            tcEl.querySelectorAll('[data-role="tc-del"]').forEach(el => el.onclick = () => {
-                _gmMutClickGroups(g => { g.textClicks.splice(+el.dataset.i, 1); });
-            });
         }
     }
 
@@ -5604,15 +5736,13 @@ if (true) {
         _gmSaveWinCfg(_gmCfgTarget, wc);
         _gmRenderClickGroups(_gmCfgTarget);
     }
-    function _gmMutWaveClick(i, fn) { _gmMutClickGroups(g => { if (g.waveClicks && g.waveClicks[i]) fn(g.waveClicks[i]); }); }
-    function _gmMutTextClick(i, fn) { _gmMutClickGroups(g => { if (g.textClicks && g.textClicks[i]) fn(g.textClicks[i]); }); }
 
     window._gmAddWaveClick = function () {
         if (!_gmCfgTarget) return;
         _gmMutClickGroups(g => {
             if (!g.waveClicks) g.waveClicks = [];
             if (g.waveClicks.length >= GM_MAX_CLICK_GROUPS) { _gmLog('最多 ' + GM_MAX_CLICK_GROUPS + ' 组到波点击', true); return; }
-            g.waveClicks.push({ wave: 10, x: null, y: null, times: 1, gapMs: 200 });
+            g.waveClicks.push({ wave: 10, points: [{ x: null, y: null, times: 1, gapMs: 200 }] });
         });
     };
     window._gmAddTextClick = function () {
@@ -5620,19 +5750,19 @@ if (true) {
         _gmMutClickGroups(g => {
             if (!g.textClicks) g.textClicks = [];
             if (g.textClicks.length >= GM_MAX_CLICK_GROUPS) { _gmLog('最多 ' + GM_MAX_CLICK_GROUPS + ' 组文字点击', true); return; }
-            g.textClicks.push({ region: null, keyword: '', x: null, y: null, times: 1, gapMs: 200, cooldownSec: 3, enabled: true });
+            g.textClicks.push({ region: null, keyword: '', points: [{ x: null, y: null, times: 1, gapMs: 200 }], cooldownSec: 3, enabled: true });
         });
     };
 
-    // 点选「到波点击」位置：截整窗图 → 在图上点一下 → 存比例坐标
-    window._gmPickWaveClickPos = async function (i) {
+    // 点选「到波点击」某点位位置：截整窗图 → 图上点一下 → 存比例坐标
+    window._gmPickWaveClickPos = async function (i, pi) {
         const win = _gmFindCfgWin();
         if (!win) { _gmLog('请先勾选游戏窗口', true); return; }
         try {
             const png = await _gmCaptureFullPng(win);
-            _gmShowPointPicker(png, '在图上点击「到波时要自动点击的位置」（如上卡按钮）', (p) => {
-                _gmMutWaveClick(i, c => { c.x = p.x; c.y = p.y; });
-                _gmLog('已保存点击位置（x=' + p.x.toFixed(3) + ' y=' + p.y.toFixed(3) + '）');
+            _gmShowPointPicker(png, '在图上点击「第' + ((i + 1) + '组·到波时要点的位置') + '」（如上卡按钮）', (p) => {
+                _gmMutClicks('wc', i, g => { g.waveClicks[i].points[pi].x = p.x; g.waveClicks[i].points[pi].y = p.y; });
+                _gmLog('已保存位置 ' + (pi + 1) + '（x=' + p.x.toFixed(3) + ' y=' + p.y.toFixed(3) + '）');
             });
         } catch (e) { _gmLog('截图失败：' + (e.message || e), true); }
     };
@@ -5643,20 +5773,20 @@ if (true) {
         try {
             const png = await _gmCaptureFullPng(win);
             _gmShowRegionPicker(png, win, (picked) => {
-                _gmMutTextClick(i, c => { c.region = picked; });
+                _gmMutClicks('tc', i, g => { g.textClicks[i].region = picked; });
                 _gmLog('已保存识别区域（w=' + picked.w.toFixed(3) + ' h=' + picked.h.toFixed(3) + '）');
             }, '在图上拖框圈住要识别的文字（如「开始战斗」按钮文字）');
         } catch (e) { _gmLog('截图失败：' + (e.message || e), true); }
     };
-    // 点选「文字点击」触发后的点击位置
-    window._gmPickTextClickPos = async function (i) {
+    // 点选「文字点击」某点位触发后的点击位置
+    window._gmPickTextClickPos = async function (i, pi) {
         const win = _gmFindCfgWin();
         if (!win) { _gmLog('请先勾选游戏窗口', true); return; }
         try {
             const png = await _gmCaptureFullPng(win);
-            _gmShowPointPicker(png, '在图上点击「识别到文字后要点击的位置」（如开始战斗按钮）', (p) => {
-                _gmMutTextClick(i, c => { c.x = p.x; c.y = p.y; });
-                _gmLog('已保存点击位置（x=' + p.x.toFixed(3) + ' y=' + p.y.toFixed(3) + '）');
+            _gmShowPointPicker(png, '在图上点击「识别到文字后要点' + (pi + 1) + '的位置」（如开始战斗按钮）', (p) => {
+                _gmMutClicks('tc', i, g => { g.textClicks[i].points[pi].x = p.x; g.textClicks[i].points[pi].y = p.y; });
+                _gmLog('已保存位置 ' + (pi + 1) + '（x=' + p.x.toFixed(3) + ' y=' + p.y.toFixed(3) + '）');
             });
         } catch (e) { _gmLog('截图失败：' + (e.message || e), true); }
     };
@@ -5909,17 +6039,24 @@ if (true) {
         // 收集每个勾选窗口的 per-window 配置
         const winConfigs = sel.map(w => {
             const wc = _gmGetWinCfg(w.title);
-            // 到波点击组：过滤掉没选位置/波数非法的组（半成品不上报，避免 Rust 端误点）
+            // 到波点击组：过滤掉没有有效点位的组（半成品不上报，避免 Rust 端误点）
             const waveClicks = (wc.waveClicks || [])
-                .filter(c => (c.wave > 0) && c.x != null && c.y != null)
-                .map(c => ({ wave: Math.round(c.wave), x: c.x, y: c.y, times: c.times || 1, gapMs: c.gapMs || 200 }));
-            // 文字点击组：过滤掉没框区域/没填关键词/没选位置的组
+                .filter(c => (c.wave > 0) && (c.points || []).some(p => p.x != null && p.y != null))
+                .map(c => ({
+                    wave: Math.round(c.wave),
+                    points: (c.points || [])
+                        .filter(p => p.x != null && p.y != null)
+                        .map(p => ({ x: p.x, y: p.y, times: p.times || 1, gapMs: p.gapMs || 200 }))
+                }));
+            // 文字点击组：过滤掉没框区域/没填关键词/没有有效点位的组
             const textClicks = (wc.textClicks || [])
-                .filter(c => c.keyword && c.region && c.region.w > 0 && c.x != null && c.y != null)
+                .filter(c => c.keyword && c.region && c.region.w > 0 && (c.points || []).some(p => p.x != null))
                 .map(c => ({
                     region: [c.region.x, c.region.y, c.region.w, c.region.h],
-                    keyword: c.keyword, x: c.x, y: c.y,
-                    times: c.times || 1, gapMs: c.gapMs || 200,
+                    keyword: c.keyword,
+                    points: (c.points || [])
+                        .filter(p => p.x != null && p.y != null)
+                        .map(p => ({ x: p.x, y: p.y, times: p.times || 1, gapMs: p.gapMs || 200 })),
                     cooldownSec: c.cooldownSec || 3, enabled: c.enabled !== false
                 }));
             return {
@@ -5938,8 +6075,8 @@ if (true) {
         const incomplete = [];
         sel.forEach(w => {
             const wc = _gmGetWinCfg(w.title);
-            const wcBad = (wc.waveClicks || []).filter(c => c.x == null || !(c.wave > 0)).length;
-            const tcBad = (wc.textClicks || []).filter(c => !c.keyword || !c.region || c.region.w <= 0 || c.x == null).length;
+            const wcBad = (wc.waveClicks || []).filter(c => !(c.points || []).some(p => p.x != null) || !(c.wave > 0)).length;
+            const tcBad = (wc.textClicks || []).filter(c => !c.keyword || !c.region || c.region.w <= 0 || !(c.points || []).some(p => p.x != null)).length;
             if (wcBad + tcBad > 0) incomplete.push((w.title.length > 12 ? w.title.slice(0, 12) + '…' : w.title) + '(' + (wcBad + tcBad) + '组)');
         });
         if (incomplete.length) _gmLog('⚠️ 未完成的点击组不会生效（没选位置/没框区域/没填关键词）：' + incomplete.join('、'), true);

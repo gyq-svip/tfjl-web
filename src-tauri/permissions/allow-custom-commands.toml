@@ -182,3 +182,8 @@ commands.allow = ["game_monitor_stop"]
 identifier = "allow-game-monitor-status"
 description = "Allow querying whether the background wave monitor thread is running"
 commands.allow = ["game_monitor_status"]
+
+[[permission]]
+identifier = "allow-gm-click"
+description = "Allow frontend-driven mouse click primitive at a window ratio point (Rust = click executor, frontend decides where/when; also used by panel test-click)"
+commands.allow = ["gm_click"]
