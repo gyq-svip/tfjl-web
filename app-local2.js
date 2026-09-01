@@ -5379,7 +5379,7 @@ if (true) {
                 <div id="gmStatus" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:10px;min-height:48px;max-height:130px;overflow:auto;color:rgba(255,255,255,0.6);font-size:0.72rem;line-height:1.6;">待启动。勾选游戏窗口 → 选择窗口配置 → 框选波数位置 → 开始监控。</div>
 
                 <div style="margin-top:14px;padding:10px;border-radius:8px;border:1px dashed rgba(255,215,0,0.35);background:rgba(255,152,0,0.08);text-align:center;">
-                    <span style="color:#ffd700;font-size:0.78rem;font-weight:bold;">✨ 已支持：到波自动点击 · 识别文字自动点击 · 新局检测 · 托盘暂停播报…（其他功能尽情期待）</span>
+                    <span style="color:#ffd700;font-size:0.78rem;font-weight:bold;">✨ 已支持：到波自动点击 · 识别文字自动点击 · 新局检测 · 托盘暂停播报…</span>
                 </div>
             </div>
         `;
