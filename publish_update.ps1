@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     tfjl one-shot publisher: write updater.json/version.json + push installer + verify signature.
     Prereq: npx tauri build done, english exe copied to repo root, and .\sign.ps1 <englishExe> done.
