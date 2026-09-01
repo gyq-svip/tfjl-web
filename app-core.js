@@ -19415,7 +19415,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             for (const it of items) {
                 if (it.src === 'wall') {
                     const s = window._contribData.shares[it.idx];
-                    rows += '<div style="padding:7px 9px;border-radius:6px;background:rgba(255,255,255,0.04);margin-bottom:6px;font-size:0.76rem;color:#fff;word-break:break-all;line-height:1.4;">'
+                    rows += '<div class="contrib-work-card" style="padding:8px 10px;border-radius:8px;background:rgba(255,255,255,0.05);margin-bottom:6px;font-size:0.76rem;color:#fff;word-break:break-all;line-height:1.4;border:1px solid rgba(255,255,255,0.08);">'
                         + '<div style="margin-bottom:4px;display:flex;gap:6px;align-items:center;"><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml((s.content || '分享脚本').slice(0,40)) + '</span><span style="color:rgba(255,255,255,0.45);font-size:0.68rem;background:rgba(255,255,255,0.08);padding:1px 6px;border-radius:4px;">需求墙</span>' + (s.isEncrypted ? '<span title="密码保护">🔒</span>' : '') + '</div>'
                         + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
                         + '<a href="javascript:void(0)" onclick="contribCopyContent(' + it.idx + ')" style="color:#4fc3f7;text-decoration:none;cursor:pointer;background:rgba(79,195,247,0.1);padding:2px 8px;border-radius:5px;font-size:0.72rem;">📋 复制</a>'
@@ -19430,7 +19430,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                     const delBtn = isOwner ? '<a href="javascript:void(0)" onclick="removeWorkFromMyPage(\'' + w.id + '\')" style="color:#ff6b6b;text-decoration:none;cursor:pointer;background:rgba(255,107,107,0.1);padding:2px 8px;border-radius:5px;font-size:0.72rem;">🗑 删除</a>' : '';
                     const visTag = (w.visibility === 'private') ? '<span style="color:rgba(255,152,0,0.85);font-size:0.66rem;background:rgba(255,152,0,0.1);padding:1px 6px;border-radius:8px;border:1px solid rgba(255,152,0,0.25);">私有</span>' : '<span style="color:rgba(76,175,80,0.85);font-size:0.66rem;background:rgba(76,175,80,0.1);padding:1px 6px;border-radius:8px;border:1px solid rgba(76,175,80,0.25);">公开</span>';
                     const shareBtn = (w.scriptUrl && /^https?:\/\//i.test(w.scriptUrl)) ? '<a href="javascript:void(0)" onclick="shareWorkFromPage(\'' + (w.scriptUrl || '').replace(/'/g, "\\'") + '\',\'' + (w.title || '未命名作品').replace(/'/g, "\\'") + '\')" style="color:#ffd700;text-decoration:none;cursor:pointer;background:rgba(255,215,0,0.12);padding:2px 8px;border-radius:5px;font-size:0.72rem;border:1px solid rgba(255,215,0,0.3);">🔗 分享</a>' : '';
-                    rows += '<div style="padding:7px 9px;border-radius:6px;background:rgba(186,104,200,0.08);margin-bottom:6px;font-size:0.76rem;color:#fff;word-break:break-all;line-height:1.4;">'
+                    rows += '<div class="contrib-work-card" style="padding:8px 10px;border-radius:8px;background:rgba(186,104,200,0.1);margin-bottom:6px;font-size:0.76rem;color:#fff;word-break:break-all;line-height:1.4;border:1px solid rgba(186,104,200,0.2);">'
                         + '<div style="margin-bottom:4px;display:flex;gap:6px;align-items:center;">'
                         + '<span style="color:#ba68c8;">📦</span>'
                         + '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(w.title || '未命名作品') + '</span>'
@@ -19545,22 +19545,33 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             const box = document.getElementById('tabQr');
             if (!box) return;
             const url = 'https://gyq-svip.github.io/tfjl-web/#pu=' + encodeURIComponent(nick);
-            box.innerHTML = '<div style="color:rgba(255,255,255,0.7);font-size:0.8rem;line-height:1.6;padding:6px 0;text-align:center;">📱 扫码或复制链接，分享你的主页：<br><span style="color:#9fb3ff;font-family:Consolas,monospace;font-size:0.68rem;word-break:break-all;">' + escapeHtml(url) + '</span></div>'
-                + '<div id="contribQrCanvas" style="display:flex;justify-content:center;margin:12px 0;"></div>'
-                + '<div style="display:flex;gap:8px;justify-content:center;">'
-                + '<button onclick="navigator.clipboard.writeText(\'' + url + '\');if(typeof showFloatToast===\'function\')showFloatToast(\'🔗 主页链接已复制\')" style="background:rgba(79,195,247,0.15);color:#4fc3f7;border:1px solid rgba(79,195,247,0.35);border-radius:8px;padding:8px 14px;cursor:pointer;font-size:0.78rem;">📋 复制链接</button>'
+            box.innerHTML = '<div style="text-align:center;padding:8px 0 4px;">'
+                + '<div style="color:rgba(255,255,255,0.85);font-size:0.92rem;font-weight:bold;margin-bottom:4px;">📱 扫码访问我的主页</div>'
+                + '<div style="color:rgba(255,255,255,0.55);font-size:0.76rem;line-height:1.5;margin-bottom:10px;">扫码或点链接进入我的全部分享<br>别人可以浏览、导入我的所有公开作品</div>'
+                + '</div>'
+                + '<div style="display:flex;justify-content:center;margin:8px 0;">'
+                + '<div style="padding:12px;background:#fff;border-radius:14px;box-shadow:0 4px 24px rgba(186,104,200,0.3),0 0 0 1px rgba(255,215,0,0.2);">'
+                + '<div id="contribQrCanvas" style="display:flex;justify-content:center;"></div>'
+                + '</div>'
+                + '</div>'
+                + '<div style="margin-top:12px;padding:8px 12px;background:rgba(0,0,0,0.3);border-radius:8px;text-align:center;">'
+                + '<span style="color:#9fb3ff;font-family:Consolas,monospace;font-size:0.66rem;word-break:break-all;">' + escapeHtml(url) + '</span>'
+                + '</div>'
+                + '<div style="display:flex;gap:8px;justify-content:center;margin-top:12px;">'
+                + '<button onclick="navigator.clipboard.writeText(\'' + url + '\');if(typeof showFloatToast===\'function\')showFloatToast(\'🔗 主页链接已复制\')" style="background:linear-gradient(135deg,#4fc3f7,#0288d1);color:#fff;border:none;padding:10px 20px;border-radius:10px;cursor:pointer;font-size:0.82rem;font-weight:bold;box-shadow:0 2px 8px rgba(79,195,247,0.3);">📋 复制主页链接</button>'
                 + '</div>';
             try {
                 if (typeof window.qrcode !== 'function') { box.innerHTML += '<div style="color:#ff9800;font-size:0.72rem;margin-top:8px;text-align:center;">（二维码库未加载，请用上方链接）</div>'; return; }
                 const qr = window.qrcode(0, 'M');
                 qr.addData(url); qr.make();
                 const n = qr.getModuleCount();
-                const size = 180, cell = Math.floor(size / n);
+                const size = 200, cell = Math.floor(size / n);
                 const cvs = document.createElement('canvas');
                 cvs.width = cvs.height = cell * n;
+                cvs.style.borderRadius = '4px';
                 const ctx = cvs.getContext('2d');
                 ctx.fillStyle = '#fff'; ctx.fillRect(0,0,cvs.width,cvs.height);
-                ctx.fillStyle = '#111';
+                ctx.fillStyle = '#1a1a2e';
                 for (let r=0;r<n;r++) for (let c=0;c<n;c++) if (qr.isDark(r,c)) ctx.fillRect(c*cell, r*cell, cell+0.5, cell+0.5);
                 const holder = document.getElementById('contribQrCanvas');
                 if (holder) holder.appendChild(cvs);
@@ -20064,32 +20075,45 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             }).join('');
             const body = document.getElementById('contributionCardBody');
             if (body) body.innerHTML = `
-                <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;background:linear-gradient(135deg,rgba(186,104,200,0.16),rgba(79,195,247,0.12));border-radius:12px;padding:12px;">
-                    <div style="width:54px;height:54px;border-radius:50%;background:linear-gradient(135deg,#ba68c8,#4fc3f7);display:flex;align-items:center;justify-content:center;font-size:1.7rem;font-weight:bold;color:#fff;flex-shrink:0;">${escapeHtml((nick||'?').slice(0,1))}</div>
-                    <div>
-                        <div style="color:#ffd700;font-size:1.25rem;font-weight:bold;">${escapeHtml(nick)}</div>
-                        <div style="color:rgba(255,255,255,0.7);font-size:0.85rem;margin-top:2px;">🎖 ${t.name}</div>
+                <style>
+                    @keyframes contribNickGlow { 0%{background-position:0% 50%;} 50%{background-position:100% 50%;} 100%{background-position:0% 50%;} }
+                    .contrib-nick-glow {
+                        background: linear-gradient(90deg, #ffd700, #ff6b6b, #a78bfa, #60a5fa, #ffd700);
+                        background-size: 300% 100%;
+                        -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+                        animation: contribNickGlow 3s linear infinite;
+                        filter: drop-shadow(0 0 4px rgba(255,215,0,0.5)) drop-shadow(0 0 8px rgba(255,107,107,0.3));
+                    }
+                    .contrib-work-card { transition: all 0.2s ease; }
+                    .contrib-work-card:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(186,104,200,0.25); }
+                </style>
+                <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;background:linear-gradient(135deg,rgba(186,104,200,0.22),rgba(79,195,247,0.16),rgba(255,215,0,0.1));border-radius:14px;padding:16px 18px;border:1px solid rgba(186,104,200,0.3);">
+                    <div style="width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#ba68c8,#4fc3f7);display:flex;align-items:center;justify-content:center;font-size:2rem;font-weight:bold;color:#fff;flex-shrink:0;box-shadow:0 0 16px rgba(186,104,200,0.5),0 4px 12px rgba(0,0,0,0.3);border:2px solid rgba(255,215,0,0.35);">${escapeHtml((nick||'?').slice(0,1))}</div>
+                    <div style="flex:1;min-width:0;">
+                        <div class="contrib-nick-glow" style="font-size:1.4rem;font-weight:bold;">${escapeHtml(nick)}</div>
+                        <div style="color:rgba(255,215,0,0.8);font-size:0.88rem;margin-top:3px;">🎖 ${escapeHtml(t.name)}</div>
                     </div>
+                    <button onclick="switchContribTab('qr')" style="background:linear-gradient(135deg,#5c6bc0,#283593);color:#fff;border:none;padding:8px 14px;border-radius:10px;cursor:pointer;font-size:0.78rem;font-weight:bold;box-shadow:0 2px 8px rgba(92,107,192,0.3);white-space:nowrap;">🔗 分享主页</button>
                 </div>
                 ${renderBadgesHtml(nick, repMap)}
-                <div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:10px 12px;margin-bottom:10px;">
-                    <div style="display:flex;justify-content:space-between;font-size:0.8rem;color:rgba(255,255,255,0.85);"><span>当前声望</span><span style="color:#ffd700;font-weight:bold;">${e.rep}</span></div>
-                    ${t.nextName ? `<div style="margin-top:8px;height:7px;background:rgba(255,255,255,0.1);border-radius:4px;overflow:hidden;"><div style="width:${pct}%;height:100%;background:linear-gradient(90deg,#ffd700,#ff6b6b);"></div></div><div style="font-size:0.7rem;color:rgba(255,255,255,0.5);margin-top:4px;">距「${t.nextName}」还需 ${t.nextRep - e.rep} 声望</div>` : '<div style="font-size:0.75rem;color:rgba(255,215,0,0.7);margin-top:6px;">已达到最高头衔 🏆</div>'}
+                <div style="background:rgba(255,255,255,0.06);border-radius:10px;padding:12px 14px;margin-bottom:12px;border:1px solid rgba(255,215,0,0.15);">
+                    <div style="display:flex;justify-content:space-between;font-size:0.82rem;color:rgba(255,255,255,0.85);margin-bottom:6px;"><span>🎖 当前声望</span><span style="color:#ffd700;font-weight:bold;font-size:0.95rem;">${e.rep}</span></div>
+                    ${t.nextName ? `<div style="height:8px;background:rgba(255,255,255,0.1);border-radius:5px;overflow:hidden;"><div style="width:${pct}%;height:100%;background:linear-gradient(90deg,#ffd700,#ff6b6b,#a78bfa);border-radius:5px;transition:width 0.5s;"></div></div><div style="font-size:0.72rem;color:rgba(255,255,255,0.5);margin-top:5px;">距「${escapeHtml(t.nextName)}」还需 <span style="color:#ffd700;">${t.nextRep - e.rep}</span> 声望</div>` : '<div style="font-size:0.78rem;color:rgba(255,215,0,0.8);margin-top:6px;text-align:center;">🏆 已达到最高头衔</div>'}
                 </div>
-                <div style="display:flex;gap:8px;margin-bottom:12px;">
-                    <div style="flex:1;text-align:center;background:rgba(79,195,247,0.1);border-radius:8px;padding:8px 4px;"><div style="color:#4fc3f7;font-size:1.1rem;font-weight:bold;">${e.shares}</div><div style="font-size:0.68rem;color:rgba(255,255,255,0.6);">分享</div></div>
-                    <div style="flex:1;text-align:center;background:rgba(255,215,0,0.1);border-radius:8px;padding:8px 4px;"><div style="color:#ffd700;font-size:1.1rem;font-weight:bold;">${e.copies}</div><div style="font-size:0.68rem;color:rgba(255,255,255,0.6);">被复制</div></div>
-                    <div style="flex:1;text-align:center;background:rgba(255,193,7,0.1);border-radius:8px;padding:8px 4px;"><div style="color:#ffc107;font-size:1.1rem;font-weight:bold;">${e.downloads}</div><div style="font-size:0.68rem;color:rgba(255,255,255,0.6);">下载</div></div>
-                    <div style="flex:1;text-align:center;background:rgba(255,107,107,0.1);border-radius:8px;padding:8px 4px;"><div style="color:#ff6b6b;font-size:1.1rem;font-weight:bold;">${e.likes}</div><div style="font-size:0.68rem;color:rgba(255,255,255,0.6);">获赞</div></div>
+                <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px;">
+                    <div style="text-align:center;background:linear-gradient(135deg,rgba(79,195,247,0.18),rgba(79,195,247,0.06));border-radius:10px;padding:10px 4px;border:1px solid rgba(79,195,247,0.25);"><div style="color:#4fc3f7;font-size:1.3rem;font-weight:bold;">${e.shares}</div><div style="font-size:0.66rem;color:rgba(255,255,255,0.6);">📤 分享</div></div>
+                    <div style="text-align:center;background:linear-gradient(135deg,rgba(255,215,0,0.18),rgba(255,215,0,0.06));border-radius:10px;padding:10px 4px;border:1px solid rgba(255,215,0,0.25);"><div style="color:#ffd700;font-size:1.3rem;font-weight:bold;">${e.copies}</div><div style="font-size:0.66rem;color:rgba(255,255,255,0.6);">📋 被复制</div></div>
+                    <div style="text-align:center;background:linear-gradient(135deg,rgba(255,193,7,0.18),rgba(255,193,7,0.06));border-radius:10px;padding:10px 4px;border:1px solid rgba(255,193,7,0.25);"><div style="color:#ffc107;font-size:1.3rem;font-weight:bold;">${e.downloads}</div><div style="font-size:0.66rem;color:rgba(255,255,255,0.6);">📥 下载</div></div>
+                    <div style="text-align:center;background:linear-gradient(135deg,rgba(255,107,107,0.18),rgba(255,107,107,0.06));border-radius:10px;padding:10px 4px;border:1px solid rgba(255,107,107,0.25);"><div style="color:#ff6b6b;font-size:1.3rem;font-weight:bold;">${e.likes}</div><div style="font-size:0.66rem;color:rgba(255,255,255,0.6);">👍 获赞</div></div>
                 </div>
                 <div style="display:flex;gap:4px;margin:4px 0 10px;border-bottom:1px solid rgba(255,255,255,0.12);">
-                    <div id="tabBtn_works" onclick="switchContribTab('works')" style="flex:1;text-align:center;padding:9px 0;cursor:pointer;color:#ffd700;border-bottom:2px solid #ffd700;font-size:0.85rem;">📦 作品</div>
-                    <div id="tabBtn_profile" onclick="switchContribTab('profile')" style="flex:1;text-align:center;padding:9px 0;cursor:pointer;color:rgba(255,255,255,0.5);font-size:0.85rem;">📝 资料</div>
-                    <div id="tabBtn_qr" onclick="switchContribTab('qr')" style="flex:1;text-align:center;padding:9px 0;cursor:pointer;color:rgba(255,255,255,0.5);font-size:0.85rem;">🔳 二维码</div>
+                    <div id="tabBtn_works" onclick="switchContribTab('works')" style="flex:1;text-align:center;padding:10px 0;cursor:pointer;color:#ffd700;border-bottom:2px solid #ffd700;font-size:0.85rem;font-weight:bold;">📦 作品</div>
+                    <div id="tabBtn_profile" onclick="switchContribTab('profile')" style="flex:1;text-align:center;padding:10px 0;cursor:pointer;color:rgba(255,255,255,0.5);font-size:0.85rem;font-weight:bold;">📝 资料</div>
+                    <div id="tabBtn_qr" onclick="switchContribTab('qr')" style="flex:1;text-align:center;padding:10px 0;cursor:pointer;color:rgba(255,255,255,0.5);font-size:0.85rem;font-weight:bold;">🔳 二维码</div>
                 </div>
                 <div id="tabWorks">
                     <div id="worksFilter" style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px;"></div>
-                    <div id="worksList" style="max-height:300px;overflow-y:auto;"></div>
+                    <div id="worksList" style="max-height:420px;overflow-y:auto;"></div>
                 </div>
                 <div id="tabProfile" style="display:none;"><div id="contribProfileEdit" style="background:rgba(255,255,255,0.04);border-radius:8px;padding:10px 12px;margin-bottom:12px;"></div></div>
                 <div id="tabQr" style="display:none;"></div>`;
