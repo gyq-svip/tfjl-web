@@ -9115,11 +9115,42 @@
         //   效果：查询从「翻箱倒柜」变成「查目录」1 次请求命中；且纳入总表统一的备份/清理/诊断。
         const SHARE_INDEX_GIST_ID = (window.TFJL_MASTER_GIST_ID) || 'a32a0628bd9275f3a4922cd12cf298c9';
         const SHARE_INDEX_FILE = 'share_index.json';
-        const SHARE_INDEX_TTL = 5 * 60 * 1000;   // 索引本地缓存 5 分钟，避免重复请求
+        const SHARE_INDEX_TTL = 5 * 60 * 1000;            // 内存缓存 5 分钟
+        const SHARE_CACHE_KEY = 'tfjl_share_idx_v1';      // 本地持久化缓存键（混淆存储）
+        const SHARE_INDEX_REFRESH_MS = 4 * 3600 * 1000;   // 本地缓存超过 4 小时 → 后台静默更新
         let _shareIndexCache = null;
 
-        async function _shareIndexLoad(force) {
-            if (!force && _shareIndexCache && (Date.now() - _shareIndexCache.ts) < SHARE_INDEX_TTL) return _shareIndexCache.data;
+        // 🔴 本地缓存做轻量混淆（XOR + base64）：只防「打开 localStorage 一眼看穿别人的分享短码/地址」。
+        //   前端代码跑在用户机器上，做不到真正的加密，别用它存密钥级信息（索引里也不存密码/内容）。
+        function _shareCacheObf(str) {
+            const k = 'TFJL-SHARE-IDX-2026';
+            let out = '';
+            for (let i = 0; i < str.length; i++) out += String.fromCharCode(str.charCodeAt(i) ^ k.charCodeAt(i % k.length));
+            try { return btoa(unescape(encodeURIComponent(out))); } catch (e) { return ''; }
+        }
+        function _shareCacheDeobf(b64) {
+            try {
+                const out = decodeURIComponent(escape(atob(b64)));
+                const k = 'TFJL-SHARE-IDX-2026';
+                let s = '';
+                for (let i = 0; i < out.length; i++) s += String.fromCharCode(out.charCodeAt(i) ^ k.charCodeAt(i % k.length));
+                return s;
+            } catch (e) { return ''; }
+        }
+        function _shareCacheRead() {
+            try {
+                const raw = localStorage.getItem(SHARE_CACHE_KEY);
+                if (!raw) return null;
+                const obj = JSON.parse(_shareCacheDeobf(raw));
+                return (obj && obj.data) ? { data: obj.data, ts: obj.ts || 0 } : null;
+            } catch (e) { return null; }
+        }
+        function _shareCacheWrite(data) {
+            try { localStorage.setItem(SHARE_CACHE_KEY, _shareCacheObf(JSON.stringify({ data: data, ts: Date.now() }))); } catch (e) {}
+        }
+
+        // 从云端拉最新索引 → 写内存 + 写本地缓存
+        async function _shareIndexRefresh() {
             try {
                 const ctrl = new AbortController();
                 const timer = setTimeout(function () { ctrl.abort(); }, 20000);
@@ -9141,11 +9172,39 @@
                     if (raw) { try { data = JSON.parse(raw) || {}; } catch (e) {} }
                 }
                 _shareIndexCache = { data: data, ts: Date.now() };
+                _shareCacheWrite(data);
                 return data;
             } catch (e) {
-                return (_shareIndexCache && _shareIndexCache.data) || {};   // 读不到不阻断：回退翻页
+                const local = _shareCacheRead();
+                return (local && local.data) || (_shareIndexCache && _shareIndexCache.data) || {};
             }
         }
+
+        // 读索引：内存 → 本地缓存（命中立即返回，陈旧则后台刷新）→ 云端
+        // （DNS 缓存思路：先拿本地的应答，同时后台把新的取回来，查询永不被更新阻塞）
+        async function _shareIndexLoad(force) {
+            if (!force && _shareIndexCache && (Date.now() - _shareIndexCache.ts) < SHARE_INDEX_TTL) return _shareIndexCache.data;
+            if (!force) {
+                const local = _shareCacheRead();
+                if (local && local.data) {
+                    _shareIndexCache = { data: local.data, ts: local.ts };
+                    if (Date.now() - local.ts > SHARE_INDEX_REFRESH_MS) setTimeout(function () { _shareIndexRefresh(); }, 50);
+                    return local.data;
+                }
+            }
+            return await _shareIndexRefresh();
+        }
+
+        // 启动 6 秒后 + 每 4 小时：后台静默更新本地缓存，让查询长期接近「本地命中」
+        async function _shareIndexAutoRefresh() {
+            try {
+                const local = _shareCacheRead();
+                if (local && (Date.now() - local.ts) < SHARE_INDEX_REFRESH_MS) return;
+                await _shareIndexRefresh();
+            } catch (e) {}
+        }
+        setTimeout(function () { _shareIndexAutoRefresh(); }, 6000);
+        setInterval(function () { _shareIndexAutoRefresh(); }, SHARE_INDEX_REFRESH_MS);
 
         // 写索引：读-改-写 + 3 次重试（多人同时分享时 PATCH 可能互相覆盖）；顺带剔除过期 30 天以上的条目控制体积
         async function _shareIndexPut(code, entry) {
@@ -9173,6 +9232,7 @@
                     } finally { clearTimeout(timer); }
                     if (res && res.ok) {
                         _shareIndexCache = { data: data, ts: Date.now() };
+                        _shareCacheWrite(data);
                         return true;
                     }
                 } catch (e) { /* 继续重试 */ }
