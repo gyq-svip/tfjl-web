@@ -633,15 +633,16 @@
     }catch(e){ return null; }
   }
 
-  // 取图像中心区域特征：中心 62% 裁剪 → 64×64 → 遮四角（边框/等级/魔化）→ 4×4 分块 RGB 均值（48维）
+  // 取图像特征：等比 cover（取最小边中心方、不拉伸→消除竖卡/方图几何差异）→ 64×64
+  // 再跳外圈只留中心立绘区（避开边框/卡名条/左下等级/右下魔化）→ 4×4 分块 RGB 均值（48维）
   function extractCardFeature(src, size){
     const sw = src.naturalWidth||src.width, sh = src.naturalHeight||src.height;
     if(!sw || !sh) return null;
+    const side = Math.round(Math.min(sw, sh) * 0.9); // 中心 90% 方形，去掉最外边框
+    const sx = Math.round((sw - side)/2), sy = Math.round((sh - side)/2);
     const cv = document.createElement('canvas'); cv.width=size; cv.height=size;
     const ctx = cv.getContext('2d');
-    const cw = Math.round(sw*0.62), ch = Math.round(sh*0.62);
-    const sx = Math.round((sw-cw)/2), sy = Math.round((sh-ch)/2);
-    ctx.drawImage(src, sx, sy, cw, ch, 0, 0, size, size);
+    try{ ctx.drawImage(src, sx, sy, side, side, 0, 0, size, size); }catch(e){ return null; } // 等比 cover，不拉伸
     let data;
     try{ data = ctx.getImageData(0,0,size,size).data; }catch(e){ return null; } // 跨域污染时返回 null
     const grid=4, cell=size/grid, feat=[];
@@ -650,7 +651,7 @@
       for(let y=Math.floor(gy*cell); y<Math.floor((gy+1)*cell); y++){
         for(let x=Math.floor(gx*cell); x<Math.floor((gx+1)*cell); x++){
           const fx=x/size, fy=y/size;
-          if((fx<0.18||fx>0.82) && (fy<0.18||fy>0.82)) continue; // 跳过四角（边框/数字/魔化）
+          if(fx<0.15||fx>0.85||fy<0.15||fy>0.85) continue; // 跳外圈（边框/卡名条/等级/魔化）
           const i=(y*size+x)*4;
           r+=data[i]; g+=data[i+1]; b+=data[i+2]; n++;
         }
@@ -728,21 +729,17 @@
     })();
     return _skinTplBuilding;
   }
-  // 单卡匹配：优先同品质池，距离过大或池太小则全池兜底
+  // 单卡匹配：全池算 top3（跨品质，供诊断）；同时优先同品质最近者作为判定
   function matchCard(feature, preferQ){
-    if(!_skinTpls || !_skinTpls.length) return {hero:null, skin:null, dist:Infinity, quality:null};
-    let pool = _skinTpls, usedQ = null;
-    if(preferQ && _skinTplByQ && _skinTplByQ[preferQ] && _skinTplByQ[preferQ].length>3){
-      pool = _skinTplByQ[preferQ]; usedQ = preferQ;
+    if(!_skinTpls || !_skinTpls.length) return {hero:null, skin:null, dist:Infinity, quality:null, top3:[]};
+    const all = _skinTpls.map(t=>({t, d:featDist(feature,t.feat)})).sort((a,b)=>a.d-b.d);
+    let best = all[0], usedQ = null;
+    if(preferQ && _skinTplByQ[preferQ] && _skinTplByQ[preferQ].length>3){
+      const inQ = _skinTplByQ[preferQ].map(t=>({t, d:featDist(feature,t.feat)})).sort((a,b)=>a.d-b.d);
+      if(inQ[0] && inQ[0].d <= all[0].d*1.15){ best = inQ[0]; usedQ = preferQ; } // 同品质足够近则优先
     }
-    let best=null, bestD=Infinity;
-    for(const t of pool){ const d=featDist(feature,t.feat); if(d<bestD){ bestD=d; best=t; } }
-    if(preferQ && (bestD>210 || !best)){
-      let bd=Infinity, bt=null;
-      for(const t of _skinTpls){ const d=featDist(feature,t.feat); if(d<bd){ bd=d; bt=t; } }
-      if(bt && bd<bestD){ best=bt; bestD=bd; usedQ=null; }
-    }
-    return { hero: best?best.hero:null, skin: best?best.skinName:null, dist: bestD, quality: usedQ };
+    const top3 = all.slice(0,3).map(o=>({hero:o.t.hero, skin:o.t.skinName, dist:Math.round(o.d)}));
+    return { hero: best.t.hero, skin: best.t.skinName, dist: best.d, quality: usedQ, top3 };
   }
 
   // 本地学习修正：用户识别错了可手动指定正确英雄，把该卡特征存本地；下次优先匹配
@@ -827,9 +824,9 @@
       else if(feat){
         const q = sampleBgQuality(cell);
         const m = matchCard(feat, q);
-        hero=m.hero; skin=m.skin; dist=m.dist; quality=q;
+        hero=m.hero; skin=m.skin; dist=m.dist; quality=q; source='skin'; top3=m.top3;
       }
-      results.push({ idx: r*cols+c+1, hero, skin, dist, quality, source,
+      results.push({ idx: r*cols+c+1, hero, skin, dist, quality, source, top3,
         feat, box:{x0:x,y0:y,x1:x+w,y1:y+h, cx:x+w/2, cy:y+h/2, w, h} });
     }
     drawBoxes($('recCanvas'), img, results.map(rr=>({idx:rr.idx, box:rr.box, hero:rr.hero, valid:{ok:!!rr.hero}})));
@@ -1117,7 +1114,7 @@
             tr.innerHTML=`<td style="padding:4px;color:#90a4ae;">${r.idx}</td>`
               +`<td style="padding:4px;">图像</td>`
               +`<td style="padding:4px;font-weight:600;color:#fff;">${r.hero||'?'}</td>`
-              +`<td style="padding:4px;">${r.hero?('<span style="color:#2e7d32;font-weight:600;">✓ 像 '+escapeHtml(r.skin||'')+'</span>'+(r.quality?' <span style="color:#90caf9;">'+r.quality+'</span>':'')+(r.source==='local'?' <span style="color:#ffb74d;">[本地]</span>':'')):'<span style="color:#c62828;">✗ 未匹配</span>'}</td>`
+              +`<td style="padding:4px;">${r.hero?('<span style="color:#2e7d32;font-weight:600;">✓ 像 '+escapeHtml(r.skin||'')+'</span>'+(r.quality?' <span style="color:#90caf9;">'+r.quality+'</span>':'')+(r.source==='local'?' <span style="color:#ffb74d;">[本地]</span>':'')+(r.top3&&r.top3.length>1?'<br><span style="color:#b0bec5;font-size:0.68rem;">备选: '+r.top3.slice(1).map(t=>escapeHtml(t.hero)+'('+t.dist+')').join('、')+'</span>':'')):'<span style="color:#c62828;">✗ 未匹配</span>'}</td>`
               +`<td style="padding:4px;"><button data-fix="${r.idx}" title="纠正为正确英雄" style="background:rgba(255,193,7,0.22);color:#ffd54f;border:none;border-radius:6px;cursor:pointer;padding:2px 8px;font-size:0.72rem;">✏️ 修正</button></td>`
               +`<td style="padding:4px;"><button data-del="${r.idx}" title="删除这张" style="background:rgba(244,67,54,0.25);color:#ff8a80;border:none;border-radius:6px;cursor:pointer;padding:2px 8px;font-size:0.72rem;">✕ 删</button></td>`;
             tb.appendChild(tr);
