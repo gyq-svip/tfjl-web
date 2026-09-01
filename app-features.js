@@ -9250,6 +9250,9 @@
                 const idx = await _shareIndexLoad();
                 const hit = idx && idx[code];
                 if (hit && hit.id) {
+                    // 管理员删除过的分享：直接判失效。保留 del 记录（而非从索引移除）正是为了
+                    // 让它命中索引后立刻报错，不会退化成翻页、把已删的分享又翻出来。
+                    if (hit.del) throw new Error('⏰ 这份分享已被移除或已过期，请联系分享者重新分享');
                     if (hit.exp && Date.now() > hit.exp) throw new Error('⏰ 这份项目分享已过期，请联系分享者重新分享');
                     return await _projShareFetchById(hit.id);
                 }
@@ -9281,6 +9284,78 @@
             }
             throw new Error('没有找到短码 ' + code + ' 的项目分享（可能已删除或输错了）');
         }
+
+        // ==================== 管理员：分享管理（查看全部 / 删除） ====================
+        // 索引条目字段：{ id: 项目Gist, n: 项目名, by: 分享者, exp: 过期时间戳(0=永久), ts: 分享时间, del: 1=已删除 }
+        // 索引只存「地址 + 元信息」，不含任何项目内容和密码，管理员看到的是分享台账而非用户数据本身。
+        async function adminLoadShareManager() {
+            const box = document.getElementById('adminShareManagerBody');
+            if (!box) return;
+            box.innerHTML = '<div style="color:rgba(255,255,255,0.5);font-size:0.8rem;">⏳ 正在读取分享索引…</div>';
+            let idx = {};
+            try { idx = await _shareIndexLoad(true); } catch (e) {
+                box.innerHTML = '<div style="color:#ff8a80;font-size:0.8rem;">❌ 读取失败：' + ((e && e.message) || e) + '</div>';
+                return;
+            }
+            const now = Date.now();
+            const codes = Object.keys(idx || {});
+            if (!codes.length) {
+                box.innerHTML = '<div style="color:rgba(255,255,255,0.5);font-size:0.8rem;">暂无分享记录（之后新分享会自动登记到这里）</div>';
+                return;
+            }
+            let alive = 0, expired = 0, deleted = 0;
+            const fmt = function (t) {
+                if (!t) return '—';
+                try {
+                    const d = new Date(t);
+                    return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+                } catch (e) { return '—'; }
+            };
+            const rows = codes.map(function (code) {
+                const it = idx[code] || {};
+                const isDel = !!it.del;
+                const isExp = !isDel && it.exp && now > it.exp;
+                if (isDel) deleted++; else if (isExp) expired++; else alive++;
+                const st = isDel ? '<span style="color:#ff8a80;">已删除</span>'
+                    : (isExp ? '<span style="color:#ffb74d;">已过期</span>' : '<span style="color:#81c784;">有效</span>');
+                const name = String(it.n || '').replace(/</g, '&lt;') || '（未命名）';
+                const by = String(it.by || '').replace(/</g, '&lt;') || '匿名';
+                return '<div style="display:flex;align-items:center;gap:8px;padding:7px 9px;background:rgba(255,255,255,0.04);border-radius:7px;margin-bottom:5px;font-size:0.76rem;flex-wrap:wrap;">'
+                    + '<span style="color:#ffd700;font-family:Consolas,monospace;font-weight:bold;letter-spacing:1px;">' + code + '</span>'
+                    + '<span style="color:#fff;flex:1;min-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + name + '</span>'
+                    + '<span style="color:rgba(255,255,255,0.6);">👤 ' + by + '</span>'
+                    + '<span style="color:rgba(255,255,255,0.45);">分享 ' + fmt(it.ts) + '</span>'
+                    + '<span style="color:rgba(255,255,255,0.45);">⏰ ' + (it.exp ? fmt(it.exp) : '永久') + '</span>'
+                    + st
+                    + (isDel ? '' : '<button onclick="adminDeleteShare(\'' + code + '\')" style="background:rgba(244,67,54,0.15);color:#ff8a80;border:1px solid rgba(244,67,54,0.35);border-radius:6px;padding:3px 9px;cursor:pointer;font-size:0.72rem;">🗑 删除</button>')
+                    + '</div>';
+            }).join('');
+            box.innerHTML =
+                '<div style="color:rgba(255,255,255,0.6);font-size:0.75rem;margin-bottom:8px;line-height:1.6;">'
+                + '共 ' + codes.length + ' 条 · 有效 <b style="color:#81c784;">' + alive + '</b> · 过期 <b style="color:#ffb74d;">' + expired + '</b> · 已删除 <b style="color:#ff8a80;">' + deleted + '</b><br>'
+                + '<span style="color:rgba(255,255,255,0.35);">索引只存短码/项目名/分享者/时间/地址，不含项目内容与密码；删除后对方拉取直接提示「已失效」，不会再去翻页查找。</span>'
+                + '</div>' + rows;
+        }
+        window.adminLoadShareManager = adminLoadShareManager;
+
+        // 删除分享 = 软删除（保留条目并标记 del=1）：既留下审计信息（谁分享的、何时），
+        // 又保证查询命中索引即判失效，不会退化成翻页把已删分享翻出来。
+        async function adminDeleteShare(code) {
+            if (!code) return;
+            if (!window.confirm('确定删除分享「' + code + '」？\n\n删除后，对方用这个短码拉取会提示「已失效」。\n（记录会保留在列表中，标记为已删除）')) return;
+            try {
+                const idx = await _shareIndexLoad(true);
+                if (!idx[code]) { if (typeof showToast === 'function') showToast('索引中已无该分享', 'info'); return; }
+                idx[code].del = 1;
+                idx[code].delTs = Date.now();
+                const ok = await _shareIndexPut(code, idx[code]);
+                if (typeof showToast === 'function') showToast(ok ? ('✅ 已删除分享 ' + code) : '⚠️ 删除失败，请重试', ok ? 'success' : 'error');
+                await adminLoadShareManager();
+            } catch (e) {
+                if (typeof showToast === 'function') showToast('❌ 删除失败：' + ((e && e.message) || e), 'error');
+            }
+        }
+        window.adminDeleteShare = adminDeleteShare;
 
         // 拉取到的项目 → 复用「恢复项目」同款导入弹窗（选名称+分类 → 新建/覆盖同名 → 落库不串当前项目）
         function _projShareImportBody(body) {

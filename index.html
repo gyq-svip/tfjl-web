@@ -1556,6 +1556,10 @@
                         <span class="mi-emoji">🛠️</span>
                         <div class="mi-text"><div class="mi-title">管理员工具箱</div><div class="mi-sub">定向通知 / 拉黑 / 重启</div></div>
                     </div>
+                    <div class="admin-menu-item" onclick="adminShowPage('shares')">
+                        <span class="mi-emoji">📤</span>
+                        <div class="mi-text"><div class="mi-title">分享管理</div><div class="mi-sub">短码/分享者/删除</div></div>
+                    </div>
 
                 </div>
                 <button class="admin-btn" onclick="logoutToLogin()" style="width:100%;margin-top:10px;background:linear-gradient(135deg,#ef4444,#dc2626);color:white;">🔙 退出登录</button>
@@ -1872,6 +1876,15 @@
                         </div>
                     </div>
                 </div>
+            </div>
+
+            <div id="adminPageShares" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
+                    <button class="admin-btn admin-btn-secondary" onclick="adminShowMenu()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
+                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">📤 分享管理</h3>
+                    <button class="admin-btn" onclick="adminLoadShareManager()" style="padding:6px 12px;font-size:0.8rem;margin-left:auto;">🔄 刷新</button>
+                </div>
+                <div id="adminShareManagerBody" style="max-height:70vh;overflow-y:auto;font-size:0.8rem;">加载中…</div>
             </div>
 
             <div id="adminPageCacheManage" style="display:none;">
