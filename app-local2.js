@@ -5299,6 +5299,15 @@ if (true) {
                     <div id="gmWindowHint" style="color:rgba(255,255,255,0.35);font-size:0.68rem;margin-top:4px;">多窗口时播报自动加「N号窗」前缀区分（1号窗 = 列表第 1 个）。找不到微信小程序窗口时勾「深度扫描」再刷新</div>
                 </div>
 
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
+                    <label style="color:rgba(255,255,255,0.75);font-size:0.82rem;">点击方式</label>
+                    <select id="gmClickModeSel" onchange="window._gmSetClickMode(this.value)" style="background:rgba(0,0,0,0.4);color:#fff;border:1px solid rgba(255,152,0,0.4);border-radius:6px;padding:5px 10px;font-size:0.78rem;cursor:pointer;">
+                        <option value="real">真实鼠标（窗口需可见前台，最兼容）</option>
+                        <option value="bg">后台消息（可遮挡/后台/多开同点，部分程序无效）</option>
+                    </select>
+                    <span style="color:rgba(255,255,255,0.4);font-size:0.7rem;">多开同玩建议选「后台消息」</span>
+                </div>
+
                 <div id="gmCfgPanel" style="margin-bottom:12px;border-top:1px solid rgba(255,255,255,0.1);padding-top:12px;">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
                         <label style="color:rgba(255,255,255,0.75);font-size:0.82rem;">② 选择配置窗口</label>
@@ -5480,6 +5489,8 @@ if (true) {
         if (hint) hint.textContent = '共 ' + wins.length + ' 个窗口，多窗口时播报自动加「N号窗」前缀区分（1号窗 = 列表第 1 个）';
         _gmLog('已检测到 ' + wins.length + ' 个可监控窗口');
         _gmPopulateCfgSelect();
+        const cmSel = document.getElementById('gmClickModeSel');
+        if (cmSel) cmSel.value = (_gmLoadCfg().clickMode) || 'real';
     }
 
     // 收集勾选的窗口（按列表顺序，编号即 Rust 端播报里的「N号窗」）
@@ -5579,9 +5590,12 @@ if (true) {
 
     // 🎯 前端可控的通用点击原语（用户提议的架构）：Rust 只当「点击执行器」，
     //    点哪里/怎么点/什么顺序全由前端决定——前端逻辑热更新免打包。
-    window.gmClick = async function (hwnd, x, y, times, gapMs) {
-        return await tauriInvoke('gm_click', { hwnd: hwnd, x: x, y: y, times: times || 1, gapMs: gapMs || 200 });
+    window.gmClick = async function (hwnd, x, y, times, gapMs, mode) {
+        return await tauriInvoke('gm_click', { hwnd: hwnd, x: x, y: y, times: times || 1, gapMs: gapMs || 200, mode: mode || 'real' });
     };
+    // 全局点击方式（多开同操作时一处设置即可）：real=真实鼠标 / bg=后台消息
+    window._gmClickMode = function () { const c = _gmLoadCfg(); return (c && c.clickMode) || 'real'; };
+    window._gmSetClickMode = function (v) { const c = _gmLoadCfg(); c.clickMode = v; _gmSaveCfg(c); };
 
     // 修改当前配置窗口（mutator 直接改 winCfg 后落库并重渲染）
     function _gmMutWinCfg(mutator) {
@@ -5644,7 +5658,7 @@ if (true) {
         const act = wc.rules && wc.rules[ri] && wc.rules[ri].actions[ai];
         if (!act || act.x == null) { _gmLog('该步骤还没选位置，先点「🎯 选位置」', true); return; }
         try {
-            await window.gmClick(win.hwnd, act.x, act.y, act.times || 1, act.gapMs || 200);
+            await window.gmClick(win.hwnd, act.x, act.y, act.times || 1, act.gapMs || 200, _gmClickMode());
             _gmLog('▶ 已试点：第 ' + (ai + 1) + ' 步（若没点到目标，检查窗口是否被遮挡）');
         } catch (e) {
             _gmLog('试点失败：' + (e.message || e), true);
@@ -5669,7 +5683,7 @@ if (true) {
             if (act.type === 'click') {
                 if (act.x == null) { _gmLog('  第 ' + (ai + 1) + ' 步还没选位置，已跳过', true); continue; }
                 try {
-                    await window.gmClick(win.hwnd, act.x, act.y, act.times || 1, act.gapMs || 200);
+                    await window.gmClick(win.hwnd, act.x, act.y, act.times || 1, act.gapMs || 200, _gmClickMode());
                     _gmLog('  ✔ 第 ' + (ai + 1) + ' 步点击完成');
                 } catch (e) {
                     _gmLog('  ✘ 第 ' + (ai + 1) + ' 步点击失败：' + ((e && e.message) || e), true);
@@ -6177,7 +6191,8 @@ if (true) {
                 speakPrefix: wc.speakPrefix || '',
                 speakSuffix: wc.speakSuffix || '',
                 keyWaves: wc.keyWaves || [],
-                rules: rules
+                rules: rules,
+                clickMode: _gmClickMode()
             };
         });
         // 半成品规则提醒（不阻断启动，但明确告知哪些规则没生效）
