@@ -545,7 +545,8 @@
   }
 
   function drawBoxes(canvas, img, results){
-    canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
+    const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+    canvas.width = iw; canvas.height = ih;
     const ctx = canvas.getContext('2d');
     ctx.drawImage(img,0,0);
     ctx.lineWidth = Math.max(2, canvas.width/600);
@@ -564,6 +565,203 @@
       ? '<span style="color:#f9a825;font-weight:600;">⚠ 4字·对</span>'
       : '<span style="color:#2e7d32;font-weight:600;">✓ 对</span>';
     return '<span style="color:#c62828;font-weight:600;">✗ '+v.reason+'</span>';
+  }
+
+  // ====================== 图像识别（皮肤比对） ======================
+  // 思路：413 张皮肤每张都是独立模板，每张游戏卡去跟所有模板比，最像哪个模板 → 该模板所属英雄。
+  // 按用户技巧优化：游戏卡背景金色=金卡、紫色=紫卡…，先取背景色判品质，只跟同品质皮肤比，比较量大降。
+  // 英雄品质映射（与 app-core.js 完整分类一致；皮肤无品质字段，靠英雄名映射）。
+  const HERO_QUALITY = {
+    // 金
+    '战将':'金','刀客':'金','霸王':'金','狂龙':'金','亡将':'金','领主':'金','孤星':'金','狂将':'金','龙拳':'金','鱼人':'金',
+    '小丑':'金','女妖':'金','雷神':'金','谜云':'金','女王':'金','沙皇':'金','龟相':'金','阿翼':'金','火神':'金','凤凰':'金','冰鸟':'金',
+    '蛇女':'金','炸弹':'金','虎弓':'金','毒王':'金','后羿':'金','船长':'金','爱神':'金','小炮':'金',
+    '恶魔':'金','幽灵':'金','神龙':'金','龙王':'金','钟馗':'金',
+    '咕咕':'金','小野':'金','圣骑':'金','鲛女':'金','天使':'金',
+    '影':'金','魇':'金','葵':'金','傀':'金','邪':'金','大圣':'金',
+    '萌萌':'金','水灵':'金','火灵':'金','风灵':'金',
+    '火炮':'金','宝库':'金','射线':'金','咬人娃娃':'金','潜艇':'金',
+    // 金精灵
+    '光精灵':'金','木精灵':'金','魔精灵':'金','魂精灵':'金','幻精灵':'金','彩精灵':'金',
+    // 紫
+    '铁骑':'紫','剑客':'紫','斧客':'紫','恶匪':'紫','钢鬃':'紫',
+    '电法':'紫','冰法':'紫','飞机':'紫','炎魔':'紫',
+    '海妖':'紫','骨弓':'紫','火枪':'紫','松鼠':'紫',
+    '悟空':'紫','冰骑':'紫',
+    '巫医':'紫','死神':'紫','工匠':'紫','地精':'紫','萨满':'紫','酋长':'紫','猫咪':'紫',
+    '闪':'紫','土灵':'紫',
+    // 紫精灵
+    '冰精灵':'紫','雷精灵':'紫','暗精灵':'紫','土精灵':'紫',
+    // 蓝
+    '刺客':'蓝','暗法':'蓝','绿弓':'蓝','蜘蛛':'蓝','骨龙':'蓝','大树':'蓝',
+    // 绿
+    '神龛':'绿','石头':'绿','火法':'绿','冰弓':'绿','祭司':'绿','小鹿':'绿'
+  };
+
+  let _skinTpls = null;            // [{hero, skinName, feat, quality}]
+  let _skinTplByQ = null;          // {金:[], 紫:[], 蓝:[], 绿:[]}
+  let _skinTplBuilding = null;     // Promise（防重复构建）
+
+  // 字节 → blob: URL（Tauri 用 fs 读 .skin 二进制时转换）
+  function _bytesToBlobUrlX(b, path){
+    let arr;
+    if(b instanceof Uint8Array) arr=b;
+    else if(b && b.data && Array.isArray(b.data)) arr=new Uint8Array(b.data);
+    else if(b instanceof ArrayBuffer) arr=new Uint8Array(b);
+    else if(Array.isArray(b)) arr=new Uint8Array(b);
+    else return null;
+    if(arr.length===0) return null;
+    const ext=(path.split('.').pop()||'png').toLowerCase();
+    const mime={png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',gif:'image/gif',webp:'image/webp',bmp:'image/bmp',skin:'image/png'}[ext]||'image/png';
+    return URL.createObjectURL(new Blob([arr], {type:mime}));
+  }
+  // 加载单张皮肤图为 Image（网页版 fetch→blob 避免 canvas 污染；Tauri 读本地 .skin）
+  async function loadSkinImg(skin){
+    if(skin._img) return skin._img;
+    let url = null;
+    if(skin.url && !isTauri()){
+      try{ const r = await fetch(skin.url, {cache:'no-cache'}); if(r.ok){ url = URL.createObjectURL(await r.blob()); } }catch(e){}
+      if(!url) url = skin.url;
+    } else if(skin.path && isTauri()){
+      try{ url = await tauriInvoke('read_image_base64', { filePath: skin.path }); }catch(e){}
+      if(!url){ try{ const b = await tauriInvoke('plugin:fs|read_file', { path: skin.path }); url = _bytesToBlobUrlX(b, skin.path); }catch(e){} }
+    }
+    if(!url) return null;
+    try{
+      const img = await new Promise((res,rej)=>{ const im=new Image(); im.onload=()=>res(im); im.onerror=()=>rej(new Error('img load fail')); im.src=url; });
+      skin._img = img; return img;
+    }catch(e){ return null; }
+  }
+
+  // 取图像中心区域特征：中心 62% 裁剪 → 64×64 → 遮四角（边框/等级/魔化）→ 4×4 分块 RGB 均值（48维）
+  function extractCardFeature(src, size){
+    const sw = src.naturalWidth||src.width, sh = src.naturalHeight||src.height;
+    if(!sw || !sh) return null;
+    const cv = document.createElement('canvas'); cv.width=size; cv.height=size;
+    const ctx = cv.getContext('2d');
+    const cw = Math.round(sw*0.62), ch = Math.round(sh*0.62);
+    const sx = Math.round((sw-cw)/2), sy = Math.round((sh-ch)/2);
+    ctx.drawImage(src, sx, sy, cw, ch, 0, 0, size, size);
+    let data;
+    try{ data = ctx.getImageData(0,0,size,size).data; }catch(e){ return null; } // 跨域污染时返回 null
+    const grid=4, cell=size/grid, feat=[];
+    for(let gy=0; gy<grid; gy++) for(let gx=0; gx<grid; gx++){
+      let r=0,g=0,b=0,n=0;
+      for(let y=Math.floor(gy*cell); y<Math.floor((gy+1)*cell); y++){
+        for(let x=Math.floor(gx*cell); x<Math.floor((gx+1)*cell); x++){
+          const fx=x/size, fy=y/size;
+          if((fx<0.18||fx>0.82) && (fy<0.18||fy>0.82)) continue; // 跳过四角（边框/数字/魔化）
+          const i=(y*size+x)*4;
+          r+=data[i]; g+=data[i+1]; b+=data[i+2]; n++;
+        }
+      }
+      if(n===0){ feat.push(0,0,0); continue; }
+      feat.push(r/n, g/n, b/n);
+    }
+    return feat;
+  }
+  function featDist(a, b){
+    let s=0;
+    for(let i=0;i<a.length;i++){ const d=a[i]-b[i]; s+=d*d; }
+    return Math.sqrt(s);
+  }
+  // 取游戏卡背景品质（采样四角，避开中心头像）：金/紫/蓝/绿/白/null
+  function sampleBgQuality(img){
+    const size=24; const cv=document.createElement('canvas'); cv.width=size; cv.height=size;
+    const ctx=cv.getContext('2d');
+    try{ ctx.drawImage(img,0,0,size,size); }catch(e){ return null; }
+    let data; try{ data=ctx.getImageData(0,0,size,size).data; }catch(e){ return null; }
+    const pts=[[2,2],[size-3,2],[2,size-3],[size-3,size-3],[2,12],[size-3,12]];
+    let rs=0,gs=0,bs=0,n=0;
+    for(const [x,y] of pts){
+      for(let dy=-2;dy<=2;dy++) for(let dx=-2;dx<=2;dx++){
+        const px=Math.min(size-1,Math.max(0,x+dx)), py=Math.min(size-1,Math.max(0,y+dy));
+        const i=(py*size+px)*4; rs+=data[i]; gs+=data[i+1]; bs+=data[i+2]; n++;
+      }
+    }
+    rs/=n; gs/=n; bs/=n;
+    const mx=Math.max(rs,gs,bs), mn=Math.min(rs,gs,bs);
+    if(mx<70) return '白';
+    if(bs>=rs && bs>=gs && bs>mx*0.45) return '蓝';
+    if(gs>=rs && gs>=bs && gs>mx*0.45) return '绿';
+    if(rs>=gs && rs>=bs && gs>mn*1.3) return '金';
+    if((rs>=gs*0.8) && (rs>=bs) && (bs>gs)) return '紫';
+    if(rs>bs && rs>gs) return '金';
+    if(bs>rs && bs>gs) return '紫';
+    return null;
+  }
+
+  // 构建模板库（首次较慢，结果缓存）。skinRegistry 来自 app-local.js(本地) 或 skins-web.js(远程)。
+  function buildSkinTpls(){
+    if(_skinTpls) return Promise.resolve(_skinTpls);
+    if(_skinTplBuilding) return _skinTplBuilding;
+    _skinTplBuilding = (async ()=>{
+      const reg = window.skinRegistry || {};
+      const tpls = [];
+      for(const hero of Object.keys(reg)){
+        const skins = reg[hero] || [];
+        for(const sk of skins){
+          try{
+            const im = await loadSkinImg(sk);
+            if(!im) continue;
+            const feat = extractCardFeature(im, 64);
+            if(!feat) continue;
+            tpls.push({ hero, skinName: sk.name, feat, quality: HERO_QUALITY[hero]||'金' });
+          }catch(e){}
+        }
+      }
+      _skinTpls = tpls;
+      _skinTplByQ = { 金:[], 紫:[], 蓝:[], 绿:[], 白:[] };
+      for(const t of tpls){ (_skinTplByQ[t.quality] || (_skinTplByQ[t.quality]=[])).push(t); }
+      return tpls;
+    })();
+    return _skinTplBuilding;
+  }
+  // 单卡匹配：优先同品质池，距离过大或池太小则全池兜底
+  function matchCard(feature, preferQ){
+    if(!_skinTpls || !_skinTpls.length) return {hero:null, skin:null, dist:Infinity, quality:null};
+    let pool = _skinTpls, usedQ = null;
+    if(preferQ && _skinTplByQ && _skinTplByQ[preferQ] && _skinTplByQ[preferQ].length>3){
+      pool = _skinTplByQ[preferQ]; usedQ = preferQ;
+    }
+    let best=null, bestD=Infinity;
+    for(const t of pool){ const d=featDist(feature,t.feat); if(d<bestD){ bestD=d; best=t; } }
+    if(preferQ && (bestD>210 || !best)){
+      let bd=Infinity, bt=null;
+      for(const t of _skinTpls){ const d=featDist(feature,t.feat); if(d<bd){ bd=d; bt=t; } }
+      if(bt && bd<bestD){ best=bt; bestD=bd; usedQ=null; }
+    }
+    return { hero: best?best.hero:null, skin: best?best.skinName:null, dist: bestD, quality: usedQ };
+  }
+
+  // 从大图裁剪一格（返回 canvas，供 extractCardFeature 用）
+  function cropCell(img, x, y, w, h){
+    const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+    cv.getContext('2d').drawImage(img, x, y, w, h, 0, 0, w, h);
+    return cv;
+  }
+  // 图像识别主流程：2×5 切格 → 每格特征+品质 → 匹配 → 结果
+  async function recognizeImageBySkin(img, statusEl, onDone){
+    if(typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('阵容图像识别');
+    if(!img){ alert('请先粘贴/选择/截图一张阵容图'); return; }
+    statusEl.textContent = '构建皮肤模板库…';
+    const tpls = await buildSkinTpls();
+    if(!tpls || !tpls.length){ alert('皮肤模板库为空（请先在设置里同步皮肤），图像识别不可用'); return; }
+    const W=img.naturalWidth||img.width, H=img.naturalHeight||img.height;
+    if(!W || !H){ alert('图片尺寸无效'); return; }
+    const rows=2, cols=5;
+    const results=[];
+    for(let r=0;r<rows;r++) for(let c=0;c<cols;c++){
+      const x=Math.round(c*W/cols), y=Math.round(r*H/rows), w=Math.round(W/cols), h=Math.round(H/rows);
+      const cell = cropCell(img, x, y, w, h);
+      const feat = extractCardFeature(cell, 64);
+      const q = sampleBgQuality(cell);
+      const m = feat ? matchCard(feat, q) : {hero:null,skin:null,dist:Infinity,quality:q};
+      results.push({ idx: r*cols+c+1, hero:m.hero, skin:m.skin, dist:m.dist, quality:q,
+        box:{x0:x,y0:y,x1:x+w,y1:y+h, cx:x+w/2, cy:y+h/2, w, h} });
+    }
+    drawBoxes($('recCanvas'), img, results.map(rr=>({idx:rr.idx, box:rr.box, hero:rr.hero, valid:{ok:!!rr.hero}})));
+    onDone(results, '图像识别(皮肤比对)', rows);
   }
 
   // ====================== 自定义弹窗（替代 window.prompt/confirm，Tauri 下原生 prompt 不工作） ======================
@@ -666,12 +864,14 @@
               <input type="file" id="recFile" accept="image/*" style="display:none;">
               <button id="recPickFile" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.28);color:#fff;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:0.8rem;">📁 选择阵容图片</button>
               <button id="recGameCapture" style="background:linear-gradient(135deg,#ff7043,#bf360c);color:#fff;border:none;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600;" title="自动找到游戏窗口→截取整窗画面→立刻识别，不用手动截图" data-tip="一键识别游戏画面：自动检测游戏窗口并截图识别（仅桌面 APP，全程只读不动游戏）">🎮 一键识别游戏画面</button>
+              <button id="recFrameBtn" style="background:linear-gradient(135deg,#ab47bc,#6a1b9a);color:#fff;border:none;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600;" title="自动找游戏窗口→截整窗→你拖框圈住阵容区域→软件按框精准截图并识别" data-tip="框选阵容区域：截游戏整窗后由你拖框圈住阵容位置，软件按框精准截图识别，避免手动截图尺寸偏差（仅桌面 APP）">📐 框选阵容区域</button>
               <span id="recFileName" style="font-size:0.78rem;color:#90a4ae;">未选择阵容图片</span>
               <span style="font-size:0.75rem;color:#90a4ae;">｜也可直接 Ctrl+V 粘贴截图</span>
             </div>
             <canvas id="recCanvas" style="width:100%;max-height:46vh;background:#000;border-radius:8px;display:block;"></canvas>
             <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
-              <button id="recAuto" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;border:none;padding:9px 14px;border-radius:8px;cursor:pointer;font-weight:600;">⚡ 自动识别(无需对齐)</button>
+              <button id="recAuto" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;border:none;padding:9px 14px;border-radius:8px;cursor:pointer;font-weight:600;">⚡ 文字识别(无需对齐)</button>
+              <button id="recImgBtn" style="background:linear-gradient(135deg,#7e57c2,#4527a0);color:#fff;border:none;padding:9px 14px;border-radius:8px;cursor:pointer;font-weight:600;" title="用现有皮肤图跟 10 张卡逐张比对，最像哪个皮肤就判哪个英雄（支持直接贴图/选择图/框选区域）">🖼️ 图像识别</button>
               <button id="recFill" style="background:linear-gradient(135deg,#42a5f5,#1565c0);color:#fff;border:none;padding:9px 14px;border-radius:8px;cursor:pointer;">➡ 填入脚本生成</button>
               <button id="recImportHand" style="background:linear-gradient(135deg,#66bb6a,#2e7d32);color:#fff;border:none;padding:9px 14px;border-radius:8px;cursor:pointer;font-weight:600;">🃏 导入到手牌</button>
               <button id="recLaunch" style="background:linear-gradient(135deg,#ff9800,#e65100);color:#fff;border:none;padding:9px 14px;border-radius:8px;cursor:pointer;font-weight:600;" title="关掉 Umi-OCR 后，点此重新打开它">🚀 启动识别引擎</button>
@@ -689,6 +889,7 @@
               <div style="margin-bottom:4px;"><b style="color:#fff;">③ 用结果（任选其一，或都用）</b>：</div>
               <div style="padding-left:14px;margin-bottom:2px;">• 「➡ 填入脚本生成」→ 直接生成上阵脚本；</div>
               <div style="padding-left:14px;margin-bottom:8px;">• 「🃏 导入到手牌」→ 放进阵容手牌（可选我的/队友、指定项目）。</div>
+              <div style="margin-bottom:4px;"><b style="color:#fff;">④ 🖼️ 图像识别（不依赖 OCR）</b>：先确认已<b>同步皮肤</b>（皮肤系统正常显示即可），粘贴/选择/框选一张阵容图后点紫色「🖼️ 图像识别」——软件把 10 张卡逐张跟皮肤库比对，最像哪个皮肤就判哪个英雄。比文字识别更准，且<b>不用装 Umi-OCR</b>。也可点「📐 框选阵容区域」自动截游戏窗口并让你拖框圈定阵容位置。</div>
               <div style="color:#9fb3c8;">识别错/多出来的行，点该行「✕ 删」去掉再使用即可。</div>
               <div style="margin-top:10px;padding-top:9px;border-top:1px dashed rgba(255,255,255,0.18);color:#ffb74d;">
                 ⏳ <b>第一次打开会自动安装识别引擎，稍慢一些，仅此一次</b>；每台电脑性能不同，快慢有差异，请耐心等待，装好后以后打开就快了。
@@ -828,6 +1029,98 @@
       });
     }
     $('recAuto').onclick = runAuto;
+
+    // ====================== 🖼️ 图像识别（皮肤比对） ======================
+    function runImgAuto(){
+      if(!currentImg){ alert('请先粘贴/选择/截图一张阵容图（或点「📐 框选阵容区域」）'); return; }
+      recognizeImageBySkin(currentImg, $('recStatus'), (results, source, rowCount)=>{
+        $('recSrc').textContent = '来源: '+source;
+        const intro=$('recIntro'); if(intro && results && results.length) intro.style.display='none';
+        const tb=$('recBody'); tb.innerHTML='';
+        results.forEach(r=>{
+          r._deleted=false;
+          const tr=document.createElement('tr'); tr.style.borderTop='1px solid #333';
+          tr.innerHTML=`<td style="padding:4px;color:#90a4ae;">${r.idx}</td>`
+            +`<td style="padding:4px;">图像</td>`
+            +`<td style="padding:4px;font-weight:600;color:#fff;">${r.hero||'?'}</td>`
+            +`<td style="padding:4px;">${r.hero?('<span style="color:#2e7d32;font-weight:600;">✓ 像 '+escapeHtml(r.skin||'')+'</span>'+(r.quality?' <span style="color:#90caf9;">'+r.quality+'</span>':'')):'<span style="color:#c62828;">✗ 未匹配</span>'}</td>`
+            +`<td style="padding:4px;"><button data-del="${r.idx}" title="删除这张" style="background:rgba(244,67,54,0.25);color:#ff8a80;border:none;border-radius:6px;cursor:pointer;padding:2px 8px;font-size:0.72rem;">✕ 删</button></td>`;
+          tb.appendChild(tr);
+        });
+        tb.querySelectorAll('button[data-del]').forEach(b=>{ b.onclick=()=>{ const id=+b.getAttribute('data-del'); const r=results.find(x=>x.idx===id); if(r) r._deleted=true; const tr=b.closest('tr'); if(tr){ tr.style.opacity='0.35'; tr.style.textDecoration='line-through'; } updateRecWarn(results); renderRecDr(results); }; });
+        overlay._results = results; updateRecWarn(results);
+        $('recStatus').textContent = `识别完成：${results.filter(rr=>rr.hero).length}/${results.length} 张匹配到英雄（${rowCount} 行）`;
+        renderRecDr(results);
+      });
+    }
+    $('recImgBtn').onclick = runImgAuto;
+
+    // 📐 框选阵容区域 → 截整窗 → 拖框 → 按框精准裁剪 → 图像识别
+    const recFrameBtn = $('recFrameBtn');
+    if(recFrameBtn){
+      if(!isTauri()) recFrameBtn.style.display='none';
+      recFrameBtn.onclick = async ()=>{
+        if(typeof window.__recordFeatureUse==='function') window.__recordFeatureUse('框选阵容区域');
+        const old=recFrameBtn.textContent; recFrameBtn.disabled=true; recFrameBtn.textContent='⏳ 截图中…';
+        try{
+          const wins = await tauriInvoke('find_game_windows') || [];
+          if(!wins.length) throw new Error('未检测到游戏窗口，请先打开游戏/模拟器再试');
+          let win=null, lastTitle=null;
+          try{ lastTitle=(JSON.parse(localStorage.getItem('tfjl_game_monitor_cfg')||'{}')||{}).winTitle||null; }catch(_){}
+          if(lastTitle) win=wins.find(w=>w.title&&w.title.includes(lastTitle))||null;
+          if(!win && wins.length===1) win=wins[0];
+          if(!win){
+            win = await new Promise(resolve=>{ recChoice({ title:'🎮 选择游戏窗口', desc:'检测到 '+wins.length+' 个可截图窗口，选一个：', maxHeight:'70vh', items: wins.map((w,i)=>({label:(i+1)+'. '+(w.title.length>34?w.title.slice(0,34)+'…':w.title), value:String(i)})), onPick:v=>resolve(wins[parseInt(v,10)]), onCancel:()=>resolve(null) }); });
+            if(!win) return;
+          }
+          const bmpB64 = await tauriInvoke('capture_window_region', { hwnd: win.hwnd, x:0, y:0, w:10, h:10, full:true });
+          if(!bmpB64) throw new Error('截图失败（窗口可能已关闭/最小化）');
+          showLineupRegionPicker(bmpB64, (picked, img)=>{
+            const W=img.naturalWidth, H=img.naturalHeight;
+            const x=Math.round(picked.x*W), y=Math.round(picked.y*H), w=Math.round(picked.w*W), h=Math.round(picked.h*H);
+            const cropped = cropCell(img, x, y, w, h);
+            currentImg = cropped;
+            const c=$('recCanvas'); c.width=cropped.width; c.height=cropped.height; c.getContext('2d').drawImage(cropped,0,0);
+            const n=$('recFileName'); if(n){ n.textContent='已框选阵容区域'; n.style.color='#ffab91'; }
+            $('recStatus').textContent='已截取并框选，开始图像识别…';
+            runImgAuto();
+          });
+        }catch(e){
+          const msg=(e&&e.message)?e.message:(typeof e==='string'?e:'未知错误');
+          recToast('❌ 框选失败：'+msg); $('recStatus').textContent='截图失败';
+        }finally{ recFrameBtn.disabled=false; recFrameBtn.textContent=old; }
+      };
+    }
+
+    // 框选 UI（拖框 → 比例坐标 + 整窗 img）
+    function showLineupRegionPicker(pngB64, cb){
+      const old=document.getElementById('recRegionPicker'); if(old) old.remove();
+      const modal=document.createElement('div'); modal.id='recRegionPicker';
+      modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:20000;display:flex;justify-content:center;align-items:center;';
+      const box=document.createElement('div'); box.style.cssText='background:#16213e;border-radius:12px;padding:16px;max-width:95vw;max-height:92vh;display:flex;flex-direction:column;gap:10px;';
+      const tip=document.createElement('div'); tip.style.cssText='color:#ffd700;font-size:0.9rem;font-weight:bold;text-align:center;';
+      tip.textContent='在游戏截图上拖动鼠标，框住整组阵容（10 张卡）的大致区域';
+      const wrap=document.createElement('div'); wrap.style.cssText='position:relative;overflow:auto;max-height:70vh;cursor:crosshair;background:#000;border-radius:8px;';
+      const img=document.createElement('img'); img.src='data:image/png;base64,'+pngB64; img.style.cssText='max-width:100%;display:block;user-select:none;-webkit-user-drag:none;';
+      wrap.appendChild(img);
+      const rect=document.createElement('div'); rect.style.cssText='position:absolute;border:2px solid #ffd700;background:rgba(255,215,0,0.15);display:none;pointer-events:none;';
+      wrap.appendChild(rect);
+      let sx=0,sy=0,dragging=false,picked=null;
+      const posOf=(e)=>{ const r=img.getBoundingClientRect(); return {x:(e.clientX-r.left)*(img.naturalWidth/r.width), y:(e.clientY-r.top)*(img.naturalHeight/r.height)}; };
+      wrap.addEventListener('mousedown',(e)=>{ if(e.button!==0) return; e.preventDefault(); const p=posOf(e); sx=p.x; sy=p.y; dragging=true; rect.style.display='block'; });
+      wrap.addEventListener('mousemove',(e)=>{ if(!dragging) return; const p=posOf(e); const x0=Math.min(sx,p.x),y0=Math.min(sy,p.y),w=Math.abs(p.x-sx),h=Math.abs(p.y-sy); const r=img.getBoundingClientRect(); rect.style.left=(x0*r.width/img.naturalWidth)+'px'; rect.style.top=(y0*r.height/img.naturalHeight)+'px'; rect.style.width=(w*r.width/img.naturalWidth)+'px'; rect.style.height=(h*r.height/img.naturalHeight)+'px'; });
+      wrap.addEventListener('mouseup',(e)=>{ if(!dragging) return; dragging=false; const p=posOf(e); const x0=Math.min(sx,p.x),y0=Math.min(sy,p.y),w=Math.abs(p.x-sx),h=Math.abs(p.y-sy); if(w<20||h<20){ rect.style.display='none'; picked=null; return; } picked={x:x0/img.naturalWidth,y:y0/img.naturalHeight,w:w/img.naturalWidth,h:h/img.naturalHeight}; });
+      const btnRow=document.createElement('div'); btnRow.style.cssText='display:flex;gap:10px;justify-content:center;';
+      const okBtn=document.createElement('button'); okBtn.textContent='✓ 截图并识别'; okBtn.style.cssText='background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;border:none;padding:9px 22px;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:bold;';
+      okBtn.onclick=()=>{ if(!picked){ tip.textContent='请先框住阵容区域'; tip.style.color='#ff9e80'; return; } cb(picked, img); modal.remove(); };
+      const retryBtn=document.createElement('button'); retryBtn.textContent='🔄 重新截图'; retryBtn.style.cssText='background:rgba(255,255,255,0.1);color:#fff;border:1px solid rgba(255,255,255,0.2);padding:9px 16px;border-radius:8px;cursor:pointer;font-size:0.8rem;';
+      retryBtn.onclick=()=>{ modal.remove(); recFrameBtn.click(); };
+      const cancelBtn=document.createElement('button'); cancelBtn.textContent='取消'; cancelBtn.style.cssText='background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.6);border:none;padding:9px 16px;border-radius:8px;cursor:pointer;font-size:0.8rem;';
+      cancelBtn.onclick=()=>modal.remove();
+      btnRow.appendChild(okBtn); btnRow.appendChild(retryBtn); btnRow.appendChild(cancelBtn);
+      box.appendChild(tip); box.appendChild(wrap); box.appendChild(btnRow);
+      modal.appendChild(box); document.body.appendChild(modal);
+    }
 
     // ====================== 🎮 一键识别游戏画面（功能10，搭游戏监控截图底座） ======================
     // 链路：find_game_windows 找游戏窗口（优先复用波数监控记住的窗口）→ capture_window_region
@@ -1139,4 +1432,7 @@
 
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', buildUI);
   else buildUI();
+
+  // 调试/测试钩子：暴露图像识别核心函数，便于本地验证（不影响正常使用）
+  window.__recImg = { buildSkinTpls, recognizeImageBySkin, extractCardFeature, sampleBgQuality, matchCard, loadSkinImg, HERO_QUALITY };
 })();
