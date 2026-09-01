@@ -5304,6 +5304,7 @@ if (true) {
                     <select id="gmClickModeSel" onchange="window._gmSetClickMode(this.value)" style="background:rgba(0,0,0,0.4);color:#fff;border:1px solid rgba(255,152,0,0.4);border-radius:6px;padding:5px 10px;font-size:0.78rem;cursor:pointer;">
                         <option value="real">真实鼠标（窗口需可见前台，最兼容）</option>
                         <option value="bg">后台消息（可遮挡/后台/多开同点，部分程序无效）</option>
+                        <option value="adb">adb（安卓模拟器·无视遮挡，MuMu 推荐）</option>
                     </select>
                     <span style="color:rgba(255,255,255,0.4);font-size:0.7rem;">多开同玩建议选「后台消息」</span>
                 </div>
