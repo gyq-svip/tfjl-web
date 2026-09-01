@@ -300,6 +300,8 @@ static FLASH_ON: AtomicBool = AtomicBool::new(false);
 // 世代计数用于「重启监控」——旧线程不必被强杀，发现世代不匹配即自然退出，避免双线程同时播报。
 static GM_RUN: AtomicBool = AtomicBool::new(false);
 static GM_GEN: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+// 托盘右键「暂停/恢复播报」全局静音开关（只停 TTS，监控/自动点击照常跑）
+static GM_MUTE: AtomicBool = AtomicBool::new(false);
 
 /// 退出时关闭本助手拉起的 Umi-OCR 进程树（/t 同时杀掉其 Paddle 引擎等子进程）
 #[allow(unused_variables)]
@@ -1499,9 +1501,12 @@ pub struct GameWindowInfo {
 }
 
 /// 枚举本机可见的普通窗口（模拟器/游戏窗口），返回 [{hwnd, title}]
-/// 过滤：可见 + 有标题 + 非工具窗口 + 客户区 ≥ 300x200 + 非本助手进程的窗口
+/// 普通模式过滤：可见 + 有标题 + 非工具窗口 + 客户区 ≥ 300x200 + 非本助手进程的窗口
+/// 深度扫描（deep=true，2026-09-01 新增）：放宽过滤——含工具窗口、无标题窗口（显示「(无标题)」）、
+///   尺寸门槛降到 ≥150x120。用于新版微信小程序等非常规窗口找不到的场景：
+///   新版微信的小程序窗口常带工具窗口样式/特殊父属关系，普通枚举被过滤掉。
 #[tauri::command]
-fn find_game_windows() -> Result<Vec<GameWindowInfo>, String> {
+fn find_game_windows(deep: Option<bool>) -> Result<Vec<GameWindowInfo>, String> {
     #[cfg(windows)]
     {
         use winapi::shared::windef::{HWND, RECT};
@@ -1509,25 +1514,33 @@ fn find_game_windows() -> Result<Vec<GameWindowInfo>, String> {
             EnumWindows, GetWindowTextLengthW, GetWindowTextW, GetWindowRect, GetWindowThreadProcessId,
             IsWindowVisible, GetWindowLongW, WS_EX_TOOLWINDOW, GWL_EXSTYLE,
         };
+        let deep = deep.unwrap_or(false);
 
         struct Ctx {
             items: Vec<GameWindowInfo>,
             self_pid: u32,
+            deep: bool,
         }
         unsafe extern "system" fn cb(hwnd: HWND, lparam: isize) -> i32 {
             let ctx = &mut *(lparam as *mut Ctx);
             if IsWindowVisible(hwnd) == 0 {
                 return 1;
             }
-            // 排除工具窗口（悬浮球/输入法条等）
+            // 普通模式排除工具窗口（悬浮球/输入法条等）；深度模式保留（微信小程序可能是工具窗样式）
             let ex_style = GetWindowLongW(hwnd, GWL_EXSTYLE);
-            if (ex_style as u32 & WS_EX_TOOLWINDOW) != 0 {
+            if !ctx.deep && (ex_style as u32 & WS_EX_TOOLWINDOW) != 0 {
                 return 1;
             }
             let len = GetWindowTextLengthW(hwnd);
-            if len <= 0 {
+            let title: String = if len > 0 {
+                let mut buf = vec![0u16; (len + 1) as usize];
+                GetWindowTextW(hwnd, buf.as_mut_ptr(), len + 1);
+                String::from_utf16_lossy(&buf[..len as usize])
+            } else if ctx.deep {
+                "(无标题)".to_string() // 深度模式收无标题窗（微信小程序可能无标题）
+            } else {
                 return 1;
-            }
+            };
             // 排除本助手自己进程的窗口（用户要选的是游戏窗口，不是助手）
             let mut pid: u32 = 0;
             GetWindowThreadProcessId(hwnd, &mut pid);
@@ -1539,20 +1552,19 @@ fn find_game_windows() -> Result<Vec<GameWindowInfo>, String> {
                 return 1;
             }
             let (w, h) = (rect.right - rect.left, rect.bottom - rect.top);
-            if w < 300 || h < 200 {
+            // 深度模式门槛放宽到 150x120（小程序窗/竖屏窗），普通模式 300x200
+            let (mw, mh) = if ctx.deep { (150, 120) } else { (300, 200) };
+            if w < mw || h < mh {
                 return 1;
             }
-            let mut buf = vec![0u16; (len + 1) as usize];
-            GetWindowTextW(hwnd, buf.as_mut_ptr(), len + 1);
-            let title = String::from_utf16_lossy(&buf[..len as usize]);
-            if title.trim().is_empty() {
+            if title.trim().is_empty() && !ctx.deep {
                 return 1;
             }
             ctx.items.push(GameWindowInfo { hwnd: hwnd as usize, title });
             1
         }
 
-        let mut ctx = Ctx { items: Vec::new(), self_pid: std::process::id() };
+        let mut ctx = Ctx { items: Vec::new(), self_pid: std::process::id(), deep };
         unsafe {
             EnumWindows(Some(cb), &mut ctx as *mut Ctx as isize);
         }
@@ -1562,6 +1574,7 @@ fn find_game_windows() -> Result<Vec<GameWindowInfo>, String> {
     }
     #[cfg(not(windows))]
     {
+        let _ = deep;
         Ok(Vec::new())
     }
 }
@@ -1735,6 +1748,113 @@ struct GmWin {
     speak_prefix: String,  // 播报前缀，如「马上到」→「马上到第12波」
     speak_suffix: String,  // 播报后缀，如「了，请注意上卡」→「第12波了，请注意上卡」
     key_waves: Vec<u32>,   // 关键波数（空 = 每波都播；非空 = 命中才播，防连播噪音）
+    // 🔴 2026-09-01 新增：到波自动点击（多组）+ 文字识别触发点击（多组）。
+    // serde(default)：旧版前端下发的 cfg 无这两个字段也能正常启动（纯播报模式不受影响）。
+    #[serde(default)]
+    wave_clicks: Vec<GmWaveClick>,
+    #[serde(default)]
+    text_clicks: Vec<GmTextClick>,
+}
+
+/// 到波自动点击（一组）：到达/跨越触发波数时，在窗口内比例位置模拟鼠标点击
+#[derive(serde::Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct GmWaveClick {
+    wave: u32,        // 触发波数（到达或跨越该波即点；新一局自动重置后每局都会点）
+    x: f64,           // 点击位置（窗口整窗比例坐标 0..1，与框选截图同一坐标系）
+    y: f64,
+    #[serde(default = "gm_d_one")]
+    times: u32,       // 点击次数（连点）
+    #[serde(default = "gm_d_gap")]
+    gap_ms: u64,       // 连点间隔（毫秒）
+}
+
+/// 文字识别触发点击（一组）：指定区域 OCR 识别到关键词 → 点击指定位置
+#[derive(serde::Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct GmTextClick {
+    region: [f64; 4], // 识别区域（比例坐标）
+    keyword: String,  // 关键词（包含匹配，去空格后比对，兼容 OCR 分词断开）
+    x: f64,           // 点击位置（比例坐标）
+    y: f64,
+    #[serde(default = "gm_d_one")]
+    times: u32,
+    #[serde(default = "gm_d_gap")]
+    gap_ms: u64,
+    #[serde(default = "gm_d_cd")]
+    cooldown_sec: u64, // 触发后冷却（秒）：防止按钮还没消失时连续误点
+    #[serde(default = "gm_d_true")]
+    enabled: bool,
+}
+
+fn gm_d_one() -> u32 { 1 }
+fn gm_d_gap() -> u64 { 200 }
+fn gm_d_cd() -> u64 { 3 }
+fn gm_d_true() -> bool { true }
+
+/// 当前 Unix 毫秒（文字点击冷却计时用）
+fn gm_now_ms() -> u128 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0)
+}
+
+/// 屏幕绝对坐标模拟鼠标左键点击（真实点击：会移动用户鼠标）
+/// ⚠️ 前提：目标窗口可见、未最小化、未被其他窗口遮挡（多开请平铺不重叠）。
+/// 用 mouse_event（user32 老牌 API，Win11 仍完整支持，模拟器/小游戏全兼容）。
+fn gm_click_at(x: i32, y: i32, times: u32, gap_ms: u64) {
+    #[cfg(windows)]
+    {
+        use winapi::um::winuser::{SetCursorPos, mouse_event, MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP};
+        let times = times.clamp(1, 10);
+        for n in 0..times {
+            unsafe {
+                SetCursorPos(x, y);
+                mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
+                std::thread::sleep(std::time::Duration::from_millis(40)); // 按住时长，游戏普遍识别
+                mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
+            }
+            if n + 1 < times {
+                std::thread::sleep(std::time::Duration::from_millis(gap_ms.max(50)));
+            }
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (x, y, times, gap_ms);
+    }
+}
+
+/// 窗口比例坐标 → 屏幕绝对坐标（与 PrintWindow 整窗截图同一坐标系 = 含标题栏，
+/// 用户在截图上点选的位置换算到屏幕分毫不差）。最小化/已关闭时报错跳过。
+fn gm_win_point_to_screen(hwnd: usize, rx: f64, ry: f64) -> Result<(i32, i32), String> {
+    #[cfg(windows)]
+    {
+        use winapi::shared::windef::{HWND, RECT};
+        use winapi::um::winuser::{GetWindowRect, IsIconic};
+        let hwnd = hwnd as HWND;
+        unsafe {
+            if IsIconic(hwnd) != 0 {
+                return Err("窗口已最小化（还原窗口后自动点击才会生效）".into());
+            }
+            let mut wr = RECT { left: 0, top: 0, right: 0, bottom: 0 };
+            if GetWindowRect(hwnd, &mut wr) == 0 {
+                return Err("获取窗口位置失败（窗口可能已关闭）".into());
+            }
+            let w = (wr.right - wr.left) as f64;
+            let h = (wr.bottom - wr.top) as f64;
+            if w <= 0.0 || h <= 0.0 {
+                return Err("窗口尺寸非法".into());
+            }
+            Ok((wr.left + (rx * w) as i32, wr.top + (ry * h) as i32))
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (hwnd, rx, ry);
+        Err("仅支持 Windows".into())
+    }
 }
 
 #[derive(serde::Deserialize, Clone)]
@@ -1875,12 +1995,46 @@ fn gm_badge_image(wave: u32) -> tauri::image::Image<'static> {
     tauri::image::Image::new_owned(rgba, s as u32, s as u32)
 }
 
-/// 恢复托盘默认状态（停止监控时）：默认图标 + 原始 tooltip
+/// 恢复托盘默认状态（停止监控时）：默认图标 + 原始 tooltip + 无监控项的菜单
 fn gm_restore_tray(app: &tauri::AppHandle) {
     if let Some(tray) = TRAY.get() {
         let _ = tray.set_tooltip(Some("塔防精灵助手"));
         if let Some(def) = app.default_window_icon() {
             let _ = tray.set_icon(Some(def.clone()));
+        }
+    }
+    gm_apply_tray_menu(app, false, false);
+}
+
+/// 构建托盘右键菜单：监控运行时附加「暂停/恢复播报 + 停止波数监控」项
+/// （此前必须打开面板才能停监控/静音，托盘直接操作快得多——2026-09-01 用户需求）
+fn gm_tray_menu<R: tauri::Runtime>(app: &tauri::AppHandle<R>, monitoring: bool, muted: bool) -> Result<Menu<R>, tauri::Error> {
+    use tauri::menu::{IsMenuItem, PredefinedMenuItem};
+    let show = MenuItem::with_id(app, "show", "显示窗口", true, None::<&str>)?;
+    let hide = MenuItem::with_id(app, "hide", "隐藏到托盘", true, None::<&str>)?;
+    let sep0 = PredefinedMenuItem::separator(app)?;
+    let mute = MenuItem::with_id(app, "gm-mute-toggle",
+        if muted { "🔊 恢复播报" } else { "🔇 暂停播报" }, true, None::<&str>)?;
+    let stop = MenuItem::with_id(app, "gm-stop", "⏹ 停止波数监控", true, None::<&str>)?;
+    let sep1 = PredefinedMenuItem::separator(app)?;
+    let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
+    let mut items: Vec<&dyn IsMenuItem<R>> = vec![&show, &hide];
+    if monitoring {
+        items.push(&sep0);
+        items.push(&mute);
+        items.push(&stop);
+    }
+    items.push(&sep1);
+    items.push(&quit);
+    Menu::with_items(app, &items)
+}
+
+/// 托盘菜单热更新（运行态/静音态变化时重建 set_menu，事件仍路由到 builder 注册的处理器）
+fn gm_apply_tray_menu(app: &tauri::AppHandle, monitoring: bool, muted: bool) {
+    if let Some(tray) = TRAY.get() {
+        match gm_tray_menu(app, monitoring, muted) {
+            Ok(m) => { let _ = tray.set_menu(Some(m)); }
+            Err(e) => { eprintln!("[TRAY] 波数监控托盘菜单构建失败: {}", e); }
         }
     }
 }
@@ -1935,16 +2089,30 @@ fn gm_tick_window(win: &GmWin, region: &[f64; 4]) -> Result<Option<Vec<String>>,
     }
 }
 
+/// 每窗口运行时状态（波数记忆 / 到波点击已触发标记 / 文字点击冷却时间戳）
+struct GmWinRT {
+    last: Option<u32>,
+    wave_done: Vec<bool>,          // 与 win.wave_clicks 平行：本局该组是否已点过
+    text_last: Vec<Option<u128>>,  // 与 win.text_clicks 平行：上次触发时间（ms），冷却用
+}
+
 /// 监控主循环（独立线程）：与窗口是否可见无关，最小化/隐藏到托盘照常播报
+/// 2026-09-01 新增：新局检测（波数回退重置到波点击）+ 到波自动点击 + 文字识别触发点击 + 托盘静音开关
 fn gm_monitor_loop(app: tauri::AppHandle, cfg: GmCfg, gen: u64, interval_sec: u64) {
     let interval_ms = interval_sec * 1000;
     let multi = cfg.windows.len() > 1;
+    let mut rt: Vec<GmWinRT> = cfg.windows.iter().map(|w| GmWinRT {
+        last: None,
+        wave_done: vec![false; w.wave_clicks.len()],
+        text_last: vec![None; w.text_clicks.len()],
+    }).collect();
     let mut last: Vec<Option<u32>> = vec![None; cfg.windows.len()];
     let mut empty_cnt: Vec<u32> = vec![0; cfg.windows.len()];
     let mut err_cnt: Vec<u32> = vec![0; cfg.windows.len()];
     let mut warned_empty: Vec<bool> = vec![false; cfg.windows.len()];
     let mut warned_dead: Vec<bool> = vec![false; cfg.windows.len()];
     let alive = |gen: u64| GM_RUN.load(Ordering::SeqCst) && GM_GEN.load(Ordering::SeqCst) == gen;
+    let muted = || GM_MUTE.load(Ordering::SeqCst);
     loop {
         if !alive(gen) { break; }
         for (idx, win) in cfg.windows.iter().enumerate() {
@@ -1956,12 +2124,27 @@ fn gm_monitor_loop(app: tauri::AppHandle, cfg: GmCfg, gen: u64, interval_sec: u6
                     match gm_parse_wave(&texts) {
                         Some(wave) => {
                             err_cnt[idx] = 0;
-                            let prev = last[idx];
+                            let prev = rt[idx].last;
+                            rt[idx].last = Some(wave);
                             last[idx] = Some(wave);
                             if prev.map_or(true, |p| p != wave) {
                                 let is_up = prev.map_or(true, |p| wave > p);
+                                // 🔴 新局检测：波数回退（如 25→1）判定新一局 → 重置到波点击标记 + 播报
+                                if let Some(p) = prev {
+                                    if wave < p {
+                                        for d in rt[idx].wave_done.iter_mut() { *d = false; }
+                                        let _ = app.emit("gm-log", serde_json::json!({
+                                            "hwnd": win.hwnd,
+                                            "msg": format!("波数回退（{}→{}）判定新一局，到波自动点击已重置（本局会再点）", p, wave),
+                                        }));
+                                        if win.speak && !muted() {
+                                            let tag = if multi { format!("{}号窗 ", idx + 1) } else { String::new() };
+                                            let _ = speak_sync(&format!("{}新一局", tag));
+                                        }
+                                    }
+                                }
                                 let key_hit = win.key_waves.is_empty() || win.key_waves.contains(&wave);
-                                let spoken = win.speak && key_hit;
+                                let spoken = win.speak && key_hit && !muted();
                                 if spoken {
                                     let tag = if multi { format!("{}号窗 ", idx + 1) } else { String::new() };
                                     let _ = speak_sync(&format!("{}{}第{}波{}", tag, win.speak_prefix, wave, win.speak_suffix));
@@ -1973,9 +2156,9 @@ fn gm_monitor_loop(app: tauri::AppHandle, cfg: GmCfg, gen: u64, interval_sec: u6
                                         let summary: Vec<String> = last.iter().enumerate()
                                             .filter_map(|(i, l)| l.map(|w| format!("{}号窗:第{}波", i + 1, w)))
                                             .collect();
-                                        format!("塔防精灵助手 — 监控中 | {}", summary.join(" | "))
+                                        format!("塔防精灵助手 — 监控中{} | {}", if muted() { "（播报已暂停）" } else { "" }, summary.join(" | "))
                                     } else {
-                                        format!("塔防精灵助手 — 监控中：第{}波", wave)
+                                        format!("塔防精灵助手 — 监控中{}：第{}波", if muted() { "（播报已暂停）" } else { "" }, wave)
                                     };
                                     let _ = tray.set_tooltip(Some(&tip));
                                 }
@@ -1984,6 +2167,29 @@ fn gm_monitor_loop(app: tauri::AppHandle, cfg: GmCfg, gen: u64, interval_sec: u6
                                     "wave": wave, "prev": prev, "isUp": is_up,
                                     "spoken": spoken, "keyHit": key_hit,
                                 }));
+                            }
+                            // 🔴 到波自动点击（多组）：到达或跨越触发波数即点，本局每组一次（新局重置）
+                            for (ci, wcx) in win.wave_clicks.iter().enumerate() {
+                                if !alive(gen) { break; }
+                                if rt[idx].wave_done[ci] { continue; }
+                                let fire = prev.map_or(false, |p| p < wcx.wave && wave >= wcx.wave)
+                                    || (prev.is_none() && wave == wcx.wave);
+                                if !fire { continue; }
+                                rt[idx].wave_done[ci] = true;
+                                match gm_win_point_to_screen(win.hwnd, wcx.x, wcx.y) {
+                                    Ok((sx, sy)) => {
+                                        let _ = app.emit("gm-log", serde_json::json!({
+                                            "hwnd": win.hwnd,
+                                            "msg": format!("⚡ 第{}波 → 自动点击（×{}次）", wcx.wave, wcx.times.max(1)),
+                                        }));
+                                        gm_click_at(sx, sy, wcx.times, wcx.gap_ms);
+                                    }
+                                    Err(e) => {
+                                        let _ = app.emit("gm-log", serde_json::json!({
+                                            "hwnd": win.hwnd, "msg": format!("自动点击跳过：{}", e), "isErr": true,
+                                        }));
+                                    }
+                                }
                             }
                         }
                         None => {
@@ -2023,6 +2229,41 @@ fn gm_monitor_loop(app: tauri::AppHandle, cfg: GmCfg, gen: u64, interval_sec: u6
                     }
                 }
             }
+            // 🔴 文字识别触发点击（多组）：对每组识别区域 OCR，命中关键词 → 冷却后点击
+            for (ti, tc) in win.text_clicks.iter().enumerate() {
+                if !alive(gen) { break; }
+                if !tc.enabled { continue; }
+                let now = gm_now_ms();
+                if let Some(t0) = rt[idx].text_last[ti] {
+                    if now.saturating_sub(t0) < (tc.cooldown_sec as u128) * 1000 { continue; }
+                }
+                match gm_tick_window(win, &tc.region) {
+                    Ok(Some(texts)) => {
+                        // 去空格拼接：OCR 分词可能把「开始战斗」拆成「开始」+「战斗」
+                        let joined: String = texts.join("").chars()
+                            .filter(|c| *c != ' ' && *c != '\u{a0}')
+                            .collect();
+                        if joined.contains(&tc.keyword) {
+                            rt[idx].text_last[ti] = Some(now);
+                            match gm_win_point_to_screen(win.hwnd, tc.x, tc.y) {
+                                Ok((sx, sy)) => {
+                                    let _ = app.emit("gm-log", serde_json::json!({
+                                        "hwnd": win.hwnd,
+                                        "msg": format!("🎯 识别到「{}」→ 自动点击（×{}次）", tc.keyword, tc.times.max(1)),
+                                    }));
+                                    gm_click_at(sx, sy, tc.times, tc.gap_ms);
+                                }
+                                Err(e) => {
+                                    let _ = app.emit("gm-log", serde_json::json!({
+                                        "hwnd": win.hwnd, "msg": format!("文字点击跳过：{}", e), "isErr": true,
+                                    }));
+                                }
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
         }
         // 按 100ms 粒度睡眠（停止/重启指令即时生效，不必等满整拍）
         let mut slept = 0u64;
@@ -2043,22 +2284,32 @@ fn game_monitor_start(cfg: GmCfg, app: tauri::AppHandle) -> Result<String, Strin
         if w.region[2] <= 0.0 || w.region[3] <= 0.0 {
             return Err(format!("第{}个窗口未配置波数识别区域", i + 1));
         }
+        // 文字识别点击组：识别区域必须有效（点击位置由前端校验）
+        for tc in &w.text_clicks {
+            if tc.enabled && (tc.region[2] <= 0.0 || tc.region[3] <= 0.0) {
+                return Err(format!("第{}个窗口的文字点击「{}」未框选识别区域", i + 1, tc.keyword));
+            }
+        }
     }
     let interval = cfg.interval_sec.clamp(1, 30);
     let nwin = cfg.windows.len();
+    let nclick = cfg.windows.iter().map(|w| w.wave_clicks.len() + w.text_clicks.iter().filter(|t| t.enabled).count()).sum::<usize>();
     let gen = GM_GEN.fetch_add(1, Ordering::SeqCst) + 1;
     GM_RUN.store(true, Ordering::SeqCst);
+    GM_MUTE.store(false, Ordering::SeqCst); // 新会话默认开声（暂停状态不跨会话残留）
     let app_h = app.clone();
     std::thread::spawn(move || gm_monitor_loop(app_h, cfg, gen, interval));
-    // 托盘先行亮「监控中」提示（识别到首个波数后自动换成角标数字）
+    // 托盘先行亮「监控中」提示（识别到首个波数后自动换成角标数字）+ 菜单加暂停播报/停止监控项
+    gm_apply_tray_menu(&app, true, false);
     if let Some(tray) = TRAY.get() {
         let _ = tray.set_tooltip(Some("塔防精灵助手 — 波数监控运行中…"));
     }
-    let _ = app.emit("gm-state", serde_json::json!({ "running": true }));
-    Ok(format!("监控已启动：{} 个窗口，每 {} 秒识别一次（最小化/关闭窗口也持续播报）", nwin, interval))
+    let _ = app.emit("gm-state", serde_json::json!({ "running": true, "muted": false }));
+    Ok(format!("监控已启动：{} 个窗口，每 {} 秒识别一次（最小化/关闭窗口也持续播报）", nwin, interval)
+        + (if nclick > 0 { format!("，含 {} 组自动点击", nclick) } else { String::new() }).as_str())
 }
 
-/// 停止波数监控：线程在 100ms 内感知退出，托盘恢复默认图标
+/// 停止波数监控：线程在 100ms 内感知退出，托盘恢复默认图标与菜单
 #[tauri::command]
 fn game_monitor_stop(app: tauri::AppHandle) -> Result<(), String> {
     GM_RUN.store(false, Ordering::SeqCst);
@@ -2211,11 +2462,8 @@ pub fn run() {
                 let _ = window.eval(&format!("window.__TAURI_APP__ = true; window.__APP_VERSION = '{}'; console.log('[Tauri] APP标记/版本已注入 v{}');", ver, ver));
             }
             // ============ 系统托盘（最小化到托盘而非退出） ============
-            let menu = Menu::with_items(app, &[
-                &MenuItem::with_id(app, "show", "显示窗口", true, None::<&str>)?,
-                &MenuItem::with_id(app, "hide", "隐藏到托盘", true, None::<&str>)?,
-                &MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?,
-            ])?;
+            // 菜单统一走 gm_tray_menu（监控运行时热加「暂停播报/停止监控」项，见 gm_apply_tray_menu）
+            let menu = gm_tray_menu(&app.handle(), false, false)?;
             let _tray = TrayIconBuilder::with_id("main-tray")
                 .icon(app.default_window_icon().cloned().unwrap())
                 .tooltip("塔防精灵助手")
@@ -2224,6 +2472,29 @@ pub fn run() {
                 .on_menu_event(|app, event| {
                     let id = event.id().as_ref();
                     match id {
+                        // 🔴 波数监控托盘快捷控制（2026-09-01）：不开面板直接暂停播报/停止监控
+                        "gm-mute-toggle" => {
+                            if GM_RUN.load(Ordering::SeqCst) { // 监控未运行（菜单残留竞态）不处理
+                                let muted = !GM_MUTE.load(Ordering::SeqCst);
+                                GM_MUTE.store(muted, Ordering::SeqCst);
+                                gm_apply_tray_menu(app, true, muted);
+                                if let Some(tray) = TRAY.get() {
+                                    let _ = tray.set_tooltip(Some(if muted {
+                                        "塔防精灵助手 — 监控中（播报已暂停，自动点击照常）"
+                                    } else {
+                                        "塔防精灵助手 — 波数监控运行中…"
+                                    }));
+                                }
+                                let _ = app.emit("gm-mute", serde_json::json!({ "muted": muted }));
+                            }
+                        }
+                        "gm-stop" => {
+                            if GM_RUN.load(Ordering::SeqCst) {
+                                GM_RUN.store(false, Ordering::SeqCst);
+                                gm_restore_tray(app);
+                                let _ = app.emit("gm-state", serde_json::json!({ "running": false }));
+                            }
+                        }
                         // 退出不依赖窗口是否存在，单独处理，保证一定能退出
                         "quit" => {
                             // 彻底退出前关闭本助手自己拉起的 Umi-OCR（含其引擎子进程）

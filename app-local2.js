@@ -5185,7 +5185,9 @@ if (true) {
             speak: old.speak,
             speakPrefix: p ? (p.value || '').trim() : (old.speakPrefix || ''),
             speakSuffix: s ? (s.value || '').trim() : (old.speakSuffix || ''),
-            keyWaves: kwEl ? (kwEl.value || '').split(/[,，\s]+/).map(x => parseInt(x, 10)).filter(x => x > 0) : (old.keyWaves || [])
+            keyWaves: kwEl ? (kwEl.value || '').split(/[,，\s]+/).map(x => parseInt(x, 10)).filter(x => x > 0) : (old.keyWaves || []),
+            waveClicks: old.waveClicks || [],   // 到波自动点击组（组内编辑即时落库，此处原样透传）
+            textClicks: old.textClicks || []    // 识别文字自动点击组
         };
     }
 
@@ -5230,17 +5232,22 @@ if (true) {
                     <button onclick="closeGameMonitor()" style="background:rgba(255,255,255,0.1);color:#fff;border:none;width:30px;height:30px;border-radius:5px;cursor:pointer;font-size:1.2rem;">×</button>
                 </div>
                 <div style="color:rgba(255,255,255,0.45);font-size:0.72rem;margin-bottom:12px;line-height:1.5;">
-                    多选游戏窗口 → 定时识别波数 → 变化时语音播报。<b style="color:#ffd700;">每个窗口独立配置：不同窗口可设不同的波数位置和播报文字</b>。<br>
-                    开始后可关闭/最小化本窗口，后台持续播报，托盘角标直接显示波数。需本机运行 Umi-OCR。
+                    多选游戏窗口 → 定时识别波数 → 变化时语音播报 + <b style="color:#ffd700;">到波自动点击 / 识别到指定文字自动点击</b>。<b style="color:#ffd700;">每个窗口独立配置</b>。<br>
+                    开始后可关闭/最小化本窗口，后台持续运行，托盘角标直接显示波数（右键托盘可暂停播报/停止监控）。需本机运行 Umi-OCR。
                 </div>
 
                 <div style="margin-bottom:12px;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;flex-wrap:wrap;gap:6px;">
                         <label style="color:rgba(255,255,255,0.75);font-size:0.82rem;">① 游戏窗口（可多选，多开一起监控）</label>
-                        <button onclick="gmRefreshWindows()" style="background:linear-gradient(135deg,#00bcd4,#00838f);color:#fff;border:none;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:0.75rem;">🔄 刷新</button>
+                        <div style="display:flex;gap:8px;align-items:center;">
+                            <label style="display:flex;align-items:center;gap:4px;color:rgba(255,255,255,0.55);font-size:0.7rem;cursor:pointer;">
+                                <input type="checkbox" id="gmDeepScan" style="accent-color:#ff9800;cursor:pointer;"> 深度扫描
+                            </label>
+                            <button onclick="gmRefreshWindows()" style="background:linear-gradient(135deg,#00bcd4,#00838f);color:#fff;border:none;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:0.75rem;">🔄 刷新</button>
+                        </div>
                     </div>
                     <div id="gmWinList" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:8px 10px;max-height:130px;overflow:auto;color:#fff;font-size:0.78rem;">检测中…</div>
-                    <div id="gmWindowHint" style="color:rgba(255,255,255,0.35);font-size:0.68rem;margin-top:4px;">多窗口时播报自动加「N号窗」前缀区分（1号窗 = 列表第 1 个）</div>
+                    <div id="gmWindowHint" style="color:rgba(255,255,255,0.35);font-size:0.68rem;margin-top:4px;">多窗口时播报自动加「N号窗」前缀区分（1号窗 = 列表第 1 个）。找不到微信小程序窗口时勾「深度扫描」再刷新</div>
                 </div>
 
                 <div id="gmCfgPanel" style="margin-bottom:12px;border-top:1px solid rgba(255,255,255,0.1);padding-top:12px;">
@@ -5287,10 +5294,34 @@ if (true) {
                         </div>
                         <div style="color:rgba(255,255,255,0.35);font-size:0.68rem;margin-top:4px;">填了 = 只播这些波（如卡怪波次），防连播变噪音</div>
                     </div>
+
+                    <div style="margin-bottom:10px;border:1px solid rgba(0,188,212,0.3);border-radius:8px;padding:10px;background:rgba(0,188,212,0.05);">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                            <label style="color:rgba(255,255,255,0.75);font-size:0.82rem;">⑥ 到波自动点击（当前窗口，最多 8 组）</label>
+                            <button onclick="_gmAddWaveClick()" style="background:linear-gradient(135deg,#00bcd4,#00838f);color:#fff;border:none;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:0.75rem;">＋ 添加</button>
+                        </div>
+                        <div id="gmWaveClicks"></div>
+                        <div style="color:rgba(255,255,255,0.35);font-size:0.68rem;margin-top:5px;line-height:1.5;">
+                            到达指定波数时，在窗口内指定位置自动点击（上卡/加速/合卡等）。每局都点（新一局自动重置）。<br>
+                            ⚠️ 用真实鼠标点击：窗口需<b style="color:#ff9e80;">可见、不最小化、不被遮挡</b>，多开请平铺不重叠
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom:10px;border:1px solid rgba(255,152,0,0.3);border-radius:8px;padding:10px;background:rgba(255,152,0,0.05);">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                            <label style="color:rgba(255,255,255,0.75);font-size:0.82rem;">⑦ 识别文字自动点击（当前窗口，最多 8 组）</label>
+                            <button onclick="_gmAddTextClick()" style="background:linear-gradient(135deg,#ff9800,#e65100);color:#fff;border:none;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:0.75rem;">＋ 添加</button>
+                        </div>
+                        <div id="gmTextClicks"></div>
+                        <div style="color:rgba(255,255,255,0.35);font-size:0.68rem;margin-top:5px;line-height:1.5;">
+                            框选识别区域，OCR 到关键词（如「开始战斗」「再来一局」）→ 自动点击指定位置。冷却防连点。<br>
+                            适合：自动开下一局 / 自动点弹窗按钮（配合⑥实现全自动挂机）
+                        </div>
+                    </div>
                 </div>
 
                 <div style="margin-bottom:12px;">
-                    <label style="color:rgba(255,255,255,0.75);font-size:0.82rem;display:block;margin-bottom:5px;">⑥ 识别间隔（全局共用）</label>
+                    <label style="color:rgba(255,255,255,0.75);font-size:0.82rem;display:block;margin-bottom:5px;">⑧ 识别间隔（全局共用）</label>
                     <div style="display:flex;align-items:center;gap:6px;">
                         <input type="number" id="gmIntervalInput" min="1" max="30" value="3" style="width:60px;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:rgba(0,0,0,0.3);color:#fff;font-size:0.8rem;">
                         <span style="color:rgba(255,255,255,0.5);font-size:0.72rem;">秒（OCR 慢可调大）</span>
@@ -5307,7 +5338,7 @@ if (true) {
                 <div id="gmStatus" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:10px;min-height:48px;max-height:130px;overflow:auto;color:rgba(255,255,255,0.6);font-size:0.72rem;line-height:1.6;">待启动。勾选游戏窗口 → 选择窗口配置 → 框选波数位置 → 开始监控。</div>
 
                 <div style="margin-top:14px;padding:10px;border-radius:8px;border:1px dashed rgba(255,215,0,0.35);background:rgba(255,152,0,0.08);text-align:center;">
-                    <span style="color:#ffd700;font-size:0.78rem;font-weight:bold;">✨ 到波自动执行操作 · 鼠标联动 · 分组播报…（其他功能尽情期待）</span>
+                    <span style="color:#ffd700;font-size:0.78rem;font-weight:bold;">✨ 已支持：到波自动点击 · 识别文字自动点击 · 新局检测 · 托盘暂停播报…（其他功能尽情期待）</span>
                 </div>
             </div>
         `;
@@ -5315,6 +5346,14 @@ if (true) {
         // 恢复全局配置
         const intervalInput = modal.querySelector('#gmIntervalInput');
         if (cfg.interval && intervalInput) intervalInput.value = cfg.interval;
+        // 恢复深度扫描开关（新版微信小程序窗口等找不到时使用）
+        const deepEl = modal.querySelector('#gmDeepScan');
+        if (deepEl) {
+            deepEl.checked = !!cfg.deepScan;
+            deepEl.onchange = () => { const c = _gmLoadCfg(); c.deepScan = deepEl.checked; _gmSaveCfg(c); };
+        }
+        // 点击组配置区渲染（⑥到波点击 / ⑦文字点击）
+        _gmRenderClickGroups();
         // 刷新窗口列表（按上次的窗口标题自动勾选）
         gmRefreshWindows();
         // Rust 线程可能在面板外继续跑：恢复按钮状态 + 绑实时事件
@@ -5336,11 +5375,26 @@ if (true) {
         const hint = document.getElementById('gmWindowHint');
         if (!list) return;
         list.innerHTML = '<span style="color:rgba(255,255,255,0.45);">检测中…</span>';
-        const wins = await tauriInvoke('find_game_windows') || [];
+        // 深度扫描：放宽窗口过滤（新版微信小程序窗口常被普通枚举过滤掉）
+        // 🔴 兼容旧 APP：默认路径不传任何参数（与旧 Rust 完全一致）；仅勾深度时才传 deep，
+        //   旧 APP 不认识该参数报错时自动回退普通枚举并提示需升级 APP。
+        const deepEl = document.getElementById('gmDeepScan');
+        const deep = !!(deepEl && deepEl.checked);
+        let wins = [];
+        let deepErr = false;
+        if (deep) {
+            try { wins = await tauriInvoke('find_game_windows', { deep: true }) || []; }
+            catch (e) { deepErr = true; wins = await tauriInvoke('find_game_windows') || []; }
+        } else {
+            wins = await tauriInvoke('find_game_windows') || [];
+        }
+        if (deepErr) _gmLog('⚠️ 当前 APP 版本不支持深度扫描，已回退普通枚举（升级 APP 后生效）', true);
         _gmWindows = wins;
         if (!wins.length) {
             list.innerHTML = '<span style="color:rgba(255,255,255,0.45);">未检测到窗口，请先打开游戏/模拟器再点刷新</span>';
-            if (hint) hint.textContent = '未检测到窗口时请先打开游戏/模拟器再刷新';
+            if (hint) hint.textContent = deep
+                ? '深度扫描仍未找到：若小程序嵌在微信主窗口里，可直接勾选「微信」主窗口，波数区域框在小程序画面内即可'
+                : '未检测到窗口时请先打开游戏/模拟器再刷新（微信小程序找不到时勾「深度扫描」）';
             _gmPopulateCfgSelect();
             return;
         }
@@ -5454,6 +5508,216 @@ if (true) {
         _gmUpdateSpeakUI(wc.speak !== false);
         _gmUpdateRegionUI(title);
         _gmUpdateSpeakPreview();
+        _gmRenderClickGroups(title);
+    }
+
+    // ============ 到波自动点击 + 识别文字自动点击（多组配置，2026-09-01）============
+    const GM_MAX_CLICK_GROUPS = 8;
+
+    // 当前配置目标对应的窗口对象（勾选列表里找）
+    function _gmFindCfgWin() {
+        const sel = _gmSelectedWindows();
+        return sel.find(w => w.title === _gmCfgTarget) || sel[0] || null;
+    }
+
+    // 截当前配置窗口整窗 PNG（点选位置/框选区域共用）
+    async function _gmCaptureFullPng(win) {
+        const bmpB64 = await tauriInvoke('capture_window_region', { hwnd: win.hwnd, x: 0, y: 0, w: 10, h: 10, full: true });
+        if (!bmpB64) throw new Error('截图失败（窗口可能已关闭或被最小化）');
+        const { png } = await _gmBmpToPng(bmpB64);
+        return png;
+    }
+
+    // 渲染当前配置窗口的两组点击配置（⑥到波点击 / ⑦文字点击）
+    function _gmRenderClickGroups(title) {
+        const wcEl = document.getElementById('gmWaveClicks');
+        const tcEl = document.getElementById('gmTextClicks');
+        if (!wcEl || !tcEl) return;
+        const t = title || _gmCfgTarget;
+        if (!t) { wcEl.innerHTML = ''; tcEl.innerHTML = ''; return; }
+        const wc = _gmGetWinCfg(t);
+        const wcl = wc.waveClicks || [];
+        const tcl = wc.textClicks || [];
+
+        // ---- ⑥ 到波点击组 ----
+        if (!wcl.length) {
+            wcEl.innerHTML = '<div style="color:rgba(255,255,255,0.35);font-size:0.7rem;padding:2px 0;">未添加（点「＋ 添加」新建一组）</div>';
+        } else {
+            wcEl.innerHTML = '';
+            wcl.forEach((c, i) => {
+                const row = document.createElement('div');
+                row.style.cssText = 'display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:6px;background:rgba(0,0,0,0.25);border-radius:6px;margin-bottom:5px;';
+                const lbl = (txt) => '<span style="color:rgba(255,255,255,0.5);font-size:0.7rem;white-space:nowrap;">' + txt + '</span>';
+                const inp = (id, val, w) => '<input type="number" data-role="' + id + '" data-i="' + i + '" value="' + val + '" style="width:' + w + ';padding:4px 6px;border-radius:5px;border:1px solid rgba(255,255,255,0.15);background:rgba(0,0,0,0.3);color:#fff;font-size:0.75rem;">';
+                row.innerHTML = lbl('第') + inp('wc-wave', c.wave || 10, '48px') + lbl('波 → 点击')
+                    + '<button data-role="wc-pos" data-i="' + i + '" style="padding:4px 8px;border-radius:5px;border:1px solid ' + (c.x != null ? 'rgba(76,175,80,0.5);background:rgba(76,175,80,0.15);color:#4ade80' : 'rgba(255,255,255,0.2);background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.7)') + ';cursor:pointer;font-size:0.72rem;white-space:nowrap;">' + (c.x != null ? '✓ 已选位置' : '🎯 选位置') + '</button>'
+                    + lbl('×') + inp('wc-times', c.times || 1, '40px') + lbl('次 · 间隔')
+                    + inp('wc-gap', c.gapMs || 200, '56px') + lbl('ms')
+                    + '<button data-role="wc-del" data-i="' + i + '" title="删除这组" style="padding:4px 8px;border-radius:5px;border:1px solid rgba(244,67,54,0.4);background:rgba(244,67,54,0.12);color:#ff8a80;cursor:pointer;font-size:0.72rem;">🗑</button>';
+                wcEl.appendChild(row);
+            });
+            // 绑定编辑事件（即时落库；数字用 change 避免输入过程重渲染打断）
+            wcEl.querySelectorAll('[data-role="wc-wave"]').forEach(el => el.onchange = () => _gmMutWaveClick(+el.dataset.i, c => { c.wave = Math.max(1, Math.min(999, parseInt(el.value, 10) || 1)); }));
+            wcEl.querySelectorAll('[data-role="wc-times"]').forEach(el => el.onchange = () => _gmMutWaveClick(+el.dataset.i, c => { c.times = Math.max(1, Math.min(10, parseInt(el.value, 10) || 1)); }));
+            wcEl.querySelectorAll('[data-role="wc-gap"]').forEach(el => el.onchange = () => _gmMutWaveClick(+el.dataset.i, c => { c.gapMs = Math.max(50, Math.min(5000, parseInt(el.value, 10) || 200)); }));
+            wcEl.querySelectorAll('[data-role="wc-pos"]').forEach(el => el.onclick = () => window._gmPickWaveClickPos(+el.dataset.i));
+            wcEl.querySelectorAll('[data-role="wc-del"]').forEach(el => el.onclick = () => {
+                _gmMutClickGroups(g => { g.waveClicks.splice(+el.dataset.i, 1); });
+            });
+        }
+
+        // ---- ⑦ 文字点击组 ----
+        if (!tcl.length) {
+            tcEl.innerHTML = '<div style="color:rgba(255,255,255,0.35);font-size:0.7rem;padding:2px 0;">未添加（点「＋ 添加」新建一组）</div>';
+        } else {
+            tcEl.innerHTML = '';
+            tcl.forEach((c, i) => {
+                const row = document.createElement('div');
+                row.style.cssText = 'display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:6px;background:rgba(0,0,0,0.25);border-radius:6px;margin-bottom:5px;';
+                const lbl = (txt) => '<span style="color:rgba(255,255,255,0.5);font-size:0.7rem;white-space:nowrap;">' + txt + '</span>';
+                const hasRegion = !!(c.region && c.region.w > 0);
+                const hasPos = c.x != null;
+                row.innerHTML = '<button data-role="tc-region" data-i="' + i + '" style="padding:4px 8px;border-radius:5px;border:1px solid ' + (hasRegion ? 'rgba(76,175,80,0.5);background:rgba(76,175,80,0.15);color:#4ade80' : 'rgba(255,255,255,0.2);background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.7)') + ';cursor:pointer;font-size:0.72rem;white-space:nowrap;">' + (hasRegion ? '✓ 已选区域' : '📐 框选区域') + '</button>'
+                    + '<input type="text" data-role="tc-keyword" data-i="' + i + '" value="' + String(c.keyword || '').replace(/"/g, '&quot;') + '" placeholder="识别文字，如：开始战斗" style="width:120px;padding:4px 6px;border-radius:5px;border:1px solid rgba(255,255,255,0.15);background:rgba(0,0,0,0.3);color:#fff;font-size:0.75rem;">'
+                    + '<button data-role="tc-pos" data-i="' + i + '" style="padding:4px 8px;border-radius:5px;border:1px solid ' + (hasPos ? 'rgba(76,175,80,0.5);background:rgba(76,175,80,0.15);color:#4ade80' : 'rgba(255,255,255,0.2);background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.7)') + ';cursor:pointer;font-size:0.72rem;white-space:nowrap;">' + (hasPos ? '✓ 点击位置' : '🎯 选位置') + '</button>'
+                    + lbl('冷却') + '<input type="number" data-role="tc-cd" data-i="' + i + '" value="' + (c.cooldownSec || 3) + '" style="width:44px;padding:4px 6px;border-radius:5px;border:1px solid rgba(255,255,255,0.15);background:rgba(0,0,0,0.3);color:#fff;font-size:0.75rem;">' + lbl('秒')
+                    + '<label style="display:flex;align-items:center;gap:3px;color:rgba(255,255,255,0.55);font-size:0.7rem;cursor:pointer;"><input type="checkbox" data-role="tc-on" data-i="' + i + '"' + (c.enabled !== false ? ' checked' : '') + ' style="accent-color:#ff9800;cursor:pointer;">启用</label>'
+                    + '<button data-role="tc-del" data-i="' + i + '" title="删除这组" style="padding:4px 8px;border-radius:5px;border:1px solid rgba(244,67,54,0.4);background:rgba(244,67,54,0.12);color:#ff8a80;cursor:pointer;font-size:0.72rem;">🗑</button>';
+                tcEl.appendChild(row);
+            });
+            tcEl.querySelectorAll('[data-role="tc-keyword"]').forEach(el => el.onchange = () => _gmMutTextClick(+el.dataset.i, c => { c.keyword = (el.value || '').trim(); }));
+            tcEl.querySelectorAll('[data-role="tc-cd"]').forEach(el => el.onchange = () => _gmMutTextClick(+el.dataset.i, c => { c.cooldownSec = Math.max(1, Math.min(600, parseInt(el.value, 10) || 3)); }));
+            tcEl.querySelectorAll('[data-role="tc-on"]').forEach(el => el.onchange = () => _gmMutTextClick(+el.dataset.i, c => { c.enabled = el.checked; }));
+            tcEl.querySelectorAll('[data-role="tc-region"]').forEach(el => el.onclick = () => window._gmPickTextClickRegion(+el.dataset.i));
+            tcEl.querySelectorAll('[data-role="tc-pos"]').forEach(el => el.onclick = () => window._gmPickTextClickPos(+el.dataset.i));
+            tcEl.querySelectorAll('[data-role="tc-del"]').forEach(el => el.onclick = () => {
+                _gmMutClickGroups(g => { g.textClicks.splice(+el.dataset.i, 1); });
+            });
+        }
+    }
+
+    // 修改当前配置窗口的点击组（mutator 直接改 winCfg 后落库并重渲染）
+    function _gmMutClickGroups(mutator) {
+        if (!_gmCfgTarget) return;
+        const wc = _gmGetWinCfg(_gmCfgTarget);
+        mutator(wc);
+        _gmSaveWinCfg(_gmCfgTarget, wc);
+        _gmRenderClickGroups(_gmCfgTarget);
+    }
+    function _gmMutWaveClick(i, fn) { _gmMutClickGroups(g => { if (g.waveClicks && g.waveClicks[i]) fn(g.waveClicks[i]); }); }
+    function _gmMutTextClick(i, fn) { _gmMutClickGroups(g => { if (g.textClicks && g.textClicks[i]) fn(g.textClicks[i]); }); }
+
+    window._gmAddWaveClick = function () {
+        if (!_gmCfgTarget) return;
+        _gmMutClickGroups(g => {
+            if (!g.waveClicks) g.waveClicks = [];
+            if (g.waveClicks.length >= GM_MAX_CLICK_GROUPS) { _gmLog('最多 ' + GM_MAX_CLICK_GROUPS + ' 组到波点击', true); return; }
+            g.waveClicks.push({ wave: 10, x: null, y: null, times: 1, gapMs: 200 });
+        });
+    };
+    window._gmAddTextClick = function () {
+        if (!_gmCfgTarget) return;
+        _gmMutClickGroups(g => {
+            if (!g.textClicks) g.textClicks = [];
+            if (g.textClicks.length >= GM_MAX_CLICK_GROUPS) { _gmLog('最多 ' + GM_MAX_CLICK_GROUPS + ' 组文字点击', true); return; }
+            g.textClicks.push({ region: null, keyword: '', x: null, y: null, times: 1, gapMs: 200, cooldownSec: 3, enabled: true });
+        });
+    };
+
+    // 点选「到波点击」位置：截整窗图 → 在图上点一下 → 存比例坐标
+    window._gmPickWaveClickPos = async function (i) {
+        const win = _gmFindCfgWin();
+        if (!win) { _gmLog('请先勾选游戏窗口', true); return; }
+        try {
+            const png = await _gmCaptureFullPng(win);
+            _gmShowPointPicker(png, '在图上点击「到波时要自动点击的位置」（如上卡按钮）', (p) => {
+                _gmMutWaveClick(i, c => { c.x = p.x; c.y = p.y; });
+                _gmLog('已保存点击位置（x=' + p.x.toFixed(3) + ' y=' + p.y.toFixed(3) + '）');
+            });
+        } catch (e) { _gmLog('截图失败：' + (e.message || e), true); }
+    };
+    // 框选「文字点击」识别区域
+    window._gmPickTextClickRegion = async function (i) {
+        const win = _gmFindCfgWin();
+        if (!win) { _gmLog('请先勾选游戏窗口', true); return; }
+        try {
+            const png = await _gmCaptureFullPng(win);
+            _gmShowRegionPicker(png, win, (picked) => {
+                _gmMutTextClick(i, c => { c.region = picked; });
+                _gmLog('已保存识别区域（w=' + picked.w.toFixed(3) + ' h=' + picked.h.toFixed(3) + '）');
+            }, '在图上拖框圈住要识别的文字（如「开始战斗」按钮文字）');
+        } catch (e) { _gmLog('截图失败：' + (e.message || e), true); }
+    };
+    // 点选「文字点击」触发后的点击位置
+    window._gmPickTextClickPos = async function (i) {
+        const win = _gmFindCfgWin();
+        if (!win) { _gmLog('请先勾选游戏窗口', true); return; }
+        try {
+            const png = await _gmCaptureFullPng(win);
+            _gmShowPointPicker(png, '在图上点击「识别到文字后要点击的位置」（如开始战斗按钮）', (p) => {
+                _gmMutTextClick(i, c => { c.x = p.x; c.y = p.y; });
+                _gmLog('已保存点击位置（x=' + p.x.toFixed(3) + ' y=' + p.y.toFixed(3) + '）');
+            });
+        } catch (e) { _gmLog('截图失败：' + (e.message || e), true); }
+    };
+
+    // 在截图上点选一个位置的弹窗（点击坐标 → 比例坐标回调）
+    function _gmShowPointPicker(pngB64, tipText, cb) {
+        const old = document.getElementById('gmPointPickerModal');
+        if (old) old.remove();
+        const modal = document.createElement('div');
+        modal.id = 'gmPointPickerModal';
+        modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:100000;display:flex;justify-content:center;align-items:center;';
+        const box = document.createElement('div');
+        box.style.cssText = 'background:#16213e;border-radius:12px;padding:16px;max-width:95vw;max-height:92vh;display:flex;flex-direction:column;gap:10px;';
+        const tip = document.createElement('div');
+        tip.style.cssText = 'color:#ffd700;font-size:0.9rem;font-weight:bold;text-align:center;';
+        tip.textContent = tipText;
+        const wrap = document.createElement('div');
+        wrap.style.cssText = 'position:relative;overflow:auto;max-height:70vh;cursor:crosshair;background:#000;border-radius:8px;';
+        const img = document.createElement('img');
+        img.src = 'data:image/png;base64,' + pngB64;
+        img.style.cssText = 'max-width:100%;display:block;user-select:none;-webkit-user-drag:none;';
+        wrap.appendChild(img);
+        // 标记点（点选后显示 ⌖）
+        const mark = document.createElement('div');
+        mark.style.cssText = 'position:absolute;width:26px;height:26px;margin:-13px 0 0 -13px;border:2px solid #ff5252;border-radius:50%;pointer-events:none;display:none;box-shadow:0 0 10px #ff5252;';
+        mark.innerHTML = '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#ff5252;font-size:14px;font-weight:bold;">+</div>';
+        wrap.appendChild(mark);
+        let picked = null;
+        wrap.addEventListener('click', (e) => {
+            const r = img.getBoundingClientRect();
+            const x = ((e.clientX - r.left) * (img.naturalWidth / r.width)) / img.naturalWidth;
+            const y = ((e.clientY - r.top) * (img.naturalHeight / r.height)) / img.naturalHeight;
+            if (x < 0 || x > 1 || y < 0 || y > 1) return;
+            picked = { x: Math.round(x * 1000) / 1000, y: Math.round(y * 1000) / 1000 };
+            mark.style.display = 'block';
+            mark.style.left = (e.clientX - r.left) + 'px';
+            mark.style.top = (e.clientY - r.top) + 'px';
+            tip.style.color = '#4ade80';
+            tip.textContent = '✓ 已选中（x=' + picked.x.toFixed(3) + ' y=' + picked.y.toFixed(3) + '），点「确定」保存';
+        });
+        const btnRow = document.createElement('div');
+        btnRow.style.cssText = 'display:flex;gap:10px;justify-content:center;';
+        const okBtn = document.createElement('button');
+        okBtn.textContent = '✓ 确定位置';
+        okBtn.style.cssText = 'background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;border:none;padding:9px 22px;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:bold;';
+        okBtn.onclick = () => {
+            if (!picked) { tip.style.color = '#ff9e80'; tip.textContent = '请先在图上点一个位置'; return; }
+            cb(picked);
+            modal.remove();
+        };
+        const cancelBtn = document.createElement('button');
+        cancelBtn.textContent = '取消';
+        cancelBtn.style.cssText = 'background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.6);border:none;padding:9px 16px;border-radius:8px;cursor:pointer;font-size:0.8rem;';
+        cancelBtn.onclick = () => modal.remove();
+        btnRow.appendChild(okBtn);
+        btnRow.appendChild(cancelBtn);
+        box.appendChild(tip);
+        box.appendChild(wrap);
+        box.appendChild(btnRow);
+        modal.appendChild(box);
+        document.body.appendChild(modal);
     }
 
     function _gmUpdateRegionUI(title) {
@@ -5517,15 +5781,12 @@ if (true) {
     // 框选波数区域：截当前配置窗口的整窗图 → 弹出图上拖框 → 保存比例坐标到该窗口
     window.gmConfigRegion = async function () {
         if (!_gmCfgTarget) { _gmLog('请先选择配置窗口', true); return; }
-        const sel = _gmSelectedWindows();
-        const win = sel.find(w => w.title === _gmCfgTarget) || sel[0];
+        const win = _gmFindCfgWin();
         if (!win) { _gmLog('请先勾选游戏窗口', true); return; }
         const btn = document.getElementById('gmConfigBtn');
         if (btn) { btn.disabled = true; btn.textContent = '⏳ 截图中…'; }
         try {
-            const bmpB64 = await tauriInvoke('capture_window_region', { hwnd: win.hwnd, x: 0, y: 0, w: 10, h: 10, full: true });
-            if (!bmpB64) throw new Error('截图失败（窗口可能已关闭或被最小化）');
-            const { png } = await _gmBmpToPng(bmpB64);
+            const png = await _gmCaptureFullPng(win);
             _gmShowRegionPicker(png, win);
         } catch (e) {
             _gmLog('配置失败：' + (e.message || e), true);
@@ -5534,8 +5795,9 @@ if (true) {
         }
     };
 
-    // 在截图上拖框选区域
-    function _gmShowRegionPicker(pngB64, win) {
+    // 在截图上拖框选区域（cb 可选：传了则把框选结果回调出去，用于⑦文字点击组；不传走默认=存波数区域）
+    // tipText 可选：顶部提示文字（默认「框住波数数字」）
+    function _gmShowRegionPicker(pngB64, win, cb, tipText) {
         const old = document.getElementById('gmRegionPickerModal');
         if (old) old.remove();
         const modal = document.createElement('div');
@@ -5545,7 +5807,7 @@ if (true) {
         box.style.cssText = 'background:#16213e;border-radius:12px;padding:16px;max-width:95vw;max-height:92vh;display:flex;flex-direction:column;gap:10px;';
         const tip = document.createElement('div');
         tip.style.cssText = 'color:#ffd700;font-size:0.9rem;font-weight:bold;text-align:center;';
-        tip.textContent = '在图上拖动鼠标，框住波数数字（如「第12波」）';
+        tip.textContent = tipText || '在图上拖动鼠标，框住波数数字（如「第12波」）';
         const wrap = document.createElement('div');
         wrap.style.cssText = 'position:relative;overflow:auto;max-height:70vh;cursor:crosshair;background:#000;border-radius:8px;';
         const img = document.createElement('img');
@@ -5600,6 +5862,12 @@ if (true) {
         okBtn.style.cssText = 'background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;border:none;padding:9px 22px;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:bold;';
         okBtn.onclick = () => {
             if (!picked) { tip.textContent = '请先在图上拖一个框圈住波数'; tip.style.color = '#ff9e80'; return; }
+            // 有回调（⑦文字点击组框选识别区域）：直接回传结果
+            if (typeof cb === 'function') {
+                cb(picked);
+                modal.remove();
+                return;
+            }
             const wc = _gmCollectWinCfg(win.title);
             wc.region = picked;
             _gmSaveWinCfg(win.title, wc);
@@ -5641,6 +5909,19 @@ if (true) {
         // 收集每个勾选窗口的 per-window 配置
         const winConfigs = sel.map(w => {
             const wc = _gmGetWinCfg(w.title);
+            // 到波点击组：过滤掉没选位置/波数非法的组（半成品不上报，避免 Rust 端误点）
+            const waveClicks = (wc.waveClicks || [])
+                .filter(c => (c.wave > 0) && c.x != null && c.y != null)
+                .map(c => ({ wave: Math.round(c.wave), x: c.x, y: c.y, times: c.times || 1, gapMs: c.gapMs || 200 }));
+            // 文字点击组：过滤掉没框区域/没填关键词/没选位置的组
+            const textClicks = (wc.textClicks || [])
+                .filter(c => c.keyword && c.region && c.region.w > 0 && c.x != null && c.y != null)
+                .map(c => ({
+                    region: [c.region.x, c.region.y, c.region.w, c.region.h],
+                    keyword: c.keyword, x: c.x, y: c.y,
+                    times: c.times || 1, gapMs: c.gapMs || 200,
+                    cooldownSec: c.cooldownSec || 3, enabled: c.enabled !== false
+                }));
             return {
                 hwnd: w.hwnd,
                 title: w.title,
@@ -5648,9 +5929,20 @@ if (true) {
                 speak: wc.speak !== false,
                 speakPrefix: wc.speakPrefix || '',
                 speakSuffix: wc.speakSuffix || '',
-                keyWaves: wc.keyWaves || []
+                keyWaves: wc.keyWaves || [],
+                waveClicks: waveClicks,
+                textClicks: textClicks
             };
         });
+        // 半成品组提醒（不阻断启动，但明确告知哪些组没生效）
+        const incomplete = [];
+        sel.forEach(w => {
+            const wc = _gmGetWinCfg(w.title);
+            const wcBad = (wc.waveClicks || []).filter(c => c.x == null || !(c.wave > 0)).length;
+            const tcBad = (wc.textClicks || []).filter(c => !c.keyword || !c.region || c.region.w <= 0 || c.x == null).length;
+            if (wcBad + tcBad > 0) incomplete.push((w.title.length > 12 ? w.title.slice(0, 12) + '…' : w.title) + '(' + (wcBad + tcBad) + '组)');
+        });
+        if (incomplete.length) _gmLog('⚠️ 未完成的点击组不会生效（没选位置/没框区域/没填关键词）：' + incomplete.join('、'), true);
         // 检查是否所有窗口都配置了区域
         const unconfigured = winConfigs.filter(wc => wc.region[2] <= 0 || wc.region[3] <= 0);
         if (unconfigured.length) {
@@ -5680,7 +5972,9 @@ if (true) {
         _gmApplyRunning(true);
         if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('游戏监控启动');
         const speakCount = winConfigs.filter(wc => wc.speak).length;
-        _gmLog('▶ 监控启动：' + sel.length + ' 个窗口，每 ' + interval + ' 秒识别一次，' + speakCount + ' 个窗口开启播报');
+        const clickCount = winConfigs.reduce((s, w) => s + w.waveClicks.length + w.textClicks.length, 0);
+        _gmLog('▶ 监控启动：' + sel.length + ' 个窗口，每 ' + interval + ' 秒识别一次，' + speakCount + ' 个窗口开启播报'
+            + (clickCount > 0 ? '，' + clickCount + ' 组自动点击' : '') + '（托盘右键可暂停播报/停止监控）');
         _gmResetWaves(sel);
     };
 
@@ -5750,7 +6044,12 @@ if (true) {
                 const tag = _gmHwndTitle(d.hwnd);
                 _gmLog((tag ? '「' + tag + '」' : '') + (d.msg || ''), !!d.isErr);
             }),
-            listen('gm-state', (ev) => { _gmApplyRunning(!!((ev.payload || {}).running)); })
+            listen('gm-state', (ev) => { _gmApplyRunning(!!((ev.payload || {}).running)); }),
+            // 托盘右键「暂停/恢复播报」→ 面板同步提示（监控/自动点击不受影响）
+            listen('gm-mute', (ev) => {
+                const m = !!((ev.payload || {}).muted);
+                _gmLog(m ? '🔇 托盘已暂停播报（监控与自动点击照常运行）' : '🔊 托盘已恢复播报');
+            })
         ];
     }
 
