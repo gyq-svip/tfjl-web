@@ -23697,6 +23697,12 @@ ${maSection}
                     pageEl.style.display = 'block';
                     adminLoadDiag();
                 }
+            } else if (page === 'shares') {
+                const pageEl = document.getElementById('adminPageShares');
+                if (pageEl) {
+                    pageEl.style.display = 'block';
+                    if (typeof window.adminLoadShareManager === 'function') window.adminLoadShareManager();
+                }
             } else if (page === 'toolbox') {
                 const pageEl = document.getElementById('adminPageToolbox');
                 if (pageEl) {
