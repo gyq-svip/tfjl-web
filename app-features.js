@@ -8292,7 +8292,8 @@
         // qrText：传入项目短链（#pg=）时右下角绘制二维码（扫码直达网页版并自动弹导入）
         // shortCode：8 位项目分享短码（整个项目已上传 Gist，导入方输码即得完整项目）
         // customMsg：用户自定义留言（绘制在二维码左侧、推广语上方，随分享图一起发出去）
-        async function _lineupBuildCanvas(qrText, shortCode, customMsg) {
+        // homeQrText：传入主页链接（#pu=）时项目码左侧再画一个主页二维码（扫码进个人主页看全部作品）
+        async function _lineupBuildCanvas(qrText, shortCode, customMsg, homeQrText) {
             const my = _lineupCollect('u');
             const tm = _lineupCollect('t');
             // 手牌（每人最多10张：上阵7 + 手牌3）：未上阵的卡一并分享，导入方完整复刻
@@ -8316,7 +8317,9 @@
 
             // 底部区（项目短链版才有二维码）：右下角 132px 二维码；左列 = 短码 + 自定义留言 + 推广语 + 生成信息（底边与二维码对齐）
             const QR_SIZE = 132;
+            const HOME_QR_SIZE = 104;                             // 主页二维码（比项目码小一号，并排在左侧）
             const hasQr = !!(qrText && typeof window.qrcode === 'function');
+            const hasHomeQr = !!(homeQrText && typeof window.qrcode === 'function');
             const codeOnlyH = 92;
             const msgH = 26;                                      // 自定义留言行（用户自由编写，空则不占位）
             const hasMsg = !!(customMsg && String(customMsg).trim());
@@ -8485,8 +8488,36 @@
                 ctx.font = '14px "Microsoft YaHei", sans-serif';
                 ctx.fillText('📱 扫码一键导入', qx + QR_SIZE / 2, qy + QR_SIZE + 15);
 
+                // 🏠 主页二维码（勾选后）：项目码左侧并排，底边对齐，扫码进个人主页看全部作品
+                let homeQrLeft = qx - 14;
+                if (hasHomeQr) {
+                    const hx = qx - 16 - HOME_QR_SIZE;
+                    const hy = qy + QR_SIZE - HOME_QR_SIZE;            // 底边与项目码对齐
+                    try {
+                        const hq = window.qrcode(0, 'M');
+                        hq.addData(homeQrText);
+                        hq.make();
+                        const hn = hq.getModuleCount();
+                        const hcell = Math.floor((HOME_QR_SIZE - 10) / hn);
+                        const hoff = (HOME_QR_SIZE - hcell * hn) / 2;
+                        ctx.fillStyle = '#fff';
+                        ctx.fillRect(hx, hy, HOME_QR_SIZE, HOME_QR_SIZE);
+                        ctx.fillStyle = '#7e57c2';                     // 主页码用紫黑色，与项目码区分
+                        for (let r = 0; r < hn; r++) {
+                            for (let c = 0; c < hn; c++) {
+                                if (hq.isDark(r, c)) ctx.fillRect(hx + hoff + c * hcell, hy + hoff + r * hcell, hcell + 0.5, hcell + 0.5);
+                            }
+                        }
+                        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                        ctx.fillStyle = 'rgba(179,157,219,0.95)';
+                        ctx.font = '13px "Microsoft YaHei", sans-serif';
+                        ctx.fillText('🏠 我的主页', hx + HOME_QR_SIZE / 2, hy + HOME_QR_SIZE + 13);
+                        homeQrLeft = hx - 14;
+                    } catch (e) { /* 主页码失败不影响项目码 */ }
+                }
+
                 // 左列（二维码左侧）：自定义留言在上，推广语+生成信息贴齐二维码底边
-                const colL = PAD + 14, colR = qx - 14;
+                const colL = PAD + 14, colR = homeQrLeft;
                 const colW = colR - colL;
                 if (hasMsg) {
                     let mt = String(customMsg).trim();
@@ -8604,7 +8635,10 @@
             if (shortLink) {
                 try {
                     await _lineupEnsureQrLib();
-                    const r2 = await _lineupBuildCanvas(shortLink, shortCode, opts.msg);
+                    // 🏠 勾选「图上加我的主页二维码」：扫码进个人主页看全部作品（引流）
+                    const homeNick = (function () { try { return localStorage.getItem('TFJL_UserName') || ''; } catch (e) { return ''; } })();
+                    const homeQrText = (opts.homeQr && homeNick) ? (LINEUP_SHARE_WEB_BASE + '#pu=' + encodeURIComponent(homeNick)) : '';
+                    const r2 = await _lineupBuildCanvas(shortLink, shortCode, opts.msg, homeQrText);
                     if (r2 && r2.canvas) result = r2;
                 } catch (e) { /* 库加载失败：保留无码版，短链仍走「复制链接」 */ }
             }
@@ -8720,7 +8754,7 @@
 
             // 需求墙同步（选项窗开关，默认开）：后台静默发整个项目，不阻塞弹窗；密码保护时同密码加密上墙
             if (opts.wall && typeof shareProjectToWall === 'function') {
-                Promise.resolve(shareProjectToWall({ auto: true, days: opts.days, pw: opts.pw })).then(function (ok) {
+                Promise.resolve(shareProjectToWall({ auto: true, days: opts.days, pw: opts.pw, cat: opts.cat })).then(function (ok) {
                     if (ok && typeof showToast === 'function') showToast('📢 已同步到需求墙（整个项目，大家可浏览/导入）', 'success');
                 }).catch(function (e) { console.warn('[需求墙同步] 失败:', e); });
             }
@@ -8759,6 +8793,17 @@
                         '<input id="lineupShareWallChk" type="checkbox" style="accent-color:#4db6ac;width:16px;height:16px;cursor:pointer;flex-shrink:0;">' +
                         '<label for="lineupShareWallChk" style="color:rgba(255,255,255,0.8);font-size:0.78rem;cursor:pointer;line-height:1.4;">📢 同步到需求墙（整个项目，大家都能浏览/一键导入；私密分享可取消勾选）</label>' +
                       '</div>' +
+                      '<div id="lineupShareCatBox" style="margin-top:10px;">' +
+                        '<div style="color:rgba(255,255,255,0.65);font-size:0.78rem;margin-bottom:5px;">🏷️ 需求墙分类（同步上墙时归到哪个分类）</div>' +
+                        '<input id="lineupShareCat" list="lineupShareCatList" placeholder="选分类或输入自定义" autocomplete="off" style="width:100%;box-sizing:border-box;background:rgba(0,0,0,0.35);color:#fff;border:1px solid rgba(255,255,255,0.25);border-radius:8px;padding:9px 10px;font-size:0.84rem;">' +
+                        '<datalist id="lineupShareCatList">' +
+                          ((window.WALL_CATEGORIES || ['未分类']).map(function (c) { return '<option value="' + c + '"></option>'; }).join('')) +
+                        '</datalist>' +
+                      '</div>' +
+                      '<div style="display:flex;align-items:center;gap:8px;margin-top:12px;background:rgba(92,107,192,0.1);border:1px solid rgba(92,107,192,0.3);border-radius:8px;padding:8px 10px;">' +
+                        '<input id="lineupShareHomeQrChk" type="checkbox" style="accent-color:#5c6bc0;width:16px;height:16px;cursor:pointer;flex-shrink:0;">' +
+                        '<label for="lineupShareHomeQrChk" style="color:rgba(255,255,255,0.8);font-size:0.78rem;cursor:pointer;line-height:1.4;">🏠 图上加我的主页二维码（扫码进我主页，看我所有分享的作品）</label>' +
+                      '</div>' +
                       '<div style="display:flex;gap:10px;margin-top:16px;">' +
                         '<button id="lineupShareOptsCancel" style="flex:1;background:rgba(255,255,255,0.08);color:#fff;border:1px solid rgba(255,255,255,0.2);padding:10px;border-radius:8px;cursor:pointer;">取消</button>' +
                         '<button id="lineupShareOptsOk" style="flex:1.8;background:linear-gradient(135deg,#ffd700,#ff9800);color:#1a1a2e;border:none;padding:10px;border-radius:8px;cursor:pointer;font-weight:bold;">📤 生成分享</button>' +
@@ -8773,6 +8818,22 @@
                 let wallDefault = true;
                 try { wallDefault = localStorage.getItem('TFJL_ShareWallSync') !== '0'; } catch (e) {}
                 if (wallChk) wallChk.checked = wallDefault;
+                // 分类输入框：默认当前项目分类，记住上次选择；随需求墙勾选联动显示/隐藏
+                const catInput = modal.querySelector('#lineupShareCat');
+                const catBox = modal.querySelector('#lineupShareCatBox');
+                if (catInput) {
+                    let catDefault = '';
+                    try { catDefault = localStorage.getItem('TFJL_ShareWallCat') || ''; } catch (e) {}
+                    if (!catDefault) { try { catDefault = (typeof currentProjectCategory !== 'undefined' && currentProjectCategory) || ''; } catch (e) {} }
+                    catInput.value = catDefault;
+                }
+                if (catBox && wallChk) catBox.style.display = wallChk.checked ? 'block' : 'none';
+                wallChk.onchange = function () { if (catBox) catBox.style.display = wallChk.checked ? 'block' : 'none'; };
+                // 主页二维码勾选：默认关 + 记住上次选择（引流用，想让群里的人进主页就勾上）
+                const homeQrChk = modal.querySelector('#lineupShareHomeQrChk');
+                if (homeQrChk) {
+                    try { homeQrChk.checked = localStorage.getItem('TFJL_ShareHomeQr') === '1'; } catch (e) {}
+                }
                 // 自定义留言：记住上次写的内容（每换一条不用重打）
                 try { msgInput.value = localStorage.getItem('TFJL_ShareMsg') || ''; } catch (e) {}
                 pwChk.onchange = function () { pwInput.style.display = pwChk.checked ? 'block' : 'none'; if (pwChk.checked) pwInput.focus(); };
@@ -8790,7 +8851,13 @@
                     if (wallChk) { try { localStorage.setItem('TFJL_ShareWallSync', wallChk.checked ? '1' : '0'); } catch (e) {} }
                     const msg = (msgInput.value || '').trim();
                     try { localStorage.setItem('TFJL_ShareMsg', msg); } catch (e) {}
-                    finish({ days: days, pw: pw, wall: !!(wallChk && wallChk.checked), msg: msg });
+                    // 🔴 2026-09-01 分类选择：同步上墙时归到所选分类（记住上次，没选则用当前项目分类）
+                    const cat = ((catInput && catInput.value) || '').trim() || (function () { try { return (typeof currentProjectCategory !== 'undefined' && currentProjectCategory) || ''; } catch (e) { return ''; } })();
+                    try { localStorage.setItem('TFJL_ShareWallCat', cat); } catch (e) {}
+                    // 主页二维码勾选持久化 + 传出
+                    const homeQr = !!(homeQrChk && homeQrChk.checked);
+                    try { localStorage.setItem('TFJL_ShareHomeQr', homeQr ? '1' : '0'); } catch (e) {}
+                    finish({ days: days, pw: pw, wall: !!(wallChk && wallChk.checked), msg: msg, cat: cat, homeQr: homeQr });
                 };
             });
         }
@@ -8830,6 +8897,15 @@
                             if (typeof showToast === 'function') showToast('✅ 已拉取项目「' + ((body.project && body.project.name) || '') + '」，选择名称和分类后导入', 'success');
                             _projShareImportBody(body);
                         } catch (e) {
+                            // 🔴 2026-09-01 降级兼容：需求墙脚本类分享的 Gist 没有 project.json（是 txt 格式），
+                            //   主页「分享」按钮生成的 #pg= 链接对脚本作品同样有效：按脚本智能导入处理
+                            if (typeof importScriptToTxtFiles === 'function') {
+                                try {
+                                    if (typeof showToast === 'function') showToast('📄 检测到脚本分享，正在按脚本导入…', 'info');
+                                    importScriptToTxtFiles('https://gist.github.com/tfjl/' + mProj[1]);
+                                    return;
+                                } catch (e2) { /* 脚本导入失败则走原始报错 */ }
+                            }
                             if (typeof showToast === 'function') showToast('❌ 拉取项目分享失败：' + (e && e.message || e), 'error');
                         }
                     }
@@ -9123,7 +9199,7 @@
 
             // 需求墙同步（选项窗开关，默认开）：与阵容分享同款，密码保护时同密码加密上墙
             if (opts.wall && typeof shareProjectToWall === 'function') {
-                Promise.resolve(shareProjectToWall({ auto: true, days: opts.days, pw: opts.pw })).then(function (ok) {
+                Promise.resolve(shareProjectToWall({ auto: true, days: opts.days, pw: opts.pw, cat: opts.cat })).then(function (ok) {
                     if (ok && typeof showToast === 'function') showToast('📢 已同步到需求墙（整个项目，大家可浏览/导入）', 'success');
                 }).catch(function (e) { console.warn('[需求墙同步] 失败:', e); });
             }
