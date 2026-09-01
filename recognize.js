@@ -709,8 +709,12 @@
     return null;                                // 仍不确定 → 全比
   }
 
-  // 构建模板库（首次较慢，结果缓存）。skinRegistry 来自 app-local.js(本地) 或 skins-web.js(远程)。
-  // statusEl：传入则实时显示「构建皮肤模板库 X/总数」，避免用户以为卡死。
+  // 皮肤模板库缓存（高成功率构建后存 localStorage，下次秒开，避免每次重跑 418 张）
+  const SKIN_TPL_CACHE_KEY = 'tfjl_skin_tpls_v2';
+  function _rebuildTplQ(){ _skinTplByQ = {金:[],紫:[],蓝:[],绿:[],白:[]}; for(const t of (_skinTpls||[])){ (_skinTplByQ[t.quality] || (_skinTplByQ[t.quality]=[])).push(t); } }
+  function _saveTplCache(sig, tpls){ try{ localStorage.setItem(SKIN_TPL_CACHE_KEY+'_'+sig, JSON.stringify(tpls)); }catch(e){} }
+  function _loadTplCache(sig){ try{ const s=localStorage.getItem(SKIN_TPL_CACHE_KEY+'_'+sig); return s?JSON.parse(s):null; }catch(e){ return null; } }
+  // 构建模板库：并行分批加载（提速）+ 60s 整体兜底 + 成功数诊断 + 高成功率缓存。skinRegistry 来自 app-local.js / skins-web.js。
   function buildSkinTpls(statusEl){
     if(_skinTpls) return Promise.resolve(_skinTpls);
     if(_skinTplBuilding) return _skinTplBuilding;
@@ -718,26 +722,33 @@
       const reg = window.skinRegistry || {};
       const entries = [];
       for(const hero of Object.keys(reg)) for(const sk of (reg[hero]||[])) entries.push({hero, sk});
-      const total = entries.length; let done = 0; const built = [];
-      for(const e of entries){
-        const im = await loadSkinImg(e.sk); done++;
-        if(statusEl) statusEl.textContent = '构建皮肤模板库 '+done+'/'+total+'…';
-        if(!im) continue;
-        const feat = extractCardFeature(im, 64);
-        if(!feat) continue;
-        built.push({ hero:e.hero, skinName:e.sk.name, feat, quality: HERO_QUALITY[e.hero]||'金' });
+      const total = entries.length;
+      const sig = 'n'+total;
+      const cached = _loadTplCache(sig);
+      if(cached && cached.length){ _skinTpls = cached; _rebuildTplQ(); if(statusEl) statusEl.textContent = '皮肤模板库已加载（缓存 '+cached.length+' 张）'; return cached; }
+      let done = 0, okCount = 0; const built = []; const BATCH = 24; // 24 并发，418 张约 18 批
+      for(let i=0;i<entries.length;i+=BATCH){
+        const batch = entries.slice(i, i+BATCH);
+        const res = await Promise.all(batch.map(async (e)=>{
+          const im = await loadSkinImg(e.sk); if(!im) return null;
+          const feat = extractCardFeature(im, 64); if(!feat) return null;
+          return { hero:e.hero, skinName:e.sk.name, feat, quality: HERO_QUALITY[e.hero]||'金' };
+        }));
+        res.forEach(t=>{ if(t){ built.push(t); okCount++; } });
+        done += batch.length;
+        if(statusEl) statusEl.textContent = '构建皮肤模板库 '+done+'/'+total+'（成功 '+okCount+'）…';
       }
-      _skinTpls = built;
-      _skinTplByQ = { 金:[], 紫:[], 蓝:[], 绿:[], 白:[] };
-      for(const t of built){ (_skinTplByQ[t.quality] || (_skinTplByQ[t.quality]=[])).push(t); }
+      _skinTpls = built; _rebuildTplQ();
+      if(okCount >= total*0.9) _saveTplCache(sig, built); // 仅高成功率才缓存，避免缓存残缺模板
+      if(statusEl) statusEl.textContent = '皮肤模板库完成：'+okCount+'/'+total+' 张'+(okCount<total*0.9?'（部分皮肤图加载失败，请检查皮肤是否已同步）':'');
       return built;
     })();
-    // 整体 20s 兜底：极端情况下（如大量皮肤图加载缓慢）绝不永久卡在「构建中」，先返回已构建的部分模板
+    // 整体 60s 兜底：并行构建 418 张足够；极端情况绝不永久卡在「构建中」，先返回已构建的部分
     _skinTplBuilding = Promise.race([p, new Promise(res=>setTimeout(()=>{
       if(!_skinTpls){ _skinTpls = []; _skinTplByQ = {金:[],紫:[],蓝:[],绿:[],白:[]}; }
-      if(statusEl) statusEl.textContent = '皮肤模板库构建超时，使用已加载的部分（' + (_skinTpls.length) + ' 张）';
+      if(statusEl) statusEl.textContent = '皮肤模板库构建超时，使用已加载的部分（'+_skinTpls.length+' 张）';
       res(_skinTpls);
-    }, 20000))]);
+    }, 60000))]);
     return _skinTplBuilding;
   }
   // 单卡匹配：全池算 top3（跨品质，供诊断）；同时优先同品质最近者作为判定
@@ -950,8 +961,7 @@
             </div>
             <canvas id="recCanvas" style="width:100%;max-height:46vh;background:#000;border-radius:8px;display:block;"></canvas>
             <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
-              <button id="recAuto" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;border:none;padding:9px 14px;border-radius:8px;cursor:pointer;font-weight:600;">⚡ 文字识别(无需对齐)</button>
-              <button id="recImgBtn" style="background:linear-gradient(135deg,#7e57c2,#4527a0);color:#fff;border:none;padding:9px 14px;border-radius:8px;cursor:pointer;font-weight:600;" title="用现有皮肤图跟 10 张卡逐张比对，最像哪个皮肤就判哪个英雄（支持直接贴图/选择图/框选区域）">🖼️ 图像识别</button>
+              <button id="recSmart" style="background:linear-gradient(135deg,#ff7043,#bf360c);color:#fff;border:none;padding:9px 14px;border-radius:8px;cursor:pointer;font-weight:600;" title="同时跑文字识别(OCR)+图像比对，两种结果分别显示，无需二选一">🚀 综合识别(文字+图像)</button>
               <button id="recFill" style="background:linear-gradient(135deg,#42a5f5,#1565c0);color:#fff;border:none;padding:9px 14px;border-radius:8px;cursor:pointer;">➡ 填入脚本生成</button>
               <button id="recImportHand" style="background:linear-gradient(135deg,#66bb6a,#2e7d32);color:#fff;border:none;padding:9px 14px;border-radius:8px;cursor:pointer;font-weight:600;">🃏 导入到手牌</button>
               <button id="recLaunch" style="background:linear-gradient(135deg,#ff9800,#e65100);color:#fff;border:none;padding:9px 14px;border-radius:8px;cursor:pointer;font-weight:600;" title="关掉 Umi-OCR 后，点此重新打开它">🚀 启动识别引擎</button>
@@ -974,6 +984,13 @@
               <div style="margin-top:10px;padding-top:9px;border-top:1px dashed rgba(255,255,255,0.18);color:#ffb74d;">
                 ⏳ <b>第一次打开会自动安装识别引擎，稍慢一些，仅此一次</b>；每台电脑性能不同，快慢有差异，请耐心等待，装好后以后打开就快了。
               </div>
+            </div>
+            <div id="recImgWrap" style="margin:10px 0;display:none;">
+              <div style="font-size:0.8rem;color:#ce93d8;font-weight:700;margin-bottom:4px;">🖼️ 图像识别结果</div>
+              <table style="width:100%;border-collapse:collapse;font-size:0.8rem;">
+                <thead><tr style="text-align:left;color:#ce93d8;"><th style="padding:4px;">#</th><th>来源</th><th>英雄</th><th>匹配</th><th>操作</th></tr></thead>
+                <tbody id="recImgBox"></tbody>
+              </table>
             </div>
             <table style="width:100%;border-collapse:collapse;font-size:0.8rem;">
               <thead><tr style="text-align:left;color:#90caf9;">
@@ -1108,7 +1125,12 @@
         renderRecDr(results); // 识别完立即算并展示减伤
       });
     }
-    $('recAuto').onclick = runAuto;
+    $('recSmart').onclick = ()=>{
+      if(!currentImg){ alert('请先粘贴/选择/截图一张阵容图（或点「📐 框选阵容区域」）'); return; }
+      runImgAuto(); // 图像识别 → recImgBox
+      if(isTauri()){ runAuto(); } // 文字识别(OCR) → recBody（需 Umi-OCR 引擎）
+      else { const st=$('recStatus'); if(st) st.textContent='网页版无文字识别(OCR)，已显示图像识别结果'; }
+    };
 
     // ====================== 🖼️ 图像识别（皮肤比对） ======================
     function runImgAuto(){
@@ -1116,7 +1138,7 @@
       recognizeImageBySkin(currentImg, $('recStatus'), (results, source, rowCount)=>{
         $('recSrc').textContent = '来源: '+source;
         const intro=$('recIntro'); if(intro && results && results.length) intro.style.display='none';
-        const tb=$('recBody');
+        const tb=$('recImgBox'); const wrap=$('recImgWrap'); if(wrap) wrap.style.display='block';
         const render = ()=>{
           tb.innerHTML='';
           results.forEach(r=>{
