@@ -5305,6 +5305,9 @@ if (true) {
                         <select id="gmCfgSelect" onchange="_gmSwitchConfigTarget()" style="background:rgba(0,0,0,0.4);color:#fff;border:1px solid rgba(255,152,0,0.4);border-radius:6px;padding:5px 10px;font-size:0.78rem;max-width:280px;cursor:pointer;"></select>
                     </div>
                     <div id="gmCfgHint" style="color:rgba(255,255,255,0.35);font-size:0.68rem;margin-bottom:8px;">下拉选择窗口后，下方设置仅对该窗口生效。不同窗口可设不同的波数位置和播报文字</div>
+                    <div style="margin:0 0 10px;">
+                        <button onclick="window._gmCopyCfgToOthers()" title="多开时操作都一样：配好一个窗口，其余窗口一键套用同样的配置" style="background:rgba(156,39,176,0.18);color:#ce93d8;border:1px solid rgba(156,39,176,0.4);padding:5px 11px;border-radius:6px;cursor:pointer;font-size:0.72rem;">📋 把当前窗口配置套用到其他窗口</button>
+                    </div>
 
                     <div style="margin-bottom:10px;">
                         <label style="color:rgba(255,255,255,0.75);font-size:0.82rem;display:block;margin-bottom:5px;">③ 波数识别区域（当前窗口）</label>
@@ -5450,7 +5453,9 @@ if (true) {
             cb.value = String(w.hwnd);
             cb.dataset.idx = String(i);
             cb.className = 'gm-win-cb';
-            if (savedTitles.some(t => w.title.includes(t) || t.includes(w.title.slice(0, 20)))) cb.checked = true;
+            // 🔴 2026-09-02 用户需求：多开时默认「全部不勾选」，不再自动勾上上次选过的那些窗口
+            //    （以前每次打开面板都要手动挨个取消，很烦）。要用哪个窗口由用户自己勾。
+            cb.checked = false;
             cb.onchange = () => {
                 if (list.querySelectorAll('.gm-win-cb:checked').length === 0) cb.checked = true;
                 _gmPopulateCfgSelect();
@@ -5646,6 +5651,74 @@ if (true) {
         }
     };
 
+    // 🔴 2026-09-02 手动执行整条规则：不用等波数、不用等识别到文字，点「▶ 执行」立刻跑一遍动作序列。
+    //    用途：① 就想定点点一下（如每局手动点开始）② 先手动验证动作配得对不对，再挂到触发器上。
+    //    支持：点击（走 gm_click）、延时；输入文字由 Rust 监控线程实现，手动执行暂不支持（会提示跳过）。
+    window._gmRunRuleNow = async function (ri) {
+        const win = _gmFindCfgWin();
+        if (!win) { _gmLog('请先勾选游戏窗口', true); return; }
+        const wc = _gmGetWinCfg(_gmCfgTarget);
+        const rule = wc.rules && wc.rules[ri];
+        if (!rule) return;
+        if (rule.enabled === false) { _gmLog('这条规则是「停用」状态，先勾上启用再执行', true); return; }
+        const acts = rule.actions || [];
+        if (!acts.length) { _gmLog('这条规则还没有动作，先添加动作', true); return; }
+        _gmLog('▶ 手动执行第 ' + (ri + 1) + ' 条规则（共 ' + acts.length + ' 步）…');
+        for (let ai = 0; ai < acts.length; ai++) {
+            const act = acts[ai];
+            if (act.type === 'click') {
+                if (act.x == null) { _gmLog('  第 ' + (ai + 1) + ' 步还没选位置，已跳过', true); continue; }
+                try {
+                    await window.gmClick(win.hwnd, act.x, act.y, act.times || 1, act.gapMs || 200);
+                    _gmLog('  ✔ 第 ' + (ai + 1) + ' 步点击完成');
+                } catch (e) {
+                    _gmLog('  ✘ 第 ' + (ai + 1) + ' 步点击失败：' + ((e && e.message) || e), true);
+                    return;
+                }
+            } else if (act.type === 'delay') {
+                const ms = Math.max(100, Math.min(60000, act.ms || 500));
+                _gmLog('  ⏳ 第 ' + (ai + 1) + ' 步延时 ' + ms + 'ms');
+                await new Promise(function (r) { setTimeout(r, ms); });
+            } else if (act.type === 'key') {
+                _gmLog('  ⚠ 第 ' + (ai + 1) + ' 步「输入文字」仅监控运行时支持，手动执行已跳过', true);
+            }
+        }
+        _gmLog('✅ 规则执行完成');
+    };
+
+    // 🔴 2026-09-02 多开复用：把「当前配置窗口」的整套配置复制给其他勾选的窗口。
+    //    多开时操作完全一样，挨个窗口配一遍太累 —— 配好一个，其余一键套用。
+    window._gmCopyCfgToOthers = function () {
+        const src = _gmCfgTarget;
+        if (!src) { _gmLog('请先在 ② 里选择作为模板的那个配置窗口', true); return; }
+        const sel = _gmSelectedWindows();
+        const targets = sel.filter(function (w) { return w.title !== src; });
+        if (!targets.length) { _gmLog('没有其他勾选的窗口可套用（先在 ① 里勾选目标窗口）', true); return; }
+        const srcName = src.length > 20 ? src.slice(0, 20) + '…' : src;
+        if (!window.confirm('把「' + srcName + '」的配置套用到另外 ' + targets.length + ' 个窗口？\n\n包含：波数识别区域、语音播报、关键波数、自动执行规则。\n（这些窗口原有的配置会被覆盖）')) return;
+        const srcCfg = _gmGetWinCfg(src);
+        const copy = JSON.parse(JSON.stringify({
+            region: srcCfg.region || null,
+            speak: srcCfg.speak !== false,
+            speakPrefix: srcCfg.speakPrefix || '',
+            speakSuffix: srcCfg.speakSuffix || '',
+            keyWaves: (srcCfg.keyWaves || []).slice(),
+            rules: (srcCfg.rules || []).map(function (r) { return JSON.parse(JSON.stringify(r)); })
+        }));
+        const cfg = _gmLoadCfg();
+        if (!cfg.winConfigs) cfg.winConfigs = {};
+        let n = 0;
+        targets.forEach(function (w) {
+            try { cfg.winConfigs[w.title] = Object.assign({}, (cfg.winConfigs[w.title] || {}), copy); n++; }
+            catch (e) {}
+        });
+        _gmSaveCfg(cfg);
+        _gmLog('✅ 已把配置套用到 ' + n + ' 个窗口（多开同操作不用重复配）');
+        if (typeof showToast === 'function') showToast('✅ 配置已套用到 ' + n + ' 个窗口', 'success');
+        _gmPopulateCfgSelect();
+        if (typeof gmRefreshWindows === 'function') gmRefreshWindows();
+    };
+
     // 点选 click 动作位置：截整窗图 → 图上点一下 → 存比例坐标
     window._gmPickActionPos = async function (ri, ai) {
         const win = _gmFindCfgWin();
@@ -5767,6 +5840,14 @@ if (true) {
                     + '<input type="number" data-role="rule-wave" data-r="' + ri + '" value="' + (r.trigger.wave || 10) + '" style="width:46px;padding:4px 6px;border-radius:5px;border:1px solid rgba(255,255,255,0.15);background:rgba(0,0,0,0.3);color:#fff;font-size:0.7rem;">'
                     + '<span style="color:#4dd0e1;font-size:0.7rem;font-weight:bold;">波时 →</span>');
             }
+            // 「▶ 执行」：不依赖波数/文字触发，立刻手动跑一遍这条规则的动作序列
+            const runRuleBtn = document.createElement('button');
+            runRuleBtn.textContent = '▶ 执行';
+            runRuleBtn.title = '不等触发条件，立刻执行一次这条规则的动作（定点点击/连点用这个）';
+            runRuleBtn.style.cssText = 'padding:4px 9px;border-radius:5px;border:1px solid rgba(255,215,0,0.5);background:rgba(255,215,0,0.12);color:#ffd700;cursor:pointer;font-size:0.7rem;white-space:nowrap;';
+            runRuleBtn.onclick = () => window._gmRunRuleNow(ri);
+            head.appendChild(runRuleBtn);
+
             const onLbl = document.createElement('label');
             onLbl.style.cssText = 'display:flex;align-items:center;gap:3px;color:rgba(255,255,255,0.55);font-size:0.68rem;cursor:pointer;margin-left:auto;';
             onLbl.innerHTML = '启用 <input type="checkbox" data-role="rule-on" data-r="' + ri + '"' + (r.enabled !== false ? ' checked' : '') + ' style="accent-color:#ce93d8;cursor:pointer;">';
