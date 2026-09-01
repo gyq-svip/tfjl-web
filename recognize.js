@@ -773,19 +773,31 @@
     if(!r){ return; }
     const heroes = Object.keys(window.skinRegistry||{});
     if(!heroes.length){ alert('皮肤库为空，无法选择英雄'); return; }
-    recChoice({
-      title:'✏️ 修正为哪个英雄',
-      desc:'选错就选正确的——系统会记住这张卡的特征，下次优先用（越修越准）',
-      maxHeight:'80vh',
-      items: heroes.map(h=>({label:h, value:h})),
-      onPick:(v)=>{
-        r.hero=v; r.skin='(本地修正)'; r.source='local'; r.quality=null;
-        if(r.feat) saveLocalCorrection(v, r.feat);
-        rerender();
-        overlay._results=results; updateRecWarn(results); renderRecDr(results);
-        $('recStatus').textContent = '已记录修正：'+v+'（本地学习样本 +1）';
-      }
-    });
+    const apply = (v)=>{
+      r.hero=v; r.skin='(本地修正)'; r.source='local'; r.quality=null;
+      if(r.feat) saveLocalCorrection(v, r.feat);
+      rerender();
+      overlay._results=results; updateRecWarn(results); renderRecDr(results);
+      $('recStatus').textContent = '已记录修正：'+v+'（本地学习样本 +1）';
+    };
+    // 优先用通用选择器（首字母/关键字搜索，脚本管理同款，输入卡名更快）；无则回退列表弹窗
+    if(typeof window.openGenericPicker === 'function'){
+      const items = heroes.map(h=>({ value:h, label:h, py: (window.hanziInitials?window.hanziInitials(h):'') }));
+      window.openGenericPicker({
+        title:'✏️ 修正为哪个英雄',
+        searchPlaceholder:'输入首字母（如 sl=水灵）或卡名关键字…',
+        items: items,
+        onPick: function(v){ apply(v); }
+      });
+    } else {
+      recChoice({
+        title:'✏️ 修正为哪个英雄',
+        desc:'选错就选正确的——系统会记住这张卡的特征，下次优先用（越修越准）',
+        maxHeight:'80vh',
+        items: heroes.map(h=>({label:h, value:h})),
+        onPick: apply
+      });
+    }
   }
 
   // 从大图裁剪一格（返回 canvas，供 extractCardFeature 用）
