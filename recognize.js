@@ -747,7 +747,7 @@
         if(statusEl) statusEl.textContent = '构建皮肤模板库 '+done+'/'+total+'（成功 '+okCount+'）…';
       }
       _skinTpls = built; _rebuildTplQ();
-      if(okCount >= total*0.9) _saveTplCache(sig, built); // 仅高成功率才缓存，避免缓存残缺模板
+      if(okCount >= total*0.5) _saveTplCache(sig, built); // 半成功即缓存，避免每次刷新都重跑 60s（皮肤同步差时也能秒开，只是识别略差）
       if(statusEl) statusEl.textContent = '皮肤模板库完成：'+okCount+'/'+total+' 张'+(okCount<total*0.9?'（部分皮肤图加载失败，请检查皮肤是否已同步）':'');
       return built;
     })();
@@ -980,6 +980,7 @@
                   <option value="strict">严格</option>
                 </select>
               </label>
+              <button id="recBuildBtn" style="background:linear-gradient(135deg,#78909c,#37474f);color:#fff;border:none;padding:9px 14px;border-radius:8px;cursor:pointer;font-weight:600;" title="先把 413 张皮肤图预处理成特征模板库，构建完成后识别秒出，无需每次等「构建皮肤模板库」">🛠 构建模板库</button>
               <button id="recFill" style="background:linear-gradient(135deg,#42a5f5,#1565c0);color:#fff;border:none;padding:9px 14px;border-radius:8px;cursor:pointer;">➡ 填入脚本生成</button>
               <button id="recImportHand" style="background:linear-gradient(135deg,#66bb6a,#2e7d32);color:#fff;border:none;padding:9px 14px;border-radius:8px;cursor:pointer;font-weight:600;">🃏 导入到手牌</button>
               <button id="recLaunch" style="background:linear-gradient(135deg,#ff9800,#e65100);color:#fff;border:none;padding:9px 14px;border-radius:8px;cursor:pointer;font-weight:600;" title="关掉 Umi-OCR 后，点此重新打开它">🚀 启动识别引擎</button>
@@ -1143,6 +1144,21 @@
         renderRecDr(results); // 识别完立即算并展示减伤
       });
     }
+    // 🛠 手动构建模板库：先点它构建（带进度），构建完状态明确，之后识别直接复用秒出
+    const recBuildBtn = $('recBuildBtn');
+    if(recBuildBtn){
+      recBuildBtn.onclick = async ()=>{
+        const old=recBuildBtn.textContent; recBuildBtn.disabled=true; recBuildBtn.textContent='⏳ 构建中…';
+        try{
+          const tpls = await buildSkinTpls($('recStatus'));
+          const ok = tpls?tpls.length:0;
+          recBuildBtn.textContent='✅ 已就绪('+ok+')';
+          if($('recStatus')) $('recStatus').textContent='模板库已构建完成：'+ok+' 张，可点 🚀 综合识别';
+        }catch(e){ recBuildBtn.textContent='❌ 失败'; alert('构建模板库失败：'+(e&&e.message||e)); }
+        finally{ setTimeout(()=>{ recBuildBtn.disabled=false; recBuildBtn.textContent=old; }, 1500); }
+      };
+    }
+
     $('recSmart').onclick = ()=>{
       if(!currentImg){ alert('请先粘贴/选择/截图一张阵容图（或点「📐 框选阵容区域」）'); return; }
       runImgAuto(); // 图像识别 → recImgBox
