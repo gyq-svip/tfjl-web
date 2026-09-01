@@ -671,24 +671,35 @@
     const ctx=cv.getContext('2d');
     try{ ctx.drawImage(img,0,0,size,size); }catch(e){ return null; }
     let data; try{ data=ctx.getImageData(0,0,size,size).data; }catch(e){ return null; }
-    const pts=[[2,2],[size-3,2],[2,size-3],[size-3,size-3],[2,12],[size-3,12]];
-    let rs=0,gs=0,bs=0,n=0;
-    for(const [x,y] of pts){
-      for(let dy=-2;dy<=2;dy++) for(let dx=-2;dx<=2;dx++){
-        const px=Math.min(size-1,Math.max(0,x+dx)), py=Math.min(size-1,Math.max(0,y+dy));
+    // 四角各取 9×9 大面积区域；要求四角主色一致(方差小)才判品质，否则返回 null → 全 413 比
+    const corners=[[2,2],[size-3,2],[2,size-3],[size-3,size-3]];
+    const samples=[];
+    for(const [cx,cy] of corners){
+      let rs=0,gs=0,bs=0,n=0;
+      for(let dy=-4;dy<=4;dy++) for(let dx=-4;dx<=4;dx++){
+        const px=Math.min(size-1,Math.max(0,cx+dx)), py=Math.min(size-1,Math.max(0,cy+dy));
         const i=(py*size+px)*4; rs+=data[i]; gs+=data[i+1]; bs+=data[i+2]; n++;
       }
+      samples.push([rs/n, gs/n, bs/n]);
     }
-    rs/=n; gs/=n; bs/=n;
-    const mx=Math.max(rs,gs,bs), mn=Math.min(rs,gs,bs);
-    if(mx<70) return '白';
-    if(bs>=rs && bs>=gs && bs>mx*0.45) return '蓝';
-    if(gs>=rs && gs>=bs && gs>mx*0.45) return '绿';
-    if(rs>=gs && rs>=bs && gs>mn*1.3) return '金';
-    if((rs>=gs*0.8) && (rs>=bs) && (bs>gs)) return '紫';
-    if(rs>bs && rs>gs) return '金';
-    if(bs>rs && bs>gs) return '紫';
-    return null;
+    let mR=0,mG=0,mB=0;
+    samples.forEach(s=>{ mR+=s[0]; mG+=s[1]; mB+=s[2]; });
+    mR/=4; mG/=4; mB/=4;
+    let varSum=0;
+    samples.forEach(s=>{ varSum += (s[0]-mR)**2 + (s[1]-mG)**2 + (s[2]-mB)**2; });
+    const variance = varSum/4;
+    if(variance > 700) return null;            // 四角主色不一致 → 背景杂，全比
+    const mx=Math.max(mR,mG,mB), mn=Math.min(mR,mG,mB);
+    const sat = mx - mn;
+    if(mx<70) return null;                      // 过暗/灰白，难判
+    if(sat < 45) return null;                   // 饱和度低，难判
+    if(mB>=mR && mB>=mG && mB>mx*0.45) return '蓝';
+    if(mG>=mR && mG>=mB && mG>mx*0.45) return '绿';
+    if(mR>=mG && mR>=mB && mG>mn*1.3) return '金';
+    if((mR>=mG*0.8) && (mR>=mB) && (mB>mG)) return '紫';
+    if(mR>mB && mR>mG) return '金';
+    if(mB>mR && mB>mG) return '紫';
+    return null;                                // 仍不确定 → 全比
   }
 
   // 构建模板库（首次较慢，结果缓存）。skinRegistry 来自 app-local.js(本地) 或 skins-web.js(远程)。
@@ -734,6 +745,49 @@
     return { hero: best?best.hero:null, skin: best?best.skinName:null, dist: bestD, quality: usedQ };
   }
 
+  // 本地学习修正：用户识别错了可手动指定正确英雄，把该卡特征存本地；下次优先匹配
+  const LOCAL_CORR_KEY = 'tfjl_rec_corrections_v1';
+  let _localCorr = null;
+  function loadLocalCorrections(){
+    if(_localCorr) return _localCorr;
+    try{ _localCorr = JSON.parse(localStorage.getItem(LOCAL_CORR_KEY)||'[]'); }catch(e){ _localCorr=[]; }
+    return _localCorr;
+  }
+  function saveLocalCorrection(hero, feat){
+    loadLocalCorrections();
+    _localCorr.push({ hero, feat, ts: Date.now() });
+    try{ localStorage.setItem(LOCAL_CORR_KEY, JSON.stringify(_localCorr)); }catch(e){}
+  }
+  function matchWithLocal(feature){
+    const local = loadLocalCorrections();
+    if(!local.length) return null;
+    let best=null, bestD=Infinity;
+    for(const c of local){ const d=featDist(feature, c.feat); if(d<bestD){ bestD=d; best=c; } }
+    if(bestD < 80) return { hero: best.hero, dist: bestD }; // 本地样本是我确认过的，阈值收紧
+    return null;
+  }
+  function clearLocalCorrections(){ _localCorr=[]; try{ localStorage.removeItem(LOCAL_CORR_KEY); }catch(e){} }
+  // 用户修正：把当前格特征存为正确英雄的本地样本，下次优先匹配
+  function fixHero(idx, results, rerender){
+    const r = results.find(x=>x.idx===idx);
+    if(!r){ return; }
+    const heroes = Object.keys(window.skinRegistry||{});
+    if(!heroes.length){ alert('皮肤库为空，无法选择英雄'); return; }
+    recChoice({
+      title:'✏️ 修正为哪个英雄',
+      desc:'选错就选正确的——系统会记住这张卡的特征，下次优先用（越修越准）',
+      maxHeight:'80vh',
+      items: heroes.map(h=>({label:h, value:h})),
+      onPick:(v)=>{
+        r.hero=v; r.skin='(本地修正)'; r.source='local'; r.quality=null;
+        if(r.feat) saveLocalCorrection(v, r.feat);
+        rerender();
+        overlay._results=results; updateRecWarn(results); renderRecDr(results);
+        $('recStatus').textContent = '已记录修正：'+v+'（本地学习样本 +1）';
+      }
+    });
+  }
+
   // 从大图裁剪一格（返回 canvas，供 extractCardFeature 用）
   function cropCell(img, x, y, w, h){
     const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
@@ -755,10 +809,16 @@
       const x=Math.round(c*W/cols), y=Math.round(r*H/rows), w=Math.round(W/cols), h=Math.round(H/rows);
       const cell = cropCell(img, x, y, w, h);
       const feat = extractCardFeature(cell, 64);
-      const q = sampleBgQuality(cell);
-      const m = feat ? matchCard(feat, q) : {hero:null,skin:null,dist:Infinity,quality:q};
-      results.push({ idx: r*cols+c+1, hero:m.hero, skin:m.skin, dist:m.dist, quality:q,
-        box:{x0:x,y0:y,x1:x+w,y1:y+h, cx:x+w/2, cy:y+h/2, w, h} });
+      let hero=null, skin=null, dist=Infinity, quality=null, source='skin';
+      const localM = feat ? matchWithLocal(feat) : null;
+      if(localM){ hero=localM.hero; skin='(本地修正)'; dist=localM.dist; source='local'; }
+      else if(feat){
+        const q = sampleBgQuality(cell);
+        const m = matchCard(feat, q);
+        hero=m.hero; skin=m.skin; dist=m.dist; quality=q;
+      }
+      results.push({ idx: r*cols+c+1, hero, skin, dist, quality, source,
+        feat, box:{x0:x,y0:y,x1:x+w,y1:y+h, cx:x+w/2, cy:y+h/2, w, h} });
     }
     drawBoxes($('recCanvas'), img, results.map(rr=>({idx:rr.idx, box:rr.box, hero:rr.hero, valid:{ok:!!rr.hero}})));
     onDone(results, '图像识别(皮肤比对)', rows);
@@ -1036,20 +1096,26 @@
       recognizeImageBySkin(currentImg, $('recStatus'), (results, source, rowCount)=>{
         $('recSrc').textContent = '来源: '+source;
         const intro=$('recIntro'); if(intro && results && results.length) intro.style.display='none';
-        const tb=$('recBody'); tb.innerHTML='';
-        results.forEach(r=>{
-          r._deleted=false;
-          const tr=document.createElement('tr'); tr.style.borderTop='1px solid #333';
-          tr.innerHTML=`<td style="padding:4px;color:#90a4ae;">${r.idx}</td>`
-            +`<td style="padding:4px;">图像</td>`
-            +`<td style="padding:4px;font-weight:600;color:#fff;">${r.hero||'?'}</td>`
-            +`<td style="padding:4px;">${r.hero?('<span style="color:#2e7d32;font-weight:600;">✓ 像 '+escapeHtml(r.skin||'')+'</span>'+(r.quality?' <span style="color:#90caf9;">'+r.quality+'</span>':'')):'<span style="color:#c62828;">✗ 未匹配</span>'}</td>`
-            +`<td style="padding:4px;"><button data-del="${r.idx}" title="删除这张" style="background:rgba(244,67,54,0.25);color:#ff8a80;border:none;border-radius:6px;cursor:pointer;padding:2px 8px;font-size:0.72rem;">✕ 删</button></td>`;
-          tb.appendChild(tr);
-        });
-        tb.querySelectorAll('button[data-del]').forEach(b=>{ b.onclick=()=>{ const id=+b.getAttribute('data-del'); const r=results.find(x=>x.idx===id); if(r) r._deleted=true; const tr=b.closest('tr'); if(tr){ tr.style.opacity='0.35'; tr.style.textDecoration='line-through'; } updateRecWarn(results); renderRecDr(results); }; });
+        const tb=$('recBody');
+        const render = ()=>{
+          tb.innerHTML='';
+          results.forEach(r=>{
+            r._deleted=false;
+            const tr=document.createElement('tr'); tr.style.borderTop='1px solid #333';
+            tr.innerHTML=`<td style="padding:4px;color:#90a4ae;">${r.idx}</td>`
+              +`<td style="padding:4px;">图像</td>`
+              +`<td style="padding:4px;font-weight:600;color:#fff;">${r.hero||'?'}</td>`
+              +`<td style="padding:4px;">${r.hero?('<span style="color:#2e7d32;font-weight:600;">✓ 像 '+escapeHtml(r.skin||'')+'</span>'+(r.quality?' <span style="color:#90caf9;">'+r.quality+'</span>':'')+(r.source==='local'?' <span style="color:#ffb74d;">[本地]</span>':'')):'<span style="color:#c62828;">✗ 未匹配</span>'}</td>`
+              +`<td style="padding:4px;"><button data-fix="${r.idx}" title="纠正为正确英雄" style="background:rgba(255,193,7,0.22);color:#ffd54f;border:none;border-radius:6px;cursor:pointer;padding:2px 8px;font-size:0.72rem;">✏️ 修正</button></td>`
+              +`<td style="padding:4px;"><button data-del="${r.idx}" title="删除这张" style="background:rgba(244,67,54,0.25);color:#ff8a80;border:none;border-radius:6px;cursor:pointer;padding:2px 8px;font-size:0.72rem;">✕ 删</button></td>`;
+            tb.appendChild(tr);
+          });
+          tb.querySelectorAll('button[data-del]').forEach(b=>{ b.onclick=()=>{ const id=+b.getAttribute('data-del'); const r=results.find(x=>x.idx===id); if(r) r._deleted=true; const tr=b.closest('tr'); if(tr){ tr.style.opacity='0.35'; tr.style.textDecoration='line-through'; } updateRecWarn(results); renderRecDr(results); }; });
+          tb.querySelectorAll('button[data-fix]').forEach(b=>{ b.onclick=()=>{ fixHero(+b.getAttribute('data-fix'), results, render); }; });
+        };
+        render();
         overlay._results = results; updateRecWarn(results);
-        $('recStatus').textContent = `识别完成：${results.filter(rr=>rr.hero).length}/${results.length} 张匹配到英雄（${rowCount} 行）`;
+        $('recStatus').textContent = `识别完成：${results.filter(rr=>rr.hero).length}/${results.length} 张匹配到英雄（${rowCount} 行；识别错点 ✏️ 修正，越修越准）`;
         renderRecDr(results);
       });
     }
@@ -1434,5 +1500,5 @@
   else buildUI();
 
   // 调试/测试钩子：暴露图像识别核心函数，便于本地验证（不影响正常使用）
-  window.__recImg = { buildSkinTpls, recognizeImageBySkin, extractCardFeature, sampleBgQuality, matchCard, loadSkinImg, HERO_QUALITY };
+  window.__recImg = { buildSkinTpls, recognizeImageBySkin, extractCardFeature, sampleBgQuality, matchCard, loadSkinImg, fixHero, saveLocalCorrection, matchWithLocal, clearLocalCorrections, HERO_QUALITY };
 })();
