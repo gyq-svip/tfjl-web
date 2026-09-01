@@ -1459,108 +1459,119 @@
                     </div>
                     <div id="adminApiUsageDetail" style="color:rgba(255,255,255,0.6);font-size:0.7rem;margin-top:4px;"></div>
                 </div>
-                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;max-height:60vh;overflow-y:auto;padding-right:3px;">
-                    <div class="admin-menu-item" onclick="adminShowPage('help')">
+                <div id="adminMenuGrid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;max-height:60vh;overflow-y:auto;padding-right:3px;">
+                    <style>
+                        .admin-draggable{cursor:grab;}
+                        .admin-menu-item.admin-drag-active{box-shadow:0 8px 24px rgba(0,0,0,0.6);outline:2px solid #ffd700;cursor:grabbing;}
+                    </style>
+                    <div class="admin-menu-item" data-key="help" onclick="adminShowPage('help')">
                         <span class="mi-emoji">📖</span>
                         <div class="mi-text"><div class="mi-title">使用说明</div></div>
                     </div>
-                    <div class="admin-menu-item" onclick="adminShowPage('news')">
+                    <div class="admin-menu-item" data-key="news" onclick="adminShowPage('news')">
                         <span class="mi-emoji">📢</span>
                         <div class="mi-text"><div class="mi-title">公告管理</div></div>
                     </div>
-                    <div class="admin-menu-item" onclick="adminShowPage('title')">
+                    <div class="admin-menu-item" data-key="title" onclick="adminShowPage('title')">
                         <span class="mi-emoji">🏷️</span>
                         <div class="mi-text"><div class="mi-title">标题管理</div></div>
                     </div>
-                    <div class="admin-menu-item" onclick="adminShowPage('stats')">
+                    <div class="admin-menu-item" data-key="stats" onclick="adminShowPage('stats')">
                         <span class="mi-emoji">📊</span>
                         <div class="mi-text"><div class="mi-title">访问统计</div></div>
                     </div>
-                    <div class="admin-menu-item" onclick="adminShowPage('loginStats')">
+                    <div class="admin-menu-item" data-key="loginStats" onclick="adminShowPage('loginStats')">
                         <span class="mi-emoji">🕐</span>
                         <div class="mi-text"><div class="mi-title">登录打卡</div><div class="mi-sub">谁登录/排行/每周</div></div>
                     </div>
-                    <div class="admin-menu-item" onclick="openCardGroupManager()">
+                    <div class="admin-menu-item" data-key="cardGroup" onclick="openCardGroupManager()">
                         <span class="mi-emoji">🃏</span>
                         <div class="mi-text"><div class="mi-title">卡组管理</div><div class="mi-sub">融合卡 / 融合皮肤</div></div>
                     </div>
-                    <div class="admin-menu-item" onclick="adminShowPage('analytics')">
+                    <div class="admin-menu-item" data-key="analytics" onclick="adminShowPage('analytics')">
                         <span class="mi-emoji">📈</span>
                         <div class="mi-text"><div class="mi-title">数据分析</div></div>
                     </div>
-                    <div class="admin-menu-item" onclick="adminShowPage('scriptStats')">
+                    <div class="admin-menu-item" data-key="scriptStats" onclick="adminShowPage('scriptStats')">
                         <span class="mi-emoji">📥</span>
                         <div class="mi-text"><div class="mi-title">脚本下载</div></div>
                     </div>
-                    <div class="admin-menu-item" onclick="adminShowPage('settings')">
+                    <div class="admin-menu-item" data-key="settings" onclick="adminShowPage('settings')">
                         <span class="mi-emoji">⚙️</span>
                         <div class="mi-text"><div class="mi-title">系统设置</div></div>
                     </div>
-                    <div class="admin-menu-item" onclick="adminShowPage('nickManage')">
+                    <div class="admin-menu-item" data-key="nickManage" onclick="adminShowPage('nickManage')">
                         <span class="mi-emoji">👤</span>
                         <div class="mi-text"><div class="mi-title">昵称管理</div></div>
                     </div>
-                    <div class="admin-menu-item" onclick="adminShowPage('passwordManage')">
+                    <div class="admin-menu-item" data-key="passwordManage" onclick="adminShowPage('passwordManage')">
                         <span class="mi-emoji">🔑</span>
                         <div class="mi-text"><div class="mi-title">密码管理</div></div>
                     </div>
-                    <div class="admin-menu-item" onclick="adminShowPage('cacheManage')">
+                    <div class="admin-menu-item" data-key="cacheManage" onclick="adminShowPage('cacheManage')">
                         <span class="mi-emoji">🧹</span>
                         <div class="mi-text"><div class="mi-title">清除缓存</div></div>
                     </div>
-                    <div class="admin-menu-item" onclick="adminShowPage('logStats')">
+                    <div class="admin-menu-item" data-key="logStats" onclick="adminShowPage('logStats')">
                         <span class="mi-emoji">🔍</span>
                         <div class="mi-text"><div class="mi-title">终端</div></div>
                     </div>
-                    <div class="admin-menu-item" onclick="wallAdminShowBackup()">
+                    <div class="admin-menu-item" data-key="wallBackup" onclick="wallAdminShowBackup()">
                         <span class="mi-emoji">💾</span>
                         <div class="mi-text"><div class="mi-title">需求墙备份中心</div><div class="mi-sub">备份/还原/紧急救回</div></div>
                     </div>
-                    <div class="admin-menu-item" onclick="wallAdminShowGist()">
+                    <div class="admin-menu-item" data-key="wallGist" onclick="wallAdminShowGist()">
                         <span class="mi-emoji">🗂️</span>
                         <div class="mi-text"><div class="mi-title">Gist文件管理</div><div class="mi-sub">孤儿/过期分享扫描清理</div></div>
                     </div>
-                    <div class="admin-menu-item" onclick="adminShowPage('featureToggles')">
+                    <div class="admin-menu-item" data-key="featureToggles" onclick="adminShowPage('featureToggles')">
                         <span class="mi-emoji">🎛️</span>
                         <div class="mi-text"><div class="mi-title">功能开关</div><div class="mi-sub">登录打卡 / 拍卖快讯 / 调试窗</div></div>
                     </div>
-                    <div class="admin-menu-item" onclick="openDeepseaStats()">
+                    <div class="admin-menu-item" data-key="deepsea" onclick="openDeepseaStats()">
                         <span class="mi-emoji">🌊</span>
                         <div class="mi-text"><div class="mi-title">深海统计</div><div class="mi-sub">每日战况与杯数趋势</div></div>
                     </div>
-                    <div class="admin-menu-item" onclick="openAlliancePage()">
+                    <div class="admin-menu-item" data-key="alliance" onclick="openAlliancePage()">
                         <span class="mi-emoji">🛡️</span>
                         <div class="mi-text"><div class="mi-title">盟战战绩</div><div class="mi-sub">个人战绩 · 注册登录</div></div>
                     </div>
-                    <div class="admin-menu-item" onclick="bossRedAdminShow()">
+                    <div class="admin-menu-item" data-key="bossRed" onclick="bossRedAdminShow()">
                         <span class="mi-emoji">🛡️</span>
                         <div class="mi-text"><div class="mi-title">Boss减伤管理</div><div class="mi-sub">寒冰/暗月/漩涡/深海</div></div>
                     </div>
-                    <div class="admin-menu-item" onclick="adminShowPage('apiMonitor')">
+                    <div class="admin-menu-item" data-key="apiMonitor" onclick="adminShowPage('apiMonitor')">
                         <span class="mi-emoji">📡</span>
                         <div class="mi-text"><div class="mi-title">API监控</div><div class="mi-sub">Token写入 / 限额</div></div>
                     </div>
-                    <div class="admin-menu-item" onclick="adminShowPage('diag')">
+                    <div class="admin-menu-item" data-key="diag" onclick="adminShowPage('diag')">
                         <span class="mi-emoji">📊</span>
                         <div class="mi-text"><div class="mi-title">写操作诊断</div><div class="mi-sub">限流归因 / 清理</div></div>
                     </div>
-                    <div class="admin-menu-item" onclick="adminShowPage('damageCalc')">
+                    <div class="admin-menu-item" data-key="damageCalc" onclick="adminShowPage('damageCalc')">
                         <span class="mi-emoji">🧮</span>
                         <div class="mi-text"><div class="mi-title">伤害测算</div><div class="mi-sub">火灵/鱼人/天使/法师</div></div>
                     </div>
-                    <div class="admin-menu-item" onclick="openAuctionAdmin()">
+                    <div class="admin-menu-item" data-key="auction" onclick="openAuctionAdmin()">
                         <span class="mi-emoji">🏪</span>
                         <div class="mi-text"><div class="mi-title">拍卖管理员</div><div class="mi-sub">直达拍卖管理员菜单</div></div>
                     </div>
-                    <div class="admin-menu-item" onclick="adminShowPage('toolbox')">
+                    <div class="admin-menu-item" data-key="toolbox" onclick="adminShowPage('toolbox')">
                         <span class="mi-emoji">🛠️</span>
                         <div class="mi-text"><div class="mi-title">管理员工具箱</div><div class="mi-sub">定向通知 / 拉黑 / 重启</div></div>
                     </div>
-                    <div class="admin-menu-item" onclick="adminShowPage('shares')">
+                    <div class="admin-menu-item" data-key="shares" onclick="adminShowPage('shares')">
                         <span class="mi-emoji">📤</span>
                         <div class="mi-text"><div class="mi-title">分享管理</div><div class="mi-sub">短码/分享者/删除</div></div>
                     </div>
 
+                </div>
+                <div id="adminSortEditBtn" style="display:flex;gap:8px;margin-top:8px;">
+                    <button class="admin-btn admin-btn-secondary" onclick="adminMenuEnterSort()" style="flex:1;font-size:0.8rem;">✏️ 拖动排序</button>
+                </div>
+                <div id="adminSortBar" style="display:none;gap:8px;margin-top:8px;">
+                    <button class="admin-btn" onclick="adminMenuExitSort()" style="flex:1;background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;font-size:0.8rem;">✅ 完成</button>
+                    <button class="admin-btn admin-btn-secondary" onclick="adminMenuResetOrder()" style="flex:1;font-size:0.8rem;">↺ 重置</button>
                 </div>
                 <button class="admin-btn" onclick="logoutToLogin()" style="width:100%;margin-top:10px;background:linear-gradient(135deg,#ef4444,#dc2626);color:white;">🔙 退出登录</button>
             </div>
@@ -2533,7 +2544,7 @@
             <!-- 🔴 版本标签真实值由 app-picker.js 的 _fillRealVersionTag() 从线上 version.json.frontVersion 拉取填充（方案B），
                  不再依赖本脚本或 window.__DEPLOY_TAG（实测 CI 注入的是 App 版本号 2.0.20，非前端部署时间，会误导）。 -->
             <span id="appUpdateBadge" style="display:none;position:absolute;right:150px;top:50%;transform:translateY(-50%);cursor:pointer;user-select:none;color:#4caf50;font-size:0.66rem;padding:1px 8px;background:rgba(76,175,80,0.15);border:1px solid rgba(76,175,80,0.4);border-radius:10px;white-space:nowrap;">🟢 有新版本</span>
-            <div class="version-tooltip">版本 s20260826-0700 · s1.0.313（双击强制刷新）</div>
+            <div class="version-tooltip">版本 s20260902-0134 · s1.0.647（双击强制刷新）</div>
             <script>(function(){var v=document.getElementById('versionTag');var t=document.querySelector('#versionTag ~ .version-tooltip');if(v&&t)t.textContent='版本 '+v.textContent+'（双击强制刷新）';})();</script>
         </div>
     </div>
