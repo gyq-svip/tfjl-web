@@ -4,7 +4,12 @@
     Usage: .\sign.ps1                         (auto-find latest *_x64-setup.exe)
     Usage: .\sign.ps1 tfjl-1.3.4_x64-setup.exe
 #>
-param([string]$ExeName = "")
+param(
+    [string]$ExeName = "",
+    # 签名密钥密码：默认空（本机 tauri.key 无密码）。带密码的密钥用 -SignPassword 传入。
+    # 不传 --password 时 tauri signer 会交互式提示输入，导致自动化脚本挂起——必须显式传空。
+    [string]$SignPassword = ""
+)
 
 $ErrorActionPreference = "Stop"
 $RootDir = (Get-Location).Path
@@ -122,6 +127,10 @@ Write-Host "Temp file: tfjl-sign-temp.exe" -ForegroundColor Cyan
 
 # ---- 4. Sign ----
 $env:TAURI_SIGNING_PRIVATE_KEY = $clean
+# 🔴 密码必须走环境变量 TAURI_SIGNING_PRIVATE_KEY_PASSWORD，不能走 --password 命令行参数：
+#    空密码（""）经 npx 的 cmd 垫片传参时会被整参数吞掉 → --password 错位吃掉文件路径 →
+#    报「required arguments were not provided: <FILE>」。环境变量即使是空串也是"已设置"，语义正确。
+$env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = $SignPassword
 Write-Host "Signing ..." -ForegroundColor Yellow
 npx tauri signer sign --private-key "$clean" "$TempExe"
 
