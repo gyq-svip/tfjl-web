@@ -4,6 +4,9 @@
   "pub_date": "2026-09-01T03:02:44Z",
   "downloadUrl": "https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/releases/download/v2.0.27/tfjl-assistant_2.0.27_x64-setup.exe",
   "size": 4838009,
+  "minVersion": "2.0.25",
+  "forceUpdate": true,
+  "deprecatedMessage": "我们已升级后台数据服务，旧版本无法连接新服务。请更新到最新版后继续使用。",
   "frontVersion": "s1.0.633",
   "deployTag": "s20260901-1103"
 }

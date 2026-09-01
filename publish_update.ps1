@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     tfjl one-shot publisher: write updater.json/version.json + push installer + verify signature.
     Prereq: npx tauri build done, english exe copied to repo root, and .\sign.ps1 <englishExe> done.
@@ -216,9 +216,11 @@ if ($po -ne 0) {
     git pull --rebase 2>$null | Out-Null; $pr = $LASTEXITCODE
     if ($pr -ne 0) {
         # version.json 冲突：远端(CI)版含 frontVersion/deployTag，本地版含新发布字段，两者都保留
+        # 🔴 2026-09-01 修复：合并键漏了 minVersion/forceUpdate/deprecatedMessage（强制升级门禁三字段），
+        #    此前冲突智能合并会丢掉它们 → 线上 version.json 门禁失效（旧版客户端不再被拦）。
         $remoteVer = (git show "origin/main:version.json" 2>$null | Out-String)
         $merged = [ordered]@{}
-        foreach ($k in @('version','notes','pub_date','downloadUrl','size')) { $merged[$k] = $versionJson[$k] }
+        foreach ($k in @('version','notes','pub_date','downloadUrl','size','minVersion','forceUpdate','deprecatedMessage')) { $merged[$k] = $versionJson[$k] }
         foreach ($k in @('frontVersion','deployTag')) {
             if ($remoteVer -match ('"' + $k + '"\s*:\s*"([^"]+)"')) { $merged[$k] = $Matches[1] }
         }
