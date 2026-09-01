@@ -23611,7 +23611,127 @@ ${maSection}
             document.getElementById('adminMenuSection').style.display = 'block';
             updateBroadcastToggleStatus();
             adminRenderApiUsage();
+            if (typeof adminApplyMenuOrder === 'function') adminApplyMenuOrder();
+            if (typeof adminMenuDragInit === 'function') adminMenuDragInit();
         }
+
+        // 管理员菜单自定义排序（长按拖动重排，顺序存 localStorage，纯 UI）
+        const ADMIN_MENU_ORDER_KEY = 'TFJL_Admin_Menu_Order';
+        function adminApplyMenuOrder() {
+            const grid = document.getElementById('adminMenuGrid');
+            if (!grid) return;
+            let order = null;
+            try { order = JSON.parse(localStorage.getItem(ADMIN_MENU_ORDER_KEY) || 'null'); } catch (e) {}
+            if (!Array.isArray(order) || !order.length) return;
+            const items = Array.from(grid.querySelectorAll('.admin-menu-item'));
+            const byKey = {};
+            items.forEach(it => { byKey[it.dataset.key] = it; });
+            const ordered = order.map(k => byKey[k]).filter(Boolean);
+            const rest = items.filter(it => !order.includes(it.dataset.key));
+            ordered.concat(rest).forEach(it => grid.appendChild(it));
+        }
+        window.adminApplyMenuOrder = adminApplyMenuOrder;
+
+        let __adminSorting = false, __dragEl = null, __dragTimer = null, __dragMoved = false, __startX = 0, __startY = 0;
+        function adminMenuEnterSort() {
+            const grid = document.getElementById('adminMenuGrid');
+            if (!grid) return;
+            __adminSorting = true;
+            grid.classList.add('admin-sorting');
+            Array.from(grid.querySelectorAll('.admin-menu-item')).forEach(it => {
+                it.dataset._on = it.getAttribute('onclick') || '';
+                it.removeAttribute('onclick');
+                it.classList.add('admin-draggable');
+            });
+            const bar = document.getElementById('adminSortBar'); if (bar) bar.style.display = 'flex';
+            const ed = document.getElementById('adminSortEditBtn'); if (ed) ed.style.display = 'none';
+        }
+        function adminMenuExitSort(save) {
+            const grid = document.getElementById('adminMenuGrid');
+            if (!grid) return;
+            __adminSorting = false;
+            grid.classList.remove('admin-sorting');
+            Array.from(grid.querySelectorAll('.admin-menu-item')).forEach(it => {
+                if (it.dataset._on) { it.setAttribute('onclick', it.dataset._on); delete it.dataset._on; }
+                it.classList.remove('admin-draggable', 'admin-drag-active');
+                it.style.position = ''; it.style.zIndex = ''; it.style.left = '';
+                it.style.top = ''; it.style.opacity = ''; it.style.width = ''; it.style.pointerEvents = '';
+            });
+            const bar = document.getElementById('adminSortBar'); if (bar) bar.style.display = 'none';
+            const ed = document.getElementById('adminSortEditBtn'); if (ed) ed.style.display = 'flex';
+            if (save !== false) adminMenuSaveOrder();
+        }
+        function adminMenuSaveOrder() {
+            const grid = document.getElementById('adminMenuGrid');
+            if (!grid) return;
+            const keys = Array.from(grid.querySelectorAll('.admin-menu-item')).map(it => it.dataset.key);
+            try { localStorage.setItem(ADMIN_MENU_ORDER_KEY, JSON.stringify(keys)); } catch (e) {}
+        }
+        function adminMenuResetOrder() {
+            localStorage.removeItem(ADMIN_MENU_ORDER_KEY);
+            const grid = document.getElementById('adminMenuGrid');
+            if (grid) {
+                const def = ['help','news','title','stats','loginStats','cardGroup','analytics','scriptStats','settings','nickManage','passwordManage','cacheManage','logStats','wallBackup','wallGist','featureToggles','deepsea','alliance','bossRed','apiMonitor','diag','damageCalc','auction','toolbox','shares'];
+                const byKey = {};
+                Array.from(grid.querySelectorAll('.admin-menu-item')).forEach(it => byKey[it.dataset.key] = it);
+                def.forEach(k => { if (byKey[k]) grid.appendChild(byKey[k]); });
+            }
+        }
+        window.adminMenuEnterSort = adminMenuEnterSort;
+        window.adminMenuExitSort = adminMenuExitSort;
+        window.adminMenuResetOrder = adminMenuResetOrder;
+
+        function adminMenuDragInit() {
+            const grid = document.getElementById('adminMenuGrid');
+            if (!grid || grid.dataset._dragInit) return;
+            grid.dataset._dragInit = '1';
+            grid.addEventListener('pointerdown', function (e) {
+                if (!__adminSorting) return;
+                const item = e.target.closest('.admin-menu-item');
+                if (!item) return;
+                __dragEl = item; __dragMoved = false; __startX = e.clientX; __startY = e.clientY;
+                __dragTimer = setTimeout(function () {
+                    item.classList.add('admin-drag-active');
+                    try { item.setPointerCapture(e.pointerId); } catch (err) {}
+                }, 300);
+            });
+            grid.addEventListener('pointermove', function (e) {
+                if (!__adminSorting || !__dragEl) return;
+                if (!__dragEl.classList.contains('admin-drag-active')) {
+                    if (Math.abs(e.clientX - __startX) > 6 || Math.abs(e.clientY - __startY) > 6) { clearTimeout(__dragTimer); __dragEl = null; }
+                    return;
+                }
+                __dragMoved = true;
+                const r = __dragEl.getBoundingClientRect();
+                __dragEl.style.position = 'fixed';
+                __dragEl.style.zIndex = '9999';
+                __dragEl.style.width = r.width + 'px';
+                __dragEl.style.left = (e.clientX - r.width / 2) + 'px';
+                __dragEl.style.top = (e.clientY - 14) + 'px';
+                __dragEl.style.opacity = '0.92';
+                __dragEl.style.pointerEvents = 'none';
+                const under = document.elementFromPoint(e.clientX, e.clientY);
+                __dragEl.style.pointerEvents = '';
+                const target = under && under.closest('.admin-menu-item');
+                if (target && target !== __dragEl) {
+                    const rect = target.getBoundingClientRect();
+                    if ((e.clientY - rect.top) > rect.height / 2) grid.insertBefore(__dragEl, target.nextSibling);
+                    else grid.insertBefore(__dragEl, target);
+                }
+            });
+            function endDrag() {
+                if (!__adminSorting || !__dragEl) { __dragEl = null; return; }
+                clearTimeout(__dragTimer);
+                const el = __dragEl; __dragEl = null;
+                el.classList.remove('admin-drag-active');
+                el.style.position = ''; el.style.zIndex = ''; el.style.left = '';
+                el.style.top = ''; el.style.opacity = ''; el.style.width = ''; el.style.pointerEvents = '';
+                if (__dragMoved) adminMenuSaveOrder();
+            }
+            grid.addEventListener('pointerup', endDrag);
+            grid.addEventListener('pointercancel', endDrag);
+        }
+        window.adminMenuDragInit = adminMenuDragInit;
 
         function adminShowPage(page) {
             adminHideAllPages();
