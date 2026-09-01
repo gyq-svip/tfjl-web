@@ -2837,5 +2837,100 @@
 
         <!-- 自定义悬浮提示（替代原生 title，避免长文字溢出窗口） -->
         <div id="customTooltip" style="display:none;position:fixed;z-index:100000;max-width:280px;padding:8px 11px;background:rgba(20,20,40,0.97);color:#eaeaf5;font-size:0.74rem;line-height:1.5;border:1px solid rgba(255,215,0,0.35);border-radius:8px;box-shadow:0 4px 18px rgba(0,0,0,0.5);pointer-events:none;word-break:break-word;white-space:pre-wrap;"></div>
+
+  <!-- 🔴 2026-09-01 管理员入口兜底脚本（内联在 body 末尾，先于所有 defer 脚本绑定事件）
+       根因：如果 app-core.js 执行到 DOMContentLoaded 注册前遇运行时错误，所有管理员入口
+       （长按/双击/快捷键/三击清缓存）都绑定不上 → 死锁，用户什么都做不了。
+       方案：在 HTML 内联脚本里直接绑定事件（此时 DOM 元素已存在），不依赖 app-core.js 的
+       DOMContentLoaded 回调。触发时优先调 window.openAdminPanel，不可用时直接操作 DOM。 -->
+  <script>
+  (function() {
+    try {
+      var el = document.getElementById('mainHeader') || document.querySelector('h1');
+      if (!el || el.dataset.adminBound) return;
+      el.dataset.adminBound = '1';
+
+      // 打开管理员面板（优先 app-core.js 的函数，不可用时直接操作 DOM）
+      function openAdmin() {
+        try {
+          if (typeof window.openAdminPanel === 'function') { window.openAdminPanel(); return; }
+        } catch(e) { console.error('[admin-fallback] openAdminPanel 报错:', e); }
+        var overlay = document.getElementById('adminPanelOverlay');
+        if (overlay) {
+          overlay.style.display = 'flex';
+          var vs = document.getElementById('adminVerifySection');
+          if (vs) vs.style.display = 'block';
+          var input = document.getElementById('adminVerifyCode');
+          if (input) { input.value = ''; input.focus(); }
+        } else {
+          alert('⚠️ 管理员面板元素未找到！请双击右下角版本号强制刷新后重试。');
+        }
+      }
+
+      // 强制清缓存+硬刷新（优先 app-core.js 的函数，不可用时简单清 SW 缓存）
+      function clearCache() {
+        try {
+          if (typeof window.forceClearAndHardRefresh === 'function') { window.forceClearAndHardRefresh(); return; }
+        } catch(e) {}
+        if (confirm('🔄 强制清缓存+硬刷新？\n\n将清除 SW 缓存并带时间戳强刷，确保拉到最新代码。')) {
+          try {
+            if ('serviceWorker' in navigator) {
+              navigator.serviceWorker.getRegistrations().then(function(regs) {
+                return Promise.all(regs.map(function(r) { return r.unregister(); }));
+              }).then(function() {
+                var u = new URL(location.href); u.searchParams.set('_t', Date.now()); location.replace(u.toString());
+              });
+            } else {
+              var u = new URL(location.href); u.searchParams.set('_t', Date.now()); location.replace(u.toString());
+            }
+          } catch(e) {
+            var u = new URL(location.href); u.searchParams.set('_t', Date.now()); location.replace(u.toString());
+          }
+        }
+      }
+
+      // A. 长按 2 秒（主入口）
+      var lpTimer = null;
+      function startLP() { if (lpTimer) clearTimeout(lpTimer); lpTimer = setTimeout(function() { lpTimer = null; openAdmin(); }, 2000); }
+      function cancelLP() { if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; } }
+      el.addEventListener('mousedown', startLP);
+      el.addEventListener('mouseup', cancelLP);
+      el.addEventListener('mouseleave', cancelLP);
+      el.addEventListener('touchstart', startLP, { passive: true });
+      el.addEventListener('touchend', cancelLP);
+      el.addEventListener('touchcancel', cancelLP);
+
+      // B. 三击清缓存 + 双击进管理员
+      var clickCount = 0;
+      var clickTimer = null;
+      el.addEventListener('click', function() {
+        clickCount++;
+        if (clickCount >= 3) {
+          clickCount = 0;
+          clearTimeout(clickTimer);
+          clearCache();
+        } else {
+          clearTimeout(clickTimer);
+          clickTimer = setTimeout(function() { clickCount = 0; }, 1500);
+        }
+      });
+      el.addEventListener('dblclick', function() {
+        setTimeout(function() {
+          if (clickCount >= 3) return;
+          cancelLP();
+          openAdmin();
+        }, 250);
+      });
+
+      // C. Ctrl+Shift+L 键盘快捷键（终极备用）
+      document.addEventListener('keydown', function(e) {
+        if (e.ctrlKey && e.shiftKey && (e.key === 'L' || e.key === 'l')) {
+          e.preventDefault();
+          openAdmin();
+        }
+      });
+    } catch(e) { console.error('[admin-fallback] 初始化失败:', e); }
+  })();
+  </script>
 </body>
 </html>

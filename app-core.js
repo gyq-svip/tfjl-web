@@ -23084,7 +23084,8 @@ ${maSection}
             //   方案：回到 mousedown/touchstart 启动 timer，不 preventDefault、不监听
             //   pointercancel/pointermove，仅在 mouseup/touchend/mouseleave 清除，让 timer 自然超时。
             const adminEntryEl = document.getElementById('mainHeader') || document.querySelector('h1');
-            if (adminEntryEl) {
+            if (adminEntryEl && !adminEntryEl.dataset.adminBound) { // 🔴 2026-09-01 如果 index.html 内联兜底脚本已绑定则跳过
+                adminEntryEl.dataset.adminBound = '1';
                 // --- A. 长按入口（主入口）---
                 let lpTimer = null;
                 const LP_MS = 2000;
@@ -23209,6 +23210,7 @@ ${maSection}
                 document.getElementById('adminVerifyCode').focus();
             }
         }
+        window.openAdminPanel = openAdminPanel; // 🔴 2026-09-01 显式暴露到 window，供 index.html 内联兜底脚本调用
 
         // 统一隐藏所有管理员子页：自动扫描 id 以 adminPage 开头的容器（含 adminPageTitle）。
         // 🔴 历史坑：此前隐藏清单在 adminShowPage/adminShowMenu/管理员验证分支三处各写一份，
@@ -26183,7 +26185,8 @@ ${maSection}
                 location.replace(url.toString());
             }, 800);
         }
-        
+        window.forceClearAndHardRefresh = forceClearAndHardRefresh; // 🔴 2026-09-01 显式暴露到 window，供 index.html 内联兜底脚本调用
+
         function showCacheStatus(message, type) {
             const statusDiv = document.getElementById('cacheManageStatus');
             const bgColor = type === 'success' ? 'rgba(74,222,128,0.2)' : 'rgba(239,68,68,0.2)';
@@ -26680,6 +26683,7 @@ ${maSection}
                 showAdminStatus('验证码错误', 'error');
             }
         }
+        window.verifyAdmin = verifyAdmin; // 🔴 2026-09-01 显式暴露到 window，供 index.html 内联兜底脚本调用
 
         function showAdminStatus(msg, type) {
             const el = document.getElementById('adminStatus');
