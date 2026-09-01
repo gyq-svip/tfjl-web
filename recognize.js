@@ -618,19 +618,25 @@
   // 加载单张皮肤图为 Image（网页版 fetch→blob 避免 canvas 污染；Tauri 读本地 .skin）
   async function loadSkinImg(skin){
     if(skin._img) return skin._img;
-    let url = null;
-    if(skin.url && !isTauri()){
-      try{ const r = await fetch(skin.url, {cache:'no-cache'}); if(r.ok){ url = URL.createObjectURL(await r.blob()); } }catch(e){}
-      if(!url) url = skin.url;
-    } else if(skin.path && isTauri()){
-      try{ url = await tauriInvoke('read_image_base64', { filePath: skin.path }); }catch(e){}
-      if(!url){ try{ const b = await tauriInvoke('plugin:fs|read_file', { path: skin.path }); url = _bytesToBlobUrlX(b, skin.path); }catch(e){} }
-    }
-    if(!url) return null;
-    try{
-      const img = await new Promise((res)=>{ const im=new Image(); const to=setTimeout(()=>res(null),4000); im.onload=()=>{clearTimeout(to);res(im);}; im.onerror=()=>{clearTimeout(to);res(null);}; im.src=url; });
-      skin._img = img; return img;
-    }catch(e){ return null; }
+    const getUrl = async ()=>{
+      const raw = skin.url || skin.path || '';
+      if(!raw) return null;
+      if(skin.url && !isTauri()){
+        try{ const r = await fetch(skin.url, {cache:'no-cache'}); if(r.ok) return URL.createObjectURL(await r.blob()); }catch(e){}
+        return skin.url;
+      }
+      if(skin.path && isTauri()){
+        try{ const b64 = await tauriInvoke('read_image_base64', { filePath: skin.path }); if(b64) return b64; }catch(e){}
+        try{ const b = await tauriInvoke('plugin:fs|read_file', { path: skin.path }); return _bytesToBlobUrlX(b, skin.path); }catch(e){}
+      }
+      return null;
+    };
+    const getImg = (async ()=>{
+      const url = await getUrl();
+      if(!url) return null;
+      return await new Promise((res)=>{ const im=new Image(); const to=setTimeout(()=>res(null),4000); im.onload=()=>{clearTimeout(to);res(im);}; im.onerror=()=>{clearTimeout(to);res(null);}; im.src=url; });
+    })();
+    return Promise.race([getImg, new Promise(res=>setTimeout(()=>res(null), 6000))]); // 全链路 6s 兜底：取图(fetch/读文件)或解码任一环节 hang 都不致永久卡死
   }
 
   // 取图像特征：等比 cover（取最小边中心方、不拉伸→消除竖卡/方图几何差异）→ 64×64
@@ -704,29 +710,34 @@
   }
 
   // 构建模板库（首次较慢，结果缓存）。skinRegistry 来自 app-local.js(本地) 或 skins-web.js(远程)。
-  function buildSkinTpls(){
+  // statusEl：传入则实时显示「构建皮肤模板库 X/总数」，避免用户以为卡死。
+  function buildSkinTpls(statusEl){
     if(_skinTpls) return Promise.resolve(_skinTpls);
     if(_skinTplBuilding) return _skinTplBuilding;
-    _skinTplBuilding = (async ()=>{
+    const p = (async ()=>{
       const reg = window.skinRegistry || {};
-      const tpls = [];
-      for(const hero of Object.keys(reg)){
-        const skins = reg[hero] || [];
-        for(const sk of skins){
-          try{
-            const im = await loadSkinImg(sk);
-            if(!im) continue;
-            const feat = extractCardFeature(im, 64);
-            if(!feat) continue;
-            tpls.push({ hero, skinName: sk.name, feat, quality: HERO_QUALITY[hero]||'金' });
-          }catch(e){}
-        }
+      const entries = [];
+      for(const hero of Object.keys(reg)) for(const sk of (reg[hero]||[])) entries.push({hero, sk});
+      const total = entries.length; let done = 0; const built = [];
+      for(const e of entries){
+        const im = await loadSkinImg(e.sk); done++;
+        if(statusEl) statusEl.textContent = '构建皮肤模板库 '+done+'/'+total+'…';
+        if(!im) continue;
+        const feat = extractCardFeature(im, 64);
+        if(!feat) continue;
+        built.push({ hero:e.hero, skinName:e.sk.name, feat, quality: HERO_QUALITY[e.hero]||'金' });
       }
-      _skinTpls = tpls;
+      _skinTpls = built;
       _skinTplByQ = { 金:[], 紫:[], 蓝:[], 绿:[], 白:[] };
-      for(const t of tpls){ (_skinTplByQ[t.quality] || (_skinTplByQ[t.quality]=[])).push(t); }
-      return tpls;
+      for(const t of built){ (_skinTplByQ[t.quality] || (_skinTplByQ[t.quality]=[])).push(t); }
+      return built;
     })();
+    // 整体 20s 兜底：极端情况下（如大量皮肤图加载缓慢）绝不永久卡在「构建中」，先返回已构建的部分模板
+    _skinTplBuilding = Promise.race([p, new Promise(res=>setTimeout(()=>{
+      if(!_skinTpls){ _skinTpls = []; _skinTplByQ = {金:[],紫:[],蓝:[],绿:[],白:[]}; }
+      if(statusEl) statusEl.textContent = '皮肤模板库构建超时，使用已加载的部分（' + (_skinTpls.length) + ' 张）';
+      res(_skinTpls);
+    }, 20000))]);
     return _skinTplBuilding;
   }
   // 单卡匹配：全池算 top3（跨品质，供诊断）；同时优先同品质最近者作为判定
@@ -808,7 +819,7 @@
     if(typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('阵容图像识别');
     if(!img){ alert('请先粘贴/选择/截图一张阵容图'); return; }
     statusEl.textContent = '构建皮肤模板库…';
-    const tpls = await buildSkinTpls();
+    const tpls = await buildSkinTpls(statusEl);
     if(!tpls || !tpls.length){ alert('皮肤模板库为空（请先在设置里同步皮肤），图像识别不可用'); return; }
     const W=img.naturalWidth||img.width, H=img.naturalHeight||img.height;
     if(!W || !H){ alert('图片尺寸无效'); return; }
