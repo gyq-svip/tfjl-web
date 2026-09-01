@@ -389,7 +389,16 @@
                 }
                 // SW 回报的缓存版本号（如 tfjl-v62）→ 显示在右下角版本标签，便于核对缓存是否更新
                 if (event.data && event.data.type === 'SW_VERSION') {
-                    updateCacheVersionDisplay(event.data.version, event.data.deployTag);
+                    // 🔴 2026-09-01 修复「右下角显示最新版本却还弹更新气泡」：
+                    //   新 SW install 时也会无条件广播 SW_VERSION（版本=新 SW 的 CACHE_VERSION），
+                    //   照单全收会把 dataset.swVersion 抬到新 SW 的版本 → 右下角显示"最新"但页面实际还跑旧资源，
+                    //   _verifyNewVersion 又拿 dataset.swVersion 当"本地已加载版本" → 核实链路整体失真。
+                    //   规则：只认「当前控制器」回报的版本（= 页面资源真正走的那套缓存）；
+                    //   无控制器（forceRefreshLatest unregister 后重载、SW 尚未接管）时才接受任意来源。
+                    const _swCtrl = navigator.serviceWorker.controller;
+                    if (!_swCtrl || event.source === _swCtrl) {
+                        updateCacheVersionDisplay(event.data.version, event.data.deployTag);
+                    }
                 }
                 // 🔴 SW 主动强刷指令（来自 SW 主动轮询 _pollLatestVersion 或 _maybeForceReload，功能开关 forceReloadEnabled 开时发出）。
                 // 升级策略（用户硬性要求）：
