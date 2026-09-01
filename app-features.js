@@ -3127,11 +3127,10 @@
                 try { info = await fetchInstallerInfo(); } catch (e) { console.warn('[gate] 解析安装包地址失败:', e && (e.message || e)); }
                 const giteeUrl = (info && info.url) || data.downloadUrl || '';
                 const list = [];
-                // 🔴 只给 APP 安装包下载地址，绝不给主站/网页版入口：
+                // 🔴 只给「一个」APP 安装包下载地址（可复制 / 可浏览器打开），绝不给主站·网页版入口：
                 //    被门禁拦的用户一旦看到网页版链接就会直接用 web 版，不再装 APP（桌面端用户流失）。
-                //    备用渠道也只给 Gitee 发布页（同样是下载页，不会导向网页版）。
-                if (giteeUrl) list.push({ label: '下载1 · Gitee 直连安装包（国内首选，点 🌐 自动打开）', url: giteeUrl });
-                list.push({ label: '下载2 · Gitee 发布页（直连打不开时的备用）', url: GITEE_RELEASES_PAGE });
+                //    仅当自动解析下载地址失败时，才由 renderLinks 兜底显示 Gitee 发布页（同样是下载页）。
+                if (giteeUrl) list.push({ label: 'Gitee 安装包直连（可 📋 复制链接，或点 🌐 用浏览器打开）', url: giteeUrl });
                 renderLinks(list.slice(0, 3));
             })();
 
