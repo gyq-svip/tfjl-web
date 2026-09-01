@@ -724,7 +724,7 @@
   }
   // 构建模板库：并行分批加载（提速）+ 60s 整体兜底 + 成功数诊断 + 高成功率缓存。skinRegistry 来自 app-local.js / skins-web.js。
   function buildSkinTpls(statusEl){
-    if(_skinTpls) return Promise.resolve(_skinTpls);
+    if(_skinTpls && _skinTpls.length) return Promise.resolve(_skinTpls); // 空数组不短路：首次构建失败后允许重建
     if(_skinTplBuilding) return _skinTplBuilding;
     const p = (async ()=>{
       const reg = window.skinRegistry || {};
@@ -981,6 +981,7 @@
                 </select>
               </label>
               <button id="recBuildBtn" style="background:linear-gradient(135deg,#78909c,#37474f);color:#fff;border:none;padding:9px 14px;border-radius:8px;cursor:pointer;font-weight:600;" title="先把 413 张皮肤图预处理成特征模板库，构建完成后识别秒出，无需每次等「构建皮肤模板库」">🛠 构建模板库</button>
+              <button id="recWinBtn" style="background:linear-gradient(135deg,#5c6bc0,#283593);color:#fff;border:none;padding:9px 14px;border-radius:8px;cursor:pointer;font-weight:600;" title="清除记住的窗口，下次点框选/一键识别时重新选游戏窗口">🔄 切换窗口</button>
               <button id="recFill" style="background:linear-gradient(135deg,#42a5f5,#1565c0);color:#fff;border:none;padding:9px 14px;border-radius:8px;cursor:pointer;">➡ 填入脚本生成</button>
               <button id="recImportHand" style="background:linear-gradient(135deg,#66bb6a,#2e7d32);color:#fff;border:none;padding:9px 14px;border-radius:8px;cursor:pointer;font-weight:600;">🃏 导入到手牌</button>
               <button id="recLaunch" style="background:linear-gradient(135deg,#ff9800,#e65100);color:#fff;border:none;padding:9px 14px;border-radius:8px;cursor:pointer;font-weight:600;" title="关掉 Umi-OCR 后，点此重新打开它">🚀 启动识别引擎</button>
@@ -1159,6 +1160,10 @@
       };
     }
 
+    // 🔄 切换窗口：清除记住的窗口标题，下次点框选/一键识别会重新弹窗选择
+    const recWinBtn = $('recWinBtn');
+    if(recWinBtn){ recWinBtn.onclick = ()=>{ try{ const cfg=JSON.parse(localStorage.getItem('tfjl_game_monitor_cfg')||'{}'); delete cfg.winTitle; localStorage.setItem('tfjl_game_monitor_cfg', JSON.stringify(cfg)); }catch(_){} if(typeof recToast==='function') recToast('已清除记住的窗口，请点「📐 框选阵容区域」或「🎮 一键识别游戏画面」重新选择'); else alert('已清除记住的窗口，请点框选/一键识别重新选择'); }; }
+
     $('recSmart').onclick = ()=>{
       if(!currentImg){ alert('请先粘贴/选择/截图一张阵容图（或点「📐 框选阵容区域」）'); return; }
       runImgAuto(); // 图像识别 → recImgBox
@@ -1196,7 +1201,8 @@
         };
         render();
         overlay._results = results; updateRecWarn(results);
-        $('recStatus').textContent = `识别完成：${results.filter(rr=>rr.hero).length}/${results.length} 张匹配到英雄（${rowCount} 行；识别错点 ✏️ 修正，越修越准）`;
+        const featNull=results.filter(rr=>!rr.feat).length; const tplN=(_skinTpls||[]).length;
+        $('recStatus').textContent = `图像识别完成：${results.filter(rr=>rr.hero).length}/${results.length} 匹配（模板库 ${tplN} 张，特征提取失败 ${featNull} 个；识别错点 ✏️ 修正，越修越准）`;
         renderRecDr(results);
       });
     }
