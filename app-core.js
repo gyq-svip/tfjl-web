@@ -545,6 +545,26 @@
                 window.__tfjlOnlineTimeoutMs = (_otm >= 1 && _otm <= 1440) ? Math.round(_otm * 60000) : 0;
                 if (window.__diagForceReload && 'serviceWorker' in navigator) {
                     setTimeout(() => {
+                        // 🔴 2026-09-01 修复「版本已是最新还弹更新气泡」：
+                        //   reg.waiting 只说明「存在一个等待激活的 SW」，不代表有新版本——
+                        //   forceRefreshLatest（unregister 全部 SW 后重载）后新 SW 安装即 waiting（版本与页面相同），
+                        //   旧逻辑见 waiting 就 notifyNewVersion() → 明明已是最新版，启动 7 秒后照样弹「发现新版本」，
+                        //   且 showSwUpdateBanner 的按目标版本去重对这种无核实路径完全失效（目标=0 直接放行）。
+                        //   与 45 分钟心跳同款：一律先经 __verifyNewVersionAsync 核实「远端小版本号 > 本地」，
+                        //   核实通过才弹；核实不通过清 __pendingUpdate 假信号。
+                        const _verify = window.__verifyNewVersionAsync;
+                        if (typeof _verify === 'function') {
+                            _verify().then(() => {
+                                if (!window.__tfjlHasNewVersion) {
+                                    window.__pendingUpdate = false; // 已是最新：清假信号，不弹
+                                    return;
+                                }
+                                if (window.__pendingUpdate) { if (typeof notifyNewVersion === 'function') notifyNewVersion(); return; }
+                                navigator.serviceWorker.ready.then(reg => { if (reg.waiting) { window.__pendingUpdate = true; if (typeof notifyNewVersion === 'function') notifyNewVersion(); } }).catch(() => {});
+                            }).catch(() => {});
+                            return;
+                        }
+                        // 降级（app-picker 未加载完等极端情况）：保持旧行为查 waiting 版本
                         if (window.__pendingUpdate) { if (typeof notifyNewVersion === 'function') notifyNewVersion(); return; }
                         navigator.serviceWorker.ready.then(reg => { if (reg.waiting) { window.__pendingUpdate = true; if (typeof notifyNewVersion === 'function') notifyNewVersion(); } }).catch(() => {});
                     }, 4000); // 等 SW 激活后再查，避免过早
@@ -26646,6 +26666,15 @@ ${maSection}
                     return;
                 }
                 window.__bannerShownVersions[_targetVer] = true;
+            } else {
+                // 🔴 2026-09-01 补漏：无核实目标版本（未经 _verifyNewVersion 的旁路调用）也会话内只弹一次，
+                //   绝不允许无版本依据的调用反复弹（此前目标=0 直接绕过全部去重）。
+                if (!window.__bannerShownVersions) window.__bannerShownVersions = {};
+                if (window.__bannerShownVersions.__unverified) {
+                    console.log('[更新] 彩球已弹过（无核实目标版本的旁路调用），本会话不再重复弹');
+                    return;
+                }
+                window.__bannerShownVersions.__unverified = true;
             }
             // 注入一次样式：左下角彩色光彩气泡（流动彩色 + 浮动 + 多层光晕呼吸），点击即更新
             if (!document.getElementById('swUpdateStyle')) {
