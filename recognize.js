@@ -770,7 +770,7 @@
     }
     const top3 = all.slice(0,3).map(o=>({hero:o.t.hero, skin:o.t.skinName, dist:Math.round(o.d)}));
     let hero = best.t.hero, dist = best.d;
-    const TH = window.__recStrict==='strict'?12 : window.__recStrict==='standard'?18 : Infinity;
+    const TH = window.__recStrict==='strict'?90 : window.__recStrict==='standard'?140 : Infinity; // 量级对齐 matchWithLocal(80)：特征距离通常几十~一百多，之前 12/18 会把正确匹配全判空→0 个英雄
     if(dist > TH){ hero=null; } // 严格度：距离过大则判「未匹配」，避免强行错配
     return { hero, skin: hero?best.t.skinName:null, dist, quality: usedQ, top3 };
   }
@@ -1201,6 +1201,12 @@
       });
     }
 
+    // 记住上次选择的游戏窗口标题（与「游戏波数监控」共用 tfjl_game_monitor_cfg.winTitle），下次自动匹配不再重复选
+    function _rememberWinTitle(title){
+      if(!title) return;
+      try{ const cfg=JSON.parse(localStorage.getItem('tfjl_game_monitor_cfg')||'{}'); cfg.winTitle=title; localStorage.setItem('tfjl_game_monitor_cfg', JSON.stringify(cfg)); }catch(_){}
+    }
+
     // 📐 框选阵容区域 → 截整窗 → 拖框 → 按框精准裁剪 → 图像识别
     const recFrameBtn = $('recFrameBtn');
     if(recFrameBtn){
@@ -1216,7 +1222,7 @@
           if(lastTitle) win=wins.find(w=>w.title&&w.title.includes(lastTitle))||null;
           if(!win && wins.length===1) win=wins[0];
           if(!win){
-            win = await new Promise(resolve=>{ recChoice({ title:'🎮 选择游戏窗口', desc:'检测到 '+wins.length+' 个可截图窗口，选一个：', maxHeight:'70vh', items: wins.map((w,i)=>({label:(i+1)+'. '+(w.title.length>34?w.title.slice(0,34)+'…':w.title), value:String(i)})), onPick:v=>resolve(wins[parseInt(v,10)]), onCancel:()=>resolve(null) }); });
+            win = await new Promise(resolve=>{ recChoice({ title:'🎮 选择游戏窗口', desc:'检测到 '+wins.length+' 个可截图窗口，选一个：', maxHeight:'70vh', items: wins.map((w,i)=>({label:(i+1)+'. '+(w.title.length>34?w.title.slice(0,34)+'…':w.title), value:String(i)})), onPick:v=>{ const w=wins[parseInt(v,10)]; if(w) _rememberWinTitle(w.title); resolve(w); }, onCancel:()=>resolve(null) }); });
             if(!win) return;
           }
           const bmpB64 = await tauriInvoke('capture_window_region', { hwnd: win.hwnd, x:0, y:0, w:10, h:10, full:true });
@@ -1294,7 +1300,7 @@
                 desc: '检测到 '+wins.length+' 个可截图窗口，选一个进行识别：',
                 maxHeight: '70vh',
                 items: wins.map((w,i)=>({ label: (i+1)+'. '+(w.title.length>34 ? w.title.slice(0,34)+'…' : w.title), value: String(i) })),
-                onPick: v=> resolve(wins[parseInt(v,10)]),
+                onPick: v=>{ const w=wins[parseInt(v,10)]; if(w) _rememberWinTitle(w.title); resolve(w); },
                 onCancel: ()=> resolve(null)
               });
             });
