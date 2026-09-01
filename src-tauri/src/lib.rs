@@ -1756,33 +1756,36 @@ struct GmWin {
     text_clicks: Vec<GmTextClick>,
 }
 
-/// 到波自动点击（一组）：到达/跨越触发波数时，在窗口内比例位置模拟鼠标点击
+/// 单个点击点位：一组内多个位置按顺序连点（点完一个等 gap_ms 再点下一个）
+#[derive(serde::Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct GmPoint {
+    x: f64,               // 点击位置（窗口整窗比例坐标 0..1，与框选截图同一坐标系）
+    y: f64,
+    #[serde(default = "gm_d_one")]
+    times: u32,           // 该位置连点次数
+    #[serde(default = "gm_d_gap")]
+    gap_ms: u64,          // 该位置点完后到下一位置的间隔（同位置连点也用此间隔）
+}
+
+/// 到波自动点击（一组）：到达/跨越触发波数时，按顺序点击多个位置
+/// 2026-09-01 v2：x/y 单点位升级为 points 多点位（用户需求「连续多点几个位置」）。
 #[derive(serde::Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 struct GmWaveClick {
-    wave: u32,        // 触发波数（到达或跨越该波即点；新一局自动重置后每局都会点）
-    x: f64,           // 点击位置（窗口整窗比例坐标 0..1，与框选截图同一坐标系）
-    y: f64,
-    #[serde(default = "gm_d_one")]
-    times: u32,       // 点击次数（连点）
-    #[serde(default = "gm_d_gap")]
-    gap_ms: u64,       // 连点间隔（毫秒）
+    wave: u32,            // 触发波数（到达或跨越该波即点；新一局自动重置后每局都会点）
+    points: Vec<GmPoint>, // 多个位置按顺序连点（空 = 不点，前端已校验）
 }
 
-/// 文字识别触发点击（一组）：指定区域 OCR 识别到关键词 → 点击指定位置
+/// 文字识别触发点击（一组）：指定区域 OCR 识别到关键词 → 按顺序点击多个位置
 #[derive(serde::Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 struct GmTextClick {
-    region: [f64; 4], // 识别区域（比例坐标）
-    keyword: String,  // 关键词（包含匹配，去空格后比对，兼容 OCR 分词断开）
-    x: f64,           // 点击位置（比例坐标）
-    y: f64,
-    #[serde(default = "gm_d_one")]
-    times: u32,
-    #[serde(default = "gm_d_gap")]
-    gap_ms: u64,
+    region: [f64; 4],     // 识别区域（比例坐标）
+    keyword: String,      // 关键词（包含匹配，去空格后比对，兼容 OCR 分词断开）
+    points: Vec<GmPoint>, // 多个位置按顺序连点
     #[serde(default = "gm_d_cd")]
-    cooldown_sec: u64, // 触发后冷却（秒）：防止按钮还没消失时连续误点
+    cooldown_sec: u64,    // 触发后冷却（秒）：防止按钮还没消失时连续误点
     #[serde(default = "gm_d_true")]
     enabled: bool,
 }
@@ -2089,6 +2092,29 @@ fn gm_tick_window(win: &GmWin, region: &[f64; 4]) -> Result<Option<Vec<String>>,
     }
 }
 
+/// 按顺序执行一组点击点位（到波点击/文字点击共用）：
+/// 逐点位换算屏幕坐标 → 连点 times 次 → 等 gap_ms → 点下一个位置。
+/// 中途世代变化（监控重启/停止）立即中断，不打断新会话。
+fn gm_click_points<F: Fn() -> bool>(app: &tauri::AppHandle, hwnd: usize, points: &[GmPoint], alive: F, ctx: &str) {
+    for (pi, pt) in points.iter().enumerate() {
+        if !alive() { break; }
+        match gm_win_point_to_screen(hwnd, pt.x, pt.y) {
+            Ok((sx, sy)) => {
+                let _ = app.emit("gm-log", serde_json::json!({
+                    "hwnd": hwnd,
+                    "msg": format!("{} 第{}个位置 → 自动点击（×{}次）", ctx, pi + 1, pt.times.max(1)),
+                }));
+                gm_click_at(sx, sy, pt.times, pt.gap_ms);
+            }
+            Err(e) => {
+                let _ = app.emit("gm-log", serde_json::json!({
+                    "hwnd": hwnd, "msg": format!("{} 第{}个位置跳过：{}", ctx, pi + 1, e), "isErr": true,
+                }));
+            }
+        }
+    }
+}
+
 /// 每窗口运行时状态（波数记忆 / 到波点击已触发标记 / 文字点击冷却时间戳）
 struct GmWinRT {
     last: Option<u32>,
@@ -2169,6 +2195,7 @@ fn gm_monitor_loop(app: tauri::AppHandle, cfg: GmCfg, gen: u64, interval_sec: u6
                                 }));
                             }
                             // 🔴 到波自动点击（多组）：到达或跨越触发波数即点，本局每组一次（新局重置）
+                            // v2：每组 points 多位置按顺序连点
                             for (ci, wcx) in win.wave_clicks.iter().enumerate() {
                                 if !alive(gen) { break; }
                                 if rt[idx].wave_done[ci] { continue; }
@@ -2176,20 +2203,8 @@ fn gm_monitor_loop(app: tauri::AppHandle, cfg: GmCfg, gen: u64, interval_sec: u6
                                     || (prev.is_none() && wave == wcx.wave);
                                 if !fire { continue; }
                                 rt[idx].wave_done[ci] = true;
-                                match gm_win_point_to_screen(win.hwnd, wcx.x, wcx.y) {
-                                    Ok((sx, sy)) => {
-                                        let _ = app.emit("gm-log", serde_json::json!({
-                                            "hwnd": win.hwnd,
-                                            "msg": format!("⚡ 第{}波 → 自动点击（×{}次）", wcx.wave, wcx.times.max(1)),
-                                        }));
-                                        gm_click_at(sx, sy, wcx.times, wcx.gap_ms);
-                                    }
-                                    Err(e) => {
-                                        let _ = app.emit("gm-log", serde_json::json!({
-                                            "hwnd": win.hwnd, "msg": format!("自动点击跳过：{}", e), "isErr": true,
-                                        }));
-                                    }
-                                }
+                                let ctx = format!("⚡ 第{}波", wcx.wave);
+                                gm_click_points(&app, win.hwnd, &wcx.points, || alive(gen), &ctx);
                             }
                         }
                         None => {
@@ -2245,20 +2260,8 @@ fn gm_monitor_loop(app: tauri::AppHandle, cfg: GmCfg, gen: u64, interval_sec: u6
                             .collect();
                         if joined.contains(&tc.keyword) {
                             rt[idx].text_last[ti] = Some(now);
-                            match gm_win_point_to_screen(win.hwnd, tc.x, tc.y) {
-                                Ok((sx, sy)) => {
-                                    let _ = app.emit("gm-log", serde_json::json!({
-                                        "hwnd": win.hwnd,
-                                        "msg": format!("🎯 识别到「{}」→ 自动点击（×{}次）", tc.keyword, tc.times.max(1)),
-                                    }));
-                                    gm_click_at(sx, sy, tc.times, tc.gap_ms);
-                                }
-                                Err(e) => {
-                                    let _ = app.emit("gm-log", serde_json::json!({
-                                        "hwnd": win.hwnd, "msg": format!("文字点击跳过：{}", e), "isErr": true,
-                                    }));
-                                }
-                            }
+                            let ctx = format!("🎯 识别到「{}」", tc.keyword);
+                            gm_click_points(&app, win.hwnd, &tc.points, || alive(gen), &ctx);
                         }
                     }
                     _ => {}
@@ -2284,10 +2287,18 @@ fn game_monitor_start(cfg: GmCfg, app: tauri::AppHandle) -> Result<String, Strin
         if w.region[2] <= 0.0 || w.region[3] <= 0.0 {
             return Err(format!("第{}个窗口未配置波数识别区域", i + 1));
         }
-        // 文字识别点击组：识别区域必须有效（点击位置由前端校验）
+        // 点击组校验：到波组必须至少 1 个有效点位；文字组（启用中）需有效识别区域 + 关键词
+        for wc in &w.wave_clicks {
+            if wc.points.is_empty() {
+                return Err(format!("第{}个窗口的「第{}波点击」没有配置任何点击位置", i + 1, wc.wave));
+            }
+        }
         for tc in &w.text_clicks {
             if tc.enabled && (tc.region[2] <= 0.0 || tc.region[3] <= 0.0) {
                 return Err(format!("第{}个窗口的文字点击「{}」未框选识别区域", i + 1, tc.keyword));
+            }
+            if tc.enabled && tc.points.is_empty() {
+                return Err(format!("第{}个窗口的文字点击「{}」没有配置任何点击位置", i + 1, tc.keyword));
             }
         }
     }
@@ -2316,6 +2327,23 @@ fn game_monitor_stop(app: tauri::AppHandle) -> Result<(), String> {
     gm_restore_tray(&app);
     let _ = app.emit("gm-state", serde_json::json!({ "running": false }));
     Ok(())
+}
+
+/// 通用点击命令（前端可控）：在指定窗口的比例坐标处点击。
+/// 🎯 架构定位（2026-09-01 用户提议）：Rust 只做「点击执行器」原语，点哪里/怎么点/什么顺序由前端决定
+///    ——前端逻辑热更新免打包。用途：①面板「试点击」当场验证位置 ②前端自定义联动（收到 gm-wave
+///    事件后自行编排点击序列）③未来扩展不走打包。
+/// ⚠️ 与监控循环内的自动点击同用 mouse_event（真实鼠标），窗口需可见/未最小化/未被遮挡。
+#[tauri::command]
+fn gm_click(hwnd: usize, x: f64, y: f64, times: Option<u32>, gap_ms: Option<u64>) -> Result<String, String> {
+    let times = times.unwrap_or(1).clamp(1, 10);
+    let gap = gap_ms.unwrap_or(200).max(50);
+    if !(0.0..=1.0).contains(&x) || !(0.0..=1.0).contains(&y) {
+        return Err("点击位置必须在 0~1 比例范围内".into());
+    }
+    let (sx, sy) = gm_win_point_to_screen(hwnd, x, y)?;
+    gm_click_at(sx, sy, times, gap);
+    Ok(format!("已点击 ({:.3},{:.3}) ×{} 次", x, y, times))
 }
 
 /// 查询监控是否运行中（前端打开面板时恢复按钮状态用）
@@ -2454,6 +2482,7 @@ pub fn run() {
             game_monitor_start,
             game_monitor_stop,
             game_monitor_status,
+            gm_click,
         ])
         .manage(AppState { umi_pid: std::sync::Mutex::new(None), heartbeat: std::sync::Mutex::new(None), checkin_day: std::sync::Mutex::new(None) })
         .setup(|app| {
