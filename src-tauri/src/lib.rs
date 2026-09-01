@@ -1754,6 +1754,10 @@ struct GmWin {
     wave_clicks: Vec<GmWaveClick>,
     #[serde(default)]
     text_clicks: Vec<GmTextClick>,
+    // 🔴 v3 通用宏规则（用户核心需求）：触发器 + 动作序列自由组合，前端编辑免打包。
+    // 旧的 wave_clicks/text_clicks 会在 game_monitor_start 统一转换为 rules 执行（兼容旧前端）。
+    #[serde(default)]
+    rules: Vec<GmRule>,
 }
 
 /// 单个点击点位：一组内多个位置按顺序连点（点完一个等 gap_ms 再点下一个）
@@ -1788,6 +1792,85 @@ struct GmTextClick {
     cooldown_sec: u64,    // 触发后冷却（秒）：防止按钮还没消失时连续误点
     #[serde(default = "gm_d_true")]
     enabled: bool,
+}
+
+// ==================== 通用宏规则引擎（2026-09-01 v3，用户核心需求）====================
+// 🎯 设计（用户提议的架构）：Rust 只做「动作原语执行器」，规则怎么编（触发条件+动作序列）
+//    完全由前端决定并下发 —— 前端热更新改宏不用打包。
+//    动作原语集合：Click（点击）/ Delay（延时）/ Key（输入文字），以后加新原语才需要打包。
+//    兼容：旧的 wave_clicks/text_clicks 结构在 game_monitor_start 里统一转换为 rules 执行。
+
+/// 宏动作（一步）：click 点位置 / delay 等待 / key 输入文字
+#[derive(serde::Deserialize, Clone)]
+#[serde(tag = "type", rename_all = "camelCase")]
+enum GmAction {
+    #[serde(rename_all = "camelCase")]
+    Click {
+        x: f64,
+        y: f64,
+        #[serde(default = "gm_d_one")]
+        times: u32,
+        #[serde(default = "gm_d_gap")]
+        gap_ms: u64,
+    },
+    #[serde(rename_all = "camelCase")]
+    Delay {
+        ms: u64,
+    },
+    #[serde(rename_all = "camelCase")]
+    Key {
+        text: String,
+    },
+}
+
+/// 宏触发条件：到第 X 波 / 指定区域识别到关键词
+#[derive(serde::Deserialize, Clone)]
+#[serde(tag = "type", rename_all = "camelCase")]
+enum GmTrigger {
+    #[serde(rename_all = "camelCase")]
+    Wave { wave: u32 },
+    #[serde(rename_all = "camelCase")]
+    Text { region: [f64; 4], keyword: String },
+}
+
+/// 宏规则：触发器 + 动作序列（自由组合，前端编辑）
+#[derive(serde::Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct GmRule {
+    trigger: GmTrigger,
+    #[serde(default)]
+    actions: Vec<GmAction>,
+    #[serde(default = "gm_d_cd")]
+    cooldown_sec: u64,    // 触发后冷却秒（text 触发防连发；wave 触发每局一次不受此限）
+    #[serde(default = "gm_d_true")]
+    enabled: bool,
+}
+
+/// 键盘输入文字原语：SendInput KEYEVENTF_UNICODE 逐字符注入（支持任意文字含中文）。
+/// ⚠️ 需目标窗口持有焦点（前面的 Click 动作点输入框即转移焦点）；比剪贴板+Ctrl+V 干净（不动剪贴板）。
+fn gm_type_text(text: &str) {
+    #[cfg(windows)]
+    {
+        use winapi::um::winuser::{SendInput, INPUT, INPUT_KEYBOARD, KEYEVENTF_UNICODE, KEYEVENTF_KEYUP};
+        for ch in text.chars() {
+            unsafe {
+                let mut down: INPUT = std::mem::zeroed();
+                down.type_ = INPUT_KEYBOARD;
+                down.u.ki_mut().wScan = ch as u16;
+                down.u.ki_mut().dwFlags = KEYEVENTF_UNICODE;
+                let mut up: INPUT = std::mem::zeroed();
+                up.type_ = INPUT_KEYBOARD;
+                up.u.ki_mut().wScan = ch as u16;
+                up.u.ki_mut().dwFlags = KEYEVENTF_UNICODE | KEYEVENTF_KEYUP;
+                let seq = [down, up];
+                SendInput(2, seq.as_ptr() as *mut _, std::mem::size_of::<INPUT>() as i32);
+            }
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = text;
+    }
 }
 
 fn gm_d_one() -> u32 { 1 }
@@ -2092,45 +2175,68 @@ fn gm_tick_window(win: &GmWin, region: &[f64; 4]) -> Result<Option<Vec<String>>,
     }
 }
 
-/// 按顺序执行一组点击点位（到波点击/文字点击共用）：
-/// 逐点位换算屏幕坐标 → 连点 times 次 → 等 gap_ms → 点下一个位置。
+/// 按顺序执行宏动作序列（规则引擎核心，Click/Delay/Key 三原语）：
+/// Click → 换算屏幕坐标连点；Delay → 100ms 粒度可中断等待；Key → SendInput UNICODE 注入文字。
 /// 中途世代变化（监控重启/停止）立即中断，不打断新会话。
-fn gm_click_points<F: Fn() -> bool>(app: &tauri::AppHandle, hwnd: usize, points: &[GmPoint], alive: F, ctx: &str) {
-    for (pi, pt) in points.iter().enumerate() {
+fn gm_exec_actions<F: Fn() -> bool>(app: &tauri::AppHandle, hwnd: usize, actions: &[GmAction], alive: F, ctx: &str) {
+    for (ai, act) in actions.iter().enumerate() {
         if !alive() { break; }
-        match gm_win_point_to_screen(hwnd, pt.x, pt.y) {
-            Ok((sx, sy)) => {
+        match act {
+            GmAction::Click { x, y, times, gap_ms } => {
+                match gm_win_point_to_screen(hwnd, *x, *y) {
+                    Ok((sx, sy)) => {
+                        let _ = app.emit("gm-log", serde_json::json!({
+                            "hwnd": hwnd,
+                            "msg": format!("{} 第{}步·点击（×{}次）", ctx, ai + 1, (*times).max(1)),
+                        }));
+                        gm_click_at(sx, sy, *times, *gap_ms);
+                    }
+                    Err(e) => {
+                        let _ = app.emit("gm-log", serde_json::json!({
+                            "hwnd": hwnd, "msg": format!("{} 第{}步·点击跳过：{}", ctx, ai + 1, e), "isErr": true,
+                        }));
+                    }
+                }
+            }
+            GmAction::Delay { ms } => {
                 let _ = app.emit("gm-log", serde_json::json!({
                     "hwnd": hwnd,
-                    "msg": format!("{} 第{}个位置 → 自动点击（×{}次）", ctx, pi + 1, pt.times.max(1)),
+                    "msg": format!("{} 第{}步·延时 {}ms", ctx, ai + 1, ms),
                 }));
-                gm_click_at(sx, sy, pt.times, pt.gap_ms);
+                let mut slept = 0u64;
+                while slept < *ms {
+                    if !alive() { break; }
+                    std::thread::sleep(std::time::Duration::from_millis(100));
+                    slept += 100;
+                }
             }
-            Err(e) => {
+            GmAction::Key { text } => {
                 let _ = app.emit("gm-log", serde_json::json!({
-                    "hwnd": hwnd, "msg": format!("{} 第{}个位置跳过：{}", ctx, pi + 1, e), "isErr": true,
+                    "hwnd": hwnd,
+                    "msg": format!("{} 第{}步·输入文字「{}」", ctx, ai + 1, text),
                 }));
+                gm_type_text(text);
             }
         }
     }
 }
 
-/// 每窗口运行时状态（波数记忆 / 到波点击已触发标记 / 文字点击冷却时间戳）
+/// 每窗口运行时状态（波数记忆 / 规则触发标记）
 struct GmWinRT {
     last: Option<u32>,
-    wave_done: Vec<bool>,          // 与 win.wave_clicks 平行：本局该组是否已点过
-    text_last: Vec<Option<u128>>,  // 与 win.text_clicks 平行：上次触发时间（ms），冷却用
+    rule_done: Vec<bool>,         // wave 触发规则：本局该条是否已执行（新局重置）
+    rule_last: Vec<Option<u128>>, // 规则上次触发时间戳（冷却用，text 触发主用）
 }
 
 /// 监控主循环（独立线程）：与窗口是否可见无关，最小化/隐藏到托盘照常播报
-/// 2026-09-01 新增：新局检测（波数回退重置到波点击）+ 到波自动点击 + 文字识别触发点击 + 托盘静音开关
+/// 2026-09-01 v3：统一宏规则引擎（触发器+动作序列），旧 wave_clicks/text_clicks 已在 start 转换为 rules
 fn gm_monitor_loop(app: tauri::AppHandle, cfg: GmCfg, gen: u64, interval_sec: u64) {
     let interval_ms = interval_sec * 1000;
     let multi = cfg.windows.len() > 1;
     let mut rt: Vec<GmWinRT> = cfg.windows.iter().map(|w| GmWinRT {
         last: None,
-        wave_done: vec![false; w.wave_clicks.len()],
-        text_last: vec![None; w.text_clicks.len()],
+        rule_done: vec![false; w.rules.len()],
+        rule_last: vec![None; w.rules.len()],
     }).collect();
     let mut last: Vec<Option<u32>> = vec![None; cfg.windows.len()];
     let mut empty_cnt: Vec<u32> = vec![0; cfg.windows.len()];
@@ -2155,13 +2261,13 @@ fn gm_monitor_loop(app: tauri::AppHandle, cfg: GmCfg, gen: u64, interval_sec: u6
                             last[idx] = Some(wave);
                             if prev.map_or(true, |p| p != wave) {
                                 let is_up = prev.map_or(true, |p| wave > p);
-                                // 🔴 新局检测：波数回退（如 25→1）判定新一局 → 重置到波点击标记 + 播报
+                                // 🔴 新局检测：波数回退（如 25→1）判定新一局 → 重置到波规则标记 + 播报
                                 if let Some(p) = prev {
                                     if wave < p {
-                                        for d in rt[idx].wave_done.iter_mut() { *d = false; }
+                                        for d in rt[idx].rule_done.iter_mut() { *d = false; }
                                         let _ = app.emit("gm-log", serde_json::json!({
                                             "hwnd": win.hwnd,
-                                            "msg": format!("波数回退（{}→{}）判定新一局，到波自动点击已重置（本局会再点）", p, wave),
+                                            "msg": format!("波数回退（{}→{}）判定新一局，到波自动执行已重置（本局会再执行）", p, wave),
                                         }));
                                         if win.speak && !muted() {
                                             let tag = if multi { format!("{}号窗 ", idx + 1) } else { String::new() };
@@ -2194,17 +2300,19 @@ fn gm_monitor_loop(app: tauri::AppHandle, cfg: GmCfg, gen: u64, interval_sec: u6
                                     "spoken": spoken, "keyHit": key_hit,
                                 }));
                             }
-                            // 🔴 到波自动点击（多组）：到达或跨越触发波数即点，本局每组一次（新局重置）
-                            // v2：每组 points 多位置按顺序连点
-                            for (ci, wcx) in win.wave_clicks.iter().enumerate() {
+                            // 🔴 到波规则（wave 触发）：到达或跨越触发波数即执行动作序列，每局一次（新局重置）
+                            for (ri, rule) in win.rules.iter().enumerate() {
                                 if !alive(gen) { break; }
-                                if rt[idx].wave_done[ci] { continue; }
-                                let fire = prev.map_or(false, |p| p < wcx.wave && wave >= wcx.wave)
-                                    || (prev.is_none() && wave == wcx.wave);
-                                if !fire { continue; }
-                                rt[idx].wave_done[ci] = true;
-                                let ctx = format!("⚡ 第{}波", wcx.wave);
-                                gm_click_points(&app, win.hwnd, &wcx.points, || alive(gen), &ctx);
+                                if !rule.enabled || rt[idx].rule_done[ri] { continue; }
+                                if let GmTrigger::Wave { wave: tw } = &rule.trigger {
+                                    let fire = prev.map_or(false, |p| p < *tw && wave >= *tw)
+                                        || (prev.is_none() && wave == *tw);
+                                    if !fire { continue; }
+                                    rt[idx].rule_done[ri] = true;
+                                    rt[idx].rule_last[ri] = Some(gm_now_ms());
+                                    let ctx = format!("⚡ 第{}波规则", tw);
+                                    gm_exec_actions(&app, win.hwnd, &rule.actions, || alive(gen), &ctx);
+                                }
                             }
                         }
                         None => {
@@ -2244,24 +2352,28 @@ fn gm_monitor_loop(app: tauri::AppHandle, cfg: GmCfg, gen: u64, interval_sec: u6
                     }
                 }
             }
-            // 🔴 文字识别触发点击（多组）：对每组识别区域 OCR，命中关键词 → 冷却后点击
-            for (ti, tc) in win.text_clicks.iter().enumerate() {
+            // 🔴 识别文字规则（text 触发）：OCR 规则区域，命中关键词且冷却过 → 执行动作序列
+            for (ri, rule) in win.rules.iter().enumerate() {
                 if !alive(gen) { break; }
-                if !tc.enabled { continue; }
+                if !rule.enabled { continue; }
+                let (region, keyword) = match &rule.trigger {
+                    GmTrigger::Text { region, keyword } => (region, keyword),
+                    GmTrigger::Wave { .. } => continue, // wave 触发在上面波数分支处理
+                };
                 let now = gm_now_ms();
-                if let Some(t0) = rt[idx].text_last[ti] {
-                    if now.saturating_sub(t0) < (tc.cooldown_sec as u128) * 1000 { continue; }
+                if let Some(t0) = rt[idx].rule_last[ri] {
+                    if now.saturating_sub(t0) < (rule.cooldown_sec as u128) * 1000 { continue; }
                 }
-                match gm_tick_window(win, &tc.region) {
+                match gm_tick_window(win, region) {
                     Ok(Some(texts)) => {
                         // 去空格拼接：OCR 分词可能把「开始战斗」拆成「开始」+「战斗」
                         let joined: String = texts.join("").chars()
                             .filter(|c| *c != ' ' && *c != '\u{a0}')
                             .collect();
-                        if joined.contains(&tc.keyword) {
-                            rt[idx].text_last[ti] = Some(now);
-                            let ctx = format!("🎯 识别到「{}」", tc.keyword);
-                            gm_click_points(&app, win.hwnd, &tc.points, || alive(gen), &ctx);
+                        if joined.contains(keyword) {
+                            rt[idx].rule_last[ri] = Some(now);
+                            let ctx = format!("🎯 识别到「{}」", keyword);
+                            gm_exec_actions(&app, win.hwnd, &rule.actions, || alive(gen), &ctx);
                         }
                     }
                     _ => {}
@@ -2280,31 +2392,61 @@ fn gm_monitor_loop(app: tauri::AppHandle, cfg: GmCfg, gen: u64, interval_sec: u6
 
 /// 启动波数监控（Rust 后台线程）：命令立即返回，运行状态经 gm-wave / gm-log / gm-state 事件推送前端。
 /// 重复调用 = 重启监控（世代计数让旧线程自然退出，避免双线程同时播报）。
+/// 🔴 v3：旧的 wave_clicks/text_clicks 在此统一转换为通用 rules（一份执行引擎，兼容旧前端下发格式）
 #[tauri::command]
-fn game_monitor_start(cfg: GmCfg, app: tauri::AppHandle) -> Result<String, String> {
+fn game_monitor_start(mut cfg: GmCfg, app: tauri::AppHandle) -> Result<String, String> {
     if cfg.windows.is_empty() { return Err("未选择监控窗口".into()); }
+    // 旧结构 → 通用规则转换（wave_clicks/text_clicks 各转一条 rule，动作序列 = points 顺序点击）
+    for w in cfg.windows.iter_mut() {
+        let mut rules = std::mem::take(&mut w.rules);
+        for wc in &w.wave_clicks {
+            let actions: Vec<GmAction> = wc.points.iter().map(|p| GmAction::Click {
+                x: p.x, y: p.y, times: p.times, gap_ms: p.gap_ms,
+            }).collect();
+            rules.push(GmRule {
+                trigger: GmTrigger::Wave { wave: wc.wave },
+                actions,
+                cooldown_sec: 0,
+                enabled: true,
+            });
+        }
+        for tc in &w.text_clicks {
+            let actions: Vec<GmAction> = tc.points.iter().map(|p| GmAction::Click {
+                x: p.x, y: p.y, times: p.times, gap_ms: p.gap_ms,
+            }).collect();
+            rules.push(GmRule {
+                trigger: GmTrigger::Text { region: tc.region, keyword: tc.keyword.clone() },
+                actions,
+                cooldown_sec: tc.cooldown_sec,
+                enabled: tc.enabled,
+            });
+        }
+        w.rules = rules;
+        w.wave_clicks.clear();
+        w.text_clicks.clear();
+    }
     for (i, w) in cfg.windows.iter().enumerate() {
         if w.region[2] <= 0.0 || w.region[3] <= 0.0 {
             return Err(format!("第{}个窗口未配置波数识别区域", i + 1));
         }
-        // 点击组校验：到波组必须至少 1 个有效点位；文字组（启用中）需有效识别区域 + 关键词
-        for wc in &w.wave_clicks {
-            if wc.points.is_empty() {
-                return Err(format!("第{}个窗口的「第{}波点击」没有配置任何点击位置", i + 1, wc.wave));
+        // 规则校验：启用中的规则必须有动作；text 触发需有效识别区域 + 关键词
+        for rule in w.rules.iter().filter(|r| r.enabled) {
+            if rule.actions.is_empty() {
+                return Err(format!("第{}个窗口有启用的规则没有配置任何动作", i + 1));
             }
-        }
-        for tc in &w.text_clicks {
-            if tc.enabled && (tc.region[2] <= 0.0 || tc.region[3] <= 0.0) {
-                return Err(format!("第{}个窗口的文字点击「{}」未框选识别区域", i + 1, tc.keyword));
-            }
-            if tc.enabled && tc.points.is_empty() {
-                return Err(format!("第{}个窗口的文字点击「{}」没有配置任何点击位置", i + 1, tc.keyword));
+            if let GmTrigger::Text { region, keyword } = &rule.trigger {
+                if region[2] <= 0.0 || region[3] <= 0.0 {
+                    return Err(format!("第{}个窗口的文字规则「{}」未框选识别区域", i + 1, keyword));
+                }
+                if keyword.trim().is_empty() {
+                    return Err(format!("第{}个窗口有文字规则没填关键词", i + 1));
+                }
             }
         }
     }
     let interval = cfg.interval_sec.clamp(1, 30);
     let nwin = cfg.windows.len();
-    let nclick = cfg.windows.iter().map(|w| w.wave_clicks.len() + w.text_clicks.iter().filter(|t| t.enabled).count()).sum::<usize>();
+    let nclick = cfg.windows.iter().map(|w| w.rules.iter().filter(|r| r.enabled).count()).sum::<usize>();
     let gen = GM_GEN.fetch_add(1, Ordering::SeqCst) + 1;
     GM_RUN.store(true, Ordering::SeqCst);
     GM_MUTE.store(false, Ordering::SeqCst); // 新会话默认开声（暂停状态不跨会话残留）
@@ -2317,7 +2459,7 @@ fn game_monitor_start(cfg: GmCfg, app: tauri::AppHandle) -> Result<String, Strin
     }
     let _ = app.emit("gm-state", serde_json::json!({ "running": true, "muted": false }));
     Ok(format!("监控已启动：{} 个窗口，每 {} 秒识别一次（最小化/关闭窗口也持续播报）", nwin, interval)
-        + (if nclick > 0 { format!("，含 {} 组自动点击", nclick) } else { String::new() }).as_str())
+        + (if nclick > 0 { format!("，含 {} 条自动执行规则", nclick) } else { String::new() }).as_str())
 }
 
 /// 停止波数监控：线程在 100ms 内感知退出，托盘恢复默认图标与菜单
