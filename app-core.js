@@ -19523,8 +19523,9 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 if (myNick && typeof openContributionCard === 'function') openContributionCard(encodeURIComponent(myNick));
                 else if (typeof showToast === 'function') showToast('请先设置昵称', 'info');
             };
-            // 生成二维码（和阵容分享/贡献主页同款）
+            // 生成二维码（和阵容分享/贡献主页同款）—— 🔴 2026-09-01 修复不显示：主动加载二维码库而非静默跳过
             try {
+                if (typeof _lineupEnsureQrLib === 'function') await _lineupEnsureQrLib();
                 if (typeof window.qrcode !== 'function') { /* 二维码库未加载，跳过 */ return; }
                 const qr = window.qrcode(0, 'M');
                 qr.addData(link); qr.make();
@@ -19544,6 +19545,8 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
         async function renderContribQr(nick) {
             const box = document.getElementById('tabQr');
             if (!box) return;
+            // 🔴 2026-09-01 修复二维码不显示：此前只检查不加载，二维码库（vendor/qrcode-generator.js）没就绪时静默跳过
+            try { if (typeof _lineupEnsureQrLib === 'function') await _lineupEnsureQrLib(); } catch (e) {}
             const url = 'https://gyq-svip.github.io/tfjl-web/#pu=' + encodeURIComponent(nick);
             box.innerHTML = '<div style="text-align:center;padding:8px 0 4px;">'
                 + '<div style="color:rgba(255,255,255,0.85);font-size:0.92rem;font-weight:bold;margin-bottom:4px;">📱 扫码访问我的主页</div>'
@@ -19595,11 +19598,349 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
         }
         window.addEventListener('hashchange', _contribHashRoute);
         if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _contribHashRoute); else _contribHashRoute();
+        // 🔴 2026-09-01 主页分享图片：和阵容分享同款（图片可转发群里），扫码进个人主页看全部作品
+        async function shareHomePageImage() {
+            const nick = (function () { try { return localStorage.getItem('TFJL_UserName') || ''; } catch (e) { return ''; } })();
+            if (!nick) {
+                if (typeof showToast === 'function') showToast('请先设置昵称再分享主页', 'info');
+                else alert('请先设置昵称再分享主页');
+                return;
+            }
+            // 收集数据：声望/头衔/统计 + 我的作品（分类统计 + 代表作标题）
+            const repMap = computeReputation();
+            const e = repMap[nick] || { rep: 0, shares: 0, copies: 0, likes: 0, downloads: 0, firstShare: 0 };
+            const t = getTitle(e.rep);
+            const allShares = (typeof wallMessages !== 'undefined' ? wallMessages : []).filter(function (m) { return isShareMsg(m) && _normNick(msgAuthor(m)) === _normNick(nick); });
+            let myWorks = [];
+            try {
+                const all = await fetchWorksGist();
+                const norm = _normNick(nick);
+                myWorks = (all[norm] && all[norm].works) || [];
+            } catch (err) { /* 拉不到作品就只画统计 */ }
+            const worksByCat = {};
+            myWorks.forEach(function (w) { const c = w.category || '未分类'; worksByCat[c] = (worksByCat[c] || 0) + 1; });
+            const catKeys = Object.keys(worksByCat);
+            const totalWorks = myWorks.length + allShares.length;
+
+            // 二维码库（与阵容分享同一个 vendor/qrcode-generator.js）
+            try { if (typeof _lineupEnsureQrLib === 'function') await _lineupEnsureQrLib(); } catch (err) {}
+            const homeUrl = 'https://gyq-svip.github.io/tfjl-web/#pu=' + encodeURIComponent(nick);
+            const hasQr = (typeof window.qrcode === 'function');
+
+            // 画布：960 宽，风格与阵容分享一致（深蓝渐变）
+            const W = 960, PAD = 32;
+            const now = new Date();
+            const dateStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+            const HEAD_H = 118;                     // 标题 + 昵称/头衔行
+            const statsH = 96;                        // 四格统计
+            const catsH = catKeys.length ? 40 + Math.ceil(catKeys.length / 3) * 30 : 0;   // 分类统计
+            const worksH = Math.min(myWorks.length, 5) * 30 + (myWorks.length ? 34 : 0);    // 代表作最多5条
+            const QR_SIZE = 150;
+            const FOOT_H = Math.max(QR_SIZE + 30, 88); // 底部：右二维码 + 左推广语
+            const H = HEAD_H + statsH + 10 + catsH + worksH + 14 + FOOT_H + 14;
+            const canvas = document.createElement('canvas');
+            canvas.width = W; canvas.height = H;
+            const ctx = canvas.getContext('2d');
+            const bg = ctx.createLinearGradient(0, 0, W, H);
+            bg.addColorStop(0, '#1a1a2e'); bg.addColorStop(1, '#141426');
+            ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+
+            // 头部：标题 + 昵称（发光金色大字）+ 头衔徽章
+            ctx.textBaseline = 'alphabetic';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = '#ffd700';
+            ctx.font = 'bold 30px "Microsoft YaHei", "PingFang SC", sans-serif';
+            ctx.fillText('塔防精灵 · 个人主页', W / 2, 44);
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 34px "Microsoft YaHei", sans-serif';
+            ctx.shadowColor = 'rgba(255,215,0,0.65)'; ctx.shadowBlur = 16;
+            ctx.fillText(nick, W / 2, 88);
+            ctx.shadowBlur = 0;
+            ctx.font = 'bold 17px "Microsoft YaHei", sans-serif';
+            ctx.fillStyle = '#ba68c8';
+            ctx.fillText('🎖 ' + t.name + '　·　声望 ' + e.rep + '　·　作品 ' + totalWorks + ' 件　·　' + dateStr, W / 2, HEAD_H - 8);
+
+            // 四格统计（分享/被复制/下载/获赞）：圆角卡片
+            let y = HEAD_H + 6;
+            const cells = [
+                { label: '📤 分享', val: e.shares, color: '#4fc3f7' },
+                { label: '📋 被复制', val: e.copies, color: '#ffd700' },
+                { label: '📥 被下载', val: e.downloads, color: '#ffc107' },
+                { label: '👍 获赞', val: e.likes, color: '#ff6b6b' }
+            ];
+            const cellW = (W - PAD * 2 - 12 * 3) / 4;
+            cells.forEach(function (c, i) {
+                const cx = PAD + i * (cellW + 12);
+                ctx.fillStyle = 'rgba(255,255,255,0.06)';
+                if (typeof _lineupRoundRect === 'function') { _lineupRoundRect(ctx, cx, y, cellW, 74, 10); ctx.fill(); }
+                else ctx.fillRect(cx, y, cellW, 74);
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillStyle = c.color;
+                ctx.font = 'bold 26px "Microsoft YaHei", sans-serif';
+                ctx.fillText(String(c.val), cx + cellW / 2, y + 26);
+                ctx.fillStyle = 'rgba(255,255,255,0.6)';
+                ctx.font = '15px "Microsoft YaHei", sans-serif';
+                ctx.fillText(c.label, cx + cellW / 2, y + 54);
+            });
+            y += statsH + 10;
+
+            // 分类统计（标签形式，一行最多3个）
+            if (catKeys.length) {
+                ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+                ctx.fillStyle = '#ba68c8';
+                ctx.font = 'bold 17px "Microsoft YaHei", sans-serif';
+                ctx.fillText('📂 作品分类', PAD, y + 12);
+                y += 34;
+                ctx.font = '15px "Microsoft YaHei", sans-serif';
+                catKeys.slice(0, 6).forEach(function (c, i) {
+                    const col = i % 3, row = Math.floor(i / 3);
+                    const tagW = 280, tagH = 26;
+                    const tx = PAD + col * (tagW + 12), ty = y + row * 30;
+                    ctx.fillStyle = 'rgba(186,104,200,0.14)';
+                    if (typeof _lineupRoundRect === 'function') { _lineupRoundRect(ctx, tx, ty, tagW, tagH, 13); ctx.fill(); }
+                    else ctx.fillRect(tx, ty, tagW, tagH);
+                    ctx.fillStyle = '#ce93d8';
+                    ctx.fillText('🏷 ' + c + ' × ' + worksByCat[c], tx + 14, ty + 13);
+                });
+                y += Math.ceil(Math.min(catKeys.length, 6) / 3) * 30;
+            }
+
+            // 代表作列表（最多5条）
+            if (myWorks.length) {
+                ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+                ctx.fillStyle = '#ffd700';
+                ctx.font = 'bold 17px "Microsoft YaHei", sans-serif';
+                ctx.fillText('⭐ 代表作', PAD, y + 12);
+                y += 34;
+                ctx.font = '15px "Microsoft YaHei", sans-serif';
+                myWorks.slice(0, 5).forEach(function (w, i) {
+                    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+                    const tag = (w.visibility === 'private' ? '🔒' : '') + (w.isEncrypted ? '🔐' : '');
+                    ctx.fillText((i + 1) + '. ' + tag + (w.title || '未命名作品') + '（' + (w.category || '未分类') + '）', PAD + 4, y + i * 30 + 13);
+                });
+                if (myWorks.length > 5) {
+                    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+                    ctx.fillText('… 还有 ' + (myWorks.length - 5) + ' 件作品，扫码进主页看全部', PAD + 4, y + 5 * 30 + 13);
+                }
+                y += Math.min(myWorks.length, 5) * 30;
+            } else if (allShares.length) {
+                ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+                ctx.fillStyle = 'rgba(255,255,255,0.6)';
+                ctx.font = '15px "Microsoft YaHei", sans-serif';
+                ctx.fillText('📦 需求墙分享 ' + allShares.length + ' 条，扫码进主页可浏览/导入', PAD, y + 13);
+                y += 30;
+            }
+
+            // 底部区：左推广语 + 右主页二维码（扫码进主页）
+            y += 14;
+            const boxH = FOOT_H;
+            ctx.fillStyle = 'rgba(255,255,255,0.05)';
+            if (typeof _lineupRoundRect === 'function') { _lineupRoundRect(ctx, PAD, y, W - PAD * 2, boxH, 10); ctx.fill(); }
+            else ctx.fillRect(PAD, y, W - PAD * 2, boxH);
+            ctx.strokeStyle = 'rgba(186,104,200,0.4)'; ctx.lineWidth = 1.5; ctx.stroke();
+            const qx = W - PAD - 16 - QR_SIZE;
+            const qy = y + (boxH - (hasQr ? QR_SIZE : 0)) / 2;
+            if (hasQr) {
+                try {
+                    const qr = window.qrcode(0, 'M');
+                    qr.addData(homeUrl); qr.make();
+                    const n = qr.getModuleCount();
+                    const cell = Math.floor((QR_SIZE - 12) / n);
+                    const off = (QR_SIZE - cell * n) / 2;
+                    ctx.fillStyle = '#fff'; ctx.fillRect(qx, qy, QR_SIZE, QR_SIZE);
+                    ctx.fillStyle = '#5e35b1';
+                    for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (qr.isDark(r, c)) ctx.fillRect(qx + off + c * cell, qy + off + r * cell, cell + 0.5, cell + 0.5);
+                } catch (err) { /* 失败跳过 */ }
+            }
+            // 左列文字：引导 + 链接 + 生成信息
+            const colL = PAD + 18, colR = qx - 14;
+            ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+            ctx.fillStyle = '#b39ddb';
+            ctx.font = 'bold 19px "Microsoft YaHei", sans-serif';
+            ctx.fillText('🏠 扫码进我的主页，浏览/一键导入全部作品', colL, y + 26);
+            ctx.fillStyle = 'rgba(255,255,255,0.62)';
+            ctx.font = '13px "Microsoft YaHei", sans-serif';
+            ctx.fillText('主页链接（复制后浏览器/软件打开）：', colL, y + 54);
+            ctx.fillStyle = '#9fb3ff';
+            ctx.font = '13px Consolas, monospace';
+            ctx.fillText(homeUrl.length > 66 ? homeUrl.slice(0, 64) + '…' : homeUrl, colL, y + 74);
+            ctx.fillStyle = '#ffe082';
+            ctx.font = 'bold 16px "Microsoft YaHei", sans-serif';
+            ctx.fillText('塔防精灵助手：脚本 · 皮肤 · 记事本 · 站位', colL, y + boxH - 34);
+            ctx.fillStyle = '#ff5252';
+            ctx.fillText('觉得不错就分享给队友！', colL + 320, y + boxH - 34);
+            ctx.fillStyle = 'rgba(255,255,255,0.4)';
+            ctx.font = '13px "Microsoft YaHei", sans-serif';
+            ctx.fillText('塔防精灵助手 生成于 ' + dateStr, colL, y + boxH - 14);
+
+            // 弹窗：图片预览 + 下载/复制图片/复制链接（与阵容分享同款按钮布局）
+            let dataUrl = '';
+            try { dataUrl = canvas.toDataURL('image/png'); }
+            catch (err) { if (typeof showToast === 'function') showToast('❌ 图片导出失败，请截图分享', 'error'); return; }
+            const old = document.getElementById('homeShareModal');
+            if (old) old.remove();
+            const modal = document.createElement('div');
+            modal.id = 'homeShareModal';
+            modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.72);z-index:' + (200000 + (window.topWinZIndex || 0)) + ';display:flex;align-items:center;justify-content:center;padding:16px;';
+            modal.innerHTML =
+                '<div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(186,104,200,0.55);border-radius:16px;padding:18px 20px;max-width:860px;width:96%;max-height:92vh;overflow-y:auto;box-shadow:0 10px 40px rgba(0,0,0,0.6);">' +
+                  '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
+                    '<div><span style="color:#ba68c8;font-size:1.1rem;font-weight:bold;">🏠 主页分享图</span>' +
+                    '<div style="color:rgba(255,255,255,0.5);font-size:0.74rem;margin-top:2px;">转发到群里，大家扫码进你的主页浏览/导入全部作品</div></div>' +
+                    '<span id="homeShareClose" style="cursor:pointer;color:rgba(255,255,255,0.4);font-size:1.5rem;">×</span>' +
+                  '</div>' +
+                  '<img id="homeShareImg" style="width:100%;border-radius:10px;display:block;box-shadow:0 4px 18px rgba(0,0,0,0.5);" alt="主页分享图">' +
+                  '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">' +
+                    '<button id="homeShareDl" style="flex:1;min-width:120px;background:linear-gradient(135deg,#ffd700,#ff9800);color:#1a1a2e;border:none;padding:10px;border-radius:8px;cursor:pointer;font-size:0.9rem;font-weight:bold;">💾 下载图片</button>' +
+                    '<button id="homeShareCopyImg" style="flex:1;min-width:120px;background:linear-gradient(135deg,#26a69a,#00796b);color:#fff;border:none;padding:10px;border-radius:8px;cursor:pointer;font-size:0.9rem;font-weight:bold;">📋 复制图片</button>' +
+                    '<button id="homeShareCopyLink" style="flex:1;min-width:120px;background:linear-gradient(135deg,#ab47bc,#6a1b9a);color:#fff;border:none;padding:10px;border-radius:8px;cursor:pointer;font-size:0.9rem;font-weight:bold;">🔗 复制链接</button>' +
+                  '</div>' +
+                '</div>';
+            document.body.appendChild(modal);
+            modal.querySelector('#homeShareImg').src = dataUrl;
+            const close = function () { modal.remove(); };
+            modal.querySelector('#homeShareClose').onclick = close;
+            modal.onclick = function (ev) { if (ev.target === modal) close(); };
+            const _fb = function (btn, txt, ms) {
+                if (!btn) return;
+                if (btn._t) clearTimeout(btn._t);
+                if (!btn._o) btn._o = btn.textContent;
+                btn.textContent = txt;
+                btn._t = setTimeout(function () { btn.textContent = btn._o; }, ms || 1600);
+            };
+            modal.querySelector('#homeShareDl').onclick = function () {
+                const a = document.createElement('a');
+                a.href = dataUrl;
+                a.download = '塔防精灵主页_' + nick.replace(/[\\/:*?"<>|]/g, '') + '_' + Date.now() + '.png';
+                document.body.appendChild(a); a.click(); a.remove();
+                _fb(this, '✓ 已开始下载');
+                if (typeof showToast === 'function') showToast('💾 图片已开始下载，发到群里即可', 'success');
+            };
+            modal.querySelector('#homeShareCopyImg').onclick = async function () {
+                const btn = this;
+                _fb(btn, '⏳ 复制中…', 4000);
+                try {
+                    const blob = await new Promise(function (res, rej) { canvas.toBlob(function (b) { b ? res(b) : rej(new Error('toBlob 失败')); }, 'image/png'); });
+                    await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+                    _fb(btn, '✓ 图片已复制');
+                    if (typeof showToast === 'function') showToast('📋 图片已复制，可直接粘贴到微信/QQ', 'success');
+                } catch (err) {
+                    _fb(btn, '❌ 复制失败');
+                    if (typeof showToast === 'function') showToast('❌ 当前环境不支持复制图片，请用「下载图片」', 'error');
+                }
+            };
+            modal.querySelector('#homeShareCopyLink').onclick = async function () {
+                try {
+                    await navigator.clipboard.writeText(homeUrl);
+                    _fb(this, '✓ 已复制');
+                    if (typeof showToast === 'function') showToast('🔗 主页链接已复制：对方点开直接进你的主页', 'success');
+                } catch (err) {
+                    try {
+                        const ta = document.createElement('textarea');
+                        ta.value = homeUrl; document.body.appendChild(ta); ta.select();
+                        document.execCommand('copy'); ta.remove();
+                        if (typeof showToast === 'function') showToast('🔗 主页链接已复制', 'success');
+                    } catch (e2) { if (typeof showToast === 'function') showToast('❌ 复制失败，请手动复制', 'error'); }
+                }
+            };
+        }
+        window.shareHomePageImage = shareHomePageImage;
+        // 🔴 2026-09-01 个人主页悬浮窗：标题栏拖动 + 右下角缩放 + 双击标题栏最大化/还原 + 位置尺寸记忆
+        (function _contribWinInit() {
+            const card = document.getElementById('contributionCard');
+            const title = document.getElementById('contribWinTitle');
+            const rsz = document.getElementById('contribWinResize');
+            if (!card || !title) return;
+            const LS_KEY = 'tfjl_contrib_win';
+            // 恢复上次的窗口位置和尺寸
+            try {
+                const sv = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
+                if (sv && sv.w && sv.h) {
+                    card.style.width = Math.max(420, Math.min(sv.w, window.innerWidth - 8)) + 'px';
+                    card.style.height = Math.max(320, Math.min(sv.h, window.innerHeight - 8)) + 'px';
+                }
+                if (sv && typeof sv.x === 'number') {
+                    card.style.transform = 'none';
+                    card.style.left = Math.max(0, Math.min(sv.x, window.innerWidth - 100)) + 'px';
+                    card.style.top = Math.max(0, Math.min(sv.y, window.innerHeight - 60)) + 'px';
+                }
+            } catch (e) {}
+            const _save = function () {
+                try {
+                    const r = card.getBoundingClientRect();
+                    localStorage.setItem(LS_KEY, JSON.stringify({ x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) }));
+                } catch (e) {}
+            };
+            // 拖动（标题栏按住移动；关闭按钮不触发）
+            let drag = null;
+            title.addEventListener('mousedown', function (e) {
+                if (e.target.closest('button')) return;
+                const r = card.getBoundingClientRect();
+                drag = { sx: e.clientX, sy: e.clientY, ox: r.left, oy: r.top };
+                card.style.transform = 'none';
+                card.style.left = r.left + 'px';
+                card.style.top = r.top + 'px';
+                e.preventDefault();
+            });
+            // 缩放（右下角手柄）
+            let rs = null;
+            if (rsz) rsz.addEventListener('mousedown', function (e) {
+                const r = card.getBoundingClientRect();
+                rs = { sx: e.clientX, sy: e.clientY, w: r.width, h: r.height };
+                card.style.transform = 'none';
+                card.style.left = r.left + 'px';
+                card.style.top = r.top + 'px';
+                e.preventDefault();
+                e.stopPropagation();
+            });
+            document.addEventListener('mousemove', function (e) {
+                if (drag) {
+                    let nx = drag.ox + e.clientX - drag.sx;
+                    let ny = drag.oy + e.clientY - drag.sy;
+                    nx = Math.max(-card.offsetWidth + 80, Math.min(nx, window.innerWidth - 80));
+                    ny = Math.max(0, Math.min(ny, window.innerHeight - 40));
+                    card.style.left = nx + 'px';
+                    card.style.top = ny + 'px';
+                } else if (rs) {
+                    const w = Math.max(420, Math.min(rs.w + e.clientX - rs.sx, window.innerWidth - 8));
+                    const h = Math.max(320, Math.min(rs.h + e.clientY - rs.sy, window.innerHeight - 8));
+                    card.style.width = w + 'px';
+                    card.style.height = h + 'px';
+                }
+            });
+            document.addEventListener('mouseup', function () {
+                if (drag || rs) _save();
+                drag = null; rs = null;
+            });
+            // 双击标题栏：最大化 ↔ 还原
+            let _maxSv = null;
+            title.addEventListener('dblclick', function () {
+                const r = card.getBoundingClientRect();
+                if (_maxSv) {
+                    card.style.left = _maxSv.x + 'px';
+                    card.style.top = _maxSv.y + 'px';
+                    card.style.width = _maxSv.w + 'px';
+                    card.style.height = _maxSv.h + 'px';
+                    _maxSv = null;
+                } else {
+                    _maxSv = { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) };
+                    card.style.transform = 'none';
+                    card.style.left = '4px';
+                    card.style.top = '4px';
+                    card.style.width = (window.innerWidth - 8) + 'px';
+                    card.style.height = (window.innerHeight - 8) + 'px';
+                }
+                _save();
+            });
+        })();
         window.collectWallShare = collectWallShare;
         window.collectContribShare = collectContribShare;
         window.collectShareToMyPage = collectShareToMyPage;
         window.removeWorkFromMyPage = removeWorkFromMyPage;
-        window.renderContribWorks = renderContribWorks;
+        // 🔴 2026-09-01 毒代码清除：window.renderContribWorks = renderContribWorks;
+        //   该函数从未定义（实际是 renderContribWorksTab），此行抛 ReferenceError 中断 app-core.js 后续执行，
+        //   导致 const ADMIN_VERIFY_KEY 处于 TDZ → verifyAdmin 抛「Cannot access before initialization」
+        //   → 管理员密码输入无任何反应。这是管理员面板彻底打不开的真正根因！
         // 复制某条分享的内容
         function contribCopyContent(i) {
             const item = _contribData && _contribData.shares[i]; if (!item) return;
@@ -20093,7 +20434,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                         <div class="contrib-nick-glow" style="font-size:1.4rem;font-weight:bold;">${escapeHtml(nick)}</div>
                         <div style="color:rgba(255,215,0,0.8);font-size:0.88rem;margin-top:3px;">🎖 ${escapeHtml(t.name)}</div>
                     </div>
-                    <button onclick="switchContribTab('qr')" style="background:linear-gradient(135deg,#5c6bc0,#283593);color:#fff;border:none;padding:8px 14px;border-radius:10px;cursor:pointer;font-size:0.78rem;font-weight:bold;box-shadow:0 2px 8px rgba(92,107,192,0.3);white-space:nowrap;">🔗 分享主页</button>
+                    <button onclick="shareHomePageImage()" title="生成主页分享图片（可转发群里，扫码进主页）" style="background:linear-gradient(135deg,#5c6bc0,#283593);color:#fff;border:none;padding:8px 14px;border-radius:10px;cursor:pointer;font-size:0.78rem;font-weight:bold;box-shadow:0 2px 8px rgba(92,107,192,0.3);white-space:nowrap;">🔗 分享主页</button>
                 </div>
                 ${renderBadgesHtml(nick, repMap)}
                 <div style="background:rgba(255,255,255,0.06);border-radius:10px;padding:12px 14px;margin-bottom:12px;border:1px solid rgba(255,215,0,0.15);">
@@ -26687,6 +27028,8 @@ ${maSection}
         }
 
         async function verifyAdmin() {
+            // 🔴 2026-09-01 防御：任何异常都要弹提示，绝不能静默失败（此前 TDZ 错误导致输入密码无反应）
+            try {
             const code = document.getElementById('adminVerifyCode').value.trim();
             if (await verifyPassword(code, ADMIN_VERIFY_HASH)) {
                 sessionStorage.setItem(ADMIN_VERIFY_KEY, 'true');
@@ -26705,6 +27048,10 @@ ${maSection}
                 showAdminStatus('验证成功！', 'success');
             } else {
                 showAdminStatus('验证码错误', 'error');
+            }
+            } catch (e) {
+                console.error('[admin] verifyAdmin 异常:', e);
+                showAdminStatus('验证异常：' + e.message, 'error');
             }
         }
         window.verifyAdmin = verifyAdmin; // 🔴 2026-09-01 显式暴露到 window，供 index.html 内联兜底脚本调用

@@ -1069,24 +1069,28 @@
             }
 
             const now = new Date();
-            const defaultName = `塔防阵容_${projectName}_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
+            const defaultName = `塔防阵容_${projectName}_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}_${String(now.getMinutes()).padStart(2,'0')}`;
             let fileName, expireMinutes, sharePassword, recoveryKey, category = '未分类';
             if (auto) {
                 fileName = defaultName + '.json';
                 expireMinutes = Math.max(1, (autoOpts.days || 30)) * 1440;
                 // 上游分享若勾了密码保护，上墙副本同密码加密（防止私密分享被公开放明文）
                 sharePassword = autoOpts.pw || ''; recoveryKey = '';
+                // 🔴 2026-09-01 分类跟随：上游分享选项里选的分类 → 需求墙消息分类（没选则用当前项目分类）
+                category = autoOpts.cat || currentProjectCategory || '未分类';
             } else {
                 const inputName = await askTextInputAsync({ title: '分享阵容', label: '分享阵容文件名（不含扩展名）：', defaultValue: defaultName });
                 if (!inputName) return false;
                 fileName = inputName.endsWith('.json') ? inputName : inputName + '.json';
 
-                // 分享选项弹窗（时长 + 密码），与脚本分享一致
+                // 分享选项弹窗（时长 + 密码 + 分类），与脚本分享一致
                 const shareOpts = await new Promise(function(resolve) { showShareOptionsDialog(function(e, p, rk, cat) { resolve([e, p, rk, cat]); }); });
                 if (shareOpts === null || shareOpts[0] === null) return false;
                 expireMinutes = shareOpts[0];
                 sharePassword = shareOpts[1];
                 recoveryKey = shareOpts[2] || '';
+                // 🔴 2026-09-01 修复：分类标签此前被丢弃（回调第4参数没取），上墙消息永远是「未分类」
+                category = shareOpts[3] || '未分类';
             }
 
             try {
