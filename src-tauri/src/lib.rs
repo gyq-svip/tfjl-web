@@ -1758,6 +1758,9 @@ struct GmWin {
     // 旧的 wave_clicks/text_clicks 会在 game_monitor_start 统一转换为 rules 执行（兼容旧前端）。
     #[serde(default)]
     rules: Vec<GmRule>,
+    // 🔴 2026-09-02 点击方式："real"=真实鼠标(默认,需窗口可见前台) / "bg"=后台消息(可遮挡/后台/多开同点)
+    #[serde(default)]
+    click_mode: Option<String>,
 }
 
 /// 单个点击点位：一组内多个位置按顺序连点（点完一个等 gap_ms 再点下一个）
@@ -1939,6 +1942,58 @@ fn gm_win_point_to_screen(hwnd: usize, rx: f64, ry: f64) -> Result<(i32, i32), S
     #[cfg(not(windows))]
     {
         let _ = (hwnd, rx, ry);
+        Err("仅支持 Windows".into())
+    }
+}
+
+/// 后台点击（PostMessage 把鼠标消息直接投递到窗口句柄）：不抢鼠标、不要求窗口前台/可见/不被遮挡，
+/// 多开多个窗口同时点也互不干扰 —— 正适合「多开 4~5 个窗口一起玩」。
+/// ⚠️ 坐标用客户区坐标（不含标题栏）：把整窗比例坐标 - 标题栏偏移。能否生效取决于目标程序是否处理
+///     合成消息（DirectInput 游戏 / 浏览器内核常忽略，需实测；模拟器通常可用）。
+fn gm_click_background(hwnd: usize, rx: f64, ry: f64, times: u32, gap_ms: u64) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        use winapi::shared::windef::{HWND, RECT, POINT};
+        use winapi::um::winuser::{GetWindowRect, ClientToScreen, PostMessageW, WM_LBUTTONDOWN, WM_LBUTTONUP, MK_LBUTTON};
+        let hwnd = hwnd as HWND;
+        unsafe {
+            let mut wr: RECT = std::mem::zeroed();
+            if GetWindowRect(hwnd, &mut wr) == 0 {
+                return Err("获取窗口位置失败（窗口可能已关闭）".into());
+            }
+            let ww = (wr.right - wr.left) as f64;
+            let wh = (wr.bottom - wr.top) as f64;
+            if ww <= 0.0 || wh <= 0.0 {
+                return Err("窗口尺寸非法（可能已最小化）".into());
+            }
+            // 整窗像素坐标（与 PrintWindow 整窗截图同坐标系，含标题栏）
+            let px = (rx * ww) as i32;
+            let py = (ry * wh) as i32;
+            // 客户区相对整窗的偏移（标题栏 + 边框）
+            let mut pt: POINT = std::mem::zeroed();
+            if ClientToScreen(hwnd, &mut pt) == 0 {
+                return Err("坐标转换失败".into());
+            }
+            let ox = pt.x - wr.left;
+            let oy = pt.y - wr.top;
+            let cx = px - ox;
+            let cy = py - oy;
+            let times = times.clamp(1, 10);
+            for n in 0..times {
+                let lparam = ((cy as i32) << 16) | ((cx as i32) & 0xffff);
+                PostMessageW(hwnd, WM_LBUTTONDOWN, MK_LBUTTON as usize, lparam as isize);
+                std::thread::sleep(std::time::Duration::from_millis(40));
+                PostMessageW(hwnd, WM_LBUTTONUP, 0, lparam as isize);
+                if n + 1 < times {
+                    std::thread::sleep(std::time::Duration::from_millis(gap_ms.max(50)));
+                }
+            }
+        }
+        Ok(())
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (hwnd, rx, ry, times, gap_ms);
         Err("仅支持 Windows".into())
     }
 }
@@ -2178,23 +2233,39 @@ fn gm_tick_window(win: &GmWin, region: &[f64; 4]) -> Result<Option<Vec<String>>,
 /// 按顺序执行宏动作序列（规则引擎核心，Click/Delay/Key 三原语）：
 /// Click → 换算屏幕坐标连点；Delay → 100ms 粒度可中断等待；Key → SendInput UNICODE 注入文字。
 /// 中途世代变化（监控重启/停止）立即中断，不打断新会话。
-fn gm_exec_actions<F: Fn() -> bool>(app: &tauri::AppHandle, hwnd: usize, actions: &[GmAction], alive: F, ctx: &str) {
+fn gm_exec_actions<F: Fn() -> bool>(app: &tauri::AppHandle, hwnd: usize, actions: &[GmAction], alive: F, ctx: &str, mode: &str) {
     for (ai, act) in actions.iter().enumerate() {
         if !alive() { break; }
         match act {
             GmAction::Click { x, y, times, gap_ms } => {
-                match gm_win_point_to_screen(hwnd, *x, *y) {
-                    Ok((sx, sy)) => {
-                        let _ = app.emit("gm-log", serde_json::json!({
-                            "hwnd": hwnd,
-                            "msg": format!("{} 第{}步·点击（×{}次）", ctx, ai + 1, (*times).max(1)),
-                        }));
-                        gm_click_at(sx, sy, *times, *gap_ms);
+                if mode == "bg" {
+                    match gm_click_background(hwnd, *x, *y, (*times).max(1), *gap_ms) {
+                        Ok(_) => {
+                            let _ = app.emit("gm-log", serde_json::json!({
+                                "hwnd": hwnd,
+                                "msg": format!("{} 第{}步·后台点击（×{}次）", ctx, ai + 1, (*times).max(1)),
+                            }));
+                        }
+                        Err(e) => {
+                            let _ = app.emit("gm-log", serde_json::json!({
+                                "hwnd": hwnd, "msg": format!("{} 第{}步·后台点击跳过：{}", ctx, ai + 1, e), "isErr": true,
+                            }));
+                        }
                     }
-                    Err(e) => {
-                        let _ = app.emit("gm-log", serde_json::json!({
-                            "hwnd": hwnd, "msg": format!("{} 第{}步·点击跳过：{}", ctx, ai + 1, e), "isErr": true,
-                        }));
+                } else {
+                    match gm_win_point_to_screen(hwnd, *x, *y) {
+                        Ok((sx, sy)) => {
+                            let _ = app.emit("gm-log", serde_json::json!({
+                                "hwnd": hwnd,
+                                "msg": format!("{} 第{}步·点击（×{}次）", ctx, ai + 1, (*times).max(1)),
+                            }));
+                            gm_click_at(sx, sy, *times, *gap_ms);
+                        }
+                        Err(e) => {
+                            let _ = app.emit("gm-log", serde_json::json!({
+                                "hwnd": hwnd, "msg": format!("{} 第{}步·点击跳过：{}", ctx, ai + 1, e), "isErr": true,
+                            }));
+                        }
                     }
                 }
             }
@@ -2311,7 +2382,7 @@ fn gm_monitor_loop(app: tauri::AppHandle, cfg: GmCfg, gen: u64, interval_sec: u6
                                     rt[idx].rule_done[ri] = true;
                                     rt[idx].rule_last[ri] = Some(gm_now_ms());
                                     let ctx = format!("⚡ 第{}波规则", tw);
-                                    gm_exec_actions(&app, win.hwnd, &rule.actions, || alive(gen), &ctx);
+                                    gm_exec_actions(&app, win.hwnd, &rule.actions, || alive(gen), &ctx, win.click_mode.as_deref().unwrap_or("real"));
                                 }
                             }
                         }
@@ -2373,7 +2444,7 @@ fn gm_monitor_loop(app: tauri::AppHandle, cfg: GmCfg, gen: u64, interval_sec: u6
                         if joined.contains(keyword) {
                             rt[idx].rule_last[ri] = Some(now);
                             let ctx = format!("🎯 识别到「{}」", keyword);
-                            gm_exec_actions(&app, win.hwnd, &rule.actions, || alive(gen), &ctx);
+                            gm_exec_actions(&app, win.hwnd, &rule.actions, || alive(gen), &ctx, win.click_mode.as_deref().unwrap_or("real"));
                         }
                     }
                     _ => {}
@@ -2477,15 +2548,21 @@ fn game_monitor_stop(app: tauri::AppHandle) -> Result<(), String> {
 ///    事件后自行编排点击序列）③未来扩展不走打包。
 /// ⚠️ 与监控循环内的自动点击同用 mouse_event（真实鼠标），窗口需可见/未最小化/未被遮挡。
 #[tauri::command]
-fn gm_click(hwnd: usize, x: f64, y: f64, times: Option<u32>, gap_ms: Option<u64>) -> Result<String, String> {
+fn gm_click(hwnd: usize, x: f64, y: f64, times: Option<u32>, gap_ms: Option<u64>, mode: Option<String>) -> Result<String, String> {
     let times = times.unwrap_or(1).clamp(1, 10);
     let gap = gap_ms.unwrap_or(200).max(50);
     if !(0.0..=1.0).contains(&x) || !(0.0..=1.0).contains(&y) {
         return Err("点击位置必须在 0~1 比例范围内".into());
     }
-    let (sx, sy) = gm_win_point_to_screen(hwnd, x, y)?;
-    gm_click_at(sx, sy, times, gap);
-    Ok(format!("已点击 ({:.3},{:.3}) ×{} 次", x, y, times))
+    let mode = mode.unwrap_or_else(|| "real".to_string());
+    if mode == "bg" {
+        gm_click_background(hwnd, x, y, times, gap)?;
+        Ok(format!("后台点击 ({:.3},{:.3}) ×{} 次", x, y, times))
+    } else {
+        let (sx, sy) = gm_win_point_to_screen(hwnd, x, y)?;
+        gm_click_at(sx, sy, times, gap);
+        Ok(format!("已点击 ({:.3},{:.3}) ×{} 次", x, y, times))
+    }
 }
 
 /// 查询监控是否运行中（前端打开面板时恢复按钮状态用）
