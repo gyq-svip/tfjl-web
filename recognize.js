@@ -710,10 +710,18 @@
   }
 
   // 皮肤模板库缓存（高成功率构建后存 localStorage，下次秒开，避免每次重跑 418 张）
-  const SKIN_TPL_CACHE_KEY = 'tfjl_skin_tpls_v2';
+  const SKIN_TPL_CACHE_KEY = 'tfjl_skin_tpls_v3';
   function _rebuildTplQ(){ _skinTplByQ = {金:[],紫:[],蓝:[],绿:[],白:[]}; for(const t of (_skinTpls||[])){ (_skinTplByQ[t.quality] || (_skinTplByQ[t.quality]=[])).push(t); } }
   function _saveTplCache(sig, tpls){ try{ localStorage.setItem(SKIN_TPL_CACHE_KEY+'_'+sig, JSON.stringify(tpls)); }catch(e){} }
-  function _loadTplCache(sig){ try{ const s=localStorage.getItem(SKIN_TPL_CACHE_KEY+'_'+sig); return s?JSON.parse(s):null; }catch(e){ return null; } }
+  // 加载缓存并校验模板特征有效性：防止坏缓存（如某图特征含 NaN/被截断）导致识别整体失效
+  function _loadTplCache(sig){
+    try{
+      const s=localStorage.getItem(SKIN_TPL_CACHE_KEY+'_'+sig); if(!s) return null;
+      const arr=JSON.parse(s); if(!Array.isArray(arr)||!arr.length) return null;
+      for(const t of arr){ if(!t || !Array.isArray(t.feat) || t.feat.length<10 || !t.feat.every(Number.isFinite)) return null; }
+      return arr;
+    }catch(e){ return null; }
+  }
   // 构建模板库：并行分批加载（提速）+ 60s 整体兜底 + 成功数诊断 + 高成功率缓存。skinRegistry 来自 app-local.js / skins-web.js。
   function buildSkinTpls(statusEl){
     if(_skinTpls) return Promise.resolve(_skinTpls);
@@ -761,7 +769,10 @@
       if(inQ[0] && inQ[0].d <= all[0].d*1.15){ best = inQ[0]; usedQ = preferQ; } // 同品质足够近则优先
     }
     const top3 = all.slice(0,3).map(o=>({hero:o.t.hero, skin:o.t.skinName, dist:Math.round(o.d)}));
-    return { hero: best.t.hero, skin: best.t.skinName, dist: best.d, quality: usedQ, top3 };
+    let hero = best.t.hero, dist = best.d;
+    const TH = window.__recStrict==='strict'?12 : window.__recStrict==='standard'?18 : Infinity;
+    if(dist > TH){ hero=null; } // 严格度：距离过大则判「未匹配」，避免强行错配
+    return { hero, skin: hero?best.t.skinName:null, dist, quality: usedQ, top3 };
   }
 
   // 本地学习修正：用户识别错了可手动指定正确英雄，把该卡特征存本地；下次优先匹配
@@ -962,6 +973,13 @@
             <canvas id="recCanvas" style="width:100%;max-height:46vh;background:#000;border-radius:8px;display:block;"></canvas>
             <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
               <button id="recSmart" style="background:linear-gradient(135deg,#ff7043,#bf360c);color:#fff;border:none;padding:9px 14px;border-radius:8px;cursor:pointer;font-weight:600;" title="同时跑文字识别(OCR)+图像比对，两种结果分别显示，无需二选一">🚀 综合识别(文字+图像)</button>
+              <label style="font-size:0.78rem;color:#b0bec5;margin-left:6px;">识别精度
+                <select id="recStrictSel" style="background:#1b1f2a;color:#fff;border:1px solid #444;border-radius:6px;padding:3px 6px;font-size:0.78rem;">
+                  <option value="loose">宽松(总匹配)</option>
+                  <option value="standard">标准</option>
+                  <option value="strict">严格</option>
+                </select>
+              </label>
               <button id="recFill" style="background:linear-gradient(135deg,#42a5f5,#1565c0);color:#fff;border:none;padding:9px 14px;border-radius:8px;cursor:pointer;">➡ 填入脚本生成</button>
               <button id="recImportHand" style="background:linear-gradient(135deg,#66bb6a,#2e7d32);color:#fff;border:none;padding:9px 14px;border-radius:8px;cursor:pointer;font-weight:600;">🃏 导入到手牌</button>
               <button id="recLaunch" style="background:linear-gradient(135deg,#ff9800,#e65100);color:#fff;border:none;padding:9px 14px;border-radius:8px;cursor:pointer;font-weight:600;" title="关掉 Umi-OCR 后，点此重新打开它">🚀 启动识别引擎</button>
@@ -1132,6 +1150,11 @@
       else { const st=$('recStatus'); if(st) st.textContent='网页版无文字识别(OCR)，已显示图像识别结果'; }
     };
 
+    // 识别严格度（宽松/标准/严格）：影响 matchCard 是否在距离过大时判「未匹配」
+    window.__recStrict = (localStorage.getItem('tfjl_rec_strict')||'loose');
+    const recStrictSel = $('recStrictSel');
+    if(recStrictSel){ recStrictSel.value = window.__recStrict; recStrictSel.onchange = e=>{ window.__recStrict=e.target.value; localStorage.setItem('tfjl_rec_strict', e.target.value); }; }
+
     // ====================== 🖼️ 图像识别（皮肤比对） ======================
     function runImgAuto(){
       if(!currentImg){ alert('请先粘贴/选择/截图一张阵容图（或点「📐 框选阵容区域」）'); return; }
@@ -1161,7 +1184,6 @@
         renderRecDr(results);
       });
     }
-    $('recImgBtn').onclick = runImgAuto;
 
     // 📐 框选阵容区域 → 截整窗 → 拖框 → 按框精准裁剪 → 图像识别
     const recFrameBtn = $('recFrameBtn');
