@@ -8488,11 +8488,11 @@
                 ctx.font = '14px "Microsoft YaHei", sans-serif';
                 ctx.fillText('📱 扫码一键导入', qx + QR_SIZE / 2, qy + QR_SIZE + 15);
 
-                // 🏠 主页二维码（勾选后）：项目码左侧并排，底边对齐，扫码进个人主页看全部作品
+                // 🏠 主页二维码（勾选后）：项目码左侧并排，顶部对齐，扫码进个人主页看全部作品
                 let homeQrLeft = qx - 14;
                 if (hasHomeQr) {
                     const hx = qx - 16 - HOME_QR_SIZE;
-                    const hy = qy + QR_SIZE - HOME_QR_SIZE;            // 底边与项目码对齐
+                    const hy = qy;                                      // 顶部与项目码对齐（比原底边对齐上移28px，更美观不挡）
                     try {
                         const hq = window.qrcode(0, 'M');
                         hq.addData(homeQrText);
@@ -8921,7 +8921,7 @@
         // 项目全量（卡组/等级/皮肤/魔化/融合副卡/卡组说明/记事本+颜色+逐字标记/脚本文件/参考图）
         // → 公开 Gist（project.json + 参考图独立文件）→ 8 位短码（description「TFJL项目 <code> 」）
         // → 对方报短码 / 点 #pg= 链接 → 拉取解密校验 → 复用「恢复项目」同款导入（选名称+分类，新建不覆盖当前项目）
-        // 参考图必须拆成独立 Gist 文件：Gist API 单文件读取上限 1MB，整包塞一个 JSON 会 truncated 拉不全。
+        // 参考图必须拆成独立 Gist 文件；project.json / 大图超 Gist API 1MB 内联上限时，拉取端走 raw_url 取全量（≤10MB）。
         const PROJECT_SHARE_LINK_BASE = LINEUP_SHARE_WEB_BASE + '#pg=';
 
         // 采集当前项目完整数据（与 saveProjectToDB 同源：DOM + 全局变量，未保存的编辑也会被带上）
@@ -8965,14 +8965,15 @@
             const body = Object.assign({}, exportData, { sc: sc });
             if (opts.days > 0) body.exp = Date.now() + opts.days * 86400000;
 
-            // referenceImages 抽成独立 Gist 文件（每张 ≤950KB），project.json 里只留引用
+            // referenceImages 抽成独立 Gist 文件，project.json 里只留引用
+            // 🔴 2026-09-01 上限放宽：拉取端已支持 raw_url 取全量（Gist API 内联只给 1MB，raw_url 官方支持到 10MB）
             const proj = Object.assign({}, body.project);
             const srcImgs = Array.isArray(proj.referenceImages) ? proj.referenceImages.filter(function (im) { return im && im.name && im.data; }) : [];
             const refList = [];
             const files = {};
             const dropped = [];
             srcImgs.forEach(function (img) {
-                if (String(img.data).length > 950000) { dropped.push(img.name || ('参考图' + (refList.length + 1))); return; }
+                if (String(img.data).length > 8000000) { dropped.push(img.name || ('参考图' + (refList.length + 1))); return; }
                 const fname = 'img-' + refList.length + '.jpg';
                 files[fname] = { content: String(img.data) };
                 refList.push({ name: img.name, projectName: img.projectName, __gistFile: fname });
@@ -8985,9 +8986,14 @@
                 if (typeof encryptContent !== 'function') throw new Error('加密模块不可用');
                 content = { t: 'TFJLPROJ', e: 1, sc: sc, exp: body.exp || 0, x: await encryptContent(JSON.stringify(body), opts.pw) };
             }
+            // 🔴 2026-09-01 修复大项目分享失败：此前按「字符数」限 95 万——中文记事本/脚本 1 字符=UTF-8 3 字节，
+            //   字符数达标但字节数可超 1MB → 上传成功、读取端被 Gist API truncated（内联只给 ≤1MB）→ 导入报
+            //   「项目分享内容缺失」。现改为按「字节数」判断；且拉取端已支持 raw_url 取全量（官方支持到 10MB），
+            //   上限同步放宽到 9MB 字节，大项目（大记事本/大脚本）也能完整分享导入。
             const json = JSON.stringify(content);
-            if (json.length > 950000) {
-                throw new Error('项目内容 ' + (json.length / 1048576).toFixed(1) + ' MB 超过云端单文件 1MB 上限（脚本/记事本过大），请精简后再分享');
+            const jsonBytes = (function (s) { try { return new TextEncoder().encode(s).length; } catch (e) { return s.length; } })(json);
+            if (jsonBytes > 9000000) {
+                throw new Error('项目内容 ' + (jsonBytes / 1048576).toFixed(1) + ' MB 超过云端单文件 9MB 上限（脚本/记事本过大），请精简后再分享');
             }
             files['project.json'] = { content: json };
 
@@ -9034,7 +9040,23 @@
         }
 
         // 按 gist id 拉取项目分享：project.json → 校验解密 → 参考图从独立文件回填
+        // 🔴 2026-09-01 修复「分享的项目太大导入报内容缺失」：Gist API 单文件只内联返回 ≤1MB，
+        //   超限时 truncated=true 且 content 为空 → 此前直接报错。现按官方文档改走 raw_url 拉全量
+        //   （≤10MB），历史已分享的大项目链接（旧版无大小校验 / 中文字节数超限）全部复活。
+        //   注：raw 拉取逻辑内嵌为本函数局部（公开 Gist 无需鉴权；不带 Authorization 避免
+        //   gist.githubusercontent.com 跨域预检失败），保持函数源码自包含可单测。
         async function _projShareFetchById(gistId) {
+            const fetchRaw = async function (rawUrl, timeoutMs) {
+                const ctrl = new AbortController();
+                const timer = setTimeout(function () { ctrl.abort(); }, timeoutMs || 120000);
+                try {
+                    const res = await fetch(rawUrl, { signal: ctrl.signal });
+                    if (!res.ok) return null;
+                    return await res.text();
+                } catch (e) {
+                    return null;
+                } finally { clearTimeout(timer); }
+            };
             const ctrl = new AbortController();
             const timer = setTimeout(function () { ctrl.abort(); }, 60000);
             let res;
@@ -9046,19 +9068,33 @@
             if (!res.ok) throw new Error('读取项目分享失败 (' + res.status + (res.status === 404 ? '：分享可能已被删除' : '') + ')');
             const g = await res.json();
             const f = g && g.files && g.files['project.json'];
-            if (!f || !f.content) throw new Error('项目分享内容缺失（project.json 不存在' + (f && f.truncated ? '，内容超过 Gist 读取上限' : '') + '）');
-            const body = await _projShareResolveContent(f.content);
+            if (!f) throw new Error('项目分享内容缺失（project.json 不存在）');
+            let pjContent = f.content || '';
+            if (!pjContent || f.truncated) {
+                if (!f.raw_url) throw new Error('项目分享内容缺失（project.json 无内容且缺少 raw 链接）');
+                pjContent = await fetchRaw(f.raw_url, 120000);
+                if (!pjContent) throw new Error('项目内容超过 Gist 读取上限（>1MB），且 raw 链接拉取失败，请稍后重试');
+            }
+            const body = await _projShareResolveContent(pjContent);
             const proj = body.project;
             if (proj && Array.isArray(proj.referenceImages) && proj.referenceImages.length) {
                 const out = [];
                 let lost = 0;
-                proj.referenceImages.forEach(function (r) {
+                for (const r of proj.referenceImages) {
                     if (r && r.__gistFile) {
                         const gf = g.files[r.__gistFile];
-                        if (gf && gf.content && !gf.truncated) out.push({ name: r.name, data: gf.content, projectName: r.projectName });
-                        else lost++;
+                        if (gf && gf.content && !gf.truncated) {
+                            out.push({ name: r.name, data: gf.content, projectName: r.projectName });
+                        } else if (gf && gf.raw_url) {
+                            // 大图超 1MB 内联上限：同样走 raw_url 取全量
+                            const ic = await fetchRaw(gf.raw_url, 120000);
+                            if (ic) out.push({ name: r.name, data: ic, projectName: r.projectName });
+                            else lost++;
+                        } else {
+                            lost++;
+                        }
                     } else if (r && r.data) { out.push(r); }
-                });
+                }
                 proj.referenceImages = out;
                 if (lost && typeof showToast === 'function') showToast('⚠️ ' + lost + ' 张参考图超过云端读取上限未随分享带回', 'info');
             }
@@ -9126,7 +9162,7 @@
             }
             tip.remove();
             if (r.dropped && r.dropped.length && typeof showToast === 'function') {
-                showToast('⚠️ ' + r.dropped.length + ' 张参考图超过 1MB 上限未随分享带出：' + r.dropped.join('、'), 'error');
+                showToast('⚠️ ' + r.dropped.length + ' 张参考图超过 8MB 上限未随分享带出：' + r.dropped.join('、'), 'error');
             }
             const link = PROJECT_SHARE_LINK_BASE + r.id;
             const statTxt = '阵容 ' + ((pj.myPlacedCards || []).length + (pj.teammatePlacedCards || []).length + (pj.myHandCards || []).length + (pj.teammateHandCards || []).length) + ' 张 · 脚本 ' + (pj.txtFiles || []).length + ' 个 · 参考图 ' + r.imgs + ' 张 · 记事本 ' + ((pj.notepad || '').length) + ' 字';
