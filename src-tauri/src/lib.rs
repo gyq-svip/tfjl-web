@@ -603,23 +603,35 @@ fn git_push_fusions() -> Result<String, String> {
 #[tauri::command]
 fn git_push_skins() -> Result<String, String> {
     let repo = "d:\\tfjl-web";
-    // 1) 仅在本地有改动时继续
-    let status = run_git(repo, &["status", "--porcelain"])?;
-    if status.trim().is_empty() {
-        return Ok("• 无本地改动，无需推送。".to_string());
-    }
     let mut log = String::new();
-    // 2) bump 前端版本号（versionTag + CACHE_VERSION），便于用户刷新识别
-    match bump_skin_versions(repo) {
-        Ok(_) => log.push_str("✓ 已自增前端版本号。\n"),
-        Err(e) => log.push_str(&format!("• 版本号自增跳过（{}）\n", e)),
+    // 1) 🔴 2026-09-01 修复误报「推送失败」：此前用【全仓库】status 判断有无改动，
+    //    未跟踪的杂文件（.playwright-cli/ 等本地工具目录）会让 status 非空 →
+    //    git add 暂存不到任何东西 → git commit 报 nothing-to-commit 退出码 1 → 整个推送被误报失败
+    //    （pre-commit 钩子照跑并全部 PASS，用户看到「全部校验通过」却报失败，非常迷惑）。
+    //    改为与 git_push_fusions 同款的【限路径】status，只看真正要提交的 skins/ + 版本文件。
+    let status = run_git(repo, &["status", "--porcelain", "--", "skins/", "index.html", "sw.js"])?;
+    if !status.trim().is_empty() {
+        // 2) bump 前端版本号（versionTag + CACHE_VERSION），便于用户刷新识别
+        match bump_skin_versions(repo) {
+            Ok(_) => log.push_str("✓ 已自增前端版本号。\n"),
+            Err(e) => log.push_str(&format!("• 版本号自增跳过（{}）\n", e)),
+        }
+        // 3) 暂存 skins/ 及前端版本文件
+        run_git(repo, &["add", "skins/", "index.html", "sw.js"])?;
+        // 4) 提交：暂存区为空（重复点击/竞态/杂文件干扰）时跳过提交不误报，
+        //    用 git diff --cached 探测而非匹配 commit 错误文案（不受 git 输出语言影响）
+        let staged = run_git(repo, &["diff", "--cached", "--name-only"])?;
+        if staged.trim().is_empty() {
+            log.push_str("• 无新改动可提交（可能刚已提交过），直接推送。\n");
+        } else {
+            run_git(repo, &["commit", "-m", "feat: 皮肤制作一键推送（自动 bump 版本）"])?;
+            log.push_str("✓ 已提交本地改动。\n");
+        }
+    } else {
+        log.push_str("• 无本地改动，跳过提交。\n");
     }
-    // 3) 暂存 skins/ 及前端版本文件
-    run_git(repo, &["add", "skins/", "index.html", "sw.js"])?;
-    // 4) 提交
-    run_git(repo, &["commit", "-m", "feat: 皮肤制作一键推送（自动 bump 版本）"])?;
-    log.push_str("✓ 已提交本地改动。\n");
-    // 5) push origin main（失败自动 rebase 远端新提交后重试）
+    // 5) push origin main（失败自动 rebase 远端新提交后重试）。
+    //    无改动也照常推送：处理「已提交但尚未推送」的中间状态（push 幂等，重复无害）
     match push_with_self_heal(repo, &["push", "origin", "main"]) {
         Ok(p1) => { log.push_str("✓ origin/main: "); log.push_str(p1.trim()); log.push('\n'); }
         Err(e) => return Err(format!("push origin/main 失败: {}", e)),

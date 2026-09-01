@@ -121,6 +121,10 @@ _skin_png_backup/
 # 开发/辅助工具（与网页/桌面软件运行无关，本地保留不入库）
 # ====================
 tools/
+# AI 测试工具的工作目录（playwright/cli）——🔴 必须忽略：未跟踪杂文件会让
+# 旧版 APP「一键推送」的全仓库 git status 误判有改动 → nothing-to-commit 误报推送失败
+.playwright-cli/
+.workbuddy/
 
 # ====================
 # 本地分类文件夹（整理散落文件用，均不入库）

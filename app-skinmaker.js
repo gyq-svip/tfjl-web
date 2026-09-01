@@ -343,10 +343,13 @@
       var tok=(tokEl&&tokEl.value?tokEl.value:'').trim();
       if(tok){ try{ localStorage.setItem('tfjl_gitee_token', tok); }catch(e){} }
       else { try{ tok=localStorage.getItem('tfjl_gitee_token')||''; }catch(e){} }
+      // 🔴 2026-09-01 修复「明明配了 GITEE_TOKEN 环境变量却提示请先填写」：
+      //   后端 publish_skins.ps1 本身支持读系统环境变量 GITEE_TOKEN 兜底，
+      //   但旧逻辑在输入框+localStorage 都空时直接拦截、根本不让请求到达后端。
+      //   现改为：本地无 Token 时不再拦截，传空 Token 给后端走环境变量；
+      //   仅在环境变量也没有（后端报错）时才由用户手动填。
       if(!tok){
-        smStatus('请先填写 Gitee Token（左侧密码框）。\n申请：Gitee → 设置 → 私人令牌 → 勾选 projects 权限。\n（也可改用系统环境变量 GITEE_TOKEN，脚本会自动读取）',true);
-        if(tokEl) tokEl.focus();
-        return;
+        if(!confirm('本地未保存 Gitee Token，将尝试读取系统环境变量 GITEE_TOKEN。\n若该环境变量也未设置，发布会失败（不影响现有用户，仍用上一个好包）。\n\n也可点「取消」后，先在左侧密码框填写 Token 再发布（申请：Gitee → 设置 → 私人令牌 → 勾选 projects 权限）。\n\n继续发布？')) return;
       }
       if(!confirm('确认打包 skins/ 全部已登记皮肤并发布到 Gitee 发行版？\n\n流程：打包 → 上传 Gitee → 校验直链 → 更新索引 → 推送 Pages\n约 20MB，请耐心等待。\n\n⚠️ 本按钮只负责「客户端用的 Gitee 整包」。\n若新皮肤也要在网页版生效，请再点旁边的「🚀 一键推送到 GitHub / Gitee」——两条线独立，任一方失败可单独重试。\n\n任一步失败都不会影响现有用户（索引仍指向上一个好包）。')) return;
       smStatus('📦 打包并发布中（约 20MB，请稍候，勿关闭）…');
