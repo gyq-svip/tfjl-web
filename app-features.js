@@ -9020,6 +9020,11 @@
             }
             const data = await res.json();
             if (!data || !data.id) throw new Error('创建项目分享失败（未返回 gist id）');
+            // 🔴 写短码索引：对方查询从「翻 Gist 列表」变「查目录」（写入失败不阻断分享，仅查询慢一点）
+            _shareIndexPut(sc, {
+                id: data.id, n: String(proj.name || '').slice(0, 40), by: String(opts.by || '').slice(0, 24),
+                exp: body.exp || 0, ts: Date.now()
+            }).catch(function (e) { console.warn('[分享索引] 写入失败（不影响本次分享）:', e); });
             return { id: data.id, code: sc, dropped: dropped, imgs: refList.length };
         }
 
@@ -9102,10 +9107,98 @@
             return body;
         }
 
-        // 8 位短码 → exportData：GET /gists 列表按 description「TFJL项目 <code> 」翻页匹配
+        // 🔴 2026-09-02 短码索引（根治「查询短码卡半天」）：
+        //   过去短码只写在 Gist 的 description 里，查询只能翻 GET /gists 列表（每页 100、最多 5 页、
+        //   单次 15s 超时 → 最坏 75 秒；且 Gist 总数超 500 的老分享根本查不到）。
+        //   现复用「总表 Gist」新建独立文件 share_index.json —— 与 room_index.json / alliance_index.json
+        //   共存于同一 Gist（PATCH 仅改本文件，不破坏其它文件，盟战系统已是同款范式）。
+        //   效果：查询从「翻箱倒柜」变成「查目录」1 次请求命中；且纳入总表统一的备份/清理/诊断。
+        const SHARE_INDEX_GIST_ID = (window.TFJL_MASTER_GIST_ID) || 'a32a0628bd9275f3a4922cd12cf298c9';
+        const SHARE_INDEX_FILE = 'share_index.json';
+        const SHARE_INDEX_TTL = 5 * 60 * 1000;   // 索引本地缓存 5 分钟，避免重复请求
+        let _shareIndexCache = null;
+
+        async function _shareIndexLoad(force) {
+            if (!force && _shareIndexCache && (Date.now() - _shareIndexCache.ts) < SHARE_INDEX_TTL) return _shareIndexCache.data;
+            try {
+                const ctrl = new AbortController();
+                const timer = setTimeout(function () { ctrl.abort(); }, 20000);
+                let res;
+                try {
+                    res = await fetch('https://api.github.com/gists/' + encodeURIComponent(SHARE_INDEX_GIST_ID), {
+                        headers: _lineupGistHeaders(), signal: ctrl.signal
+                    });
+                } finally { clearTimeout(timer); }
+                if (!res || !res.ok) throw new Error('读取分享索引失败 (' + (res && res.status) + ')');
+                const g = await res.json();
+                const f = g && g.files && g.files[SHARE_INDEX_FILE];
+                let data = {};
+                if (f && f.content && !f.truncated) {
+                    try { data = JSON.parse(f.content) || {}; } catch (e) { data = {}; }
+                } else if (f && f.raw_url) {
+                    // 索引超 1MB 内联上限时走 raw 取全量（与 project.json 同款兜底）
+                    const raw = await fetch(f.raw_url).then(function (r) { return r.ok ? r.text() : null; }).catch(function () { return null; });
+                    if (raw) { try { data = JSON.parse(raw) || {}; } catch (e) {} }
+                }
+                _shareIndexCache = { data: data, ts: Date.now() };
+                return data;
+            } catch (e) {
+                return (_shareIndexCache && _shareIndexCache.data) || {};   // 读不到不阻断：回退翻页
+            }
+        }
+
+        // 写索引：读-改-写 + 3 次重试（多人同时分享时 PATCH 可能互相覆盖）；顺带剔除过期 30 天以上的条目控制体积
+        async function _shareIndexPut(code, entry) {
+            for (let attempt = 0; attempt < 3; attempt++) {
+                try {
+                    const data = await _shareIndexLoad(true);
+                    data[code] = entry;
+                    const now = Date.now();
+                    Object.keys(data).forEach(function (k) {
+                        const it = data[k];
+                        if (it && it.exp && it.exp < now - 30 * 86400000) delete data[k];
+                    });
+                    const files = {};
+                    files[SHARE_INDEX_FILE] = { content: JSON.stringify(data) };
+                    const ctrl = new AbortController();
+                    const timer = setTimeout(function () { ctrl.abort(); }, 20000);
+                    let res;
+                    try {
+                        res = await fetch('https://api.github.com/gists/' + encodeURIComponent(SHARE_INDEX_GIST_ID), {
+                            method: 'PATCH',
+                            headers: Object.assign({ 'Content-Type': 'application/json' }, _lineupGistHeaders()),
+                            signal: ctrl.signal,
+                            body: JSON.stringify({ files: files })
+                        });
+                    } finally { clearTimeout(timer); }
+                    if (res && res.ok) {
+                        _shareIndexCache = { data: data, ts: Date.now() };
+                        return true;
+                    }
+                } catch (e) { /* 继续重试 */ }
+                await new Promise(function (r) { setTimeout(r, 400 * (attempt + 1)); });
+            }
+            return false;
+        }
+
+        // 8 位短码 → exportData：① 查索引目录（快）② 未命中才翻 /gists 列表（兼容老分享，命中后回写索引自愈）
         async function _projShareFetchByCode(code) {
             code = String(code || '').trim();
             if (!code) throw new Error('短码为空');
+            // ① 快路径：查总表 Gist 的 share_index.json（1 次请求命中，多老的分享都能查到）
+            try {
+                const idx = await _shareIndexLoad();
+                const hit = idx && idx[code];
+                if (hit && hit.id) {
+                    if (hit.exp && Date.now() > hit.exp) throw new Error('⏰ 这份项目分享已过期，请联系分享者重新分享');
+                    return await _projShareFetchById(hit.id);
+                }
+            } catch (e) {
+                // 「已过期」是索引给出的明确结论，不必再翻页空等几十秒
+                if (e && /已过期/.test(String((e && e.message) || ''))) throw e;
+            }
+            // ② 慢路径（索引建立前的老分享）：翻页匹配 description；命中后回写索引，下次即快路径
+            if (typeof showToast === 'function') showToast('⏳ 短码不在索引中（较早的分享），正在翻页查找…', 'info');
             const marker = 'TFJL项目 ' + code + ' ';
             for (let page = 1; page <= 5; page++) {
                 const ctrl = new AbortController();
@@ -9120,7 +9213,10 @@
                 const list = await res.json();
                 if (!Array.isArray(list) || !list.length) break;
                 const hit = list.find(function (g) { return g && typeof g.description === 'string' && g.description.indexOf(marker) === 0; });
-                if (hit && hit.id) return await _projShareFetchById(hit.id);
+                if (hit && hit.id) {
+                    _shareIndexPut(code, { id: hit.id, ts: Date.now(), legacy: 1 }).catch(function () {});
+                    return await _projShareFetchById(hit.id);
+                }
                 if (list.length < 100) break;
             }
             throw new Error('没有找到短码 ' + code + ' 的项目分享（可能已删除或输错了）');
