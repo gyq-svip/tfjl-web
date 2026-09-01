@@ -628,7 +628,7 @@
     }
     if(!url) return null;
     try{
-      const img = await new Promise((res,rej)=>{ const im=new Image(); im.onload=()=>res(im); im.onerror=()=>rej(new Error('img load fail')); im.src=url; });
+      const img = await new Promise((res)=>{ const im=new Image(); const to=setTimeout(()=>res(null),4000); im.onload=()=>{clearTimeout(to);res(im);}; im.onerror=()=>{clearTimeout(to);res(null);}; im.src=url; });
       skin._img = img; return img;
     }catch(e){ return null; }
   }
@@ -932,7 +932,6 @@
             <div style="margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
               <input type="file" id="recFile" accept="image/*" style="display:none;">
               <button id="recPickFile" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.28);color:#fff;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:0.8rem;">📁 选择阵容图片</button>
-              <button id="recGameCapture" style="background:linear-gradient(135deg,#ff7043,#bf360c);color:#fff;border:none;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600;" title="自动找到游戏窗口→截取整窗画面→立刻识别，不用手动截图" data-tip="一键识别游戏画面：自动检测游戏窗口并截图识别（仅桌面 APP，全程只读不动游戏）">🎮 一键识别游戏画面</button>
               <button id="recFrameBtn" style="background:linear-gradient(135deg,#ab47bc,#6a1b9a);color:#fff;border:none;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600;" title="自动找游戏窗口→截整窗→你拖框圈住阵容区域→软件按框精准截图并识别" data-tip="框选阵容区域：截游戏整窗后由你拖框圈住阵容位置，软件按框精准截图识别，避免手动截图尺寸偏差（仅桌面 APP）">📐 框选阵容区域</button>
               <span id="recFileName" style="font-size:0.78rem;color:#90a4ae;">未选择阵容图片</span>
               <span style="font-size:0.75rem;color:#90a4ae;">｜也可直接 Ctrl+V 粘贴截图</span>
@@ -1157,8 +1156,7 @@
             currentImg = cropped;
             const c=$('recCanvas'); c.width=cropped.width; c.height=cropped.height; c.getContext('2d').drawImage(cropped,0,0);
             const n=$('recFileName'); if(n){ n.textContent='已框选阵容区域'; n.style.color='#ffab91'; }
-            $('recStatus').textContent='已截取并框选，开始图像识别…';
-            runImgAuto();
+            $('recStatus').textContent='已截取并框选，可点 ⚡ 文字识别 或 🖼️ 图像识别（游戏画面同样支持文字识别）';
           });
         }catch(e){
           const msg=(e&&e.message)?e.message:(typeof e==='string'?e:'未知错误');
@@ -1197,66 +1195,10 @@
       modal.appendChild(box); document.body.appendChild(modal);
     }
 
-    // ====================== 🎮 一键识别游戏画面（功能10，搭游戏监控截图底座） ======================
-    // 链路：find_game_windows 找游戏窗口（优先复用波数监控记住的窗口）→ capture_window_region
-    // 截整窗（BMP base64）→ 灌入 currentImg → 自动触发 runAuto 识别。全程只读：不动游戏、不抢焦点。
-    const recGameBtn = $('recGameCapture');
-    if(recGameBtn){
-      if(!isTauri()) recGameBtn.style.display = 'none'; // 网页版无窗口截图能力，隐藏
-      recGameBtn.onclick = async ()=>{
-        if(typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('一键识别游戏画面');
-        const old = recGameBtn.textContent;
-        recGameBtn.disabled = true; recGameBtn.textContent = '⏳ 截图中…';
-        try{
-          const wins = await tauriInvoke('find_game_windows') || [];
-          if(!wins.length) throw new Error('未检测到游戏窗口，请先打开游戏/模拟器再试');
-          // 优先自动匹配上次用的窗口（与「游戏波数监控」共用记忆）
-          let win = null;
-          let lastTitle = null;
-          try { lastTitle = (JSON.parse(localStorage.getItem('tfjl_game_monitor_cfg')||'{}')||{}).winTitle || null; } catch(_){}
-          if(lastTitle) win = wins.find(w=> w.title && w.title.includes(lastTitle)) || null;
-          if(!win && wins.length === 1) win = wins[0];
-          if(!win){
-            // 多个窗口：让用户挑（不瞎猜）
-            win = await new Promise(resolve=>{
-              recChoice({
-                title: '🎮 选择游戏窗口',
-                desc: '检测到 '+wins.length+' 个可截图窗口，选一个进行识别：',
-                maxHeight: '70vh',
-                items: wins.map((w,i)=>({ label: (i+1)+'. '+(w.title.length>34 ? w.title.slice(0,34)+'…' : w.title), value: String(i) })),
-                onPick: v=> resolve(wins[parseInt(v,10)]),
-                onCancel: ()=> resolve(null)
-              });
-            });
-            if(!win) return; // 用户取消，finally 里恢复按钮
-          }
-          const bmpB64 = await tauriInvoke('capture_window_region', { hwnd: win.hwnd, x: 0, y: 0, w: 10, h: 10, full: true });
-          if(!bmpB64) throw new Error('截图失败（窗口可能已关闭或被最小化）');
-          const im = await new Promise((resolve, reject)=>{
-            const img = new Image();
-            img.onload = ()=> resolve(img);
-            img.onerror = ()=> reject(new Error('截图解码失败'));
-            img.src = 'data:image/bmp;base64,' + bmpB64;
-          });
-          currentImg = im;
-          const c = $('recCanvas');
-          c.width = im.naturalWidth; c.height = im.naturalHeight;
-          c.getContext('2d').drawImage(im, 0, 0);
-          const n = $('recFileName');
-          if(n){ n.textContent = '已截取游戏窗口：'+(win.title.length>22 ? win.title.slice(0,22)+'…' : win.title); n.style.color = '#ffab91'; }
-          const st = $('recStatus');
-          if(st) st.textContent = '已截取游戏画面，自动识别中…';
-          runAuto();
-        }catch(e){
-          const msg = (e && e.message) ? e.message : (typeof e === 'string' ? e : '未知错误');
-          recToast('❌ 一键识别失败：'+msg);
-          const st = $('recStatus');
-          if(st) st.textContent = '截图失败';
-        }finally{
-          recGameBtn.disabled = false; recGameBtn.textContent = old;
-        }
-      };
-    }
+    // ====================== 🎮 一键识别游戏画面 已合并进「📐 框选阵容区域」 ======================
+    // 用户反馈：一键识别与框选阵容区域功能重复（后者选窗口→框选即可），故移除前者，
+    // 框选入口统一承担「游戏窗口截图」能力；框选只取图，识别方式交给 ⚡文字 / 🖼️图像（游戏画面两者皆可用）。
+
     $('recFill').onclick = ()=>{
       const all = overlay._results || [];
       const results = all.filter(r=>!r._deleted);
