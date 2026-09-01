@@ -1203,6 +1203,7 @@
         overlay._results = results; updateRecWarn(results);
         const featNull=results.filter(rr=>!rr.feat).length; const tplN=(_skinTpls||[]).length;
         $('recStatus').textContent = `图像识别完成：${results.filter(rr=>rr.hero).length}/${results.length} 匹配（模板库 ${tplN} 张，特征提取失败 ${featNull} 个；识别错点 ✏️ 修正，越修越准）`;
+        const stg=$('recStage'); if(stg){ stg.style.display='inline'; stg.textContent='🎨 图像：'+results.filter(rr=>rr.hero).length+'/'+results.length+'（模板库 '+tplN+' 张，特征失败 '+featNull+' 个）'; }
         renderRecDr(results);
       });
     }
