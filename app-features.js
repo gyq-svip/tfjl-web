@@ -6073,6 +6073,8 @@
                     + '\n皮肤：'
                     + '\n主战车：'
                     + '\n副战车：';
+                // 读取后把精灵卡排到上阵行最后（便于用户复制前面的卡到魔化栏：精灵不上卡槽、也不会魔化）
+                sortParserDeploySpiritsLast(input, true);
                 if (typeof updateRealTimeDamageReduction === 'function') updateRealTimeDamageReduction();
             }
             if (typeof switchTxtPanelTab === 'function') switchTxtPanelTab('parser');
