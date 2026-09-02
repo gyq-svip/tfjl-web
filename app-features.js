@@ -5907,6 +5907,13 @@
                 heroNames = heroNames.slice(0, 10);
             }
 
+            // 精灵类卡统一排到最后（保持各自原有相对顺序）
+            const handJingLingNames = ['冰精灵', '光精灵', '魔精灵', '木精灵', '土精灵', '雷精灵', '暗精灵', '幻精灵', '魂精灵', '彩精灵'];
+            heroNames = [
+                ...heroNames.filter(name => !handJingLingNames.some(jl => name.includes(jl))),
+                ...heroNames.filter(name => handJingLingNames.some(jl => name.includes(jl)))
+            ];
+
             // 获取目标手牌数组
             const targetHand = target === 'my' ? myHandCards : teammateHandCards;
 
@@ -6110,7 +6117,15 @@
             const jingLingNames = ['冰精灵', '光精灵', '魔精灵', '木精灵', '土精灵', '雷精灵', '暗精灵', '幻精灵', '魂精灵', '彩精灵'];
             // 工程类卡名列表（工程卡不占6位置，单独满）
             const gongChengNames = ['火炮', '咬人娃娃', '潜艇', '宝库', '射线'];
-            
+
+            // 精灵类卡统一排到最后（非精灵保持原相对顺序，精灵也保持原相对顺序）
+            heroNames = [
+                ...heroNames.filter(name => !jingLingNames.some(jl => name.includes(jl))),
+                ...heroNames.filter(name => jingLingNames.some(jl => name.includes(jl)))
+            ];
+            // 上阵行按重排后的顺序重建，保证输出的"上阵："也是精灵在最后
+            if (zhenZhanLine) zhenZhanLine = '上阵：' + heroNames.join(',');
+
             // 检查是否有工程卡
             const hasGongCheng = heroNames.some(name => gongChengNames.some(gc => name.includes(gc)));
             
@@ -6563,6 +6578,14 @@
             const jingLingNames = ['冰精灵', '光精灵', '魔精灵', '木精灵', '土精灵', '雷精灵', '暗精灵', '幻精灵', '魂精灵', '彩精灵'];
             const gongChengNames = ['火炮', '咬人娃娃', '潜艇', '射线', '宝库'];
 
+            // 精灵类卡统一排到最后（非精灵保持原相对顺序，精灵也保持原相对顺序）
+            heroNames = [
+                ...heroNames.filter(name => !jingLingNames.some(jl => name.includes(jl))),
+                ...heroNames.filter(name => jingLingNames.some(jl => name.includes(jl)))
+            ];
+            // 上阵行按重排后的顺序重建，保证输出的"上阵："也是精灵在最后
+            if (zhenZhanLine) zhenZhanLine = '上阵：' + heroNames.join(',');
+
             const hasSheNv = heroNames.some(name => name.includes('蛇女'));
             const hasHuoLing = heroNames.some(name => name.includes('火灵'));
             const hasTianShi = heroNames.some(name => name.includes('天使'));
@@ -6657,8 +6680,8 @@
 
             // 头部信息
             if (zhenZhanLine) output += zhenZhanLine + '\n';
-            // 保留用户输入的皮肤、魔化、主战车、副战车行，没有则输出默认空行
-            const defaultLines = ['皮肤：', '魔化：', '主战车：', '副战车：'];
+            // 保留用户输入的魔化、皮肤、主战车、副战车行，没有则输出默认空行（顺序与活动/隐藏榜一致）
+            const defaultLines = ['魔化：', '皮肤：', '主战车：', '副战车：'];
             defaultLines.forEach(defaultLine => {
                 const foundLine = otherLines.find(line => line.startsWith(defaultLine.replace('：', '')));
                 if (foundLine) {
