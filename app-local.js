@@ -1640,7 +1640,7 @@ if (true) {
         }
 
         // 收集 IndexedDB 数据
-        let projects = [], dbCategories = [];
+        let projects = [], dbCategories = [], cards = [];
         try {
             if (window.db) {
                 projects = await new Promise((res, rej) => {
@@ -1652,6 +1652,8 @@ if (true) {
                 });
             }
             dbCategories = window.categories || [];
+            // 🔴 2026-09-03 收集小卡片（本机阵容卡片缓存）随一键备份一起导出
+            if (typeof _cardList === 'function') cards = await _cardList();
         } catch (e) {
             console.error('[备份] IndexedDB读取失败:', e);
         }
@@ -1661,7 +1663,8 @@ if (true) {
             version: '1.0',
             backupDate: new Date().toISOString(),
             localStorage: localStorageData,
-            indexedDB: { projects, categories: dbCategories }
+            indexedDB: { projects, categories: dbCategories },
+            cards: cards
         };
 
         const d = new Date();
@@ -1795,6 +1798,13 @@ if (true) {
                     if (typeof window.saveCategories === 'function') window.saveCategories();
                 }
             } catch (e) { console.error('[还原] IndexedDB恢复失败:', e); }
+        }
+
+        // 🔴 2026-09-03 还原小卡片（本机阵容卡片缓存）
+        if (Array.isArray(backup.cards) && backup.cards.length) {
+            for (const c of backup.cards) {
+                if (c && c.dataUrl) { try { await _cardSave(c.dataUrl, { projectName: c.projectName || '导入卡片', code: c.code || '', kind: c.kind || 'upload', source: c.source || '' }); } catch (e) { console.error('[还原] 卡片失败:', e); } }
+            }
         }
 
         alert('✅ 还原完成！建议刷新页面以应用所有配置。');
