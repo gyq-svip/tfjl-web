@@ -3944,7 +3944,7 @@
                                 <span id="${windowId}_hexTxt" style="font-size:0.66rem;color:#c9c9dd;font-family:Consolas,monospace;">#e0e0e0</span>
                             </div>
                             <div id="${windowId}_colorSlots" style="display:flex;align-items:center;gap:10px;justify-content:center;border-top:1px solid rgba(255,255,255,0.12);padding-top:8px;"></div>
-                            <label id="${windowId}_glowRow" style="display:none;align-items:center;gap:6px;font-size:0.74rem;color:#c9c9dd;margin-top:8px;cursor:pointer;"><input type="checkbox" id="${windowId}_glowChk" checked onchange="if(window.renderNotebookOverlay)renderNotebookOverlay('${windowId}')"> 动态呼吸发光</label>
+                            <label id="${windowId}_glowRow" style="display:none;align-items:center;gap:6px;font-size:0.74rem;color:#c9c9dd;margin-top:8px;cursor:pointer;"><input type="checkbox" id="${windowId}_glowChk" checked> 动态呼吸发光</label>
                             <div id="${windowId}_clearRow" style="display:none;margin-top:8px;">
                                 <button onclick="clearNotebookSelectionColor('${windowId}')" style="width:100%;background:rgba(244,67,54,0.18);border:1px solid rgba(244,67,54,0.35);color:#f44336;padding:6px;border-radius:6px;cursor:pointer;font-size:0.74rem;">🧹 清除选中颜色</button>
                                 <button onclick="clearAllNotebookSelectionColor('${windowId}')" style="width:100%;margin-top:6px;background:rgba(244,67,54,0.28);border:1px solid rgba(244,67,54,0.5);color:#ff8a80;padding:6px;border-radius:6px;cursor:pointer;font-size:0.74rem;">🗑️ 清除全部颜色</button>
@@ -4368,8 +4368,17 @@
             inner.style.transform = 'translateY(' + (-ta.scrollTop) + 'px)';
             nbSyncOverlayGutterById(windowId);
         }
-        // 暴露为全局，供勾选框 onchange 直接重渲染（动态呼吸发光 = 全局总开关）
+        // 暴露为全局，供其它逻辑直接调用
         window.renderNotebookOverlay = renderNotebookOverlay;
+        // 全局委托：任意窗口"动态呼吸发光"勾选变化 → 重渲染该窗口（全局总开关）。
+        // 用 document 委托 + 闭包引用，避免内联 onchange 在 IIFE 作用域下裸名失效的问题。
+        document.addEventListener('change', function(e){
+            const t = e.target;
+            if(t && typeof t.id === 'string' && t.id.endsWith('_glowChk')){
+                const wid = t.id.slice(0, -'_glowChk'.length);
+                renderNotebookOverlay(wid);
+            }
+        });
 
         function applyNotebookSelectionColor(windowId, color, glow) {
             const ta = document.getElementById(windowId + '_content');
