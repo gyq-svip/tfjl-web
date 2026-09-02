@@ -4376,7 +4376,9 @@
             const t = e.target;
             if(t && typeof t.id === 'string' && t.id.endsWith('_glowChk')){
                 const wid = t.id.slice(0, -'_glowChk'.length);
-                renderNotebookOverlay(wid);
+                // 主记事本（#notepadEditable）走 renderNotepadEditable；动态项目记事本窗口走 renderNotebookOverlay
+                if (wid === 'notebook_main') { renderNotepadEditable(); }
+                else { renderNotebookOverlay(wid); }
             }
         });
 
@@ -4568,11 +4570,12 @@
             const value = ta.value;
             let marks = anchorNotebookMarks(value, getNotebookMainMarks());
             if (nbPreviewMark) marks = nbMergePreviewMark(value, marks, nbPreviewMark);
+            const glowOn = document.getElementById('notebook_main_glowChk')?.checked;
             let html = '', cursor = 0;
             for (const m of marks) {
                 if (m.start < cursor) continue;
                 html += escapeHtml(value.slice(cursor, m.start));
-                const cls = 'nb-mark' + (m.glow ? ' nb-glow' : '');
+                const cls = 'nb-mark' + ((m.glow && glowOn) ? ' nb-glow' : '');
                 html += '<span class="' + cls + '" style="color:' + m.color + '">' + escapeHtml(value.slice(m.start, m.start + m.text.length)) + '</span>';
                 cursor = m.start + m.text.length;
             }
