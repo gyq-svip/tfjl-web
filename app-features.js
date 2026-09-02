@@ -5874,7 +5874,7 @@
 
             if (heroNames.length === 0) {
                 resultEl.innerHTML = '<span style="color:#f44336;">未找到英雄名称！</span>';
-                return;
+                return null;
             }
 
             // 过滤融合卡（融合卡不能用于脚本，需拆分为单卡）
@@ -6013,15 +6013,20 @@
             if (r) r.innerHTML = '<span style="color:#4caf50;">✅ 已从「' + (isTeammate ? '队友手牌' : '我的手牌') + '」读取 ' + uniq.length + ' 张（融合卡已自动取主卡），已填入输入框。请选择下方按钮生成对应脚本。</span>';
         }
 
-        function parseActivityScript(includeChengShang) {
-            if (typeof includeChengShang === 'undefined') includeChengShang = true;
-            if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse(includeChengShang ? '活动脚本生成' : '隐藏榜脚本生成');
+        // ==================== 活动脚本 / 隐藏榜脚本（已拆成两套独立逻辑） ====================
+        // 隐藏榜：规则长期稳定，基本不再改动。
+        // 活动：每期活动都可能调整。
+        // 两者共用「输入解析 + 基础时间轴」buildScriptBase，差异部分各自独立：
+        //   · 隐藏榜专属：buildHiddenSwitchPart（无敌链/切卡）+ 00:01 行光葫芦
+        //   · 活动专属：见 parseActivityScript 内的「活动专属区」
+        // 👉 以后改活动脚本只动 parseActivityScript / 活动专属区，不要动 buildHiddenSwitchPart。
+        function buildScriptBase(isHidden) {
             const input = document.getElementById('parserInput').value.trim();
             const resultEl = document.getElementById('parserResult');
 
             if (!input) {
                 resultEl.innerHTML = '<span style="color:#f44336;">请输入文本！</span>';
-                return;
+                return null;
             }
 
             // 按行分割输入
@@ -6062,7 +6067,7 @@
 
             if (heroNames.length === 0) {
                 resultEl.innerHTML = '<span style="color:#f44336;">未找到英雄名称！</span>';
-                return;
+                return null;
             }
 
             // 过滤融合卡（融合卡不能用于脚本，需拆分为单卡）
@@ -6091,7 +6096,7 @@
 
             if (heroNames.length === 0 && filteredFusion.length > 0) {
                 resultEl.innerHTML = '<span style="color:#9c27b0;">🚫 输入的均为融合卡，已过滤。融合卡需拆分为单卡后重新输入。</span>';
-                return;
+                return null;
             }
 
             // 超出10张上限提示
@@ -6219,7 +6224,7 @@
             // 光葫芦（仅隐藏榜）：对上阵的卡逐张生成"光葫芦{卡名}"，顺序与上卡一致（6张非工程 + 工程卡第7位）
             //   有"强制顺序上卡"时排在其后，没有则放在开头
             let guangHuLuStr = '';
-            if (!includeChengShang && hasGuangJingLing) {
+            if (isHidden && hasGuangJingLing) {
                 const guangHuLuCards = hasGongCheng ? [...arrangedCards, ...gongChengCards] : [...arrangedCards];
                 guangHuLuStr = guangHuLuCards.map(name => '光葫芦' + name + ',').join('');
             }
@@ -6265,8 +6270,35 @@
                 }
             }
 
-            // 无敌链逻辑（小野8秒无敌 → 凤凰6秒无敌）—— 仅隐藏榜生效，活动脚本不切卡
-            if (!includeChengShang) {
+            // —— 以上是活动/隐藏榜共用的基础时间轴 ——
+            return {
+                output: output,
+                arrangedCards: arrangedCards,
+                gongChengCards: gongChengCards,
+                heroNames: heroNames,
+                gongChengNames: gongChengNames,
+                jingLingNames: jingLingNames,
+                overLimitCards: overLimitCards,
+                hasLeiJingLing: hasLeiJingLing,
+                hasMoJingLing: hasMoJingLing,
+                hasMuJingLing: hasMuJingLing,
+                hasHunJingLing: hasHunJingLing
+            };
+        }
+
+        // 隐藏榜专属：无敌链逻辑（小野8秒无敌 → 凤凰6秒无敌）
+        // ⚠️ 这段是隐藏榜长期稳定的规则，改活动脚本时不要动这里。
+        function buildHiddenSwitchPart(ctx) {
+            const arrangedCards = ctx.arrangedCards;
+            const heroNames = ctx.heroNames;
+            const gongChengNames = ctx.gongChengNames;
+            const jingLingNames = ctx.jingLingNames;
+            const hasLeiJingLing = ctx.hasLeiJingLing;
+            const hasMoJingLing = ctx.hasMoJingLing;
+            const hasMuJingLing = ctx.hasMuJingLing;
+            const hasHunJingLing = ctx.hasHunJingLing;
+            let output = '';
+
             // 第一张卡名（arrangedCards的第一张）
             const firstCardName = arrangedCards[0] || '第一张卡';
             // 凤凰/小野检测：区分"携带"（在牌库中）和"上阵"（在arrangedCards中）
@@ -6343,7 +6375,15 @@
                     alert('⚠️ 检查到有凤凰或小野，可能要切卡\n\n请注意：\n1. 请根据实际情况修改需要上下的卡\n2. 请根据自身情况修改上下卡时间\n3. 不需要上下卡的请自行删除即可');
                 }, 100);
             }
-            } // 结束 if (!includeChengShang) 隐藏榜切卡逻辑块
+            return output;
+        }
+
+        // 共用收尾：计算总减伤 + 渲染结果面板
+        function finishScriptOutput(ctx, output, label) {
+            const resultEl = document.getElementById('parserResult');
+            const overLimitCards = ctx.overLimitCards;
+            const arrangedCards = ctx.arrangedCards;
+            const gongChengCards = ctx.gongChengCards;
 
             // 计算总减伤（只算实际上阵的卡：6张非工程+工程卡）
             loadDamageReductionData();
@@ -6355,7 +6395,7 @@
             const overLimitHtml = overLimitCards.length > 0 ? `<div style="color:#ff5722;font-size:0.85rem;margin-bottom:8px;">⚠️ 超出10张上限，已忽略：${overLimitCards.join('、')}</div>` : '';
             resultEl.innerHTML = `
                 <div style="background:rgba(0,0,0,0.3);padding:10px;border-radius:8px;margin-top:5px;">
-                    <div style="color:#4caf50;font-weight:bold;margin-bottom:8px;">✅ ${includeChengShang ? '活动' : '隐藏榜'}脚本输出：</div>
+                    <div style="color:#4caf50;font-weight:bold;margin-bottom:8px;">✅ ${label}脚本输出：</div>
                     ${overLimitHtml}
                     <div style="background:rgba(78,205,196,0.1);border:1px solid rgba(78,205,196,0.3);border-radius:6px;padding:8px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
                         <span style="color:#4ecdc4;font-size:0.85rem;">🛡️ 总减伤：<strong id="autoGenDrValue" style="color:#fff;font-size:1rem;">${totalDamageReduction}</strong></span>
@@ -6375,6 +6415,30 @@
 
             // 保存输出到全局变量供复制使用
             window._activityScriptOutput = output;
+        }
+
+        // 📜 活动脚本生成 —— 每期活动会调整，改这里（不会影响隐藏榜）
+        function parseActivityScript() {
+            if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('活动脚本生成');
+            const ctx = buildScriptBase(false);
+            if (!ctx) return;
+            let output = ctx.output;
+            // ===== 活动专属区 START（每期活动按需在这里加/减指令）=====
+            // 例：output += '最大承伤次数，4\n';
+            // ===== 活动专属区 END =====
+            finishScriptOutput(ctx, output, '活动');
+        }
+
+        // 🎭 隐藏榜脚本生成 —— 规则长期稳定，非必要不改；与活动脚本互不影响
+        function parseHiddenScript() {
+            if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('隐藏榜脚本生成');
+            const ctx = buildScriptBase(true);
+            if (!ctx) return;
+            let output = ctx.output;
+            // ===== 隐藏榜专属区 START =====
+            output += buildHiddenSwitchPart(ctx);
+            // ===== 隐藏榜专属区 END =====
+            finishScriptOutput(ctx, output, '隐藏榜');
         }
 
         // 复制活动脚本输出
@@ -6456,7 +6520,7 @@
 
             if (heroNames.length === 0) {
                 resultEl.innerHTML = '<span style="color:#f44336;">未找到英雄名称！</span>';
-                return;
+                return null;
             }
 
             // 过滤融合卡（融合卡不能用于脚本，需拆分为单卡）
@@ -6485,7 +6549,7 @@
 
             if (heroNames.length === 0 && filteredFusion.length > 0) {
                 resultEl.innerHTML = '<span style="color:#9c27b0;">🚫 输入的均为融合卡，已过滤。融合卡需拆分为单卡后重新输入。</span>';
-                return;
+                return null;
             }
 
             // 超出10张上限提示
