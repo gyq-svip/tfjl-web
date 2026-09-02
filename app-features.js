@@ -8909,7 +8909,7 @@
             }
             // 🔴 自动缓存小卡片到本机（IndexedDB，最近 30 张），方便日后随时取回发给朋友，不用重走分享流程
             if (dataUrl) {
-                Promise.resolve(_cardSave(dataUrl, { projectName: (typeof currentProjectName !== 'undefined' && currentProjectName) || '', code: shortCode })).catch(function () {});
+                Promise.resolve(_cardSave(dataUrl, { projectName: (typeof currentProjectName !== 'undefined' && currentProjectName) || '', code: shortCode, link: shortLink })).catch(function () {});
             }
             // 短链（#pg= 项目短链，~80字符，与二维码同款）；上传失败则无链接按钮
             const link = shortLink;
@@ -9495,7 +9495,7 @@
             try {
                 const db = await _cardDbOpen();
                 if (!db || !dataUrl) return;
-                const entry = { id: 'c_' + Date.now() + '_' + Math.floor(Math.random() * 1e6), dataUrl: dataUrl, ts: Date.now(), projectName: String(meta.projectName || ''), code: String(meta.code || ''), kind: meta.kind || 'gen', source: String(meta.source || '') };
+                const entry = { id: 'c_' + Date.now() + '_' + Math.floor(Math.random() * 1e6), dataUrl: dataUrl, ts: Date.now(), projectName: String(meta.projectName || ''), code: String(meta.code || ''), kind: meta.kind || 'gen', source: String(meta.source || ''), link: String(meta.link || '') };
                 await new Promise(function (resolve) {
                     try {
                         const tx = db.transaction(_CARD_STORE, 'readwrite');
@@ -9612,74 +9612,130 @@
             modal.querySelector('#cardGalImport').onclick = function () { _cardImportBackup(); };
             Array.prototype.forEach.call(modal.querySelectorAll('[data-cid]'), function (cell) {
                 cell.onclick = function () {
-                    const card = cards.filter(function (c) { return c.id === cell.getAttribute('data-cid'); })[0];
-                    if (card) _cardPreview(card);
+                    const idx = cards.findIndex(function (c) { return c.id === cell.getAttribute('data-cid'); });
+                    if (idx >= 0) _cardPreview(cards[idx], idx, cards);
                 };
             });
         }
-        function _cardPreview(card) {
+        function _cardPreview(card, index, list) {
+            list = Array.isArray(list) ? list : null;
+            index = (typeof index === 'number') ? index : -1;
             const old = document.getElementById('lineupCardPreview');
             if (old) old.remove();
             const m = document.createElement('div');
             m.id = 'lineupCardPreview';
             m.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:' + (220000 + (window.topWinZIndex || 0)) + ';display:flex;align-items:center;justify-content:center;flex-direction:column;padding:16px;';
-            const isUp = card.kind === 'upload';
-            const parseBtn = isUp
-                ? '<button id="cpParse" style="flex:1;min-width:120px;background:linear-gradient(135deg,#ab47bc,#7b1fa2);color:#fff;border:none;padding:10px;border-radius:8px;cursor:pointer;font-weight:bold;">🔍 解析到阵容</button>'
-                : '';
-            m.innerHTML = '<div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(255,215,0,0.4);border-radius:16px;padding:14px;max-width:90vw;max-height:90vh;overflow:auto;">' +
-                '<img src="' + card.dataUrl + '" style="max-width:100%;max-height:56vh;border-radius:10px;display:block;">' +
-                '<div style="color:rgba(255,255,255,0.6);font-size:0.78rem;margin:8px 2px;">' + (isUp ? '🟣 别人上传的卡片' : '🟢 自己生成的卡片') + (card.source ? ' · 来源：' + String(card.source).slice(0, 48) : '') + '</div>' +
-                '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">' +
-                  '<button id="cpDl" style="flex:1;min-width:110px;background:linear-gradient(135deg,#ffd700,#ff9800);color:#1a1a2e;border:none;padding:10px;border-radius:8px;cursor:pointer;font-weight:bold;">💾 下载</button>' +
-                  '<button id="cpCopy" style="flex:1;min-width:110px;background:linear-gradient(135deg,#26a69a,#00796b);color:#fff;border:none;padding:10px;border-radius:8px;cursor:pointer;font-weight:bold;">📋 复制</button>' +
-                  '<button id="cpDel" style="flex:1;min-width:100px;background:rgba(255,82,82,0.18);color:#ff8a80;border:1px solid rgba(255,82,82,0.4);padding:10px;border-radius:8px;cursor:pointer;">🗑 删除</button>' +
-                  parseBtn +
-                  '<button id="cpClose" style="flex:1;min-width:100px;background:rgba(255,255,255,0.15);color:#fff;border:none;padding:10px;border-radius:8px;cursor:pointer;">关闭</button>' +
-                '</div></div>';
             document.body.appendChild(m);
-            m.querySelector('#cpClose').onclick = function () { m.remove(); };
-            m.onclick = function (e) { if (e.target === m) m.remove(); };
-            m.querySelector('#cpDl').onclick = function () {
-                const a = document.createElement('a'); a.href = card.dataUrl;
-                const pn = String(card.projectName || '阵容').replace(/[\\/:*?"<>|]/g, '');
-                a.download = '塔防阵容_' + pn + '_' + card.ts + '.png';
-                document.body.appendChild(a); a.click(); a.remove();
-                if (typeof showToast === 'function') showToast('💾 已开始下载', 'success');
+            // 按钮点击反馈（点了不知道有没有点上）
+            const _btnFb = function (btn, text, ms) {
+                if (!btn) return;
+                if (btn._fbTimer) clearTimeout(btn._fbTimer);
+                if (!btn._origText) btn._origText = btn.textContent;
+                btn.textContent = text; btn.style.transform = 'scale(0.97)';
+                requestAnimationFrame(function () { btn.style.transition = 'transform 0.15s'; btn.style.transform = 'scale(1)'; });
+                btn._fbTimer = setTimeout(function () { btn.textContent = btn._origText; }, ms || 1600);
             };
-            m.querySelector('#cpCopy').onclick = async function () {
+            const copyText = async function (text, okMsg, btn) {
+                if (!text) { if (typeof showToast === 'function') showToast('该卡片没有可复制的内容', 'error'); return; }
                 try {
-                    const blob = await (await fetch(card.dataUrl)).blob();
-                    await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-                    if (typeof showToast === 'function') showToast('📋 已复制，可直接粘贴到微信/QQ', 'success');
-                } catch (e) { if (typeof showToast === 'function') showToast('❌ 当前环境不支持复制图片，请用下载', 'error'); }
-            };
-            m.querySelector('#cpDel').onclick = async function () {
-                try {
-                    const db = await _cardDbOpen();
-                    if (db) { await new Promise(function (res) { try { const tx = db.transaction(_CARD_STORE, 'readwrite'); tx.objectStore(_CARD_STORE).delete(card.id); tx.oncomplete = res; tx.onerror = res; tx.onabort = res; } catch (e) { res(); } }); }
-                    m.remove();
-                    const gal = document.getElementById('lineupCardGallery'); if (gal) gal.remove();
-                    _cardGallery();
-                    if (typeof showToast === 'function') showToast('🗑 已删除该卡片', 'success');
-                } catch (e) {}
-            };
-            const parseEl = m.querySelector('#cpParse');
-            if (parseEl) parseEl.onclick = async function () {
-                parseEl.disabled = true; parseEl.textContent = '🔍 识别中…';
-                let code = (card.source && card.source.trim()) || '';
-                // 优先 OCR 识别卡片图上的 8 位短码（APP 端 Umi-OCR，短码画在图底部固定位置）
-                if (!code && typeof window.__recImg !== 'undefined' && typeof window.__recImg.ocrRawText === 'function') {
+                    await navigator.clipboard.writeText(text);
+                    if (btn) _btnFb(btn, '✓ 已复制');
+                    if (typeof showToast === 'function') showToast(okMsg, 'success');
+                } catch (e) {
                     try {
-                        const txt = await window.__recImg.ocrRawText(card.dataUrl);
-                        const all = (txt || '').match(/[A-Za-z2-9]{8}/g) || [];
-                        code = all.find(function (s) { return !/[0O1lI]/.test(s); }) || all[0] || '';
-                    } catch (e) { console.warn('[解析] OCR失败:', e); }
+                        const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
+                        document.execCommand('copy'); ta.remove();
+                        if (btn) _btnFb(btn, '✓ 已复制');
+                        if (typeof showToast === 'function') showToast(okMsg, 'success');
+                    } catch (e2) {
+                        if (btn) _btnFb(btn, '❌ 复制失败');
+                        if (typeof showToast === 'function') showToast('❌ 复制失败，请手动复制', 'error');
+                    }
                 }
-                if (!code) { if (typeof showToast === 'function') showToast('⚠️ 未识别到短码：请在桌面APP端（需Umi-OCR）解析，或上传时填写来源短码', 'error'); parseEl.disabled = false; parseEl.textContent = '🔍 解析到阵容'; return; }
-                if (typeof importProjectViaCode === 'function') { m.remove(); importProjectViaCode(code); }
-                else if (typeof showToast === 'function') showToast('解析功能不可用', 'error');
             };
+            const box = document.createElement('div');
+            box.style.cssText = 'background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(255,215,0,0.4);border-radius:16px;padding:14px;max-width:90vw;max-height:90vh;overflow:auto;';
+            m.appendChild(box);
+            function render(cur, idx) {
+                const isUp = cur.kind === 'upload';
+                const hasLink = !!cur.link, hasCode = !!cur.code;
+                const pager = (list && list.length > 1)
+                    ? '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">' +
+                        '<button id="cpPrev" style="background:rgba(255,255,255,0.15);border:none;color:#fff;padding:6px 12px;border-radius:8px;cursor:pointer;">◀ 上一张</button>' +
+                        '<span style="color:rgba(255,255,255,0.6);font-size:0.78rem;">' + (idx + 1) + ' / ' + list.length + '</span>' +
+                        '<button id="cpNext" style="background:rgba(255,255,255,0.15);border:none;color:#fff;padding:6px 12px;border-radius:8px;cursor:pointer;">下一张 ▶</button>' +
+                      '</div>'
+                    : '';
+                const parseBtn = isUp
+                    ? '<button id="cpParse" style="flex:1;min-width:120px;background:linear-gradient(135deg,#ab47bc,#7b1fa2);color:#fff;border:none;padding:10px;border-radius:8px;cursor:pointer;font-weight:bold;">🔍 解析到阵容</button>'
+                    : '';
+                const linkBtn = hasLink
+                    ? '<button id="cpLink" style="flex:1;min-width:120px;background:linear-gradient(135deg,#ab47bc,#6a1b9a);color:#fff;border:none;padding:10px;border-radius:8px;cursor:pointer;font-weight:bold;">🔗 复制链接</button>'
+                    : '';
+                const shortBtn = hasCode
+                    ? '<button id="cpShort" style="flex:1;min-width:120px;background:linear-gradient(135deg,#ffd700,#ff9800);color:#1a1a2e;border:none;padding:10px;border-radius:8px;cursor:pointer;font-weight:bold;">📋 复制短码</button>'
+                    : '';
+                box.innerHTML = pager +
+                    '<img src="' + cur.dataUrl + '" style="max-width:100%;max-height:52vh;border-radius:10px;display:block;margin:0 auto;">' +
+                    '<div style="color:rgba(255,255,255,0.6);font-size:0.78rem;margin:8px 2px;">' + (isUp ? '🟣 别人上传的卡片' : '🟢 自己生成的卡片') +
+                        (cur.projectName ? ' · ' + String(cur.projectName).slice(0, 40) : '') + (cur.code ? ' · 短码 ' + cur.code : '') + '</div>' +
+                    '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">' +
+                      '<button id="cpDl" style="flex:1;min-width:120px;background:linear-gradient(135deg,#ffd700,#ff9800);color:#1a1a2e;border:none;padding:10px;border-radius:8px;cursor:pointer;font-weight:bold;">💾 下载图片</button>' +
+                      '<button id="cpCopy" style="flex:1;min-width:120px;background:linear-gradient(135deg,#26a69a,#00796b);color:#fff;border:none;padding:10px;border-radius:8px;cursor:pointer;font-weight:bold;">📋 复制图片</button>' +
+                      linkBtn + shortBtn + parseBtn +
+                      '<button id="cpDel" style="flex:1;min-width:100px;background:rgba(255,82,82,0.18);color:#ff8a80;border:1px solid rgba(255,82,82,0.4);padding:10px;border-radius:8px;cursor:pointer;">🗑 删除</button>' +
+                      '<button id="cpClose" style="flex:1;min-width:100px;background:rgba(255,255,255,0.15);color:#fff;border:none;padding:10px;border-radius:8px;cursor:pointer;">关闭</button>' +
+                    '</div>';
+                box.querySelector('#cpClose').onclick = function () { m.remove(); };
+                if (box.querySelector('#cpPrev')) box.querySelector('#cpPrev').onclick = function () { const n = (idx - 1 + list.length) % list.length; render(list[n], n); };
+                if (box.querySelector('#cpNext')) box.querySelector('#cpNext').onclick = function () { const n = (idx + 1) % list.length; render(list[n], n); };
+                box.querySelector('#cpDl').onclick = function () {
+                    const a = document.createElement('a'); a.href = cur.dataUrl;
+                    const pn = String(cur.projectName || '阵容').replace(/[\\/:*?"<>|]/g, '');
+                    a.download = '塔防阵容_' + pn + '_' + cur.ts + '.png';
+                    document.body.appendChild(a); a.click(); a.remove();
+                    _btnFb(this, '✓ 已开始下载');
+                    if (typeof showToast === 'function') showToast('💾 已开始下载', 'success');
+                };
+                box.querySelector('#cpCopy').onclick = async function () {
+                    try {
+                        const blob = await (await fetch(cur.dataUrl)).blob();
+                        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+                        _btnFb(this, '✓ 已复制');
+                        if (typeof showToast === 'function') showToast('📋 已复制，可直接粘贴到微信/QQ', 'success');
+                    } catch (e) { if (typeof showToast === 'function') showToast('❌ 当前环境不支持复制图片，请用下载', 'error'); }
+                };
+                if (box.querySelector('#cpLink')) box.querySelector('#cpLink').onclick = function () { copyText(cur.link, '🔗 链接已复制：对方浏览器/软件打开会自动弹导入', this); };
+                if (box.querySelector('#cpShort')) box.querySelector('#cpShort').onclick = function () { copyText(cur.code, '📋 短码 ' + cur.code + ' 已复制：在软件「从短码导入」输入即可', this); };
+                box.querySelector('#cpDel').onclick = async function () {
+                    try {
+                        const db = await _cardDbOpen();
+                        if (db) { await new Promise(function (res) { try { const tx = db.transaction(_CARD_STORE, 'readwrite'); tx.objectStore(_CARD_STORE).delete(cur.id); tx.oncomplete = res; tx.onerror = res; tx.onabort = res; } catch (e) { res(); } }); }
+                        m.remove();
+                        const gal = document.getElementById('lineupCardGallery'); if (gal) gal.remove();
+                        _cardGallery();
+                        if (typeof showToast === 'function') showToast('🗑 已删除该卡片', 'success');
+                    } catch (e) {}
+                };
+                const parseEl = box.querySelector('#cpParse');
+                if (parseEl) parseEl.onclick = async function () {
+                    parseEl.disabled = true; parseEl.textContent = '🔍 识别中…';
+                    let code = (cur.source && cur.source.trim()) || '';
+                    // 优先 OCR 识别卡片图上的 8 位短码（APP 端 Umi-OCR，短码画在图底部固定位置）
+                    if (!code && typeof window.__recImg !== 'undefined' && typeof window.__recImg.ocrRawText === 'function') {
+                        try {
+                            const txt = await window.__recImg.ocrRawText(cur.dataUrl);
+                            const all = (txt || '').match(/[A-Za-z2-9]{8}/g) || [];
+                            code = all.find(function (s) { return !/[0O1lI]/.test(s); }) || all[0] || '';
+                        } catch (e) { console.warn('[解析] OCR失败:', e); }
+                    }
+                    if (!code) { if (typeof showToast === 'function') showToast('⚠️ 未识别到短码：请在桌面APP端（需Umi-OCR）解析，或上传时填写来源短码', 'error'); parseEl.disabled = false; parseEl.textContent = '🔍 解析到阵容'; return; }
+                    if (typeof importProjectViaCode === 'function') { m.remove(); importProjectViaCode(code); }
+                    else if (typeof showToast === 'function') showToast('解析功能不可用', 'error');
+                };
+            }
+            m.onclick = function (e) { if (e.target === m) m.remove(); };
+            render(card, index < 0 ? 0 : index);
         }
         // 🔴 2026-09-03 上传本地图片作为「别人生成的卡片」（解析时自动 OCR 短码，无需手填来源）
         function _cardUpload() {
@@ -9729,7 +9785,7 @@
                         let n = 0;
                         for (const c of list) {
                             if (!c || !c.dataUrl) continue;
-                            await _cardSave(c.dataUrl, { projectName: c.projectName || '导入卡片', code: c.code || '', kind: c.kind || 'upload', source: c.source || '' });
+                            await _cardSave(c.dataUrl, { projectName: c.projectName || '导入卡片', code: c.code || '', kind: c.kind || 'upload', source: c.source || '', link: c.link || '' });
                             n++;
                         }
                         const gal = document.getElementById('lineupCardGallery'); if (gal) gal.remove();
