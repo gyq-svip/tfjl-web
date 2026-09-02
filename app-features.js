@@ -8130,6 +8130,9 @@
                 try {
                     if (typeof window.__tfjlLoadProjectList === 'function') projects = await window.__tfjlLoadProjectList();
                 } catch (e) {}
+                // 🔴 2026-09-03 收集小卡片（本机阵容卡片）随系统备份一起导出
+                let cards = [];
+                try { if (typeof _cardList === 'function') cards = await _cardList(); } catch (e) {}
 
                 const payload = {
                     __tfjl_backup__: true,
@@ -8137,6 +8140,7 @@
                     exportedAt: new Date().toISOString(),
                     appStore,
                     projects,
+                    cards,
                     localStorage: ls,
                 };
                 const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
@@ -8181,6 +8185,12 @@
                             entries.forEach(([k, v]) => map.set(k, v));
                             if (api.syncAllNow) await api.syncAllNow();
                         } catch (e) { console.warn('appStore 恢复失败:', e); }
+                    }
+                    // 🔴 2026-09-03 小卡片写回 IndexedDB
+                    if (Array.isArray(data.cards) && data.cards.length) {
+                        for (const c of data.cards) {
+                            if (c && c.dataUrl) { try { await _cardSave(c.dataUrl, { projectName: c.projectName || '导入卡片', code: c.code || '', kind: c.kind || 'gen', source: c.source || '' }); } catch (e) {} }
+                        }
                     }
                     alert('✅ 恢复完成！部分变更（如皮肤/英雄缓存）需刷新页面后完全生效。建议刷新。');
                 } catch (e) {
@@ -9485,7 +9495,7 @@
             try {
                 const db = await _cardDbOpen();
                 if (!db || !dataUrl) return;
-                const entry = { id: 'c_' + Date.now() + '_' + Math.floor(Math.random() * 1e6), dataUrl: dataUrl, ts: Date.now(), projectName: String(meta.projectName || ''), code: String(meta.code || '') };
+                const entry = { id: 'c_' + Date.now() + '_' + Math.floor(Math.random() * 1e6), dataUrl: dataUrl, ts: Date.now(), projectName: String(meta.projectName || ''), code: String(meta.code || ''), kind: meta.kind || 'gen', source: String(meta.source || '') };
                 await new Promise(function (resolve) {
                     try {
                         const tx = db.transaction(_CARD_STORE, 'readwrite');
@@ -9525,36 +9535,81 @@
                 });
             } catch (e) { return []; }
         }
-        // 取回画廊：列出本机缓存的历史卡片，点开可下载/复制
+        // 🔴 2026-09-03 小卡片画廊（增强）：悬浮窗（拖拽标题栏 + 右下角缩放），工具栏含上传/备份/恢复，区分生成/上传
         async function _cardGallery() {
             const cards = await _cardList();
             const old = document.getElementById('lineupCardGallery');
             if (old) old.remove();
             const modal = document.createElement('div');
             modal.id = 'lineupCardGallery';
-            modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);z-index:' + (210000 + (window.topWinZIndex || 0)) + ';display:flex;align-items:center;justify-content:center;padding:16px;';
-            let grid = '';
+            modal.style.cssText = 'position:fixed;left:120px;top:60px;width:680px;max-width:92vw;height:74vh;max-height:90vh;background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(255,215,0,0.4);border-radius:16px;z-index:' + (210000 + (window.topWinZIndex || 0)) + ';display:flex;flex-direction:column;overflow:hidden;box-shadow:0 18px 60px rgba(0,0,0,0.6);';
+            const head = '<div id="cardGalHead" style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:rgba(255,215,0,0.12);border-bottom:1px solid rgba(255,255,255,0.1);cursor:move;flex:0 0 auto;">' +
+                '<span style="color:#ffd700;font-size:1rem;font-weight:bold;">📇 我的小卡片（本机）</span>' +
+                '<div style="display:flex;gap:6px;align-items:center;">' +
+                  '<button id="cardGalUpload" style="background:rgba(255,255,255,0.14);border:none;color:#fff;padding:5px 10px;border-radius:7px;cursor:pointer;font-size:0.78rem;">📤 上传</button>' +
+                  '<button id="cardGalExport" style="background:rgba(255,255,255,0.14);border:none;color:#fff;padding:5px 10px;border-radius:7px;cursor:pointer;font-size:0.78rem;">⬇️ 备份</button>' +
+                  '<button id="cardGalImport" style="background:rgba(255,255,255,0.14);border:none;color:#fff;padding:5px 10px;border-radius:7px;cursor:pointer;font-size:0.78rem;">⬆️ 恢复</button>' +
+                  '<span id="lineupCardGalleryClose" style="cursor:pointer;color:rgba(255,255,255,0.5);font-size:1.4rem;margin-left:4px;">×</span>' +
+                '</div></div>';
+            let body;
             if (!cards.length) {
-                grid = '<div style="color:rgba(255,255,255,0.5);padding:40px;text-align:center;">还没有缓存的卡片。先去分享一张阵容图，卡片会自动存到这里。</div>';
+                body = '<div style="flex:1;overflow-y:auto;padding:24px;color:rgba(255,255,255,0.7);text-align:center;">' +
+                  '<div style="font-size:3rem;margin-bottom:12px;">🃏</div>' +
+                  '<div style="font-size:1rem;font-weight:bold;color:#ffd700;margin-bottom:10px;">你还没有任何小卡片</div>' +
+                  '<div style="font-size:0.85rem;line-height:1.8;color:rgba(255,255,255,0.6);max-width:440px;margin:0 auto;text-align:left;">' +
+                  '小卡片 = 一键分享的阵容图，随时发给朋友、随时取回。怎么得到第一张？<br>' +
+                  '① 打开任意阵容 → 点「📸 生成卡片图」分享，卡片会<b>自动存到这里</b>；<br>' +
+                  '② 或点上方「📤 上传」，把朋友发你的卡片图存进来（可填来源链接，之后点「🔍 解析」一键导入到你的阵容）。' +
+                  '</div></div>';
             } else {
-                grid = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;">';
+                let grid = '<div style="flex:1;overflow-y:auto;padding:14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;align-content:start;">';
                 cards.forEach(function (c) {
                     const pn = String(c.projectName || '未命名阵容');
                     const ts = (function () { try { const d = new Date(c.ts); return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); } catch (e) { return ''; } })();
-                    grid += '<div data-cid="' + c.id + '" style="cursor:pointer;border:1px solid rgba(255,255,255,0.12);border-radius:10px;overflow:hidden;background:rgba(0,0,0,0.3);">' +
+                    const isUp = c.kind === 'upload';
+                    const tag = isUp
+                        ? '<span style="background:rgba(186,104,200,0.3);color:#ce93d8;padding:1px 6px;border-radius:6px;font-size:0.64rem;">🟣 上传</span>'
+                        : '<span style="background:rgba(76,175,80,0.25);color:#a5d6a7;padding:1px 6px;border-radius:6px;font-size:0.64rem;">🟢 生成</span>';
+                    grid += '<div data-cid="' + c.id + '" style="cursor:pointer;border:1px solid rgba(255,255,255,0.12);border-radius:10px;overflow:hidden;background:rgba(0,0,0,0.3);position:relative;">' +
+                        '<div style="position:absolute;top:6px;left:6px;z-index:2;">' + tag + '</div>' +
                         '<img src="' + c.dataUrl + '" style="width:100%;display:block;" alt="' + pn + '">' +
                         '<div style="padding:6px 8px;font-size:0.72rem;color:rgba(255,255,255,0.7);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + pn + '</div>' +
                         '<div style="padding:0 8px 6px;font-size:0.66rem;color:rgba(255,255,255,0.4);">' + ts + (c.code ? ' · ' + c.code : '') + '</div>' +
                       '</div>';
                 });
                 grid += '</div>';
+                body = grid;
             }
-            modal.innerHTML = '<div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(255,215,0,0.4);border-radius:16px;padding:16px 18px;max-width:820px;width:96%;max-height:90vh;overflow-y:auto;">' +
-                '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><span style="color:#ffd700;font-size:1.05rem;font-weight:bold;">📇 我缓存的阵容卡片（本机）</span><span id="lineupCardGalleryClose" style="cursor:pointer;color:rgba(255,255,255,0.4);font-size:1.5rem;">×</span></div>' +
-                grid + '</div>';
+            modal.innerHTML = head + body;
             document.body.appendChild(modal);
+            // 拖拽标题栏
+            (function () {
+                const h = modal.querySelector('#cardGalHead');
+                let sx, sy, ox, oy, drag = false;
+                h.onmousedown = function (e) {
+                    if (e.target.tagName === 'BUTTON') return;
+                    drag = true; sx = e.clientX; sy = e.clientY; ox = modal.offsetLeft; oy = modal.offsetTop;
+                    document.onmousemove = function (ev) { if (!drag) return; modal.style.left = (ox + ev.clientX - sx) + 'px'; modal.style.top = (oy + ev.clientY - sy) + 'px'; };
+                    document.onmouseup = function () { drag = false; document.onmousemove = null; document.onmouseup = null; };
+                };
+            })();
+            // 右下角缩放手柄
+            const handle = document.createElement('div');
+            handle.style.cssText = 'position:absolute;right:2px;bottom:2px;width:18px;height:18px;cursor:nwse-resize;background:linear-gradient(135deg,transparent 50%,rgba(255,215,0,0.65) 50%);border-bottom-right-radius:14px;';
+            modal.appendChild(handle);
+            (function () {
+                let sx, sy, sw, sh, rz = false;
+                handle.onmousedown = function (e) {
+                    rz = true; sx = e.clientX; sy = e.clientY; sw = modal.offsetWidth; sh = modal.offsetHeight;
+                    e.stopPropagation();
+                    document.onmousemove = function (ev) { if (!rz) return; modal.style.width = Math.max(360, sw + ev.clientX - sx) + 'px'; modal.style.height = Math.max(260, sh + ev.clientY - sy) + 'px'; };
+                    document.onmouseup = function () { rz = false; document.onmousemove = null; document.onmouseup = null; };
+                };
+            })();
             modal.querySelector('#lineupCardGalleryClose').onclick = function () { modal.remove(); };
-            modal.onclick = function (e) { if (e.target === modal) modal.remove(); };
+            modal.querySelector('#cardGalUpload').onclick = function () { _cardUpload(); };
+            modal.querySelector('#cardGalExport').onclick = function () { _cardExportBackup(); };
+            modal.querySelector('#cardGalImport').onclick = function () { _cardImportBackup(); };
             Array.prototype.forEach.call(modal.querySelectorAll('[data-cid]'), function (cell) {
                 cell.onclick = function () {
                     const card = cards.filter(function (c) { return c.id === cell.getAttribute('data-cid'); })[0];
@@ -9568,11 +9623,18 @@
             const m = document.createElement('div');
             m.id = 'lineupCardPreview';
             m.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:' + (220000 + (window.topWinZIndex || 0)) + ';display:flex;align-items:center;justify-content:center;flex-direction:column;padding:16px;';
+            const isUp = card.kind === 'upload';
+            const parseBtn = isUp
+                ? '<button id="cpParse" style="flex:1;min-width:120px;background:linear-gradient(135deg,#ab47bc,#7b1fa2);color:#fff;border:none;padding:10px;border-radius:8px;cursor:pointer;font-weight:bold;">🔍 解析到阵容</button>'
+                : '';
             m.innerHTML = '<div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(255,215,0,0.4);border-radius:16px;padding:14px;max-width:90vw;max-height:90vh;overflow:auto;">' +
-                '<img src="' + card.dataUrl + '" style="max-width:100%;max-height:60vh;border-radius:10px;display:block;">' +
-                '<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">' +
-                  '<button id="cpDl" style="flex:1;min-width:120px;background:linear-gradient(135deg,#ffd700,#ff9800);color:#1a1a2e;border:none;padding:10px;border-radius:8px;cursor:pointer;font-weight:bold;">💾 下载</button>' +
-                  '<button id="cpCopy" style="flex:1;min-width:120px;background:linear-gradient(135deg,#26a69a,#00796b);color:#fff;border:none;padding:10px;border-radius:8px;cursor:pointer;font-weight:bold;">📋 复制图片</button>' +
+                '<img src="' + card.dataUrl + '" style="max-width:100%;max-height:56vh;border-radius:10px;display:block;">' +
+                '<div style="color:rgba(255,255,255,0.6);font-size:0.78rem;margin:8px 2px;">' + (isUp ? '🟣 别人上传的卡片' : '🟢 自己生成的卡片') + (card.source ? ' · 来源：' + String(card.source).slice(0, 48) : '') + '</div>' +
+                '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">' +
+                  '<button id="cpDl" style="flex:1;min-width:110px;background:linear-gradient(135deg,#ffd700,#ff9800);color:#1a1a2e;border:none;padding:10px;border-radius:8px;cursor:pointer;font-weight:bold;">💾 下载</button>' +
+                  '<button id="cpCopy" style="flex:1;min-width:110px;background:linear-gradient(135deg,#26a69a,#00796b);color:#fff;border:none;padding:10px;border-radius:8px;cursor:pointer;font-weight:bold;">📋 复制</button>' +
+                  '<button id="cpDel" style="flex:1;min-width:100px;background:rgba(255,82,82,0.18);color:#ff8a80;border:1px solid rgba(255,82,82,0.4);padding:10px;border-radius:8px;cursor:pointer;">🗑 删除</button>' +
+                  parseBtn +
                   '<button id="cpClose" style="flex:1;min-width:100px;background:rgba(255,255,255,0.15);color:#fff;border:none;padding:10px;border-radius:8px;cursor:pointer;">关闭</button>' +
                 '</div></div>';
             document.body.appendChild(m);
@@ -9592,7 +9654,97 @@
                     if (typeof showToast === 'function') showToast('📋 已复制，可直接粘贴到微信/QQ', 'success');
                 } catch (e) { if (typeof showToast === 'function') showToast('❌ 当前环境不支持复制图片，请用下载', 'error'); }
             };
+            m.querySelector('#cpDel').onclick = async function () {
+                try {
+                    const db = await _cardDbOpen();
+                    if (db) { await new Promise(function (res) { try { const tx = db.transaction(_CARD_STORE, 'readwrite'); tx.objectStore(_CARD_STORE).delete(card.id); tx.oncomplete = res; tx.onerror = res; tx.onabort = res; } catch (e) { res(); } }); }
+                    m.remove();
+                    const gal = document.getElementById('lineupCardGallery'); if (gal) gal.remove();
+                    _cardGallery();
+                    if (typeof showToast === 'function') showToast('🗑 已删除该卡片', 'success');
+                } catch (e) {}
+            };
+            const parseEl = m.querySelector('#cpParse');
+            if (parseEl) parseEl.onclick = async function () {
+                parseEl.disabled = true; parseEl.textContent = '🔍 识别中…';
+                let code = (card.source && card.source.trim()) || '';
+                // 优先 OCR 识别卡片图上的 8 位短码（APP 端 Umi-OCR，短码画在图底部固定位置）
+                if (!code && typeof window.__recImg !== 'undefined' && typeof window.__recImg.ocrRawText === 'function') {
+                    try {
+                        const txt = await window.__recImg.ocrRawText(card.dataUrl);
+                        const all = (txt || '').match(/[A-Za-z2-9]{8}/g) || [];
+                        code = all.find(function (s) { return !/[0O1lI]/.test(s); }) || all[0] || '';
+                    } catch (e) { console.warn('[解析] OCR失败:', e); }
+                }
+                if (!code) { if (typeof showToast === 'function') showToast('⚠️ 未识别到短码：请在桌面APP端（需Umi-OCR）解析，或上传时填写来源短码', 'error'); parseEl.disabled = false; parseEl.textContent = '🔍 解析到阵容'; return; }
+                if (typeof importProjectViaCode === 'function') { m.remove(); importProjectViaCode(code); }
+                else if (typeof showToast === 'function') showToast('解析功能不可用', 'error');
+            };
         }
+        // 🔴 2026-09-03 上传本地图片作为「别人生成的卡片」（解析时自动 OCR 短码，无需手填来源）
+        function _cardUpload() {
+            const inp = document.createElement('input');
+            inp.type = 'file'; inp.accept = 'image/*';
+            inp.onchange = function () {
+                const f = inp.files && inp.files[0];
+                if (!f) return;
+                const rd = new FileReader();
+                rd.onload = function () {
+                    const dataUrl = rd.result;
+                    _cardSave(dataUrl, { projectName: ('上传·' + (f.name || '卡片')).slice(0, 40), code: '', kind: 'upload', source: '' }).then(function () {
+                        const gal = document.getElementById('lineupCardGallery'); if (gal) gal.remove();
+                        _cardGallery();
+                        if (typeof showToast === 'function') showToast('📤 卡片已上传（点开可「🔍 解析到阵容」，自动 OCR 识别短码）', 'success');
+                    });
+                };
+                rd.readAsDataURL(f);
+            };
+            inp.click();
+        }
+        // 🔴 2026-09-03 小卡片独立备份/恢复（导出为 JSON 文件，含生成与上传的卡片）
+        async function _cardExportBackup() {
+            try {
+                const cards = await _cardList();
+                if (!cards.length) { if (typeof showToast === 'function') showToast('没有卡片可备份', 'info'); return; }
+                const payload = { type: 'tfjl_share_cards', version: 1, exportedAt: Date.now(), cards: cards };
+                const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+                const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+                a.download = '塔防小卡片备份_' + new Date().toISOString().slice(0, 10) + '.json';
+                document.body.appendChild(a); a.click(); a.remove();
+                if (typeof showToast === 'function') showToast('⬇️ 已导出 ' + cards.length + ' 张卡片备份', 'success');
+            } catch (e) { if (typeof showToast === 'function') showToast('导出失败：' + (e.message || e), 'error'); }
+        }
+        function _cardImportBackup() {
+            const inp = document.createElement('input');
+            inp.type = 'file'; inp.accept = 'application/json,.json';
+            inp.onchange = function () {
+                const f = inp.files && inp.files[0];
+                if (!f) return;
+                const rd = new FileReader();
+                rd.onload = async function () {
+                    try {
+                        const data = JSON.parse(rd.result);
+                        const list = (data && data.cards) || (Array.isArray(data) ? data : []);
+                        if (!Array.isArray(list) || !list.length) { if (typeof showToast === 'function') showToast('备份文件无卡片数据', 'error'); return; }
+                        let n = 0;
+                        for (const c of list) {
+                            if (!c || !c.dataUrl) continue;
+                            await _cardSave(c.dataUrl, { projectName: c.projectName || '导入卡片', code: c.code || '', kind: c.kind || 'upload', source: c.source || '' });
+                            n++;
+                        }
+                        const gal = document.getElementById('lineupCardGallery'); if (gal) gal.remove();
+                        _cardGallery();
+                        if (typeof showToast === 'function') showToast('⬆️ 已恢复 ' + n + ' 张卡片', 'success');
+                    } catch (e) { if (typeof showToast === 'function') showToast('恢复失败：' + (e.message || e), 'error'); }
+                };
+                rd.readAsText(f);
+            };
+            inp.click();
+        }
+        window._cardGallery = _cardGallery;
+        window._cardUpload = _cardUpload;
+        window._cardExportBackup = _cardExportBackup;
+        window._cardImportBackup = _cardImportBackup;
 
         // gist 内容 → 解密 + 有效期校验 → exportData（tower-defense-project 格式）
         async function _projShareResolveContent(raw) {

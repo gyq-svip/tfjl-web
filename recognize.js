@@ -494,6 +494,29 @@
     throw new Error('本功能需要本机 Umi-OCR（免费开源），未安装则不支持识别。请在桌面端安装并双击打开 Umi-OCR 后重试。');
   }
 
+  // 🔴 2026-09-03 图片→纯文字 OCR（供小卡片解析短码用）：复用 Umi-OCR 链路，返回拼接的全图文字
+  async function ocrRawText(dataUrl) {
+    const b64 = String(dataUrl || '').split(',')[1];
+    if (!b64) return '';
+    let j;
+    if (isTauri()) {
+      j = await tauriInvoke('umi_ocr', {
+        base64: b64,
+        options: { data:{format:'dict', outputDirName:'', outputFileName:'', outputFileFormat:[]}, ocr:{language:'models/config_chinese.txt', cls:true} }
+      });
+    } else {
+      try {
+        const resp = await fetch('/umi-ocr', {method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({base64:b64, options:{data:{format:'dict', outputDirName:'', outputFileName:'', outputFileFormat:[]}, ocr:{language:'models/config_chinese.txt', cls:true}}})});
+        if (!resp.ok) return '';
+        j = await resp.json();
+      } catch (e) { return ''; }
+    }
+    if (!j || (j.code && j.code !== 100)) return '';
+    const arr = Array.isArray(j.data) ? j.data : (Array.isArray(j) ? j : []);
+    return arr.map(b => (b && b.text) ? b.text : '').join('\n');
+  }
+
   // ====================== 自动识别主流程 ======================
   function autoRecognize(img, canvas, statusEl, onDone){
     if(typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('阵容识别');
@@ -1640,5 +1663,5 @@
   else buildUI();
 
   // 调试/测试钩子：暴露图像识别核心函数，便于本地验证（不影响正常使用）
-  window.__recImg = { buildSkinTpls, recognizeImageBySkin, extractCardFeature, sampleBgQuality, matchCard, loadSkinImg, fixHero, saveLocalCorrection, matchWithLocal, clearLocalCorrections, HERO_QUALITY };
+  window.__recImg = { buildSkinTpls, recognizeImageBySkin, extractCardFeature, sampleBgQuality, matchCard, loadSkinImg, fixHero, saveLocalCorrection, matchWithLocal, clearLocalCorrections, HERO_QUALITY, ocrRawText };
 })();
