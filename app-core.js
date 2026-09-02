@@ -20611,7 +20611,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                     }
                 }
                 
-                const deleteBtn = canDelete ? `<a href="javascript:void(0)" onclick="deleteMessage(${realIndex})" style="color:#ff6b6b;cursor:pointer;margin-left:10px;font-size:0.7rem;" title="${isOwner ? '删除我的消息' : '管理员删除'}">🗑️</a>` : '';
+                const deleteBtn = canDelete ? `<a href="javascript:void(0)" onclick="if(event){event.preventDefault();event.stopPropagation();}deleteMessage(${realIndex});return false;" style="color:#ff6b6b;cursor:pointer;margin-left:10px;font-size:0.7rem;" title="${isOwner ? '删除我的消息' : '管理员删除'}">🗑️</a>` : '';
                 
                 // 分享类消息：附加 复制/赞/踩 操作条（声望系统）
                 if (isShareMsg(msg)) {
