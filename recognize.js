@@ -1110,6 +1110,27 @@
     };
 
     // 识别执行体（「⚡ 自动识别」与「🎮 一键识别游戏画面」共用）
+    // 把图像识别结果渲染到主结果表（recBody）：OCR 识别不到文字（无卡名图）时，用户能直接在主表看到图像结果
+    function renderImgToBody(results){
+      const tb = $('recBody'); if(!tb) return 0;
+      const heroes = results.filter(r=>r.hero && !r._deleted);
+      if(!heroes.length) return 0;
+      tb.innerHTML = '';
+      heroes.forEach((r,i)=>{
+        const tr = document.createElement('tr'); tr.style.borderTop='1px solid #333';
+        tr.innerHTML = `<td style="padding:4px;color:#90a4ae;">${i+1}</td>`
+          + '<td style="padding:4px;">图像</td>'
+          + `<td style="padding:4px;font-weight:600;color:#fff;">${escapeHtml(r.hero||'')}</td>`
+          + '<td style="padding:4px;color:#2e7d32;font-weight:600;">✓ 图像匹配</td>'
+          + `<td style="padding:4px;"><button data-del="${r.idx}" title="删除这张" style="background:rgba(244,67,54,0.25);color:#ff8a80;border:none;border-radius:6px;cursor:pointer;padding:2px 8px;font-size:0.72rem;">✕ 删</button></td>`;
+        tb.appendChild(tr);
+      });
+      tb.querySelectorAll('button[data-del]').forEach(b=>{ b.onclick=()=>{ const id=+b.getAttribute('data-del'); const r=results.find(x=>x.idx===id); if(r) r._deleted=true; const tr=b.closest('tr'); if(tr){ tr.style.opacity='0.35'; tr.style.textDecoration='line-through'; } updateRecWarn(results); renderRecDr(results); }; });
+      overlay._results = results; updateRecWarn(results); renderRecDr(results);
+      const src=$('recSrc'); if(src) src.textContent='来源: 图像识别(皮肤比对)';
+      return heroes.length;
+    }
+
     function runAuto(){
       autoRecognize(currentImg, $('recCanvas'), $('recStatus'), (results, source, rowCount)=>{
         $('recSrc').textContent = '来源: '+source;
@@ -1141,13 +1162,19 @@
         overlay._results = results;
         updateRecWarn(results);
         $('recStatus').textContent = `识别完成：${results.length} 个英雄（${rowCount} 行）`;
-        // 智能 fallback：OCR 0 行（图无卡名/引擎未就绪）且非综合模式（综合已并行跑图像）→ 自动转图像识别
+        // 智能：OCR 0 行（无卡名图）→ 优先把已跑的图像结果填进主表；图像还没跑则转图像识别
         const smartMode = window.__recSmartMode; window.__recSmartMode = false;
-        if(results.length === 0 && currentImg && !smartMode){
-          const wrap = $('recImgWrap');
-          if(!wrap || wrap.style.display === 'none' || !$('recImgBox').children.length){
-            $('recStatus').textContent = 'OCR 未识别到文字（图可能无卡名），自动切换图像识别…';
-            runImgAuto();
+        if(results.length === 0 && currentImg){
+          const imgRes = window.__recImgResults;
+          if(imgRes && imgRes.some(r=>r.hero)){
+            const n = renderImgToBody(imgRes);
+            $('recStatus').textContent = 'OCR 未识别到文字，已用图像识别结果（'+n+' 个英雄；图像匹配可能有误，可对照紫色表核对）';
+          } else if(!smartMode){
+            const wrap = $('recImgWrap');
+            if(!wrap || wrap.style.display === 'none' || !$('recImgBox').children.length){
+              $('recStatus').textContent = 'OCR 未识别到文字（图可能无卡名），自动切换图像识别…';
+              runImgAuto();
+            }
           }
         }
         renderRecDr(results); // 识别完立即算并展示减伤
@@ -1213,6 +1240,8 @@
         const featNull=results.filter(rr=>!rr.feat).length; const tplN=(_skinTpls||[]).length;
         $('recStatus').textContent = `图像识别完成：${results.filter(rr=>rr.hero).length}/${results.length} 匹配（模板库 ${tplN} 张，特征提取失败 ${featNull} 个；识别错点 ✏️ 修正，越修越准）`;
         const stg=$('recStage'); if(stg){ stg.style.display='inline'; stg.textContent='🎨 图像：'+results.filter(rr=>rr.hero).length+'/'+results.length+'（模板库 '+tplN+' 张，特征失败 '+featNull+' 个）'; }
+        window.__recImgResults = results; // 存下来：OCR 0 行时用于填主表
+        const bodyTb=$('recBody'); if(bodyTb && !bodyTb.children.length){ renderImgToBody(results); } // 主表尚无 OCR 结果时先填图像结果
         renderRecDr(results);
       });
     }
