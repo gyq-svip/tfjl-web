@@ -1141,6 +1141,15 @@
         overlay._results = results;
         updateRecWarn(results);
         $('recStatus').textContent = `识别完成：${results.length} 个英雄（${rowCount} 行）`;
+        // 智能 fallback：OCR 0 行（图无卡名/引擎未就绪）且非综合模式（综合已并行跑图像）→ 自动转图像识别
+        const smartMode = window.__recSmartMode; window.__recSmartMode = false;
+        if(results.length === 0 && currentImg && !smartMode){
+          const wrap = $('recImgWrap');
+          if(!wrap || wrap.style.display === 'none' || !$('recImgBox').children.length){
+            $('recStatus').textContent = 'OCR 未识别到文字（图可能无卡名），自动切换图像识别…';
+            runImgAuto();
+          }
+        }
         renderRecDr(results); // 识别完立即算并展示减伤
       });
     }
@@ -1165,6 +1174,7 @@
 
     $('recSmart').onclick = ()=>{
       if(!currentImg){ alert('请先粘贴/选择/截图一张阵容图（或点「📐 框选阵容区域」）'); return; }
+      window.__recSmartMode = true; // 标记综合模式，OCR onDone 不重复 fallback（图像已并行跑）
       runImgAuto(); // 图像识别 → recImgBox
       if(isTauri()){ runAuto(); } // 文字识别(OCR) → recBody（需 Umi-OCR 引擎）
       else { const st=$('recStatus'); if(st) st.textContent='网页版无文字识别(OCR)，已显示图像识别结果'; }
