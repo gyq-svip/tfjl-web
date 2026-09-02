@@ -20633,9 +20633,38 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                     <span style="color:rgba(255,215,0,0.7);font-size:0.68rem;background:rgba(255,215,0,0.12);padding:1px 7px;border-radius:10px;">${_aTitle}</span>
                     <span style="margin-left:auto;color:rgba(255,255,255,0.4);font-size:0.68rem;display:flex;align-items:center;gap:4px;">${catBadge}${timeAgo}${expireLabel}${encryptedLabel}${deleteBtn}</span>
                 </div>`;
+                // ===== 评论区（需求墙留言）=====
+                const _cid = msg.id;
+                const _comments = (msg.comments || []);
+                const _open = _wallOpenComments.has(_cid);
+                const _cmtBtn = `<a href="javascript:void(0)" onclick="if(event){event.preventDefault();event.stopPropagation();}toggleWallComment('${_cid}');return false;" style="color:#7fd1ff;cursor:pointer;margin-left:8px;font-size:0.7rem;" title="查看/发表留言">💬 评论 ${_comments.length ? '(' + _comments.length + ')' : ''}</a>`;
+                let _commentHtml = `<div style="margin-top:6px;display:flex;justify-content:flex-end;">${_cmtBtn}</div>`;
+                if (_open) {
+                    const _cmtList = _comments.length ? _comments.map(function(c){
+                        const _cDel = (c.author && currentNickname && c.author.toLowerCase() === currentNickname.toLowerCase()) || isOwner || isAdmin;
+                        const _cDelBtn = _cDel ? `<a href="javascript:void(0)" onclick="if(event){event.preventDefault();event.stopPropagation();}deleteWallComment('${_cid}','${(c.id||'').replace(/'/g,"\\'")}');return false;" style="color:#ff6b6b;cursor:pointer;margin-left:8px;font-size:0.7rem;" title="删除评论">🗑️</a>` : '';
+                        return `<div style="background:rgba(255,255,255,0.05);border-radius:6px;padding:6px 8px;margin-bottom:5px;">
+                            <div style="display:flex;align-items:baseline;gap:6px;">
+                                <span style="color:#ffd700;font-weight:bold;font-size:0.78rem;">${escapeHtml(c.author || '游客')}</span>
+                                <span style="color:rgba(255,255,255,0.4);font-size:0.66rem;">${formatMessageTime(c.time)}</span>
+                                ${_cDelBtn}
+                            </div>
+                            <div style="color:#fff;font-size:0.82rem;margin-top:2px;line-height:1.5;word-break:break-word;">${escapeHtml(c.content)}</div>
+                        </div>`;
+                    }).join('') : '<div style="color:rgba(255,255,255,0.4);font-size:0.75rem;padding:4px 0;">还没有留言，快来抢沙发～</div>';
+                    const _cmtInput = `<div style="display:flex;gap:6px;margin-top:8px;">
+                        <input id="wallCommentInput_${_cid}" maxlength="300" placeholder="说点什么…（回车发送）" onkeydown="if(event.key==='Enter'){if(event){event.preventDefault();event.stopPropagation();}postWallComment('${_cid}');return false;}" style="flex:1;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:6px 8px;color:#fff;font-size:0.8rem;outline:none;" />
+                        <button onclick="if(event){event.preventDefault();event.stopPropagation();}postWallComment('${_cid}');return false;" style="background:#ffd700;color:#1a1a2e;border:none;border-radius:6px;padding:6px 12px;font-size:0.8rem;cursor:pointer;white-space:nowrap;">发送</button>
+                    </div>`;
+                    _commentHtml = `<div style="margin-top:8px;border-top:1px dashed rgba(255,255,255,0.12);padding-top:8px;background:rgba(0,0,0,0.18);border-radius:8px;padding:8px;">
+                        ${_cmtList}
+                        ${_cmtInput}
+                    </div>`;
+                }
                 return `<div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:10px 12px 8px;font-size:0.85rem;">
                     <div style="margin-bottom:8px;">${_whoHtml}</div>
                     <div style="background:rgba(0,0,0,0.28);border-left:3px solid #ffd700;border-radius:6px;padding:9px 11px;color:#fff;line-height:1.6;font-size:0.86rem;word-break:break-word;" class="${_isEmojiOnly ? 'msgEmojiOnly' : ''}">${contentHtml}</div>
+                    ${_commentHtml}
                 </div>`;
             }).join('');
             
@@ -20655,6 +20684,57 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 }).join('');
             })();
         }
+
+        // ===== 需求墙评论（留言）功能 =====
+        function toggleWallComment(msgId) {
+            if (_wallOpenComments.has(msgId)) _wallOpenComments.delete(msgId);
+            else _wallOpenComments.add(msgId);
+            renderMessages();
+        }
+        window.toggleWallComment = toggleWallComment;
+
+        async function postWallComment(msgId) {
+            const input = document.getElementById('wallCommentInput_' + msgId);
+            if (!input) return;
+            const content = input.value.trim();
+            if (!content) return;
+            const msg = wallMessages.find(m => m.id === msgId);
+            if (!msg) return;
+            const nick = _currentNick() || '游客';
+            if (!msg.comments) msg.comments = [];
+            msg.comments.push({
+                id: Date.now() + '_' + Math.random().toString(36).substr(2, 7),
+                author: nick,
+                content: content,
+                time: Date.now()
+            });
+            input.value = '';
+            renderMessages();
+            try { await saveMessagesToGist(); } catch (e) { console.warn('评论保存失败:', e); }
+        }
+        window.postWallComment = postWallComment;
+
+        async function deleteWallComment(msgId, commentId) {
+            const msg = wallMessages.find(m => m.id === msgId);
+            if (!msg || !msg.comments) return;
+            const nicknameInput = document.getElementById('messageNickname');
+            const currentNickname = (nicknameInput && nicknameInput.value.trim()) || localStorage.getItem('TFJL_UserName') || '';
+            const adminNicknames = ['gyq', 'GYQ', '龙行'];
+            const isAdmin = adminNicknames.some(nick => currentNickname.toLowerCase() === nick.toLowerCase());
+            const c = msg.comments.find(x => x.id === commentId);
+            if (c) {
+                const isCommentOwner = !!(c.author && currentNickname && c.author.toLowerCase() === currentNickname.toLowerCase());
+                const isMsgOwner = !!(msg.author && currentNickname && msg.author.toLowerCase() === currentNickname.toLowerCase());
+                if (!isCommentOwner && !isMsgOwner && !isAdmin) {
+                    alert('你只能删除自己发的评论，或这条消息下的评论');
+                    return;
+                }
+            }
+            msg.comments = msg.comments.filter(x => x.id !== commentId);
+            renderMessages();
+            try { await saveMessagesToGist(); } catch (e) { console.warn('评论删除保存失败:', e); }
+        }
+        window.deleteWallComment = deleteWallComment;
 
         function setWallCatFilter(cat) {
             window._wallCatFilter = cat;
@@ -22956,7 +23036,8 @@ ${maSection}
                     likes: 0,
                     dislikes: 0,
                     copyCount: 0,
-                    previewCount: 0
+                    previewCount: 0,
+                    comments: []
                 };
                 if (pendingScriptEnc) {
                     if (pendingScriptEnc.isEncrypted) newMsg.isEncrypted = true;
