@@ -3944,7 +3944,7 @@
                                 <span id="${windowId}_hexTxt" style="font-size:0.66rem;color:#c9c9dd;font-family:Consolas,monospace;">#e0e0e0</span>
                             </div>
                             <div id="${windowId}_colorSlots" style="display:flex;align-items:center;gap:10px;justify-content:center;border-top:1px solid rgba(255,255,255,0.12);padding-top:8px;"></div>
-                            <label id="${windowId}_glowRow" style="display:none;align-items:center;gap:6px;font-size:0.74rem;color:#c9c9dd;margin-top:8px;cursor:pointer;"><input type="checkbox" id="${windowId}_glowChk" checked> 动态呼吸发光</label>
+                            <label id="${windowId}_glowRow" style="display:none;align-items:center;gap:6px;font-size:0.74rem;color:#c9c9dd;margin-top:8px;cursor:pointer;"><input type="checkbox" id="${windowId}_glowChk" checked onchange="if(window.renderNotebookOverlay)renderNotebookOverlay('${windowId}')"> 动态呼吸发光</label>
                             <div id="${windowId}_clearRow" style="display:none;margin-top:8px;">
                                 <button onclick="clearNotebookSelectionColor('${windowId}')" style="width:100%;background:rgba(244,67,54,0.18);border:1px solid rgba(244,67,54,0.35);color:#f44336;padding:6px;border-radius:6px;cursor:pointer;font-size:0.74rem;">🧹 清除选中颜色</button>
                                 <button onclick="clearAllNotebookSelectionColor('${windowId}')" style="width:100%;margin-top:6px;background:rgba(244,67,54,0.28);border:1px solid rgba(244,67,54,0.5);color:#ff8a80;padding:6px;border-radius:6px;cursor:pointer;font-size:0.74rem;">🗑️ 清除全部颜色</button>
@@ -4358,7 +4358,8 @@
             for (const m of marks) {
                 if (m.start < cursor) continue;
                 html += escapeHtml(value.slice(cursor, m.start));
-                const cls = 'nb-mark' + (m.glow ? ' nb-glow' : '');
+                const glowOn = document.getElementById(windowId + '_glowChk')?.checked;
+                const cls = 'nb-mark' + ((m.glow && glowOn) ? ' nb-glow' : '');
                 html += '<span class="' + cls + '" style="color:' + m.color + '">' + escapeHtml(value.slice(m.start, m.start + m.text.length)) + '</span>';
                 cursor = m.start + m.text.length;
             }
@@ -4367,6 +4368,8 @@
             inner.style.transform = 'translateY(' + (-ta.scrollTop) + 'px)';
             nbSyncOverlayGutterById(windowId);
         }
+        // 暴露为全局，供勾选框 onchange 直接重渲染（动态呼吸发光 = 全局总开关）
+        window.renderNotebookOverlay = renderNotebookOverlay;
 
         function applyNotebookSelectionColor(windowId, color, glow) {
             const ta = document.getElementById(windowId + '_content');
