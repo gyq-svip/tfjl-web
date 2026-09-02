@@ -19310,6 +19310,33 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             const el = document.getElementById('messageNickname');
             return (el && el.value.trim()) || localStorage.getItem('TFJL_UserName') || '';
         }
+        // 🔴 2026-09-03 作品卡片图存到作品自己的 Gist（让主页访客能看到封面）。无 token/失败则静默跳过，不影响分享。
+        async function _uploadWorkCard(gistId, jpegBase64) {
+            const token = getGistToken();
+            if (!token || !gistId) return false;
+            try {
+                const body = { files: { 'card.jpg': { content: 'data:image/jpeg;base64,' + jpegBase64 } } };
+                const res = await fetch('https://api.github.com/gists/' + encodeURIComponent(gistId), {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/vnd.github.v3+json', 'Authorization': 'token ' + token },
+                    body: JSON.stringify(body)
+                });
+                return res.ok;
+            } catch (e) { return false; }
+        }
+        // 回写作品封面到 works.json（按 scriptUrl 匹配），主页渲染时凭 cover 取云端图
+        async function _setWorkCover(scriptUrl, coverVal) {
+            try {
+                const nick = _currentNick();
+                if (!nick) return;
+                const norm = _normNick(nick);
+                const all = await fetchWorksGist();
+                const mine = (all[norm] && all[norm].works) || [];
+                let changed = false;
+                mine.forEach(function (w) { if (w.scriptUrl === scriptUrl && w.cover !== coverVal) { w.cover = coverVal; changed = true; } });
+                if (changed) await saveWorksToGist(all);
+            } catch (e) {}
+        }
         async function collectShareToMyPage(share) {
             const nick = _currentNick();
             if (!nick) { showFloatToast('请先设置昵称再收录'); return false; }
@@ -19474,7 +19501,9 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                     const delBtn = isOwner ? '<a href="javascript:void(0)" onclick="removeWorkFromMyPage(\'' + w.id + '\')" style="color:#ff6b6b;text-decoration:none;cursor:pointer;background:rgba(255,107,107,0.1);padding:2px 8px;border-radius:5px;font-size:0.72rem;">🗑 删除</a>' : '';
                     const visTag = (w.visibility === 'private') ? '<span style="color:rgba(255,152,0,0.85);font-size:0.66rem;background:rgba(255,152,0,0.1);padding:1px 6px;border-radius:8px;border:1px solid rgba(255,152,0,0.25);">私有</span>' : '<span style="color:rgba(76,175,80,0.85);font-size:0.66rem;background:rgba(76,175,80,0.1);padding:1px 6px;border-radius:8px;border:1px solid rgba(76,175,80,0.25);">公开</span>';
                     const shareBtn = (w.scriptUrl && /^https?:\/\//i.test(w.scriptUrl)) ? '<a href="javascript:void(0)" onclick="shareWorkFromPage(\'' + (w.scriptUrl || '').replace(/'/g, "\\'") + '\',\'' + (w.title || '未命名作品').replace(/'/g, "\\'") + '\')" style="color:#ffd700;text-decoration:none;cursor:pointer;background:rgba(255,215,0,0.12);padding:2px 8px;border-radius:5px;font-size:0.72rem;border:1px solid rgba(255,215,0,0.3);">🔗 分享</a>' : '';
+                    const hasCover = (w.cover && w.cover.indexOf('gist:') === 0);
                     rows += '<div class="contrib-work-card" style="padding:8px 10px;border-radius:8px;background:rgba(186,104,200,0.1);margin-bottom:6px;font-size:0.76rem;color:#fff;word-break:break-all;line-height:1.4;border:1px solid rgba(186,104,200,0.2);">'
+                        + (hasCover ? '<img data-cover-gid="' + escapeHtml(w.cover.slice(5)) + '" style="width:100%;max-height:140px;object-fit:cover;border-radius:8px;margin-bottom:8px;background:rgba(0,0,0,0.3);display:block;" alt="作品卡片">' : '')
                         + '<div style="margin-bottom:4px;display:flex;gap:6px;align-items:center;">'
                         + '<span style="color:#ba68c8;">📦</span>'
                         + '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(w.title || '未命名作品') + '</span>'
@@ -19490,11 +19519,23 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 }
             }
             listBox.innerHTML = rows;
+            // 🔴 2026-09-03 作品封面：异步拉取云端 card.jpg（data URL）显示，扫码进主页的人也能看到卡片
+            try {
+                const covers = listBox.querySelectorAll('img[data-cover-gid]');
+                Array.prototype.forEach.call(covers, function (img) {
+                    const gid = img.getAttribute('data-cover-gid');
+                    if (!gid) return;
+                    fetch('https://api.github.com/gists/' + encodeURIComponent(gid), { headers: { 'Accept': 'application/vnd.github.v3+json' } })
+                        .then(function (r) { return r.ok ? r.json() : null; })
+                        .then(function (j) { const f = j && j.files && j.files['card.jpg']; if (f && f.content) img.src = f.content; })
+                        .catch(function () {});
+                });
+            } catch (e) {}
         }
         window.renderContribWorksTab = renderContribWorksTab;
         // 🔴 2026-09-01 新增：分享个人主页单个作品（和阵容分享同款弹窗：链接+二维码+复制按钮）
         //   从 scriptUrl（Gist raw_url）解析 Gist ID → 生成 #pg=<gistId> 分享链接 → 弹窗
-        async function shareWorkFromPage(rawUrl, title) {
+        async function shareWorkFromPage(rawUrl, title, category) {
             if (!rawUrl || !/^https?:\/\//i.test(rawUrl)) {
                 if (typeof showFloatToast === 'function') showFloatToast('⚠️ 该作品使用旧版离线格式，无法生成分享链接');
                 else alert('⚠️ 该作品使用旧版离线格式，无法生成分享链接');
@@ -19538,7 +19579,9 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                   '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">' +
                     '<button id="workShareCopyAll" style="flex:1;min-width:140px;background:linear-gradient(135deg,#26a69a,#00796b);color:#fff;border:none;padding:10px;border-radius:8px;cursor:pointer;font-size:0.9rem;font-weight:bold;">📋 复制分享文案</button>' +
                     '<button id="workShareViewHome" style="flex:1;min-width:140px;background:linear-gradient(135deg,#ab47bc,#6a1b9a);color:#fff;border:none;padding:10px;border-radius:8px;cursor:pointer;font-size:0.9rem;font-weight:bold;">🏠 查看我的主页</button>' +
+                    '<button id="workShareCardBtn" style="flex:1;min-width:140px;background:linear-gradient(135deg,#ffa726,#f57c00);color:#1a1a2e;border:none;padding:10px;border-radius:8px;cursor:pointer;font-size:0.9rem;font-weight:bold;" title="生成一张作品卡片图：可下载转发群里，也会存到云端让你主页访客看到">📸 生成卡片图</button>' +
                   '</div>' +
+                  '<div id="workShareCardWrap" style="display:none;margin-top:12px;"></div>' +
                 '</div>';
             document.body.appendChild(modal);
             const close = function () { modal.remove(); };
@@ -19584,6 +19627,64 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 const holder = document.getElementById('workShareQrCanvas');
                 if (holder) holder.appendChild(cvs);
             } catch (e) { /* 二维码生成失败，不影响主流程 */ }
+
+            // 🔴 2026-09-03 生成作品卡片图：标题+分类+二维码，可下载转发，并存云端让主页访客看到
+            const cardBtn = modal.querySelector('#workShareCardBtn');
+            if (cardBtn) cardBtn.onclick = async function () {
+                try {
+                    if (typeof _lineupEnsureQrLib === 'function') await _lineupEnsureQrLib();
+                    const CW = 600, CH = 360;
+                    const cv = document.createElement('canvas'); cv.width = CW; cv.height = CH;
+                    const c = cv.getContext('2d');
+                    const grad = c.createLinearGradient(0, 0, CW, CH);
+                    grad.addColorStop(0, '#1a1a2e'); grad.addColorStop(1, '#16213e');
+                    c.fillStyle = grad; c.fillRect(0, 0, CW, CH);
+                    c.fillStyle = '#ffd700'; c.font = 'bold 30px sans-serif';
+                    c.fillText('📦 ' + String(title || '未命名作品').slice(0, 16), 24, 56);
+                    c.fillStyle = 'rgba(255,255,255,0.7)'; c.font = '18px sans-serif';
+                    c.fillText('分类：' + (category || '未分类'), 24, 100);
+                    c.fillStyle = 'rgba(255,255,255,0.4)'; c.font = '13px sans-serif';
+                    c.fillText('扫码导入作品 · 或进我主页看全部', 24, 130);
+                    if (typeof window.qrcode === 'function') {
+                        const qr = window.qrcode(0, 'M'); qr.addData(link); qr.make();
+                        const qn = qr.getModuleCount(), qs = 140, qc = Math.floor(qs / qn);
+                        const ox = CW - qs - 24, oy = CH - qs - 24;
+                        c.fillStyle = '#fff'; c.fillRect(ox - 8, oy - 8, qs + 16, qs + 16);
+                        c.fillStyle = '#111';
+                        for (let r = 0; r < qn; r++) for (let cc = 0; cc < qn; cc++) if (qr.isDark(r, cc)) c.fillRect(ox + cc * qc, oy + r * qc, qc + 0.5, qc + 0.5);
+                    }
+                    const dataUrl = cv.toDataURL('image/png');
+                    const wrap = modal.querySelector('#workShareCardWrap');
+                    if (wrap) {
+                        wrap.style.display = 'block';
+                        wrap.innerHTML = '<img src="' + dataUrl + '" style="width:100%;border-radius:10px;display:block;box-shadow:0 4px 18px rgba(0,0,0,0.5);">' +
+                          '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">' +
+                            '<button id="workCardDl" style="flex:1;min-width:120px;background:linear-gradient(135deg,#ffd700,#ff9800);color:#1a1a2e;border:none;padding:10px;border-radius:8px;cursor:pointer;font-weight:bold;">💾 下载卡片</button>' +
+                            '<button id="workCardCopy" style="flex:1;min-width:120px;background:linear-gradient(135deg,#26a69a,#00796b);color:#fff;border:none;padding:10px;border-radius:8px;cursor:pointer;font-weight:bold;">📋 复制</button>' +
+                          '</div>' +
+                          '<div style="color:rgba(255,255,255,0.45);font-size:0.72rem;margin-top:8px;">卡片已生成本机预览，转发给小伙伴即可；同时会尝试存到云端，让你主页访客也能看到</div>';
+                        wrap.querySelector('#workCardDl').onclick = function () {
+                            const a = document.createElement('a'); a.href = dataUrl; a.download = '塔防作品_' + (title || '作品') + '_' + Date.now() + '.png';
+                            document.body.appendChild(a); a.click(); a.remove();
+                            if (typeof showFloatToast === 'function') showFloatToast('💾 已开始下载');
+                        };
+                        wrap.querySelector('#workCardCopy').onclick = async function () {
+                            try {
+                                const blob = await (await fetch(dataUrl)).blob();
+                                await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+                                if (typeof showFloatToast === 'function') showFloatToast('📋 已复制，可直接粘贴到微信/QQ');
+                            } catch (e) { if (typeof showFloatToast === 'function') showFloatToast('❌ 当前环境不支持复制图片，请用下载'); }
+                        };
+                    }
+                    // 🔴 存云端：上传到作品自己的 Gist（card.jpg），并回写 works 封面（主页访客可见）
+                    if (gistId) {
+                        const jpeg = cv.toDataURL('image/jpeg', 0.82).split(',')[1];
+                        _uploadWorkCard(gistId, jpeg).then(function (ok) {
+                            if (ok) { _setWorkCover(rawUrl, 'gist:' + gistId); if (typeof showFloatToast === 'function') showFloatToast('☁️ 卡片已存云端，主页访客也能看到'); }
+                        }).catch(function () {});
+                    }
+                } catch (e) { if (typeof showFloatToast === 'function') showFloatToast('❌ 生成卡片失败：' + (e && e.message || e)); }
+            };
         }
         window.shareWorkFromPage = shareWorkFromPage;
         async function renderContribQr(nick) {
