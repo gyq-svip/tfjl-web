@@ -5587,6 +5587,54 @@
             }
         }
 
+        // 上阵行自动排序：精灵类卡排到最后（非精灵保持原相对顺序，精灵也保持原相对顺序）
+        // 只改「上阵：」这一行，魔化/皮肤/主战车/副战车等行不动。
+        // force=true 时跳过光标检查（供程序追加卡后调用）
+        function sortParserDeploySpiritsLast(ta, force) {
+            if (!ta) ta = document.getElementById('parserInput');
+            if (!ta) return;
+            const v = ta.value;
+            if (!v) return;
+            const lines = v.split('\n');
+            const idx = lines.findIndex(l => /^\s*上阵[：:]/.test(l));
+            if (idx < 0) return;
+            const m = lines[idx].match(/^\s*上阵[：:]\s*(.*)$/);
+            if (!m) return;
+            const raw = m[1];
+            const cards = raw.split(/[,，]/).map(s => s.trim()).filter(Boolean);
+            if (cards.length < 2) return;
+            const jl = ['冰精灵', '光精灵', '魔精灵', '木精灵', '土精灵', '雷精灵', '暗精灵', '幻精灵', '魂精灵', '彩精灵'];
+            const sorted = [
+                ...cards.filter(n => !jl.some(j => n.includes(j))),
+                ...cards.filter(n => jl.some(j => n.includes(j)))
+            ];
+            if (sorted.join(',') === cards.join(',')) return;   // 顺序已正确就不动，避免打断输入
+            if (!force) {
+                // 光标不在上阵行时不重排，避免在「魔化：」等行打字时被打扰
+                const sel = ta.selectionStart;
+                let acc = 0, caretLine = -1;
+                for (let i = 0; i < lines.length; i++) {
+                    const end = acc + lines[i].length;
+                    if (sel >= acc && sel <= end + 1) { caretLine = i; break; }
+                    acc = end + 1;
+                }
+                if (caretLine !== idx) return;
+            }
+            // 保留行尾逗号，方便继续接着输入下一张
+            const trailing = (raw.match(/[,，][ \t]*$/) || [''])[0];
+            lines[idx] = '上阵：' + sorted.join(',') + trailing;
+            ta.value = lines.join('\n');
+        }
+
+        // 手动输入时自动排序：停止输入 600ms 后把精灵卡挪到最后（防抖，打字过程不打扰）
+        let parserSortTimer = null;
+        document.addEventListener('input', function(e){
+            const t = e.target;
+            if (!t || t.id !== 'parserInput') return;
+            if (parserSortTimer) clearTimeout(parserSortTimer);
+            parserSortTimer = setTimeout(() => { sortParserDeploySpiritsLast(t, false); }, 600);
+        }, false);
+
         function selectQuickCard(name) {
             const textarea = document.getElementById('parserInput');
             let current = textarea.value.trim();
@@ -5614,6 +5662,8 @@
             document.getElementById('quickCardInput').value = '';
             document.getElementById('quickCardSuggest').style.display = 'none';
             quickSuggestList = [];
+            // 追加后自动把精灵卡排到最后（程序改 value 不触发 input 事件，这里显式调用）
+            sortParserDeploySpiritsLast(textarea, true);
             // 实时更新减伤显示
             updateRealTimeDamageReduction();
             // 焦点回到输入框，方便连续输入
@@ -6034,8 +6084,11 @@
                 if(!v) return;
                 const firstLine = v.split('\n').find(l => l.trim()) || '';
                 if(!/^上阵[：:]/.test(firstLine)) return;   // 首行不是「上阵：」不补（可能粘贴别处文本）
-                if(/^(魔化|皮肤|主战车|副战车)[：:]/m.test(v)) return;   // 已含模板行不补
-                t.value = v.trimEnd() + '\n魔化：\n皮肤：\n主战车：\n副战车：';
+                if(!/^(魔化|皮肤|主战车|副战车)[：:]/m.test(v)) {   // 已含模板行则不补
+                    t.value = v.trimEnd() + '\n魔化：\n皮肤：\n主战车：\n副战车：';
+                }
+                // 粘贴后光标落在末尾（不在上阵行），防抖排序会被光标检查跳过，这里强制排一次
+                sortParserDeploySpiritsLast(t, true);
             }, 0);
         }, false);
 
