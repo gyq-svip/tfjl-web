@@ -8801,6 +8801,9 @@
                     const r = await _projShareCreate(_projShareBuildPayload(), opts);
                     shortLink = PROJECT_SHARE_LINK_BASE + r.id;
                     shortCode = r.code;
+                    if (r.reused && typeof showToast === 'function') {
+                        showToast('♻️ 内容没变，已复用你 ' + _shareReuseDateText(r.ts) + ' 的分享（省一份云端空间）');
+                    }
                 } catch (e) {
                     shortLink = ''; shortCode = '';
                     if (typeof showToast === 'function') showToast('❌ 项目上传失败（' + (e && e.message || e) + '），图片无短码', 'error');
@@ -8979,6 +8982,10 @@
                         '<input id="lineupShareHomeQrChk" type="checkbox" style="accent-color:#5c6bc0;width:16px;height:16px;cursor:pointer;flex-shrink:0;">' +
                         '<label for="lineupShareHomeQrChk" style="color:rgba(255,255,255,0.8);font-size:0.78rem;cursor:pointer;line-height:1.4;">🏠 图上加我的主页二维码（扫码进我主页，看我所有分享的作品）</label>' +
                       '</div>' +
+                      '<div id="lineupShareForceNewBox" style="display:flex;align-items:center;gap:8px;margin-top:12px;background:rgba(255,152,0,0.08);border:1px solid rgba(255,152,0,0.28);border-radius:8px;padding:8px 10px;">' +
+                        '<input id="lineupShareForceNewChk" type="checkbox" style="accent-color:#ff9800;width:16px;height:16px;cursor:pointer;flex-shrink:0;">' +
+                        '<label for="lineupShareForceNewChk" style="color:rgba(255,255,255,0.8);font-size:0.78rem;cursor:pointer;line-height:1.4;">🆕 强制新建一份（内容没变也重新上传。默认会自动复用你以前分享过的相同阵容，省云端空间）</label>' +
+                      '</div>' +
                       '<div style="display:flex;gap:10px;margin-top:16px;">' +
                         '<button id="lineupShareOptsCancel" style="flex:1;background:rgba(255,255,255,0.08);color:#fff;border:1px solid rgba(255,255,255,0.2);padding:10px;border-radius:8px;cursor:pointer;">取消</button>' +
                         '<button id="lineupShareOptsOk" style="flex:1.8;background:linear-gradient(135deg,#ffd700,#ff9800);color:#1a1a2e;border:none;padding:10px;border-radius:8px;cursor:pointer;font-weight:bold;">📤 生成分享</button>' +
@@ -9017,7 +9024,14 @@
                 }
                 // 自定义留言：记住上次写的内容（每换一条不用重打）
                 try { msgInput.value = localStorage.getItem('TFJL_ShareMsg') || ''; } catch (e) {}
-                pwChk.onchange = function () { pwInput.style.display = pwChk.checked ? 'block' : 'none'; if (pwChk.checked) pwInput.focus(); };
+                // 加密分享不参与复用（无法安全判断密码是否与上次一致），勾了密码就藏起「强制新建」，免得勾了没效果
+                const forceNewBox = modal.querySelector('#lineupShareForceNewBox');
+                const forceNewChk = modal.querySelector('#lineupShareForceNewChk');
+                pwChk.onchange = function () {
+                    pwInput.style.display = pwChk.checked ? 'block' : 'none';
+                    if (forceNewBox) forceNewBox.style.display = pwChk.checked ? 'none' : 'flex';
+                    if (pwChk.checked) pwInput.focus();
+                };
                 const finish = function (val) { modal.remove(); resolve(val); };
                 modal.querySelector('#lineupShareOptsCancel').onclick = function () { finish(null); };
                 modal.onclick = function (e) { if (e.target === modal) finish(null); };
@@ -9038,7 +9052,7 @@
                     // 主页二维码勾选持久化 + 传出
                     const homeQr = !!(homeQrChk && homeQrChk.checked);
                     try { localStorage.setItem('TFJL_ShareHomeQr', homeQr ? '1' : '0'); } catch (e) {}
-                    finish({ days: days, pw: pw, wall: !!(wallChk && wallChk.checked), msg: msg, cat: cat, homeQr: homeQr });
+                    finish({ days: days, pw: pw, wall: !!(wallChk && wallChk.checked), msg: msg, cat: cat, homeQr: homeQr, forceNew: !!(forceNewChk && forceNewChk.checked) });
                 };
             });
         }
@@ -9138,10 +9152,97 @@
             return { type: 'tower-defense-project', version: '1.0', exportDate: new Date().toISOString(), project: data };
         }
 
+        // ==================== 分享复用：内容指纹（2026-09-02）====================
+        // 目的：同一套阵容反复分享给不同人时，不再每次新建一份 Gist（省云端空间 + 控索引膨胀）。
+        // 🔴 关键难点：payload 里塞满了"每次都变"的字段（exportDate / project.timestamp / 短码 sc /
+        //   有效期 exp / 项目名），直接对整个 JSON 哈希永远算不出相同——这正是早先评估"去重率≈0"的根因。
+        //   所以先规整再哈希：① 剔除易变 key；② 参考图 base64（可达数 MB）各自先哈希再参与；
+        //   ③ 对象按 key 排序序列化 → 保证"内容一样 ⇒ 字符串一定一样"。
+        const _SHARE_FP_VOLATILE = { exportDate: 1, timestamp: 1, ts: 1, time: 1, date: 1, sc: 1, exp: 1 };
+        function _shareFpHash(str) {
+            let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+            for (let i = 0; i < str.length; i++) {
+                const ch = str.charCodeAt(i);
+                h1 = Math.imul(h1 ^ ch, 2654435761);
+                h2 = Math.imul(h2 ^ ch, 1597334677);
+            }
+            h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+            h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+            return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
+        }
+        function _shareNormForFp(v) {
+            if (Array.isArray(v)) return v.map(_shareNormForFp);
+            if (v && typeof v === 'object') {
+                const out = {};
+                Object.keys(v).sort().forEach(function (k) {
+                    if (_SHARE_FP_VOLATILE[k]) return;
+                    out[k] = _shareNormForFp(v[k]);
+                });
+                return out;
+            }
+            return (v === undefined || v === null) ? '' : String(v);
+        }
+        // exportData（_projShareBuildPayload 的产物）→ 指纹字符串；失败返回 ''
+        function _shareContentFingerprint(exportData) {
+            try {
+                const d = JSON.parse(JSON.stringify(exportData || {}));
+                const p = d.project || {};
+                // 项目名不参与：给张三/给李四 改个名而已，阵容没动就该复用
+                delete p.name;
+                // 参考图：base64 太大，每张先各自哈希（内容变了即视为不同阵容）
+                if (Array.isArray(p.referenceImages)) {
+                    p.referenceImages = p.referenceImages.map(function (im) {
+                        if (!im) return null;
+                        return { name: String(im.name || ''), projectName: String(im.projectName || ''), h: _shareFpHash(String(im.data || '')) };
+                    }).filter(Boolean);
+                }
+                return 'fp1_' + _shareFpHash(JSON.stringify(_shareNormForFp(d)));
+            } catch (e) { return ''; }
+        }
+        window._shareContentFingerprint = _shareContentFingerprint;
+
+        // 在短码索引里找「我以前分享过、内容完全相同、且还没过期」的一份 → 可复用
+        // 老分享没有 fp 字段（本功能上线前创建的），自然匹配不到，只能新建——这是预期行为。
+        async function _shareFindReusable(fp, by) {
+            if (!fp) return null;
+            try {
+                const idx = await _shareIndexLoad();
+                const now = Date.now();
+                let best = null;
+                Object.keys(idx || {}).forEach(function (code) {
+                    const it = idx[code];
+                    if (!it || it.del) return;                  // 已（软）删除
+                    if (it.fp !== fp) return;                   // 内容不同
+                    if ((it.by || '') !== (by || '')) return;   // 只复用自己的
+                    if (it.exp && it.exp < now) return;         // 已过期：对方拉取会报错，不能复用
+                    if (!best || (it.ts || 0) > (best.ts || 0)) best = { code: code, id: it.id, ts: it.ts || 0, exp: it.exp || 0 };
+                });
+                return best;
+            } catch (e) { return null; }
+        }
+
+        function _shareReuseDateText(ts) {
+            try {
+                const d = new Date(ts);
+                if (!ts || isNaN(d.getTime())) return '之前';
+                return (d.getMonth() + 1) + ' 月 ' + d.getDate() + ' 日';
+            } catch (e) { return '之前'; }
+        }
+
         // 创建项目分享：公开 Gist = project.json + 参考图独立文件，返回 { id, code, dropped, imgs }
-        // opts = { days: 有效期天数（0=永久）, pw: 加密密码（''=不加密）, by: 分享者昵称 }
+        // opts = { days: 有效期天数（0=永久）, pw: 加密密码（''=不加密）, by: 分享者昵称, forceNew: 强制新建不复用 }
         async function _projShareCreate(exportData, opts) {
             opts = opts || {};
+            // 🔴 复用检查（命中则完全不碰网络新建 Gist）：内容完全相同 + 非加密 + 未强制新建
+            //    加密分享不参与复用：密文由随机 salt 生成，无法安全判断这次密码与上次是否一致，
+            //    复用会让本次新设的密码失效（对方得用旧密码打开），故加密一律新建。
+            const fp = _shareContentFingerprint(exportData);
+            if (fp && !opts.pw && !opts.forceNew) {
+                const hit = await _shareFindReusable(fp, opts.by);
+                if (hit && hit.id && hit.code) {
+                    return { id: hit.id, code: hit.code, reused: true, ts: hit.ts, exp: hit.exp, dropped: [], imgs: 0 };
+                }
+            }
             const sc = _lineupShortCodeGen();
             const body = Object.assign({}, exportData, { sc: sc });
             if (opts.days > 0) body.exp = Date.now() + opts.days * 86400000;
@@ -9203,9 +9304,9 @@
             // 🔴 写短码索引：对方查询从「翻 Gist 列表」变「查目录」（写入失败不阻断分享，仅查询慢一点）
             _shareIndexPut(sc, {
                 id: data.id, n: String(proj.name || '').slice(0, 40), by: String(opts.by || '').slice(0, 24),
-                exp: body.exp || 0, ts: Date.now()
+                exp: body.exp || 0, ts: Date.now(), fp: fp   // 🔴 fp=内容指纹，供以后「内容相同直接复用」识别
             }).catch(function (e) { console.warn('[分享索引] 写入失败（不影响本次分享）:', e); });
-            return { id: data.id, code: sc, dropped: dropped, imgs: refList.length };
+            return { id: data.id, code: sc, dropped: dropped, imgs: refList.length, fp: fp };
         }
 
         // gist 内容 → 解密 + 有效期校验 → exportData（tower-defense-project 格式）
@@ -9573,6 +9674,9 @@
                 return;
             }
             tip.remove();
+            if (r.reused && typeof showToast === 'function') {
+                showToast('♻️ 内容没变，已复用你 ' + _shareReuseDateText(r.ts) + ' 的分享（省一份云端空间）');
+            }
             if (r.dropped && r.dropped.length && typeof showToast === 'function') {
                 showToast('⚠️ ' + r.dropped.length + ' 张参考图超过 8MB 上限未随分享带出：' + r.dropped.join('、'), 'error');
             }
