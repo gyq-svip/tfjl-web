@@ -19269,7 +19269,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
         // ====== 个人主页·作品（P1：收录/发布，复用需求墙 Gist 独立文件 works.json）======
         const WORKS_GIST_ID = MESSAGES_GIST_ID;
         const WORKS_FILE = 'works.json';
-        window.WORK_CATEGORIES = ['未分类', '寒冰', '暗月', '漩涡', '深海', '对战'];
+        window.WORK_CATEGORIES = ['未分类', '寒冰', '暗月', '漩涡', '深海', '对战', '隐藏'];
         window.WALL_CATEGORIES = window.WORK_CATEGORIES;
         async function fetchWorksGist() {
             try {

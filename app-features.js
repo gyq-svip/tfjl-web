@@ -7306,11 +7306,10 @@
                     </div>
 
                     <div style="margin-bottom:16px;">
-                        <label style="color:rgba(255,255,255,0.8);font-size:0.85rem;display:block;margin-bottom:6px;">🏷️ 分类标签（下拉选择预设，或输入自定义分类）</label>
-                        <input id="shareCategory" list="wallCatList" placeholder="选分类或输入自定义" autocomplete="off" style="width:100%;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:white;font-size:0.85rem;outline:none;box-sizing:border-box;" />
-                        <datalist id="wallCatList">
-                            ${(window.WALL_CATEGORIES || ['未分类']).map(function(c){ return '<option value="'+c+'"></option>'; }).join('')}
-                        </datalist>
+                        <label style="color:rgba(255,255,255,0.8);font-size:0.85rem;display:block;margin-bottom:6px;">🏷️ 分类标签</label>
+                        <select id="shareCategory" style="width:100%;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:white;font-size:0.85rem;outline:none;box-sizing:border-box;">
+                            ${(window.WALL_CATEGORIES || ['未分类']).map(function(c){ return '<option value="'+c+'" style="background:#1a1a2e;">'+c+'</option>'; }).join('')}
+                        </select>
                     </div>
 
                     <div style="display:flex;gap:10px;">
@@ -8972,10 +8971,9 @@
                       '</div>' +
                       '<div id="lineupShareCatBox" style="margin-top:10px;">' +
                         '<div style="color:rgba(255,255,255,0.65);font-size:0.78rem;margin-bottom:5px;">🏷️ 需求墙分类（同步上墙时归到哪个分类）</div>' +
-                        '<input id="lineupShareCat" list="lineupShareCatList" placeholder="选分类或输入自定义" autocomplete="off" style="width:100%;box-sizing:border-box;background:rgba(0,0,0,0.35);color:#fff;border:1px solid rgba(255,255,255,0.25);border-radius:8px;padding:9px 10px;font-size:0.84rem;">' +
-                        '<datalist id="lineupShareCatList">' +
-                          ((window.WALL_CATEGORIES || ['未分类']).map(function (c) { return '<option value="' + c + '"></option>'; }).join('')) +
-                        '</datalist>' +
+                        '<select id="lineupShareCat" style="width:100%;box-sizing:border-box;height:36px;background:rgba(0,0,0,0.35);color:#fff;border:1px solid rgba(255,255,255,0.25);border-radius:8px;padding:0 8px;font-size:0.84rem;">' +
+                          ((window.WALL_CATEGORIES || ['未分类']).map(function (c) { return '<option value="' + c + '" style="background:#1a1a2e;">' + c + '</option>'; }).join('')) +
+                        '</select>' +
                       '</div>' +
                       '<div style="display:flex;align-items:center;gap:8px;margin-top:12px;background:rgba(92,107,192,0.1);border:1px solid rgba(92,107,192,0.3);border-radius:8px;padding:8px 10px;">' +
                         '<input id="lineupShareHomeQrChk" type="checkbox" style="accent-color:#5c6bc0;width:16px;height:16px;cursor:pointer;flex-shrink:0;">' +
@@ -9002,6 +9000,12 @@
                     let catDefault = '';
                     try { catDefault = localStorage.getItem('TFJL_ShareWallCat') || ''; } catch (e) {}
                     if (!catDefault) { try { catDefault = (typeof currentProjectCategory !== 'undefined' && currentProjectCategory) || ''; } catch (e) {} }
+                    // 已保存的自定义分类不在预设列表里时补一个选项，避免换成 select 后值丢失
+                    if (catDefault && !Array.prototype.some.call(catInput.options, function (o) { return o.value === catDefault; })) {
+                        const op = document.createElement('option');
+                        op.value = catDefault; op.textContent = catDefault;
+                        catInput.appendChild(op);
+                    }
                     catInput.value = catDefault;
                 }
                 if (catBox && wallChk) catBox.style.display = wallChk.checked ? 'block' : 'none';
