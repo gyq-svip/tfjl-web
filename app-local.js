@@ -1803,7 +1803,7 @@ if (true) {
         // 🔴 2026-09-03 还原小卡片（本机阵容卡片缓存）
         if (Array.isArray(backup.cards) && backup.cards.length) {
             for (const c of backup.cards) {
-                if (c && c.dataUrl) { try { await _cardSave(c.dataUrl, { projectName: c.projectName || '导入卡片', code: c.code || '', kind: c.kind || 'upload', source: c.source || '' }); } catch (e) { console.error('[还原] 卡片失败:', e); } }
+                if (c && c.dataUrl) { try { await _cardSave(c.dataUrl, { projectName: c.projectName || '导入卡片', code: c.code || '', kind: c.kind || 'upload', source: c.source || '', link: c.link || '' }); } catch (e) { console.error('[还原] 卡片失败:', e); } }
             }
         }
 
