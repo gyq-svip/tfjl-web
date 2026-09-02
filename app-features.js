@@ -2975,12 +2975,20 @@
 
         // 运行时填充当前版本号（桌面版从 Tauri 取，在线版保持「网页版」）
         async function fillCurrentVersion() {
+            let v = '';
             try {
                 if (window.__TAURI__ && window.__TAURI__.app && window.__TAURI__.app.getVersion) {
-                    const v = await window.__TAURI__.app.getVersion();
-                    if (v) CURRENT_VERSION = v;
+                    v = await window.__TAURI__.app.getVersion();
                 }
             } catch (e) {}
+            // 🔴 2026-09-03 兼容老版本 Tauri：新 API 取不到时回退注入变量 / 旧命令
+            if (!v) {
+                try { if (typeof window.__APP_VERSION === 'string' && /^v?\d+\.\d+/.test(window.__APP_VERSION)) v = window.__APP_VERSION; } catch (e) {}
+            }
+            if (!v) {
+                try { const gv = (typeof getAppVersion === 'function') ? await getAppVersion() : ''; if (gv && /^v?\d+\.\d+/.test(gv)) v = gv; } catch (e) {}
+            }
+            if (v) CURRENT_VERSION = v.replace(/^v/, '');
             const el = document.getElementById('currentVersionText');
             if (el) el.textContent = CURRENT_VERSION;
             const el2 = document.getElementById('dlCurrentVersion');
