@@ -6216,7 +6216,14 @@
             const qiangZhiStr = hasSheNv ? '强制顺序上卡,' : '';
             // 如果有飞机和大圣同排，加"飞机大圣同排,"
             const tongPaiStr = hasTongPai ? '飞机大圣同排,' : '';
-            output += `00:01,${qiangZhiStr}${tongPaiStr}${shangKaStr}\n`;
+            // 光葫芦（仅隐藏榜）：对上阵的卡逐张生成"光葫芦{卡名}"，顺序与上卡一致（6张非工程 + 工程卡第7位）
+            //   有"强制顺序上卡"时排在其后，没有则放在开头
+            let guangHuLuStr = '';
+            if (!includeChengShang && hasGuangJingLing) {
+                const guangHuLuCards = hasGongCheng ? [...arrangedCards, ...gongChengCards] : [...arrangedCards];
+                guangHuLuStr = guangHuLuCards.map(name => '光葫芦' + name + ',').join('');
+            }
+            output += `00:01,${qiangZhiStr}${guangHuLuStr}${tongPaiStr}${shangKaStr}\n`;
             
             // 如果有光精灵，添加光精灵输出
             // 光精灵次数 = 20 - 魔化卡数量（最少1次）
