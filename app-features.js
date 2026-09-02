@@ -5751,7 +5751,10 @@
                 }
                 const reader = new FileReader();
                 reader.onload = function(e) {
-                    document.getElementById('parserInput').value = e.target.result;
+                    const ta = document.getElementById('parserInput');
+                    ta.value = e.target.result;
+                    // 导入后自动把精灵卡排到最后（程序改 value 不触发 input 事件，这里显式调用）
+                    sortParserDeploySpiritsLast(ta, true);
                     document.getElementById('parserResult').innerHTML = `<span style="color:#4caf50;">✅ 已从文件 "${file.name}" 导入文本</span>`;
                 };
                 reader.readAsText(file, 'UTF-8');
@@ -5761,7 +5764,10 @@
             // 没有文件则处理拖拽的文本
             const text = event.dataTransfer.getData('text');
             if (text) {
-                document.getElementById('parserInput').value = text;
+                const ta = document.getElementById('parserInput');
+                ta.value = text;
+                // 导入后自动把精灵卡排到最后
+                sortParserDeploySpiritsLast(ta, true);
                 document.getElementById('parserResult').innerHTML = '<span style="color:#4caf50;">✅ 已导入拖拽文本</span>';
             }
         }
