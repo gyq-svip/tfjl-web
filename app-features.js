@@ -6234,11 +6234,19 @@
             }
             // 始终输出魔化、皮肤、主战车、副战车这几行
             const defaultLines = ['魔化：', '皮肤：', '主战车：', '副战车：'];
+            // 隐藏榜专属：魔化栏自动填入「除精灵外的所有卡」（用户自己填了魔化行则以用户为准）
+            const moHuaAutoList = isHidden
+                ? heroNames.filter(name => !jingLingNames.some(jl => name.includes(jl)))
+                : [];
             defaultLines.forEach(defaultLine => {
                 // 检查输入中是否有这一行
                 const foundLine = otherLines.find(line => line.startsWith(defaultLine.replace('：', '')));
                 if (foundLine) {
                     output += foundLine + '\n';
+                } else if (defaultLine === '魔化：' && moHuaAutoList.length) {
+                    // 同步进 moHuaCards，后面上卡等级就会按"有魔化"判成上4级
+                    moHuaCards = moHuaAutoList.slice();
+                    output += '魔化：' + moHuaAutoList.join(',') + '\n';
                 } else {
                     output += defaultLine + '\n';
                 }
@@ -6281,9 +6289,13 @@
                 arrangedCards = [...first6];
             }
 
-            // 生成上卡字符串（有光精灵：魔化4级/其他3级；无光精灵：全满）
+            // 生成上卡字符串
+            // 隐藏榜：魔化的卡固定上4级（魔化栏已自动填全部非精灵卡，所以基本都是4级）
+            // 活动：有光精灵→魔化4级/其他3级；无光精灵→全满
             arrangedCards.forEach(name => {
-                if (hasGuangJingLing) {
+                if (isHidden && isMoHua(name)) {
+                    shangKaStr += `上${name}4级,`;
+                } else if (hasGuangJingLing) {
                     const level = isMoHua(name) ? '4级' : '3级';
                     shangKaStr += `上${name}${level},`;
                 } else {
@@ -6294,7 +6306,9 @@
             // 工程卡加在最后（第7位）
             if (hasGongCheng) {
                 gongChengCards.forEach(name => {
-                    if (hasGuangJingLing) {
+                    if (isHidden && isMoHua(name)) {
+                        shangKaStr += `上${name}4级,`;
+                    } else if (hasGuangJingLing) {
                         const level = isMoHua(name) ? '4级' : '3级';
                         shangKaStr += `上${name}${level},`;
                     } else {
