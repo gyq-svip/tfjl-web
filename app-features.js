@@ -6012,13 +6012,32 @@
             names.forEach(n => { if (!seen.has(n)) { seen.add(n); uniq.push(n); } });
             const input = document.getElementById('parserInput');
             if (input) {
-                input.value = '上阵：' + uniq.join(',');
+                input.value = '上阵：' + uniq.join(',')
+                    + '\n魔化：'
+                    + '\n皮肤：'
+                    + '\n主战车：'
+                    + '\n副战车：';
                 if (typeof updateRealTimeDamageReduction === 'function') updateRealTimeDamageReduction();
             }
             if (typeof switchTxtPanelTab === 'function') switchTxtPanelTab('parser');
             const r = document.getElementById('parserResult');
             if (r) r.innerHTML = '<span style="color:#4caf50;">✅ 已从「' + (isTeammate ? '队友手牌' : '我的手牌') + '」读取 ' + uniq.length + ' 张（融合卡已自动取主卡），已填入输入框。请选择下方按钮生成对应脚本。</span>';
         }
+
+        // 粘贴到脚本输入框时，若只有「上阵：」一行（首行），自动在末尾补 4 行模板（避免手打）
+        // 已包含魔化/皮肤/主战车/副战车任一行的不补（说明是完整脚本）
+        document.addEventListener('paste', function(e){
+            const t = e.target;
+            if(!t || t.id !== 'parserInput') return;
+            setTimeout(()=>{
+                const v = t.value;
+                if(!v) return;
+                const firstLine = v.split('\n').find(l => l.trim()) || '';
+                if(!/^上阵[：:]/.test(firstLine)) return;   // 首行不是「上阵：」不补（可能粘贴别处文本）
+                if(/^(魔化|皮肤|主战车|副战车)[：:]/m.test(v)) return;   // 已含模板行不补
+                t.value = v.trimEnd() + '\n魔化：\n皮肤：\n主战车：\n副战车：';
+            }, 0);
+        }, false);
 
         // ==================== 活动脚本 / 隐藏榜脚本（已拆成两套独立逻辑） ====================
         // 隐藏榜：规则长期稳定，基本不再改动。
