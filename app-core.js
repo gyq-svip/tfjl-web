@@ -18574,6 +18574,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 // 打开墙 = 标记(最新)所有消息为已读(加入指纹集合并持久化), 必须基于 fetch 后的最新列表
                 _wallMarkAllRead();
                 updateWallAttention();   // 重新评估, 确保新拉到的消息也标记为已读
+                _notifyNewWallComments();   // 💬 我的消息收到新留言 → 打开墙时提示一次（不闪托盘、不打扰）
                 initMessageWallDrag();
                 // 打开需求墙时，按本地记忆决定是否同时弹出右侧贡献排行榜
                 // （默认开启；用户若曾关闭，则下次开墙也保持关闭——本地记忆，他人默认开启）
@@ -20738,6 +20739,52 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             try { await saveMessagesToGist(); } catch (e) { console.warn('评论删除保存失败:', e); }
         }
         window.deleteWallComment = deleteWallComment;
+
+        // ===== 我的消息收到新留言：打开墙时提示一次（不闪托盘、不打扰）=====
+        // 只统计「我发的消息」下、别人留的、且我还没看过的言；看过即记 id，下次不再打扰。
+        function _myWallIncomingComments(nick, seen) {
+            const incoming = [];
+            (wallMessages || []).forEach(function (m) {
+                if ((m.author || '') !== nick) return;          // 只看我发的消息
+                (m.comments || []).forEach(function (c) {
+                    if (!c || !c.id) return;
+                    if ((c.author || '') === nick) return;      // 跳过我自己留的
+                    if (seen.has(c.id)) return;                 // 已看过
+                    incoming.push(c);
+                });
+            });
+            return incoming;
+        }
+
+        function _notifyNewWallComments() {
+            try {
+                const nick = (typeof _currentNick === 'function' ? _currentNick() : '') || '';
+                if (!nick) return;   // 没昵称=没发过言，谈不上"我的消息"
+                const raw = localStorage.getItem('TFJL_WallSeenComments');
+                let seen = new Set();
+                if (raw !== null) {
+                    try { const arr = JSON.parse(raw); if (Array.isArray(arr)) seen = new Set(arr); } catch (e) {}
+                } else {
+                    // 🔴 首次运行：把当前已有留言全部作为基线记下，不提示——否则一升级就被历史留言刷屏
+                    (wallMessages || []).forEach(function (m) {
+                        if ((m.author || '') !== nick) return;
+                        (m.comments || []).forEach(function (c) { if (c && c.id) seen.add(c.id); });
+                    });
+                    try { localStorage.setItem('TFJL_WallSeenComments', JSON.stringify([...seen].slice(-2000))); } catch (e) {}
+                    return;
+                }
+                const list = _myWallIncomingComments(nick, seen);
+                if (!list.length) return;
+                // 先记为已看再提示，避免提示失败导致反复打扰
+                list.forEach(function (c) { seen.add(c.id); });
+                try { localStorage.setItem('TFJL_WallSeenComments', JSON.stringify([...seen].slice(-2000))); } catch (e) {}
+                const tip = list.length === 1
+                    ? '💬 ' + (list[0].author || '有人') + ' 给你留了言'
+                    : '💬 你有 ' + list.length + ' 条新留言';
+                if (typeof showToast === 'function') showToast(tip);
+            } catch (e) { console.warn('留言提醒失败:', e); }
+        }
+        window._notifyNewWallComments = _notifyNewWallComments;
 
         function setWallCatFilter(cat) {
             window._wallCatFilter = cat;
