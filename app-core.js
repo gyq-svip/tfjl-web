@@ -27089,12 +27089,12 @@ ${maSection}
                 st.id = 'swUpdateStyle';
                 st.textContent = [
                     '@keyframes swBg{0%{background-position:0% 50%}100%{background-position:300% 50%}}',
-                    '@keyframes swFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}',
-                    '@keyframes swGlow{0%,100%{box-shadow:0 0 14px #ff6b6b,0 0 26px #ffd700,0 0 38px #4ecdc4}50%{box-shadow:0 0 18px #4ecdc4,0 0 32px #a78bfa,0 0 46px #ff6b6b}}',
+                    '@keyframes swFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}',
+                    '@keyframes swGlow{0%,100%{box-shadow:0 0 8px #ff6b6b,0 0 14px #ffd700,0 0 20px #4ecdc4}50%{box-shadow:0 0 10px #4ecdc4,0 0 18px #a78bfa,0 0 24px #ff6b6b}}',
                     // 位置固定左下角（右下角是双击刷新/版本号标签，不要挤）。
-                    '#swUpdateBanner{position:fixed;left:14px;bottom:70px;z-index:99999;display:flex;align-items:center;gap:7px;padding:10px 16px;border-radius:999px;cursor:pointer;color:#fff;font-size:0.82rem;font-weight:700;letter-spacing:0.5px;background:linear-gradient(90deg,#ff6b6b,#ffd700,#4ecdc4,#a78bfa,#ff6b6b);background-size:300% 100%;animation:swBg 6s linear infinite,swFloat 3s ease-in-out infinite,swGlow 2.4s ease-in-out infinite;user-select:none;}',
+                    '#swUpdateBanner{position:fixed;left:14px;bottom:70px;z-index:99999;display:flex;align-items:center;gap:5px;padding:6px 11px;border-radius:999px;cursor:pointer;color:#fff;font-size:0.7rem;font-weight:700;letter-spacing:0.3px;background:linear-gradient(90deg,#ff6b6b,#ffd700,#4ecdc4,#a78bfa,#ff6b6b);background-size:300% 100%;animation:swBg 6s linear infinite,swFloat 3s ease-in-out infinite,swGlow 2.4s ease-in-out infinite;user-select:none;}',
                     '#swUpdateBanner:hover{filter:brightness(1.12);}',
-                    '#swUpdateBanner .sw-dot{width:8px;height:8px;border-radius:50%;background:#fff;box-shadow:0 0 8px #fff;}'
+                    '#swUpdateBanner .sw-dot{width:6px;height:6px;border-radius:50%;background:#fff;box-shadow:0 0 6px #fff;}'
                 ].join('\n');
                 document.head.appendChild(st);
             }
