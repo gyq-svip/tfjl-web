@@ -839,9 +839,13 @@
   async function recognizeImageBySkin(img, statusEl, onDone){
     if(typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('阵容图像识别');
     if(!img){ alert('请先粘贴/选择/截图一张阵容图'); return; }
-    statusEl.textContent = '构建皮肤模板库…';
-    const tpls = await buildSkinTpls(statusEl);
-    if(!tpls || !tpls.length){ alert('皮肤模板库为空（请先在设置里同步皮肤），图像识别不可用'); return; }
+    if(!_skinTpls || !_skinTpls.length){
+      alert('皮肤模板库还没构建。请先点识别区的「🛠 构建模板库」按钮（首次约需 1 分钟，有进度提示），构建完成后再点「🖼️ 图片比对」即可秒出。');
+      if(statusEl) statusEl.textContent = '请先点「🛠 构建模板库」';
+      return;
+    }
+    if(statusEl) statusEl.textContent = '图像比对中…';
+    const tpls = _skinTpls;
     const W=img.naturalWidth||img.width, H=img.naturalHeight||img.height;
     if(!W || !H){ alert('图片尺寸无效'); return; }
     const rows=2, cols=5;
