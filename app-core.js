@@ -16841,6 +16841,7 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
         // ==================== 消息墙功能 ====================
         let wallMessages = [];
         let messageWallOpen = false;
+        let _wallOpenComments = new Set(); // 需求墙评论区展开状态集合（msgId -> 是否展开）
         // 🔴 已读基准改用「消息内容指纹集合」(time_author_content)，而非绝对时间戳——
         // 消息墙跨设备共享(Gist)，各机本地时钟不一致会导致"未来消息"误判未读/红点。
         // 指纹方案与合并去重一致，彻底规避跨设备时钟问题；且自动升级强刷不重置(见 forceRefreshLatest)。
