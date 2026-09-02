@@ -854,7 +854,7 @@
       const x=Math.round(c*W/cols), y=Math.round(r*H/rows), w=Math.round(W/cols), h=Math.round(H/rows);
       const cell = cropCell(img, x, y, w, h);
       const feat = extractCardFeature(cell, 64);
-      let hero=null, skin=null, dist=Infinity, quality=null, source='skin';
+      let hero=null, skin=null, dist=Infinity, quality=null, source='skin', top3=null;
       const localM = feat ? matchWithLocal(feat) : null;
       if(localM){ hero=localM.hero; skin='(本地修正)'; dist=localM.dist; source='local'; }
       else if(feat){
