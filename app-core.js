@@ -19337,6 +19337,30 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 if (changed) await saveWorksToGist(all);
             } catch (e) {}
         }
+        // 🔴 2026-09-03 作品无阵容数据时的降级卡片（标题+分类+二维码）
+        function _buildWorkFallbackCard(title, category, link) {
+            const CW = 600, CH = 360;
+            const cv = document.createElement('canvas'); cv.width = CW; cv.height = CH;
+            const c = cv.getContext('2d');
+            const grad = c.createLinearGradient(0, 0, CW, CH);
+            grad.addColorStop(0, '#1a1a2e'); grad.addColorStop(1, '#16213e');
+            c.fillStyle = grad; c.fillRect(0, 0, CW, CH);
+            c.fillStyle = '#ffd700'; c.font = 'bold 30px sans-serif';
+            c.fillText('📦 ' + String(title || '未命名作品').slice(0, 16), 24, 56);
+            c.fillStyle = 'rgba(255,255,255,0.7)'; c.font = '18px sans-serif';
+            c.fillText('分类：' + (category || '未分类'), 24, 100);
+            c.fillStyle = 'rgba(255,255,255,0.4)'; c.font = '13px sans-serif';
+            c.fillText('扫码导入作品 · 或进我主页看全部', 24, 130);
+            if (typeof window.qrcode === 'function') {
+                const qr = window.qrcode(0, 'M'); qr.addData(link); qr.make();
+                const qn = qr.getModuleCount(), qs = 140, qc = Math.floor(qs / qn);
+                const ox = CW - qs - 24, oy = CH - qs - 24;
+                c.fillStyle = '#fff'; c.fillRect(ox - 8, oy - 8, qs + 16, qs + 16);
+                c.fillStyle = '#111';
+                for (let r = 0; r < qn; r++) for (let cc = 0; cc < qn; cc++) if (qr.isDark(r, cc)) c.fillRect(ox + cc * qc, oy + r * qc, qc + 0.5, qc + 0.5);
+            }
+            return cv;
+        }
         async function collectShareToMyPage(share) {
             const nick = _currentNick();
             if (!nick) { showFloatToast('请先设置昵称再收录'); return false; }
@@ -19633,26 +19657,28 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             if (cardBtn) cardBtn.onclick = async function () {
                 try {
                     if (typeof _lineupEnsureQrLib === 'function') await _lineupEnsureQrLib();
-                    const CW = 600, CH = 360;
-                    const cv = document.createElement('canvas'); cv.width = CW; cv.height = CH;
-                    const c = cv.getContext('2d');
-                    const grad = c.createLinearGradient(0, 0, CW, CH);
-                    grad.addColorStop(0, '#1a1a2e'); grad.addColorStop(1, '#16213e');
-                    c.fillStyle = grad; c.fillRect(0, 0, CW, CH);
-                    c.fillStyle = '#ffd700'; c.font = 'bold 30px sans-serif';
-                    c.fillText('📦 ' + String(title || '未命名作品').slice(0, 16), 24, 56);
-                    c.fillStyle = 'rgba(255,255,255,0.7)'; c.font = '18px sans-serif';
-                    c.fillText('分类：' + (category || '未分类'), 24, 100);
-                    c.fillStyle = 'rgba(255,255,255,0.4)'; c.font = '13px sans-serif';
-                    c.fillText('扫码导入作品 · 或进我主页看全部', 24, 130);
-                    if (typeof window.qrcode === 'function') {
-                        const qr = window.qrcode(0, 'M'); qr.addData(link); qr.make();
-                        const qn = qr.getModuleCount(), qs = 140, qc = Math.floor(qs / qn);
-                        const ox = CW - qs - 24, oy = CH - qs - 24;
-                        c.fillStyle = '#fff'; c.fillRect(ox - 8, oy - 8, qs + 16, qs + 16);
-                        c.fillStyle = '#111';
-                        for (let r = 0; r < qn; r++) for (let cc = 0; cc < qn; cc++) if (qr.isDark(r, cc)) c.fillRect(ox + cc * qc, oy + r * qc, qc + 0.5, qc + 0.5);
+                    let cv = null;
+                    // 🔴 对齐阵容分享：先从作品 Gist 拉阵容数据，生成带英雄卡的阵容图
+                    if (gistId && typeof _projShareFetchById === 'function' && typeof _lineupBuildCanvas === 'function' && typeof _buildWorkCardsFromProject === 'function') {
+                        try {
+                            const fetched = await _projShareFetchById(gistId);
+                            const project = fetched && fetched.project ? fetched.project : (fetched && fetched.myPlacedCards ? fetched : null);
+                            if (project && (project.myPlacedCards || project.teammatePlacedCards || project.myHandCards || project.teammateHandCards)) {
+                                const cards = await _buildWorkCardsFromProject(project);
+                                const built = await _lineupBuildCanvas(link, null, '', homeLink, {
+                                    fromData: true,
+                                    my: cards.my, tm: cards.tm, myHand: cards.myHand, tmHand: cards.tmHand,
+                                    projName: project.name || title || '',
+                                    catName: category || (project.category || ''),
+                                    myDr: null, tmDr: null,
+                                    workLink: link
+                                });
+                                if (built && built.canvas) cv = built.canvas;
+                            }
+                        } catch (e) { cv = null; }
                     }
+                    // 降级：无阵容数据时生成简易标题卡
+                    if (!cv) cv = _buildWorkFallbackCard(title, category, link);
                     const dataUrl = cv.toDataURL('image/png');
                     const wrap = modal.querySelector('#workShareCardWrap');
                     if (wrap) {

@@ -8469,13 +8469,28 @@
         // shortCode：8 位项目分享短码（整个项目已上传 Gist，导入方输码即得完整项目）
         // customMsg：用户自定义留言（绘制在二维码左侧、推广语上方，随分享图一起发出去）
         // homeQrText：传入主页链接（#pu=）时项目码左侧再画一个主页二维码（扫码进个人主页看全部作品）
-        async function _lineupBuildCanvas(qrText, shortCode, customMsg, homeQrText) {
-            const my = _lineupCollect('u');
-            const tm = _lineupCollect('t');
-            // 手牌（每人最多10张：上阵7 + 手牌3）：未上阵的卡一并分享，导入方完整复刻
-            const myHand = _lineupCollectHand('myHandContainer');
-            const tmHand = _lineupCollectHand('teammateHandContainer');
-            const filled = my.concat(tm, myHand, tmHand).filter(Boolean).length;
+        async function _lineupBuildCanvas(qrText, shortCode, customMsg, homeQrText, opts) {
+            opts = opts || {};
+            const drTxt = function (id) { const el = document.getElementById(id); const m = el && /([\d.]+)/.exec(el.textContent || ''); return m ? m[1] : null; };
+            let my, tm, myHand, tmHand, projName, catName, myDr, tmDr;
+            let filled;
+            if (opts.fromData) {
+                // 🔴 2026-09-03 作品分享：卡组直接由数据注入（不从当前打开项目的 DOM 收集）
+                my = opts.my || []; tm = opts.tm || []; myHand = opts.myHand || []; tmHand = opts.tmHand || [];
+                projName = (opts.projName != null) ? opts.projName : '';
+                catName = (opts.catName != null) ? opts.catName : '';
+                myDr = (opts.myDr != null) ? opts.myDr : null;
+                tmDr = (opts.tmDr != null) ? opts.tmDr : null;
+            } else {
+                my = _lineupCollect('u');
+                tm = _lineupCollect('t');
+                myHand = _lineupCollectHand('myHandContainer');
+                tmHand = _lineupCollectHand('teammateHandContainer');
+                projName = (typeof currentProjectName !== 'undefined' && currentProjectName) ? currentProjectName : '';
+                catName = (typeof currentProjectCategory !== 'undefined' && currentProjectCategory) ? String(currentProjectCategory) : '';
+                myDr = drTxt('myDamageReduction'); tmDr = drTxt('teammateDamageReduction');
+            }
+            filled = my.concat(tm, myHand, tmHand).filter(Boolean).length;
             if (!filled) return { canvas: null, filled: 0 };
 
             // 紧凑布局：960 宽 + 94×110 小卡，一张图完整容纳（上阵×2 + 手牌×2 + 短码/二维码）
@@ -8487,9 +8502,6 @@
             const now = new Date();
             const dateStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
             const nick = (function () { try { return localStorage.getItem('TFJL_UserName') || '匿名'; } catch (e) { return '匿名'; } })();
-            const projName = (typeof currentProjectName !== 'undefined' && currentProjectName) ? currentProjectName : '';
-            const drTxt = function (id) { const el = document.getElementById(id); const m = el && /([\d.]+)/.exec(el.textContent || ''); return m ? m[1] : null; };
-            const myDr = drTxt('myDamageReduction'), tmDr = drTxt('teammateDamageReduction');
 
             // 底部区（项目短链版才有二维码）：右下角 132px 二维码；左列 = 短码 + 自定义留言 + 推广语 + 生成信息（底边与二维码对齐）
             const QR_SIZE = 132;
@@ -8520,7 +8532,6 @@
             ctx.fillRect(0, 0, W, H);
             // 标题 + 副标题（分类金色高亮：群里的人第一眼看出「打的是什么」分类）
             ctx.textBaseline = 'alphabetic';
-            const catName = (typeof currentProjectCategory !== 'undefined' && currentProjectCategory) ? String(currentProjectCategory) : '';
             ctx.textAlign = 'center';
             ctx.fillStyle = '#ffd700';
             ctx.font = 'bold 30px "Microsoft YaHei", "PingFang SC", sans-serif';
@@ -8608,6 +8619,18 @@
                 ctx.fillStyle = 'rgba(255,255,255,0.55)';
                 ctx.font = '13px "Microsoft YaHei", sans-serif';
                 ctx.fillText('👆 8 位短码，在软件菜单「📥 从短码导入」输入 → 导入完整项目（阵容+脚本+记事本）', PAD + 14, y + 82);
+            } else if (opts && opts.workLink) {
+                // 🔴 2026-09-03 作品分享：无项目短码，改为显示作品链接（对齐阵容卡片布局，避免「失败」警告）
+                ctx.fillStyle = '#4fc3f7';
+                ctx.font = 'bold 16px "Microsoft YaHei", sans-serif';
+                ctx.fillText('🔗 作品链接（扫码直达 / 软件内导入）', PAD + 14, y + 20);
+                ctx.fillStyle = 'rgba(255,255,255,0.7)';
+                ctx.font = '14px Consolas, "Courier New", monospace';
+                let wl = String(opts.workLink); if (wl.length > 56) wl = wl.slice(0, 53) + '…';
+                ctx.fillText(wl, PAD + 14, y + 50);
+                ctx.fillStyle = 'rgba(255,255,255,0.45)';
+                ctx.font = '13px "Microsoft YaHei", sans-serif';
+                ctx.fillText('👆 扫码或复制链接，在软件「📥 从链接导入」打开此作品', PAD + 14, y + 82);
             } else {
                 ctx.fillStyle = '#ff8a80';
                 ctx.font = 'bold 16px "Microsoft YaHei", sans-serif';
@@ -8733,6 +8756,50 @@
 
             return { canvas: canvas, filled: filled };
         }
+
+        // 🔴 2026-09-03 从作品 Gist 的 project.json 重建卡组（含皮肤图），供作品分享生成对齐阵容的卡片
+        async function _buildWorkCardsFromProject(project) {
+            if (!project) return { my: [], tm: [], myHand: [], tmHand: [] };
+            const loader = async function (pc, side) {
+                if (!pc) return null;
+                const idKey = side + '_' + pc.id;
+                const skinName = (project.cardSkins && project.cardSkins[idKey]) || '默认';
+                let img = null;
+                if (skinName && skinName !== '默认' && typeof window.resolveHeroSkinUrl === 'function') {
+                    try {
+                        const url = await window.resolveHeroSkinUrl(pc.name, skinName);
+                        if (url) {
+                            img = await new Promise(function (res) {
+                                const im = new Image();
+                                im.crossOrigin = 'anonymous';
+                                im.onload = function () { res(im); };
+                                im.onerror = function () { res(null); };
+                                im.src = url;
+                            });
+                        }
+                    } catch (e) { img = null; }
+                }
+                return {
+                    slot: pc.slot || pc.placed || 'h',
+                    name: pc.name,
+                    display: pc.name,
+                    level: '',
+                    mohua: false,
+                    skin: skinName,
+                    prof: pc.profession || '',
+                    eng: !!pc.isEngineering,
+                    mainImg: img,
+                    fusedImg: null
+                };
+            };
+            const norm = function (arr) { return Array.isArray(arr) ? arr : []; };
+            const my = await Promise.all(norm(project.myPlacedCards).map(function (c) { return loader(c, 'my'); }));
+            const tm = await Promise.all(norm(project.teammatePlacedCards).map(function (c) { return loader(c, 'teammate'); }));
+            const myHand = await Promise.all(norm(project.myHandCards).map(function (c) { return loader(c, 'my'); }));
+            const tmHand = await Promise.all(norm(project.teammateHandCards).map(function (c) { return loader(c, 'teammate'); }));
+            return { my: my, tm: tm, myHand: myHand, tmHand: tmHand };
+        }
+        window._buildWorkCardsFromProject = _buildWorkCardsFromProject;
 
         // ---- 分享短链：整个项目上传公开 Gist → #pg=<gistId> 短链 → 图上二维码 ----
         // Gist 公开可读：手机扫码（未登录网页版）也能拉取；有 token 则带上提高限额。
