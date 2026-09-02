@@ -640,7 +640,8 @@
   }
 
   // 取图像特征：等比 cover（取最小边中心方、不拉伸→消除竖卡/方图几何差异）→ 64×64
-  // 再跳外圈只留中心立绘区（避开边框/卡名条/左下等级/右下魔化）→ 4×4 分块 RGB 均值（48维）
+  // 跳外圈（边框/卡名条/等级/魔化）→ 8×8 分块（192维）；每块相对全局均值的对数比值做亮度/对比度归一；
+  // 末位 L2 归一使 featDist 等价于余弦距离，抗整体明暗与缩放。← 单卡区分度远高于旧 48维均值
   function extractCardFeature(src, size){
     const sw = src.naturalWidth||src.width, sh = src.naturalHeight||src.height;
     if(!sw || !sh) return null;
@@ -651,21 +652,31 @@
     try{ ctx.drawImage(src, sx, sy, side, side, 0, 0, size, size); }catch(e){ return null; } // 等比 cover，不拉伸
     let data;
     try{ data = ctx.getImageData(0,0,size,size).data; }catch(e){ return null; } // 跨域污染时返回 null
-    const grid=4, cell=size/grid, feat=[];
+    const keep = (fx,fy)=> !(fx<0.12||fx>0.88||fy<0.12||fy>0.88); // 跳外圈边框/卡名条
+    // 先算全局每通道均值（亮度归一基准）
+    let gr=0, gg=0, gb=0, gn=0;
+    for(let y=0;y<size;y++) for(let x=0;x<size;x++){
+      if(!keep(x/size, y/size)) continue;
+      const i=(y*size+x)*4; gr+=data[i]; gg+=data[i+1]; gb+=data[i+2]; gn++;
+    }
+    if(gn===0) return null;
+    const gr0=(gr/gn)||1, gg0=(gg/gn)||1, gb0=(gb/gn)||1;
+    const grid=8, cell=size/grid, feat=[];
     for(let gy=0; gy<grid; gy++) for(let gx=0; gx<grid; gx++){
       let r=0,g=0,b=0,n=0;
       for(let y=Math.floor(gy*cell); y<Math.floor((gy+1)*cell); y++){
         for(let x=Math.floor(gx*cell); x<Math.floor((gx+1)*cell); x++){
-          const fx=x/size, fy=y/size;
-          if(fx<0.15||fx>0.85||fy<0.15||fy>0.85) continue; // 跳外圈（边框/卡名条/等级/魔化）
-          const i=(y*size+x)*4;
-          r+=data[i]; g+=data[i+1]; b+=data[i+2]; n++;
+          if(!keep(x/size, y/size)) continue;
+          const i=(y*size+x)*4; r+=data[i]; g+=data[i+1]; b+=data[i+2]; n++;
         }
       }
       if(n===0){ feat.push(0,0,0); continue; }
-      feat.push(r/n, g/n, b/n);
+      // 对数比值：抗光照/缩放，放大颜色差异对比度
+      feat.push(Math.log((r/n)/gr0 + 0.01), Math.log((g/n)/gg0 + 0.01), Math.log((b/n)/gb0 + 0.01));
     }
-    return feat;
+    // L2 归一 → featDist 即余弦距离（只比方向不比明暗）
+    let norm=0; for(const v of feat) norm+=v*v; norm=Math.sqrt(norm)||1;
+    return feat.map(v=>v/norm);
   }
   function featDist(a, b){
     let s=0;
@@ -731,7 +742,7 @@
       const entries = [];
       for(const hero of Object.keys(reg)) for(const sk of (reg[hero]||[])) entries.push({hero, sk});
       const total = entries.length;
-      const sig = 'n'+total;
+      const sig = 'n'+total+'_v2';
       const cached = _loadTplCache(sig);
       if(cached && cached.length){ _skinTpls = cached; _rebuildTplQ(); if(statusEl) statusEl.textContent = '皮肤模板库已加载（缓存 '+cached.length+' 张）'; return cached; }
       let done = 0, okCount = 0; const built = []; const BATCH = 24; // 24 并发，418 张约 18 批
@@ -775,7 +786,7 @@
   }
 
   // 本地学习修正：用户识别错了可手动指定正确英雄，把该卡特征存本地；下次优先匹配
-  const LOCAL_CORR_KEY = 'tfjl_rec_corrections_v1';
+  const LOCAL_CORR_KEY = 'tfjl_rec_corrections_v2';
   let _localCorr = null;
   function loadLocalCorrections(){
     if(_localCorr) return _localCorr;
@@ -792,7 +803,7 @@
     if(!local.length) return null;
     let best=null, bestD=Infinity;
     for(const c of local){ const d=featDist(feature, c.feat); if(d<bestD){ bestD=d; best=c; } }
-    if(bestD < 80) return { hero: best.hero, dist: bestD }; // 本地样本是我确认过的，阈值收紧
+    if(bestD < 0.5) return { hero: best.hero, dist: bestD }; // 本地样本是我确认过的；余弦距离尺度下阈值收紧
     return null;
   }
   function clearLocalCorrections(){ _localCorr=[]; try{ localStorage.removeItem(LOCAL_CORR_KEY); }catch(e){} }
