@@ -964,7 +964,8 @@
             <div style="margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
               <input type="file" id="recFile" accept="image/*" style="display:none;">
               <button id="recPickFile" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.28);color:#fff;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:0.8rem;">📁 选择阵容图片</button>
-              <button id="recGameCapture" style="background:linear-gradient(135deg,#ff7043,#bf360c);color:#fff;border:none;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600;" title="自动找游戏窗口→截整窗→走文字识别(OCR)识别卡名" data-tip="一键识别游戏画面：自动检测游戏窗口并截图，用文字识别(OCR)识别卡名（仅桌面 APP）">🎮 一键识别游戏画面</button>
+              <button id="recGameCapture" style="background:linear-gradient(135deg,#ff7043,#bf360c);color:#fff;border:none;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600;" title="自动找游戏窗口→截整窗→走文字识别(OCR)识别卡名" data-tip="一键识别游戏画面：自动检测游戏窗口并截图，用文字识别(OCR)识别卡名（仅桌面 APP）">🎮 文字识别(OCR)</button>
+              <button id="recImgCapture" style="background:linear-gradient(135deg,#ab47bc,#6a1b9a);color:#fff;border:none;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600;" title="自动找游戏窗口→截整窗→走图像识别(皮肤模板比对)识别卡名" data-tip="图像识别：自动截图后用皮肤模板库比对卡面，适合无卡名的卡图（仅桌面 APP）">🖼️ 图像识别(皮肤比对)</button>
               <button id="recFrameBtn" style="background:linear-gradient(135deg,#ab47bc,#6a1b9a);color:#fff;border:none;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600;" title="自动找游戏窗口→截整窗→你拖框圈住阵容区域→软件按框精准截图并识别" data-tip="框选阵容区域：截游戏整窗后由你拖框圈住阵容位置，软件按框精准截图识别，避免手动截图尺寸偏差（仅桌面 APP）">📐 框选阵容区域</button>
               <span id="recFileName" style="font-size:0.78rem;color:#90a4ae;">未选择阵容图片</span>
               <span style="font-size:0.75rem;color:#90a4ae;">｜也可直接 Ctrl+V 粘贴截图</span>
@@ -1162,21 +1163,8 @@
         overlay._results = results;
         updateRecWarn(results);
         $('recStatus').textContent = `识别完成：${results.length} 个英雄（${rowCount} 行）`;
-        // 智能：OCR 0 行（无卡名图）→ 优先把已跑的图像结果填进主表；图像还没跑则转图像识别
-        const smartMode = window.__recSmartMode; window.__recSmartMode = false;
-        if(results.length === 0 && currentImg){
-          const imgRes = window.__recImgResults;
-          if(imgRes && imgRes.some(r=>r.hero)){
-            const n = renderImgToBody(imgRes);
-            $('recStatus').textContent = 'OCR 未识别到文字，已用图像识别结果（'+n+' 个英雄；图像匹配可能有误，可对照紫色表核对）';
-          } else if(!smartMode){
-            const wrap = $('recImgWrap');
-            if(!wrap || wrap.style.display === 'none' || !$('recImgBox').children.length){
-              $('recStatus').textContent = 'OCR 未识别到文字（图可能无卡名），自动切换图像识别…';
-              runImgAuto();
-            }
-          }
-        }
+        // 纯文字识别结果渲染（图像识别走独立「🖼️ 图像识别」按钮，结果在紫色表）
+        $('recStatus').textContent = `识别完成：${results.length} 个英雄（${rowCount} 行）`;
         renderRecDr(results); // 识别完立即算并展示减伤
       });
     }
@@ -1376,6 +1364,44 @@
         }finally{
           recGameBtn.disabled = false; recGameBtn.textContent = old;
         }
+      };
+    }
+    // 🖼️ 图像识别按钮：截整窗 → currentImg → runImgAuto（与文字识别同理，走皮肤模板比对）
+    const recImgCapBtn = $('recImgCapture');
+    if(recImgCapBtn){
+      if(!isTauri()) recImgCapBtn.style.display = 'none';
+      recImgCapBtn.onclick = async ()=>{
+        if(typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('图像识别');
+        const old = recImgCapBtn.textContent;
+        recImgCapBtn.disabled = true; recImgCapBtn.textContent = '⏳ 截图中…';
+        try{
+          const wins = await tauriInvoke('find_game_windows') || [];
+          if(!wins.length) throw new Error('未检测到游戏窗口，请先打开游戏/模拟器再试');
+          let win = null, lastTitle = null;
+          try { lastTitle = (JSON.parse(localStorage.getItem('tfjl_game_monitor_cfg')||'{}')||{}).winTitle || null; } catch(_){}
+          if(lastTitle) win = wins.find(w=> w.title && w.title.includes(lastTitle)) || null;
+          if(!win && wins.length === 1) win = wins[0];
+          if(!win){
+            win = await new Promise(resolve=>{
+              recChoice({ title:'🎮 选择游戏窗口', desc:'检测到 '+wins.length+' 个可截图窗口，选一个进行图像识别：', maxHeight:'70vh',
+                items: wins.map((w,i)=>({ label:(i+1)+'. '+(w.title.length>34?w.title.slice(0,34)+'…':w.title), value:String(i) })),
+                onPick:v=>{ const w=wins[parseInt(v,10)]; if(w) _rememberWinTitle(w.title); resolve(w); }, onCancel:()=>resolve(null) });
+            });
+            if(!win) return;
+          }
+          const bmpB64 = await tauriInvoke('capture_window_region', { hwnd: win.hwnd, x:0, y:0, w:10, h:10, full:true });
+          if(!bmpB64) throw new Error('截图失败（窗口可能已关闭或被最小化）');
+          const im = await new Promise((resolve,reject)=>{ const img=new Image(); img.onload=()=>resolve(img); img.onerror=()=>reject(new Error('截图解码失败')); img.src='data:image/bmp;base64,'+bmpB64; });
+          currentImg = im;
+          const c=$('recCanvas'); c.width=im.naturalWidth; c.height=im.naturalHeight; c.getContext('2d').drawImage(im,0,0);
+          const n=$('recFileName'); if(n){ n.textContent='已截取游戏窗口：'+(win.title.length>22?win.title.slice(0,22)+'…':win.title); n.style.color='#ce93d8'; }
+          const st=$('recStatus'); if(st) st.textContent='已截取游戏画面，图像识别中…';
+          runImgAuto();
+        }catch(e){
+          const msg=(e&&e.message)?e.message:(typeof e==='string'?e:'未知错误');
+          recToast('❌ 图像识别失败：'+msg);
+          const st=$('recStatus'); if(st) st.textContent='截图失败';
+        }finally{ recImgCapBtn.disabled=false; recImgCapBtn.textContent=old; }
       };
     }
     $('recFill').onclick = ()=>{
