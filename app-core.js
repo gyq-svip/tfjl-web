@@ -20635,7 +20635,9 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                     <span style="margin-left:auto;color:rgba(255,255,255,0.4);font-size:0.68rem;display:flex;align-items:center;gap:4px;">${catBadge}${timeAgo}${expireLabel}${encryptedLabel}${deleteBtn}</span>
                 </div>`;
                 // ===== 评论区（需求墙留言）=====
-                const _cid = msg.id;
+                // 🔴 必须用 wallMsgKey（稳定唯一键，base64 无引号、放进 onclick 安全）：不能直接用 msg.id ——
+                // 老消息没有 id 字段，模板字符串会把 undefined 渲染成字符串 "undefined"，而渲染时判断的是 has(undefined)，两者永不相等 → 评论区永远展开不了。
+                const _cid = wallMsgKey(msg);
                 const _comments = (msg.comments || []);
                 const _open = _wallOpenComments.has(_cid);
                 const _cmtBtn = `<a href="javascript:void(0)" onclick="if(event){event.preventDefault();event.stopPropagation();}toggleWallComment('${_cid}');return false;" style="color:#7fd1ff;cursor:pointer;margin-left:8px;font-size:0.7rem;" title="查看/发表留言">💬 评论 ${_comments.length ? '(' + _comments.length + ')' : ''}</a>`;
@@ -20699,7 +20701,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             if (!input) return;
             const content = input.value.trim();
             if (!content) return;
-            const msg = wallMessages.find(m => m.id === msgId);
+            const msg = wallMessages.find(m => wallMsgKey(m) === msgId); // 🔴 按 wallMsgKey 匹配：老消息无 id，按 m.id 找永远找不到(静默失败)
             if (!msg) return;
             const nick = _currentNick() || '游客';
             if (!msg.comments) msg.comments = [];
@@ -20716,7 +20718,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
         window.postWallComment = postWallComment;
 
         async function deleteWallComment(msgId, commentId) {
-            const msg = wallMessages.find(m => m.id === msgId);
+            const msg = wallMessages.find(m => wallMsgKey(m) === msgId); // 🔴 按 wallMsgKey 匹配：老消息无 id，按 m.id 找永远找不到(静默失败)
             if (!msg || !msg.comments) return;
             const nicknameInput = document.getElementById('messageNickname');
             const currentNickname = (nicknameInput && nicknameInput.value.trim()) || localStorage.getItem('TFJL_UserName') || '';
