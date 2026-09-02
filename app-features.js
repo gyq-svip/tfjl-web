@@ -8803,6 +8803,8 @@
                     shortCode = r.code;
                     if (r.reused && typeof showToast === 'function') {
                         showToast('♻️ 内容没变，已复用你 ' + _shareReuseDateText(r.ts) + ' 的分享（省一份云端空间）');
+                    } else if (r.updated && typeof showToast === 'function') {
+                        showToast('🔄 阵容有更新，已覆盖到原来的分享（短码 ' + r.code + ' 不变，之前发出去的码照样拿到新内容）');
                     }
                 } catch (e) {
                     shortLink = ''; shortCode = '';
@@ -8827,6 +8829,10 @@
                 // canvas 被跨域皮肤图污染（理论不该发生，兜底提示）
                 if (typeof showToast === 'function') showToast('❌ 图片导出被浏览器安全策略拦截（皮肤图跨域），请截图分享', 'error');
                 return;
+            }
+            // 🔴 自动缓存小卡片到本机（IndexedDB，最近 30 张），方便日后随时取回发给朋友，不用重走分享流程
+            if (dataUrl) {
+                Promise.resolve(_cardSave(dataUrl, { projectName: (typeof currentProjectName !== 'undefined' && currentProjectName) || '', code: shortCode })).catch(function () {});
             }
             // 短链（#pg= 项目短链，~80字符，与二维码同款）；上传失败则无链接按钮
             const link = shortLink;
@@ -8858,6 +8864,7 @@
                     '<button id="lineupShareCopyImg" style="flex:1;min-width:120px;background:linear-gradient(135deg,#26a69a,#00796b);color:#fff;border:none;padding:10px;border-radius:8px;cursor:pointer;font-size:0.9rem;font-weight:bold;">📋 复制图片</button>' +
                     (link ? '<button id="lineupShareCopyLink" style="flex:1;min-width:120px;background:linear-gradient(135deg,#ab47bc,#6a1b9a);color:#fff;border:none;padding:10px;border-radius:8px;cursor:pointer;font-size:0.9rem;font-weight:bold;">🔗 复制链接</button>' : '') +
                     '<button id="lineupShareViewHome" style="flex:1;min-width:140px;background:linear-gradient(135deg,#5c6bc0,#283593);color:#fff;border:none;padding:10px;border-radius:8px;cursor:pointer;font-size:0.9rem;font-weight:bold;" title="打开我的贡献主页，查看/分享我所有作品">🏠 查看我的主页</button>' +
+                    '<button id="lineupShareGetCard" style="flex:1;min-width:140px;background:linear-gradient(135deg,#ffa726,#f57c00);color:#1a1a2e;border:none;padding:10px;border-radius:8px;cursor:pointer;font-size:0.9rem;font-weight:bold;" title="取回我之前分享过的卡片，直接发给朋友">📇 取回之前卡片</button>' +
                   '</div>' +
                 '</div>';
             document.body.appendChild(modal);
@@ -8930,6 +8937,9 @@
                 if (typeof openContributionCard === 'function') openContributionCard(encodeURIComponent(myNick));
                 else if (window.openContributionCard) window.openContributionCard(encodeURIComponent(myNick));
             };
+            // 🔴 取回之前缓存的卡片（本机 IndexedDB），弹画廊随时发给朋友
+            const getCardBtn = modal.querySelector('#lineupShareGetCard');
+            if (getCardBtn) getCardBtn.onclick = function () { if (typeof _cardGallery === 'function') _cardGallery(); };
 
             // 需求墙同步（选项窗开关，默认开）：后台静默发整个项目，不阻塞弹窗；密码保护时同密码加密上墙
             if (opts.wall && typeof shareProjectToWall === 'function') {
@@ -9221,6 +9231,62 @@
             } catch (e) { return null; }
         }
 
+        // 找「我以前分享过的同名项目」→ 用于内容变更时覆盖更新（短码不变，云端始终一份）
+        // 注意：内容变了指纹必然不同，所以这里按「项目名 + 作者」认定是同一项目的不同版本。
+        async function _shareFindByProject(name, by) {
+            const key = String(name || '').trim().slice(0, 40);   // 索引里的 n 存的是截取 40 字符后的名字
+            if (!key) return null;
+            try {
+                const idx = await _shareIndexLoad();
+                let best = null;
+                Object.keys(idx || {}).forEach(function (code) {
+                    const it = idx[code];
+                    if (!it || it.del || !it.id) return;
+                    if ((it.by || '') !== (by || '')) return;
+                    if (String(it.n || '').trim() !== key) return;
+                    if (!best || (it.ts || 0) > (best.ts || 0)) best = { code: code, id: it.id, ts: it.ts || 0, exp: it.exp || 0, fp: it.fp || '' };
+                });
+                return best;
+            } catch (e) { return null; }
+        }
+
+        // 覆盖更新旧分享：拉旧文件清单 → 本次不再需要的（旧参考图）置 null 删除 → 写新内容
+        async function _shareOverwriteGist(gistId, files) {
+            const ctrl = new AbortController();
+            const timer = setTimeout(function () { ctrl.abort(); }, 30000);
+            let oldFiles = {};
+            try {
+                const g = await fetch('https://api.github.com/gists/' + encodeURIComponent(gistId), {
+                    headers: _lineupGistHeaders(), signal: ctrl.signal
+                });
+                if (g && g.ok) { const j = await g.json(); oldFiles = (j && j.files) || {}; }
+            } catch (e) { /* 拉不到旧清单就只覆盖写，不删多余文件（不阻断） */ }
+            finally { clearTimeout(timer); }
+            const patch = {};
+            Object.keys(files).forEach(function (k) { patch[k] = files[k]; });
+            Object.keys(oldFiles).forEach(function (k) {
+                if (k === 'card.jpg') return;   // 卡片图由卡片流程单独维护，别被覆盖流程删掉
+                if (!Object.prototype.hasOwnProperty.call(patch, k)) patch[k] = null;   // null = 删除该文件
+            });
+            const c2 = new AbortController();
+            const t2 = setTimeout(function () { c2.abort(); }, 60000);
+            let res;
+            try {
+                res = await fetch('https://api.github.com/gists/' + encodeURIComponent(gistId), {
+                    method: 'PATCH',
+                    headers: Object.assign({ 'Content-Type': 'application/json' }, _lineupGistHeaders()),
+                    signal: c2.signal,
+                    body: JSON.stringify({ files: patch })
+                });
+            } finally { clearTimeout(t2); }
+            if (!res || !res.ok) {
+                let msg = '更新旧分享失败 (' + (res && res.status) + ')';
+                try { const j = await res.json(); if (j && j.message) msg += '：' + j.message; } catch (e) {}
+                throw new Error(msg);
+            }
+            return true;
+        }
+
         function _shareReuseDateText(ts) {
             try {
                 const d = new Date(ts);
@@ -9243,7 +9309,14 @@
                     return { id: hit.id, code: hit.code, reused: true, ts: hit.ts, exp: hit.exp, dropped: [], imgs: 0 };
                 }
             }
-            const sc = _lineupShortCodeGen();
+            // 🔴 自动覆盖旧版（用户 2026-09-03 拍板）：内容变了不再新建一份，而是更新「我 + 同项目名」的那份，
+            //    沿用原短码 —— 云端始终只有一份，之前发出去的短码会自动指向新内容。
+            let overwrite = null;
+            if (fp && !opts.forceNew) {
+                const old = await _shareFindByProject((exportData && exportData.project && exportData.project.name) || '', opts.by);
+                if (old && old.id && old.code && old.fp !== fp) overwrite = old;   // 内容相同的话上面复用分支已处理
+            }
+            const sc = (overwrite && overwrite.code) ? overwrite.code : _lineupShortCodeGen();
             const body = Object.assign({}, exportData, { sc: sc });
             if (opts.days > 0) body.exp = Date.now() + opts.days * 86400000;
 
@@ -9279,6 +9352,20 @@
             }
             files['project.json'] = { content: json };
 
+            // 覆盖旧版：PATCH 已有 Gist（短码不变）；失败则回退为新建，不阻断分享
+            if (overwrite && overwrite.id) {
+                try {
+                    await _shareOverwriteGist(overwrite.id, files);
+                    _shareIndexPut(overwrite.code, {
+                        id: overwrite.id, n: String(proj.name || '').slice(0, 40), by: String(opts.by || '').slice(0, 24),
+                        exp: body.exp || 0, ts: Date.now(), fp: fp
+                    }).catch(function (e) { console.warn('[分享索引] 覆盖后写索引失败:', e); });
+                    return { id: overwrite.id, code: overwrite.code, updated: true, dropped: dropped, imgs: refList.length, fp: fp };
+                } catch (e) {
+                    console.warn('[分享覆盖] 更新旧分享失败，改为新建一份:', e);
+                }
+            }
+
             const ctrl = new AbortController();
             const timer = setTimeout(function () { ctrl.abort(); }, 60000);
             let res;
@@ -9307,6 +9394,137 @@
                 exp: body.exp || 0, ts: Date.now(), fp: fp   // 🔴 fp=内容指纹，供以后「内容相同直接复用」识别
             }).catch(function (e) { console.warn('[分享索引] 写入失败（不影响本次分享）:', e); });
             return { id: data.id, code: sc, dropped: dropped, imgs: refList.length, fp: fp };
+        }
+
+        // ==================== 小卡片本机缓存（2026-09-03）====================
+        // 生成的阵容小卡片存本机 IndexedDB（最近 30 张），随时取回发给朋友，不用重走分享流程。
+        // ⚠️ 仅本机可见：扫码进你主页的人看不到（那是第 4 项，需云端存图）。
+        // IndexedDB 只在浏览器里有；Node/测试环境没有，函数全部容错（noop / 返回空）。
+        const _CARD_DB_NAME = 'tfjl_share_cards';
+        const _CARD_STORE = 'cards';
+        const _CARD_MAX = 30;
+        function _cardDbOpen() {
+            return new Promise(function (resolve) {
+                if (typeof indexedDB === 'undefined' || !indexedDB) { resolve(null); return; }
+                try {
+                    const req = indexedDB.open(_CARD_DB_NAME, 1);
+                    req.onupgradeneeded = function () { try { req.result.createObjectStore(_CARD_STORE, { keyPath: 'id' }); } catch (e) {} };
+                    req.onsuccess = function () { resolve(req.result); };
+                    req.onerror = function () { resolve(null); };
+                } catch (e) { resolve(null); }
+            });
+        }
+        async function _cardSave(dataUrl, meta) {
+            try {
+                const db = await _cardDbOpen();
+                if (!db || !dataUrl) return;
+                const entry = { id: 'c_' + Date.now() + '_' + Math.floor(Math.random() * 1e6), dataUrl: dataUrl, ts: Date.now(), projectName: String(meta.projectName || ''), code: String(meta.code || '') };
+                await new Promise(function (resolve) {
+                    try {
+                        const tx = db.transaction(_CARD_STORE, 'readwrite');
+                        tx.objectStore(_CARD_STORE).put(entry);
+                        tx.oncomplete = resolve; tx.onerror = function () { resolve(); }; tx.onabort = function () { resolve(); };
+                    } catch (e) { resolve(); }
+                });
+                const all = await _cardList();
+                if (all.length > _CARD_MAX) {
+                    const oldest = all.slice(0, all.length - _CARD_MAX);   // 超出 30 张，删最旧的
+                    await new Promise(function (resolve) {
+                        try {
+                            const tx = db.transaction(_CARD_STORE, 'readwrite');
+                            oldest.forEach(function (o) { tx.objectStore(_CARD_STORE).delete(o.id); });
+                            tx.oncomplete = resolve; tx.onerror = function () { resolve(); };
+                        } catch (e) { resolve(); }
+                    });
+                }
+            } catch (e) {}
+        }
+        async function _cardList() {
+            try {
+                const db = await _cardDbOpen();
+                if (!db) return [];
+                return await new Promise(function (resolve) {
+                    const out = [];
+                    try {
+                        const tx = db.transaction(_CARD_STORE, 'readonly');
+                        const cur = tx.objectStore(_CARD_STORE).openCursor();
+                        cur.onsuccess = function (e) {
+                            const c = e.target.result;
+                            if (c) { out.push(c.value); c.continue(); }
+                            else { out.sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); }); resolve(out); }
+                        };
+                        cur.onerror = function () { resolve(out); };
+                    } catch (e) { resolve(out); }
+                });
+            } catch (e) { return []; }
+        }
+        // 取回画廊：列出本机缓存的历史卡片，点开可下载/复制
+        async function _cardGallery() {
+            const cards = await _cardList();
+            const old = document.getElementById('lineupCardGallery');
+            if (old) old.remove();
+            const modal = document.createElement('div');
+            modal.id = 'lineupCardGallery';
+            modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);z-index:' + (210000 + (window.topWinZIndex || 0)) + ';display:flex;align-items:center;justify-content:center;padding:16px;';
+            let grid = '';
+            if (!cards.length) {
+                grid = '<div style="color:rgba(255,255,255,0.5);padding:40px;text-align:center;">还没有缓存的卡片。先去分享一张阵容图，卡片会自动存到这里。</div>';
+            } else {
+                grid = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;">';
+                cards.forEach(function (c) {
+                    const pn = String(c.projectName || '未命名阵容');
+                    const ts = (function () { try { const d = new Date(c.ts); return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); } catch (e) { return ''; } })();
+                    grid += '<div data-cid="' + c.id + '" style="cursor:pointer;border:1px solid rgba(255,255,255,0.12);border-radius:10px;overflow:hidden;background:rgba(0,0,0,0.3);">' +
+                        '<img src="' + c.dataUrl + '" style="width:100%;display:block;" alt="' + pn + '">' +
+                        '<div style="padding:6px 8px;font-size:0.72rem;color:rgba(255,255,255,0.7);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + pn + '</div>' +
+                        '<div style="padding:0 8px 6px;font-size:0.66rem;color:rgba(255,255,255,0.4);">' + ts + (c.code ? ' · ' + c.code : '') + '</div>' +
+                      '</div>';
+                });
+                grid += '</div>';
+            }
+            modal.innerHTML = '<div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(255,215,0,0.4);border-radius:16px;padding:16px 18px;max-width:820px;width:96%;max-height:90vh;overflow-y:auto;">' +
+                '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><span style="color:#ffd700;font-size:1.05rem;font-weight:bold;">📇 我缓存的阵容卡片（本机）</span><span id="lineupCardGalleryClose" style="cursor:pointer;color:rgba(255,255,255,0.4);font-size:1.5rem;">×</span></div>' +
+                grid + '</div>';
+            document.body.appendChild(modal);
+            modal.querySelector('#lineupCardGalleryClose').onclick = function () { modal.remove(); };
+            modal.onclick = function (e) { if (e.target === modal) modal.remove(); };
+            Array.prototype.forEach.call(modal.querySelectorAll('[data-cid]'), function (cell) {
+                cell.onclick = function () {
+                    const card = cards.filter(function (c) { return c.id === cell.getAttribute('data-cid'); })[0];
+                    if (card) _cardPreview(card);
+                };
+            });
+        }
+        function _cardPreview(card) {
+            const old = document.getElementById('lineupCardPreview');
+            if (old) old.remove();
+            const m = document.createElement('div');
+            m.id = 'lineupCardPreview';
+            m.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:' + (220000 + (window.topWinZIndex || 0)) + ';display:flex;align-items:center;justify-content:center;flex-direction:column;padding:16px;';
+            m.innerHTML = '<div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(255,215,0,0.4);border-radius:16px;padding:14px;max-width:90vw;max-height:90vh;overflow:auto;">' +
+                '<img src="' + card.dataUrl + '" style="max-width:100%;max-height:60vh;border-radius:10px;display:block;">' +
+                '<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">' +
+                  '<button id="cpDl" style="flex:1;min-width:120px;background:linear-gradient(135deg,#ffd700,#ff9800);color:#1a1a2e;border:none;padding:10px;border-radius:8px;cursor:pointer;font-weight:bold;">💾 下载</button>' +
+                  '<button id="cpCopy" style="flex:1;min-width:120px;background:linear-gradient(135deg,#26a69a,#00796b);color:#fff;border:none;padding:10px;border-radius:8px;cursor:pointer;font-weight:bold;">📋 复制图片</button>' +
+                  '<button id="cpClose" style="flex:1;min-width:100px;background:rgba(255,255,255,0.15);color:#fff;border:none;padding:10px;border-radius:8px;cursor:pointer;">关闭</button>' +
+                '</div></div>';
+            document.body.appendChild(m);
+            m.querySelector('#cpClose').onclick = function () { m.remove(); };
+            m.onclick = function (e) { if (e.target === m) m.remove(); };
+            m.querySelector('#cpDl').onclick = function () {
+                const a = document.createElement('a'); a.href = card.dataUrl;
+                const pn = String(card.projectName || '阵容').replace(/[\\/:*?"<>|]/g, '');
+                a.download = '塔防阵容_' + pn + '_' + card.ts + '.png';
+                document.body.appendChild(a); a.click(); a.remove();
+                if (typeof showToast === 'function') showToast('💾 已开始下载', 'success');
+            };
+            m.querySelector('#cpCopy').onclick = async function () {
+                try {
+                    const blob = await (await fetch(card.dataUrl)).blob();
+                    await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+                    if (typeof showToast === 'function') showToast('📋 已复制，可直接粘贴到微信/QQ', 'success');
+                } catch (e) { if (typeof showToast === 'function') showToast('❌ 当前环境不支持复制图片，请用下载', 'error'); }
+            };
         }
 
         // gist 内容 → 解密 + 有效期校验 → exportData（tower-defense-project 格式）
@@ -9676,6 +9894,8 @@
             tip.remove();
             if (r.reused && typeof showToast === 'function') {
                 showToast('♻️ 内容没变，已复用你 ' + _shareReuseDateText(r.ts) + ' 的分享（省一份云端空间）');
+            } else if (r.updated && typeof showToast === 'function') {
+                showToast('🔄 阵容有更新，已覆盖到原来的分享（短码 ' + r.code + ' 不变，之前发出去的码照样拿到新内容）');
             }
             if (r.dropped && r.dropped.length && typeof showToast === 'function') {
                 showToast('⚠️ ' + r.dropped.length + ' 张参考图超过 8MB 上限未随分享带出：' + r.dropped.join('、'), 'error');
