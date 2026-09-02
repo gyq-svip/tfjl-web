@@ -14375,7 +14375,7 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
                         }
                     }
 
-                    const deleteBtn = canDelete ? `<a href="javascript:void(0)" onclick="deleteWallMsgInModal(${index})" style="color:#ff6b6b;cursor:pointer;margin-left:10px;font-size:0.7rem;" title="${isOwner ? '删除我的消息' : '管理员删除'}">🗑️</a>` : '';
+                    const deleteBtn = canDelete ? `<a href="javascript:void(0)" onclick="deleteWallMsgInModal(${wallMessages.indexOf(msg)})" style="color:#ff6b6b;cursor:pointer;margin-left:10px;font-size:0.7rem;" title="${isOwner ? '删除我的消息' : '管理员删除'}">🗑️</a>` : '';
 
                     return `<div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:10px 12px;font-size:0.85rem;margin-bottom:8px;">
                         <div style="color:#fff;margin-bottom:6px;line-height:1.5;">${contentHtml}</div>
@@ -14429,6 +14429,7 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
                 showNewsListModal();
             }
         }
+        window.deleteWallMsgInModal = deleteWallMsgInModal;
 
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') closeNewsListModal();
@@ -20839,6 +20840,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 alert('⚠️ 删除未完全同步到服务器（可能网络波动或接口限流）。\n\n本地已移除，但其他客户端可能仍可见、导入可能失败。\n请稍后刷新页面重试删除，或等限流恢复。');
             }
         }
+        window.deleteMessage = deleteMessage;
         
         function formatMessageTime(timestamp) {
             const now = Date.now();
