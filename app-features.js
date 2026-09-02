@@ -6119,8 +6119,6 @@
             });
             const first6 = filteredCards.slice(0, 6);
             
-            // 检查是否有冰精灵
-            const hasBingJingLing = heroNames.some(name => name.includes('冰精灵'));
             // 检查是否有魔精灵、光精灵、木精灵、魂精灵
             const hasMoJingLing = heroNames.some(name => name.includes('魔精灵'));
             const hasLongWang = heroNames.some(name => name.includes('龙王'));
@@ -6339,16 +6337,6 @@
                 }, 100);
             }
             } // 结束 if (!includeChengShang) 隐藏榜切卡逻辑块
-
-            // 如果有冰精灵，添加额外输出（空一行）
-            if (hasBingJingLing) {
-                output += '\n田伯光最大吃酒数，1\n田伯光扔壶前，每1秒共1次冰精灵\n田伯光酒壶，每2秒共3次冰精灵\n田伯光药壶，停球';
-            }
-
-            // 最大承伤次数（活动脚本包含，隐藏榜脚本不包含）
-            if (includeChengShang) {
-                output += '\n最大承伤次数，4\n';
-            }
 
             // 计算总减伤（只算实际上阵的卡：6张非工程+工程卡）
             loadDamageReductionData();
