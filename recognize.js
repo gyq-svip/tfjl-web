@@ -762,17 +762,16 @@
   // 单卡匹配：全池算 top3（跨品质，供诊断）；同时优先同品质最近者作为判定
   function matchCard(feature, preferQ){
     if(!_skinTpls || !_skinTpls.length) return {hero:null, skin:null, dist:Infinity, quality:null, top3:[]};
-    const all = _skinTpls.map(t=>({t, d:featDist(feature,t.feat)})).sort((a,b)=>a.d-b.d);
+    let all;
+    try{ all = _skinTpls.map(t=>({t, d:featDist(feature,t.feat)})).sort((a,b)=>a.d-b.d); }catch(e){ return {hero:null, skin:null, dist:Infinity, quality:null, top3:[]}; }
     let best = all[0], usedQ = null;
     if(preferQ && _skinTplByQ[preferQ] && _skinTplByQ[preferQ].length>3){
       const inQ = _skinTplByQ[preferQ].map(t=>({t, d:featDist(feature,t.feat)})).sort((a,b)=>a.d-b.d);
       if(inQ[0] && inQ[0].d <= all[0].d*1.15){ best = inQ[0]; usedQ = preferQ; } // 同品质足够近则优先
     }
     const top3 = all.slice(0,3).map(o=>({hero:o.t.hero, skin:o.t.skinName, dist:Math.round(o.d)}));
-    let hero = best.t.hero, dist = best.d;
-    const TH = window.__recStrict==='strict'?90 : window.__recStrict==='standard'?140 : Infinity; // 量级对齐 matchWithLocal(80)：特征距离通常几十~一百多，之前 12/18 会把正确匹配全判空→0 个英雄
-    if(dist > TH){ hero=null; } // 严格度：距离过大则判「未匹配」，避免强行错配
-    return { hero, skin: hero?best.t.skinName:null, dist, quality: usedQ, top3 };
+    // 排查期：移除严格度 reject，总返回最近匹配，确认 0 匹配是 feat null 还是 reject 导致
+    return { hero: best.t.hero, skin: best.t.skinName, dist: best.d, quality: usedQ, top3 };
   }
 
   // 本地学习修正：用户识别错了可手动指定正确英雄，把该卡特征存本地；下次优先匹配
