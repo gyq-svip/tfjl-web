@@ -1395,9 +1395,12 @@ if (true) {
             html += '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">未找到 txt/json 文件</div>';
         } else if (_shareModeScanned) {
             // 分享模式：扁平列表，文件名点击直接分享，勾选批量分享
-            html += `<div style="display:flex;align-items:center;justify-content:space-between;margin:6px 0;color:rgba(255,255,255,0.6);font-size:0.75rem;">
+            html += `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin:6px 0;color:rgba(255,255,255,0.6);font-size:0.75rem;flex-wrap:wrap;">
                 <span>📢 分享模式：点击文件名直接分享，或勾选批量分享</span>
-                <label style="cursor:pointer;font-size:0.7rem;"><input type="checkbox" onchange="toggleAllScannedShareSelectsFromMain(this.checked)" style="cursor:pointer;vertical-align:middle;"> 全选</label>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <button id="batchScannedShareFromMainBtn" onclick="doBatchShareScannedFromMain()" title="一键分享选中项到需求墙" style="background:linear-gradient(135deg,#ff6b6b,#ff9e80);color:#fff;border:none;padding:4px 12px;border-radius:5px;cursor:pointer;font-size:0.75rem;font-weight:bold;opacity:0.5;transition:all 0.2s;">📢 批量分享</button>
+                    <label style="cursor:pointer;font-size:0.7rem;"><input type="checkbox" onchange="toggleAllScannedShareSelectsFromMain(this.checked)" style="cursor:pointer;vertical-align:middle;"> 全选</label>
+                </div>
             </div>`;
             html += '<div style="display:flex;flex-direction:column;gap:5px;">';
             displayFiles.forEach(f => {
