@@ -2031,6 +2031,8 @@ if (true) {
             const input = document.getElementById('parserInput');
             if (input) {
                 input.value = content;
+                // 从文件导入后自动把精灵卡排到最后（函数定义在 app-features.js，全局可见）
+                if (typeof sortParserDeploySpiritsLast === 'function') sortParserDeploySpiritsLast(input, true);
                 document.getElementById('fileEditorModal')?.remove();
                 closeAppLocalSettings();
                 input.scrollIntoView({ behavior: 'smooth' });
