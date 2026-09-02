@@ -616,6 +616,10 @@
             window.addEventListener('load', function() {
                 // 方案B：启动即用线上 version.json 真实版本号填充右下角标签（占位符 dev → 真实版本），绝不写死误导
                 _fillRealVersionTag().catch(function() {});
+                // 🔴 2026-09-03 启动强制升级门禁：低于 minVersion 的桌面端 APP 启动即全屏拦截（不能只靠 SW 触发）
+                if (typeof checkVersionGate === 'function') {
+                    setTimeout(function () { checkVersionGate().catch(function () {}); }, 600);
+                }
                 // dev 模式（localhost/127.0.0.1）跳过 SW 注册：dev 用 http-server 服务 webroot，SW 的 scope='./' 会缓存 dev 前端，
                 // 且会接管之前生产 exe 注册的旧 SW，导致前端初始化卡死、按钮全失效。生产（github.io）才注册 SW。
                 const isDev = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\//.test(location.href);
