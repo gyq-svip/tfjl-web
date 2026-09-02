@@ -14375,7 +14375,7 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
                         }
                     }
 
-                    const deleteBtn = canDelete ? `<a href="javascript:void(0)" onclick="deleteWallMsgInModal(${wallMessages.indexOf(msg)})" style="color:#ff6b6b;cursor:pointer;margin-left:10px;font-size:0.7rem;" title="${isOwner ? '删除我的消息' : '管理员删除'}">🗑️</a>` : '';
+                    const deleteBtn = canDelete ? `<a href="javascript:void(0)" onclick="if(event&&event.preventDefault)event.preventDefault();if(event&&event.stopPropagation)event.stopPropagation();deleteWallMsgInModal(${wallMessages.indexOf(msg)});return false;" style="color:#ff6b6b;cursor:pointer;margin-left:10px;font-size:0.7rem;" title="${isOwner ? '删除我的消息' : '管理员删除'}">🗑️</a>` : '';
 
                     return `<div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:10px 12px;font-size:0.85rem;margin-bottom:8px;">
                         <div style="color:#fff;margin-bottom:6px;line-height:1.5;">${contentHtml}</div>
@@ -14420,12 +14420,18 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
             document.getElementById('newsListModal').style.display = 'none';
         }
 
-        // 从全部公告弹窗中删除需求墙消息（删除后刷新弹窗）
+        // 从全部公告弹窗中删除需求墙消息（删除后留在弹窗，不跳走）
         async function deleteWallMsgInModal(index) {
-            await deleteMessage(index);
-            // 删除完成后刷新弹窗（如果还开着）
+            try {
+                await deleteMessage(index);
+            } catch (e) {
+                console.error('删除需求墙消息失败:', e);
+                alert('删除失败：' + (e && e.message ? e.message : e));
+            }
+            // 删除完成后强制保持在公告弹窗（无论是否异常、modal 当前状态如何都不跳到主页）
             const modal = document.getElementById('newsListModal');
-            if (modal && modal.style.display === 'flex') {
+            if (modal) {
+                modal.style.display = 'flex';
                 showNewsListModal();
             }
         }
