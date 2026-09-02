@@ -4,7 +4,6 @@
   "version": "2.0.29",
   "identifier": "com.gyq.tfjl",
     "build": {
-    "frontendDist": "webroot",
     "devUrl": "http://localhost:1420",
     "beforeDevCommand": "npx http-server . -p 1420 --cors",
     "beforeBuildCommand": ""
