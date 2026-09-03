@@ -5416,13 +5416,10 @@
             if (typeof updateRealTimeDamageReduction === 'function') updateRealTimeDamageReduction();
         }
 
-        // 校验：上阵的非精灵卡必须出现在魔化行，否则返回缺失列表（供生成前提示）
-        function checkMissingMoHua(heroNames, moHuaCards) {
-            const jingLingNames = ['冰精灵','光精灵','魔精灵','木精灵','土精灵','雷精灵','暗精灵','幻精灵','魂精灵','彩精灵'];
-            return heroNames.filter(name => {
-                if (jingLingNames.some(jl => name.includes(jl))) return false;
-                return !moHuaCards.includes(name);
-            });
+        // 提醒：魔化行已默认填入全部非精灵上阵卡，生成后提示用户自行核对并删除没有的卡（不中止生成）
+        function remindMoHua(moHuaCards) {
+            const list = (moHuaCards && moHuaCards.length) ? moHuaCards.join('、') : '（空）';
+            alert('⚠️ 魔化行已默认填入全部非精灵上阵卡：\n\n' + list + '\n\n请核对并删除您实际没有魔化的卡（精灵类无需魔化，已自动排除）。');
         }
 
         // ==================== 快速输入卡牌（拼音联想，支持全拼+简拼） ====================
@@ -6250,13 +6247,6 @@
             // 上阵行按重排后的顺序重建，保证输出的"上阵："也是精灵在最后
             if (zhenZhanLine) zhenZhanLine = '上阵：' + heroNames.join(',');
 
-            // 校验：上阵的非精灵卡必须出现在魔化行，否则提示用户自行删除
-            const _missingMoHua = checkMissingMoHua(heroNames, moHuaCards);
-            if (_missingMoHua.length > 0) {
-                alert('⚠️ 以下上阵卡未魔化，请自行删除或补到「魔化：」行：\n\n' + _missingMoHua.join('、'));
-                return null;
-            }
-
             // 检查是否有工程卡
             const hasGongCheng = heroNames.some(name => gongChengNames.some(gc => name.includes(gc)));
             
@@ -6293,10 +6283,8 @@
             }
             // 始终输出魔化、皮肤、主战车、副战车这几行
             const defaultLines = ['魔化：', '皮肤：', '主战车：', '副战车：'];
-            // 隐藏榜专属：魔化栏自动填入「除精灵外的所有卡」（用户自己填了魔化行则以用户为准）
-            const moHuaAutoList = isHidden
-                ? heroNames.filter(name => !jingLingNames.some(jl => name.includes(jl)))
-                : [];
+            // 活动/隐藏榜：魔化栏默认自动填入「除精灵外的所有卡」（用户自己填了魔化行则以用户为准）
+            const moHuaAutoList = heroNames.filter(name => !jingLingNames.some(jl => name.includes(jl)));
             defaultLines.forEach(defaultLine => {
                 // 检查输入中是否有这一行
                 const foundLine = otherLines.find(line => line.startsWith(defaultLine.replace('：', '')));
@@ -6310,7 +6298,10 @@
                     output += defaultLine + '\n';
                 }
             });
-            
+
+            // 提醒用户核对魔化行（已默认全填非精灵卡）
+            remindMoHua(moHuaCards);
+
             // 空一行
             output += '\n';
             
@@ -6673,13 +6664,6 @@
                 }
             });
 
-            // 校验：上阵的非精灵卡必须出现在魔化行，否则提示用户自行删除
-            const _missingMoHua = checkMissingMoHua(heroNames, moHuaCards);
-            if (_missingMoHua.length > 0) {
-                alert('⚠️ 以下上阵卡未魔化，请自行删除或补到「魔化：」行：\n\n' + _missingMoHua.join('、'));
-                return null;
-            }
-
             // 没有"上阵："时，自动补上
             if (heroNames.length > 0 && !zhenZhanLine) {
                 zhenZhanLine = '上阵：' + heroNames.join(',');
@@ -6834,14 +6818,21 @@
             if (zhenZhanLine) output += zhenZhanLine + '\n';
             // 保留用户输入的魔化、皮肤、主战车、副战车行，没有则输出默认空行（顺序与活动/隐藏榜一致）
             const defaultLines = ['魔化：', '皮肤：', '主战车：', '副战车：'];
+            // 深海：未填魔化行时，默认把非精灵上阵卡填入魔化
+            const moHuaAutoList = heroNames.filter(name => !jingLingNames.some(jl => name.includes(jl)));
             defaultLines.forEach(defaultLine => {
                 const foundLine = otherLines.find(line => line.startsWith(defaultLine.replace('：', '')));
                 if (foundLine) {
                     output += foundLine + '\n';
+                } else if (defaultLine === '魔化：' && moHuaAutoList.length) {
+                    moHuaCards = moHuaAutoList.slice();
+                    output += '魔化：' + moHuaAutoList.join(',') + '\n';
                 } else {
                     output += defaultLine + '\n';
                 }
             });
+            // 提醒用户核对魔化行（已默认全填非精灵卡）
+            remindMoHua(moHuaCards);
             output += '\n';
 
             // 第1行 (时间1)
