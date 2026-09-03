@@ -6575,8 +6575,6 @@
 
             // 保存输出到全局变量供复制使用
             window._activityScriptOutput = output;
-            // 生成完成后自动清空输入框，方便直接输入下一组（结果保留在下方）
-            clearParserInputBox();
         }
 
         // 📜 活动脚本生成 —— 每期活动会调整，改这里（不会影响隐藏榜）
@@ -6996,8 +6994,6 @@
                 '</div></div>';
 
             window._dungeonScriptOutput = output;
-            // 生成完成后自动清空输入框，方便直接输入下一组（结果保留在下方）
-            clearParserInputBox();
         }
 
         // 复制副本脚本输出
