@@ -104,7 +104,13 @@
       if (!rExpired && (tgt === 'all' || tgt === dev) && !_isAcked(rAck)) {
         _markAck(rAck);
         console.log('[adminCtl] 收到重启指令，前端兜底 reload（APP 版由 Rust restart 生效）');
-        setTimeout(() => location.reload(), 600);
+        // 🔴 2026-09-04：正在编辑（阵容输入框有内容/正在输入/项目未保存）→ 延后到编辑结束再重启，绝不打断
+        const _doRestart = function () { location.reload(); };
+        if (typeof window.__tfjlRunWhenNotEditing === 'function') {
+          window.__tfjlRunWhenNotEditing(_doRestart, '管理员重启指令');
+        } else {
+          setTimeout(_doRestart, 600);
+        }
       }
     }
 
@@ -446,8 +452,16 @@
       const ack = JSON.parse(localStorage.getItem(ACK_KEY) || '{}');
       Object.keys(ack).forEach(k => { try { sessionStorage.setItem('tfjl_adminctl_ackguard@' + k, '1'); } catch (e) {} });
     } catch (e) {}
+    // 🔴 2026-09-04：正在编辑 → 延后刷新，等编辑结束再刷，绝不打断编辑（覆盖 forceReload / latestSwVersion 等所有调用方）
     // 直接 reload，不走 SW postMessage（SW 无新版本时 waiting 为 null，多此一举且引入 600ms 异步竞态）
-    try { location.reload(true); } catch (e) { location.reload(); }
+    const _doReload = function () {
+      try { location.reload(true); } catch (e) { location.reload(); }
+    };
+    if (typeof window.__tfjlRunWhenNotEditing === 'function') {
+      window.__tfjlRunWhenNotEditing(_doReload, '管理员强制刷新(' + (reason || '') + ')');
+    } else {
+      _doReload();
+    }
   };
   //  - 立即诊断上报：复用 app-core 的 _pushDiagReport（若已定义），否则标记待上报由下次心跳带出。
   window.__tfjlForceDiagPush = function () {
