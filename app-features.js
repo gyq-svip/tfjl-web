@@ -5405,6 +5405,17 @@
             document.getElementById('parserResult').innerHTML = '';
         }
 
+        // 只清空「上阵卡」输入框（连同快速输入卡名框/联想框），不动下方生成结果
+        function clearParserInputBox() {
+            const ta = document.getElementById('parserInput');
+            if (ta) ta.value = '';
+            const q = document.getElementById('quickCardInput');
+            if (q) q.value = '';
+            const s = document.getElementById('quickCardSuggest');
+            if (s) s.style.display = 'none';
+            if (typeof updateRealTimeDamageReduction === 'function') updateRealTimeDamageReduction();
+        }
+
         // ==================== 快速输入卡牌（拼音联想，支持全拼+简拼） ====================
         // 内置字符级拼音映射表，覆盖所有卡牌用到的汉字，无需外部CDN
 
@@ -5645,26 +5656,39 @@
 
         function selectQuickCard(name) {
             const textarea = document.getElementById('parserInput');
-            let current = textarea.value.trim();
+            const jingLingNames = ['冰精灵','光精灵','魔精灵','木精灵','土精灵','雷精灵','暗精灵','幻精灵','魂精灵','彩精灵'];
+            const isJingLing = jingLingNames.some(jl => name.includes(jl));
 
-            // 智能拼接
-            if (!current) {
-                // 空文本，自动加上"上阵："前缀
-                textarea.value = `上阵：${name}`;
-            } else if (current.endsWith('：') || current.endsWith(':')) {
-                // 刚好输入了冒号
-                textarea.value = current + name;
-            } else if (current.startsWith('上阵') || current.startsWith('上阵：') || current.startsWith('上阵:')) {
-                // 已有"上阵："前缀，追加卡名
-                if (current.endsWith(',') || current.endsWith('，')) {
-                    textarea.value = current + name;
-                } else {
-                    textarea.value = current + ',' + name;
+            // 辅助：按行追加卡名（去重）
+            const appendToLine = (lines, prefix, val) => {
+                let idx = lines.findIndex(l => l.trim().startsWith(prefix));
+                if (idx === -1) { lines.push(prefix + '：'); idx = lines.length - 1; }
+                const line = lines[idx];
+                const existing = line.split(/[,，]/).map(s => s.trim()).filter(Boolean);
+                if (existing.includes(val)) return; // 已存在则跳过
+                const sep = /[：:]$/.test(line) ? '' : ',';
+                lines[idx] = line + sep + val;
+            };
+
+            let lines = textarea.value.split('\n');
+
+            // 补齐/确保模板四行
+            ['魔化','皮肤','主战车','副战车'].forEach(prefix => {
+                if (!lines.some(l => l.trim().startsWith(prefix))) {
+                    lines.push(prefix + '：');
                 }
-            } else {
-                // 没有前缀，直接追加
-                textarea.value = current + ',' + name;
+            });
+
+            // 上阵行必须存在
+            if (!lines.some(l => l.trim().startsWith('上阵'))) {
+                lines.unshift('上阵：');
             }
+
+            // 追加到上阵；非精灵同时追加到魔化
+            appendToLine(lines, '上阵', name);
+            if (!isJingLing) appendToLine(lines, '魔化', name);
+
+            textarea.value = lines.join('\n');
 
             // 清空输入框，继续输入下一张
             document.getElementById('quickCardInput').value = '';
@@ -6076,12 +6100,15 @@
             names.forEach(n => { if (!seen.has(n)) { seen.add(n); uniq.push(n); } });
             const input = document.getElementById('parserInput');
             if (input) {
+                // 读取手牌时自动把非精灵卡（含工程卡）填到魔化行（精灵不上卡槽、也不魔化）
+                const jingLingNames = ['冰精灵','光精灵','魔精灵','木精灵','土精灵','雷精灵','暗精灵','幻精灵','魂精灵','彩精灵'];
+                const moHuaNames = uniq.filter(n => !jingLingNames.some(jl => n.includes(jl)));
                 input.value = '上阵：' + uniq.join(',')
-                    + '\n魔化：'
+                    + '\n魔化：' + moHuaNames.join(',')
                     + '\n皮肤：'
                     + '\n主战车：'
                     + '\n副战车：';
-                // 读取后把精灵卡排到上阵行最后（便于用户复制前面的卡到魔化栏：精灵不上卡槽、也不会魔化）
+                // 读取后把精灵卡排到上阵行最后
                 sortParserDeploySpiritsLast(input, true);
                 if (typeof updateRealTimeDamageReduction === 'function') updateRealTimeDamageReduction();
             }
@@ -6213,6 +6240,17 @@
             ];
             // 上阵行按重排后的顺序重建，保证输出的"上阵："也是精灵在最后
             if (zhenZhanLine) zhenZhanLine = '上阵：' + heroNames.join(',');
+
+            // 校验：上阵的非精灵、非工程卡必须出现在魔化行，否则提示用户自行删除
+            const _missingMoHua = heroNames.filter(name => {
+                if (jingLingNames.some(jl => name.includes(jl))) return false;
+                // 工程卡也需魔化（用户要求：工程卡可魔化）
+                return !moHuaCards.includes(name);
+            });
+            if (_missingMoHua.length > 0) {
+                alert('⚠️ 以下上阵卡未魔化，请自行删除或补到「魔化：」行：\n\n' + _missingMoHua.join('、'));
+                return null;
+            }
 
             // 检查是否有工程卡
             const hasGongCheng = heroNames.some(name => gongChengNames.some(gc => name.includes(gc)));
@@ -6532,6 +6570,8 @@
 
             // 保存输出到全局变量供复制使用
             window._activityScriptOutput = output;
+            // 生成完成后自动清空输入框，方便直接输入下一组（结果保留在下方）
+            clearParserInputBox();
         }
 
         // 📜 活动脚本生成 —— 每期活动会调整，改这里（不会影响隐藏榜）
@@ -6944,6 +6984,8 @@
                 '</div></div>';
 
             window._dungeonScriptOutput = output;
+            // 生成完成后自动清空输入框，方便直接输入下一组（结果保留在下方）
+            clearParserInputBox();
         }
 
         // 复制副本脚本输出
