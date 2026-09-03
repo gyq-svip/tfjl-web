@@ -12,6 +12,69 @@
                 console.log('[BOOT] 启动版本 · 大版本(exe)=' + _exe + ' · 小版本(SW)=' + (_sw || '未知') + ' · ' + _t);
             } catch (e) {}
         })();
+
+        // 🔴 2026-09-04 根治「正在编辑阵容却突然刷新，编辑半天的内容没了」：
+        //   app-picker.js 里 4 处 isEditing() 都调用 window.__tfjlIsEditing，但该函数【从未定义】，
+        //   保护退化成只认 window.__tfjlProjectDirty（项目编辑脏标记）——编辑阵容/手牌并不置该标记
+        //   → 保护完全失效：切后台、挂托盘、心跳(15分钟)、SW轮询(5分钟)、24h兜底 都会把页面刷掉。
+        //   这里正式定义，覆盖所有「正在编辑」场景，所有自动刷新路径统一调用。
+        window.__tfjlIsEditing = function () {
+            try {
+                if (window.__tfjlProjectDirty) return true;                 // ① 项目有未保存改动
+                const ae = document.activeElement;                          // ② 正在输入（可编辑元素聚焦）
+                if (ae) {
+                    const tag = (ae.tagName || '').toLowerCase();
+                    if (tag === 'input' || tag === 'textarea' || tag === 'select' || ae.isContentEditable) return true;
+                }
+                const pi = document.getElementById('parserInput');           // ③ 阵容脚本输入框有内容（刷新直接丢失）
+                if (pi && typeof pi.value === 'string' && pi.value.trim().length > 0) return true;
+                const qi = document.getElementById('quickCardInput');        // ④ 快速输入联想框有内容
+                if (qi && typeof qi.value === 'string' && qi.value.trim().length > 0) return true;
+                return false;
+            } catch (e) { return false; }
+        };
+        // 刷新前把阵容输入框内容存草稿，刷新后自动恢复——即使发生任何意外刷新也不丢编辑内容
+        window.__tfjlSaveEditorDraft = function () {
+            try {
+                const pi = document.getElementById('parserInput');
+                if (pi && pi.value && pi.value.trim()) {
+                    localStorage.setItem('TFJL_ParserDraft', pi.value);
+                    localStorage.setItem('TFJL_ParserDraftTime', String(Date.now()));
+                }
+            } catch (e) {}
+        };
+        // 统一守卫：正在编辑 → 不刷新，每 3 秒轮询等到编辑结束再执行（永不打断编辑，无超时强刷）
+        window.__tfjlRunWhenNotEditing = function (fn, tag) {
+            const _run = function () {
+                try { window.__tfjlSaveEditorDraft(); } catch (e) {}
+                fn();
+            };
+            if (typeof window.__tfjlIsEditing !== 'function' || !window.__tfjlIsEditing()) { _run(); return; }
+            console.log('[更新] ' + (tag || '自动刷新') + '：检测到正在编辑，延后执行直到编辑结束（不打断）');
+            try { if (typeof showSwUpdateBanner === 'function') showSwUpdateBanner(); } catch (e) {}
+            const iv = setInterval(() => {
+                try {
+                    if (!window.__tfjlIsEditing()) { clearInterval(iv); _run(); }
+                } catch (e) { clearInterval(iv); _run(); }
+            }, 3000);
+        };
+        // 页面加载后恢复草稿（上一次刷新/崩溃前自动保存的编辑内容）
+        (function _restoreEditorDraft() {
+            const _do = function () {
+                try {
+                    const pi = document.getElementById('parserInput');
+                    if (!pi) return;
+                    const d = localStorage.getItem('TFJL_ParserDraft');
+                    if (!d) return;
+                    const t = parseInt(localStorage.getItem('TFJL_ParserDraftTime') || '0', 10);
+                    if (t && Date.now() - t > 24 * 3600 * 1000) { localStorage.removeItem('TFJL_ParserDraft'); return; }
+                    if (!pi.value || !pi.value.trim()) pi.value = d;
+                    localStorage.removeItem('TFJL_ParserDraft');
+                } catch (e) {}
+            };
+            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _do);
+            else _do();
+        })();
         const MAX_CONSOLE_LOGS = 500;
         // 🔴 2026-08-29 内存优化：单条日志最大字符数。
         //    原实现只截断 object（JSON.stringify(a).slice(0,300)），**字符串参数完全不限制** ——
@@ -948,8 +1011,13 @@
                     if (!hitAll && !hitMe) return; // 不是全部、也不是我这台
                     try { localStorage.setItem(_FR_KEY, sigStr); } catch (e) {}
                     console.log('[强制刷新] 收到远程指令(' + sigStr + ')，立即拉取最新版');
-                    if (typeof forceRefreshLatest === 'function') { forceRefreshLatest(); return; }
-                    location.reload(true);
+                    const _doFR = function () {
+                        if (typeof forceRefreshLatest === 'function') { forceRefreshLatest(); return; }
+                        location.reload(true);
+                    };
+                    // 🔴 管理员远程强刷也必须让位于「正在编辑」（此前 60 秒轮询无条件刷新）
+                    if (typeof window.__tfjlRunWhenNotEditing === 'function') window.__tfjlRunWhenNotEditing(_doFR, '管理员远程强刷');
+                    else _doFR();
                 } catch (e) { /* 读不到索引不影响心跳 */ }
             }
             // 手动清除「强制刷新指令已执行」本地记录（若想重新接收某已过期/已忽略的指令可调用）
@@ -27031,8 +27099,13 @@ ${maSection}
             // 🔴 2026-08-27 改：强制更新总开关「只管自动升级」。开关关 → 无论前后台都只弹气泡，绝不自动升级。
             if (inBackground && window.__diagForceReload) {
                 console.log('[更新] 处于后台/托盘且开关开，静默强制更新到新版本');
-                if (typeof forceRefreshLatest === 'function') { forceRefreshLatest(); return; }
-                location.reload(true);
+                const _do = function () {
+                    if (typeof forceRefreshLatest === 'function') { forceRefreshLatest(); return; }
+                    location.reload(true);
+                };
+                // 🔴 编辑中绝不刷新（此前此处零保护：切后台/挂托盘时正在编辑阵容会被直接刷掉）
+                if (typeof window.__tfjlRunWhenNotEditing === 'function') window.__tfjlRunWhenNotEditing(_do, '心跳静默强刷');
+                else _do();
                 return;
             }
             // 其余（前台 / 或开关关的后台）：绝不自动升级，只弹彩球（用户手动点才升）

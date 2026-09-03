@@ -3533,6 +3533,8 @@
         // 菜单「刷新最新资源」：清理所有缓存并强制重新加载，确保拿到最新前端
         // 核心优化：用时间戳 URL 强刷，彻底绕过浏览器/SW/WebView 各级缓存
         async function forceRefreshLatest() {
+            // 🔴 2026-09-04：强刷前把阵容输入框内容存草稿，刷新后自动恢复（防止编辑内容丢失）
+            try { if (typeof window.__tfjlSaveEditorDraft === 'function') window.__tfjlSaveEditorDraft(); } catch (e) {}
             // 🔴 关键修复：升级/强刷前，先把当前编辑中的项目、记事本等数据落盘，
             // 避免「编辑一半突然自动升级」导致未保存内容丢失（用户明确要求：自动升级绝不能丢数据）。
             try {
