@@ -297,9 +297,19 @@ if (true) {
                 setTimeout(() => {
                     // 二次确认仍在隐藏态才刷新，避免用户已切回前台时误 reload 打断操作
                     if (document.visibilityState === 'hidden') {
-                        _flushStore().catch(() => {});  // 更新前再保存一次当前页面数据
-                        console.log('[更新] 隐藏态延迟刷新，拉取最新前端资源');
-                        location.reload(true);
+                        // 🔴 2026-09-04 根治「编辑阵容时切后台/最小化 15 秒后被刷新，编辑半天没了」：
+                        //   原逻辑隐藏态即无条件 reload，完全不看是否在编辑。改走统一守卫：
+                        //   正在编辑（输入框有内容/正在输入/项目未保存）→ 不刷新，轮询等到编辑结束再刷，绝不打断。
+                        const _doReload = function () {
+                            _flushStore().catch(() => {});  // 更新前再保存一次当前页面数据
+                            console.log('[更新] 隐藏态延迟刷新，拉取最新前端资源');
+                            location.reload(true);
+                        };
+                        if (typeof window.__tfjlRunWhenNotEditing === 'function') {
+                            window.__tfjlRunWhenNotEditing(_doReload, '隐藏态延迟刷新');
+                        } else {
+                            _doReload();
+                        }
                     }
                 }, 15000);
             }
