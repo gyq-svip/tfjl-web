@@ -897,7 +897,6 @@
                     <div style="margin-bottom:8px;display:flex;gap:5px;align-items:center;flex-wrap:wrap;">
                         <input id="quickCardInput" type="text" placeholder="⚡ 输入卡名首字母或关键字快速添加（如 sm=萨满, sl=水灵）" oninput="onQuickCardInput(event)" onkeydown="onQuickCardKeydown(event)" style="flex:1;min-width:120px;padding:6px 10px;border-radius:6px;border:1px solid rgba(0,188,212,0.4);background:rgba(0,0,0,0.3);color:#fff;font-size:0.85rem;box-sizing:border-box;">
                         <button onclick="openParserCardPicker()" data-tip="用通用筛选器（首字母/关键字）从全部英雄卡里挑，点一下直接加入下方文本" style="background:linear-gradient(135deg,#00bcd4,#7b61ff);color:#fff;border:none;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:0.8rem;white-space:nowrap;">📋 列表选</button>
-                        <button onclick="clearQuickCardInput()" data-tip="清空上方快速输入卡名框" style="background:rgba(255,255,255,0.1);color:#fff;border:none;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:0.8rem;">清</button>
                         <button onclick="clearParserInputBox()" data-tip="清空下方「上阵卡」输入框（保留生成结果），生成下一组前重置" style="background:rgba(255,255,255,0.1);color:#fff;border:none;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:0.8rem;white-space:nowrap;">🗑 清空输入</button>
                     </div>
                     <div id="quickCardSuggest" style="display:none;position:relative;z-index:20;"></div>

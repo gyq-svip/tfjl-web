@@ -5416,6 +5416,15 @@
             if (typeof updateRealTimeDamageReduction === 'function') updateRealTimeDamageReduction();
         }
 
+        // 校验：上阵的非精灵卡必须出现在魔化行，否则返回缺失列表（供生成前提示）
+        function checkMissingMoHua(heroNames, moHuaCards) {
+            const jingLingNames = ['冰精灵','光精灵','魔精灵','木精灵','土精灵','雷精灵','暗精灵','幻精灵','魂精灵','彩精灵'];
+            return heroNames.filter(name => {
+                if (jingLingNames.some(jl => name.includes(jl))) return false;
+                return !moHuaCards.includes(name);
+            });
+        }
+
         // ==================== 快速输入卡牌（拼音联想，支持全拼+简拼） ====================
         // 内置字符级拼音映射表，覆盖所有卡牌用到的汉字，无需外部CDN
 
@@ -6241,12 +6250,8 @@
             // 上阵行按重排后的顺序重建，保证输出的"上阵："也是精灵在最后
             if (zhenZhanLine) zhenZhanLine = '上阵：' + heroNames.join(',');
 
-            // 校验：上阵的非精灵、非工程卡必须出现在魔化行，否则提示用户自行删除
-            const _missingMoHua = heroNames.filter(name => {
-                if (jingLingNames.some(jl => name.includes(jl))) return false;
-                // 工程卡也需魔化（用户要求：工程卡可魔化）
-                return !moHuaCards.includes(name);
-            });
+            // 校验：上阵的非精灵卡必须出现在魔化行，否则提示用户自行删除
+            const _missingMoHua = checkMissingMoHua(heroNames, moHuaCards);
             if (_missingMoHua.length > 0) {
                 alert('⚠️ 以下上阵卡未魔化，请自行删除或补到「魔化：」行：\n\n' + _missingMoHua.join('、'));
                 return null;
@@ -6669,6 +6674,13 @@
                     heroNames = line.split(/[,，]/).map(name => name.trim()).filter(name => name);
                 }
             });
+
+            // 校验：上阵的非精灵卡必须出现在魔化行，否则提示用户自行删除
+            const _missingMoHua = checkMissingMoHua(heroNames, moHuaCards);
+            if (_missingMoHua.length > 0) {
+                alert('⚠️ 以下上阵卡未魔化，请自行删除或补到「魔化：」行：\n\n' + _missingMoHua.join('、'));
+                return null;
+            }
 
             // 没有"上阵："时，自动补上
             if (heroNames.length > 0 && !zhenZhanLine) {
