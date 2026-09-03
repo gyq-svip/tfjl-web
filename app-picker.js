@@ -368,7 +368,7 @@
                         let waited = 0;
                         const iv = setInterval(() => {
                             waited += 3000;
-                            if (!isEditing() || waited >= 600000) { clearInterval(iv); doSilentUpgrade(); }
+                            if (!isEditing()) { clearInterval(iv); doSilentUpgrade(); }
                         }, 3000);
                     } else {
                         doSilentUpgrade();
@@ -460,7 +460,7 @@
                             let waited = 0;
                             const iv = setInterval(() => {
                                 waited += 3000;
-                                if (!isEditing() || waited >= 600000) { clearInterval(iv); doSilentUpgrade(); }
+                                if (!isEditing()) { clearInterval(iv); doSilentUpgrade(); }
                             }, 3000);
                         } else {
                             setTimeout(doSilentUpgrade, 15000);
@@ -487,7 +487,7 @@
                                         let waited = 0;
                                         const iv = setInterval(() => {
                                             waited += 3000;
-                                            if (!isEditing() || waited >= 600000) { clearInterval(iv); doSilentUpgrade(); }
+                                            if (!isEditing()) { clearInterval(iv); doSilentUpgrade(); }
                                         }, 3000);
                                     } else { doSilentUpgrade(); }
                                 }
@@ -499,16 +499,26 @@
                             }
                         }
                     } else {
-                        // 网页版前台：不弹气泡、不升级，切后台时静默升
+                        // 网页版前台：不弹气泡、不升级，切后台且空闲时静默升（编辑中无限延后）
                         window.__tfjlHasNewVersion = true;
                         _markNewVersionAvailable();
                         if (!window.__tfjlHideUpgradeBound) {
                             window.__tfjlHideUpgradeBound = true;
                             document.addEventListener('visibilitychange', () => {
                                 if (document.hidden && window.__tfjlHasNewVersion) {
-                                    window.__tfjlHasNewVersion = false;
-                                    if (typeof forceRefreshLatest === 'function') forceRefreshLatest();
-                                    else location.reload(true);
+                                    const _editing = function () {
+                                        return !!(window.__tfjlProjectDirty) || (typeof window.__tfjlIsEditing === 'function' && window.__tfjlIsEditing());
+                                    };
+                                    if (_editing()) {
+                                        console.log('[更新] 网页版切后台但编辑中，延后升级直到编辑结束');
+                                        let _iv = setInterval(() => {
+                                            if (!_editing()) { clearInterval(_iv); window.__tfjlHasNewVersion = false; if (typeof forceRefreshLatest === 'function') forceRefreshLatest(); else location.reload(true); }
+                                        }, 3000);
+                                    } else {
+                                        window.__tfjlHasNewVersion = false;
+                                        if (typeof forceRefreshLatest === 'function') forceRefreshLatest();
+                                        else location.reload(true);
+                                    }
                                 }
                             });
                         }

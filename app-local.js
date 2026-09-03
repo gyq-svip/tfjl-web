@@ -2472,6 +2472,8 @@ if (true) {
         if (!dir) { if (!silent) alert('未配置该目录'); return false; }
         const sep = dir.endsWith('\\') || dir.endsWith('/') ? '' : '\\';
         const filePath = dir + sep + fileName;
+        // 老马助手/Windows 记事本按 CRLF 解析行；确保写入 CRLF，避免 LF 被识别成一行
+        content = content.replace(/\r?\n/g, '\r\n');
         const ok = await writeTextFile(filePath, content);
         if (ok) {
             if (!silent) alert('✅ 脚本已保存到：\n' + filePath);
