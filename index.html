@@ -1639,6 +1639,23 @@
                         <div id="toolboxPollSecStatus" style="font-size:0.72rem;color:rgba(255,255,255,0.55);margin-top:6px;">客户端下次轮询即按新间隔拉取指令；设小=指令更快触达，但更耗 GitHub API 额度</div>
                     </div>
                     <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:12px;margin-bottom:12px;">
+                        <div style="color:rgba(255,255,255,0.7);font-size:0.75rem;margin-bottom:8px;">📌 最低版本门槛（低于此版本的桌面端弹升级提示，可「稍后提醒」，不阻断使用）</div>
+                        <div style="display:flex;flex-direction:column;gap:8px;">
+                            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                                <input id="toolboxMinExeVer" placeholder="最低版本，如 2.0.25" style="width:132px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:6px;padding:7px 9px;font-size:0.8rem;">
+                                <input id="toolboxMinExeHours" type="number" min="1" max="72" placeholder="间隔" style="width:82px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:6px;padding:7px 9px;font-size:0.8rem;">
+                                <span style="font-size:0.72rem;color:rgba(255,255,255,0.5);">小时后再次提醒（默认4）</span>
+                            </div>
+                            <input id="toolboxMinExeMsg" placeholder="自定义提示语（可留空）" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:6px;padding:7px 9px;font-size:0.8rem;">
+                            <input id="toolboxMinExeUrl" placeholder="手动下载兜底地址（留空=自动解析最新安装包）" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:6px;padding:7px 9px;font-size:0.78rem;">
+                            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                                <button onclick="toolboxSetMinExeVersion()" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;border:none;padding:8px 14px;border-radius:7px;cursor:pointer;font-size:0.8rem;font-weight:600;">应用到指令 Gist</button>
+                                <button onclick="toolboxClearMinExeVersion()" style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:#fff;padding:8px 14px;border-radius:7px;cursor:pointer;font-size:0.78rem;">清除（回退内置门槛）</button>
+                            </div>
+                            <div id="toolboxMinExeStatus" style="font-size:0.72rem;color:rgba(255,255,255,0.55);">留空并「清除」则回退到内置默认门槛；客户端下次轮询生效（默认5分钟内）</div>
+                        </div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:12px;margin-bottom:12px;">
                         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
                             <span style="color:rgba(255,255,255,0.7);font-size:0.75rem;">🔓 解除拉黑（从 blacklist 移除）</span>
                             <button onclick="toolboxLoadBlocked()" style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:#fff;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:0.72rem;">刷新列表</button>

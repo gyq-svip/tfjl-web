@@ -24226,12 +24226,63 @@ ${maSection}
                     const data = f && f.content ? JSON.parse(f.content) : {};
                     const psInp = document.getElementById('toolboxPollSec');
                     if (psInp && data.pollSec) psInp.value = data.pollSec;
+                    // 回填最低版本门槛配置（否则每次进来显示空，误以为没设置）
+                    const mvInp = document.getElementById('toolboxMinExeVer');
+                    if (mvInp && data.minExeVersion) mvInp.value = data.minExeVersion;
+                    const mhInp = document.getElementById('toolboxMinExeHours');
+                    if (mhInp && data.minExeVersionSnoozeHours) mhInp.value = data.minExeVersionSnoozeHours;
+                    const mmInp = document.getElementById('toolboxMinExeMsg');
+                    if (mmInp && data.minExeVersionMsg) mmInp.value = data.minExeVersionMsg;
+                    const muInp = document.getElementById('toolboxMinExeUrl');
+                    if (muInp && data.minExeVersionDownloadUrl) muInp.value = data.minExeVersionDownloadUrl;
                 } catch (e) {}
                 if (s) { s.style.color = '#4ade80'; s.textContent = '已拉取最新指令 Gist'; }
             } catch (e) {
                 if (s) { s.style.color = '#f87171'; s.textContent = '拉取失败：' + (e.message || e); }
                 raw.value = '{}';
             }
+        };
+        // 设置「最低版本门槛」：低于该版本的桌面端弹出升级提示（可稍后提醒 + 手动下载兜底）。
+        // 写进 admin_ctl.json：minExeVersion / minExeVersionSnoozeHours / minExeVersionMsg / minExeVersionDownloadUrl
+        window.toolboxSetMinExeVersion = async function () {
+            const s = document.getElementById('toolboxMinExeStatus');
+            const vEl = document.getElementById('toolboxMinExeVer');
+            const v = ((vEl && vEl.value) || '').trim().replace(/^v/, '');
+            if (v && !/^\d+(\.\d+)+$/.test(v)) {
+                if (s) { s.style.color = '#f87171'; s.textContent = '版本号格式不对，应形如 2.0.25'; }
+                return;
+            }
+            const hEl = document.getElementById('toolboxMinExeHours');
+            const hours = parseInt((hEl && hEl.value) || '', 10);
+            const mEl = document.getElementById('toolboxMinExeMsg');
+            const msg = ((mEl && mEl.value) || '').trim();
+            const uEl = document.getElementById('toolboxMinExeUrl');
+            const url = ((uEl && uEl.value) || '').trim();
+            try {
+                const g = await _toolboxGistGet(TOOLBOX_GIST_ID);
+                let data = {};
+                try {
+                    const f = g && g.files && g.files[TOOLBOX_FILE];
+                    data = (f && f.content) ? JSON.parse(f.content) : {};
+                } catch (e) { data = {}; }
+                if (v) data.minExeVersion = v; else delete data.minExeVersion;
+                if (hours > 0) data.minExeVersionSnoozeHours = hours; else delete data.minExeVersionSnoozeHours;
+                if (msg) data.minExeVersionMsg = msg; else delete data.minExeVersionMsg;
+                if (url) data.minExeVersionDownloadUrl = url; else delete data.minExeVersionDownloadUrl;
+                await _toolboxGistPatch(TOOLBOX_GIST_ID, { [TOOLBOX_FILE]: { content: JSON.stringify(data, null, 2) } });
+                if (s) {
+                    s.style.color = '#4ade80';
+                    s.textContent = v ? ('✅ 已设最低版本 ' + v + '，客户端下次轮询（默认5分钟内）生效') : '✅ 已清除远程门槛，回退到内置默认门槛';
+                }
+            } catch (e) {
+                if (s) { s.style.color = '#f87171'; s.textContent = '保存失败：' + (e.message || e); }
+            }
+        };
+        // 清除远程门槛（回退到代码内置的默认门槛）
+        window.toolboxClearMinExeVersion = function () {
+            const ve = document.getElementById('toolboxMinExeVer');
+            if (ve) ve.value = '';
+            window.toolboxSetMinExeVersion();
         };
         window.toolboxSaveRaw = async function () {
             const raw = document.getElementById('toolboxRaw');
