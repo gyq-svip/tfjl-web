@@ -185,18 +185,40 @@
         try { alert('自动升级失败' + (m ? '：' + m : '') + '\n\n请点「手动下载」获取安装包。'); } catch (_) {}
       });
     };
-    // 【手动下载】兜底：远程配置地址 → version.json 动态解析最新安装包 → Gitee 发布页
-    document.getElementById('minVerDlBtn').onclick = function () {
+    // 【手动下载】只给安装包「下载直链」，绝不跳发布页（避免用户在发布页迷路/不会下）
+    //   优先级：远程配置地址 → version.json 的 downloadUrl → Gitee API 解析最新 release 的 exe 直链
+    document.getElementById('minVerDlBtn').onclick = async function () {
+      const btn = this;
       const open = function (u) {
         try { if (window.__TAURI__ && window.__TAURI__.shell && typeof window.__TAURI__.shell.open === 'function') { window.__TAURI__.shell.open(u); return; } } catch (e) {}
         try { if (window.__TAURI__ && window.__TAURI__.opener && typeof window.__TAURI__.opener.openUrl === 'function') { window.__TAURI__.opener.openUrl(u); return; } } catch (e) {}
         try { window.open(u, '_blank'); } catch (e) {}
       };
-      if (dlUrl) { open(dlUrl); return; }
-      fetch('https://gyq-svip.github.io/tfjl-web/version.json?t=' + Date.now())
-        .then(function (r) { return r.json(); })
-        .then(function (d) { open((d && d.downloadUrl) || GITEE_RELEASES_PAGE); })
-        .catch(function () { open(GITEE_RELEASES_PAGE); });
+      let finalUrl = dlUrl || '';
+      if (!finalUrl) {
+        btn.textContent = '⏳ 获取中…'; btn.disabled = true;
+        // ① version.json（每次发布自动更新，含最新版安装包直链）
+        try {
+          const r = await fetch('https://gyq-svip.github.io/tfjl-web/version.json?t=' + Date.now());
+          if (r && r.ok) { const d = await r.json(); if (d && d.downloadUrl) finalUrl = d.downloadUrl; }
+        } catch (e) {}
+        // ② Gitee API：取最新 release 的 exe 安装包直链（不跳发布页）
+        if (!finalUrl) {
+          try {
+            const r2 = await fetch('https://gitee.com/api/v5/repos/dragon-soars-across-the-world_0/tfjl-web/releases/latest');
+            if (r2 && r2.ok) {
+              const rel = await r2.json();
+              const assets = (rel && rel.assets) || [];
+              const hit = assets.filter(function (a) { return /\.exe$/i.test((a && a.name) || ''); })[0] || assets[0];
+              if (hit && hit.browser_download_url) finalUrl = hit.browser_download_url;
+            }
+          } catch (e) {}
+        }
+        btn.textContent = '📥 手动下载'; btn.disabled = false;
+      }
+      if (finalUrl) { open(finalUrl); return; }
+      // 实在拿不到直链：给可复制地址（不跳转，避免迷失在发布页）
+      try { prompt('自动获取下载地址失败，请复制下面地址到浏览器下载安装包：', GITEE_RELEASES_PAGE); } catch (_) {}
     };
     // 【稍后提醒】N 小时内不再弹
     document.getElementById('minVerLaterBtn').onclick = function () {

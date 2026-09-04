@@ -8899,7 +8899,7 @@
             return s;
         }
 
-        // 📸 分享阵容图：先选有效期/密码 → 整个项目上传 Gist（含脚本/记事本/参考图）→ 生成图+短码 → 弹窗预览
+        // 📸 分享阵容图：先选有效期/密码 → 🔴先查本机是否分享过同一套阵容（命中可直取回，不重复上传）→ 整个项目上传 Gist（含脚本/记事本/参考图）→ 生成图+短码 → 弹窗预览
         // 对方扫码 / 报短码 / 点链接 → 与「分享整个项目」同款导入（完整项目，非纯阵容）。
         // 上传失败自动降级为纯图片（无短码，图上有重试提示），分享功能不受影响。
         async function shareLineupImage() {
@@ -8917,6 +8917,22 @@
                 if (typeof showToast === 'function') showToast('当前阵容是空的（我方和队友都没有上阵卡），先摆好阵容再分享', 'error');
                 return;
             }
+            // 🔴 分享前先查本机：同一套阵容之前分享过 → 提示直接取回，不再上传一次（省云端资源、不产生重复卡片/短码）
+            //    payload 只构建一次，后面上传直接复用，避免重复开销。
+            const _payload = _projShareBuildPayload();
+            const _curFp = (function () { try { return _shareContentFingerprint(_payload); } catch (e) { return ''; } })();
+            if (_curFp && !opts.pw) {   // 加密分享不参与查重（与云端复用策略一致）
+                try {
+                    const _hit = await _cardFindByFp(_curFp);
+                    if (_hit && _hit.dataUrl) {
+                        const _choice = await _confirmTakeOldCard(_hit);
+                        if (_choice === 'take') { _showTakenCardModal(_hit); return; }
+                        if (_choice === 'cancel') return;
+                        // 'new' → 继续走正常分享上传流程
+                    }
+                } catch (e) { /* 查重失败不影响正常分享 */ }
+            }
+
             // 整个项目上传 Gist（与「分享整个项目」同一条链路）：右上角浮条提示，断网/限额静默降级
             let shortLink = '', shortCode = '';
             {
@@ -8926,7 +8942,7 @@
                 document.body.appendChild(tip);
                 try {
                     opts.by = (function () { try { return localStorage.getItem('TFJL_UserName') || '匿名'; } catch (e) { return '匿名'; } })();
-                    const r = await _projShareCreate(_projShareBuildPayload(), opts);
+                    const r = await _projShareCreate(_payload, opts);
                     shortLink = PROJECT_SHARE_LINK_BASE + r.id;
                     shortCode = r.code;
                     if (r.reused && typeof showToast === 'function') {
@@ -8959,8 +8975,9 @@
                 return;
             }
             // 🔴 自动缓存小卡片到本机（IndexedDB，最近 30 张），方便日后随时取回发给朋友，不用重走分享流程
+            //    带上内容指纹 fp：下次分享同一套阵容时可直接取回，不重复占云端空间
             if (dataUrl) {
-                Promise.resolve(_cardSave(dataUrl, { projectName: (typeof currentProjectName !== 'undefined' && currentProjectName) || '', code: shortCode, link: shortLink })).catch(function () {});
+                Promise.resolve(_cardSave(dataUrl, { projectName: (typeof currentProjectName !== 'undefined' && currentProjectName) || '', code: shortCode, link: shortLink, fp: _curFp })).catch(function () {});
             }
             // 短链（#pg= 项目短链，~80字符，与二维码同款）；上传失败则无链接按钮
             const link = shortLink;
@@ -9546,7 +9563,8 @@
             try {
                 const db = await _cardDbOpen();
                 if (!db || !dataUrl) return;
-                const entry = { id: 'c_' + Date.now() + '_' + Math.floor(Math.random() * 1e6), dataUrl: dataUrl, ts: Date.now(), projectName: String(meta.projectName || ''), code: String(meta.code || ''), kind: meta.kind || 'gen', source: String(meta.source || ''), link: String(meta.link || '') };
+                // fp=内容指纹：供「分享前查本机是否分享过同一套阵容」识别（不存则无法去重）
+                const entry = { id: 'c_' + Date.now() + '_' + Math.floor(Math.random() * 1e6), dataUrl: dataUrl, ts: Date.now(), projectName: String(meta.projectName || ''), code: String(meta.code || ''), kind: meta.kind || 'gen', source: String(meta.source || ''), link: String(meta.link || ''), fp: String(meta.fp || '') };
                 await new Promise(function (resolve) {
                     try {
                         const tx = db.transaction(_CARD_STORE, 'readwrite');
@@ -9586,6 +9604,115 @@
                 });
             } catch (e) { return []; }
         }
+
+        // 🔴 2026-09-04 分享前本机查重：按内容指纹找本机已缓存的「同一套阵容」卡片
+        async function _cardFindByFp(fp) {
+            if (!fp) return null;
+            try {
+                const all = await _cardList();
+                for (let i = 0; i < all.length; i++) {
+                    const c = all[i];
+                    if (c && c.fp && c.fp === fp && c.dataUrl) return c;   // _cardList 已按 ts 倒序，首个即最新
+                }
+            } catch (e) {}
+            return null;
+        }
+        window._cardFindByFp = _cardFindByFp;
+
+        // 命中「本机已分享过这套阵容」→ 让用户选「取回旧卡片」还是「仍然重新分享」
+        function _confirmTakeOldCard(card) {
+            return new Promise(function (resolve) {
+                try {
+                    const old = document.getElementById('takeOldCardModal');
+                    if (old) old.remove();
+                    const d = new Date(card.ts || Date.now());
+                    const dt = (isNaN(d.getTime()) ? '之前' : (d.getMonth() + 1) + ' 月 ' + d.getDate() + ' 日 ' +
+                        String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'));
+                    const modal = document.createElement('div');
+                    modal.id = 'takeOldCardModal';
+                    modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.72);z-index:' + (200100 + (window.topWinZIndex || 0)) + ';display:flex;align-items:center;justify-content:center;padding:16px;';
+                    modal.innerHTML =
+                        '<div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(255,215,0,0.45);border-radius:16px;padding:18px 20px;max-width:520px;width:96%;box-shadow:0 10px 40px rgba(0,0,0,0.6);">' +
+                          '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">' +
+                            '<div style="min-width:0;"><span style="color:#ffd700;font-size:1.05rem;font-weight:bold;">♻️ 这套阵容你分享过</span>' +
+                            '<div style="color:rgba(255,255,255,0.5);font-size:0.76rem;margin-top:4px;">本机存有 ' + dt + ' 生成的卡片' + (card.code ? '（短码 ' + card.code + '）' : '') + '，直接取回即可，不用再上传一次</div></div>' +
+                            '<span id="takeOldClose" style="cursor:pointer;color:rgba(255,255,255,0.4);font-size:1.5rem;margin-left:10px;">×</span>' +
+                          '</div>' +
+                          '<img id="takeOldImg" style="width:100%;border-radius:10px;display:block;box-shadow:0 4px 18px rgba(0,0,0,0.5);max-height:44vh;object-fit:contain;background:#000;">' +
+                          '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;">' +
+                            '<button id="takeOldBtn" style="flex:1;min-width:140px;background:linear-gradient(135deg,#ffa726,#f57c00);color:#1a1a2e;border:none;padding:11px;border-radius:8px;cursor:pointer;font-size:0.92rem;font-weight:bold;">📇 取回这张卡片</button>' +
+                            '<button id="reshareBtn" style="flex:1;min-width:140px;background:rgba(255,255,255,0.14);border:1px solid rgba(255,255,255,0.25);color:#fff;padding:11px;border-radius:8px;cursor:pointer;font-size:0.9rem;">🔄 仍然重新分享</button>' +
+                          '</div>' +
+                          '<div style="color:rgba(255,255,255,0.42);font-size:0.7rem;margin-top:8px;text-align:center;">取回＝拿本机已存的那张，不重复占云端空间；重新分享＝走正常上传流程</div>' +
+                        '</div>';
+                    document.body.appendChild(modal);
+                    const img = modal.querySelector('#takeOldImg');
+                    if (img) img.src = card.dataUrl || '';
+                    const done = function (v) { modal.remove(); resolve(v); };
+                    modal.querySelector('#takeOldBtn').onclick = function () { done('take'); };
+                    modal.querySelector('#reshareBtn').onclick = function () { done('new'); };
+                    modal.querySelector('#takeOldClose').onclick = function () { done('cancel'); };
+                    modal.onclick = function (e) { if (e.target === modal) done('cancel'); };
+                } catch (e) { resolve('new'); }
+            });
+        }
+
+        // 取回展示：本机卡片 + 短码 + 下载/复制（未走云端，纯本机）
+        function _showTakenCardModal(card) {
+            try {
+                const old = document.getElementById('lineupShareModal');
+                if (old) old.remove();
+                const modal = document.createElement('div');
+                modal.id = 'lineupShareModal';
+                modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.72);z-index:' + (200000 + (window.topWinZIndex || 0)) + ';display:flex;align-items:center;justify-content:center;padding:16px;';
+                modal.innerHTML =
+                    '<div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(255,215,0,0.45);border-radius:16px;padding:18px 20px;max-width:860px;width:96%;max-height:92vh;overflow-y:auto;box-shadow:0 10px 40px rgba(0,0,0,0.6);">' +
+                      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
+                        '<div><span style="color:#ffd700;font-size:1.1rem;font-weight:bold;">📇 已取回卡片（本机）</span>' +
+                        '<div style="color:rgba(255,255,255,0.45);font-size:0.74rem;margin-top:2px;">未重复上传云端，直接用你之前分享的那张</div></div>' +
+                        '<span id="lineupShareClose" style="cursor:pointer;color:rgba(255,255,255,0.4);font-size:1.5rem;">×</span>' +
+                      '</div>' +
+                      '<img id="lineupShareImg" style="width:100%;border-radius:10px;display:block;box-shadow:0 4px 18px rgba(0,0,0,0.5);" alt="阵容分享图">' +
+                      (card.code ?
+                        '<div style="margin-top:12px;background:linear-gradient(135deg,rgba(255,215,0,0.12),rgba(255,152,0,0.10));border:2px solid rgba(255,215,0,0.5);border-radius:12px;padding:12px 16px;display:flex;align-items:center;gap:14px;">' +
+                          '<div style="flex:1;min-width:0;">' +
+                            '<div style="color:rgba(255,255,255,0.55);font-size:0.74rem;">分享短码（对方在软件「📥 从短码导入」输入这 8 位）：</div>' +
+                            '<div style="color:#ffd700;font-size:2rem;font-weight:bold;letter-spacing:0.22em;font-family:Consolas,monospace;text-shadow:0 0 12px rgba(255,215,0,0.35);margin-top:4px;">' + card.code + '</div>' +
+                          '</div>' +
+                          '<button id="lineupShareCopyShort" style="flex-shrink:0;background:linear-gradient(135deg,#ffd700,#ff9800);color:#1a1a2e;border:none;padding:12px 18px;border-radius:10px;cursor:pointer;font-size:0.95rem;font-weight:bold;">📋 复制短码</button>' +
+                        '</div>' : '') +
+                      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">' +
+                        '<button id="lineupShareDl" style="flex:1;min-width:120px;background:linear-gradient(135deg,#ffd700,#ff9800);color:#1a1a2e;border:none;padding:10px;border-radius:8px;cursor:pointer;font-size:0.9rem;font-weight:bold;">💾 下载图片</button>' +
+                        '<button id="lineupShareCopyImg" style="flex:1;min-width:120px;background:linear-gradient(135deg,#26a69a,#00796b);color:#fff;border:none;padding:10px;border-radius:8px;cursor:pointer;font-size:0.9rem;font-weight:bold;">📋 复制图片</button>' +
+                      '</div>' +
+                    '</div>';
+                document.body.appendChild(modal);
+                const img = modal.querySelector('#lineupShareImg');
+                if (img) img.src = card.dataUrl || '';
+                const close = function () { modal.remove(); };
+                modal.querySelector('#lineupShareClose').onclick = close;
+                modal.onclick = function (e) { if (e.target === modal) close(); };
+                modal.querySelector('#lineupShareDl').onclick = function () {
+                    try {
+                        const a = document.createElement('a');
+                        a.href = card.dataUrl;
+                        const pn = String(card.projectName || '阵容').replace(/[\\/:*?"<>|]/g, '');
+                        a.download = '塔防阵容_' + pn + '_' + Date.now() + '.png';
+                        document.body.appendChild(a); a.click(); a.remove();
+                    } catch (e) {}
+                };
+                modal.querySelector('#lineupShareCopyImg').onclick = function () {
+                    try { if (typeof copyText === 'function') copyText(card.dataUrl, '📋 图片已复制（可直接粘贴到聊天窗口）', this); } catch (e) {}
+                };
+                if (card.code) {
+                    modal.querySelector('#lineupShareCopyShort').onclick = function () {
+                        try { if (typeof copyText === 'function') copyText(card.code, '📋 短码 ' + card.code + ' 已复制', this); } catch (e) {}
+                    };
+                }
+                if (typeof showToast === 'function') showToast('📇 已取回本机卡片（未重复上传云端）', 'success');
+            } catch (e) {}
+        }
+
         // 🔴 2026-09-03 小卡片画廊（增强）：悬浮窗（拖拽标题栏 + 右下角缩放），工具栏含上传/备份/恢复，区分生成/上传
         async function _cardGallery() {
             const cards = await _cardList();
