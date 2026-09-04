@@ -86,6 +86,125 @@
     }
   }
 
+  // ==================== 版本门槛管控（低于最低要求版本 → 弹窗提示升级）====================
+  // 设计：内置默认门槛（预埋在前端，永久生效）+ admin_ctl Gist 远程字段覆盖（不改代码即可开关/调门槛）。
+  //   · minExeVersion             最低要求的桌面 exe 版本，如 "2.0.25"；低于此版本弹升级提示
+  //   · minExeVersionMsg          自定义提示语（可留空）
+  //   · minExeVersionSnoozeHours  点「稍后提醒」后间隔几小时再提示（默认 4）
+  //   · minExeVersionDownloadUrl  手动下载兜底地址（留空则自动解析最新安装包）
+  // 只对桌面端（Tauri）生效；网页版 / 取不到版本号一律不打扰，避免误弹。
+  const BUILTIN_MIN_EXE_VERSION = '2.0.25';
+  const MIN_VER_SNOOZE_KEY = 'tfjl_minver_snooze';
+  const DEFAULT_SNOOZE_HOURS = 4;
+  const GITEE_RELEASES_PAGE = 'https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/releases';
+
+  // 语义化版本比较：a>b 返回 1，a==b 返回 0，a<b 返回 -1
+  // （按位数字比较，避免 "2.0.9" > "2.0.25" 的字符串比较坑）
+  function _cmpVer(a, b) {
+    try {
+      const pa = String(a || '').replace(/^v/, '').split('.').map(n => parseInt(n, 10) || 0);
+      const pb = String(b || '').replace(/^v/, '').split('.').map(n => parseInt(n, 10) || 0);
+      for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+        const x = pa[i] || 0, y = pb[i] || 0;
+        if (x > y) return 1;
+        if (x < y) return -1;
+      }
+      return 0;
+    } catch (e) { return 0; }
+  }
+
+  // 取本地 exe 版本（仅桌面端；网页版 / 取不到返回 ''）
+  async function _localExeVersion() {
+    try {
+      const isTauri = !!(window.__TAURI_INTERNALS__ || window.__TAURI__);
+      if (!isTauri) return '';
+      if (window.__TAURI__ && window.__TAURI__.app && typeof window.__TAURI__.app.getVersion === 'function') {
+        const v = await window.__TAURI__.app.getVersion();
+        if (v && /^v?\d+\.\d+/.test(v)) return v.replace(/^v/, '');
+      }
+      if (typeof window.__APP_VERSION === 'string' && /^v?\d+\.\d+/.test(window.__APP_VERSION)) {
+        return window.__APP_VERSION.replace(/^v/, '');
+      }
+    } catch (e) {}
+    return '';
+  }
+
+  async function _checkMinExeVersion(ctl) {
+    try {
+      const cur = await _localExeVersion();
+      if (!cur) return;                                          // 网页版 / 取不到版本 → 不打扰
+      const minV = (ctl && ctl.minExeVersion) ? String(ctl.minExeVersion).replace(/^v/, '') : BUILTIN_MIN_EXE_VERSION;
+      if (!minV || !/^\d+\.\d+/.test(minV)) return;              // 门槛为空 / 非法 → 不启用
+      if (_cmpVer(cur, minV) >= 0) return;                       // 版本达标 → 不提示
+      let snoozeUntil = 0;
+      try { snoozeUntil = parseInt(localStorage.getItem(MIN_VER_SNOOZE_KEY + '@' + minV) || '0', 10); } catch (e) {}
+      if (snoozeUntil && Date.now() < snoozeUntil) return;        // 仍在「稍后提醒」冷却期
+      const hours = (ctl && ctl.minExeVersionSnoozeHours > 0) ? ctl.minExeVersionSnoozeHours : DEFAULT_SNOOZE_HOURS;
+      _showMinVersionDialog(cur, minV, (ctl && ctl.minExeVersionMsg) || '', hours, (ctl && ctl.minExeVersionDownloadUrl) || '');
+    } catch (e) {}
+  }
+
+  function _showMinVersionDialog(curVer, minVer, msg, snoozeHours, dlUrl) {
+    if (document.getElementById('adminCtlMinVer')) return;       // 已弹过，不叠加
+    const box = document.createElement('div');
+    box.id = 'adminCtlMinVer';
+    box.style.cssText = 'position:fixed;inset:0;z-index:100001;background:rgba(10,10,15,0.72);' +
+      'display:flex;align-items:center;justify-content:center;font-family:system-ui,"Microsoft YaHei",sans-serif;padding:20px;';
+    const bodyHtml = (msg ? _esc(msg) + '<br><br>' : '') +
+      '当前版本：<b style="color:#f87171;">v' + _esc(curVer) + '</b><br>' +
+      '要求版本：<b style="color:#4ade80;">v' + _esc(minVer) + ' 及以上</b><br><br>' +
+      '<span style="opacity:0.75;">旧版本可能存在已知问题，建议尽快升级。</span>';
+    box.innerHTML =
+      '<div style="max-width:400px;width:100%;background:linear-gradient(135deg,#1e293b,#0f172a);color:#fff;' +
+      'border-radius:16px;padding:22px 20px;box-shadow:0 18px 50px rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.12);">' +
+        '<div style="font-size:1.12rem;font-weight:700;margin-bottom:12px;color:#fbbf24;">⚠️ 版本过低，请升级</div>' +
+        '<div style="font-size:0.86rem;line-height:1.75;opacity:0.92;">' + bodyHtml + '</div>' +
+        '<div style="margin-top:18px;display:flex;gap:8px;flex-wrap:wrap;">' +
+          '<button id="minVerUpgradeBtn" style="flex:1;min-width:104px;background:#22c55e;color:#fff;border:none;padding:10px 12px;border-radius:9px;cursor:pointer;font-size:0.82rem;font-weight:700;">⬆️ 立即升级</button>' +
+          '<button id="minVerDlBtn" style="flex:1;min-width:104px;background:#2563eb;color:#fff;border:none;padding:10px 12px;border-radius:9px;cursor:pointer;font-size:0.82rem;font-weight:700;">📥 手动下载</button>' +
+          '<button id="minVerLaterBtn" style="flex:1;min-width:104px;background:rgba(255,255,255,0.14);color:#fff;border:1px solid rgba(255,255,255,0.2);padding:10px 12px;border-radius:9px;cursor:pointer;font-size:0.82rem;">稍后提醒</button>' +
+        '</div>' +
+        '<div style="margin-top:10px;font-size:0.66rem;opacity:0.5;text-align:center;">点「稍后提醒」将 ' + snoozeHours + ' 小时后再提示一次</div>' +
+      '</div>';
+    document.body.appendChild(box);
+    const close = function () { if (box && box.parentNode) box.remove(); };
+
+    // 【立即升级】复用 exe 整包更新通道（后台静默下载 + 自动重启完成升级）
+    document.getElementById('minVerUpgradeBtn').onclick = function () {
+      const btn = this;
+      btn.textContent = '⏳ 升级中…'; btn.disabled = true;
+      const invoke = function (cmd) {
+        if (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke) return window.__TAURI__.core.invoke(cmd);
+        if (window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke) return window.__TAURI_INTERNALS__.invoke(cmd);
+        if (window.__TAURI__ && window.__TAURI__.invoke) return window.__TAURI__.invoke(cmd);
+        return Promise.reject('no invoke');
+      };
+      invoke('install_app_update').catch(function (e) {
+        const m = (typeof e === 'string') ? e : ((e && e.message) ? e.message : '');
+        btn.textContent = '⬆️ 立即升级'; btn.disabled = false;
+        try { alert('自动升级失败' + (m ? '：' + m : '') + '\n\n请点「手动下载」获取安装包。'); } catch (_) {}
+      });
+    };
+    // 【手动下载】兜底：远程配置地址 → version.json 动态解析最新安装包 → Gitee 发布页
+    document.getElementById('minVerDlBtn').onclick = function () {
+      const open = function (u) {
+        try { if (window.__TAURI__ && window.__TAURI__.shell && typeof window.__TAURI__.shell.open === 'function') { window.__TAURI__.shell.open(u); return; } } catch (e) {}
+        try { if (window.__TAURI__ && window.__TAURI__.opener && typeof window.__TAURI__.opener.openUrl === 'function') { window.__TAURI__.opener.openUrl(u); return; } } catch (e) {}
+        try { window.open(u, '_blank'); } catch (e) {}
+      };
+      if (dlUrl) { open(dlUrl); return; }
+      fetch('https://gyq-svip.github.io/tfjl-web/version.json?t=' + Date.now())
+        .then(function (r) { return r.json(); })
+        .then(function (d) { open((d && d.downloadUrl) || GITEE_RELEASES_PAGE); })
+        .catch(function () { open(GITEE_RELEASES_PAGE); });
+    };
+    // 【稍后提醒】N 小时内不再弹
+    document.getElementById('minVerLaterBtn').onclick = function () {
+      try { localStorage.setItem(MIN_VER_SNOOZE_KEY + '@' + minVer, String(Date.now() + snoozeHours * 3600 * 1000)); } catch (e) {}
+      close();
+    };
+  }
+
   // 处理针对本设备的指令
   async function applyAdminCtl(ctl) {
     if (!ctl) return;
@@ -156,6 +275,9 @@
       // 已解封 / 指令里没有该设备：立刻移除残留遮罩（否则解封后刷新仍显示限制中）
       _hideBlockOverlay();
     }
+
+    // 2.5) 🔴 版本门槛：低于最低要求版本 → 弹窗提示升级（可关闭 + 定时提醒，不阻断使用）
+    _checkMinExeVersion(ctl);
 
     // 4) 定向指令（notify / 会话）
     const list = (ctl.cmds && ctl.cmds[dev]) || [];
