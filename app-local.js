@@ -1451,7 +1451,7 @@ if (true) {
                         <button id="${drBtnId}" onclick="computeFileDr('${safePath}','${drBtnId}')" title="计算减伤" style="background:rgba(255,152,0,0.2);color:#ff9800;border:1px solid rgba(255,152,0,0.3);padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;">🛡️</button>
                         <button onclick="detectFileEncoding('${safePath}')" style="background:rgba(156,39,176,0.3);color:#ce93d8;border:1px solid rgba(156,39,176,0.3);padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;">编码</button>
                         <button onclick="viewFile('${safePath}')" style="background:rgba(0,188,212,0.3);color:#00bcd4;border:1px solid rgba(0,188,212,0.3);padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;">查看</button>
-                        <button onclick="loadFileToHand('${safePath}')" style="background:rgba(76,175,80,0.3);color:#4caf50;border:1px solid rgba(76,175,80,0.3);padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;">加载</button>
+                        <button onclick="if(window.loadScannedFileToProject)window.loadScannedFileToProject('${safePath}')" style="background:rgba(76,175,80,0.3);color:#4caf50;border:1px solid rgba(76,175,80,0.3);padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;" title="把扫描脚本导入到项目：询问新建项目 / 当前项目 / 选分类到指定项目">加载</button>
                         <button onclick="shareScannedFileFromMain('${safePath}','${f.name.replace(/'/g, "\\'")}')" title="分享到需求墙" style="background:rgba(156,39,176,0.25);color:#ce93d8;border:1px solid rgba(156,39,176,0.35);padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.7rem;">📢</button>
                     </div>`;
                 });
@@ -2072,6 +2072,32 @@ if (true) {
     async function loadFileToHand(filePath) {
         await loadFileContentToHand(filePath);
     }
+
+    // 扫描文件「加载」→ 询问导入到哪个项目（新建 / 当前 / 选分类到指定项目），
+    // 而不是把内容塞进脚本管理的解析输入框（旧 loadFileToHand 逻辑，已废弃）。
+    // 复用 showSaveScriptDialog 的项目选择弹窗（分类分组 + 新建项目 + 当前项目默认选中）。
+    async function loadScannedFileToProject(filePath) {
+        try {
+            const content = await readTextFile(filePath);
+            if (content === null || content === undefined) { alert('读取文件失败：' + filePath); return; }
+            const fileName = filePath.split(/[\\/]/).pop();
+            const wid = '__scan__' + filePath;
+            window.__notebookSaveContent = window.__notebookSaveContent || {};
+            window.__notebookSaveContent[wid] = content;
+            window.__notebookSaveName = window.__notebookSaveName || {};
+            window.__notebookSaveName[wid] = fileName;
+            window.__notebookSaveMarks = window.__notebookSaveMarks || {};
+            window.__notebookSaveMarks[wid] = [];
+            if (typeof window.showSaveScriptDialog === 'function') {
+                window.showSaveScriptDialog(null, null, wid);
+            } else {
+                alert('保存脚本到项目功能未加载，请刷新页面后重试');
+            }
+        } catch (e) {
+            alert('加载失败：' + (e && e.message ? e.message : e));
+        }
+    }
+    window.loadScannedFileToProject = loadScannedFileToProject;
 
     // ==================== 查找替换 ====================
 
