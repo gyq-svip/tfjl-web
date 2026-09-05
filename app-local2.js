@@ -3971,6 +3971,11 @@ if (true) {
     // blob URL 只持有编码后的 PNG 字节（413×~50KB≈20MB，可忽略）；解码位图仍只存在于正在显示的 <img>，
     // 不随缓存增长。配合 _preheatLocalSkinUrls 启动预热，任何切皮零读盘零缩放、即点即换。
     const skinImageUrlCache = new Map(); // filePath -> url（Map 保持插入顺序，天然支持 LRU）
+    // 🔴 2026-09-06 内存泄漏诊断：累计记录所有「曾为皮肤创建」的 blob: URL。
+    //    两个 LRU 缓存淘汰时都【不 revoke】（怕 <img> 仍引用→黑图），导致被淘汰的 blob URL 永不释放 →
+    //    挂机/反复切皮时孤立 blob（含其 PNG 字节 + 浏览器解码位图）持续堆积，是 2G 内存的头号嫌疑。
+    //    此 Set 只存短字符串（blob: URL ~45 字符），本身极小，仅供 memoryReport() 量化泄漏。
+    const _skinBlobEver = new Set();
 
     function _skinUrlRelease(url) {
         if (typeof url === 'string' && url.indexOf('blob:') === 0) {
@@ -3993,6 +3998,7 @@ if (true) {
     function _skinUrlSet(filePath, url) {
         if (skinImageUrlCache.has(filePath)) skinImageUrlCache.delete(filePath);
         skinImageUrlCache.set(filePath, url);
+        if (typeof url === 'string' && url.indexOf('blob:') === 0) _skinBlobEver.add(url);
         _skinUrlEvictIfNeeded();
     }
 
@@ -4005,8 +4011,41 @@ if (true) {
             _skinBlobUrlCache.forEach(function (u) { if (u && u.indexOf('blob:') === 0) { try { URL.revokeObjectURL(u); } catch (e) {} } });
             _skinBlobUrlCache.clear();
         } catch (e) {}
+        // 🔴 2026-09-06：两个 LRU 淘汰时不 revoke，会留下「已淘汰但未释放」的孤立 blob（泄漏源）。
+        //    全清（重扫/切项目）时一并 revoke 累计追踪集里的全部 blob，彻底回收，并清空追踪集。
+        try { _skinBlobEver.forEach(function (u) { if (u && u.indexOf('blob:') === 0) { try { URL.revokeObjectURL(u); } catch (e) {} } }); _skinBlobEver.clear(); } catch (e) {}
     }
     window.clearSkinUrlCache = clearSkinUrlCache;
+
+    // 🔴 2026-09-06 安全清扫：revoke「纯孤儿」皮肤 blob URL——既不在任何 <img> src、也不在两个活跃缓存里。
+    //    两个 LRU 淘汰时为防黑图不 revoke，被淘汰且已离开 DOM 的 blob 会永久泄漏（PNG 字节 + 解码位图）。
+    //    此函数只动真正无人引用的，绝不碰正在显示/仍被缓存命中的，故无黑图风险。
+    //    每 3 分钟自动跑一次；也可手动 window.sweepSkinOrphanBlobs() / freeMemory() 触发。
+    function sweepSkinOrphanBlobs() {
+        let revoked = 0;
+        try {
+            const imgSet = new Set();
+            const imgs = document.getElementsByTagName('img');
+            for (let i = 0; i < imgs.length; i++) { const s = imgs[i].getAttribute('src') || ''; if (s) imgSet.add(s); }
+            const cacheA = new Set(); skinImageUrlCache.forEach(function (u) { if (typeof u === 'string') cacheA.add(u); });
+            const cacheB = new Set(); _skinBlobUrlCache.forEach(function (u) { if (typeof u === 'string') cacheB.add(u); });
+            const dead = [];
+            _skinBlobEver.forEach(function (u) {
+                if (u && u.indexOf('blob:') === 0 && !imgSet.has(u) && !cacheA.has(u) && !cacheB.has(u)) dead.push(u);
+            });
+            for (let i = 0; i < dead.length; i++) {
+                try { URL.revokeObjectURL(dead[i]); } catch (e) {}
+                _skinBlobEver.delete(dead[i]);
+                revoked++;
+            }
+        } catch (e) {}
+        if (revoked > 0 && (typeof console !== 'undefined')) console.log('[MEM] sweepSkinOrphanBlobs 回收孤儿 blob:', revoked, '剩余累计:', _skinBlobEver.size);
+        return revoked;
+    }
+    window.sweepSkinOrphanBlobs = sweepSkinOrphanBlobs;
+    if (typeof _skinOrphanSweepTimer === 'undefined') {
+        var _skinOrphanSweepTimer = setInterval(sweepSkinOrphanBlobs, 3 * 60 * 1000);
+    }
 
     // 供 app-core.js 的 memoryReport() 调用：报告皮肤 URL 缓存占用
     window.skinCacheStats = function () {
@@ -4025,13 +4064,24 @@ if (true) {
         // blob: URL 字符串本身极短，无法据此估算真实位图内存；改为按「缩放后解码尺寸」估算：
         // 缩放到 ≤256px 的 PNG 解码位图约 256×256×4 ≈ 262KB/张（GPU 纹理另计，约再 ×1.5）。
         const estDecodeMB = (blobCount + dataCount) * 256 * 256 * 4 / 1048576;
+        // 🔴 2026-09-06 泄漏量化：累计创建过的 blob URL 中，有多少仍被页面 <img> 引用、多少已孤立未释放
+        let referencedByImg = 0;
+        try {
+            const imgSet = new Set();
+            const imgs = document.getElementsByTagName('img');
+            for (let i = 0; i < imgs.length; i++) { const s = imgs[i].getAttribute('src') || ''; if (s) imgSet.add(s); }
+            _skinBlobEver.forEach(function (u) { if (imgSet.has(u)) referencedByImg++; });
+        } catch (e) {}
         return {
             size: skinImageUrlCache.size,
             max: SKIN_URL_CACHE_MAX,
             blob: blobCount,
             data: dataCount,
             estDecodeMB: estDecodeMB.toFixed(1),
-            remoteBlobCache: remoteBlob + ' / 上限 ' + _SKIN_BLOB_CACHE_MAX
+            remoteBlobCache: remoteBlob + ' / 上限 ' + _SKIN_BLOB_CACHE_MAX,
+            everCreatedBlob: _skinBlobEver.size,
+            referencedByImg: referencedByImg,
+            orphanBlob: (_skinBlobEver.size - referencedByImg)
         };
     };
 
@@ -4663,6 +4713,7 @@ if (true) {
         //    后 set 的会把先 set、且正被 <img> 显示的 blobUrl1 revoke 掉 → 图变黑。
         //    被覆盖的旧 blob 交给浏览器 GC（<img> 移除后自动回收），上限 200 的 LRU 已控制增长。
         _skinBlobUrlCache.set(url, blobUrl);
+        if (typeof blobUrl === 'string' && blobUrl.indexOf('blob:') === 0) _skinBlobEver.add(blobUrl);
         // 超过上限 → 淘汰最旧（Map 迭代顺序=插入顺序，最旧在前面）
         // 🔴 2026-08-30 关键修复：淘汰时【不再 revoke】blob URL，与本地皮肤缓存
         //    （_skinUrlEvictIfNeeded）保持一致。

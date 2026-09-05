@@ -26856,6 +26856,10 @@ ${maSection}
                     rep['皮肤URL缓存-条目数'] = s.size + ' / 上限 ' + s.max;
                     rep['皮肤URL缓存-blob/data'] = s.blob + ' / ' + s.data;
                     rep['皮肤URL缓存-解码位图估算'] = s.estDecodeMB + ' MB (GPU纹理另计)';
+                    // 🔴 2026-09-06 泄漏量化：LRU 淘汰时不 revoke，累计创建里减去仍被 <img> 引用的 = 孤立泄漏
+                    rep['皮肤blob-累计创建'] = s.everCreatedBlob;
+                    rep['皮肤blob-被img引用'] = s.referencedByImg;
+                    rep['皮肤blob-孤立未释放(泄漏)'] = s.orphanBlob + ' (非0即泄漏，挂机会持续涨)';
                 } catch (e) { rep['皮肤URL缓存'] = '统计失败: ' + e.message; }
             } else {
                 rep['皮肤URL缓存'] = 'app-local2.js 未提供 skinCacheStats()';
