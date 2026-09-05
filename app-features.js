@@ -8902,8 +8902,16 @@
         // 📸 分享阵容图：先选有效期/密码 → 🔴先查本机是否分享过同一套阵容（命中可直取回，不重复上传）→ 整个项目上传 Gist（含脚本/记事本/参考图）→ 生成图+短码 → 弹窗预览
         // 对方扫码 / 报短码 / 点链接 → 与「分享整个项目」同款导入（完整项目，非纯阵容）。
         // 上传失败自动降级为纯图片（无短码，图上有重试提示），分享功能不受影响。
-        async function shareLineupImage() {
+        async function shareLineupImage(skipPrecheck) {
             if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('分享阵容图');
+            // 🔴 分享前检测：这套阵容之前分享过 → 直接弹「查看卡片」，不重新上传（省云端、不重复生成）
+            if (!skipPrecheck) {
+                try {
+                    let _hit = await _sharePrecheckHit();
+                    if (!_hit) _hit = await _shareEnsureDemoCard(); // 内置示例无缓存→现场生成，不传 9M
+                    if (_hit) { _showTakenCardModal(_hit, function () { shareLineupImage(true); }); return; }
+                } catch (e) {}
+            }
             // 1) 分享选项：有效期 + 可选密码（需求墙同款 PBKDF2+AES-GCM 加密）
             const opts = await _lineupShareOptionsDialog();
             if (!opts) return;
@@ -8916,21 +8924,6 @@
             if (!result || !result.canvas) {
                 if (typeof showToast === 'function') showToast('当前阵容是空的（我方和队友都没有上阵卡），先摆好阵容再分享', 'error');
                 return;
-            }
-            // 🔴 分享前先查本机：同一套阵容之前分享过 → 提示直接取回，不再上传一次（省云端资源、不产生重复卡片/短码）
-            //    payload 只构建一次，后面上传直接复用，避免重复开销。
-            const _payload = _projShareBuildPayload();
-            const _curFp = (function () { try { return _shareContentFingerprint(_payload); } catch (e) { return ''; } })();
-            if (_curFp && !opts.pw) {   // 加密分享不参与查重（与云端复用策略一致）
-                try {
-                    const _hit = await _cardFindByFp(_curFp);
-                    if (_hit && _hit.dataUrl) {
-                        const _choice = await _confirmTakeOldCard(_hit);
-                        if (_choice === 'take') { _showTakenCardModal(_hit); return; }
-                        if (_choice === 'cancel') return;
-                        // 'new' → 继续走正常分享上传流程
-                    }
-                } catch (e) { /* 查重失败不影响正常分享 */ }
             }
 
             // 整个项目上传 Gist（与「分享整个项目」同一条链路）：右上角浮条提示，断网/限额静默降级
@@ -9619,6 +9612,49 @@
         }
         window._cardFindByFp = _cardFindByFp;
 
+        // 按项目名查本机已分享卡片（与 _cardFindByFp 互补：指纹可能因微调变化，但项目名稳定）
+        async function _cardFindByName(name) {
+            if (!name) return null;
+            try {
+                const all = await _cardList();
+                for (let i = 0; i < all.length; i++) {
+                    const c = all[i];
+                    if (c && c.projectName && c.projectName === name && c.dataUrl) return c;
+                }
+            } catch (e) {}
+            return null;
+        }
+        // 🔴 分享前统一检测：指纹命中 或 项目名命中本机已分享卡片 → 返回该卡片（供直接弹「查看卡片」）
+        async function _sharePrecheckHit() {
+            try {
+                const name = (typeof currentProjectName !== 'undefined' && currentProjectName) || '';
+                const payload = (typeof _projShareBuildPayload === 'function') ? _projShareBuildPayload() : null;
+                const fp = (function () { try { return payload ? _shareContentFingerprint(payload) : ''; } catch (e) { return ''; } })();
+                if (fp) { const h = await _cardFindByFp(fp); if (h) return h; }
+                if (name) { const h = await _cardFindByName(name); if (h) return h; }
+            } catch (e) {}
+            return null;
+        }
+
+        // 🔴 内置示例项目（默认启动项如「王城低配版」）：本机无分享缓存时，现场用当前阵容生成轻量示例卡片，
+        //    避免用户拿 9M 大项目反复「分享整个项目」上传慢、以为软件不好用。卡片图轻量、不重传云端。
+        const BUILTIN_DEMO_PROJECTS = { '王城低配版': true };
+        async function _shareEnsureDemoCard() {
+            const name = (typeof currentProjectName !== 'undefined' && currentProjectName) || '';
+            if (!BUILTIN_DEMO_PROJECTS[name]) return null;
+            const cached = await _cardFindByName(name);
+            if (cached) return cached;
+            try {
+                const r = await _lineupBuildCanvas('', '', '内置示例阵容 · ' + name, '');
+                if (r && r.canvas) {
+                    const dataUrl = r.canvas.toDataURL('image/png');
+                    await _cardSave(dataUrl, { projectName: name, code: '', kind: 'demo', source: 'builtin' });
+                    return { dataUrl: dataUrl, projectName: name, code: '', ts: Date.now(), kind: 'demo' };
+                }
+            } catch (e) {}
+            return null;
+        }
+
         // 命中「本机已分享过这套阵容」→ 让用户选「取回旧卡片」还是「仍然重新分享」
         function _confirmTakeOldCard(card) {
             return new Promise(function (resolve) {
@@ -9658,7 +9694,7 @@
         }
 
         // 取回展示：本机卡片 + 短码 + 下载/复制（未走云端，纯本机）
-        function _showTakenCardModal(card) {
+        function _showTakenCardModal(card, onReshare) {
             try {
                 const old = document.getElementById('lineupShareModal');
                 if (old) old.remove();
@@ -9684,6 +9720,7 @@
                       '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">' +
                         '<button id="lineupShareDl" style="flex:1;min-width:120px;background:linear-gradient(135deg,#ffd700,#ff9800);color:#1a1a2e;border:none;padding:10px;border-radius:8px;cursor:pointer;font-size:0.9rem;font-weight:bold;">💾 下载图片</button>' +
                         '<button id="lineupShareCopyImg" style="flex:1;min-width:120px;background:linear-gradient(135deg,#26a69a,#00796b);color:#fff;border:none;padding:10px;border-radius:8px;cursor:pointer;font-size:0.9rem;font-weight:bold;">📋 复制图片</button>' +
+                        (onReshare ? '<button id="lineupShareReshare" style="flex:1;min-width:140px;background:rgba(255,255,255,0.14);border:1px solid rgba(255,255,255,0.25);color:#fff;padding:10px;border-radius:8px;cursor:pointer;font-size:0.9rem;font-weight:bold;">🔄 重新分享</button>' : '') +
                       '</div>' +
                     '</div>';
                 document.body.appendChild(modal);
@@ -9704,6 +9741,10 @@
                 modal.querySelector('#lineupShareCopyImg').onclick = function () {
                     try { if (typeof copyText === 'function') copyText(card.dataUrl, '📋 图片已复制（可直接粘贴到聊天窗口）', this); } catch (e) {}
                 };
+                if (onReshare) {
+                    const _rb = modal.querySelector('#lineupShareReshare');
+                    if (_rb) _rb.onclick = function () { try { close(); onReshare(); } catch (e) {} };
+                }
                 if (card.code) {
                     modal.querySelector('#lineupShareCopyShort').onclick = function () {
                         try { if (typeof copyText === 'function') copyText(card.code, '📋 短码 ' + card.code + ' 已复制', this); } catch (e) {}
@@ -10319,8 +10360,16 @@
         }
 
         // 📦 分享整个项目：选项窗（有效期+密码）→ 打包上传 → 短码+链接结果弹窗
-        async function shareProjectViaCode() {
+        async function shareProjectViaCode(skipPrecheck) {
             if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('分享整个项目');
+            // 🔴 分享前检测：此项目之前分享过 → 直接弹「查看卡片」，不重新打包上传（王城低配版等 9M 大项目尤其省）
+            if (!skipPrecheck) {
+                try {
+                    let _hit = await _sharePrecheckHit();
+                    if (!_hit) _hit = await _shareEnsureDemoCard(); // 内置示例无缓存→现场生成，不传 9M
+                    if (_hit) { _showTakenCardModal(_hit, function () { shareProjectViaCode(true); }); return; }
+                } catch (e) {}
+            }
             const name = (typeof currentProjectName !== 'undefined' && currentProjectName) || '';
             if (!name) {
                 if (typeof showToast === 'function') showToast('当前没有打开的项目，先创建或选择一个项目再分享', 'error');
