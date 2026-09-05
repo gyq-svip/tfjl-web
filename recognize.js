@@ -1010,7 +1010,6 @@
             <canvas id="recCanvas" style="width:100%;max-height:46vh;background:#000;border-radius:8px;display:block;"></canvas>
             <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
               <button id="recAuto" style="background:linear-gradient(135deg,#43a047,#1b5e20);color:#fff;border:none;padding:9px 14px;border-radius:8px;cursor:pointer;font-weight:600;" title="用文字识别(OCR)读卡名，结果显示在右侧列表（需识别引擎）">⚡ 文字识别(OCR)</button>
-              <button id="recImgBtn" style="background:linear-gradient(135deg,#ab47bc,#6a1b9a);color:#fff;border:none;padding:9px 14px;border-radius:8px;cursor:pointer;font-weight:600;" title="用皮肤模板库比对卡面，结果显示在下方紫色表（无卡名也能识别，首次用先点「🛠 构建模板库」）">🖼️ 图片比对(皮肤)</button>
               <label style="font-size:0.78rem;color:#b0bec5;margin-left:6px;">识别精度
                 <select id="recStrictSel" style="background:#1b1f2a;color:#fff;border:1px solid #444;border-radius:6px;padding:3px 6px;font-size:0.78rem;">
                   <option value="loose">宽松(总匹配)</option>
@@ -1018,7 +1017,6 @@
                   <option value="strict">严格</option>
                 </select>
               </label>
-              <button id="recBuildBtn" style="background:linear-gradient(135deg,#78909c,#37474f);color:#fff;border:none;padding:9px 14px;border-radius:8px;cursor:pointer;font-weight:600;" title="先把 413 张皮肤图预处理成特征模板库，构建完成后识别秒出，无需每次等「构建皮肤模板库」">🛠 构建模板库</button>
               <button id="recWinBtn" style="background:linear-gradient(135deg,#5c6bc0,#283593);color:#fff;border:none;padding:9px 14px;border-radius:8px;cursor:pointer;font-weight:600;" title="清除记住的窗口，下次点框选/一键识别时重新选游戏窗口">🔄 切换窗口</button>
               <button id="recFill" style="background:linear-gradient(135deg,#42a5f5,#1565c0);color:#fff;border:none;padding:9px 14px;border-radius:8px;cursor:pointer;">➡ 填入脚本生成</button>
               <button id="recImportHand" style="background:linear-gradient(135deg,#66bb6a,#2e7d32);color:#fff;border:none;padding:9px 14px;border-radius:8px;cursor:pointer;font-weight:600;">🃏 导入到手牌</button>
@@ -1033,22 +1031,14 @@
             <div id="recIntro" style="font-size:0.82rem;line-height:1.75;color:#cfd8dc;background:rgba(66,165,245,0.10);border:1px solid rgba(66,165,245,0.28);border-radius:10px;padding:12px 14px;">
               <div style="font-weight:700;color:#90caf9;margin-bottom:8px;font-size:0.9rem;">📖 使用说明（识别结果会显示在这里）</div>
               <div style="margin-bottom:4px;"><b style="color:#fff;">① 取图</b>：游戏开着时直接点 <b style="color:#ffab91;">🎮 一键识别游戏画面</b>（选窗口→截整窗），或 <b style="color:#ce93d8;">📐 框选阵容区域</b>（选窗口→拖框圈住阵容）；也可游戏里截图后 <b style="color:#ffd54f;">Ctrl+V 粘贴</b>，或点「📁 选择阵容图片」。</div>
-              <div style="margin-bottom:4px;"><b style="color:#fff;">② 识别</b>（两个按钮分开跑，各出各的结果，方便定位问题）：<b style="color:#a5d6a7;">⚡ 文字识别(OCR)</b> 读卡名→结果进右侧列表；<b style="color:#ce93d8;">🖼️ 图片比对(皮肤)</b> 用皮肤模板库比对卡面→结果进下方紫色表。图上没有卡名就用「🖼️ 图片比对」，首次用请先点「🛠 构建模板库」。</div>
+              <div style="margin-bottom:4px;"><b style="color:#fff;">② 识别</b>：取到图后点 <b style="color:#a5d6a7;">⚡ 文字识别(OCR)</b>，读卡名→结果显示在下方列表。</div>
               <div style="margin-bottom:4px;"><b style="color:#fff;">③ 用结果（任选其一，或都用）</b>：</div>
               <div style="padding-left:14px;margin-bottom:2px;">• 「➡ 填入脚本生成」→ 直接生成上阵脚本；</div>
               <div style="padding-left:14px;margin-bottom:8px;">• 「🃏 导入到手牌」→ 放进阵容手牌（可选我的/队友、指定项目）。</div>
-              <div style="margin-bottom:4px;"><b style="color:#fff;">④ 🖼️ 图像识别（不依赖 OCR）</b>：先确认已<b>同步皮肤</b>（皮肤系统正常显示即可），粘贴/选择/框选一张阵容图后点紫色「🖼️ 图像识别」——软件把 10 张卡逐张跟皮肤库比对，最像哪个皮肤就判哪个英雄。比文字识别更准，且<b>不用装 Umi-OCR</b>。也可点「📐 框选阵容区域」自动截游戏窗口并让你拖框圈定阵容位置。</div>
               <div style="color:#9fb3c8;">识别错/多出来的行，点该行「✕ 删」去掉再使用即可。</div>
               <div style="margin-top:10px;padding-top:9px;border-top:1px dashed rgba(255,255,255,0.18);color:#ffb74d;">
                 ⏳ <b>第一次打开会自动安装识别引擎，稍慢一些，仅此一次</b>；每台电脑性能不同，快慢有差异，请耐心等待，装好后以后打开就快了。
               </div>
-            </div>
-            <div id="recImgWrap" style="margin:10px 0;display:none;">
-              <div style="font-size:0.8rem;color:#ce93d8;font-weight:700;margin-bottom:4px;">🖼️ 图像识别结果</div>
-              <table style="width:100%;border-collapse:collapse;font-size:0.8rem;">
-                <thead><tr style="text-align:left;color:#ce93d8;"><th style="padding:4px;">#</th><th>来源</th><th>英雄</th><th>匹配</th><th>操作</th></tr></thead>
-                <tbody id="recImgBox"></tbody>
-              </table>
             </div>
             <table style="width:100%;border-collapse:collapse;font-size:0.8rem;">
               <thead><tr style="text-align:left;color:#90caf9;">
@@ -1201,25 +1191,13 @@
         overlay._results = results;
         updateRecWarn(results);
         $('recStatus').textContent = `识别完成：${results.length} 个英雄（${rowCount} 行）`;
-        // 纯文字识别结果渲染（图像识别走独立「🖼️ 图像识别」按钮，结果在紫色表）
+        // 纯文字识别结果渲染
         $('recStatus').textContent = `识别完成：${results.length} 个英雄（${rowCount} 行）`;
         renderRecDr(results); // 识别完立即算并展示减伤
       });
     }
-    // 🛠 手动构建模板库：先点它构建（带进度），构建完状态明确，之后识别直接复用秒出
-    const recBuildBtn = $('recBuildBtn');
-    if(recBuildBtn){
-      recBuildBtn.onclick = async ()=>{
-        const old=recBuildBtn.textContent; recBuildBtn.disabled=true; recBuildBtn.textContent='⏳ 构建中…';
-        try{
-          const tpls = await buildSkinTpls($('recStatus'));
-          const ok = tpls?tpls.length:0;
-          recBuildBtn.textContent='✅ 已就绪('+ok+')';
-          if($('recStatus')) $('recStatus').textContent='模板库已构建完成：'+ok+' 张，可点 🚀 综合识别';
-        }catch(e){ recBuildBtn.textContent='❌ 失败'; alert('构建模板库失败：'+(e&&e.message||e)); }
-        finally{ setTimeout(()=>{ recBuildBtn.disabled=false; recBuildBtn.textContent=old; }, 1500); }
-      };
-    }
+    // 🔴 2026-09-05 移除：「🛠 构建模板库」「🖼️ 图片比对(皮肤)」整套皮肤模板比对功能已删除（用户反馈无法使用）。
+    //    识别只保留：⚡ 文字识别(OCR) + 🎮 一键识别游戏画面 + 📐 框选阵容区域。
 
     // 🔄 切换窗口：清除记住的窗口标题，下次点框选/一键识别会重新弹窗选择
     const recWinBtn = $('recWinBtn');
@@ -1232,52 +1210,10 @@
       if(typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('识别-文字OCR');
       runAuto();
     };
-    // 识别按钮②：图片比对(皮肤) —— 模板库比对卡面，结果进紫色表
-    const recImgRecBtn = $('recImgBtn');
-    if(recImgRecBtn) recImgRecBtn.onclick = ()=>{
-      if(!currentImg){ alert('请先粘贴/选择/截图一张阵容图（或点「🎮 一键识别游戏画面」/「📐 框选阵容区域」）'); return; }
-      if(typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('识别-图片比对');
-      runImgAuto();
-    };
-
     // 识别严格度（宽松/标准/严格）：影响 matchCard 是否在距离过大时判「未匹配」
     window.__recStrict = (localStorage.getItem('tfjl_rec_strict')||'loose');
     const recStrictSel = $('recStrictSel');
     if(recStrictSel){ recStrictSel.value = window.__recStrict; recStrictSel.onchange = e=>{ window.__recStrict=e.target.value; localStorage.setItem('tfjl_rec_strict', e.target.value); }; }
-
-    // ====================== 🖼️ 图像识别（皮肤比对） ======================
-    function runImgAuto(){
-      if(!currentImg){ alert('请先粘贴/选择/截图一张阵容图（或点「📐 框选阵容区域」）'); return; }
-      recognizeImageBySkin(currentImg, $('recStatus'), (results, source, rowCount)=>{
-        $('recSrc').textContent = '来源: '+source;
-        const intro=$('recIntro'); if(intro && results && results.length) intro.style.display='none';
-        const tb=$('recImgBox'); const wrap=$('recImgWrap'); if(wrap) wrap.style.display='block';
-        const render = ()=>{
-          tb.innerHTML='';
-          results.forEach(r=>{
-            r._deleted=false;
-            const tr=document.createElement('tr'); tr.style.borderTop='1px solid #333';
-            tr.innerHTML=`<td style="padding:4px;color:#90a4ae;">${r.idx}</td>`
-              +`<td style="padding:4px;">图像</td>`
-              +`<td style="padding:4px;font-weight:600;color:#fff;">${r.hero||'?'}</td>`
-              +`<td style="padding:4px;">${r.hero?('<span style="color:#2e7d32;font-weight:600;">✓ 像 '+escapeHtml(r.skin||'')+'</span>'+(r.quality?' <span style="color:#90caf9;">'+r.quality+'</span>':'')+(r.source==='local'?' <span style="color:#ffb74d;">[本地]</span>':'')+(r.top3&&r.top3.length>1?'<br><span style="color:#b0bec5;font-size:0.68rem;">备选: '+r.top3.slice(1).map(t=>escapeHtml(t.hero)+'('+t.dist+')').join('、')+'</span>':'')):'<span style="color:#c62828;">✗ 未匹配</span>'}</td>`
-              +`<td style="padding:4px;"><button data-fix="${r.idx}" title="纠正为正确英雄" style="background:rgba(255,193,7,0.22);color:#ffd54f;border:none;border-radius:6px;cursor:pointer;padding:2px 8px;font-size:0.72rem;">✏️ 修正</button></td>`
-              +`<td style="padding:4px;"><button data-del="${r.idx}" title="删除这张" style="background:rgba(244,67,54,0.25);color:#ff8a80;border:none;border-radius:6px;cursor:pointer;padding:2px 8px;font-size:0.72rem;">✕ 删</button></td>`;
-            tb.appendChild(tr);
-          });
-          tb.querySelectorAll('button[data-del]').forEach(b=>{ b.onclick=()=>{ const id=+b.getAttribute('data-del'); const r=results.find(x=>x.idx===id); if(r) r._deleted=true; const tr=b.closest('tr'); if(tr){ tr.style.opacity='0.35'; tr.style.textDecoration='line-through'; } updateRecWarn(results); renderRecDr(results); }; });
-          tb.querySelectorAll('button[data-fix]').forEach(b=>{ b.onclick=()=>{ fixHero(+b.getAttribute('data-fix'), results, render); }; });
-        };
-        render();
-        overlay._results = results; updateRecWarn(results);
-        const featNull=results.filter(rr=>!rr.feat).length; const tplN=(_skinTpls||[]).length;
-        $('recStatus').textContent = `图像识别完成：${results.filter(rr=>rr.hero).length}/${results.length} 匹配（模板库 ${tplN} 张，特征提取失败 ${featNull} 个；识别错点 ✏️ 修正，越修越准）`;
-        const stg=$('recStage'); if(stg){ stg.style.display='inline'; stg.textContent='🎨 图像：'+results.filter(rr=>rr.hero).length+'/'+results.length+'（模板库 '+tplN+' 张，特征失败 '+featNull+' 个）'; }
-        window.__recImgResults = results; // 存下来：OCR 0 行时用于填主表
-        const bodyTb=$('recBody'); if(bodyTb && !bodyTb.children.length){ renderImgToBody(results); } // 主表尚无 OCR 结果时先填图像结果
-        renderRecDr(results);
-      });
-    }
 
     // 记住上次选择的游戏窗口标题（与「游戏波数监控」共用 tfjl_game_monitor_cfg.winTitle），下次自动匹配不再重复选
     function _rememberWinTitle(title){
@@ -1285,7 +1221,7 @@
       try{ const cfg=JSON.parse(localStorage.getItem('tfjl_game_monitor_cfg')||'{}'); cfg.winTitle=title; localStorage.setItem('tfjl_game_monitor_cfg', JSON.stringify(cfg)); }catch(_){}
     }
 
-    // 📐 框选阵容区域 → 截整窗 → 拖框 → 按框精准裁剪 → 图像识别
+    // 📐 框选阵容区域 → 截整窗 → 拖框 → 按框精准裁剪 → 文字识别(OCR)
     const recFrameBtn = $('recFrameBtn');
     if(recFrameBtn){
       if(!isTauri()) recFrameBtn.style.display='none';
@@ -1312,7 +1248,7 @@
             currentImg = cropped;
             const c=$('recCanvas'); c.width=cropped.width; c.height=cropped.height; c.getContext('2d').drawImage(cropped,0,0);
             const n=$('recFileName'); if(n){ n.textContent='已框选阵容区域'; n.style.color='#ffab91'; }
-            $('recStatus').textContent='已截取并框选，可点 ⚡ 文字识别 或 🖼️ 图像识别（游戏画面同样支持文字识别）';
+            $('recStatus').textContent='已截取并框选，点 ⚡ 文字识别(OCR) 开始识别';
           });
         }catch(e){
           const msg=(e&&e.message)?e.message:(typeof e==='string'?e:'未知错误');
