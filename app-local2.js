@@ -4064,13 +4064,19 @@ if (true) {
         // blob: URL 字符串本身极短，无法据此估算真实位图内存；改为按「缩放后解码尺寸」估算：
         // 缩放到 ≤256px 的 PNG 解码位图约 256×256×4 ≈ 262KB/张（GPU 纹理另计，约再 ×1.5）。
         const estDecodeMB = (blobCount + dataCount) * 256 * 256 * 4 / 1048576;
-        // 🔴 2026-09-06 泄漏量化：累计创建过的 blob URL 中，有多少仍被页面 <img> 引用、多少已孤立未释放
-        let referencedByImg = 0;
+        // 🔴 2026-09-06 泄漏量化：累计创建过的 blob URL 里，真正的孤儿 = 既不在两个活跃缓存、也不在任何 <img>。
+        //    （在缓存里常驻但当前没显示的属于「故意缓存」，不算泄漏。）
+        let referencedByImg = 0, trueOrphan = 0;
         try {
             const imgSet = new Set();
             const imgs = document.getElementsByTagName('img');
             for (let i = 0; i < imgs.length; i++) { const s = imgs[i].getAttribute('src') || ''; if (s) imgSet.add(s); }
-            _skinBlobEver.forEach(function (u) { if (imgSet.has(u)) referencedByImg++; });
+            const cacheA = new Set(); skinImageUrlCache.forEach(function (u) { if (typeof u === 'string') cacheA.add(u); });
+            const cacheB = new Set(); _skinBlobUrlCache.forEach(function (u) { if (typeof u === 'string') cacheB.add(u); });
+            _skinBlobEver.forEach(function (u) {
+                if (imgSet.has(u)) referencedByImg++;
+                else if (!cacheA.has(u) && !cacheB.has(u)) trueOrphan++;
+            });
         } catch (e) {}
         return {
             size: skinImageUrlCache.size,
@@ -4081,7 +4087,7 @@ if (true) {
             remoteBlobCache: remoteBlob + ' / 上限 ' + _SKIN_BLOB_CACHE_MAX,
             everCreatedBlob: _skinBlobEver.size,
             referencedByImg: referencedByImg,
-            orphanBlob: (_skinBlobEver.size - referencedByImg)
+            orphanBlob: trueOrphan
         };
     };
 
