@@ -4021,17 +4021,33 @@ if (true) {
     //    两个 LRU 淘汰时为防黑图不 revoke，被淘汰且已离开 DOM 的 blob 会永久泄漏（PNG 字节 + 解码位图）。
     //    此函数只动真正无人引用的，绝不碰正在显示/仍被缓存命中的，故无黑图风险。
     //    每 3 分钟自动跑一次；也可手动 window.sweepSkinOrphanBlobs() / freeMemory() 触发。
+    // 收集当前正被页面引用的皮肤 blob: URL：<img src> + 元素内联 background-image（皮肤用 <img> 与 CSS 背景双贴）。
+    function _collectReferencedSkinBlobUrls() {
+        const s = new Set();
+        try {
+            const imgs = document.getElementsByTagName('img');
+            for (let i = 0; i < imgs.length; i++) { const src = imgs[i].getAttribute('src') || ''; if (src.indexOf('blob:') === 0) s.add(src); }
+            const re = /url\(["']?(blob:[^"')]+)/g;
+            const all = document.getElementsByTagName('*');
+            for (let i = 0; i < all.length; i++) {
+                const bi = all[i].style && all[i].style.backgroundImage;
+                if (bi && bi.indexOf('blob:') !== -1) {
+                    re.lastIndex = 0; let m;
+                    while ((m = re.exec(bi)) !== null) s.add(m[1]);
+                }
+            }
+        } catch (e) {}
+        return s;
+    }
     function sweepSkinOrphanBlobs() {
         let revoked = 0;
         try {
-            const imgSet = new Set();
-            const imgs = document.getElementsByTagName('img');
-            for (let i = 0; i < imgs.length; i++) { const s = imgs[i].getAttribute('src') || ''; if (s) imgSet.add(s); }
+            const refSet = _collectReferencedSkinBlobUrls();
             const cacheA = new Set(); skinImageUrlCache.forEach(function (u) { if (typeof u === 'string') cacheA.add(u); });
             const cacheB = new Set(); _skinBlobUrlCache.forEach(function (u) { if (typeof u === 'string') cacheB.add(u); });
             const dead = [];
             _skinBlobEver.forEach(function (u) {
-                if (u && u.indexOf('blob:') === 0 && !imgSet.has(u) && !cacheA.has(u) && !cacheB.has(u)) dead.push(u);
+                if (u && u.indexOf('blob:') === 0 && !refSet.has(u) && !cacheA.has(u) && !cacheB.has(u)) dead.push(u);
             });
             for (let i = 0; i < dead.length; i++) {
                 try { URL.revokeObjectURL(dead[i]); } catch (e) {}
@@ -4068,13 +4084,11 @@ if (true) {
         //    （在缓存里常驻但当前没显示的属于「故意缓存」，不算泄漏。）
         let referencedByImg = 0, trueOrphan = 0;
         try {
-            const imgSet = new Set();
-            const imgs = document.getElementsByTagName('img');
-            for (let i = 0; i < imgs.length; i++) { const s = imgs[i].getAttribute('src') || ''; if (s) imgSet.add(s); }
+            const refSet = _collectReferencedSkinBlobUrls();
             const cacheA = new Set(); skinImageUrlCache.forEach(function (u) { if (typeof u === 'string') cacheA.add(u); });
             const cacheB = new Set(); _skinBlobUrlCache.forEach(function (u) { if (typeof u === 'string') cacheB.add(u); });
             _skinBlobEver.forEach(function (u) {
-                if (imgSet.has(u)) referencedByImg++;
+                if (refSet.has(u)) referencedByImg++;
                 else if (!cacheA.has(u) && !cacheB.has(u)) trueOrphan++;
             });
         } catch (e) {}
