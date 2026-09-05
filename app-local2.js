@@ -4705,7 +4705,7 @@ if (true) {
     //    避免每次 reapplyAllSkins 都重新 fetch + 生成新 blob（旧的从不释放 → 持续泄漏数百 MB）。
     //    缓存的 blobUrl 通过 LRU 上限管理：超过上限淘汰最旧的并 revokeObjectURL，避免挂机无限增长。
     const _skinBlobUrlCache = new Map();
-    const _SKIN_BLOB_CACHE_MAX = 200;
+    const _SKIN_BLOB_CACHE_MAX = 600; // 🔴 2026-09-06 200→600：皮肤共 413 张，200 必淘汰→孤儿 blob 泄漏（2G 元凶）。提到 600 全量常驻永不淘汰，从源头不产孤儿。每个 blob 只持压缩 PNG 字节（413×~50KB≈20MB 可忽略），解码位图只活在显示中的 <img>，不随缓存涨。
     function _skinBlobCacheSet(url, blobUrl) {
         if (!url || !blobUrl) return;
         // 🔴 2026-08-30 关键修复：覆盖同名旧 blobUrl 时【不再 revoke】。
