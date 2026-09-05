@@ -8991,7 +8991,7 @@
             }
 
             // 整个项目上传 Gist（与「分享整个项目」同一条链路）：右上角浮条提示，断网/限额静默降级
-            let shortLink = '', shortCode = '';
+            let shortLink = '', shortCode = '', _curFp = '';
             {
                 const tip = document.createElement('div');
                 tip.style.cssText = 'position:fixed;top:14px;right:14px;z-index:' + (200000 + (window.topWinZIndex || 0)) + ';background:rgba(20,20,40,0.92);border:1px solid rgba(255,215,0,0.4);color:#ffd700;padding:8px 14px;border-radius:8px;font-size:0.82rem;box-shadow:0 4px 16px rgba(0,0,0,0.5);';
@@ -8999,7 +8999,9 @@
                 document.body.appendChild(tip);
                 try {
                     opts.by = (function () { try { return localStorage.getItem('TFJL_UserName') || '匿名'; } catch (e) { return '匿名'; } })();
-                    const r = await _projShareCreate(_payload, opts);
+                    const _pl = _projShareBuildPayload();
+                    _curFp = (typeof _shareContentFingerprint === 'function') ? _shareContentFingerprint(_pl) : '';
+                    const r = await _projShareCreate(_pl, opts);
                     shortLink = PROJECT_SHARE_LINK_BASE + r.id;
                     shortCode = r.code;
                     if (r.reused && typeof showToast === 'function') {
