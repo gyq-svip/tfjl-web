@@ -17,10 +17,28 @@
     "冰骑","恶魔","幽灵","神龙","骨龙","祭司","小炮","爱神","船长","毒王","炸弹","火枪","松鼠","绿弓","蜘蛛",
     "冰弓","小鹿","大树","猫咪","萨满","地精","工匠","火法","暗法","冰法","凤凰","火神","阿翼","龟相","谜云",
     "雷神","女妖","神龛","刺客","钢鬃","恶匪","斧客","剑客","龙拳","狂将","孤星","领主","狂龙","土精灵","彩精灵",
-    "魔精灵","木精灵","光精灵","幻精灵","雷精灵","冰精灵","暗精灵","魂精灵","冰鸟"
+    "魔精灵","木精灵","光精灵","幻精灵","雷精灵","冰精灵","暗精灵","魂精灵","冰鸟",
+    "水人"
   ];
   // 显示名别名（游戏显示名 → 库名）
   const ALIASES = { "邪能火炮":"火炮", "地精宝库":"宝库", "微型潜艇":"潜艇" };
+
+  // 🔴 2026-09-05：英雄库 = 硬编码 100 库 + 运行时皮肤库（window.skinRegistry）
+  //    背景：管理员新增的英雄（如「水人」）已进皮肤系统/卡池/registry.json，
+  //    但上面硬编码库没同步 → OCR 正确识别出「水人」也判「不在100英雄库」。
+  //    改为运行时动态合并，以后新增卡自动支持，无需再改代码。
+  //    缓存以 registry 的 key 数为失效依据（新卡加入数量变化即重建）。
+  let _heroLibCache = null;
+  function heroLib(){
+    let reg = {};
+    try{ reg = (typeof window !== 'undefined' && window.skinRegistry) || {}; }catch(e){ reg = {}; }
+    const n = Object.keys(reg).length;
+    if(_heroLibCache && _heroLibCache._n === n) return _heroLibCache._lib;
+    const lib = DEFAULT_HEROES.slice();
+    for(const h of Object.keys(reg)){ if(h && lib.indexOf(h) < 0) lib.push(h); }
+    _heroLibCache = { _n: n, _lib: lib };
+    return lib;
+  }
 
   // ====================== 工具 ======================
   const $ = id => document.getElementById(id);
@@ -448,13 +466,14 @@
   function matchHero(raw){
     let t = norm(raw);
     if(!t) return {hero:null, score:0, method:'空'};
-    if(DEFAULT_HEROES.includes(t)) return {hero:t, score:1.0, method:'精确'};
+    const LIB = heroLib();
+    if(LIB.includes(t)) return {hero:t, score:1.0, method:'精确'};
     if(ALIASES[t]) return {hero:ALIASES[t], score:0.96, method:'别名'};
-    for(const h of DEFAULT_HEROES){ if(t.includes(h)) return {hero:h, score:0.82, method:'包含(显⊃库)'}; }
-    for(const h of DEFAULT_HEROES){ if(h.includes(t) && t.length>=1) return {hero:h, score:0.7, method:'包含(库⊃显)'}; }
+    for(const h of LIB){ if(t.includes(h)) return {hero:h, score:0.82, method:'包含(显⊃库)'}; }
+    for(const h of LIB){ if(h.includes(t) && t.length>=1) return {hero:h, score:0.7, method:'包含(库⊃显)'}; }
     if(t.includes('·')){
       const after = t.split('·').pop();
-      if(DEFAULT_HEROES.includes(after)) return {hero:after, score:0.85, method:'去前缀'};
+      if(LIB.includes(after)) return {hero:after, score:0.85, method:'去前缀'};
     }
     return {hero:null, score:0, method:'无'};
   }
@@ -462,8 +481,9 @@
   function validateHero100(name){
     const n = norm(name);
     if(!n) return {ok:false, reason:'空/未识别', four:false, hero:null};
-    if(DEFAULT_HEROES.includes(n)) return {ok:true, hero:n, four:isFourCharName(n)};
-    if(ALIASES[n] && DEFAULT_HEROES.includes(ALIASES[n])) return {ok:true, hero:ALIASES[n], four:isFourCharName(n)};
+    const LIB = heroLib();
+    if(LIB.includes(n)) return {ok:true, hero:n, four:isFourCharName(n)};
+    if(ALIASES[n] && LIB.includes(ALIASES[n])) return {ok:true, hero:ALIASES[n], four:isFourCharName(n)};
     return {ok:false, reason:'不在100英雄库', four:isFourCharName(n), hero:null};
   }
 
