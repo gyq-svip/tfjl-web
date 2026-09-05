@@ -160,6 +160,42 @@ const ADMIN_CTL_FILE: &str = "admin_ctl.json";
 
 // 拉取管理员指令 Gist，发现针对本设备的指令则：① 唤起被最小化的窗口 ② emit 给前端处理。
 // 这样即使 APP 在系统托盘后台，用户也能看到飘窗通知/拉黑遮罩（Rust 直接 show 窗口）。
+// 一次性指令去重（防止「无 expire 的 restart/forceReload」被心跳反复执行）：
+// 把已执行过的指令 ts 记到 app_data_dir/admin_ctl_ack.json，进程重启后也不重复执行。
+fn admin_ctl_ack_path(app: &tauri::AppHandle) -> Option<std::path::PathBuf> {
+    app.path().app_data_dir().ok().map(|d| d.join("admin_ctl_ack.json"))
+}
+fn admin_ctl_is_acked(app: &tauri::AppHandle, key: &str, ts: u64) -> bool {
+    if ts == 0 { return false; }
+    if let Some(p) = admin_ctl_ack_path(app) {
+        if let Ok(s) = fs::read_to_string(&p) {
+            if let Ok(v) = serde_json::from_str::<serde_json::Value>(&s) {
+                if let Some(arr) = v.get(key).and_then(|x| x.as_array()) {
+                    return arr.iter().any(|x| x.as_u64() == Some(ts));
+                }
+            }
+        }
+    }
+    false
+}
+fn admin_ctl_mark_acked(app: &tauri::AppHandle, key: &str, ts: u64) {
+    if ts == 0 { return; }
+    if let Some(p) = admin_ctl_ack_path(app) {
+        if let Some(parent) = p.parent() { let _ = fs::create_dir_all(parent); }
+        let mut v: serde_json::Value = if let Ok(s) = fs::read_to_string(&p) {
+            serde_json::from_str(&s).unwrap_or(serde_json::json!({}))
+        } else { serde_json::json!({}) };
+        let arr = match v.get_mut(key).and_then(|x| x.as_array_mut()) {
+            Some(a) => a,
+            None => { v[key] = serde_json::json!([]); v.get_mut(key).unwrap().as_array_mut().unwrap() }
+        };
+        if !arr.iter().any(|x| x.as_u64() == Some(ts)) {
+            arr.push(serde_json::json!(ts));
+        }
+        if let Ok(s) = serde_json::to_string(&v) { let _ = fs::write(&p, s); }
+    }
+}
+
 async fn do_admin_ctl_check(app: &tauri::AppHandle, ctx: &HeartbeatCtx) -> Result<(), String> {
     if ADMIN_CTL_GIST_ID.starts_with("REPLACE_") { return Ok(()); }
     let client = reqwest::Client::builder()
@@ -183,30 +219,47 @@ async fn do_admin_ctl_check(app: &tauri::AppHandle, ctx: &HeartbeatCtx) -> Resul
         .and_then(|f| f.get("content")).and_then(|c| c.as_str())
         .ok_or_else(|| "admin_ctl.json not found".to_string())?;
     let ctl: serde_json::Value = serde_json::from_str(content).map_err(|e| format!("parse admin_ctl: {}", e))?;
-    // 本设备是否命中（强制刷新 / 指令 / 拉黑 / 远程重启）
     let dev = &ctx.device_id;
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0);
+    // 本设备是否命中（指令 / 拉黑 / 强制刷新 / 远程重启）
     let has_cmd = ctl.get("cmds").and_then(|c| c.get(dev)).map(|v| v.is_array() && !v.as_array().unwrap().is_empty()).unwrap_or(false);
     let has_black = ctl.get("blacklist").and_then(|b| b.get(dev)).is_some();
-    let force = ctl.get("forceReload").and_then(|f| f.get("to")).and_then(|t| t.as_str())
-        .map(|t| t == "all" || t == dev).unwrap_or(false);
+    // forceReload：补 expire 过期检查（之前漏了 → 过期指令仍被反复命中）
+    let force_to = ctl.get("forceReload").and_then(|f| f.get("to")).and_then(|t| t.as_str()).unwrap_or("");
+    let force_expire = ctl.get("forceReload").and_then(|f| f.get("expire")).and_then(|e| e.as_u64()).unwrap_or(0);
+    let force = (force_to == "all" || force_to == dev) && (force_expire == 0 || now_ms <= force_expire);
     let latest_ver = ctl.get("latestSwVersion").and_then(|v| v.as_str()).unwrap_or("");
-    // 远程重启（救活假死设备）：本设备命中 restart 指令 → Rust 直接 restart（进程级，能绕过 JS 假死）
-    let restart = ctl.get("restart").and_then(|r| r.get("to")).and_then(|t| t.as_str())
-        .map(|t| t == "all" || t == dev).unwrap_or(false);
+    // 远程重启（救活假死设备）：本设备命中 restart 指令才重启，且必须「未过期 + 未执行过」双条件，
+    // 否则「无 expire 的 restart 指令」会被心跳无限重启（2026-09-06 事故根因：前端有 expire+ack 双检，Rust 侧两个都没做）。
+    let restart_to = ctl.get("restart").and_then(|r| r.get("to")).and_then(|t| t.as_str()).unwrap_or("");
+    let restart_expire = ctl.get("restart").and_then(|r| r.get("expire")).and_then(|e| e.as_u64()).unwrap_or(0);
+    let restart_ts = ctl.get("restart").and_then(|r| r.get("ts")).and_then(|t| t.as_u64()).unwrap_or(0);
+    let restart_hit = restart_to == "all" || restart_to == dev;
+    let restart_expired = restart_expire > 0 && now_ms > restart_expire;
+    let restart_acked = admin_ctl_is_acked(app, "restart", restart_ts);
+    let restart = restart_hit && !restart_expired && !restart_acked;
     if restart {
+        admin_ctl_mark_acked(app, "restart", restart_ts);
         println!("[adminCtl] 收到重启指令 dev={}，即将 restart()", dev);
         // 延迟 1s 让日志/emit 先出去，再重启（restart 是 ! 类型，成功则进程退出并重拉，假死也能救）
         std::thread::sleep(std::time::Duration::from_secs(1));
         app.restart();
     }
-    if has_cmd || has_black || force || !latest_ver.is_empty() {
-        // ① 唤起窗口（从托盘/最小化弹出），保证用户看得到
+    // 仅「真有动作」的指令（指令/拉黑/强制刷新）才把窗口从托盘/最小化弹出来抢焦点；
+    // latestSwVersion 恒非空，之前 `!latest_ver.is_empty()` 导致「每次心跳都弹窗」——移除该条件，版本校验交给前端处理。
+    let need_pop = has_cmd || has_black || force;
+    if need_pop {
         if let Some(w) = app.get_webview_window("main") {
             let _ = w.show();
             let _ = w.unminimize();
             let _ = w.set_focus();
         }
-        // ② emit 给前端（window.__adminCtlApply 会处理）
+    }
+    if has_cmd || has_black || force || !latest_ver.is_empty() {
+        // emit 给前端（window.__adminCtlApply 会处理，含版本校验）
         let _ = app.emit("admin-ctl", ctl.clone());
         println!("[adminCtl] 命中本设备指令 dev={} cmd={} black={} force={} ver={}", dev, has_cmd, has_black, force, latest_ver);
     }
@@ -1998,6 +2051,66 @@ fn gm_click_background(hwnd: usize, rx: f64, ry: f64, times: u32, gap_ms: u64) -
     }
 }
 
+/// adb 模式点击（针对安卓模拟器，如 MuMu）：通过 MuMu 自带 adb.exe 在 Android 系统层注入触摸，
+/// 无视窗口前台/可见/遮挡，也不需要真实鼠标设备 —— 模拟器只吃系统层输入，PostMessage 常无效。
+/// 坐标 x/y 为 0~1 比例（基于窗口客户区，与后台模式一致），直接映射到模拟器内部分辨率（默认 1040×585，横屏铺满）。
+fn gm_click_adb(_hwnd: usize, x: f64, y: f64, times: u32, gap_ms: u64) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        let adb = find_adb().ok_or_else(|| "找不到 MuMu 的 adb.exe（请确认 MuMu 已安装，或手动配置 adb 路径）".to_string())?;
+        let port = adb_port();
+        let ax = (x * 1040.0).round().clamp(0.0, 1040.0) as i32;
+        let ay = (y * 585.0).round().clamp(0.0, 585.0) as i32;
+        // 确保已连接（幂等：已连会报 already connected 但不影响后续 tap）
+        let _ = std::process::Command::new(&adb)
+            .args(["connect", &format!("127.0.0.1:{}", port)])
+            .output();
+        let times = times.clamp(1, 10);
+        for n in 0..times {
+            let out = std::process::Command::new(&adb)
+                .args(["-s", &format!("127.0.0.1:{}", port), "shell", "input", "tap", &ax.to_string(), &ay.to_string()])
+                .output();
+            match out {
+                Ok(o) if o.status.success() => {}
+                Ok(o) => return Err(format!("adb tap 失败: {}", String::from_utf8_lossy(&o.stderr))),
+                Err(e) => return Err(format!("执行 adb 失败: {}", e)),
+            }
+            if n + 1 < times {
+                std::thread::sleep(std::time::Duration::from_millis(gap_ms.max(50)));
+            }
+        }
+        Ok(())
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (hwnd, x, y, times, gap_ms);
+        Err("仅支持 Windows".into())
+    }
+}
+
+/// 探测 MuMu 自带的 adb.exe（优先复用安装目录，无需打包/下载）。
+fn find_adb() -> Option<String> {
+    let candidates = [
+        r"D:\Program Files\Netease\MuMu Player 12\shell\adb.exe",
+        r"C:\Program Files\Netease\MuMu Player 12\shell\adb.exe",
+        r"D:\Program Files\Netease\MuMuPlayer\shell\adb.exe",
+        r"C:\Program Files\Netease\MuMuPlayer\shell\adb.exe",
+        r"D:\Program Files\Netease\MuMu\emulator\nemu\shell\adb.exe",
+        r"C:\Program Files\Netease\MuMu\emulator\nemu\shell\adb.exe",
+    ];
+    for c in &candidates {
+        if std::path::Path::new(c).exists() {
+            return Some(c.to_string());
+        }
+    }
+    None
+}
+
+/// MuMu adb 端口（单开默认 7555；多开器 7557/7559…，后续可做成配置项）。
+fn adb_port() -> u16 {
+    7555
+}
+
 #[derive(serde::Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 struct GmCfg {
@@ -2249,6 +2362,20 @@ fn gm_exec_actions<F: Fn() -> bool>(app: &tauri::AppHandle, hwnd: usize, actions
                         Err(e) => {
                             let _ = app.emit("gm-log", serde_json::json!({
                                 "hwnd": hwnd, "msg": format!("{} 第{}步·后台点击跳过：{}", ctx, ai + 1, e), "isErr": true,
+                            }));
+                        }
+                    }
+                } else if mode == "adb" {
+                    match gm_click_adb(hwnd, *x, *y, (*times).max(1), *gap_ms) {
+                        Ok(_) => {
+                            let _ = app.emit("gm-log", serde_json::json!({
+                                "hwnd": hwnd,
+                                "msg": format!("{} 第{}步·adb点击（×{}次）", ctx, ai + 1, (*times).max(1)),
+                            }));
+                        }
+                        Err(e) => {
+                            let _ = app.emit("gm-log", serde_json::json!({
+                                "hwnd": hwnd, "msg": format!("{} 第{}步·adb点击跳过：{}", ctx, ai + 1, e), "isErr": true,
                             }));
                         }
                     }
@@ -2558,6 +2685,9 @@ fn gm_click(hwnd: usize, x: f64, y: f64, times: Option<u32>, gap_ms: Option<u64>
     if mode == "bg" {
         gm_click_background(hwnd, x, y, times, gap)?;
         Ok(format!("后台点击 ({:.3},{:.3}) ×{} 次", x, y, times))
+    } else if mode == "adb" {
+        gm_click_adb(hwnd, x, y, times, gap)?;
+        Ok(format!("adb点击 ({:.3},{:.3}) ×{} 次（系统层注入，无需前台/真实鼠标）", x, y, times))
     } else {
         let (sx, sy) = gm_win_point_to_screen(hwnd, x, y)?;
         gm_click_at(sx, sy, times, gap);
