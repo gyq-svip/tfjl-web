@@ -24012,6 +24012,113 @@ ${maSection}
         }
         window.openAdminPanel = openAdminPanel; // 🔴 2026-09-01 显式暴露到 window，供 index.html 内联兜底脚本调用
 
+        // ==================== 旧活动·道具档位维护（管理员） ====================
+        // 数据存索引 Gist 的 old_activity_items.json：{ items: [{ name, cost }] }
+        // 档位即 cost（材料数），任意数字都支持；前端「旧活动·选择目标」读这份数据，无配置时退回内置默认。
+        const OLD_ITEMS_GIST_FILE = 'old_activity_items.json';
+        let _oldItemsAdminDraft = null;
+        async function renderOldItemsAdmin() {
+            const box = document.getElementById('adminOldItemsBody');
+            if (!box) return;
+            box.innerHTML = '加载中…';
+            let items = [];
+            try {
+                const token = getGistToken();
+                if (token && typeof wallReadGistFile === 'function') {
+                    const c = await wallReadGistFile(GIST_ID, OLD_ITEMS_GIST_FILE, token);
+                    if (c) { const d = JSON.parse(c); if (d && Array.isArray(d.items)) items = d.items; }
+                }
+            } catch (e) {}
+            if (!items || !items.length) {
+                items = (window.ACTIVITY_SKINS_DEFAULT || []).map(s => ({ name: s.name, cost: s.cost }));
+            }
+            _oldItemsAdminDraft = items.map(x => ({ name: String(x.name || ''), cost: Number(x.cost) || 0 }));
+            _renderOldItemsAdminList();
+        }
+        window.renderOldItemsAdmin = renderOldItemsAdmin;
+
+        function _renderOldItemsAdminList() {
+            const box = document.getElementById('adminOldItemsBody');
+            if (!box) return;
+            const draft = _oldItemsAdminDraft || [];
+            const cats = Array.from(new Set(draft.map(x => Number(x.cost) || 0))).sort((a, b) => a - b);
+            let html = '';
+            if (!cats.length) html += '<div style="color:rgba(255,255,255,0.4);padding:10px;text-align:center;">暂无道具，请在下方添加</div>';
+            cats.forEach(cat => {
+                const items = draft.filter(x => (Number(x.cost) || 0) === cat);
+                html += '<div style="margin-bottom:10px;background:rgba(255,255,255,0.04);border-radius:8px;padding:8px;">';
+                html += '<div style="color:#ffd700;font-size:0.8rem;font-weight:600;margin-bottom:6px;">' + cat + ' 材料档（' + items.length + ' 项）</div>';
+                items.forEach(it => {
+                    const idx = draft.indexOf(it);
+                    html += '<div style="display:flex;gap:6px;margin-bottom:5px;align-items:center;">' +
+                        '<input data-oldi="' + idx + '" data-f="name" value="' + _esc(it.name) + '" style="flex:1;min-width:0;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.15);border-radius:5px;color:#fff;font-size:0.75rem;padding:4px 6px;outline:none;">' +
+                        '<input data-oldi="' + idx + '" data-f="cost" type="number" value="' + (Number(it.cost) || 0) + '" style="width:84px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.15);border-radius:5px;color:#ffd700;font-size:0.75rem;padding:4px 6px;outline:none;">' +
+                        '<button onclick="oldItemsAdminRemove(' + idx + ')" style="background:rgba(239,68,68,0.2);border:1px solid rgba(239,68,68,0.4);color:#ef4444;font-size:0.72rem;padding:4px 9px;border-radius:5px;cursor:pointer;">删除</button>' +
+                        '</div>';
+                });
+                html += '</div>';
+            });
+            html += '<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">' +
+                '<input id="oldItemsNewName" placeholder="新道具名" style="flex:1;min-width:120px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,215,0,0.3);border-radius:5px;color:#fff;font-size:0.75rem;padding:5px 8px;outline:none;">' +
+                '<input id="oldItemsNewCost" type="number" placeholder="档位/材料数" style="width:112px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,215,0,0.3);border-radius:5px;color:#ffd700;font-size:0.75rem;padding:5px 8px;outline:none;">' +
+                '<button onclick="oldItemsAdminAdd()" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;border:none;font-size:0.75rem;padding:5px 12px;border-radius:5px;cursor:pointer;">➕ 添加</button>' +
+                '</div>';
+            html += '<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">' +
+                '<button onclick="oldItemsAdminSave()" style="flex:1;min-width:140px;background:linear-gradient(135deg,#2196f3,#1976d2);color:#fff;border:none;font-size:0.85rem;padding:9px;border-radius:7px;cursor:pointer;font-weight:600;">💾 保存并立即生效</button>' +
+                '<button onclick="oldItemsAdminReset()" style="background:rgba(255,152,0,0.2);border:1px solid rgba(255,152,0,0.4);color:#ffb74d;font-size:0.8rem;padding:9px 14px;border-radius:7px;cursor:pointer;">↩ 恢复内置默认</button>' +
+                '</div>';
+            box.innerHTML = html;
+            box.querySelectorAll('input[data-oldi]').forEach(inp => {
+                inp.addEventListener('change', function () {
+                    const i = parseInt(this.getAttribute('data-oldi'), 10);
+                    const f = this.getAttribute('data-f');
+                    if (!_oldItemsAdminDraft || !_oldItemsAdminDraft[i]) return;
+                    if (f === 'name') _oldItemsAdminDraft[i].name = this.value.trim();
+                    else { _oldItemsAdminDraft[i].cost = Math.max(0, Number(this.value) || 0); _renderOldItemsAdminList(); } // 档位变了要重新分组
+                });
+            });
+        }
+        window.oldItemsAdminAdd = function () {
+            const n = document.getElementById('oldItemsNewName');
+            const c = document.getElementById('oldItemsNewCost');
+            const name = (n ? n.value : '').trim();
+            const cost = Math.max(0, Number(c ? c.value : 0) || 0);
+            if (!name) { alert('请填写道具名'); return; }
+            if (!cost) { alert('请填写档位/材料数（如 480、1600）'); return; }
+            _oldItemsAdminDraft = (_oldItemsAdminDraft || []).concat([{ name: name, cost: cost }]);
+            if (n) n.value = '';
+            _renderOldItemsAdminList();
+        };
+        window.oldItemsAdminRemove = function (idx) {
+            if (!_oldItemsAdminDraft || !_oldItemsAdminDraft[idx]) return;
+            if (!confirm('删除「' + _oldItemsAdminDraft[idx].name + '」？')) return;
+            _oldItemsAdminDraft.splice(idx, 1);
+            _renderOldItemsAdminList();
+        };
+        window.oldItemsAdminReset = function () {
+            if (!confirm('恢复为内置默认清单（当前云端配置将被覆盖）？')) return;
+            _oldItemsAdminDraft = (window.ACTIVITY_SKINS_DEFAULT || []).map(s => ({ name: s.name, cost: s.cost }));
+            _renderOldItemsAdminList();
+        };
+        window.oldItemsAdminSave = async function () {
+            const token = getGistToken();
+            if (!token) { alert('无 Token，无法保存到云端'); return; }
+            const items = (_oldItemsAdminDraft || [])
+                .filter(x => x && String(x.name).trim())
+                .map(x => ({ name: String(x.name).trim(), cost: Math.max(0, Number(x.cost) || 0) }));
+            if (!items.length) { alert('清单为空，至少要有一个道具'); return; }
+            try {
+                const r = await fetch('https://api.github.com/gists/' + GIST_ID, {
+                    method: 'PATCH',
+                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': 'token ' + token },
+                    body: JSON.stringify({ files: { [OLD_ITEMS_GIST_FILE]: { content: JSON.stringify({ items: items }, null, 2) } } })
+                });
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                if (typeof window.__reloadOldActivityItems === 'function') await window.__reloadOldActivityItems();
+                alert('✅ 已保存并生效（' + items.length + ' 个道具）');
+            } catch (e) { alert('保存失败：' + ((e && e.message) || e)); }
+        };
+
         // 统一隐藏所有管理员子页：自动扫描 id 以 adminPage 开头的容器（含 adminPageTitle）。
         // 🔴 历史坑：此前隐藏清单在 adminShowPage/adminShowMenu/管理员验证分支三处各写一份，
         //    新增页面漏登记任意一处 → "打开后关闭不消失"（登录打卡/API监控/BossRed/WallGist 均中过招）。
@@ -24086,7 +24193,7 @@ ${maSection}
             localStorage.removeItem(ADMIN_MENU_ORDER_KEY);
             const grid = document.getElementById('adminMenuGrid');
             if (grid) {
-                const def = ['help','news','title','stats','loginStats','cardGroup','analytics','scriptStats','settings','nickManage','passwordManage','cacheManage','logStats','wallBackup','wallGist','featureToggles','deepsea','alliance','bossRed','apiMonitor','diag','damageCalc','auction','toolbox','shares','feedback'];
+                const def = ['help','news','title','stats','loginStats','cardGroup','analytics','scriptStats','settings','nickManage','passwordManage','cacheManage','logStats','wallBackup','wallGist','featureToggles','deepsea','alliance','bossRed','apiMonitor','diag','damageCalc','auction','toolbox','shares','feedback','oldItems'];
                 const byKey = {};
                 Array.from(grid.querySelectorAll('.admin-menu-item')).forEach(it => byKey[it.dataset.key] = it);
                 def.forEach(k => { if (byKey[k]) grid.appendChild(byKey[k]); });
@@ -24249,6 +24356,12 @@ ${maSection}
                 if (pageEl) {
                     pageEl.style.display = 'block';
                     if (typeof window.renderFeedbackAdmin === 'function') window.renderFeedbackAdmin();
+                }
+            } else if (page === 'oldItems') {
+                const pageEl = document.getElementById('adminPageOldItems');
+                if (pageEl) {
+                    pageEl.style.display = 'block';
+                    if (typeof window.renderOldItemsAdmin === 'function') window.renderOldItemsAdmin();
                 }
             }
         }

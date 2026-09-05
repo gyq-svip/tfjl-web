@@ -1570,6 +1570,10 @@
                         <span class="mi-emoji">🎧</span>
                         <div class="mi-text"><div class="mi-title">用户反馈</div><div class="mi-sub">问题/建议(私有)</div></div>
                     </div>
+                    <div class="admin-menu-item" data-key="oldItems" onclick="adminShowPage('oldItems')">
+                        <span class="mi-emoji">🎪</span>
+                        <div class="mi-text"><div class="mi-title">活动道具</div><div class="mi-sub">旧活动档位/道具维护</div></div>
+                    </div>
 
                 </div>
                 <div id="adminSortEditBtn" style="display:flex;gap:8px;margin-top:8px;">
@@ -1932,6 +1936,20 @@
                     用户通过右下角💬悬浮按钮提交，仅管理员可见。每条自动附带版本/平台/报错。点击「✅ 标为已处理」即记录。
                 </div>
                 <div id="adminFeedbackBody" style="max-height:68vh;overflow-y:auto;font-size:0.8rem;">加载中…</div>
+            </div>
+
+            <div id="adminPageOldItems" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+                    <button class="admin-btn admin-btn-secondary" onclick="adminShowMenu()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
+                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">🎪 旧活动·道具档位维护</h3>
+                    <button class="admin-btn" onclick="renderOldItemsAdmin()" style="padding:6px 12px;font-size:0.8rem;margin-left:auto;">🔄 重新载入</button>
+                </div>
+                <div style="font-size:0.72rem;color:rgba(255,255,255,0.55);margin-bottom:10px;background:rgba(255,255,255,0.05);border-radius:6px;padding:8px;line-height:1.6;">
+                    档位 = 材料数：改「档位数字」即改档位，填一个不存在的数字（如 1600 / 604）就是新增档位。<br>
+                    计算只按档位数字累加，档位数量和每个档位里的道具数量都不影响计算。<br>
+                    保存后对所有人生效（存云端 Gist），活动换期时在这里改即可，不用改代码。
+                </div>
+                <div id="adminOldItemsBody" style="max-height:66vh;overflow-y:auto;font-size:0.8rem;">加载中…</div>
             </div>
 
             <div id="adminPageCacheManage" style="display:none;">
