@@ -1,5 +1,5 @@
 
-        // ==================== 通用选择器（首字母 + 关键字搜索，所有"选卡/选英雄/选皮肤"场景复用）====================
+        // ==================== 速选器 QuickPicker（通用选择器 · 内部函数名 openGenericPicker，请勿改名）====================
         // 汉字→拼音首字母紧凑字典（塔防精灵全部卡名用字，457字全覆盖，由 scripts 生成校验）
         window._hanziPyMap = null;
         window.hanziInitials = function(str) {
@@ -14,6 +14,19 @@
             for (const _c of _s) { if (window._hanziPyMap[_c]) _o += window._hanziPyMap[_c]; }
             return _o;
         };
+        // ===================== 速选器 QuickPicker（openGenericPicker）=====================
+        // 统一的「首字母 / 关键字搜索」浮层选择器，被所有 选卡 / 选英雄 / 选融合卡 / OCR 修正 场景复用。
+        // 搜索：基于 window.hanziInitials（汉字→拼音首字母）做简拼匹配（sl→水灵）+ 关键字子串匹配。
+        // 调用：window.openGenericPicker(opts)
+        //   opts.items     : [{ value, label, py?, style?, current?, profession?, favorite? }, ...]  py=拼音首字母(供搜索)
+        //   opts.title     : 标题
+        //   opts.searchPlaceholder : 搜索框占位符
+        //   opts.onPick    : (value, item) => void  点击某项的回调
+        //   opts.multi     : true 多选模式（手牌选卡上阵，配合 columns）
+        //   opts.align     : 'center' | 'left' | 'right'  浮层对齐
+        //   opts.floating  : true 悬浮窗（无背景 / 可拖拽缩放 / 多实例并存），配 opts.floatKey 记忆位置（存 localStorage tfjl_floatrect_<key>）
+        //   opts.wide / overlayWidth / columns / noBackdrop / overlayId / parent / floatWidth : 外观与挂载控制
+        // 复用点：① 减伤计算·选英雄卡  ② 融合卡变体菜单  ③ 手牌·选卡上阵(我的/队友)  ④ OCR 修正英雄
         // 通用筛选器：居中浮层 + 搜索框（关键字 / 首字母）+ 列表，点击回调 onPick(value, item)
         function openGenericPicker(opts) {
             opts = opts || {};
