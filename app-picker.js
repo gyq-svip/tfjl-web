@@ -26,6 +26,8 @@
         //   opts.align     : 'center' | 'left' | 'right'  浮层对齐
         //   opts.floating  : true 悬浮窗（无背景 / 可拖拽缩放 / 多实例并存），配 opts.floatKey 记忆位置（存 localStorage tfjl_floatrect_<key>）
         //   opts.wide / overlayWidth / columns / noBackdrop / overlayId / parent / floatWidth : 外观与挂载控制
+        //   opts.learn     : true(默认) 开启「高频优先(学习)」——自动记录常选卡并置顶(收藏 favorite 永远最前)
+        //   opts.learnKey  : 学习分组键(默认取 title)；不同场景用不同 key 隔离高频统计
         // 复用点：① 减伤计算·选英雄卡  ② 融合卡变体菜单  ③ 手牌·选卡上阵(我的/队友)  ④ OCR 修正英雄
         // 通用筛选器：居中浮层 + 搜索框（关键字 / 首字母）+ 列表，点击回调 onPick(value, item)
         function openGenericPicker(opts) {
@@ -34,6 +36,21 @@
             const title = opts.title || '请选择';
             const placeholder = opts.searchPlaceholder || '🔍 输入关键字或首字母';
             const onPick = opts.onPick || function() {};
+            // —— 高频优先（"学习"）：自动记录常选的卡，下次打开时置顶；favorite 收藏永远最前 ——
+            const learn = opts.learn !== false; // 默认开启；个别场景可传 learn:false 关闭
+            const _learnKey = 'tfjl_picker_freq_v1::' + (opts.learnKey || title || 'generic');
+            function _loadFreq() { try { return JSON.parse(localStorage.getItem(_learnKey) || '{}') || {}; } catch (e) { return {}; } }
+            function _bumpFreq(value) { if (!learn || !value) return; try { const f = _loadFreq(); f[value] = Math.min(9999, (f[value] || 0) + 1); localStorage.setItem(_learnKey, JSON.stringify(f)); } catch (e) {} }
+            const _freq = learn ? _loadFreq() : {};
+            function _sortItems(arr) {
+                if (!learn) return arr;
+                return arr.map(function(it, i) { return { it: it, i: i }; }).sort(function(a, b) {
+                    const fa = a.it.favorite ? 1e9 : (_freq[a.it.value] || 0);
+                    const fb = b.it.favorite ? 1e9 : (_freq[b.it.value] || 0);
+                    if (fb !== fa) return fb - fa; // 收藏/高频在前
+                    return a.i - b.i;             // 同频保持原序（稳定排序）
+                }).map(function(x) { return x.it; });
+            }
             const multi = !!opts.multi; // 卡片多选模式
             const wide = !!opts.wide;
             // 多列密度：'2'|'3'|'4'。手牌多选默认 2 列（选多职业卡片变多也不拥挤）；皮肤等单选走自适应
@@ -202,6 +219,7 @@
                     const vals = Array.from(selectedCards);
                     const its = items.filter(function(it) { return selectedCards.has(pickKey(it)); });
                     overlay.remove();
+                    vals.forEach(function(v) { _bumpFreq(v); });
                     onPick(vals, its);
                 };
                 actionBar.appendChild(info); actionBar.appendChild(done);
@@ -213,7 +231,8 @@
                 q = (q || '').trim().toLowerCase();
                 list.innerHTML = '';
                 let shown = 0;
-                items.forEach(function(it) {
+                const _ordered = _sortItems(items);
+                _ordered.forEach(function(it) {
                     const label = (it.label != null ? it.label : it.value);
                     const py = (it.py != null ? it.py : window.hanziInitials(label)).toLowerCase();
                     const hit = !q || label.toLowerCase().indexOf(q) >= 0 || py.indexOf(q) >= 0;
@@ -246,7 +265,18 @@
                     } else {
                         row.style.cssText = 'padding:7px 10px;border-radius:7px;cursor:pointer;color:' + (it.current ? '#4caf50' : '#fff') + ';font-size:0.85rem;' + (it.current ? 'background:rgba(76,175,80,0.12);' : '');
                     }
-                    if (!multi) row.textContent = label + (profCn ? ('  ·  ' + profCn) : '');
+                    if (!multi) {
+                        row.textContent = '';
+                        const _t = document.createElement('span');
+                        _t.textContent = label + (profCn ? ('  ·  ' + profCn) : '');
+                        row.appendChild(_t);
+                        if ((_freq[it.value] || 0) >= 2 && !it.favorite) {
+                            const _tag = document.createElement('span');
+                            _tag.textContent = ' 常用';
+                            _tag.style.cssText = 'color:rgba(255,255,255,0.4);font-size:0.72rem;margin-left:2px;';
+                            row.appendChild(_tag);
+                        }
+                    }
                     if (multi) {
                         row.onclick = function() {
                             if (selectedCards.has(key)) selectedCards.delete(key); else selectedCards.add(key);
@@ -255,7 +285,7 @@
                     } else {
                         row.onmouseenter = function() { if (!it.current) row.style.background = 'rgba(255,255,255,0.08)'; };
                         row.onmouseleave = function() { if (!it.current) row.style.background = 'transparent'; };
-                        row.onclick = function() { onPick(it.value, it); overlay.remove(); };
+                        row.onclick = function() { _bumpFreq(it.value); onPick(it.value, it); overlay.remove(); };
                     }
                     list.appendChild(row);
                 });
