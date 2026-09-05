@@ -16597,7 +16597,7 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
                                             mergeCounters(counterData, remoteData);
                                             // 🔴 合并在线用户（按设备取最新时间戳并集），避免同步时互相覆盖导致在线数漏算
                                             mergeOnlineUsers(counterData, remoteData);
-                                            lastGoodCounter = JSON.parse(JSON.stringify(counterData));
+                                            lastGoodCounter = (typeof structuredClone === 'function') ? structuredClone(counterData) : JSON.parse(JSON.stringify(counterData)); // 🔴 2026-09-06 内存优化：structuredClone 免去「整对象 stringify+parse」双份大字符串（每 5 分钟一次的 JS 堆突增主因之一）
                                         }
                                 } catch (parseErr) {
                                     console.warn('合并远程数据失败，使用本地数据:', parseErr);
@@ -16631,7 +16631,7 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
                     } catch (e) {
                         console.log('[TFJL app-core] 准备写回统计 Gist · total_visits=' + counterData.total_visits + ' · remoteOk=' + remoteOk);
                     }
-                    let content = JSON.stringify(counterData, null, 2);
+                    let content = JSON.stringify(counterData); // 🔴 2026-09-06 内存优化：去掉 2 空格缩进美化（counter.json 数 MB 时体积省 ~20-30%；PATCH body 还会再嵌套转义一份，美化纯属浪费）
                     try {
                         // 使用 PATCH 更新现有 Gist
                         const patchResponse = await fetch(`https://api.github.com/gists/${counterGistId}`, {
@@ -16654,7 +16654,7 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
                         if (patchResponse.ok) {
                             saveCounterToCache(counterData);
                             clearPendingSync();
-                            lastGoodCounter = JSON.parse(JSON.stringify(counterData));
+                            lastGoodCounter = (typeof structuredClone === 'function') ? structuredClone(counterData) : JSON.parse(JSON.stringify(counterData)); // 🔴 2026-09-06 内存优化：structuredClone 免去「整对象 stringify+parse」双份大字符串（每 5 分钟一次的 JS 堆突增主因之一）
                             updateStatsBar();
                             return;
                         }
