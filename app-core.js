@@ -26978,6 +26978,30 @@ ${maSection}
             return res;
         };
 
+        // 🔴 2026-09-06 内存历史采样：每 30s 记一条轻量快照到环形缓冲（最多 120 条=1 小时）。
+        //   突增时跑 memHistory() 看前后对比，定位是 JS 堆突涨（JS 泄漏）还是原生层突涨（Chromium）。
+        //   刻意极轻：只读 performance.memory + img 数，不遍历全 DOM、不累积长字符串（防自涨）。
+        window.__memHist = [];
+        window.memHistory = function () {
+            const h = window.__memHist || [];
+            console.log('=== memHistory（近 ' + h.length + ' 条，30s/条）===');
+            h.forEach(function (r) {
+                console.log(r.t + ' | JS堆 ' + (r.js ? (r.js / 1048576).toFixed(0) + 'MB' : 'n/a') + ' | IMG ' + r.img);
+            });
+            return h;
+        };
+        if (typeof _memSamplerTimer === 'undefined') {
+            var _memSamplerTimer = setInterval(function () {
+                try {
+                    const pm = (typeof performance !== 'undefined') ? performance.memory : null;
+                    let img = 0;
+                    try { img = document.getElementsByTagName('img').length; } catch (e) {}
+                    window.__memHist.push({ t: new Date().toTimeString().slice(0, 8), js: pm ? pm.usedJSHeapSize : 0, img: img });
+                    if (window.__memHist.length > 120) window.__memHist.shift();
+                } catch (e) {}
+            }, 30000);
+        }
+
         // 快捷：清空 Service Worker 缓存（强刷前端）
         window.clearSWCache = function () {
             return new Promise((resolve) => {
