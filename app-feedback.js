@@ -43,11 +43,21 @@
     return '未知';
   }
   function _fbExeVersion() {
+    // 🔴 2026-09-05 修复：取不到版本绝不断言"网页版"（用户 APP 被误标根因）。
+    // 取值链与项目同款：__APP_VERSION（Rust eval 注入）→ getAppVersion()（Tauri API，仅 APP 有此全局）
+    // → 都没有 = 旧包未注入（平台判断在 _fbPlatform，不在这里猜）
     try { if (window.__APP_VERSION) return String(window.__APP_VERSION).replace(/^v/, ''); } catch (e) {}
-    return '网页版';
+    return '';
   }
   function _fbPlatform() {
-    try { return (window.__TAURI_INTERNALS__ || window.__TAURI__) ? 'app' : 'web'; } catch (e) { return 'web'; }
+    try {
+      // 🔴 与项目判断链对齐（app-local.js _isTauriRuntime 同款三重 + Rust 注入的 __TAURI_APP__ 标记），
+      // 2026-09-05 修复：APP 被误判成"网页版"（旧写法只查 __TAURI_INTERNALS__/__TAURI__，漏 UA 兜底）
+      if (typeof isTauriApp !== 'undefined') return isTauriApp ? 'app' : 'web';
+      if (window.__TAURI_INTERNALS__ || window.__TAURI__ || window.__TAURI_APP__) return 'app';
+      if (navigator.userAgent.indexOf('Tauri') !== -1) return 'app';
+      return 'web';
+    } catch (e) { return 'unknown'; }
   }
   function _fbRecentErrors() {
     try {
@@ -56,11 +66,18 @@
         .map(function (l) { return (l.time || '') + ' [' + (l.level || '') + '] ' + (l.msg || ''); });
     } catch (e) { return []; }
   }
-  function _fbDiag() {
+  async function _fbDiag() {
+    // 桌面版本：__APP_VERSION → Tauri getAppVersion()（异步，提交时取）→ 空表示旧包未注入（不猜"网页版"）
+    var exe = _fbExeVersion();
+    var plat = _fbPlatform();
+    if (!exe && typeof getAppVersion === 'function') {
+      try { var gv = await getAppVersion(); if (gv) exe = String(gv).replace(/^v/, ''); } catch (e) {}
+    }
+    if (!exe && plat === 'app') exe = '未注入(旧包)';
     return {
       swVersion: _fbSwVersion(),
-      exeVersion: _fbExeVersion(),
-      platform: _fbPlatform(),
+      exeVersion: exe,
+      platform: plat,
       devId: _fbDevId(),
       nick: _fbNick(),
       time: new Date().toLocaleString('zh-CN'),
@@ -127,7 +144,7 @@
     var entry = {
       id: Date.now() + '_' + Math.random().toString(36).slice(2, 7),
       type: _fbType, text: text, nick: _fbNick(), devId: _fbDevId(),
-      ts: Date.now(), diag: _fbDiag(), status: 'pending', reply: ''
+      ts: Date.now(), diag: await _fbDiag(), status: 'pending', reply: ''
     };
     // 本地历史（用户自己可见 + 立即回复）
     var local = _fbLoadLocal();
@@ -149,24 +166,53 @@
     _fbToast('✅ 已记录，等待后续处理', 'success');
     if (typeof window.renderFeedbackHistory === 'function') window.renderFeedbackHistory();
   };
-  window.renderFeedbackHistory = function () {
+  // 我的反馈记录：先渲染本地，再后台拉云端自己文件合并"管理员回复/处理状态"（按 id 匹配，以云端为准）
+  window.renderFeedbackHistory = async function () {
     var box = document.getElementById('feedbackHistory');
     if (!box) return;
     var local = _fbLoadLocal();
-    if (!local.length) {
-      box.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:12px;font-size:0.78rem;">你还没有提交过反馈</div>';
-      return;
-    }
-    box.innerHTML = local.map(function (e) {
-      return '<div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:8px 10px;margin-bottom:8px;">' +
-        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">' +
-        '<span style="font-size:0.75rem;color:#ffd700;">' + _fbEsc(FB_TYPE[e.type] || '反馈') + '</span>' +
-        '<span style="font-size:0.7rem;color:#4ade80;">✅ 已记录，等待后续处理</span>' +
-        '</div>' +
-        '<div style="font-size:0.8rem;color:rgba(255,255,255,0.9);white-space:pre-wrap;word-break:break-word;">' + _fbEsc(e.text) + '</div>' +
-        '<div style="font-size:0.65rem;color:rgba(255,255,255,0.4);margin-top:3px;">' + _fbEsc(new Date(e.ts).toLocaleString('zh-CN')) + '</div>' +
-        '</div>';
-    }).join('');
+    var render = function () {
+      if (!local.length) {
+        box.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:12px;font-size:0.78rem;">你还没有提交过反馈</div>';
+        return;
+      }
+      box.innerHTML = local.map(function (e) {
+        var done = (e.status === 'done');
+        var replied = done && e.reply;
+        var st = replied
+          ? '<span style="font-size:0.7rem;color:#4ecdc4;">📩 管理员已回复</span>'
+          : (done ? '<span style="font-size:0.7rem;color:#4ade80;">✅ 已处理</span>' : '<span style="font-size:0.7rem;color:#4ade80;">✅ 已记录，等待后续处理</span>');
+        return '<div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:8px 10px;margin-bottom:8px;">' +
+          '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">' +
+          '<span style="font-size:0.75rem;color:#ffd700;">' + _fbEsc(FB_TYPE[e.type] || '反馈') + '</span>' + st +
+          '</div>' +
+          '<div style="font-size:0.8rem;color:rgba(255,255,255,0.9);white-space:pre-wrap;word-break:break-word;">' + _fbEsc(e.text) + '</div>' +
+          (replied ? '<div style="font-size:0.75rem;color:#4ecdc4;background:rgba(78,205,196,0.12);border-left:2px solid #4ecdc4;border-radius:4px;padding:5px 8px;margin-top:5px;white-space:pre-wrap;word-break:break-word;">💬 ' + _fbEsc(e.reply) + '</div>' : '') +
+          '<div style="font-size:0.65rem;color:rgba(255,255,255,0.4);margin-top:3px;">' + _fbEsc(new Date(e.ts).toLocaleString('zh-CN')) + '</div>' +
+          '</div>';
+      }).join('');
+    };
+    render();
+    try {
+      var devId = (_fbDevId() || '').replace(/[^a-zA-Z0-9_-]/g, '_');
+      if (!devId) return;
+      var fileName = 'fb_' + devId + '.json';
+      var files = await _fbReadGist();
+      if (!files || !files[fileName] || !files[fileName].content) return;
+      var arr = JSON.parse(files[fileName].content) || [];
+      var byId = {};
+      arr.forEach(function (x) { if (x && x.id) byId[x.id] = x; });
+      var changed = false;
+      local.forEach(function (e) {
+        var c = byId[e.id];
+        if (c && (((c.status || 'pending') !== (e.status || 'pending')) || ((c.reply || '') !== (e.reply || '')))) {
+          e.status = c.status || 'pending';
+          e.reply = c.reply || '';
+          changed = true;
+        }
+      });
+      if (changed) { _fbSaveLocal(local); render(); }
+    } catch (e) {}
   };
 
   // ==================== 管理员面板：查看 / 标记 ====================
@@ -205,10 +251,34 @@
         '<div style="font-size:0.68rem;color:rgba(255,255,255,0.5);margin-top:4px;">' +
         '👤 ' + (e.nick || '匿名') + ' · 🆔 ' + (e.devId || '-') + ' · 🕒 ' + _fbEsc(new Date(e.ts || Date.now()).toLocaleString('zh-CN')) + '<br>' + _fbEsc(diagStr) +
         '</div>' +
-        (done && e.reply ? '<div style="font-size:0.72rem;color:#4ade80;margin-top:3px;">💬 回复：' + _fbEsc(e.reply) + '</div>' : '') +
-        (done ? '' : '<div style="margin-top:6px;"><button onclick="fbAdminMarkDone(' + idx + ')" style="background:rgba(76,175,80,0.2);border:1px solid rgba(76,175,80,0.4);color:#4ade80;font-size:0.72rem;padding:3px 10px;border-radius:5px;cursor:pointer;">✅ 标为已处理</button></div>') +
+        (done && e.reply ? '<div style="font-size:0.72rem;color:#4ade80;margin-top:3px;">💬 已回复：' + _fbEsc(e.reply) + '</div>' : '') +
+        (done ? '' :
+          '<div style="margin-top:6px;display:flex;gap:6px;align-items:center;">' +
+          '<input id="fbReply_' + idx + '" placeholder="回复该用户（用户端可见）" style="flex:1;min-width:0;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.2);border-radius:5px;color:#fff;font-size:0.72rem;padding:4px 8px;outline:none;">' +
+          '<button onclick="fbAdminReply(' + idx + ')" style="background:rgba(78,205,196,0.25);border:1px solid rgba(78,205,196,0.5);color:#4ecdc4;font-size:0.72rem;padding:3px 10px;border-radius:5px;cursor:pointer;white-space:nowrap;">📩 回复</button>' +
+          '<button onclick="fbAdminMarkDone(' + idx + ')" style="background:rgba(76,175,80,0.2);border:1px solid rgba(76,175,80,0.4);color:#4ade80;font-size:0.72rem;padding:3px 10px;border-radius:5px;cursor:pointer;white-space:nowrap;">✅ 已处理</button>' +
+          '</div>') +
         '</div>';
     }).join('');
+  };
+  // 管理员回复：写入该用户文件的 entry.reply（status=done），用户端打开反馈面板即可看到
+  window.fbAdminReply = async function (idx) {
+    var entries = window.__fbAdminEntries || [];
+    var e = entries[idx];
+    var inp = document.getElementById('fbReply_' + idx);
+    var text = inp ? inp.value.trim() : '';
+    if (!e || !e._file) return;
+    if (!text) { _fbToast('请先输入回复内容', 'warn'); return; }
+    var files = await _fbReadGist();
+    if (!files || !files[e._file]) { _fbToast('读取失败', 'error'); return; }
+    var arr = [];
+    try { arr = JSON.parse(files[e._file].content || '[]'); } catch (err) {}
+    var changed = false;
+    arr.forEach(function (x) { if (x.id === e.id) { x.reply = text; x.replyTs = Date.now(); x.status = 'done'; changed = true; } });
+    if (!changed) return;
+    var ok = await _fbWriteUserFile(e._file, JSON.stringify(arr, null, 1));
+    if (ok) { _fbToast('📩 已回复，用户下次打开反馈面板可见', 'success'); if (typeof window.renderFeedbackAdmin === 'function') window.renderFeedbackAdmin(); }
+    else _fbToast('回复写入失败', 'error');
   };
   window.fbAdminMarkDone = async function (idx) {
     var entries = window.__fbAdminEntries || [];

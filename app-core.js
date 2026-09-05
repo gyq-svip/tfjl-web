@@ -216,7 +216,26 @@
                 // （历史 bug：曾 return url.slice(0,60)，导致部分带缓存参数的写操作把 URL 存进诊断文件，面板翻译不了 → 显示英文/链接）
                 return m ? m[1] : 'unknown';
             }
-            function _recordGistIO(method, url, status) {
+            // 🔍 写操作来源捕获：从调用堆栈解析发起本次写入的业务函数名（跳过本 hook 自身帧）。
+            // 目的：诊断面板每一次 Gist 写入都能定位到"哪个功能写的"，杜绝「其他/不明写入」。
+            // 解析优先级：具名函数名 > 匿名帧的 文件名:行号（同样能精确定位）。
+            function _gistWriteSource() {
+                try {
+                    const lines = (new Error().stack || '').split('\n');
+                    for (let i = 0; i < lines.length; i++) {
+                        const line = lines[i];
+                        if (line.indexOf('_gistWriteSource') !== -1) continue;   // 本函数
+                        if (line.indexOf('_recordGistIO') !== -1) continue;      // hook 记录函数
+                        if (line.indexOf('window.fetch') !== -1) continue;       // hook 替身的 fetch 帧
+                        const nm = /at\s+(?:async\s+)?([A-Za-z_$][\w$]*)\s*(\(|$)/.exec(line);
+                        if (nm && nm[1] && nm[1] !== 'fetch') return nm[1];
+                        const fm = /([A-Za-z][\w.-]*\.js:\d+:\d+)/.exec(line);
+                        if (fm) return fm[1];
+                    }
+                } catch (e) {}
+                return '';
+            }
+            function _recordGistIO(method, url, status, init) {
                 try {
                     const id = _gistIdOf(url);
                     const isWrite = method !== 'GET';
@@ -240,11 +259,15 @@
                         s.count++; s.sample = stack;
                         console.warn('[GIST-IO] ⚠️ 403 限流 @ ' + (g.label || id) + '  触发栈: ' + key);
                     }
-                    // 全网写操作诊断：本地记录明细（外部诊断模块挂 window.__recordDiagWrite(gistId, fn, method)）
-                    // 用 _inferDiagFn 从 url 推断功能名（如 saveMessagesToGist / indexGist(room_index) 等），
-                    // 便于面板按 gistId|功能 聚合；只统计真正的写操作（PATCH/POST/DELETE），GET 不记。
+                    // 全网写操作诊断：本地记录明细（外部诊断模块挂 window.__recordDiagWrite(gistId, fn, method, src)）
+                    // 用 _inferDiagFn 从 url+body 推断功能名（如 saveMessagesToGist / indexGist(room_index) 等），
+                    // src = 调用堆栈解析出的发起函数名（精确到"谁写的"）；
+                    // 只统计真正的写操作（PATCH/POST/DELETE），GET 不记。
                     if (method !== 'GET' && typeof window.__recordDiagWrite === 'function') {
-                        try { window.__recordDiagWrite(_gistIdOf(url), _inferDiagFn(url, method), method); } catch (e) {}
+                        try {
+                            const bodyHint = (init && typeof init.body === 'string') ? init.body.slice(0, 4000) : '';
+                            window.__recordDiagWrite(_gistIdOf(url), _inferDiagFn(url, method, bodyHint), method, _gistWriteSource());
+                        } catch (e) {}
                     }
                 } catch (e) {}
             }
@@ -270,7 +293,7 @@
                 const url = typeof input === 'string' ? input : (input && input.url) || '';
                 const isGist = typeof url === 'string' && url.indexOf('api.github.com/gists/') !== -1;
                 if (!isGistGet(method, url) || isMutable(url)) {
-                    if (isGist) _recordGistIO(method, url, null); // 先记请求，status 随后补
+                    if (isGist) _recordGistIO(method, url, null, init); // 先记请求，status 随后补
                     const r = await _origFetch(input, init);
                     if (isGist) {
                         // 回填 status 到最近一条记录
@@ -284,7 +307,7 @@
                 const headers = Object.assign({}, init.headers);
                 if (cached && cached.etag) headers['If-None-Match'] = cached.etag;
                 const r = await _origFetch(input, Object.assign({}, init, { headers }));
-                _recordGistIO(method, url, r.status);
+                _recordGistIO(method, url, r.status, init);
                 if (r.status === 304 && cached) {
                     return new Response(cached.body, { status: 200, statusText: 'OK', headers: { 'content-type': 'application/json' } });
                 }
@@ -393,7 +416,8 @@
             } catch (e) { return { date: _todayStr(), uploads: 0, writes: 0, ops: 0 }; }
         }
         // 每次 Gist 写操作累加（由 IIFE 内 _recordGistIO 调用 window.__recordDiagWrite）：gistId × 功能标签 × 方法 → 计数 + 采样时间戳
-        window.__recordDiagWrite = function _recordDiagWrite(gistId, fn, method) {
+        // src = 调用堆栈解析的发起函数名（谁写的），随 entries 上报，面板可精确显示来源
+        window.__recordDiagWrite = function _recordDiagWrite(gistId, fn, method, src) {
             try {
                 if (!gistId || gistId.length < 8) return;
                 // 只统计真正写操作；GET 一律忽略（即使被错误传入）
@@ -401,7 +425,8 @@
                 const b = _loadDiagBuffer();
                 const key = gistId + '|' + (fn || 'unknown') + '|' + (method || 'WRITE');
                 const now = Date.now();
-                if (!b[key]) b[key] = { gistId, fn: fn || 'unknown', method: method || 'WRITE', count: 0, first: now, last: now, samples: [] };
+                if (!b[key]) b[key] = { gistId, fn: fn || 'unknown', method: method || 'WRITE', count: 0, first: now, last: now, samples: [], src: src || '' };
+                if (src && !b[key].src) b[key].src = src;
                 b[key].count++;
                 b[key].last = now;
                 _bumpDiagDay(['writes', 'ops']);
@@ -429,8 +454,19 @@
         // 从 URL 推断功能标签（粗粒度，足够定位）
         const DIAG_MESSAGES_GIST = 'b02794a8d5c43874b76286185f7b1f7f';
         const DIAG_INDEX_GIST = 'a32a0628bd9275f3a4922cd12cf298c9';
-        function _inferDiagFn(url, method) {
+        function _inferDiagFn(url, method, bodyHint) {
             if (!url) return 'unknown';
+            // ① 请求体特征最强优先（同一 Gist 多文件时也能精确区分写的是哪个文件）
+            if (bodyHint) {
+                if (bodyHint.indexOf('"messages.json"') !== -1) return 'saveMessagesToGist';
+                if (bodyHint.indexOf('"profiles.json"') !== -1) return 'saveNickProfiles';
+                if (bodyHint.indexOf('"room_index.json"') !== -1) return 'indexGist(room_index)';
+                if (bodyHint.indexOf('"diag_config.json"') !== -1) return 'diagConfigWrite';
+                if (/fb_[\w-]+\.json/.test(bodyHint)) return 'feedbackWrite';
+                if (/"diag-[\w-]+\.json"/.test(bodyHint)) return 'diagUpload';
+                const fm2 = /"files"\s*:\s*\{\s*"([^"]{1,60})"/.exec(bodyHint);
+                if (fm2 && fm2[1]) return 'writeFile(' + fm2[1] + ')';
+            }
             if (url.indexOf('/gists/' + DIAG_MESSAGES_GIST) !== -1) return 'saveMessagesToGist';
             const counterGid = (function(){ try { return localStorage.getItem('counter_gist_id') || 'e1bd9a5139e1c4e011bfea707e917d61'; } catch(e){ return 'e1bd9a5139e1c4e011bfea707e917d61'; } })();
             if (url.indexOf('/gists/' + counterGid) !== -1) return 'syncCounterToGist';
@@ -508,12 +544,17 @@
                 const t = /\(([^)]+)\)/.exec(fn);
                 return '索引Gist写入' + (t ? '(' + t[1] + ')' : '');
             }
+            // writeFile(文件名)：按请求体提取的文件名直显，一眼看清写的是哪个文件
+            if (fn.indexOf('writeFile(') === 0) return '写入 ' + fn.substring(10, fn.length - 1);
             const MAP = {
                 'diagUpload': '诊断数据上传',
                 'saveMessagesToGist': '消息墙写入',
                 'saveBossToGist': 'Boss减伤写入',
                 'backupWallMessages': '消息墙备份',
                 'createGist': '新建Gist',
+                'saveNickProfiles': '昵称资料写入',
+                'diagConfigWrite': '诊断配置写入',
+                'feedbackWrite': '用户反馈写入',
                 'chat': '聊天消息',
                 'image': '图片上传',
                 'otherGist': '其他Gist写入',
@@ -523,8 +564,33 @@
                 'feature': '功能使用'
             };
             if (MAP[fn]) return MAP[fn];
-            // 兜底：未匹配的内部 fn 不再裸露英文/ID，统一显示中文"未知操作"，避免面板出现模糊标识
-            return '未知操作';
+            // 兜底（2026-09-05 用户要求"杜绝不明写入"）：宁可原样显示内部函数名，也绝不显示笼统"未知操作"
+            return fn;
+        }
+        // 把堆栈解析出的发起函数名（src）翻译成中文功能说明；未收录的原样显示函数名（仍精确可查，绝不显示"不明"）
+        function _srcZh(src) {
+            if (!src) return '';
+            if (/[\u4e00-\u9fff]/.test(src)) return src;
+            const MAP = {
+                'saveMessagesToGist': '需求墙发消息', 'sendWallMessage': '需求墙发消息', 'wallSendMsg': '需求墙发消息',
+                'syncCounterToGist': '在线状态/计数器', '_pushDiagReport': '诊断心跳上报', 'pushDiagReport': '诊断心跳上报',
+                '_ensureDiagGist': '诊断Gist初始化', '_getDiagConfig': '诊断配置拉取',
+                '_shareIndexPut': '分享索引写入', 'shareIndexPut': '分享索引写入',
+                '_shareOverwriteGist': '分享覆盖更新', 'shareProjectViaCode': '项目分享(短码)',
+                'shareLineupImage': '阵容卡片分享', '_uploadWorkCard': '作品卡片上传',
+                '_shareUploadPayload': '分享内容上传', 'shareProjectToWall': '项目同步上墙',
+                'saveBossToGist': 'Boss减伤保存', 'createWallBackup': '需求墙备份',
+                'backupWallMessages': '需求墙消息备份', 'wallAdminBackupNow': '需求墙立即备份',
+                '_restoreWallBackup': '需求墙还原', 'adminRestoreFromBackup': '管理员紧急还原',
+                'saveRoomIndex': '房间索引写入', '_saveRoomIndex': '房间索引写入',
+                'joinRoom': '加入房间', 'createRoom': '创建房间', 'sendRoomChat': '房间聊天',
+                'uploadRoomScript': '房间脚本上传', 'saveAuctionItem': '拍卖上架', 'auctionSync': '拍卖同步',
+                'submitFeedback': '用户反馈提交', 'fbAdminMarkDone': '反馈标记已处理', 'fbAdminReply': '管理员回复反馈',
+                'saveNickProfiles': '昵称资料写入', 'saveSettingsToGist': '远程配置保存',
+                'adminSaveConfig': '管理员配置保存', 'shareScriptToWall': '脚本分享上墙',
+                'uploadScriptToGist': '脚本上传', 'saveHandToGist': '手牌数据保存'
+            };
+            return MAP[src] || src;
         }
         // 诊断配置拉取间隔（用户可设置）：默认 15 分钟；下限 1 分钟避免过于频繁打 GitHub API
         function _getDiagCfgTtl() {
@@ -25001,14 +25067,16 @@ ${maSection}
                                 if (m.err) html += '<br><span style="color:#f87171;">err: ' + m.err + '</span>';
                                 if (m.payload && m.payload.entries && m.payload.entries.length) {
                                     html += '<table style="border-collapse:collapse;margin-top:4px;font-size:0.72rem;width:100%;">';
-                                    html += '<tr style="font-size:0.68rem;"><th style="text-align:left;padding:2px 6px;color:#a78bfa;background:rgba(167,139,250,0.12);">功能</th><th style="text-align:right;padding:2px 6px;color:#fbbf24;background:rgba(251,191,36,0.12);">次数</th><th style="text-align:left;padding:2px 6px;color:#60a5fa;background:rgba(96,165,250,0.12);">最近 Gist</th><th style="text-align:left;padding:2px 6px;color:#4ade80;background:rgba(74,222,128,0.12);">Gist 用途</th></tr>';
+                                    html += '<tr style="font-size:0.68rem;"><th style="text-align:left;padding:2px 6px;color:#a78bfa;background:rgba(167,139,250,0.12);">功能</th><th style="text-align:right;padding:2px 6px;color:#fbbf24;background:rgba(251,191,36,0.12);">次数</th><th style="text-align:left;padding:2px 6px;color:#60a5fa;background:rgba(96,165,250,0.12);">最近 Gist</th><th style="text-align:left;padding:2px 6px;color:#4ade80;background:rgba(74,222,128,0.12);">Gist 用途</th><th style="text-align:left;padding:2px 6px;color:#fbbf24;background:rgba(251,191,36,0.12);">发起来源</th></tr>';
                                     m.payload.entries.forEach(e => {
                                         const isWrite = e.gistId !== 'feature' && e.method !== 'GET' && e.method !== 'USE' && e.method !== 'unknown';
                                         const badge = isWrite ? ' <span style="color:#f87171;">✍️写Gist</span>' : ' <span style="color:#94a3b8;">📊仅埋点</span>';
                                         // 🔴 2026-08-28 可读性修复：① 功能列用 _fnZh 翻译中文（不再裸英文 fn）② 第4列"最近文件名"原 bug 显示 e.fn 重复 → 改为 _gistLabel 中文用途
                                         const fnZh = (typeof _fnZh === 'function') ? _fnZh(e.gistId, e.fn) : (e.fn || '?');
                                         const gistZh = (typeof _gistLabel === 'function') ? _gistLabel(e.gistId).label : (e.gistId || '?');
-                                        html += '<tr style="border-top:1px dashed rgba(255,255,255,0.1);"><td style="padding:2px 6px;color:#c4b5fd;">' + fnZh + badge + '</td><td style="text-align:right;padding:2px 6px;color:' + (isWrite ? '#f87171' : '#fbbf24') + ';font-weight:700;">' + (e.count || 0) + '</td><td style="padding:2px 6px;color:#60a5fa;font-family:monospace;">' + (e.gistId ? e.gistId.substring(0, 12) + '…' : '?') + '</td><td style="padding:2px 6px;color:#4ade80;">' + gistZh + '</td></tr>';
+                                        // 🔴 2026-09-05 杜绝"不明写入"：发起来源 = 堆栈解析的函数名（_srcZh 中文映射，未收录原样显示函数名）
+                                        const srcZh = (typeof _srcZh === 'function') ? _srcZh(e.src) : (e.src || '');
+                                        html += '<tr style="border-top:1px dashed rgba(255,255,255,0.1);"><td style="padding:2px 6px;color:#c4b5fd;">' + fnZh + badge + '</td><td style="text-align:right;padding:2px 6px;color:' + (isWrite ? '#f87171' : '#fbbf24') + ';font-weight:700;">' + (e.count || 0) + '</td><td style="padding:2px 6px;color:#60a5fa;font-family:monospace;">' + (e.gistId ? e.gistId.substring(0, 12) + '…' : '?') + '</td><td style="padding:2px 6px;color:#4ade80;">' + gistZh + '</td><td style="padding:2px 6px;color:#fbbf24;">' + (srcZh || '<span style="color:#94a3b8;">旧数据无来源</span>') + '</td></tr>';
                                     });
                                     html += '</table>';
                                 } else {
@@ -25037,7 +25105,7 @@ ${maSection}
                             (detailByGist[x.k] || []).forEach(row => {
                                 const m = row.file, e = row.entry;
                                 const ts = m.last ? new Date(m.last).toLocaleString('zh-CN') : '?';
-                                html += '<div style="margin-bottom:4px;">' + _colorWho(m.who) + ' → <b style="color:' + C_FRONTV + ';">' + (e.fn || '?') + '</b> ×<b style="color:' + C_NUM + ';">' + (e.count || 0) + '</b> <span style="color:' + C_TIME + ';">[' + ts + ']</span></div>';
+                                html += '<div style="margin-bottom:4px;">' + _colorWho(m.who) + ' → <b style="color:' + C_FRONTV + ';">' + (e.fn || '?') + '</b>' + (e.src ? ' <span style="color:#fbbf24;font-size:0.68rem;">← ' + _srcZh(e.src) + '</span>' : '') + ' ×<b style="color:' + C_NUM + ';">' + (e.count || 0) + '</b> <span style="color:' + C_TIME + ';">[' + ts + ']</span></div>';
                             });
                             html += '</div>';
                         });
@@ -25068,13 +25136,17 @@ ${maSection}
                                 const linkHtml = info.url ? '<a href="' + info.url + '" target="_blank" rel="noopener" style="color:#60a5fa;text-decoration:underline;font-size:0.68rem;margin-left:6px;" title="' + info.url + '">' + short8 + '</a>' : short8;
                                 labelHtml = info.emoji + ' <b style="color:#fca5a5;">' + info.label + '</b> ' + linkHtml;
                             }
-                            html += '<div style="cursor:pointer;color:#fca5a5;" onclick="var d=document.getElementById(\'' + id + '\');if(d.style.display===\'none\'){d.style.display=\'block\';}else{d.style.display=\'none\';}">' + bar(x.v, wMax) + ' <b style="color:' + C_NUM + ';">' + x.v + '</b>　✍️ ' + labelHtml + ' <span style="color:' + C_TIME + ';font-size:0.68rem;">/ ' + _fnZh(rawGid, fn) + '</span> <span style="color:#60a5fa;font-size:0.7rem;">▶</span></div>';
+                            // 来源：取该聚合组内首个非空 src（谁写的）
+                            let _wsrc = '';
+                            writeKeys.filter(k => k.substring(6) === x.k).forEach(k => { (detailByFn[k] || []).forEach(r => { if (!_wsrc && r.entry && r.entry.src) _wsrc = r.entry.src; }); });
+                            const _wsrcHtml = _wsrc ? ' <span style="color:#fbbf24;font-size:0.66rem;">← ' + _srcZh(_wsrc) + '</span>' : '';
+                            html += '<div style="cursor:pointer;color:#fca5a5;" onclick="var d=document.getElementById(\'' + id + '\');if(d.style.display===\'none\'){d.style.display=\'block\';}else{d.style.display=\'none\';}">' + bar(x.v, wMax) + ' <b style="color:' + C_NUM + ';">' + x.v + '</b>　✍️ ' + labelHtml + ' <span style="color:' + C_TIME + ';font-size:0.68rem;">/ ' + _fnZh(rawGid, fn) + _wsrcHtml + '</span> <span style="color:#60a5fa;font-size:0.7rem;">▶</span></div>';
                             html += '<div id="' + id + '" style="display:none;background:rgba(0,0,0,0.25);border-left:2px solid #f87171;padding:6px 10px;margin:4px 0 8px 12px;font-size:0.75rem;">';
                             writeKeys.filter(k => k.substring(6) === x.k).forEach(k => {
                                 (detailByFn[k] || []).forEach(row => {
                                     const m = row.file, e = row.entry;
                                     const ts = m.last ? new Date(m.last).toLocaleString('zh-CN') : '?';
-                                    html += '<div style="margin-bottom:4px;">' + _colorWho(m.who) + ' ×<b style="color:#f87171;">' + (e.count || 0) + '</b> <span style="color:' + C_TIME + ';">[' + ts + ']</span></div>';
+                                    html += '<div style="margin-bottom:4px;">' + _colorWho(m.who) + ' ×<b style="color:#f87171;">' + (e.count || 0) + '</b> <span style="color:' + C_TIME + ';">[' + ts + ']</span>' + (e.src ? ' <span style="color:#fbbf24;font-size:0.68rem;">← ' + _srcZh(e.src) + '</span>' : '') + '</div>';
                                 });
                             });
                             html += '</div>';
