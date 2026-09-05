@@ -4,6 +4,10 @@
         let refDragOffset = {x: 0, y: 0};
 
         // ==================== 活动氪金计算器 ====================
+        // 🔴 2026-09-06：以下只是「内置默认」。实际生效清单由管理员在「管理员面板 → 🎪 活动道具」维护，
+        //    配置存在索引 Gist 的 old_activity_items.json（全员共享，无配置时退回这里）。
+        //    档位 = 材料数（cost）：改数字即改档位，填不存在的数字就是新增档位（如 604 / 1600），
+        //    计算只按档位数字累加，档位多少、内部有几个道具都不影响计算。
         const ACTIVITY_SKINS = [
             // 480材料档
             { name: '巨灵神·海妖', cost: 480, category: '480' },
@@ -25,6 +29,39 @@
             // 1280材料档
             { name: '少林掌门·咕咕', cost: 1280, category: '1280' },
         ];
+        // 内置默认（供管理员页「恢复内置」与云端无配置时兜底，暴露给 app-core.js 侧的管理界面）
+        window.ACTIVITY_SKINS_DEFAULT = ACTIVITY_SKINS.map(function (s) { return { name: s.name, cost: s.cost, category: String(s.cost) }; });
+        const OLD_ITEMS_FILE = 'old_activity_items.json';
+        let _oldItemsCache = null;
+        let _oldItemsFlat = [];
+        // 读云端配置（管理员维护的清单），失败/无配置 → 内置默认
+        async function loadOldActivityItems(force) {
+            if (_oldItemsCache && !force) return _oldItemsCache;
+            try {
+                const token = (typeof getGistToken === 'function') ? getGistToken() : '';
+                const gid = window.TFJL_MASTER_GIST_ID || 'a32a0628bd9275f3a4922cd12cf298c9';
+                if (token && typeof wallReadGistFile === 'function') {
+                    const c = await wallReadGistFile(gid, OLD_ITEMS_FILE, token);
+                    if (c) {
+                        const d = JSON.parse(c);
+                        if (d && Array.isArray(d.items) && d.items.length) {
+                            _oldItemsCache = d.items.filter(function (x) { return x && x.name; })
+                                .map(function (x) { const cost = Number(x.cost) || 0; return { name: String(x.name), cost: cost, category: String(cost) }; });
+                            return _oldItemsCache;
+                        }
+                    }
+                }
+            } catch (e) {}
+            _oldItemsCache = window.ACTIVITY_SKINS_DEFAULT.slice();
+            return _oldItemsCache;
+        }
+        function getOldActivityItems() { return _oldItemsCache || window.ACTIVITY_SKINS_DEFAULT; }
+        // 管理员保存后调用：清缓存 → 重拉 → 重渲染
+        window.__reloadOldActivityItems = async function () {
+            _oldItemsCache = null;
+            await loadOldActivityItems(true);
+            if (typeof renderCalcSkins === 'function') await renderCalcSkins();
+        };
         // 封神杯襄商店皮肤/战车清单（第四话·封神台）
         const BEIXIANG_SKINS = [
             // 480战旗档
@@ -423,26 +460,45 @@
             c.innerHTML = html;
         }
 
-        function renderCalcSkins() {
+        // 档位配色按排序序号循环取（支持任意数量档位，不再写死 5 档）
+        const OLD_CAT_COLORS = ['#4caf50', '#2196f3', '#9c27b0', '#ff9800', '#ef4444', '#00bcd4', '#e91e63', '#cddc39', '#ffd700', '#8bc34a'];
+        function _oldNameEsc(s) {
+            return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
+        async function renderCalcSkins() {
             const container = document.getElementById('calcSkinsList');
-            const categories = ['480', '640', '720', '960', '1280'];
-            const catColors = { '480': '#4caf50', '640': '#2196f3', '720': '#9c27b0', '960': '#ff9800', '1280': '#ef4444' };
+            if (!container) return;
+            await loadOldActivityItems();
+            const all = getOldActivityItems();
+            // 档位 = 材料数，从数据动态提取并升序排列 → 任意档位（480/604/720/1280/1600…）自动支持
+            const cats = Array.from(new Set(all.map(s => Number(s.cost) || 0))).sort((a, b) => a - b);
+            _oldItemsFlat = [];
             let html = '';
-            categories.forEach(cat => {
-                const skins = ACTIVITY_SKINS.filter(s => s.category === cat);
+            cats.forEach((cat, ci) => {
+                const skins = all.filter(s => (Number(s.cost) || 0) === cat);
                 if (skins.length === 0) return;
+                const color = OLD_CAT_COLORS[ci % OLD_CAT_COLORS.length];
                 html += `<div style="margin-bottom:12px;">`;
-                html += `<div style="color:${catColors[cat]};font-size:0.8rem;font-weight:600;margin-bottom:6px;">${cat}材料档</div>`;
+                html += `<div style="color:${color};font-size:0.8rem;font-weight:600;margin-bottom:6px;">${cat}材料档</div>`;
                 html += `<div style="display:flex;flex-wrap:wrap;gap:6px;">`;
                 skins.forEach(skin => {
+                    // 用索引而非道具名拼接 onclick（道具名由管理员自定义，可能含引号把 HTML 属性撑坏）
+                    const idx = _oldItemsFlat.length;
+                    _oldItemsFlat.push({ name: skin.name, cost: skin.cost });
                     const isSelected = calcSelectedSkins.has(skin.name);
-                    const bg = isSelected ? `background:linear-gradient(135deg,${catColors[cat]},#2e7d32);border-color:${catColors[cat]};` : 'background:rgba(255,255,255,0.05);border-color:rgba(255,255,255,0.1);';
+                    const bg = isSelected ? `background:linear-gradient(135deg,${color},#2e7d32);border-color:${color};` : 'background:rgba(255,255,255,0.05);border-color:rgba(255,255,255,0.1);';
                     const check = isSelected ? '<span style="margin-right:4px;">✓</span>' : '';
-                    html += `<div onclick="toggleCalcSkin('${skin.name}')" style="${bg}border:1px solid;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:0.8rem;color:${isSelected ? '#fff' : 'rgba(255,255,255,0.8)'};transition:all 0.2s;user-select:none;">${check}${skin.name}<span style="opacity:0.7;margin-left:4px;font-size:0.7rem;">${skin.cost}</span></div>`;
+                    html += `<div onclick="toggleCalcSkinByIdx(${idx})" style="${bg}border:1px solid;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:0.8rem;color:${isSelected ? '#fff' : 'rgba(255,255,255,0.8)'};transition:all 0.2s;user-select:none;">${check}${_oldNameEsc(skin.name)}<span style="opacity:0.7;margin-left:4px;font-size:0.7rem;">${skin.cost}</span></div>`;
                 });
                 html += `</div></div>`;
             });
             container.innerHTML = html;
+            if (typeof updateCalcSummary === 'function') updateCalcSummary();
+        }
+        function toggleCalcSkinByIdx(idx) {
+            const it = _oldItemsFlat[idx];
+            if (!it) return;
+            toggleCalcSkin(it.name);
         }
 
         function toggleCalcSkin(name) {
@@ -463,8 +519,9 @@
 
         function updateCalcSummary() {
             let total = 0;
+            const all = getOldActivityItems();
             calcSelectedSkins.forEach(name => {
-                const skin = ACTIVITY_SKINS.find(s => s.name === name);
+                const skin = all.find(s => s.name === name);
                 if (skin) total += skin.cost;
             });
             document.getElementById('calcTargetTotal').textContent = total;
