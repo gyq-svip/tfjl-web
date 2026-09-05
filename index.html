@@ -1400,6 +1400,7 @@
     <script defer src="app-damagecalc.js?v=CI_AUTO"></script>
     <script defer src="gh-gist.js?v=CI_AUTO"></script>
     <script defer src="app-core.js?v=CI_AUTO"></script>
+    <script defer src="app-feedback.js?v=CI_AUTO"></script>
     <script defer src="admin-ctl.js?v=CI_AUTO"></script>
 
     <!-- 模态框：创建分类 -->
@@ -1564,6 +1565,10 @@
                     <div class="admin-menu-item" data-key="shares" onclick="adminShowPage('shares')">
                         <span class="mi-emoji">📤</span>
                         <div class="mi-text"><div class="mi-title">分享管理</div><div class="mi-sub">短码/分享者/删除</div></div>
+                    </div>
+                    <div class="admin-menu-item" data-key="feedback" onclick="adminShowPage('feedback')">
+                        <span class="mi-emoji">🎧</span>
+                        <div class="mi-text"><div class="mi-title">用户反馈</div><div class="mi-sub">问题/建议(私有)</div></div>
                     </div>
 
                 </div>
@@ -1914,6 +1919,19 @@
                     <button class="admin-btn" onclick="adminLoadShareManager()" style="padding:6px 12px;font-size:0.8rem;margin-left:auto;">🔄 刷新</button>
                 </div>
                 <div id="adminShareManagerBody" style="max-height:70vh;overflow-y:auto;font-size:0.8rem;">加载中…</div>
+            </div>
+
+            <div id="adminPageFeedback" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+                    <button class="admin-btn admin-btn-secondary" onclick="adminShowMenu()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
+                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">🎧 用户反馈</h3>
+                    <span id="adminFeedbackSummary" style="margin-left:auto;font-size:0.75rem;color:rgba(255,255,255,0.6);"></span>
+                    <button class="admin-btn" onclick="renderFeedbackAdmin()" style="padding:6px 12px;font-size:0.8rem;">🔄 刷新</button>
+                </div>
+                <div style="font-size:0.72rem;color:rgba(255,255,255,0.5);margin-bottom:10px;background:rgba(255,255,255,0.05);border-radius:6px;padding:8px;line-height:1.5;">
+                    用户通过右下角💬悬浮按钮提交，仅管理员可见。每条自动附带版本/平台/报错。点击「✅ 标为已处理」即记录。
+                </div>
+                <div id="adminFeedbackBody" style="max-height:68vh;overflow-y:auto;font-size:0.8rem;">加载中…</div>
             </div>
 
             <div id="adminPageCacheManage" style="display:none;">
@@ -2564,6 +2582,26 @@
             <span id="appUpdateBadge" style="display:none;position:absolute;right:150px;top:50%;transform:translateY(-50%);cursor:pointer;user-select:none;color:#4caf50;font-size:0.66rem;padding:1px 8px;background:rgba(76,175,80,0.15);border:1px solid rgba(76,175,80,0.4);border-radius:10px;white-space:nowrap;">🟢 有新版本</span>
             <div class="version-tooltip">版本 s20260905-1143 · s1.0.723（双击强制刷新）</div>
             <script>(function(){var v=document.getElementById('versionTag');var t=document.querySelector('#versionTag ~ .version-tooltip');if(v&&t)t.textContent='版本 '+v.textContent+'（双击强制刷新）';})();</script>
+        </div>
+
+        <!-- 客服反馈悬浮按钮（右下角，点开可提交问题反馈/功能建议，仅管理员可见） -->
+        <div id="feedbackFab" onclick="toggleFeedbackPanel()" title="问题反馈 / 功能建议" style="position:fixed;right:18px;bottom:70px;z-index:1200;width:54px;height:54px;border-radius:50%;background:linear-gradient(135deg,#4f9bff,#2f6bff);color:#fff;display:flex;align-items:center;justify-content:center;font-size:1.6rem;cursor:pointer;box-shadow:0 4px 18px rgba(47,107,255,0.55);user-select:none;">💬</div>
+        <div id="feedbackPanel" style="display:none;position:fixed;right:18px;bottom:132px;z-index:1201;width:320px;max-width:92vw;background:rgba(18,20,38,0.98);border:1px solid rgba(79,155,255,0.55);border-radius:14px;box-shadow:0 12px 44px rgba(0,0,0,0.6);color:#fff;font-size:0.85rem;overflow:hidden;">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:linear-gradient(135deg,#2f6bff,#4f9bff);">
+                <span style="font-weight:600;font-size:0.9rem;">🎧 客服 · 意见反馈</span>
+                <span onclick="toggleFeedbackPanel()" style="cursor:pointer;font-size:1.1rem;opacity:0.85;">✕</span>
+            </div>
+            <div style="padding:12px 14px;">
+                <div style="display:flex;gap:8px;margin-bottom:10px;">
+                    <button id="fbTypeBug" onclick="setFeedbackType('bug')" style="flex:1;padding:7px;border:none;border-radius:8px;cursor:pointer;font-size:0.82rem;background:linear-gradient(135deg,#ff6b6b,#ee5253);color:#fff;">🐞 问题反馈</button>
+                    <button id="fbTypeSug" onclick="setFeedbackType('suggestion')" style="flex:1;padding:7px;border:none;border-radius:8px;cursor:pointer;font-size:0.82rem;background:rgba(255,255,255,0.1);color:#fff;">💡 功能建议</button>
+                </div>
+                <textarea id="feedbackText" placeholder="请描述你遇到的问题或功能建议（可附上复现步骤）…" style="width:100%;height:90px;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:#22243f;color:#fff;font-size:0.82rem;box-sizing:border-box;resize:vertical;"></textarea>
+                <div style="font-size:0.66rem;color:rgba(255,255,255,0.45);margin:6px 0 8px;line-height:1.4;">提交将自动附带：版本号 / 平台 / 最近报错，便于排查。内容仅管理员可见。</div>
+                <button id="feedbackSubmitBtn" onclick="submitFeedback()" style="width:100%;padding:9px;border:none;border-radius:8px;background:linear-gradient(135deg,#4f9bff,#2f6bff);color:#fff;font-size:0.88rem;cursor:pointer;font-weight:600;">✅ 提交反馈</button>
+                <div style="font-size:0.72rem;color:#ffd700;margin:10px 0 4px;">📋 我的反馈记录</div>
+                <div id="feedbackHistory" style="max-height:160px;overflow-y:auto;"></div>
+            </div>
         </div>
     </div>
 
