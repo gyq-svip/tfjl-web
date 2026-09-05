@@ -8648,17 +8648,24 @@
             bg.addColorStop(0, '#1a1a2e'); bg.addColorStop(1, '#141426');
             ctx.fillStyle = bg;
             ctx.fillRect(0, 0, W, H);
-            // 标题 + 副标题（分类金色高亮：群里的人第一眼看出「打的是什么」分类）
+            // 标题 = 阵容名字（一眼看出打什么，最显眼）；副标题 = 品牌 + 分类(金) + 日期 + 作者（小一号）
             ctx.textBaseline = 'alphabetic';
             ctx.textAlign = 'center';
+            const _nameTitle = projName ? projName : '当前阵容';
             ctx.fillStyle = '#ffd700';
-            ctx.font = 'bold 30px "Microsoft YaHei", "PingFang SC", sans-serif';
-            ctx.fillText('塔防精灵 · 阵容分享', W / 2, 42);
-            // 副标题分段绘制：分类段金色加粗，其余半透明白（分段测量宽度后整体居中）
+            let _nameFont = 30;
+            ctx.font = 'bold ' + _nameFont + 'px "Microsoft YaHei", "PingFang SC", sans-serif';
+            // 阵容名过长自动缩小字号，避免溢出画布
+            while (ctx.measureText(_nameTitle).width > W - 48 && _nameFont > 18) {
+                _nameFont -= 2;
+                ctx.font = 'bold ' + _nameFont + 'px "Microsoft YaHei", "PingFang SC", sans-serif';
+            }
+            ctx.fillText(_nameTitle, W / 2, 42);
+            // 副标题分段绘制：品牌 + 分类段金色加粗 + 其余半透明白（分段测量宽度后整体居中）
             ctx.font = 'bold 18px "Microsoft YaHei", sans-serif';
             const segs = [
+                { t: '塔防精灵 · 阵容分享', bold: false },
                 catName ? { t: '📁 ' + catName, bold: true } : null,
-                projName ? { t: '项目：' + projName, bold: false } : { t: '当前阵容', bold: false },
                 { t: dateStr, bold: false },
                 { t: 'by ' + nick, bold: false }
             ].filter(Boolean);
