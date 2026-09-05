@@ -24020,7 +24020,7 @@ ${maSection}
             localStorage.removeItem(ADMIN_MENU_ORDER_KEY);
             const grid = document.getElementById('adminMenuGrid');
             if (grid) {
-                const def = ['help','news','title','stats','loginStats','cardGroup','analytics','scriptStats','settings','nickManage','passwordManage','cacheManage','logStats','wallBackup','wallGist','featureToggles','deepsea','alliance','bossRed','apiMonitor','diag','damageCalc','auction','toolbox','shares'];
+                const def = ['help','news','title','stats','loginStats','cardGroup','analytics','scriptStats','settings','nickManage','passwordManage','cacheManage','logStats','wallBackup','wallGist','featureToggles','deepsea','alliance','bossRed','apiMonitor','diag','damageCalc','auction','toolbox','shares','feedback'];
                 const byKey = {};
                 Array.from(grid.querySelectorAll('.admin-menu-item')).forEach(it => byKey[it.dataset.key] = it);
                 def.forEach(k => { if (byKey[k]) grid.appendChild(byKey[k]); });
@@ -24177,6 +24177,12 @@ ${maSection}
                 if (pageEl) {
                     pageEl.style.display = 'block';
                     adminShowToolbox();
+                }
+            } else if (page === 'feedback') {
+                const pageEl = document.getElementById('adminPageFeedback');
+                if (pageEl) {
+                    pageEl.style.display = 'block';
+                    if (typeof window.renderFeedbackAdmin === 'function') window.renderFeedbackAdmin();
                 }
             }
         }
