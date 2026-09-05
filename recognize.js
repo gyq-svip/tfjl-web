@@ -621,215 +621,13 @@
     '神龛':'绿','石头':'绿','火法':'绿','冰弓':'绿','祭司':'绿','小鹿':'绿'
   };
 
-  let _skinTpls = null;            // [{hero, skinName, feat, quality}]
-  let _skinTplByQ = null;          // {金:[], 紫:[], 蓝:[], 绿:[]}
-  let _skinTplBuilding = null;     // Promise（防重复构建）
+  // 🔴 2026-09-05 移除：皮肤模板库加载（_bytesToBlobUrlX / loadSkinImg / _skinTpls 系列）随皮肤比对功能一并删除。
 
-  // 字节 → blob: URL（Tauri 用 fs 读 .skin 二进制时转换）
-  function _bytesToBlobUrlX(b, path){
-    let arr;
-    if(b instanceof Uint8Array) arr=b;
-    else if(b && b.data && Array.isArray(b.data)) arr=new Uint8Array(b.data);
-    else if(b instanceof ArrayBuffer) arr=new Uint8Array(b);
-    else if(Array.isArray(b)) arr=new Uint8Array(b);
-    else return null;
-    if(arr.length===0) return null;
-    const ext=(path.split('.').pop()||'png').toLowerCase();
-    const mime={png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',gif:'image/gif',webp:'image/webp',bmp:'image/bmp',skin:'image/png'}[ext]||'image/png';
-    return URL.createObjectURL(new Blob([arr], {type:mime}));
-  }
-  // 加载单张皮肤图为 Image（网页版 fetch→blob 避免 canvas 污染；Tauri 读本地 .skin）
-  async function loadSkinImg(skin){
-    if(skin._img) return skin._img;
-    const getUrl = async ()=>{
-      const raw = skin.url || skin.path || '';
-      if(!raw) return null;
-      if(skin.url && !isTauri()){
-        try{ const r = await fetch(skin.url, {cache:'no-cache'}); if(r.ok) return URL.createObjectURL(await r.blob()); }catch(e){}
-        return skin.url;
-      }
-      if(skin.path && isTauri()){
-        try{ const b64 = await tauriInvoke('read_image_base64', { filePath: skin.path }); if(b64) return b64; }catch(e){}
-        try{ const b = await tauriInvoke('plugin:fs|read_file', { path: skin.path }); return _bytesToBlobUrlX(b, skin.path); }catch(e){}
-      }
-      return null;
-    };
-    const getImg = (async ()=>{
-      const url = await getUrl();
-      if(!url) return null;
-      return await new Promise((res)=>{ const im=new Image(); const to=setTimeout(()=>res(null),4000); im.onload=()=>{clearTimeout(to);res(im);}; im.onerror=()=>{clearTimeout(to);res(null);}; im.src=url; });
-    })();
-    return Promise.race([getImg, new Promise(res=>setTimeout(()=>res(null), 6000))]); // 全链路 6s 兜底：取图(fetch/读文件)或解码任一环节 hang 都不致永久卡死
-  }
+  // 🔴 2026-09-05 移除：卡面特征提取（extractCardFeature / featDist / sampleBgQuality）随皮肤比对功能一并删除。
 
-  // 取图像特征：等比 cover（取最小边中心方、不拉伸→消除竖卡/方图几何差异）→ 64×64
-  // 跳外圈（边框/卡名条/等级/魔化）→ 8×8 分块（192维）；每块相对全局均值的对数比值做亮度/对比度归一；
-  // 末位 L2 归一使 featDist 等价于余弦距离，抗整体明暗与缩放。← 单卡区分度远高于旧 48维均值
-  function extractCardFeature(src, size){
-    const sw = src.naturalWidth||src.width, sh = src.naturalHeight||src.height;
-    if(!sw || !sh) return null;
-    const side = Math.round(Math.min(sw, sh) * 0.9); // 中心 90% 方形，去掉最外边框
-    const sx = Math.round((sw - side)/2), sy = Math.round((sh - side)/2);
-    const cv = document.createElement('canvas'); cv.width=size; cv.height=size;
-    const ctx = cv.getContext('2d');
-    try{ ctx.drawImage(src, sx, sy, side, side, 0, 0, size, size); }catch(e){ return null; } // 等比 cover，不拉伸
-    let data;
-    try{ data = ctx.getImageData(0,0,size,size).data; }catch(e){ return null; } // 跨域污染时返回 null
-    const keep = (fx,fy)=> !(fx<0.12||fx>0.88||fy<0.12||fy>0.88); // 跳外圈边框/卡名条
-    // 先算全局每通道均值（亮度归一基准）
-    let gr=0, gg=0, gb=0, gn=0;
-    for(let y=0;y<size;y++) for(let x=0;x<size;x++){
-      if(!keep(x/size, y/size)) continue;
-      const i=(y*size+x)*4; gr+=data[i]; gg+=data[i+1]; gb+=data[i+2]; gn++;
-    }
-    if(gn===0) return null;
-    const gr0=(gr/gn)||1, gg0=(gg/gn)||1, gb0=(gb/gn)||1;
-    const grid=8, cell=size/grid, feat=[];
-    for(let gy=0; gy<grid; gy++) for(let gx=0; gx<grid; gx++){
-      let r=0,g=0,b=0,n=0;
-      for(let y=Math.floor(gy*cell); y<Math.floor((gy+1)*cell); y++){
-        for(let x=Math.floor(gx*cell); x<Math.floor((gx+1)*cell); x++){
-          if(!keep(x/size, y/size)) continue;
-          const i=(y*size+x)*4; r+=data[i]; g+=data[i+1]; b+=data[i+2]; n++;
-        }
-      }
-      if(n===0){ feat.push(0,0,0); continue; }
-      // 对数比值：抗光照/缩放，放大颜色差异对比度
-      feat.push(Math.log((r/n)/gr0 + 0.01), Math.log((g/n)/gg0 + 0.01), Math.log((b/n)/gb0 + 0.01));
-    }
-    // L2 归一 → featDist 即余弦距离（只比方向不比明暗）
-    let norm=0; for(const v of feat) norm+=v*v; norm=Math.sqrt(norm)||1;
-    return feat.map(v=>v/norm);
-  }
-  function featDist(a, b){
-    let s=0;
-    for(let i=0;i<a.length;i++){ const d=a[i]-b[i]; s+=d*d; }
-    return Math.sqrt(s);
-  }
-  // 取游戏卡背景品质（采样四角，避开中心头像）：金/紫/蓝/绿/白/null
-  function sampleBgQuality(img){
-    const size=24; const cv=document.createElement('canvas'); cv.width=size; cv.height=size;
-    const ctx=cv.getContext('2d');
-    try{ ctx.drawImage(img,0,0,size,size); }catch(e){ return null; }
-    let data; try{ data=ctx.getImageData(0,0,size,size).data; }catch(e){ return null; }
-    // 四角各取 9×9 大面积区域；要求四角主色一致(方差小)才判品质，否则返回 null → 全 413 比
-    const corners=[[2,2],[size-3,2],[2,size-3],[size-3,size-3]];
-    const samples=[];
-    for(const [cx,cy] of corners){
-      let rs=0,gs=0,bs=0,n=0;
-      for(let dy=-4;dy<=4;dy++) for(let dx=-4;dx<=4;dx++){
-        const px=Math.min(size-1,Math.max(0,cx+dx)), py=Math.min(size-1,Math.max(0,cy+dy));
-        const i=(py*size+px)*4; rs+=data[i]; gs+=data[i+1]; bs+=data[i+2]; n++;
-      }
-      samples.push([rs/n, gs/n, bs/n]);
-    }
-    let mR=0,mG=0,mB=0;
-    samples.forEach(s=>{ mR+=s[0]; mG+=s[1]; mB+=s[2]; });
-    mR/=4; mG/=4; mB/=4;
-    let varSum=0;
-    samples.forEach(s=>{ varSum += (s[0]-mR)**2 + (s[1]-mG)**2 + (s[2]-mB)**2; });
-    const variance = varSum/4;
-    if(variance > 700) return null;            // 四角主色不一致 → 背景杂，全比
-    const mx=Math.max(mR,mG,mB), mn=Math.min(mR,mG,mB);
-    const sat = mx - mn;
-    if(mx<70) return null;                      // 过暗/灰白，难判
-    if(sat < 45) return null;                   // 饱和度低，难判
-    if(mB>=mR && mB>=mG && mB>mx*0.45) return '蓝';
-    if(mG>=mR && mG>=mB && mG>mx*0.45) return '绿';
-    if(mR>=mG && mR>=mB && mG>mn*1.3) return '金';
-    if((mR>=mG*0.8) && (mR>=mB) && (mB>mG)) return '紫';
-    if(mR>mB && mR>mG) return '金';
-    if(mB>mR && mB>mG) return '紫';
-    return null;                                // 仍不确定 → 全比
-  }
-
-  // 皮肤模板库缓存（高成功率构建后存 localStorage，下次秒开，避免每次重跑 418 张）
-  const SKIN_TPL_CACHE_KEY = 'tfjl_skin_tpls_v3';
-  function _rebuildTplQ(){ _skinTplByQ = {金:[],紫:[],蓝:[],绿:[],白:[]}; for(const t of (_skinTpls||[])){ (_skinTplByQ[t.quality] || (_skinTplByQ[t.quality]=[])).push(t); } }
-  function _saveTplCache(sig, tpls){ try{ localStorage.setItem(SKIN_TPL_CACHE_KEY+'_'+sig, JSON.stringify(tpls)); }catch(e){} }
-  // 加载缓存并校验模板特征有效性：防止坏缓存（如某图特征含 NaN/被截断）导致识别整体失效
-  function _loadTplCache(sig){
-    try{
-      const s=localStorage.getItem(SKIN_TPL_CACHE_KEY+'_'+sig); if(!s) return null;
-      const arr=JSON.parse(s); if(!Array.isArray(arr)||!arr.length) return null;
-      for(const t of arr){ if(!t || !Array.isArray(t.feat) || t.feat.length<10 || !t.feat.every(Number.isFinite)) return null; }
-      return arr;
-    }catch(e){ return null; }
-  }
-  // 构建模板库：并行分批加载（提速）+ 60s 整体兜底 + 成功数诊断 + 高成功率缓存。skinRegistry 来自 app-local.js / skins-web.js。
-  function buildSkinTpls(statusEl){
-    if(_skinTpls && _skinTpls.length) return Promise.resolve(_skinTpls); // 空数组不短路：首次构建失败后允许重建
-    if(_skinTplBuilding) return _skinTplBuilding;
-    const p = (async ()=>{
-      const reg = window.skinRegistry || {};
-      const entries = [];
-      for(const hero of Object.keys(reg)) for(const sk of (reg[hero]||[])) entries.push({hero, sk});
-      const total = entries.length;
-      const sig = 'n'+total+'_v2';
-      const cached = _loadTplCache(sig);
-      if(cached && cached.length){ _skinTpls = cached; _rebuildTplQ(); if(statusEl) statusEl.textContent = '皮肤模板库已加载（缓存 '+cached.length+' 张）'; return cached; }
-      let done = 0, okCount = 0; const built = []; const BATCH = 24; // 24 并发，418 张约 18 批
-      for(let i=0;i<entries.length;i+=BATCH){
-        const batch = entries.slice(i, i+BATCH);
-        const res = await Promise.all(batch.map(async (e)=>{
-          const im = await loadSkinImg(e.sk); if(!im) return null;
-          const feat = extractCardFeature(im, 64); if(!feat) return null;
-          return { hero:e.hero, skinName:e.sk.name, feat, quality: HERO_QUALITY[e.hero]||'金' };
-        }));
-        res.forEach(t=>{ if(t){ built.push(t); okCount++; } });
-        done += batch.length;
-        if(statusEl) statusEl.textContent = '构建皮肤模板库 '+done+'/'+total+'（成功 '+okCount+'）…';
-      }
-      _skinTpls = built; _rebuildTplQ();
-      if(okCount >= total*0.5) _saveTplCache(sig, built); // 半成功即缓存，避免每次刷新都重跑 60s（皮肤同步差时也能秒开，只是识别略差）
-      if(statusEl) statusEl.textContent = '皮肤模板库完成：'+okCount+'/'+total+' 张'+(okCount<total*0.9?'（部分皮肤图加载失败，请检查皮肤是否已同步）':'');
-      return built;
-    })();
-    // 整体 60s 兜底：并行构建 418 张足够；极端情况绝不永久卡在「构建中」，先返回已构建的部分
-    _skinTplBuilding = Promise.race([p, new Promise(res=>setTimeout(()=>{
-      if(!_skinTpls){ _skinTpls = []; _skinTplByQ = {金:[],紫:[],蓝:[],绿:[],白:[]}; }
-      if(statusEl) statusEl.textContent = '皮肤模板库构建超时，使用已加载的部分（'+_skinTpls.length+' 张）';
-      res(_skinTpls);
-    }, 60000))]);
-    return _skinTplBuilding;
-  }
-  // 单卡匹配：全池算 top3（跨品质，供诊断）；同时优先同品质最近者作为判定
-  function matchCard(feature, preferQ){
-    if(!_skinTpls || !_skinTpls.length) return {hero:null, skin:null, dist:Infinity, quality:null, top3:[]};
-    let all;
-    try{ all = _skinTpls.map(t=>({t, d:featDist(feature,t.feat)})).sort((a,b)=>a.d-b.d); }catch(e){ return {hero:null, skin:null, dist:Infinity, quality:null, top3:[]}; }
-    let best = all[0], usedQ = null;
-    if(preferQ && _skinTplByQ[preferQ] && _skinTplByQ[preferQ].length>3){
-      const inQ = _skinTplByQ[preferQ].map(t=>({t, d:featDist(feature,t.feat)})).sort((a,b)=>a.d-b.d);
-      if(inQ[0] && inQ[0].d <= all[0].d*1.15){ best = inQ[0]; usedQ = preferQ; } // 同品质足够近则优先
-    }
-    const top3 = all.slice(0,3).map(o=>({hero:o.t.hero, skin:o.t.skinName, dist:Math.round(o.d)}));
-    // 排查期：移除严格度 reject，总返回最近匹配，确认 0 匹配是 feat null 还是 reject 导致
-    return { hero: best.t.hero, skin: best.t.skinName, dist: best.d, quality: usedQ, top3 };
-  }
-
-  // 本地学习修正：用户识别错了可手动指定正确英雄，把该卡特征存本地；下次优先匹配
-  const LOCAL_CORR_KEY = 'tfjl_rec_corrections_v2';
-  let _localCorr = null;
-  function loadLocalCorrections(){
-    if(_localCorr) return _localCorr;
-    try{ _localCorr = JSON.parse(localStorage.getItem(LOCAL_CORR_KEY)||'[]'); }catch(e){ _localCorr=[]; }
-    return _localCorr;
-  }
-  function saveLocalCorrection(hero, feat){
-    loadLocalCorrections();
-    _localCorr.push({ hero, feat, ts: Date.now() });
-    try{ localStorage.setItem(LOCAL_CORR_KEY, JSON.stringify(_localCorr)); }catch(e){}
-  }
-  function matchWithLocal(feature){
-    const local = loadLocalCorrections();
-    if(!local.length) return null;
-    let best=null, bestD=Infinity;
-    for(const c of local){ const d=featDist(feature, c.feat); if(d<bestD){ bestD=d; best=c; } }
-    if(bestD < 0.5) return { hero: best.hero, dist: bestD }; // 本地样本是我确认过的；余弦距离尺度下阈值收紧
-    return null;
-  }
-  function clearLocalCorrections(){ _localCorr=[]; try{ localStorage.removeItem(LOCAL_CORR_KEY); }catch(e){} }
+  // 🔴 2026-09-05 移除：皮肤模板库构建（buildSkinTpls / _loadTplCache / _saveTplCache / matchCard）
+  //    与「本地学习修正」（saveLocalCorrection / matchWithLocal，存的是卡面特征）随皮肤比对功能一并删除。
+  //    识别仅保留离线 OCR 链路：matchHero / validateHero100 / autoRecognize / runAuto。
   // 用户修正：把当前格特征存为正确英雄的本地样本，下次优先匹配
   function fixHero(idx, results, rerender){
     const r = results.find(x=>x.idx===idx);
@@ -837,11 +635,10 @@
     const heroes = Object.keys(window.skinRegistry||{});
     if(!heroes.length){ alert('皮肤库为空，无法选择英雄'); return; }
     const apply = (v)=>{
-      r.hero=v; r.skin='(本地修正)'; r.source='local'; r.quality=null;
-      if(r.feat) saveLocalCorrection(v, r.feat);
+      r.hero=v; r.skin='(手动修正)'; r.source='manual'; r.quality=null;
       rerender();
       overlay._results=results; updateRecWarn(results); renderRecDr(results);
-      $('recStatus').textContent = '已记录修正：'+v+'（本地学习样本 +1）';
+      $('recStatus').textContent = '已修正为：'+v;
     };
     // 优先用通用选择器（首字母/关键字搜索，脚本管理同款，输入卡名更快）；无则回退列表弹窗
     if(typeof window.openGenericPicker === 'function'){
@@ -855,7 +652,7 @@
     } else {
       recChoice({
         title:'✏️ 修正为哪个英雄',
-        desc:'选错就选正确的——系统会记住这张卡的特征，下次优先用（越修越准）',
+        desc:'识别错了就选正确的英雄',
         maxHeight:'80vh',
         items: heroes.map(h=>({label:h, value:h})),
         onPick: apply
@@ -863,45 +660,13 @@
     }
   }
 
-  // 从大图裁剪一格（返回 canvas，供 extractCardFeature 用）
+  // 从大图裁剪一格（返回 canvas，供「📐 框选阵容区域」按框截图用）
   function cropCell(img, x, y, w, h){
     const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
     cv.getContext('2d').drawImage(img, x, y, w, h, 0, 0, w, h);
     return cv;
   }
-  // 图像识别主流程：2×5 切格 → 每格特征+品质 → 匹配 → 结果
-  async function recognizeImageBySkin(img, statusEl, onDone){
-    if(typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('阵容图像识别');
-    if(!img){ alert('请先粘贴/选择/截图一张阵容图'); return; }
-    if(!_skinTpls || !_skinTpls.length){
-      alert('皮肤模板库还没构建。请先点识别区的「🛠 构建模板库」按钮（首次约需 1 分钟，有进度提示），构建完成后再点「🖼️ 图片比对」即可秒出。');
-      if(statusEl) statusEl.textContent = '请先点「🛠 构建模板库」';
-      return;
-    }
-    if(statusEl) statusEl.textContent = '图像比对中…';
-    const tpls = _skinTpls;
-    const W=img.naturalWidth||img.width, H=img.naturalHeight||img.height;
-    if(!W || !H){ alert('图片尺寸无效'); return; }
-    const rows=2, cols=5;
-    const results=[];
-    for(let r=0;r<rows;r++) for(let c=0;c<cols;c++){
-      const x=Math.round(c*W/cols), y=Math.round(r*H/rows), w=Math.round(W/cols), h=Math.round(H/rows);
-      const cell = cropCell(img, x, y, w, h);
-      const feat = extractCardFeature(cell, 64);
-      let hero=null, skin=null, dist=Infinity, quality=null, source='skin', top3=null;
-      const localM = feat ? matchWithLocal(feat) : null;
-      if(localM){ hero=localM.hero; skin='(本地修正)'; dist=localM.dist; source='local'; }
-      else if(feat){
-        const q = sampleBgQuality(cell);
-        const m = matchCard(feat, q);
-        hero=m.hero; skin=m.skin; dist=m.dist; quality=q; source='skin'; top3=m.top3;
-      }
-      results.push({ idx: r*cols+c+1, hero, skin, dist, quality, source, top3,
-        feat, box:{x0:x,y0:y,x1:x+w,y1:y+h, cx:x+w/2, cy:y+h/2, w, h} });
-    }
-    drawBoxes($('recCanvas'), img, results.map(rr=>({idx:rr.idx, box:rr.box, hero:rr.hero, valid:{ok:!!rr.hero}})));
-    onDone(results, '图像识别(皮肤比对)', rows);
-  }
+  // 🔴 2026-09-05 移除：recognizeImageBySkin（皮肤比对主流程）随皮肤比对功能一并删除。
 
   // ====================== 自定义弹窗（替代 window.prompt/confirm，Tauri 下原生 prompt 不工作） ======================
   function recCloseModal(id){ const d=document.getElementById(id); if(d) d.remove(); }
@@ -1010,13 +775,6 @@
             <canvas id="recCanvas" style="width:100%;max-height:46vh;background:#000;border-radius:8px;display:block;"></canvas>
             <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
               <button id="recAuto" style="background:linear-gradient(135deg,#43a047,#1b5e20);color:#fff;border:none;padding:9px 14px;border-radius:8px;cursor:pointer;font-weight:600;" title="用文字识别(OCR)读卡名，结果显示在右侧列表（需识别引擎）">⚡ 文字识别(OCR)</button>
-              <label style="font-size:0.78rem;color:#b0bec5;margin-left:6px;">识别精度
-                <select id="recStrictSel" style="background:#1b1f2a;color:#fff;border:1px solid #444;border-radius:6px;padding:3px 6px;font-size:0.78rem;">
-                  <option value="loose">宽松(总匹配)</option>
-                  <option value="standard">标准</option>
-                  <option value="strict">严格</option>
-                </select>
-              </label>
               <button id="recWinBtn" style="background:linear-gradient(135deg,#5c6bc0,#283593);color:#fff;border:none;padding:9px 14px;border-radius:8px;cursor:pointer;font-weight:600;" title="清除记住的窗口，下次点框选/一键识别时重新选游戏窗口">🔄 切换窗口</button>
               <button id="recFill" style="background:linear-gradient(135deg,#42a5f5,#1565c0);color:#fff;border:none;padding:9px 14px;border-radius:8px;cursor:pointer;">➡ 填入脚本生成</button>
               <button id="recImportHand" style="background:linear-gradient(135deg,#66bb6a,#2e7d32);color:#fff;border:none;padding:9px 14px;border-radius:8px;cursor:pointer;font-weight:600;">🃏 导入到手牌</button>
@@ -1140,25 +898,7 @@
 
     // 识别执行体（「⚡ 自动识别」与「🎮 一键识别游戏画面」共用）
     // 把图像识别结果渲染到主结果表（recBody）：OCR 识别不到文字（无卡名图）时，用户能直接在主表看到图像结果
-    function renderImgToBody(results){
-      const tb = $('recBody'); if(!tb) return 0;
-      const heroes = results.filter(r=>r.hero && !r._deleted);
-      if(!heroes.length) return 0;
-      tb.innerHTML = '';
-      heroes.forEach((r,i)=>{
-        const tr = document.createElement('tr'); tr.style.borderTop='1px solid #333';
-        tr.innerHTML = `<td style="padding:4px;color:#90a4ae;">${i+1}</td>`
-          + '<td style="padding:4px;">图像</td>'
-          + `<td style="padding:4px;font-weight:600;color:#fff;">${escapeHtml(r.hero||'')}</td>`
-          + '<td style="padding:4px;color:#2e7d32;font-weight:600;">✓ 图像匹配</td>'
-          + `<td style="padding:4px;"><button data-del="${r.idx}" title="删除这张" style="background:rgba(244,67,54,0.25);color:#ff8a80;border:none;border-radius:6px;cursor:pointer;padding:2px 8px;font-size:0.72rem;">✕ 删</button></td>`;
-        tb.appendChild(tr);
-      });
-      tb.querySelectorAll('button[data-del]').forEach(b=>{ b.onclick=()=>{ const id=+b.getAttribute('data-del'); const r=results.find(x=>x.idx===id); if(r) r._deleted=true; const tr=b.closest('tr'); if(tr){ tr.style.opacity='0.35'; tr.style.textDecoration='line-through'; } updateRecWarn(results); renderRecDr(results); }; });
-      overlay._results = results; updateRecWarn(results); renderRecDr(results);
-      const src=$('recSrc'); if(src) src.textContent='来源: 图像识别(皮肤比对)';
-      return heroes.length;
-    }
+    // 🔴 2026-09-05 移除：renderImgToBody（把皮肤比对结果填进主表）随皮肤比对功能一并删除。
 
     function runAuto(){
       autoRecognize(currentImg, $('recCanvas'), $('recStatus'), (results, source, rowCount)=>{
@@ -1210,10 +950,7 @@
       if(typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('识别-文字OCR');
       runAuto();
     };
-    // 识别严格度（宽松/标准/严格）：影响 matchCard 是否在距离过大时判「未匹配」
-    window.__recStrict = (localStorage.getItem('tfjl_rec_strict')||'loose');
-    const recStrictSel = $('recStrictSel');
-    if(recStrictSel){ recStrictSel.value = window.__recStrict; recStrictSel.onchange = e=>{ window.__recStrict=e.target.value; localStorage.setItem('tfjl_rec_strict', e.target.value); }; }
+    // 🔴 2026-09-05 移除：「识别精度」下拉（__recStrict）仅被已删除的 matchCard 读取，属死控件，一并移除。
 
     // 记住上次选择的游戏窗口标题（与「游戏波数监控」共用 tfjl_game_monitor_cfg.winTitle），下次自动匹配不再重复选
     function _rememberWinTitle(title){
@@ -1599,5 +1336,8 @@
   else buildUI();
 
   // 调试/测试钩子：暴露图像识别核心函数，便于本地验证（不影响正常使用）
-  window.__recImg = { buildSkinTpls, recognizeImageBySkin, extractCardFeature, sampleBgQuality, matchCard, loadSkinImg, fixHero, saveLocalCorrection, matchWithLocal, clearLocalCorrections, HERO_QUALITY, ocrRawText };
+  // 🔴 2026-09-05：皮肤比对函数（buildSkinTpls / recognizeImageBySkin / extractCardFeature / sampleBgQuality /
+  //    matchCard / loadSkinImg / saveLocalCorrection / matchWithLocal / clearLocalCorrections）已全部移除，
+  //    仅保留离线 OCR 需要的接口。HERO_QUALITY 为英雄品质数据表，保留备用。
+  window.__recImg = { fixHero, HERO_QUALITY, ocrRawText };
 })();
