@@ -30,6 +30,16 @@
                 if (pi && typeof pi.value === 'string' && pi.value.trim().length > 0) return true;
                 const qi = document.getElementById('quickCardInput');        // ④ 快速输入联想框有内容
                 if (qi && typeof qi.value === 'string' && qi.value.trim().length > 0) return true;
+                // ⑤ 任意面板/弹窗遮罩打开中（管理员面板、密码层等）：刷新会打断当前操作，按"编辑中"处理
+                try {
+                    const overlays = document.querySelectorAll('[id$="Overlay"], [class*="overlay"], [class*="modal"], [class*="mask"]');
+                    for (const el of overlays) {
+                        if (el && el.offsetWidth > 0 && el.offsetHeight > 0) {
+                            const cs = getComputedStyle(el);
+                            if (cs.display !== 'none' && cs.visibility !== 'hidden' && parseFloat(cs.opacity || '1') > 0) return true;
+                        }
+                    }
+                } catch (e) {}
                 return false;
             } catch (e) { return false; }
         };
