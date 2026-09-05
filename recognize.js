@@ -23,6 +23,21 @@
   // 显示名别名（游戏显示名 → 库名）
   const ALIASES = { "邪能火炮":"火炮", "地精宝库":"宝库", "微型潜艇":"潜艇" };
 
+  // 🔴 2026-09-05 OCR 形近字纠正表（用户实测收集）
+  //    生僻卡名被 Umi-OCR 认成形近字 → 匹配只能走「包含(库⊃显)」(score 0.7)
+  //    → 被主流程 LOOSE 过滤 → 表现为「这张卡识别不出来」。
+  //    这里按「引擎认出的错字 → 正确卡名」纠正。
+  //    优先级：精确 / 别名 / 包含(显⊃库) 之后，包含(库⊃显) 之前 —— 保证不抢正常识别：
+  //      例：「魔」→「魇」，但「魔精灵」完整识别时会先精确命中「魔精灵」，不会被误判成「魇」。
+  const OCR_TYPO_FIX = {
+    '魔':'魇',                                        // 魇
+    '愧':'傀', '倪':'傀',                             // 傀
+    '钟道':'钟馗', '锺道':'钟馗', '钟逵':'钟馗', '锺馗':'钟馗',   // 钟馗
+    '弹客':'斧客', '芳客':'斧客', '芹客':'斧客', '客':'斧客',      // 斧客（注：单字「客」默认归斧客，若上阵剑客且只认出「客」请用 ✏️ 修正）
+    '钢票':'钢鬃', '钢':'钢鬃',                        // 钢鬃
+    '神鑫':'神龛', '神盒':'神龛', '神含':'神龛'         // 神龛
+  };
+
   // 🔴 2026-09-05：英雄库 = 硬编码 100 库 + 运行时皮肤库（window.skinRegistry）
   //    背景：管理员新增的英雄（如「水人」）已进皮肤系统/卡池/registry.json，
   //    但上面硬编码库没同步 → OCR 正确识别出「水人」也判「不在100英雄库」。
@@ -470,6 +485,8 @@
     if(LIB.includes(t)) return {hero:t, score:1.0, method:'精确'};
     if(ALIASES[t]) return {hero:ALIASES[t], score:0.96, method:'别名'};
     for(const h of LIB){ if(t.includes(h)) return {hero:h, score:0.82, method:'包含(显⊃库)'}; }
+    // 🔴 形近字纠正：整串命中错字表 → 改判为正确卡名（method 不在 LOOSE 里，不会被过滤）
+    if(OCR_TYPO_FIX[t] && LIB.includes(OCR_TYPO_FIX[t])) return {hero:OCR_TYPO_FIX[t], score:0.75, method:'形近字纠正'};
     for(const h of LIB){ if(h.includes(t) && t.length>=1) return {hero:h, score:0.7, method:'包含(库⊃显)'}; }
     if(t.includes('·')){
       const after = t.split('·').pop();
