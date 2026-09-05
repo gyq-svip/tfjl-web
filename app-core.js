@@ -24492,6 +24492,28 @@ ${maSection}
                 if (s) { s.style.color = '#f87171'; s.textContent = '保存失败：' + (e.message || e); }
             }
         };
+        // 一键清除 pending 的 restart / forceReload 指令（不动通知/拉黑/版本门槛等其它字段）。
+        // 场景：误发重启/强刷、或像"旧版 app 卡在无限重启"这类遗留指令，点一下即可让目标设备下次心跳恢复安静。
+        window.toolboxClearCtl = async function () {
+            const s = document.getElementById('toolboxStatus');
+            try {
+                const g = await _toolboxGistGet(TOOLBOX_GIST_ID);
+                const f = g && g.files && g.files[TOOLBOX_FILE];
+                const data = f && f.content ? JSON.parse(f.content) : {};
+                const removed = [];
+                if (data.restart) { delete data.restart; removed.push('restart'); }
+                if (data.forceReload) { delete data.forceReload; removed.push('forceReload'); }
+                if (!removed.length) {
+                    if (s) { s.style.color = '#fbbf24'; s.textContent = '✅ 当前没有 restart / forceReload 指令，无需清除'; }
+                    return;
+                }
+                await _toolboxGistPatch(TOOLBOX_GIST_ID, { [TOOLBOX_FILE]: { content: JSON.stringify(data, null, 2) } });
+                if (s) { s.style.color = '#4ade80'; s.textContent = '✅ 已清除：' + removed.join(' / ') + '，目标设备下次心跳（≤' + (data.pollSec || 300) + 's）即不再重启/刷新'; }
+                toolboxLoad();
+            } catch (e) {
+                if (s) { s.style.color = '#f87171'; s.textContent = '清除失败：' + (e.message || e); }
+            }
+        };
         window.toolboxSend = async function () {
             const s = document.getElementById('toolboxStatus');
             const target = (document.getElementById('toolboxTarget').value || '').trim();
