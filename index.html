@@ -1699,7 +1699,8 @@
                         </div>
                         <textarea id="toolboxRaw" placeholder="点「拉取」查看当前 admin_ctl.json" rows="10" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:6px;padding:8px;font-size:0.75rem;font-family:monospace;resize:vertical;"></textarea>
                         <button onclick="toolboxSaveRaw()" style="margin-top:8px;width:100%;background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none;padding:8px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600;">💾 保存原始内容</button>
-                        <button onclick="toolboxClearCtl()" style="margin-top:8px;width:100%;background:linear-gradient(135deg,#f97316,#ea580c);color:#fff;border:none;padding:8px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600;">🧹 一键清除 restart / forceReload</button>
+                        <button id="toolboxClearBtn" onclick="toolboxClearCtl()" style="margin-top:8px;width:100%;background:linear-gradient(135deg,#f97316,#ea580c);color:#fff;border:none;padding:8px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600;">🧹 一键清除 restart / forceReload</button>
+                        <div id="toolboxClearStatus" style="font-size:0.72rem;min-height:1em;margin-top:6px;color:rgba(255,255,255,0.6);"></div>
                     </div>
                 </div>
             </div>
