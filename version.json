@@ -1,12 +1,12 @@
 {
-    "version":  "2.0.30",
-    "notes":  "auto update v2.0.30",
-    "pub_date":  "2026-09-05T19:45:38Z",
-    "downloadUrl":  "https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/releases/download/v2.0.30/tfjl-assistant_2.0.30_x64-setup.exe",
-    "size":  4845052,
-    "minVersion":  "2.0.25",
-    "forceUpdate":  true,
-    "deprecatedMessage":  "我们已升级后台数据服务，旧版本无法连接新服务。请更新到最新版后继续使用。",
-    "frontVersion":  "s1.0.730",
-    "deployTag":  "s20260906-0139"
+  "version": "2.0.30",
+  "notes": "auto update v2.0.30",
+  "pub_date": "2026-09-05T19:45:38Z",
+  "downloadUrl": "https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/releases/download/v2.0.30/tfjl-assistant_2.0.30_x64-setup.exe",
+  "size": 4845052,
+  "minVersion": "2.0.25",
+  "forceUpdate": true,
+  "deprecatedMessage": "我们已升级后台数据服务，旧版本无法连接新服务。请更新到最新版后继续使用。",
+  "frontVersion": "s1.0.731",
+  "deployTag": "s20260906-0348"
 }
