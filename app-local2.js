@@ -4968,23 +4968,23 @@ if (true) {
         //    反复重刷即持续泄漏数百 MB（实测开一会飙到 4G）。
         //    改为：有本地 path 就永远走本地磁盘读图（快、缓存进 skinImageUrlCache、无泄漏），远程 url 仅作兜底。
         if (entry.path) {
-            // 🔴 2026-08-30 修复「切皮超级慢」：改回 Tauri 原生资源协议 asset://（convertFileSrc）优先。
-            //    配置 assetProtocol.enable=true + scope=["**"] 全放行、csp=null → 用户环境 asset:// 可用；
-            //    由 WebView 原生解码、浏览器按 URL 缓存，零 JS 缩放/解码开销 → 切皮丝滑不卡主线程。
-            //    之前误判"变黑"实为切换瞬间旧 img 已 remove、新 img 未 onload 的黑闪（非 asset:// 不可用），
-            //    已在 applySkinBgToSlot 用「双缓冲 onload 后移除旧图」根治。Rust 读图 blob 仅作兜底。
-            const nativeUrl = (typeof convertFileSrc === 'function') ? convertFileSrc(entry.path) : null;
-            if (nativeUrl) {
-                entry.url = nativeUrl; entry.loaded = true;
-                const cachedUrl = await _getCachedSkinUrl(nativeUrl);
-                return { url: cachedUrl, name: entry.name, path: entry.path };
-            }
-            // 兜底：asset:// 不可用（极旧 exe 未挂载全局 Tauri）时，走 Rust 读图（read_image_base64 → blob → 缩放）
+            // 🔴 2026-09-06 内存优化（App 1.5G 头号根因修复）：桌面皮肤改用「Rust 读图 → 缩放到 ≤256px → blob」路径（与网页一致），
+            //    不再优先 asset://（convertFileSrc）。原因：asset:// 由 WebView2 按【原图 512~1024px】解码，413 张皮肤同时驻留
+            //    即 ~1.6GB 解码位图 + GPU 纹理，正是 App 打开就 1.5G 的主因；而 256px 缩放在 94px 槽位/卡池缩略图里
+            //    视觉几乎无差，解码位图 + GPU 纹理内存可省 60%~80%（约 110MB）。缩放结果缓存进 skinImageUrlCache，
+            //    首次打开后 reapply 直接命中缓存，不再重复解码。
+            //    asset:// 降级为兜底：仅当 getSkinImageUrl 失败（读图命令被 ACL 拦 / 缩放异常）时退回，保证绝不出黑图。
             const dataUrl = await getSkinImageUrl(entry.path);
             if (dataUrl) {
                 entry.url = dataUrl; entry.loaded = true;
-                const cachedUrl = await _getCachedSkinUrl(dataUrl);
+                const cachedUrl = await _getCachedSkinUrl(dataUrl); // blob: 直接复用（skinImageUrlCache 已按 filePath 缓存）
                 return { url: cachedUrl, name: entry.name, path: entry.path };
+            }
+            // 兜底：缩放路径失败 → 退回 Tauri 原生资源协议 asset://（按原图解码，速度优先、内存换速度）
+            const nativeUrl = (typeof convertFileSrc === 'function') ? convertFileSrc(entry.path) : null;
+            if (nativeUrl) {
+                entry.url = nativeUrl; entry.loaded = true;
+                return { url: nativeUrl, name: entry.name, path: entry.path };
             }
         }
         // 本地无 path（纯远程皮肤）→ 用远程 url 兜底（网页版 / 远程特有皮）
