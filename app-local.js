@@ -3672,10 +3672,35 @@ if (true) {
         } catch(e) { /* fallback */ }
         return null;
     }
-    // 皮肤图片 URL 缓存（blob: URL，比 data: URL 更可靠，不会被 ?t= 参数污染）
-    const skinImageUrlCache = {};
+    // 皮肤图片 URL 缓存（blob/data URL，按 filePath 缓存）。LRU 上限 600 > 本地皮肤总数(约413)，
+    // 正常浏览永不淘汰→不产黑图；淘汰/重扫时 revoke 旧 blob 释放内存（修复挂机内存只增不减）。
+    const SKIN_URL_CACHE_MAX = 600;
+    const skinImageUrlCache = new Map(); // filePath -> url
+    function _skinUrlGet(fp) { const v = skinImageUrlCache.get(fp); if (v !== undefined) { skinImageUrlCache.delete(fp); skinImageUrlCache.set(fp, v); } return v; }
+    function _skinUrlSet(fp, url) {
+        if (skinImageUrlCache.has(fp)) skinImageUrlCache.delete(fp);
+        skinImageUrlCache.set(fp, url);
+        // 超上限才淘汰（正常不触发）；淘汰的旧 blob 必须 revoke，否则内存泄漏
+        while (skinImageUrlCache.size > SKIN_URL_CACHE_MAX) {
+            const oldest = skinImageUrlCache.keys().next().value;
+            const old = skinImageUrlCache.get(oldest);
+            if (old && old.indexOf('blob:') === 0) { try { URL.revokeObjectURL(old); } catch (e) {} }
+            skinImageUrlCache.delete(oldest);
+        }
+    }
+    function _skinUrlClearAll() {
+        skinImageUrlCache.forEach(function (u) { if (u && u.indexOf('blob:') === 0) { try { URL.revokeObjectURL(u); } catch (e) {} } });
+        skinImageUrlCache.clear();
+    }
+    // 暴露给 freeMemory()/右键「清扫」：清掉本端（Tauri）皮肤缓存，并与网页端 clearSkinUrlCache 合并调用
+    (function () {
+        const _prev = window.clearSkinUrlCache;
+        window.clearSkinUrlCache = function () { try { if (typeof _prev === 'function') _prev(); } catch (e) {} try { _skinUrlClearAll(); } catch (e) {} };
+        window.__tfjlClearLocalSkinCache = _skinUrlClearAll; // Tauri 端专用，防止被网页端 clearSkinUrlCache 覆盖
+    })();
     async function getSkinImageUrl(filePath) {
-        if (skinImageUrlCache[filePath]) return skinImageUrlCache[filePath];
+        const _hit = _skinUrlGet(filePath);
+        if (_hit) return _hit;
         const invokeFn = window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke;
         if (!invokeFn) return null;
 
@@ -3683,7 +3708,7 @@ if (true) {
         try {
             const dataUrl = await invokeFn('read_image_base64', { filePath });
             if (dataUrl) {
-                skinImageUrlCache[filePath] = dataUrl;
+                _skinUrlSet(filePath, dataUrl);
                 return dataUrl;
             }
         } catch(e) {
@@ -3697,7 +3722,7 @@ if (true) {
             console.log('[SKIN] read_file raw type:', filePath, bytes?.constructor?.name, 'len:', bytes?.byteLength ?? bytes?.length);
             const blobUrl = bytesToBlobUrl(bytes, filePath);
             if (blobUrl) {
-                skinImageUrlCache[filePath] = blobUrl;
+                _skinUrlSet(filePath, blobUrl);
                 console.log('[SKIN] blob URL via fs plugin OK:', filePath);
                 return blobUrl;
             }
@@ -3759,7 +3784,7 @@ if (true) {
         }
         window.skinRegistry = {};
         // 清内存皮肤图缓存，避免重新扫描后仍命中旧 blob（更新/修复后拿不到新皮肤）
-        try { Object.keys(skinImageUrlCache).forEach(k => delete skinImageUrlCache[k]); } catch (e) {}
+        try { _skinUrlClearAll(); } catch (e) {}
         console.log('[SKIN] softwareDataDir:', softwareDataDir);
         if (!softwareDataDir) { console.warn('[SKIN] No softwareDataDir, aborting scanSkins'); return window.skinRegistry; }
         const skinRoot = getSkinRootDir();
