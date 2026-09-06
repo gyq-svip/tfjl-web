@@ -13494,6 +13494,14 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 document.addEventListener('click', hideCtxMenu);
                 document.addEventListener('scroll', hideCtxMenu, true);
                 document.addEventListener('keydown', function (e) { if (e.key === 'Escape') hideCtxMenu(); }, true);
+                // 主区域滚动：优先 #mainContent，否则滚 window（兼容 body 滚动布局）
+                window.__tfjlScrollMain = function (top) {
+                    try {
+                        const el = document.getElementById('mainContent');
+                        if (el && el.scrollHeight > el.clientHeight + 4) { el.scrollTo({ top: top, behavior: 'smooth' }); return; }
+                    } catch (e) {}
+                    window.scrollTo({ top: top, behavior: 'smooth' });
+                };
                 window.addEventListener('blur', hideCtxMenu);
             })();
 
@@ -13508,6 +13516,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         if (typeof window.repairSkins === 'function') window.repairSkins();
                         else showToast('⚠️ 皮肤修复功能暂不可用');
                     } },
+                    { icon: '🔝', label: '回到顶部', onClick: function () { if (typeof window.__tfjlScrollMain === 'function') window.__tfjlScrollMain(0); } },
+                    { icon: '🔻', label: '回到底部', onClick: function () { if (typeof window.__tfjlScrollMain === 'function') window.__tfjlScrollMain(1e9); } },
                     { icon: '⚡', label: '强制刷新', onClick: function () {
                         const _do = function () { if (typeof forceRefreshLatest === 'function') forceRefreshLatest(); else location.reload(true); };
                         if (typeof window.__tfjlRunWhenNotEditing === 'function') window.__tfjlRunWhenNotEditing(_do, '右键强制刷新');
