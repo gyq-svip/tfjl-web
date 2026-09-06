@@ -13454,6 +13454,15 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 handlePoolCardClick(card);
             });
             
+            // 🔴 2026-09-06 屏蔽 WebView2 原生右键菜单（含「刷新/重新加载」）：原生 reload 会复用旧文档已失效的
+            //    blob: 皮肤 URL → 大量皮肤变黑/不显示；App 已有双击版本号「强制刷新」做干净硬重载，原生菜单有害无益。
+            //    卡片/槽位自定义右键不受影响（它们的 handler 照常运行，仅原生菜单不弹）。
+            document.addEventListener('contextmenu', function (e) {
+                const t = e.target;
+                if (t && t.closest && t.closest('.card-item, .battle-slot, #favoriteCardsGrid')) return;
+                e.preventDefault();
+            }, true);
+
             document.addEventListener('contextmenu', (e) => {
                 const card = e.target.closest('.card-item');
                 /* [SKIN log muted] */ void (0) && console.log('[SKIN] global contextmenu target:', e.target.tagName, e.target.className, 'card-item:', card ? 'yes' : 'no', 'battle-slot:', card && card.closest('.battle-slot') ? 'yes' : 'no');
@@ -23917,15 +23926,15 @@ ${maSection}
                 adminEntryEl.addEventListener('touchend', cancelLP);
                 adminEntryEl.addEventListener('touchcancel', cancelLP);
 
-                // --- B. 三击清缓存 + 双击进管理员 ---
+                // --- B. 五连击清缓存 + 双击进管理员（2026-09-06：3连击易误触，改为5连击）---
                 let titleClickCount = 0;
                 let titleClickTimer = null;
                 adminEntryEl.addEventListener('click', () => {
                     titleClickCount++;
-                    if (titleClickCount >= 3) {
+                    if (titleClickCount >= 5) {
                         titleClickCount = 0;
                         clearTimeout(titleClickTimer);
-                        if (confirm('🔧 三击触发：强制清缓存+硬刷新？\n\n将清除全部缓存并用时间戳强刷，确保拉到最新代码。')) {
+                        if (confirm('🔧 五连击触发：强制清缓存+硬刷新？\n\n将清除全部缓存并用时间戳强刷，确保拉到最新代码。')) {
                             forceClearAndHardRefresh();
                         }
                     } else {
@@ -23933,12 +23942,12 @@ ${maSection}
                         titleClickTimer = setTimeout(() => { titleClickCount = 0; }, 1500);
                     }
                 });
-                // 双击入口（备用）：dblclick 延迟 250ms，若期间第 3 次 click 来（三击）则让路给清缓存
+                // 双击入口（备用）：dblclick 延迟 250ms，若期间第 5 次 click 来（五连击）则让路给清缓存
                 if (!adminEntryEl.dataset.adminDbl) {
                     adminEntryEl.dataset.adminDbl = '1';
                     adminEntryEl.addEventListener('dblclick', () => {
                         setTimeout(() => {
-                            if (titleClickCount >= 3) return; // 三击清缓存已触发，让路
+                            if (titleClickCount >= 5) return; // 五连击清缓存已触发，让路
                             cancelLP(); // 取消可能正在运行的长按 timer，避免重复弹
                             try {
                                 if (typeof openAdminPanel === 'function') openAdminPanel();
