@@ -8649,9 +8649,10 @@
             ctx.fillStyle = bg;
             ctx.fillRect(0, 0, W, H);
             // 标题 = 阵容名字（一眼看出打什么，最显眼）；副标题 = 品牌 + 分类(金) + 日期 + 作者（小一号）
+            // 🔴 2026-09-06 卡片名称自定义：opts.cardName 优先（分享者填写的主题），否则用项目名兜底，再否则「当前阵容」
             ctx.textBaseline = 'alphabetic';
             ctx.textAlign = 'center';
-            const _nameTitle = projName ? projName : '当前阵容';
+            const _nameTitle = (opts.cardName && String(opts.cardName).trim()) ? String(opts.cardName).trim() : (projName ? projName : '当前阵容');
             ctx.fillStyle = '#ffd700';
             let _nameFont = 30;
             ctx.font = 'bold ' + _nameFont + 'px "Microsoft YaHei", "PingFang SC", sans-serif';
@@ -8980,7 +8981,7 @@
             const opts = await _lineupShareOptionsDialog();
             if (!opts) return;
             let result;
-            try { result = await _lineupBuildCanvas('', '', opts.msg); }
+            try { result = await _lineupBuildCanvas('', '', opts.msg, '', opts); }
             catch (e) {
                 if (typeof showToast === 'function') showToast('❌ 生成阵容图失败：' + (e && e.message || e), 'error');
                 return;
@@ -9022,7 +9023,7 @@
                     // 🏠 勾选「图上加我的主页二维码」：扫码进个人主页看全部作品（引流）
                     const homeNick = (function () { try { return localStorage.getItem('TFJL_UserName') || ''; } catch (e) { return ''; } })();
                     const homeQrText = (opts.homeQr && homeNick) ? (LINEUP_SHARE_WEB_BASE + '#pu=' + encodeURIComponent(homeNick)) : '';
-                    const r2 = await _lineupBuildCanvas(shortLink, shortCode, opts.msg, homeQrText);
+                    const r2 = await _lineupBuildCanvas(shortLink, shortCode, opts.msg, homeQrText, opts);
                     if (r2 && r2.canvas) result = r2;
                 } catch (e) { /* 库加载失败：保留无码版，短链仍走「复制链接」 */ }
             }
@@ -9036,7 +9037,8 @@
             // 🔴 自动缓存小卡片到本机（IndexedDB，最近 30 张），方便日后随时取回发给朋友，不用重走分享流程
             //    带上内容指纹 fp：下次分享同一套阵容时可直接取回，不重复占云端空间
             if (dataUrl) {
-                Promise.resolve(_cardSave(dataUrl, { projectName: (typeof currentProjectName !== 'undefined' && currentProjectName) || '', code: shortCode, link: shortLink, fp: _curFp })).catch(function () {});
+                const _cardProjectName = (opts && opts.cardName && String(opts.cardName).trim()) ? String(opts.cardName).trim() : ((typeof currentProjectName !== 'undefined' && currentProjectName) ? currentProjectName : '');
+                Promise.resolve(_cardSave(dataUrl, { projectName: _cardProjectName, code: shortCode, link: shortLink, fp: _curFp })).catch(function () {});
             }
             // 短链（#pg= 项目短链，~80字符，与二维码同款）；上传失败则无链接按钮
             const link = shortLink;
@@ -9090,7 +9092,7 @@
             modal.querySelector('#lineupShareDl').onclick = function () {
                 const a = document.createElement('a');
                 a.href = dataUrl;
-                const pn = (typeof currentProjectName !== 'undefined' && currentProjectName) ? currentProjectName.replace(/[\\/:*?"<>|]/g, '') : '阵容';
+                const pn = (opts && opts.cardName && String(opts.cardName).trim()) ? String(opts.cardName).trim().replace(/[\\/:*?"<>|]/g, '') : ((typeof currentProjectName !== 'undefined' && currentProjectName) ? currentProjectName.replace(/[\\/:*?"<>|]/g, '') : '阵容');
                 a.download = '塔防阵容_' + pn + '_' + Date.now() + '.png';
                 document.body.appendChild(a); a.click(); a.remove();
                 _btnFb(this, '✓ 已开始下载');
@@ -9175,6 +9177,8 @@
                         '<option value="90">90 天</option>' +
                         '<option value="0">永久有效</option>' +
                       '</select>' +
+                      '<div style="color:rgba(255,255,255,0.65);font-size:0.78rem;margin:12px 0 5px;">🏷️ 卡片名称（自定义主题名，印在分享图顶部，留空则用项目名）</div>' +
+                      '<input id="lineupShareCardName" type="text" maxlength="40" placeholder="如：合租火炮的脚本 / 深海车队25波稳过" style="width:100%;box-sizing:border-box;background:rgba(0,0,0,0.35);color:#fff;border:1px solid rgba(255,215,0,0.35);border-radius:8px;padding:9px 10px;font-size:0.84rem;">' +
                       '<div style="color:rgba(255,255,255,0.65);font-size:0.78rem;margin:12px 0 5px;">✍️ 自定义留言（印在分享图二维码左侧，可留空）</div>' +
                       '<input id="lineupShareMsg" type="text" maxlength="60" placeholder="如：深海车队招人 / 稳过25波 / 联系方式…" style="width:100%;box-sizing:border-box;background:rgba(0,0,0,0.35);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:8px;padding:9px 10px;font-size:0.84rem;">' +
                       '<div style="display:flex;align-items:center;gap:8px;margin-top:12px;">' +
@@ -9238,6 +9242,12 @@
                 }
                 // 自定义留言：记住上次写的内容（每换一条不用重打）
                 try { msgInput.value = localStorage.getItem('TFJL_ShareMsg') || ''; } catch (e) {}
+                // 卡片名称：默认填当前项目名，记住上次写的（用户可改；留空则分享图用项目名兜底）
+                const cardNameInput = modal.querySelector('#lineupShareCardName');
+                try {
+                    const lastCardName = localStorage.getItem('TFJL_ShareCardName') || '';
+                    cardNameInput.value = lastCardName || ((typeof currentProjectName !== 'undefined' && currentProjectName) ? currentProjectName : '');
+                } catch (e) {}
                 // 加密分享不参与复用（无法安全判断密码是否与上次一致），勾了密码就藏起「强制新建」，免得勾了没效果
                 const forceNewBox = modal.querySelector('#lineupShareForceNewBox');
                 const forceNewChk = modal.querySelector('#lineupShareForceNewChk');
@@ -9260,13 +9270,16 @@
                     if (wallChk) { try { localStorage.setItem('TFJL_ShareWallSync', wallChk.checked ? '1' : '0'); } catch (e) {} }
                     const msg = (msgInput.value || '').trim();
                     try { localStorage.setItem('TFJL_ShareMsg', msg); } catch (e) {}
+                    // 卡片名称：自定义主题名，留空则分享图/卡片用项目名兜底；记住上次
+                    const cardName = (cardNameInput && cardNameInput.value || '').trim();
+                    try { localStorage.setItem('TFJL_ShareCardName', cardName); } catch (e) {}
                     // 🔴 2026-09-01 分类选择：同步上墙时归到所选分类（记住上次，没选则用当前项目分类）
                     const cat = ((catInput && catInput.value) || '').trim() || (function () { try { return (typeof currentProjectCategory !== 'undefined' && currentProjectCategory) || ''; } catch (e) { return ''; } })();
                     try { localStorage.setItem('TFJL_ShareWallCat', cat); } catch (e) {}
                     // 主页二维码勾选持久化 + 传出
                     const homeQr = !!(homeQrChk && homeQrChk.checked);
                     try { localStorage.setItem('TFJL_ShareHomeQr', homeQr ? '1' : '0'); } catch (e) {}
-                    finish({ days: days, pw: pw, wall: !!(wallChk && wallChk.checked), msg: msg, cat: cat, homeQr: homeQr, forceNew: !!(forceNewChk && forceNewChk.checked) });
+                    finish({ days: days, pw: pw, wall: !!(wallChk && wallChk.checked), msg: msg, cat: cat, homeQr: homeQr, forceNew: !!(forceNewChk && forceNewChk.checked), cardName: cardName });
                 };
             });
         }
