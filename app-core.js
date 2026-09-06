@@ -13454,13 +13454,20 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 handlePoolCardClick(card);
             });
             
-            // 🔴 2026-09-06 屏蔽 WebView2 原生右键菜单（含「刷新/重新加载」）：原生 reload 会复用旧文档已失效的
-            //    blob: 皮肤 URL → 大量皮肤变黑/不显示；App 已有双击版本号「强制刷新」做干净硬重载，原生菜单有害无益。
-            //    卡片/槽位自定义右键不受影响（它们的 handler 照常运行，仅原生菜单不弹）。
+            // 🔴 2026-09-06 右键空白处 = 执行「强制刷新」（替代原生 WebView2 有害的「刷新/重新加载」）：
+            //   原生 reload 复用旧文档已失效的 blob: 皮肤 URL → 大量皮肤变黑；forceRefreshLatest 是干净硬重载，皮肤正常。
+            //   编辑中（__tfjlIsEditing）会自动延后到编辑结束再刷（__tfjlRunWhenNotEditing），绝不打断/丢内容。
+            //   卡片/槽位/收藏 grid 的自定义右键不受影响（放行，由各自 handler 处理）。
             document.addEventListener('contextmenu', function (e) {
                 const t = e.target;
                 if (t && t.closest && t.closest('.card-item, .battle-slot, #favoriteCardsGrid')) return;
                 e.preventDefault();
+                const _doForce = function () {
+                    if (typeof forceRefreshLatest === 'function') forceRefreshLatest();
+                    else location.reload(true);
+                };
+                if (typeof window.__tfjlRunWhenNotEditing === 'function') window.__tfjlRunWhenNotEditing(_doForce, '右键强制刷新');
+                else _doForce();
             }, true);
 
             document.addEventListener('contextmenu', (e) => {
