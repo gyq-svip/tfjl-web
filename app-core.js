@@ -7060,26 +7060,42 @@ const FUSION_SIZE = '40%';                                        // 副卡直�
 //    现把预加载器放进全局池持有引用，加载结束才释放，杜绝中途被 GC。
 const _skinPreloadPool = new Set();
 window.__tfjlPreloadPoolSize = function () { try { return _skinPreloadPool.size; } catch (e) { return 'n/a'; } };
-// 🔴 2026-09-07 空闲自动修剪皮肤缓存：挂机 30 秒无用户操作 → 清掉 50% 最旧皮肤缓存（用户要求改短回收时间做测试），
-// 回收解码位图 + GPU 纹理，避免渲染进程挂机持续偏高。当前正被 <img> 引用的皮肤保留（不黑图）。
+// 🔴 2026-09-07 空闲自动修剪皮肤缓存：静止/进托盘 30 秒 → 清掉 50% 最旧皮肤缓存（回收解码位图 + GPU 纹理）。
+// 当前正被 <img> 引用的皮肤保留（不黑图）。⚠️ 原版用 setInterval(10s) 轮询，但 App 进托盘=窗口隐藏时 WebView2 会节流
+// 后台 setInterval（暂停/降到1分钟+），导致定时修剪失效 → 改为 visibilitychange 驱动（窗口隐藏时浏览器主动同步分发，不受节流）。
 (function () {
     if (window.__tfjlIdleTrimReady) return;
     window.__tfjlIdleTrimReady = true;
     window.__tfjlLastUserActivity = Date.now();
+    let _hiddenTimer = null;
     const _mark = function () { window.__tfjlLastUserActivity = Date.now(); };
     ['mousemove', 'keydown', 'pointerdown', 'wheel', 'click', 'touchstart'].forEach(function (ev) {
         window.addEventListener(ev, _mark, { passive: true });
     });
     window.addEventListener('focus', _mark);
-    setInterval(function () {
+    const _doTrim = function () {
         try {
-            if (Date.now() - (window.__tfjlLastUserActivity || 0) < 30 * 1000) return;
             if (typeof window.__tfjlTrimSkinCache === 'function') {
                 const r = window.__tfjlTrimSkinCache(0.5);
                 if (r && r.trimmed) console.log('[SKIN] 空闲修剪皮肤缓存：' + r.trimmed + ' 张，剩余 ' + r.remaining);
             }
         } catch (e) {}
+    };
+    // 前台：每 10 秒检查静止时长（前台不受节流，可靠）
+    setInterval(function () {
+        try { if (Date.now() - (window.__tfjlLastUserActivity || 0) >= 30 * 1000) _doTrim(); } catch (e) {}
     }, 10 * 1000);
+    // 进托盘/隐藏：visibilitychange 触发 30 秒兜底倒计时（后台 setTimeout 会被节流，但最终仍会跑；替代失效的 setInterval）
+    const _onVis = function () {
+        if (document.hidden) {
+            if (_hiddenTimer) clearTimeout(_hiddenTimer);
+            _hiddenTimer = setTimeout(_doTrim, 30 * 1000);
+        } else if (_hiddenTimer) {
+            clearTimeout(_hiddenTimer); _hiddenTimer = null;
+        }
+    };
+    document.addEventListener('visibilitychange', _onVis);
+    if (document.hidden) _onVis(); // 启动即隐藏（如最小化启动）也兜底
 })();
 function _swapSkinImgSrc(img, nextUrl) {
     if (!img || !nextUrl) return;
