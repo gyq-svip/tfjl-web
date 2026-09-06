@@ -13559,8 +13559,12 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         else _do();
                     } },
                     { icon: '🧹', label: '清扫孤儿皮肤缓存', onClick: function () {
-                        const n = (typeof window.sweepSkinOrphanBlobs === 'function') ? window.sweepSkinOrphanBlobs() : 0;
-                        showToast('🧹 回收孤儿皮肤 blob：' + n + ' 个');
+                        let n = (typeof window.sweepSkinOrphanBlobs === 'function') ? window.sweepSkinOrphanBlobs() : 0;
+                        let cleared = false;
+                        if (typeof window.clearSkinUrlCache === 'function') { try { window.clearSkinUrlCache(); cleared = true; } catch (e) {} }
+                        if (typeof window.__tfjlClearLocalSkinCache === 'function') { try { window.__tfjlClearLocalSkinCache(); cleared = true; } catch (e) {} }
+                        if (cleared) showToast('🧹 已清空皮肤缓存（如有黑图点「重新扫描皮肤」或「强制刷新」）');
+                        else showToast('🧹 回收孤儿皮肤 blob：' + n + ' 个');
                     } },
                     { icon: '🗑', label: '清缓存并重启', danger: true, onClick: function () {
                         if (typeof window.forceClearAndHardRefresh === 'function') window.forceClearAndHardRefresh();
