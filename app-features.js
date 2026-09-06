@@ -8763,8 +8763,8 @@
             }
 
             // 推广脚注文案：主句米黄 + 「如果觉得有用请分享！」红色（用户指定红字落位）
-            const FOOT_MAIN = '📦 塔防精灵助手：脚本 · 皮肤 · 记事本 · 站位 · 一键还原 —— ';
-            const FOOT_RED = '如果觉得有用请分享！';
+            const FOOT_MAIN = '📦 塔防助手：脚本 · 皮肤 · 记事本 · 站位 · 分享即展示 —— ';
+            const FOOT_RED = '扫码可获取脚本！';
             const GEN_LINE = '塔防精灵助手 生成于 ' + dateStr + ' ' + now.toTimeString().slice(0, 5);
             const drawFootTwo = function (cx, footBaseY, genBaseY) {   // 两行脚注（居中坐标）
                 ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
