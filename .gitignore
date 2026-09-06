@@ -46,6 +46,8 @@ icon-source.png
 # ====================
 index_backup_*.html
 *_backup_*.html
+# 发布脚本备份（本地保留，不入库）
+publish_update.ps1.bak
 
 # ====================
 # 测试数据文件
