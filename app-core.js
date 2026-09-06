@@ -7082,14 +7082,16 @@ window.__tfjlPreloadPoolSize = function () { try { return _skinPreloadPool.size;
         } catch (e) {}
     };
     // 前台：每 10 秒检查静止时长（前台不受节流，可靠）
+    // ⚠️ 阈值 3 分钟（非测试期的 30s 极端值）：30s 过短会导致 trim 反复「清冷皮肤→重新解码」，
+    // 反而喂大 WebView2 的 ImageDecodeCache（每次新 blob URL = 新解码副本），呈 30s 锯齿式增长（实测鼠标不动也涨到 1.4G）。
     setInterval(function () {
-        try { if (Date.now() - (window.__tfjlLastUserActivity || 0) >= 30 * 1000) _doTrim(); } catch (e) {}
+        try { if (Date.now() - (window.__tfjlLastUserActivity || 0) >= 3 * 60 * 1000) _doTrim(); } catch (e) {}
     }, 10 * 1000);
-    // 进托盘/隐藏：visibilitychange 触发 30 秒兜底倒计时（后台 setTimeout 会被节流，但最终仍会跑；替代失效的 setInterval）
+    // 进托盘/隐藏：visibilitychange 触发兜底倒计时（后台 setTimeout 会被节流，但最终仍会跑；替代失效的 setInterval）
     const _onVis = function () {
         if (document.hidden) {
             if (_hiddenTimer) clearTimeout(_hiddenTimer);
-            _hiddenTimer = setTimeout(_doTrim, 30 * 1000);
+            _hiddenTimer = setTimeout(_doTrim, 3 * 60 * 1000);
         } else if (_hiddenTimer) {
             clearTimeout(_hiddenTimer); _hiddenTimer = null;
         }
