@@ -13467,9 +13467,12 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 function hideCtxMenu() { menu.style.display = 'none'; _curItems = []; }
                 window.__tfjlHideCtxMenu = hideCtxMenu;
                 menu.addEventListener('click', function (e) {
-                    const idx = parseInt(e.target.getAttribute('data-i') || '-1', 10);
+                    const item = (e.target && e.target.closest) ? e.target.closest('[data-i]') : null;
+                    const idx = item ? parseInt(item.getAttribute('data-i') || '-1', 10) : -1;
+                    let action = null;
+                    if (idx >= 0 && _curItems[idx] && typeof _curItems[idx].onClick === 'function') action = _curItems[idx].onClick;
                     hideCtxMenu();
-                    if (idx >= 0 && _curItems[idx] && typeof _curItems[idx].onClick === 'function') _curItems[idx].onClick();
+                    if (action) action();
                 });
                 window.__tfjlShowCtxMenu = function (x, y, items) {
                     _curItems = items || [];
