@@ -1230,6 +1230,18 @@
         let bidLock = false;
         let lastAuctionSnapshot = {};
         let chatRefreshCurrentInterval = 5000;
+
+        // 🔴 2026-09-07 拍卖行/聊天所有后台定时器集中清理（强制停止），与 app-features.js 保持一致
+        function __tfjlStopAuctionTimers() {
+            try {
+                if (chatRefreshInterval) { clearInterval(chatRefreshInterval); chatRefreshInterval = null; }
+                if (auctionCounterInterval) { clearInterval(auctionCounterInterval); auctionCounterInterval = null; }
+                currentChatRoom = null;
+                lastAuctionSnapshot = {};
+            } catch (e) {}
+            return true;
+        }
+        window.__tfjlStopAuctionTimers = __tfjlStopAuctionTimers;
         let auctionBroadcastQueue = [];
 
         // ==================== 密码验证 ====================
@@ -2348,10 +2360,14 @@
         }
 
         function closeChatRoom() {
-            document.getElementById('chatRoomPanel').style.display = 'none';
-            if (chatRefreshInterval) clearInterval(chatRefreshInterval);
-            if (auctionCounterInterval) clearInterval(auctionCounterInterval);
-            currentChatRoom = null;
+            const panel = document.getElementById('chatRoomPanel');
+            if (panel) panel.style.display = 'none';
+            if (typeof __tfjlStopAuctionTimers === 'function') __tfjlStopAuctionTimers();
+            else {
+                if (chatRefreshInterval) clearInterval(chatRefreshInterval);
+                if (auctionCounterInterval) clearInterval(auctionCounterInterval);
+                currentChatRoom = null;
+            }
         }
 
         function switchChatRoom() {

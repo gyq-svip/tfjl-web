@@ -862,6 +862,20 @@
         let auctionCounterInterval = null;
         let imagesData = null;
 
+        // 🔴 2026-09-07 拍卖行/聊天所有后台定时器集中清理（强制停止）
+        // 用法：控制台/浮动控制台执行 __tfjlStopAuctionTimers() 立即停掉所有拍卖行轮询。
+        // 仅主站（皮肤搭配）场景不需要这些定时任务，残留会持续 renderChatMessages/renderAuctionsList 并解码图片 → 内存缓慢涨。
+        function __tfjlStopAuctionTimers() {
+            try {
+                if (chatRefreshInterval) { clearInterval(chatRefreshInterval); chatRefreshInterval = null; }
+                if (auctionCounterInterval) { clearInterval(auctionCounterInterval); auctionCounterInterval = null; }
+                currentChatRoom = null;
+                if (typeof lastAuctionSnapshot === 'object' && lastAuctionSnapshot) lastAuctionSnapshot = {};
+            } catch (e) {}
+            return true;
+        }
+        window.__tfjlStopAuctionTimers = __tfjlStopAuctionTimers;
+
         // 拍卖播报队列（持久化到Gist，所有设备共享）
         let auctionBroadcastQueue = []; // { id, text, roomId, addedAt }
 
@@ -1551,10 +1565,15 @@
         }
 
         function closeChatRoom() {
-            document.getElementById('chatRoomPanel').style.display = 'none';
-            if (chatRefreshInterval) clearInterval(chatRefreshInterval);
-            if (auctionCounterInterval) clearInterval(auctionCounterInterval);
-            currentChatRoom = null;
+            const panel = document.getElementById('chatRoomPanel');
+            if (panel) panel.style.display = 'none';
+            // 🔴 2026-09-07 关面板即彻底停掉所有拍卖行后台定时（之前只隐藏面板会残留 interval 持续后台跑）
+            if (typeof __tfjlStopAuctionTimers === 'function') __tfjlStopAuctionTimers();
+            else {
+                if (chatRefreshInterval) clearInterval(chatRefreshInterval);
+                if (auctionCounterInterval) clearInterval(auctionCounterInterval);
+                currentChatRoom = null;
+            }
         }
 
         function resizeChatRoom(deltaWidth, deltaHeight) {
