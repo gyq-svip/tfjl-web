@@ -4390,15 +4390,28 @@ if (true) {
         const skin = skins.find(s => s.name === target);
         const entry = skin || skins.find(s => s.name === baseHero) || skins[0];
         if (!entry) return null;
-        // 优先用 IndexedDB 缓存（毫秒级返回），否则走网络并回写
+        // 🔴 2026-09-07 内存优化（对齐 app-local2.js，修复 04df3ca 遗留缺口）：Tauri 端【本地 path 优先】于远程 url。
+        // 有本地 path 就永远走 getSkinImageUrl（缩放到 ≤256px）→ 缓存进 skinImageUrlCache，不按原图解码；
+        // asset://(convertFileSrc) 降级为兜底（仅当缩放失败），避免 WebView2 按【原图 512~1024px】解码 413 张 ≈1.6GB 位图+GPU 纹理。
+        // 原版 `if (entry.url) return` 会让 syncRemoteSkins 注入的远程 URL / 原图 asset:// 覆盖本地 path，
+        // 导致降采样形同虚设、App 始终按原图解码（实测 1.3~1.9G 主因）。
+        if (entry.path) {
+            const dataUrl = await getSkinImageUrl(entry.path);
+            if (dataUrl) {
+                entry.url = dataUrl; entry.loaded = true;
+                const cachedUrl = await _getCachedSkinUrl(dataUrl); // blob: 直接复用（skinImageUrlCache 已按 filePath 缓存）
+                return { url: cachedUrl, name: entry.name, path: entry.path };
+            }
+            // 兜底：缩放路径失败 → 退回 Tauri 原生资源协议 asset://（按原图解码，速度优先、内存换速度）
+            const nativeUrl = (typeof convertFileSrc === 'function') ? convertFileSrc(entry.path) : null;
+            if (nativeUrl) {
+                entry.url = nativeUrl; entry.loaded = true;
+                return { url: nativeUrl, name: entry.name, path: entry.path };
+            }
+        }
+        // 本地无 path（纯远程皮肤）→ 用远程 url 兜底（网页版 / 远程特有皮）
         if (entry.url) {
             const cachedUrl = await _getCachedSkinUrl(entry.url);
-            return { url: cachedUrl, name: entry.name, path: entry.path };
-        }
-        const dataUrl = await getSkinImageUrl(entry.path);
-        if (dataUrl) {
-            entry.url = dataUrl; entry.loaded = true;
-            const cachedUrl = await _getCachedSkinUrl(dataUrl);
             return { url: cachedUrl, name: entry.name, path: entry.path };
         }
         return null;
