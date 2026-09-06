@@ -13454,20 +13454,74 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 handlePoolCardClick(card);
             });
             
-            // 🔴 2026-09-06 右键空白处 = 执行「强制刷新」（替代原生 WebView2 有害的「刷新/重新加载」）：
-            //   原生 reload 复用旧文档已失效的 blob: 皮肤 URL → 大量皮肤变黑；forceRefreshLatest 是干净硬重载，皮肤正常。
-            //   编辑中（__tfjlIsEditing）会自动延后到编辑结束再刷（__tfjlRunWhenNotEditing），绝不打断/丢内容。
-            //   卡片/槽位/收藏 grid 的自定义右键不受影响（放行，由各自 handler 处理）。
+            // 右键空白处 = 弹出自定义菜单（替代原生 WebView2 有害的「刷新/重新加载」）；卡片/槽位/收藏 grid、
+            // 输入框/可编辑区 的右键不受影响（放行）。菜单构建见下方 IIFE（__tfjlCtxMenuReady 防重复注册）。
+            (function () {
+                if (window.__tfjlCtxMenuReady) return;
+                window.__tfjlCtxMenuReady = true;
+                const menu = document.createElement('div');
+                menu.id = 'tfjlCtxMenu';
+                menu.style.cssText = 'position:fixed;z-index:2147483646;min-width:188px;background:#1f2230;color:#e8e8f0;border:1px solid #3a3f52;border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.5);padding:6px;font-size:14px;display:none;user-select:none;';
+                document.body.appendChild(menu);
+                let _curItems = [];
+                function hideCtxMenu() { menu.style.display = 'none'; _curItems = []; }
+                window.__tfjlHideCtxMenu = hideCtxMenu;
+                menu.addEventListener('click', function (e) {
+                    const idx = parseInt(e.target.getAttribute('data-i') || '-1', 10);
+                    hideCtxMenu();
+                    if (idx >= 0 && _curItems[idx] && typeof _curItems[idx].onClick === 'function') _curItems[idx].onClick();
+                });
+                window.__tfjlShowCtxMenu = function (x, y, items) {
+                    _curItems = items || [];
+                    menu.innerHTML = '';
+                    _curItems.forEach(function (it, i) {
+                        const el = document.createElement('div');
+                        el.setAttribute('data-i', String(i));
+                        el.style.cssText = 'padding:9px 12px;border-radius:7px;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:8px;' + (it.danger ? 'color:#ff8a8a;' : '');
+                        el.innerHTML = (it.icon ? '<span style="width:18px;text-align:center">' + it.icon + '</span>' : '') + '<span>' + it.label + '</span>';
+                        el.addEventListener('mouseenter', function () { el.style.background = it.danger ? 'rgba(255,90,90,.14)' : '#2b2f42'; });
+                        el.addEventListener('mouseleave', function () { el.style.background = 'transparent'; });
+                        menu.appendChild(el);
+                    });
+                    if (!_curItems.length) { hideCtxMenu(); return; }
+                    menu.style.display = 'block';
+                    const mw = menu.offsetWidth, mh = menu.offsetHeight;
+                    if (x + mw > window.innerWidth - 8) x = window.innerWidth - mw - 8;
+                    if (y + mh > window.innerHeight - 8) y = window.innerHeight - mh - 8;
+                    menu.style.left = Math.max(8, x) + 'px';
+                    menu.style.top = Math.max(8, y) + 'px';
+                };
+                document.addEventListener('click', hideCtxMenu);
+                document.addEventListener('scroll', hideCtxMenu, true);
+                document.addEventListener('keydown', function (e) { if (e.key === 'Escape') hideCtxMenu(); }, true);
+                window.addEventListener('blur', hideCtxMenu);
+            })();
+
             document.addEventListener('contextmenu', function (e) {
                 const t = e.target;
-                if (t && t.closest && t.closest('.card-item, .battle-slot, #favoriteCardsGrid')) return;
+                if (!t || !t.closest) return;
+                // 卡片/槽位/收藏 grid 走各自自定义菜单；输入框/可编辑区保留原生复制菜单
+                if (t.closest('.card-item, .battle-slot, #favoriteCardsGrid, input, textarea, select, [contenteditable="true"], [contenteditable=""]')) return;
                 e.preventDefault();
-                const _doForce = function () {
-                    if (typeof forceRefreshLatest === 'function') forceRefreshLatest();
-                    else location.reload(true);
-                };
-                if (typeof window.__tfjlRunWhenNotEditing === 'function') window.__tfjlRunWhenNotEditing(_doForce, '右键强制刷新');
-                else _doForce();
+                const items = [
+                    { icon: '🔄', label: '重新扫描皮肤', onClick: function () {
+                        if (typeof window.repairSkins === 'function') window.repairSkins();
+                        else showToast('⚠️ 皮肤修复功能暂不可用');
+                    } },
+                    { icon: '⚡', label: '强制刷新', onClick: function () {
+                        const _do = function () { if (typeof forceRefreshLatest === 'function') forceRefreshLatest(); else location.reload(true); };
+                        if (typeof window.__tfjlRunWhenNotEditing === 'function') window.__tfjlRunWhenNotEditing(_do, '右键强制刷新');
+                        else _do();
+                    } },
+                    { icon: '🧹', label: '清扫孤儿皮肤缓存', onClick: function () {
+                        const n = (typeof window.sweepSkinOrphanBlobs === 'function') ? window.sweepSkinOrphanBlobs() : 0;
+                        showToast('🧹 回收孤儿皮肤 blob：' + n + ' 个');
+                    } },
+                    { icon: '🗑', label: '清缓存并重启', danger: true, onClick: function () {
+                        if (typeof window.forceClearAndHardRefresh === 'function') window.forceClearAndHardRefresh();
+                    } }
+                ];
+                window.__tfjlShowCtxMenu(e.clientX, e.clientY, items);
             }, true);
 
             document.addEventListener('contextmenu', (e) => {
