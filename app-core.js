@@ -7060,7 +7060,7 @@ const FUSION_SIZE = '40%';                                        // 副卡直�
 //    现把预加载器放进全局池持有引用，加载结束才释放，杜绝中途被 GC。
 const _skinPreloadPool = new Set();
 window.__tfjlPreloadPoolSize = function () { try { return _skinPreloadPool.size; } catch (e) { return 'n/a'; } };
-// 🔴 2026-09-07 空闲自动修剪皮肤缓存：挂机 5 分钟无用户操作 → 清掉 50% 最旧皮肤缓存（用户要求改短回收时间），
+// 🔴 2026-09-07 空闲自动修剪皮肤缓存：挂机 30 秒无用户操作 → 清掉 50% 最旧皮肤缓存（用户要求改短回收时间做测试），
 // 回收解码位图 + GPU 纹理，避免渲染进程挂机持续偏高。当前正被 <img> 引用的皮肤保留（不黑图）。
 (function () {
     if (window.__tfjlIdleTrimReady) return;
@@ -7073,13 +7073,13 @@ window.__tfjlPreloadPoolSize = function () { try { return _skinPreloadPool.size;
     window.addEventListener('focus', _mark);
     setInterval(function () {
         try {
-            if (Date.now() - (window.__tfjlLastUserActivity || 0) < 5 * 60 * 1000) return;
+            if (Date.now() - (window.__tfjlLastUserActivity || 0) < 30 * 1000) return;
             if (typeof window.__tfjlTrimSkinCache === 'function') {
                 const r = window.__tfjlTrimSkinCache(0.5);
                 if (r && r.trimmed) console.log('[SKIN] 空闲修剪皮肤缓存：' + r.trimmed + ' 张，剩余 ' + r.remaining);
             }
         } catch (e) {}
-    }, 5 * 60 * 1000);
+    }, 10 * 1000);
 })();
 function _swapSkinImgSrc(img, nextUrl) {
     if (!img || !nextUrl) return;
