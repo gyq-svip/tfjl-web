@@ -3698,33 +3698,69 @@ if (true) {
         window.clearSkinUrlCache = function () { try { if (typeof _prev === 'function') _prev(); } catch (e) {} try { _skinUrlClearAll(); } catch (e) {} };
         window.__tfjlClearLocalSkinCache = _skinUrlClearAll; // Tauri 端专用，防止被网页端 clearSkinUrlCache 覆盖
     })();
+    // 🔴 2026-09-06 降采样（与 app-local2.js 一致）：皮肤缩到 ≤256px 再生成 blob。
+    // 修复 Tauri 端「App 渲染进程 1.5~1.8G」元凶——之前 getSkinImageUrl 直接返回原图 blob/dataUrl，
+    // WebView2 按原图 512~1024px 解码，413 张同时驻留 ≈1.6GB 位图+GPU 纹理。
+    // 缩到 256px 在 94px 槽位/卡池缩略图视觉无差，解码位图+GPU 纹理省 60%~80%。
+    const SKIN_MAX_EDGE = 256;
+    async function _dataUrlToBlob(dataUrl) {
+        try { return await (await fetch(dataUrl)).blob(); } catch (e) { return null; }
+    }
+    async function _downscaleBlobIfNeeded(blob) {
+        if (!blob || !blob.type || blob.type.indexOf('image/') !== 0) return URL.createObjectURL(blob);
+        try {
+            if (typeof createImageBitmap !== 'function') return URL.createObjectURL(blob);
+            const bmp = await createImageBitmap(blob);
+            const w = bmp.width, h = bmp.height, maxEdge = Math.max(w, h);
+            if (maxEdge <= SKIN_MAX_EDGE) { bmp.close && bmp.close(); return URL.createObjectURL(blob); }
+            const scale = SKIN_MAX_EDGE / maxEdge;
+            const tw = Math.max(1, Math.round(w * scale)), th = Math.max(1, Math.round(h * scale));
+            const canvas = document.createElement('canvas');
+            canvas.width = tw; canvas.height = th;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(bmp, 0, 0, tw, th);
+            bmp.close && bmp.close();
+            const outBlob = await new Promise(res => canvas.toBlob(res, 'image/png'));
+            if (outBlob) return URL.createObjectURL(outBlob);
+            return URL.createObjectURL(blob);
+        } catch (e) {
+            return URL.createObjectURL(blob);
+        }
+    }
     async function getSkinImageUrl(filePath) {
         const _hit = _skinUrlGet(filePath);
         if (_hit) return _hit;
         const invokeFn = window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke;
         if (!invokeFn) return null;
 
-        // 方案A：优先用 read_image_base64 自定义命令（rebuild exe 后可用）
+        // 方案A：read_image_base64 → dataUrl → blob → 缩放
         try {
             const dataUrl = await invokeFn('read_image_base64', { filePath });
             if (dataUrl) {
-                _skinUrlSet(filePath, dataUrl);
-                return dataUrl;
+                const blob = await _dataUrlToBlob(dataUrl);
+                const finalUrl = blob ? await _downscaleBlobIfNeeded(blob) : dataUrl;
+                _skinUrlSet(filePath, finalUrl);
+                return finalUrl;
             }
         } catch(e) {
             console.log('[SKIN] read_image_base64 ACL blocked, trying fs plugin...', String(e).slice(0,80));
         }
 
-        // 方案B：用 Tauri 内置 fs 插件读二进制 → blob: URL
-        // （read_image_base64 的 ACL 需 rebuild exe 才能解锁，fs:default 在旧 exe 中已编译）
+        // 方案B：fs plugin 读二进制 → blob → 缩放（中间原始 blob URL 缩放后必须 revoke，否则泄漏）
         try {
             const bytes = await invokeFn('plugin:fs|read_file', { path: filePath, options: undefined });
-            console.log('[SKIN] read_file raw type:', filePath, bytes?.constructor?.name, 'len:', bytes?.byteLength ?? bytes?.length);
             const blobUrl = bytesToBlobUrl(bytes, filePath);
             if (blobUrl) {
-                _skinUrlSet(filePath, blobUrl);
-                console.log('[SKIN] blob URL via fs plugin OK:', filePath);
-                return blobUrl;
+                try {
+                    const blob = await (await fetch(blobUrl)).blob();
+                    const finalUrl = await _downscaleBlobIfNeeded(blob);
+                    try { URL.revokeObjectURL(blobUrl); } catch (e) {} // 释放未缩放的原始 blob URL（关键防泄漏）
+                    _skinUrlSet(filePath, finalUrl);
+                    return finalUrl;
+                } catch (e) {
+                    _skinUrlSet(filePath, blobUrl); // 缩放失败退回原 blob
+                    return blobUrl;
+                }
             }
         } catch(e) {
             console.warn('[SKIN] read_file also failed:', filePath, String(e).slice(0,160));
