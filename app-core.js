@@ -13502,6 +13502,16 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     } catch (e) {}
                     window.scrollTo({ top: top, behavior: 'smooth' });
                 };
+                // 剪贴板降级（WebView2 无 clipboard API 时）：textarea + execCommand
+                window.__tfjlFallbackCopy = function (txt) {
+                    try {
+                        const ta = document.createElement('textarea');
+                        ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
+                        document.body.appendChild(ta); ta.select();
+                        try { document.execCommand('copy'); } catch (e) {}
+                        document.body.removeChild(ta);
+                    } catch (e) {}
+                };
                 window.addEventListener('blur', hideCtxMenu);
             })();
 
@@ -13518,6 +13528,28 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     } },
                     { icon: '🔝', label: '回到顶部', onClick: function () { if (typeof window.__tfjlScrollMain === 'function') window.__tfjlScrollMain(0); } },
                     { icon: '🔻', label: '回到底部', onClick: function () { if (typeof window.__tfjlScrollMain === 'function') window.__tfjlScrollMain(1e9); } },
+                    { icon: '📊', label: '内存诊断', onClick: function () {
+                        if (typeof window.memoryReport === 'function') { window.memoryReport(); showToast('📊 内存诊断已打印到控制台（F12 / 浮动控制台查看）'); }
+                        else showToast('⚠️ 诊断功能暂不可用');
+                    } },
+                    { icon: '💬', label: '打开反馈面板', onClick: function () {
+                        if (typeof window.toggleFeedbackPanel === 'function') window.toggleFeedbackPanel();
+                        else showToast('⚠️ 反馈面板暂不可用');
+                    } },
+                    { icon: '📋', label: '复制诊断信息', onClick: function () {
+                        try {
+                            const vt = document.getElementById('versionTag');
+                            const swVer = (vt && vt.dataset && vt.dataset.swVersion) ? vt.dataset.swVersion : (vt ? vt.textContent.trim() : '未知');
+                            const exeVer = (typeof window.__APP_VERSION === 'string') ? window.__APP_VERSION : '（网页版/未注入）';
+                            const ua = navigator.userAgent || '';
+                            const isTauri = !!(window.__TAURI_INTERNALS__ || window.__TAURI__ || ua.indexOf('Tauri') !== -1);
+                            const txt = '塔防助手诊断信息\n前端版本(SW): ' + swVer + '\n桌面版本: ' + exeVer + '\n平台: ' + (isTauri ? '桌面 App' : '网页版') + '\nUA: ' + ua;
+                            const _done = function () { showToast('📋 诊断信息已复制'); };
+                            if (navigator.clipboard && navigator.clipboard.writeText) {
+                                navigator.clipboard.writeText(txt).then(_done, function () { window.__tfjlFallbackCopy(txt); _done(); });
+                            } else { window.__tfjlFallbackCopy(txt); _done(); }
+                        } catch (e) { showToast('⚠️ 复制失败'); }
+                    } },
                     { icon: '⚡', label: '强制刷新', onClick: function () {
                         const _do = function () { if (typeof forceRefreshLatest === 'function') forceRefreshLatest(); else location.reload(true); };
                         if (typeof window.__tfjlRunWhenNotEditing === 'function') window.__tfjlRunWhenNotEditing(_do, '右键强制刷新');
