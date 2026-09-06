@@ -7059,6 +7059,28 @@ const FUSION_SIZE = '40%';                                        // 副卡直�
 //    槽位 skin-bg 类已加、图却空白 → 永久黑屏（手牌恰好在 GC 前完成故"看起来正常"）。
 //    现把预加载器放进全局池持有引用，加载结束才释放，杜绝中途被 GC。
 const _skinPreloadPool = new Set();
+window.__tfjlPreloadPoolSize = function () { try { return _skinPreloadPool.size; } catch (e) { return 'n/a'; } };
+// 🔴 2026-09-07 空闲自动修剪皮肤缓存：挂机 30 分钟无用户操作 → 清掉 50% 最旧皮肤缓存，
+// 回收解码位图 + GPU 纹理，避免渲染进程挂机持续偏高。当前正被 <img> 引用的皮肤保留（不黑图）。
+(function () {
+    if (window.__tfjlIdleTrimReady) return;
+    window.__tfjlIdleTrimReady = true;
+    window.__tfjlLastUserActivity = Date.now();
+    const _mark = function () { window.__tfjlLastUserActivity = Date.now(); };
+    ['mousemove', 'keydown', 'pointerdown', 'wheel', 'click', 'touchstart'].forEach(function (ev) {
+        window.addEventListener(ev, _mark, { passive: true });
+    });
+    window.addEventListener('focus', _mark);
+    setInterval(function () {
+        try {
+            if (Date.now() - (window.__tfjlLastUserActivity || 0) < 30 * 60 * 1000) return;
+            if (typeof window.__tfjlTrimSkinCache === 'function') {
+                const r = window.__tfjlTrimSkinCache(0.5);
+                if (r && r.trimmed) console.log('[SKIN] 空闲修剪皮肤缓存：' + r.trimmed + ' 张，剩余 ' + r.remaining);
+            }
+        } catch (e) {}
+    }, 5 * 60 * 1000);
+})();
 function _swapSkinImgSrc(img, nextUrl) {
     if (!img || !nextUrl) return;
     // 记录「最后一次请求的 URL」：并发多次切皮时，只有与最新意图一致的预加载才允许落 src，
@@ -7069,6 +7091,11 @@ function _swapSkinImgSrc(img, nextUrl) {
     // 无旧图可保（新建的空 img）：直接设 src。留着空白 img 等 preload 反而制造「skin-bg+空图」黑窗
     if (!cur) { img.src = nextUrl; return; }
     const pre = new Image();
+    // 🔴 2026-09-07 限制预载池上限 50：防止连续快速切皮时一次性 new 大量 Image 堆积（虽 onload 后会删除，但极端并发仍会瞬间飙升）
+    if (_skinPreloadPool.size >= 50) {
+        const _old = _skinPreloadPool.values().next().value;
+        if (_old) { try { _old.onload = null; _old.onerror = null; } catch (e) {} _skinPreloadPool.delete(_old); }
+    }
     _skinPreloadPool.add(pre);
     const apply = function () {
         _skinPreloadPool.delete(pre);
@@ -26968,6 +26995,7 @@ ${maSection}
             // ② DOM 规模（节点过多会显著推高渲染进程内存）
             try { rep['DOM节点总数'] = document.getElementsByTagName('*').length; } catch (e) { rep['DOM节点总数'] = '读取失败'; }
             try { rep['IMG元素数'] = document.getElementsByTagName('img').length; } catch (e) { rep['IMG元素数'] = '读取失败'; }
+            try { rep['皮肤预载池'] = (typeof window.__tfjlPreloadPoolSize === 'function') ? window.__tfjlPreloadPoolSize() : 'n/a'; } catch (e) { rep['皮肤预载池'] = '读取失败'; }
             // ③ 皮肤图 URL 缓存（app-local2.js 提供统计；这是本次内存优化的重点）
             if (typeof window.skinCacheStats === 'function') {
                 try {
