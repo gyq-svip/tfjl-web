@@ -3698,6 +3698,37 @@ if (true) {
         window.clearSkinUrlCache = function () { try { if (typeof _prev === 'function') _prev(); } catch (e) {} try { _skinUrlClearAll(); } catch (e) {} };
         window.__tfjlClearLocalSkinCache = _skinUrlClearAll; // Tauri 端专用，防止被网页端 clearSkinUrlCache 覆盖
     })();
+    // 🔴 2026-09-07 空闲修剪：回收最旧 fraction 比例的皮肤 blob（保留正在显示的 + 最近使用的），降渲染进程常驻
+    function _collectReferencedSkinBlobUrlsTauri() {
+        const set = new Set();
+        try {
+            const imgs = document.getElementsByTagName('img');
+            for (let i = 0; i < imgs.length; i++) { const s = imgs[i].getAttribute('src') || ''; if (s.indexOf('blob:') === 0) set.add(s); }
+            const re = /url\(["']?(blob:[^"')]+)/g;
+            const all = document.getElementsByTagName('*');
+            for (let i = 0; i < all.length; i++) {
+                const bi = all[i].style && all[i].style.backgroundImage;
+                if (bi && bi.indexOf('blob:') !== -1) { re.lastIndex = 0; let m; while ((m = re.exec(bi)) !== null) set.add(m[1]); }
+            }
+        } catch (e) {}
+        return set;
+    }
+    window.__tfjlTrimSkinCache = function (fraction) {
+        try {
+            const refSet = _collectReferencedSkinBlobUrlsTauri();
+            const n = skinImageUrlCache.size;
+            const keep = Math.max(1, Math.floor(n * (1 - (fraction || 0.5))));
+            let trimmed = 0;
+            for (const [fp, u] of skinImageUrlCache) {
+                if (skinImageUrlCache.size <= keep) break;
+                if (refSet.has(u)) continue; // 正在显示，绝不删（防黑图）
+                if (u && u.indexOf('blob:') === 0) { try { URL.revokeObjectURL(u); } catch (e) {} }
+                skinImageUrlCache.delete(fp);
+                trimmed++;
+            }
+            return { trimmed: trimmed, remaining: skinImageUrlCache.size };
+        } catch (e) { return { error: String(e) }; }
+    };
     // 🔴 2026-09-06 降采样（与 app-local2.js 一致）：皮肤缩到 ≤256px 再生成 blob。
     // 修复 Tauri 端「App 渲染进程 1.5~1.8G」元凶——之前 getSkinImageUrl 直接返回原图 blob/dataUrl，
     // WebView2 按原图 512~1024px 解码，413 张同时驻留 ≈1.6GB 位图+GPU 纹理。
