@@ -976,31 +976,17 @@ if (true) {
                 window.__setDiagLogDir(softwareDataDir.replace(/[\\/]+$/, '') + '\\tfjl_temp\\logs');
             }
         } catch (e) {}
-        const btn = document.getElementById('appLocalSettingsBtn');
-        // 🔴 2026-08-30 网页版按钮误显修复：按钮只应在 Tauri APP 显示（index.html 默认 display:none）。
-        //    旧逻辑「无条件 display:flex」是当初为绕过 Tauri WebView 旧缓存残缺 app-local.js 的临时测试手段
-        //    （commit a2abf7d），忘记改回 → 网页版右上角也出现 📁 图标、点击却无任何反应。
-        //    现在恢复平台门控：立即判定一次；若判定为否，用轮询兜底防「Tauri 全局注入晚于本函数」的极端时序
-        //    （500ms×10 次共 5 秒，期间检测到立即显示，超时保持隐藏 = 网页版）。
-        function _showAppBtnIfTauri() {
-            if (_isTauriRuntime()) {
-                if (btn) btn.style.display = 'flex';
-                const pin = document.getElementById('alwaysOnTopBtn');
-                if (pin) pin.style.display = 'flex';
-                const clip = document.getElementById('clipboardImportBtn');
-                if (clip) clip.style.display = 'flex';
-                const gm = document.getElementById('gameMonitorBtn');
-                if (gm) gm.style.display = 'flex';
-                return true;
-            }
-            return false;
+        // 🔴 2026-09-07 调整：右上角 4 个按钮（📁本地设置/📌窗口置顶/📋剪贴板导入/🎮游戏监控）改为「网页版也显示」。
+        //    此前为修「Web 误显后点击无反应」只在 Tauri 运行时显示；现按需求在网页版同样显示。
+        //    App 专属的 📁/📌/🎮 点击时已由各自函数内的非 Tauri 分支给出「仅桌面版可用」提示，
+        //    📋 剪贴板导入在网页端用 navigator.clipboard 真可用，无需提示。
+        function _showTopRightBtns() {
+            ['appLocalSettingsBtn', 'alwaysOnTopBtn', 'clipboardImportBtn', 'gameMonitorBtn'].forEach(function (id) {
+                var el = document.getElementById(id);
+                if (el) el.style.display = 'flex';
+            });
         }
-        if (!_showAppBtnIfTauri()) {
-            let _btnTries = 0;
-            const _btnTimer = setInterval(function () {
-                if (_showAppBtnIfTauri() || ++_btnTries >= 10) clearInterval(_btnTimer);
-            }, 500);
-        }
+        _showTopRightBtns();
         // 🔴 2026-08-31 APP专属·窗口置顶：启动时恢复上次的置顶状态（记在 localStorage）
         _tryRestoreAlwaysOnTop();
         await restoreLocalFromDisk();  // 先恢复磁盘配置（重装/清缓存后复原）
@@ -1085,7 +1071,7 @@ if (true) {
             if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('窗口置顶:' + (next ? '开' : '关'));
         } catch (e) {
             console.warn('[置顶] 调用失败（老版APP无权限）:', e && (e.message || e));
-            if (typeof showToast === 'function') showToast('📌 置顶功能需要更新到新版APP后使用', 'error');
+            if (typeof showToast === 'function') showToast('📌 窗口置顶仅桌面版可用（请使用塔防精灵助手桌面版）', 'error');
         }
     }
 
