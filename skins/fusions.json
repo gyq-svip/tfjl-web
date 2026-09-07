@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated": "2026-09-05T13:20:46.059Z",
+  "updated": "2026-09-07T12:19:16.260Z",
   "note": "融合卡定义：components 为参与融合的2张基础卡。",
   "fusions": {
     "火炮射线": {
@@ -226,6 +226,14 @@
       ],
       "profession": "战士",
       "quality": "金"
+    },
+    "骨弓绿弓": {
+      "components": [
+        "骨弓",
+        "绿弓"
+      ],
+      "profession": "射手",
+      "quality": "紫"
     }
   }
 }
