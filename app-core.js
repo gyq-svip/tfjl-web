@@ -28094,13 +28094,54 @@ ${maSection}
 
         // ============== 全局用户注册表（增删改查） ==============
         // 缓存全量列表：搜索/改名/删除直接复用，避免每次按键都请求 gist
+        // 🔴 2026-09-07 补全昵称管理：从诊断 Gist 心跳收集「登录过的真实昵称」
+        //    诊断 Gist（DIAG_GIST_ID）每用户一个 diag-<anonId>.json，payload.nick 即其本地昵称；
+        //    过滤游客/匿名，返回去重数组；无 token/失败降级为空（不影响原 usedNicks 列表）。
+        async function getLoginNicks() {
+            try {
+                const gid = (typeof DIAG_GIST_ID !== 'undefined' && DIAG_GIST_ID) ? DIAG_GIST_ID : (localStorage.getItem('tdjl_diagGistId') || '');
+                if (!gid) return [];
+                const token = getGistToken();
+                if (!token) return [];
+                const r = await fetch('https://api.github.com/gists/' + gid, {
+                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': 'token ' + token }
+                });
+                if (!r.ok) return [];
+                const d = await r.json();
+                const files = (d.files || {});
+                const seen = {};
+                const out = [];
+                Object.keys(files).forEach(function (fn) {
+                    if (fn.indexOf('diag-') !== 0 || fn.indexOf('.json') !== fn.length - 5) return;
+                    let p; try { p = JSON.parse(files[fn].content || '{}'); } catch (e) { return; }
+                    const payload = p.payload || p;
+                    const n = (payload && payload.nick) || '';
+                    const t = (typeof n === 'string') ? n.trim() : '';
+                    if (!t || t === '匿名用户' || t.indexOf('游客') === 0) return;
+                    if (!seen[t]) { seen[t] = true; out.push(t); }
+                });
+                return out;
+            } catch (e) { console.warn('[昵称管理] 读取登录昵称失败:', e); return []; }
+        }
+
         async function renderNickRegistry() {
             const list = document.getElementById('nickRegistryList');
             if (!list) return;
             const q = (document.getElementById('nickSearchInput') ? document.getElementById('nickSearchInput').value.trim().toLowerCase() : '');
             if (!window._nickAllUsed) {
                 list.innerHTML = '<div style="color:rgba(255,255,255,0.5);font-size:0.8rem;text-align:center;padding:10px;">加载中...</div>';
-                window._nickAllUsed = await getUsedNicks();
+                let _used = await getUsedNicks();
+                // 🔴 2026-09-07 补全：合并「登录过的真实昵称」（诊断 Gist 心跳），
+                //    让早期/本地设昵称未登记的用户（如 KHD）也出现在昵称管理；写回 usedNicks 持久化（占用防重名）。
+                try {
+                    const _logins = await getLoginNicks();
+                    const _extra = (_logins || []).filter(function (n) { return _used.indexOf(n) < 0; });
+                    if (_extra.length) {
+                        _used = _used.concat(_extra);
+                        await saveUsedNicks(_used);
+                    }
+                } catch (e) { console.warn('[昵称管理] 合并登录昵称失败(降级):', e); }
+                window._nickAllUsed = _used;
             }
             const allUsed = window._nickAllUsed || [];
             if (!allUsed.length) {
