@@ -13570,6 +13570,11 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 if (t.closest('.card-item, .battle-slot, #favoriteCardsGrid, input, textarea, select, [contenteditable="true"], [contenteditable=""]')) return;
                 e.preventDefault();
                 const items = [
+                    { icon: '⚡', label: '强制刷新', onClick: function () {
+                        const _do = function () { if (typeof forceRefreshLatest === 'function') forceRefreshLatest(); else location.reload(true); };
+                        if (typeof window.__tfjlRunWhenNotEditing === 'function') window.__tfjlRunWhenNotEditing(_do, '右键强制刷新');
+                        else _do();
+                    } },
                     { icon: '🔄', label: '重新扫描皮肤', onClick: function () {
                         if (typeof window.repairSkins === 'function') window.repairSkins();
                         else showToast('⚠️ 皮肤修复功能暂不可用');
@@ -13597,11 +13602,6 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                                 navigator.clipboard.writeText(txt).then(_done, function () { window.__tfjlFallbackCopy(txt); _done(); });
                             } else { window.__tfjlFallbackCopy(txt); _done(); }
                         } catch (e) { showToast('⚠️ 复制失败'); }
-                    } },
-                    { icon: '⚡', label: '强制刷新', onClick: function () {
-                        const _do = function () { if (typeof forceRefreshLatest === 'function') forceRefreshLatest(); else location.reload(true); };
-                        if (typeof window.__tfjlRunWhenNotEditing === 'function') window.__tfjlRunWhenNotEditing(_do, '右键强制刷新');
-                        else _do();
                     } },
                     { icon: '🧹', label: '清扫孤儿皮肤缓存', onClick: function () {
                         let n = (typeof window.sweepSkinOrphanBlobs === 'function') ? window.sweepSkinOrphanBlobs() : 0;
