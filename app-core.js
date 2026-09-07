@@ -999,6 +999,7 @@
                     if (cfg.enabled && localStorage.getItem(DIAG_OPTIN_KEY) !== '0') _scheduleDiagUpload('open');
                 });
                 initForceReloadFromIndex(); // 从索引 Gist 读「强制更新」开关（功能开关面板权威来源）
+                applyServerNickOverride(); // 🔴 2026-09-07 方案B：启动即应用管理员远程改名（若有）
             }, 3000); // 启动 3s 后才去读配置，避免阻塞首屏
             // 规律心跳：每 45 分钟上报一次（写盘健康 + 缓冲合并），面板离线阈值 60 分钟。
             // 从"打开 App 那一刻"开始计时，每人打开时刻不同 → 天然错峰（不会卡正点同时触发）。
@@ -28124,6 +28125,76 @@ ${maSection}
             } catch (e) { console.warn('[昵称管理] 读取登录昵称失败:', e); return []; }
         }
 
+        // 🔴 2026-09-07 方案B：管理员改名时同步改写诊断 Gist 心跳记录的 nick（真正的远程改名）
+        //    诊断 Gist 每用户一个 diag-<anonId>.json（覆盖式单文件），payload.nick = 本机 localStorage 昵称；
+        //    只改 usedNicks 不够——本机下次心跳会把旧名写回（昵称"复活"）。所以一并改诊断 nick，
+        //    并打 nickManagedByAdmin 标记，供软件端 applyServerNickOverride 在启动时覆盖本机昵称。
+        async function renameNickInDiagGists(oldName, newName) {
+            try {
+                const gid = (typeof DIAG_GIST_ID !== 'undefined' && DIAG_GIST_ID) ? DIAG_GIST_ID : (localStorage.getItem('tdjl_diagGistId') || '');
+                if (!gid) return;
+                const token = getGistToken();
+                if (!token) return;
+                const r = await fetch('https://api.github.com/gists/' + gid, {
+                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': 'token ' + token }
+                });
+                if (!r.ok) return;
+                const d = await r.json();
+                const files = d.files || {};
+                const updates = {};
+                Object.keys(files).forEach(function (fn) {
+                    if (fn.indexOf('diag-') !== 0 || fn.indexOf('.json') !== fn.length - 5) return;
+                    let content = files[fn].content || '';
+                    let obj; try { obj = JSON.parse(content); } catch (e) { obj = null; }
+                    if (!obj) return;
+                    const payload = obj.payload || obj;
+                    const n = (payload && payload.nick) || '';
+                    if (typeof n !== 'string' || n.trim() !== oldName) return;
+                    if (obj.payload && obj.payload.nick !== undefined) obj.payload.nick = newName;
+                    else if (obj.nick !== undefined) obj.nick = newName;
+                    else return;
+                    obj.nickManagedByAdmin = true;
+                    updates[fn] = { content: JSON.stringify(obj, null, 2) };
+                });
+                if (!Object.keys(updates).length) return;
+                const r2 = await fetch('https://api.github.com/gists/' + gid, {
+                    method: 'PATCH',
+                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': 'token ' + token },
+                    body: JSON.stringify({ files: updates })
+                });
+                if (r2.ok) console.log('[昵称管理] 已同步改写诊断 Gist 中 ' + Object.keys(updates).length + ' 个心跳文件的昵称: ' + oldName + ' → ' + newName);
+            } catch (e) { console.warn('[昵称管理] 改写诊断昵称失败(降级):', e); }
+        }
+
+        // 🔴 2026-09-07 方案B：软件启动（3s后）读取本机 diag-<anonId>.json，
+        //    若管理员打过 nickManagedByAdmin 且服务器 nick ≠ 本机 → 覆盖本机 localStorage 昵称（远程改名真正生效）。
+        async function applyServerNickOverride() {
+            try {
+                if (localStorage.getItem(DIAG_OPTIN_KEY) === '0') return;
+                const token = getGistToken();
+                if (!token) return;
+                const gid = (typeof DIAG_GIST_ID !== 'undefined' && DIAG_GIST_ID) ? DIAG_GIST_ID : (localStorage.getItem('tdjl_diagGistId') || '');
+                if (!gid) return;
+                const myFile = 'diag-' + _getDiagAnonId() + '.json';
+                const r = await fetch('https://api.github.com/gists/' + gid, {
+                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': 'token ' + token }
+                });
+                if (!r.ok) return;
+                const d = await r.json();
+                const f = (d.files || {})[myFile];
+                if (!f || !f.content) return;
+                let obj; try { obj = JSON.parse(f.content); } catch (e) { return; }
+                if (!obj || !obj.nickManagedByAdmin) return;
+                const serverNick = (obj.payload && obj.payload.nick) || obj.nick || '';
+                if (!serverNick || serverNick === _myNick()) return;
+                localStorage.setItem('TFJL_UserName', serverNick);
+                localStorage.setItem('TFJL_HasSetNick', 'true');
+                if (typeof persistNicknameToDisk === 'function') persistNicknameToDisk();
+                if (typeof loadCurrentNick === 'function') loadCurrentNick();
+                console.log('[昵称管理] 已应用管理员远程昵称: ' + _myNick() + ' → ' + serverNick);
+            } catch (e) { console.warn('[昵称管理] 应用服务器昵称失败(降级):', e); }
+        }
+
         async function renderNickRegistry() {
             const list = document.getElementById('nickRegistryList');
             if (!list) return;
@@ -28198,6 +28269,8 @@ ${maSection}
             full[idx] = v;
             wallMessages.forEach(function(m) { if (m.author === oldName) m.author = v; });
             await saveUsedNicks(full);
+            // 🔴 2026-09-07 方案B：同步改写诊断 Gist 心跳记录的 nick（真正的远程改名，防旧名复活）
+            await renameNickInDiagGists(oldName, v);
             await saveMessagesToGist();
             window._nickAllUsed = full;
             renderMessages();
