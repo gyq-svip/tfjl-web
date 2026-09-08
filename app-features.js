@@ -6212,6 +6212,18 @@
             const _gJl = uniq.filter(_isJ);
             uniq.length = 0;
             uniq.push(..._gGc, ..._mainFront, ..._accelFront, ..._gShe, ..._mainRest, ..._gJl);
+            // 🔴 2026-09-09 自动读取规则：小野/凤凰为无敌链替代卡，垫在所有非精灵卡之后、精灵之前（开局不上阵）；
+            //   手动输入时此规则不生效（buildScriptBase 按输入顺序），仅自动读取时保证排最后。
+            {
+                const _xyFh = uniq.filter(n => n.includes('小野') || n.includes('凤凰'));
+                if (_xyFh.length) {
+                    const _nonXY = uniq.filter(n => !n.includes('小野') && !n.includes('凤凰'));
+                    const _jl = _nonXY.filter(n => _isJ(n));
+                    const _nonXYNonJl = _nonXY.filter(n => !_isJ(n));
+                    uniq.length = 0;
+                    uniq.push(..._nonXYNonJl, ..._xyFh, ..._jl); // 非精灵其他卡 → 小野/凤凰 → 精灵(最末)
+                }
+            }
             const input = document.getElementById('parserInput');
             if (input) {
                 // 读取手牌时自动把非精灵卡（含工程卡）填到魔化行（精灵不上卡槽、也不魔化）
@@ -6423,7 +6435,8 @@
             // 蛇女加速优先级：火灵 > 虎弓 > 风灵 > 后羿 > 小野 > 天使 > 水灵
             // 有蛇女时优先级最高的2张卡放第4、5位，蛇女固定第6位
             // 🔴 2026-09-09 用户指定顺序：冰鸟插在「风灵」之后、「后羿」之前
-            const sheNvPriority = ['火灵', '虎弓', '风灵', '冰鸟', '后羿', '小野', '天使', '水灵'];
+            //   小野/凤凰为无敌链替代卡，不参与加速优先级（永远垫后），故从 sheNvPriority 排除；垫后由 importHandToParser 自动读取时完成
+            const sheNvPriority = ['火灵', '虎弓', '风灵', '冰鸟', '后羿', '天使', '水灵'];
             const priorityCards = sheNvPriority.filter(p =>
                 filteredCards.some(name => name.includes(p))
             ).map(p => filteredCards.find(name => name.includes(p)));
@@ -6446,23 +6459,6 @@
             } else {
                 // 没有蛇女，正常上卡（取前6张）
                 arrangedCards = [...first6];
-            }
-
-            // 🔴 2026-09-09 小野 / 凤凰是无敌链替代卡（扛 02:30 boss），开局不上阵，统一排到末尾（其他卡优先）。
-            //   活动 / 隐藏榜共用 buildScriptBase，两种榜都应置后；深海脚本同类规则在 6826-6943 独立实现。
-            //   做法：从已排序的 arrangedCards 移除小野/凤凰，再用 filteredCards 中未被选的其他卡补足6张
-            //        （保留原排序顺序，避免加速卡4-5位等回归），蛇女固定第6。
-            {
-                // 其他卡优先；小野/凤凰作为无敌链替代卡，排在所有其他卡之后（其他卡不足6张时才由它们补位）
-                const _others = arrangedCards.filter(n => !n.includes('小野') && !n.includes('凤凰')); // 已选其他卡（保留原排序顺序）
-                const _extra = filteredCards.filter(n =>
-                    !n.includes('小野') && !n.includes('凤凰') && !_others.some(k => k === n)
-                );
-                const _xyFhAll = filteredCards.filter(n => n.includes('小野') || n.includes('凤凰')); // 小野/凤凰兜底
-                const _ordered = [..._others, ..._extra, ..._xyFhAll].slice(0, 6); // 其他卡优先，不足6张才补小野/凤凰
-                arrangedCards = hasSheNv
-                    ? [..._ordered.filter(n => !n.includes('蛇女')).slice(0, 5), ...sheNvCards] // 蛇女固定第6
-                    : _ordered;
             }
 
             // 生成上卡字符串
