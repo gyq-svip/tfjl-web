@@ -865,16 +865,7 @@
                 <div id="parserDropHint" style="display:none;position:absolute;inset:0;background:rgba(76,175,80,0.2);border:3px dashed #4caf50;border-radius:12px;z-index:10;align-items:center;justify-content:center;pointer-events:none;">
                     <div style="text-align:center;color:#4caf50;font-size:1.1rem;font-weight:bold;">📄 拖拽文件到此处松手<br><span style="font-size:0.8rem;font-weight:normal;opacity:0.8;">支持 .txt / .js / .json 文件</span></div>
                 </div>
-                <div style="margin-bottom:10px;">
-                    <label style="color:rgba(255,255,255,0.8);font-size:0.85rem;margin-bottom:5px;display:block;">分配到手牌：</label>
-                    <div style="display:flex;gap:6px;align-items:center;">
-                        <select id="parserHandTarget" data-tip="选择读取/添加手牌的目标：我的手牌 或 队友手牌（读取手牌、解析并添加都按此选择）" style="flex:1;min-width:0;padding:8px;border-radius:6px;border:1px solid rgba(255,215,0,0.3);background:#2a2a4a;color:#fff;font-size:0.9rem;cursor:pointer;">
-                            <option value="my">我的手牌</option>
-                            <option value="teammate">队友手牌</option>
-                        </select>
-                    </div>
-                </div>
-                <!-- 实时减伤计算显示 -->
+                <!-- 实时减伤计算显示（置顶：生成脚本后显示，位于分配到手牌上方） -->
                 <div id="parserDrDisplay" style="display:none;margin-bottom:10px;padding:10px 14px;border-radius:8px;background:linear-gradient(135deg,rgba(255,215,0,0.08),rgba(255,107,107,0.08));border:2px solid rgba(255,215,0,0.25);">
                     <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;">
                         <span style="font-size:0.85rem;color:#ffd700;">🛡️ <b>实时减伤</b></span>
@@ -889,6 +880,15 @@
                         <select id="parserDrTable" onchange="window._parserDrTable=this.value;updateRealTimeDamageReduction();" style="background:rgba(30,30,60,0.95);border:1px solid rgba(255,215,0,0.4);color:#ffd700;padding:4px 8px;border-radius:6px;font-size:0.8rem;"></select>
                     </div>
                     <div id="parserDrDetail" style="margin-top:6px;font-size:0.75rem;color:rgba(255,255,255,0.5);line-height:1.5;"></div>
+                </div>
+                <div style="margin-bottom:10px;">
+                    <label style="color:rgba(255,255,255,0.8);font-size:0.85rem;margin-bottom:5px;display:block;">分配到手牌：</label>
+                    <div style="display:flex;gap:6px;align-items:center;">
+                        <select id="parserHandTarget" data-tip="选择读取/添加手牌的目标：我的手牌 或 队友手牌（读取手牌、解析并添加都按此选择）" style="flex:1;min-width:0;padding:8px;border-radius:6px;border:1px solid rgba(255,215,0,0.3);background:#2a2a4a;color:#fff;font-size:0.9rem;cursor:pointer;">
+                            <option value="my">我的手牌</option>
+                            <option value="teammate">队友手牌</option>
+                        </select>
+                    </div>
                 </div>
                 <div style="margin-bottom:10px;flex:1;">
                     <label style="color:rgba(255,255,255,0.8);font-size:0.85rem;margin-bottom:5px;display:flex;justify-content:space-between;align-items:center;gap:8px;"><span>输入文本（格式：上阵：英雄1,英雄2,...）：</span><button onclick="importHandToParser()" data-tip="读取「分配到手牌」所选的那份手牌，融合卡自动取主卡；自动读取时小野/凤凰垫到精灵前（无敌链替代卡，开局不上），手动输入则按你写的顺序。生成时：有蛇女执行加速优先级（蛇女第6），无蛇女取前6，精灵始终垫后，有工程卡永远多1张" style="white-space:nowrap;background:linear-gradient(135deg,#26c6da,#00838f);color:#fff;border:none;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:500;">📥 读取手牌</button></label>
