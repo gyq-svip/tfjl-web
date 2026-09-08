@@ -26009,6 +26009,9 @@ ${maSection}
                     <div id="fabQrPreview" style="width:132px;height:132px;border:1px dashed rgba(255,255,255,0.25);border-radius:10px;background:rgba(0,0,0,0.25);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.35);font-size:0.7rem;overflow:hidden;">未设置</div>
                     <div style="flex:1;min-width:230px;display:flex;flex-direction:column;gap:8px;">
                         <input type="file" id="fabQrFile" accept="image/*" onchange="onFabQrFile(this)" style="font-size:0.72rem;color:rgba(255,255,255,0.7);">
+                        <div id="fabQrPasteZone" tabindex="0" onpaste="onFabQrPaste(event)" onclick="this.focus()" style="padding:10px;border:1px dashed rgba(79,195,247,0.5);border-radius:8px;text-align:center;color:rgba(255,255,255,0.6);font-size:0.72rem;cursor:pointer;background:rgba(79,195,247,0.05);outline:none;line-height:1.5;">
+                            📋 <b>点这里，然后按 Ctrl+V 粘贴截图</b><br><span style="color:rgba(255,255,255,0.35);">（截图后不用保存，直接粘贴即可；本面板打开时也可直接 Ctrl+V）</span>
+                        </div>
                         <input type="text" id="fabQrUrlInput" placeholder="或粘贴图片链接（http…）" style="padding:7px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:#16213e;color:#fff;font-size:0.78rem;">
                         <input type="text" id="fabQrTipInput" placeholder="二维码下方文字（如：扫码加群）" style="padding:7px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:#16213e;color:#fff;font-size:0.78rem;">
                         <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -26037,7 +26040,39 @@ ${maSection}
                 if (u && /^https?:/i.test(src)) u.value = src;
                 const t = document.getElementById('fabQrTipInput');
                 if (t && cfg && cfg.fabQrcodeTip) t.value = cfg.fabQrcodeTip;
+                // 面板打开期间，页面任意处直接 Ctrl+V 也能粘贴（焦点在输入框/文本域时不接管，粘贴文字也不拦截）
+                if (!window.__fabQrPasteBound) {
+                    window.__fabQrPasteBound = true;
+                    document.addEventListener('paste', function (e) {
+                        if (!document.getElementById('fabQrPasteZone')) return; // 二维码卡片未渲染（不在功能开关页）
+                        const ae = document.activeElement;
+                        if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return;
+                        const cd = e.clipboardData;
+                        if (!cd) return;
+                        let hasImg = false;
+                        const items = cd.items || [];
+                        for (let i = 0; i < items.length; i++) {
+                            if (items[i] && items[i].type && items[i].type.indexOf('image/') === 0) { hasImg = true; break; }
+                        }
+                        if (!hasImg) return; // 粘贴的是文字 → 交给浏览器原生行为
+                        if (typeof window.onFabQrPaste === 'function') window.onFabQrPaste(e);
+                    });
+                }
             } catch (e) {}
+        }
+
+        // 统一处理「待保存的二维码图片」（本地选择 / 剪贴板粘贴 共用）
+        function _setFabQrImage(data, srcLabel) {
+            const st = document.getElementById('fabQrStatus');
+            if (data.length > 500000) {
+                if (st) st.textContent = '⚠️ 图片过大（约 ' + Math.round(data.length / 1024) + 'KB），请压缩后再上传或改用图片链接';
+                return false;
+            }
+            window.__fabQrPending = data;
+            const pv = document.getElementById('fabQrPreview');
+            if (pv) pv.innerHTML = '<img src="' + data.replace(/"/g, '&quot;') + '" style="max-width:100%;max-height:100%;object-fit:contain;background:#fff;">';
+            if (st) st.textContent = '✅ ' + (srcLabel || '图片') + '已就绪，点「保存」生效';
+            return true;
         }
 
         // 选择本地图片 → 转 base64（暂存，点保存才写入）
@@ -26045,19 +26080,31 @@ ${maSection}
             const f = input && input.files && input.files[0];
             if (!f) return;
             const rd = new FileReader();
-            rd.onload = function () {
-                const data = String(rd.result || '');
-                const st = document.getElementById('fabQrStatus');
-                if (data.length > 500000) {
-                    if (st) st.textContent = '⚠️ 图片过大（约 ' + Math.round(data.length / 1024) + 'KB），请压缩后再上传或改用图片链接';
-                    return;
-                }
-                window.__fabQrPending = data;
-                const pv = document.getElementById('fabQrPreview');
-                if (pv) pv.innerHTML = '<img src="' + data.replace(/"/g, '&quot;') + '" style="max-width:100%;max-height:100%;object-fit:contain;background:#fff;">';
-                if (st) st.textContent = '已选择图片，点「保存」生效';
-            };
+            rd.onload = function () { _setFabQrImage(String(rd.result || ''), '所选图片'); };
             rd.readAsDataURL(f);
+        };
+
+        // 🔴 2026-09-08：支持剪贴板直接粘贴截图（群二维码常失效，截图即粘最便捷，不必先保存成文件）
+        window.onFabQrPaste = function (e) {
+            try {
+                const cd = e.clipboardData || (e.originalEvent && e.originalEvent.clipboardData);
+                if (!cd) return;
+                const items = cd.items || [];
+                for (let i = 0; i < items.length; i++) {
+                    const it = items[i];
+                    if (it && it.type && it.type.indexOf('image/') === 0) {
+                        const f = it.getAsFile();
+                        if (!f) continue;
+                        const rd = new FileReader();
+                        rd.onload = function () { _setFabQrImage(String(rd.result || ''), '粘贴的图片'); };
+                        rd.readAsDataURL(f);
+                        e.preventDefault();
+                        return;
+                    }
+                }
+                const st = document.getElementById('fabQrStatus');
+                if (st) st.textContent = '⚠️ 剪贴板里没有图片（请先截图或复制图片）';
+            } catch (err) {}
         };
 
         window.adminSaveFabQrcode = async function () {
