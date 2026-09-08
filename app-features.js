@@ -6392,7 +6392,8 @@
             
             // 蛇女加速优先级：火灵 > 虎弓 > 风灵 > 后羿 > 小野 > 天使 > 水灵
             // 有蛇女时优先级最高的2张卡放第4、5位，蛇女固定第6位
-            const sheNvPriority = ['火灵', '虎弓', '风灵', '后羿', '小野', '天使', '水灵'];
+            // 🔴 2026-09-09 用户指定顺序：冰鸟插在「风灵」之后、「后羿」之前
+            const sheNvPriority = ['火灵', '虎弓', '风灵', '冰鸟', '后羿', '小野', '天使', '水灵'];
             const priorityCards = sheNvPriority.filter(p =>
                 filteredCards.some(name => name.includes(p))
             ).map(p => filteredCards.find(name => name.includes(p)));
@@ -6844,7 +6845,8 @@
             const hasCycle = cycleCardNames.length > 0;
 
             // 蛇女加速优先级（第4、第5位）
-            const sheNvPriority = ['火灵', '虎弓', '风灵', '后羿', '小野', '天使', '水灵'];
+            // 🔴 2026-09-09 用户指定顺序：冰鸟插在「风灵」之后、「后羿」之前
+            const sheNvPriority = ['火灵', '虎弓', '风灵', '冰鸟', '后羿', '小野', '天使', '水灵'];
             const priorityCards = sheNvPriority.filter(p =>
                 filteredCards.some(name => name.includes(p))
             ).map(p => filteredCards.find(name => name.includes(p)));
