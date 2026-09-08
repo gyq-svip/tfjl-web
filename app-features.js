@@ -6448,19 +6448,22 @@
                 arrangedCards = [...first6];
             }
 
-            // 🔴 2026-09-09 隐藏榜专属：小野 / 凤凰是无敌链替代卡，开局不上阵（由 02:26 上小野 / 02:38 上凤凰 切卡）。
-            //   buildScriptBase 与活动脚本共用上方排序（小野/凤凰可能进前3），但隐藏榜必须把它们移出开局6张，
-            //   否则 buildHiddenSwitchPart 会误判"已上阵"、切卡逻辑错乱。
-            //   （深海脚本的同类规则在 6826-6943，但隐藏榜走 buildScriptBase，必须在此独立应用。）
-            if (isHidden) {
-                // 基于「全量战斗卡」重排（不能只基于已截断的 arrangedCards，否则鱼人/咕咕等会被挤掉、小野/凤凰反而挤不出去）
-                const _xy = filteredCards.filter(n => n.includes('小野'));
-                const _fh = filteredCards.filter(n => n.includes('凤凰'));
-                const _other = filteredCards.filter(n => !n.includes('小野') && !n.includes('凤凰'));
-                const _picked = [..._other, ..._xy, ..._fh].slice(0, 6); // 其他卡优先，小野/凤凰仅兜底
-                arrangedCards = hasSheNv
-                    ? [..._picked.filter(n => !n.includes('蛇女')).slice(0, 5), ...sheNvCards] // 蛇女固定第6
-                    : _picked;
+            // 🔴 2026-09-09 小野 / 凤凰是无敌链替代卡（扛 02:30 boss），开局不上阵，统一排到末尾（其他卡优先）。
+            //   活动 / 隐藏榜共用 buildScriptBase，两种榜都应置后；深海脚本同类规则在 6826-6943 独立实现。
+            //   做法：从已排序的 arrangedCards 移除小野/凤凰，再用 filteredCards 中未被选的其他卡补足6张
+            //        （保留原排序顺序，避免加速卡4-5位等回归），蛇女固定第6。
+            {
+                const _xyFh = arrangedCards.filter(n => n.includes('小野') || n.includes('凤凰'));
+                if (_xyFh.length) {
+                    const _kept = arrangedCards.filter(n => !n.includes('小野') && !n.includes('凤凰'));
+                    const _extra = filteredCards.filter(n =>
+                        !n.includes('小野') && !n.includes('凤凰') && !_kept.some(k => k === n)
+                    );
+                    const _fill = [..._kept, ..._extra];
+                    arrangedCards = hasSheNv
+                        ? [..._fill.filter(n => !n.includes('蛇女')).slice(0, 5), ...sheNvCards]
+                        : _fill.slice(0, 6);
+                }
             }
 
             // 生成上卡字符串
