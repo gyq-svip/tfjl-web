@@ -6182,19 +6182,34 @@
                 .map(n => (typeof getMainCardName === 'function') ? getMainCardName(n) : n);
             const seen = new Set(); const uniq = [];
             names.forEach(n => { if (!seen.has(n)) { seen.add(n); uniq.push(n); } });
-            // 🔴 2026-09-09 读取手牌统一排序：其他卡 → 小野 → 凤凰 → 精灵（与隐藏榜/活动/深海上阵规则一致）
-            //    根因：三种脚本生成器解析「上阵」行得到的 filteredCards 顺序即生成顺序（arrangedCards 内部不另对小野/凤凰重排），
-            //    若读取按手牌添加顺序填空，生成的脚本卡序就错。这里一次排对，三种生成器直接正确；后续 sortParserDeploySpiritsLast 再确保精灵最后（幂等）。
+            // 🔴 2026-09-09 读取手牌统一排序：复现活动脚本「正确部署顺序」
+            //   工程卡(置前) → 主战卡前3 → 加速卡(蛇女加速优先级前2，占4-5位) → 蛇女(第6) → 主战余/其余加速 → 精灵(最后)
+            //   规则来源：活动脚本生成器 sheNvPriority（火灵>虎弓>风灵>冰鸟>后羿>小野>天使>水灵），加速卡放4-5位、蛇女固定第6位。
+            //   小野/凤凰按活动脚本规则属主战（可能进前3），不参与"无敌链置后"——隐藏榜的无敌链置后由隐藏榜生成器独立处理（见 6891 后）。
+            //   加速卡超过2张时只取优先级最高2张占4-5位，其余加速卡与多余主战一并移到蛇女之后（保证蛇女精确第6，与活动脚本生成器 arrangedCards 一致）。
             const _jlSet = ['冰精灵','光精灵','魔精灵','木精灵','土精灵','雷精灵','暗精灵','幻精灵','魂精灵','彩精灵'];
+            const _gcSet = ['火炮','咬人娃娃','潜艇','宝库','射线'];
+            const _sheNvPriority = ['火灵','虎弓','风灵','冰鸟','后羿','小野','天使','水灵']; // 蛇女加速优先级
             const _isJ = n => _jlSet.some(j => n.includes(j));
-            const _isX = n => n.includes('小野');
-            const _isF = n => n.includes('凤凰');
-            uniq.sort((a, b) => {
-                const ka = _isJ(a) ? 3 : (_isX(a) ? 1 : (_isF(a) ? 2 : 0));
-                const kb = _isJ(b) ? 3 : (_isX(b) ? 1 : (_isF(b) ? 2 : 0));
-                if (ka !== kb) return ka - kb;
-                return 0; // 同组保持原相对顺序（手牌添加顺序）
-            });
+            const _isG = n => _gcSet.some(g => n.includes(g));
+            const _isShe = n => n.includes('蛇女');
+            const _isAccel = n => !_isJ(n) && !_isG(n) && !_isShe(n) && _sheNvPriority.some(p => n.includes(p));
+            const _accelCmp = (a, b) => {
+                const ia = _sheNvPriority.findIndex(p => a.includes(p));
+                const ib = _sheNvPriority.findIndex(p => b.includes(p));
+                return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+            };
+            const _accelAll = uniq.filter(_isAccel).sort(_accelCmp);
+            const _accelFront = _accelAll.slice(0, 2);   // 加速卡前2张，占 4-5 位
+            const _isMain = n => !_isJ(n) && !_isG(n) && !_isShe(n) && !_accelAll.some(a => a === n); // 主战（含凤凰、含未进top2的加速卡如风灵/小野，统一归主战组避免重复）
+            const _mainCards = uniq.filter(_isMain);
+            const _mainFront = _mainCards.slice(0, 3);   // 前3位主战卡
+            const _mainRest = _mainCards.slice(3);        // 多余主战卡（移到蛇女之后）
+            const _gGc = uniq.filter(_isG); // 工程卡：生成器单独满上、不占6位置，保留并置前
+            const _gShe = uniq.filter(_isShe);
+            const _gJl = uniq.filter(_isJ);
+            uniq.length = 0;
+            uniq.push(..._gGc, ..._mainFront, ..._accelFront, ..._gShe, ..._mainRest, ..._gJl);
             const input = document.getElementById('parserInput');
             if (input) {
                 // 读取手牌时自动把非精灵卡（含工程卡）填到魔化行（精灵不上卡槽、也不魔化）
@@ -6916,6 +6931,14 @@
                     !gongChengNames.some(gc => name.includes(gc)) && !name.includes('射线') && !name.includes('宝库') && !name.includes('蛇女')
                 ).slice(0, 6);
             }
+
+            // 🔴 2026-09-09 隐藏榜：小野/凤凰为无敌链替代卡，开局不上阵，统一移到 arrangedCards 末尾（蛇女之后）。
+            //   读取手牌按活动脚本顺序排（小野凤凰可能进前3），此处独立重排保证隐藏榜正确，不依赖读取顺序。
+            arrangedCards = [
+                ...arrangedCards.filter(name => !name.includes('小野') && !name.includes('凤凰')),
+                ...arrangedCards.filter(name => name.includes('小野')),
+                ...arrangedCards.filter(name => name.includes('凤凰'))
+            ];
 
             // 构建输出
             let output = '';
