@@ -6182,6 +6182,19 @@
                 .map(n => (typeof getMainCardName === 'function') ? getMainCardName(n) : n);
             const seen = new Set(); const uniq = [];
             names.forEach(n => { if (!seen.has(n)) { seen.add(n); uniq.push(n); } });
+            // 🔴 2026-09-09 读取手牌统一排序：其他卡 → 小野 → 凤凰 → 精灵（与隐藏榜/活动/深海上阵规则一致）
+            //    根因：三种脚本生成器解析「上阵」行得到的 filteredCards 顺序即生成顺序（arrangedCards 内部不另对小野/凤凰重排），
+            //    若读取按手牌添加顺序填空，生成的脚本卡序就错。这里一次排对，三种生成器直接正确；后续 sortParserDeploySpiritsLast 再确保精灵最后（幂等）。
+            const _jlSet = ['冰精灵','光精灵','魔精灵','木精灵','土精灵','雷精灵','暗精灵','幻精灵','魂精灵','彩精灵'];
+            const _isJ = n => _jlSet.some(j => n.includes(j));
+            const _isX = n => n.includes('小野');
+            const _isF = n => n.includes('凤凰');
+            uniq.sort((a, b) => {
+                const ka = _isJ(a) ? 3 : (_isX(a) ? 1 : (_isF(a) ? 2 : 0));
+                const kb = _isJ(b) ? 3 : (_isX(b) ? 1 : (_isF(b) ? 2 : 0));
+                if (ka !== kb) return ka - kb;
+                return 0; // 同组保持原相对顺序（手牌添加顺序）
+            });
             const input = document.getElementById('parserInput');
             if (input) {
                 // 读取手牌时自动把非精灵卡（含工程卡）填到魔化行（精灵不上卡槽、也不魔化）
