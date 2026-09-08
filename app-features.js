@@ -6448,6 +6448,21 @@
                 arrangedCards = [...first6];
             }
 
+            // 🔴 2026-09-09 隐藏榜专属：小野 / 凤凰是无敌链替代卡，开局不上阵（由 02:26 上小野 / 02:38 上凤凰 切卡）。
+            //   buildScriptBase 与活动脚本共用上方排序（小野/凤凰可能进前3），但隐藏榜必须把它们移出开局6张，
+            //   否则 buildHiddenSwitchPart 会误判"已上阵"、切卡逻辑错乱。
+            //   （深海脚本的同类规则在 6826-6943，但隐藏榜走 buildScriptBase，必须在此独立应用。）
+            if (isHidden) {
+                // 基于「全量战斗卡」重排（不能只基于已截断的 arrangedCards，否则鱼人/咕咕等会被挤掉、小野/凤凰反而挤不出去）
+                const _xy = filteredCards.filter(n => n.includes('小野'));
+                const _fh = filteredCards.filter(n => n.includes('凤凰'));
+                const _other = filteredCards.filter(n => !n.includes('小野') && !n.includes('凤凰'));
+                const _picked = [..._other, ..._xy, ..._fh].slice(0, 6); // 其他卡优先，小野/凤凰仅兜底
+                arrangedCards = hasSheNv
+                    ? [..._picked.filter(n => !n.includes('蛇女')).slice(0, 5), ...sheNvCards] // 蛇女固定第6
+                    : _picked;
+            }
+
             // 生成上卡字符串
             // 隐藏榜：魔化的卡固定上4级（魔化栏已自动填全部非精灵卡，所以基本都是4级）
             // 活动：有光精灵→魔化4级/其他3级；无光精灵→全满
